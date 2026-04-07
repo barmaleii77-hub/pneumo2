@@ -1,0 +1,20 @@
+BUILD INFO — PneumoApp v6_73
+Built UTC: 2026-02-13T03:44:13Z
+Base: v6_72
+
+Primary goal: bugfix-only hardening of diagnostics + stability after merges (no new features).
+
+Changes vs v6_72:
+- FIX: crash_guard.py used undefined REPO_ROOT in atexit + crash hooks -> could break auto-save diagnostics on exit/crash.
+       Replaced with _get_project_root() everywhere.
+- CLEANUP: removed __pycache__/pyc from release tree before packaging (prevent zip noise and reduce encoding/path issues).
+- VERSION: bumped VERSION.txt + release_tag.json + release_info.DEFAULT_RELEASE + app.py fallback to UNIFIED_v6_73.
+
+Validation (headless):
+- python -m compileall: OK
+- python -m pneumo_solver_ui.tools.mech_energy_smoke_check --t_end_max 0.05: OK
+- python -m pneumo_solver_ui.tools.run_autotest --level quick: OK (warnings only)
+
+Notes:
+- Scheme truth remains: PNEUMO_SCHEME.json derived from "Пневмосхема исправленная2".
+  Exhaust throttles connect directly to ATMO (no mufflers after exhaust throttles in current truth).

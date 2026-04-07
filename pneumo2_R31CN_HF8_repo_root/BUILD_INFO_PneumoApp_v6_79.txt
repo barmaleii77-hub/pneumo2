@@ -1,0 +1,22 @@
+UnifiedPneumoApp — BUILD INFO
+=============================
+
+Release: UNIFIED_v6_79
+Version: 6.79
+Built (UTC): 2026-02-15T07:29:57Z
+
+Base / Parent:
+- UnifiedPneumoApp_UNIFIED_v6_78_WINSAFE.zip
+  sha256: e66deb49aaa4703fbcdb69aaf9055ee5b28af8713e39b9232eb4eba79814a462
+
+Changes in v6_79 (scope: stability / audit / no feature expansion):
+- Streamlit UI compatibility:
+  - Added startup hook that installs pneumo_solver_ui.ui_st_compat.install_st_compat().
+  - Updated ui_st_compat to translate deprecated use_container_width -> width='stretch' (when supported).
+  - Keeps backward compatibility by translating width->use_container_width on older Streamlit.
+- Pandas FutureWarning mitigation:
+  - Normalized dtype for df['включен'] before astype(bool) in pneumo_ui_app.py.
+
+Notes:
+- This release intentionally does NOT expand solver features.
+- Focus is on reducing deprecation noise + improving forward compatibility.

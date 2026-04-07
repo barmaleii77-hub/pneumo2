@@ -1,0 +1,13 @@
+BUILD_INFO v6_55
+
+База: UNIFIED_v6_54
+Цель: восстановить автосохранение DIAG при краше (crash_guard) + исправить рассинхронизацию меток релиза.
+
+Ключевые изменения:
+- FIX(crash_guard): crash_guard.install() снова совместим с app.py (принимает label/project_root/extra_meta, игнорирует неизвестные kwargs).
+- FIX(crash_guard): добавлен override корня проекта (project_root) для корректного выбора каталогов DIAG/SEND_BUNDLES.
+- FIX(app): установка crash_guard.install(...) выполняется после вычисления APP_DIR; ошибки установки больше не «проглатываются» молча.
+- FIX(versioning): release_tag.json синхронизирован (release=release_tag=UNIFIED_v6_55), обновлены DEFAULT_RELEASE и START_PNEUMO_APP.*
+
+Примечания:
+- Новых функций не добавлялось; изменения направлены только на исправление регрессий от мерджа.

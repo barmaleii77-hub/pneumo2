@@ -1,0 +1,738 @@
+schema: pneumo.contracts.keys_registry.v1
+env_vars:
+  APPDATA:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  DASK_WORKER_NAME:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  LOCALAPPDATA:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  MECH_ENERGY_MODELS:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  MECH_ENERGY_T_END_MAX:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_ALLOW_CUSTOM_VENV_WIPE:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_APPDATA_DIR:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTOCHECK_DISABLE:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTOCHECK_NO_COMPILE:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTOCHECK_NO_IMPORT:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTOCHECK_STRICT:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTOSAVE_DIAG_ON_CRASH:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTOSAVE_DIAG_ON_EXIT:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTOSAVE_THROTTLE_S:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTO_CEMFULL_MIN_HIST:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTO_FULL_COV_MAX_D:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTO_MIN_IMPROVE_REL:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTO_MIXED_MIN_HIST:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTO_PATIENCE:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTO_REHEAT_SIGMA:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_AUTO_SEND_BUNDLE:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_BUNDLE_INCLUDE_WORKSPACE:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_BUNDLE_KEEP_LAST_N:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_BUNDLE_MAX_FILE_MB:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_BUNDLE_RUN_SELFCHECK:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_BUNDLE_SELFCHECK_LEVEL:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_BUNDLE_TAG_SUFFIX:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_BUNDLE_TAIL_BYTES:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_BUNDLE_TAIL_DISABLE:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_CEM_ALPHA:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_CEM_JITTER:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_CEM_MIX:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_CEM_SIGMA_INIT:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_CEM_SIGMA_MIN:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_DIAG_ECHO_WARNINGS:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_DIAG_TAG:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_ELITE_FRAC:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_GUIDED_MODE:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_GUIDED_RATIO:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_HIST_MAX:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_INIT_RANDOM:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_ISO6358_RHO_ANR_MODE:
+    default: norm
+    type: enum[norm,calc]
+    owner: pneumatics.iso6358
+    desc: 'Выбор ρ_ANR: norm=1.185 (ISO 8778), calc=p_ANR/(R*T_ANR).'
+  PNEUMO_LAMBDA_PEN:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_LEGACY_BATCH_BY_FLUSH:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_LOG_DIR:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_MIN_HIST:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_MUT_SCALE0:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_MUT_SCALE_MIN:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_OPT_PROBLEM_HASH_MODE:
+    default: stable
+    type: enum[stable,legacy]
+    owner: optimization
+    desc: Режим вычисления problem_hash для distributed optimization (stable=контентный,
+      legacy=совместимость).
+  PNEUMO_PROJECT:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_RELEASE:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_RESET_PROB:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_RUN_ID:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_SEND_BUNDLE_INCLUDE_OSC:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_SEND_BUNDLE_KEEP_LAST_N:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_SEND_BUNDLE_MAX_FILE_MB:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_SESSION_DIR:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_SESSION_ID:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_SHARED_VENV_DIR:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_SHOW_LEGACY:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_STATE_DIR:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_TRACE_ID:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_UI_PORT:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_UI_SESSION_DIR:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_UI_STATE_DIR:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_USE_LOCAL_VENV:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_VENV_DIR:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_VERSION:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_WARMSTART_MIN_COVERAGE:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  PNEUMO_WORKSPACE_DIR:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  STREAMLIT_SERVER_PORT:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  UI_CACHE_TTL_SEC:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  WORLDROAD_CACHE_DIR:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  WORLDROAD_CACHE_MAX_ITEMS:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  XDG_CACHE_HOME:
+    default: null
+    type: null
+    owner: null
+    desc: null
+  XDG_DATA_HOME:
+    default: null
+    type: null
+    owner: null
+    desc: null
+session_state_keys:
+- __dist_opt_job
+- __opt_autorefresh_enabled
+- _autoselfcheck_v1_done
+- _autoselfcheck_v1_ok
+- _diag_bundle_bytes
+- _diag_bundle_name
+- _diag_bundle_path
+- _log_event_cb
+- _log_path
+- _log_seq
+- _playhead_last_logged
+- _session_id
+- _skip_plotly_notice_shown
+- _ui_heavy_cache_obj
+- _ui_nonce
+- _ui_start_logged
+- _ui_startup_done
+- anim_edges_svg
+- anim_latest_npz
+- anim_latest_pointer
+- anim_nodes_svg
+- auto_detail_on_select
+- auto_export_anim_latest
+- auto_export_npz
+- auto_launch_animator
+- autoupdate_baseline
+- baseline_cache_dir
+- baseline_df
+- baseline_full_cache
+- baseline_full_cache_keep
+- baseline_just_ran
+- baseline_tests_map
+- baseline_updated_ts
+- cal_auto_osc_dir
+- cal_csv_osc_dir
+- cmp_enable_dashboard
+- cmp_ext_active
+- cmp_external_paths
+- cmp_npz_dir
+- compare_active_runs
+- compare_active_runs_pending
+- compare_active_runs_pending_value
+- compare_baseline_first_n
+- compare_baseline_window_s
+- compare_click_t
+- compare_deltat_abs
+- compare_deltat_anim
+- compare_deltat_frames
+- compare_deltat_max_sigs
+- compare_deltat_rel
+- compare_deltat_show
+- compare_deltat_tpts
+- compare_events_enable
+- compare_events_limit
+- compare_events_pick
+- compare_events_timeline
+- compare_focus_pending
+- compare_focus_run
+- compare_focus_sig
+- compare_infl_anim_cache
+- compare_infl_anim_frames
+- compare_infl_anim_maxfeat
+- compare_infl_anim_maxsig
+- compare_infl_anim_tpts
+- compare_infl_focus_feat
+- compare_infl_focus_sig
+- compare_infl_rms_maxfeat
+- compare_infl_t_maxfeat
+- compare_infl_t_trend
+- compare_linked_brushing
+- compare_multi_3d_keepfrac
+- compare_multi_3d_opacity
+- compare_multi_3d_pebbles
+- compare_multi_3d_size
+- compare_multi_feats
+- compare_multi_lod
+- compare_multi_metrics
+- compare_multi_par_dims
+- compare_multi_splom_dims
+- compare_p_atm
+- compare_playhead
+- compare_qa_all_sigs
+- compare_qa_cache_key
+- compare_qa_cache_records
+- compare_qa_enable
+- compare_qa_sensitivity
+- compare_sig_filter
+- dask_dashboard_address
+- dask_memory_limit
+- dask_mode
+- dask_scheduler
+- dask_threads_per_worker
+- dask_workers
+- detail_auto_pending
+- detail_dt_pick
+- detail_guard
+- detail_max_points
+- detail_prev_test_pick
+- detail_t_end_pick
+- detail_test_pick
+- detail_want_full
+- df_params_edit
+- df_params_signature
+- df_suite_edit
+- diag_autosave_on_crash
+- diag_autosave_on_exit
+- diag_autosave_on_watchdog
+- diag_bundle_bytes
+- diag_bundle_name
+- diag_include_workspace_osc
+- diag_keep_last_n
+- diag_max_file_mb
+- diag_output_dir
+- diag_reason
+- diag_run_selfcheck
+- diag_selfcheck_level_idx
+- diag_tag
+- events_chatter_toggles
+- events_graph_labels
+- events_graph_max
+- events_graph_sev
+- events_on_graphs
+- events_pmax_margin_atm
+- events_pmax_margin_bar
+- events_show
+- events_vacuum_min_atm
+- events_vacuum_min_bar
+- flag_search
+- flag_show_all
+- flow_graph_edges
+- last_autopilot_out_dir
+- last_calib_out_dir
+- last_opt_meta
+- last_opt_ptr
+- last_send_bundle_clipboard_ok
+- last_send_bundle_zip
+- log_path
+- mech_pick_event_last_ts
+- mech_plot_corners
+- mech_selected_corners
+- metrics_path
+- mode_search
+- mode_show_all
+- model_path
+- node_pressure_plot
+- opt_auto_refresh
+- opt_autoupdate_baseline
+- opt_backend
+- opt_budget
+- opt_device
+- opt_flush_every
+- opt_jobs
+- opt_max_inflight
+- opt_minutes
+- opt_objectives
+- opt_penalty_key
+- opt_penalty_tol
+- opt_progress_every_sec
+- opt_proposer
+- opt_q
+- opt_refresh_sec
+- opt_run_name
+- opt_seed
+- opt_seed_candidates
+- opt_seed_conditions
+- opt_settings
+- opt_use_staged
+- opt_variant
+- osc_dir_path
+- out_prefix
+- param_only_opt
+- param_search
+- pareto_pen_filter
+- pareto_pen_max
+- pareto_topn
+- pending_overrides_si
+- pi_ale_bins
+- pi_ale_max_base
+- pi_ale_n_estimators
+- pi_apply_selection
+- pi_csv_path
+- pi_csv_ref_path
+- pi_enable_dashboard
+- pi_group_q
+- pi_idx_df_cache
+- pi_idx_max
+- pi_imp_n
+- pi_imp_rep
+- pi_imp_test
+- pi_inputs
+- pi_int_base
+- pi_int_feats
+- pi_int_grid
+- pi_int_model_key
+- pi_int_model_obj
+- pi_int_model_r2
+- pi_int_rf_n
+- pi_int_top
+- pi_loc_eps
+- pi_loc_ins
+- pi_loc_outs
+- pi_loc_rf_n
+- pi_loc_test
+- pi_loc_train_rows
+- pi_max_rows_plot
+- pi_mi_max_rows
+- pi_mi_neighbors
+- pi_outputs
+- pi_pairs_x
+- pi_pc_cols
+- pi_pdp_grid
+- pi_pdp_ice_n
+- pi_pdp_max_base
+- pi_pdp_n
+- pi_ref_enable
+- pi_sankey_cap
+- pi_sankey_per_out
+- pi_sankey_thr
+- pi_seed
+- pi_selected_rows
+- pi_sens_auto
+- pi_sens_ins
+- pi_sens_outs
+- pi_sens_rep
+- pi_sens_rf_n
+- pi_sens_test
+- pi_sens_train_rows
+- pi_sess_new_name
+- pi_splom_dims
+- pi_top_k
+- pi_wi_adj
+- pi_wi_rf_n
+- pi_wi_train_rows
+- playhead_active_dataset
+- playhead_cmd
+- playhead_dataset_id
+- playhead_event
+- playhead_event_last_ts
+- playhead_idx
+- playhead_loop
+- playhead_picked_event
+- playhead_playing
+- playhead_request_x
+- playhead_show_markers
+- playhead_show_values
+- playhead_speed
+- playhead_t
+- pneumo_show_legacy
+- quick_selfcheck
+- ray_address
+- ray_local_dashboard
+- ray_local_dashboard_port
+- ray_local_num_cpus
+- ray_mode
+- ring_dt_s
+- ring_n_laps
+- ring_n_segments
+- ring_scenario_spec
+- ring_seed
+- ring_sel_seg_idx
+- ring_test_desc
+- ring_test_name
+- route_advance_to_unmapped
+- route_auto_max_len
+- route_auto_next
+- route_clear_after_assign
+- route_label_sugg_k
+- route_label_sugg_thr
+- route_q_max_attach_dist
+- route_q_max_detour
+- route_q_min_turn_deg
+- route_show_cov
+- settings_diag_out_dir
+- settings_opt_problem_hash_mode
+- skip_heavy_on_play
+- sort_tests_by_cost
+- spring_table_df
+- stop_pen_stage1
+- stop_pen_stage2
+- suite_search
+- suite_sel
+- surrogate_samples
+- surrogate_top_k
+- svg_autotrace_analysis
+- svg_autotrace_components
+- svg_autotrace_report
+- svg_click_mode
+- svg_detail_cache
+- svg_graph_highlight
+- svg_label_pick_mode
+- svg_label_pick_radius
+- svg_mapping_source
+- svg_mapping_text
+- svg_pick_edges
+- svg_pick_event
+- svg_pick_event_last_ts
+- svg_pick_nodes
+- svg_review_auto_advance
+- svg_review_hud
+- svg_review_last
+- svg_review_pick_mode
+- svg_review_statuses
+- svg_route_assign_edge
+- svg_route_end_opt
+- svg_route_filter
+- svg_route_label_pick_pending
+- svg_route_label_picks
+- svg_route_paths
+- svg_route_quality
+- svg_route_report
+- svg_route_simplify_eps
+- svg_route_start_opt
+- svg_run_source
+- svg_selected
+- svg_selected_edge
+- svg_selected_node
+- svg_show_review_overlay
+- ui_auto_refresh
+- ui_autosave_enabled
+- ui_autosave_last_saved
+- ui_autosave_load_error
+- ui_autosave_loaded
+- ui_compact
+- ui_diag_zip_path
+- ui_dw2d_dw_range_mm
+- ui_dw2d_track_mm
+- ui_dw2d_wheel_x_mm
+- ui_dw2d_wheelbase_mm
+- ui_flush_every
+- ui_jobs
+- ui_opt_minutes
+- ui_out_prefix
+- ui_params_group
+- ui_params_search
+- ui_params_section
+- ui_params_selected_key
+- ui_perf_cache_disk
+- ui_perf_cache_enabled
+- ui_perf_cache_ttl_s
+- ui_progress_every_sec
+- ui_refresh_sec
+- ui_reset_input_confirm
+- ui_seed_candidates
+- ui_seed_conditions
+- ui_suite_only_enabled
+- ui_suite_search
+- ui_suite_selected_id
+- ui_suite_selected_row
+- ui_suite_stage_all_prev
+- ui_suite_stage_filter
+- use_rel0_for_plots
+- use_staged_opt
+- warmstart_mode
+- worker_path

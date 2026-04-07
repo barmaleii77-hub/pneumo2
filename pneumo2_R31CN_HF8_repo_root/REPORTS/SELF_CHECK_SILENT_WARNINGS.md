@@ -1,0 +1,9 @@
+# SELF_CHECK — Silent warnings snapshot
+
+- generated_at_utc: 2026-04-02T05:07:25Z
+- release: PneumoApp_v6_80_R176_R31CI_2026-04-01
+- version: PneumoApp_v6_80_R176_R31CI_2026-04-01
+- rc: 0
+- fail_count: 0
+- warn_count: 0
+

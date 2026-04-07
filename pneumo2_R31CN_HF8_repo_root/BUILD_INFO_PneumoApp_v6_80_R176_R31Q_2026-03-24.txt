@@ -1,0 +1,4 @@
+PneumoApp_v6_80_R176_R31Q_2026-03-24
+- root-cause-oriented Desktop Animator fix: dedicated top-level GL window instead of floating QDockWidget workaround
+- external 3D window remains movable/resizable/toggleable and persists geometry/visibility
+- pid-aware strict loglint retained; TODO/WISHLIST corrected after R31P workaround rollback

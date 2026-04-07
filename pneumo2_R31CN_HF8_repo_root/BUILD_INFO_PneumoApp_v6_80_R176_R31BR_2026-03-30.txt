@@ -1,0 +1,4 @@
+PneumoApp_v6_80_R176_R31BR_2026-03-30
+- Fix: suite apply no longer writes widget-backed ui_suite_selected_id after widget instantiation; uses pending state + rerun.
+- Fix: stage filter updates use pending queues instead of direct widget-key mutation.
+- Unified suite/runtime stage contract: missing stages inferred explicitly, negative stages clamped to 0, runtime stage descriptions exported to preview/UI.

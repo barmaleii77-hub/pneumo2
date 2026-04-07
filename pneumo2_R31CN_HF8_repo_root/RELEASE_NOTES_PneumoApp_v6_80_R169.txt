@@ -1,0 +1,15 @@
+Release Notes — PneumoApp_v6_80_R169
+Base: PneumoApp_v6_80_R168
+
+Highlights:
+- FIX: Desktop Animator speed is now displayed as |v| (hypot(vx,vy)) instead of vx.
+  This removes '0 then negative speed' artifacts on ring scenarios where vx changes sign in world coordinates.
+- Segment ring stats now also use |v| so reported mean speed/radius are stable across the whole loop.
+
+Absolute law compliance:
+- No new exported parameters/keys were introduced.
+- |v| is a local *service derived* value computed strictly from model outputs (vx, vy).
+
+Files changed:
+- pneumo_solver_ui/desktop_animator/app.py
+- REPORTS/R169_ANIMATOR_SPEED_FIX.md

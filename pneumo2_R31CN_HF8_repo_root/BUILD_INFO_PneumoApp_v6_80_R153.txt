@@ -1,0 +1,12 @@
+Build: PneumoApp v6.80
+Release: ETALON_v6_80_R153
+Built UTC: 2026-02-19T20:11:42Z
+
+Notes:
+- Launcher: venv structural integrity check + auto-repair for missing pyvenv.cfg/python.exe (rc=106).
+- ISO6358: fixed NameError in rho_ANR_ref() (P_ANR/R_DRY_AIR).
+- ABSOLUTE LAW + Parameter Registry (00_READ_FIRST__ABSOLUTE_LAW.md, 01_PARAMETER_REGISTRY.md)
+- Canonical speed key: vx0_м_с (no road_speed_mps / v0_м_с / скорость_м_с duplicates)
+- Meta normalization: migration-only with loud warnings, no silent aliases
+- NPZ export preserves NaN (no nan_to_num -> 0.0)
+- Logging bootstrap enabled (diag/)

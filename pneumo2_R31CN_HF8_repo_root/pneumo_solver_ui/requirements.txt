@@ -1,0 +1,29 @@
+streamlit>=1.37
+streamlit-autorefresh>=1.0.1
+numpy>=1.26
+pandas>=2.1
+openpyxl>=3.1
+
+# Диагностика/метрики (CPU/RAM)
+psutil>=5.9
+
+# Управление threadpools BLAS/OpenMP (важно при multiprocessing)
+threadpoolctl>=3.2
+
+
+# Persistent cache (recommended)
+diskcache>=5.6
+# UI: интерактивные графики/анимации
+plotly>=5.18
+
+# Калибровка по NPZ/CSV (можно ставить отдельно через requirements_calibration.txt)
+scipy>=1.11
+matplotlib>=3.8
+scikit-learn>=1.3
+requests>=2.31.0
+
+# Desktop Animator / Qt + OpenGL
+PySide6>=6.10.1
+pyqtgraph>=0.13.7
+PyOpenGL>=3.1.8
+PyOpenGL_accelerate; platform_system == "Windows"

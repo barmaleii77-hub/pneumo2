@@ -1,0 +1,21 @@
+UnifiedPneumoApp — UNIFIED_v6_51 (WINSAFE)
+Build date (UTC): 2026-02-05
+
+WHAT CHANGED vs UNIFIED_v6_50:
+- Integration step: applied machine audit findings from integration_audit_v6_50.*
+- Added missing sample files from suspicious packs: 29 files
+- Auto-imported additional NEW files (non-conflicting, ASCII, whitelisted ext) from suspicious packs: 1566
+- Preserved CONFLICT variants (same path, different content) under pneumo_solver_ui/_legacy/_variants_import/: 826 files
+- No overwrites of existing code paths; conflicts stored as variants for manual review.
+- Updated release tag/version markers to UNIFIED_v6_51.
+- Verified: all audit 'missing_sample' paths now present; compileall OK.
+
+NOTES:
+- This release focuses on safe integration completeness. Potentially newer/alternative file versions are stored in _legacy/_variants_import for manual selection.
+- Next step: review conflicts list and selectively merge if needed.
+
+EXTRA INTEGRATION (archive-of-archives):
+- Processed inner ZIPs from Mechanika.zip + Interfeis.zip: 41 ZIPs
+- Auto-imported additional NEW files from inner ZIPs: 6204
+- Preserved additional CONFLICT variants from inner ZIPs: 1545
+- Same safety rule: no overwrites; conflicts stored as variants.

@@ -1,0 +1,170 @@
+{
+  "ok": true,
+  "results": [
+    {
+      "name": "pages_filenames_ascii",
+      "ok": true,
+      "message": "Имена файлов страниц выглядят безопасными (ASCII).",
+      "details": null
+    },
+    {
+      "name": "scenario_generator_road_csv",
+      "ok": true,
+      "message": "road_csv создан",
+      "details": {
+        "meta": {
+          "t_end": 2.0,
+          "dt": 0.01,
+          "speed_mps": 10.0,
+          "wheelbase_m": 1.6,
+          "left_right_coherence": 0.6,
+          "L_n_pts": 1332.0,
+          "L_dx_m": 0.02,
+          "L_length_m": 26.62,
+          "L_gd_n0_target_m3": 0.000256,
+          "L_gd_n0_est_m3": 0.00010990667953421963,
+          "L_scale_applied": 1.5261876644458396,
+          "L_seed": 12424.0,
+          "R_n_pts": 1332.0,
+          "R_dx_m": 0.02,
+          "R_length_m": 26.62,
+          "R_gd_n0_target_m3": 0.000256,
+          "R_gd_n0_est_m3": 0.00022268063063214655,
+          "R_scale_applied": 1.0722073040308435,
+          "R_seed": 12425.0
+        }
+      }
+    },
+    {
+      "name": "scenario_generator_axay_csv",
+      "ok": true,
+      "message": "axay_csv создан",
+      "details": {
+        "meta": {
+          "t_end": 2.0,
+          "dt": 0.01,
+          "seed": 123.0,
+          "n_accel_events": 0.0,
+          "n_brake_events": 1.0,
+          "n_turn_events": 0.0
+        }
+      }
+    },
+    {
+      "name": "app_navigation_paths",
+      "ok": true,
+      "message": "Навигация app.py: пути страниц существуют",
+      "details": {
+        "count": 15
+      }
+    },
+    {
+      "name": "app_titles_ru",
+      "ok": true,
+      "message": "title= в app.py выглядят русифицированными",
+      "details": {
+        "count": 17
+      }
+    },
+    {
+      "name": "ui_modules_present",
+      "ok": true,
+      "message": "UI‑модули присутствуют",
+      "details": {
+        "files": [
+          "/tmp/u640p06_work/UnifiedPneumoApp_UNIFIED_v6_40_PATCH06_MERGED/pneumo_solver_ui/ui_tooltips_ru.py",
+          "/tmp/u640p06_work/UnifiedPneumoApp_UNIFIED_v6_40_PATCH06_MERGED/pneumo_solver_ui/ui_persistence.py",
+          "/tmp/u640p06_work/UnifiedPneumoApp_UNIFIED_v6_40_PATCH06_MERGED/pneumo_solver_ui/ui_bootstrap.py",
+          "/tmp/u640p06_work/UnifiedPneumoApp_UNIFIED_v6_40_PATCH06_MERGED/pneumo_solver_ui/ui_autokeys.py",
+          "/tmp/u640p06_work/UnifiedPneumoApp_UNIFIED_v6_40_PATCH06_MERGED/pneumo_solver_ui/diag_bundle.py"
+        ]
+      }
+    },
+    {
+      "name": "bootstrap_installs_autokeys",
+      "ok": true,
+      "message": "autokeys подключен",
+      "details": {
+        "path": "/tmp/u640p06_work/UnifiedPneumoApp_UNIFIED_v6_40_PATCH06_MERGED/pneumo_solver_ui/ui_bootstrap.py"
+      }
+    },
+    {
+      "name": "ui_persistence_coverage",
+      "ok": true,
+      "message": "",
+      "details": {
+        "status": "OK"
+      }
+    },
+    {
+      "name": "widget_key_audit",
+      "ok": true,
+      "message": "Скан исходников завершён. Виджеты без key= закрываются ui_autokeys.",
+      "details": {
+        "total_calls": 864,
+        "missing_key": 377,
+        "examples": [
+          "app.py:41:st.download_button",
+          "pneumo_solver_ui/compare_npz_web.py:458:st.selectbox",
+          "pneumo_solver_ui/compare_npz_web.py:459:st.text_input",
+          "pneumo_solver_ui/compare_npz_web.py:467:st.multiselect",
+          "pneumo_solver_ui/compare_npz_web.py:472:st.radio",
+          "pneumo_solver_ui/compare_npz_web.py:476:st.selectbox",
+          "pneumo_solver_ui/compare_npz_web.py:477:st.selectbox",
+          "pneumo_solver_ui/compare_npz_web.py:478:st.selectbox",
+          "pneumo_solver_ui/compare_npz_web.py:480:st.checkbox",
+          "pneumo_solver_ui/compare_npz_web.py:481:st.selectbox",
+          "pneumo_solver_ui/compare_npz_web.py:482:st.number_input",
+          "pneumo_solver_ui/compare_npz_web.py:483:st.number_input",
+          "pneumo_solver_ui/compare_npz_web.py:485:st.checkbox",
+          "pneumo_solver_ui/compare_npz_web.py:486:st.checkbox",
+          "pneumo_solver_ui/compare_npz_web.py:487:st.checkbox",
+          "pneumo_solver_ui/compare_npz_web.py:488:st.checkbox",
+          "pneumo_solver_ui/compare_npz_web.py:491:st.number_input",
+          "pneumo_solver_ui/compare_npz_web.py:525:st.selectbox",
+          "pneumo_solver_ui/compare_npz_web.py:526:st.selectbox",
+          "pneumo_solver_ui/compare_npz_web.py:539:st.text_input",
+          "pneumo_solver_ui/compare_npz_web.py:543:st.multiselect",
+          "pneumo_solver_ui/compare_npz_web.py:552:st.slider",
+          "pneumo_solver_ui/compare_npz_web.py:555:st.slider",
+          "pneumo_solver_ui/pneumo_ui_app.py:11784:st.checkbox",
+          "pneumo_solver_ui/pneumo_ui_app.py:11786:st.text_input",
+          "pneumo_solver_ui/pneumo_ui_app.py:4780:st.checkbox",
+          "pneumo_solver_ui/pneumo_ui_app.py:5018:st.text_input",
+          "pneumo_solver_ui/pneumo_ui_app.py:5028:st.checkbox",
+          "pneumo_solver_ui/pneumo_ui_app.py:5039:st.checkbox",
+          "pneumo_solver_ui/pneumo_ui_app.py:5052:st.selectbox",
+          "pneumo_solver_ui/pneumo_ui_app.py:5064:st.number_input",
+          "pneumo_solver_ui/pneumo_ui_app.py:5074:st.number_input",
+          "pneumo_solver_ui/pneumo_ui_app.py:5084:st.number_input",
+          "pneumo_solver_ui/pneumo_ui_app.py:5094:st.number_input",
+          "pneumo_solver_ui/pneumo_ui_app.py:5104:st.checkbox",
+          "pneumo_solver_ui/pneumo_ui_app.py:6215:st.file_uploader",
+          "pneumo_solver_ui/pneumo_ui_app.py:6229:st.download_button",
+          "pneumo_solver_ui/pneumo_ui_app.py:6335:st.button",
+          "pneumo_solver_ui/pneumo_ui_app.py:6741:st.button",
+          "pneumo_solver_ui/pneumo_ui_app.py:6747:st.button",
+          "pneumo_solver_ui/pneumo_ui_app.py:6753:st.button",
+          "pneumo_solver_ui/pneumo_ui_app.py:6763:st.button",
+          "pneumo_solver_ui/pneumo_ui_app.py:7111:st.button",
+          "pneumo_solver_ui/pneumo_ui_app.py:11521:st.button",
+          "pneumo_solver_ui/pneumo_ui_app.py:5717:st.button",
+          "pneumo_solver_ui/pneumo_ui_app.py:5722:st.button",
+          "pneumo_solver_ui/pneumo_ui_app.py:5727:st.button",
+          "pneumo_solver_ui/pneumo_ui_app.py:11524:st.button",
+          "pneumo_solver_ui/pneumo_ui_app.py:11526:st.button",
+          "pneumo_solver_ui/pneumo_ui_app.py:5869:st.slider"
+        ]
+      }
+    },
+    {
+      "name": "component_pneumo_svg_flow_ru",
+      "ok": true,
+      "message": "",
+      "details": {
+        "bad": [],
+        "good": true
+      }
+    }
+  ]
+}

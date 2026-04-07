@@ -1,0 +1,1304 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    :root {
+      --bg: #fafafa;
+      --panel-border: #e6e6e6;
+      --text: #222;
+      --muted: #666;
+      --pos: rgba(0,120,255,0.80);
+      --neg: rgba(255,80,0,0.80);
+      --closed: rgba(180,180,180,0.50);
+    }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
+    .wrap { display:flex; flex-direction:column; height:100%; min-height: 640px; }
+    .hdr { display:flex; align-items:center; gap:10px; padding: 8px 10px; border-bottom: 1px solid var(--panel-border); flex-wrap: wrap; background: #fff; }
+    .hdr h3 { margin:0; font-size:16px; color: var(--text); }
+    .btn { padding: 4px 10px; border: 1px solid #bbb; border-radius: 8px; background:#fff; cursor:pointer; font-size: 12px; }
+    .btn.primary { border-color:#1f77b4; }
+    input[type=range] { width: 320px; }
+    .time { font-variant-numeric: tabular-nums; font-size: 12px; color:#333; }
+
+    .main { flex: 1; display:flex; min-height: 520px; }
+    .left { flex: 1; position: relative; overflow:hidden; background:var(--bg); }
+    .right { width: 360px; border-left: 1px solid var(--panel-border); padding: 10px; box-sizing:border-box; overflow:auto; background:#fff; }
+
+    #svgHost svg { width:100%; height:100%; display:block; background:white; user-select:none; }
+
+    /* flow paths */
+    .edgePath { fill:none; stroke-linecap: round; stroke-linejoin: round; cursor: pointer; }
+    .edgePath.pos { stroke: var(--pos); }
+    .edgePath.neg { stroke: var(--neg); }
+    .edgePath.closed { stroke: var(--closed); }
+
+    /* route (shortest path / connectivity) */
+    .routePath { fill:none; stroke: rgba(255,140,0,0.85); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 10 7; pointer-events: none; }
+    .routeEnd { fill: rgba(255,140,0,0.90); stroke: rgba(255,140,0,0.0); pointer-events: none; }
+
+    /* review overlay (edges_meta.review.status) */
+    .reviewPath { fill:none; stroke-linecap: round; stroke-linejoin: round; stroke-width: 9; stroke-opacity: 0.45; pointer-events: stroke; cursor: pointer; }
+    .reviewPath.approved { stroke: rgba(30,150,60,0.90); }
+    .reviewPath.pending  { stroke: rgba(230,160,0,0.90); }
+    .reviewPath.rejected { stroke: rgba(200,40,40,0.90); stroke-dasharray: 6 5; stroke-opacity: 0.55; }
+    .reviewPath.unknown  { stroke: rgba(160,160,160,0.80); stroke-opacity: 0.35; }
+    .reviewPath.sel { stroke-opacity: 0.85 !important; filter: drop-shadow(0 0 2px rgba(0,0,0,0.35)); }
+    
+    .dot { cursor: pointer; }
+    .dot.pos { fill: var(--pos); }
+    .dot.neg { fill: var(--neg); }
+    .dot.closed { fill: rgba(180,180,180,0.65); }
+
+    /* selection */
+    .edgePath.sel {
+      stroke-opacity: 1 !important;
+      filter: drop-shadow(0 0 2px rgba(0,0,0,0.35));
+    }
+    .dot.sel { filter: drop-shadow(0 0 3px rgba(0,0,0,0.35)); }
+
+    /* node labels */
+    .nodeDot { fill: rgba(0,0,0,0.55); stroke: rgba(255,255,255,0.90); stroke-width: 3; cursor:pointer; }
+    .nodeDot.sel { filter: drop-shadow(0 0 3px rgba(0,0,0,0.35)); }
+    .nodeText {
+      font-size: 14px;
+      fill: rgba(0,0,0,0.85);
+      stroke: rgba(255,255,255,0.95);
+      stroke-width: 3;
+      paint-order: stroke;
+      font-variant-numeric: tabular-nums;
+      cursor:pointer;
+      user-select:none;
+    }
+
+    .h4 { font-size: 12px; color:#222; margin: 10px 0 6px 0; text-transform: uppercase; letter-spacing: .04em; }
+
+    .controls { display:flex; gap:10px; flex-wrap:wrap; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+    .controls label { font-size: 12px; color:#333; user-select:none; display:flex; gap:6px; align-items:center; }
+
+    .legend { margin-top: 8px; border: 1px solid #eee; border-radius: 10px; padding: 8px; background: #fff; }
+    .legendRow { display:flex; align-items:center; gap:8px; font-size: 12px; color:#333; }
+    .swatch { width: 28px; height: 8px; border-radius: 999px; }
+    .swatch.pos { background: var(--pos); }
+    .swatch.neg { background: var(--neg); }
+    .swatch.closed { background: var(--closed); }
+
+    .row { display:flex; justify-content:space-between; gap:10px; border-bottom:1px dashed #eee; padding: 6px 0; cursor:pointer; }
+    .row:hover { background: rgba(0,0,0,0.03); }
+    .row.sel { background: rgba(0,120,255,0.08); }
+    .row .name { font-size: 12px; width: 220px; word-break: break-word; }
+    .row .val  { font-size: 12px; text-align:right; font-variant-numeric: tabular-nums; color:#333; }
+
+    .hint { font-size: 11px; color: var(--muted); line-height: 1.35; margin-top: 10px; }
+
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid #ddd; color:#333; background:#fff; }
+    .badge.edge { border-color: rgba(0,120,255,0.35); }
+    .badge.node { border-color: rgba(0,0,0,0.25); }
+    .badge.pick { border-color: rgba(255,180,0,0.55); background: #fffbe6; color: #ad6800; }
+
+    
+    /* review HUD overlay (on top of SVG) */
+    .hud { position:absolute; top:10px; right:10px; z-index: 30; width: 220px;
+      border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(2px); padding: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+    .hudTitle { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color:#333; margin-bottom: 6px; }
+    .hudGrid { display:flex; flex-direction:column; gap:4px; }
+    .hudRow { display:grid; grid-template-columns: 14px 1fr auto; gap:8px; align-items:center; font-size: 12px; color:#333; }
+    .hudSw { width: 28px; height: 8px; border-radius: 999px; display:inline-block; }
+    .hudNum { font-variant-numeric: tabular-nums; }
+    .hudSel { font-size: 11px; margin-top: 8px; color:#333; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .hudBtns { display:flex; gap:8px; margin-top: 8px; }
+    .hudBtn { flex:1; font-size: 11px; padding: 6px 8px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.18); background:#fff; cursor:pointer; }
+    .hudBtn:hover { background: #f7f7f7; }
+    .hudHint { font-size: 10px; color: var(--muted); margin-top: 8px; line-height: 1.25; }
+/* label pick highlighting (START/END) */
+    .labelStart { fill: rgba(0,140,0,0.95) !important; stroke: rgba(0,140,0,0.95) !important; stroke-width: 0.6; paint-order: stroke; }
+    .labelEnd   { fill: rgba(180,0,0,0.95) !important; stroke: rgba(180,0,0,0.95) !important; stroke-width: 0.6; paint-order: stroke; }
+
+
+    .toprow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h3 id="title">Пневмосхема (поток)</h3>
+      <button id="play" class="btn primary">▶︎</button>
+      <button id="pause" class="btn">⏸</button>
+      <span class="time">t=<span id="t">0.000</span> s</span>
+      <input id="slider" type="range" min="0" max="0" value="0" step="1"/>
+      <span class="time">idx=<span id="idx">0</span></span>
+      <button id="resetView" class="btn">↺ Сброс вида</button>
+      <span id="pickBadge" class="badge" style="display:none"></span>
+    </div>
+
+    <div class="main">
+      <div class="left">
+        <div id="svgHost"></div>
+          <div id="reviewHud" class="hud" style="display:none">
+            <div class="hudTitle">Проверка</div>
+            <div class="hudGrid">
+              <div class="hudRow"><span class="hudSw" style="background: rgba(30,150,60,0.90)"></span><span>одобрено</span><span id="hudApproved" class="hudNum">0</span></div>
+              <div class="hudRow"><span class="hudSw" style="background: rgba(230,160,0,0.90)"></span><span>на проверке</span><span id="hudPending" class="hudNum">0</span></div>
+              <div class="hudRow"><span class="hudSw" style="background: rgba(200,40,40,0.90)"></span><span>отклонено</span><span id="hudRejected" class="hudNum">0</span></div>
+              <div class="hudRow"><span class="hudSw" style="background: rgba(160,160,160,0.80)"></span><span>неизвестно</span><span id="hudUnknown" class="hudNum">0</span></div>
+              <div class="hudRow" style="margin-top:4px; opacity:0.85"><span style="width:8px"></span><span><b>всего</b></span><span id="hudTotal" class="hudNum">0</span></div>
+            </div>
+            <div class="hudSel">sel: <span id="hudSel" style="font-weight:600">—</span> <span id="hudSelStatus" style="opacity:0.8"></span></div>
+            <div class="hudBtns">
+              <button id="hudPrevPending" class="hudBtn" title="Предыдущая: «на проверке»/«неизвестно»">◀ на проверке</button>
+              <button id="hudNextPending" class="hudBtn" title="Следующая: «на проверке»/«неизвестно»">на проверке ▶</button>
+            </div>
+            <div class="hudBtns" style="margin-top:6px">
+              <button id="hudTogglePendingOnly" class="hudBtn" title="Переключить фильтр статусов (только «на проверке» / показать всё)">Только «на проверке»</button>
+            </div>
+            <div class="hudHint">Горячие клавиши (по линии): Shift=одобрить, Ctrl/Cmd=отклонить, Alt=на проверке</div>
+          </div>
+      </div>
+      <div class="right">
+        <div class="controls">
+          <label><input id="togPaths" type="checkbox" checked/>Пути</label>
+        <label><input id="togGlobalQ" type="checkbox"/>Глоб. шкала Q</label>
+          <label><input id="togDots" type="checkbox" checked/>Маркеры</label>
+          <label><input id="togNodes" type="checkbox" checked/>Давление</label>
+          <label><input id="togLegend" type="checkbox" checked/>Легенда</label>
+          <label><input id="togReview" type="checkbox"/>Проверка</label>
+        </div>
+
+        <div id="legend" class="legend">
+          <div class="legendRow"><span class="swatch pos"></span><span>Q ≥ 0 (направление как задано веткой)</span></div>
+          <div class="legendRow" style="margin-top:6px"><span class="swatch neg"></span><span>Q &lt; 0 (реверс потока)</span></div>
+          <div class="legendRow" style="margin-top:6px"><span class="swatch closed"></span><span>закрыт (элемент закрыт)</span></div>
+          <div class="legendRow" style="margin-top:10px; border-top:1px dashed #eee; padding-top:8px; opacity:0.95"><b>Слой проверки</b> (edges_meta.review.status)</div>
+          <div class="legendRow"><span class="swatch" style="background: rgba(30,150,60,0.90)"></span><span>одобрено</span></div>
+          <div class="legendRow"><span class="swatch" style="background: rgba(230,160,0,0.90)"></span><span>на проверке</span></div>
+          <div class="legendRow"><span class="swatch" style="background: rgba(200,40,40,0.90)"></span><span>отклонено</span></div>
+          <div class="legendRow" style="margin-top:6px; opacity:0.75"><span>Горячие клавиши (режим проверки): Shift=одобрить, Ctrl/Cmd=отклонить, Alt=на проверке</span></div>
+        </div>
+
+        <div class="h4">Узлы</div>
+        <div id="nodesList"></div>
+
+        <div class="h4">Ветки</div>
+        <div id="edgesList"></div>
+
+        <div class="hint">
+          Пан: перетащите мышью. Zoom: колёсико мыши.<br/>
+          Клик по ветке/узлу → отправляется в Python (для синхронизации графиков).<br/>
+          Толщина/яркость пути ~ |Q|, цвет ~ знак Q.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ----------------------------------------------------
+// Streamlit "no-tooling" component messaging helpers
+// Source inspiration: Streamlit community snippet
+// ----------------------------------------------------
+function sendMessageToStreamlitClient(type, data) {
+  var outData = Object.assign({
+    isStreamlitMessage: true,
+    type: type,
+  }, data);
+  window.parent.postMessage(outData, "*");
+}
+
+
+// ----------------------------------------------------
+// Robust "componentReady" (guards against apiVersion=undefined)
+// Some Streamlit versions show: Unrecognized component API version: 'undefined'
+// if the ready handshake is not received early enough or an error happens before init().
+// ----------------------------------------------------
+var __stHasRender = false;
+var __stReadyTries = 0;
+var __stReadyTimer = null;
+
+function stSetReady() {
+  // IMPORTANT: Streamlit expects apiVersion in the componentReady handshake.
+  // Some setups can lose the first message, so we ping until we see the first render.
+  try {
+    sendMessageToStreamlitClient("streamlit:componentReady", { apiVersion: 1, args: { apiVersion: 1 } });
+  } catch (e) {
+    console.error("streamlit componentReady failed", e);
+  }
+}
+
+function stStartReadyPinger() {
+  if (__stReadyTimer) return;
+  __stReadyTimer = setInterval(() => {
+    if (__stHasRender) {
+      clearInterval(__stReadyTimer);
+      __stReadyTimer = null;
+      return;
+    }
+    __stReadyTries += 1;
+    if (__stReadyTries > 60) {
+      clearInterval(__stReadyTimer);
+      __stReadyTimer = null;
+      return;
+    }
+    stSetReady();
+  }, 250);
+}
+
+// Send as early as possible (before heavy init / potential errors)
+stSetReady();
+stStartReadyPinger();
+
+function init() {
+  stSetReady();
+
+  // wire UI toggles (checkboxes)
+  try {
+    ['togPaths','togDots','togNodes','togLegend','togReview'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', (ev) => {
+        try { applyToggles(); } catch(e) {}
+        try {
+          if (id === 'togReview') {
+            // Let Python own the state: tell backend to toggle overlay
+            sendDataToPython({ kind: 'review_toggle', value: !!el.checked, ts: Date.now(), via: 'ui' });
+          }
+        } catch(e) {}
+      });
+    });
+  } catch(e) {}
+
+  // HUD buttons (review)
+  try {
+    const bPrev = document.getElementById('hudPrevPending');
+    const bNext = document.getElementById('hudNextPending');
+    const bTog  = document.getElementById('hudTogglePendingOnly');
+    if (bPrev) bPrev.addEventListener('click', (ev) => {
+      sendDataToPython({ kind: 'review_nav', action: 'prev_pending', ts: Date.now(), via: 'hud' });
+      ev.stopPropagation(); ev.preventDefault();
+    });
+    if (bNext) bNext.addEventListener('click', (ev) => {
+      sendDataToPython({ kind: 'review_nav', action: 'next_pending', ts: Date.now(), via: 'hud' });
+      ev.stopPropagation(); ev.preventDefault();
+    });
+    if (bTog) bTog.addEventListener('click', (ev) => {
+      sendDataToPython({ kind: 'review_filter', mode: 'toggle_pending_only', ts: Date.now(), via: 'hud' });
+      ev.stopPropagation(); ev.preventDefault();
+    });
+  } catch(e) {}
+}
+function setFrameHeight(height) {
+  sendMessageToStreamlitClient("streamlit:setFrameHeight", { height: height });
+}
+function sendDataToPython(data) {
+  // The `data` argument can be any JSON-serializable value.
+  sendMessageToStreamlitClient("streamlit:setComponentValue", data);
+}
+
+// ----------------------------------------------------
+// Widget state
+// ----------------------------------------------------
+let DATA = { title: "", svg: "", mapping: {}, time: [], edges: [], nodes: [], selected: {}, label_pick_mode: "", label_picks: {}, height: 740, sync_playhead: false, playhead_storage_key: "pneumo_play_state", dataset_id: "" };
+let svg = null;
+let overlay = null;
+let pathLayer = null;
+let dotLayer = null;
+let nodeLayer = null;
+let routeLayer = null;
+let reviewLayer = null;
+let reviewSegs = []; // {edgeName, path}
+
+let textEls = [];
+let labelCenters = [];
+let segs = [];        // {edgeIdx, edgeName, path, dot, len, phase}
+let nodeObjs = [];    // {name, g, circle, text, pArr, unit}
+let qMax = [];
+let qGlobalMax = 1e-9;        // max abs(q) per edge
+let edgeNameToSegs = new Map();
+let edgeNameToRows = new Map();
+let nodeNameToRows = new Map();
+let nodeNameToObj = new Map();
+
+let view0 = {x:0, y:0, w:1920, h:1080};
+let view = {...view0};
+let idx = 0;
+let playing = false;
+let lastTs = performance.now();
+let __FLOW_DIRTY = true;
+let __LAST_LOOP_IDX = -1;
+
+let dragging = false;
+let dragStart = null;
+let dragMoved = false;
+
+let selectedEdge = null;
+let selectedNode = null;
+
+
+let syncPlayhead = false;
+let playheadStorageKey = 'pneumo_play_state';
+let playheadDatasetId = '';
+
+function readPlayheadState() {
+  try {
+    const s = localStorage.getItem(playheadStorageKey);
+    if (!s) return null;
+    const obj = JSON.parse(s);
+    if (!obj || typeof obj !== 'object') return null;
+    if (playheadDatasetId && String(obj.dataset_id || '') !== String(playheadDatasetId)) return null;
+    return obj;
+  } catch(_e) { return null; }
+}
+
+const NS = "http://www.w3.org/2000/svg";
+
+const elTitle = document.getElementById('title');
+const slider = document.getElementById('slider');
+const tEl = document.getElementById('t');
+const idxEl = document.getElementById('idx');
+const svgHost = document.getElementById('svgHost');
+const edgesListEl = document.getElementById('edgesList');
+const nodesListEl = document.getElementById('nodesList');
+
+const togPaths = document.getElementById('togPaths');
+const togGlobalQ = document.getElementById('togGlobalQ');
+
+const togDots  = document.getElementById('togDots');
+const togNodes = document.getElementById('togNodes');
+const togLegend = document.getElementById('togLegend');
+const togReview = document.getElementById('togReview');
+const legendEl = document.getElementById('legend');
+
+const pickBadge = document.getElementById('pickBadge');
+
+function parseViewBox(vbStr) {
+  const a = (vbStr || '').trim().split(/\s+/).map(parseFloat);
+  if (a.length !== 4 || a.some(x => Number.isNaN(x))) return null;
+  return {x:a[0], y:a[1], w:a[2], h:a[3]};
+}
+function setViewBox(v) { if (svg) svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`); }
+function resetView() { view = {...view0}; setViewBox(view); }
+
+function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
+
+function fmtSig(x, sig=3){
+  if (x===null || x===undefined) return '—';
+  const n = Number(x);
+  if (!Number.isFinite(n)) return '—';
+  // toPrecision gives compact scientific when needed
+  const s = n.toPrecision(sig);
+  return String(parseFloat(s));
+}
+
+function fmtFixed(x, dec=2){
+  if (x===null || x===undefined) return '—';
+  const n = Number(x);
+  if (!Number.isFinite(n)) return '—';
+  return n.toFixed(dec);
+}
+
+
+function polyToPath(points) {
+  if (!points || points.length < 2) return '';
+  const p0 = points[0];
+  let d = `M ${p0[0]} ${p0[1]}`;
+  for (let i=1;i<points.length;i++) {
+    const p = points[i];
+    d += ` L ${p[0]} ${p[1]}`;
+  }
+  return d;
+}
+
+function getSvgPoint(clientX, clientY) {
+  const pt = svg.createSVGPoint();
+  pt.x = clientX; pt.y = clientY;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return {x:0,y:0};
+  const sp = pt.matrixTransform(ctm.inverse());
+  return {x: sp.x, y: sp.y};
+}
+
+function clearDom() {
+  svgHost.innerHTML = '';
+  edgesListEl.innerHTML = '';
+  nodesListEl.innerHTML = '';
+  edgeNameToSegs = new Map();
+  edgeNameToRows = new Map();
+  nodeNameToRows = new Map();
+  nodeNameToObj = new Map();
+  segs = [];
+  nodeObjs = [];
+  qMax = [];
+  reviewSegs = [];
+  reviewLayer = null;
+}
+
+function applyToggles() {
+  if (!pathLayer) return;
+  pathLayer.style.display = togPaths.checked ? 'block' : 'none';
+  dotLayer.style.display  = togDots.checked ? 'block' : 'none';
+  nodeLayer.style.display = (togNodes.checked && nodeObjs.length>0) ? 'block' : 'none';
+  legendEl.style.display  = togLegend.checked ? 'block' : 'none';
+  nodesListEl.style.display = (togNodes.checked && nodeObjs.length>0) ? 'block' : 'none';
+  // review overlay toggle (controlled by checkbox)
+  try {
+    if (reviewLayer && typeof togReview !== 'undefined' && togReview) {
+      reviewLayer.style.display = togReview.checked ? 'block' : 'none';
+    }
+    const hud = document.getElementById('reviewHud');
+    if (hud && typeof togReview !== 'undefined' && togReview) {
+      hud.style.display = togReview.checked ? '' : 'none';
+    }
+  } catch(e) {}
+}
+
+function setBadge(kind, name) {
+  if (!kind || !name) {
+    pickBadge.style.display = 'none';
+    pickBadge.textContent = '';
+    return;
+  }
+  pickBadge.style.display = 'inline-block';
+  pickBadge.textContent = `${kind}: ${name}`;
+  let cls = 'node';
+  if (kind === 'edge') cls = 'edge';
+  if (kind === 'pick' || kind === 'label') cls = 'pick';
+  pickBadge.className = `badge ${cls}`;
+}
+
+
+function updateReviewHud(show, counts, selEdge, selStatus, modeLabel) {
+  try {
+    const hud = document.getElementById('reviewHud');
+    if (!hud) return;
+    hud.style.display = (show ? '' : 'none');
+    const get = (id) => document.getElementById(id);
+    if (counts && typeof counts === 'object') {
+      const a = get('hudApproved'); if (a) a.textContent = String(counts.approved || 0);
+      const p = get('hudPending');  if (p) p.textContent = String(counts.pending || 0);
+      const r = get('hudRejected'); if (r) r.textContent = String(counts.rejected || 0);
+      const u = get('hudUnknown');  if (u) u.textContent = String(counts.unknown || 0);
+      const t = get('hudTotal');    if (t) t.textContent = String(counts.total || 0);
+    }
+    const s = get('hudSel'); if (s) s.textContent = selEdge ? String(selEdge) : '—';
+    const ss = get('hudSelStatus'); if (ss) ss.textContent = selStatus ? `(${String(selStatus)})` : '';
+    const b = get('hudTogglePendingOnly');
+    if (b) b.textContent = String(modeLabel || 'Только «на проверке»');
+  } catch(e) {}
+}
+
+function setSelectedEdge(name, send=true) {
+  selectedEdge = name;
+  // update path selection
+  edgeNameToSegs.forEach((arr, ename) => {
+    arr.forEach(s => {
+      if (ename === name) {
+        s.path.classList.add('sel');
+        s.dot.classList.add('sel');
+      } else {
+        s.path.classList.remove('sel');
+        s.dot.classList.remove('sel');
+      }
+    });
+  });
+  // update review overlay selection
+  if (Array.isArray(reviewSegs)) {
+    reviewSegs.forEach((s) => {
+      if (!s || !s.path) return;
+      if (s.edgeName === name) s.path.classList.add('sel'); else s.path.classList.remove('sel');
+    });
+  }
+
+  // update row selection
+  edgeNameToRows.forEach((row, ename) => {
+    if (ename === name) row.classList.add('sel');
+    else row.classList.remove('sel');
+  });
+  if (name) setBadge('edge', name); else setBadge(null,null);
+
+  if (send && name) {
+    sendDataToPython({ kind: 'edge', name: name, ts: Date.now(), dataType: 'json' });
+  }
+}
+
+function setSelectedNode(name, send=true) {
+  selectedNode = name;
+  nodeObjs.forEach(nd => {
+    if (nd.name === name) {
+      nd.circle.classList.add('sel');
+      nd.text.classList.add('sel');
+    } else {
+      nd.circle.classList.remove('sel');
+      nd.text.classList.remove('sel');
+    }
+  });
+  nodeNameToRows.forEach((row, nname) => {
+    if (nname === name) row.classList.add('sel');
+    else row.classList.remove('sel');
+  });
+  if (name) setBadge('node', name); else setBadge(null,null);
+
+  if (send && name) {
+    sendDataToPython({ kind: 'node', name: name, ts: Date.now(), dataType: 'json' });
+  }
+}
+
+function build(args) {
+  clearDom();
+  DATA = Object.assign(DATA, args);
+  __lastArgs = args;
+
+  try { if (togReview) togReview.checked = !!DATA.show_review_overlay; } catch(e) {}
+
+  // Global playhead sync (optional)
+  syncPlayhead = !!DATA.sync_playhead;
+  playheadStorageKey = String(DATA.playhead_storage_key || 'pneumo_play_state');
+  playheadDatasetId = String(DATA.dataset_id || '');
+
+  const btnPlayEl = document.getElementById('play');
+  const btnPauseEl = document.getElementById('pause');
+  if (syncPlayhead) {
+    if (btnPlayEl) btnPlayEl.style.display = 'none';
+    if (btnPauseEl) btnPauseEl.style.display = 'none';
+    if (slider) slider.style.display = 'none';
+  } else {
+    if (btnPlayEl) btnPlayEl.style.display = '';
+    if (btnPauseEl) btnPauseEl.style.display = '';
+    if (slider) slider.style.display = '';
+  }
+
+  elTitle.textContent = DATA.title || 'Пневмосхема (поток)';
+
+  // svg
+  svgHost.innerHTML = DATA.svg || '';
+  svg = svgHost.querySelector('svg');
+  if (!svg) {
+    svgHost.innerHTML = '<div style="padding:12px;color:#a00">Нет SVG</div>';
+    return;
+  }
+
+
+  // ----------------------------------------------------
+  // ----------------------------------------------------
+  // Label picking (connectivity/pathfinder)
+  //  - Shift+Click        : pick START label (nearest text)
+  //  - Ctrl/Cmd+Click     : pick END label (nearest text)
+  //  - Or set DATA.label_pick_mode ('start'|'end') and click on <text>
+  // ----------------------------------------------------
+  try {
+    textEls = Array.from(svg.querySelectorAll('text')) || [];
+    labelCenters = [];
+    textEls.forEach((t, i) => {
+      try {
+        t.dataset.tidx = String(i);
+        t.style.cursor = 'pointer';
+        t.style.pointerEvents = 'auto';
+        const label = (t.textContent || '').trim();
+        let cx = 0, cy = 0;
+        try {
+          const bb = t.getBBox();
+          cx = bb.x + bb.width / 2;
+          cy = bb.y + bb.height / 2;
+        } catch(e) {}
+        labelCenters.push({ti: i, name: label, x: cx, y: cy, el: t});
+
+        t.addEventListener('click', (ev) => {
+          if (dragMoved) return;
+
+          let mode = '';
+          if (ev.shiftKey) mode = 'start';
+          else if (ev.ctrlKey || ev.metaKey) mode = 'end';
+          else mode = (DATA.label_pick_mode || '').trim();
+
+          if (!(mode === 'start' || mode === 'end')) return;
+
+          sendDataToPython({kind:'label', mode: mode, ti: i, name: label, x: cx, y: cy, ts: Date.now(), via: 'text'});
+          ev.stopPropagation();
+        });
+      } catch(e) {}
+    });
+
+    function findNearestLabel(x, y, radius) {
+      const r = Math.max(0, Number(radius || 0));
+      if (!Number.isFinite(r) || r <= 0) return null;
+      const r2 = r * r;
+      let best = null;
+      let bestD = 1e30;
+      for (let k = 0; k < labelCenters.length; k++) {
+        const c = labelCenters[k];
+        if (!c || !Number.isFinite(c.x) || !Number.isFinite(c.y)) continue;
+        const dx = c.x - x;
+        const dy = c.y - y;
+        const d2 = dx*dx + dy*dy;
+        if (d2 < bestD) { bestD = d2; best = c; }
+      }
+      if (best && bestD <= r2) return best;
+      return null;
+    }
+
+    // Hotkey pick anywhere (nearest label): Shift=START, Ctrl/Cmd=END
+    svg.addEventListener('click', (ev) => {
+      try {
+        if (dragMoved) return;
+        if (DATA.review_pick_mode) return;
+        try {
+          if (ev && ev.target && ev.target.classList && ev.target.classList.contains('reviewPath')) return;
+        } catch(e) {}
+        const isStart = !!ev.shiftKey;
+        const isEnd = !!(ev.ctrlKey || ev.metaKey);
+        if (!isStart && !isEnd) return;
+
+        const mode = isStart ? 'start' : 'end';
+        const p = getSvgPoint(ev.clientX, ev.clientY);
+        const rad = Number(DATA.label_pick_radius || 18);
+
+        const found = findNearestLabel(p.x, p.y, rad);
+        if (!found) return;
+
+        sendDataToPython({kind:'label', mode: mode, ti: found.ti, name: found.name, x: found.x, y: found.y, ts: Date.now(), via: 'hotkey'});
+        ev.stopPropagation();
+        ev.preventDefault();
+      } catch(e) {}
+    }, {capture: true});
+
+    // highlight selected labels (START/END)
+    const picks = DATA.label_picks || {};
+    textEls.forEach((t) => { t.classList.remove('labelStart'); t.classList.remove('labelEnd'); });
+    if (picks && picks.start && Number.isFinite(parseFloat(picks.start.ti))) {
+      const ii = parseInt(String(picks.start.ti), 10);
+      if (textEls[ii]) textEls[ii].classList.add('labelStart');
+    }
+    if (picks && picks.end && Number.isFinite(parseFloat(picks.end.ti))) {
+      const ii = parseInt(String(picks.end.ti), 10);
+      if (textEls[ii]) textEls[ii].classList.add('labelEnd');
+    }
+
+    // show pick badge if mode active
+    const pm = (DATA.label_pick_mode || '').trim();
+    if (pm === 'start' || pm === 'end') {
+      setBadge('pick', pm.toUpperCase());
+    }
+  } catch(e) {}
+
+  // viewBox baseline
+  const vb = parseViewBox((DATA.mapping || {}).viewBox) || parseViewBox(svg.getAttribute('viewBox')) || {x:0,y:0,w:1920,h:1080};
+  view0 = vb;
+  // preserve current view if it exists and seems non-default
+  if (!view || !view.w) view = {...view0};
+  // if we never changed view, reset
+  if (Math.abs(view.w - view0.w) < 1e-9 && Math.abs(view.h - view0.h) < 1e-9) {
+    view = {...view0};
+  }
+  setViewBox(view);
+
+  // overlay layers
+  overlay = document.createElementNS(NS, 'g');
+  overlay.setAttribute('id','pneumo_overlay_anim');
+  svg.appendChild(overlay);
+
+  // review overlay (below animated paths)
+  reviewLayer = document.createElementNS(NS, 'g');
+  reviewLayer.setAttribute('id','pneumo_overlay_review');
+  overlay.appendChild(reviewLayer);
+
+  pathLayer = document.createElementNS(NS, 'g');
+  dotLayer  = document.createElementNS(NS, 'g');
+  nodeLayer = document.createElementNS(NS, 'g');
+  routeLayer = document.createElementNS(NS, 'g');
+  overlay.appendChild(pathLayer);
+  overlay.appendChild(routeLayer);
+  overlay.appendChild(dotLayer);
+  overlay.appendChild(nodeLayer);
+
+  // route overlay (optional)
+  try {
+    const rps = DATA.route_paths || [];
+    if (routeLayer && Array.isArray(rps) && rps.length) {
+      rps.forEach((poly) => {
+        if (!poly || poly.length < 2) return;
+        let d = '';
+        for (let i=0;i<poly.length;i++){
+          const p = poly[i];
+          if (!p || p.length<2) continue;
+          d += (i===0 ? 'M ' : ' L ') + String(p[0]) + ' ' + String(p[1]);
+        }
+        const rp = document.createElementNS(NS, 'path');
+        rp.setAttribute('d', d);
+        rp.setAttribute('class','routePath');
+        routeLayer.appendChild(rp);
+
+        // endpoints markers
+        const p0 = poly[0];
+        const p1 = poly[poly.length-1];
+        if (p0 && p1) {
+          const c0 = document.createElementNS(NS,'circle');
+          c0.setAttribute('cx', String(p0[0]));
+          c0.setAttribute('cy', String(p0[1]));
+          c0.setAttribute('r','7');
+          c0.setAttribute('class','routeEnd');
+          routeLayer.appendChild(c0);
+          const c1 = document.createElementNS(NS,'circle');
+          c1.setAttribute('cx', String(p1[0]));
+          c1.setAttribute('cy', String(p1[1]));
+          c1.setAttribute('r','7');
+          c1.setAttribute('class','routeEnd');
+          routeLayer.appendChild(c1);
+        }
+      });
+    }
+  } catch(e) {}
+
+  // time
+  const time = DATA.time || [];
+  const n = time.length;
+  slider.max = String(Math.max(0, n-1));
+  idx = clamp(idx, 0, Math.max(0,n-1));
+  slider.value = String(idx);
+
+  // lists
+  const edges = DATA.edges || [];
+  const nodes = DATA.nodes || [];
+
+  edges.forEach((e) => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<div class="name">${e.name}</div><div class="val"><span class="q">0</span> ${e.unit||''}</div>`;
+    row.addEventListener('click', () => setSelectedEdge(e.name, true));
+    edgesListEl.appendChild(row);
+    edgeNameToRows.set(e.name, row);
+  });
+
+  nodes.forEach((nd) => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<div class="name">${nd.name}</div><div class="val"><span class="p">0</span> ${nd.unit||''}</div>`;
+    row.addEventListener('click', () => setSelectedNode(nd.name, true));
+    nodesListEl.appendChild(row);
+    nodeNameToRows.set(nd.name, row);
+  });
+
+  // precompute qMax
+  qMax = edges.map(e => {
+    let m = 1e-9;
+    (e.q || []).forEach(v => { m = Math.max(m, Math.abs(v)); });
+    return m;
+  });
+
+  // compute global q scale (for comparing edges)
+  qGlobalMax = 1e-9;
+  try { qMax.forEach(m => { qGlobalMax = Math.max(qGlobalMax, m); }); } catch (e) { qGlobalMax = 1e-9; }
+
+  // build review overlay paths from mapping.edges (colored by edges_meta.review.status)
+  reviewSegs = [];
+  let reviewCounts = { approved:0, pending:0, rejected:0, unknown:0, total:0 };
+
+  try {
+    const mappingR = DATA.mapping || {};
+    const showReview = !!DATA.show_review_overlay;
+    const statusAllow = Array.isArray(DATA.review_statuses) ? DATA.review_statuses.map(String) : ['approved','pending','rejected','unknown'];
+    if (reviewLayer) reviewLayer.style.display = showReview ? '' : 'none';
+    if (reviewLayer && showReview && mappingR && mappingR.edges && typeof mappingR.edges === 'object') {
+      const emap = (mappingR.edges_meta && typeof mappingR.edges_meta === 'object') ? mappingR.edges_meta : {};
+      Object.keys(mappingR.edges).forEach((edgeName) => {
+        const segs = mappingR.edges[edgeName];
+        if (!Array.isArray(segs) || !segs.length) return;
+        let status = 'unknown';
+        try {
+          const meta = emap ? emap[edgeName] : null;
+          const rv = meta && typeof meta === 'object' ? meta.review : null;
+          if (rv && typeof rv === 'object' && rv.status) status = String(rv.status);
+          else status = 'pending';
+        } catch(e) { status = 'unknown'; }
+        if (!statusAllow.includes(status)) return;
+
+        segs.forEach((poly, pi) => {
+          if (!poly || poly.length < 2) return;
+          
+        try {
+          reviewCounts.total += 1;
+          if (status === 'approved') reviewCounts.approved += 1;
+          else if (status === 'pending') reviewCounts.pending += 1;
+          else if (status === 'rejected') reviewCounts.rejected += 1;
+          else reviewCounts.unknown += 1;
+      
+    // update review HUD
+    try {
+      const selEdge = (DATA.selected && DATA.selected.edge) ? String(DATA.selected.edge) : (selectedEdge ? String(selectedEdge) : '');
+      let selStatus = '';
+      try {
+        const emap2 = (mappingR.edges_meta && typeof mappingR.edges_meta === 'object') ? mappingR.edges_meta : {};
+        const meta2 = emap2 ? emap2[selEdge] : null;
+        const rv2 = meta2 && typeof meta2 === 'object' ? meta2.review : null;
+        if (rv2 && typeof rv2 === 'object' && typeof rv2.status === 'string') selStatus = String(rv2.status);
+        else if (selEdge) selStatus = 'unknown';
+      } catch(e) {}
+      // label for pending-only toggle
+      let modeLabel = 'Только «на проверке»';
+      try {
+        const stAllow = Array.isArray(DATA.review_statuses) ? DATA.review_statuses.map(String) : [];
+        if (stAllow.length === 1 && stAllow[0] === 'pending') modeLabel = 'Показать всё';
+        if (stAllow.length === 2 && stAllow.indexOf('pending')>=0 && stAllow.indexOf('unknown')>=0) modeLabel = 'Показать всё';
+      } catch(e) {}
+      const showHud = showReview && (DATA.review_hud !== false);
+      updateReviewHud(showHud, reviewCounts, selEdge, selStatus, modeLabel);
+    } catch(e) {}
+  } catch(e) {}
+const pth = document.createElementNS(NS, 'path');
+          pth.setAttribute('d', polyToPath(poly));
+          pth.setAttribute('class', 'reviewPath ' + status);
+          pth.dataset.edge = edgeName;
+          pth.dataset.seg = String(pi);
+          reviewLayer.appendChild(pth);
+          reviewSegs.push({edgeName: edgeName, path: pth});
+
+          pth.addEventListener('click', (ev) => {
+            if (dragMoved) return;
+            try {
+              // In review mode: Shift=approve, Ctrl/Cmd=reject, Alt=pending, plain click=select
+              const rm = !!DATA.review_pick_mode;
+              let act = '';
+              if (rm) {
+                if (ev.shiftKey) act = 'approved';
+                else if (ev.ctrlKey || ev.metaKey) act = 'rejected';
+                else if (ev.altKey) act = 'pending';
+              }
+              if (act) {
+                setSelectedEdge(edgeName, false);
+                sendDataToPython({ kind: 'edge', name: edgeName, review_action: act, ts: Date.now(), via: 'review' });
+              } else {
+                setSelectedEdge(edgeName, true);
+              }
+              ev.stopPropagation();
+              ev.preventDefault();
+            } catch(e) {}
+          });
+        });
+      });
+    }
+  } catch(e) {}
+
+  // build edges paths
+  const mapping = DATA.mapping || {};
+  edges.forEach((e, ei) => {
+    const polys = (mapping.edges && mapping.edges[e.name]) ? mapping.edges[e.name] : [];
+    if (!polys || polys.length === 0) return;
+    polys.forEach((poly) => {
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', polyToPath(poly));
+      path.setAttribute('class','edgePath pos');
+      path.setAttribute('stroke-width','4');
+      path.dataset.edge = e.name;
+      pathLayer.appendChild(path);
+
+      const dot = document.createElementNS(NS, 'circle');
+      dot.setAttribute('r','6');
+      dot.setAttribute('class','dot pos');
+      dot.dataset.edge = e.name;
+      dotLayer.appendChild(dot);
+
+      const len = path.getTotalLength();
+      const s = { edgeIdx: ei, edgeName: e.name, path, dot, len, phase: Math.random() };
+      segs.push(s);
+      if (!edgeNameToSegs.has(e.name)) edgeNameToSegs.set(e.name, []);
+      edgeNameToSegs.get(e.name).push(s);
+
+      // click selection
+      path.addEventListener('click', (ev) => {
+        if (dragMoved) return;
+        setSelectedEdge(e.name, true);
+        ev.stopPropagation();
+      });
+      dot.addEventListener('click', (ev) => {
+        if (dragMoved) return;
+        setSelectedEdge(e.name, true);
+        ev.stopPropagation();
+      });
+    });
+  });
+
+  // build nodes overlay
+  (nodes || []).forEach((nd) => {
+    const xy = (mapping.nodes && mapping.nodes[nd.name]) ? mapping.nodes[nd.name] : null;
+    if (!xy || !Array.isArray(xy) || xy.length < 2) return;
+    const x = xy[0], y = xy[1];
+
+    const g = document.createElementNS(NS, 'g');
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', x);
+    c.setAttribute('cy', y);
+    c.setAttribute('r', 10);
+    c.setAttribute('class', 'nodeDot');
+    c.dataset.node = nd.name;
+    g.appendChild(c);
+
+    const t = document.createElementNS(NS, 'text');
+    t.setAttribute('x', x + 12);
+    t.setAttribute('y', y - 12);
+    t.setAttribute('class', 'nodeText');
+    t.dataset.node = nd.name;
+    t.textContent = '0.00';
+    g.appendChild(t);
+
+    const tt = document.createElementNS(NS, 'title');
+    tt.textContent = nd.name;
+    g.appendChild(tt);
+
+    nodeLayer.appendChild(g);
+
+    const obj = {name: nd.name, g, circle: c, text: t, pArr: nd.p || [], unit: nd.unit || ''};
+    nodeObjs.push(obj);
+    nodeNameToObj.set(nd.name, obj);
+
+    c.addEventListener('click', (ev) => {
+      if (dragMoved) return;
+      setSelectedNode(nd.name, true);
+      ev.stopPropagation();
+    });
+    t.addEventListener('click', (ev) => {
+      if (dragMoved) return;
+      setSelectedNode(nd.name, true);
+      ev.stopPropagation();
+    });
+  });
+
+  // toggles
+  applyToggles();
+
+  // svg interactions
+  svg.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const z = (e.deltaY < 0) ? 0.9 : 1.1;
+    const p = getSvgPoint(e.clientX, e.clientY);
+    const nx = p.x - (p.x - view.x) * z;
+    const ny = p.y - (p.y - view.y) * z;
+    view = { x: nx, y: ny, w: view.w * z, h: view.h * z };
+    setViewBox(view);
+  }, {passive:false});
+
+  svg.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    dragMoved = false;
+    svg.setPointerCapture(e.pointerId);
+    dragStart = { p: getSvgPoint(e.clientX, e.clientY), v: {...view}, client: {x:e.clientX, y:e.clientY} };
+  });
+  svg.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const p = getSvgPoint(e.clientX, e.clientY);
+    const dx = p.x - dragStart.p.x;
+    const dy = p.y - dragStart.p.y;
+    view = { x: dragStart.v.x - dx, y: dragStart.v.y - dy, w: dragStart.v.w, h: dragStart.v.h };
+    setViewBox(view);
+    const ddx = e.clientX - dragStart.client.x;
+    const ddy = e.clientY - dragStart.client.y;
+    if (Math.abs(ddx) + Math.abs(ddy) > 4) dragMoved = true;
+  });
+  svg.addEventListener('pointerup', (e) => {
+    dragging = false;
+    dragStart = null;
+    window.setTimeout(() => { dragMoved = false; }, 0);
+  });
+
+  // apply selection passed from Python
+  const sel = DATA.selected || {};
+  if (sel.edge) setSelectedEdge(sel.edge, false);
+  if (sel.node) setSelectedNode(sel.node, false);
+
+  // keep label-pick badge visible (if active)
+  const pm2 = (DATA.label_pick_mode || '').trim();
+  if (pm2 === 'start' || pm2 === 'end') setBadge('pick', pm2.toUpperCase());
+
+  // set initial height
+  if (DATA.height) setFrameHeight(DATA.height);
+  __FLOW_DIRTY = true;
+}
+
+// toggles events
+[togPaths, togDots, togNodes, togLegend].forEach(el => el.addEventListener('change', applyToggles));
+if (togGlobalQ) {
+  togGlobalQ.addEventListener('change', () => {
+    try { if (__lastArgs !== null) build(__lastArgs); else build({}); } catch (e) {}
+  });
+}
+
+document.getElementById('resetView').addEventListener('click', () => resetView());
+document.getElementById('play').addEventListener('click', () => { playing = true; __wakeLoop(); });
+document.getElementById('pause').addEventListener('click', () => { playing = false; __wakeLoop(); });
+slider.addEventListener('input', () => { idx = parseInt(slider.value||'0',10) || 0; });
+
+const __PERF_KEY_PREFIX = 'pneumo_perf_component::';
+const __PERF_NAME = 'pneumo_svg_flow';
+let __PERF_STATE = {
+  component: __PERF_NAME,
+  dataset_id: '',
+  ts_ms: Date.now(),
+  viewport_state: 'init',
+  wakeups: 0,
+  storage_wakeups: 0,
+  focus_wakeups: 0,
+  visibility_wakeups: 0,
+  duplicate_guard_hits: 0,
+  schedule_raf_count: 0,
+  schedule_timeout_count: 0,
+  hidden_gate_hits: 0,
+  zero_size_gate_hits: 0,
+  css_hidden_gate_hits: 0,
+  offscreen_gate_hits: 0,
+  render_count: 0,
+  idle_poll_ms: 0,
+  playing: false,
+  loop_kind: '',
+};
+function __perfBump(key, delta){
+  const add = Number.isFinite(Number(delta)) ? Number(delta) : 1;
+  __PERF_STATE[key] = Number(__PERF_STATE[key] || 0) + add;
+}
+function __perfSet(key, value){ __PERF_STATE[key] = value; }
+function __perfSyncDataset(){
+  try { __PERF_STATE.dataset_id = String((DATA && DATA.dataset_id) || datasetId || ''); } catch(_e) {}
+}
+function __perfFlush(force){
+  const now = Date.now();
+  if (!force && (now - Number(__PERF_STATE.ts_ms || 0) < 1200)) return;
+  __perfSyncDataset();
+  __PERF_STATE.ts_ms = now;
+  try { localStorage.setItem(__PERF_KEY_PREFIX + __PERF_NAME, JSON.stringify(__PERF_STATE)); } catch(_e) {}
+}
+function __setViewportState(state){
+  __PERF_STATE.viewport_state = String(state || 'unknown');
+  return __PERF_STATE.viewport_state;
+}
+function __frameInParentViewport(){
+  try {
+    const fe = window.frameElement;
+    if (!fe || !fe.getBoundingClientRect) { __setViewportState('visible'); return true; }
+    const r = fe.getBoundingClientRect();
+    const w = Number(r.width || Math.max(0, (r.right || 0) - (r.left || 0)) || 0);
+    const h = Number(r.height || Math.max(0, (r.bottom || 0) - (r.top || 0)) || 0);
+    if (w <= 2 || h <= 2) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    if ((Number(fe.clientWidth || 0) <= 2) || (Number(fe.clientHeight || 0) <= 2)) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    let hiddenByCss = false;
+    try {
+      const hostView = fe.ownerDocument && fe.ownerDocument.defaultView;
+      const cs = (hostView && hostView.getComputedStyle) ? hostView.getComputedStyle(fe) : null;
+      hiddenByCss = !!(cs && (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity || '1') === 0));
+    } catch(_cssErr) {}
+    if (hiddenByCss) { __perfBump('css_hidden_gate_hits'); __setViewportState('css_hidden'); __perfFlush(false); return false; }
+    const hostWin = (window.top && window.top !== window) ? window.top : window;
+    const vh = Number(hostWin.innerHeight || window.innerHeight || 0);
+    const vw = Number(hostWin.innerWidth || window.innerWidth || 0);
+    const margin = 64;
+    const visible = (r.bottom >= -margin) && (r.top <= vh + margin) && (r.right >= -margin) && (r.left <= vw + margin);
+    if (!visible) { __perfBump('offscreen_gate_hits'); __setViewportState('offscreen'); __perfFlush(false); return false; }
+    __setViewportState('visible');
+    return true;
+  } catch(_e) {
+    __setViewportState('visible');
+    return true;
+  }
+}
+function __canAnimateNow(){
+  if (document && document.hidden) { __perfBump('hidden_gate_hits'); __setViewportState('hidden'); __perfFlush(false); return false; }
+  return __frameInParentViewport();
+}
+function __nextIdleMs(visibleMs, hiddenMs, offscreenMs){
+  if (document && document.hidden) return hiddenMs;
+  return __frameInParentViewport() ? visibleMs : offscreenMs;
+}
+let __LOOP_HANDLE = 0;
+let __LOOP_KIND = '';
+function __clearScheduledLoop(){
+  try {
+    if (!__LOOP_HANDLE) return;
+    if (__LOOP_KIND === 'raf' && window.cancelAnimationFrame) window.cancelAnimationFrame(__LOOP_HANDLE);
+    else clearTimeout(__LOOP_HANDLE);
+  } catch(_e) {}
+  __LOOP_HANDLE = 0;
+  __LOOP_KIND = '';
+}
+function __scheduleLoop(kind, delayMs){
+  if (__LOOP_HANDLE) __perfBump('duplicate_guard_hits');
+  __clearScheduledLoop();
+  if (kind === 'raf') {
+    __LOOP_KIND = 'raf';
+    __perfBump('schedule_raf_count');
+    __LOOP_HANDLE = requestAnimationFrame(loop);
+  } else {
+    __LOOP_KIND = 'timeout';
+    const ms = Math.max(0, Number(delayMs) || 0);
+    __perfBump('schedule_timeout_count');
+    __perfSet('idle_poll_ms', ms);
+    __LOOP_HANDLE = window.setTimeout(loop, ms);
+  }
+  __perfSet('loop_kind', __LOOP_KIND);
+  __perfFlush(false);
+}
+function __wakeLoop(){
+  __perfBump('wakeups');
+  if (__canAnimateNow()) __scheduleLoop('raf', 0);
+  else { __perfSet('idle_poll_ms', 0); __LOOP_HANDLE = null; __perfFlush(false); }
+}
+function __playDelayMs(){
+  const fpsRaw = Number(DATA.play_fps_cap);
+  if (!Number.isFinite(fpsRaw) || fpsRaw <= 0) return 0;
+  const fps = Math.max(1, Math.min(60, fpsRaw));
+  return Math.max(1, Math.round(1000 / fps));
+}
+
+function loop(ts) {
+  const dt = (ts - lastTs) / 1000.0;
+  lastTs = ts;
+
+  const time = DATA.time || [];
+  const n = time.length;
+  let activePlayback = false;
+  if (syncPlayhead && n > 0) {
+    const st = readPlayheadState();
+    activePlayback = !!(st && st.playing);
+    if (st && st.idx !== undefined && st.idx !== null) {
+      const v = parseInt(String(st.idx), 10);
+      const ni = clamp((Number.isFinite(v) ? v : 0), 0, n-1);
+      idx = ni;
+      slider.value = String(idx);
+    }
+  } else if (playing && n > 0) {
+    activePlayback = true;
+    idx = idx + Math.max(1, Math.floor(dt * 60));
+    if (idx >= n) idx = 0;
+    slider.value = String(idx);
+  }
+
+  const changed = (__FLOW_DIRTY || idx !== __LAST_LOOP_IDX);
+  __LAST_LOOP_IDX = idx;
+  if (!changed && !activePlayback) {
+    __perfSet('playing', false);
+    __perfFlush(false);
+    __LOOP_HANDLE = null;
+    return;
+  }
+  __FLOW_DIRTY = false;
+
+  idxEl.textContent = String(idx);
+  tEl.textContent = (time[idx] ?? 0).toFixed(3);
+
+  const edges = DATA.edges || [];
+  const nodes = DATA.nodes || [];
+
+  edges.forEach((e) => {
+    const row = edgeNameToRows.get(e.name);
+    const qv = (e.q && e.q[idx] !== undefined) ? e.q[idx] : 0;
+    const qEl = row ? row.querySelector('.q') : null;
+    if (qEl) qEl.textContent = fmtSig(qv, 4);
+  });
+  nodes.forEach((nd) => {
+    const row = nodeNameToRows.get(nd.name);
+    const pv = (nd.p && nd.p[idx] !== undefined) ? nd.p[idx] : 0;
+    const pEl = row ? row.querySelector('.p') : null;
+    if (pEl) pEl.textContent = fmtFixed(pv, 2);
+  });
+
+  nodeObjs.forEach((nd) => {
+    const pv = (nd.pArr && nd.pArr[idx] !== undefined) ? nd.pArr[idx] : 0;
+    nd.text.textContent = fmtFixed(pv, 2);
+  });
+
+  segs.forEach((s) => {
+    const e = edges[s.edgeIdx];
+    if (!e) return;
+    const qv = (e.q && e.q[idx] !== undefined) ? e.q[idx] : 0;
+    const openArr = e.open || null;
+    const isOpen = openArr ? !!openArr[idx] : true;
+
+    const dir = (qv >= 0) ? 1 : -1;
+    const mag = Math.abs(qv);
+    const denom = (togGlobalQ && togGlobalQ.checked) ? (qGlobalMax || 1e-9) : (qMax[s.edgeIdx] || 1e-9);
+    const norm = clamp(mag / (denom || 1e-9), 0, 1);
+
+    const speed = 0.15 + 1.8 * norm;
+    if (activePlayback) {
+      s.phase = (s.phase + dir * speed * dt) % 1;
+      if (s.phase < 0) s.phase += 1;
+    }
+
+    const pt = s.path.getPointAtLength(s.phase * s.len);
+    s.dot.setAttribute('cx', pt.x);
+    s.dot.setAttribute('cy', pt.y);
+
+    const w = 2.0 + 6.0 * norm;
+    s.path.setAttribute('stroke-width', w.toFixed(2));
+    s.path.style.opacity = (0.15 + 0.85 * norm).toFixed(3);
+
+    if (dir >= 0) {
+      s.path.classList.add('pos');
+      s.path.classList.remove('neg');
+      s.dot.classList.add('pos');
+      s.dot.classList.remove('neg');
+    } else {
+      s.path.classList.add('neg');
+      s.path.classList.remove('pos');
+      s.dot.classList.add('neg');
+      s.dot.classList.remove('pos');
+    }
+
+    if (!isOpen) {
+      s.path.classList.add('closed');
+      s.dot.classList.add('closed');
+    } else {
+      s.path.classList.remove('closed');
+      s.dot.classList.remove('closed');
+    }
+
+    if (selectedEdge && s.edgeName === selectedEdge) {
+      s.path.classList.add('sel');
+      s.dot.classList.add('sel');
+    }
+  });
+
+  __perfBump('render_count');
+  __perfSet('playing', !!activePlayback);
+  __perfFlush(false);
+  if (activePlayback && __canAnimateNow()) {
+    const playMs = __playDelayMs();
+    if (playMs > 0) __scheduleLoop('timeout', playMs);
+    else __scheduleLoop('raf', 0);
+  }
+  else {
+    __LOOP_HANDLE = null;
+  }
+}
+window.addEventListener('storage', (ev) => {
+  if (!DATA.sync_playhead) return;
+  if (ev && ev.key && ev.key !== String(DATA.playhead_storage_key || 'pneumo_play_state')) return;
+  __perfBump('storage_wakeups');
+  const st = readPlayheadState();
+  if (st && st.playing) { __wakeLoop(); return; }
+  const idxNow = (st && st.idx != null) ? Number(st.idx) : __LAST_LOOP_IDX;
+  const changed = idxNow !== __LAST_LOOP_IDX;
+  if (!changed && !__FLOW_DIRTY) return;
+  __FLOW_DIRTY = true;
+  if (__canAnimateNow()) __wakeLoop();
+});
+window.addEventListener('focus', () => { __perfBump('focus_wakeups'); __wakeLoop(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { __perfBump('visibility_wakeups'); __wakeLoop(); } });
+window.addEventListener('scroll', () => { try { __wakeLoop(); } catch(_e) {} }, {passive:true});
+window.addEventListener('resize', () => { try { __wakeLoop(); } catch(_e) {} }, {passive:true});
+__perfFlush(true);
+// ----------------------------------------------------
+// Streamlit render handler
+// ----------------------------------------------------
+function onDataFromPython(event) {
+  if (event.data.type !== "streamlit:render") return;
+  __stHasRender = true;
+  stSetReady();
+  const args = event.data.args || {};
+  try {
+    build(args);
+  } catch (e) {
+    svgHost.innerHTML = `<div style="padding:12px;color:#a00">Ошибка UI: ${String(e)}</div>`;
+  }
+}
+
+window.addEventListener("message", onDataFromPython);
+try { init(); } catch (e) { console.error(e); }
+// Reasonable default height until Python sends one
+setFrameHeight(740);
+</script>
+</body>
+</html>

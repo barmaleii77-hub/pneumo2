@@ -1,0 +1,43 @@
+BUILD INFO: PneumoApp_v6_77
+==========================
+
+Release tag: UNIFIED_v6_77
+Version:     6.77
+Built (UTC): (see release_tag.json)
+Base:        UNIFIED_v6_76 (v6.76)
+
+Goal of this build
+------------------
+P0 stability for unified Streamlit multipage navigation: eliminate crashes caused by
+legacy pages calling st.set_page_config() after the main app has already configured
+Streamlit.
+
+Key changes (v6_77)
+-------------------
+1) pages_legacy safety:
+   - All legacy pages that had `st.set_page_config(...)` were migrated to
+     `safe_set_page_config(...)`.
+   - This makes them runnable BOTH:
+       a) as standalone Streamlit scripts, and
+       b) inside the unified multipage app (app.py) without "set_page_config can only be called once" crashes.
+
+2) Added helper module:
+   - pneumo_solver_ui/streamlit_compat.py
+     Provides `safe_set_page_config()`.
+
+3) Cleanup:
+   - Removed stale artifact pneumo_solver_ui/scheme_fingerprint.MISMATCH.current.json (misleading when fingerprint matches).
+
+3) Version markers synchronized:
+   - VERSION.txt / release_tag.json / pneumo_solver_ui/release_info.py
+
+QC summary
+----------
+- preflight_gate: OK (see REPORTS/PREFLIGHT_GATE_v6_77.txt)
+- scheme fingerprint: OK
+- self_check: OK
+
+Notes
+-----
+- This build focuses on preserving functionality and preventing navigation crashes.
+  No feature removals and no heavy new functionality.

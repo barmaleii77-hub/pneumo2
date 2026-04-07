@@ -1,0 +1,17 @@
+UnifiedPneumoApp — UNIFIED_v6_59 (WINSAFE)
+
+Focus: restore after merge without потеря функциональности.
+
+Changes vs v6_57:
+- app.py: восстановлена legacy-навигация (добавлены страницы из набора v6_46),
+  при этом главный единый маршрут (pneumo_ui_app.py) сохранён и остаётся default.
+- app.py: кнопка "Сохранить диагностику" исправлена (убран несовместимый параметр tag),
+  добавлена совместимость с новым API download_button (width='stretch').
+- pages/_page_runner.py: run_page() теперь умеет искать targets в pages_legacy/
+  и маппить ORIGINAL_FILENAME -> nonascii_*.py (исправление "мертвых" legacy страниц).
+- scheme_integrity.py: добавлена compute_fingerprint() для совместимости UI (01_SchemeIntegrity).
+- release_tag.json, release_info.DEFAULT_RELEASE: обновлены на UNIFIED_v6_59.
+
+Quick checks:
+- python -m compileall : OK
+- mech_energy_smoke_check --t_end_max 0.2 : OK

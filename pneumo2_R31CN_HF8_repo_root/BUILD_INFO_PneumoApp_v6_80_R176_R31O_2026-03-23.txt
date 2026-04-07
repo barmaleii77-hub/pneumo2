@@ -1,0 +1,13 @@
+Build Info — PneumoApp_v6_80_R176_R31O_2026-03-23
+Base: PneumoApp_v6_80_R176_R31N_DESKTOP_FPS_PLAYBACK_LITEMODE_2026-03-23
+Built (UTC): 2026-03-23 00:00 UTC
+
+Key diffs vs R31N:
+- Ring generator keeps authored raw tracks for preview/summary while building closed spline data separately for periodic export.
+- Periodic phased SINE no longer receives a false seam-slope correction that inflates amplitude near the lap boundary.
+- Active ring UI removes the last deprecated `use_container_width` call.
+- TODO/WISHLIST and release metadata refreshed for the new patch artifact.
+
+Integrity:
+- py_compile (scenario_ring.py, ui_scenario_ring.py, release_info.py): expected PASS in targeted verification
+- targeted pytest slice: ring closure/amplitude + streamlit width runtime + release sync

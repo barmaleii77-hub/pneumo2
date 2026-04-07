@@ -1,0 +1,20 @@
+{
+  "release_under_test": "PneumoApp_v6_80_R176_R31AB_2026-03-25",
+  "bundle_created_at": "2026-03-25T09:22:21",
+  "bundle_zip": "SEND_20260325_092217_auto-sys.excepthook_bundle.zip",
+  "root_cause": "Desktop Animator crashed on first-frame load because Car3DWidget._corner_is_front was defined without self or @staticmethod, but was called as self._corner_is_front(corner).",
+  "symptom": "Animator appears hung and road is not visible, because load_npz aborts during _update_frame(0) before the scene completes its first paint.",
+  "evidence": {
+    "health_ok": true,
+    "validation_ok": true,
+    "geometry_acceptance": "PASS",
+    "anim_latest_available": true,
+    "anim_latest_npz_present": true,
+    "anim_latest_road_csv_present": true,
+    "pointer_sync_ok": true,
+    "unhandled_exception": "TypeError: Car3DWidget._corner_is_front() takes 1 positional argument but 2 were given",
+    "crash_location": "pneumo_solver_ui/desktop_animator/app.py :: load_npz -> _update_frame -> cockpit.update_frame -> car3d.update_frame -> _corner_cylinder_contract -> _corner_is_front"
+  },
+  "fix": "Restore explicit static helper semantics for _corner_is_front and add a regression test guarding this method-binding contract.",
+  "expected_after_fix": "Animator opens, first frame paints, road becomes visible, latest SEND bundle no longer records sys.excepthook TypeError for _corner_is_front."
+}

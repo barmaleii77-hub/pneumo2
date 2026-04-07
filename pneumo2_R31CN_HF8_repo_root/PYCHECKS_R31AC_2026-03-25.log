@@ -1,0 +1,2 @@
+$ python -m py_compile pneumo_solver_ui/desktop_animator/app.py pneumo_solver_ui/release_info.py
+$ python -m compileall -q .

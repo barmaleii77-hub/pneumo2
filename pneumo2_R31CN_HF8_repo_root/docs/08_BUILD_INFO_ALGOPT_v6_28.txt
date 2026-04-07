@@ -1,0 +1,37 @@
+BUILD INFO — Algoritmy Optimizatsii (v6.28)
+
+Base:
+- AlgoritmyOptimizatsiiUnifiedPneumoAppVSixTwentySevenWinSafe.zip
+
+Key changes:
+1) Worker:
+   - baseline row id=-1 is evaluated automatically and saved to stage CSV
+   - seed_points_json + seed_only mode (for warm-start / external schedulers)
+   - early-stop by accumulated penalty (stop_if_pen_gt)
+   - optional sorting tests by estimated cost (dt*t_end)
+   - stable service columns: meta_source, meta_stage, meta_budget, pruned_early, pruned_after_test
+
+2) StageRunner:
+   - warmstart_mode: surrogate / archive / none
+   - surrogate warm-start (ExtraTreesRegressor) trained on global archive -> elite sampling -> mu/cov
+   - stage plan tuned (final stage uses t_end_scale=2.0, more scenarios)
+   - passes early-stop thresholds to worker: stop_pen_stage1/2
+   - baseline update is now guarded: baseline_best_score.json + update only if better
+
+3) UI:
+   - added controls for warmstart_mode, surrogate samples/topk, early-stop thresholds, sorting tests by cost
+   - passes new flags into StageRunner
+
+Artifacts:
+- patches/patch_vsix_twenty_eight_worker.diff
+- patches/patch_vsix_twenty_eight_stage_runner.diff
+- patches/patch_vsix_twenty_eight_ui.diff
+- CHANGED_FILES_v6_28.md
+- README_v6_28_ALGOPT.md
+- TODO_v6_28.md
+- WISHLIST_v6_28.md
+
+Notes:
+- No external internet installs are required for the new features; scikit-learn is used (ExtraTreesRegressor).
+- If scikit-learn is not available in target environment, warmstart_mode=surrogate automatically becomes a no-op (falls back to archive / none).
+

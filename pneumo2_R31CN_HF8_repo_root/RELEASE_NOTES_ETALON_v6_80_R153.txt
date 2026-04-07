@@ -1,0 +1,14 @@
+ETALON_v6_80_R153
+
+Hotfix / stability:
+- Launcher: fixed NameError (_python_in_venv) that could break shared-venv bootstrap in GUI mode.
+- Launcher: detects broken shared venv (missing pyvenv.cfg / python.exe) and automatically recreates it.
+  This addresses the error: "failed to locate pyvenv.cfg" (rc=106) during pip install.
+- ISO6358 core: fixed NameError in rho_ANR_ref() (P_ANR/R_DRY_AIR constants) so self-check/preflight does not fail.
+
+Quality gates run (this build):
+- python -m py_compile (launcher + updated modules) ✅
+- pneumo_solver_ui/tools/preflight_gate.py (basic suite + registry sanity) ✅
+
+Notes:
+- No changes to physics/model/data contracts (ABSOLUTE LAW remains in force).

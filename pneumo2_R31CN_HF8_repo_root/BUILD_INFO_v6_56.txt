@@ -1,0 +1,20 @@
+BUILD_INFO v6_56
+
+База: UNIFIED_v6_55
+Цель: исправить регрессии интерфейса/утилит после мерджа (без добавления новых функций).
+
+Ключевые изменения:
+- FIX(streamlit): восстановлена страница "Просмотр результатов" — добавлен файл
+  pneumo_solver_ui/pages/12_ResultsViewer.py как тонкий алиас на существующую страницу
+  сравнения результатов (06_CompareNPZ_Web.py). Это устраняет фатальное падение
+  Streamlit на старте ("Unable to create Page. The file `12_ResultsViewer.py` could not be found.").
+- FIX(desktop_animator): устранён краш Desktop Animator при запуске (NameError: os is not defined)
+  — добавлен import os и актуализирован fallback метки релиза в заголовке окна.
+- FIX(clipboard): исправлено "GlobalLock failed" при копировании ZIP в буфер обмена на Windows 64‑bit.
+  Причина — усечение WinAPI handle/pointer из‑за неустановленных ctypes restype/argtypes.
+  Добавлены сигнатуры GlobalAlloc/GlobalLock/GlobalUnlock/GlobalFree + функций clipboard.
+- CHORE(versioning): обновлены VERSION.txt, release_tag.json и DEFAULT_RELEASE.
+
+Примечания:
+- Новых функций не добавлялось; изменения направлены только на устранение регрессий
+  от перезаписи/неполного мерджа.

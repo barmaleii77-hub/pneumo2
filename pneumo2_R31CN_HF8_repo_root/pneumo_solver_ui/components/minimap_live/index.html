@@ -1,0 +1,908 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    :root{
+      --bg:#ffffff;
+      --panel:rgba(255,255,255,0.92);
+      --border:rgba(0,0,0,0.12);
+      --text:#1b1b1b;
+      --muted:#666;
+      --accent:rgba(0,120,255,0.92);
+      --path:rgba(0,0,0,0.25);
+      --future:rgba(0,0,0,0.55);
+      --past:rgba(0,0,0,0.18);
+      --grid:rgba(0,0,0,0.06);
+      --warn:rgba(255,140,0,0.90);
+    }
+    html,body{height:100%;margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
+    .root{position:relative;width:100%;height:100%;min-height:240px;overflow:hidden;background:var(--bg);}
+    canvas{display:block;width:100%;height:100%;background:var(--bg);}
+    .hud{
+      position:absolute;left:10px;top:10px;max-width:min(420px,calc(100% - 20px));
+      background:var(--panel);border:1px solid var(--border);border-radius:12px;
+      padding:10px 12px;box-shadow:0 2px 10px rgba(0,0,0,0.08);
+      color:var(--text);user-select:none;
+    }
+    .title{font-weight:700;font-size:14px;line-height:1.2;margin:0 0 6px 0;}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:baseline;margin:3px 0;}
+    .pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.08);color:var(--muted);}
+    .pill b{color:var(--text);font-weight:700;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+    .hint{font-size:11px;color:var(--muted);line-height:1.25;margin-top:6px;}
+
+    .badge{
+      display:inline-block;
+      font-size:11px;
+      padding:2px 8px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,0.14);
+      background:#fff;
+      color:#333;
+      max-width:100%;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+
+    .badge.warn{border-color:rgba(255,140,0,0.35);background:rgba(255,245,235,0.9);color:#8a4b00;}
+  </style>
+</head>
+<body>
+<div class="root" id="root">
+  <canvas id="cv"></canvas>
+  <div class="hud" id="hud" style="display:none;">
+    <div class="title" id="title">Mini‑map</div>
+    <div class="row">
+      <span class="pill mono" id="pillIdx">idx: 0</span>
+      <span class="pill mono" id="pillT">t: 0.000s</span>
+    </div>
+    <div class="row">
+      <span class="pill" id="pillV">v: 0.00 m/s</span>
+      <span class="pill" id="pillSteer">steer: 0.0°</span>
+      <span class="pill" id="pillR">R: ∞</span>
+    </div>
+    <div class="row">
+      <span class="badge" id="badgeMan">Манёвр: —</span>
+      <span class="badge" id="badgeSeg">Сегмент: —</span>
+    </div>
+    <div class="hint" id="hint">Клик/drag по карте → перемотка (playhead). Колёсико/панорамирование не требуется.</div>
+  </div>
+</div>
+
+<script>
+// -------------------------
+// Streamlit component glue
+// -------------------------
+function sendValue(value) {
+  const msg = {isStreamlitMessage:true, type:"streamlit:setComponentValue", value:value};
+  parent.postMessage(msg, "*");
+}
+function setFrameHeight(height) {
+  const msg = {isStreamlitMessage:true, type:"streamlit:setFrameHeight", height: height};
+  parent.postMessage(msg, "*");
+}
+let __stHasRender = false;
+let __stReadyTries = 0;
+let __stReadyTimer = null;
+function componentReady() {
+  const msg = {isStreamlitMessage:true, type:"streamlit:componentReady", apiVersion: 1, args: { apiVersion: 1 }};
+  parent.postMessage(msg, "*");
+}
+function startReadyPinger() {
+  if (__stReadyTimer) return;
+  __stReadyTimer = setInterval(() => {
+    if (__stHasRender) {
+      clearInterval(__stReadyTimer);
+      __stReadyTimer = null;
+      return;
+    }
+    __stReadyTries += 1;
+    if (__stReadyTries > 50) {
+      clearInterval(__stReadyTimer);
+      __stReadyTimer = null;
+      return;
+    }
+    try { componentReady(); } catch (e) { console.error(e); }
+  }, 200);
+}
+try { componentReady(); } catch (e) { console.error(e); }
+startReadyPinger();
+
+// -------------------------
+// Helpers
+// -------------------------
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function fmt(v, nd=2){
+  const x = Number(v);
+  if (!isFinite(x)) return "—";
+  return x.toFixed(nd);
+}
+function unwrapYaw(arr){
+  if (!Array.isArray(arr) || arr.length < 2) return arr;
+  const out = new Array(arr.length);
+  let prev = Number(arr[0]||0);
+  out[0]=prev;
+  let acc = 0;
+  for (let i=1;i<arr.length;i++){
+    const y = Number(arr[i]||0);
+    let dy = y - prev;
+    // wrap to [-pi,pi]
+    while (dy > Math.PI) dy -= 2*Math.PI;
+    while (dy < -Math.PI) dy += 2*Math.PI;
+    acc += dy;
+    out[i] = out[0] + acc;
+    prev = y;
+  }
+  return out;
+}
+
+// -------------------------
+// Playhead (localStorage)
+// -------------------------
+function nowMs(){ return Date.now(); }
+function ensurePlayheadState(storageKey){
+  const k = String(storageKey || 'pneumo_play_state');
+  const raw = localStorage.getItem(k);
+  if (raw) {
+    try {
+      const st = JSON.parse(raw);
+      if (st && typeof st === 'object') return st;
+    } catch(e) {}
+  }
+  const st0 = {idx:0, playing:false, ts: nowMs(), dataset_id: ""};
+  try { localStorage.setItem(k, JSON.stringify(st0)); } catch(e) {}
+  return st0;
+}
+function readPlayheadState(storageKey){
+  const k = String(storageKey || 'pneumo_play_state');
+  try {
+    const raw = localStorage.getItem(k);
+    if (!raw) return null;
+    const st = JSON.parse(raw);
+    if (st && typeof st === 'object') return st;
+    return null;
+  } catch(e) {
+    return null;
+  }
+}
+function writePlayheadState(storageKey, patch){
+  const k = String(storageKey || 'pneumo_play_state');
+  const cur = ensurePlayheadState(k);
+  const out = Object.assign({}, cur, patch || {});
+  out.ts = nowMs();
+  try { localStorage.setItem(k, JSON.stringify(out)); } catch(e) {}
+  return out;
+}
+
+// -------------------------
+// State
+// -------------------------
+let DATA = {
+  title: 'Mini-map',
+  hint: '',
+  time: [],
+  path: null,
+  meta: {},
+  sync_playhead: true,
+  playhead_storage_key: 'pneumo_play_state',
+  dataset_id: '',
+  height: 380,
+  allow_scrub: true,
+  show_hud: true,
+  mode: 'follow', // 'follow' | 'global'
+  window_m_ahead: 60,
+  window_m_back: 25,
+  window_points: 260,
+  show_grid: true,
+  show_path: true,
+  ring_visual: null,
+};
+let __YAWU = null; // unwrapped yaw
+let __YAWR = null; // yaw rate
+let __LAST_IDX = -1;
+let __DIRTY = true;
+let __DRAG = false;
+
+const root = document.getElementById('root');
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const hud = document.getElementById('hud');
+const titleEl = document.getElementById('title');
+const pillIdx = document.getElementById('pillIdx');
+const pillT = document.getElementById('pillT');
+const pillV = document.getElementById('pillV');
+const pillSteer = document.getElementById('pillSteer');
+const pillR = document.getElementById('pillR');
+const badgeMan = document.getElementById('badgeMan');
+const badgeSeg = document.getElementById('badgeSeg');
+const hintEl = document.getElementById('hint');
+
+function resizeCanvas(){
+  const W = root.clientWidth;
+  const H = root.clientHeight;
+  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  if (cv.width !== Math.floor(W*dpr) || cv.height !== Math.floor(H*dpr)){
+    cv.width = Math.floor(W*dpr);
+    cv.height = Math.floor(H*dpr);
+    cv.style.width = W+'px';
+    cv.style.height = H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    __DIRTY = true;
+  }
+}
+window.addEventListener('resize', ()=>{ __DIRTY = true; });
+document.addEventListener('visibilitychange', ()=>{ __DIRTY = true; });
+
+function prepareDerived(){
+  __YAWU = null;
+  __YAWR = null;
+  const t = DATA.time || [];
+  const p = DATA.path || {};
+  if (!Array.isArray(t) || t.length < 2) return;
+  // yaw unwrap
+  const yaw = (p && Array.isArray(p.yaw) && p.yaw.length === t.length) ? p.yaw : null;
+  if (yaw){
+    __YAWU = unwrapYaw(yaw);
+    // yaw rate
+    __YAWR = new Array(t.length);
+    __YAWR[0] = 0;
+    for (let i=1;i<t.length;i++){
+      const dt = Math.max(1e-6, Number(t[i]||0) - Number(t[i-1]||0));
+      __YAWR[i] = (Number(__YAWU[i]||0) - Number(__YAWU[i-1]||0)) / dt;
+    }
+  }
+}
+
+
+function __ringSegments(){
+  return (DATA.ring_visual && Array.isArray(DATA.ring_visual.segments)) ? DATA.ring_visual.segments : [];
+}
+function __ringLength(){
+  const rv = DATA.ring_visual || {};
+  const L = Number(rv.ring_length_m || 0);
+  return isFinite(L) && L > 0 ? L : 0;
+}
+function __sModRing(sVal){
+  const L = __ringLength();
+  if (!(L > 0)) return Number(sVal || 0);
+  let x = Number(sVal || 0) % L;
+  if (x < 0) x += L;
+  return x;
+}
+function __segContains(seg, sMod){
+  const x0 = Number(seg.x_start_m || 0);
+  const x1 = Number(seg.x_end_m || x0);
+  return (sMod >= x0 - 1e-9) && (sMod <= x1 + 1e-9);
+}
+function __segmentForS(sVal){
+  const segs = __ringSegments();
+  if (!segs.length) return null;
+  const sMod = __sModRing(sVal);
+  for (const seg of segs){
+    if (__segContains(seg, sMod)) return seg;
+  }
+  return null;
+}
+function drawRingSegmentOverlay(tf, i0, i1){
+  const p = DATA.path || {};
+  if (!p || !Array.isArray(p.x) || !Array.isArray(p.z) || !Array.isArray(p.s)) return;
+  const segs = __ringSegments();
+  if (!segs.length) return;
+  for (const seg of segs){
+    const color = String(seg.edge_color || 'rgba(0,120,255,0.85)');
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    let started = false;
+    for (let k=i0;k<=i1;k++) {
+      const sVal = Number(p.s[k]||0);
+      if (!__segContains(seg, __sModRing(sVal))) {
+        if (started) { ctx.stroke(); ctx.beginPath(); started = false; }
+        continue;
+      }
+      const q = tf.W2S(Number(p.x[k]||0), Number(p.z[k]||0));
+      if (!started) { ctx.moveTo(q[0], q[1]); started = true; }
+      else { ctx.lineTo(q[0], q[1]); }
+    }
+    if (started) ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function getIdxFromPlayhead(){
+  const n = (DATA.time && DATA.time.length) ? DATA.time.length : 0;
+  if (n <= 0) return 0;
+  if (!DATA.sync_playhead) return clamp(__LAST_IDX>=0?__LAST_IDX:0, 0, n-1);
+  const st = readPlayheadState(DATA.playhead_storage_key);
+  if (!st) return clamp(__LAST_IDX>=0?__LAST_IDX:0, 0, n-1);
+  if (DATA.dataset_id && st.dataset_id && String(st.dataset_id) !== String(DATA.dataset_id)) {
+    // dataset mismatch: do not follow чужой playhead
+    return clamp(__LAST_IDX>=0?__LAST_IDX:0, 0, n-1);
+  }
+  const idx = Number(st.idx||0);
+  return clamp(idx, 0, n-1);
+}
+
+function worldToScreenFactory(points, W, H){
+  // points: array of {x,z}
+  let xmin=Infinity, xmax=-Infinity, zmin=Infinity, zmax=-Infinity;
+  for (const P of points){
+    const x = P.x, z = P.z;
+    if (!isFinite(x)||!isFinite(z)) continue;
+    if (x<xmin) xmin=x; if (x>xmax) xmax=x;
+    if (z<zmin) zmin=z; if (z>zmax) zmax=z;
+  }
+  if (!isFinite(xmin) || !isFinite(xmax)) { xmin=-1; xmax=1; zmin=-1; zmax=1; }
+  const pad = 18;
+  const w = Math.max(1e-9, (xmax-xmin));
+  const h = Math.max(1e-9, (zmax-zmin));
+  const sx = (W - pad*2) / w;
+  const sy = (H - pad*2) / h;
+  const s = Math.min(sx, sy);
+  const cx = (xmin+xmax)*0.5;
+  const cz = (zmin+zmax)*0.5;
+  const ox = W*0.5 - s*cx;
+  const oz = H*0.5 - s*cz;
+  // z axis goes down on screen, so invert
+  function W2S(x,z){
+    return [ox + s*x, oz - s*z];
+  }
+  return {W2S, scale:s, center:[cx,cz], bounds:[xmin,xmax,zmin,zmax]};
+}
+
+function drawGrid(W,H,tf){
+  if (!DATA.show_grid) return;
+  const s = tf.scale;
+  if (!(s>0)) return;
+  // grid step in meters: choose from {0.5,1,2,5,10,20,50}
+  const pxPerM = s;
+  const steps = [0.5,1,2,5,10,20,50,100];
+  let stepM = 10;
+  for (const st of steps){
+    if (st*pxPerM >= 55) { stepM = st; break; }
+  }
+  const b = tf.bounds;
+  const xmin=b[0], xmax=b[1], zmin=b[2], zmax=b[3];
+  const x0 = Math.floor(xmin/stepM)*stepM;
+  const x1 = Math.ceil(xmax/stepM)*stepM;
+  const z0 = Math.floor(zmin/stepM)*stepM;
+  const z1 = Math.ceil(zmax/stepM)*stepM;
+
+  ctx.save();
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid') || 'rgba(0,0,0,0.06)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x=x0; x<=x1+1e-9; x+=stepM){
+    const p0 = tf.W2S(x, z0);
+    const p1 = tf.W2S(x, z1);
+    ctx.moveTo(p0[0], p0[1]);
+    ctx.lineTo(p1[0], p1[1]);
+  }
+  for (let z=z0; z<=z1+1e-9; z+=stepM){
+    const p0 = tf.W2S(x0, z);
+    const p1 = tf.W2S(x1, z);
+    ctx.moveTo(p0[0], p0[1]);
+    ctx.lineTo(p1[0], p1[1]);
+  }
+  ctx.stroke();
+
+  // origin axes
+  ctx.strokeStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath();
+  const oX0 = tf.W2S(0, z0);
+  const oX1 = tf.W2S(0, z1);
+  ctx.moveTo(oX0[0], oX0[1]); ctx.lineTo(oX1[0], oX1[1]);
+  const oZ0 = tf.W2S(x0, 0);
+  const oZ1 = tf.W2S(x1, 0);
+  ctx.moveTo(oZ0[0], oZ0[1]); ctx.lineTo(oZ1[0], oZ1[1]);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawPathSegment(tf, i0, i1, style){
+  const p = DATA.path || {};
+  if (!p || !Array.isArray(p.x) || !Array.isArray(p.z)) return;
+  const n = p.x.length;
+  i0 = clamp(i0, 0, n-1);
+  i1 = clamp(i1, 0, n-1);
+  if (i1 <= i0) return;
+  ctx.save();
+  ctx.strokeStyle = style;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  let started=false;
+  for (let i=i0;i<=i1;i++){
+    const x = Number(p.x[i]);
+    const z = Number(p.z[i]);
+    if (!isFinite(x) || !isFinite(z)) continue;
+    const q = tf.W2S(x,z);
+    if (!started){ ctx.moveTo(q[0], q[1]); started=true; }
+    else { ctx.lineTo(q[0], q[1]); }
+  }
+  if (started) ctx.stroke();
+  ctx.restore();
+}
+
+function drawCar(tf, idx){
+  const p = DATA.path || {};
+  if (!p || !Array.isArray(p.x) || !Array.isArray(p.z)) return;
+  const x = Number(p.x[idx]||0);
+  const z = Number(p.z[idx]||0);
+  const yaw = (p.yaw && p.yaw[idx]!=null) ? Number(p.yaw[idx]) : 0;
+  const q = tf.W2S(x,z);
+  const size = 10;
+
+  // arrow/triangle
+  ctx.save();
+  ctx.translate(q[0], q[1]);
+  ctx.rotate(-yaw); // because screen z inverted
+
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent') || 'rgba(0,120,255,0.92)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(size*1.2, 0);
+  ctx.lineTo(-size*0.9, size*0.8);
+  ctx.lineTo(-size*0.9, -size*0.8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // heading line
+  ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.lineTo(size*1.9,0);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function calcTurnInfo(idx){
+  const p = DATA.path || {};
+  const v = (p && p.v && p.v[idx]!=null) ? Number(p.v[idx]) : NaN;
+  const steer = (p && p.steer && p.steer[idx]!=null) ? Number(p.steer[idx]) : NaN;
+  let yawRate = NaN;
+  if (__YAWR && __YAWR[idx]!=null) yawRate = Number(__YAWR[idx]);
+  let R = Infinity;
+  if (isFinite(v) && isFinite(yawRate) && Math.abs(yawRate) > 1e-4) {
+    R = Math.abs(v / yawRate);
+  }
+  let dir = 0; // -1 right, +1 left
+  if (isFinite(yawRate)) dir = (yawRate >= 0) ? 1 : -1;
+
+  // maneuver label
+  let man = '—';
+  if (isFinite(yawRate) && Math.abs(yawRate) <= 2e-3) {
+    man = 'Прямая';
+  } else if (isFinite(R) && R < 1e6) {
+    man = (dir>=0) ? ('Поворот влево, R≈'+fmt(R,1)+' m') : ('Поворот вправо, R≈'+fmt(R,1)+' m');
+  }
+  return {v, steer, R, yawRate, man};
+}
+
+function updateHud(idx){
+  const t = DATA.time || [];
+  if (!DATA.show_hud) {
+    hud.style.display='none';
+    return;
+  }
+  hud.style.display='block';
+  titleEl.textContent = String(DATA.title || 'Mini‑map');
+  hintEl.textContent = String(DATA.hint || 'Клик/drag по карте → перемотка (playhead).');
+
+  const tt = (t && t[idx]!=null) ? Number(t[idx]) : 0;
+  pillIdx.textContent = 'idx: ' + String(idx);
+  pillT.textContent = 't: ' + fmt(tt,3) + 's';
+
+  const info = calcTurnInfo(idx);
+  if (isFinite(info.v)) {
+    const kmh = info.v * 3.6;
+    pillV.textContent = 'v: ' + fmt(info.v,2) + ' m/s (' + fmt(kmh,1) + ' km/h)';
+  } else {
+    pillV.textContent = 'v: —';
+  }
+  if (isFinite(info.steer)) {
+    pillSteer.textContent = 'steer: ' + fmt(info.steer*180/Math.PI,1) + '°';
+  } else {
+    pillSteer.textContent = 'steer: —';
+  }
+  if (isFinite(info.R) && info.R < 1e6) {
+    pillR.textContent = 'R: ' + fmt(info.R,1) + ' m';
+  } else {
+    pillR.textContent = 'R: ∞';
+  }
+
+  badgeMan.textContent = 'Манёвр: ' + info.man;
+  badgeMan.className = (info.man && info.man !== '—' && info.man !== 'Прямая') ? 'badge warn' : 'badge';
+  if (badgeSeg){
+    const seg = (p && Array.isArray(p.s) && p.s[idx] != null) ? __segmentForS(Number(p.s[idx]||0)) : null;
+    const segName = seg ? (String(seg.name || ('S'+String(seg.seg_idx||'')))) : '—';
+    badgeSeg.textContent = 'Сегмент: ' + segName;
+    badgeSeg.style.borderColor = seg && seg.edge_color ? String(seg.edge_color) : 'rgba(0,0,0,0.14)';
+  }
+}
+
+function getWindowIndices(idx){
+  const p = DATA.path || {};
+  const n = (p && p.x && p.x.length) ? p.x.length : 0;
+  if (n <= 0) return [0,0];
+
+  // Prefer distance window if s exists
+  const sArr = (p && Array.isArray(p.s) && p.s.length === n) ? p.s : null;
+  if (DATA.mode === 'follow' && sArr) {
+    const s0 = Number(sArr[idx]||0);
+    const sMin = s0 - Number(DATA.window_m_back||25);
+    const sMax = s0 + Number(DATA.window_m_ahead||60);
+    // find indices by linear scan around idx (fast)
+    let i0 = idx;
+    while (i0 > 0 && Number(sArr[i0]||0) > sMin) i0--;
+    let i1 = idx;
+    while (i1 < n-1 && Number(sArr[i1]||0) < sMax) i1++;
+    return [i0, i1];
+  }
+
+  // Fallback: fixed window points
+  const win = Number(DATA.window_points||260);
+  const back = Math.floor(win*0.35);
+  const ahead = win - back;
+  return [clamp(idx-back, 0, n-1), clamp(idx+ahead, 0, n-1)];
+}
+
+function draw(){
+  resizeCanvas();
+  const W = root.clientWidth;
+  const H = root.clientHeight;
+  ctx.clearRect(0,0,W,H);
+
+  const p = DATA.path || {};
+  if (!p || !Array.isArray(p.x) || !Array.isArray(p.z) || p.x.length < 2){
+    // empty
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.font = '14px system-ui';
+    ctx.fillText('Нет данных траектории (path.x/z).', 16, 28);
+    ctx.restore();
+    return;
+  }
+
+  const idx = getIdxFromPlayhead();
+  const n = p.x.length;
+  const i = clamp(idx, 0, n-1);
+
+  // window
+  let i0=0, i1=n-1;
+  if (DATA.mode === 'follow') {
+    const w = getWindowIndices(i);
+    i0 = w[0];
+    i1 = w[1];
+  }
+
+  // collect points for bounds
+  const pts = [];
+  for (let k=i0;k<=i1;k++){
+    pts.push({x:Number(p.x[k]||0), z:Number(p.z[k]||0)});
+  }
+  const tf = worldToScreenFactory(pts, W, H);
+
+  drawGrid(W,H,tf);
+
+  if (DATA.show_path) {
+    if (DATA.ring_visual && DATA.path && Array.isArray(DATA.path.s)) {
+      drawRingSegmentOverlay(tf, i0, i1);
+    }
+    // past/future
+    const colPast = getComputedStyle(document.documentElement).getPropertyValue('--past') || 'rgba(0,0,0,0.18)';
+    const colFuture = getComputedStyle(document.documentElement).getPropertyValue('--future') || 'rgba(0,0,0,0.55)';
+    drawPathSegment(tf, i0, i, colPast);
+    drawPathSegment(tf, i, i1, colFuture);
+  }
+
+  // car marker
+  drawCar(tf, i);
+
+  updateHud(i);
+
+  __LAST_IDX = i;
+}
+
+function pickIdxAtClientXY(clientX, clientY){
+  const rect = cv.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+  const p = DATA.path || {};
+  if (!p || !Array.isArray(p.x) || !Array.isArray(p.z)) return null;
+  const n = p.x.length;
+  if (n <= 0) return null;
+
+  const idx = getIdxFromPlayhead();
+  let i0=0, i1=n-1;
+  if (DATA.mode === 'follow') {
+    const w = getWindowIndices(clamp(idx,0,n-1));
+    i0 = w[0];
+    i1 = w[1];
+  }
+
+  // build same transform
+  const pts = [];
+  for (let k=i0;k<=i1;k++) pts.push({x:Number(p.x[k]||0), z:Number(p.z[k]||0)});
+  const tf = worldToScreenFactory(pts, rect.width, rect.height);
+
+  let bestI = null;
+  let bestD2 = Infinity;
+  for (let k=i0;k<=i1;k++){
+    const q = tf.W2S(Number(p.x[k]||0), Number(p.z[k]||0));
+    const dx = q[0]-x;
+    const dy = q[1]-y;
+    const d2 = dx*dx + dy*dy;
+    if (d2 < bestD2) { bestD2 = d2; bestI = k; }
+  }
+  if (bestI == null) return null;
+
+  // reject if too far (avoid случайные клики)
+  const maxPx = 60;
+  if (bestD2 > maxPx*maxPx) return null;
+  return bestI;
+}
+
+function scrubToIdx(i){
+  if (i == null) return;
+  const n = (DATA.time && DATA.time.length) ? DATA.time.length : 0;
+  if (n <= 0) return;
+  const idx = clamp(Number(i||0), 0, n-1);
+
+  // update playhead locally (no server rerun)
+  writePlayheadState(DATA.playhead_storage_key, {idx: idx, playing: false, dataset_id: DATA.dataset_id || ''});
+  __DIRTY = true;
+
+  // optional send back to python (throttled by streamlit itself)
+  try {
+    sendValue({kind:'scrub', idx: idx, ts: nowMs()});
+  } catch(e) {}
+}
+
+cv.addEventListener('mousedown', (ev)=>{
+  if (!DATA.allow_scrub) return;
+  __DRAG = true;
+  const i = pickIdxAtClientXY(ev.clientX, ev.clientY);
+  scrubToIdx(i);
+});
+window.addEventListener('mousemove', (ev)=>{
+  if (!DATA.allow_scrub) return;
+  if (!__DRAG) return;
+  const i = pickIdxAtClientXY(ev.clientX, ev.clientY);
+  scrubToIdx(i);
+});
+window.addEventListener('mouseup', ()=>{ __DRAG = false; });
+cv.addEventListener('mouseleave', ()=>{ __DRAG = false; });
+cv.addEventListener('click', (ev)=>{
+  if (!DATA.allow_scrub) return;
+  const i = pickIdxAtClientXY(ev.clientX, ev.clientY);
+  scrubToIdx(i);
+});
+
+// Main loop (low power): redraw when idx changes or dirty
+const __PERF_KEY_PREFIX = 'pneumo_perf_component::';
+const __PERF_NAME = 'minimap_live';
+let __PERF_STATE = {
+  component: __PERF_NAME,
+  dataset_id: '',
+  ts_ms: Date.now(),
+  viewport_state: 'init',
+  wakeups: 0,
+  storage_wakeups: 0,
+  focus_wakeups: 0,
+  visibility_wakeups: 0,
+  duplicate_guard_hits: 0,
+  schedule_raf_count: 0,
+  schedule_timeout_count: 0,
+  hidden_gate_hits: 0,
+  zero_size_gate_hits: 0,
+  css_hidden_gate_hits: 0,
+  offscreen_gate_hits: 0,
+  render_count: 0,
+  idle_poll_ms: 0,
+  playing: false,
+  loop_kind: '',
+};
+function __perfBump(key, delta){
+  const add = Number.isFinite(Number(delta)) ? Number(delta) : 1;
+  __PERF_STATE[key] = Number(__PERF_STATE[key] || 0) + add;
+}
+function __perfSet(key, value){ __PERF_STATE[key] = value; }
+function __perfSyncDataset(){
+  try { __PERF_STATE.dataset_id = String((DATA && DATA.dataset_id) || datasetId || ''); } catch(_e) {}
+}
+function __perfFlush(force){
+  const now = Date.now();
+  if (!force && (now - Number(__PERF_STATE.ts_ms || 0) < 1200)) return;
+  __perfSyncDataset();
+  __PERF_STATE.ts_ms = now;
+  try { localStorage.setItem(__PERF_KEY_PREFIX + __PERF_NAME, JSON.stringify(__PERF_STATE)); } catch(_e) {}
+}
+function __setViewportState(state){
+  __PERF_STATE.viewport_state = String(state || 'unknown');
+  return __PERF_STATE.viewport_state;
+}
+function __frameInParentViewport(){
+  try {
+    const fe = window.frameElement;
+    if (!fe || !fe.getBoundingClientRect) { __setViewportState('visible'); return true; }
+    const r = fe.getBoundingClientRect();
+    const w = Number(r.width || Math.max(0, (r.right || 0) - (r.left || 0)) || 0);
+    const h = Number(r.height || Math.max(0, (r.bottom || 0) - (r.top || 0)) || 0);
+    if (w <= 2 || h <= 2) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    if ((Number(fe.clientWidth || 0) <= 2) || (Number(fe.clientHeight || 0) <= 2)) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    let hiddenByCss = false;
+    try {
+      const hostView = fe.ownerDocument && fe.ownerDocument.defaultView;
+      const cs = (hostView && hostView.getComputedStyle) ? hostView.getComputedStyle(fe) : null;
+      hiddenByCss = !!(cs && (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity || '1') === 0));
+    } catch(_cssErr) {}
+    if (hiddenByCss) { __perfBump('css_hidden_gate_hits'); __setViewportState('css_hidden'); __perfFlush(false); return false; }
+    const hostWin = (window.top && window.top !== window) ? window.top : window;
+    const vh = Number(hostWin.innerHeight || window.innerHeight || 0);
+    const vw = Number(hostWin.innerWidth || window.innerWidth || 0);
+    const margin = 64;
+    const visible = (r.bottom >= -margin) && (r.top <= vh + margin) && (r.right >= -margin) && (r.left <= vw + margin);
+    if (!visible) { __perfBump('offscreen_gate_hits'); __setViewportState('offscreen'); __perfFlush(false); return false; }
+    __setViewportState('visible');
+    return true;
+  } catch(_e) {
+    __setViewportState('visible');
+    return true;
+  }
+}
+function __canAnimateNow(){
+  if (document && document.hidden) { __perfBump('hidden_gate_hits'); __setViewportState('hidden'); __perfFlush(false); return false; }
+  return __frameInParentViewport();
+}
+function __nextIdleMs(visibleMs, hiddenMs, offscreenMs){
+  if (document && document.hidden) return hiddenMs;
+  return __frameInParentViewport() ? visibleMs : offscreenMs;
+}
+function __playDelayMs(){
+  const fpsRaw = Number(DATA.play_fps_cap);
+  if (!Number.isFinite(fpsRaw) || fpsRaw <= 0) return 0;
+  const fps = Math.max(1, Math.min(60, fpsRaw));
+  return Math.max(1, Math.round(1000 / fps));
+}
+let __LOOP_HANDLE = 0;
+let __LOOP_KIND = '';
+function __clearScheduledLoop(){
+  try {
+    if (!__LOOP_HANDLE) return;
+    if (__LOOP_KIND === 'raf' && window.cancelAnimationFrame) window.cancelAnimationFrame(__LOOP_HANDLE);
+    else clearTimeout(__LOOP_HANDLE);
+  } catch(_e) {}
+  __LOOP_HANDLE = 0;
+  __LOOP_KIND = '';
+}
+function __scheduleLoop(kind, delayMs){
+  if (__LOOP_HANDLE) __perfBump('duplicate_guard_hits');
+  __clearScheduledLoop();
+  __LOOP_KIND = String(kind || 'timeout');
+  __perfSet('loop_kind', __LOOP_KIND);
+  if (__LOOP_KIND === 'raf') {
+    __perfBump('schedule_raf_count');
+    __LOOP_HANDLE = requestAnimationFrame(loop);
+  } else {
+    const ms = Math.max(0, Number(delayMs) || 0);
+    __perfBump('schedule_timeout_count');
+    __perfSet('idle_poll_ms', ms);
+    __LOOP_HANDLE = setTimeout(loop, ms);
+  }
+  __perfFlush(false);
+}
+function __wakeLoop(){
+  __perfBump('wakeups');
+  if (__canAnimateNow()) __scheduleLoop('raf', 0);
+  else { __perfSet('idle_poll_ms', 0); __LOOP_HANDLE = null; __perfFlush(false); }
+}
+
+function loop(){
+  const idx = getIdxFromPlayhead();
+  const need = __DIRTY || (idx !== __LAST_IDX);
+  if (need) {
+    __DIRTY = false;
+    draw();
+    __perfBump('render_count');
+  }
+
+  let playing = false;
+  if (DATA.sync_playhead) {
+    const st = readPlayheadState(DATA.playhead_storage_key);
+    if (st && st.playing) playing = true;
+  }
+  __perfSet('playing', !!playing);
+  __perfFlush(false);
+  if (playing && __canAnimateNow()) {
+    const playMs = __playDelayMs();
+    if (playMs > 0) __scheduleLoop('timeout', playMs);
+    else __scheduleLoop('raf', 0);
+  } else {
+    __LOOP_HANDLE = null;
+  }
+}
+__wakeLoop();
+
+window.addEventListener('storage', (ev) => {
+  try {
+    const key = String(DATA.playhead_storage_key || 'pneumo_play_state');
+    if (ev && ev.key && String(ev.key) !== key) return;
+    __perfBump('storage_wakeups');
+    const st = readPlayheadState(DATA.playhead_storage_key);
+    if (st && st.playing) { __wakeLoop(); return; }
+    const n = Array.isArray(DATA.time) ? DATA.time.length : 0;
+    const idxNow = (st && String(st.dataset_id||'') === String(DATA.dataset_id||'') && n > 0)
+      ? clamp(Number(st.idx||0), 0, n - 1)
+      : __LAST_IDX;
+    const changed = idxNow !== __LAST_IDX;
+    if (!changed && !__DIRTY) return;
+    __DIRTY = true;
+    if (!__canAnimateNow()) return;
+    draw();
+    __LAST_IDX = idxNow;
+    __DIRTY = false;
+    __perfBump('render_count');
+    __perfFlush(false);
+  } catch(_e) {}
+});
+window.addEventListener('focus', () => { try { __perfBump('focus_wakeups'); __wakeLoop(); } catch(_e) {} });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { try { __perfBump('visibility_wakeups'); __wakeLoop(); } catch(_e) {} } });
+window.addEventListener('scroll', () => { try { __wakeLoop(); } catch(_e) {} }, {passive:true});
+window.addEventListener('resize', () => { try { __wakeLoop(); } catch(_e) {} }, {passive:true});
+__perfFlush(true);
+// -------------------------
+// Streamlit render handler
+// -------------------------
+function onRender(event){
+  if (!event.data || event.data.type !== 'streamlit:render') return;
+  __stHasRender = true;
+  const args = event.data.args || {};
+
+  // Update DATA with defaults
+  DATA.title = args.title || DATA.title;
+  DATA.hint = (args.hint != null) ? String(args.hint) : DATA.hint;
+  DATA.time = Array.isArray(args.time) ? args.time : DATA.time;
+  DATA.path = (args.path && typeof args.path === 'object') ? args.path : (args.path || DATA.path);
+  DATA.ring_visual = (args.ring_visual && typeof args.ring_visual === 'object') ? args.ring_visual : (DATA.ring_visual || null);
+  DATA.meta = (args.meta && typeof args.meta === 'object') ? args.meta : (DATA.meta || {});
+  DATA.sync_playhead = (args.sync_playhead === false || args.sync_playhead === true) ? !!args.sync_playhead : DATA.sync_playhead;
+  DATA.playhead_storage_key = args.playhead_storage_key || DATA.playhead_storage_key;
+  DATA.dataset_id = (args.dataset_id != null) ? String(args.dataset_id) : (DATA.dataset_id || '');
+  DATA.height = (args.height != null) ? Number(args.height) : DATA.height;
+
+  DATA.allow_scrub = (args.allow_scrub === false || args.allow_scrub === true) ? !!args.allow_scrub : DATA.allow_scrub;
+  DATA.show_hud = (args.show_hud === false || args.show_hud === true) ? !!args.show_hud : DATA.show_hud;
+  // view controls
+  if (args.mode) DATA.mode = String(args.mode);
+  if (args.window_m_ahead != null) DATA.window_m_ahead = Number(args.window_m_ahead);
+  if (args.window_m_back != null) DATA.window_m_back = Number(args.window_m_back);
+  if (args.window_points != null) DATA.window_points = Number(args.window_points);
+  if (args.show_grid === false || args.show_grid === true) DATA.show_grid = !!args.show_grid;
+  if (args.show_path === false || args.show_path === true) DATA.show_path = !!args.show_path;
+
+  // component height
+  try { setFrameHeight(Math.max(240, Number(DATA.height||380))); } catch(e) {}
+
+  // derived
+  prepareDerived();
+
+  // show hud only when we have something
+  hud.style.display = DATA.show_hud ? 'block' : 'none';
+  __DIRTY = true;
+}
+
+window.addEventListener('message', onRender);
+
+</script>
+</body>
+</html>

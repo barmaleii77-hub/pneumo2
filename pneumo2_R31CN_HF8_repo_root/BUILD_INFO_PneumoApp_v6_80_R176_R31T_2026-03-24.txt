@@ -1,0 +1,6 @@
+PneumoApp_v6_80_R176_R31T_2026-03-24
+Base: PneumoApp_v6_80_R176_R31S_2026-03-24
+Highlights:
+- bundle/view-stable road wire-grid spacing in Desktop Animator
+- higher auxiliary pane cadence floors for playback
+- AnimatorAuxCadence telemetry for future SEND bundle acceptance

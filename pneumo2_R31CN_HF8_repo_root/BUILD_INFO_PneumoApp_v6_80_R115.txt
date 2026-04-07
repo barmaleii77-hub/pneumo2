@@ -1,0 +1,28 @@
+PneumoApp v6.80-R115 (integrated)
+Built: 2026-02-17 (Europe/Amsterdam)
+
+Base archive:
+- PneumoApp_ETALON_v6_80_R114.zip
+  sha256: f42a418ed7bcf9c862362c13dc6f7c8b11ed87c7ef5da747bca91d83bf651a81
+
+Donor archives ported in R115:
+- Matematika6802.zip
+  sha256: 9fa776ff6712e9a780f2e5898b43e03e0a85f8566e45090f308bf1928f5b0111
+- FizikaV680R3.zip
+  sha256: 20e528757e3db9d6d34480b473a7a9676e4398f7e67c70e8faba219d52b8bf03
+- InterfeysV680R08.zip
+  sha256: dd607010819951b979d723d12650edeb9c92731e119dd512518b02fde3f7edea
+- Mechanika680v002.zip
+  sha256: 0e3ff55b070c7b5e5a68747f17ef7d40117b83b3f150ebecd9f3bf5c7515c3d3
+
+What changed (high-level):
+- Integrator: RK2 local error control (step-halving/doubling) + per-step telemetry columns in df_main.
+- ISO6358: single source of truth for ANR constants + phi (iso6358_system now imports iso6358_core).
+- UI: restored Optimization implementation page (03_Optimization) + added Settings page (97_Settings).
+- Selfcheck: added UI-traceability guard to catch missing/unused pages.
+- Verification: added coil-bind margin check.
+- Tools: added Camozzi cylinder catalog viewer + spring geometry / coil-bind calculator.
+
+Verification:
+- pytest -q: PASS
+- selfcheck_suite --level quick: PASS (local run)

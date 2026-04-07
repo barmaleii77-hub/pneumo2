@@ -1,0 +1,932 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    :root {
+      --bg: #fafafa;
+      --panel-border: #e6e6e6;
+      --text: #222;
+      --muted: #666;
+      --c1: rgba(0,120,255,0.85);
+      --c2: rgba(255,120,0,0.85);
+      --body: rgba(0,0,0,0.75);
+      --wheel: rgba(0,0,0,0.65);
+      --road: rgba(80,80,80,0.35);
+      --panel: rgba(255,255,255,1);
+    }
+
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
+    .wrap { display:flex; flex-direction:column; height:100%; min-height: 520px; }
+    .hdr { display:flex; align-items:center; gap:10px; padding: 8px 10px; border-bottom: 1px solid var(--panel-border); flex-wrap: wrap; background: #fff; }
+    .hdr h3 { margin:0; font-size:16px; color: var(--text); }
+    .btn { padding: 4px 10px; border: 1px solid #bbb; border-radius: 8px; background:#fff; cursor:pointer; font-size: 12px; }
+    .btn.primary { border-color:#1f77b4; }
+    input[type=range] { width: 320px; }
+    .time { font-variant-numeric: tabular-nums; font-size: 12px; color:#333; }
+    .muted { color: var(--muted); }
+
+    .main { flex: 1; display:flex; min-height: 440px; background: var(--bg); }
+    .canvas { flex: 1; padding: 10px; box-sizing: border-box; }
+
+    svg { width: 100%; height: 100%; display:block; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; }
+
+    .label { font-size: 14px; fill: rgba(0,0,0,0.75); }
+    .small { font-size: 12px; fill: rgba(0,0,0,0.65); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h3 id="title">Механика</h3>
+      <button id="play" class="btn primary">▶︎</button>
+      <button id="pause" class="btn">⏸</button>
+      <span class="time">t=<span id="t">0.000</span> s</span>
+      <input id="slider" type="range" min="0" max="0" value="0" step="1"/>
+      <span class="time">idx=<span id="idx">0</span></span>
+      <span class="time muted">φ=<span id="phi">0.00</span>°</span>
+      <span class="time muted">θ=<span id="theta">0.00</span>°</span>
+      <span class="time muted" id="status">—</span>
+    </div>
+
+    <div class="main">
+      <div class="canvas">
+        <svg id="sv" viewBox="0 0 1000 520" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ----------------------------------------------------
+// Streamlit "no-tooling" component messaging helpers
+// ----------------------------------------------------
+function sendMessageToStreamlitClient(type, data) {
+  var outData = Object.assign({
+    isStreamlitMessage: true,
+    type: type,
+  }, data);
+  window.parent.postMessage(outData, "*");
+}
+
+
+// ----------------------------------------------------
+// Robust "componentReady" (guards against apiVersion=undefined)
+// Some Streamlit versions show: Unrecognized component API version: 'undefined'
+// if the ready handshake is not received early enough or an error happens before init().
+// ----------------------------------------------------
+// We deliberately *repeat* componentReady until we receive the first render message.
+// Reason: in some environments the very early postMessage can be lost; Streamlit then
+// reports: "Unrecognized component API version: 'undefined'".
+let __stHasRender = false;
+let __stReadyTries = 0;
+let __stReadyTimer = null;
+function stSetReady() {
+  try {
+    // Provide apiVersion both at top-level and nested (some protocol variants read args.apiVersion)
+    sendMessageToStreamlitClient("streamlit:componentReady", { apiVersion: 1, args: { apiVersion: 1 } });
+  } catch (e) {
+    console.error("streamlit componentReady failed", e);
+  }
+}
+function stStartReadyPinger() {
+  if (__stReadyTimer) return;
+  __stReadyTimer = setInterval(() => {
+    if (__stHasRender) {
+      clearInterval(__stReadyTimer);
+      __stReadyTimer = null;
+      return;
+    }
+    __stReadyTries++;
+    if (__stReadyTries > 60) { // ~12s
+      clearInterval(__stReadyTimer);
+      __stReadyTimer = null;
+      return;
+    }
+    stSetReady();
+  }, 200);
+}
+// Send as early as possible (before heavy init / potential errors) + keep retrying
+stSetReady();
+stStartReadyPinger();
+
+function init() {
+  stSetReady();
+}
+function setFrameHeight(height) {
+  sendMessageToStreamlitClient("streamlit:setFrameHeight", { height: height });
+}
+function sendDataToPython(data) {
+  sendMessageToStreamlitClient("streamlit:setComponentValue", data);
+}
+
+
+// ----------------------------------------------------
+// State
+// ----------------------------------------------------
+let DATA = {
+  title: "",
+  time: [],
+  body: {},
+  wheel: {},
+  road: {},
+  stroke: {},
+  phi: [],
+  theta: [],
+  selected: [],
+  meta: {},
+  sync_playhead: false,
+  playhead_storage_key: "pneumo_play_state",
+  dataset_id: "",
+  height: 620,
+};
+
+let refs = null;
+const elStatus = document.getElementById("status");
+
+let syncPlayhead = false;
+let playheadStorageKey = 'pneumo_play_state';
+let playheadDatasetId = '';
+let lastExternalIdx = -1;
+let lastExternalTs = 0;
+let lastLocalAdvanceRaf = 0;
+
+
+function readPlayheadState() {
+  try {
+    const s = localStorage.getItem(playheadStorageKey);
+    if (!s) return null;
+    const obj = JSON.parse(s);
+    if (!obj || typeof obj !== 'object') return null;
+    if (playheadDatasetId && String(obj.dataset_id || '') !== String(playheadDatasetId)) return null;
+    return obj;
+  } catch(_e) { return null; }
+}
+
+
+function readPlayheadStateRaw() {
+  try {
+    const s = localStorage.getItem(playheadStorageKey);
+    if (!s) return null;
+    const obj = JSON.parse(s);
+    if (!obj || typeof obj !== 'object') return null;
+    return obj;
+  } catch(_e) { return null; }
+}
+
+function writePlayheadState(patch) {
+  // Write shared playhead state to localStorage so that *all* iframes/components stay in sync.
+  // IMPORTANT: we do NOT call Streamlit.setComponentValue() here to avoid server reruns on every slider move.
+  try {
+    if (!playheadStorageKey) return;
+    const cur = readPlayheadStateRaw() || {};
+    const n = (DATA.time && DATA.time.length) ? DATA.time.length : (cur.n || 0);
+    const next = Object.assign({}, cur, (patch || {}));
+    next.kind = 'playhead';
+    if (playheadDatasetId) next.dataset_id = playheadDatasetId;
+    if (n) next.n = n;
+    if (DATA.meta && typeof DATA.meta.frame_dt_s === 'number' && !('frame_dt_s' in next)) {
+      next.frame_dt_s = DATA.meta.frame_dt_s;
+    }
+    next.ts = Date.now();
+    const s = JSON.stringify(next);
+    localStorage.setItem(playheadStorageKey, s);
+    // storage event will fire automatically in other iframes; dispatching here is only for same-document listeners.
+    try {
+      const ev = new StorageEvent('storage', { key: playheadStorageKey, newValue: s });
+      window.dispatchEvent(ev);
+    } catch(_e) {}
+  } catch(_e) {}
+}
+
+function ensurePlayheadState() {
+  // Ensure that a valid playhead state exists for this dataset.
+  let st = readPlayheadState();
+  if (st) return st;
+  const n = (DATA.time && DATA.time.length) ? DATA.time.length : 0;
+  const t0 = (DATA.time && DATA.time.length) ? Number(DATA.time[0]) : 0.0;
+  const base = {
+    kind: 'playhead',
+    dataset_id: playheadDatasetId || undefined,
+    n: n,
+    idx: 0,
+    t: t0,
+    playing: false,
+    frame_dt_s: (DATA.meta && typeof DATA.meta.frame_dt_s === 'number') ? DATA.meta.frame_dt_s : 0.03,
+    ts: Date.now(),
+  };
+  try {
+    if (playheadStorageKey) {
+      const s = JSON.stringify(base);
+      localStorage.setItem(playheadStorageKey, s);
+      try {
+        const ev = new StorageEvent('storage', { key: playheadStorageKey, newValue: s });
+        window.dispatchEvent(ev);
+      } catch(_e) {}
+    }
+  } catch(_e) {}
+  st = readPlayheadState();
+  return st;
+}
+
+let idx = 0;
+let playing = false;
+let lastTs = performance.now();
+let acc = 0.0;
+
+const NS = "http://www.w3.org/2000/svg";
+
+const elTitle = document.getElementById('title');
+const elT = document.getElementById('t');
+const elIdx = document.getElementById('idx');
+const elPhi = document.getElementById('phi');
+const elTheta = document.getElementById('theta');
+const slider = document.getElementById('slider');
+const btnPlay = document.getElementById('play');
+const btnPause = document.getElementById('pause');
+const svg = document.getElementById('sv');
+
+function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
+
+function sendPick(kind, name, ev) {
+  const out = { kind: kind, name: name, ts: Date.now() };
+  try {
+    if (ev) {
+      out.shift = !!ev.shiftKey;
+      out.ctrl  = !!ev.ctrlKey;
+      out.meta  = !!ev.metaKey;
+      out.alt   = !!ev.altKey;
+    }
+  } catch(_e) {}
+  sendDataToPython(out);
+}
+
+function svgEl(tag, attrs) {
+  const e = document.createElementNS(NS, tag);
+  if (attrs) {
+    for (const [k,v] of Object.entries(attrs)) {
+      e.setAttribute(k, String(v));
+    }
+  }
+  return e;
+}
+
+function getSeries(obj, key) {
+  try {
+    if (!obj) return null;
+    const a = obj[key];
+    if (!a || !Array.isArray(a) || a.length === 0) return null;
+    return a;
+  } catch(_e) { return null; }
+}
+
+function series0(arr) {
+  return (arr && arr.length) ? Number(arr[0]) : 0.0;
+}
+
+function buildScene() {
+  svg.innerHTML = '';
+
+  // Panels
+  const bg = svgEl('rect', {x:0, y:0, width:1000, height:520, fill:'white'});
+  svg.appendChild(bg);
+
+  const front = {x0:40, y0:70, w:430, h:410};
+  const side  = {x0:530, y0:70, w:430, h:410};
+
+  svg.appendChild(svgEl('rect', {x:front.x0, y:front.y0, width:front.w, height:front.h, rx:12, ry:12, fill:'#fff', stroke:'#e6e6e6'}));
+  svg.appendChild(svgEl('rect', {x:side.x0,  y:side.y0,  width:side.w,  height:side.h,  rx:12, ry:12, fill:'#fff', stroke:'#e6e6e6'}));
+
+  svg.appendChild(svgEl('text', {x:front.x0+12, y:front.y0-18, class:'label'})).textContent = 'Фронтальный вид (крен)';
+  svg.appendChild(svgEl('text', {x:side.x0+12,  y:side.y0-18,  class:'label'})).textContent = 'Боковой вид (тангаж)';
+
+  // shared constants
+  const wheelR = 22;
+
+  // FRONT VIEW elements
+  const fxL = front.x0 + 140;
+  const fxR = front.x0 + 290;
+  const fGroundY = front.y0 + front.h - 60;
+
+  // Road lines (per wheel)
+  const fRoadL = svgEl('line', {x1:fxL-70, y1:fGroundY, x2:fxL+70, y2:fGroundY, stroke:'rgba(80,80,80,0.35)', 'stroke-width':4, 'stroke-linecap':'round'});
+  const fRoadR = svgEl('line', {x1:fxR-70, y1:fGroundY, x2:fxR+70, y2:fGroundY, stroke:'rgba(80,80,80,0.35)', 'stroke-width':4, 'stroke-linecap':'round'});
+  svg.appendChild(fRoadL);
+  svg.appendChild(fRoadR);
+
+  // Wheels
+  const fWheelL = svgEl('circle', {cx:fxL, cy:fGroundY-wheelR, r:wheelR, fill:'rgba(0,0,0,0.07)', stroke:'rgba(0,0,0,0.55)', 'stroke-width':2});
+  const fWheelR = svgEl('circle', {cx:fxR, cy:fGroundY-wheelR, r:wheelR, fill:'rgba(0,0,0,0.07)', stroke:'rgba(0,0,0,0.55)', 'stroke-width':2});
+  svg.appendChild(fWheelL);
+  svg.appendChild(fWheelR);
+
+  // Body beam
+  const fBody = svgEl('line', {x1:fxL-30, y1:fGroundY-150, x2:fxR+30, y2:fGroundY-150, stroke:'rgba(0,0,0,0.75)', 'stroke-width':10, 'stroke-linecap':'round'});
+  svg.appendChild(fBody);
+
+  // Cylinders (C1 blue, C2 orange) for each wheel
+  const fCyl = {
+    LP: {c1: svgEl('line', {x1:fxL-6, y1:0, x2:fxL-6, y2:0, stroke:'rgba(0,120,255,0.85)', 'stroke-width':6, 'stroke-linecap':'round'}),
+         c2: svgEl('line', {x1:fxL+6, y1:0, x2:fxL+6, y2:0, stroke:'rgba(255,120,0,0.85)', 'stroke-width':6, 'stroke-linecap':'round'}),
+         txt: svgEl('text', {x:fxL-28, y:fGroundY-10, class:'small'})
+    },
+    PP: {c1: svgEl('line', {x1:fxR-6, y1:0, x2:fxR-6, y2:0, stroke:'rgba(0,120,255,0.85)', 'stroke-width':6, 'stroke-linecap':'round'}),
+         c2: svgEl('line', {x1:fxR+6, y1:0, x2:fxR+6, y2:0, stroke:'rgba(255,120,0,0.85)', 'stroke-width':6, 'stroke-linecap':'round'}),
+         txt: svgEl('text', {x:fxR-28, y:fGroundY-10, class:'small'})
+    },
+  };
+  svg.appendChild(fCyl.LP.c1); svg.appendChild(fCyl.LP.c2); svg.appendChild(fCyl.LP.txt);
+  svg.appendChild(fCyl.PP.c1); svg.appendChild(fCyl.PP.c2); svg.appendChild(fCyl.PP.txt);
+
+  // SIDE VIEW elements
+  const sxF = side.x0 + 130;
+  const sxR = side.x0 + 300;
+  const sGroundY = side.y0 + side.h - 60;
+
+  const sRoadF = svgEl('line', {x1:sxF-80, y1:sGroundY, x2:sxF+80, y2:sGroundY, stroke:'rgba(80,80,80,0.35)', 'stroke-width':4, 'stroke-linecap':'round'});
+  const sRoadR = svgEl('line', {x1:sxR-80, y1:sGroundY, x2:sxR+80, y2:sGroundY, stroke:'rgba(80,80,80,0.35)', 'stroke-width':4, 'stroke-linecap':'round'});
+  svg.appendChild(sRoadF);
+  svg.appendChild(sRoadR);
+
+  const sWheelF = svgEl('circle', {cx:sxF, cy:sGroundY-wheelR, r:wheelR, fill:'rgba(0,0,0,0.07)', stroke:'rgba(0,0,0,0.55)', 'stroke-width':2});
+  const sWheelR = svgEl('circle', {cx:sxR, cy:sGroundY-wheelR, r:wheelR, fill:'rgba(0,0,0,0.07)', stroke:'rgba(0,0,0,0.55)', 'stroke-width':2});
+  svg.appendChild(sWheelF);
+  svg.appendChild(sWheelR);
+
+  // Click-to-select (sync with Python)
+  fWheelL.setAttribute('class', 'wheel');
+  fWheelR.setAttribute('class', 'wheel');
+  sWheelF.setAttribute('class', 'wheel');
+  sWheelR.setAttribute('class', 'wheel');
+
+  fWheelL.addEventListener('click', (ev) => { ev.stopPropagation(); sendPick('corner', 'ЛП', ev); });
+  fWheelR.addEventListener('click', (ev) => { ev.stopPropagation(); sendPick('corner', 'ПП', ev); });
+  sWheelF.addEventListener('click', (ev) => { ev.stopPropagation(); sendPick('axle', 'Перед', ev); });
+  sWheelR.addEventListener('click', (ev) => { ev.stopPropagation(); sendPick('axle', 'Зад', ev); });
+
+
+  const sBody = svgEl('line', {x1:sxF-40, y1:sGroundY-150, x2:sxR+40, y2:sGroundY-150, stroke:'rgba(0,0,0,0.75)', 'stroke-width':10, 'stroke-linecap':'round'});
+  svg.appendChild(sBody);
+
+  const sCyl = {
+    F: {c1: svgEl('line', {x1:sxF-6, y1:0, x2:sxF-6, y2:0, stroke:'rgba(0,120,255,0.85)', 'stroke-width':6, 'stroke-linecap':'round'}),
+        c2: svgEl('line', {x1:sxF+6, y1:0, x2:sxF+6, y2:0, stroke:'rgba(255,120,0,0.85)', 'stroke-width':6, 'stroke-linecap':'round'}),
+        txt: svgEl('text', {x:sxF-28, y:sGroundY-10, class:'small'})
+    },
+    R: {c1: svgEl('line', {x1:sxR-6, y1:0, x2:sxR-6, y2:0, stroke:'rgba(0,120,255,0.85)', 'stroke-width':6, 'stroke-linecap':'round'}),
+        c2: svgEl('line', {x1:sxR+6, y1:0, x2:sxR+6, y2:0, stroke:'rgba(255,120,0,0.85)', 'stroke-width':6, 'stroke-linecap':'round'}),
+        txt: svgEl('text', {x:sxR-28, y:sGroundY-10, class:'small'})
+    },
+  };
+  svg.appendChild(sCyl.F.c1); svg.appendChild(sCyl.F.c2); svg.appendChild(sCyl.F.txt);
+  svg.appendChild(sCyl.R.c1); svg.appendChild(sCyl.R.c2); svg.appendChild(sCyl.R.txt);
+
+  // axis hints
+  const hint = svgEl('text', {x:front.x0+12, y:front.y0+18, class:'small'});
+  hint.textContent = 'Колёса: ●, рама: —, цилиндры: ║║ (Ц1/Ц2)';
+  svg.appendChild(hint);
+
+  refs = {
+    front, side,
+    wheelR,
+    fxL, fxR, fGroundY,
+    sxF, sxR, sGroundY,
+    fRoadL, fRoadR,
+    sRoadF, sRoadR,
+    fWheelL, fWheelR,
+    sWheelF, sWheelR,
+    fBody, sBody,
+    fCyl, sCyl,
+  };
+}
+
+function updateFrame(i) {
+  if (!refs) return;
+  const n = (DATA.time && DATA.time.length) ? DATA.time.length : 0;
+  if (n <= 0) return;
+  i = clamp(i, 0, n-1);
+
+  const t = Number(DATA.time[i] || 0);
+  elT.textContent = t.toFixed(3);
+  elIdx.textContent = String(i);
+
+  const phiArr = Array.isArray(DATA.phi) ? DATA.phi : [];
+  const thArr  = Array.isArray(DATA.theta) ? DATA.theta : [];
+  const phi = Number(phiArr[i] || 0) * 180.0 / Math.PI;
+  const th  = Number(thArr[i]  || 0) * 180.0 / Math.PI;
+  elPhi.textContent = phi.toFixed(2);
+  elTheta.textContent = th.toFixed(2);
+
+  const visualContract = (DATA.meta && DATA.meta.visual_contract) ? DATA.meta.visual_contract : {};
+  const roadMissing = Array.isArray(visualContract.road_missing_corners) ? visualContract.road_missing_corners : [];
+  const roadAvailable = new Set(Array.isArray(visualContract.road_available_corners) ? visualContract.road_available_corners : []);
+  const solverOk = !!visualContract.solver_points_complete;
+  const roadText = String(visualContract.road_overlay_text || (!roadAvailable.size ? 'NO ROAD DATA' : ''));
+  const solverText = String(visualContract.solver_points_overlay_text || (!solverOk ? 'NO SOLVER POINTS' : ''));
+  const statusParts = [];
+  if (roadText) statusParts.push(roadText);
+  if (solverText) statusParts.push(solverText);
+  if (elStatus) {
+    elStatus.textContent = statusParts.length ? statusParts.join(' · ') : 'OK';
+  }
+
+  const pxPerM = Number((DATA.meta && DATA.meta.px_per_m) ? DATA.meta.px_per_m : 2000);
+  const bodyOffset = Number((DATA.meta && DATA.meta.body_offset_px) ? DATA.meta.body_offset_px : 110);
+  const Lstroke = Number((DATA.meta && DATA.meta.L_stroke_m) ? DATA.meta.L_stroke_m : 0.25);
+
+  // Corners: 'ЛП','ПП','ЛЗ','ПЗ'
+  const bLP = getSeries(DATA.body, 'ЛП');
+  const bPP = getSeries(DATA.body, 'ПП');
+  const bLZ = getSeries(DATA.body, 'ЛЗ');
+  const bPZ = getSeries(DATA.body, 'ПЗ');
+
+  const wLP = getSeries(DATA.wheel, 'ЛП');
+  const wPP = getSeries(DATA.wheel, 'ПП');
+  const wLZ = getSeries(DATA.wheel, 'ЛЗ');
+  const wPZ = getSeries(DATA.wheel, 'ПЗ');
+
+  const rLP = getSeries(DATA.road, 'ЛП');
+  const rPP = getSeries(DATA.road, 'ПП');
+  const rLZ = getSeries(DATA.road, 'ЛЗ');
+  const rPZ = getSeries(DATA.road, 'ПЗ');
+
+  const sLP = getSeries(DATA.stroke, 'ЛП');
+  const sPP = getSeries(DATA.stroke, 'ПП');
+  const sLZ = getSeries(DATA.stroke, 'ЛЗ');
+  const sPZ = getSeries(DATA.stroke, 'ПЗ');
+
+  // Baselines
+  const bLP0 = series0(bLP), bPP0 = series0(bPP), bLZ0 = series0(bLZ), bPZ0 = series0(bPZ);
+  const wLP0 = series0(wLP), wPP0 = series0(wPP), wLZ0 = series0(wLZ), wPZ0 = series0(wPZ);
+  const rLP0 = series0(rLP), rPP0 = series0(rPP), rLZ0 = series0(rLZ), rPZ0 = series0(rPZ);
+
+  // deltas (m)
+  const dbLP = (bLP ? (Number(bLP[i]) - bLP0) : 0);
+  const dbPP = (bPP ? (Number(bPP[i]) - bPP0) : 0);
+  const dbLZ = (bLZ ? (Number(bLZ[i]) - bLZ0) : 0);
+  const dbPZ = (bPZ ? (Number(bPZ[i]) - bPZ0) : 0);
+
+  const dwLP = (wLP ? (Number(wLP[i]) - wLP0) : 0);
+  const dwPP = (wPP ? (Number(wPP[i]) - wPP0) : 0);
+  const dwLZ = (wLZ ? (Number(wLZ[i]) - wLZ0) : 0);
+  const dwPZ = (wPZ ? (Number(wPZ[i]) - wPZ0) : 0);
+
+  const drLP = (rLP ? (Number(rLP[i]) - rLP0) : 0);
+  const drPP = (rPP ? (Number(rPP[i]) - rPP0) : 0);
+  const drLZ = (rLZ ? (Number(rLZ[i]) - rLZ0) : 0);
+  const drPZ = (rPZ ? (Number(rPZ[i]) - rPZ0) : 0);
+
+  // Front view (roll) uses FRONT axle corners (ЛП/ПП)
+  const fGy = refs.fGroundY;
+  const wr = refs.wheelR;
+
+  const roadYL = fGy - drLP * pxPerM;
+  const roadYR = fGy - drPP * pxPerM;
+  if (roadAvailable.has('ЛП')) { refs.fRoadL.setAttribute('y1', roadYL); refs.fRoadL.setAttribute('y2', roadYL); refs.fRoadL.style.display=''; } else { refs.fRoadL.style.display='none'; }
+  if (roadAvailable.has('ПП')) { refs.fRoadR.setAttribute('y1', roadYR); refs.fRoadR.setAttribute('y2', roadYR); refs.fRoadR.style.display=''; } else { refs.fRoadR.style.display='none'; }
+
+  const wheelYL = fGy - wr - dwLP * pxPerM;
+  const wheelYR = fGy - wr - dwPP * pxPerM;
+  refs.fWheelL.setAttribute('cy', wheelYL);
+  refs.fWheelR.setAttribute('cy', wheelYR);
+
+  const bodyYL = fGy - wr - bodyOffset - dbLP * pxPerM;
+  const bodyYR = fGy - wr - bodyOffset - dbPP * pxPerM;
+  refs.fBody.setAttribute('y1', bodyYL);
+  refs.fBody.setAttribute('y2', bodyYR);
+
+  // Cylinders: from body to wheel
+  function setLine(line, x1,y1,x2,y2){ line.setAttribute('x1', x1); line.setAttribute('y1', y1); line.setAttribute('x2', x2); line.setAttribute('y2', y2); }
+
+  // Stroke text (mm)
+  const sLPv = sLP ? Number(sLP[i]) : 0;
+  const sPPv = sPP ? Number(sPP[i]) : 0;
+  const sLZv = sLZ ? Number(sLZ[i]) : 0;
+  const sPZv = sPZ ? Number(sPZ[i]) : 0;
+
+
+  // Stroke baselines (for zero-reference view)
+  const sLP0 = series0(sLP), sPP0 = series0(sPP), sLZ0 = series0(sLZ), sPZ0 = series0(sPZ);
+  const dsLP = (sLP ? (Number(sLP[i]) - sLP0) : 0);
+  const dsPP = (sPP ? (Number(sPP[i]) - sPP0) : 0);
+  const dsLZ = (sLZ ? (Number(sLZ[i]) - sLZ0) : 0);
+  const dsPZ = (sPZ ? (Number(sPZ[i]) - sPZ0) : 0);
+
+  function fmtSignedMM(mm) {
+    const v = Number(mm || 0);
+    const s = (v >= 0) ? '+' : '';
+    return s + v.toFixed(0);
+  }
+
+  // normalize stroke into alpha (simple visual cue)
+  function strokeAlpha(s) {
+    if (Lstroke <= 1e-9) return 0.9;
+    const r = clamp(s / Lstroke, 0.0, 1.0);
+    return 0.35 + 0.65 * r;
+  }
+
+  if (solverOk) {
+    setLine(refs.fCyl.LP.c1, refs.fxL-6, bodyYL, refs.fxL-6, wheelYL);
+    setLine(refs.fCyl.LP.c2, refs.fxL+6, bodyYL, refs.fxL+6, wheelYL);
+    refs.fCyl.LP.c1.setAttribute('stroke-opacity', strokeAlpha(sLPv));
+    refs.fCyl.LP.c2.setAttribute('stroke-opacity', strokeAlpha(sLPv));
+    refs.fCyl.LP.txt.setAttribute('y', wheelYL + 42);
+    refs.fCyl.LP.txt.textContent = `ЛП: ${fmtSignedMM(dsLP*1000)} / ${(sLPv*1000).toFixed(0)} мм`;
+    refs.fCyl.LP.c1.style.display = ''; refs.fCyl.LP.c2.style.display = ''; refs.fCyl.LP.txt.style.display = '';
+
+    setLine(refs.fCyl.PP.c1, refs.fxR-6, bodyYR, refs.fxR-6, wheelYR);
+    setLine(refs.fCyl.PP.c2, refs.fxR+6, bodyYR, refs.fxR+6, wheelYR);
+    refs.fCyl.PP.c1.setAttribute('stroke-opacity', strokeAlpha(sPPv));
+    refs.fCyl.PP.c2.setAttribute('stroke-opacity', strokeAlpha(sPPv));
+    refs.fCyl.PP.txt.setAttribute('y', wheelYR + 42);
+    refs.fCyl.PP.txt.textContent = `ПП: ${fmtSignedMM(dsPP*1000)} / ${(sPPv*1000).toFixed(0)} мм`;
+    refs.fCyl.PP.c1.style.display = ''; refs.fCyl.PP.c2.style.display = ''; refs.fCyl.PP.txt.style.display = '';
+  } else {
+    refs.fCyl.LP.c1.style.display = 'none'; refs.fCyl.LP.c2.style.display = 'none'; refs.fCyl.LP.txt.style.display = 'none';
+    refs.fCyl.PP.c1.style.display = 'none'; refs.fCyl.PP.c2.style.display = 'none'; refs.fCyl.PP.txt.style.display = 'none';
+  }
+
+  // Side view (pitch) uses axle averages (front = mean(ЛП/ПП), rear = mean(ЛЗ/ПЗ))
+  const sGy = refs.sGroundY;
+
+  const drF = 0.5 * (drLP + drPP);
+  const drR = 0.5 * (drLZ + drPZ);
+  const roadYF = sGy - drF * pxPerM;
+  const roadYR2 = sGy - drR * pxPerM;
+  if (roadAvailable.has('ЛП') && roadAvailable.has('ПП')) { refs.sRoadF.setAttribute('y1', roadYF); refs.sRoadF.setAttribute('y2', roadYF); refs.sRoadF.style.display=''; } else { refs.sRoadF.style.display='none'; }
+  if (roadAvailable.has('ЛЗ') && roadAvailable.has('ПЗ')) { refs.sRoadR.setAttribute('y1', roadYR2); refs.sRoadR.setAttribute('y2', roadYR2); refs.sRoadR.style.display=''; } else { refs.sRoadR.style.display='none'; }
+
+  const dwF = 0.5 * (dwLP + dwPP);
+  const dwR = 0.5 * (dwLZ + dwPZ);
+  const wheelYF = sGy - wr - dwF * pxPerM;
+  const wheelYR2 = sGy - wr - dwR * pxPerM;
+  refs.sWheelF.setAttribute('cy', wheelYF);
+  refs.sWheelR.setAttribute('cy', wheelYR2);
+
+  const dbF = 0.5 * (dbLP + dbPP);
+  const dbR = 0.5 * (dbLZ + dbPZ);
+  const bodyYF = sGy - wr - bodyOffset - dbF * pxPerM;
+  const bodyYR2 = sGy - wr - bodyOffset - dbR * pxPerM;
+  refs.sBody.setAttribute('y1', bodyYF);
+  refs.sBody.setAttribute('y2', bodyYR2);
+
+  const sFv = 0.5 * (sLPv + sPPv);
+  const sRv = 0.5 * (sLZv + sPZv);
+
+  if (solverOk) {
+    setLine(refs.sCyl.F.c1, refs.sxF-6, bodyYF, refs.sxF-6, wheelYF);
+    setLine(refs.sCyl.F.c2, refs.sxF+6, bodyYF, refs.sxF+6, wheelYF);
+    refs.sCyl.F.c1.setAttribute('stroke-opacity', strokeAlpha(sFv));
+    refs.sCyl.F.c2.setAttribute('stroke-opacity', strokeAlpha(sFv));
+    refs.sCyl.F.txt.setAttribute('y', wheelYF + 42);
+    refs.sCyl.F.txt.textContent = `Перед: ${fmtSignedMM(0.5*(dsLP+dsPP)*1000)} / ${(sFv*1000).toFixed(0)} мм`;
+    refs.sCyl.F.c1.style.display = ''; refs.sCyl.F.c2.style.display = ''; refs.sCyl.F.txt.style.display = '';
+  } else {
+    refs.sCyl.F.c1.style.display = 'none'; refs.sCyl.F.c2.style.display = 'none'; refs.sCyl.F.txt.style.display = 'none';
+  }
+
+  if (solverOk) {
+    setLine(refs.sCyl.R.c1, refs.sxR-6, bodyYR2, refs.sxR-6, wheelYR2);
+    setLine(refs.sCyl.R.c2, refs.sxR+6, bodyYR2, refs.sxR+6, wheelYR2);
+    refs.sCyl.R.c1.setAttribute('stroke-opacity', strokeAlpha(sRv));
+    refs.sCyl.R.c2.setAttribute('stroke-opacity', strokeAlpha(sRv));
+    refs.sCyl.R.txt.setAttribute('y', wheelYR2 + 42);
+    refs.sCyl.R.txt.textContent = `Зад: ${fmtSignedMM(0.5*(dsLZ+dsPZ)*1000)} / ${(sRv*1000).toFixed(0)} мм`;
+    refs.sCyl.R.c1.style.display = ''; refs.sCyl.R.c2.style.display = ''; refs.sCyl.R.txt.style.display = '';
+  } else {
+    refs.sCyl.R.c1.style.display = 'none'; refs.sCyl.R.c2.style.display = 'none'; refs.sCyl.R.txt.style.display = 'none';
+  }
+
+  // Selection highlight (from Python)
+  const selArr = Array.isArray(DATA.selected) ? DATA.selected : [];
+  const sel = new Set(selArr.map((x) => String(x)));
+
+  const selLP = sel.has('ЛП');
+  const selPP = sel.has('ПП');
+  const selLZ = sel.has('ЛЗ');
+  const selPZ = sel.has('ПЗ');
+  const selFront = sel.has('Перед') || selLP || selPP;
+  const selRear  = sel.has('Зад')   || selLZ || selPZ;
+
+  function styleWheel(w, on) {
+    if (!w) return;
+    if (on) {
+      w.setAttribute('stroke', 'rgba(0,120,255,0.95)');
+      w.setAttribute('stroke-width', 4);
+      w.setAttribute('fill', 'rgba(0,120,255,0.10)');
+    } else {
+      w.setAttribute('stroke', 'rgba(0,0,0,0.55)');
+      w.setAttribute('stroke-width', 2);
+      w.setAttribute('fill', 'rgba(0,0,0,0.07)');
+    }
+  }
+
+  styleWheel(refs.fWheelL, selLP);
+  styleWheel(refs.fWheelR, selPP);
+  styleWheel(refs.sWheelF, selFront);
+  styleWheel(refs.sWheelR, selRear);
+}
+
+
+/**
+ * Legacy hook: раньше подписи могли обновляться отдельной функцией.
+ * Сейчас подписи обновляются внутри updateFrame().
+ * Оставляем заглушку, чтобы не падать на старых вызовах.
+ */
+function updateLabels() {
+  // noop
+}
+
+const __PERF_KEY_PREFIX = 'pneumo_perf_component::';
+const __PERF_NAME = 'mech_anim';
+let __PERF_STATE = {
+  component: __PERF_NAME,
+  dataset_id: '',
+  ts_ms: Date.now(),
+  viewport_state: 'init',
+  wakeups: 0,
+  storage_wakeups: 0,
+  focus_wakeups: 0,
+  visibility_wakeups: 0,
+  duplicate_guard_hits: 0,
+  schedule_raf_count: 0,
+  schedule_timeout_count: 0,
+  hidden_gate_hits: 0,
+  zero_size_gate_hits: 0,
+  css_hidden_gate_hits: 0,
+  offscreen_gate_hits: 0,
+  render_count: 0,
+  idle_poll_ms: 0,
+  playing: false,
+  loop_kind: '',
+};
+function __perfBump(key, delta){
+  const add = Number.isFinite(Number(delta)) ? Number(delta) : 1;
+  __PERF_STATE[key] = Number(__PERF_STATE[key] || 0) + add;
+}
+function __perfSet(key, value){ __PERF_STATE[key] = value; }
+function __perfSyncDataset(){
+  try { __PERF_STATE.dataset_id = String(playheadDatasetId || DATA.dataset_id || ''); } catch(_e) {}
+}
+function __perfFlush(force){
+  const now = Date.now();
+  if (!force && (now - Number(__PERF_STATE.ts_ms || 0) < 1200)) return;
+  __perfSyncDataset();
+  __PERF_STATE.ts_ms = now;
+  try { localStorage.setItem(__PERF_KEY_PREFIX + __PERF_NAME, JSON.stringify(__PERF_STATE)); } catch(_e) {}
+}
+function __setViewportState(state){
+  __PERF_STATE.viewport_state = String(state || 'unknown');
+  return __PERF_STATE.viewport_state;
+}
+function __frameInParentViewport(){
+  try {
+    const fe = window.frameElement;
+    if (!fe || !fe.getBoundingClientRect) { __setViewportState('visible'); return true; }
+    const r = fe.getBoundingClientRect();
+    const w = Number(r.width || Math.max(0, (r.right || 0) - (r.left || 0)) || 0);
+    const h = Number(r.height || Math.max(0, (r.bottom || 0) - (r.top || 0)) || 0);
+    if (w <= 2 || h <= 2) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    if ((Number(fe.clientWidth || 0) <= 2) || (Number(fe.clientHeight || 0) <= 2)) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    let hiddenByCss = false;
+    try {
+      const hostView = fe.ownerDocument && fe.ownerDocument.defaultView;
+      const cs = (hostView && hostView.getComputedStyle) ? hostView.getComputedStyle(fe) : null;
+      hiddenByCss = !!(cs && (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity || '1') === 0));
+    } catch(_cssErr) {}
+    if (hiddenByCss) { __perfBump('css_hidden_gate_hits'); __setViewportState('css_hidden'); __perfFlush(false); return false; }
+    const hostWin = (window.top && window.top !== window) ? window.top : window;
+    const vh = Number(hostWin.innerHeight || window.innerHeight || 0);
+    const vw = Number(hostWin.innerWidth || window.innerWidth || 0);
+    const margin = 64;
+    const visible = (r.bottom >= -margin) && (r.top <= vh + margin) && (r.right >= -margin) && (r.left <= vw + margin);
+    if (!visible) { __perfBump('offscreen_gate_hits'); __setViewportState('offscreen'); __perfFlush(false); return false; }
+    __setViewportState('visible');
+    return true;
+  } catch(_e) {
+    __setViewportState('visible');
+    return true;
+  }
+}
+function __canAnimateNow(){
+  if (document && document.hidden) { __perfBump('hidden_gate_hits'); __setViewportState('hidden'); __perfFlush(false); return false; }
+  return __frameInParentViewport();
+}
+function __nextIdleMs(visibleMs, hiddenMs, offscreenMs){
+  if (document && document.hidden) return hiddenMs;
+  return __frameInParentViewport() ? visibleMs : offscreenMs;
+}
+let __LOOP_HANDLE = 0;
+let __LOOP_KIND = '';
+function __clearScheduledTick(){
+  try {
+    if (!__LOOP_HANDLE) return;
+    if (__LOOP_KIND === 'raf' && window.cancelAnimationFrame) window.cancelAnimationFrame(__LOOP_HANDLE);
+    else clearTimeout(__LOOP_HANDLE);
+  } catch(_e) {}
+  __LOOP_HANDLE = 0;
+  __LOOP_KIND = '';
+}
+function __scheduleTick(kind, delayMs){
+  if (__LOOP_HANDLE) __perfBump('duplicate_guard_hits');
+  __clearScheduledTick();
+  if (kind === 'raf') {
+    __LOOP_KIND = 'raf';
+    __perfBump('schedule_raf_count');
+    __LOOP_HANDLE = requestAnimationFrame(tick);
+  } else {
+    __LOOP_KIND = 'timeout';
+    const ms = Math.max(0, Number(delayMs) || 0);
+    __perfBump('schedule_timeout_count');
+    __perfSet('idle_poll_ms', ms);
+    __LOOP_HANDLE = setTimeout(tick, ms);
+  }
+  __perfSet('loop_kind', __LOOP_KIND);
+  __perfFlush(false);
+}
+function __wakeTick(){
+  __perfBump('wakeups');
+  if (__canAnimateNow()) __scheduleTick('raf', 0);
+  else { __perfSet('idle_poll_ms', 0); __LOOP_HANDLE = null; __perfFlush(false); }
+}
+
+function tick(ts) {
+  const n = (DATA.time && DATA.time.length) ? DATA.time.length : 0;
+  if (n <= 0) {
+    const _isPlaying = !!playing;
+    __perfSet('playing', _isPlaying);
+    __perfFlush(false);
+    if (_isPlaying) {
+      __scheduleTick('raf', 0);
+    } else {
+      __LOOP_HANDLE = null;
+    }
+    return;
+  }
+
+  const dt = Math.max(0, (ts - lastTs) / 1000.0);
+  lastTs = ts;
+
+  if (syncPlayhead) {
+    let st = readPlayheadState();
+    if (!st) st = ensurePlayheadState();
+
+    const stTs = (st && st.ts !== undefined && st.ts !== null) ? Number(st.ts) : 0;
+    const externalUpdate = (stTs && (stTs !== lastExternalTs));
+    if (externalUpdate) lastExternalTs = stTs;
+
+    let ni = null;
+    if (st && st.idx !== undefined && st.idx !== null) {
+      const v = Number(st.idx);
+      ni = clamp((Number.isFinite(v) ? Math.round(v) : 0), 0, n-1);
+    } else if (st && typeof st.t === 'number' && DATA.time && DATA.time.length) {
+      const t = Number(st.t);
+      let lo = 0, hi = DATA.time.length - 1;
+      while (lo < hi) {
+        const mid = Math.floor((lo + hi) / 2);
+        if (DATA.time[mid] < t) lo = mid + 1;
+        else hi = mid;
+      }
+      ni = clamp(lo, 0, n-1);
+    }
+
+    if (ni !== null && ni !== lastExternalIdx) {
+      lastExternalIdx = ni;
+      idx = ni;
+      slider.value = String(idx);
+      updateFrame(idx);
+      __perfBump('render_count');
+      if (typeof updateLabels === "function") { updateLabels(); }
+    }
+
+    const _isPlaying = !!(st && st.playing);
+    __perfSet('playing', _isPlaying);
+    __perfFlush(false);
+    if (_isPlaying) {
+      __scheduleTick('raf', 0);
+    } else {
+      __LOOP_HANDLE = null;
+    }
+    return;
+  }
+
+  if (playing) {
+    acc += dt;
+    const frameDt = Number((DATA.meta && DATA.meta.frame_dt_s) ? DATA.meta.frame_dt_s : 0.03);
+    if (acc >= frameDt) {
+      const steps = Math.max(1, Math.floor(acc / frameDt));
+      acc = 0.0;
+      idx = (idx + steps) % n;
+      slider.value = String(idx);
+      updateFrame(idx);
+      __perfBump('render_count');
+    }
+  }
+
+  const _isPlaying2 = !!(playing);
+  __perfSet('playing', _isPlaying2);
+  __perfFlush(false);
+  if (_isPlaying2) {
+    __scheduleTick('raf', 0);
+  } else {
+    __LOOP_HANDLE = null;
+  }
+}
+
+window.addEventListener('storage', (ev) => { try { if (!syncPlayhead) return; if (ev && ev.key && ev.key !== String(playheadStorageKey || 'pneumo_play_state')) return; const st = (ev && typeof ev.newValue === 'string' && ev.newValue) ? JSON.parse(ev.newValue) : readPlayheadState(); const stTs = Number(st && st.ts ? st.ts : 0); const stIdx = (st && st.idx != null) ? Number(st.idx) : null; if (!(st && st.playing) && stTs && stTs === lastExternalTs && stIdx === lastExternalIdx) return; __perfBump('storage_wakeups'); lastExternalTs = 0; __wakeTick(); } catch(_) {} });
+window.addEventListener('focus', () => { try { __perfBump('focus_wakeups'); __wakeTick(); } catch(_) {} });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { try { __perfBump('visibility_wakeups'); __wakeTick(); } catch(_) {} } });
+window.addEventListener('scroll', () => { try { __wakeTick(); } catch(_) {} }, {passive:true});
+window.addEventListener('resize', () => { try { __wakeTick(); } catch(_) {} }, {passive:true});
+__perfFlush(true);
+
+btnPlay.addEventListener('click', () => {
+    if (syncPlayhead) {
+      ensurePlayheadState();
+      writePlayheadState({ playing: true });
+    } else {
+      playing = true;
+    }
+  });
+btnPause.addEventListener('click', () => {
+    if (syncPlayhead) {
+      ensurePlayheadState();
+      writePlayheadState({ playing: false });
+    } else {
+      playing = false;
+    }
+  });
+
+slider.addEventListener('input', (e) => {
+  const n = (DATA.time && DATA.time.length) ? DATA.time.length : 0;
+  if (n <= 0) return;
+  idx = clamp(parseInt(e.target.value || '0', 10) || 0, 0, n-1);
+  playing = false;
+
+  // Always update local view immediately.
+  updateFrame(idx);
+
+  // If we are in shared-playhead mode, also update the global playhead state so that other views (3D, plots) follow.
+  if (syncPlayhead) {
+    ensurePlayheadState();
+    const t = (DATA.time && DATA.time.length) ? Number(DATA.time[idx]) : 0.0;
+    writePlayheadState({ idx: idx, t: t, playing: false });
+  }
+});
+
+window.addEventListener("message", (event) => {
+  const msg = event.data;
+  if (!msg || !msg.type || !msg.isStreamlitMessage) return;
+  if (msg.type === "streamlit:render") {
+    // mark that Streamlit is alive and sending data, stop readiness ping loop
+    __stHasRender = true;
+    stSetReady();
+    const args = msg.args || {};
+    DATA = Object.assign({}, DATA, args);
+
+    // Global playhead sync (optional)
+    syncPlayhead = !!DATA.sync_playhead;
+    if (syncPlayhead) { ensurePlayheadState(); }
+
+    // In sync mode this component is a FOLLOWER (master = playhead_ctrl).
+    // Hide local transport controls to avoid having multiple masters fighting over the same playhead.
+    try {
+      const elControls = document.querySelector('.controls');
+      const elTwrap = document.querySelector('.twrap');
+      if (syncPlayhead) {
+        if (elControls) elControls.style.display = 'none';
+        if (elTwrap) elTwrap.style.display = 'none';
+      } else {
+        if (elControls) elControls.style.display = '';
+        if (elTwrap) elTwrap.style.display = '';
+      }
+    } catch (e) {}
+    playheadStorageKey = String(DATA.playhead_storage_key || 'pneumo_play_state');
+    playheadDatasetId = String(DATA.dataset_id || '');
+    if (syncPlayhead) {
+      playing = false;
+      // Controls remain visible in sync mode: they update the shared playhead state in localStorage.
+    }
+    lastExternalIdx = -1;
+
+    elTitle.textContent = (DATA.title || 'Механика') + (syncPlayhead ? ' (SYNC)' : '');
+
+    const n = (DATA.time && DATA.time.length) ? DATA.time.length : 0;
+    slider.max = String(Math.max(0, n-1));
+    idx = clamp(idx, 0, Math.max(0, n-1));
+    slider.value = String(idx);
+
+    // rebuild scene each render (safe and simple)
+    buildScene();
+    updateFrame(idx);
+    __wakeTick();
+
+    setFrameHeight(Number(DATA.height || 620));
+  }
+});
+try { init(); } catch (e) { console.error(e); }
+buildScene();
+__scheduleTick('raf', 0);
+</script>
+</body>
+</html>

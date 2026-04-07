@@ -1,0 +1,7 @@
+# Optional: PostgreSQL backend for ExperimentDB (Release 60)
+#
+# Preferred: psycopg v3 (with binary wheels)
+psycopg[binary]>=3.1
+
+# If you prefer the older driver you can install instead:
+# psycopg2-binary

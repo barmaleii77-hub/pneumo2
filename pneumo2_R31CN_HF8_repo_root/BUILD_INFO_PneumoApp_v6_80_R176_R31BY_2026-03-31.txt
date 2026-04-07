@@ -1,0 +1,19 @@
+BUILD_INFO_PneumoApp_v6_80_R176_R31BY_2026-03-31
+
+Release: PneumoApp_v6_80_R176_R31BY_2026-03-31
+Built (UTC): 2026-03-31T16:30:00Z
+
+Included in this step:
+- stage-aware adaptive epsilon profiles for StageRunner system-influence diagnostics
+- coarse profile for stage0_relevance
+- balanced profile for stage1_long
+- fine profile for stage2_final
+- explicit adaptive epsilon strategy + stage_name contract in system_influence_report_v1
+- UI forwards adaptive influence grid to StageRunner
+
+Key changed surfaces:
+- pneumo_solver_ui/optimization_defaults.py
+- pneumo_solver_ui/calibration/system_influence_report_v1.py
+- pneumo_solver_ui/opt_stage_runner_v1.py
+- pneumo_solver_ui/pneumo_ui_app.py
+- tests/test_r31by_stage_aware_influence_profiles.py

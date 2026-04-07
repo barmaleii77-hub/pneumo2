@@ -1,0 +1,18 @@
+BUILD_INFO v6_54
+
+База: UNIFIED_v6_53
+Цель: критические фиксы запуска Streamlit + восстановление smoke/QC проверки мех‑энергии.
+
+Ключевые изменения:
+- FIX(Streamlit): убрана запись в st.session_state["sort_tests_by_cost"] после создания виджета (иначе StreamlitAPIException).
+- FIX: добавлен import json в model_pneumo_v8_energy_audit_vacuum_patched_smooth_all.py (иначе NameError в smoke‑проверке).
+- FIX/QC: для model_pneumo_v9_mech_doublewishbone_worldroad добавлены обязательные колонки энерго‑аудита в df_main
+  ('ошибка_энергии_мех_Дж', 'ошибка_энергии_мех_отн', 'ошибка_мощности_p_dV_Вт'), чтобы smoke/QC пайплайн не падал.
+- Clean: устранён SyntaxWarning (escape sequence) в calibration/mo_metrics_v1.py.
+
+Артефакты контроля:
+- REPORTS/QA_CONTROL_v6_54.md (обновить при следующем прогоне локально)
+
+Примечания:
+- Функциональность UI не удалялась; исправление касается только корректного использования session_state.
+- Полный мех‑энерго аудит для worldroad модели будет расширяться (сейчас поля гарантированно присутствуют для диагностики).

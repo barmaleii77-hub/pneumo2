@@ -1,0 +1,603 @@
+{
+  "meta": {
+    "project": "пневмоподвеска",
+    "generated_at": "2026-03-31T06:00:00Z",
+    "version": "v4",
+    "notes": "Browser perf registry snapshot exporter from playhead_ctrl to workspace/exports; send-bundle/triage diagnostics surface browser_perf_registry_snapshot.json, browser_perf_contract.json and optional browser_perf_trace.* artifacts.",
+    "updated_at": "2026-03-31"
+  },
+  "frozen_constants": {
+    "колея_м": 1.0,
+    "база_м": 1.5,
+    "default_spring_preload_rebound_min_m": 0.01
+  },
+  "epics": [
+    {
+      "id": "EPIC-MECH-OBS",
+      "title": "Наблюдаемость механики",
+      "priority": "P0"
+    },
+    {
+      "id": "EPIC-WORLD",
+      "title": "World-frame движение + дорожный профиль z(x,y)",
+      "priority": "P0"
+    },
+    {
+      "id": "EPIC-GEOM",
+      "title": "Кинематика/геометрия цилиндров и пружин",
+      "priority": "P0"
+    },
+    {
+      "id": "EPIC-LONG",
+      "title": "Длинные тесты (масса/температура/давления)",
+      "priority": "P0"
+    },
+    {
+      "id": "EPIC-UI",
+      "title": "UI/анимация/синхронизация",
+      "priority": "P1"
+    },
+    {
+      "id": "EPIC-CAMOZZI",
+      "title": "Каталог Camozzi и привязка к компонентам",
+      "priority": "P1"
+    },
+    {
+      "id": "EPIC-DIFF",
+      "title": "Полная дифференцируемость и ускорение",
+      "priority": "P2"
+    },
+    {
+      "id": "EPIC-OPS",
+      "title": "Сборка/лаунчер/диагностика/хранение версий",
+      "priority": "P0"
+    }
+  ],
+  "design_variables": {
+    "cylinder_mounts": {
+      "description": "12 параметров креплений цилиндров (горизонталь/вертикаль верхних шарниров + доля рычага для нижнего шарнира) для 4 групп: Ц1/Ц2 × перед/зад",
+      "variables": [
+        "верх_Ц1_перед_между_ЛП_ПП_м",
+        "верх_Ц2_перед_между_ЛП_ПП_м",
+        "верх_Ц1_зад_между_ЛЗ_ПЗ_м",
+        "верх_Ц2_зад_между_ЛЗ_ПЗ_м",
+        "верх_Ц1_перед_z_относительно_рамы_м",
+        "верх_Ц2_перед_z_относительно_рамы_м",
+        "верх_Ц1_зад_z_относительно_рамы_м",
+        "верх_Ц2_зад_z_относительно_рамы_м",
+        "низ_Ц1_перед_доля_рычага",
+        "низ_Ц2_перед_доля_рычага",
+        "низ_Ц1_зад_доля_рычага",
+        "низ_Ц2_зад_доля_рычага"
+      ]
+    },
+    "cylinder_stroke": {
+      "description": "Разные физические ходы цилиндров для Ц1/Ц2 × перед/зад (минимум 4 независимых параметра либо дискретный выбор из каталога)",
+      "variables": [
+        "ход_штока_Ц1_перед_м",
+        "ход_штока_Ц2_перед_м",
+        "ход_штока_Ц1_зад_м",
+        "ход_штока_Ц2_зад_м"
+      ]
+    }
+  },
+  "minimum_outputs": {
+    "mechanics": [
+      "крен/тангаж рамы (угол/скорость/ускорение)",
+      "z/v/a рамы по углам (ЛП/ПП/ЛЗ/ПЗ)",
+      "z/v/a центра масс рамы",
+      "z/v/a каждого колеса относительно рамы и дороги",
+      "профиль дороги под каждым колесом",
+      "x(t), v(t), a_x(t) автомобиля по дороге",
+      "при повороте: радиус и центростремительное ускорение"
+    ],
+    "pneumatics": [
+      "давление в каждом ресивере и аккумуляторе",
+      "состояния клапанов: выхлоп/подпитка/заряд",
+      "расходы по ключевым ветвям, масса в атмосферу (желательно)"
+    ]
+  },
+  "backlog": [
+    {
+      "id": "P0-01",
+      "epic": "EPIC-MECH-OBS",
+      "priority": "P0",
+      "title": "Добавить ЦТ (z,v,a) и раму по углам (z,v,a) в логи/вывод",
+      "status": "todo"
+    },
+    {
+      "id": "P0-02",
+      "epic": "EPIC-MECH-OBS",
+      "priority": "P0",
+      "title": "Добавить колёса относительно рамы и дороги (z,v,a)",
+      "status": "todo"
+    },
+    {
+      "id": "P0-03",
+      "epic": "EPIC-WORLD",
+      "priority": "P0",
+      "title": "World-frame движение: x(t), v(t), yaw(t); дороги как z(x,y)",
+      "status": "todo"
+    },
+    {
+      "id": "P0-04",
+      "epic": "EPIC-LONG",
+      "priority": "P0",
+      "title": "Long-suite: масса/температура/начальные давления; длинный тест со 2-й итерации",
+      "status": "todo"
+    },
+    {
+      "id": "P0-05",
+      "epic": "EPIC-GEOM",
+      "priority": "P0",
+      "title": "Параметризация креплений цилиндров (12 параметров) + solver/export packaging contract для честных body/rod/piston mesh",
+      "status": "todo"
+    },
+    {
+      "id": "P0-06",
+      "epic": "EPIC-GEOM",
+      "priority": "P0",
+      "title": "Статика: контроль поршень≈середина хода (масса+minP3+Pacc) после явного packaging contract и catalogue sizing",
+      "status": "todo"
+    },
+    {
+      "id": "P1-01",
+      "epic": "EPIC-CAMOZZI",
+      "priority": "P1",
+      "title": "Каталог Camozzi для цилиндров: дискретный выбор + ограничения",
+      "status": "todo"
+    },
+    {
+      "id": "P1-02",
+      "epic": "EPIC-GEOM",
+      "priority": "P1",
+      "title": "Модели пружин с упаковочными ограничениями (free length/coil bind/верх ниже крышки)",
+      "status": "todo"
+    },
+    {
+      "id": "P1-03",
+      "epic": "EPIC-UI",
+      "priority": "P1",
+      "title": "«Один экран» проверки: анимация + графики + клапаны",
+      "status": "todo"
+    },
+    {
+      "id": "P1-04",
+      "epic": "EPIC-UI",
+      "priority": "P1",
+      "title": "Синхронизация playhead↔графики; Play без пересчёта",
+      "status": "todo"
+    },
+    {
+      "id": "P2-01",
+      "epic": "EPIC-DIFF",
+      "priority": "P2",
+      "title": "Полная дифференцируемость + перенос интегратора на JAX/PyTorch/CasADi",
+      "status": "todo"
+    },
+    {
+      "id": "P2-02",
+      "epic": "EPIC-DIFF",
+      "priority": "P2",
+      "title": "GPU для оптимизатора/суррогата + батч прогонов",
+      "status": "todo"
+    },
+    {
+      "id": "P2-03",
+      "epic": "EPIC-DIFF",
+      "priority": "P2",
+      "title": "Авто-отчёт релевантности + сравнение с экспериментом",
+      "status": "todo"
+    },
+    {
+      "id": "P0-OPS-01",
+      "epic": "EPIC-OPS",
+      "priority": "P0",
+      "title": "Лаунчер: «Запустить» всегда автоустанавливает зависимости + видимый прогресс + без ввода команд пользователем",
+      "status": "todo"
+    },
+    {
+      "id": "P0-OPS-02",
+      "epic": "EPIC-OPS",
+      "priority": "P0",
+      "title": "Единая кнопка в UI: «Сохранить диагностический пакет (ZIP)» включает логи лаунчера/Streamlit/events + хэши и параметры запуска",
+      "status": "todo"
+    },
+    {
+      "id": "P1-UI-04",
+      "epic": "EPIC-UI",
+      "priority": "P1",
+      "title": "Исправить Streamlit custom components: declare_component должен вызываться из обычного модуля (без ошибки module is None)",
+      "status": "todo"
+    },
+    {
+      "id": "P1-UI-05",
+      "epic": "EPIC-UI",
+      "priority": "P1",
+      "title": "Синфаза/разнофаза: разделить тесты по парам (перед/зад, лево/право, диагонали) и явно подписывать в UI",
+      "status": "todo"
+    },
+    {
+      "id": "P0-GEOM-05",
+      "epic": "EPIC-GEOM",
+      "priority": "P0",
+      "title": "Подтвердить архитектуру double wishbone: 2 рычага + 2 цилиндра + 1/2 пружины на угол (вариативность)",
+      "status": "todo"
+    },
+    {
+      "id": "P0-UI-GL-06",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Заменить floating QDockWidget crash-path на dedicated top-level GL 3D window с сохранением move/resize/toggle",
+      "status": "done"
+    },
+    {
+      "id": "P0-OPS-03",
+      "epic": "EPIC-OPS",
+      "priority": "P0",
+      "title": "Strict loglint must validate seq per session+pid when UI and Desktop Animator append to the same session logs",
+      "status": "done"
+    },
+    {
+      "id": "P0-UI-GL-07",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Повторно принять Windows GL viewport на R31Q: spawn/move/resize/close/reopen отдельного 3D окна + playback + bundle health на живом driver stack",
+      "status": "todo"
+    },
+    {
+      "id": "P0-UI-GL-08",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Убрать out-of-range road interpolation artefacts в Desktop Animator: клип окна дороги к общему диапазону s_world/road_profile, без repeated endpoint slices и degenerate faces",
+      "status": "done"
+    },
+    {
+      "id": "P1-UI-GL-09",
+      "epic": "EPIC-UI",
+      "priority": "P1",
+      "title": "Playback density tiers для Car3D road mesh: отдельные caps для normal-play и many-docks mode ради FPS без возврата к редкой/ложной дороге",
+      "status": "done"
+    },
+    {
+      "id": "P0-UI-GL-10",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Убрать aux-pane playback starvation в Desktop Animator: visible panes должны обновляться живыми группами, а не single-panel round-robin при many-docks",
+      "status": "done"
+    },
+    {
+      "id": "P0-UI-GL-11",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Привязать 3D road wire-grid к world longitudinal s, а не к локальному row=0 viewport mesh, чтобы сетка не дрейфовала относительно дороги",
+      "status": "done"
+    },
+    {
+      "id": "P0-UI-GL-12",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Повторно принять Windows playback на R31S: живая cadence auxiliary panes + отсутствие world-grid drift relative to road на SEND bundle",
+      "status": "todo"
+    },
+    {
+      "date": "2026-03-24",
+      "title": "R31T addendum",
+      "items": [
+        "Road wire-grid в Desktop Animator должна быть bundle/view-stable и не менять longitudinal spacing при изменении speed/look-ahead внутри одного playback run.",
+        "SEND bundle должен включать AnimatorAuxCadence telemetry по detached panes/timeline/trends, чтобы acceptance больше не зависел только от визуального впечатления.",
+        "Many-docks playback должен держать более высокий cadence floor для auxiliary panes при сохранении lighter overlays и без отката в starvation path."
+      ]
+    },
+    {
+      "date": "2026-03-24",
+      "title": "R31U addendum",
+      "items": [
+        "Desktop Animator startup must use truly empty mesh placeholders: no zero-area bootstrap triangles that poison MeshData normals/warnings before the first real frame.",
+        "Animator bundles should carry explicit meta.geometry.road_width_m from exporter-side supplement policy so visual consumers stop emitting derived-road-width warnings for healthy datasets.",
+        "Acceptance logs should be quiet by default: deprecated Qt high-DPI/text-alignment calls must not remain in the normal Desktop Animator startup path."
+      ]
+    },
+    {
+      "id": "P0-UI-GL-13",
+      "epic": "EPIC-GEOM",
+      "priority": "P0",
+      "title": "Формализовать explicit cylinder packaging contract в meta.geometry: outer diameter + dead lengths без consumer-side догадок",
+      "status": "done"
+    },
+    {
+      "id": "P0-UI-GL-14",
+      "epic": "EPIC-GEOM",
+      "priority": "P0",
+      "title": "Вернуть честные 3D cylinders/rods/pistons в Desktop Animator по solver-points + packaging contract, без fake piston thickness",
+      "status": "done"
+    },
+    {
+      "id": "P0-UI-GL-15",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Повторно принять Windows playback на R31W: visible cylinders/rods/pistons + отсутствие новой GL/FPS регрессии на SEND bundle",
+      "status": "todo"
+    },
+    {
+      "date": "2026-03-24",
+      "title": "R31W addendum",
+      "items": [
+        "Exporter/meta layer now carries explicit cylinder packaging keys (`cyl1/2_outer_diameter_m`, `cyl1/2_dead_cap|dead_rod_length_m`) so Animator no longer needs to guess body packaging from incomplete inputs.",
+        "Desktop Animator restores honest 3D body/rod/piston rendering from solver-points + packaging contract only; piston is placed on a contract-derived plane instead of using a fake arbitrary thickness.",
+        "Next step after R31W is not more hidden heuristics but catalogue-aware Camozzi sizing/limits plus live Windows acceptance on a fresh SEND bundle."
+      ]
+    },
+    {
+      "id": "P0-07",
+      "epic": "EPIC-WORLD",
+      "priority": "P0",
+      "title": "Desktop Animator: dense road surface mesh должна быть world-anchored по spacing/phase и не дрейфовать относительно той же дороги на playback",
+      "status": "todo"
+    },
+    {
+      "id": "P0-08",
+      "epic": "EPIC-GEOM",
+      "priority": "P0",
+      "title": "Acceptance cylinders/pistons: визуально подтвердить «цилиндр к раме, шток к рычагу», корректное направление piston plane и видимость на Windows SEND bundle",
+      "status": "todo"
+    },
+    {
+      "id": "P0-UI-GL-16",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Вернуть dockable 3D по умолчанию: убрать forced startup detach, гейтить старый persisted layout version и использовать safe separate window только на explicit detach",
+      "status": "done"
+    },
+    {
+      "id": "P0-UI-GL-17",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "После manual playback stop сразу восстанавливать полноценную отрисовку панелей/лейблов и не оставлять stale lite/perf state до следующего внешнего refresh",
+      "status": "done"
+    },
+    {
+      "id": "P0-UI-GL-18",
+      "epic": "EPIC-WORLD",
+      "priority": "P0",
+      "title": "Dense road surface: lateral normal/width orientation брать из bundle-level world path cache, а не из текущего viewport slice, чтобы исчезла resize-dependent drift",
+      "status": "done"
+    },
+    {
+      "id": "P0-UI-GL-19",
+      "epic": "EPIC-GEOM",
+      "priority": "P0",
+      "title": "Добавить exporter-side explicit gland/body-end point для цилиндров (`cyl*_gland_xyz` или equivalent), чтобы Animator отказался от transparent housing shell fallback",
+      "status": "todo"
+    },
+    {
+      "id": "P0-UI-GL-20",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Принять R31Y на Windows SEND bundle: road drift при resize, piston plane visibility, detach/re-dock 3D и отсутствие CPU tail после расчётов/stop",
+      "status": "todo"
+    },
+    {
+      "date": "2026-03-24",
+      "title": "R31Y addendum",
+      "items": [
+        "Fresh SEND bundle confirmed that exported `cyl*_top` are frame-side and `cyl*_bot` are arm-side; the misleading yellow balls were consumer-side debug piston markers, not frame mounts.",
+        "Desktop Animator now keeps 3D docked by default again, gates old forced-detached layouts with a new layout version and uses the safe top-level GL window only for explicit detach flows.",
+        "Dense road surface now also takes lateral orientation from a bundle-level world path cache instead of a per-viewport local approximation, reducing resize-dependent mesh drift.",
+        "Until exporter provides explicit `gland/body-end` points, Animator uses an honest transparent housing shell fallback plus exact rod/piston rendering and keeps scatter markers debug-only/hidden-by-default."
+      ]
+    },
+    {
+      "id": "P0-UI-GL-21",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Убрать special external/reparent path для live 3D GL и вернуть native dock/floating с авто-паузой playback на время move/resize/layout transitions",
+      "status": "done"
+    },
+    {
+      "id": "P0-UI-GL-22",
+      "epic": "EPIC-GEOM",
+      "priority": "P0",
+      "title": "Убрать user-facing GL point-sprite шары из 3D сцены: contact markers перевести в line-based crosses, piston debug markers оставить только debug-only",
+      "status": "done"
+    },
+    {
+      "id": "P0-UI-GL-23",
+      "epic": "EPIC-GEOM",
+      "priority": "P0",
+      "title": "Сделать cylinder packaging читаемым в 3D: outer shell + exact cap-side chamber + exact rod + exact piston plane/ring вместо визуально неразличимых «просто цилиндров»",
+      "status": "done"
+    },
+    {
+      "id": "P0-UI-GL-24",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Принять R31Z на Windows SEND bundle: native float/re-dock 3D во время playback с авто-паузой/resume, без GL error-spam/crash и без CPU tail после расчётов",
+      "status": "todo"
+    },
+    {
+      "date": "2026-03-24",
+      "title": "R31Z addendum",
+      "items": [
+        "Live 3D GL returns to native dock/floating behaviour; if the user moves or resizes the 3D panel during playback, Animator must auto-pause playback, suppress live GL frame updates while layout settles, then resume from the current frame.",
+        "User-facing 3D scene must not rely on GL point-sprite balls for cylinder/contact diagnostics. Ordinary mode should use line-based contact crosses and keep piston/debug balls out of the scene.",
+        "Until exporter provides explicit cyl*_gland/body-end points, the minimum honest cylinder packaging view is: outer housing shell, exact cap-side chamber, exact rod, and exact piston plane/ring — not a single opaque cylinder that hides the internals.",
+        "Fresh Windows acceptance remains mandatory because the last SEND bundle still crashed through _set_panel_external_mode and showed GLMesh/GLLine/GLScatter draw errors plus CPU-heavy error spam."
+      ]
+    },
+    {
+      "id": "P0-WEB-CPU-25",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Считать hidden/zero-size Streamlit iframes off-screen в web follower-компонентах и встроенных HTML-виджетах, чтобы скрытые табы не держали idle loop как видимые.",
+      "status": "done"
+    },
+    {
+      "id": "P0-WEB-CPU-26",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Для тяжёлых Web UI loop-path (`mech_anim`, `mech_car3d`, `pneumo_svg_flow`) держать single-flight scheduler и не допускать параллельных RAF/timeout цепочек от focus/storage/visibility wakeups.",
+      "status": "done"
+    },
+    {
+      "id": "P0-WEB-CPU-27",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Принять R31AA на живом Windows SEND bundle: доказать, что web UI после detail-run больше не держит холостую CPU-нагрузку и что скрытые табы действительно засыпают.",
+      "status": "todo"
+    },
+    {
+      "date": "2026-03-25",
+      "title": "R31AA addendum",
+      "items": [
+        "Hidden/zero-size Streamlit iframes must be treated as off-screen by browser followers; checking only position in getBoundingClientRect() is not enough because hidden tabs can still report 0x0 rects near the origin and look “visible” to naive guards.",
+        "Heavy browser loops need a single-flight scheduler policy: storage/focus/visibility wakeups must reuse the same pending RAF/timeout slot instead of spawning parallel chains that keep CPU busy after calculations have already finished.",
+        "Measured acceptance is still open: future SEND bundles should export browser wakeup counters / idle-poll diagnostics so Web UI CPU regressions can be verified numerically instead of only by Task Manager or user feeling."
+      ]
+    },
+    {
+      "id": "P0-WEB-CPU-28",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Расширить single-flight/off-screen policy на все Web UI follower-компоненты и встроенные HTML widgets, а не только на mech_anim / mech_car3d / pneumo_svg_flow.",
+      "status": "done"
+    },
+    {
+      "id": "P0-WEB-CPU-29",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Добавить browser perf registry (`pneumo_perf_component::*`) и playhead-side perf overlay / JSON export для измеримой диагностики idle CPU.",
+      "status": "done"
+    },
+    {
+      "id": "P0-WEB-CPU-30",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Принять R31AB на живом Windows SEND bundle: проверить perf registry / JSON export и доказать, что Web UI после detail-run не держит холостую CPU-нагрузку.",
+      "status": "todo"
+    },
+    {
+      "date": "2026-03-25",
+      "title": "R31AB addendum",
+      "items": [
+        "Browser-side idle-CPU hardening must be end-to-end: every follower with its own RAF/timeout loop now needs the same off-screen guard and single-flight wake policy, not only the historically heaviest trio.",
+        "Measured acceptance is promoted from wishlist to code: follower components publish `pneumo_perf_component::*` snapshots, and playhead_ctrl can render/export the current registry for manual diagnostics without forcing a rerun.",
+        "Open next step remains Windows proof: future SEND bundles should include or be accompanied by a browser perf snapshot so post-run CPU regressions are verified numerically, not only by Task Manager or user feeling."
+      ]
+    },
+    {
+      "id": "P0-ANIM-CRASH-31",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Устранить регрессию R31AB: Desktop Animator не должен падать на первом кадре из-за сигнатуры Car3DWidget._corner_is_front; road assets в bundle уже присутствуют.",
+      "status": "done"
+    },
+    {
+      "id": "P0-ANIM-CRASH-32",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Принять R31AC на живом Windows SEND bundle: Animator открывается, дорога видна с первого кадра, в bundle нет sys.excepthook/TypeError по _corner_is_front.",
+      "status": "todo"
+    },
+    {
+      "date": "2026-03-25",
+      "title": "R31AC addendum",
+      "items": [
+        "Latest SEND bundle distinguished the real problem cleanly: anim_latest and road CSV were present and synchronized, but Desktop Animator crashed inside Car3DWidget.update_frame before the scene could finish its first paint.",
+        "User-facing visual acceptance for Animator needs an explicit first-frame crash gate; otherwise a packaging-layer helper regression can masquerade as “road missing” or “hang” even when the export contract is healthy.",
+        "Small helper-method semantics matter in this project: for Car3D state-free helpers, keeping explicit static/bound method intent plus a regression test is cheaper than debugging another Windows SEND bundle after the fact."
+      ]
+    },
+    {
+      "id": "P0-ANIM-CRASH-33",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Принять R31AD на живом Windows SEND bundle: Animator стартует без first-frame TypeError по _circle_line_vertices, дорога видна сразу, ring editor открывается с новыми дефолтами, список сценариев не автоселектится.",
+      "status": "todo"
+    },
+    {
+      "date": "2026-03-25",
+      "title": "R31AD addendum",
+      "items": [
+        "Any user-facing Animator sublayer must fail soft: a piston-ring/cylinder overlay bug is allowed to hide that overlay, but not to abort the whole first frame and make the road look missing.",
+        "Ring editor defaults are now treated as an explicit user-approved preset rather than historical leftovers; the next wishlist step is a UI action to capture/export the current ring setup as the new default profile.",
+        "Suite/test selection UX is now allowed to start empty, and that policy should remain consistent across autosave, suite import and default resets instead of silently snapping back to the first row."
+      ]
+    },
+    {
+      "id": "P0-GEOM-CONT-34",
+      "epic": "EPIC-MECH-OBS",
+      "priority": "P0",
+      "title": "Довести solver/export до rigid-body continuity: frame-mounted hardpoints и `cyl*_top` не должны дрейфовать относительно рамы при крене/тангаже/перемещении.",
+      "status": "done"
+    },
+    {
+      "id": "P0-GEOM-CONT-35",
+      "epic": "EPIC-MECH-OBS",
+      "priority": "P0",
+      "title": "Держать `cyl*_bot` на фактической ветви рычага в world geometry и проверять это через `max_cyl*_bot_arm_offset_m`.",
+      "status": "done"
+    },
+    {
+      "id": "P0-GEOM-CONT-36",
+      "epic": "EPIC-MECH-OBS",
+      "priority": "P0",
+      "title": "Принять R31AH на живом Windows SEND bundle: frame-side mounts жёстко сидят на раме, wheel-side mounts — на wheel/upright, cylinder rod mount — на рычаге; self-check/HUD не дают continuity FAIL.",
+      "status": "todo"
+    },
+    {
+      "id": "P0-WEB-CPU-37",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Перевести post-run Web UI CPU acceptance на browser trace/render-loop counters: доказать источник хвоста через perf registry/trace, а не через очередное растягивание idle timeout.",
+      "status": "todo"
+    },
+    {
+      "date": "2026-03-26",
+      "title": "R31AH addendum",
+      "items": [
+        "Архив `mhtml.zip` содержит много точных дублей чатов по одним и тем же темам; его роль — контекстный индекс требований, а не новый канонический слой поверх ABSOLUTE LAW / PARAMETER REGISTRY / master TODO/WISHLIST.",
+        "Главный новый P0-гейт — geometric continuity: frame-mounted hardpoints и cylinder tops должны оставаться жёстко приклеенными к раме при roll/pitch/heave/yaw, а `cyl*_bot` — лежать на выбранной ветви рычага без off-arm drift.",
+        "Web CPU remains open, but дальнейшие попытки должны идти через browser-side render-loop truth (trace / perf registry / counters), потому что простое растягивание idle sleep уже несколько раз не доказало эффект."
+      ]
+    },
+    {
+      "id": "P0-ANIM-FPS-38",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Принять R31AI на живом Windows bundle: при speed=1.0 Desktop Animator должен держать заметно лучшую playback cadence без провала к ~1 Hz при 10+ видимых панелях.",
+      "status": "todo"
+    },
+    {
+      "id": "P0-ANIM-GL-39",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Во время drag/resize/floating/re-dock live 3D GL не должен бросать `OpenGL GLError`; layout transition допускает временную паузу/placeholder, но не зависание всего UI.",
+      "status": "todo"
+    },
+    {
+      "date": "2026-03-26",
+      "title": "R31AI addendum",
+      "items": [
+        "Свежий bundle показал, что проблема playback на speed=1.0 и зависание при манипуляции окнами связаны: live GL layout churn даёт реальные `OpenGL GLError`, а при 11 видимых панелях cadence playback падает примерно до 0.9–1.0 Hz.",
+        "Следующий канон для Desktop Animator: во время floating move/resize 3D viewport можно временно suspend/hide + placeholder, но нельзя продолжать paint через нестабильный GL context и нельзя наблюдать child viewport events как равноправный layout trigger.",
+        "Playback budget теперь явно 3D-priority: timer service cadence на x1.0 должен быть достаточно частым, а fast/slow auxiliary panes обязаны уступать кадры live 3D вместо того, чтобы конкурировать с ним на равных."
+      ]
+    }
+  ],
+  "release": "R31BU",
+  "updated": "2026-03-31",
+  "notes": "Wishlist/backlog refreshed for R31AL: this pass moves Desktop Animator from a 4 ms source-frame-chasing loop to display-rate time playback, demotes auxiliary panes behind live 3D during playback, removes the remaining 60/180/300 s idle timeout polling from follower/embedded Web widgets, and makes actuator meshes capped/readable. Live Windows SEND-bundle acceptance is still required for final proof of speed switching, x1 smoothness and post-run browser CPU idle.",
+  "items": [
+    {
+      "date": "2026-03-26",
+      "title": "R31AL addendum",
+      "items": [
+        "После R31AK densify `anim_latest` уже не был главным bottleneck: новый аудит показал, что основная проблема скорости — 4 ms GUI service loop с source-frame chasing, который under load схлопывал разные speed settings в один и тот же дёрганый playback path.",
+        "Следующий канон для Desktop Animator — display-rate continuous-time playback: GUI thread показывает ближайший кадр к текущему playhead time, а не пытается «догонять» каждый source frame любой ценой.",
+        "Auxiliary panes во время playback должны быть intentionally cheap: front/rear/left/right и прочая периферия уступают budget live 3D вместо того, чтобы конкурировать с ним на равных.",
+        "Web CPU acceptance всё ещё не считается окончательно закрытой до свежего Windows SEND bundle с подтверждением, что event-driven idle stop действительно убрал post-run browser tail."
+      ]
+    }
+  ]
+}

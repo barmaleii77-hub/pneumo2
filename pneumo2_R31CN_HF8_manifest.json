@@ -1,0 +1,36 @@
+{
+  "selected_release": {
+    "release": "R176_R31CN_HF8",
+    "product_release": "PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03",
+    "date_utc": "2026-04-03T00:00:00Z",
+    "date": "2026-04-03",
+    "notes": "Objective/penalty contract is now a first-class distributed optimization artifact and part of stable problem_hash: coordinator writes objective_contract.json, Optimization history shows per-run contract, and resume/cache no longer merge runs that changed objective_keys, penalty_key or penalty_tol.",
+    "base_product_release": "PneumoApp_v6_80_R176_R31CN_HF7_2026-04-03",
+    "base_release": "R176_R31CN_HF7"
+  },
+  "artifacts": {
+    "PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03.zip": {
+      "size_bytes": 6280073,
+      "sha256": "5c1485d64af9529e5e9718e1e39e2ed9b2d401bd7f9b4b7d02ab5f838e188473"
+    },
+    "pneumo2_R31CN_HF8_repo_root.zip": {
+      "size_bytes": 6178097,
+      "sha256": "0ccd327afcf4ae56aec7abd84e08b45fcf40c5e2bbab54389f211e7cb9c600ae"
+    },
+    "pneumo2_R31CN_HF8.git.bundle": {
+      "size_bytes": 5162138,
+      "sha256": "f7cb8adb38ee2bde9b16a8ee707178b72cffb7c239f8eb6e4dbb2380ee3188f0"
+    },
+    "pneumo2_R31CN_HF8_selection.json": {
+      "size_bytes": 5138,
+      "sha256": "ae0210cd62cf6c305ca4bc3edba153d982f5f196454362237bf5844261cf96c4"
+    }
+  },
+  "git_commit": "56878455d599547ea16f575acb0e02fa22cd6c69",
+  "git_branch": "main",
+  "working_tree_file_count": 1214,
+  "working_tree_dir_count": 54,
+  "bundle_clone_working_tree_file_count": 1214,
+  "bundle_clone_working_tree_dir_count": 54,
+  "bundle_clone_verified_with_branch": "main"
+}

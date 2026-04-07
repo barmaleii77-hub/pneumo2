@@ -1,0 +1,23 @@
+Files investigate/src_root/01_PARAMETER_REGISTRY.md and work_r31x/01_PARAMETER_REGISTRY.md differ
+Files investigate/src_root/BUILD_INFO_LATEST.txt and work_r31x/BUILD_INFO_LATEST.txt differ
+Only in work_r31x: BUILD_INFO_PneumoApp_v6_80_R176_R31X_2026-03-24.txt
+Only in work_r31x: BUNDLE_ANALYSIS_R31W_ROAD_SURFACE_AND_CYL_PACKAGING_2026-03-24.json
+Only in work_r31x: BUNDLE_ANALYSIS_R31W_ROAD_SURFACE_AND_CYL_PACKAGING_2026-03-24.md
+Only in work_r31x: CHANGED_FILES_R31X_2026-03-24.txt
+Files investigate/src_root/DATA_CONTRACT_UNIFIED_KEYS.md and work_r31x/DATA_CONTRACT_UNIFIED_KEYS.md differ
+Only in work_r31x: PYCHECKS_R31X_2026-03-24.log
+Only in work_r31x: PYTEST_TARGETED_R31X_2026-03-24.log
+Only in work_r31x: RELEASE_BUILD_REPORT_R31X_2026-03-24.md
+Files investigate/src_root/RELEASE_NOTES_LATEST.txt and work_r31x/RELEASE_NOTES_LATEST.txt differ
+Only in work_r31x: RELEASE_NOTES_R31X_2026-03-24.md
+Only in work_r31x: TODO_WISHLIST_R31X_ADDENDUM_2026-03-24.md
+Files investigate/src_root/VERSION.txt and work_r31x/VERSION.txt differ
+Files investigate/src_root/docs/11_TODO.md and work_r31x/docs/11_TODO.md differ
+Files investigate/src_root/docs/12_Wishlist.md and work_r31x/docs/12_Wishlist.md differ
+Files investigate/src_root/docs/WISHLIST.json and work_r31x/docs/WISHLIST.json differ
+Files investigate/src_root/pneumo_solver_ui/desktop_animator/app.py and work_r31x/pneumo_solver_ui/desktop_animator/app.py differ
+Files investigate/src_root/pneumo_solver_ui/desktop_animator/geom3d_helpers.py and work_r31x/pneumo_solver_ui/desktop_animator/geom3d_helpers.py differ
+Files investigate/src_root/pneumo_solver_ui/release_info.py and work_r31x/pneumo_solver_ui/release_info.py differ
+Files investigate/src_root/release_tag.json and work_r31x/release_tag.json differ
+Files investigate/src_root/tests/test_r44_cylinder_packaging_contract_and_animator.py and work_r31x/tests/test_r44_cylinder_packaging_contract_and_animator.py differ
+Only in work_r31x/tests: test_r45_stable_surface_mesh_spacing_and_animator.py

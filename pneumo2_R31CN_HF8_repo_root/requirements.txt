@@ -1,0 +1,56 @@
+# UnifiedPneumoApp requirements (FULL)
+#
+# IMPORTANT: This project follows the "ABSOLUTE LAW" of unified keys/metadata.
+# There is NO "minimal" dependency set. The launcher installs this file only.
+#
+# Notes:
+# - Prefer wheels for speed.
+# - Keep versions as "minimum" where possible to reduce wheel-availability issues.
+
+streamlit>=1.41.1
+streamlit-autorefresh>=1.0.1
+numpy>=2.2.3
+pandas>=2.2.3
+openpyxl>=3.1
+duckdb>=0.9.0
+scipy>=1.15.2
+matplotlib>=3.10.0
+plotly>=5.18
+
+# IMPORTANT: Do NOT pin sympy here.
+# sympy is a transitive dependency of torch, and torch pins/constraints sympy
+# differently across Python versions. Pinning sympy directly causes resolver conflicts.
+packaging>=24.0
+PyYAML>=6.0.2
+Pillow>=11.1.0
+requests>=2.32.3
+psutil>=7.0.0
+
+# Bayesian optimisation stack
+botorch>=0.12.0
+
+# NOTE: torch wheels for newer Python (3.13+) require newer torch releases.
+torch==2.5.1; python_version < '3.13'
+torch==2.6.0; python_version == '3.13'
+torch==2.10.0; python_version >= '3.14'
+
+# PyTorch BO dependencies
+pyro-ppl>=1.9.1
+
+# Dask parallelism
+# (version compatibility is important for distributed)
+dask>=2025.2.0
+distributed>=2025.2.0
+
+# Desktop Animator stack (PySide6 + OpenGL)
+PySide6>=6.10.1
+pyqtgraph>=0.13.7
+PyOpenGL>=3.1.8
+PyOpenGL_accelerate; platform_system == "Windows"
+
+# XML safety / parsing helpers (used by some UI/IO paths)
+defusedxml>=0.7.1
+lxml>=5.3.1
+
+# Thread-pool control (avoid BLAS/OpenMP oversubscription under multiprocessing)
+threadpoolctl>=3.2.0

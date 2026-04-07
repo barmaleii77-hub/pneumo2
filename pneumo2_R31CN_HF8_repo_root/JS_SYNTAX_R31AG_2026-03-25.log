@@ -1,0 +1,9 @@
+[components/mech_car3d/index.html] rc=0
+[components/mech_anim/index.html] rc=0
+[components/mech_anim_quad/index.html] rc=0
+[components/corner_heatmap_live/index.html] rc=0
+[components/minimap_live/index.html] rc=0
+[components/road_profile_live/index.html] rc=0
+[components/pneumo_svg_flow/index.html] rc=0
+[components/playhead_ctrl/index.html] rc=0
+ALL_JS_OK

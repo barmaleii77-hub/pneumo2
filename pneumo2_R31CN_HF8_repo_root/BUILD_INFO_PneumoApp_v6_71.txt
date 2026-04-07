@@ -1,0 +1,19 @@
+BUILD INFO — PneumoApp_v6_71
+UTC: 2026-02-12T20:16:20Z
+
+Changes vs v6_70 (bugfix/packaging only):
+- FIX: app.py: добавлен input `tag` (суффикс имени диагностического ZIP) и безопасная установка PNEUMO_BUNDLE_TAG_SUFFIX.
+  Ранее в v6_70 `tag` использовался без определения → NameError при запуске UI.
+- UPDATE: default RELEASE (PNEUMO_RELEASE fallback) -> UNIFIED_v6_71.
+- UPDATE: release_tag.json + VERSION.txt -> v6_71.
+- CLEAN: удалены runtime-артефакты (SEND_BUNDLES/* кроме README_KEEP_THIS_FOLDER.txt; __pycache__/; *.pyc).
+- REGEN: HASH_MANIFEST_PneumoApp_v6_71.sha256 + обновление HASH_MANIFEST_LATEST.txt.
+
+QC (headless in Linux, without Streamlit):
+- tools.autoselfcheck: OK (param contracts + mech energy smoke + import smoke).
+- scheme_integrity.verify_scheme_integrity(PNEUMO_SCHEME.json): OK.
+- model_pneumo_v9_mech_doublewishbone_worldroad: compile_only smoke: OK.
+- model_pneumo_v9_doublewishbone_camozzi: t_end=0 smoke (fingerprint assert path): OK.
+
+Notes:
+- Streamlit UI smoke is not executed here (streamlit not installed in this environment). Windows GUI must be validated on target machine.

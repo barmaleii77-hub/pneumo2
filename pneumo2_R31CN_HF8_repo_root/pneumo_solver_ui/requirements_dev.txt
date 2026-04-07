@@ -1,0 +1,7 @@
+# Dev-only tooling (optional)
+
+ruff
+mypy
+pytest
+pytest-cov
+pre-commit

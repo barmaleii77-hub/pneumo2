@@ -1,0 +1,26 @@
+[
+  {
+    "meas_table": "main",
+    "meas_col": "давление_ресивер3_Па",
+    "model_key": "main:давление_ресивер3_Па",
+    "weight": 1e-5
+  },
+  {
+    "meas_table": "p",
+    "meas_col": "Ресивер3",
+    "model_key": "p:Ресивер3",
+    "weight": 1e-5
+  },
+  {
+    "meas_table": "q",
+    "meas_col": "__EDGE_NAME__",
+    "model_key": "q:__EDGE_NAME__",
+    "weight": 1.0
+  },
+  {
+    "meas_table": "open",
+    "meas_col": "__EDGE_NAME__",
+    "model_key": "open:__EDGE_NAME__",
+    "weight": 1.0
+  }
+]

@@ -1,0 +1,28 @@
+usage: system_influence_report_v1.py [-h] --run_dir RUN_DIR [--model MODEL]
+                                     [--base_json BASE_JSON]
+                                     [--fit_ranges_json FIT_RANGES_JSON]
+                                     [--p_up_ref P_UP_REF]
+                                     [--p_dn_ref P_DN_REF] [--eps_rel EPS_REL]
+                                     [--adaptive_eps]
+                                     [--adaptive_eps_grid ADAPTIVE_EPS_GRID]
+                                     [--max_params MAX_PARAMS]
+
+System Influence report (pneumatics + kinematics)
+
+options:
+  -h, --help            show this help message and exit
+  --run_dir RUN_DIR
+  --model MODEL         path to model.py (optional; auto from AUTOPILOT meta)
+  --base_json BASE_JSON
+                        override base_json (optional)
+  --fit_ranges_json FIT_RANGES_JSON
+                        override fit_ranges_json (optional)
+  --p_up_ref P_UP_REF   reference upstream abs pressure for mdot_ref
+  --p_dn_ref P_DN_REF   reference downstream abs pressure for mdot_ref
+  --eps_rel EPS_REL     relative perturbation for elasticity
+  --adaptive_eps        scan a small eps_rel grid and choose the most stable
+                        local elasticity per parameter
+  --adaptive_eps_grid ADAPTIVE_EPS_GRID
+                        comma-separated eps_rel grid for --adaptive_eps
+  --max_params MAX_PARAMS
+                        safety limit

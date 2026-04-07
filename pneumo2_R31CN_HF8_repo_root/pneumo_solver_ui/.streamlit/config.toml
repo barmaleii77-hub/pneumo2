@@ -1,0 +1,19 @@
+[ui]
+hideTopBar = true
+
+[server]
+headless = true
+port = 8505
+address = "127.0.0.1"
+# Для релизов/пакетов на Windows: отключаем file-watcher Streamlit,
+# т.к. он может сильно тормозить и вызывать фоновую нагрузку CPU/диск.
+# Горячая перезагрузка в релизе не нужна.
+fileWatcherType = "none"
+runOnSave = false
+
+[browser]
+gatherUsageStats = false
+
+[client]
+showSidebarNavigation = false
+toolbarMode = "minimal"

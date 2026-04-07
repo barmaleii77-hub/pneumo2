@@ -1,0 +1,8 @@
+2026-02-06 UNIFIED_v6_54 built from v6_53 (streamlit session_state fix, smoke energy cols, json import)
+2026-02-06 UNIFIED_v6_55 built from v6_54 (crash_guard install restored, release_tag sync)
+2026-02-06 UNIFIED_v6_56 built from v6_55 (restore missing legacy pages, fix CF_HDROP clipboard (GlobalLock), fix Desktop Animator os import)
+2026-02-06 UNIFIED_v6_59 built from v6_56 (normalize release fallback defaults, update release tagging across tools)
+2026-02-14 UTC: UNIFIED_v6_77 (v6.77) — P0 fix: safe_set_page_config for pages_legacy + streamlit_compat; version markers synced.
+[2026-02-14 10:52 UTC] v6_78: silent WARN signalization (self_check energy/entropy)
+- v6_79 (2026-02-15 07:29 UTC): Streamlit compat auto-translates deprecated use_container_width -> width (silences WARNs + forward-compat).
+  Also mitigated Pandas FutureWarning for df['включен'] by normalizing dtype before astype(bool).

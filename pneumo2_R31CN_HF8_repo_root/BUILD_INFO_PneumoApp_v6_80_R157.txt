@@ -1,0 +1,13 @@
+Build: PneumoApp v6.80
+Release: ETALON_v6_80_R157
+Built UTC: 2026-02-20T00:00:00Z
+
+Notes:
+- Shared venv: lock file moved OUT of VENV_DIR; lock now covers venv creation + pip install (fixes RC=106 / "failed to locate pyvenv.cfg" race).
+- Launcher drift removed: START_PNEUMO_APP.pyw delegates to START_PNEUMO_APP.py (single source of truth).
+- Key canonicalization (no runtime aliases) outside ring scenarios:
+  * base geometry: use only "база" / "колея" (removed "база_м" / "колея_м" lookups across UI/tools/models)
+  * ring scenario: only TURN_LEFT / TURN_RIGHT + turn_radius_m (removed legacy TURN/CORNER/radius_m/turn_dir)
+- Animator road profile reconstruction: requires canonical meta_json key wheelbase_m; no guessed defaults. If missing/invalid -> road profile disabled with warning.
+- Auto-export meta_json geometry: exports wheelbase_m/track_m strictly from base_override (no invented defaults).
+- Cleanup: removed unused legacy modules that contained obsolete alias logic.

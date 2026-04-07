@@ -1,0 +1,29 @@
+BUILD INFO — v6_60
+Built at (UTC): 2026-02-10T18:11:58Z
+
+Change focus: SCHEME CONSISTENCY (Source of truth: "Пневмосхема исправленная2")
+
+✅ Source of truth rule:
+- After exhaust throttles (SCO) there is nothing except atmosphere (АТМ).
+
+What was fixed/updated:
+1) Scheme metadata
+   - Added docs copy: docs/PneumoScheme_source_of_truth/* (ASCII filenames).
+   - Updated pneumo_solver_ui/PNEUMO_SCHEME.json meta to reference source of truth.
+
+2) Exhaust silencer references removed from active scheme (no functional deletion, reserve code kept)
+   - Removed '+2905' from camozzi_код for exhaust throttle edges in:
+     * pneumo_solver_ui/PNEUMO_SCHEME.json
+     * pneumo_solver_ui/scheme_fingerprint.json
+     * pneumo_solver_ui/scheme_fingerprint_v8_r48.json
+
+3) Scheme fingerprint mismatch resolved
+   - Patched models to match scheme (no extra nodes/edges after exhaust throttles):
+     * pneumo_solver_ui/model_pneumo_v8_energy_audit_vacuum.py
+     * pneumo_solver_ui/model_pneumo_v9_mech_doublewishbone_r48_reference.py
+   - Updated fingerprints accordingly.
+   - Removed stale file: scheme_fingerprint_v8_r48.MISMATCH.current.json
+
+Notes:
+- No new features were added. This is a consistency + packaging release.
+- Muffler/silencer related calculations remain in code as reserve for future scheme revisions.

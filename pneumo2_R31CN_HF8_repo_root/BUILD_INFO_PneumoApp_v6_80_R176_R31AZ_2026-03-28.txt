@@ -1,0 +1,7 @@
+PneumoApp_v6_80_R176_R31AZ_2026-03-28
+Built UTC: 2026-03-28T16:20:00Z
+
+Highlights:
+- Fixed staged optimization root causes around system influence / stage plan / schema parsing.
+- Added loud failure statuses for broken staged-optimization prep.
+- Added portable release packaging helper and produced a short-path Windows-friendly release archive.

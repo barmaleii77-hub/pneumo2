@@ -1,0 +1,7 @@
+pneumo_solver_ui/ui_scenario_ring.py
+pneumo_solver_ui/app.py
+pneumo_solver_ui/detail_autorun_policy.py
+tests/test_r33_ring_sine_input_semantics.py
+tests/test_r33_detail_autorun_policy.py
+RELEASE_NOTES_R31F_2026-03-22.md
+R31F_AUDIT_2026-03-22.md

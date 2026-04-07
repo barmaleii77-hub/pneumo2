@@ -1,0 +1,10 @@
+BUILD_INFO_R148
+
+Release: ETALON_v6_80_R148
+Built (UTC): 2026-02-19
+Base: ETALON_v6_80_R116
+
+Key changes vs R147:
+- Desktop Animator: removed visualization-only Z base offsets (vis_*), rendering uses model outputs only.
+- Desktop Animator: fixed 2D/3D coordinate usage and wheel_air key mapping.
+

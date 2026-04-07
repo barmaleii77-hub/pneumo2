@@ -1,0 +1,8 @@
+# Desktop Animator (PySide6 + plots + optional OpenGL)
+# Install this if you want the separate Windows animation window.
+
+PySide6>=6.6
+pyqtgraph>=0.13.7
+PyOpenGL>=3.1.7
+qdarktheme>=2.1
+numpy>=1.24

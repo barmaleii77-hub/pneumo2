@@ -1,0 +1,3830 @@
+{
+  "meta": {
+    "generated_at_utc": "2026-02-07T08:45:50Z",
+    "generator": "pneumo_solver_ui (Mechanika) - camozzi_catalog merge",
+    "notes": [
+      "This file intentionally duplicates 'component_passport.json' to provide a single self-contained Camozzi catalog bundle.",
+      "Legacy code continues using component_passport.json; cylinders are provided for discrete selection & geometry checks."
+    ]
+  },
+  "pneumo_components_passport": {
+    "meta": {
+      "generated_at": "2026-01-25T07:29:15.301904Z",
+      "project": "пневмоподвеска",
+      "model_file": "model_pneumo_v10_mech_doublewishbone_worldroad_iso6358.py",
+      "reference_atmosphere": {
+        "standard": "ISO 8778 / ISO 6358 reference atmosphere (ANR)",
+        "p0_Pa": 100000.0,
+        "T0_K": 293.15,
+        "rho0_kg_m3": 1.185,
+        "RH_percent": 65
+      },
+      "Qn_test_point_assumed": {
+        "p_supply_gauge_bar": 6.0,
+        "dp_bar": 1.0,
+        "p1_abs_bar": 7.0,
+        "p2_abs_bar": 6.0,
+        "T1_K": 293.15
+      },
+      "notes": [
+        "C,b,m,Δpc поля рассчитаны/проставлены как стартовые (для реального соответствия требуется подбор по кривым/испытаниям).",
+        "C (sonic conductance) в большинстве каталогов задаётся в dm^3/(s·bar); в коде удобнее хранить в m^3/(s·Pa) (1 dm^3/(s·bar)=1e-8 m^3/(s·Pa)).",
+        "R45: заполнены оценочные ISO6358 поля для MC104/VMR/2905; требуется замена на даташит/стенд для окончательной верификации."
+      ],
+      "updated_in_release": "PnevmatikaR47",
+      "updated_at_utc": "2026-01-25",
+      "note": "R47: Added explicit Camozzi Series 29 silencer models (2901/2903/2921/2931/2928/2929) with catalog Qn @6bar(g)->atm and ISO6358 C fitted at that point.",
+      "legacy_sources": [
+        {
+          "id": "PnevmatikaR48",
+          "note": "Legacy passport schema embedded per-component under legacy_r48 to prevent loss."
+        }
+      ],
+      "model_notes": "R51: default model moved to v10 (worldroad+iso6358+passport+thermal)."
+    },
+    "components": [
+      {
+        "id": "MC104-R00 (Series MC)",
+        "manufacturer": "Camozzi",
+        "family": "MC",
+        "category": "pressure_regulator",
+        "ports": "G1/8 (from catalog MC104?)",
+        "datasheet": {
+          "inlet_pressure_bar_max": 16.0,
+          "outlet_pressure_bar_range": [
+            0.5,
+            10.0
+          ],
+          "self_reliving": "yes (series MC self-relieving regulators)",
+          "Qn_Nl_min_at_6bar_dp1bar": 1450.0
+        },
+        "iso6358": {
+          "C_dm3_s_bar": 4.9275623268596185,
+          "C_m3_s_Pa": 4.9275623268596185e-08,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "estimated_from_Qn_at_6bar_dp1bar_assuming_b=0.5_m=0.5",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed"
+          }
+        },
+        "in_code": {
+          "camozzi_код_string": "MC104-R00 (Series MC)",
+          "edges_in_build_network_full": [
+            "регулятор‑после‑себя‑Pmin‑питание‑Ресивер2‑из‑Аккумулятор"
+          ],
+          "edge_count": 1,
+          "A_values_m2": [
+            6.796924892414566e-05
+          ],
+          "dp_crack_values_Pa": [
+            2000.0
+          ],
+          "p_set_values_Pa": [
+            301325.0
+          ],
+          "Cd_values": [
+            0.8
+          ],
+          "kind_values": [
+            "reg_after"
+          ],
+          "flow_params_approximation": "Uses A and dp from VNR-238-3/8 via A_по_VNR in build_network_full"
+        },
+        "missing_data": [
+          "Flow curve (Pa/Pr -> Q) from datasheet (digitize) or bench test",
+          "ISO 6358 parameters C,b,m from curve fitting",
+          "Dynamic behavior: response time, hysteresis, internal volume (optional)"
+        ],
+        "legacy_r48": {
+          "id": "MC104-R00 (Series MC)",
+          "manufacturer": "Camozzi",
+          "family": "MC",
+          "category": "pressure_regulator",
+          "ports": "G1/8 (from catalog MC104?)",
+          "datasheet": {
+            "inlet_pressure_bar_max": 16.0,
+            "outlet_pressure_bar_range": [
+              0.5,
+              10.0
+            ],
+            "self_reliving": "yes (series MC self-relieving regulators)",
+            "Qn_Nl_min_at_6bar_dp1bar": 1450.0
+          },
+          "iso6358": {
+            "C_dm3_s_bar": 4.9275623268596185,
+            "C_m3_s_Pa": 4.9275623268596185e-08,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "estimated_from_Qn_at_6bar_dp1bar_assuming_b=0.5_m=0.5",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed"
+            },
+            "_uncertainty": {
+              "C_rel": 0.45,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "in_code": {
+            "camozzi_код_string": "MC104-R00 (Series MC)",
+            "edges_in_build_network_full": [
+              "регулятор‑после‑себя‑Pmin‑питание‑Ресивер2‑из‑Аккумулятор"
+            ],
+            "edge_count": 1,
+            "A_values_m2": [
+              6.796924892414566e-05
+            ],
+            "dp_crack_values_Pa": [
+              2000.0
+            ],
+            "p_set_values_Pa": [
+              301325.0
+            ],
+            "Cd_values": [
+              0.8
+            ],
+            "kind_values": [
+              "reg_after"
+            ],
+            "flow_params_approximation": "Uses A and dp from VNR-238-3/8 via A_по_VNR in build_network_full"
+          },
+          "missing_data": [
+            "Flow curve (Pa/Pr -> Q) from datasheet (digitize) or bench test",
+            "ISO 6358 parameters C,b,m from curve fitting",
+            "Dynamic behavior: response time, hysteresis, internal volume (optional)"
+          ]
+        }
+      },
+      {
+        "id": "SCO 604-1/8",
+        "manufacturer": "Camozzi",
+        "family": "SCO",
+        "category": "bidirectional_flow_control",
+        "ports": "G1/8",
+        "datasheet": {
+          "d_max_mm": 2.0,
+          "Qn_open_Nl_min_at_6bar_dp1bar": 200.0,
+          "Qn_closed_Nl_min_at_6bar_dp1bar": 70.0
+        },
+        "iso6358": {
+          "C_open_dm3_s_bar": 0.6804138174397716,
+          "C_closed_dm3_s_bar": 0.23814483610392007,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C_open": "estimated_from_Qn_open_assuming_b=0.5_m=0.5",
+            "C_closed": "estimated_from_Qn_closed_assuming_b=0.5_m=0.5",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_0_for_symmetric_orifice"
+          }
+        },
+        "assembly": {
+          "base": "SCO 604-1/8",
+          "silencer": "none"
+        },
+        "in_code": {
+          "camozzi_код_string": "SCO 604-1/8",
+          "edges_in_build_network_full": [],
+          "edge_count": 0,
+          "A_values_m2": [],
+          "A_max_values_m2": [],
+          "alpha_values": [],
+          "Cd_values": [],
+          "kind_values": []
+        },
+        "missing_data": [
+          "Calibration curve: opening (turns) -> C (or A) for the actual screw position",
+          "Pressure drop vs flow curve for better b,m fitting (optional)"
+        ],
+        "legacy_r48": {
+          "id": "SCO 604-1/8",
+          "manufacturer": "Camozzi",
+          "family": "SCO",
+          "category": "bidirectional_flow_control",
+          "ports": "G1/8",
+          "datasheet": {
+            "d_max_mm": 2.0,
+            "Qn_open_Nl_min_at_6bar_dp1bar": 200.0,
+            "Qn_closed_Nl_min_at_6bar_dp1bar": 70.0
+          },
+          "iso6358": {
+            "C_open_dm3_s_bar": 0.6804138174397716,
+            "C_closed_dm3_s_bar": 0.23814483610392007,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C_open": "estimated_from_Qn_open_assuming_b=0.5_m=0.5",
+              "C_closed": "estimated_from_Qn_closed_assuming_b=0.5_m=0.5",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_0_for_symmetric_orifice"
+            },
+            "_uncertainty": {
+              "C_rel": 0.35,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "assembly": {
+            "base": "SCO 604-1/8",
+            "silencer": "none"
+          },
+          "in_code": {
+            "camozzi_код_string": "SCO 604-1/8",
+            "edges_in_build_network_full": [],
+            "edge_count": 0,
+            "A_values_m2": [],
+            "A_max_values_m2": [],
+            "alpha_values": [],
+            "Cd_values": [],
+            "kind_values": []
+          },
+          "missing_data": [
+            "Calibration curve: opening (turns) -> C (or A) for the actual screw position",
+            "Pressure drop vs flow curve for better b,m fitting (optional)"
+          ]
+        }
+      },
+      {
+        "id": "SCO 604-1/8+2905",
+        "manufacturer": "Camozzi",
+        "family": "SCO",
+        "category": "bidirectional_flow_control",
+        "ports": "G1/8 (+2905)",
+        "datasheet": {
+          "d_max_mm": 2.0,
+          "Qn_open_Nl_min_at_6bar_dp1bar": 200.0,
+          "Qn_closed_Nl_min_at_6bar_dp1bar": 70.0
+        },
+        "iso6358": {
+          "C_open_dm3_s_bar": 0.6804138174397716,
+          "C_closed_dm3_s_bar": 0.23814483610392007,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C_open": "estimated_from_Qn_open_assuming_b=0.5_m=0.5",
+            "C_closed": "estimated_from_Qn_closed_assuming_b=0.5_m=0.5",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_0_for_symmetric_orifice"
+          }
+        },
+        "assembly": {
+          "base": "SCO 604-1/8",
+          "silencer": "2905 (Series 29)"
+        },
+        "in_code": {
+          "camozzi_код_string": "SCO 604-1/8+2905",
+          "edges_in_build_network_full": [
+            "дроссель_выхлоп_Pmid",
+            "дроссель_выхлоп_Pmin"
+          ],
+          "edge_count": 2,
+          "A_values_m2": [
+            9.424777960769378e-07,
+            1.4137166941154069e-06
+          ],
+          "A_max_values_m2": [
+            3.141592653589793e-06
+          ],
+          "alpha_values": [
+            0.3,
+            0.45
+          ],
+          "Cd_values": [
+            0.8
+          ],
+          "kind_values": [
+            "orifice"
+          ]
+        },
+        "missing_data": [
+          "Calibration curve: opening (turns) -> C (or A) for the actual screw position",
+          "Pressure drop vs flow curve for better b,m fitting (optional)",
+          "Pressure drop / ISO C,b,m for the silencer 2905 (not in code, no Qn in catalog)"
+        ],
+        "legacy_r48": {
+          "id": "SCO 604-1/8+2905",
+          "manufacturer": "Camozzi",
+          "family": "SCO",
+          "category": "bidirectional_flow_control",
+          "ports": "G1/8 (+2905)",
+          "datasheet": {
+            "d_max_mm": 2.0,
+            "Qn_open_Nl_min_at_6bar_dp1bar": 200.0,
+            "Qn_closed_Nl_min_at_6bar_dp1bar": 70.0
+          },
+          "iso6358": {
+            "C_open_dm3_s_bar": 0.6804138174397716,
+            "C_closed_dm3_s_bar": 0.23814483610392007,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C_open": "estimated_from_Qn_open_assuming_b=0.5_m=0.5",
+              "C_closed": "estimated_from_Qn_closed_assuming_b=0.5_m=0.5",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_0_for_symmetric_orifice"
+            },
+            "_uncertainty": {
+              "C_rel": 0.35,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "assembly": {
+            "base": "SCO 604-1/8",
+            "silencer": "2905 (Series 29)"
+          },
+          "in_code": {
+            "camozzi_код_string": "SCO 604-1/8+2905",
+            "edges_in_build_network_full": [
+              "дроссель_выхлоп_Pmid",
+              "дроссель_выхлоп_Pmin"
+            ],
+            "edge_count": 2,
+            "A_values_m2": [
+              9.424777960769378e-07,
+              1.4137166941154069e-06
+            ],
+            "A_max_values_m2": [
+              3.141592653589793e-06
+            ],
+            "alpha_values": [
+              0.3,
+              0.45
+            ],
+            "Cd_values": [
+              0.8
+            ],
+            "kind_values": [
+              "orifice"
+            ]
+          },
+          "missing_data": [
+            "Calibration curve: opening (turns) -> C (or A) for the actual screw position",
+            "Pressure drop vs flow curve for better b,m fitting (optional)",
+            "Pressure drop / ISO C,b,m for the silencer 2905 (not in code, no Qn in catalog)"
+          ]
+        }
+      },
+      {
+        "id": "SCO 606-1/4",
+        "manufacturer": "Camozzi",
+        "family": "SCO",
+        "category": "bidirectional_flow_control",
+        "ports": "G1/4",
+        "datasheet": {
+          "d_max_mm": 4.0,
+          "Qn_open_Nl_min_at_6bar_dp1bar": 530.0,
+          "Qn_closed_Nl_min_at_6bar_dp1bar": 160.0
+        },
+        "iso6358": {
+          "C_open_dm3_s_bar": 1.8030966162153947,
+          "C_closed_dm3_s_bar": 0.5443310539518174,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C_open": "estimated_from_Qn_open_assuming_b=0.5_m=0.5",
+            "C_closed": "estimated_from_Qn_closed_assuming_b=0.5_m=0.5",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_0_for_symmetric_orifice"
+          }
+        },
+        "assembly": {
+          "base": "SCO 606-1/4",
+          "silencer": "none"
+        },
+        "in_code": {
+          "camozzi_код_string": "SCO 606-1/4",
+          "edges_in_build_network_full": [
+            "дроссель‑диагональ‑Ц2‑линия_CAP→ROD‑ЛПCAP→ПЗROD",
+            "дроссель‑диагональ‑Ц2‑линия_ROD→CAP‑ПЗROD→ЛПCAP",
+            "дроссель‑диагональ‑Ц2‑линия_ROD→CAP‑ЛПROD→ПЗCAP",
+            "дроссель‑диагональ‑Ц2‑линия_CAP→ROD‑ПЗCAP→ЛПROD",
+            "дроссель‑диагональ‑Ц2‑линия_CAP→ROD‑ППCAP→ЛЗROD",
+            "дроссель‑диагональ‑Ц2‑линия_ROD→CAP‑ЛЗROD→ППCAP",
+            "дроссель‑диагональ‑Ц2‑линия_ROD→CAP‑ППROD→ЛЗCAP",
+            "дроссель‑диагональ‑Ц2‑линия_CAP→ROD‑ЛЗCAP→ППROD"
+          ],
+          "edge_count": 8,
+          "A_values_m2": [
+            4.39822971502571e-06
+          ],
+          "A_max_values_m2": [
+            1.2566370614359172e-05
+          ],
+          "alpha_values": [
+            0.35
+          ],
+          "Cd_values": [
+            0.8
+          ],
+          "kind_values": [
+            "orifice"
+          ]
+        },
+        "missing_data": [
+          "Calibration curve: opening (turns) -> C (or A) for the actual screw position",
+          "Pressure drop vs flow curve for better b,m fitting (optional)"
+        ],
+        "legacy_r48": {
+          "id": "SCO 606-1/4",
+          "manufacturer": "Camozzi",
+          "family": "SCO",
+          "category": "bidirectional_flow_control",
+          "ports": "G1/4",
+          "datasheet": {
+            "d_max_mm": 4.0,
+            "Qn_open_Nl_min_at_6bar_dp1bar": 530.0,
+            "Qn_closed_Nl_min_at_6bar_dp1bar": 160.0
+          },
+          "iso6358": {
+            "C_open_dm3_s_bar": 1.8030966162153947,
+            "C_closed_dm3_s_bar": 0.5443310539518174,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C_open": "estimated_from_Qn_open_assuming_b=0.5_m=0.5",
+              "C_closed": "estimated_from_Qn_closed_assuming_b=0.5_m=0.5",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_0_for_symmetric_orifice"
+            },
+            "_uncertainty": {
+              "C_rel": 0.35,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "assembly": {
+            "base": "SCO 606-1/4",
+            "silencer": "none"
+          },
+          "in_code": {
+            "camozzi_код_string": "SCO 606-1/4",
+            "edges_in_build_network_full": [
+              "дроссель‑диагональ‑Ц2‑линия_CAP→ROD‑ЛПCAP→ПЗROD",
+              "дроссель‑диагональ‑Ц2‑линия_ROD→CAP‑ПЗROD→ЛПCAP",
+              "дроссель‑диагональ‑Ц2‑линия_ROD→CAP‑ЛПROD→ПЗCAP",
+              "дроссель‑диагональ‑Ц2‑линия_CAP→ROD‑ПЗCAP→ЛПROD",
+              "дроссель‑диагональ‑Ц2‑линия_CAP→ROD‑ППCAP→ЛЗROD",
+              "дроссель‑диагональ‑Ц2‑линия_ROD→CAP‑ЛЗROD→ППCAP",
+              "дроссель‑диагональ‑Ц2‑линия_ROD→CAP‑ППROD→ЛЗCAP",
+              "дроссель‑диагональ‑Ц2‑линия_CAP→ROD‑ЛЗCAP→ППROD"
+            ],
+            "edge_count": 8,
+            "A_values_m2": [
+              4.39822971502571e-06
+            ],
+            "A_max_values_m2": [
+              1.2566370614359172e-05
+            ],
+            "alpha_values": [
+              0.35
+            ],
+            "Cd_values": [
+              0.8
+            ],
+            "kind_values": [
+              "orifice"
+            ]
+          },
+          "missing_data": [
+            "Calibration curve: opening (turns) -> C (or A) for the actual screw position",
+            "Pressure drop vs flow curve for better b,m fitting (optional)"
+          ]
+        }
+      },
+      {
+        "id": "SCO 606-1/4+2905",
+        "manufacturer": "Camozzi",
+        "family": "SCO",
+        "category": "bidirectional_flow_control",
+        "ports": "G1/4 (+2905)",
+        "datasheet": {
+          "d_max_mm": 4.0,
+          "Qn_open_Nl_min_at_6bar_dp1bar": 530.0,
+          "Qn_closed_Nl_min_at_6bar_dp1bar": 160.0
+        },
+        "iso6358": {
+          "C_open_dm3_s_bar": 1.8030966162153947,
+          "C_closed_dm3_s_bar": 0.5443310539518174,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C_open": "estimated_from_Qn_open_assuming_b=0.5_m=0.5",
+            "C_closed": "estimated_from_Qn_closed_assuming_b=0.5_m=0.5",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_0_for_symmetric_orifice"
+          }
+        },
+        "assembly": {
+          "base": "SCO 606-1/4",
+          "silencer": "2905 (Series 29)"
+        },
+        "in_code": {
+          "camozzi_код_string": "SCO 606-1/4+2905",
+          "edges_in_build_network_full": [
+            "дроссель_выхлоп_Pmax"
+          ],
+          "edge_count": 1,
+          "A_values_m2": [
+            8.79645943005142e-06
+          ],
+          "A_max_values_m2": [
+            1.2566370614359172e-05
+          ],
+          "alpha_values": [
+            0.7
+          ],
+          "Cd_values": [
+            0.8
+          ],
+          "kind_values": [
+            "orifice"
+          ]
+        },
+        "missing_data": [
+          "Calibration curve: opening (turns) -> C (or A) for the actual screw position",
+          "Pressure drop vs flow curve for better b,m fitting (optional)",
+          "Pressure drop / ISO C,b,m for the silencer 2905 (not in code, no Qn in catalog)"
+        ],
+        "legacy_r48": {
+          "id": "SCO 606-1/4+2905",
+          "manufacturer": "Camozzi",
+          "family": "SCO",
+          "category": "bidirectional_flow_control",
+          "ports": "G1/4 (+2905)",
+          "datasheet": {
+            "d_max_mm": 4.0,
+            "Qn_open_Nl_min_at_6bar_dp1bar": 530.0,
+            "Qn_closed_Nl_min_at_6bar_dp1bar": 160.0
+          },
+          "iso6358": {
+            "C_open_dm3_s_bar": 1.8030966162153947,
+            "C_closed_dm3_s_bar": 0.5443310539518174,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C_open": "estimated_from_Qn_open_assuming_b=0.5_m=0.5",
+              "C_closed": "estimated_from_Qn_closed_assuming_b=0.5_m=0.5",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_0_for_symmetric_orifice"
+            },
+            "_uncertainty": {
+              "C_rel": 0.35,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "assembly": {
+            "base": "SCO 606-1/4",
+            "silencer": "2905 (Series 29)"
+          },
+          "in_code": {
+            "camozzi_код_string": "SCO 606-1/4+2905",
+            "edges_in_build_network_full": [
+              "дроссель_выхлоп_Pmax"
+            ],
+            "edge_count": 1,
+            "A_values_m2": [
+              8.79645943005142e-06
+            ],
+            "A_max_values_m2": [
+              1.2566370614359172e-05
+            ],
+            "alpha_values": [
+              0.7
+            ],
+            "Cd_values": [
+              0.8
+            ],
+            "kind_values": [
+              "orifice"
+            ]
+          },
+          "missing_data": [
+            "Calibration curve: opening (turns) -> C (or A) for the actual screw position",
+            "Pressure drop vs flow curve for better b,m fitting (optional)",
+            "Pressure drop / ISO C,b,m for the silencer 2905 (not in code, no Qn in catalog)"
+          ]
+        }
+      },
+      {
+        "id": "SCO 608-3/8",
+        "manufacturer": "Camozzi",
+        "family": "SCO",
+        "category": "bidirectional_flow_control",
+        "ports": "G3/8",
+        "datasheet": {
+          "d_max_mm": 7.0,
+          "Qn_open_Nl_min_at_6bar_dp1bar": 710.0,
+          "Qn_closed_Nl_min_at_6bar_dp1bar": 410.0
+        },
+        "iso6358": {
+          "C_open_dm3_s_bar": 2.4154690519111894,
+          "C_closed_dm3_s_bar": 1.3948483257515318,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C_open": "estimated_from_Qn_open_assuming_b=0.5_m=0.5",
+            "C_closed": "estimated_from_Qn_closed_assuming_b=0.5_m=0.5",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_0_for_symmetric_orifice"
+          }
+        },
+        "assembly": {
+          "base": "SCO 608-3/8",
+          "silencer": "none"
+        },
+        "in_code": {
+          "camozzi_код_string": "SCO 608-3/8",
+          "edges_in_build_network_full": [],
+          "edge_count": 0,
+          "A_values_m2": [],
+          "A_max_values_m2": [],
+          "alpha_values": [],
+          "Cd_values": [],
+          "kind_values": []
+        },
+        "missing_data": [
+          "Calibration curve: opening (turns) -> C (or A) for the actual screw position",
+          "Pressure drop vs flow curve for better b,m fitting (optional)"
+        ],
+        "legacy_r48": {
+          "id": "SCO 608-3/8",
+          "manufacturer": "Camozzi",
+          "family": "SCO",
+          "category": "bidirectional_flow_control",
+          "ports": "G3/8",
+          "datasheet": {
+            "d_max_mm": 7.0,
+            "Qn_open_Nl_min_at_6bar_dp1bar": 710.0,
+            "Qn_closed_Nl_min_at_6bar_dp1bar": 410.0
+          },
+          "iso6358": {
+            "C_open_dm3_s_bar": 2.4154690519111894,
+            "C_closed_dm3_s_bar": 1.3948483257515318,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C_open": "estimated_from_Qn_open_assuming_b=0.5_m=0.5",
+              "C_closed": "estimated_from_Qn_closed_assuming_b=0.5_m=0.5",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_0_for_symmetric_orifice"
+            },
+            "_uncertainty": {
+              "C_rel": 0.35,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "assembly": {
+            "base": "SCO 608-3/8",
+            "silencer": "none"
+          },
+          "in_code": {
+            "camozzi_код_string": "SCO 608-3/8",
+            "edges_in_build_network_full": [],
+            "edge_count": 0,
+            "A_values_m2": [],
+            "A_max_values_m2": [],
+            "alpha_values": [],
+            "Cd_values": [],
+            "kind_values": []
+          },
+          "missing_data": [
+            "Calibration curve: opening (turns) -> C (or A) for the actual screw position",
+            "Pressure drop vs flow curve for better b,m fitting (optional)"
+          ]
+        }
+      },
+      {
+        "id": "SCO 610-1/2",
+        "manufacturer": "Camozzi",
+        "family": "SCO",
+        "category": "bidirectional_flow_control",
+        "ports": "G1/2",
+        "datasheet": {
+          "d_max_mm": 12.0,
+          "Qn_open_Nl_min_at_6bar_dp1bar": 2570.0,
+          "Qn_closed_Nl_min_at_6bar_dp1bar": 1330.0
+        },
+        "iso6358": {
+          "C_open_dm3_s_bar": 8.743317554101065,
+          "C_closed_dm3_s_bar": 4.5247518859744815,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C_open": "estimated_from_Qn_open_assuming_b=0.5_m=0.5",
+            "C_closed": "estimated_from_Qn_closed_assuming_b=0.5_m=0.5",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_0_for_symmetric_orifice"
+          }
+        },
+        "assembly": {
+          "base": "SCO 610-1/2",
+          "silencer": "none"
+        },
+        "in_code": {
+          "camozzi_код_string": "SCO 610-1/2",
+          "edges_in_build_network_full": [],
+          "edge_count": 0,
+          "A_values_m2": [],
+          "A_max_values_m2": [],
+          "alpha_values": [],
+          "Cd_values": [],
+          "kind_values": []
+        },
+        "missing_data": [
+          "Calibration curve: opening (turns) -> C (or A) for the actual screw position",
+          "Pressure drop vs flow curve for better b,m fitting (optional)"
+        ],
+        "legacy_r48": {
+          "id": "SCO 610-1/2",
+          "manufacturer": "Camozzi",
+          "family": "SCO",
+          "category": "bidirectional_flow_control",
+          "ports": "G1/2",
+          "datasheet": {
+            "d_max_mm": 12.0,
+            "Qn_open_Nl_min_at_6bar_dp1bar": 2570.0,
+            "Qn_closed_Nl_min_at_6bar_dp1bar": 1330.0
+          },
+          "iso6358": {
+            "C_open_dm3_s_bar": 8.743317554101065,
+            "C_closed_dm3_s_bar": 4.5247518859744815,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C_open": "estimated_from_Qn_open_assuming_b=0.5_m=0.5",
+              "C_closed": "estimated_from_Qn_closed_assuming_b=0.5_m=0.5",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_0_for_symmetric_orifice"
+            },
+            "_uncertainty": {
+              "C_rel": 0.35,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "assembly": {
+            "base": "SCO 610-1/2",
+            "silencer": "none"
+          },
+          "in_code": {
+            "camozzi_код_string": "SCO 610-1/2",
+            "edges_in_build_network_full": [],
+            "edge_count": 0,
+            "A_values_m2": [],
+            "A_max_values_m2": [],
+            "alpha_values": [],
+            "Cd_values": [],
+            "kind_values": []
+          },
+          "missing_data": [
+            "Calibration curve: opening (turns) -> C (or A) for the actual screw position",
+            "Pressure drop vs flow curve for better b,m fitting (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2901 1/2",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G1/2"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 3400.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 2377.6297285736423,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 8.079943915683408e-08,
+          "C_dm3_s_bar": 8.079943915683408,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2901 1/2",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G1/2"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 3400.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 2377.6297285736423,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 8.079943915683408e-08,
+            "C_dm3_s_bar": 8.079943915683408,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2901 1/4-17",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G1/4"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 1000.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 699.3028613451891,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 2.3764540928480615e-08,
+          "C_dm3_s_bar": 2.3764540928480615,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2901 1/4-17",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G1/4"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 1000.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 699.3028613451891,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 2.3764540928480615e-08,
+            "C_dm3_s_bar": 2.3764540928480615,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2901 1/4-22",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G1/4"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 1600.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1118.8845781523025,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 3.8023265485568987e-08,
+          "C_dm3_s_bar": 3.8023265485568984,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2901 1/4-22",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G1/4"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 1600.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1118.8845781523025,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 3.8023265485568987e-08,
+            "C_dm3_s_bar": 3.8023265485568984,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2901 1/8",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G1/8"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 700.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 489.51200294163226,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 1.6635178649936427e-08,
+          "C_dm3_s_bar": 1.6635178649936428,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2901 1/8",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G1/8"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 700.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 489.51200294163226,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 1.6635178649936427e-08,
+            "C_dm3_s_bar": 1.6635178649936428,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2901 3/8",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G3/8"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 1500.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1048.9542920177835,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 3.564681139272092e-08,
+          "C_dm3_s_bar": 3.5646811392720923,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2901 3/8",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G3/8"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 1500.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1048.9542920177835,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 3.564681139272092e-08,
+            "C_dm3_s_bar": 3.5646811392720923,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2901 M5",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "M5"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 150.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 104.89542920177837,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 3.564681139272092e-09,
+          "C_dm3_s_bar": 0.35646811392720923,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2901 M5",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "M5"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 150.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 104.89542920177837,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 3.564681139272092e-09,
+            "C_dm3_s_bar": 0.35646811392720923,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2903 1/8",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G1/8"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 700.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 489.51200294163226,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 1.6635178649936427e-08,
+          "C_dm3_s_bar": 1.6635178649936428,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2903 1/8",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G1/8"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 700.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 489.51200294163226,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 1.6635178649936427e-08,
+            "C_dm3_s_bar": 1.6635178649936428,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2905 (Series 29 silencing bush)",
+        "manufacturer": "Camozzi",
+        "family": "SIL",
+        "category": "muffler",
+        "ports": "G1/4 (example; depends on version)",
+        "datasheet": {
+          "known": "Only geometry in catalog; flow/noise data not explicitly given for 2905 in the catalog snippet we found.",
+          "Qn_Nl_min_at_6bar_dp1bar": 900.0
+        },
+        "iso6358": {
+          "C_dm3_s_bar": 3.058486961499074,
+          "C_m3_s_Pa": 3.058486961499074e-08,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "estimated_from_series29_neighbors_placeholder",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed"
+          }
+        },
+        "in_code": {
+          "used_indirectly_in": [
+            "SCO 604-1/8+2905",
+            "SCO 606-1/4+2905"
+          ],
+          "modeled_explicitly": false
+        },
+        "missing_data": [
+          "Pressure drop vs flow rate for 2905 (or ISO 6358 C,b,m)",
+          "Acoustic attenuation vs flow (optional)",
+          "Backpressure effect on exhaust dynamics"
+        ],
+        "legacy_r48": {
+          "id": "2905 (Series 29 silencing bush)",
+          "manufacturer": "Camozzi",
+          "family": "SIL",
+          "category": "muffler",
+          "ports": "G1/4 (example; depends on version)",
+          "datasheet": {
+            "known": "Only geometry in catalog; flow/noise data not explicitly given for 2905 in the catalog snippet we found.",
+            "Qn_Nl_min_at_6bar_dp1bar": 900.0
+          },
+          "iso6358": {
+            "C_dm3_s_bar": 3.058486961499074,
+            "C_m3_s_Pa": 3.058486961499074e-08,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "estimated_from_series29_neighbors_placeholder",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed"
+            },
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "in_code": {
+            "used_indirectly_in": [
+              "SCO 604-1/8+2905",
+              "SCO 606-1/4+2905"
+            ],
+            "modeled_explicitly": false
+          },
+          "missing_data": [
+            "Pressure drop vs flow rate for 2905 (or ISO 6358 C,b,m)",
+            "Acoustic attenuation vs flow (optional)",
+            "Backpressure effect on exhaust dynamics"
+          ]
+        }
+      },
+      {
+        "id": "2905 1/4",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G1/4"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 1000.0,
+          "Qn_Nl_min_at_6bar_dp1bar": 250.0,
+          "Pmax_bar": 10.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv": 1000.0
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 2.380952380952381e-08,
+          "C_dm3_s_bar": 2.380952380952381,
+          "b": 0.5,
+          "m": 1.0,
+          "delta_pc_bar": 0.0,
+          "status": "estimated_from_camozzi_series29_2901_flow_same_thread",
+          "notes": "C computed from Qn @6bar(g)->atm assuming choked; Qn_dp1bar field is a rough placeholder"
+        },
+        "notes": "Silencing bush / muffler. Real Qn depends on contamination and mounting.",
+        "legacy_r48": {
+          "id": "2905 1/4",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G1/4"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 1000.0,
+            "Qn_Nl_min_at_6bar_dp1bar": 250.0,
+            "Pmax_bar": 10.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv": 1000.0
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 2.380952380952381e-08,
+            "C_dm3_s_bar": 2.380952380952381,
+            "b": 0.5,
+            "m": 1.0,
+            "delta_pc_bar": 0.0,
+            "status": "estimated_from_camozzi_series29_2901_flow_same_thread",
+            "notes": "C computed from Qn @6bar(g)->atm assuming choked; Qn_dp1bar field is a rough placeholder",
+            "_uncertainty": {
+              "C_rel": 0.55,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "notes": "Silencing bush / muffler. Real Qn depends on contamination and mounting."
+        }
+      },
+      {
+        "id": "2905 1/8",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G1/8"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 700.0,
+          "Qn_Nl_min_at_6bar_dp1bar": 125.0,
+          "Pmax_bar": 10.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv": 700.0
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 1.6666666666666664e-08,
+          "C_dm3_s_bar": 1.6666666666666663,
+          "b": 0.5,
+          "m": 1.0,
+          "delta_pc_bar": 0.0,
+          "status": "estimated_from_camozzi_series29_2901_flow_same_thread",
+          "notes": "C computed from Qn @6bar(g)->atm assuming choked; Qn_dp1bar field is a rough placeholder"
+        },
+        "notes": "Silencing bush / muffler. Real Qn depends on contamination and mounting.",
+        "legacy_r48": {
+          "id": "2905 1/8",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G1/8"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 700.0,
+            "Qn_Nl_min_at_6bar_dp1bar": 125.0,
+            "Pmax_bar": 10.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv": 700.0
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 1.6666666666666664e-08,
+            "C_dm3_s_bar": 1.6666666666666663,
+            "b": 0.5,
+            "m": 1.0,
+            "delta_pc_bar": 0.0,
+            "status": "estimated_from_camozzi_series29_2901_flow_same_thread",
+            "notes": "C computed from Qn @6bar(g)->atm assuming choked; Qn_dp1bar field is a rough placeholder",
+            "_uncertainty": {
+              "C_rel": 0.55,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "notes": "Silencing bush / muffler. Real Qn depends on contamination and mounting."
+        }
+      },
+      {
+        "id": "2905 3/8",
+        "family": "SIL",
+        "type": "silencing_bush",
+        "manufacturer": "Camozzi",
+        "series": "29",
+        "ports": {
+          "inlet": "G3/8",
+          "outlet": "ATM"
+        },
+        "datasheet": {
+          "max_operating_pressure_bar": 10.0,
+          "Qn_Nl_min_at_6bar_to_atm": 1500.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv": 1500.0,
+          "notes": "Оценка по каталогу Camozzi Series 29: сопоставление с 2901 G3/8 (похожие элемент и резьба)."
+        },
+        "iso6358": {
+          "C_dm3_s_bar": 3.5714285714285716,
+          "C_m3_s_Pa": 3.571428571428572e-08,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "status": "estimated_from_camozzi_series29_2901_flow_same_thread"
+        },
+        "legacy_r48": {
+          "id": "2905 3/8",
+          "family": "SIL",
+          "type": "silencing_bush",
+          "manufacturer": "Camozzi",
+          "series": "29",
+          "ports": {
+            "inlet": "G3/8",
+            "outlet": "ATM"
+          },
+          "datasheet": {
+            "max_operating_pressure_bar": 10.0,
+            "Qn_Nl_min_at_6bar_to_atm": 1500.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv": 1500.0,
+            "notes": "Оценка по каталогу Camozzi Series 29: сопоставление с 2901 G3/8 (похожие элемент и резьба)."
+          },
+          "iso6358": {
+            "C_dm3_s_bar": 3.5714285714285716,
+            "C_m3_s_Pa": 3.571428571428572e-08,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "status": "estimated_from_camozzi_series29_2901_flow_same_thread",
+            "_uncertainty": {
+              "C_rel": 0.55,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          }
+        }
+      },
+      {
+        "id": "2921 1/4",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G1/4"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 3300.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 2307.699442439124,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 7.842298506398603e-08,
+          "C_dm3_s_bar": 7.8422985063986035,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2921 1/4",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G1/4"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 3300.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 2307.699442439124,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 7.842298506398603e-08,
+            "C_dm3_s_bar": 7.8422985063986035,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2921 1/8",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G1/8"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 1730.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1209.7939501271774,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 4.1112655806271463e-08,
+          "C_dm3_s_bar": 4.111265580627147,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2921 1/8",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G1/8"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 1730.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1209.7939501271774,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 4.1112655806271463e-08,
+            "C_dm3_s_bar": 4.111265580627147,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2928 1/4",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G1/4"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 2730.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1909.0968114723664,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 6.487719673475208e-08,
+          "C_dm3_s_bar": 6.487719673475207,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2928 1/4",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G1/4"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 2730.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1909.0968114723664,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 6.487719673475208e-08,
+            "C_dm3_s_bar": 6.487719673475207,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2928 1/8",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G1/8"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 1450.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1013.9891489505242,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 3.445858434629689e-08,
+          "C_dm3_s_bar": 3.445858434629689,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2928 1/8",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G1/8"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 1450.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1013.9891489505242,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 3.445858434629689e-08,
+            "C_dm3_s_bar": 3.445858434629689,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2928 M5",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "M5"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 320.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 223.77691563046048,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 7.604653097113796e-09,
+          "C_dm3_s_bar": 0.7604653097113796,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2928 M5",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "M5"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 320.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 223.77691563046048,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 7.604653097113796e-09,
+            "C_dm3_s_bar": 0.7604653097113796,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2929 10",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "tube_10"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 2800.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1958.048011766529,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 6.654071459974571e-08,
+          "C_dm3_s_bar": 6.654071459974571,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2929 10",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "tube_10"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 2800.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1958.048011766529,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 6.654071459974571e-08,
+            "C_dm3_s_bar": 6.654071459974571,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2929 12",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "tube_12"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 4200.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 2937.0720176497944,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 9.981107189961859e-08,
+          "C_dm3_s_bar": 9.98110718996186,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2929 12",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "tube_12"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 4200.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 2937.0720176497944,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 9.981107189961859e-08,
+            "C_dm3_s_bar": 9.98110718996186,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2929 4",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "tube_4"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 380.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 265.73508731117187,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 9.030525552822633e-09,
+          "C_dm3_s_bar": 0.9030525552822634,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2929 4",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "tube_4"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 380.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 265.73508731117187,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 9.030525552822633e-09,
+            "C_dm3_s_bar": 0.9030525552822634,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2929 6",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "tube_6"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 660.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 461.5398884878248,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 1.5684597012797207e-08,
+          "C_dm3_s_bar": 1.5684597012797208,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2929 6",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "tube_6"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 660.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 461.5398884878248,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 1.5684597012797207e-08,
+            "C_dm3_s_bar": 1.5684597012797208,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2929 8",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "tube_8"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 1300.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 909.0937197487459,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 3.08939032070248e-08,
+          "C_dm3_s_bar": 3.0893903207024804,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2929 8",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "tube_8"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 1300.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 909.0937197487459,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 3.08939032070248e-08,
+            "C_dm3_s_bar": 3.0893903207024804,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2931 1/4",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G1/4"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 3200.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 2237.769156304605,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 7.604653097113797e-08,
+          "C_dm3_s_bar": 7.604653097113797,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2931 1/4",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G1/4"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 3200.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 2237.769156304605,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 7.604653097113797e-08,
+            "C_dm3_s_bar": 7.604653097113797,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2931 1/8",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "G1/8"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 1927.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1347.5566138121792,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 4.579427036918215e-08,
+          "C_dm3_s_bar": 4.579427036918215,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2931 1/8",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "G1/8"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 1927.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 1347.5566138121792,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 4.579427036918215e-08,
+            "C_dm3_s_bar": 4.579427036918215,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2931 M5",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "M5"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 450.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 314.6862876053351,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 1.0694043417816278e-08,
+          "C_dm3_s_bar": 1.0694043417816277,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2931 M5",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "M5"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 450.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 314.6862876053351,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 1.0694043417816278e-08,
+            "C_dm3_s_bar": 1.0694043417816277,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "2931 M7",
+        "family": "SIL",
+        "type": "silencer",
+        "vendor": "Camozzi",
+        "ports": {
+          "thread": "M7"
+        },
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_to_atm": 1130.0,
+          "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 790.2122333200635,
+          "test_conditions": {
+            "p_supply_gauge_bar": 6.0,
+            "p_out": "atmosphere",
+            "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+          },
+          "Pmax_bar": 10.0,
+          "source": {
+            "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+            "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+          }
+        },
+        "iso6358": {
+          "C_m3_s_Pa": 2.685393124918309e-08,
+          "C_dm3_s_bar": 2.685393124918309,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed_zero"
+          },
+          "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults."
+        },
+        "missing_data": [
+          "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+          "ISO 6358 b,m fitted from multi-point curve (if required)",
+          "Effect of clogging/contamination over time (optional)"
+        ],
+        "legacy_r48": {
+          "id": "2931 M7",
+          "family": "SIL",
+          "type": "silencer",
+          "vendor": "Camozzi",
+          "ports": {
+            "thread": "M7"
+          },
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_to_atm": 1130.0,
+            "Qn_Nl_min_at_6bar_dp1bar_equiv_iso": 790.2122333200635,
+            "test_conditions": {
+              "p_supply_gauge_bar": 6.0,
+              "p_out": "atmosphere",
+              "note": "Catalog flow for silencers is given at 6 bar(g) inlet, exhaust to atmosphere."
+            },
+            "Pmax_bar": 10.0,
+            "source": {
+              "title": "Camozzi SILENCERS / 2025/08 (Series 29)",
+              "url": "https://media.camozzi.com/data_sheet/29-SILENCERS-ENG.pdf"
+            }
+          },
+          "iso6358": {
+            "C_m3_s_Pa": 2.685393124918309e-08,
+            "C_dm3_s_bar": 2.685393124918309,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "from_camozzi_silencers_catalog_Qn_6bar_to_atm_fitted_as_iso_C",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed_zero"
+            },
+            "notes": "C is fitted from catalog Qn at 6 bar(g) to atmosphere using ISO6358 proxy. b,m are defaults.",
+            "_uncertainty": {
+              "C_rel": 0.25,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "missing_data": [
+            "Pressure drop curve Δp(Q) (bench test) for real exhaust dynamics",
+            "ISO 6358 b,m fitted from multi-point curve (if required)",
+            "Effect of clogging/contamination over time (optional)"
+          ]
+        }
+      },
+      {
+        "id": "VMR 1/8-B10",
+        "manufacturer": "Camozzi",
+        "family": "VMR",
+        "category": "overpressure_exhaust_valve",
+        "ports": "G1/8",
+        "datasheet": {
+          "working_pressure_bar_range": [
+            1.0,
+            8.0
+          ],
+          "medium": "compressed air, filtered, lubricated or not",
+          "Qn_Nl_min_at_6bar_dp1bar": 800.0
+        },
+        "iso6358": {
+          "C_dm3_s_bar": 2.7186550768880653,
+          "C_m3_s_Pa": 2.7186550768880654e-08,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.0,
+          "_status": {
+            "C": "estimated_from_Qn_at_6bar_dp1bar_assuming_b=0.5_m=0.5",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "assumed"
+          }
+        },
+        "in_code": {
+          "camozzi_код_string": "VMR 1/8-B10",
+          "edges_in_build_network_full": [
+            "регулятор_до_себя_заряд_аккумулятора_из_Ресивер3",
+            "клапан_предохранительный_Pmax_Ресивер3→узел",
+            "регулятор_до_себя_Pmid_сброс",
+            "регулятор_до_себя_Pmin_сброс"
+          ],
+          "edge_count": 4,
+          "A_values_m2": [
+            6.796924892414566e-05,
+            0.0001314072145866816
+          ],
+          "dp_crack_values_Pa": [
+            0.0
+          ],
+          "p_set_values_Pa": [
+            301325.0,
+            501325.0,
+            901325.0
+          ],
+          "Cd_values": [
+            0.8
+          ],
+          "kind_values": [
+            "relief"
+          ],
+          "flow_params_approximation": "Uses A and dp from VNR-843-07 via A_по_VNR in build_network_full"
+        },
+        "missing_data": [
+          "Flow curve (Pa/Pr -> Q) from datasheet (digitize) or bench test",
+          "ISO 6358 parameters C,b,m from curve fitting",
+          "Dynamic behavior: response time, hysteresis, internal volume (optional)"
+        ],
+        "legacy_r48": {
+          "id": "VMR 1/8-B10",
+          "manufacturer": "Camozzi",
+          "family": "VMR",
+          "category": "overpressure_exhaust_valve",
+          "ports": "G1/8",
+          "datasheet": {
+            "working_pressure_bar_range": [
+              1.0,
+              8.0
+            ],
+            "medium": "compressed air, filtered, lubricated or not",
+            "Qn_Nl_min_at_6bar_dp1bar": 800.0
+          },
+          "iso6358": {
+            "C_dm3_s_bar": 2.7186550768880653,
+            "C_m3_s_Pa": 2.7186550768880654e-08,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.0,
+            "_status": {
+              "C": "estimated_from_Qn_at_6bar_dp1bar_assuming_b=0.5_m=0.5",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "assumed"
+            },
+            "_uncertainty": {
+              "C_rel": 0.55,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "in_code": {
+            "camozzi_код_string": "VMR 1/8-B10",
+            "edges_in_build_network_full": [
+              "регулятор_до_себя_заряд_аккумулятора_из_Ресивер3",
+              "клапан_предохранительный_Pmax_Ресивер3→узел",
+              "регулятор_до_себя_Pmid_сброс",
+              "регулятор_до_себя_Pmin_сброс"
+            ],
+            "edge_count": 4,
+            "A_values_m2": [
+              6.796924892414566e-05,
+              0.0001314072145866816
+            ],
+            "dp_crack_values_Pa": [
+              0.0
+            ],
+            "p_set_values_Pa": [
+              301325.0,
+              501325.0,
+              901325.0
+            ],
+            "Cd_values": [
+              0.8
+            ],
+            "kind_values": [
+              "relief"
+            ],
+            "flow_params_approximation": "Uses A and dp from VNR-843-07 via A_по_VNR in build_network_full"
+          },
+          "missing_data": [
+            "Flow curve (Pa/Pr -> Q) from datasheet (digitize) or bench test",
+            "ISO 6358 parameters C,b,m from curve fitting",
+            "Dynamic behavior: response time, hysteresis, internal volume (optional)"
+          ]
+        }
+      },
+      {
+        "id": "VNR-210-1/8",
+        "manufacturer": "Camozzi",
+        "family": "VNR",
+        "category": "check_valve",
+        "ports": "G1/8",
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_dp1bar": 600.0,
+          "min_operating_pressure_bar": 0.2,
+          "max_operating_pressure_bar": 10.0
+        },
+        "iso6358": {
+          "C_dm3_s_bar": 2.0412414523193148,
+          "C_m3_s_Pa": 2.0412414523193148e-08,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.2,
+          "_status": {
+            "C": "estimated_from_Qn_at_6bar_dp1bar_assuming_b=0.5_m=0.5",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "from_datasheet_as_min_operating_pressure"
+          }
+        },
+        "in_code": {
+          "camozzi_код_string": "VNR-210-1/8",
+          "edges_in_build_network_full": [],
+          "edge_count": 0,
+          "A_values_m2": [],
+          "dp_crack_values_Pa": [],
+          "Cd_values": [],
+          "kind_values": []
+        },
+        "missing_data": [
+          "ISO 6358 b (critical pressure ratio) from datasheet or fit",
+          "ISO 6358 m (subsonic index) from datasheet or fit",
+          "Leakage in reverse direction vs dp (for realism)",
+          "Internal volume of the valve (for fast dynamics, optional)",
+          "Hysteresis of cracking pressure Δpc (optional)"
+        ],
+        "legacy_r48": {
+          "id": "VNR-210-1/8",
+          "manufacturer": "Camozzi",
+          "family": "VNR",
+          "category": "check_valve",
+          "ports": "G1/8",
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_dp1bar": 600.0,
+            "min_operating_pressure_bar": 0.2,
+            "max_operating_pressure_bar": 10.0
+          },
+          "iso6358": {
+            "C_dm3_s_bar": 2.0412414523193148,
+            "C_m3_s_Pa": 2.0412414523193148e-08,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.2,
+            "_status": {
+              "C": "estimated_from_Qn_at_6bar_dp1bar_assuming_b=0.5_m=0.5",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "from_datasheet_as_min_operating_pressure"
+            },
+            "_uncertainty": {
+              "C_rel": 0.3,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "in_code": {
+            "camozzi_код_string": "VNR-210-1/8",
+            "edges_in_build_network_full": [],
+            "edge_count": 0,
+            "A_values_m2": [],
+            "dp_crack_values_Pa": [],
+            "Cd_values": [],
+            "kind_values": []
+          },
+          "missing_data": [
+            "ISO 6358 b (critical pressure ratio) from datasheet or fit",
+            "ISO 6358 m (subsonic index) from datasheet or fit",
+            "Leakage in reverse direction vs dp (for realism)",
+            "Internal volume of the valve (for fast dynamics, optional)",
+            "Hysteresis of cracking pressure Δpc (optional)"
+          ]
+        }
+      },
+      {
+        "id": "VNR-212-1/2",
+        "manufacturer": "Camozzi",
+        "family": "VNR",
+        "category": "check_valve",
+        "ports": "G1/2",
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_dp1bar": 5800.0,
+          "min_operating_pressure_bar": 0.02,
+          "max_operating_pressure_bar": 25.0
+        },
+        "iso6358": {
+          "C_dm3_s_bar": 19.73200070575338,
+          "C_m3_s_Pa": 1.9732000705753378e-07,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.02,
+          "_status": {
+            "C": "estimated_from_Qn_at_6bar_dp1bar_assuming_b=0.5_m=0.5",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "from_datasheet_as_min_operating_pressure"
+          }
+        },
+        "in_code": {
+          "camozzi_код_string": "VNR-212-1/2",
+          "edges_in_build_network_full": [
+            "обратный_клапан‑выпуск‑Ц1‑ЛП‑штоковая‑в‑Ресивер2",
+            "обратный_клапан‑выпуск‑Ц1‑ПП‑штоковая‑в‑Ресивер2",
+            "обратный_клапан‑выпуск‑Ц1‑ЛЗ‑штоковая‑в‑Ресивер2",
+            "обратный_клапан‑выпуск‑Ц1‑ПЗ‑штоковая‑в‑Ресивер2",
+            "обратный_клапан‑магистраль‑ЛП2ПЗ2‑в‑Ресивер3",
+            "обратный_клапан‑магистраль‑ПП2ЛЗ2‑в‑Ресивер3",
+            "обратный_клапан‑заряд‑аккумулятора‑после_регулятора"
+          ],
+          "edge_count": 7,
+          "A_values_m2": [
+            0.0001314072145866816
+          ],
+          "dp_crack_values_Pa": [
+            2000.0
+          ],
+          "Cd_values": [
+            0.8
+          ],
+          "kind_values": [
+            "check"
+          ]
+        },
+        "missing_data": [
+          "ISO 6358 b (critical pressure ratio) from datasheet or fit",
+          "ISO 6358 m (subsonic index) from datasheet or fit",
+          "Leakage in reverse direction vs dp (for realism)",
+          "Internal volume of the valve (for fast dynamics, optional)",
+          "Hysteresis of cracking pressure Δpc (optional)"
+        ],
+        "legacy_r48": {
+          "id": "VNR-212-1/2",
+          "manufacturer": "Camozzi",
+          "family": "VNR",
+          "category": "check_valve",
+          "ports": "G1/2",
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_dp1bar": 5800.0,
+            "min_operating_pressure_bar": 0.02,
+            "max_operating_pressure_bar": 25.0
+          },
+          "iso6358": {
+            "C_dm3_s_bar": 19.73200070575338,
+            "C_m3_s_Pa": 1.9732000705753378e-07,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.02,
+            "_status": {
+              "C": "estimated_from_Qn_at_6bar_dp1bar_assuming_b=0.5_m=0.5",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "from_datasheet_as_min_operating_pressure"
+            },
+            "_uncertainty": {
+              "C_rel": 0.3,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "in_code": {
+            "camozzi_код_string": "VNR-212-1/2",
+            "edges_in_build_network_full": [
+              "обратный_клапан‑выпуск‑Ц1‑ЛП‑штоковая‑в‑Ресивер2",
+              "обратный_клапан‑выпуск‑Ц1‑ПП‑штоковая‑в‑Ресивер2",
+              "обратный_клапан‑выпуск‑Ц1‑ЛЗ‑штоковая‑в‑Ресивер2",
+              "обратный_клапан‑выпуск‑Ц1‑ПЗ‑штоковая‑в‑Ресивер2",
+              "обратный_клапан‑магистраль‑ЛП2ПЗ2‑в‑Ресивер3",
+              "обратный_клапан‑магистраль‑ПП2ЛЗ2‑в‑Ресивер3",
+              "обратный_клапан‑заряд‑аккумулятора‑после_регулятора"
+            ],
+            "edge_count": 7,
+            "A_values_m2": [
+              0.0001314072145866816
+            ],
+            "dp_crack_values_Pa": [
+              2000.0
+            ],
+            "Cd_values": [
+              0.8
+            ],
+            "kind_values": [
+              "check"
+            ]
+          },
+          "missing_data": [
+            "ISO 6358 b (critical pressure ratio) from datasheet or fit",
+            "ISO 6358 m (subsonic index) from datasheet or fit",
+            "Leakage in reverse direction vs dp (for realism)",
+            "Internal volume of the valve (for fast dynamics, optional)",
+            "Hysteresis of cracking pressure Δpc (optional)"
+          ]
+        }
+      },
+      {
+        "id": "VNR-238-3/8",
+        "manufacturer": "Camozzi",
+        "family": "VNR",
+        "category": "check_valve",
+        "ports": "G3/8",
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_dp1bar": 3000.0,
+          "min_operating_pressure_bar": 0.02,
+          "max_operating_pressure_bar": 25.0
+        },
+        "iso6358": {
+          "C_dm3_s_bar": 10.206207261596575,
+          "C_m3_s_Pa": 1.0206207261596575e-07,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.02,
+          "_status": {
+            "C": "estimated_from_Qn_at_6bar_dp1bar_assuming_b=0.5_m=0.5",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "from_datasheet_as_min_operating_pressure"
+          }
+        },
+        "in_code": {
+          "camozzi_код_string": "VNR-238-3/8",
+          "edges_in_build_network_full": [
+            "обратный_клапан‑впуск‑атмосфера‑Ц1‑ЛП‑бесштоковая",
+            "обратный_клапан‑выпуск‑Ц1‑ЛП‑бесштоковая‑в‑Ресивер1",
+            "обратный_клапан‑впуск‑Ресивер1‑в‑Ц1‑ЛП‑штоковая",
+            "обратный_клапан‑впуск‑атмосфера‑Ц1‑ПП‑бесштоковая",
+            "обратный_клапан‑выпуск‑Ц1‑ПП‑бесштоковая‑в‑Ресивер1",
+            "обратный_клапан‑впуск‑Ресивер1‑в‑Ц1‑ПП‑штоковая",
+            "обратный_клапан‑впуск‑атмосфера‑Ц1‑ЛЗ‑бесштоковая",
+            "обратный_клапан‑выпуск‑Ц1‑ЛЗ‑бесштоковая‑в‑Ресивер1",
+            "обратный_клапан‑впуск‑Ресивер1‑в‑Ц1‑ЛЗ‑штоковая",
+            "обратный_клапан‑впуск‑атмосфера‑Ц1‑ПЗ‑бесштоковая",
+            "обратный_клапан‑выпуск‑Ц1‑ПЗ‑бесштоковая‑в‑Ресивер1",
+            "обратный_клапан‑впуск‑Ресивер1‑в‑Ц1‑ПЗ‑штоковая",
+            "обратный_клапан‑питание‑Ресивер2‑из‑узла‑после‑регулятора",
+            "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ЛП2_ПЗ2‑из‑узла‑ЛПCAPкПЗROD",
+            "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ЛП2_ПЗ2‑из‑узла‑ПЗRODкЛПCAP",
+            "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ЛП2_ПЗ2‑из‑узла‑ЛПRODкПЗCAP",
+            "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ЛП2_ПЗ2‑из‑узла‑ПЗCAPкЛПROD",
+            "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ПП2_ЛЗ2‑из‑узла‑ППCAPкЛЗROD",
+            "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ПП2_ЛЗ2‑из‑узла‑ЛЗRODкППCAP",
+            "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ПП2_ЛЗ2‑из‑узла‑ППRODкЛЗCAP",
+            "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ПП2_ЛЗ2‑из‑узла‑ЛЗCAPкППROD",
+            "обратный_клапан_Pmid_к_выхлопу",
+            "обратный_клапан_Pmin_к_выхлопу"
+          ],
+          "edge_count": 23,
+          "A_values_m2": [
+            6.796924892414566e-05
+          ],
+          "dp_crack_values_Pa": [
+            2000.0
+          ],
+          "Cd_values": [
+            0.8
+          ],
+          "kind_values": [
+            "check"
+          ]
+        },
+        "missing_data": [
+          "ISO 6358 b (critical pressure ratio) from datasheet or fit",
+          "ISO 6358 m (subsonic index) from datasheet or fit",
+          "Leakage in reverse direction vs dp (for realism)",
+          "Internal volume of the valve (for fast dynamics, optional)",
+          "Hysteresis of cracking pressure Δpc (optional)"
+        ],
+        "legacy_r48": {
+          "id": "VNR-238-3/8",
+          "manufacturer": "Camozzi",
+          "family": "VNR",
+          "category": "check_valve",
+          "ports": "G3/8",
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_dp1bar": 3000.0,
+            "min_operating_pressure_bar": 0.02,
+            "max_operating_pressure_bar": 25.0
+          },
+          "iso6358": {
+            "C_dm3_s_bar": 10.206207261596575,
+            "C_m3_s_Pa": 1.0206207261596575e-07,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.02,
+            "_status": {
+              "C": "estimated_from_Qn_at_6bar_dp1bar_assuming_b=0.5_m=0.5",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "from_datasheet_as_min_operating_pressure"
+            },
+            "_uncertainty": {
+              "C_rel": 0.3,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "in_code": {
+            "camozzi_код_string": "VNR-238-3/8",
+            "edges_in_build_network_full": [
+              "обратный_клапан‑впуск‑атмосфера‑Ц1‑ЛП‑бесштоковая",
+              "обратный_клапан‑выпуск‑Ц1‑ЛП‑бесштоковая‑в‑Ресивер1",
+              "обратный_клапан‑впуск‑Ресивер1‑в‑Ц1‑ЛП‑штоковая",
+              "обратный_клапан‑впуск‑атмосфера‑Ц1‑ПП‑бесштоковая",
+              "обратный_клапан‑выпуск‑Ц1‑ПП‑бесштоковая‑в‑Ресивер1",
+              "обратный_клапан‑впуск‑Ресивер1‑в‑Ц1‑ПП‑штоковая",
+              "обратный_клапан‑впуск‑атмосфера‑Ц1‑ЛЗ‑бесштоковая",
+              "обратный_клапан‑выпуск‑Ц1‑ЛЗ‑бесштоковая‑в‑Ресивер1",
+              "обратный_клапан‑впуск‑Ресивер1‑в‑Ц1‑ЛЗ‑штоковая",
+              "обратный_клапан‑впуск‑атмосфера‑Ц1‑ПЗ‑бесштоковая",
+              "обратный_клапан‑выпуск‑Ц1‑ПЗ‑бесштоковая‑в‑Ресивер1",
+              "обратный_клапан‑впуск‑Ресивер1‑в‑Ц1‑ПЗ‑штоковая",
+              "обратный_клапан‑питание‑Ресивер2‑из‑узла‑после‑регулятора",
+              "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ЛП2_ПЗ2‑из‑узла‑ЛПCAPкПЗROD",
+              "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ЛП2_ПЗ2‑из‑узла‑ПЗRODкЛПCAP",
+              "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ЛП2_ПЗ2‑из‑узла‑ЛПRODкПЗCAP",
+              "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ЛП2_ПЗ2‑из‑узла‑ПЗCAPкЛПROD",
+              "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ПП2_ЛЗ2‑из‑узла‑ППCAPкЛЗROD",
+              "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ПП2_ЛЗ2‑из‑узла‑ЛЗRODкППCAP",
+              "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ПП2_ЛЗ2‑из‑узла‑ППRODкЛЗCAP",
+              "обратный_клапан‑сбор‑в‑магистраль‑Магистраль_ПП2_ЛЗ2‑из‑узла‑ЛЗCAPкППROD",
+              "обратный_клапан_Pmid_к_выхлопу",
+              "обратный_клапан_Pmin_к_выхлопу"
+            ],
+            "edge_count": 23,
+            "A_values_m2": [
+              6.796924892414566e-05
+            ],
+            "dp_crack_values_Pa": [
+              2000.0
+            ],
+            "Cd_values": [
+              0.8
+            ],
+            "kind_values": [
+              "check"
+            ]
+          },
+          "missing_data": [
+            "ISO 6358 b (critical pressure ratio) from datasheet or fit",
+            "ISO 6358 m (subsonic index) from datasheet or fit",
+            "Leakage in reverse direction vs dp (for realism)",
+            "Internal volume of the valve (for fast dynamics, optional)",
+            "Hysteresis of cracking pressure Δpc (optional)"
+          ]
+        }
+      },
+      {
+        "id": "VNR-843-07",
+        "manufacturer": "Camozzi",
+        "family": "VNR",
+        "category": "check_valve",
+        "ports": "G1/4",
+        "datasheet": {
+          "Qn_Nl_min_at_6bar_dp1bar": 1400.0,
+          "min_operating_pressure_bar": 0.2,
+          "max_operating_pressure_bar": 10.0
+        },
+        "iso6358": {
+          "C_dm3_s_bar": 4.762896722078401,
+          "C_m3_s_Pa": 4.762896722078401e-08,
+          "b": 0.5,
+          "m": 0.5,
+          "delta_pc_bar": 0.2,
+          "_status": {
+            "C": "estimated_from_Qn_at_6bar_dp1bar_assuming_b=0.5_m=0.5",
+            "b": "assumed_default_until_fitted",
+            "m": "assumed_default_until_fitted",
+            "delta_pc": "from_datasheet_as_min_operating_pressure"
+          }
+        },
+        "in_code": {
+          "camozzi_код_string": "VNR-843-07",
+          "edges_in_build_network_full": [
+            "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ЛП‑бесштоковая",
+            "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ЛП‑штоковая",
+            "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ПП‑бесштоковая",
+            "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ПП‑штоковая",
+            "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ЛЗ‑бесштоковая",
+            "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ЛЗ‑штоковая",
+            "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ПЗ‑бесштоковая",
+            "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ПЗ‑штоковая",
+            "обратный_клапан‑выход‑из‑Ц2‑ЛП‑CAP‑в‑диагональ‑к‑ПЗ‑ROD",
+            "обратный_клапан‑вход‑в‑Ц2‑ПЗ‑ROD‑из‑диагонали‑ЛПCAP→ПЗROD",
+            "обратный_клапан‑выход‑из‑Ц2‑ПЗ‑ROD‑в‑диагональ‑к‑ЛП‑CAP",
+            "обратный_клапан‑вход‑в‑Ц2‑ЛП‑CAP‑из‑диагонали‑ПЗROD→ЛПCAP",
+            "обратный_клапан‑выход‑из‑Ц2‑ЛП‑ROD‑в‑диагональ‑к‑ПЗ‑CAP",
+            "обратный_клапан‑вход‑в‑Ц2‑ПЗ‑CAP‑из‑диагонали‑ЛПROD→ПЗCAP",
+            "обратный_клапан‑выход‑из‑Ц2‑ПЗ‑CAP‑в‑диагональ‑к‑ЛП‑ROD",
+            "обратный_клапан‑вход‑в‑Ц2‑ЛП‑ROD‑из‑диагонали‑ПЗCAP→ЛПROD",
+            "обратный_клапан‑выход‑из‑Ц2‑ПП‑CAP‑в‑диагональ‑к‑ЛЗ‑ROD",
+            "обратный_клапан‑вход‑в‑Ц2‑ЛЗ‑ROD‑из‑диагонали‑ППCAP→ЛЗROD",
+            "обратный_клапан‑выход‑из‑Ц2‑ЛЗ‑ROD‑в‑диагональ‑к‑ПП‑CAP",
+            "обратный_клапан‑вход‑в‑Ц2‑ПП‑CAP‑из‑диагонали‑ЛЗROD→ППCAP",
+            "обратный_клапан‑выход‑из‑Ц2‑ПП‑ROD‑в‑диагональ‑к‑ЛЗ‑CAP",
+            "обратный_клапан‑вход‑в‑Ц2‑ЛЗ‑CAP‑из‑диагонали‑ППROD→ЛЗCAP",
+            "обратный_клапан‑выход‑из‑Ц2‑ЛЗ‑CAP‑в‑диагональ‑к‑ПП‑ROD",
+            "обратный_клапан‑вход‑в‑Ц2‑ПП‑ROD‑из‑диагонали‑ЛЗCAP→ППROD"
+          ],
+          "edge_count": 24,
+          "A_values_m2": [
+            3.1718982831267966e-05
+          ],
+          "dp_crack_values_Pa": [
+            20000.0
+          ],
+          "Cd_values": [
+            0.8
+          ],
+          "kind_values": [
+            "check"
+          ]
+        },
+        "missing_data": [
+          "ISO 6358 b (critical pressure ratio) from datasheet or fit",
+          "ISO 6358 m (subsonic index) from datasheet or fit",
+          "Leakage in reverse direction vs dp (for realism)",
+          "Internal volume of the valve (for fast dynamics, optional)",
+          "Hysteresis of cracking pressure Δpc (optional)"
+        ],
+        "legacy_r48": {
+          "id": "VNR-843-07",
+          "manufacturer": "Camozzi",
+          "family": "VNR",
+          "category": "check_valve",
+          "ports": "G1/4",
+          "datasheet": {
+            "Qn_Nl_min_at_6bar_dp1bar": 1400.0,
+            "min_operating_pressure_bar": 0.2,
+            "max_operating_pressure_bar": 10.0
+          },
+          "iso6358": {
+            "C_dm3_s_bar": 4.762896722078401,
+            "C_m3_s_Pa": 4.762896722078401e-08,
+            "b": 0.5,
+            "m": 0.5,
+            "delta_pc_bar": 0.2,
+            "_status": {
+              "C": "estimated_from_Qn_at_6bar_dp1bar_assuming_b=0.5_m=0.5",
+              "b": "assumed_default_until_fitted",
+              "m": "assumed_default_until_fitted",
+              "delta_pc": "from_datasheet_as_min_operating_pressure"
+            },
+            "_uncertainty": {
+              "C_rel": 0.3,
+              "b_abs": 0.05,
+              "m_abs": 0.2,
+              "delta_pc_abs_bar": 0.1,
+              "_status": "heuristic_defaults_R48"
+            }
+          },
+          "in_code": {
+            "camozzi_код_string": "VNR-843-07",
+            "edges_in_build_network_full": [
+              "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ЛП‑бесштоковая",
+              "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ЛП‑штоковая",
+              "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ПП‑бесштоковая",
+              "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ПП‑штоковая",
+              "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ЛЗ‑бесштоковая",
+              "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ЛЗ‑штоковая",
+              "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ПЗ‑бесштоковая",
+              "обратный_клапан‑впуск‑Ресивер2‑в‑Ц2‑ПЗ‑штоковая",
+              "обратный_клапан‑выход‑из‑Ц2‑ЛП‑CAP‑в‑диагональ‑к‑ПЗ‑ROD",
+              "обратный_клапан‑вход‑в‑Ц2‑ПЗ‑ROD‑из‑диагонали‑ЛПCAP→ПЗROD",
+              "обратный_клапан‑выход‑из‑Ц2‑ПЗ‑ROD‑в‑диагональ‑к‑ЛП‑CAP",
+              "обратный_клапан‑вход‑в‑Ц2‑ЛП‑CAP‑из‑диагонали‑ПЗROD→ЛПCAP",
+              "обратный_клапан‑выход‑из‑Ц2‑ЛП‑ROD‑в‑диагональ‑к‑ПЗ‑CAP",
+              "обратный_клапан‑вход‑в‑Ц2‑ПЗ‑CAP‑из‑диагонали‑ЛПROD→ПЗCAP",
+              "обратный_клапан‑выход‑из‑Ц2‑ПЗ‑CAP‑в‑диагональ‑к‑ЛП‑ROD",
+              "обратный_клапан‑вход‑в‑Ц2‑ЛП‑ROD‑из‑диагонали‑ПЗCAP→ЛПROD",
+              "обратный_клапан‑выход‑из‑Ц2‑ПП‑CAP‑в‑диагональ‑к‑ЛЗ‑ROD",
+              "обратный_клапан‑вход‑в‑Ц2‑ЛЗ‑ROD‑из‑диагонали‑ППCAP→ЛЗROD",
+              "обратный_клапан‑выход‑из‑Ц2‑ЛЗ‑ROD‑в‑диагональ‑к‑ПП‑CAP",
+              "обратный_клапан‑вход‑в‑Ц2‑ПП‑CAP‑из‑диагонали‑ЛЗROD→ППCAP",
+              "обратный_клапан‑выход‑из‑Ц2‑ПП‑ROD‑в‑диагональ‑к‑ЛЗ‑CAP",
+              "обратный_клапан‑вход‑в‑Ц2‑ЛЗ‑CAP‑из‑диагонали‑ППROD→ЛЗCAP",
+              "обратный_клапан‑выход‑из‑Ц2‑ЛЗ‑CAP‑в‑диагональ‑к‑ПП‑ROD",
+              "обратный_клапан‑вход‑в‑Ц2‑ПП‑ROD‑из‑диагонали‑ЛЗCAP→ППROD"
+            ],
+            "edge_count": 24,
+            "A_values_m2": [
+              3.1718982831267966e-05
+            ],
+            "dp_crack_values_Pa": [
+              20000.0
+            ],
+            "Cd_values": [
+              0.8
+            ],
+            "kind_values": [
+              "check"
+            ]
+          },
+          "missing_data": [
+            "ISO 6358 b (critical pressure ratio) from datasheet or fit",
+            "ISO 6358 m (subsonic index) from datasheet or fit",
+            "Leakage in reverse direction vs dp (for realism)",
+            "Internal volume of the valve (for fast dynamics, optional)",
+            "Hysteresis of cracking pressure Δpc (optional)"
+          ]
+        }
+      }
+    ]
+  },
+  "cylinders": {
+    "meta": {
+      "source": "Camozzi Automation - Series 63 ISO 15552 cylinders catalog",
+      "source_pdf": "https://media.camozzi.com/pdf/63-ISO-ENG.pdf",
+      "source_shop": "https://shop.camozzi.com/.../series-63",
+      "extracted_at_utc": "2026-02-07T08:45:50Z",
+      "notes": [
+        "This file stores only key geometric parameters needed by this simulator (bore/rod diameters and external envelope hints).",
+        "For full ordering codes and exact dimensions per mounting, refer to the official Camozzi catalogue."
+      ]
+    },
+    "standard": "ISO 15552",
+    "series": "63",
+    "variants": {
+      "round_tube_through_rod": {
+        "versions": [
+          "63MT6...",
+          "63MT7..."
+        ],
+        "items": [
+          {
+            "bore_mm": 32,
+            "rod_mm": 12,
+            "rod_thread": "M10x1.25",
+            "B_mm": 30,
+            "port_thread": "G1/8",
+            "TG_mm": 32.5,
+            "E_mm": 47
+          },
+          {
+            "bore_mm": 40,
+            "rod_mm": 16,
+            "rod_thread": "M10x1.25",
+            "B_mm": 35,
+            "port_thread": "G1/4",
+            "TG_mm": 38.0,
+            "E_mm": 55
+          },
+          {
+            "bore_mm": 50,
+            "rod_mm": 20,
+            "rod_thread": "M16x1.5",
+            "B_mm": 40,
+            "port_thread": "G1/4",
+            "TG_mm": 46.5,
+            "E_mm": 65
+          },
+          {
+            "bore_mm": 63,
+            "rod_mm": 20,
+            "rod_thread": "M16x1.5",
+            "B_mm": 45,
+            "port_thread": "G3/8",
+            "TG_mm": 56.5,
+            "E_mm": 75
+          },
+          {
+            "bore_mm": 80,
+            "rod_mm": 25,
+            "rod_thread": "M20x1.5",
+            "B_mm": 45,
+            "port_thread": "G3/8",
+            "TG_mm": 72.0,
+            "E_mm": 93
+          },
+          {
+            "bore_mm": 100,
+            "rod_mm": 25,
+            "rod_thread": "M20x1.5",
+            "B_mm": 55,
+            "port_thread": "G1/2",
+            "TG_mm": 89.0,
+            "E_mm": 110
+          },
+          {
+            "bore_mm": 125,
+            "rod_mm": 32,
+            "rod_thread": "M27x2",
+            "B_mm": 60,
+            "port_thread": "G1/2",
+            "TG_mm": 110.0,
+            "E_mm": 135
+          }
+        ]
+      },
+      "profile_through_rod": {
+        "versions": [
+          "63MP6...",
+          "63MP7..."
+        ],
+        "items": [
+          {
+            "bore_mm": 32,
+            "rod_mm": 12,
+            "rod_thread": "M10x1.25",
+            "B_mm": 30,
+            "port_thread": "G1/8",
+            "TG_mm": 32.5,
+            "E_mm": 47
+          },
+          {
+            "bore_mm": 40,
+            "rod_mm": 16,
+            "rod_thread": "M10x1.25",
+            "B_mm": 35,
+            "port_thread": "G1/4",
+            "TG_mm": 38.0,
+            "E_mm": 55
+          },
+          {
+            "bore_mm": 50,
+            "rod_mm": 20,
+            "rod_thread": "M16x1.5",
+            "B_mm": 40,
+            "port_thread": "G1/4",
+            "TG_mm": 46.5,
+            "E_mm": 65
+          },
+          {
+            "bore_mm": 63,
+            "rod_mm": 20,
+            "rod_thread": "M16x1.5",
+            "B_mm": 45,
+            "port_thread": "G3/8",
+            "TG_mm": 56.5,
+            "E_mm": 75
+          },
+          {
+            "bore_mm": 80,
+            "rod_mm": 25,
+            "rod_thread": "M20x1.5",
+            "B_mm": 45,
+            "port_thread": "G3/8",
+            "TG_mm": 72.0,
+            "E_mm": 93
+          },
+          {
+            "bore_mm": 100,
+            "rod_mm": 25,
+            "rod_thread": "M20x1.5",
+            "B_mm": 55,
+            "port_thread": "G1/2",
+            "TG_mm": 89.0,
+            "E_mm": 110
+          },
+          {
+            "bore_mm": 125,
+            "rod_mm": 32,
+            "rod_thread": "M27x2",
+            "B_mm": 60,
+            "port_thread": "G1/2",
+            "TG_mm": 110.0,
+            "E_mm": 135
+          }
+        ]
+      }
+    },
+    "stroke_options_mm": [
+      25,
+      30,
+      40,
+      50,
+      55,
+      75,
+      80,
+      85,
+      90,
+      100,
+      105,
+      120,
+      125,
+      140,
+      150,
+      160,
+      165,
+      170,
+      180,
+      200,
+      250,
+      270,
+      350,
+      400,
+      500
+    ]
+  }
+}

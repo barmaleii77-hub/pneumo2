@@ -1,0 +1,158 @@
+{
+  "release_under_test": "PneumoApp_v6_80_R176_R31AC_2026-03-25",
+  "bundle_path": "/mnt/data/bundle_latest",
+  "root_cause": "Desktop Animator aborted on first frame because Car3DWidget._circle_line_vertices was decorated as staticmethod but still declared self, so the first piston-ring line build raised TypeError during load_npz -> _update_frame(0).",
+  "exception_event": {
+    "ts": "2026-03-25T12:43:47",
+    "etype": "TypeError",
+    "error": "TypeError(\"Car3DWidget._circle_line_vertices() missing 1 required positional argument: 'self'\")"
+  },
+  "evidence": {
+    "assets_present": {
+      "anim_latest_npz": true,
+      "anim_latest_json": true,
+      "anim_latest_road_csv": true
+    },
+    "pointer_sync": "bundle exports present; road data was not missing",
+    "traceback_head": [
+      "Traceback (most recent call last):",
+      "  File \"C:\\Users\\User\\Desktop\\PneumoApp_v6_80_R176_R31AC_2026-03-25\\pneumo_solver_ui\\desktop_animator\\app.py\", line 9734, in load_npz",
+      "    self._update_frame(0)",
+      "    ~~~~~~~~~~~~~~~~~~^^^",
+      "  File \"C:\\Users\\User\\Desktop\\PneumoApp_v6_80_R176_R31AC_2026-03-25\\pneumo_solver_ui\\desktop_animator\\app.py\", line 9702, in _update_frame",
+      "    self.cockpit.update_frame(idx, playing=bool(self._playing))",
+      "    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+      "  File \"C:\\Users\\User\\Desktop\\PneumoApp_v6_80_R176_R31AC_2026-03-25\\pneumo_solver_ui\\desktop_animator\\app.py\", line 9140, in update_frame",
+      "    self.car3d.update_frame(b, i)",
+      "    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^"
+    ]
+  },
+  "adopted_ring_defaults": {
+    "closure_policy": "closed_c1_periodic",
+    "v0_kph": 40.0,
+    "seed": 123,
+    "dx_m": 0.02,
+    "n_laps": 1,
+    "segments": [
+      {
+        "name": "S1_прямо",
+        "duration_s": 5.0,
+        "drive_mode": "STRAIGHT",
+        "speed_kph": 40.0,
+        "road": {
+          "mode": "ISO8608",
+          "iso_class": "E",
+          "gd_pick": "mid",
+          "gd_n0_scale": 1.0,
+          "waviness_w": 2.0,
+          "left_right_coherence": 0.5,
+          "seed": 12345
+        },
+        "events": [
+          {
+            "kind": "яма",
+            "side": "left",
+            "start_m": 8.0,
+            "length_m": 0.6,
+            "depth_mm": -35.0,
+            "ramp_m": 0.15
+          },
+          {
+            "kind": "препятствие",
+            "side": "both",
+            "start_m": 14.0,
+            "length_m": 0.35,
+            "depth_mm": 25.0,
+            "ramp_m": 0.08
+          }
+        ],
+        "uid": "ddbd81d4",
+        "length_m": 55.55555555555556
+      },
+      {
+        "name": "S2_поворот",
+        "duration_s": 4.0,
+        "drive_mode": "TURN_LEFT",
+        "speed_kph": 40.0,
+        "turn_radius_m": 60.0,
+        "road": {
+          "mode": "SINE",
+          "aL_mm": 50.0,
+          "aR_mm": 50.0,
+          "lambdaL_m": 1.5,
+          "lambdaR_m": 1.5,
+          "phaseL_deg": 0.0,
+          "phaseR_deg": 180.0,
+          "rand_aL": false,
+          "rand_aL_p": 0.5,
+          "rand_aL_lo_mm": 4.0,
+          "rand_aL_hi_mm": 4.0,
+          "rand_aR": false,
+          "rand_aR_p": 0.5,
+          "rand_aR_lo_mm": 4.0,
+          "rand_aR_hi_mm": 4.0,
+          "rand_lL": false,
+          "rand_lL_p": 0.5,
+          "rand_lL_lo_m": 2.5,
+          "rand_lL_hi_m": 2.5,
+          "rand_lR": false,
+          "rand_lR_p": 0.5,
+          "rand_lR_lo_m": 2.5,
+          "rand_lR_hi_m": 2.5,
+          "rand_pL": true,
+          "rand_pL_p": 0.5,
+          "rand_pL_lo_deg": 0.0,
+          "rand_pL_hi_deg": 360.0,
+          "rand_pR": true,
+          "rand_pR_p": 0.5,
+          "rand_pR_lo_deg": 0.0,
+          "rand_pR_hi_deg": 360.0
+        },
+        "events": [],
+        "uid": "8d56ab50",
+        "length_m": 44.44444444444444
+      },
+      {
+        "name": "S3_разгон",
+        "duration_s": 3.0,
+        "drive_mode": "ACCEL",
+        "v_end_kph": 55.0,
+        "road": {
+          "mode": "ISO8608",
+          "iso_class": "E",
+          "gd_pick": "mid",
+          "gd_n0_scale": 1.0,
+          "waviness_w": 2.0,
+          "left_right_coherence": 0.5,
+          "seed": 54321
+        },
+        "events": [],
+        "uid": "27233314",
+        "length_m": 39.58333333333333
+      },
+      {
+        "name": "S4_торможение",
+        "duration_s": 3.0,
+        "drive_mode": "BRAKE",
+        "v_end_kph": 40.0,
+        "road": {
+          "mode": "ISO8608",
+          "iso_class": "E",
+          "gd_pick": "mid",
+          "gd_n0_scale": 1.0,
+          "waviness_w": 2.0,
+          "left_right_coherence": 0.5,
+          "seed": 999
+        },
+        "events": [],
+        "uid": "b8cabe88",
+        "length_m": 39.58333333333333
+      }
+    ]
+  },
+  "ux_changes": {
+    "suite_list_optional_selection": true,
+    "fresh_session_clears_suite_selection_once": true,
+    "legacy_app_optional_selection": true
+  }
+}

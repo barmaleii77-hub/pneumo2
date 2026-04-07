@@ -1,0 +1,6 @@
+Release: PneumoApp_v6_80_R176_R31AY_2026-03-28
+Built UTC: 2026-03-28T12:45:00Z
+Highlights:
+- centralized Windows-safe name sanitizers for optimization/UI runtime
+- guarded reserved Windows basenames for run/output/test-derived files
+- added regression tests to keep app.py, pneumo_ui_app.py and opt_stage_runner_v1.py on one sanitizer contract

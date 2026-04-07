@@ -1,0 +1,3 @@
+pneumo_solver_ui/scenario_ring.py
+pneumo_solver_ui/ui_scenario_ring.py
+RELEASE_NOTES_R31A_2026-03-22.md

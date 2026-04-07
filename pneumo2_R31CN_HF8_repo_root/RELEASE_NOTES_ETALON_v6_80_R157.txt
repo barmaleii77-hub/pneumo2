@@ -1,0 +1,26 @@
+ETALON_v6_80_R157 — Release Notes (2026-02-20)
+
+What changed
+1) Startup reliability (shared venv)
+   - Fixed intermittent dependency-install crashes when multiple releases were started in parallel.
+   - The deps lock is now outside the venv folder and also protects venv creation.
+     This removes the "failed to locate pyvenv.cfg" / RC=106 race on Windows.
+
+2) Single launcher source of truth
+   - START_PNEUMO_APP.pyw is now a thin wrapper that runs START_PNEUMO_APP.py.
+     No duplicated launcher logic.
+
+3) Canonical keys (no aliases)
+   - Base geometry keys: only "база" and "колея" are used.
+     Legacy keys "база_м" / "колея_м" are no longer read.
+   - Ring scenario keys: only TURN_LEFT / TURN_RIGHT with turn_radius_m.
+     Legacy TURN/CORNER/radius_m/turn_dir are removed.
+
+4) Animator fidelity
+   - Road profile reconstruction no longer guesses wheelbase.
+     If meta_json has no wheelbase_m (or it's invalid) the road profile is disabled
+     with a warning instead of silently using a fake default.
+
+Breaking changes
+- Old ring scenario JSONs that used TURN/CORNER (or radius_m / turn_dir) are NOT supported.
+  Update the scenario to TURN_LEFT / TURN_RIGHT and provide turn_radius_m.

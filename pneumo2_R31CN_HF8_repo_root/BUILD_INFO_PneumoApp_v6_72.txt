@@ -1,0 +1,20 @@
+BUILD INFO — PneumoApp_v6_72
+UTC: 2026-02-12T23:35:15Z
+
+Changes vs v6_71 (bugfix/packaging only):
+- FIX: app.py: навигация теперь автоматически включает `pneumo_solver_ui/pages_legacy/` без скрытых переключателей.
+  Это восстанавливает доступ к страницам/инструментам (например: 04_SchemeEditor / 05_RoadProfiles / 06_Signals / 07_KPI / 08_ResultCompare / 09_ComparePlots / 10_StagedOptimizer),
+  которые ранее существовали в пакете, но не отображались в меню.
+  *Приоритет*: если файл с тем же именем есть в `pages/`, legacy-дубликат не добавляется в меню.
+  Архивные копии `__dup*` не добавляются в меню (но остаются в пакете для истории).
+- FIX: pneumo_solver_ui/self_check.py: добавлено гарантированное добавление путей в sys.path для совместимости динамических импортов моделей при запуске через `python -m`.
+- UPDATE: PNEUMO_RELEASE fallback -> UNIFIED_v6_72; VERSION.txt + release_tag.json -> v6_72.
+- CLEAN: удалены __pycache__/ и *.pyc (чистый пакет без runtime-артефактов).
+- REGEN: HASH_MANIFEST_PneumoApp_v6_72.sha256 + обновление HASH_MANIFEST_LATEST.txt.
+- ADD: PATCH_NOTES_v6_72.md; REPORTS/QC_REPORT_v6_72.md.
+
+QC (headless in this environment):
+- tools.autoselfcheck(strict=True): OK.
+
+Notes:
+- Streamlit UI / Windows GUI smoke должен быть подтверждён на целевой машине (Windows).

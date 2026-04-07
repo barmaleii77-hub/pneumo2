@@ -1,0 +1,76 @@
+# Canonical interface parameter registry (minimal) for cross-module compatibility.
+# See: 00_READ_FIRST__ABSOLUTE_LAW.md
+version: 1
+
+sources:
+  model_params:
+    file: pneumo_solver_ui/default_base.json
+    description: Canonical model parameter keys and defaults.
+  model_ranges:
+    file: pneumo_solver_ui/default_ranges.json
+    description: Ranges/constraints for model parameters.
+  suite_example:
+    file: pneumo_solver_ui/default_suite.json
+    description: Canonical suite schema example.
+  npz_contract:
+    file: DATA_CONTRACT_UNIFIED_KEYS.md
+    description: Canonical NPZ/meta keys and Animator-required signals.
+
+canonical:
+  suite_columns:
+    id: id
+    name: имя
+    type: тип
+    enabled: включен
+
+  test_keys_min:
+    dt: dt
+    t_end: t_end
+    auto_t_end_from_len: auto_t_end_from_len
+    road_len_m: road_len_m
+    vx0_m_s: vx0_м_с
+    road_csv: road_csv
+    axay_csv: axay_csv
+
+  meta_keys_min:
+    road_csv: road_csv
+    axay_csv: axay_csv
+    road_len_m: road_len_m
+    vx0_m_s: vx0_м_с
+    dt: dt
+    t_end: t_end
+
+  df_main_keys:
+    time_s: время_с
+    speed_vx_m_s: скорость_vx_м_с
+    yaw_rad: yaw_рад
+
+service_derived:
+  - key: svc__s_world_м
+    units: м
+    derived_from: ["скорость_vx_м_с", "время_с"]
+    note: "SERVICE/DERIVED. Coordinate along road. Must not be exported as a model signal."
+  - key: svc__x_world_м
+    units: м
+    derived_from: ["скорость_vx_м_с", "yaw_рад", "время_с"]
+    note: "SERVICE/DERIVED. World X for road overlay."
+  - key: svc__y_world_м
+    units: м
+    derived_from: ["скорость_vx_м_с", "yaw_рад", "время_с"]
+    note: "SERVICE/DERIVED. World Y for road overlay."
+
+legacy_for_migration_only:
+  # WARNING: this section must NOT be used as a runtime compatibility bridge.
+  # It exists only to help humans/CI find and remove legacy keys from data.
+  - legacy: road_speed_mps
+    canonical: vx0_м_с
+  - legacy: speed_mps
+    canonical: vx0_м_с
+  - legacy: v0_м_с
+    canonical: vx0_м_с
+  - legacy: скорость_м_с
+    canonical: vx0_м_с
+  - legacy: road_profile_path
+    canonical: road_csv
+  - legacy: road_profile_csv
+    canonical: road_csv

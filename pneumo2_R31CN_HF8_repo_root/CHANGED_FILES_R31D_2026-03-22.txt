@@ -1,0 +1,11 @@
+pneumo_solver_ui/scenario_ring.py
+pneumo_solver_ui/ui_scenario_ring.py
+pneumo_solver_ui/desktop_animator/app.py
+pneumo_solver_ui/tools/make_send_bundle.py
+pneumo_solver_ui/tools/triage_report.py
+tests/test_r32_ring_closure_policy_and_ui_labels.py
+tests/test_r32_triage_and_anim_sidecars.py
+RELEASE_NOTES_R31D_2026-03-22.md
+R31D_AUDIT_2026-03-22.md
+CHANGED_FILES_R31D_2026-03-22.txt
+PYTEST_FULL_R31D_2026-03-22.log

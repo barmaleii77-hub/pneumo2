@@ -1,0 +1,12 @@
+Build Info — PneumoApp_v6_80_R168
+Base: PneumoApp_v6_80_R167
+Built (UTC): 2026-02-25 14:17 UTC
+
+Key diffs vs R167:
+- Animator: force PySide6 Qt binding (QT_API / PYQTGRAPH_QT_LIB).
+- Ring scenarios: rebuilt shipped ETALON_* ring bundles; strict drive_mode (no silent fallback).
+- Default suite uses SHORT 15s ring CSV bundle (1501 samples) and road_len_m=83.36.
+- UI bootstrap: create initial autosave snapshot to make support bundles reproducible.
+
+Integrity:
+- compileall: OK

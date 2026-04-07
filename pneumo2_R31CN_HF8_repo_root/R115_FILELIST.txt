@@ -1,0 +1,36 @@
+PneumoApp v6.80-R115 (integrated) — file-level changes vs ETALON R114
+NOTE: __pycache__/.pyc and other volatile artifacts are excluded.
+
+Added files (15):
+  + BUILD_INFO_PneumoApp_v6_80_R115.txt
+  + HASH_MANIFEST_v6_80_R115.csv
+  + pneumo_solver_ui/camozzi_catalog_ui.py
+  + pneumo_solver_ui/catalogs/camozzi_catalog.json
+  + pneumo_solver_ui/catalogs/camozzi_cylinders_series63_iso15552.json
+  + pneumo_solver_ui/pages/03_Optimization.py
+  + pneumo_solver_ui/pages/13_CamozziCylindersCatalog.py
+  + pneumo_solver_ui/pages/14_SpringsGeometry_CoilBind.py
+  + pneumo_solver_ui/pages/97_Settings.py
+  + pneumo_solver_ui/release_gate.py
+  + pneumo_solver_ui/spec/gate_policy.yaml
+  + pneumo_solver_ui/spring_geometry_ui.py
+  + pneumo_solver_ui/tools/ui_trace_snapshot.json
+  + pneumo_solver_ui/tools/ui_traceability.py
+  + pneumo_solver_ui/ui_settings.py
+
+Changed files ({len(changed)}):
+  * BUILD_INFO_LATEST.txt
+  * HASH_MANIFEST_LATEST.txt
+  * VERSION.txt
+  * pneumo_solver_ui/iso6358_core.py
+  * pneumo_solver_ui/iso6358_fit.py
+  * pneumo_solver_ui/iso6358_system.py
+  * pneumo_solver_ui/iso_fit_demo.py
+  * pneumo_solver_ui/model_pneumo_v9_doublewishbone_camozzi.py
+  * pneumo_solver_ui/model_pneumo_v9_mech_doublewishbone_r48_reference.py
+  * pneumo_solver_ui/model_pneumo_v9_mech_doublewishbone_worldroad.py
+  * pneumo_solver_ui/page_registry.py
+  * pneumo_solver_ui/tools/preflight_gate.py
+  * pneumo_solver_ui/tools/selfcheck.py
+  * pneumo_solver_ui/tools/thermo_energy_smoke_check.py
+  * pneumo_solver_ui/verif_autochecks.py

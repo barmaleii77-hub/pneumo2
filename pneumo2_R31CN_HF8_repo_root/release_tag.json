@@ -1,0 +1,9 @@
+{
+  "release": "R176_R31CN_HF8",
+  "product_release": "PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03",
+  "date_utc": "2026-04-03T00:00:00Z",
+  "date": "2026-04-03",
+  "notes": "Objective/penalty contract is now a first-class distributed optimization artifact and part of stable problem_hash: coordinator writes objective_contract.json, Optimization history shows per-run contract, and resume/cache no longer merge runs that changed objective_keys, penalty_key or penalty_tol.",
+  "base_product_release": "PneumoApp_v6_80_R176_R31CN_HF7_2026-04-03",
+  "base_release": "R176_R31CN_HF7"
+}

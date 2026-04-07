@@ -1,0 +1,22 @@
+UnifiedPneumoApp — UNIFIED_v6_62 (WINSAFE)
+
+Дата сборки (UTC): 2026-02-11 08:11:50
+
+Цель сборки: доводка релиза после интеграции, без расширения функционала.
+
+Ключевые изменения относительно v6_61
+
+1) FIX (P0): кнопка скачивания диагностического ZIP в корневом app.py
+   - Было: make_send_bundle_bytes() возвращает (bytes, filename), а app.py передавал tuple в st.download_button(data=...).
+   - Стало: app.py распаковывает результат в data_bytes и bundle_name и передаёт в Streamlit корректные типы.
+
+2) Версия/маркировка
+   - Обновлены version markers: VERSION.txt, release_tag.json, DEFAULT_RELEASE.
+
+Контрольная проверка в среде сборки
+   - Импорт/компиляция v9 моделей с проверкой scheme fingerprint: OK.
+   - tools/mech_energy_smoke_check.py: OK.
+
+Примечание по "SOURCE OF TRUTH" схемы
+   - Эталон: pneumo_solver_ui/PNEUMO_SCHEME.json (по "Пневмосхема исправленная2").
+   - После выхлопных дросселей: атмосфера (без глушителей). Код расчёта глушителей/"+2905" сохранён как резерв.

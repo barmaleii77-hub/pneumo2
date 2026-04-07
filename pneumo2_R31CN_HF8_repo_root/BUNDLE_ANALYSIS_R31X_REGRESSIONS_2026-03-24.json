@@ -1,0 +1,207 @@
+{
+  "bundle_release": "PneumoApp_v6_80_R176_R31X_2026-03-24",
+  "npz_path": "/mnt/data/bundle_latest2/ui_sessions/UI_20260325_002253/workspace/exports/anim_latest.npz",
+  "startup_external_gl_window_warning_present": true,
+  "startup_external_gl_window_line": "[2026-03-25T00:35:31] AnimatorWarning: Animator starts with auxiliary docks attached for stability. After first show side panels are re-tiled against current screen metrics; live 3D GL uses a dedicated top-level window from launch instead of floating QDockWidget mode. {'code': 'startup_external_gl_window', 'context': {}}",
+  "mount_analysis": [
+    {
+      "corner": "ЛП",
+      "cylinder": 1,
+      "closest_branch": "upper_front",
+      "closest_distance_m": 0.010357800778300699,
+      "second_branch": "upper_rear",
+      "second_distance_m": 0.10396180720261695,
+      "top_xyz_world_m": [
+        82.93089354156503,
+        6.911934668674582,
+        0.5434931826681283
+      ],
+      "bot_xyz_world_m": [
+        82.90163885102164,
+        6.997599957581701,
+        0.41276752128465566
+      ]
+    },
+    {
+      "corner": "ЛП",
+      "cylinder": 2,
+      "closest_branch": "upper_rear",
+      "closest_distance_m": 0.010435297913006528,
+      "second_branch": "upper_front",
+      "second_distance_m": 0.10395408186410378,
+      "top_xyz_world_m": [
+        82.8592818375393,
+        6.876272870535218,
+        0.5433646562684841
+      ],
+      "bot_xyz_world_m": [
+        82.80854363578821,
+        6.951239620000528,
+        0.41276752128465566
+      ]
+    },
+    {
+      "corner": "ПП",
+      "cylinder": 1,
+      "closest_branch": "upper_front",
+      "closest_distance_m": 0.010418749573460234,
+      "second_branch": "lower_front",
+      "second_distance_m": 0.08957951278088135,
+      "top_xyz_world_m": [
+        83.19835702761024,
+        6.374846888481684,
+        0.4839564362820955
+      ],
+      "bot_xyz_world_m": [
+        83.25097057721406,
+        6.296114292581755,
+        0.3869742192919946
+      ]
+    },
+    {
+      "corner": "ПП",
+      "cylinder": 2,
+      "closest_branch": "upper_rear",
+      "closest_distance_m": 0.010341676974252147,
+      "second_branch": "lower_rear",
+      "second_distance_m": 0.08965699053701097,
+      "top_xyz_world_m": [
+        83.12674532358452,
+        6.33918509034232,
+        0.4838279098824513
+      ],
+      "bot_xyz_world_m": [
+        83.15787536198063,
+        6.249753955000582,
+        0.3869742192919946
+      ]
+    },
+    {
+      "corner": "ЛЗ",
+      "cylinder": 1,
+      "closest_branch": "upper_front",
+      "closest_distance_m": 0.010333868668633095,
+      "second_branch": "upper_rear",
+      "second_distance_m": 0.10388476813470053,
+      "top_xyz_world_m": [
+        81.58817409108278,
+        6.243275953561516,
+        0.538801969081115
+      ],
+      "bot_xyz_world_m": [
+        81.55760634236167,
+        6.331577966876775,
+        0.41480667237344876
+      ]
+    },
+    {
+      "corner": "ЛЗ",
+      "cylinder": 2,
+      "closest_branch": "upper_rear",
+      "closest_distance_m": 0.010411222779741665,
+      "second_branch": "upper_front",
+      "second_distance_m": 0.1038776134994872,
+      "top_xyz_world_m": [
+        81.51656238705705,
+        6.207614155422152,
+        0.5386734426814708
+      ],
+      "bot_xyz_world_m": [
+        81.46451112712823,
+        6.285217629295603,
+        0.41480667237344876
+      ]
+    },
+    {
+      "corner": "ПЗ",
+      "cylinder": 1,
+      "closest_branch": "upper_front",
+      "closest_distance_m": 0.010474882369461085,
+      "second_branch": "lower_front",
+      "second_distance_m": 0.0993033150998071,
+      "top_xyz_world_m": [
+        81.855637577128,
+        5.706188173368617,
+        0.47926522269508215
+      ],
+      "bot_xyz_world_m": [
+        81.90726474174001,
+        5.6294363163482215,
+        0.38925804237973677
+      ]
+    },
+    {
+      "corner": "ПЗ",
+      "cylinder": 2,
+      "closest_branch": "upper_rear",
+      "closest_distance_m": 0.010397432182640174,
+      "second_branch": "lower_rear",
+      "second_distance_m": 0.09937559367504868,
+      "top_xyz_world_m": [
+        81.78402587310227,
+        5.670526375229254,
+        0.479136696295438
+      ],
+      "bot_xyz_world_m": [
+        81.81416952650657,
+        5.583075978767049,
+        0.38925804237973677
+      ]
+    }
+  ],
+  "initial_piston_positions": [
+    {
+      "corner": "ЛП",
+      "cylinder": 1,
+      "stroke0_m": 0.1256764492961242,
+      "piston_frac_from_top_t0": 0.4871049397679744
+    },
+    {
+      "corner": "ПП",
+      "cylinder": 1,
+      "stroke0_m": 0.12426654242805008,
+      "piston_frac_from_top_t0": 0.49190840123216956
+    },
+    {
+      "corner": "ЛЗ",
+      "cylinder": 1,
+      "stroke0_m": 0.12432247484411707,
+      "piston_frac_from_top_t0": 0.49171784311002636
+    },
+    {
+      "corner": "ПЗ",
+      "cylinder": 1,
+      "stroke0_m": 0.125734533431615,
+      "piston_frac_from_top_t0": 0.486907050876992
+    },
+    {
+      "corner": "ЛП",
+      "cylinder": 2,
+      "stroke0_m": 0.1256764492961242,
+      "piston_frac_from_top_t0": 0.4962343649903289
+    },
+    {
+      "corner": "ПП",
+      "cylinder": 2,
+      "stroke0_m": 0.12426654242805008,
+      "piston_frac_from_top_t0": 0.5015361867369024
+    },
+    {
+      "corner": "ЛЗ",
+      "cylinder": 2,
+      "stroke0_m": 0.12432247484411707,
+      "piston_frac_from_top_t0": 0.5013258581637479
+    },
+    {
+      "corner": "ПЗ",
+      "cylinder": 2,
+      "stroke0_m": 0.125734533431615,
+      "piston_frac_from_top_t0": 0.49601594507930546
+    }
+  ],
+  "notes": [
+    "All cylinder top points stay on the frame-side; all bot points are nearest to upper-arm branches in this bundle.",
+    "Initial piston fractions are ~0.49-0.50 from top at t0, i.e. close to mid-stroke; the user confusion came from the old visual consumer path/debug markers rather than from a bad exported static stroke state.",
+    "The bundle still contains the old startup warning about forced external GL-from-launch, which matches the reported non-dockable 3D behaviour."
+  ]
+}

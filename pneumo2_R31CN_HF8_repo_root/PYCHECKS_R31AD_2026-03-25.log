@@ -1,0 +1,5 @@
+python -m py_compile modified files
+PASS
+
+python -m compileall -q pneumo_solver_ui
+PASS

@@ -1,0 +1,7 @@
+PneumoApp release: v6_67
+Build UTC: 2026-02-12 05:22:37Z
+Notes:
+- Fix scheme_integrity regressions (verify_scheme_integrity/enforce_camozzi_only).
+- Restore fingerprint canonicalization for index-based edges (no numerical params).
+- Fix Camozzi passport code extraction (id/in_code/fields).
+- Headless self_check: OK.

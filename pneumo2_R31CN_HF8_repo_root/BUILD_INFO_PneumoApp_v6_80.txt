@@ -1,0 +1,17 @@
+Build Info: PneumoApp v6_80
+Built UTC: 2026-02-15T10:04:49Z
+Base: v6_79
+
+Changes vs v6_79 (P0/P1):
+- P0: Восстановлены функции в pneumo_solver_ui/release_info.py (get_release/get_release_tag/get_version/format_release_header).
+      Это устраняет ImportError на старте (crash_guard, desktop animator, self_check suite).
+- P1: Восстановлены backward-compat API в pneumo_solver_ui/pneumo_dist для distributed tools:
+      * eval_core: Evaluator + evaluate_xu_to_row
+      * mobo_propose: ProposeOptions + propose_next
+      * hv_tools: hypervolume_from_min
+      * trial_hash: stable_hash_params/stable_hash_problem
+- P1: diagnostics_unified снова может безопасно извлекать persistable UI state через _extract_persistable_state.
+
+Notes:
+- Истина схемы (PNEUMO_SCHEME.json + scheme_fingerprint) не менялась.
+- Версия/тэг по умолчанию: UNIFIED_v6_80.

@@ -1,0 +1,16 @@
+# R21 bundle smoke
+
+NPZ: `/tmp/b20/workspace/exports/anim_latest.npz`
+
+- `lower_arm_frame_front` -> `[1200, 3]`
+- `lower_arm_frame_rear` -> `[1200, 3]`
+- `lower_arm_hub_front` -> `[1200, 3]`
+- `lower_arm_hub_rear` -> `[1200, 3]`
+- `upper_arm_frame_front` -> `[1200, 3]`
+- `upper_arm_frame_rear` -> `[1200, 3]`
+- `upper_arm_hub_front` -> `[1200, 3]`
+- `upper_arm_hub_rear` -> `[1200, 3]`
+
+- contract_ok = `True`
+- missing_triplets = `0`
+- partial_triplets = `0`

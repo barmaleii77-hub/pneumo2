@@ -1,0 +1,14 @@
+TODO_MASTER_v9_R31G_ADDENDUM_2026-03-22.md
+WISHLIST_MASTER_v14_R31G_ADDENDUM_2026-03-22.md
+pneumo_solver_ui/components/corner_heatmap_live/index.html
+pneumo_solver_ui/components/mech_anim/index.html
+pneumo_solver_ui/components/mech_anim_quad/index.html
+pneumo_solver_ui/components/mech_car3d/index.html
+pneumo_solver_ui/components/minimap_live/index.html
+pneumo_solver_ui/components/playhead_ctrl/index.html
+pneumo_solver_ui/components/playhead_ctrl/index_unified_v1.html
+pneumo_solver_ui/components/pneumo_svg_flow/index.html
+pneumo_solver_ui/components/road_profile_live/index.html
+pneumo_solver_ui/plotly_playhead_html.py
+pneumo_solver_ui/pneumo_ui_app.py
+tests/test_r31g_detail_autorun_fresh_and_cpu_idle.py

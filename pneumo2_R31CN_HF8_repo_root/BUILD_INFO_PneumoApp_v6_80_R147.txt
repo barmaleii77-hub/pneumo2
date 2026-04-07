@@ -1,0 +1,7 @@
+BUILD_INFO_PneumoApp_v6_80_R146.txt
+# Updated release tag: ETALON_v6_80_R147
+
+
+R147:
+- WorldRoad: v0 now falls back to road_speed_mps / vx0 aliases if v0_м_с missing.
+- Desktop Animator: Z-base offsets for wheels/body; speed display uses |v|.

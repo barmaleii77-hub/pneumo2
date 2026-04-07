@@ -1,0 +1,5 @@
+# Optional dependencies for distributed evaluation via Ray
+# Install:
+#   python -m pip install -r requirements_distributed_ray.txt
+
+ray[default]

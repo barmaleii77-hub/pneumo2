@@ -1,0 +1,12 @@
+UnifiedPneumoApp UNIFIED WINSAFE v6_49
+
+CHANGELOG (delta from v6_48):
+- Fixed false "scheme_fingerprint" mismatches when edges store Node objects instead of integer indices:
+  canonicalize_scheme now resolves n1/n2 as: index→node.name map, else n.name, else str(n).
+  This stabilizes fingerprint for unchanged topology.
+- Removed stale shipped file "scheme_fingerprint_v8_r48.MISMATCH.current.json" from runtime area.
+  Moved it into LEGACY/mismatch_fingerprints/ for history only.
+
+Notes:
+- No functional features removed. Legacy items preserved under LEGACY/.
+- VERSION.txt updated to 6_49.

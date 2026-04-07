@@ -1,0 +1,15 @@
+BUILD_INFO v6_53
+
+База: UNIFIED_v6_52
+Цель: критический фикс авто-диагностики при краше + уточнение fingerprint mismatch + обновление релиз-тега.
+
+Ключевые изменения:
+- FIX: pneumo_solver_ui/crash_guard.py (logger import/definition) -> восстановлено автосохранение diagnostic bundle при краше.
+- UX: pneumo_solver_ui/scheme_integrity.py (текст ошибки mismatch) -> корректная формулировка без ложных обвинений.
+- Release tag: VERSION.txt, release_tag.json, release_info.DEFAULT_RELEASE.
+
+Артефакты контроля:
+- REPORTS/QA_CONTROL_v6_53.md
+- REPORTS/integration_audit_v6_53.md (+ .csv)
+
+- FIX: app.py unified diagnostics sidebar -> make_send_bundle_bytes(repo_root=APP_DIR, ...) (раньше отсутствовал repo_root и кнопка могла падать).

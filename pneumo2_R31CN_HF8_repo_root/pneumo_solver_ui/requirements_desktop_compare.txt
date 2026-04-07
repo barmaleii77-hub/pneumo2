@@ -1,0 +1,8 @@
+# Дополнительные зависимости для Desktop Compare Viewer (Windows/Qt)
+#
+# Установка:
+#   python -m pip install -r pneumo_solver_ui/requirements.txt
+#   python -m pip install -r pneumo_solver_ui/requirements_desktop_compare.txt
+
+PySide6>=6.5
+pyqtgraph>=0.13

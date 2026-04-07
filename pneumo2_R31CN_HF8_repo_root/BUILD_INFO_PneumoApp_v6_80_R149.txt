@@ -1,0 +1,10 @@
+BUILD: PneumoApp_v6_80_R149
+DATE: 2026-02-19
+
+Key changes vs R148:
+- Desktop Animator: ABS-only animation law (no implicit *_rel0 usage).
+- Hard NPZ contract validation: required ABS geometry columns must exist.
+- Docs/HELP updated: rel0 is for plots/analysis only; animation uses ABS.
+
+Build sanity:
+- python -m py_compile: OK (desktop_animator/data_bundle.py, self_checks.py, app.py)

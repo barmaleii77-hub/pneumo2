@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "viewBox": "0 0 1920 1080",
+  "edges": {},
+  "nodes": {},
+  "edges_meta": {},
+  "meta": {
+    "purpose": "Default (template) mapping for pneumo SVG flow overlay.",
+    "note_ru": "Это шаблон mapping JSON. Он нужен, чтобы UI не требовал ручной загрузки файла и сразу запускался. Геометрию веток (edges) и узлов (nodes) можно размечать во встроенных инструментах UI: 'Разметка веток' и 'Разметка узлов'.",
+    "created_in_release": "ObobshchenieR17"
+  },
+  "metadata": {
+    "created_in_release": "ObobshchenieR17"
+  }
+}

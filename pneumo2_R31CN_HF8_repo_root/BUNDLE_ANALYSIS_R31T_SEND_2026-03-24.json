@@ -1,0 +1,114 @@
+{
+  "checked_bundle_zip": "/mnt/data/3009ddbb-30a5-4a46-979e-dd2707a94a9c.zip",
+  "release_in_bundle": "PneumoApp_v6_80_R176_R31T_2026-03-24",
+  "validation_ok": true,
+  "health_ok": true,
+  "geometry_release_gate": "PASS",
+  "aux_cadence_windows": 206,
+  "aux_cadence_summary": {
+    "dock_corner_quick": {
+      "hz_min": 7.761,
+      "hz_median": 9.991,
+      "hz_max": 26.259,
+      "dt_max_ms_max": 286.133,
+      "samples": 203
+    },
+    "dock_flows": {
+      "hz_min": 7.761,
+      "hz_median": 9.464,
+      "hz_max": 19.49,
+      "dt_max_ms_max": 286.133,
+      "samples": 70
+    },
+    "dock_heatmap": {
+      "hz_min": 7.761,
+      "hz_median": 9.991,
+      "hz_max": 26.259,
+      "dt_max_ms_max": 286.133,
+      "samples": 203
+    },
+    "dock_left": {
+      "hz_min": 8.557,
+      "hz_median": 10.551,
+      "hz_max": 26.259,
+      "dt_max_ms_max": 286.133,
+      "samples": 203
+    },
+    "dock_pressures": {
+      "hz_min": 7.761,
+      "hz_median": 9.598,
+      "hz_max": 19.49,
+      "dt_max_ms_max": 286.133,
+      "samples": 106
+    },
+    "dock_telemetry": {
+      "hz_min": 7.761,
+      "hz_median": 9.991,
+      "hz_max": 26.259,
+      "dt_max_ms_max": 286.133,
+      "samples": 203
+    },
+    "dock_timeline": {
+      "hz_min": 7.761,
+      "hz_median": 9.991,
+      "hz_max": 26.259,
+      "dt_max_ms_max": 286.133,
+      "samples": 203
+    },
+    "dock_trends": {
+      "hz_min": 7.761,
+      "hz_median": 9.991,
+      "hz_max": 26.259,
+      "dt_max_ms_max": 286.133,
+      "samples": 203
+    }
+  },
+  "distinct_warning_rows": [
+    {
+      "event": "Warning",
+      "message": "Enum value 'Qt::ApplicationAttribute.AA_EnableHighDpiScaling' is marked as deprecated, please check the documentation for more information.",
+      "code": null,
+      "category": "DeprecationWarning"
+    },
+    {
+      "event": "Warning",
+      "message": "Enum value 'Qt::ApplicationAttribute.AA_UseHighDpiPixmaps' is marked as deprecated, please check the documentation for more information.",
+      "code": null,
+      "category": "DeprecationWarning"
+    },
+    {
+      "event": "Warning",
+      "message": "Function: 'QTableWidgetItem.setTextAlignment(int alignment)' is marked as deprecated, please check the documentation for more information.",
+      "code": null,
+      "category": "DeprecationWarning"
+    },
+    {
+      "event": "Warning",
+      "message": "invalid value encountered in divide",
+      "code": null,
+      "category": "RuntimeWarning"
+    },
+    {
+      "event": "AnimatorWarning",
+      "message": "Animator starts with auxiliary docks attached for stability. After first show side panels are re-tiled against current screen metrics; live 3D GL uses a dedicated top-level window from launch instead of floating QDockWidget mode.",
+      "code": "startup_external_gl_window",
+      "category": null
+    },
+    {
+      "event": "AnimatorWarning",
+      "message": "[Animator] road_width_m отсутствует/некорректен в meta_json.geometry → использована SERVICE/DERIVED ширина ленты дороги 1.22 м из track_m + wheel_width_m.",
+      "code": "derived_road_width_m",
+      "category": null
+    }
+  ],
+  "conclusion": {
+    "stability": "ok",
+    "old_gl_crash_regressed": false,
+    "old_loglint_seq_regressed": false,
+    "remaining_live_issues": [
+      "startup MeshData divide warning from degenerate placeholder meshdata",
+      "derived road_width_m warning because exporter leaves meta.geometry without explicit road_width_m",
+      "Qt deprecation warnings on Desktop Animator startup path"
+    ]
+  }
+}

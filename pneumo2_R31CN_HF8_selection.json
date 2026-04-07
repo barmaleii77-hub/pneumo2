@@ -1,0 +1,134 @@
+{
+  "selected_source_zip": "PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03.zip",
+  "selected_release": "R176_R31CN_HF8",
+  "selected_product_release": "PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03",
+  "selected_date_utc": "2026-04-03T00:00:00Z",
+  "selection_reason": [
+    "Newest dated source release archive present in /mnt/data.",
+    "Has internal release_tag.json confirming product release and date.",
+    "Suitable for GitHub import because it contains the full source tree, unlike patch-only archives."
+  ],
+  "available_release_candidates": [
+    {
+      "file": "PneumoApp_R31CN_HF8_objective_contract_persistence_patch_20260403.zip",
+      "kind": "patch",
+      "date": "2026-04-03",
+      "size_bytes": 75199,
+      "release_meta": null
+    },
+    {
+      "file": "PneumoApp_R31CN_HF8_portable_20260403 (1).zip",
+      "kind": "portable",
+      "date": "2026-04-03",
+      "size_bytes": 6270361,
+      "release_meta": {
+        "release": "R176_R31CN_HF8",
+        "product_release": "PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03",
+        "date_utc": "2026-04-03T00:00:00Z",
+        "date": "2026-04-03",
+        "notes": "Objective/penalty contract is now a first-class distributed optimization artifact and part of stable problem_hash: coordinator writes objective_contract.json, Optimization history shows per-run contract, and resume/cache no longer merge runs that changed objective_keys, penalty_key or penalty_tol.",
+        "base_product_release": "PneumoApp_v6_80_R176_R31CN_HF7_2026-04-03",
+        "base_release": "R176_R31CN_HF7"
+      }
+    },
+    {
+      "file": "PneumoApp_R31CN_HF8_portable_20260403.zip",
+      "kind": "portable",
+      "date": "2026-04-03",
+      "size_bytes": 6270361,
+      "release_meta": {
+        "release": "R176_R31CN_HF8",
+        "product_release": "PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03",
+        "date_utc": "2026-04-03T00:00:00Z",
+        "date": "2026-04-03",
+        "notes": "Objective/penalty contract is now a first-class distributed optimization artifact and part of stable problem_hash: coordinator writes objective_contract.json, Optimization history shows per-run contract, and resume/cache no longer merge runs that changed objective_keys, penalty_key or penalty_tol.",
+        "base_product_release": "PneumoApp_v6_80_R176_R31CN_HF7_2026-04-03",
+        "base_release": "R176_R31CN_HF7"
+      }
+    },
+    {
+      "file": "PneumoApp_R31CN_HF8_release_bundle_20260403.zip",
+      "kind": "bundle",
+      "date": "2026-04-03",
+      "size_bytes": 12173788,
+      "release_meta": null
+    },
+    {
+      "file": "PneumoApp_R31CN_optimization_ui_rerun_single_mode_patch_20260402 (1).zip",
+      "kind": "patch",
+      "date": "2026-04-02",
+      "size_bytes": 384312,
+      "release_meta": null
+    },
+    {
+      "file": "PneumoApp_R31CN_optimization_ui_rerun_single_mode_patch_20260402.zip",
+      "kind": "patch",
+      "date": "2026-04-02",
+      "size_bytes": 384312,
+      "release_meta": null
+    },
+    {
+      "file": "PneumoApp_R31CN_portable_20260402 (1).zip",
+      "kind": "portable",
+      "date": "2026-04-02",
+      "size_bytes": 5950212,
+      "release_meta": null
+    },
+    {
+      "file": "PneumoApp_R31CN_portable_20260402.zip",
+      "kind": "portable",
+      "date": "2026-04-02",
+      "size_bytes": 5950212,
+      "release_meta": null
+    },
+    {
+      "file": "PneumoApp_v6_80_R176_R31CN_2026-04-02.zip",
+      "kind": "source",
+      "date": "2026-04-02",
+      "size_bytes": 6235074,
+      "release_meta": {
+        "release": "R176_R31CN",
+        "product_release": "PneumoApp_v6_80_R176_R31CN_2026-04-02",
+        "date_utc": "2026-04-02T15:40:00Z",
+        "date": "2026-04-02",
+        "notes": "Streamlit rerun compatibility fixed; Optimization page now exposes one active launch mode at a time and one explicit start button."
+      }
+    },
+    {
+      "file": "PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03.zip",
+      "kind": "source",
+      "date": "2026-04-03",
+      "size_bytes": 6280073,
+      "release_meta": {
+        "release": "R176_R31CN_HF8",
+        "product_release": "PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03",
+        "date_utc": "2026-04-03T00:00:00Z",
+        "date": "2026-04-03",
+        "notes": "Objective/penalty contract is now a first-class distributed optimization artifact and part of stable problem_hash: coordinator writes objective_contract.json, Optimization history shows per-run contract, and resume/cache no longer merge runs that changed objective_keys, penalty_key or penalty_tol.",
+        "base_product_release": "PneumoApp_v6_80_R176_R31CN_HF7_2026-04-03",
+        "base_release": "R176_R31CN_HF7"
+      }
+    },
+    {
+      "file": "mhtml.zip",
+      "kind": "other",
+      "date": null,
+      "size_bytes": 118672949,
+      "release_meta": null
+    },
+    {
+      "file": "pneumo_historical_release_archive_index_ai_package.zip",
+      "kind": "other",
+      "date": null,
+      "size_bytes": 51353,
+      "release_meta": null
+    },
+    {
+      "file": "pneumo_release_r31cn_bundle.zip",
+      "kind": "bundle",
+      "date": null,
+      "size_bytes": 18509027,
+      "release_meta": null
+    }
+  ]
+}

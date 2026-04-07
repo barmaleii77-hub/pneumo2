@@ -1,0 +1,642 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    :root {
+      --border: #e6e6e6;
+      --text: #222;
+      --muted: #666;
+      --bg: #ffffff;
+      --panel: #ffffff;
+      --btn: #ffffff;
+      --btn-border: #bbbbbb;
+      --accent: rgba(0,120,255,0.95);
+    }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: var(--bg); }
+    .bar {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap: wrap;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      box-sizing: border-box;
+    }
+    .title { font-size: 14px; font-weight: 600; color: var(--text); margin-right: 6px; }
+    .btn {
+      padding: 5px 10px;
+      border: 1px solid var(--btn-border);
+      border-radius: 10px;
+      background: var(--btn);
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text);
+      user-select: none;
+    }
+    .btn.primary { border-color: var(--accent); }
+    .btn:active { transform: translateY(1px); }
+    .time { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--text); }
+    .muted { color: var(--muted); }
+    input[type=range] { width: 340px; }
+
+    .sliderWrap { position: relative; width: 340px; height: 30px; }
+    .sliderWrap input[type=range] { position: absolute; left: 0; right: 0; bottom: 0; width: 340px; }
+    .eventBar { position: absolute; left: 0; right: 0; top: 0; height: 12px; }
+    .eventMarker {
+      position: absolute;
+      top: 0;
+      width: 2px;
+      height: 12px;
+      border-radius: 2px;
+      cursor: pointer;
+      opacity: 0.95;
+    }
+    .sev-info { background: rgba(0,120,255,0.85); }
+    .sev-warn { background: rgba(255,170,0,0.90); }
+    .sev-error { background: rgba(220,0,0,0.92); }
+
+    select {
+      padding: 4px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--btn-border);
+      font-size: 12px;
+      background: #fff;
+    }
+    label { font-size: 12px; color: var(--text); display:flex; align-items:center; gap:6px; user-select:none; }
+    .spacer { flex: 1; min-width: 20px; }
+    .hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.25; }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="bar">
+      <span class="title" id="title">Таймлайн</span>
+
+      <button id="btnPlay" class="btn primary">▶︎</button>
+      <button id="btnPause" class="btn">⏸</button>
+      <button id="btnStepBack" class="btn">⟵</button>
+      <button id="btnStepFwd" class="btn">⟶</button>
+
+      <span class="time">t=<span id="t">0.000</span>s</span>
+      <span class="time muted">idx=<span id="idx">0</span></span>
+
+      <div class="sliderWrap">
+        <div id="eventBar" class="eventBar"></div>
+        <input id="slider" type="range" min="0" max="0" value="0" step="1"/>
+      </div>
+
+      <label>speed
+        <select id="speed">
+          <option value="0.25">0.25×</option>
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+          <option value="8">8×</option>
+        </select>
+      </label>
+
+      <label>
+        <input id="loop" type="checkbox" checked/>
+        loop
+      </label>
+
+      <span class="spacer"></span>
+      <span class="time muted" id="status"></span>
+    </div>
+    <div class="hint" id="hint"></div>
+  </div>
+
+<script>
+// ----------------------------------------------------
+// Streamlit "no-tooling" component messaging helpers
+// ----------------------------------------------------
+function sendMessageToStreamlitClient(type, data) {
+  var outData = Object.assign({ isStreamlitMessage: true, type: type }, data);
+  window.parent.postMessage(outData, "*");
+}
+
+
+// ----------------------------------------------------
+// Robust "componentReady" (guards against apiVersion=undefined)
+// Some Streamlit versions show: Unrecognized component API version: 'undefined'
+// if the ready handshake is not received early enough or an error happens before init().
+// ----------------------------------------------------
+// We re-send componentReady a few times until we receive the first "render".
+// This avoids rare situations where the very first postMessage is missed.
+var __stHasRender = false;
+var __stReadyPingTimer = null;
+var __stReadyTries = 0;
+function stSetReady() {
+  try {
+    // Provide apiVersion both at top-level and nested (some protocol variants read args.apiVersion)
+    sendMessageToStreamlitClient("streamlit:componentReady", { apiVersion: 1, args: { apiVersion: 1 } });
+  } catch (e) {
+    console.error("streamlit componentReady failed", e);
+  }
+}
+function stStartReadyPinger() {
+  if (__stReadyPingTimer) return;
+  __stReadyPingTimer = setInterval(function () {
+    if (__stHasRender) {
+      clearInterval(__stReadyPingTimer);
+      __stReadyPingTimer = null;
+      return;
+    }
+    __stReadyTries += 1;
+    if (__stReadyTries > 50) {
+      clearInterval(__stReadyPingTimer);
+      __stReadyPingTimer = null;
+      return;
+    }
+    stSetReady();
+  }, 200);
+}
+// Send as early as possible (before heavy init / potential errors)
+stSetReady();
+stStartReadyPinger();
+
+function init() {
+  stSetReady();
+}
+function setFrameHeight(height) {
+  sendMessageToStreamlitClient("streamlit:setFrameHeight", { height: height });
+}
+function sendDataToPython(data) {
+  sendMessageToStreamlitClient("streamlit:setComponentValue", data);
+}
+
+// ----------------------------------------------------
+// State
+// ----------------------------------------------------
+const DEFAULT_STORAGE_KEY = 'pneumo_play_state';
+let DATA = {
+  title: 'Таймлайн',
+  time: [],
+  dataset_id: '',
+  storage_key: DEFAULT_STORAGE_KEY,
+  events: [],
+  send_hz: 4,
+  height: 86,
+  cmd: null,   // {ts, set_idx, set_playing, set_speed, set_loop}
+  hint: 'Клик по графику может переносить сюда время (если включено).',
+};
+
+let timeArr = [];
+let datasetId = '';
+let storageKey = DEFAULT_STORAGE_KEY;
+
+let eventsArr = [];
+let lastPickedEvent = null;
+
+let idx = 0;
+let playing = false;
+let speed = 1.0;
+let loop = true;
+
+let dtSample = 0.033;
+let acc = 0.0;
+let lastTs = performance.now();
+let lastSendPerf = 0;
+let lastCmdTs = 0;
+let lastStored = '';
+
+const elTitle = document.getElementById('title');
+const elT = document.getElementById('t');
+const elIdx = document.getElementById('idx');
+const elStatus = document.getElementById('status');
+const elHint = document.getElementById('hint');
+
+const slider = document.getElementById('slider');
+const elEventBar = document.getElementById('eventBar');
+const btnPlay = document.getElementById('btnPlay');
+const btnPause = document.getElementById('btnPause');
+const btnStepBack = document.getElementById('btnStepBack');
+const btnStepFwd = document.getElementById('btnStepFwd');
+const selSpeed = document.getElementById('speed');
+const chkLoop = document.getElementById('loop');
+
+function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
+function n(){ return (timeArr && timeArr.length) ? timeArr.length : 0; }
+
+function computeDtSample() {
+  const nn = n();
+  if (nn >= 2) {
+    const dt = (Number(timeArr[nn-1]) - Number(timeArr[0])) / Math.max(1, nn-1);
+    dtSample = (dt > 1e-9 && Number.isFinite(dt)) ? dt : 0.033;
+  } else {
+    dtSample = 0.033;
+  }
+}
+
+function uiUpdate() {
+  const nn = n();
+  if (nn <= 0) {
+    elT.textContent = '0.000';
+    elIdx.textContent = '0';
+    elStatus.textContent = 'нет данных';
+    return;
+  }
+  idx = clamp(idx, 0, nn-1);
+  elT.textContent = (Number(timeArr[idx] || 0)).toFixed(3);
+  elIdx.textContent = String(idx);
+  slider.value = String(idx);
+  elStatus.textContent = playing ? 'playing' : 'paused';
+}
+
+
+function renderEvents() {
+  if (!elEventBar) return;
+  elEventBar.innerHTML = '';
+  const nn = n();
+  if (nn <= 1) return;
+
+  const evs = Array.isArray(eventsArr) ? eventsArr : [];
+  const maxMarkers = Math.max(0, Number(DATA.events_max || 300));
+  let shown = 0;
+
+  for (let k = 0; k < evs.length; k++) {
+    if (shown >= maxMarkers) break;
+    const ev = evs[k] || {};
+    let ei = 0;
+    try { ei = parseInt(ev.idx || 0, 10); } catch(_e) { ei = 0; }
+    ei = clamp(ei, 0, nn - 1);
+
+    const leftPct = (nn > 1) ? (100.0 * ei / (nn - 1)) : 0.0;
+
+    const div = document.createElement('div');
+    const sev = String(ev.severity || 'info');
+    div.className = 'eventMarker ' + (sev === 'error' ? 'sev-error' : (sev === 'warn' ? 'sev-warn' : 'sev-info'));
+    div.style.left = `calc(${leftPct}% - 1px)`;
+
+    const t0 = Number(timeArr[ei] || 0);
+    const lbl = String(ev.label || ev.kind || 'event');
+    div.title = lbl + ` (t=${t0.toFixed(3)}s)`;
+
+    div.addEventListener('click', (e) => {
+      e.stopPropagation();
+      playing = false;
+      idx = ei;
+      uiUpdate();
+  renderEvents();
+      writeStorage(false);
+      lastPickedEvent = ev;
+      sendToPython(true);
+    });
+
+    elEventBar.appendChild(div);
+    shown += 1;
+  }
+}
+
+// --- Cross-component state bus (localStorage) --------------------------------
+//
+// The playhead is shared between multiple custom components (2D, 3D, etc.).
+// We use localStorage as a simple shared bus.
+//
+// IMPORTANT: localStorage.setItem(...) is relatively expensive, and when done
+// ~60 times per second it can tank FPS on slower machines. Therefore we
+// throttle writes to a configurable rate (storage_hz).
+
+let lastStoredKey = '';
+let lastStorePerf = 0;
+
+function writeStorage(force=false) {
+  if (!storageKey || storageKey.length <= 0) return;
+
+  const perfNow = performance.now();
+  const hzRaw = Number(DATA.storage_hz);
+  const hz = (Number.isFinite(hzRaw) ? hzRaw : 30);
+  const hzClamped = Math.max(1.0, Math.min(120.0, hz || 30));
+  const minDt = 1000.0 / hzClamped;
+
+  // Compare only the functional state; 'ts' is added only when we actually
+  // publish to storage.
+  const keyObj = { dataset_id: datasetId, idx: idx, playing: playing, speed: speed, loop: loop };
+  const keyStr = JSON.stringify(keyObj);
+
+  // Skip if nothing changed.
+  if (!force && keyStr === lastStoredKey) return;
+
+  // Throttle update rate.
+  if (!force && (perfNow - lastStorePerf) < minDt) return;
+
+  lastStorePerf = perfNow;
+  lastStoredKey = keyStr;
+
+  const obj = { ...keyObj, ts: Date.now() };
+  const s = JSON.stringify(obj);
+  lastStored = s;
+  try {
+    localStorage.setItem(storageKey, s);
+  } catch(_e) {}
+}
+
+function sendToPython(force=false) {
+  // IMPORTANT:
+  // Sending values back to Python triggers a full Streamlit rerun.
+  // During "Play" this can look like an "infinite recalculation" if the app
+  // is heavy (Plotly + large tables). Therefore we allow send_hz=0 to disable
+  // periodic server-sync while keeping smooth browser-side animation.
+  //
+  // - send_hz <= 0 : do NOT send periodic updates (only when force=true)
+  // - send_hz > 0  : throttle updates to the requested rate
+  const perfNow = performance.now();
+  const hzRaw = Number(DATA.send_hz);
+  const hz = (Number.isFinite(hzRaw) ? hzRaw : 0);
+
+  if (!force && (!hz || hz <= 0)) {
+    return;
+  }
+  const hzClamped = Math.max(0.1, hz || 0.1);
+  const minDt = 1000.0 / hzClamped;
+  if (!force && (perfNow - lastSendPerf) < minDt) return;
+
+  lastSendPerf = perfNow;
+  const payload = { kind: 'playhead', dataset_id: datasetId, idx: idx, t: Number(timeArr[idx] || 0), playing: playing, speed: speed, loop: loop, ts: Date.now() };
+  if (lastPickedEvent) { payload.picked_event = lastPickedEvent; lastPickedEvent = null; }
+  sendDataToPython(payload);
+}
+
+function applyCmd(cmd) {
+  if (!cmd || typeof cmd !== 'object') return;
+  const ts = Number(cmd.ts || 0);
+  if (!ts || ts <= lastCmdTs) return;
+  lastCmdTs = ts;
+
+  const nn = n();
+  if (cmd.set_idx !== undefined && cmd.set_idx !== null) {
+    const v = Number(cmd.set_idx);
+    if (Number.isFinite(v) && nn > 0) idx = clamp(Math.round(v), 0, nn-1);
+  }
+  if (cmd.set_playing !== undefined && cmd.set_playing !== null) {
+    playing = !!cmd.set_playing;
+  }
+  if (cmd.set_speed !== undefined && cmd.set_speed !== null) {
+    const v = Number(cmd.set_speed);
+    if (Number.isFinite(v) && v > 0) speed = v;
+  }
+  if (cmd.set_loop !== undefined && cmd.set_loop !== null) {
+    loop = !!cmd.set_loop;
+  }
+
+  // sync UI controls
+  selSpeed.value = String(speed);
+  chkLoop.checked = !!loop;
+
+  // reset accumulator so it doesn't jump
+  acc = 0.0;
+
+  uiUpdate();
+  writeStorage(false);
+  sendToPython(true);
+}
+
+function readStorageIfMatches() {
+  try {
+    const s = localStorage.getItem(storageKey);
+    if (!s) return false;
+    if (s === lastStored) return false;
+    const obj = JSON.parse(s);
+    if (!obj || typeof obj !== 'object') return false;
+    if (String(obj.dataset_id || '') !== String(datasetId || '')) return false;
+
+    const prev = { idx, playing, speed, loop };
+    const nn = n();
+    if (nn > 0 && obj.idx !== undefined) {
+      const v = Number(obj.idx);
+      if (Number.isFinite(v)) idx = clamp(Math.round(v), 0, nn-1);
+    }
+    if (obj.playing !== undefined) playing = !!obj.playing;
+    if (obj.speed !== undefined) {
+      const v = Number(obj.speed);
+      if (Number.isFinite(v) && v > 0) speed = v;
+    }
+    if (obj.loop !== undefined) loop = !!obj.loop;
+
+    selSpeed.value = String(speed);
+    chkLoop.checked = !!loop;
+    lastStored = s;
+    return (prev.idx !== idx) || (prev.playing !== playing) || (prev.speed !== speed) || (prev.loop !== loop);
+  } catch(_e) {
+    return false;
+  }
+}
+
+// UI events
+btnPlay.addEventListener('click', () => {
+  if (n() <= 0) return;
+  playing = true;
+  acc = 0.0;
+  uiUpdate();
+  writeStorage(false);
+  sendToPython(true);
+});
+btnPause.addEventListener('click', () => {
+  playing = false;
+  uiUpdate();
+  writeStorage(false);
+  sendToPython(true);
+});
+
+btnStepBack.addEventListener('click', () => {
+  if (n() <= 0) return;
+  playing = false;
+  idx = clamp(idx - 1, 0, n()-1);
+  uiUpdate();
+  writeStorage(false);
+  sendToPython(true);
+});
+btnStepFwd.addEventListener('click', () => {
+  if (n() <= 0) return;
+  playing = false;
+  idx = clamp(idx + 1, 0, n()-1);
+  uiUpdate();
+  writeStorage(false);
+  sendToPython(true);
+});
+
+slider.addEventListener('input', (e) => {
+  if (n() <= 0) return;
+  playing = false;
+  idx = clamp(parseInt(slider.value || '0', 10) || 0, 0, n()-1);
+  uiUpdate();
+  writeStorage(false);
+  sendToPython(true);
+});
+
+selSpeed.addEventListener('change', () => {
+  const v = Number(selSpeed.value);
+  if (Number.isFinite(v) && v > 0) speed = v;
+  writeStorage(false);
+  sendToPython(true);
+});
+
+chkLoop.addEventListener('change', () => {
+  loop = !!chkLoop.checked;
+  writeStorage(false);
+  sendToPython(true);
+});
+
+const __PERF_KEY_PREFIX = 'pneumo_perf_component::';
+const __PERF_NAME = 'playhead_ctrl_unified_v1';
+let __PERF_STATE = {
+  component: __PERF_NAME,
+  dataset_id: '',
+  ts_ms: Date.now(),
+  viewport_state: 'init',
+  wakeups: 0,
+  storage_wakeups: 0,
+  focus_wakeups: 0,
+  visibility_wakeups: 0,
+  duplicate_guard_hits: 0,
+  schedule_raf_count: 0,
+  schedule_timeout_count: 0,
+  hidden_gate_hits: 0,
+  zero_size_gate_hits: 0,
+  css_hidden_gate_hits: 0,
+  offscreen_gate_hits: 0,
+  render_count: 0,
+  idle_poll_ms: 0,
+  playing: false,
+  loop_kind: '',
+};
+function __perfBump(key, delta){ const add = Number.isFinite(Number(delta)) ? Number(delta) : 1; __PERF_STATE[key] = Number(__PERF_STATE[key] || 0) + add; }
+function __perfSet(key, value){ __PERF_STATE[key] = value; }
+function __perfSyncDataset(){ try { __PERF_STATE.dataset_id = String(datasetId || ''); } catch(_e) {} }
+function __perfFlush(force){ const now = Date.now(); if (!force && (now - Number(__PERF_STATE.ts_ms || 0) < 1200)) return; __perfSyncDataset(); __PERF_STATE.ts_ms = now; try { localStorage.setItem(__PERF_KEY_PREFIX + __PERF_NAME, JSON.stringify(__PERF_STATE)); } catch(_e) {} }
+function __setViewportState(state){ __PERF_STATE.viewport_state = String(state || 'unknown'); return __PERF_STATE.viewport_state; }
+function __frameInParentViewport(){
+  try {
+    const fe = window.frameElement;
+    if (!fe || !fe.getBoundingClientRect) { __setViewportState('visible'); return true; }
+    const r = fe.getBoundingClientRect();
+    const w = Number(r.width || Math.max(0, (r.right || 0) - (r.left || 0)) || 0);
+    const h = Number(r.height || Math.max(0, (r.bottom || 0) - (r.top || 0)) || 0);
+    if (w <= 2 || h <= 2) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    if ((Number(fe.clientWidth || 0) <= 2) || (Number(fe.clientHeight || 0) <= 2)) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    let hiddenByCss = false;
+    try {
+      const hostView = fe.ownerDocument && fe.ownerDocument.defaultView;
+      const cs = (hostView && hostView.getComputedStyle) ? hostView.getComputedStyle(fe) : null;
+      hiddenByCss = !!(cs && (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity || '1') === 0));
+    } catch(_cssErr) {}
+    if (hiddenByCss) { __perfBump('css_hidden_gate_hits'); __setViewportState('css_hidden'); __perfFlush(false); return false; }
+    const hostWin = (window.top && window.top !== window) ? window.top : window;
+    const vh = Number(hostWin.innerHeight || window.innerHeight || 0);
+    const vw = Number(hostWin.innerWidth || window.innerWidth || 0);
+    const margin = 64;
+    const visible = (r.bottom >= -margin) && (r.top <= vh + margin) && (r.right >= -margin) && (r.left <= vw + margin);
+    if (!visible) { __perfBump('offscreen_gate_hits'); __setViewportState('offscreen'); __perfFlush(false); return false; }
+    __setViewportState('visible');
+    return true;
+  } catch(_e) {
+    __setViewportState('visible');
+    return true;
+  }
+}
+function __canAnimateNow(){ if (document && document.hidden) { __perfBump('hidden_gate_hits'); __setViewportState('hidden'); __perfFlush(false); return false; } return __frameInParentViewport(); }
+function __nextIdleMs(visibleMs, hiddenMs, offscreenMs){ if (document && document.hidden) return hiddenMs; return __frameInParentViewport() ? visibleMs : offscreenMs; }
+let __LOOP_HANDLE = 0;
+let __LOOP_KIND = '';
+function __clearScheduledTick(){ try { if (!__LOOP_HANDLE) return; if (__LOOP_KIND === 'raf' && window.cancelAnimationFrame) window.cancelAnimationFrame(__LOOP_HANDLE); else clearTimeout(__LOOP_HANDLE); } catch(_e) {} __LOOP_HANDLE = 0; __LOOP_KIND = ''; }
+function __scheduleTick(kind, delayMs){ if (__LOOP_HANDLE) __perfBump('duplicate_guard_hits'); __clearScheduledTick(); if (kind === 'raf') { __LOOP_KIND = 'raf'; __perfBump('schedule_raf_count'); __LOOP_HANDLE = requestAnimationFrame(tick); } else { __LOOP_KIND = 'timeout'; const ms = Math.max(0, Number(delayMs) || 0); __perfBump('schedule_timeout_count'); __perfSet('idle_poll_ms', ms); __LOOP_HANDLE = setTimeout(tick, ms); } __perfSet('loop_kind', __LOOP_KIND); __perfFlush(false); }
+function __wakeTick(){ __perfBump('wakeups'); if (__canAnimateNow()) __scheduleTick('raf', 0); else { __perfSet('idle_poll_ms', 0); __LOOP_HANDLE = null; __perfFlush(false); } }
+function tick(ts) {
+  const nn = n();
+  const dt = Math.max(0, (ts - lastTs) / 1000.0);
+  lastTs = ts;
+  let changed = false;
+  let active = false;
+  if (playing && nn > 0) {
+    active = true;
+    const prevIdx = idx;
+    const prevPlaying = playing;
+    acc += speed * dt;
+    while (acc >= dtSample) {
+      acc -= dtSample;
+      idx += 1;
+      if (idx >= nn) {
+        if (loop) idx = 0;
+        else { idx = nn - 1; playing = false; break; }
+      }
+    }
+    changed = (prevIdx !== idx) || (prevPlaying !== playing);
+    if (changed) { uiUpdate(); renderEvents(); writeStorage(false); sendToPython(false); __perfBump('render_count'); }
+  } else {
+    changed = readStorageIfMatches();
+    if (changed) { acc = 0.0; uiUpdate(); renderEvents(); writeStorage(false); __perfBump('render_count'); }
+  }
+  __perfSet('playing', !!active);
+  __perfFlush(false);
+  if (active) __scheduleTick('raf', 0); else { __perfSet('idle_poll_ms', 0); __LOOP_HANDLE = null; __perfFlush(false); }
+}
+__wakeTick();
+window.addEventListener('storage', (ev) => {
+  try {
+    if (ev && ev.key && String(ev.key) !== String(storageKey || DEFAULT_STORAGE_KEY)) return;
+    __perfBump('storage_wakeups');
+    if (playing) return;
+    const changed = readStorageIfMatches();
+    if (changed) {
+      acc = 0.0;
+      uiUpdate();
+      renderEvents();
+      __perfBump('render_count');
+      __wakeTick();
+    } else if (__perfPanelVisible) {
+      __wakeTick();
+    }
+  } catch(_e) {}
+});
+window.addEventListener('focus', () => { try { __perfBump('focus_wakeups'); __wakeTick(); } catch(_e) {} });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { try { __perfBump('visibility_wakeups'); __wakeTick(); } catch(_e) {} } });
+window.addEventListener('scroll', () => { try { __wakeTick(); } catch(_e) {} }, {passive:true});
+window.addEventListener('resize', () => { try { __wakeTick(); } catch(_e) {} }, {passive:true});
+__perfFlush(true);
+
+// Streamlit render
+function onDataFromPython(event) {
+  if (!event.data || event.data.type !== 'streamlit:render') return;
+  __stHasRender = true;
+  stSetReady();
+  const args = event.data.args || {};
+  DATA = Object.assign({}, DATA, args);
+
+  elTitle.textContent = DATA.title || 'Таймлайн';
+  elHint.textContent = DATA.hint || '';
+
+  timeArr = Array.isArray(DATA.time) ? DATA.time : [];
+eventsArr = Array.isArray(DATA.events) ? DATA.events : [];
+  datasetId = String(DATA.dataset_id || '');
+  storageKey = String(DATA.storage_key || DEFAULT_STORAGE_KEY);
+
+  slider.max = String(Math.max(0, timeArr.length - 1));
+  computeDtSample();
+
+  // If we have matching saved state for this dataset — use it.
+  // Otherwise keep current internal state.
+  readStorageIfMatches();
+
+  // Apply command, if any.
+  applyCmd(DATA.cmd);
+
+  // Ensure idx is valid
+  if (timeArr.length > 0) idx = clamp(idx, 0, timeArr.length-1); else idx = 0;
+  uiUpdate();
+  writeStorage(false);
+
+  // Set height
+  setFrameHeight(Number(DATA.height || 86));
+}
+
+window.addEventListener('message', onDataFromPython);
+try { init(); } catch (e) { console.error(e); }
+setFrameHeight(96);
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+BUILD INFO — PneumoApp_v6_80_R167
+Base: PneumoApp_v6_80_R166 (itself based on ETALON_v6_80_R157)
+Built (UTC): 2026-02-24T06:54:21Z
+Built (Local Europe/Amsterdam): 2026-02-24 07:54:21 +0100
+
+What changed vs R166:
+1) run_artifacts.autoload_to_session
+   - Removed duplicate/alias session_state keys.
+   - Fixed potential crash when optimization pointer exists (load_last_opt_ptr returns str).
+   - Autoload now sets ONLY:
+       * last_opt_ptr (str run_dir)
+       * last_opt_meta (dict)
+       * anim_latest_npz (str path or None)
+       * anim_latest_pointer (str path or None)
+2) Desktop Animator
+   - Removed speed “fallback” substitution from meta vx0_м_с.
+     The animator now shows speed purely from exported time-series channels.
+
+QA / smoke:
+- python -m compileall: OK
+- selfcheck_suite: OK (report in send_bundles/_selfcheck_tmp/)
+- aggregate_todo_wishlist: OK (REPORTS/consolidated_todo_wishlist.*)
+
+Packaging notes:
+- Folder name and launcher RELEASE updated to PneumoApp_v6_80_R167.
+- release_tag.json + VERSION.txt updated accordingly.

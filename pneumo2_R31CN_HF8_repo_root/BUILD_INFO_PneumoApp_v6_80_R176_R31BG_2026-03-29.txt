@@ -1,0 +1,5 @@
+PneumoApp_v6_80_R176_R31BG_2026-03-29
+- Fixed staged optimization path-budget blow-up on Windows by shortening runtime run/stage/output paths.
+- Background optimization workers now launch through console python.exe instead of pythonw.exe, with captured stdout/stderr logs.
+- Stage runner now fails fast on worker startup stalls / timeout / nonzero worker rc instead of hanging at stage0_relevance.
+- No optimization objective defaults or stage semantics changed in this build.

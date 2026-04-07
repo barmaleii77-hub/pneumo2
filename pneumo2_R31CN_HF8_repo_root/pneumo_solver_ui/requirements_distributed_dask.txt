@@ -1,0 +1,5 @@
+# Optional dependencies for distributed evaluation via Dask
+# Install:
+#   python -m pip install -r requirements_distributed_dask.txt
+
+dask[distributed]

@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Профиль дороги (вперёд)</title>
+  <style>
+    :root{
+      --bg:#ffffff;
+      --fg:#111111;
+      --muted:#666;
+      --grid:rgba(0,0,0,0.08);
+      --zero:rgba(0,0,0,0.22);
+      --accent:#0b6cff;
+      --panel:#f7f7f8;
+      --shadow:rgba(0,0,0,0.08);
+    }
+    body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;overflow:hidden;}
+    #root{width:100%;height:100vh;display:flex;flex-direction:column;}
+    #hdr{padding:8px 10px 6px 10px;border-bottom:1px solid #e7e7ea;background:linear-gradient(#fff,#fbfbfc);}
+    #ttl{font-weight:650;font-size:14px;line-height:1.1;margin:0;}
+    #sub{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    #wrap{flex:1;position:relative;}
+    canvas{width:100%;height:100%;display:block;touch-action:none;}
+    #hud{
+      position:absolute;left:10px;top:10px;
+      background:rgba(255,255,255,0.86);
+      border:1px solid rgba(0,0,0,0.10);
+      border-radius:8px;
+      padding:6px 8px;
+      box-shadow:0 3px 14px var(--shadow);
+      font-size:12px;color:#222;
+      max-width: calc(100% - 20px);
+      pointer-events:none;
+    }
+    #legend{
+      position:absolute;right:10px;top:10px;
+      background:rgba(255,255,255,0.86);
+      border:1px solid rgba(0,0,0,0.10);
+      border-radius:8px;
+      padding:6px 8px;
+      box-shadow:0 3px 14px var(--shadow);
+      font-size:12px;color:#222;
+      pointer-events:none;
+    }
+    .row{display:flex;align-items:center;gap:8px;margin:2px 0;}
+    .sw{width:18px;height:3px;border-radius:3px;opacity:0.95;}
+    #hint{
+      position:absolute;left:10px;bottom:8px;
+      font-size:12px;color:rgba(0,0,0,0.58);
+      background:rgba(255,255,255,0.78);
+      border:1px solid rgba(0,0,0,0.08);
+      border-radius:10px;
+      padding:4px 8px;
+      pointer-events:none;
+      max-width: calc(100% - 20px);
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <div id="hdr">
+      <div id="ttl">Профиль дороги (вперёд)</div>
+      <div id="sub">—</div>
+    </div>
+    <div id="wrap">
+      <canvas id="cv"></canvas>
+      <div id="hud">—</div>
+      <div id="legend">
+        <div class="row"><div class="sw" id="swFL"></div><div>ЛП (front‑left)</div></div>
+        <div class="row"><div class="sw" id="swFR"></div><div>ПП (front‑right)</div></div>
+        <div class="row"><div class="sw" id="swRL"></div><div>ЛЗ (rear‑left)</div></div>
+        <div class="row"><div class="sw" id="swRR"></div><div>ПЗ (rear‑right)</div></div>
+      </div>
+      <div id="hint">Drag по графику → перемотка playhead. Двойной клик → центр (t/idx не меняется).</div>
+    </div>
+  </div>
+
+  <script src="./streamlit-component-lib.js"></script>
+  <script>
+  // Corner labels
+  const FL='ЛП', FR='ПП', RL='ЛЗ', RR='ПЗ';
+  const COLORS = {
+    FL: 'rgba( 11,108,255,0.92)',
+    FR: 'rgba(255,140,  0,0.92)',
+    RL: 'rgba(  0,168, 84,0.92)',
+    RR: 'rgba(217, 54, 79,0.92)',
+  };
+
+  // -------------------------
+  // Playhead (localStorage)
+  // -------------------------
+  function nowMs(){ return Date.now(); }
+  function ensurePlayheadState(storageKey){
+    const k = String(storageKey || 'pneumo_play_state');
+    const raw = localStorage.getItem(k);
+    if (raw) {
+      try { const st = JSON.parse(raw); if (st && typeof st === 'object') return st; } catch(e) {}
+    }
+    const st0 = {idx:0, playing:false, ts: nowMs(), dataset_id: ""};
+    try { localStorage.setItem(k, JSON.stringify(st0)); } catch(e) {}
+    return st0;
+  }
+  function readPlayheadState(storageKey){
+    const k = String(storageKey || 'pneumo_play_state');
+    try {
+      const raw = localStorage.getItem(k);
+      if (!raw) return null;
+      const st = JSON.parse(raw);
+      if (st && typeof st === 'object') return st;
+      return null;
+    } catch(e) { return null; }
+  }
+  function writePlayheadState(storageKey, patch){
+    const k = String(storageKey || 'pneumo_play_state');
+    const cur = ensurePlayheadState(k);
+    const out = Object.assign({}, cur, patch || {});
+    out.ts = nowMs();
+    try { localStorage.setItem(k, JSON.stringify(out)); } catch(e) {}
+    return out;
+  }
+
+  function clamp(x,a,b){ x=Number(x); if(!(x===x)) return a; if (x<a) return a; if(x>b) return b; return x; }
+  function fmt(x, d){ x=Number(x); if(!isFinite(x)) return '—'; return x.toFixed(d); }
+
+  // -------------------------
+  // State
+  // -------------------------
+  let DATA = {
+    title: 'Профиль дороги (вперёд)',
+    hint: '',
+    time: [],
+    road: {},      // per-corner road height
+    path: null,    // expects .s (distance), .v (optional)
+    meta: {},
+    sync_playhead: true,
+    playhead_storage_key: 'pneumo_play_state',
+    dataset_id: '',
+    height: 200,
+
+    window_m_ahead: 25,
+    window_m_back: 8,
+    y_exag: 1.0,
+    allow_scrub: true,
+    ring_visual: null,
+  };
+
+  // derived
+  let __DIRTY = true;
+  let __LAST_IDX = -1;
+  let __S_MONO = true;
+  let __S_ARR = null;
+
+  // DOM
+  const root = document.getElementById('wrap');
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const ttlEl = document.getElementById('ttl');
+  const subEl = document.getElementById('sub');
+  const hudEl = document.getElementById('hud');
+  const hintEl = document.getElementById('hint');
+  document.getElementById('swFL').style.background = COLORS.FL;
+  document.getElementById('swFR').style.background = COLORS.FR;
+  document.getElementById('swRL').style.background = COLORS.RL;
+  document.getElementById('swRR').style.background = COLORS.RR;
+
+  function resizeCanvas(){
+    const W = root.clientWidth;
+    const H = root.clientHeight;
+    const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    if (cv.width !== Math.floor(W*dpr) || cv.height !== Math.floor(H*dpr)){
+      cv.width = Math.floor(W*dpr);
+      cv.height = Math.floor(H*dpr);
+      cv.style.width = W+'px';
+      cv.style.height = H+'px';
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      __DIRTY = true;
+    }
+  }
+  window.addEventListener('resize', ()=>{ __DIRTY = true; });
+  document.addEventListener('visibilitychange', ()=>{ __DIRTY = true; });
+
+  function pickSArray(){
+    const t = DATA.time || [];
+    const n = t.length || 0;
+    let s = null;
+    const p = DATA.path || {};
+    if (p && Array.isArray(p.s) && p.s.length === n){
+      s = p.s.map(v=>Number(v||0));
+    }
+    if (!s){
+      // fallback: index as distance
+      s = new Array(n);
+      for (let i=0;i<n;i++) s[i] = i;
+    }
+    // monotonic check
+    __S_MONO = true;
+    for (let i=1;i<Math.min(n, 2000);i++){
+      if (!(s[i] >= s[i-1])) { __S_MONO = false; break; }
+    }
+    __S_ARR = s;
+  }
+
+  function getIdx(){
+    const n = (DATA.time && DATA.time.length) ? DATA.time.length : 0;
+    if (n <= 0) return 0;
+    if (!DATA.sync_playhead) return clamp(__LAST_IDX>=0?__LAST_IDX:0, 0, n-1);
+    const st = readPlayheadState(DATA.playhead_storage_key);
+    if (!st) return clamp(__LAST_IDX>=0?__LAST_IDX:0, 0, n-1);
+    if (DATA.dataset_id && st.dataset_id && String(st.dataset_id) !== String(DATA.dataset_id)) {
+      return clamp(__LAST_IDX>=0?__LAST_IDX:0, 0, n-1);
+    }
+    const idx = Number(st.idx||0);
+    return clamp(idx, 0, n-1);
+  }
+
+  function nearestIndex(sArr, target){
+    const n = sArr.length;
+    if (n <= 1) return 0;
+    if (__S_MONO){
+      let lo = 0, hi = n - 1;
+      if (target <= sArr[0]) return 0;
+      if (target >= sArr[hi]) return hi;
+      while (hi - lo > 1){
+        const mid = (lo + hi) >> 1;
+        if (sArr[mid] < target) lo = mid;
+        else hi = mid;
+      }
+      // choose closer
+      return (Math.abs(sArr[lo] - target) <= Math.abs(sArr[hi] - target)) ? lo : hi;
+    }
+    // fallback linear
+    let best = 0, bestD = Infinity;
+    for (let i=0;i<n;i++){
+      const d = Math.abs(sArr[i] - target);
+      if (d < bestD){ bestD = d; best = i; }
+    }
+    return best;
+  }
+
+  function rangeIndicesByS(sArr, s0, backU, aheadU){
+    const n = sArr.length;
+    let sMin = s0 - backU;
+    let sMax = s0 + aheadU;
+    if (__S_MONO){
+      const i0 = nearestIndex(sArr, sMin);
+      const i1 = nearestIndex(sArr, sMax);
+      return [Math.min(i0,i1), Math.max(i0,i1)];
+    }
+    // fallback window in indices
+    const idx = nearestIndex(sArr, s0);
+    const w = Math.max(40, Math.floor(n * 0.08));
+    return [clamp(idx-w,0,n-1), clamp(idx+w,0,n-1)];
+  }
+
+  function __ringSegments(){
+    return (DATA.ring_visual && Array.isArray(DATA.ring_visual.segments)) ? DATA.ring_visual.segments : [];
+  }
+  function __ringLength(){
+    const rv = DATA.ring_visual || {};
+    const L = Number(rv.ring_length_m || 0);
+    return isFinite(L) && L > 0 ? L : 0;
+  }
+  function __modRing(sVal){
+    const L = __ringLength();
+    if (!(L > 0)) return Number(sVal || 0);
+    let x = Number(sVal || 0) % L;
+    if (x < 0) x += L;
+    return x;
+  }
+  function __segmentForS(sVal){
+    const segs = __ringSegments();
+    if (!segs.length) return null;
+    const sMod = __modRing(sVal);
+    for (const seg of segs){
+      const x0 = Number(seg.x_start_m || 0);
+      const x1 = Number(seg.x_end_m || x0);
+      if (sMod >= x0 - 1e-9 && sMod <= x1 + 1e-9) return seg;
+    }
+    return null;
+  }
+  function drawRingSegmentBands(px0, py0, pw, ph, X, xMin, xMax, s0, distScale){
+    const segs = __ringSegments();
+    const L = __ringLength();
+    if (!segs.length || !(L > 0) || !(distScale > 0)) return;
+    const absMin = Number(s0 || 0) + xMin * distScale;
+    const absMax = Number(s0 || 0) + xMax * distScale;
+    const lapMin = Math.floor(absMin / L) - 1;
+    const lapMax = Math.floor(absMax / L) + 1;
+    ctx.save();
+    for (let lap = lapMin; lap <= lapMax; lap++) {
+      const base = lap * L;
+      for (const seg of segs) {
+        const a = base + Number(seg.x_start_m || 0);
+        const b = base + Number(seg.x_end_m || a);
+        const lo = Math.max(a, absMin);
+        const hi = Math.min(b, absMax);
+        if (!(hi > lo)) continue;
+        const x0m = (lo - Number(s0 || 0)) / distScale;
+        const x1m = (hi - Number(s0 || 0)) / distScale;
+        const xx0 = X(x0m);
+        const xx1 = X(x1m);
+        const color = String(seg.edge_color || 'rgba(0,120,255,0.85)');
+        ctx.fillStyle = color.replace(')', ',0.08)').replace('rgb(', 'rgba(');
+        if (ctx.fillStyle === color) ctx.fillStyle = 'rgba(0,120,255,0.08)';
+        ctx.fillRect(xx0, py0, Math.max(1, xx1 - xx0), ph);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(xx0, py0 + 1.5);
+        ctx.lineTo(xx1, py0 + 1.5);
+        ctx.moveTo(xx0, py0 + ph - 1.5);
+        ctx.lineTo(xx1, py0 + ph - 1.5);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  // -------------------------
+  // Drawing
+  // -------------------------
+  function draw(){
+    resizeCanvas();
+    if (!__DIRTY) return;
+    const W = cv.clientWidth, H = cv.clientHeight;
+    ctx.clearRect(0,0,W,H);
+
+    const t = DATA.time || [];
+    const n = t.length || 0;
+    if (!n || n < 2){
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.font = '13px system-ui';
+      ctx.fillText('Нет данных для профиля дороги.', 12, 20);
+      ctx.restore();
+      __DIRTY = false;
+      return;
+    }
+
+    if (!__S_ARR || __S_ARR.length !== n) pickSArray();
+    const sArr = __S_ARR;
+
+    const idx = getIdx();
+    if (idx !== __LAST_IDX){ __LAST_IDX = idx; }
+    const tNow = Number(t[idx]||0);
+
+    const meta = DATA.meta || {};
+    const distScale = Number(meta.dist_scale || 1.0); // units per meter (1000 for mm)
+    const distUnit = String(meta.dist_unit || 'm');
+    const wbU = Number(meta.wheelbase_u || 0); // in dist_unit
+    const wbM = wbU / distScale;
+
+    const s0 = Number(sArr[idx]||0);
+
+    // window (meters -> units)
+    const backU = Number(DATA.window_m_back || 8) * distScale;
+    const aheadU = Number(DATA.window_m_ahead || 25) * distScale;
+
+    // ensure we include wheel offsets
+    const padWbU = Math.max(0, wbU*0.6);
+    const r = rangeIndicesByS(sArr, s0, backU + padWbU, aheadU + padWbU);
+    const i0 = clamp(r[0], 0, n-1);
+    const i1 = clamp(r[1], 0, n-1);
+
+    // arrays
+    const road = DATA.road || {};
+    const visualContract = (DATA.meta && DATA.meta.visual_contract) ? DATA.meta.visual_contract : {};
+    const roadAvailable = new Set(Array.isArray(visualContract.road_available_corners) ? visualContract.road_available_corners : []);
+    const roadText = String(visualContract.road_overlay_text || '');
+    const solverText = String(visualContract.solver_points_overlay_text || '');
+    const statusBits = [];
+    if (roadText) statusBits.push(roadText);
+    if (solverText) statusBits.push(solverText);
+    if (statusBits.length) subEl.textContent = statusBits.join(' · ');
+    const zFL = roadAvailable.has(FL) ? (Array.isArray(road.FL) ? road.FL : (Array.isArray(road[FL]) ? road[FL] : null)) : null;
+    const zFR = roadAvailable.has(FR) ? (Array.isArray(road.FR) ? road.FR : (Array.isArray(road[FR]) ? road[FR] : null)) : null;
+    const zRL = roadAvailable.has(RL) ? (Array.isArray(road.RL) ? road.RL : (Array.isArray(road[RL]) ? road[RL] : null)) : null;
+    const zRR = roadAvailable.has(RR) ? (Array.isArray(road.RR) ? road.RR : (Array.isArray(road[RR]) ? road[RR] : null)) : null;
+
+    // plot rect
+    const mL = 54, mR = 16, mT = 18, mB = 28;
+    const px0 = mL, py0 = mT;
+    const pw = Math.max(10, W - mL - mR);
+    const ph = Math.max(10, H - mT - mB);
+
+    const xMin = -Number(DATA.window_m_back || 8);
+    const xMax =  Number(DATA.window_m_ahead || 25);
+
+    // y range
+    let yMin = Infinity, yMax = -Infinity;
+    function acc(arr){
+      if (!arr) return;
+      for (let i=i0;i<=i1;i++){
+        const v = Number(arr[i]);
+        if (!isFinite(v)) continue;
+        if (v < yMin) yMin = v;
+        if (v > yMax) yMax = v;
+      }
+    }
+    acc(zFL); acc(zFR); acc(zRL); acc(zRR);
+    if (!isFinite(yMin) || !isFinite(yMax) || yMin === yMax){
+      yMin = -1; yMax = 1;
+    }
+    // y exaggeration
+    const yEx = Math.max(0.25, Math.min(20.0, Number(DATA.y_exag || 1.0)));
+    const mid = 0.5*(yMin + yMax);
+    const half = Math.max(1e-9, 0.5*(yMax - yMin)) / yEx;
+    yMin = mid - half;
+    yMax = mid + half;
+
+    // coordinate transforms
+    function X(xm){ return px0 + (xm - xMin) / (xMax - xMin) * pw; }
+    function Y(y){ return py0 + (yMax - y) / (yMax - yMin) * ph; }
+
+    // background panel
+    ctx.save();
+    ctx.fillStyle = 'rgba(247,247,248,1)';
+    ctx.fillRect(px0, py0, pw, ph);
+    ctx.restore();
+
+    if (DATA.ring_visual && DATA.path && Array.isArray(DATA.path.s)) {
+      drawRingSegmentBands(px0, py0, pw, ph, X, xMin, xMax, s0, distScale);
+    }
+
+    // grid X + Y
+    ctx.save();
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid') || 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const stepX = (pw > 700) ? 2 : 5;
+    for (let xm = Math.ceil(xMin/stepX)*stepX; xm <= xMax + 1e-9; xm += stepX){
+      const xx = X(xm);
+      ctx.moveTo(xx, py0);
+      ctx.lineTo(xx, py0 + ph);
+    }
+    for (let k=0;k<=4;k++){
+      const yy = py0 + (ph*k)/4;
+      ctx.moveTo(px0, yy);
+      ctx.lineTo(px0 + pw, yy);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // zero line
+    ctx.save();
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--zero') || 'rgba(0,0,0,0.22)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6,5]);
+    const y0 = Y(0.0);
+    ctx.beginPath();
+    ctx.moveTo(px0, y0);
+    ctx.lineTo(px0+pw, y0);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // CG marker at x=0
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    ctx.moveTo(X(0), py0);
+    ctx.lineTo(X(0), py0+ph);
+    ctx.stroke();
+    ctx.restore();
+
+    // wheelbase markers (front/rear)
+    if (isFinite(wbM) && wbM > 0.05){
+      const xf = X(+0.5*wbM);
+      const xr = X(-0.5*wbM);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2,5]);
+      ctx.beginPath();
+      ctx.moveTo(xf, py0); ctx.lineTo(xf, py0+ph);
+      ctx.moveTo(xr, py0); ctx.lineTo(xr, py0+ph);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (!zFL && !zFR && !zRL && !zRR) {
+      hudEl.textContent = roadText || "NO ROAD DATA";
+      ctx.save();
+      ctx.fillStyle = "rgba(180,83,9,0.95)";
+      ctx.font = "600 14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+      ctx.fillText(roadText || "NO ROAD DATA", 18, 28);
+      ctx.restore();
+      return;
+    }
+
+    // draw series
+    function drawSeries(arr, corner){
+      if (!arr) return;
+      const offs = (corner===FL || corner===FR) ? (+0.5*wbU) : (-0.5*wbU);
+      ctx.save();
+      ctx.strokeStyle = COLORS[(corner===FL)?'FL':(corner===FR)?'FR':(corner===RL)?'RL':'RR'];
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let started = false;
+      for (let i=i0;i<=i1;i++){
+        const yv = Number(arr[i]);
+        const s = Number(sArr[i]||0) + offs;
+        const xm = (s - s0) / distScale; // meters
+        if (xm < xMin-0.2 || xm > xMax+0.2) continue;
+        const xx = X(xm);
+        const yy = Y(yv);
+        if (!started){ ctx.moveTo(xx,yy); started=true; }
+        else ctx.lineTo(xx,yy);
+      }
+      if (started) ctx.stroke();
+      ctx.restore();
+    }
+    drawSeries(zFL, FL);
+    drawSeries(zFR, FR);
+    drawSeries(zRL, RL);
+    drawSeries(zRR, RR);
+
+    // current markers
+    function drawMarker(arr, corner){
+      if (!arr) return;
+      const yv = Number(arr[idx]||0);
+      const offs = (corner===FL || corner===FR) ? (+0.5*wbU) : (-0.5*wbU);
+      const xm = ((Number(sArr[idx]||0) + offs) - s0) / distScale;
+      const xx = X(xm), yy = Y(yv);
+      ctx.save();
+      ctx.fillStyle = COLORS[(corner===FL)?'FL':(corner===FR)?'FR':(corner===RL)?'RL':'RR'];
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(xx,yy,4.2,0,Math.PI*2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+    drawMarker(zFL, FL);
+    drawMarker(zFR, FR);
+    drawMarker(zRL, RL);
+    drawMarker(zRR, RR);
+
+    // axes labels
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.70)';
+    ctx.font = '12px system-ui';
+    ctx.textBaseline = 'top';
+    ctx.fillText('Δs, м', px0, py0 - 14);
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`дорога, ${distUnit} (y×${fmt(yEx,1)})`, px0, py0 + ph + 22);
+    ctx.restore();
+
+    // hud + subtitle
+    const p = DATA.path || {};
+    const vNow = (p && Array.isArray(p.v) && p.v.length===n) ? Number(p.v[idx]||0) : NaN;
+    const sM = s0 / distScale;
+    subEl.textContent = `t=${fmt(tNow,3)} s · idx=${idx}/${n-1} · s=${fmt(sM,2)} m · окно: ${fmt(DATA.window_m_back,1)}m назад + ${fmt(DATA.window_m_ahead,1)}m вперёд`;
+    const segNow = (DATA.path && Array.isArray(DATA.path.s) && DATA.path.s[idx] != null) ? __segmentForS(Number(DATA.path.s[idx]||0)) : null;
+    const segNowName = segNow ? String(segNow.name || ('S' + String(segNow.seg_idx || ''))) : '—';
+    const segSwatch = segNow && segNow.edge_color ? `<span style="display:inline-block;width:12px;height:12px;border-radius:999px;background:${String(segNow.edge_color)};vertical-align:-2px;margin-right:6px;"></span>` : '';
+    hudEl.innerHTML = `
+      <div><b>t</b>: ${fmt(tNow,3)} s &nbsp; <b>idx</b>: ${idx}/${n-1}</div>
+      <div><b>s</b>: ${fmt(sM,2)} m &nbsp; <b>v</b>: ${isFinite(vNow)?fmt(vNow,2)+' m/s':'—'}</div>
+      <div>${segSwatch}<b>сегмент</b>: ${segNowName}</div>
+      <div><b>нуль</b>: пунктир · <b>CG</b>: x=0 · <b>колёсная база</b>: ${isFinite(wbM)?fmt(wbM,2)+' m':'—'}</div>
+    `;
+
+    __DIRTY = false;
+  }
+
+  // -------------------------
+  // Scrub interactions
+  // -------------------------
+  let __SCRUB = {active:false};
+
+  function pointerToPlot(ev){
+    const r = cv.getBoundingClientRect();
+    return {x: ev.clientX - r.left, y: ev.clientY - r.top, pid: ev.pointerId};
+  }
+
+  function scrubbingEnabled(){ return !!DATA.allow_scrub && !!DATA.sync_playhead; }
+
+  function setIdxFromDeltaM(deltaM){
+    const t = DATA.time || [];
+    const n = t.length || 0;
+    if (!n || !__S_ARR) return;
+    const idxCur = getIdx();
+    const s0 = Number(__S_ARR[idxCur]||0);
+    const meta = DATA.meta || {};
+    const distScale = Number(meta.dist_scale || 1.0);
+    const sTarget = s0 + deltaM * distScale;
+    const idx = nearestIndex(__S_ARR, sTarget);
+    writePlayheadState(DATA.playhead_storage_key, {idx: idx, playing: false, dataset_id: DATA.dataset_id || ''});
+    __DIRTY = true;
+  }
+
+  function attachScrub(){
+    cv.addEventListener('pointerdown', (e)=>{
+      if (!scrubbingEnabled()) return;
+      __SCRUB.active = true;
+      try { cv.setPointerCapture(e.pointerId); } catch(_) {}
+      const pos = pointerToPlot(e);
+      const W = cv.clientWidth, H = cv.clientHeight;
+      const mL = 54, mR = 16, mT = 18, mB = 28;
+      const px0 = mL, py0 = mT;
+      const pw = Math.max(10, W - mL - mR);
+      const ph = Math.max(10, H - mT - mB);
+      if (pos.x < px0 || pos.x > px0+pw || pos.y < py0 || pos.y > py0+ph) return;
+      const xMin = -Number(DATA.window_m_back || 8);
+      const xMax =  Number(DATA.window_m_ahead || 25);
+      const deltaM = xMin + (pos.x - px0) / pw * (xMax - xMin);
+      setIdxFromDeltaM(deltaM);
+      e.preventDefault();
+    }, {passive:false});
+
+    cv.addEventListener('pointermove', (e)=>{
+      if (!__SCRUB.active) return;
+      if (!scrubbingEnabled()) return;
+      const pos = pointerToPlot(e);
+      const W = cv.clientWidth, H = cv.clientHeight;
+      const mL = 54, mR = 16, mT = 18, mB = 28;
+      const px0 = mL, py0 = mT;
+      const pw = Math.max(10, W - mL - mR);
+      const xMin = -Number(DATA.window_m_back || 8);
+      const xMax =  Number(DATA.window_m_ahead || 25);
+      const xClamped = clamp(pos.x, px0, px0+pw);
+      const deltaM = xMin + (xClamped - px0) / pw * (xMax - xMin);
+      setIdxFromDeltaM(deltaM);
+      e.preventDefault();
+    }, {passive:false});
+
+    function stop(e){
+      if (!__SCRUB.active) return;
+      __SCRUB.active = false;
+      try { cv.releasePointerCapture(e.pointerId); } catch(_) {}
+    }
+    cv.addEventListener('pointerup', stop);
+    cv.addEventListener('pointercancel', stop);
+
+    cv.addEventListener('dblclick', (e)=>{
+      __DIRTY = true;
+      e.preventDefault();
+    }, {passive:false});
+  }
+
+  // -------------------------
+  // Streamlit hooks
+  // -------------------------
+  function stSetReady(){
+    try { Streamlit.setComponentReady(); Streamlit.setFrameHeight(DATA.height||200); } catch(e) {}
+  }
+
+  function setDataFromStreamlit(args){
+    args = args || {};
+    DATA.title = args.title || DATA.title;
+    DATA.hint = args.hint || DATA.hint;
+    DATA.time = Array.isArray(args.time) ? args.time : DATA.time;
+    DATA.road = args.road || DATA.road;
+    DATA.path = args.path || DATA.path;
+    DATA.meta = args.meta || DATA.meta;
+
+    DATA.sync_playhead = (args.sync_playhead === false || args.sync_playhead === true) ? !!args.sync_playhead : DATA.sync_playhead;
+    DATA.playhead_storage_key = args.playhead_storage_key || DATA.playhead_storage_key;
+    DATA.dataset_id = args.dataset_id || DATA.dataset_id;
+
+    if (typeof args.height === 'number' && isFinite(args.height)) DATA.height = args.height;
+    if (typeof args.window_m_ahead === 'number' && isFinite(args.window_m_ahead)) DATA.window_m_ahead = args.window_m_ahead;
+    if (typeof args.window_m_back === 'number' && isFinite(args.window_m_back)) DATA.window_m_back = args.window_m_back;
+    if (typeof args.y_exag === 'number' && isFinite(args.y_exag)) DATA.y_exag = args.y_exag;
+    if (typeof args.allow_scrub === 'boolean') DATA.allow_scrub = args.allow_scrub;
+
+    ttlEl.textContent = String(DATA.title || 'Профиль дороги');
+    hintEl.textContent = String(DATA.hint || 'Drag по графику → перемотка playhead.');
+    try { Streamlit.setFrameHeight(DATA.height||200); } catch(e) {}
+
+    pickSArray();
+    __DIRTY = true;
+    try { __wakeLoop(); } catch(_e) {}
+  }
+
+  Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, (event) => {
+    setDataFromStreamlit(event.detail.args);
+  });
+
+
+const __PERF_KEY_PREFIX = 'pneumo_perf_component::';
+const __PERF_NAME = 'road_profile_live';
+let __PERF_STATE = {
+  component: __PERF_NAME,
+  dataset_id: '',
+  ts_ms: Date.now(),
+  viewport_state: 'init',
+  wakeups: 0,
+  storage_wakeups: 0,
+  focus_wakeups: 0,
+  visibility_wakeups: 0,
+  duplicate_guard_hits: 0,
+  schedule_raf_count: 0,
+  schedule_timeout_count: 0,
+  hidden_gate_hits: 0,
+  zero_size_gate_hits: 0,
+  css_hidden_gate_hits: 0,
+  offscreen_gate_hits: 0,
+  render_count: 0,
+  idle_poll_ms: 0,
+  playing: false,
+  loop_kind: '',
+};
+function __perfBump(key, delta){
+  const add = Number.isFinite(Number(delta)) ? Number(delta) : 1;
+  __PERF_STATE[key] = Number(__PERF_STATE[key] || 0) + add;
+}
+function __perfSet(key, value){ __PERF_STATE[key] = value; }
+function __perfSyncDataset(){
+  try { __PERF_STATE.dataset_id = String((DATA && DATA.dataset_id) || ''); } catch(_e) {}
+}
+function __perfFlush(force){
+  const now = Date.now();
+  if (!force && (now - Number(__PERF_STATE.ts_ms || 0) < 1200)) return;
+  __perfSyncDataset();
+  __PERF_STATE.ts_ms = now;
+  try { localStorage.setItem(__PERF_KEY_PREFIX + __PERF_NAME, JSON.stringify(__PERF_STATE)); } catch(_e) {}
+}
+function __setViewportState(state){
+  __PERF_STATE.viewport_state = String(state || 'unknown');
+  return __PERF_STATE.viewport_state;
+}
+function __frameInParentViewport(){
+  try {
+    const fe = window.frameElement;
+    if (!fe || !fe.getBoundingClientRect) { __setViewportState('visible'); return true; }
+    const r = fe.getBoundingClientRect();
+    const w = Number(r.width || Math.max(0, (r.right || 0) - (r.left || 0)) || 0);
+    const h = Number(r.height || Math.max(0, (r.bottom || 0) - (r.top || 0)) || 0);
+    if (w <= 2 || h <= 2) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    if ((Number(fe.clientWidth || 0) <= 2) || (Number(fe.clientHeight || 0) <= 2)) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    let hiddenByCss = false;
+    try {
+      const hostView = fe.ownerDocument && fe.ownerDocument.defaultView;
+      const cs = (hostView && hostView.getComputedStyle) ? hostView.getComputedStyle(fe) : null;
+      hiddenByCss = !!(cs && (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity || '1') === 0));
+    } catch(_cssErr) {}
+    if (hiddenByCss) { __perfBump('css_hidden_gate_hits'); __setViewportState('css_hidden'); __perfFlush(false); return false; }
+    const hostWin = (window.top && window.top !== window) ? window.top : window;
+    const vh = Number(hostWin.innerHeight || window.innerHeight || 0);
+    const vw = Number(hostWin.innerWidth || window.innerWidth || 0);
+    const margin = 64;
+    const visible = (r.bottom >= -margin) && (r.top <= vh + margin) && (r.right >= -margin) && (r.left <= vw + margin);
+    if (!visible) { __perfBump('offscreen_gate_hits'); __setViewportState('offscreen'); __perfFlush(false); return false; }
+    __setViewportState('visible');
+    return true;
+  } catch(_e) {
+    __setViewportState('visible');
+    return true;
+  }
+}
+function __canAnimateNow(){
+  if (document && document.hidden) { __perfBump('hidden_gate_hits'); __setViewportState('hidden'); __perfFlush(false); return false; }
+  return __frameInParentViewport();
+}
+function __nextIdleMs(visibleMs, hiddenMs, offscreenMs){
+  if (document && document.hidden) return hiddenMs;
+  return __frameInParentViewport() ? visibleMs : offscreenMs;
+}
+function __playDelayMs(){
+  const fpsRaw = Number(DATA.play_fps_cap);
+  if (!Number.isFinite(fpsRaw) || fpsRaw <= 0) return 0;
+  const fps = Math.max(1, Math.min(60, fpsRaw));
+  return Math.max(1, Math.round(1000 / fps));
+}
+let __LOOP_HANDLE = 0;
+let __LOOP_KIND = '';
+function __clearScheduledLoop(){
+  try {
+    if (!__LOOP_HANDLE) return;
+    if (__LOOP_KIND === 'raf' && window.cancelAnimationFrame) window.cancelAnimationFrame(__LOOP_HANDLE);
+    else clearTimeout(__LOOP_HANDLE);
+  } catch(_e) {}
+  __LOOP_HANDLE = 0;
+  __LOOP_KIND = '';
+}
+function __scheduleLoop(kind, delayMs){
+  if (__LOOP_HANDLE) __perfBump('duplicate_guard_hits');
+  __clearScheduledLoop();
+  __LOOP_KIND = String(kind || 'timeout');
+  __perfSet('loop_kind', __LOOP_KIND);
+  if (__LOOP_KIND === 'raf') {
+    __perfBump('schedule_raf_count');
+    __LOOP_HANDLE = window.requestAnimationFrame(tick);
+  } else {
+    const ms = Math.max(0, Number(delayMs) || 0);
+    __perfBump('schedule_timeout_count');
+    __perfSet('idle_poll_ms', ms);
+    __LOOP_HANDLE = window.setTimeout(tick, ms);
+  }
+  __perfFlush(false);
+}
+function __wakeLoop(){
+  __perfBump('wakeups');
+  if (__canAnimateNow()) __scheduleLoop('raf', 0);
+  else { __perfSet('idle_poll_ms', 0); __LOOP_HANDLE = null; __perfFlush(false); }
+}
+
+  function tick(){
+    let playing = false;
+    if (DATA.sync_playhead){
+      const st = readPlayheadState(DATA.playhead_storage_key);
+      const idx = (st && st.idx!=null) ? Number(st.idx) : -1;
+      playing = !!(st && st.playing);
+      if (idx !== __LAST_IDX){ __DIRTY = true; }
+    }
+    if (__DIRTY) { draw(); __perfBump('render_count'); }
+    __perfSet('playing', !!playing);
+    __perfFlush(false);
+    if ((playing || __DIRTY) && __canAnimateNow()) {
+      const playMs = __playDelayMs();
+      if (playMs > 0) __scheduleLoop('timeout', playMs);
+      else __scheduleLoop('raf', 0);
+    } else {
+      __LOOP_HANDLE = null;
+    }
+  }
+
+  window.addEventListener('storage', (ev) => {
+    try {
+      const key = String(DATA.playhead_storage_key || 'pneumo_play_state');
+      if (ev && ev.key && String(ev.key) !== key) return;
+      __perfBump('storage_wakeups');
+      const st = readPlayheadState(DATA.playhead_storage_key);
+      if (st && st.playing) { __wakeLoop(); return; }
+      const idxNow = (st && st.idx != null) ? Number(st.idx) : __LAST_IDX;
+      const changed = idxNow !== __LAST_IDX;
+      if (!changed && !__DIRTY) return;
+      __DIRTY = true;
+      if (!__canAnimateNow()) return;
+      draw();
+      __LAST_IDX = idxNow;
+      __DIRTY = false;
+      __perfBump('render_count');
+      __perfFlush(false);
+    } catch(e) {}
+  });
+  window.addEventListener('focus', () => { try { __perfBump('focus_wakeups'); __wakeLoop(); } catch(_e) {} });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { try { __perfBump('visibility_wakeups'); __wakeLoop(); } catch(_e) {} } });
+window.addEventListener('scroll', () => { try { __wakeLoop(); } catch(_e) {} }, {passive:true});
+window.addEventListener('resize', () => { try { __wakeLoop(); } catch(_e) {} }, {passive:true});
+  __perfFlush(true);
+
+  function init(){
+    stSetReady();
+    attachScrub();
+    try {
+      const ro = new ResizeObserver(()=>{ resizeCanvas(); __DIRTY=true; });
+      ro.observe(root);
+    } catch(e) {}
+    resizeCanvas();
+    __wakeLoop();
+  }
+  init();
+  </script>
+</body>
+</html>

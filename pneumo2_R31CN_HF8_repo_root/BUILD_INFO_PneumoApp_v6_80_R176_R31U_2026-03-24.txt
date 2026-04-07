@@ -1,0 +1,2 @@
+PneumoApp_v6_80_R176_R31U_2026-03-24
+Built from R31T after bundle-driven clean-log/runtime-contract fixes on 2026-03-24.

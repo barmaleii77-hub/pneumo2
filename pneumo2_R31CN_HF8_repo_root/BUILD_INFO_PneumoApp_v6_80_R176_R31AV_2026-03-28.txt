@@ -1,0 +1,6 @@
+Release: PneumoApp_v6_80_R176_R31AV_2026-03-28
+Built UTC: 2026-03-28T08:30:00Z
+Highlights:
+- fixed 03_Optimization NameError runtime blocker
+- aligned optimization defaults with diagnostics archive
+- canonicalized objective priorities to frame vertical + lateral response

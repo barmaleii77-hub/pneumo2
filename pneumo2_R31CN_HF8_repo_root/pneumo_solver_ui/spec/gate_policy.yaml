@@ -1,0 +1,40 @@
+# Gate policy (human + machine readable).
+# Used as documentation for pneumo_solver_ui/release_gate.py and CI checks.
+
+policy_version: 1
+
+verdict_rules:
+  - verdict: FAIL
+    when_any:
+      - step: compileall
+        status: FAIL
+      - step: selfcheck_suite
+        status: FAIL
+      - step: pytest
+        status: FAIL
+  - verdict: PASS
+    when_all:
+      - step: compileall
+        status: PASS
+      - step: selfcheck_suite
+        status: PASS
+      # pytest is optional
+
+steps:
+  compileall:
+    required: true
+    description: "Syntax/bytecode compile of the whole tree"
+
+  selfcheck_suite:
+    required: true
+    levels:
+      quick:
+        description: "Fast smoke checks (preflight + invariants + UI trace guard)"
+      standard:
+        description: "Wider numeric checks + stability checks"
+      full:
+        description: "Maximal local test suite (may be slow)"
+
+  pytest:
+    required: false
+    description: "Unit tests (pytest -q)"

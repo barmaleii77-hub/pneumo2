@@ -1,0 +1,4 @@
+PneumoApp_v6_80_R176_R31Z_2026-03-24
+Date: 2026-03-24
+Base source: PneumoApp_v6_80_R176_R31Y_2026-03-24
+Focus: native 3D dock/floating + auto-pause on layout changes + honest cylinder internals without GL point-sprite balls

@@ -1,0 +1,12 @@
+# Optional deps for distributed mode (Dask)
+
+# Dask distributed cluster
+"dask[distributed]" >= 2024.0
+
+# DB (optional but recommended)
+duckdb>=0.9
+
+# For qNEHVI proposer
+botorch>=0.9
+# torch is intentionally NOT pinned here because you need to install the
+# correct CUDA build for your GPU driver.

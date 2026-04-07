@@ -1,0 +1,3 @@
+PneumoApp_v6_80_R176_R31BB_2026-03-28
+StageRunner + opt_worker hardening for staged optimization suite integrity.
+Piston diameter ranges promoted into canonical default_ranges.json.

@@ -1,0 +1,109 @@
+{
+  "bundle_path": "/mnt/data/investigate/bundle_root/workspace/exports/anim_latest.npz",
+  "road_surface_current_ds_min_m": 0.0670391061452514,
+  "road_surface_current_ds_max_m": 0.10886969224375168,
+  "road_surface_current_ds_unique": 686,
+  "road_surface_current_n_long_min": 180,
+  "road_surface_current_n_long_max": 720,
+  "road_surface_current_n_long_unique": 355,
+  "road_surface_nominal_visible_length_m": 64.77777777777777,
+  "road_surface_stable_spacing_m": 0.0900942667284809,
+  "cylinder_metrics": [
+    {
+      "cyl": 1,
+      "corner": "ЛП",
+      "stroke_min_m": 0.015350476731558427,
+      "stroke_max_m": 0.23130104896525394,
+      "current_frac_min": 0.11584072841197776,
+      "current_frac_max": 0.8515703538108725,
+      "fixed_frac_min": 0.1272487636825491,
+      "fixed_frac_max": 0.862978389081444,
+      "corr_current": 1.0,
+      "corr_fixed": -0.9999999999999999
+    },
+    {
+      "cyl": 1,
+      "corner": "ПП",
+      "stroke_min_m": 0.006928671882673876,
+      "stroke_max_m": 0.23205077313062356,
+      "current_frac_min": 0.08714818426837109,
+      "current_frac_max": 0.8541246155274981,
+      "fixed_frac_min": 0.12469450196592366,
+      "fixed_frac_max": 0.8916709332250506,
+      "corr_current": 0.9999999999999993,
+      "corr_fixed": -0.9999999999999996
+    },
+    {
+      "cyl": 1,
+      "corner": "ЛЗ",
+      "stroke_min_m": 0.03203758398414713,
+      "stroke_max_m": 0.23479423947853223,
+      "current_frac_min": 0.17269262299576352,
+      "current_frac_max": 0.8634714278446103,
+      "fixed_frac_min": 0.11534768964881151,
+      "fixed_frac_max": 0.8061264944976582,
+      "corr_current": 1.0,
+      "corr_fixed": -1.0
+    },
+    {
+      "cyl": 1,
+      "corner": "ПЗ",
+      "stroke_min_m": 0.026482891236911388,
+      "stroke_max_m": 0.23063545568857413,
+      "current_frac_min": 0.15376814425112215,
+      "current_frac_max": 0.8493027205878879,
+      "fixed_frac_min": 0.12951639690553368,
+      "fixed_frac_max": 0.8250509732422995,
+      "corr_current": 0.9999999999999992,
+      "corr_fixed": -0.9999999999999993
+    },
+    {
+      "cyl": 2,
+      "corner": "ЛП",
+      "stroke_min_m": 0.015350476731558427,
+      "stroke_max_m": 0.23130104896525394,
+      "current_frac_min": 0.08645140239892822,
+      "current_frac_max": 0.8985131534119539,
+      "fixed_frac_min": 0.09904302407301234,
+      "fixed_frac_max": 0.911104775086038,
+      "corr_current": 0.9999999999999999,
+      "corr_fixed": -0.9999999999999996
+    },
+    {
+      "cyl": 2,
+      "corner": "ПП",
+      "stroke_min_m": 0.006928671882673876,
+      "stroke_max_m": 0.23205077313062356,
+      "current_frac_min": 0.05478199989846075,
+      "current_frac_max": 0.9013324203961043,
+      "fixed_frac_min": 0.09622375708886201,
+      "fixed_frac_max": 0.9427741775865055,
+      "corr_current": 0.9999999999999994,
+      "corr_fixed": -0.9999999999999994
+    },
+    {
+      "cyl": 2,
+      "corner": "ЛЗ",
+      "stroke_min_m": 0.03203758398414713,
+      "stroke_max_m": 0.23479423947853223,
+      "current_frac_min": 0.1492016947214458,
+      "current_frac_max": 0.9116489667394827,
+      "fixed_frac_min": 0.0859072107454835,
+      "fixed_frac_max": 0.8483544827635204,
+      "corr_current": 0.9999999999999997,
+      "corr_fixed": -0.9999999999999998
+    },
+    {
+      "cyl": 2,
+      "corner": "ПЗ",
+      "stroke_min_m": 0.026482891236911388,
+      "stroke_max_m": 0.23063545568857413,
+      "current_frac_min": 0.12831379675478422,
+      "current_frac_max": 0.8960102526966078,
+      "fixed_frac_min": 0.10154592478835839,
+      "fixed_frac_max": 0.869242380730182,
+      "corr_current": 1.0,
+      "corr_fixed": -1.0
+    }
+  ]
+}

@@ -1,0 +1,558 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    :root{
+      --bg:#ffffff;
+      --panel:rgba(255,255,255,0.96);
+      --border:#e6e6e6;
+      --text:#222;
+      --muted:#666;
+    }
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);}
+    .root{box-sizing:border-box;padding:10px 10px;}
+    .hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+    .title{font-weight:650;font-size:14px;color:var(--text);}
+    .meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+    .pill{
+      font-size:12px;line-height:1;
+      padding:4px 8px;border-radius:999px;
+      background:rgba(0,0,0,0.04);
+      border:1px solid rgba(0,0,0,0.06);
+      color:var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .pill.muted{color:var(--muted);}
+    .canvasWrap{border:1px solid var(--border);border-radius:12px;background:var(--panel);overflow:hidden;}
+    canvas{display:block;width:100%;height:100%;}
+    .hint{margin-top:6px;font-size:11px;color:var(--muted);line-height:1.25;}
+  </style>
+</head>
+<body>
+  <div class="root">
+    <div class="hdr">
+      <div class="title" id="title">Теплокарта (4 угла)</div>
+      <div class="meta">
+        <span class="pill" id="pillT">t: 0.000 s</span>
+        <span class="pill muted" id="pillIdx">idx: 0</span>
+        <span class="pill muted" id="pillUnit">unit</span>
+        <span class="pill muted" id="pillRange">min..max</span>
+      </div>
+    </div>
+    <div class="canvasWrap" id="wrap">
+      <canvas id="cv"></canvas>
+    </div>
+    <div class="hint" id="hint">Управление временем: используйте общий таймлайн / механику (Play/Pause/ползунок).</div>
+  </div>
+
+<script>
+// ----------------------------------------------------
+// Streamlit "no-tooling" component messaging helpers
+// ----------------------------------------------------
+function sendMessageToStreamlitClient(type, data) {
+  var outData = Object.assign({ isStreamlitMessage: true, type: type }, data);
+  window.parent.postMessage(outData, "*");
+}
+function setFrameHeight(height) {
+  sendMessageToStreamlitClient("streamlit:setFrameHeight", { height: height });
+}
+
+// Robust componentReady pinger
+var __stHasRender = false;
+var __stReadyTimer = null;
+var __stReadyTries = 0;
+function stSetReady(){
+  try { sendMessageToStreamlitClient("streamlit:componentReady", { apiVersion: 1, args: { apiVersion: 1 } }); } catch(e) {}
+}
+stSetReady();
+__stReadyTimer = setInterval(function(){
+  if (__stHasRender) { clearInterval(__stReadyTimer); __stReadyTimer = null; return; }
+  __stReadyTries += 1;
+  if (__stReadyTries > 60) { clearInterval(__stReadyTimer); __stReadyTimer = null; return; }
+  stSetReady();
+}, 200);
+
+// ----------------------------------------------------
+// DOM refs
+// ----------------------------------------------------
+const cv = document.getElementById('cv');
+const wrap = document.getElementById('wrap');
+const ctx = cv.getContext('2d');
+const titleEl = document.getElementById('title');
+const pillT = document.getElementById('pillT');
+const pillIdx = document.getElementById('pillIdx');
+const pillUnit = document.getElementById('pillUnit');
+const pillRange = document.getElementById('pillRange');
+const hintEl = document.getElementById('hint');
+
+// ----------------------------------------------------
+// Data
+// ----------------------------------------------------
+let DATA = {
+  title: 'Теплокарта (4 угла)',
+  time: [],
+  series: {}, // {"ЛП":[],"ПП":[],"ЛЗ":[],"ПЗ":[]}
+  unit: '',
+  zmin: null,
+  zmax: null,
+  show_text: true,
+  show_sign: true,
+  digits: 3,
+  height: 300,
+  sync_playhead: true,
+  playhead_storage_key: 'pneumo_play_state',
+  dataset_id: '',
+  hint: '',
+};
+
+let timeArr = [];
+let series = {};
+let zmin = 0;
+let zmax = 1;
+let storageKey = 'pneumo_play_state';
+let datasetId = '';
+let showText = true;
+let showSign = true;
+let digits = 3;
+
+// 33-step viridis-like palette (handpicked, perceptually uniform)
+const VIRIDIS = [
+  '#440154','#481567','#482677','#453781','#404788','#3b528b','#365c8d','#31668e',
+  '#2c718e','#287c8e','#238a8d','#1f968b','#20a387','#2db27d','#3fc06b','#55c667',
+  '#6ccd5a','#81d34d','#95d840','#aadc32','#bddf26','#d2e21b','#e8e51a','#fce51b',
+  '#fde725','#f9e721','#f3e51d','#ede31b','#e7e11a','#e1df1a','#dbdd1a','#d5db1a','#cfe919'
+];
+
+function hexToRgb(h){
+  const s = h.replace('#','');
+  const n = parseInt(s, 16);
+  return {r:(n>>16)&255, g:(n>>8)&255, b:n&255};
+}
+function lerp(a,b,t){return a + (b-a)*t;}
+function colorForValue(v){
+  if (!isFinite(v)) return {r:200,g:200,b:200};
+  let t = 0.0;
+  if (zmax !== zmin) t = (v - zmin) / (zmax - zmin);
+  if (!isFinite(t)) t = 0.5;
+  t = Math.max(0, Math.min(1, t));
+  const m = VIRIDIS.length - 1;
+  const x = t * m;
+  const i0 = Math.floor(x);
+  const i1 = Math.min(m, i0 + 1);
+  const f = x - i0;
+  const c0 = hexToRgb(VIRIDIS[i0]);
+  const c1 = hexToRgb(VIRIDIS[i1]);
+  return {
+    r: Math.round(lerp(c0.r, c1.r, f)),
+    g: Math.round(lerp(c0.g, c1.g, f)),
+    b: Math.round(lerp(c0.b, c1.b, f)),
+  };
+}
+function rgbStr(c){return `rgb(${c.r},${c.g},${c.b})`;}
+function luminance(c){return 0.299*c.r + 0.587*c.g + 0.114*c.b;}
+
+function readPlayheadState(){
+  try {
+    const s = localStorage.getItem(storageKey);
+    if (!s) return null;
+    const obj = JSON.parse(s);
+    if (!obj || typeof obj !== 'object') return null;
+    if (datasetId && String(obj.dataset_id || '') !== String(datasetId)) return null;
+    return obj;
+  } catch(_e){ return null; }
+}
+
+// ----------------------------------------------------
+// Resize handling
+// ----------------------------------------------------
+let __DIRTY = true;
+function resizeCanvas(){
+  const rect = wrap.getBoundingClientRect();
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const w = Math.max(10, Math.floor(rect.width));
+  const h = Math.max(10, Math.floor(rect.height));
+  if (cv.width !== Math.floor(w*dpr) || cv.height !== Math.floor(h*dpr)){
+    cv.width = Math.floor(w*dpr);
+    cv.height = Math.floor(h*dpr);
+    cv.style.width = w + 'px';
+    cv.style.height = h + 'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    __DIRTY = true;
+  }
+}
+try {
+  const ro = new ResizeObserver(()=>{ resizeCanvas(); });
+  ro.observe(wrap);
+} catch(e) {
+  window.addEventListener('resize', ()=>{ resizeCanvas(); });
+}
+
+function fmtNum(v){
+  if (!isFinite(v)) return '—';
+  try { return Number(v).toFixed(digits); } catch(_e){ return String(v); }
+}
+
+function draw(idx){
+  resizeCanvas();
+  const W = wrap.getBoundingClientRect().width;
+  const H = wrap.getBoundingClientRect().height;
+  ctx.clearRect(0,0,W,H);
+
+  // layout
+  const pad = 14;
+  const labelX = 54;
+  const labelY = 26;
+  const legendH = 26;
+  const gridW = Math.max(10, W - pad*2 - labelX);
+  const gridH = Math.max(10, H - pad*2 - labelY - legendH);
+  const cellW = gridW / 2;
+  const cellH = gridH / 2;
+  const ox = pad + labelX;
+  const oy = pad + labelY;
+
+  // labels
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.font = '600 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Л', ox + cellW*0.5, pad + labelY*0.55);
+  ctx.fillText('П', ox + cellW*1.5, pad + labelY*0.55);
+
+  ctx.textAlign = 'right';
+  ctx.font = '600 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+  ctx.fillText('Перед', pad + labelX - 6, oy + cellH*0.5);
+  ctx.fillText('Зад',   pad + labelX - 6, oy + cellH*1.5);
+  ctx.restore();
+
+  // values
+  const cFL = (series['ЛП'] && series['ЛП'].length>idx) ? Number(series['ЛП'][idx]) : NaN;
+  const cFR = (series['ПП'] && series['ПП'].length>idx) ? Number(series['ПП'][idx]) : NaN;
+  const cRL = (series['ЛЗ'] && series['ЛЗ'].length>idx) ? Number(series['ЛЗ'][idx]) : NaN;
+  const cRR = (series['ПЗ'] && series['ПЗ'].length>idx) ? Number(series['ПЗ'][idx]) : NaN;
+
+  const cells = [
+    {x:ox,         y:oy,         v:cFL, name:'ЛП'},
+    {x:ox+cellW,   y:oy,         v:cFR, name:'ПП'},
+    {x:ox,         y:oy+cellH,   v:cRL, name:'ЛЗ'},
+    {x:ox+cellW,   y:oy+cellH,   v:cRR, name:'ПЗ'},
+  ];
+
+  // draw cells
+  for (const cell of cells){
+    const col = colorForValue(cell.v);
+    ctx.fillStyle = rgbStr(col);
+    ctx.fillRect(cell.x, cell.y, cellW, cellH);
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cell.x, cell.y, cellW, cellH);
+
+    // labels + numbers
+    if (showText){
+      const lum = luminance(col);
+      ctx.fillStyle = lum < 140 ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.82)';
+
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.font = '600 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      ctx.fillText(cell.name, cell.x + 10, cell.y + 8);
+
+      const sign = (!showSign || !isFinite(cell.v)) ? '' : (cell.v > 0 ? '↑' : (cell.v < 0 ? '↓' : '•'));
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '700 22px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      ctx.fillText(fmtNum(cell.v), cell.x + cellW*0.5, cell.y + cellH*0.52);
+      if (showSign){
+        ctx.font = '700 18px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+        ctx.fillText(sign, cell.x + cellW*0.5, cell.y + cellH*0.76);
+      }
+    }
+  }
+
+  // legend
+  const lx = ox;
+  const ly = oy + gridH + 10;
+  const lw = gridW;
+  const lh = 10;
+  const steps = VIRIDIS.length;
+  for (let i=0;i<steps;i++){
+    ctx.fillStyle = VIRIDIS[i];
+    const x0 = lx + (i/steps)*lw;
+    const w0 = lw/steps + 1;
+    ctx.fillRect(x0, ly, w0, lh);
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(lx, ly, lw, lh);
+
+  ctx.fillStyle = 'rgba(0,0,0,0.70)';
+  ctx.font = '11px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(String(zmin.toFixed(3)), lx, ly + 12);
+  ctx.textAlign = 'right';
+  ctx.fillText(String(zmax.toFixed(3)), lx + lw, ly + 12);
+}
+
+let lastIdx = -1;
+const __PERF_KEY_PREFIX = 'pneumo_perf_component::';
+const __PERF_NAME = 'corner_heatmap_live';
+let __PERF_STATE = {
+  component: __PERF_NAME,
+  dataset_id: '',
+  ts_ms: Date.now(),
+  viewport_state: 'init',
+  wakeups: 0,
+  storage_wakeups: 0,
+  focus_wakeups: 0,
+  visibility_wakeups: 0,
+  duplicate_guard_hits: 0,
+  schedule_raf_count: 0,
+  schedule_timeout_count: 0,
+  hidden_gate_hits: 0,
+  zero_size_gate_hits: 0,
+  css_hidden_gate_hits: 0,
+  offscreen_gate_hits: 0,
+  render_count: 0,
+  idle_poll_ms: 0,
+  playing: false,
+  loop_kind: '',
+};
+function __perfBump(key, delta){
+  const add = Number.isFinite(Number(delta)) ? Number(delta) : 1;
+  __PERF_STATE[key] = Number(__PERF_STATE[key] || 0) + add;
+}
+function __perfSet(key, value){ __PERF_STATE[key] = value; }
+function __perfSyncDataset(){
+  try { __PERF_STATE.dataset_id = String((DATA && DATA.dataset_id) || datasetId || ''); } catch(_e) {}
+}
+function __perfFlush(force){
+  const now = Date.now();
+  if (!force && (now - Number(__PERF_STATE.ts_ms || 0) < 1200)) return;
+  __perfSyncDataset();
+  __PERF_STATE.ts_ms = now;
+  try { localStorage.setItem(__PERF_KEY_PREFIX + __PERF_NAME, JSON.stringify(__PERF_STATE)); } catch(_e) {}
+}
+function __setViewportState(state){
+  __PERF_STATE.viewport_state = String(state || 'unknown');
+  return __PERF_STATE.viewport_state;
+}
+function __frameInParentViewport(){
+  try {
+    const fe = window.frameElement;
+    if (!fe || !fe.getBoundingClientRect) { __setViewportState('visible'); return true; }
+    const r = fe.getBoundingClientRect();
+    const w = Number(r.width || Math.max(0, (r.right || 0) - (r.left || 0)) || 0);
+    const h = Number(r.height || Math.max(0, (r.bottom || 0) - (r.top || 0)) || 0);
+    if (w <= 2 || h <= 2) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    if ((Number(fe.clientWidth || 0) <= 2) || (Number(fe.clientHeight || 0) <= 2)) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    let hiddenByCss = false;
+    try {
+      const hostView = fe.ownerDocument && fe.ownerDocument.defaultView;
+      const cs = (hostView && hostView.getComputedStyle) ? hostView.getComputedStyle(fe) : null;
+      hiddenByCss = !!(cs && (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity || '1') === 0));
+    } catch(_cssErr) {}
+    if (hiddenByCss) { __perfBump('css_hidden_gate_hits'); __setViewportState('css_hidden'); __perfFlush(false); return false; }
+    const hostWin = (window.top && window.top !== window) ? window.top : window;
+    const vh = Number(hostWin.innerHeight || window.innerHeight || 0);
+    const vw = Number(hostWin.innerWidth || window.innerWidth || 0);
+    const margin = 64;
+    const visible = (r.bottom >= -margin) && (r.top <= vh + margin) && (r.right >= -margin) && (r.left <= vw + margin);
+    if (!visible) { __perfBump('offscreen_gate_hits'); __setViewportState('offscreen'); __perfFlush(false); return false; }
+    __setViewportState('visible');
+    return true;
+  } catch(_e) {
+    __setViewportState('visible');
+    return true;
+  }
+}
+function __canAnimateNow(){
+  if (document && document.hidden) { __perfBump('hidden_gate_hits'); __setViewportState('hidden'); __perfFlush(false); return false; }
+  return __frameInParentViewport();
+}
+function __nextIdleMs(visibleMs, hiddenMs, offscreenMs){
+  if (document && document.hidden) return hiddenMs;
+  return __frameInParentViewport() ? visibleMs : offscreenMs;
+}
+function __playDelayMs(){
+  const fpsRaw = Number(DATA.play_fps_cap);
+  if (!Number.isFinite(fpsRaw) || fpsRaw <= 0) return 0;
+  const fps = Math.max(1, Math.min(60, fpsRaw));
+  return Math.max(1, Math.round(1000 / fps));
+}
+let __LOOP_HANDLE = 0;
+let __LOOP_KIND = '';
+function __clearScheduledLoop(){
+  try {
+    if (!__LOOP_HANDLE) return;
+    if (__LOOP_KIND === 'raf' && window.cancelAnimationFrame) window.cancelAnimationFrame(__LOOP_HANDLE);
+    else clearTimeout(__LOOP_HANDLE);
+  } catch(_e) {}
+  __LOOP_HANDLE = 0;
+  __LOOP_KIND = '';
+}
+function __scheduleLoop(kind, delayMs){
+  if (__LOOP_HANDLE) __perfBump('duplicate_guard_hits');
+  __clearScheduledLoop();
+  __LOOP_KIND = String(kind || 'timeout');
+  __perfSet('loop_kind', __LOOP_KIND);
+  if (__LOOP_KIND === 'raf') {
+    __perfBump('schedule_raf_count');
+    __LOOP_HANDLE = requestAnimationFrame(tick);
+  } else {
+    const ms = Math.max(0, Number(delayMs) || 0);
+    __perfBump('schedule_timeout_count');
+    __perfSet('idle_poll_ms', ms);
+    __LOOP_HANDLE = setTimeout(tick, ms);
+  }
+  __perfFlush(false);
+}
+function __wakeLoop(){
+  __perfBump('wakeups');
+  if (__canAnimateNow()) __scheduleLoop('raf', 0);
+  else { __perfSet('idle_poll_ms', 0); __LOOP_HANDLE = null; __perfFlush(false); }
+}
+
+function tick(){
+  let active = false;
+  try {
+    let idx = 0;
+    let tval = 0.0;
+    if (DATA.sync_playhead){
+      const ph = readPlayheadState();
+      if (ph && typeof ph.idx === 'number') idx = Math.round(Number(ph.idx));
+      if (ph && typeof ph.t === 'number') tval = Number(ph.t);
+      active = !!(ph && ph.playing);
+    }
+    idx = Math.max(0, Math.min(idx, Math.max(0, timeArr.length - 1)));
+    if (timeArr && timeArr.length && idx < timeArr.length) {
+      try { tval = Number(timeArr[idx]); } catch(_e) {}
+    }
+    pillT.textContent = `t: ${tval.toFixed(3)} s`;
+    pillIdx.textContent = `idx: ${idx}`;
+
+    if (__DIRTY || idx !== lastIdx){
+      draw(idx);
+      lastIdx = idx;
+      __DIRTY = false;
+      __perfBump('render_count');
+    }
+  } catch(_e) {
+    // ignore
+  }
+  __perfSet('playing', !!active);
+  __perfFlush(false);
+  if (active && __canAnimateNow()) {
+    const playMs = __playDelayMs();
+    if (playMs > 0) __scheduleLoop('timeout', playMs);
+    else __scheduleLoop('raf', 0);
+  }
+  else {
+    __LOOP_HANDLE = null;
+  }
+}
+__wakeLoop();
+
+window.addEventListener('storage', (ev) => {
+  try {
+    const key = String(storageKey || 'pneumo_play_state');
+    if (ev && ev.key && String(ev.key) !== key) return;
+    __perfBump('storage_wakeups');
+    const ph = readPlayheadState();
+    if (ph && ph.playing) { __wakeLoop(); return; }
+    let idx = 0;
+    if (ph && ph.idx != null) idx = Math.max(0, Math.min(Number(ph.idx)||0, Math.max(0, timeArr.length - 1)));
+    const changed = idx !== lastIdx;
+    if (!changed && !__DIRTY) return;
+    __DIRTY = true;
+    if (!__canAnimateNow()) return;
+    draw(idx);
+    lastIdx = idx;
+    __DIRTY = false;
+    __perfBump('render_count');
+    __perfFlush(false);
+  } catch(_e) {}
+});
+window.addEventListener('focus', () => { try { __perfBump('focus_wakeups'); __wakeLoop(); } catch(_e) {} });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { try { __perfBump('visibility_wakeups'); __wakeLoop(); } catch(_e) {} } });
+window.addEventListener('scroll', () => { try { __wakeLoop(); } catch(_e) {} }, {passive:true});
+window.addEventListener('resize', () => { try { __wakeLoop(); } catch(_e) {} }, {passive:true});
+__perfFlush(true);
+// ----------------------------------------------------
+// Streamlit render handler
+// ----------------------------------------------------
+function applyArgs(args){
+  DATA = Object.assign(DATA, (args||{}));
+  titleEl.textContent = String(DATA.title || 'Теплокарта (4 угла)');
+  if (DATA.hint) hintEl.textContent = String(DATA.hint);
+
+  timeArr = Array.isArray(DATA.time) ? DATA.time : [];
+  series = (DATA.series && typeof DATA.series === 'object') ? DATA.series : {};
+
+  storageKey = String(DATA.playhead_storage_key || 'pneumo_play_state');
+  datasetId = String(DATA.dataset_id || '');
+
+  showText = Boolean(DATA.show_text !== false);
+  showSign = Boolean(DATA.show_sign !== false);
+  digits = (typeof DATA.digits === 'number') ? Math.max(0, Math.min(6, Math.floor(DATA.digits))) : 3;
+
+  // range
+  let lo = Number(DATA.zmin);
+  let hi = Number(DATA.zmax);
+  if (!isFinite(lo) || !isFinite(hi) || lo === hi){
+    // derive from current arrays (robust-ish)
+    let vals = [];
+    ['ЛП','ПП','ЛЗ','ПЗ'].forEach((k)=>{
+      const arr = series[k];
+      if (Array.isArray(arr)){
+        for (let i=0;i<arr.length;i++){
+          const v = Number(arr[i]);
+          if (isFinite(v)) vals.push(v);
+        }
+      }
+    });
+    if (vals.length){
+      vals.sort((a,b)=>a-b);
+      const q = (p)=>{
+        const j = Math.floor((p/100)*(vals.length-1));
+        return vals[Math.max(0, Math.min(vals.length-1, j))];
+      };
+      lo = q(2);
+      hi = q(98);
+      if (!isFinite(lo) || !isFinite(hi) || lo===hi){
+        lo = Math.min(...vals);
+        hi = Math.max(...vals);
+      }
+    } else {
+      lo = -1; hi = 1;
+    }
+  }
+  zmin = lo; zmax = hi;
+
+  pillUnit.textContent = String(DATA.unit || '').trim() ? String(DATA.unit) : 'unit';
+  pillRange.textContent = `range: ${zmin.toFixed(3)} .. ${zmax.toFixed(3)}`;
+
+  // height
+  const h = (typeof DATA.height === 'number') ? Math.max(180, Math.min(900, Math.floor(DATA.height))) : 300;
+  // set wrap height
+  wrap.style.height = h + 'px';
+  setFrameHeight(h + 10 + 28); // header+hint approx
+
+  __DIRTY = true;
+}
+
+window.addEventListener('message', (event) => {
+  const d = event.data;
+  if (!d || !d.isStreamlitMessage) return;
+  if (d.type === 'streamlit:render'){
+    __stHasRender = true;
+    try { applyArgs(d.args || {}); } catch(e) {}
+  }
+});
+
+</script>
+</body>
+</html>

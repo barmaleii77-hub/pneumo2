@@ -1,0 +1,1774 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    :root{
+      --bg:#ffffff;
+      --panel:rgba(255,255,255,0.92);
+      --border:#e6e6e6;
+      --text:#222;
+      --muted:#666;
+      --accent:rgba(0,120,255,0.9);
+      --road:rgba(80,80,80,0.55);
+      --wheel:rgba(20,20,20,0.85);
+      --body:rgba(0,0,0,0.85);
+      --hint:rgba(0,0,0,0.55);
+    }
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);}
+    .root{position:relative;width:100%;height:100vh;overflow:hidden;}
+    canvas{display:block;width:100%;height:100%;background:var(--bg);}
+    .hud{
+      position:absolute;left:10px;top:10px;min-width:220px;
+      background:var(--panel);border:1px solid var(--border);border-radius:10px;
+      padding:10px 10px;box-shadow:0 2px 10px rgba(0,0,0,0.06);
+      color:var(--text);user-select:none;
+    }
+    .hud .title{font-weight:650;font-size:14px;margin-bottom:6px;}
+    .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0;}
+    button{
+      font:inherit;font-size:12px;padding:6px 8px;border-radius:8px;
+      border:1px solid var(--border);background:#fff;cursor:pointer;
+    }
+    button:disabled{opacity:0.55;cursor:not-allowed;}
+    button.rec-on{background:#ffefef;border-color:#ff4d4d;color:#b30000;font-weight:700;}
+    select{
+      font:inherit;font-size:12px;padding:6px 8px;border-radius:8px;
+      border:1px solid var(--border);background:#fff;cursor:pointer;
+    }
+
+    button:hover{border-color:#cfcfcf}
+    .pill{
+      display:inline-block;font-size:12px;padding:3px 8px;border-radius:999px;
+      background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.06);
+      color:var(--muted);
+    }
+    .hint{font-size:12px;color:var(--hint);line-height:1.25;margin-top:6px;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+    .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;
+         border:1px solid rgba(0,0,0,0.15);border-bottom-width:2px;border-radius:6px;
+         padding:1px 6px;background:rgba(255,255,255,0.75);}
+  
+    .tooltip{
+      position:fixed;
+      left:0; top:0;
+      transform: translate(12px,12px);
+      background:rgba(255,255,255,0.96);
+      border:1px solid rgba(0,0,0,0.14);
+      border-radius:10px;
+      padding:8px 10px;
+      font-size:12px;
+      color:#111;
+      box-shadow:0 6px 24px rgba(0,0,0,0.12);
+      pointer-events:none;
+      display:none;
+      z-index:9999;
+      max-width:360px;
+      line-height:1.25;
+    }
+    .tooltip .k{color:#666;}
+    .tooltip .v{font-weight:650;}
+</style>
+</head>
+<body>
+<div class="root">
+  <canvas id="cv"></canvas>
+  <div class="hud" id="hud">
+    <div class="title" id="title">Механика 3D (wireframe)</div>
+    <div class="row">
+      <button id="btnIso">ISO</button>
+      <button id="btnTop">TOP</button>
+      <button id="btnFront">FRONT</button>
+      <button id="btnSide">SIDE</button>
+      <button id="btnReset">RESET</button>
+    </div>
+    <div class="row">
+      <button id="btnShot" title="Сохранить кадр PNG">PNG</button>
+      <button id="btnRec" title="Запись видео WebM (canvas.captureStream)">REC</button>
+      <button id="btnStop" title="Остановить запись" disabled>STOP</button>
+      <select id="selFps" title="FPS записи">
+        <option value="15">15 fps</option>
+        <option value="30" selected>30 fps</option>
+        <option value="60">60 fps</option>
+      </select>
+    </div>
+    <div class="row">
+      <span class="pill" id="pillIdx">idx: 0</span>
+      <span class="pill" id="pillT">t: 0.00s</span>
+    </div>
+    <div class="row">
+      <span class="pill" id="pillV">v: 0.00 m/s</span>
+      <span class="pill" id="pillSteer">steer: 0.0°</span>
+      <span class="pill" id="pillFps">fps: 0</span>
+      <span class="pill" id="pillSeg">seg: –</span>
+    </div>
+    <div class="row">
+      <span class="pill mono" id="pillCam">cam</span>
+    </div>
+    <div class="row" id="rowGap" style="display:none;">
+      <span class="pill mono" id="pillGapNow">gap</span>
+    </div>
+    <div class="row" id="rowMinGap" style="display:none;">
+      <span class="pill mono" id="pillMinGap">min-gap</span>
+    </div>
+    <div class="row" id="rowStatus" style="display:none;">
+      <span class="pill mono" id="pillStatus">status</span>
+    </div>
+    <div class="hint">
+      Drag: <span class="kbd">LMB</span> rotate · <span class="kbd">RMB</span> / <span class="kbd">Shift</span>+Drag pan · Wheel: zoom · Click: pick wheel/axle · REC: WebM · Double‑click: reset view
+    </div>
+  </div>
+  <div id="tooltip" class="tooltip"></div>
+</div>
+
+<script>
+/**
+ * Streamlit component wiring (no external libs).
+ * Receives args via postMessage: {type:"streamlit:render", args:{...}}
+ * Can (optionally) send value back via "streamlit:setComponentValue".
+ */
+function sendValue(value) {
+  const msg = {isStreamlitMessage:true, type:"streamlit:setComponentValue", value:value};
+  parent.postMessage(msg, "*");
+}
+function setFrameHeight(height) {
+  const msg = {isStreamlitMessage:true, type:"streamlit:setFrameHeight", height: height};
+  parent.postMessage(msg, "*");
+}
+let __stHasRender = false;
+let __stReadyTries = 0;
+let __stReadyTimer = null;
+function componentReady() {
+  // IMPORTANT: Streamlit expects apiVersion in the componentReady handshake.
+  // Without it, Streamlit may show: "Unrecognized component API version: 'undefined'".
+  const msg = {isStreamlitMessage:true, type:"streamlit:componentReady", apiVersion: 1, args: { apiVersion: 1 }};
+  parent.postMessage(msg, "*");
+}
+function startReadyPinger() {
+  if (__stReadyTimer) return;
+  __stReadyTimer = setInterval(() => {
+    if (__stHasRender) {
+      clearInterval(__stReadyTimer);
+      __stReadyTimer = null;
+      return;
+    }
+    __stReadyTries += 1;
+    if (__stReadyTries > 50) {
+      clearInterval(__stReadyTimer);
+      __stReadyTimer = null;
+      return;
+    }
+    try { componentReady(); } catch (e) { console.error(e); }
+  }, 200);
+}
+
+// Send ready handshake as early as possible (and retry until first render)
+try { componentReady(); } catch (e) { console.error(e); }
+startReadyPinger();
+
+const cv = document.getElementById("cv");
+
+// Low‑power rendering: when paused we avoid continuous redraws.
+// Redraw is triggered by: playing, dragging, frame index change, resize, or user interactions.
+let __DIRTY = true;
+let __LAST_IDX = -1;
+let __LAST_W = 0;
+let __LAST_H = 0;
+// В паузе нет смысла часто перерисовывать — снижает GPU нагрузку.
+const __PAUSE_POLL_MS = 10000;
+function markDirty(){ __DIRTY = true; try { if (!__RENDER_HANDLE) __wakeRender(); } catch(_e) {} }
+["mousedown","mousemove","mouseup","wheel","click","dblclick","contextmenu","keydown","keyup","touchstart","touchmove","touchend"].forEach((ev)=>{
+  try { cv.addEventListener(ev, markDirty, {passive:true}); } catch(e) { cv.addEventListener(ev, markDirty); }
+});
+window.addEventListener("resize", markDirty);
+document.addEventListener("visibilitychange", markDirty);
+
+const ctx = cv.getContext("2d");
+const hud = document.getElementById("hud");
+const titleEl = document.getElementById("title");
+const pillIdx = document.getElementById("pillIdx");
+const pillT = document.getElementById("pillT");
+const pillV = document.getElementById("pillV");
+const pillSteer = document.getElementById("pillSteer");
+const pillFps = document.getElementById("pillFps");
+const pillSeg = document.getElementById("pillSeg");
+const pillCam = document.getElementById("pillCam");
+const rowGap = document.getElementById("rowGap");
+const rowMinGap = document.getElementById("rowMinGap");
+const pillGapNow = document.getElementById("pillGapNow");
+const pillMinGap = document.getElementById("pillMinGap");
+const tooltipEl = document.getElementById("tooltip");
+const rowStatus = document.getElementById("rowStatus");
+const pillStatus = document.getElementById("pillStatus");
+
+const btnIso = document.getElementById("btnIso");
+const btnTop = document.getElementById("btnTop");
+const btnFront = document.getElementById("btnFront");
+const btnSide = document.getElementById("btnSide");
+const btnReset = document.getElementById("btnReset");
+const btnShot = document.getElementById("btnShot");
+const btnRec = document.getElementById("btnRec");
+const btnStop = document.getElementById("btnStop");
+const selFps = document.getElementById("selFps");
+
+// --- Export: PNG snapshot + WebM recording (v7.31)
+let mediaRecorder = null;
+let recChunks = [];
+let recActive = false;
+
+function safeName(prefix, ext){
+  const ts = new Date().toISOString().replace(/[:.]/g,"-");
+  return `${prefix}_${ts}.${ext}`;
+}
+
+function downloadBlob(blob, filename){
+  try{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 1500);
+  }catch(e){
+    console.warn("downloadBlob failed", e);
+  }
+}
+
+function shotPNG(){
+  try{
+    const url = cv.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = safeName("mech3d", "png");
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }catch(e){
+    console.warn("PNG snapshot failed", e);
+    alert("PNG snapshot failed: " + e);
+  }
+}
+
+function pickMime(){
+  try{
+    if (typeof MediaRecorder === "undefined") return "";
+    const cands = [
+      "video/webm;codecs=vp9",
+      "video/webm;codecs=vp8",
+      "video/webm"
+    ];
+    for (const t of cands){
+      if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) return t;
+    }
+  }catch(_e){}
+  return "";
+}
+
+function startRec(){
+  if (recActive) return;
+  if (!cv.captureStream){
+    alert("Ваш браузер не поддерживает canvas.captureStream()");
+    return;
+  }
+  if (typeof MediaRecorder === "undefined"){
+    alert("Ваш браузер не поддерживает MediaRecorder");
+    return;
+  }
+  const fps = Math.max(5, Math.min(120, parseInt(selFps.value || "30", 10)));
+  const stream = cv.captureStream(fps);
+  const mimeType = pickMime();
+  const opts = {};
+  if (mimeType) opts.mimeType = mimeType;
+  // bitrate: leave default (browser decides). Can be extended later.
+  try{
+    mediaRecorder = new MediaRecorder(stream, opts);
+  }catch(e){
+    console.warn("MediaRecorder init failed", e);
+    alert("MediaRecorder init failed: " + e);
+    return;
+  }
+  recChunks = [];
+  mediaRecorder.ondataavailable = (e)=>{
+    if (e.data && e.data.size > 0) recChunks.push(e.data);
+  };
+  mediaRecorder.onstop = ()=>{
+    try{
+      const blob = new Blob(recChunks, {type: (mediaRecorder && mediaRecorder.mimeType) ? mediaRecorder.mimeType : "video/webm"});
+      downloadBlob(blob, safeName("mech3d", "webm"));
+    }catch(e){
+      console.warn("save record failed", e);
+    }
+  };
+  try{
+    mediaRecorder.start(200); // collect chunks
+    recActive = true;
+    btnRec.classList.add("rec-on");
+    btnRec.textContent = "REC●";
+    btnStop.disabled = false;
+  }catch(e){
+    console.warn("start record failed", e);
+    alert("start record failed: " + e);
+  }
+}
+
+function stopRec(){
+  if (!recActive) return;
+  try{
+    if (mediaRecorder && mediaRecorder.state !== "inactive"){
+      mediaRecorder.stop();
+    }
+  }catch(e){
+    console.warn("stop record failed", e);
+  }
+  recActive = false;
+  btnRec.classList.remove("rec-on");
+  btnRec.textContent = "REC";
+  btnStop.disabled = true;
+}
+
+if (btnShot) btnShot.onclick = shotPNG;
+if (btnRec) btnRec.onclick = startRec;
+if (btnStop) btnStop.onclick = stopRec;
+
+
+let DATA = null;
+let timeArr = [];
+let wheel = null;
+let road = null;
+let bodyZ = [];
+let phiArr = [];
+let thetaArr = [];
+let path = null; // {x,z,yaw,s}
+let geo = null;  // {track_m, base_m, wheel_radius_m, wheel_width_m, body_L, body_W, body_H, wheel_center_offset_m, body_y_offset_m}
+let options = null;
+let datasetId = null;
+let storageKey = "pneumo_play_state";
+
+// Track dataset / commands to allow safe resets
+let _lastDatasetId = null;
+let _lastCmdTs = null;
+
+
+// Camera state (orbit around target)
+let camAz = Math.PI * 0.25;   // around Y
+let camEl = Math.PI * 0.22;   // elevation
+let camDist = 8.0;            // meters
+let camOrtho = false;
+
+// Pan in screen pixels (applies to ISO view).
+let panX = 0;
+let panY = 0;
+let dragMode = "rotate"; // rotate|pan
+let isoRect = null; // {x,y,w,h} when multi-view is on
+
+let targetSmooth = null; // smoothed camera target (v7.30)
+
+
+// Selection / picking (shared between 2D+3D mech views via Streamlit session_state)
+let SELECTED = [];            // list of selected corners ["ЛП","ПП",...]
+let PICK_VIEW = null;         // last interactive view transform (for click picking)
+let LAST_WHEEL_CENTERS = null; // corner -> [x,y,z] at current frame
+let HOVER = null;             // {kind:'corner'|'axle', name}
+let lastMouseClientX = 0, lastMouseClientY = 0;
+
+
+// Click vs drag disambiguation
+let downX = 0, downY = 0;
+let dragMoved = false;
+
+
+let dragging = false;
+let lastX = 0, lastY = 0;
+let lastDrawTs = 0;
+let fpsEma = 0;
+let fpsLastTs = 0;
+
+// Resize handling
+function resizeCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  const rect = cv.getBoundingClientRect();
+  const w = Math.max(10, Math.floor(rect.width));
+  const h = Math.max(10, Math.floor(rect.height));
+  if (w !== __LAST_W || h !== __LAST_H) { __DIRTY = true; }
+  cv.width = Math.floor(w * dpr);
+  cv.height = Math.floor(h * dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+new ResizeObserver(resizeCanvas).observe(document.querySelector(".root"));
+
+// ---------- math helpers ----------
+function v(x,y,z){return [x,y,z];}
+function add(a,b){return [a[0]+b[0], a[1]+b[1], a[2]+b[2]];}
+function sub(a,b){return [a[0]-b[0], a[1]-b[1], a[2]-b[2]];}
+function mul(a,s){return [a[0]*s, a[1]*s, a[2]*s];}
+function dot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
+function cross(a,b){return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];}
+function norm(a){return Math.sqrt(dot(a,a));}
+function normalize(a){const n=norm(a)||1e-9;return [a[0]/n,a[1]/n,a[2]/n];}
+
+function rotY(a,p){ // around Y (up)
+  const c=Math.cos(a), s=Math.sin(a);
+  return [ c*p[0] + s*p[2], p[1], -s*p[0] + c*p[2] ];
+}
+function rotX(a,p){ // around X (forward)
+  const c=Math.cos(a), s=Math.sin(a);
+  return [ p[0], c*p[1] - s*p[2], s*p[1] + c*p[2] ];
+}
+function rotZ(a,p){ // around Z (right)
+  const c=Math.cos(a), s=Math.sin(a);
+  return [ c*p[0] - s*p[1], s*p[0] + c*p[1], p[2] ];
+}
+
+function applyBodyRot(pLocal, yaw, pitch, roll) {
+  // Order: yaw(Y) -> pitch(Z) -> roll(X)
+  let p = pLocal;
+  p = rotY(yaw, p);
+  p = rotZ(pitch, p);
+  p = rotX(roll, p);
+  return p;
+}
+
+// Camera basis from orbit params
+function cameraFromTarget(target, headingYaw) {
+  const ce = Math.max(-Math.PI*0.49, Math.min(Math.PI*0.49, camEl));
+  const ca = camAz + (headingYaw || 0.0);
+  const R = Math.max(0.8, camDist);
+  const cam = [
+    target[0] + R*Math.cos(ce)*Math.cos(ca),
+    target[1] + R*Math.sin(ce),
+    target[2] + R*Math.cos(ce)*Math.sin(ca),
+  ];
+  const fwd = normalize(sub(target, cam));          // towards target
+  const up0 = [0,1,0];
+  const right = normalize(cross(up0, fwd));
+  const up = cross(fwd, right);
+  return {cam, fwd, right, up};
+}
+
+function project(pWorld, camBasis, ppm, focal) {
+  const d = sub(pWorld, camBasis.cam);
+  const x = dot(d, camBasis.right);
+  const y = dot(d, camBasis.up);
+  const z = dot(d, camBasis.fwd); // distance along view dir (positive in front)
+  if (camOrtho) {
+    return {sx: x*ppm, sy: -y*ppm, z: z};
+  }
+  const zz = Math.max(0.05, z);
+  const s = (focal / zz);
+  return {sx: x*ppm*s, sy: -y*ppm*s, z: z};
+}
+
+function drawLine2D(a,b,style,width=1) {
+  ctx.strokeStyle = style;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(a[0], a[1]);
+  ctx.lineTo(b[0], b[1]);
+  ctx.stroke();
+}
+
+// ---------- wheel / body wireframe builders ----------
+function boxEdges(halfL, halfH, halfW) {
+  const V = [
+    [-halfL,-halfH,-halfW], [ halfL,-halfH,-halfW], [ halfL, halfH,-halfW], [-halfL, halfH,-halfW],
+    [-halfL,-halfH, halfW], [ halfL,-halfH, halfW], [ halfL, halfH, halfW], [-halfL, halfH, halfW],
+  ];
+  const E = [
+    [0,1],[1,2],[2,3],[3,0],
+    [4,5],[5,6],[6,7],[7,4],
+    [0,4],[1,5],[2,6],[3,7],
+  ];
+  return {V,E};
+}
+
+function wheelWire(radius, width, seg=18, spin=0.0) {
+  // returns {rings: [points], spokes: [line segments]}
+  const ptsA = [];
+  const ptsB = [];
+  for (let i=0;i<=seg;i++){
+    const a = (i/seg)*Math.PI*2 + spin;
+    const x = radius*Math.cos(a);
+    const y = radius*Math.sin(a);
+    ptsA.push([x,y,-width*0.5]);
+    ptsB.push([x,y, width*0.5]);
+  }
+  const spokes = [
+    [[0,0,-width*0.5],[radius,0,-width*0.5]],
+    [[0,0, width*0.5],[radius,0, width*0.5]],
+    [[radius,0,-width*0.5],[radius,0, width*0.5]],
+  ];
+  return {ringA:ptsA, ringB:ptsB, spokes:spokes};
+}
+
+function readPlayState() {
+  try {
+    const s = localStorage.getItem(storageKey);
+    if (!s) return null;
+    const obj = JSON.parse(s);
+    if (!obj) return null;
+    if (datasetId && obj.dataset_id && obj.dataset_id !== datasetId) return null;
+    return obj;
+  } catch(_e) { return null; }
+}
+
+// ---------- interaction ----------
+cv.addEventListener("contextmenu", (e)=>{ e.preventDefault(); });
+cv.addEventListener("mousedown", (e)=>{
+  // If multi-view is enabled, only ISO viewport is interactive.
+  try {
+    if (isoRect) {
+      const r = cv.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      const inside = (x >= isoRect.x && x <= isoRect.x + isoRect.w && y >= isoRect.y && y <= isoRect.y + isoRect.h);
+      if (!inside) return;
+    }
+  } catch(_) {}
+
+  dragging = true;
+  downX = e.clientX; downY = e.clientY; dragMoved = false;
+  lastX = e.clientX; lastY = e.clientY;
+  if (Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY) > 4) dragMoved = true;
+
+  // Pan with RMB/MMB or Shift+LMB (if allowed by geo)
+  const allowPan = !(geo && geo.allow_pan === false);
+  if (allowPan && (e.button === 2 || e.button === 1 || e.shiftKey)) {
+    dragMode = "pan";
+  } else {
+    dragMode = "rotate";
+  }
+});
+window.addEventListener("mouseup", ()=>{ dragging=false; });
+window.addEventListener("mousemove", (e)=>{
+  if (!dragging) return;
+  const dx = (e.clientX - lastX);
+  const dy = (e.clientY - lastY);
+  lastX = e.clientX; lastY = e.clientY;
+
+  if (dragMode === "pan") {
+    panX += dx;
+    panY += dy;
+    return;
+  }
+
+  camAz += dx * 0.01;
+  camEl += -dy * 0.01;
+  camEl = Math.max(-Math.PI*0.49, Math.min(Math.PI*0.49, camEl));
+});
+cv.addEventListener("wheel", (e)=>{
+  // zoom (ISO viewport only in multi-view)
+  try {
+    if (isoRect) {
+      const r = cv.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      const inside = (x >= isoRect.x && x <= isoRect.x + isoRect.w && y >= isoRect.y && y <= isoRect.y + isoRect.h);
+      if (!inside) return;
+    }
+  } catch(_) {}
+
+  e.preventDefault();
+  const dy = e.deltaY;
+  const k = Math.exp(dy * 0.001);
+  camDist = Math.max(1.0, Math.min(60.0, camDist * k));
+}, {passive:false});
+
+cv.addEventListener("dblclick", ()=>{
+  camAz = Math.PI*0.25; camEl = Math.PI*0.22; camDist = 8.0; camOrtho = false;
+  panX = 0; panY = 0;
+});
+
+cv.addEventListener("click", (e)=>{
+  // ignore click if it was a drag
+  if (dragMoved) return;
+
+  if (!PICK_VIEW || !LAST_WHEEL_CENTERS) return;
+
+  // only interactive viewport
+  const r = cv.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const y = e.clientY - r.top;
+
+  const rect = PICK_VIEW.rect || {x:0,y:0,w:cv.width,h:cv.height};
+  const inside = (x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h);
+  if (!inside) return;
+
+  function toScreenPick(pWorld){
+    const pr = project(pWorld, PICK_VIEW.camBasis, PICK_VIEW.ppm, PICK_VIEW.focal);
+    return [rect.x + rect.w*0.5 + (PICK_VIEW.panX||0) + pr.sx, rect.y + rect.h*0.55 + (PICK_VIEW.panY||0) + pr.sy];
+  }
+
+  let bestCorner = null;
+  let bestD2 = 1e18;
+  const thrWheel = 26;
+
+  for (const c of Object.keys(LAST_WHEEL_CENTERS)) {
+    const p = LAST_WHEEL_CENTERS[c];
+    const s = toScreenPick(p);
+    const dx = s[0] - x;
+    const dy = s[1] - y;
+    const d2 = dx*dx + dy*dy;
+    if (d2 < bestD2) { bestD2 = d2; bestCorner = c; }
+  }
+
+  // axle centers (front/rear) for quick selection
+  let bestAxle = null;
+  let bestAxleD2 = 1e18;
+  const thrAxle = 34;
+  try {
+    const fl = LAST_WHEEL_CENTERS["ЛП"], fr = LAST_WHEEL_CENTERS["ПП"];
+    const rl = LAST_WHEEL_CENTERS["ЛЗ"], rr = LAST_WHEEL_CENTERS["ПЗ"];
+    if (fl && fr) {
+      const f = [(fl[0]+fr[0])*0.5, (fl[1]+fr[1])*0.5, (fl[2]+fr[2])*0.5];
+      const sf = toScreenPick(f);
+      const d2 = (sf[0]-x)*(sf[0]-x) + (sf[1]-y)*(sf[1]-y);
+      bestAxle = "front"; bestAxleD2 = d2;
+    }
+    if (rl && rr) {
+      const b = [(rl[0]+rr[0])*0.5, (rl[1]+rr[1])*0.5, (rl[2]+rr[2])*0.5];
+      const sb = toScreenPick(b);
+      const d2 = (sb[0]-x)*(sb[0]-x) + (sb[1]-y)*(sb[1]-y);
+      if (d2 < bestAxleD2) { bestAxle = "rear"; bestAxleD2 = d2; }
+    }
+  } catch(_e) {}
+
+  const ts = Date.now();
+  if (bestCorner && bestD2 <= thrWheel*thrWheel) {
+    sendValue({kind:"corner", name:String(bestCorner), ts:ts, shift:!!e.shiftKey, ctrl:!!e.ctrlKey, meta:!!e.metaKey, alt:!!e.altKey, source:"mech_car3d"});
+  } else if (bestAxle && bestAxleD2 <= thrAxle*thrAxle) {
+    sendValue({kind:"axle", name:String(bestAxle), ts:ts, shift:!!e.shiftKey, ctrl:!!e.ctrlKey, meta:!!e.metaKey, alt:!!e.altKey, source:"mech_car3d"});
+  }
+});
+
+cv.addEventListener("mousemove", (e)=>{
+  lastMouseClientX = e.clientX;
+  lastMouseClientY = e.clientY;
+
+  // disable hover while dragging
+  if (dragging) return;
+
+  const hoverEnabled = !!(geo && geo.hover_tooltip);
+  if (!hoverEnabled) {
+    HOVER = null;
+    if (tooltipEl) tooltipEl.style.display = "none";
+    cv.style.cursor = "default";
+    return;
+  }
+
+  if (!PICK_VIEW || !LAST_WHEEL_CENTERS) return;
+
+  // only interactive viewport
+  try {
+    if (isoRect) {
+      const r0 = cv.getBoundingClientRect();
+      const x0 = e.clientX - r0.left;
+      const y0 = e.clientY - r0.top;
+      const inside = (x0 >= isoRect.x && x0 <= isoRect.x + isoRect.w && y0 >= isoRect.y && y0 <= isoRect.y + isoRect.h);
+      if (!inside) {
+        HOVER = null;
+        if (tooltipEl) tooltipEl.style.display = "none";
+        cv.style.cursor = "default";
+        return;
+      }
+    }
+  } catch(_e) {}
+
+  const r = cv.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const y = e.clientY - r.top;
+
+  const rect = (PICK_VIEW && PICK_VIEW.rect) ? PICK_VIEW.rect : {x:0,y:0,w:cv.width,h:cv.height};
+  function toScreenPick(pWorld){
+    const pr = project(pWorld, PICK_VIEW.camBasis, PICK_VIEW.ppm, PICK_VIEW.focal);
+    return [rect.x + rect.w*0.5 + (PICK_VIEW.panX||0) + pr.sx, rect.y + rect.h*0.55 + (PICK_VIEW.panY||0) + pr.sy];
+  }
+
+  let bestKind = null;
+  let bestName = null;
+  let bestD2 = 1e18;
+
+  const thrWheel = 26;
+  for (const c of Object.keys(LAST_WHEEL_CENTERS)) {
+    const p = LAST_WHEEL_CENTERS[c];
+    const s = toScreenPick(p);
+    const dx = s[0] - x;
+    const dy = s[1] - y;
+    const d2 = dx*dx + dy*dy;
+    if (d2 < bestD2) { bestD2 = d2; bestKind = "corner"; bestName = c; }
+  }
+
+  // axle centers
+  const thrAxle = 34;
+  try {
+    const fl = LAST_WHEEL_CENTERS["ЛП"], fr = LAST_WHEEL_CENTERS["ПП"];
+    const rl = LAST_WHEEL_CENTERS["ЛЗ"], rr = LAST_WHEEL_CENTERS["ПЗ"];
+    if (fl && fr) {
+      const f = [(fl[0]+fr[0])*0.5, (fl[1]+fr[1])*0.5, (fl[2]+fr[2])*0.5];
+      const sf = toScreenPick(f);
+      const d2 = (sf[0]-x)*(sf[0]-x) + (sf[1]-y)*(sf[1]-y);
+      if (d2 < bestD2) { bestD2 = d2; bestKind = "axle"; bestName = "front"; }
+    }
+    if (rl && rr) {
+      const b = [(rl[0]+rr[0])*0.5, (rl[1]+rr[1])*0.5, (rl[2]+rr[2])*0.5];
+      const sb = toScreenPick(b);
+      const d2 = (sb[0]-x)*(sb[0]-x) + (sb[1]-y)*(sb[1]-y);
+      if (d2 < bestD2) { bestD2 = d2; bestKind = "axle"; bestName = "rear"; }
+    }
+  } catch(_e) {}
+
+  // thresholding
+  if (bestKind === "corner" && bestD2 <= thrWheel*thrWheel) {
+    HOVER = {kind:"corner", name:String(bestName)};
+    cv.style.cursor = "pointer";
+  } else if (bestKind === "axle" && bestD2 <= thrAxle*thrAxle) {
+    HOVER = {kind:"axle", name:String(bestName)};
+    cv.style.cursor = "pointer";
+  } else {
+    HOVER = null;
+    cv.style.cursor = "default";
+    if (tooltipEl) tooltipEl.style.display = "none";
+  }
+});
+
+cv.addEventListener("mouseleave", ()=>{
+  HOVER = null;
+  cv.style.cursor = "default";
+  if (tooltipEl) tooltipEl.style.display = "none";
+});
+
+
+btnIso.onclick = ()=>{ camAz = Math.PI*0.25; camEl = Math.PI*0.22; camDist = 8.0; };
+btnTop.onclick = ()=>{ camAz = Math.PI*0.25; camEl = Math.PI*0.49; camDist = 10.0; };
+btnFront.onclick = ()=>{ camAz = 0.0; camEl = Math.PI*0.18; camDist = 10.0; };
+btnSide.onclick = ()=>{ camAz = Math.PI*0.5; camEl = Math.PI*0.15; camDist = 10.0; };
+btnReset.onclick = ()=>{ camAz = Math.PI*0.25; camEl = Math.PI*0.22; camDist = 8.0; camOrtho=false; panX=0; panY=0; };
+
+
+// ---------- precompute helpers ----------
+let WHEEL_S = null; // per-wheel cumulative distance for spin (meters)
+function wheelXZ_given(i, corner, yaw_i, xOff, zOff){
+  const xo = (xOff && xOff[corner] != null) ? Number(xOff[corner]) : 0.0;
+  const zo = (zOff && zOff[corner] != null) ? Number(zOff[corner]) : 0.0;
+  const offs = rotY(Number(yaw_i||0.0), [xo, 0.0, zo]);
+  const xb = (path && path.x && path.x[i]!=null) ? Number(path.x[i]) : 0.0;
+  const zb = (path && path.z && path.z[i]!=null) ? Number(path.z[i]) : 0.0;
+  return {x: xb + offs[0], z: zb + offs[2]};
+}
+
+function recomputeWheelS(){
+  WHEEL_S = null;
+  if (!path || !Array.isArray(timeArr) || timeArr.length < 2) return;
+  if (!Array.isArray(path.x) || !Array.isArray(path.z)) return;
+  const n = timeArr.length;
+  const corners = ["ЛП","ПП","ЛЗ","ПЗ"];
+
+  const base_m = (geo && typeof geo.base_m === "number") ? geo.base_m : 2.8;
+  const track_m = (geo && typeof geo.track_m === "number") ? geo.track_m : 1.6;
+  const xOff = (geo && geo.wheel_x_off_m) ? geo.wheel_x_off_m : {"ЛП": base_m*0.5, "ПП": base_m*0.5, "ЛЗ": -base_m*0.5, "ПЗ": -base_m*0.5};
+  const zOff = (geo && geo.wheel_z_off_m) ? geo.wheel_z_off_m : {"ЛП": -track_m*0.5, "ПП": track_m*0.5, "ЛЗ": -track_m*0.5, "ПЗ": track_m*0.5};
+
+  const yawArr = (path && Array.isArray(path.yaw) && path.yaw.length === n) ? path.yaw : null;
+
+  const out = {};
+  for (const c of corners){
+    const arr = new Array(n);
+    arr[0] = 0.0;
+    let acc = 0.0;
+    let prev = wheelXZ_given(0, c, yawArr ? yawArr[0] : 0.0, xOff, zOff);
+    for (let i=1;i<n;i++){
+      const cur = wheelXZ_given(i, c, yawArr ? yawArr[i] : 0.0, xOff, zOff);
+      acc += Math.hypot(cur.x - prev.x, cur.z - prev.z);
+      arr[i] = acc;
+      prev = cur;
+    }
+    out[c] = arr;
+  }
+  WHEEL_S = out;
+}
+
+// ---------- render loop ----------
+const __PERF_KEY_PREFIX = 'pneumo_perf_component::';
+const __PERF_NAME = 'mech_car3d';
+let __PERF_STATE = {
+  component: __PERF_NAME,
+  dataset_id: '',
+  ts_ms: Date.now(),
+  viewport_state: 'init',
+  wakeups: 0,
+  storage_wakeups: 0,
+  focus_wakeups: 0,
+  visibility_wakeups: 0,
+  duplicate_guard_hits: 0,
+  schedule_raf_count: 0,
+  schedule_timeout_count: 0,
+  hidden_gate_hits: 0,
+  zero_size_gate_hits: 0,
+  css_hidden_gate_hits: 0,
+  offscreen_gate_hits: 0,
+  render_count: 0,
+  idle_poll_ms: 0,
+  playing: false,
+  loop_kind: '',
+  fps_ema: 0,
+};
+function __perfBump(key, delta){
+  const add = Number.isFinite(Number(delta)) ? Number(delta) : 1;
+  __PERF_STATE[key] = Number(__PERF_STATE[key] || 0) + add;
+}
+function __perfSet(key, value){ __PERF_STATE[key] = value; }
+function __perfSyncDataset(){
+  try { __PERF_STATE.dataset_id = String(datasetId || (DATA && DATA.dataset_id) || ''); } catch(_e) {}
+}
+function __perfFlush(force){
+  const now = Date.now();
+  if (!force && (now - Number(__PERF_STATE.ts_ms || 0) < 1200)) return;
+  __perfSyncDataset();
+  __PERF_STATE.ts_ms = now;
+  try { localStorage.setItem(__PERF_KEY_PREFIX + __PERF_NAME, JSON.stringify(__PERF_STATE)); } catch(_e) {}
+}
+function __setViewportState(state){ __PERF_STATE.viewport_state = String(state || 'unknown'); return __PERF_STATE.viewport_state; }
+function __frameInParentViewport(){
+  try {
+    const fe = window.frameElement;
+    if (!fe || !fe.getBoundingClientRect) { __setViewportState('visible'); return true; }
+    const r = fe.getBoundingClientRect();
+    const w = Number(r.width || Math.max(0, (r.right || 0) - (r.left || 0)) || 0);
+    const h = Number(r.height || Math.max(0, (r.bottom || 0) - (r.top || 0)) || 0);
+    if (w <= 2 || h <= 2) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    if ((Number(fe.clientWidth || 0) <= 2) || (Number(fe.clientHeight || 0) <= 2)) { __perfBump('zero_size_gate_hits'); __setViewportState('zero_size'); __perfFlush(false); return false; }
+    let hiddenByCss = false;
+    try {
+      const hostView = fe.ownerDocument && fe.ownerDocument.defaultView;
+      const cs = (hostView && hostView.getComputedStyle) ? hostView.getComputedStyle(fe) : null;
+      hiddenByCss = !!(cs && (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity || '1') === 0));
+    } catch(_cssErr) {}
+    if (hiddenByCss) { __perfBump('css_hidden_gate_hits'); __setViewportState('css_hidden'); __perfFlush(false); return false; }
+    const hostWin = (window.top && window.top !== window) ? window.top : window;
+    const vh = Number(hostWin.innerHeight || window.innerHeight || 0);
+    const vw = Number(hostWin.innerWidth || window.innerWidth || 0);
+    const margin = 64;
+    const visible = (r.bottom >= -margin) && (r.top <= vh + margin) && (r.right >= -margin) && (r.left <= vw + margin);
+    if (!visible) { __perfBump('offscreen_gate_hits'); __setViewportState('offscreen'); __perfFlush(false); return false; }
+    __setViewportState('visible');
+    return true;
+  } catch(_e) {
+    __setViewportState('visible');
+    return true;
+  }
+}
+function __canAnimateNow(){
+  if (document && document.hidden) { __perfBump('hidden_gate_hits'); __setViewportState('hidden'); __perfFlush(false); return false; }
+  return __frameInParentViewport();
+}
+function __nextIdleMs(visibleMs, hiddenMs, offscreenMs){
+  if (document && document.hidden) return hiddenMs;
+  return __frameInParentViewport() ? visibleMs : offscreenMs;
+}
+let __RENDER_HANDLE = 0;
+let __RENDER_KIND = '';
+function __clearScheduledRender(){
+  try {
+    if (!__RENDER_HANDLE) return;
+    if (__RENDER_KIND === 'raf' && window.cancelAnimationFrame) window.cancelAnimationFrame(__RENDER_HANDLE);
+    else clearTimeout(__RENDER_HANDLE);
+  } catch(_e) {}
+  __RENDER_HANDLE = 0;
+  __RENDER_KIND = '';
+}
+function __scheduleRender(kind, delayMs){
+  if (__RENDER_HANDLE) __perfBump('duplicate_guard_hits');
+  __clearScheduledRender();
+  if (kind === 'raf') {
+    __RENDER_KIND = 'raf';
+    __perfBump('schedule_raf_count');
+    __RENDER_HANDLE = requestAnimationFrame(renderFrame);
+  } else {
+    __RENDER_KIND = 'timeout';
+    const ms = Math.max(0, Number(delayMs) || 0);
+    __perfBump('schedule_timeout_count');
+    __perfSet('idle_poll_ms', ms);
+    __RENDER_HANDLE = setTimeout(renderFrame, ms);
+  }
+  __perfSet('loop_kind', __RENDER_KIND);
+  __perfFlush(false);
+}
+function __wakeRender(){
+  __perfBump('wakeups');
+  if (__canAnimateNow()) __scheduleRender('raf', 0);
+  else { __perfSet('idle_poll_ms', 0); __RENDER_HANDLE = null; __perfFlush(false); }
+}
+
+function renderFrame() {
+  const rect = cv.getBoundingClientRect();
+  const W = rect.width, H = rect.height;
+  if (W < 10 || H < 10) { __perfSet('playing', false); __perfFlush(false); __perfSet('idle_poll_ms', 0); __RENDER_HANDLE = null; return; }
+
+  if (!DATA || timeArr.length === 0 || !geo) {
+  __perfSet('playing', false);
+  ctx.save();
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = "#fff";
+  ctx.font = "14px system-ui";
+  ctx.fillText("Нет данных для 3D: сначала посчитайте baseline/детальный лог.", 10, 22);
+  ctx.restore();
+  __perfFlush(false);
+  __RENDER_HANDLE = null;
+  return;
+}
+
+const ps = readPlayState();
+  const playing = !!(ps && ps.playing);
+  __perfSet('playing', playing);
+
+  let idx = 0;
+  if (ps && typeof ps.idx === "number") idx = Math.max(0, Math.min(timeArr.length-1, ps.idx|0));
+
+  // Idle fast-path: paused + nothing changed -> don't redraw (saves GPU).
+  if (!playing && !dragging && !__DIRTY && timeArr.length > 0 && idx === __LAST_IDX) {
+    __RENDER_HANDLE = null;
+    __perfSet('idle_poll_ms', 0);
+    __perfFlush(false);
+    return;
+  }
+
+  // --- FPS throttle ---
+  const nowPerf = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  const minDt = playing ? (1000/60) : (1000/8);
+  if (nowPerf - lastDrawTs < minDt) {
+    if ((playing || dragging) && __canAnimateNow()) {
+      __scheduleRender('raf', 0);
+    } else {
+      __RENDER_HANDLE = null;
+    }
+    return;
+  }
+  if (lastDrawTs > 0) {
+    const instFps = 1000.0 / Math.max(1e-3, nowPerf - lastDrawTs);
+    fpsEma = (fpsEma > 0) ? (0.88 * fpsEma + 0.12 * instFps) : instFps;
+  }
+  __perfSet('fps_ema', Number(fpsEma || 0));
+  lastDrawTs = nowPerf;
+  if (pillFps) pillFps.textContent = "fps: " + (fpsEma > 0 ? fpsEma.toFixed(1) : "0");
+  // Clear + simple background grid
+  ctx.clearRect(0,0,W,H);
+  ctx.save();
+  ctx.strokeStyle = "#0d1222";
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.04;
+  const step = 32;
+  for (let x=0; x<=W; x+=step) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y=0; y<=H; y+=step) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  ctx.restore();
+
+
+
+  const t = timeArr[idx] || 0.0;
+
+  // Optional arrays for HUD (if provided by Python)
+  const steerHud = (path && path.steer && path.steer[idx] != null) ? path.steer[idx] : 0.0;
+  const vHud = (path && path.v && path.v[idx] != null) ? path.v[idx] : null;
+
+  pillIdx.textContent = "idx: " + idx;
+  pillT.textContent = "t: " + (t.toFixed(2)) + "s";
+  if (pillV) pillV.textContent = (vHud==null) ? "v: n/a" : ("v: " + vHud.toFixed(2) + " m/s");
+  if (pillSteer) pillSteer.textContent = "steer: " + (steerHud * 180/Math.PI).toFixed(1) + "°";
+  pillCam.textContent = (camOrtho ? "ORT" : "PERSP") + " az=" + (camAz*180/Math.PI).toFixed(0) + " el=" + (camEl*180/Math.PI).toFixed(0) + " d=" + camDist.toFixed(1);
+
+  // Optional: small on-canvas debug overlay (helps when users think 3D is "out of canvas")
+  if (geo && geo.debug_overlay) {
+    ctx.save();
+    ctx.fillStyle = "#000";
+    ctx.font = "12px monospace";
+    ctx.fillText("3D DEBUG: dataset=" + (datasetId||"n/a") + " idx=" + idx + " t=" + (t.toFixed(2)) + "s", 10, 18);
+    ctx.restore();
+  }
+
+
+  // read signals
+  const ySign = (geo && typeof geo.y_sign === "number") ? geo.y_sign : 1.0;
+  const bodyYOffset = (geo.body_y_offset_m ?? 0.0);
+  const rWheel = geo.wheel_radius_m ?? 0.32;
+  const roadYOffset = (typeof geo.road_y_offset_m === "number") ? geo.road_y_offset_m : 0.0;
+  const roadSubtractR = !!geo.road_subtract_radius;
+
+  const zBody = ((bodyZ[idx] ?? 0.0) * ySign) + bodyYOffset;
+  const roll = (phiArr[idx] ?? 0.0) * (geo.roll_sign ?? 1.0);
+  const pitch = (thetaArr[idx] ?? 0.0) * (geo.pitch_sign ?? 1.0);
+  const yaw = (path && path.yaw && path.yaw[idx] != null) ? path.yaw[idx] : 0.0;
+  const steer = (path && path.steer && path.steer[idx] != null) ? path.steer[idx] : 0.0;
+  const xBody = (path && path.x && path.x[idx] != null) ? path.x[idx] : 0.0;
+  const zBodyLat = (path && path.z && path.z[idx] != null) ? path.z[idx] : 0.0;
+  const sBody = (path && path.s && path.s[idx] != null) ? path.s[idx] : xBody;
+
+  const followCar = (geo && (geo.camera_follow === false || geo.camera_follow === true)) ? !!geo.camera_follow : false;
+  const followSelected = !!(geo && geo.camera_follow_selected);
+  let target = followCar ? [xBody, zBody, zBodyLat] : [0, zBody, 0];
+  const headingYaw = (geo && geo.camera_follow_heading) ? yaw : 0.0;
+
+  // scaling baseline (used per-viewport)
+  const bodyL = (geo && typeof geo.body_L_m === "number") ? Math.max(0.0, geo.body_L_m) : 0.0;
+
+  // Gather WORLD segments, then project per-view (supports multi-view)
+  const segsW = [];
+
+  function addSeg(p0, p1, color, width=1) {
+    segsW.push({p0:p0, p1:p1, color:color, width:width});
+  }
+
+  function makeCamBasis(target, headingYawLocal, az, el, dist) {
+    const ce = Math.max(-Math.PI*0.49, Math.min(Math.PI*0.49, el));
+    const ca = az + (headingYawLocal || 0.0);
+    const R = Math.max(0.8, dist);
+    const cam = [
+      target[0] + R*Math.cos(ce)*Math.cos(ca),
+      target[1] + R*Math.sin(ce),
+      target[2] + R*Math.cos(ce)*Math.sin(ca),
+    ];
+    const fwd = normalize(sub(target, cam));
+    const up0 = [0,1,0];
+    const right = normalize(cross(up0, fwd));
+    const up = cross(fwd, right);
+    return {cam, fwd, right, up};
+  }
+
+  function drawView(viewRect, az, el, dist, panPxX, panPxY, headingYawLocal, doSort=true) {
+    const camBasisV = makeCamBasis(target, headingYawLocal, az, el, dist);
+    const ppmV = Math.min(viewRect.w, viewRect.h) / Math.max(3.0, bodyL*2.8);
+    const focalV = Math.max(0.6, viewRect.w * 0.75 / ppmV);
+
+    function toScreenV(pWorld) {
+      const pr = project(pWorld, camBasisV, ppmV, focalV);
+      return [viewRect.x + viewRect.w*0.5 + panPxX + pr.sx, viewRect.y + viewRect.h*0.55 + panPxY + pr.sy, pr.z];
+    }
+
+    // build screen segs for this view
+    const segs = [];
+    for (const s of segsW) {
+      const a = toScreenV(s.p0);
+      const b = toScreenV(s.p1);
+      const zavg = (a[2] + b[2]) * 0.5;
+      segs.push({a:a, b:b, z:zavg, color:s.color, width:s.width});
+    }
+    if (doSort) segs.sort((a,b)=> b.z - a.z);
+
+    // clip to view rect
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(viewRect.x, viewRect.y, viewRect.w, viewRect.h);
+    ctx.clip();
+
+    for (const s of segs) {
+      drawLine2D([s.a[0], s.a[1]], [s.b[0], s.b[1]], s.color, s.width);
+    }
+
+    ctx.restore();
+    return {camBasis: camBasisV, ppm: ppmV, focal: focalV, rect: viewRect, panX: panPxX, panY: panPxY, headingYaw: headingYawLocal};
+  }
+  // Axes at target
+  const axLen = Math.max(1.0, bodyL*0.6);
+  addSeg(target, add(target, [axLen,0,0]), "rgba(0,120,255,0.35)", 2);
+  addSeg(target, add(target, [0,axLen,0]), "rgba(0,200,0,0.25)", 2);
+  addSeg(target, add(target, [0,0,axLen]), "rgba(255,120,0,0.25)", 2);
+
+  // Path trail (center)
+  if (path && path.x && path.z) {
+    const win = Math.max(40, Math.min(400, geo.path_window_points ?? 160));
+    const i0 = Math.max(0, idx - win);
+    const i1 = Math.min(timeArr.length-1, idx + win);
+    for (let i=i0;i<i1;i++){
+      const pA = [path.x[i], ((bodyZ[i] ?? 0.0) * ySign) + bodyYOffset, path.z[i]];
+      const pB = [path.x[i+1], ((bodyZ[i+1] ?? 0.0) * ySign) + bodyYOffset, path.z[i+1]];
+      addSeg(pA, pB, "rgba(0,0,0,0.12)", 2);
+    }
+  }
+
+  // Road profiles under each wheel
+  const corners = ["ЛП","ПП","ЛЗ","ПЗ"];
+
+  // Wheel offsets (body frame): X forward, Z right. Left = negative Z.
+  const base_m = (geo && typeof geo.base_m === "number") ? geo.base_m : 2.8;
+  const track_m = (geo && typeof geo.track_m === "number") ? geo.track_m : 1.6;
+  const xOff = (geo && geo.wheel_x_off_m) ? geo.wheel_x_off_m : {"ЛП": base_m*0.5, "ПП": base_m*0.5, "ЛЗ": -base_m*0.5, "ПЗ": -base_m*0.5};
+  const zOff = (geo && geo.wheel_z_off_m) ? geo.wheel_z_off_m : {"ЛП": -track_m*0.5, "ПП": track_m*0.5, "ЛЗ": -track_m*0.5, "ПЗ": track_m*0.5};
+
+  const roadWin = Math.max(40, Math.min(600, geo.road_window_points ?? 220));
+  const i0r = Math.max(0, idx - roadWin);
+  const i1r = Math.min(timeArr.length-1, idx + roadWin);
+
+  function wheelXZ(i, corner){
+    const yaw_i = (path && path.yaw && path.yaw[i]!=null) ? path.yaw[i] : yaw;
+    const xo = xOff[corner] ?? 0.0;
+    const zo = zOff[corner] ?? 0.0;
+    // rotate offsets by yaw about Y axis
+    const offs = rotY(yaw_i, [xo, 0.0, zo]); // returns [x, y, z]
+    const xb = (path && path.x && path.x[i]!=null) ? path.x[i] : 0.0;
+    const zb = (path && path.z && path.z[i]!=null) ? path.z[i] : 0.0;
+    return {x: xb + offs[0], z: zb + offs[2]};
+  }
+
+  // Road mode:
+  //  - "track": road points follow full trajectory (uses yaw_i and path x/z at each sample)
+  //  - "local": road is drawn in current body frame (window around current time), aligned with current yaw
+  const roadMode = (geo && typeof geo.road_mode === "string") ? String(geo.road_mode) : "track";
+  const spinPerWheel = (geo && (geo.spin_per_wheel === false || geo.spin_per_wheel === true)) ? !!geo.spin_per_wheel : true;
+  const visualContract = (geo && geo.visual_contract) ? geo.visual_contract : {};
+  const ringVisual = (geo && geo.ring_visual && Array.isArray(geo.ring_visual.x_m) && Array.isArray(geo.ring_visual.z_left_m) && Array.isArray(geo.ring_visual.z_right_m)) ? geo.ring_visual : null;
+  const ringMode = !!(ringVisual && ringVisual.mode === "ring_closed_circle" && Number(ringVisual.ring_length_m || 0) > 0);
+  const roadAvailableCorners = new Set(Array.isArray(visualContract.road_available_corners) ? visualContract.road_available_corners : []);
+  const roadComplete = !!visualContract.road_complete;
+  const roadStatusText = ringMode
+    ? (String((((ringVisual && ringVisual.meta) || {}).seam_open) ? 'RING SEAM OPEN' : 'RING CLOSED'))
+    : String(visualContract.road_overlay_text || (!roadComplete ? 'NO ROAD DATA' : ''));
+  const solverOk = !!visualContract.solver_points_complete;
+  const solverStatusText = String(visualContract.solver_points_overlay_text || (!solverOk ? 'NO SOLVER POINTS' : ''));
+  const statusBits = [];
+  if (roadStatusText) statusBits.push(roadStatusText);
+  if (solverStatusText) statusBits.push(solverStatusText);
+  if (pillStatus) pillStatus.textContent = statusBits.length ? statusBits.join(' · ') : 'OK';
+  const allowRoadDraw = roadComplete && roadAvailableCorners.size > 0;
+  const showSusp = !!(geo && geo.show_suspension) && solverOk;
+  const showContact = !!(geo && geo.show_contact) && allowRoadDraw;
+
+  // distance array for local road mode
+  const sArr = (path && Array.isArray(path.s)) ? path.s : ((path && Array.isArray(path.x)) ? path.x : null);
+  const s0 = (sArr && sArr[idx] != null) ? Number(sArr[idx]) : 0.0;
+  const yaw0 = yaw;
+
+  function __ringWrapS(sVal, ringL) {
+    if (!(ringL > 0)) return 0.0;
+    let out = Number(sVal || 0.0) % ringL;
+    if (out < 0) out += ringL;
+    return out;
+  }
+
+  function __ringApproxDx() {
+    if (!ringMode) return 0.02;
+    const xs = ringVisual.x_m || [];
+    if (!Array.isArray(xs) || xs.length < 2) return 0.02;
+    const dx = Number(xs[1]) - Number(xs[0]);
+    return (Number.isFinite(dx) && dx > 1e-6) ? dx : 0.02;
+  }
+
+  function __ringInterp(arr, sVal) {
+    if (!ringMode || !Array.isArray(arr) || arr.length === 0) return 0.0;
+    const xs = ringVisual.x_m || [];
+    const Lr = Number(ringVisual.ring_length_m || 0.0);
+    const dx = __ringApproxDx();
+    const sm = __ringWrapS(sVal, Lr);
+    let i0 = Math.floor(sm / dx);
+    if (!(i0 >= 0)) i0 = 0;
+    if (i0 >= arr.length - 1) i0 = arr.length - 2;
+    const x0s = Number(xs[i0] || (i0 * dx));
+    const x1s = Number(xs[i0 + 1] || ((i0 + 1) * dx));
+    const denom = Math.max(1e-9, x1s - x0s);
+    const a = Math.max(0.0, Math.min(1.0, (sm - x0s) / denom));
+    return Number(arr[i0] || 0.0) * (1.0 - a) + Number(arr[i0 + 1] || 0.0) * a;
+  }
+
+  function __ringCurvAbsAt(sVal) {
+    return __ringInterp((ringVisual && ringVisual.curvature_abs_m_inv) || [], sVal);
+  }
+
+  function __ringTheta(sVal) {
+    const Lr = Number(ringVisual.ring_length_m || 1.0);
+    return 2.0 * Math.PI * __ringWrapS(sVal, Lr) / Math.max(1e-9, Lr);
+  }
+
+  function __ringRightNormal(thetaVal) {
+    return [-Math.sin(thetaVal), 0.0, Math.cos(thetaVal)];
+  }
+
+  function __ringCurrentSegment(sVal) {
+    const segsRing = Array.isArray(ringVisual && ringVisual.segments) ? ringVisual.segments : [];
+    if (!ringMode || segsRing.length === 0) return null;
+    const Lr = Number(ringVisual.ring_length_m || 0.0);
+    const sm = __ringWrapS(sVal, Lr);
+    for (let i = 0; i < segsRing.length; i++) {
+      const seg = segsRing[i] || {};
+      const x0 = Number(seg.x_start_m || 0.0);
+      const x1 = Number(seg.x_end_m || x0);
+      const isLast = (i === segsRing.length - 1);
+      if (sm >= x0 - 1e-9 && (sm < x1 - 1e-9 || (isLast && sm <= x1 + 1e-9))) return seg;
+    }
+    return segsRing[segsRing.length - 1] || null;
+  }
+
+  function __ringPoint(sVal, lat, yVal) {
+    const Rr = Number(ringVisual.ring_radius_m || 0.0);
+    const th = __ringTheta(sVal);
+    const ctrX = Rr * Math.sin(th);
+    const ctrZ = -Rr * Math.cos(th);
+    const nr = __ringRightNormal(th);
+    return [ctrX + lat * nr[0], yVal, ctrZ + lat * nr[2]];
+  }
+
+  function __ringHeatColor(kappaAbs, alphaVal) {
+    const kMax = Math.max(1e-9, Number(ringVisual.curvature_max_m_inv || 0.0));
+    const tHeat = Math.max(0.0, Math.min(1.0, Number(kappaAbs || 0.0) / kMax));
+    const hue = 220.0 - 220.0 * tHeat; // blue -> red
+    return `hsla(${hue.toFixed(1)}, 92%, 58%, ${alphaVal})`;
+  }
+
+  function drawRingRoadEmbedded(currentSeg) {
+    const Lr = Number(ringVisual.ring_length_m || 0.0);
+    const halfW = Number(ringVisual.road_half_width_m || 0.0);
+    if (!(Lr > 0) || !(halfW > 0)) return;
+    const edgeStep = Math.max(0.04, Number(ringVisual.edge_step_m || 0.08));
+    const gridStep = Math.max(0.15, Number(ringVisual.grid_step_m || 0.35));
+    const latFracs = [-1.0, -0.5, 0.0, 0.5, 1.0];
+    const yShift = roadYOffset - (roadSubtractR ? rWheel : 0.0);
+
+    // long rails (square-ish grid with 4 cells across width)
+    for (const frac of latFracs) {
+      for (let sA = 0.0; sA < Lr - 1e-9; sA += edgeStep) {
+        const sB = Math.min(Lr, sA + edgeStep);
+        const tA = (frac + 1.0) * 0.5;
+        const tB = tA;
+        const yLA = __ringInterp(ringVisual.z_left_m || [], sA);
+        const yRA = __ringInterp(ringVisual.z_right_m || [], sA);
+        const yLB = __ringInterp(ringVisual.z_left_m || [], sB);
+        const yRB = __ringInterp(ringVisual.z_right_m || [], sB);
+        const yA = (1.0 - tA) * yLA + tA * yRA;
+        const yB = (1.0 - tB) * yLB + tB * yRB;
+        const pA = __ringPoint(sA, frac * halfW, yA * ySign + yShift);
+        const pB = __ringPoint(sB, frac * halfW, yB * ySign + yShift);
+        const col = __ringHeatColor(__ringCurvAbsAt(0.5 * (sA + sB)), frac === -1.0 || frac === 1.0 ? 0.45 : 0.28);
+        addSeg(pA, pB, col, frac === -1.0 || frac === 1.0 ? 2 : 1);
+      }
+    }
+
+    // transverse crossbars
+    for (let sA = 0.0; sA < Lr - 1e-9; sA += gridStep) {
+      const yL = __ringInterp(ringVisual.z_left_m || [], sA);
+      const yR = __ringInterp(ringVisual.z_right_m || [], sA);
+      const pL = __ringPoint(sA, -halfW, yL * ySign + yShift);
+      const pR = __ringPoint(sA, halfW, yR * ySign + yShift);
+      addSeg(pL, pR, __ringHeatColor(__ringCurvAbsAt(sA), 0.30), 1);
+    }
+
+    // thick colored left/right edge lines per segment
+    const segsRing = Array.isArray(ringVisual.segments) ? ringVisual.segments : [];
+    for (const seg of segsRing) {
+      const x0s = Number(seg.x_start_m || 0.0);
+      const x1s = Number(seg.x_end_m || x0s);
+      const col = String(seg.edge_color || 'rgba(0,120,255,0.95)');
+      const isCurrent = !!(currentSeg && String(currentSeg.name || '') === String(seg.name || ''));
+      const lineW = isCurrent ? 7 : 4;
+      const boundaryW = isCurrent ? 5 : 3;
+      for (let sA = x0s; sA < x1s - 1e-9; sA += edgeStep) {
+        const sB = Math.min(x1s, sA + edgeStep);
+        const yL0 = __ringInterp(ringVisual.z_left_m || [], sA);
+        const yL1 = __ringInterp(ringVisual.z_left_m || [], sB);
+        const yR0 = __ringInterp(ringVisual.z_right_m || [], sA);
+        const yR1 = __ringInterp(ringVisual.z_right_m || [], sB);
+        addSeg(__ringPoint(sA, -halfW, yL0 * ySign + yShift), __ringPoint(sB, -halfW, yL1 * ySign + yShift), col, lineW);
+        addSeg(__ringPoint(sA, halfW, yR0 * ySign + yShift), __ringPoint(sB, halfW, yR1 * ySign + yShift), col, lineW);
+      }
+      const yBL = __ringInterp(ringVisual.z_left_m || [], x0s);
+      const yBR = __ringInterp(ringVisual.z_right_m || [], x0s);
+      addSeg(__ringPoint(x0s, -halfW, yBL * ySign + yShift), __ringPoint(x0s, halfW, yBR * ySign + yShift), col, boundaryW);
+    }
+  }
+
+  const currentRingSeg = ringMode ? __ringCurrentSegment(sBody) : null;
+  if (pillSeg) {
+    if (currentRingSeg) {
+      pillSeg.textContent = "seg: " + String(currentRingSeg.name || ("S" + String(currentRingSeg.seg_idx || "")));
+      try { pillSeg.style.borderColor = String(currentRingSeg.edge_color || "rgba(0,120,255,0.95)"); } catch(_e) {}
+    } else {
+      pillSeg.textContent = "seg: –";
+      try { pillSeg.style.borderColor = "rgba(0,0,0,0.18)"; } catch(_e) {}
+    }
+  }
+  if (ringMode) {
+    drawRingRoadEmbedded(currentRingSeg);
+  } else {
+  if (allowRoadDraw && road) {
+    for (const c of corners) {
+      const rr = road[c] || null;
+      if (!rr) continue;
+
+      // base wheel position at current time for local mode
+      let baseW = null;
+      if (roadMode !== "track" && sArr) {
+        const xo = xOff[c] ?? 0.0;
+        const zo = zOff[c] ?? 0.0;
+        const offs0 = rotY(yaw0, [xo, 0.0, zo]);
+        baseW = {x: xBody + offs0[0], z: zBodyLat + offs0[2]};
+      }
+
+      for (let i=i0r;i<i1r;i++){
+        let aXZ, bXZ;
+
+        if (roadMode === "track") {
+          aXZ = wheelXZ(i, c);
+          bXZ = wheelXZ(i+1, c);
+        } else if (sArr && baseW) {
+          const dsA = Number(sArr[i] ?? 0.0) - s0;
+          const dsB = Number(sArr[i+1] ?? 0.0) - s0;
+          const shA = rotY(yaw0, [dsA, 0.0, 0.0]);
+          const shB = rotY(yaw0, [dsB, 0.0, 0.0]);
+          aXZ = {x: baseW.x + shA[0], z: baseW.z + shA[2]};
+          bXZ = {x: baseW.x + shB[0], z: baseW.z + shB[2]};
+        } else {
+          aXZ = wheelXZ(i, c);
+          bXZ = wheelXZ(i+1, c);
+        }
+
+        const ya = ((rr[i] ?? 0.0) * ySign) + roadYOffset - (roadSubtractR ? rWheel : 0.0);
+        const yb = ((rr[i+1] ?? 0.0) * ySign) + roadYOffset - (roadSubtractR ? rWheel : 0.0);
+
+        const pA = [aXZ.x, ya, aXZ.z];
+        const pB = [bXZ.x, yb, bXZ.z];
+
+        const isLeft = (c === "ЛП" || c === "ЛЗ");
+        addSeg(pA, pB, isLeft ? "rgba(90,90,90,0.55)" : "rgba(60,60,60,0.40)", 2);
+      }
+    }
+  }
+
+  // --- Road mesh "crossbars" between left/right wheels (helps visualize slalom/turns)
+  const showRoadMesh = !!(geo && geo.show_road_mesh);
+  const meshStep = Math.max(1, Math.min(40, (geo && typeof geo.road_mesh_step === "number") ? geo.road_mesh_step : 6));
+
+  function roadY(i, corner) {
+    try {
+      const rr = (road && road[corner]) ? road[corner] : null;
+      if (!rr) return 0.0;
+      return ((rr[i] ?? 0.0) * ySign) + roadYOffset - (roadSubtractR ? rWheel : 0.0);
+    } catch(_) { return 0.0; }
+  }
+
+  function roadXZ(i, corner) {
+    // Keep consistent with line drawing logic (track vs local)
+    if (roadMode === "track") return wheelXZ(i, corner);
+    // local: shift along sArr around current
+    if (sArr) {
+      const xo = xOff[corner] ?? 0.0;
+      const zo = zOff[corner] ?? 0.0;
+      const offs0 = rotY(yaw0, [xo, 0.0, zo]);
+      const baseW = {x: xBody + offs0[0], z: zBodyLat + offs0[2]};
+      const ds = Number(sArr[i] ?? 0.0) - s0;
+      const sh = rotY(yaw0, [ds, 0.0, 0.0]);
+      return {x: baseW.x + sh[0], z: baseW.z + sh[2]};
+    }
+    return wheelXZ(i, corner);
+  }
+
+  if (showRoadMesh && allowRoadDraw && road) {
+    for (let i=i0r; i<i1r; i+=meshStep) {
+      const fl = roadXZ(i, "ЛП"); const fr = roadXZ(i, "ПП");
+      const rl = roadXZ(i, "ЛЗ"); const rr = roadXZ(i, "ПЗ");
+      const yfl = roadY(i, "ЛП"); const yfr = roadY(i, "ПП");
+      const yrl = roadY(i, "ЛЗ"); const yrr = roadY(i, "ПЗ");
+      addSeg([fl.x, yfl, fl.z], [fr.x, yfr, fr.z], "rgba(30,30,30,0.18)", 1);
+      addSeg([rl.x, yrl, rl.z], [rr.x, yrr, rr.z], "rgba(30,30,30,0.12)", 1);
+      // longitudinal rails (left/right) show profile under each side
+      addSeg([fl.x, yfl, fl.z], [rl.x, yrl, rl.z], "rgba(30,30,30,0.18)", 1);
+      addSeg([fr.x, yfr, fr.z], [rr.x, yrr, rr.z], "rgba(30,30,30,0.18)", 1);
+    }
+  }
+
+  }
+  // --- Trajectory trails (body + wheels)
+  const showTrail = !!(geo && geo.show_trail);
+  const trailLen = Math.max(20, Math.min(5000, (geo && typeof geo.trail_len === "number") ? geo.trail_len : 500));
+  const trailStep = Math.max(1, Math.min(40, (geo && typeof geo.trail_step === "number") ? geo.trail_step : 3));
+  if (showTrail && path && Array.isArray(path.x) && Array.isArray(path.z)) {
+    const iStart = Math.max(0, idx - trailLen);
+    // body trail
+    for (let i=iStart; i<idx-trailStep; i+=trailStep) {
+      const p0 = [Number(path.x[i]||0.0), ((bodyZ[i]||0.0)*ySign)+bodyYOffset, Number(path.z[i]||0.0)];
+      const p1 = [Number(path.x[i+trailStep]||0.0), ((bodyZ[i+trailStep]||0.0)*ySign)+bodyYOffset, Number(path.z[i+trailStep]||0.0)];
+      addSeg(p0, p1, "rgba(0,120,255,0.22)", 2);
+    }
+    // wheel trails (centers)
+    if (wheel) {
+      for (const c of corners) {
+        const ww = wheel[c] || null;
+        if (!ww) continue;
+        for (let i=iStart; i<idx-trailStep; i+=trailStep) {
+          const yaw_i = (path.yaw && path.yaw[i]!=null) ? path.yaw[i] : 0.0;
+          const yaw_j = (path.yaw && path.yaw[i+trailStep]!=null) ? path.yaw[i+trailStep] : 0.0;
+          const pXZ0 = wheelXZ_given(i, c, yaw_i, xOff, zOff);
+          const pXZ1 = wheelXZ_given(i+trailStep, c, yaw_j, xOff, zOff);
+          const y0 = (Number(ww[i]||0.0) * ySign) + wheelCenterOffset;
+          const y1 = (Number(ww[i+trailStep]||0.0) * ySign) + wheelCenterOffset;
+          addSeg([pXZ0.x, y0, pXZ0.z], [pXZ1.x, y1, pXZ1.z], "rgba(0,0,0,0.12)", 1);
+        }
+      }
+    }
+  }
+
+  // expose for click picking
+  LAST_WHEEL_CENTERS = wheelCenters;
+
+
+  // Body wireframe
+  const bodyL3D = (geo && typeof geo.body_L_m === "number") ? Math.max(0.0, geo.body_L_m) : 0.0;
+  const bodyW3D = (geo && typeof geo.body_W_m === "number") ? Math.max(0.0, geo.body_W_m) : 0.0;
+  const bodyH3D = (geo && typeof geo.body_H_m === "number") ? Math.max(0.0, geo.body_H_m) : 0.0;
+  if ((bodyL3D <= 0.0 || bodyW3D <= 0.0 || bodyH3D <= 0.0) && !window.__pneumo_warned_missing_body_dims) {
+    console.warn("[mech_car3d] body_L_m/body_W_m/body_H_m missing in geo; body wireframe disabled (no hidden 2.4/1.2/0.35 defaults).");
+    window.__pneumo_warned_missing_body_dims = true;
+  }
+  if (bodyL3D > 0.0 && bodyW3D > 0.0 && bodyH3D > 0.0) {
+    const halfL = bodyL3D * 0.5;
+    const halfW = bodyW3D * 0.5;
+    const halfH = bodyH3D * 0.5;
+    const be = boxEdges(halfL, halfH, halfW);
+    const vertsWorld = be.V.map(p=>{
+      const p3 = applyBodyRot([p[0], p[1], p[2]], yaw, pitch, roll);
+      return [xBody + p3[0], zBody + p3[1], zBodyLat + p3[2]];
+    });
+    for (const e of be.E){
+      addSeg(vertsWorld[e[0]], vertsWorld[e[1]], "rgba(0,0,0,0.75)", 2);
+    }
+  }
+
+  // Wheels
+  const r = rWheel;
+  if (!(geo && typeof geo.wheel_width_m === "number") && !window.__pneumo_warned_missing_wheel_width_m) {
+    console.warn("[mech_car3d] wheel_width_m missing in geo; width-dependent rendering disabled (0.0 m, no hidden default).");
+    window.__pneumo_warned_missing_wheel_width_m = true;
+  }
+  const w = (geo && typeof geo.wheel_width_m === "number") ? Math.max(0.0, geo.wheel_width_m) : 0.0;
+  const wheelCenterOffset = (geo && typeof geo.wheel_center_offset_m === "number") ? geo.wheel_center_offset_m : 0.0;
+  const spinSign = (geo && typeof geo.spin_sign === "number") ? geo.spin_sign : 1.0;
+
+  const showGapHeat = !!(geo && geo.show_gap_heat);
+  const gapScale = (geo && typeof geo.gap_scale_m === "number") ? geo.gap_scale_m : 0.050;
+  const showGapHud = !!(geo && geo.show_gap_hud);
+  const minGapWindow = Math.max(0, Math.min(20000, (geo && typeof geo.min_gap_window === "number") ? geo.min_gap_window : 0));
+  const minGapStep = Math.max(1, Math.min(80, (geo && typeof geo.min_gap_step === "number") ? geo.min_gap_step : 3));
+  const hoverContactMarker = !!(geo && geo.hover_contact_marker);
+
+  function gapColor(gap, scale, alpha=0.85) {
+    if (gap == null || !isFinite(gap)) return "rgba(60,60,60,0.35)";
+    const s = Math.max(1e-6, scale || 0.05);
+    let h = 120.0;
+    if (gap < 0) {
+      const x = Math.max(-1.0, Math.min(0.0, gap / s)); // -1..0
+      h = 120.0 * (1.0 + x); // -s -> 0 (red), 0 -> 120 (green)
+    } else {
+      const x = Math.min(1.0, gap / s); // 0..1
+      h = 120.0 - 60.0 * x; // 120 -> 60 (green->yellow)
+    }
+    return `hsla(${h.toFixed(1)}, 90%, 45%, ${alpha})`;
+  }
+
+  function roadSurfaceYAt(i, cornerName) {
+    try {
+      if (!allowRoadDraw || !road || !roadAvailableCorners.has(cornerName) || !road[cornerName] || road[cornerName][i] == null) return null;
+      return Number(road[cornerName][i]) * ySign + roadYOffset - (roadSubtractR ? rWheel : 0.0);
+    } catch(_e) { return null; }
+  }
+
+  function wheelCenterYAt(i, cornerName) {
+    try {
+      if (!wheel || !wheel[cornerName] || wheel[cornerName][i] == null) return null;
+      return Number(wheel[cornerName][i]) * ySign + wheelCenterOffset;
+    } catch(_e) { return null; }
+  }
+
+  function gapAt(i, cornerName) {
+    const wy = wheelCenterYAt(i, cornerName);
+    const ry = roadSurfaceYAt(i, cornerName);
+    if (wy == null || ry == null) return null;
+    return (wy - rWheel) - ry; // >0 wheel above, <0 penetration
+  }
+
+  const gapNow = {}; // corner -> gap at idx
+
+  const wheelCenters = {}; // corner -> [x,y,z]
+  for (const c of corners) {
+    const xz = wheelXZ(idx, c);
+    const yw = ((wheel && wheel[c] && wheel[c][idx] != null) ? Number(wheel[c][idx]) : 0.0) * ySign;
+    const wheelCenter = [xz.x, yw + wheelCenterOffset, xz.z];
+    wheelCenters[c] = wheelCenter;
+    // gap for heat/HUD
+    gapNow[c] = gapAt(idx, c);
+
+    // spin per wheel (uses cumulative distance of each wheel center) or body s
+    let sUse = Number(sBody);
+    try {
+      if (spinPerWheel && WHEEL_S && WHEEL_S[c] && WHEEL_S[c][idx] != null) sUse = Number(WHEEL_S[c][idx]);
+    } catch(_e) {}
+    const spin = (sUse / Math.max(1e-6, r)) * spinSign;
+
+    const yawWheel = yaw + ((c === "ЛП" || c === "ПП") ? steer : 0.0);
+
+    const wf = wheelWire(r, w, 18, spin);
+    function xf(p){ // local wheel point -> world
+      // local wheel points are in wheel frame: X forward, Y up, Z right (axle)
+      let q = p;
+      // spin around axle Z (right)
+      q = rotZ(spin, q);
+      // yaw of vehicle rotates wheel frame around Y
+      q = rotY(yawWheel, q);
+      return [wheelCenter[0] + q[0], wheelCenter[1] + q[1], wheelCenter[2] + q[2]];
+    }
+    // rings
+    for (let i=0;i<wf.ringA.length-1;i++){
+      const isSel = Array.isArray(SELECTED) && (SELECTED.indexOf(c) >= 0);
+      const isHover = (HOVER && (
+        (HOVER.kind === "corner" && String(HOVER.name) === String(c)) ||
+        (HOVER.kind === "axle" && ((String(HOVER.name)==="front" && (c==="ЛП" || c==="ПП")) || (String(HOVER.name)==="rear" && (c==="ЛЗ" || c==="ПЗ"))))
+      ));
+      const gcol = showGapHeat ? gapColor(gapNow[c], gapScale, 0.88) : "rgba(20,20,20,0.75)";
+      const colRing = isSel ? "rgba(255,80,0,0.90)" : (isHover ? "rgba(0,120,255,0.92)" : gcol);
+      const colWeb  = isSel ? "rgba(255,80,0,0.35)" : (isHover ? "rgba(0,120,255,0.26)" : (showGapHeat ? gapColor(gapNow[c], gapScale, 0.22) : "rgba(20,20,20,0.30)"));
+      const wRing = isSel ? 3 : (isHover ? 3 : 2);
+      addSeg(xf(wf.ringA[i]), xf(wf.ringA[i+1]), colRing, wRing);
+      addSeg(xf(wf.ringB[i]), xf(wf.ringB[i+1]), colRing, wRing);
+      addSeg(xf(wf.ringA[i]), xf(wf.ringB[i]), colWeb, 1);
+    }
+    for (const sp of wf.spokes){
+      const isSel2 = Array.isArray(SELECTED) && (SELECTED.indexOf(c) >= 0);
+      const isHover2 = (HOVER && (
+        (HOVER.kind==="corner" && String(HOVER.name)===String(c)) ||
+        (HOVER.kind==="axle" && (
+          (String(HOVER.name)==="front" && (c==="ЛП" || c==="ПП")) ||
+          (String(HOVER.name)==="rear" && (c==="ЛЗ" || c==="ПЗ"))
+        ))
+      ));
+      const colSp = isSel2 ? "rgba(255,80,0,0.90)" : (isHover2 ? "rgba(0,120,255,0.65)" : (showGapHeat ? gapColor(gapNow[c], gapScale, 0.55) : "rgba(0,120,255,0.65)"));
+      const wSp = isSel2 ? 3 : 2;
+      addSeg(xf(sp[0]), xf(sp[1]), colSp, wSp);
+    }
+
+    // contact indicator with road (gap between wheel bottom and road)
+    if (showContact && road && roadAvailableCorners.has(c) && road[c]) {
+      const rr = road[c];
+      const yRoad = ((rr[idx] ?? 0.0) * ySign) + roadYOffset - (roadSubtractR ? rWheel : 0.0);
+      const yWheelBottom = wheelCenter[1] - r;
+      const gap = yWheelBottom - yRoad; // >0: wheel above road
+
+      const pRoad = [wheelCenter[0], yRoad, wheelCenter[2]];
+      const pBot = [wheelCenter[0], yWheelBottom, wheelCenter[2]];
+
+      let col = (gap > 0.02) ? "rgba(255,140,0,0.75)" : (gap < -0.02 ? "rgba(255,0,0,0.75)" : "rgba(0,180,0,0.65)");
+      if (showGapHeat) col = gapColor(gap, gapScale, 0.85);
+      addSeg(pRoad, pBot, col, 2);
+
+      // small cross on road
+      const cs = 0.06;
+      addSeg([pRoad[0]-cs, pRoad[1], pRoad[2]-cs],[pRoad[0]+cs,pRoad[1],pRoad[2]+cs], col, 2);
+      addSeg([pRoad[0]-cs, pRoad[1], pRoad[2]+cs],[pRoad[0]+cs,pRoad[1],pRoad[2]-cs], col, 2);
+
+      // extra marker for hovered wheel/axle (bigger + thicker)
+      const isHoverCorner = !!(HOVER && (HOVER.hit === ('wheel_'+c) || HOVER.hit === ('wheel_web_'+c) || HOVER.hit === ('wheel_spoke_'+c) || HOVER.hit === ('susp_'+c) || HOVER.hit === ('contact_'+c)));
+      if (hoverContactMarker && isHoverCorner) {
+        const colH = showGapHeat ? gapColor(gap, gapScale, 0.95) : "rgba(0,120,255,0.95)";
+        addSeg(pRoad, pBot, colH, 4);
+        const cs2 = 0.12;
+        addSeg([pRoad[0]-cs2, pRoad[1], pRoad[2]-cs2],[pRoad[0]+cs2,pRoad[1],pRoad[2]+cs2], colH, 3);
+        addSeg([pRoad[0]-cs2, pRoad[1], pRoad[2]+cs2],[pRoad[0]+cs2,pRoad[1],pRoad[2]-cs2], colH, 3);
+      }
+    }
+  }
+
+  // Suspension lines from body corners to wheel centers
+  if (showSusp) {
+    const halfL = ((geo && typeof geo.body_L_m === "number") ? Math.max(0.0, geo.body_L_m) : 0.0) * 0.5;
+    const halfW = ((geo && typeof geo.body_W_m === "number") ? Math.max(0.0, geo.body_W_m) : 0.0) * 0.5;
+    const halfH = ((geo && typeof geo.body_H_m === "number") ? Math.max(0.0, geo.body_H_m) : 0.0) * 0.5;
+    const mounts = {
+      "ЛП": [ halfL, -halfH, -halfW],
+      "ПП": [ halfL, -halfH,  halfW],
+      "ЛЗ": [-halfL, -halfH, -halfW],
+      "ПЗ": [-halfL, -halfH,  halfW],
+    };
+    for (const c of corners) {
+      const wc = wheelCenters[c];
+      if (!wc) continue;
+      const ml = mounts[c];
+      const mW = applyBodyRot([ml[0], ml[1], ml[2]], yaw, pitch, roll);
+      const pM = [xBody + mW[0], zBody + mW[1], zBodyLat + mW[2]];
+      addSeg(pM, wc, "rgba(0,0,0,0.35)", 2);
+    }
+  }
+
+  // camera target override: follow selected wheel/axle center
+  if (followCar && followSelected && (typeof wheelCenters === "object") && wheelCenters && Array.isArray(SELECTED) && SELECTED.length) {
+    let sx = 0, sy = 0, sz = 0, n = 0;
+    for (const cc of SELECTED) {
+      const p = wheelCenters[String(cc)];
+      if (p && p.length === 3) { sx += p[0]; sy += p[1]; sz += p[2]; n += 1; }
+    }
+    if (n > 0) target = [sx/n, sy/n, sz/n];
+  }
+  // Smooth camera target follow (optional)
+  try {
+    const a = (geo && typeof geo.follow_smooth === "number") ? geo.follow_smooth : 0.0;
+    if (a > 0.0) {
+      if (!Array.isArray(targetSmooth) || targetSmooth.length !== 3) {
+        targetSmooth = [target[0], target[1], target[2]];
+      } else {
+        targetSmooth[0] += (target[0] - targetSmooth[0]) * a;
+        targetSmooth[1] += (target[1] - targetSmooth[1]) * a;
+        targetSmooth[2] += (target[2] - targetSmooth[2]) * a;
+      }
+      target = [targetSmooth[0], targetSmooth[1], targetSmooth[2]];
+    } else {
+      targetSmooth = [target[0], target[1], target[2]];
+    }
+  } catch(_e) {}
+
+
+  // ---- draw views ----
+  const mv = !!(geo && geo.multi_view);
+  if (mv) {
+    const pad = 10;
+    const w2 = Math.max(10, (W - pad*3) * 0.5);
+    const h2 = Math.max(10, (H - pad*3) * 0.5);
+
+    const rectISO   = {x: pad,           y: pad,           w: w2, h: h2};
+    const rectTOP   = {x: pad*2 + w2,    y: pad,           w: w2, h: h2};
+    const rectFRONT = {x: pad,           y: pad*2 + h2,    w: w2, h: h2};
+    const rectSIDE  = {x: pad*2 + w2,    y: pad*2 + h2,    w: w2, h: h2};
+    isoRect = rectISO;
+
+    // ISO: interactive
+    PICK_VIEW = drawView(rectISO, camAz, camEl, camDist, panX, panY, headingYaw, true);
+    // Other views: fixed, cheap (no sort to stay fast)
+    drawView(rectTOP, 0.0, Math.PI*0.49, camDist*1.25, 0, 0, 0.0, false);
+    drawView(rectFRONT, Math.PI, 0.08, camDist*1.25, 0, 0, 0.0, false);
+    drawView(rectSIDE, -Math.PI*0.5, 0.08, camDist*1.25, 0, 0, 0.0, false);
+
+    // view borders + labels
+    ctx.save();
+    ctx.strokeStyle = "rgba(0,0,0,0.18)";
+    ctx.lineWidth = 1;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.font = "12px system-ui";
+    for (const V of [
+      {r: rectISO, name: "ISO"},
+      {r: rectTOP, name: "TOP"},
+      {r: rectFRONT, name: "FRONT"},
+      {r: rectSIDE, name: "SIDE"},
+    ]) {
+      ctx.strokeRect(V.r.x, V.r.y, V.r.w, V.r.h);
+      ctx.fillText(V.name, V.r.x + 10, V.r.y + 18);
+    }
+    ctx.restore();
+  } else {
+    isoRect = null;
+    PICK_VIEW = drawView({x:0, y:0, w:W, h:H}, camAz, camEl, camDist, panX, panY, headingYaw, true);
+  }
+
+  __LAST_IDX = idx;
+  __LAST_W = W;
+  __LAST_H = H;
+  __DIRTY = false;
+  __perfBump('render_count');
+  __perfFlush(false);
+
+  if ((playing || dragging) && __canAnimateNow()) {
+    __scheduleRender('raf', 0);
+  } else {
+    __RENDER_HANDLE = null;
+  }
+}
+
+// ---------- build ----------
+function build(args) {
+  DATA = args || {};
+  // new dataset -> force redraw
+  __LAST_IDX = -1;
+  markDirty();
+  titleEl.textContent = String(DATA.title || "Механика 3D (wireframe)");
+  timeArr = Array.isArray(DATA.time) ? DATA.time : [];
+  datasetId = DATA.dataset_id || null;
+  storageKey = DATA.playhead_storage_key || "pneumo_play_state";
+  wheel = DATA.wheel || null;
+  road = DATA.road || null;
+  bodyZ = (DATA.body && Array.isArray(DATA.body.z)) ? DATA.body.z : (Array.isArray(DATA.body_z) ? DATA.body_z : []);
+  phiArr = Array.isArray(DATA.phi) ? DATA.phi : (DATA.body && Array.isArray(DATA.body.phi) ? DATA.body.phi : []);
+  thetaArr = Array.isArray(DATA.theta) ? DATA.theta : (DATA.body && Array.isArray(DATA.body.theta) ? DATA.body.theta : []);
+  path = DATA.path || null;
+  geo = DATA.geo || {};
+  options = DATA.options || {};
+  // selected corners (optional)
+  SELECTED = Array.isArray(DATA.selected) ? DATA.selected : (geo && Array.isArray(geo.selected_corners) ? geo.selected_corners : []);
+  // --- dataset change: reset camera/pan so the car is always visible
+  if (datasetId && datasetId !== _lastDatasetId) {
+    // Derive a reasonable default camera distance from geometry
+    const _base = (geo && typeof geo.base_m === "number") ? geo.base_m : 2.7;
+    const _bodyL = (geo && typeof geo.body_L_m === "number" && geo.body_L_m > 0.0) ? geo.body_L_m : _base;
+    camAz = Math.PI * 0.25; camEl = Math.PI * 0.22;
+    camDist = Math.max(3.0, Math.min(60.0, _bodyL * 3.8));
+    camOrtho = false;
+    panX = 0; panY = 0;
+  }
+  _lastDatasetId = datasetId || _lastDatasetId;
+
+  // --- one-shot commands from Python (e.g., reset view)
+  try {
+    const cmd = (DATA && typeof DATA.cmd === "object") ? DATA.cmd : null;
+    if (cmd) {
+      const cmdTs = (typeof cmd.ts === "number") ? cmd.ts : Date.now();
+      if (_lastCmdTs === null || cmdTs !== _lastCmdTs) {
+        if (cmd.reset_view) {
+          camAz = Math.PI * 0.25; camEl = Math.PI * 0.22;
+          const _base = (geo && typeof geo.base_m === "number") ? geo.base_m : 2.7;
+          const _bodyL = (geo && typeof geo.body_L_m === "number" && geo.body_L_m > 0.0) ? geo.body_L_m : _base;
+          camDist = Math.max(3.0, Math.min(60.0, _bodyL * 3.8));
+          camOrtho = false;
+          panX = 0; panY = 0;
+        }
+        if (cmd.clear_selection) {
+          SELECTED = [];
+        }
+        _lastCmdTs = cmdTs;
+      }
+    }
+  } catch(_e) {}
+
+  try { recomputeWheelS(); } catch(_e) { WHEEL_S = null; }
+  if (typeof DATA.height === "number") setFrameHeight(DATA.height);
+}
+
+// Streamlit render hook
+function onDataFromPython(event) {
+  if (event.data.type !== "streamlit:render") return;
+  __stHasRender = true;
+  componentReady();
+  const args = event.data.args || {};
+  try { build(args); markDirty(); __wakeRender(); } catch(e) {
+    console.error(e);
+  }
+}
+
+window.addEventListener("focus", () => { try { __perfBump('focus_wakeups'); markDirty(); __wakeRender(); } catch(_) {} });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { try { __perfBump('visibility_wakeups'); markDirty(); __wakeRender(); } catch(_) {} } });
+window.addEventListener('scroll', () => { try { markDirty(); __wakeRender(); } catch(_) {} }, {passive:true});
+window.addEventListener('resize', () => { try { markDirty(); __wakeRender(); } catch(_) {} }, {passive:true});
+window.addEventListener("message", onDataFromPython);
+componentReady();
+resizeCanvas();
+__perfFlush(true);
+markDirty(); __wakeRender();
+
+window.addEventListener('storage', (ev) => {
+  try {
+    const key = String(storageKey || 'pneumo_play_state');
+    if (ev && ev.key && String(ev.key) !== key) return;
+    __perfBump('storage_wakeups');
+    const ps = readPlayState();
+    if (ps && ps.playing) return;
+    const idxNow = (ps && ps.idx != null) ? Number(ps.idx) : __LAST_IDX;
+    if (!__DIRTY && idxNow === __LAST_IDX) return;
+    markDirty();
+    __wakeRender();
+  } catch(_e) {}
+});
+// default height until python sends one
+setFrameHeight(660);
+</script>
+</body>
+</html>

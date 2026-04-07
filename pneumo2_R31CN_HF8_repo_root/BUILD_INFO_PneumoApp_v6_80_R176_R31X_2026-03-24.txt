@@ -1,0 +1,4 @@
+PneumoApp_v6_80_R176_R31X_2026-03-24
+Date: 2026-03-24
+Base source: PneumoApp_v6_80_R176_R31W_2026-03-24
+Focus: road surface drift + cylinder/rod/piston visual semantics

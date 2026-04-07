@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "description": "Approximate hose/line losses used as a multiplicative penalty for A and ISO conductance on selected edges. Tune L/D and fittings to match hardware.",
+  "defaults": {
+    "Klen": 0.25,
+    "Kfit": 0.15,
+    "min_factor": 0.05
+  },
+  "segments": [
+    {
+      "match": "обратный_клапан‑сбор‑в‑магистраль‑",
+      "L_m": 2.0,
+      "D_mm": 6.0,
+      "n_fittings": 4,
+      "note": "N_* → магистраль (диагональная увязка / инерционный тормоз)"
+    },
+    {
+      "match": "обратный_клапан‑магистраль‑",
+      "L_m": 1.2,
+      "D_mm": 8.0,
+      "n_fittings": 2,
+      "note": "магистраль → Ресивер3 (ветка P3)"
+    },
+    {
+      "match": "обратный_клапан‑Ресивер2‑в‑Магистраль_",
+      "L_m": 2.0,
+      "D_mm": 6.0,
+      "n_fittings": 4,
+      "note": "Ресивер2 → магистраль (подача в диагональные линии)"
+    },
+    {
+      "match": "дроссель‑Ресивер2‑в‑Магистраль_",
+      "L_m": 2.0,
+      "D_mm": 6.0,
+      "n_fittings": 4,
+      "note": "дроссель синфазного демпфирования (учёт труб/фитингов)"
+    }
+  ]
+}

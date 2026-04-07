@@ -1,0 +1,10 @@
+Build Info — PneumoApp_v6_80_R169
+Base: PneumoApp_v6_80_R168
+Built (UTC): 2026-02-25 15:26 UTC
+
+Key diffs vs R168:
+- Desktop Animator: speed shown as |v| derived from model outputs (vx, vy) to avoid sign flips on ring.
+- Ring segments stats: use |v| for segment mean speed / radius estimates.
+
+Integrity:
+- py_compile (desktop_animator/app.py): OK

@@ -1,0 +1,16 @@
+VERSION.txt
+pneumo_solver_ui/release_info.py
+release_tag.json
+BUILD_INFO_LATEST.txt
+RELEASE_NOTES_LATEST.txt
+pneumo_solver_ui/desktop_animator/app.py
+pneumo_solver_ui/desktop_animator/geom3d_helpers.py
+tests/test_r26_road_view_density_helpers.py
+tests/test_r44_road_crossbars_exact_world_interp.py
+docs/11_TODO.md
+docs/12_Wishlist.md
+docs/WISHLIST.json
+RELEASE_NOTES_R31V_2026-03-24.md
+TODO_WISHLIST_R31V_ADDENDUM_2026-03-24.md
+BUNDLE_ANALYSIS_R31U_ROAD_CROSSBARS_2026-03-24.md
+BUNDLE_ANALYSIS_R31U_ROAD_CROSSBARS_2026-03-24.json

@@ -1,0 +1,7 @@
+# PYTEST_TARGETED_R31W_2026-03-24
+
+Command:
+pytest -q tests/test_r22_solver_points_frame_plane_and_meta.py tests/test_r24_contact_patch_and_cylinder_helpers.py tests/test_npz_meta_geometry_contract.py tests/test_visual_consumers_geometry_strict.py tests/test_r43_animator_startup_mesh_and_export_geometry.py tests/test_r44_cylinder_packaging_contract_and_animator.py
+
+Result:
+20 passed in 0.36s

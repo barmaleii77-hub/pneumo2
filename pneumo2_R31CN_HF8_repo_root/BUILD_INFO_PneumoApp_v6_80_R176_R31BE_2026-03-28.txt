@@ -1,0 +1,4 @@
+PneumoApp_v6_80_R176_R31BE_2026-03-28
+- Hotfix: imported sanitize_optimization_inputs into pneumo_ui_app.py, fixing the Optimization page NameError in R31BD.
+- Added an AST-based regression guard so optimization UI entrypoints cannot use sanitize_optimization_inputs without importing it.
+- No optimization defaults, staging policy, or worker behavior changed in this hotfix.

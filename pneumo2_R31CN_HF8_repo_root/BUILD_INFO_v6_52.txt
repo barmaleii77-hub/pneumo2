@@ -1,0 +1,17 @@
+BUILD INFO — UnifiedPneumoApp UNIFIED v6_52 (WINSAFE)
+Date: 2026-02-05
+Base: UNIFIED v6_51
+Changes in v6_52:
+- Integrated missing documentation discovered by integration_audit_v6_51 (and follow-ups):
+  - docs/16_WorldRoad.md
+  - docs/DIAGRAMS_GUIDE.md
+  - docs/15_SpringTablePCHIPAndX0Modes.md
+  - docs/15_DiagrammyChartsGuide_V639.md
+  - docs/README_DIAGRAMMY_V628.md
+  - docs/README_DIAGRAMMY_V639.md
+- Version bump + refreshed release metadata (VERSION.txt, release_tag.json, release_info.py)
+- Regenerated integration audit for v6_52 and QA control report.
+- Fixed Windows unzip hazards: removed case-only directory/file collisions (DOCS/docs, PATCHES/patches, REPORTS/reports, and some legacy NOTES_TIME_GRID variants).
+
+Notes:
+- No functional code paths were intentionally removed. Only docs/metadata merged.

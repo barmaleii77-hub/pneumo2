@@ -1,0 +1,35 @@
+RELEASE NOTES — PneumoApp_v6_80_R168
+Built (UTC): 2026-02-25 14:17 UTC
+Base: PneumoApp_v6_80_R167
+
+Что изменилось (ключевое):
+1) Desktop Animator (2D/3D)
+   - Жёстко фиксируем единый Qt-бэкенд PySide6 для всего процесса:
+     QT_API=pyside6, PYQTGRAPH_QT_LIB=PySide6.
+     Это убирает класс "окно пустое" / "краш при старте" при смешивании Qt-библиотек.
+
+2) Сценарии «Сегменты‑кольцо»
+   - Встроенные (ship) сценарии пересобраны и приведены к каноническим строкам drive_mode:
+     STRAIGHT / TURN_LEFT / TURN_RIGHT / ACCEL / BRAKE.
+   - Убрана тихая подмена неизвестного режима на STRAIGHT: теперь это ошибка (ABSOLUTE LAW).
+
+3) Набор тестов по умолчанию
+   - Дефолтный ring‑тест по‑прежнему 15 секунд при 20 км/ч,
+     но теперь использует SHORT‑bundle (1501 sample) вместо LONG‑bundle (30001 sample).
+     Это ускоряет запуск и уменьшает нагрузку/размер файлов.
+   - road_len_m выровнен по ring_length_m из генератора: 83.36 м.
+
+4) Диагностика / support bundle
+   - При bootstrap создаётся стартовый autosave snapshot (если его ещё нет).
+     Это помогает, чтобы в send bundle почти всегда был persistent_state,
+     даже если сессия упала очень рано.
+
+Проверки:
+- python -m compileall: OK
+- build_key_registry: OK
+- regenerate ring bundles (ETALON_SHORT / ETALON_LONG): OK
+
+Известные моменты:
+- Старые ring spec JSON с drive_mode вроде "city_straight" больше НЕ принимаются генератором.
+  Их нужно открыть в редакторе «Сегменты‑кольцо», выбрать корректный drive_mode из списка
+  и пересохранить/перегенерировать road/axay.

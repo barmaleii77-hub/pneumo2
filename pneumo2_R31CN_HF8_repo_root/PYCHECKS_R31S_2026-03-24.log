@@ -1,0 +1,4 @@
+[py_compile] app.py + geom3d_helpers.py
+py_compile: PASS
+[compileall] pneumo_solver_ui tests
+compileall: PASS

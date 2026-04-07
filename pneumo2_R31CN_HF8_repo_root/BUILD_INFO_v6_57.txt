@@ -1,0 +1,31 @@
+UNIFIED_v6_57 — WINSAFE
+
+Цель релиза:
+- Релиз‑багфиксы после мерджа: единая/корректная маркировка релиза во всех инструментах, без “залипших” дефолтов UNIFIED_v6_42/47.
+- Без добавления новых функций: только устранение ошибок интеграции (неправильные дефолты, неверные подписи/теги).
+
+Изменения (по сравнению с UNIFIED_v6_56):
+1) Нормализация получения версии релиза:
+   - Убраны/заменены устаревшие дефолты "UNIFIED_v6_42" и "UNIFIED_v6_47" в:
+     * pneumo_solver_ui/diag/eventlog.py
+     * pneumo_solver_ui/tools/dashboard_report.py
+     * pneumo_solver_ui/tools/run_autotest.py
+     * pneumo_solver_ui/tools/send_results_gui.py
+     * pneumo_solver_ui/tools/test_center_gui.py
+     * pneumo_solver_ui/tools/triage_report.py
+     * pneumo_solver_ui/tools/validate_send_bundle.py
+     * pneumo_solver_ui/tools/launch_ui.py
+     * pneumo_solver_ui/run_registry.py
+     * pneumo_solver_ui/pneumo_ui_app.py
+     * pneumo_solver_ui/crash_guard.py
+   - Теперь инструменты берут версию из release_tag.json / PNEUMO_RELEASE через release_info.get_release(), а не из захардкоженных строк.
+
+2) Обновления версии/метаданных релиза:
+   - VERSION.txt = 6_57
+   - release_tag.json = UNIFIED_v6_57
+   - BUILDLOG.txt: добавлена запись о сборке v6_57
+
+Проверки (быстрые):
+- python -m compileall проходит.
+- Статическая проверка наличия streamlit‑страниц (файлы pages/* присутствуют).
+

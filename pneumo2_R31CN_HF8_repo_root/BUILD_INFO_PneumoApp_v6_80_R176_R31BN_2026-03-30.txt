@@ -1,0 +1,4 @@
+PneumoApp_v6_80_R176_R31BN_2026-03-30
+- Explicit anim_latest export contract validation + sidecar artifacts added to export and SEND-bundle diagnostics.
+- Desktop Animator now uses per-cylinder truth gates and falls back to axis-only honesty mode until packaging truth is complete.
+- Optimization suite input contract now clamps stage normalization safely and repairs missing/duplicate suite row IDs.

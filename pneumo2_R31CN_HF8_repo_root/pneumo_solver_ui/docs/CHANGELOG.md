@@ -1,0 +1,41 @@
+# Changelog (high level)
+
+- v7.0: Baseline UI + Pareto/opt skeleton
+- v7.1: Graphs baseline (Plotly optional)
+- v7.2: SVG animation (manual mapping)
+- v7.3: Nodes (pressure labels) + layer toggles
+- v7.4: Bi-directional SVG clicks (custom component v1)
+- v7.5: Plotly click-sync (selection events)
+- v7.6: Onefolder structure + mech MVP + fuzzy mapping
+- v7.7: Mech click-sync -> graphs
+- v7.8: Global playhead sync (localStorage master)
+- v7.9: Playhead markers + current values table
+- v7.10: Events timeline markers + list + jump
+- v7.11: Events vertical lines on graphs
+- v7.12: SVG autotrace beta (lines+texts -> graph+polylines -> auto mapping)
+- v7.14: Improved node snapping (junction preferred; else nearest point on polyline) + richer autotrace meta
+- v7.15: SVG connectivity — shortest path between labels/points + route overlay on SVG component
+- v7.16: Connectivity → mapping.edges (назначить найденный маршрут ветке модели прямо из UI)
+
+- v7.17: Pick START/END labels directly on SVG (label_pick_mode) to speed up connectivity route building + route->mapping.
+- v7.18: SVG pathfinder: hotkeys Shift/Ctrl(Cmd) for start/end + nearest-label pick radius + mapping.edges coverage mini-wizard
+- v7.19: SVG pathfinder: guided mapping assistant (choose target edge early, label suggestions by fuzzy score, auto-filter, optional clear-route-after-assign)
+- v7.20: SVG pathfinder: AUTO pipeline (propose start/end by fuzzy score -> build route -> write mapping.edges) + AUTO batch N with report
+- v7.21: Route quality heuristics + review workflow: edges_meta[edge].quality + edges_meta[edge].review.status; UI review/approve/reject + approved-only filter in SVG animation
+- v7.22: Review overlay on SVG (colored by edges_meta.review.status) + review hotkeys via click modifiers (Shift/Ctrl/Alt) + status filter
+- v7.23: Review HUD overlay + pending-first conveyor (next/prev pending, pending-only toggle, auto-advance after approve/reject)
+- v7.24: Mech 3D wireframe car (orbit camera) + road profiles under each wheel + maneuvers (straight/slalom/ax/ay integration) + wheel spin
+- v7.25: Fix mech_car3d body.z input + add speed/steer HUD + front wheel steering (bicycle approx) + Y sign/offset calibration + road surface (road-R) toggle + camera follow/follow-yaw.
+- v7.26: mech_car3d: fix road vertical calibration (y_sign/offset + road-R applied), add road_mode track/local, per-wheel spin (wheel path), wheel-road contact markers, suspension lines.
+- v7.27: 3D car: pan (RMB/Shift-drag) + multi-view ISO/TOP/FRONT/SIDE; road mesh crossbars; trajectory trails; new maneuver constant-radius turn
+- v7.28: mech_car3d: click-pick wheels/axles + highlight; mech2d/mech3d pick events unified by ts; road mesh adds longitudinal rails
+- v7.29: mech_car3d: hover tooltips (wheel/road/gap), camera follow selected wheel/axle, minimap top view overlay
+- v7.30: mech_car3d: gap-heat coloring + gap/minGap HUD; hover contact marker; smooth camera target follow
+- v7.31: mech_car3d: export tools in HUD: PNG snapshot + WebM recording via canvas.captureStream + MediaRecorder (FPS 15/30/60)
+- v7.32: Graph Studio (signal browser + stacked/overlay plots), minmax decimation, svg/webgl renderer, unified hover, click->playhead, CSV/Excel export
+
+- v7.34: Hotfix + diagnostics:
+  - Fix crash: NameError `test_sel` in Graph Studio key build.
+  - NPZ oneclick/autopilot: soft-exit with clear hint when no `T??_osc.npz` found; write mapping template instead of raising.
+  - Added *full* headless diagnostics runner: `RUN_FULL_DIAGNOSTICS_WINDOWS.bat` -> `tools/run_full_diagnostics.py`.
+  - Streamlit custom components: more robust `componentReady` handshake (retry until first `streamlit:render`) to avoid "Unrecognized component API version".

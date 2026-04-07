@@ -1,0 +1,14 @@
+# Optional dependencies for MOBO proposer (BoTorch).
+#
+# IMPORTANT:
+# - Torch CUDA wheels depend on your CUDA version; for Windows often easiest:
+#   * if you already have torch installed, keep it;
+#   * otherwise install torch first from official instructions, then:
+#       python -m pip install -r requirements_mobo_botorch.txt
+#
+# Minimal set:
+# - botorch
+# - gpytorch
+
+botorch
+gpytorch

@@ -1,0 +1,3 @@
+PneumoApp_v6_80_R176_R31V_2026-03-24
+Patched from R31U on 2026-03-24
+Fix: exact world-anchored road cross-bars without nearest-row snapping or forced viewport-edge bar.

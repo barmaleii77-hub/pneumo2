@@ -1,0 +1,7 @@
+UnifiedPneumoApp UNIFIED v6_61 WINSAFE
+
+Patched from v6_60:
+- Scheme truth alignment: exhaust throttle camozzi codes normalized to match PNEUMO_SCHEME.json (no +2905) for v9 models and v8 patched models.
+- Smoke check (mech_energy_smoke_check) passes in this build environment.
+
+Built at (UTC): 2026-02-11T06:29:03Z

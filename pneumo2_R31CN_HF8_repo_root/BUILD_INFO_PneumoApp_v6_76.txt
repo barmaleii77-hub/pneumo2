@@ -1,0 +1,40 @@
+PneumoApp build info
+====================
+
+Release: UNIFIED_v6_76
+Base:    PneumoApp_v6_75
+
+Build UTC: 2026-02-14 (generated in this session)
+
+Scope: bugfix-only (no feature expansion)
+
+Key fixes
+---------
+
+P0 — Diagnostics / crash autosave was silently broken after merges
+
+1) Fixed API compatibility for diagnostic bundle creation:
+   - `pneumo_solver_ui.send_bundle.make_send_bundle(...)` now accepts `tag=` (kw-only)
+   - `pneumo_solver_ui.send_bundle.make_send_bundle_bytes(...)` now accepts `tag=` (kw-only)
+   This removes `TypeError: unexpected keyword argument 'tag'` from the Streamlit sidebar
+   and from crash-guard autosave.
+
+2) Restored crash-guard autosave pipeline:
+   - `pneumo_solver_ui.crash_guard` now imports `make_send_bundle` from the stable wrapper
+     `pneumo_solver_ui.send_bundle` (single source of truth for bundling API).
+   - Fixed a hard crash in autosave path: undefined `_get_project_root()` → use `_repo_root()`.
+
+Impact
+------
+
+- Sidebar "Сохранить диагностику" button works again (no runtime TypeError).
+- Autosave diagnostics on crash/exit works again (crash_guard no longer fails at bundling).
+
+QC summary
+----------
+
+- `compileall`: OK
+- `tools/preflight_gate.py`: OK (fingerprint OK; warnings remain as WARN, not fails)
+- `tools/mech_energy_smoke_check.py`: OK
+- `send_bundle` self-test: make_send_bundle_bytes(tag=...) returns bytes + filename: OK
+

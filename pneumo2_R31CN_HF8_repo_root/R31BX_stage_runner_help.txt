@@ -1,0 +1,63 @@
+usage: opt_stage_runner_v1.py [-h] --model MODEL --worker WORKER
+                              --run_dir RUN_DIR --base_json BASE_JSON
+                              --ranges_json RANGES_JSON
+                              --suite_json SUITE_JSON --out_csv OUT_CSV
+                              --progress_json PROGRESS_JSON
+                              --stop_file STOP_FILE [--minutes MINUTES]
+                              [--seed_candidates SEED_CANDIDATES]
+                              [--seed_conditions SEED_CONDITIONS]
+                              [--jobs JOBS] [--flush_every FLUSH_EVERY]
+                              [--progress_every_sec PROGRESS_EVERY_SEC]
+                              [--autoupdate_baseline AUTOUPDATE_BASELINE]
+                              [--warmstart_mode {surrogate,archive,none}]
+                              [--surrogate_samples SURROGATE_SAMPLES]
+                              [--surrogate_top_k SURROGATE_TOP_K]
+                              [--stop_pen_stage1 STOP_PEN_STAGE1]
+                              [--stop_pen_stage2 STOP_PEN_STAGE2]
+                              [--sort_tests_by_cost SORT_TESTS_BY_COST]
+                              [--eps_rel INFLUENCE_EPS_REL]
+                              [--adaptive_influence_eps]
+                              [--adaptive_influence_eps_grid ADAPTIVE_INFLUENCE_EPS_GRID]
+
+options:
+  -h, --help            show this help message and exit
+  --model MODEL
+  --worker WORKER
+  --run_dir RUN_DIR
+  --base_json BASE_JSON
+  --ranges_json RANGES_JSON
+  --suite_json SUITE_JSON
+  --out_csv OUT_CSV
+  --progress_json PROGRESS_JSON
+  --stop_file STOP_FILE
+  --minutes MINUTES
+  --seed_candidates SEED_CANDIDATES
+  --seed_conditions SEED_CONDITIONS
+  --jobs JOBS
+  --flush_every FLUSH_EVERY
+  --progress_every_sec PROGRESS_EVERY_SEC
+  --autoupdate_baseline AUTOUPDATE_BASELINE
+  --warmstart_mode {surrogate,archive,none}
+                        Как инициализировать распределение (CEM): surrogate
+                        (RF/ET) / archive (топ из истории) / none
+  --surrogate_samples SURROGATE_SAMPLES
+                        Сколько случайных точек прогнать через surrogate для
+                        выбора элиты (warm-start)
+  --surrogate_top_k SURROGATE_TOP_K
+                        Сколько лучших по surrogate взять как elite для mu/cov
+  --stop_pen_stage1 STOP_PEN_STAGE1
+                        Early-stop порог по суммарному штрафу для stage1
+  --stop_pen_stage2 STOP_PEN_STAGE2
+                        Early-stop порог по суммарному штрафу для stage2
+  --sort_tests_by_cost SORT_TESTS_BY_COST
+                        Сортировать тесты по dt*t_end (дешёвые первыми) в
+                        worker
+  --eps_rel, --influence_eps_rel INFLUENCE_EPS_REL
+                        Относительный шаг возмущения для
+                        system_influence_report_v1
+  --adaptive_influence_eps
+                        Включить adaptive epsilon scan в
+                        system_influence_report_v1
+  --adaptive_influence_eps_grid ADAPTIVE_INFLUENCE_EPS_GRID
+                        Опциональная сетка eps_rel для adaptive epsilon в
+                        system_influence_report_v1

@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PneumoSolverProfile",
+  "type": "object",
+  "required": [
+    "profile_version",
+    "base",
+    "ranges",
+    "suite"
+  ],
+  "properties": {
+    "profile_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "app_release": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "base": {
+      "type": "object"
+    },
+    "ranges": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2
+          },
+          {
+            "type": "object",
+            "required": [
+              "min",
+              "max"
+            ],
+            "properties": {
+              "min": {},
+              "max": {}
+            },
+            "additionalProperties": true
+          }
+        ]
+      }
+    },
+    "suite": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "additionalProperties": true
+}

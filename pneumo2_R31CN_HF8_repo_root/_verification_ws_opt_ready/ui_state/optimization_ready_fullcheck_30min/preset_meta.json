@@ -1,0 +1,9 @@
+{
+  "schema_version": "pneumo_opt_ready_preset_v1",
+  "preset_name": "fullcheck_30min",
+  "base_json": "/mnt/data/work_r31ck/PneumoApp_v6_80_R176_R31CJ_2026-04-02/pneumo_solver_ui/default_base.json",
+  "base_json_mtime_ns": 1774971568000000000,
+  "suite_source_json": "/mnt/data/work_r31ck/PneumoApp_v6_80_R176_R31CJ_2026-04-02/pneumo_solver_ui/default_suite.json",
+  "suite_source_json_mtime_ns": 1774971568000000000,
+  "wheelbase_m": 1.5
+}

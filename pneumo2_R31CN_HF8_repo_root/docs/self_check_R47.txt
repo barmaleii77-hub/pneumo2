@@ -1,0 +1,28 @@
+[1] build_test_suite(): тестов собрано = 9
+  OK: комбо-тест присутствует
+[2] candidate_penalty(): pen_bad=3.19286, pen_ok=0
+  OK: штраф реагирует на нарушения и ~0 при выполнении
+[3] smoke-test simulate(): метрик=113
+  OK: ключевые метрики на месте
+[3b] nist_air cp,gamma: cp300=1004.6 J/kg/K, gamma300=1.3999, cp1000=1140.7, gamma1000=1.3362
+  OK: cp(T), gamma(T) выглядят разумно
+[3c] smoke-test simulate(nist_air): метрик=113
+  OK: nist_air режим запускается и отдаёт ключевые метрики
+[4] ISO 6358-3 eq: Ceq_series=1.000e-08, Ceq_parallel=3.000e-08
+  OK: параллельный Ceq > каждого C_i
+  OK: последовательный Ceq < min(C_i)
+  OK: mdot(dp==dPcrack)~0
+[5] dPcrack check: md_model=0.008058, md_ref=0.008058, rel=0
+  OK: dPcrack учитывается как p1_eff=p1-dPcrack (dp_width=0)
+[6] VNR passport Qn match (worst relative): 1.104e-03
+[6] SCO passport Qn match (worst relative): 1.104e-03
+[7] passport precedence VNR: relC=0.000e+00, |b-b_ref|=0.000e+00  (ISO_b_default=0.3)
+[7] passport precedence SCO: relC_open=0.000e+00, |b-b_ref|=0.000e+00
+  OK: component_passport.json реально используется и имеет приоритет
+[8] gas energy balance residual: 97.8691 J  (tol 8.26 J)
+  !! [8] WARNING: energy balance error is larger than expected — проверьте dt/параметры или модель тепла/расхода
+[9] entropy generation (cum): 0.229002 J/K, exergy destroyed: 67.1319 J
+[10] wall Biot max: 0.000416667  (lumped ok ~ Bi<0.1)
+[10] wall Biot max (dyn): 0.00120494
+
+SELF-CHECK: OK

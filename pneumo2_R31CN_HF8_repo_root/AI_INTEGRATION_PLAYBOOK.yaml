@@ -1,0 +1,97 @@
+# Machine-readable playbook for AI-driven integration/merge.
+# Schema: pneumo.ai_integration_playbook.v1
+
+schema: pneumo.ai_integration_playbook.v1
+etalon_release:
+  name: PneumoApp_ETALON_v6_80_R116
+  built_at: '2026-02-18'
+  base_dir: 'PneumoApp_v6_80'
+  rationale:
+    - 'R116 chosen as best-known integrated base: includes diagnostics, structured UI navigation, optimization + dist tools.'
+    - 'Merged fixes from latest donors: optimization hashing stability, energy/entropy audit fixes, ISO6358 rho_ANR toggle, scenario-matrix nominal compatibility.'
+
+critical_defaults:
+  env_defaults:
+    PNEUMO_OPT_PROBLEM_HASH_MODE: stable
+    PNEUMO_ISO6358_RHO_ANR_MODE: norm
+
+contracts:
+  generated_artifacts:
+    - 'pneumo_solver_ui/contracts/generated/key_usage_index.json'
+    - 'pneumo_solver_ui/contracts/generated/keys_registry.yaml'
+    - 'docs/consolidated/consolidated_todo_wishlist.json'
+    - 'docs/consolidated/donor_diff_inventory.json'
+
+build_and_verify:
+  prerequisites:
+    python: '>=3.10'
+  steps:
+    - id: setup
+      cmd: |
+        python -m venv .venv
+        . .venv/bin/activate
+        pip install -r requirements.txt
+    - id: syntax
+      cmd: |
+        python -m compileall -q .
+    - id: unit_tests
+      cmd: |
+        pytest -q
+    - id: selfcheck
+      cmd: |
+        python -m pneumo_solver_ui.tools.selfcheck_suite --level quick
+    - id: energy_smoke
+      cmd: |
+        python -m pneumo_solver_ui.tools.thermo_energy_smoke_check
+    - id: key_registry
+      cmd: |
+        python -m pneumo_solver_ui.tools.build_key_registry --root . --out_dir pneumo_solver_ui/contracts/generated
+    - id: todo_wishlist
+      cmd: |
+        # optional: requires donor unpack dirs
+        python -m pneumo_solver_ui.tools.aggregate_todo_wishlist --scan_root ../work --out_dir docs/consolidated
+
+merge_workflow_for_new_donors:
+  required_inputs_per_donor_archive:
+    - 'PneumoApp_v6_80/ (app.py + pneumo_solver_ui/ tree)'
+    - 'BUILD_INFO/ (optional but recommended)'
+    - 'DONOR_MANIFEST.json (recommended)'
+  process:
+    - id: unpack
+      description: 'Unpack donor archives into a scan_root folder. Keep folder names stable.'
+    - id: inventory
+      description: 'Build diff inventory vs current etalon.'
+      cmd: |
+        python -m pneumo_solver_ui.tools.build_donor_diff_inventory \
+          --base ./PneumoApp_v6_80 \
+          --scan_root <SCAN_ROOT> \
+          --out ./docs/consolidated/donor_diff_inventory.json
+    - id: classify
+      description: |
+        Classify changes per domain:
+          - mechanics: model_pneumo_v9_mech_* / road_profile_* / mech core
+          - pneumatics: iso6358_* / valve models / pneumatic nets
+          - physics/thermo: energy audit / entropy checks
+          - optimization: dist_opt_coordinator, opt_stage_runner, worker, registries
+          - UI: pages/, ui_*.py
+          - diagnostics: tools/*bundle*, selfcheck_suite, preflight gate
+    - id: merge
+      description: |
+        Merge policy:
+          - Prefer newest donor per domain branch, BUT never lose functionality.
+          - Preserve unified contracts/registries:
+              - env keys (PNEUMO_*)
+              - session_state keys
+              - base.json/ranges.json/suite.json semantics
+          - If a donor feature is valuable but risky: integrate behind a flag (env or UI setting), default OFF.
+          - Do not keep 'legacy-only' pages: either fix, or mark WIP/IN_DEV with explicit banner and menu label.
+    - id: verify
+      description: 'Run build_and_verify steps. Bundle diagnostics if failures.'
+
+acceptance_criteria:
+  - 'All P0 checks: compileall, pytest, selfcheck_suite(quick), thermo_energy_smoke_check pass.'
+  - 'Diagnostics bundle can be generated and validated.'
+  - 'No broken imports in distributed optimization scripts (Ray/Dask).' 
+  - 'Structured UI navigation intact; pages either work or clearly marked WIP.'
+  - 'Unified key registry regenerated; no key drift without registry update.'
+

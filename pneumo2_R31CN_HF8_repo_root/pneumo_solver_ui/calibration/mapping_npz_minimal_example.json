@@ -1,0 +1,38 @@
+[
+  {
+    "meas_table": "main",
+    "meas_col": "давление_ресивер1_Па",
+    "model_key": "main:давление_ресивер1_Па",
+    "weight": 1e-5
+  },
+  {
+    "meas_table": "main",
+    "meas_col": "давление_ресивер2_Па",
+    "model_key": "main:давление_ресивер2_Па",
+    "weight": 1e-5
+  },
+  {
+    "meas_table": "main",
+    "meas_col": "давление_ресивер3_Па",
+    "model_key": "main:давление_ресивер3_Па",
+    "weight": 1e-5
+  },
+  {
+    "meas_table": "main",
+    "meas_col": "давление_аккумулятор_Па",
+    "model_key": "main:давление_аккумулятор_Па",
+    "weight": 1e-5
+  },
+  {
+    "meas_table": "main",
+    "meas_col": "крен_phi_рад",
+    "model_key": "main:крен_phi_рад",
+    "weight": 1.0
+  },
+  {
+    "meas_table": "main",
+    "meas_col": "тангаж_theta_рад",
+    "model_key": "main:тангаж_theta_рад",
+    "weight": 1.0
+  }
+]
