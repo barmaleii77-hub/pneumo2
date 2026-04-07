@@ -10,7 +10,7 @@
   внутри calibration/*.py.
 
 Ожидаемый запуск:
-    python -m streamlit run pneumo_ui_app.py
+    python -m streamlit run app.py
 
 Streamlit автоматически подхватит папку pages/.
 """

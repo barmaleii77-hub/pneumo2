@@ -17,6 +17,8 @@ import hashlib
 import re
 from pathlib import Path
 
+from pneumo_solver_ui.entrypoints import canonical_home_page_rel, repo_root
+
 import re
 
 def _extract_original_filename(p: Path) -> str | None:
@@ -151,11 +153,6 @@ class PageEntry:
         return f"{self.icon} {self.title}{suffix}".strip()
 
 
-def _repo_root() -> Path:
-    # .../pneumo_solver_ui/page_registry.py -> repo root is one level up.
-    return Path(__file__).resolve().parents[1]
-
-
 def _slug(s: str) -> str:
     s = s.lower().strip()
     s = re.sub(r"[^a-z0-9]+", "-", s)
@@ -234,13 +231,13 @@ def get_entries() -> list[PageEntry]:
     """Return explicit + autodiscovered page entries."""
 
     files = _discover_page_files()
-    repo = _repo_root()
+    repo = repo_root(here=__file__)
 
     # Explicit (curated) pages first.
     curated: list[PageEntry] = []
 
     # Home page (main UI)
-    home_rel = "pneumo_solver_ui/pneumo_ui_app.py"
+    home_rel = canonical_home_page_rel(here=__file__)
     curated.append(
         PageEntry(
             section="Старт",

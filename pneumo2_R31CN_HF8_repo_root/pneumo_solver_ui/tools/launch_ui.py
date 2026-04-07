@@ -43,6 +43,7 @@ import webbrowser
 from datetime import datetime
 from pathlib import Path
 
+from pneumo_solver_ui.entrypoints import canonical_streamlit_entrypoint, repo_root
 from pneumo_solver_ui.workspace_contract import ensure_workspace_contract_dirs
 
 
@@ -51,10 +52,6 @@ try:
     RELEASE = get_release()
 except Exception:
     RELEASE = os.environ.get("PNEUMO_RELEASE", "UNIFIED_v6_67") or "UNIFIED_v6_67"
-
-
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
 
 
 def _ts() -> str:
@@ -90,9 +87,9 @@ def main() -> int:
     ap.add_argument("--headless", action="store_true", help="Run Streamlit headless=true")
     args = ap.parse_args()
 
-    repo = _repo_root()
+    repo = repo_root(here=__file__)
     pneumo_dir = repo / "pneumo_solver_ui"
-    app = pneumo_dir / "pneumo_ui_app.py"
+    app = canonical_streamlit_entrypoint(here=__file__)
     if not app.exists():
         print(f"ERROR: app not found: {app}")
         return 2
@@ -135,6 +132,7 @@ def main() -> int:
             run_id,
             session_dir=str(session_dir),
             launcher="launch_ui.py",
+            app=str(app),
             release=RELEASE,
             **extra,
         )
@@ -167,7 +165,7 @@ def main() -> int:
     print("Starting Streamlit...")
     proc = None
     try:
-        proc = subprocess.Popen(cmd, cwd=str(pneumo_dir), env=env, stdout=lf, stderr=lf, creationflags=_creationflags_no_window())
+        proc = subprocess.Popen(cmd, cwd=str(repo), env=env, stdout=lf, stderr=lf, creationflags=_creationflags_no_window())
     except Exception as e:
         if lf:
             try:

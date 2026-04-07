@@ -10,6 +10,8 @@ Streamlit UI:
 Требования: streamlit, numpy, pandas, openpyxl.
 
 """
+# Compatibility note: this is the heavy home page rendered by the repo-root multipage shell.
+# Keep it runnable for diagnostics, but prefer streamlit run app.py as the canonical launcher.
 import os
 import sys
 import platform
@@ -27,6 +29,7 @@ from logging.handlers import RotatingFileHandler
 import traceback
 import threading
 import uuid
+from functools import partial
 from pathlib import Path
 
 # Ensure project root is on sys.path (fixes ModuleNotFoundError for package-style imports)
@@ -58,7 +61,6 @@ import copy
 import gzip
 import pickle
 
-from difflib import SequenceMatcher
 from contextlib import contextmanager
 
 import numpy as np
@@ -71,7 +73,65 @@ try:
 except Exception:
     pass
 
-from pneumo_solver_ui.streamlit_compat import safe_set_page_config, request_rerun
+from pneumo_solver_ui.streamlit_compat import safe_set_page_config
+from pneumo_solver_ui.ui_cache_helpers import (
+    detail_cache_path as build_detail_cache_path,
+    df_to_excel_bytes,
+    float_tag as _float_tag,
+    legacy_detail_cache_path as build_legacy_detail_cache_path,
+    load_baseline_cache as load_ui_baseline_cache,
+    load_detail_cache_payload as load_ui_detail_cache,
+    load_last_baseline_ptr as load_ui_last_baseline_ptr,
+    make_detail_cache_key,
+    pareto_front_2d,
+    save_baseline_cache as save_ui_baseline_cache,
+    save_detail_cache_payload as save_ui_detail_cache,
+    save_last_baseline_ptr as save_ui_last_baseline_ptr,
+    stable_obj_hash,
+)
+from pneumo_solver_ui.ui_data_helpers import decimate_minmax, downsample_df, write_tests_index_csv
+from pneumo_solver_ui.ui_event_sync_helpers import (
+    consume_mech_pick_event as _consume_mech_pick_event_core,
+    consume_playhead_event as _consume_playhead_event_core,
+    consume_plotly_pick_events as _consume_plotly_pick_events_core,
+    consume_svg_pick_event as _consume_svg_pick_event_core,
+)
+from pneumo_solver_ui.ui_interaction_helpers import (
+    apply_pick_list as _apply_pick_list,
+    ensure_mapping_for_selection,
+    extract_plotly_selection_points as _extract_plotly_selection_points,
+    plotly_points_signature as _plotly_points_signature,
+    strip_svg_xml_header,
+)
+from pneumo_solver_ui.ui_param_helpers import (
+    is_numeric_scalar as _is_numeric_scalar,
+    is_pressure_param,
+    is_small_volume_param,
+    is_volume_param,
+    param_desc,
+)
+from pneumo_solver_ui.ui_runtime_helpers import (
+    do_rerun,
+    get_ui_nonce,
+    is_any_fallback_anim_playing,
+    pid_alive,
+    proc_metrics as _proc_metrics,
+)
+from pneumo_solver_ui.ui_suite_helpers import (
+    load_default_suite_disabled,
+    load_suite,
+    resolve_osc_dir,
+)
+from pneumo_solver_ui.ui_simulation_helpers import (
+    call_simulate,
+    compute_road_profile_from_suite,
+    parse_sim_output,
+)
+from pneumo_solver_ui.ui_svg_html_builders import (
+    render_svg_edge_mapper_html,
+    render_svg_flow_animation_html,
+    render_svg_node_mapper_html,
+)
 
 from pneumo_solver_ui.ui_heavy_cache import UIHeavyCache, default_cache_dir
 from pneumo_solver_ui.anim_export_meta import extract_anim_sidecar_meta as _extract_anim_sidecar_meta_core
@@ -170,6 +230,13 @@ from pneumo_solver_ui.optimization_runtime_paths import (
 )
 from pneumo_solver_ui.optimization_stage_policy_live import (
     summarize_stage_policy_runtime,
+)
+from pneumo_solver_ui.ui_shared_helpers import (
+    best_match as _best_match,
+    name_score as _name_score,
+    norm_name as _norm_name,
+    run_starts as _run_starts,
+    shorten_name as _shorten_name,
 )
 
 
@@ -623,19 +690,7 @@ except Exception:
     pass
 
 
-def get_osc_dir() -> Path:
-    """Return current osc_dir.
-
-    The UI exposes osc_dir via a text_input (key: osc_dir_path). If user didn't touch it
-    (or the expander wasn't opened), we fall back to WORKSPACE_OSC_DIR.
-    """
-    try:
-        p = st.session_state.get("osc_dir_path")
-        if isinstance(p, str) and p.strip():
-            return Path(p).expanduser()
-    except Exception:
-        pass
-    return WORKSPACE_OSC_DIR
+get_osc_dir = partial(resolve_osc_dir, WORKSPACE_OSC_DIR)
 
 
 # -------------------------------
@@ -931,26 +986,6 @@ except Exception:
     pass
 
 
-def get_ui_nonce() -> str:
-    """Короткий nonce на сессию UI.
-
-    Зачем нужен:
-    - Компоненты анимации синхронизируются через localStorage.
-    - При refresh окна/вкладки localStorage может содержать "старое" состояние play/pause.
-    - Если dataset_id совпадает, фронт может на доли секунды подхватить старый playhead.
-
-    Поэтому мы добавляем per-session nonce в dataset_id (не влияет на кэш расчётов),
-    чтобы *любая* новая Streamlit-сессия считалась "новым датасетом" для анимации.
-    """
-
-    n = st.session_state.get("_ui_nonce")
-    if not n:
-        n = uuid.uuid4().hex[:8]
-        st.session_state["_ui_nonce"] = n
-    return str(n)
-
-
-
 # --- Desktop Animator launcher (best-effort) ---
 def _desktop_animator_log_dir() -> Path:
     raw = str(os.environ.get('PNEUMO_LOG_DIR', '') or '').strip()
@@ -1047,47 +1082,6 @@ def launch_desktop_animator_follow(pointer_path: str | Path, *, theme: str = 'da
         return False
 
 
-
-def _proc_metrics() -> Dict[str, Any]:
-    """Снимок метрик процесса (CPU/RAM) — best effort."""
-
-    if not _HAS_PSUTIL or psutil is None:
-        return {}
-
-    # На Windows/корп. ПК отдельные вызовы psutil иногда падают
-    # (AccessDenied/NotImplementedError). Поэтому собираем "по кускам":
-    # что смогли — то записали.
-    out: Dict[str, Any] = {}
-    try:
-        p = psutil.Process(os.getpid())
-        out["pid"] = p.pid
-    except Exception:
-        return {}
-
-    try:
-        mem = p.memory_info()
-        out["rss_mb"] = round(mem.rss / 1024 / 1024, 1)
-        out["vms_mb"] = round(mem.vms / 1024 / 1024, 1)
-    except Exception:
-        pass
-
-    try:
-        out["cpu_num"] = p.cpu_num()
-    except Exception:
-        pass
-
-    try:
-        out["cpu_count"] = psutil.cpu_count(logical=True)
-    except Exception:
-        pass
-
-    # cpu_percent требует "прогрева"; всё равно полезно видеть хоть что-то.
-    try:
-        out["cpu_percent"] = p.cpu_percent(interval=None)
-    except Exception:
-        pass
-
-    return out
 
 # -------------------------------
 # Bi-directional SVG component (click on scheme -> Python)
@@ -1253,636 +1247,36 @@ try:
 except Exception:
     pass
 
-def _apply_pick_list(cur: Any, name: str, mode: str) -> List[str]:
-    if cur is None:
-        cur_list: List[str] = []
-    elif isinstance(cur, list):
-        cur_list = list(cur)
-    else:
-        try:
-            cur_list = list(cur)
-        except Exception:
-            cur_list = []
-
-    if mode == "replace":
-        return [name]
-    if name not in cur_list:
-        cur_list.append(name)
-    return cur_list
-
-
-def consume_svg_pick_event():
-    """Consume last pick event from the SVG component and sync other widgets.
-
-    Why this exists:
-    - Streamlit forbids mutating st.session_state[widget_key] after that widget
-      has been instantiated in the current run.
-    - When the component sends a click event, Streamlit re-runs the script and
-      the component value is already present in st.session_state. We can read it
-      early in the run and update defaults for multiselects used by graphs.
-
-    The component sends events like:
-      {kind: 'edge'|'node', name: str, ts: int}
-
-    This function updates:
-      - edges: flow_graph_edges, anim_edges_svg
-      - nodes: anim_nodes_svg, node_pressure_plot
-      - last selected: svg_selected_edge / svg_selected_node
-    """
-    evt = st.session_state.get("svg_pick_event")
-    if not isinstance(evt, dict):
-        return
-
-    # de-duplicate by timestamp (each click sends Date.now())
-    ts = evt.get("ts")
-    last_ts = st.session_state.get("svg_pick_event_last_ts")
-    if ts is not None and ts == last_ts:
-        return
-    st.session_state["svg_pick_event_last_ts"] = ts
-
-    kind = evt.get("kind")
-    name = evt.get("name")
-    if not isinstance(name, str) or not name.strip():
-        return
-    name = name.strip()
-    if kind not in ("edge", "node", "label", "review_nav", "review_filter", "review_toggle"):
-        return
-
-    # review action from SVG overlay (approve/pending/reject) — updates mapping JSON text
-    try:
-        if kind == "edge":
-            ra = evt.get("review_action")
-            if isinstance(ra, str):
-                ra = ra.strip().lower()
-            if ra in ("approved", "pending", "rejected"):
-                mapping_text = st.session_state.get("svg_mapping_text", "")
-                if isinstance(mapping_text, str) and mapping_text.strip():
-                    try:
-                        mobj = json.loads(mapping_text)
-                    except Exception:
-                        mobj = None
-                    if isinstance(mobj, dict):
-                        mobj.setdefault("version", 2)
-                        mobj.setdefault("edges", {})
-                        mobj.setdefault("nodes", {})
-                        mobj.setdefault("edges_meta", {})
-                        if not isinstance(mobj.get("edges_meta"), dict):
-                            mobj["edges_meta"] = {}
-                        em = mobj["edges_meta"].get(name, {})
-                        if not isinstance(em, dict):
-                            em = {}
-                        em.setdefault("review", {})
-                        if not isinstance(em.get("review"), dict):
-                            em["review"] = {}
-                        em["review"]["status"] = ra
-                        em["review"]["by"] = str(evt.get("via", "svg"))
-                        em["review"]["ts"] = float(time.time())
-                        # preserve existing note, unless provided
-                        if isinstance(evt.get("note"), str) and evt.get("note").strip():
-                            em["review"]["note"] = evt.get("note").strip()
-                        mobj["edges_meta"][name] = em
-                        st.session_state["svg_mapping_text"] = json.dumps(mobj, ensure_ascii=False, indent=2)
-                        st.session_state["svg_review_last"] = {"edge": name, "status": ra, "ts": float(time.time())}
-    except Exception:
-        pass
-
-
-    # -----------------------------------------------------------
-    # Review HUD / conveyor events (from SVG component)
-    # -----------------------------------------------------------
-    if kind == "review_toggle":
-        try:
-            st.session_state["svg_show_review_overlay"] = bool(evt.get("value"))
-        except Exception:
-            pass
-        return
-
-    if kind == "review_filter":
-        try:
-            mode = str(evt.get("mode") or "").strip()
-        except Exception:
-            mode = ""
-        if mode == "toggle_pending_only":
-            try:
-                cur = st.session_state.get("svg_review_statuses", ["approved", "pending", "rejected"])
-                cur_set = set([str(x) for x in cur]) if isinstance(cur, (list, tuple)) else set()
-                # if already pending-only (pending/unknown), toggle back to full set
-                if cur_set and cur_set.issubset({"pending", "unknown"}):
-                    st.session_state["svg_review_statuses"] = ["approved", "pending", "rejected"]
-                else:
-                    st.session_state["svg_review_statuses"] = ["pending", "unknown"]
-                st.session_state["svg_show_review_overlay"] = True
-            except Exception:
-                pass
-            return
-
-    if kind == "review_nav":
-        try:
-            action = str(evt.get("action") or "").strip()
-        except Exception:
-            action = ""
-        if action in ("next_pending", "prev_pending"):
-            try:
-                mapping_text = st.session_state.get("svg_mapping_text", "")
-                mobj = json.loads(mapping_text) if isinstance(mapping_text, str) and mapping_text.strip() else {}
-            except Exception:
-                mobj = {}
-            pending = []
-            try:
-                edges_geo = mobj.get("edges", {}) if isinstance(mobj, dict) else {}
-                emap = mobj.get("edges_meta", {}) if isinstance(mobj, dict) else {}
-                if not isinstance(edges_geo, dict):
-                    edges_geo = {}
-                if not isinstance(emap, dict):
-                    emap = {}
-                for e_name, segs in edges_geo.items():
-                    if not isinstance(segs, list) or not segs:
-                        continue
-                    status = "unknown"
-                    try:
-                        meta = emap.get(str(e_name), {})
-                        rv = meta.get("review", {}) if isinstance(meta, dict) else {}
-                        stt = rv.get("status", "") if isinstance(rv, dict) else ""
-                        status = str(stt) if stt else "unknown"
-                    except Exception:
-                        status = "unknown"
-                    if status in ("pending", "unknown", ""):
-                        pending.append(str(e_name))
-                pending = sorted(set(pending))
-            except Exception:
-                pending = []
-            if pending:
-                cur = str(st.session_state.get("svg_selected_edge") or "")
-                if cur in pending:
-                    i = pending.index(cur)
-                else:
-                    i = -1
-                if action == "next_pending":
-                    j = (i + 1) if (i + 1) < len(pending) else 0
-                else:
-                    j = (i - 1) if i > 0 else (len(pending) - 1)
-                st.session_state["svg_selected_edge"] = pending[j]
-                st.session_state["svg_selected_node"] = ""
-            return
-
-    # Auto-advance in review mode (after Shift/Ctrl/Alt click on overlay line)
-    try:
-        if kind == "edge":
-            ra = evt.get("review_action")
-            if isinstance(ra, str):
-                ra2 = ra.strip().lower()
-            else:
-                ra2 = ""
-            if ra2 in ("approved", "rejected") and bool(st.session_state.get("svg_review_auto_advance", True)):
-                # select next pending/unknown (in mapping.edges)
-                try:
-                    mapping_text = st.session_state.get("svg_mapping_text", "")
-                    mobj = json.loads(mapping_text) if isinstance(mapping_text, str) and mapping_text.strip() else {}
-                except Exception:
-                    mobj = {}
-                pending = []
-                try:
-                    edges_geo = mobj.get("edges", {}) if isinstance(mobj, dict) else {}
-                    emap = mobj.get("edges_meta", {}) if isinstance(mobj, dict) else {}
-                    if not isinstance(edges_geo, dict):
-                        edges_geo = {}
-                    if not isinstance(emap, dict):
-                        emap = {}
-                    for e_name, segs in edges_geo.items():
-                        if not isinstance(segs, list) or not segs:
-                            continue
-                        status = "unknown"
-                        try:
-                            meta = emap.get(str(e_name), {})
-                            rv = meta.get("review", {}) if isinstance(meta, dict) else {}
-                            stt = rv.get("status", "") if isinstance(rv, dict) else ""
-                            status = str(stt) if stt else "unknown"
-                        except Exception:
-                            status = "unknown"
-                        if status in ("pending", "unknown", ""):
-                            pending.append(str(e_name))
-                    pending = sorted(set(pending))
-                except Exception:
-                    pending = []
-                if pending:
-                    cur = str(st.session_state.get("svg_selected_edge") or "")
-                    if cur in pending:
-                        i = pending.index(cur)
-                    else:
-                        i = -1
-                    j = (i + 1) if (i + 1) < len(pending) else 0
-                    st.session_state["svg_selected_edge"] = pending[j]
-                    st.session_state["svg_selected_node"] = ""
-    except Exception:
-        pass
-
-
-    # label pick from SVG (used by connectivity/pathfinder)
-    if kind == "label":
-        pmode = evt.get("mode")
-        if pmode in ("start", "end"):
-            st.session_state["svg_route_label_pick_pending"] = evt
-            # exit label-pick mode after successful click
-            st.session_state["svg_label_pick_mode"] = ""
-        return
-
-    mode = st.session_state.get("svg_click_mode", "replace")
-    if mode not in ("add", "replace"):
-        mode = "add"
-
-    if kind == "edge":
-        st.session_state["svg_selected_edge"] = name
-        st.session_state["flow_graph_edges"] = _apply_pick_list(st.session_state.get("flow_graph_edges"), name, mode)
-        st.session_state["anim_edges_svg"] = _apply_pick_list(st.session_state.get("anim_edges_svg"), name, mode)
-
-    if kind == "node":
-        st.session_state["svg_selected_node"] = name
-        st.session_state["anim_nodes_svg"] = _apply_pick_list(st.session_state.get("anim_nodes_svg"), name, mode)
-        st.session_state["node_pressure_plot"] = _apply_pick_list(st.session_state.get("node_pressure_plot"), name, mode)
-
-
-def consume_mech_pick_event():
-    """Consume last pick event from mechanical animation components (2D/3D) and sync widgets.
-
-    Components write pick events into Streamlit session_state keys:
-      - mech2d_pick_event  (2D schematic)
-      - mech3d_pick_event  (3D wireframe)
-      - (legacy) mech_pick_event
-
-    Event schema (dict), typical:
-      {kind: 'corner'|'axle', name: str, ts: int|float, shift: bool, ctrl: bool, meta: bool, alt: bool, source: str}
-
-    We use this to:
-      - highlight selected corners in the mech animation (mech_selected_corners)
-      - set defaults for mechanical plots (mech_plot_corners)
-    """
-    # pick newest event by ts (prefer 3D if equal)
-    candidates = []
-    for k in ("mech3d_pick_event", "mech2d_pick_event", "mech_pick_event"):
-        evt_k = st.session_state.get(k)
-        if isinstance(evt_k, dict):
-            ts_k = evt_k.get("ts")
-            try:
-                ts_f = float(ts_k) if ts_k is not None else 0.0
-            except Exception:
-                ts_f = 0.0
-            candidates.append((ts_f, 1 if k == "mech3d_pick_event" else 0, evt_k))
-
-    if not candidates:
-        return
-
-    candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
-    evt = candidates[0][2]
-
-    # de-duplicate by timestamp
-    ts = evt.get("ts")
-    last_ts = st.session_state.get("mech_pick_event_last_ts")
-    if ts is not None and ts == last_ts:
-        return
-    st.session_state["mech_pick_event_last_ts"] = ts
-
-    name = evt.get("name")
-    if not isinstance(name, str) or not name.strip():
-        return
-    name = name.strip()
-
-    # click mode: reuse SVG click mode to keep UX consistent
-    mode = st.session_state.get("svg_click_mode", "replace")
-    if mode not in ("add", "replace"):
-        mode = "add"
-
-    # map selection -> corners
-    name_l = name.lower()
-    if name in ("ЛП", "ПП", "ЛЗ", "ПЗ"):
-        corners = [name]
-    elif name_l in ("перед", "front", "f", "передок"):
-        corners = ["ЛП", "ПП"]
-    elif name_l in ("зад", "rear", "r", "задок"):
-        corners = ["ЛЗ", "ПЗ"]
-    else:
-        return
-
-    # apply to mech_selected_corners
-    cur_sel = st.session_state.get("mech_selected_corners")
-    if not isinstance(cur_sel, list):
-        cur_sel = []
-    if mode == "replace":
-        new_sel = list(dict.fromkeys(corners))
-    else:
-        new_sel = list(cur_sel)
-        for c in corners:
-            if c not in new_sel:
-                new_sel.append(c)
-
-    st.session_state["mech_selected_corners"] = new_sel
-
-    # also set default corners for mech plots
-    st.session_state["mech_plot_corners"] = list(new_sel) if new_sel else st.session_state.get("mech_plot_corners", ["ЛП", "ПП", "ЛЗ", "ПЗ"])
-
-
-def _extract_plotly_selection_points(plot_state: Any) -> List[Dict[str, Any]]:
-    """Best-effort extraction of Plotly selection points from st.plotly_chart state.
-
-    Streamlit returns a dictionary-like PlotlyState object when on_select != "ignore".
-    The schema includes .selection.points (list of dicts). See Streamlit docs.
-    """
-    if plot_state is None:
-        return []
-
-    # PlotlyState supports both attribute and key access.
-    sel = None
-    try:
-        sel = plot_state.get("selection") if isinstance(plot_state, dict) else getattr(plot_state, "selection", None)
-    except Exception:
-        sel = None
-
-    if sel is None:
-        try:
-            sel = plot_state["selection"]
-        except Exception:
-            sel = None
-
-    if sel is None:
-        return []
-
-    try:
-        pts = sel.get("points") if isinstance(sel, dict) else getattr(sel, "points", None)
-    except Exception:
-        pts = None
-
-    if pts is None:
-        try:
-            pts = sel["points"]
-        except Exception:
-            pts = None
-
-    if pts is None:
-        return []
-
-    # Ensure list[dict]
-    out: List[Dict[str, Any]] = []
-    if isinstance(pts, list):
-        for p in pts:
-            if isinstance(p, dict):
-                out.append(p)
-            else:
-                try:
-                    out.append(dict(p))
-                except Exception:
-                    pass
-    return out
-
-
-def _plotly_points_signature(points: List[Dict[str, Any]]) -> str:
-    """Small stable signature for deduplicating selection events."""
-    sig_items = []
-    for p in points:
-        cn = p.get("curve_number", p.get("curveNumber"))
-        # point_index is preferred; fall back to point_number
-        pi = p.get("point_index", p.get("pointIndex", p.get("point_number", p.get("pointNumber"))))
-        try:
-            cn_i = int(cn) if cn is not None else -1
-        except Exception:
-            cn_i = -1
-        try:
-            pi_i = int(pi) if pi is not None else -1
-        except Exception:
-            pi_i = -1
-        sig_items.append((cn_i, pi_i))
-
-    # order-independent
-    sig_items = sorted(set(sig_items))
-    s = json.dumps(sig_items, ensure_ascii=False)
-    return hashlib.sha1(s.encode("utf-8")).hexdigest()[:12]
-
-
-def consume_plotly_pick_events():
-    """Sync Plotly chart selections -> SVG selection (and animation defaults).
-
-    We use Streamlit native `st.plotly_chart(..., on_select="rerun")` to capture clicks.
-    The selection state is stored in st.session_state under the chart key.
-
-    This function runs early in the script (before widgets are created), so it can
-    safely update multiselect defaults.
-    """
-
-    # 1) Flow chart -> pick edge(s)
-    flow_key = "plot_flow_edges"
-    flow_state = st.session_state.get(flow_key)
-    flow_points = _extract_plotly_selection_points(flow_state)
-    if flow_points:
-        sig = _plotly_points_signature(flow_points)
-        last_sig = st.session_state.get(flow_key + "__last_sig")
-        if sig != last_sig:
-            st.session_state[flow_key + "__last_sig"] = sig
-
-            # also: click on plot -> request playhead jump by x (time)
-            try:
-                x0 = flow_points[0].get("x")
-                if x0 is not None:
-                    st.session_state["playhead_request_x"] = float(x0)
-            except Exception:
-                pass
-
-            trace_names = st.session_state.get(flow_key + "__trace_names")
-            if isinstance(trace_names, list) and trace_names:
-                picked = []
-                for p in flow_points:
-                    cn = p.get("curve_number", p.get("curveNumber"))
-                    try:
-                        ci = int(cn)
-                    except Exception:
-                        continue
-                    if 0 <= ci < len(trace_names):
-                        picked.append(str(trace_names[ci]))
-
-                # unique, keep order
-                seen = set()
-                picked_u = []
-                for name in picked:
-                    if name not in seen:
-                        seen.add(name)
-                        picked_u.append(name)
-
-                if picked_u:
-                    # Graph click behavior: highlight + ensure it is included in animation list.
-                    # We intentionally do NOT "replace" multiselects here to avoid surprising UI resets.
-                    for name in picked_u:
-                        st.session_state["svg_selected_edge"] = name
-                        st.session_state["anim_edges_svg"] = _apply_pick_list(st.session_state.get("anim_edges_svg"), name, "add")
-
-    # 2) Node pressure chart -> pick node(s)
-    node_key = "plot_node_pressure"
-    node_state = st.session_state.get(node_key)
-    node_points = _extract_plotly_selection_points(node_state)
-    if node_points:
-        sig = _plotly_points_signature(node_points)
-        last_sig = st.session_state.get(node_key + "__last_sig")
-        if sig != last_sig:
-            st.session_state[node_key + "__last_sig"] = sig
-
-            # also: click on plot -> request playhead jump by x (time)
-            try:
-                x0 = node_points[0].get("x")
-                if x0 is not None:
-                    st.session_state["playhead_request_x"] = float(x0)
-            except Exception:
-                pass
-
-            trace_names = st.session_state.get(node_key + "__trace_names")
-            if isinstance(trace_names, list) and trace_names:
-                picked = []
-                for p in node_points:
-                    cn = p.get("curve_number", p.get("curveNumber"))
-                    try:
-                        ci = int(cn)
-                    except Exception:
-                        continue
-                    if 0 <= ci < len(trace_names):
-                        picked.append(str(trace_names[ci]))
-
-                seen = set()
-                picked_u = []
-                for name in picked:
-                    if name not in seen:
-                        seen.add(name)
-                        picked_u.append(name)
-
-                if picked_u:
-                    for name in picked_u:
-                        st.session_state["svg_selected_node"] = name
-                        st.session_state["anim_nodes_svg"] = _apply_pick_list(st.session_state.get("anim_nodes_svg"), name, "add")
-                        st.session_state["node_pressure_plot"] = _apply_pick_list(st.session_state.get("node_pressure_plot"), name, "add")
-
-
-def consume_playhead_event():
-    """Consume global playhead updates from the playhead_ctrl component.
-
-    The component sends events like:
-      {kind: 'playhead', dataset_id: str, idx: int, t: float, playing: bool, speed: float, loop: bool, ts: int}
-
-    We store the latest state in st.session_state:
-      - playhead_idx (int)
-      - playhead_t (float)
-      - playhead_playing (bool)
-      - playhead_speed (float)
-      - playhead_loop (bool)
-      - playhead_dataset_id (str)
-    """
-    evt = st.session_state.get("playhead_event")
-    if not isinstance(evt, dict):
-        return
-
-    if evt.get("kind") == "browser_perf_snapshot":
-        ts = evt.get("ts")
-        last_perf_ts = st.session_state.get("playhead_browser_perf_last_ts")
-        if ts is not None and ts == last_perf_ts:
-            return
-        st.session_state["playhead_browser_perf_last_ts"] = ts
-        try:
-            perf_summary = persist_browser_perf_snapshot_event(evt, WORKSPACE_EXPORTS_DIR)
-        except Exception:
-            perf_summary = None
-        if isinstance(perf_summary, dict):
-            st.session_state["browser_perf_summary"] = perf_summary
-            try:
-                log_event(
-                    "browser_perf_snapshot_exported",
-                    dataset_id=str(perf_summary.get("browser_perf_dataset_id") or evt.get("dataset_id") or ""),
-                    component_count=int(perf_summary.get("browser_perf_component_count") or 0),
-                    total_wakeups=int(perf_summary.get("browser_perf_total_wakeups") or 0),
-                    total_duplicate_guard_hits=int(perf_summary.get("browser_perf_total_duplicate_guard_hits") or 0),
-                    trace_exists=bool(perf_summary.get("browser_perf_trace_exists")),
-                    level=str(perf_summary.get("browser_perf_level") or ""),
-                    proc=_proc_metrics(),
-                )
-            except Exception:
-                pass
-        return
-
-    if evt.get("kind") not in (None, "playhead"):
-        return
-
-    ts = evt.get("ts")
-    last_ts = st.session_state.get("playhead_event_last_ts")
-    if ts is not None and ts == last_ts:
-        return
-    st.session_state["playhead_event_last_ts"] = ts
-
-    # dataset id (to ignore stale storage between runs)
-    ds = evt.get("dataset_id")
-    if isinstance(ds, str):
-        st.session_state["playhead_dataset_id"] = ds
-
-    # idx / t
-    try:
-        idx = int(evt.get("idx", 0))
-    except Exception:
-        idx = 0
-    if idx < 0:
-        idx = 0
-    st.session_state["playhead_idx"] = idx
-
-    try:
-        t = float(evt.get("t", 0.0))
-    except Exception:
-        t = 0.0
-    st.session_state["playhead_t"] = t
-
-    st.session_state["playhead_playing"] = bool(evt.get("playing", False))
-
-    try:
-        sp = float(evt.get("speed", 1.0))
-    except Exception:
-        sp = 1.0
-    if not (sp > 0):
-        sp = 1.0
-    st.session_state["playhead_speed"] = sp
-
-    st.session_state["playhead_loop"] = bool(evt.get("loop", True))
-
-    picked = evt.get("picked_event")
-    if isinstance(picked, dict):
-        st.session_state["playhead_picked_event"] = picked
-
-    # Log playhead changes (best effort, throttled by state changes)
-    try:
-        last = st.session_state.get("_playhead_last_logged")
-        if not isinstance(last, dict):
-            last = {}
-
-        last_idx = last.get("idx")
-        last_play = last.get("playing")
-        last_ds = last.get("dataset_id")
-
-        # We log only on meaningful changes to avoid spamming.
-        changed = (
-            last_idx != idx
-            or bool(last_play) != bool(st.session_state.get("playhead_playing"))
-            or str(last_ds) != str(ds)
-            or isinstance(picked, dict)
-        )
-
-        if changed:
-            log_event(
-                "playhead_update",
-                dataset_id=str(ds) if isinstance(ds, str) else None,
-                idx=int(idx),
-                t=float(t),
-                playing=bool(st.session_state.get("playhead_playing")),
-                speed=float(st.session_state.get("playhead_speed", 1.0)),
-                loop=bool(st.session_state.get("playhead_loop", True)),
-                picked_event=bool(isinstance(picked, dict)),
-                proc=_proc_metrics(),
-            )
-
-        st.session_state["_playhead_last_logged"] = {
-            "dataset_id": str(ds) if isinstance(ds, str) else None,
-            "idx": int(idx),
-            "playing": bool(st.session_state.get("playhead_playing")),
-        }
-    except Exception:
-        pass
+consume_svg_pick_event = partial(
+    _consume_svg_pick_event_core,
+    st.session_state,
+    apply_pick_list_fn=_apply_pick_list,
+)
+
+
+consume_mech_pick_event = partial(
+    _consume_mech_pick_event_core,
+    st.session_state,
+)
+
+
+consume_plotly_pick_events = partial(
+    _consume_plotly_pick_events_core,
+    st.session_state,
+    extract_plotly_selection_points_fn=_extract_plotly_selection_points,
+    plotly_points_signature_fn=_plotly_points_signature,
+    apply_pick_list_fn=_apply_pick_list,
+)
+
+
+consume_playhead_event = partial(
+    _consume_playhead_event_core,
+    st.session_state,
+    persist_browser_perf_snapshot_event_fn=persist_browser_perf_snapshot_event,
+    workspace_exports_dir=WORKSPACE_EXPORTS_DIR,
+    log_event_fn=log_event,
+    proc_metrics_fn=_proc_metrics,
+)
 
 
 
@@ -1899,138 +1293,6 @@ def load_py_module(path: Path, module_name: str):
         log=lambda event, message, **kw: _emit(event, message, **kw),
     )
 
-
-
-def call_simulate(
-    model_mod,
-    params: dict,
-    test: dict,
-    *,
-    dt: Optional[float] = None,
-    t_end: Optional[float] = None,
-    record_full: bool = False,
-    **kwargs,
-):
-    """Совместимый вызов model.simulate() для разных версий модели.
-
-    Задачи:
-    - разные версии модели могут иметь разную сигнатуру simulate()
-    - некоторые версии мутируют входные dict => передаём deep-copy
-    - dt/t_end иногда не передаются из UI/диагностики => берём из test/params или дефолты
-    """
-
-    sim = getattr(model_mod, "simulate", None)
-    if sim is None:
-        raise AttributeError("model_mod has no simulate()")
-
-    # Нормализация dt/t_end: разрешаем передавать None (тогда берём из test/params или дефолты)
-    if dt is None:
-        dt = (test or {}).get("dt") or (params or {}).get("dt")
-    if t_end is None:
-        t_end = (test or {}).get("t_end") or (test or {}).get("t_end_s") or (params or {}).get("t_end")
-    try:
-        dt = float(dt) if dt is not None else 0.01
-    except Exception:
-        dt = 0.01
-    try:
-        t_end = float(t_end) if t_end is not None else 1.0
-    except Exception:
-        t_end = 1.0
-
-    # Изолируем вызов simulate() от мутаций
-    params = copy.deepcopy(params)
-    test = copy.deepcopy(test)
-
-    # --- compile time-series inputs (road_csv / axay_csv) for UI detailed simulations ---
-    # Важно: baseline использует worker_mod.eval_candidate_once(), который компилирует CSV -> callables.
-    # Детальный прогон (call_simulate) должен делать то же самое, иначе сценарий запускается с нулевой дорогой/манёвром.
-    ts_compile_ok = 1
-    ts_compile_error = ""
-    try:
-        # импортируем из worker-модуля (единый источник истины)
-        from pneumo_solver_ui import opt_worker_v3_margins_energy as _tsw
-        if isinstance(test, dict) and (str(test.get('road_csv') or '').strip() or str(test.get('axay_csv') or '').strip()):
-            test = _tsw._compile_timeseries_inputs(test)
-            # alias for legacy models (если где-то ожидается road_func_dot)
-            if callable(test.get('road_dfunc')) and (not callable(test.get('road_func_dot'))):
-                test['road_func_dot'] = test.get('road_dfunc')
-    except Exception as e:
-        ts_compile_ok = 0
-        ts_compile_error = (f"{type(e).__name__}: {e}")[:300]
-        try:
-            log_event('timeseries_compile_error', error=ts_compile_error)
-        except Exception:
-            pass
-        if bool((test or {}).get('timeseries_strict', True)):
-            raise RuntimeError('Time-series input compile failed: ' + ts_compile_error) from e
-
-
-
-    # Базовые именованные аргументы, которые мы пытаемся передать в simulate()
-    base_kwargs = dict(params=params, test=test, dt=float(dt), t_end=float(t_end), record_full=bool(record_full))
-    extra_kwargs = dict(kwargs or {})
-
-    try:
-        sig = inspect.signature(sim)
-        allowed = set(sig.parameters.keys())
-        # Если simulate ожидает позиционные (params, test, ...), тоже поддержим.
-        # Мы просто фильтруем kwargs до разрешённых имён.
-        call_kwargs = {k: v for k, v in {**base_kwargs, **extra_kwargs}.items() if k in allowed}
-
-        dropped = sorted(set({**base_kwargs, **extra_kwargs}.keys()) - set(call_kwargs.keys()))
-        if dropped:
-            log_event("call_simulate_dropped_kwargs", dropped=dropped)
-
-        return sim(**call_kwargs)
-    except TypeError:
-        # Иногда signature() не отражает реальность (C-обёртки и т.п.) => пробуем строго совместимый вызов
-        return sim(params, test, dt=float(dt), t_end=float(t_end), record_full=bool(record_full))
-    except Exception:
-        # Последний шанс: строго ожидаем сигнатуру simulate(params, test, dt=..., t_end=..., record_full=...)
-        return sim(params, test, dt=float(dt), t_end=float(t_end), record_full=bool(record_full))
-
-
-def compute_road_profile_from_suite(
-    model_mod: Any,
-    test_obj: Dict[str, Any],
-    time_s: List[float],
-    wheelbase_m: float,
-    track_m: float,
-    corners: List[str],
-) -> Optional[Dict[str, List[float]]]:
-    """Road profile under each wheel corner from suite definition (input).
-
-    Why: some solver versions don't export road(t) columns into the output log. In that case
-    the animation would show moving wheels but a flat/zero road, which is misleading.
-    This helper reconstructs the road profile *from the same suite test definition* that
-    the solver uses (via model_mod._compile_suite_test_inputs), so we stay truthful.
-
-    Returns dict corner->list[float] or None if not available.
-    """
-    try:
-        if model_mod is None:
-            return None
-        compile_fn = getattr(model_mod, "_compile_suite_test_inputs", None)
-        if not callable(compile_fn):
-            return None
-
-        # ABSOLUTE LAW: no duplicated aliases in params.
-        params = {"база": float(wheelbase_m), "колея": float(track_m)}
-        add = compile_fn(test_obj, params)
-        road_func = add.get("road_func")
-        if not callable(road_func):
-            return None
-
-        arr = np.asarray([road_func(float(t)) for t in time_s], dtype=float)
-        if arr.ndim != 2 or arr.shape[1] != 4:
-            return None
-
-        out: Dict[str, List[float]] = {}
-        for i, c in enumerate(corners[:4]):
-            out[c] = arr[:, i].astype(float).tolist()
-        return out
-    except Exception:
-        return None
 
 
 def safe_dataframe(df: pd.DataFrame, height: int = 240, hide_index: bool = False, *, max_cols: int = 10, key: str = ""):
@@ -2145,94 +1407,6 @@ def ui_popover(label: str, expanded: bool = False):
             yield
 
 
-def parse_sim_output(out: Any, *, want_full: bool = False) -> Dict[str, Any]:
-    """Нормализует вывод model.simulate() в единый dict.
-
-    В проекте одновременно гуляли несколько форматов вывода симулятора.
-    Сейчас основной формат (model_pneumo_v8_energy_audit_vacuum_patched_smooth_all.py):
-
-    record_full=False:
-        (df_main, df_drossel, df_energy, nodes, edges, df_Eedges, df_Egroups, df_atm)
-
-    record_full=True (нормально, без дублирования хвоста):
-        (df_main, df_drossel, df_energy, nodes, edges, df_Eedges, df_Egroups, df_atm,
-         df_p, df_mdot, df_open)
-
-    Legacy (встречалось в старых моделях):
-        (..., df_p, df_mdot, df_open, df_Eedges, df_Egroups, df_atm)
-
-    Эта функция:
-    - не падает, если каких-то частей нет;
-    - подхватывает повторяющиеся хвостовые df_E*/df_atm (если модель их дублирует);
-    - умеет принимать dict-вывод (если в будущем модель сменится).
-    """
-    res: Dict[str, Any] = {
-        "df_main": None,
-        "df_drossel": None,
-        "df_energy_drossel": None,
-        "nodes": None,
-        "edges": None,
-        "df_Eedges": None,
-        "df_Egroups": None,
-        "df_atm": None,
-        "df_p": None,
-        "df_mdot": None,
-        "df_open": None,
-    }
-
-    if out is None:
-        return res
-
-    # Будущий формат (если симулятор начнёт возвращать dict)
-    if isinstance(out, dict):
-        res.update(out)
-        # нормализуем ключи (популярные варианты)
-        if res.get("df_main") is None:
-            res["df_main"] = out.get("main") or out.get("df")
-        return res
-
-    if not isinstance(out, (list, tuple)):
-        # неизвестный формат — возвращаем как есть (в лог)
-        res["raw"] = out
-        return res
-
-    n = len(out)
-    try:
-        if n > 0: res["df_main"] = out[0]
-        if n > 1: res["df_drossel"] = out[1]
-        if n > 2: res["df_energy_drossel"] = out[2]
-        if n > 3: res["nodes"] = out[3]
-        if n > 4: res["edges"] = out[4]
-        if n > 5: res["df_Eedges"] = out[5]
-        if n > 6: res["df_Egroups"] = out[6]
-        if n > 7: res["df_atm"] = out[7]
-
-        # Полный лог (давления/расходы/срабатывания)
-        if n >= 11:
-            res["df_p"] = out[8]
-            res["df_mdot"] = out[9]
-            res["df_open"] = out[10]
-
-        # Некоторые версии модели дублируют энергетику/атмосферный баланс в конце — берём хвост, если он есть
-        if n >= 12 and isinstance(out[11], pd.DataFrame):
-            res["df_Eedges"] = out[11]
-        if n >= 13 and isinstance(out[12], pd.DataFrame):
-            res["df_Egroups"] = out[12]
-        if n >= 14 and isinstance(out[13], pd.DataFrame):
-            res["df_atm"] = out[13]
-
-    except Exception as e:
-        # Ничего не роняем — но логируем в UI лог.
-        try:
-            log_event("parse_sim_output_error", err=str(e), n=int(n))
-        except Exception:
-            pass
-        res["raw"] = out
-
-    # want_full=True: просто подсказка вызывающему коду, что он ожидает df_p/df_mdot/df_open.
-    # Если модель их не вернула, тут останется None (UI покажет понятное предупреждение).
-    return res
-
 
 def safe_plotly_chart(fig, *, key=None, on_select=None, selection_mode=None):
     """Безопасная обёртка над st.plotly_chart для разных версий Streamlit.
@@ -2263,29 +1437,6 @@ def safe_plotly_chart(fig, *, key=None, on_select=None, selection_mode=None):
             return st.plotly_chart(fig, use_container_width=True, key=key)
 
 
-def is_any_fallback_anim_playing() -> bool:
-    """True если где-либо активен Play в fallback-анимации (2D/3D).
-
-    В fallback-режиме анимация реализована через st_autorefresh -> частые rerun.
-    Если в этот момент пересоздавать тяжёлые Plotly-графики, пользователю кажется,
-    что идёт "бесконечный расчёт".
-    """
-    try:
-        for k, v in st.session_state.items():
-            if not isinstance(k, str):
-                continue
-            if not k.endswith("::play"):
-                continue
-            if not (k.startswith("mech2d_fb_") or k.startswith("mech3d_fb_")):
-                continue
-            if bool(v):
-                return True
-    except Exception:
-        # Никогда не падать из-за этого хелпера.
-        return False
-    return False
-
-
 def safe_image(img, *, caption=None):
     """Безопасный st.image без депрецированного use_container_width.
 
@@ -2301,38 +1452,6 @@ def safe_image(img, *, caption=None):
         except TypeError:
             return st.image(img, caption=caption, use_container_width=True)
 
-
-def write_tests_index_csv(osc_dir: Path, tests: List[dict], *, filename: str = "tests_index.csv") -> Path:
-    """Генерирует tests_index.csv рядом с NPZ для пайплайнов калибровки.
-
-    Почему это важно:
-    - calibration/pipeline_npz_oneclick_v1.py ожидает tests_index.csv с колонкой "имя_теста".
-    - Ранее UI экспортировал только Txx_osc.npz, из-за чего autopilot мог искать файлы не там/не так.
-
-    Формат (минимально достаточный):
-      - test_num (1..N)
-      - имя_теста (строка)
-      - npz_file (имя файла)
-    """
-    osc_dir = Path(osc_dir)
-    osc_dir.mkdir(parents=True, exist_ok=True)
-    rows = []
-    for i, t in enumerate(tests, start=1):
-        name = str(t.get("name", f"T{i:02d}"))
-        rows.append({
-            "test_num": int(i),
-            "имя_теста": name,
-            "npz_file": f"T{i:02d}_osc.npz",
-        })
-
-    df = pd.DataFrame(rows)
-    out = osc_dir / filename
-    try:
-        # utf-8-sig помогает Excel на Windows корректно открыть русские заголовки
-        out.write_text(df.to_csv(index=False), encoding="utf-8-sig")
-    except Exception:
-        df.to_csv(out, index=False)
-    return out
 
 def make_ui_diagnostics_zip(
     out_zip_path=None,
@@ -2439,55 +1558,6 @@ def make_ui_diagnostics_zip(
                 zf.write(p, arcname=arc)
 
     return out_zip_path
-def pareto_front_2d(df: pd.DataFrame, obj1: str, obj2: str) -> pd.Series:
-    """Булев маск недоминируемых точек (минимизация obj1 и obj2).
-
-    Быстрый алгоритм для 2D:
-      сортируем по obj1 по возрастанию и держим текущий минимум obj2.
-    """
-    if len(df) == 0:
-        return pd.Series([], dtype=bool)
-    d = df[[obj1, obj2]].copy()
-    d = d.replace([np.inf, -np.inf], np.nan).dropna()
-    if len(d) == 0:
-        return pd.Series([False] * len(df), index=df.index)
-    d = d.sort_values(obj1, ascending=True)
-    best2 = float("inf")
-    keep_idx = []
-    for idx, row in d.iterrows():
-        v2 = float(row[obj2])
-        if v2 < best2:
-            keep_idx.append(idx)
-            best2 = v2
-    return df.index.isin(keep_idx)
-
-
-def df_to_excel_bytes(sheets: dict) -> bytes:
-    """Собирает Excel из набора {sheet_name: DataFrame} в память."""
-    bio = BytesIO()
-    with pd.ExcelWriter(bio, engine="openpyxl") as w:
-        for name, frame in sheets.items():
-            frame.to_excel(w, sheet_name=str(name)[:31], index=False)
-    bio.seek(0)
-    return bio.read()
-
-
-def stable_obj_hash(obj: Any) -> str:
-    """Стабильный короткий хэш для словарей параметров/тестов.
-
-    Нужен, чтобы:
-    - понимать, что baseline был рассчитан именно для текущих параметров,
-    - кэшировать «полный лог» (record_full=True) по ключу.
-    """
-    try:
-        s = json.dumps(obj, ensure_ascii=False, sort_keys=True, default=str)
-    except Exception:
-        s = str(obj)
-    return hashlib.sha1(s.encode("utf-8")).hexdigest()[:12]
-
-
-
-
 # ------------------------- Persistent cache (baseline/details) -------------------------
 # Цель: после refresh (новая session_state) не пересчитывать baseline/детальный прогон,
 # а подхватывать с диска. Кэш хранится в WORKSPACE_DIR/cache/baseline/<key>/...
@@ -2515,143 +1585,18 @@ def baseline_cache_dir(base_hash: str, suite_hash: str, model_file: str) -> Path
     return WORKSPACE_DIR / "cache" / "baseline" / key
 
 
-def _baseline_cache_meta_path(cache_dir: Path) -> Path:
-    return cache_dir / "meta.json"
-
-
-def _baseline_cache_table_path(cache_dir: Path) -> Path:
-    return cache_dir / "baseline_table.csv"
-
-
-def _baseline_cache_tests_path(cache_dir: Path) -> Path:
-    return cache_dir / "tests_map.json"
-
-
-def _baseline_cache_base_path(cache_dir: Path) -> Path:
-    return cache_dir / "base_override.json"
-
-
-def _baseline_cache_last_ptr_path() -> Path:
-    return WORKSPACE_DIR / "cache" / "baseline" / "_last_baseline.json"
-
-
-def _atomic_write_text(path: Path, text: str, encoding: str = "utf-8") -> None:
-    """Atomic text write: write to *.tmp then replace.
-
-    Streamlit app can be interrupted at any time; atomic writes prevent corrupt caches.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(text, encoding=encoding)
-    os.replace(tmp, path)
-
-
-def _atomic_write_csv(path: Path, df: pd.DataFrame) -> None:
-    """Atomic CSV write: df -> *.tmp then replace."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    df.to_csv(tmp, index=False)
-    os.replace(tmp, path)
-
+# Shared baseline-cache wrappers override the legacy inline copies above.
 def save_last_baseline_ptr(cache_dir: Path, meta: Dict[str, Any]) -> None:
-    try:
-        p = _baseline_cache_last_ptr_path()
-        p.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "cache_dir": str(cache_dir),
-            "ts": datetime.now().isoformat(timespec="seconds"),
-            "meta": meta,
-        }
-        _atomic_write_text(p, json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    except Exception:
-        # не критично
-        pass
+    return save_ui_last_baseline_ptr(cache_dir, meta, workspace_dir=WORKSPACE_DIR)
 
 
 def load_last_baseline_ptr() -> Optional[Dict[str, Any]]:
-    """Load pointer to the most recently saved baseline cache.
-
-    Used to restore UI state after browser refresh without forcing baseline recalculation.
-    """
-    try:
-        p = _baseline_cache_last_ptr_path()
-        if not p.exists():
-            return None
-        return json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
-        return None
+    return load_ui_last_baseline_ptr(workspace_dir=WORKSPACE_DIR)
 
 
 def load_baseline_cache(cache_dir: Path) -> Optional[Dict[str, Any]]:
-    """Load cached baseline if exists. Returns dict or None."""
-    try:
-        table_p = _baseline_cache_table_path(cache_dir)
-        tests_p = _baseline_cache_tests_path(cache_dir)
-        base_p = _baseline_cache_base_path(cache_dir)
-        if not (table_p.exists() and tests_p.exists() and base_p.exists()):
-            return None
-        baseline_df = pd.read_csv(table_p)
-        tests_map = json.loads(tests_p.read_text(encoding="utf-8"))
-        base_override = json.loads(base_p.read_text(encoding="utf-8"))
-        meta_p = _baseline_cache_meta_path(cache_dir)
-        meta = json.loads(meta_p.read_text(encoding="utf-8")) if meta_p.exists() else {}
-        return {
-            "baseline_df": baseline_df,
-            "tests_map": tests_map,
-            "base_override": base_override,
-            "meta": meta,
-        }
-    except Exception:
-        return None
+    return load_ui_baseline_cache(cache_dir)
 
-
-
-def _json_safe(obj: Any, _depth: int = 0) -> Any:
-    """Make object JSON-serializable (best-effort).
-
-    Needed because UI config may contain callables / numpy scalars / Paths etc.
-    We prefer to keep *something* in cache files rather than failing completely.
-    """
-    if _depth > 10:
-        return str(obj)
-    if obj is None or isinstance(obj, (str, int, float, bool)):
-        return obj
-    try:
-        # numpy scalars
-        import numpy as _np  # local import
-        if isinstance(obj, (_np.generic,)):
-            return obj.item()
-        if isinstance(obj, _np.ndarray):
-            return obj.tolist()
-    except Exception:
-        pass
-    try:
-        from pathlib import Path as _Path
-        if isinstance(obj, _Path):
-            return str(obj)
-    except Exception:
-        pass
-    if callable(obj):
-        try:
-            return getattr(obj, "__name__", "callable")
-        except Exception:
-            return "callable"
-    if isinstance(obj, dict):
-        out = {}
-        for k, v in obj.items():
-            try:
-                ks = str(k)
-            except Exception:
-                ks = repr(k)
-            out[ks] = _json_safe(v, _depth=_depth + 1)
-        return out
-    if isinstance(obj, (list, tuple, set)):
-        return [_json_safe(v, _depth=_depth + 1) for v in list(obj)]
-    # fallback
-    try:
-        return float(obj)
-    except Exception:
-        return str(obj)
 
 def save_baseline_cache(
     cache_dir: Path,
@@ -2660,168 +1605,70 @@ def save_baseline_cache(
     base_override: Dict[str, Any],
     meta: Dict[str, Any],
 ) -> None:
-    """Persist baseline artifacts for reuse after refresh (atomically).
-
-    Important:
-    - Streamlit reruns/refreshes can interrupt writes.
-    - Atomic writes prevent partial/corrupt baseline caches.
-    """
-    try:
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        _atomic_write_csv(_baseline_cache_table_path(cache_dir), baseline_df)
-        _atomic_write_text(
-            _baseline_cache_tests_path(cache_dir),
-            json.dumps(_json_safe(tests_map), ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        _atomic_write_text(
-            _baseline_cache_base_path(cache_dir),
-            json.dumps(_json_safe(base_override), ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        _atomic_write_text(
-            _baseline_cache_meta_path(cache_dir),
-            json.dumps(_json_safe(meta), ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        save_last_baseline_ptr(cache_dir, meta)
-    except Exception as e:
-        log_event("baseline_cache_save_error", error=str(e), cache_dir=str(cache_dir))
-
-
-
-def _float_tag(x: float) -> str:
-    """Format float into a filesystem-friendly tag (no '.', no '-', stable)."""
-    try:
-        s = f"{float(x):.6g}"  # 6 significant digits is enough for dt/t_end in UI
-    except Exception:
-        s = str(x)
-    # Filesystem-safe: '.' -> 'p', '-' -> 'm'
-    s = s.replace('-', 'm').replace('.', 'p')
-    return s
-
-
-
-def make_detail_cache_key(model_hash: str, test_name: str, dt: float, t_end: float, max_points: int, want_full: bool) -> str:
-    """Canonical key for detail/full-cache entries (in-memory + disk).
-
-    Important: this key must be used everywhere (single-test run, run-all, exports, animation).
-    Otherwise we get cache misses and repeated heavy recomputation on reruns.
-    """
-    return (
-        f"{model_hash}::{test_name}::dt{_float_tag(float(dt))}::t{_float_tag(float(t_end))}"
-        f"::mp{int(max_points)}::full{int(bool(want_full))}"
+    return save_ui_baseline_cache(
+        cache_dir,
+        baseline_df,
+        tests_map,
+        base_override,
+        meta,
+        workspace_dir=WORKSPACE_DIR,
+        json_safe_fn=_json_safe,
+        log_event_fn=log_event,
     )
 
-def detail_cache_path(cache_dir: Path, test_name: str, dt: float, t_end: float, max_points: int, want_full: bool) -> Path:
-    ddir = cache_dir / "detail"
-    t = sanitize_test_name(test_name)
-    dt_tag = _float_tag(dt)
-    te_tag = _float_tag(t_end)
-    return ddir / f"{t}__dt{dt_tag}__t{te_tag}__mp{int(max_points)}__full{int(bool(want_full))}.pkl.gz"
-def legacy_detail_cache_path(cache_dir: Path, test_name: str, max_points: int, want_full: bool) -> Path:
-    """Legacy cache filename (R32 and earlier) without dt/t_end in the name."""
-    ddir = cache_dir / "detail"
-    t = sanitize_test_name(test_name)
-    return ddir / f"{t}__mp{int(max_points)}__full{int(bool(want_full))}.pkl.gz"
 
-def save_detail_cache(cache_dir: Path, test_name: str, dt: float, t_end: float, max_points: int, want_full: bool, payload: Dict[str, Any]) -> Optional[Path]:
-    """Persist detail-run payload (atomically) to disk.
-
-    IMPORTANT: We write to a temp file and then os.replace() it to avoid partial/corrupt caches
-    if the app/session is interrupted during write.
-    """
-    p = detail_cache_path(cache_dir, test_name, dt, t_end, max_points, want_full)
+def _dump_detail_cache_payload(handle: Any, payload: Dict[str, Any]) -> None:
     try:
-        p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(p.suffix + ".tmp")
-        with gzip.open(tmp, "wb") as f:
-            try:
-                import cloudpickle as _cp  # type: ignore
-                _cp.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-            except Exception:
-                pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-        os.replace(tmp, p)
-        return p
-    except Exception as e:
-        # Cleanup temp/partial files and log the error.
-        try:
-            if 'tmp' in locals() and Path(tmp).exists():
-                Path(tmp).unlink(missing_ok=True)
-        except Exception:
-            pass
-        try:
-            # If a partial target exists, keep it as a .bad* artifact for diagnostics.
-            if p.exists():
-                bad = p.with_suffix(p.suffix + f".bad{int(time.time())}")
-                try:
-                    os.replace(p, bad)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        log_event(
-            'detail_cache_save_error',
-            test=str(test_name),
-            dt=float(dt),
-            t_end=float(t_end),
-            max_points=int(max_points),
-            want_full=bool(want_full),
-            error=str(e),
-        )
-        return None
+        import cloudpickle as _cp  # type: ignore
+
+        _cp.dump(payload, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    except Exception:
+        pickle.dump(payload, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def _load_detail_cache_payload(handle: Any) -> Dict[str, Any]:
+    try:
+        import cloudpickle as _cp  # type: ignore
+
+        return _cp.load(handle)
+    except Exception:
+        return pickle.load(handle)
+
+
+# Shared detail-cache wrappers override the legacy inline copies above.
+def save_detail_cache(cache_dir: Path, test_name: str, dt: float, t_end: float, max_points: int, want_full: bool, payload: Dict[str, Any]) -> Optional[Path]:
+    return save_ui_detail_cache(
+        cache_dir,
+        test_name,
+        dt,
+        t_end,
+        max_points,
+        want_full,
+        payload,
+        sanitize_test_name=sanitize_test_name,
+        dump_payload_fn=_dump_detail_cache_payload,
+        float_tag_fn=_float_tag,
+        log_event_fn=log_event,
+    )
+
 
 def load_detail_cache(cache_dir: Path, test_name: str, dt: float, t_end: float, max_points: int, want_full: bool) -> Optional[Dict[str, Any]]:
-    """Load detail-run payload from disk.
+    def _resave_detail_payload(loaded_payload: Dict[str, Any]) -> Optional[Path]:
+        return save_detail_cache(cache_dir, test_name, dt, t_end, max_points, want_full, loaded_payload)
 
-    - Tries new filename (with dt/t_end) first.
-    - Falls back to legacy filename (without dt/t_end) for backwards compatibility.
-    - On corruption, quarantines the file and returns None.
-    """
-    p = detail_cache_path(cache_dir, test_name, dt, t_end, max_points, want_full)
-    legacy_p = legacy_detail_cache_path(cache_dir, test_name, max_points, want_full)
-    for path in [p, legacy_p]:
-        if not path.exists():
-            continue
-        try:
-            with gzip.open(path, 'rb') as f:
-                try:
-                    import cloudpickle as _cp  # type: ignore
-                    payload = _cp.load(f)
-                except Exception:
-                    payload = pickle.load(f)
-            # If we loaded legacy cache, migrate to new name (best-effort).
-            if path == legacy_p and not p.exists():
-                try:
-                    save_detail_cache(cache_dir, test_name, dt, t_end, max_points, want_full, payload)
-                except Exception:
-                    pass
-            return payload
-        except Exception as e:
-            log_event(
-                'detail_cache_load_error',
-                test=str(test_name),
-                dt=float(dt),
-                t_end=float(t_end),
-                max_points=int(max_points),
-                want_full=bool(want_full),
-                path=str(path),
-                error=str(e),
-            )
-            # Quarantine the bad cache so we do not fail repeatedly.
-            try:
-                bad = path.with_suffix(path.suffix + f".bad{int(time.time())}")
-                os.replace(path, bad)
-            except Exception:
-                pass
-            return None
-    return None
-def downsample_df(df: pd.DataFrame, max_points: int = 1200) -> pd.DataFrame:
-    """Уменьшает число точек для графиков/анимации (чтобы не тормозить UI)."""
-    if df is None or len(df) <= max_points:
-        return df
-    idx = np.linspace(0, len(df) - 1, num=max_points, dtype=int)
-    return df.iloc[idx].reset_index(drop=True)
+    return load_ui_detail_cache(
+        cache_dir,
+        test_name,
+        dt,
+        t_end,
+        max_points,
+        want_full,
+        sanitize_test_name=sanitize_test_name,
+        load_payload_fn=_load_detail_cache_payload,
+        resave_payload_fn=_resave_detail_payload,
+        float_tag_fn=_float_tag,
+        log_event_fn=log_event,
+    )
 
 
 # -------------------------------
@@ -2851,53 +1698,6 @@ def _infer_unit_and_transform(col: str):
         return ("Н", None, "Н")
     # default
     return ("", None, "")
-
-
-def decimate_minmax(x: np.ndarray, y: np.ndarray, max_points: int = 2000):
-    """Min-max decimation to preserve spikes (keeps <= max_points points)."""
-    try:
-        x = np.asarray(x, dtype=float)
-        y = np.asarray(y, dtype=float)
-    except Exception:
-        return x, y
-    n = int(len(x))
-    if n <= 0 or n <= int(max_points):
-        return x, y
-
-    # We emit 2 points per bin (min+max), so bins ~ max_points/2
-    bins = max(2, int(max_points) // 2)
-    step = n / float(bins)
-    ox = []
-    oy = []
-    # always include first
-    ox.append(float(x[0])); oy.append(float(y[0]) if np.isfinite(y[0]) else float('nan'))
-
-    for bi in range(bins):
-        a = int(bi * step)
-        b = int((bi + 1) * step)
-        if b <= a:
-            continue
-        if a < 0: a = 0
-        if b > n: b = n
-        ys = y[a:b]
-        if ys.size <= 0:
-            continue
-        # handle all-NaN bins
-        if not np.isfinite(ys).any():
-            continue
-        i_min = int(np.nanargmin(ys))
-        i_max = int(np.nanargmax(ys))
-        j1 = a + min(i_min, i_max)
-        j2 = a + max(i_min, i_max)
-        # append in time order
-        ox.append(float(x[j1])); oy.append(float(y[j1]))
-        if j2 != j1:
-            ox.append(float(x[j2])); oy.append(float(y[j2]))
-
-    # always include last
-    ox.append(float(x[-1])); oy.append(float(y[-1]) if np.isfinite(y[-1]) else float('nan'))
-
-    return np.asarray(ox, dtype=float), np.asarray(oy, dtype=float)
 
 
 def plot_studio_timeseries(
@@ -3191,25 +1991,6 @@ def plot_studio_timeseries(
 # -------------------------------
 # Event/alert detection for the global timeline (playhead)
 # -------------------------------
-
-def _run_starts(mask: np.ndarray) -> List[int]:
-    """Return indices where a boolean mask starts being True (rising edges of a run)."""
-    if mask is None:
-        return []
-    m = np.asarray(mask, dtype=bool)
-    if m.size == 0:
-        return []
-    prev = np.concatenate([[False], m[:-1]])
-    starts = np.where(m & (~prev))[0]
-    return [int(i) for i in starts.tolist()]
-
-
-def _shorten_name(name: str, max_len: int = 60) -> str:
-    s = str(name)
-    if len(s) <= max_len:
-        return s
-    return s[: max_len - 1] + "…"
-
 
 def compute_events(
     df_main: pd.DataFrame | None,
@@ -3929,8 +2710,7 @@ def render_flow_panel_html(
 
       if (playing && !document.hidden && __frameInParentViewport()) __scheduleStep('raf', 0);
       else {
-        
-        __STEP_HANDLE = null;
+        __scheduleStep('timeout', __nextIdleMs(60000, 180000, 300000));
       }
     }
 
@@ -3957,1319 +2737,12 @@ window.addEventListener('resize', () => { try { __wakeStep(); } catch(_e) {} }, 
 
 
 
-def strip_svg_xml_header(svg_text: str) -> str:
-    """Превращает файл SVG в фрагмент, который безопасно вставлять в HTML.
 
-    Многие SVG начинаются с `<?xml ...?>` и комментариев — внутри HTML это может мешать.
-    Возвращаем подстроку начиная с первого `<svg`.
-    """
-    if not svg_text:
-        return ""
-    p = svg_text.find("<svg")
-    if p >= 0:
-        return svg_text[p:]
-    return svg_text
 
 
-# -------------------------------
-# Автосопоставление имён (ветки/узлы) для mapping JSON
-# -------------------------------
 
-_DASH_RE = re.compile(r"[‐-‒–—−]")
-_NONWORD_RE = re.compile(r"[^0-9A-Za-zА-Яа-я]+", re.UNICODE)
 
 
-def _norm_name(s: Any) -> str:
-    """Нормализует имя для устойчивого сопоставления.
-
-    - приводит к нижнему регистру
-    - унифицирует разные типы дефисов
-    - выкидывает пунктуацию/лишние пробелы
-    """
-    try:
-        s = str(s)
-    except Exception:
-        return ""
-    s = s.strip().lower()
-    s = _DASH_RE.sub("-", s)
-    s = _NONWORD_RE.sub(" ", s)
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
-
-
-def _name_score(a: str, b: str) -> float:
-    na = _norm_name(a)
-    nb = _norm_name(b)
-    if not na or not nb:
-        return 0.0
-    if na == nb:
-        return 1.0
-    r = SequenceMatcher(None, na, nb).ratio()
-    ta = set(na.split())
-    tb = set(nb.split())
-    jac = len(ta & tb) / max(1, len(ta | tb))
-    return 0.75 * r + 0.25 * jac
-
-
-def _best_match(target: str, candidates: List[str]) -> Tuple[Any, float]:
-    best = None
-    best_s = 0.0
-    for c in candidates:
-        sc = _name_score(target, c)
-        if sc > best_s:
-            best_s = sc
-            best = c
-    return best, float(best_s)
-
-
-def ensure_mapping_for_selection(
-    mapping: Dict[str, Any],
-    need_edges: List[str],
-    need_nodes: List[str],
-    min_score: float = 0.70,
-) -> Tuple[Dict[str, Any], Dict[str, List[Dict[str, Any]]]]:
-    """Подмешивает в mapping недостающие ключи, находя "похожие" по имени.
-
-    Задача: если mapping JSON делался под старую версию модели (или наоборот),
-    но имена отличаются только деталями (пробелы/дефисы/порядок слов),
-    мы пытаемся автоматически найти соответствия.
-
-    Возвращает:
-      - mapping_use (deepcopy исходного mapping с добавленными ключами)
-      - report: {edges:[{need,from,score}], nodes:[...]}
-    """
-    mapping_use = copy.deepcopy(mapping) if isinstance(mapping, dict) else {}
-    report: Dict[str, List[Dict[str, Any]]] = {"edges": [], "nodes": []}
-
-    edges_dict = mapping_use.get("edges")
-    if not isinstance(edges_dict, dict):
-        edges_dict = {}
-    nodes_dict = mapping_use.get("nodes")
-    if not isinstance(nodes_dict, dict):
-        nodes_dict = {}
-
-    edge_keys = list(edges_dict.keys())
-    node_keys = list(nodes_dict.keys())
-
-    # edges
-    for name in (need_edges or []):
-        if not isinstance(name, str) or not name:
-            continue
-        if edges_dict.get(name):
-            continue
-        best, score = _best_match(name, edge_keys)
-        if best is not None and score >= float(min_score) and edges_dict.get(best):
-            edges_dict[name] = edges_dict.get(best)
-            report["edges"].append({"need": name, "from": best, "score": score})
-
-    # nodes
-    for name in (need_nodes or []):
-        if not isinstance(name, str) or not name:
-            continue
-        val = nodes_dict.get(name)
-        if isinstance(val, list) and len(val) >= 2:
-            continue
-        best, score = _best_match(name, node_keys)
-        if best is not None and score >= float(min_score):
-            best_val = nodes_dict.get(best)
-            if isinstance(best_val, list) and len(best_val) >= 2:
-                nodes_dict[name] = best_val
-                report["nodes"].append({"need": name, "from": best, "score": score})
-
-    mapping_use["edges"] = edges_dict
-    mapping_use["nodes"] = nodes_dict
-    return mapping_use, report
-
-
-
-def render_svg_edge_mapper_html(
-    svg_inline: str,
-    edge_names: List[str],
-    height: int = 740,
-    title: str = "Разметка веток по SVG (клик → точки → сегмент)",
-):
-    """HTML-инструмент для создания mapping JSON: edge_name -> polyline(points).
-
-    Важно: это односторонний компонент (Streamlit components.html), поэтому:
-    - JSON выдаётся в textarea + кнопка Download/Copy.
-    - затем пользователь загружает JSON обратно в Streamlit для анимации.
-
-    Mapping формат (version 2):
-      {
-        "version": 2,
-        "viewBox": "0 0 1920 1080",
-        "edges": {
-          "edgeA": [
-             [[x,y],[x,y],...],   # polyline 1
-             [[x,y],...],         # polyline 2 ...
-          ],
-          ...
-        },
-        "nodes": {
-          "Ресивер3": [x,y],
-          ...
-        }
-      }
-
-    Поле nodes можно размечать отдельным инструментом render_svg_node_mapper_html().
-    """
-    payload = {
-        "title": title,
-        "svg": svg_inline,
-        "edgeNames": edge_names,
-    }
-    js_data = json.dumps(payload, ensure_ascii=False)
-
-    html = """<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
-    .wrap { display:flex; gap:0; height: 100%; min-height: 640px; }
-    .left { width: 360px; padding: 10px; border-right: 1px solid #e6e6e6; box-sizing:border-box; overflow:auto; }
-    .right { flex: 1; position: relative; overflow:hidden; background: #fafafa; }
-    h3 { margin: 0 0 6px 0; font-size: 16px; }
-    .muted { color:#666; font-size: 12px; line-height: 1.35; margin-bottom: 8px; }
-    label { display:block; font-size:12px; color:#444; margin-top:8px; }
-    select, textarea { width:100%; box-sizing:border-box; }
-    textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
-    .row { display:flex; gap:8px; margin: 8px 0; flex-wrap: wrap; }
-    .btn { padding: 6px 10px; border: 1px solid #bbb; border-radius: 8px; background:#fff; cursor:pointer; font-size: 12px; }
-    .btn.primary { border-color:#1f77b4; }
-    .btn.danger { border-color:#c62828; }
-    .btn:active { transform: translateY(1px); }
-
-    /* SVG */
-    #svgHost svg { width: 100%; height: 100%; display:block; background: white; user-select:none; }
-    .edgePath { fill:none; stroke: rgba(220,0,0,0.55); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
-    .edgePath.other { stroke: rgba(0,0,0,0.10); stroke-width: 3; }
-    .draft { fill:none; stroke: rgba(0,128,255,0.90); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 10 7; }
-    .pt { fill: rgba(0,128,255,0.90); }
-    .hud { position:absolute; left: 10px; top: 10px; padding: 6px 8px; background: rgba(255,255,255,0.85); border: 1px solid #ddd; border-radius: 8px; font-size: 12px; }
-    .hud b { font-variant-numeric: tabular-nums; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="left">
-      <h3 id="title"></h3>
-      <div class="muted">
-        <div><b>Режим “Рисовать”</b>: клик по схеме → добавляется точка.</div>
-        <div>Нажмите <b>“Завершить сегмент”</b>, чтобы сохранить polyline для выбранной ветки.</div>
-        <div><b>Режим “Пан”</b>: drag мышью. Колёсико — zoom. Кнопка “Сброс вида”.</div>
-        <div style="margin-top:6px;">Дальше: скачайте JSON и загрузите его в Streamlit в блоке анимации “По схеме”.</div>
-      </div>
-
-      <label>Ветка (edge)</label>
-      <select id="edgeSel"></select>
-
-      <div class="row">
-        <button id="modeDraw" class="btn primary">✏️ Рисовать</button>
-        <button id="modePan" class="btn">✋ Пан</button>
-        <button id="resetView" class="btn">↺ Сброс вида</button>
-      </div>
-
-      <div class="row">
-        <button id="undo" class="btn">↶ Undo</button>
-        <button id="finish" class="btn primary">✅ Завершить сегмент</button>
-        <button id="clearEdge" class="btn danger">🗑 Очистить ветку</button>
-      </div>
-
-      <div class="row">
-        <button id="copy" class="btn">📋 Copy JSON</button>
-        <button id="download" class="btn">⬇️ Download JSON</button>
-      </div>
-
-      <label>Mapping JSON</label>
-      <textarea id="json" rows="16" spellcheck="false"></textarea>
-
-      <div class="row">
-        <button id="loadJson" class="btn">⭮ Загрузить из поля</button>
-      </div>
-    </div>
-
-    <div class="right">
-      <div id="svgHost">__SVG_INLINE__</div>
-      <div class="hud">
-        режим: <b id="mode">draw</b> ·
-        edge: <b id="edgeName"></b> ·
-        pts: <b id="pts">0</b>
-      </div>
-    </div>
-  </div>
-
-<script>
-const DATA = __JS_DATA__;
-document.getElementById('title').textContent = DATA.title || 'SVG mapping';
-const edgeSel = document.getElementById('edgeSel');
-const modeEl = document.getElementById('mode');
-const edgeNameEl = document.getElementById('edgeName');
-const ptsEl = document.getElementById('pts');
-const jsonEl = document.getElementById('json');
-
-const EDGE_NAMES = DATA.edgeNames || [];
-EDGE_NAMES.forEach(n => {
-  const opt = document.createElement('option');
-  opt.value = n; opt.textContent = n;
-  edgeSel.appendChild(opt);
-});
-
-// SVG
-const svgHost = document.getElementById('svgHost');
-svgHost.innerHTML = DATA.svg || '';
-const svg = svgHost.querySelector('svg');
-if (!svg) {
-  svgHost.innerHTML = '<div style="padding:12px;color:#c00">SVG не найден в HTML.</div>';
-}
-
-function parseViewBox(vbStr) {
-  // NOTE: двойной backslash нужен, чтобы не ловить Python SyntaxWarning
-  // "invalid escape sequence '\\s'" при генерации HTML из строки.
-  const a = (vbStr || '').trim().split(/\\s+/).map(parseFloat);
-  if (a.length !== 4 || a.some(x => Number.isNaN(x))) return null;
-  return {x:a[0], y:a[1], w:a[2], h:a[3]};
-}
-const vb0 = parseViewBox(svg?.getAttribute('viewBox')) || {x:0, y:0, w:1920, h:1080};
-let view = {...vb0};
-
-function setViewBox(v) {
-  svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`);
-}
-function resetView() { view = {...vb0}; setViewBox(view); }
-
-// overlay
-const NS = "http://www.w3.org/2000/svg";
-const overlay = document.createElementNS(NS, 'g');
-overlay.setAttribute('id', 'pneumo_overlay');
-svg.appendChild(overlay);
-
-const segLayer = document.createElementNS(NS, 'g');
-const draftLayer = document.createElementNS(NS, 'g');
-overlay.appendChild(segLayer);
-overlay.appendChild(draftLayer);
-
-// mapping state
-let mapping = { version: 2, viewBox: svg.getAttribute('viewBox') || `${vb0.x} ${vb0.y} ${vb0.w} ${vb0.h}`, edges: {}, nodes: {} };
-EDGE_NAMES.forEach(n => { mapping.edges[n] = []; });
-
-let mode = 'draw'; // draw | pan
-let selectedEdge = EDGE_NAMES[0] || '';
-edgeNameEl.textContent = selectedEdge;
-
-let curPts = [];
-let dragging = false;
-let dragStart = null;
-
-function getSvgPoint(clientX, clientY) {
-  const pt = svg.createSVGPoint();
-  pt.x = clientX; pt.y = clientY;
-  const ctm = svg.getScreenCTM();
-  if (!ctm) return {x:0,y:0};
-  const sp = pt.matrixTransform(ctm.inverse());
-  return {x: sp.x, y: sp.y};
-}
-
-function polyToPath(points) {
-  if (!points || points.length < 2) return '';
-  const p0 = points[0];
-  let d = `M ${p0[0]} ${p0[1]}`;
-  for (let i=1;i<points.length;i++) {
-    const p = points[i];
-    d += ` L ${p[0]} ${p[1]}`;
-  }
-  return d;
-}
-
-function rebuildSegments() {
-  while (segLayer.firstChild) segLayer.removeChild(segLayer.firstChild);
-  for (const [edge, segs] of Object.entries(mapping.edges)) {
-    const isSel = (edge === selectedEdge);
-    for (const seg of (segs || [])) {
-      const path = document.createElementNS(NS, 'path');
-      path.setAttribute('d', polyToPath(seg));
-      path.setAttribute('class', 'edgePath' + (isSel ? '' : ' other'));
-      segLayer.appendChild(path);
-    }
-  }
-}
-
-function rebuildDraft() {
-  while (draftLayer.firstChild) draftLayer.removeChild(draftLayer.firstChild);
-  if (curPts.length >= 2) {
-    const pts = curPts.map(p => [p.x, p.y]);
-    const path = document.createElementNS(NS, 'path');
-    path.setAttribute('d', polyToPath(pts));
-    path.setAttribute('class', 'draft');
-    draftLayer.appendChild(path);
-  }
-  for (const p of curPts) {
-    const c = document.createElementNS(NS, 'circle');
-    c.setAttribute('cx', p.x);
-    c.setAttribute('cy', p.y);
-    c.setAttribute('r', 6);
-    c.setAttribute('class', 'pt');
-    draftLayer.appendChild(c);
-  }
-  ptsEl.textContent = String(curPts.length);
-}
-
-function syncJson(pretty=true) {
-  const s = JSON.stringify(mapping, null, pretty ? 2 : 0);
-  jsonEl.value = s;
-}
-
-function setMode(m) {
-  mode = m;
-  modeEl.textContent = mode;
-  document.getElementById('modeDraw').classList.toggle('primary', mode === 'draw');
-  document.getElementById('modePan').classList.toggle('primary', mode === 'pan');
-}
-
-edgeSel.addEventListener('change', () => {
-  selectedEdge = edgeSel.value;
-  edgeNameEl.textContent = selectedEdge;
-  curPts = [];
-  rebuildDraft();
-  rebuildSegments();
-  syncJson(true);
-});
-
-document.getElementById('modeDraw').addEventListener('click', () => setMode('draw'));
-document.getElementById('modePan').addEventListener('click', () => setMode('pan'));
-document.getElementById('resetView').addEventListener('click', () => resetView());
-
-document.getElementById('undo').addEventListener('click', () => {
-  curPts.pop();
-  rebuildDraft();
-});
-
-document.getElementById('finish').addEventListener('click', () => {
-  if (curPts.length < 2) return;
-  const seg = curPts.map(p => [Number(p.x.toFixed(2)), Number(p.y.toFixed(2))]);
-  mapping.edges[selectedEdge] = mapping.edges[selectedEdge] || [];
-  mapping.edges[selectedEdge].push(seg);
-  curPts = [];
-  rebuildDraft();
-  rebuildSegments();
-  syncJson(true);
-});
-
-document.getElementById('clearEdge').addEventListener('click', () => {
-  mapping.edges[selectedEdge] = [];
-  curPts = [];
-  rebuildDraft();
-  rebuildSegments();
-  syncJson(true);
-});
-
-document.getElementById('copy').addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.writeText(jsonEl.value || '');
-  } catch(e) {}
-});
-
-document.getElementById('download').addEventListener('click', () => {
-  const blob = new Blob([jsonEl.value || ''], {type: 'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'pneumo_svg_mapping.json';
-  a.click();
-  URL.revokeObjectURL(url);
-});
-
-document.getElementById('loadJson').addEventListener('click', () => {
-  try {
-    const obj = JSON.parse(jsonEl.value || '{}');
-    if (!obj || typeof obj !== 'object') return;
-    if (!obj.edges) obj.edges = {};
-    if (!obj.nodes) obj.nodes = {};
-    // Если в JSON нет некоторых веток — добавляем пустые
-    EDGE_NAMES.forEach(n => { if (!obj.edges[n]) obj.edges[n] = []; });
-    mapping = obj;
-    if (!mapping.viewBox) mapping.viewBox = svg.getAttribute('viewBox') || `${vb0.x} ${vb0.y} ${vb0.w} ${vb0.h}`;
-    rebuildSegments();
-  } catch(e) {}
-});
-
-
-// zoom (wheel)
-svg.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  const z = (e.deltaY < 0) ? 0.9 : 1.1;
-  const p = getSvgPoint(e.clientX, e.clientY);
-  const nx = p.x - (p.x - view.x) * z;
-  const ny = p.y - (p.y - view.y) * z;
-  view = { x: nx, y: ny, w: view.w * z, h: view.h * z };
-  setViewBox(view);
-}, {passive:false});
-
-// pan (drag)
-svg.addEventListener('pointerdown', (e) => {
-  if (mode !== 'pan') return;
-  dragging = true;
-  svg.setPointerCapture(e.pointerId);
-  dragStart = { p: getSvgPoint(e.clientX, e.clientY), v: {...view} };
-});
-svg.addEventListener('pointermove', (e) => {
-  if (!dragging || mode !== 'pan') return;
-  const p = getSvgPoint(e.clientX, e.clientY);
-  const dx = p.x - dragStart.p.x;
-  const dy = p.y - dragStart.p.y;
-  view = { x: dragStart.v.x - dx, y: dragStart.v.y - dy, w: dragStart.v.w, h: dragStart.v.h };
-  setViewBox(view);
-});
-svg.addEventListener('pointerup', (e) => {
-  dragging = false;
-  dragStart = null;
-});
-
-// draw (click)
-svg.addEventListener('click', (e) => {
-  if (mode !== 'draw') return;
-  const p = getSvgPoint(e.clientX, e.clientY);
-  curPts.push(p);
-  rebuildDraft();
-});
-
-setMode('draw');
-rebuildDraft();
-rebuildSegments();
-syncJson(true);
-
-</script>
-</body>
-</html>"""
-
-    html = html.replace("__SVG_INLINE__", svg_inline)
-    html = html.replace("__JS_DATA__", js_data)
-
-    components.html(html, height=height, scrolling=False)
-
-
-def render_svg_node_mapper_html(
-    svg_inline: str,
-    node_names: List[str],
-    edge_names: List[str] | None = None,
-    height: int = 740,
-    title: str = "Разметка узлов давления по SVG (клик → позиция)",
-):
-    """HTML-инструмент для создания mapping JSON: node_name -> (x,y) в координатах SVG.
-
-    Это дополняет mapping веток (edges). Идея такая:
-    - Ветки размечаются в render_svg_edge_mapper_html() (polyline сегменты).
-    - Узлы давления размечаются здесь: один клик = одна точка (узел).
-
-    Формат (version 2):
-      {
-        "version": 2,
-        "viewBox": "0 0 1920 1080",
-        "edges": { ... },
-        "nodes": {
-           "Ресивер3": [x,y],
-           ...
-        }
-      }
-
-    Компонент односторонний (components.html), поэтому итоговый JSON
-    нужно скачать/скопировать и загрузить обратно в блок анимации.
-    """
-    payload = {
-        "title": title,
-        "svg": svg_inline,
-        "nodeNames": node_names,
-        "edgeNames": (edge_names or []),
-    }
-    js_data = json.dumps(payload, ensure_ascii=False)
-
-    html = """<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
-    .wrap { display:flex; gap:0; height: 100%; min-height: 640px; }
-    .left { width: 360px; padding: 10px; border-right: 1px solid #e6e6e6; box-sizing:border-box; overflow:auto; }
-    .right { flex: 1; position: relative; overflow:hidden; background: #fafafa; }
-    h3 { margin: 0 0 6px 0; font-size: 16px; }
-    .muted { color:#666; font-size: 12px; line-height: 1.35; margin-bottom: 8px; }
-    label { display:block; font-size:12px; color:#444; margin-top:8px; }
-    select, textarea { width:100%; box-sizing:border-box; }
-    textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
-    .row { display:flex; gap:8px; margin: 8px 0; flex-wrap: wrap; }
-    .btn { padding: 6px 10px; border: 1px solid #bbb; border-radius: 8px; background:#fff; cursor:pointer; font-size: 12px; }
-    .btn.primary { border-color:#1f77b4; }
-    .btn.danger { border-color:#c62828; }
-    .btn:active { transform: translateY(1px); }
-
-    #svgHost svg { width: 100%; height: 100%; display:block; background: white; user-select:none; }
-
-    .nodeDot { fill: rgba(0,128,255,0.85); stroke: rgba(255,255,255,0.9); stroke-width: 3; }
-    .nodeDot.missing { fill: rgba(200,200,200,0.7); }
-    .nodeLabel {
-      font-size: 14px;
-      fill: rgba(0,0,0,0.85);
-      stroke: rgba(255,255,255,0.95);
-      stroke-width: 3;
-      paint-order: stroke;
-      font-variant-numeric: tabular-nums;
-    }
-    .hud { position:absolute; left: 10px; top: 10px; padding: 6px 8px; background: rgba(255,255,255,0.85); border: 1px solid #ddd; border-radius: 8px; font-size: 12px; }
-    .hud b { font-variant-numeric: tabular-nums; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="left">
-      <h3 id="title"></h3>
-      <div class="muted">
-        <div><b>Режим “Поставить”</b>: клик по схеме → координата выбранного узла.</div>
-        <div><b>Режим “Пан”</b>: drag мышью. Колёсико — zoom. Кнопка “Сброс вида”.</div>
-        <div style="margin-top:6px;">Скачайте JSON и загрузите обратно в Streamlit (в блоке анимации “По схеме”).</div>
-      </div>
-
-      <label>Узел (node)</label>
-      <select id="nodeSel"></select>
-
-      <div class="row">
-        <button id="modePlace" class="btn primary">📍 Поставить</button>
-        <button id="modePan" class="btn">✋ Пан</button>
-        <button id="resetView" class="btn">↺ Сброс вида</button>
-      </div>
-
-      <div class="row">
-        <button id="clearNode" class="btn danger">🗑 Очистить узел</button>
-      </div>
-
-      <div class="row">
-        <button id="copy" class="btn">📋 Copy JSON</button>
-        <button id="download" class="btn">⬇️ Download JSON</button>
-      </div>
-
-      <label>Mapping JSON</label>
-      <textarea id="json" rows="16" spellcheck="false"></textarea>
-
-      <div class="row">
-        <button id="loadJson" class="btn">⭮ Загрузить из поля</button>
-      </div>
-    </div>
-
-    <div class="right">
-      <div id="svgHost">__SVG_INLINE__</div>
-      <div class="hud">
-        режим: <b id="mode">place</b> ·
-        node: <b id="nodeName"></b> ·
-        xy: <b id="xy">—</b>
-      </div>
-    </div>
-  </div>
-
-<script>
-const DATA = __JS_DATA__;
-document.getElementById('title').textContent = DATA.title || 'SVG node mapping';
-const nodeSel = document.getElementById('nodeSel');
-const modeEl = document.getElementById('mode');
-const nodeNameEl = document.getElementById('nodeName');
-const xyEl = document.getElementById('xy');
-const jsonEl = document.getElementById('json');
-
-const NODE_NAMES = DATA.nodeNames || [];
-NODE_NAMES.forEach(n => {
-  const opt = document.createElement('option');
-  opt.value = n; opt.textContent = n;
-  nodeSel.appendChild(opt);
-});
-
-// SVG
-const svgHost = document.getElementById('svgHost');
-svgHost.innerHTML = DATA.svg || '';
-const svg = svgHost.querySelector('svg');
-if (!svg) {
-  svgHost.innerHTML = '<div style="padding:12px;color:#c00">SVG не найден в HTML.</div>';
-}
-
-function parseViewBox(vbStr) {
-  // NOTE: двойной backslash нужен, чтобы не ловить Python SyntaxWarning
-  // "invalid escape sequence '\\s'" при генерации HTML из строки.
-  const a = (vbStr || '').trim().split(/\\s+/).map(parseFloat);
-  if (a.length !== 4 || a.some(x => Number.isNaN(x))) return null;
-  return {x:a[0], y:a[1], w:a[2], h:a[3]};
-}
-const vb0 = parseViewBox(svg?.getAttribute('viewBox')) || {x:0, y:0, w:1920, h:1080};
-let view = {...vb0};
-function setViewBox(v) { svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`); }
-function resetView() { view = {...vb0}; setViewBox(view); }
-
-const NS = 'http://www.w3.org/2000/svg';
-const overlay = document.createElementNS(NS, 'g');
-overlay.setAttribute('id', 'pneumo_overlay_nodes');
-svg.appendChild(overlay);
-
-let mapping = { version: 2, viewBox: svg.getAttribute('viewBox') || `${vb0.x} ${vb0.y} ${vb0.w} ${vb0.h}`, edges: {}, nodes: {} };
-const EDGE_NAMES = DATA.edgeNames || [];
-EDGE_NAMES.forEach(n => { if (!(n in mapping.edges)) mapping.edges[n] = []; });
-// В шаблоне держим все узлы (значение null, пока не задано)
-NODE_NAMES.forEach(n => { if (!(n in mapping.nodes)) mapping.nodes[n] = null; });
-
-let mode = 'place'; // place | pan
-let selectedNode = NODE_NAMES[0] || '';
-nodeNameEl.textContent = selectedNode;
-
-let dragging = false;
-let dragStart = null;
-
-function getSvgPoint(clientX, clientY) {
-  const pt = svg.createSVGPoint();
-  pt.x = clientX; pt.y = clientY;
-  const ctm = svg.getScreenCTM();
-  if (!ctm) return {x:0,y:0};
-  const sp = pt.matrixTransform(ctm.inverse());
-  return {x: sp.x, y: sp.y};
-}
-
-function syncJson(pretty=true) {
-  const s = JSON.stringify(mapping, null, pretty ? 2 : 0);
-  jsonEl.value = s;
-}
-
-function rebuild() {
-  while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
-  for (const [name, xy] of Object.entries(mapping.nodes || {})) {
-    if (!xy || !Array.isArray(xy) || xy.length < 2) continue;
-    const x = xy[0], y = xy[1];
-    const c = document.createElementNS(NS, 'circle');
-    c.setAttribute('cx', x);
-    c.setAttribute('cy', y);
-    c.setAttribute('r', 10);
-    c.setAttribute('class', 'nodeDot');
-    overlay.appendChild(c);
-
-    const t = document.createElementNS(NS, 'text');
-    t.setAttribute('x', x + 12);
-    t.setAttribute('y', y - 12);
-    t.setAttribute('class', 'nodeLabel');
-    t.textContent = name;
-    overlay.appendChild(t);
-  }
-  // HUD
-  const xy = mapping.nodes?.[selectedNode];
-  if (xy && Array.isArray(xy)) xyEl.textContent = `${xy[0].toFixed(1)}, ${xy[1].toFixed(1)}`;
-  else xyEl.textContent = '—';
-  syncJson(true);
-}
-
-function setMode(m) {
-  mode = m;
-  modeEl.textContent = mode;
-  document.getElementById('modePlace').classList.toggle('primary', mode === 'place');
-  document.getElementById('modePan').classList.toggle('primary', mode === 'pan');
-}
-
-nodeSel.addEventListener('change', () => {
-  selectedNode = nodeSel.value;
-  nodeNameEl.textContent = selectedNode;
-  rebuild();
-});
-
-// buttons
-document.getElementById('modePlace').addEventListener('click', () => setMode('place'));
-document.getElementById('modePan').addEventListener('click', () => setMode('pan'));
-document.getElementById('resetView').addEventListener('click', () => resetView());
-
-document.getElementById('clearNode').addEventListener('click', () => {
-  mapping.nodes[selectedNode] = null;
-  rebuild();
-});
-
-document.getElementById('copy').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(jsonEl.value || ''); } catch(e) {}
-});
-
-document.getElementById('download').addEventListener('click', () => {
-  const blob = new Blob([jsonEl.value || ''], {type: 'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'pneumo_svg_mapping_nodes.json';
-  a.click();
-  URL.revokeObjectURL(url);
-});
-
-document.getElementById('loadJson').addEventListener('click', () => {
-  try {
-    const obj = JSON.parse(jsonEl.value || '{}');
-    if (!obj || typeof obj !== 'object') return;
-    if (!obj.nodes) obj.nodes = {};
-    if (!obj.edges) obj.edges = {};
-    EDGE_NAMES.forEach(n => { if (!obj.edges[n]) obj.edges[n] = []; });
-    NODE_NAMES.forEach(n => { if (!(n in obj.nodes)) obj.nodes[n] = null; });
-    mapping = obj;
-    if (!mapping.viewBox) mapping.viewBox = svg.getAttribute('viewBox') || `${vb0.x} ${vb0.y} ${vb0.w} ${vb0.h}`;
-    rebuild();
-  } catch(e) {}
-});
-
-// zoom
-svg.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  const z = (e.deltaY < 0) ? 0.9 : 1.1;
-  const p = getSvgPoint(e.clientX, e.clientY);
-  const nx = p.x - (p.x - view.x) * z;
-  const ny = p.y - (p.y - view.y) * z;
-  view = { x: nx, y: ny, w: view.w * z, h: view.h * z };
-  setViewBox(view);
-}, {passive:false});
-
-// pan
-svg.addEventListener('pointerdown', (e) => {
-  if (mode !== 'pan') return;
-  dragging = true;
-  svg.setPointerCapture(e.pointerId);
-  dragStart = { p: getSvgPoint(e.clientX, e.clientY), v: {...view} };
-});
-svg.addEventListener('pointermove', (e) => {
-  if (!dragging || mode !== 'pan') return;
-  const p = getSvgPoint(e.clientX, e.clientY);
-  const dx = p.x - dragStart.p.x;
-  const dy = p.y - dragStart.p.y;
-  view = { x: dragStart.v.x - dx, y: dragStart.v.y - dy, w: dragStart.v.w, h: dragStart.v.h };
-  setViewBox(view);
-});
-svg.addEventListener('pointerup', (e) => {
-  dragging = false;
-  dragStart = null;
-});
-
-// place
-svg.addEventListener('click', (e) => {
-  if (mode !== 'place') return;
-  const p = getSvgPoint(e.clientX, e.clientY);
-  mapping.nodes[selectedNode] = [Number(p.x.toFixed(2)), Number(p.y.toFixed(2))];
-  rebuild();
-});
-
-setMode('place');
-resetView();
-rebuild();
-
-</script>
-</body>
-</html>"""
-
-    html = html.replace("__SVG_INLINE__", svg_inline)
-    html = html.replace("__JS_DATA__", js_data)
-    components.html(html, height=height, scrolling=False)
-
-
-
-
-def render_svg_flow_animation_html(
-    svg_inline: str,
-    mapping: Dict[str, Any],
-    time_s: List[float],
-    edge_series: List[Dict[str, Any]],
-    node_series: List[Dict[str, Any]] | None = None,
-    title: str = "Анимация по схеме (SVG)",
-    height: int = 740,
-):
-    """Проигрывает потоки по “ручной” геометрии (mapping JSON) поверх SVG схемы.
-
-    edge_series: [{name, q, open, unit}]
-    node_series: [{name, p, unit}] (давление узлов, обычно в бар (изб.))
-    mapping:
-      version 1: {viewBox, edges}
-      version 2: {viewBox, edges, nodes}
-
-    Реализация:
-    - координаты “точек” берём из mapping,
-    - движение маркера по polyline делаем через SVGPathElement.getTotalLength()/getPointAtLength(),
-    - пан/зум: управляем viewBox.
-    """
-    payload = {
-        "title": title,
-        "svg": svg_inline,
-        "mapping": mapping,
-        "time": time_s,
-        "edges": edge_series,
-        "nodes": (node_series or []),
-    }
-    js_data = json.dumps(payload, ensure_ascii=False)
-
-    html = """<!doctype html>
-<html>
-<head>
-  <meta charset=\"utf-8\"/>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
-    .wrap { display:flex; flex-direction:column; height:100%; min-height: 640px; }
-    .hdr { display:flex; align-items:center; gap:10px; padding: 8px 10px; border-bottom: 1px solid #e6e6e6; flex-wrap: wrap; }
-    .hdr h3 { margin:0; font-size:16px; }
-    .btn { padding: 4px 10px; border: 1px solid #bbb; border-radius: 8px; background:#fff; cursor:pointer; font-size: 12px; }
-    .btn.primary { border-color:#1f77b4; }
-    input[type=range] { width: 320px; }
-    .time { font-variant-numeric: tabular-nums; font-size: 12px; color:#333; }
-
-    .main { flex: 1; display:flex; min-height: 520px; }
-    .left { flex: 1; position: relative; overflow:hidden; background:#fafafa; }
-    .right { width: 360px; border-left: 1px solid #e6e6e6; padding: 10px; box-sizing:border-box; overflow:auto; }
-
-    #svgHost svg { width:100%; height:100%; display:block; background:white; user-select:none; }
-
-    /* flow paths */
-    .edgePath { fill:none; stroke-linecap: round; stroke-linejoin: round; }
-    .edgePath.pos { stroke: rgba(0,120,255,0.70); }
-    .edgePath.neg { stroke: rgba(255,80,0,0.70); }
-    .edgePath.closed { stroke: rgba(180,180,180,0.30); }
-
-    .dot { }
-    .dot.pos { fill: rgba(0,120,255,0.95); }
-    .dot.neg { fill: rgba(255,80,0,0.95); }
-    .dot.closed { fill: rgba(180,180,180,0.65); }
-
-    /* node labels */
-    .nodeDot { fill: rgba(0,0,0,0.55); stroke: rgba(255,255,255,0.90); stroke-width: 3; }
-    .nodeText {
-      font-size: 14px;
-      fill: rgba(0,0,0,0.85);
-      stroke: rgba(255,255,255,0.95);
-      stroke-width: 3;
-      paint-order: stroke;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .h4 { font-size: 12px; color:#222; margin: 10px 0 6px 0; text-transform: uppercase; letter-spacing: .04em; }
-
-    .controls { display:flex; gap:10px; flex-wrap:wrap; padding-bottom: 8px; border-bottom: 1px solid #eee; }
-    .controls label { font-size: 12px; color:#333; user-select:none; display:flex; gap:6px; align-items:center; }
-
-    .legend { margin-top: 8px; border: 1px solid #eee; border-radius: 10px; padding: 8px; background: #fff; }
-    .legendRow { display:flex; align-items:center; gap:8px; font-size: 12px; color:#333; }
-    .swatch { width: 28px; height: 8px; border-radius: 999px; }
-    .swatch.pos { background: rgba(0,120,255,0.80); }
-    .swatch.neg { background: rgba(255,80,0,0.80); }
-    .swatch.closed { background: rgba(180,180,180,0.45); }
-
-    .row { display:flex; justify-content:space-between; gap:10px; border-bottom:1px dashed #eee; padding: 6px 0; }
-    .row .name { font-size: 12px; width: 220px; word-break: break-word; }
-    .row .val  { font-size: 12px; text-align:right; font-variant-numeric: tabular-nums; color:#333; }
-
-    .hint { font-size: 11px; color:#666; line-height: 1.35; margin-top: 10px; }
-  </style>
-</head>
-<body>
-  <div class=\"wrap\">
-    <div class=\"hdr\">
-      <h3 id=\"title\"></h3>
-      <button id=\"play\" class=\"btn primary\">▶︎</button>
-      <button id=\"pause\" class=\"btn\">⏸</button>
-      <span class=\"time\">t=<span id=\"t\">0.000</span> s</span>
-      <input id=\"slider\" type=\"range\" min=\"0\" max=\"0\" value=\"0\" step=\"1\"/>
-      <span class=\"time\">idx=<span id=\"idx\">0</span></span>
-      <button id=\"resetView\" class=\"btn\">↺ Сброс вида</button>
-    </div>
-
-    <div class=\"main\">
-      <div class=\"left\">
-        <div id=\"svgHost\">__SVG_INLINE__</div>
-      </div>
-      <div class=\"right\">
-        <div class=\"controls\">
-          <label><input id=\"togPaths\" type=\"checkbox\" checked/>Пути</label>
-          <label><input id=\"togDots\" type=\"checkbox\" checked/>Маркеры</label>
-          <label><input id=\"togNodes\" type=\"checkbox\" checked/>Давление</label>
-          <label><input id=\"togLegend\" type=\"checkbox\" checked/>Легенда</label>
-        </div>
-
-        <div id=\"legend\" class=\"legend\">
-          <div class=\"legendRow\"><span class=\"swatch pos\"></span><span>Q ≥ 0 (направление как задано веткой)</span></div>
-          <div class=\"legendRow\" style=\"margin-top:6px\"><span class=\"swatch neg\"></span><span>Q &lt; 0 (реверс потока)</span></div>
-          <div class=\"legendRow\" style=\"margin-top:6px\"><span class=\"swatch closed\"></span><span>closed (элемент закрыт)</span></div>
-        </div>
-
-        <div class=\"h4\">Узлы</div>
-        <div id=\"nodesList\"></div>
-
-        <div class=\"h4\">Ветки</div>
-        <div id=\"edgesList\"></div>
-
-        <div class=\"hint\">
-          Пан: перетащите мышью (всегда). Zoom: колёсико мыши.<br/>
-          Толщина/яркость пути ~ |Q|, цвет ~ знак Q.
-        </div>
-      </div>
-    </div>
-  </div>
-
-<script>
-const DATA = __JS_DATA__;
-document.getElementById('title').textContent = DATA.title || 'SVG flow';
-const slider = document.getElementById('slider');
-const tEl = document.getElementById('t');
-const idxEl = document.getElementById('idx');
-
-const edges = DATA.edges || [];
-const nodes = DATA.nodes || [];
-const mapping = DATA.mapping || {};
-const time = DATA.time || [];
-const n = time.length;
-slider.max = Math.max(0, n-1);
-
-const svgHost = document.getElementById('svgHost');
-svgHost.innerHTML = DATA.svg || '';
-const svg = svgHost.querySelector('svg');
-
-function parseViewBox(vbStr) {
-  // NOTE: двойной backslash нужен, чтобы не ловить Python SyntaxWarning
-  // "invalid escape sequence '\\s'" при генерации HTML из строки.
-  const a = (vbStr || '').trim().split(/\\s+/).map(parseFloat);
-  if (a.length !== 4 || a.some(x => Number.isNaN(x))) return null;
-  return {x:a[0], y:a[1], w:a[2], h:a[3]};
-}
-const vb0 = parseViewBox(mapping.viewBox) || parseViewBox(svg?.getAttribute('viewBox')) || {x:0, y:0, w:1920, h:1080};
-let view = {...vb0};
-function setViewBox(v) { svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`); }
-function resetView() { view = {...vb0}; setViewBox(view); }
-resetView();
-
-const NS = "http://www.w3.org/2000/svg";
-const overlay = document.createElementNS(NS, 'g');
-overlay.setAttribute('id','pneumo_overlay_anim');
-svg.appendChild(overlay);
-
-const pathLayer = document.createElementNS(NS, 'g');
-const dotLayer  = document.createElementNS(NS, 'g');
-const nodeLayer = document.createElementNS(NS, 'g');
-overlay.appendChild(pathLayer);
-overlay.appendChild(dotLayer);
-overlay.appendChild(nodeLayer);
-
-function getSvgPoint(clientX, clientY) {
-  const pt = svg.createSVGPoint();
-  pt.x = clientX; pt.y = clientY;
-  const ctm = svg.getScreenCTM();
-  if (!ctm) return {x:0,y:0};
-  const sp = pt.matrixTransform(ctm.inverse());
-  return {x: sp.x, y: sp.y};
-}
-
-function polyToPath(points) {
-  if (!points || points.length < 2) return '';
-  const p0 = points[0];
-  let d = `M ${p0[0]} ${p0[1]}`;
-  for (let i=1;i<points.length;i++) {
-    const p = points[i];
-    d += ` L ${p[0]} ${p[1]}`;
-  }
-  return d;
-}
-
-function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
-
-// --- right panel lists
-const edgesListEl = document.getElementById('edgesList');
-const nodesListEl = document.getElementById('nodesList');
-
-edges.forEach((e) => {
-  const row = document.createElement('div');
-  row.className = 'row';
-  row.innerHTML = `<div class="name">${e.name}</div><div class="val"><span class="q">0</span> ${e.unit||''}</div>`;
-  edgesListEl.appendChild(row);
-  e._row = row;
-});
-
-nodes.forEach((nd) => {
-  const row = document.createElement('div');
-  row.className = 'row';
-  row.innerHTML = `<div class="name">${nd.name}</div><div class="val"><span class="p">0</span> ${nd.unit||''}</div>`;
-  nodesListEl.appendChild(row);
-  nd._row = row;
-});
-
-// --- build paths/dots
-const segs = []; // {edgeIdx, path, dot, len, phase}
-const qMax = edges.map(e => {
-  let m = 1e-9;
-  (e.q || []).forEach(v => { m = Math.max(m, Math.abs(v)); });
-  return m;
-});
-
-edges.forEach((e, ei) => {
-  const polys = (mapping.edges && mapping.edges[e.name]) ? mapping.edges[e.name] : [];
-  if (!polys || polys.length === 0) return;
-  polys.forEach((poly) => {
-    const path = document.createElementNS(NS, 'path');
-    path.setAttribute('d', polyToPath(poly));
-    path.setAttribute('class','edgePath pos');
-    path.setAttribute('stroke-width','4');
-    pathLayer.appendChild(path);
-
-    const dot = document.createElementNS(NS, 'circle');
-    dot.setAttribute('r','6');
-    dot.setAttribute('class','dot pos');
-    dotLayer.appendChild(dot);
-
-    const len = path.getTotalLength();
-    segs.push({ edgeIdx: ei, path, dot, len, phase: Math.random() });
-  });
-});
-
-// --- nodes overlay
-const nodeObjs = []; // {name, circle, text, pArr, unit}
-(nodes || []).forEach((nd) => {
-  const xy = (mapping.nodes && mapping.nodes[nd.name]) ? mapping.nodes[nd.name] : null;
-  if (!xy || !Array.isArray(xy) || xy.length < 2) return;
-  const x = xy[0], y = xy[1];
-
-  const g = document.createElementNS(NS, 'g');
-  const c = document.createElementNS(NS, 'circle');
-  c.setAttribute('cx', x);
-  c.setAttribute('cy', y);
-  c.setAttribute('r', 10);
-  c.setAttribute('class', 'nodeDot');
-  g.appendChild(c);
-
-  const t = document.createElementNS(NS, 'text');
-  t.setAttribute('x', x + 12);
-  t.setAttribute('y', y - 12);
-  t.setAttribute('class', 'nodeText');
-  t.textContent = '0.00';
-  g.appendChild(t);
-
-  const tt = document.createElementNS(NS, 'title');
-  tt.textContent = nd.name;
-  g.appendChild(tt);
-
-  nodeLayer.appendChild(g);
-
-  nodeObjs.push({name: nd.name, circle: c, text: t, pArr: nd.p || [], unit: nd.unit || ''});
-});
-
-// --- toggles
-const togPaths = document.getElementById('togPaths');
-const togDots  = document.getElementById('togDots');
-const togNodes = document.getElementById('togNodes');
-const togLegend = document.getElementById('togLegend');
-const legendEl = document.getElementById('legend');
-
-function applyToggles() {
-  pathLayer.style.display = togPaths.checked ? 'block' : 'none';
-  dotLayer.style.display  = togDots.checked ? 'block' : 'none';
-  nodeLayer.style.display = (togNodes.checked && nodeObjs.length>0) ? 'block' : 'none';
-  legendEl.style.display  = togLegend.checked ? 'block' : 'none';
-  nodesListEl.style.display = (togNodes.checked && nodes.length>0) ? 'block' : 'none';
-}
-[togPaths, togDots, togNodes, togLegend].forEach(el => el.addEventListener('change', applyToggles));
-applyToggles();
-
-// --- interactions: zoom/pan
-let idx = 0;
-let playing = false;
-let lastTs = performance.now();
-let dragging = false;
-let dragStart = null;
-
-svg.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  const z = (e.deltaY < 0) ? 0.9 : 1.1;
-  const p = getSvgPoint(e.clientX, e.clientY);
-  const nx = p.x - (p.x - view.x) * z;
-  const ny = p.y - (p.y - view.y) * z;
-  view = { x: nx, y: ny, w: view.w * z, h: view.h * z };
-  setViewBox(view);
-}, {passive:false});
-
-svg.addEventListener('pointerdown', (e) => {
-  dragging = true;
-  svg.setPointerCapture(e.pointerId);
-  dragStart = { p: getSvgPoint(e.clientX, e.clientY), v: {...view} };
-});
-svg.addEventListener('pointermove', (e) => {
-  if (!dragging) return;
-  const p = getSvgPoint(e.clientX, e.clientY);
-  const dx = p.x - dragStart.p.x;
-  const dy = p.y - dragStart.p.y;
-  view = { x: dragStart.v.x - dx, y: dragStart.v.y - dy, w: dragStart.v.w, h: dragStart.v.h };
-  setViewBox(view);
-});
-svg.addEventListener('pointerup', (e) => {
-  dragging = false;
-  dragStart = null;
-});
-
-// transport
-slider.addEventListener('input', () => { idx = parseInt(slider.value||'0',10) || 0; });
-document.getElementById('resetView').addEventListener('click', () => resetView());
-document.getElementById('play').addEventListener('click', () => { playing = true; });
-document.getElementById('pause').addEventListener('click', () => { playing = false; });
-
-let lastRenderedIdx = -1;
-let lastRenderedPlaying = null;
-
-function renderFrame(dt) {
-  idxEl.textContent = String(idx);
-  tEl.textContent = (time[idx] ?? 0).toFixed(3);
-
-  // edges numeric list
-  edges.forEach((e) => {
-    const qv = (e.q && e.q[idx] !== undefined) ? e.q[idx] : 0;
-    const qEl = e._row?.querySelector('.q');
-    if (qEl) qEl.textContent = Number(qv).toFixed(2);
-  });
-
-  // nodes numeric list
-  nodes.forEach((nd) => {
-    const pv = (nd.p && nd.p[idx] !== undefined) ? nd.p[idx] : 0;
-    const pEl = nd._row?.querySelector('.p');
-    if (pEl) pEl.textContent = Number(pv).toFixed(2);
-  });
-
-  // node overlay labels
-  nodeObjs.forEach((nd) => {
-    const pv = (nd.pArr && nd.pArr[idx] !== undefined) ? nd.pArr[idx] : 0;
-    nd.text.textContent = Number(pv).toFixed(2);
-  });
-
-  // flow segments
-  segs.forEach((s) => {
-    const e = edges[s.edgeIdx];
-    const qv = (e.q && e.q[idx] !== undefined) ? e.q[idx] : 0;
-    const openArr = e.open || null;
-    const isOpen = openArr ? !!openArr[idx] : true;
-
-    const dir = (qv >= 0) ? 1 : -1;
-    const mag = Math.abs(qv);
-    const norm = clamp(mag / (qMax[s.edgeIdx] || 1e-9), 0, 1);
-
-    // marker movement only while playing
-    if (playing && dt > 0) {
-      const speed = 0.15 + 1.8 * norm;
-      s.phase = (s.phase + dir * speed * dt) % 1;
-      if (s.phase < 0) s.phase += 1;
-    }
-
-    const pt = s.path.getPointAtLength(s.phase * s.len);
-    s.dot.setAttribute('cx', pt.x);
-    s.dot.setAttribute('cy', pt.y);
-
-    // style
-    const w = 2.0 + 6.0 * norm;
-    s.path.setAttribute('stroke-width', w.toFixed(2));
-    s.path.style.opacity = (0.15 + 0.85 * norm).toFixed(3);
-
-    // direction classes
-    if (dir >= 0) {
-      s.path.classList.add('pos');
-      s.path.classList.remove('neg');
-      s.dot.classList.add('pos');
-      s.dot.classList.remove('neg');
-    } else {
-      s.path.classList.add('neg');
-      s.path.classList.remove('pos');
-      s.dot.classList.add('neg');
-      s.dot.classList.remove('pos');
-    }
-
-    if (!isOpen) {
-      s.path.classList.add('closed');
-      s.dot.classList.add('closed');
-    } else {
-      s.path.classList.remove('closed');
-      s.dot.classList.remove('closed');
-    }
-  });
-
-  lastRenderedIdx = idx;
-  lastRenderedPlaying = playing;
-}
-
-function __frameInParentViewport(){
-  try {
-    const fe = window.frameElement;
-    if (!fe || !fe.getBoundingClientRect) return true;
-    const r = fe.getBoundingClientRect();
-    const w = Number(r.width || Math.max(0, (r.right || 0) - (r.left || 0)) || 0);
-    const h = Number(r.height || Math.max(0, (r.bottom || 0) - (r.top || 0)) || 0);
-    if (w <= 2 || h <= 2) return false;
-    if ((Number(fe.clientWidth || 0) <= 2) || (Number(fe.clientHeight || 0) <= 2)) return false;
-    let hiddenByCss = false;
-    try {
-      const hostView = fe.ownerDocument && fe.ownerDocument.defaultView;
-      const cs = (hostView && hostView.getComputedStyle) ? hostView.getComputedStyle(fe) : null;
-      hiddenByCss = !!(cs && (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity || '1') === 0));
-    } catch(_cssErr) {}
-    if (hiddenByCss) return false;
-    const hostWin = (window.top && window.top !== window) ? window.top : window;
-    const vh = Number(hostWin.innerHeight || window.innerHeight || 0);
-    const vw = Number(hostWin.innerWidth || window.innerWidth || 0);
-    const margin = 64;
-    return (r.bottom >= -margin) && (r.top <= vh + margin) && (r.right >= -margin) && (r.left <= vw + margin);
-  } catch(_e) {
-    return true;
-  }
-}
-function __nextIdleMs(visibleMs, hiddenMs, offscreenMs){
-  if (document && document.hidden) return hiddenMs;
-  return __frameInParentViewport() ? visibleMs : offscreenMs;
-}
-let __STEP_HANDLE = 0;
-let __STEP_KIND = '';
-function __clearScheduledStep(){
-  try {
-    if (!__STEP_HANDLE) return;
-    if (__STEP_KIND === 'raf' && window.cancelAnimationFrame) window.cancelAnimationFrame(__STEP_HANDLE);
-    else clearTimeout(__STEP_HANDLE);
-  } catch(_e) {}
-  __STEP_HANDLE = 0;
-  __STEP_KIND = '';
-}
-function __scheduleStep(kind, delayMs){
-  __clearScheduledStep();
-  if (kind === 'raf') {
-    __STEP_KIND = 'raf';
-    __STEP_HANDLE = requestAnimationFrame(step);
-  } else {
-    __STEP_KIND = 'timeout';
-    __STEP_HANDLE = setTimeout(step, Math.max(0, Number(delayMs) || 0));
-  }
-}
-function __wakeStep(){
-  if (!document.hidden && __frameInParentViewport()) __scheduleStep('raf', 0);
-  else { __STEP_HANDLE = null; }
-}
-
-function step(ts) {
-  const dt = Math.max(0, (ts - lastTs) / 1000.0);
-  lastTs = ts;
-
-  if (playing && n > 0) {
-    idx = idx + Math.max(1, Math.floor(dt * 60));
-    if (idx >= n) idx = 0;
-    slider.value = String(idx);
-  }
-
-  const shouldRender = playing || (idx !== lastRenderedIdx) || (lastRenderedPlaying !== playing);
-  if (shouldRender) renderFrame(dt);
-
-  if (playing && !document.hidden && __frameInParentViewport()) __scheduleStep('raf', 0);
-  else {
-    __STEP_HANDLE = null;
-  }
-}
-
-window.addEventListener('focus', __wakeStep);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) __wakeStep(); });
-window.addEventListener('scroll', () => { try { __wakeStep(); } catch(_e) {} }, {passive:true});
-window.addEventListener('resize', () => { try { __wakeStep(); } catch(_e) {} }, {passive:true});
-__wakeStep();
-</script>
-</body>
-</html>"""
-
-    html = html.replace("__SVG_INLINE__", svg_inline)
-    html = html.replace("__JS_DATA__", js_data)
-
-    components.html(html, height=height, scrolling=False)
 
 def start_worker(cmd: list, cwd: Path):
     """Старт фонового неграфического процесса с тихим окном и логами.
@@ -5323,16 +2796,6 @@ def start_worker(cmd: list, cwd: Path):
             except Exception:
                 pass
     return proc
-
-
-def pid_alive(p: subprocess.Popen | None) -> bool:
-    return p is not None and (p.poll() is None)
-
-
-def do_rerun():
-    """Best-effort rerun helper for old/new Streamlit builds."""
-    request_rerun(st)
-    return
 
 
 # -------------------------------
@@ -6587,20 +4050,6 @@ def atm_g_to_pa_abs(p_g_atm: float) -> float:
     return P_ATM + float(p_g_atm) * ATM_PA
 
 
-def is_pressure_param(name: str) -> bool:
-    """Грубая эвристика: параметры, которые храним как абсолютное давление (Па)."""
-    return name.startswith("давление_") or name in {"начальное_давление_аккумулятора"}
-
-
-def is_volume_param(name: str) -> bool:
-    return name.startswith("объём_") or name in {"мёртвый_объём_камеры"}
-
-
-def is_small_volume_param(name: str) -> bool:
-    """Объёмы, которые удобнее показывать в миллилитрах (линии, мёртвые объёмы)."""
-    return name in {"объём_линии", "мёртвый_объём_камеры"}
-
-
 def is_length_param(name: str) -> bool:
     """Длины/координаты, которые внутри модели хранятся в метрах, а пользователю удобнее видеть в мм."""
     if name in {"колея", "база", "ширина_рамы", "ход_штока", "статический_ход_колеса"}:
@@ -6613,24 +4062,6 @@ def is_length_param(name: str) -> bool:
 # ВАЖНО: эти функции должны быть определены ДО того, как мы строим таблицу df_opt.
 # Иначе Python упадёт с NameError, т.к. модуль выполняется сверху вниз.
 # -------------------------------
-
-PARAM_DESC: Dict[str, str] = {
-    # давления (в UI — бар избыточного)
-    "давление_Pmin_питание_Ресивер2": "Уставка подпитки Ресивера 2 от аккумулятора (ветка Акк → Р2). Нужно, чтобы третья ступень (Ц2/антикрен) не проседала по давлению при резком росте расхода.",
-    "давление_Pmin_сброс": "Уставка «мягкого режима»: порог, при котором Ресивер 3 начинает разгружаться/ограничиваться по давлению через путь в атмосферу.",
-    "давление_Pmid_сброс": "Уставка «жёсткого режима»: порог, при котором включается дополнительный путь/регулятор, повышающий жёсткость/демпфирование (адаптивность).",
-    "давление_Pзаряд_аккумулятора_из_Ресивер3": "Уставка зарядки аккумулятора от Ресивера 3 (ветка Р3 → Акк). Нужна, чтобы во время движения аккумулятор восстанавливал запас и был готов к внезапному манёвру.",
-    # дроссели/клапаны (в UI — доля открытия 0..1)
-    "открытие_дросселя_Ц2_CAP_в_ROD": "Доля открытия дросселя в диагональной линии Ц2 при направлении потока CAP→ROD (как в схеме).",
-    "открытие_дросселя_Ц2_ROD_в_CAP": "Доля открытия дросселя в диагональной линии Ц2 при направлении потока ROD→CAP (как в схеме).",
-    "открытие_дросселя_выхлоп_Pmin": "Доля открытия дросселя/ограничителя на выхлопе в «мягком» режиме (рядом с Pmin-веткой).",
-    "открытие_дросселя_выхлоп_Pmid": "Доля открытия дросселя/ограничителя на выхлопе в «жёстком» режиме (рядом с Pmid-веткой).",
-    "открытие_дросселя_выхлоп_Pmax": "Доля открытия дросселя/ограничителя на аварийном выхлопе (рядом с Pmax/предохранителем).",
-    # механика
-    "пружина_масштаб": "Масштаб нелинейной характеристики пружины (1.0 = базовая табличная кривая).",
-    "лимит_пробоя_крен_град": "Эксплуатационный лимит крена (град), по которому считается KPI «запас до пробоя». Это НЕ геометрическое опрокидывание, а требование по устойчивости/комфорту.",
-    "лимит_пробоя_тангаж_град": "Эксплуатационный лимит тангажа (град), по которому считается KPI «запас до пробоя».",
-}
 
 
 def param_unit(name: str) -> str:
@@ -6646,10 +4077,6 @@ def param_unit(name: str) -> str:
     if name == "пружина_масштаб":
         return "коэф."
     return "—"
-
-
-def param_desc(name: str) -> str:
-    return PARAM_DESC.get(name, "")
 
 
 # -------------------------------
@@ -7062,20 +4489,6 @@ if (SPR_X in base0) and (SPR_F in base0):
 
 # Список ключей со структурированными значениями (list/dict) — их исключаем из таблицы скаляров
 structured_keys = [k for k in all_keys if isinstance(base0.get(k, None), (list, dict))]
-
-def _is_numeric_scalar(v: Any) -> bool:
-    """Можно ли показывать параметр в числовой таблице."""
-    if v is None:
-        return False
-    # bool является подклассом int -> исключаем, чтобы не превращать флаги в 0/1
-    if isinstance(v, bool):
-        return False
-    try:
-        if isinstance(v, (np.integer, np.floating)):
-            return True
-    except Exception:
-        pass
-    return isinstance(v, (int, float))
 
 # В таблицу редактирования попадают только числовые скаляры.
 scalar_keys = [k for k in all_keys if (k not in structured_keys) and _is_numeric_scalar(base0.get(k, None))]
@@ -7747,30 +5160,6 @@ ALLOWED_TEST_TYPES = list(CANONICAL_OPTIMIZATION_TEST_TYPES)
 
 DEFAULT_SUITE_PATH = canonical_suite_json_path(HERE)
 SUITE_CONTRACT_WARNINGS_PENDING_KEY = "suite_contract_warnings_pending"
-
-def load_suite(path: Path) -> List[Dict[str, Any]]:
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            suite = json.load(f)
-        if isinstance(suite, list):
-            return suite
-    except Exception:
-        pass
-    return []
-
-
-def load_default_suite_disabled(path: Path) -> List[Dict[str, Any]]:
-    """Return shipped default suite rows with every scenario disabled by default."""
-    rows = load_suite(path)
-    out: List[Dict[str, Any]] = []
-    for row in rows:
-        try:
-            rec = dict(row)
-        except Exception:
-            continue
-        rec["включен"] = False
-        out.append(rec)
-    return out
 
 
 def _normalize_suite_id_value(value: Any) -> str:
@@ -9914,7 +7303,18 @@ else:
                     if _det_disk is not None:
                         _det_meta = dict(_det_disk.get("meta") or {})
                         _det_meta["loaded_from_cache"] = True
-                        _det_meta["cache_file"] = str(detail_cache_path(_cache_dir, test_pick, float(detail_dt), float(detail_t_end), int(max_points), bool(want_full)))
+                        _det_meta["cache_file"] = str(
+                            build_detail_cache_path(
+                                _cache_dir,
+                                test_pick,
+                                float(detail_dt),
+                                float(detail_t_end),
+                                int(max_points),
+                                bool(want_full),
+                                sanitize_test_name=sanitize_test_name,
+                                float_tag_fn=_float_tag,
+                            )
+                        )
                         _det_disk["meta"] = _det_meta
                         st.session_state.baseline_full_cache[cache_key] = _det_disk
                         if st.session_state.get("detail_auto_pending") == cache_key:
@@ -9924,7 +7324,18 @@ else:
                             "detail_loaded_cache",
                             test=str(test_pick),
                             cache_key=str(cache_key),
-                            cache_file=str(detail_cache_path(_cache_dir, test_pick, float(detail_dt), float(detail_t_end), int(max_points), bool(want_full))),
+                            cache_file=str(
+                                build_detail_cache_path(
+                                    _cache_dir,
+                                    test_pick,
+                                    float(detail_dt),
+                                    float(detail_t_end),
+                                    int(max_points),
+                                    bool(want_full),
+                                    sanitize_test_name=sanitize_test_name,
+                                    float_tag_fn=_float_tag,
+                                )
+                            ),
                         )
                         st.info("Детальный лог для текущего теста загружен из кэша. Для принудительного пересчёта нажмите 'Рассчитать полный лог и показать'.")
             except Exception:

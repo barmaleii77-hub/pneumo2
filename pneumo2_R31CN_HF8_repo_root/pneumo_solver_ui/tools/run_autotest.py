@@ -46,6 +46,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from pneumo_solver_ui.entrypoints import canonical_streamlit_entrypoint
+
 
 try:
     from pneumo_solver_ui.release_info import get_release
@@ -730,7 +732,7 @@ def main() -> int:
                 ui_meta = _ui_smoke_streamlit(
                     python_exe_path,
                     repo_root,
-                    pneumo_dir / "pneumo_ui_app.py",
+                    canonical_streamlit_entrypoint(here=__file__),
                     run_dir / "ui_smoke",
                     timeout_s=float(args.ui_smoke_timeout_s),
                 )

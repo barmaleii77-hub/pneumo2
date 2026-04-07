@@ -26,6 +26,39 @@
 3) Первый запуск создаст виртуальное окружение `.venv` и поставит зависимости.
 4) После старта Streamlit откроется в браузере (обычно `http://127.0.0.1:8505` (alt: `http://localhost:8505`)).
 
+## Dev Bootstrap (локальный smoke)
+
+Для воспроизводимого developer-прогона проект фиксирует Python `3.14.3`
+через `.python-version` в git-корне и в папке приложения.
+
+Из `pneumo2_R31CN_HF8_repo_root`:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install --upgrade pip
+.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python -m pip install -r pneumo_solver_ui\requirements_dev.txt
+.\.venv\Scripts\python -m compileall -q pneumo_solver_ui tests app.py START_PNEUMO_APP.py
+.\.venv\Scripts\python -c "from pathlib import Path; import pneumo_solver_ui.scheme_integrity as si; ok,msg=si.verify_scheme_integrity(Path('pneumo_solver_ui/PNEUMO_SCHEME.json'), Path('pneumo_solver_ui/scheme_fingerprint.json')); print('OK' if ok else 'FAIL', msg)"
+.\.venv\Scripts\python -m pytest tests/test_release_info_default_release_sync.py tests/test_app_release_sync.py tests/test_root_requirements_runtime_ui_deps.py tests/test_phase1_repo_bootstrap.py -q
+```
+
+Для ручного UI-smoke:
+
+```powershell
+.\.venv\Scripts\python -m streamlit run app.py --server.headless true --server.port 8505
+```
+
+## Entrypoint Map
+
+- `app.py` — canonical Streamlit shell for `START_PNEUMO_APP.*` and manual `streamlit run app.py`.
+- `pneumo_solver_ui/pneumo_ui_app.py` — heavy home page rendered inside the canonical multipage shell.
+- `pneumo_solver_ui/app.py` — legacy single-page package UI kept only for compatibility and regression guards; not the default launch target.
+
+`START_PNEUMO_APP.py` и `START_PNEUMO_APP.cmd` по-прежнему поддерживают
+shared-venv сценарий. Локальная `.venv` нужна именно для повторяемого
+developer smoke и быстрой диагностики состояния репозитория.
+
 ## Пост-билд тестирование (обязательный чек‑лист перед отправкой)
 
 ### Автоматическое (CLI)

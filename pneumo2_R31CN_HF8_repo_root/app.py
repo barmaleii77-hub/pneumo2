@@ -32,6 +32,7 @@ except Exception:
     pass
 
 from pneumo_solver_ui.crash_guard import install_crash_guard
+from pneumo_solver_ui.release_info import get_release
 from pneumo_solver_ui.ui_bootstrap import bootstrap
 from pneumo_solver_ui.ui_persistence import autosave_if_enabled
 
@@ -75,7 +76,7 @@ def _safe_set_page_config(*args, **kwargs):
 st.set_page_config = _safe_set_page_config  # type: ignore[assignment]
 
 
-RELEASE = os.environ.get("PNEUMO_RELEASE") or "PneumoApp_v6_80_R176"
+RELEASE = get_release()
 
 st.set_page_config(
     page_title=f"PneumoApp — {RELEASE}",

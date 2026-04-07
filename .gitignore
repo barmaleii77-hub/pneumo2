@@ -1,0 +1,22 @@
+# Packaging wrapper artifacts
+*_repo_root.zip
+
+# Local Python environments and caches
+pneumo2_R31CN_HF8_repo_root/.venv/
+pneumo2_R31CN_HF8_repo_root/**/__pycache__/
+pneumo2_R31CN_HF8_repo_root/**/*.py[cod]
+pneumo2_R31CN_HF8_repo_root/.pytest_cache/
+pneumo2_R31CN_HF8_repo_root/.mypy_cache/
+pneumo2_R31CN_HF8_repo_root/.ruff_cache/
+pneumo2_R31CN_HF8_repo_root/.coverage
+pneumo2_R31CN_HF8_repo_root/.coverage.*
+pneumo2_R31CN_HF8_repo_root/htmlcov/
+
+# Runtime smoke / diagnostics outputs
+pneumo2_R31CN_HF8_repo_root/diagnostics_runs/
+pneumo2_R31CN_HF8_repo_root/send_bundles/
+pneumo2_R31CN_HF8_repo_root/selfcheck_out/
+pneumo2_R31CN_HF8_repo_root/workspace/
+pneumo2_R31CN_HF8_repo_root/runs/ui_sessions/
+pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/autotest_runs/
+

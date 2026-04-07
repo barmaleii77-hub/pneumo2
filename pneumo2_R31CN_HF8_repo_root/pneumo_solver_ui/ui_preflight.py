@@ -22,6 +22,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from pneumo_solver_ui.entrypoints import (
+    canonical_home_page_rel,
+    desktop_animator_page_rel,
+    env_diagnostics_page_rel,
+    validation_web_page_rel,
+)
+
 
 @dataclass
 class _Step:
@@ -32,6 +39,12 @@ class _Step:
     detail: str
     page: Optional[str] = None
     action_label: Optional[str] = None
+
+
+HOME_PAGE = canonical_home_page_rel(here=__file__)
+DESKTOP_ANIMATOR_PAGE = desktop_animator_page_rel(here=__file__)
+VALIDATION_WEB_PAGE = validation_web_page_rel(here=__file__)
+ENV_DIAGNOSTICS_PAGE = env_diagnostics_page_rel(here=__file__)
 
 
 def _fmt_ts(ts: Any) -> str:
@@ -237,7 +250,7 @@ def collect_steps(st_mod: Any, app_dir: Path) -> Dict[str, _Step]:
         ok=ok,
         level="ok" if ok else "warn",
         detail=detail,
-        page="pneumo_solver_ui/pneumo_ui_app.py",
+        page=HOME_PAGE,
         action_label="Открыть Интерфейс",
     )
 
@@ -248,7 +261,7 @@ def collect_steps(st_mod: Any, app_dir: Path) -> Dict[str, _Step]:
         ok=ok,
         level="ok" if ok else "warn",
         detail=detail,
-        page="pneumo_solver_ui/pneumo_ui_app.py",
+        page=HOME_PAGE,
         action_label="Открыть Интерфейс",
     )
 
@@ -293,7 +306,7 @@ def collect_steps(st_mod: Any, app_dir: Path) -> Dict[str, _Step]:
         ok=ok,
         level="ok" if ok else "warn",
         detail="\n".join(detail_lines),
-        page="pneumo_solver_ui/pages/08_DesktopAnimator.py",
+        page=DESKTOP_ANIMATOR_PAGE,
         action_label="Открыть Desktop Animator",
     )
 
@@ -304,7 +317,7 @@ def collect_steps(st_mod: Any, app_dir: Path) -> Dict[str, _Step]:
         ok=ok,
         level="ok" if ok else "warn",
         detail=detail,
-        page="pneumo_solver_ui/pages/08_DesktopAnimator.py",
+        page=DESKTOP_ANIMATOR_PAGE,
         action_label="Открыть Desktop Animator",
     )
 
@@ -315,7 +328,7 @@ def collect_steps(st_mod: Any, app_dir: Path) -> Dict[str, _Step]:
         ok=True,
         level="ok",
         detail=f"OS: {platform.system()} | Python: {platform.python_version()}",
-        page="pneumo_solver_ui/pages/99_EnvDiagnostics.py",
+        page=ENV_DIAGNOSTICS_PAGE,
         action_label="Диагностика",
     )
 
@@ -336,6 +349,22 @@ def _pick_next_page(steps: Dict[str, _Step]) -> Tuple[str, str]:
         return "pneumo_solver_ui/pages/08_DesktopAnimator.py", "Установить/запустить Desktop Animator"
 
     return "pneumo_solver_ui/pages/09_Validation_Web.py", "Перейти к Валидации (Web)"
+
+
+def _pick_next_page_canonical(steps: Dict[str, _Step]) -> Tuple[str, str]:
+    """Return canonical relative page targets for the recommended next step."""
+    if not steps.get("suite", _Step("", "", True, "ok", "")).ok:
+        return HOME_PAGE, "РћС‚РєСЂС‹С‚СЊ РРЅС‚РµСЂС„РµР№СЃ Рё РЅР°СЃС‚СЂРѕРёС‚СЊ С‚РµСЃС‚вЂ‘РЅР°Р±РѕСЂ"
+    if not steps.get("baseline", _Step("", "", True, "ok", "")).ok:
+        return HOME_PAGE, "Р—Р°РїСѓСЃС‚РёС‚СЊ Baseline"
+    if not steps.get("export", _Step("", "", True, "ok", "")).ok:
+        return HOME_PAGE, "РЎРґРµР»Р°С‚СЊ РґРµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ + СЌРєСЃРїРѕСЂС‚ anim_latest"
+    if not steps.get("desktop", _Step("", "", True, "ok", "")).ok:
+        return DESKTOP_ANIMATOR_PAGE, "РЈСЃС‚Р°РЅРѕРІРёС‚СЊ/Р·Р°РїСѓСЃС‚РёС‚СЊ Desktop Animator"
+    return VALIDATION_WEB_PAGE, "РџРµСЂРµР№С‚Рё Рє Р’Р°Р»РёРґР°С†РёРё (Web)"
+
+
+_pick_next_page = _pick_next_page_canonical
 
 
 def _nav_link(st_mod: Any, page: str, label: str, *, key: str) -> None:

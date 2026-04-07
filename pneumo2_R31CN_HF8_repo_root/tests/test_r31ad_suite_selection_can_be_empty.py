@@ -12,7 +12,8 @@ RING_EDITOR = (ROOT / 'pneumo_solver_ui' / 'ui_scenario_ring.py').read_text(enco
 
 
 def test_main_suite_editor_uses_normal_selection_and_default_suite_disabled() -> None:
-    assert 'load_default_suite_disabled(DEFAULT_SUITE_PATH)' in PNEUMO_UI_APP
+    assert 'load_optimization_ready_suite_rows' in PNEUMO_UI_APP
+    assert 'load_default_suite_disabled(DEFAULT_SUITE_PATH)' not in PNEUMO_UI_APP
     assert 'st.session_state["ui_suite_selected_id"] = _cur_sel' in PNEUMO_UI_APP
     assert '_suite_select_options = list(_row_ids)' in PNEUMO_UI_APP
     assert 'format_func=lambda _id: _label_for_id(str(_id))' in PNEUMO_UI_APP

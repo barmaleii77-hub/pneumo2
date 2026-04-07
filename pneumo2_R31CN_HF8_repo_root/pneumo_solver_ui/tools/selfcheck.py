@@ -26,6 +26,8 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Iterable, List, Optional
 
+from pneumo_solver_ui.entrypoints import ui_entrypoint_specs
+
 
 @dataclass
 class CheckResult:
@@ -112,12 +114,11 @@ def run_quick_selfcheck(project_root: str | os.PathLike) -> List[dict]:
 
     # 3) Project structure
     must_have_files = [
-        "app.py",
-        "START_PNEUMO_APP.py",
-        "requirements.txt",
-        "pneumo_solver_ui/pneumo_ui_app.py",
+        ("START_PNEUMO_APP.py", "Windows/bootstrap launcher"),
+        ("requirements.txt", "Runtime dependency manifest"),
     ]
-    for rel in must_have_files:
+    must_have_files.extend((spec.rel_path, spec.role) for spec in ui_entrypoint_specs(here=__file__))
+    for rel, role in must_have_files:
         ok = _file_exists(root, rel)
         out.append(
             CheckResult(
