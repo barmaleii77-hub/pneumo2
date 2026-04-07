@@ -41,7 +41,6 @@ from pneumo_solver_ui.suite_contract_migration import migrate_legacy_suite_colum
 
 import copy
 import gzip
-import pickle
 
 import numpy as np
 import pandas as pd
@@ -65,7 +64,6 @@ except Exception:
     make_subplots = None  # type: ignore
     _HAS_PLOTLY = False
 
-import streamlit.components.v1 as components
 from pneumo_solver_ui.ui_cache_helpers import (
     detail_cache_path as build_detail_cache_path,
     df_to_excel_bytes,
@@ -82,6 +80,7 @@ from pneumo_solver_ui.ui_cache_helpers import (
     stable_obj_hash,
 )
 from pneumo_solver_ui.ui_data_helpers import decimate_minmax, downsample_df, write_tests_index_csv
+from pneumo_solver_ui.ui_diagnostics_helpers import make_ui_diagnostics_zip_bundle
 from pneumo_solver_ui.ui_event_sync_helpers import (
     consume_mech_pick_event as _consume_mech_pick_event_core,
     consume_playhead_event as _consume_playhead_event_core,
@@ -95,12 +94,18 @@ from pneumo_solver_ui.ui_interaction_helpers import (
     plotly_points_signature as _plotly_points_signature,
     strip_svg_xml_header,
 )
+from pneumo_solver_ui.ui_flow_panel_helpers import render_flow_panel_html
 from pneumo_solver_ui.ui_param_helpers import (
     is_numeric_scalar as _is_numeric_scalar,
     is_pressure_param,
     is_small_volume_param,
     is_volume_param,
     param_desc,
+)
+from pneumo_solver_ui.ui_process_helpers import (
+    dump_pickle_payload as _dump_detail_cache_payload,
+    load_pickle_payload as _load_detail_cache_payload,
+    start_background_worker,
 )
 from pneumo_solver_ui.ui_runtime_helpers import (
     do_rerun,
@@ -123,6 +128,20 @@ from pneumo_solver_ui.ui_suite_helpers import (
     load_default_suite_disabled,
     load_suite,
     resolve_osc_dir,
+)
+from pneumo_solver_ui.ui_components import (
+    get_mech_anim_component,
+    get_mech_car3d_component,
+    get_playhead_ctrl_component,
+    get_pneumo_svg_flow_component,
+)
+from pneumo_solver_ui.ui_unit_helpers import (
+    gauge_to_pa_abs,
+    infer_plot_unit_and_transform,
+    pa_abs_to_gauge,
+    param_unit_label,
+    si_to_ui_value,
+    ui_to_si_value,
 )
 from pneumo_solver_ui.ui_shared_helpers import (
     best_match as _best_match,
@@ -331,136 +350,6 @@ try:
     st.session_state["_log_event_cb"] = log_event
 except Exception:
     pass
-
-
-# -------------------------------
-# Bi-directional SVG component (click on scheme -> Python)
-# -------------------------------
-
-_PNEUMO_SVG_FLOW_COMPONENT = None
-
-
-def get_pneumo_svg_flow_component():
-    """Return (and cache) the bi-directional SVG flow component callable.
-
-    The component is served from ./components/pneumo_svg_flow (index.html).
-    If the folder is missing for some reason, the app will fall back
-    to the static HTML renderer.
-    """
-    global _PNEUMO_SVG_FLOW_COMPONENT
-    if _PNEUMO_SVG_FLOW_COMPONENT is not None:
-        return _PNEUMO_SVG_FLOW_COMPONENT
-    comp_dir = HERE / "components" / "pneumo_svg_flow"
-    if comp_dir.exists():
-        try:
-            # declare_component expects an absolute path
-            _PNEUMO_SVG_FLOW_COMPONENT = components.declare_component(
-                "pneumo_svg_flow",
-                path=str(comp_dir.resolve()),
-            )
-        except Exception:
-            _PNEUMO_SVG_FLOW_COMPONENT = None
-    else:
-        _PNEUMO_SVG_FLOW_COMPONENT = None
-    return _PNEUMO_SVG_FLOW_COMPONENT
-
-
-# -------------------------------
-# Mechanical animation component (front/side views)
-# -------------------------------
-
-_MECH_ANIM_COMPONENT = None
-
-
-def get_mech_anim_component():
-    """Return (and cache) the mechanical animation component callable.
-
-    The component is served from ./components/mech_anim (index.html).
-    If the folder is missing for some reason, the app will fall back
-    to a static image.
-    """
-    global _MECH_ANIM_COMPONENT
-    if _MECH_ANIM_COMPONENT is not None:
-        return _MECH_ANIM_COMPONENT
-    comp_dir = HERE / "components" / "mech_anim"
-    if comp_dir.exists():
-        try:
-            _MECH_ANIM_COMPONENT = components.declare_component(
-                "mech_anim",
-                path=str(comp_dir.resolve()),
-            )
-        except Exception:
-            _MECH_ANIM_COMPONENT = None
-    else:
-        _MECH_ANIM_COMPONENT = None
-    return _MECH_ANIM_COMPONENT
-
-
-
-
-
-# -------------------------------
-# Mechanical car 3D animation component (wireframe, orbit camera)
-# -------------------------------
-
-_MECH_CAR3D_COMPONENT = None
-
-
-def get_mech_car3d_component():
-    """Return (and cache) the 3D car animation component callable.
-
-    The component is served from ./components/mech_car3d (index.html).
-
-    Implementation notes:
-      - Pure HTML/JS canvas (no external libs) to keep the repo self‑contained.
-      - Reads the global playhead state from localStorage (same key as graphs / SVG).
-    """
-    global _MECH_CAR3D_COMPONENT
-    if _MECH_CAR3D_COMPONENT is not None:
-        return _MECH_CAR3D_COMPONENT
-    comp_dir = HERE / "components" / "mech_car3d"
-    if comp_dir.exists():
-        try:
-            _MECH_CAR3D_COMPONENT = components.declare_component(
-                "mech_car3d",
-                path=str(comp_dir.resolve()),
-            )
-        except Exception:
-            _MECH_CAR3D_COMPONENT = None
-    else:
-        _MECH_CAR3D_COMPONENT = None
-    return _MECH_CAR3D_COMPONENT
-
-# -------------------------------
-# Global playhead controller component (shared timeline)
-# -------------------------------
-
-_PLAYHEAD_CTRL_COMPONENT = None
-
-
-def get_playhead_ctrl_component():
-    """Return (and cache) the global playhead controller component callable.
-
-    The component is served from ./components/playhead_ctrl (index.html).
-    It writes playhead state into browser localStorage (so other components can follow)
-    and sends throttled playhead updates back to Python for syncing graphs.
-    """
-    global _PLAYHEAD_CTRL_COMPONENT
-    if _PLAYHEAD_CTRL_COMPONENT is not None:
-        return _PLAYHEAD_CTRL_COMPONENT
-    comp_dir = HERE / "components" / "playhead_ctrl"
-    if comp_dir.exists():
-        try:
-            _PLAYHEAD_CTRL_COMPONENT = components.declare_component(
-                "playhead_ctrl",
-                path=str(comp_dir.resolve()),
-            )
-        except Exception:
-            _PLAYHEAD_CTRL_COMPONENT = None
-    else:
-        _PLAYHEAD_CTRL_COMPONENT = None
-    return _PLAYHEAD_CTRL_COMPONENT
-
 
 
 consume_svg_pick_event = partial(
@@ -758,111 +647,13 @@ def export_anim_latest_bundle(df_main, df_p=None, df_q=None, df_open=None, meta=
             return None
 
 
-def make_ui_diagnostics_zip(
-    out_zip_path=None,
-    *,
-    base_json=None,
-    suite_json=None,
-    ranges_json=None,
-    tag="ui",
-    include_logs=True,
-    include_results=True,
-    include_calibration=True,
-    include_workspace=True,
-    extra_paths=None,
-    meta=None,
-):
-    """Собрать диагностический ZIP прямо из UI.
-
-    Зачем:
-    - когда что-то "плывёт" в окружении пользователя (Windows/прокси/версии Streamlit)
-      нужен единый ZIP со всеми логами, конфигами и выходными файлами;
-    - чтобы можно было прислать его сюда без отправки всей папки проекта.
-
-    В ZIP кладём:
-    - meta.json (версии/платформа/время)
-    - base/suite/ranges снапшоты (json)
-    - logs/ (ui_*.log, metrics_*.jsonl, combined)
-    - results/ (если есть)
-    - calibration_runs/ (если есть)
-    - workspace/ (osc/, exports/, diagnostics/ ...)
-    - любые extra_paths
-    """
-    import zipfile
-    import json as _json
-
-    # default path
-    if out_zip_path is None:
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        out_zip_path = (WORKSPACE_DIR / "diagnostics" / f"ui_diagnostics_{ts}_{tag}.zip")
-    out_zip_path = Path(out_zip_path)
-    out_zip_path.parent.mkdir(parents=True, exist_ok=True)
-
-    extra_paths = list(extra_paths or [])
-
-    # default folders that matter for debugging
-    default_paths = []
-    if include_logs:
-        default_paths.append(LOG_DIR)
-    if include_results:
-        default_paths.append(HERE / "results")
-    if include_calibration:
-        default_paths.append(HERE / "calibration_runs")
-    if include_workspace:
-        default_paths.append(WORKSPACE_DIR)
-    all_paths = default_paths + extra_paths
-
-    # meta
-    meta = dict(meta or {})
-    meta.setdefault("app_release", APP_RELEASE)
-    meta.setdefault("python", sys.version)
-    meta.setdefault("platform", platform.platform())
-    meta.setdefault("ts", datetime.now().isoformat(timespec="seconds"))
-
-    # helper
-    def _write_json(zf, name, obj):
-        try:
-            zf.writestr(name, _json.dumps(obj, ensure_ascii=False, indent=2))
-        except Exception as e:
-            zf.writestr(name + ".error.txt", f"Failed to serialize {name}: {e}")
-
-    def _should_skip(p: Path) -> bool:
-        suf = p.suffix.lower()
-        if suf in {".pyc", ".pyo"}:
-            return True
-        # extremely large caches / venv should not be included
-        parts = set(p.parts)
-        if ".venv" in parts or "__pycache__" in parts:
-            return True
-        return False
-
-    with zipfile.ZipFile(out_zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("meta.json", _json.dumps(meta, ensure_ascii=False, indent=2))
-        if base_json is not None:
-            _write_json(zf, "snapshot/base_json.json", base_json)
-        if suite_json is not None:
-            _write_json(zf, "snapshot/suite_json.json", suite_json)
-        if ranges_json is not None:
-            _write_json(zf, "snapshot/ranges_json.json", ranges_json)
-
-        for base in all_paths:
-            base = Path(base)
-            if not base.exists():
-                continue
-            if base.is_file():
-                if _should_skip(base):
-                    continue
-                arc = str(base.relative_to(HERE)) if str(base).startswith(str(HERE)) else str(base.name)
-                zf.write(base, arcname=arc)
-                continue
-            # directory
-            for p in base.rglob("*"):
-                if p.is_dir() or _should_skip(p):
-                    continue
-                arc = str(p.relative_to(HERE)) if str(p).startswith(str(HERE)) else str(Path(base.name) / p.relative_to(base))
-                zf.write(p, arcname=arc)
-
-    return out_zip_path
+make_ui_diagnostics_zip = partial(
+    make_ui_diagnostics_zip_bundle,
+    here=HERE,
+    workspace_dir=WORKSPACE_DIR,
+    log_dir=LOG_DIR,
+    app_release=APP_RELEASE,
+)
 # ------------------------- Persistent cache (baseline/details) -------------------------
 # Цель: после refresh (новая session_state) не пересчитывать baseline/детальный прогон,
 # а подхватывать с диска. Кэш хранится в WORKSPACE_DIR/cache/baseline/<key>/...
@@ -921,14 +712,6 @@ def save_baseline_cache(
     )
 
 
-def _dump_detail_cache_payload(handle: Any, payload: Dict[str, Any]) -> None:
-    pickle.dump(payload, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-
-def _load_detail_cache_payload(handle: Any) -> Dict[str, Any]:
-    return pickle.load(handle)
-
-
 # Shared detail-cache wrappers override the legacy inline copies above.
 def save_detail_cache(cache_dir: Path, test_name: str, dt: float, t_end: float, max_points: int, want_full: bool, payload: Dict[str, Any]) -> Optional[Path]:
     return save_ui_detail_cache(
@@ -969,29 +752,14 @@ def load_detail_cache(cache_dir: Path, test_name: str, dt: float, t_end: float, 
 # Graph Studio helpers (v7.32)
 # -------------------------------
 
-def _infer_unit_and_transform(col: str):
-    """Infer a display unit + transform function for a column name.
-
-    This is a best-effort heuristic for быстрый инженерный просмотр графиков.
-    Returns: (unit: str, transform: callable|None, yaxis_title: str)
-    """
-    c = str(col)
-    # pressures in Pa -> atm gauge (изб.)
-    if c.endswith("_Па") and ("давление" in c or "p_" in c.lower()):
-        return ("атм (изб.)", lambda a: (a - P_ATM) / ATM_PA, "атм (изб.)")
-    # angles rad -> deg
-    if c.endswith("_рад") or c.endswith("_rad"):
-        return ("град", lambda a: a * 180.0 / math.pi, "град")
-    # lengths
-    if "_м_с" in c or c.endswith("_м/с") or c.endswith("_m_s"):
-        return ("м/с", None, "м/с")
-    if c.endswith("_м") or c.endswith("_m"):
-        return ("м", None, "м")
-    # forces
-    if c.endswith("_Н") or c.endswith("_N"):
-        return ("Н", None, "Н")
-    # default
-    return ("", None, "")
+_infer_unit_and_transform = partial(
+    infer_plot_unit_and_transform,
+    pressure_unit_label="атм (изб.)",
+    pressure_offset_pa=lambda: P_ATM,
+    pressure_divisor_pa=lambda: ATM_PA,
+    length_unit_label="м",
+    length_scale=1.0,
+)
 
 
 def plot_studio_timeseries(
@@ -1677,266 +1445,6 @@ def plot_lines(
     return None
 
 
-def render_flow_panel_html(
-    time_s: List[float],
-    edge_series: List[Dict[str, Any]],
-    title: str = "Анимация потоков (MVP)",
-    height: int = 520,
-):
-    """Рендерит HTML (SVG) панель анимации потоков.
-
-    edge_series: список словарей вида:
-      {name: str, q: List[float], open: List[int] | None, unit: str}
-
-    Это «инструментальный» MVP: каждая ветка рисуется как отдельная линия,
-    по которой бегает маркер (скорость ~ |Q|, направление ~ sign(Q)).
-
-    Почему так:
-    - не нужно CAD/SVG‑геометрии схемы,
-    - анимация идёт на фронтенде (без постоянных rerun Streamlit).
-    """
-    payload = {
-        "title": title,
-        "time": time_s,
-        "edges": edge_series,
-    }
-    js_data = json.dumps(payload, ensure_ascii=False)
-
-    html = """<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
-    .wrap { padding: 8px 10px; }
-    .hdr { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    .hdr h3 { margin: 0; font-size: 16px; }
-    .btn { padding: 4px 10px; border: 1px solid #bbb; border-radius: 6px; background: #fff; cursor: pointer; }
-    .btn:active { transform: translateY(1px); }
-    .row { display:flex; align-items:center; gap:10px; margin: 6px 0; }
-    .name { width: 380px; font-size: 12px; line-height: 1.1; }
-    .val { width: 120px; font-size: 12px; text-align:right; font-variant-numeric: tabular-nums; }
-    .svg { flex: 1; height: 18px; }
-    .line { stroke: #888; stroke-width: 3; stroke-linecap: round; }
-    .line.closed { stroke: #ccc; }
-    .dot { fill: #1f77b4; }
-    .dot.closed { fill: #bbb; }
-    .time { font-variant-numeric: tabular-nums; }
-    input[type=range] { width: 320px; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="hdr">
-      <h3 id="title"></h3>
-      <button id="play" class="btn">▶︎</button>
-      <button id="pause" class="btn">⏸</button>
-      <span class="time">t=<span id="t">0.000</span> s</span>
-      <input id="slider" type="range" min="0" max="0" value="0" step="1"/>
-      <span class="time">idx=<span id="idx">0</span></span>
-    </div>
-    <div id="rows"></div>
-  </div>
-  <script>
-    const DATA = __JS_DATA__;
-    const titleEl = document.getElementById('title');
-    const rowsEl = document.getElementById('rows');
-    const tEl = document.getElementById('t');
-    const idxEl = document.getElementById('idx');
-    const slider = document.getElementById('slider');
-
-    titleEl.textContent = DATA.title || 'Flow';
-
-    const T = DATA.time || [];
-    const edges = DATA.edges || [];
-    const n = T.length;
-    slider.max = Math.max(0, n-1);
-
-    // построение строк
-    const state = edges.map((e, i) => ({ phase: Math.random(), qmax: 1e-9 }));
-    edges.forEach((e, i) => {
-      const q = e.q || [];
-      let qmax = 1e-9;
-      for (let k=0; k<q.length; k++) qmax = Math.max(qmax, Math.abs(q[k]));
-      state[i].qmax = qmax;
-
-      const row = document.createElement('div');
-      row.className = 'row';
-
-      const name = document.createElement('div');
-      name.className = 'name';
-      name.textContent = e.name;
-
-      const val = document.createElement('div');
-      val.className = 'val';
-      val.innerHTML = '<span class="q">0</span> ' + (e.unit || '');
-
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('class', 'svg');
-      svg.setAttribute('viewBox', '0 0 500 18');
-
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', '10');
-      line.setAttribute('y1', '9');
-      line.setAttribute('x2', '490');
-      line.setAttribute('y2', '9');
-      line.setAttribute('class', 'line');
-      svg.appendChild(line);
-
-      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      dot.setAttribute('r', '5');
-      dot.setAttribute('cy', '9');
-      dot.setAttribute('cx', '10');
-      dot.setAttribute('class', 'dot');
-      svg.appendChild(dot);
-
-      row.appendChild(name);
-      row.appendChild(svg);
-      row.appendChild(val);
-      rowsEl.appendChild(row);
-
-      e._dom = {row, line, dot, val};
-    });
-
-    function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
-
-    let idx = 0;
-    let playing = false;
-    let lastTs = performance.now();
-    let lastRenderedIdx = -1;
-    let lastRenderedPlaying = null;
-    const speedTime = 1.0; // множитель скорости времени (1.0 = real‑time)
-    const speedDots = 1.5; // скорость «бегущих точек»
-
-    function renderFrame(dt) {
-      idxEl.textContent = String(idx);
-      tEl.textContent = (T[idx] ?? 0).toFixed(3);
-
-      // обновление каждой ветки
-      edges.forEach((e, i) => {
-        const q = e.q || [];
-        const open = e.open || null;
-        const qv = (q[idx] ?? 0);
-        const s = state[i];
-        const dir = (qv >= 0) ? 1 : -1;
-        const mag = Math.abs(qv);
-        const norm = clamp(mag / (s.qmax || 1e-9), 0, 1);
-
-        // фазу маркера крутим только при реальном проигрывании
-        if (playing && dt > 0) {
-          s.phase = (s.phase + dir * speedDots * norm * dt) % 1;
-          if (s.phase < 0) s.phase += 1;
-        }
-        const x = 10 + s.phase * (490 - 10);
-        e._dom.dot.setAttribute('cx', x.toFixed(2));
-
-        const isOpen = open ? !!open[idx] : true;
-        e._dom.line.setAttribute('class', 'line' + (isOpen ? '' : ' closed'));
-        e._dom.dot.setAttribute('class', 'dot' + (isOpen ? '' : ' closed'));
-
-        // число
-        const qEl = e._dom.val.querySelector('.q');
-        if (qEl) qEl.textContent = (qv).toFixed(2);
-      });
-
-      lastRenderedIdx = idx;
-      lastRenderedPlaying = playing;
-    }
-
-    function __frameInParentViewport(){
-      try {
-        const fe = window.frameElement;
-        if (!fe || !fe.getBoundingClientRect) return true;
-        const r = fe.getBoundingClientRect();
-        const w = Number(r.width || Math.max(0, (r.right || 0) - (r.left || 0)) || 0);
-        const h = Number(r.height || Math.max(0, (r.bottom || 0) - (r.top || 0)) || 0);
-        if (w <= 2 || h <= 2) return false;
-        if ((Number(fe.clientWidth || 0) <= 2) || (Number(fe.clientHeight || 0) <= 2)) return false;
-        let hiddenByCss = false;
-        try {
-          const hostView = fe.ownerDocument && fe.ownerDocument.defaultView;
-          const cs = (hostView && hostView.getComputedStyle) ? hostView.getComputedStyle(fe) : null;
-          hiddenByCss = !!(cs && (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity || '1') === 0));
-        } catch(_cssErr) {}
-        if (hiddenByCss) return false;
-        const hostWin = (window.top && window.top !== window) ? window.top : window;
-        const vh = Number(hostWin.innerHeight || window.innerHeight || 0);
-        const vw = Number(hostWin.innerWidth || window.innerWidth || 0);
-        const margin = 64;
-        return (r.bottom >= -margin) && (r.top <= vh + margin) && (r.right >= -margin) && (r.left <= vw + margin);
-      } catch(_e) {
-        return true;
-      }
-    }
-    function __nextIdleMs(visibleMs, hiddenMs, offscreenMs){
-      if (document && document.hidden) return hiddenMs;
-      return __frameInParentViewport() ? visibleMs : offscreenMs;
-    }
-    let __STEP_HANDLE = 0;
-    let __STEP_KIND = '';
-    function __clearScheduledStep(){
-      try {
-        if (!__STEP_HANDLE) return;
-        if (__STEP_KIND === 'raf' && window.cancelAnimationFrame) window.cancelAnimationFrame(__STEP_HANDLE);
-        else clearTimeout(__STEP_HANDLE);
-      } catch(_e) {}
-      __STEP_HANDLE = 0;
-      __STEP_KIND = '';
-    }
-    function __scheduleStep(kind, delayMs){
-      __clearScheduledStep();
-      if (kind === 'raf') {
-        __STEP_KIND = 'raf';
-        __STEP_HANDLE = requestAnimationFrame(step);
-      } else {
-        __STEP_KIND = 'timeout';
-        __STEP_HANDLE = setTimeout(step, Math.max(0, Number(delayMs) || 0));
-      }
-    }
-    function __wakeStep(){
-      if (!document.hidden && __frameInParentViewport()) __scheduleStep('raf', 0);
-      else { __STEP_HANDLE = null; }
-    }
-
-    function step(ts) {
-      const dt = Math.max(0, (ts - lastTs) / 1000.0);
-      lastTs = ts;
-
-      if (playing) {
-        idx = idx + Math.max(1, Math.floor(speedTime * dt * 60));
-        if (idx >= n) idx = 0;
-        slider.value = String(idx);
-      }
-
-      const shouldRender = playing || (idx !== lastRenderedIdx) || (lastRenderedPlaying !== playing);
-      if (shouldRender) renderFrame(dt);
-
-      if (playing && !document.hidden && __frameInParentViewport()) __scheduleStep('raf', 0);
-      else {
-        __scheduleStep('timeout', __nextIdleMs(60000, 180000, 300000));
-      }
-    }
-
-    slider.addEventListener('input', (ev) => {
-      idx = parseInt(slider.value || '0', 10) || 0;
-      __wakeStep();
-    });
-    document.getElementById('play').addEventListener('click', () => { playing = true; __wakeStep(); });
-    document.getElementById('pause').addEventListener('click', () => { playing = false; __wakeStep(); });
-    window.addEventListener('focus', __wakeStep);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) __wakeStep(); });
-window.addEventListener('scroll', () => { try { __wakeStep(); } catch(_e) {} }, {passive:true});
-window.addEventListener('resize', () => { try { __wakeStep(); } catch(_e) {} }, {passive:true});
-
-    __wakeStep();
-  </script>
-</body>
- </html>"""
-
-    # ВАЖНО: намеренно вставляем JSON через replace, чтобы не экранировать все {{ }} в HTML/JS как в f-string.
-    html = html.replace("__JS_DATA__", js_data)
-
-    components.html(html, height=height, scrolling=True)
 
 
 
@@ -1945,60 +1453,11 @@ window.addEventListener('resize', () => { try { __wakeStep(); } catch(_e) {} }, 
 
 
 
-
-
-def start_worker(cmd: list, cwd: Path):
-    """Старт фонового неграфического процесса с тихим окном и логами.
-
-    Важно: background workers/staged runners должны идти через ``python.exe``,
-    а не через ``pythonw.exe``. Иначе на Windows ошибки и multiprocessing могут
-    выглядеть как бесконечное зависание без видимого stderr/stdout.
-    """
-    creationflags = 0
-    startupinfo = None
-    run_cmd = list(cmd)
-    stdout_f = None
-    stderr_f = None
-    try:
-        if run_cmd:
-            run_cmd[0] = console_python_executable(run_cmd[0]) or str(run_cmd[0])
-    except Exception:
-        pass
-    if os.name == "nt":
-        creationflags = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
-        startupinfo = subprocess.STARTUPINFO()  # type: ignore[attr-defined]
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW  # type: ignore[attr-defined]
-        try:
-            script_stem = Path(str(run_cmd[1] if len(run_cmd) > 1 else 'worker')).stem
-        except Exception:
-            script_stem = 'worker'
-        try:
-            cwd = Path(cwd)
-            cwd.mkdir(parents=True, exist_ok=True)
-            stdout_f = (cwd / "_proc.out.log").open('ab')
-            stderr_f = (cwd / "_proc.err.log").open('ab')
-        except Exception:
-            stdout_f = None
-            stderr_f = None
-    try:
-        proc = subprocess.Popen(
-            run_cmd,
-            cwd=str(cwd),
-            creationflags=creationflags,
-            startupinfo=startupinfo,
-            stdout=stdout_f,
-            stderr=stderr_f,
-        )
-    finally:
-        # Дочерний процесс уже унаследовал дескрипторы; родителю нельзя держать
-        # их открытыми, иначе Windows diagnostics ловит ResourceWarning на _proc.*.log.
-        for _fh in (stdout_f, stderr_f):
-            try:
-                if _fh is not None:
-                    _fh.close()
-            except Exception:
-                pass
-    return proc
+# Shared worker/process helpers override the legacy inline copy above.
+start_worker = partial(
+    start_background_worker,
+    console_python_executable_fn=console_python_executable,
+)
 
 
 # -------------------------------
@@ -2300,14 +1759,8 @@ P_ATM = float(getattr(model_mod, "P_ATM", 101325.0))
 ATM_PA = 101325.0
 
 
-def pa_abs_to_atm_g(p_abs_pa: float) -> float:
-    """Абсолютное давление (Па) -> атм (изб.) относительно P_ATM."""
-    return (float(p_abs_pa) - P_ATM) / ATM_PA
-
-
-def atm_g_to_pa_abs(p_g_atm: float) -> float:
-    """атм (изб.) -> абсолютное давление (Па)."""
-    return P_ATM + float(p_g_atm) * ATM_PA
+pa_abs_to_atm_g = partial(pa_abs_to_gauge, pressure_offset_pa=P_ATM, pressure_divisor_pa=ATM_PA)
+atm_g_to_pa_abs = partial(gauge_to_pa_abs, pressure_offset_pa=P_ATM, pressure_divisor_pa=ATM_PA)
 
 
 # -------------------------------
@@ -2317,19 +1770,13 @@ def atm_g_to_pa_abs(p_g_atm: float) -> float:
 # -------------------------------
 
 
-def param_unit(name: str) -> str:
-    """Единицы вывода в UI (строго в тех единицах, в которых показываем мин/макс/база)."""
-    if is_pressure_param(name):
-        return "атм изб."
-    if is_volume_param(name):
-        return "мл" if is_small_volume_param(name) else "л"
-    if name.endswith("_град"):
-        return "град"
-    if "открытие" in name:
-        return "доля 0..1"
-    if name == "пружина_масштаб":
-        return "коэф."
-    return "—"
+param_unit = partial(
+    param_unit_label,
+    pressure_unit_label="атм изб.",
+    is_pressure_param_fn=is_pressure_param,
+    is_volume_param_fn=is_volume_param,
+    is_small_volume_param_fn=is_small_volume_param,
+)
 
 
 # -------------------------------
@@ -2450,71 +1897,8 @@ PARAM_META = {
 }
 
 
-def _si_to_ui(key: str, x_si: Any, kind: str) -> Any:
-    """Преобразование значения из внутреннего СИ -> UI.
-
-    Важно: часть параметров конфигурации хранится как *нечисловые* значения
-    (строки/булевы/списки) — например режимы типа "constant".
-    Для таких ключей в метаданных используется kind="raw".
-
-    Для kind="raw" делаем безопасный passthrough:
-      - если это число — показываем числом,
-      - если это строка/булево/список/словарь — возвращаем как есть.
-
-    Это предотвращает падения вида: float('constant').
-    """
-    if x_si is None:
-        return float('nan')
-
-    # kind='raw' — хранить как есть (могут быть строки/булевы/таблицы/режимы).
-    if kind == 'raw':
-        if isinstance(x_si, (str, bool, list, tuple, dict)):
-            return x_si
-        # numpy scalar -> python scalar
-        try:
-            import numpy as _np
-            if isinstance(x_si, (_np.bool_,)):
-                return bool(x_si)
-            if isinstance(x_si, (_np.integer,)):
-                return int(x_si)
-            if isinstance(x_si, (_np.floating,)):
-                return float(x_si)
-        except Exception:
-            pass
-        try:
-            return float(x_si)
-        except Exception:
-            return float('nan')
-
-    if kind == 'pressure_atm_g':
-        # x_si: Pa absolute -> atm gauge in UI
-        return (float(x_si) - P_ATM) / P_ATM
-    if kind == 'pressure_kPa_abs':
-        return float(x_si) / 1000.0
-    if kind == 'volume_L':
-        return float(x_si) * 1000.0
-    if kind == 'volume_mL':
-        return float(x_si) * 1_000_000.0
-    if kind == 'temperature_C':
-        return float(x_si) - 273.15
-    try:
-        return float(x_si)
-    except Exception:
-        return float('nan')
-
-def _ui_to_si(key: str, x_ui: float, kind: str) -> float:
-    if kind == "pressure_atm_g":
-        # atm gauge -> Pa absolute
-        return P_ATM * (1.0 + float(x_ui))
-    if kind == "pressure_kPa_abs":
-        return 1000.0 * float(x_ui)
-    if kind == "volume_L":
-        return float(x_ui) / 1000.0
-    if kind == "volume_mL":
-        return float(x_ui) / 1_000_000.0
-    if kind == "temperature_C":
-        return float(x_ui) + 273.15
-    return float(x_ui)
+_si_to_ui = partial(si_to_ui_value, p_atm=P_ATM, bar_pa=100000.0)
+_ui_to_si = partial(ui_to_si_value, p_atm=P_ATM, bar_pa=100000.0)
 
 
 # дополняем базу значениями для ключей, которые есть в диапазонах, но отсутствуют в base0

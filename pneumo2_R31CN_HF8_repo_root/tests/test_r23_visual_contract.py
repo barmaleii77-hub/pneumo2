@@ -61,6 +61,8 @@ def test_desktop_animator_spawns_use_no_console_on_windows() -> None:
     txt1 = (ROOT / 'pneumo_solver_ui' / 'pneumo_ui_app.py').read_text(encoding='utf-8', errors='replace')
     txt2 = (ROOT / 'pneumo_solver_ui' / 'app.py').read_text(encoding='utf-8', errors='replace')
     txt3 = (ROOT / 'pneumo_solver_ui' / 'pages' / '08_DesktopAnimator.py').read_text(encoding='utf-8', errors='replace')
-    assert 'CREATE_NO_WINDOW' in txt1
-    assert 'start_worker(cmd, cwd=HERE)' in txt2 or 'CREATE_NO_WINDOW' in txt2
+    txt4 = (ROOT / 'pneumo_solver_ui' / 'ui_process_helpers.py').read_text(encoding='utf-8', errors='replace')
+    assert 'CREATE_NO_WINDOW' in txt4
+    assert 'start_background_worker' in txt1
+    assert 'start_worker(cmd, cwd=HERE)' in txt2 or 'start_background_worker' in txt2
     assert '_spawn_no_console' in txt3
