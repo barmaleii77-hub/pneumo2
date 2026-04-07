@@ -20,3 +20,10 @@ pneumo2_R31CN_HF8_repo_root/workspace/
 pneumo2_R31CN_HF8_repo_root/runs/ui_sessions/
 pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/autotest_runs/
 
+# Repo-local runtime outputs from manual/root launches
+pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/logs/*
+!pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/logs/.keep
+pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/workspace/
+pneumo2_R31CN_HF8_repo_root/runs/index.json
+pneumo2_R31CN_HF8_repo_root/runs/run_registry.jsonl
+pneumo2_R31CN_HF8_repo_root/runs/desktop.ini

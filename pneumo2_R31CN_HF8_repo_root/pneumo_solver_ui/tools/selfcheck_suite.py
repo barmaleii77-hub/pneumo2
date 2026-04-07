@@ -35,6 +35,7 @@ from pneumo_solver_ui.diag.json_safe import json_dumps, to_jsonable
 from pneumo_solver_ui.release_info import get_release
 from pneumo_solver_ui.workspace_contract import (
     REQUIRED_WORKSPACE_DIRS,
+    ensure_workspace_contract_dirs,
     resolve_effective_workspace_dir,
 )
 
@@ -183,6 +184,7 @@ def run_selfcheck_suite(
     preferred_python = _resolve_cli_python_executable(env)
     env.setdefault("PNEUMO_SHARED_VENV_PYTHON", preferred_python)
     workspace_dir = resolve_effective_workspace_dir(repo_root, env=env)
+    ensure_workspace_contract_dirs(workspace_dir, include_optional=True)
 
     steps: List[StepResult] = []
 

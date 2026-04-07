@@ -15,6 +15,11 @@ def test_gitignore_covers_local_runtime_noise() -> None:
     assert "pneumo2_R31CN_HF8_repo_root/**/__pycache__/" in text
     assert "pneumo2_R31CN_HF8_repo_root/workspace/" in text
     assert "pneumo2_R31CN_HF8_repo_root/runs/ui_sessions/" in text
+    assert "pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/logs/*" in text
+    assert "!pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/logs/.keep" in text
+    assert "pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/workspace/" in text
+    assert "pneumo2_R31CN_HF8_repo_root/runs/index.json" in text
+    assert "pneumo2_R31CN_HF8_repo_root/runs/run_registry.jsonl" in text
 
 
 def test_gitattributes_normalizes_cross_platform_text_and_binary_files() -> None:

@@ -39,8 +39,12 @@ def test_selfcheck_prefers_shared_venv_python_envvar(tmp_path: Path, monkeypatch
 def test_launcher_and_selfcheck_sources_wire_workspace_contract_and_integrator_smoke() -> None:
     launcher_src = (ROOT / 'START_PNEUMO_APP.py').read_text(encoding='utf-8', errors='replace')
     selfcheck_src = (ROOT / 'pneumo_solver_ui' / 'tools' / 'selfcheck_suite.py').read_text(encoding='utf-8', errors='replace')
+    ui_bootstrap_src = (ROOT / 'pneumo_solver_ui' / 'ui_bootstrap.py').read_text(encoding='utf-8', errors='replace')
 
     assert 'ensure_workspace_contract_dirs(session / "workspace", include_optional=True)' in launcher_src
     assert 'resolve_effective_workspace_dir(repo_root, env=env)' in selfcheck_src
+    assert 'ensure_workspace_contract_dirs(workspace_dir, include_optional=True)' in selfcheck_src
+    assert 'workspace_dir = resolve_effective_workspace_dir(repo_root)' in ui_bootstrap_src
+    assert 'ensure_workspace_contract_dirs(workspace_dir, include_optional=True)' in ui_bootstrap_src
     assert 'name="integrator_autotune_smoke"' in selfcheck_src
     assert 'pneumo_solver_ui.tools.integrator_autotune_smoke_check' in selfcheck_src

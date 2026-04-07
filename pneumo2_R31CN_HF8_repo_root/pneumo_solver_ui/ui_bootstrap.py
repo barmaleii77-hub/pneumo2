@@ -13,7 +13,23 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
+
+
+def _bootstrap_workspace_contract() -> None:
+    """Best-effort workspace bootstrap for manual/root Streamlit runs."""
+    try:
+        from pneumo_solver_ui.workspace_contract import (
+            ensure_workspace_contract_dirs,
+            resolve_effective_workspace_dir,
+        )
+
+        repo_root = Path(__file__).resolve().parents[1]
+        workspace_dir = resolve_effective_workspace_dir(repo_root)
+        ensure_workspace_contract_dirs(workspace_dir, include_optional=True)
+    except Exception:
+        pass
 
 
 def bootstrap(st_mod: Any) -> None:
@@ -50,6 +66,9 @@ def bootstrap(st_mod: Any) -> None:
         install_tooltips_ru()
     except Exception:
         pass
+
+    # 1b) Manual/root launches do not go through the session launcher.
+    _bootstrap_workspace_contract()
 
     # 2) persistence (autoload once)
     try:
