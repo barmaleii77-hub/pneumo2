@@ -223,9 +223,19 @@ def test_r31cd_runtime_arg_builder_restores_real_wiring_for_dask_and_ray() -> No
 def test_r31cd_ui_surfaces_expose_real_distributed_controls() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     page03 = (repo_root / "pneumo_solver_ui" / "pages" / "03_Optimization.py").read_text(encoding="utf-8")
+    page03_persistence = (
+        repo_root / "pneumo_solver_ui" / "optimization_coordinator_persistence_ui.py"
+    ).read_text(encoding="utf-8")
+    page03_botorch = (
+        repo_root / "pneumo_solver_ui" / "optimization_botorch_advanced_ui.py"
+    ).read_text(encoding="utf-8")
+    page03_launch_plan = (
+        repo_root / "pneumo_solver_ui" / "optimization_launch_plan_runtime.py"
+    ).read_text(encoding="utf-8")
     main_ui = (repo_root / "pneumo_solver_ui" / "pneumo_ui_app.py").read_text(encoding="utf-8")
+    page03_combined = page03 + "\n" + page03_persistence + "\n" + page03_botorch + "\n" + page03_launch_plan
 
-    for text in (page03, main_ui):
+    for text in (page03_combined, main_ui):
         assert "ray_runtime_env_mode" in text
         assert "ray_runtime_env_json" in text
         assert "opt_botorch_n_init" in text
@@ -238,4 +248,7 @@ def test_r31cd_ui_surfaces_expose_real_distributed_controls() -> None:
         assert "duckdb" in text
         assert "requirements_mobo_botorch.txt" in text
 
-    assert "append_coordinator_runtime_args" in page03
+    assert "render_coordinator_persistence_controls" in page03
+    assert "render_botorch_advanced_controls" in page03
+    assert "build_optimization_launch_plan" in page03
+    assert "append_coordinator_runtime_args" in page03_combined

@@ -317,6 +317,12 @@ from pneumo_solver_ui.optimization_runtime_paths import (
     console_python_executable,
     staged_progress_path,
 )
+from pneumo_solver_ui.optimization_last_pointer_snapshot import (
+    load_last_optimization_pointer_snapshot,
+)
+from pneumo_solver_ui.optimization_last_pointer_ui import (
+    render_last_optimization_pointer_summary,
+)
 from pneumo_solver_ui.optimization_stage_policy_live import (
     summarize_stage_policy_runtime,
 )
@@ -350,70 +356,7 @@ def _opt_gateway_nav(page: str, label: str, *, key: str, help_text: Optional[str
 
 def _opt_gateway_last_pointer_snapshot() -> dict:
     """Best-effort summary of the latest optimization pointer for the home gateway."""
-    try:
-        from pneumo_solver_ui import run_artifacts as _run_artifacts
-
-        raw = dict(_run_artifacts.load_last_opt_ptr() or {})
-    except Exception:
-        raw = {}
-
-    meta = dict(raw.get("meta") or {})
-    run_dir = None
-    raw_run_dir = raw.get("run_dir")
-    if isinstance(raw_run_dir, str) and raw_run_dir.strip():
-        try:
-            run_dir = Path(raw_run_dir).expanduser()
-        except Exception:
-            run_dir = None
-
-    mode_label = "—"
-    if run_dir is not None:
-        try:
-            parts_lower = {str(p).lower() for p in run_dir.parts}
-        except Exception:
-            parts_lower = set()
-        if (run_dir / "sp.json").exists() or "staged" in parts_lower:
-            mode_label = "StageRunner"
-        else:
-            backend = str(meta.get("backend") or "").strip()
-            mode_label = f"Distributed coordinator ({backend})" if backend else "Distributed coordinator"
-
-    live_policy = {}
-    if run_dir is not None and run_dir.exists():
-        try:
-            stage_dirs = sorted(
-                [p for p in run_dir.iterdir() if p.is_dir() and re.fullmatch(r"s\d+", p.name)],
-                key=lambda p: int(p.name[1:] or 0),
-            )
-        except Exception:
-            stage_dirs = []
-        if stage_dirs:
-            last_stage = stage_dirs[-1]
-            try:
-                stage_idx = int(last_stage.name[1:] or 0)
-            except Exception:
-                stage_idx = 0
-            stage_name = {0: "stage0_relevance", 1: "stage1_long", 2: "stage2_final"}.get(stage_idx, f"stage{stage_idx}")
-            try:
-                live_policy = summarize_stage_policy_runtime(run_dir, stage_idx=stage_idx, stage_name=stage_name) or {}
-            except Exception:
-                live_policy = {}
-
-    sp_payload = {}
-    if run_dir is not None and (run_dir / "sp.json").exists():
-        try:
-            sp_payload = json.loads((run_dir / "sp.json").read_text(encoding="utf-8"))
-        except Exception:
-            sp_payload = {}
-
-    return {
-        "raw": raw,
-        "meta": meta,
-        "run_dir": run_dir,
-        "mode_label": mode_label,
-        "live_policy": live_policy,
-        "sp_payload": sp_payload,
-    }
+    return load_last_optimization_pointer_snapshot()
 
 
 def _render_home_opt_config_snapshot(*, compact: bool = False) -> None:
@@ -488,48 +431,14 @@ def _render_home_opt_config_snapshot(*, compact: bool = False) -> None:
 
 def _render_home_opt_last_pointer_summary(*, compact: bool = False) -> None:
     snap = _opt_gateway_last_pointer_snapshot()
-    raw = snap.get("raw") or {}
-    if not raw:
-        st.info("Последняя оптимизация пока не запускалась (или указатель ещё не записан).")
-        st.markdown("**Seed/promotion policy (текущая стадия)**")
-        st.caption("Будет видно после staged run, когда появятся stage artifacts и live policy summary.")
-        return
-
-    meta = snap.get("meta") or {}
-    run_dir = snap.get("run_dir")
-    mode_label = str(snap.get("mode_label") or "—")
-    if compact:
-        st.write(f"**Путь:** `{run_dir}`")
-        st.caption(f"Режим: {mode_label}")
-        st.caption(f"Время: {meta.get('ts', raw.get('updated_at', '—'))}")
-    else:
-        cols = st.columns(3)
-        with cols[0]:
-            st.metric("Последний режим", mode_label)
-        with cols[1]:
-            st.metric("Backend", str(meta.get("backend") or "—"))
-        with cols[2]:
-            st.metric("Время", str(meta.get("ts") or raw.get("updated_at") or "—"))
-        st.caption(f"Папка: `{run_dir}`")
-
-    sp_payload = snap.get("sp_payload") or {}
-    if sp_payload:
-        st.caption(
-            "StageRunner pointer: "
-            f"status={sp_payload.get('status') or '—'}, ts={sp_payload.get('ts') or '—'}"
-        )
-
-    live_policy = snap.get("live_policy") or {}
-    st.markdown("**Seed/promotion policy (текущая стадия)**")
-    if live_policy.get("available"):
-        st.caption(
-            f"requested={live_policy.get('requested_mode') or '—'} → effective={live_policy.get('effective_mode') or '—'}; "
-            f"policy={live_policy.get('policy_name') or '—'}"
-        )
-        if str(live_policy.get("summary_line") or "").strip():
-            st.caption(str(live_policy.get("summary_line") or ""))
-    else:
-        st.caption("Будет видно после staged run, когда появятся stage artifacts и live policy summary.")
+    render_last_optimization_pointer_summary(
+        st,
+        snap,
+        compact=compact,
+        missing_message="Последняя оптимизация пока не запускалась (или указатель ещё не записан).",
+        packaging_heading="Packaging snapshot (last run)",
+        packaging_interference_prefix="В последнем run есть packaging-interference evidence",
+    )
 
 
 from pneumo_solver_ui.ring_visuals import (

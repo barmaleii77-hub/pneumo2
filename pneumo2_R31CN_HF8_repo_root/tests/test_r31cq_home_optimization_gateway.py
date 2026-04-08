@@ -17,8 +17,10 @@ def test_home_page_exposes_gateway_and_not_second_live_control_plane() -> None:
     assert 'Legacy home optimization block retained only as dormant source surface' in src
     assert 'Live launch path = dedicated Optimization page.' in src
     assert '"Seed/promotion policy"' in src
+    assert 'load_last_optimization_pointer_snapshot' in src
+    assert 'return load_last_optimization_pointer_snapshot()' in src
+    assert 'render_last_optimization_pointer_summary' in src
     assert '"System Influence eps_rel"' in src
-    assert 'summarize_stage_policy_runtime' in src
 
 
 def test_page_registry_and_dedicated_optimization_page_reflect_new_split() -> None:

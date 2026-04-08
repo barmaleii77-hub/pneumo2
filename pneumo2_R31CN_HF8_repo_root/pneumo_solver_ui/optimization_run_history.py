@@ -20,6 +20,7 @@ import json
 from typing import Any, Dict, Optional
 
 from pneumo_solver_ui.optimization_objective_contract import objective_contract_payload
+from pneumo_solver_ui.packaging_surface_helpers import collect_packaging_surface_metrics
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,19 @@ class OptimizationRunSummary:
     penalty_tol: Optional[float] = None
     objective_source: str = ''
     objective_contract_path: Optional[Path] = None
+
+
+@dataclass(frozen=True)
+class OptimizationRunPackagingSnapshot:
+    rows_considered: int = 0
+    rows_with_packaging: int = 0
+    packaging_complete_rows: int = 0
+    packaging_truth_ready_rows: int = 0
+    packaging_verification_pass_rows: int = 0
+    runtime_fallback_rows: int = 0
+    spring_host_interference_rows: int = 0
+    spring_pair_interference_rows: int = 0
+    status_counts: tuple[tuple[str, int], ...] = ()
 
 
 def _safe_json(path: Path) -> Dict[str, Any]:
@@ -82,6 +96,111 @@ def _float_or_none(value: Any) -> Optional[float]:
     except Exception:
         return None
     return out if out == out else None
+
+
+def _bool_like(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    num = _float_or_none(value)
+    if num is not None:
+        return bool(num != 0.0)
+    text = str(value or '').strip().lower()
+    return text in {'true', 'yes', 'y', 'on'}
+
+
+def _parse_json_text(raw: Any) -> Dict[str, Any]:
+    text = str(raw or '').strip()
+    if not text:
+        return {}
+    try:
+        obj = json.loads(text)
+        return dict(obj) if isinstance(obj, dict) else {}
+    except Exception:
+        return {}
+
+
+def _iter_result_rows(result_path: Path):
+    with result_path.open('r', encoding='utf-8', errors='ignore', newline='') as fh:
+        reader = csv.DictReader(fh)
+        for raw_row in reader:
+            row = dict(raw_row or {})
+            metrics_blob = _parse_json_text(row.get('metrics_json'))
+            for key, value in metrics_blob.items():
+                if key not in row or str(row.get(key) or '').strip() == '':
+                    row[str(key)] = value
+            yield row
+
+
+def summarize_run_packaging_snapshot(result_path: Optional[Path]) -> OptimizationRunPackagingSnapshot:
+    if result_path is None or not result_path.exists():
+        return OptimizationRunPackagingSnapshot()
+
+    rows_considered = 0
+    rows_with_packaging = 0
+    packaging_complete_rows = 0
+    packaging_truth_ready_rows = 0
+    packaging_verification_pass_rows = 0
+    runtime_fallback_rows = 0
+    spring_host_interference_rows = 0
+    spring_pair_interference_rows = 0
+    status_counts: Dict[str, int] = {}
+
+    try:
+        for row in _iter_result_rows(result_path):
+            row_status = str((row or {}).get('status') or '').strip().upper()
+            if row_status and row_status != 'DONE':
+                continue
+            rows_considered += 1
+
+            has_packaging = any(
+                key in row and str(row.get(key) or '').strip() != ''
+                for key in (
+                    'anim_export_packaging_status',
+                    'anim_export_packaging_truth_ready',
+                    'верификация_флаги',
+                    'число_runtime_fallback_пружины',
+                    'число_пересечений_пружина_цилиндр',
+                    'число_пересечений_пружина_пружина',
+                )
+            )
+            if not has_packaging:
+                continue
+
+            rows_with_packaging += 1
+            surface = collect_packaging_surface_metrics(row)
+            packaging_status = str(surface.get('packaging_статус') or '').strip() or 'n/a'
+            status_counts[packaging_status] = int(status_counts.get(packaging_status, 0)) + 1
+
+            if packaging_status == 'complete':
+                packaging_complete_rows += 1
+            if _bool_like(row.get('anim_export_packaging_truth_ready')):
+                packaging_truth_ready_rows += 1
+            if int(surface.get('pass_packaging_верификация', 0) or 0) == 1:
+                packaging_verification_pass_rows += 1
+
+            runtime_fallback = _float_or_none(row.get('число_runtime_fallback_пружины')) or 0.0
+            host_hits = _float_or_none(row.get('число_пересечений_пружина_цилиндр')) or 0.0
+            pair_hits = _float_or_none(row.get('число_пересечений_пружина_пружина')) or 0.0
+            if runtime_fallback > 0.0:
+                runtime_fallback_rows += 1
+            if host_hits > 0.0:
+                spring_host_interference_rows += 1
+            if pair_hits > 0.0:
+                spring_pair_interference_rows += 1
+    except Exception:
+        return OptimizationRunPackagingSnapshot()
+
+    return OptimizationRunPackagingSnapshot(
+        rows_considered=int(rows_considered),
+        rows_with_packaging=int(rows_with_packaging),
+        packaging_complete_rows=int(packaging_complete_rows),
+        packaging_truth_ready_rows=int(packaging_truth_ready_rows),
+        packaging_verification_pass_rows=int(packaging_verification_pass_rows),
+        runtime_fallback_rows=int(runtime_fallback_rows),
+        spring_host_interference_rows=int(spring_host_interference_rows),
+        spring_pair_interference_rows=int(spring_pair_interference_rows),
+        status_counts=tuple(sorted((str(key), int(value)) for key, value in status_counts.items())),
+    )
 
 
 def _read_objective_contract(run_dir: Path) -> tuple[Dict[str, Any], Optional[Path]]:
@@ -315,8 +434,10 @@ def format_run_choice(summary: OptimizationRunSummary) -> str:
 
 
 __all__ = [
+    'OptimizationRunPackagingSnapshot',
     'OptimizationRunSummary',
     'discover_workspace_optimization_runs',
     'format_run_choice',
+    'summarize_run_packaging_snapshot',
     'summarize_optimization_run',
 ]

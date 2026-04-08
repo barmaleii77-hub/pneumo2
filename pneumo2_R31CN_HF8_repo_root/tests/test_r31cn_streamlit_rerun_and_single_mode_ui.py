@@ -55,16 +55,21 @@ def test_r31cn_runtime_sources_use_shared_rerun_helper_without_direct_experiment
         "pneumo_solver_ui/pneumo_ui_app.py",
     ]:
         src = (ROOT / rel).read_text(encoding="utf-8")
-        assert "request_rerun" in src
+        assert "request_rerun" in src or "do_rerun" in src
         assert "st.experimental_rerun(" not in src
 
 
 def test_r31cn_optimization_page_exposes_one_active_launch_mode_and_one_explicit_start_button() -> None:
     src = (UI_ROOT / "pages" / "03_Optimization.py").read_text(encoding="utf-8")
+    launch_src = (UI_ROOT / "optimization_launch_session_ui.py").read_text(encoding="utf-8")
+    combined = src + "\n" + launch_src
     assert '"Активный путь запуска"' in src
     assert '"Сейчас активен только один путь запуска.' in src
     assert 'if not opt_use_staged:' in src
     assert 'if opt_use_staged:' in src
-    assert 'launch_button_label = "Запустить StageRunner"' in src
-    assert '"Запустить distributed coordinator"' in src
-    assert '"**Что нажимать:** выберите режим выше' in src
+    assert 'render_optimization_launch_session_block' in src
+    assert 'launch_button_label = (' in launch_src
+    assert '"Запустить StageRunner"' in combined
+    assert '"Запустить distributed coordinator"' in combined
+    assert 'render_optimization_launch_panel' in combined
+    assert '"**Что нажимать:** выберите режим выше' in combined
