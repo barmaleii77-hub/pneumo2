@@ -35,7 +35,6 @@ from typing import Dict, Tuple, Any, List, Optional
 
 from pneumo_solver_ui.data_contract import build_geometry_meta_from_base, assert_required_geometry_meta, supplement_animator_geometry_meta
 from pneumo_solver_ui.solver_points_contract import assert_required_solver_points_contract
-from pneumo_solver_ui.visual_contract import build_visual_reload_diagnostics
 from pneumo_solver_ui.browser_perf_artifacts import persist_browser_perf_snapshot_event
 from pneumo_solver_ui.suite_contract_migration import migrate_legacy_suite_columns
 
@@ -102,6 +101,7 @@ from pneumo_solver_ui.ui_param_helpers import (
     is_volume_param,
     param_desc,
 )
+from pneumo_solver_ui.suspension_family_contract import family_param_meta
 from pneumo_solver_ui.ui_process_helpers import (
     dump_pickle_payload as _dump_detail_cache_payload,
     load_pickle_payload as _load_detail_cache_payload,
@@ -119,6 +119,12 @@ from pneumo_solver_ui.ui_simulation_helpers import (
     compute_road_profile_from_suite,
     parse_sim_output,
 )
+from pneumo_solver_ui.run_artifacts import (
+    apply_anim_latest_to_session as apply_anim_latest_to_session_global,
+    local_anim_latest_export_paths as local_anim_latest_export_paths_global,
+    write_anim_latest_pointer_json as write_anim_latest_pointer_json_global,
+)
+from pneumo_solver_ui.tools.send_bundle_contract import ANIM_LOCAL_NPZ, ANIM_LOCAL_POINTER
 from pneumo_solver_ui.ui_svg_html_builders import (
     render_svg_edge_mapper_html,
     render_svg_flow_animation_html,
@@ -529,8 +535,8 @@ def export_full_log_to_npz(out_path, df_main, df_p=None, df_q=None, df_open=None
 
 
 # --- Desktop Animator helpers ---
-ANIM_LATEST_NPZ_NAME = "anim_latest.npz"
-ANIM_LATEST_PTR_NAME = "anim_latest.json"
+ANIM_LATEST_NPZ_NAME = Path(ANIM_LOCAL_NPZ).name
+ANIM_LATEST_PTR_NAME = Path(ANIM_LOCAL_POINTER).name
 
 
 def get_anim_latest_paths() -> tuple[Path, Path]:
@@ -542,11 +548,10 @@ def get_anim_latest_paths() -> tuple[Path, Path]:
       2) Animator auto-reloads anim_latest
     """
     try:
-        exp_dir = Path(WORKSPACE_EXPORTS_DIR)
+        return local_anim_latest_export_paths_global(Path(WORKSPACE_EXPORTS_DIR))
     except Exception:
         exp_dir = Path(__file__).resolve().parent / "workspace" / "exports"
-    exp_dir.mkdir(parents=True, exist_ok=True)
-    return exp_dir / ANIM_LATEST_NPZ_NAME, exp_dir / ANIM_LATEST_PTR_NAME
+    return local_anim_latest_export_paths_global(exp_dir)
 
 
 def write_anim_latest_pointer(npz_path: Path, *, meta: dict | None = None, pointer_path: Path | None = None) -> Path:
@@ -555,38 +560,17 @@ def write_anim_latest_pointer(npz_path: Path, *, meta: dict | None = None, point
     Pointer diagnostics must expose not only the NPZ path but also the visual
     dependency token used by web/desktop reload logic.
     """
-    import json as _json
-    import time as _time
-    from datetime import datetime as _datetime, timezone as _timezone
-
-    npz_path = Path(npz_path).expanduser().resolve()
     if pointer_path is None:
         _, pointer_path = get_anim_latest_paths()
-    pointer_path = Path(pointer_path)
-    pointer_path.parent.mkdir(parents=True, exist_ok=True)
-    meta_obj = dict(meta or {})
-    reload_diag = build_visual_reload_diagnostics(
+    pointer_path, _payload, _mirrored = write_anim_latest_pointer_json_global(
         npz_path,
-        meta=meta_obj,
+        pointer_path=pointer_path,
+        meta=dict(meta or {}),
+        extra_fields={"ts": float(time.time())},
         context="anim_latest legacy pointer",
         log=_APP_LOGGER.warning,
+        mirror_global_pointer=True,
     )
-    rec = {
-        "ts": float(_time.time()),
-        "updated_utc": _datetime.now(_timezone.utc).isoformat(),
-        "npz_path": str(npz_path),
-        "meta": meta_obj,
-        "visual_cache_token": reload_diag.get("visual_cache_token", ""),
-        "visual_reload_inputs": list(reload_diag.get("inputs") or []),
-        "visual_cache_dependencies": dict(reload_diag.get("visual_cache_dependencies") or {}),
-    }
-    pointer_path.write_text(_json.dumps(rec, ensure_ascii=False, indent=2), encoding="utf-8")
-    try:
-        from pneumo_solver_ui.run_artifacts import save_latest_animation_ptr
-
-        save_latest_animation_ptr(npz_path=npz_path, pointer_json=pointer_path, meta=meta_obj)
-    except Exception:
-        pass
     return pointer_path
 
 
@@ -623,6 +607,13 @@ def export_anim_latest_bundle(df_main, df_p=None, df_q=None, df_open=None, meta=
             df_open=df_open,
             meta=meta,
         )
+        try:
+            apply_anim_latest_to_session_global(
+                st.session_state,
+                {"npz_path": npz_latest, "pointer_json": ptr_latest, "meta": dict(meta or {})},
+            )
+        except Exception:
+            pass
         return npz_latest
     except ValueError:
         # Contract errors must not be bypassed by a fallback exporter.
@@ -641,7 +632,14 @@ def export_anim_latest_bundle(df_main, df_p=None, df_q=None, df_open=None, meta=
                 require_geometry_contract=True,
                 require_solver_points_contract=True,
             )
-            write_anim_latest_pointer(out, meta=meta)
+            ptr_latest = write_anim_latest_pointer(out, meta=meta)
+            try:
+                apply_anim_latest_to_session_global(
+                    st.session_state,
+                    {"npz_path": out, "pointer_json": ptr_latest, "meta": dict(meta or {})},
+                )
+            except Exception:
+                pass
             return out
         except Exception:
             return None
@@ -1979,7 +1977,7 @@ non_numeric_keys = [k for k in all_keys if (k not in structured_keys) and (not _
 
 rows = []
 for k in scalar_keys:
-    meta = PARAM_META.get(k, {"группа": "Прочее", "ед": "СИ", "kind": "raw", "описание": ""})
+    meta = PARAM_META.get(k) or family_param_meta(k) or {"группа": "Прочее", "ед": "СИ", "kind": "raw", "описание": ""}
     kind = meta.get("kind", "raw")
     val_ui = _si_to_ui(k, base0.get(k, float("nan")), kind)
     is_opt = k in ranges0

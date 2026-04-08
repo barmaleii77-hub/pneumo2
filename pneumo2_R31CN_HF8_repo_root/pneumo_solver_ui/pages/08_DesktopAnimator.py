@@ -26,6 +26,8 @@ import platform
 from pathlib import Path
 
 import streamlit as st
+from pneumo_solver_ui.run_artifacts import local_anim_latest_export_paths
+from pneumo_solver_ui.tools.send_bundle_contract import extract_anim_snapshot
 from pneumo_solver_ui.ui_bootstrap import bootstrap
 from pneumo_solver_ui.ui_persistence import autosave_if_enabled
 
@@ -49,7 +51,7 @@ st.caption(
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 EXPORTS_DIR = PROJECT_ROOT / "pneumo_solver_ui" / "workspace" / "exports"
-POINTER_PATH = EXPORTS_DIR / "anim_latest.json"
+_, POINTER_PATH = local_anim_latest_export_paths(EXPORTS_DIR, ensure_exists=False)
 
 # --- helpers ---
 
@@ -173,7 +175,8 @@ st.subheader("Состояние anim_latest")
 
 if POINTER_PATH.exists():
     try:
-        obj = json.loads(POINTER_PATH.read_text(encoding="utf-8"))
+        raw_obj = json.loads(POINTER_PATH.read_text(encoding="utf-8"))
+        obj = extract_anim_snapshot(raw_obj, source="desktop_animator_page") or raw_obj
         npz_rel = obj.get("npz_path")
         npz_path = (POINTER_PATH.parent / npz_rel).resolve() if isinstance(npz_rel, str) else None
         st.success("Pointer найден")

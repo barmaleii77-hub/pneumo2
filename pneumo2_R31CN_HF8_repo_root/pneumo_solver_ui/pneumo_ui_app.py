@@ -111,6 +111,7 @@ from pneumo_solver_ui.ui_param_helpers import (
     is_volume_param,
     param_desc,
 )
+from pneumo_solver_ui.suspension_family_contract import family_param_meta
 from pneumo_solver_ui.ui_process_helpers import (
     dump_cloudpickle_payload as _dump_detail_cache_payload,
     load_cloudpickle_payload as _load_detail_cache_payload,
@@ -148,6 +149,10 @@ from pneumo_solver_ui.ui_simulation_helpers import (
     call_simulate,
     compute_road_profile_from_suite,
     parse_sim_output,
+)
+from pneumo_solver_ui.run_artifacts import (
+    apply_anim_latest_to_session as apply_anim_latest_to_session_global,
+    local_anim_latest_export_paths as local_anim_latest_export_paths_global,
 )
 from pneumo_solver_ui.ui_svg_html_builders import (
     render_svg_edge_mapper_html,
@@ -3711,6 +3716,9 @@ def infer_param_meta(k: str) -> Dict[str, str]:
     """
     if k in PARAM_META:
         return PARAM_META[k]
+    fam_meta = family_param_meta(k)
+    if fam_meta is not None:
+        return fam_meta
     # эвристики для параметров, которых нет в ручном словаре:
     if is_pressure_param(k):
         return {"группа": "Давление", "ед": "бар (изб.)", "kind": "pressure_bar_g", "описание": param_desc(k)}
@@ -6922,8 +6930,11 @@ else:
                                     df_open=df_open,
                                     meta=_meta_anim,
                                 )
-                                st.session_state['anim_latest_npz'] = str(npz_latest)
-                                st.session_state['anim_latest_pointer'] = str(ptr_latest)
+                                _anim_state = {
+                                    'npz_path': npz_latest,
+                                    'pointer_json': ptr_latest,
+                                    'meta': dict(_meta_anim or {}),
+                                }
                                 log_event('anim_latest_exported', npz=str(npz_latest), pointer=str(ptr_latest), test=str(test_pick))
                                 # Cross-page compatibility: store anim_latest pointers.
                                 try:
@@ -6940,9 +6951,12 @@ else:
                                         anim_latest_npz=npz_latest,
                                         anim_latest_json=ptr_latest,
                                     )
-                                    st.session_state['anim_latest_visual_cache_token'] = str(_ra_payload.get('visual_cache_token') or '')
-                                    st.session_state['anim_latest_visual_reload_inputs'] = list(_ra_payload.get('visual_reload_inputs') or [])
-                                    st.session_state['anim_latest_visual_cache_dependencies'] = dict(_ra_payload.get('visual_cache_dependencies') or {})
+                                    if isinstance(_ra_payload, dict):
+                                        _anim_state = dict(_ra_payload)
+                                except Exception:
+                                    pass
+                                try:
+                                    apply_anim_latest_to_session_global(st.session_state, _anim_state)
                                 except Exception:
                                     pass
                                 if bool(st.session_state.get('auto_launch_animator', False)):
@@ -7144,8 +7158,10 @@ else:
                 # Desktop Animator integration (follow-mode)
                 # -----------------------------------
                 with st.expander('🖥 Desktop Animator (внешнее окно, follow anim_latest)', expanded=False):
-                    ptr_path = WORKSPACE_EXPORTS_DIR / 'anim_latest.json'
-                    npz_path = WORKSPACE_EXPORTS_DIR / 'anim_latest.npz'
+                    npz_path, ptr_path = local_anim_latest_export_paths_global(
+                        WORKSPACE_EXPORTS_DIR,
+                        ensure_exists=False,
+                    )
                     st.caption('Animator читает последнюю выгрузку из workspace/exports (anim_latest.*).')
                     st.code(str(ptr_path))
                     cols_da = st.columns([1, 1, 1])
@@ -7187,8 +7203,11 @@ else:
                                     df_open=df_open,
                                     meta=_meta_anim,
                                 )
-                                st.session_state['anim_latest_npz'] = str(npz_latest)
-                                st.session_state['anim_latest_pointer'] = str(ptr_latest)
+                                _anim_state = {
+                                    'npz_path': npz_latest,
+                                    'pointer_json': ptr_latest,
+                                    'meta': dict(_meta_anim or {}),
+                                }
                                 st.success(f'OK: {npz_latest.name}')
                                 log_event('anim_latest_exported_manual', npz=str(npz_latest), pointer=str(ptr_latest), test=str(test_pick))
                                 try:
@@ -7205,9 +7224,12 @@ else:
                                         anim_latest_npz=npz_latest,
                                         anim_latest_json=ptr_latest,
                                     )
-                                    st.session_state['anim_latest_visual_cache_token'] = str(_ra_payload.get('visual_cache_token') or '')
-                                    st.session_state['anim_latest_visual_reload_inputs'] = list(_ra_payload.get('visual_reload_inputs') or [])
-                                    st.session_state['anim_latest_visual_cache_dependencies'] = dict(_ra_payload.get('visual_cache_dependencies') or {})
+                                    if isinstance(_ra_payload, dict):
+                                        _anim_state = dict(_ra_payload)
+                                except Exception:
+                                    pass
+                                try:
+                                    apply_anim_latest_to_session_global(st.session_state, _anim_state)
                                 except Exception:
                                     pass
                             except Exception as e:
@@ -8792,7 +8814,11 @@ else:
                                                 _npz_candidates.append(Path(_npz_ss))
                                         except Exception:
                                             pass
-                                        _npz_candidates.append(WORKSPACE_EXPORTS_DIR / 'anim_latest.npz')
+                                        _anim_latest_npz_path, _ = local_anim_latest_export_paths_global(
+                                            WORKSPACE_EXPORTS_DIR,
+                                            ensure_exists=False,
+                                        )
+                                        _npz_candidates.append(_anim_latest_npz_path)
                                         for _npz_cand in _npz_candidates:
                                             try:
                                                 _npz_cand = Path(_npz_cand)

@@ -25,7 +25,15 @@ import importlib
 if TYPE_CHECKING:
     import pandas as pd
 
+from .data_contract import ANIM_LATEST_POINTER_SCHEMA_VERSION
 from .browser_perf_artifacts import collect_browser_perf_artifacts_summary
+from .tools.send_bundle_contract import (
+    ANIM_GLOBAL_POINTER,
+    ANIM_LOCAL_NPZ,
+    ANIM_LOCAL_POINTER,
+    extract_anim_snapshot,
+)
+from .visual_contract import build_visual_reload_diagnostics
 
 
 # ----------------------- paths -----------------------
@@ -99,16 +107,52 @@ def last_opt_ptr_path() -> Path:
     return opt_runs_dir() / "_last_opt.json"
 
 
+def global_simulation_pointer_path(
+    workspace_dir: Optional[Path] = None,
+    *,
+    ensure_exists: bool = True,
+) -> Path:
+    ws_dir = Path(workspace_dir) if workspace_dir is not None else _workspace_dir()
+    ptr_dir = ws_dir / "_pointers"
+    if ensure_exists:
+        ptr_dir.mkdir(parents=True, exist_ok=True)
+    return ptr_dir / "latest_simulation.json"
+
+
 def latest_simulation_ptr_path() -> Path:
-    return pointers_dir() / "latest_simulation.json"
+    return global_simulation_pointer_path()
 
 
 def latest_optimization_ptr_path() -> Path:
     return pointers_dir() / "latest_optimization.json"
 
 
+def global_anim_latest_pointer_path(
+    workspace_dir: Optional[Path] = None,
+    *,
+    ensure_exists: bool = True,
+) -> Path:
+    ws_dir = Path(workspace_dir) if workspace_dir is not None else _workspace_dir()
+    ptr_dir = ws_dir / "_pointers"
+    if ensure_exists:
+        ptr_dir.mkdir(parents=True, exist_ok=True)
+    return ptr_dir / Path(ANIM_GLOBAL_POINTER).name
+
+
 def latest_animation_ptr_path() -> Path:
-    return pointers_dir() / "anim_latest.json"
+    return global_anim_latest_pointer_path()
+
+
+def local_anim_latest_export_paths(
+    exports_dir: Optional[Path] = None,
+    *,
+    ensure_exists: bool = True,
+) -> tuple[Path, Path]:
+    """Canonical local exports paths for anim_latest bundle + pointer JSON."""
+    exp_dir = Path(exports_dir) if exports_dir is not None else (_workspace_dir() / "exports")
+    if ensure_exists:
+        exp_dir.mkdir(parents=True, exist_ok=True)
+    return exp_dir / Path(ANIM_LOCAL_NPZ).name, exp_dir / Path(ANIM_LOCAL_POINTER).name
 
 
 # ----------------------- utils -----------------------
@@ -188,19 +232,104 @@ def _extract_anim_pointer_payload(
         except Exception:
             payload["npz_path"] = str(npz_path)
 
+    pointer_snap = extract_anim_snapshot(pointer_obj, source="anim_pointer") if isinstance(pointer_obj, dict) else None
     if isinstance(pointer_obj, dict):
         payload["schema_version"] = pointer_obj.get("schema_version")
-        payload["updated_utc"] = pointer_obj.get("updated_utc")
-        payload["visual_cache_token"] = str(pointer_obj.get("visual_cache_token") or "")
-        payload["visual_reload_inputs"] = list(pointer_obj.get("visual_reload_inputs") or [])
-        payload["visual_cache_dependencies"] = dict(pointer_obj.get("visual_cache_dependencies") or {})
-        payload["meta"] = _merge_meta(payload.get("meta"), pointer_obj.get("meta"))
+        payload["updated_utc"] = (pointer_snap or {}).get("updated_utc") or pointer_obj.get("updated_utc")
+        payload["visual_cache_token"] = str((pointer_snap or {}).get("visual_cache_token") or "")
+        payload["visual_reload_inputs"] = list((pointer_snap or {}).get("visual_reload_inputs") or [])
+        payload["visual_cache_dependencies"] = dict((pointer_snap or {}).get("visual_cache_dependencies") or {})
+        payload["meta"] = _merge_meta(
+            payload.get("meta"),
+            (pointer_snap or {}).get("meta") if isinstance((pointer_snap or {}).get("meta"), dict) else pointer_obj.get("meta"),
+        )
         if "npz_path" not in payload:
-            resolved_npz = _resolve_pointer_npz(pointer_abs, pointer_obj.get("npz_path")) if pointer_abs else None
+            resolved_npz = _resolve_pointer_npz(
+                pointer_abs,
+                (pointer_snap or {}).get("npz_path") or pointer_obj.get("npz_path"),
+            ) if pointer_abs else None
             if resolved_npz is not None:
                 payload["npz_path"] = str(resolved_npz)
 
     return payload
+
+
+def write_anim_latest_pointer_json(
+    npz_path: Path,
+    *,
+    pointer_path: Optional[Path] = None,
+    meta: Optional[Dict[str, Any]] = None,
+    updated_utc: Optional[str] = None,
+    extra_fields: Optional[Dict[str, Any]] = None,
+    context: str = "anim_latest export pointer",
+    log: Any = None,
+    mirror_global_pointer: bool = True,
+) -> tuple[Path, Dict[str, Any], bool]:
+    """Write canonical anim_latest pointer JSON and optionally mirror global pointer."""
+    npz_abs = Path(npz_path).expanduser().resolve()
+    if pointer_path is None:
+        _, pointer_path = local_anim_latest_export_paths(npz_abs.parent)
+    pointer_abs = Path(pointer_path).expanduser().resolve()
+    meta_obj = dict(meta or {})
+    updated = str(updated_utc or _utc_iso())
+    reload_diag = build_visual_reload_diagnostics(
+        npz_abs,
+        meta=meta_obj,
+        context=context,
+        log=log,
+    )
+    payload: Dict[str, Any] = {
+        "schema_version": ANIM_LATEST_POINTER_SCHEMA_VERSION,
+        "updated_utc": updated,
+        "npz_path": str(npz_abs),
+        "meta": meta_obj,
+        "visual_cache_token": reload_diag.get("visual_cache_token", ""),
+        "visual_reload_inputs": list(reload_diag.get("inputs") or []),
+        "visual_cache_dependencies": dict(reload_diag.get("visual_cache_dependencies") or {}),
+    }
+    for key, value in dict(extra_fields or {}).items():
+        if value is not None:
+            payload[str(key)] = value
+    _write_json_atomic(pointer_abs, payload)
+
+    mirrored_global_pointer = False
+    if mirror_global_pointer:
+        try:
+            save_latest_animation_ptr(npz_path=npz_abs, pointer_json=pointer_abs, meta=meta_obj)
+            mirrored_global_pointer = True
+        except Exception:
+            mirrored_global_pointer = False
+
+    return pointer_abs, payload, mirrored_global_pointer
+
+
+def _enrich_anim_info(info: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    src = dict(info) if isinstance(info, dict) else {}
+    raw_meta = src.get("anim_latest_meta") if isinstance(src.get("anim_latest_meta"), dict) else src.get("meta")
+    raw_pointer = _safe_path(src.get("pointer_json") or src.get("anim_latest_json"))
+    raw_npz = _safe_path(src.get("npz_path") or src.get("anim_latest_npz"))
+    if raw_pointer is not None or raw_npz is not None:
+        enriched = _extract_anim_pointer_payload(
+            npz_path=raw_npz,
+            pointer_json=raw_pointer,
+            meta=raw_meta if isinstance(raw_meta, dict) else None,
+        )
+        for key in (
+            "pointer_json",
+            "npz_path",
+            "visual_cache_token",
+            "visual_reload_inputs",
+            "visual_cache_dependencies",
+            "updated_utc",
+        ):
+            current = src.get(key)
+            if current in (None, "", [], {}):
+                value = enriched.get(key)
+                if value not in (None, "", [], {}):
+                    src[key] = value
+        if not isinstance(src.get("meta"), dict) and isinstance(enriched.get("meta"), dict):
+            src["meta"] = dict(enriched.get("meta") or {})
+    return src
 
 
 # ----------------------- pointers: animation -----------------------
@@ -220,6 +349,28 @@ def save_latest_animation_ptr(
 
 def load_latest_animation_ptr() -> Optional[dict]:
     return _read_json(latest_animation_ptr_path())
+
+
+def apply_anim_latest_to_session(session_state: dict, info: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    """Normalize anim_latest info and write canonical session-state keys."""
+    src = _enrich_anim_info(info)
+    if not src:
+        src = _enrich_anim_info(load_latest_animation_ptr() or load_last_baseline_ptr() or {})
+    if not src:
+        return None
+
+    anim_snap = extract_anim_snapshot(src, source="session_state") or {}
+    if not anim_snap:
+        return None
+
+    session_state["anim_latest_npz"] = anim_snap.get("npz_path") or src.get("anim_latest_npz")
+    session_state["anim_latest_pointer"] = anim_snap.get("pointer_json") or src.get("anim_latest_json")
+    session_state["anim_latest_meta"] = dict(anim_snap.get("meta") or {})
+    session_state["anim_latest_visual_cache_token"] = str(anim_snap.get("visual_cache_token") or "")
+    session_state["anim_latest_visual_reload_inputs"] = list(anim_snap.get("visual_reload_inputs") or [])
+    session_state["anim_latest_visual_cache_dependencies"] = dict(anim_snap.get("visual_cache_dependencies") or {})
+    session_state["anim_latest_updated_utc"] = anim_snap.get("updated_utc") or src.get("updated_at")
+    return anim_snap
 
 
 
@@ -273,24 +424,25 @@ def collect_anim_latest_diagnostics_summary(
     send-bundle / validator surfaces distinguish between a valid current anim
     export and a stale external pointer copied into diagnostics by mistake.
     """
-    src = info if isinstance(info, dict) else None
-    if src is None:
-        src = load_latest_animation_ptr() or load_last_baseline_ptr() or {}
+    src = _enrich_anim_info(info)
+    if not src:
+        src = _enrich_anim_info(load_latest_animation_ptr() or load_last_baseline_ptr() or {})
 
     try:
         global_pointer = latest_animation_ptr_path().resolve()
     except Exception:
         global_pointer = latest_animation_ptr_path()
 
-    pointer_json = str(src.get("pointer_json") or src.get("anim_latest_json") or "")
-    npz_path = str(src.get("npz_path") or src.get("anim_latest_npz") or "")
+    snap = extract_anim_snapshot(src, source="run_artifacts") or {}
+    pointer_json = str(snap.get("pointer_json") or "")
+    npz_path = str(snap.get("npz_path") or "")
     workspace = _workspace_dir()
     pointer_exists = _path_exists_flag(pointer_json) if pointer_json else None
     npz_exists = _path_exists_flag(npz_path) if npz_path else None
     pointer_in_workspace = _path_within_flag(pointer_json, workspace) if pointer_json else None
     npz_in_workspace = _path_within_flag(npz_path, workspace) if npz_path else None
 
-    issues: list[str] = []
+    issues: list[str] = [str(x) for x in (snap.get("issues") or []) if str(x).strip()]
     if pointer_json and pointer_exists is False:
         issues.append(f"anim_latest pointer_json is missing on disk: {pointer_json}")
     if npz_path and npz_exists is False:
@@ -302,7 +454,7 @@ def collect_anim_latest_diagnostics_summary(
 
     usable = bool(pointer_json and npz_path and pointer_exists is True and npz_exists is True)
 
-    meta_dict = dict(src.get("meta") or {}) if isinstance(src.get("meta"), dict) else {}
+    meta_dict = dict(snap.get("meta") or {}) if isinstance(snap.get("meta"), dict) else {}
     artifact_refs = dict(meta_dict.get("anim_export_contract_artifacts") or {}) if isinstance(meta_dict.get("anim_export_contract_artifacts"), dict) else {}
 
     def _resolve_pointer_relative(ref: Any, default_name: str = "") -> tuple[str, str, Optional[bool]]:
@@ -347,20 +499,20 @@ def collect_anim_latest_diagnostics_summary(
     )
 
     out: dict = {
-        "anim_latest_available": bool(pointer_json or npz_path or src.get("visual_cache_token") or src.get("visual_reload_inputs")),
+        "anim_latest_available": bool(snap.get("available")),
         "anim_latest_global_pointer_json": str(global_pointer) if global_pointer else "",
         "anim_latest_pointer_json": pointer_json,
         "anim_latest_npz_path": npz_path,
-        "anim_latest_visual_cache_token": str(src.get("visual_cache_token") or ""),
-        "anim_latest_visual_reload_inputs": list(src.get("visual_reload_inputs") or []),
-        "anim_latest_visual_cache_dependencies": dict(src.get("visual_cache_dependencies") or {}),
-        "anim_latest_updated_utc": str(src.get("updated_utc") or src.get("updated_at") or ""),
+        "anim_latest_visual_cache_token": str(snap.get("visual_cache_token") or ""),
+        "anim_latest_visual_reload_inputs": list(snap.get("visual_reload_inputs") or []),
+        "anim_latest_visual_cache_dependencies": dict(snap.get("visual_cache_dependencies") or {}),
+        "anim_latest_updated_utc": str(snap.get("updated_utc") or ""),
         "anim_latest_pointer_json_exists": pointer_exists,
         "anim_latest_npz_exists": npz_exists,
         "anim_latest_pointer_json_in_workspace": pointer_in_workspace,
         "anim_latest_npz_in_workspace": npz_in_workspace,
         "anim_latest_usable": usable,
-        "anim_latest_issues": issues,
+        "anim_latest_issues": list(dict.fromkeys(issues)),
         "anim_latest_contract_sidecar_ref": contract_ref,
         "anim_latest_contract_sidecar_path": contract_path,
         "anim_latest_contract_sidecar_exists": contract_exists,
@@ -386,8 +538,12 @@ def collect_anim_latest_diagnostics_summary(
         browser_perf = {}
     if browser_perf:
         out.update(browser_perf)
-    if include_meta and isinstance(src.get("meta"), dict):
-        out["anim_latest_meta"] = dict(src.get("meta") or {})
+    if include_meta and (
+        isinstance(src.get("meta"), dict)
+        or isinstance(src.get("anim_latest_meta"), dict)
+        or bool(meta_dict)
+    ):
+        out["anim_latest_meta"] = dict(meta_dict)
     return out
 
 
@@ -643,10 +799,4 @@ def autoload_to_session(session_state: dict) -> None:
         anim_info = load_last_baseline_ptr() or {}
 
     if anim_info:
-        session_state["anim_latest_npz"] = anim_info.get("npz_path") or anim_info.get("anim_latest_npz")
-        session_state["anim_latest_pointer"] = anim_info.get("pointer_json") or anim_info.get("anim_latest_json")
-        session_state["anim_latest_meta"] = dict(anim_info.get("meta") or {})
-        session_state["anim_latest_visual_cache_token"] = str(anim_info.get("visual_cache_token") or "")
-        session_state["anim_latest_visual_reload_inputs"] = list(anim_info.get("visual_reload_inputs") or [])
-        session_state["anim_latest_visual_cache_dependencies"] = dict(anim_info.get("visual_cache_dependencies") or {})
-        session_state["anim_latest_updated_utc"] = anim_info.get("updated_utc") or anim_info.get("updated_at")
+        apply_anim_latest_to_session(session_state, anim_info)

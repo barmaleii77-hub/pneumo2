@@ -3,8 +3,8 @@
     "project": "пневмоподвеска",
     "generated_at": "2026-03-31T06:00:00Z",
     "version": "v4",
-    "notes": "Browser perf registry snapshot exporter from playhead_ctrl to workspace/exports; send-bundle/triage diagnostics surface browser_perf_registry_snapshot.json, browser_perf_contract.json and optional browser_perf_trace.* artifacts.",
-    "updated_at": "2026-03-31"
+    "notes": "Browser perf registry snapshot exporter from playhead_ctrl to workspace/exports; send-bundle/triage diagnostics surface browser_perf_registry_snapshot.json, browser_perf_contract.json and optional browser_perf_trace.* artifacts. Added 2026-04-07 ring-editor scenario canon: user-facing segment semantics are direction + end-state + road end-state, with explicit longitudinal height / cross-slope controls and optimization-aware spring/cylinder family asymmetry requirements.",
+    "updated_at": "2026-04-07"
   },
   "frozen_constants": {
     "колея_м": 1.0,
@@ -583,11 +583,70 @@
         "Следующий канон для Desktop Animator: во время floating move/resize 3D viewport можно временно suspend/hide + placeholder, но нельзя продолжать paint через нестабильный GL context и нельзя наблюдать child viewport events как равноправный layout trigger.",
         "Playback budget теперь явно 3D-priority: timer service cadence на x1.0 должен быть достаточно частым, а fast/slow auxiliary panes обязаны уступать кадры live 3D вместо того, чтобы конкурировать с ним на равных."
       ]
+    },
+    {
+      "id": "P0-RING-40",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Сделать ring editor единственным каноническим способом задания пользовательских сценариев: все сценарные настройки редактируются в кольцевом редакторе, без обязательного ручного JSON/service-layer обхода.",
+      "status": "todo"
+    },
+    {
+      "id": "P0-RING-41",
+      "epic": "EPIC-WORLD",
+      "priority": "P0",
+      "title": "Перевести ring editor на сегментную семантику `направление + конечная скорость + дорожные конечные параметры`: начало явно задаётся только у первого сегмента, а конец последнего автоматически замыкается в начало первого.",
+      "status": "todo"
+    },
+    {
+      "id": "P0-RING-42",
+      "epic": "EPIC-WORLD",
+      "priority": "P0",
+      "title": "Задавать продольный уклон дороги через высоту дороги в начале первого и в конце сегментов, а разбегание левой/правой колеи по высоте — через явный поперечный уклон сегмента.",
+      "status": "todo"
+    },
+    {
+      "id": "P0-RING-43",
+      "epic": "EPIC-UI",
+      "priority": "P0",
+      "title": "Все поля/флаги ring editor должны иметь понятное развёрнутое объяснение прямо в UI; пользовательские сегменты не должны маскироваться под внутренние ACCEL/BRAKE типы.",
+      "status": "todo"
+    },
+    {
+      "id": "P0-GEOM-44",
+      "epic": "EPIC-GEOM",
+      "priority": "P0",
+      "title": "Пружины: ручной ввод или авто-подбор `поршень≈середина хода` в статике на ровной площадке при текущей массе + запрет пересечений пружина-пружина и пружина-цилиндр на одном углу.",
+      "status": "todo"
+    },
+    {
+      "id": "P0-GEOM-45",
+      "epic": "EPIC-GEOM",
+      "priority": "P0",
+      "title": "Поддержать независимые семейства передних/задних Ц1/Ц2 цилиндров и пружин (минимум 4 типа на одну сторону) с учётом продольной симметрии, включая точки крепления, размеры и ограничения.",
+      "status": "todo"
+    },
+    {
+      "id": "P0-GEOM-46",
+      "epic": "EPIC-GEOM",
+      "priority": "P0",
+      "title": "Оптимизация должна учитывать раздельные семейства цилиндров/пружин и их packaging/static constraints вместо предположения об одном общем типе на все углы.",
+      "status": "todo"
+    },
+    {
+      "date": "2026-04-07",
+      "title": "R31BV addendum",
+      "items": [
+        "Канонический пользовательский путь сценариев теперь должен быть только через ring editor: сегменты, скорости, уклоны, повороты и дорожные параметры редактируются там же, а не в рассыпанных альтернативных surfaces.",
+        "Пользовательский смысл сегмента: направление (`прямо/влево/вправо`), конечная скорость и дорожные конечные параметры. Исторические `ACCEL/BRAKE` остаются только как service-level compatibility representation.",
+        "Для дороги кольца продольный уклон задаётся высотой дороги в начале первого и в конце сегментов, а расхождение высот левой/правой колеи задаётся через явный поперечный уклон сегмента.",
+        "Для пружин/цилиндров следующий обязательный канон: либо ручной выбор, либо авто-подбор под `поршень≈середина хода` в статике; семейства Ц1/Ц2 перед/зад могут отличаться и это должно быть видно и в UI, и в оптимизации."
+      ]
     }
   ],
   "release": "R31BU",
-  "updated": "2026-03-31",
-  "notes": "Wishlist/backlog refreshed for R31AL: this pass moves Desktop Animator from a 4 ms source-frame-chasing loop to display-rate time playback, demotes auxiliary panes behind live 3D during playback, removes the remaining 60/180/300 s idle timeout polling from follower/embedded Web widgets, and makes actuator meshes capped/readable. Live Windows SEND-bundle acceptance is still required for final proof of speed switching, x1 smoothness and post-run browser CPU idle.",
+  "updated": "2026-04-07",
+  "notes": "Wishlist/backlog refreshed for R31BV: keep existing Desktop Animator/browser-perf work, but add a new canon for ring-editor scenario authoring (direction + end-state + road-state, no user-facing ACCEL/BRAKE types), explicit road height/cross-slope semantics, and optimization-aware independent spring/cylinder families.",
   "items": [
     {
       "date": "2026-03-26",

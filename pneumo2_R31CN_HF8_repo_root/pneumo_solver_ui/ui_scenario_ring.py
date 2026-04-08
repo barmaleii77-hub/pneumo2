@@ -21,7 +21,13 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 import streamlit as st
 
-from .scenario_ring import generate_ring_scenario_bundle, summarize_ring_track_segments, validate_ring_spec, _resolve_initial_speed_kph
+from .scenario_ring import (
+    _resolve_initial_speed_kph,
+    _segment_motion_contract,
+    generate_ring_scenario_bundle,
+    summarize_ring_track_segments,
+    validate_ring_spec,
+)
 from .ui_persistence import autosave_if_enabled
 
 
@@ -64,13 +70,20 @@ def _default_ring_spec() -> Dict[str, Any]:
         "dt_s": 0.01,
         "n_laps": 1,
         "wheelbase_m": 1.5,
+        "track_m": 1.0,
         "segments": [
             {
                 "name": "S1_прямо",
                 "duration_s": 5.0,
                 "drive_mode": "STRAIGHT",
                 "speed_kph": 40.0,
+                "turn_direction": "STRAIGHT",
+                "speed_end_kph": 40.0,
                 "road": {
+                    "center_height_start_mm": 0.0,
+                    "center_height_end_mm": 0.0,
+                    "cross_slope_start_pct": 0.0,
+                    "cross_slope_end_pct": 0.0,
                     "mode": "ISO8608",
                     "iso_class": "E",
                     "gd_pick": "mid",
@@ -103,8 +116,12 @@ def _default_ring_spec() -> Dict[str, Any]:
                 "duration_s": 4.0,
                 "drive_mode": "TURN_LEFT",
                 "speed_kph": 40.0,
+                "turn_direction": "LEFT",
+                "speed_end_kph": 40.0,
                 "turn_radius_m": 60.0,
                 "road": {
+                    "center_height_end_mm": 0.0,
+                    "cross_slope_end_pct": 0.0,
                     "mode": "SINE",
                     "aL_mm": 50.0,
                     "aR_mm": 50.0,
@@ -144,7 +161,11 @@ def _default_ring_spec() -> Dict[str, Any]:
                 "duration_s": 3.0,
                 "drive_mode": "ACCEL",
                 "v_end_kph": 55.0,
+                "turn_direction": "STRAIGHT",
+                "speed_end_kph": 55.0,
                 "road": {
+                    "center_height_end_mm": 0.0,
+                    "cross_slope_end_pct": 0.0,
                     "mode": "ISO8608",
                     "iso_class": "E",
                     "gd_pick": "mid",
@@ -160,7 +181,11 @@ def _default_ring_spec() -> Dict[str, Any]:
                 "duration_s": 3.0,
                 "drive_mode": "BRAKE",
                 "v_end_kph": 40.0,
+                "turn_direction": "STRAIGHT",
+                "speed_end_kph": 40.0,
                 "road": {
+                    "center_height_end_mm": 0.0,
+                    "cross_slope_end_pct": 0.0,
                     "mode": "ISO8608",
                     "iso_class": "E",
                     "gd_pick": "mid",
@@ -189,32 +214,58 @@ def _segment_length_estimate_m(v_start_kph: float, seg: Dict[str, Any]) -> float
     if dur <= 0:
         return 0.0
 
-    mode = str(seg.get("drive_mode", "STRAIGHT")).upper()
-    v0 = max(0.0, float(v_start_kph) / 3.6)
-
-    if mode in ("STRAIGHT", "TURN_LEFT", "TURN_RIGHT"):
-        sp_kph = float(seg.get("speed_kph", 0.0))
-        if sp_kph <= 0.0:
-            sp_kph = float(v_start_kph)
-        v = max(0.0, sp_kph / 3.6)
-        return float(v * dur)
-
-    if mode in ("ACCEL", "BRAKE"):
-        v1_kph = float(seg.get("v_end_kph", v_start_kph))
-        v1 = max(0.0, v1_kph / 3.6)
+    motion = _segment_motion_contract(seg, v_start_kph)
+    v0 = max(0.0, float(motion["speed_start_kph"]) / 3.6)
+    v1 = max(0.0, float(motion["speed_end_kph"]) / 3.6)
+    if motion["vary_speed"]:
         return float(0.5 * (v0 + v1) * dur)
-
-    return float(v0 * dur)
+    return float(v1 * dur)
 
 
 def _segment_end_speed_kph(v_start_kph: float, seg: Dict[str, Any]) -> float:
     """Segment end speed (for preview only)."""
-    mode = str(seg.get("drive_mode", "STRAIGHT")).upper()
-    if mode in ("STRAIGHT", "TURN_LEFT", "TURN_RIGHT"):
-        return float(seg.get("speed_kph", v_start_kph))
-    if mode in ("ACCEL", "BRAKE"):
-        return float(seg.get("v_end_kph", v_start_kph))
-    return float(v_start_kph)
+    return float(_segment_motion_contract(seg, v_start_kph)["speed_end_kph"])
+
+
+def _turn_direction_label(direction: str) -> str:
+    return {
+        "STRAIGHT": "Прямо",
+        "LEFT": "Поворот влево",
+        "RIGHT": "Поворот вправо",
+    }.get(str(direction).upper(), str(direction))
+
+
+def _derive_ring_road_state_flow(segments: List[Dict[str, Any]]) -> Tuple[List[Dict[str, float]], List[Dict[str, float]]]:
+    starts: List[Dict[str, float]] = []
+    ends: List[Dict[str, float]] = []
+    if not segments:
+        return starts, ends
+    road0 = dict((segments[0] or {}).get("road", {}) or {})
+    first_center = float(road0.get("center_height_start_mm", 0.0) or 0.0)
+    first_cross = float(road0.get("cross_slope_start_pct", 0.0) or 0.0)
+    prev_center = first_center
+    prev_cross = first_cross
+    for idx, seg in enumerate(segments):
+        road = dict((seg or {}).get("road", {}) or {})
+        if idx == 0:
+            start_center = first_center
+            start_cross = first_cross
+        else:
+            start_center = prev_center
+            start_cross = prev_cross
+        is_last = idx >= len(segments) - 1
+        end_center_default = first_center if is_last else start_center
+        end_cross_default = first_cross if is_last else start_cross
+        end_center = float(road.get("center_height_end_mm", end_center_default) or end_center_default)
+        end_cross = float(road.get("cross_slope_end_pct", end_cross_default) or end_cross_default)
+        if is_last:
+            end_center = first_center
+            end_cross = first_cross
+        starts.append({"center_height_mm": float(start_center), "cross_slope_pct": float(start_cross)})
+        ends.append({"center_height_mm": float(end_center), "cross_slope_pct": float(end_cross)})
+        prev_center = float(end_center)
+        prev_cross = float(end_cross)
+    return starts, ends
 
 
 
@@ -254,17 +305,33 @@ def _guess_suite_stage(df_suite_edit: pd.DataFrame) -> int:
     return 0
 
 
-def _render_segment_editor(seg: Dict[str, Any], *, idx: int, v_start_kph: float) -> Tuple[Dict[str, Any], float]:
+def _render_segment_editor(
+    seg: Dict[str, Any],
+    *,
+    idx: int,
+    v_start_kph: float,
+    ring_start_speed_kph: float,
+    is_first: bool,
+    is_last: bool,
+    road_start_center_mm: float,
+    road_start_cross_pct: float,
+    ring_start_center_mm: float,
+    ring_start_cross_pct: float,
+) -> Tuple[Dict[str, Any], float]:
     """Возвращает (updated_seg, v_end_kph)."""
     uid = str(seg.get("uid") or f"s{idx+1}")
     name = str(seg.get("name", f"S{idx+1}"))
-    mode = str(seg.get("drive_mode", "STRAIGHT")).upper()
+    motion = _segment_motion_contract(seg, v_start_kph)
+    turn_direction = str(motion["turn_direction"]).upper()
     dur = float(seg.get("duration_s", 5.0))
 
     # Заголовок‑сводка
     v_end_preview = _segment_end_speed_kph(v_start_kph, seg)
     est_len = _segment_length_estimate_m(v_start_kph, seg)
-    summary = f"{name} · {mode} · {dur:.1f} c · v: {v_start_kph:.1f}→{v_end_preview:.1f} км/ч · ≈{est_len:.1f} м"
+    summary = (
+        f"{name} · {_turn_direction_label(turn_direction)} · {dur:.1f} c · "
+        f"v: {v_start_kph:.1f}→{v_end_preview:.1f} км/ч · ≈{est_len:.1f} м"
+    )
 
     # Важно: label expander должен быть стабильным, иначе Streamlit будет
     # пересоздавать блок после каждого изменения полей сегмента и панель
@@ -289,83 +356,108 @@ def _render_segment_editor(seg: Dict[str, Any], *, idx: int, v_start_kph: float)
                 help="Сколько времени длится сегмент в одном круге. Длина сегмента вычисляется из скорости.",
             )
         with colC:
-            allowed_modes = ["STRAIGHT", "TURN_LEFT", "TURN_RIGHT", "ACCEL", "BRAKE"]
-            if mode not in allowed_modes:
-                st.warning(
-                    f"Сегмент {idx+1}: неподдерживаемый drive_mode='{mode}'. Доступные: {', '.join(allowed_modes)}.",
-                    icon="⚠️",
-                )
-                mode = "STRAIGHT"
-            drive_mode = st.selectbox(
-                "Режим движения",
-                options=allowed_modes,
-                index=allowed_modes.index(mode),
-                key=f"seg_mode_{uid}",
-                help="Выбирайте один режим на сегмент. Если нужен «поворот + разгон» — делайте 2 сегмента подряд.",
+            allowed_turns = ["STRAIGHT", "LEFT", "RIGHT"]
+            turn_direction = st.selectbox(
+                "Направление движения",
+                options=allowed_turns,
+                index=allowed_turns.index(turn_direction if turn_direction in allowed_turns else "STRAIGHT"),
+                key=f"seg_turn_direction_{uid}",
+                format_func=_turn_direction_label,
+                help=(
+                    "Канонический пользовательский смысл сегмента: прямо, поворот влево или поворот вправо. "
+                    "Разгон/торможение задаются не типом сегмента, а изменением конечной скорости."
+                ),
             )
-            seg["drive_mode"] = drive_mode
+            seg["turn_direction"] = turn_direction
 
         # Параметры режима
-        if drive_mode in ("STRAIGHT", "TURN_LEFT", "TURN_RIGHT"):
-            c1, c2, c3 = st.columns([1.2, 1.2, 1.2])
-            with c1:
-                seg["speed_kph"] = st.number_input(
-                    "Скорость, км/ч",
-                    min_value=0.0,
-                    value=float(seg.get("speed_kph", v_start_kph)),
-                    step=1.0,
-                    key=f"seg_speed_{uid}",
-                    help="Заданная скорость на сегменте. Если отличается от предыдущего сегмента — лучше добавить отдельный сегмент «Разгон/Торможение».",
+        c1, c2, c3 = st.columns([1.2, 1.2, 1.2])
+        with c1:
+            start_label = "Начальная скорость кольца" if is_first else "Скорость на входе"
+            if is_first:
+                st.metric(start_label, f"{ring_start_speed_kph:.1f} км/ч")
+                st.caption(
+                    "Это начало первого сегмента и одновременно скорость замыкания кольца. "
+                    "Редактируется в верхнем поле `Начальная скорость кольца`."
                 )
-            if drive_mode in ("TURN_LEFT", "TURN_RIGHT"):
-                with c2:
-                    seg["turn_radius_m"] = st.number_input(
-                        "Радиус поворота, м",
-                        min_value=1.0,
-                        value=float(seg.get("turn_radius_m", 60.0)),
-                        step=5.0,
-                        key=f"seg_r_{uid}",
-                        help="Радиус траектории. Внутренне преобразуется в боковое ускорение ay = v²/R.",
-                    )
-                with c3:
-                    st.info("Направление задаётся режимом", icon="ℹ️")
+            else:
+                st.metric(start_label, f"{v_start_kph:.1f} км/ч")
+                st.caption("Для сегментов 2..N начальная скорость берётся автоматически из конца предыдущего сегмента.")
+        with c2:
+            if is_last:
+                seg["speed_end_kph"] = float(ring_start_speed_kph)
+                st.metric("Конечная скорость", f"{float(ring_start_speed_kph):.1f} км/ч")
+                st.caption("Последний сегмент автоматически замыкается в начальную скорость первого.")
+            else:
+                seg["speed_end_kph"] = st.number_input(
+                    "Конечная скорость, км/ч",
+                    min_value=0.0,
+                    value=float(seg.get("speed_end_kph", motion["speed_end_kph"])),
+                    step=1.0,
+                    key=f"seg_speed_end_{uid}",
+                    help=(
+                        "Конечная скорость сегмента. Если отличается от входной скорости, это и есть разгон/торможение. "
+                        "Отдельный тип сегмента для этого не нужен."
+                    ),
+                )
+        with c3:
+            if turn_direction in ("LEFT", "RIGHT"):
+                seg["turn_radius_m"] = st.number_input(
+                    "Радиус поворота, м",
+                    min_value=1.0,
+                    value=float(seg.get("turn_radius_m", 60.0)),
+                    step=5.0,
+                    key=f"seg_r_{uid}",
+                    help=(
+                        "Радиус траектории для этого сегмента. Направление задаётся отдельно: влево или вправо. "
+                        "Внутри именно из скорости и радиуса вычисляется боковое ускорение."
+                    ),
+                )
+            else:
+                seg.pop("turn_radius_m", None)
+                st.info("Поворота нет", icon="ℹ️")
 
-                # Быстрая проверка на «нереалистичность» (когнитивно экономно: показываем сразу смысл)
+        start_speed_kph = float(ring_start_speed_kph if is_first else v_start_kph)
+        end_speed_kph = float(seg.get("speed_end_kph", start_speed_kph))
+        if turn_direction == "STRAIGHT":
+            if abs(end_speed_kph - start_speed_kph) <= 1e-9:
+                seg["drive_mode"] = "STRAIGHT"
+                seg["speed_kph"] = float(end_speed_kph)
+                seg.pop("v_end_kph", None)
+            else:
+                seg["drive_mode"] = "ACCEL" if end_speed_kph > start_speed_kph else "BRAKE"
+                seg["v_end_kph"] = float(end_speed_kph)
+                seg["speed_kph"] = float(end_speed_kph)
+        else:
+            seg["drive_mode"] = "TURN_LEFT" if turn_direction == "LEFT" else "TURN_RIGHT"
+            seg["speed_kph"] = float(end_speed_kph)
+            seg.pop("v_end_kph", None)
+
+        seg["speed_start_kph"] = float(start_speed_kph)
+
+        c4, c5 = st.columns([1.2, 1.2])
+        with c4:
+            delta_v = float(end_speed_kph - start_speed_kph)
+            st.metric("Δv по сегменту", f"{delta_v:+.1f} км/ч")
+        with c5:
+            if turn_direction in ("LEFT", "RIGHT"):
                 try:
-                    v_mps = float(seg.get("speed_kph", 0.0)) / 3.6
-                    r_m = max(float(seg.get("turn_radius_m", 1.0)), 1e-6)
-                    ay = (v_mps * v_mps) / r_m
+                    v_ref_mps = max(float(start_speed_kph), float(end_speed_kph)) / 3.6
+                    r_m = max(float(seg.get("turn_radius_m", 1.0) or 1.0), 1e-6)
+                    ay = (v_ref_mps * v_ref_mps) / r_m
                     ay_g = ay / 9.80665
-                    sign = 1.0 if drive_mode == "TURN_LEFT" else -1.0
-                    st.caption(f"Оценка: ay ≈ {sign*ay:.2f} м/с² ({sign*ay_g:.2f} g) = v²/R")
+                    sign = 1.0 if turn_direction == "LEFT" else -1.0
+                    st.metric("Оценка ay", f"{sign * ay:.2f} м/с²")
+                    st.caption(f"≈ {sign * ay_g:.2f} g при v≈max(v0,v1) и R={r_m:.1f} м")
                     if abs(ay_g) > 1.0:
                         st.warning(
-                            "Боковое ускорение > 1g. Проверьте радиус/скорость: это может быть нецелевой режим и приводить к «нечестным» тестам.",
+                            "Боковое ускорение > 1g. Проверьте радиус/скорость: это может быть нецелевой режим и приводить к нечестным тестам.",
                             icon="⚠️",
                         )
                 except Exception:
-                    pass
+                    st.info("Не удалось оценить ay", icon="ℹ️")
             else:
-                with c2:
-                    st.info("Поворота нет", icon="ℹ️")
-                with c3:
-                    st.info("ay = 0", icon="ℹ️")
-
-        elif drive_mode in ("ACCEL", "BRAKE"):
-            c1, c2, c3 = st.columns([1.2, 1.2, 1.2])
-            with c1:
-                st.metric("Стартовая скорость", f"{v_start_kph:.1f} км/ч")
-            with c2:
-                seg["v_end_kph"] = st.number_input(
-                    "Конечная скорость, км/ч",
-                    min_value=0.0,
-                    value=float(seg.get("v_end_kph", v_start_kph)),
-                    step=1.0,
-                    key=f"seg_vend_{uid}",
-                    help="Скорость в конце сегмента. Внутренне формируется плавный S‑профиль скорости, чтобы не было рывков.",
-                )
-            with c3:
-                st.info("ay = 0", icon="ℹ️")
+                st.info("Для прямого сегмента ay = 0", icon="ℹ️")
 
         # Дорога
         st.markdown("#### Профиль дороги")
@@ -381,6 +473,76 @@ def _render_segment_editor(seg: Dict[str, Any], *, idx: int, v_start_kph: float)
                 help="ISO8608 — спектральная шероховатость по классу дороги. SINE — синус по каждой стороне отдельно.",
             )
         road["mode"] = road_mode
+
+        st.caption(
+            "Канон геометрии кольца: продольный уклон задаётся через высоту дороги в начале первого и в конце сегментов; "
+            "разбегание левой/правой колеи по высоте задаётся через поперечный уклон сегмента."
+        )
+        cG1, cG2 = st.columns(2)
+        with cG1:
+            if is_first:
+                road["center_height_start_mm"] = st.number_input(
+                    "Высота дороги в начале сегмента, мм",
+                    value=float(road.get("center_height_start_mm", road_start_center_mm)),
+                    step=5.0,
+                    key=f"seg_center_start_{uid}",
+                    help=(
+                        "Абсолютная высота центра дороги в начале первого сегмента. "
+                        "Для сегментов 2..N начало берётся автоматически из конца предыдущего, потому что кольцо непрерывно."
+                    ),
+                )
+            else:
+                st.metric("Высота дороги на входе", f"{float(road_start_center_mm):.1f} мм")
+                st.caption("Старт сегмента наследуется из конца предыдущего.")
+        with cG2:
+            if is_last:
+                road["center_height_end_mm"] = float(ring_start_center_mm)
+                st.metric("Высота дороги в конце", f"{float(ring_start_center_mm):.1f} мм")
+                st.caption("Последний сегмент автоматически замыкается в высоту начала первого.")
+            else:
+                road["center_height_end_mm"] = st.number_input(
+                    "Высота дороги в конце сегмента, мм",
+                    value=float(road.get("center_height_end_mm", road_start_center_mm)),
+                    step=5.0,
+                    key=f"seg_center_end_{uid}",
+                    help=(
+                        "Высота центра дороги в конце сегмента. "
+                        "Именно через это поле задаётся продольный уклон, а не через тип «разгон/торможение»."
+                    ),
+                )
+
+        cG3, cG4 = st.columns(2)
+        with cG3:
+            if is_first:
+                road["cross_slope_start_pct"] = st.number_input(
+                    "Поперечный уклон в начале, %",
+                    value=float(road.get("cross_slope_start_pct", road_start_cross_pct)),
+                    step=0.1,
+                    key=f"seg_cross_start_{uid}",
+                    help=(
+                        "Поперечный уклон дороги в начале первого сегмента. "
+                        "Положительное значение означает: правая колея выше левой; отрицательное — левая выше правой."
+                    ),
+                )
+            else:
+                st.metric("Поперечный уклон на входе", f"{float(road_start_cross_pct):.2f} %")
+                st.caption("Стартовый поперечный уклон наследуется из конца предыдущего сегмента.")
+        with cG4:
+            if is_last:
+                road["cross_slope_end_pct"] = float(ring_start_cross_pct)
+                st.metric("Поперечный уклон в конце", f"{float(ring_start_cross_pct):.2f} %")
+                st.caption("Последний сегмент автоматически замыкается в поперечный уклон начала первого.")
+            else:
+                road["cross_slope_end_pct"] = st.number_input(
+                    "Поперечный уклон в конце, %",
+                    value=float(road.get("cross_slope_end_pct", road_start_cross_pct)),
+                    step=0.1,
+                    key=f"seg_cross_end_{uid}",
+                    help=(
+                        "Поперечный уклон в конце сегмента. "
+                        "Так задаётся расхождение левой/правой колеи по высоте вместо ручного раздельного дрейфа колей."
+                    ),
+                )
 
         if road_mode == "ISO8608":
             iso_class = str(road.get("iso_class", "C")).upper()
@@ -886,8 +1048,14 @@ def render_ring_scenario_generator(
     st.subheader("Генератор сценариев/тестов: кольцо из сегментов")
     st.caption(
         "Последовательность: **1) описать кольцо → 2) проверить → 3) добавить в набор → 4) прогнать**. "
-        "Манёвры задаются радиусом/скоростью/временем (внутри строится ax/ay). "
-        "Профиль дороги: ISO 8608 или синус по сторонам + события (яма/препятствие)."
+        "Канонический путь сценариев в проекте — именно ring editor: пользователь задаёт сегменты, повороты, скорости, "
+        "продольный и поперечный уклоны дороги, а генератор уже строит совместимый профиль/ax/ay."
+    )
+    st.info(
+        "Новая каноническая семантика сегмента: тип сегмента больше не является главным пользовательским понятием. "
+        "Пользователь задаёт направление (прямо / влево / вправо), конечную скорость сегмента и параметры дороги. "
+        "Legacy `drive_mode` сохраняется только как внутренний совместимый слой.",
+        icon="ℹ️",
     )
 
     pending_n_seg_key = "_ring_n_segments_pending"
@@ -897,14 +1065,17 @@ def render_ring_scenario_generator(
         except Exception:
             st.session_state.pop(pending_n_seg_key, None)
 
-    colTop1, colTop2, colTop3, colTop4 = st.columns([1.2, 1.0, 1.0, 1.0])
+    colTop1, colTop2, colTop3, colTop4, colTop5 = st.columns([1.2, 1.0, 1.0, 1.0, 1.0])
     with colTop1:
         spec["v0_kph"] = st.number_input(
             "Начальная скорость кольца, км/ч",
             min_value=0.0,
             value=float(spec.get("v0_kph", _resolve_initial_speed_kph(spec) or 40.0)),
             step=1.0,
-            help="Скорость в начале первого сегмента. Дальше скорость идёт по сегментам.",
+            help=(
+                "Скорость в начале первого сегмента. "
+                "Конец последнего сегмента автоматически замыкается в это же значение, чтобы кольцо было непрерывным по скорости."
+            ),
         )
     v0_eff_kph = float(_resolve_initial_speed_kph(spec))
     if float(spec.get("v0_kph", 0.0) or 0.0) <= 0.0 and v0_eff_kph > 0.0:
@@ -936,12 +1107,24 @@ def render_ring_scenario_generator(
             format="%.3f",
             help="Шаг дискретизации профиля дороги. Меньше dx — детальнее профиль и тяжелее CSV.",
         )
+    with colTop5:
+        track_m = st.number_input(
+            "Колея, м",
+            min_value=0.2,
+            max_value=3.5,
+            value=float(spec.get("track_m", 1.0) or 1.0),
+            step=0.05,
+            help=(
+                "Колея используется для перевода поперечного уклона сегмента в реальную разницу высот между левой и правой колеёй."
+            ),
+        )
 
     spec["schema_version"] = "ring_v2"
     spec["seed"] = int(seed)
     spec["dx_m"] = float(dx_m)
     spec["n_laps"] = int(n_laps)
     spec["wheelbase_m"] = float(wheelbase_m)
+    spec["track_m"] = float(track_m)
     spec["closure_policy"] = str(spec.get("closure_policy", "closed_c1_periodic") or "closed_c1_periodic")
 
     # 1) Сегменты
@@ -1014,6 +1197,7 @@ def render_ring_scenario_generator(
     v_starts: List[float] = []
     v_ends: List[float] = []
     seg_lens_m: List[float] = []
+    road_state_starts, road_state_ends = _derive_ring_road_state_flow(segs)
 
     seg_summaries: List[str] = []
     seg_rows: List[Dict[str, Any]] = []
@@ -1027,16 +1211,24 @@ def render_ring_scenario_generator(
 
         seg_lens_m.append(float(seg_len))
         v_ends.append(float(v_end))
+        turn_i = str((seg.get("turn_direction") or _segment_motion_contract(seg, v_start_i)["turn_direction"]) or "STRAIGHT").upper()
+        road_end_i = road_state_ends[i] if i < len(road_state_ends) else {"center_height_mm": 0.0, "cross_slope_pct": 0.0}
 
         name_i = str(seg.get("name") or f"S{i+1}")
-        seg_summaries.append(f"{i+1}. {name_i} • {seg_len:.0f} м • v {v_start_i:.0f}→{v_end:.0f} км/ч")
+        seg_summaries.append(
+            f"{i+1}. {name_i} • {_turn_direction_label(turn_i)} • {seg_len:.0f} м • "
+            f"v {v_start_i:.0f}→{v_end:.0f} км/ч • z1 {float(road_end_i['center_height_mm']):.0f} мм"
+        )
         seg_rows.append(
             {
                 "№": i + 1,
                 "Название": name_i,
+                "Поворот": _turn_direction_label(turn_i),
                 "v0, км/ч": float(f"{v_start_i:.1f}"),
                 "v1, км/ч": float(f"{v_end:.1f}"),
                 "≈длина, м": float(f"{seg_len:.1f}"),
+                "z конца, мм": float(f"{float(road_end_i['center_height_mm']):.1f}"),
+                "поперечный уклон конца, %": float(f"{float(road_end_i['cross_slope_pct']):.2f}"),
             }
         )
 
@@ -1068,6 +1260,7 @@ def render_ring_scenario_generator(
             v_prev = 60.0
         out["speed_start_kph"] = v_prev
         out["speed_end_kph"] = v_prev
+        out["turn_direction"] = str(out.get("turn_direction") or "STRAIGHT").upper()
         out["accel_time_s"] = 0.0
         out["brake_time_s"] = 0.0
         return out
@@ -1147,8 +1340,21 @@ def render_ring_scenario_generator(
     # --- Редактор выбранного сегмента ---
     # v_start_kph для текущего сегмента берём из цепочки скоростей (v0_kph + пред. сегменты)
     v_start_cur = float(v_starts[cur_idx] if 0 <= cur_idx < len(v_starts) else v0_kph)
+    road_start_cur = road_state_starts[cur_idx] if 0 <= cur_idx < len(road_state_starts) else {"center_height_mm": 0.0, "cross_slope_pct": 0.0}
+    ring_road_start = road_state_starts[0] if road_state_starts else {"center_height_mm": 0.0, "cross_slope_pct": 0.0}
 
-    updated_seg, v_end_cur = _render_segment_editor(segs[cur_idx], idx=cur_idx, v_start_kph=v_start_cur)
+    updated_seg, v_end_cur = _render_segment_editor(
+        segs[cur_idx],
+        idx=cur_idx,
+        v_start_kph=v_start_cur,
+        ring_start_speed_kph=float(v0_kph),
+        is_first=bool(cur_idx == 0),
+        is_last=bool(cur_idx == len(segs) - 1),
+        road_start_center_mm=float(road_start_cur["center_height_mm"]),
+        road_start_cross_pct=float(road_start_cur["cross_slope_pct"]),
+        ring_start_center_mm=float(ring_road_start["center_height_mm"]),
+        ring_start_cross_pct=float(ring_road_start["cross_slope_pct"]),
+    )
     if not isinstance(updated_seg, dict):
         updated_seg = dict(segs[cur_idx])
     updated_seg["uid"] = cur_uid  # фиксируем uid, чтобы не потерялся
@@ -1306,11 +1512,15 @@ def render_ring_scenario_generator(
                         df_view = pd.DataFrame({
                             "Сегмент": df_seg["seg_idx"],
                             "Имя": df_seg["name"],
-                            "Движение": df_seg["drive_mode"],
+                            "Поворот": df_seg["turn_direction"],
+                            "v0, км/ч": df_seg["speed_start_kph"].round(2),
+                            "v1, км/ч": df_seg["speed_end_kph"].round(2),
                             "Дорога": df_seg["road_mode"],
                             "x0, м": df_seg["x_start_m"].round(3),
                             "x1, м": df_seg["x_end_m"].round(3),
                             "L сегм., м": df_seg["length_m"].round(3),
+                            "z центра 0→1, мм": (df_seg["center_height_end_mm"] - df_seg["center_height_start_mm"]).round(2),
+                            "поперечный уклон 0→1, %": (df_seg["cross_slope_end_pct"] - df_seg["cross_slope_start_pct"]).round(2),
                             "x факт, м": df_seg["generated_x_local_end_m"].round(3),
                             "Л A зад., мм": df_seg["aL_req_mm"].round(2),
                             "Л A факт, мм": df_seg["L_amp_mm"].round(2),

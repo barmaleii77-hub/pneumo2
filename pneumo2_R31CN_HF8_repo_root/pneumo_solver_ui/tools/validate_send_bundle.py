@@ -44,6 +44,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .send_bundle_contract import (
+    ANIM_DIAG_JSON,
+    ANIM_DIAG_MD,
+    ANIM_GLOBAL_POINTER,
+    ANIM_LOCAL_NPZ,
+    ANIM_LOCAL_POINTER,
+    annotate_anim_source_for_bundle,
+    choose_anim_snapshot,
+    extract_anim_snapshot,
+)
+
 
 try:
     from pneumo_solver_ui.release_info import get_release
@@ -51,13 +62,6 @@ try:
     RELEASE = get_release()
 except Exception:
     RELEASE = os.environ.get("PNEUMO_RELEASE", "UNIFIED_v6_67") or "UNIFIED_v6_67"
-
-
-ANIM_DIAG_JSON = "triage/latest_anim_pointer_diagnostics.json"
-ANIM_DIAG_MD = "triage/latest_anim_pointer_diagnostics.md"
-ANIM_LOCAL_POINTER = "workspace/exports/anim_latest.json"
-ANIM_LOCAL_NPZ = "workspace/exports/anim_latest.npz"
-ANIM_GLOBAL_POINTER = "workspace/_pointers/anim_latest.json"
 
 
 def _now_iso() -> str:
@@ -81,23 +85,6 @@ def _md_list(items: List[str]) -> str:
     return "\n".join([f"- {x}" for x in items])
 
 
-def _normalize_reload_inputs(value: Any) -> List[str]:
-    if value is None:
-        return []
-    if isinstance(value, (list, tuple, set)):
-        out: List[str] = []
-        for x in value:
-            sx = str(x).strip()
-            if sx:
-                out.append(sx)
-        return out
-    sx = str(value).strip()
-    return [sx] if sx else []
-
-
-
-
-
 def _ui_state_payload_names(name_set: set[str], prefix: str) -> List[str]:
     out: List[str] = []
     for n in sorted(name_set):
@@ -112,81 +99,6 @@ def _ui_state_marker_names(name_set: set[str], prefix: str) -> List[str]:
         if n.startswith(prefix) and n.endswith('_EMPTY_OR_MISSING.txt'):
             out.append(n)
     return out
-
-
-def _basename_or_empty(value: Any) -> str:
-    if value in (None, ""):
-        return ""
-    try:
-        return Path(str(value)).name
-    except Exception:
-        return ""
-
-
-def _annotate_anim_source_for_bundle(state: Optional[Dict[str, Any]], *, name_set: set[str]) -> Optional[Dict[str, Any]]:
-    if not isinstance(state, dict):
-        return None
-    out = dict(state)
-    pointer_json = str(out.get("pointer_json") or "")
-    npz_path = str(out.get("npz_path") or "")
-    pointer_in_bundle = bool(pointer_json and ANIM_LOCAL_POINTER in name_set and _basename_or_empty(pointer_json) == Path(ANIM_LOCAL_POINTER).name)
-    npz_in_bundle = bool(npz_path and ANIM_LOCAL_NPZ in name_set and _basename_or_empty(npz_path) == Path(ANIM_LOCAL_NPZ).name)
-    out["pointer_json_in_bundle"] = pointer_in_bundle if pointer_json else None
-    out["npz_path_in_bundle"] = npz_in_bundle if npz_path else None
-    out["usable_from_bundle"] = bool(out.get("visual_cache_token") and npz_in_bundle)
-    issues = [str(x) for x in (out.get("issues") or []) if str(x).strip()]
-    src = str(out.get("source") or "source")
-    if pointer_json and not pointer_in_bundle:
-        issues.append(f"anim_latest {src} pointer_json is external / not mirrored in bundle: {pointer_json}")
-    if npz_path and not npz_in_bundle:
-        issues.append(f"anim_latest {src} npz_path is external / not mirrored in bundle: {npz_path}")
-    if (out.get("available") or out.get("visual_cache_token")) and not out["usable_from_bundle"]:
-        issues.append(f"anim_latest {src} is not usable from this bundle")
-    out["issues"] = list(dict.fromkeys(issues))
-    return out
-
-
-def _extract_anim_snapshot(obj: Any, *, source: str) -> Optional[Dict[str, Any]]:
-    if not isinstance(obj, dict):
-        return None
-
-    available = bool(
-        obj.get("anim_latest_available")
-        if "anim_latest_available" in obj
-        else (
-            obj.get("pointer_json")
-            or obj.get("anim_latest_json")
-            or obj.get("npz_path")
-            or obj.get("anim_latest_npz")
-            or obj.get("kind") == "anim_latest"
-        )
-    )
-
-    meta_obj = obj.get("anim_latest_meta") if isinstance(obj.get("anim_latest_meta"), dict) else obj.get("meta")
-    deps_obj = (
-        obj.get("anim_latest_visual_cache_dependencies")
-        if isinstance(obj.get("anim_latest_visual_cache_dependencies"), dict)
-        else obj.get("visual_cache_dependencies")
-    )
-
-    return {
-        "source": str(source),
-        "available": available,
-        "pointer_json": str(obj.get("anim_latest_pointer_json") or obj.get("pointer_json") or obj.get("anim_latest_json") or ""),
-        "global_pointer_json": str(obj.get("anim_latest_global_pointer_json") or obj.get("global_pointer_json") or ""),
-        "npz_path": str(obj.get("anim_latest_npz_path") or obj.get("npz_path") or obj.get("anim_latest_npz") or ""),
-        "visual_cache_token": str(obj.get("anim_latest_visual_cache_token") or obj.get("visual_cache_token") or ""),
-        "visual_reload_inputs": _normalize_reload_inputs(
-            obj.get("anim_latest_visual_reload_inputs") if "anim_latest_visual_reload_inputs" in obj else obj.get("visual_reload_inputs")
-        ),
-        "visual_cache_dependencies": dict(deps_obj or {}),
-        "updated_utc": str(obj.get("anim_latest_updated_utc") or obj.get("updated_utc") or obj.get("updated_at") or ""),
-        "meta": dict(meta_obj or {}) if isinstance(meta_obj, dict) else {},
-        "pointer_json_in_bundle": obj.get("pointer_json_in_bundle"),
-        "npz_path_in_bundle": obj.get("npz_path_in_bundle"),
-        "usable_from_bundle": obj.get("usable_from_bundle"),
-        "issues": list(obj.get("issues") or []) if isinstance(obj.get("issues"), list) else [],
-    }
 
 
 @dataclass
@@ -388,39 +300,25 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                 warnings.append(f"{ANIM_GLOBAL_POINTER} is not valid JSON")
 
             source_states = {
-                "diagnostics": _annotate_anim_source_for_bundle(
-                    _extract_anim_snapshot(diag_obj, source="diagnostics") if isinstance(diag_obj, dict) else None,
+                "diagnostics": annotate_anim_source_for_bundle(
+                    extract_anim_snapshot(diag_obj, source="diagnostics") if isinstance(diag_obj, dict) else None,
                     name_set=name_set,
                 ),
-                "local_pointer": _annotate_anim_source_for_bundle(
-                    _extract_anim_snapshot(local_obj, source="local_pointer") if isinstance(local_obj, dict) else None,
+                "local_pointer": annotate_anim_source_for_bundle(
+                    extract_anim_snapshot(local_obj, source="local_pointer") if isinstance(local_obj, dict) else None,
                     name_set=name_set,
                 ),
-                "global_pointer": _annotate_anim_source_for_bundle(
-                    _extract_anim_snapshot(global_obj, source="global_pointer") if isinstance(global_obj, dict) else None,
+                "global_pointer": annotate_anim_source_for_bundle(
+                    extract_anim_snapshot(global_obj, source="global_pointer") if isinstance(global_obj, dict) else None,
                     name_set=name_set,
                 ),
             }
             anim_latest["sources"] = {k: v for k, v in source_states.items() if isinstance(v, dict)}
 
-            canonical: Dict[str, Any] = {}
-            for key in ("diagnostics", "local_pointer", "global_pointer"):
-                state = source_states.get(key)
-                if isinstance(state, dict) and state.get("usable_from_bundle") is True:
-                    canonical = state
-                    break
-            if not canonical:
-                for key in ("diagnostics", "local_pointer", "global_pointer"):
-                    state = source_states.get(key)
-                    if isinstance(state, dict) and (state.get("visual_cache_token") or state.get("available")):
-                        canonical = state
-                        break
-            if not canonical:
-                for key in ("diagnostics", "local_pointer", "global_pointer"):
-                    state = source_states.get(key)
-                    if isinstance(state, dict):
-                        canonical = state
-                        break
+            canonical = choose_anim_snapshot(
+                {k: v for k, v in source_states.items() if isinstance(v, dict)},
+                preferred_order=("diagnostics", "local_pointer", "global_pointer"),
+            )
 
             if canonical:
                 anim_latest["available"] = bool(
@@ -438,14 +336,11 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                 anim_latest["usable_from_bundle"] = canonical.get("usable_from_bundle")
                 anim_latest["pointer_json_in_bundle"] = canonical.get("pointer_json_in_bundle")
                 anim_latest["npz_path_in_bundle"] = canonical.get("npz_path_in_bundle")
+                anim_latest["pointer_sync_ok"] = canonical.get("pointer_sync_ok")
+                anim_latest["reload_inputs_sync_ok"] = canonical.get("reload_inputs_sync_ok")
+                anim_latest["npz_path_sync_ok"] = canonical.get("npz_path_sync_ok")
 
-            issues: List[str] = []
-            for state in source_states.values():
-                if isinstance(state, dict):
-                    for msg in list(state.get("issues") or []):
-                        smsg = str(msg).strip()
-                        if smsg and smsg not in issues:
-                            issues.append(smsg)
+            issues: List[str] = [str(x).strip() for x in (canonical.get("issues") or []) if str(x).strip()]
 
             token_values = {
                 src: str(state.get("visual_cache_token") or "")

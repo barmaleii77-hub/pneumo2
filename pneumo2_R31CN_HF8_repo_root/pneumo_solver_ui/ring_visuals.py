@@ -75,7 +75,11 @@ def load_ring_spec_from_npz(npz_path: str | Path) -> Optional[dict]:
 
 
 def _segment_curvature_signed(seg: Dict[str, Any]) -> float:
-    drive_mode = str(seg.get("drive_mode") or "").strip().upper()
+    turn_direction = str(seg.get("turn_direction") or "").strip().upper()
+    if turn_direction in {"LEFT", "RIGHT"}:
+        drive_mode = "TURN_LEFT" if turn_direction == "LEFT" else "TURN_RIGHT"
+    else:
+        drive_mode = str(seg.get("drive_mode") or "").strip().upper()
     if drive_mode not in {"TURN_LEFT", "TURN_RIGHT"}:
         return 0.0
     try:

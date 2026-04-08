@@ -26,6 +26,8 @@ from typing import Dict, List, Optional, Tuple
 import pandas as pd
 import streamlit as st
 
+from .suspension_family_contract import AXLES, cylinder_family_key
+
 
 CATALOG_DIR = Path(__file__).resolve().parent / "catalogs"
 CATALOG_JSON = CATALOG_DIR / "camozzi_catalog.json"
@@ -97,32 +99,41 @@ def _queue_overrides_si(overrides: Dict[str, float]) -> None:
     st.session_state["pending_overrides_si"] = bag
 
 
+def _target_spec(target: str) -> tuple[str, tuple[str, ...], bool]:
+    raw = str(target or "").strip()
+    if raw in {"Ц1", "Ц1 обе оси"}:
+        return "Ц1", tuple(AXLES), True
+    if raw in {"Ц2", "Ц2 обе оси"}:
+        return "Ц2", tuple(AXLES), True
+    if raw == "Ц1 перед":
+        return "Ц1", ("перед",), False
+    if raw == "Ц1 зад":
+        return "Ц1", ("зад",), False
+    if raw == "Ц2 перед":
+        return "Ц2", ("перед",), False
+    if raw == "Ц2 зад":
+        return "Ц2", ("зад",), False
+    raise ValueError(f"Unsupported Camozzi target: {target!r}")
+
+
 def _apply_choice(choice: CamozziCylinderChoice, target: str) -> Dict[str, float]:
-    # target: "Ц1" or "Ц2"
+    cyl, axles, update_legacy = _target_spec(target)
     bore_m = float(choice.bore_mm) / 1000.0
     rod_m = float(choice.rod_mm) / 1000.0
     stroke_f_m = float(choice.stroke_front_mm) / 1000.0
     stroke_r_m = float(choice.stroke_rear_mm) / 1000.0
 
     out: Dict[str, float] = {}
-    if target == "Ц1":
-        out.update(
-            {
-                "диаметр_поршня_Ц1": bore_m,
-                "диаметр_штока_Ц1": rod_m,
-                "ход_штока_Ц1_перед_м": stroke_f_m,
-                "ход_штока_Ц1_зад_м": stroke_r_m,
-            }
-        )
-    else:
-        out.update(
-            {
-                "диаметр_поршня_Ц2": bore_m,
-                "диаметр_штока_Ц2": rod_m,
-                "ход_штока_Ц2_перед_м": stroke_f_m,
-                "ход_штока_Ц2_зад_м": stroke_r_m,
-            }
-        )
+    for axle in axles:
+        out[cylinder_family_key("bore", cyl, axle)] = bore_m
+        out[cylinder_family_key("rod", cyl, axle)] = rod_m
+        out[cylinder_family_key("stroke", cyl, axle)] = stroke_f_m if axle == "перед" else stroke_r_m
+
+    if update_legacy:
+        out[f"диаметр_поршня_{cyl}"] = bore_m
+        out[f"диаметр_штока_{cyl}"] = rod_m
+        out[f"ход_штока_{cyl}_перед_м"] = stroke_f_m
+        out[f"ход_штока_{cyl}_зад_м"] = stroke_r_m
 
     # Если человек сознательно выбирает цилиндр из Camozzi — логично включить enforce_camozzi_only
     out.setdefault("enforce_camozzi_only", 1.0)
@@ -131,6 +142,11 @@ def _apply_choice(choice: CamozziCylinderChoice, target: str) -> Dict[str, float
 
 def run() -> None:
     st.title("Каталог цилиндров Camozzi → автозаполнение параметров")
+    st.info(
+        "Канонический режим: цилиндры задаются по семействам `Ц1/Ц2 × перед/зад`. "
+        "Можно выбрать только перед, только зад или обе оси сразу. При выборе обеих осей "
+        "legacy-ключи тоже синхронизируются для обратной совместимости."
+    )
 
     cat = _load_camozzi_catalog()
     cyl = (cat or {}).get("cylinders", {})
@@ -165,7 +181,15 @@ def run() -> None:
 
     colA, colB = st.columns([1, 1])
     with colA:
-        target = st.selectbox("Куда применить", ["Ц1", "Ц2"], index=0)
+        target = st.selectbox(
+            "Куда применить",
+            ["Ц1 обе оси", "Ц1 перед", "Ц1 зад", "Ц2 обе оси", "Ц2 перед", "Ц2 зад"],
+            index=0,
+            help=(
+                "Семейства считаются независимыми по передней и задней оси. "
+                "Выбор «обе оси» сохраняет совместимость со старым общим контрактом канала Ц1/Ц2."
+            ),
+        )
     with colB:
         variant_key = st.selectbox(
             "Исполнение (вариант)",
@@ -237,6 +261,7 @@ def run() -> None:
     st.write(
         {
             "variant": _variant_label(choice.variant_key),
+            "target": target,
             "bore_mm": choice.bore_mm,
             "rod_mm": choice.rod_mm,
             "stroke_front_mm": choice.stroke_front_mm,

@@ -4,6 +4,7 @@ from typing import Any
 
 import numpy as np
 
+from .suspension_family_contract import family_param_description
 
 PARAM_DESC: dict[str, str] = {
     # давления (в UI — атм избыточного)
@@ -39,6 +40,9 @@ def is_small_volume_param(name: str) -> bool:
 
 
 def param_desc(name: str) -> str:
+    dyn = family_param_description(name)
+    if dyn:
+        return dyn
     return PARAM_DESC.get(name, "")
 
 

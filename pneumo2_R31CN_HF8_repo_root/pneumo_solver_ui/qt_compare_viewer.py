@@ -96,6 +96,22 @@ except Exception:
 
 try:
     try:
+        from desktop_animator.pointer_paths import iter_session_workspaces, workspace_autoload_pointer_candidates  # type: ignore
+    except Exception:
+        from pneumo_solver_ui.desktop_animator.pointer_paths import (  # type: ignore
+            iter_session_workspaces,
+            workspace_autoload_pointer_candidates,
+        )
+except Exception:
+    def iter_session_workspaces(project_root, limit=None):
+        return []
+
+    def workspace_autoload_pointer_candidates(workspace_dir):
+        return []
+
+
+try:
+    try:
         from geometry_acceptance_contract import format_geometry_acceptance_summary_lines  # type: ignore
     except Exception:
         from pneumo_solver_ui.geometry_acceptance_contract import format_geometry_acceptance_summary_lines  # type: ignore
@@ -4462,20 +4478,6 @@ def _auto_find_npz(max_files: int = 6) -> List[Path]:
             seen.add(s)
             out.append(p2)
 
-    def _iter_session_workspaces(base_root: Path) -> List[Path]:
-        sessions_root = base_root / 'runs' / 'ui_sessions'
-        if not sessions_root.exists() or not sessions_root.is_dir():
-            return []
-        try:
-            session_dirs = sorted(
-                [p for p in sessions_root.iterdir() if p.is_dir()],
-                key=lambda p: p.stat().st_mtime,
-                reverse=True,
-            )
-        except Exception:
-            return []
-        return [ws for ws in (session_dir / 'workspace' for session_dir in session_dirs) if ws.exists() and ws.is_dir()]
-
     candidate_dirs: list[Path] = []
     for base in root_candidates:
         candidate_dirs.extend([
@@ -4484,21 +4486,16 @@ def _auto_find_npz(max_files: int = 6) -> List[Path]:
             base / 'workspace' / 'osc_logs',
             base / 'osc_logs',
         ])
-        for ws in _iter_session_workspaces(base):
+        for ws in iter_session_workspaces(base):
             candidate_dirs.extend([ws / 'osc', ws / 'exports', ws / 'osc_logs'])
 
     pointer_candidates: list[Path] = []
-    pointer_names = ('anim_latest.json', 'latest_simulation.json')
     for base in root_candidates:
-        pointer_candidates.extend([
-            base / 'workspace' / 'exports' / 'anim_latest.json',
-            base / 'workspace' / '_pointers' / 'anim_latest.json',
-            base / 'workspace' / '_pointers' / 'latest_simulation.json',
-        ])
-        for ws in _iter_session_workspaces(base):
-            for ptr_name in pointer_names:
-                pointer_candidates.append(ws / 'exports' / ptr_name)
-                pointer_candidates.append(ws / '_pointers' / ptr_name)
+        base_workspace = base / 'workspace'
+        if base_workspace.exists() and base_workspace.is_dir():
+            pointer_candidates.extend(workspace_autoload_pointer_candidates(base_workspace))
+        for ws in iter_session_workspaces(base):
+            pointer_candidates.extend(workspace_autoload_pointer_candidates(ws))
 
     for ptr in pointer_candidates:
         try:

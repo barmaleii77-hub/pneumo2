@@ -137,9 +137,15 @@ def test_generate_triage_report_prefers_latest_send_bundle_path_over_stale_regis
 
 
 def test_desktop_animator_default_pointer_source_scans_global_and_session_pointers() -> None:
-    src = (ROOT / "pneumo_solver_ui" / "desktop_animator" / "app.py").read_text(encoding="utf-8")
-    assert 'workspace" / "_pointers" / "anim_latest.json' in src or "workspace' / '_pointers' / 'anim_latest.json" in src
-    assert 'runs" / "ui_sessions"' in src or "runs' / 'ui_sessions'" in src
+    helper_src = (ROOT / "pneumo_solver_ui" / "desktop_animator" / "pointer_paths.py").read_text(encoding="utf-8")
+    app_src = (ROOT / "pneumo_solver_ui" / "desktop_animator" / "app.py").read_text(encoding="utf-8")
+    main_src = (ROOT / "pneumo_solver_ui" / "desktop_animator" / "main.py").read_text(encoding="utf-8")
+    assert "global_anim_latest_pointer_path" in helper_src
+    assert "local_anim_latest_export_paths" in helper_src
+    assert 'runs" / "ui_sessions"' in helper_src or "runs' / 'ui_sessions'" in helper_src
+    assert "default_anim_pointer_path(PROJECT_ROOT)" in app_src
+    assert "default_anim_pointer_path(" in main_src
+    assert "Path(__file__).resolve().parents[2]" in main_src
 
 
 def test_generate_triage_report_surfaces_road_contract_artifacts(tmp_path: Path, monkeypatch) -> None:

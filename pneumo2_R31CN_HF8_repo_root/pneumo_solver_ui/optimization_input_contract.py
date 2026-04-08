@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List
 
+from .suspension_family_contract import normalize_component_family_contract
+
 NON_DESIGN_RANGE_KEYS: tuple[str, ...] = (
     "vx0_м_с",
     "world_road_vmin_м_с",
@@ -206,5 +208,10 @@ def sanitize_ranges_for_optimization(base: Dict[str, Any] | None, ranges: Dict[s
 def sanitize_optimization_inputs(base: Dict[str, Any] | None, ranges: Dict[str, Any] | None, suite: List[Dict[str, Any]] | None) -> tuple[Dict[str, Any], Dict[str, Any], List[Dict[str, Any]], Dict[str, Any]]:
     base_out = dict(base or {})
     ranges_out, ranges_audit = sanitize_ranges_for_optimization(base_out, ranges)
+    base_out, ranges_out, family_audit = normalize_component_family_contract(base_out, ranges_out)
     suite_out, suite_audit = normalize_suite_stage_numbers(suite)
-    return base_out, ranges_out, suite_out, {"ranges": ranges_audit, "suite_stage": suite_audit}
+    return base_out, ranges_out, suite_out, {
+        "ranges": ranges_audit,
+        "suite_stage": suite_audit,
+        "component_families": family_audit,
+    }

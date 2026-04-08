@@ -45,6 +45,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from .send_bundle_contract import (
+    ANIM_DIAG_JSON,
+    ANIM_DIAG_MD,
+    ANIM_DIAG_SIDECAR_JSON,
+    ANIM_DIAG_SIDECAR_MD,
+    anim_has_signal,
+    normalize_anim_dashboard_obj,
+    render_anim_latest_md,
+)
+
 
 try:
     from pneumo_solver_ui.release_info import get_release
@@ -52,10 +62,6 @@ try:
     RELEASE = get_release()
 except Exception:
     RELEASE = os.environ.get("PNEUMO_RELEASE", "UNIFIED_v6_67") or "UNIFIED_v6_67"
-
-
-ANIM_DIAG_JSON = "triage/latest_anim_pointer_diagnostics.json"
-ANIM_DIAG_MD = "triage/latest_anim_pointer_diagnostics.md"
 
 
 def _now_iso() -> str:
@@ -134,79 +140,6 @@ def _short_token(token: str, n: int = 16) -> str:
     if not tok:
         return ""
     return tok if len(tok) <= n else tok[:n] + "…"
-
-
-def _normalize_anim_dashboard_obj(obj: Any) -> Dict[str, Any]:
-    if not isinstance(obj, dict):
-        return {}
-    out = dict(obj)
-    out["available"] = bool(obj.get("available") if "available" in obj else obj.get("anim_latest_available"))
-    out["visual_cache_token"] = str(obj.get("visual_cache_token") or obj.get("anim_latest_visual_cache_token") or "")
-    out["visual_reload_inputs"] = list(obj.get("visual_reload_inputs") or obj.get("anim_latest_visual_reload_inputs") or [])
-    out["pointer_json"] = str(obj.get("pointer_json") or obj.get("anim_latest_pointer_json") or "")
-    out["global_pointer_json"] = str(obj.get("global_pointer_json") or obj.get("anim_latest_global_pointer_json") or "")
-    out["npz_path"] = str(obj.get("npz_path") or obj.get("anim_latest_npz_path") or "")
-    out["updated_utc"] = str(obj.get("updated_utc") or obj.get("anim_latest_updated_utc") or "")
-    out["usable_from_bundle"] = obj.get("usable_from_bundle") if "usable_from_bundle" in obj else obj.get("anim_latest_usable")
-    out["pointer_json_in_bundle"] = obj.get("pointer_json_in_bundle")
-    out["npz_path_in_bundle"] = obj.get("npz_path_in_bundle")
-    if "issues" not in out:
-        out["issues"] = list(obj.get("issues") or obj.get("anim_latest_issues") or [])
-    if "sources" not in out and isinstance(obj.get("sources"), dict):
-        out["sources"] = dict(obj.get("sources") or {})
-    return out
-
-
-
-def _anim_has_signal(anim: Any) -> bool:
-    if not isinstance(anim, dict):
-        return False
-    return bool(
-        anim.get("visual_cache_token")
-        or anim.get("anim_latest_visual_cache_token")
-        or anim.get("available")
-        or anim.get("anim_latest_available")
-        or anim.get("npz_path")
-        or anim.get("anim_latest_npz_path")
-    )
-
-
-
-
-def _render_anim_latest_md(anim: Any) -> str:
-    if not isinstance(anim, dict):
-        return "(anim_latest diagnostics not found)"
-    lines = [
-        "# Anim latest diagnostics",
-        "",
-        f"- available: {bool(anim.get('available') or anim.get('anim_latest_available'))}",
-        f"- visual_cache_token: {anim.get('visual_cache_token') or anim.get('anim_latest_visual_cache_token') or '—'}",
-    ]
-    reload_inputs = anim.get("visual_reload_inputs")
-    if reload_inputs is None:
-        reload_inputs = anim.get("anim_latest_visual_reload_inputs")
-    reload_inputs = list(reload_inputs or [])
-    lines.append(f"- visual_reload_inputs: {', '.join(str(x) for x in reload_inputs) if reload_inputs else '—'}")
-    lines.append(f"- pointer_json: {anim.get('pointer_json') or anim.get('anim_latest_pointer_json') or '—'}")
-    lines.append(f"- global_pointer_json: {anim.get('global_pointer_json') or anim.get('anim_latest_global_pointer_json') or '—'}")
-    lines.append(f"- npz_path: {anim.get('npz_path') or anim.get('anim_latest_npz_path') or '—'}")
-    lines.append(f"- updated_utc: {anim.get('updated_utc') or anim.get('anim_latest_updated_utc') or '—'}")
-    if anim.get('usable_from_bundle') is not None:
-        lines.append(f"- usable_from_bundle: {anim.get('usable_from_bundle')}")
-    if anim.get('pointer_json_in_bundle') is not None:
-        lines.append(f"- pointer_json_in_bundle: {anim.get('pointer_json_in_bundle')}")
-    if anim.get('npz_path_in_bundle') is not None:
-        lines.append(f"- npz_path_in_bundle: {anim.get('npz_path_in_bundle')}")
-    if anim.get("pointer_sync_ok") is not None:
-        lines.append(f"- pointer_sync_ok: {anim.get('pointer_sync_ok')}")
-    if anim.get("reload_inputs_sync_ok") is not None:
-        lines.append(f"- reload_inputs_sync_ok: {anim.get('reload_inputs_sync_ok')}")
-    if anim.get("npz_path_sync_ok") is not None:
-        lines.append(f"- npz_path_sync_ok: {anim.get('npz_path_sync_ok')}")
-    issues = list(anim.get("issues") or [])
-    if issues:
-        lines.extend(["", "## Issues", *[f"- {x}" for x in issues]])
-    return "\n".join(lines).rstrip() + "\n"
 
 
 
@@ -311,8 +244,8 @@ def generate_dashboard_report(
     # -----------------------------
     # Load anim_latest diagnostics
     # -----------------------------
-    anim_md_path = out_dir / "latest_anim_pointer_diagnostics.md"
-    anim_json_path = out_dir / "latest_anim_pointer_diagnostics.json"
+    anim_md_path = out_dir / ANIM_DIAG_SIDECAR_MD
+    anim_json_path = out_dir / ANIM_DIAG_SIDECAR_JSON
 
     anim_md = ""
     anim_json: Any = None
@@ -336,16 +269,16 @@ def generate_dashboard_report(
         if isinstance(anim_json, dict):
             rep["warnings"].append("anim_latest diagnostics sidecar not found; using validation summary")
 
-    anim_norm = _normalize_anim_dashboard_obj(anim_json)
+    anim_norm = normalize_anim_dashboard_obj(anim_json)
     val_anim_json = val_json.get("anim_latest") if isinstance(val_json, dict) else None
-    val_anim_norm = _normalize_anim_dashboard_obj(val_anim_json)
-    if (not _anim_has_signal(anim_norm)) and _anim_has_signal(val_anim_norm):
+    val_anim_norm = normalize_anim_dashboard_obj(val_anim_json)
+    if (not anim_has_signal(anim_norm)) and anim_has_signal(val_anim_norm):
         anim_json = val_anim_json
         anim_norm = val_anim_norm
         rep["warnings"].append("anim_latest ZIP/sidecar diagnostics are empty; using validation summary")
-        anim_md = _render_anim_latest_md(anim_json)
+        anim_md = render_anim_latest_md(anim_json)
     elif not anim_md and isinstance(anim_json, dict):
-        anim_md = _render_anim_latest_md(anim_json)
+        anim_md = render_anim_latest_md(anim_json)
 
     rep["sections"]["anim_latest"] = {
         "md_path": str(anim_md_path) if anim_md_path.exists() else None,

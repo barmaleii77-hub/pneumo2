@@ -144,7 +144,12 @@ def test_playhead_component_exports_browser_perf_snapshot_to_python() -> None:
 
 
 def test_ui_sources_consume_browser_perf_snapshot_event() -> None:
+    helper_text = (ROOT / "pneumo_solver_ui" / "ui_event_sync_helpers.py").read_text(encoding="utf-8")
+    assert 'evt.get("kind") == "browser_perf_snapshot"' in helper_text
+    assert "persist_browser_perf_snapshot_event_fn(evt, workspace_exports_dir)" in helper_text
+
     for rel in ("pneumo_solver_ui/pneumo_ui_app.py", "pneumo_solver_ui/app.py"):
         text = (ROOT / rel).read_text(encoding="utf-8")
-        assert 'evt.get("kind") == "browser_perf_snapshot"' in text
-        assert 'persist_browser_perf_snapshot_event(evt, WORKSPACE_EXPORTS_DIR)' in text
+        assert "consume_playhead_event = partial(" in text
+        assert "persist_browser_perf_snapshot_event_fn=persist_browser_perf_snapshot_event" in text
+        assert "workspace_exports_dir=WORKSPACE_EXPORTS_DIR" in text

@@ -50,6 +50,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from .send_bundle_contract import ANIM_DIAG_JSON, ANIM_DIAG_MD, ANIM_DIAG_SIDECAR_JSON, ANIM_DIAG_SIDECAR_MD
+
 
 try:
     from pneumo_solver_ui.release_info import get_release
@@ -363,8 +365,8 @@ def _collect_anim_latest_bundle_diagnostics(out_dir: Path) -> Tuple[Dict[str, An
     md = "\n".join(lines).rstrip() + "\n"
 
     try:
-        _safe_write_text(out_dir / "latest_anim_pointer_diagnostics.json", json.dumps(diag, ensure_ascii=False, indent=2))
-        _safe_write_text(out_dir / "latest_anim_pointer_diagnostics.md", md)
+        _safe_write_text(out_dir / ANIM_DIAG_SIDECAR_JSON, json.dumps(diag, ensure_ascii=False, indent=2))
+        _safe_write_text(out_dir / ANIM_DIAG_SIDECAR_MD, md)
     except Exception:
         pass
     return diag, md
@@ -424,8 +426,8 @@ def _build_send_bundle_readme(anim_diag: Optional[Dict[str, Any]] = None) -> str
         f"- browser_perf_trace_ref: {browser_perf_trace_ref}\n"
         f"- anim_latest_updated_utc: {diag.get('anim_latest_updated_utc') or '—'}\n"
         f"- anim_latest_issues: {issues_preview}\n"
-        "- In bundle: triage/latest_anim_pointer_diagnostics.json\n"
-        "- In bundle: triage/latest_anim_pointer_diagnostics.md\n"
+        f"- In bundle: {ANIM_DIAG_JSON}\n"
+        f"- In bundle: {ANIM_DIAG_MD}\n"
         "- In bundle: health/health_report.json\n"
         "- In bundle: health/health_report.md\n\n"
         "Если каких-то папок нет, они не будут включены.\n"
@@ -1496,7 +1498,7 @@ def _make_send_bundle_inner(
         try:
             rr = _add_generated_text(
                 z,
-                "triage/latest_anim_pointer_diagnostics.md",
+                ANIM_DIAG_MD,
                 anim_diag_md,
                 manifest=manifest,
             )
@@ -1507,7 +1509,7 @@ def _make_send_bundle_inner(
 
             rr = _add_generated_text(
                 z,
-                "triage/latest_anim_pointer_diagnostics.json",
+                ANIM_DIAG_JSON,
                 json.dumps(anim_diag_event, ensure_ascii=False, indent=2),
                 manifest=manifest,
             )
@@ -1516,7 +1518,7 @@ def _make_send_bundle_inner(
             res_total.skipped_files += rr.skipped_files
             res_total.skipped_bytes += rr.skipped_bytes
         except Exception:
-            z.writestr("triage/latest_anim_pointer_diagnostics_failed.txt", traceback.format_exc())
+            z.writestr(f"{Path(ANIM_DIAG_JSON).parent.as_posix()}/latest_anim_pointer_diagnostics_failed.txt", traceback.format_exc())
 
         # --- self_check silent warnings snapshot (if present) ---
         reports_root = repo_root / "REPORTS"
@@ -1793,12 +1795,12 @@ def _make_send_bundle_inner(
         )
         _triage3_md = _re3.sub(
             r"(?m)^- Latest anim diagnostics json:.*$",
-            "- Latest anim diagnostics json: triage/latest_anim_pointer_diagnostics.json (inside this bundle)",
+            f"- Latest anim diagnostics json: {ANIM_DIAG_JSON} (inside this bundle)",
             _triage3_md,
         )
         _triage3_md = _re3.sub(
             r"(?m)^- Latest anim diagnostics md:.*$",
-            "- Latest anim diagnostics md: triage/latest_anim_pointer_diagnostics.md (inside this bundle)",
+            f"- Latest anim diagnostics md: {ANIM_DIAG_MD} (inside this bundle)",
             _triage3_md,
         )
         with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as _z3:

@@ -35,6 +35,205 @@ from .scenario_generator import ISO8608Spec, generate_iso8608_profile, write_axa
 log = logging.getLogger(__name__)
 
 
+def _segment_has_explicit_motion_fields(seg: Dict[str, Any]) -> bool:
+    return any(k in seg for k in ("turn_direction", "speed_start_kph", "speed_end_kph"))
+
+
+def _segment_turn_direction(seg: Dict[str, Any]) -> str:
+    raw_turn = str(seg.get("turn_direction", "") or "").strip().upper()
+    if raw_turn in {"STRAIGHT", "LEFT", "RIGHT"}:
+        return raw_turn
+    legacy_mode = str(seg.get("drive_mode", "STRAIGHT") or "STRAIGHT").strip().upper()
+    if legacy_mode == "TURN_LEFT":
+        return "LEFT"
+    if legacy_mode == "TURN_RIGHT":
+        return "RIGHT"
+    return "STRAIGHT"
+
+
+def _segment_motion_contract(seg: Dict[str, Any], v_start_kph: float) -> Dict[str, Any]:
+    """Return normalized motion semantics for both canonical and legacy ring specs.
+
+    Canonical UI intent:
+    - user picks turn direction separately from speed change;
+    - the first segment gets ring-level initial speed;
+    - each segment owns only its end speed;
+    - legacy ``drive_mode`` is preserved only as a compatibility/service field.
+    """
+    legacy_mode = str(seg.get("drive_mode", "STRAIGHT") or "STRAIGHT").strip().upper()
+    turn_direction = _segment_turn_direction(seg)
+    explicit_motion = _segment_has_explicit_motion_fields(seg)
+
+    if explicit_motion:
+        try:
+            speed_start_kph = float(seg.get("speed_start_kph", v_start_kph) or v_start_kph)
+        except Exception:
+            speed_start_kph = float(v_start_kph)
+        if "speed_end_kph" in seg:
+            try:
+                speed_end_kph = float(seg.get("speed_end_kph", speed_start_kph) or speed_start_kph)
+            except Exception:
+                speed_end_kph = float(speed_start_kph)
+        elif "v_end_kph" in seg:
+            try:
+                speed_end_kph = float(seg.get("v_end_kph", speed_start_kph) or speed_start_kph)
+            except Exception:
+                speed_end_kph = float(speed_start_kph)
+        elif "speed_kph" in seg:
+            try:
+                speed_end_kph = float(seg.get("speed_kph", speed_start_kph) or speed_start_kph)
+            except Exception:
+                speed_end_kph = float(speed_start_kph)
+        else:
+            speed_end_kph = float(speed_start_kph)
+    else:
+        if legacy_mode in ("ACCEL", "BRAKE"):
+            speed_start_kph = float(v_start_kph)
+            try:
+                speed_end_kph = float(seg.get("v_end_kph", v_start_kph) or v_start_kph)
+            except Exception:
+                speed_end_kph = float(v_start_kph)
+        else:
+            try:
+                speed_end_kph = float(seg.get("speed_kph", v_start_kph) or v_start_kph)
+            except Exception:
+                speed_end_kph = float(v_start_kph)
+            speed_start_kph = float(speed_end_kph)
+
+    speed_start_kph = max(0.0, float(speed_start_kph))
+    speed_end_kph = max(0.0, float(speed_end_kph))
+
+    if turn_direction == "STRAIGHT":
+        if abs(speed_end_kph - speed_start_kph) <= 1e-9:
+            derived_legacy_mode = "STRAIGHT"
+        else:
+            derived_legacy_mode = "ACCEL" if speed_end_kph > speed_start_kph else "BRAKE"
+    else:
+        derived_legacy_mode = "TURN_LEFT" if turn_direction == "LEFT" else "TURN_RIGHT"
+
+    try:
+        turn_radius_m = float(seg.get("turn_radius_m", 0.0) or 0.0)
+    except Exception:
+        turn_radius_m = 0.0
+
+    return {
+        "explicit_motion": bool(explicit_motion),
+        "turn_direction": turn_direction,
+        "speed_start_kph": speed_start_kph,
+        "speed_end_kph": speed_end_kph,
+        "vary_speed": bool(abs(speed_end_kph - speed_start_kph) > 1e-9),
+        "turn_radius_m": max(0.0, turn_radius_m),
+        "legacy_mode": derived_legacy_mode if explicit_motion else legacy_mode,
+        "display_mode": derived_legacy_mode,
+    }
+
+
+def _resolve_track_m(spec: Dict[str, Any]) -> float:
+    try:
+        track_m = float(spec.get("track_m", 1.0) or 1.0)
+    except Exception:
+        track_m = 1.0
+    return float(max(1e-6, track_m))
+
+
+def _road_state_contract_enabled(spec: Dict[str, Any]) -> bool:
+    keys = {
+        "center_height_start_mm",
+        "center_height_end_mm",
+        "cross_slope_start_pct",
+        "cross_slope_end_pct",
+    }
+    for seg in list(spec.get("segments", []) or []):
+        road = dict(seg.get("road", {}) or {})
+        if any(k in road for k in keys):
+            return True
+    return False
+
+
+def _segment_road_state_mm(
+    spec: Dict[str, Any],
+    segments: List[Dict[str, Any]],
+    idx: int,
+    prev_end_center_mm: float,
+    prev_end_cross_pct: float,
+    first_start_center_mm: float,
+    first_start_cross_pct: float,
+) -> Dict[str, float]:
+    road = dict((segments[idx] or {}).get("road", {}) or {})
+    if idx == 0:
+        try:
+            start_center_mm = float(road.get("center_height_start_mm", 0.0) or 0.0)
+        except Exception:
+            start_center_mm = 0.0
+        try:
+            start_cross_pct = float(road.get("cross_slope_start_pct", 0.0) or 0.0)
+        except Exception:
+            start_cross_pct = 0.0
+    else:
+        start_center_mm = float(prev_end_center_mm)
+        start_cross_pct = float(prev_end_cross_pct)
+
+    is_last = idx >= len(segments) - 1
+    end_center_default = first_start_center_mm if is_last else start_center_mm
+    end_cross_default = first_start_cross_pct if is_last else start_cross_pct
+    try:
+        end_center_mm = float(road.get("center_height_end_mm", end_center_default) or end_center_default)
+    except Exception:
+        end_center_mm = float(end_center_default)
+    try:
+        end_cross_pct = float(road.get("cross_slope_end_pct", end_cross_default) or end_cross_default)
+    except Exception:
+        end_cross_pct = float(end_cross_default)
+
+    if is_last:
+        end_center_mm = float(first_start_center_mm)
+        end_cross_pct = float(first_start_cross_pct)
+
+    return {
+        "start_center_mm": float(start_center_mm),
+        "end_center_mm": float(end_center_mm),
+        "start_cross_pct": float(start_cross_pct),
+        "end_cross_pct": float(end_cross_pct),
+    }
+
+
+def _apply_segment_boundary_targets(
+    x_local: np.ndarray,
+    left: np.ndarray,
+    right: np.ndarray,
+    *,
+    track_m: float,
+    start_center_mm: float,
+    end_center_mm: float,
+    start_cross_pct: float,
+    end_cross_pct: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Tilt/shift segment so its boundary heights match explicit road-state targets."""
+    if x_local.size == 0:
+        return np.asarray(left, dtype=float), np.asarray(right, dtype=float)
+    if x_local.size == 1:
+        alpha = np.array([0.0], dtype=float)
+    else:
+        length_m = float(max(x_local[-1] - x_local[0], 1e-9))
+        alpha = (np.asarray(x_local, dtype=float) - float(x_local[0])) / length_m
+
+    center_start_m = float(start_center_mm) / 1000.0
+    center_end_m = float(end_center_mm) / 1000.0
+    cross_start = float(start_cross_pct) / 100.0
+    cross_end = float(end_cross_pct) / 100.0
+
+    start_left_target = center_start_m - 0.5 * float(track_m) * cross_start
+    end_left_target = center_end_m - 0.5 * float(track_m) * cross_end
+    start_right_target = center_start_m + 0.5 * float(track_m) * cross_start
+    end_right_target = center_end_m + 0.5 * float(track_m) * cross_end
+
+    left = np.asarray(left, dtype=float)
+    right = np.asarray(right, dtype=float)
+    corr_left = (start_left_target - float(left[0])) + alpha * ((end_left_target - float(left[-1])) - (start_left_target - float(left[0])))
+    corr_right = (start_right_target - float(right[0])) + alpha * ((end_right_target - float(right[-1])) - (start_right_target - float(right[0])))
+    return left + corr_left, right + corr_right
+
+
 def _segment_length_canonical_m(v_start_kph: float, seg: Dict[str, Any], *, fallback_dt_s: float = 0.01, dx_m: float = 0.02) -> float:
     """Canonical segment length used by preview/summary/export.
 
@@ -58,23 +257,12 @@ def _segment_length_canonical_m(v_start_kph: float, seg: Dict[str, Any], *, fall
     dur_s = max(float(fallback_dt_s), dur_s)
     dx_m = max(1e-6, float(dx_m))
 
-    mode = str(seg.get("drive_mode", "STRAIGHT") or "STRAIGHT").upper()
-    v0 = max(0.0, float(v_start_kph) / 3.6)
-
-    if mode in ("ACCEL", "BRAKE"):
-        try:
-            v1_kph = float(seg.get("v_end_kph", v_start_kph) or v_start_kph)
-        except Exception:
-            v1_kph = float(v_start_kph)
-        v1 = max(0.0, v1_kph / 3.6)
+    motion = _segment_motion_contract(seg, v_start_kph)
+    v0 = max(0.0, float(motion["speed_start_kph"]) / 3.6)
+    v1 = max(0.0, float(motion["speed_end_kph"]) / 3.6)
+    if motion["vary_speed"]:
         return float(max(dx_m, 0.5 * (v0 + v1) * dur_s))
-
-    try:
-        sp_kph = float(seg.get("speed_kph", v_start_kph) or v_start_kph)
-    except Exception:
-        sp_kph = float(v_start_kph)
-    v = max(0.0, sp_kph / 3.6)
-    return float(max(dx_m, v * dur_s))
+    return float(max(dx_m, v1 * dur_s))
 
 
 def _resolve_initial_speed_kph(spec: Dict[str, Any]) -> float:
@@ -98,18 +286,25 @@ def _resolve_initial_speed_kph(spec: Dict[str, Any]) -> float:
     segs = list(spec.get("segments", []) or [])
     if segs:
         s0 = dict(segs[0] or {})
-        mode0 = str(s0.get("drive_mode", "STRAIGHT") or "STRAIGHT").upper()
-        if mode0 in ("STRAIGHT", "TURN_LEFT", "TURN_RIGHT"):
+        if "speed_start_kph" in s0:
             try:
-                v1 = float(s0.get("speed_kph", 0.0) or 0.0)
+                v1 = float(s0.get("speed_start_kph", 0.0) or 0.0)
             except Exception:
                 v1 = 0.0
             if np.isfinite(v1) and v1 > 0.0:
                 log.warning(
-                    "scenario_ring: spec.v0_kph missing/zero; using first segment speed_kph=%.3f as canonical initial ring speed",
+                    "scenario_ring: spec.v0_kph missing/zero; using first segment speed_start_kph=%.3f as canonical initial ring speed",
                     v1,
                 )
                 return float(v1)
+        motion0 = _segment_motion_contract(s0, 0.0)
+        v1 = float(motion0["speed_start_kph"] if motion0["explicit_motion"] else motion0["speed_end_kph"])
+        if np.isfinite(v1) and v1 > 0.0:
+            log.warning(
+                "scenario_ring: spec.v0_kph missing/zero; using first segment authored speed=%.3f as canonical initial ring speed",
+                v1,
+            )
+            return float(v1)
     return 0.0
 
 
@@ -458,70 +653,41 @@ def _build_segment_time_series(seg: Dict[str, Any], dt_s: float, v_start_mps: fl
       * Lateral acceleration ay is produced only for TURN_*.
     """
 
-    mode = str(seg.get("drive_mode", "STRAIGHT")).upper()
+    motion = _segment_motion_contract(seg, float(v_start_mps) * 3.6)
+    mode = str(motion["legacy_mode"]).upper()
     dur_s = float(seg.get("duration_s", 0.0))
     dur_s = max(0.0, dur_s)
 
     if dur_s <= 0.0:
         t = np.array([0.0, dt_s])
-        v = np.array([v_start_mps, v_start_mps])
+        v_static = max(0.0, float(motion["speed_start_kph"]) / 3.6)
+        v = np.array([v_static, v_static])
         ay = np.zeros_like(t)
-        return t, v, ay, v_start_mps
+        return t, v, ay, float(v[-1])
 
     n = int(math.floor(dur_s / dt_s)) + 1
     t = np.linspace(0.0, dur_s, n)
 
-    # --- STRAIGHT (constant speed) ---
-    if mode in ("STRAIGHT", "CRUISE"):
-        if "speed_kph" in seg:
-            speed_kph = float(seg["speed_kph"])
-        else:
-            speed_kph = v_start_mps * 3.6
-            log.warning("scenario_ring: segment STRAIGHT missing speed_kph; using v_start_kph=%.3f", speed_kph)
-        v = np.full_like(t, max(0.0, speed_kph / 3.6))
-        ay = np.zeros_like(t)
-        return t, v, ay, float(v[-1])
+    v0 = max(0.0, float(motion["speed_start_kph"]) / 3.6)
+    v1 = max(0.0, float(motion["speed_end_kph"]) / 3.6)
+    if motion["vary_speed"]:
+        v = np.linspace(v0, v1, len(t))
+    else:
+        v = np.full_like(t, v1 if mode in ("STRAIGHT", "CRUISE", "TURN_LEFT", "TURN_RIGHT") else v0)
 
-    # --- TURN (constant speed + constant ay) ---
-    # ABSOLUTE LAW: canonical modes/keys only.
-    # Supported modes: TURN_LEFT / TURN_RIGHT
-    if mode in ("TURN_LEFT", "TURN_RIGHT"):
-        if "turn_radius_m" in seg:
-            radius_m = float(seg["turn_radius_m"])
-        else:
-            radius_m = float("nan")
-            log.warning("scenario_ring: segment %s missing turn_radius_m; ay will be 0", mode)
-        if "speed_kph" in seg:
-            speed_kph = float(seg["speed_kph"])
-        else:
-            speed_kph = v_start_mps * 3.6
-            log.warning("scenario_ring: segment %s missing speed_kph; using v_start_kph=%.3f", mode, speed_kph)
-        v = np.full_like(t, max(0.0, speed_kph / 3.6))
+    turn_direction = str(motion["turn_direction"]).upper()
+    radius_m = float(motion["turn_radius_m"])
+    if turn_direction in ("LEFT", "RIGHT"):
         if np.isfinite(radius_m) and radius_m > 0.0:
-            ay_const = (v[0] ** 2) / radius_m
-            if mode == "TURN_RIGHT":
-                ay_const = -ay_const
-            ay = np.full_like(t, ay_const)
+            ay = (v * v) / radius_m
+            if turn_direction == "RIGHT":
+                ay = -ay
         else:
+            log.warning("scenario_ring: turn segment missing/invalid turn_radius_m; ay will be 0")
             ay = np.zeros_like(t)
-        return t, v, ay, float(v[-1])
-
-    # --- ACCEL / BRAKE (linear v(t)) ---
-    if mode in ("ACCEL", "BRAKE"):
-        if "v_end_kph" in seg:
-            v_end_kph = float(seg["v_end_kph"])
-        else:
-            v_end_kph = v_start_mps * 3.6
-            log.warning("scenario_ring: segment %s missing v_end_kph; holding v_start_kph=%.3f", mode, v_end_kph)
-
-        v_end = max(0.0, v_end_kph / 3.6)
-        v = np.linspace(v_start_mps, v_end, len(t))
+    else:
         ay = np.zeros_like(t)
-        return t, v, ay, float(v[-1])
-
-    # Unknown mode is a hard error (ABSOLUTE LAW: no silent aliases / fallbacks).
-    allowed = "STRAIGHT, TURN_LEFT, TURN_RIGHT, ACCEL, BRAKE"
-    raise ValueError(f"Unknown segment drive_mode={mode!r}. Allowed: {allowed}")
+    return t, v, ay, float(v[-1])
 
 
 def generate_ring_drive_profile(
@@ -590,6 +756,12 @@ def generate_ring_tracks(
     x_offset = 0.0
     prev_end_L = 0.0
     prev_end_R = 0.0
+    track_m = _resolve_track_m(spec)
+    use_road_state_contract = _road_state_contract_enabled(spec)
+    first_start_center_mm = 0.0
+    first_start_cross_pct = 0.0
+    prev_end_center_mm = 0.0
+    prev_end_cross_pct = 0.0
 
     # Track length estimation must be consistent with the drive profile generator.
     # If a segment length is not specified explicitly, we estimate it from duration and the
@@ -599,52 +771,22 @@ def generate_ring_tracks(
         log.warning("scenario_ring: using effective initial speed v0_kph=%.3f for track geometry", v_cur_kph)
 
     for i, seg in enumerate(segments):
-        seg_type = str(seg.get("drive_mode", "STRAIGHT")).upper()
+        motion = _segment_motion_contract(seg, v_cur_kph)
+        seg_type = str(motion["legacy_mode"]).upper()
         seg_len_m = float(seg.get("length_m", 0.0))
-        v_next_kph = v_cur_kph
+        v_next_kph = float(motion["speed_end_kph"])
         if seg_len_m <= 0.0:
             dur_s = float(seg.get("duration_s", 0.0))
             # Keep geometry stable even if duration is missing
             dur_s = max(dur_s, float(spec.get("dt_s", 0.01)))
 
-            if seg_type in ("ACCEL", "BRAKE"):
-                if "v_end_kph" in seg:
-                    v_end_kph = float(seg.get("v_end_kph", 0.0))
-                else:
-                    v_end_kph = v_cur_kph
-                    log.warning("scenario_ring: segment %s missing v_end_kph; using v0_kph=%.3f", seg_type, v_cur_kph)
-
-                if v_end_kph <= 0.0:
-                    v_end_kph = v_cur_kph
-                    log.warning("scenario_ring: segment %s has invalid v_end_kph<=0; using v0_kph=%.3f", seg_type, v_cur_kph)
-                v_avg_kph = 0.5 * (v_cur_kph + v_end_kph)
-                v = max(0.1, v_avg_kph / 3.6)
-                seg_len_m = max(dx_m, dur_s * v)
-                v_next_kph = v_end_kph
-            else:
-                if "speed_kph" in seg:
-                    sp_kph = float(seg.get("speed_kph", 0.0))
-                else:
-                    sp_kph = v_cur_kph
-                    if seg_type in ("STRAIGHT", "TURN_LEFT", "TURN_RIGHT"):
-                        log.warning("scenario_ring: segment %s missing speed_kph; using v0_kph=%.3f", seg_type, v_cur_kph)
-
-                if sp_kph <= 0.0:
-                    sp_kph = v_cur_kph
-                    log.warning("scenario_ring: segment %s has invalid speed_kph<=0; using v0_kph=%.3f", seg_type, v_cur_kph)
-                v = max(0.1, sp_kph / 3.6)
-                seg_len_m = max(dx_m, dur_s * v)
-                v_next_kph = sp_kph
+            v_avg_kph = 0.5 * (float(motion["speed_start_kph"]) + float(motion["speed_end_kph"]))
+            if not np.isfinite(v_avg_kph) or v_avg_kph <= 0.0:
+                v_avg_kph = max(float(v_cur_kph), float(motion["speed_end_kph"]))
+            v = max(0.1, v_avg_kph / 3.6)
+            seg_len_m = max(dx_m, dur_s * v)
         else:
-            # If length is given explicitly we still update the speed state when possible
-            if seg_type in ("ACCEL", "BRAKE"):
-                _v_end = float(seg.get("v_end_kph", 0.0))
-                if _v_end > 0.0:
-                    v_next_kph = _v_end
-            else:
-                _sp = float(seg.get("speed_kph", 0.0))
-                if _sp > 0.0:
-                    v_next_kph = _sp
+            v_next_kph = float(motion["speed_end_kph"])
 
         n = int(math.floor(seg_len_m / dx_m)) + 1
         x_local = np.linspace(0.0, seg_len_m, n)
@@ -801,7 +943,41 @@ def generate_ring_tracks(
             except Exception:
                 continue
 
-        if i == 0:
+        if use_road_state_contract:
+            road_state = _segment_road_state_mm(
+                spec,
+                segments,
+                i,
+                prev_end_center_mm=prev_end_center_mm,
+                prev_end_cross_pct=prev_end_cross_pct,
+                first_start_center_mm=first_start_center_mm,
+                first_start_cross_pct=first_start_cross_pct,
+            )
+            if i == 0:
+                first_start_center_mm = float(road_state["start_center_mm"])
+                first_start_cross_pct = float(road_state["start_cross_pct"])
+                road_state = _segment_road_state_mm(
+                    spec,
+                    segments,
+                    i,
+                    prev_end_center_mm=prev_end_center_mm,
+                    prev_end_cross_pct=prev_end_cross_pct,
+                    first_start_center_mm=first_start_center_mm,
+                    first_start_cross_pct=first_start_cross_pct,
+                )
+            left, right = _apply_segment_boundary_targets(
+                x_local,
+                left,
+                right,
+                track_m=track_m,
+                start_center_mm=float(road_state["start_center_mm"]),
+                end_center_mm=float(road_state["end_center_mm"]),
+                start_cross_pct=float(road_state["start_cross_pct"]),
+                end_cross_pct=float(road_state["end_cross_pct"]),
+            )
+            prev_end_center_mm = float(road_state["end_center_mm"])
+            prev_end_cross_pct = float(road_state["end_cross_pct"])
+        elif i == 0:
             # Preserve the requested absolute phase/offset of the very first segment.
             # Forcing z(0)=0 here distorts SINE amplitude whenever phase != 0 and was the
             # source of the apparent "A×2" bug in the ring preview/generator.
@@ -810,8 +986,9 @@ def generate_ring_tracks(
         else:
             dL = prev_end_L - float(left[0])
             dR = prev_end_R - float(right[0])
-        left = left + dL
-        right = right + dR
+        if not use_road_state_contract:
+            left = left + dL
+            right = right + dR
 
         x_global = x_local + x_offset
         if i > 0:
@@ -917,6 +1094,8 @@ def generate_ring_tracks(
         "right_spline": right_spline,
         "meta": {
             "dx_m": dx_m,
+            "track_m": track_m,
+            "road_state_contract": bool(use_road_state_contract),
             "L_total_m": L_total,
             "n_pts": int(len(x)),
             "closure_policy": closure_policy,
@@ -965,7 +1144,13 @@ def summarize_ring_track_segments(spec: Dict[str, Any], tracks: Dict[str, Any]) 
     x_cursor = float(x[0])
     tol = 1e-9
     v_cur_kph = float(spec.get("v0_kph", 0.0) or 0.0)
+    use_road_state_contract = _road_state_contract_enabled(spec)
+    first_start_center_mm = 0.0
+    first_start_cross_pct = 0.0
+    prev_end_center_mm = 0.0
+    prev_end_cross_pct = 0.0
     for i, seg in enumerate(segs):
+        motion = _segment_motion_contract(seg, v_cur_kph)
         length_m = _segment_length_canonical_m(
             v_cur_kph,
             seg,
@@ -1015,22 +1200,47 @@ def summarize_ring_track_segments(spec: Dict[str, Any], tracks: Dict[str, Any]) 
 
         st_l = _stats(zl)
         st_r = _stats(zr)
-        mode = str(seg.get("drive_mode", "STRAIGHT") or "STRAIGHT").upper()
-        if mode in ("ACCEL", "BRAKE"):
-            try:
-                v_cur_kph = float(seg.get("v_end_kph", v_cur_kph) or v_cur_kph)
-            except Exception:
-                pass
-        else:
-            try:
-                v_cur_kph = float(seg.get("speed_kph", v_cur_kph) or v_cur_kph)
-            except Exception:
-                pass
+        road_state = {
+            "start_center_mm": float("nan"),
+            "end_center_mm": float("nan"),
+            "start_cross_pct": float("nan"),
+            "end_cross_pct": float("nan"),
+        }
+        if use_road_state_contract:
+            road_state = _segment_road_state_mm(
+                spec,
+                segs,
+                i,
+                prev_end_center_mm=prev_end_center_mm,
+                prev_end_cross_pct=prev_end_cross_pct,
+                first_start_center_mm=first_start_center_mm,
+                first_start_cross_pct=first_start_cross_pct,
+            )
+            if i == 0:
+                first_start_center_mm = float(road_state["start_center_mm"])
+                first_start_cross_pct = float(road_state["start_cross_pct"])
+                road_state = _segment_road_state_mm(
+                    spec,
+                    segs,
+                    i,
+                    prev_end_center_mm=prev_end_center_mm,
+                    prev_end_cross_pct=prev_end_cross_pct,
+                    first_start_center_mm=first_start_center_mm,
+                    first_start_cross_pct=first_start_cross_pct,
+                )
+            prev_end_center_mm = float(road_state["end_center_mm"])
+            prev_end_cross_pct = float(road_state["end_cross_pct"])
+
+        v_cur_kph = float(motion["speed_end_kph"])
 
         out.append({
             "seg_idx": int(i + 1),
             "name": str(seg.get("name", f"S{i+1}")),
-            "drive_mode": str(seg.get("drive_mode", "STRAIGHT") or "STRAIGHT").upper(),
+            "drive_mode": str(motion["legacy_mode"]).upper(),
+            "turn_direction": str(motion["turn_direction"]).upper(),
+            "speed_start_kph": float(motion["speed_start_kph"]),
+            "speed_end_kph": float(motion["speed_end_kph"]),
+            "turn_radius_m": float(motion["turn_radius_m"]),
             "road_mode": road_mode,
             "x_start_m": x0,
             "x_end_m": x1,
@@ -1040,6 +1250,10 @@ def summarize_ring_track_segments(spec: Dict[str, Any], tracks: Dict[str, Any]) 
             "aR_req_mm": float(road.get("aR_mm", float("nan"))) if road_mode == "SINE" else float("nan"),
             "lambdaL_m": float(road.get("lambdaL_m", float("nan"))) if road_mode == "SINE" else float("nan"),
             "lambdaR_m": float(road.get("lambdaR_m", float("nan"))) if road_mode == "SINE" else float("nan"),
+            "center_height_start_mm": float(road_state["start_center_mm"]),
+            "center_height_end_mm": float(road_state["end_center_mm"]),
+            "cross_slope_start_pct": float(road_state["start_cross_pct"]),
+            "cross_slope_end_pct": float(road_state["end_cross_pct"]),
             **{f"L_{k}": v for k, v in st_l.items()},
             **{f"R_{k}": v for k, v in st_r.items()},
         })
@@ -1107,6 +1321,7 @@ def generate_ring_scenario_bundle(
         "seed": None if seed is None else int(seed),
         "v0_kph": float(_resolve_initial_speed_kph(spec)),
         "wheelbase_m": wheelbase_m,
+        "track_m": float(_resolve_track_m(spec)),
         "ring_length_m": L_total,
         "lap_time_s": float(drive["t_s"][-1]) / float(n_laps) if n_laps > 0 else float(drive["t_s"][-1]),
         "n_samples": int(len(t)),
@@ -1121,27 +1336,29 @@ def generate_ring_scenario_bundle(
     spec_to_save["schema_version"] = "ring_v2"
     spec_to_save["closure_policy"] = str(_resolve_closure_policy(spec))
     spec_to_save["v0_kph"] = float(_resolve_initial_speed_kph(spec))
+    spec_to_save["track_m"] = float(_resolve_track_m(spec))
     segs_to_save = []
     v_cur_save_kph = float(_resolve_initial_speed_kph(spec))
     for seg in list(spec.get("segments", []) or []):
         seg_saved = dict(seg)
+        motion_saved = _segment_motion_contract(seg_saved, v_cur_save_kph)
         seg_saved["length_m"] = _segment_length_canonical_m(
             v_cur_save_kph,
             seg_saved,
             fallback_dt_s=float(dt_s),
             dx_m=float(dx_m),
         )
-        mode_save = str(seg_saved.get("drive_mode", "STRAIGHT") or "STRAIGHT").upper()
-        if mode_save in ("ACCEL", "BRAKE"):
-            try:
-                v_cur_save_kph = float(seg_saved.get("v_end_kph", v_cur_save_kph) or v_cur_save_kph)
-            except Exception:
-                pass
+        seg_saved["drive_mode"] = str(motion_saved["legacy_mode"]).upper()
+        seg_saved["turn_direction"] = str(motion_saved["turn_direction"]).upper()
+        seg_saved["speed_start_kph"] = float(motion_saved["speed_start_kph"])
+        seg_saved["speed_end_kph"] = float(motion_saved["speed_end_kph"])
+        if seg_saved["drive_mode"] in ("TURN_LEFT", "TURN_RIGHT"):
+            seg_saved["speed_kph"] = float(motion_saved["speed_end_kph"])
+        elif seg_saved["drive_mode"] in ("ACCEL", "BRAKE"):
+            seg_saved["v_end_kph"] = float(motion_saved["speed_end_kph"])
         else:
-            try:
-                v_cur_save_kph = float(seg_saved.get("speed_kph", v_cur_save_kph) or v_cur_save_kph)
-            except Exception:
-                pass
+            seg_saved["speed_kph"] = float(motion_saved["speed_end_kph"])
+        v_cur_save_kph = float(motion_saved["speed_end_kph"])
         segs_to_save.append(seg_saved)
     spec_to_save["segments"] = segs_to_save
     spec_to_save["dt_s"] = float(dt_s)
@@ -1182,6 +1399,13 @@ def validate_ring_spec(spec: Dict[str, Any]) -> Dict[str, List[str]]:
     closure_policy = str(spec.get("closure_policy", "closed_c1_periodic") or "closed_c1_periodic").strip().lower()
     if closure_policy not in ("closed_c1_periodic", "strict_exact"):
         errors.append("closure_policy должен быть одним из 'closed_c1_periodic' или 'strict_exact'.")
+    if "track_m" in spec:
+        try:
+            track_m = float(spec.get("track_m", 1.0) or 1.0)
+        except Exception:
+            track_m = -1.0
+        if track_m <= 0.0:
+            errors.append("track_m должен быть > 0.")
 
     v0_eff_kph = _resolve_initial_speed_kph(spec)
     if not (float(spec.get("v0_kph", 0.0) or 0.0) > 0.0):
@@ -1191,13 +1415,16 @@ def validate_ring_spec(spec: Dict[str, Any]) -> Dict[str, List[str]]:
         dur = float(seg.get("duration_s", 0.0))
         if dur <= 0:
             errors.append(f"Сегмент {i}: длительность должна быть > 0.")
+        motion = _segment_motion_contract(seg, v0_eff_kph if i == 1 else 0.0)
         mode = str(seg.get("drive_mode", "STRAIGHT")).upper()
         if mode not in ("STRAIGHT", "TURN_LEFT", "TURN_RIGHT", "ACCEL", "BRAKE"):
             errors.append(
                 f"Сегмент {i}: неизвестный drive_mode={mode!r}. Допустимо: STRAIGHT, TURN_LEFT, TURN_RIGHT, ACCEL, BRAKE."
             )
             continue
-        if mode in ("TURN_LEFT", "TURN_RIGHT"):
+        if "turn_direction" in seg and str(seg.get("turn_direction", "") or "").upper() not in ("STRAIGHT", "LEFT", "RIGHT"):
+            errors.append(f"Сегмент {i}: turn_direction должен быть STRAIGHT, LEFT или RIGHT.")
+        if motion["turn_direction"] in ("LEFT", "RIGHT"):
             r = float(seg.get("turn_radius_m", 0.0))
             if r <= 0:
                 errors.append(f"Сегмент {i}: радиус поворота должен быть > 0.")
@@ -1216,6 +1443,24 @@ def validate_ring_spec(spec: Dict[str, Any]) -> Dict[str, List[str]]:
 
         road = dict(seg.get("road", {}))
         road_mode = str(road.get("mode", "ISO8608")).upper()
+        for state_key in ("center_height_start_mm", "center_height_end_mm"):
+            if state_key in road:
+                try:
+                    state_mm = float(road.get(state_key, 0.0))
+                except Exception:
+                    errors.append(f"Сегмент {i}: {state_key} должен быть числом.")
+                    continue
+                if abs(state_mm) > 2000.0:
+                    warns.append(f"Сегмент {i}: {state_key}={state_mm:.1f} мм выглядит подозрительно большим.")
+        for state_key in ("cross_slope_start_pct", "cross_slope_end_pct"):
+            if state_key in road:
+                try:
+                    slope_pct = float(road.get(state_key, 0.0))
+                except Exception:
+                    errors.append(f"Сегмент {i}: {state_key} должен быть числом.")
+                    continue
+                if abs(slope_pct) > 50.0:
+                    warns.append(f"Сегмент {i}: {state_key}={slope_pct:.2f}% выглядит подозрительно большим.")
         if road_mode == "SINE":
             for side_key in ("aL_mm", "aR_mm"):
                 if side_key in road:
@@ -1262,23 +1507,27 @@ def validate_ring_spec(spec: Dict[str, Any]) -> Dict[str, List[str]]:
     try:
         v_end_kph = float(v0_eff_kph)
         for seg in segs:
-            mode = str(seg.get("drive_mode", "STRAIGHT") or "STRAIGHT").upper()
-            if mode in ("ACCEL", "BRAKE"):
-                try:
-                    v_end_kph = float(seg.get("v_end_kph", v_end_kph) or v_end_kph)
-                except Exception:
-                    pass
-            else:
-                try:
-                    v_end_kph = float(seg.get("speed_kph", v_end_kph) or v_end_kph)
-                except Exception:
-                    pass
+            motion = _segment_motion_contract(seg, v_end_kph)
+            v_end_kph = float(motion["speed_end_kph"])
         if abs(float(v_end_kph) - float(v0_eff_kph)) > 0.5:
             warns.append(
                 f"Стык скорости кольца не замкнут: start={float(v0_eff_kph):.2f} км/ч, end={float(v_end_kph):.2f} км/ч. Для замкнутого кольца скорости начала и конца должны совпадать."
             )
     except Exception:
         pass
+
+    if _road_state_contract_enabled(spec):
+        try:
+            road0 = dict((segs[0] or {}).get("road", {}) or {})
+            start_center = float(road0.get("center_height_start_mm", 0.0) or 0.0)
+            start_cross = float(road0.get("cross_slope_start_pct", 0.0) or 0.0)
+            road_last = dict((segs[-1] or {}).get("road", {}) or {})
+            if "center_height_end_mm" in road_last and abs(float(road_last.get("center_height_end_mm", 0.0) or 0.0) - start_center) > 1e-9:
+                warns.append("Последний сегмент: center_height_end_mm отличается от начала первого сегмента; UI/генератор всё равно замкнёт кольцо по начальному состоянию.")
+            if "cross_slope_end_pct" in road_last and abs(float(road_last.get("cross_slope_end_pct", 0.0) or 0.0) - start_cross) > 1e-9:
+                warns.append("Последний сегмент: cross_slope_end_pct отличается от начала первого сегмента; UI/генератор всё равно замкнёт кольцо по начальному состоянию.")
+        except Exception:
+            pass
 
     has_pothole = False
     has_bump = False

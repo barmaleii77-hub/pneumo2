@@ -88,12 +88,19 @@ def test_export_anim_latest_pointer_contains_visual_reload_diagnostics(tmp_path:
 def test_pointer_status_sources_reference_visual_reload_fields() -> None:
     root = Path(__file__).resolve().parents[1]
     app_text = (root / "pneumo_solver_ui" / "app.py").read_text(encoding="utf-8")
+    run_artifacts_text = (root / "pneumo_solver_ui" / "run_artifacts.py").read_text(encoding="utf-8")
+    bundle_text = (root / "pneumo_solver_ui" / "npz_bundle.py").read_text(encoding="utf-8")
     page_text = (root / "pneumo_solver_ui" / "pages/08_DesktopAnimator.py").read_text(encoding="utf-8")
 
-    assert '"visual_cache_token"' in app_text
-    assert '"visual_cache_dependencies"' in app_text
-    assert '"visual_reload_inputs"' in app_text
+    assert "write_anim_latest_pointer_json_global(" in app_text
+    assert "write_anim_latest_pointer_json(" in bundle_text
+    assert '"visual_cache_token"' in run_artifacts_text
+    assert '"visual_cache_dependencies"' in run_artifacts_text
+    assert '"visual_reload_inputs"' in run_artifacts_text
+    assert "build_visual_reload_diagnostics(" in run_artifacts_text
 
     assert 'obj.get("visual_cache_token", "")' in page_text
     assert 'obj.get("visual_reload_inputs", [])' in page_text
     assert 'obj.get("visual_cache_dependencies", {})' in page_text
+    assert "local_anim_latest_export_paths(EXPORTS_DIR, ensure_exists=False)" in page_text
+    assert 'extract_anim_snapshot(raw_obj, source="desktop_animator_page")' in page_text

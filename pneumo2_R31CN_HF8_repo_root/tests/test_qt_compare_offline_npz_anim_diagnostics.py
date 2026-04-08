@@ -145,9 +145,12 @@ def test_inspect_npz_bundle_reports_anim_diagnostics(tmp_path: Path, monkeypatch
 
 def test_qt_compare_viewer_sources_reference_anim_diagnostics_panel() -> None:
     text = (ROOT / "pneumo_solver_ui" / "qt_compare_viewer.py").read_text(encoding="utf-8")
+    diag_text = (ROOT / "pneumo_solver_ui" / "npz_anim_diagnostics.py").read_text(encoding="utf-8")
 
     assert "format_anim_diagnostics_lines" in text
     assert "self.txt_anim_diag" in text
     assert "anim_diagnostics: Dict" in text
     assert "anim_diagnostics=dict(b.get('anim_diagnostics') or {})" in text
     assert "Road source:" in text
+    assert "workspace_autoload_pointer_candidates" in text
+    assert "nearest_anim_pointer_candidates" in diag_text

@@ -15,7 +15,8 @@ def test_pneumo_ui_app_embedded_animator_falls_back_to_anim_latest_npz_sidecar()
     src = (ROOT / 'pneumo_solver_ui' / 'pneumo_ui_app.py').read_text(encoding='utf-8')
     assert 'load_ring_spec_from_npz' in src
     assert "st.session_state.get('anim_latest_npz')" in src
-    assert "WORKSPACE_EXPORTS_DIR / 'anim_latest.npz'" in src
+    assert 'local_anim_latest_export_paths_global(' in src
+    assert '_npz_candidates.append(_anim_latest_npz_path)' in src
     assert 'load_ring_spec_from_npz(_npz_cand)' in src
 
 

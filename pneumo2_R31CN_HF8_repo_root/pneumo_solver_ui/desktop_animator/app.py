@@ -76,6 +76,7 @@ from pneumo_solver_ui.visual_contract import (
     collect_visual_cache_dependencies,
     visual_cache_dependencies_token,
 )
+from pneumo_solver_ui.desktop_animator.pointer_paths import default_anim_pointer_path
 from pneumo_solver_ui.desktop_animator.geometry_acceptance import (
     collect_acceptance_status,
     corner_acceptance_arrays,
@@ -10092,69 +10093,8 @@ def run_app(
 # ---------------------------------------------------------------------------
 
 def _default_pointer_path() -> Path:
-    """Locate default anim_latest.json pointer file (best-effort).
-
-    Priority:
-      1) canonical global pointer in current workspace (`workspace/_pointers/anim_latest.json`)
-      2) latest UI session workspace pointer/export inside `runs/ui_sessions/UI_*`
-      3) legacy project-local exports pointer paths
-
-    This avoids stale autoloads from old project workspaces when the current run
-    already mirrored anim_latest into a session workspace/global pointer.
-    """
-    candidates: list[Path] = []
-
-    try:
-        from pneumo_solver_ui.run_artifacts import latest_animation_ptr_path as _latest_animation_ptr_path
-        from pneumo_solver_ui.run_artifacts import _workspace_dir as _anim_workspace_dir
-
-        ws = Path(_anim_workspace_dir())
-        candidates.extend([
-            Path(_latest_animation_ptr_path()),
-            ws / "_pointers" / "anim_latest.json",
-            ws / "exports" / "anim_latest.json",
-        ])
-    except Exception:
-        pass
-
-    try:
-        ui_parent = PROJECT_ROOT / "runs" / "ui_sessions"
-        if ui_parent.exists():
-            ui_dirs = [p for p in ui_parent.iterdir() if p.is_dir() and p.name.startswith("UI_")]
-            ui_dirs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-            for ui_dir in ui_dirs[:5]:
-                ws = ui_dir / "workspace"
-                candidates.extend([
-                    ws / "_pointers" / "anim_latest.json",
-                    ws / "exports" / "anim_latest.json",
-                ])
-    except Exception:
-        pass
-
-    candidates.extend([
-        PROJECT_ROOT / "pneumo_solver_ui" / "workspace" / "_pointers" / "anim_latest.json",
-        PROJECT_ROOT / "workspace" / "_pointers" / "anim_latest.json",
-        PROJECT_ROOT / "pneumo_solver_ui" / "workspace" / "exports" / "anim_latest.json",
-        PROJECT_ROOT / "workspace" / "exports" / "anim_latest.json",
-        PROJECT_ROOT / "pneumo_solver_ui" / "workspace" / "anim_latest.json",
-    ])
-
-    seen: set[str] = set()
-    uniq: list[Path] = []
-    for p in candidates:
-        s = str(p)
-        if s in seen:
-            continue
-        seen.add(s)
-        uniq.append(p)
-
-    for p in uniq:
-        try:
-            if p.exists():
-                return p
-        except Exception:
-            continue
-    return uniq[0]
+    """Locate default anim_latest pointer file via the shared candidate chain."""
+    return default_anim_pointer_path(PROJECT_ROOT)
 
 
 def _parse_args(argv: Optional[list[str]] = None):

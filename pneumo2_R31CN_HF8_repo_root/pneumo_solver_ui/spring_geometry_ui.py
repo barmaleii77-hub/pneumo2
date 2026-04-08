@@ -27,6 +27,17 @@ from typing import Dict, Tuple
 
 import streamlit as st
 
+from .suspension_family_contract import (
+    FAMILY_ORDER,
+    SPRING_STATIC_MODE_AUTO_MIDSTROKE,
+    SPRING_STATIC_MODE_KEY,
+    SPRING_STATIC_MODE_MANUAL,
+    family_name,
+    normalize_spring_static_mode,
+    spring_family_key,
+    spring_static_mode_description,
+)
+
 
 def _spring_rate_N_per_m(G_Pa: float, d_wire_m: float, D_mean_m: float, N_active: float) -> float:
     """k = G d^4 / (8 D^3 N)"""
@@ -74,6 +85,55 @@ def _queue_overrides_si(overrides: Dict[str, float]) -> None:
     st.session_state["pending_overrides_si"] = bag
 
 
+def build_spring_family_overrides(
+    *,
+    target: str,
+    static_mode: str,
+    d_wire_m: float,
+    D_mean_m: float,
+    N_active: float,
+    N_total: float,
+    pitch_m: float,
+    G_Pa: float,
+    L_solid_m: float,
+    margin_bind_m: float,
+) -> Dict[str, float | str]:
+    mode = normalize_spring_static_mode(static_mode)
+    generic_overrides: Dict[str, float | str] = {
+        SPRING_STATIC_MODE_KEY: mode,
+        "пружина_геом_диаметр_проволоки_м": d_wire_m,
+        "пружина_геом_диаметр_средний_м": D_mean_m,
+        "пружина_геом_число_витков_активных": float(N_active),
+        "пружина_геом_число_витков_полное": float(N_total),
+        "пружина_геом_шаг_витка_м": pitch_m,
+        "пружина_геом_G_Па": float(G_Pa),
+        "пружина_длина_солид_м": float(L_solid_m) if math.isfinite(L_solid_m) else 0.0,
+        "пружина_запас_до_coil_bind_минимум_м": float(margin_bind_m),
+    }
+    suffix_map = {
+        "геом_диаметр_проволоки_м": d_wire_m,
+        "геом_диаметр_средний_м": D_mean_m,
+        "геом_число_витков_активных": float(N_active),
+        "геом_число_витков_полное": float(N_total),
+        "геом_шаг_витка_м": pitch_m,
+        "геом_G_Па": float(G_Pa),
+        "длина_солид_м": float(L_solid_m) if math.isfinite(L_solid_m) else 0.0,
+        "запас_до_coil_bind_минимум_м": float(margin_bind_m),
+    }
+    if str(target).strip() == "Все 4 семейства":
+        out = dict(generic_overrides)
+        for cyl, axle in FAMILY_ORDER:
+            for suffix, value in suffix_map.items():
+                out[spring_family_key(suffix, cyl, axle)] = value
+        return out
+
+    cyl, axle = str(target).split(" ", 1)
+    out = {SPRING_STATIC_MODE_KEY: mode}
+    for suffix, value in suffix_map.items():
+        out[spring_family_key(suffix, cyl, axle)] = value
+    return out
+
+
 def run() -> None:
     st.title("Пружины: геометрия / материал / coil-bind")
 
@@ -81,6 +141,38 @@ def run() -> None:
         "Эта страница нужна для инженерной увязки характеристики пружины с геометрией витков. "
         "Результат — параметры pruzhina_геом_* и корректная проверка coil-bind в модели/оптимизаторе."
     )
+    st.caption(
+        "Канонический режим проекта: пружины можно задавать отдельно для семейств "
+        "`Ц1 перед`, `Ц2 перед`, `Ц1 зад`, `Ц2 зад`, либо применить один набор ко всем четырём семействам."
+    )
+
+    top_a, top_b = st.columns([1.2, 1.8])
+    with top_a:
+        target = st.selectbox(
+            "Семейство пружины",
+            ["Все 4 семейства", *[family_name(cyl, axle) for cyl, axle in FAMILY_ORDER]],
+            index=0,
+            help=(
+                "По новому канону перед/зад и Ц1/Ц2 могут иметь разные пружины. "
+                "Если пока нужна прежняя схема, выберите «Все 4 семейства»."
+            ),
+        )
+    with top_b:
+        static_mode_ui = st.selectbox(
+            "Режим настройки в статике",
+            ["Авто: шток около середины хода", "Ручной: семейство задаёт инженер"],
+            index=0,
+            help=(
+                "Авто-режим нужен для концепции «машина стоит ровно, текущая масса, поршни примерно в середине хода». "
+                "Ручной режим сохраняет геометрию как задано пользователем."
+            ),
+        )
+        static_mode = (
+            SPRING_STATIC_MODE_AUTO_MIDSTROKE
+            if static_mode_ui.startswith("Авто")
+            else SPRING_STATIC_MODE_MANUAL
+        )
+        st.caption(spring_static_mode_description(static_mode))
 
     # --- Inputs ---
     col1, col2, col3 = st.columns([1, 1, 1])
@@ -160,23 +252,33 @@ def run() -> None:
 
     st.subheader("Применение к базе")
 
-    overrides = {
-        "пружина_геом_диаметр_проволоки_м": d_wire_m,
-        "пружина_геом_диаметр_средний_м": D_mean_m,
-        "пружина_геом_число_витков_активных": float(N_active),
-        "пружина_геом_число_витков_полное": float(N_total),
-        "пружина_геом_шаг_витка_м": pitch_m,
-        "пружина_геом_G_Па": float(G_Pa),
-        "пружина_длина_солид_м": float(L_solid) if math.isfinite(L_solid) else 0.0,
-        "пружина_запас_до_coil_bind_минимум_м": float(margin_bind_mm) / 1000.0,
-    }
+    overrides = build_spring_family_overrides(
+        target=target,
+        static_mode=static_mode,
+        d_wire_m=d_wire_m,
+        D_mean_m=D_mean_m,
+        N_active=float(N_active),
+        N_total=float(N_total),
+        pitch_m=pitch_m,
+        G_Pa=float(G_Pa),
+        L_solid_m=float(L_solid) if math.isfinite(L_solid) else 0.0,
+        margin_bind_m=float(margin_bind_mm) / 1000.0,
+    )
 
     st.json(overrides)
 
     if st.button("Сохранить overrides (pending)", type="primary"):
-        _queue_overrides_si(overrides)
+        numeric_overrides = {
+            str(k): float(v)
+            for k, v in overrides.items()
+            if not isinstance(v, str)
+        }
+        _queue_overrides_si(numeric_overrides)
+        st.session_state[SPRING_STATIC_MODE_KEY] = str(overrides.get(SPRING_STATIC_MODE_KEY) or static_mode)
+        st.session_state[f"mode__{SPRING_STATIC_MODE_KEY}"] = str(overrides.get(SPRING_STATIC_MODE_KEY) or static_mode)
         st.success(
-            "Overrides сохранены. Откройте главную страницу 'Расчёт' — они применятся автоматически."
+            "Overrides сохранены. Числовые параметры попадут в pending_overrides, "
+            "а режим статики сохранён в session_state и в строковом editor-state главной страницы."
         )
 
     st.caption(

@@ -55,6 +55,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from .tools.send_bundle_contract import (
+    ANIM_LATEST_INDEX_FIELDS,
+    ANIM_LATEST_REGISTRY_EVENT_FIELDS,
+    pick_anim_latest_fields,
+)
+
 try:
     from pneumo_solver_ui.release_info import get_release
     RELEASE = get_release()
@@ -211,17 +217,13 @@ def _event_summary(rec: Dict[str, Any]) -> Dict[str, Any]:
         "sha256",
         "validation_ok",
         "dashboard_created",
-        "anim_latest_visual_cache_token",
-        "anim_latest_visual_reload_inputs",
-        "anim_latest_updated_utc",
-        "anim_latest_pointer_json",
-        "anim_latest_npz_path",
     ]
     out: Dict[str, Any] = {}
     for k in keep:
         v = rec.get(k)
         if v is not None:
             out[k] = v
+    out.update(pick_anim_latest_fields(rec, fields=ANIM_LATEST_INDEX_FIELDS))
     return out
 
 
@@ -381,24 +383,26 @@ def log_send_bundle_created(
             rec["validation_errors"] = int(validation_errors)
         if validation_warnings is not None:
             rec["validation_warnings"] = int(validation_warnings)
-        if anim_latest_available is not None:
-            rec["anim_latest_available"] = bool(anim_latest_available)
-        if anim_latest_global_pointer_json is not None:
-            rec["anim_latest_global_pointer_json"] = str(anim_latest_global_pointer_json)
-        if anim_latest_pointer_json is not None:
-            rec["anim_latest_pointer_json"] = str(anim_latest_pointer_json)
-        if anim_latest_npz_path is not None:
-            rec["anim_latest_npz_path"] = str(anim_latest_npz_path)
-        if anim_latest_visual_cache_token is not None:
-            rec["anim_latest_visual_cache_token"] = str(anim_latest_visual_cache_token)
-        if anim_latest_visual_reload_inputs is not None:
-            rec["anim_latest_visual_reload_inputs"] = list(anim_latest_visual_reload_inputs)
-        if anim_latest_visual_cache_dependencies is not None:
-            rec["anim_latest_visual_cache_dependencies"] = dict(anim_latest_visual_cache_dependencies)
-        if anim_latest_updated_utc is not None:
-            rec["anim_latest_updated_utc"] = str(anim_latest_updated_utc)
+        rec.update(
+            pick_anim_latest_fields(
+                {
+                    "anim_latest_available": bool(anim_latest_available) if anim_latest_available is not None else None,
+                    "anim_latest_global_pointer_json": str(anim_latest_global_pointer_json) if anim_latest_global_pointer_json is not None else None,
+                    "anim_latest_pointer_json": str(anim_latest_pointer_json) if anim_latest_pointer_json is not None else None,
+                    "anim_latest_npz_path": str(anim_latest_npz_path) if anim_latest_npz_path is not None else None,
+                    "anim_latest_visual_cache_token": str(anim_latest_visual_cache_token) if anim_latest_visual_cache_token is not None else None,
+                    "anim_latest_visual_reload_inputs": list(anim_latest_visual_reload_inputs) if anim_latest_visual_reload_inputs is not None else None,
+                    "anim_latest_visual_cache_dependencies": dict(anim_latest_visual_cache_dependencies) if anim_latest_visual_cache_dependencies is not None else None,
+                    "anim_latest_updated_utc": str(anim_latest_updated_utc) if anim_latest_updated_utc is not None else None,
+                },
+                fields=ANIM_LATEST_REGISTRY_EVENT_FIELDS,
+            )
+        )
         if extra:
-            rec.update({str(k): v for k, v in extra.items() if v is not None})
+            anim_extra = pick_anim_latest_fields(extra, fields=ANIM_LATEST_REGISTRY_EVENT_FIELDS)
+            if anim_extra:
+                rec.update(anim_extra)
+            rec.update({str(k): v for k, v in extra.items() if v is not None and str(k) not in anim_extra})
         append_event(rec)
     except Exception:
         return

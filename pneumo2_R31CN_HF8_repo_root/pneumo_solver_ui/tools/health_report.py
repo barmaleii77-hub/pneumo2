@@ -24,10 +24,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-
-ANIM_LOCAL_POINTER = "workspace/exports/anim_latest.json"
-ANIM_LOCAL_NPZ = "workspace/exports/anim_latest.npz"
-ANIM_GLOBAL_POINTER = "workspace/_pointers/anim_latest.json"
+from .send_bundle_contract import (
+    ANIM_DIAG_JSON,
+    ANIM_GLOBAL_POINTER,
+    ANIM_LOCAL_NPZ,
+    ANIM_LOCAL_POINTER,
+    annotate_anim_source_for_bundle,
+    choose_anim_snapshot,
+    extract_anim_snapshot,
+)
 
 
 @dataclass
@@ -56,20 +61,6 @@ def _read_json_from_zip(z: zipfile.ZipFile, name: str) -> Optional[Dict[str, Any
 
 def _glob_zip_names(names: List[str], suffix: str) -> List[str]:
     return [n for n in names if n.endswith(suffix)]
-
-
-def _normalize_reload_inputs(value: Any) -> List[str]:
-    if value is None:
-        return []
-    if isinstance(value, (list, tuple, set)):
-        out: List[str] = []
-        for x in value:
-            sx = str(x).strip()
-            if sx:
-                out.append(sx)
-        return out
-    sx = str(value).strip()
-    return [sx] if sx else []
 
 
 
@@ -116,161 +107,6 @@ def _format_geometry_acceptance_summary_lines_best_effort(geom: Dict[str, Any]) 
         return [f"- gate: {gate}", f"- reason: {reason}"]
 
 
-def _basename_or_empty(value: Any) -> str:
-    if value in (None, ""):
-        return ""
-    try:
-        return Path(str(value)).name
-    except Exception:
-        return ""
-
-
-def _annotate_anim_source_for_bundle(state: Optional[Dict[str, Any]], *, name_set: set[str]) -> Optional[Dict[str, Any]]:
-    if not isinstance(state, dict):
-        return None
-    out = dict(state)
-    pointer_json = str(out.get("pointer_json") or "")
-    npz_path = str(out.get("npz_path") or "")
-    pointer_in_bundle = bool(pointer_json and ANIM_LOCAL_POINTER in name_set and _basename_or_empty(pointer_json) == Path(ANIM_LOCAL_POINTER).name)
-    npz_in_bundle = bool(npz_path and ANIM_LOCAL_NPZ in name_set and _basename_or_empty(npz_path) == Path(ANIM_LOCAL_NPZ).name)
-    out["pointer_json_in_bundle"] = pointer_in_bundle if pointer_json else None
-    out["npz_path_in_bundle"] = npz_in_bundle if npz_path else None
-    out["usable_from_bundle"] = bool(out.get("visual_cache_token") and npz_in_bundle)
-    issues = [str(x) for x in (out.get("issues") or []) if str(x).strip()]
-    src = str(out.get("source") or "source")
-    if pointer_json and not pointer_in_bundle:
-        issues.append(f"anim_latest {src} pointer_json is external / not mirrored in bundle: {pointer_json}")
-    if npz_path and not npz_in_bundle:
-        issues.append(f"anim_latest {src} npz_path is external / not mirrored in bundle: {npz_path}")
-    if (out.get("available") or out.get("visual_cache_token")) and not out["usable_from_bundle"]:
-        issues.append(f"anim_latest {src} is not usable from this bundle")
-    out["issues"] = list(dict.fromkeys(issues))
-    return out
-
-
-def _extract_anim_snapshot(obj: Any, *, source: str) -> Optional[Dict[str, Any]]:
-    if not isinstance(obj, dict):
-        return None
-
-    available = bool(
-        obj.get("anim_latest_available")
-        if "anim_latest_available" in obj
-        else (
-            obj.get("available")
-            or obj.get("pointer_json")
-            or obj.get("anim_latest_json")
-            or obj.get("npz_path")
-            or obj.get("anim_latest_npz")
-            or obj.get("kind") == "anim_latest"
-        )
-    )
-
-    meta_obj = obj.get("anim_latest_meta") if isinstance(obj.get("anim_latest_meta"), dict) else obj.get("meta")
-    deps_obj = (
-        obj.get("anim_latest_visual_cache_dependencies")
-        if isinstance(obj.get("anim_latest_visual_cache_dependencies"), dict)
-        else obj.get("visual_cache_dependencies")
-    )
-
-    return {
-        "source": str(source),
-        "available": available,
-        "pointer_json": str(obj.get("anim_latest_pointer_json") or obj.get("pointer_json") or obj.get("anim_latest_json") or ""),
-        "global_pointer_json": str(obj.get("anim_latest_global_pointer_json") or obj.get("global_pointer_json") or ""),
-        "npz_path": str(obj.get("anim_latest_npz_path") or obj.get("npz_path") or obj.get("anim_latest_npz") or ""),
-        "visual_cache_token": str(obj.get("anim_latest_visual_cache_token") or obj.get("visual_cache_token") or ""),
-        "visual_reload_inputs": _normalize_reload_inputs(
-            obj.get("anim_latest_visual_reload_inputs") if "anim_latest_visual_reload_inputs" in obj else obj.get("visual_reload_inputs")
-        ),
-        "visual_cache_dependencies": dict(deps_obj or {}) if isinstance(deps_obj, dict) else {},
-        "updated_utc": str(obj.get("anim_latest_updated_utc") or obj.get("updated_utc") or obj.get("updated_at") or ""),
-        "meta": dict(meta_obj or {}) if isinstance(meta_obj, dict) else {},
-        "pointer_sync_ok": obj.get("pointer_sync_ok"),
-        "reload_inputs_sync_ok": obj.get("reload_inputs_sync_ok"),
-        "npz_path_sync_ok": obj.get("npz_path_sync_ok"),
-        "usable_from_bundle": obj.get("usable_from_bundle") if "usable_from_bundle" in obj else obj.get("anim_latest_usable"),
-        "pointer_json_in_bundle": obj.get("pointer_json_in_bundle"),
-        "npz_path_in_bundle": obj.get("npz_path_in_bundle"),
-        "issues": list(obj.get("issues") or obj.get("anim_latest_issues") or []) if isinstance(obj.get("issues") or obj.get("anim_latest_issues") or [], list) else [],
-    }
-
-
-def _choose_anim_snapshot(sources: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
-    if not sources:
-        return {
-            "available": False,
-            "visual_cache_token": "",
-            "visual_reload_inputs": [],
-            "pointer_json": "",
-            "global_pointer_json": "",
-            "npz_path": "",
-            "updated_utc": "",
-            "pointer_sync_ok": None,
-            "reload_inputs_sync_ok": None,
-            "npz_path_sync_ok": None,
-            "usable_from_bundle": None,
-            "pointer_json_in_bundle": None,
-            "npz_path_in_bundle": None,
-            "issues": [],
-            "source": "",
-            "sources_present": [],
-            "sources": {},
-        }
-
-    for key in ("validation", "diagnostics", "local_pointer", "global_pointer", "dashboard"):
-        snap = sources.get(key)
-        if isinstance(snap, dict) and (snap.get("visual_cache_token") or snap.get("available")):
-            chosen = dict(snap)
-            chosen["source"] = key
-            break
-    else:
-        first_key = next(iter(sources.keys()))
-        chosen = dict(sources[first_key])
-        chosen["source"] = first_key
-
-    chosen["sources_present"] = list(sources.keys())
-    chosen["sources"] = {k: dict(v) for k, v in sources.items()}
-
-    issues: List[str] = []
-    token_map = {k: str(v.get("visual_cache_token") or "") for k, v in sources.items() if str(v.get("visual_cache_token") or "")}
-    reload_map = {
-        k: tuple(_normalize_reload_inputs(v.get("visual_reload_inputs")))
-        for k, v in sources.items()
-        if _normalize_reload_inputs(v.get("visual_reload_inputs"))
-    }
-    npz_map = {k: str(v.get("npz_path") or "") for k, v in sources.items() if str(v.get("npz_path") or "")}
-
-    if len(set(token_map.values())) > 1:
-        parts = ", ".join(f"{k}={v}" for k, v in token_map.items())
-        issues.append(f"anim_latest visual_cache_token mismatch between sources: {parts}")
-    if len(set(reload_map.values())) > 1:
-        parts = ", ".join(f"{k}={list(v)}" for k, v in reload_map.items())
-        issues.append(f"anim_latest visual_reload_inputs mismatch between sources: {parts}")
-    if len(set(npz_map.values())) > 1:
-        parts = ", ".join(f"{k}={v}" for k, v in npz_map.items())
-        issues.append(f"anim_latest npz_path mismatch between sources: {parts}")
-
-    for snap in sources.values():
-        for msg in list(snap.get("issues") or []):
-            smsg = str(msg).strip()
-            if smsg and smsg not in issues:
-                issues.append(smsg)
-
-    if chosen.get("available") and not str(chosen.get("visual_cache_token") or ""):
-        issues.append("anim_latest is marked available but visual_cache_token is empty")
-    if chosen.get("available") and chosen.get("usable_from_bundle") is False:
-        issues.append("anim_latest diagnostics exist but are not reproducible from this bundle")
-
-    chosen["issues"] = list(dict.fromkeys(issues))
-    if chosen.get("pointer_sync_ok") is None:
-        chosen["pointer_sync_ok"] = None if len(token_map) <= 1 else (len(set(token_map.values())) == 1)
-    if chosen.get("reload_inputs_sync_ok") is None:
-        chosen["reload_inputs_sync_ok"] = None if len(reload_map) <= 1 else (len(set(reload_map.values())) == 1)
-    if chosen.get("npz_path_sync_ok") is None:
-        chosen["npz_path_sync_ok"] = None if len(npz_map) <= 1 else (len(set(npz_map.values())) == 1)
-    return chosen
-
-
 def collect_health_report(zip_path: Path) -> HealthReport:
     zip_path = Path(zip_path).resolve()
     created_at = _now_iso()
@@ -287,7 +123,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 "validation_report": "validation/validation_report.json" in name_set,
                 "dashboard_report": "dashboard/dashboard.json" in name_set,
                 "triage_report": "triage/triage_report.json" in name_set or "triage/triage_report.md" in name_set,
-                "anim_diagnostics": "triage/latest_anim_pointer_diagnostics.json" in name_set,
+                "anim_diagnostics": ANIM_DIAG_JSON in name_set,
                 "health_report_embedded": "health/health_report.json" in name_set or "health/health_report.md" in name_set,
             }
 
@@ -314,8 +150,8 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 }
                 if not bool(val.get("ok", False)):
                     ok = False
-                anim_snap = _annotate_anim_source_for_bundle(
-                    _extract_anim_snapshot(val.get("anim_latest"), source="validation"),
+                anim_snap = annotate_anim_source_for_bundle(
+                    extract_anim_snapshot(val.get("anim_latest"), source="validation"),
                     name_set=name_set,
                 )
                 if anim_snap is not None:
@@ -353,17 +189,17 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     "warnings": list(dash.get("warnings") or [])[:10],
                     "errors": list(dash.get("errors") or [])[:10],
                 }
-                anim_snap = _annotate_anim_source_for_bundle(
-                    _extract_anim_snapshot(dash.get("anim_latest"), source="dashboard"),
+                anim_snap = annotate_anim_source_for_bundle(
+                    extract_anim_snapshot(dash.get("anim_latest"), source="dashboard"),
                     name_set=name_set,
                 )
                 if anim_snap is not None:
                     anim_sources["dashboard"] = anim_snap
 
-            diag = _read_json_from_zip(z, "triage/latest_anim_pointer_diagnostics.json")
+            diag = _read_json_from_zip(z, ANIM_DIAG_JSON)
             if diag is not None:
-                anim_snap = _annotate_anim_source_for_bundle(
-                    _extract_anim_snapshot(diag, source="diagnostics"),
+                anim_snap = annotate_anim_source_for_bundle(
+                    extract_anim_snapshot(diag, source="diagnostics"),
                     name_set=name_set,
                 )
                 if anim_snap is not None:
@@ -371,8 +207,8 @@ def collect_health_report(zip_path: Path) -> HealthReport:
 
             local_ptr = _read_json_from_zip(z, ANIM_LOCAL_POINTER)
             if local_ptr is not None:
-                anim_snap = _annotate_anim_source_for_bundle(
-                    _extract_anim_snapshot(local_ptr, source="local_pointer"),
+                anim_snap = annotate_anim_source_for_bundle(
+                    extract_anim_snapshot(local_ptr, source="local_pointer"),
                     name_set=name_set,
                 )
                 if anim_snap is not None:
@@ -380,8 +216,8 @@ def collect_health_report(zip_path: Path) -> HealthReport:
 
             global_ptr = _read_json_from_zip(z, ANIM_GLOBAL_POINTER)
             if global_ptr is not None:
-                anim_snap = _annotate_anim_source_for_bundle(
-                    _extract_anim_snapshot(global_ptr, source="global_pointer"),
+                anim_snap = annotate_anim_source_for_bundle(
+                    extract_anim_snapshot(global_ptr, source="global_pointer"),
                     name_set=name_set,
                 )
                 if anim_snap is not None:
@@ -412,7 +248,10 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     if worst.get("total_errors", 0) > 0:
                         ok = False
 
-            anim_summary = _choose_anim_snapshot(anim_sources)
+            anim_summary = choose_anim_snapshot(
+                anim_sources,
+                preferred_order=("validation", "diagnostics", "local_pointer", "global_pointer", "dashboard"),
+            )
             if ANIM_LOCAL_NPZ in name_set:
                 try:
                     with z.open(ANIM_LOCAL_NPZ, "r") as f:

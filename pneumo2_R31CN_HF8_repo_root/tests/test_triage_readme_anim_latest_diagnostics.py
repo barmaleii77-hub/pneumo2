@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from pneumo_solver_ui.tools.make_send_bundle import _build_send_bundle_readme
+from pneumo_solver_ui.tools.send_bundle_contract import ANIM_DIAG_JSON, ANIM_DIAG_MD, ANIM_DIAG_SIDECAR_JSON, ANIM_DIAG_SIDECAR_MD
 from pneumo_solver_ui.tools.triage_report import generate_triage_report
 
 
@@ -37,11 +39,11 @@ def test_generate_triage_report_exposes_anim_latest_diagnostics_from_sidecar(tmp
     sb_root = tmp_path / "send_bundles"
     sb_root.mkdir(parents=True, exist_ok=True)
     diag = _make_anim_diag(token="tok-triage")
-    (sb_root / "latest_anim_pointer_diagnostics.json").write_text(
+    (sb_root / ANIM_DIAG_SIDECAR_JSON).write_text(
         json.dumps(diag, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    (sb_root / "latest_anim_pointer_diagnostics.md").write_text(
+    (sb_root / ANIM_DIAG_SIDECAR_MD).write_text(
         "# Anim latest diagnostics\n\n- token: tok-triage\n",
         encoding="utf-8",
     )
@@ -54,8 +56,8 @@ def test_generate_triage_report_exposes_anim_latest_diagnostics_from_sidecar(tmp
     assert anim["anim_latest_available"] is True
     assert anim["anim_latest_visual_cache_token"] == "tok-triage"
     assert anim["anim_latest_visual_reload_inputs"] == ["npz", "road_csv"]
-    assert paths["latest_anim_pointer_diagnostics_json"] == str((sb_root / "latest_anim_pointer_diagnostics.json").resolve())
-    assert paths["latest_anim_pointer_diagnostics_md"] == str((sb_root / "latest_anim_pointer_diagnostics.md").resolve())
+    assert os.path.normcase(paths["latest_anim_pointer_diagnostics_json"]) == os.path.normcase(str((sb_root / ANIM_DIAG_SIDECAR_JSON).resolve()))
+    assert os.path.normcase(paths["latest_anim_pointer_diagnostics_md"]) == os.path.normcase(str((sb_root / ANIM_DIAG_SIDECAR_MD).resolve()))
     assert "## Anim latest diagnostics" in md
     assert "tok-triage" in md
     assert "npz, road_csv" in md
@@ -72,8 +74,8 @@ def test_build_send_bundle_readme_includes_anim_latest_token_and_reload_inputs()
     assert "anim_latest_visual_cache_token: tok-readme" in text
     assert "anim_latest_visual_reload_inputs: npz, road_csv" in text
     assert "anim_latest_global_pointer_json: /abs/workspace/_pointers/anim_latest.json" in text
-    assert "triage/latest_anim_pointer_diagnostics.json" in text
-    assert "triage/latest_anim_pointer_diagnostics.md" in text
+    assert ANIM_DIAG_JSON in text
+    assert ANIM_DIAG_MD in text
 
 
 
@@ -84,9 +86,11 @@ def test_sources_wire_anim_latest_diagnostics_into_triage_and_readme() -> None:
     assert '_load_anim_latest_summary' in triage_text
     assert '"anim_latest": anim_summary' in triage_text
     assert '## Anim latest diagnostics' in triage_text
-    assert 'Latest anim diagnostics json' in triage_text
+    assert 'ANIM_DIAG_SIDECAR_JSON' in triage_text
+    assert 'ANIM_DIAG_SIDECAR_MD' in triage_text
 
     assert '_build_send_bundle_readme' in bundle_text
     assert 'anim_latest_visual_cache_token' in bundle_text
-    assert 'triage/latest_anim_pointer_diagnostics.json' in bundle_text
+    assert 'ANIM_DIAG_JSON' in bundle_text
+    assert 'ANIM_DIAG_MD' in bundle_text
     assert 'readme = _build_send_bundle_readme(anim_diag_event)' in bundle_text

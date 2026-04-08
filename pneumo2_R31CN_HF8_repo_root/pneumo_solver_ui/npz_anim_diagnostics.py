@@ -4,6 +4,13 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
+from pneumo_solver_ui.desktop_animator.pointer_paths import nearest_anim_pointer_candidates
+from pneumo_solver_ui.tools.send_bundle_contract import (
+    ANIM_DIAG_JSON,
+    choose_anim_snapshot,
+    extract_anim_snapshot,
+    normalize_reload_inputs,
+)
 from pneumo_solver_ui.visual_contract import build_visual_reload_diagnostics
 
 LogFn = Callable[[str], None]
@@ -30,25 +37,15 @@ def _read_json(path: Path | None) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _normalize_reload_inputs(raw: Any) -> List[str]:
-    if raw in (None, ""):
-        return []
-    if isinstance(raw, (list, tuple, set)):
-        out: List[str] = []
-        for item in raw:
-            s = str(item).strip()
-            if s and s not in out:
-                out.append(s)
-        return out
-    s = str(raw).strip()
-    return [s] if s else []
-
-
 def _short_token(token: str, n: int = 12) -> str:
     token = str(token or '').strip()
     if not token:
         return '—'
     return token[:n] + ('…' if len(token) > n else '')
+
+
+def _normalize_pointer_inputs(raw: Any) -> List[str]:
+    return list(dict.fromkeys(normalize_reload_inputs(raw)))
 
 
 def _norm_path(s: Any) -> str:
@@ -64,31 +61,11 @@ def _same_path(a: Any, b: Any) -> bool | None:
     return aa == bb
 
 
-def _search_workspace_global_pointer(npz_path: Path) -> Path | None:
-    # Prefer the nearest explicit workspace ancestor.
-    for anc in [npz_path.parent, *npz_path.parents]:
-        try:
-            if anc.name == 'workspace':
-                cand = anc / '_pointers' / 'anim_latest.json'
-                if cand.exists():
-                    return cand.resolve()
-        except Exception:
-            continue
-    # Fallback: common extracted layouts may have workspace as a child.
-    for anc in [npz_path.parent, *npz_path.parents]:
-        try:
-            cand = anc / 'workspace' / '_pointers' / 'anim_latest.json'
-            if cand.exists():
-                return cand.resolve()
-        except Exception:
-            continue
-    return None
-
-
 def _search_triage_sidecar(npz_path: Path) -> Path | None:
+    sidecar_parts = Path(ANIM_DIAG_JSON).parts
     for anc in [npz_path.parent, *npz_path.parents]:
         try:
-            cand = anc / 'triage' / 'latest_anim_pointer_diagnostics.json'
+            cand = anc.joinpath(*sidecar_parts)
             if cand.exists():
                 return cand.resolve()
         except Exception:
@@ -96,39 +73,20 @@ def _search_triage_sidecar(npz_path: Path) -> Path | None:
     return None
 
 
-def _extract_snapshot(
+def _extract_pointer_snapshot(
     obj: Mapping[str, Any],
     *,
     source: str,
     path: Path | None = None,
     global_pointer: Path | None = None,
 ) -> Dict[str, Any]:
-    raw = dict(obj or {})
-    is_flat = any(str(k).startswith('anim_latest_') for k in raw.keys())
-    src = raw
-    available = bool(raw.get('anim_latest_available') if is_flat else raw.get('available'))
-
-    snap: Dict[str, Any] = {
-        'source': str(source),
-        'available': bool(
-            available
-            or raw.get('pointer_json')
-            or raw.get('anim_latest_pointer_json')
-            or raw.get('npz_path')
-            or raw.get('anim_latest_npz_path')
-            or raw.get('visual_cache_token')
-            or raw.get('anim_latest_visual_cache_token')
-        ),
-        'pointer_json': str(raw.get('anim_latest_pointer_json') if is_flat else raw.get('pointer_json') or (str(path) if path else '')),
-        'global_pointer_json': str(raw.get('anim_latest_global_pointer_json') if is_flat else raw.get('global_pointer_json') or (str(global_pointer) if global_pointer else '')),
-        'npz_path': str(raw.get('anim_latest_npz_path') if is_flat else raw.get('npz_path') or ''),
-        'visual_cache_token': str(raw.get('anim_latest_visual_cache_token') if is_flat else raw.get('visual_cache_token') or ''),
-        'visual_reload_inputs': _normalize_reload_inputs(raw.get('anim_latest_visual_reload_inputs') if is_flat else raw.get('visual_reload_inputs')),
-        'visual_cache_dependencies': dict(raw.get('anim_latest_visual_cache_dependencies') if is_flat else raw.get('visual_cache_dependencies') or {}),
-        'updated_utc': str(raw.get('anim_latest_updated_utc') if is_flat else raw.get('updated_utc') or raw.get('updated_at') or ''),
-        'meta': dict(raw.get('anim_latest_meta') if is_flat else raw.get('meta') or {}),
-        'issues': [str(x) for x in list(raw.get('issues') or []) if str(x).strip()],
-    }
+    snap = dict(extract_anim_snapshot(dict(obj or {}), source=source) or {})
+    snap['visual_reload_inputs'] = _normalize_pointer_inputs(snap.get('visual_reload_inputs'))
+    if path is not None and not str(snap.get('pointer_json') or '').strip():
+        snap['pointer_json'] = str(path)
+    if global_pointer is not None and not str(snap.get('global_pointer_json') or '').strip():
+        snap['global_pointer_json'] = str(global_pointer)
+    snap['issues'] = [str(x) for x in list(snap.get('issues') or []) if str(x).strip()]
     return snap
 
 
@@ -148,16 +106,20 @@ def collect_npz_anim_diagnostics(
         log=log,
     )
     bundle_token = str(bundle_diag.get('visual_cache_token') or '')
-    bundle_inputs = _normalize_reload_inputs(bundle_diag.get('inputs'))
+    bundle_inputs = _normalize_pointer_inputs(bundle_diag.get('inputs'))
     bundle_deps = dict(bundle_diag.get('visual_cache_dependencies') or {})
 
-    local_pointer = p.with_name('anim_latest.json') if p.name.lower() == 'anim_latest.npz' else None
-    if local_pointer is not None:
+    local_pointer: Path | None = None
+    global_pointer: Path | None = None
+    for cand in nearest_anim_pointer_candidates(p):
         try:
-            local_pointer = local_pointer.resolve()
+            cand = cand.resolve()
         except Exception:
-            local_pointer = local_pointer
-    global_pointer = _search_workspace_global_pointer(p)
+            cand = cand
+        if cand.parent.name == 'exports' and local_pointer is None:
+            local_pointer = cand
+        elif cand.parent.name == '_pointers' and global_pointer is None:
+            global_pointer = cand
     triage_sidecar = _search_triage_sidecar(p)
 
     sources: Dict[str, Dict[str, Any]] = {}
@@ -168,32 +130,26 @@ def collect_npz_anim_diagnostics(
     ):
         obj = _read_json(src_path)
         if isinstance(obj, dict):
-            snap = _extract_snapshot(obj, source=key, path=src_path, global_pointer=global_pointer)
+            snap = _extract_pointer_snapshot(obj, source=key, path=src_path, global_pointer=global_pointer)
             if key == 'global_pointer':
                 snap['global_pointer_json'] = str(src_path)
             if key == 'triage_diagnostics':
                 snap['triage_json'] = str(src_path)
             sources[key] = snap
 
-    pointer_snap: Dict[str, Any] = {}
-    for key in ('local_pointer', 'global_pointer', 'triage_diagnostics'):
-        snap = sources.get(key)
-        if isinstance(snap, dict) and (snap.get('visual_cache_token') or snap.get('available')):
-            pointer_snap = dict(snap)
-            break
-
-    token_map = {k: str(v.get('visual_cache_token') or '') for k, v in sources.items() if str(v.get('visual_cache_token') or '')}
-    reload_map = {k: tuple(_normalize_reload_inputs(v.get('visual_reload_inputs'))) for k, v in sources.items() if _normalize_reload_inputs(v.get('visual_reload_inputs'))}
-    npz_map = {k: str(v.get('npz_path') or '') for k, v in sources.items() if str(v.get('npz_path') or '')}
+    pointer_snap = choose_anim_snapshot(
+        sources,
+        preferred_order=('local_pointer', 'global_pointer', 'triage_diagnostics'),
+    )
 
     issues: List[str] = []
     if not sources:
         issues.append('adjacent anim_latest pointer diagnostics not found; using current bundle token only')
-    if len(set(token_map.values())) > 1:
+    if pointer_snap.get('pointer_sync_ok') is False:
         issues.append('pointer visual_cache_token mismatch between local/global/triage sources')
-    if len(set(reload_map.values())) > 1:
+    if pointer_snap.get('reload_inputs_sync_ok') is False:
         issues.append('pointer visual_reload_inputs mismatch between local/global/triage sources')
-    if len(set(npz_map.values())) > 1:
+    if pointer_snap.get('npz_path_sync_ok') is False:
         issues.append('pointer npz_path mismatch between local/global/triage sources')
 
     for snap in sources.values():
@@ -203,7 +159,7 @@ def collect_npz_anim_diagnostics(
                 issues.append(smsg)
 
     pointer_token = str(pointer_snap.get('visual_cache_token') or '')
-    pointer_inputs = _normalize_reload_inputs(pointer_snap.get('visual_reload_inputs'))
+    pointer_inputs = _normalize_pointer_inputs(pointer_snap.get('visual_reload_inputs'))
     pointer_npz = str(pointer_snap.get('npz_path') or '')
 
     if pointer_token and bundle_token != pointer_token:
@@ -228,14 +184,14 @@ def collect_npz_anim_diagnostics(
         'triage_diagnostics_json': str(triage_sidecar) if triage_sidecar is not None and triage_sidecar.exists() else '',
         'pointer_npz_path': pointer_npz,
         'pointer_updated_utc': str(pointer_snap.get('updated_utc') or ''),
-        'pointer_sources_present': list(sources.keys()),
+        'pointer_sources_present': list(pointer_snap.get('sources_present') or sources.keys()),
         'pointer_sources': {k: dict(v) for k, v in sources.items()},
         'bundle_vs_pointer_token_match': None if not pointer_token else (bundle_token == pointer_token),
         'bundle_vs_pointer_reload_inputs_match': None if not pointer_inputs else (tuple(bundle_inputs) == tuple(pointer_inputs)),
         'bundle_vs_pointer_npz_path_match': path_match,
-        'pointer_sources_token_sync_ok': None if len(token_map) <= 1 else (len(set(token_map.values())) == 1),
-        'pointer_sources_reload_inputs_sync_ok': None if len(reload_map) <= 1 else (len(set(reload_map.values())) == 1),
-        'pointer_sources_npz_path_sync_ok': None if len(npz_map) <= 1 else (len(set(npz_map.values())) == 1),
+        'pointer_sources_token_sync_ok': pointer_snap.get('pointer_sync_ok'),
+        'pointer_sources_reload_inputs_sync_ok': pointer_snap.get('reload_inputs_sync_ok'),
+        'pointer_sources_npz_path_sync_ok': pointer_snap.get('npz_path_sync_ok'),
         'issues': issues,
     }
     return out
@@ -247,9 +203,9 @@ def format_anim_diagnostics_lines(diag: Mapping[str, Any] | None, *, label: str 
     if label:
         lines.append(f'Run: {label}')
     lines.append(f"Current token: {_short_token(str(d.get('bundle_visual_cache_token') or ''))}")
-    lines.append(f"Current inputs: {', '.join(_normalize_reload_inputs(d.get('bundle_visual_reload_inputs'))) or '—'}")
+    lines.append(f"Current inputs: {', '.join(_normalize_pointer_inputs(d.get('bundle_visual_reload_inputs'))) or '—'}")
     lines.append(f"Pointer token: {_short_token(str(d.get('pointer_visual_cache_token') or ''))}")
-    lines.append(f"Pointer inputs: {', '.join(_normalize_reload_inputs(d.get('pointer_visual_reload_inputs'))) or '—'}")
+    lines.append(f"Pointer inputs: {', '.join(_normalize_pointer_inputs(d.get('pointer_visual_reload_inputs'))) or '—'}")
     lines.append(f"Token match: {d.get('bundle_vs_pointer_token_match')}")
     lines.append(f"Inputs match: {d.get('bundle_vs_pointer_reload_inputs_match')}")
     lines.append(f"Pointer path match: {d.get('bundle_vs_pointer_npz_path_match')}")

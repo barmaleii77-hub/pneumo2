@@ -44,7 +44,6 @@ import numpy as np
 import pandas as pd
 
 from .data_contract import (
-    ANIM_LATEST_POINTER_SCHEMA_VERSION,
     normalize_npz_meta,
     dumps_meta_json,
     assert_required_geometry_meta,
@@ -54,7 +53,6 @@ from .solver_points_contract import assert_required_solver_points_contract
 from .visual_contract import (
     ROAD_CONTRACT_DESKTOP_JSON_NAME,
     ROAD_CONTRACT_WEB_JSON_NAME,
-    build_visual_reload_diagnostics,
     write_road_contract_artifacts,
 )
 from .anim_export_contract import (
@@ -68,6 +66,7 @@ from .anim_export_contract import (
     validate_anim_export_contract_meta,
     write_anim_export_contract_artifacts,
 )
+from .run_artifacts import local_anim_latest_export_paths, write_anim_latest_pointer_json
 
 
 # NOTE: версии и ключи централизованы в pneumo_solver_ui.data_contract
@@ -595,7 +594,7 @@ def export_anim_latest_bundle(
     except Exception:
         pass
 
-    npz_path = exports_dir / "anim_latest.npz"
+    npz_path, pointer_path = local_anim_latest_export_paths(exports_dir)
     export_full_log_to_npz(
         npz_path,
         df_main_anim,
@@ -607,26 +606,25 @@ def export_anim_latest_bundle(
         require_solver_points_contract=True,
     )
 
-    pointer_path = exports_dir / "anim_latest.json"
     updated_utc = datetime.now(timezone.utc).isoformat()
-    reload_diag = build_visual_reload_diagnostics(
+    pointer_path, pointer, mirrored_global_pointer = write_anim_latest_pointer_json(
         npz_path,
+        pointer_path=pointer_path,
         meta=meta_norm,
+        updated_utc=updated_utc,
+        extra_fields={
+            "anim_export_validation_level": str((contract_validation.get("level") or "")),
+            "anim_export_truth_ready": bool(str(contract_validation.get("level") or "") == "PASS"),
+        },
         context="anim_latest export pointer",
         log=logging.warning,
+        mirror_global_pointer=_should_mirror_global_anim_pointer(exports_dir, explicit=mirror_global_pointer),
     )
-    pointer = {
-        "schema_version": ANIM_LATEST_POINTER_SCHEMA_VERSION,
-        "updated_utc": updated_utc,
-        "npz_path": str(npz_path.resolve()),
-        "meta": meta_norm,
-        "visual_cache_token": reload_diag.get("visual_cache_token", ""),
-        "visual_reload_inputs": list(reload_diag.get("inputs") or []),
-        "visual_cache_dependencies": dict(reload_diag.get("visual_cache_dependencies") or {}),
-        "anim_export_validation_level": str((contract_validation.get("level") or "")),
-        "anim_export_truth_ready": bool(str(contract_validation.get("level") or "") == "PASS"),
+    reload_diag = {
+        "visual_cache_token": pointer.get("visual_cache_token", ""),
+        "inputs": list(pointer.get("visual_reload_inputs") or []),
+        "visual_cache_dependencies": dict(pointer.get("visual_cache_dependencies") or {}),
     }
-    pointer_path.write_text(json.dumps(pointer, ensure_ascii=False, indent=2), encoding="utf-8")
 
     contract_artifacts = {}
     try:
@@ -654,16 +652,6 @@ def export_anim_latest_bundle(
         )
     except Exception as exc:
         logging.warning("[anim_latest] failed to write road contract artifacts for %s: %s", exports_dir, exc)
-
-    mirrored_global_pointer = False
-    if _should_mirror_global_anim_pointer(exports_dir, explicit=mirror_global_pointer):
-        try:
-            from .run_artifacts import save_latest_animation_ptr
-
-            save_latest_animation_ptr(npz_path=npz_path, pointer_json=pointer_path, meta=meta_norm)
-            mirrored_global_pointer = True
-        except Exception as exc:
-            logging.warning("[anim_latest] failed to mirror global pointer for %s: %s", exports_dir, exc)
 
     # Debug trace (helps diagnose “ничего не передалось в аниматор”)
     try:

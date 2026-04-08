@@ -82,10 +82,14 @@ def test_page_registry_and_preflight_use_canonical_relative_targets() -> None:
         "desktop_animator_page_rel",
         "validation_web_page_rel",
         "env_diagnostics_page_rel",
+        "local_anim_latest_export_paths",
+        "extract_anim_snapshot",
         "_pick_next_page_canonical",
         "_pick_next_page = _pick_next_page_canonical",
     ]:
         assert helper_name in ui_preflight
+    assert "local_anim_latest_export_paths(exports_dir, ensure_exists=False)" in ui_preflight
+    assert 'extract_anim_snapshot(obj, source="ui_preflight_pointer")' in ui_preflight
 
 
 def test_selfcheck_uses_entrypoint_inventory_instead_of_hardcoded_ui_paths() -> None:

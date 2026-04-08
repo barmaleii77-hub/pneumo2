@@ -50,6 +50,7 @@ from pneumo_solver_ui.optimization_result_rows import BASELINE_ROLE
 from pneumo_solver_ui.atomic_write_retry import atomic_write_json_retry
 from pneumo_solver_ui.module_loading import load_python_module_from_path
 from pneumo_solver_ui.project_path_resolution import resolve_project_py_path
+from pneumo_solver_ui.suspension_family_contract import normalize_component_family_contract
 from typing import Dict, List, Tuple, Any, Optional, Iterable
 
 import numpy as np
@@ -2577,7 +2578,12 @@ def make_base_and_ranges(P_ATM: float) -> Tuple[Dict[str, Any], Dict[str, Tuple[
         if (not isinstance(v, (list, tuple))) or len(v) != 2:
             raise ValueError(f"Диапазон '{k}' должен быть списком [мин, макс], получено: {v}")
         ranges[str(k)] = (float(v[0]), float(v[1]))
-    return base, ranges
+    base, ranges_norm, _family_audit = normalize_component_family_contract(base, ranges)
+    ranges_typed: Dict[str, Tuple[float, float]] = {}
+    for k, v in ranges_norm.items():
+        if isinstance(v, (list, tuple)) and len(v) == 2:
+            ranges_typed[str(k)] = (float(v[0]), float(v[1]))
+    return base, ranges_typed
 
 
 def read_csv_header_cols(path: str) -> List[str]:

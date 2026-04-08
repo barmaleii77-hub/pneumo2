@@ -22,20 +22,23 @@ import sys
 from pneumo_solver_ui.diag.bootstrap import bootstrap as _diag_bootstrap
 _diag_bootstrap("DesktopAnimator")
 from pathlib import Path
+from pneumo_solver_ui.desktop_animator.pointer_paths import default_anim_pointer_path
 
 
 def _default_pointer() -> Path:
-    # .../pneumo_solver_ui/desktop_animator/main.py -> .../pneumo_solver_ui
-    here = Path(__file__).resolve().parent
-    ui_root = here.parent
-    return (ui_root / "workspace" / "exports" / "anim_latest.json").resolve()
+    return default_anim_pointer_path(Path(__file__).resolve().parents[2])
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="pneumo-desktop-animator")
     ap.add_argument("--npz", type=str, default="", help="Path to NPZ log file")
     ap.add_argument("--follow", action="store_true", help="Follow anim_latest.json pointer")
-    ap.add_argument("--pointer", type=str, default="", help="Pointer json path (default: workspace/exports/anim_latest.json)")
+    ap.add_argument(
+        "--pointer",
+        type=str,
+        default="",
+        help="Pointer json path (default: current workspace global pointer, then session/local fallbacks)",
+    )
     ap.add_argument("--no-gl", action="store_true", help="Disable 3D OpenGL view (compat mode)")
     ap.add_argument("--theme", type=str, default="dark", choices=["dark", "light"], help="UI theme")
 

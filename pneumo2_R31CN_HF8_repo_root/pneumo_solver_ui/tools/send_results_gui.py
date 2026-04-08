@@ -32,6 +32,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from pneumo_solver_ui.tools.clipboard_file import copy_file_to_clipboard
+from pneumo_solver_ui.tools.send_bundle_contract import ANIM_DIAG_SIDECAR_JSON
 
 try:
     from pneumo_solver_ui.release_info import get_release
@@ -253,7 +254,7 @@ class SendResultsGUI:
         except Exception:
             pass
         try:
-            diag_json = self.out_dir / "latest_anim_pointer_diagnostics.json"
+            diag_json = self.out_dir / ANIM_DIAG_SIDECAR_JSON
             if diag_json.exists():
                 import json
                 d = json.loads(diag_json.read_text(encoding="utf-8", errors="replace"))

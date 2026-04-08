@@ -28,6 +28,8 @@ from pneumo_solver_ui.entrypoints import (
     env_diagnostics_page_rel,
     validation_web_page_rel,
 )
+from pneumo_solver_ui.run_artifacts import local_anim_latest_export_paths
+from pneumo_solver_ui.tools.send_bundle_contract import extract_anim_snapshot
 
 
 @dataclass
@@ -60,7 +62,7 @@ def _fmt_ts(ts: Any) -> str:
 
 def _exports_paths(app_dir: Path) -> Tuple[Path, Path]:
     exports_dir = (app_dir / "pneumo_solver_ui" / "workspace" / "exports").resolve()
-    pointer = exports_dir / "anim_latest.json"
+    _, pointer = local_anim_latest_export_paths(exports_dir, ensure_exists=False)
     return exports_dir, pointer
 
 
@@ -72,14 +74,16 @@ def _read_anim_pointer(pointer_path: Path) -> Tuple[Optional[dict], Optional[Pat
     except Exception:
         return None, None
 
-    npz_rel = obj.get("npz_path")
+    snap = extract_anim_snapshot(obj, source="ui_preflight_pointer") if isinstance(obj, dict) else None
+    norm_obj = dict(snap or obj) if isinstance(snap or obj, dict) else None
+    npz_rel = (norm_obj or {}).get("npz_path")
     npz_path = None
     if isinstance(npz_rel, str) and npz_rel.strip():
         try:
             npz_path = (pointer_path.parent / npz_rel).resolve()
         except Exception:
             npz_path = None
-    return obj, npz_path
+    return norm_obj, npz_path
 
 
 def _read_global_anim_pointer() -> Tuple[Optional[dict], Optional[Path]]:
@@ -96,7 +100,9 @@ def _read_global_anim_pointer() -> Tuple[Optional[dict], Optional[Path]]:
     obj = None
     try:
         if path.exists():
-            obj = json.loads(path.read_text(encoding="utf-8"))
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            snap = extract_anim_snapshot(raw, source="ui_preflight_global_pointer") if isinstance(raw, dict) else None
+            obj = dict(snap or raw) if isinstance(snap or raw, dict) else None
     except Exception:
         obj = None
     return obj, path

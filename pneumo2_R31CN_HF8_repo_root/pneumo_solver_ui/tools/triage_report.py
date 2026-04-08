@@ -52,6 +52,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from .send_bundle_contract import ANIM_DIAG_JSON, ANIM_DIAG_MD, ANIM_DIAG_SIDECAR_JSON, ANIM_DIAG_SIDECAR_MD
 
 try:
     from pneumo_solver_ui.release_info import get_release
@@ -331,8 +332,8 @@ def _load_anim_latest_summary(repo_root: Path, sb_root: Path) -> Dict[str, Any]:
 
     The result remains flat/canonical (`anim_latest_*` keys) to avoid alias bridges.
     """
-    diag_json = sb_root / "latest_anim_pointer_diagnostics.json"
-    diag_md = sb_root / "latest_anim_pointer_diagnostics.md"
+    diag_json = sb_root / ANIM_DIAG_SIDECAR_JSON
+    diag_md = sb_root / ANIM_DIAG_SIDECAR_MD
 
     out: Dict[str, Any] = {
         "source": None,

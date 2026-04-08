@@ -11,6 +11,7 @@ from pneumo_solver_ui.run_artifacts import collect_anim_latest_diagnostics_summa
 from pneumo_solver_ui.run_registry import log_send_bundle_created
 from pneumo_solver_ui.solver_points_contract import CORNERS, POINT_KINDS, point_cols
 from pneumo_solver_ui.tools.make_send_bundle import _collect_anim_latest_bundle_diagnostics
+from pneumo_solver_ui.tools.send_bundle_contract import ANIM_DIAG_SIDECAR_JSON, ANIM_DIAG_SIDECAR_MD
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,8 +78,8 @@ def test_collect_anim_latest_bundle_diagnostics_writes_sidecars(tmp_path: Path, 
     assert diag["anim_latest_npz_path"] == str(npz_path.resolve())
     assert diag["anim_latest_visual_cache_token"] == pointer["visual_cache_token"]
     assert diag["anim_latest_visual_reload_inputs"] == ["npz", "road_csv"]
-    assert (tmp_path / "latest_anim_pointer_diagnostics.json").exists()
-    assert (tmp_path / "latest_anim_pointer_diagnostics.md").exists()
+    assert (tmp_path / ANIM_DIAG_SIDECAR_JSON).exists()
+    assert (tmp_path / ANIM_DIAG_SIDECAR_MD).exists()
     assert pointer["visual_cache_token"] in md
 
 
@@ -122,19 +123,60 @@ def test_run_registry_send_bundle_created_accepts_extended_anim_fields(tmp_path:
     assert rec["anim_latest_visual_cache_token"] == pointer["visual_cache_token"]
     assert rec["anim_latest_visual_reload_inputs"] == ["npz", "road_csv"]
     assert rec["anim_latest_available"] is True
-    assert rec["anim_latest_global_pointer_json"].endswith("workspace/_pointers/anim_latest.json")
+    assert Path(rec["anim_latest_global_pointer_json"]).parts[-3:] == ("workspace", "_pointers", "anim_latest.json")
 
+
+
+def test_run_registry_index_last_event_keeps_anim_latest_usability_summary(tmp_path: Path, monkeypatch) -> None:
+    runs_root = tmp_path / "runs"
+    monkeypatch.setattr("pneumo_solver_ui.run_registry._runs_root", lambda: runs_root)
+
+    log_send_bundle_created(
+        zip_path=tmp_path / "bundle.zip",
+        sha256="abc123",
+        size_bytes=123,
+        release="pytest-release",
+        anim_latest_available=True,
+        anim_latest_global_pointer_json=str(tmp_path / "workspace" / "_pointers" / "anim_latest.json"),
+        anim_latest_pointer_json=str(tmp_path / "workspace" / "exports" / "anim_latest.json"),
+        anim_latest_npz_path=str(tmp_path / "workspace" / "exports" / "anim_latest.npz"),
+        anim_latest_visual_cache_token="tok-idx",
+        anim_latest_visual_reload_inputs=["npz", "road_csv"],
+        anim_latest_visual_cache_dependencies={"npz": {"path": "anim_latest.npz"}},
+        anim_latest_updated_utc="2026-04-07T21:00:00Z",
+        anim_latest_pointer_json_exists=False,
+        anim_latest_npz_exists=False,
+        anim_latest_pointer_json_in_workspace=True,
+        anim_latest_npz_in_workspace=True,
+        anim_latest_usable=False,
+        anim_latest_issues=["not reproducible from this bundle"],
+    )
+
+    idx = json.loads((runs_root / "index.json").read_text(encoding="utf-8"))
+    last = dict(idx.get("last_event") or {})
+
+    assert last["anim_latest_available"] is True
+    assert last["anim_latest_visual_cache_token"] == "tok-idx"
+    assert last["anim_latest_visual_reload_inputs"] == ["npz", "road_csv"]
+    assert last["anim_latest_pointer_json_exists"] is False
+    assert last["anim_latest_npz_exists"] is False
+    assert last["anim_latest_usable"] is False
+    assert last["anim_latest_issues"] == ["not reproducible from this bundle"]
+    assert "anim_latest_visual_cache_dependencies" not in last
 
 
 def test_sources_wire_anim_diagnostics_into_launcher_and_send_bundle() -> None:
     bundle_text = (ROOT / "pneumo_solver_ui" / "tools" / "make_send_bundle.py").read_text(encoding="utf-8")
     gui_text = (ROOT / "pneumo_solver_ui" / "tools" / "send_results_gui.py").read_text(encoding="utf-8")
     launcher_text = (ROOT / "START_PNEUMO_APP.py").read_text(encoding="utf-8")
+    registry_text = (ROOT / "pneumo_solver_ui" / "run_registry.py").read_text(encoding="utf-8")
 
     assert '("_pointers", False)' in bundle_text
-    assert 'latest_anim_pointer_diagnostics.json' in bundle_text
+    assert 'ANIM_DIAG_SIDECAR_JSON' in bundle_text
     assert '**anim_diag_event' in bundle_text
     assert 'collect_anim_latest_diagnostics_summary' in launcher_text
     assert 'send_results_gui_spawned' in launcher_text
-    assert 'latest_anim_pointer_diagnostics.json' in gui_text
+    assert 'ANIM_DIAG_SIDECAR_JSON' in gui_text
     assert 'Anim latest token:' in gui_text
+    assert 'pick_anim_latest_fields' in registry_text
+    assert 'ANIM_LATEST_INDEX_FIELDS' in registry_text
