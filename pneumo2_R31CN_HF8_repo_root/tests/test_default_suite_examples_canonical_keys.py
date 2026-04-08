@@ -15,6 +15,12 @@ FORBIDDEN_SUITE_KEYS = {
     "road_profile_path": "road_csv",
     "road_profile_csv": "road_csv",
 }
+REQUIRED_PACKAGING_TARGETS = {
+    "target_мин_зазор_пружина_цилиндр_м",
+    "target_мин_зазор_пружина_пружина_м",
+    "target_макс_ошибка_midstroke_t0_м",
+    "target_мин_запас_до_coil_bind_пружины_м",
+}
 
 
 def _load_json(path: Path):
@@ -48,9 +54,13 @@ def test_default_suite_long_bump_diag_speed_comes_from_per_test_vx0() -> None:
         and "vx0_м_с" in rec
     }
     assert source_speed_by_name, "default_suite_long.json must define canonical vx0_м_с for bump_diag tests"
+    enabled_suite = [
+        {**rec, "включен": True} if isinstance(rec, dict) and str(rec.get("тип") or "") == "кочка_диагональ" else rec
+        for rec in suite
+    ]
 
     cfg = {
-        "suite": suite,
+        "suite": enabled_suite,
         "скорость_м_с_по_умолчанию": 77.0,
         "колея": 1.2,
         "база": 2.3,
@@ -68,3 +78,20 @@ def test_default_suite_long_bump_diag_speed_comes_from_per_test_vx0() -> None:
             f"{name}: build_test_suite must use per-test vx0_м_с={expected_speed} from default_suite_long.json, "
             f"got {built_speed_by_name[name]}"
         )
+
+
+def test_default_suite_examples_include_family_packaging_targets_for_penalty_rows() -> None:
+    violations: list[str] = []
+    for path in SUITE_FILES:
+        payload = _load_json(path)
+        for idx, rec in enumerate(payload):
+            if not isinstance(rec, dict):
+                continue
+            has_targets = any(str(k).startswith("target_") for k in rec.keys())
+            is_ring = str(rec.get("имя") or "").strip() == "ring_город_неровная_дорога_20кмч_15s"
+            if not (has_targets or is_ring):
+                continue
+            missing = sorted(key for key in REQUIRED_PACKAGING_TARGETS if key not in rec)
+            if missing:
+                violations.append(f"{path.name}[{idx}] missing packaging targets: {', '.join(missing)}")
+    assert not violations, "\n".join(violations)

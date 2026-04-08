@@ -61,3 +61,52 @@ def test_autoverif_ok_path():
     assert int(out.get("верификация_ok", 0)) == 1
     assert float(out.get("верификация_штраф", 1.0)) == 0.0
     assert str(out.get("верификация_флаги", "")) == ""
+
+
+def test_autoverif_family_packaging_guards_trigger_on_clearance_and_midstroke():
+    from pneumo_solver_ui.verif_autochecks import check_candidate_metrics
+
+    metrics = {
+        "мин_зазор_пружина_цилиндр_м": -0.001,
+        "мин_зазор_пружина_пружина_м": -0.002,
+        "мин_зазор_пружина_до_крышки_м": -0.003,
+        "макс_ошибка_midstroke_t0_м": 0.08,
+        "anim_export_packaging_metrics_ok": 1,
+    }
+    params = {
+        "enforce_scheme_integrity": True,
+        "enforce_camozzi_only": True,
+        "autoverif_enable": True,
+        "autoverif_packaging_enabled": True,
+        "autoverif_spring_host_min_clearance_m": 0.0,
+        "autoverif_spring_pair_min_clearance_m": 0.0,
+        "autoverif_spring_cap_min_margin_m": 0.0,
+        "autoverif_midstroke_t0_max_error_m": 0.05,
+    }
+
+    out = check_candidate_metrics(metrics, params, test={"name": "t"})
+    flags = str(out.get("верификация_флаги", ""))
+    assert int(out.get("верификация_ok", 1)) == 0
+    assert "spring_host_clearance" in flags
+    assert "spring_pair_clearance" in flags
+    assert "spring_cap_gap" in flags
+    assert "midstroke_t0" in flags
+
+
+def test_autoverif_family_coilbind_metric_works_without_legacy_generic_key():
+    from pneumo_solver_ui.verif_autochecks import check_candidate_metrics
+
+    metrics = {
+        "мин_запас_до_coil_bind_пружины_м": 0.001,
+    }
+    params = {
+        "enforce_scheme_integrity": True,
+        "enforce_camozzi_only": True,
+        "autoverif_enable": True,
+        "autoverif_coilbind_enabled": True,
+        "autoverif_coilbind_min_margin_m": 0.003,
+    }
+
+    out = check_candidate_metrics(metrics, params, test={"name": "t"})
+    assert int(out.get("верификация_ok", 1)) == 0
+    assert "coil_bind_risk" in str(out.get("верификация_флаги", ""))

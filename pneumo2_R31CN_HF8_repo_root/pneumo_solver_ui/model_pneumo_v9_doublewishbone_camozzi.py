@@ -39,6 +39,28 @@ import logging
 import numpy as np
 import pandas as pd
 import re
+from typing import Any
+
+try:
+    from .suspension_family_runtime import (
+        build_spring_family_runtime_snapshot,
+        normalize_spring_attachment_mode,
+        resolve_cylinder_corner_geometry,
+        resolve_spring_corner_geometry,
+        split_dual_spring_force_target,
+        spring_family_mode_id,
+        spring_family_runtime_series_template,
+    )
+except Exception:
+    from suspension_family_runtime import (
+        build_spring_family_runtime_snapshot,
+        normalize_spring_attachment_mode,
+        resolve_cylinder_corner_geometry,
+        resolve_spring_corner_geometry,
+        split_dual_spring_force_target,
+        spring_family_mode_id,
+        spring_family_runtime_series_template,
+    )
 
 
 
@@ -1841,7 +1863,6 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         # spring table (compression only)
         табл_пруж_ход_мм_auto = np.array(params.get('пружина_таблица_ход_мм', [-125, -80, -40, -20, 0, 20, 50, 80, 125]), dtype=float)
         табл_пруж_сила_Н_auto = np.array(params.get('пружина_таблица_сила_Н', [-1200, -900, -500, -200, 0, 400, 1200, 2200, 4000]), dtype=float)
-        масштаб_пружины_auto = float(params.get('пружина_масштаб', 1.0))
         табл_пруж_ход_м_auto = табл_пруж_ход_мм_auto * 1e-3
 
         mask = (табл_пруж_ход_м_auto >= 0.0) & (табл_пруж_сила_Н_auto >= 0.0)
@@ -1853,6 +1874,9 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         табл_пруж_сила_Н_auto = np.maximum.accumulate(табл_пруж_сила_Н_auto[order])
 
         if табл_пруж_ход_м_auto.size >= 2:
+            spring_mode_auto = normalize_spring_attachment_mode(
+                params.get('механика_пружина_режим', params.get('spring_mode', params.get('пружина_режим', 'c1')))
+            )
             spring_interp_mode_auto = str(params.get('пружина_интерполяция', params.get('spring_interp_mode', params.get('spring_interp', 'linear')))).strip().lower()
             if spring_interp_mode_auto not in ('linear', 'pchip'):
                 spring_interp_mode_auto = 'linear'
@@ -1862,9 +1886,19 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             x_ref = float(x_ref_default if (x_ref_raw is None) else x_ref_raw)
             x_ref = float(np.clip(x_ref, float(табл_пруж_ход_м_auto[0]), float(табл_пруж_ход_м_auto[-1])))
 
-            k_rod_N_m = float(масштаб_пружины_auto) * float(np.squeeze(spring_stiffness(x_ref, табл_пруж_ход_м_auto, табл_пруж_сила_Н_auto, mode=spring_interp_mode_auto)))
-            if not (np.isfinite(k_rod_N_m) and (k_rod_N_m > 0.0)):
-                k_rod_N_m = 0.0
+            spring_k_table_N_m = float(np.squeeze(spring_stiffness(x_ref, табл_пруж_ход_м_auto, табл_пруж_сила_Н_auto, mode=spring_interp_mode_auto)))
+            spring_auto = resolve_spring_corner_geometry(
+                params,
+                spring_mode=spring_mode_auto,
+                default_scale=float(params.get('пружина_масштаб', 1.0)),
+                default_free_length=float(табл_пруж_ход_м_auto[-1]),
+                default_solid_length=0.0,
+                default_top_offset=0.02,
+                default_rebound_preload_min=0.0,
+                default_coil_bind_margin_min=0.0,
+            )
+            k_rod_N_m = spring_k_table_N_m * np.asarray(spring_auto['scale'], dtype=float)
+            k_rod_N_m = np.where(np.isfinite(k_rod_N_m) & (k_rod_N_m > 0.0), k_rod_N_m, 0.0)
 
             # motion ratio (wheel travel / rod travel): MR; drod/ddw = 1/MR
             mr_raw = params.get('передаточное_отношение_ход_колеса_к_ходу_штока', params.get('motion_ratio', 1.0))
@@ -1877,7 +1911,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             drod_ddw0 = 1.0 / MR_vec
 
             # spring wheel rate
-            k_spring_wheel = float(k_rod_N_m) * (drod_ddw0 ** 2)
+            k_spring_wheel = k_rod_N_m * (drod_ddw0 ** 2)
             k_spring_wheel = np.where(np.isfinite(k_spring_wheel) & (k_spring_wheel > 0.0), k_spring_wheel, 0.0)
 
             # --- pneumatic gas stiffness (optional) ---
@@ -1894,26 +1928,27 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 sref_frac = float(np.clip(sref_frac, 0.0, 1.0))
 
                 # Cylinder geometry
-                D1 = float(params.get('диаметр_поршня_Ц1', 0.032))
-                d1 = float(params.get('диаметр_штока_Ц1', 0.016))
-                D2 = float(params.get('диаметр_поршня_Ц2', 0.050))
-                d2 = float(params.get('диаметр_штока_Ц2', 0.014))
+                cyl1_geom = resolve_cylinder_corner_geometry(
+                    params,
+                    'Ц1',
+                    default_bore=0.032,
+                    default_rod=0.016,
+                    default_stroke=float(params.get('ход_штока', 0.250)),
+                )
+                cyl2_geom = resolve_cylinder_corner_geometry(
+                    params,
+                    'Ц2',
+                    default_bore=0.050,
+                    default_rod=0.014,
+                    default_stroke=float(params.get('ход_штока', 0.250)),
+                )
                 V_dead = float(params.get('мёртвый_объём_камеры', params.get('corner_pneumo_dead_volume_m3', 15e-6)))
-
-                A1_cap = math.pi * (D1 * 0.5) ** 2
-                A1_rod = max(1e-12, A1_cap - math.pi * (d1 * 0.5) ** 2)
-                A2_cap = math.pi * (D2 * 0.5) ** 2
-                A2_rod = max(1e-12, A2_cap - math.pi * (d2 * 0.5) ** 2)
-
-                # Strokes (per corner, same logic as in main model)
-                L_stroke_legacy = float(params.get('ход_штока', 0.250))
-                L_C1_front = float(params.get('ход_штока_Ц1_перед_м', params.get('ход_штока_Ц1_перед', L_stroke_legacy)))
-                L_C1_rear  = float(params.get('ход_штока_Ц1_зад_м',  params.get('ход_штока_Ц1_зад',  L_stroke_legacy)))
-                L_C2_front = float(params.get('ход_штока_Ц2_перед_м', params.get('ход_штока_Ц2_перед', L_stroke_legacy)))
-                L_C2_rear  = float(params.get('ход_штока_Ц2_зад_м',  params.get('ход_штока_Ц2_зад',  L_stroke_legacy)))
-
-                L_stroke_C1 = np.array([L_C1_front, L_C1_front, L_C1_rear, L_C1_rear], dtype=float)
-                L_stroke_C2 = np.array([L_C2_front, L_C2_front, L_C2_rear, L_C2_rear], dtype=float)
+                A1_cap = np.asarray(cyl1_geom['cap_area_m2'], dtype=float)
+                A1_rod = np.asarray(cyl1_geom['rod_area_m2'], dtype=float)
+                A2_cap = np.asarray(cyl2_geom['cap_area_m2'], dtype=float)
+                A2_rod = np.asarray(cyl2_geom['rod_area_m2'], dtype=float)
+                L_stroke_C1 = np.asarray(cyl1_geom['stroke_m'], dtype=float)
+                L_stroke_C2 = np.asarray(cyl2_geom['stroke_m'], dtype=float)
 
                 k_ax_C1 = np.zeros(4, dtype=float)
                 k_ax_C2 = np.zeros(4, dtype=float)
@@ -1922,8 +1957,8 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                     s2_ref = sref_frac * float(L_stroke_C2[i])
                     k_ax_C1[i] = gas_stiffness_axial_from_geometry(
                         p_ref_abs_Pa=float(P_ref_abs),
-                        A_cap_m2=float(A1_cap),
-                        A_rod_m2=float(A1_rod),
+                        A_cap_m2=float(A1_cap[i]),
+                        A_rod_m2=float(A1_rod[i]),
                         V_dead_m3=float(V_dead),
                         stroke_m=float(L_stroke_C1[i]),
                         s_ref_m=float(s1_ref),
@@ -1932,8 +1967,8 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                     )
                     k_ax_C2[i] = gas_stiffness_axial_from_geometry(
                         p_ref_abs_Pa=float(P_ref_abs),
-                        A_cap_m2=float(A2_cap),
-                        A_rod_m2=float(A2_rod),
+                        A_cap_m2=float(A2_cap[i]),
+                        A_rod_m2=float(A2_rod[i]),
                         V_dead_m3=float(V_dead),
                         stroke_m=float(L_stroke_C2[i]),
                         s_ref_m=float(s2_ref),
@@ -2109,7 +2144,44 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     # delta = z_колеса - z_рамы_в_углу (м): delta>0 = сжатие подвески
     табл_пруж_ход_мм = np.array(params.get('пружина_таблица_ход_мм', [-125, -80, -40, -20, 0, 20, 50, 80, 125]), dtype=float)
     табл_пруж_сила_Н = np.array(params.get('пружина_таблица_сила_Н', [-1200, -900, -500, -200, 0, 400, 1200, 2200, 4000]), dtype=float)
-    масштаб_пружины = float(params.get('пружина_масштаб', 1.0))
+    spring_mode = normalize_spring_attachment_mode(
+        params.get('механика_пружина_режим', params.get('spring_mode', params.get('пружина_режим', 'c1')))
+    )
+    dual_spring_mode = bool(spring_mode == 'dual')
+    spring_family_c1 = resolve_spring_corner_geometry(
+        params,
+        spring_mode='c1',
+        default_scale=float(params.get('пружина_масштаб', 1.0)),
+        default_free_length=float(params.get('пружина_длина_свободная_м', 0.30)),
+        default_solid_length=float(params.get('пружина_длина_солид_м', 0.0)),
+        default_top_offset=float(params.get('пружина_верхний_отступ_от_крышки_м', 0.02)),
+        default_rebound_preload_min=float(params.get("пружина_преднатяг_на_отбое_минимум_м", 0.0)),
+        default_coil_bind_margin_min=float(params.get("пружина_запас_до_coil_bind_минимум_м", 0.0)),
+    )
+    spring_family_c2 = resolve_spring_corner_geometry(
+        params,
+        spring_mode='c2',
+        default_scale=float(params.get('пружина_масштаб', 1.0)),
+        default_free_length=float(params.get('пружина_длина_свободная_м', 0.30)),
+        default_solid_length=float(params.get('пружина_длина_солид_м', 0.0)),
+        default_top_offset=float(params.get('пружина_верхний_отступ_от_крышки_м', 0.02)),
+        default_rebound_preload_min=float(params.get("пружина_преднатяг_на_отбое_минимум_м", 0.0)),
+        default_coil_bind_margin_min=float(params.get("пружина_запас_до_coil_bind_минимум_м", 0.0)),
+    )
+    spring_family = resolve_spring_corner_geometry(
+        params,
+        spring_mode=spring_mode,
+        default_scale=float(params.get('пружина_масштаб', 1.0)),
+        default_free_length=float(params.get('пружина_длина_свободная_м', 0.30)),
+        default_solid_length=float(params.get('пружина_длина_солид_м', 0.0)),
+        default_top_offset=float(params.get('пружина_верхний_отступ_от_крышки_м', 0.02)),
+        default_rebound_preload_min=float(params.get("пружина_преднатяг_на_отбое_минимум_м", 0.0)),
+        default_coil_bind_margin_min=float(params.get("пружина_запас_до_coil_bind_минимум_м", 0.0)),
+    )
+    масштаб_пружины = float(np.mean(np.asarray(spring_family['scale'], dtype=float)))
+    масштаб_пружины_vec = np.asarray(spring_family['scale'], dtype=float)
+    масштаб_пружины_vec_C1 = np.asarray(spring_family_c1['scale'], dtype=float)
+    масштаб_пружины_vec_C2 = np.asarray(spring_family_c2['scale'], dtype=float)
     табл_пруж_ход_м = табл_пруж_ход_мм * 1e-3
 
     # ВАЖНО: пружина односторонняя (только на сжатие).
@@ -2137,41 +2209,43 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     else:
         табл_пруж_энергия_Дж = np.array([0.0], dtype=float)
 
-    # Геометрия цилиндров
-    D1 = params.get('диаметр_поршня_Ц1', 0.032)
-    d1 = params.get('диаметр_штока_Ц1', 0.016)
-    D2 = params.get('диаметр_поршня_Ц2', 0.050)
-    d2 = params.get('диаметр_штока_Ц2', 0.014)
-    A1_cap = math.pi*(D1/2)**2
-    A1_rod = A1_cap - math.pi*(d1/2)**2
-    A2_cap = math.pi*(D2/2)**2
-    A2_rod = A2_cap - math.pi*(d2/2)**2
-
-    # ------------------------------------------------------------
-    # Ход цилиндров
-    # ------------------------------------------------------------
-    # Legacy: один ход на все цилиндры
     L_stroke_legacy = float(params.get('ход_штока', 0.250))
-
-    # New: раздельные физические ходы для 4 групп (Ц1/Ц2 × перед/зад)
-    # Если параметры не заданы — используем legacy.
-    L_C1_front = float(params.get('ход_штока_Ц1_перед_м', params.get('ход_штока_Ц1_перед', L_stroke_legacy)))
-    L_C1_rear  = float(params.get('ход_штока_Ц1_зад_м',  params.get('ход_штока_Ц1_зад',  L_stroke_legacy)))
-    L_C2_front = float(params.get('ход_штока_Ц2_перед_м', params.get('ход_штока_Ц2_перед', L_stroke_legacy)))
-    L_C2_rear  = float(params.get('ход_штока_Ц2_зад_м',  params.get('ход_штока_Ц2_зад',  L_stroke_legacy)))
-
-    # По углам: ЛП, ПП = перед; ЛЗ, ПЗ = зад
-    L_stroke_C1 = np.array([L_C1_front, L_C1_front, L_C1_rear, L_C1_rear], dtype=float)
-    L_stroke_C2 = np.array([L_C2_front, L_C2_front, L_C2_rear, L_C2_rear], dtype=float)
+    cyl1_geom = resolve_cylinder_corner_geometry(
+        params,
+        'Ц1',
+        default_bore=0.032,
+        default_rod=0.016,
+        default_stroke=L_stroke_legacy,
+    )
+    cyl2_geom = resolve_cylinder_corner_geometry(
+        params,
+        'Ц2',
+        default_bore=0.050,
+        default_rod=0.014,
+        default_stroke=L_stroke_legacy,
+    )
+    A1_cap = np.asarray(cyl1_geom['cap_area_m2'], dtype=float)
+    A1_rod = np.asarray(cyl1_geom['rod_area_m2'], dtype=float)
+    A2_cap = np.asarray(cyl2_geom['cap_area_m2'], dtype=float)
+    A2_rod = np.asarray(cyl2_geom['rod_area_m2'], dtype=float)
+    L_stroke_C1 = np.asarray(cyl1_geom['stroke_m'], dtype=float)
+    L_stroke_C2 = np.asarray(cyl2_geom['stroke_m'], dtype=float)
 
     # Центр хода: хотим ~50% выдвижения в условной "статике" (delta_w=0)
     s0_C1 = 0.5 * L_stroke_C1
     s0_C2 = 0.5 * L_stroke_C2
 
     # Для обратной совместимости (старые места кода):
-    # L_stroke и s0 интерпретируем как Ц1.
-    L_stroke = L_stroke_C1
-    s0 = s0_C1
+    # L_stroke и s0 интерпретируем как активную coilover-семью.
+    if spring_mode == 'c2':
+        L_stroke = L_stroke_C2
+        s0 = s0_C2
+    elif dual_spring_mode:
+        L_stroke = np.minimum(L_stroke_C1, L_stroke_C2)
+        s0 = 0.5 * L_stroke
+    else:
+        L_stroke = L_stroke_C1
+        s0 = s0_C1
 
     # Кинематика подвески: передаточное отношение (ход колеса / ход штока).
     # MR = 1.0 => прямое соединение (как было).
@@ -2519,6 +2593,15 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         Lc0_C1 = Lc0_tmp_C1
         Lc0_C2 = Lc0_tmp_C2
 
+    if spring_mode == 'c2':
+        spring_drod_ddw0 = drod_ddw0_C2
+        spring_Lc0 = Lc0_C2
+        spring_top_sign = sign_s_C2
+    else:
+        spring_drod_ddw0 = drod_ddw0_C1
+        spring_Lc0 = Lc0_C1
+        spring_top_sign = sign_s_C1
+
     # Массивы камер
     V0_vec = np.array([n.V0 for n in nodes], dtype=float)
     chamber_indices = []
@@ -2536,10 +2619,10 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             chamber_is_c1.append(1 if is_c1 else 0)
 
             if is_c1:
-                A = A1_cap if n.chamber == 'CAP' else A1_rod
+                A = A1_cap[ic] if n.chamber == 'CAP' else A1_rod[ic]
                 Ls = float(L_stroke_C1[ic])
             else:
-                A = A2_cap if n.chamber == 'CAP' else A2_rod
+                A = A2_cap[ic] if n.chamber == 'CAP' else A2_rod[ic]
                 Ls = float(L_stroke_C2[ic])
 
             if n.chamber == 'CAP':
@@ -2607,13 +2690,13 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     def F_cyl_split_at_p(p_vec):
         F1 = []
         F2 = []
-        for cname in corner_order:
+        for i_c, cname in enumerate(corner_order):
             p1c = p_vec[node_index[f'Ц1_{cname}_БП']]
             p1r = p_vec[node_index[f'Ц1_{cname}_ШП']]
             p2c = p_vec[node_index[f'Ц2_{cname}_БП']]
             p2r = p_vec[node_index[f'Ц2_{cname}_ШП']]
-            f1 = (p1c - P_ATM) * A1_cap - (p1r - P_ATM) * A1_rod
-            f2 = (p2c - P_ATM) * A2_cap - (p2r - P_ATM) * A2_rod
+            f1 = (p1c - P_ATM) * A1_cap[i_c] - (p1r - P_ATM) * A1_rod[i_c]
+            f2 = (p2c - P_ATM) * A2_cap[i_c] - (p2r - P_ATM) * A2_rod[i_c]
             F1.append(f1)
             F2.append(f2)
         return np.asarray(F1, dtype=float), np.asarray(F2, dtype=float)
@@ -2622,17 +2705,25 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
 
     # Вертикальный эквивалент на колесе с учётом кинематики (вирт. работа)
     F_cyl0_wheel = F_cyl1_rod0 * drod_ddw0_C1 + F_cyl2_rod0 * drod_ddw0_C2
+    spring_drod_ddw0_C1 = np.asarray(drod_ddw0_C1, dtype=float)
+    spring_drod_ddw0_C2 = np.asarray(drod_ddw0_C2, dtype=float)
 
     # Пружина: предсжатие (x0) вместо постоянного смещения силы.
     # Требование: таблица только для сжатия (x>=0, F>=0), а в динамике x = max(0, x0 + delta_rod_C1).
-    L_free = float(params.get('пружина_длина_свободная_м', float(табл_пруж_ход_м[-1]) if len(табл_пруж_ход_м) else 0.30))
-    L_free = max(0.0, L_free)
+    L_free_vec_C1 = np.maximum(0.0, np.asarray(spring_family_c1['free_length_m'], dtype=float))
+    L_free_vec_C2 = np.maximum(0.0, np.asarray(spring_family_c2['free_length_m'], dtype=float))
+    L_free_vec = np.asarray(spring_family['free_length_m'], dtype=float)
+    L_free_vec = np.maximum(0.0, L_free_vec)
+    L_free = float(np.mean(L_free_vec))
 
     # Геометрическая привязка пружины к длине цилиндра (по требованию проекта).
     # Если включено, то L_free будет автоматически согласован с Lc0 (длина цилиндра при delta_w=0)
     # и рассчитанным x0_vec (статический преднатяг/компрессия).
-    spring_top_offset_m = float(params.get('пружина_верхний_отступ_от_крышки_м', 0.02))
-    spring_top_offset_m = max(0.0, spring_top_offset_m)
+    spring_top_offset_m_vec_C1 = np.maximum(0.0, np.asarray(spring_family_c1['top_offset_m'], dtype=float))
+    spring_top_offset_m_vec_C2 = np.maximum(0.0, np.asarray(spring_family_c2['top_offset_m'], dtype=float))
+    spring_top_offset_m_vec = np.asarray(spring_family['top_offset_m'], dtype=float)
+    spring_top_offset_m_vec = np.maximum(0.0, spring_top_offset_m_vec)
+    spring_top_offset_m = float(np.mean(spring_top_offset_m_vec))
     spring_sync_geom = bool(params.get('пружина_геометрия_согласовать_с_цилиндром', True))
 
     # Требуемая *вертикальная* сила на каждом углу от пружины, чтобы в статике держать массу рамы.
@@ -2640,48 +2731,108 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     F_corner_weight = np.asarray(F_body_corner, dtype=float)
     F_spr_static_wheel_target = np.maximum(0.0, F_corner_weight - F_cyl0_wheel)
 
-    # Требуемая сила пружины вдоль штока Ц1 (вирт. работа): F_rod = F_wheel / (drod/ddw)
-    F_spr_static_rod_target = F_spr_static_wheel_target / np.maximum(1e-12, drod_ddw0_C1)
-
-    # Нормируем на масштаб пружины (если он используется как множитель таблицы)
-    F_tab_target_vec = F_spr_static_rod_target / max(1e-9, масштаб_пружины)
-
-    if len(табл_пруж_ход_м) >= 2:
-        x0_vec = np.interp(
-            F_tab_target_vec,
-            табл_пруж_сила_Н,
-            табл_пруж_ход_м,
-            left=float(табл_пруж_ход_м[0]),
-            right=float(табл_пруж_ход_м[-1])
-        ).astype(float)
+    if dual_spring_mode:
+        dual_capability_C1 = np.maximum(1e-9, масштаб_пружины_vec_C1 * np.maximum(1e-12, spring_drod_ddw0_C1))
+        dual_capability_C2 = np.maximum(1e-9, масштаб_пружины_vec_C2 * np.maximum(1e-12, spring_drod_ddw0_C2))
+        F_spr_static_wheel_target_C1, F_spr_static_wheel_target_C2 = split_dual_spring_force_target(
+            F_spr_static_wheel_target,
+            dual_capability_C1,
+            dual_capability_C2,
+        )
+        F_spr_static_rod_target_C1 = F_spr_static_wheel_target_C1 / np.maximum(1e-12, spring_drod_ddw0_C1)
+        F_spr_static_rod_target_C2 = F_spr_static_wheel_target_C2 / np.maximum(1e-12, spring_drod_ddw0_C2)
+        F_tab_target_vec_C1 = F_spr_static_rod_target_C1 / np.maximum(1e-9, масштаб_пружины_vec_C1)
+        F_tab_target_vec_C2 = F_spr_static_rod_target_C2 / np.maximum(1e-9, масштаб_пружины_vec_C2)
+        if len(табл_пруж_ход_м) >= 2:
+            x0_vec_C1 = np.interp(
+                F_tab_target_vec_C1,
+                табл_пруж_сила_Н,
+                табл_пруж_ход_м,
+                left=float(табл_пруж_ход_м[0]),
+                right=float(табл_пруж_ход_м[-1]),
+            ).astype(float)
+            x0_vec_C2 = np.interp(
+                F_tab_target_vec_C2,
+                табл_пруж_сила_Н,
+                табл_пруж_ход_м,
+                left=float(табл_пруж_ход_м[0]),
+                right=float(табл_пруж_ход_м[-1]),
+            ).astype(float)
+        else:
+            x0_vec_C1 = np.zeros(4, dtype=float)
+            x0_vec_C2 = np.zeros(4, dtype=float)
+        F_spr_static_rod_target = F_spr_static_rod_target_C1 + F_spr_static_rod_target_C2
+        F_tab_target_vec = 0.5 * (F_tab_target_vec_C1 + F_tab_target_vec_C2)
     else:
-        x0_vec = np.zeros(4, dtype=float)
+        # Требуемая сила пружины вдоль активного штока (вирт. работа): F_rod = F_wheel / (drod/ddw)
+        F_spr_static_rod_target = F_spr_static_wheel_target / np.maximum(1e-12, spring_drod_ddw0)
+
+        # Нормируем на масштаб пружины (если он используется как множитель таблицы)
+        F_tab_target_vec = F_spr_static_rod_target / np.maximum(1e-9, масштаб_пружины_vec)
+
+        if len(табл_пруж_ход_м) >= 2:
+            x0_vec = np.interp(
+                F_tab_target_vec,
+                табл_пруж_сила_Н,
+                табл_пруж_ход_м,
+                left=float(табл_пруж_ход_м[0]),
+                right=float(табл_пруж_ход_м[-1])
+            ).astype(float)
+        else:
+            x0_vec = np.zeros(4, dtype=float)
+        x0_vec_C1 = np.asarray(x0_vec if spring_mode != 'c2' else np.zeros(4, dtype=float), dtype=float)
+        x0_vec_C2 = np.asarray(x0_vec if spring_mode == 'c2' else np.zeros(4, dtype=float), dtype=float)
 
 
     # Если разрешено – согласуем L_free с геометрией цилиндра и рассчитанным x0_vec.
     # В dw2d-режиме: L_inst_stat = Lc0_C1 - spring_top_offset_m; L_free = L_inst_stat + x0_vec.
     # Это делает модель пружины физически непротиворечивой (пружина реально "сидит" на цилиндре).
-    if spring_sync_geom and (kin_mode == 'dw2d_mounts') and np.all(np.isfinite(Lc0_C1)):
-        L_inst_stat_vec = np.maximum(0.0, Lc0_C1 - spring_top_offset_m)
-        L_free_geom_vec = L_inst_stat_vec + x0_vec
-        # Считаем, что пружины одинаковые (одна свободная длина на все углы).
-        # Поэтому берём среднее; если геометрия симметрична, значения совпадут.
-        L_free = float(np.mean(L_free_geom_vec))
-        L_free = max(0.0, L_free)
-    x0_vec = np.clip(x0_vec, 0.0, L_free)
+    if spring_sync_geom and (kin_mode == 'dw2d_mounts'):
+        if np.all(np.isfinite(Lc0_C1)):
+            L_inst_stat_vec_C1 = np.maximum(0.0, Lc0_C1 - spring_top_offset_m_vec_C1)
+            L_free_vec_C1 = np.maximum(0.0, L_inst_stat_vec_C1 + x0_vec_C1)
+        if np.all(np.isfinite(Lc0_C2)):
+            L_inst_stat_vec_C2 = np.maximum(0.0, Lc0_C2 - spring_top_offset_m_vec_C2)
+            L_free_vec_C2 = np.maximum(0.0, L_inst_stat_vec_C2 + x0_vec_C2)
+    x0_vec_C1 = np.clip(x0_vec_C1, 0.0, np.maximum(1e-12, L_free_vec_C1))
+    x0_vec_C2 = np.clip(x0_vec_C2, 0.0, np.maximum(1e-12, L_free_vec_C2))
+    if dual_spring_mode:
+        x0_vec = np.maximum(x0_vec_C1, x0_vec_C2)
+        L_free_vec = np.minimum(L_free_vec_C1, L_free_vec_C2)
+        spring_top_offset_m_vec = np.maximum(spring_top_offset_m_vec_C1, spring_top_offset_m_vec_C2)
+    else:
+        L_free_vec = np.asarray(L_free_vec_C2 if spring_mode == 'c2' else L_free_vec_C1, dtype=float)
+        spring_top_offset_m_vec = np.asarray(spring_top_offset_m_vec_C2 if spring_mode == 'c2' else spring_top_offset_m_vec_C1, dtype=float)
+    L_free = float(np.mean(L_free_vec))
+    spring_top_offset_m = float(np.mean(spring_top_offset_m_vec))
     x0 = float(np.mean(x0_vec))  # для удобства (среднее предсжатие)
 
     # Требование: пружина НЕ должна "разжиматься в ноль" на полном отбое (шток полностью выдвинут)
-    пружина_преднатяг_на_отбое_минимум_м = float(params.get("пружина_преднатяг_на_отбое_минимум_м", 0.0))
-    x_пружины_на_отбое_м_vec = x0_vec - 0.5*L_stroke
-    запас_преднатяга_пружины_на_отбое_м_vec = x_пружины_на_отбое_м_vec - пружина_преднатяг_на_отбое_минимум_м
+    пружина_преднатяг_на_отбое_минимум_м_vec_C1 = np.asarray(spring_family_c1['rebound_preload_min_m'], dtype=float)
+    пружина_преднатяг_на_отбое_минимум_м_vec_C2 = np.asarray(spring_family_c2['rebound_preload_min_m'], dtype=float)
+    if dual_spring_mode:
+        пружина_преднатяг_на_отбое_минимум_м_vec = np.maximum(пружина_преднатяг_на_отбое_минимум_м_vec_C1, пружина_преднатяг_на_отбое_минимум_м_vec_C2)
+        x_пружины_на_отбое_м_vec_C1 = x0_vec_C1 - 0.5 * L_stroke_C1
+        x_пружины_на_отбое_м_vec_C2 = x0_vec_C2 - 0.5 * L_stroke_C2
+        запас_преднатяга_пружины_на_отбое_м_vec_C1 = x_пружины_на_отбое_м_vec_C1 - пружина_преднатяг_на_отбое_минимум_м_vec_C1
+        запас_преднатяга_пружины_на_отбое_м_vec_C2 = x_пружины_на_отбое_м_vec_C2 - пружина_преднатяг_на_отбое_минимум_м_vec_C2
+        x_пружины_на_отбое_м_vec = np.minimum(x_пружины_на_отбое_м_vec_C1, x_пружины_на_отбое_м_vec_C2)
+        запас_преднатяга_пружины_на_отбое_м_vec = np.minimum(
+            запас_преднатяга_пружины_на_отбое_м_vec_C1,
+            запас_преднатяга_пружины_на_отбое_м_vec_C2,
+        )
+    else:
+        пружина_преднатяг_на_отбое_минимум_м_vec = np.asarray(spring_family['rebound_preload_min_m'], dtype=float)
+        x_пружины_на_отбое_м_vec = x0_vec - 0.5*L_stroke
+        запас_преднатяга_пружины_на_отбое_м_vec = x_пружины_на_отбое_м_vec - пружина_преднатяг_на_отбое_минимум_м_vec
+    пружина_преднатяг_на_отбое_минимум_м = float(np.max(пружина_преднатяг_на_отбое_минимум_м_vec))
 
     # Для KPI берём худший угол (минимум запаса)
     x_пружины_на_отбое_м = float(np.min(x_пружины_на_отбое_м_vec))
     запас_преднатяга_пружины_на_отбое_м = float(np.min(запас_преднатяга_пружины_на_отбое_м_vec))
 
     # Геометрическая проверка по свободной длине (упрощённо): в статике длина должна оставаться положительной
-    запас_до_полного_сжатия_по_свободной_длине_м_vec = L_free - x0_vec
+    запас_до_полного_сжатия_по_свободной_длине_м_vec = L_free_vec - x0_vec
     запас_до_полного_сжатия_по_свободной_длине_м = float(np.min(запас_до_полного_сжатия_по_свободной_длине_м_vec))
 
 
@@ -2692,29 +2843,75 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     # Если задать пружина_длина_солид_м > 0, считаем запас до coil‑bind
     # на полном сжатии (delta_rod=+L/2), а также в статике/отбое.
 
-    пружина_длина_солид_м = float(params.get("пружина_длина_солид_м", 0.0))
-    if (not np.isfinite(пружина_длина_солид_м)) or (пружина_длина_солид_м <= 0.0):
-        пружина_длина_солид_м = float("nan")
+    пружина_длина_солид_м_vec_C1 = np.asarray(spring_family_c1['solid_length_m'], dtype=float)
+    пружина_длина_солид_м_vec_C2 = np.asarray(spring_family_c2['solid_length_m'], dtype=float)
+    if dual_spring_mode:
+        пружина_длина_солид_м_vec = np.where(
+            np.isfinite(пружина_длина_солид_м_vec_C1) & np.isfinite(пружина_длина_солид_м_vec_C2),
+            np.maximum(пружина_длина_солид_м_vec_C1, пружина_длина_солид_м_vec_C2),
+            np.where(np.isfinite(пружина_длина_солид_м_vec_C1), пружина_длина_солид_м_vec_C1, пружина_длина_солид_м_vec_C2),
+        )
+    else:
+        пружина_длина_солид_м_vec = np.asarray(spring_family['solid_length_m'], dtype=float)
+    пружина_длина_солид_м = float(np.nanmean(пружина_длина_солид_м_vec)) if np.any(np.isfinite(пружина_длина_солид_м_vec)) else float("nan")
 
-    пружина_запас_до_coil_bind_минимум_м = float(params.get("пружина_запас_до_coil_bind_минимум_м", 0.0))
-    if not np.isfinite(пружина_запас_до_coil_bind_минимум_м):
-        пружина_запас_до_coil_bind_минимум_м = 0.0
-    пружина_запас_до_coil_bind_минимум_м = max(0.0, пружина_запас_до_coil_bind_минимум_м)
+    пружина_запас_до_coil_bind_минимум_м_vec_C1 = np.asarray(spring_family_c1['coil_bind_margin_min_m'], dtype=float)
+    пружина_запас_до_coil_bind_минимум_м_vec_C2 = np.asarray(spring_family_c2['coil_bind_margin_min_m'], dtype=float)
+    if dual_spring_mode:
+        пружина_запас_до_coil_bind_минимум_м_vec = np.maximum(
+            пружина_запас_до_coil_bind_минимум_м_vec_C1,
+            пружина_запас_до_coil_bind_минимум_м_vec_C2,
+        )
+    else:
+        пружина_запас_до_coil_bind_минимум_м_vec = np.asarray(spring_family['coil_bind_margin_min_m'], dtype=float)
+    пружина_запас_до_coil_bind_минимум_м = float(np.max(пружина_запас_до_coil_bind_минимум_м_vec))
 
     # Установленная длина: L_inst = L_free - x, где x — компрессия (x>=0).
     # Для отчёта берём состояния: отбой (−L/2), статика (0), сжатие (+L/2).
-    x_reb_vec = x0_vec - 0.5*L_stroke
-    x_stat_vec = x0_vec
-    x_bump_vec = x0_vec + 0.5*L_stroke
+    if dual_spring_mode:
+        x_reb_vec_C1 = x0_vec_C1 - 0.5 * L_stroke_C1
+        x_stat_vec_C1 = x0_vec_C1
+        x_bump_vec_C1 = x0_vec_C1 + 0.5 * L_stroke_C1
+        x_reb_vec_C2 = x0_vec_C2 - 0.5 * L_stroke_C2
+        x_stat_vec_C2 = x0_vec_C2
+        x_bump_vec_C2 = x0_vec_C2 + 0.5 * L_stroke_C2
 
-    L_inst_reb_vec = L_free - np.clip(x_reb_vec, 0.0, L_free)
-    L_inst_stat_vec = L_free - np.clip(x_stat_vec, 0.0, L_free)
-    L_inst_bump_vec = L_free - np.clip(x_bump_vec, 0.0, L_free)
+        L_inst_reb_vec_C1 = L_free_vec_C1 - np.clip(x_reb_vec_C1, 0.0, L_free_vec_C1)
+        L_inst_stat_vec_C1 = L_free_vec_C1 - np.clip(x_stat_vec_C1, 0.0, L_free_vec_C1)
+        L_inst_bump_vec_C1 = L_free_vec_C1 - np.clip(x_bump_vec_C1, 0.0, L_free_vec_C1)
+        L_inst_reb_vec_C2 = L_free_vec_C2 - np.clip(x_reb_vec_C2, 0.0, L_free_vec_C2)
+        L_inst_stat_vec_C2 = L_free_vec_C2 - np.clip(x_stat_vec_C2, 0.0, L_free_vec_C2)
+        L_inst_bump_vec_C2 = L_free_vec_C2 - np.clip(x_bump_vec_C2, 0.0, L_free_vec_C2)
 
-    if np.isfinite(пружина_длина_солид_м):
-        запас_до_coil_bind_на_сжатии_м_vec = L_inst_bump_vec - (пружина_длина_солид_м + пружина_запас_до_coil_bind_минимум_м)
-        запас_до_coil_bind_в_статике_м_vec = L_inst_stat_vec - (пружина_длина_солид_м + пружина_запас_до_coil_bind_минимум_м)
-        запас_до_coil_bind_на_отбое_м_vec = L_inst_reb_vec - (пружина_длина_солид_м + пружина_запас_до_coil_bind_минимум_м)
+        L_inst_reb_vec = np.minimum(L_inst_reb_vec_C1, L_inst_reb_vec_C2)
+        L_inst_stat_vec = np.minimum(L_inst_stat_vec_C1, L_inst_stat_vec_C2)
+        L_inst_bump_vec = np.minimum(L_inst_bump_vec_C1, L_inst_bump_vec_C2)
+    else:
+        x_reb_vec = x0_vec - 0.5*L_stroke
+        x_stat_vec = x0_vec
+        x_bump_vec = x0_vec + 0.5*L_stroke
+        L_inst_reb_vec = L_free_vec - np.clip(x_reb_vec, 0.0, L_free_vec)
+        L_inst_stat_vec = L_free_vec - np.clip(x_stat_vec, 0.0, L_free_vec)
+        L_inst_bump_vec = L_free_vec - np.clip(x_bump_vec, 0.0, L_free_vec)
+
+    if np.any(np.isfinite(пружина_длина_солид_м_vec)):
+        if dual_spring_mode:
+            coil_threshold_vec_C1 = пружина_длина_солид_м_vec_C1 + пружина_запас_до_coil_bind_минимум_м_vec_C1
+            coil_threshold_vec_C2 = пружина_длина_солид_м_vec_C2 + пружина_запас_до_coil_bind_минимум_м_vec_C2
+            запас_до_coil_bind_на_сжатии_м_vec_C1 = L_inst_bump_vec_C1 - coil_threshold_vec_C1
+            запас_до_coil_bind_в_статике_м_vec_C1 = L_inst_stat_vec_C1 - coil_threshold_vec_C1
+            запас_до_coil_bind_на_отбое_м_vec_C1 = L_inst_reb_vec_C1 - coil_threshold_vec_C1
+            запас_до_coil_bind_на_сжатии_м_vec_C2 = L_inst_bump_vec_C2 - coil_threshold_vec_C2
+            запас_до_coil_bind_в_статике_м_vec_C2 = L_inst_stat_vec_C2 - coil_threshold_vec_C2
+            запас_до_coil_bind_на_отбое_м_vec_C2 = L_inst_reb_vec_C2 - coil_threshold_vec_C2
+            запас_до_coil_bind_на_сжатии_м_vec = np.minimum(запас_до_coil_bind_на_сжатии_м_vec_C1, запас_до_coil_bind_на_сжатии_м_vec_C2)
+            запас_до_coil_bind_в_статике_м_vec = np.minimum(запас_до_coil_bind_в_статике_м_vec_C1, запас_до_coil_bind_в_статике_м_vec_C2)
+            запас_до_coil_bind_на_отбое_м_vec = np.minimum(запас_до_coil_bind_на_отбое_м_vec_C1, запас_до_coil_bind_на_отбое_м_vec_C2)
+        else:
+            coil_threshold_vec = пружина_длина_солид_м_vec + пружина_запас_до_coil_bind_минимум_м_vec
+            запас_до_coil_bind_на_сжатии_м_vec = L_inst_bump_vec - coil_threshold_vec
+            запас_до_coil_bind_в_статике_м_vec = L_inst_stat_vec - coil_threshold_vec
+            запас_до_coil_bind_на_отбое_м_vec = L_inst_reb_vec - coil_threshold_vec
         запас_до_coil_bind_на_сжатии_минимум_м = float(np.min(запас_до_coil_bind_на_сжатии_м_vec))
         запас_до_coil_bind_в_статике_минимум_м = float(np.min(запас_до_coil_bind_в_статике_м_vec))
         запас_до_coil_bind_на_отбое_минимум_м = float(np.min(запас_до_coil_bind_на_отбое_м_vec))
@@ -2725,6 +2922,120 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         запас_до_coil_bind_на_сжатии_минимум_м = float("nan")
         запас_до_coil_bind_в_статике_минимум_м = float("nan")
         запас_до_coil_bind_на_отбое_минимум_м = float("nan")
+
+    def _build_spring_runtime_state(
+        delta_rod_c1: np.ndarray,
+        delta_rod_c2: np.ndarray,
+        *,
+        drod_ddw_c1: np.ndarray | None = None,
+        drod_ddw_c2: np.ndarray | None = None,
+    ) -> dict[str, Any]:
+        delta_rod_c1 = np.asarray(delta_rod_c1, dtype=float)
+        delta_rod_c2 = np.asarray(delta_rod_c2, dtype=float)
+        drod_ddw_c1 = np.asarray(drod_ddw_c1, dtype=float) if drod_ddw_c1 is not None else np.zeros(4, dtype=float)
+        drod_ddw_c2 = np.asarray(drod_ddw_c2, dtype=float) if drod_ddw_c2 is not None else np.zeros(4, dtype=float)
+
+        x_comp_c1 = np.clip(x0_vec_C1 + delta_rod_c1, 0.0, np.maximum(1e-12, L_free_vec_C1))
+        x_comp_c2 = np.clip(x0_vec_C2 + delta_rod_c2, 0.0, np.maximum(1e-12, L_free_vec_C2))
+        len_c1 = L_free_vec_C1 - x_comp_c1
+        len_c2 = L_free_vec_C2 - x_comp_c2
+
+        if (kin_mode == 'dw2d_mounts') and np.all(np.isfinite(Lc0_C1)) and np.all(np.isfinite(Lc0_C2)):
+            lc_now_c1 = Lc0_C1 - delta_rod_c1 / sign_s_C1
+            lc_now_c2 = Lc0_C2 - delta_rod_c2 / sign_s_C2
+            avail_c1 = np.maximum(0.0, lc_now_c1 - spring_top_offset_m_vec_C1)
+            avail_c2 = np.maximum(0.0, lc_now_c2 - spring_top_offset_m_vec_C2)
+        else:
+            lc_now_c1 = np.full(4, np.nan, dtype=float)
+            lc_now_c2 = np.full(4, np.nan, dtype=float)
+            avail_c1 = np.full(4, np.nan, dtype=float)
+            avail_c2 = np.full(4, np.nan, dtype=float)
+        gap_c1 = avail_c1 - len_c1
+        gap_c2 = avail_c2 - len_c2
+
+        coil_margin_c1 = np.full(4, np.nan, dtype=float)
+        coil_margin_c2 = np.full(4, np.nan, dtype=float)
+        if np.any(np.isfinite(пружина_длина_солид_м_vec_C1)):
+            coil_margin_c1 = len_c1 - (пружина_длина_солид_м_vec_C1 + пружина_запас_до_coil_bind_минимум_м_vec_C1)
+        if np.any(np.isfinite(пружина_длина_солид_м_vec_C2)):
+            coil_margin_c2 = len_c2 - (пружина_длина_солид_м_vec_C2 + пружина_запас_до_coil_bind_минимум_м_vec_C2)
+
+        f_inc_c1 = np.interp(x_comp_c1, табл_пруж_ход_м, табл_пруж_сила_Н)
+        f_inc_c2 = np.interp(x_comp_c2, табл_пруж_ход_м, табл_пруж_сила_Н)
+        force_rod_c1 = масштаб_пружины_vec_C1 * f_inc_c1
+        force_rod_c2 = масштаб_пружины_vec_C2 * f_inc_c2
+        force_wheel_c1 = force_rod_c1 * drod_ddw_c1
+        force_wheel_c2 = force_rod_c2 * drod_ddw_c2
+
+        if dual_spring_mode:
+            compression = np.maximum(x_comp_c1, x_comp_c2)
+            length = np.fmin(len_c1, len_c2)
+            gap_to_cap = np.fmin(gap_c1, gap_c2)
+            coil_margin = np.fmin(coil_margin_c1, coil_margin_c2)
+            force_rod = force_rod_c1 + force_rod_c2
+            force_wheel = force_wheel_c1 + force_wheel_c2
+        elif spring_mode == 'c2':
+            compression = x_comp_c2
+            length = len_c2
+            gap_to_cap = gap_c2
+            coil_margin = coil_margin_c2
+            force_rod = force_rod_c2
+            force_wheel = force_wheel_c2
+        else:
+            compression = x_comp_c1
+            length = len_c1
+            gap_to_cap = gap_c1
+            coil_margin = coil_margin_c1
+            force_rod = force_rod_c1
+            force_wheel = force_wheel_c1
+
+        return {
+            "Lc_now_C1": lc_now_c1,
+            "Lc_now_C2": lc_now_c2,
+            "compression_m": compression,
+            "length_m": length,
+            "gap_to_cap_m": gap_to_cap,
+            "installed_length_m": length,
+            "coil_bind_margin_m": coil_margin,
+            "force_rod_N": force_rod,
+            "force_wheel_N": force_wheel,
+            "compression_by_cyl": {
+                "Ц1": x_comp_c1,
+                "Ц2": x_comp_c2,
+            },
+            "length_by_cyl": {
+                "Ц1": len_c1,
+                "Ц2": len_c2,
+            },
+            "gap_to_cap_by_cyl": {
+                "Ц1": gap_c1,
+                "Ц2": gap_c2,
+            },
+            "coil_bind_margin_by_cyl": {
+                "Ц1": coil_margin_c1,
+                "Ц2": coil_margin_c2,
+            },
+            "force_wheel_by_cyl": {
+                "Ц1": force_wheel_c1,
+                "Ц2": force_wheel_c2,
+            },
+            "runtime_metrics_by_cyl": {
+                "Ц1": {
+                    "компрессия_м": x_comp_c1,
+                    "длина_м": len_c1,
+                    "зазор_до_крышки_м": gap_c1,
+                    "запас_до_coil_bind_м": coil_margin_c1,
+                    "длина_установленная_м": len_c1,
+                },
+                "Ц2": {
+                    "компрессия_м": x_comp_c2,
+                    "длина_м": len_c2,
+                    "зазор_до_крышки_м": gap_c2,
+                    "запас_до_coil_bind_м": coil_margin_c2,
+                    "длина_установленная_м": len_c2,
+                },
+            },
+        }
 
     # Функция объёмов (дифференциальная)
     # В R51: считаем кинематику/ходы Ц1 и Ц2 раздельно.
@@ -4482,19 +4793,17 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         x_ctrl = state[idx_x0:idx_x0+n_ctrl].copy() if n_ctrl else np.zeros(0, dtype=float)
 
         p, V, dV, delta_w, delta_rod_C1, delta_rod_C2, s_C1, s_C2, s_dot_C1, s_dot_C2, drod_ddw_C1, drod_ddw_C2, T, Tw = compute_pressures(state)
-
-        # Геометрия цилиндров/пружины (для диагностики; в иных кинематиках может быть NaN)
-        if (kin_mode == 'dw2d_mounts') and np.all(np.isfinite(Lc0_C1)):
-            Lc_now_C1 = Lc0_C1 - delta_rod_C1 / sign_s_C1
-            Lc_now_C2 = Lc0_C2 - delta_rod_C2 / sign_s_C2
-            spring_avail_len_now = np.maximum(0.0, Lc_now_C1 - spring_top_offset_m)
-        else:
-            Lc_now_C1 = np.full(4, np.nan, dtype=float)
-            Lc_now_C2 = np.full(4, np.nan, dtype=float)
-            spring_avail_len_now = np.full(4, np.nan, dtype=float)
-        spring_x_now = np.clip(x0_vec + delta_rod_C1, 0.0, max(1e-12, L_free))
-        spring_len_now = L_free - spring_x_now
-        spring_gap_to_cap_now = spring_avail_len_now - spring_len_now
+        spring_state_now = _build_spring_runtime_state(
+            delta_rod_C1,
+            delta_rod_C2,
+            drod_ddw_c1=drod_ddw_C1,
+            drod_ddw_c2=drod_ddw_C2,
+        )
+        Lc_now_C1 = np.asarray(spring_state_now["Lc_now_C1"], dtype=float)
+        Lc_now_C2 = np.asarray(spring_state_now["Lc_now_C2"], dtype=float)
+        spring_x_now = np.asarray(spring_state_now["compression_m"], dtype=float)
+        spring_len_now = np.asarray(spring_state_now["length_m"], dtype=float)
+        spring_gap_to_cap_now = np.asarray(spring_state_now["gap_to_cap_m"], dtype=float)
         mdots = compute_flows(p, T, x_ctrl)
 
         # Current gas↔wall conductance (may be flow-dependent)
@@ -4600,12 +4909,8 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         # Вертикальная сила на колесе: F_wheel = F_rod * d(rod)/d(wheel) (энергосохранение).
 
         # Односторонняя пружина: работает только на сжатие (x>=0).
-        # В R51 пружина считается коаксиальной с Ц1 (delta_rod_C1).
-        x = x0_vec + delta_rod_C1
-        x_comp = np.clip(x, 0.0, L_free)
-        F_inc = np.interp(x_comp, табл_пруж_ход_м, табл_пруж_сила_Н)
-        F_spr_rod = масштаб_пружины * F_inc
-        F_spr = F_spr_rod * drod_ddw_C1
+        # В семейном режиме пружина может быть привязана к Ц1 или Ц2.
+        F_spr = np.asarray(spring_state_now["force_wheel_N"], dtype=float)
 
         # Силы от цилиндров Ц1 и Ц2 (вдоль штока)
         F_cyl1_rod = np.zeros(4, dtype=float)
@@ -4615,8 +4920,8 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             p1r = p[node_index[f'Ц1_{cname}_ШП']]
             p2c = p[node_index[f'Ц2_{cname}_БП']]
             p2r = p[node_index[f'Ц2_{cname}_ШП']]
-            F1 = (p1c - P_ATM) * A1_cap - (p1r - P_ATM) * A1_rod
-            F2 = (p2c - P_ATM) * A2_cap - (p2r - P_ATM) * A2_rod
+            F1 = (p1c - P_ATM) * A1_cap[i_c] - (p1r - P_ATM) * A1_rod[i_c]
+            F2 = (p2c - P_ATM) * A2_cap[i_c] - (p2r - P_ATM) * A2_rod[i_c]
             F_cyl1_rod[i_c] = F1
             F_cyl2_rod[i_c] = F2
 
@@ -5593,6 +5898,8 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         рыскание_v_min_м_с = 0.5
     рыскание_v_min_м_с = max(1e-6, рыскание_v_min_м_с)
 
+    out.update(spring_family_runtime_series_template(n_steps))
+    out['пружина_режим_семейства_id'] = np.full(n_steps, float(spring_family_mode_id(spring_mode)), dtype=float)
 
     for k, t in enumerate(time):
         # Синхронизация времени с сеткой логирования (защита от накопления float)
@@ -5617,20 +5924,17 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         out['перемещение_колеса_ПЗ_м'][k] = state[6]
 
         p, V, dV, delta_w, delta_rod_C1, delta_rod_C2, s_C1, s_C2, s_dot_C1, s_dot_C2, drod_ddw_C1, drod_ddw_C2, T, Tw = compute_pressures(state)
-
-        # Геометрия цилиндров/пружины (для диагностики; в иных кинематиках может быть NaN)
-        if kin_mode == 'dw2d_mounts' and np.all(np.isfinite(Lc0_C1)):
-            Lc_now_C1 = Lc0_C1 - delta_rod_C1 / sign_s_C1
-            Lc_now_C2 = Lc0_C2 - delta_rod_C2 / sign_s_C2
-            L_spr_avail_now = np.maximum(0.0, Lc_now_C1 - spring_top_offset_m)
-        else:
-            Lc_now_C1 = np.full(4, np.nan, dtype=float)
-            Lc_now_C2 = np.full(4, np.nan, dtype=float)
-            L_spr_avail_now = np.full(4, np.nan, dtype=float)
-
-        x_spr_now = np.clip(x0_vec + delta_rod_C1, 0.0, L_free)  # м, компрессия
-        L_spr_now = L_free - x_spr_now  # м, фактическая длина пружины
-        spring_gap_now = L_spr_avail_now - L_spr_now  # м, положительное = запас, отрицательное = выступает выше
+        spring_state_now = _build_spring_runtime_state(
+            delta_rod_C1,
+            delta_rod_C2,
+            drod_ddw_c1=drod_ddw_C1,
+            drod_ddw_c2=drod_ddw_C2,
+        )
+        Lc_now_C1 = np.asarray(spring_state_now["Lc_now_C1"], dtype=float)
+        Lc_now_C2 = np.asarray(spring_state_now["Lc_now_C2"], dtype=float)
+        x_spr_now = np.asarray(spring_state_now["compression_m"], dtype=float)
+        L_spr_now = np.asarray(spring_state_now["length_m"], dtype=float)
+        spring_gap_now = np.asarray(spring_state_now["gap_to_cap_m"], dtype=float)
 
         # Сохранение диагностических рядов (длины цилиндров и геометрия пружины)
         out['длина_цилиндра_ЛП_м'][k] = float(Lc_now_C1[0]) if np.isfinite(Lc_now_C1[0]) else np.nan
@@ -5899,19 +6203,24 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         out['доля_хода_штока_ПЗ'][k] = float(s_C1[3] / max(1e-12, L_stroke_C1[3]))
 
         # Пружина: установленная длина (и запас до coil‑bind, если задана solid length)
-        x_dyn = x0_vec + delta_rod_C1
-        x_dyn_comp = np.clip(x_dyn, 0.0, L_free)
-        L_inst_dyn = L_free - x_dyn_comp
+        x_dyn_comp = np.asarray(spring_state_now["compression_m"], dtype=float)
+        L_inst_dyn = np.asarray(spring_state_now["installed_length_m"], dtype=float)
+        coil_margin = np.asarray(spring_state_now["coil_bind_margin_m"], dtype=float)
         out['пружина_длина_установленная_ЛП_м'][k] = float(L_inst_dyn[0])
         out['пружина_длина_установленная_ПП_м'][k] = float(L_inst_dyn[1])
         out['пружина_длина_установленная_ЛЗ_м'][k] = float(L_inst_dyn[2])
         out['пружина_длина_установленная_ПЗ_м'][k] = float(L_inst_dyn[3])
-        if np.isfinite(пружина_длина_солид_м):
-            coil_margin = L_inst_dyn - (пружина_длина_солид_м + пружина_запас_до_coil_bind_минимум_м)
+        if np.any(np.isfinite(coil_margin)):
             out['пружина_запас_до_coil_bind_ЛП_м'][k] = float(coil_margin[0])
             out['пружина_запас_до_coil_bind_ПП_м'][k] = float(coil_margin[1])
             out['пружина_запас_до_coil_bind_ЛЗ_м'][k] = float(coil_margin[2])
             out['пружина_запас_до_coil_bind_ПЗ_м'][k] = float(coil_margin[3])
+        spring_family_runtime_now = build_spring_family_runtime_snapshot(
+            spring_mode=spring_mode,
+            metrics_by_cyl=spring_state_now["runtime_metrics_by_cyl"],
+        )
+        for _name, _value in spring_family_runtime_now.items():
+            out[_name][k] = float(_value)
 
         # Дорога/контакт (с учётом скорости дороги)
         zroad_m, zroad_dot_m = road_state(state, t_cur)
@@ -6000,19 +6309,36 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         P_road = float(np.sum(F_tire_m * zroad_dot_m))
 
         # Энергия подвесочной пружины (табличная, вдоль штока)
-        x = x0_vec + delta_rod_C1
-        x_comp = np.clip(x, 0.0, L_free)
         if len(табл_пруж_ход_м) >= 2:
-            E_base = np.interp(
-                x_comp,
-                табл_пруж_ход_м,
-                табл_пруж_энергия_Дж,
-                left=0.0,
-                right=float(табл_пруж_энергия_Дж[-1])
-            )
-            # хвост за пределами последней точки (если L_free > xmax): сила ≈ const = F_last
-            E_base = E_base + np.maximum(0.0, x_comp - float(табл_пруж_ход_м[-1])) * float(табл_пруж_сила_Н[-1])
-            E_spr = float(np.sum(масштаб_пружины * E_base))
+            def _spring_energy_for_family(x_comp_vec: np.ndarray, scale_vec: np.ndarray) -> float:
+                e_base = np.interp(
+                    np.asarray(x_comp_vec, dtype=float),
+                    табл_пруж_ход_м,
+                    табл_пруж_энергия_Дж,
+                    left=0.0,
+                    right=float(табл_пруж_энергия_Дж[-1]),
+                )
+                e_base = e_base + np.maximum(0.0, np.asarray(x_comp_vec, dtype=float) - float(табл_пруж_ход_м[-1])) * float(табл_пруж_сила_Н[-1])
+                return float(np.sum(np.asarray(scale_vec, dtype=float) * e_base))
+
+            if dual_spring_mode:
+                E_spr = _spring_energy_for_family(
+                    spring_state_now["compression_by_cyl"]["Ц1"],
+                    масштаб_пружины_vec_C1,
+                ) + _spring_energy_for_family(
+                    spring_state_now["compression_by_cyl"]["Ц2"],
+                    масштаб_пружины_vec_C2,
+                )
+            elif spring_mode == 'c2':
+                E_spr = _spring_energy_for_family(
+                    spring_state_now["compression_by_cyl"]["Ц2"],
+                    масштаб_пружины_vec_C2,
+                )
+            else:
+                E_spr = _spring_energy_for_family(
+                    spring_state_now["compression_by_cyl"]["Ц1"],
+                    масштаб_пружины_vec_C1,
+                )
         else:
             E_spr = 0.0
 
@@ -6103,8 +6429,8 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             p1r = p[node_index[f'Ц1_{cname}_ШП']]
             p2c = p[node_index[f'Ц2_{cname}_БП']]
             p2r = p[node_index[f'Ц2_{cname}_ШП']]
-            F1 = (p1c - P_ATM) * A1_cap - (p1r - P_ATM) * A1_rod
-            F2 = (p2c - P_ATM) * A2_cap - (p2r - P_ATM) * A2_rod
+            F1 = (p1c - P_ATM) * A1_cap[i_c] - (p1r - P_ATM) * A1_rod[i_c]
+            F2 = (p2c - P_ATM) * A2_cap[i_c] - (p2r - P_ATM) * A2_rod[i_c]
             F_cyl1_rod_m[i_c] = F1
             F_cyl2_rod_m[i_c] = F2
 

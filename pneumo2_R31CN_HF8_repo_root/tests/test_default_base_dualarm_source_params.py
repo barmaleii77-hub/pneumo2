@@ -16,6 +16,14 @@ REQUIRED_KEYS = (
     "dw_upper_arm_len_перед_м",
     "dw_upper_arm_len_зад_м",
 )
+REQUIRED_AUTOVERIF_PACKAGING_KEYS = (
+    "autoverif_packaging_enabled",
+    "autoverif_spring_host_min_clearance_m",
+    "autoverif_spring_pair_min_clearance_m",
+    "autoverif_spring_cap_min_margin_m",
+    "autoverif_midstroke_t0_max_error_m",
+    "autoverif_coilbind_min_margin_m",
+)
 
 
 def test_default_base_declares_upper_arm_source_data_keys() -> None:
@@ -23,3 +31,9 @@ def test_default_base_declares_upper_arm_source_data_keys() -> None:
     for key in REQUIRED_KEYS:
         assert key in data, key
         assert isinstance(data[key], (int, float)), key
+
+
+def test_default_base_declares_packaging_autoverif_defaults() -> None:
+    data = json.loads(DEFAULT_BASE.read_text(encoding="utf-8"))
+    for key in REQUIRED_AUTOVERIF_PACKAGING_KEYS:
+        assert key in data, key

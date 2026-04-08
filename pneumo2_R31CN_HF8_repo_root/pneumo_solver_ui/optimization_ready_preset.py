@@ -413,6 +413,10 @@ def _append_generated_rows(rows: list[dict[str, Any]], *, generated_profile: Map
             "target_мин_Fmin_Н": 0.0,
             "target_мин_запас_до_упора_штока_м": 0.001,
             "target_лимит_скорости_штока_м_с": 3.0,
+            "target_мин_зазор_пружина_цилиндр_м": 0.001,
+            "target_мин_зазор_пружина_пружина_м": 0.001,
+            "target_макс_ошибка_midstroke_t0_м": 0.03,
+            "target_мин_запас_до_coil_bind_пружины_м": 0.003,
             "save_npz": True,
             "save_csv": True,
         }
@@ -465,6 +469,10 @@ def build_optimization_ready_suite_rows(
             item["комментарий"] = (
                 "Автогенерируемое кольцо short city rough 20 км/ч для final-stage one-click проверки манёвра и sidecar paths."
             )
+            item.setdefault("target_мин_зазор_пружина_цилиндр_м", 0.001)
+            item.setdefault("target_мин_зазор_пружина_пружина_м", 0.001)
+            item.setdefault("target_макс_ошибка_midstroke_t0_м", 0.03)
+            item.setdefault("target_мин_запас_до_coil_bind_пружины_м", 0.003)
         updated_rows.append(item)
 
     return _append_generated_rows(updated_rows, generated_profile=generated_profile)

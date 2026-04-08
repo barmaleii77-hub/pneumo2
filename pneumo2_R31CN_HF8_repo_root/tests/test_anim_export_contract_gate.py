@@ -85,6 +85,24 @@ def _build_meta() -> dict:
             "cyl1_body_length_rear_m": 0.29,
             "cyl2_body_length_front_m": 0.27,
             "cyl2_body_length_rear_m": 0.27,
+            "spring_cyl1_front_wire_diameter_m": 0.008,
+            "spring_cyl1_front_mean_diameter_m": 0.060,
+            "spring_cyl1_front_inner_diameter_m": 0.052,
+            "spring_cyl1_front_outer_diameter_m": 0.068,
+            "spring_cyl1_front_free_length_m": 0.31,
+            "spring_cyl1_front_solid_length_m": 0.085,
+            "spring_cyl1_front_top_offset_m": 0.02,
+            "spring_cyl1_front_coil_bind_margin_min_m": 0.005,
+            "spring_cyl1_front_rebound_preload_min_m": 0.01,
+            "spring_cyl2_front_wire_diameter_m": 0.007,
+            "spring_cyl2_front_mean_diameter_m": 0.072,
+            "spring_cyl2_front_inner_diameter_m": 0.065,
+            "spring_cyl2_front_outer_diameter_m": 0.079,
+            "spring_cyl2_front_free_length_m": 0.30,
+            "spring_cyl2_front_solid_length_m": 0.084,
+            "spring_cyl2_front_top_offset_m": 0.019,
+            "spring_cyl2_front_coil_bind_margin_min_m": 0.005,
+            "spring_cyl2_front_rebound_preload_min_m": 0.01,
         },
         "scenario_kind": "ring",
         "road_len_m": 100.0,
@@ -106,6 +124,7 @@ def test_validate_anim_export_contract_warns_on_partial_packaging() -> None:
     assert report["summary"]["has_hardpoints_block"] is True
     assert report["summary"]["has_packaging_block"] is True
     assert report["summary"]["packaging_truth_ready"] is False
+    assert any("shared axle fallback" in msg for msg in report["warnings"])
 
 
 def test_write_anim_export_contract_artifacts_writes_files(tmp_path: Path) -> None:
@@ -138,3 +157,30 @@ def test_write_anim_export_contract_artifacts_writes_files(tmp_path: Path) -> No
     md = Path(out["validation_md_path"]).read_text(encoding="utf-8")
     assert "packaging_truth_ready" in md
     assert "visible_present_family_count" in md
+
+
+def test_validate_anim_export_contract_fails_on_spring_cylinder_interference() -> None:
+    df = _build_df()
+    df_fixed, length_repair = ensure_cylinder_length_columns(df)
+    meta = _build_meta()
+    meta["geometry"]["spring_cyl1_front_inner_diameter_m"] = 0.030
+    meta = augment_anim_latest_meta(meta, df_main=df_fixed, length_repair=length_repair)
+    report = validate_anim_export_contract_meta(meta)
+    assert report["level"] == "FAIL"
+    assert any("spring/cylinder interference" in msg for msg in report["messages"])
+
+
+def test_validate_anim_export_contract_fails_on_spring_spring_interference() -> None:
+    df = _build_df()
+    for corner in ("ЛП", "ПП"):
+        df.loc[:, f"cyl2_top_{corner}_x_м"] = df.loc[:, f"cyl1_top_{corner}_x_м"] + 0.01
+        df.loc[:, f"cyl2_bot_{corner}_x_м"] = df.loc[:, f"cyl1_bot_{corner}_x_м"] + 0.01
+        df.loc[:, f"cyl2_top_{corner}_y_м"] = df.loc[:, f"cyl1_top_{corner}_y_м"]
+        df.loc[:, f"cyl2_bot_{corner}_y_м"] = df.loc[:, f"cyl1_bot_{corner}_y_м"]
+        df.loc[:, f"cyl2_top_{corner}_z_м"] = df.loc[:, f"cyl1_top_{corner}_z_м"]
+        df.loc[:, f"cyl2_bot_{corner}_z_м"] = df.loc[:, f"cyl1_bot_{corner}_z_м"]
+    df_fixed, length_repair = ensure_cylinder_length_columns(df)
+    meta = augment_anim_latest_meta(_build_meta(), df_main=df_fixed, length_repair=length_repair)
+    report = validate_anim_export_contract_meta(meta)
+    assert report["level"] == "FAIL"
+    assert any("spring/spring interference" in msg for msg in report["messages"])

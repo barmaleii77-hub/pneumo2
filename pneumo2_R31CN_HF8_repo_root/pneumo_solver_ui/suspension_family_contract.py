@@ -31,6 +31,29 @@ _SPRING_GENERIC_SUFFIXES: tuple[str, ...] = (
     "геом_шаг_витка_м",
     "геом_G_Па",
 )
+CYLINDER_AXLE_GEOMETRY_FIELDS: tuple[str, ...] = (
+    "bore_diameter_m",
+    "rod_diameter_m",
+    "outer_diameter_m",
+    "stroke_m",
+    "dead_cap_length_m",
+    "dead_rod_length_m",
+    "dead_height_m",
+    "body_length_m",
+)
+SPRING_GEOMETRY_FIELDS: tuple[str, ...] = (
+    "wire_diameter_m",
+    "mean_diameter_m",
+    "inner_diameter_m",
+    "outer_diameter_m",
+    "free_length_m",
+    "solid_length_m",
+    "top_offset_m",
+    "coil_bind_margin_min_m",
+    "rebound_preload_min_m",
+)
+_CANONICAL_AXLE_SLUGS: dict[str, str] = {"перед": "front", "зад": "rear"}
+_CANONICAL_CYL_SLUGS: dict[str, str] = {"Ц1": "cyl1", "Ц2": "cyl2"}
 
 _CYLINDER_FIELD_LABELS: dict[str, str] = {
     "bore": "Диаметр поршня",
@@ -128,6 +151,53 @@ def cylinder_generic_key(field: str, cyl: str) -> str:
 
 def spring_family_key(suffix: str, cyl: str, axle: str) -> str:
     return f"пружина_{str(cyl).strip().upper()}_{str(axle).strip().lower()}_{str(suffix).strip()}"
+
+
+def canonical_cylinder_slug(cyl: str) -> str:
+    cyl_key = str(cyl).strip().upper()
+    return _CANONICAL_CYL_SLUGS.get(cyl_key, cyl_key.lower())
+
+
+def canonical_axle_slug(axle: str) -> str:
+    axle_key = str(axle).strip().lower()
+    return _CANONICAL_AXLE_SLUGS.get(axle_key, axle_key)
+
+
+def cylinder_axle_geometry_key(field: str, cyl: str, axle: str) -> str:
+    cyl_slug = canonical_cylinder_slug(cyl)
+    axle_slug = canonical_axle_slug(axle)
+    mapping = {
+        "bore_diameter_m": f"{cyl_slug}_bore_diameter_{axle_slug}_m",
+        "rod_diameter_m": f"{cyl_slug}_rod_diameter_{axle_slug}_m",
+        "outer_diameter_m": f"{cyl_slug}_outer_diameter_{axle_slug}_m",
+        "stroke_m": f"{cyl_slug}_stroke_{axle_slug}_m",
+        "dead_cap_length_m": f"{cyl_slug}_dead_cap_length_{axle_slug}_m",
+        "dead_rod_length_m": f"{cyl_slug}_dead_rod_length_{axle_slug}_m",
+        "dead_height_m": f"{cyl_slug}_dead_height_{axle_slug}_m",
+        "body_length_m": f"{cyl_slug}_body_length_{axle_slug}_m",
+    }
+    if field not in mapping:
+        raise KeyError(field)
+    return mapping[field]
+
+
+def spring_geometry_key(field: str, cyl: str, axle: str) -> str:
+    cyl_slug = canonical_cylinder_slug(cyl)
+    axle_slug = canonical_axle_slug(axle)
+    mapping = {
+        "wire_diameter_m": f"spring_{cyl_slug}_{axle_slug}_wire_diameter_m",
+        "mean_diameter_m": f"spring_{cyl_slug}_{axle_slug}_mean_diameter_m",
+        "inner_diameter_m": f"spring_{cyl_slug}_{axle_slug}_inner_diameter_m",
+        "outer_diameter_m": f"spring_{cyl_slug}_{axle_slug}_outer_diameter_m",
+        "free_length_m": f"spring_{cyl_slug}_{axle_slug}_free_length_m",
+        "solid_length_m": f"spring_{cyl_slug}_{axle_slug}_solid_length_m",
+        "top_offset_m": f"spring_{cyl_slug}_{axle_slug}_top_offset_m",
+        "coil_bind_margin_min_m": f"spring_{cyl_slug}_{axle_slug}_coil_bind_margin_min_m",
+        "rebound_preload_min_m": f"spring_{cyl_slug}_{axle_slug}_rebound_preload_min_m",
+    }
+    if field not in mapping:
+        raise KeyError(field)
+    return mapping[field]
 
 
 def normalize_spring_static_mode(value: Any) -> str:
@@ -331,11 +401,16 @@ def normalize_component_family_contract(
 
 __all__ = [
     "AXLES",
+    "CYLINDER_AXLE_GEOMETRY_FIELDS",
     "CYLINDERS",
     "FAMILY_ORDER",
+    "SPRING_GEOMETRY_FIELDS",
     "SPRING_STATIC_MODE_AUTO_MIDSTROKE",
     "SPRING_STATIC_MODE_KEY",
     "SPRING_STATIC_MODE_MANUAL",
+    "canonical_axle_slug",
+    "canonical_cylinder_slug",
+    "cylinder_axle_geometry_key",
     "cylinder_family_key",
     "cylinder_generic_key",
     "family_name",
@@ -345,5 +420,6 @@ __all__ = [
     "normalize_component_family_contract",
     "normalize_spring_static_mode",
     "spring_family_key",
+    "spring_geometry_key",
     "spring_static_mode_description",
 ]

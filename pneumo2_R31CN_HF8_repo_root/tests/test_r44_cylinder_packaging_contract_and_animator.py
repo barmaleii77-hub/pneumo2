@@ -11,6 +11,7 @@ from pneumo_solver_ui.desktop_animator.geom3d_helpers import (
     cylinder_visual_segments_from_state,
     cylinder_visual_state_from_packaging,
 )
+from pneumo_solver_ui.suspension_family_contract import cylinder_axle_geometry_key, spring_geometry_key
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,6 +47,14 @@ def test_build_geometry_meta_exports_explicit_cylinder_packaging_contract() -> N
         rel_tol=0.0,
         abs_tol=1e-12,
     )
+    assert math.isclose(geom[cylinder_axle_geometry_key("bore_diameter_m", "Ц1", "перед")], 0.032, rel_tol=0.0, abs_tol=1e-12)
+    assert math.isclose(geom[cylinder_axle_geometry_key("outer_diameter_m", "Ц2", "зад")], 0.056, rel_tol=0.0, abs_tol=1e-12)
+    assert math.isclose(
+        geom[cylinder_axle_geometry_key("dead_cap_length_m", "Ц1", "перед")],
+        geom["cyl1_dead_cap_length_m"],
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    )
 
 
 def test_read_visual_geometry_meta_exposes_packaging_keys() -> None:
@@ -62,6 +71,8 @@ def test_read_visual_geometry_meta_exposes_packaging_keys() -> None:
             "cylinder_wall_thickness_m": 0.003,
             "cyl1_dead_height_m": 0.01,
             "cyl1_body_length_front_m": 0.266,
+            "cyl1_bore_diameter_front_m": 0.032,
+            "cyl2_outer_diameter_rear_m": 0.056,
         }
     }
     vis = read_visual_geometry_meta(meta, context="pytest meta")
@@ -71,6 +82,40 @@ def test_read_visual_geometry_meta_exposes_packaging_keys() -> None:
     assert vis["cyl2_dead_rod_length_m"] == 0.04
     assert vis["cylinder_wall_thickness_m"] == 0.003
     assert vis["cyl1_body_length_front_m"] == 0.266
+    assert vis["cyl1_bore_diameter_front_m"] == 0.032
+    assert vis["cyl2_outer_diameter_rear_m"] == 0.056
+
+
+def test_build_geometry_meta_exports_family_specific_spring_packaging_keys() -> None:
+    base = {
+        "база": 1.5,
+        "колея": 1.0,
+        "диаметр_поршня_Ц1_перед_м": 0.032,
+        "диаметр_поршня_Ц1_зад_м": 0.036,
+        "диаметр_штока_Ц1_перед_м": 0.016,
+        "диаметр_штока_Ц1_зад_м": 0.018,
+        "ход_штока_Ц1_перед_м": 0.25,
+        "ход_штока_Ц1_зад_м": 0.22,
+        "мёртвый_объём_камеры": 1.5e-5,
+        "стенка_толщина_м": 0.003,
+        "пружина_Ц1_перед_геом_диаметр_проволоки_м": 0.008,
+        "пружина_Ц1_перед_геом_диаметр_средний_м": 0.060,
+        "пружина_Ц1_перед_длина_свободная_м": 0.31,
+        "пружина_Ц1_перед_длина_солид_м": 0.085,
+        "пружина_Ц1_перед_верхний_отступ_от_крышки_м": 0.02,
+        "пружина_Ц1_перед_запас_до_coil_bind_минимум_м": 0.005,
+        "пружина_Ц1_перед_преднатяг_на_отбое_минимум_м": 0.01,
+    }
+
+    geom = build_geometry_meta_from_base(base)
+
+    assert math.isclose(geom["cyl1_bore_diameter_front_m"], 0.032, rel_tol=0.0, abs_tol=1e-12)
+    assert math.isclose(geom["cyl1_bore_diameter_rear_m"], 0.036, rel_tol=0.0, abs_tol=1e-12)
+    assert "cyl1_bore_diameter_m" not in geom
+    assert math.isclose(geom[spring_geometry_key("wire_diameter_m", "Ц1", "перед")], 0.008, rel_tol=0.0, abs_tol=1e-12)
+    assert math.isclose(geom[spring_geometry_key("mean_diameter_m", "Ц1", "перед")], 0.060, rel_tol=0.0, abs_tol=1e-12)
+    assert math.isclose(geom[spring_geometry_key("inner_diameter_m", "Ц1", "перед")], 0.052, rel_tol=0.0, abs_tol=1e-12)
+    assert math.isclose(geom[spring_geometry_key("outer_diameter_m", "Ц1", "перед")], 0.068, rel_tol=0.0, abs_tol=1e-12)
 
 
 def test_cylinder_visual_state_from_packaging_uses_exact_contract_and_no_fake_piston_thickness() -> None:

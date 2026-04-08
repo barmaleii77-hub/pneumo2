@@ -78,6 +78,12 @@ def check_candidate_metrics(metrics: Dict[str, Any], params: Dict[str, Any], tes
       autoverif_track_expected_m: float (default 1.0)
       autoverif_wheelbase_expected_m: float (default 1.5)
       autoverif_geom_tol_m: float (default 1e-9)
+      autoverif_packaging_enabled: bool (default True)
+      autoverif_spring_host_min_clearance_m: float (default 0.0)
+      autoverif_spring_pair_min_clearance_m: float (default 0.0)
+      autoverif_spring_cap_min_margin_m: float (default 0.0)
+      autoverif_midstroke_t0_max_error_m: float (optional)
+      autoverif_coilbind_min_margin_m: float (default 0.0)
 
     Любая отсутствующая метрика -> проверка пропускается.
     """
@@ -100,6 +106,7 @@ def check_candidate_metrics(metrics: Dict[str, Any], params: Dict[str, Any], tes
     energy_err_rel_max = float(params.get("autoverif_energy_err_rel_max", 5e-3))
     entropy_mix_min = float(params.get("autoverif_entropy_mix_min", -1e-9))
     require_scheme_lock = bool(params.get("autoverif_require_scheme_lock", True))
+    packaging_enabled = bool(params.get("autoverif_packaging_enabled", True))
 
     track_expected = float(params.get("autoverif_track_expected_m", 1.0))
     wheelbase_expected = float(params.get("autoverif_wheelbase_expected_m", 1.5))
@@ -169,28 +176,73 @@ def check_candidate_metrics(metrics: Dict[str, Any], params: Dict[str, Any], tes
             flags.append("wheelbase_changed")
             msgs.append(f"wheelbase={wb} expected={wheelbase_expected}")
 
-    
-    # --- 6) Пружина: запас до coil-bind (смыкание витков) ---
-    # Важно: проверка имеет смысл только если задана длина "solid" (пружина_длина_солид_м > 0).
-    # Иначе у нас нет геометрии витков, и coil-bind по сути не определён.
+    # --- 6) Packaging / spring family geometry ---
+    if packaging_enabled:
+        packaging_ok = metrics.get("anim_export_packaging_metrics_ok", None)
+        if packaging_ok is not None:
+            try:
+                if int(packaging_ok) == 0:
+                    penalty += pen_selfcheck
+                    flags.append("packaging_metrics_fail")
+                    pm = str(metrics.get("anim_export_packaging_metrics_error", "")).strip()
+                    if pm:
+                        msgs.append(("packaging:" + pm)[:200])
+            except Exception:
+                penalty += pen_selfcheck
+                flags.append("packaging_metrics_bad")
+                msgs.append("anim_export_packaging_metrics_ok not int")
+
+        host_req = float(params.get("autoverif_spring_host_min_clearance_m", 0.0))
+        host_clearance = _as_float(metrics.get("мин_зазор_пружина_цилиндр_м", float("nan")))
+        if _finite(host_clearance) and host_clearance < host_req:
+            denom = max(1e-6, abs(host_req) if abs(host_req) > 1e-9 else 1e-3)
+            penalty += pen_invariant * (1.0 + (host_req - host_clearance) / denom)
+            flags.append("spring_host_clearance")
+            msgs.append(f"spring_host_clearance={host_clearance:.4g} < {host_req:.4g}")
+
+        pair_req = float(params.get("autoverif_spring_pair_min_clearance_m", 0.0))
+        pair_clearance = _as_float(metrics.get("мин_зазор_пружина_пружина_м", float("nan")))
+        if _finite(pair_clearance) and pair_clearance < pair_req:
+            denom = max(1e-6, abs(pair_req) if abs(pair_req) > 1e-9 else 1e-3)
+            penalty += pen_invariant * (1.0 + (pair_req - pair_clearance) / denom)
+            flags.append("spring_pair_clearance")
+            msgs.append(f"spring_pair_clearance={pair_clearance:.4g} < {pair_req:.4g}")
+
+        cap_req = float(params.get("autoverif_spring_cap_min_margin_m", 0.0))
+        cap_gap = _as_float(metrics.get("мин_зазор_пружина_до_крышки_м", float("nan")))
+        if _finite(cap_gap) and cap_gap < cap_req:
+            denom = max(1e-6, abs(cap_req) if abs(cap_req) > 1e-9 else 1e-3)
+            penalty += pen_invariant * (1.0 + (cap_req - cap_gap) / denom)
+            flags.append("spring_cap_gap")
+            msgs.append(f"spring_cap_gap={cap_gap:.4g} < {cap_req:.4g}")
+
+        midstroke_limit = _as_float(params.get("autoverif_midstroke_t0_max_error_m", float("nan")))
+        midstroke_err = _as_float(metrics.get("макс_ошибка_midstroke_t0_м", float("nan")))
+        if _finite(midstroke_limit) and midstroke_limit >= 0.0 and _finite(midstroke_err) and midstroke_err > midstroke_limit:
+            denom = max(1e-6, abs(midstroke_limit) if abs(midstroke_limit) > 1e-9 else 1e-3)
+            penalty += pen_invariant * (1.0 + (midstroke_err - midstroke_limit) / denom)
+            flags.append("midstroke_t0")
+            msgs.append(f"midstroke_t0_err={midstroke_err:.4g} > {midstroke_limit:.4g}")
+
+    # --- 7) Пружина: запас до coil-bind (смыкание витков) ---
+    # Предпочитаем family-aware метрику из exporter/runtime слоя.
     if bool(params.get("autoverif_coilbind_enabled", True)):
-        try:
-            L_solid = float(params.get("пружина_длина_солид_м", 0.0))
-        except Exception:
-            L_solid = 0.0
+        coil_min = _as_float(
+            _get_first(
+                metrics,
+                ["мин_запас_до_coil_bind_пружины_м", "пружина_запас_до_coil_bind_все_минимум_м"],
+            ),
+            float("nan"),
+        )
+        coil_req = float(params.get("autoverif_coilbind_min_margin_m", 0.0))
+        if _finite(coil_min) and coil_min < coil_req:
+            denom = max(1e-6, abs(coil_req) if abs(coil_req) > 1e-9 else 1e-3)
+            penalty += pen_invariant * (1.0 + (coil_req - coil_min) / denom)
+            flags.append("coil_bind_risk")
+            msgs.append(f"coil_margin_min={coil_min:.4g} < {coil_req:.4g}")
 
-        if L_solid > 1e-9:
-            coil_min = _as_float(metrics.get("пружина_запас_до_coil_bind_все_минимум_м", float("nan")))
-            coil_req = float(params.get("autoverif_coilbind_min_margin_m", 0.0))
-            if _finite(coil_min) and coil_min < coil_req:
-                # мягкий штраф: пропорционально недостатку запаса
-                denom = max(1e-6, abs(coil_req) if abs(coil_req) > 1e-9 else 1e-3)
-                penalty += pen_invariant * (1.0 + (coil_req - coil_min) / denom)
-                flags.append("coil_bind_risk")
-                msgs.append(f"coil_margin_min={coil_min:.4g} < {coil_req:.4g}")
 
-
-# --- 6) Non-finite значения в метриках ---
+# --- 8) Non-finite значения в метриках ---
     # Нюанс проекта: некоторые метрики *осознанно* могут быть +inf.
     # Например, t_пересечения_Pmid_с == +inf означает «пересечения не было в пределах теста»
     # и это НЕ является ошибкой физики.

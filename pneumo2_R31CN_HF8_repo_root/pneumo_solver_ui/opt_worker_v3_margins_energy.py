@@ -48,6 +48,8 @@ for _p in (str(_PROJECT_ROOT), str(_PNEUMO_ROOT)):
 from pneumo_solver_ui.optimization_input_contract import sanitize_ranges_for_optimization
 from pneumo_solver_ui.optimization_result_rows import BASELINE_ROLE
 from pneumo_solver_ui.atomic_write_retry import atomic_write_json_retry
+from pneumo_solver_ui.anim_export_contract import build_packaging_block, summarize_anim_export_objective_metrics
+from pneumo_solver_ui.data_contract import build_geometry_meta_from_base
 from pneumo_solver_ui.module_loading import load_python_module_from_path
 from pneumo_solver_ui.project_path_resolution import resolve_project_py_path
 from pneumo_solver_ui.suspension_family_contract import normalize_component_family_contract
@@ -204,6 +206,30 @@ PENALTY_TARGET_SPECS: List[Dict[str, str]] = [
         "label": "Лимит скорости штока",
         "unit": "м/с",
         "help": "Максимальная скорость штока (макс. по всем углам).",
+    },
+    {
+        "key": "мин_зазор_пружина_цилиндр_м",
+        "label": "Мин. зазор пружина-цилиндр",
+        "unit": "м",
+        "help": "Минимальный радиальный зазор между пружиной и её цилиндром-хостом по всем семействам. Отрицательное значение означает интерференцию.",
+    },
+    {
+        "key": "мин_зазор_пружина_пружина_м",
+        "label": "Мин. зазор пружина-пружина",
+        "unit": "м",
+        "help": "Минимальный зазор между пружинами Ц1 и Ц2 на одном углу по геометрии осей и наружных диаметров.",
+    },
+    {
+        "key": "макс_ошибка_midstroke_t0_м",
+        "label": "Макс. ошибка midstroke t0",
+        "unit": "м",
+        "help": "Абсолютное отклонение поршня от середины хода в начале расчёта.",
+    },
+    {
+        "key": "мин_запас_до_coil_bind_пружины_м",
+        "label": "Мин. запас до coil-bind пружины",
+        "unit": "м",
+        "help": "Минимальный запас до coil-bind по всем активным семействам пружин с family-aware runtime fallback для старых bundle-схем.",
     },
     {
         "key": "макс_ошибка_энергии_газа_отн",
@@ -1105,6 +1131,16 @@ def _compile_timeseries_inputs(test: Dict[str, Any]) -> Dict[str, Any]:
     return test
 
 
+def _collect_packaging_penalty_metrics(params: Dict[str, Any], df_main: pd.DataFrame) -> Dict[str, Any]:
+    if not isinstance(df_main, pd.DataFrame) or df_main.empty:
+        return {}
+    meta = {
+        "geometry": build_geometry_meta_from_base(params),
+    }
+    meta["packaging"] = build_packaging_block(meta, df_main)
+    return summarize_anim_export_objective_metrics(meta)
+
+
 def eval_candidate_once(model, params: Dict[str, Any], test: Dict[str, Any], dt: float, t_end: float, targets: Dict[str, float] | None = None) -> Dict[str, Any]:
     """Запуск одного теста; возвращает словарь метрик."""
     params_local = copy.deepcopy(params)
@@ -1400,6 +1436,13 @@ def eval_candidate_once(model, params: Dict[str, Any], test: Dict[str, Any], dt:
     metrics.update(lift_per)
     # добавить штоки
     metrics.update(rod_metrics)
+    try:
+        metrics.update(_collect_packaging_penalty_metrics(params_local, df_main))
+        metrics["anim_export_packaging_metrics_ok"] = 1
+        metrics["anim_export_packaging_metrics_error"] = ""
+    except Exception as e:
+        metrics["anim_export_packaging_metrics_ok"] = 0
+        metrics["anim_export_packaging_metrics_error"] = (f"{type(e).__name__}: {e}")[:300]
 
 
     # ---- Root-cause: нарушения по target_* + физические причины ----
@@ -1462,6 +1505,31 @@ def eval_candidate_once(model, params: Dict[str, Any], test: Dict[str, Any], dt:
         vmax_lim = float(targets_local['лимит_скорости_штока_м_с'])
         if vmax > vmax_lim:
             viol['скорость_штока'] = (vmax - vmax_lim) / max(0.1, abs(vmax_lim) + 0.1)
+
+    # 6b) Packaging / spring family geometry
+    if 'мин_зазор_пружина_цилиндр_м' in targets_local:
+        host_clearance = float(metrics.get('мин_зазор_пружина_цилиндр_м', float("nan")))
+        host_clearance_min = float(targets_local['мин_зазор_пружина_цилиндр_м'])
+        if np.isfinite(host_clearance) and host_clearance < host_clearance_min:
+            viol['зазор_пружина_цилиндр'] = (host_clearance_min - host_clearance) / max(1e-4, abs(host_clearance_min) + 1e-4)
+
+    if 'мин_зазор_пружина_пружина_м' in targets_local:
+        pair_clearance = float(metrics.get('мин_зазор_пружина_пружина_м', float("nan")))
+        pair_clearance_min = float(targets_local['мин_зазор_пружина_пружина_м'])
+        if np.isfinite(pair_clearance) and pair_clearance < pair_clearance_min:
+            viol['зазор_пружина_пружина'] = (pair_clearance_min - pair_clearance) / max(1e-4, abs(pair_clearance_min) + 1e-4)
+
+    if 'макс_ошибка_midstroke_t0_м' in targets_local:
+        midstroke_err = float(metrics.get('макс_ошибка_midstroke_t0_м', float("nan")))
+        midstroke_lim = float(targets_local['макс_ошибка_midstroke_t0_м'])
+        if np.isfinite(midstroke_err) and midstroke_err > midstroke_lim:
+            viol['midstroke_t0'] = (midstroke_err - midstroke_lim) / max(1e-4, abs(midstroke_lim) + 1e-4)
+
+    if 'мин_запас_до_coil_bind_пружины_м' in targets_local:
+        coil_margin = float(metrics.get('мин_запас_до_coil_bind_пружины_м', float("nan")))
+        coil_margin_min = float(targets_local['мин_запас_до_coil_bind_пружины_м'])
+        if np.isfinite(coil_margin) and coil_margin < coil_margin_min:
+            viol['coil_bind_пружины'] = (coil_margin_min - coil_margin) / max(1e-4, abs(coil_margin_min) + 1e-4)
 
     # 7) 1-й закон (баланс энергии газа)
     if 'макс_ошибка_энергии_газа_отн' in targets_local:
@@ -1573,6 +1641,14 @@ def eval_candidate_once(model, params: Dict[str, Any], test: Dict[str, Any], dt:
     Xrest2 = float(metrics.get('эксергия_остаток_без_теплопередачи_Дж', 0.0))
     if Xtot > 1e-12 and (Xrest2 / Xtot) > 0.25:
         tags.append('необратимости_остаток_без_теплопередачи_высок')
+
+    if float(metrics.get('число_пересечений_пружина_цилиндр', 0.0)) > 0.0:
+        tags.append('пружина_цилиндр_интерференция')
+    if float(metrics.get('число_пересечений_пружина_пружина', 0.0)) > 0.0:
+        tags.append('пружина_пружина_интерференция')
+    coil_margin = float(metrics.get('мин_запас_до_coil_bind_пружины_м', float("nan")))
+    if np.isfinite(coil_margin) and coil_margin < 0.0:
+        tags.append('coil_bind_пружины')
 
     # Итоговые поля
     if viol:
@@ -1760,6 +1836,31 @@ def candidate_penalty(m: Dict[str, float], targets: Dict[str, float]) -> float:
         vmax_lim = float(targets['лимит_скорости_штока_м_с'])
         if vmax > vmax_lim:
             pen += w * (vmax - vmax_lim) / max(0.1, abs(vmax_lim) + 0.1)
+
+    # 6b) Family-aware spring/cylinder geometry and static packaging
+    if 'мин_зазор_пружина_цилиндр_м' in targets:
+        host_clearance = float(m.get('мин_зазор_пружина_цилиндр_м', float("nan")))
+        host_clearance_min = float(targets['мин_зазор_пружина_цилиндр_м'])
+        if np.isfinite(host_clearance) and host_clearance < host_clearance_min:
+            pen += w * (host_clearance_min - host_clearance) / max(1e-4, abs(host_clearance_min) + 1e-4)
+
+    if 'мин_зазор_пружина_пружина_м' in targets:
+        pair_clearance = float(m.get('мин_зазор_пружина_пружина_м', float("nan")))
+        pair_clearance_min = float(targets['мин_зазор_пружина_пружина_м'])
+        if np.isfinite(pair_clearance) and pair_clearance < pair_clearance_min:
+            pen += w * (pair_clearance_min - pair_clearance) / max(1e-4, abs(pair_clearance_min) + 1e-4)
+
+    if 'макс_ошибка_midstroke_t0_м' in targets:
+        midstroke_err = float(m.get('макс_ошибка_midstroke_t0_м', float("nan")))
+        midstroke_lim = float(targets['макс_ошибка_midstroke_t0_м'])
+        if np.isfinite(midstroke_err) and midstroke_err > midstroke_lim:
+            pen += w * (midstroke_err - midstroke_lim) / max(1e-4, abs(midstroke_lim) + 1e-4)
+
+    if 'мин_запас_до_coil_bind_пружины_м' in targets:
+        coil_margin = float(m.get('мин_запас_до_coil_bind_пружины_м', float("nan")))
+        coil_margin_min = float(targets['мин_запас_до_coil_bind_пружины_м'])
+        if np.isfinite(coil_margin) and coil_margin < coil_margin_min:
+            pen += w * (coil_margin_min - coil_margin) / max(1e-4, abs(coil_margin_min) + 1e-4)
 
     # 7) Физический контроль: ошибка баланса энергии газа (если явно задано в targets)
     # Важно: по умолчанию (если target_* не задан) штраф НЕ применяется — обратная совместимость.

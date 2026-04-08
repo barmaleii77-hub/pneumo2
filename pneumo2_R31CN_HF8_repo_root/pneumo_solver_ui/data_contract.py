@@ -22,12 +22,53 @@ from typing import Any, Callable, Iterable, Mapping
 import json
 import math
 
+from .suspension_family_contract import (
+    FAMILY_ORDER,
+    canonical_axle_slug,
+    canonical_cylinder_slug,
+    cylinder_axle_geometry_key,
+    cylinder_family_key,
+    cylinder_generic_key,
+    spring_family_key,
+    spring_geometry_key,
+)
+
 # Pointer/meta schema identifiers used by NPZ bundles (desktop animator integration).
 ANIM_POINTER_SCHEMA = "pneumo_npz_meta_pointer"
 ANIM_META_SCHEMA = "pneumo_npz_meta"
 # Currently we keep a single version string for both pointer and meta.
 ANIM_LATEST_POINTER_SCHEMA_VERSION = "pneumo_npz_meta_v1"
 ANIM_LATEST_META_SCHEMA_VERSION = "pneumo_npz_meta_v1"
+
+_CYLINDER_AXLE_GEOMETRY_KEYS: tuple[str, ...] = tuple(
+    key
+    for cyl, axle in FAMILY_ORDER
+    for key in (
+        cylinder_axle_geometry_key("bore_diameter_m", cyl, axle),
+        cylinder_axle_geometry_key("rod_diameter_m", cyl, axle),
+        cylinder_axle_geometry_key("outer_diameter_m", cyl, axle),
+        cylinder_axle_geometry_key("stroke_m", cyl, axle),
+        cylinder_axle_geometry_key("dead_cap_length_m", cyl, axle),
+        cylinder_axle_geometry_key("dead_rod_length_m", cyl, axle),
+        cylinder_axle_geometry_key("dead_height_m", cyl, axle),
+        cylinder_axle_geometry_key("body_length_m", cyl, axle),
+    )
+)
+_SPRING_FAMILY_GEOMETRY_KEYS: tuple[str, ...] = tuple(
+    key
+    for cyl, axle in FAMILY_ORDER
+    for key in (
+        spring_geometry_key("wire_diameter_m", cyl, axle),
+        spring_geometry_key("mean_diameter_m", cyl, axle),
+        spring_geometry_key("inner_diameter_m", cyl, axle),
+        spring_geometry_key("outer_diameter_m", cyl, axle),
+        spring_geometry_key("free_length_m", cyl, axle),
+        spring_geometry_key("solid_length_m", cyl, axle),
+        spring_geometry_key("top_offset_m", cyl, axle),
+        spring_geometry_key("coil_bind_margin_min_m", cyl, axle),
+        spring_geometry_key("rebound_preload_min_m", cyl, axle),
+    )
+)
 
 # Canonical nested geometry container used by new NPZ meta_json.
 # IMPORTANT:
@@ -69,6 +110,8 @@ CANONICAL_META_GEOMETRY_KEYS: tuple[str, ...] = (
     "cyl1_body_length_rear_m",
     "cyl2_body_length_front_m",
     "cyl2_body_length_rear_m",
+    *_CYLINDER_AXLE_GEOMETRY_KEYS,
+    *_SPRING_FAMILY_GEOMETRY_KEYS,
 )
 
 REQUIRED_META_GEOMETRY_KEYS_MIN: tuple[str, ...] = (
@@ -95,6 +138,16 @@ NONNEGATIVE_META_GEOMETRY_KEYS: frozenset[str] = frozenset(
         "cyl1_body_length_rear_m",
         "cyl2_body_length_front_m",
         "cyl2_body_length_rear_m",
+        *(
+            key
+            for key in _CYLINDER_AXLE_GEOMETRY_KEYS
+            if any(token in key for token in ("outer_diameter", "dead_cap_length", "dead_rod_length", "dead_height", "body_length"))
+        ),
+        *(
+            key
+            for key in _SPRING_FAMILY_GEOMETRY_KEYS
+            if not any(token in key for token in ("wire_diameter", "mean_diameter", "inner_diameter", "outer_diameter"))
+        ),
     }
 )
 
@@ -329,6 +382,64 @@ def _dead_height_and_body_lengths_from_bore_stroke_dead_and_wall(
     return out
 
 
+def _values_match(a: float | None, b: float | None, *, abs_tol: float = 1e-12) -> bool:
+    if a is None or b is None:
+        return False
+    return bool(math.isclose(float(a), float(b), rel_tol=0.0, abs_tol=abs_tol))
+
+
+def _pick_cylinder_family_value(
+    base: Mapping[str, Any],
+    *,
+    field: str,
+    cyl: str,
+    axle: str,
+    target_key: str,
+    allow_zero: bool,
+    log: LogFn | None = None,
+) -> float | None:
+    source_keys: tuple[str, ...]
+    if field == "stroke":
+        source_keys = (
+            cylinder_family_key("stroke", cyl, axle),
+            "ход_штока",
+        )
+    else:
+        source_keys = (
+            cylinder_family_key(field, cyl, axle),
+            cylinder_generic_key(field, cyl),
+        )
+    return _pick_numeric_from_base(
+        base,
+        source_keys,
+        target_key=target_key,
+        allow_zero=allow_zero,
+        log=log,
+    )
+
+
+def _pick_spring_family_value(
+    base: Mapping[str, Any],
+    *,
+    suffix: str,
+    cyl: str,
+    axle: str,
+    target_key: str,
+    allow_zero: bool,
+    log: LogFn | None = None,
+) -> float | None:
+    return _pick_numeric_from_base(
+        base,
+        (
+            spring_family_key(suffix, cyl, axle),
+            f"пружина_{suffix}",
+        ),
+        target_key=target_key,
+        allow_zero=allow_zero,
+        log=log,
+    )
+
+
 def build_geometry_meta_from_base(base: Mapping[str, Any] | None, *, log: LogFn | None = None) -> dict[str, float]:
     """Build canonical ``meta_json.geometry`` from canonical model/base parameters.
 
@@ -419,80 +530,200 @@ def build_geometry_meta_from_base(base: Mapping[str, Any] | None, *, log: LogFn 
     if frame_height is not None:
         out["frame_height_m"] = float(frame_height)
 
-    cyl1_bore = _pick_numeric_from_base(base, ("диаметр_поршня_Ц1",), target_key="cyl1_bore_diameter_m", allow_zero=False, log=log)
-    cyl1_rod = _pick_numeric_from_base(base, ("диаметр_штока_Ц1",), target_key="cyl1_rod_diameter_m", allow_zero=False, log=log)
-    cyl2_bore = _pick_numeric_from_base(base, ("диаметр_поршня_Ц2",), target_key="cyl2_bore_diameter_m", allow_zero=False, log=log)
-    cyl2_rod = _pick_numeric_from_base(base, ("диаметр_штока_Ц2",), target_key="cyl2_rod_diameter_m", allow_zero=False, log=log)
-    cyl1_stroke_front = _pick_numeric_from_base(base, ("ход_штока_Ц1_перед_м", "ход_штока"), target_key="cyl1_stroke_front_m", allow_zero=False, log=log)
-    cyl1_stroke_rear = _pick_numeric_from_base(base, ("ход_штока_Ц1_зад_м", "ход_штока"), target_key="cyl1_stroke_rear_m", allow_zero=False, log=log)
-    cyl2_stroke_front = _pick_numeric_from_base(base, ("ход_штока_Ц2_перед_м", "ход_штока"), target_key="cyl2_stroke_front_m", allow_zero=False, log=log)
-    cyl2_stroke_rear = _pick_numeric_from_base(base, ("ход_штока_Ц2_зад_м", "ход_штока"), target_key="cyl2_stroke_rear_m", allow_zero=False, log=log)
     dead_vol = _pick_numeric_from_base(base, ("мёртвый_объём_камеры",), target_key="dead_volume_chamber_m3", allow_zero=True, log=log)
     wall_thickness = _pick_numeric_from_base(base, ("стенка_толщина_м",), target_key="cylinder_outer_diameter", allow_zero=False, log=log)
-    cyl_packaging: dict[str, float] = {}
     if wall_thickness is not None:
         out["cylinder_wall_thickness_m"] = float(wall_thickness)
-    if cyl1_bore is not None and wall_thickness is not None:
-        cyl_packaging["cyl1_outer_diameter_m"] = float(cyl1_bore + 2.0 * wall_thickness)
-    if cyl2_bore is not None and wall_thickness is not None:
-        cyl_packaging["cyl2_outer_diameter_m"] = float(cyl2_bore + 2.0 * wall_thickness)
-    cyl_packaging.update(
-        _dead_lengths_from_bore_rod_and_volume(
-            bore_diameter_m=cyl1_bore,
-            rod_diameter_m=cyl1_rod,
-            dead_volume_m3=dead_vol,
-            target_prefix="cyl1",
+
+    cylinder_values: dict[tuple[str, str], dict[str, float | None]] = {}
+    for cyl in ("Ц1", "Ц2"):
+        cyl_slug = canonical_cylinder_slug(cyl)
+        for axle in ("перед", "зад"):
+            axle_slug = canonical_axle_slug(axle)
+            bore = _pick_cylinder_family_value(
+                base,
+                field="bore",
+                cyl=cyl,
+                axle=axle,
+                target_key=cylinder_axle_geometry_key("bore_diameter_m", cyl, axle),
+                allow_zero=False,
+                log=log,
+            )
+            rod = _pick_cylinder_family_value(
+                base,
+                field="rod",
+                cyl=cyl,
+                axle=axle,
+                target_key=cylinder_axle_geometry_key("rod_diameter_m", cyl, axle),
+                allow_zero=False,
+                log=log,
+            )
+            stroke = _pick_cylinder_family_value(
+                base,
+                field="stroke",
+                cyl=cyl,
+                axle=axle,
+                target_key=cylinder_axle_geometry_key("stroke_m", cyl, axle),
+                allow_zero=False,
+                log=log,
+            )
+            cylinder_values[(cyl, axle)] = {"bore": bore, "rod": rod, "stroke": stroke}
+            if bore is not None:
+                out[cylinder_axle_geometry_key("bore_diameter_m", cyl, axle)] = float(bore)
+            if rod is not None:
+                out[cylinder_axle_geometry_key("rod_diameter_m", cyl, axle)] = float(rod)
+            if stroke is not None:
+                out[cylinder_axle_geometry_key("stroke_m", cyl, axle)] = float(stroke)
+            if bore is not None and wall_thickness is not None:
+                out[cylinder_axle_geometry_key("outer_diameter_m", cyl, axle)] = float(bore + 2.0 * wall_thickness)
+            dead_lengths = _dead_lengths_from_bore_rod_and_volume(
+                bore_diameter_m=bore,
+                rod_diameter_m=rod,
+                dead_volume_m3=dead_vol,
+                target_prefix=f"{cyl_slug}_{axle_slug}",
+                log=log,
+            )
+            if f"{cyl_slug}_{axle_slug}_dead_cap_length_m" in dead_lengths:
+                out[cylinder_axle_geometry_key("dead_cap_length_m", cyl, axle)] = float(
+                    dead_lengths[f"{cyl_slug}_{axle_slug}_dead_cap_length_m"]
+                )
+            if f"{cyl_slug}_{axle_slug}_dead_rod_length_m" in dead_lengths:
+                out[cylinder_axle_geometry_key("dead_rod_length_m", cyl, axle)] = float(
+                    dead_lengths[f"{cyl_slug}_{axle_slug}_dead_rod_length_m"]
+                )
+            area = math.pi * (0.5 * float(bore)) ** 2 if bore is not None else float("nan")
+            if (
+                bore is not None
+                and stroke is not None
+                and dead_vol is not None
+                and wall_thickness is not None
+                and math.isfinite(area)
+                and area > 1e-12
+            ):
+                dead_height = float(max(0.0, dead_vol) / area)
+                out[cylinder_axle_geometry_key("dead_height_m", cyl, axle)] = dead_height
+                out[cylinder_axle_geometry_key("body_length_m", cyl, axle)] = float(
+                    stroke + 2.0 * dead_height + 2.0 * wall_thickness
+                )
+
+        front = cylinder_values[(cyl, "перед")]
+        rear = cylinder_values[(cyl, "зад")]
+        if _values_match(front["bore"], rear["bore"]):
+            out[f"{cyl_slug}_bore_diameter_m"] = float(front["bore"])
+        if _values_match(front["rod"], rear["rod"]):
+            out[f"{cyl_slug}_rod_diameter_m"] = float(front["rod"])
+        if wall_thickness is not None:
+            front_outer = _finite_float_or_none(out.get(cylinder_axle_geometry_key("outer_diameter_m", cyl, "перед")))
+            rear_outer = _finite_float_or_none(out.get(cylinder_axle_geometry_key("outer_diameter_m", cyl, "зад")))
+            if _values_match(front_outer, rear_outer):
+                out[f"{cyl_slug}_outer_diameter_m"] = float(front_outer)
+        front_dead_cap = _finite_float_or_none(out.get(cylinder_axle_geometry_key("dead_cap_length_m", cyl, "перед")))
+        rear_dead_cap = _finite_float_or_none(out.get(cylinder_axle_geometry_key("dead_cap_length_m", cyl, "зад")))
+        front_dead_rod = _finite_float_or_none(out.get(cylinder_axle_geometry_key("dead_rod_length_m", cyl, "перед")))
+        rear_dead_rod = _finite_float_or_none(out.get(cylinder_axle_geometry_key("dead_rod_length_m", cyl, "зад")))
+        front_dead_h = _finite_float_or_none(out.get(cylinder_axle_geometry_key("dead_height_m", cyl, "перед")))
+        rear_dead_h = _finite_float_or_none(out.get(cylinder_axle_geometry_key("dead_height_m", cyl, "зад")))
+        if _values_match(front_dead_cap, rear_dead_cap):
+            out[f"{cyl_slug}_dead_cap_length_m"] = float(front_dead_cap)
+        if _values_match(front_dead_rod, rear_dead_rod):
+            out[f"{cyl_slug}_dead_rod_length_m"] = float(front_dead_rod)
+        if _values_match(front_dead_h, rear_dead_h):
+            out[f"{cyl_slug}_dead_height_m"] = float(front_dead_h)
+
+    for cyl, axle in FAMILY_ORDER:
+        wire = _pick_spring_family_value(
+            base,
+            suffix="геом_диаметр_проволоки_м",
+            cyl=cyl,
+            axle=axle,
+            target_key=spring_geometry_key("wire_diameter_m", cyl, axle),
+            allow_zero=False,
             log=log,
         )
-    )
-    cyl_packaging.update(
-        _dead_lengths_from_bore_rod_and_volume(
-            bore_diameter_m=cyl2_bore,
-            rod_diameter_m=cyl2_rod,
-            dead_volume_m3=dead_vol,
-            target_prefix="cyl2",
+        mean = _pick_spring_family_value(
+            base,
+            suffix="геом_диаметр_средний_м",
+            cyl=cyl,
+            axle=axle,
+            target_key=spring_geometry_key("mean_diameter_m", cyl, axle),
+            allow_zero=False,
             log=log,
         )
-    )
-    cyl_packaging.update(
-        _dead_height_and_body_lengths_from_bore_stroke_dead_and_wall(
-            bore_diameter_m=cyl1_bore,
-            stroke_front_m=cyl1_stroke_front,
-            stroke_rear_m=cyl1_stroke_rear,
-            dead_volume_m3=dead_vol,
-            wall_thickness_m=wall_thickness,
-            target_prefix="cyl1",
+        free_length = _pick_spring_family_value(
+            base,
+            suffix="длина_свободная_м",
+            cyl=cyl,
+            axle=axle,
+            target_key=spring_geometry_key("free_length_m", cyl, axle),
+            allow_zero=True,
+            log=log,
         )
-    )
-    cyl_packaging.update(
-        _dead_height_and_body_lengths_from_bore_stroke_dead_and_wall(
-            bore_diameter_m=cyl2_bore,
-            stroke_front_m=cyl2_stroke_front,
-            stroke_rear_m=cyl2_stroke_rear,
-            dead_volume_m3=dead_vol,
-            wall_thickness_m=wall_thickness,
-            target_prefix="cyl2",
+        solid_length = _pick_spring_family_value(
+            base,
+            suffix="длина_солид_м",
+            cyl=cyl,
+            axle=axle,
+            target_key=spring_geometry_key("solid_length_m", cyl, axle),
+            allow_zero=True,
+            log=log,
         )
-    )
-    if cyl1_bore is not None:
-        out["cyl1_bore_diameter_m"] = float(cyl1_bore)
-    if cyl1_rod is not None:
-        out["cyl1_rod_diameter_m"] = float(cyl1_rod)
-    if cyl2_bore is not None:
-        out["cyl2_bore_diameter_m"] = float(cyl2_bore)
-    if cyl2_rod is not None:
-        out["cyl2_rod_diameter_m"] = float(cyl2_rod)
-    if cyl1_stroke_front is not None:
-        out["cyl1_stroke_front_m"] = float(cyl1_stroke_front)
-    if cyl1_stroke_rear is not None:
-        out["cyl1_stroke_rear_m"] = float(cyl1_stroke_rear)
-    if cyl2_stroke_front is not None:
-        out["cyl2_stroke_front_m"] = float(cyl2_stroke_front)
-    if cyl2_stroke_rear is not None:
-        out["cyl2_stroke_rear_m"] = float(cyl2_stroke_rear)
+        top_offset = _pick_spring_family_value(
+            base,
+            suffix="верхний_отступ_от_крышки_м",
+            cyl=cyl,
+            axle=axle,
+            target_key=spring_geometry_key("top_offset_m", cyl, axle),
+            allow_zero=True,
+            log=log,
+        )
+        coil_margin = _pick_spring_family_value(
+            base,
+            suffix="запас_до_coil_bind_минимум_м",
+            cyl=cyl,
+            axle=axle,
+            target_key=spring_geometry_key("coil_bind_margin_min_m", cyl, axle),
+            allow_zero=True,
+            log=log,
+        )
+        rebound_preload = _pick_spring_family_value(
+            base,
+            suffix="преднатяг_на_отбое_минимум_м",
+            cyl=cyl,
+            axle=axle,
+            target_key=spring_geometry_key("rebound_preload_min_m", cyl, axle),
+            allow_zero=True,
+            log=log,
+        )
+        if wire is not None:
+            out[spring_geometry_key("wire_diameter_m", cyl, axle)] = float(wire)
+        if mean is not None:
+            out[spring_geometry_key("mean_diameter_m", cyl, axle)] = float(mean)
+        if free_length is not None:
+            out[spring_geometry_key("free_length_m", cyl, axle)] = float(free_length)
+        if solid_length is not None:
+            out[spring_geometry_key("solid_length_m", cyl, axle)] = float(solid_length)
+        if top_offset is not None:
+            out[spring_geometry_key("top_offset_m", cyl, axle)] = float(top_offset)
+        if coil_margin is not None:
+            out[spring_geometry_key("coil_bind_margin_min_m", cyl, axle)] = float(coil_margin)
+        if rebound_preload is not None:
+            out[spring_geometry_key("rebound_preload_min_m", cyl, axle)] = float(rebound_preload)
+        if wire is not None and mean is not None:
+            inner = float(mean - wire)
+            outer = float(mean + wire)
+            if inner > 0.0:
+                out[spring_geometry_key("inner_diameter_m", cyl, axle)] = inner
+            else:
+                _emit(
+                    f"[contract] Spring family {cyl}/{axle} has invalid geometry: mean_diameter <= wire_diameter. "
+                    "Исправьте параметры пружины.",
+                    log,
+                )
+            if outer > 0.0:
+                out[spring_geometry_key("outer_diameter_m", cyl, axle)] = outer
+
     if dead_vol is not None:
         out["dead_volume_chamber_m3"] = float(dead_vol)
-    out.update(cyl_packaging)
 
     return out
 
@@ -844,6 +1075,30 @@ def read_visual_geometry_meta(
     cyl1_body_rear = _first_finite_geometry_value(geom, ("cyl1_body_length_rear_m",), allow_zero=True)
     cyl2_body_front = _first_finite_geometry_value(geom, ("cyl2_body_length_front_m",), allow_zero=True)
     cyl2_body_rear = _first_finite_geometry_value(geom, ("cyl2_body_length_rear_m",), allow_zero=True)
+    family_visual_values: dict[str, float | None] = {}
+    for cyl, axle in FAMILY_ORDER:
+        for field in ("bore_diameter_m", "rod_diameter_m", "outer_diameter_m", "stroke_m", "dead_cap_length_m", "dead_rod_length_m", "dead_height_m", "body_length_m"):
+            family_visual_values[cylinder_axle_geometry_key(field, cyl, axle)] = _first_finite_geometry_value(
+                geom,
+                (cylinder_axle_geometry_key(field, cyl, axle),),
+                allow_zero=field not in {"bore_diameter_m", "rod_diameter_m", "outer_diameter_m", "stroke_m"},
+            )
+        for field in (
+            "wire_diameter_m",
+            "mean_diameter_m",
+            "inner_diameter_m",
+            "outer_diameter_m",
+            "free_length_m",
+            "solid_length_m",
+            "top_offset_m",
+            "coil_bind_margin_min_m",
+            "rebound_preload_min_m",
+        ):
+            family_visual_values[spring_geometry_key(field, cyl, axle)] = _first_finite_geometry_value(
+                geom,
+                (spring_geometry_key(field, cyl, axle),),
+                allow_zero=field not in {"wire_diameter_m", "mean_diameter_m", "inner_diameter_m", "outer_diameter_m"},
+            )
 
     return {
         "wheelbase_m": wheelbase,
@@ -876,6 +1131,7 @@ def read_visual_geometry_meta(
         "cyl1_body_length_rear_m": cyl1_body_rear,
         "cyl2_body_length_front_m": cyl2_body_front,
         "cyl2_body_length_rear_m": cyl2_body_rear,
+        **family_visual_values,
         "issues": issues,
         "warnings": warnings,
     }

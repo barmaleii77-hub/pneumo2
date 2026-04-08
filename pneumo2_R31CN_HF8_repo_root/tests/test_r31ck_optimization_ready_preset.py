@@ -55,12 +55,20 @@ def test_r31ck_ready_preset_materializes_valid_30min_suite(tmp_path: Path) -> No
     assert Path(ring["axay_csv"]).is_absolute() and Path(ring["axay_csv"]).exists()
     assert Path(ring["scenario_json"]).is_absolute() and Path(ring["scenario_json"]).exists()
     assert float(ring["t_end"]) >= 14.0
+    assert ring["target_мин_зазор_пружина_цилиндр_м"] == 0.001
+    assert ring["target_мин_зазор_пружина_пружина_м"] == 0.001
+    assert ring["target_макс_ошибка_midstroke_t0_м"] == 0.03
+    assert ring["target_мин_запас_до_coil_bind_пружины_м"] == 0.003
 
     profile = enabled[READY_PROFILE_NAME]
     assert profile["тип"] == "road_profile_csv"
     assert Path(profile["road_csv"]).is_absolute() and Path(profile["road_csv"]).exists()
     assert Path(profile["scenario_json"]).is_absolute() and Path(profile["scenario_json"]).exists()
     assert abs(float(profile["vx0_м_с"]) - (20.0 / 3.6)) < 1e-9
+    assert profile["target_мин_зазор_пружина_цилиндр_м"] == 0.001
+    assert profile["target_мин_зазор_пружина_пружина_м"] == 0.001
+    assert profile["target_макс_ошибка_midstroke_t0_м"] == 0.03
+    assert profile["target_мин_запас_до_coil_bind_пружины_м"] == 0.003
 
 
 def test_r31ck_ready_session_defaults_seed_stage_runner_30min() -> None:

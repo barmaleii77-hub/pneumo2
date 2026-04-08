@@ -57,6 +57,44 @@ def test_camozzi_runtime_respects_canonical_speed_and_center_geometry() -> None:
     assert abs(float(df_main["колесо_контакт_ЛП_м"].iloc[0]) - (float(df_main["перемещение_колеса_ЛП_м"].iloc[0]) - 0.3)) <= 1e-9
 
 
+def test_camozzi_dual_spring_runtime_exports_explicit_family_columns() -> None:
+    params = _base()
+    params.update(
+        {
+            "механика_пружина_режим": "dual",
+            "пружина_Ц1_перед_масштаб": 1.1,
+            "пружина_Ц1_зад_масштаб": 1.2,
+            "пружина_Ц2_перед_масштаб": 1.3,
+            "пружина_Ц2_зад_масштаб": 1.4,
+            "пружина_Ц1_перед_длина_свободная_м": 0.30,
+            "пружина_Ц1_зад_длина_свободная_м": 0.31,
+            "пружина_Ц2_перед_длина_свободная_м": 0.32,
+            "пружина_Ц2_зад_длина_свободная_м": 0.33,
+        }
+    )
+
+    df_main, *_ = camozzi.simulate(
+        params,
+        {
+            "имя": "dual-smoke",
+            "vx0_м_с": 5.0,
+            "ax_func": lambda t: 0.0,
+            "ay_func": lambda t: 0.0,
+        },
+        dt=0.01,
+        t_end=0.02,
+        record_full=False,
+        max_steps=10,
+    )
+
+    assert float(df_main["пружина_режим_семейства_id"].iloc[0]) == 3.0
+    assert float(df_main["пружина_Ц1_ЛП_активна"].iloc[0]) == 1.0
+    assert float(df_main["пружина_Ц2_ЛП_активна"].iloc[0]) == 1.0
+    assert np.isfinite(float(df_main["пружина_Ц1_ЛП_длина_м"].iloc[0]))
+    assert np.isfinite(float(df_main["пружина_Ц2_ЛП_длина_м"].iloc[0]))
+    assert abs(float(df_main["пружина_Ц1_ЛП_длина_м"].iloc[0]) - float(df_main["пружина_Ц2_ЛП_длина_м"].iloc[0])) > 1e-6
+
+
 def test_desktop_animator_selfcheck_accepts_camozzi_canonical_speed_and_wheel_pose(tmp_path: Path) -> None:
     vx0 = 11.11111111111111
     df_main = _smoke_df(vx0)
