@@ -15,8 +15,8 @@ def test_layout_guard_observes_only_dock_and_suspends_viewport() -> None:
 
 
 def test_playback_timer_and_road_mesh_budget_are_tightened_for_live_playback() -> None:
-    assert 'base_ms = 16.0' in APP
     assert 'base_ms = 12.0' in APP
+    assert 'base_ms = 10.0' in APP
     assert 'base_ms = 8.0' in APP
     assert 'base_ms = 6.0' in APP
     assert 'int(max(6, min(20, round(base_ms))))' in APP

@@ -21,10 +21,10 @@ COMPONENTS = [
 def test_desktop_animator_uses_display_rate_playback_instead_of_4ms_frame_chasing() -> None:
     assert 'self._play_cursor_t_s = 0.0' in APP
     assert 'Display cadence' in APP or 'display cadence' in APP
-    assert 'base_ms = 16.0' in APP
-    assert 'base_ms = 12.0' in APP
-    assert 'base_ms = 8.0' in APP
-    assert 'base_ms = 6.0' in APP
+    assert 'base_ms = 12.0  # ~83 Hz keeps x1.0 visibly alive without source-frame chasing.' in APP
+    assert 'base_ms = 10.0  # ~100 Hz for moderate fast-forward.' in APP
+    assert 'base_ms = 8.0   # ~125 Hz.' in APP
+    assert 'base_ms = 6.0   # ~166 Hz upper service cadence on Windows precise timer.' in APP
     assert 'np.searchsorted(t, float(self._play_cursor_t_s), side=\'left\')' in APP
     assert 'base_ms = 4.0 if speed >= 1.0' not in APP
     assert 'visible_budget = int(max(1, _max_visible_advances_per_tick(self._speed)))' not in APP

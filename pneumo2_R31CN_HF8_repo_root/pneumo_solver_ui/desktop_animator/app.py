@@ -160,6 +160,46 @@ def _infer_patm_pa(b: "DataBundle", i: int) -> float:
 
     return float(PATM_PA_DEFAULT)
 
+
+def _infer_patm_source(b: "DataBundle") -> tuple[Optional[np.ndarray], float]:
+    try:
+        m = b.meta or {}
+        for k in ("patm_pa", "p_atm_pa", "P_ATM", "P_ATM_Па", "p_atm_Па"):
+            if k in m and m.get(k) is not None:
+                try:
+                    return None, float(m.get(k))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    try:
+        df = b.main
+        if df is not None and hasattr(df, "columns"):
+            for c in ("patm_pa", "p_atm_pa", "P_ATM", "P_ATM_Па", "p_atm_Па"):
+                if c in df.columns:
+                    try:
+                        arr = np.asarray(df[c], dtype=float).reshape(-1)
+                        if arr.size:
+                            return arr, float(PATM_PA_DEFAULT)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+    return None, float(PATM_PA_DEFAULT)
+
+
+def _patm_value_from_source(patm_arr: Optional[np.ndarray], patm_default_pa: float, i: int) -> float:
+    if patm_arr is not None and 0 <= int(i) < int(patm_arr.size):
+        try:
+            v = float(patm_arr[int(i)])
+            if np.isfinite(v) and abs(v) > 1.0:
+                return v
+        except Exception:
+            pass
+    return float(patm_default_pa)
+
 try:
     from PySide6 import QtCore, QtGui, QtWidgets
 except ModuleNotFoundError as e:
@@ -204,6 +244,11 @@ from .cylinder_truth_gate import (
     evaluate_all_cylinder_truth_gates as _evaluate_all_cylinder_truth_gates,
     render_cylinder_truth_gate_message as _render_cylinder_truth_gate_message,
 )
+from .playback_sampling import (
+    lerp_point_row as _lerp_point_row,
+    lerp_series_value as _lerp_series_value,
+    sample_time_bracket as _sample_time_bracket,
+)
 
 from .geom3d_helpers import (
     car_frame_rotate_xy as _car_frame_rotate_xy,
@@ -215,6 +260,7 @@ from .geom3d_helpers import (
     grid_faces_rect as _grid_faces_rect,
     lifted_box_center_from_lower_corners as _lifted_box_center_from_lower_corners,
     localize_world_points_to_car_frame as _localize_world_points_to_car_frame,
+    orient_centered_cylinder_vertices_to_y as _orient_centered_cylinder_vertices_to_y,
     orthonormal_frame_from_corners as _orthonormal_frame_from_corners,
     project_vector_to_plane as _project_vector_to_plane,
     regular_grid_submesh as _regular_grid_submesh,
@@ -224,6 +270,7 @@ from .geom3d_helpers import (
     road_grid_target_s_values_from_range as _road_grid_target_s_values_from_range,
     road_native_support_s_values_from_axis as _road_native_support_s_values_from_axis,
     road_crossbar_line_segments_from_profiles as _road_crossbar_line_segments_from_profiles,
+    rod_internal_centerline_vertices_from_packaging_state as _rod_internal_centerline_vertices_from_packaging_state,
     stable_road_grid_cross_spacing_from_view as _stable_road_grid_cross_spacing_from_view,
     stable_road_surface_spacing_from_view as _stable_road_surface_spacing_from_view,
     road_patch_faces_inside_wheel_cylinder as _road_patch_faces_inside_wheel_cylinder,
@@ -279,6 +326,503 @@ def _fmt(x: float, unit: str = "", *, digits: int = 3) -> str:
         return f"{v:.{digits}f}{unit}"
     except Exception:
         return f"?{unit}"
+
+
+_AIR_ITEM_STATE_ROLE = int(QtCore.Qt.ItemDataRole.UserRole) + 17
+
+
+def _set_label_text_if_changed(label: Optional[QtWidgets.QLabel], text: str) -> None:
+    if label is None:
+        return
+    try:
+        if label.text() == text:
+            return
+    except Exception:
+        pass
+    try:
+        label.setText(text)
+    except Exception:
+        pass
+
+
+def _set_graphics_text_if_changed(item: Optional[Any], text: str) -> None:
+    if item is None:
+        return
+    try:
+        if hasattr(item, "text"):
+            if str(item.text()) == text:
+                return
+        elif hasattr(item, "toPlainText"):
+            if str(item.toPlainText()) == text:
+                return
+    except Exception:
+        pass
+    try:
+        if hasattr(item, "setText"):
+            item.setText(text)
+        elif hasattr(item, "setPlainText"):
+            item.setPlainText(text)
+    except Exception:
+        pass
+
+
+def _set_graphics_pos_if_changed(item: Optional[Any], x: float, y: float) -> None:
+    if item is None:
+        return
+    tx = float(x)
+    ty = float(y)
+    try:
+        pos = item.pos()
+        if abs(float(pos.x()) - tx) <= 1e-9 and abs(float(pos.y()) - ty) <= 1e-9:
+            return
+    except Exception:
+        pass
+    try:
+        item.setPos(tx, ty)
+    except Exception:
+        pass
+
+
+def _make_graphics_label_item(
+    scene: Optional[QtWidgets.QGraphicsScene],
+    *,
+    color: Optional[QtGui.QColor] = None,
+    font_family: str = "Consolas",
+    font_size: int = 8,
+    z: float = 20.0,
+) -> QtWidgets.QGraphicsSimpleTextItem:
+    item = QtWidgets.QGraphicsSimpleTextItem()
+    item.setZValue(float(z))
+    try:
+        item.setBrush(QtGui.QBrush(color or QtGui.QColor(220, 220, 220)))
+    except Exception:
+        pass
+    try:
+        item.setFlag(QtWidgets.QGraphicsItem.ItemIgnoresTransformations, True)
+    except Exception:
+        pass
+    try:
+        item.setFont(QtGui.QFont(str(font_family), int(font_size)))
+    except Exception:
+        pass
+    try:
+        if scene is not None:
+            scene.addItem(item)
+    except Exception:
+        pass
+    return item
+
+
+def _set_table_item_text_if_changed(item: Optional[QtWidgets.QTableWidgetItem], text: str) -> None:
+    if item is None:
+        return
+    try:
+        if item.text() == text:
+            return
+    except Exception:
+        pass
+    try:
+        item.setText(text)
+    except Exception:
+        pass
+
+
+def _set_progress_value_if_changed(pb: Optional[QtWidgets.QProgressBar], value: int) -> None:
+    if pb is None:
+        return
+    try:
+        target = int(value)
+    except Exception:
+        target = 0
+    try:
+        if int(pb.value()) == target:
+            return
+    except Exception:
+        pass
+    try:
+        pb.setValue(target)
+    except Exception:
+        pass
+
+
+def _set_table_row_count_if_changed(table: Optional[QtWidgets.QTableWidget], rows: int) -> None:
+    if table is None:
+        return
+    target = int(max(0, rows))
+    try:
+        if int(table.rowCount()) == target:
+            return
+    except Exception:
+        pass
+    try:
+        table.setRowCount(target)
+    except Exception:
+        pass
+
+
+def _set_table_row_hidden_if_changed(
+    table: Optional[QtWidgets.QTableWidget], row: int, hidden: bool
+) -> None:
+    if table is None:
+        return
+    row_i = int(max(0, row))
+    target = bool(hidden)
+    try:
+        if bool(table.isRowHidden(row_i)) == target:
+            return
+    except Exception:
+        pass
+    try:
+        table.setRowHidden(row_i, target)
+    except Exception:
+        pass
+
+
+def _set_table_fixed_row_height(
+    table: Optional[QtWidgets.QTableWidget], *, padding: int = 8, minimum: int = 20
+) -> None:
+    if table is None:
+        return
+    try:
+        table.setWordWrap(False)
+    except Exception:
+        pass
+    try:
+        vh = table.verticalHeader()
+    except Exception:
+        return
+    try:
+        fm = QtGui.QFontMetrics(table.font())
+        row_h = int(max(int(minimum), int(fm.height()) + int(padding)))
+    except Exception:
+        row_h = int(max(int(minimum), 22))
+    try:
+        vh.setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
+    except Exception:
+        pass
+    try:
+        vh.setMinimumSectionSize(int(row_h))
+    except Exception:
+        pass
+    try:
+        vh.setDefaultSectionSize(int(row_h))
+    except Exception:
+        pass
+
+
+def _set_air_flag_item_foreground(item: Optional[QtWidgets.QTableWidgetItem], air: bool) -> None:
+    if item is None:
+        return
+    state = 1 if air else 0
+    try:
+        if int(item.data(_AIR_ITEM_STATE_ROLE) or -1) == state:
+            return
+    except Exception:
+        pass
+    try:
+        item.setData(_AIR_ITEM_STATE_ROLE, state)
+        item.setForeground(
+            QtGui.QBrush(QtGui.QColor(255, 120, 120) if air else QtGui.QColor(120, 220, 140))
+        )
+    except Exception:
+        pass
+
+
+def _begin_qt_update_batch(widget: Optional[QtWidgets.QWidget]) -> list[tuple[QtWidgets.QWidget, bool]]:
+    if widget is None:
+        return []
+    handles: list[tuple[QtWidgets.QWidget, bool]] = []
+    targets: list[QtWidgets.QWidget] = [widget]
+    try:
+        viewport = widget.viewport() if hasattr(widget, "viewport") else None
+    except Exception:
+        viewport = None
+    if viewport is not None and viewport is not widget:
+        targets.append(viewport)
+
+    seen: set[int] = set()
+    for target in targets:
+        if target is None:
+            continue
+        ident = id(target)
+        if ident in seen:
+            continue
+        seen.add(ident)
+        try:
+            enabled = bool(target.updatesEnabled())
+        except Exception:
+            enabled = False
+        try:
+            if enabled:
+                target.setUpdatesEnabled(False)
+        except Exception:
+            enabled = False
+        handles.append((target, enabled))
+    return handles
+
+
+def _end_qt_update_batch(handles: list[tuple[QtWidgets.QWidget, bool]]) -> None:
+    for target, enabled in reversed(handles):
+        if not enabled:
+            continue
+        try:
+            target.setUpdatesEnabled(True)
+        except Exception:
+            pass
+
+
+def _call_with_qt_update_batch(widget: Any, fn: Callable[[], None]) -> None:
+    handles = _begin_qt_update_batch(widget if isinstance(widget, QtWidgets.QWidget) else None)
+    try:
+        fn()
+    finally:
+        _end_qt_update_batch(handles)
+
+
+def _ensure_corner_signal_cache(b: DataBundle) -> Dict[str, Dict[str, Any]]:
+    key = "svc__corner_signal_cache"
+    cached = b._derived.get(key)
+    if isinstance(cached, dict):
+        return cached  # type: ignore[return-value]
+
+    cache: Dict[str, Dict[str, Any]] = {}
+    for c in CORNERS:
+        road_arr = b.road_series(c)
+        cache[str(c)] = {
+            "zb": np.asarray(b.frame_corner_z(c, default=0.0), dtype=float),
+            "vb": np.asarray(b.frame_corner_v(c, default=0.0), dtype=float),
+            "ab": np.asarray(b.frame_corner_a(c, default=0.0), dtype=float),
+            "zw": np.asarray(b.get(f"перемещение_колеса_{c}_м", 0.0), dtype=float),
+            "vw": np.asarray(b.get(f"скорость_колеса_{c}_м_с", 0.0), dtype=float),
+            "aw": np.asarray(b.get(f"ускорение_колеса_{c}_м_с2", 0.0), dtype=float),
+            "zr": None if road_arr is None else np.asarray(road_arr, dtype=float),
+            "stroke": np.asarray(b.get(f"положение_штока_{c}_м", 0.0), dtype=float),
+            "tireF": np.asarray(b.get(f"нормальная_сила_шины_{c}_Н", 0.0), dtype=float),
+            "air": np.asarray(b.get(f"колесо_в_воздухе_{c}", 0.0), dtype=float),
+        }
+    b._derived[key] = cache  # type: ignore[assignment]
+    return cache
+
+
+def _ensure_vertical_view_signal_cache(b: DataBundle, wheelbase_m: float) -> Dict[str, Any]:
+    wb = float(max(0.0, wheelbase_m))
+    key = f"svc__vertical_view_signal_cache__{wb:.6f}"
+    cached = b._derived.get(key)
+    if isinstance(cached, dict):
+        return cached  # type: ignore[return-value]
+
+    frame_cache = {
+        "z_com": np.asarray(b.get("перемещение_рамы_z_м", 0.0), dtype=float),
+        "vz_com": np.asarray(b.get("скорость_рамы_z_м_с", 0.0), dtype=float),
+        "az_com": np.asarray(b.get("ускорение_рамы_z_м_с2", 0.0), dtype=float),
+    }
+    try:
+        s_world = np.asarray(b.ensure_s_world(), dtype=float)
+    except Exception:
+        s_world = np.zeros((0,), dtype=float)
+
+    road_profiles: Dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    for mode in ("center", "left", "right"):
+        try:
+            s_prof, z_prof = b.ensure_road_profile(wheelbase_m=wb, mode=mode)
+            road_profiles[str(mode)] = (
+                np.asarray(s_prof, dtype=float),
+                np.asarray(z_prof, dtype=float),
+            )
+        except Exception:
+            road_profiles[str(mode)] = (np.zeros((0,), dtype=float), np.zeros((0,), dtype=float))
+
+    cache: Dict[str, Any] = {
+        "corners": _ensure_corner_signal_cache(b),
+        "frame": frame_cache,
+        "s_world": s_world,
+        "road_profiles": road_profiles,
+    }
+    b._derived[key] = cache  # type: ignore[assignment]
+    return cache
+
+
+def _road_profile_corner_offset_m(corner: str, wheelbase_m: float) -> float:
+    return (+0.5 * float(wheelbase_m)) if (len(str(corner)) >= 2 and str(corner)[1] == "П") else (-0.5 * float(wheelbase_m))
+
+
+def _ensure_road_profile_panel_cache(b: DataBundle, wheelbase_m: float) -> Dict[str, Any]:
+    wb = float(max(0.0, wheelbase_m))
+    key = f"svc__road_profile_panel_cache__{wb:.6f}"
+    cached = b._derived.get(key)
+    if isinstance(cached, dict):
+        return cached  # type: ignore[return-value]
+
+    try:
+        s_world = np.asarray(b.ensure_s_world(), dtype=float).reshape(-1)
+    except Exception:
+        s_world = np.zeros((0,), dtype=float)
+
+    corners: Dict[str, Dict[str, Any]] = {}
+    z_min = float("inf")
+    z_max = float("-inf")
+    have_finite = False
+
+    for c in CORNERS:
+        name = str(c)
+        marker_x = float(_road_profile_corner_offset_m(name, wb))
+        zr_full = b.road_series(name)
+        if zr_full is None:
+            corners[name] = {
+                "x_world": np.zeros((0,), dtype=float),
+                "z": np.zeros((0,), dtype=float),
+                "marker_x": marker_x,
+                "missing": True,
+            }
+            continue
+
+        z_arr = np.asarray(zr_full, dtype=float).reshape(-1)
+        n = int(min(s_world.size, z_arr.size))
+        if n <= 0:
+            corners[name] = {
+                "x_world": np.zeros((0,), dtype=float),
+                "z": np.zeros((0,), dtype=float),
+                "marker_x": marker_x,
+                "missing": True,
+            }
+            continue
+
+        x_world = np.asarray(s_world[:n], dtype=float) + marker_x
+        z_arr = np.asarray(z_arr[:n], dtype=float)
+        corners[name] = {
+            "x_world": x_world,
+            "z": z_arr,
+            "marker_x": marker_x,
+            "missing": False,
+        }
+
+        try:
+            finite = z_arr[np.isfinite(z_arr)]
+        except Exception:
+            finite = np.zeros((0,), dtype=float)
+        if finite.size:
+            z_min = min(z_min, float(np.nanmin(finite)))
+            z_max = max(z_max, float(np.nanmax(finite)))
+            have_finite = True
+
+    if have_finite:
+        pad = max(0.03, 0.15 * (z_max - z_min + 1e-9))
+        y_range = (float(z_min - pad), float(z_max + pad))
+    else:
+        y_range = (-0.1, 0.1)
+
+    cache: Dict[str, Any] = {
+        "wheelbase_m": wb,
+        "s_world": s_world,
+        "corners": corners,
+        "y_range": y_range,
+    }
+    b._derived[key] = cache  # type: ignore[assignment]
+    return cache
+
+
+def _shorten_display_name(name: str, limit: int = 34) -> str:
+    text = str(name)
+    max_len = int(max(4, limit))
+    if len(text) <= max_len:
+        return text
+    keep = max(1, max_len - 3)
+    return text[:keep] + "..."
+
+
+def _kind_code_from_label(kind: str) -> int:
+    normalized = str(kind).strip().lower()
+    if normalized == "выхлоп":
+        return 0
+    if normalized == "подпитка":
+        return 1
+    if normalized == "заряд":
+        return 2
+    if normalized in ("обратный", "чек"):
+        return 3
+    return 4
+
+
+def _top_descending_indices(values: Any, limit: int, *, threshold: float = 0.0) -> np.ndarray:
+    arr = np.asarray(values, dtype=float).reshape(-1)
+    top_n = int(max(0, limit))
+    if arr.size == 0 or top_n <= 0:
+        return np.zeros((0,), dtype=int)
+
+    active = np.flatnonzero(arr > float(threshold))
+    if active.size == 0:
+        return np.zeros((0,), dtype=int)
+
+    scores = arr[active]
+    top_n = min(top_n, int(scores.size))
+    if top_n <= 0:
+        return np.zeros((0,), dtype=int)
+    if int(scores.size) <= top_n:
+        order = np.argsort(-scores)
+    else:
+        part = np.argpartition(-scores, top_n - 1)[:top_n]
+        order = part[np.argsort(-scores[part])]
+    return np.asarray(active[order], dtype=int)
+
+
+def _sample_series_local(
+    series: Any,
+    *,
+    i0: int,
+    i1: int,
+    alpha: float,
+    default: float = 0.0,
+) -> float:
+    try:
+        return float(
+            _lerp_series_value(
+                np.asarray(series, dtype=float),
+                i0=int(i0),
+                i1=int(i1),
+                alpha=float(alpha),
+                default=float(default),
+            )
+        )
+    except Exception:
+        return float(default)
+
+
+def _make_series_sampler(*, i0: int, i1: int, alpha: float) -> Callable[[Any, float], float]:
+    def _sample(series: Any, default: float = 0.0) -> float:
+        return _sample_series_local(series, i0=int(i0), i1=int(i1), alpha=float(alpha), default=float(default))
+
+    return _sample
+
+
+def _sample_series_avg2(
+    sample: Callable[[Any, float], float],
+    series_a: Any,
+    series_b: Any,
+    *,
+    default: float = 0.0,
+) -> float:
+    return 0.5 * (
+        float(sample(series_a, default))
+        + float(sample(series_b, default))
+    )
+
+
+def _sample_point_local(
+    rows_xyz: Any,
+    *,
+    i0: int,
+    i1: int,
+    alpha: float,
+) -> Optional[np.ndarray]:
+    try:
+        return _lerp_point_row(
+            np.asarray(rows_xyz, dtype=float),
+            i0=int(i0),
+            i1=int(i1),
+            alpha=float(alpha),
+        )
+    except Exception:
+        return None
 
 
 def _elide_px(text: str, font: QtGui.QFont, max_px: int) -> str:
@@ -691,25 +1235,96 @@ class PointerWatcher(QtCore.QObject):
 class Arrow2D(QtCore.QObject):
     """Gradient arrow (body line + head polygon)."""
 
-    def __init__(self, scene: QtWidgets.QGraphicsScene, *, width_m: float = 0.03):
+    def __init__(self, scene: QtWidgets.QGraphicsScene, *, width_m: float = 0.03, gradient_body: bool = False):
         super().__init__()
         self.scene = scene
         self.width_m = float(width_m)
-        self.body = QtWidgets.QGraphicsPathItem()
+        self.gradient_body = bool(gradient_body)
+        self.body = QtWidgets.QGraphicsLineItem()
         self.head = QtWidgets.QGraphicsPolygonItem()
         self.body.setZValue(10)
         self.head.setZValue(11)
         self.scene.addItem(self.body)
         self.scene.addItem(self.head)
+        self._hidden = False
+        self._last_body_style_key: Optional[tuple[Any, ...]] = None
+        self._last_head_style_key: Optional[tuple[Any, ...]] = None
+        self._last_geom_key: Optional[tuple[Any, ...]] = None
         self.hide()
 
     def hide(self):
+        if self._hidden:
+            return
+        self._hidden = True
         self.body.setVisible(False)
         self.head.setVisible(False)
 
     def show(self):
+        if not self._hidden:
+            return
+        self._hidden = False
         self.body.setVisible(True)
         self.head.setVisible(True)
+
+    @staticmethod
+    def _geom_key(
+        p0: QtCore.QPointF,
+        p1: QtCore.QPointF,
+        *,
+        head_len_m: float,
+        head_w_m: float,
+    ) -> tuple[int, int, int, int, int, int]:
+        return (
+            int(round(float(p0.x()) * 10000.0)),
+            int(round(float(p0.y()) * 10000.0)),
+            int(round(float(p1.x()) * 10000.0)),
+            int(round(float(p1.y()) * 10000.0)),
+            int(round(float(head_len_m) * 10000.0)),
+            int(round(float(head_w_m) * 10000.0)),
+        )
+
+    def _apply_body_style(
+        self,
+        p0: QtCore.QPointF,
+        p1: QtCore.QPointF,
+        *,
+        rgb: Tuple[int, int, int],
+        alpha: int,
+        width_m: float,
+    ) -> None:
+        if bool(self.gradient_body):
+            body_style_key = ("gradient", tuple(int(v) for v in rgb), int(alpha), round(float(width_m), 5), self._geom_key(p0, p1, head_len_m=0.0, head_w_m=0.0))
+            if body_style_key == self._last_body_style_key:
+                return
+            grad = QtGui.QLinearGradient(p0, p1)
+            c_end = _qt_color(rgb, a=int(alpha))
+            c0 = _qt_color(rgb, a=0)
+            grad.setColorAt(0.0, c0)
+            grad.setColorAt(1.0, c_end)
+            pen = QtGui.QPen(QtGui.QBrush(grad), float(width_m))
+            pen.setCapStyle(QtCore.Qt.RoundCap)
+            pen.setJoinStyle(QtCore.Qt.RoundJoin)
+            self.body.setPen(pen)
+            self._last_body_style_key = body_style_key
+            return
+
+        body_style_key = ("solid", tuple(int(v) for v in rgb), int(alpha), round(float(width_m), 5))
+        if body_style_key == self._last_body_style_key:
+            return
+        pen = QtGui.QPen(_qt_color(rgb, a=int(alpha)), float(width_m))
+        pen.setCapStyle(QtCore.Qt.RoundCap)
+        pen.setJoinStyle(QtCore.Qt.RoundJoin)
+        self.body.setPen(pen)
+        self._last_body_style_key = body_style_key
+
+    def _apply_head_style(self, *, rgb: Tuple[int, int, int], alpha: int, width_m: float) -> None:
+        head_style_key = (tuple(int(v) for v in rgb), int(alpha), round(float(width_m), 5))
+        if head_style_key == self._last_head_style_key:
+            return
+        color = _qt_color(rgb, a=int(alpha))
+        self.head.setPen(QtGui.QPen(color, max(0.001, float(width_m) * 0.2)))
+        self.head.setBrush(QtGui.QBrush(color))
+        self._last_head_style_key = head_style_key
 
     def set_arrow(
         self,
@@ -740,32 +1355,18 @@ class Arrow2D(QtCore.QObject):
 
         # Body segment ends before head
         body_end = QtCore.QPointF(p1.x() - ux * head_len, p1.y() - uy * head_len)
-
-        path = QtGui.QPainterPath()
-        path.moveTo(p0)
-        path.lineTo(body_end)
-
-        grad = QtGui.QLinearGradient(p0, p1)
-        c_end = _qt_color(rgb, a=int(alpha))
-        c0 = _qt_color(rgb, a=0)
-        grad.setColorAt(0.0, c0)
-        grad.setColorAt(1.0, c_end)
-
-        pen = QtGui.QPen(QtGui.QBrush(grad), w)
-        pen.setCapStyle(QtCore.Qt.RoundCap)
-        pen.setJoinStyle(QtCore.Qt.RoundJoin)
-        self.body.setPen(pen)
-        self.body.setBrush(QtCore.Qt.NoBrush)
-        self.body.setPath(path)
+        self._apply_body_style(p0, p1, rgb=rgb, alpha=alpha, width_m=w)
+        self._apply_head_style(rgb=rgb, alpha=alpha, width_m=w)
 
         # Head triangle
         tip = p1
         left = QtCore.QPointF(body_end.x() + px * (0.5 * head_w), body_end.y() + py * (0.5 * head_w))
         right = QtCore.QPointF(body_end.x() - px * (0.5 * head_w), body_end.y() - py * (0.5 * head_w))
-        poly = QtGui.QPolygonF([tip, left, right])
-        self.head.setPolygon(poly)
-        self.head.setPen(QtGui.QPen(_qt_color(rgb, a=int(alpha)), max(0.001, w * 0.2)))
-        self.head.setBrush(QtGui.QBrush(_qt_color(rgb, a=int(alpha))))
+        geom_key = self._geom_key(p0, p1, head_len_m=head_len, head_w_m=head_w)
+        if geom_key != self._last_geom_key:
+            self.body.setLine(QtCore.QLineF(p0, body_end))
+            self.head.setPolygon(QtGui.QPolygonF([tip, left, right]))
+            self._last_geom_key = geom_key
 
 
 # -----------------------------
@@ -873,8 +1474,8 @@ class FrontViewWidget(QtWidgets.QGraphicsView):
             pass
 
         # Items
-        self.road = QtWidgets.QGraphicsPathItem()
-        self.body = QtWidgets.QGraphicsPathItem()
+        self.road = QtWidgets.QGraphicsLineItem()
+        self.body = QtWidgets.QGraphicsLineItem()
         self.susp_l = QtWidgets.QGraphicsLineItem()
         self.susp_r = QtWidgets.QGraphicsLineItem()
 
@@ -903,19 +1504,11 @@ class FrontViewWidget(QtWidgets.QGraphicsView):
         self.arrow_v_wheel_r = Arrow2D(self.scene, width_m=0.010)
 
         # Labels (optional)
-        self.lab_com = QtWidgets.QGraphicsTextItem()
-        self.lab_body_l = QtWidgets.QGraphicsTextItem()
-        self.lab_body_r = QtWidgets.QGraphicsTextItem()
-        self.lab_wheel_l = QtWidgets.QGraphicsTextItem()
-        self.lab_wheel_r = QtWidgets.QGraphicsTextItem()
-        for lab in (self.lab_com, self.lab_body_l, self.lab_body_r, self.lab_wheel_l, self.lab_wheel_r):
-            lab.setZValue(20)
-            lab.setDefaultTextColor(QtGui.QColor(220, 220, 220))
-            # keep text readable when zoomed
-            lab.setFlag(QtWidgets.QGraphicsItem.ItemIgnoresTransformations, True)
-            f = QtGui.QFont("Consolas", 8)
-            lab.setFont(f)
-            self.scene.addItem(lab)
+        self.lab_com = _make_graphics_label_item(self.scene, font_size=8)
+        self.lab_body_l = _make_graphics_label_item(self.scene, font_size=8)
+        self.lab_body_r = _make_graphics_label_item(self.scene, font_size=8)
+        self.lab_wheel_l = _make_graphics_label_item(self.scene, font_size=8)
+        self.lab_wheel_r = _make_graphics_label_item(self.scene, font_size=8)
 
         # Reference road lines behind everything
         for it in (self.road_zero, self.road_lvl_l, self.road_lvl_r):
@@ -979,8 +1572,14 @@ class FrontViewWidget(QtWidgets.QGraphicsView):
         self.show_dims = False
         self.show_scale_bar = True
         self._playback_perf_mode = False
+        self._compact_dock_mode = False
+        self._compact_max_height = 176
         self._render_hints_normal = QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing
+        self._render_hints_compact = QtGui.QPainter.TextAntialiasing
         self._render_hints_perf = QtGui.QPainter.RenderHints()
+        self._bundle_key: Optional[int] = None
+        self._signal_cache: Dict[str, Any] = {}
+        self._apply_render_hint_policy()
 
     def set_px_per_m(self, px_per_m: float):
         self._base_px_per_m = float(px_per_m)
@@ -1023,6 +1622,10 @@ class FrontViewWidget(QtWidgets.QGraphicsView):
     def set_geometry(self, geom: ViewGeometry):
         self.geom = geom
 
+    def set_bundle(self, b: DataBundle) -> None:
+        self._bundle_key = id(b)
+        self._signal_cache = _ensure_vertical_view_signal_cache(b, float(self.geom.wheelbase))
+
     def set_scales(self, accel_scale: float, vel_scale: float):
         self._accel_scale = float(accel_scale)
         self._vel_scale = float(vel_scale)
@@ -1052,11 +1655,39 @@ class FrontViewWidget(QtWidgets.QGraphicsView):
         if enabled == bool(self._playback_perf_mode):
             return
         self._playback_perf_mode = enabled
+        self._apply_render_hint_policy()
         try:
-            self.setRenderHints(self._render_hints_perf if enabled else self._render_hints_normal)
+            self.viewport().update()
+        except Exception:
+            pass
+
+    def _apply_render_hint_policy(self) -> None:
+        if bool(self._playback_perf_mode):
+            hints = self._render_hints_perf
+        elif bool(self._compact_dock_mode):
+            hints = self._render_hints_compact
+        else:
+            hints = self._render_hints_normal
+        try:
+            self.setRenderHints(hints)
+        except Exception:
+            pass
+
+    def set_compact_dock_mode(self, compact: bool) -> None:
+        compact = bool(compact)
+        if compact == bool(getattr(self, "_compact_dock_mode", False)):
+            return
+        self._compact_dock_mode = compact
+        self._apply_render_hint_policy()
+        max_h = int(self._compact_max_height) if compact else 16777215
+        vpol = QtWidgets.QSizePolicy.Maximum if compact else QtWidgets.QSizePolicy.Expanding
+        try:
+            self.setMaximumHeight(max_h)
+            self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, vpol)
         except Exception:
             pass
         try:
+            self.updateGeometry()
             self.viewport().update()
         except Exception:
             pass
@@ -1102,8 +1733,8 @@ class FrontViewWidget(QtWidgets.QGraphicsView):
         if eff_show_dims:
             txt = (
                 f"Геометрия (м):\n"
-                f"  Колея W = {self.geom.track_m:.3f}\n"
-                f"  Радиус колеса R = {self.geom.wheel_radius_m:.3f}"
+                f"  Колея W = {self.geom.track:.3f}\n"
+                f"  Радиус колеса R = {self.geom.wheel_radius:.3f}"
             )
             fm = painter.fontMetrics()
             lines = txt.split("\n")
@@ -1369,13 +2000,21 @@ class FrontViewWidget(QtWidgets.QGraphicsView):
         except Exception:
             return "Сегмент"
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
         # Runtime visual toggles. These must be resolved locally in the front/rear
         # axle views as well; otherwise partial graphics silently disappear when the
         # method reaches richer overlay paths below.
+        if int(getattr(self, "_bundle_key", 0) or 0) != id(b) or not self._signal_cache:
+            self.set_bundle(b)
         eff_show_accel = bool(getattr(self, 'show_accel', True)) and (not bool(getattr(self, '_playback_perf_mode', False)))
         eff_show_vel = bool(getattr(self, 'show_vel', False)) and (not bool(getattr(self, '_playback_perf_mode', False)))
         eff_show_labels = bool(getattr(self, 'show_labels', True)) and (not bool(getattr(self, '_playback_perf_mode', False)))
+        sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+            np.asarray(b.t, dtype=float),
+            sample_t=sample_t,
+            fallback_index=i,
+        )
+        sample = _make_series_sampler(i0=sample_i0, i1=sample_i1, alpha=alpha)
 
         # Geometry constants
         y = self.geom.y_pos
@@ -1385,17 +2024,22 @@ class FrontViewWidget(QtWidgets.QGraphicsView):
 
         # Signals
         cL, cR = self.cL, self.cR
+        cache = getattr(self, "_signal_cache", {}) or {}
+        corner_cache = cache.get("corners", {}) or {}
+        frame_cache = cache.get("frame", {}) or {}
+        corner_L = corner_cache.get(str(cL), {}) or {}
+        corner_R = corner_cache.get(str(cR), {}) or {}
 
-        z_body_L = float(b.frame_corner_z(cL, default=0.0)[i])
-        z_body_R = float(b.frame_corner_z(cR, default=0.0)[i])
-        z_com = float(b.get("перемещение_рамы_z_м")[i])
+        z_body_L = sample(corner_L.get("zb", 0.0), 0.0)
+        z_body_R = sample(corner_R.get("zb", 0.0), 0.0)
+        z_com = sample(frame_cache.get("z_com", 0.0), 0.0)
 
-        z_wL = float(b.get(f"перемещение_колеса_{cL}_м")[i])
-        z_wR = float(b.get(f"перемещение_колеса_{cR}_м")[i])
-        road_L = b.road_series(cL)
-        road_R = b.road_series(cR)
-        z_rL = float(road_L[i]) if road_L is not None else float("nan")
-        z_rR = float(road_R[i]) if road_R is not None else float("nan")
+        z_wL = sample(corner_L.get("zw", 0.0), 0.0)
+        z_wR = sample(corner_R.get("zw", 0.0), 0.0)
+        road_L = corner_L.get("zr")
+        road_R = corner_R.get("zr")
+        z_rL = sample(road_L, float("nan")) if road_L is not None else float("nan")
+        z_rR = sample(road_R, float("nan")) if road_R is not None else float("nan")
 
         # Reference levels: z=0 + explicit road levels under each wheel
         try:
@@ -1412,34 +2056,27 @@ class FrontViewWidget(QtWidgets.QGraphicsView):
             self.road_lvl_r.setLine(yR - seg, z_rR, yR + seg, z_rR)
 
         # Derived: velocities/accelerations
-        az_com = float(b.get("ускорение_рамы_z_м_с2", 0.0)[i])
-        az_body_L = float(b.frame_corner_a(cL, default=0.0)[i])
-        az_body_R = float(b.frame_corner_a(cR, default=0.0)[i])
-        az_wL = float(b.get(f"ускорение_колеса_{cL}_м_с2", 0.0)[i])
-        az_wR = float(b.get(f"ускорение_колеса_{cR}_м_с2", 0.0)[i])
+        az_com = sample(frame_cache.get("az_com", 0.0), 0.0)
+        az_body_L = sample(corner_L.get("ab", 0.0), 0.0)
+        az_body_R = sample(corner_R.get("ab", 0.0), 0.0)
+        az_wL = sample(corner_L.get("aw", 0.0), 0.0)
+        az_wR = sample(corner_R.get("aw", 0.0), 0.0)
 
-        vz_com = float(b.get("скорость_рамы_z_м_с", 0.0)[i])
-        vz_body_L = float(b.frame_corner_v(cL, default=0.0)[i])
-        vz_body_R = float(b.frame_corner_v(cR, default=0.0)[i])
-        vz_wL = float(b.get(f"скорость_колеса_{cL}_м_с", 0.0)[i])
-        vz_wR = float(b.get(f"скорость_колеса_{cR}_м_с", 0.0)[i])
+        vz_com = sample(frame_cache.get("vz_com", 0.0), 0.0)
+        vz_body_L = sample(corner_L.get("vb", 0.0), 0.0)
+        vz_body_R = sample(corner_R.get("vb", 0.0), 0.0)
+        vz_wL = sample(corner_L.get("vw", 0.0), 0.0)
+        vz_wR = sample(corner_R.get("vw", 0.0), 0.0)
 
         # Road line
         if np.isfinite(z_rL) and np.isfinite(z_rR):
-            path = QtGui.QPainterPath()
-            path.moveTo(QtCore.QPointF(yL, z_rL))
-            path.lineTo(QtCore.QPointF(yR, z_rR))
-            self.road.setPath(path)
+            self.road.setLine(yL, z_rL, yR, z_rR)
             self.road.show()
         else:
-            self.road.setPath(QtGui.QPainterPath())
             self.road.hide()
 
         # Body line
-        pbody = QtGui.QPainterPath()
-        pbody.moveTo(QtCore.QPointF(yL, z_body_L))
-        pbody.lineTo(QtCore.QPointF(yR, z_body_R))
-        self.body.setPath(pbody)
+        self.body.setLine(yL, z_body_L, yR, z_body_R)
 
         # Suspension
         self.susp_l.setLine(yL, z_body_L, yL, z_wL)
@@ -1501,24 +2138,24 @@ class FrontViewWidget(QtWidgets.QGraphicsView):
                 return f"az {az:+.1f}"
 
             # small offsets in scene meters
-            self.lab_com.setPlainText(_txt(az_com, vz_com))
-            self.lab_com.setPos(0.06, z_com + 0.06)
+            _set_graphics_text_if_changed(self.lab_com, _txt(az_com, vz_com))
+            _set_graphics_pos_if_changed(self.lab_com, 0.06, z_com + 0.06)
             self.lab_com.setVisible(True)
 
-            self.lab_body_l.setPlainText(_txt(az_body_L, vz_body_L))
-            self.lab_body_l.setPos(yL + 0.06, z_body_L + 0.06)
+            _set_graphics_text_if_changed(self.lab_body_l, _txt(az_body_L, vz_body_L))
+            _set_graphics_pos_if_changed(self.lab_body_l, yL + 0.06, z_body_L + 0.06)
             self.lab_body_l.setVisible(True)
 
-            self.lab_body_r.setPlainText(_txt(az_body_R, vz_body_R))
-            self.lab_body_r.setPos(yR + 0.06, z_body_R + 0.06)
+            _set_graphics_text_if_changed(self.lab_body_r, _txt(az_body_R, vz_body_R))
+            _set_graphics_pos_if_changed(self.lab_body_r, yR + 0.06, z_body_R + 0.06)
             self.lab_body_r.setVisible(True)
 
-            self.lab_wheel_l.setPlainText(_txt(az_wL, vz_wL))
-            self.lab_wheel_l.setPos(yL + 0.06, z_wL - 0.26)
+            _set_graphics_text_if_changed(self.lab_wheel_l, _txt(az_wL, vz_wL))
+            _set_graphics_pos_if_changed(self.lab_wheel_l, yL + 0.06, z_wL - 0.26)
             self.lab_wheel_l.setVisible(True)
 
-            self.lab_wheel_r.setPlainText(_txt(az_wR, vz_wR))
-            self.lab_wheel_r.setPos(yR + 0.06, z_wR - 0.26)
+            _set_graphics_text_if_changed(self.lab_wheel_r, _txt(az_wR, vz_wR))
+            _set_graphics_pos_if_changed(self.lab_wheel_r, yR + 0.06, z_wR - 0.26)
             self.lab_wheel_r.setVisible(True)
         else:
             for lab in (self.lab_com, self.lab_body_l, self.lab_body_r, self.lab_wheel_l, self.lab_wheel_r):
@@ -1565,7 +2202,7 @@ class SideViewWidget(QtWidgets.QGraphicsView):
         self.mode = str(mode).lower().strip() or "avg"
 
         self.road = QtWidgets.QGraphicsPathItem()
-        self.body = QtWidgets.QGraphicsPathItem()
+        self.body = QtWidgets.QGraphicsLineItem()
         self.susp_f = QtWidgets.QGraphicsLineItem()
         self.susp_r = QtWidgets.QGraphicsLineItem()
 
@@ -1593,17 +2230,11 @@ class SideViewWidget(QtWidgets.QGraphicsView):
         self.arrow_v_wheel_r = Arrow2D(self.scene, width_m=0.010)
 
         # Labels
-        self.lab_com = QtWidgets.QGraphicsTextItem()
-        self.lab_f = QtWidgets.QGraphicsTextItem()
-        self.lab_r = QtWidgets.QGraphicsTextItem()
-        self.lab_wf = QtWidgets.QGraphicsTextItem()
-        self.lab_wr = QtWidgets.QGraphicsTextItem()
-        for lab in (self.lab_com, self.lab_f, self.lab_r, self.lab_wf, self.lab_wr):
-            lab.setZValue(20)
-            lab.setDefaultTextColor(QtGui.QColor(220, 220, 220))
-            lab.setFlag(QtWidgets.QGraphicsItem.ItemIgnoresTransformations, True)
-            lab.setFont(QtGui.QFont("Consolas", 8))
-            self.scene.addItem(lab)
+        self.lab_com = _make_graphics_label_item(self.scene, font_size=8)
+        self.lab_f = _make_graphics_label_item(self.scene, font_size=8)
+        self.lab_r = _make_graphics_label_item(self.scene, font_size=8)
+        self.lab_wf = _make_graphics_label_item(self.scene, font_size=8)
+        self.lab_wr = _make_graphics_label_item(self.scene, font_size=8)
 
         # Reference road lines behind everything
         for it in [self.road_zero, self.road_lvl_f, self.road_lvl_r]:
@@ -1651,9 +2282,19 @@ class SideViewWidget(QtWidgets.QGraphicsView):
         self.show_accel = True
         self.show_vel = False
         self.show_labels = True
+        self.show_dims = False
+        self.show_scale_bar = True
         self._playback_perf_mode = False
+        self._compact_dock_mode = False
+        self._compact_max_height = 150
+        self._road_x_nodes_cache_key: Optional[Tuple[float, float, int]] = None
+        self._road_x_nodes_cache: Optional[np.ndarray] = None
         self._render_hints_normal = QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing
+        self._render_hints_compact = QtGui.QPainter.TextAntialiasing
         self._render_hints_perf = QtGui.QPainter.RenderHints()
+        self._bundle_key: Optional[int] = None
+        self._signal_cache: Dict[str, Any] = {}
+        self._apply_render_hint_policy()
 
     def set_px_per_m(self, px_per_m: float):
         self._base_px_per_m = float(px_per_m)
@@ -1695,6 +2336,12 @@ class SideViewWidget(QtWidgets.QGraphicsView):
 
     def set_geometry(self, geom: ViewGeometry):
         self.geom = geom
+        self._bundle_key = None
+        self._signal_cache = {}
+
+    def set_bundle(self, b: DataBundle) -> None:
+        self._bundle_key = id(b)
+        self._signal_cache = _ensure_vertical_view_signal_cache(b, float(self.geom.wheelbase))
 
     def set_scales(self, accel_scale: float, vel_scale: float):
         self._accel_scale = float(accel_scale)
@@ -1725,14 +2372,60 @@ class SideViewWidget(QtWidgets.QGraphicsView):
         if enabled == bool(self._playback_perf_mode):
             return
         self._playback_perf_mode = enabled
-        try:
-            self.setRenderHints(self._render_hints_perf if enabled else self._render_hints_normal)
-        except Exception:
-            pass
+        self._apply_render_hint_policy()
         try:
             self.viewport().update()
         except Exception:
             pass
+
+    def _apply_render_hint_policy(self) -> None:
+        if bool(self._playback_perf_mode):
+            hints = self._render_hints_perf
+        elif bool(self._compact_dock_mode):
+            hints = self._render_hints_compact
+        else:
+            hints = self._render_hints_normal
+        try:
+            self.setRenderHints(hints)
+        except Exception:
+            pass
+
+    def set_compact_dock_mode(self, compact: bool) -> None:
+        compact = bool(compact)
+        if compact == bool(getattr(self, "_compact_dock_mode", False)):
+            return
+        self._compact_dock_mode = compact
+        self._apply_render_hint_policy()
+        self._road_x_nodes_cache_key = None
+        self._road_x_nodes_cache = None
+        max_h = int(self._compact_max_height) if compact else 16777215
+        vpol = QtWidgets.QSizePolicy.Maximum if compact else QtWidgets.QSizePolicy.Expanding
+        try:
+            self.setMaximumHeight(max_h)
+            self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, vpol)
+        except Exception:
+            pass
+        try:
+            self.updateGeometry()
+            self.viewport().update()
+        except Exception:
+            pass
+
+    def _road_polyline_sample_count(self) -> int:
+        try:
+            viewport_w = int(max(180, self.viewport().width()))
+        except Exception:
+            viewport_w = 320
+        budget_cap = 64 if bool(getattr(self, "_compact_dock_mode", False)) else 144
+        return int(max(32, min(int(budget_cap), (viewport_w // 5) + 8)))
+
+    def _road_x_nodes_for_scene(self, x_min: float, x_max: float) -> np.ndarray:
+        count = self._road_polyline_sample_count()
+        key = (round(float(x_min), 4), round(float(x_max), 4), int(count))
+        if key != self._road_x_nodes_cache_key or self._road_x_nodes_cache is None:
+            self._road_x_nodes_cache_key = key
+            self._road_x_nodes_cache = np.linspace(float(x_min), float(x_max), int(count), dtype=float)
+        return self._road_x_nodes_cache
 
     def drawForeground(self, painter: QtGui.QPainter, rect: QtCore.QRectF):  # type: ignore
         super().drawForeground(painter, rect)
@@ -1773,8 +2466,8 @@ class SideViewWidget(QtWidgets.QGraphicsView):
         if eff_show_dims:
             txt = (
                 f"Геометрия (м):\n"
-                f"  База L = {self.geom.wheelbase_m:.3f}\n"
-                f"  Радиус колеса R = {self.geom.wheel_radius_m:.3f}"
+                f"  База L = {self.geom.wheelbase:.3f}\n"
+                f"  Радиус колеса R = {self.geom.wheel_radius:.3f}"
             )
             fm = painter.fontMetrics()
             lines = txt.split("\n")
@@ -1841,62 +2534,85 @@ class SideViewWidget(QtWidgets.QGraphicsView):
         self._apply_recommended_scales()
         self._emit_visual()
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
+        if int(getattr(self, "_bundle_key", 0) or 0) != id(b) or not self._signal_cache:
+            self.set_bundle(b)
         eff_show_accel = bool(self.show_accel) and not bool(self._playback_perf_mode)
         eff_show_vel = bool(self.show_vel) and not bool(self._playback_perf_mode)
         eff_show_labels = bool(self.show_labels) and not bool(self._playback_perf_mode)
+        sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+            np.asarray(b.t, dtype=float),
+            sample_t=sample_t,
+            fallback_index=i,
+        )
+        sample = _make_series_sampler(i0=sample_i0, i1=sample_i1, alpha=alpha)
         x = self.geom.x_pos
         xF, xR = float(x[0]), float(x[2])
         wheel_r = float(self.geom.wheel_radius)
 
         modeF, modeR = self._pick()
+        cache = getattr(self, "_signal_cache", {}) or {}
+        corner_cache = cache.get("corners", {}) or {}
+        frame_cache = cache.get("frame", {}) or {}
 
         # Body/wheel/road signals
         if modeF == "avg":
+            fl = corner_cache.get("ЛП", {}) or {}
+            fr = corner_cache.get("ПП", {}) or {}
+            rl = corner_cache.get("ЛЗ", {}) or {}
+            rr = corner_cache.get("ПЗ", {}) or {}
             # Average left/right per axle
-            z_body_F = 0.5 * float(b.frame_corner_z("ЛП", default=0.0)[i] + b.frame_corner_z("ПП", default=0.0)[i])
-            z_body_R = 0.5 * float(b.frame_corner_z("ЛЗ", default=0.0)[i] + b.frame_corner_z("ПЗ", default=0.0)[i])
+            z_body_F = _sample_series_avg2(sample, fl.get("zb", 0.0), fr.get("zb", 0.0), default=0.0)
+            z_body_R = _sample_series_avg2(sample, rl.get("zb", 0.0), rr.get("zb", 0.0), default=0.0)
 
-            z_wF = 0.5 * float(b.get("перемещение_колеса_ЛП_м")[i] + b.get("перемещение_колеса_ПП_м")[i])
-            z_wR = 0.5 * float(b.get("перемещение_колеса_ЛЗ_м")[i] + b.get("перемещение_колеса_ПЗ_м")[i])
+            z_wF = _sample_series_avg2(sample, fl.get("zw", 0.0), fr.get("zw", 0.0), default=0.0)
+            z_wR = _sample_series_avg2(sample, rl.get("zw", 0.0), rr.get("zw", 0.0), default=0.0)
 
-            road_LP = b.road_series("ЛП")
-            road_PP = b.road_series("ПП")
-            road_LZ = b.road_series("ЛЗ")
-            road_PZ = b.road_series("ПЗ")
-            z_rF = 0.5 * float(road_LP[i] + road_PP[i]) if (road_LP is not None and road_PP is not None) else float("nan")
-            z_rR = 0.5 * float(road_LZ[i] + road_PZ[i]) if (road_LZ is not None and road_PZ is not None) else float("nan")
+            road_LP = fl.get("zr")
+            road_PP = fr.get("zr")
+            road_LZ = rl.get("zr")
+            road_PZ = rr.get("zr")
+            z_rF = 0.5 * (
+                sample(road_LP, float("nan"))
+                + sample(road_PP, float("nan"))
+            ) if (road_LP is not None and road_PP is not None) else float("nan")
+            z_rR = 0.5 * (
+                sample(road_LZ, float("nan"))
+                + sample(road_PZ, float("nan"))
+            ) if (road_LZ is not None and road_PZ is not None) else float("nan")
 
-            az_body_F = 0.5 * float(b.frame_corner_a("ЛП", default=0.0)[i] + b.frame_corner_a("ПП", default=0.0)[i])
-            az_body_R = 0.5 * float(b.frame_corner_a("ЛЗ", default=0.0)[i] + b.frame_corner_a("ПЗ", default=0.0)[i])
-            az_wF = 0.5 * float(b.get("ускорение_колеса_ЛП_м_с2", 0.0)[i] + b.get("ускорение_колеса_ПП_м_с2", 0.0)[i])
-            az_wR = 0.5 * float(b.get("ускорение_колеса_ЛЗ_м_с2", 0.0)[i] + b.get("ускорение_колеса_ПЗ_м_с2", 0.0)[i])
+            az_body_F = _sample_series_avg2(sample, fl.get("ab", 0.0), fr.get("ab", 0.0), default=0.0)
+            az_body_R = _sample_series_avg2(sample, rl.get("ab", 0.0), rr.get("ab", 0.0), default=0.0)
+            az_wF = _sample_series_avg2(sample, fl.get("aw", 0.0), fr.get("aw", 0.0), default=0.0)
+            az_wR = _sample_series_avg2(sample, rl.get("aw", 0.0), rr.get("aw", 0.0), default=0.0)
 
-            vz_body_F = 0.5 * float(b.frame_corner_v("ЛП", default=0.0)[i] + b.frame_corner_v("ПП", default=0.0)[i])
-            vz_body_R = 0.5 * float(b.frame_corner_v("ЛЗ", default=0.0)[i] + b.frame_corner_v("ПЗ", default=0.0)[i])
-            vz_wF = 0.5 * float(b.get("скорость_колеса_ЛП_м_с", 0.0)[i] + b.get("скорость_колеса_ПП_м_с", 0.0)[i])
-            vz_wR = 0.5 * float(b.get("скорость_колеса_ЛЗ_м_с", 0.0)[i] + b.get("скорость_колеса_ПЗ_м_с", 0.0)[i])
+            vz_body_F = _sample_series_avg2(sample, fl.get("vb", 0.0), fr.get("vb", 0.0), default=0.0)
+            vz_body_R = _sample_series_avg2(sample, rl.get("vb", 0.0), rr.get("vb", 0.0), default=0.0)
+            vz_wF = _sample_series_avg2(sample, fl.get("vw", 0.0), fr.get("vw", 0.0), default=0.0)
+            vz_wR = _sample_series_avg2(sample, rl.get("vw", 0.0), rr.get("vw", 0.0), default=0.0)
         else:
             # One side only
             cF, cR = modeF, modeR
-            z_body_F = float(b.frame_corner_z(cF, default=0.0)[i])
-            z_body_R = float(b.frame_corner_z(cR, default=0.0)[i])
-            z_wF = float(b.get(f"перемещение_колеса_{cF}_м")[i])
-            z_wR = float(b.get(f"перемещение_колеса_{cR}_м")[i])
-            road_F = b.road_series(cF)
-            road_R = b.road_series(cR)
-            z_rF = float(road_F[i]) if road_F is not None else float("nan")
-            z_rR = float(road_R[i]) if road_R is not None else float("nan")
+            front_cache = corner_cache.get(str(cF), {}) or {}
+            rear_cache = corner_cache.get(str(cR), {}) or {}
+            z_body_F = sample(front_cache.get("zb", 0.0), 0.0)
+            z_body_R = sample(rear_cache.get("zb", 0.0), 0.0)
+            z_wF = sample(front_cache.get("zw", 0.0), 0.0)
+            z_wR = sample(rear_cache.get("zw", 0.0), 0.0)
+            road_F = front_cache.get("zr")
+            road_R = rear_cache.get("zr")
+            z_rF = sample(road_F, float("nan")) if road_F is not None else float("nan")
+            z_rR = sample(road_R, float("nan")) if road_R is not None else float("nan")
 
-            az_body_F = float(b.frame_corner_a(cF, default=0.0)[i])
-            az_body_R = float(b.frame_corner_a(cR, default=0.0)[i])
-            az_wF = float(b.get(f"ускорение_колеса_{cF}_м_с2", 0.0)[i])
-            az_wR = float(b.get(f"ускорение_колеса_{cR}_м_с2", 0.0)[i])
+            az_body_F = sample(front_cache.get("ab", 0.0), 0.0)
+            az_body_R = sample(rear_cache.get("ab", 0.0), 0.0)
+            az_wF = sample(front_cache.get("aw", 0.0), 0.0)
+            az_wR = sample(rear_cache.get("aw", 0.0), 0.0)
 
-            vz_body_F = float(b.frame_corner_v(cF, default=0.0)[i])
-            vz_body_R = float(b.frame_corner_v(cR, default=0.0)[i])
-            vz_wF = float(b.get(f"скорость_колеса_{cF}_м_с", 0.0)[i])
-            vz_wR = float(b.get(f"скорость_колеса_{cR}_м_с", 0.0)[i])
+            vz_body_F = sample(front_cache.get("vb", 0.0), 0.0)
+            vz_body_R = sample(rear_cache.get("vb", 0.0), 0.0)
+            vz_wF = sample(front_cache.get("vw", 0.0), 0.0)
+            vz_wR = sample(rear_cache.get("vw", 0.0), 0.0)
 
         # Reference levels: z=0 + explicit road levels under each wheel
         try:
@@ -1912,9 +2628,9 @@ class SideViewWidget(QtWidgets.QGraphicsView):
         if np.isfinite(z_rR):
             self.road_lvl_r.setLine(xR - seg, z_rR, xR + seg, z_rR)
 
-        z_com = float(b.get("перемещение_рамы_z_м")[i])
-        az_com = float(b.get("ускорение_рамы_z_м_с2", 0.0)[i])
-        vz_com = float(b.get("скорость_рамы_z_м_с", 0.0)[i])
+        z_com = sample(frame_cache.get("z_com", 0.0), 0.0)
+        az_com = sample(frame_cache.get("az_com", 0.0), 0.0)
+        vz_com = sample(frame_cache.get("vz_com", 0.0), 0.0)
 
         def _a_to_len(a: float) -> float:
             return float(_clamp(a * self._accel_scale, -0.6, 0.6))
@@ -1927,14 +2643,18 @@ class SideViewWidget(QtWidgets.QGraphicsView):
         road_path = QtGui.QPainterPath()
         road_ok = False
         try:
-            s_world = np.asarray(b.ensure_s_world(), dtype=float)
-            s0 = float(s_world[i])
+            s_world = np.asarray(cache.get("s_world", np.zeros((0,), dtype=float)), dtype=float)
+            s0 = sample(
+                s_world,
+                float(s_world[min(max(i, 0), max(0, len(s_world) - 1))]),
+            )
             mode_profile = "center" if modeF == "avg" else ("left" if str(modeF).startswith("Л") else "right")
-            s_prof, z_prof = b.ensure_road_profile(wheelbase_m=float(self.geom.wheelbase), mode=mode_profile)
+            road_profiles = cache.get("road_profiles", {}) or {}
+            s_prof, z_prof = tuple(road_profiles.get(str(mode_profile), (np.zeros((0,), dtype=float), np.zeros((0,), dtype=float))))
             r = self.scene.sceneRect()
             x_min = float(r.left()) if r.width() > 0.0 else float(min(xR, xF) - 0.6)
             x_max = float(r.right()) if r.width() > 0.0 else float(max(xR, xF) + 0.6)
-            x_nodes = np.linspace(x_min, x_max, 96)
+            x_nodes = self._road_x_nodes_for_scene(x_min, x_max)
             z_nodes = np.interp(s0 + x_nodes, np.asarray(s_prof, dtype=float), np.asarray(z_prof, dtype=float))
             if z_nodes.size >= 2 and np.isfinite(z_nodes).any():
                 road_path.moveTo(QtCore.QPointF(float(x_nodes[0]), float(z_nodes[0])))
@@ -1957,10 +2677,7 @@ class SideViewWidget(QtWidgets.QGraphicsView):
             self.road.hide()
 
         # Body
-        pbody = QtGui.QPainterPath()
-        pbody.moveTo(QtCore.QPointF(xF, z_body_F))
-        pbody.lineTo(QtCore.QPointF(xR, z_body_R))
-        self.body.setPath(pbody)
+        self.body.setLine(xF, z_body_F, xR, z_body_R)
 
         # Susp
         self.susp_f.setLine(xF, z_body_F, xF, z_wF)
@@ -2000,24 +2717,24 @@ class SideViewWidget(QtWidgets.QGraphicsView):
                     return f"az {az:+.1f}\nvz {vz:+.2f}"
                 return f"az {az:+.1f}"
 
-            self.lab_com.setPlainText(_txt(az_com, vz_com))
-            self.lab_com.setPos(0.06, z_com + 0.06)
+            _set_graphics_text_if_changed(self.lab_com, _txt(az_com, vz_com))
+            _set_graphics_pos_if_changed(self.lab_com, 0.06, z_com + 0.06)
             self.lab_com.setVisible(True)
 
-            self.lab_f.setPlainText(_txt(az_body_F, vz_body_F))
-            self.lab_f.setPos(xF + 0.06, z_body_F + 0.06)
+            _set_graphics_text_if_changed(self.lab_f, _txt(az_body_F, vz_body_F))
+            _set_graphics_pos_if_changed(self.lab_f, xF + 0.06, z_body_F + 0.06)
             self.lab_f.setVisible(True)
 
-            self.lab_r.setPlainText(_txt(az_body_R, vz_body_R))
-            self.lab_r.setPos(xR + 0.06, z_body_R + 0.06)
+            _set_graphics_text_if_changed(self.lab_r, _txt(az_body_R, vz_body_R))
+            _set_graphics_pos_if_changed(self.lab_r, xR + 0.06, z_body_R + 0.06)
             self.lab_r.setVisible(True)
 
-            self.lab_wf.setPlainText(_txt(az_wF, vz_wF))
-            self.lab_wf.setPos(xF + 0.06, z_wF - 0.26)
+            _set_graphics_text_if_changed(self.lab_wf, _txt(az_wF, vz_wF))
+            _set_graphics_pos_if_changed(self.lab_wf, xF + 0.06, z_wF - 0.26)
             self.lab_wf.setVisible(True)
 
-            self.lab_wr.setPlainText(_txt(az_wR, vz_wR))
-            self.lab_wr.setPos(xR + 0.06, z_wR - 0.26)
+            _set_graphics_text_if_changed(self.lab_wr, _txt(az_wR, vz_wR))
+            _set_graphics_pos_if_changed(self.lab_wr, xR + 0.06, z_wR - 0.26)
             self.lab_wr.setVisible(True)
         else:
             for lab in (self.lab_com, self.lab_f, self.lab_r, self.lab_wf, self.lab_wr):
@@ -2058,18 +2775,13 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         self.lane_l = QtWidgets.QGraphicsPathItem()
         self.lane_r = QtWidgets.QGraphicsPathItem()
         # semi-transparent road ribbon (instrument-cluster style)
-        self.road_fill = QtWidgets.QGraphicsPathItem()
+        self.road_fill = QtWidgets.QGraphicsPolygonItem()
         self.car = QtWidgets.QGraphicsPathItem()
 
-        self.arrow_a = Arrow2D(self.scene, width_m=0.03)
+        self.arrow_a = Arrow2D(self.scene, width_m=0.03, gradient_body=True)
 
         # Text overlay (readability > style)
-        self.hud_text = QtWidgets.QGraphicsTextItem()
-        self.hud_text.setZValue(10)
-        self.hud_text.setDefaultTextColor(QtGui.QColor(220, 220, 220))
-        self.hud_text.setFlag(QtWidgets.QGraphicsItem.ItemIgnoresTransformations, True)
-        self.hud_text.setFont(QtGui.QFont("Consolas", 9))
-        self.scene.addItem(self.hud_text)
+        self.hud_text = _make_graphics_label_item(self.scene, font_size=9, z=10.0)
 
         # Road ribbon fill (under lane edges)
         self.road_fill.setZValue(0)
@@ -2107,6 +2819,8 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
 
         self._px_per_m = 18.0
         self._auto_view_fit = True
+        self._last_fit_rect_key: Optional[tuple[float, float, float, float]] = None
+        self._last_fit_viewport_size: tuple[int, int] = (0, 0)
         self._set_transform()
 
         self._lane_width = 3.5
@@ -2118,6 +2832,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         self._seg_starts: Optional[np.ndarray] = None
         self._seg_ends: Optional[np.ndarray] = None
         self._seg_ids: Optional[np.ndarray] = None
+        self._seg_full: Optional[np.ndarray] = None
         self._seg_s0: Optional[np.ndarray] = None
         self._seg_s1: Optional[np.ndarray] = None
         self._seg_start_to_idx: dict[int, int] = {}
@@ -2137,16 +2852,73 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         self._playback_perf_mode = False
         self._render_hints_normal = QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing
         self._render_hints_perf = QtGui.QPainter.RenderHints()
+        self._last_lane_pen_key: Optional[tuple[int, int]] = None
+        self._car_path_key: Optional[tuple[int, int, int, int]] = None
+        self._last_perf_visual_key: Optional[tuple[int, ...]] = None
+        self._centerline_path_key: Optional[tuple[int, ...]] = None
+        self._lane_l_path_key: Optional[tuple[int, ...]] = None
+        self._lane_r_path_key: Optional[tuple[int, ...]] = None
+        self._road_fill_poly_key: Optional[tuple[int, ...]] = None
+        self._hud_polyline_point_budget_min = 160
+        self._hud_polyline_point_budget_max = 520
+        self._hud_perf_polyline_point_budget_cap = 180
+        self._hud_lane_polyline_scale = 0.62
+        self._hud_lane_polyline_min_points = 96
+        self._hud_perf_lane_polyline_scale = 0.48
+        self._hud_perf_lane_polyline_min_points = 72
+        self._hud_fill_polyline_scale = 0.42
+        self._hud_fill_polyline_min_points = 64
+        self._hud_perf_fill_polyline_scale = 0.34
+        self._hud_perf_fill_polyline_min_points = 48
+        self._hud_elide_cache: Dict[tuple[str, int, str], str] = {}
 
     def set_px_per_m(self, px_per_m: float):
         self._px_per_m = float(px_per_m)
         self._set_transform()
+        self._last_perf_visual_key = None
+        self._centerline_path_key = None
+        self._lane_l_path_key = None
+        self._lane_r_path_key = None
+        self._road_fill_poly_key = None
 
     def _set_transform(self):
         tr = QtGui.QTransform()
         # x right, y forward; flip y so forward is up
         tr.scale(self._px_per_m, -self._px_per_m)
         self.setTransform(tr)
+        self._last_fit_rect_key = None
+        self._last_fit_viewport_size = (0, 0)
+
+    @staticmethod
+    def _scene_rect_fit_key(rect: QtCore.QRectF) -> tuple[float, float, float, float]:
+        return (
+            round(float(rect.x()), 3),
+            round(float(rect.y()), 3),
+            round(float(rect.width()), 3),
+            round(float(rect.height()), 3),
+        )
+
+    def _fit_view_to_scene_if_needed(self, rect: Optional[QtCore.QRectF] = None, *, force: bool = False) -> None:
+        if rect is None:
+            rect = self.scene.sceneRect()
+        try:
+            vp = self.viewport()
+            viewport_size = (int(vp.width()), int(vp.height()))
+        except Exception:
+            viewport_size = (0, 0)
+        rect_key = self._scene_rect_fit_key(rect)
+        if (
+            not bool(force)
+            and viewport_size == tuple(getattr(self, "_last_fit_viewport_size", (0, 0)))
+            and rect_key == getattr(self, "_last_fit_rect_key", None)
+        ):
+            return
+        try:
+            self.fitInView(rect, QtCore.Qt.KeepAspectRatio)
+            self._last_fit_rect_key = rect_key
+            self._last_fit_viewport_size = viewport_size
+        except Exception:
+            pass
 
     def wheelEvent(self, event: QtGui.QWheelEvent):  # type: ignore[override]
         delta = 0
@@ -2164,10 +2936,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
 
     def mouseDoubleClickEvent(self, event: QtGui.QMouseEvent):  # type: ignore[override]
         self._auto_view_fit = True
-        try:
-            self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
-        except Exception:
-            pass
+        self._fit_view_to_scene_if_needed(force=True)
         try:
             event.accept()
         except Exception:
@@ -2178,6 +2947,12 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         """Apply inferred vehicle geometry (wheelbase/track/wheel sizes) to HUD view."""
         try:
             self.geom = geom
+            self._car_path_key = None
+            self._last_perf_visual_key = None
+            self._centerline_path_key = None
+            self._lane_l_path_key = None
+            self._lane_r_path_key = None
+            self._road_fill_poly_key = None
         except Exception:
             pass
 
@@ -2195,12 +2970,61 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             self.show_seg_markers = bool(show_seg_markers)
         if show_seg_colors is not None:
             self.show_seg_colors = bool(show_seg_colors)
+        self._last_perf_visual_key = None
+
+    def _poly_visual_key(self, xa: np.ndarray, ya: np.ndarray, *, closed: bool = False) -> tuple[int, ...]:
+        x_arr = np.asarray(xa, dtype=float).reshape(-1)
+        y_arr = np.asarray(ya, dtype=float).reshape(-1)
+        n = int(min(x_arr.size, y_arr.size))
+        if n <= 0:
+            return (int(bool(closed)), 0, 0)
+        quant = float(max(1.0, float(self._px_per_m) * 2.0))
+        coords = np.empty((n, 2), dtype=np.int32)
+        coords[:, 0] = np.rint(x_arr[:n] * quant).astype(np.int32, copy=False)
+        coords[:, 1] = np.rint(y_arr[:n] * quant).astype(np.int32, copy=False)
+        return (int(bool(closed)), n, int(hash(coords.tobytes())))
+
+    def _set_poly_path_if_changed(
+        self,
+        attr_name: str,
+        item: QtWidgets.QGraphicsPathItem,
+        xa: np.ndarray,
+        ya: np.ndarray,
+        *,
+        closed: bool = False,
+    ) -> None:
+        key = self._poly_visual_key(xa, ya, closed=closed)
+        if key == getattr(self, attr_name, None):
+            return
+        setattr(self, attr_name, key)
+        item.setPath(self._path_from_xy(xa, ya, closed=closed))
+
+    def _set_poly_polygon_if_changed(
+        self,
+        attr_name: str,
+        item: QtWidgets.QGraphicsPolygonItem,
+        xa: np.ndarray,
+        ya: np.ndarray,
+    ) -> None:
+        key = self._poly_visual_key(xa, ya, closed=True)
+        if key == getattr(self, attr_name, None):
+            return
+        setattr(self, attr_name, key)
+        item.setPolygon(
+            QtGui.QPolygonF(
+                [
+                    QtCore.QPointF(float(x), float(y))
+                    for x, y in zip(np.asarray(xa, dtype=float), np.asarray(ya, dtype=float))
+                ]
+            )
+        )
 
     def set_playback_perf_mode(self, enabled: bool) -> None:
         enabled = bool(enabled)
         if enabled == bool(self._playback_perf_mode):
             return
         self._playback_perf_mode = enabled
+        self._last_perf_visual_key = None
         try:
             self.setRenderHints(self._render_hints_perf if enabled else self._render_hints_normal)
         except Exception:
@@ -2240,6 +3064,112 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
     def _hide_seg_fills(self) -> None:
         for it in self._seg_fill_items:
             it.setVisible(False)
+
+    def _visible_polyline_point_budget(self) -> int:
+        try:
+            vp = self.viewport()
+            vw = max(120, int(vp.width()))
+            vh = max(120, int(vp.height()))
+        except Exception:
+            vw, vh = 320, 220
+        span = max(vw, vh)
+        budget = int(round(0.55 * float(span)))
+        if bool(getattr(self, "_playback_perf_mode", False)):
+            budget = min(budget, int(self._hud_perf_polyline_point_budget_cap))
+        return int(
+            max(
+                int(self._hud_polyline_point_budget_min),
+                min(int(self._hud_polyline_point_budget_max), budget),
+            )
+        )
+
+    def _lane_polyline_point_budget(self, centerline_points: int) -> int:
+        if bool(getattr(self, "_playback_perf_mode", False)):
+            points = int(round(float(centerline_points) * float(self._hud_perf_lane_polyline_scale)))
+            min_points = int(self._hud_perf_lane_polyline_min_points)
+        else:
+            points = int(round(float(centerline_points) * float(self._hud_lane_polyline_scale)))
+            min_points = int(self._hud_lane_polyline_min_points)
+        return int(
+            max(
+                int(min_points),
+                min(int(centerline_points), points),
+            )
+        )
+
+    def _fill_polyline_point_budget(self, centerline_points: int) -> int:
+        if bool(getattr(self, "_playback_perf_mode", False)):
+            points = int(round(float(centerline_points) * float(self._hud_perf_fill_polyline_scale)))
+            min_points = int(self._hud_perf_fill_polyline_min_points)
+        else:
+            points = int(round(float(centerline_points) * float(self._hud_fill_polyline_scale)))
+            min_points = int(self._hud_fill_polyline_min_points)
+        return int(
+            max(
+                int(min_points),
+                min(int(centerline_points), points),
+            )
+        )
+
+    @staticmethod
+    def _decimate_visible_polyline(max_points: int, *arrays: np.ndarray) -> tuple[np.ndarray, ...]:
+        """Keep a viewport-sized point budget for HUD polylines.
+
+        The HUD often sees thousands of source path samples inside the same visible window.
+        Replaying every point into QPainterPath brings no visible benefit once adjacent points
+        land within the same screen pixel, but it does cost a lot of Python/Qt calls.  We keep
+        endpoints and uniformly subsample the middle so the rendered shape stays stable while the
+        path build cost scales with the actual widget size, not with raw export density.
+        """
+        if not arrays:
+            return tuple()
+        ref = np.asarray(arrays[0])
+        n = int(ref.shape[0]) if ref.ndim >= 1 else 0
+        limit = int(max(8, max_points))
+        if n <= limit:
+            return tuple(np.asarray(arr) for arr in arrays)
+        sel = np.linspace(0, n - 1, num=limit, dtype=int)
+        sel = np.unique(sel)
+        if sel[0] != 0:
+            sel = np.insert(sel, 0, 0)
+        if sel[-1] != (n - 1):
+            sel = np.append(sel, n - 1)
+        return tuple(np.asarray(arr)[sel] for arr in arrays)
+
+    @staticmethod
+    def _path_from_xy(xa: np.ndarray, ya: np.ndarray, *, closed: bool = False) -> QtGui.QPainterPath:
+        x_arr = np.asarray(xa, dtype=float).reshape(-1)
+        y_arr = np.asarray(ya, dtype=float).reshape(-1)
+        n = int(min(x_arr.size, y_arr.size))
+        if n <= 0:
+            return QtGui.QPainterPath()
+        path = QtGui.QPainterPath()
+        pts = [QtCore.QPointF(x, y) for x, y in zip(x_arr[:n], y_arr[:n])]
+        path.addPolygon(QtGui.QPolygonF(pts))
+        if bool(closed):
+            path.closeSubpath()
+        return path
+
+    def _elide_hud_lines(self, lines: list[str], font: QtGui.QFont, max_px: int) -> list[str]:
+        width_px = max(10, int(max_px))
+        try:
+            font_key = str(font.key())
+        except Exception:
+            font_key = f"{font.family()}|{font.pointSizeF():.2f}|{int(font.weight())}|{int(bool(font.italic()))}"
+        cache = self._hud_elide_cache
+        if len(cache) > 2048:
+            cache.clear()
+        fm = QtGui.QFontMetrics(font)
+        out: list[str] = []
+        for line in lines:
+            text = str(line)
+            key = (font_key, int(width_px), text)
+            cached = cache.get(key)
+            if cached is None:
+                cached = fm.elidedText(text, QtCore.Qt.ElideRight, width_px)
+                cache[key] = cached
+            out.append(cached)
+        return out
 
     @staticmethod
     def _surface_hint(rough_std_m: float) -> str:
@@ -2454,6 +3384,82 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         base.setAlpha(90 if is_current else 45)
         return base
 
+    def _apply_lane_pens_if_needed(self) -> None:
+        key = (
+            int(round(float(self._history_m) * 10.0)),
+            int(round(float(self._lookahead_m) * 10.0)),
+        )
+        if key == self._last_lane_pen_key:
+            return
+        self._last_lane_pen_key = key
+        try:
+            tot = float(self._history_m + self._lookahead_m + 1e-9)
+            k0 = float(self._history_m / tot)
+            g_lane = QtGui.QLinearGradient(QtCore.QPointF(0.0, -self._history_m), QtCore.QPointF(0.0, self._lookahead_m))
+            g_lane.setColorAt(0.0, QtGui.QColor(80, 80, 80, 35))
+            g_lane.setColorAt(_clamp(k0, 0.0, 1.0), QtGui.QColor(130, 130, 130, 200))
+            g_lane.setColorAt(1.0, QtGui.QColor(80, 80, 80, 70))
+            pen_lane = QtGui.QPen(QtGui.QBrush(g_lane), 0.03)
+            self.lane_l.setPen(pen_lane)
+            self.lane_r.setPen(pen_lane)
+
+            g_c = QtGui.QLinearGradient(QtCore.QPointF(0.0, -self._history_m), QtCore.QPointF(0.0, self._lookahead_m))
+            g_c.setColorAt(0.0, QtGui.QColor(120, 120, 120, 25))
+            g_c.setColorAt(_clamp(k0, 0.0, 1.0), QtGui.QColor(180, 180, 180, 160))
+            g_c.setColorAt(1.0, QtGui.QColor(120, 120, 120, 60))
+            self.centerline.setPen(QtGui.QPen(QtGui.QBrush(g_c), 0.02, QtCore.Qt.DashLine))
+        except Exception:
+            pass
+
+    def _update_car_path_if_needed(self) -> None:
+        key = (
+            int(round(float(self.geom.track) * 1000.0)),
+            int(round(float(self.geom.wheel_width) * 1000.0)),
+            int(round(float(self.geom.wheelbase) * 1000.0)),
+            int(round(float(self.geom.wheel_radius) * 1000.0)),
+        )
+        if key == self._car_path_key:
+            return
+        self._car_path_key = key
+        car_w = max(0.6, float(self.geom.track) + float(self.geom.wheel_width))
+        car_l = max(0.8, float(self.geom.wheelbase) + 2.0 * float(self.geom.wheel_radius))
+        xh = 0.5 * car_w
+        yb = -2.0
+        self.car.setPath(
+            self._path_from_xy(
+                np.asarray([-xh, +xh, +xh, -xh], dtype=float),
+                np.asarray([yb, yb, yb + car_l, yb + car_l], dtype=float),
+                closed=True,
+            )
+        )
+
+    def _perf_visual_key(
+        self,
+        *,
+        x0: float,
+        y0: float,
+        yaw: float,
+    ) -> tuple[int, ...]:
+        pixel_world_step = max(1e-4, 1.0 / max(1e-3, float(self._px_per_m)))
+        span_m = max(1.0, float(self._lookahead_m + self._history_m + 4.0))
+        yaw_step = max(1e-4, pixel_world_step / span_m)
+        try:
+            vp = self.viewport()
+            viewport_w = int(max(1, vp.width()))
+            viewport_h = int(max(1, vp.height()))
+        except Exception:
+            viewport_w, viewport_h = 0, 0
+        return (
+            int(round(float(x0) / pixel_world_step)),
+            int(round(float(y0) / pixel_world_step)),
+            int(round(float(yaw) / yaw_step)),
+            int(round(float(self._lookahead_m) * 10.0)),
+            int(round(float(self._history_m) * 10.0)),
+            int(viewport_w),
+            int(viewport_h),
+            int(bool(self.show_lanes)),
+        )
+
     def _ensure_segment_cache(self, b: DataBundle) -> None:
         """Compute segment boundaries + merge optional meta_json labels."""
         key = id(b)
@@ -2464,6 +3470,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         self._seg_starts = None
         self._seg_ends = None
         self._seg_ids = None
+        self._seg_full = None
         self._seg_infos = []
         self._seg_start_to_idx = {}
         self._seg_id_to_info = {}
@@ -2479,6 +3486,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             return
         if seg_arr.size < 2:
             return
+        self._seg_full = seg_arr
 
         # Segment boundaries by changes in segment_id over time index
         changes = np.nonzero(seg_arr[1:] != seg_arr[:-1])[0] + 1
@@ -2699,61 +3707,65 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         self._apply_recommended_scales()
         self._emit_visual()
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
         eff_show_accel = bool(self.show_accel) and not bool(self._playback_perf_mode)
         eff_show_text = bool(self.show_text) and not bool(self._playback_perf_mode)
         eff_show_seg_markers = bool(self.show_seg_markers) and not bool(self._playback_perf_mode)
         eff_show_seg_colors = bool(self.show_seg_colors) and not bool(self._playback_perf_mode)
+        sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+            np.asarray(b.t, dtype=float),
+            sample_t=sample_t,
+            fallback_index=i,
+        )
+        sample = _make_series_sampler(i0=sample_i0, i1=sample_i1, alpha=alpha)
         xw, yw = b.ensure_world_xy()
         n = len(xw)
         if n <= 1:
             return
 
-        yaw = float(b.get("yaw_рад", 0.0)[i])
-        x0, y0 = float(xw[i]), float(yw[i])
+        idx_ref = int(_clamp(int(i), 0, n - 1))
+        yaw_series = b.get("yaw_рад", 0.0)
+        vx_series = b.get("скорость_vx_м_с", 0.0)
+        vy_series = b.get("скорость_vy_м_с", 0.0)
+        yaw_rate_series = b.get("yaw_rate_рад_с", 0.0)
+        ax_series = b.get("ускорение_продольное_ax_м_с2", 0.0)
+        ay_series = b.get("ускорение_поперечное_ay_м_с2", 0.0)
+        s_world = b.ensure_s_world()
+
+        yaw = sample(yaw_series, 0.0)
+        x0 = sample(xw, float(xw[idx_ref]))
+        y0 = sample(yw, float(yw[idx_ref]))
 
         # Auto lookahead scaling: more road shown at higher speed (instrument-cluster style)
         if getattr(self, "auto_lookahead", False):
             try:
-                vx0 = float(b.get("скорость_vx_м_с", 0.0)[i])
+                vx0 = sample(vx_series, 0.0)
             except Exception:
                 vx0 = 0.0
             self._lookahead_m = float(_clamp(20.0 + vx0 * 4.0, 40.0, 140.0))
             self._history_m = float(_clamp(8.0 + vx0 * 1.5, 15.0, 60.0))
 
-        # Pen gradients: brighter near the car, softer far away (instrument-cluster style)
-        try:
-            tot = float(self._history_m + self._lookahead_m + 1e-9)
-            k0 = float(self._history_m / tot)  # y=0 position in gradient in [0..1]
-            # Lane edges
-            g_lane = QtGui.QLinearGradient(QtCore.QPointF(0.0, -self._history_m), QtCore.QPointF(0.0, self._lookahead_m))
-            g_lane.setColorAt(0.0, QtGui.QColor(80, 80, 80, 35))
-            g_lane.setColorAt(_clamp(k0, 0.0, 1.0), QtGui.QColor(130, 130, 130, 200))
-            g_lane.setColorAt(1.0, QtGui.QColor(80, 80, 80, 70))
-            pen_lane = QtGui.QPen(QtGui.QBrush(g_lane), 0.03)
-            self.lane_l.setPen(pen_lane)
-            self.lane_r.setPen(pen_lane)
+        if bool(self._playback_perf_mode):
+            perf_visual_key = self._perf_visual_key(x0=float(x0), y0=float(y0), yaw=float(yaw))
+            if perf_visual_key == self._last_perf_visual_key:
+                return
+        else:
+            perf_visual_key = None
+            self._last_perf_visual_key = None
 
-            # Centerline (dashed)
-            g_c = QtGui.QLinearGradient(QtCore.QPointF(0.0, -self._history_m), QtCore.QPointF(0.0, self._lookahead_m))
-            g_c.setColorAt(0.0, QtGui.QColor(120, 120, 120, 25))
-            g_c.setColorAt(_clamp(k0, 0.0, 1.0), QtGui.QColor(180, 180, 180, 160))
-            g_c.setColorAt(1.0, QtGui.QColor(120, 120, 120, 60))
-            pen_c = QtGui.QPen(QtGui.QBrush(g_c), 0.02, QtCore.Qt.DashLine)
-            self.centerline.setPen(pen_c)
-        except Exception:
-            pass
+        # Pen gradients: brighter near the car, softer far away (instrument-cluster style)
+        self._apply_lane_pens_if_needed()
 
         # Convert world points to car-local coordinates (car at origin).
         # Car frame: X forward, Y left. HUD scene: X right, Y forward (up).
         c, s = np.cos(-yaw), np.sin(-yaw)
 
         # Window of indices (fast)
-        i0 = max(0, i - 200)
-        i1 = min(n, i + 400)
+        win_i0 = max(0, i - 200)
+        win_i1 = min(n, i + 400)
 
-        xs = xw[i0:i1] - x0
-        ys = yw[i0:i1] - y0
+        xs = xw[win_i0:win_i1] - x0
+        ys = yw[win_i0:win_i1] - y0
         x_fwd = c * xs - s * ys
         y_left = s * xs + c * ys
 
@@ -2773,21 +3785,18 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             return
 
         # Indices in the original arrays corresponding to the visible road window
-        idxs = np.arange(i0, i1)[mask]
+        idxs = np.arange(win_i0, win_i1)[mask]
 
-        def _poly_path(xa: np.ndarray, ya: np.ndarray) -> QtGui.QPainterPath:
-            p = QtGui.QPainterPath()
-            p.moveTo(QtCore.QPointF(float(xa[0]), float(ya[0])))
-            for k in range(1, len(xa)):
-                p.lineTo(QtCore.QPointF(float(xa[k]), float(ya[k])))
-            return p
-
-        self.centerline.setPath(_poly_path(xl, yl))
+        max_points = self._visible_polyline_point_budget()
+        xl, yl, idxs = self._decimate_visible_polyline(max_points, xl, yl, idxs)
+        self._set_poly_path_if_changed("_centerline_path_key", self.centerline, xl, yl)
 
         # Lane boundaries via offset along normal of tangent
         if self.show_lanes:
-            dx = np.gradient(xl)
-            dy = np.gradient(yl)
+            lane_points = self._lane_polyline_point_budget(len(xl))
+            lane_xl, lane_yl, lane_idxs = self._decimate_visible_polyline(lane_points, xl, yl, idxs)
+            dx = np.gradient(lane_xl)
+            dy = np.gradient(lane_yl)
             norm = np.sqrt(dx * dx + dy * dy)
             norm[norm < 1e-9] = 1.0
             tx = dx / norm
@@ -2795,12 +3804,12 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             nx = -ty
             ny = tx
             w = 0.5 * float(self._lane_width)
-            xlL = xl + nx * w
-            ylL = yl + ny * w
-            xlR = xl - nx * w
-            ylR = yl - ny * w
-            self.lane_l.setPath(_poly_path(xlL, ylL))
-            self.lane_r.setPath(_poly_path(xlR, ylR))
+            xlL = lane_xl + nx * w
+            ylL = lane_yl + ny * w
+            xlR = lane_xl - nx * w
+            ylR = lane_yl - ny * w
+            self._set_poly_path_if_changed("_lane_l_path_key", self.lane_l, xlL, ylL)
+            self._set_poly_path_if_changed("_lane_r_path_key", self.lane_r, xlR, ylR)
             self.lane_l.show()
             self.lane_r.show()
 
@@ -2809,37 +3818,50 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             try:
                 self._ensure_segment_cache(b)
                 cur_seg_id = None
-                seg_full = b.get("сегмент_id", None)
-                if seg_full is None:
-                    seg_full = b.get("segment_id", None)
+                seg_full = self._seg_full
                 if seg_full is not None:
-                    cur_seg_id = int(np.asarray(seg_full).reshape(-1)[i])
+                    cur_seg_id = int(seg_full[i])
                 if eff_show_seg_colors:
-                    self._update_segment_fills(b, idxs, xlL, ylL, xlR, ylR, cur_seg_id)
+                    self._update_segment_fills(b, lane_idxs, xlL, ylL, xlR, ylR, cur_seg_id)
                 else:
                     self._hide_seg_fills()
             except Exception:
                 # Never fail drawing due to metadata issues
                 self._hide_seg_fills()
 
-            # Road ribbon fill between lane edges (cheap polygon path)
+            # Road ribbon fill between lane edges.
             try:
-                pfill = QtGui.QPainterPath()
-                pfill.moveTo(QtCore.QPointF(float(xlL[0]), float(ylL[0])))
-                for k in range(1, len(xlL)):
-                    pfill.lineTo(QtCore.QPointF(float(xlL[k]), float(ylL[k])))
-                for k in range(len(xlR) - 1, -1, -1):
-                    pfill.lineTo(QtCore.QPointF(float(xlR[k]), float(ylR[k])))
-                pfill.closeSubpath()
-                self.road_fill.setPath(pfill)
+                fill_points = self._fill_polyline_point_budget(len(lane_xl))
+                fill_xl, fill_yl, _fill_idxs = self._decimate_visible_polyline(fill_points, lane_xl, lane_yl, lane_idxs)
+                fill_dx = np.gradient(fill_xl)
+                fill_dy = np.gradient(fill_yl)
+                fill_norm = np.sqrt(fill_dx * fill_dx + fill_dy * fill_dy)
+                fill_norm[fill_norm < 1e-9] = 1.0
+                fill_tx = fill_dx / fill_norm
+                fill_ty = fill_dy / fill_norm
+                fill_nx = -fill_ty
+                fill_ny = fill_tx
+                fill_xlL = fill_xl + fill_nx * w
+                fill_ylL = fill_yl + fill_ny * w
+                fill_xlR = fill_xl - fill_nx * w
+                fill_ylR = fill_yl - fill_ny * w
+                self._set_poly_polygon_if_changed(
+                    "_road_fill_poly_key",
+                    self.road_fill,
+                    np.concatenate((fill_xlL, fill_xlR[::-1])),
+                    np.concatenate((fill_ylL, fill_ylR[::-1])),
+                )
                 self.road_fill.show()
             except Exception:
                 self.road_fill.hide()
         else:
             self.lane_l.hide()
             self.lane_r.hide()
+            self._lane_l_path_key = None
+            self._lane_r_path_key = None
             try:
                 self.road_fill.hide()
+                self._road_fill_poly_key = None
             except Exception:
                 pass
 
@@ -2861,11 +3883,11 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
 
                     for start_idx in starts[1:]:
                         k = int(start_idx)
-                        if k < i0 or k >= i1:
+                        if k < win_i0 or k >= win_i1:
                             continue
                         # Also require that this boundary is in the currently visible (masked) window
                         try:
-                            if not bool(mask[k - i0]):
+                            if not bool(mask[k - win_i0]):
                                 continue
                         except Exception:
                             pass
@@ -2904,27 +3926,13 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
 
         # Car silhouette at origin
         # Силуэт машины на миникарте — в одном масштабе с расчётной геометрией.
-        car_w = max(0.6, float(self.geom.track) + float(self.geom.wheel_width))
-        car_l = max(0.8, float(self.geom.wheelbase) + 2.0 * float(self.geom.wheel_radius))
-        xh = 0.5 * car_w
         yb = -2.0  # a bit down
-        pts = [
-            QtCore.QPointF(-xh, yb),
-            QtCore.QPointF(+xh, yb),
-            QtCore.QPointF(+xh, yb + car_l),
-            QtCore.QPointF(-xh, yb + car_l),
-        ]
-        pcar = QtGui.QPainterPath()
-        pcar.moveTo(pts[0])
-        for pt in pts[1:]:
-            pcar.lineTo(pt)
-        pcar.closeSubpath()
-        self.car.setPath(pcar)
+        self._update_car_path_if_needed()
 
         # Horizontal accel vector at COM (car frame): ax forward, ay left
         if eff_show_accel:
-            ax = float(b.get("ускорение_продольное_ax_м_с2", 0.0)[i])
-            ay = float(b.get("ускорение_поперечное_ay_м_с2", 0.0)[i])
+            ax = sample(ax_series, 0.0)
+            ay = sample(ay_series, 0.0)
             # scale (m/s^2 -> meters)
             a_scale = 0.6
             p0 = QtCore.QPointF(0.0, yb + 1.0)
@@ -2935,22 +3943,13 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
 
         # Overlay text: speed/turn/accels + segment progress (no text overlap).
         if eff_show_text:
-            def _get_scalar(key: str, idx: int, default: float = 0.0) -> float:
-                v = b.get(key, None)
-                if v is None:
-                    return float(default)
-                try:
-                    return float(v[idx])
-                except Exception:
-                    return float(default)
-
-            vx = _get_scalar("скорость_vx_м_с", i, 0.0)
-            vy = _get_scalar("скорость_vy_м_с", i, 0.0)
+            vx = sample(vx_series, 0.0)
+            vy = sample(vy_series, 0.0)
             v_mps = math.hypot(vx, vy)  # DERIVED from model outputs (vx, vy)
-            yaw_rate = _get_scalar("yaw_rate_рад_с", i, 0.0)
-            ax = _get_scalar("ускорение_продольное_ax_м_с2", i, 0.0)
-            ay = _get_scalar("ускорение_поперечное_ay_м_с2", i, 0.0)
-            s = float(b.ensure_s_world()[i])
+            yaw_rate = sample(yaw_rate_series, 0.0)
+            ax = sample(ax_series, 0.0)
+            ay = sample(ay_series, 0.0)
+            s = sample(s_world, 0.0)
 
             # Signed radius estimate
             R = float("inf")
@@ -3049,19 +4048,22 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
 
             max_px = max(260, int(self.viewport().width() * 0.78))
             fnt = self.hud_text.font()
-            lines = [_elide_px(ln, fnt, max_px) for ln in lines]
+            lines = self._elide_hud_lines(lines, fnt, max_px)
             txt = "\n".join(lines)
-            self.hud_text.setPlainText(txt)
+            _set_graphics_text_if_changed(self.hud_text, txt)
             # place near top-left of the scene rect
-            self.hud_text.setPos(-7.6, self._lookahead_m - 4.5)
+            _set_graphics_pos_if_changed(self.hud_text, -7.6, self._lookahead_m - 4.5)
             self.hud_text.show()
         else:
             self.hud_text.hide()
 
         # Frame
-        self.scene.setSceneRect(-8.0, -self._history_m - 4.0, 16.0, self._lookahead_m + self._history_m + 8.0)
+        scene_rect = QtCore.QRectF(-8.0, -self._history_m - 4.0, 16.0, self._lookahead_m + self._history_m + 8.0)
+        self.scene.setSceneRect(scene_rect)
         if bool(getattr(self, "_auto_view_fit", True)):
-            self.fitInView(self.scene.sceneRect(), QtCore.Qt.KeepAspectRatio)
+            self._fit_view_to_scene_if_needed(scene_rect)
+        if perf_visual_key is not None:
+            self._last_perf_visual_key = perf_visual_key
 
 # -----------------------------
 # 3D View (optional)
@@ -3183,6 +4185,7 @@ class Car3DWidget(QtWidgets.QWidget):
         self._cyl_rod_meshes: List["gl.GLMeshItem"] = []
         self._cyl_piston_meshes: List["gl.GLMeshItem"] = []
         self._cyl_piston_ring_lines: List["gl.GLLinePlotItem"] = []
+        self._cyl_rod_core_lines: List["gl.GLLinePlotItem"] = []
         self._cyl_piston_markers: Optional[Any] = None
         self._cyl_frame_mount_markers: Optional["gl.GLLinePlotItem"] = None
 
@@ -3565,7 +4568,8 @@ class Car3DWidget(QtWidgets.QWidget):
                    self._chassis_mesh, self._contact_pts, self._contact_links,
                    self._arm_lines, self._cyl1_lines, self._cyl2_lines,
                    self._contact_patch_mesh, self._vec_vel, self._vec_acc,
-                   self._cyl_piston_markers, self._cyl_frame_mount_markers, *self._cyl_piston_ring_lines]:
+                   self._cyl_piston_markers, self._cyl_frame_mount_markers,
+                   *self._cyl_piston_ring_lines, *self._cyl_rod_core_lines]:
             if it is not None:
                 try:
                     self.view.removeItem(it)
@@ -3585,6 +4589,7 @@ class Car3DWidget(QtWidgets.QWidget):
                     pass
             meshes.clear()
         self._cyl_piston_ring_lines = []
+        self._cyl_rod_core_lines = []
 
         # --- Road: ribbon mesh + edges + stripes
         self._road_mesh = gl.GLMeshItem(
@@ -3666,7 +4671,7 @@ class Car3DWidget(QtWidgets.QWidget):
         v_unit, f_unit = self._capped_cylinder_mesh(1.0, 1.0, cols=24)
         v_unit = np.asarray(v_unit, dtype=float)
         f_unit = np.asarray(f_unit, dtype=np.int32)
-        self._unit_cyl_y_vertices = np.asarray(_center_and_orient_cylinder_vertices_to_y(v_unit, length_m=1.0), dtype=float)
+        self._unit_cyl_y_vertices = np.asarray(_orient_centered_cylinder_vertices_to_y(v_unit), dtype=float)
         self._unit_cyl_faces = np.asarray(f_unit, dtype=np.int32)
         disc_seg = 24
         disc_ang = np.linspace(0.0, 2.0 * np.pi, disc_seg, endpoint=False)
@@ -3694,12 +4699,14 @@ class Car3DWidget(QtWidgets.QWidget):
             self.view.addItem(w)
             self._wheel_meshes.append(w)
 
-        # --- Pneumatic cylinders: edge-only outer housing + exact internal chamber + exact rod + exact piston plane.
+        # --- Pneumatic cylinders: translucent housing + exact cap-side chamber + external rod
+        # mesh + separate inner rod-core overlay + exact piston plane.
         # Honesty policy:
-        # - outer shell spans the full exported pin-to-pin actuator envelope because the bundle still
-        #   lacks an explicit external gland/body-end point;
-        # - the exact cap-side -> piston split is shown as a separate semi-transparent *internal chamber*;
-        # - rod and piston are rendered from the contract-derived geometry, without fake spheres or fake thickness.
+        # - housing shell uses explicit packaging length when the bundle exports it;
+        # - the exact cap-side -> piston split is shown as a separate semi-transparent chamber;
+        # - the opaque rod mesh represents only the exposed external rod, while a light line overlay
+        #   keeps the internal rod readable through the translucent shell;
+        # - piston is rendered from the contract-derived plane only, without fake thickness.
         cyl_body_md = gl.MeshData(vertexes=np.zeros((0, 3), dtype=float), faces=np.zeros((0, 3), dtype=np.int32))
         for _ in range(8):
             body = gl.GLMeshItem(
@@ -3765,6 +4772,17 @@ class Car3DWidget(QtWidgets.QWidget):
             piston_ring.setVisible(False)
             self.view.addItem(piston_ring)
             self._cyl_piston_ring_lines.append(piston_ring)
+
+            rod_core = gl.GLLinePlotItem(
+                pos=np.zeros((0, 3), dtype=float),
+                color=(0.96, 0.98, 1.00, 0.92),
+                width=2.6,
+                antialias=True,
+                mode="lines",
+            )
+            rod_core.setVisible(False)
+            self.view.addItem(rod_core)
+            self._cyl_rod_core_lines.append(rod_core)
 
         # No GL point sprites here: they caused Windows/OpenGL runtime warnings and were
         # easily mistaken for frame mounts or other packaging points.
@@ -4126,6 +5144,11 @@ class Car3DWidget(QtWidgets.QWidget):
                 it.setVisible(bool(it.isVisible()))
             except Exception:
                 pass
+        for it in self._cyl_rod_core_lines:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
         if self._cyl_piston_markers:
             self._cyl_piston_markers.setVisible(bool(getattr(self, "_show_piston_markers_debug", False)))
 
@@ -4146,41 +5169,45 @@ class Car3DWidget(QtWidgets.QWidget):
         if accel_scale is not None:
             self._accel_scale = float(accel_scale)
 
+    def _solver_signed_speed_along_road(self, get_value) -> float:
+        try:
+            return float(get_value("скорость_vx_м_с", 0.0))
+        except Exception:
+            return 0.0
+
+    def _solver_external_acceleration_xy(self, get_value) -> tuple[float, float]:
+        try:
+            return (
+                float(get_value("ускорение_продольное_ax_м_с2", 0.0)),
+                float(get_value("ускорение_поперечное_ay_м_с2", 0.0)),
+            )
+        except Exception:
+            return 0.0, 0.0
+
     # ---------------------------- main update ----------------------------
 
-    def update_frame(self, b: DataBundle, i: int) -> None:
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None) -> None:
         if not _HAS_GL:
             return
         if bool(getattr(self, '_layout_transition_active', False)):
             return
 
-        # ---- Data (with safe fallbacks)
-        # DataBundle.get(...) -> np.ndarray, поэтому берём массив и индексируем [i].
-        def _g(name: str, default: float = 0.0) -> float:
-            return float(b.get(name, default)[i])
+        i0, i1, alpha, _sample_t = _sample_time_bracket(
+            np.asarray(b.t, dtype=float),
+            sample_t=sample_t,
+            fallback_index=i,
+        )
 
-        # Canonical channels (no aliases / no silent compatibility bridges).
-        # IMPORTANT: some models export ``скорость_vy_м_с`` as a world-Y derivative,
-        # not as body-lateral speed. Therefore 3D vectors use body-frame velocities
-        # reconstructed from the explicit world path when it is available.
-        vx = _g("скорость_vx_м_с", 0.0)
-        vy = 0.0
-        ax = _g("ускорение_продольное_ax_м_с2", 0.0)
-        ay = _g("ускорение_поперечное_ay_м_с2", 0.0)
-        try:
-            vx_body, vy_body = b.ensure_body_velocity_xy()
-            if len(vx_body) > i and len(vy_body) > i:
-                vx = float(vx_body[i])
-                vy = float(vy_body[i])
-        except Exception:
-            pass
-        try:
-            ax_body, ay_body = b.ensure_body_acceleration_xy()
-            if len(ax_body) > i and len(ay_body) > i:
-                ax = float(ax_body[i])
-                ay = float(ay_body[i])
-        except Exception:
-            pass
+        # ---- Data (with safe fallbacks)
+        # DataBundle.get(...) -> np.ndarray; sample continuously between source rows so
+        # sparse bundles still look smooth at high display cadence.
+        def _g(name: str, default: float = 0.0) -> float:
+            return _sample_series_local(b.get(name, default), i0=i0, i1=i1, alpha=alpha, default=default)
+
+        # Canonical solver-truth channels only. The user-facing 3D arrows intentionally stay
+        # in the road plane and do not mix in heave channels or reconstructed body helpers.
+        speed_along_road = self._solver_signed_speed_along_road(_g)
+        external_ax, external_ay = self._solver_external_acceleration_xy(_g)
 
         yaw0 = _g("yaw_рад", 0.0)
 
@@ -4191,7 +5218,11 @@ class Car3DWidget(QtWidgets.QWidget):
         # ---- Wheel & road heights (per-corner)
         corners = ["ЛП", "ПП", "ЛЗ", "ПЗ"]
         z_wheels = [_g(f"перемещение_колеса_{c}_м", 0.0) for c in corners]
-        z_roads = [float(arr[i]) if (arr := b.road_series(c)) is not None else float("nan") for c in corners]
+        z_roads = [
+            _sample_series_local(arr, i0=i0, i1=i1, alpha=alpha, default=float("nan"))
+            if (arr := b.road_series(c)) is not None else float("nan")
+            for c in corners
+        ]
         wheel_air = [_g(f"колесо_в_воздухе_{c}", 0.0) for c in corners]
 
         # ---- Canonical local car-frame coordinates (no axis remapping)
@@ -4234,8 +5265,11 @@ class Car3DWidget(QtWidgets.QWidget):
             if arr is None:
                 return None
             try:
+                sample = _sample_point_local(arr, i0=i0, i1=i1, alpha=alpha)
+                if sample is None:
+                    return None
                 return np.asarray(
-                    _localize_world_points_to_car_frame(arr[i], x0=x0, y0=y0, yaw_rad=yaw0)[0],
+                    _localize_world_points_to_car_frame(sample, x0=x0, y0=y0, yaw_rad=yaw0)[0],
                     dtype=float,
                 )
             except Exception:
@@ -4247,19 +5281,35 @@ class Car3DWidget(QtWidgets.QWidget):
             fpt = b.frame_corner_xyz(corner)
 
             if wpt is not None:
-                wloc = _localize_world_points_to_car_frame(wpt[i], x0=x0, y0=y0, yaw_rad=yaw0)[0]
+                wpt_sample = _sample_point_local(wpt, i0=i0, i1=i1, alpha=alpha)
+                if wpt_sample is not None:
+                    wloc = _localize_world_points_to_car_frame(wpt_sample, x0=x0, y0=y0, yaw_rad=yaw0)[0]
+                else:
+                    fx, fy = wheel_xy_fallback[idx]
+                    wloc = np.asarray([fx, fy, z_wheels[idx]], dtype=float)
             else:
                 fx, fy = wheel_xy_fallback[idx]
                 wloc = np.asarray([fx, fy, z_wheels[idx]], dtype=float)
             if rpt is not None:
-                rloc = _localize_world_points_to_car_frame(rpt[i], x0=x0, y0=y0, yaw_rad=yaw0)[0]
+                rpt_sample = _sample_point_local(rpt, i0=i0, i1=i1, alpha=alpha)
+                if rpt_sample is not None:
+                    rloc = _localize_world_points_to_car_frame(rpt_sample, x0=x0, y0=y0, yaw_rad=yaw0)[0]
+                else:
+                    zr = z_roads[idx]
+                    if not np.isfinite(zr):
+                        zr = float(wloc[2]) - float(self.geom.wheel_radius)
+                    rloc = np.asarray([wloc[0], wloc[1], zr], dtype=float)
             else:
                 zr = z_roads[idx]
                 if not np.isfinite(zr):
                     zr = float(wloc[2]) - float(self.geom.wheel_radius)
                 rloc = np.asarray([wloc[0], wloc[1], zr], dtype=float)
             if fpt is not None:
-                floc = _localize_world_points_to_car_frame(fpt[i], x0=x0, y0=y0, yaw_rad=yaw0)[0]
+                fpt_sample = _sample_point_local(fpt, i0=i0, i1=i1, alpha=alpha)
+                if fpt_sample is not None:
+                    floc = _localize_world_points_to_car_frame(fpt_sample, x0=x0, y0=y0, yaw_rad=yaw0)[0]
+                else:
+                    floc = np.asarray([wloc[0], wloc[1], z_body], dtype=float)
             else:
                 floc = np.asarray([wloc[0], wloc[1], z_body], dtype=float)
 
@@ -4496,12 +5546,14 @@ class Car3DWidget(QtWidgets.QWidget):
                         self._invalidate_mesh(self._cyl_piston_meshes[cyl_mesh_idx])
                         if cyl_mesh_idx < len(self._cyl_piston_ring_lines):
                             _set_line_item_pos(self._cyl_piston_ring_lines[cyl_mesh_idx], None)
+                        if cyl_mesh_idx < len(self._cyl_rod_core_lines):
+                            _set_line_item_pos(self._cyl_rod_core_lines[cyl_mesh_idx], None)
                     cyl_mesh_idx += 1
                     continue
                 bore_d, rod_d, outer_d, stroke_len, dead_cap_len, dead_rod_len, dead_height_len, body_len = self._corner_cylinder_contract(cyl_index=cyl_index, corner=corner)
                 stroke_col = self._column_for_cyl_stroke(cyl_index, corner)
                 try:
-                    stroke_pos = float(b.get(stroke_col, 0.0)[i])
+                    stroke_pos = _g(stroke_col, 0.0)
                 except Exception:
                     stroke_pos = 0.0
                 truth_gate = self._cylinder_truth_gate(cyl_index)
@@ -4529,6 +5581,8 @@ class Car3DWidget(QtWidgets.QWidget):
                         self._invalidate_mesh(self._cyl_piston_meshes[cyl_mesh_idx])
                         if cyl_mesh_idx < len(self._cyl_piston_ring_lines):
                             _set_line_item_pos(self._cyl_piston_ring_lines[cyl_mesh_idx], None)
+                        if cyl_mesh_idx < len(self._cyl_rod_core_lines):
+                            _set_line_item_pos(self._cyl_rod_core_lines[cyl_mesh_idx], None)
                     else:
                         piston_radius = float(packaging_state.get("piston_radius_m", 0.0) or 0.0)
                         _set_mesh_from_segment(
@@ -4568,6 +5622,11 @@ class Car3DWidget(QtWidgets.QWidget):
                                     extra={"corner": str(corner), "cyl_index": int(cyl_index)},
                                 )
                             _set_line_item_pos(self._cyl_piston_ring_lines[cyl_mesh_idx], ring_vertices)
+                        if cyl_mesh_idx < len(self._cyl_rod_core_lines):
+                            _set_line_item_pos(
+                                self._cyl_rod_core_lines[cyl_mesh_idx],
+                                _rod_internal_centerline_vertices_from_packaging_state(packaging_state),
+                            )
                 cyl_mesh_idx += 1
         if self._cyl_frame_mount_markers is not None:
             try:
@@ -4616,17 +5675,10 @@ class Car3DWidget(QtWidgets.QWidget):
 
         z_vec_offset = 0.55 * body_h + 0.15 * float(self.geom.wheel_radius)
         vec_origin = np.asarray(center_draw, dtype=float) + np.asarray(R_local[:, 2], dtype=float) * float(z_vec_offset)
-        vz = _g("скорость_рамы_z_м_с", 0.0)
-        az = _g("ускорение_рамы_z_м_с2", 0.0)
-        vel_vec = (
-            np.asarray(R_local[:, 0], dtype=float) * float(vx * self._vel_scale)
-            + np.asarray(R_local[:, 1], dtype=float) * float(vy * self._vel_scale)
-            + np.asarray(R_local[:, 2], dtype=float) * float(vz * self._vel_scale)
-        )
+        vel_vec = np.asarray(R_local[:, 0], dtype=float) * float(speed_along_road * self._vel_scale)
         acc_vec = (
-            np.asarray(R_local[:, 0], dtype=float) * float(ax * self._accel_scale)
-            + np.asarray(R_local[:, 1], dtype=float) * float(ay * self._accel_scale)
-            + np.asarray(R_local[:, 2], dtype=float) * float(az * self._accel_scale)
+            np.asarray(R_local[:, 0], dtype=float) * float(external_ax * self._accel_scale)
+            + np.asarray(R_local[:, 1], dtype=float) * float(external_ay * self._accel_scale)
         )
         if self._vec_vel:
             self._vec_vel.setData(pos=_arrow_lines_3d(vec_origin, vel_vec))
@@ -4644,9 +5696,9 @@ class Car3DWidget(QtWidgets.QWidget):
             try:
                 s_world = b.ensure_s_world()
                 xw, yw = b.ensure_world_xy()
-                s0 = float(s_world[i])
-                x0 = float(xw[i])
-                y0 = float(yw[i])
+                s0 = _sample_series_local(s_world, i0=i0, i1=i1, alpha=alpha, default=0.0)
+                x0 = _sample_series_local(xw, i0=i0, i1=i1, alpha=alpha, default=0.0)
+                y0 = _sample_series_local(yw, i0=i0, i1=i1, alpha=alpha, default=0.0)
 
                 la = self._auto_lookahead(vx)
                 s_min = s0 - self._lookbehind_m
@@ -5002,17 +6054,23 @@ class CornerTable(QtWidgets.QTableWidget):
         self.setHorizontalHeaderLabels(list(CORNERS))
         self.setVerticalHeaderLabels(self.ROWS)
         self.horizontalHeader().setStretchLastSection(True)
-        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.setAlternatingRowColors(True)
+        self._bundle_key: Optional[int] = None
+        self._corner_cache: Dict[str, Dict[str, Any]] = {}
+        self._cell_items: List[List[QtWidgets.QTableWidgetItem]] = [
+            [QtWidgets.QTableWidgetItem("–") for _ in range(self.columnCount())]
+            for _ in range(self.rowCount())
+        ]
 
         # Pre-create items
         for r in range(self.rowCount()):
             for c in range(self.columnCount()):
-                it = QtWidgets.QTableWidgetItem("–")
+                it = self._cell_items[r][c]
                 it.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
                 self.setItem(r, c, it)
+        _set_table_fixed_row_height(self)
 
 
     def set_recommended_scales(self, accel_scale: float, vel_scale: float):
@@ -5056,26 +6114,35 @@ class CornerTable(QtWidgets.QTableWidget):
         self._apply_recommended_scales()
         self._emit_visual()
 
+    def set_bundle(self, b: DataBundle):
+        self._bundle_key = id(b)
+        self._corner_cache = _ensure_corner_signal_cache(b)
+
     def update_frame(self, b: DataBundle, i: int):
+        if int(getattr(self, "_bundle_key", 0) or 0) != id(b):
+            self.set_bundle(b)
+
         for ci, c in enumerate(CORNERS):
-            zb = float(b.frame_corner_z(c, default=0.0)[i])
-            vb = float(b.frame_corner_v(c, default=0.0)[i])
-            ab = float(b.frame_corner_a(c, default=0.0)[i])
+            sig = self._corner_cache.get(str(c))
+            if not sig:
+                continue
+            zb = float(sig["zb"][i])
+            vb = float(sig["vb"][i])
+            ab = float(sig["ab"][i])
 
-            zw = float(b.get(f"перемещение_колеса_{c}_м", 0.0)[i])
-            vw = float(b.get(f"скорость_колеса_{c}_м_с", 0.0)[i])
-            aw = float(b.get(f"ускорение_колеса_{c}_м_с2", 0.0)[i])
+            zw = float(sig["zw"][i])
+            vw = float(sig["vw"][i])
+            aw = float(sig["aw"][i])
 
-            road_arr = b.road_series(c)
+            road_arr = sig["zr"]
             zr = float(road_arr[i]) if road_arr is not None else float("nan")
 
-            # Relative signals
             z_w_minus_body = zw - zb
             z_w_minus_road = (zw - zr) if np.isfinite(zr) else float("nan")
 
-            s = float(b.get(f"положение_штока_{c}_м", 0.0)[i])
-            Ft = float(b.get(f"нормальная_сила_шины_{c}_Н", 0.0)[i])
-            air = int(float(b.get(f"колесо_в_воздухе_{c}", 0.0)[i]) > 0.5)
+            s = float(sig["stroke"][i])
+            Ft = float(sig["tireF"][i])
+            air = int(float(sig["air"][i]) > 0.5)
 
             vals = [
                 _fmt(zb, digits=3),
@@ -5092,17 +6159,12 @@ class CornerTable(QtWidgets.QTableWidget):
                 "1" if air else "0",
             ]
             for r, v in enumerate(vals):
-                it = self.item(r, ci)
-                if it is None:
-                    it = QtWidgets.QTableWidgetItem(v)
-                    self.setItem(r, ci, it)
-                it.setText(v)
+                it = self._cell_items[r][ci]
+                _set_table_item_text_if_changed(it, v)
 
                 # Colorize "in air"
                 if r == (len(self.ROWS) - 1):
-                    it.setForeground(
-                        QtGui.QBrush(QtGui.QColor(255, 120, 120) if air else QtGui.QColor(120, 220, 140))
-                    )
+                    _set_air_flag_item_foreground(it, bool(air))
 
 class CornerQuickTable(QtWidgets.QTableWidget):
     """Pinned compact table: the 4 corners at once (most important signals).
@@ -5125,11 +6187,16 @@ class CornerQuickTable(QtWidgets.QTableWidget):
         self.setHorizontalHeaderLabels(list(CORNERS))
         self.setVerticalHeaderLabels(self.ROWS)
         self.horizontalHeader().setStretchLastSection(True)
-        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.setAlternatingRowColors(True)
         self.setMaximumHeight(165)
+        self._bundle_key: Optional[int] = None
+        self._corner_cache: Dict[str, Dict[str, Any]] = {}
+        self._cell_items: List[List[QtWidgets.QTableWidgetItem]] = [
+            [QtWidgets.QTableWidgetItem("–") for _ in range(self.columnCount())]
+            for _ in range(self.rowCount())
+        ]
 
         # Slightly smaller font to fit in the pinned area
         f = self.font()
@@ -5141,23 +6208,34 @@ class CornerQuickTable(QtWidgets.QTableWidget):
 
         for r in range(self.rowCount()):
             for c in range(self.columnCount()):
-                it = QtWidgets.QTableWidgetItem("–")
+                it = self._cell_items[r][c]
                 it.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
                 self.setItem(r, c, it)
+        _set_table_fixed_row_height(self, padding=7, minimum=18)
+
+    def set_bundle(self, b: DataBundle):
+        self._bundle_key = id(b)
+        self._corner_cache = _ensure_corner_signal_cache(b)
 
     def update_frame(self, b: DataBundle, i: int):
+        if int(getattr(self, "_bundle_key", 0) or 0) != id(b):
+            self.set_bundle(b)
+
         for ci, c in enumerate(CORNERS):
-            zb = float(b.frame_corner_z(c, default=0.0)[i])
-            zw = float(b.get(f"перемещение_колеса_{c}_м", 0.0)[i])
-            road_arr = b.road_series(c)
+            sig = self._corner_cache.get(str(c))
+            if not sig:
+                continue
+            zb = float(sig["zb"][i])
+            zw = float(sig["zw"][i])
+            road_arr = sig["zr"]
             zr = float(road_arr[i]) if road_arr is not None else float("nan")
 
             z_w_minus_body = zw - zb
             z_w_minus_road = (zw - zr) if np.isfinite(zr) else float("nan")
 
-            s = float(b.get(f"положение_штока_{c}_м", 0.0)[i])
-            Ft = float(b.get(f"нормальная_сила_шины_{c}_Н", 0.0)[i])
-            air = int(float(b.get(f"колесо_в_воздухе_{c}", 0.0)[i]) > 0.5)
+            s = float(sig["stroke"][i])
+            Ft = float(sig["tireF"][i])
+            air = int(float(sig["air"][i]) > 0.5)
 
             vals = [
                 _fmt(zb, digits=3),
@@ -5168,19 +6246,317 @@ class CornerQuickTable(QtWidgets.QTableWidget):
                 "1" if air else "0",
             ]
             for r, v in enumerate(vals):
-                it = self.item(r, ci)
-                if it is None:
-                    it = QtWidgets.QTableWidgetItem(v)
-                    it.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-                    self.setItem(r, ci, it)
-                it.setText(v)
+                it = self._cell_items[r][ci]
+                _set_table_item_text_if_changed(it, v)
 
                 # Colorize wheel in air
                 if r == (len(self.ROWS) - 1):
-                    it.setForeground(
-                        QtGui.QBrush(QtGui.QColor(255, 120, 120) if air else QtGui.QColor(120, 220, 140))
-                    )
+                    _set_air_flag_item_foreground(it, bool(air))
 
+
+
+class _RoadProfileCanvas(QtWidgets.QWidget):
+    """Lightweight road profile renderer for always-visible dock mode."""
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self.setMinimumHeight(150)
+        try:
+            self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)
+        except Exception:
+            pass
+        self._xrange: tuple[float, float] = (-8.0, 35.0)
+        self._yrange: tuple[float, float] = (-0.15, 0.15)
+        self._front_x: float = 1.15
+        self._rear_x: float = -1.15
+        self._curves: Dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        self._markers: Dict[str, Optional[tuple[float, float]]] = {}
+        self._curve_colors: Dict[str, QtGui.QColor] = {
+            "ЛП": QtGui.QColor(70, 180, 255, 220),
+            "ПП": QtGui.QColor(90, 220, 130, 220),
+            "ЛЗ": QtGui.QColor(255, 170, 60, 220),
+            "ПЗ": QtGui.QColor(255, 90, 120, 220),
+        }
+        self._bg_cache_key: Optional[tuple[Any, ...]] = None
+        self._bg_cache_pixmap: Optional[QtGui.QPixmap] = None
+        self._curve_pens: Dict[str, QtGui.QPen] = {}
+        for corner, color in self._curve_colors.items():
+            pen = QtGui.QPen(color, 2.0)
+            try:
+                pen.setCosmetic(True)
+            except Exception:
+                pass
+            self._curve_pens[corner] = pen
+        self._grid_pen = QtGui.QPen(QtGui.QColor(90, 98, 110, 70), 1.0, QtCore.Qt.DashLine)
+        self._zero_pen = QtGui.QPen(QtGui.QColor(180, 180, 180, 120), 1.0)
+        self._wheel_pen = QtGui.QPen(QtGui.QColor(140, 140, 140, 120), 1.0, QtCore.Qt.DashLine)
+        self._border_pen = QtGui.QPen(QtGui.QColor(62, 68, 78), 1.0)
+        for pen in (self._grid_pen, self._zero_pen, self._wheel_pen, self._border_pen):
+            try:
+                pen.setCosmetic(True)
+            except Exception:
+                pass
+
+    def clear_data(self) -> None:
+        self._curves.clear()
+        self._markers.clear()
+        self.update()
+
+    def _invalidate_background_cache(self) -> None:
+        self._bg_cache_key = None
+        self._bg_cache_pixmap = None
+
+    def resizeEvent(self, event: QtGui.QResizeEvent):  # type: ignore[override]
+        self._invalidate_background_cache()
+        super().resizeEvent(event)
+
+    def set_wheelbase(self, wheelbase_m: float) -> None:
+        wb = float(wheelbase_m)
+        new_front = +0.5 * wb
+        new_rear = -0.5 * wb
+        if abs(float(new_front) - float(self._front_x)) > 1e-9 or abs(float(new_rear) - float(self._rear_x)) > 1e-9:
+            self._front_x = new_front
+            self._rear_x = new_rear
+            self._invalidate_background_cache()
+
+    def set_state(
+        self,
+        *,
+        curves: Dict[str, tuple[np.ndarray, np.ndarray]],
+        markers: Dict[str, Optional[tuple[float, float]]],
+        x_range: tuple[float, float],
+        y_range: tuple[float, float],
+        wheelbase_m: float,
+    ) -> None:
+        self._curves = {
+            str(corner): (
+                np.asarray(pair[0], dtype=float).reshape(-1),
+                np.asarray(pair[1], dtype=float).reshape(-1),
+            )
+            for corner, pair in curves.items()
+        }
+        self._markers = {
+            str(corner): (None if pos is None else (float(pos[0]), float(pos[1])))
+            for corner, pos in markers.items()
+        }
+        next_xrange = (float(x_range[0]), float(x_range[1]))
+        next_yrange = (float(y_range[0]), float(y_range[1]))
+        if next_xrange != self._xrange or next_yrange != self._yrange:
+            self._xrange = next_xrange
+            self._yrange = next_yrange
+            self._invalidate_background_cache()
+        else:
+            self._xrange = next_xrange
+            self._yrange = next_yrange
+        self.set_wheelbase(float(wheelbase_m))
+        self.update()
+
+    @staticmethod
+    def _plot_rect(rect: QtCore.QRect) -> QtCore.QRectF:
+        return QtCore.QRectF(rect.adjusted(52, 12, -14, -28))
+
+    @staticmethod
+    def _safe_range(lo: float, hi: float, pad: float) -> tuple[float, float]:
+        if not np.isfinite(lo) or not np.isfinite(hi):
+            return (-pad, pad)
+        if abs(float(hi) - float(lo)) <= 1e-9:
+            mid = 0.5 * (float(lo) + float(hi))
+            return (mid - pad, mid + pad)
+        return (float(lo), float(hi))
+
+    @staticmethod
+    def _draw_tick_labels(
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        x_range: tuple[float, float],
+        y_range: tuple[float, float],
+    ) -> None:
+        painter.setPen(QtGui.QColor(178, 186, 196))
+        font = painter.font()
+        try:
+            font.setPointSize(max(7, int(font.pointSize()) - 1))
+        except Exception:
+            pass
+        painter.setFont(font)
+        x0, x1 = x_range
+        y0, y1 = y_range
+        painter.drawText(
+            QtCore.QRectF(rect.left(), rect.bottom() + 6.0, 110.0, 16.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"{x0:.0f} m",
+        )
+        painter.drawText(
+            QtCore.QRectF(rect.right() - 110.0, rect.bottom() + 6.0, 110.0, 16.0),
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            f"{x1:.0f} m",
+        )
+        painter.drawText(
+            QtCore.QRectF(rect.left() - 48.0, rect.top() - 8.0, 42.0, 16.0),
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            f"{y1:.2f}",
+        )
+        painter.drawText(
+            QtCore.QRectF(rect.left() - 48.0, rect.bottom() - 8.0, 42.0, 16.0),
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            f"{y0:.2f}",
+        )
+        painter.drawText(
+            QtCore.QRectF(rect.left(), rect.bottom() + 6.0, rect.width(), 16.0),
+            QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter,
+            "distance (m)",
+        )
+        painter.save()
+        try:
+            painter.translate(rect.left() - 36.0, rect.center().y())
+            painter.rotate(-90.0)
+            painter.drawText(
+                QtCore.QRectF(-0.5 * rect.height(), -8.0, rect.height(), 16.0),
+                QtCore.Qt.AlignCenter,
+                "road z (m)",
+            )
+        finally:
+            painter.restore()
+
+    def _ensure_background_cache(
+        self,
+        *,
+        plot_rect: QtCore.QRectF,
+        x_range: tuple[float, float],
+        y_range: tuple[float, float],
+    ) -> Optional[QtGui.QPixmap]:
+        w = max(1, int(self.width()))
+        h = max(1, int(self.height()))
+        key = (
+            w,
+            h,
+            round(float(plot_rect.left()), 3),
+            round(float(plot_rect.top()), 3),
+            round(float(plot_rect.width()), 3),
+            round(float(plot_rect.height()), 3),
+            round(float(x_range[0]), 6),
+            round(float(x_range[1]), 6),
+            round(float(y_range[0]), 6),
+            round(float(y_range[1]), 6),
+            round(float(self._front_x), 6),
+            round(float(self._rear_x), 6),
+        )
+        if key == self._bg_cache_key and self._bg_cache_pixmap is not None:
+            return self._bg_cache_pixmap
+
+        dpr = 1.0
+        try:
+            dpr = float(max(1.0, self.devicePixelRatioF()))
+        except Exception:
+            dpr = 1.0
+        pix = QtGui.QPixmap(int(max(1.0, w * dpr)), int(max(1.0, h * dpr)))
+        try:
+            pix.setDevicePixelRatio(dpr)
+        except Exception:
+            pass
+        pix.fill(QtGui.QColor(15, 18, 24))
+
+        p = QtGui.QPainter(pix)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, False)
+        p.setPen(self._border_pen)
+        p.setBrush(QtGui.QColor(21, 26, 34))
+        p.drawRoundedRect(plot_rect, 6.0, 6.0)
+
+        x0, x1 = x_range
+        y0, y1 = y_range
+        dx = max(1e-9, float(x1 - x0))
+        dy = max(1e-9, float(y1 - y0))
+
+        def map_x_scalar(x: float) -> float:
+            return float(plot_rect.left()) + (float(x) - float(x0)) * (float(plot_rect.width()) / dx)
+
+        def map_y_scalar(y: float) -> float:
+            return float(plot_rect.bottom()) - (float(y) - float(y0)) * (float(plot_rect.height()) / dy)
+
+        p.setClipRect(plot_rect.adjusted(0.0, 0.0, 1.0, 1.0))
+        p.setPen(self._grid_pen)
+        for frac in (0.0, 0.25, 0.5, 0.75, 1.0):
+            xx = plot_rect.left() + frac * plot_rect.width()
+            yy = plot_rect.top() + frac * plot_rect.height()
+            p.drawLine(QtCore.QPointF(xx, plot_rect.top()), QtCore.QPointF(xx, plot_rect.bottom()))
+            p.drawLine(QtCore.QPointF(plot_rect.left(), yy), QtCore.QPointF(plot_rect.right(), yy))
+
+        p.setPen(self._wheel_pen)
+        for wx in (self._front_x, self._rear_x):
+            if x0 <= float(wx) <= x1:
+                xp = map_x_scalar(float(wx))
+                p.drawLine(QtCore.QPointF(xp, plot_rect.top()), QtCore.QPointF(xp, plot_rect.bottom()))
+
+        if y0 <= 0.0 <= y1:
+            p.setPen(self._zero_pen)
+            yz = map_y_scalar(0.0)
+            p.drawLine(QtCore.QPointF(plot_rect.left(), yz), QtCore.QPointF(plot_rect.right(), yz))
+
+        p.setClipping(False)
+        self._draw_tick_labels(p, rect=plot_rect, x_range=x_range, y_range=y_range)
+        p.end()
+
+        self._bg_cache_key = key
+        self._bg_cache_pixmap = pix
+        return self._bg_cache_pixmap
+
+    def paintEvent(self, _event: QtGui.QPaintEvent):  # type: ignore[override]
+        p = QtGui.QPainter(self)
+        plot_rect = self._plot_rect(self.rect())
+        if plot_rect.width() <= 8.0 or plot_rect.height() <= 8.0:
+            p.fillRect(self.rect(), QtGui.QColor(15, 18, 24))
+            return
+
+        x0, x1 = self._safe_range(*self._xrange, pad=1.0)
+        y0, y1 = self._safe_range(*self._yrange, pad=0.1)
+        dx = max(1e-9, float(x1 - x0))
+        dy = max(1e-9, float(y1 - y0))
+
+        def map_x(x: np.ndarray | float) -> np.ndarray | float:
+            return plot_rect.left() + (np.asarray(x, dtype=float) - x0) * (plot_rect.width() / dx)
+
+        def map_y(y: np.ndarray | float) -> np.ndarray | float:
+            return plot_rect.bottom() - (np.asarray(y, dtype=float) - y0) * (plot_rect.height() / dy)
+
+        bg = self._ensure_background_cache(plot_rect=plot_rect, x_range=(x0, x1), y_range=(y0, y1))
+        if bg is not None:
+            p.drawPixmap(0, 0, bg)
+        else:
+            p.fillRect(self.rect(), QtGui.QColor(15, 18, 24))
+
+        p.setClipRect(plot_rect.adjusted(0.0, 0.0, 1.0, 1.0))
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        for corner in CORNERS:
+            pair = self._curves.get(str(corner))
+            if pair is None:
+                continue
+            x_arr, y_arr = pair
+            if x_arr.size < 2 or y_arr.size < 2:
+                continue
+            mask = np.isfinite(x_arr) & np.isfinite(y_arr)
+            if np.count_nonzero(mask) < 2:
+                continue
+            xp = np.asarray(map_x(x_arr[mask]), dtype=float).reshape(-1)
+            yp = np.asarray(map_y(y_arr[mask]), dtype=float).reshape(-1)
+            poly = QtGui.QPolygonF([QtCore.QPointF(float(xv), float(yv)) for xv, yv in zip(xp, yp)])
+            if poly.count() >= 2:
+                p.setPen(self._curve_pens.get(str(corner), QtGui.QPen(QtGui.QColor(220, 220, 220), 2.0)))
+                p.drawPolyline(poly)
+
+            marker = self._markers.get(str(corner))
+            if marker is None:
+                continue
+            mx, my = marker
+            if not np.isfinite(mx) or not np.isfinite(my):
+                continue
+            if not (x0 <= float(mx) <= x1 and y0 <= float(my) <= y1):
+                continue
+            color = self._curve_colors.get(str(corner), QtGui.QColor(220, 220, 220, 220))
+            p.setPen(QtCore.Qt.NoPen)
+            p.setBrush(QtGui.QBrush(color))
+            p.drawEllipse(QtCore.QPointF(float(map_x(mx)), float(map_y(my))), 3.5, 3.5)
+
+        p.setClipping(False)
 
 
 class RoadProfilePanel(QtWidgets.QWidget):
@@ -5197,12 +6573,27 @@ class RoadProfilePanel(QtWidgets.QWidget):
         super().__init__(parent)
 
         self._wheelbase = 2.3
+        self._bundle_key: Optional[int] = None
+        self._profile_cache: Dict[str, Any] = {}
+        self._last_xrange: Optional[tuple[float, float]] = None
+        self._last_yrange: Optional[tuple[float, float]] = None
+        self._last_visual_key: Optional[tuple[Any, ...]] = None
+        self._compact_dock_mode = False
+        self._compact_plot_height = 120
+        self._compact_max_height = 170
+        self._full_plot_min_height = 150
+        self._road_profile_point_budget_compact = 176
+        self._road_profile_point_budget_full = 288
+        self._panel_bg = QtGui.QColor(15, 18, 24)
+        try:
+            self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)
+        except Exception:
+            pass
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(4)
 
-        # Controls row (no hotkeys required)
         ctl = QtWidgets.QHBoxLayout()
         ctl.setContentsMargins(0, 0, 0, 0)
 
@@ -5224,7 +6615,6 @@ class RoadProfilePanel(QtWidgets.QWidget):
         ctl.addWidget(QtWidgets.QLabel("lookahead:"))
         ctl.addWidget(self.sp_ahead)
         ctl.addStretch(1)
-
         lay.addLayout(ctl)
 
         self.lbl_status = QtWidgets.QLabel("")
@@ -5233,89 +6623,72 @@ class RoadProfilePanel(QtWidgets.QWidget):
         self.lbl_status.hide()
         lay.addWidget(self.lbl_status)
 
-        if not _HAS_PG:
-            lab = QtWidgets.QLabel(
-                "pyqtgraph is not available — road profile plot disabled.\n"
-                "Install requirements_animator.txt (pyqtgraph)."
-            )
-            lab.setWordWrap(True)
-            lay.addWidget(lab)
-            self.plot = None
-            self._curves = {}
-            self._markers = {}
-            self._v_front = None
-            self._v_rear = None
-            return
-
-        # Plot
-        self.plot = pg.PlotWidget()
-        self.plot.setMinimumHeight(150)
-        self.plot.setMenuEnabled(False)
-        self.plot.showGrid(x=True, y=True, alpha=0.25)
-
-        # Zero road level reference
-        self._zero_line = pg.InfiniteLine(pos=0.0, angle=0, pen=pg.mkPen((180, 180, 180, 120), width=1))
-        self._zero_line.setZValue(-100)
-        self.plot.addItem(self._zero_line)
-        self.plot.setLabel("bottom", "distance", units="m")
-        self.plot.setLabel("left", "road z", units="m")
+        self.lbl_legend = QtWidgets.QLabel(
+            "<span style='color:#46b4ff'>ЛП</span>   "
+            "<span style='color:#5adc82'>ПП</span>   "
+            "<span style='color:#ffaa3c'>ЛЗ</span>   "
+            "<span style='color:#ff5a78'>ПЗ</span>"
+        )
         try:
-            self.plot.addLegend(offset=(10, 8))
+            self.lbl_legend.setStyleSheet("color:#cfd8e3;")
+        except Exception:
+            pass
+        lay.addWidget(self.lbl_legend)
+
+        self.plot = _RoadProfileCanvas()
+        lay.addWidget(self.plot, stretch=1)
+        self.set_compact_dock_mode(True)
+
+    def paintEvent(self, event: QtGui.QPaintEvent):  # type: ignore[override]
+        p = QtGui.QPainter(self)
+        p.fillRect(self.rect(), self._panel_bg)
+
+    def set_compact_dock_mode(self, compact: bool) -> None:
+        compact = bool(compact)
+        if compact == bool(getattr(self, "_compact_dock_mode", False)):
+            return
+        self._compact_dock_mode = compact
+        vpol = QtWidgets.QSizePolicy.Maximum if compact else QtWidgets.QSizePolicy.Expanding
+        plot_h = int(self._compact_plot_height if compact else self._full_plot_min_height)
+        max_h = int(self._compact_max_height if compact else 16777215)
+        try:
+            self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, vpol)
+            self.setMaximumHeight(max_h)
+        except Exception:
+            pass
+        try:
+            self.plot.setSizePolicy(QtWidgets.QSizePolicy.Preferred, vpol)
+            self.plot.setMinimumHeight(plot_h)
+            self.plot.setMaximumHeight(plot_h if compact else 16777215)
+        except Exception:
+            pass
+        try:
+            self.updateGeometry()
+            self.adjustSize()
         except Exception:
             pass
 
-        # Curves per wheel
-        self._curves: Dict[str, Any] = {}
-        self._markers: Dict[str, Any] = {}
-
-        # Pen palette (glanceable)
-        pen_map = {
-            "ЛП": pg.mkPen((70, 180, 255, 220), width=2),
-            "ПП": pg.mkPen((90, 220, 130, 220), width=2),
-            "ЛЗ": pg.mkPen((255, 170, 60, 220), width=2),
-            "ПЗ": pg.mkPen((255, 90, 120, 220), width=2),
-        }
-
-        for c in CORNERS:
-            pen = pen_map.get(c, pg.mkPen((200, 200, 200, 200), width=2))
-            name = f"{c}"
-            self._curves[c] = self.plot.plot([], [], pen=pen, name=name)
-
-            mk = pg.ScatterPlotItem(size=6)
-            mk.setPen(pen)
-            try:
-                # semi-transparent fill
-                mk.setBrush(pg.mkBrush((*pen.color().getRgb()[:3], 160)))
-            except Exception:
-                pass
-            self.plot.addItem(mk)
-            self._markers[c] = mk
-
-        # Wheel position markers (front/rear)
-        self._v_front = pg.InfiniteLine(angle=90, movable=False)
-        self._v_rear = pg.InfiniteLine(angle=90, movable=False)
-        for v in (self._v_front, self._v_rear):
-            try:
-                v.setPen(pg.mkPen((140, 140, 140, 120), style=QtCore.Qt.DashLine))
-            except Exception:
-                pass
-            self.plot.addItem(v)
-
+    def set_bundle(self, b: DataBundle) -> None:
+        self._bundle_key = id(b)
+        geom = infer_geometry(b.meta)
+        self._wheelbase = float(geom.wheelbase)
+        self._profile_cache = _ensure_road_profile_panel_cache(b, float(self._wheelbase))
+        self._last_yrange = tuple(self._profile_cache.get("y_range", (-0.1, 0.1)))
+        self._last_xrange = None
+        self._last_visual_key = None
         self._update_wheel_lines()
-
-        lay.addWidget(self.plot, stretch=1)
 
     def set_wheelbase(self, wheelbase_m: float):
         self._wheelbase = float(wheelbase_m)
         self._update_wheel_lines()
 
     def _update_wheel_lines(self):
-        if self.plot is None or self._v_front is None or self._v_rear is None:
+        if self.plot is None:
             return
-        wb = float(self._wheelbase)
-        self._v_front.setPos(+0.5 * wb)
-        self._v_rear.setPos(-0.5 * wb)
-
+        try:
+            self.plot.set_wheelbase(float(self._wheelbase))
+        except Exception:
+            pass
 
     def _set_status(self, message: str) -> None:
         if not hasattr(self, "lbl_status"):
@@ -5330,15 +6703,17 @@ class RoadProfilePanel(QtWidgets.QWidget):
     def _clear_curves(self) -> None:
         if self.plot is None:
             return
-        for c in CORNERS:
-            try:
-                self._curves[c].setData([], [])
-            except Exception:
-                pass
-            try:
-                self._markers[c].setData([])
-            except Exception:
-                pass
+        self._last_visual_key = None
+        try:
+            self.plot.clear_data()
+        except Exception:
+            pass
+
+    @staticmethod
+    def _range_changed(prev: Optional[tuple[float, float]], curr: tuple[float, float], *, tol: float = 1e-9) -> bool:
+        if prev is None:
+            return True
+        return abs(float(prev[0]) - float(curr[0])) > tol or abs(float(prev[1]) - float(curr[1])) > tol
 
     def set_recommended_scales(self, accel_scale: float, vel_scale: float):
         """Provide recommended vector scales (computed from log)."""
@@ -5348,12 +6723,10 @@ class RoadProfilePanel(QtWidgets.QWidget):
         except Exception:
             self._rec_acc_scale = None
             self._rec_vel_scale = None
-        # if auto-scale enabled, apply immediately
         self._apply_recommended_scales()
 
     def _apply_recommended_scales(self):
         if not bool(getattr(self, "cb_auto_scale", None) and self.cb_auto_scale.isChecked()):
-            # manual mode
             try:
                 self.sp_acc_scale.setEnabled(True)
                 self.sp_vel_scale.setEnabled(True)
@@ -5361,7 +6734,6 @@ class RoadProfilePanel(QtWidgets.QWidget):
                 pass
             return
 
-        # auto mode: lock spinboxes and set recommended values if present
         try:
             self.sp_acc_scale.setEnabled(False)
             self.sp_vel_scale.setEnabled(False)
@@ -5377,102 +6749,102 @@ class RoadProfilePanel(QtWidgets.QWidget):
             pass
 
     def _on_auto_scale_changed(self, *_args):
-        # Toggle manual/auto modes
         self._apply_recommended_scales()
         self._emit_visual()
 
     def update_frame(self, b: DataBundle, i: int):
         if self.plot is None:
             return
+        if int(getattr(self, "_bundle_key", 0) or 0) != id(b) or not self._profile_cache:
+            self.set_bundle(b)
 
-        # Geometry
-        geom = infer_geometry(b.meta)
-        wb = float(geom.wheelbase)
-        if abs(float(wb) - float(self._wheelbase)) > 1e-6:
-            self.set_wheelbase(float(wb))
         wb = float(self._wheelbase)
+        cache = dict(self._profile_cache or {})
 
-        # Window (meters)
         hist = float(self.sp_hist.value())
         ahead = float(self.sp_ahead.value())
         x_min = -hist
         x_max = +ahead
 
-        # Distance axis (monotonic)
-        s = b.ensure_s_world()
+        s = np.asarray(cache.get("s_world", np.zeros((0,), dtype=float)), dtype=float)
         if len(s) <= 1:
             return
         i = int(_clamp(int(i), 0, len(s) - 1))
         s0 = float(s[i])
+        plot_width_px = int(max(160, float(self.plot.width())))
+        budget_cap = self._road_profile_point_budget_compact if bool(self._compact_dock_mode) else self._road_profile_point_budget_full
+        max_points = int(max(96, min(int(budget_cap), (plot_width_px // 4) + 24)))
 
-        # Preselect indices via distance window (fast)
-        margin = max(1.0, 0.65 * wb)
-        s_min = s0 - hist - margin
-        s_max = s0 + ahead + margin
-        j0 = int(np.searchsorted(s, s_min, side="left"))
-        j1 = int(np.searchsorted(s, s_max, side="right"))
-        j0 = int(_clamp(j0, 0, len(s) - 1))
-        j1 = int(_clamp(j1, j0 + 1, len(s)))
-
-        ss = np.asarray(s[j0:j1], dtype=float) - s0
-
-        # Update curves
         self._set_status("")
-        z_all_min = float("inf")
-        z_all_max = float("-inf")
         missing_road: list[str] = []
         any_curve = False
+        curves: Dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        markers: Dict[str, Optional[tuple[float, float]]] = {}
+        corners_cache = dict(cache.get("corners", {}) or {})
+        prepared_corners: List[tuple[str, Dict[str, Any]]] = []
+        visual_corner_keys: List[tuple[Any, ...]] = []
+        world_lo = float(s0 + x_min)
+        world_hi = float(s0 + x_max)
+        pixel_world_step = max(1e-6, float(x_max - x_min) / max(24.0, float(plot_width_px)))
+        s_bucket = int(round(float(s0) / pixel_world_step))
 
         for c in CORNERS:
-            zr_full = b.road_series(c)
-            if zr_full is None:
-                missing_road.append(c)
-                self._curves[c].setData([], [])
-                try:
-                    self._markers[c].setData([])
-                except Exception:
-                    pass
+            name = str(c)
+            corner_cache = corners_cache.get(str(c))
+            if not corner_cache or bool(corner_cache.get("missing", False)):
+                missing_road.append(name)
+                prepared_corners.append((name, {"missing": True}))
+                visual_corner_keys.append((name, "missing"))
                 continue
 
-            z = np.asarray(zr_full[j0:j1], dtype=float)
+            x_world = np.asarray(corner_cache.get("x_world", np.zeros((0,), dtype=float)), dtype=float)
+            z_arr = np.asarray(corner_cache.get("z", np.zeros((0,), dtype=float)), dtype=float)
+            n = int(min(x_world.size, z_arr.size))
+            if n <= 1:
+                prepared_corners.append((name, {"missing": False, "empty": True}))
+                visual_corner_keys.append((name, "empty"))
+                continue
+            x_world = x_world[:n]
+            z_arr = z_arr[:n]
 
-            # axle offset
-            off = (+0.5 * wb) if (len(c) >= 2 and c[1] == "П") else (-0.5 * wb)
-            x = ss + off
+            j0 = int(np.searchsorted(x_world, world_lo, side="left"))
+            j1 = int(np.searchsorted(x_world, world_hi, side="right"))
+            j0 = int(_clamp(j0, 0, n - 1))
+            j1 = int(_clamp(j1, j0 + 1, n))
 
-            m = (x >= x_min) & (x <= x_max)
-            if not np.any(m):
-                self._curves[c].setData([], [])
-                try:
-                    self._markers[c].setData([])
-                except Exception:
-                    pass
+            count = int(max(0, j1 - j0))
+            if count <= 0:
+                prepared_corners.append((name, {"missing": False, "empty": True}))
+                visual_corner_keys.append((name, "empty"))
                 continue
 
-            x2 = x[m]
-            z2 = z[m]
-
-            # Downsample to keep 60Hz smooth
-            step = max(1, int(len(x2) // 450))
-            x2 = x2[::step]
-            z2 = z2[::step]
-
-            self._curves[c].setData(x2, z2)
-
-            # Marker at current wheel position
             try:
-                zc = float(zr_full[i])
-                self._markers[c].setData([{"pos": (off, zc)}])
+                marker_x = float(corner_cache.get("marker_x", _road_profile_corner_offset_m(name, wb)))
+                zc = float(z_arr[i]) if i < z_arr.size else float("nan")
+                marker_z_bucket = -999999 if not np.isfinite(zc) else int(round(float(zc) * 1000.0))
             except Exception:
-                try:
-                    self._markers[c].setData([])
-                except Exception:
-                    pass
+                marker_x = float(_road_profile_corner_offset_m(name, wb))
+                zc = float("nan")
+                marker_z_bucket = -999999
 
-            if len(z2) > 0:
-                any_curve = True
-                z_all_min = min(z_all_min, float(np.nanmin(z2)))
-                z_all_max = max(z_all_max, float(np.nanmax(z2)))
+            prepared_corners.append(
+                (
+                    name,
+                    {
+                        "missing": False,
+                        "empty": False,
+                        "x_world": x_world,
+                        "z_arr": z_arr,
+                        "j0": int(j0),
+                        "j1": int(j1),
+                        "count": int(count),
+                        "marker_x": float(marker_x),
+                        "marker_z": float(zc),
+                    },
+                )
+            )
+            visual_corner_keys.append((name, int(j0), int(j1), int(min(count, int(max_points))), int(marker_z_bucket)))
+            any_curve = True
 
         if missing_road:
             self._set_status(
@@ -5480,13 +6852,53 @@ class RoadProfilePanel(QtWidgets.QWidget):
             )
         if not any_curve:
             self._clear_curves()
+            return
 
-        # Axes
         try:
-            self.plot.setXRange(x_min, x_max, padding=0.0)
-            if np.isfinite(z_all_min) and np.isfinite(z_all_max):
-                pad = max(0.03, 0.15 * (z_all_max - z_all_min + 1e-9))
-                self.plot.setYRange(z_all_min - pad, z_all_max + pad, padding=0.0)
+            x_range = (float(x_min), float(x_max))
+            self._last_xrange = x_range
+            y_range = tuple(cache.get("y_range", self._last_yrange if self._last_yrange is not None else (-0.1, 0.1)))
+            self._last_yrange = y_range
+            visual_key = (
+                int(s_bucket),
+                int(max_points),
+                tuple(visual_corner_keys),
+                tuple(missing_road),
+                int(round(float(x_range[0]) * 1000.0)),
+                int(round(float(x_range[1]) * 1000.0)),
+            )
+            if visual_key == self._last_visual_key:
+                return
+
+            for name, meta in prepared_corners:
+                if bool(meta.get("missing", False)) or bool(meta.get("empty", False)):
+                    curves[name] = (np.zeros((0,), dtype=float), np.zeros((0,), dtype=float))
+                    markers[name] = None
+                    continue
+                x_world = np.asarray(meta.get("x_world", np.zeros((0,), dtype=float)), dtype=float)
+                z_arr = np.asarray(meta.get("z_arr", np.zeros((0,), dtype=float)), dtype=float)
+                j0 = int(meta.get("j0", 0))
+                j1 = int(meta.get("j1", 0))
+                count = int(meta.get("count", 0))
+                if count > int(max_points):
+                    idx = np.unique(np.linspace(j0, j1 - 1, int(max_points), dtype=int))
+                    x2 = np.asarray(x_world[idx], dtype=float) - float(s0)
+                    z2 = np.asarray(z_arr[idx], dtype=float)
+                else:
+                    x2 = np.asarray(x_world[j0:j1], dtype=float) - float(s0)
+                    z2 = np.asarray(z_arr[j0:j1], dtype=float)
+                curves[name] = (np.asarray(x2, dtype=float), np.asarray(z2, dtype=float))
+                zc = float(meta.get("marker_z", float("nan")))
+                markers[name] = None if not np.isfinite(zc) else (float(meta.get("marker_x", 0.0)), zc)
+
+            self.plot.set_state(
+                curves=curves,
+                markers=markers,
+                x_range=x_range,
+                y_range=y_range,
+                wheelbase_m=float(self._wheelbase),
+            )
+            self._last_visual_key = visual_key
         except Exception:
             pass
 
@@ -5529,13 +6941,13 @@ class PressureGauge(QtWidgets.QWidget):
 
     def set_value_bar_g(self, bar_g: Optional[float]):
         if bar_g is None or (isinstance(bar_g, float) and (np.isnan(bar_g) or np.isinf(bar_g))):
-            self.lbl_value.setText("—")
-            self.bar.setValue(0)
+            _set_label_text_if_changed(self.lbl_value, "—")
+            _set_progress_value_if_changed(self.bar, 0)
             return
         v = float(bar_g)
-        self.lbl_value.setText(f"{v:.2f} bar(g)")
+        _set_label_text_if_changed(self.lbl_value, f"{v:.2f} bar(g)")
         vmax = float(self.max_bar_g)
-        self.bar.setValue(int(_clamp(v, 0.0, vmax) * 100))
+        _set_progress_value_if_changed(self.bar, int(_clamp(v, 0.0, vmax) * 100))
 
 
 class PressurePanel(QtWidgets.QWidget):
@@ -5669,8 +7081,8 @@ class PressurePanel(QtWidgets.QWidget):
                 else:
                     g.set_value_bar_g(None)
 
-            self.lbl_extra.setText("Другие узлы: n/a (нужно record_full=True)")
-            self.tbl_extra.setRowCount(0)
+            _set_label_text_if_changed(self.lbl_extra, "Другие узлы: n/a (нужно record_full=True)")
+            _set_table_row_count_if_changed(self.tbl_extra, 0)
             return
 
         patm = _infer_patm_pa(b, i)
@@ -5684,12 +7096,12 @@ class PressurePanel(QtWidgets.QWidget):
 
         # Extra nodes table
         if not self._extra_nodes:
-            self.lbl_extra.setText("Другие узлы: —")
-            self.tbl_extra.setRowCount(0)
+            _set_label_text_if_changed(self.lbl_extra, "Другие узлы: —")
+            _set_table_row_count_if_changed(self.tbl_extra, 0)
             return
 
-        self.lbl_extra.setText(f"Другие узлы (top‑динамика, {len(self._extra_nodes)}):")
-        self.tbl_extra.setRowCount(len(self._extra_nodes))
+        _set_label_text_if_changed(self.lbl_extra, f"Другие узлы (top‑динамика, {len(self._extra_nodes)}):")
+        _set_table_row_count_if_changed(self.tbl_extra, len(self._extra_nodes))
         for r, name in enumerate(self._extra_nodes):
             try:
                 P = float(b.p.column(name)[i])
@@ -5702,16 +7114,14 @@ class PressurePanel(QtWidgets.QWidget):
             if it0 is None:
                 it0 = QtWidgets.QTableWidgetItem(str(name))
                 self.tbl_extra.setItem(r, 0, it0)
-            else:
-                it0.setText(str(name))
+            _set_table_item_text_if_changed(it0, str(name))
 
             it1 = self.tbl_extra.item(r, 1)
             if it1 is None:
                 it1 = QtWidgets.QTableWidgetItem(s)
                 it1.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
                 self.tbl_extra.setItem(r, 1, it1)
-            else:
-                it1.setText(s)
+            _set_table_item_text_if_changed(it1, s)
 
 
 def _infer_valve_kind(name: str) -> str:
@@ -5772,27 +7182,80 @@ class ValvePanel(QtWidgets.QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setMaximumHeight(280)
         lay.addWidget(self.table)
+        _set_table_fixed_row_height(self.table, padding=6, minimum=18)
 
         self._names: list[str] = []
+        self._kinds: list[str] = []
         self._idxs: np.ndarray | None = None
+        self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, QtWidgets.QProgressBar, QtWidgets.QTableWidgetItem]] = []
+        self._row_binding_keys: list[Optional[int]] = []
+        self._last_display_key: Optional[tuple[Any, ...]] = None
+        self._visible_rows: int = 0
 
     def set_bundle(self, b: DataBundle):
         self._names = []
+        self._kinds = []
         self._idxs = None
+        self._row_handles = []
+        self._row_binding_keys = []
+        self._last_display_key = None
+        self._visible_rows = 0
+        _set_table_row_count_if_changed(self.table, 0)
         if b.open is None:
             return
         cols = [c for c in b.open.cols if c not in ("время_с",)]
         idxs = []
         names = []
+        kinds = []
         for c in cols:
             j = b.open.index_of(c)
             if j is None:
                 continue
             idxs.append(int(j))
             names.append(str(c))
+            kinds.append(_infer_valve_kind(str(c)))
         if idxs:
             self._idxs = np.array(idxs, dtype=int)
             self._names = names
+            self._kinds = kinds
+
+    def _ensure_row_widgets(self, rows: int) -> None:
+        rows = int(max(0, rows))
+        if int(self.table.rowCount()) < rows:
+            _set_table_row_count_if_changed(self.table, rows)
+        for r in range(len(self._row_handles), rows):
+            it0 = QtWidgets.QTableWidgetItem("")
+            pb = QtWidgets.QProgressBar()
+            pb.setRange(0, 100)
+            pb.setTextVisible(True)
+            pb.setFormat("%p%")
+            pb.setFixedHeight(12)
+            pb.setStyleSheet(
+                """
+                QProgressBar{border:1px solid #444;border-radius:4px;background:#1b1f24;}
+                QProgressBar::chunk{border-radius:4px;background:#4aa3df;}
+                """
+            )
+            it2 = QtWidgets.QTableWidgetItem("")
+            it2.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(r, 0, it0)
+            self.table.setCellWidget(r, 1, pb)
+            self.table.setItem(r, 2, it2)
+            self._row_handles.append((it0, pb, it2))
+            self._row_binding_keys.append(None)
+
+    def _set_visible_rows(self, rows: int) -> None:
+        target = int(max(0, rows))
+        current = int(max(0, getattr(self, "_visible_rows", 0)))
+        if target == current:
+            return
+        if target > current:
+            for r in range(current, target):
+                _set_table_row_hidden_if_changed(self.table, r, False)
+        else:
+            for r in range(target, current):
+                _set_table_row_hidden_if_changed(self.table, r, True)
+        self._visible_rows = target
 
 
     def set_recommended_scales(self, accel_scale: float, vel_scale: float):
@@ -5838,7 +7301,10 @@ class ValvePanel(QtWidgets.QWidget):
 
     def update_frame(self, b: DataBundle, i: int):
         if b.open is None or self._idxs is None or not self._names:
-            self.table.setRowCount(0)
+            if self._last_display_key == tuple() and int(getattr(self, "_visible_rows", 0)) == 0:
+                return
+            self._last_display_key = tuple()
+            _call_with_qt_update_batch(self.table, lambda: self._set_visible_rows(0))
             return
 
         thr = float(self.thr.value())
@@ -5849,70 +7315,46 @@ class ValvePanel(QtWidgets.QWidget):
         try:
             vals = np.asarray(b.open.values[i, self._idxs], dtype=float)
         except Exception:
-            self.table.setRowCount(0)
+            if self._last_display_key == tuple() and int(getattr(self, "_visible_rows", 0)) == 0:
+                return
+            self._last_display_key = tuple()
+            _call_with_qt_update_batch(self.table, lambda: self._set_visible_rows(0))
             return
 
-        if only_active:
-            mask = vals > thr
-        else:
-            mask = np.ones_like(vals, dtype=bool)
-
-        idxs = np.nonzero(mask)[0]
-        if idxs.size == 0:
-            self.table.setRowCount(0)
+        order = _top_descending_indices(vals, topn, threshold=(thr if only_active else -1.0))
+        if order.size == 0:
+            if self._last_display_key == tuple() and int(getattr(self, "_visible_rows", 0)) == 0:
+                return
+            self._last_display_key = tuple()
+            _call_with_qt_update_batch(self.table, lambda: self._set_visible_rows(0))
             return
 
+        idxs = np.asarray(order, dtype=int)
         sel_vals = vals[idxs]
-        # sort descending
-        order = np.argsort(-sel_vals)
-        order = order[: min(topn, int(order.size))]
-        idxs = idxs[order]
-        sel_vals = sel_vals[order]
+        display_pct = np.asarray(np.rint(np.clip(sel_vals, 0.0, 1.0) * 100.0), dtype=int)
+        visual_key = tuple((int(j), int(display_pct[pos])) for pos, j in enumerate(idxs.tolist()))
+        if visual_key == self._last_display_key and int(self.table.rowCount()) == int(idxs.size):
+            return
+        self._last_display_key = visual_key
 
-        self.table.setRowCount(int(idxs.size))
+        def _apply_rows() -> None:
+            self._ensure_row_widgets(int(idxs.size))
+            for r in range(int(idxs.size)):
+                j = int(idxs[r])
+                name = self._names[j]
+                kind = self._kinds[j] if j < len(self._kinds) else _infer_valve_kind(name)
+                it0, pb, it2 = self._row_handles[r]
+                if self._row_binding_keys[r] != j:
+                    _set_table_item_text_if_changed(it0, name)
+                    _set_table_item_text_if_changed(it2, kind)
+                    self._row_binding_keys[r] = j
+                try:
+                    _set_progress_value_if_changed(pb, int(display_pct[r]))
+                except Exception:
+                    pass
+            self._set_visible_rows(int(idxs.size))
 
-        for r in range(int(idxs.size)):
-            j = int(idxs[r])
-            name = self._names[j]
-            v = float(sel_vals[r])
-            kind = _infer_valve_kind(name)
-
-            # name
-            it0 = self.table.item(r, 0)
-            if it0 is None:
-                it0 = QtWidgets.QTableWidgetItem(name)
-                self.table.setItem(r, 0, it0)
-            else:
-                it0.setText(name)
-
-            # open progress
-            pb = self.table.cellWidget(r, 1)
-            if pb is None:
-                pb = QtWidgets.QProgressBar()
-                pb.setRange(0, 100)
-                pb.setTextVisible(True)
-                pb.setFormat("%p%")
-                pb.setFixedHeight(12)
-                pb.setStyleSheet(
-                    """
-                    QProgressBar{border:1px solid #444;border-radius:4px;background:#1b1f24;}
-                    QProgressBar::chunk{border-radius:4px;background:#4aa3df;}
-                    """
-                )
-                self.table.setCellWidget(r, 1, pb)
-            try:
-                pb.setValue(int(_clamp(v, 0.0, 1.0) * 100.0))
-            except Exception:
-                pass
-
-            # kind
-            it2 = self.table.item(r, 2)
-            if it2 is None:
-                it2 = QtWidgets.QTableWidgetItem(kind)
-                it2.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-                self.table.setItem(r, 2, it2)
-            else:
-                it2.setText(kind)
+        _call_with_qt_update_batch(self.table, _apply_rows)
 
 
 
@@ -5933,6 +7375,217 @@ def _infer_flow_kind(name: str) -> str:
         return "other"
 
 
+class _QuickBarListCanvas(QtWidgets.QWidget):
+    """Compact lightweight list of bars with left/right text."""
+
+    def __init__(
+        self,
+        *,
+        max_rows: int,
+        bar_color: QtGui.QColor,
+        empty_label: str = "—",
+        parent: Optional[QtWidgets.QWidget] = None,
+    ):
+        super().__init__(parent)
+        self.max_rows = int(max(1, max_rows))
+        self.empty_label = str(empty_label)
+        self._rows: List[Tuple[str, float, str]] = []
+        self._rows_key: Optional[tuple[tuple[str, int, str], ...]] = None
+        self._bar_color = QtGui.QColor(bar_color)
+        self._bg_color = QtGui.QColor(19, 23, 28)
+        self._row_bg_color = QtGui.QColor(24, 29, 35)
+        self._track_color = QtGui.QColor(45, 52, 61)
+        self._text_color = QtGui.QColor(232, 236, 241)
+        self._muted_text_color = QtGui.QColor(176, 184, 196)
+        self._border_pen = QtGui.QPen(QtGui.QColor(60, 68, 80), 1.0)
+        try:
+            self._border_pen.setCosmetic(True)
+        except Exception:
+            pass
+        self.setMinimumHeight(int(8 + self.max_rows * 18))
+        self._static_bg_cache_key: Optional[tuple[int, int, int]] = None
+        self._static_bg_cache_pixmap: Optional[QtGui.QPixmap] = None
+        try:
+            self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)
+        except Exception:
+            pass
+
+    def _invalidate_static_background_cache(self) -> None:
+        self._static_bg_cache_key = None
+        self._static_bg_cache_pixmap = None
+
+    def resizeEvent(self, event: QtGui.QResizeEvent):  # type: ignore[override]
+        self._invalidate_static_background_cache()
+        super().resizeEvent(event)
+
+    def clear_rows(self) -> None:
+        self.set_rows([])
+
+    def set_rows(self, rows: Sequence[tuple[str, float, str]]) -> None:
+        normalized: List[Tuple[str, float, str]] = []
+        for left, frac, right in list(rows)[: self.max_rows]:
+            normalized.append(
+                (
+                    str(left),
+                    float(_clamp(float(frac), 0.0, 1.0)),
+                    str(right),
+                )
+            )
+        key = tuple((left, int(round(frac * 100.0)), right) for left, frac, right in normalized)
+        if key == self._rows_key:
+            return
+        self._rows = normalized
+        self._rows_key = key
+        self.update()
+
+    @staticmethod
+    def _row_metrics(rect: QtCore.QRectF, max_rows: int) -> tuple[float, float]:
+        row_gap = 4.0
+        row_h = max(16.0, (rect.height() - row_gap * max(0, max_rows - 1)) / max(1, max_rows))
+        return row_h, row_gap
+
+    def _ensure_static_background_cache(self) -> Optional[QtGui.QPixmap]:
+        key = (int(max(1, self.width())), int(max(1, self.height())), int(self.max_rows))
+        if key == self._static_bg_cache_key and self._static_bg_cache_pixmap is not None:
+            return self._static_bg_cache_pixmap
+
+        dpr = 1.0
+        try:
+            dpr = float(max(1.0, self.devicePixelRatioF()))
+        except Exception:
+            dpr = 1.0
+        pix = QtGui.QPixmap(
+            int(max(1.0, float(max(1, self.width())) * dpr)),
+            int(max(1.0, float(max(1, self.height())) * dpr)),
+        )
+        try:
+            pix.setDevicePixelRatio(dpr)
+        except Exception:
+            pass
+        pix.fill(self._bg_color)
+
+        outer = QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        row_h, row_gap = self._row_metrics(outer, self.max_rows)
+        label_w = min(240.0, max(132.0, outer.width() * 0.42))
+        right_w = min(132.0, max(72.0, outer.width() * 0.22))
+        bar_gap = 8.0
+        text_margin = 8.0
+
+        p = QtGui.QPainter(pix)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        for row_idx in range(self.max_rows):
+            top = outer.top() + row_idx * (row_h + row_gap)
+            row_rect = QtCore.QRectF(outer.left(), top, outer.width(), row_h)
+            p.setPen(self._border_pen)
+            p.setBrush(self._row_bg_color)
+            p.drawRoundedRect(row_rect, 6.0, 6.0)
+
+            left_rect = QtCore.QRectF(
+                row_rect.left() + text_margin,
+                row_rect.top(),
+                label_w - text_margin,
+                row_rect.height(),
+            )
+            right_rect = QtCore.QRectF(
+                row_rect.right() - right_w,
+                row_rect.top(),
+                right_w - text_margin,
+                row_rect.height(),
+            )
+            bar_rect = QtCore.QRectF(
+                left_rect.right() + bar_gap,
+                row_rect.center().y() - 4.5,
+                max(18.0, right_rect.left() - left_rect.right() - bar_gap * 2.0),
+                9.0,
+            )
+            p.setPen(QtCore.Qt.NoPen)
+            p.setBrush(self._track_color)
+            p.drawRoundedRect(bar_rect, 4.0, 4.0)
+        p.end()
+
+        self._static_bg_cache_key = key
+        self._static_bg_cache_pixmap = pix
+        return self._static_bg_cache_pixmap
+
+    def paintEvent(self, _event: QtGui.QPaintEvent):  # type: ignore[override]
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        bg = self._ensure_static_background_cache()
+        if bg is not None:
+            p.drawPixmap(0, 0, bg)
+        else:
+            p.fillRect(self.rect(), self._bg_color)
+        outer = QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        row_h, row_gap = self._row_metrics(outer, self.max_rows)
+        label_w = min(240.0, max(132.0, outer.width() * 0.42))
+        right_w = min(132.0, max(72.0, outer.width() * 0.22))
+        bar_gap = 8.0
+        text_margin = 8.0
+
+        font_label = p.font()
+        font_right = QtGui.QFont(font_label)
+        try:
+            font_label.setPointSize(max(8, int(font_label.pointSize()) - 1))
+            font_right.setPointSize(max(8, int(font_right.pointSize()) - 1))
+        except Exception:
+            pass
+        fm_label = QtGui.QFontMetrics(font_label)
+        fm_right = QtGui.QFontMetrics(font_right)
+
+        for row_idx in range(self.max_rows):
+            top = outer.top() + row_idx * (row_h + row_gap)
+            row_rect = QtCore.QRectF(outer.left(), top, outer.width(), row_h)
+
+            if row_idx < len(self._rows):
+                left, frac, right = self._rows[row_idx]
+                text_color = self._text_color
+            else:
+                left, frac, right = self.empty_label, 0.0, ""
+                text_color = self._muted_text_color
+
+            left_rect = QtCore.QRectF(
+                row_rect.left() + text_margin,
+                row_rect.top(),
+                label_w - text_margin,
+                row_rect.height(),
+            )
+            right_rect = QtCore.QRectF(
+                row_rect.right() - right_w,
+                row_rect.top(),
+                right_w - text_margin,
+                row_rect.height(),
+            )
+            bar_rect = QtCore.QRectF(
+                left_rect.right() + bar_gap,
+                row_rect.center().y() - 4.5,
+                max(18.0, right_rect.left() - left_rect.right() - bar_gap * 2.0),
+                9.0,
+            )
+
+            p.setFont(font_label)
+            p.setPen(text_color)
+            p.drawText(
+                left_rect,
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                fm_label.elidedText(str(left), QtCore.Qt.ElideRight, max(8, int(left_rect.width()))),
+            )
+
+            if float(frac) > 1e-6:
+                fill_rect = QtCore.QRectF(bar_rect)
+                fill_rect.setWidth(max(1.0, bar_rect.width() * float(frac)))
+                p.setPen(QtCore.Qt.NoPen)
+                p.setBrush(self._bar_color)
+                p.drawRoundedRect(fill_rect, 4.0, 4.0)
+
+            p.setFont(font_right)
+            p.setPen(self._muted_text_color if not right else text_color)
+            p.drawText(
+                right_rect,
+                QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+                fm_right.elidedText(str(right), QtCore.Qt.ElideLeft, max(8, int(right_rect.width()))),
+            )
+
+
 class FlowQuickPanel(QtWidgets.QWidget):
     """Pinned mini-panel: top mass flows (df_q / mdot) + group counters.
 
@@ -5942,7 +7595,9 @@ class FlowQuickPanel(QtWidgets.QWidget):
 
     def __init__(self, *, max_rows: int = 6, thr_kg_s: float = 0.001, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
-        self.max_rows = int(max(1, max_rows))
+        self._full_max_rows = int(max(1, max_rows))
+        self._compact_max_rows = int(max(2, min(self._full_max_rows, 3)))
+        self.max_rows = int(self._full_max_rows)
         self.thr_kg_s = float(max(0.0, thr_kg_s))
 
         lay = QtWidgets.QVBoxLayout(self)
@@ -5953,74 +7608,81 @@ class FlowQuickPanel(QtWidgets.QWidget):
         self.lbl_groups.setStyleSheet("color:#b8c3cf;")
         lay.addWidget(self.lbl_groups)
 
-        self.rows: list[tuple[QtWidgets.QLabel, QtWidgets.QProgressBar, QtWidgets.QLabel]] = []
-        for _ in range(self.max_rows):
-            row = QtWidgets.QHBoxLayout()
-            row.setContentsMargins(0, 0, 0, 0)
-            row.setSpacing(6)
-
-            lab = QtWidgets.QLabel("—")
-            lab.setMinimumWidth(170)
-            lab.setToolTip("Edge (mdot)")
-            bar = QtWidgets.QProgressBar()
-            bar.setRange(0, 100)
-            bar.setTextVisible(False)
-            bar.setFixedHeight(10)
-            bar.setStyleSheet(
-                """
-                QProgressBar{border:1px solid #444;border-radius:4px;background:#1b1f24;}
-                QProgressBar::chunk{border-radius:4px;background:#7bd88f;}
-                """
-            )
-            val = QtWidgets.QLabel("")
-            val.setMinimumWidth(84)
-            val.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
-            val.setStyleSheet("color:#e6e6e6;")
-
-            row.addWidget(lab, stretch=0)
-            row.addWidget(bar, stretch=1)
-            row.addWidget(val, stretch=0)
-
-            lay.addLayout(row)
-            self.rows.append((lab, bar, val))
+        self.rows_canvas = _QuickBarListCanvas(
+            max_rows=self.max_rows,
+            bar_color=QtGui.QColor(123, 216, 143),
+            parent=self,
+        )
+        lay.addWidget(self.rows_canvas)
 
         self._names: list[str] = []
+        self._short_names: list[str] = []
         self._idxs: np.ndarray | None = None
         self._maxabs: np.ndarray | None = None
         self._kinds: list[str] = []
+        self._kind_codes = np.zeros((0,), dtype=np.int8)
+        self._compact_mode = False
+
+    def set_compact_mode(self, compact: bool) -> None:
+        compact = bool(compact)
+        if compact == bool(self._compact_mode):
+            return
+        self._compact_mode = compact
+        self.max_rows = int(self._compact_max_rows if compact else self._full_max_rows)
+        self.rows_canvas.max_rows = int(self.max_rows)
+        self.rows_canvas.setMinimumHeight(int(8 + self.max_rows * 18))
+        try:
+            self.setMaximumHeight(112 if compact else 16777215)
+        except Exception:
+            pass
+        self.rows_canvas.clear_rows()
+        try:
+            self.updateGeometry()
+        except Exception:
+            pass
 
     def set_bundle(self, b: DataBundle):
         self._names = []
+        self._short_names = []
         self._idxs = None
         self._maxabs = None
         self._kinds = []
+        self._kind_codes = np.zeros((0,), dtype=np.int8)
 
         if getattr(b, "q", None) is None:
-            self.lbl_groups.setText("FLOW: n/a")
+            _set_label_text_if_changed(self.lbl_groups, "FLOW: n/a")
             self._clear_rows()
             return
 
         cols = [c for c in b.q.cols if c not in ("время_с",)]
         idxs = []
         names = []
+        short_names = []
         kinds = []
+        kind_codes = []
 
         for c in cols:
             j = b.q.index_of(c)
             if j is None:
                 continue
+            name = str(c)
+            kind = _infer_flow_kind(name)
             idxs.append(int(j))
-            names.append(str(c))
-            kinds.append(_infer_flow_kind(str(c)))
+            names.append(name)
+            short_names.append(_shorten_display_name(name))
+            kinds.append(kind)
+            kind_codes.append(_kind_code_from_label(kind))
 
         if not idxs:
-            self.lbl_groups.setText("FLOW: n/a")
+            _set_label_text_if_changed(self.lbl_groups, "FLOW: n/a")
             self._clear_rows()
             return
 
         self._idxs = np.array(idxs, dtype=int)
         self._names = names
+        self._short_names = short_names
         self._kinds = kinds
+        self._kind_codes = np.asarray(kind_codes, dtype=np.int8)
 
         # robust max abs flow per edge for stable normalization
         try:
@@ -6036,67 +7698,48 @@ class FlowQuickPanel(QtWidgets.QWidget):
         self._clear_rows()
 
     def _clear_rows(self):
-        for lab, bar, val in self.rows:
-            lab.setText("—")
-            bar.setValue(0)
-            val.setText("")
+        self.rows_canvas.clear_rows()
 
     def update_frame(self, b: DataBundle, i: int):
         if getattr(b, "q", None) is None or self._idxs is None or not self._names:
-            self.lbl_groups.setText("FLOW: n/a")
+            _set_label_text_if_changed(self.lbl_groups, "FLOW: n/a")
             self._clear_rows()
             return
 
         try:
             q = np.asarray(b.q.values[i, self._idxs], dtype=float)
         except Exception:
-            self.lbl_groups.setText("FLOW: n/a")
+            _set_label_text_if_changed(self.lbl_groups, "FLOW: n/a")
             self._clear_rows()
             return
 
         thr = float(self.thr_kg_s)
         aq = np.abs(q)
+        active_mask = aq > thr
 
         # group counters
-        # NOTE: _infer_flow_kind() reuses valve classifier and returns
-        # Russian labels ("выхлоп", "подпитка", ...). Keep counters consistent
-        # to avoid silently-broken grouping.
-        c_exh = c_fill = c_chg = c_chk = c_oth = 0
-        for k, kind in enumerate(self._kinds):
-            if aq[k] <= thr:
-                continue
-            if kind == "выхлоп":
-                c_exh += 1
-            elif kind == "подпитка":
-                c_fill += 1
-            elif kind == "заряд":
-                c_chg += 1
-            elif kind == "чек":
-                c_chk += 1
-            else:
-                c_oth += 1
+        if self._kind_codes.size == aq.size:
+            active_codes = self._kind_codes[active_mask]
+            c_exh = int(np.count_nonzero(active_codes == 0))
+            c_fill = int(np.count_nonzero(active_codes == 1))
+            c_chg = int(np.count_nonzero(active_codes == 2))
+            c_chk = int(np.count_nonzero(active_codes == 3))
+            c_oth = int(np.count_nonzero(active_codes == 4))
+        else:
+            c_exh = c_fill = c_chg = c_chk = c_oth = 0
 
-        self.lbl_groups.setText(
+        _set_label_text_if_changed(
+            self.lbl_groups,
             f"FLOW>|{thr*1000:.1f} g/s|  вых:{c_exh}  подп:{c_fill}  зар:{c_chg}  чек:{c_chk}  проч:{c_oth}"
         )
 
         # pick top by abs
-        order = np.argsort(-aq)
-        # filter zeros first to avoid showing dead edges
-        order = [int(j) for j in order.tolist() if float(aq[int(j)]) > thr]
-        order = order[: self.max_rows]
+        order = _top_descending_indices(aq, self.max_rows, threshold=thr)
 
         # update rows
-        for r in range(self.max_rows):
-            lab, bar, val = self.rows[r]
-            if r >= len(order):
-                lab.setText("—")
-                bar.setValue(0)
-                val.setText("")
-                continue
-
-            j = int(order[r])
-            name = self._names[j]
+        rows_data: list[tuple[str, float, str]] = []
+        for j in order.tolist():
+            j = int(j)
             mdot = float(q[j])
             kind = self._kinds[j] if j < len(self._kinds) else "other"
             # normalize
@@ -6104,16 +7747,17 @@ class FlowQuickPanel(QtWidgets.QWidget):
             if self._maxabs is not None and j < int(self._maxabs.size):
                 denom = float(self._maxabs[j])
             frac = 0.0 if denom <= 1e-12 else float(abs(mdot) / denom)
-            bar.setValue(int(_clamp(frac, 0.0, 1.0) * 100.0))
-
-            # label: shorten, keep kind
-            short = name
-            if len(short) > 34:
-                short = short[:31] + "…"
-            lab.setText(f"{short} [{kind}]")
+            short = self._short_names[j] if j < len(self._short_names) else _shorten_display_name(self._names[j])
 
             arrow = "→" if mdot >= 0.0 else "←"
-            val.setText(f"{arrow} {mdot*1000.0:+.1f} g/s")
+            rows_data.append(
+                (
+                    f"{short} [{kind}]",
+                    float(_clamp(frac, 0.0, 1.0)),
+                    f"{arrow} {mdot*1000.0:+.1f} g/s",
+                )
+            )
+        self.rows_canvas.set_rows(rows_data)
 
 
 class FlowPanel(QtWidgets.QWidget):
@@ -6163,17 +7807,27 @@ class FlowPanel(QtWidgets.QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setMaximumHeight(320)
         lay.addWidget(self.table)
+        _set_table_fixed_row_height(self.table, padding=6, minimum=18)
 
         self._names: list[str] = []
         self._idxs: np.ndarray | None = None
         self._maxabs: np.ndarray | None = None
         self._kinds: list[str] = []
+        self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, QtWidgets.QTableWidgetItem, QtWidgets.QProgressBar, QtWidgets.QTableWidgetItem]] = []
+        self._row_binding_keys: list[Optional[int]] = []
+        self._last_display_key: Optional[tuple[Any, ...]] = None
+        self._visible_rows: int = 0
 
     def set_bundle(self, b: DataBundle):
         self._names = []
         self._idxs = None
         self._maxabs = None
         self._kinds = []
+        self._row_handles = []
+        self._row_binding_keys = []
+        self._last_display_key = None
+        self._visible_rows = 0
+        _set_table_row_count_if_changed(self.table, 0)
 
         if getattr(b, "q", None) is None:
             return
@@ -6207,9 +7861,53 @@ class FlowPanel(QtWidgets.QWidget):
             except Exception:
                 self._maxabs = None
 
+    def _ensure_row_widgets(self, rows: int) -> None:
+        rows = int(max(0, rows))
+        if int(self.table.rowCount()) < rows:
+            _set_table_row_count_if_changed(self.table, rows)
+        for r in range(len(self._row_handles), rows):
+            it0 = QtWidgets.QTableWidgetItem("")
+            it1 = QtWidgets.QTableWidgetItem("")
+            it1.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+            pb = QtWidgets.QProgressBar()
+            pb.setRange(0, 100)
+            pb.setTextVisible(True)
+            pb.setFormat("%p%")
+            pb.setFixedHeight(12)
+            pb.setStyleSheet(
+                """
+                QProgressBar{border:1px solid #444;border-radius:4px;background:#1b1f24;}
+                QProgressBar::chunk{border-radius:4px;background:#7bd88f;}
+                """
+            )
+            it3 = QtWidgets.QTableWidgetItem("")
+            it3.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(r, 0, it0)
+            self.table.setItem(r, 1, it1)
+            self.table.setCellWidget(r, 2, pb)
+            self.table.setItem(r, 3, it3)
+            self._row_handles.append((it0, it1, pb, it3))
+            self._row_binding_keys.append(None)
+
+    def _set_visible_rows(self, rows: int) -> None:
+        target = int(max(0, rows))
+        current = int(max(0, getattr(self, "_visible_rows", 0)))
+        if target == current:
+            return
+        if target > current:
+            for r in range(current, target):
+                _set_table_row_hidden_if_changed(self.table, r, False)
+        else:
+            for r in range(target, current):
+                _set_table_row_hidden_if_changed(self.table, r, True)
+        self._visible_rows = target
+
     def update_frame(self, b: DataBundle, i: int):
         if getattr(b, "q", None) is None or self._idxs is None or not self._names:
-            self.table.setRowCount(0)
+            if self._last_display_key == tuple() and int(getattr(self, "_visible_rows", 0)) == 0:
+                return
+            self._last_display_key = tuple()
+            _call_with_qt_update_batch(self.table, lambda: self._set_visible_rows(0))
             return
 
         # thr is in g/s in UI
@@ -6221,84 +7919,236 @@ class FlowPanel(QtWidgets.QWidget):
         try:
             q = np.asarray(b.q.values[i, self._idxs], dtype=float)
         except Exception:
-            self.table.setRowCount(0)
+            if self._last_display_key == tuple() and int(getattr(self, "_visible_rows", 0)) == 0:
+                return
+            self._last_display_key = tuple()
+            _call_with_qt_update_batch(self.table, lambda: self._set_visible_rows(0))
             return
 
         aq = np.abs(q)
-        if only_active:
-            mask = aq > thr
-        else:
-            mask = np.ones_like(aq, dtype=bool)
-
-        idxs = np.nonzero(mask)[0]
-        if idxs.size == 0:
-            self.table.setRowCount(0)
+        order = _top_descending_indices(aq, topn, threshold=(thr if only_active else -1.0))
+        if order.size == 0:
+            if self._last_display_key == tuple() and int(getattr(self, "_visible_rows", 0)) == 0:
+                return
+            self._last_display_key = tuple()
+            _call_with_qt_update_batch(self.table, lambda: self._set_visible_rows(0))
             return
 
-        sel_aq = aq[idxs]
-        order = np.argsort(-sel_aq)
-        order = order[: min(topn, int(order.size))]
-        idxs = idxs[order]
+        idxs = np.asarray(order, dtype=int)
         sel_q = q[idxs]
         sel_aq = aq[idxs]
-
-        self.table.setRowCount(int(idxs.size))
-
-        for r in range(int(idxs.size)):
-            j = int(idxs[r])
-            name = self._names[j]
-            mdot = float(sel_q[r])
-            kind = self._kinds[j] if j < len(self._kinds) else "other"
-
-            # name
-            it0 = self.table.item(r, 0)
-            if it0 is None:
-                it0 = QtWidgets.QTableWidgetItem(name)
-                self.table.setItem(r, 0, it0)
-            else:
-                it0.setText(name)
-
-            # q value (g/s) with arrow
-            arrow = "→" if mdot >= 0.0 else "←"
-            txt = f"{arrow} {mdot*1000.0:+.2f} g/s"
-            it1 = self.table.item(r, 1)
-            if it1 is None:
-                it1 = QtWidgets.QTableWidgetItem(txt)
-                it1.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
-                self.table.setItem(r, 1, it1)
-            else:
-                it1.setText(txt)
-
-            # magnitude bar (% of robust max)
-            pb = self.table.cellWidget(r, 2)
-            if pb is None:
-                pb = QtWidgets.QProgressBar()
-                pb.setRange(0, 100)
-                pb.setTextVisible(True)
-                pb.setFormat("%p%")
-                pb.setFixedHeight(12)
-                pb.setStyleSheet(
-                    """
-                    QProgressBar{border:1px solid #444;border-radius:4px;background:#1b1f24;}
-                    QProgressBar::chunk{border-radius:4px;background:#7bd88f;}
-                    """
-                )
-                self.table.setCellWidget(r, 2, pb)
-
+        frac_pct = np.zeros(int(idxs.size), dtype=int)
+        for pos, j in enumerate(idxs.tolist()):
             denom = 0.0
-            if self._maxabs is not None and j < int(self._maxabs.size):
-                denom = float(self._maxabs[j])
-            frac = 0.0 if denom <= 1e-12 else float(abs(mdot) / denom)
-            pb.setValue(int(_clamp(frac, 0.0, 1.0) * 100.0))
+            if self._maxabs is not None and int(j) < int(self._maxabs.size):
+                denom = float(self._maxabs[int(j)])
+            frac = 0.0 if denom <= 1e-12 else float(sel_aq[pos] / denom)
+            frac_pct[pos] = int(np.rint(np.clip(frac, 0.0, 1.0) * 100.0))
 
-            # kind
-            it3 = self.table.item(r, 3)
-            if it3 is None:
-                it3 = QtWidgets.QTableWidgetItem(kind)
-                it3.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-                self.table.setItem(r, 3, it3)
+        value_centigs = np.asarray(np.rint(sel_q * 100000.0), dtype=int)
+        visual_key = tuple((int(j), int(value_centigs[pos]), int(frac_pct[pos])) for pos, j in enumerate(idxs.tolist()))
+        if visual_key == self._last_display_key and int(self.table.rowCount()) == int(idxs.size):
+            return
+        self._last_display_key = visual_key
+
+        def _apply_rows() -> None:
+            self._ensure_row_widgets(int(idxs.size))
+            for r in range(int(idxs.size)):
+                j = int(idxs[r])
+                name = self._names[j]
+                mdot = float(sel_q[r])
+                kind = self._kinds[j] if j < len(self._kinds) else "other"
+                it0, it1, pb, it3 = self._row_handles[r]
+                if self._row_binding_keys[r] != j:
+                    _set_table_item_text_if_changed(it0, name)
+                    _set_table_item_text_if_changed(it3, kind)
+                    self._row_binding_keys[r] = j
+                arrow = "→" if mdot >= 0.0 else "←"
+                txt = f"{arrow} {mdot*1000.0:+.2f} g/s"
+                _set_table_item_text_if_changed(it1, txt)
+                _set_progress_value_if_changed(pb, int(frac_pct[r]))
+            self._set_visible_rows(int(idxs.size))
+
+        _call_with_qt_update_batch(self.table, _apply_rows)
+
+
+class _PressureQuickGridCanvas(QtWidgets.QWidget):
+    """Lightweight 2x2 pressure quick cards."""
+
+    def __init__(self, *, nodes: Sequence[str], max_bar_g: float = 12.0, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self._nodes = [str(x) for x in nodes]
+        self._max_bar_g = float(max_bar_g)
+        self._values: Dict[str, Optional[float]] = {str(x): None for x in self._nodes}
+        self._values_key: Optional[tuple[tuple[str, Optional[float]], ...]] = None
+        self._bg_cache_key: Optional[tuple[int, int]] = None
+        self._bg_cache_pixmap: Optional[QtGui.QPixmap] = None
+        self._layout_cache_key: Optional[tuple[int, int]] = None
+        self._layout_cache: Dict[str, Any] = {}
+        self.setMinimumHeight(86)
+        try:
+            self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)
+        except Exception:
+            pass
+        self._bg = QtGui.QColor(18, 22, 28)
+        self._card_bg = QtGui.QColor(24, 29, 35)
+        self._track = QtGui.QColor(42, 48, 56)
+        self._border_pen = QtGui.QPen(QtGui.QColor(60, 68, 80), 1.0)
+        try:
+            self._border_pen.setCosmetic(True)
+        except Exception:
+            pass
+
+    def _invalidate_background_cache(self) -> None:
+        self._bg_cache_key = None
+        self._bg_cache_pixmap = None
+
+    def resizeEvent(self, event: QtGui.QResizeEvent):  # type: ignore[override]
+        self._layout_cache_key = None
+        self._layout_cache = {}
+        self._invalidate_background_cache()
+        super().resizeEvent(event)
+
+    def _layout_metrics(self) -> Dict[str, Any]:
+        key = (int(self.width()), int(self.height()))
+        if key == self._layout_cache_key and self._layout_cache:
+            return self._layout_cache
+
+        w = max(1, key[0])
+        h = max(1, key[1])
+        outer = QtCore.QRectF(0.5, 0.5, max(1.0, float(w) - 1.0), max(1.0, float(h) - 1.0))
+        cols = 2
+        rows = max(1, int(math.ceil(float(len(self._nodes)) / float(cols))))
+        gap = 6.0
+        card_w = max(40.0, (outer.width() - gap * (cols - 1)) / cols)
+        card_h = max(34.0, (outer.height() - gap * (rows - 1)) / rows)
+
+        cards: list[dict[str, Any]] = []
+        for idx, node in enumerate(self._nodes):
+            r = idx // cols
+            c = idx % cols
+            card = QtCore.QRectF(
+                outer.left() + c * (card_w + gap),
+                outer.top() + r * (card_h + gap),
+                card_w,
+                card_h,
+            )
+            cards.append(
+                {
+                    "node": str(node),
+                    "card": card,
+                    "title_rect": QtCore.QRectF(card.left() + 8.0, card.top() + 4.0, card.width() - 16.0, 14.0),
+                    "value_rect": QtCore.QRectF(card.left() + 8.0, card.top() + 18.0, card.width() - 16.0, 14.0),
+                    "bar_rect": QtCore.QRectF(card.left() + 8.0, card.bottom() - 12.0, card.width() - 16.0, 7.0),
+                }
+            )
+
+        self._layout_cache_key = key
+        self._layout_cache = {"w": w, "h": h, "cards": cards}
+        return self._layout_cache
+
+    def _ensure_background_cache(self) -> tuple[Optional[QtGui.QPixmap], Dict[str, Any]]:
+        metrics = self._layout_metrics()
+        key = (int(metrics["w"]), int(metrics["h"]))
+        if key == self._bg_cache_key and self._bg_cache_pixmap is not None:
+            return self._bg_cache_pixmap, metrics
+
+        dpr = 1.0
+        try:
+            dpr = float(max(1.0, self.devicePixelRatioF()))
+        except Exception:
+            dpr = 1.0
+        pix = QtGui.QPixmap(int(max(1.0, float(metrics["w"]) * dpr)), int(max(1.0, float(metrics["h"]) * dpr)))
+        try:
+            pix.setDevicePixelRatio(dpr)
+        except Exception:
+            pass
+        pix.fill(self._bg)
+
+        p = QtGui.QPainter(pix)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        title_font = p.font()
+        try:
+            title_font.setPointSize(max(8, int(title_font.pointSize()) - 1))
+            title_font.setBold(True)
+        except Exception:
+            pass
+        p.setFont(title_font)
+        p.setPen(QtGui.QColor(214, 220, 228))
+        for info in metrics["cards"]:
+            card = info["card"]
+            p.setPen(self._border_pen)
+            p.setBrush(self._card_bg)
+            p.drawRoundedRect(card, 7.0, 7.0)
+            p.drawText(
+                info["title_rect"],
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                str(info["node"]),
+            )
+            p.setPen(QtCore.Qt.NoPen)
+            p.setBrush(self._track)
+            p.drawRoundedRect(info["bar_rect"], 3.5, 3.5)
+        p.end()
+
+        self._bg_cache_key = key
+        self._bg_cache_pixmap = pix
+        return self._bg_cache_pixmap, metrics
+
+    def set_values(self, values: Dict[str, Optional[float]]) -> None:
+        normalized = []
+        for node in self._nodes:
+            val = values.get(str(node))
+            if val is None:
+                normalized.append((str(node), None))
             else:
-                it3.setText(kind)
+                try:
+                    normalized.append((str(node), round(float(val), 2)))
+                except Exception:
+                    normalized.append((str(node), None))
+        key = tuple(normalized)
+        if key == self._values_key:
+            return
+        self._values = {node: val for node, val in normalized}
+        self._values_key = key
+        self.update()
+
+    def paintEvent(self, _event: QtGui.QPaintEvent):  # type: ignore[override]
+        p = QtGui.QPainter(self)
+        bg_pixmap, metrics = self._ensure_background_cache()
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        if bg_pixmap is not None:
+            p.drawPixmap(0, 0, bg_pixmap)
+        else:
+            p.fillRect(self.rect(), self._bg)
+        value_font = QtGui.QFont(p.font())
+        try:
+            value_font.setPointSize(max(8, int(value_font.pointSize()) - 1))
+        except Exception:
+            pass
+        for info in metrics.get("cards", []):
+            node = str(info.get("node", ""))
+            val = self._values.get(node)
+            txt = "—" if val is None or not np.isfinite(float(val)) else f"{float(val):.2f} bar(g)"
+            p.setFont(value_font)
+            p.setPen(QtGui.QColor(234, 238, 243))
+            p.drawText(
+                info["value_rect"],
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                txt,
+            )
+
+            bar_rect = info["bar_rect"]
+            if val is not None and np.isfinite(float(val)):
+                frac = float(_clamp(float(val), 0.0, self._max_bar_g) / max(1.0, self._max_bar_g))
+                if frac > 1e-6:
+                    fill_rect = QtCore.QRectF(bar_rect)
+                    fill_rect.setWidth(max(1.0, bar_rect.width() * frac))
+                    grad = QtGui.QLinearGradient(fill_rect.topLeft(), fill_rect.topRight())
+                    grad.setColorAt(0.0, QtGui.QColor(63, 163, 77))
+                    grad.setColorAt(0.65, QtGui.QColor(246, 194, 68))
+                    grad.setColorAt(1.0, QtGui.QColor(217, 83, 79))
+                    p.setBrush(QtGui.QBrush(grad))
+                    p.drawRoundedRect(fill_rect, 3.5, 3.5)
 
 
 class PressureQuickPanel(QtWidgets.QWidget):
@@ -6311,20 +8161,56 @@ class PressureQuickPanel(QtWidgets.QWidget):
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
-        lay = QtWidgets.QGridLayout(self)
+        lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setHorizontalSpacing(6)
-        lay.setVerticalSpacing(6)
+        self.canvas = _PressureQuickGridCanvas(nodes=self.KEY_NODES, max_bar_g=12.0, parent=self)
+        lay.addWidget(self.canvas)
+        self._bundle_key: Optional[int] = None
+        self._pressure_series_map: Dict[str, np.ndarray] = {}
+        self._main_p_map = {
+            "Ресивер1": "давление_ресивер1_Па",
+            "Ресивер2": "давление_ресивер2_Па",
+            "Ресивер3": "давление_ресивер3_Па",
+            "Аккумулятор": "давление_аккумулятор_Па",
+        }
+        self._patm_arr: Optional[np.ndarray] = None
+        self._patm_default_pa: float = float(PATM_PA_DEFAULT)
+        self._compact_mode = False
 
-        self.gauges: Dict[str, PressureGauge] = {}
-        for k, (r, c) in zip(self.KEY_NODES, [(0, 0), (0, 1), (1, 0), (1, 1)]):
-            g = PressureGauge(k, max_bar_g=12.0)
-            self.gauges[k] = g
-            lay.addWidget(g, r, c)
+    def set_compact_mode(self, compact: bool) -> None:
+        compact = bool(compact)
+        if compact == bool(self._compact_mode):
+            return
+        self._compact_mode = compact
+        try:
+            self.canvas.setMinimumHeight(72 if compact else 86)
+            self.canvas.setMaximumHeight(78 if compact else 16777215)
+            self.setMaximumHeight(82 if compact else 16777215)
+        except Exception:
+            pass
+        try:
+            self.updateGeometry()
+        except Exception:
+            pass
 
     def set_bundle(self, b: DataBundle):
-        # Nothing to precompute, but keep symmetry with other panels.
-        return
+        self._bundle_key = id(b)
+        self._pressure_series_map = {}
+        self._patm_arr, self._patm_default_pa = _infer_patm_source(b)
+        if b.p is not None:
+            for node in self.KEY_NODES:
+                if b.p.has(node):
+                    try:
+                        self._pressure_series_map[str(node)] = np.asarray(b.p.column(node), dtype=float).reshape(-1)
+                    except Exception:
+                        pass
+        else:
+            for node, col in self._main_p_map.items():
+                if b.main.has(col):
+                    try:
+                        self._pressure_series_map[str(node)] = np.asarray(b.get(col, 0.0), dtype=float).reshape(-1)
+                    except Exception:
+                        pass
 
 
     def set_recommended_scales(self, accel_scale: float, vel_scale: float):
@@ -6369,29 +8255,21 @@ class PressureQuickPanel(QtWidgets.QWidget):
         self._emit_visual()
 
     def update_frame(self, b: DataBundle, i: int):
-        patm = _infer_patm_pa(b, i)
-        if b.p is None:
-            mapping = {
-                "Ресивер1": "давление_ресивер1_Па",
-                "Ресивер2": "давление_ресивер2_Па",
-                "Ресивер3": "давление_ресивер3_Па",
-                "Аккумулятор": "давление_аккумулятор_Па",
-            }
-            for node, g in self.gauges.items():
-                col = mapping.get(node)
-                if col and b.main.has(col):
-                    P = float(b.get(col, patm)[i])
-                    g.set_value_bar_g((P - patm) / BAR_PA)
-                else:
-                    g.set_value_bar_g(None)
-            return
-
-        for node, g in self.gauges.items():
-            if b.p.has(node):
-                P = float(b.p.column(node)[i])
-                g.set_value_bar_g((P - patm) / BAR_PA)
-            else:
-                g.set_value_bar_g(None)
+        if int(getattr(self, "_bundle_key", 0) or 0) != id(b):
+            self.set_bundle(b)
+        patm = _patm_value_from_source(self._patm_arr, self._patm_default_pa, i)
+        values: Dict[str, Optional[float]] = {}
+        for node in self.KEY_NODES:
+            arr = self._pressure_series_map.get(str(node))
+            if arr is None or not (0 <= int(i) < int(arr.size)):
+                values[str(node)] = None
+                continue
+            try:
+                P = float(arr[int(i)])
+                values[str(node)] = float((P - patm) / BAR_PA) if np.isfinite(P) else None
+            except Exception:
+                values[str(node)] = None
+        self.canvas.set_values(values)
 
 
 class _ReceiverTankCanvas(QtWidgets.QWidget):
@@ -6414,6 +8292,9 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
         self._p_name: Optional[str] = None
         self._p_bar_g: Optional[float] = None
         self._p_max_bar_g: float = 10.0
+        self._p_series_map: Dict[str, np.ndarray] = {}
+        self._p_series_arr: Optional[np.ndarray] = None
+        self._p_max_map: Dict[str, float] = {}
         self._markers_bar = list(self.DEFAULT_MARKERS_BAR)
 
         self._q_in_arr: Optional[np.ndarray] = None
@@ -6428,12 +8309,29 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
         self._u_out: float = 0.0
 
         self._bundle_key: Optional[int] = None
+        self._patm_arr: Optional[np.ndarray] = None
+        self._patm_default_pa: float = float(PATM_PA_DEFAULT)
+        self._last_visual_key: Optional[tuple[int, int, int, int, int, int]] = None
         self._main_p_map = {
             "Ресивер1": "давление_ресивер1_Па",
             "Ресивер2": "давление_ресивер2_Па",
             "Ресивер3": "давление_ресивер3_Па",
             "Аккумулятор": "давление_аккумулятор_Па",
         }
+        self._bg_cache_key: Optional[tuple[int, int, float, tuple[float, ...]]] = None
+        self._bg_cache_pixmap: Optional[QtGui.QPixmap] = None
+        self._layout_cache_key: Optional[tuple[int, int]] = None
+        self._layout_cache: Dict[str, Any] = {}
+        self._tank_pen = QtGui.QPen(QtGui.QColor(220, 220, 220), 2)
+        self._dash_pen = QtGui.QPen(QtGui.QColor(200, 200, 200, 150), 1, QtCore.Qt.DashLine)
+        self._pipe_pen = QtGui.QPen(QtGui.QColor(220, 220, 220), 2)
+        self._track_pen = QtGui.QPen(QtGui.QColor(220, 220, 220, 120), 1)
+        self._text_pen = QtGui.QPen(QtGui.QColor(240, 240, 240), 1)
+        for pen in (self._tank_pen, self._dash_pen, self._pipe_pen, self._track_pen, self._text_pen):
+            try:
+                pen.setCosmetic(True)
+            except Exception:
+                pass
 
     @staticmethod
     def _normalize_flow_edge_name(name: str) -> str:
@@ -6522,7 +8420,45 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
             return None
 
     def set_pressure_name(self, name: Optional[str]):
-        self._p_name = str(name) if name else None
+        next_name = str(name) if name else None
+        self._p_name = next_name
+        if next_name is not None:
+            self._p_series_arr = self._p_series_map.get(next_name)
+            pair = self._q_name_map.get(next_name)
+        else:
+            self._p_series_arr = None
+            pair = None
+        if pair is not None:
+            self._q_in_arr, self._q_out_arr = pair
+        else:
+            self._q_in_arr = None
+            self._q_out_arr = None
+        self._p_max_bar_g = float(self._p_max_map.get(str(next_name), 10.0))
+        self._p_bar_g = None
+        self._q_in = 0.0
+        self._q_out = 0.0
+        self._u_in = 0.0
+        self._u_out = 0.0
+        self._last_visual_key = None
+        self._invalidate_background_cache()
+
+    def _pressure_max_for_series(self, series_pa: np.ndarray) -> float:
+        arr = np.asarray(series_pa, dtype=float).reshape(-1)
+        if arr.size == 0:
+            return 10.0
+        if self._patm_arr is not None and self._patm_arr.size:
+            n = int(min(arr.size, self._patm_arr.size))
+            patm = np.asarray(self._patm_arr[:n], dtype=float)
+            valid_patm = np.isfinite(patm) & (np.abs(patm) > 1.0)
+            patm = np.where(valid_patm, patm, float(self._patm_default_pa))
+            gauge_bar = (arr[:n] - patm) / BAR_PA
+        else:
+            gauge_bar = (arr - float(self._patm_default_pa)) / BAR_PA
+        finite = gauge_bar[np.isfinite(gauge_bar)]
+        if finite.size <= 0:
+            return 10.0
+        p99 = float(np.nanpercentile(finite, 99))
+        return float(max(10.0, math.ceil(max(0.0, p99) + 0.5)))
 
     def set_markers_bar(self, markers: Sequence[float]):
         try:
@@ -6531,14 +8467,141 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
             self._markers_bar = vals[:8]
         except Exception:
             self._markers_bar = list(self.DEFAULT_MARKERS_BAR)
+        self._invalidate_background_cache()
         self.update()
+
+    def _invalidate_background_cache(self) -> None:
+        self._bg_cache_key = None
+        self._bg_cache_pixmap = None
+
+    def resizeEvent(self, event: QtGui.QResizeEvent):  # type: ignore[override]
+        self._layout_cache_key = None
+        self._layout_cache = {}
+        self._invalidate_background_cache()
+        super().resizeEvent(event)
+
+    def _layout_metrics(self) -> Dict[str, Any]:
+        key = (int(self.width()), int(self.height()))
+        if key == self._layout_cache_key and self._layout_cache:
+            return self._layout_cache
+
+        w = max(1, key[0])
+        h = max(1, key[1])
+        m = 10
+        tank_w = max(40, int(0.34 * w))
+        tank_h = max(90, int(0.72 * h))
+        tx = int(0.5 * (w - tank_w))
+        ty = m
+        tank = QtCore.QRectF(tx, ty, tank_w, tank_h)
+        pipe_len = max(18, int(0.22 * w))
+        in_y = tank.top() + 0.22 * tank.height()
+        out_y = tank.bottom() - 0.18 * tank.height()
+        in_a = QtCore.QPointF(tank.right(), in_y)
+        in_b = QtCore.QPointF(tank.right() + pipe_len, in_y)
+        out_a = QtCore.QPointF(tank.left(), out_y)
+        out_b = QtCore.QPointF(tank.left() - pipe_len, out_y)
+        x_mid = tank.center().x()
+        dx = 0.18 * tank.width()
+        xin = x_mid - dx
+        xout = x_mid + dx
+        marker_layout: list[dict[str, Any]] = []
+        max_bar = max(1e-6, float(self._p_max_bar_g))
+        for idx, mk in enumerate(self._markers_bar):
+            if mk < 0:
+                continue
+            mk_u = float(mk) / max_bar
+            y = tank.bottom() - mk_u * tank.height()
+            if not (tank.top() <= y <= tank.bottom()):
+                continue
+            side = 1.0 if (idx % 2 == 0) else -1.0
+            if abs(y - in_y) < 0.07 * tank.height():
+                side = -1.0
+            if abs(y - out_y) < 0.07 * tank.height():
+                side = 1.0
+            stub_len = max(14.0, min(26.0, 0.22 * float(w)))
+            if side > 0:
+                a = QtCore.QPointF(tank.right(), y)
+                bpt = QtCore.QPointF(tank.right() + stub_len, y)
+            else:
+                a = QtCore.QPointF(tank.left(), y)
+                bpt = QtCore.QPointF(tank.left() - stub_len, y)
+            marker_layout.append({"mk": float(mk), "y": float(y), "a": a, "b": bpt})
+
+        self._layout_cache_key = key
+        self._layout_cache = {
+            "w": w,
+            "h": h,
+            "tank": tank,
+            "in_a": in_a,
+            "in_b": in_b,
+            "out_a": out_a,
+            "out_b": out_b,
+            "xin": xin,
+            "xout": xout,
+            "markers": marker_layout,
+        }
+        return self._layout_cache
+
+    def _ensure_background_cache(self) -> tuple[Optional[QtGui.QPixmap], Dict[str, Any]]:
+        metrics = self._layout_metrics()
+        key = (
+            int(metrics["w"]),
+            int(metrics["h"]),
+            round(float(self._p_max_bar_g), 3),
+            tuple(round(float(x), 3) for x in self._markers_bar),
+        )
+        if key == self._bg_cache_key and self._bg_cache_pixmap is not None:
+            return self._bg_cache_pixmap, metrics
+
+        pix = QtGui.QPixmap(int(metrics["w"]), int(metrics["h"]))
+        pix.fill(QtGui.QColor(18, 18, 18))
+        p = QtGui.QPainter(pix)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        tank = metrics["tank"]
+        p.setPen(self._tank_pen)
+        p.setBrush(QtCore.Qt.NoBrush)
+        p.drawRoundedRect(tank, 6, 6)
+
+        p.setPen(self._dash_pen)
+        inactive_col = QtGui.QColor(140, 140, 140, 160)
+        for info in metrics["markers"]:
+            y = float(info["y"])
+            p.drawLine(QtCore.QPointF(tank.left(), y), QtCore.QPointF(tank.right(), y))
+            p.setPen(QtGui.QPen(inactive_col, 2))
+            try:
+                p.pen().setCosmetic(True)
+            except Exception:
+                pass
+            p.drawLine(info["a"], info["b"])
+            p.setPen(QtCore.Qt.NoPen)
+            p.setBrush(inactive_col)
+            p.drawEllipse(info["b"], 4.0, 4.0)
+            p.setPen(self._dash_pen)
+
+        p.setPen(self._pipe_pen)
+        p.drawLine(metrics["in_a"], metrics["in_b"])
+        p.drawLine(metrics["out_a"], metrics["out_b"])
+
+        p.setPen(self._track_pen)
+        p.drawLine(QtCore.QPointF(float(metrics["xin"]), tank.bottom()), QtCore.QPointF(float(metrics["xin"]), tank.top()))
+        p.drawLine(QtCore.QPointF(float(metrics["xout"]), tank.bottom()), QtCore.QPointF(float(metrics["xout"]), tank.top()))
+        p.end()
+
+        self._bg_cache_key = key
+        self._bg_cache_pixmap = pix
+        return self._bg_cache_pixmap, metrics
 
     def set_bundle(self, b: DataBundle):
         self._bundle_key = id(b)
+        self._patm_arr, self._patm_default_pa = _infer_patm_source(b)
+        self._p_series_map = {}
+        self._p_series_arr = None
+        self._p_max_map = {}
         self._q_in_arr = None
         self._q_out_arr = None
         self._q_name_map = {}
         self._q_ref = 0.02
+        self._last_visual_key = None
 
         # Precompute per-receiver classified flow magnitudes once (for stable ball scaling).
         # If the edge direction cannot be classified unambiguously from the canonical edge name,
@@ -6566,34 +8629,56 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
             self._q_out_arr = None
             self._q_ref = 0.02
 
+        try:
+            candidate_names: List[str] = list(self._main_p_map.keys())
+            if b.p is not None:
+                for name in list(b.p.cols):
+                    if str(name) == "время_с":
+                        continue
+                    if str(name) not in candidate_names:
+                        candidate_names.append(str(name))
+                for name in candidate_names:
+                    if b.p.has(name):
+                        arr = np.asarray(b.p.column(name), dtype=float).reshape(-1)
+                        self._p_series_map[str(name)] = arr
+                        self._p_max_map[str(name)] = self._pressure_max_for_series(arr)
+            else:
+                for name, col in self._main_p_map.items():
+                    if b.main.has(col):
+                        arr = np.asarray(b.get(col, 0.0), dtype=float).reshape(-1)
+                        self._p_series_map[str(name)] = arr
+                        self._p_max_map[str(name)] = self._pressure_max_for_series(arr)
+        except Exception:
+            self._p_series_map = {}
+            self._p_max_map = {}
+
+        if self._p_name is None and self._p_series_map:
+            self._p_name = next(iter(self._p_series_map.keys()))
+        self.set_pressure_name(self._p_name)
+
     def update_frame(self, b: DataBundle, i: int):
+        if int(getattr(self, "_bundle_key", 0) or 0) != id(b):
+            self.set_bundle(b)
         # pressure
-        patm = _infer_patm_pa(b, i)
+        patm = _patm_value_from_source(self._patm_arr, self._patm_default_pa, i)
         p_bar_g: Optional[float] = None
         try:
-            if self._p_name:
-                if b.p is not None and b.p.has(self._p_name):
-                    P = float(b.p.column(self._p_name)[i])
+            if self._p_series_arr is not None and 0 <= int(i) < int(self._p_series_arr.size):
+                P = float(self._p_series_arr[int(i)])
+                if np.isfinite(P):
                     p_bar_g = (P - patm) / BAR_PA
-                else:
-                    col = self._main_p_map.get(self._p_name)
-                    if col and b.main.has(col):
-                        P = float(b.get(col, patm)[i])
-                        p_bar_g = (P - patm) / BAR_PA
         except Exception:
             p_bar_g = None
         self._p_bar_g = p_bar_g
 
         # flows (classified relative to the currently selected receiver/tank)
         try:
-            pair = self._q_name_map.get(str(self._p_name)) if self._p_name else None
-            q_in_arr, q_out_arr = pair if pair is not None else (self._q_in_arr, self._q_out_arr)
-            if q_in_arr is not None and 0 <= i < len(q_in_arr):
-                self._q_in = float(q_in_arr[i])
+            if self._q_in_arr is not None and 0 <= int(i) < int(len(self._q_in_arr)):
+                self._q_in = float(self._q_in_arr[int(i)])
             else:
                 self._q_in = 0.0
-            if q_out_arr is not None and 0 <= i < len(q_out_arr):
-                self._q_out = float(q_out_arr[i])
+            if self._q_out_arr is not None and 0 <= int(i) < int(len(self._q_out_arr)):
+                self._q_out = float(self._q_out_arr[int(i)])
             else:
                 self._q_out = 0.0
         except Exception:
@@ -6614,37 +8699,28 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
             self._u_in *= 0.9
             self._u_out *= 0.9
 
-        # auto range (stable)
-        try:
-            if p_bar_g is not None and np.isfinite(p_bar_g):
-                self._p_max_bar_g = max(self._p_max_bar_g, float(np.ceil((p_bar_g + 0.5))))
-        except Exception:
-            pass
-
+        visual_key = (
+            -9999 if p_bar_g is None or not np.isfinite(float(p_bar_g)) else int(round(float(p_bar_g) * 10.0)),
+            int(round(max(0.0, float(self._q_in)) * 10000.0)),
+            int(round(max(0.0, float(self._q_out)) * 10000.0)),
+            int(round(float(_clamp(self._u_in, 0.0, 1.0)) * 100.0)),
+            int(round(float(_clamp(self._u_out, 0.0, 1.0)) * 100.0)),
+            int(round(float(self._p_max_bar_g) * 10.0)),
+        )
+        if visual_key == self._last_visual_key:
+            return
+        self._last_visual_key = visual_key
         self.update()
 
     def paintEvent(self, ev: QtGui.QPaintEvent):  # type: ignore
         p = QtGui.QPainter(self)
         p.setRenderHint(QtGui.QPainter.Antialiasing, True)
-
-        w = self.width()
-        h = self.height()
-        m = 10
-
-        # tank rect
-        tank_w = max(40, int(0.34 * w))
-        tank_h = max(90, int(0.72 * h))
-        tx = int(0.5 * (w - tank_w))
-        ty = m
-        tank = QtCore.QRectF(tx, ty, tank_w, tank_h)
-
-        # background
-        p.fillRect(self.rect(), QtGui.QColor(18, 18, 18))
-
-        # tank outline
-        p.setPen(QtGui.QPen(QtGui.QColor(220, 220, 220), 2))
-        p.setBrush(QtCore.Qt.NoBrush)
-        p.drawRoundedRect(tank, 6, 6)
+        bg_pixmap, metrics = self._ensure_background_cache()
+        if bg_pixmap is not None:
+            p.drawPixmap(0, 0, bg_pixmap)
+        tank = metrics.get("tank", QtCore.QRectF())
+        w = int(metrics.get("w", max(1, self.width())))
+        h = int(metrics.get("h", max(1, self.height())))
 
         # fill level (pressure as "liquid")
         frac = 0.0
@@ -6664,72 +8740,27 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
             p.drawRoundedRect(fill, 5, 5)
 
         # markers + "outlet" stubs (user-friendly, experience-based metaphor)
-        dash_pen = QtGui.QPen(QtGui.QColor(200, 200, 200, 150), 1, QtCore.Qt.DashLine)
         lvl_bar = float(self._p_bar_g) if (self._p_bar_g is not None and np.isfinite(self._p_bar_g)) else -1e9
-        for idx, mk in enumerate(self._markers_bar):
-            if mk < 0:
+        for info in metrics.get("markers", []):
+            mk = float(info.get("mk", -1.0))
+            if lvl_bar < mk - 1e-6:
                 continue
-            mk_u = float(mk) / max(1e-6, float(self._p_max_bar_g))
-            y = tank.bottom() - mk_u * tank.height()
-            if not (tank.top() <= y <= tank.bottom()):
-                continue
-
-            # dashed line inside tank
-            p.setPen(dash_pen)
-            p.drawLine(QtCore.QPointF(tank.left(), y), QtCore.QPointF(tank.right(), y))
-
-            # outlet stub on tank wall: lights up when pressure reached
-            active = lvl_bar >= float(mk) - 1e-6
-            stub_len = max(14.0, min(26.0, 0.22 * float(w)))
-            # avoid overlap with inlet/outlet main pipes by alternating side
-            side = 1.0 if (idx % 2 == 0) else -1.0
-            # keep room for main inlet at ~22% height and outlet at ~82% height
-            in_y = tank.top() + 0.22 * tank.height()
-            out_y = tank.bottom() - 0.18 * tank.height()
-            if abs(y - in_y) < 0.07 * tank.height():
-                side = -1.0
-            if abs(y - out_y) < 0.07 * tank.height():
-                side = 1.0
-
-            if side > 0:
-                a = QtCore.QPointF(tank.right(), y)
-                bpt = QtCore.QPointF(tank.right() + stub_len, y)
-            else:
-                a = QtCore.QPointF(tank.left(), y)
-                bpt = QtCore.QPointF(tank.left() - stub_len, y)
-
-            col = QtGui.QColor(230, 190, 90, 230) if active else QtGui.QColor(140, 140, 140, 160)
-            p.setPen(QtGui.QPen(col, 2))
-            p.drawLine(a, bpt)
+            col = QtGui.QColor(230, 190, 90, 230)
+            pen = QtGui.QPen(col, 2)
+            try:
+                pen.setCosmetic(True)
+            except Exception:
+                pass
+            p.setPen(pen)
+            p.drawLine(info["a"], info["b"])
             p.setPen(QtCore.Qt.NoPen)
             p.setBrush(col)
-            p.drawEllipse(bpt, 4.0, 4.0)
-
-        # pipes (main in/out)
-        pipe_len = max(18, int(0.22 * w))
-        pipe_r = max(4, int(0.06 * tank_h))
-        # inlet (top-right)
-        in_y = tank.top() + 0.22 * tank.height()
-        in_a = QtCore.QPointF(tank.right(), in_y)
-        in_b = QtCore.QPointF(tank.right() + pipe_len, in_y)
-        # outlet (bottom-left)
-        out_y = tank.bottom() - 0.18 * tank.height()
-        out_a = QtCore.QPointF(tank.left(), out_y)
-        out_b = QtCore.QPointF(tank.left() - pipe_len, out_y)
-        p.setPen(QtGui.QPen(QtGui.QColor(220, 220, 220), 2))
-        p.drawLine(in_a, in_b)
-        p.drawLine(out_a, out_b)
+            p.drawEllipse(info["b"], 4.0, 4.0)
 
         # Internal flow "floats" (green=in, red=out): map to 0..1 by q_ref
         try:
-            x_mid = tank.center().x()
-            dx = 0.18 * tank.width()
-            xin = x_mid - dx
-            xout = x_mid + dx
-            p.setPen(QtGui.QPen(QtGui.QColor(220, 220, 220, 120), 1))
-            p.drawLine(QtCore.QPointF(xin, tank.bottom()), QtCore.QPointF(xin, tank.top()))
-            p.drawLine(QtCore.QPointF(xout, tank.bottom()), QtCore.QPointF(xout, tank.top()))
-
+            xin = float(metrics.get("xin", tank.center().x()))
+            xout = float(metrics.get("xout", tank.center().x()))
             yin = tank.bottom() - float(self._u_in) * tank.height()
             yout = tank.bottom() - float(self._u_out) * tank.height()
             p.setPen(QtCore.Qt.NoPen)
@@ -6749,12 +8780,12 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
 
         p.setPen(QtCore.Qt.NoPen)
         p.setBrush(QtGui.QColor(80, 220, 120, 220))
-        p.drawEllipse(in_b, rin, rin)
+        p.drawEllipse(metrics.get("in_b", QtCore.QPointF()), rin, rin)
         p.setBrush(QtGui.QColor(240, 90, 90, 220))
-        p.drawEllipse(out_b, rout, rout)
+        p.drawEllipse(metrics.get("out_b", QtCore.QPointF()), rout, rout)
 
         # labels
-        p.setPen(QtGui.QPen(QtGui.QColor(240, 240, 240), 1))
+        p.setPen(self._text_pen)
         if self._p_bar_g is None:
             p_txt = "P: —"
         else:
@@ -6803,6 +8834,28 @@ class ReceiverTankWidget(QtWidgets.QWidget):
         self._bundle_key: Optional[int] = None
         self._names: List[str] = []
         self.cmb.currentIndexChanged.connect(self._on_sel)
+        self._compact_mode = False
+
+    def set_compact_mode(self, compact: bool) -> None:
+        compact = bool(compact)
+        if compact == bool(self._compact_mode):
+            return
+        self._compact_mode = compact
+        try:
+            self.legend.setVisible(not compact)
+        except Exception:
+            pass
+        try:
+            self.canvas.setMinimumHeight(112 if compact else 170)
+            self.canvas.setMaximumHeight(124 if compact else 16777215)
+            self.setMaximumHeight(154 if compact else 16777215)
+        except Exception:
+            pass
+        try:
+            self.updateGeometry()
+            self.adjustSize()
+        except Exception:
+            pass
 
     def _on_sel(self, idx: int):
         if 0 <= idx < len(self._names):
@@ -6850,7 +8903,9 @@ class ValveQuickPanel(QtWidgets.QWidget):
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None, *, max_rows: int = 8, thr: float = 0.05):
         super().__init__(parent)
-        self.max_rows = int(max(3, max_rows))
+        self._full_max_rows = int(max(3, max_rows))
+        self._compact_max_rows = int(max(3, min(self._full_max_rows, 4)))
+        self.max_rows = int(self._full_max_rows)
         self.thr = float(thr)
 
         lay = QtWidgets.QVBoxLayout(self)
@@ -6861,60 +8916,86 @@ class ValveQuickPanel(QtWidgets.QWidget):
         self.lbl.setStyleSheet("color:#cfcfcf;")
         lay.addWidget(self.lbl)
 
-        # Group counters (wishlist: exhaust / feed / charge)
-        self.lbl_groups = QtWidgets.QLabel("выхлоп: —   подпитка: —   заряд: —")
-        self.lbl_groups.setStyleSheet("color:#cfcfcf;")
-        lay.addWidget(self.lbl_groups)
+        # Group counters: keep them as plain labels instead of rich-text HTML so
+        # docked telemetry stays cheap even when the counts change every frame.
+        groups = QtWidgets.QHBoxLayout()
+        groups.setContentsMargins(0, 0, 0, 0)
+        groups.setSpacing(8)
+        self.lbl_exh = QtWidgets.QLabel("выхлоп: —")
+        self.lbl_exh.setStyleSheet("color:#ff8a8a;")
+        self.lbl_fill = QtWidgets.QLabel("подпитка: —")
+        self.lbl_fill.setStyleSheet("color:#9fe3a8;")
+        self.lbl_charge = QtWidgets.QLabel("заряд: —")
+        self.lbl_charge.setStyleSheet("color:#f6d57a;")
+        groups.addWidget(self.lbl_exh)
+        groups.addWidget(self.lbl_fill)
+        groups.addWidget(self.lbl_charge)
+        groups.addStretch(1)
+        lay.addLayout(groups)
 
-        self.rows: list[tuple[QtWidgets.QLabel, QtWidgets.QProgressBar, QtWidgets.QLabel]] = []
-        grid = QtWidgets.QGridLayout()
-        grid.setHorizontalSpacing(6)
-        grid.setVerticalSpacing(2)
-        lay.addLayout(grid)
-
-        for r in range(self.max_rows):
-            name = QtWidgets.QLabel("—")
-            name.setMinimumWidth(150)
-            pb = QtWidgets.QProgressBar()
-            pb.setRange(0, 100)
-            pb.setTextVisible(False)
-            pb.setFixedHeight(10)
-            pb.setStyleSheet(
-                """
-                QProgressBar{border:1px solid #444;border-radius:4px;background:#1b1f24;}
-                QProgressBar::chunk{border-radius:4px;background:#4aa3df;}
-                """
-            )
-            kind = QtWidgets.QLabel("")
-            kind.setStyleSheet("color:#cfcfcf;")
-            kind.setMinimumWidth(60)
-
-            grid.addWidget(name, r, 0)
-            grid.addWidget(pb, r, 1)
-            grid.addWidget(kind, r, 2)
-
-            self.rows.append((name, pb, kind))
+        self.rows_canvas = _QuickBarListCanvas(
+            max_rows=self.max_rows,
+            bar_color=QtGui.QColor(74, 163, 223),
+            parent=self,
+        )
+        lay.addWidget(self.rows_canvas)
 
         self._names: list[str] = []
+        self._short_names: list[str] = []
+        self._kinds: list[str] = []
+        self._kind_codes = np.zeros((0,), dtype=np.int8)
         self._idxs: np.ndarray | None = None
+        self._compact_mode = False
+
+    def set_compact_mode(self, compact: bool) -> None:
+        compact = bool(compact)
+        if compact == bool(self._compact_mode):
+            return
+        self._compact_mode = compact
+        self.max_rows = int(self._compact_max_rows if compact else self._full_max_rows)
+        self.rows_canvas.max_rows = int(self.max_rows)
+        self.rows_canvas.setMinimumHeight(int(8 + self.max_rows * 18))
+        try:
+            self.setMaximumHeight(138 if compact else 16777215)
+        except Exception:
+            pass
+        self.rows_canvas.clear_rows()
+        try:
+            self.updateGeometry()
+        except Exception:
+            pass
 
     def set_bundle(self, b: DataBundle):
         self._names = []
+        self._short_names = []
+        self._kinds = []
+        self._kind_codes = np.zeros((0,), dtype=np.int8)
         self._idxs = None
         if b.open is None:
             return
         cols = [c for c in b.open.cols if c not in ("время_с",)]
         idxs = []
         names = []
+        short_names = []
+        kinds = []
+        kind_codes = []
         for c in cols:
             j = b.open.index_of(c)
             if j is None:
                 continue
+            name = str(c)
+            kind = _infer_valve_kind(name)
             idxs.append(int(j))
-            names.append(str(c))
+            names.append(name)
+            short_names.append(_shorten_display_name(name))
+            kinds.append(kind)
+            kind_codes.append(_kind_code_from_label(kind))
         if idxs:
             self._idxs = np.array(idxs, dtype=int)
             self._names = names
+            self._short_names = short_names
+            self._kinds = kinds
+            self._kind_codes = np.asarray(kind_codes, dtype=np.int8)
 
 
     def set_recommended_scales(self, accel_scale: float, vel_scale: float):
@@ -6961,15 +9042,11 @@ class ValveQuickPanel(QtWidgets.QWidget):
     def update_frame(self, b: DataBundle, i: int):
         # default: clear
         def _clear():
-            self.lbl.setText("Активные клапаны (top): —")
-            try:
-                self.lbl_groups.setText("выхлоп: —   подпитка: —   заряд: —")
-            except Exception:
-                pass
-            for (name, pb, kind) in self.rows:
-                name.setText("—")
-                pb.setValue(0)
-                kind.setText("")
+            _set_label_text_if_changed(self.lbl, "Активные клапаны (top): —")
+            _set_label_text_if_changed(self.lbl_exh, "выхлоп: —")
+            _set_label_text_if_changed(self.lbl_fill, "подпитка: —")
+            _set_label_text_if_changed(self.lbl_charge, "заряд: —")
+            self.rows_canvas.clear_rows()
             return
 
         if b.open is None or self._idxs is None or not self._names:
@@ -6982,83 +9059,105 @@ class ValveQuickPanel(QtWidgets.QWidget):
             _clear()
             return
 
-        mask = vals > float(self.thr)
-        idxs = np.nonzero(mask)[0]
-        if idxs.size == 0:
+        thr = float(self.thr)
+        active_mask = vals > thr
+        if not np.any(active_mask):
             _clear()
             return
 
         # Group counters across ALL active valves (not just the top list)
-        try:
-            cnt = {"выхлоп": 0, "подпитка": 0, "заряд": 0}
-            for j in idxs.tolist():
-                nmj = str(self._names[int(j)])
-                k = _infer_valve_kind(nmj)
-                if k in cnt:
-                    cnt[k] += 1
-            self.lbl_groups.setText(
-                f"<span style='color:#ff8a8a'>выхлоп:{cnt['выхлоп']}</span>   "
-                f"<span style='color:#9fe3a8'>подпитка:{cnt['подпитка']}</span>   "
-                f"<span style='color:#f6d57a'>заряд:{cnt['заряд']}</span>"
-            )
-        except Exception:
-            pass
+        if self._kind_codes.size == vals.size:
+            active_codes = self._kind_codes[active_mask]
+            exh_count = int(np.count_nonzero(active_codes == 0))
+            fill_count = int(np.count_nonzero(active_codes == 1))
+            charge_count = int(np.count_nonzero(active_codes == 2))
+        else:
+            exh_count = fill_count = charge_count = 0
+        _set_label_text_if_changed(self.lbl_exh, f"выхлоп: {exh_count}")
+        _set_label_text_if_changed(self.lbl_fill, f"подпитка: {fill_count}")
+        _set_label_text_if_changed(self.lbl_charge, f"заряд: {charge_count}")
 
-        sel_vals = vals[idxs]
-        order = np.argsort(-sel_vals)
-        order = order[: min(self.max_rows, int(order.size))]
-        idxs = idxs[order]
-        sel_vals = sel_vals[order]
+        idxs = _top_descending_indices(vals, self.max_rows, threshold=thr)
+        sel_vals = vals[idxs] if idxs.size else np.zeros((0,), dtype=float)
 
-        self.lbl.setText(f"Активные клапаны (top {int(idxs.size)}):")
-        for row_i in range(self.max_rows):
-            (name, pb, kind) = self.rows[row_i]
-            if row_i < int(idxs.size):
-                j = int(idxs[row_i])
-                nm = self._names[j]
-                v = float(sel_vals[row_i])
-                name.setText(nm)
-                pb.setValue(int(_clamp(v, 0.0, 1.0) * 100.0))
-                kind.setText(_infer_valve_kind(nm))
-            else:
-                name.setText("—")
-                pb.setValue(0)
-                kind.setText("")
+        _set_label_text_if_changed(self.lbl, f"Активные клапаны (top {int(idxs.size)}):")
+        rows_data: list[tuple[str, float, str]] = []
+        for row_i, j in enumerate(idxs.tolist()):
+            j = int(j)
+            nm = self._short_names[j] if j < len(self._short_names) else _shorten_display_name(self._names[j])
+            v = float(sel_vals[row_i])
+            kind = self._kinds[j] if j < len(self._kinds) else _infer_valve_kind(self._names[j])
+            rows_data.append((nm, float(_clamp(v, 0.0, 1.0)), kind))
+        self.rows_canvas.set_rows(rows_data)
 
-class _HeatCell(QtWidgets.QFrame):
+class _HeatCell(QtWidgets.QWidget):
     def __init__(self, corner: str):
         super().__init__()
-        self.corner = corner
-        self.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.corner = str(corner)
         self.setObjectName(f"heatCell_{corner}")
         self.setMinimumSize(92, 54)
         self.setMaximumHeight(60)
-
-        lay = QtWidgets.QVBoxLayout(self)
-        lay.setContentsMargins(6, 6, 6, 6)
-        lay.setSpacing(2)
-
-        self.lbl_corner = QtWidgets.QLabel(corner)
-        self.lbl_corner.setStyleSheet("font-weight:700;")
-        self.lbl_val = QtWidgets.QLabel("--")
-        self.lbl_val.setStyleSheet("font-family:Consolas,Menlo,monospace;")
-
-        lay.addWidget(self.lbl_corner)
-        lay.addWidget(self.lbl_val)
-
-        # default bg
-        self.setStyleSheet("QFrame{background-color: rgb(40,40,40); border-radius:8px;}")
+        try:
+            self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)
+        except Exception:
+            pass
+        self._value_text = "--"
+        self._style_key: Optional[tuple[int, int, int, int, int, int]] = None
+        self._bg_color = QtGui.QColor(40, 40, 40)
+        self._fg_color = QtGui.QColor(235, 235, 235)
+        self._border_color = QtGui.QColor(26, 28, 34, 150)
 
     def set_value(self, value: float, *, text: str, u: float):
         rgb = _heat_rgb(u)
         tr, tg, tb = _bg_text_rgb(rgb)
-        self.setStyleSheet(
-            f"QFrame{{background-color: rgb({rgb[0]},{rgb[1]},{rgb[2]}); border-radius:8px;}}"
+        style_key = (int(rgb[0]), int(rgb[1]), int(rgb[2]), int(tr), int(tg), int(tb))
+        changed = False
+        if style_key != self._style_key:
+            self._bg_color = QtGui.QColor(int(rgb[0]), int(rgb[1]), int(rgb[2]))
+            self._fg_color = QtGui.QColor(int(tr), int(tg), int(tb))
+            self._style_key = style_key
+            changed = True
+        if str(text) != self._value_text:
+            self._value_text = str(text)
+            changed = True
+        if changed:
+            self.update()
+
+    def paintEvent(self, _event: QtGui.QPaintEvent):  # type: ignore[override]
+        p = QtGui.QPainter(self)
+        rect = QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        p.setPen(QtGui.QPen(self._border_color, 1.0))
+        p.setBrush(QtGui.QBrush(self._bg_color))
+        p.drawRoundedRect(rect, 8.0, 8.0)
+
+        p.setPen(self._fg_color)
+        font_corner = p.font()
+        try:
+            font_corner.setBold(True)
+            font_corner.setPointSize(max(8, int(font_corner.pointSize())))
+        except Exception:
+            pass
+        p.setFont(font_corner)
+        p.drawText(
+            QtCore.QRectF(rect.left() + 8.0, rect.top() + 6.0, rect.width() - 16.0, 16.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            self.corner,
         )
-        self.lbl_corner.setStyleSheet(f"font-weight:700; color: rgb({tr},{tg},{tb});")
-        self.lbl_val.setStyleSheet(f"font-family:Consolas,Menlo,monospace; color: rgb({tr},{tg},{tb});")
-        self.lbl_val.setText(text)
+
+        font_val = p.font()
+        try:
+            font_val.setBold(False)
+            font_val.setPointSize(max(8, int(font_val.pointSize()) - 1))
+            font_val.setFamilies(["Consolas", "Menlo", "DejaVu Sans Mono"])
+        except Exception:
+            pass
+        p.setFont(font_val)
+        p.drawText(
+            QtCore.QRectF(rect.left() + 8.0, rect.top() + 24.0, rect.width() - 16.0, rect.height() - 30.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            self._value_text,
+        )
 
 
 class CornerHeatmapPanel(QtWidgets.QWidget):
@@ -7090,6 +9189,8 @@ class CornerHeatmapPanel(QtWidgets.QWidget):
         self._max_override = 0.0
         self._ranges: Dict[str, float] = {}
         self._b: Optional[DataBundle] = None
+        self._bundle_key: Optional[int] = None
+        self._corner_metric_cache: Dict[str, Dict[str, Any]] = {}
 
         outer = QtWidgets.QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -7166,6 +9267,7 @@ class CornerHeatmapPanel(QtWidgets.QWidget):
 
     def set_bundle(self, b: DataBundle):
         self._b = b
+        self._bundle_key = id(b)
         # Precompute robust max for each metric (shared across corners)
         self._ranges = {}
         for key, _label, _unit in self.METRICS:
@@ -7211,9 +9313,30 @@ class CornerHeatmapPanel(QtWidgets.QWidget):
                 mx = 1.0
             self._ranges[key] = float(mx)
 
+        corner_cache = _ensure_corner_signal_cache(b)
+        metric_cache: Dict[str, Dict[str, Any]] = {}
+        for c in CORNERS:
+            sig = corner_cache.get(str(c), {})
+            acc = corner_acceptance_arrays(b, c)
+            metric_cache[str(c)] = {
+                "az_body": np.asarray(sig.get("ab", np.zeros((0,), dtype=float)), dtype=float),
+                "az_wheel": np.asarray(sig.get("aw", np.zeros((0,), dtype=float)), dtype=float),
+                "zw": np.asarray(sig.get("zw", np.zeros((0,), dtype=float)), dtype=float),
+                "zb": np.asarray(sig.get("zb", np.zeros((0,), dtype=float)), dtype=float),
+                "zr": None if sig.get("zr") is None else np.asarray(sig.get("zr"), dtype=float),
+                "stroke": np.asarray(sig.get("stroke", np.zeros((0,), dtype=float)), dtype=float),
+                "tireF": np.asarray(sig.get("tireF", np.zeros((0,), dtype=float)), dtype=float),
+                "air": np.asarray(sig.get("air", np.zeros((0,), dtype=float)), dtype=float),
+                "frame_road_m": None if not acc.get("ok", False) else np.asarray(acc["frame_road_m"], dtype=float),
+                "invariant_err_m": None if not acc.get("ok", False) else np.asarray(acc["invariant_err_m"], dtype=float),
+                "xy_err_wheel_road_m": None if not acc.get("ok", False) else np.asarray(acc["xy_err_wheel_road_m"], dtype=float),
+            }
+        self._corner_metric_cache = metric_cache
         self._update_max_from_ranges()
 
     def update_frame(self, b: DataBundle, i: int):
+        if int(getattr(self, "_bundle_key", 0) or 0) != id(b) or not self._corner_metric_cache:
+            self.set_bundle(b)
         key = self._metric
         # determine max range
         if self._auto:
@@ -7223,63 +9346,62 @@ class CornerHeatmapPanel(QtWidgets.QWidget):
         mv = mv if mv > 1e-12 else 1.0
 
         for c in CORNERS:
+            cache = self._corner_metric_cache.get(str(c), {})
             v = 0.0
             if key == "az_body":
-                v = float(b.frame_corner_a(c, default=0.0)[i])
+                arr = cache.get("az_body")
+                v = float(arr[i]) if isinstance(arr, np.ndarray) and i < arr.size else 0.0
                 txt = f"{v:+.2f}"
                 u = abs(v) / mv
             elif key == "az_wheel":
-                v = float(b.get(f"ускорение_колеса_{c}_м_с2", 0.0)[i])
+                arr = cache.get("az_wheel")
+                v = float(arr[i]) if isinstance(arr, np.ndarray) and i < arr.size else 0.0
                 txt = f"{v:+.2f}"
                 u = abs(v) / mv
             elif key == "wheel_road":
-                zw = float(b.get(f"перемещение_колеса_{c}_м", 0.0)[i])
-                road_arr = b.road_series(c)
-                zr = float(road_arr[i]) if road_arr is not None else float("nan")
+                zw_arr = cache.get("zw")
+                zw = float(zw_arr[i]) if isinstance(zw_arr, np.ndarray) and i < zw_arr.size else 0.0
+                road_arr = cache.get("zr")
+                zr = float(road_arr[i]) if isinstance(road_arr, np.ndarray) and i < road_arr.size else float("nan")
                 v = zw - zr
                 txt = f"{v:+.3f}"
                 u = abs(v) / mv
             elif key == "wheel_body":
-                zw = float(b.get(f"перемещение_колеса_{c}_м", 0.0)[i])
-                zb = float(b.frame_corner_z(c, default=0.0)[i])
+                zw_arr = cache.get("zw")
+                zb_arr = cache.get("zb")
+                zw = float(zw_arr[i]) if isinstance(zw_arr, np.ndarray) and i < zw_arr.size else 0.0
+                zb = float(zb_arr[i]) if isinstance(zb_arr, np.ndarray) and i < zb_arr.size else 0.0
                 v = zw - zb
                 txt = f"{v:+.3f}"
                 u = abs(v) / mv
             elif key == "frame_road":
-                acc = corner_acceptance_arrays(b, c)
-                if acc.get("ok", False):
-                    v = float(np.asarray(acc["frame_road_m"], dtype=float)[i])
-                else:
-                    v = float("nan")
+                arr = cache.get("frame_road_m")
+                v = float(arr[i]) if isinstance(arr, np.ndarray) and i < arr.size else float("nan")
                 txt = "—" if not np.isfinite(v) else f"{v:+.3f}"
                 u = 0.0 if not np.isfinite(v) else abs(v) / mv
             elif key == "inv_sum":
-                acc = corner_acceptance_arrays(b, c)
-                if acc.get("ok", False):
-                    v = float(np.asarray(acc["invariant_err_m"], dtype=float)[i]) * 1000.0
-                else:
-                    v = float("nan")
+                arr = cache.get("invariant_err_m")
+                v = (float(arr[i]) * 1000.0) if isinstance(arr, np.ndarray) and i < arr.size else float("nan")
                 txt = "—" if not np.isfinite(v) else f"{v:.3f}"
                 u = 0.0 if not np.isfinite(v) else abs(v) / mv
             elif key == "triplet_xy":
-                acc = corner_acceptance_arrays(b, c)
-                if acc.get("ok", False):
-                    xy_wr = float(np.asarray(acc["xy_err_wheel_road_m"], dtype=float)[i])
-                    v = xy_wr * 1000.0
-                else:
-                    v = float("nan")
+                arr = cache.get("xy_err_wheel_road_m")
+                v = (float(arr[i]) * 1000.0) if isinstance(arr, np.ndarray) and i < arr.size else float("nan")
                 txt = "—" if not np.isfinite(v) else f"{v:.3f}"
                 u = 0.0 if not np.isfinite(v) else abs(v) / mv
             elif key == "stroke":
-                v = float(b.get(f"положение_штока_{c}_м", 0.0)[i])
+                arr = cache.get("stroke")
+                v = float(arr[i]) if isinstance(arr, np.ndarray) and i < arr.size else 0.0
                 txt = f"{v:.3f}"
                 u = abs(v) / mv
             elif key == "tireF":
-                v = float(b.get(f"нормальная_сила_шины_{c}_Н", 0.0)[i])
+                arr = cache.get("tireF")
+                v = float(arr[i]) if isinstance(arr, np.ndarray) and i < arr.size else 0.0
                 txt = f"{v/1000.0:.1f}k"
                 u = abs(v) / mv
             elif key == "wheel_air":
-                v = float(b.get(f"колесо_в_воздухе_{c}", 0.0)[i])
+                arr = cache.get("air")
+                v = float(arr[i]) if isinstance(arr, np.ndarray) and i < arr.size else 0.0
                 txt = "AIR" if v > 0.5 else "OK"
                 u = 1.0 if v > 0.5 else 0.0
             else:
@@ -7309,6 +9431,7 @@ class TelemetryPanel(QtWidgets.QWidget):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None, *, compact: bool = False):
         super().__init__(parent)
         self.compact = bool(compact)
+        self._compact_dock_mode = False
         self.lbl_zcm: Optional[QtWidgets.QLabel] = None
         self.lbl_vzcm: Optional[QtWidgets.QLabel] = None
         self.lbl_azcm: Optional[QtWidgets.QLabel] = None
@@ -7338,6 +9461,7 @@ class TelemetryPanel(QtWidgets.QWidget):
         lay_sum = QtWidgets.QGridLayout(gb_sum)
         lay_sum.setHorizontalSpacing(10)
         lay_sum.setVerticalSpacing(2)
+        self.gb_sum = gb_sum
 
         self.lbl_t = QtWidgets.QLabel("t = —")
         self.lbl_v = QtWidgets.QLabel("vx = —")
@@ -7371,6 +9495,7 @@ class TelemetryPanel(QtWidgets.QWidget):
         lay_vis = QtWidgets.QGridLayout(gb_vis)
         lay_vis.setHorizontalSpacing(8)
         lay_vis.setVerticalSpacing(2)
+        self.gb_vis = gb_vis
 
         self.cb_show_acc = QtWidgets.QCheckBox("ускорения (a)")
         self.cb_show_acc.setChecked(True)
@@ -7458,6 +9583,7 @@ class TelemetryPanel(QtWidgets.QWidget):
         lay_pq.setContentsMargins(6, 6, 6, 6)
         lay_pq.setHorizontalSpacing(10)
         lay_pq.setVerticalSpacing(6)
+        self.gb_pq = gb_pq
 
         self.press_quick = PressureQuickPanel()
         self.valve_quick = ValveQuickPanel(max_rows=8, thr=0.05)
@@ -7604,6 +9730,7 @@ class TelemetryPanel(QtWidgets.QWidget):
         # emit initial config once (safe even if no receivers yet)
         QtCore.QTimer.singleShot(0, self._on_auto_scale_changed)
         QtCore.QTimer.singleShot(0, self._emit_visual)
+        self.set_compact_dock_mode(False)
 
     def current_visual(self) -> Dict[str, Any]:
         return {
@@ -7622,6 +9749,45 @@ class TelemetryPanel(QtWidgets.QWidget):
             "gl_road": bool(self.cb_3d_road.isChecked()),
             "gl_vectors": bool(self.cb_3d_vec.isChecked()),
         }
+
+    def set_compact_dock_mode(self, compact: bool) -> None:
+        compact = bool(compact)
+        if compact == bool(getattr(self, "_compact_dock_mode", False)):
+            return
+        self._compact_dock_mode = compact
+        max_h = 280 if compact else 16777215
+        vpol = QtWidgets.QSizePolicy.Maximum if compact else QtWidgets.QSizePolicy.Preferred
+        try:
+            self.lbl_title.setVisible(not compact)
+        except Exception:
+            pass
+        try:
+            self.setMaximumHeight(max_h)
+            self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, vpol)
+        except Exception:
+            pass
+        for gb_name, compact_h in (("gb_sum", 132), ("gb_vis", 132), ("gb_pq", 136)):
+            gb = getattr(self, gb_name, None)
+            if gb is None:
+                continue
+            try:
+                gb.setMaximumHeight(compact_h if compact else 16777215)
+                gb.setSizePolicy(QtWidgets.QSizePolicy.Preferred, vpol)
+            except Exception:
+                pass
+        for child_name in ("press_quick", "valve_quick", "flow_quick", "tank_gauge"):
+            child = getattr(self, child_name, None)
+            if child is None or not hasattr(child, "set_compact_mode"):
+                continue
+            try:
+                getattr(child, "set_compact_mode")(compact)
+            except Exception:
+                pass
+        try:
+            self.updateGeometry()
+            self.adjustSize()
+        except Exception:
+            pass
 
     def _emit_visual(self):
         try:
@@ -7722,27 +9888,27 @@ class TelemetryPanel(QtWidgets.QWidget):
             R = vx / yaw_rate
         a_c = ay
 
-        self.lbl_t.setText(f"t = {_fmt(t, ' s', digits=3)}")
-        self.lbl_v.setText(f"vx = {_fmt(vx, ' m/s', digits=2)}")
-        self.lbl_vkmh.setText(f"v = {_fmt(v_mps * 3.6, ' km/h', digits=1)}")
-        self.lbl_ax.setText(f"ax = {_fmt(ax, ' m/s²', digits=2)}")
-        self.lbl_ay.setText(f"ay = {_fmt(ay, ' m/s²', digits=2)}")
-        self.lbl_yaw.setText(f"yaw = {_fmt(np.degrees(yaw), '°', digits=1)}")
-        self.lbl_yawr.setText(f"yaw_rate = {_fmt(np.degrees(yaw_rate), '°/s', digits=2)}")
-        self.lbl_R.setText("R = —" if not np.isfinite(R) else f"R = {_fmt(R, ' m', digits=1)}")
-        self.lbl_ac.setText(f"a_c = {_fmt(a_c, ' m/s²', digits=2)}")
-        self.lbl_roll.setText(f"roll = {_fmt(np.degrees(roll), '°', digits=2)}")
-        self.lbl_pitch.setText(f"pitch = {_fmt(np.degrees(pitch), '°', digits=2)}")
+        _set_label_text_if_changed(self.lbl_t, f"t = {_fmt(t, ' s', digits=3)}")
+        _set_label_text_if_changed(self.lbl_v, f"vx = {_fmt(vx, ' m/s', digits=2)}")
+        _set_label_text_if_changed(self.lbl_vkmh, f"v = {_fmt(v_mps * 3.6, ' km/h', digits=1)}")
+        _set_label_text_if_changed(self.lbl_ax, f"ax = {_fmt(ax, ' m/s²', digits=2)}")
+        _set_label_text_if_changed(self.lbl_ay, f"ay = {_fmt(ay, ' m/s²', digits=2)}")
+        _set_label_text_if_changed(self.lbl_yaw, f"yaw = {_fmt(np.degrees(yaw), '°', digits=1)}")
+        _set_label_text_if_changed(self.lbl_yawr, f"yaw_rate = {_fmt(np.degrees(yaw_rate), '°/s', digits=2)}")
+        _set_label_text_if_changed(self.lbl_R, "R = —" if not np.isfinite(R) else f"R = {_fmt(R, ' m', digits=1)}")
+        _set_label_text_if_changed(self.lbl_ac, f"a_c = {_fmt(a_c, ' m/s²', digits=2)}")
+        _set_label_text_if_changed(self.lbl_roll, f"roll = {_fmt(np.degrees(roll), '°', digits=2)}")
+        _set_label_text_if_changed(self.lbl_pitch, f"pitch = {_fmt(np.degrees(pitch), '°', digits=2)}")
 
         zcm = float(b.get("перемещение_рамы_z_м", 0.0)[i])
         vzcm = float(b.get("скорость_рамы_z_м_с", 0.0)[i])
         azcm = float(b.get("ускорение_рамы_z_м_с2", 0.0)[i])
         if self.lbl_zcm is not None:
-            self.lbl_zcm.setText(f"z_cm = {_fmt(zcm, ' m', digits=3)}")
+            _set_label_text_if_changed(self.lbl_zcm, f"z_cm = {_fmt(zcm, ' m', digits=3)}")
         if self.lbl_vzcm is not None:
-            self.lbl_vzcm.setText(f"vz_cm = {_fmt(vzcm, ' m/s', digits=3)}")
+            _set_label_text_if_changed(self.lbl_vzcm, f"vz_cm = {_fmt(vzcm, ' m/s', digits=3)}")
         if self.lbl_azcm is not None:
-            self.lbl_azcm.setText(f"az_cm = {_fmt(azcm, ' m/s²', digits=2)}")
+            _set_label_text_if_changed(self.lbl_azcm, f"az_cm = {_fmt(azcm, ' m/s²', digits=2)}")
 
         if self.corner_table is not None:
             self.corner_table.update_frame(b, i)
@@ -7917,21 +10083,31 @@ class CockpitWidget(QtWidgets.QWidget):
         self.layout_mode = str(layout_mode).strip().lower()
         self.bundle: Optional[DataBundle] = None
         self._last_i: int = 0
+        self._playback_sample_t_s: float | None = None
         # Performance policy: the main 3D view owns the playback budget.
         # Auxiliary panes must stay readable, but they must not compete with the 3D
         # renderer for every GUI tick.  We therefore keep only HUD-class overlays in
         # the fast lane and move the axle/side views into the slower lane.
-        self._aux_play_fast_fps: float = 10.0
-        self._aux_play_slow_fps: float = 3.0
-        self._aux_many_fast_fps: float = 6.0
-        self._aux_many_slow_fps: float = 1.5
-        self._many_visible_threshold: int = 6
+        self._aux_play_fast_fps: float = 24.0
+        self._aux_play_slow_fps: float = 12.0
+        self._aux_scrub_fast_fps: float = 30.0
+        self._aux_scrub_slow_fps: float = 4.0
+        self._interactive_scrub_slow_batch_size: int = 2
+        self._interactive_scrub_slow_rr_cursor: int = 0
+        self._interactive_scrub_release_only_docks: Set[str] = {
+            "dock_corner_table",
+            "dock_road_profile",
+        }
+        self._aux_many_fast_fps: float = 18.0
+        self._aux_many_slow_fps: float = 10.0
+        self._many_visible_threshold: int = 12
         self._aux_fast_last_ts: float = 0.0
         self._aux_slow_last_ts: float = 0.0
         self._playback_perf_mode_active: bool = False
         self._aux_cadence_stats: Dict[str, Dict[str, float]] = {}
         self._aux_cadence_window_started_ts: float = 0.0
         self._aux_cadence_emit_period_s: float = 1.5
+        self._aux_cadence_tracking_active: bool = False
         self._external_windows: Dict[str, ExternalPanelWindow] = {}
         self._external_window_actions: Dict[str, QtGui.QAction] = {}
         self._external_window_settings_key_prefix: str = "window/panel_external/"
@@ -8156,6 +10332,14 @@ class CockpitWidget(QtWidgets.QWidget):
                 pass
             try:
                 dock.visibilityChanged.connect(lambda visible, _name=str(obj_name): self._on_dock_visibility_changed(_name, bool(visible)))
+            except Exception:
+                pass
+            try:
+                if hasattr(widget, "set_compact_dock_mode"):
+                    getattr(widget, "set_compact_dock_mode")(not bool(dock.isFloating()))
+                    dock.topLevelChanged.connect(
+                        lambda floating, _widget=widget: getattr(_widget, "set_compact_dock_mode")(not bool(floating))
+                    )
             except Exception:
                 pass
             return dock
@@ -8391,6 +10575,8 @@ class CockpitWidget(QtWidgets.QWidget):
         window = dict(getattr(self, "_external_windows", {}) or {}).get(name)
         if window is None:
             return
+        docks = dict(getattr(self, "_docks", {}) or {})
+        dock = docks.get(name)
         live_widget = dict(getattr(self, "_dock_live_widgets", {}) or {}).get(name)
         host_layout = dict(getattr(self, "_dock_live_host_layouts", {}) or {}).get(name)
         placeholder = dict(getattr(self, "_dock_detached_placeholders", {}) or {}).get(name)
@@ -8432,6 +10618,11 @@ class CockpitWidget(QtWidgets.QWidget):
                 window.set_panel_widget(live_widget)
             except Exception:
                 pass
+            try:
+                if hasattr(live_widget, "set_compact_dock_mode"):
+                    getattr(live_widget, "set_compact_dock_mode")(False)
+            except Exception:
+                pass
             self._dock_external_mode[name] = True
         else:
             try:
@@ -8461,6 +10652,11 @@ class CockpitWidget(QtWidgets.QWidget):
                     pass
             try:
                 live_widget.show()
+            except Exception:
+                pass
+            try:
+                if hasattr(live_widget, "set_compact_dock_mode"):
+                    getattr(live_widget, "set_compact_dock_mode")(not bool(dock.isFloating()) if dock is not None else True)
             except Exception:
                 pass
             self._dock_external_mode[name] = False
@@ -8888,7 +11084,7 @@ class CockpitWidget(QtWidgets.QWidget):
         if enabled == bool(self._playback_perf_mode_active):
             return
         self._playback_perf_mode_active = enabled
-        for panel in (self.sideL, self.sideR, self.hud):
+        for panel in (self.axleF, self.axleR, self.sideL, self.sideR, self.hud):
             try:
                 panel.set_playback_perf_mode(enabled)
             except Exception:
@@ -9082,6 +11278,11 @@ class CockpitWidget(QtWidgets.QWidget):
         self.axleR.set_geometry(self.geom)
         self.sideL.set_geometry(self.geom)
         self.sideR.set_geometry(self.geom)
+        for panel in (self.axleF, self.axleR, self.sideL, self.sideR):
+            try:
+                panel.set_bundle(b)
+            except Exception:
+                pass
         try:
             self.hud.set_geometry(self.geom)
         except Exception:
@@ -9307,46 +11508,50 @@ class CockpitWidget(QtWidgets.QWidget):
             except Exception:
                 pass
 
-    def update_frame(self, i: int, *, playing: bool = False):
+    def set_playback_sample_t(self, sample_t: float | None) -> None:
+        if sample_t is None:
+            self._playback_sample_t_s = None
+            return
+        try:
+            ts = float(sample_t)
+        except Exception:
+            self._playback_sample_t_s = None
+            return
+        self._playback_sample_t_s = ts if np.isfinite(ts) else None
+
+    def reset_interactive_scrub_budget(self) -> None:
+        self._interactive_scrub_slow_rr_cursor = 0
+        self._aux_fast_last_ts = 0.0
+        self._aux_slow_last_ts = float(time.perf_counter())
+
+    def _take_interactive_scrub_slow_batch(
+        self,
+        entries: List[Tuple[str, Any, str]],
+    ) -> tuple[List[Tuple[str, Any, str]], bool]:
+        if not entries:
+            self._interactive_scrub_slow_rr_cursor = 0
+            return [], True
+        n = int(len(entries))
+        batch_size = int(max(1, min(int(getattr(self, "_interactive_scrub_slow_batch_size", 3)), n)))
+        start = int(getattr(self, "_interactive_scrub_slow_rr_cursor", 0)) % n
+        batch = [entries[(start + k) % n] for k in range(batch_size)]
+        cursor = (start + batch_size) % n
+        self._interactive_scrub_slow_rr_cursor = cursor
+        return batch, cursor == 0
+
+    def flush_interactive_scrub_detail_batch(self, i: int, *, sample_t: float | None = None) -> bool:
         b = self.bundle
         if b is None:
-            return
+            return True
         n = len(b.t)
         if n <= 0:
-            return
-        i = int(_clamp(int(i), 0, n - 1))
-        self._last_i = i
-
+            return True
+        idx = int(_clamp(int(i), 0, n - 1))
+        self._last_i = idx
+        self.set_playback_sample_t(sample_t if sample_t is not None else float(np.asarray(b.t, dtype=float)[idx]))
         now_ts = float(time.perf_counter())
-        visible_aux = int(self._visible_aux_dock_count()) if bool(playing) else 0
-        many_visible_budget = bool(playing) and visible_aux >= int(getattr(self, "_many_visible_threshold", 10))
-        self._apply_playback_perf_mode(many_visible_budget)
-        if self.car3d is not None:
-            try:
-                self.car3d.set_playback_state(bool(playing))
-            except Exception:
-                pass
-        if not bool(playing):
-            fast_due = True
-            slow_due = True
-            self._aux_fast_last_ts = now_ts
-            self._aux_slow_last_ts = now_ts
-        else:
-            fast_fps = self._aux_many_fast_fps if many_visible_budget else self._aux_play_fast_fps
-            slow_fps = self._aux_many_slow_fps if many_visible_budget else self._aux_play_slow_fps
-            fast_period = 1.0 / float(max(0.5, fast_fps))
-            slow_period = 1.0 / float(max(0.5, slow_fps))
-            fast_due = (now_ts - float(self._aux_fast_last_ts)) >= fast_period
-            slow_due = (now_ts - float(self._aux_slow_last_ts)) >= slow_period
 
-        fast_panels: List[Tuple[str, Any, str]] = [
-            ("dock_hud", self.hud, "update_frame"),
-        ]
         slow_panels: List[Tuple[str, Any, str]] = [
-            ("dock_front", self.axleF, "update_frame"),
-            ("dock_rear", self.axleR, "update_frame"),
-            ("dock_left", self.sideL, "update_frame"),
-            ("dock_right", self.sideR, "update_frame"),
             ("dock_telemetry", self.telemetry, "update_frame"),
             ("dock_heatmap", getattr(self, "telemetry_heatmap", None), "update_frame"),
             ("dock_corner_quick", getattr(self, "telemetry_corner_quick", None), "update_frame"),
@@ -9356,6 +11561,130 @@ class CockpitWidget(QtWidgets.QWidget):
             ("dock_flows", getattr(self, "telemetry_flow_panel", None), "update_frame"),
             ("dock_valves", getattr(self, "telemetry_valve_panel", None), "update_frame"),
         ]
+        visible: List[Tuple[str, Any, str]] = []
+        for dock_name, panel, method_name in slow_panels:
+            if panel is None or not hasattr(panel, method_name):
+                continue
+            if not self._dock_is_exposed(dock_name):
+                continue
+            visible.append((dock_name, panel, method_name))
+
+        batch, done = self._take_interactive_scrub_slow_batch(visible)
+        for dock_name, panel, method_name in batch:
+            try:
+                _call_with_qt_update_batch(
+                    panel,
+                    lambda panel=panel, method_name=method_name: getattr(panel, method_name)(b, idx),
+                )
+                self._record_aux_cadence(str(dock_name), now_ts)
+            except Exception:
+                pass
+
+        if self._dock_is_exposed("dock_timeline"):
+            try:
+                _call_with_qt_update_batch(
+                    self.timeline,
+                    lambda: self.timeline.set_index(idx),
+                )
+                self._record_aux_cadence("dock_timeline", now_ts)
+            except Exception:
+                pass
+        if self._dock_is_exposed("dock_trends"):
+            try:
+                _call_with_qt_update_batch(
+                    self.trends,
+                    lambda: self.trends.update_frame(idx),
+                )
+                self._record_aux_cadence("dock_trends", now_ts)
+            except Exception:
+                pass
+        if done:
+            self._apply_playback_perf_mode(False)
+            self._aux_cadence_tracking_active = False
+            self._emit_aux_cadence_metrics(
+                now_ts,
+                playing=False,
+                many_visible_budget=False,
+                force=True,
+            )
+        return bool(done)
+
+    def update_frame(
+        self,
+        i: int,
+        *,
+        playing: bool = False,
+        sample_t: float | None = None,
+        interactive_scrub: bool = False,
+    ):
+        b = self.bundle
+        if b is None:
+            return
+        n = len(b.t)
+        if n <= 0:
+            return
+        self.set_playback_sample_t(sample_t if sample_t is not None else float(np.asarray(b.t, dtype=float)[int(_clamp(int(i), 0, n - 1))]))
+        i = int(_clamp(int(i), 0, n - 1))
+        self._last_i = i
+
+        now_ts = float(time.perf_counter())
+        interactive_scrub = bool(interactive_scrub) and not bool(playing)
+        track_aux_cadence = bool(playing or interactive_scrub)
+        visible_aux = int(self._visible_aux_dock_count()) if (bool(playing) or interactive_scrub) else 0
+        many_visible_budget = (bool(playing) or interactive_scrub) and visible_aux >= int(getattr(self, "_many_visible_threshold", 10))
+        self._apply_playback_perf_mode(many_visible_budget)
+        if self.car3d is not None:
+            try:
+                self.car3d.set_playback_state(bool(playing))
+            except Exception:
+                pass
+        if not bool(playing) and not interactive_scrub:
+            fast_due = True
+            slow_due = True
+            self._aux_fast_last_ts = now_ts
+            self._aux_slow_last_ts = now_ts
+        else:
+            if bool(playing):
+                fast_fps = self._aux_many_fast_fps if many_visible_budget else self._aux_play_fast_fps
+                slow_fps = self._aux_many_slow_fps if many_visible_budget else self._aux_play_slow_fps
+            else:
+                fast_fps = min(self._aux_scrub_fast_fps, self._aux_many_fast_fps) if many_visible_budget else self._aux_scrub_fast_fps
+                slow_fps = min(self._aux_scrub_slow_fps, self._aux_many_slow_fps) if many_visible_budget else self._aux_scrub_slow_fps
+            fast_period = 1.0 / float(max(0.5, fast_fps))
+            slow_period = 1.0 / float(max(0.5, slow_fps))
+            fast_due = (now_ts - float(self._aux_fast_last_ts)) >= fast_period
+            slow_due = (now_ts - float(self._aux_slow_last_ts)) >= slow_period
+
+        fast_panels: List[Tuple[str, Any, str]] = [
+            ("dock_hud", self.hud, "update_frame"),
+        ]
+        slow_panels: List[Tuple[str, Any, str]] = [
+            ("dock_telemetry", self.telemetry, "update_frame"),
+            ("dock_heatmap", getattr(self, "telemetry_heatmap", None), "update_frame"),
+            ("dock_corner_quick", getattr(self, "telemetry_corner_quick", None), "update_frame"),
+            ("dock_road_profile", getattr(self, "telemetry_road_profile", None), "update_frame"),
+            ("dock_corner_table", getattr(self, "telemetry_corner_table", None), "update_frame"),
+            ("dock_pressures", getattr(self, "telemetry_press_panel", None), "update_frame"),
+            ("dock_flows", getattr(self, "telemetry_flow_panel", None), "update_frame"),
+            ("dock_valves", getattr(self, "telemetry_valve_panel", None), "update_frame"),
+        ]
+        if interactive_scrub:
+            fast_panels.extend(
+                [
+                    ("dock_front", self.axleF, "update_frame"),
+                    ("dock_rear", self.axleR, "update_frame"),
+                    ("dock_left", self.sideL, "update_frame"),
+                    ("dock_right", self.sideR, "update_frame"),
+                ]
+            )
+        else:
+            slow_panels = [
+                ("dock_front", self.axleF, "update_frame"),
+                ("dock_rear", self.axleR, "update_frame"),
+                ("dock_left", self.sideL, "update_frame"),
+                ("dock_right", self.sideR, "update_frame"),
+                *slow_panels,
+            ]
 
         def _visible_panel_entries(entries: List[Tuple[str, Any, str]]) -> List[Tuple[str, Any, str]]:
             out: List[Tuple[str, Any, str]] = []
@@ -9370,13 +11699,39 @@ class CockpitWidget(QtWidgets.QWidget):
         def _call_panel(entry: Tuple[str, Any, str]) -> None:
             dock_name, panel, method_name = entry
             try:
-                getattr(panel, method_name)(b, i)
-                self._record_aux_cadence(str(dock_name), now_ts)
+                def _update_panel() -> None:
+                    if panel in (self.hud, self.axleF, self.axleR, self.sideL, self.sideR):
+                        getattr(panel, method_name)(
+                            b,
+                            i,
+                            sample_t=self._playback_sample_t_s if bool(playing) else None,
+                        )
+                    else:
+                        getattr(panel, method_name)(b, i)
+
+                _call_with_qt_update_batch(
+                    panel,
+                    _update_panel,
+                )
+                if track_aux_cadence:
+                    self._record_aux_cadence(str(dock_name), now_ts)
+            except Exception:
+                pass
+
+        def _call_aux_widget(dock_name: str, widget: Any, fn: Callable[[], None]) -> None:
+            try:
+                _call_with_qt_update_batch(widget, fn)
+                if track_aux_cadence:
+                    self._record_aux_cadence(str(dock_name), now_ts)
             except Exception:
                 pass
 
         fast_visible = _visible_panel_entries(fast_panels)
         slow_visible = _visible_panel_entries(slow_panels)
+        if interactive_scrub:
+            release_only = set(getattr(self, "_interactive_scrub_release_only_docks", set()))
+            if release_only:
+                slow_visible = [entry for entry in slow_visible if str(entry[0]) not in release_only]
 
         if fast_due:
             self._aux_fast_last_ts = now_ts
@@ -9385,29 +11740,34 @@ class CockpitWidget(QtWidgets.QWidget):
 
         if slow_due:
             self._aux_slow_last_ts = now_ts
-            for entry in slow_visible:
+            slow_entries = slow_visible
+            if interactive_scrub:
+                slow_entries = []
+            for entry in slow_entries:
                 _call_panel(entry)
 
-            if self._dock_is_exposed("dock_timeline"):
-                try:
-                    self.timeline.set_index(i)
-                    self._record_aux_cadence("dock_timeline", now_ts)
-                except Exception:
-                    pass
-            if self._dock_is_exposed("dock_trends"):
-                try:
-                    self.trends.update_frame(i)
-                    self._record_aux_cadence("dock_trends", now_ts)
-                except Exception:
-                    pass
-        if bool(playing) and (fast_due or slow_due):
+            if self._dock_is_exposed("dock_timeline") and not interactive_scrub:
+                _call_aux_widget(
+                    "dock_timeline",
+                    self.timeline,
+                    lambda: self.timeline.set_index(i),
+                )
+            if self._dock_is_exposed("dock_trends") and not interactive_scrub:
+                _call_aux_widget(
+                    "dock_trends",
+                    self.trends,
+                    lambda: self.trends.update_frame(i),
+                )
+        if track_aux_cadence and (fast_due or slow_due):
+            self._aux_cadence_tracking_active = True
             self._emit_aux_cadence_metrics(
                 now_ts,
                 playing=bool(playing),
                 many_visible_budget=bool(many_visible_budget),
                 force=False,
             )
-        elif not bool(playing):
+        elif bool(getattr(self, "_aux_cadence_tracking_active", False)) and bool(getattr(self, "_aux_cadence_stats", {})):
+            self._aux_cadence_tracking_active = False
             self._emit_aux_cadence_metrics(
                 now_ts,
                 playing=False,
@@ -9415,7 +11775,11 @@ class CockpitWidget(QtWidgets.QWidget):
                 force=True,
             )
         if self.car3d is not None and self._dock_is_visible("dock_3d"):
-            self.car3d.update_frame(b, i)
+            self.car3d.update_frame(
+                b,
+                i,
+                sample_t=self._playback_sample_t_s if bool(playing) else None,
+            )
 
 # -----------------------------
 # Main Window + playback
@@ -9450,6 +11814,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._playing = False
         self._speed = 1.0
         self._repeat = False
+        self._interactive_scrub_active = False
         self._play_wall_ts = 0.0
         self._play_accum_s = 0.0
         self._play_cursor_t_s = 0.0
@@ -9459,7 +11824,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Persistent UI state (window geometry + (future) dock layout + a few runtime toggles)
         # On Windows this is stored in registry (good for "settings must not disappear").
         self._settings = QtCore.QSettings("UnifiedPneumoApp", "DesktopAnimator")
-        self._dock_layout_version = "r31al_display_rate_no_gl_hide_v1"
+        self._dock_layout_version = "r31cn_continuous_sampling_gl_native_v2"
         self._first_show_layout_pending = True
 
         self._timer = QtCore.QTimer(self)
@@ -9470,6 +11835,18 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
         self._timer.setInterval(16)
         self._timer.timeout.connect(self._tick)
+        self._scrub_release_timer = QtCore.QTimer(self)
+        self._scrub_release_timer.setSingleShot(True)
+        try:
+            self._scrub_release_timer.setTimerType(QtCore.Qt.PreciseTimer)
+        except Exception:
+            pass
+        self._scrub_release_timer.setInterval(12)
+        self._scrub_release_timer.timeout.connect(self._flush_scrub_release_batch)
+        self._scrub_release_pending = False
+        self._scrub_release_idx = 0
+        self._scrub_release_sample_t_s = 0.0
+        self._paused_seek_settle_delay_ms = 20
 
         self._make_toolbar()
         self._make_statusbar()
@@ -9497,15 +11874,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Startup policy:
         # - docks start attached for a clean first paint and normal Qt snapping/tabbing;
-        # - live 3D GL uses native dock/floating behaviour again, so it can re-attach to
+        # - live 3D GL uses native dock/floating mode again, so it can re-attach to
         #   other panels instead of being routed through a special safe window;
         # - if the user moves/resizes the live 3D panel during playback, playback is
-        #   auto-paused until the layout settles and then resumed from the current frame;
+        #   auto-paused, the 3D viewport is temporarily suspended until the layout settles,
+        #   and playback then resumes from the current frame;
         # - layout version is bumped so old persisted special-window state does not
         #   silently return after upgrade.
         try:
             _emit_animator_warning(
-                "Animator starts with docks attached. Live 3D GL uses native dock/floating mode; during layout churn playback auto-pauses, live repaints are suspended without hide/show, and playback resumes from the current frame once the dock settles.",
+                "Animator starts with docks attached. Live 3D GL uses native dock/floating mode again; during layout churn playback auto-pauses, the 3D viewport is temporarily suspended until the layout settles, live repaints stay in native dock/floating mode without hide/show, and playback resumes from the current frame once the dock settles.",
                 code="startup_native_gl_autopause_with_gl_suspend_on_layout",
             )
         except Exception:
@@ -9662,6 +12040,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.slider.setMinimum(0)
         self.slider.setMaximum(0)
         self.slider.valueChanged.connect(self._slider_changed)
+        self.slider.sliderPressed.connect(self._slider_pressed)
+        self.slider.sliderReleased.connect(self._slider_released)
         self.slider.setMinimumWidth(520)
         tb.addWidget(QtWidgets.QLabel("  frame:"))
         tb.addWidget(self.slider)
@@ -9676,6 +12056,56 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _status(self, msg: str):
         self._status_label.setText(str(msg))
+
+    def _slider_pressed(self):
+        self._interactive_scrub_active = True
+        self._scrub_release_pending = False
+        try:
+            self._scrub_release_timer.stop()
+        except Exception:
+            pass
+        try:
+            self.cockpit.reset_interactive_scrub_budget()
+        except Exception:
+            pass
+
+    def _slider_released(self):
+        self._interactive_scrub_active = False
+        if self.bundle is None:
+            return
+        self._idx = int(self.slider.value())
+        self._play_cursor_t_s = self.current_time()
+        self._scrub_release_idx = int(self._idx)
+        self._scrub_release_sample_t_s = float(self._play_cursor_t_s)
+        self._scrub_release_pending = True
+        try:
+            self._scrub_release_timer.start(0)
+        except Exception:
+            self._flush_scrub_release_batch()
+
+    def _flush_scrub_release_batch(self):
+        if not bool(getattr(self, "_scrub_release_pending", False)):
+            return
+        if self.bundle is None:
+            self._scrub_release_pending = False
+            return
+        done = True
+        try:
+            done = bool(
+                self.cockpit.flush_interactive_scrub_detail_batch(
+                    int(self._scrub_release_idx),
+                    sample_t=float(self._scrub_release_sample_t_s),
+                )
+            )
+        except Exception:
+            done = True
+        if done:
+            self._scrub_release_pending = False
+        else:
+            try:
+                self._scrub_release_timer.start()
+            except Exception:
+                pass
 
     def _restore_persisted_state(self):
         """Restore small persistent UI state.
@@ -9740,8 +12170,13 @@ class MainWindow(QtWidgets.QMainWindow):
         # Follow mode
         try:
             flw = s.value("follow/enabled", None)
-            if flw is not None and hasattr(self, "cb_follow"):
-                self.cb_follow.setChecked(bool(int(flw)))
+            if flw is not None and hasattr(self, "act_follow"):
+                enabled = bool(int(flw))
+                blocked = self.act_follow.blockSignals(True)
+                self.act_follow.setChecked(enabled)
+                self.act_follow.blockSignals(blocked)
+                if self.pointer_watcher is not None:
+                    self._toggle_follow(enabled)
         except Exception:
             pass
 
@@ -9777,8 +12212,8 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
 
         try:
-            if hasattr(self, "cb_follow"):
-                s.setValue("follow/enabled", int(bool(self.cb_follow.isChecked())))
+            if hasattr(self, "act_follow"):
+                s.setValue("follow/enabled", int(bool(self.act_follow.isChecked())))
         except Exception:
             pass
 
@@ -9792,6 +12227,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 pass
             try:
                 self._timer.stop()
+            except Exception:
+                pass
+            try:
+                self._scrub_release_timer.stop()
             except Exception:
                 pass
             try:
@@ -9850,9 +12289,33 @@ class MainWindow(QtWidgets.QMainWindow):
     def _slider_changed(self, v: int):
         if self.bundle is None:
             return
+        self._scrub_release_pending = False
+        try:
+            self._scrub_release_timer.stop()
+        except Exception:
+            pass
         self._idx = int(v)
         self._play_cursor_t_s = self.current_time()
-        self._update_frame(self._idx)
+        interactive_scrub = bool(not self._playing and (self._interactive_scrub_active or self.slider.isSliderDown()))
+        coalesced_seek = bool(not self._playing and not interactive_scrub)
+        if coalesced_seek:
+            try:
+                self.cockpit.reset_interactive_scrub_budget()
+            except Exception:
+                pass
+        self._update_frame(
+            self._idx,
+            sample_t=self._play_cursor_t_s,
+            interactive_scrub=bool(interactive_scrub or coalesced_seek),
+        )
+        if coalesced_seek:
+            self._scrub_release_idx = int(self._idx)
+            self._scrub_release_sample_t_s = float(self._play_cursor_t_s)
+            self._scrub_release_pending = True
+            try:
+                self._scrub_release_timer.start(int(max(0, getattr(self, "_paused_seek_settle_delay_ms", 20))))
+            except Exception:
+                self._flush_scrub_release_batch()
         if self._playing:
             self._play_accum_s = 0.0
             self._play_cursor_t_s = self.current_time()
@@ -9875,13 +12338,13 @@ class MainWindow(QtWidgets.QMainWindow):
         # a display cadence and select the source frame from a continuous playhead time.
         speed = float(max(0.05, self._speed))
         if speed <= 1.0:
-            base_ms = 16.0  # ~60 Hz
+            base_ms = 12.0  # ~83 Hz keeps x1.0 visibly alive without source-frame chasing.
         elif speed <= 2.0:
-            base_ms = 12.0  # ~83 Hz service for faster playback
+            base_ms = 10.0  # ~100 Hz for moderate fast-forward.
         elif speed <= 4.0:
-            base_ms = 8.0
+            base_ms = 8.0   # ~125 Hz.
         else:
-            base_ms = 6.0
+            base_ms = 6.0   # ~166 Hz upper service cadence on Windows precise timer.
         return int(max(6, min(20, round(base_ms))))
 
     def _arm_next_playback_tick(self) -> None:
@@ -9985,24 +12448,34 @@ class MainWindow(QtWidgets.QMainWindow):
             self.slider.blockSignals(True)
             self.slider.setValue(int(self._idx))
             self.slider.blockSignals(False)
-            self._update_frame(int(self._idx))
+            self._update_frame(int(self._idx), sample_t=self._play_cursor_t_s if self._playing else None)
+        # Continuous playback sampling only helps if we actually redraw every service tick.
+        if self._playing:
+            self._update_frame(int(self._idx), sample_t=self._play_cursor_t_s)
         if not self._playing:
             self._refresh_after_playback_stop()
 
         if self._playing:
             self._arm_next_playback_tick()
 
-    def _update_frame(self, idx: int):
+    def _update_frame(self, idx: int, *, sample_t: float | None = None, interactive_scrub: bool = False):
         b = self.bundle
         if b is None:
             return
         n = len(b.t)
         idx = int(_clamp(idx, 0, n - 1))
+        sample_time = sample_t if (sample_t is not None and np.isfinite(float(sample_t))) else float(np.asarray(b.t, dtype=float)[idx])
+        self.cockpit.set_playback_sample_t(sample_time)
         self.lbl_frame.setText(f"{idx+1}/{n}")
-        self.cockpit.update_frame(idx, playing=bool(self._playing))
+        self.cockpit.update_frame(
+            idx,
+            playing=bool(self._playing),
+            sample_t=sample_time,
+            interactive_scrub=bool(interactive_scrub),
+        )
         # status line: time + speed
         try:
-            t = float(b.t[idx])
+            t = float(sample_time)
             vxw, vyw = b.ensure_world_velocity_xy()
             v = math.hypot(float(vxw[idx]), float(vyw[idx])) if len(vxw) > idx and len(vyw) > idx else float(abs(b.get("скорость_vx_м_с", 0.0)[idx]))
             self._status(f"t={t:.3f}s, v={v:.2f}m/s, file={b.npz_path.name}")
@@ -10017,6 +12490,11 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         self.bundle = b
+        self._scrub_release_pending = False
+        try:
+            self._scrub_release_timer.stop()
+        except Exception:
+            pass
         self.cockpit.set_bundle(b)
 
         n = len(b.t)
@@ -10031,7 +12509,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_play.setText("▶ Пуск")
         self._timer.stop()
 
-        self._update_frame(0)
+        self._play_cursor_t_s = float(np.asarray(b.t, dtype=float)[0]) if len(b.t) else 0.0
+        self._update_frame(0, sample_t=self._play_cursor_t_s)
         self._status(f"Loaded: {path}")
 
         # If follow mode is enabled, keep it.

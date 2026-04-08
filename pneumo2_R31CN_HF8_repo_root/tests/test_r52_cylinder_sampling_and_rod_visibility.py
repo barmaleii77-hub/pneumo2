@@ -67,9 +67,8 @@ def test_cylinder_visual_state_keeps_housing_on_frame_and_rod_runs_from_piston_t
     assert np.allclose(housing0, np.array([0.0, 0.0, 1.0], dtype=float), atol=1e-12)
     assert np.allclose(body0, np.array([0.0, 0.0, 1.0], dtype=float), atol=1e-12)
     assert np.allclose(body1, piston, atol=1e-12)
-    # Rod must be visible through the transparent housing, so it starts at the piston,
-    # not at the gland/external exit only.
-    assert np.allclose(rod0, piston, atol=1e-12)
+    # The opaque rod mesh represents only the exposed section outside the housing.
+    assert np.allclose(rod0, housing1, atol=1e-12)
     assert np.allclose(rod1, np.array([0.0, 0.0, 0.0], dtype=float), atol=1e-12)
     assert float(housing1[2]) < 1.0
     assert float(housing1[2]) > 0.0
@@ -105,5 +104,5 @@ def test_app_source_wires_playback_sampling_into_3d_renderer() -> None:
     assert 'sample_t=self._playback_sample_t_s if bool(playing) else None' in src
     assert '_sample_time_bracket(' in src
     assert '_orient_centered_cylinder_vertices_to_y(v_unit)' in src
-    assert '_rod_centerline_vertices_from_packaging_state(packaging_state)' in src
+    assert '_rod_internal_centerline_vertices_from_packaging_state(packaging_state)' in src
     assert 'self._cyl_rod_core_lines' in src

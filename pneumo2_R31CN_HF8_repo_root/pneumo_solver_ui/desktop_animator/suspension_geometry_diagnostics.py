@@ -118,6 +118,11 @@ def _min_arm_branch_offset(bundle: DataBundle, corner: str, cyl_kind: str) -> fl
 
 
 def collect_suspension_geometry_status(bundle: DataBundle, tol_m: float = 1e-9) -> dict[str, Any]:
+    cache_key = f"_suspension_geometry_status::{float(tol_m):.12g}"
+    cached = bundle._derived.get(cache_key)  # pylint: disable=protected-access
+    if isinstance(cached, dict):
+        return cached
+
     rows: list[CornerSuspensionSummary] = []
     issues: list[str] = []
     coincident_corners: list[str] = []
@@ -281,7 +286,7 @@ def collect_suspension_geometry_status(bundle: DataBundle, tol_m: float = 1e-9) 
             + ", ".join(cyl2_detached_corners)
         )
 
-    return {
+    out = {
         "ok": not issues,
         "issues": issues,
         "coincident_cylinder_corners": coincident_corners,
@@ -293,6 +298,8 @@ def collect_suspension_geometry_status(bundle: DataBundle, tol_m: float = 1e-9) 
         "cyl2_detached_corners": cyl2_detached_corners,
         "rows": [r.__dict__ for r in rows],
     }
+    bundle._derived[cache_key] = out  # pylint: disable=protected-access
+    return out
 
 
 def format_suspension_hud_lines(bundle: DataBundle, tol_m: float = 1e-9) -> list[str]:

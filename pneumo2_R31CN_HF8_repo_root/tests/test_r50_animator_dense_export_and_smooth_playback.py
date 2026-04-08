@@ -54,5 +54,6 @@ def test_desktop_animator_uses_continuous_playhead_and_redraws_every_service_tic
     assert "self._play_cursor_t_s = float(self._play_cursor_t_s) + wall_dt * float(max(0.05, self._speed))" in APP_TEXT
     assert "idx = int(np.searchsorted(t, float(self._play_cursor_t_s), side='left'))" in APP_TEXT
     assert "# Continuous playback sampling only helps if we actually redraw every service tick." in APP_TEXT
-    assert "if self._playing:\n            self._update_frame(int(self._idx))" in APP_TEXT
+    assert "if self._playing:\n            self._update_frame(int(self._idx), sample_t=self._play_cursor_t_s)" in APP_TEXT
     assert "self.cockpit.set_playback_sample_t(" in APP_TEXT
+    assert "interactive_scrub: bool = False" in APP_TEXT

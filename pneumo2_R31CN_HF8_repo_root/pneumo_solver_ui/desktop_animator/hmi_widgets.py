@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -50,6 +51,17 @@ def _robust_minmax(y: np.ndarray, *, p_lo: float = 1.0, p_hi: float = 99.0) -> T
         except Exception:
             lo, hi = -1.0, 1.0
     return lo, hi
+
+
+def _decimate_series_for_display(x: np.ndarray, y: np.ndarray, max_points: int) -> Tuple[np.ndarray, np.ndarray]:
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    n = int(min(x.size, y.size))
+    budget = int(max(2, max_points))
+    if n <= budget:
+        return x[:n], y[:n]
+    idx = np.unique(np.linspace(0, n - 1, budget, dtype=int))
+    return x[idx], y[idx]
 
 
 class SparklineWidget(QtWidgets.QWidget):
@@ -108,7 +120,10 @@ class SparklineWidget(QtWidgets.QWidget):
         self.update()
 
     def set_index(self, idx: int):
-        self._idx = int(max(0, idx))
+        idx_i = int(max(0, idx))
+        if idx_i == self._idx:
+            return
+        self._idx = idx_i
         self.update()
 
     def _window_indices(self) -> Tuple[int, int]:
@@ -172,6 +187,8 @@ class SparklineWidget(QtWidgets.QWidget):
         yy = self._y[i0:i1]
         if tt.size < 2:
             return
+        max_points = int(max(48, min(int(tt.size), int(max(1, plot.width())) + 12)))
+        tt, yy = _decimate_series_for_display(tt, yy, max_points)
 
         t_min = float(tt[0])
         t_max = float(tt[-1])
@@ -202,37 +219,276 @@ class SparklineWidget(QtWidgets.QWidget):
         p.drawLine(int(xpix), plot.top(), int(xpix), plot.bottom())
 
 
+@dataclass
+class _TrendSeriesData:
+    title: str
+    unit: str
+    y: np.ndarray
+    y_lo: float
+    y_hi: float
+
+
+class _TrendsCanvas(QtWidgets.QWidget):
+    """Single-canvas sparkline grid for lower repaint/layout overhead."""
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self.setMinimumHeight(150)
+        self._t: Optional[np.ndarray] = None
+        self._series: List[_TrendSeriesData] = []
+        self._idx: int = 0
+        self.lookback_s = 2.0
+        self.lookahead_s = 0.5
+        self._layout_cache_key: Optional[tuple[int, int, int]] = None
+        self._layout_cache: List[QtCore.QRectF] = []
+        self._bg_cache_key: Optional[tuple[int, int, int]] = None
+        self._bg_cache_pixmap: Optional[QtGui.QPixmap] = None
+
+        self._bg = QtGui.QColor(18, 22, 28)
+        self._panel_bg = QtGui.QColor(20, 24, 30)
+        self._grid = QtGui.QColor(60, 70, 80, 160)
+        self._line = QtGui.QColor(220, 220, 220, 220)
+        self._accent = QtGui.QColor(255, 180, 60, 220)
+        self._text = QtGui.QColor(235, 235, 235)
+        self._muted = QtGui.QColor(170, 170, 170)
+        self._border_pen = QtGui.QPen(QtGui.QColor(60, 68, 80), 1.0)
+        try:
+            self._border_pen.setCosmetic(True)
+            self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)
+        except Exception:
+            pass
+
+        f = QtGui.QFont("Consolas", 8)
+        self.setFont(f)
+
+    def _invalidate_background_cache(self) -> None:
+        self._bg_cache_key = None
+        self._bg_cache_pixmap = None
+
+    def resizeEvent(self, event: QtGui.QResizeEvent):  # type: ignore[override]
+        self._layout_cache_key = None
+        self._layout_cache = []
+        self._invalidate_background_cache()
+        super().resizeEvent(event)
+
+    def set_series(self, t: Sequence[float], series: Sequence[_TrendSeriesData]) -> None:
+        self._t = np.asarray(t, dtype=float).reshape(-1)
+        self._series = list(series)
+        self._idx = 0
+        self._layout_cache_key = None
+        self._layout_cache = []
+        self._invalidate_background_cache()
+        self.update()
+
+    def set_window(self, *, lookback_s: float = 2.0, lookahead_s: float = 0.5) -> None:
+        next_lb = float(max(0.0, lookback_s))
+        next_la = float(max(0.0, lookahead_s))
+        if abs(next_lb - float(self.lookback_s)) <= 1e-12 and abs(next_la - float(self.lookahead_s)) <= 1e-12:
+            return
+        self.lookback_s = next_lb
+        self.lookahead_s = next_la
+        self.update()
+
+    def set_index(self, idx: int) -> None:
+        idx_i = int(max(0, idx))
+        if idx_i == self._idx:
+            return
+        self._idx = idx_i
+        self.update()
+
+    def _window_indices(self) -> Tuple[int, int]:
+        if self._t is None or self._t.size == 0:
+            return 0, 0
+        n = int(self._t.size)
+        i = int(_clamp(self._idx, 0, n - 1))
+        t0 = float(self._t[i])
+        t_lo = t0 - float(self.lookback_s)
+        t_hi = t0 + float(self.lookahead_s)
+        i0 = int(np.searchsorted(self._t, t_lo, side="left"))
+        i1 = int(np.searchsorted(self._t, t_hi, side="right"))
+        i0 = int(_clamp(i0, 0, n - 1))
+        i1 = int(_clamp(i1, i0 + 1, n))
+        return i0, i1
+
+    def _panel_rects(self) -> List[QtCore.QRectF]:
+        count = max(1, int(len(self._series)))
+        key = (int(self.width()), int(self.height()), count)
+        if key == self._layout_cache_key and self._layout_cache:
+            return self._layout_cache
+
+        outer = QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        cols = 3
+        rows = max(1, int(math.ceil(float(count) / float(cols))))
+        gap = 6.0
+        panel_w = max(48.0, (outer.width() - gap * (cols - 1)) / cols)
+        panel_h = max(42.0, (outer.height() - gap * (rows - 1)) / rows)
+
+        rects: List[QtCore.QRectF] = []
+        for idx in range(count):
+            r = idx // cols
+            c = idx % cols
+            rects.append(
+                QtCore.QRectF(
+                    outer.left() + c * (panel_w + gap),
+                    outer.top() + r * (panel_h + gap),
+                    panel_w,
+                    panel_h,
+                )
+            )
+
+        self._layout_cache_key = key
+        self._layout_cache = rects
+        return rects
+
+    def _ensure_background_cache(self) -> tuple[Optional[QtGui.QPixmap], List[QtCore.QRectF]]:
+        rects = self._panel_rects()
+        key = (int(self.width()), int(self.height()), int(len(rects)))
+        if key == self._bg_cache_key and self._bg_cache_pixmap is not None:
+            return self._bg_cache_pixmap, rects
+
+        dpr = 1.0
+        try:
+            dpr = float(max(1.0, self.devicePixelRatioF()))
+        except Exception:
+            dpr = 1.0
+        pix = QtGui.QPixmap(int(max(1.0, float(max(1, self.width())) * dpr)), int(max(1.0, float(max(1, self.height())) * dpr)))
+        try:
+            pix.setDevicePixelRatio(dpr)
+        except Exception:
+            pass
+        pix.fill(self._bg)
+
+        p = QtGui.QPainter(pix)
+        p.setRenderHints(QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing)
+        title_font = QtGui.QFont(self.font())
+        try:
+            title_font.setPointSize(max(8, int(title_font.pointSize()) - 1))
+        except Exception:
+            pass
+        p.setFont(title_font)
+        p.setPen(self._muted)
+        for idx, panel in enumerate(rects):
+            p.setPen(self._border_pen)
+            p.setBrush(self._panel_bg)
+            p.drawRoundedRect(panel, 6.0, 6.0)
+
+            title = self._series[idx].title if idx < len(self._series) else "n/a"
+            p.setPen(self._muted)
+            p.drawText(
+                QtCore.QRectF(panel.left() + 6.0, panel.top() + 4.0, panel.width() - 12.0, 14.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                title,
+            )
+
+            plot = QtCore.QRectF(panel.left() + 6.0, panel.top() + 18.0, max(24.0, panel.width() - 98.0), max(18.0, panel.height() - 24.0))
+            p.setPen(QtGui.QPen(self._grid, 1))
+            for yy in (0.25, 0.5, 0.75):
+                ypix = float(plot.top() + (1.0 - yy) * plot.height())
+                p.drawLine(QtCore.QPointF(plot.left(), ypix), QtCore.QPointF(plot.right(), ypix))
+        p.end()
+
+        self._bg_cache_key = key
+        self._bg_cache_pixmap = pix
+        return self._bg_cache_pixmap, rects
+
+    def paintEvent(self, ev: QtGui.QPaintEvent):  # type: ignore[override]
+        p = QtGui.QPainter(self)
+        # The rounded panel chrome is already cached with AA; dynamic trend redraw only needs crisp text.
+        p.setRenderHints(QtGui.QPainter.TextAntialiasing)
+        bg, rects = self._ensure_background_cache()
+        if bg is not None:
+            p.drawPixmap(0, 0, bg)
+        else:
+            p.fillRect(self.rect(), self._bg)
+
+        if self._t is None or self._t.size == 0 or not self._series:
+            p.setPen(self._muted)
+            p.drawText(self.rect(), int(QtCore.Qt.AlignCenter), "trends: n/a")
+            return
+
+        n = int(self._t.size)
+        idx = int(_clamp(self._idx, 0, n - 1))
+        i0, i1 = self._window_indices()
+        tt = np.asarray(self._t[i0:i1], dtype=float)
+        if tt.size < 2:
+            return
+        t_min = float(tt[0])
+        t_max = float(tt[-1])
+        if abs(t_max - t_min) < 1e-9:
+            t_max = t_min + 1e-9
+
+        value_font = QtGui.QFont(self.font())
+        unit_font = QtGui.QFont(value_font)
+        try:
+            value_font.setPointSize(max(8, int(value_font.pointSize())))
+            unit_font.setPointSize(max(7, int(unit_font.pointSize()) - 1))
+        except Exception:
+            pass
+
+        for idx_series, panel in enumerate(rects):
+            if idx_series >= len(self._series):
+                continue
+            series = self._series[idx_series]
+            y_all = np.asarray(series.y, dtype=float)
+            if y_all.size == 0:
+                continue
+            y0 = float(y_all[min(idx, y_all.size - 1)])
+
+            plot = QtCore.QRectF(panel.left() + 6.0, panel.top() + 18.0, max(24.0, panel.width() - 98.0), max(18.0, panel.height() - 24.0))
+            valr = QtCore.QRectF(panel.right() - 86.0, panel.top() + 4.0, 80.0, panel.height() - 8.0)
+
+            p.setFont(value_font)
+            p.setPen(self._text)
+            p.drawText(valr, int(QtCore.Qt.AlignRight | QtCore.Qt.AlignTop), f"{y0:+.3f}")
+            p.setFont(unit_font)
+            p.setPen(self._muted)
+            p.drawText(
+                valr.adjusted(0.0, 14.0, 0.0, 0.0),
+                int(QtCore.Qt.AlignRight | QtCore.Qt.AlignTop) | int(QtCore.Qt.TextWordWrap),
+                series.unit,
+            )
+
+            yy = np.asarray(y_all[i0:i1], dtype=float)
+            if yy.size < 2:
+                continue
+            max_points = int(max(48, min(int(yy.size), int(max(1.0, plot.width())) + 12)))
+            tt_dec, yy_dec = _decimate_series_for_display(tt, yy, max_points)
+            if tt_dec.size < 2 or yy_dec.size < 2:
+                continue
+
+            y_lo = float(series.y_lo)
+            y_hi = float(series.y_hi)
+            if abs(y_hi - y_lo) < 1e-12:
+                y_hi = y_lo + 1e-12
+
+            poly = QtGui.QPolygonF()
+            for k in range(int(tt_dec.size)):
+                x = (float(tt_dec[k]) - t_min) / (t_max - t_min)
+                u = (float(yy_dec[k]) - y_lo) / (y_hi - y_lo)
+                u = _clamp(u, 0.0, 1.0)
+                px = plot.left() + x * plot.width()
+                py = plot.top() + (1.0 - u) * plot.height()
+                poly.append(QtCore.QPointF(float(px), float(py)))
+
+            p.setPen(QtGui.QPen(self._line, 1.6))
+            p.drawPolyline(poly)
+
+            t_i = float(self._t[idx])
+            x_i = (t_i - t_min) / (t_max - t_min)
+            xpix = plot.left() + x_i * plot.width()
+            p.setPen(QtGui.QPen(self._accent, 1.2))
+            p.drawLine(QtCore.QPointF(float(xpix), plot.top()), QtCore.QPointF(float(xpix), plot.bottom()))
+
+
 class TrendsPanel(QtWidgets.QWidget):
     """Grid of sparklines for key signals."""
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
-        lay = QtWidgets.QGridLayout(self)
+        lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setHorizontalSpacing(6)
-        lay.setVerticalSpacing(6)
-
-        # Fixed set (glanceable). If some signals are absent, widgets show n/a.
-        self.s_v = SparklineWidget("v", unit="m/s")
-        self.s_az = SparklineWidget("az_cm", unit="m/s²")
-        self.s_roll = SparklineWidget("roll", unit="deg")
-        self.s_pitch = SparklineWidget("pitch", unit="deg")
-        self.s_pacc = SparklineWidget("P_acc", unit="bar(g)")
-        self.s_open = SparklineWidget("valves_open", unit="count")
-        self.s_qmax = SparklineWidget("mdot_max", unit="g/s")
-        self.s_qcnt = SparklineWidget("mdot_active", unit="count")
-        self.s_air = SparklineWidget("wheels_air", unit="count")
-
-        w = [self.s_v, self.s_az, self.s_roll, self.s_pitch, self.s_pacc, self.s_open, self.s_qmax, self.s_qcnt, self.s_air]
-        for i, sw in enumerate(w):
-            r = i // 3
-            c = i % 3
-            lay.addWidget(sw, r, c)
-
-        lay.setColumnStretch(0, 1)
-        lay.setColumnStretch(1, 1)
-        lay.setColumnStretch(2, 1)
-
+        self.canvas = _TrendsCanvas(self)
+        lay.addWidget(self.canvas)
         self._t: Optional[np.ndarray] = None
 
     def set_bundle(self, b):
@@ -240,6 +496,7 @@ class TrendsPanel(QtWidgets.QWidget):
         t = np.asarray(getattr(b, "t", np.zeros((0,), dtype=float)), dtype=float)
         self._t = t
         if t.size == 0:
+            self.canvas.set_series(np.zeros((0,), dtype=float), [])
             return
 
         # helper for pressures: prefer df_p("Аккумулятор") if present, else df_main
@@ -251,13 +508,10 @@ class TrendsPanel(QtWidgets.QWidget):
                 pass
             return 101325.0
 
-        # v
-        self.s_v.set_data(t, np.asarray(b.get("скорость_vx_м_с", 0.0), dtype=float))
-        # az_cm
-        self.s_az.set_data(t, np.asarray(b.get("ускорение_рамы_z_м_с2", 0.0), dtype=float))
-        # roll/pitch in deg
-        self.s_roll.set_data(t, np.degrees(np.asarray(b.get("крен_phi_рад", 0.0), dtype=float)))
-        self.s_pitch.set_data(t, np.degrees(np.asarray(b.get("тангаж_theta_рад", 0.0), dtype=float)))
+        y_v = np.asarray(b.get("скорость_vx_м_с", 0.0), dtype=float)
+        y_az = np.asarray(b.get("ускорение_рамы_z_м_с2", 0.0), dtype=float)
+        y_roll = np.degrees(np.asarray(b.get("крен_phi_рад", 0.0), dtype=float))
+        y_pitch = np.degrees(np.asarray(b.get("тангаж_theta_рад", 0.0), dtype=float))
 
         # P accumulator in bar(g)
         patm0 = _patm_pa(0)
@@ -268,8 +522,6 @@ class TrendsPanel(QtWidgets.QWidget):
         else:
             pacc = np.asarray(b.get("давление_аккумулятор_Па", patm0), dtype=float)
             bar_g = (pacc - patm0) / 1e5
-        self.s_pacc.set_data(t, bar_g)
-
         # valves_open count (df_open)
         if getattr(b, "open", None) is not None:
             try:
@@ -286,7 +538,6 @@ class TrendsPanel(QtWidgets.QWidget):
                 cnt = np.zeros((t.size,), dtype=float)
         else:
             cnt = np.zeros((t.size,), dtype=float)
-        self.s_open.set_data(t, cnt)
 
         # mdot / mass flow (glanceable)
         if getattr(b, "q", None) is not None:
@@ -310,9 +561,6 @@ class TrendsPanel(QtWidgets.QWidget):
             mdot_max = np.zeros((t.size,), dtype=float)
             mdot_active = np.zeros((t.size,), dtype=float)
 
-        self.s_qmax.set_data(t, mdot_max)
-        self.s_qcnt.set_data(t, mdot_active)
-
         # Wheels airborne count (0..4)
         try:
             a_fl = (np.asarray(b.get("колесо_в_воздухе_ЛП", 0.0), dtype=float) > 0.5).astype(float)
@@ -323,15 +571,31 @@ class TrendsPanel(QtWidgets.QWidget):
         except Exception:
             air_cnt = np.zeros((t.size,), dtype=float)
 
-        self.s_air.set_data(t, air_cnt)
+        series_defs = [
+            ("v", "m/s", y_v),
+            ("az_cm", "m/s²", y_az),
+            ("roll", "deg", y_roll),
+            ("pitch", "deg", y_pitch),
+            ("P_acc", "bar(g)", bar_g),
+            ("valves_open", "count", cnt),
+            ("mdot_max", "g/s", mdot_max),
+            ("mdot_active", "count", mdot_active),
+            ("wheels_air", "count", air_cnt),
+        ]
+        series_payload: List[_TrendSeriesData] = []
+        for title, unit, values in series_defs:
+            y = np.asarray(values, dtype=float).reshape(-1)
+            if y.size > 0:
+                y_lo, y_hi = _robust_minmax(y)
+            else:
+                y_lo, y_hi = -1.0, 1.0
+            series_payload.append(_TrendSeriesData(title=title, unit=unit, y=y, y_lo=float(y_lo), y_hi=float(y_hi)))
 
-        # window tuning (same for all)
-        for sw in (self.s_v, self.s_az, self.s_roll, self.s_pitch, self.s_pacc, self.s_open, self.s_qmax, self.s_qcnt, self.s_air):
-            sw.set_window(lookback_s=2.0, lookahead_s=0.5)
+        self.canvas.set_series(t, series_payload)
+        self.canvas.set_window(lookback_s=2.0, lookahead_s=0.5)
 
     def update_frame(self, i: int):
-        for sw in (self.s_v, self.s_az, self.s_roll, self.s_pitch, self.s_pacc, self.s_open, self.s_qmax, self.s_qcnt, self.s_air):
-            sw.set_index(i)
+        self.canvas.set_index(i)
 
 
 def _infer_valve_kind(name: str) -> str:
@@ -385,6 +649,9 @@ class EventTimelineWidget(QtWidgets.QWidget):
         self._idx: int = 0
         self._label_w = 120
         self._pad = 6
+        self._static_cache_key: Optional[tuple[int, int, Any]] = None
+        self._static_cache_pixmap: Optional[QtGui.QPixmap] = None
+        self._static_data_key: Any = None
 
         self._bg = QtGui.QColor(14, 18, 22)
         self._grid = QtGui.QColor(70, 80, 90, 120)
@@ -394,6 +661,14 @@ class EventTimelineWidget(QtWidgets.QWidget):
 
         self.setToolTip("Клик по таймлайну → перемотка")
 
+    def _invalidate_static_cache(self) -> None:
+        self._static_cache_key = None
+        self._static_cache_pixmap = None
+
+    def resizeEvent(self, event: QtGui.QResizeEvent):  # type: ignore[override]
+        self._invalidate_static_cache()
+        super().resizeEvent(event)
+
     def set_bundle(self, b):
         # b is DataBundle
         t = np.asarray(getattr(b, "t", np.zeros((0,), dtype=float)), dtype=float)
@@ -401,6 +676,8 @@ class EventTimelineWidget(QtWidgets.QWidget):
         self._idx = 0
         self._lanes = []
         self._markers = []
+        self._static_data_key = None
+        self._invalidate_static_cache()
 
         if t.size == 0:
             self.update()
@@ -502,10 +779,28 @@ class EventTimelineWidget(QtWidgets.QWidget):
         except Exception:
             self._markers = []
 
+        self._static_data_key = (
+            int(t.size),
+            -1 if t.size == 0 else int(round(float(t[0]) * 1000.0)),
+            -1 if t.size == 0 else int(round(float(t[-1]) * 1000.0)),
+            tuple(
+                (
+                    str(lane.name),
+                    int(lane.color.rgba()),
+                    tuple((int(i0), int(i1)) for i0, i1 in lane.segs),
+                )
+                for lane in self._lanes
+            ),
+            tuple(int(x) for x in self._markers),
+        )
+
         self.update()
 
     def set_index(self, idx: int):
-        self._idx = int(max(0, idx))
+        idx_i = int(max(0, idx))
+        if idx_i == self._idx:
+            return
+        self._idx = idx_i
         self.update()
 
     def mousePressEvent(self, ev: QtGui.QMouseEvent):
@@ -532,16 +827,108 @@ class EventTimelineWidget(QtWidgets.QWidget):
         except Exception:
             pass
 
+    def _ensure_static_cache(self, rect: QtCore.QRect) -> Optional[QtGui.QPixmap]:
+        if self._t is None or self._t.size == 0:
+            return None
+
+        key = (int(max(1, rect.width())), int(max(1, rect.height())), self._static_data_key)
+        if key == self._static_cache_key and self._static_cache_pixmap is not None:
+            return self._static_cache_pixmap
+
+        dpr = 1.0
+        try:
+            dpr = float(max(1.0, self.devicePixelRatioF()))
+        except Exception:
+            dpr = 1.0
+        pix = QtGui.QPixmap(
+            int(max(1.0, float(max(1, rect.width())) * dpr)),
+            int(max(1.0, float(max(1, rect.height())) * dpr)),
+        )
+        try:
+            pix.setDevicePixelRatio(dpr)
+        except Exception:
+            pass
+        pix.fill(self._bg)
+
+        p = QtGui.QPainter(pix)
+        p.setRenderHints(QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing)
+
+        t = self._t
+        assert t is not None
+        n = int(t.size)
+        pad = self._pad
+        label_w = int(self._label_w)
+        lanes = self._lanes
+        lane_h = max(10, int((rect.height() - 2 * pad) / max(1, len(lanes))))
+        top = pad
+        x0 = label_w + pad
+        x1 = rect.width() - pad
+        w = max(1, x1 - x0)
+        t0 = float(t[0])
+        t1 = float(t[-1])
+        dt = max(1e-9, t1 - t0)
+
+        p.setPen(QtGui.QPen(self._grid, 1))
+        for frac in (0.0, 0.25, 0.5, 0.75, 1.0):
+            xx = int(x0 + frac * w)
+            p.drawLine(xx, top, xx, rect.height() - pad)
+
+        for li, lane in enumerate(lanes):
+            y = top + li * lane_h
+            rr = QtCore.QRect(x0, y, w, lane_h - 2)
+
+            p.setPen(self._muted)
+            p.drawText(QtCore.QRect(pad, y, label_w - 2, lane_h - 2), int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter), lane.name)
+
+            p.setPen(QtCore.Qt.NoPen)
+            p.setBrush(QtGui.QBrush(lane.color))
+            for i0, i1 in lane.segs:
+                ii0 = int(_clamp(i0, 0, n - 1))
+                ii1 = int(_clamp(i1, 0, n - 1))
+                tt0 = float(t[ii0])
+                tt1 = float(t[ii1])
+                if ii1 == ii0:
+                    tt1 = min(t1, tt0 + 0.02)
+                u0 = (tt0 - t0) / dt
+                u1 = (tt1 - t0) / dt
+                xx0 = int(x0 + _clamp(u0, 0.0, 1.0) * w)
+                xx1 = int(x0 + _clamp(u1, 0.0, 1.0) * w)
+                if xx1 <= xx0:
+                    xx1 = xx0 + 1
+                p.drawRect(QtCore.QRect(xx0, rr.top(), xx1 - xx0, rr.height()))
+
+        if self._markers:
+            p.setPen(QtGui.QPen(QtGui.QColor(120, 120, 120, 140), 1, QtCore.Qt.DotLine))
+            for mi in self._markers:
+                ii = int(_clamp(mi, 0, n - 1))
+                u = (float(t[ii]) - t0) / dt
+                xx = int(x0 + _clamp(u, 0.0, 1.0) * w)
+                p.drawLine(xx, top, xx, rect.height() - pad)
+
+        p.setPen(self._text)
+        p.drawText(QtCore.QRect(x0, pad, w, 14), int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter), "Events (wheel_air + valve groups) — click to seek")
+        p.end()
+
+        self._static_cache_key = key
+        self._static_cache_pixmap = pix
+        return self._static_cache_pixmap
+
     def paintEvent(self, ev: QtGui.QPaintEvent):
         p = QtGui.QPainter(self)
         p.setRenderHints(QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing)
         r = self.rect()
-        p.fillRect(r, self._bg)
 
         if self._t is None or self._t.size == 0:
+            p.fillRect(r, self._bg)
             p.setPen(self._muted)
             p.drawText(r, int(QtCore.Qt.AlignCenter), "events: n/a")
             return
+
+        bg = self._ensure_static_cache(r)
+        if bg is not None:
+            p.drawPixmap(0, 0, bg)
+        else:
+            p.fillRect(r, self._bg)
 
         t = self._t
         n = int(t.size)
@@ -559,55 +946,8 @@ class EventTimelineWidget(QtWidgets.QWidget):
         t1 = float(t[-1])
         dt = max(1e-9, t1 - t0)
 
-        # faint grid (time ticks)
-        p.setPen(QtGui.QPen(self._grid, 1))
-        for frac in (0.0, 0.25, 0.5, 0.75, 1.0):
-            xx = int(x0 + frac * w)
-            p.drawLine(xx, top, xx, r.height() - pad)
-
-        # lanes
-        for li, lane in enumerate(lanes):
-            y = top + li * lane_h
-            rr = QtCore.QRect(x0, y, w, lane_h - 2)
-
-            # label
-            p.setPen(self._muted)
-            p.drawText(QtCore.QRect(pad, y, label_w - 2, lane_h - 2), int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter), lane.name)
-
-            # segments
-            p.setPen(QtCore.Qt.NoPen)
-            p.setBrush(QtGui.QBrush(lane.color))
-            for i0, i1 in lane.segs:
-                i0 = int(_clamp(i0, 0, n - 1))
-                i1 = int(_clamp(i1, 0, n - 1))
-                tt0 = float(t[i0])
-                tt1 = float(t[i1])
-                # small pad in time to make single-frame events visible
-                if i1 == i0:
-                    tt1 = min(t1, tt0 + 0.02)
-                u0 = (tt0 - t0) / dt
-                u1 = (tt1 - t0) / dt
-                xx0 = int(x0 + _clamp(u0, 0.0, 1.0) * w)
-                xx1 = int(x0 + _clamp(u1, 0.0, 1.0) * w)
-                if xx1 <= xx0:
-                    xx1 = xx0 + 1
-                p.drawRect(QtCore.QRect(xx0, rr.top(), xx1 - xx0, rr.height()))
-
-        # segment markers (vertical)
-        if self._markers:
-            p.setPen(QtGui.QPen(QtGui.QColor(120, 120, 120, 140), 1, QtCore.Qt.DotLine))
-            for mi in self._markers:
-                mi = int(_clamp(mi, 0, n - 1))
-                u = (float(t[mi]) - t0) / dt
-                xx = int(x0 + _clamp(u, 0.0, 1.0) * w)
-                p.drawLine(xx, top, xx, r.height() - pad)
-
         # playhead line
         p.setPen(QtGui.QPen(self._play, 2))
         u = (float(t[idx]) - t0) / dt
         xx = int(x0 + _clamp(u, 0.0, 1.0) * w)
         p.drawLine(xx, top, xx, r.height() - pad)
-
-        # caption
-        p.setPen(self._text)
-        p.drawText(QtCore.QRect(x0, pad, w, 14), int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter), "Events (wheel_air + valve groups) — click to seek")

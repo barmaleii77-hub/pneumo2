@@ -1210,11 +1210,12 @@ def cylinder_visual_state_from_packaging(
         body_len_vis = float(min(max(float(body_len_m), 1e-9), total_len))
         gland_point = top + axis_unit * body_len_vis
         housing_seg = (top, gland_point)
-        # Render the full piston->eye rod, not only the exposed gland->eye part.
-        # The body shell is intentionally translucent, so the user must see the rod
-        # continue *inside* the cylinder up to the piston instead of floating as a
-        # detached external segment next to the wishbone.
-        rod_seg = (piston_center, bot)
+        # The opaque rod mesh represents only the exposed external rod. The internal
+        # part is rendered separately by an overlay helper so it stays readable through
+        # the translucent shell without falsely thickening the outer rod mesh.
+        piston_proj = float(np.dot(piston_center - top, axis_unit))
+        rod_start = gland_point if piston_proj <= body_len_vis + 1e-9 else piston_center
+        rod_seg = (np.asarray(rod_start, dtype=float), bot)
     else:
         housing_seg = (top, bot)
         rod_seg = (piston_center, bot)
@@ -1266,13 +1267,13 @@ def rod_internal_centerline_vertices_from_packaging_state(state: dict[str, objec
     if not isinstance(state, dict):
         return None
     try:
-        rod_seg = state.get("rod_seg")
+        piston_center = state.get("piston_center")
         housing_seg = state.get("housing_seg")
-        if not isinstance(rod_seg, (tuple, list)) or len(rod_seg) != 2:
+        if piston_center is None:
             return None
         if not isinstance(housing_seg, (tuple, list)) or len(housing_seg) != 2:
             return None
-        p0 = np.asarray(rod_seg[0], dtype=float).reshape(3)
+        p0 = np.asarray(piston_center, dtype=float).reshape(3)
         p1 = np.asarray(housing_seg[1], dtype=float).reshape(3)
     except Exception:
         return None

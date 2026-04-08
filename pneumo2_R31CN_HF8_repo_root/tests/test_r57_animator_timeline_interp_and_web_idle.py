@@ -42,7 +42,7 @@ def test_internal_rod_overlay_targets_only_the_segment_inside_transparent_housin
     inner = rod_internal_centerline_vertices_from_packaging_state(state)
     assert inner is not None
     assert inner.shape == (2, 3)
-    assert np.allclose(inner[0], np.asarray(state['rod_seg'][0], dtype=float), atol=1e-12)
+    assert np.allclose(inner[0], np.asarray(state['piston_center'], dtype=float), atol=1e-12)
     assert np.allclose(inner[1], np.asarray(state['housing_seg'][1], dtype=float), atol=1e-12)
     assert float(np.linalg.norm(inner[1] - inner[0])) > 1e-9
 
