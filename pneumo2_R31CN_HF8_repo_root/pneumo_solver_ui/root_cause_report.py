@@ -34,6 +34,10 @@ import importlib.util
 import numpy as np
 import pandas as pd
 from pneumo_solver_ui.module_loading import load_python_module_from_path
+from pneumo_solver_ui.packaging_surface_helpers import (
+    collect_packaging_surface_metrics,
+    format_packaging_markdown_lines,
+)
 
 
 HERE = Path(__file__).resolve().parent
@@ -105,9 +109,11 @@ def main() -> int:
             md.append(f"**ОШИБКА:** {e}\n")
             continue
 
+        packaging_summary = collect_packaging_surface_metrics(m, targets=targets, params=base)
         m2 = dict(m)
         m2['тест'] = test_name
         m2['штраф'] = pen
+        m2.update(packaging_summary)
         rows.append(m2)
 
         # Ключевые KPI (минимально)
@@ -128,6 +134,9 @@ def main() -> int:
             md.append(f"- топ нарушение: `{topv}` (норм. {topvs})\n")
         if rf:
             md.append(f"- причины (физика): `{rf}`\n")
+
+        md.append("\n**Packaging / пружины**\n")
+        md.extend(format_packaging_markdown_lines(m2, targets=targets, params=base, fmt_func=fmt))
 
         # Эксергия
         md.append("\n**Эксергия / необратимости**\n")

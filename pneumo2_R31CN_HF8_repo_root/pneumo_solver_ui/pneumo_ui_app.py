@@ -111,6 +111,17 @@ from pneumo_solver_ui.ui_param_helpers import (
     is_volume_param,
     param_desc,
 )
+from pneumo_solver_ui.packaging_surface_helpers import (
+    collect_packaging_surface_metrics,
+    enrich_packaging_surface_df,
+    packaging_error_surface_metrics,
+)
+from pneumo_solver_ui.packaging_surface_ui import (
+    apply_packaging_surface_filters,
+    load_packaging_params_from_base_json,
+    packaging_surface_result_columns,
+    render_packaging_surface_metrics,
+)
 from pneumo_solver_ui.suspension_family_contract import family_param_meta
 from pneumo_solver_ui.ui_process_helpers import (
     dump_cloudpickle_payload as _dump_detail_cache_payload,
@@ -6044,6 +6055,7 @@ with colB:
                         m["pass_верификация"] = 0
                     m["pass_цели"] = int(float(pen_targets) <= 0.0)
                     m["pass"] = int((m["pass_верификация"] == 1) and (m["pass_цели"] == 1))
+                    m.update(collect_packaging_surface_metrics(m, targets=targets, params=base_override))
                     res_rows.append(m)
                 except Exception as e:
                     err_cnt += 1
@@ -6054,7 +6066,18 @@ with colB:
                         traceback=traceback.format_exc(limit=8),
                         proc=_proc_metrics(),
                     )
-                    res_rows.append({"тест": name, "ошибка": str(e), "штраф": 1e9, "штраф_цели": 1e9, "штраф_верификация": 0.0, "pass": 0, "pass_верификация": 0, "pass_цели": 0})
+                    err_row = {
+                        "тест": name,
+                        "ошибка": str(e),
+                        "штраф": 1e9,
+                        "штраф_цели": 1e9,
+                        "штраф_верификация": 0.0,
+                        "pass": 0,
+                        "pass_верификация": 0,
+                        "pass_цели": 0,
+                    }
+                    err_row.update(packaging_error_surface_metrics())
+                    res_rows.append(err_row)
         df_res = pd.DataFrame(res_rows)
         st.session_state.baseline_df = df_res
         safe_dataframe(df_res, height=360)
@@ -6112,7 +6135,9 @@ if st.session_state.get("baseline_df") is not None:
             _n_fail = (_n_total - _n_pass) if _n_pass is not None else None
 
             _best_pen = None
-            if "penalty" in _bdf.columns:
+            if "штраф" in _bdf.columns:
+                _best_pen = float(pd.to_numeric(_bdf["штраф"], errors="coerce").min())
+            elif "penalty" in _bdf.columns:
                 _best_pen = float(pd.to_numeric(_bdf["penalty"], errors="coerce").min())
 
             cM1, cM2, cM3, cM4 = st.columns(4)
@@ -11438,14 +11463,22 @@ if False:
                 df_all = _filter_opt_display_df(df_all_raw, include_baseline=bool(show_service_rows))
             except Exception:
                 df_all = df_all_raw.copy()
+            _opt_packaging_params = load_packaging_params_from_base_json(st.session_state.get("opt_base_json"))
+            if len(df_all) > 0:
+                df_all = enrich_packaging_surface_df(df_all, params=_opt_packaging_params)
             st.write(f"Строк: {len(df_all)}")
             if len(df_all) != len(df_all_raw):
                 st.caption(f"Скрыто служебных baseline/service rows: {int(len(df_all_raw) - len(df_all))}")
+            render_packaging_surface_metrics(st, df_all)
 
             st.markdown("### Быстрый TOP по суммарному штрафу")
             if "штраф_физичности_сумма" in df_all.columns:
                 df_top = df_all.sort_values(["штраф_физичности_сумма"], ascending=True).head(30)
-                safe_dataframe(df_top, height=260)
+                top_cols = packaging_surface_result_columns(
+                    df_top,
+                    leading=["id", "поколение", "штраф_физичности_сумма"],
+                )
+                safe_dataframe(df_top[top_cols] if top_cols else df_top, height=260)
 
             st.markdown("### Pareto: выбор осей (без жёстких отсечек по умолчанию)")
 
@@ -11479,6 +11512,7 @@ if False:
                         df_all2 = df_all2[df_all2["штраф_физичности_сумма"].astype(float) <= _pen_max_use]
                     except Exception:
                         pass
+                df_all2 = apply_packaging_surface_filters(st, df_all2, key_prefix="pareto", compact=True)
                 st.divider()
                 st.slider(
                     "TOP-N для вывода",
@@ -11537,6 +11571,9 @@ if False:
                     show_cols += [obj1, obj2]
                     if "штраф_физичности_сумма" in df_top.columns:
                         show_cols.append("штраф_физичности_сумма")
+                    for c in packaging_surface_result_columns(df_top, leading=[]):
+                        if c not in show_cols:
+                            show_cols.append(c)
 
                     safe_dataframe(df_top[show_cols])
 
