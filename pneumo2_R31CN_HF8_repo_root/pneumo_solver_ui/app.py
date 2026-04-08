@@ -80,18 +80,63 @@ from pneumo_solver_ui.ui_cache_helpers import (
 )
 from pneumo_solver_ui.ui_data_helpers import decimate_minmax, downsample_df, write_tests_index_csv
 from pneumo_solver_ui.ui_diagnostics_helpers import make_ui_diagnostics_zip_bundle
+from pneumo_solver_ui.ui_animation_mode_helpers import (
+    ANIMATION_VIEW_MECHANICS,
+    render_animation_view_selector,
+    render_non_mechanical_animation_subsection,
+)
 from pneumo_solver_ui.ui_event_sync_helpers import (
     consume_mech_pick_event as _consume_mech_pick_event_core,
     consume_playhead_event as _consume_playhead_event_core,
     consume_plotly_pick_events as _consume_plotly_pick_events_core,
     consume_svg_pick_event as _consume_svg_pick_event_core,
 )
+from pneumo_solver_ui.ui_event_overlay_helpers import (
+    prepare_events_for_graph_overlays,
+)
+from pneumo_solver_ui.ui_flow_rate_helpers import (
+    flow_rate_display_scale_and_unit,
+)
+from pneumo_solver_ui.ui_flow_graph_helpers import (
+    render_flow_edge_graphs_section,
+)
+from pneumo_solver_ui.ui_flow_animation_helpers import (
+    render_flow_animation_panel,
+)
+from pneumo_solver_ui.ui_graph_studio_helpers import (
+    render_graph_studio_section,
+)
+from pneumo_solver_ui.ui_svg_scheme_section_helpers import (
+    render_svg_scheme_section,
+)
 from pneumo_solver_ui.ui_interaction_helpers import (
     apply_pick_list as _apply_pick_list,
-    ensure_mapping_for_selection,
     extract_plotly_selection_points as _extract_plotly_selection_points,
     plotly_points_signature as _plotly_points_signature,
-    strip_svg_xml_header,
+)
+from pneumo_solver_ui.ui_line_plot_helpers import (
+    plot_lines as plot_lines_core,
+)
+from pneumo_solver_ui.ui_mech_graph_helpers import (
+    render_mech_overview_graphs,
+)
+from pneumo_solver_ui.ui_mech_animation_helpers import (
+    render_mechanical_animation_intro,
+    render_mechanical_scheme_asset_expander,
+)
+from pneumo_solver_ui.ui_node_pressure_helpers import (
+    render_node_pressure_expander,
+)
+from pneumo_solver_ui.ui_playhead_helpers import (
+    make_playhead_jump_command,
+    make_playhead_reset_command,
+    render_results_view_selector,
+)
+from pneumo_solver_ui.ui_playhead_section_helpers import (
+    render_playhead_results_section,
+)
+from pneumo_solver_ui.ui_timeline_event_helpers import (
+    compute_events as compute_events_core,
 )
 from pneumo_solver_ui.ui_flow_panel_helpers import render_flow_panel_html
 from pneumo_solver_ui.ui_param_helpers import (
@@ -111,6 +156,12 @@ from pneumo_solver_ui.packaging_surface_ui import (
     load_packaging_params_from_base_json,
     packaging_surface_result_columns,
     render_packaging_surface_metrics,
+)
+from pneumo_solver_ui.ui_plot_studio_helpers import (
+    plot_studio_timeseries as plot_studio_timeseries_core,
+)
+from pneumo_solver_ui.ui_quick_graph_helpers import (
+    render_main_overview_graphs,
 )
 from pneumo_solver_ui.suspension_family_contract import family_param_meta
 from pneumo_solver_ui.ui_process_helpers import (
@@ -137,9 +188,7 @@ from pneumo_solver_ui.run_artifacts import (
 )
 from pneumo_solver_ui.tools.send_bundle_contract import ANIM_LOCAL_NPZ, ANIM_LOCAL_POINTER
 from pneumo_solver_ui.ui_svg_html_builders import (
-    render_svg_edge_mapper_html,
     render_svg_flow_animation_html,
-    render_svg_node_mapper_html,
 )
 from pneumo_solver_ui.ui_suite_helpers import (
     load_default_suite_disabled,
@@ -771,7 +820,7 @@ _infer_unit_and_transform = partial(
 )
 
 
-def plot_studio_timeseries(
+def _legacy_plot_studio_timeseries_dead(
     df: pd.DataFrame,
     tcol: str,
     y_cols: List[str],
@@ -1061,11 +1110,31 @@ def plot_studio_timeseries(
                 pass
 
 
+_GRAPH_STUDIO_PLOTLY_MISSING_MESSAGE = (
+    "Plotly не установлен — интерактивные графики отключены (Graph Studio / интерактивные Plotly-графики).\n\n"
+    "Решение: используйте RUN_ONECLICK_WINDOWS.bat или INSTALL_DEPENDENCIES_WINDOWS.bat (создаст .venv и установит зависимости).\n"
+    "Либо выполните в консоли: python -m pip install -r requirements.txt"
+)
+
+plot_studio_timeseries = partial(
+    plot_studio_timeseries_core,
+    has_plotly=_HAS_PLOTLY,
+    go_module=go,
+    make_subplots_fn=make_subplots,
+    safe_plotly_chart_fn=safe_plotly_chart,
+    infer_unit_and_transform_fn=_infer_unit_and_transform,
+    extract_plotly_selection_points_fn=_extract_plotly_selection_points,
+    plotly_points_signature_fn=_plotly_points_signature,
+    decimate_minmax_fn=decimate_minmax,
+    missing_plotly_message=_GRAPH_STUDIO_PLOTLY_MISSING_MESSAGE,
+)
+
+
 # -------------------------------
 # Event/alert detection for the global timeline (playhead)
 # -------------------------------
 
-def compute_events(
+def _legacy_compute_events_dead(
     df_main: pd.DataFrame | None,
     df_p: pd.DataFrame | None,
     df_open: pd.DataFrame | None,
@@ -1248,7 +1317,37 @@ def compute_events(
     return events
 
 
-def plot_lines(
+def compute_events(
+    df_main: pd.DataFrame | None,
+    df_p: pd.DataFrame | None,
+    df_open: pd.DataFrame | None,
+    params_abs: dict,
+    test: dict,
+    vacuum_min_gauge_atm: float = -0.2,
+    pmax_margin_atm: float = 0.10,
+    chatter_window_s: float = 0.25,
+    chatter_toggle_count: int = 6,
+    max_events: int = 240,
+) -> List[dict]:
+    return compute_events_core(
+        df_main=df_main,
+        df_p=df_p,
+        df_open=df_open,
+        params_abs=params_abs,
+        test=test,
+        vacuum_min_gauge=vacuum_min_gauge_atm,
+        pmax_margin_gauge=pmax_margin_atm,
+        chatter_window_s=chatter_window_s,
+        chatter_toggle_count=chatter_toggle_count,
+        max_events=max_events,
+        gauge_pressure_scale_pa=101325.0,
+        vacuum_unit_label="атм(изб)",
+        run_starts_fn=_run_starts,
+        shorten_name_fn=_shorten_name,
+    )
+
+
+def _legacy_plot_lines_dead(
     df: pd.DataFrame,
     x_col: str,
     y_cols: List[str],
@@ -1452,6 +1551,16 @@ def plot_lines(
     if idx_ph is not None and xph is not None:
         return {"idx": int(idx_ph), "x": float(xph), "values": play_values}
     return None
+
+
+plot_lines = partial(
+    plot_lines_core,
+    has_plotly=_HAS_PLOTLY,
+    go_module=go,
+    safe_plotly_chart_fn=safe_plotly_chart,
+    is_any_fallback_anim_playing_fn=is_any_fallback_anim_playing,
+    shorten_name_fn=_shorten_name,
+)
 
 
 
@@ -3698,7 +3807,7 @@ if SHOW_RESULTS or SHOW_TOOLS:
                         st.session_state["playhead_idx"] = 0
                         if time_s:
                             st.session_state["playhead_t"] = float(time_s[0])
-                        st.session_state["playhead_cmd"] = {"ts": int(time.time() * 1000), "set_idx": 0, "set_playing": False, "set_loop": False, "set_speed": 0.25}
+                        st.session_state["playhead_cmd"] = make_playhead_reset_command()
                         log_event("playhead_reset", dataset_id=str(dataset_id_ui))
 
                     # jump from plot clicks (x=time)
@@ -3710,7 +3819,7 @@ if SHOW_RESULTS or SHOW_TOOLS:
                             j = int(np.argmin(np.abs(arr - req_x_f)))
                             st.session_state["playhead_idx"] = j
                             st.session_state["playhead_t"] = float(time_s[j])
-                            st.session_state["playhead_cmd"] = {"ts": int(time.time() * 1000), "set_idx": j, "set_playing": False}
+                            st.session_state["playhead_cmd"] = make_playhead_jump_command(j)
                         except Exception:
                             pass
 
@@ -3774,247 +3883,35 @@ if SHOW_RESULTS or SHOW_TOOLS:
                         except Exception:
                             events_list = []
 
-                    # Prepare event list for graph overlays (filtered by severity and max)
-                    events_for_graphs: List[dict] = []
-                    events_graph_labels = bool(st.session_state.get("events_graph_labels", False))
-                    try:
-                        events_graph_max = int(st.session_state.get("events_graph_max", 120))
-                    except Exception:
-                        events_graph_max = 120
+                    events_for_graphs, events_graph_labels, events_graph_max = prepare_events_for_graph_overlays(
+                        events_list,
+                        st.session_state,
+                    )
 
-                    if events_list and st.session_state.get("events_on_graphs", True) and events_graph_max > 0:
-                        sev_allow = set(
-                            str(s).lower()
-                            for s in (st.session_state.get("events_graph_sev", ["error", "warn"]) or [])
-                        )
-                        events_for_graphs = [
-                            ev for ev in events_list
-                            if str(ev.get("severity", "")).lower() in sev_allow
-                        ]
-                        events_for_graphs.sort(key=lambda e: int(e.get("idx", 0)))
-                        # Let plot_lines thin out further, but also cap here (helps memory)
-                        if len(events_for_graphs) > max(10, events_graph_max * 4):
-                            step = int(math.ceil(len(events_for_graphs) / float(events_graph_max * 4)))
-                            if step > 1:
-                                events_for_graphs = events_for_graphs[::step]
-
-                    # --- Playhead server sync (important for perceived responsiveness) ---
-                    # By default we do NOT send periodic updates to Python while playing.
-                    # This avoids the "infinite recalculation" feel (Streamlit reruns).
-                    # You can still scrub/jump time and get a sync snapshot (forced event).
-                    cols_phsync = st.columns([1.35, 0.95, 0.95, 0.95], gap="medium")
-                    with cols_phsync[0]:
-                        ph_server_sync = st.checkbox(
-                            "Синхронизация графиков во время Play (СЕРВЕР, тяжело)",
-                            value=False,
-                            key="playhead_server_sync",
-                        )
-                    with cols_phsync[1]:
-                        if ph_server_sync:
-                            ph_send_hz = st.slider(
-                                "Hz (сервер)",
-                                1,
-                                10,
-                                2,
-                                1,
-                                key="playhead_send_hz",
-                                help=(
-                                    "Каждые N раз/сек будет происходить полный rerun Streamlit-скрипта, "
-                                    "чтобы двигались маркеры на графиках. Это может подвисать при N>2."
-                                ),
-                            )
-                        else:
-                            ph_send_hz = 0
-                    with cols_phsync[2]:
-                        ph_storage_hz = st.slider(
-                            "FPS (браузер)",
-                            5,
-                            60,
-                            30,
-                            1,
-                            key="playhead_storage_hz",
-                            help=(
-                                "Ограничивает частоту обновления общего playhead через localStorage. "
-                                "Влияет на плавность 2D/3D анимации, но не вызывает rerun на сервере."
-                            ),
-                        )
-                    with cols_phsync[3]:
-                        st.caption(
-                            "Рекомендация: **Hz(сервер)=0** для плавной анимации. "
-                            "Если нужны маркеры на графиках — 1–2 Hz."
-                        )
-
-                    if ph_server_sync and int(ph_send_hz) >= 4:
-                        st.warning(
-                            "Hz(сервер) ≥ 4 часто приводит к зависанию: Streamlit не успевает перерабатывать rerun. "
-                            "Для плавности увеличивайте FPS(браузер), а не Hz(сервер)."
-                        )
-
-                    ph_comp = get_playhead_ctrl_component()
-
-                    if ph_comp is not None and time_s:
-                        ph_comp(
-                            title='Playhead',
-                            time=time_s,
-                            dataset_id=str(dataset_id_ui),
-                            storage_key='pneumo_play_state',
-                            send_hz=int(ph_send_hz),
-                            storage_hz=int(ph_storage_hz),
-                            height=88,
-                            cmd=st.session_state.get('playhead_cmd'),
-                            events=[{'t': float(ev.get('t', ev.get('t_s', 0.0))), 'label': str(ev.get('label', ''))} for ev in (events_list or [])],
-                            events_max=40,
-                            hint='Воспроизведение и точный переход по времени. Loop по умолчанию выключен (можно включить в контроле).',
-                            restore_state=False,
-                            key='playhead_event',
-                            default=None,
-                        )
-                    elif not time_s:
-                        st.info("Нет временного массива для таймлайна.")
-                    else:
-                        st.info("Компонент playhead_ctrl не найден (components/playhead_ctrl).")
-
-                    picked_ev = st.session_state.get("playhead_picked_event")
-                    if isinstance(picked_ev, dict):
-                        st.caption(f"Последний клик по событию: {picked_ev.get('label','')}" )
-
-
-                    if st.session_state.get("events_show", True) and events_list:
-                        with st.expander("События/алёрты", expanded=False):
-                            st.caption(f"Найдено событий: {len(events_list)}")
-                            df_events_view = pd.DataFrame([
-                                {
-                                    "t, s": float(e.get("t", 0.0)),
-                                    "severity": e.get("severity"),
-                                    "kind": e.get("kind"),
-                                    "name": e.get("name"),
-                                    "label": e.get("label"),
-                                    "idx": int(e.get("idx", 0)),
-                                }
-                                for e in events_list
-                            ])
-                            safe_dataframe(df_events_view, height=240)
-
-                            opt = list(range(len(events_list)))
-
-                            def _fmt(i: int):
-                                e = events_list[i]
-                                return f't={float(e.get("t",0.0)):.3f}s | {e.get("severity","")} | {e.get("label","")}'
-
-                            sel_i = st.selectbox("Перейти к событию", options=opt, format_func=_fmt, key="events_jump_sel")
-                            if st.button("Перейти (jump playhead)", key="events_jump_btn"):
-                                try:
-                                    e = events_list[int(sel_i)]
-                                    j = int(e.get("idx", 0))
-                                    st.session_state["playhead_cmd"] = {"ts": int(time.time()*1000), "set_idx": j, "set_playing": False}
-                                    st.session_state["playhead_idx"] = j
-                                    st.session_state["playhead_t"] = float(e.get("t", 0.0))
-                                except Exception:
-                                    pass
-
-
-                    # Настройки синхронизации playhead → графики
-                    cols_ph = st.columns(2)
-                    with cols_ph[0]:
-                        st.checkbox("Маркеры на графиках (playhead)", value=True, key="playhead_show_markers")
-                    with cols_ph[1]:
-                        st.checkbox("Таблица значений (playhead)", value=True, key="playhead_show_values")
-
-                    if st.session_state.get("playhead_show_values", True) and playhead_x is not None:
-                        with st.expander("Текущие значения (playhead)", expanded=False):
-                            st.caption(f"t = {float(playhead_x):.3f} s")
-                            rows = []
-
-                            # --- df_main (углы/давления/штоки) ---
-                            if df_main is not None and "время_с" in df_main.columns and len(df_main) > 0:
-                                try:
-                                    arr = df_main["время_с"].to_numpy(dtype=float)
-                                    idx0 = int(np.argmin(np.abs(arr - float(playhead_x))))
-                                except Exception:
-                                    idx0 = 0
-                                idx0 = max(0, min(idx0, len(df_main) - 1))
-
-                                if "крен_phi_рад" in df_main.columns:
-                                    rows.append({"показатель": "крен φ", "значение": float(df_main["крен_phi_рад"].iloc[idx0] * 180.0 / math.pi), "ед": "град"})
-                                if "тангаж_theta_рад" in df_main.columns:
-                                    rows.append({"показатель": "тангаж θ", "значение": float(df_main["тангаж_theta_рад"].iloc[idx0] * 180.0 / math.pi), "ед": "град"})
-
-                                for col, label in [
-                                    ("давление_ресивер1_Па", "P ресивер1"),
-                                    ("давление_ресивер2_Па", "P ресивер2"),
-                                    ("давление_ресивер3_Па", "P ресивер3"),
-                                    ("давление_аккумулятор_Па", "P аккумулятор"),
-                                ]:
-                                    if col in df_main.columns:
-                                        rows.append({"показатель": label, "значение": float(pa_abs_to_atm_g(df_main[col].iloc[idx0])), "ед": "атм (изб.)"})
-
-                                sel_corners = st.session_state.get("mech_plot_corners")
-                                if not isinstance(sel_corners, list) or not sel_corners:
-                                    sel_corners = ["ЛП", "ПП", "ЛЗ", "ПЗ"]
-
-                                for cc in sel_corners:
-                                    col = f"положение_штока_{cc}_м"
-                                    if col in df_main.columns:
-                                        rows.append({"показатель": f"шток {cc}", "значение": float(df_main[col].iloc[idx0]), "ед": "м"})
-
-                            # --- df_p (узлы давления) ---
-                            if df_p is not None and "время_с" in df_p.columns and len(df_p) > 0:
-                                nodes = st.session_state.get("node_pressure_plot")
-                                if not isinstance(nodes, list) or not nodes:
-                                    nodes = st.session_state.get("anim_nodes_svg")
-                                if not isinstance(nodes, list):
-                                    nodes = []
-                                if not nodes:
-                                    nodes = [n for n in ["Ресивер1", "Ресивер2", "Ресивер3", "Аккумулятор"] if n in df_p.columns]
-
-                                if nodes:
-                                    try:
-                                        arr = df_p["время_с"].to_numpy(dtype=float)
-                                        idxp = int(np.argmin(np.abs(arr - float(playhead_x))))
-                                    except Exception:
-                                        idxp = 0
-                                    idxp = max(0, min(idxp, len(df_p) - 1))
-
-                                    for n in nodes[:8]:
-                                        if n in df_p.columns:
-                                            rows.append({"показатель": f"P узел {n}", "значение": float(pa_abs_to_atm_g(df_p[n].iloc[idxp])), "ед": "атм (изб.)"})
-
-                            # --- df_mdot (потоки по веткам) ---
-                            if df_mdot is not None and "время_с" in df_mdot.columns and len(df_mdot) > 0:
-                                edges = st.session_state.get("flow_graph_edges")
-                                if not isinstance(edges, list) or not edges:
-                                    edges = st.session_state.get("anim_edges_svg")
-                                if not isinstance(edges, list):
-                                    edges = []
-                                if not edges:
-                                    edges = [c for c in df_mdot.columns if c != "время_с"][:4]
-
-                                if edges:
-                                    # unit conversion (same as tabB)
-                                    try:
-                                        rho_N = float(P_ATM) / (float(getattr(model_mod, 'R_AIR', 287.0)) * float(getattr(model_mod, 'T_AIR', 293.15)))
-                                        scale = 1000.0 * 60.0 / rho_N
-                                        unit = "Нл/мин"
-                                    except Exception:
-                                        scale = 1.0
-                                        unit = "кг/с"
-
-                                    try:
-                                        arr = df_mdot["время_с"].to_numpy(dtype=float)
-                                        idxm = int(np.argmin(np.abs(arr - float(playhead_x))))
-                                    except Exception:
-                                        idxm = 0
-                                    idxm = max(0, min(idxm, len(df_mdot) - 1))
-
-                                    for e in edges[:8]:
-                                        if e in df_mdot.columns:
-                                            rows.append({"показатель": f"Q {e}", "значение": float(df_mdot[e].iloc[idxm]) * float(scale), "ед": unit})
-
-                            if rows:
-                                dfv = pd.DataFrame(rows)
-                                safe_dataframe(dfv, height=min(360, 34 * (len(dfv) + 1) + 40))
-                            else:
-                                st.info("Нет данных для отображения на playhead.")
+                    render_playhead_results_section(
+                        get_playhead_ctrl_component(),
+                        dataset_id=dataset_id_ui,
+                        time_s=time_s,
+                        session_state=st.session_state,
+                        events_list=events_list,
+                        safe_dataframe_fn=safe_dataframe,
+                        df_main=df_main,
+                        df_p=df_p,
+                        df_mdot=df_mdot,
+                        playhead_x=playhead_x,
+                        pressure_from_pa_fn=pa_abs_to_atm_g,
+                        pressure_unit="атм (изб.)",
+                        stroke_scale=1.0,
+                        stroke_unit="м",
+                        flow_scale_and_unit_fn=flow_rate_display_scale_and_unit,
+                        p_atm=P_ATM,
+                        model_module=model_mod,
+                        info_fn=st.info,
+                        caption_fn=st.caption,
+                        expander_fn=st.expander,
+                        columns_fn=st.columns,
+                        checkbox_fn=st.checkbox,
+                    )
                     # Важно: st.tabs не "ленивый" — код внутри всех табов исполняется при каждом rerun.
                     # При анимации (auto-refresh) это выглядит как "бесконечный расчёт".
                     # Поэтому используем явный селектор и рендерим только выбранную ветку.
@@ -4023,440 +3920,101 @@ if SHOW_RESULTS or SHOW_TOOLS:
                     else:
                         _baseline_view_opts = ["Графики", "Анимация"]
 
-                    view_res = st.radio(
-                        "Раздел результатов",
+                    view_res = render_results_view_selector(
                         options=_baseline_view_opts,
-                        horizontal=True,
-                        key="baseline_view_res",
+                        session_state=st.session_state,
+                        cur_hash=cur_hash,
+                        test_pick=test_pick,
+                        log_event_fn=log_event,
+                        radio_fn=st.radio,
                     )
-                    # Auto-pause playhead on view switches to avoid accidental background load
-                    _prev_view_key = f'__prev_view_res__{cur_hash}::{test_pick}'
-                    _prev_view = st.session_state.get(_prev_view_key)
-                    if _prev_view != view_res:
-                        st.session_state[_prev_view_key] = view_res
-                        log_event("view_switch", view=view_res, test=test_pick)
-                        # Pause any running frontend playhead when switching views (esp. entering Animation)
-                        st.session_state['playhead_cmd'] = {
-                            'ts': int(time.time() * 1000),
-                            'set_playing': False,
-                        }
 
 
                     if view_res == "Графики":
                         st.subheader("Графики по времени")
                         tcol = "время_с"
 
-                        # крен/тангаж (град)
-                        if df_main is not None:
-                            plot_lines(
-                                df_main,
-                                tcol,
-                                ["крен_phi_рад", "тангаж_theta_рад"],
-                                title="Крен/тангаж",
-                                yaxis_title="град",
-                                transform_y=lambda a: a * 180.0 / math.pi,
+                        render_main_overview_graphs(
+                            plot_lines_fn=plot_lines,
+                            df_main=df_main,
+                            tcol=tcol,
+                            playhead_x=playhead_x,
+                            events=events_for_graphs,
+                            events_max=events_graph_max,
+                            events_show_labels=events_graph_labels,
+                            pressure_title="Давление (атм изб.)",
+                            pressure_yaxis_title="атм (изб.)",
+                            pressure_transform_fn=lambda a: (a - P_ATM) / ATM_PA,
+                        )
+
+                        render_mech_overview_graphs(
+                            plot_lines_fn=plot_lines,
+                            df_main=df_main,
+                            tcol=tcol,
+                            playhead_x=playhead_x,
+                            events=events_for_graphs,
+                            events_max=events_graph_max,
+                            events_show_labels=events_graph_labels,
+                            session_state=st.session_state,
+                            markdown_fn=st.markdown,
+                            columns_fn=st.columns,
+                            multiselect_fn=st.multiselect,
+                            caption_fn=st.caption,
+                        )
+
+                        render_node_pressure_expander(
+                            df_p=df_p,
+                            plot_lines_fn=plot_lines,
+                            session_state=st.session_state,
+                            playhead_x=playhead_x,
+                            events=events_for_graphs,
+                            events_max=events_graph_max,
+                            events_show_labels=events_graph_labels,
+                            title="Давление узлов (df_p, атм изб.)",
+                            yaxis_title="атм (изб.)",
+                            transform_y_fn=lambda a: (a - P_ATM) / ATM_PA,
+                            has_plotly=_HAS_PLOTLY,
+                            expander_fn=st.expander,
+                            multiselect_fn=st.multiselect,
+                            info_fn=st.info,
+                            caption_fn=st.caption,
+                        )
+
+                        with st.container():
+                            render_graph_studio_section(
+                                st,
+                                df_main=df_main,
+                                df_p=df_p,
+                                df_mdot=df_mdot,
+                                df_open=df_open,
+                                cache_key=cache_key,
+                                pressure_preset_label="Давления (Pa → атм изб.)",
+                                auto_units_label="Auto-units (Pa\u2192\u0430\u0442\u043c, \u0440\u0430\u0434\u2192\u0433\u0440\u0430\u0434)",
+                                drop_all_nan=False,
+                                session_state=st.session_state,
                                 playhead_x=playhead_x,
-                                events=events_for_graphs,
-                                events_max=events_graph_max,
-                                events_show_labels=events_graph_labels,
-
+                                events_for_graphs=events_for_graphs,
+                                plot_timeseries_fn=plot_studio_timeseries,
+                                excel_bytes_fn=df_to_excel_bytes,
+                                safe_dataframe_fn=safe_dataframe,
                             )
-
-                            # давления (быстро): из df_main
-                            press_cols = [c for c in [
-                                "давление_ресивер1_Па",
-                                "давление_ресивер2_Па",
-                                "давление_ресивер3_Па",
-                                "давление_аккумулятор_Па",
-                            ] if c in df_main.columns]
-                            if press_cols:
-                                plot_lines(
-                                    df_main,
-                                    tcol,
-                                    press_cols,
-                                    title="Давление (атм изб.)",
-                                    yaxis_title="атм (изб.)",
-                                    transform_y=lambda a: (a - P_ATM) / ATM_PA,
-                                    playhead_x=playhead_x,
-                                    events=events_for_graphs,
-                                    events_max=events_graph_max,
-                                    events_show_labels=events_graph_labels,
-
-                                )
-
-                            # выбор углов для механических графиков (синхр. с мех-анимацией)
-                            corners_mech = ["ЛП", "ПП", "ЛЗ", "ПЗ"]
-                            default_corners_mech = st.session_state.get("mech_plot_corners")
-                            if not default_corners_mech:
-                                default_corners_mech = corners_mech
-                            st.markdown("**Углы (механика) — синхронизация с анимацией**")
-                            col_pick, col_hint = st.columns([1, 4], gap="small")
-                            with col_pick:
-                                pick_corners_mech = st.multiselect(
-                                    "Углы",
-                                    options=corners_mech,
-                                    default=default_corners_mech,
-                                    key="mech_plot_corners",
-                                    label_visibility="collapsed",
-                                )
-                            with col_hint:
-                                st.caption("Клик по колесу/оси в вкладке «Анимация → Механика» обновляет этот выбор.")
-                            if not pick_corners_mech:
-                                pick_corners_mech = corners_mech
-
-                            # силы шин
-                            f_cols = []
-                            for cc in pick_corners_mech:
-                                col = f"нормальная_сила_шины_{cc}_Н"
-                                if col in df_main.columns:
-                                    f_cols.append(col)
-                            if not f_cols:
-                                f_cols = [c for c in df_main.columns if c.startswith("нормальная_сила_шины_")]
-                            if f_cols:
-                                plot_lines(df_main, tcol, f_cols, title="Нормальные силы шин", yaxis_title="Н", playhead_x=playhead_x, events=events_for_graphs, events_max=events_graph_max, events_show_labels=events_graph_labels)
-
-                            # положение штоков
-                            s_cols = []
-                            for cc in pick_corners_mech:
-                                col = f"положение_штока_{cc}_м"
-                                if col in df_main.columns:
-                                    s_cols.append(col)
-                            if s_cols:
-                                plot_lines(df_main, tcol, s_cols, title="Положение штоков", yaxis_title="м", playhead_x=playhead_x, events=events_for_graphs, events_max=events_graph_max, events_show_labels=events_graph_labels)
-
-                            # скорости штоков
-                            v_cols = []
-                            for cc in pick_corners_mech:
-                                col = f"скорость_штока_{cc}_м_с"
-                                if col in df_main.columns:
-                                    v_cols.append(col)
-                            if not v_cols:
-                                v_cols = [c for c in df_main.columns if c.startswith("скорость_штока_")]
-                            if v_cols:
-                                plot_lines(df_main, tcol, v_cols, title="Скорость штоков", yaxis_title="м/с", playhead_x=playhead_x, events=events_for_graphs, events_max=events_graph_max, events_show_labels=events_graph_labels)
-
-                        # Дополнительно: давления узлов из df_p (record_full=True)
-                        if df_p is not None:
-                            with st.expander("Давление узлов (df_p)", expanded=False):
-                                node_cols_p = [c for c in df_p.columns if c != "время_с"]
-                                if not node_cols_p:
-                                    st.info("В df_p нет колонок узлов давления.")
-                                else:
-                                    # если пользователь кликал по узлам на схеме — используем это как дефолт
-                                    default_nodes_plot = st.session_state.get("node_pressure_plot")
-                                    if not default_nodes_plot:
-                                        default_nodes_plot = st.session_state.get("anim_nodes_svg")
-                                    if not default_nodes_plot:
-                                        default_nodes_plot = [n for n in ["Ресивер1","Ресивер2","Ресивер3","Аккумулятор"] if n in node_cols_p]
-                                    if not default_nodes_plot:
-                                        default_nodes_plot = node_cols_p[: min(6, len(node_cols_p))]
-
-                                    pick_nodes_plot = st.multiselect("Узлы (df_p)", options=node_cols_p, default=default_nodes_plot, key="node_pressure_plot")
-                                    plot_lines(
-                                        df_p,
-                                        "время_с",
-                                        pick_nodes_plot,
-                                        title="Давление узлов (df_p, атм изб.)",
-                                        yaxis_title="атм (изб.)",
-                                        transform_y=lambda a: (a - P_ATM) / ATM_PA,
-                                        height=320,
-                                        plot_key="plot_node_pressure",
-                                        enable_select=True,
-                                        playhead_x=playhead_x,
-                                        events=events_for_graphs,
-                                        events_max=events_graph_max,
-                                        events_show_labels=events_graph_labels,
-
-                                    )
-                                    if _HAS_PLOTLY:
-                                        st.caption("Клик по графику выбирает узел и подсвечивает его на SVG схеме (вкладка ‘Анимация’).")
-
-
-                            # -----------------------------------
-                            # Graph Studio (произвольные сигналы) — v7.32
-                            # -----------------------------------
-                            st.divider()
-                            st.subheader("Конструктор графиков (Graph Studio)")
-                            st.caption("Выбирайте любые сигналы из df_main/df_p/df_mdot/df_open, стройте осциллограф (stack) или overlay, кликом прыгайте по времени.")
-
-                            with st.expander("Graph Studio: сигналы → график → экспорт", expanded=True):
-                                # доступные источники
-                                sources = {
-                                    "df_main": df_main,
-                                    "df_p (давления узлов)": df_p,
-                                    "df_mdot (потоки)": df_mdot,
-                                    "df_open (состояния клапанов)": df_open,
-                                }
-                                avail_sources = {k: v for k, v in sources.items() if v is not None and hasattr(v, "columns") and len(v)}
-                                if not avail_sources:
-                                    st.info("Нет источников данных для Graph Studio (нужно record_full=True или df_main).")
-                                else:
-                                    src_name = st.selectbox(
-                                        "Источник данных",
-                                        options=list(avail_sources.keys()),
-                                        index=0,
-                                        key=f"gs_src_{cache_key}",
-                                    )
-                                    df_src = avail_sources.get(src_name)
-
-                                    # определяем колонку времени
-                                    tcol_gs = "время_с" if (df_src is not None and "время_с" in df_src.columns) else None
-                                    if tcol_gs is None and df_src is not None and len(df_src.columns):
-                                        tcol_gs = str(df_src.columns[0])
-
-                                    if df_src is None or tcol_gs is None or tcol_gs not in df_src.columns:
-                                        st.warning("Не удалось определить колонку времени.")
-                                    else:
-                                        all_cols = [c for c in df_src.columns if c != tcol_gs]
-
-                                        q = st.text_input(
-                                            "Фильтр сигналов (подстрока или regex)",
-                                            value="",
-                                            key=f"gs_filter_{cache_key}",
-                                        )
-                                        if q:
-                                            try:
-                                                rx = re.compile(q, flags=re.IGNORECASE)
-                                                cols_f = [c for c in all_cols if rx.search(str(c))]
-                                            except Exception:
-                                                ql = q.lower()
-                                                cols_f = [c for c in all_cols if ql in str(c).lower()]
-                                        else:
-                                            cols_f = list(all_cols)
-
-                                        # presets
-                                        preset = st.selectbox(
-                                            "Пресет",
-                                            options=[
-                                                "(нет)",
-                                                "Механика: штоки (положение/скорость)",
-                                                "Механика: колёса (z + дорога)",
-                                                "Давления (Pa → атм изб.)",
-                                                "Крен/тангаж (рад → град)",
-                                            ],
-                                            index=0,
-                                            key=f"gs_preset_{cache_key}",
-                                        )
-
-                                        # current selection (dataset-specific)
-                                        # IMPORTANT (Streamlit): чтобы не получать предупреждение
-                                        # "... created with a default value but also had its value set via the Session State API",
-                                        # мы инициализируем st.session_state[gs_key] ДО создания виджета и НЕ передаём default=...
-                                        gs_key = f"gs_cols_{cache_key}::{src_name}"
-
-                                        def _sanitize_cols(sel: list) -> list:
-                                            return [c for c in sel if c in cols_f]
-
-                                        if (gs_key not in st.session_state) or (not isinstance(st.session_state.get(gs_key), list)):
-                                            st.session_state[gs_key] = cols_f[: min(8, len(cols_f))]
-                                        else:
-                                            st.session_state[gs_key] = _sanitize_cols(st.session_state.get(gs_key, []))
-
-                                        # Apply preset button
-                                        if st.button("Применить пресет", key=f"gs_apply_{cache_key}"):
-                                            if preset.startswith("Механика: штоки"):
-                                                pick = [c for c in all_cols if str(c).startswith("положение_штока_") or str(c).startswith("скорость_штока_")]
-                                            elif preset.startswith("Механика: колёса"):
-                                                pick = [c for c in all_cols if ("перемещение_колеса_" in str(c)) or str(c).startswith("дорога_")]
-                                            elif preset.startswith("Давления"):
-                                                pick = [c for c in all_cols if str(c).endswith("_Па") and ("давление" in str(c))]
-                                            elif preset.startswith("Крен/тангаж"):
-                                                pick = [c for c in all_cols if str(c) in ("крен_phi_рад", "тангаж_theta_рад")]
-                                            else:
-                                                pick = st.session_state.get(gs_key, [])
-                                            if pick:
-                                                st.session_state[gs_key] = _sanitize_cols(pick)
-
-                                        pick_cols = st.multiselect(
-                                            "Сигналы",
-                                            options=cols_f,
-                                            key=gs_key,
-                                        )
-                                        if not pick_cols:
-                                            st.info("Выберите хотя бы один сигнал.")
-                                        else:
-                                            colS1, colS2, colS3, colS4 = st.columns([1.0, 0.9, 0.8, 0.8], gap="medium")
-                                            with colS1:
-                                                gs_mode = st.radio(
-                                                    "Режим",
-                                                    options=["stack", "overlay"],
-                                                    index=0,
-                                                    format_func=lambda v: "Осциллограф (stack)" if v == "stack" else "Overlay (одна ось)",
-                                                    key=f"gs_mode_{cache_key}",
-                                                )
-                                            with colS2:
-                                                gs_maxp = st.number_input(
-                                                    "Макс точек",
-                                                    min_value=400,
-                                                    max_value=20000,
-                                                    value=2200,
-                                                    step=200,
-                                                    key=f"gs_maxp_{cache_key}",
-                                                )
-                                            with colS3:
-                                                gs_dec = st.selectbox(
-                                                    "Decimation",
-                                                    options=["minmax", "stride"],
-                                                    index=0,
-                                                    key=f"gs_dec_{cache_key}",
-                                                )
-                                            with colS4:
-                                                gs_render = st.selectbox(
-                                                    "Renderer",
-                                                    options=["svg", "webgl"],
-                                                    index=0,
-                                                    key=f"gs_render_{cache_key}",
-                                                )
-
-                                            colS5, colS6, colS7 = st.columns([1.0, 1.0, 1.0], gap="medium")
-                                            with colS5:
-                                                gs_auto_units = st.checkbox(
-                                                    "Auto-units (Pa→атм, рад→град)",
-                                                    value=True,
-                                                    key=f"gs_auto_units_{cache_key}",
-                                                )
-                                            with colS6:
-                                                gs_hover = st.checkbox(
-                                                    "Hover: x unified (по всем подграфикам)",
-                                                    value=True,
-                                                    key=f"gs_hover_{cache_key}",
-                                                )
-                                            with colS7:
-                                                gs_show_events = st.checkbox(
-                                                    "Показывать события (timeline)",
-                                                    value=True,
-                                                    key=f"gs_events_{cache_key}",
-                                                )
-
-                                            # Plot
-                                            plot_studio_timeseries(
-                                                df=df_src,
-                                                tcol=tcol_gs,
-                                                y_cols=pick_cols[:32],  # guard
-                                                title=f"Graph Studio: {src_name}",
-                                                mode=gs_mode,
-                                                max_points=int(gs_maxp),
-                                                decimation=gs_dec,
-                                                auto_units=bool(gs_auto_units),
-                                                render=gs_render,
-                                                hover_unified=bool(gs_hover),
-                                                playhead_x=playhead_x,
-                                                events=(events_for_graphs if (gs_show_events and events_for_graphs) else None),
-                                                plot_key=f"plot_graph_studio_{cache_key}",
-                                            )
-
-                                            # Export
-                                            st.markdown("**Экспорт выбранных сигналов**")
-                                            try:
-                                                df_exp = df_src[[tcol_gs] + [c for c in pick_cols if c in df_src.columns]].copy()
-                                                csv_bytes = df_exp.to_csv(index=False).encode("utf-8")
-                                                st.download_button(
-                                                    "Скачать CSV",
-                                                    data=csv_bytes,
-                                                    file_name="graph_studio_signals.csv",
-                                                    mime="text/csv",
-                                                    key=f"gs_csv_{cache_key}",
-                                                )
-                                                xlsx_bytes = df_to_excel_bytes({"signals": df_exp})
-                                                st.download_button(
-                                                    "Скачать Excel",
-                                                    data=xlsx_bytes,
-                                                    file_name="graph_studio_signals.xlsx",
-                                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                                    key=f"gs_xlsx_{cache_key}",
-                                                )
-                                            except Exception:
-                                                st.info("Экспорт недоступен для выбранного источника.")
-
-                                            # Quick stats on time window
-                                            try:
-                                                tarr = np.asarray(df_src[tcol_gs].to_numpy(), dtype=float)
-                                                t0 = float(np.min(tarr))
-                                                t1 = float(np.max(tarr))
-                                                tw = st.slider(
-                                                    "Окно времени для статистики (min/max/mean)",
-                                                    min_value=float(t0),
-                                                    max_value=float(t1),
-                                                    value=(float(t0), float(t1)),
-                                                    step=float(max(1e-3, (t1 - t0) / 200.0)),
-                                                    key=f"gs_tw_{cache_key}",
-                                                )
-                                                msk = (tarr >= float(tw[0])) & (tarr <= float(tw[1]))
-                                                rows = []
-                                                for c in pick_cols[:64]:
-                                                    if c not in df_src.columns:
-                                                        continue
-                                                    yv = np.asarray(df_src[c].to_numpy(), dtype=float)
-                                                    yv = yv[msk]
-                                                    if yv.size <= 0:
-                                                        continue
-                                                    rows.append({
-                                                        "сигнал": c,
-                                                        "min": float(np.nanmin(yv)),
-                                                        "max": float(np.nanmax(yv)),
-                                                        "mean": float(np.nanmean(yv)),
-                                                    })
-                                                if rows:
-                                                    safe_dataframe(pd.DataFrame(rows), height=min(420, 34 * (len(rows) + 1) + 40))
-                                            except Exception:
-                                                pass
 
 
                     elif view_res == "Потоки":
-                        st.subheader("Потоки по веткам")
-                        if df_mdot is None:
-                            st.info("Потоки доступны только при record_full=True.")
-                        else:
-                            edge_cols = [c for c in df_mdot.columns if c != "время_с"]
-                            default_edges = edge_cols[: min(6, len(edge_cols))]
-                            pick_edges = st.multiselect("Ветки/элементы", options=edge_cols, default=default_edges, key="flow_graph_edges")
-
-                            # перевод в Нл/мин (если есть константы)
-                            try:
-                                rho_N = float(P_ATM) / (float(getattr(model_mod, 'R_AIR', 287.0)) * float(getattr(model_mod, 'T_AIR', 293.15)))
-                                scale = 1000.0 * 60.0 / rho_N
-                                unit = "Нл/мин"
-                            except Exception:
-                                scale = 1.0
-                                unit = "кг/с"
-
-                            plot_lines(
-                                df_mdot,
-                                "время_с",
-                                pick_edges,
-                                title=f"Расход по веткам ({unit})",
-                                yaxis_title=unit,
-                                transform_y=lambda a: a * scale,
-                                height=360,
-                                plot_key="plot_flow_edges",
-                                enable_select=True,
-                                playhead_x=playhead_x,
-                                events=events_for_graphs,
-                                events_max=events_graph_max,
-                                events_show_labels=events_graph_labels,
-
-                            )
-                            if _HAS_PLOTLY:
-                                st.caption("Клик по графику выбирает ветку и подсвечивает её на SVG схеме (вкладка ‘Анимация’).")
-
-                            if df_open is not None:
-                                # открыто/закрыто (0/1)
-                                open_cols = [c for c in pick_edges if c in df_open.columns]
-                                if open_cols:
-                                    plot_lines(
-                                        df_open,
-                                        "время_с",
-                                        open_cols,
-                                        title="Состояния элементов (open=1)",
-                                        yaxis_title="0/1",
-                                        transform_y=lambda a: a,
-                                        height=220,
-                                        playhead_x=playhead_x,
-                                        events=events_for_graphs,
-                                        events_max=events_graph_max,
-                                        events_show_labels=events_graph_labels,
-
-                                    )
+                        render_flow_edge_graphs_section(
+                            st,
+                            df_mdot=df_mdot,
+                            df_open=df_open,
+                            playhead_x=playhead_x,
+                            events_for_graphs=events_for_graphs,
+                            events_graph_max=events_graph_max,
+                            events_graph_labels=events_graph_labels,
+                            p_atm=P_ATM,
+                            model_module=model_mod,
+                            plot_lines_fn=plot_lines,
+                            flow_scale_and_unit_fn=flow_rate_display_scale_and_unit,
+                            has_plotly=_HAS_PLOTLY,
+                        )
 
                     elif view_res == "Энерго‑аудит":
                         st.subheader("Энерго‑аудит")
@@ -4474,37 +4032,58 @@ if SHOW_RESULTS or SHOW_TOOLS:
 
 
                     elif view_res == "Анимация":
-                        st.subheader("Анимация")
-
-                        # st.tabs не ленивый — для анимации нужно, чтобы исполнялся только выбранный раздел.
-                        anim_view = st.radio(
-                            "Подраздел",
-                            options=["Механика", "Потоки (инструмент)", "Пневмосхема (SVG)"],
-                            horizontal=True,
-                            key=f"anim_view_{cur_hash}::{test_pick}",
+                        anim_view = render_animation_view_selector(
+                            st,
+                            cur_hash=cur_hash,
+                            test_pick=test_pick,
                         )
+
+                        def _render_flow_tool_animation() -> None:
+                            render_flow_animation_panel(
+                                st,
+                                df_mdot=df_mdot,
+                                df_open=df_open,
+                                p_atm=P_ATM,
+                                model_module=model_mod,
+                                flow_scale_and_unit_fn=flow_rate_display_scale_and_unit,
+                                render_flow_panel_html_fn=render_flow_panel_html,
+                            )
+
+                        def _render_svg_scheme_animation() -> None:
+                            render_svg_scheme_section(
+                                st,
+                                st.session_state,
+                                df_mdot=df_mdot,
+                                df_open=df_open,
+                                df_p=df_p,
+                                base_dir=HERE,
+                                default_svg_mapping_path=DEFAULT_SVG_MAPPING_PATH,
+                                route_write_view_box=view_box,
+                                do_rerun_fn=do_rerun,
+                                log_event_fn=log_event,
+                                p_atm=P_ATM,
+                                model_module=model_mod,
+                                pressure_divisor=ATM_PA,
+                                pressure_unit="атм (изб.)",
+                                dataset_id=dataset_id_ui,
+                                safe_dataframe_fn=safe_dataframe,
+                                flow_scale_and_unit_fn=flow_rate_display_scale_and_unit,
+                                get_component_fn=get_pneumo_svg_flow_component,
+                                render_svg_flow_animation_html_fn=render_svg_flow_animation_html,
+                                has_svg_autotrace=_HAS_SVG_AUTOTRACE,
+                                extract_polylines_fn=extract_polylines,
+                                auto_build_mapping_from_svg_fn=auto_build_mapping_from_svg,
+                                detect_component_bboxes_fn=detect_component_bboxes,
+                                name_score_fn=_name_score,
+                                shortest_path_fn=shortest_path_between_points,
+                                evaluate_quality_fn=evaluate_route_quality,
+                            )
 
                         # -----------------------------------
                         # (1) Механическая анимация (упрощённая)
                         # -----------------------------------
-                        if anim_view == "Механика":
-                            st.caption(
-                                "Упрощённая анимация механики: фронтальный вид (крен) и боковой вид (тангаж). "
-                                "Показывает движение рамы/колёс и ход штока по данным df_main."
-                            )
-
-                            st.radio(
-                                "Клик по механике",
-                                options=["replace", "add"],
-                                format_func=lambda v: "Заменять выбор" if v == "replace" else "Добавлять к выбору",
-                                horizontal=True,
-                                index=0,
-                                key="mech_click_mode",
-                            )
-
-                            if df_main is None or "время_с" not in df_main.columns:
-                                st.warning("Нет df_main для анимации механики.")
-                            else:
+                        if anim_view == ANIMATION_VIEW_MECHANICS:
+                            if render_mechanical_animation_intro(st, df_main=df_main):
                                 colM1, colM2, colM3 = st.columns(3)
                                 with colM1:
                                     px_per_m = st.slider("Масштаб (px/м)", 500, 4000, 2000, step=100, key="mech_px_per_m")
@@ -5219,1978 +4798,18 @@ if SHOW_RESULTS or SHOW_TOOLS:
                                             key="mech3d_pick_event",
                                             default=None,
                                         )
-                                with st.expander("Показать исходную механическую схему (SVG/PNG)", expanded=False):
-                                    png = HERE / "assets" / "mech_scheme.png"
-                                    if png.exists():
-                                        safe_image(str(png))
-                                    svg_path = HERE / "assets" / "mech_scheme.svg"
-                                    if svg_path.exists():
-                                        st.download_button(
-                                            "Скачать mech_scheme.svg",
-                                            data=svg_path.read_bytes(),
-                                            file_name="mech_scheme.svg",
-                                            mime="image/svg+xml",
-                                        )
-
-                        # -----------------------------------
-                        # (2) Потоки: инструментальная анимация
-                        # -----------------------------------
-                        elif anim_view == "Потоки (инструмент)":
-                            if df_mdot is None:
-                                st.info("Анимация потоков доступна только при record_full=True (df_mdot).")
-                            else:
-                                st.caption("MVP: каждая выбранная ветка рисуется отдельной линией, по ней бегает маркер.")
-                                edge_cols = [c for c in df_mdot.columns if c != "время_с"]
-                                # по умолчанию берём несколько «похожих на магистраль»
-                                defaults = [c for c in edge_cols if ("Ресивер3" in c or "выхлоп" in c or "предохран" in c)][:8]
-                                if not defaults:
-                                    defaults = edge_cols[: min(8, len(edge_cols))]
-                                pick_edges = st.multiselect("Ветки для анимации", options=edge_cols, default=defaults, key="anim_edges")
-                                if len(pick_edges) == 0:
-                                    st.info("Выберите хотя бы одну ветку.")
-                                else:
-                                    # конверсия в Нл/мин
-                                    try:
-                                        rho_N = float(P_ATM) / (float(getattr(model_mod, "R_AIR", 287.0)) * float(getattr(model_mod, "T_AIR", 293.15)))
-                                        scale = 1000.0 * 60.0 / rho_N
-                                        unit = "Нл/мин"
-                                    except Exception:
-                                        scale = 1.0
-                                        unit = "кг/с"
-
-                                    time_s = df_mdot["время_с"].astype(float).tolist()
-                                    edge_series = []
-                                    for c in pick_edges:
-                                        q = (df_mdot[c].astype(float).to_numpy() * scale).tolist()
-                                        if df_open is not None and c in df_open.columns:
-                                            op = df_open[c].astype(int).tolist()
-                                        else:
-                                            op = None
-                                        edge_series.append({"name": c, "q": q, "open": op, "unit": unit})
-
-                                    render_flow_panel_html(time_s=time_s, edge_series=edge_series, height=560)
-
-                        # -----------------------------------
-                        # (3) Потоки: анимация по SVG схеме + автосопоставление имён
-                        # -----------------------------------
-                        elif anim_view == "Пневмосхема (SVG)":
-                            if df_mdot is None:
-                                st.info("Анимация по схеме (SVG) доступна только при record_full=True (df_mdot + mapping).")
-                            else:
-                                st.caption(
-                                    "Анимация поверх SVG схемы работает по mapping JSON: "
-                                    "ветка → polyline(points), узел → [x,y] в координатах SVG."
+                                render_mechanical_scheme_asset_expander(
+                                    st,
+                                    base_dir=HERE,
+                                    safe_image_fn=safe_image,
                                 )
 
-                                st.radio(
-                                    "Клик по схеме",
-                                    options=["add", "replace"],
-                                    format_func=lambda v: "Добавлять к выбору" if v == "add" else "Заменять выбор",
-                                    horizontal=True,
-                                    key="svg_click_mode",
-                                )
-
-                                edge_cols = [c for c in df_mdot.columns if c != "время_с"]
-
-                                # Узлы давления (подписи на схеме) берём из df_p при record_full=True
-                                if df_p is not None:
-                                    node_cols = [c for c in df_p.columns if c != "время_с"]
-                                else:
-                                    node_cols = []
-
-                                if node_cols:
-                                    default_nodes = [n for n in [
-                                        "Ресивер1", "Ресивер2", "Ресивер3", "Аккумулятор",
-                                        "узел_после_рег_Pmin_питание_Р2", "узел_после_предохран_Pmax",
-                                        "узел_после_рег_Pmid", "узел_после_рег_Pmin_сброс", "узел_после_рег_заряд_аккумулятора",
-                                        "Магистраль_ЛП2_ПЗ2", "Магистраль_ПП2_ЛЗ2",
-                                    ] if n in node_cols]
-                                    if not default_nodes:
-                                        default_nodes = node_cols[: min(8, len(node_cols))]
-
-                                    pick_nodes_svg = st.multiselect(
-                                        "Узлы давления для отображения на схеме",
-                                        options=node_cols,
-                                        default=default_nodes,
-                                        key="anim_nodes_svg",
-                                    )
-                                else:
-                                    pick_nodes_svg = []
-                                    st.info("Подписи давления на схеме доступны только при record_full=True (df_p).")
-
-                                # --- SVG источник (по умолчанию: assets/pneumo_scheme.svg)
-                                default_svg_path = HERE / "assets" / "pneumo_scheme.svg"
-                                default_svg_text = ""
-                                if default_svg_path.exists():
-                                    try:
-                                        default_svg_text = default_svg_path.read_text(encoding="utf-8")
-                                    except Exception:
-                                        default_svg_text = default_svg_path.read_text(errors="ignore")
-
-                                svg_upl = st.file_uploader(
-                                    "SVG файл схемы (опционально, если хотите заменить)",
-                                    type=["svg"],
-                                    key="svg_scheme_upl",
-                                )
-                                if svg_upl is not None:
-                                    try:
-                                        svg_text = svg_upl.getvalue().decode("utf-8")
-                                    except Exception:
-                                        svg_text = svg_upl.getvalue().decode("utf-8", errors="ignore")
-                                else:
-                                    svg_text = default_svg_text
-
-                                if not svg_text:
-                                    st.warning("SVG не найден. Положите файл в assets/pneumo_scheme.svg или загрузите через uploader.")
-                                else:
-                                    svg_inline = strip_svg_xml_header(svg_text)
-
-                                    # viewBox для шаблона mapping
-                                    vb = "0 0 1920 1080"
-                                    m = re.search(r'viewBox\s*=\s*"([^"]+)"', svg_inline)
-                                    if m:
-                                        vb = m.group(1)
-
-                                    template_mapping = {
-                                        "version": 2,
-                                        "viewBox": vb,
-                                        "edges": {c: [] for c in edge_cols},
-                                        "nodes": {n: None for n in pick_nodes_svg},
-                                    }
-                                    st.download_button(
-                                        "Скачать шаблон mapping JSON",
-                                        data=json.dumps(template_mapping, ensure_ascii=False, indent=2).encode("utf-8"),
-                                        file_name="pneumo_svg_mapping_template.json",
-                                        mime="application/json",
-                                    )
-
-                                    with st.expander("Авторазметка из SVG (beta)", expanded=False):
-                                        if not _HAS_SVG_AUTOTRACE:
-                                            st.error("pneumo_solver_ui.svg_autotrace не импортируется. Проверьте целостность пакета pneumo_solver_ui.")
-                                        else:
-                                            st.info(
-                                                "Авторазметка пытается построить черновой mapping JSON по геометрии линий (<line>) "
-                                                "и текстовым меткам (<text>, transform=matrix...). "
-                                                "Это помогает быстро получить стартовый mapping без ручного клика по каждой ветке."
-                                            )
-
-                                            colAT1, colAT2, colAT3 = st.columns(3)
-                                            with colAT1:
-                                                tol_merge = st.slider(
-                                                    "Tol склейки концов (px)",
-                                                    0.5, 8.0, 2.1, step=0.1,
-                                                    key="svg_autotrace_tol_merge",
-                                                )
-                                            with colAT2:
-                                                max_label_dist = st.slider(
-                                                    "Макс. расстояние метка → трубка (px)",
-                                                    10.0, 300.0, 80.0, step=5.0,
-                                                    key="svg_autotrace_max_label_dist",
-                                                )
-                                            with colAT3:
-                                                min_name_score = st.slider(
-                                                    "Порог сходства имён (fuzzy)",
-                                                    0.50, 0.95, 0.75, step=0.05,
-                                                    key="svg_autotrace_min_name_score",
-                                                )
-
-                                            colAT4, colAT5, colAT6 = st.columns(3)
-                                            with colAT4:
-                                                simplify_eps = st.slider(
-                                                    "Упростить полилинии (epsilon, px)",
-                                                    0.0, 5.0, 0.0, step=0.2,
-                                                    key="svg_autotrace_simplify_eps",
-                                                )
-                                            with colAT5:
-                                                snap_nodes = st.checkbox(
-                                                    "Snap узлы к графу",
-                                                    value=True,
-                                                    key="svg_autotrace_snap_nodes",
-                                                )
-                                            with colAT6:
-                                                prefer_junc = st.checkbox(
-                                                    "Prefer junction (deg≠2)",
-                                                    value=True,
-                                                    key="svg_autotrace_prefer_junction",
-                                                )
-                                            node_snap_max_dist = st.slider(
-                                                "Макс. dist метка→junction для snap (px)",
-                                                5.0, 160.0, 40.0, step=5.0,
-                                                key="svg_autotrace_snap_dist",
-                                            )
-
-    # Выбираем ветки/узлы, для которых строим mapping
-                                            default_auto_edges = edge_cols[: min(16, len(edge_cols))]
-                                            auto_edges = st.multiselect(
-                                                "Ветки, для которых построить mapping.edges",
-                                                options=edge_cols,
-                                                default=default_auto_edges,
-                                                key="svg_autotrace_edges",
-                                            )
-                                            auto_nodes = st.multiselect(
-                                                "Узлы, для которых построить mapping.nodes (координаты подписей давления)",
-                                                options=(pick_nodes_svg if pick_nodes_svg else node_cols),
-                                                default=(pick_nodes_svg if pick_nodes_svg else []),
-                                                key="svg_autotrace_nodes",
-                                            )
-
-                                            colB1, colB2, colB3 = st.columns(3)
-                                            with colB1:
-                                                do_analyze = st.button("Проанализировать SVG", key="btn_svg_autotrace_analyze")
-                                            with colB2:
-                                                do_build = st.button("Сгенерировать mapping (auto)", key="btn_svg_autotrace_build")
-                                            with colB3:
-                                                do_clear = st.button("Очистить результаты", key="btn_svg_autotrace_clear")
-
-                                            if do_clear:
-                                                for k in ["svg_autotrace_analysis", "svg_autotrace_report", "svg_autotrace_components"]:
-                                                    st.session_state.pop(k, None)
-                                                st.success("Очищено.")
-
-                                            if do_analyze:
-                                                try:
-                                                    analysis = extract_polylines(svg_inline, tol_merge=float(tol_merge))  # type: ignore
-                                                    st.session_state["svg_autotrace_analysis"] = analysis
-                                                    st.success(
-                                                        f"SVG разобран: polylines={len(analysis.get('polylines', []))}, "
-                                                        f"nodes={len(analysis.get('nodes', []))}, edges={len(analysis.get('edges', []))}"
-                                                    )
-                                                except Exception as e:
-                                                    st.error(f"Ошибка анализа SVG: {e}")
-
-                                            if do_build:
-                                                try:
-                                                    mapping_auto, report_auto = auto_build_mapping_from_svg(  # type: ignore
-                                                        svg_text=svg_inline,
-                                                        edge_names=list(auto_edges),
-                                                        node_names=list(auto_nodes),
-                                                        tol_merge=float(tol_merge),
-                                                        max_label_dist=float(max_label_dist),
-                                                        min_name_score=float(min_name_score),
-                                                        simplify_epsilon=float(simplify_eps),
-                                                        snap_nodes_to_graph=bool(snap_nodes),
-                                                        prefer_junctions=bool(prefer_junc),
-                                                        node_snap_max_dist=float(node_snap_max_dist),
-                                                    )
-                                                    st.session_state["svg_mapping_text"] = json.dumps(mapping_auto, ensure_ascii=False, indent=2)
-                                                    st.session_state["svg_autotrace_report"] = report_auto
-                                                    st.success(
-                                                        f"mapping обновлён (edges={len(mapping_auto.get('edges', {}))}, "
-                                                        f"nodes={len(mapping_auto.get('nodes', {}))}). "
-                                                        "Прокрутите ниже — mapping уже подставлен в текстовое поле."
-                                                    )
-                                                except Exception as e:
-                                                    st.error(f"Ошибка авторазметки: {e}")
-
-                                            analysis = st.session_state.get("svg_autotrace_analysis")
-                                            report_auto = st.session_state.get("svg_autotrace_report")
-
-                                            if analysis:
-                                                with st.expander("Результаты анализа SVG", expanded=False):
-                                                    try:
-                                                        deg_counts = analysis.get("degree_counts", {})
-                                                        st.write(
-                                                            {
-                                                                "viewBox": analysis.get("viewBox"),
-                                                                "nodes": len(analysis.get("nodes", [])),
-                                                                "edges": len(analysis.get("edges", [])),
-                                                                "polylines": len(analysis.get("polylines", [])),
-                                                                "degree_counts": deg_counts,
-                                                                "junction_nodes": len(analysis.get("junction_nodes", [])),
-                                                                "poly_endpoints": len(analysis.get("poly_endpoints", [])),
-                                                            }
-                                                        )
-                                                        df_txt = pd.DataFrame(analysis.get("texts", []))
-                                                        if len(df_txt):
-                                                            # небольшая фильтрация “шумных” P/Q
-                                                            df_show = df_txt.copy()
-                                                            df_show["len"] = df_show["text"].astype(str).str.len()
-                                                            df_show = df_show.sort_values(["len", "text"]).head(200)
-                                                            safe_dataframe(df_show[["text", "x", "y", "klass"]], height=280)
-                                                        st.download_button(
-                                                            "Скачать анализ SVG (json)",
-                                                            data=json.dumps(analysis, ensure_ascii=False, indent=2).encode("utf-8"),
-                                                            file_name="svg_analysis.json",
-                                                            mime="application/json",
-                                                        )
-                                                    except Exception as e:
-                                                        st.error(f"Не удалось показать анализ: {e}")
-
-                                            if report_auto:
-                                                with st.expander("Отчёт авторазметки (mapping)", expanded=False):
-                                                    try:
-                                                        st.write(report_auto.get("summary", {}))
-                                                        df_edges = pd.DataFrame(report_auto.get("edges", []))
-                                                        if len(df_edges):
-                                                            safe_dataframe(df_edges.sort_values(["score", "dist"], ascending=[False, True]), height=260)
-                                                        df_nodes = pd.DataFrame(report_auto.get("nodes", []))
-                                                        if len(df_nodes):
-                                                            try:
-                                                                df_nodes_show = df_nodes.sort_values(
-                                                                    ["score", "dist_label_poly"], ascending=[False, True]
-                                                                )
-                                                            except Exception:
-                                                                df_nodes_show = df_nodes
-                                                            safe_dataframe(df_nodes_show, height=240)
-                                                        if report_auto.get("unmatched_nodes"):
-                                                            st.warning(f"Не сопоставлены {len(report_auto['unmatched_nodes'])} узлов.")
-                                                        if report_auto.get("unmatched_edges"):
-                                                            st.warning(f"Не сопоставлены {len(report_auto['unmatched_edges'])} веток.")
-                                                        st.download_button(
-                                                            "Скачать отчёт авторазметки (json)",
-                                                            data=json.dumps(report_auto, ensure_ascii=False, indent=2).encode("utf-8"),
-                                                            file_name="svg_autotrace_report.json",
-                                                            mime="application/json",
-                                                        )
-                                                    except Exception as e:
-                                                        st.error(f"Не удалось показать отчёт: {e}")
-
-                                            with st.expander("Компоненты (bbox по текстовым меткам)", expanded=False):
-                                                st.caption("Грубая оценка bbox компонентов вокруг меток типа 'Ресивер', 'Аккумулятор', 'Рег.'.")
-                                                comp_r = st.slider("Радиус поиска линий вокруг метки (px)", 40, 260, 120, step=10, key="svg_comp_radius")
-                                                if st.button("Найти компоненты", key="btn_svg_find_components"):
-                                                    try:
-                                                        comps = detect_component_bboxes(svg_inline, radius=float(comp_r))  # type: ignore
-                                                        st.session_state["svg_autotrace_components"] = comps
-                                                        st.success(f"Найдено компонентов: {len(comps)}")
-                                                    except Exception as e:
-                                                        st.error(f"Ошибка поиска компонентов: {e}")
-
-                                                comps = st.session_state.get("svg_autotrace_components", [])
-                                                if comps:
-                                                    dfc = pd.DataFrame(comps)
-                                                    safe_dataframe(dfc, height=260)
-                                                    st.download_button(
-                                                        "Скачать компоненты (json)",
-                                                        data=json.dumps(comps, ensure_ascii=False, indent=2).encode("utf-8"),
-                                                        file_name="svg_components.json",
-                                                        mime="application/json",
-                                                    )
-
-
-                                    with st.expander("Путь по схеме (connectivity beta)", expanded=False):
-                                        st.info(
-                                            "Инструмент ниже ищет кратчайший путь по *геометрическому графу* труб (line->nodes/edges), "
-                                            "между двумя текстовыми метками SVG. "
-                                            "Результат подсвечивается на схеме как маршрут (overlay)."
-                                        )
-
-                                        analysis = st.session_state.get("svg_autotrace_analysis")
-                                        if not analysis:
-                                            st.warning("Сначала нажмите **Проанализировать SVG** в блоке выше.")
-                                        else:
-                                            texts = analysis.get("texts", [])
-                                            if not isinstance(texts, list) or len(texts) == 0:
-                                                st.warning("В SVG не найдены текстовые метки (<text>).")
-                                            else:
-                                                # --- фильтрация “шумных” меток (P/Q и т.п.)
-                                                def _is_noise_label(s: str) -> bool:
-                                                    s = (s or "").strip()
-                                                    if not s:
-                                                        return True
-                                                    s_up = s.upper()
-                                                    if s_up in {"P", "Q", "PQ", "PQPQ"}:
-                                                        return True
-                                                    if len(s) == 1:
-                                                        return True
-                                                    return False
-
-                                                flt = st.text_input(
-                                                    "Фильтр меток (подстрока, регистр не важен)",
-                                                    value=st.session_state.get("svg_route_filter", ""),
-                                                    key="svg_route_filter",
-                                                )
-
-                                                items = []
-                                                for ti, t in enumerate(texts):
-                                                    try:
-                                                        label = str(t.get("text", "")).strip()
-                                                        if _is_noise_label(label):
-                                                            continue
-                                                        if flt and (flt.lower() not in label.lower()):
-                                                            continue
-                                                        x = float(t.get("x", 0.0))
-                                                        y = float(t.get("y", 0.0))
-                                                        items.append((ti, label, x, y))
-                                                    except Exception:
-                                                        continue
-
-                                                if len(items) == 0:
-                                                    st.warning("Нет подходящих меток (после фильтрации). Попробуйте очистить фильтр.")
-                                                else:
-                                                    # ограничим список, чтобы UI не тормозил
-                                                    items = items[:600]
-
-                                                    def _fmt_item(it):
-                                                        ti, label, x, y = it
-                                                        return f"#{ti:03d} | {label} | ({x:.0f},{y:.0f})"
-
-                                                    opts = [_fmt_item(it) for it in items]
-                                                    opt_to_idx = {o: int(o.split('|')[0].strip().lstrip('#')) for o in opts}
-
-
-                                                    # --- Ассистент разметки веток (guided): выбор целевой ветки + подсказки меток
-                                                    edge_target = st.session_state.get("svg_route_assign_edge", edge_cols[0] if edge_cols else "")
-                                                    with st.expander("Ассистент разметки веток (guided)", expanded=False):
-                                                        if not edge_cols:
-                                                            st.info("Нет df_mdot веток (edge_cols пуст). Запустите детальный прогон с **record_full=True**.")
-                                                        else:
-                                                            # применяем запрос авто‑перехода к неразмеченной ветке (до создания selectbox)
-                                                            _adv = st.session_state.pop("route_advance_to_unmapped", None)
-                                                            if isinstance(_adv, str) and _adv in edge_cols:
-                                                                st.session_state["svg_route_assign_edge"] = _adv
-
-                                                            # текущее покрытие mapping.edges
-                                                            _map_txt = st.session_state.get("svg_mapping_text", "{}") or "{}"
-                                                            mapping_current = {}
-                                                            try:
-                                                                mapping_current = json.loads(_map_txt)
-                                                                if not isinstance(mapping_current, dict):
-                                                                    mapping_current = {}
-                                                            except Exception:
-                                                                mapping_current = {}
-                                                            _edges_map = mapping_current.get("edges") if isinstance(mapping_current, dict) else {}
-                                                            if not isinstance(_edges_map, dict):
-                                                                _edges_map = {}
-                                                            mapped_set = set(_edges_map.keys())
-                                                            unmapped = [e for e in edge_cols if e not in mapped_set]
-                                                            st.caption(f"Покрытие mapping.edges: {len(mapped_set)}/{len(edge_cols)} веток. Неразмечено: {len(unmapped)}.")
-
-                                                            colW1, colW2, colW3, colW4 = st.columns([1, 1, 1, 2])
-                                                            with colW1:
-                                                                if st.button("Следующая неразмеченная", key="btn_route_next_unmapped"):
-                                                                    if unmapped:
-                                                                        st.session_state["svg_route_assign_edge"] = unmapped[0]
-                                                            with colW2:
-                                                                st.checkbox("Автопереход после записи", value=True, key="route_auto_next")
-                                                            with colW3:
-                                                                st.checkbox("Показать таблицу покрытия", value=False, key="route_show_cov")
-                                                            with colW4:
-                                                                if st.button("Автофильтр по имени ветки", key="btn_route_autofilter_edge"):
-                                                                    try:
-                                                                        tgt0 = str(st.session_state.get("svg_route_assign_edge", "") or "")
-                                                                        # ищем сигнатуры типа ЛП1/ПЗ2
-                                                                        ms = re.findall(r"(ЛП|ЛЗ|ПП|ПЗ)\s*([0-9]+)", tgt0.upper())
-                                                                        if ms:
-                                                                            st.session_state["svg_route_filter"] = f"{ms[0][0]}{ms[0][1]}"
-                                                                        else:
-                                                                            tt = tgt0.strip().split()
-                                                                            if tt:
-                                                                                st.session_state["svg_route_filter"] = tt[0][:24]
-                                                                    except Exception:
-                                                                        pass
-
-                                                            st.checkbox("Очистить маршрут после записи", value=False, key="route_clear_after_assign")
-
-                                                            if st.session_state.get("route_show_cov"):
-                                                                try:
-                                                                    df_cov = pd.DataFrame([
-                                                                        {
-                                                                            "edge": e,
-                                                                            "mapped": (e in mapped_set),
-                                                                            "segments": len(_edges_map.get(e, [])) if isinstance(_edges_map.get(e, []), list) else 0,
-                                                                        }
-                                                                        for e in edge_cols
-                                                                    ])
-                                                                    safe_dataframe(df_cov.sort_values(["mapped", "edge"]), height=220)
-                                                                except Exception as e:
-                                                                    st.warning(f"Не удалось построить таблицу покрытия: {e}")
-
-                                                            edge_target = st.selectbox(
-                                                                "Целевая ветка модели (df_mdot) для разметки",
-                                                                options=edge_cols,
-                                                                key="svg_route_assign_edge",
-                                                            )
-
-                                                            st.markdown("**Подсказки START/END меток по имени ветки (fuzzy):**")
-                                                            colS1, colS2, colS3 = st.columns([1, 1, 2])
-                                                            with colS1:
-                                                                sugg_thr = st.slider("Порог", 0.0, 1.0, 0.55, step=0.01, key="route_label_sugg_thr")
-                                                            with colS2:
-                                                                sugg_k = st.slider("Top‑K", 3, 30, 12, step=1, key="route_label_sugg_k")
-                                                            with colS3:
-                                                                if st.button("↔ Поменять START/END", key="btn_swap_route_labels"):
-                                                                    s0 = st.session_state.get("svg_route_start_opt")
-                                                                    e0 = st.session_state.get("svg_route_end_opt")
-                                                                    if s0 is not None and e0 is not None:
-                                                                        st.session_state["svg_route_start_opt"] = e0
-                                                                        st.session_state["svg_route_end_opt"] = s0
-
-                                                            def _latinize_sig(s: str) -> str:
-                                                                if not isinstance(s, str):
-                                                                    s = str(s)
-                                                                table = str.maketrans({
-                                                                    "Л": "L", "П": "P", "З": "Z",
-                                                                    "л": "l", "п": "p", "з": "z",
-                                                                    "Р": "R", "р": "r",
-                                                                    "В": "B", "в": "b",
-                                                                    "А": "A", "а": "a",
-                                                                    "Е": "E", "е": "e",
-                                                                    "К": "K", "к": "k",
-                                                                    "М": "M", "м": "m",
-                                                                    "Н": "H", "н": "h",
-                                                                    "О": "O", "о": "o",
-                                                                    "С": "C", "с": "c",
-                                                                    "Т": "T", "т": "t",
-                                                                    "У": "Y", "у": "y",
-                                                                    "Х": "X", "х": "x",
-                                                                })
-                                                                return s.translate(table)
-
-                                                            def _score_edge_label(edge_name: str, label: str) -> float:
-                                                                try:
-                                                                    s1 = _name_score(edge_name, label)
-                                                                    s2 = _name_score(_latinize_sig(edge_name), _latinize_sig(label))
-                                                                    return float(max(s1, s2))
-                                                                except Exception:
-                                                                    return 0.0
-
-                                                            try:
-                                                                tgt = str(edge_target or "")
-                                                                cand = []
-                                                                for it in items:
-                                                                    ti, lab, x, y = it
-                                                                    sc = _score_edge_label(tgt, str(lab))
-                                                                    if sc >= float(sugg_thr):
-                                                                        cand.append((sc, it))
-                                                                cand.sort(key=lambda x: x[0], reverse=True)
-                                                                cand = cand[: int(sugg_k)]
-                                                                if not cand:
-                                                                    st.caption("Подсказки не найдены (попробуйте снизить порог или используйте фильтр/клик по схеме).")
-                                                                else:
-                                                                    for j, (sc, it) in enumerate(cand):
-                                                                        ti, lab, x, y = it
-                                                                        c1, c2, c3, c4 = st.columns([4, 1, 1, 1])
-                                                                        c1.write(_fmt_item(it))
-                                                                        c2.metric("score", f"{sc:.2f}")
-                                                                        if c3.button("START", key=f"btn_sugg_start_{ti}_{j}"):
-                                                                            st.session_state["svg_route_start_opt"] = _fmt_item(it)
-                                                                        if c4.button("END", key=f"btn_sugg_end_{ti}_{j}"):
-                                                                            st.session_state["svg_route_end_opt"] = _fmt_item(it)
-                                                            except Exception as e:
-                                                                st.warning(f"Не удалось построить подсказки: {e}")
-
-
-
-                                                    # --- AUTO pipeline: propose → find route → write mapping.edges → next (beta)
-                                                    with st.expander("AUTO: propose → route → mapping (beta)", expanded=False):
-                                                        if not edge_cols:
-                                                            st.info("Нет df_mdot веток (edge_cols пуст). Запустите детальный прогон с **record_full=True**.")
-                                                        else:
-                                                            edge_auto = str(st.session_state.get("svg_route_assign_edge", "") or "")
-                                                            if not edge_auto:
-                                                                st.warning("Сначала выберите целевую ветку в ассистенте выше (guided).")
-                                                            else:
-                                                                st.caption(f"Текущая целевая ветка: **{edge_auto}**")
-                                                
-                                                                # Параметры авто‑подбора меток и записи
-                                                                colAA1, colAA2 = st.columns(2)
-                                                                with colAA1:
-                                                                    auto_strategy = st.selectbox(
-                                                                        "Стратегия выбора START/END (из top‑K по score)",
-                                                                        options=[
-                                                                            "Top2",
-                                                                            "Best+Farthest",
-                                                                            "FarthestPair",
-                                                                        ],
-                                                                        index=1,
-                                                                        key="route_auto_strategy",
-                                                                        help=(
-                                                                            "Top2: берём 2 лучших по score. "
-                                                                            "Best+Farthest: START=лучший, END=самый дальний из top‑K. "
-                                                                            "FarthestPair: выбираем самую далёкую пару из top‑K."
-                                                                        ),
-                                                                    )
-                                                                with colAA2:
-                                                                    auto_write_mode = st.radio(
-                                                                        "Режим записи (AUTO)",
-                                                                        options=["Заменить", "Добавить сегмент"],
-                                                                        horizontal=True,
-                                                                        key="route_auto_write_mode",
-                                                                    )
-                                                
-                                                                colAB1, colAB2, colAB3, colAB4 = st.columns([1, 1, 1, 1])
-                                                                with colAB1:
-                                                                    auto_thr = st.slider("Мин. score", 0.0, 1.0, float(st.session_state.get("route_label_sugg_thr", 0.55)), step=0.01, key="route_auto_thr")
-                                                                with colAB2:
-                                                                    auto_k = st.slider("Top‑K", 2, 80, int(st.session_state.get("route_label_sugg_k", 12)), step=1, key="route_auto_k")
-                                                                with colAB3:
-                                                                    auto_simplify = st.slider("Simplify (RDP, px)", 0.0, 10.0, float(st.session_state.get("svg_route_simplify_eps", 1.0)), step=0.1, key="route_auto_simplify")
-                                                                with colAB4:
-                                                                    auto_max_len = st.number_input("MaxLen (px, 0=∞)", min_value=0.0, max_value=30000.0, value=float(st.session_state.get("route_auto_max_len", 0.0)), step=50.0, key="route_auto_max_len")
-                                                
-                                                                colAC1, colAC2, colAC3 = st.columns([1.2, 1.2, 2.0])
-                                                                with colAC1:
-                                                                    btn_auto_one = st.button("AUTO: текущая", key="btn_route_auto_one")
-                                                                with colAC2:
-                                                                    batch_n = st.number_input("Batch N (неразм.)", min_value=1, max_value=50, value=10, step=1, key="route_auto_batch_n")
-                                                                    btn_auto_batch = st.button("AUTO: batch", key="btn_route_auto_batch")
-                                                                with colAC3:
-                                                                    st.caption(
-                                                                        "AUTO использует fuzzy‑score по текстовым меткам SVG. "
-                                                                        "Лучше работает, если предварительно нажать **«Автофильтр по имени ветки»** в guided‑блоке."
-                                                                    )
-                                                
-                                                                # Локальные утилиты
-                                                                def _latinize_sig_auto(s: str) -> str:
-                                                                    table = str.maketrans({
-                                                                        "Л": "L", "П": "P", "З": "Z",
-                                                                        "л": "l", "п": "p", "з": "z",
-                                                                        "Р": "R", "р": "r",
-                                                                        "В": "B", "в": "b",
-                                                                        "А": "A", "а": "a",
-                                                                        "Е": "E", "е": "e",
-                                                                        "К": "K", "к": "k",
-                                                                        "М": "M", "м": "m",
-                                                                        "Н": "H", "н": "h",
-                                                                        "О": "O", "о": "o",
-                                                                        "С": "C", "с": "c",
-                                                                        "Т": "T", "т": "t",
-                                                                        "У": "Y", "у": "y",
-                                                                        "Х": "X", "х": "x",
-                                                                    })
-                                                                    try:
-                                                                        return str(s).translate(table)
-                                                                    except Exception:
-                                                                        return str(s)
-                                                
-                                                                def _score_edge_label_auto(edge_name: str, label: str) -> float:
-                                                                    try:
-                                                                        s1 = _name_score(edge_name, label)
-                                                                        s2 = _name_score(_latinize_sig_auto(edge_name), _latinize_sig_auto(label))
-                                                                        return float(max(s1, s2))
-                                                                    except Exception:
-                                                                        return 0.0
-                                                
-                                                                def _choose_pair(cands, strategy: str):
-                                                                    if not cands or len(cands) < 2:
-                                                                        return None
-                                                                    if strategy == "Top2":
-                                                                        return cands[0], cands[1]
-                                                                    # best+farthest
-                                                                    if strategy == "Best+Farthest":
-                                                                        best = cands[0]
-                                                                        bx = float(best[1][2]); by = float(best[1][3])
-                                                                        best_i = 1
-                                                                        best_d = -1.0
-                                                                        for i in range(1, len(cands)):
-                                                                            it = cands[i]
-                                                                            x = float(it[1][2]); y = float(it[1][3])
-                                                                            d = (x - bx) ** 2 + (y - by) ** 2
-                                                                            if d > best_d:
-                                                                                best_d = d
-                                                                                best_i = i
-                                                                        return best, cands[best_i]
-                                                                    # farthest pair among topK
-                                                                    best_pair = (cands[0], cands[1])
-                                                                    best_d = -1.0
-                                                                    best_s = -1.0
-                                                                    for i in range(len(cands)):
-                                                                        for j in range(i + 1, len(cands)):
-                                                                            xi = float(cands[i][1][2]); yi = float(cands[i][1][3])
-                                                                            xj = float(cands[j][1][2]); yj = float(cands[j][1][3])
-                                                                            d = (xi - xj) ** 2 + (yi - yj) ** 2
-                                                                            s = float(cands[i][0]) + float(cands[j][0])
-                                                                            if d > best_d or (abs(d - best_d) < 1e-9 and s > best_s):
-                                                                                best_d = d
-                                                                                best_s = s
-                                                                                best_pair = (cands[i], cands[j])
-                                                                    return best_pair
-                                                
-                                                                def _load_mapping_or_empty() -> Dict[str, Any]:
-                                                                    mtxt = str(st.session_state.get("svg_mapping_text", "") or "").strip()
-                                                                    if mtxt:
-                                                                        try:
-                                                                            m = json.loads(mtxt)
-                                                                            if isinstance(m, dict):
-                                                                                return m
-                                                                        except Exception:
-                                                                            pass
-                                                                    return {"version": 2, "viewBox": analysis.get("viewBox"), "edges": {}, "nodes": {}}
-                                                
-                                                                def _write_edge_route(mapping2: Dict[str, Any], edge_name: str, poly_xy: List[List[float]], mode: str, meta: Dict[str, Any]):
-                                                                    mapping2.setdefault("version", 2)
-                                                                    mapping2.setdefault("viewBox", analysis.get("viewBox"))
-                                                                    mapping2.setdefault("edges", {})
-                                                                    mapping2.setdefault("nodes", {})
-                                                                    if not isinstance(mapping2.get("edges"), dict):
-                                                                        mapping2["edges"] = {}
-                                                                    if mode == "Добавить сегмент":
-                                                                        segs = mapping2["edges"].get(edge_name, [])
-                                                                        if not isinstance(segs, list):
-                                                                            segs = []
-                                                                        segs.append(poly_xy)
-                                                                        mapping2["edges"][edge_name] = segs
-                                                                    else:
-                                                                        mapping2["edges"][edge_name] = [poly_xy]
-                                                
-                                                                    mapping2.setdefault("edges_meta", {})
-                                                                    if not isinstance(mapping2.get("edges_meta"), dict):
-                                                                        mapping2["edges_meta"] = {}
-                                                                    try:
-                                                                        existing = mapping2["edges_meta"].get(edge_name, {})
-                                                                    except Exception:
-                                                                        existing = {}
-                                                                    if isinstance(existing, dict) and isinstance(meta, dict):
-                                                                        merged = dict(existing)
-                                                                        for k, v in meta.items():
-                                                                            if isinstance(v, dict) and isinstance(merged.get(k), dict):
-                                                                                tmpv = dict(merged.get(k, {}))
-                                                                                tmpv.update(v)
-                                                                                merged[k] = tmpv
-                                                                            else:
-                                                                                merged[k] = v
-                                                                        mapping2["edges_meta"][edge_name] = merged
-                                                                    else:
-                                                                        mapping2["edges_meta"][edge_name] = meta
-                                                
-                                                                # --- AUTO для одной ветки (используем items после фильтрации, чтобы значения гарантированно были в opts)
-                                                                if btn_auto_one:
-                                                                    try:
-                                                                        cands = []
-                                                                        for it in items:
-                                                                            ti, lab, x, y = it
-                                                                            sc = _score_edge_label_auto(edge_auto, str(lab))
-                                                                            if sc >= float(auto_thr):
-                                                                                cands.append((float(sc), it))
-                                                                        cands.sort(key=lambda x: x[0], reverse=True)
-                                                                        cands = cands[: int(auto_k)]
-                                                                        if len(cands) < 2:
-                                                                            raise ValueError("Недостаточно кандидатов меток для AUTO. Попробуйте снизить порог или очистить фильтр.")
-                                                
-                                                                        pair = _choose_pair(cands, str(auto_strategy))
-                                                                        if not pair:
-                                                                            raise ValueError("Не удалось выбрать пару меток.")
-                                                
-                                                                        (sc_s, it_s), (sc_e, it_e) = pair
-                                                                        st.session_state["svg_route_start_opt"] = _fmt_item(it_s)
-                                                                        st.session_state["svg_route_end_opt"] = _fmt_item(it_e)
-                                                                        st.session_state["svg_route_label_picks"] = {
-                                                                            "start": {"ti": int(it_s[0]), "name": str(it_s[1]), "x": float(it_s[2]), "y": float(it_s[3])},
-                                                                            "end": {"ti": int(it_e[0]), "name": str(it_e[1]), "x": float(it_e[2]), "y": float(it_e[3])},
-                                                                        }
-                                                
-                                                                        p1 = (float(it_s[2]), float(it_s[3]))
-                                                                        p2 = (float(it_e[2]), float(it_e[3]))
-                                                                        route = shortest_path_between_points(
-                                                                            nodes_coords=analysis.get("nodes", []),
-                                                                            edges_ab=analysis.get("edges", []),
-                                                                            p_start=p1,
-                                                                            p_end=p2,
-                                                                            snap_eps_px=0.25,
-                                                                            simplify_epsilon=float(auto_simplify),
-                                                                        )
-                                                                        poly = route.get("path_xy", [])
-                                                                        if not (isinstance(poly, list) and len(poly) >= 2):
-                                                                            raise ValueError("AUTO: маршрут пустой или слишком короткий.")
-                                                
-                                                                        if float(auto_max_len) > 0 and float(route.get("length", 0.0) or 0.0) > float(auto_max_len):
-                                                                            raise ValueError("AUTO: маршрут слишком длинный. Проверьте метки/фильтр.")
-                                                
-                                                                        mapping2 = _load_mapping_or_empty()
-                                                                        meta = {
-                                                                            "auto": True,
-                                                                            "strategy": str(auto_strategy),
-                                                                            "start": {"label": str(it_s[1]), "ti": int(it_s[0]), "score": float(sc_s), "x": float(it_s[2]), "y": float(it_s[3])},
-                                                                            "end": {"label": str(it_e[1]), "ti": int(it_e[0]), "score": float(sc_e), "x": float(it_e[2]), "y": float(it_e[3])},
-                                                                            "route": {"length_px": float(route.get("length", 0.0) or 0.0), "points": int(len(poly))},
-                                                                            "ts": float(time.time()),
-                                                                        }
-                                                                        # --- quality + review status for AUTO (v7.21)
-                                                                        try:
-                                                                            q = evaluate_route_quality(
-                                                                                poly,
-                                                                                attach_start=route.get("attach_start") if isinstance(route, dict) else None,
-                                                                                attach_end=route.get("attach_end") if isinstance(route, dict) else None,
-                                                                                min_turn_deg=float(st.session_state.get("route_q_min_turn_deg", 45.0)),
-                                                                                max_detour=float(st.session_state.get("route_q_max_detour", 8.0)),
-                                                                                max_attach_dist=float(st.session_state.get("route_q_max_attach_dist", 35.0)),
-                                                                            )
-                                                                        except Exception:
-                                                                            q = None
-                                                                        try:
-                                                                            meta["quality"] = q
-                                                                        except Exception:
-                                                                            pass
-                                                                        try:
-                                                                            if isinstance(q, dict) and str(q.get("grade", "")).upper() == "PASS":
-                                                                                status_r = "approved"
-                                                                            else:
-                                                                                status_r = "pending"
-                                                                        except Exception:
-                                                                            status_r = "pending"
-                                                                        meta["review"] = {"status": status_r, "by": "auto", "ts": float(time.time())}
-
-                                                                        _write_edge_route(mapping2, edge_auto, poly, str(auto_write_mode), meta)
-                                                                        mapping2.setdefault("meta", {})
-                                                                        if isinstance(mapping2.get("meta"), dict):
-                                                                            mapping2["meta"]["last_auto_route_assign"] = {"edge": edge_auto, "ts": float(time.time())}
-                                                
-                                                                        st.session_state["svg_mapping_text"] = json.dumps(mapping2, ensure_ascii=False, indent=2)
-                                                                        st.session_state["svg_route_paths"] = [poly]
-                                                                        st.session_state["svg_route_report"] = route
-                                                
-                                                                        st.success(
-                                                                            f"AUTO OK: {edge_auto} ← '{it_s[1]}' → '{it_e[1]}' | "
-                                                                            f"len≈{float(route.get('length', 0.0) or 0.0):.0f}px, pts={len(poly)}."
-                                                                        )
-                                                
-                                                                        # авто‑переход к следующей неразмеченной ветке (через request-key)
-                                                                        if st.session_state.get("route_auto_next", True):
-                                                                            try:
-                                                                                _edges_map2 = mapping2.get("edges") if isinstance(mapping2, dict) else {}
-                                                                                if not isinstance(_edges_map2, dict):
-                                                                                    _edges_map2 = {}
-                                                                                _mapped2 = set(_edges_map2.keys())
-                                                                                _unmapped2 = [e for e in edge_cols if e not in _mapped2]
-                                                                                if _unmapped2:
-                                                                                    st.session_state["route_advance_to_unmapped"] = _unmapped2[0]
-                                                                            except Exception:
-                                                                                pass
-                                                
-                                                                        if st.session_state.get("route_clear_after_assign", False):
-                                                                            try:
-                                                                                st.session_state.pop("svg_route_paths", None)
-                                                                                st.session_state.pop("svg_route_report", None)
-                                                                            except Exception:
-                                                                                pass
-                                                                    except Exception as e:
-                                                                        st.error(f"AUTO: не удалось: {e}")
-                                                
-                                                                # --- AUTO batch: пройтись по N неразмеченным веткам (используем все тексты, игнорируя фильтр)
-                                                                if btn_auto_batch:
-                                                                    try:
-                                                                        mapping2 = _load_mapping_or_empty()
-                                                                        _edges_map2 = mapping2.get("edges") if isinstance(mapping2, dict) else {}
-                                                                        if not isinstance(_edges_map2, dict):
-                                                                            _edges_map2 = {}
-                                                                        _mapped2 = set(_edges_map2.keys())
-                                                                        todo = [e for e in edge_cols if e not in _mapped2][: int(batch_n)]
-                                                                        if not todo:
-                                                                            st.info("AUTO batch: нет неразмеченных веток (или N=0).")
-                                                                        else:
-                                                                            items_all = []
-                                                                            for ti, t in enumerate(texts):
-                                                                                try:
-                                                                                    lab = str(t.get("text", "")).strip()
-                                                                                    if _is_noise_label(lab):
-                                                                                        continue
-                                                                                    x = float(t.get("x", 0.0)); y = float(t.get("y", 0.0))
-                                                                                    items_all.append((int(ti), lab, x, y))
-                                                                                except Exception:
-                                                                                    continue
-                                                
-                                                                            prog = st.progress(0.0)
-                                                                            out_rows = []
-                                                                            ok_cnt = 0
-                                                                            for k_i, e_name in enumerate(todo):
-                                                                                status = "fail"
-                                                                                err = ""
-                                                                                chosen = None
-                                                                                try:
-                                                                                    cands = []
-                                                                                    for it in items_all:
-                                                                                        ti, lab, x, y = it
-                                                                                        sc = _score_edge_label_auto(str(e_name), str(lab))
-                                                                                        if sc >= float(auto_thr):
-                                                                                            cands.append((float(sc), it))
-                                                                                    cands.sort(key=lambda x: x[0], reverse=True)
-                                                                                    cands = cands[: int(auto_k)]
-                                                                                    if len(cands) < 2:
-                                                                                        raise ValueError("not enough label candidates")
-                                                                                    pair = _choose_pair(cands, str(auto_strategy))
-                                                                                    if not pair:
-                                                                                        raise ValueError("pair selection failed")
-                                                                                    (sc_s, it_s), (sc_e, it_e) = pair
-                                                                                    p1 = (float(it_s[2]), float(it_s[3]))
-                                                                                    p2 = (float(it_e[2]), float(it_e[3]))
-                                                                                    route = shortest_path_between_points(
-                                                                                        nodes_coords=analysis.get("nodes", []),
-                                                                                        edges_ab=analysis.get("edges", []),
-                                                                                        p_start=p1,
-                                                                                        p_end=p2,
-                                                                                        snap_eps_px=0.25,
-                                                                                        simplify_epsilon=float(auto_simplify),
-                                                                                    )
-                                                                                    poly = route.get("path_xy", [])
-                                                                                    if not (isinstance(poly, list) and len(poly) >= 2):
-                                                                                        raise ValueError("empty route")
-                                                                                    if float(auto_max_len) > 0 and float(route.get("length", 0.0) or 0.0) > float(auto_max_len):
-                                                                                        raise ValueError("route too long")
-                                                
-                                                                                    meta = {
-                                                                                        "auto_batch": True,
-                                                                                        "strategy": str(auto_strategy),
-                                                                                        "start": {"label": str(it_s[1]), "ti": int(it_s[0]), "score": float(sc_s), "x": float(it_s[2]), "y": float(it_s[3])},
-                                                                                        "end": {"label": str(it_e[1]), "ti": int(it_e[0]), "score": float(sc_e), "x": float(it_e[2]), "y": float(it_e[3])},
-                                                                                        "route": {"length_px": float(route.get("length", 0.0) or 0.0), "points": int(len(poly))},
-                                                                                        "ts": float(time.time()),
-                                                                                    }
-                                                                                    # --- quality + review status for AUTO batch (v7.21)
-                                                                                    try:
-                                                                                        q = evaluate_route_quality(
-                                                                                            poly,
-                                                                                            attach_start=route.get("attach_start") if isinstance(route, dict) else None,
-                                                                                            attach_end=route.get("attach_end") if isinstance(route, dict) else None,
-                                                                                            min_turn_deg=float(st.session_state.get("route_q_min_turn_deg", 45.0)),
-                                                                                            max_detour=float(st.session_state.get("route_q_max_detour", 8.0)),
-                                                                                            max_attach_dist=float(st.session_state.get("route_q_max_attach_dist", 35.0)),
-                                                                                        )
-                                                                                    except Exception:
-                                                                                        q = None
-                                                                                    try:
-                                                                                        meta["quality"] = q
-                                                                                    except Exception:
-                                                                                        pass
-                                                                                    try:
-                                                                                        if isinstance(q, dict) and str(q.get("grade", "")).upper() == "PASS":
-                                                                                            status_r = "approved"
-                                                                                        else:
-                                                                                            status_r = "pending"
-                                                                                    except Exception:
-                                                                                        status_r = "pending"
-                                                                                    meta["review"] = {"status": status_r, "by": "auto_batch", "ts": float(time.time())}
-
-                                                                                    _write_edge_route(mapping2, str(e_name), poly, str(auto_write_mode), meta)
-                                                                                    status = "ok"
-                                                                                    ok_cnt += 1
-                                                                                    chosen = (it_s, it_e, float(sc_s), float(sc_e), float(route.get("length", 0.0) or 0.0), int(len(poly)))
-                                                                                except Exception as ex:
-                                                                                    err = str(ex)
-                                                
-                                                                                if chosen:
-                                                                                    it_s, it_e, sc_s, sc_e, lpx, pts = chosen
-                                                                                    # quality summary (if any)
-                                                                                    try:
-                                                                                        q_grade = str(q.get("grade", "")) if isinstance(q, dict) else ""
-                                                                                        q_review = str(status_r) if isinstance(status_r, str) else ""
-                                                                                        q_detour = q.get("detour_ratio") if isinstance(q, dict) else None
-                                                                                    except Exception:
-                                                                                        q_grade = ""
-                                                                                        q_review = ""
-                                                                                        q_detour = None
-
-                                                                                    out_rows.append({
-                                                                                        "edge": str(e_name),
-                                                                                        "status": status,
-                                                                                        "review_status": q_review,
-                                                                                        "grade": q_grade,
-                                                                                        "detour": q_detour,
-                                                                                        "start": str(it_s[1]),
-                                                                                        "end": str(it_e[1]),
-                                                                                        "score_start": float(sc_s),
-                                                                                        "score_end": float(sc_e),
-                                                                                        "len_px": float(lpx),
-                                                                                        "points": int(pts),
-                                                                                        "error": err,
-                                                                                    })
-                                                                                else:
-                                                                                    out_rows.append({"edge": str(e_name), "status": status, "review_status": "", "grade": "", "detour": None, "start": "", "end": "", "score_start": 0.0, "score_end": 0.0, "len_px": 0.0, "points": 0, "error": err})
-                                                
-                                                                                prog.progress((k_i + 1) / max(1, len(todo)))
-                                                
-                                                                            mapping2.setdefault("meta", {})
-                                                                            if isinstance(mapping2.get("meta"), dict):
-                                                                                mapping2["meta"]["auto_batch_last"] = {"ok": int(ok_cnt), "total": int(len(todo)), "ts": float(time.time())}
-                                                
-                                                                            st.session_state["svg_mapping_text"] = json.dumps(mapping2, ensure_ascii=False, indent=2)
-                                                
-                                                                            st.success(f"AUTO batch завершён: OK {ok_cnt}/{len(todo)}")
-                                                                            try:
-                                                                                df_auto = pd.DataFrame(out_rows)
-                                                                                safe_dataframe(df_auto, height=260)
-                                                                                st.download_button(
-                                                                                    "Скачать отчёт AUTO batch (csv)",
-                                                                                    data=df_auto.to_csv(index=False).encode("utf-8"),
-                                                                                    file_name="svg_auto_batch_report.csv",
-                                                                                    mime="text/csv",
-                                                                                )
-                                                                            except Exception:
-                                                                                pass
-                                                                    except Exception as e:
-                                                                        st.error(f"AUTO batch: не удалось: {e}")
-
-                                                    # --- Быстрый выбор старт/финиш меток кликом на SVG (без длинных списков)
-                                                    colP1, colP2 = st.columns(2)
-                                                    with colP1:
-                                                        if st.button("Выбрать START кликом на схеме", key="btn_svg_pick_start_label"):
-                                                            st.session_state["svg_label_pick_mode"] = "start"
-                                                    with colP2:
-                                                        if st.button("Выбрать END кликом на схеме", key="btn_svg_pick_end_label"):
-                                                            st.session_state["svg_label_pick_mode"] = "end"
-
-                                                    st.caption("Горячие клавиши: **Shift+клик** = START, **Ctrl/Cmd+клик** = END. Можно кликать рядом с подписью (поиск ближайшей метки).")
-                                                    st.slider("Радиус поиска ближайшей метки (px)", min_value=6, max_value=60, value=18, key="svg_label_pick_radius")
-
-
-                                                    pm = st.session_state.get("svg_label_pick_mode", "")
-                                                    if pm in ("start", "end"):
-                                                        st.warning(f"Режим выбора метки: **{pm.upper()}**. Кликните по текстовой подписи на схеме (SVG справа).")
-
-                                                    # если компонент прислал клик по метке — применим как выбор start/end
-                                                    pending = st.session_state.get("svg_route_label_pick_pending")
-                                                    if isinstance(pending, dict):
-                                                        try:
-                                                            pmode = str(pending.get("mode", "")).strip().lower()
-                                                            ti_p = pending.get("ti")
-                                                            lx = float(pending.get("x", 0.0))
-                                                            ly = float(pending.get("y", 0.0))
-                                                            lname = str(pending.get("name", "")).strip()
-
-                                                            # найдём соответствующий item (предпочитаем совпадение по ti)
-                                                            picked = None
-                                                            if isinstance(ti_p, int):
-                                                                for it in items:
-                                                                    if int(it[0]) == int(ti_p):
-                                                                        picked = it
-                                                                        break
-                                                            if picked is None and isinstance(lx, float) and isinstance(ly, float):
-                                                                # fallback: ближайшая метка по координатам (и по имени, если есть)
-                                                                best_d = 1e18
-                                                                for it in items:
-                                                                    ti, lab, x, y = it
-                                                                    if lname and str(lab).strip().lower() != lname.lower():
-                                                                        continue
-                                                                    d = (float(x) - lx) ** 2 + (float(y) - ly) ** 2
-                                                                    if d < best_d:
-                                                                        best_d = d
-                                                                        picked = it
-                                                            if picked is not None:
-                                                                picked_opt = _fmt_item(picked)
-                                                                if picked_opt not in opts:
-                                                                    opts.append(picked_opt)
-                                                                    opt_to_idx[picked_opt] = int(picked[0])
-
-                                                                if pmode == "start":
-                                                                    st.session_state["svg_route_start_opt"] = picked_opt
-                                                                elif pmode == "end":
-                                                                    st.session_state["svg_route_end_opt"] = picked_opt
-
-                                                                # сохраним для подсветки на SVG
-                                                                picks = st.session_state.get("svg_route_label_picks")
-                                                                picks = dict(picks) if isinstance(picks, dict) else {}
-                                                                picks[pmode] = {"ti": int(picked[0]), "name": str(picked[1]), "x": float(picked[2]), "y": float(picked[3])}
-                                                                st.session_state["svg_route_label_picks"] = picks
-                                                        except Exception:
-                                                            pass
-                                                        # сбросим pending
-                                                        try:
-                                                            st.session_state.pop("svg_route_label_pick_pending", None)
-                                                        except Exception:
-                                                            pass
-
-                                                    colR1, colR2 = st.columns(2)
-                                                    with colR1:
-                                                        start_opt = st.selectbox("Стартовая метка", opts, key="svg_route_start_opt")
-                                                    with colR2:
-                                                        end_default = min(1, len(opts) - 1)
-                                                        end_opt = st.selectbox("Конечная метка", opts, index=end_default, key="svg_route_end_opt")
-
-
-                                                    # --- Подсветка выбранных меток на SVG (START/END)
-                                                    try:
-                                                        picks = {}
-                                                        ti_s = opt_to_idx.get(start_opt)
-                                                        ti_e = opt_to_idx.get(end_opt)
-                                                        if isinstance(ti_s, int):
-                                                            for it in items:
-                                                                if int(it[0]) == int(ti_s):
-                                                                    picks["start"] = {"ti": int(it[0]), "name": str(it[1]), "x": float(it[2]), "y": float(it[3])}
-                                                                    break
-                                                        if isinstance(ti_e, int):
-                                                            for it in items:
-                                                                if int(it[0]) == int(ti_e):
-                                                                    picks["end"] = {"ti": int(it[0]), "name": str(it[1]), "x": float(it[2]), "y": float(it[3])}
-                                                                    break
-                                                        st.session_state["svg_route_label_picks"] = picks
-                                                    except Exception:
-                                                        st.session_state["svg_route_label_picks"] = {}
-
-                                                    colB1, colB2, colB3 = st.columns(3)
-                                                    with colB1:
-                                                        btn_find = st.button("Найти путь", key="btn_svg_route_find")
-                                                    with colB2:
-                                                        btn_clear = st.button("Очистить путь", key="btn_svg_route_clear")
-                                                    with colB3:
-                                                        simplify_eps = st.slider(
-                                                            "Упростить маршрут (RDP epsilon, px)",
-                                                            0.0, 10.0, 1.0,
-                                                            step=0.1,
-                                                            key="svg_route_simplify_eps",
-                                                        )
-
-                                                    if btn_clear:
-                                                        st.session_state.pop("svg_route_paths", None)
-                                                        st.session_state.pop("svg_route_report", None)
-                                                        st.success("Маршрут очищен.")
-
-                                                    if btn_find:
-                                                        try:
-                                                            si = opt_to_idx.get(start_opt, None)
-                                                            ei = opt_to_idx.get(end_opt, None)
-                                                            if si is None or ei is None:
-                                                                raise ValueError("Не удалось распарсить индексы меток.")
-                                                            p1 = (float(texts[si].get("x", 0.0)), float(texts[si].get("y", 0.0)))
-                                                            p2 = (float(texts[ei].get("x", 0.0)), float(texts[ei].get("y", 0.0)))
-
-                                                            route = shortest_path_between_points(
-                                                                nodes_coords=analysis.get("nodes", []),
-                                                                edges_ab=analysis.get("edges", []),
-                                                                p_start=p1,
-                                                                p_end=p2,
-                                                                snap_eps_px=0.25,
-                                                                simplify_epsilon=float(simplify_eps),
-                                                            )
-                                                            st.session_state["svg_route_paths"] = [route.get("path_xy", [])]
-                                                            st.session_state["svg_route_report"] = route
-
-                                                            st.success(
-                                                                f"Путь найден: длина≈{route.get('length', 0.0):.1f}px, "
-                                                                f"точек={len(route.get('path_xy', []))}."
-                                                            )
-                                                        except Exception as e:
-                                                            st.session_state["svg_route_paths"] = []
-                                                            st.session_state["svg_route_report"] = {"ok": False, "error": str(e)}
-                                                            st.error(f"Не удалось найти путь: {e}")
-
-                                                    rep = st.session_state.get("svg_route_report")
-                                                    if isinstance(rep, dict) and rep:
-                                                        with st.expander("Маршрут: детали", expanded=False):
-                                                            st.write(
-                                                                {
-                                                                    "ok": rep.get("ok"),
-                                                                    "length_px": rep.get("length"),
-                                                                    "node_count": rep.get("node_count"),
-                                                                    "attach_start": rep.get("attach_start"),
-                                                                    "attach_end": rep.get("attach_end"),
-                                                                    "params": rep.get("params"),
-                                                                }
-                                                            )
-                                                            st.download_button(
-                                                                "Скачать маршрут (json)",
-                                                                data=json.dumps(rep, ensure_ascii=False, indent=2).encode("utf-8"),
-                                                                file_name="svg_route.json",
-                                                                mime="application/json",
-                                                            )
-                                                        # --- Route quality (beta)
-                                                        try:
-                                                            q_params = {
-                                                                "min_turn_deg": float(st.session_state.get("route_q_min_turn_deg", 45.0)),
-                                                                "max_detour": float(st.session_state.get("route_q_max_detour", 8.0)),
-                                                                "max_attach_dist": float(st.session_state.get("route_q_max_attach_dist", 35.0)),
-                                                            }
-                                                        except Exception:
-                                                            q_params = {"min_turn_deg": 45.0, "max_detour": 8.0, "max_attach_dist": 35.0}
-
-                                                        with st.expander("Проверка качества маршрута (beta)", expanded=False):
-                                                            colQ1, colQ2, colQ3 = st.columns(3)
-                                                            with colQ1:
-                                                                st.slider("Порог поворота (deg)", 20.0, 120.0, float(q_params["min_turn_deg"]), step=5.0, key="route_q_min_turn_deg")
-                                                            with colQ2:
-                                                                st.slider("Max detour", 2.0, 20.0, float(q_params["max_detour"]), step=0.5, key="route_q_max_detour")
-                                                            with colQ3:
-                                                                st.slider("Max dist метка→трубка (px)", 5.0, 120.0, float(q_params["max_attach_dist"]), step=5.0, key="route_q_max_attach_dist")
-
-                                                            try:
-                                                                q = evaluate_route_quality(
-                                                                    rep.get("path_xy", []) if isinstance(rep, dict) else [],
-                                                                    attach_start=rep.get("attach_start") if isinstance(rep, dict) else None,
-                                                                    attach_end=rep.get("attach_end") if isinstance(rep, dict) else None,
-                                                                    min_turn_deg=float(st.session_state.get("route_q_min_turn_deg", 45.0)),
-                                                                    max_detour=float(st.session_state.get("route_q_max_detour", 8.0)),
-                                                                    max_attach_dist=float(st.session_state.get("route_q_max_attach_dist", 35.0)),
-                                                                )
-                                                                st.session_state["svg_route_quality"] = q
-                                                            except Exception as e:
-                                                                q = {"grade": "FAIL", "reasons": [f"Не удалось оценить: {e}"]}
-
-                                                            grade = str(q.get("grade", ""))
-                                                            if grade == "PASS":
-                                                                st.success("PASS: маршрут выглядит адекватно.")
-                                                            elif grade == "FAIL":
-                                                                st.error("FAIL: маршрут подозрительный (см. причины ниже).")
-                                                            else:
-                                                                st.warning("WARN: маршрут требует проверки.")
-
-                                                            st.write(
-                                                                {
-                                                                    "grade": q.get("grade"),
-                                                                    "length_px": q.get("length_px"),
-                                                                    "detour_ratio": q.get("detour_ratio"),
-                                                                    "points": q.get("points"),
-                                                                    "turns": q.get("turns"),
-                                                                    "self_intersections": q.get("self_intersections"),
-                                                                    "attach_start_dist": q.get("attach_start_dist"),
-                                                                    "attach_end_dist": q.get("attach_end_dist"),
-                                                                }
-                                                            )
-                                                            if q.get("reasons"):
-                                                                st.markdown("**Причины / предупреждения:**")
-                                                                for r in q.get("reasons", []):
-                                                                    st.write(f"- {r}")
-                                                            st.download_button(
-                                                                "Скачать quality report (json)",
-                                                                data=json.dumps(q, ensure_ascii=False, indent=2).encode("utf-8"),
-                                                                file_name="svg_route_quality.json",
-                                                                mime="application/json",
-                                                            )
-
-                                                        st.markdown("#### Привязать найденный путь к ветке модели (mapping.edges)")
-                                                        route_paths = st.session_state.get("svg_route_paths", [])
-                                                        if not (isinstance(route_paths, list) and route_paths and isinstance(route_paths[0], list) and len(route_paths[0]) >= 2):
-                                                            st.info("Сначала нажмите **«Найти путь»** — затем можно записать маршрут в mapping.edges.")
-                                                        else:
-                                                        
-                                                            # --- Целевая ветка выбирается в ассистенте выше (svg_route_assign_edge)
-                                                            edge_target = str(st.session_state.get("svg_route_assign_edge", "") or "")
-                                                            if not edge_target:
-                                                                st.warning("Выберите целевую ветку в ассистенте выше (в этом же блоке).")
-                                                            else:
-                                                                st.caption(f"Целевая ветка: **{edge_target}**")
-
-                                                            mode = st.radio(
-                                                                "Режим записи",
-                                                                options=["Заменить", "Добавить сегмент"],
-                                                                horizontal=True,
-                                                                key="svg_route_assign_mode",
-                                                            )
-                                                            colM1, colM2, colM3 = st.columns([1, 1, 2])
-                                                            with colM1:
-                                                                btn_assign = st.button("Записать маршрут", key="btn_svg_route_assign")
-                                                            with colM2:
-                                                                btn_clear_edge = st.button("Очистить ветку", key="btn_svg_route_clear_edge")
-                                                            with colM3:
-                                                                st.caption("Запись обновит текст в блоке **Анимация по схеме (mapping JSON)** ниже. Рекомендуется потом скачать mapping JSON файлом.")
-
-                                                            if btn_assign or btn_clear_edge:
-                                                                try:
-                                                                    mtxt = str(st.session_state.get("svg_mapping_text", "") or "").strip()
-                                                                    if mtxt:
-                                                                        mapping2 = json.loads(mtxt)
-                                                                        if not isinstance(mapping2, dict):
-                                                                            raise ValueError("mapping JSON должен быть объектом (dict).")
-                                                                    else:
-                                                                        mapping2 = {"version": 2, "viewBox": analysis.get("viewBox"), "edges": {}, "nodes": {}}
-
-                                                                    mapping2.setdefault("version", 2)
-                                                                    mapping2.setdefault("viewBox", analysis.get("viewBox"))
-                                                                    mapping2.setdefault("edges", {})
-                                                                    mapping2.setdefault("nodes", {})
-                                                                    if not isinstance(mapping2.get("edges"), dict):
-                                                                        mapping2["edges"] = {}
-
-                                                                    if btn_clear_edge:
-                                                                        mapping2["edges"].pop(edge_target, None)
-                                                                        st.success(f"Очищено: mapping.edges['{edge_target}']")
-
-                                                                    if btn_assign:
-                                                                        poly = route_paths[0]
-                                                                        if mode == "Добавить сегмент":
-                                                                            segs = mapping2["edges"].get(edge_target, [])
-                                                                            if not isinstance(segs, list):
-                                                                                segs = []
-                                                                            segs.append(poly)
-                                                                            mapping2["edges"][edge_target] = segs
-                                                                        else:
-                                                                            mapping2["edges"][edge_target] = [poly]
-
-                                                                        mapping2.setdefault("meta", {})
-                                                                        mapping2["meta"]["last_route_assign"] = {
-                                                                            "edge": edge_target,
-                                                                            "mode": mode,
-                                                                            "route_length_px": float(rep.get("length", 0.0) or 0.0),
-                                                                            "points": int(len(poly)),
-                                                                            "ts": float(time.time()),
-                                                                        }
-                                                                        # --- route quality + review meta (v7.21)
-                                                                        try:
-                                                                            q_params = {
-                                                                                "min_turn_deg": float(st.session_state.get("route_q_min_turn_deg", 45.0)),
-                                                                                "max_detour": float(st.session_state.get("route_q_max_detour", 8.0)),
-                                                                                "max_attach_dist": float(st.session_state.get("route_q_max_attach_dist", 35.0)),
-                                                                            }
-                                                                        except Exception:
-                                                                            q_params = {"min_turn_deg": 45.0, "max_detour": 8.0, "max_attach_dist": 35.0}
-
-                                                                        try:
-                                                                            q = evaluate_route_quality(
-                                                                                poly,
-                                                                                attach_start=rep.get("attach_start") if isinstance(rep, dict) else None,
-                                                                                attach_end=rep.get("attach_end") if isinstance(rep, dict) else None,
-                                                                                min_turn_deg=float(q_params.get("min_turn_deg", 45.0)),
-                                                                                max_detour=float(q_params.get("max_detour", 8.0)),
-                                                                                max_attach_dist=float(q_params.get("max_attach_dist", 35.0)),
-                                                                            )
-                                                                            st.session_state["svg_route_quality"] = q
-                                                                        except Exception:
-                                                                            q = None
-
-                                                                        try:
-                                                                            mapping2.setdefault("edges_meta", {})
-                                                                            if not isinstance(mapping2.get("edges_meta"), dict):
-                                                                                mapping2["edges_meta"] = {}
-                                                                            edge_meta_new = {
-                                                                                "manual": True,
-                                                                                "quality": q,
-                                                                                "review": {"status": "approved", "by": "manual", "ts": float(time.time())},
-                                                                                "route": {
-                                                                                    "length_px": float(rep.get("length", 0.0) or 0.0) if isinstance(rep, dict) else float(rep.get("length", 0.0) or 0.0) if isinstance(rep, dict) else 0.0,
-                                                                                    "points": int(len(poly)),
-                                                                                },
-                                                                                "start_end": st.session_state.get("svg_route_label_picks", {}),
-                                                                            }
-                                                                            existing = mapping2["edges_meta"].get(edge_target, {})
-                                                                            if isinstance(existing, dict) and isinstance(edge_meta_new, dict):
-                                                                                merged = dict(existing)
-                                                                                for k, v in edge_meta_new.items():
-                                                                                    if isinstance(v, dict) and isinstance(merged.get(k), dict):
-                                                                                        tmpv = dict(merged.get(k, {}))
-                                                                                        tmpv.update(v)
-                                                                                        merged[k] = tmpv
-                                                                                    else:
-                                                                                        merged[k] = v
-                                                                                mapping2["edges_meta"][edge_target] = merged
-                                                                            else:
-                                                                                mapping2["edges_meta"][edge_target] = edge_meta_new
-                                                                        except Exception:
-                                                                            pass
-                                                                        st.success(f"Маршрут записан в mapping.edges['{edge_target}'] ({mode}).")
-
-                                                                    st.session_state["svg_mapping_text"] = json.dumps(mapping2, ensure_ascii=False, indent=2)
-                                                                    # авто‑переход к следующей неразмеченной ветке (через request-key, чтобы не трогать виджет напрямую)
-                                                                    if st.session_state.get("route_auto_next", True):
-                                                                        try:
-                                                                            _edges_map2 = mapping2.get("edges") if isinstance(mapping2, dict) else {}
-                                                                            if not isinstance(_edges_map2, dict):
-                                                                                _edges_map2 = {}
-                                                                            _mapped2 = set(_edges_map2.keys())
-                                                                            _unmapped2 = [e for e in edge_cols if e not in _mapped2]
-                                                                            if _unmapped2:
-                                                                                st.session_state["route_advance_to_unmapped"] = _unmapped2[0]
-                                                                        except Exception:
-                                                                            pass
-
-                                                                    # опционально: очистить маршрут после записи (чтобы не мешал следующей ветке)
-                                                                    if btn_assign and st.session_state.get("route_clear_after_assign", False):
-                                                                        try:
-                                                                            st.session_state.pop("svg_route_paths", None)
-                                                                            st.session_state.pop("svg_route_report", None)
-                                                                        except Exception:
-                                                                            pass
-
-                                                                except Exception as e:
-                                                                    st.error(f"Не удалось обновить mapping JSON: {e}")
-
-
-                                    with st.expander("Разметка веток (edges)", expanded=False):
-                                        st.info(
-                                            "Инструмент ниже создаёт mapping.edges локально в браузере. "
-                                            "Нажмите Download/Copy и потом загрузите JSON обратно в блоке анимации. "
-                                            "Если в JSON уже есть mapping.nodes — они сохранятся."
-                                        )
-                                        render_svg_edge_mapper_html(svg_inline=svg_inline, edge_names=edge_cols, height=760)
-
-                                    with st.expander("Разметка узлов давления (nodes)", expanded=False):
-                                        st.info(
-                                            "Инструмент ниже размечает mapping.nodes (координаты узлов давления). "
-                                            "Можно вставить сюда JSON после разметки веток и дополнить узлами."
-                                        )
-                                        node_names_for_mapper = pick_nodes_svg if pick_nodes_svg else (node_cols[: min(20, len(node_cols))] if node_cols else [])
-                                        render_svg_node_mapper_html(svg_inline=svg_inline, node_names=node_names_for_mapper, edge_names=edge_cols, height=760)
-
-                                    # --- загрузка mapping JSON
-                                    st.markdown("### Анимация по схеме (по mapping JSON)")
-
-                                    # Показываем, откуда взят mapping сейчас
-                                    cur_map_src = st.session_state.get("svg_mapping_source", "(не задан)")
-                                    st.caption(f"Источник mapping: {cur_map_src}")
-
-                                    colMAP1, colMAP2 = st.columns([1.0, 1.0], gap="medium")
-                                    with colMAP1:
-                                        if st.button("Сбросить mapping к default", key="svg_mapping_reset_default", help="Загрузить default_svg_mapping.json из пакета приложения."):
-                                            try:
-                                                st.session_state["svg_mapping_text"] = DEFAULT_SVG_MAPPING_PATH.read_text(encoding="utf-8")
-                                                st.session_state["svg_mapping_source"] = str(DEFAULT_SVG_MAPPING_PATH)
-                                                log_event("svg_mapping_reset_default", path=str(DEFAULT_SVG_MAPPING_PATH))
-                                                do_rerun()
-                                            except Exception as e:
-                                                st.error(f"Не удалось загрузить default mapping: {e}")
-                                                log_event("svg_mapping_reset_default_failed", error=repr(e))
-                                    with colMAP2:
-                                        # Удобный быстрый экспорт текущего mapping из textarea
-                                        try:
-                                            _cur_bytes = (st.session_state.get("svg_mapping_text", "") or "").encode("utf-8")
-                                            st.download_button(
-                                                "Скачать текущий mapping.json",
-                                                data=_cur_bytes,
-                                                file_name="mapping.json",
-                                                mime="application/json",
-                                                help="Скачивает содержимое mapping из текстового поля (как сейчас в UI).",
-                                            )
-                                        except Exception:
-                                            pass
-
-                                    map_upl = st.file_uploader("Загрузить mapping JSON", type=["json"], key="svg_mapping_upl")
-
-                                    map_text = st.text_area(
-                                        "…или вставьте mapping JSON сюда (если вы нажали Copy в разметчике)",
-                                        value=st.session_state.get("svg_mapping_text", ""),
-                                        height=160,
-                                    )
-                                    mapping = None
-                                    if map_upl is not None:
-                                        try:
-                                            mapping = json.loads(map_upl.getvalue().decode("utf-8"))
-                                            st.session_state["svg_mapping_text"] = json.dumps(mapping, ensure_ascii=False, indent=2)
-                                            st.session_state["svg_mapping_source"] = f"uploaded:{getattr(map_upl, 'name', '')}".strip(":")
-                                            log_event("svg_mapping_uploaded", name=getattr(map_upl, "name", ""), bytes=len(map_upl.getvalue()))
-                                        except Exception as e:
-                                            st.error(f"Не удалось прочитать mapping JSON: {e}")
-                                            log_event("svg_mapping_upload_failed", error=repr(e))
-                                    elif map_text.strip():
-                                        try:
-                                            mapping = json.loads(map_text)
-                                            # Если пользователь правит руками (textarea), считаем это источником
-                                            if st.session_state.get("svg_mapping_source", "").startswith("uploaded") is False:
-                                                st.session_state["svg_mapping_source"] = "textarea"
-                                        except Exception as e:
-                                            st.error(f"JSON не парсится: {e}")
-                                            log_event("svg_mapping_text_parse_failed", error=repr(e))
-
-                                    if not mapping:
-                                        st.warning("Нужен mapping JSON. Создайте его в разметчиках выше или загрузите файл.")
-                                    else:
-                                        # --- Review / Quality: mapping.edges_meta (approve/reject) (v7.21)
-                                        with st.expander("Review / Quality: mapping.edges_meta (approve/reject)", expanded=False):
-                                            mapping2 = copy.deepcopy(mapping) if isinstance(mapping, dict) else {}
-                                            if not isinstance(mapping2, dict):
-                                                mapping2 = {}
-                                            mapping2.setdefault("version", 2)
-                                            mapping2.setdefault("edges", {})
-                                            mapping2.setdefault("nodes", {})
-                                            mapping2.setdefault("edges_meta", {})
-                                            if not isinstance(mapping2.get("edges"), dict):
-                                                mapping2["edges"] = {}
-                                            if not isinstance(mapping2.get("edges_meta"), dict):
-                                                mapping2["edges_meta"] = {}
-
-                                            edges_meta = mapping2.get("edges_meta", {})
-                                            edges_geo = mapping2.get("edges", {})
-
-                                            def _first_poly(edge_name: str):
-                                                try:
-                                                    segs = edges_geo.get(edge_name, None)
-                                                    if isinstance(segs, list) and segs:
-                                                        poly0 = segs[0]
-                                                        if isinstance(poly0, list) and len(poly0) >= 2:
-                                                            return poly0
-                                                except Exception:
-                                                    pass
-                                                return None
-
-                                            colRQ1, colRQ2, colRQ3 = st.columns([1.2, 1.2, 2.0])
-                                            with colRQ1:
-                                                btn_recompute_q = st.button("Recompute quality (all)", key="btn_map_recompute_quality")
-                                            with colRQ2:
-                                                btn_approve_pass = st.button("Approve all PASS", key="btn_map_approve_pass")
-                                            with colRQ3:
-                                                st.caption("Quality хранится в edges_meta[edge].quality; статусы — в edges_meta[edge].review.status.")
-
-                                            if btn_recompute_q:
-                                                try:
-                                                    for e_name, segs in list(edges_geo.items()):
-                                                        poly = _first_poly(str(e_name))
-                                                        if not poly:
-                                                            continue
-                                                        q = evaluate_route_quality(
-                                                            poly,
-                                                            attach_start=None,
-                                                            attach_end=None,
-                                                            min_turn_deg=float(st.session_state.get("route_q_min_turn_deg", 45.0)),
-                                                            max_detour=float(st.session_state.get("route_q_max_detour", 8.0)),
-                                                            max_attach_dist=float(st.session_state.get("route_q_max_attach_dist", 35.0)),
-                                                        )
-                                                        em = edges_meta.get(str(e_name), {})
-                                                        if not isinstance(em, dict):
-                                                            em = {}
-                                                        em["quality"] = q
-                                                        em.setdefault("review", {})
-                                                        if isinstance(em.get("review"), dict):
-                                                            em["review"].setdefault("status", "pending")
-                                                            em["review"].setdefault("by", "quality_recompute")
-                                                            em["review"]["ts"] = float(time.time())
-                                                        edges_meta[str(e_name)] = em
-                                                    mapping2["edges_meta"] = edges_meta
-                                                    st.session_state["svg_mapping_text"] = json.dumps(mapping2, ensure_ascii=False, indent=2)
-                                                    st.success("Quality пересчитан и сохранён в mapping JSON (text area ниже обновится после rerun).")
-                                                    st.rerun()
-                                                except Exception as e:
-                                                    st.error(f"Не удалось пересчитать quality: {e}")
-
-                                            if btn_approve_pass:
-                                                try:
-                                                    n_ok = 0
-                                                    for e_name, em in list(edges_meta.items()):
-                                                        if not isinstance(em, dict):
-                                                            continue
-                                                        q = em.get("quality")
-                                                        if isinstance(q, dict) and str(q.get("grade", "")).upper() == "PASS":
-                                                            em.setdefault("review", {})
-                                                            if isinstance(em.get("review"), dict):
-                                                                em["review"]["status"] = "approved"
-                                                                em["review"]["by"] = "approve_pass"
-                                                                em["review"]["ts"] = float(time.time())
-                                                                n_ok += 1
-                                                            edges_meta[str(e_name)] = em
-                                                    mapping2["edges_meta"] = edges_meta
-                                                    st.session_state["svg_mapping_text"] = json.dumps(mapping2, ensure_ascii=False, indent=2)
-                                                    st.success(f"Approved PASS: {n_ok}")
-                                                    st.rerun()
-                                                except Exception as e:
-                                                    st.error(f"Approve PASS: ошибка: {e}")
-
-                                            # table
-                                            rows = []
-                                            try:
-                                                # show only edges from model if present, else from mapping
-                                                edges_list = edge_cols if edge_cols else list(edges_geo.keys())
-                                            except Exception:
-                                                edges_list = list(edges_geo.keys())
-
-                                            for e in edges_list:
-                                                e = str(e)
-                                                poly = _first_poly(e)
-                                                em = edges_meta.get(e, {})
-                                                if not isinstance(em, dict):
-                                                    em = {}
-                                                rv = em.get("review", {})
-                                                if not isinstance(rv, dict):
-                                                    rv = {}
-                                                stt = str(rv.get("status", "")) if rv else ""
-                                                q = em.get("quality", {})
-                                                if not isinstance(q, dict):
-                                                    q = {}
-                                                rows.append({
-                                                    "edge": e,
-                                                    "has_geom": bool(poly),
-                                                    "status": stt,
-                                                    "grade": q.get("grade", ""),
-                                                    "len_px": q.get("length_px", None),
-                                                    "detour": q.get("detour_ratio", None),
-                                                    "points": q.get("points", None),
-                                                })
-
-                                            df_rev = pd.DataFrame(rows)
-                                            if len(df_rev) == 0:
-                                                st.info("Нет данных для review.")
-                                            else:
-                                                colF1, colF2 = st.columns([1.2, 2.0])
-                                                with colF1:
-                                                    status_filter = st.multiselect(
-                                                        "Фильтр по status",
-                                                        options=sorted([s for s in df_rev["status"].unique().tolist() if s != ""]),
-                                                        default=[],
-                                                        key="map_review_status_filter",
-                                                    )
-                                                with colF2:
-                                                    grade_filter = st.multiselect(
-                                                        "Фильтр по grade",
-                                                        options=sorted([s for s in df_rev["grade"].unique().tolist() if s != ""]),
-                                                        default=[],
-                                                        key="map_review_grade_filter",
-                                                    )
-
-                                                df_show = df_rev.copy()
-                                                if status_filter:
-                                                    df_show = df_show[df_show["status"].isin(status_filter)]
-                                                if grade_filter:
-                                                    df_show = df_show[df_show["grade"].isin(grade_filter)]
-
-                                                safe_dataframe(df_show.sort_values(["has_geom", "status", "grade", "edge"], ascending=[False, True, True, True]), height=280)
-                                                st.download_button(
-                                                    "Скачать review table (csv)",
-                                                    data=df_show.to_csv(index=False).encode("utf-8"),
-                                                    file_name="mapping_review_table.csv",
-                                                    mime="text/csv",
-                                                )
-
-                                            st.markdown("#### Изменить статус / заметку для одной ветки")
-                                            edge_sel = ""
-                                            if rows:
-                                                edge_sel = st.selectbox(
-                                                    "Edge",
-                                                    options=[r["edge"] for r in rows],
-                                                    index=0,
-                                                    key="map_review_edge_select",
-                                                )
-                                            else:
-                                                st.info("Нет веток для выбора (rows пуст).")
-
-                                            if edge_sel:
-                                                em = edges_meta.get(str(edge_sel), {})
-                                                if not isinstance(em, dict):
-                                                    em = {}
-                                                rv = em.get("review", {})
-                                                if not isinstance(rv, dict):
-                                                    rv = {}
-                                                cur_status = str(rv.get("status", "pending") or "pending")
-                                                note = str(rv.get("note", "") or "")
-                                                colE1, colE2 = st.columns([1.0, 2.0])
-                                                with colE1:
-                                                    new_status = st.radio(
-                                                        "status",
-                                                        options=["approved", "pending", "rejected"],
-                                                        index=["approved", "pending", "rejected"].index(cur_status) if cur_status in ["approved", "pending", "rejected"] else 1,
-                                                        horizontal=True,
-                                                        key="map_review_status_set",
-                                                    )
-                                                with colE2:
-                                                    new_note = st.text_input("note", value=note, key="map_review_note_set")
-
-                                                colA1, colA2, colA3 = st.columns([1.2, 1.2, 2.0])
-                                                with colA1:
-                                                    btn_save_status = st.button("Save review", key="btn_map_review_save")
-                                                with colA2:
-                                                    btn_clear_geom = st.button("Clear geometry", key="btn_map_review_clear_geom")
-                                                with colA3:
-                                                    st.caption("Clear geometry удаляет mapping.edges[edge], но оставляет edges_meta (для истории).")
-
-                                                if btn_save_status:
-                                                    try:
-                                                        em.setdefault("review", {})
-                                                        if not isinstance(em.get("review"), dict):
-                                                            em["review"] = {}
-                                                        em["review"]["status"] = str(new_status)
-                                                        em["review"]["note"] = str(new_note)
-                                                        em["review"]["by"] = "user"
-                                                        em["review"]["ts"] = float(time.time())
-                                                        edges_meta[str(edge_sel)] = em
-                                                        mapping2["edges_meta"] = edges_meta
-                                                        st.session_state["svg_mapping_text"] = json.dumps(mapping2, ensure_ascii=False, indent=2)
-                                                        st.success("Review сохранён.")
-                                                        st.rerun()
-                                                    except Exception as e:
-                                                        st.error(f"Save review: ошибка: {e}")
-
-                                                if btn_clear_geom:
-                                                    try:
-                                                        if isinstance(mapping2.get("edges"), dict):
-                                                            mapping2["edges"].pop(str(edge_sel), None)
-                                                        em.setdefault("review", {})
-                                                        if not isinstance(em.get("review"), dict):
-                                                            em["review"] = {}
-                                                        em["review"]["status"] = "rejected"
-                                                        em["review"]["by"] = "clear_geom"
-                                                        em["review"]["ts"] = float(time.time())
-                                                        edges_meta[str(edge_sel)] = em
-                                                        mapping2["edges_meta"] = edges_meta
-                                                        st.session_state["svg_mapping_text"] = json.dumps(mapping2, ensure_ascii=False, indent=2)
-                                                        st.success("Геометрия удалена (и помечено rejected).")
-                                                        st.rerun()
-                                                    except Exception as e:
-                                                        st.error(f"Clear geometry: ошибка: {e}")
-
-                                        # Optional: filter by review status (approved only)
-                                        approved_only = st.checkbox(
-                                            "Только APPROVED (review.status=approved)",
-                                            value=False,
-                                            key="svg_only_approved_edges",
-                                        )
-                                        edge_options_anim = edge_cols
-                                        try:
-                                            if approved_only and isinstance(mapping, dict):
-                                                emap = mapping.get("edges_meta", {})
-                                                if isinstance(emap, dict):
-                                                    edge_options_anim = []
-                                                    for e in edge_cols:
-                                                        meta_e = emap.get(str(e), {})
-                                                        if not isinstance(meta_e, dict):
-                                                            continue
-                                                        rv = meta_e.get("review", {})
-                                                        if not isinstance(rv, dict):
-                                                            continue
-                                                        if str(rv.get("status", "")) == "approved":
-                                                            edge_options_anim.append(str(e))
-                                                    if not edge_options_anim:
-                                                        edge_options_anim = edge_cols
-                                        except Exception:
-                                            edge_options_anim = edge_cols
-
-                                        defaults_svg = [c for c in edge_options_anim if ("Ресивер3" in c or "выхлоп" in c or "предохран" in c)][:6]
-                                        if not defaults_svg:
-                                            defaults_svg = edge_options_anim[: min(6, len(edge_options_anim))]
-                                        pick_edges_svg = st.multiselect(
-                                            "Ветки для анимации на схеме",
-                                            options=edge_options_anim,
-                                            default=defaults_svg,
-                                            key="anim_edges_svg",
-                                        )
-
-                                        auto_match = st.checkbox(
-                                            "Автосопоставление имён (fuzzy) — если mapping делался под другую версию модели",
-                                            value=True,
-                                            key="svg_auto_match_names",
-                                        )
-                                        min_score = st.slider(
-                                            "Порог совпадения имён",
-                                            min_value=0.50,
-                                            max_value=0.95,
-                                            value=0.70,
-                                            step=0.01,
-                                            key="svg_auto_match_threshold",
-                                        )
-
-                                        if len(pick_edges_svg) == 0:
-                                            st.info("Выберите хотя бы одну ветку.")
-                                        else:
-                                            mapping_use = mapping
-                                            report = {"edges": [], "nodes": []}
-                                            if auto_match:
-                                                mapping_use, report = ensure_mapping_for_selection(
-                                                    mapping=mapping,
-                                                    need_edges=pick_edges_svg,
-                                                    need_nodes=pick_nodes_svg,
-                                                    min_score=float(min_score),
-                                                )
-
-                                                if report.get("edges") or report.get("nodes"):
-                                                    with st.expander("Отчёт автосопоставления", expanded=False):
-                                                        if report.get("edges"):
-                                                            st.markdown("**Ветки (edges)**")
-                                                            safe_dataframe(
-                                                                pd.DataFrame(report["edges"]).sort_values("score", ascending=False),
-                                                                height=220,
-                                                            )
-                                                        if report.get("nodes"):
-                                                            st.markdown("**Узлы (nodes)**")
-                                                            safe_dataframe(
-                                                                pd.DataFrame(report["nodes"]).sort_values("score", ascending=False),
-                                                                height=220,
-                                                            )
-
-                                            # конверсия в Нл/мин
-                                            try:
-                                                rho_N = float(P_ATM) / (float(getattr(model_mod, "R_AIR", 287.0)) * float(getattr(model_mod, "T_AIR", 293.15)))
-                                                scale = 1000.0 * 60.0 / rho_N
-                                                unit = "Нл/мин"
-                                            except Exception:
-                                                scale = 1.0
-                                                unit = "кг/с"
-
-                                            time_s = df_mdot["время_с"].astype(float).tolist()
-                                            edge_series = []
-                                            missing = []
-                                            for c in pick_edges_svg:
-                                                q = (df_mdot[c].astype(float).to_numpy() * scale).tolist()
-                                                if df_open is not None and c in df_open.columns:
-                                                    op = df_open[c].astype(int).tolist()
-                                                else:
-                                                    op = None
-                                                edge_series.append({"name": c, "q": q, "open": op, "unit": unit})
-
-                                                try:
-                                                    if not mapping_use.get("edges", {}).get(c):
-                                                        missing.append(c)
-                                                except Exception:
-                                                    pass
-                                            if missing:
-                                                st.warning("Для некоторых веток нет геометрии в mapping.edges: " + ", ".join(missing[:20]))
-
-                                            # --- Узлы давления (если выбраны) + проверка координат
-                                            node_series = []
-                                            missing_nodes = []
-                                            if df_p is not None and pick_nodes_svg:
-                                                try:
-                                                    t_target = np.array(time_s, dtype=float)
-                                                    t_src = df_p["время_с"].astype(float).to_numpy()
-                                                except Exception:
-                                                    t_target = None
-                                                    t_src = None
-
-                                                for nn in pick_nodes_svg:
-                                                    if nn not in df_p.columns:
-                                                        continue
-                                                    p_src = df_p[nn].astype(float).to_numpy()
-                                                    p_g = (p_src - P_ATM) / ATM_PA
-                                                    if t_target is not None and t_src is not None and len(t_src) >= 2 and len(t_target) >= 2:
-                                                        if len(t_src) != len(t_target) or (abs(float(t_src[0]) - float(t_target[0])) > 1e-9) or (abs(float(t_src[-1]) - float(t_target[-1])) > 1e-9):
-                                                            try:
-                                                                p_g = np.interp(t_target, t_src, p_g)
-                                                            except Exception:
-                                                                p_g = p_g[: len(t_target)]
-                                                    else:
-                                                        p_g = p_g[: len(time_s)]
-
-                                                    node_series.append({"name": nn, "p": p_g.tolist(), "unit": "атм (изб.)"})
-
-                                                    try:
-                                                        xy = mapping_use.get("nodes", {}).get(nn)
-                                                        if not (isinstance(xy, list) and len(xy) >= 2):
-                                                            missing_nodes.append(nn)
-                                                    except Exception:
-                                                        pass
-
-                                            if missing_nodes:
-                                                st.warning("Для некоторых узлов нет координат в mapping.nodes: " + ", ".join(missing_nodes[:20]))
-
-
-                                            # Review overlay controls (v7.22)
-                                            colOV1, colOV2, colOV3 = st.columns([1.2, 1.2, 2.2])
-                                            with colOV1:
-                                                st.checkbox(
-                                                    "Показать review overlay",
-                                                    value=True,
-                                                    key="svg_show_review_overlay",
-                                                    help="Раскраска mapping.edges по edges_meta.review.status поверх SVG.",
-                                                )
-                                            with colOV2:
-                                                st.checkbox(
-                                                    "Review hotkeys",
-                                                    value=False,
-                                                    key="svg_review_pick_mode",
-                                                    help="Включает горячие клики по линиям overlay: Shift=approved, Ctrl/Cmd=rejected, Alt=pending.",
-                                                )
-                                            with colOV3:
-                                                st.multiselect(
-                                                    "Показывать статусы",
-                                                    options=["approved", "pending", "rejected", "unknown"],
-                                                    default=["approved", "pending", "rejected"],
-                                                    key="svg_review_statuses",
-                                                )
-
-                                            with colOV3:
-                                                st.checkbox(
-                                                    "HUD на схеме",
-                                                    value=True,
-                                                    key="svg_review_hud",
-                                                    help="Показывает небольшую панель статистики review прямо поверх SVG (с кнопками Next/Prev pending).",
-                                                )
-
-                                            with st.expander("Review conveyor (pending-first)", expanded=False):
-                                                mapping_text = st.session_state.get("svg_mapping_text", "")
-                                                mobj = None
-                                                try:
-                                                    if isinstance(mapping_text, str) and mapping_text.strip():
-                                                        mobj = json.loads(mapping_text)
-                                                except Exception:
-                                                    mobj = None
-
-                                                # counts
-                                                cnt = {"approved":0, "pending":0, "rejected":0, "unknown":0, "total":0}
-                                                pending_list = []
-                                                try:
-                                                    if isinstance(mobj, dict):
-                                                        edges_geo = mobj.get("edges", {})
-                                                        emap = mobj.get("edges_meta", {})
-                                                        if not isinstance(edges_geo, dict):
-                                                            edges_geo = {}
-                                                        if not isinstance(emap, dict):
-                                                            emap = {}
-                                                        for e_name, segs in edges_geo.items():
-                                                            if not isinstance(segs, list) or not segs:
-                                                                continue
-                                                            stt = "unknown"
-                                                            try:
-                                                                meta = emap.get(str(e_name), {})
-                                                                rv = meta.get("review", {}) if isinstance(meta, dict) else {}
-                                                                stt2 = rv.get("status", "") if isinstance(rv, dict) else ""
-                                                                stt = str(stt2) if stt2 else "unknown"
-                                                            except Exception:
-                                                                stt = "unknown"
-                                                            cnt["total"] += 1
-                                                            if stt in cnt:
-                                                                cnt[stt] += 1
-                                                            else:
-                                                                cnt["unknown"] += 1
-                                                            if stt in ("pending", "unknown", ""):
-                                                                pending_list.append(str(e_name))
-                                                except Exception:
-                                                    pass
-                                                pending_list = sorted(set(pending_list))
-
-                                                c1, c2, c3, c4, c5 = st.columns(5)
-                                                c1.metric("approved", cnt["approved"])
-                                                c2.metric("pending", cnt["pending"])
-                                                c3.metric("rejected", cnt["rejected"])
-                                                c4.metric("unknown", cnt["unknown"])
-                                                c5.metric("total", cnt["total"])
-
-                                                st.checkbox(
-                                                    "Auto-advance после approve/reject",
-                                                    value=True,
-                                                    key="svg_review_auto_advance",
-                                                    help="После Shift/Ctrl-клика по линии overlay автоматически выбирается следующая pending/unknown ветка.",
-                                                )
-
-                                                colN1, colN2, colN3 = st.columns([1.2, 1.2, 2.4])
-                                                with colN1:
-                                                    if st.button("◀ Prev pending", key="btn_prev_pending"):
-                                                        if pending_list:
-                                                            cur = str(st.session_state.get("svg_selected_edge") or "")
-                                                            i = pending_list.index(cur) if cur in pending_list else 0
-                                                            j = (i - 1) if i > 0 else (len(pending_list)-1)
-                                                            st.session_state["svg_selected_edge"] = pending_list[j]
-                                                            st.session_state["svg_selected_node"] = ""
-                                                            st.rerun()
-                                                with colN2:
-                                                    if st.button("Next pending ▶", key="btn_next_pending"):
-                                                        if pending_list:
-                                                            cur = str(st.session_state.get("svg_selected_edge") or "")
-                                                            i = pending_list.index(cur) if cur in pending_list else -1
-                                                            j = (i + 1) if (i + 1) < len(pending_list) else 0
-                                                            st.session_state["svg_selected_edge"] = pending_list[j]
-                                                            st.session_state["svg_selected_node"] = ""
-                                                            st.rerun()
-                                                with colN3:
-                                                    if pending_list:
-                                                        st.caption(f"pending/unknown: {len(pending_list)} | текущая: {st.session_state.get('svg_selected_edge')}")
-                                                    else:
-                                                        st.caption("pending/unknown: 0")
-
-
-                                            last_rv = st.session_state.get("svg_review_last")
-                                            if isinstance(last_rv, dict) and last_rv.get("edge"):
-                                                st.caption(f"Последнее review: {last_rv.get('edge')} → {last_rv.get('status')}")
-
-                                            comp = get_pneumo_svg_flow_component()
-                                            selected = {
-                                                "edge": st.session_state.get("svg_selected_edge"),
-                                                "node": st.session_state.get("svg_selected_node"),
-                                            }
-                                            if comp is not None:
-                                                _evt = comp(
-                                                    title="Анимация по схеме (SVG)",
-                                                    svg=svg_inline,
-                                                    mapping=mapping_use,
-                                                    show_review_overlay=bool(st.session_state.get('svg_show_review_overlay', True)),
-                                                    review_pick_mode=bool(st.session_state.get('svg_review_pick_mode', False)),
-                                                    review_statuses=st.session_state.get('svg_review_statuses', ['approved','pending','rejected']),
-                                                    review_hud=bool(st.session_state.get('svg_review_hud', True)),
-                                                    route_paths=st.session_state.get("svg_route_paths", []),
-                                                    label_pick_mode=st.session_state.get("svg_label_pick_mode", ""),
-                                                    label_picks=st.session_state.get("svg_route_label_picks", {}),
-                                                    label_pick_radius=st.session_state.get("svg_label_pick_radius", 18),
-                                                    time=time_s,
-                                                    edges=edge_series,
-                                                    nodes=node_series,
-                                                    selected=selected,
-                                                    sync_playhead=True,
-                                                    playhead_storage_key="pneumo_play_state",
-                                                    dataset_id=dataset_id_ui,
-                                                    height=760,
-                                                    key="svg_pick_event",
-                                                    default=None,
-                                                )
-                                                st.caption("Клик по ветке/узлу на схеме добавляет/заменяет выбор в графиках (см. переключатель выше).")
-                                            else:
-                                                render_svg_flow_animation_html(
-                                                    svg_inline=svg_inline,
-                                                    mapping=mapping_use,
-                                                    time_s=time_s,
-                                                    edge_series=edge_series,
-                                                    node_series=node_series,
-                                                    height=760,
-                                                )
+                        else:
+                            render_non_mechanical_animation_subsection(
+                                anim_view,
+                                render_flow_tool_fn=_render_flow_tool_animation,
+                                render_svg_scheme_fn=_render_svg_scheme_animation,
+                            )
 
 
 

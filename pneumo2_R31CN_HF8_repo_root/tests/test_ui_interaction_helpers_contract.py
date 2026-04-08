@@ -68,12 +68,9 @@ def test_large_ui_entrypoints_import_shared_interaction_helpers() -> None:
         src = (ROOT / rel).read_text(encoding="utf-8")
         assert "from pneumo_solver_ui.ui_interaction_helpers import (" in src
         assert "apply_pick_list as _apply_pick_list" in src
-        assert "ensure_mapping_for_selection" in src
         assert "extract_plotly_selection_points as _extract_plotly_selection_points" in src
         assert "plotly_points_signature as _plotly_points_signature" in src
-        assert "strip_svg_xml_header" in src
         assert "def _apply_pick_list(" not in src
         assert "def _extract_plotly_selection_points(" not in src
         assert "def _plotly_points_signature(" not in src
-        assert "def strip_svg_xml_header(" not in src
         assert "def ensure_mapping_for_selection(" not in src
