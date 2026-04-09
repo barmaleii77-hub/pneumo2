@@ -8,6 +8,7 @@ from pneumo_solver_ui.ui_event_overlay_helpers import prepare_events_for_graph_o
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+RESULTS_SURFACE_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_helpers.py"
 
 
 def test_prepare_events_for_graph_overlays_filters_sorts_and_thins() -> None:
@@ -63,11 +64,13 @@ def test_prepare_events_for_graph_overlays_handles_disabled_or_bad_max() -> None
 def test_entrypoints_use_shared_event_overlay_helper() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = RESULTS_SURFACE_HELPERS_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_event_overlay_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_event_overlay_helpers import (" in heavy_text
-    assert "prepare_events_for_graph_overlays(" in app_text
-    assert "prepare_events_for_graph_overlays(" in heavy_text
+    assert "from pneumo_solver_ui.ui_event_overlay_helpers import (" not in app_text
+    assert "from pneumo_solver_ui.ui_event_overlay_helpers import (" not in heavy_text
+    assert "prepare_events_for_graph_overlays(" not in app_text
+    assert "prepare_events_for_graph_overlays(" not in heavy_text
+    assert "prepare_events_for_graph_overlays(" in surface_text
     assert 'events_graph_sev", ["error", "warn"]' not in app_text
     assert 'events_graph_sev", ["error", "warn"]' not in heavy_text
     assert "events_for_graphs.sort(key=lambda e: int(e.get(\"idx\", 0)))" not in app_text

@@ -10,6 +10,7 @@ from pneumo_solver_ui import ui_mech_graph_helpers
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+GRAPH_SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_graph_section_helpers.py"
 
 
 def test_collect_mech_metric_columns_and_render_mech_overview_graphs() -> None:
@@ -75,11 +76,12 @@ def test_collect_mech_metric_columns_and_render_mech_overview_graphs() -> None:
 def test_entrypoints_use_shared_mech_graph_helper() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
-
     assert "from pneumo_solver_ui.ui_mech_graph_helpers import (" in app_text
     assert "from pneumo_solver_ui.ui_mech_graph_helpers import (" in heavy_text
-    assert "render_mech_overview_graphs(" in app_text
-    assert "render_mech_overview_graphs(" in heavy_text
+    assert "render_mech_overview_graphs(" not in app_text
+    assert "render_mech_overview_graphs(" not in heavy_text
+    assert '"render_mech_overview_graphs_fn": render_mech_overview_graphs' in app_text
+    assert '"render_mech_overview_graphs_fn": render_mech_overview_graphs' in heavy_text
     assert 'key="mech_plot_corners"' not in app_text
     assert 'key="mech_plot_corners"' not in heavy_text
     assert 'title="Нормальные силы шин"' not in app_text

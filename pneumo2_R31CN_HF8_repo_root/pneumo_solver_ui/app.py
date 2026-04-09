@@ -1,13 +1,13 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 pneumo_ui_app.py
 
 Streamlit UI:
-- запуск одиночных тестов (baseline),
-- запуск оптимизации (фоновый процесс) из UI,
-- просмотр/фильтр результатов.
+- Р·Р°РїСѓСЃРє РѕРґРёРЅРѕС‡РЅС‹С… С‚РµСЃС‚РѕРІ (baseline),
+- Р·Р°РїСѓСЃРє РѕРїС‚РёРјРёР·Р°С†РёРё (С„РѕРЅРѕРІС‹Р№ РїСЂРѕС†РµСЃСЃ) РёР· UI,
+- РїСЂРѕСЃРјРѕС‚СЂ/С„РёР»СЊС‚СЂ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ.
 
-Требования: streamlit, numpy, pandas, openpyxl.
+РўСЂРµР±РѕРІР°РЅРёСЏ: streamlit, numpy, pandas, openpyxl.
 
 """
 # Compatibility note: this is the legacy single-page package UI.
@@ -51,7 +51,7 @@ try:
 except Exception:
     pass
 
-# Опционально: интерактивные графики (Plotly). Если не установлено — UI продолжит работать без Plotly.
+# РћРїС†РёРѕРЅР°Р»СЊРЅРѕ: РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рµ РіСЂР°С„РёРєРё (Plotly). Р•СЃР»Рё РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅРѕ вЂ” UI РїСЂРѕРґРѕР»Р¶РёС‚ СЂР°Р±РѕС‚Р°С‚СЊ Р±РµР· Plotly.
 try:
     import plotly.graph_objects as go  # type: ignore
     import plotly.express as px  # type: ignore
@@ -80,34 +80,14 @@ from pneumo_solver_ui.ui_cache_helpers import (
 )
 from pneumo_solver_ui.ui_data_helpers import decimate_minmax, downsample_df, write_tests_index_csv
 from pneumo_solver_ui.ui_diagnostics_helpers import make_ui_diagnostics_zip_bundle
-from pneumo_solver_ui.ui_animation_mode_helpers import (
-    ANIMATION_VIEW_MECHANICS,
-    render_animation_view_selector,
-    render_non_mechanical_animation_subsection,
-)
 from pneumo_solver_ui.ui_event_sync_helpers import (
     consume_mech_pick_event as _consume_mech_pick_event_core,
     consume_playhead_event as _consume_playhead_event_core,
     consume_plotly_pick_events as _consume_plotly_pick_events_core,
     consume_svg_pick_event as _consume_svg_pick_event_core,
 )
-from pneumo_solver_ui.ui_event_overlay_helpers import (
-    prepare_events_for_graph_overlays,
-)
 from pneumo_solver_ui.ui_flow_rate_helpers import (
     flow_rate_display_scale_and_unit,
-)
-from pneumo_solver_ui.ui_flow_graph_helpers import (
-    render_flow_edge_graphs_section,
-)
-from pneumo_solver_ui.ui_flow_animation_helpers import (
-    render_flow_animation_panel,
-)
-from pneumo_solver_ui.ui_graph_studio_helpers import (
-    render_graph_studio_section,
-)
-from pneumo_solver_ui.ui_svg_scheme_section_helpers import (
-    render_svg_scheme_section,
 )
 from pneumo_solver_ui.ui_interaction_helpers import (
     apply_pick_list as _apply_pick_list,
@@ -117,28 +97,19 @@ from pneumo_solver_ui.ui_interaction_helpers import (
 from pneumo_solver_ui.ui_line_plot_helpers import (
     plot_lines as plot_lines_core,
 )
-from pneumo_solver_ui.ui_mech_graph_helpers import (
-    render_mech_overview_graphs,
-)
-from pneumo_solver_ui.ui_mech_animation_helpers import (
-    render_mechanical_animation_intro,
-    render_mechanical_scheme_asset_expander,
-)
-from pneumo_solver_ui.ui_node_pressure_helpers import (
-    render_node_pressure_expander,
-)
 from pneumo_solver_ui.ui_playhead_helpers import (
     make_playhead_jump_command,
     make_playhead_reset_command,
-    render_results_view_selector,
 )
-from pneumo_solver_ui.ui_playhead_section_helpers import (
-    render_playhead_results_section,
+from pneumo_solver_ui.ui_results_runtime_helpers import (
+    prepare_results_runtime,
+)
+from pneumo_solver_ui.ui_results_surface_section_helpers import (
+    render_app_results_surface_section,
 )
 from pneumo_solver_ui.ui_timeline_event_helpers import (
     compute_events as compute_events_core,
 )
-from pneumo_solver_ui.ui_flow_panel_helpers import render_flow_panel_html
 from pneumo_solver_ui.ui_param_helpers import (
     is_numeric_scalar as _is_numeric_scalar,
     is_pressure_param,
@@ -159,9 +130,6 @@ from pneumo_solver_ui.packaging_surface_ui import (
 )
 from pneumo_solver_ui.ui_plot_studio_helpers import (
     plot_studio_timeseries as plot_studio_timeseries_core,
-)
-from pneumo_solver_ui.ui_quick_graph_helpers import (
-    render_main_overview_graphs,
 )
 from pneumo_solver_ui.suspension_family_contract import family_param_meta
 from pneumo_solver_ui.ui_process_helpers import (
@@ -194,12 +162,6 @@ from pneumo_solver_ui.ui_suite_helpers import (
     load_default_suite_disabled,
     load_suite,
     resolve_osc_dir,
-)
-from pneumo_solver_ui.ui_components import (
-    get_mech_anim_component,
-    get_mech_car3d_component,
-    get_playhead_ctrl_component,
-    get_pneumo_svg_flow_component,
 )
 from pneumo_solver_ui.ui_unit_helpers import (
     gauge_to_pa_abs,
@@ -245,7 +207,7 @@ from pneumo_solver_ui.optimization_runtime_paths import (
     staged_progress_path,
 )
 
-# Optional: метрики процесса (CPU/RAM). Если psutil не установлен — просто отключаем метрики.
+# Optional: РјРµС‚СЂРёРєРё РїСЂРѕС†РµСЃСЃР° (CPU/RAM). Р•СЃР»Рё psutil РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅ вЂ” РїСЂРѕСЃС‚Рѕ РѕС‚РєР»СЋС‡Р°РµРј РјРµС‚СЂРёРєРё.
 try:
     import psutil  # type: ignore
     _HAS_PSUTIL = True
@@ -258,8 +220,8 @@ from pneumo_solver_ui.release_info import get_release
 from pneumo_solver_ui.name_sanitize import sanitize_ascii_id as _sanitize_id, sanitize_test_name
 APP_RELEASE = get_release()
 
-# Fallback (без Streamlit Components): matplotlib‑визуализация механики.
-# Это лечит типовые проблемы вроде "Unrecognized component API version" в некоторых окружениях.
+# Fallback (Р±РµР· Streamlit Components): matplotlibвЂ‘РІРёР·СѓР°Р»РёР·Р°С†РёСЏ РјРµС…Р°РЅРёРєРё.
+# Р­С‚Рѕ Р»РµС‡РёС‚ С‚РёРїРѕРІС‹Рµ РїСЂРѕР±Р»РµРјС‹ РІСЂРѕРґРµ "Unrecognized component API version" РІ РЅРµРєРѕС‚РѕСЂС‹С… РѕРєСЂСѓР¶РµРЅРёСЏС….
 try:
     import mech_anim_fallback as mech_fb  # local module
 except Exception:
@@ -267,7 +229,7 @@ except Exception:
 
 from io import BytesIO
 
-# Optional: SVG auto-trace / анализ схемы по геометрии линий
+# Optional: SVG auto-trace / Р°РЅР°Р»РёР· СЃС…РµРјС‹ РїРѕ РіРµРѕРјРµС‚СЂРёРё Р»РёРЅРёР№
 try:
     from pneumo_solver_ui.svg_autotrace import extract_polylines, auto_build_mapping_from_svg, detect_component_bboxes, shortest_path_between_points, evaluate_route_quality  # type: ignore
     _HAS_SVG_AUTOTRACE = True
@@ -292,6 +254,7 @@ RANGES_DEFAULT = str(canonical_ranges_json_path(HERE))
 # Default files shipped with the app
 # -------------------------------
 DEFAULT_SVG_MAPPING_PATH = HERE / "default_svg_mapping.json"
+DEFAULT_SVG_VIEWBOX = "0 0 1920 1080"
 
 # -------------------------------
 # Logging / diagnostics
@@ -326,7 +289,7 @@ get_osc_dir = partial(resolve_osc_dir, WORKSPACE_OSC_DIR)
 try:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:
-    # не падаем, если нет прав на запись — просто отключим файловое логирование
+    # РЅРµ РїР°РґР°РµРј, РµСЃР»Рё РЅРµС‚ РїСЂР°РІ РЅР° Р·Р°РїРёСЃСЊ вЂ” РїСЂРѕСЃС‚Рѕ РѕС‚РєР»СЋС‡РёРј С„Р°Р№Р»РѕРІРѕРµ Р»РѕРіРёСЂРѕРІР°РЅРёРµ
     LOG_DIR = None  # type: ignore
 
 _APP_LOGGER = logging.getLogger("pneumo_ui")
@@ -335,17 +298,17 @@ _APP_LOGGER.propagate = False
 
 
 def _init_file_logger_once() -> None:
-    """Инициализировать логгер один раз на сессию Streamlit.
+    """РРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°С‚СЊ Р»РѕРіРіРµСЂ РѕРґРёРЅ СЂР°Р· РЅР° СЃРµСЃСЃРёСЋ Streamlit.
 
-    В Streamlit скрипт перезапускается на каждое изменение виджетов.
-    Нельзя добавлять хендлер каждый раз, иначе будут дубликаты строк.
+    Р’ Streamlit СЃРєСЂРёРїС‚ РїРµСЂРµР·Р°РїСѓСЃРєР°РµС‚СЃСЏ РЅР° РєР°Р¶РґРѕРµ РёР·РјРµРЅРµРЅРёРµ РІРёРґР¶РµС‚РѕРІ.
+    РќРµР»СЊР·СЏ РґРѕР±Р°РІР»СЏС‚СЊ С…РµРЅРґР»РµСЂ РєР°Р¶РґС‹Р№ СЂР°Р·, РёРЅР°С‡Рµ Р±СѓРґСѓС‚ РґСѓР±Р»РёРєР°С‚С‹ СЃС‚СЂРѕРє.
     """
 
-    # Папка логов может быть недоступна (например, read-only).
+    # РџР°РїРєР° Р»РѕРіРѕРІ РјРѕР¶РµС‚ Р±С‹С‚СЊ РЅРµРґРѕСЃС‚СѓРїРЅР° (РЅР°РїСЂРёРјРµСЂ, read-only).
     if LOG_DIR is None:
         return
 
-    # log_path храним в session_state, чтобы был один файл на сессию
+    # log_path С…СЂР°РЅРёРј РІ session_state, С‡С‚РѕР±С‹ Р±С‹Р» РѕРґРёРЅ С„Р°Р№Р» РЅР° СЃРµСЃСЃРёСЋ
     if "_log_path" not in st.session_state:
         sid = st.session_state.get("_session_id")
         if not sid:
@@ -357,7 +320,7 @@ def _init_file_logger_once() -> None:
     if not log_path:
         return
 
-    # Проверяем: уже есть хендлер на этот файл?
+    # РџСЂРѕРІРµСЂСЏРµРј: СѓР¶Рµ РµСЃС‚СЊ С…РµРЅРґР»РµСЂ РЅР° СЌС‚РѕС‚ С„Р°Р№Р»?
     for h in list(_APP_LOGGER.handlers):
         if isinstance(h, RotatingFileHandler) and getattr(h, "baseFilename", None) == log_path:
             return
@@ -368,16 +331,16 @@ def _init_file_logger_once() -> None:
         h.setFormatter(fmt)
         _APP_LOGGER.addHandler(h)
     except Exception:
-        # не фейлим UI из-за логирования
+        # РЅРµ С„РµР№Р»РёРј UI РёР·-Р·Р° Р»РѕРіРёСЂРѕРІР°РЅРёСЏ
         return
 
 
 def log_event(event: str, **fields: Any) -> None:
-    """Единая точка логирования.
+    """Р•РґРёРЅР°СЏ С‚РѕС‡РєР° Р»РѕРіРёСЂРѕРІР°РЅРёСЏ.
 
-    Пишем в:
-    - ui_*.log (если доступно)
-    - metrics_*.jsonl (если доступно)
+    РџРёС€РµРј РІ:
+    - ui_*.log (РµСЃР»Рё РґРѕСЃС‚СѓРїРЅРѕ)
+    - metrics_*.jsonl (РµСЃР»Рё РґРѕСЃС‚СѓРїРЅРѕ)
     """
 
     try:
@@ -385,7 +348,7 @@ def log_event(event: str, **fields: Any) -> None:
         payload = {"event": event, **fields}
         _APP_LOGGER.info(json.dumps(payload, ensure_ascii=False))
 
-        # metrics jsonl — удобнее парсить
+        # metrics jsonl вЂ” СѓРґРѕР±РЅРµРµ РїР°СЂСЃРёС‚СЊ
         if LOG_DIR is not None:
             sid = st.session_state.get("_session_id", "")
             mp = LOG_DIR / f"metrics_{sid}.jsonl"
@@ -394,7 +357,7 @@ def log_event(event: str, **fields: Any) -> None:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
             # Optional: a single combined log file for all sessions.
-            # This addresses the typical question "почему каждый запуск пишет в новый файл".
+            # This addresses the typical question "РїРѕС‡РµРјСѓ РєР°Р¶РґС‹Р№ Р·Р°РїСѓСЃРє РїРёС€РµС‚ РІ РЅРѕРІС‹Р№ С„Р°Р№Р»".
             try:
                 with open(LOG_DIR / "ui_combined.log", "a", encoding="utf-8") as f:
                     f.write(json.dumps({"ts": rec["ts"], "session_id": sid, **payload}, ensure_ascii=False) + "\n")
@@ -410,9 +373,9 @@ def log_event(event: str, **fields: Any) -> None:
 
 
 
-# Пробрасываем callback для внутренних модулей (fallback-анимации) без прямого импорта этого файла.
+# РџСЂРѕР±СЂР°СЃС‹РІР°РµРј callback РґР»СЏ РІРЅСѓС‚СЂРµРЅРЅРёС… РјРѕРґСѓР»РµР№ (fallback-Р°РЅРёРјР°С†РёРё) Р±РµР· РїСЂСЏРјРѕРіРѕ РёРјРїРѕСЂС‚Р° СЌС‚РѕРіРѕ С„Р°Р№Р»Р°.
 try:
-    # В Streamlit-сессии можно хранить callable. Это нужно для mech_anim_fallback.
+    # Р’ Streamlit-СЃРµСЃСЃРёРё РјРѕР¶РЅРѕ С…СЂР°РЅРёС‚СЊ callable. Р­С‚Рѕ РЅСѓР¶РЅРѕ РґР»СЏ mech_anim_fallback.
     st.session_state["_log_event_cb"] = log_event
 except Exception:
     pass
@@ -486,12 +449,12 @@ def safe_dataframe(df: pd.DataFrame, height: int = 240, hide_index: bool = False
 
 
 def safe_plotly_chart(fig, *, key=None, on_select=None, selection_mode=None):
-    """Безопасная обёртка над st.plotly_chart для разных версий Streamlit.
+    """Р‘РµР·РѕРїР°СЃРЅР°СЏ РѕР±С‘СЂС‚РєР° РЅР°Рґ st.plotly_chart РґР»СЏ СЂР°Р·РЅС‹С… РІРµСЂСЃРёР№ Streamlit.
 
-    В новых версиях Streamlit параметр on_select НЕ принимает None (только "ignore"/"rerun"/callable).
-    Поэтому передаём on_select только если он задан явно.
+    Р’ РЅРѕРІС‹С… РІРµСЂСЃРёСЏС… Streamlit РїР°СЂР°РјРµС‚СЂ on_select РќР• РїСЂРёРЅРёРјР°РµС‚ None (С‚РѕР»СЊРєРѕ "ignore"/"rerun"/callable).
+    РџРѕСЌС‚РѕРјСѓ РїРµСЂРµРґР°С‘Рј on_select С‚РѕР»СЊРєРѕ РµСЃР»Рё РѕРЅ Р·Р°РґР°РЅ СЏРІРЅРѕ.
     """
-    # New API (2025+): width="stretch" вместо use_container_width
+    # New API (2025+): width="stretch" РІРјРµСЃС‚Рѕ use_container_width
     kwargs_new = {"width": "stretch", "key": key}
     if on_select is not None:
         kwargs_new["on_select"] = on_select
@@ -513,7 +476,7 @@ def safe_plotly_chart(fig, *, key=None, on_select=None, selection_mode=None):
 
 
 def safe_image(img, *, caption=None):
-    """Безопасный st.image: width='stretch' (новый API) -> fallback на use_container_width."""
+    """Р‘РµР·РѕРїР°СЃРЅС‹Р№ st.image: width='stretch' (РЅРѕРІС‹Р№ API) -> fallback РЅР° use_container_width."""
     try:
         return st.image(img, caption=caption, width='stretch')
     except TypeError:
@@ -554,7 +517,7 @@ def export_full_log_to_npz(out_path, df_main, df_p=None, df_q=None, df_open=None
     if df_open is not None:
         payload["open_cols"] = _np.array(list(df_open.columns), dtype=object)
         payload["open_values"] = _np.asarray(df_open.to_numpy(), dtype=float)
-    # meta: добавляем полезные поля для трассируемости (связь NPZ ↔ UI ↔ CSV)
+    # meta: РґРѕР±Р°РІР»СЏРµРј РїРѕР»РµР·РЅС‹Рµ РїРѕР»СЏ РґР»СЏ С‚СЂР°СЃСЃРёСЂСѓРµРјРѕСЃС‚Рё (СЃРІСЏР·СЊ NPZ в†” UI в†” CSV)
     meta = dict(meta or {})
     meta.setdefault("app_release", APP_RELEASE)
     meta.setdefault("exported_at", datetime.now().isoformat(timespec="seconds"))
@@ -575,9 +538,9 @@ def export_full_log_to_npz(out_path, df_main, df_p=None, df_q=None, df_open=None
         payload["meta_json"] = _json.dumps(meta, ensure_ascii=False)
     _np.savez_compressed(out_path, **payload)
 
-    # Дополнительно ведём индекс экспортов, чтобы можно было:
-    # - понимать, какой файл к какому тесту/бейслайну относится
-    # - агрегировать результаты без "угадывания" по имени
+    # Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅРѕ РІРµРґС‘Рј РёРЅРґРµРєСЃ СЌРєСЃРїРѕСЂС‚РѕРІ, С‡С‚РѕР±С‹ РјРѕР¶РЅРѕ Р±С‹Р»Рѕ:
+    # - РїРѕРЅРёРјР°С‚СЊ, РєР°РєРѕР№ С„Р°Р№Р» Рє РєР°РєРѕРјСѓ С‚РµСЃС‚Сѓ/Р±РµР№СЃР»Р°Р№РЅСѓ РѕС‚РЅРѕСЃРёС‚СЃСЏ
+    # - Р°РіСЂРµРіРёСЂРѕРІР°С‚СЊ СЂРµР·СѓР»СЊС‚Р°С‚С‹ Р±РµР· "СѓРіР°РґС‹РІР°РЅРёСЏ" РїРѕ РёРјРµРЅРё
     try:
         idx_path = out_path.parent / "osc_index.jsonl"
         rec = {
@@ -589,7 +552,7 @@ def export_full_log_to_npz(out_path, df_main, df_p=None, df_q=None, df_open=None
         with idx_path.open("a", encoding="utf-8") as f:
             f.write(_json.dumps(rec, ensure_ascii=False) + "\n")
     except Exception:
-        # Индекс не критичен — экспорт NPZ должен завершиться даже если индекс не пишется.
+        # РРЅРґРµРєСЃ РЅРµ РєСЂРёС‚РёС‡РµРЅ вЂ” СЌРєСЃРїРѕСЂС‚ NPZ РґРѕР»Р¶РµРЅ Р·Р°РІРµСЂС€РёС‚СЊСЃСЏ РґР°Р¶Рµ РµСЃР»Рё РёРЅРґРµРєСЃ РЅРµ РїРёС€РµС‚СЃСЏ.
         pass
     return out_path
 
@@ -713,8 +676,8 @@ make_ui_diagnostics_zip = partial(
     app_release=APP_RELEASE,
 )
 # ------------------------- Persistent cache (baseline/details) -------------------------
-# Цель: после refresh (новая session_state) не пересчитывать baseline/детальный прогон,
-# а подхватывать с диска. Кэш хранится в WORKSPACE_DIR/cache/baseline/<key>/...
+# Р¦РµР»СЊ: РїРѕСЃР»Рµ refresh (РЅРѕРІР°СЏ session_state) РЅРµ РїРµСЂРµСЃС‡РёС‚С‹РІР°С‚СЊ baseline/РґРµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ,
+# Р° РїРѕРґС…РІР°С‚С‹РІР°С‚СЊ СЃ РґРёСЃРєР°. РљСЌС€ С…СЂР°РЅРёС‚СЃСЏ РІ WORKSPACE_DIR/cache/baseline/<key>/...
 
 def baseline_cache_dir(base_hash: str, suite_hash: str, model_file: str) -> Path:
     """Deterministic cache dir for the given (model, base, suite)."""
@@ -812,10 +775,10 @@ def load_detail_cache(cache_dir: Path, test_name: str, dt: float, t_end: float, 
 
 _infer_unit_and_transform = partial(
     infer_plot_unit_and_transform,
-    pressure_unit_label="атм (изб.)",
+    pressure_unit_label="Р°С‚Рј (РёР·Р±.)",
     pressure_offset_pa=lambda: P_ATM,
     pressure_divisor_pa=lambda: ATM_PA,
-    length_unit_label="м",
+    length_unit_label="Рј",
     length_scale=1.0,
 )
 
@@ -837,19 +800,19 @@ def _legacy_plot_studio_timeseries_dead(
 ):
     """Render Graph Studio time-series plot(s)."""
     if df is None or df.empty or not y_cols:
-        st.info("Нет данных/сигналов для построения.")
+        st.info("РќРµС‚ РґР°РЅРЅС‹С…/СЃРёРіРЅР°Р»РѕРІ РґР»СЏ РїРѕСЃС‚СЂРѕРµРЅРёСЏ.")
         return
     if not _HAS_PLOTLY:
         st.warning(
-            "Plotly не установлен — интерактивные графики отключены (Graph Studio / интерактивные Plotly‑графики).\n\n"
-            "Решение: используйте RUN_ONECLICK_WINDOWS.bat или INSTALL_DEPENDENCIES_WINDOWS.bat (создаст .venv и установит зависимости).\n"
-            "Либо выполните в консоли: python -m pip install -r requirements.txt"
+            "Plotly РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅ вЂ” РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рµ РіСЂР°С„РёРєРё РѕС‚РєР»СЋС‡РµРЅС‹ (Graph Studio / РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рµ PlotlyвЂ‘РіСЂР°С„РёРєРё).\n\n"
+            "Р РµС€РµРЅРёРµ: РёСЃРїРѕР»СЊР·СѓР№С‚Рµ RUN_ONECLICK_WINDOWS.bat РёР»Рё INSTALL_DEPENDENCIES_WINDOWS.bat (СЃРѕР·РґР°СЃС‚ .venv Рё СѓСЃС‚Р°РЅРѕРІРёС‚ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё).\n"
+            "Р›РёР±Рѕ РІС‹РїРѕР»РЅРёС‚Рµ РІ РєРѕРЅСЃРѕР»Рё: python -m pip install -r requirements.txt"
         )
         return
 
     # time axis
     if tcol not in df.columns:
-        st.warning(f"Нет колонки времени '{tcol}'")
+        st.warning(f"РќРµС‚ РєРѕР»РѕРЅРєРё РІСЂРµРјРµРЅРё '{tcol}'")
         return
     x = df[tcol].to_numpy()
 
@@ -1111,9 +1074,9 @@ def _legacy_plot_studio_timeseries_dead(
 
 
 _GRAPH_STUDIO_PLOTLY_MISSING_MESSAGE = (
-    "Plotly не установлен — интерактивные графики отключены (Graph Studio / интерактивные Plotly-графики).\n\n"
-    "Решение: используйте RUN_ONECLICK_WINDOWS.bat или INSTALL_DEPENDENCIES_WINDOWS.bat (создаст .venv и установит зависимости).\n"
-    "Либо выполните в консоли: python -m pip install -r requirements.txt"
+    "Plotly РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅ вЂ” РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рµ РіСЂР°С„РёРєРё РѕС‚РєР»СЋС‡РµРЅС‹ (Graph Studio / РёРЅС‚РµСЂР°РєС‚РёРІРЅС‹Рµ Plotly-РіСЂР°С„РёРєРё).\n\n"
+    "Р РµС€РµРЅРёРµ: РёСЃРїРѕР»СЊР·СѓР№С‚Рµ RUN_ONECLICK_WINDOWS.bat РёР»Рё INSTALL_DEPENDENCIES_WINDOWS.bat (СЃРѕР·РґР°СЃС‚ .venv Рё СѓСЃС‚Р°РЅРѕРІРёС‚ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё).\n"
+    "Р›РёР±Рѕ РІС‹РїРѕР»РЅРёС‚Рµ РІ РєРѕРЅСЃРѕР»Рё: python -m pip install -r requirements.txt"
 )
 
 plot_studio_timeseries = partial(
@@ -1157,10 +1120,10 @@ def _legacy_compute_events_dead(
     """
     events: List[dict] = []
 
-    if df_main is None or "время_с" not in df_main.columns or len(df_main) == 0:
+    if df_main is None or "РІСЂРµРјСЏ_СЃ" not in df_main.columns or len(df_main) == 0:
         return events
 
-    t_arr = df_main["время_с"].to_numpy(dtype=float)
+    t_arr = df_main["РІСЂРµРјСЏ_СЃ"].to_numpy(dtype=float)
     n = int(len(t_arr))
     if n <= 1:
         return events
@@ -1184,53 +1147,53 @@ def _legacy_compute_events_dead(
     # --------------------
     # 1) Wheel lift (wheel in air)
     # --------------------
-    for c in ["ЛП", "ПП", "ЛЗ", "ПЗ"]:
-        col = f"колесо_в_воздухе_{c}"
+    for c in ["Р›Рџ", "РџРџ", "Р›Р—", "РџР—"]:
+        col = f"РєРѕР»РµСЃРѕ_РІ_РІРѕР·РґСѓС…Рµ_{c}"
         if col in df_main.columns:
             m = df_main[col].to_numpy()
             # treat any nonzero as True
             starts = _run_starts(m != 0)
             for i0 in starts:
-                add_event(i0, "warn", "wheel_lift", c, f"Колесо {c} в воздухе")
+                add_event(i0, "warn", "wheel_lift", c, f"РљРѕР»РµСЃРѕ {c} РІ РІРѕР·РґСѓС…Рµ")
 
     # --------------------
     # 2) Stroke limit / bump stop near
     # --------------------
-    stroke = float(params_abs.get("ход_штока", 0.25))
-    margin = float(test.get("target_мин_запас_до_упора_штока_м", 0.005))
+    stroke = float(params_abs.get("С…РѕРґ_С€С‚РѕРєР°", 0.25))
+    margin = float(test.get("target_РјРёРЅ_Р·Р°РїР°СЃ_РґРѕ_СѓРїРѕСЂР°_С€С‚РѕРєР°_Рј", 0.005))
     margin = max(0.0, margin)
 
-    for c in ["ЛП", "ПП", "ЛЗ", "ПЗ"]:
-        col = f"положение_штока_{c}_м"
+    for c in ["Р›Рџ", "РџРџ", "Р›Р—", "РџР—"]:
+        col = f"РїРѕР»РѕР¶РµРЅРёРµ_С€С‚РѕРєР°_{c}_Рј"
         if col in df_main.columns:
             x = df_main[col].to_numpy(dtype=float)
             m_low = x <= margin
             m_high = x >= (stroke - margin)
             for i0 in _run_starts(m_low):
-                add_event(i0, "warn", "stroke_limit", c, f"Шток {c}: близко к упору (min)")
+                add_event(i0, "warn", "stroke_limit", c, f"РЁС‚РѕРє {c}: Р±Р»РёР·РєРѕ Рє СѓРїРѕСЂСѓ (min)")
             for i0 in _run_starts(m_high):
-                add_event(i0, "warn", "stroke_limit", c, f"Шток {c}: близко к упору (max)")
+                add_event(i0, "warn", "stroke_limit", c, f"РЁС‚РѕРє {c}: Р±Р»РёР·РєРѕ Рє СѓРїРѕСЂСѓ (max)")
 
     # --------------------
     # 3) Rod speed limit
     # --------------------
-    v_lim = float(test.get("target_лимит_скорости_штока_м_с", 2.0))
+    v_lim = float(test.get("target_Р»РёРјРёС‚_СЃРєРѕСЂРѕСЃС‚Рё_С€С‚РѕРєР°_Рј_СЃ", 2.0))
     if v_lim > 0:
-        for c in ["ЛП", "ПП", "ЛЗ", "ПЗ"]:
-            col = f"скорость_штока_{c}_м_с"
+        for c in ["Р›Рџ", "РџРџ", "Р›Р—", "РџР—"]:
+            col = f"СЃРєРѕСЂРѕСЃС‚СЊ_С€С‚РѕРєР°_{c}_Рј_СЃ"
             if col in df_main.columns:
                 v = df_main[col].to_numpy(dtype=float)
                 m_v = np.abs(v) > v_lim
                 for i0 in _run_starts(m_v):
-                    add_event(i0, "warn", "rod_speed", c, f"Скорость штока {c} > {v_lim:g} м/с")
+                    add_event(i0, "warn", "rod_speed", c, f"РЎРєРѕСЂРѕСЃС‚СЊ С€С‚РѕРєР° {c} > {v_lim:g} Рј/СЃ")
 
     # --------------------
     # 4) Overpressure / vacuum checks (by node pressures if present)
     # --------------------
-    if df_p is not None and "время_с" in df_p.columns and len(df_p) == n:
-        cols = [c for c in df_p.columns if c != "время_с" and c != "АТМ"]
+    if df_p is not None and "РІСЂРµРјСЏ_СЃ" in df_p.columns and len(df_p) == n:
+        cols = [c for c in df_p.columns if c != "РІСЂРµРјСЏ_СЃ" and c != "РђРўРњ"]
         if cols:
-            Pmax_abs = float(params_abs.get("давление_Pmax_предохран", P_ATM + 8e5))
+            Pmax_abs = float(params_abs.get("РґР°РІР»РµРЅРёРµ_Pmax_РїСЂРµРґРѕС…СЂР°РЅ", P_ATM + 8e5))
             pmax_thr = Pmax_abs + float(pmax_margin_atm) * ATM_PA
 
             try:
@@ -1243,23 +1206,23 @@ def _legacy_compute_events_dead(
 
             if p_max is not None:
                 for i0 in _run_starts(p_max > pmax_thr):
-                    add_event(i0, "error", "overpressure", "nodes", "P>ПРЕДОХ (max node)")
+                    add_event(i0, "error", "overpressure", "nodes", "P>РџР Р•Р”РћРҐ (max node)")
 
             vac_thr = P_ATM + float(vacuum_min_gauge_atm) * ATM_PA
             # do not go below absolute min + small epsilon (avoid false positives)
-            p_abs_min = float(params_abs.get("минимальное_абсолютное_давление_Па", 1000.0))
+            p_abs_min = float(params_abs.get("РјРёРЅРёРјР°Р»СЊРЅРѕРµ_Р°Р±СЃРѕР»СЋС‚РЅРѕРµ_РґР°РІР»РµРЅРёРµ_РџР°", 1000.0))
             vac_thr = max(vac_thr, p_abs_min + 1.0)
 
             if p_min is not None:
                 for i0 in _run_starts(p_min < vac_thr):
-                    add_event(i0, "warn", "vacuum", "nodes", f"Вакуум: min node < {vacuum_min_gauge_atm:g} атм(изб)")
+                    add_event(i0, "warn", "vacuum", "nodes", f"Р’Р°РєСѓСѓРј: min node < {vacuum_min_gauge_atm:g} Р°С‚Рј(РёР·Р±)")
 
     # --------------------
     # 5) Valve chatter (rapid toggling) from df_open
     # --------------------
-    if df_open is not None and "время_с" in df_open.columns and len(df_open) == n:
+    if df_open is not None and "РІСЂРµРјСЏ_СЃ" in df_open.columns and len(df_open) == n:
         # Analyze only edges that actually toggle, and keep top few.
-        edge_cols = [c for c in df_open.columns if c != "время_с"]
+        edge_cols = [c for c in df_open.columns if c != "РІСЂРµРјСЏ_СЃ"]
         toggle_stats = []
         for col in edge_cols:
             arr = df_open[col].to_numpy()
@@ -1287,7 +1250,7 @@ def _legacy_compute_events_dead(
                 win_cnt = j - i
                 if win_cnt >= chatter_toggle_count:
                     nm = _shorten_name(col, 55)
-                    add_event(togg_list[i], "info", "chatter", nm, f"Дребезг: {nm} ({win_cnt} toggles/{chatter_window_s:.2f}s)")
+                    add_event(togg_list[i], "info", "chatter", nm, f"Р”СЂРµР±РµР·Рі: {nm} ({win_cnt} toggles/{chatter_window_s:.2f}s)")
                     # skip to the end of this window to avoid spamming
                     i = j
                 else:
@@ -1341,7 +1304,7 @@ def compute_events(
         chatter_toggle_count=chatter_toggle_count,
         max_events=max_events,
         gauge_pressure_scale_pa=101325.0,
-        vacuum_unit_label="атм(изб)",
+        vacuum_unit_label="Р°С‚Рј(РёР·Р±)",
         run_starts_fn=_run_starts,
         shorten_name_fn=_shorten_name,
     )
@@ -1363,27 +1326,27 @@ def _legacy_plot_lines_dead(
     events_show_labels: bool = False,
     events_label_severities: Tuple[str, ...] = ("error",),
 ):
-    """Единый helper для графиков: Plotly (если установлен) или fallback на st.line_chart.
+    """Р•РґРёРЅС‹Р№ helper РґР»СЏ РіСЂР°С„РёРєРѕРІ: Plotly (РµСЃР»Рё СѓСЃС‚Р°РЅРѕРІР»РµРЅ) РёР»Рё fallback РЅР° st.line_chart.
 
-    Дополнительно: если задан playhead_x, рисуем вертикальную линию и маркеры значений
-    на каждой кривой в текущий момент времени (по ближайшему индексу).
+    Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅРѕ: РµСЃР»Рё Р·Р°РґР°РЅ playhead_x, СЂРёСЃСѓРµРј РІРµСЂС‚РёРєР°Р»СЊРЅСѓСЋ Р»РёРЅРёСЋ Рё РјР°СЂРєРµСЂС‹ Р·РЅР°С‡РµРЅРёР№
+    РЅР° РєР°Р¶РґРѕР№ РєСЂРёРІРѕР№ РІ С‚РµРєСѓС‰РёР№ РјРѕРјРµРЅС‚ РІСЂРµРјРµРЅРё (РїРѕ Р±Р»РёР¶Р°Р№С€РµРјСѓ РёРЅРґРµРєСЃСѓ).
 
-    Возвращает словарь с данными playhead (idx/x/values) или None.
+    Р’РѕР·РІСЂР°С‰Р°РµС‚ СЃР»РѕРІР°СЂСЊ СЃ РґР°РЅРЅС‹РјРё playhead (idx/x/values) РёР»Рё None.
     """
     if df is None or len(df) == 0:
-        st.info("Нет данных для графика.")
+        st.info("РќРµС‚ РґР°РЅРЅС‹С… РґР»СЏ РіСЂР°С„РёРєР°.")
         return None
 
     y_cols = [c for c in y_cols if c in df.columns]
     if len(y_cols) == 0:
-        st.info("Не выбрано ни одной колонки для графика.")
+        st.info("РќРµ РІС‹Р±СЂР°РЅРѕ РЅРё РѕРґРЅРѕР№ РєРѕР»РѕРЅРєРё РґР»СЏ РіСЂР°С„РёРєР°.")
         return None
 
     # ---- performance guard: while fallback animation is playing, avoid heavy Plotly rebuilds ----
     try:
         if st.session_state.get("skip_heavy_on_play", True) and is_any_fallback_anim_playing():
             if not st.session_state.get("_skip_plotly_notice_shown", False):
-                st.info("Play (fallback) активен → Plotly-графики временно скрыты, чтобы анимация не тормозила. Поставь на паузу, чтобы вернуть графики.")
+                st.info("Play (fallback) Р°РєС‚РёРІРµРЅ в†’ Plotly-РіСЂР°С„РёРєРё РІСЂРµРјРµРЅРЅРѕ СЃРєСЂС‹С‚С‹, С‡С‚РѕР±С‹ Р°РЅРёРјР°С†РёСЏ РЅРµ С‚РѕСЂРјРѕР·РёР»Р°. РџРѕСЃС‚Р°РІСЊ РЅР° РїР°СѓР·Сѓ, С‡С‚РѕР±С‹ РІРµСЂРЅСѓС‚СЊ РіСЂР°С„РёРєРё.")
                 st.session_state["_skip_plotly_notice_shown"] = True
             return None
     except Exception:
@@ -1581,7 +1544,7 @@ start_worker = partial(
 # -------------------------------
 # UI
 # -------------------------------
-st.set_page_config(page_title="Пневмоподвеска: solver+оптимизация", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="РџРЅРµРІРјРѕРїРѕРґРІРµСЃРєР°: solver+РѕРїС‚РёРјРёР·Р°С†РёСЏ", layout="wide", initial_sidebar_state="collapsed")
 
 # --- Logging bootstrap (1 file per session) ---
 if not st.session_state.get("_ui_start_logged"):
@@ -1600,14 +1563,14 @@ if not st.session_state.get("_ui_start_logged"):
     st.session_state["_ui_start_logged"] = True
 
 # --- Default SVG mapping JSON (loaded by default) ---
-# Это закрывает требование: "Нужен mapping JSON - сделай рабочий и грузи по дефолту".
+# Р­С‚Рѕ Р·Р°РєСЂС‹РІР°РµС‚ С‚СЂРµР±РѕРІР°РЅРёРµ: "РќСѓР¶РµРЅ mapping JSON - СЃРґРµР»Р°Р№ СЂР°Р±РѕС‡РёР№ Рё РіСЂСѓР·Рё РїРѕ РґРµС„РѕР»С‚Сѓ".
 if "svg_mapping_text" not in st.session_state or not str(st.session_state.get("svg_mapping_text", "")).strip():
     try:
         st.session_state["svg_mapping_text"] = DEFAULT_SVG_MAPPING_PATH.read_text(encoding="utf-8")
         st.session_state["svg_mapping_source"] = str(DEFAULT_SVG_MAPPING_PATH)
         log_event("svg_mapping_loaded_default", path=str(DEFAULT_SVG_MAPPING_PATH))
     except Exception as e:
-        # Если файл недоступен, подставляем минимальный рабочий шаблон.
+        # Р•СЃР»Рё С„Р°Р№Р» РЅРµРґРѕСЃС‚СѓРїРµРЅ, РїРѕРґСЃС‚Р°РІР»СЏРµРј РјРёРЅРёРјР°Р»СЊРЅС‹Р№ СЂР°Р±РѕС‡РёР№ С€Р°Р±Р»РѕРЅ.
         st.session_state["svg_mapping_text"] = json.dumps(
             {"version": 2, "viewBox": "0 0 1920 1080", "edges": {}, "nodes": {}},
             ensure_ascii=False,
@@ -1617,25 +1580,25 @@ if "svg_mapping_text" not in st.session_state or not str(st.session_state.get("s
         log_event("svg_mapping_default_failed", error=repr(e))
 
 # -------------------------------
-# UI: компактный макет (чтобы короткие селекторы/списки не растягивались на весь экран)
+# UI: РєРѕРјРїР°РєС‚РЅС‹Р№ РјР°РєРµС‚ (С‡С‚РѕР±С‹ РєРѕСЂРѕС‚РєРёРµ СЃРµР»РµРєС‚РѕСЂС‹/СЃРїРёСЃРєРё РЅРµ СЂР°СЃС‚СЏРіРёРІР°Р»РёСЃСЊ РЅР° РІРµСЃСЊ СЌРєСЂР°РЅ)
 # -------------------------------
 with st.sidebar:
     st.markdown("## UI")
     ui_compact = st.checkbox(
-        "Сжатый макет (не растягивать списки)",
+        "РЎР¶Р°С‚С‹Р№ РјР°РєРµС‚ (РЅРµ СЂР°СЃС‚СЏРіРёРІР°С‚СЊ СЃРїРёСЃРєРё)",
         value=st.session_state.get("ui_compact", True),
-        help="Ограничивает максимальную ширину контента. Полезно на широких мониторах: короткие списки/селекторы не будут на всю ширину.",
+        help="РћРіСЂР°РЅРёС‡РёРІР°РµС‚ РјР°РєСЃРёРјР°Р»СЊРЅСѓСЋ С€РёСЂРёРЅСѓ РєРѕРЅС‚РµРЅС‚Р°. РџРѕР»РµР·РЅРѕ РЅР° С€РёСЂРѕРєРёС… РјРѕРЅРёС‚РѕСЂР°С…: РєРѕСЂРѕС‚РєРёРµ СЃРїРёСЃРєРё/СЃРµР»РµРєС‚РѕСЂС‹ РЅРµ Р±СѓРґСѓС‚ РЅР° РІСЃСЋ С€РёСЂРёРЅСѓ.",
     )
     st.session_state["ui_compact"] = ui_compact
 
 
     st.checkbox(
-        "При Play (fallback) скрывать Plotly-графики",
+        "РџСЂРё Play (fallback) СЃРєСЂС‹РІР°С‚СЊ Plotly-РіСЂР°С„РёРєРё",
         value=st.session_state.get("skip_heavy_on_play", True),
         key="skip_heavy_on_play",
-        help="Fallback-анимация использует автообновление (каждый кадр = rerun всего приложения). "
-             "Чтобы Play не превращался в 'бесконечный расчёт', мы можем временно скрывать тяжёлые Plotly-графики. "
-             "Поставь на паузу — графики вернутся.",
+        help="Fallback-Р°РЅРёРјР°С†РёСЏ РёСЃРїРѕР»СЊР·СѓРµС‚ Р°РІС‚РѕРѕР±РЅРѕРІР»РµРЅРёРµ (РєР°Р¶РґС‹Р№ РєР°РґСЂ = rerun РІСЃРµРіРѕ РїСЂРёР»РѕР¶РµРЅРёСЏ). "
+             "Р§С‚РѕР±С‹ Play РЅРµ РїСЂРµРІСЂР°С‰Р°Р»СЃСЏ РІ 'Р±РµСЃРєРѕРЅРµС‡РЅС‹Р№ СЂР°СЃС‡С‘С‚', РјС‹ РјРѕР¶РµРј РІСЂРµРјРµРЅРЅРѕ СЃРєСЂС‹РІР°С‚СЊ С‚СЏР¶С‘Р»С‹Рµ Plotly-РіСЂР°С„РёРєРё. "
+             "РџРѕСЃС‚Р°РІСЊ РЅР° РїР°СѓР·Сѓ вЂ” РіСЂР°С„РёРєРё РІРµСЂРЅСѓС‚СЃСЏ.",
     )
 if st.session_state.get("ui_compact", True):
     st.markdown(
@@ -1645,24 +1608,24 @@ if st.session_state.get("ui_compact", True):
         unsafe_allow_html=True,
     )
 
-# Синхронизация: клик по SVG схеме → выбор веток/узлов в графиках
+# РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ: РєР»РёРє РїРѕ SVG СЃС…РµРјРµ в†’ РІС‹Р±РѕСЂ РІРµС‚РѕРє/СѓР·Р»РѕРІ РІ РіСЂР°С„РёРєР°С…
 consume_svg_pick_event()
 
-# Синхронизация: клик по механике → выбор углов для графиков/подсветки
+# РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ: РєР»РёРє РїРѕ РјРµС…Р°РЅРёРєРµ в†’ РІС‹Р±РѕСЂ СѓРіР»РѕРІ РґР»СЏ РіСЂР°С„РёРєРѕРІ/РїРѕРґСЃРІРµС‚РєРё
 consume_mech_pick_event()
 
-# Синхронизация: клик/выделение на графиках Plotly → подсветка/выбор на SVG схеме
+# РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ: РєР»РёРє/РІС‹РґРµР»РµРЅРёРµ РЅР° РіСЂР°С„РёРєР°С… Plotly в†’ РїРѕРґСЃРІРµС‚РєР°/РІС‹Р±РѕСЂ РЅР° SVG СЃС…РµРјРµ
 consume_plotly_pick_events()
 
 # Shared timeline (playhead) updates
 consume_playhead_event()
 
-st.title("Пневмоподвеска: матмодель + оптимизация (solver‑first)")
+st.title("РџРЅРµРІРјРѕРїРѕРґРІРµСЃРєР°: РјР°С‚РјРѕРґРµР»СЊ + РѕРїС‚РёРјРёР·Р°С†РёСЏ (solverвЂ‘first)")
 
 # -------------------------------
-# UI: Навигация (progressive disclosure)
+# UI: РќР°РІРёРіР°С†РёСЏ (progressive disclosure)
 # -------------------------------
-UI_MODES = ["🏠 Рабочее место", "🧰 Полный интерфейс"]
+UI_MODES = ["рџЏ  Р Р°Р±РѕС‡РµРµ РјРµСЃС‚Рѕ", "рџ§° РџРѕР»РЅС‹Р№ РёРЅС‚РµСЂС„РµР№СЃ"]
 
 def _seg_or_radio(label: str, options: List[str], key: str, index: int = 0, horizontal: bool = True) -> str:
     """
@@ -1675,22 +1638,22 @@ def _seg_or_radio(label: str, options: List[str], key: str, index: int = 0, hori
     except Exception:
         return st.radio(label, options=options, index=index, horizontal=horizontal, key=key)
 
-ui_mode = _seg_or_radio("Режим", UI_MODES, key="ui_mode", index=0, horizontal=True)
+ui_mode = _seg_or_radio("Р РµР¶РёРј", UI_MODES, key="ui_mode", index=0, horizontal=True)
 
-FULL_SECTIONS = ["Модель", "Параметры", "Тесты", "Прогон", "Результаты", "Инструменты"]
-if ui_mode == "🧰 Полный интерфейс":
-    ui_section = _seg_or_radio("Раздел", FULL_SECTIONS, key="ui_section", index=0, horizontal=True)
+FULL_SECTIONS = ["РњРѕРґРµР»СЊ", "РџР°СЂР°РјРµС‚СЂС‹", "РўРµСЃС‚С‹", "РџСЂРѕРіРѕРЅ", "Р РµР·СѓР»СЊС‚Р°С‚С‹", "РРЅСЃС‚СЂСѓРјРµРЅС‚С‹"]
+if ui_mode == "рџ§° РџРѕР»РЅС‹Р№ РёРЅС‚РµСЂС„РµР№СЃ":
+    ui_section = _seg_or_radio("Р Р°Р·РґРµР»", FULL_SECTIONS, key="ui_section", index=0, horizontal=True)
 else:
     ui_section = "WORKSPACE"
 
-SHOW_MODEL = (ui_section == "Модель")
-SHOW_PARAMS = (ui_section == "Параметры")
-SHOW_TESTS = (ui_section == "Тесты")
-SHOW_RUN = (ui_section == "Прогон")
-SHOW_RESULTS = (ui_section == "Результаты")
-SHOW_TOOLS = (ui_section == "Инструменты")
+SHOW_MODEL = (ui_section == "РњРѕРґРµР»СЊ")
+SHOW_PARAMS = (ui_section == "РџР°СЂР°РјРµС‚СЂС‹")
+SHOW_TESTS = (ui_section == "РўРµСЃС‚С‹")
+SHOW_RUN = (ui_section == "РџСЂРѕРіРѕРЅ")
+SHOW_RESULTS = (ui_section == "Р РµР·СѓР»СЊС‚Р°С‚С‹")
+SHOW_TOOLS = (ui_section == "РРЅСЃС‚СЂСѓРјРµРЅС‚С‹")
 
-# Workspace = быстрый сценарий: Прогон + Результаты (без лишнего)
+# Workspace = Р±С‹СЃС‚СЂС‹Р№ СЃС†РµРЅР°СЂРёР№: РџСЂРѕРіРѕРЅ + Р РµР·СѓР»СЊС‚Р°С‚С‹ (Р±РµР· Р»РёС€РЅРµРіРѕ)
 if ui_section == "WORKSPACE":
     SHOW_RUN = True
     SHOW_RESULTS = True
@@ -1700,13 +1663,13 @@ if ui_section == "WORKSPACE":
     SHOW_TOOLS = False
 
 st.caption(
-    "Идея интерфейса: один экран = одна задача. "
-    "Полный интерфейс разнесён по смысловым разделам, чтобы не было 'простыней' и горизонтального скролла."
+    "РРґРµСЏ РёРЅС‚РµСЂС„РµР№СЃР°: РѕРґРёРЅ СЌРєСЂР°РЅ = РѕРґРЅР° Р·Р°РґР°С‡Р°. "
+    "РџРѕР»РЅС‹Р№ РёРЅС‚РµСЂС„РµР№СЃ СЂР°Р·РЅРµСЃС‘РЅ РїРѕ СЃРјС‹СЃР»РѕРІС‹Рј СЂР°Р·РґРµР»Р°Рј, С‡С‚РѕР±С‹ РЅРµ Р±С‹Р»Рѕ 'РїСЂРѕСЃС‚С‹РЅРµР№' Рё РіРѕСЂРёР·РѕРЅС‚Р°Р»СЊРЅРѕРіРѕ СЃРєСЂРѕР»Р»Р°."
 )
 
 
 # -------------------------------
-# Проект: пути к модели/оптимизатору и настройки (persisted via session_state)
+# РџСЂРѕРµРєС‚: РїСѓС‚Рё Рє РјРѕРґРµР»Рё/РѕРїС‚РёРјРёР·Р°С‚РѕСЂСѓ Рё РЅР°СЃС‚СЂРѕР№РєРё (persisted via session_state)
 # -------------------------------
 DEFAULT_MODEL_PATH = str(HERE / "model_pneumo_v8_energy_audit_vacuum.py")
 DEFAULT_WORKER_PATH = str(HERE / "opt_worker_v3_margins_energy.py")
@@ -1724,7 +1687,7 @@ if "out_prefix" not in st.session_state:
 out_prefix = str(st.session_state.get("out_prefix", "results_opt"))
 
 if "opt_settings" not in st.session_state:
-    # UI для этих настроек находится в разделе "Прогон" (чтобы не захламлять сайдбар).
+    # UI РґР»СЏ СЌС‚РёС… РЅР°СЃС‚СЂРѕРµРє РЅР°С…РѕРґРёС‚СЃСЏ РІ СЂР°Р·РґРµР»Рµ "РџСЂРѕРіРѕРЅ" (С‡С‚РѕР±С‹ РЅРµ Р·Р°С…Р»Р°РјР»СЏС‚СЊ СЃР°Р№РґР±Р°СЂ).
     st.session_state["opt_settings"] = {
         "minutes": 10.0,
         "seed_candidates": 1,
@@ -1748,11 +1711,11 @@ refresh_sec = float(_opt.get("refresh_sec", 1.0))
 
 
 # -------------------------------
-# Раздел "Модель": выбор файлов проекта (без захламления сайдбара)
+# Р Р°Р·РґРµР» "РњРѕРґРµР»СЊ": РІС‹Р±РѕСЂ С„Р°Р№Р»РѕРІ РїСЂРѕРµРєС‚Р° (Р±РµР· Р·Р°С…Р»Р°РјР»РµРЅРёСЏ СЃР°Р№РґР±Р°СЂР°)
 # -------------------------------
 if SHOW_MODEL:
-    st.subheader("Модель: файлы проекта")
-    st.caption("Выбор файлов вынесен сюда: так сайдбар остаётся лёгким, а редактирование — в одном месте.")
+    st.subheader("РњРѕРґРµР»СЊ: С„Р°Р№Р»С‹ РїСЂРѕРµРєС‚Р°")
+    st.caption("Р’С‹Р±РѕСЂ С„Р°Р№Р»РѕРІ РІС‹РЅРµСЃРµРЅ СЃСЋРґР°: С‚Р°Рє СЃР°Р№РґР±Р°СЂ РѕСЃС‚Р°С‘С‚СЃСЏ Р»С‘РіРєРёРј, Р° СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ вЂ” РІ РѕРґРЅРѕРј РјРµСЃС‚Рµ.")
 
     colM1, colM2 = st.columns(2, gap="large")
 
@@ -1762,9 +1725,9 @@ if SHOW_MODEL:
         opts = model_files.copy()
         if current_model and (current_model not in opts):
             opts = [current_model] + opts
-        choice = st.selectbox("Файл модели (.py)", options=opts + ["(вручную)"], index=(opts.index(current_model) if current_model in opts else 0), key="model_file_choice")
-        if choice == "(вручную)":
-            manual = st.text_input("Путь к модели", value=model_path, key="model_path_manual")
+        choice = st.selectbox("Р¤Р°Р№Р» РјРѕРґРµР»Рё (.py)", options=opts + ["(РІСЂСѓС‡РЅСѓСЋ)"], index=(opts.index(current_model) if current_model in opts else 0), key="model_file_choice")
+        if choice == "(РІСЂСѓС‡РЅСѓСЋ)":
+            manual = st.text_input("РџСѓС‚СЊ Рє РјРѕРґРµР»Рё", value=model_path, key="model_path_manual")
             st.session_state["model_path"] = str(manual)
         else:
             st.session_state["model_path"] = str(HERE / choice)
@@ -1775,9 +1738,9 @@ if SHOW_MODEL:
         opts = worker_files.copy()
         if current_worker and (current_worker not in opts):
             opts = [current_worker] + opts
-        choice = st.selectbox("Файл оптимизатора (.py)", options=opts + ["(вручную)"], index=(opts.index(current_worker) if current_worker in opts else 0), key="worker_file_choice")
-        if choice == "(вручную)":
-            manual = st.text_input("Путь к оптимизатору", value=worker_path, key="worker_path_manual")
+        choice = st.selectbox("Р¤Р°Р№Р» РѕРїС‚РёРјРёР·Р°С‚РѕСЂР° (.py)", options=opts + ["(РІСЂСѓС‡РЅСѓСЋ)"], index=(opts.index(current_worker) if current_worker in opts else 0), key="worker_file_choice")
+        if choice == "(РІСЂСѓС‡РЅСѓСЋ)":
+            manual = st.text_input("РџСѓС‚СЊ Рє РѕРїС‚РёРјРёР·Р°С‚РѕСЂСѓ", value=worker_path, key="worker_path_manual")
             st.session_state["worker_path"] = str(manual)
         else:
             st.session_state["worker_path"] = str(HERE / choice)
@@ -1786,11 +1749,11 @@ if SHOW_MODEL:
     model_path = str(st.session_state.get("model_path", model_path))
     worker_path = str(st.session_state.get("worker_path", worker_path))
 
-    st.info(f"Текущая модель: {Path(model_path).name} · оптимизатор: {Path(worker_path).name}")
+    st.info(f"РўРµРєСѓС‰Р°СЏ РјРѕРґРµР»СЊ: {Path(model_path).name} В· РѕРїС‚РёРјРёР·Р°С‚РѕСЂ: {Path(worker_path).name}")
 
 
 
-# состояния session
+# СЃРѕСЃС‚РѕСЏРЅРёСЏ session
 if "opt_proc" not in st.session_state:
     st.session_state.opt_proc = None
 if "opt_out_csv" not in st.session_state:
@@ -1802,7 +1765,7 @@ if "opt_ranges_json" not in st.session_state:
 if "opt_stop_requested" not in st.session_state:
     st.session_state.opt_stop_requested = False
 
-# baseline (быстрый прогон) + детальные логи для графиков/анимации
+# baseline (Р±С‹СЃС‚СЂС‹Р№ РїСЂРѕРіРѕРЅ) + РґРµС‚Р°Р»СЊРЅС‹Рµ Р»РѕРіРё РґР»СЏ РіСЂР°С„РёРєРѕРІ/Р°РЅРёРјР°С†РёРё
 if "baseline_df" not in st.session_state:
     st.session_state.baseline_df = None
 if "baseline_tests_map" not in st.session_state:
@@ -1816,8 +1779,8 @@ if "baseline_full_cache" not in st.session_state:
 if "baseline_autoloaded_once" not in st.session_state:
     st.session_state.baseline_autoloaded_once = False
 
-# Автовосстановление baseline после refresh окна (без пересчёта).
-# Важно: это только восстановление данных для просмотра; база параметров в UI не «подкручивается» автоматически.
+# РђРІС‚РѕРІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ baseline РїРѕСЃР»Рµ refresh РѕРєРЅР° (Р±РµР· РїРµСЂРµСЃС‡С‘С‚Р°).
+# Р’Р°Р¶РЅРѕ: СЌС‚Рѕ С‚РѕР»СЊРєРѕ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ РґР°РЅРЅС‹С… РґР»СЏ РїСЂРѕСЃРјРѕС‚СЂР°; Р±Р°Р·Р° РїР°СЂР°РјРµС‚СЂРѕРІ РІ UI РЅРµ В«РїРѕРґРєСЂСѓС‡РёРІР°РµС‚СЃСЏВ» Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё.
 if (st.session_state.baseline_df is None) and (not st.session_state.baseline_autoloaded_once):
     ptr = load_last_baseline_ptr()
     if ptr and isinstance(ptr, dict):
@@ -1836,18 +1799,18 @@ if (st.session_state.baseline_df is None) and (not st.session_state.baseline_aut
     st.session_state.baseline_autoloaded_once = True
 
 
-# загрузка модулей
+# Р·Р°РіСЂСѓР·РєР° РјРѕРґСѓР»РµР№
 try:
     resolved_worker_path, _worker_msgs = resolve_project_py_path(
         worker_path,
         here=HERE,
-        kind="оптимизатор",
+        kind="РѕРїС‚РёРјРёР·Р°С‚РѕСЂ",
         default_path=DEFAULT_WORKER_PATH,
     )
     resolved_model_path, _model_msgs = resolve_project_py_path(
         model_path,
         here=HERE,
-        kind="модель",
+        kind="РјРѕРґРµР»СЊ",
         default_path=DEFAULT_MODEL_PATH,
     )
 
@@ -1868,12 +1831,12 @@ try:
     worker_mod = load_py_module(Path(resolved_worker_path), "opt_worker_mod")
     model_mod = load_py_module(Path(resolved_model_path), "pneumo_model_mod")
 except Exception as e:
-    st.error(f"Не могу загрузить модель/оптимизатор: {e}")
+    st.error(f"РќРµ РјРѕРіСѓ Р·Р°РіСЂСѓР·РёС‚СЊ РјРѕРґРµР»СЊ/РѕРїС‚РёРјРёР·Р°С‚РѕСЂ: {e}")
     st.stop()
 
 P_ATM = float(getattr(model_mod, "P_ATM", 101325.0))
-# 1 atm (стандартная атмосфера) = 101325 Па.
-# В UI работаем в "атм (изб.)" (gauge), внутри модели — Па (абсолютное).
+# 1 atm (СЃС‚Р°РЅРґР°СЂС‚РЅР°СЏ Р°С‚РјРѕСЃС„РµСЂР°) = 101325 РџР°.
+# Р’ UI СЂР°Р±РѕС‚Р°РµРј РІ "Р°С‚Рј (РёР·Р±.)" (gauge), РІРЅСѓС‚СЂРё РјРѕРґРµР»Рё вЂ” РџР° (Р°Р±СЃРѕР»СЋС‚РЅРѕРµ).
 ATM_PA = 101325.0
 
 
@@ -1882,15 +1845,15 @@ atm_g_to_pa_abs = partial(gauge_to_pa_abs, pressure_offset_pa=P_ATM, pressure_di
 
 
 # -------------------------------
-# Описания/единицы параметров (для UI)
-# ВАЖНО: эти функции должны быть определены ДО того, как мы строим таблицу df_opt.
-# Иначе Python упадёт с NameError, т.к. модуль выполняется сверху вниз.
+# РћРїРёСЃР°РЅРёСЏ/РµРґРёРЅРёС†С‹ РїР°СЂР°РјРµС‚СЂРѕРІ (РґР»СЏ UI)
+# Р’РђР–РќРћ: СЌС‚Рё С„СѓРЅРєС†РёРё РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ РѕРїСЂРµРґРµР»РµРЅС‹ Р”Рћ С‚РѕРіРѕ, РєР°Рє РјС‹ СЃС‚СЂРѕРёРј С‚Р°Р±Р»РёС†Сѓ df_opt.
+# РРЅР°С‡Рµ Python СѓРїР°РґС‘С‚ СЃ NameError, С‚.Рє. РјРѕРґСѓР»СЊ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ СЃРІРµСЂС…Сѓ РІРЅРёР·.
 # -------------------------------
 
 
 param_unit = partial(
     param_unit_label,
-    pressure_unit_label="атм изб.",
+    pressure_unit_label="Р°С‚Рј РёР·Р±.",
     is_pressure_param_fn=is_pressure_param,
     is_volume_param_fn=is_volume_param,
     is_small_volume_param_fn=is_small_volume_param,
@@ -1898,11 +1861,11 @@ param_unit = partial(
 
 
 # -------------------------------
-# Блок параметров (база + диапазоны)
+# Р‘Р»РѕРє РїР°СЂР°РјРµС‚СЂРѕРІ (Р±Р°Р·Р° + РґРёР°РїР°Р·РѕРЅС‹)
 # -------------------------------
 base0, ranges0 = worker_mod.make_base_and_ranges(P_ATM)
 
-# Запоминаем исходные типы флагов, чтобы UI корректно показывал чекбоксы даже если где-то значения стали 0/1 или numpy.bool_.
+# Р—Р°РїРѕРјРёРЅР°РµРј РёСЃС…РѕРґРЅС‹Рµ С‚РёРїС‹ С„Р»Р°РіРѕРІ, С‡С‚РѕР±С‹ UI РєРѕСЂСЂРµРєС‚РЅРѕ РїРѕРєР°Р·С‹РІР°Р» С‡РµРєР±РѕРєСЃС‹ РґР°Р¶Рµ РµСЃР»Рё РіРґРµ-С‚Рѕ Р·РЅР°С‡РµРЅРёСЏ СЃС‚Р°Р»Рё 0/1 РёР»Рё numpy.bool_.
 try:
     BASE_BOOL_KEYS = {k for k, v in base0.items() if isinstance(v, (bool, np.bool_))}
 except Exception:
@@ -1910,108 +1873,108 @@ except Exception:
 BASE_STR_KEYS = {k for k, v in base0.items() if isinstance(v, str)}
 
 # -------------------------------
-# ЕДИНЫЙ ВВОД ПАРАМЕТРОВ (значение + диапазон оптимизации)
+# Р•Р”РРќР«Р™ Р’Р’РћР” РџРђР РђРњР•РўР РћР’ (Р·РЅР°С‡РµРЅРёРµ + РґРёР°РїР°Р·РѕРЅ РѕРїС‚РёРјРёР·Р°С†РёРё)
 # -------------------------------
 
-# (UI параметров отображается ниже в разделе "Параметры")
+# (UI РїР°СЂР°РјРµС‚СЂРѕРІ РѕС‚РѕР±СЂР°Р¶Р°РµС‚СЃСЏ РЅРёР¶Рµ РІ СЂР°Р·РґРµР»Рµ "РџР°СЂР°РјРµС‚СЂС‹")
 
-# Метаданные (текст/единицы) — без «захардкоженных» чисел.
+# РњРµС‚Р°РґР°РЅРЅС‹Рµ (С‚РµРєСЃС‚/РµРґРёРЅРёС†С‹) вЂ” Р±РµР· В«Р·Р°С…Р°СЂРґРєРѕР¶РµРЅРЅС‹С…В» С‡РёСЃРµР».
 PARAM_META = {
-    # Давления (уставки) — в UI: атм (избыточного)
-    "давление_Pmin_питание_Ресивер2": {
-        "группа": "Давление (уставки)",
-        "ед": "атм (изб.)",
+    # Р”Р°РІР»РµРЅРёСЏ (СѓСЃС‚Р°РІРєРё) вЂ” РІ UI: Р°С‚Рј (РёР·Р±С‹С‚РѕС‡РЅРѕРіРѕ)
+    "РґР°РІР»РµРЅРёРµ_Pmin_РїРёС‚Р°РЅРёРµ_Р РµСЃРёРІРµСЂ2": {
+        "РіСЂСѓРїРїР°": "Р”Р°РІР»РµРЅРёРµ (СѓСЃС‚Р°РІРєРё)",
+        "РµРґ": "Р°С‚Рј (РёР·Р±.)",
         "kind": "pressure_atm_g",
-        "описание": "Уставка подпитки: линия «Аккумулятор → Ресивер 2». Это НЕ Pmin сброса/атмосферы. "
-                    "Оптимизируйте отдельно от Pmin."
+        "РѕРїРёСЃР°РЅРёРµ": "РЈСЃС‚Р°РІРєР° РїРѕРґРїРёС‚РєРё: Р»РёРЅРёСЏ В«РђРєРєСѓРјСѓР»СЏС‚РѕСЂ в†’ Р РµСЃРёРІРµСЂ 2В». Р­С‚Рѕ РќР• Pmin СЃР±СЂРѕСЃР°/Р°С‚РјРѕСЃС„РµСЂС‹. "
+                    "РћРїС‚РёРјРёР·РёСЂСѓР№С‚Рµ РѕС‚РґРµР»СЊРЅРѕ РѕС‚ Pmin."
     },
-    "давление_Pmin_сброс": {
-        "группа": "Давление (уставки)",
-        "ед": "атм (изб.)",
+    "РґР°РІР»РµРЅРёРµ_Pmin_СЃР±СЂРѕСЃ": {
+        "РіСЂСѓРїРїР°": "Р”Р°РІР»РµРЅРёРµ (СѓСЃС‚Р°РІРєРё)",
+        "РµРґ": "Р°С‚Рј (РёР·Р±.)",
         "kind": "pressure_atm_g",
-        "описание": "Pmin для сброса в атмосферу (ветка Р3→атм). Ниже этого давления ступень не должна «разряжаться» в ноль."
+        "РѕРїРёСЃР°РЅРёРµ": "Pmin РґР»СЏ СЃР±СЂРѕСЃР° РІ Р°С‚РјРѕСЃС„РµСЂСѓ (РІРµС‚РєР° Р 3в†’Р°С‚Рј). РќРёР¶Рµ СЌС‚РѕРіРѕ РґР°РІР»РµРЅРёСЏ СЃС‚СѓРїРµРЅСЊ РЅРµ РґРѕР»Р¶РЅР° В«СЂР°Р·СЂСЏР¶Р°С‚СЊСЃСЏВ» РІ РЅРѕР»СЊ."
     },
-    "давление_Pmid_сброс": {
-        "группа": "Давление (уставки)",
-        "ед": "атм (изб.)",
+    "РґР°РІР»РµРЅРёРµ_Pmid_СЃР±СЂРѕСЃ": {
+        "РіСЂСѓРїРїР°": "Р”Р°РІР»РµРЅРёРµ (СѓСЃС‚Р°РІРєРё)",
+        "РµРґ": "Р°С‚Рј (РёР·Р±.)",
         "kind": "pressure_atm_g",
-        "описание": "Pmid (уставка «середины»): выше — подвеска заметно «жёстче». Используется в метрике «раньше‑жёстко»."
+        "РѕРїРёСЃР°РЅРёРµ": "Pmid (СѓСЃС‚Р°РІРєР° В«СЃРµСЂРµРґРёРЅС‹В»): РІС‹С€Рµ вЂ” РїРѕРґРІРµСЃРєР° Р·Р°РјРµС‚РЅРѕ В«Р¶С‘СЃС‚С‡РµВ». РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ РјРµС‚СЂРёРєРµ В«СЂР°РЅСЊС€РµвЂ‘Р¶С‘СЃС‚РєРѕВ»."
     },
-    "давление_Pзаряд_аккумулятора_из_Ресивер3": {
-        "группа": "Давление (уставки)",
-        "ед": "атм (изб.)",
+    "РґР°РІР»РµРЅРёРµ_PР·Р°СЂСЏРґ_Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°_РёР·_Р РµСЃРёРІРµСЂ3": {
+        "РіСЂСѓРїРїР°": "Р”Р°РІР»РµРЅРёРµ (СѓСЃС‚Р°РІРєРё)",
+        "РµРґ": "Р°С‚Рј (РёР·Р±.)",
         "kind": "pressure_atm_g",
-        "описание": "Уставка подпитки аккумулятора из Ресивера 3 во время движения (восполнение запаса воздуха)."
+        "РѕРїРёСЃР°РЅРёРµ": "РЈСЃС‚Р°РІРєР° РїРѕРґРїРёС‚РєРё Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР° РёР· Р РµСЃРёРІРµСЂР° 3 РІРѕ РІСЂРµРјСЏ РґРІРёР¶РµРЅРёСЏ (РІРѕСЃРїРѕР»РЅРµРЅРёРµ Р·Р°РїР°СЃР° РІРѕР·РґСѓС…Р°)."
     },
-    "давление_Pmax_предохран": {
-        "группа": "Давление (уставки)",
-        "ед": "атм (изб.)",
+    "РґР°РІР»РµРЅРёРµ_Pmax_РїСЂРµРґРѕС…СЂР°РЅ": {
+        "РіСЂСѓРїРїР°": "Р”Р°РІР»РµРЅРёРµ (СѓСЃС‚Р°РІРєРё)",
+        "РµРґ": "Р°С‚Рј (РёР·Р±.)",
         "kind": "pressure_atm_g",
-        "описание": "Pmax — аварийная уставка предохранительного клапана (не должна превышаться)."
+        "РѕРїРёСЃР°РЅРёРµ": "Pmax вЂ” Р°РІР°СЂРёР№РЅР°СЏ СѓСЃС‚Р°РІРєР° РїСЂРµРґРѕС…СЂР°РЅРёС‚РµР»СЊРЅРѕРіРѕ РєР»Р°РїР°РЅР° (РЅРµ РґРѕР»Р¶РЅР° РїСЂРµРІС‹С€Р°С‚СЊСЃСЏ)."
     },
-    "начальное_давление_аккумулятора": {
-        "группа": "Давление (начальные)",
-        "ед": "атм (изб.)",
+    "РЅР°С‡Р°Р»СЊРЅРѕРµ_РґР°РІР»РµРЅРёРµ_Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°": {
+        "РіСЂСѓРїРїР°": "Р”Р°РІР»РµРЅРёРµ (РЅР°С‡Р°Р»СЊРЅС‹Рµ)",
+        "РµРґ": "Р°С‚Рј (РёР·Р±.)",
         "kind": "pressure_atm_g",
-        "описание": "Начальное давление в аккумуляторе на старте движения. По вашему ТЗ обычно равно Pmin (идеально — стартовать даже с пустым)."
+        "РѕРїРёСЃР°РЅРёРµ": "РќР°С‡Р°Р»СЊРЅРѕРµ РґР°РІР»РµРЅРёРµ РІ Р°РєРєСѓРјСѓР»СЏС‚РѕСЂРµ РЅР° СЃС‚Р°СЂС‚Рµ РґРІРёР¶РµРЅРёСЏ. РџРѕ РІР°С€РµРјСѓ РўР— РѕР±С‹С‡РЅРѕ СЂР°РІРЅРѕ Pmin (РёРґРµР°Р»СЊРЅРѕ вЂ” СЃС‚Р°СЂС‚РѕРІР°С‚СЊ РґР°Р¶Рµ СЃ РїСѓСЃС‚С‹Рј)."
     },
 
-    # Объёмы — в UI: л или мл
-    "объём_ресивера_1": {"группа": "Объёмы", "ед": "л", "kind": "volume_L", "описание": "Объём ресивера 1."},
-    "объём_ресивера_2": {"группа": "Объёмы", "ед": "л", "kind": "volume_L", "описание": "Объём ресивера 2."},
-    "объём_ресивера_3": {"группа": "Объёмы", "ед": "л", "kind": "volume_L", "описание": "Объём ресивера 3."},
-    "объём_аккумулятора": {"группа": "Объёмы", "ед": "л", "kind": "volume_L", "описание": "Объём аккумулятора."},
-    "объём_линии": {"группа": "Объёмы", "ед": "мл", "kind": "volume_mL", "описание": "Эквивалентный объём пневмолинии (суммарно), учитывает сжимаемость в трубках."},
-    "мёртвый_объём_камеры": {"группа": "Объёмы", "ед": "мл", "kind": "volume_mL", "описание": "Мёртвый объём камеры/полости (из каталогов Camozzi)."},
+    # РћР±СЉС‘РјС‹ вЂ” РІ UI: Р» РёР»Рё РјР»
+    "РѕР±СЉС‘Рј_СЂРµСЃРёРІРµСЂР°_1": {"РіСЂСѓРїРїР°": "РћР±СЉС‘РјС‹", "РµРґ": "Р»", "kind": "volume_L", "РѕРїРёСЃР°РЅРёРµ": "РћР±СЉС‘Рј СЂРµСЃРёРІРµСЂР° 1."},
+    "РѕР±СЉС‘Рј_СЂРµСЃРёРІРµСЂР°_2": {"РіСЂСѓРїРїР°": "РћР±СЉС‘РјС‹", "РµРґ": "Р»", "kind": "volume_L", "РѕРїРёСЃР°РЅРёРµ": "РћР±СЉС‘Рј СЂРµСЃРёРІРµСЂР° 2."},
+    "РѕР±СЉС‘Рј_СЂРµСЃРёРІРµСЂР°_3": {"РіСЂСѓРїРїР°": "РћР±СЉС‘РјС‹", "РµРґ": "Р»", "kind": "volume_L", "РѕРїРёСЃР°РЅРёРµ": "РћР±СЉС‘Рј СЂРµСЃРёРІРµСЂР° 3."},
+    "РѕР±СЉС‘Рј_Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°": {"РіСЂСѓРїРїР°": "РћР±СЉС‘РјС‹", "РµРґ": "Р»", "kind": "volume_L", "РѕРїРёСЃР°РЅРёРµ": "РћР±СЉС‘Рј Р°РєРєСѓРјСѓР»СЏС‚РѕСЂР°."},
+    "РѕР±СЉС‘Рј_Р»РёРЅРёРё": {"РіСЂСѓРїРїР°": "РћР±СЉС‘РјС‹", "РµРґ": "РјР»", "kind": "volume_mL", "РѕРїРёСЃР°РЅРёРµ": "Р­РєРІРёРІР°Р»РµРЅС‚РЅС‹Р№ РѕР±СЉС‘Рј РїРЅРµРІРјРѕР»РёРЅРёРё (СЃСѓРјРјР°СЂРЅРѕ), СѓС‡РёС‚С‹РІР°РµС‚ СЃР¶РёРјР°РµРјРѕСЃС‚СЊ РІ С‚СЂСѓР±РєР°С…."},
+    "РјС‘СЂС‚РІС‹Р№_РѕР±СЉС‘Рј_РєР°РјРµСЂС‹": {"РіСЂСѓРїРїР°": "РћР±СЉС‘РјС‹", "РµРґ": "РјР»", "kind": "volume_mL", "РѕРїРёСЃР°РЅРёРµ": "РњС‘СЂС‚РІС‹Р№ РѕР±СЉС‘Рј РєР°РјРµСЂС‹/РїРѕР»РѕСЃС‚Рё (РёР· РєР°С‚Р°Р»РѕРіРѕРІ Camozzi)."},
 
 
-    # Дроссели/проходы — доля открытия 0..1
-    "открытие_дросселя_Ц2_CAP_в_ROD": {
-        "группа": "Дроссели",
-        "ед": "доля 0..1",
+    # Р”СЂРѕСЃСЃРµР»Рё/РїСЂРѕС…РѕРґС‹ вЂ” РґРѕР»СЏ РѕС‚РєСЂС‹С‚РёСЏ 0..1
+    "РѕС‚РєСЂС‹С‚РёРµ_РґСЂРѕСЃСЃРµР»СЏ_Р¦2_CAP_РІ_ROD": {
+        "РіСЂСѓРїРїР°": "Р”СЂРѕСЃСЃРµР»Рё",
+        "РµРґ": "РґРѕР»СЏ 0..1",
         "kind": "fraction01",
-        "описание": "Нормированная доля открытия дросселя (0=минимум/почти закрыт, 1=максимум/полностью открыт). "
-                    "Физически интерпретируется как масштаб проходного сечения/kv выбранного дросселя Camozzi."
+        "РѕРїРёСЃР°РЅРёРµ": "РќРѕСЂРјРёСЂРѕРІР°РЅРЅР°СЏ РґРѕР»СЏ РѕС‚РєСЂС‹С‚РёСЏ РґСЂРѕСЃСЃРµР»СЏ (0=РјРёРЅРёРјСѓРј/РїРѕС‡С‚Рё Р·Р°РєСЂС‹С‚, 1=РјР°РєСЃРёРјСѓРј/РїРѕР»РЅРѕСЃС‚СЊСЋ РѕС‚РєСЂС‹С‚). "
+                    "Р¤РёР·РёС‡РµСЃРєРё РёРЅС‚РµСЂРїСЂРµС‚РёСЂСѓРµС‚СЃСЏ РєР°Рє РјР°СЃС€С‚Р°Р± РїСЂРѕС…РѕРґРЅРѕРіРѕ СЃРµС‡РµРЅРёСЏ/kv РІС‹Р±СЂР°РЅРЅРѕРіРѕ РґСЂРѕСЃСЃРµР»СЏ Camozzi."
     },
-    "открытие_дросселя_Ц2_ROD_в_CAP": {"группа": "Дроссели", "ед": "доля 0..1", "kind": "fraction01", "описание": "То же, обратное направление (шток→поршень)."},
-    "открытие_дросселя_Ц1_CAP_в_ROD": {"группа": "Дроссели", "ед": "доля 0..1", "kind": "fraction01", "описание": "То же для Ц1."},
-    "открытие_дросселя_Ц1_ROD_в_CAP": {"группа": "Дроссели", "ед": "доля 0..1", "kind": "fraction01", "описание": "То же для Ц1 (обратное направление)."},
+    "РѕС‚РєСЂС‹С‚РёРµ_РґСЂРѕСЃСЃРµР»СЏ_Р¦2_ROD_РІ_CAP": {"РіСЂСѓРїРїР°": "Р”СЂРѕСЃСЃРµР»Рё", "РµРґ": "РґРѕР»СЏ 0..1", "kind": "fraction01", "РѕРїРёСЃР°РЅРёРµ": "РўРѕ Р¶Рµ, РѕР±СЂР°С‚РЅРѕРµ РЅР°РїСЂР°РІР»РµРЅРёРµ (С€С‚РѕРєв†’РїРѕСЂС€РµРЅСЊ)."},
+    "РѕС‚РєСЂС‹С‚РёРµ_РґСЂРѕСЃСЃРµР»СЏ_Р¦1_CAP_РІ_ROD": {"РіСЂСѓРїРїР°": "Р”СЂРѕСЃСЃРµР»Рё", "РµРґ": "РґРѕР»СЏ 0..1", "kind": "fraction01", "РѕРїРёСЃР°РЅРёРµ": "РўРѕ Р¶Рµ РґР»СЏ Р¦1."},
+    "РѕС‚РєСЂС‹С‚РёРµ_РґСЂРѕСЃСЃРµР»СЏ_Р¦1_ROD_РІ_CAP": {"РіСЂСѓРїРїР°": "Р”СЂРѕСЃСЃРµР»Рё", "РµРґ": "РґРѕР»СЏ 0..1", "kind": "fraction01", "РѕРїРёСЃР°РЅРёРµ": "РўРѕ Р¶Рµ РґР»СЏ Р¦1 (РѕР±СЂР°С‚РЅРѕРµ РЅР°РїСЂР°РІР»РµРЅРёРµ)."},
 
-    # Пружина
-    "пружина_масштаб": {
-        "группа": "Пружина",
-        "ед": "коэф.",
+    # РџСЂСѓР¶РёРЅР°
+    "РїСЂСѓР¶РёРЅР°_РјР°СЃС€С‚Р°Р±": {
+        "РіСЂСѓРїРїР°": "РџСЂСѓР¶РёРЅР°",
+        "РµРґ": "РєРѕСЌС„.",
         "kind": "raw",
-        "описание": "Масштаб кривой «сила‑ход» пружины (табличная нелинейность остаётся, умножаем силу на коэффициент)."
+        "РѕРїРёСЃР°РЅРёРµ": "РњР°СЃС€С‚Р°Р± РєСЂРёРІРѕР№ В«СЃРёР»Р°вЂ‘С…РѕРґВ» РїСЂСѓР¶РёРЅС‹ (С‚Р°Р±Р»РёС‡РЅР°СЏ РЅРµР»РёРЅРµР№РЅРѕСЃС‚СЊ РѕСЃС‚Р°С‘С‚СЃСЏ, СѓРјРЅРѕР¶Р°РµРј СЃРёР»Сѓ РЅР° РєРѕСЌС„С„РёС†РёРµРЅС‚)."
     },
 
-    # Механика/массы
-    "масса_рамы": {"группа": "Механика", "ед": "кг", "kind": "raw", "описание": "Подрессоренная масса (рама/кузов)."},
-    "масса_неподрессоренная": {"группа": "Механика", "ед": "кг", "kind": "raw", "описание": "Неподрессоренная масса на колесо (ступица/рычаг/колесо)."},
-    "колея": {"группа": "Геометрия", "ед": "м", "kind": "raw", "описание": "Колея (расстояние между центрами левого и правого колёс)."},
-    "база": {"группа": "Геометрия", "ед": "м", "kind": "raw", "описание": "Колёсная база (перед‑зад)."},
-    "ширина_рамы": {"группа": "Геометрия", "ед": "м", "kind": "raw", "описание": "Ширина рамы (для расчёта плеч/кинематики в упрощённой схеме)."},
-    "ход_штока": {"группа": "Геометрия", "ед": "м", "kind": "raw", "описание": "Полный ход штока цилиндра (ограничение по пробою/вылету)."},
-    "коэф_передачи_рычаг": {"группа": "Геометрия", "ед": "коэф.", "kind": "raw", "описание": "Передаточное отношение рычага (ход штока ↔ ход колеса)."},
-    "статический_ход_колеса": {"группа": "Геометрия", "ед": "м", "kind": "raw", "описание": "Статический ход колеса/сжатие относительно нейтрали."},
+    # РњРµС…Р°РЅРёРєР°/РјР°СЃСЃС‹
+    "РјР°СЃСЃР°_СЂР°РјС‹": {"РіСЂСѓРїРїР°": "РњРµС…Р°РЅРёРєР°", "РµРґ": "РєРі", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РџРѕРґСЂРµСЃСЃРѕСЂРµРЅРЅР°СЏ РјР°СЃСЃР° (СЂР°РјР°/РєСѓР·РѕРІ)."},
+    "РјР°СЃСЃР°_РЅРµРїРѕРґСЂРµСЃСЃРѕСЂРµРЅРЅР°СЏ": {"РіСЂСѓРїРїР°": "РњРµС…Р°РЅРёРєР°", "РµРґ": "РєРі", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РќРµРїРѕРґСЂРµСЃСЃРѕСЂРµРЅРЅР°СЏ РјР°СЃСЃР° РЅР° РєРѕР»РµСЃРѕ (СЃС‚СѓРїРёС†Р°/СЂС‹С‡Р°Рі/РєРѕР»РµСЃРѕ)."},
+    "РєРѕР»РµСЏ": {"РіСЂСѓРїРїР°": "Р“РµРѕРјРµС‚СЂРёСЏ", "РµРґ": "Рј", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РљРѕР»РµСЏ (СЂР°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ С†РµРЅС‚СЂР°РјРё Р»РµРІРѕРіРѕ Рё РїСЂР°РІРѕРіРѕ РєРѕР»С‘СЃ)."},
+    "Р±Р°Р·Р°": {"РіСЂСѓРїРїР°": "Р“РµРѕРјРµС‚СЂРёСЏ", "РµРґ": "Рј", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РљРѕР»С‘СЃРЅР°СЏ Р±Р°Р·Р° (РїРµСЂРµРґвЂ‘Р·Р°Рґ)."},
+    "С€РёСЂРёРЅР°_СЂР°РјС‹": {"РіСЂСѓРїРїР°": "Р“РµРѕРјРµС‚СЂРёСЏ", "РµРґ": "Рј", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РЁРёСЂРёРЅР° СЂР°РјС‹ (РґР»СЏ СЂР°СЃС‡С‘С‚Р° РїР»РµС‡/РєРёРЅРµРјР°С‚РёРєРё РІ СѓРїСЂРѕС‰С‘РЅРЅРѕР№ СЃС…РµРјРµ)."},
+    "С…РѕРґ_С€С‚РѕРєР°": {"РіСЂСѓРїРїР°": "Р“РµРѕРјРµС‚СЂРёСЏ", "РµРґ": "Рј", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РџРѕР»РЅС‹Р№ С…РѕРґ С€С‚РѕРєР° С†РёР»РёРЅРґСЂР° (РѕРіСЂР°РЅРёС‡РµРЅРёРµ РїРѕ РїСЂРѕР±РѕСЋ/РІС‹Р»РµС‚Сѓ)."},
+    "РєРѕСЌС„_РїРµСЂРµРґР°С‡Рё_СЂС‹С‡Р°Рі": {"РіСЂСѓРїРїР°": "Р“РµРѕРјРµС‚СЂРёСЏ", "РµРґ": "РєРѕСЌС„.", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РџРµСЂРµРґР°С‚РѕС‡РЅРѕРµ РѕС‚РЅРѕС€РµРЅРёРµ СЂС‹С‡Р°РіР° (С…РѕРґ С€С‚РѕРєР° в†” С…РѕРґ РєРѕР»РµСЃР°)."},
+    "СЃС‚Р°С‚РёС‡РµСЃРєРёР№_С…РѕРґ_РєРѕР»РµСЃР°": {"РіСЂСѓРїРїР°": "Р“РµРѕРјРµС‚СЂРёСЏ", "РµРґ": "Рј", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РЎС‚Р°С‚РёС‡РµСЃРєРёР№ С…РѕРґ РєРѕР»РµСЃР°/СЃР¶Р°С‚РёРµ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РЅРµР№С‚СЂР°Р»Рё."},
 
-    # Шина
-    "жёсткость_шины": {"группа": "Шина", "ед": "Н/м", "kind": "raw", "описание": "Вертикальная жёсткость шины (линеаризованная)."},
-    "демпфирование_шины": {"группа": "Шина", "ед": "Н·с/м", "kind": "raw", "описание": "Вертикальное демпфирование шины (линеаризованное)."},
+    # РЁРёРЅР°
+    "Р¶С‘СЃС‚РєРѕСЃС‚СЊ_С€РёРЅС‹": {"РіСЂСѓРїРїР°": "РЁРёРЅР°", "РµРґ": "Рќ/Рј", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "Р’РµСЂС‚РёРєР°Р»СЊРЅР°СЏ Р¶С‘СЃС‚РєРѕСЃС‚СЊ С€РёРЅС‹ (Р»РёРЅРµР°СЂРёР·РѕРІР°РЅРЅР°СЏ)."},
+    "РґРµРјРїС„РёСЂРѕРІР°РЅРёРµ_С€РёРЅС‹": {"РіСЂСѓРїРїР°": "РЁРёРЅР°", "РµРґ": "РќВ·СЃ/Рј", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "Р’РµСЂС‚РёРєР°Р»СЊРЅРѕРµ РґРµРјРїС„РёСЂРѕРІР°РЅРёРµ С€РёРЅС‹ (Р»РёРЅРµР°СЂРёР·РѕРІР°РЅРЅРѕРµ)."},
 
-    # Инерции
-    "момент_инерции_рамы_по_крену": {"группа": "Инерция", "ед": "кг·м²", "kind": "raw", "описание": "Момент инерции рамы относительно оси крена."},
-    "момент_инерции_рамы_по_тангажу": {"группа": "Инерция", "ед": "кг·м²", "kind": "raw", "описание": "Момент инерции рамы относительно оси тангажа."},
-    "момент_инерции_рамы_по_рысканью": {"группа": "Инерция", "ед": "кг·м²", "kind": "raw", "описание": "Момент инерции рамы относительно оси рысканья."},
+    # РРЅРµСЂС†РёРё
+    "РјРѕРјРµРЅС‚_РёРЅРµСЂС†РёРё_СЂР°РјС‹_РїРѕ_РєСЂРµРЅСѓ": {"РіСЂСѓРїРїР°": "РРЅРµСЂС†РёСЏ", "РµРґ": "РєРіВ·РјВІ", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РњРѕРјРµРЅС‚ РёРЅРµСЂС†РёРё СЂР°РјС‹ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РѕСЃРё РєСЂРµРЅР°."},
+    "РјРѕРјРµРЅС‚_РёРЅРµСЂС†РёРё_СЂР°РјС‹_РїРѕ_С‚Р°РЅРіР°Р¶Сѓ": {"РіСЂСѓРїРїР°": "РРЅРµСЂС†РёСЏ", "РµРґ": "РєРіВ·РјВІ", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РњРѕРјРµРЅС‚ РёРЅРµСЂС†РёРё СЂР°РјС‹ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РѕСЃРё С‚Р°РЅРіР°Р¶Р°."},
+    "РјРѕРјРµРЅС‚_РёРЅРµСЂС†РёРё_СЂР°РјС‹_РїРѕ_СЂС‹СЃРєР°РЅСЊСЋ": {"РіСЂСѓРїРїР°": "РРЅРµСЂС†РёСЏ", "РµРґ": "РєРіВ·РјВІ", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РњРѕРјРµРЅС‚ РёРЅРµСЂС†РёРё СЂР°РјС‹ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РѕСЃРё СЂС‹СЃРєР°РЅСЊСЏ."},
 
-    # Ограничения/запасы (в UI)
-    "лимит_пробоя_крен_град": {"группа": "Ограничения", "ед": "град", "kind": "raw", "описание": "Ограничение по крену (жёсткое/аварийное)."},
-    "лимит_пробоя_тангаж_град": {"группа": "Ограничения", "ед": "град", "kind": "raw", "описание": "Ограничение по тангажу (жёсткое/аварийное)."},
-    "минимальное_абсолютное_давление_Па": {"группа": "Ограничения", "ед": "кПа (абс.)", "kind": "pressure_kPa_abs", "описание": "Нижняя граница абсолютного давления для численной устойчивости. Вакуум допускаем, но p_abs не может быть < 0."},
+    # РћРіСЂР°РЅРёС‡РµРЅРёСЏ/Р·Р°РїР°СЃС‹ (РІ UI)
+    "Р»РёРјРёС‚_РїСЂРѕР±РѕСЏ_РєСЂРµРЅ_РіСЂР°Рґ": {"РіСЂСѓРїРїР°": "РћРіСЂР°РЅРёС‡РµРЅРёСЏ", "РµРґ": "РіСЂР°Рґ", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РћРіСЂР°РЅРёС‡РµРЅРёРµ РїРѕ РєСЂРµРЅСѓ (Р¶С‘СЃС‚РєРѕРµ/Р°РІР°СЂРёР№РЅРѕРµ)."},
+    "Р»РёРјРёС‚_РїСЂРѕР±РѕСЏ_С‚Р°РЅРіР°Р¶_РіСЂР°Рґ": {"РіСЂСѓРїРїР°": "РћРіСЂР°РЅРёС‡РµРЅРёСЏ", "РµРґ": "РіСЂР°Рґ", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РћРіСЂР°РЅРёС‡РµРЅРёРµ РїРѕ С‚Р°РЅРіР°Р¶Сѓ (Р¶С‘СЃС‚РєРѕРµ/Р°РІР°СЂРёР№РЅРѕРµ)."},
+    "РјРёРЅРёРјР°Р»СЊРЅРѕРµ_Р°Р±СЃРѕР»СЋС‚РЅРѕРµ_РґР°РІР»РµРЅРёРµ_РџР°": {"РіСЂСѓРїРїР°": "РћРіСЂР°РЅРёС‡РµРЅРёСЏ", "РµРґ": "РєРџР° (Р°Р±СЃ.)", "kind": "pressure_kPa_abs", "РѕРїРёСЃР°РЅРёРµ": "РќРёР¶РЅСЏСЏ РіСЂР°РЅРёС†Р° Р°Р±СЃРѕР»СЋС‚РЅРѕРіРѕ РґР°РІР»РµРЅРёСЏ РґР»СЏ С‡РёСЃР»РµРЅРЅРѕР№ СѓСЃС‚РѕР№С‡РёРІРѕСЃС‚Рё. Р’Р°РєСѓСѓРј РґРѕРїСѓСЃРєР°РµРј, РЅРѕ p_abs РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ < 0."},
 
-    # Газ
-    "температура_газа_К": {"группа": "Газ", "ед": "°C", "kind": "temperature_C", "описание": "Температура газа (внутри модели хранится Кельвин)."},
-    "гравитация": {"группа": "Среда", "ед": "м/с²", "kind": "raw", "описание": "Ускорение свободного падения."},
+    # Р“Р°Р·
+    "С‚РµРјРїРµСЂР°С‚СѓСЂР°_РіР°Р·Р°_Рљ": {"РіСЂСѓРїРїР°": "Р“Р°Р·", "РµРґ": "В°C", "kind": "temperature_C", "РѕРїРёСЃР°РЅРёРµ": "РўРµРјРїРµСЂР°С‚СѓСЂР° РіР°Р·Р° (РІРЅСѓС‚СЂРё РјРѕРґРµР»Рё С…СЂР°РЅРёС‚СЃСЏ РљРµР»СЊРІРёРЅ)."},
+    "РіСЂР°РІРёС‚Р°С†РёСЏ": {"РіСЂСѓРїРїР°": "РЎСЂРµРґР°", "РµРґ": "Рј/СЃВІ", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РЈСЃРєРѕСЂРµРЅРёРµ СЃРІРѕР±РѕРґРЅРѕРіРѕ РїР°РґРµРЅРёСЏ."},
 }
 
 
@@ -2019,7 +1982,7 @@ _si_to_ui = partial(si_to_ui_value, p_atm=P_ATM, bar_pa=100000.0)
 _ui_to_si = partial(ui_to_si_value, p_atm=P_ATM, bar_pa=100000.0)
 
 
-# дополняем базу значениями для ключей, которые есть в диапазонах, но отсутствуют в base0
+# РґРѕРїРѕР»РЅСЏРµРј Р±Р°Р·Сѓ Р·РЅР°С‡РµРЅРёСЏРјРё РґР»СЏ РєР»СЋС‡РµР№, РєРѕС‚РѕСЂС‹Рµ РµСЃС‚СЊ РІ РґРёР°РїР°Р·РѕРЅР°С…, РЅРѕ РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‚ РІ base0
 for _k, _rng in ranges0.items():
     if _k not in base0:
         try:
@@ -2029,75 +1992,75 @@ for _k, _rng in ranges0.items():
 
 all_keys = sorted(set(base0.keys()) | set(ranges0.keys()))
 
-# --- Структурированные параметры (списки/таблицы) ---
-# Важно: некоторые параметры (например нелинейная пружина) хранятся как списки чисел.
-# Их нельзя показывать в общей таблице скаляров (иначе будет TypeError: float(list)).
+# --- РЎС‚СЂСѓРєС‚СѓСЂРёСЂРѕРІР°РЅРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹ (СЃРїРёСЃРєРё/С‚Р°Р±Р»РёС†С‹) ---
+# Р’Р°Р¶РЅРѕ: РЅРµРєРѕС‚РѕСЂС‹Рµ РїР°СЂР°РјРµС‚СЂС‹ (РЅР°РїСЂРёРјРµСЂ РЅРµР»РёРЅРµР№РЅР°СЏ РїСЂСѓР¶РёРЅР°) С…СЂР°РЅСЏС‚СЃСЏ РєР°Рє СЃРїРёСЃРєРё С‡РёСЃРµР».
+# РС… РЅРµР»СЊР·СЏ РїРѕРєР°Р·С‹РІР°С‚СЊ РІ РѕР±С‰РµР№ С‚Р°Р±Р»РёС†Рµ СЃРєР°Р»СЏСЂРѕРІ (РёРЅР°С‡Рµ Р±СѓРґРµС‚ TypeError: float(list)).
 
-# 1) Таблица нелинейной пружины (ход_мм -> сила_Н)
-SPR_X = "пружина_таблица_ход_мм"
-SPR_F = "пружина_таблица_сила_Н"
+# 1) РўР°Р±Р»РёС†Р° РЅРµР»РёРЅРµР№РЅРѕР№ РїСЂСѓР¶РёРЅС‹ (С…РѕРґ_РјРј -> СЃРёР»Р°_Рќ)
+SPR_X = "РїСЂСѓР¶РёРЅР°_С‚Р°Р±Р»РёС†Р°_С…РѕРґ_РјРј"
+SPR_F = "РїСЂСѓР¶РёРЅР°_С‚Р°Р±Р»РёС†Р°_СЃРёР»Р°_Рќ"
 
 if (SPR_X in base0) and (SPR_F in base0):
     """
-    Нелинейная пружина хранится как 2 массива (ход_мм, сила_Н).
-    Важное правило UI: редактирование — только в разделе "Параметры", чтобы не захламлять другие экраны.
-    При этом значения из session_state применяются ВСЕГДА (чтобы прогон/результаты использовали актуальную таблицу).
+    РќРµР»РёРЅРµР№РЅР°СЏ РїСЂСѓР¶РёРЅР° С…СЂР°РЅРёС‚СЃСЏ РєР°Рє 2 РјР°СЃСЃРёРІР° (С…РѕРґ_РјРј, СЃРёР»Р°_Рќ).
+    Р’Р°Р¶РЅРѕРµ РїСЂР°РІРёР»Рѕ UI: СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ вЂ” С‚РѕР»СЊРєРѕ РІ СЂР°Р·РґРµР»Рµ "РџР°СЂР°РјРµС‚СЂС‹", С‡С‚РѕР±С‹ РЅРµ Р·Р°С…Р»Р°РјР»СЏС‚СЊ РґСЂСѓРіРёРµ СЌРєСЂР°РЅС‹.
+    РџСЂРё СЌС‚РѕРј Р·РЅР°С‡РµРЅРёСЏ РёР· session_state РїСЂРёРјРµРЅСЏСЋС‚СЃСЏ Р’РЎР•Р“Р”Рђ (С‡С‚РѕР±С‹ РїСЂРѕРіРѕРЅ/СЂРµР·СѓР»СЊС‚Р°С‚С‹ РёСЃРїРѕР»СЊР·РѕРІР°Р»Рё Р°РєС‚СѓР°Р»СЊРЅСѓСЋ С‚Р°Р±Р»РёС†Сѓ).
     """
     try:
         import pandas as _pd
 
         if "spring_table_df" not in st.session_state:
             st.session_state["spring_table_df"] = _pd.DataFrame({
-                "ход_мм": list(base0.get(SPR_X, [])),
-                "сила_Н": list(base0.get(SPR_F, [])),
+                "С…РѕРґ_РјРј": list(base0.get(SPR_X, [])),
+                "СЃРёР»Р°_Рќ": list(base0.get(SPR_F, [])),
             })
 
         spring_df = st.session_state.get("spring_table_df")
 
         if SHOW_PARAMS:
-            st.markdown("### Нелинейная пружина: табличная характеристика")
-            st.caption("Редактируйте точки (без правки файлов). Точки будут отсортированы по ходу. Минимум 2 точки.")
+            st.markdown("### РќРµР»РёРЅРµР№РЅР°СЏ РїСЂСѓР¶РёРЅР°: С‚Р°Р±Р»РёС‡РЅР°СЏ С…Р°СЂР°РєС‚РµСЂРёСЃС‚РёРєР°")
+            st.caption("Р РµРґР°РєС‚РёСЂСѓР№С‚Рµ С‚РѕС‡РєРё (Р±РµР· РїСЂР°РІРєРё С„Р°Р№Р»РѕРІ). РўРѕС‡РєРё Р±СѓРґСѓС‚ РѕС‚СЃРѕСЂС‚РёСЂРѕРІР°РЅС‹ РїРѕ С…РѕРґСѓ. РњРёРЅРёРјСѓРј 2 С‚РѕС‡РєРё.")
             spring_df = st.data_editor(
                 spring_df,
                 width="stretch",
                 num_rows="dynamic",
                 hide_index=True,
                 column_config={
-                    "ход_мм": st.column_config.NumberColumn("Ход (мм)", step=None, help="Ход подвески/пружины (мм). Отрицательный = отбой, положительный = сжатие."),
-                    "сила_Н": st.column_config.NumberColumn("Сила (Н)", step=None, help="Сила пружины (Н) при соответствующем ходе."),
+                    "С…РѕРґ_РјРј": st.column_config.NumberColumn("РҐРѕРґ (РјРј)", step=None, help="РҐРѕРґ РїРѕРґРІРµСЃРєРё/РїСЂСѓР¶РёРЅС‹ (РјРј). РћС‚СЂРёС†Р°С‚РµР»СЊРЅС‹Р№ = РѕС‚Р±РѕР№, РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Р№ = СЃР¶Р°С‚РёРµ."),
+                    "СЃРёР»Р°_Рќ": st.column_config.NumberColumn("РЎРёР»Р° (Рќ)", step=None, help="РЎРёР»Р° РїСЂСѓР¶РёРЅС‹ (Рќ) РїСЂРё СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РµРј С…РѕРґРµ."),
                 },
                 key="spring_table_editor",
             )
             st.session_state["spring_table_df"] = spring_df
 
-        # Валидация + нормализация (применяем всегда)
+        # Р’Р°Р»РёРґР°С†РёСЏ + РЅРѕСЂРјР°Р»РёР·Р°С†РёСЏ (РїСЂРёРјРµРЅСЏРµРј РІСЃРµРіРґР°)
         _df = _pd.DataFrame(spring_df).copy()
-        _df["ход_мм"] = _pd.to_numeric(_df["ход_мм"], errors="coerce")
-        _df["сила_Н"] = _pd.to_numeric(_df["сила_Н"], errors="coerce")
-        _df = _df.dropna().sort_values("ход_мм")
+        _df["С…РѕРґ_РјРј"] = _pd.to_numeric(_df["С…РѕРґ_РјРј"], errors="coerce")
+        _df["СЃРёР»Р°_Рќ"] = _pd.to_numeric(_df["СЃРёР»Р°_Рќ"], errors="coerce")
+        _df = _df.dropna().sort_values("С…РѕРґ_РјРј")
 
         if len(_df) < 2:
             if SHOW_PARAMS or SHOW_RUN:
-                st.error("Таблица пружины должна содержать минимум 2 числовые точки.")
+                st.error("РўР°Р±Р»РёС†Р° РїСЂСѓР¶РёРЅС‹ РґРѕР»Р¶РЅР° СЃРѕРґРµСЂР¶Р°С‚СЊ РјРёРЅРёРјСѓРј 2 С‡РёСЃР»РѕРІС‹Рµ С‚РѕС‡РєРё.")
         else:
-            base0[SPR_X] = _df["ход_мм"].astype(float).tolist()
-            base0[SPR_F] = _df["сила_Н"].astype(float).tolist()
+            base0[SPR_X] = _df["С…РѕРґ_РјРј"].astype(float).tolist()
+            base0[SPR_F] = _df["СЃРёР»Р°_Рќ"].astype(float).tolist()
 
     except Exception as e:
         if SHOW_PARAMS or SHOW_RUN:
-            st.error(f"Ошибка обработки таблицы пружины: {e}")
+            st.error(f"РћС€РёР±РєР° РѕР±СЂР°Р±РѕС‚РєРё С‚Р°Р±Р»РёС†С‹ РїСЂСѓР¶РёРЅС‹: {e}")
 
 
-# Список ключей со структурированными значениями (list/dict) — их исключаем из таблицы скаляров
+# РЎРїРёСЃРѕРє РєР»СЋС‡РµР№ СЃРѕ СЃС‚СЂСѓРєС‚СѓСЂРёСЂРѕРІР°РЅРЅС‹РјРё Р·РЅР°С‡РµРЅРёСЏРјРё (list/dict) вЂ” РёС… РёСЃРєР»СЋС‡Р°РµРј РёР· С‚Р°Р±Р»РёС†С‹ СЃРєР°Р»СЏСЂРѕРІ
 structured_keys = [k for k in all_keys if isinstance(base0.get(k, None), (list, dict))]
 
-# В таблицу редактирования попадают только числовые скаляры.
+# Р’ С‚Р°Р±Р»РёС†Сѓ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ РїРѕРїР°РґР°СЋС‚ С‚РѕР»СЊРєРѕ С‡РёСЃР»РѕРІС‹Рµ СЃРєР°Р»СЏСЂС‹.
 scalar_keys = [k for k in all_keys if (k not in structured_keys) and _is_numeric_scalar(base0.get(k, None))]
 non_numeric_keys = [k for k in all_keys if (k not in structured_keys) and (not _is_numeric_scalar(base0.get(k, None)))]
 
 rows = []
 for k in scalar_keys:
-    meta = PARAM_META.get(k) or family_param_meta(k) or {"группа": "Прочее", "ед": "СИ", "kind": "raw", "описание": ""}
+    meta = PARAM_META.get(k) or family_param_meta(k) or {"РіСЂСѓРїРїР°": "РџСЂРѕС‡РµРµ", "РµРґ": "РЎР", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": ""}
     kind = meta.get("kind", "raw")
     val_ui = _si_to_ui(k, base0.get(k, float("nan")), kind)
     is_opt = k in ranges0
@@ -2109,14 +2072,14 @@ for k in scalar_keys:
         mx_ui = float("nan")
 
     rows.append({
-        "группа": meta.get("группа", "Прочее"),
-        "параметр": k,
-        "единица": meta.get("ед", "СИ"),
-        "значение": val_ui,
-        "оптимизировать": bool(is_opt),
-        "мин": mn_ui,
-        "макс": mx_ui,
-        "пояснение": meta.get("описание", ""),
+        "РіСЂСѓРїРїР°": meta.get("РіСЂСѓРїРїР°", "РџСЂРѕС‡РµРµ"),
+        "РїР°СЂР°РјРµС‚СЂ": k,
+        "РµРґРёРЅРёС†Р°": meta.get("РµРґ", "РЎР"),
+        "Р·РЅР°С‡РµРЅРёРµ": val_ui,
+        "РѕРїС‚РёРјРёР·РёСЂРѕРІР°С‚СЊ": bool(is_opt),
+        "РјРёРЅ": mn_ui,
+        "РјР°РєСЃ": mx_ui,
+        "РїРѕСЏСЃРЅРµРЅРёРµ": meta.get("РѕРїРёСЃР°РЅРёРµ", ""),
         "_key": k,
         "_kind": kind,
     })
@@ -2126,9 +2089,9 @@ df_params0 = pd.DataFrame(rows)
 if "df_params_edit" not in st.session_state:
     st.session_state["df_params_edit"] = df_params0
 
-# --- UI: параметры без горизонтального скролла (список + карточка) ---
+# --- UI: РїР°СЂР°РјРµС‚СЂС‹ Р±РµР· РіРѕСЂРёР·РѕРЅС‚Р°Р»СЊРЅРѕРіРѕ СЃРєСЂРѕР»Р»Р° (СЃРїРёСЃРѕРє + РєР°СЂС‚РѕС‡РєР°) ---
 def _merge_params_df(df_old: pd.DataFrame, df_new: pd.DataFrame) -> pd.DataFrame:
-    """С remember: сохраняем пользовательские правки и подхватываем новые ключи из df_new."""
+    """РЎ remember: СЃРѕС…СЂР°РЅСЏРµРј РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёРµ РїСЂР°РІРєРё Рё РїРѕРґС…РІР°С‚С‹РІР°РµРј РЅРѕРІС‹Рµ РєР»СЋС‡Рё РёР· df_new."""
     try:
         if (df_old is None) or (len(df_old) == 0):
             return df_new.copy()
@@ -2137,26 +2100,26 @@ def _merge_params_df(df_old: pd.DataFrame, df_new: pd.DataFrame) -> pd.DataFrame
         a = df_old.copy()
         b = df_new.copy()
         if "_key" not in a.columns:
-            a["_key"] = a.get("параметр", "")
+            a["_key"] = a.get("РїР°СЂР°РјРµС‚СЂ", "")
         if "_key" not in b.columns:
-            b["_key"] = b.get("параметр", "")
-        # индекс по ключу
+            b["_key"] = b.get("РїР°СЂР°РјРµС‚СЂ", "")
+        # РёРЅРґРµРєСЃ РїРѕ РєР»СЋС‡Сѓ
         a = a.set_index("_key", drop=False)
         b = b.set_index("_key", drop=False)
 
-        # 1) обновляем описания/группы/единицы из "свежего"
-        for col in ["группа", "единица", "пояснение", "_kind", "параметр"]:
+        # 1) РѕР±РЅРѕРІР»СЏРµРј РѕРїРёСЃР°РЅРёСЏ/РіСЂСѓРїРїС‹/РµРґРёРЅРёС†С‹ РёР· "СЃРІРµР¶РµРіРѕ"
+        for col in ["РіСЂСѓРїРїР°", "РµРґРёРЅРёС†Р°", "РїРѕСЏСЃРЅРµРЅРёРµ", "_kind", "РїР°СЂР°РјРµС‚СЂ"]:
             if col in b.columns:
                 a[col] = a[col].where(~a[col].isna(), b[col])
-                # если у нас устаревшее описание — предпочитаем новое
+                # РµСЃР»Рё Сѓ РЅР°СЃ СѓСЃС‚Р°СЂРµРІС€РµРµ РѕРїРёСЃР°РЅРёРµ вЂ” РїСЂРµРґРїРѕС‡РёС‚Р°РµРј РЅРѕРІРѕРµ
                 a[col] = b[col].combine_first(a[col])
 
-        # 2) добавляем новые ключи, которых не было
+        # 2) РґРѕР±Р°РІР»СЏРµРј РЅРѕРІС‹Рµ РєР»СЋС‡Рё, РєРѕС‚РѕСЂС‹С… РЅРµ Р±С‹Р»Рѕ
         missing = [k for k in b.index if k not in a.index]
         if missing:
             a = pd.concat([a, b.loc[missing].copy()], axis=0)
 
-        # 3) сортировка как в новом df (группа/ключ)
+        # 3) СЃРѕСЂС‚РёСЂРѕРІРєР° РєР°Рє РІ РЅРѕРІРѕРј df (РіСЂСѓРїРїР°/РєР»СЋС‡)
         try:
             a = a.loc[b.index.intersection(a.index).tolist() + [k for k in a.index if k not in b.index]]
         except Exception:
@@ -2167,11 +2130,11 @@ def _merge_params_df(df_old: pd.DataFrame, df_new: pd.DataFrame) -> pd.DataFrame
 
 def _render_param_card_row(row: Dict[str, Any]) -> Dict[str, Any]:
     """Render one parameter row as a card, return updated values."""
-    k = str(row.get("_key") or row.get("параметр") or "")
-    group = str(row.get("группа") or "Прочее")
-    unit = str(row.get("единица") or "—")
+    k = str(row.get("_key") or row.get("РїР°СЂР°РјРµС‚СЂ") or "")
+    group = str(row.get("РіСЂСѓРїРїР°") or "РџСЂРѕС‡РµРµ")
+    unit = str(row.get("РµРґРёРЅРёС†Р°") or "вЂ”")
     kind = str(row.get("_kind") or "raw")
-    desc = str(row.get("пояснение") or "")
+    desc = str(row.get("РїРѕСЏСЃРЅРµРЅРёРµ") or "")
 
     # current values (UI units already)
     def _f(x, default=float("nan")):
@@ -2180,20 +2143,20 @@ def _render_param_card_row(row: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             return default
 
-    v = _f(row.get("значение"))
-    opt = bool(row.get("оптимизировать", False))
-    vmin = _f(row.get("мин"))
-    vmax = _f(row.get("макс"))
+    v = _f(row.get("Р·РЅР°С‡РµРЅРёРµ"))
+    opt = bool(row.get("РѕРїС‚РёРјРёР·РёСЂРѕРІР°С‚СЊ", False))
+    vmin = _f(row.get("РјРёРЅ"))
+    vmax = _f(row.get("РјР°РєСЃ"))
 
     # Card layout
     with st.container():
         topL, topR = st.columns([1.4, 1.0], gap="large")
         with topL:
-            st.markdown(f"**{k}**  ·  {group}")
+            st.markdown(f"**{k}**  В·  {group}")
             if desc:
                 st.caption(desc)
         with topR:
-            opt_new = st.checkbox("Оптимизировать", value=opt, key=f"popt__{k}")
+            opt_new = st.checkbox("РћРїС‚РёРјРёР·РёСЂРѕРІР°С‚СЊ", value=opt, key=f"popt__{k}")
             opt = bool(opt_new)
 
         # Value editor
@@ -2205,14 +2168,14 @@ def _render_param_card_row(row: Dict[str, Any]) -> Dict[str, Any]:
         use_slider = False
         smin, smax, step = None, None, None
 
-        if kind == "fraction01" or (("доля" in unit) and ("0..1" in unit)):
+        if kind == "fraction01" or (("РґРѕР»СЏ" in unit) and ("0..1" in unit)):
             use_slider = True
             smin, smax = 0.0, 1.0
             step = 0.01
             if not (0.0 <= v <= 1.0):
                 v = max(0.0, min(1.0, v if math.isfinite(v) else 0.0))
 
-        elif kind == "pressure_atm_g" or ("атм" in unit):
+        elif kind == "pressure_atm_g" or ("Р°С‚Рј" in unit):
             use_slider = True
             # leaving some room for vacuum (negative gauge)
             base = v if math.isfinite(v) else 0.0
@@ -2223,19 +2186,19 @@ def _render_param_card_row(row: Dict[str, Any]) -> Dict[str, Any]:
                 smax = float(max(base + 2.0, 10.0))
             step = 0.05
 
-        elif ("объём" in k) or (kind.startswith("volume_")) or (unit in ("л", "мл")):
+        elif ("РѕР±СЉС‘Рј" in k) or (kind.startswith("volume_")) or (unit in ("Р»", "РјР»")):
             use_slider = True
-            base = v if math.isfinite(v) else (1.0 if unit == "л" else 100.0)
+            base = v if math.isfinite(v) else (1.0 if unit == "Р»" else 100.0)
             if opt and math.isfinite(vmin) and math.isfinite(vmax) and (vmin < vmax):
                 smin, smax = float(vmin), float(vmax)
             else:
                 # heuristic around current
-                span = max(abs(base) * 0.5, 1.0 if unit == "л" else 50.0)
+                span = max(abs(base) * 0.5, 1.0 if unit == "Р»" else 50.0)
                 smin = max(0.0, base - span)
-                smax = max(smin + (1.0 if unit == "л" else 10.0), base + span)
-            step = 0.1 if unit == "л" else 1.0
+                smax = max(smin + (1.0 if unit == "Р»" else 10.0), base + span)
+            step = 0.1 if unit == "Р»" else 1.0
 
-        elif k.endswith("_град") or (unit == "град"):
+        elif k.endswith("_РіСЂР°Рґ") or (unit == "РіСЂР°Рґ"):
             use_slider = True
             base = v if math.isfinite(v) else 0.0
             if opt and math.isfinite(vmin) and math.isfinite(vmax) and (vmin < vmax):
@@ -2250,7 +2213,7 @@ def _render_param_card_row(row: Dict[str, Any]) -> Dict[str, Any]:
             vv = v if math.isfinite(v) else (0.0 if smin <= 0.0 <= smax else smin)
             vv = min(max(vv, float(smin)), float(smax))
             v_new = st.slider(
-                "Значение",
+                "Р—РЅР°С‡РµРЅРёРµ",
                 min_value=float(smin),
                 max_value=float(smax),
                 value=float(vv),
@@ -2259,7 +2222,7 @@ def _render_param_card_row(row: Dict[str, Any]) -> Dict[str, Any]:
             )
         else:
             v_new = st.number_input(
-                "Значение",
+                "Р—РЅР°С‡РµРЅРёРµ",
                 value=float(v) if math.isfinite(v) else 0.0,
                 step=None,
                 key=val_key,
@@ -2268,18 +2231,18 @@ def _render_param_card_row(row: Dict[str, Any]) -> Dict[str, Any]:
         # Range editor (advanced)
         vmin_new, vmax_new = vmin, vmax
         if opt:
-            with st.expander("Диапазон оптимизации", expanded=False):
+            with st.expander("Р”РёР°РїР°Р·РѕРЅ РѕРїС‚РёРјРёР·Р°С†РёРё", expanded=False):
                 c1, c2 = st.columns(2)
                 with c1:
-                    vmin_new = st.number_input("Мин", value=float(vmin) if math.isfinite(vmin) else float(v_new), step=None, key=f"pmin__{k}")
+                    vmin_new = st.number_input("РњРёРЅ", value=float(vmin) if math.isfinite(vmin) else float(v_new), step=None, key=f"pmin__{k}")
                 with c2:
-                    vmax_new = st.number_input("Макс", value=float(vmax) if math.isfinite(vmax) else float(v_new), step=None, key=f"pmax__{k}")
+                    vmax_new = st.number_input("РњР°РєСЃ", value=float(vmax) if math.isfinite(vmax) else float(v_new), step=None, key=f"pmax__{k}")
         return {
             **row,
-            "значение": float(v_new),
-            "оптимизировать": bool(opt),
-            "мин": float(vmin_new) if math.isfinite(float(vmin_new)) else float("nan"),
-            "макс": float(vmax_new) if math.isfinite(float(vmax_new)) else float("nan"),
+            "Р·РЅР°С‡РµРЅРёРµ": float(v_new),
+            "РѕРїС‚РёРјРёР·РёСЂРѕРІР°С‚СЊ": bool(opt),
+            "РјРёРЅ": float(vmin_new) if math.isfinite(float(vmin_new)) else float("nan"),
+            "РјР°РєСЃ": float(vmax_new) if math.isfinite(float(vmax_new)) else float("nan"),
         }
 
 # Ensure params table exists and stays in sync with current PARAM_META
@@ -2290,49 +2253,49 @@ else:
 
 # Reflect edits only in the Parameters section (progressive disclosure)
 if SHOW_PARAMS:
-    st.subheader("Параметры (значения + диапазоны оптимизации)")
+    st.subheader("РџР°СЂР°РјРµС‚СЂС‹ (Р·РЅР°С‡РµРЅРёСЏ + РґРёР°РїР°Р·РѕРЅС‹ РѕРїС‚РёРјРёР·Р°С†РёРё)")
     st.caption(
-        "Тут редактируются числовые параметры. Нет горизонтального скролла: список → карточка параметра. "
-        "Оптимизацию включайте галочкой на карточке, диапазон прячется в 'Диапазон оптимизации'."
+        "РўСѓС‚ СЂРµРґР°РєС‚РёСЂСѓСЋС‚СЃСЏ С‡РёСЃР»РѕРІС‹Рµ РїР°СЂР°РјРµС‚СЂС‹. РќРµС‚ РіРѕСЂРёР·РѕРЅС‚Р°Р»СЊРЅРѕРіРѕ СЃРєСЂРѕР»Р»Р°: СЃРїРёСЃРѕРє в†’ РєР°СЂС‚РѕС‡РєР° РїР°СЂР°РјРµС‚СЂР°. "
+        "РћРїС‚РёРјРёР·Р°С†РёСЋ РІРєР»СЋС‡Р°Р№С‚Рµ РіР°Р»РѕС‡РєРѕР№ РЅР° РєР°СЂС‚РѕС‡РєРµ, РґРёР°РїР°Р·РѕРЅ РїСЂСЏС‡РµС‚СЃСЏ РІ 'Р”РёР°РїР°Р·РѕРЅ РѕРїС‚РёРјРёР·Р°С†РёРё'."
     )
 
     df_in = st.session_state["df_params_edit"].copy()
     # Filters
-    groups = sorted([g for g in df_in.get("группа", pd.Series(dtype=str)).dropna().unique().tolist() if str(g).strip()])
+    groups = sorted([g for g in df_in.get("РіСЂСѓРїРїР°", pd.Series(dtype=str)).dropna().unique().tolist() if str(g).strip()])
     colF1, colF2, colF3 = st.columns([1.2, 1.0, 0.9], gap="medium")
     with colF1:
-        q = st.text_input("Поиск", value=st.session_state.get("param_search", ""), key="param_search", placeholder="например: давление, объём, открытие...")
+        q = st.text_input("РџРѕРёСЃРє", value=st.session_state.get("param_search", ""), key="param_search", placeholder="РЅР°РїСЂРёРјРµСЂ: РґР°РІР»РµРЅРёРµ, РѕР±СЉС‘Рј, РѕС‚РєСЂС‹С‚РёРµ...")
     with colF2:
-        grp = st.selectbox("Группа", options=["(все)"] + groups, index=0, key="param_group")
+        grp = st.selectbox("Р“СЂСѓРїРїР°", options=["(РІСЃРµ)"] + groups, index=0, key="param_group")
     with colF3:
-        only_opt = st.checkbox("Только оптимизируемые", value=bool(st.session_state.get("param_only_opt", False)), key="param_only_opt")
+        only_opt = st.checkbox("РўРѕР»СЊРєРѕ РѕРїС‚РёРјРёР·РёСЂСѓРµРјС‹Рµ", value=bool(st.session_state.get("param_only_opt", False)), key="param_only_opt")
 
     df_view = df_in.copy()
-    if grp != "(все)":
-        df_view = df_view[df_view["группа"] == grp]
+    if grp != "(РІСЃРµ)":
+        df_view = df_view[df_view["РіСЂСѓРїРїР°"] == grp]
     if q.strip():
         qq = q.strip().lower()
-        df_view = df_view[df_view.apply(lambda r: (qq in str(r.get("_key","")).lower()) or (qq in str(r.get("пояснение","")).lower()), axis=1)]
+        df_view = df_view[df_view.apply(lambda r: (qq in str(r.get("_key","")).lower()) or (qq in str(r.get("РїРѕСЏСЃРЅРµРЅРёРµ","")).lower()), axis=1)]
     if only_opt:
-        df_view = df_view[df_view["оптимизировать"].astype(bool)]
+        df_view = df_view[df_view["РѕРїС‚РёРјРёР·РёСЂРѕРІР°С‚СЊ"].astype(bool)]
 
     # Limit visible cards for performance
     total = int(len(df_view))
-    show_n = st.slider("Показывать параметров", min_value=8, max_value=40, value=int(min(16, max(8, total))), step=1, key="param_show_n")
-    st.caption(f"Показано: {min(show_n, total)} из {total} (фильтры сверху).")
+    show_n = st.slider("РџРѕРєР°Р·С‹РІР°С‚СЊ РїР°СЂР°РјРµС‚СЂРѕРІ", min_value=8, max_value=40, value=int(min(16, max(8, total))), step=1, key="param_show_n")
+    st.caption(f"РџРѕРєР°Р·Р°РЅРѕ: {min(show_n, total)} РёР· {total} (С„РёР»СЊС‚СЂС‹ СЃРІРµСЂС…Сѓ).")
     df_view = df_view.head(show_n)
 
     # Render cards and write back into df_in
     updated_rows = {}
     for _, r in df_view.iterrows():
         rec = _render_param_card_row(r.to_dict())
-        updated_rows[str(rec.get("_key") or rec.get("параметр") or "")] = rec
+        updated_rows[str(rec.get("_key") or rec.get("РїР°СЂР°РјРµС‚СЂ") or "")] = rec
 
     if updated_rows:
         df_out = df_in.copy().set_index("_key", drop=False)
         for k, rec in updated_rows.items():
             if k in df_out.index:
-                for col in ["значение", "оптимизировать", "мин", "макс"]:
+                for col in ["Р·РЅР°С‡РµРЅРёРµ", "РѕРїС‚РёРјРёР·РёСЂРѕРІР°С‚СЊ", "РјРёРЅ", "РјР°РєСЃ"]:
                     if col in df_out.columns and col in rec:
                         df_out.loc[k, col] = rec[col]
         df_out = df_out.reset_index(drop=True)
@@ -2340,7 +2303,7 @@ if SHOW_PARAMS:
 
 df_params_edit = st.session_state["df_params_edit"]
 
-# строим base_override / ranges_override из единой таблицы
+# СЃС‚СЂРѕРёРј base_override / ranges_override РёР· РµРґРёРЅРѕР№ С‚Р°Р±Р»РёС†С‹
 base_override = dict(base0)
 ranges_override: Dict[str, Tuple[float, float]] = {}
 
@@ -2349,70 +2312,70 @@ for _, r in df_params_edit.iterrows():
     k = str(r["_key"])
     kind = str(r["_kind"])
     try:
-        val_ui = float(r["значение"])
+        val_ui = float(r["Р·РЅР°С‡РµРЅРёРµ"])
     except Exception:
-        param_errors.append(f"Параметр '{k}': пустое/некорректное базовое значение.")
+        param_errors.append(f"РџР°СЂР°РјРµС‚СЂ '{k}': РїСѓСЃС‚РѕРµ/РЅРµРєРѕСЂСЂРµРєС‚РЅРѕРµ Р±Р°Р·РѕРІРѕРµ Р·РЅР°С‡РµРЅРёРµ.")
         continue
 
-    # физические проверки (только невозможное)
+    # С„РёР·РёС‡РµСЃРєРёРµ РїСЂРѕРІРµСЂРєРё (С‚РѕР»СЊРєРѕ РЅРµРІРѕР·РјРѕР¶РЅРѕРµ)
     if kind == "fraction01":
         if not (0.0 <= val_ui <= 1.0):
-            param_errors.append(f"Параметр '{k}': доля должна быть 0..1, сейчас {val_ui}")
-    if k.startswith("масса_") and val_ui < 0:
-        param_errors.append(f"Параметр '{k}': масса не может быть отрицательной, сейчас {val_ui}")
-    if ("объём" in k) and (("volume_" in kind) or k.startswith("объём_") or k.startswith("мёртвый_объём")):
+            param_errors.append(f"РџР°СЂР°РјРµС‚СЂ '{k}': РґРѕР»СЏ РґРѕР»Р¶РЅР° Р±С‹С‚СЊ 0..1, СЃРµР№С‡Р°СЃ {val_ui}")
+    if k.startswith("РјР°СЃСЃР°_") and val_ui < 0:
+        param_errors.append(f"РџР°СЂР°РјРµС‚СЂ '{k}': РјР°СЃСЃР° РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РѕС‚СЂРёС†Р°С‚РµР»СЊРЅРѕР№, СЃРµР№С‡Р°СЃ {val_ui}")
+    if ("РѕР±СЉС‘Рј" in k) and (("volume_" in kind) or k.startswith("РѕР±СЉС‘Рј_") or k.startswith("РјС‘СЂС‚РІС‹Р№_РѕР±СЉС‘Рј")):
         if val_ui <= 0:
-            param_errors.append(f"Параметр '{k}': объём должен быть > 0, сейчас {val_ui}")
+            param_errors.append(f"РџР°СЂР°РјРµС‚СЂ '{k}': РѕР±СЉС‘Рј РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ > 0, СЃРµР№С‡Р°СЃ {val_ui}")
 
-    # конвертация в СИ
+    # РєРѕРЅРІРµСЂС‚Р°С†РёСЏ РІ РЎР
     val_si = _ui_to_si(k, val_ui, kind)
     base_override[k] = float(val_si)
 
-    if bool(r["оптимизировать"]):
+    if bool(r["РѕРїС‚РёРјРёР·РёСЂРѕРІР°С‚СЊ"]):
         try:
-            mn_ui = float(r["мин"])
-            mx_ui = float(r["макс"])
+            mn_ui = float(r["РјРёРЅ"])
+            mx_ui = float(r["РјР°РєСЃ"])
         except Exception:
-            param_errors.append(f"Параметр '{k}': включена оптимизация, но диапазон (мин/макс) не задан.")
+            param_errors.append(f"РџР°СЂР°РјРµС‚СЂ '{k}': РІРєР»СЋС‡РµРЅР° РѕРїС‚РёРјРёР·Р°С†РёСЏ, РЅРѕ РґРёР°РїР°Р·РѕРЅ (РјРёРЅ/РјР°РєСЃ) РЅРµ Р·Р°РґР°РЅ.")
             continue
         mn_si = _ui_to_si(k, mn_ui, kind)
         mx_si = _ui_to_si(k, mx_ui, kind)
         if not (mn_si < mx_si):
-            param_errors.append(f"Параметр '{k}': диапазон некорректный (мин >= макс).")
+            param_errors.append(f"РџР°СЂР°РјРµС‚СЂ '{k}': РґРёР°РїР°Р·РѕРЅ РЅРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ (РјРёРЅ >= РјР°РєСЃ).")
             continue
-        # физика
+        # С„РёР·РёРєР°
         if kind == "fraction01" and (mn_ui < 0 or mx_ui > 1):
-            param_errors.append(f"Параметр '{k}': диапазон доли должен быть в 0..1.")
+            param_errors.append(f"РџР°СЂР°РјРµС‚СЂ '{k}': РґРёР°РїР°Р·РѕРЅ РґРѕР»Рё РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РІ 0..1.")
             continue
-        if ("объём" in k) and ((mn_si <= 0) or (mx_si <= 0)):
-            param_errors.append(f"Параметр '{k}': объёмы должны быть > 0.")
+        if ("РѕР±СЉС‘Рј" in k) and ((mn_si <= 0) or (mx_si <= 0)):
+            param_errors.append(f"РџР°СЂР°РјРµС‚СЂ '{k}': РѕР±СЉС‘РјС‹ РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ > 0.")
             continue
 
         ranges_override[k] = (float(mn_si), float(mx_si))
 
 if param_errors and (SHOW_PARAMS or SHOW_RUN):
-    st.error("В таблице параметров есть ошибки (исправьте перед запуском):\n- " + "\n- ".join(param_errors))
+    st.error("Р’ С‚Р°Р±Р»РёС†Рµ РїР°СЂР°РјРµС‚СЂРѕРІ РµСЃС‚СЊ РѕС€РёР±РєРё (РёСЃРїСЂР°РІСЊС‚Рµ РїРµСЂРµРґ Р·Р°РїСѓСЃРєРѕРј):\n- " + "\n- ".join(param_errors))
 
 
 
 
 
 # -------------------------------
-# Модель: режимы и флаги (bool + string)
+# РњРѕРґРµР»СЊ: СЂРµР¶РёРјС‹ Рё С„Р»Р°РіРё (bool + string)
 # -------------------------------
-# Принцип: UI "модельных" настроек показываем только в разделе "Модель",
-# но выбранные значения применяются ВСЕГДА (чтобы Прогон/Результаты работали одинаково).
+# РџСЂРёРЅС†РёРї: UI "РјРѕРґРµР»СЊРЅС‹С…" РЅР°СЃС‚СЂРѕРµРє РїРѕРєР°Р·С‹РІР°РµРј С‚РѕР»СЊРєРѕ РІ СЂР°Р·РґРµР»Рµ "РњРѕРґРµР»СЊ",
+# РЅРѕ РІС‹Р±СЂР°РЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ РїСЂРёРјРµРЅСЏСЋС‚СЃСЏ Р’РЎР•Р“Р”Рђ (С‡С‚РѕР±С‹ РџСЂРѕРіРѕРЅ/Р РµР·СѓР»СЊС‚Р°С‚С‹ СЂР°Р±РѕС‚Р°Р»Рё РѕРґРёРЅР°РєРѕРІРѕ).
 bool_keys_ui = [k for k in BASE_BOOL_KEYS if (k in base0)]
 str_keys_ui = [k for k in BASE_STR_KEYS if (k in base0)]
 
 if SHOW_MODEL:
     st.divider()
-    st.subheader("Модель: режимы и флаги")
-    st.caption("Булевы — чекбоксы. Строковые — выпадающие списки. Поиск сверху, чтобы не было 'простыней'.")
+    st.subheader("РњРѕРґРµР»СЊ: СЂРµР¶РёРјС‹ Рё С„Р»Р°РіРё")
+    st.caption("Р‘СѓР»РµРІС‹ вЂ” С‡РµРєР±РѕРєСЃС‹. РЎС‚СЂРѕРєРѕРІС‹Рµ вЂ” РІС‹РїР°РґР°СЋС‰РёРµ СЃРїРёСЃРєРё. РџРѕРёСЃРє СЃРІРµСЂС…Сѓ, С‡С‚РѕР±С‹ РЅРµ Р±С‹Р»Рѕ 'РїСЂРѕСЃС‚С‹РЅРµР№'.")
 
-    with st.expander("Булевы флаги", expanded=False):
-        qf = st.text_input("Поиск флага", value=st.session_state.get("flag_search", ""), key="flag_search", placeholder="например: вакуум, мягк, демпф...")
-        show_all = st.checkbox("Показать все", value=bool(st.session_state.get("flag_show_all", False)), key="flag_show_all")
+    with st.expander("Р‘СѓР»РµРІС‹ С„Р»Р°РіРё", expanded=False):
+        qf = st.text_input("РџРѕРёСЃРє С„Р»Р°РіР°", value=st.session_state.get("flag_search", ""), key="flag_search", placeholder="РЅР°РїСЂРёРјРµСЂ: РІР°РєСѓСѓРј, РјСЏРіРє, РґРµРјРїС„...")
+        show_all = st.checkbox("РџРѕРєР°Р·Р°С‚СЊ РІСЃРµ", value=bool(st.session_state.get("flag_show_all", False)), key="flag_show_all")
         keys = bool_keys_ui
         if qf.strip():
             qq = qf.strip().lower()
@@ -2425,11 +2388,11 @@ if SHOW_MODEL:
             st.checkbox(k, value=v0, key=f"flag__{k}")
 
         if (not show_all) and (len(bool_keys_ui) > 40):
-            st.caption("Часть флагов скрыта. Включите 'Показать все' или используйте поиск.")
+            st.caption("Р§Р°СЃС‚СЊ С„Р»Р°РіРѕРІ СЃРєСЂС‹С‚Р°. Р’РєР»СЋС‡РёС‚Рµ 'РџРѕРєР°Р·Р°С‚СЊ РІСЃРµ' РёР»Рё РёСЃРїРѕР»СЊР·СѓР№С‚Рµ РїРѕРёСЃРє.")
 
-    with st.expander("Строковые режимы", expanded=False):
-        qm = st.text_input("Поиск режима", value=st.session_state.get("mode_search", ""), key="mode_search", placeholder="например: паспорт, стратегия, режим...")
-        show_all = st.checkbox("Показать все режимы", value=bool(st.session_state.get("mode_show_all", False)), key="mode_show_all")
+    with st.expander("РЎС‚СЂРѕРєРѕРІС‹Рµ СЂРµР¶РёРјС‹", expanded=False):
+        qm = st.text_input("РџРѕРёСЃРє СЂРµР¶РёРјР°", value=st.session_state.get("mode_search", ""), key="mode_search", placeholder="РЅР°РїСЂРёРјРµСЂ: РїР°СЃРїРѕСЂС‚, СЃС‚СЂР°С‚РµРіРёСЏ, СЂРµР¶РёРј...")
+        show_all = st.checkbox("РџРѕРєР°Р·Р°С‚СЊ РІСЃРµ СЂРµР¶РёРјС‹", value=bool(st.session_state.get("mode_show_all", False)), key="mode_show_all")
 
         keys = str_keys_ui
         if qm.strip():
@@ -2439,7 +2402,7 @@ if SHOW_MODEL:
             keys = keys[:30]
 
         for k in keys:
-            if k == "паспорт_компонентов_json":
+            if k == "РїР°СЃРїРѕСЂС‚_РєРѕРјРїРѕРЅРµРЅС‚РѕРІ_json":
                 # prefer local json files as presets
                 json_files = []
                 try:
@@ -2451,7 +2414,7 @@ if SHOW_MODEL:
                     pass
 
                 current = str(base_override.get(k, base0.get(k, "")) or "")
-                options = ["(как в базе)"] + json_files + ["(вручную)"]
+                options = ["(РєР°Рє РІ Р±Р°Р·Рµ)"] + json_files + ["(РІСЂСѓС‡РЅСѓСЋ)"]
                 # index
                 idx = 0
                 if current in json_files:
@@ -2459,10 +2422,10 @@ if SHOW_MODEL:
                 elif current.strip():
                     idx = len(options) - 1
 
-                choice = st.selectbox("паспорт_компонентов_json", options=options, index=idx, key=f"mode__{k}__choice")
-                if choice == "(вручную)":
-                    st.text_input("Путь/имя JSON", value=current, key=f"mode__{k}__manual")
-                elif choice == "(как в базе)":
+                choice = st.selectbox("РїР°СЃРїРѕСЂС‚_РєРѕРјРїРѕРЅРµРЅС‚РѕРІ_json", options=options, index=idx, key=f"mode__{k}__choice")
+                if choice == "(РІСЂСѓС‡РЅСѓСЋ)":
+                    st.text_input("РџСѓС‚СЊ/РёРјСЏ JSON", value=current, key=f"mode__{k}__manual")
+                elif choice == "(РєР°Рє РІ Р±Р°Р·Рµ)":
                     # clear manual
                     st.session_state.pop(f"mode__{k}__manual", None)
                     st.session_state[f"mode__{k}"] = str(base0.get(k, "")) or ""
@@ -2475,7 +2438,7 @@ if SHOW_MODEL:
                 st.text_input(k, value=v0, key=f"mode__{k}")
 
         if (not show_all) and (len(str_keys_ui) > 30):
-            st.caption("Часть режимов скрыта. Включите 'Показать все режимы' или используйте поиск.")
+            st.caption("Р§Р°СЃС‚СЊ СЂРµР¶РёРјРѕРІ СЃРєСЂС‹С‚Р°. Р’РєР»СЋС‡РёС‚Рµ 'РџРѕРєР°Р·Р°С‚СЊ РІСЃРµ СЂРµР¶РёРјС‹' РёР»Рё РёСЃРїРѕР»СЊР·СѓР№С‚Рµ РїРѕРёСЃРє.")
 
 # Apply overrides from session_state (always)
 for k in bool_keys_ui:
@@ -2483,7 +2446,7 @@ for k in bool_keys_ui:
     base_override[k] = bool(v)
 
 for k in str_keys_ui:
-    if k == "паспорт_компонентов_json":
+    if k == "РїР°СЃРїРѕСЂС‚_РєРѕРјРїРѕРЅРµРЅС‚РѕРІ_json":
         v_man = str(st.session_state.get(f"mode__{k}__manual", "") or "").strip()
         if v_man:
             base_override[k] = v_man
@@ -2492,18 +2455,18 @@ for k in str_keys_ui:
     else:
         base_override[k] = str(st.session_state.get(f"mode__{k}", base0.get(k, "")) or "")
 # -------------------------------
-# Тест‑набор и пороги (редактируется из UI)
+# РўРµСЃС‚вЂ‘РЅР°Р±РѕСЂ Рё РїРѕСЂРѕРіРё (СЂРµРґР°РєС‚РёСЂСѓРµС‚СЃСЏ РёР· UI)
 # -------------------------------
-# (UI тест-набора отображается ниже в разделе "Тесты")
+# (UI С‚РµСЃС‚-РЅР°Р±РѕСЂР° РѕС‚РѕР±СЂР°Р¶Р°РµС‚СЃСЏ РЅРёР¶Рµ РІ СЂР°Р·РґРµР»Рµ "РўРµСЃС‚С‹")
 
 ALLOWED_TEST_TYPES = [
-    "инерция_крен",
-    "инерция_тангаж",
-    "микро_синфаза",
-    "микро_разнофаза",
-    "кочка_одно_колесо",
-    "кочка_диагональ",
-    "комбо_крен_плюс_микро",
+    "РёРЅРµСЂС†РёСЏ_РєСЂРµРЅ",
+    "РёРЅРµСЂС†РёСЏ_С‚Р°РЅРіР°Р¶",
+    "РјРёРєСЂРѕ_СЃРёРЅС„Р°Р·Р°",
+    "РјРёРєСЂРѕ_СЂР°Р·РЅРѕС„Р°Р·Р°",
+    "РєРѕС‡РєР°_РѕРґРЅРѕ_РєРѕР»РµСЃРѕ",
+    "РєРѕС‡РєР°_РґРёР°РіРѕРЅР°Р»СЊ",
+    "РєРѕРјР±Рѕ_РєСЂРµРЅ_РїР»СЋСЃ_РјРёРєСЂРѕ",
 ]
 
 DEFAULT_SUITE_PATH = HERE / "default_suite.json"
@@ -2540,19 +2503,19 @@ def _show_suite_contract_warnings_once() -> None:
     if not issues:
         return
     st.warning(
-        "В suite обнаружены legacy-колонки. Выполнена явная миграция в canonical schema; "
-        "пересохраните suite.json.\n- " + "\n- ".join(str(x) for x in issues)
+        "Р’ suite РѕР±РЅР°СЂСѓР¶РµРЅС‹ legacy-РєРѕР»РѕРЅРєРё. Р’С‹РїРѕР»РЅРµРЅР° СЏРІРЅР°СЏ РјРёРіСЂР°С†РёСЏ РІ canonical schema; "
+        "РїРµСЂРµСЃРѕС…СЂР°РЅРёС‚Рµ suite.json.\n- " + "\n- ".join(str(x) for x in issues)
     )
 
 
-# загрузка suite по умолчанию
+# Р·Р°РіСЂСѓР·РєР° suite РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
 if "df_suite_edit" not in st.session_state:
     st.session_state["df_suite_edit"] = _normalize_suite_df_for_editor(
         pd.DataFrame(load_default_suite_disabled(DEFAULT_SUITE_PATH)),
         context="app.default_suite_load",
     )
 
-# upload/редактирование suite — только в разделе "Тесты" (progressive disclosure)
+# upload/СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ suite вЂ” С‚РѕР»СЊРєРѕ РІ СЂР°Р·РґРµР»Рµ "РўРµСЃС‚С‹" (progressive disclosure)
 df_suite_edit = st.session_state.get("df_suite_edit")
 if df_suite_edit is None:
     df_suite_edit = pd.DataFrame()
@@ -2561,20 +2524,20 @@ else:
     df_suite_edit = _normalize_suite_df_for_editor(pd.DataFrame(df_suite_edit), context="app.session_state_restore")
     st.session_state["df_suite_edit"] = df_suite_edit
 
-# Нормализация колонок (на случай старых/загруженных suite)
+# РќРѕСЂРјР°Р»РёР·Р°С†РёСЏ РєРѕР»РѕРЅРѕРє (РЅР° СЃР»СѓС‡Р°Р№ СЃС‚Р°СЂС‹С…/Р·Р°РіСЂСѓР¶РµРЅРЅС‹С… suite)
 EXPECTED_SUITE_COLS = [
-    "имя", "включен", "тип", "dt", "t_end",
+    "РёРјСЏ", "РІРєР»СЋС‡РµРЅ", "С‚РёРї", "dt", "t_end",
     "t_step", "settle_band_min_deg", "settle_band_ratio",
     "ax", "ay", "A", "f", "dur", "t0", "idx",
-    "vx0_м_с", "угол_град", "доля_плавной_стыковки",
+    "vx0_Рј_СЃ", "СѓРіРѕР»_РіСЂР°Рґ", "РґРѕР»СЏ_РїР»Р°РІРЅРѕР№_СЃС‚С‹РєРѕРІРєРё",
     # targets:
-    "target_макс_доля_отрыва",
-    "target_мин_запас_до_Pmid_бар",
-    "target_мин_Fmin_Н",
-    "target_мин_запас_до_пробоя_крен_град",
-    "target_мин_запас_до_пробоя_тангаж_град",
-    "target_мин_запас_до_упора_штока_м",
-    "target_лимит_скорости_штока_м_с",
+    "target_РјР°РєСЃ_РґРѕР»СЏ_РѕС‚СЂС‹РІР°",
+    "target_РјРёРЅ_Р·Р°РїР°СЃ_РґРѕ_Pmid_Р±Р°СЂ",
+    "target_РјРёРЅ_Fmin_Рќ",
+    "target_РјРёРЅ_Р·Р°РїР°СЃ_РґРѕ_РїСЂРѕР±РѕСЏ_РєСЂРµРЅ_РіСЂР°Рґ",
+    "target_РјРёРЅ_Р·Р°РїР°СЃ_РґРѕ_РїСЂРѕР±РѕСЏ_С‚Р°РЅРіР°Р¶_РіСЂР°Рґ",
+    "target_РјРёРЅ_Р·Р°РїР°СЃ_РґРѕ_СѓРїРѕСЂР°_С€С‚РѕРєР°_Рј",
+    "target_Р»РёРјРёС‚_СЃРєРѕСЂРѕСЃС‚Рё_С€С‚РѕРєР°_Рј_СЃ",
 ]
 for _c in EXPECTED_SUITE_COLS:
     if _c not in df_suite_edit.columns:
@@ -2584,21 +2547,21 @@ if SHOW_TESTS or SHOW_RUN:
     _show_suite_contract_warnings_once()
 
 if SHOW_TESTS:
-    st.subheader("Тест‑набор (suite)")
+    st.subheader("РўРµСЃС‚вЂ‘РЅР°Р±РѕСЂ (suite)")
     st.caption(
-        "Слева — список тестов (поиск/выбор). Справа — карточка выбранного теста. "
-        "Это устраняет горизонтальный скролл и 'простыни' таблиц."
+        "РЎР»РµРІР° вЂ” СЃРїРёСЃРѕРє С‚РµСЃС‚РѕРІ (РїРѕРёСЃРє/РІС‹Р±РѕСЂ). РЎРїСЂР°РІР° вЂ” РєР°СЂС‚РѕС‡РєР° РІС‹Р±СЂР°РЅРЅРѕРіРѕ С‚РµСЃС‚Р°. "
+        "Р­С‚Рѕ СѓСЃС‚СЂР°РЅСЏРµС‚ РіРѕСЂРёР·РѕРЅС‚Р°Р»СЊРЅС‹Р№ СЃРєСЂРѕР»Р» Рё 'РїСЂРѕСЃС‚С‹РЅРё' С‚Р°Р±Р»РёС†."
     )
 
     # Import / export / reset
-    with st.expander("Импорт / экспорт / сброс", expanded=True):
+    with st.expander("РРјРїРѕСЂС‚ / СЌРєСЃРїРѕСЂС‚ / СЃР±СЂРѕСЃ", expanded=True):
         colIE1, colIE2, colIE3 = st.columns([1.2, 1.0, 1.0], gap="medium")
 
         with colIE1:
             suite_upload = st.file_uploader(
-                "Импорт suite (JSON)",
+                "РРјРїРѕСЂС‚ suite (JSON)",
                 type=["json"],
-                help="Загрузите ранее сохранённый suite.json (список словарей).",
+                help="Р—Р°РіСЂСѓР·РёС‚Рµ СЂР°РЅРµРµ СЃРѕС…СЂР°РЅС‘РЅРЅС‹Р№ suite.json (СЃРїРёСЃРѕРє СЃР»РѕРІР°СЂРµР№).",
                 key="suite_upload_json",
             )
             if suite_upload is not None:
@@ -2611,15 +2574,15 @@ if SHOW_TESTS:
                         )
                         st.session_state["df_suite_edit"] = _loaded_df
                         st.session_state["suite_sel"] = first_suite_selected_index(_loaded_df)
-                        st.success("Suite загружен.")
+                        st.success("Suite Р·Р°РіСЂСѓР¶РµРЅ.")
                         st.rerun()
                     else:
-                        st.error("JSON должен быть списком объектов (list[dict]).")
+                        st.error("JSON РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ СЃРїРёСЃРєРѕРј РѕР±СЉРµРєС‚РѕРІ (list[dict]).")
                 except Exception as e:
-                    st.error(f"Не удалось прочитать JSON: {e}")
+                    st.error(f"РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ JSON: {e}")
 
         with colIE2:
-            if st.button("Сбросить к default_suite.json", key="suite_reset_default"):
+            if st.button("РЎР±СЂРѕСЃРёС‚СЊ Рє default_suite.json", key="suite_reset_default"):
                 _default_df = _normalize_suite_df_for_editor(
                     pd.DataFrame(load_default_suite_disabled(DEFAULT_SUITE_PATH)),
                     context="app.suite_reset_default",
@@ -2647,7 +2610,7 @@ if SHOW_TESTS:
             except Exception:
                 suite_json = "[]"
             st.download_button(
-                "Экспорт suite.json",
+                "Р­РєСЃРїРѕСЂС‚ suite.json",
                 data=suite_json,
                 file_name="suite_export.json",
                 mime="application/json",
@@ -2659,15 +2622,15 @@ if SHOW_TESTS:
     left, right = st.columns([1.0, 1.2], gap="large")
 
     with left:
-        q = st.text_input("Поиск теста", value=st.session_state.get("suite_search", ""), key="suite_search", placeholder="например: крен, микро, кочка...")
+        q = st.text_input("РџРѕРёСЃРє С‚РµСЃС‚Р°", value=st.session_state.get("suite_search", ""), key="suite_search", placeholder="РЅР°РїСЂРёРјРµСЂ: РєСЂРµРЅ, РјРёРєСЂРѕ, РєРѕС‡РєР°...")
         # build labels
         labels = []
         idx_map = []
         for i, r in df_suite_edit.iterrows():
-            name = str(r.get("имя") or f"test_{i}")
-            typ = str(r.get("тип") or "")
-            enabled = bool(r.get("включен")) if ("включен" in r) else True
-            lbl = f"{'✅' if enabled else '⛔'} {name}  ·  {typ}"
+            name = str(r.get("РёРјСЏ") or f"test_{i}")
+            typ = str(r.get("С‚РёРї") or "")
+            enabled = bool(r.get("РІРєР»СЋС‡РµРЅ")) if ("РІРєР»СЋС‡РµРЅ" in r) else True
+            lbl = f"{'вњ…' if enabled else 'в›”'} {name}  В·  {typ}"
             if q.strip():
                 if q.strip().lower() not in lbl.lower():
                     continue
@@ -2675,7 +2638,7 @@ if SHOW_TESTS:
             idx_map.append(i)
 
         if not labels:
-            st.info("Список тестов пуст (или фильтр ничего не нашёл). Добавьте тест.")
+            st.info("РЎРїРёСЃРѕРє С‚РµСЃС‚РѕРІ РїСѓСЃС‚ (РёР»Рё С„РёР»СЊС‚СЂ РЅРёС‡РµРіРѕ РЅРµ РЅР°С€С‘Р»). Р”РѕР±Р°РІСЊС‚Рµ С‚РµСЃС‚.")
             sel_i = None
         else:
             # keep selection stable with a normal always-selected scenario when list is not empty.
@@ -2684,7 +2647,7 @@ if SHOW_TESTS:
             if st.session_state["suite_sel"] not in idx_map:
                 st.session_state["suite_sel"] = idx_map[0]
             sel_i = st.selectbox(
-                "Тест",
+                "РўРµСЃС‚",
                 options=idx_map,
                 format_func=lambda i: (labels[idx_map.index(i)] if i in idx_map else str(i)),
                 key="suite_sel",
@@ -2692,11 +2655,11 @@ if SHOW_TESTS:
 
         btnC1, btnC2, btnC3 = st.columns(3, gap="small")
         with btnC1:
-            if st.button("➕ Добавить", key="suite_add"):
+            if st.button("вћ• Р”РѕР±Р°РІРёС‚СЊ", key="suite_add"):
                 new_row = {c: np.nan for c in EXPECTED_SUITE_COLS}
-                new_row["включен"] = True
-                new_row["имя"] = f"new_test_{len(df_suite_edit)+1}"
-                new_row["тип"] = ALLOWED_TEST_TYPES[0] if ALLOWED_TEST_TYPES else "инерция_крен"
+                new_row["РІРєР»СЋС‡РµРЅ"] = True
+                new_row["РёРјСЏ"] = f"new_test_{len(df_suite_edit)+1}"
+                new_row["С‚РёРї"] = ALLOWED_TEST_TYPES[0] if ALLOWED_TEST_TYPES else "РёРЅРµСЂС†РёСЏ_РєСЂРµРЅ"
                 new_row["dt"] = 0.01
                 new_row["t_end"] = 3.0
                 df_suite_edit = pd.concat([df_suite_edit, pd.DataFrame([new_row])], ignore_index=True)
@@ -2704,27 +2667,27 @@ if SHOW_TESTS:
                 st.session_state["suite_sel"] = int(len(df_suite_edit)-1)
                 st.rerun()
         with btnC2:
-            if st.button("📄 Дублировать", disabled=(sel_i is None), key="suite_dup"):
+            if st.button("рџ“„ Р”СѓР±Р»РёСЂРѕРІР°С‚СЊ", disabled=(sel_i is None), key="suite_dup"):
                 if sel_i is not None:
                     row = df_suite_edit.loc[sel_i].to_dict()
-                    row["имя"] = str(row.get("имя") or "copy") + "_copy"
+                    row["РёРјСЏ"] = str(row.get("РёРјСЏ") or "copy") + "_copy"
                     df_suite_edit = pd.concat([df_suite_edit, pd.DataFrame([row])], ignore_index=True)
                     st.session_state["df_suite_edit"] = df_suite_edit
                     st.session_state["suite_sel"] = int(len(df_suite_edit)-1)
                     st.rerun()
         with btnC3:
-            if st.button("🗑️ Удалить", disabled=(sel_i is None), key="suite_del"):
+            if st.button("рџ—‘пёЏ РЈРґР°Р»РёС‚СЊ", disabled=(sel_i is None), key="suite_del"):
                 if sel_i is not None and len(df_suite_edit) > 0:
                     df_suite_edit = df_suite_edit.drop(index=sel_i).reset_index(drop=True)
                     st.session_state["df_suite_edit"] = df_suite_edit
                     st.session_state["suite_sel"] = first_suite_selected_index(df_suite_edit)
                     st.rerun()
 
-        st.caption(f"Всего тестов: {len(st.session_state['df_suite_edit'])}")
+        st.caption(f"Р’СЃРµРіРѕ С‚РµСЃС‚РѕРІ: {len(st.session_state['df_suite_edit'])}")
 
     with right:
         if sel_i is None or len(df_suite_edit) == 0:
-            st.info("Выберите тест слева.")
+            st.info("Р’С‹Р±РµСЂРёС‚Рµ С‚РµСЃС‚ СЃР»РµРІР°.")
         else:
             row = df_suite_edit.loc[sel_i].to_dict()
 
@@ -2734,18 +2697,18 @@ if SHOW_TESTS:
                 except Exception:
                     return default
 
-            enabled = bool(row.get("включен", True))
-            name = str(row.get("имя") or f"test_{sel_i}")
-            typ = str(row.get("тип") or (ALLOWED_TEST_TYPES[0] if ALLOWED_TEST_TYPES else ""))
+            enabled = bool(row.get("РІРєР»СЋС‡РµРЅ", True))
+            name = str(row.get("РёРјСЏ") or f"test_{sel_i}")
+            typ = str(row.get("С‚РёРї") or (ALLOWED_TEST_TYPES[0] if ALLOWED_TEST_TYPES else ""))
 
             with st.container():
-                st.markdown("**Карточка теста**")
+                st.markdown("**РљР°СЂС‚РѕС‡РєР° С‚РµСЃС‚Р°**")
                 cA, cB = st.columns([1.0, 1.0], gap="medium")
                 with cA:
-                    enabled = st.checkbox("Включен", value=enabled, key=f"suite_enabled__{sel_i}")
-                    name = st.text_input("Имя", value=name, key=f"suite_name__{sel_i}")
+                    enabled = st.checkbox("Р’РєР»СЋС‡РµРЅ", value=enabled, key=f"suite_enabled__{sel_i}")
+                    name = st.text_input("РРјСЏ", value=name, key=f"suite_name__{sel_i}")
                 with cB:
-                    typ = st.selectbox("Тип", options=ALLOWED_TEST_TYPES, index=(ALLOWED_TEST_TYPES.index(typ) if typ in ALLOWED_TEST_TYPES else 0), key=f"suite_type__{sel_i}")
+                    typ = st.selectbox("РўРёРї", options=ALLOWED_TEST_TYPES, index=(ALLOWED_TEST_TYPES.index(typ) if typ in ALLOWED_TEST_TYPES else 0), key=f"suite_type__{sel_i}")
 
                 # dt / t_end presets
                 dt0 = _num(row.get("dt"), 0.01)
@@ -2755,43 +2718,43 @@ if SHOW_TESTS:
 
                 c1, c2 = st.columns(2, gap="medium")
                 with c1:
-                    dt_choice = st.selectbox("Шаг dt (с)", options=dt_presets + ["другое"], index=(dt_presets.index(dt0) if dt0 in dt_presets else len(dt_presets)), key=f"suite_dt_choice__{sel_i}")
-                    if dt_choice == "другое":
-                        dt = st.number_input("dt (с)", value=float(dt0), step=None, key=f"suite_dt__{sel_i}")
+                    dt_choice = st.selectbox("РЁР°Рі dt (СЃ)", options=dt_presets + ["РґСЂСѓРіРѕРµ"], index=(dt_presets.index(dt0) if dt0 in dt_presets else len(dt_presets)), key=f"suite_dt_choice__{sel_i}")
+                    if dt_choice == "РґСЂСѓРіРѕРµ":
+                        dt = st.number_input("dt (СЃ)", value=float(dt0), step=None, key=f"suite_dt__{sel_i}")
                     else:
                         dt = float(dt_choice)
                 with c2:
-                    te_choice = st.selectbox("Длительность t_end (с)", options=te_presets + ["другое"], index=(te_presets.index(tend0) if tend0 in te_presets else len(te_presets)), key=f"suite_te_choice__{sel_i}")
-                    if te_choice == "другое":
-                        t_end = st.number_input("t_end (с)", value=float(tend0), step=None, key=f"suite_te__{sel_i}")
+                    te_choice = st.selectbox("Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ t_end (СЃ)", options=te_presets + ["РґСЂСѓРіРѕРµ"], index=(te_presets.index(tend0) if tend0 in te_presets else len(te_presets)), key=f"suite_te_choice__{sel_i}")
+                    if te_choice == "РґСЂСѓРіРѕРµ":
+                        t_end = st.number_input("t_end (СЃ)", value=float(tend0), step=None, key=f"suite_te__{sel_i}")
                     else:
                         t_end = float(te_choice)
 
                 # Common excitation / maneuver params (only if present)
-                st.markdown("**Возмущение / манёвр**")
+                st.markdown("**Р’РѕР·РјСѓС‰РµРЅРёРµ / РјР°РЅС‘РІСЂ**")
                 c3, c4, c5 = st.columns(3, gap="small")
                 with c3:
                     ax = _num(row.get("ax"), 0.0)
-                    ax = st.slider("ax (м/с²)", min_value=-20.0, max_value=20.0, value=float(max(-20.0, min(20.0, ax))), step=0.1, key=f"suite_ax__{sel_i}")
+                    ax = st.slider("ax (Рј/СЃВІ)", min_value=-20.0, max_value=20.0, value=float(max(-20.0, min(20.0, ax))), step=0.1, key=f"suite_ax__{sel_i}")
                 with c4:
                     ay = _num(row.get("ay"), 0.0)
-                    ay = st.slider("ay (м/с²)", min_value=-20.0, max_value=20.0, value=float(max(-20.0, min(20.0, ay))), step=0.1, key=f"suite_ay__{sel_i}")
+                    ay = st.slider("ay (Рј/СЃВІ)", min_value=-20.0, max_value=20.0, value=float(max(-20.0, min(20.0, ay))), step=0.1, key=f"suite_ay__{sel_i}")
                 with c5:
-                    speed = _num(row.get("vx0_м_с"), 0.0)
-                    speed = st.slider("скорость (м/с)", min_value=0.0, max_value=40.0, value=float(max(0.0, min(40.0, speed))), step=0.5, key=f"suite_speed__{sel_i}")
+                    speed = _num(row.get("vx0_Рј_СЃ"), 0.0)
+                    speed = st.slider("СЃРєРѕСЂРѕСЃС‚СЊ (Рј/СЃ)", min_value=0.0, max_value=40.0, value=float(max(0.0, min(40.0, speed))), step=0.5, key=f"suite_speed__{sel_i}")
 
                 c6, c7, c8 = st.columns(3, gap="small")
                 with c6:
                     A = _num(row.get("A"), 0.0)
-                    A = st.slider("A (м)", min_value=0.0, max_value=0.3, value=float(max(0.0, min(0.3, A))), step=0.001, key=f"suite_A__{sel_i}")
+                    A = st.slider("A (Рј)", min_value=0.0, max_value=0.3, value=float(max(0.0, min(0.3, A))), step=0.001, key=f"suite_A__{sel_i}")
                 with c7:
                     f = _num(row.get("f"), 0.0)
-                    f = st.slider("f (Гц)", min_value=0.0, max_value=25.0, value=float(max(0.0, min(25.0, f))), step=0.1, key=f"suite_f__{sel_i}")
+                    f = st.slider("f (Р“С†)", min_value=0.0, max_value=25.0, value=float(max(0.0, min(25.0, f))), step=0.1, key=f"suite_f__{sel_i}")
                 with c8:
-                    angle = _num(row.get("угол_град"), 0.0)
-                    angle = st.slider("угол (град)", min_value=-45.0, max_value=45.0, value=float(max(-45.0, min(45.0, angle))), step=0.5, key=f"suite_angle__{sel_i}")
+                    angle = _num(row.get("СѓРіРѕР»_РіСЂР°Рґ"), 0.0)
+                    angle = st.slider("СѓРіРѕР» (РіСЂР°Рґ)", min_value=-45.0, max_value=45.0, value=float(max(-45.0, min(45.0, angle))), step=0.5, key=f"suite_angle__{sel_i}")
 
-                with st.expander("Порог/уставки (targets) и расширенные параметры", expanded=True):
+                with st.expander("РџРѕСЂРѕРі/СѓСЃС‚Р°РІРєРё (targets) Рё СЂР°СЃС€РёСЂРµРЅРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹", expanded=True):
                     # show only non-empty targets
                     for k in EXPECTED_SUITE_COLS:
                         if not k.startswith("target_"):
@@ -2801,7 +2764,7 @@ if SHOW_TESTS:
                             v0 = 0.0
                         row[k] = st.number_input(k, value=float(v0) if v0 is not None else 0.0, step=None, key=f"suite_tgt__{k}__{sel_i}")
                     # extra non-target fields we didn't expose above
-                    for k in ["t_step", "settle_band_min_deg", "settle_band_ratio", "dur", "t0", "idx", "доля_плавной_стыковки"]:
+                    for k in ["t_step", "settle_band_min_deg", "settle_band_ratio", "dur", "t0", "idx", "РґРѕР»СЏ_РїР»Р°РІРЅРѕР№_СЃС‚С‹РєРѕРІРєРё"]:
                         if k not in row:
                             continue
                         v0 = row.get(k, np.nan)
@@ -2809,18 +2772,18 @@ if SHOW_TESTS:
                             v0 = 0.0
                         row[k] = st.number_input(k, value=float(v0) if v0 is not None else 0.0, step=None, key=f"suite_extra__{k}__{sel_i}")
 
-                if st.button("✅ Применить", key=f"suite_apply__{sel_i}"):
+                if st.button("вњ… РџСЂРёРјРµРЅРёС‚СЊ", key=f"suite_apply__{sel_i}"):
                     # write back
                     df2 = st.session_state["df_suite_edit"].copy()
-                    df2.loc[sel_i, "включен"] = bool(enabled)
-                    df2.loc[sel_i, "имя"] = str(name)
-                    df2.loc[sel_i, "тип"] = str(typ)
+                    df2.loc[sel_i, "РІРєР»СЋС‡РµРЅ"] = bool(enabled)
+                    df2.loc[sel_i, "РёРјСЏ"] = str(name)
+                    df2.loc[sel_i, "С‚РёРї"] = str(typ)
                     df2.loc[sel_i, "dt"] = float(dt)
                     df2.loc[sel_i, "t_end"] = float(t_end)
                     # common params
                     for k, v in {
-                        "ax": ax, "ay": ay, "vx0_м_с": speed,
-                        "A": A, "f": f, "угол_град": angle,
+                        "ax": ax, "ay": ay, "vx0_Рј_СЃ": speed,
+                        "A": A, "f": f, "СѓРіРѕР»_РіСЂР°Рґ": angle,
                     }.items():
                         if k in df2.columns:
                             df2.loc[sel_i, k] = float(v)
@@ -2832,7 +2795,7 @@ if SHOW_TESTS:
                                 df2.loc[sel_i, k] = float(row.get(k, 0.0))
                             except Exception:
                                 pass
-                    for k in ["t_step", "settle_band_min_deg", "settle_band_ratio", "dur", "t0", "idx", "доля_плавной_стыковки"]:
+                    for k in ["t_step", "settle_band_min_deg", "settle_band_ratio", "dur", "t0", "idx", "РґРѕР»СЏ_РїР»Р°РІРЅРѕР№_СЃС‚С‹РєРѕРІРєРё"]:
                         if k in df2.columns:
                             try:
                                 df2.loc[sel_i, k] = float(row.get(k, 0.0))
@@ -2840,7 +2803,7 @@ if SHOW_TESTS:
                                 pass
 
                     st.session_state["df_suite_edit"] = df2
-                    st.success("Сохранено.")
+                    st.success("РЎРѕС…СЂР°РЅРµРЅРѕ.")
                     st.rerun()
 
 # Always define df_suite_edit for downstream logic
@@ -2856,77 +2819,77 @@ try:
         st.session_state["df_suite_edit"] = df_suite_edit
 except Exception:
     pass
-# валидируем и собираем suite_override (list[dict])
+# РІР°Р»РёРґРёСЂСѓРµРј Рё СЃРѕР±РёСЂР°РµРј suite_override (list[dict])
 suite_errors = []
-SUITE_REQUIRED = ["имя", "тип", "dt", "t_end"]
+SUITE_REQUIRED = ["РёРјСЏ", "С‚РёРї", "dt", "t_end"]
 
 suite_override: List[Dict[str, Any]] = []
 for i, row in df_suite_edit.iterrows():
     rec = {k: (None if (isinstance(v, float) and (pd.isna(v))) else v) for k, v in row.to_dict().items()}
-    # пропускаем полностью пустые строки
+    # РїСЂРѕРїСѓСЃРєР°РµРј РїРѕР»РЅРѕСЃС‚СЊСЋ РїСѓСЃС‚С‹Рµ СЃС‚СЂРѕРєРё
     if all((rec.get(k) in [None, "", False] for k in rec.keys())):
         continue
 
-    enabled = bool(rec.get("включен", True))
-    name = str(rec.get("имя", "")).strip()
-    typ = str(rec.get("тип", "")).strip()
+    enabled = bool(rec.get("РІРєР»СЋС‡РµРЅ", True))
+    name = str(rec.get("РёРјСЏ", "")).strip()
+    typ = str(rec.get("С‚РёРї", "")).strip()
 
     if enabled:
         if not name:
-            suite_errors.append(f"Строка {i+1}: пустое имя теста")
+            suite_errors.append(f"РЎС‚СЂРѕРєР° {i+1}: РїСѓСЃС‚РѕРµ РёРјСЏ С‚РµСЃС‚Р°")
         if typ not in ALLOWED_TEST_TYPES:
-            suite_errors.append(f"Тест '{name or i+1}': неизвестный тип '{typ}'")
+            suite_errors.append(f"РўРµСЃС‚ '{name or i+1}': РЅРµРёР·РІРµСЃС‚РЅС‹Р№ С‚РёРї '{typ}'")
         try:
             dt_i = float(rec.get("dt"))
             if dt_i <= 0:
-                suite_errors.append(f"Тест '{name}': dt должен быть > 0")
+                suite_errors.append(f"РўРµСЃС‚ '{name}': dt РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ > 0")
         except Exception:
-            suite_errors.append(f"Тест '{name}': dt не задан")
+            suite_errors.append(f"РўРµСЃС‚ '{name}': dt РЅРµ Р·Р°РґР°РЅ")
         try:
             t_end_i = float(rec.get("t_end"))
             if t_end_i <= 0:
-                suite_errors.append(f"Тест '{name}': t_end должен быть > 0")
+                suite_errors.append(f"РўРµСЃС‚ '{name}': t_end РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ > 0")
         except Exception:
-            suite_errors.append(f"Тест '{name}': t_end не задан")
+            suite_errors.append(f"РўРµСЃС‚ '{name}': t_end РЅРµ Р·Р°РґР°РЅ")
 
-        # физика: доля отрыва 0..1
-        if rec.get("target_макс_доля_отрыва") is not None:
+        # С„РёР·РёРєР°: РґРѕР»СЏ РѕС‚СЂС‹РІР° 0..1
+        if rec.get("target_РјР°РєСЃ_РґРѕР»СЏ_РѕС‚СЂС‹РІР°") is not None:
             try:
-                frac = float(rec["target_макс_доля_отрыва"])
+                frac = float(rec["target_РјР°РєСЃ_РґРѕР»СЏ_РѕС‚СЂС‹РІР°"])
                 if not (0.0 <= frac <= 1.0):
-                    suite_errors.append(f"Тест '{name}': target_макс_доля_отрыва должна быть 0..1")
+                    suite_errors.append(f"РўРµСЃС‚ '{name}': target_РјР°РєСЃ_РґРѕР»СЏ_РѕС‚СЂС‹РІР° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ 0..1")
             except Exception:
-                suite_errors.append(f"Тест '{name}': target_макс_доля_отрыва некорректна")
+                suite_errors.append(f"РўРµСЃС‚ '{name}': target_РјР°РєСЃ_РґРѕР»СЏ_РѕС‚СЂС‹РІР° РЅРµРєРѕСЂСЂРµРєС‚РЅР°")
 
     suite_override.append(rec)
 
 if suite_errors and (SHOW_TESTS or SHOW_RUN):
-    st.error("В тест‑наборе есть ошибки (исправьте перед запуском):\n- " + "\n- ".join(suite_errors))
+    st.error("Р’ С‚РµСЃС‚вЂ‘РЅР°Р±РѕСЂРµ РµСЃС‚СЊ РѕС€РёР±РєРё (РёСЃРїСЂР°РІСЊС‚Рµ РїРµСЂРµРґ Р·Р°РїСѓСЃРєРѕРј):\n- " + "\n- ".join(suite_errors))
 
 
 # -------------------------------
-# Одиночные тесты
+# РћРґРёРЅРѕС‡РЅС‹Рµ С‚РµСЃС‚С‹
 # -------------------------------
 if SHOW_RUN:
-    # Настройки вывода/оптимизации (вынесены сюда, чтобы не перегружать сайдбар)
-    st.subheader("Прогон: настройки")
+    # РќР°СЃС‚СЂРѕР№РєРё РІС‹РІРѕРґР°/РѕРїС‚РёРјРёР·Р°С†РёРё (РІС‹РЅРµСЃРµРЅС‹ СЃСЋРґР°, С‡С‚РѕР±С‹ РЅРµ РїРµСЂРµРіСЂСѓР¶Р°С‚СЊ СЃР°Р№РґР±Р°СЂ)
+    st.subheader("РџСЂРѕРіРѕРЅ: РЅР°СЃС‚СЂРѕР№РєРё")
     cS1, cS2 = st.columns([1.1, 1.0], gap="large")
     with cS1:
-        out_prefix = st.text_input("Префикс результата", value=str(st.session_state.get("out_prefix", out_prefix)), key="out_prefix")
-        auto_refresh = st.checkbox("Авто‑обновление результатов", value=bool(st.session_state.get("opt_auto_refresh", auto_refresh)), key="opt_auto_refresh")
+        out_prefix = st.text_input("РџСЂРµС„РёРєСЃ СЂРµР·СѓР»СЊС‚Р°С‚Р°", value=str(st.session_state.get("out_prefix", out_prefix)), key="out_prefix")
+        auto_refresh = st.checkbox("РђРІС‚РѕвЂ‘РѕР±РЅРѕРІР»РµРЅРёРµ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ", value=bool(st.session_state.get("opt_auto_refresh", auto_refresh)), key="opt_auto_refresh")
     with cS2:
-        minutes = st.slider("Время оптимизации (мин)", min_value=0.2, max_value=120.0, value=float(st.session_state.get("opt_minutes", minutes)), step=0.2, key="opt_minutes")
+        minutes = st.slider("Р’СЂРµРјСЏ РѕРїС‚РёРјРёР·Р°С†РёРё (РјРёРЅ)", min_value=0.2, max_value=120.0, value=float(st.session_state.get("opt_minutes", minutes)), step=0.2, key="opt_minutes")
         jobs_max = int(max(1, min(32, (os.cpu_count() or 4))))
-        jobs = st.slider("Параллельные jobs", min_value=1, max_value=jobs_max, value=int(st.session_state.get("opt_jobs", jobs)), step=1, key="opt_jobs")
+        jobs = st.slider("РџР°СЂР°Р»Р»РµР»СЊРЅС‹Рµ jobs", min_value=1, max_value=jobs_max, value=int(st.session_state.get("opt_jobs", jobs)), step=1, key="opt_jobs")
 
-    with st.expander("Расширенные настройки оптимизации", expanded=True):
+    with st.expander("Р Р°СЃС€РёСЂРµРЅРЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё РѕРїС‚РёРјРёР·Р°С†РёРё", expanded=True):
         seed_candidates = st.number_input("seed_candidates", min_value=1, max_value=9999, value=int(st.session_state.get("opt_seed_candidates", seed_candidates)), step=1, key="opt_seed_candidates")
         seed_conditions = st.number_input("seed_conditions", min_value=1, max_value=9999, value=int(st.session_state.get("opt_seed_conditions", seed_conditions)), step=1, key="opt_seed_conditions")
         flush_every = st.number_input("flush_every", min_value=1, max_value=9999, value=int(st.session_state.get("opt_flush_every", flush_every)), step=1, key="opt_flush_every")
         progress_every_sec = st.number_input("progress_every_sec", min_value=0.1, max_value=60.0, value=float(st.session_state.get("opt_progress_every_sec", progress_every_sec)), step=0.1, key="opt_progress_every_sec")
         refresh_sec = st.number_input("refresh_sec", min_value=0.2, max_value=10.0, value=float(st.session_state.get("opt_refresh_sec", refresh_sec)), step=0.1, key="opt_refresh_sec")
 
-    # сохраняем настройки обратно в session_state (единый источник правды)
+    # СЃРѕС…СЂР°РЅСЏРµРј РЅР°СЃС‚СЂРѕР№РєРё РѕР±СЂР°С‚РЅРѕ РІ session_state (РµРґРёРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РїСЂР°РІРґС‹)
     st.session_state["out_prefix"] = str(out_prefix)
     st.session_state["opt_settings"] = {
         "minutes": float(minutes),
@@ -2939,14 +2902,14 @@ if SHOW_RUN:
         "refresh_sec": float(refresh_sec),
     }
 
-    st.subheader("Быстрый прогон тестов (baseline)")
-    st.caption("Проверка адекватности модели на текущих параметрах.")
+    st.subheader("Р‘С‹СЃС‚СЂС‹Р№ РїСЂРѕРіРѕРЅ С‚РµСЃС‚РѕРІ (baseline)")
+    st.caption("РџСЂРѕРІРµСЂРєР° Р°РґРµРєРІР°С‚РЅРѕСЃС‚Рё РјРѕРґРµР»Рё РЅР° С‚РµРєСѓС‰РёС… РїР°СЂР°РјРµС‚СЂР°С….")
 
     tests_cfg = {"suite": suite_override}
     tests = worker_mod.build_test_suite(tests_cfg)
 
     # --- persistent baseline cache (auto-load after refresh / new session) ---
-    # Ключ кэша зависит от base_override + suite (с учетом dt/t_end/targets) + model file.
+    # РљР»СЋС‡ РєСЌС€Р° Р·Р°РІРёСЃРёС‚ РѕС‚ base_override + suite (СЃ СѓС‡РµС‚РѕРј dt/t_end/targets) + model file.
     try:
         _tests_map_preview: Dict[str, Any] = {}
         for _nm, _tst, _dt, _tend, _targets in tests:
@@ -2967,16 +2930,16 @@ if SHOW_RUN:
                 st.session_state.baseline_df = _cached["baseline_df"]
                 st.session_state.baseline_tests_map = _cached["tests_map"]
                 st.session_state.baseline_param_hash = _base_hash_preview
-                # детальные прогоны не грузим целиком — будут подхвачены по запросу
+                # РґРµС‚Р°Р»СЊРЅС‹Рµ РїСЂРѕРіРѕРЅС‹ РЅРµ РіСЂСѓР·РёРј С†РµР»РёРєРѕРј вЂ” Р±СѓРґСѓС‚ РїРѕРґС…РІР°С‡РµРЅС‹ РїРѕ Р·Р°РїСЂРѕСЃСѓ
                 log_event("baseline_loaded_cache", cache_dir=str(_cache_dir_preview))
-                st.info(f"Baseline загружен из кэша: {_cache_dir_preview.name}")
+                st.info(f"Baseline Р·Р°РіСЂСѓР¶РµРЅ РёР· РєСЌС€Р°: {_cache_dir_preview.name}")
     except Exception:
         pass
 
     test_names = [x[0] for x in tests]
-    pick = st.selectbox("Тест", options=["(все)"] + test_names, index=0)
+    pick = st.selectbox("РўРµСЃС‚", options=["(РІСЃРµ)"] + test_names, index=0)
 
-    if st.button("Запустить baseline"):
+    if st.button("Р—Р°РїСѓСЃС‚РёС‚СЊ baseline"):
         t0_baseline = time.perf_counter()
         log_event(
             "baseline_start",
@@ -2987,37 +2950,37 @@ if SHOW_RUN:
         )
         res_rows = []
         err_cnt = 0
-        # сохраняем карту тестов (понадобится для детального прогона)
+        # СЃРѕС…СЂР°РЅСЏРµРј РєР°СЂС‚Сѓ С‚РµСЃС‚РѕРІ (РїРѕРЅР°РґРѕР±РёС‚СЃСЏ РґР»СЏ РґРµС‚Р°Р»СЊРЅРѕРіРѕ РїСЂРѕРіРѕРЅР°)
         st.session_state.baseline_tests_map = {
             name: {"test": dict(test), "dt": float(dt_i), "t_end": float(t_end_i), "targets": dict(targets)}
             for (name, test, dt_i, t_end_i, targets) in tests
         }
         st.session_state.baseline_param_hash = stable_obj_hash(base_override)
-        st.session_state.baseline_full_cache = {}  # сброс детальных прогонов (параметры могли измениться)
-        with st.spinner("Считаю..."):
+        st.session_state.baseline_full_cache = {}  # СЃР±СЂРѕСЃ РґРµС‚Р°Р»СЊРЅС‹С… РїСЂРѕРіРѕРЅРѕРІ (РїР°СЂР°РјРµС‚СЂС‹ РјРѕРіР»Рё РёР·РјРµРЅРёС‚СЊСЃСЏ)
+        with st.spinner("РЎС‡РёС‚Р°СЋ..."):
             for name, test, dt_i, t_end_i, targets in tests:
-                if pick != "(все)" and name != pick:
+                if pick != "(РІСЃРµ)" and name != pick:
                     continue
                 try:
                     m = worker_mod.eval_candidate_once(model_mod, base_override, test, dt=dt_i, t_end=t_end_i)
-                    m["тест"] = name
-                    m["описание"] = test.get("описание", "")
+                    m["С‚РµСЃС‚"] = name
+                    m["РѕРїРёСЃР°РЅРёРµ"] = test.get("РѕРїРёСЃР°РЅРёРµ", "")
                     pen_targets = float(worker_mod.candidate_penalty(m, targets))
                     try:
-                        pen_verif = float(m.get("верификация_штраф", 0.0))
+                        pen_verif = float(m.get("РІРµСЂРёС„РёРєР°С†РёСЏ_С€С‚СЂР°С„", 0.0))
                     except Exception:
                         pen_verif = 0.0
 
-                    m["штраф_цели"] = float(pen_targets)
-                    m["штраф_верификация"] = float(pen_verif)
-                    m["штраф"] = float(pen_targets + pen_verif)
+                    m["С€С‚СЂР°С„_С†РµР»Рё"] = float(pen_targets)
+                    m["С€С‚СЂР°С„_РІРµСЂРёС„РёРєР°С†РёСЏ"] = float(pen_verif)
+                    m["С€С‚СЂР°С„"] = float(pen_targets + pen_verif)
 
                     try:
-                        m["pass_верификация"] = int(int(m.get("верификация_ok", 1)) == 1)
+                        m["pass_РІРµСЂРёС„РёРєР°С†РёСЏ"] = int(int(m.get("РІРµСЂРёС„РёРєР°С†РёСЏ_ok", 1)) == 1)
                     except Exception:
-                        m["pass_верификация"] = 0
-                    m["pass_цели"] = int(float(pen_targets) <= 0.0)
-                    m["pass"] = int((m["pass_верификация"] == 1) and (m["pass_цели"] == 1))
+                        m["pass_РІРµСЂРёС„РёРєР°С†РёСЏ"] = 0
+                    m["pass_С†РµР»Рё"] = int(float(pen_targets) <= 0.0)
+                    m["pass"] = int((m["pass_РІРµСЂРёС„РёРєР°С†РёСЏ"] == 1) and (m["pass_С†РµР»Рё"] == 1))
                     m.update(collect_packaging_surface_metrics(m, targets=targets, params=base_override))
                     res_rows.append(m)
                 except Exception as e:
@@ -3030,21 +2993,21 @@ if SHOW_RUN:
                         proc=_proc_metrics(),
                     )
                     err_row = {
-                        "тест": name,
-                        "ошибка": str(e),
-                        "штраф": 1e9,
-                        "штраф_цели": 1e9,
-                        "штраф_верификация": 0.0,
+                        "С‚РµСЃС‚": name,
+                        "РѕС€РёР±РєР°": str(e),
+                        "С€С‚СЂР°С„": 1e9,
+                        "С€С‚СЂР°С„_С†РµР»Рё": 1e9,
+                        "С€С‚СЂР°С„_РІРµСЂРёС„РёРєР°С†РёСЏ": 0.0,
                         "pass": 0,
-                        "pass_верификация": 0,
-                        "pass_цели": 0,
+                        "pass_РІРµСЂРёС„РёРєР°С†РёСЏ": 0,
+                        "pass_С†РµР»Рё": 0,
                     }
                     err_row.update(packaging_error_surface_metrics())
                     res_rows.append(err_row)
         df_res = pd.DataFrame(res_rows)
         st.session_state.baseline_df = df_res
         safe_dataframe(df_res, height=360)
-        st.success(f"Готово. Ошибок: {err_cnt}")
+        st.success(f"Р“РѕС‚РѕРІРѕ. РћС€РёР±РѕРє: {err_cnt}")
 
         log_event(
             "baseline_end",
@@ -3054,7 +3017,7 @@ if SHOW_RUN:
             proc=_proc_metrics(),
         )
 
-        # отметка: baseline обновился (для авто‑детального триггера)
+        # РѕС‚РјРµС‚РєР°: baseline РѕР±РЅРѕРІРёР»СЃСЏ (РґР»СЏ Р°РІС‚РѕвЂ‘РґРµС‚Р°Р»СЊРЅРѕРіРѕ С‚СЂРёРіРіРµСЂР°)
         st.session_state["baseline_updated_ts"] = time.time()
         # One-shot flag: the Detail section may start auto-detail exactly once
         # after a fresh baseline calculation.
@@ -3081,33 +3044,33 @@ if SHOW_RUN:
         except Exception:
             pass
 
-        # быстрый sanity-check: вакуум/давления
-        if "pR3_max_бар" in df_res.columns:
-            st.write("Макс давление Р3 (бар abs):", float(df_res["pR3_max_бар"].max()))
+        # Р±С‹СЃС‚СЂС‹Р№ sanity-check: РІР°РєСѓСѓРј/РґР°РІР»РµРЅРёСЏ
+        if "pR3_max_Р±Р°СЂ" in df_res.columns:
+            st.write("РњР°РєСЃ РґР°РІР»РµРЅРёРµ Р 3 (Р±Р°СЂ abs):", float(df_res["pR3_max_Р±Р°СЂ"].max()))
 
 
 # -------------------------------
 if SHOW_RESULTS or SHOW_TOOLS:
-    # Детальные графики + анимация (baseline)
+    # Р”РµС‚Р°Р»СЊРЅС‹Рµ РіСЂР°С„РёРєРё + Р°РЅРёРјР°С†РёСЏ (baseline)
     # -------------------------------
     st.divider()
-    st.header("Baseline: результаты и диагностика")
+    st.header("Baseline: СЂРµР·СѓР»СЊС‚Р°С‚С‹ Рё РґРёР°РіРЅРѕСЃС‚РёРєР°")
     st.caption(
-        "Сначала запустите baseline. Затем выберите один тест и получите полный лог (record_full=True): "
-        "графики P/Q/крен/тангаж/силы и MVP-анимацию потоков."
+        "РЎРЅР°С‡Р°Р»Р° Р·Р°РїСѓСЃС‚РёС‚Рµ baseline. Р—Р°С‚РµРј РІС‹Р±РµСЂРёС‚Рµ РѕРґРёРЅ С‚РµСЃС‚ Рё РїРѕР»СѓС‡РёС‚Рµ РїРѕР»РЅС‹Р№ Р»РѕРі (record_full=True): "
+        "РіСЂР°С„РёРєРё P/Q/РєСЂРµРЅ/С‚Р°РЅРіР°Р¶/СЃРёР»С‹ Рё MVP-Р°РЅРёРјР°С†РёСЋ РїРѕС‚РѕРєРѕРІ."
     )
 
     cur_hash = stable_obj_hash(base_override)
     if st.session_state.baseline_df is None:
-        st.info("Нет baseline-таблицы. Нажмите ‘Запустить baseline’ выше.")
+        st.info("РќРµС‚ baseline-С‚Р°Р±Р»РёС†С‹. РќР°Р¶РјРёС‚Рµ вЂР—Р°РїСѓСЃС‚РёС‚СЊ baselineвЂ™ РІС‹С€Рµ.")
     elif st.session_state.baseline_param_hash and st.session_state.baseline_param_hash != cur_hash:
         st.warning(
-            "Параметры изменились после baseline. Чтобы графики/анимация соответствовали текущим параметрам, "
-            "перезапустите baseline."
+            "РџР°СЂР°РјРµС‚СЂС‹ РёР·РјРµРЅРёР»РёСЃСЊ РїРѕСЃР»Рµ baseline. Р§С‚РѕР±С‹ РіСЂР°С„РёРєРё/Р°РЅРёРјР°С†РёСЏ СЃРѕРѕС‚РІРµС‚СЃС‚РІРѕРІР°Р»Рё С‚РµРєСѓС‰РёРј РїР°СЂР°РјРµС‚СЂР°Рј, "
+            "РїРµСЂРµР·Р°РїСѓСЃС‚РёС‚Рµ baseline."
         )
     else:
         tests_map = st.session_state.baseline_tests_map or {}
-        # --- live suite -> tests_map (чтобы изменения тестов применялись сразу, без обязательного baseline) ---
+        # --- live suite -> tests_map (С‡С‚РѕР±С‹ РёР·РјРµРЅРµРЅРёСЏ С‚РµСЃС‚РѕРІ РїСЂРёРјРµРЅСЏР»РёСЃСЊ СЃСЂР°Р·Сѓ, Р±РµР· РѕР±СЏР·Р°С‚РµР»СЊРЅРѕРіРѕ baseline) ---
         try:
             live_suite = suite_override if isinstance(locals().get('suite_override', None), list) else None
             if live_suite:
@@ -3132,40 +3095,40 @@ if SHOW_RESULTS or SHOW_TOOLS:
         
         avail = [t for t in tests_map.keys()]
         if not avail:
-            st.info("В baseline нет доступных тестов (проверьте тест‑набор).")
+            st.info("Р’ baseline РЅРµС‚ РґРѕСЃС‚СѓРїРЅС‹С… С‚РµСЃС‚РѕРІ (РїСЂРѕРІРµСЂСЊС‚Рµ С‚РµСЃС‚вЂ‘РЅР°Р±РѕСЂ).")
         else:
             colG1, colG2, colG3 = st.columns([1.2, 1.0, 1.0], gap="large")
             with colG1:
-                test_pick = st.selectbox("Тест для детального прогона", options=avail, index=0, key="detail_test_pick")
+                test_pick = st.selectbox("РўРµСЃС‚ РґР»СЏ РґРµС‚Р°Р»СЊРЅРѕРіРѕ РїСЂРѕРіРѕРЅР°", options=avail, index=0, key="detail_test_pick")
             with colG2:
-                max_points = st.number_input("Макс точек (downsample)", min_value=200, max_value=5000, value=1200, step=100, key="detail_max_points")
+                max_points = st.number_input("РњР°РєСЃ С‚РѕС‡РµРє (downsample)", min_value=200, max_value=5000, value=1200, step=100, key="detail_max_points")
             with colG3:
-                want_full = st.checkbox("Использовать record_full (потоки/состояния)", value=True, key="detail_want_full")
+                want_full = st.checkbox("РСЃРїРѕР»СЊР·РѕРІР°С‚СЊ record_full (РїРѕС‚РѕРєРё/СЃРѕСЃС‚РѕСЏРЅРёСЏ)", value=True, key="detail_want_full")
                 auto_detail_on_select = st.checkbox(
-                    "Авто‑расчёт при выборе теста",
+                    "РђРІС‚РѕвЂ‘СЂР°СЃС‡С‘С‚ РїСЂРё РІС‹Р±РѕСЂРµ С‚РµСЃС‚Р°",
                     value=True,
                     key="auto_detail_on_select",
-                    help="Если включено и кэш пуст, будет считаться детальный прогон (может грузить CPU).",
+                    help="Р•СЃР»Рё РІРєР»СЋС‡РµРЅРѕ Рё РєСЌС€ РїСѓСЃС‚, Р±СѓРґРµС‚ СЃС‡РёС‚Р°С‚СЊСЃСЏ РґРµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ (РјРѕР¶РµС‚ РіСЂСѓР·РёС‚СЊ CPU).",
                 )
                 auto_export_npz = st.checkbox(
-                    "Авто‑экспорт NPZ (osc_dir)",
+                    "РђРІС‚РѕвЂ‘СЌРєСЃРїРѕСЂС‚ NPZ (osc_dir)",
                     value=True,
                     key="auto_export_npz",
-                    help="Экспортирует Txx_osc.npz в папку osc_dir (см. Калибровка). Нужно для oneclick/autopilot.",
+                    help="Р­РєСЃРїРѕСЂС‚РёСЂСѓРµС‚ Txx_osc.npz РІ РїР°РїРєСѓ osc_dir (СЃРј. РљР°Р»РёР±СЂРѕРІРєР°). РќСѓР¶РЅРѕ РґР»СЏ oneclick/autopilot.",
                 )
 
                 auto_export_anim_latest = st.checkbox(
-                    "Авто‑экспорт anim_latest (Desktop Animator)",
+                    "РђРІС‚РѕвЂ‘СЌРєСЃРїРѕСЂС‚ anim_latest (Desktop Animator)",
                     value=True,
                     key="auto_export_anim_latest",
                     help=(
-                        "Пишет workspace/exports/anim_latest.npz + anim_latest.json. "
-                        "Desktop Animator в режиме --follow автоматически перезагрузит анимацию."
+                        "РџРёС€РµС‚ workspace/exports/anim_latest.npz + anim_latest.json. "
+                        "Desktop Animator РІ СЂРµР¶РёРјРµ --follow Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё РїРµСЂРµР·Р°РіСЂСѓР·РёС‚ Р°РЅРёРјР°С†РёСЋ."
                     ),
                 )
 
             # Desktop Animator integration (minimal manual steps)
-            with st.expander("Desktop Animator (Windows) — информативная анимация", expanded=True):
+            with st.expander("Desktop Animator (Windows) вЂ” РёРЅС„РѕСЂРјР°С‚РёРІРЅР°СЏ Р°РЅРёРјР°С†РёСЏ", expanded=True):
                 # Recompute current detail cache key here (this expander appears before the main cache_key assignment).
                 _info_pick = tests_map.get(test_pick, {}) if isinstance(tests_map, dict) else {}
                 _detail_dt = float(_info_pick.get("dt", 0.01) or 0.01)
@@ -3180,13 +3143,13 @@ if SHOW_RESULTS or SHOW_TOOLS:
                 _st = []
                 try:
                     if _npz_p.exists():
-                        _st.append(f"NPZ: ✅ {_npz_p.name} ({_npz_p.stat().st_size/1024:.1f} KB)")
+                        _st.append(f"NPZ: вњ… {_npz_p.name} ({_npz_p.stat().st_size/1024:.1f} KB)")
                     else:
-                        _st.append(f"NPZ: ❌ {_npz_p.name} (нет)")
+                        _st.append(f"NPZ: вќЊ {_npz_p.name} (РЅРµС‚)")
                     if _ptr_p.exists():
-                        _st.append(f"PTR: ✅ {_ptr_p.name}")
+                        _st.append(f"PTR: вњ… {_ptr_p.name}")
                     else:
-                        _st.append(f"PTR: ❌ {_ptr_p.name} (нет)")
+                        _st.append(f"PTR: вќЊ {_ptr_p.name} (РЅРµС‚)")
                 except Exception:
                     pass
                 if _st:
@@ -3194,30 +3157,30 @@ if SHOW_RESULTS or SHOW_TOOLS:
 
                 colA1, colA2, colA3 = st.columns([1.0, 1.0, 1.2], gap="medium")
                 with colA1:
-                    if st.button("Запустить Animator (--follow)", key="launch_desktop_animator"):
+                    if st.button("Р—Р°РїСѓСЃС‚РёС‚СЊ Animator (--follow)", key="launch_desktop_animator"):
                         try:
                             cmd = [sys.executable, "-m", "pneumo_solver_ui.desktop_animator.main", "--follow", "--theme", "dark"]
                             # Streamlit runs from project root typically; force cwd near UI package to resolve imports/assets.
                             start_worker(cmd, cwd=HERE)
-                            st.success("Desktop Animator запущен.")
+                            st.success("Desktop Animator Р·Р°РїСѓС‰РµРЅ.")
                         except Exception as e:
-                            st.error(f"Не удалось запустить Desktop Animator: {e}")
+                            st.error(f"РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РїСѓСЃС‚РёС‚СЊ Desktop Animator: {e}")
                 with colA2:
-                    if st.button("Открыть папку exports", key="open_exports_dir"):
+                    if st.button("РћС‚РєСЂС‹С‚СЊ РїР°РїРєСѓ exports", key="open_exports_dir"):
                         try:
                             if os.name == "nt":
                                 os.startfile(str(WORKSPACE_EXPORTS_DIR))  # type: ignore[attr-defined]
                             else:
-                                st.warning("Кнопка открытия папки работает только на Windows.")
+                                st.warning("РљРЅРѕРїРєР° РѕС‚РєСЂС‹С‚РёСЏ РїР°РїРєРё СЂР°Р±РѕС‚Р°РµС‚ С‚РѕР»СЊРєРѕ РЅР° Windows.")
                         except Exception as e:
-                            st.error(f"Не удалось открыть папку: {e}")
+                            st.error(f"РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ РїР°РїРєСѓ: {e}")
                 with colA3:
                     # Manual export button (useful if auto-export disabled)
-                    if st.button("Экспортировать текущий детальный лог в anim_latest", key="export_anim_latest_now"):
+                    if st.button("Р­РєСЃРїРѕСЂС‚РёСЂРѕРІР°С‚СЊ С‚РµРєСѓС‰РёР№ РґРµС‚Р°Р»СЊРЅС‹Р№ Р»РѕРі РІ anim_latest", key="export_anim_latest_now"):
                         try:
                             det_now = st.session_state.baseline_full_cache.get(_cache_key_now)
                             if not det_now:
-                                st.warning("Сначала выполните детальный расчёт, чтобы появился кэш.")
+                                st.warning("РЎРЅР°С‡Р°Р»Р° РІС‹РїРѕР»РЅРёС‚Рµ РґРµС‚Р°Р»СЊРЅС‹Р№ СЂР°СЃС‡С‘С‚, С‡С‚РѕР±С‹ РїРѕСЏРІРёР»СЃСЏ РєСЌС€.")
                             else:
                                 export_anim_latest_bundle(
                                     det_now.get("df_main"),
@@ -3226,37 +3189,37 @@ if SHOW_RESULTS or SHOW_TOOLS:
                                     df_open=det_now.get("df_open"),
                                     meta=(det_now.get("meta") or {}),
                                 )
-                                st.success("Экспортировано в anim_latest.")
+                                st.success("Р­РєСЃРїРѕСЂС‚РёСЂРѕРІР°РЅРѕ РІ anim_latest.")
                         except Exception as e:
-                            st.error(f"Экспорт не удался: {e}")
+                            st.error(f"Р­РєСЃРїРѕСЂС‚ РЅРµ СѓРґР°Р»СЃСЏ: {e}")
 
                 st.caption(
-                    "Рекомендуемый workflow: откройте Desktop Animator (follow), затем нажмите 'Рассчитать полный лог'. "
-                    "Если включён авто‑экспорт — Desktop Animator обновится автоматически."
+                    "Р РµРєРѕРјРµРЅРґСѓРµРјС‹Р№ workflow: РѕС‚РєСЂРѕР№С‚Рµ Desktop Animator (follow), Р·Р°С‚РµРј РЅР°Р¶РјРёС‚Рµ 'Р Р°СЃСЃС‡РёС‚Р°С‚СЊ РїРѕР»РЅС‹Р№ Р»РѕРі'. "
+                    "Р•СЃР»Рё РІРєР»СЋС‡С‘РЅ Р°РІС‚РѕвЂ‘СЌРєСЃРїРѕСЂС‚ вЂ” Desktop Animator РѕР±РЅРѕРІРёС‚СЃСЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё."
                 )
 
-            # dt/t_end берём из suite для выбранного теста — это часть cache_key и параметров simulate()
+            # dt/t_end Р±РµСЂС‘Рј РёР· suite РґР»СЏ РІС‹Р±СЂР°РЅРЅРѕРіРѕ С‚РµСЃС‚Р° вЂ” СЌС‚Рѕ С‡Р°СЃС‚СЊ cache_key Рё РїР°СЂР°РјРµС‚СЂРѕРІ simulate()
             info_pick = tests_map.get(test_pick, {}) if isinstance(tests_map, dict) else {}
             detail_dt = float(info_pick.get("dt", 0.01) or 0.01)
             detail_t_end = float(info_pick.get("t_end", 1.0) or 1.0)
-            # сохраняем для других страниц/инструментов
+            # СЃРѕС…СЂР°РЅСЏРµРј РґР»СЏ РґСЂСѓРіРёС… СЃС‚СЂР°РЅРёС†/РёРЅСЃС‚СЂСѓРјРµРЅС‚РѕРІ
             st.session_state["detail_dt_pick"] = detail_dt
             st.session_state["detail_t_end_pick"] = detail_t_end
 
-            run_detail = st.button("Рассчитать полный лог и показать", key="run_detail")
+            run_detail = st.button("Р Р°СЃСЃС‡РёС‚Р°С‚СЊ РїРѕР»РЅС‹Р№ Р»РѕРі Рё РїРѕРєР°Р·Р°С‚СЊ", key="run_detail")
 
             colDAll1, colDAll2 = st.columns([1.0, 1.0])
             with colDAll1:
-                run_detail_all = st.button("Рассчитать полный лог ДЛЯ ВСЕХ тестов", key="run_detail_all")
+                run_detail_all = st.button("Р Р°СЃСЃС‡РёС‚Р°С‚СЊ РїРѕР»РЅС‹Р№ Р»РѕРі Р”Р›РЇ Р’РЎР•РҐ С‚РµСЃС‚РѕРІ", key="run_detail_all")
             with colDAll2:
-                export_npz_all = st.button("Экспорт NPZ ДЛЯ ВСЕХ (из кэша)", key="export_npz_all")
+                export_npz_all = st.button("Р­РєСЃРїРѕСЂС‚ NPZ Р”Р›РЇ Р’РЎР•РҐ (РёР· РєСЌС€Р°)", key="export_npz_all")
 
                 cache_key = make_detail_cache_key(cur_hash, test_pick, detail_dt, detail_t_end, max_points, want_full)
 
-            # --- Авто‑детальный прогон: запускать ТОЛЬКО по триггеру
-            # Триггеры:
-            #   1) смена теста (test_pick)
-            #   2) завершение baseline (one-shot флаг baseline_just_ran)
+            # --- РђРІС‚РѕвЂ‘РґРµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ: Р·Р°РїСѓСЃРєР°С‚СЊ РўРћР›Р¬РљРћ РїРѕ С‚СЂРёРіРіРµСЂСѓ
+            # РўСЂРёРіРіРµСЂС‹:
+            #   1) СЃРјРµРЅР° С‚РµСЃС‚Р° (test_pick)
+            #   2) Р·Р°РІРµСЂС€РµРЅРёРµ baseline (one-shot С„Р»Р°Рі baseline_just_ran)
             if "detail_auto_pending" not in st.session_state:
                 st.session_state["detail_auto_pending"] = None
             if "detail_prev_test_pick" not in st.session_state:
@@ -3283,14 +3246,14 @@ if SHOW_RESULTS or SHOW_TOOLS:
             ):
                 log_event("auto_detail_pending_after_baseline", test=test_pick, cache_key=cache_key, force_fresh=True)
 
-            # Массовые действия
-            # - полный лог для всех тестов
-            # - экспорт NPZ для всех тестов
+            # РњР°СЃСЃРѕРІС‹Рµ РґРµР№СЃС‚РІРёСЏ
+            # - РїРѕР»РЅС‹Р№ Р»РѕРі РґР»СЏ РІСЃРµС… С‚РµСЃС‚РѕРІ
+            # - СЌРєСЃРїРѕСЂС‚ NPZ РґР»СЏ РІСЃРµС… С‚РµСЃС‚РѕРІ
             if run_detail_all:
                 if not want_full:
-                    st.warning("Для массового расчёта включи record_full (потоки/состояния) — иначе NPZ будет неполный.")
+                    st.warning("Р”Р»СЏ РјР°СЃСЃРѕРІРѕРіРѕ СЂР°СЃС‡С‘С‚Р° РІРєР»СЋС‡Рё record_full (РїРѕС‚РѕРєРё/СЃРѕСЃС‚РѕСЏРЅРёСЏ) вЂ” РёРЅР°С‡Рµ NPZ Р±СѓРґРµС‚ РЅРµРїРѕР»РЅС‹Р№.")
                 else:
-                    with st.spinner("Считаю полный лог для всех тестов… (может быть долго)"):
+                    with st.spinner("РЎС‡РёС‚Р°СЋ РїРѕР»РЅС‹Р№ Р»РѕРі РґР»СЏ РІСЃРµС… С‚РµСЃС‚РѕРІвЂ¦ (РјРѕР¶РµС‚ Р±С‹С‚СЊ РґРѕР»РіРѕ)"):
                         prog = st.progress(0.0)
                         n_total = max(1, len(avail))
 
@@ -3302,11 +3265,18 @@ if SHOW_RESULTS or SHOW_TOOLS:
                             pass
 
                         for j, tn in enumerate(avail, start=1):
-                            ck = make_detail_cache_key(cur_hash, tn, float(tobj.get("dt", detail_dt)), float(tobj.get("t_end", detail_t_end)), max_points, want_full)
+                            info_j = tests_map.get(tn) or {}
+                            ck = make_detail_cache_key(
+                                cur_hash,
+                                tn,
+                                float(info_j.get("dt", detail_dt) or detail_dt),
+                                float(info_j.get("t_end", detail_t_end) or detail_t_end),
+                                max_points,
+                                want_full,
+                            )
                             if ck in st.session_state.baseline_full_cache:
                                 prog.progress(j / n_total)
                                 continue
-                            info_j = tests_map.get(tn) or {}
                             test_j = info_j.get("test")
                             dt_j = float(info_j.get("dt", 0.01) or 0.01)
                             t_end_j = float(info_j.get("t_end", 1.0) or 1.0)
@@ -3375,18 +3345,18 @@ if SHOW_RESULTS or SHOW_TOOLS:
                                             },
                                         )
                                     except Exception as _e:
-                                        st.warning(f"NPZ экспорт не удался для {tn}: {_e}")
+                                        st.warning(f"NPZ СЌРєСЃРїРѕСЂС‚ РЅРµ СѓРґР°Р»СЃСЏ РґР»СЏ {tn}: {_e}")
                             except Exception as e:
-                                st.error(f"Ошибка в тесте {tn}: {e}")
+                                st.error(f"РћС€РёР±РєР° РІ С‚РµСЃС‚Рµ {tn}: {e}")
                             prog.progress(j / n_total)
                         prog.empty()
                     log_event("detail_all_done", n_tests=len(avail), want_full=bool(want_full), max_points=int(max_points))
 
             if export_npz_all:
                 if not want_full:
-                    st.warning("Экспорт NPZ имеет смысл только при record_full=True (иначе нет p/q/open).")
+                    st.warning("Р­РєСЃРїРѕСЂС‚ NPZ РёРјРµРµС‚ СЃРјС‹СЃР» С‚РѕР»СЊРєРѕ РїСЂРё record_full=True (РёРЅР°С‡Рµ РЅРµС‚ p/q/open).")
                 else:
-                    with st.spinner("Экспортирую NPZ для всех тестов, которые уже посчитаны…"):
+                    with st.spinner("Р­РєСЃРїРѕСЂС‚РёСЂСѓСЋ NPZ РґР»СЏ РІСЃРµС… С‚РµСЃС‚РѕРІ, РєРѕС‚РѕСЂС‹Рµ СѓР¶Рµ РїРѕСЃС‡РёС‚Р°РЅС‹вЂ¦"):
                         prog = st.progress(0.0)
                         n_total = max(1, len(avail))
 
@@ -3397,7 +3367,15 @@ if SHOW_RESULTS or SHOW_TOOLS:
                             pass
 
                         for j, tn in enumerate(avail, start=1):
-                            ck = make_detail_cache_key(cur_hash, tn, float(tobj.get("dt", detail_dt)), float(tobj.get("t_end", detail_t_end)), max_points, want_full)
+                            info_j = tests_map.get(tn) or {}
+                            ck = make_detail_cache_key(
+                                cur_hash,
+                                tn,
+                                float(info_j.get("dt", detail_dt) or detail_dt),
+                                float(info_j.get("t_end", detail_t_end) or detail_t_end),
+                                max_points,
+                                want_full,
+                            )
                             det_j = st.session_state.baseline_full_cache.get(ck)
                             if not det_j:
                                 prog.progress(j / n_total)
@@ -3419,7 +3397,7 @@ if SHOW_RESULTS or SHOW_TOOLS:
                                     },
                                 )
                             except Exception as e:
-                                st.warning(f"NPZ экспорт не удался для {tn}: {e}")
+                                st.warning(f"NPZ СЌРєСЃРїРѕСЂС‚ РЅРµ СѓРґР°Р»СЃСЏ РґР»СЏ {tn}: {e}")
                             prog.progress(j / n_total)
                         prog.empty()
                     log_event("export_npz_all_done", n_tests=len(avail), max_points=int(max_points))
@@ -3427,9 +3405,9 @@ if SHOW_RESULTS or SHOW_TOOLS:
                 st.session_state.baseline_full_cache.pop(cache_key, None)
 
             if test_pick:
-                # --- autorun guard: protects from endless rerun-loops (autorefresh / playhead sync / компоненты) ---
-                # Важно: auto_detail может вызываться много раз из‑за частых rerun'ов. Если кэш по какой‑то причине
-                # не удерживается, получится бесконечный «детальный прогон». Этот guard подавляет повторные автозапуски.
+                # --- autorun guard: protects from endless rerun-loops (autorefresh / playhead sync / РєРѕРјРїРѕРЅРµРЅС‚С‹) ---
+                # Р’Р°Р¶РЅРѕ: auto_detail РјРѕР¶РµС‚ РІС‹Р·С‹РІР°С‚СЊСЃСЏ РјРЅРѕРіРѕ СЂР°Р· РёР·вЂ‘Р·Р° С‡Р°СЃС‚С‹С… rerun'РѕРІ. Р•СЃР»Рё РєСЌС€ РїРѕ РєР°РєРѕР№вЂ‘С‚Рѕ РїСЂРёС‡РёРЅРµ
+                # РЅРµ СѓРґРµСЂР¶РёРІР°РµС‚СЃСЏ, РїРѕР»СѓС‡РёС‚СЃСЏ Р±РµСЃРєРѕРЅРµС‡РЅС‹Р№ В«РґРµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅВ». Р­С‚РѕС‚ guard РїРѕРґР°РІР»СЏРµС‚ РїРѕРІС‚РѕСЂРЅС‹Рµ Р°РІС‚РѕР·Р°РїСѓСЃРєРё.
                 if "detail_guard" not in st.session_state:
                     st.session_state["detail_guard"] = {
                         "last_key": None,
@@ -3444,7 +3422,7 @@ if SHOW_RESULTS or SHOW_TOOLS:
                     _cache_dir = Path(_bcd) if _bcd else None
                     _force_fresh_after_baseline = should_bypass_detail_disk_cache(st.session_state, cache_key=str(cache_key))
                     if _force_fresh_after_baseline:
-                        st.info("После свежего baseline выполняется принудительный пересчёт детального лога: старый detail cache для этого теста игнорируется.")
+                        st.info("РџРѕСЃР»Рµ СЃРІРµР¶РµРіРѕ baseline РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅС‹Р№ РїРµСЂРµСЃС‡С‘С‚ РґРµС‚Р°Р»СЊРЅРѕРіРѕ Р»РѕРіР°: СЃС‚Р°СЂС‹Р№ detail cache РґР»СЏ СЌС‚РѕРіРѕ С‚РµСЃС‚Р° РёРіРЅРѕСЂРёСЂСѓРµС‚СЃСЏ.")
                         log_event("detail_cache_bypassed_after_baseline", test=str(test_pick), cache_key=str(cache_key))
                     if (not _force_fresh_after_baseline) and _cache_dir and _cache_dir.exists() and cache_key not in st.session_state.baseline_full_cache:
                         _det_disk = load_detail_cache(_cache_dir, test_pick, float(detail_dt), float(detail_t_end), int(max_points), bool(want_full))
@@ -3485,7 +3463,7 @@ if SHOW_RESULTS or SHOW_TOOLS:
                                     )
                                 ),
                             )
-                            st.info("Детальный лог для текущего теста загружен из кэша. Для принудительного пересчёта нажмите 'Рассчитать полный лог и показать'.")
+                            st.info("Р”РµС‚Р°Р»СЊРЅС‹Р№ Р»РѕРі РґР»СЏ С‚РµРєСѓС‰РµРіРѕ С‚РµСЃС‚Р° Р·Р°РіСЂСѓР¶РµРЅ РёР· РєСЌС€Р°. Р”Р»СЏ РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕРіРѕ РїРµСЂРµСЃС‡С‘С‚Р° РЅР°Р¶РјРёС‚Рµ 'Р Р°СЃСЃС‡РёС‚Р°С‚СЊ РїРѕР»РЅС‹Р№ Р»РѕРі Рё РїРѕРєР°Р·Р°С‚СЊ'.")
                 except Exception:
                     pass
 
@@ -3496,12 +3474,12 @@ if SHOW_RESULTS or SHOW_TOOLS:
                 if cache_key not in st.session_state.baseline_full_cache and (run_detail or auto_trigger):
                     if auto_trigger and not run_detail:
                         st.session_state["detail_auto_pending"] = None
-                    # --- autorun guard: protects from endless rerun-loops (autorefresh / playhead sync / компоненты) ---
-                    # Если по какой-то причине Streamlit делает частые rerun'ы, auto_detail может стартовать снова и снова.
-                    # Мы:
-                    #  - не запускаем второй расчёт, если такой же уже выполняется
-                    #  - подавляем повторный автозапуск того же cache_key вскоре после завершения (симптом rerun-loop)
-                    #  - всегда сбрасываем флаг in_progress в finally
+                    # --- autorun guard: protects from endless rerun-loops (autorefresh / playhead sync / РєРѕРјРїРѕРЅРµРЅС‚С‹) ---
+                    # Р•СЃР»Рё РїРѕ РєР°РєРѕР№-С‚Рѕ РїСЂРёС‡РёРЅРµ Streamlit РґРµР»Р°РµС‚ С‡Р°СЃС‚С‹Рµ rerun'С‹, auto_detail РјРѕР¶РµС‚ СЃС‚Р°СЂС‚РѕРІР°С‚СЊ СЃРЅРѕРІР° Рё СЃРЅРѕРІР°.
+                    # РњС‹:
+                    #  - РЅРµ Р·Р°РїСѓСЃРєР°РµРј РІС‚РѕСЂРѕР№ СЂР°СЃС‡С‘С‚, РµСЃР»Рё С‚Р°РєРѕР№ Р¶Рµ СѓР¶Рµ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ
+                    #  - РїРѕРґР°РІР»СЏРµРј РїРѕРІС‚РѕСЂРЅС‹Р№ Р°РІС‚РѕР·Р°РїСѓСЃРє С‚РѕРіРѕ Р¶Рµ cache_key РІСЃРєРѕСЂРµ РїРѕСЃР»Рµ Р·Р°РІРµСЂС€РµРЅРёСЏ (СЃРёРјРїС‚РѕРј rerun-loop)
+                    #  - РІСЃРµРіРґР° СЃР±СЂР°СЃС‹РІР°РµРј С„Р»Р°Рі in_progress РІ finally
                     _dg = dict(st.session_state.get("detail_guard") or {})
                     _dg.setdefault("in_progress", False)
                     _dg.setdefault("last_key", None)
@@ -3527,7 +3505,7 @@ if SHOW_RESULTS or SHOW_TOOLS:
                     _start_ts = float(_dg.get("last_start_ts") or 0.0)
                     _age = (_now - _start_ts) if (_start_ts > 0.0) else 0.0
                     if bool(_dg.get("in_progress")) and (_guard_pid != _cur_pid or _start_ts <= 0.0 or _age > 1800.0):
-                        st.warning("⚠️ Обнаружен зависший/устаревший прогон — сбрасываю блокировку повторного запуска.")
+                        st.warning("вљ пёЏ РћР±РЅР°СЂСѓР¶РµРЅ Р·Р°РІРёСЃС€РёР№/СѓСЃС‚Р°СЂРµРІС€РёР№ РїСЂРѕРіРѕРЅ вЂ” СЃР±СЂР°СЃС‹РІР°СЋ Р±Р»РѕРєРёСЂРѕРІРєСѓ РїРѕРІС‚РѕСЂРЅРѕРіРѕ Р·Р°РїСѓСЃРєР°.")
                         _dg["in_progress"] = False
                         _dg["pid"] = _cur_pid
                         _dg["last_start_ts"] = _now
@@ -3546,8 +3524,8 @@ if SHOW_RESULTS or SHOW_TOOLS:
                             guard=_dg,
                         )
                         st.warning(
-                            "⚠️ Обнаружен застрявший флаг 'детальный прогон выполняется'. "
-                            "Сбрасываю флаг и запускаю заново."
+                            "вљ пёЏ РћР±РЅР°СЂСѓР¶РµРЅ Р·Р°СЃС‚СЂСЏРІС€РёР№ С„Р»Р°Рі 'РґРµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ'. "
+                            "РЎР±СЂР°СЃС‹РІР°СЋ С„Р»Р°Рі Рё Р·Р°РїСѓСЃРєР°СЋ Р·Р°РЅРѕРІРѕ."
                         )
                         _dg["in_progress"] = False
                         _dg["pid"] = _cur_pid
@@ -3569,21 +3547,21 @@ if SHOW_RESULTS or SHOW_TOOLS:
                     if _already_running:
                         # Show a placeholder progress bar to avoid the "no progress" confusion.
                         _p0 = float(_dg.get("progress") or 0.0)
-                        st.progress(min(max(_p0, 0.0), 1.0), text="Детальный прогон уже выполняется…")
-                        st.info("Детальный прогон уже выполняется (повторный запуск подавлен).")
+                        st.progress(min(max(_p0, 0.0), 1.0), text="Р”РµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ СѓР¶Рµ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏвЂ¦")
+                        st.info("Р”РµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ СѓР¶Рµ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ (РїРѕРІС‚РѕСЂРЅС‹Р№ Р·Р°РїСѓСЃРє РїРѕРґР°РІР»РµРЅ).")
                         log_event("detail_autorun_already_running", test=test_pick)
 
                     elif (_dg.get('failed_key') == cache_key) and auto_trigger and (not run_detail):
-                        st.warning('Авто‑детальный прогон подавлен: предыдущая попытка для этого набора завершилась ошибкой. Нажмите кнопку **"Рассчитать полный лог и показать"** для повтора.')
+                        st.warning('РђРІС‚РѕвЂ‘РґРµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ РїРѕРґР°РІР»РµРЅ: РїСЂРµРґС‹РґСѓС‰Р°СЏ РїРѕРїС‹С‚РєР° РґР»СЏ СЌС‚РѕРіРѕ РЅР°Р±РѕСЂР° Р·Р°РІРµСЂС€РёР»Р°СЃСЊ РѕС€РёР±РєРѕР№. РќР°Р¶РјРёС‚Рµ РєРЅРѕРїРєСѓ **"Р Р°СЃСЃС‡РёС‚Р°С‚СЊ РїРѕР»РЅС‹Р№ Р»РѕРі Рё РїРѕРєР°Р·Р°С‚СЊ"** РґР»СЏ РїРѕРІС‚РѕСЂР°.')
                         log_event('detail_autorun_suppressed_after_error', key=cache_key, test=test_pick, err=str(_dg.get('failed_err') or ''))
                     elif _same_key_recent and auto_trigger and (not run_detail):
-                        # Это почти всегда означает loop из rerun'ов (например, fallback Play, server-sync playhead, автоперерисовка).
+                        # Р­С‚Рѕ РїРѕС‡С‚Рё РІСЃРµРіРґР° РѕР·РЅР°С‡Р°РµС‚ loop РёР· rerun'РѕРІ (РЅР°РїСЂРёРјРµСЂ, fallback Play, server-sync playhead, Р°РІС‚РѕРїРµСЂРµСЂРёСЃРѕРІРєР°).
                         _dg["suppressed"] = int(_dg.get("suppressed") or 0) + 1
                         st.session_state["detail_guard"] = _dg
                         st.warning(
-                            "Подавлен повторный автозапуск детального прогона для текущего теста: обнаружен rerun-loop. "
-                            "Проверь: (1) отключена ли «Синхронизация playhead с сервером»; (2) не включён ли Play в fallback; "
-                            "(3) нет ли автоперерисовки/обновления. Для принудительного пересчёта нажми кнопку «Пересчитать полный лог»."
+                            "РџРѕРґР°РІР»РµРЅ РїРѕРІС‚РѕСЂРЅС‹Р№ Р°РІС‚РѕР·Р°РїСѓСЃРє РґРµС‚Р°Р»СЊРЅРѕРіРѕ РїСЂРѕРіРѕРЅР° РґР»СЏ С‚РµРєСѓС‰РµРіРѕ С‚РµСЃС‚Р°: РѕР±РЅР°СЂСѓР¶РµРЅ rerun-loop. "
+                            "РџСЂРѕРІРµСЂСЊ: (1) РѕС‚РєР»СЋС‡РµРЅР° Р»Рё В«РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ playhead СЃ СЃРµСЂРІРµСЂРѕРјВ»; (2) РЅРµ РІРєР»СЋС‡С‘РЅ Р»Рё Play РІ fallback; "
+                            "(3) РЅРµС‚ Р»Рё Р°РІС‚РѕРїРµСЂРµСЂРёСЃРѕРІРєРё/РѕР±РЅРѕРІР»РµРЅРёСЏ. Р”Р»СЏ РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕРіРѕ РїРµСЂРµСЃС‡С‘С‚Р° РЅР°Р¶РјРё РєРЅРѕРїРєСѓ В«РџРµСЂРµСЃС‡РёС‚Р°С‚СЊ РїРѕР»РЅС‹Р№ Р»РѕРіВ»."
                         )
                         log_event("detail_autorun_suppressed", test=test_pick, suppressed=_dg["suppressed"])
 
@@ -3597,7 +3575,7 @@ if SHOW_RESULTS or SHOW_TOOLS:
 
                         # Even if the solver itself runs in a single call, we must show that
                         # a long operation started.
-                        _pbar = st.progress(0.02, text="Детальный прогон: подготовка…")
+                        _pbar = st.progress(0.02, text="Р”РµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ: РїРѕРґРіРѕС‚РѕРІРєР°вЂ¦")
                         _dg["progress"] = 0.02
                         st.session_state["detail_guard"] = _dg
 
@@ -3611,13 +3589,13 @@ if SHOW_RESULTS or SHOW_TOOLS:
                             #  (A) baseline_tests_map contract: info={"test": {...}, "dt":..., "t_end":..., ...}
                             #  (B) raw test dict (legacy / live suite): info={...test fields...}
                             if test_j is None and isinstance(info, dict):
-                                looks_like_test = any(k in info for k in ("тип", "type", "road_csv", "axay_csv", "t_end", "dt"))
+                                looks_like_test = any(k in info for k in ("С‚РёРї", "type", "road_csv", "axay_csv", "t_end", "dt"))
                                 if looks_like_test:
                                     test_j = info
                                     dt_j = info.get("dt", dt_j)
                                     t_end_j = info.get("t_end", t_end_j)
                             if test_j is None:
-                                raise RuntimeError(f"Не найден тест '{test_pick}' в suite")
+                                raise RuntimeError(f"РќРµ РЅР°Р№РґРµРЅ С‚РµСЃС‚ '{test_pick}' РІ suite")
                             # fallback: allow dt/t_end embedded in test dict
                             if dt_j is None and isinstance(test_j, dict):
                                 dt_j = test_j.get("dt", None)
@@ -3627,7 +3605,7 @@ if SHOW_RESULTS or SHOW_TOOLS:
                             t_end_j = float(t_end_j) if t_end_j is not None else 1.0
                             log_event("detail_start", test=test_pick, dt=float(dt_j), t_end=float(t_end_j), max_points=int(max_points), want_full=bool(want_full))
                             try:
-                                _pbar.progress(0.08, text="Детальный прогон: запуск симуляции…")
+                                _pbar.progress(0.08, text="Р”РµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ: Р·Р°РїСѓСЃРє СЃРёРјСѓР»СЏС†РёРёвЂ¦")
                                 _dg["progress"] = 0.08
                                 st.session_state["detail_guard"] = _dg
                             except Exception:
@@ -3642,7 +3620,7 @@ if SHOW_RESULTS or SHOW_TOOLS:
                                 max_steps=int(2e6),
                             )
                             try:
-                                _pbar.progress(0.85, text="Детальный прогон: обработка результатов…")
+                                _pbar.progress(0.85, text="Р”РµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ: РѕР±СЂР°Р±РѕС‚РєР° СЂРµР·СѓР»СЊС‚Р°С‚РѕРІвЂ¦")
                                 _dg["progress"] = 0.85
                                 st.session_state["detail_guard"] = _dg
                             except Exception:
@@ -3687,7 +3665,7 @@ if SHOW_RESULTS or SHOW_TOOLS:
                             }
 
                             try:
-                                _pbar.progress(1.0, text="Детальный прогон: готово")
+                                _pbar.progress(1.0, text="Р”РµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ: РіРѕС‚РѕРІРѕ")
                                 _dg["progress"] = 1.0
                                 st.session_state["detail_guard"] = _dg
                             except Exception:
@@ -3724,7 +3702,7 @@ if SHOW_RESULTS or SHOW_TOOLS:
                                     )
                                     log_event("anim_latest_export", test=str(test_pick), cache_key=str(cache_key))
                                 except Exception as _e:
-                                    st.warning(f"Авто-экспорт anim_latest не удался: {_e}")
+                                    st.warning(f"РђРІС‚Рѕ-СЌРєСЃРїРѕСЂС‚ anim_latest РЅРµ СѓРґР°Р»СЃСЏ: {_e}")
                                     log_event("anim_latest_export_error", err=str(_e), test=str(test_pick), cache_key=str(cache_key))
                             try:
                                 if _cache_dir and _cache_dir.exists():
@@ -3746,10 +3724,10 @@ if SHOW_RESULTS or SHOW_TOOLS:
                             _dg_ok["failed_err"] = None
                             st.session_state["detail_guard"] = _dg_ok
                         except Exception as e:
-                            st.error(f"Ошибка детального прогона: {e}")
+                            st.error(f"РћС€РёР±РєР° РґРµС‚Р°Р»СЊРЅРѕРіРѕ РїСЂРѕРіРѕРЅР°: {e}")
                             log_event("detail_error", err=str(e), test=test_pick)
                             try:
-                                _pbar.progress(1.0, text="Детальный прогон: ошибка")
+                                _pbar.progress(1.0, text="Р”РµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ: РѕС€РёР±РєР°")
                             except Exception:
                                 pass
                             _dg_fail = dict(st.session_state.get("detail_guard") or {})
@@ -3772,11 +3750,11 @@ if SHOW_RESULTS or SHOW_TOOLS:
                     det = st.session_state.baseline_full_cache[cache_key]
                     _det_meta_ui = dict(det.get("meta") or {})
                     _det_ts = str(_det_meta_ui.get("ts") or "")
-                    _det_src = "кэш" if ("cache_file" in _det_meta_ui or _det_meta_ui.get("loaded_from_cache")) else "свежий расчёт"
+                    _det_src = "РєСЌС€" if ("cache_file" in _det_meta_ui or _det_meta_ui.get("loaded_from_cache")) else "СЃРІРµР¶РёР№ СЂР°СЃС‡С‘С‚"
                     if _det_ts:
-                        st.caption(f"Детальный лог: {_det_src}; метка времени: {_det_ts}.")
+                        st.caption(f"Р”РµС‚Р°Р»СЊРЅС‹Р№ Р»РѕРі: {_det_src}; РјРµС‚РєР° РІСЂРµРјРµРЅРё: {_det_ts}.")
                     else:
-                        st.caption(f"Детальный лог: {_det_src}.")
+                        st.caption(f"Р”РµС‚Р°Р»СЊРЅС‹Р№ Р»РѕРі: {_det_src}.")
                     df_main = det.get("df_main")
                     df_p = det.get("df_p")
                     df_mdot = det.get("df_mdot")
@@ -3788,1065 +3766,146 @@ if SHOW_RESULTS or SHOW_TOOLS:
                     # Global timeline (shared playhead)
                     # -----------------------------------
                     time_s = []
-                    if df_main is not None and "время_с" in df_main.columns:
-                        time_s = df_main["время_с"].astype(float).tolist()
-                    elif df_mdot is not None and "время_с" in df_mdot.columns:
-                        time_s = df_mdot["время_с"].astype(float).tolist()
+                    if df_main is not None and "РІСЂРµРјСЏ_СЃ" in df_main.columns:
+                        time_s = df_main["РІСЂРµРјСЏ_СЃ"].astype(float).tolist()
+                    elif df_mdot is not None and "РІСЂРµРјСЏ_СЃ" in df_mdot.columns:
+                        time_s = df_mdot["РІСЂРµРјСЏ_СЃ"].astype(float).tolist()
 
-                    # Важно: dataset_id для компонентов делаем *уникальным внутри UI‑сессии*.
-                    # Это защищает от редкой гонки: при refresh и неизменившемся cache_key
-                    # в localStorage может остаться playhead с playing=true, и 2D/3D
-                    # компоненты успевают его подхватить, пока playhead_ctrl не перезаписал
-                    # состояние. Добавляя nonce, мы гарантируем, что старое состояние
-                    # будет проигнорировано (dataset_id не совпадёт).
-                    dataset_id_ui = f"{cache_key}__{get_ui_nonce()}"
-
-                    # reset playhead when dataset changes
-                    if st.session_state.get("playhead_active_dataset") != cache_key:
-                        st.session_state["playhead_active_dataset"] = cache_key
-                        st.session_state["playhead_idx"] = 0
-                        if time_s:
-                            st.session_state["playhead_t"] = float(time_s[0])
-                        st.session_state["playhead_cmd"] = make_playhead_reset_command()
-                        log_event("playhead_reset", dataset_id=str(dataset_id_ui))
-
-                    # jump from plot clicks (x=time)
-                    req_x = st.session_state.pop("playhead_request_x", None)
-                    if req_x is not None and time_s:
-                        try:
-                            req_x_f = float(req_x)
-                            arr = np.asarray(time_s, dtype=float)
-                            j = int(np.argmin(np.abs(arr - req_x_f)))
-                            st.session_state["playhead_idx"] = j
-                            st.session_state["playhead_t"] = float(time_s[j])
-                            st.session_state["playhead_cmd"] = make_playhead_jump_command(j)
-                        except Exception:
-                            pass
-
-                    # clamp playhead to data
-                    playhead_x = None
-                    if time_s:
-                        try:
-                            ph_idx = int(st.session_state.get("playhead_idx", 0))
-                        except Exception:
-                            ph_idx = 0
-                        ph_idx = max(0, min(ph_idx, len(time_s) - 1))
-                        st.session_state["playhead_idx"] = ph_idx
-                        playhead_x = float(time_s[ph_idx])
-                        st.session_state["playhead_t"] = playhead_x
-                    st.markdown("### ⏱ Общий таймлайн")
-
-                    # --- События/алёрты (метки на таймлайне) ---
-                    cols_evt = st.columns([1, 1, 1, 1])
-                    with cols_evt[0]:
-                        st.checkbox("События/алёрты", value=True, key="events_show")
-                    with cols_evt[1]:
-                        st.slider("Вакуум мин, атм(изб)", -1.0, 0.0, -0.2, 0.05, key="events_vacuum_min_atm")
-                    with cols_evt[2]:
-                        st.slider("Запас к Pmax, атм", 0.0, 1.0, 0.10, 0.05, key="events_pmax_margin_atm")
-                    with cols_evt[3]:
-                        st.slider("Дребезг: toggles/окно", 3, 20, 6, 1, key="events_chatter_toggles")
-
-                    # --- События на графиках (вертикальные линии) ---
-                    cols_evt2 = st.columns([1, 2, 1, 1])
-                    with cols_evt2[0]:
-                        st.checkbox("Метки событий на графиках", value=True, key="events_on_graphs")
-                    with cols_evt2[1]:
-                        st.multiselect(
-                            "Уровни на графиках",
-                            options=["error", "warn", "info"],
-                            default=["error", "warn"],
-                            key="events_graph_sev",
-                        )
-                    with cols_evt2[2]:
-                        st.checkbox("Подписи error", value=False, key="events_graph_labels")
-                    with cols_evt2[3]:
-                        st.slider("Макс. событий на графиках", 0, 300, 120, 10, key="events_graph_max")
-
-                    events_list = []
-                    if st.session_state.get("events_show", True):
-                        try:
-                            params_for_events = dict(base_override)
-                            params_for_events["_P_ATM"] = float(P_ATM)
-                            events_list = compute_events(
-                                df_main=df_main,
-                                df_p=df_p,
-                                df_open=df_open,
-                                params_abs=params_for_events,
-                                test=test,
-                                vacuum_min_gauge_atm=float(st.session_state.get("events_vacuum_min_atm", -0.2)),
-                                pmax_margin_atm=float(st.session_state.get("events_pmax_margin_atm", 0.10)),
-                                chatter_window_s=0.25,
-                                chatter_toggle_count=int(st.session_state.get("events_chatter_toggles", 6)),
-                                max_events=240,
-                            )
-                        except Exception:
-                            events_list = []
-
-                    events_for_graphs, events_graph_labels, events_graph_max = prepare_events_for_graph_overlays(
-                        events_list,
-                        st.session_state,
+                    # Р’Р°Р¶РЅРѕ: dataset_id РґР»СЏ РєРѕРјРїРѕРЅРµРЅС‚РѕРІ РґРµР»Р°РµРј *СѓРЅРёРєР°Р»СЊРЅС‹Рј РІРЅСѓС‚СЂРё UIвЂ‘СЃРµСЃСЃРёРё*.
+                    # Р­С‚Рѕ Р·Р°С‰РёС‰Р°РµС‚ РѕС‚ СЂРµРґРєРѕР№ РіРѕРЅРєРё: РїСЂРё refresh Рё РЅРµРёР·РјРµРЅРёРІС€РµРјСЃСЏ cache_key
+                    # РІ localStorage РјРѕР¶РµС‚ РѕСЃС‚Р°С‚СЊСЃСЏ playhead СЃ playing=true, Рё 2D/3D
+                    # РєРѕРјРїРѕРЅРµРЅС‚С‹ СѓСЃРїРµРІР°СЋС‚ РµРіРѕ РїРѕРґС…РІР°С‚РёС‚СЊ, РїРѕРєР° playhead_ctrl РЅРµ РїРµСЂРµР·Р°РїРёСЃР°Р»
+                    # СЃРѕСЃС‚РѕСЏРЅРёРµ. Р”РѕР±Р°РІР»СЏСЏ nonce, РјС‹ РіР°СЂР°РЅС‚РёСЂСѓРµРј, С‡С‚Рѕ СЃС‚Р°СЂРѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ
+                    # Р±СѓРґРµС‚ РїСЂРѕРёРіРЅРѕСЂРёСЂРѕРІР°РЅРѕ (dataset_id РЅРµ СЃРѕРІРїР°РґС‘С‚).
+                    _results_runtime = prepare_results_runtime(
+                        st,
+                        session_state=st.session_state,
+                        cache_key=cache_key,
+                        get_ui_nonce_fn=get_ui_nonce,
+                        time_s=time_s,
+                        make_playhead_reset_command_fn=make_playhead_reset_command,
+                        make_playhead_jump_command_fn=make_playhead_jump_command,
+                        log_event_fn=log_event,
+                        event_controls_kwargs={
+                            "vacuum_label": "Вакуум мин, атм(изб)",
+                            "pmax_label": "Запас к Pmax, атм",
+                            "vacuum_state_key": "events_vacuum_min_atm",
+                            "pmax_state_key": "events_pmax_margin_atm",
+                        },
+                        compute_results_events_kwargs={
+                            "compute_events_fn": compute_events,
+                            "base_override": base_override,
+                            "p_atm": P_ATM,
+                            "df_main": df_main,
+                            "df_p": df_p,
+                            "df_open": df_open,
+                            "test": test,
+                            "vacuum_state_key": "events_vacuum_min_atm",
+                            "pmax_state_key": "events_pmax_margin_atm",
+                            "vacuum_kwarg_name": "vacuum_min_gauge_atm",
+                            "pmax_kwarg_name": "pmax_margin_atm",
+                        },
                     )
+                    dataset_id_ui = str(_results_runtime["dataset_id_ui"])
+                    playhead_x = _results_runtime["playhead_x"]
+                    events_list = _results_runtime["events_list"]
 
-                    render_playhead_results_section(
-                        get_playhead_ctrl_component(),
+                    # Р’Р°Р¶РЅРѕ: st.tabs РЅРµ "Р»РµРЅРёРІС‹Р№" вЂ” РєРѕРґ РІРЅСѓС‚СЂРё РІСЃРµС… С‚Р°Р±РѕРІ РёСЃРїРѕР»РЅСЏРµС‚СЃСЏ РїСЂРё РєР°Р¶РґРѕРј rerun.
+                    # РџСЂРё Р°РЅРёРјР°С†РёРё (auto-refresh) СЌС‚Рѕ РІС‹РіР»СЏРґРёС‚ РєР°Рє "Р±РµСЃРєРѕРЅРµС‡РЅС‹Р№ СЂР°СЃС‡С‘С‚".
+                    # РџРѕСЌС‚РѕРјСѓ РёСЃРїРѕР»СЊР·СѓРµРј СЏРІРЅС‹Р№ СЃРµР»РµРєС‚РѕСЂ Рё СЂРµРЅРґРµСЂРёРј С‚РѕР»СЊРєРѕ РІС‹Р±СЂР°РЅРЅСѓСЋ РІРµС‚РєСѓ.
+                    if SHOW_TOOLS and (not SHOW_RESULTS):
+                        _baseline_view_opts = ["РџРѕС‚РѕРєРё", "Р­РЅРµСЂРіРѕвЂ‘Р°СѓРґРёС‚"]
+                    else:
+                        _baseline_view_opts = ["Р“СЂР°С„РёРєРё", "РђРЅРёРјР°С†РёСЏ"]
+
+                    render_app_results_surface_section(
+                        st,
+                        session_state=st.session_state,
+                        options=_baseline_view_opts,
+                        cur_hash=cur_hash,
+                        test_pick=test_pick,
+                        cache_key=cache_key,
                         dataset_id=dataset_id_ui,
                         time_s=time_s,
-                        session_state=st.session_state,
+                        playhead_x=playhead_x,
                         events_list=events_list,
-                        safe_dataframe_fn=safe_dataframe,
                         df_main=df_main,
                         df_p=df_p,
                         df_mdot=df_mdot,
-                        playhead_x=playhead_x,
-                        pressure_from_pa_fn=pa_abs_to_atm_g,
-                        pressure_unit="атм (изб.)",
-                        stroke_scale=1.0,
-                        stroke_unit="м",
-                        flow_scale_and_unit_fn=flow_rate_display_scale_and_unit,
+                        df_open=df_open,
+                        df_egroups=df_Egroups,
+                        df_eedges=df_Eedges,
+                        plot_lines_fn=plot_lines,
+                        plot_timeseries_fn=plot_studio_timeseries,
+                        excel_bytes_fn=df_to_excel_bytes,
+                        safe_dataframe_fn=safe_dataframe,
                         p_atm=P_ATM,
+                        pressure_from_pa_fn=pa_abs_to_atm_g,
+                        pressure_divisor=ATM_PA,
+                        flow_scale_and_unit_fn=flow_rate_display_scale_and_unit,
                         model_module=model_mod,
-                        info_fn=st.info,
-                        caption_fn=st.caption,
-                        expander_fn=st.expander,
-                        columns_fn=st.columns,
-                        checkbox_fn=st.checkbox,
-                    )
-                    # Важно: st.tabs не "ленивый" — код внутри всех табов исполняется при каждом rerun.
-                    # При анимации (auto-refresh) это выглядит как "бесконечный расчёт".
-                    # Поэтому используем явный селектор и рендерим только выбранную ветку.
-                    if SHOW_TOOLS and (not SHOW_RESULTS):
-                        _baseline_view_opts = ["Потоки", "Энерго‑аудит"]
-                    else:
-                        _baseline_view_opts = ["Графики", "Анимация"]
-
-                    view_res = render_results_view_selector(
-                        options=_baseline_view_opts,
-                        session_state=st.session_state,
-                        cur_hash=cur_hash,
-                        test_pick=test_pick,
+                        has_plotly=_HAS_PLOTLY,
+                        px_module=px,
+                        safe_plotly_chart_fn=safe_plotly_chart,
                         log_event_fn=log_event,
-                        radio_fn=st.radio,
+                        base_override=base_override,
+                        tests_map=tests_map,
+                        compute_road_profile_fn=compute_road_profile_from_suite,
+                        proc_metrics_fn=_proc_metrics,
+                        safe_image_fn=safe_image,
+                        base_dir=HERE,
+                        mech_fallback_module=mech_fb,
+                        default_svg_mapping_path=DEFAULT_SVG_MAPPING_PATH,
+                        route_write_view_box=DEFAULT_SVG_VIEWBOX,
+                        do_rerun_fn=do_rerun,
+                        render_svg_flow_animation_html_fn=render_svg_flow_animation_html,
+                        has_svg_autotrace=_HAS_SVG_AUTOTRACE,
+                        extract_polylines_fn=extract_polylines,
+                        auto_build_mapping_from_svg_fn=auto_build_mapping_from_svg,
+                        detect_component_bboxes_fn=detect_component_bboxes,
+                        name_score_fn=_name_score,
+                        shortest_path_fn=shortest_path_between_points,
+                        evaluate_quality_fn=evaluate_route_quality,
                     )
 
 
-                    if view_res == "Графики":
-                        st.subheader("Графики по времени")
-                        tcol = "время_с"
-
-                        render_main_overview_graphs(
-                            plot_lines_fn=plot_lines,
-                            df_main=df_main,
-                            tcol=tcol,
-                            playhead_x=playhead_x,
-                            events=events_for_graphs,
-                            events_max=events_graph_max,
-                            events_show_labels=events_graph_labels,
-                            pressure_title="Давление (атм изб.)",
-                            pressure_yaxis_title="атм (изб.)",
-                            pressure_transform_fn=lambda a: (a - P_ATM) / ATM_PA,
-                        )
-
-                        render_mech_overview_graphs(
-                            plot_lines_fn=plot_lines,
-                            df_main=df_main,
-                            tcol=tcol,
-                            playhead_x=playhead_x,
-                            events=events_for_graphs,
-                            events_max=events_graph_max,
-                            events_show_labels=events_graph_labels,
-                            session_state=st.session_state,
-                            markdown_fn=st.markdown,
-                            columns_fn=st.columns,
-                            multiselect_fn=st.multiselect,
-                            caption_fn=st.caption,
-                        )
-
-                        render_node_pressure_expander(
-                            df_p=df_p,
-                            plot_lines_fn=plot_lines,
-                            session_state=st.session_state,
-                            playhead_x=playhead_x,
-                            events=events_for_graphs,
-                            events_max=events_graph_max,
-                            events_show_labels=events_graph_labels,
-                            title="Давление узлов (df_p, атм изб.)",
-                            yaxis_title="атм (изб.)",
-                            transform_y_fn=lambda a: (a - P_ATM) / ATM_PA,
-                            has_plotly=_HAS_PLOTLY,
-                            expander_fn=st.expander,
-                            multiselect_fn=st.multiselect,
-                            info_fn=st.info,
-                            caption_fn=st.caption,
-                        )
-
-                        with st.container():
-                            render_graph_studio_section(
-                                st,
-                                df_main=df_main,
-                                df_p=df_p,
-                                df_mdot=df_mdot,
-                                df_open=df_open,
-                                cache_key=cache_key,
-                                pressure_preset_label="Давления (Pa → атм изб.)",
-                                auto_units_label="Auto-units (Pa\u2192\u0430\u0442\u043c, \u0440\u0430\u0434\u2192\u0433\u0440\u0430\u0434)",
-                                drop_all_nan=False,
-                                session_state=st.session_state,
-                                playhead_x=playhead_x,
-                                events_for_graphs=events_for_graphs,
-                                plot_timeseries_fn=plot_studio_timeseries,
-                                excel_bytes_fn=df_to_excel_bytes,
-                                safe_dataframe_fn=safe_dataframe,
-                            )
-
-
-                    elif view_res == "Потоки":
-                        render_flow_edge_graphs_section(
-                            st,
-                            df_mdot=df_mdot,
-                            df_open=df_open,
-                            playhead_x=playhead_x,
-                            events_for_graphs=events_for_graphs,
-                            events_graph_max=events_graph_max,
-                            events_graph_labels=events_graph_labels,
-                            p_atm=P_ATM,
-                            model_module=model_mod,
-                            plot_lines_fn=plot_lines,
-                            flow_scale_and_unit_fn=flow_rate_display_scale_and_unit,
-                            has_plotly=_HAS_PLOTLY,
-                        )
-
-                    elif view_res == "Энерго‑аудит":
-                        st.subheader("Энерго‑аудит")
-                        if df_Egroups is not None and len(df_Egroups):
-                            safe_dataframe(df_Egroups.sort_values("энергия_Дж", ascending=False), height=220)
-                            if _HAS_PLOTLY and px is not None:
-                                try:
-                                    fig = px.bar(df_Egroups.sort_values("энергия_Дж", ascending=False), x="группа", y="энергия_Дж", title="Энергия по группам")
-                                    safe_plotly_chart(fig)
-                                except Exception:
-                                    pass
-                        if df_Eedges is not None and len(df_Eedges):
-                            st.markdown("**TOP‑20 элементов по энергии**")
-                            safe_dataframe(df_Eedges.sort_values("энергия_Дж", ascending=False).head(20), height=320)
-
-
-                    elif view_res == "Анимация":
-                        anim_view = render_animation_view_selector(
-                            st,
-                            cur_hash=cur_hash,
-                            test_pick=test_pick,
-                        )
-
-                        def _render_flow_tool_animation() -> None:
-                            render_flow_animation_panel(
-                                st,
-                                df_mdot=df_mdot,
-                                df_open=df_open,
-                                p_atm=P_ATM,
-                                model_module=model_mod,
-                                flow_scale_and_unit_fn=flow_rate_display_scale_and_unit,
-                                render_flow_panel_html_fn=render_flow_panel_html,
-                            )
-
-                        def _render_svg_scheme_animation() -> None:
-                            render_svg_scheme_section(
-                                st,
-                                st.session_state,
-                                df_mdot=df_mdot,
-                                df_open=df_open,
-                                df_p=df_p,
-                                base_dir=HERE,
-                                default_svg_mapping_path=DEFAULT_SVG_MAPPING_PATH,
-                                route_write_view_box=view_box,
-                                do_rerun_fn=do_rerun,
-                                log_event_fn=log_event,
-                                p_atm=P_ATM,
-                                model_module=model_mod,
-                                pressure_divisor=ATM_PA,
-                                pressure_unit="атм (изб.)",
-                                dataset_id=dataset_id_ui,
-                                safe_dataframe_fn=safe_dataframe,
-                                flow_scale_and_unit_fn=flow_rate_display_scale_and_unit,
-                                get_component_fn=get_pneumo_svg_flow_component,
-                                render_svg_flow_animation_html_fn=render_svg_flow_animation_html,
-                                has_svg_autotrace=_HAS_SVG_AUTOTRACE,
-                                extract_polylines_fn=extract_polylines,
-                                auto_build_mapping_from_svg_fn=auto_build_mapping_from_svg,
-                                detect_component_bboxes_fn=detect_component_bboxes,
-                                name_score_fn=_name_score,
-                                shortest_path_fn=shortest_path_between_points,
-                                evaluate_quality_fn=evaluate_route_quality,
-                            )
-
-                        # -----------------------------------
-                        # (1) Механическая анимация (упрощённая)
-                        # -----------------------------------
-                        if anim_view == ANIMATION_VIEW_MECHANICS:
-                            if render_mechanical_animation_intro(st, df_main=df_main):
-                                colM1, colM2, colM3 = st.columns(3)
-                                with colM1:
-                                    px_per_m = st.slider("Масштаб (px/м)", 500, 4000, 2000, step=100, key="mech_px_per_m")
-                                with colM2:
-                                    body_offset_px = st.slider("Отступ рамы над колёсами (px)", 40, 220, 110, step=5, key="mech_body_offset_px")
-                                with colM3:
-                                    fps = st.slider("Скорость (FPS)", 10, 60, 30, step=5, key="mech_fps")
-
-                                frame_dt_s = 1.0 / max(1.0, float(fps))
-
-                                time_s = df_main["время_с"].astype(float).tolist()
-                                corners = ["ЛП", "ПП", "ЛЗ", "ПЗ"]
-
-                                # Геометрия для расчёта высоты углов рамы (как в модели)
-                                try:
-                                    wheelbase = float(base_override.get("база", 2.3))
-                                    track = float(base_override.get("колея", 1.2))
-                                except Exception:
-                                    wheelbase = 2.3
-                                    track = 1.2
-
-                                z = df_main.get("перемещение_рамы_z_м", pd.Series(np.zeros(len(time_s)))).astype(float).to_numpy()
-                                phi = df_main.get("крен_phi_рад", pd.Series(np.zeros(len(time_s)))).astype(float).to_numpy()
-                                theta = df_main.get("тангаж_theta_рад", pd.Series(np.zeros(len(time_s)))).astype(float).to_numpy()
-
-                                x_pos = np.array([wheelbase/2, wheelbase/2, -wheelbase/2, -wheelbase/2], dtype=float)
-                                y_pos = np.array([track/2, -track/2, track/2, -track/2], dtype=float)
-
-                                z_body = (
-                                    z[:, None]
-                                    + np.sin(phi)[:, None] * y_pos[None, :] * np.cos(theta)[:, None]
-                                    - np.sin(theta)[:, None] * x_pos[None, :]
-                                )
-                                body = {corners[i]: z_body[:, i].tolist() for i in range(4)}
-                                body3d = {"z": z.astype(float).tolist()}  # for mech_car3d component (expects body.z)
-
-
-                                wheel: Dict[str, List[float]] = {}
-                                road: Dict[str, List[float]] = {}
-                                stroke: Dict[str, List[float]] = {}
-                                for c in corners:
-                                    col_w = f"перемещение_колеса_{c}_м"
-                                    col_r = f"дорога_{c}_м"
-                                    col_s = f"положение_штока_{c}_м"
-                                    wheel[c] = df_main[col_w].astype(float).tolist() if col_w in df_main.columns else [0.0] * len(time_s)
-                                    road[c] = df_main[col_r].astype(float).tolist() if col_r in df_main.columns else [0.0] * len(time_s)
-                                    stroke[c] = df_main[col_s].astype(float).tolist() if col_s in df_main.columns else [0.0] * len(time_s)
-                            # Если солвер не экспортировал профиль дороги в лог — восстанавливаем его из входного теста (road_func).
-                            # Это НЕ "подрисовка физики": мы визуализируем вход (дорожный профиль), а динамику (крен/тангаж/ходы) берём только из расчёта.
-                            #
-                            # Важно: из-за контрактов/нормализации колонок иногда в df_main появляются колонки дороги,
-                            # но заполненные нулями (как будто дорога плоская) — тогда тоже делаем восстановление.
-                            needs_road_restore = False
-                            try:
-                                _test_cfg = tests_map.get(test_pick, {}) or {}
-                                _has_road_input = bool(str(_test_cfg.get('road_csv') or '').strip()) or callable(_test_cfg.get('road_func'))
-                                if any((f"дорога_{c}_м" not in df_main.columns) for c in corners):
-                                    needs_road_restore = True
-                                elif _has_road_input:
-                                    # Колонки есть, но они могут быть "пустыми" (все ~0).
-                                    mx_road = 0.0
-                                    for _c in corners:
-                                        col = f"дорога_{_c}_м"
-                                        if col not in df_main.columns:
-                                            continue
-                                        try:
-                                            arr = pd.to_numeric(df_main[col], errors='coerce').fillna(0.0).to_numpy(dtype=float)
-                                            mx_road = max(mx_road, float(np.max(np.abs(arr))))
-                                        except Exception:
-                                            pass
-                                    if mx_road < 1e-9:
-                                        needs_road_restore = True
-                            except Exception:
-                                pass
-
-                            if needs_road_restore:
-
-
-
-                                road_from_suite = compute_road_profile_from_suite(
-
-                                model_mod,
-
-                                tests_map.get(test_pick, {}),
-
-                                time_s,
-
-                                wheelbase,
-
-                                track,
-
-                                corners,
-
-                                )
-
-                                if road_from_suite is not None:
-
-                                    road = road_from_suite
-
-                                    st.caption("ℹ️ Профиль дороги восстановлен из входного профиля теста (road_func), т.к. в логе нет колонок дороги или они заполнены нулями.")
-
-                                    log_event("anim_road_from_suite", test=test_pick)
-
-                                try:
-                                    L_stroke_m = float(base_override.get("ход_штока", 0.25))
-                                except Exception:
-                                    L_stroke_m = 0.25
-
-                                # --- Движок анимации (по умолчанию: компонент; fallback доступен) ---
-                                col_animA, col_animB = st.columns([1, 2])
-                                with col_animA:
-                                    anim_backend = st.selectbox(
-                                        "Движок анимации",
-                                        ["Встроенный (matplotlib, совместимость)", "Компонент (SVG/Canvas, быстро)"],
-                                        index=1,
-                                        key=f"anim_backend_{cache_key}",
-                                        help="Если видишь ошибки Streamlit Component (например apiVersion undefined) — используй встроенный режим.",
-                                    )
-
-                                # Unified boolean used дальше по коду (и чтобы не ловить NameError в ветках)
-                                use_component_anim = bool(str(anim_backend).startswith("Компонент"))
-                                with col_animB:
-                                    st.caption(
-                                        "По умолчанию включён компонентный режим (SVG/Canvas): Play/Pause выполняются в браузере и не дёргают сервер на каждый кадр. "
-                                        "Если компоненты Streamlit не загружаются/видишь ошибки вида `apiVersion undefined` — переключись на встроенный режим (matplotlib)."
-                                    )
-                                # Log which backend the user chose (helps debug "Play causes infinite compute" etc.)
-                                try:
-                                    _cur_backend = "component" if use_component_anim else "fallback"
-                                    _last_backend = st.session_state.get(f"_anim_backend_last::{cache_key}")
-                                    if _last_backend != _cur_backend:
-                                        st.session_state[f"_anim_backend_last::{cache_key}"] = _cur_backend
-                                        log_event(
-                                            "anim_backend_selected",
-                                            backend=_cur_backend,
-                                            dataset_id=str(dataset_id_ui),
-                                            proc=_proc_metrics(),
-                                        )
-                                except Exception:
-                                    pass
-
-                                if use_component_anim:
-                                    st.caption("Управление Play/Pause/скоростью — в блоке **Таймлайн (общий playhead)** выше. Во время Play сервер не дёргается; синхронизация графиков выполняется при паузе/скраббинге.")
-
-                                mech_view = st.radio(
-                                    "Визуализация",
-                                    options=["2D (схема)", "3D (машинка)"],
-                                    horizontal=True,
-                                    key=f"mech_view_{cache_key}",
-                                )
-
-                                if mech_view == "2D (схема)":
-                                    mech_comp = get_mech_anim_component() if use_component_anim else None
-                                    if mech_comp is not None:
-                                        mech_comp(
-                                            title="Механика (2D схема: крен/тангаж)",
-                                            time=time_s,
-                                            body=body,
-                                            wheel=wheel,
-                                            road=road,
-                                            stroke=stroke,
-                                            phi=phi.tolist(),
-                                            theta=theta.tolist(),
-                                            selected=st.session_state.get("mech_selected_corners", []),
-                                            meta={
-                                                "px_per_m": float(px_per_m),
-                                                "body_offset_px": float(body_offset_px),
-                                                "L_stroke_m": float(L_stroke_m),
-                                                "frame_dt_s": float(frame_dt_s),
-                                            },
-                                            sync_playhead=True,
-                                            playhead_storage_key="pneumo_play_state",
-                                            dataset_id=dataset_id_ui,
-                                            cmd=st.session_state.get(f"mech3d_cmd_{cache_key}"),
-                                            height=620,
-                                            key="mech2d_pick_event",
-                                            default=None,
-                                        )
-                                    else:
-                                        if use_component_anim:
-                                            st.warning("Компонент mech_anim не найден/не загружается (components/mech_anim). Покажу fallback (matplotlib).")
-                                        else:
-                                            st.info("Компонентный режим отключён — показываю встроенную 2D визуализацию (matplotlib).")
-                                    
-                                        if mech_fb is not None:
-                                            mech_fb.render_mech2d_fallback(
-                                                time=time_s,
-                                                body=body,
-                                                wheel=wheel,
-                                                road=road,
-                                                stroke=stroke,
-                                                wheelbase_m=float(wheelbase),
-                                                track_m=float(track),
-                                                L_stroke_m=float(L_stroke_m),
-                                                dataset_id=str(dataset_id_ui),
-                                                # Передаём реальный callback логирования, чтобы события Play/Seek попадали в logs/ui_*.log
-                                                log_cb=log_event,
-                                            )
-                                        else:
-                                            st.warning("Модуль mech_anim_fallback.py недоступен — показываю статическую схему.")
-                                            png = HERE / "assets" / "mech_scheme.png"
-                                            if png.exists():
-                                                safe_image(str(png), caption="Механическая схема (статично)")
-                                elif mech_view == "3D (машинка)":
-                                    st.caption(
-                                        "3D‑wireframe «машинка»: рама (параллелепипед), 4 колеса (цилиндры) и профили дороги под каждым колесом. "
-                                        "Крутите сцену мышью, колёсики реально вращаются по пройденному пути."
-                                    )
-
-                                    # --- Path / maneuver (pure kinematics, does NOT affect the solver) ---
-                                    colA, colB, colC = st.columns(3)
-                                    with colA:
-                                            demo_paths = st.checkbox(
-                                                "3D: доп. траектории (НЕ физика, только визуализация)",
-                                                value=False,
-                                                key=f"mech3d_demo_paths_{cache_key}",
-                                            )
-                                            if not demo_paths:
-                                                path_mode = "Статика (без движения)"
-                                                st.caption("По умолчанию X/Z‑движение отключено. В 3D рисуются только величины из результатов расчёта (крен/тангаж/ходы/дорога).")
-                                                # дефолты (в статике почти не используются, но нужны как переменные ниже)
-                                                v0 = 12.0
-                                                lateral_scale = 1.0
-                                                steer_gain = 1.0
-                                                steer_max_deg = 35.0
-                                            else:
-                                                path_mode = st.selectbox(
-                                                    "Траектория (для 3D)",
-                                                    ["Статика (без движения)", "По ax/ay из модели", "Прямая", "Слалом", "Поворот (радиус)"],
-                                                    index=0,
-                                                    key=f"mech3d_path_mode_{cache_key}",
-                                                )
-                                                st.info("3D: траектория X/Z сейчас кинематическая (только визуализация) и НЕ влияет на расчёт. Крен/тангаж/высоты берутся из результатов симуляции. Реальная продольная/поперечная динамика (передача момента/торможение, скорость по дороге и т.д.) — TODO.")
-                                                v0 = st.number_input(
-                                                    "v0, м/с",
-                                                    min_value=0.0,
-                                                    max_value=60.0,
-                                                    value=12.0,
-                                                    step=0.5,
-                                                    key=f"mech3d_v0_{cache_key}",
-                                                )
-                                                lateral_scale = st.number_input(
-                                                    "масштаб бокового смещения",
-                                                    min_value=0.0,
-                                                    max_value=20.0,
-                                                    value=1.0,
-                                                    step=0.1,
-                                                    key=f"mech3d_lat_scale_{cache_key}",
-                                                )
-                                                steer_gain = st.number_input(
-                                                    "усиление руления (по φ)",
-                                                    min_value=0.0,
-                                                    max_value=10.0,
-                                                    value=1.0,
-                                                    step=0.1,
-                                                    key=f"mech3d_steer_gain_{cache_key}",
-                                                )
-                                                steer_max_deg = st.slider(
-                                                    "ограничение руления, град",
-                                                    min_value=0,
-                                                    max_value=60,
-                                                    value=35,
-                                                    step=1,
-                                                    key=f"mech3d_steer_max_deg_{cache_key}",
-                                                )
-
-                                    with colB:
-                                            if demo_paths:
-                                                slalom_amp = st.number_input(
-                                                    "Слалом: амплитуда (м)",
-                                                    min_value=0.0,
-                                                    value=1.5,
-                                                    step=0.1,
-                                                    key=f"mech3d_slalom_amp_{cache_key}",
-                                                )
-                                                slalom_period = st.number_input(
-                                                    "Слалом: период (с)",
-                                                    min_value=0.2,
-                                                    value=4.0,
-                                                    step=0.2,
-                                                    key=f"mech3d_slalom_period_{cache_key}",
-                                                )
-                                                yaw_smooth = st.number_input(
-                                                    "Сглаживание yaw (0..1)",
-                                                    min_value=0.0,
-                                                    max_value=1.0,
-                                                    value=0.15,
-                                                    step=0.05,
-                                                    key=f"mech3d_yaw_smooth_{cache_key}",
-                                                )
-                                                st.markdown("**Поворот/радиус (для манёвра)**")
-                                                turn_radius = st.number_input(
-                                                    "Поворот: радиус R (м)",
-                                                    min_value=1.0,
-                                                    value=35.0,
-                                                    step=1.0,
-                                                    key=f"mech3d_turn_R_{cache_key}",
-                                                )
-                                                turn_dir = st.selectbox(
-                                                    "Поворот: направление",
-                                                    options=["влево", "вправо"],
-                                                    index=0,
-                                                    key=f"mech3d_turn_dir_{cache_key}",
-                                                )
-                                            else:
-                                                # дефолты (не используются, когда demo_paths=False)
-                                                slalom_amp = 1.5
-                                                slalom_period = 4.0
-                                                yaw_smooth = 0.15
-                                                turn_radius = 35.0
-                                                turn_dir = "влево"
-
-                                    with colC:
-                                        # --- Geometry / viz ---
-                                        base_m = float(base_override.get("база", 2.8))
-                                        track_m = float(base_override.get("колея", 1.6))
-                                        wheel_r = st.number_input(
-                                            "Радиус колеса (м)",
-                                            min_value=0.05,
-                                            value=0.32,
-                                            step=0.01,
-                                            key=f"mech3d_wheel_r_{cache_key}",
-                                        )
-                                        wheel_w = st.number_input(
-                                            "Ширина колеса (м)",
-                                            min_value=0.02,
-                                            value=0.22,
-                                            step=0.01,
-                                            key=f"mech3d_wheel_w_{cache_key}",
-                                        )
-                                        body_y_off = st.number_input(
-                                            "Поднять раму (м)",
-                                            min_value=-5.0,
-                                            value=0.60,
-                                            step=0.05,
-                                            key=f"mech3d_body_yoff_{cache_key}",
-                                        )
-                                        road_win = st.slider(
-                                            "Окно дороги (точек)",
-                                            min_value=60,
-                                            max_value=600,
-                                            value=220,
-                                            step=10,
-                                            key=f"mech3d_road_win_{cache_key}",
-                                        )
-                                        st.markdown("**Калибровка высот (3D)**")
-                                        invert_y = st.checkbox("Инвертировать вертикаль (Y)", value=False, key=f"mech3d_invert_y_{cache_key}")
-                                        y_sign = -1.0 if invert_y else 1.0
-                                        wheel_center_offset = st.number_input("Сдвиг центра колеса по Y (м)", min_value=-5.0, value=0.0, step=0.05, key=f"mech3d_wheel_center_off_{cache_key}")
-                                        road_y_offset = st.number_input("Сдвиг дороги по Y (м)", min_value=-5.0, value=0.0, step=0.05, key=f"mech3d_road_y_off_{cache_key}")
-                                        road_subtract_radius = st.checkbox("Дорога в df = уровень центра колеса (рисовать поверхность = road - R)", value=False, key=f"mech3d_road_subr_{cache_key}")
-                                        camera_follow = st.checkbox("Камера следует за машиной (центр кадра)", value=True, key=f"mech3d_cam_follow_{cache_key}")
-                                        camera_follow_heading = st.checkbox("Камера поворачивается по yaw (удобно для поворотов/слалома)", value=False, key=f"mech3d_cam_follow_heading_{cache_key}")
-                                        camera_follow_selected = st.checkbox(
-                                            "Камера следует за выбранным колесом/осью (если выбрано)",
-                                            value=False,
-                                            key=f"mech3d_cam_follow_selected_{cache_key}",
-                                        )
-                                        follow_smooth = st.slider(
-                                            "Сглаживание target (камера/следование)",
-                                            min_value=0.0,
-                                            max_value=1.0,
-                                            value=0.25,
-                                            step=0.05,
-                                            key=f"mech3d_follow_smooth_{cache_key}",
-                                        )
-                                        hover_tooltip = st.checkbox(
-                                            "Hover‑подсказки (колесо/ось): wheel/road/gap",
-                                            value=True,
-                                            key=f"mech3d_hover_tooltip_{cache_key}",
-                                        )
-                                        show_minimap = st.checkbox(
-                                            "Мини‑карта (вид сверху) поверх сцены",
-                                            value=False,
-                                            key=f"mech3d_show_minimap_{cache_key}",
-                                        )
-                                        minimap_size = st.slider(
-                                            "Размер мини‑карты (px)",
-                                            min_value=80,
-                                            max_value=320,
-                                            value=160,
-                                            step=10,
-                                            key=f"mech3d_minimap_size_{cache_key}",
-                                        )
-
-                                        st.markdown("**Отрисовка дороги/подвески (3D)**")
-                                        road_mode_ui = st.selectbox(
-                                            "Режим дороги (как рисовать профиль под колёсами)",
-                                            options=["track (след по траектории)", "local (под машиной)"],
-                                            index=0,
-                                            key=f"mech3d_road_mode_{cache_key}",
-                                        )
-                                        road_mode = "track" if str(road_mode_ui).startswith("track") else "local"
-                                        spin_per_wheel = st.checkbox(
-                                            "Крутить колёса по пути каждого колеса (в повороте внутр/наруж отличаются)",
-                                            value=True,
-                                            key=f"mech3d_spin_per_wheel_{cache_key}",
-                                        )
-                                        show_suspension = st.checkbox(
-                                            "Показывать стойки/подвеску (линии от рамы к колёсам)",
-                                            value=True,
-                                            key=f"mech3d_show_susp_{cache_key}",
-                                        )
-                                        show_contact = st.checkbox(
-                                            "Показывать контакт колеса с дорогой (gap/penetration)",
-                                            value=True,
-                                            key=f"mech3d_show_contact_{cache_key}",
-                                        )
-                                        show_gap_heat = st.checkbox(
-                                            "Цвет по gap (контакт/зазор) — окрашивать колёса/контакт",
-                                            value=True,
-                                            key=f"mech3d_show_gap_heat_{cache_key}",
-                                        )
-                                        gap_scale_m = st.slider(
-                                            "Шкала gap (м) для цвета",
-                                            min_value=0.005,
-                                            max_value=0.200,
-                                            value=0.050,
-                                            step=0.005,
-                                            key=f"mech3d_gap_scale_{cache_key}",
-                                        )
-                                        show_gap_hud = st.checkbox(
-                                            "Показывать gap/min-gap в HUD",
-                                            value=True,
-                                            key=f"mech3d_show_gap_hud_{cache_key}",
-                                        )
-                                        min_gap_window = st.slider(
-                                            "Окно min-gap (точек назад, 0=выкл)",
-                                            min_value=0,
-                                            max_value=2000,
-                                            value=300,
-                                            step=50,
-                                            key=f"mech3d_min_gap_window_{cache_key}",
-                                        )
-                                        min_gap_step = st.slider(
-                                            "Шаг анализа min-gap (прореживание)",
-                                            min_value=1,
-                                            max_value=20,
-                                            value=3,
-                                            step=1,
-                                            key=f"mech3d_min_gap_step_{cache_key}",
-                                        )
-                                        hover_contact_marker = st.checkbox(
-                                            "Маркер контакта при hover (крупнее, цвет по gap)",
-                                            value=True,
-                                            key=f"mech3d_hover_contact_{cache_key}",
-                                        )
-                                        st.markdown("**Камера/виды (3D)**")
-                                        multi_view = st.checkbox(
-                                            "Мультивид: 4 проекции (ISO/TOP/FRONT/SIDE)",
-                                            value=False,
-                                            key=f"mech3d_multi_view_{cache_key}",
-                                        )
-                                        allow_pan = st.checkbox(
-                                            "Разрешить панорамирование (RMB/Shift+Drag)",
-                                            value=True,
-                                            key=f"mech3d_allow_pan_{cache_key}",
-                                        )
-                                        debug_overlay = st.checkbox(
-                                            "DEBUG overlay (служебный текст на канве)",
-                                            value=False,
-                                            key=f"mech3d_debug_overlay_{cache_key}",
-                                            help="Если 3D кажется пустым/«за пределами канвы»: включи overlay — он покажет dataset/idx/t и подтвердит, что сцена реально рисуется.",
-                                        )
-                                        if st.button(
-                                            "Сбросить вид 3D (Reset view)",
-                                            key=f"mech3d_reset_view_{cache_key}",
-                                            help="Сбрасывает камеру/панорамирование (так же работает dblclick по 3D). Полезно, если сцену «увели» за экран.",
-                                        ):
-                                            st.session_state[f"mech3d_cmd_{cache_key}"] = {"reset_view": True, "ts": time.time()}
-
-                                        st.markdown("**Дорога/траектория (3D)**")
-                                        show_road_mesh = st.checkbox(
-                                            "Показывать «сетку/перемычки» дороги (между левым и правым колесом)",
-                                            value=True,
-                                            key=f"mech3d_show_road_mesh_{cache_key}",
-                                        )
-                                        road_mesh_step = st.slider(
-                                            "Шаг сетки дороги (точек)",
-                                            min_value=1,
-                                            max_value=30,
-                                            value=6,
-                                            step=1,
-                                            key=f"mech3d_road_mesh_step_{cache_key}",
-                                        )
-                                        show_trail = st.checkbox(
-                                            "Показывать траекторию (след кузова и колёс)",
-                                            value=True,
-                                            key=f"mech3d_show_trail_{cache_key}",
-                                        )
-                                        trail_len = st.slider(
-                                            "Длина следа (точек назад)",
-                                            min_value=20,
-                                            max_value=2000,
-                                            value=500,
-                                            step=20,
-                                            key=f"mech3d_trail_len_{cache_key}",
-                                        )
-                                        trail_step = st.slider(
-                                            "Шаг следа (прореживание)",
-                                            min_value=1,
-                                            max_value=20,
-                                            value=3,
-                                            step=1,
-                                            key=f"mech3d_trail_step_{cache_key}",
-                                        )
-
-
-
-                                    # --- build path arrays ---
-                                    t_np = np.asarray(time_s, dtype=float)
-                                    n = len(t_np)
-                                    if n >= 2:
-                                        dt = np.diff(t_np, prepend=t_np[0])
-                                        dt[0] = dt[1]
-                                    else:
-                                        dt = np.ones_like(t_np)
-
-                                    # outputs
-                                    x = np.zeros(n, dtype=float)
-                                    z = np.zeros(n, dtype=float)
-                                    vx = np.zeros(n, dtype=float)
-                                    vz = np.zeros(n, dtype=float)
-
-                                    if path_mode == "Статика (без движения)":
-                                        vx[:] = 0.0
-                                        vz[:] = 0.0
-                                        x[:] = 0.0
-                                        z[:] = 0.0
-                                    elif path_mode == "Прямая":
-                                        vx[:] = float(v0)
-                                        vz[:] = 0.0
-                                        x = np.cumsum(vx * dt)
-                                        x = x - x[0]
-                                        z[:] = 0.0
-                                    elif path_mode == "Слалом":
-                                        vx[:] = float(v0)
-                                        z = float(slalom_amp) * np.sin(2.0 * np.pi * t_np / float(slalom_period))
-                                        # dz/dt for heading
-                                        vz = float(slalom_amp) * (2.0 * np.pi / float(slalom_period)) * np.cos(2.0 * np.pi * t_np / float(slalom_period))
-                                        x = np.cumsum(vx * dt)
-                                        x = x - x[0]
-                                    elif path_mode == "Поворот (радиус)":
-                                        R = float(st.session_state.get(f"mech3d_turn_R_{cache_key}", 35.0))
-                                        dir_left = str(st.session_state.get(f"mech3d_turn_dir_{cache_key}", "влево")).startswith("влево")
-                                        sign = 1.0 if dir_left else -1.0
-                                        vx[:] = float(v0)
-                                        # yaw = omega * t, omega = v / R
-                                        omega = (float(v0) / max(1e-6, R)) * sign
-                                        yaw = omega * (t_np - t_np[0])
-                                        # circle arc: x=R*sin(yaw), z=sign*R*(1-cos(yaw))
-                                        x = R * np.sin(yaw)
-                                        z = sign * R * (1.0 - np.cos(yaw))
-                                        # approximate v components
-                                        vx = float(v0) * np.cos(yaw)
-                                        vz = float(v0) * np.sin(yaw) * sign
-
-                                    else:
-                                        # By ax/ay from df_main (if present). This is a visualization-only integration.
-                                        ax_col = "ускорение_продольное_ax_м_с2"
-                                        ay_col = "ускорение_поперечное_ay_м_с2"
-                                        ax = df_main[ax_col].to_numpy(dtype=float) if ax_col in df_main.columns else np.zeros(n, dtype=float)
-                                        ay = df_main[ay_col].to_numpy(dtype=float) if ay_col in df_main.columns else np.zeros(n, dtype=float)
-                                        vx[0] = float(v0)
-                                        vz[0] = 0.0
-                                        for i in range(1, n):
-                                            vx[i] = vx[i - 1] + ax[i] * dt[i]
-                                            vz[i] = vz[i - 1] + ay[i] * dt[i]
-                                            x[i] = x[i - 1] + vx[i] * dt[i]
-                                            z[i] = z[i - 1] + vz[i] * dt[i]
-
-                                    # apply scale (helps avoid huge drift when integrating ay)
-                                    z = z * float(lateral_scale)
-
-                                    # yaw from velocity direction (robust for slalom + ax/ay)
-                                    if path_mode == "Поворот (радиус)":
-                                        # yaw already set by the turn generator
-                                        pass
-                                    else:
-                                        yaw = np.arctan2(vz * float(lateral_scale), np.maximum(vx, 1e-6))
-
-                                    # smooth yaw a bit to make camera nicer
-                                    if n >= 3 and float(yaw_smooth) > 0.0:
-                                        a = float(yaw_smooth)
-                                        for i in range(1, n):
-                                            yaw[i] = (1 - a) * yaw[i - 1] + a * yaw[i]
-
-                                    # traveled distance for wheel spin
-                                    vabs = np.sqrt(vx * vx + (vz * float(lateral_scale)) * (vz * float(lateral_scale)))
-                                    s = np.cumsum(vabs * dt)
-                                    s = s - s[0]
-
-                                    # Steering angle (kinematic bicycle): r = yaw_rate = v/L * tan(delta) => delta = atan(L*r/v)
-                                    if n >= 3:
-                                        yaw_u = np.unwrap(yaw)
-                                        yaw_rate = np.gradient(yaw_u, t_np)
-                                    else:
-                                        yaw_rate = np.zeros(n, dtype=float)
-                                    steer = np.arctan2(float(base_m) * yaw_rate, np.maximum(vabs, 0.1))
-                                    steer = steer * float(steer_gain)
-                                    steer_max = np.deg2rad(float(steer_max_deg))
-                                    steer = np.clip(steer, -steer_max, steer_max)
-
-                                    path_payload = {
-                                        "x": x.tolist(),
-                                        "z": z.tolist(),
-                                        "yaw": yaw.tolist(),
-                                        "s": s.tolist(),
-                                        "v": vabs.tolist(),
-                                        "steer": steer.tolist(),
-                                    }
-
-                                    mech3d_comp = get_mech_car3d_component() if use_component_anim else None
-                                    if mech3d_comp is None:
-                                        if use_component_anim:
-                                            st.warning("Компонент mech_car3d не найден/не загружается (components/mech_car3d). Покажу fallback (matplotlib).")
-                                        else:
-                                            st.info("Компонентный режим отключён — показываю встроенную 3D визуализацию (matplotlib).")
-                                    
-                                        if mech_fb is not None:
-                                            mech_fb.render_mech3d_fallback(
-                                                time=time_s,
-                                                body=body3d,
-                                                wheel=wheel,
-                                                road=road,
-                                                phi=phi.tolist(),
-                                                theta=theta.tolist(),
-                                                path=path_payload,
-                                                wheelbase_m=float(base_m),
-                                                track_m=float(track_m),
-                                                dataset_id=str(dataset_id_ui),
-                                                # Передаём callback логирования, чтобы видеть в логах причины "кажется бесконечным" (частота rerun, idx, t)
-                                                log_cb=log_event,
-                                            )
-                                        else:
-                                            st.error("Модуль mech_anim_fallback.py недоступен — 3D fallback не может быть показан.")
-
-                                    else:
-                                        # reasonable body dims from geometry
-                                        body_L = float(st.session_state.get(f"mech3d_body_L_{cache_key}", base_m * 0.85))
-                                        body_W = float(st.session_state.get(f"mech3d_body_W_{cache_key}", track_m * 0.55))
-                                        body_H = float(st.session_state.get(f"mech3d_body_H_{cache_key}", 0.35))
-                                        c1, c2, c3 = st.columns(3)
-                                        with c1:
-                                            body_L = st.number_input("Длина рамы (м)", min_value=0.2, value=body_L, step=0.05, key=f"mech3d_body_L_{cache_key}")
-                                        with c2:
-                                            body_W = st.number_input("Ширина рамы (м)", min_value=0.2, value=body_W, step=0.05, key=f"mech3d_body_W_{cache_key}")
-                                        with c3:
-                                            body_H = st.number_input("Высота рамы (м)", min_value=0.05, value=body_H, step=0.02, key=f"mech3d_body_H_{cache_key}")
-
-                                        geo_payload = {
-                                            "base_m": float(base_m),
-                                            "track_m": float(track_m),
-                                            "wheel_radius_m": float(wheel_r),
-                                            "wheel_width_m": float(wheel_w),
-                                            "wheel_center_offset_m": float(wheel_center_offset),
-                                            "road_y_offset_m": float(road_y_offset),
-                                            "road_subtract_radius": bool(road_subtract_radius),
-                                            "road_mode": str(road_mode),
-                                            "spin_per_wheel": bool(spin_per_wheel),
-                                            "show_suspension": bool(show_suspension),
-                                                                                    "show_contact": bool(show_contact),
-                                            "multi_view": bool(multi_view),
-                                            "allow_pan": bool(allow_pan),
-                                            "show_road_mesh": bool(show_road_mesh),
-                                            "road_mesh_step": int(road_mesh_step),
-                                            "show_trail": bool(show_trail),
-                                            "trail_len": int(trail_len),
-                                            "trail_step": int(trail_step),
-                                            "y_sign": float(y_sign),
-                                            "camera_follow": bool(camera_follow),
-                                            "camera_follow_heading": bool(camera_follow_heading),
-                                            "camera_follow_selected": bool(camera_follow_selected),
-                                            "hover_tooltip": bool(hover_tooltip),
-                                            "debug_overlay": bool(debug_overlay),
-                                            "follow_smooth": float(follow_smooth),
-                                            "show_gap_heat": bool(show_gap_heat),
-                                            "gap_scale_m": float(gap_scale_m),
-                                            "show_gap_hud": bool(show_gap_hud),
-                                            "min_gap_window": int(min_gap_window),
-                                            "min_gap_step": int(min_gap_step),
-                                            "hover_contact_marker": bool(hover_contact_marker),
-                                            "show_minimap": bool(show_minimap),
-                                            "minimap_size": int(minimap_size),
-                                            "body_y_offset_m": float(body_y_off),
-                                            "body_L_m": float(body_L),
-                                            "body_W_m": float(body_W),
-                                            "body_H_m": float(body_H),
-                                            "road_window_points": int(road_win),
-                                            "path_window_points": 160,
-                                            "roll_sign": 1.0,
-                                            "pitch_sign": 1.0,
-                                            "spin_sign": 1.0,
-                                            "wheel_x_off_m": {"ЛП": base_m * 0.5, "ПП": base_m * 0.5, "ЛЗ": -base_m * 0.5, "ПЗ": -base_m * 0.5},
-                                            "wheel_z_off_m": {"ЛП": -track_m * 0.5, "ПП": track_m * 0.5, "ЛЗ": -track_m * 0.5, "ПЗ": track_m * 0.5},
-                                        }
-
-                                        mech3d_comp(
-                                            title="Механика 3D (машинка wireframe)",
-                                            time=time_s,
-                                            body=body3d,
-                                            wheel=wheel,
-                                            road=road,
-                                            phi=phi.tolist(),
-                                            theta=theta.tolist(),
-                                            selected=st.session_state.get("mech_selected_corners", []),
-                                            path=path_payload,
-                                            geo=geo_payload,
-                                            dataset_id=dataset_id_ui,
-                                            playhead_storage_key="pneumo_play_state",
-                                            height=680,
-                                            key="mech3d_pick_event",
-                                            default=None,
-                                        )
-                                render_mechanical_scheme_asset_expander(
-                                    st,
-                                    base_dir=HERE,
-                                    safe_image_fn=safe_image,
-                                )
-
-                        else:
-                            render_non_mechanical_animation_subsection(
-                                anim_view,
-                                render_flow_tool_fn=_render_flow_tool_animation,
-                                render_svg_scheme_fn=_render_svg_scheme_animation,
-                            )
 
 
 
 if SHOW_RUN:
     # -------------------------------
-    # Оптимизация (фон)
+    # РћРїС‚РёРјРёР·Р°С†РёСЏ (С„РѕРЅ)
     # -------------------------------
     st.divider()
-    st.header("Оптимизация (фон)")
+    st.header("РћРїС‚РёРјРёР·Р°С†РёСЏ (С„РѕРЅ)")
 
     colO1, colO2, colO3 = st.columns([1.2, 1.0, 1.0], gap="large")
 
     with colO1:
-        st.markdown("**Команды**")
-        btn_start = st.button("Старт оптимизации", disabled=pid_alive(st.session_state.opt_proc) or bool(param_errors) or bool(suite_errors))
+        st.markdown("**РљРѕРјР°РЅРґС‹**")
+        btn_start = st.button("РЎС‚Р°СЂС‚ РѕРїС‚РёРјРёР·Р°С†РёРё", disabled=pid_alive(st.session_state.opt_proc) or bool(param_errors) or bool(suite_errors))
         colS1, colS2 = st.columns(2)
         with colS1:
-            btn_stop_soft = st.button("Стоп (мягко)", disabled=not pid_alive(st.session_state.opt_proc), help="Создаёт STOP‑файл. Оптимизатор сам корректно завершится и сохранит CSV/прогресс.")
+            btn_stop_soft = st.button("РЎС‚РѕРї (РјСЏРіРєРѕ)", disabled=not pid_alive(st.session_state.opt_proc), help="РЎРѕР·РґР°С‘С‚ STOPвЂ‘С„Р°Р№Р». РћРїС‚РёРјРёР·Р°С‚РѕСЂ СЃР°Рј РєРѕСЂСЂРµРєС‚РЅРѕ Р·Р°РІРµСЂС€РёС‚СЃСЏ Рё СЃРѕС…СЂР°РЅРёС‚ CSV/РїСЂРѕРіСЂРµСЃСЃ.")
         with colS2:
-            btn_stop_hard = st.button("Стоп (жёстко)", disabled=not pid_alive(st.session_state.opt_proc), help="Создаёт STOP‑файл и принудительно завершает процесс. Используйте только если мягкая остановка не срабатывает.")
+            btn_stop_hard = st.button("РЎС‚РѕРї (Р¶С‘СЃС‚РєРѕ)", disabled=not pid_alive(st.session_state.opt_proc), help="РЎРѕР·РґР°С‘С‚ STOPвЂ‘С„Р°Р№Р» Рё РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕ Р·Р°РІРµСЂС€Р°РµС‚ РїСЂРѕС†РµСЃСЃ. РСЃРїРѕР»СЊР·СѓР№С‚Рµ С‚РѕР»СЊРєРѕ РµСЃР»Рё РјСЏРіРєР°СЏ РѕСЃС‚Р°РЅРѕРІРєР° РЅРµ СЃСЂР°Р±Р°С‚С‹РІР°РµС‚.")
 
     with colO2:
-        st.markdown("**Статус**")
+        st.markdown("**РЎС‚Р°С‚СѓСЃ**")
         if pid_alive(st.session_state.opt_proc):
-            st.success(f"Оптимизация идёт (PID={st.session_state.opt_proc.pid})")
+            st.success(f"РћРїС‚РёРјРёР·Р°С†РёСЏ РёРґС‘С‚ (PID={st.session_state.opt_proc.pid})")
             if st.session_state.opt_stop_requested:
-                st.warning("Запрошена мягкая остановка… ждём завершения процесса.")
+                st.warning("Р—Р°РїСЂРѕС€РµРЅР° РјСЏРіРєР°СЏ РѕСЃС‚Р°РЅРѕРІРєР°вЂ¦ Р¶РґС‘Рј Р·Р°РІРµСЂС€РµРЅРёСЏ РїСЂРѕС†РµСЃСЃР°.")
         else:
-            st.info("Оптимизация не запущена")
-            # если процесс завершился (сам или после мягкого STOP) — чистим состояние
+            st.info("РћРїС‚РёРјРёР·Р°С†РёСЏ РЅРµ Р·Р°РїСѓС‰РµРЅР°")
+            # РµСЃР»Рё РїСЂРѕС†РµСЃСЃ Р·Р°РІРµСЂС€РёР»СЃСЏ (СЃР°Рј РёР»Рё РїРѕСЃР»Рµ РјСЏРіРєРѕРіРѕ STOP) вЂ” С‡РёСЃС‚РёРј СЃРѕСЃС‚РѕСЏРЅРёРµ
             if st.session_state.opt_proc is not None:
                 st.session_state.opt_proc = None
             st.session_state.opt_stop_requested = False
 
         if st.session_state.opt_out_csv:
-            st.write("Файл результатов:", st.session_state.opt_out_csv)
-            # прогресс оптимизации (файл пишет worker)
+            st.write("Р¤Р°Р№Р» СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ:", st.session_state.opt_out_csv)
+            # РїСЂРѕРіСЂРµСЃСЃ РѕРїС‚РёРјРёР·Р°С†РёРё (С„Р°Р№Р» РїРёС€РµС‚ worker)
             try:
                 out_csv_path = Path(st.session_state.opt_out_csv)
                 progress_path = out_csv_path.with_suffix("")
@@ -4857,24 +3916,24 @@ if SHOW_RUN:
                     try:
                         _mtime = os.path.getmtime(progress_path)
                         _age = time.time() - float(_mtime)
-                        st.caption(f"Прогресс‑файл обновлён {_age:.1f} с назад: {progress_path}")
-                        # Если процесс жив, а файл давно не обновлялся — вероятно завис/упал или пишет в другой каталог.
+                        st.caption(f"РџСЂРѕРіСЂРµСЃСЃвЂ‘С„Р°Р№Р» РѕР±РЅРѕРІР»С‘РЅ {_age:.1f} СЃ РЅР°Р·Р°Рґ: {progress_path}")
+                        # Р•СЃР»Рё РїСЂРѕС†РµСЃСЃ Р¶РёРІ, Р° С„Р°Р№Р» РґР°РІРЅРѕ РЅРµ РѕР±РЅРѕРІР»СЏР»СЃСЏ вЂ” РІРµСЂРѕСЏС‚РЅРѕ Р·Р°РІРёСЃ/СѓРїР°Р» РёР»Рё РїРёС€РµС‚ РІ РґСЂСѓРіРѕР№ РєР°С‚Р°Р»РѕРі.
                         if pid_alive(st.session_state.opt_proc) and (_age > max(300.0, 10.0*float(refresh_sec) + 5.0)):
-                            st.caption("⚠️ Прогресс‑файл давно не обновлялся. Если это неожиданно — проверьте, что worker пишет progress.json в тот же каталог и что расчёт не завис.")
+                            st.caption("вљ пёЏ РџСЂРѕРіСЂРµСЃСЃвЂ‘С„Р°Р№Р» РґР°РІРЅРѕ РЅРµ РѕР±РЅРѕРІР»СЏР»СЃСЏ. Р•СЃР»Рё СЌС‚Рѕ РЅРµРѕР¶РёРґР°РЅРЅРѕ вЂ” РїСЂРѕРІРµСЂСЊС‚Рµ, С‡С‚Рѕ worker РїРёС€РµС‚ progress.json РІ С‚РѕС‚ Р¶Рµ РєР°С‚Р°Р»РѕРі Рё С‡С‚Рѕ СЂР°СЃС‡С‘С‚ РЅРµ Р·Р°РІРёСЃ.")
                     except Exception:
                         pass
 
-                    лимит_мин = float(prog.get("лимит_минут", 0.0) or 0.0)
-                    прошло_сек = float(prog.get("прошло_сек", 0.0) or 0.0)
+                    time_limit_min = float(prog.get("лимит_минут", 0.0) or 0.0)
+                    elapsed_sec = float(prog.get("прошло_сек", 0.0) or 0.0)
                     ts_start = prog.get("ts_start", None)
                     try:
                         if ts_start is not None:
-                            прошло_сек_live = max(прошло_сек, time.time() - float(ts_start))
+                            elapsed_sec_live = max(elapsed_sec, time.time() - float(ts_start))
                         else:
-                            прошло_сек_live = прошло_сек
+                            elapsed_sec_live = elapsed_sec
                     except Exception:
-                        прошло_сек_live = прошло_сек
-                    статус = str(prog.get("статус", "") or "")
+                        elapsed_sec_live = elapsed_sec
+                    status_text = str(prog.get("статус", "") or "")
                     ok = prog.get("ok", None)
                     err = prog.get("err", None)
 
@@ -4898,8 +3957,8 @@ if SHOW_RUN:
                         stage_name = str(staged_summary.get("stage", "") or "")
                         stage_idx = int(staged_summary.get("idx", 0) or 0)
                         stage_total = int(staged_summary.get("stage_total", 0) or 0)
-                        готово = int(staged_summary.get("total_rows_live", 0) or 0)
-                        готово_в_файле = int(staged_summary.get("total_rows_live", готово) or готово)
+                        total_done = int(staged_summary.get("total_rows_live", 0) or 0)
+                        total_done_in_file = int(staged_summary.get("total_rows_live", total_done) or total_done)
                         stage_rows_current = int(staged_summary.get("stage_rows_current", 0) or 0)
                         stage_rows_done_before = int(staged_summary.get("stage_rows_done_before", 0) or 0)
                         worker_done_current = int(staged_summary.get("worker_done_current", stage_rows_current) or stage_rows_current)
@@ -4907,45 +3966,45 @@ if SHOW_RUN:
                         stage_elapsed_sec = staged_summary.get("stage_elapsed_sec", None)
                         stage_budget_sec = staged_summary.get("stage_budget_sec", None)
 
-                        st.write(f"Стадия: **{stage_name}** (idx={stage_idx}, 0-based; всего стадий: {max(1, stage_total)})")
+                        st.write(f"РЎС‚Р°РґРёСЏ: **{stage_name}** (idx={stage_idx}, 0-based; РІСЃРµРіРѕ СЃС‚Р°РґРёР№: {max(1, stage_total)})")
                         st.caption(describe_runtime_stage(stage_name))
-                        st.write(f"Готово (суммарно): {готово}  |  Записано в файл: {готово_в_файле}")
-                        st.write(f"Текущая стадия: rows в CSV = **{stage_rows_current}**  |  по progress worker = {worker_done_current}/{worker_written_current}")
+                        st.write(f"Готово (суммарно): {total_done}  |  Записано в файл: {total_done_in_file}")
+                        st.write(f"РўРµРєСѓС‰Р°СЏ СЃС‚Р°РґРёСЏ: rows РІ CSV = **{stage_rows_current}**  |  РїРѕ progress worker = {worker_done_current}/{worker_written_current}")
                         if stage_rows_done_before > 0:
-                            st.caption(f"Завершённые предыдущие стадии уже дали строк: {stage_rows_done_before}")
+                            st.caption(f"Р—Р°РІРµСЂС€С‘РЅРЅС‹Рµ РїСЂРµРґС‹РґСѓС‰РёРµ СЃС‚Р°РґРёРё СѓР¶Рµ РґР°Р»Рё СЃС‚СЂРѕРє: {stage_rows_done_before}")
                         if stage_budget_sec is not None and float(stage_budget_sec) > 0:
                             frac_stage = max(0.0, min(1.0, float(stage_elapsed_sec or 0.0) / float(stage_budget_sec)))
-                            st.progress(frac_stage, text=f"Прогресс текущей стадии по времени: {frac_stage*100:.1f}% (статус: {статус})")
-                        elif лимит_мин > 0:
-                            frac_t = max(0.0, min(1.0, прошло_сек_live / (лимит_мин * 60.0)))
-                            st.progress(frac_t, text=f"Прогресс по времени: {frac_t*100:.1f}% (статус: {статус})")
+                            st.progress(frac_stage, text=f"РџСЂРѕРіСЂРµСЃСЃ С‚РµРєСѓС‰РµР№ СЃС‚Р°РґРёРё РїРѕ РІСЂРµРјРµРЅРё: {frac_stage*100:.1f}% (СЃС‚Р°С‚СѓСЃ: {status_text})")
+                        elif time_limit_min > 0:
+                            frac_t = max(0.0, min(1.0, elapsed_sec_live / (time_limit_min * 60.0)))
+                            st.progress(frac_t, text=f"РџСЂРѕРіСЂРµСЃСЃ РїРѕ РІСЂРµРјРµРЅРё: {frac_t*100:.1f}% (СЃС‚Р°С‚СѓСЃ: {status_text})")
                         if bool(staged_summary.get("worker_progress_stale", False)):
-                            st.caption("⚠️ Вложенный progress.json отстаёт от live CSV текущей стадии; UI показывает производные счётчики по фактическим строкам stage CSV.")
+                            st.caption("вљ пёЏ Р’Р»РѕР¶РµРЅРЅС‹Р№ progress.json РѕС‚СЃС‚Р°С‘С‚ РѕС‚ live CSV С‚РµРєСѓС‰РµР№ СЃС‚Р°РґРёРё; UI РїРѕРєР°Р·С‹РІР°РµС‚ РїСЂРѕРёР·РІРѕРґРЅС‹Рµ СЃС‡С‘С‚С‡РёРєРё РїРѕ С„Р°РєС‚РёС‡РµСЃРєРёРј СЃС‚СЂРѕРєР°Рј stage CSV.")
                     else:
-                        готово = int(prog.get("готово_кандидатов", 0) or 0)
-                        готово_в_файле = int(prog.get("готово_кандидатов_в_файле", готово) or 0)
-                        st.write(f"Готово (посчитано): {готово}  |  Записано в файл: {готово_в_файле}")
-                        if лимит_мин > 0:
-                            frac_t = max(0.0, min(1.0, прошло_сек_live / (лимит_мин * 60.0)))
-                            st.progress(frac_t, text=f"Прогресс по времени: {frac_t*100:.1f}% (статус: {статус})")
-                        st.write(f"Готово кандидатов: **{готово}**")
+                        total_done = int(prog.get("готово_кандидатов", 0) or 0)
+                        total_done_in_file = int(prog.get("готово_кандидатов_в_файле", total_done) or 0)
+                        st.write(f"Готово (посчитано): {total_done}  |  Записано в файл: {total_done_in_file}")
+                        if time_limit_min > 0:
+                            frac_t = max(0.0, min(1.0, elapsed_sec_live / (time_limit_min * 60.0)))
+                            st.progress(frac_t, text=f"РџСЂРѕРіСЂРµСЃСЃ РїРѕ РІСЂРµРјРµРЅРё: {frac_t*100:.1f}% (СЃС‚Р°С‚СѓСЃ: {status_text})")
+                        st.write(f"Готово кандидатов: **{total_done}**")
 
                     if ok is not None and err is not None:
-                        st.write(f"В последнем батче: OK={ok}, ERR={err}")
-                    # диагностика: процесс умер, но статус ещё «идёт»
-                    if (not pid_alive(st.session_state.opt_proc)) and статус in ["запущено", "идёт", "stage_running", "baseline_eval", "seed_eval"]:
+                        st.write(f"Р’ РїРѕСЃР»РµРґРЅРµРј Р±Р°С‚С‡Рµ: OK={ok}, ERR={err}")
+                    # РґРёР°РіРЅРѕСЃС‚РёРєР°: РїСЂРѕС†РµСЃСЃ СѓРјРµСЂ, РЅРѕ СЃС‚Р°С‚СѓСЃ РµС‰С‘ В«РёРґС‘С‚В»
+                    if (not pid_alive(st.session_state.opt_proc)) and status_text in ["Р·Р°РїСѓС‰РµРЅРѕ", "РёРґС‘С‚", "stage_running", "baseline_eval", "seed_eval"]:
                         st.error(
-                            "Похоже, worker/staged-runner завершился аварийно или был остановлен до финального статуса, а прогресс не дошёл до 'завершено'. "
-                            "Смотрите log/CSV/staged_progress и stage_*_progress.json."
+                            "РџРѕС…РѕР¶Рµ, worker/staged-runner Р·Р°РІРµСЂС€РёР»СЃСЏ Р°РІР°СЂРёР№РЅРѕ РёР»Рё Р±С‹Р» РѕСЃС‚Р°РЅРѕРІР»РµРЅ РґРѕ С„РёРЅР°Р»СЊРЅРѕРіРѕ СЃС‚Р°С‚СѓСЃР°, Р° РїСЂРѕРіСЂРµСЃСЃ РЅРµ РґРѕС€С‘Р» РґРѕ 'Р·Р°РІРµСЂС€РµРЅРѕ'. "
+                            "РЎРјРѕС‚СЂРёС‚Рµ log/CSV/staged_progress Рё stage_*_progress.json."
                         )
                 else:
-                    st.caption(f"Файл прогресса ещё не создан. Ожидаемый путь: {progress_path}")
+                    st.caption(f"Р¤Р°Р№Р» РїСЂРѕРіСЂРµСЃСЃР° РµС‰С‘ РЅРµ СЃРѕР·РґР°РЅ. РћР¶РёРґР°РµРјС‹Р№ РїСѓС‚СЊ: {progress_path}")
             except Exception as _e:
-                st.caption(f"Не удалось прочитать прогресс: {_e}")
+                st.caption(f"РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ РїСЂРѕРіСЂРµСЃСЃ: {_e}")
 
     with colO3:
-        st.markdown("**Логика**")
-        st.write("Результаты пишутся в CSV инкрементально, каждые N кандидатов.")
+        st.markdown("**Р›РѕРіРёРєР°**")
+        st.write("Р РµР·СѓР»СЊС‚Р°С‚С‹ РїРёС€СѓС‚СЃСЏ РІ CSV РёРЅРєСЂРµРјРµРЅС‚Р°Р»СЊРЅРѕ, РєР°Р¶РґС‹Рµ N РєР°РЅРґРёРґР°С‚РѕРІ.")
 
 
     def write_json(obj: dict, path: Path):
@@ -4969,16 +4028,16 @@ if SHOW_RUN:
         write_json(suite_effective, Path(suite_json))
         write_json(optimization_input_audit, Path(os.path.splitext(out_csv)[0] + "_input_audit.json"))
 
-        # Создаём файл прогресса заранее (чтобы UI не писал «файл прогресса не создан» из‑за гонки времени).
-        # Worker перезапишет его своим первым update.
+        # РЎРѕР·РґР°С‘Рј С„Р°Р№Р» РїСЂРѕРіСЂРµСЃСЃР° Р·Р°СЂР°РЅРµРµ (С‡С‚РѕР±С‹ UI РЅРµ РїРёСЃР°Р» В«С„Р°Р№Р» РїСЂРѕРіСЂРµСЃСЃР° РЅРµ СЃРѕР·РґР°РЅВ» РёР·вЂ‘Р·Р° РіРѕРЅРєРё РІСЂРµРјРµРЅРё).
+        # Worker РїРµСЂРµР·Р°РїРёС€РµС‚ РµРіРѕ СЃРІРѕРёРј РїРµСЂРІС‹Рј update.
         try:
             progress_path = os.path.splitext(out_csv)[0] + "_progress.json"
             write_json({
-                "статус": "запущено",
-                "готово_кандидатов": 0,
-                "прошло_сек": 0.0,
-                "лимит_минут": float(minutes),
-                "последний_batch": 0,
+                "СЃС‚Р°С‚СѓСЃ": "Р·Р°РїСѓС‰РµРЅРѕ",
+                "РіРѕС‚РѕРІРѕ_РєР°РЅРґРёРґР°С‚РѕРІ": 0,
+                "РїСЂРѕС€Р»Рѕ_СЃРµРє": 0.0,
+                "Р»РёРјРёС‚_РјРёРЅСѓС‚": float(minutes),
+                "РїРѕСЃР»РµРґРЅРёР№_batch": 0,
                 "ok": 0,
                 "err": 0,
             }, Path(progress_path))
@@ -4999,7 +4058,7 @@ if SHOW_RUN:
             "--base_json", base_json,
             "--ranges_json", ranges_json,
         ]
-        # удалим стоп‑файл (если был)
+        # СѓРґР°Р»РёРј СЃС‚РѕРївЂ‘С„Р°Р№Р» (РµСЃР»Рё Р±С‹Р»)
         stop_file = HERE / "STOP_OPTIMIZATION.txt"
         if stop_file.exists():
             try:
@@ -5014,7 +4073,7 @@ if SHOW_RUN:
         do_rerun()
 
     if 'btn_stop_soft' in locals() and btn_stop_soft:
-        # Мягкая остановка: только STOP‑файл. Процесс сам завершится, запишет прогресс и корректно закроет файлы.
+        # РњСЏРіРєР°СЏ РѕСЃС‚Р°РЅРѕРІРєР°: С‚РѕР»СЊРєРѕ STOPвЂ‘С„Р°Р№Р». РџСЂРѕС†РµСЃСЃ СЃР°Рј Р·Р°РІРµСЂС€РёС‚СЃСЏ, Р·Р°РїРёС€РµС‚ РїСЂРѕРіСЂРµСЃСЃ Рё РєРѕСЂСЂРµРєС‚РЅРѕ Р·Р°РєСЂРѕРµС‚ С„Р°Р№Р»С‹.
         try:
             (HERE / "STOP_OPTIMIZATION.txt").write_text("stop", encoding="utf-8")
         except Exception:
@@ -5023,7 +4082,7 @@ if SHOW_RUN:
         do_rerun()
 
     if 'btn_stop_hard' in locals() and btn_stop_hard:
-        # Жёсткая остановка: STOP‑файл + принудительное завершение процесса (если нужно).
+        # Р–С‘СЃС‚РєР°СЏ РѕСЃС‚Р°РЅРѕРІРєР°: STOPвЂ‘С„Р°Р№Р» + РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕРµ Р·Р°РІРµСЂС€РµРЅРёРµ РїСЂРѕС†РµСЃСЃР° (РµСЃР»Рё РЅСѓР¶РЅРѕ).
         try:
             (HERE / "STOP_OPTIMIZATION.txt").write_text("stop", encoding="utf-8")
         except Exception:
@@ -5048,21 +4107,21 @@ if SHOW_RUN:
 
 if SHOW_RESULTS:
     # -------------------------------
-    # Просмотр результатов оптимизации
+    # РџСЂРѕСЃРјРѕС‚СЂ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РѕРїС‚РёРјРёР·Р°С†РёРё
     # -------------------------------
-    st.subheader("Просмотр результатов (CSV)")
+    st.subheader("РџСЂРѕСЃРјРѕС‚СЂ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ (CSV)")
 
-    show_csv = st.checkbox("Показывать/обновлять таблицу CSV (может тормозить при долгих прогонах)", value=not pid_alive(st.session_state.opt_proc))
+    show_csv = st.checkbox("РџРѕРєР°Р·С‹РІР°С‚СЊ/РѕР±РЅРѕРІР»СЏС‚СЊ С‚Р°Р±Р»РёС†Сѓ CSV (РјРѕР¶РµС‚ С‚РѕСЂРјРѕР·РёС‚СЊ РїСЂРё РґРѕР»РіРёС… РїСЂРѕРіРѕРЅР°С…)", value=not pid_alive(st.session_state.opt_proc))
 
-    csv_to_view = st.text_input("Открыть CSV", value=st.session_state.opt_out_csv or "")
+    csv_to_view = st.text_input("РћС‚РєСЂС‹С‚СЊ CSV", value=st.session_state.opt_out_csv or "")
     if show_csv and csv_to_view and os.path.exists(csv_to_view):
         try:
             df_all_raw = pd.read_csv(csv_to_view)
             show_service_rows = st.checkbox(
-                "Показывать baseline/service rows",
+                "РџРѕРєР°Р·С‹РІР°С‚СЊ baseline/service rows",
                 value=bool(st.session_state.get("opt_show_service_rows", False)),
                 key="opt_show_service_rows",
-                help="Служебные baseline-anchor строки не считаются реальными кандидатами и обычно скрыты по умолчанию.",
+                help="РЎР»СѓР¶РµР±РЅС‹Рµ baseline-anchor СЃС‚СЂРѕРєРё РЅРµ СЃС‡РёС‚Р°СЋС‚СЃСЏ СЂРµР°Р»СЊРЅС‹РјРё РєР°РЅРґРёРґР°С‚Р°РјРё Рё РѕР±С‹С‡РЅРѕ СЃРєСЂС‹С‚С‹ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ.",
             )
             try:
                 from pneumo_solver_ui.optimization_result_rows import filter_display_df as _filter_opt_display_df
@@ -5072,65 +4131,65 @@ if SHOW_RESULTS:
             _opt_packaging_params = load_packaging_params_from_base_json(st.session_state.get("opt_base_json"))
             if len(df_all) > 0:
                 df_all = enrich_packaging_surface_df(df_all, params=_opt_packaging_params)
-            st.write(f"Строк: {len(df_all)}")
+            st.write(f"РЎС‚СЂРѕРє: {len(df_all)}")
             if len(df_all) != len(df_all_raw):
-                st.caption(f"Скрыто служебных baseline/service rows: {int(len(df_all_raw) - len(df_all))}")
+                st.caption(f"РЎРєСЂС‹С‚Рѕ СЃР»СѓР¶РµР±РЅС‹С… baseline/service rows: {int(len(df_all_raw) - len(df_all))}")
             render_packaging_surface_metrics(st, df_all)
 
-            st.markdown("### Быстрый TOP по суммарному штрафу")
-            if "штраф_физичности_сумма" in df_all.columns:
-                df_top = df_all.sort_values(["штраф_физичности_сумма"], ascending=True).head(30)
+            st.markdown("### Р‘С‹СЃС‚СЂС‹Р№ TOP РїРѕ СЃСѓРјРјР°СЂРЅРѕРјСѓ С€С‚СЂР°С„Сѓ")
+            if "С€С‚СЂР°С„_С„РёР·РёС‡РЅРѕСЃС‚Рё_СЃСѓРјРјР°" in df_all.columns:
+                df_top = df_all.sort_values(["С€С‚СЂР°С„_С„РёР·РёС‡РЅРѕСЃС‚Рё_СЃСѓРјРјР°"], ascending=True).head(30)
                 top_cols = packaging_surface_result_columns(
                     df_top,
-                    leading=["id", "поколение", "штраф_физичности_сумма"],
+                    leading=["id", "РїРѕРєРѕР»РµРЅРёРµ", "С€С‚СЂР°С„_С„РёР·РёС‡РЅРѕСЃС‚Рё_СЃСѓРјРјР°"],
                 )
                 safe_dataframe(df_top[top_cols] if top_cols else df_top, height=260)
 
-            st.markdown("### Pareto: выбор осей (без жёстких отсечек по умолчанию)")
+            st.markdown("### Pareto: РІС‹Р±РѕСЂ РѕСЃРµР№ (Р±РµР· Р¶С‘СЃС‚РєРёС… РѕС‚СЃРµС‡РµРє РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ)")
 
-            # Рабочая копия
+            # Р Р°Р±РѕС‡Р°СЏ РєРѕРїРёСЏ
             df_all2 = df_all.copy()
 
-            # (опционально) фильтр по штрафу — НЕ включён по умолчанию
-            use_pen_filter = st.checkbox("Фильтровать по штрафу физичности", value=False, key="pareto_pen_filter")
-            if use_pen_filter and "штраф_физичности_сумма" in df_all2.columns:
-                pen_max_default = float(np.nanmax(df_all2["штраф_физичности_сумма"].astype(float).values))
-                pen_max = st.number_input("Макс штраф физичности (<=)", min_value=0.0, value=pen_max_default, step=0.5, key="pareto_pen_max")
-                df_all2 = df_all2[df_all2["штраф_физичности_сумма"].astype(float) <= float(pen_max)]
+            # (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ) С„РёР»СЊС‚СЂ РїРѕ С€С‚СЂР°С„Сѓ вЂ” РќР• РІРєР»СЋС‡С‘РЅ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
+            use_pen_filter = st.checkbox("Р¤РёР»СЊС‚СЂРѕРІР°С‚СЊ РїРѕ С€С‚СЂР°С„Сѓ С„РёР·РёС‡РЅРѕСЃС‚Рё", value=False, key="pareto_pen_filter")
+            if use_pen_filter and "С€С‚СЂР°С„_С„РёР·РёС‡РЅРѕСЃС‚Рё_СЃСѓРјРјР°" in df_all2.columns:
+                pen_max_default = float(np.nanmax(df_all2["С€С‚СЂР°С„_С„РёР·РёС‡РЅРѕСЃС‚Рё_СЃСѓРјРјР°"].astype(float).values))
+                pen_max = st.number_input("РњР°РєСЃ С€С‚СЂР°С„ С„РёР·РёС‡РЅРѕСЃС‚Рё (<=)", min_value=0.0, value=pen_max_default, step=0.5, key="pareto_pen_max")
+                df_all2 = df_all2[df_all2["С€С‚СЂР°С„_С„РёР·РёС‡РЅРѕСЃС‚Рё_СЃСѓРјРјР°"].astype(float) <= float(pen_max)]
             df_all2 = apply_packaging_surface_filters(st, df_all2, key_prefix="pareto", compact=True)
 
-            # Выбор осей Pareto — из всех численных столбцов
+            # Р’С‹Р±РѕСЂ РѕСЃРµР№ Pareto вЂ” РёР· РІСЃРµС… С‡РёСЃР»РµРЅРЅС‹С… СЃС‚РѕР»Р±С†РѕРІ
             num_cols = [c for c in df_all2.columns if pd.api.types.is_numeric_dtype(df_all2[c])]
 
             if len(num_cols) < 2:
-                st.info("Недостаточно численных столбцов для Pareto.")
+                st.info("РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ С‡РёСЃР»РµРЅРЅС‹С… СЃС‚РѕР»Р±С†РѕРІ РґР»СЏ Pareto.")
             else:
-                default1 = "цель1_устойчивость_инерция__с" if "цель1_устойчивость_инерция__с" in num_cols else num_cols[0]
-                default2 = "цель2_комфорт__RMS_ускор_м_с2" if "цель2_комфорт__RMS_ускор_м_с2" in num_cols else (num_cols[1] if num_cols[1] != default1 else num_cols[0])
+                default1 = "С†РµР»СЊ1_СѓСЃС‚РѕР№С‡РёРІРѕСЃС‚СЊ_РёРЅРµСЂС†РёСЏ__СЃ" if "С†РµР»СЊ1_СѓСЃС‚РѕР№С‡РёРІРѕСЃС‚СЊ_РёРЅРµСЂС†РёСЏ__СЃ" in num_cols else num_cols[0]
+                default2 = "С†РµР»СЊ2_РєРѕРјС„РѕСЂС‚__RMS_СѓСЃРєРѕСЂ_Рј_СЃ2" if "С†РµР»СЊ2_РєРѕРјС„РѕСЂС‚__RMS_СѓСЃРєРѕСЂ_Рј_СЃ2" in num_cols else (num_cols[1] if num_cols[1] != default1 else num_cols[0])
 
-                obj1 = st.selectbox("Ось X (минимизировать)", num_cols, index=num_cols.index(default1), key="pareto_obj1")
-                obj2 = st.selectbox("Ось Y (минимизировать)", num_cols, index=num_cols.index(default2), key="pareto_obj2")
+                obj1 = st.selectbox("РћСЃСЊ X (РјРёРЅРёРјРёР·РёСЂРѕРІР°С‚СЊ)", num_cols, index=num_cols.index(default1), key="pareto_obj1")
+                obj2 = st.selectbox("РћСЃСЊ Y (РјРёРЅРёРјРёР·РёСЂРѕРІР°С‚СЊ)", num_cols, index=num_cols.index(default2), key="pareto_obj2")
 
                 df_f = df_all2.copy()
                 df_f = df_f[df_f[obj1].apply(lambda v: np.isfinite(float(v)) if v is not None else False)]
                 df_f = df_f[df_f[obj2].apply(lambda v: np.isfinite(float(v)) if v is not None else False)]
 
                 if len(df_f) == 0:
-                    st.info("Нет данных для Pareto (все значения NaN/inf или отфильтрованы).")
+                    st.info("РќРµС‚ РґР°РЅРЅС‹С… РґР»СЏ Pareto (РІСЃРµ Р·РЅР°С‡РµРЅРёСЏ NaN/inf РёР»Рё РѕС‚С„РёР»СЊС‚СЂРѕРІР°РЅС‹).")
                 else:
                     keep = pareto_front_2d(df_f, obj1, obj2)
                     df_p = df_f.loc[keep].copy()
                     st.write(f"Pareto candidates: {len(df_p)} / {len(df_f)}")
 
-                    top_n = st.number_input("TOP‑N для вывода", min_value=5, max_value=500, value=10, step=5, key="pareto_topn")
+                    top_n = st.number_input("TOPвЂ‘N РґР»СЏ РІС‹РІРѕРґР°", min_value=5, max_value=500, value=10, step=5, key="pareto_topn")
 
-                    # Балансный скор: нормализованные оси + (опционально) штраф физичности
+                    # Р‘Р°Р»Р°РЅСЃРЅС‹Р№ СЃРєРѕСЂ: РЅРѕСЂРјР°Р»РёР·РѕРІР°РЅРЅС‹Рµ РѕСЃРё + (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ) С€С‚СЂР°С„ С„РёР·РёС‡РЅРѕСЃС‚Рё
                     df_p["_o1n"] = (df_p[obj1] - df_p[obj1].min()) / (df_p[obj1].max() - df_p[obj1].min() + 1e-12)
                     df_p["_o2n"] = (df_p[obj2] - df_p[obj2].min()) / (df_p[obj2].max() - df_p[obj2].min() + 1e-12)
 
-                    if "штраф_физичности_сумма" in df_p.columns:
-                        w_pen = st.slider("Вес штрафа в балансном скоре", 0.0, 5.0, 1.0, 0.1, key="pareto_wpen")
-                        df_p["_penn"] = (df_p["штраф_физичности_сумма"] - df_p["штраф_физичности_сумма"].min()) / (df_p["штраф_физичности_сумма"].max() - df_p["штраф_физичности_сумма"].min() + 1e-12)
+                    if "С€С‚СЂР°С„_С„РёР·РёС‡РЅРѕСЃС‚Рё_СЃСѓРјРјР°" in df_p.columns:
+                        w_pen = st.slider("Р’РµСЃ С€С‚СЂР°С„Р° РІ Р±Р°Р»Р°РЅСЃРЅРѕРј СЃРєРѕСЂРµ", 0.0, 5.0, 1.0, 0.1, key="pareto_wpen")
+                        df_p["_penn"] = (df_p["С€С‚СЂР°С„_С„РёР·РёС‡РЅРѕСЃС‚Рё_СЃСѓРјРјР°"] - df_p["С€С‚СЂР°С„_С„РёР·РёС‡РЅРѕСЃС‚Рё_СЃСѓРјРјР°"].min()) / (df_p["С€С‚СЂР°С„_С„РёР·РёС‡РЅРѕСЃС‚Рё_СЃСѓРјРјР°"].max() - df_p["С€С‚СЂР°С„_С„РёР·РёС‡РЅРѕСЃС‚Рё_СЃСѓРјРјР°"].min() + 1e-12)
                     else:
                         w_pen = 0.0
                         df_p["_penn"] = 0.0
@@ -5139,47 +4198,47 @@ if SHOW_RESULTS:
 
                     df_top = df_p.sort_values("_score_bal").head(int(top_n)).copy()
 
-                    # Что показывать в таблице
+                    # Р§С‚Рѕ РїРѕРєР°Р·С‹РІР°С‚СЊ РІ С‚Р°Р±Р»РёС†Рµ
                     show_cols = []
-                    for c in ["id", "поколение", "seed_candidates", "seed_conditions"]:
+                    for c in ["id", "РїРѕРєРѕР»РµРЅРёРµ", "seed_candidates", "seed_conditions"]:
                         if c in df_top.columns:
                             show_cols.append(c)
                     show_cols += [obj1, obj2]
-                    if "штраф_физичности_сумма" in df_top.columns:
-                        show_cols.append("штраф_физичности_сумма")
+                    if "С€С‚СЂР°С„_С„РёР·РёС‡РЅРѕСЃС‚Рё_СЃСѓРјРјР°" in df_top.columns:
+                        show_cols.append("С€С‚СЂР°С„_С„РёР·РёС‡РЅРѕСЃС‚Рё_СЃСѓРјРјР°")
                     for c in packaging_surface_result_columns(df_top, leading=[]):
                         if c not in show_cols:
                             show_cols.append(c)
 
                     safe_dataframe(df_top[show_cols])
 
-                    st.markdown("#### 3 финала (aggressive / balanced / comfort)")
+                    st.markdown("#### 3 С„РёРЅР°Р»Р° (aggressive / balanced / comfort)")
                     aggressive = df_p.sort_values(obj1).head(1).copy()
                     comfort = df_p.sort_values(obj2).head(1).copy()
                     balanced = df_p.sort_values("_score_bal").head(1).copy()
 
-                    aggressive["финал"] = "aggressive"
-                    balanced["финал"] = "balanced"
-                    comfort["финал"] = "comfort"
+                    aggressive["С„РёРЅР°Р»"] = "aggressive"
+                    balanced["С„РёРЅР°Р»"] = "balanced"
+                    comfort["С„РёРЅР°Р»"] = "comfort"
 
                     finals = pd.concat([aggressive, balanced, comfort], ignore_index=True)
-                    finals_cols = show_cols + (["финал"] if "финал" in finals.columns else [])
+                    finals_cols = show_cols + (["С„РёРЅР°Р»"] if "С„РёРЅР°Р»" in finals.columns else [])
                     safe_dataframe(finals[finals_cols])
 
-                    # Выгрузка
+                    # Р’С‹РіСЂСѓР·РєР°
                     buf = BytesIO()
                     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
                         df_p.drop(columns=[c for c in ["_o1n","_o2n","_penn","_score_bal"] if c in df_p.columns]).to_excel(writer, sheet_name="pareto", index=False)
                         df_top.drop(columns=[c for c in ["_o1n","_o2n","_penn","_score_bal"] if c in df_top.columns]).to_excel(writer, sheet_name="topN", index=False)
                         finals.to_excel(writer, sheet_name="finals", index=False)
                     st.download_button(
-                        "Скачать Pareto/Top/Finals (xlsx)",
+                        "РЎРєР°С‡Р°С‚СЊ Pareto/Top/Finals (xlsx)",
                         data=buf.getvalue(),
                         file_name="pareto_top_final.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
         except Exception as e:
-            st.error(f"Не могу прочитать CSV: {e}")
+            st.error(f"РќРµ РјРѕРіСѓ РїСЂРѕС‡РёС‚Р°С‚СЊ CSV: {e}")
 
 
 
@@ -5187,22 +4246,22 @@ if SHOW_RESULTS:
 
 if SHOW_RESULTS:
     # -------------------------------
-    # Диаграммы: сравнение прогонов + влияние параметров (N→N)
+    # Р”РёР°РіСЂР°РјРјС‹: СЃСЂР°РІРЅРµРЅРёРµ РїСЂРѕРіРѕРЅРѕРІ + РІР»РёСЏРЅРёРµ РїР°СЂР°РјРµС‚СЂРѕРІ (Nв†’N)
     # -------------------------------
 
     st.markdown("---")
-    st.subheader("Диаграммы: сравнение и влияние параметров")
+    st.subheader("Р”РёР°РіСЂР°РјРјС‹: СЃСЂР°РІРЅРµРЅРёРµ Рё РІР»РёСЏРЅРёРµ РїР°СЂР°РјРµС‚СЂРѕРІ")
 
-    with st.expander("Влияние параметров (N→N) — анализ CSV оптимизации/экспериментов", expanded=False):
+    with st.expander("Р’Р»РёСЏРЅРёРµ РїР°СЂР°РјРµС‚СЂРѕРІ (Nв†’N) вЂ” Р°РЅР°Р»РёР· CSV РѕРїС‚РёРјРёР·Р°С†РёРё/СЌРєСЃРїРµСЂРёРјРµРЅС‚РѕРІ", expanded=False):
         st.caption(
-            "Coordinated multiple views: Explorer (выбор) → матрицы/MI → Sankey → PDP/ICE → N×N чувствительность → интеракции (H). "
-            "Поддерживает reference CSV (A/B/Δ), сохранение сессий и передачу выбранных NPZ в сравнение."
+            "Coordinated multiple views: Explorer (РІС‹Р±РѕСЂ) в†’ РјР°С‚СЂРёС†С‹/MI в†’ Sankey в†’ PDP/ICE в†’ NГ—N С‡СѓРІСЃС‚РІРёС‚РµР»СЊРЅРѕСЃС‚СЊ в†’ РёРЅС‚РµСЂР°РєС†РёРё (H). "
+            "РџРѕРґРґРµСЂР¶РёРІР°РµС‚ reference CSV (A/B/О”), СЃРѕС…СЂР°РЅРµРЅРёРµ СЃРµСЃСЃРёР№ Рё РїРµСЂРµРґР°С‡Сѓ РІС‹Р±СЂР°РЅРЅС‹С… NPZ РІ СЃСЂР°РІРЅРµРЅРёРµ."
         )
         enable_pi = st.checkbox(
-            "Включить Dashboard влияния (может быть тяжёлым на больших CSV)",
+            "Р’РєР»СЋС‡РёС‚СЊ Dashboard РІР»РёСЏРЅРёСЏ (РјРѕР¶РµС‚ Р±С‹С‚СЊ С‚СЏР¶С‘Р»С‹Рј РЅР° Р±РѕР»СЊС€РёС… CSV)",
             value=bool(st.session_state.get("pi_enable_dashboard") or False),
             key="pi_enable_dashboard",
-            help="Если CSV большой, включайте после выбора файла и фильтров."
+            help="Р•СЃР»Рё CSV Р±РѕР»СЊС€РѕР№, РІРєР»СЋС‡Р°Р№С‚Рµ РїРѕСЃР»Рµ РІС‹Р±РѕСЂР° С„Р°Р№Р»Р° Рё С„РёР»СЊС‚СЂРѕРІ."
         )
         if enable_pi:
             try:
@@ -5215,25 +4274,25 @@ if SHOW_RESULTS:
                     allow_upload=True,
                 )
             except Exception as _e:
-                st.error(f"Не удалось открыть модуль влияния параметров: {_e}")
+                st.error(f"РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ РјРѕРґСѓР»СЊ РІР»РёСЏРЅРёСЏ РїР°СЂР°РјРµС‚СЂРѕРІ: {_e}")
         else:
-            st.info("Включите чекбокс выше, чтобы отрисовать полный Dashboard влияния.")
+            st.info("Р’РєР»СЋС‡РёС‚Рµ С‡РµРєР±РѕРєСЃ РІС‹С€Рµ, С‡С‚РѕР±С‹ РѕС‚СЂРёСЃРѕРІР°С‚СЊ РїРѕР»РЅС‹Р№ Dashboard РІР»РёСЏРЅРёСЏ.")
 
 
-    with st.expander("Сравнение прогонов (NPZ) — overlay/small‑multiples/Δ/метрики", expanded=False):
+    with st.expander("РЎСЂР°РІРЅРµРЅРёРµ РїСЂРѕРіРѕРЅРѕРІ (NPZ) вЂ” overlay/smallвЂ‘multiples/О”/РјРµС‚СЂРёРєРё", expanded=False):
         st.caption(
-            "Сравнение нескольких NPZ (Txx_osc.npz): наложение, small‑multiples, разность относительно референса, "
-            "метрики (RMS/ptp/mean/min/max), playhead (без лишних rerun) и сохранение сессий сравнения."
+            "РЎСЂР°РІРЅРµРЅРёРµ РЅРµСЃРєРѕР»СЊРєРёС… NPZ (Txx_osc.npz): РЅР°Р»РѕР¶РµРЅРёРµ, smallвЂ‘multiples, СЂР°Р·РЅРѕСЃС‚СЊ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ СЂРµС„РµСЂРµРЅСЃР°, "
+            "РјРµС‚СЂРёРєРё (RMS/ptp/mean/min/max), playhead (Р±РµР· Р»РёС€РЅРёС… rerun) Рё СЃРѕС…СЂР°РЅРµРЅРёРµ СЃРµСЃСЃРёР№ СЃСЂР°РІРЅРµРЅРёСЏ."
         )
         st.info(
-            "Если браузер тяжело тянет большие traces — используйте Desktop Compare Viewer: "
-            "`INSTALL_DESKTOP_COMPARE_WINDOWS.bat` → `RUN_COMPARE_VIEWER_WINDOWS.bat`."
+            "Р•СЃР»Рё Р±СЂР°СѓР·РµСЂ С‚СЏР¶РµР»Рѕ С‚СЏРЅРµС‚ Р±РѕР»СЊС€РёРµ traces вЂ” РёСЃРїРѕР»СЊР·СѓР№С‚Рµ Desktop Compare Viewer: "
+            "`INSTALL_DESKTOP_COMPARE_WINDOWS.bat` в†’ `RUN_COMPARE_VIEWER_WINDOWS.bat`."
         )
         enable_cmp = st.checkbox(
-            "Включить Dashboard сравнения NPZ",
+            "Р’РєР»СЋС‡РёС‚СЊ Dashboard СЃСЂР°РІРЅРµРЅРёСЏ NPZ",
             value=bool(st.session_state.get("cmp_enable_dashboard") or False),
             key="cmp_enable_dashboard",
-            help="Если NPZ много/тяжёлые — включайте после выбора каталога и нужных файлов."
+            help="Р•СЃР»Рё NPZ РјРЅРѕРіРѕ/С‚СЏР¶С‘Р»С‹Рµ вЂ” РІРєР»СЋС‡Р°Р№С‚Рµ РїРѕСЃР»Рµ РІС‹Р±РѕСЂР° РєР°С‚Р°Р»РѕРіР° Рё РЅСѓР¶РЅС‹С… С„Р°Р№Р»РѕРІ."
         )
         if enable_cmp:
             try:
@@ -5247,16 +4306,16 @@ if SHOW_RESULTS:
                     allow_upload=True,
                 )
             except Exception as _e:
-                st.error(f"Не удалось открыть модуль сравнения NPZ: {_e}")
+                st.error(f"РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ РјРѕРґСѓР»СЊ СЃСЂР°РІРЅРµРЅРёСЏ NPZ: {_e}")
         else:
-            st.info("Включите чекбокс выше, чтобы отрисовать Dashboard сравнения.")
+            st.info("Р’РєР»СЋС‡РёС‚Рµ С‡РµРєР±РѕРєСЃ РІС‹С€Рµ, С‡С‚РѕР±С‹ РѕС‚СЂРёСЃРѕРІР°С‚СЊ Dashboard СЃСЂР°РІРЅРµРЅРёСЏ.")
 
 
 if SHOW_TOOLS:
     # -------------------------------
-    # Калибровка / Autopilot (NPZ/CSV) — UI
+    # РљР°Р»РёР±СЂРѕРІРєР° / Autopilot (NPZ/CSV) вЂ” UI
     # -------------------------------
-    with st.expander("Калибровка и Autopilot (NPZ/CSV) — эксперимент", expanded=False):
+    with st.expander("РљР°Р»РёР±СЂРѕРІРєР° Рё Autopilot (NPZ/CSV) вЂ” СЌРєСЃРїРµСЂРёРјРµРЅС‚", expanded=False):
         st.markdown(
             """
             ...
@@ -5265,22 +4324,22 @@ if SHOW_TOOLS:
         # Where calibration/autopilot looks for oscillogram logs.
         # Default: workspace/osc (inside the project), but user may point to any local folder.
         osc_dir_input = st.text_input(
-            "Папка с логами (osc_dir): где лежат NPZ/CSV и куда их сохранять",
+            "РџР°РїРєР° СЃ Р»РѕРіР°РјРё (osc_dir): РіРґРµ Р»РµР¶Р°С‚ NPZ/CSV Рё РєСѓРґР° РёС… СЃРѕС…СЂР°РЅСЏС‚СЊ",
             value=str(st.session_state.get("osc_dir_path", WORKSPACE_OSC_DIR)),
             key="osc_dir_path",
             help=(
-                "Калибровка и Autopilot читают Txx_osc.npz из этой папки. "
-                "По умолчанию это pneumo_solver_ui/workspace/osc, но можно выбрать любую локальную директорию."
+                "РљР°Р»РёР±СЂРѕРІРєР° Рё Autopilot С‡РёС‚Р°СЋС‚ Txx_osc.npz РёР· СЌС‚РѕР№ РїР°РїРєРё. "
+                "РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ СЌС‚Рѕ pneumo_solver_ui/workspace/osc, РЅРѕ РјРѕР¶РЅРѕ РІС‹Р±СЂР°С‚СЊ Р»СЋР±СѓСЋ Р»РѕРєР°Р»СЊРЅСѓСЋ РґРёСЂРµРєС‚РѕСЂРёСЋ."
             ),
         )
         osc_dir = Path(osc_dir_input).expanduser()
         try:
             osc_dir.mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            st.error(f"Не могу создать/открыть osc_dir: {osc_dir} ({e})")
+            st.error(f"РќРµ РјРѕРіСѓ СЃРѕР·РґР°С‚СЊ/РѕС‚РєСЂС‹С‚СЊ osc_dir: {osc_dir} ({e})")
         st.code(str(osc_dir), language="text")
 
-        # Подсказка по ожидаемым именам файлов (если есть baseline-suite)
+        # РџРѕРґСЃРєР°Р·РєР° РїРѕ РѕР¶РёРґР°РµРјС‹Рј РёРјРµРЅР°Рј С„Р°Р№Р»РѕРІ (РµСЃР»Рё РµСЃС‚СЊ baseline-suite)
         _tests_map = st.session_state.get("baseline_tests_map") or {}
         if _tests_map:
             _avail = list(_tests_map.keys())
@@ -5293,9 +4352,9 @@ if SHOW_TOOLS:
                 })
             safe_dataframe(pd.DataFrame(_rows), hide_index=True)
 
-        st.write("Добавить файлы в osc_dir (см. путь выше):")
+        st.write("Р”РѕР±Р°РІРёС‚СЊ С„Р°Р№Р»С‹ РІ osc_dir (СЃРј. РїСѓС‚СЊ РІС‹С€Рµ):")
         uploads = st.file_uploader(
-            "NPZ/CSV (можно несколько)",
+            "NPZ/CSV (РјРѕР¶РЅРѕ РЅРµСЃРєРѕР»СЊРєРѕ)",
             type=["npz", "csv"],
             accept_multiple_files=True,
             key="osc_upload_files",
@@ -5323,9 +4382,9 @@ if SHOW_TOOLS:
                     dst.write_bytes(uf.getbuffer())
                     log_event("osc_upload", name=fname, size=int(len(uf.getbuffer())))
                 except Exception as e:
-                    st.error(f"Не смог сохранить {uf.name}: {e}")
+                    st.error(f"РќРµ СЃРјРѕРі СЃРѕС…СЂР°РЅРёС‚СЊ {uf.name}: {e}")
 
-        # Список файлов
+        # РЎРїРёСЃРѕРє С„Р°Р№Р»РѕРІ
         npz_files = sorted(osc_dir.glob("*.npz"))
         csv_files = sorted(osc_dir.glob("*.csv"))
         st.write(f"NPZ: {len(npz_files)}, CSV: {len(csv_files)}")
@@ -5344,19 +4403,19 @@ if SHOW_TOOLS:
 
     
         # -------------------------------------------------
-        # Mapping: произвольные файлы -> ожидаемые Txx_osc.npz
+        # Mapping: РїСЂРѕРёР·РІРѕР»СЊРЅС‹Рµ С„Р°Р№Р»С‹ -> РѕР¶РёРґР°РµРјС‹Рµ Txx_osc.npz
         # -------------------------------------------------
-        st.markdown("### Mapping файлов ➜ Txx_osc.npz (без ручной писанины в консоли)")
+        st.markdown("### Mapping С„Р°Р№Р»РѕРІ вћњ Txx_osc.npz (Р±РµР· СЂСѓС‡РЅРѕР№ РїРёСЃР°РЅРёРЅС‹ РІ РєРѕРЅСЃРѕР»Рё)")
         st.caption(
-            "Autopilot/калибровка по умолчанию ищут файлы с именами T01_osc.npz, T02_osc.npz, ... "
-            "Если у тебя файлы называются иначе — выбери соответствие здесь и нажми «Применить mapping»."
+            "Autopilot/РєР°Р»РёР±СЂРѕРІРєР° РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ РёС‰СѓС‚ С„Р°Р№Р»С‹ СЃ РёРјРµРЅР°РјРё T01_osc.npz, T02_osc.npz, ... "
+            "Р•СЃР»Рё Сѓ С‚РµР±СЏ С„Р°Р№Р»С‹ РЅР°Р·С‹РІР°СЋС‚СЃСЏ РёРЅР°С‡Рµ вЂ” РІС‹Р±РµСЂРё СЃРѕРѕС‚РІРµС‚СЃС‚РІРёРµ Р·РґРµСЃСЊ Рё РЅР°Р¶РјРё В«РџСЂРёРјРµРЅРёС‚СЊ mappingВ»."
         )
 
         _all_files = sorted([p.name for p in (npz_files + csv_files)])
         if (_tests_map or {}) and _all_files:
-            file_opts = ["(не выбрано)"] + _all_files
+            file_opts = ["(РЅРµ РІС‹Р±СЂР°РЅРѕ)"] + _all_files
 
-            # Попробуем загрузить сохранённый mapping (если есть)
+            # РџРѕРїСЂРѕР±СѓРµРј Р·Р°РіСЂСѓР·РёС‚СЊ СЃРѕС…СЂР°РЅС‘РЅРЅС‹Р№ mapping (РµСЃР»Рё РµСЃС‚СЊ)
             mapping_json_path = osc_dir / "mapping_tests_files.json"
             _saved_map = {}
             try:
@@ -5368,7 +4427,7 @@ if SHOW_TOOLS:
             _rows_map = []
             for i, name in enumerate(list(_tests_map.keys()), start=1):
                 expected = f"T{i:02d}_osc.npz"
-                # default: если ожидаемый уже есть, берём его; иначе пытаемся из сохранённого mapping
+                # default: РµСЃР»Рё РѕР¶РёРґР°РµРјС‹Р№ СѓР¶Рµ РµСЃС‚СЊ, Р±РµСЂС‘Рј РµРіРѕ; РёРЅР°С‡Рµ РїС‹С‚Р°РµРјСЃСЏ РёР· СЃРѕС…СЂР°РЅС‘РЅРЅРѕРіРѕ mapping
                 pick = expected if expected in _all_files else _saved_map.get(str(i), "")
                 if pick not in _all_files:
                     pick = ""
@@ -5376,7 +4435,7 @@ if SHOW_TOOLS:
                     {
                         "test_num": i,
                         "test_name": name,
-                        "source_file": pick if pick else "(не выбрано)",
+                        "source_file": pick if pick else "(РЅРµ РІС‹Р±СЂР°РЅРѕ)",
                         "expected_npz": expected,
                     }
                 )
@@ -5384,7 +4443,7 @@ if SHOW_TOOLS:
             df_map = pd.DataFrame(_rows_map)
 
             try:
-                # Streamlit >=1.29: column_config поддерживается
+                # Streamlit >=1.29: column_config РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ
                 edited_map = st.data_editor(
                     df_map,
                     hide_index=True,
@@ -5392,7 +4451,7 @@ if SHOW_TOOLS:
                     column_config={
                         "source_file": st.column_config.SelectboxColumn(
                             "source_file",
-                            help="Выбери файл (NPZ/CSV) для этого теста",
+                            help="Р’С‹Р±РµСЂРё С„Р°Р№Р» (NPZ/CSV) РґР»СЏ СЌС‚РѕРіРѕ С‚РµСЃС‚Р°",
                             options=file_opts,
                             required=True,
                         )
@@ -5400,13 +4459,13 @@ if SHOW_TOOLS:
                     key="osc_mapping_editor",
                 )
             except Exception:
-                # fallback без column_config
+                # fallback Р±РµР· column_config
                 edited_map = safe_dataframe(df_map, hide_index=True)
                 edited_map = df_map
 
             col_m1, col_m2 = st.columns(2)
             with col_m1:
-                if st.button("Применить mapping (создать/обновить Txx_osc.npz)", key="apply_tests_file_mapping"):
+                if st.button("РџСЂРёРјРµРЅРёС‚СЊ mapping (СЃРѕР·РґР°С‚СЊ/РѕР±РЅРѕРІРёС‚СЊ Txx_osc.npz)", key="apply_tests_file_mapping"):
                     created = 0
                     missing = 0
                     for _, r in edited_map.iterrows():
@@ -5414,14 +4473,14 @@ if SHOW_TOOLS:
                         src_name = str(r.get("source_file", "") or "").strip()
                         if not tnum:
                             continue
-                        if src_name == "(не выбрано)" or not src_name:
+                        if src_name == "(РЅРµ РІС‹Р±СЂР°РЅРѕ)" or not src_name:
                             missing += 1
                             continue
                         src_path = osc_dir / src_name
                         dst_path = osc_dir / f"T{tnum:02d}_osc.npz"
                         try:
                             if src_path.suffix.lower() == ".csv":
-                                # convert to simple NPZ (таблица -> main_cols/main_values)
+                                # convert to simple NPZ (С‚Р°Р±Р»РёС†Р° -> main_cols/main_values)
                                 df = pd.read_csv(src_path, sep=None, engine="python")
                                 export_full_log_to_npz(
                                     dst_path,
@@ -5434,19 +4493,19 @@ if SHOW_TOOLS:
                                     },
                                 )
                             else:
-                                # NPZ -> просто копия под ожидаемое имя
+                                # NPZ -> РїСЂРѕСЃС‚Рѕ РєРѕРїРёСЏ РїРѕРґ РѕР¶РёРґР°РµРјРѕРµ РёРјСЏ
                                 dst_path.write_bytes(src_path.read_bytes())
                             created += 1
                         except Exception as e:
-                            st.error(f"Не смог подготовить {dst_path.name} из {src_name}: {e}")
+                            st.error(f"РќРµ СЃРјРѕРі РїРѕРґРіРѕС‚РѕРІРёС‚СЊ {dst_path.name} РёР· {src_name}: {e}")
 
-                    # сохраняем mapping (test_num -> source_file) чтобы не выбирать заново
+                    # СЃРѕС…СЂР°РЅСЏРµРј mapping (test_num -> source_file) С‡С‚РѕР±С‹ РЅРµ РІС‹Р±РёСЂР°С‚СЊ Р·Р°РЅРѕРІРѕ
                     try:
                         out_map = {}
                         for _, r in edited_map.iterrows():
                             tnum = int(r.get("test_num", 0) or 0)
                             src_name = str(r.get("source_file", "") or "").strip()
-                            if tnum and src_name and src_name != "(не выбрано)":
+                            if tnum and src_name and src_name != "(РЅРµ РІС‹Р±СЂР°РЅРѕ)":
                                 out_map[str(tnum)] = src_name
                         mapping_json_path.write_text(json.dumps(out_map, ensure_ascii=False, indent=2), encoding="utf-8")
                     except Exception:
@@ -5459,23 +4518,23 @@ if SHOW_TOOLS:
                         osc_dir=str(osc_dir),
                         mapping_json=str(mapping_json_path),
                     )
-                    st.success(f"Готово: подготовлено {created} файлов Txx_osc.npz (пропусков: {missing})")
+                    st.success(f"Р“РѕС‚РѕРІРѕ: РїРѕРґРіРѕС‚РѕРІР»РµРЅРѕ {created} С„Р°Р№Р»РѕРІ Txx_osc.npz (РїСЂРѕРїСѓСЃРєРѕРІ: {missing})")
             with col_m2:
-                if st.button("Открыть osc_dir (путь)", key="show_osc_dir_hint"):
+                if st.button("РћС‚РєСЂС‹С‚СЊ osc_dir (РїСѓС‚СЊ)", key="show_osc_dir_hint"):
                     st.info(str(osc_dir))
         else:
-            st.info("Для mapping нужны: (1) baseline-suite (список тестов) и (2) хотя бы один файл NPZ/CSV в osc_dir.")
+            st.info("Р”Р»СЏ mapping РЅСѓР¶РЅС‹: (1) baseline-suite (СЃРїРёСЃРѕРє С‚РµСЃС‚РѕРІ) Рё (2) С…РѕС‚СЏ Р±С‹ РѕРґРёРЅ С„Р°Р№Р» NPZ/CSV РІ osc_dir.")
 
         st.markdown("---")
-        st.write("Конвертация CSV ➜ NPZ (минимальный режим: CSV=таблица чисел, сохраняем как main_cols/main_values).")
+        st.write("РљРѕРЅРІРµСЂС‚Р°С†РёСЏ CSV вћњ NPZ (РјРёРЅРёРјР°Р»СЊРЅС‹Р№ СЂРµР¶РёРј: CSV=С‚Р°Р±Р»РёС†Р° С‡РёСЃРµР», СЃРѕС…СЂР°РЅСЏРµРј РєР°Рє main_cols/main_values).")
         if csv_files:
             csv_pick = st.selectbox(
-                "CSV для конвертации", options=[f.name for f in csv_files], index=0, key="csv_to_npz_pick"
+                "CSV РґР»СЏ РєРѕРЅРІРµСЂС‚Р°С†РёРё", options=[f.name for f in csv_files], index=0, key="csv_to_npz_pick"
             )
             csv_test_num = st.number_input(
-                "В какой номер теста положить (Txx_osc.npz)", min_value=1, max_value=99, value=1, step=1, key="csv_to_npz_num"
+                "Р’ РєР°РєРѕР№ РЅРѕРјРµСЂ С‚РµСЃС‚Р° РїРѕР»РѕР¶РёС‚СЊ (Txx_osc.npz)", min_value=1, max_value=99, value=1, step=1, key="csv_to_npz_num"
             )
-            if st.button("Конвертировать CSV ➜ NPZ", key="csv_to_npz_btn"):
+            if st.button("РљРѕРЅРІРµСЂС‚РёСЂРѕРІР°С‚СЊ CSV вћњ NPZ", key="csv_to_npz_btn"):
                 src = osc_dir / csv_pick
                 out_npz = osc_dir / f"T{int(csv_test_num):02d}_osc.npz"
                 try:
@@ -5488,20 +4547,20 @@ if SHOW_TOOLS:
                     st.success(f"OK: {out_npz.name}")
                     log_event("csv_to_npz", src=str(src), dst=str(out_npz))
                 except Exception as e:
-                    st.error(f"Не удалось конвертировать: {e}")
+                    st.error(f"РќРµ СѓРґР°Р»РѕСЃСЊ РєРѕРЅРІРµСЂС‚РёСЂРѕРІР°С‚СЊ: {e}")
 
         st.markdown("---")
-        st.write("Запуск пайплайнов калибровки (они используют файлы Txx_osc.npz из osc_dir).")
+        st.write("Р—Р°РїСѓСЃРє РїР°Р№РїР»Р°Р№РЅРѕРІ РєР°Р»РёР±СЂРѕРІРєРё (РѕРЅРё РёСЃРїРѕР»СЊР·СѓСЋС‚ С„Р°Р№Р»С‹ Txx_osc.npz РёР· osc_dir).")
 
         calib_mode = st.selectbox(
-            "Режим калибровки", options=["minimal", "full"], index=["minimal", "full"].index(str(st.session_state.get("calib_mode_pick", DIAGNOSTIC_CALIB_MODE) or DIAGNOSTIC_CALIB_MODE)) if str(st.session_state.get("calib_mode_pick", DIAGNOSTIC_CALIB_MODE) or DIAGNOSTIC_CALIB_MODE) in ["minimal", "full"] else 0, key="calib_mode_pick"
+            "Р РµР¶РёРј РєР°Р»РёР±СЂРѕРІРєРё", options=["minimal", "full"], index=["minimal", "full"].index(str(st.session_state.get("calib_mode_pick", DIAGNOSTIC_CALIB_MODE) or DIAGNOSTIC_CALIB_MODE)) if str(st.session_state.get("calib_mode_pick", DIAGNOSTIC_CALIB_MODE) or DIAGNOSTIC_CALIB_MODE) in ["minimal", "full"] else 0, key="calib_mode_pick"
         )
 
         def _run_pipeline(script_rel: str, out_dir: Path, extra_args: list[str]):
             cmd = [sys.executable, str(HERE / script_rel)] + extra_args
             log_event("pipeline_start", script=script_rel, out_dir=str(out_dir), cmd=" ".join(cmd))
             out_dir.mkdir(parents=True, exist_ok=True)
-            # Снимок UI-логов рядом с результатами пайплайна (удобно отправлять одним архивом)
+            # РЎРЅРёРјРѕРє UI-Р»РѕРіРѕРІ СЂСЏРґРѕРј СЃ СЂРµР·СѓР»СЊС‚Р°С‚Р°РјРё РїР°Р№РїР»Р°Р№РЅР° (СѓРґРѕР±РЅРѕ РѕС‚РїСЂР°РІР»СЏС‚СЊ РѕРґРЅРёРј Р°СЂС…РёРІРѕРј)
             try:
                 snap_dir = out_dir / "ui_logs_snapshot"
                 snap_dir.mkdir(parents=True, exist_ok=True)
@@ -5526,31 +4585,31 @@ if SHOW_TOOLS:
                 return 999, "", str(e)
 
     
-        st.markdown("### Автоматизация (без консоли): полный расчёт ➜ NPZ ➜ oneclick/autopilot")
+        st.markdown("### РђРІС‚РѕРјР°С‚РёР·Р°С†РёСЏ (Р±РµР· РєРѕРЅСЃРѕР»Рё): РїРѕР»РЅС‹Р№ СЂР°СЃС‡С‘С‚ вћњ NPZ вћњ oneclick/autopilot")
         st.caption(
-            "Если реальных замеров пока нет — можно генерировать «расчётные» NPZ из текущего baseline "
-            "и гонять пайплайны oneclick/autopilot как самопроверку форматов и обвязки."
+            "Р•СЃР»Рё СЂРµР°Р»СЊРЅС‹С… Р·Р°РјРµСЂРѕРІ РїРѕРєР° РЅРµС‚ вЂ” РјРѕР¶РЅРѕ РіРµРЅРµСЂРёСЂРѕРІР°С‚СЊ В«СЂР°СЃС‡С‘С‚РЅС‹РµВ» NPZ РёР· С‚РµРєСѓС‰РµРіРѕ baseline "
+            "Рё РіРѕРЅСЏС‚СЊ РїР°Р№РїР»Р°Р№РЅС‹ oneclick/autopilot РєР°Рє СЃР°РјРѕРїСЂРѕРІРµСЂРєСѓ С„РѕСЂРјР°С‚РѕРІ Рё РѕР±РІСЏР·РєРё."
         )
 
         col_fc1, col_fc2, col_fc3 = st.columns(3)
 
         def _ensure_full_npz_for_all_tests(_mode_label: str) -> tuple[bool, str]:
-            """Гарантирует, что в osc_dir есть Txx_osc.npz для всех тестов baseline-suite.
+            """Р“Р°СЂР°РЅС‚РёСЂСѓРµС‚, С‡С‚Рѕ РІ osc_dir РµСЃС‚СЊ Txx_osc.npz РґР»СЏ РІСЃРµС… С‚РµСЃС‚РѕРІ baseline-suite.
 
-            Возвращает (ok, message).
+            Р’РѕР·РІСЂР°С‰Р°РµС‚ (ok, message).
             """
             _tests = list((_tests_map or {}).items())
             if not _tests:
-                return False, "Нет baseline-suite (списка тестов). Сначала рассчитай baseline."
+                return False, "РќРµС‚ baseline-suite (СЃРїРёСЃРєР° С‚РµСЃС‚РѕРІ). РЎРЅР°С‡Р°Р»Р° СЂР°СЃСЃС‡РёС‚Р°Р№ baseline."
             if model_mod is None:
-                return False, "Модель не загружена (model_mod=None)."
+                return False, "РњРѕРґРµР»СЊ РЅРµ Р·Р°РіСЂСѓР¶РµРЅР° (model_mod=None)."
             try:
                 baseline_full_cache = st.session_state.get("baseline_full_cache") or {}
                 st.session_state["baseline_full_cache"] = baseline_full_cache
             except Exception:
                 baseline_full_cache = {}
 
-            # Чтобы UI не зависал: ограничим количество точек
+            # Р§С‚РѕР±С‹ UI РЅРµ Р·Р°РІРёСЃР°Р»: РѕРіСЂР°РЅРёС‡РёРј РєРѕР»РёС‡РµСЃС‚РІРѕ С‚РѕС‡РµРє
             _max_points = int(st.session_state.get("detail_max_points", 1200) or 1200)
             want_full = True
 
@@ -5558,8 +4617,8 @@ if SHOW_TOOLS:
             missing = 0
             ok_cnt = 0
 
-            # Важно для calibration/pipeline_npz_oneclick_v1.py: нужен tests_index.csv с колонкой "имя_теста".
-            # Ранее это часто отсутствовало => autopilot/oneclick могли искать файлы "не там".
+            # Р’Р°Р¶РЅРѕ РґР»СЏ calibration/pipeline_npz_oneclick_v1.py: РЅСѓР¶РµРЅ tests_index.csv СЃ РєРѕР»РѕРЅРєРѕР№ "РёРјСЏ_С‚РµСЃС‚Р°".
+            # Р Р°РЅРµРµ СЌС‚Рѕ С‡Р°СЃС‚Рѕ РѕС‚СЃСѓС‚СЃС‚РІРѕРІР°Р»Рѕ => autopilot/oneclick РјРѕРіР»Рё РёСЃРєР°С‚СЊ С„Р°Р№Р»С‹ "РЅРµ С‚Р°Рј".
             try:
                 write_tests_index_csv(
                     osc_dir,
@@ -5569,9 +4628,9 @@ if SHOW_TOOLS:
             except Exception as e:
                 log_event("oneclick_tests_index_write_error", err=str(e), osc_dir=str(osc_dir))
 
-            prog = st.progress(0.0, text=f"[{_mode_label}] Подготовка NPZ: расчёт/экспорт…")
+            prog = st.progress(0.0, text=f"[{_mode_label}] РџРѕРґРіРѕС‚РѕРІРєР° NPZ: СЂР°СЃС‡С‘С‚/СЌРєСЃРїРѕСЂС‚вЂ¦")
             for i, (name, cfg0) in enumerate(_tests, start=1):
-                # cache key совместим с основным кэшем деталей (baseline_full_cache)
+                # cache key СЃРѕРІРјРµСЃС‚РёРј СЃ РѕСЃРЅРѕРІРЅС‹Рј РєСЌС€РµРј РґРµС‚Р°Р»РµР№ (baseline_full_cache)
                 dt_j = float(cfg0.get("dt", 0.01) or 0.01)
                 t_end_j = float(cfg0.get("t_end", 1.0) or 1.0)
                 cache_key = make_detail_cache_key(cur_hash, name, dt_j, t_end_j, _max_points, want_full)
@@ -5662,18 +4721,18 @@ if SHOW_TOOLS:
                     missing += 1
                     log_event("oneclick_full_npz_export_error", test=name, err=str(e))
 
-                prog.progress(i / max(1, len(_tests)), text=f"[{_mode_label}] {i}/{len(_tests)}…")
+                prog.progress(i / max(1, len(_tests)), text=f"[{_mode_label}] {i}/{len(_tests)}вЂ¦")
 
             dt_s = time.time() - t_start
-            prog.progress(1.0, text=f"[{_mode_label}] Готово за {dt_s:.1f} сек. OK={ok_cnt}, missing={missing}")
+            prog.progress(1.0, text=f"[{_mode_label}] Р“РѕС‚РѕРІРѕ Р·Р° {dt_s:.1f} СЃРµРє. OK={ok_cnt}, missing={missing}")
 
             log_event("oneclick_full_npz_done", ok=int(ok_cnt), missing=int(missing), dt_s=float(dt_s), osc_dir=str(osc_dir))
             if ok_cnt == 0:
-                return False, "Не удалось сформировать ни одного NPZ. Проверь логи/модель."
-            return True, f"NPZ подготовлены: OK={ok_cnt}, пропусков/ошибок={missing}, время={dt_s:.1f} сек."
+                return False, "РќРµ СѓРґР°Р»РѕСЃСЊ СЃС„РѕСЂРјРёСЂРѕРІР°С‚СЊ РЅРё РѕРґРЅРѕРіРѕ NPZ. РџСЂРѕРІРµСЂСЊ Р»РѕРіРё/РјРѕРґРµР»СЊ."
+            return True, f"NPZ РїРѕРґРіРѕС‚РѕРІР»РµРЅС‹: OK={ok_cnt}, РїСЂРѕРїСѓСЃРєРѕРІ/РѕС€РёР±РѕРє={missing}, РІСЂРµРјСЏ={dt_s:.1f} СЃРµРє."
 
         with col_fc1:
-            if st.button("1) Полный лог + NPZ (все тесты)", key="oneclick_full_logs_npz"):
+            if st.button("1) РџРѕР»РЅС‹Р№ Р»РѕРі + NPZ (РІСЃРµ С‚РµСЃС‚С‹)", key="oneclick_full_logs_npz"):
                 ok, msg = _ensure_full_npz_for_all_tests("full_npz")
                 if ok:
                     st.success(msg)
@@ -5681,11 +4740,11 @@ if SHOW_TOOLS:
                     st.error(msg)
 
         with col_fc2:
-            if st.button("2) Полный лог + NPZ ➜ oneclick", key="oneclick_full_then_oneclick"):
+            if st.button("2) РџРѕР»РЅС‹Р№ Р»РѕРі + NPZ вћњ oneclick", key="oneclick_full_then_oneclick"):
                 ok, msg = _ensure_full_npz_for_all_tests("full_then_oneclick")
                 if ok:
                     st.success(msg)
-                    # запускаем oneclick пайплайн
+                    # Р·Р°РїСѓСЃРєР°РµРј oneclick РїР°Р№РїР»Р°Р№РЅ
                     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                     out_dir = WORKSPACE_CALIB_RUNS_DIR / f"RUN_{ts}_oneclick_auto"
                     rc, so, se = _run_pipeline(
@@ -5717,17 +4776,17 @@ if SHOW_TOOLS:
                     )
                     st.write(f"oneclick exit code: {rc}")
                     if rc != 0:
-                        st.error("oneclick завершился с ошибкой — см. stdout/stderr ниже и файлы в out_dir.")
+                        st.error("oneclick Р·Р°РІРµСЂС€РёР»СЃСЏ СЃ РѕС€РёР±РєРѕР№ вЂ” СЃРј. stdout/stderr РЅРёР¶Рµ Рё С„Р°Р№Р»С‹ РІ out_dir.")
                         st.code(so[-4000:] if so else "", language="text")
                         st.code(se[-4000:] if se else "", language="text")
                     else:
-                        st.success("oneclick выполнен. Результаты в out_dir.")
+                        st.success("oneclick РІС‹РїРѕР»РЅРµРЅ. Р РµР·СѓР»СЊС‚Р°С‚С‹ РІ out_dir.")
                         st.code(str(out_dir), language="text")
                 else:
                     st.error(msg)
 
         with col_fc3:
-            if st.button("3) Полный лог + NPZ ➜ autopilot (minimal)", key="oneclick_full_then_autopilot"):
+            if st.button("3) РџРѕР»РЅС‹Р№ Р»РѕРі + NPZ вћњ autopilot (minimal)", key="oneclick_full_then_autopilot"):
                 ok, msg = _ensure_full_npz_for_all_tests("full_then_autopilot")
                 if ok:
                     st.success(msg)
@@ -5747,11 +4806,11 @@ if SHOW_TOOLS:
                     )
                     st.write(f"autopilot exit code: {rc}")
                     if rc != 0:
-                        st.error("autopilot завершился с ошибкой — см. stdout/stderr ниже и файлы в out_dir.")
+                        st.error("autopilot Р·Р°РІРµСЂС€РёР»СЃСЏ СЃ РѕС€РёР±РєРѕР№ вЂ” СЃРј. stdout/stderr РЅРёР¶Рµ Рё С„Р°Р№Р»С‹ РІ out_dir.")
                         st.code(so[-4000:] if so else "", language="text")
                         st.code(se[-4000:] if se else "", language="text")
                     else:
-                        st.success("autopilot выполнен. Результаты в out_dir.")
+                        st.success("autopilot РІС‹РїРѕР»РЅРµРЅ. Р РµР·СѓР»СЊС‚Р°С‚С‹ РІ out_dir.")
                         st.code(str(out_dir), language="text")
                 else:
                     st.error(msg)
@@ -5759,7 +4818,7 @@ if SHOW_TOOLS:
         st.markdown("---")
         col_cal1, col_cal2 = st.columns(2)
         with col_cal1:
-            if st.button("Запустить калибровку (oneclick)", key="run_calib_oneclick"):
+            if st.button("Р—Р°РїСѓСЃС‚РёС‚СЊ РєР°Р»РёР±СЂРѕРІРєСѓ (oneclick)", key="run_calib_oneclick"):
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 out_dir = WORKSPACE_CALIB_RUNS_DIR / f"RUN_{ts}_oneclick"
                 rc, so, se = _run_pipeline(
@@ -5776,12 +4835,12 @@ if SHOW_TOOLS:
                 )
                 st.session_state["last_calib_out_dir"] = str(out_dir)
                 if rc == 0:
-                    st.success(f"Готово: {out_dir}")
+                    st.success(f"Р“РѕС‚РѕРІРѕ: {out_dir}")
                 else:
-                    st.error(f"Ошибка (код {rc}) — см. pipeline_stderr.txt")
+                    st.error(f"РћС€РёР±РєР° (РєРѕРґ {rc}) вЂ” СЃРј. pipeline_stderr.txt")
 
         with col_cal2:
-            if st.button("Запустить Autopilot (NPZ) v19", key="run_autopilot_v19"):
+            if st.button("Р—Р°РїСѓСЃС‚РёС‚СЊ Autopilot (NPZ) v19", key="run_autopilot_v19"):
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 out_dir = WORKSPACE_CALIB_RUNS_DIR / f"RUN_{ts}_autopilot_v19"
                 rc, so, se = _run_pipeline(
@@ -5798,31 +4857,31 @@ if SHOW_TOOLS:
                 )
                 st.session_state["last_autopilot_out_dir"] = str(out_dir)
                 if rc == 0:
-                    st.success(f"Готово: {out_dir}")
+                    st.success(f"Р“РѕС‚РѕРІРѕ: {out_dir}")
                 else:
-                    st.error(f"Ошибка (код {rc}) — см. pipeline_stderr.txt")
+                    st.error(f"РћС€РёР±РєР° (РєРѕРґ {rc}) вЂ” СЃРј. pipeline_stderr.txt")
 
         last_dir = st.session_state.get("last_calib_out_dir") or st.session_state.get("last_autopilot_out_dir")
         if last_dir:
-            st.info(f"Последний запуск: {last_dir}")
+            st.info(f"РџРѕСЃР»РµРґРЅРёР№ Р·Р°РїСѓСЃРє: {last_dir}")
 
 if SHOW_TOOLS:
     # -------------------------------
-    # Диагностика (ZIP для отправки)
+    # Р”РёР°РіРЅРѕСЃС‚РёРєР° (ZIP РґР»СЏ РѕС‚РїСЂР°РІРєРё)
     # -------------------------------
-    with st.expander("Диагностика — собрать ZIP (для отправки)", expanded=False):
+    with st.expander("Р”РёР°РіРЅРѕСЃС‚РёРєР° вЂ” СЃРѕР±СЂР°С‚СЊ ZIP (РґР»СЏ РѕС‚РїСЂР°РІРєРё)", expanded=False):
         st.markdown(
             """
-            Это **локальный** ZIP, который удобно отправлять вместо всей папки.
+            Р­С‚Рѕ **Р»РѕРєР°Р»СЊРЅС‹Р№** ZIP, РєРѕС‚РѕСЂС‹Р№ СѓРґРѕР±РЅРѕ РѕС‚РїСЂР°РІР»СЏС‚СЊ РІРјРµСЃС‚Рѕ РІСЃРµР№ РїР°РїРєРё.
 
-            Внутри: логи UI, результаты, **workspace/osc** (NPZ/CSV), **calibration_runs** (oneclick/autopilot) и снимок текущих JSON (base/suite/ranges).
+            Р’РЅСѓС‚СЂРё: Р»РѕРіРё UI, СЂРµР·СѓР»СЊС‚Р°С‚С‹, **workspace/osc** (NPZ/CSV), **calibration_runs** (oneclick/autopilot) Рё СЃРЅРёРјРѕРє С‚РµРєСѓС‰РёС… JSON (base/suite/ranges).
             """
         )
-        diag_tag = st.text_input("Тэг (опционально)", value="ui", key="ui_diag_tag")
-        if st.button("Сформировать ZIP диагностики", key="ui_diag_make_btn"):
+        diag_tag = st.text_input("РўСЌРі (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ)", value="ui", key="ui_diag_tag")
+        if st.button("РЎС„РѕСЂРјРёСЂРѕРІР°С‚СЊ ZIP РґРёР°РіРЅРѕСЃС‚РёРєРё", key="ui_diag_make_btn"):
             try:
                 zpath = make_ui_diagnostics_zip(
-                    # Снимок текущих **перезаписанных** значений (а не только дефолтов)
+                    # РЎРЅРёРјРѕРє С‚РµРєСѓС‰РёС… **РїРµСЂРµР·Р°РїРёСЃР°РЅРЅС‹С…** Р·РЅР°С‡РµРЅРёР№ (Р° РЅРµ С‚РѕР»СЊРєРѕ РґРµС„РѕР»С‚РѕРІ)
                     base_json=base_override,
                     suite_json=suite_override,
                     ranges_json=ranges_override,
@@ -5834,9 +4893,9 @@ if SHOW_TOOLS:
                 )
                 st.session_state["ui_diag_zip_path"] = str(zpath)
                 log_event("ui_diag_zip_done", path=str(zpath))
-                st.success(f"Готово: {zpath.name}")
+                st.success(f"Р“РѕС‚РѕРІРѕ: {zpath.name}")
             except Exception as e:
-                st.error(f"Не удалось собрать ZIP: {e}")
+                st.error(f"РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР±СЂР°С‚СЊ ZIP: {e}")
 
         zpath = st.session_state.get("ui_diag_zip_path")
         if zpath:
@@ -5844,27 +4903,27 @@ if SHOW_TOOLS:
                 zp = Path(zpath)
                 if zp.exists():
                     st.download_button(
-                        "Скачать ZIP",
+                        "РЎРєР°С‡Р°С‚СЊ ZIP",
                         data=zp.read_bytes(),
                         file_name=zp.name,
                         mime="application/zip",
                         key="ui_diag_download_btn",
                     )
             except Exception as e:
-                st.warning(f"Не смог подготовить download: {e}")
+                st.warning(f"РќРµ СЃРјРѕРі РїРѕРґРіРѕС‚РѕРІРёС‚СЊ download: {e}")
 
 # -------------------------------
-# Автообновление прогресса во время оптимизации
+# РђРІС‚РѕРѕР±РЅРѕРІР»РµРЅРёРµ РїСЂРѕРіСЂРµСЃСЃР° РІРѕ РІСЂРµРјСЏ РѕРїС‚РёРјРёР·Р°С†РёРё
 # -------------------------------
-# Streamlit по умолчанию перерисовывает приложение при действиях пользователя.
-# Чтобы прогресс фонового расчёта обновлялся "вживую", делаем периодический rerun.
+# Streamlit РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ РїРµСЂРµСЂРёСЃРѕРІС‹РІР°РµС‚ РїСЂРёР»РѕР¶РµРЅРёРµ РїСЂРё РґРµР№СЃС‚РІРёСЏС… РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.
+# Р§С‚РѕР±С‹ РїСЂРѕРіСЂРµСЃСЃ С„РѕРЅРѕРІРѕРіРѕ СЂР°СЃС‡С‘С‚Р° РѕР±РЅРѕРІР»СЏР»СЃСЏ "РІР¶РёРІСѓСЋ", РґРµР»Р°РµРј РїРµСЂРёРѕРґРёС‡РµСЃРєРёР№ rerun.
 #
-# Раньше это было сделано через time.sleep()+st.rerun(), но это:
-#  1) блокирует поток выполнения (UI "замирает"),
-#  2) легко словить ошибки логики rerun.
+# Р Р°РЅСЊС€Рµ СЌС‚Рѕ Р±С‹Р»Рѕ СЃРґРµР»Р°РЅРѕ С‡РµСЂРµР· time.sleep()+st.rerun(), РЅРѕ СЌС‚Рѕ:
+#  1) Р±Р»РѕРєРёСЂСѓРµС‚ РїРѕС‚РѕРє РІС‹РїРѕР»РЅРµРЅРёСЏ (UI "Р·Р°РјРёСЂР°РµС‚"),
+#  2) Р»РµРіРєРѕ СЃР»РѕРІРёС‚СЊ РѕС€РёР±РєРё Р»РѕРіРёРєРё rerun.
 #
-# Поэтому используем фронтенд‑таймер streamlit‑autorefresh (если установлен).
-# Он пингует сервер и корректно инициирует rerun без бесконечных циклов.
+# РџРѕСЌС‚РѕРјСѓ РёСЃРїРѕР»СЊР·СѓРµРј С„СЂРѕРЅС‚РµРЅРґвЂ‘С‚Р°Р№РјРµСЂ streamlitвЂ‘autorefresh (РµСЃР»Рё СѓСЃС‚Р°РЅРѕРІР»РµРЅ).
+# РћРЅ РїРёРЅРіСѓРµС‚ СЃРµСЂРІРµСЂ Рё РєРѕСЂСЂРµРєС‚РЅРѕ РёРЅРёС†РёРёСЂСѓРµС‚ rerun Р±РµР· Р±РµСЃРєРѕРЅРµС‡РЅС‹С… С†РёРєР»РѕРІ.
 if 'auto_refresh' in globals() and auto_refresh and pid_alive(st.session_state.opt_proc):
     try:
         from streamlit_autorefresh import st_autorefresh  # type: ignore
@@ -5874,6 +4933,9 @@ if 'auto_refresh' in globals() and auto_refresh and pid_alive(st.session_state.o
             key="progress_autorefresh",
         )
     except Exception:
-        # Fallback (без зависимостей): редкий rerun через sleep.
+        # Fallback (Р±РµР· Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№): СЂРµРґРєРёР№ rerun С‡РµСЂРµР· sleep.
         time.sleep(float(refresh_sec))
         do_rerun()
+
+
+

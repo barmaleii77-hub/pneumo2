@@ -8,6 +8,7 @@ from pneumo_solver_ui import ui_playhead_section_helpers
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+RESULTS_SURFACE_SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 
 
 def test_render_playhead_results_section_coordinates_shared_layers(monkeypatch) -> None:
@@ -85,11 +86,13 @@ def test_render_playhead_results_section_coordinates_shared_layers(monkeypatch) 
 def test_entrypoints_use_shared_playhead_results_section() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = RESULTS_SURFACE_SECTION_HELPERS_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_playhead_section_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_playhead_section_helpers import (" in heavy_text
-    assert "render_playhead_results_section(" in app_text
-    assert "render_playhead_results_section(" in heavy_text
+    assert "from pneumo_solver_ui.ui_playhead_section_helpers import (" not in app_text
+    assert "from pneumo_solver_ui.ui_playhead_section_helpers import (" not in heavy_text
+    assert "render_playhead_results_section(" not in app_text
+    assert "render_playhead_results_section(" not in heavy_text
+    assert "render_playhead_results_section_fn=render_playhead_results_section" in surface_text
     assert "render_playhead_sync_controls()" not in app_text
     assert "render_playhead_sync_controls()" not in heavy_text
     assert "render_event_alerts_panel(" not in app_text

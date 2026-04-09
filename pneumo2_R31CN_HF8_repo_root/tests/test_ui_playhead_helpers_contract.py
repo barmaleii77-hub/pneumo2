@@ -9,6 +9,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
 EVENT_PANEL_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_event_panel_helpers.py"
+RESULTS_SECTION_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_section_helpers.py"
+RESULTS_PLAYHEAD_JUMP_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_playhead_jump_helpers.py"
+RESULTS_PLAYHEAD_RESET_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_playhead_reset_helpers.py"
 
 
 class _Context:
@@ -250,18 +253,28 @@ def test_entrypoints_use_shared_playhead_helpers() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
     event_panel_text = EVENT_PANEL_PATH.read_text(encoding="utf-8")
+    results_section_text = RESULTS_SECTION_PATH.read_text(encoding="utf-8")
+    jump_helper_text = RESULTS_PLAYHEAD_JUMP_HELPERS_PATH.read_text(encoding="utf-8")
+    reset_helper_text = RESULTS_PLAYHEAD_RESET_HELPERS_PATH.read_text(encoding="utf-8")
 
     assert "from pneumo_solver_ui.ui_playhead_helpers import (" in app_text
     assert "from pneumo_solver_ui.ui_playhead_helpers import (" in heavy_text
-    assert "render_results_view_selector(" in app_text
-    assert "render_results_view_selector(" in heavy_text
-    assert "radio_fn=st.radio" in app_text
-    assert "radio_fn=st.radio" in heavy_text
-    assert "make_playhead_reset_command()" in app_text
-    assert "make_playhead_reset_command()" in heavy_text
-    assert "make_playhead_jump_command(j)" in app_text
-    assert "make_playhead_jump_command(j)" in heavy_text
+    assert "render_results_view_selector(" not in app_text
+    assert "render_results_view_selector(" not in heavy_text
+    assert "from pneumo_solver_ui.ui_playhead_helpers import render_results_view_selector" in results_section_text
+    assert "render_results_view_selector(" in results_section_text
+    assert "radio_fn=radio_fn or st.radio" in results_section_text
+    assert "make_playhead_reset_command()" not in app_text
+    assert "make_playhead_reset_command()" not in heavy_text
+    assert "make_playhead_reset_command_fn=make_playhead_reset_command" in app_text
+    assert "make_playhead_reset_command_fn=make_playhead_reset_command" in heavy_text
+    assert "make_playhead_jump_command(j)" not in app_text
+    assert "make_playhead_jump_command(j)" not in heavy_text
+    assert "make_playhead_jump_command_fn=make_playhead_jump_command" in app_text
+    assert "make_playhead_jump_command_fn=make_playhead_jump_command" in heavy_text
     assert "make_playhead_jump_command(jump_index, time_ms_fn=time_ms_fn)" in event_panel_text
+    assert "make_playhead_reset_command_fn()" in reset_helper_text
+    assert "make_playhead_jump_command_fn(jump_index)" in jump_helper_text
     assert "cols_phsync = st.columns([1.35, 0.95, 0.95, 0.95], gap=\"medium\")" not in app_text
     assert "cols_phsync = st.columns([1.35, 0.95, 0.95, 0.95], gap=\"medium\")" not in heavy_text
     assert "build_playhead_component_events(events_list)" not in app_text
