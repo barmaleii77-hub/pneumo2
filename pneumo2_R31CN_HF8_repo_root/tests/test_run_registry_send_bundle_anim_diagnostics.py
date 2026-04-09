@@ -63,6 +63,26 @@ def _prepare_anim_export(tmp_path: Path, monkeypatch) -> tuple[Path, Path, dict]
             "road_csv": str(road_csv),
         },
     )
+    (npz_path.with_name(f"{npz_path.stem}.desktop_mnemo_events.json")).write_text(
+        json.dumps(
+            {
+                "schema_version": "desktop_mnemo_event_log_v1",
+                "updated_utc": "2026-04-10T08:15:00Z",
+                "npz_path": str(npz_path.resolve()),
+                "current_mode": "Регуляторный коридор",
+                "event_count": 4,
+                "active_latch_count": 1,
+                "acknowledged_latch_count": 2,
+                "recent_events": [
+                    {"title": "Большой перепад давлений"},
+                    {"title": "Смена режима"},
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     pointer = json.loads(ptr_path.read_text(encoding="utf-8"))
     return npz_path, ptr_path, pointer
 
@@ -78,9 +98,13 @@ def test_collect_anim_latest_bundle_diagnostics_writes_sidecars(tmp_path: Path, 
     assert diag["anim_latest_npz_path"] == str(npz_path.resolve())
     assert diag["anim_latest_visual_cache_token"] == pointer["visual_cache_token"]
     assert diag["anim_latest_visual_reload_inputs"] == ["npz", "road_csv"]
+    assert diag["anim_latest_mnemo_event_log_exists"] is True
+    assert diag["anim_latest_mnemo_event_log_current_mode"] == "Регуляторный коридор"
+    assert diag["anim_latest_mnemo_event_log_event_count"] == 4
     assert (tmp_path / ANIM_DIAG_SIDECAR_JSON).exists()
     assert (tmp_path / ANIM_DIAG_SIDECAR_MD).exists()
     assert pointer["visual_cache_token"] in md
+    assert "anim_latest_mnemo_event_log_state: mode=Регуляторный коридор / total=4 / active=1 / acked=2" in md
 
 
 
@@ -123,6 +147,8 @@ def test_run_registry_send_bundle_created_accepts_extended_anim_fields(tmp_path:
     assert rec["anim_latest_visual_cache_token"] == pointer["visual_cache_token"]
     assert rec["anim_latest_visual_reload_inputs"] == ["npz", "road_csv"]
     assert rec["anim_latest_available"] is True
+    assert rec["anim_latest_mnemo_event_log_exists"] is True
+    assert rec["anim_latest_mnemo_event_log_current_mode"] == "Регуляторный коридор"
     assert Path(rec["anim_latest_global_pointer_json"]).parts[-3:] == ("workspace", "_pointers", "anim_latest.json")
 
 
@@ -150,6 +176,15 @@ def test_run_registry_index_last_event_keeps_anim_latest_usability_summary(tmp_p
         anim_latest_npz_in_workspace=True,
         anim_latest_usable=False,
         anim_latest_issues=["not reproducible from this bundle"],
+        anim_latest_mnemo_event_log_ref="anim_latest.desktop_mnemo_events.json",
+        anim_latest_mnemo_event_log_exists=True,
+        anim_latest_mnemo_event_log_schema_version="desktop_mnemo_event_log_v1",
+        anim_latest_mnemo_event_log_updated_utc="2026-04-10T08:15:00Z",
+        anim_latest_mnemo_event_log_current_mode="Регуляторный коридор",
+        anim_latest_mnemo_event_log_event_count=4,
+        anim_latest_mnemo_event_log_active_latch_count=1,
+        anim_latest_mnemo_event_log_acknowledged_latch_count=2,
+        anim_latest_mnemo_event_log_recent_titles=["Большой перепад давлений", "Смена режима"],
     )
 
     idx = json.loads((runs_root / "index.json").read_text(encoding="utf-8"))
@@ -162,6 +197,9 @@ def test_run_registry_index_last_event_keeps_anim_latest_usability_summary(tmp_p
     assert last["anim_latest_npz_exists"] is False
     assert last["anim_latest_usable"] is False
     assert last["anim_latest_issues"] == ["not reproducible from this bundle"]
+    assert last["anim_latest_mnemo_event_log_exists"] is True
+    assert last["anim_latest_mnemo_event_log_current_mode"] == "Регуляторный коридор"
+    assert last["anim_latest_mnemo_event_log_recent_titles"] == ["Большой перепад давлений", "Смена режима"]
     assert "anim_latest_visual_cache_dependencies" not in last
 
 
@@ -237,6 +275,7 @@ def test_sources_wire_anim_diagnostics_into_launcher_and_send_bundle() -> None:
     assert '("_pointers", False)' in bundle_text
     assert 'ANIM_DIAG_SIDECAR_JSON' in bundle_text
     assert '**anim_diag_event' in bundle_text
+    assert 'anim_latest_mnemo_event_log_state' in bundle_text
     assert 'collect_anim_latest_diagnostics_summary' in launcher_text
     assert 'send_results_gui_spawned' in launcher_text
     assert 'ANIM_DIAG_SIDECAR_JSON' in gui_text

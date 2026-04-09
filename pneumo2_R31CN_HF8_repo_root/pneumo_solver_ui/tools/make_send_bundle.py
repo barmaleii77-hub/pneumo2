@@ -334,6 +334,16 @@ def _collect_anim_latest_bundle_diagnostics(out_dir: Path) -> Tuple[Dict[str, An
     lines.append(f"- anim_latest_cylinder_packaging_passport: {diag.get('anim_latest_cylinder_packaging_passport_ref') or '—'} -> {diag.get('anim_latest_cylinder_packaging_passport_path') or '—'} (exists={diag.get('anim_latest_cylinder_packaging_passport_exists')})")
     lines.append(f"- anim_latest_road_contract_web: {diag.get('anim_latest_road_contract_web_ref') or '—'} -> {diag.get('anim_latest_road_contract_web_path') or '—'} (exists={diag.get('anim_latest_road_contract_web_exists')})")
     lines.append(f"- anim_latest_road_contract_desktop: {diag.get('anim_latest_road_contract_desktop_ref') or '—'} -> {diag.get('anim_latest_road_contract_desktop_path') or '—'} (exists={diag.get('anim_latest_road_contract_desktop_exists')})")
+    lines.append(
+        f"- anim_latest_mnemo_event_log: {diag.get('anim_latest_mnemo_event_log_ref') or '—'} -> {diag.get('anim_latest_mnemo_event_log_path') or '—'} "
+        f"(exists={diag.get('anim_latest_mnemo_event_log_exists')}, schema={diag.get('anim_latest_mnemo_event_log_schema_version') or '—'}, updated_utc={diag.get('anim_latest_mnemo_event_log_updated_utc') or '—'})"
+    )
+    lines.append(
+        f"- anim_latest_mnemo_event_log_state: mode={diag.get('anim_latest_mnemo_event_log_current_mode') or '—'} / total={diag.get('anim_latest_mnemo_event_log_event_count')} / active={diag.get('anim_latest_mnemo_event_log_active_latch_count')} / acked={diag.get('anim_latest_mnemo_event_log_acknowledged_latch_count')}"
+    )
+    recent_titles = [str(x) for x in (diag.get("anim_latest_mnemo_event_log_recent_titles") or []) if str(x).strip()]
+    if recent_titles:
+        lines.append(f"- anim_latest_mnemo_event_log_recent: {' | '.join(recent_titles[:3])}")
     lines.append(f"- browser_perf_registry_snapshot: {diag.get('browser_perf_registry_snapshot_ref') or '—'} -> {diag.get('browser_perf_registry_snapshot_path') or '—'} (exists={diag.get('browser_perf_registry_snapshot_exists')}, in_bundle={diag.get('browser_perf_registry_snapshot_in_bundle')})")
     lines.append(f"- browser_perf_previous_snapshot: {diag.get('browser_perf_previous_snapshot_ref') or '—'} -> {diag.get('browser_perf_previous_snapshot_path') or '—'} (exists={diag.get('browser_perf_previous_snapshot_exists')}, in_bundle={diag.get('browser_perf_previous_snapshot_in_bundle')})")
     lines.append(f"- browser_perf_contract: {diag.get('browser_perf_contract_ref') or '—'} -> {diag.get('browser_perf_contract_path') or '—'} (exists={diag.get('browser_perf_contract_exists')}, in_bundle={diag.get('browser_perf_contract_in_bundle')})")

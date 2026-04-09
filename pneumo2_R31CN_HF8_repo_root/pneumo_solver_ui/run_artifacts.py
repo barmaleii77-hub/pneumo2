@@ -408,6 +408,31 @@ def _path_within_flag(value: Any, base: Path) -> Optional[bool]:
         return False
 
 
+def _infer_mnemo_event_log_path(
+    npz_path: Any,
+    pointer_json: Any,
+) -> tuple[str, str, Optional[bool]]:
+    npz_abs = _safe_path(npz_path)
+    if npz_abs is not None:
+        event_path = npz_abs.with_name(f"{npz_abs.stem}.desktop_mnemo_events.json")
+        try:
+            exists = bool(event_path.exists())
+        except Exception:
+            exists = None
+        return event_path.name, str(event_path), exists
+
+    ptr_abs = _safe_path(pointer_json)
+    if ptr_abs is not None:
+        event_path = ptr_abs.parent / "anim_latest.desktop_mnemo_events.json"
+        try:
+            exists = bool(event_path.exists())
+        except Exception:
+            exists = None
+        return event_path.name, str(event_path), exists
+
+    return "", "", None
+
+
 def collect_anim_latest_diagnostics_summary(
     info: Optional[Dict[str, Any]] = None,
     *,
@@ -497,6 +522,32 @@ def collect_anim_latest_diagnostics_summary(
         artifact_refs.get("road_contract_desktop"),
         default_name="road_contract_desktop.json",
     )
+    mnemo_event_ref, mnemo_event_path, mnemo_event_exists = _infer_mnemo_event_log_path(npz_path, pointer_json)
+    mnemo_event_obj = _read_json(Path(mnemo_event_path)) if mnemo_event_path and mnemo_event_exists else None
+    if mnemo_event_exists and mnemo_event_obj is None:
+        issues.append(f"anim_latest Desktop Mnemo event log exists but is unreadable: {mnemo_event_path}")
+
+    mnemo_event_recent_titles: list[str] = []
+    mnemo_event_schema_version = ""
+    mnemo_event_updated_utc = ""
+    mnemo_event_current_mode = ""
+    mnemo_event_event_count: Any = None
+    mnemo_event_active_latch_count: Any = None
+    mnemo_event_ack_count: Any = None
+    if isinstance(mnemo_event_obj, dict):
+        mnemo_event_schema_version = str(mnemo_event_obj.get("schema_version") or "")
+        mnemo_event_updated_utc = str(mnemo_event_obj.get("updated_utc") or "")
+        mnemo_event_current_mode = str(mnemo_event_obj.get("current_mode") or "")
+        mnemo_event_event_count = mnemo_event_obj.get("event_count")
+        mnemo_event_active_latch_count = mnemo_event_obj.get("active_latch_count")
+        mnemo_event_ack_count = mnemo_event_obj.get("acknowledged_latch_count")
+        recent_events = mnemo_event_obj.get("recent_events")
+        if isinstance(recent_events, list):
+            for item in recent_events[:3]:
+                if isinstance(item, dict):
+                    title = str(item.get("title") or "").strip()
+                    if title:
+                        mnemo_event_recent_titles.append(title)
 
     out: dict = {
         "anim_latest_available": bool(snap.get("available")),
@@ -531,6 +582,16 @@ def collect_anim_latest_diagnostics_summary(
         "anim_latest_road_contract_desktop_ref": road_desktop_ref,
         "anim_latest_road_contract_desktop_path": road_desktop_path,
         "anim_latest_road_contract_desktop_exists": road_desktop_exists,
+        "anim_latest_mnemo_event_log_ref": mnemo_event_ref,
+        "anim_latest_mnemo_event_log_path": mnemo_event_path,
+        "anim_latest_mnemo_event_log_exists": mnemo_event_exists,
+        "anim_latest_mnemo_event_log_schema_version": mnemo_event_schema_version,
+        "anim_latest_mnemo_event_log_updated_utc": mnemo_event_updated_utc,
+        "anim_latest_mnemo_event_log_current_mode": mnemo_event_current_mode,
+        "anim_latest_mnemo_event_log_event_count": mnemo_event_event_count,
+        "anim_latest_mnemo_event_log_active_latch_count": mnemo_event_active_latch_count,
+        "anim_latest_mnemo_event_log_acknowledged_latch_count": mnemo_event_ack_count,
+        "anim_latest_mnemo_event_log_recent_titles": mnemo_event_recent_titles,
     }
     try:
         browser_perf = dict(collect_browser_perf_artifacts_summary(_workspace_dir() / "exports") or {})

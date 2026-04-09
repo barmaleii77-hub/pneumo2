@@ -31,5 +31,6 @@ def test_r31co_large_ui_entrypoints_use_shared_worker_helper() -> None:
         src = (PNEUMO / rel).read_text(encoding="utf-8")
         assert "from pneumo_solver_ui.ui_process_helpers import (" in src
         assert "start_background_worker" in src
-        assert "start_worker = partial(" in src
+        assert "from pneumo_solver_ui.ui_process_profile_helpers import (" in src
+        assert "start_worker = build_background_worker_starter(" in src
         assert "def start_worker(" not in src

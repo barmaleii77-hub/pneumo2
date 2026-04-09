@@ -572,6 +572,15 @@ def _end_qt_update_batch(handles: list[tuple[QtWidgets.QWidget, bool]]) -> None:
 
 
 def _call_with_qt_update_batch(widget: Any, fn: Callable[[], None]) -> None:
+    # QGraphicsView scene-item updates are already coalesced well enough for our
+    # animator hot path; toggling updatesEnabled() on the view/viewport each tick
+    # only adds overhead and can force broader invalidation work.
+    # TelemetryPanel is also mostly a coordinator for child widgets; toggling
+    # updatesEnabled() on the container each frame adds churn without helping
+    # the already granular child-level updates.
+    if isinstance(widget, (QtWidgets.QGraphicsView, QtWidgets.QTableWidget, TelemetryPanel)):
+        fn()
+        return
     handles = _begin_qt_update_batch(widget if isinstance(widget, QtWidgets.QWidget) else None)
     try:
         fn()
@@ -716,6 +725,33 @@ def _ensure_road_profile_panel_cache(b: DataBundle, wheelbase_m: float) -> Dict[
         "s_world": s_world,
         "corners": corners,
         "y_range": y_range,
+    }
+    b._derived[key] = cache  # type: ignore[assignment]
+    return cache
+
+
+def _ensure_telemetry_summary_cache(b: DataBundle) -> Dict[str, np.ndarray]:
+    key = "svc__telemetry_summary_cache"
+    cached = b._derived.get(key)
+    if isinstance(cached, dict):
+        return cached  # type: ignore[return-value]
+
+    def _series(name: str, default: float = 0.0) -> np.ndarray:
+        return np.asarray(b.get(name, default), dtype=float).reshape(-1)
+
+    cache: Dict[str, np.ndarray] = {
+        "t": np.asarray(b.t, dtype=float).reshape(-1),
+        "vx": _series("скорость_vx_м_с", 0.0),
+        "vy": _series("скорость_vy_м_с", 0.0),
+        "yaw": _series("yaw_рад", 0.0),
+        "yaw_rate": _series("yaw_rate_рад_с", 0.0),
+        "ax": _series("ускорение_продольное_ax_м_с2", 0.0),
+        "ay": _series("ускорение_поперечное_ay_м_с2", 0.0),
+        "roll": _series("крен_phi_рад", 0.0),
+        "pitch": _series("тангаж_theta_рад", 0.0),
+        "zcm": _series("перемещение_рамы_z_м", 0.0),
+        "vzcm": _series("скорость_рамы_z_м_с", 0.0),
+        "azcm": _series("ускорение_рамы_z_м_с2", 0.0),
     }
     b._derived[key] = cache  # type: ignore[assignment]
     return cache
@@ -7522,6 +7558,13 @@ class _QuickBarListCanvas(QtWidgets.QWidget):
         self._text_color = QtGui.QColor(232, 236, 241)
         self._muted_text_color = QtGui.QColor(176, 184, 196)
         self._border_pen = QtGui.QPen(QtGui.QColor(60, 68, 80), 1.0)
+        self._text_font = QtGui.QFont(self.font())
+        self._text_metrics = QtGui.QFontMetrics(self._text_font)
+        self._text_metrics_key: Optional[tuple[str, int, int, int]] = None
+        self._row_layout_key: Optional[tuple[int, int, int]] = None
+        self._row_layout: list[tuple[QtCore.QRectF, QtCore.QRectF, QtCore.QRectF]] = []
+        self._display_rows_key: Optional[tuple[tuple[Any, ...], tuple[int, int, int], tuple[str, int, int, int]]] = None
+        self._display_rows: list[tuple[str, float, str, QtGui.QColor, QtGui.QColor]] = []
         try:
             self._border_pen.setCosmetic(True)
         except Exception:
@@ -7540,6 +7583,10 @@ class _QuickBarListCanvas(QtWidgets.QWidget):
 
     def resizeEvent(self, event: QtGui.QResizeEvent):  # type: ignore[override]
         self._invalidate_static_background_cache()
+        self._row_layout_key = None
+        self._row_layout = []
+        self._display_rows_key = None
+        self._display_rows = []
         super().resizeEvent(event)
 
     def clear_rows(self) -> None:
@@ -7560,6 +7607,7 @@ class _QuickBarListCanvas(QtWidgets.QWidget):
             return
         self._rows = normalized
         self._rows_key = key
+        self._rebuild_display_rows()
         self.update()
 
     @staticmethod
@@ -7567,6 +7615,94 @@ class _QuickBarListCanvas(QtWidgets.QWidget):
         row_gap = 4.0
         row_h = max(16.0, (rect.height() - row_gap * max(0, max_rows - 1)) / max(1, max_rows))
         return row_h, row_gap
+
+    def _ensure_text_metrics(self) -> tuple[QtGui.QFont, QtGui.QFontMetrics]:
+        font = QtGui.QFont(self.font())
+        try:
+            font.setPointSize(max(8, int(font.pointSize()) - 1))
+        except Exception:
+            pass
+        key = (
+            str(font.family()),
+            int(round(float(font.pointSizeF()) * 10.0)),
+            int(font.weight()),
+            int(bool(font.italic())),
+        )
+        if key != self._text_metrics_key:
+            self._text_font = font
+            self._text_metrics = QtGui.QFontMetrics(font)
+            self._text_metrics_key = key
+            self._display_rows_key = None
+        return self._text_font, self._text_metrics
+
+    def _ensure_row_layout(self) -> list[tuple[QtCore.QRectF, QtCore.QRectF, QtCore.QRectF]]:
+        key = (int(max(1, self.width())), int(max(1, self.height())), int(self.max_rows))
+        if key == self._row_layout_key and self._row_layout:
+            return self._row_layout
+        outer = QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        row_h, row_gap = self._row_metrics(outer, self.max_rows)
+        label_w = min(240.0, max(132.0, outer.width() * 0.42))
+        right_w = min(132.0, max(72.0, outer.width() * 0.22))
+        bar_gap = 8.0
+        text_margin = 8.0
+        layout: list[tuple[QtCore.QRectF, QtCore.QRectF, QtCore.QRectF]] = []
+        for row_idx in range(self.max_rows):
+            top = outer.top() + row_idx * (row_h + row_gap)
+            row_rect = QtCore.QRectF(outer.left(), top, outer.width(), row_h)
+            left_rect = QtCore.QRectF(
+                row_rect.left() + text_margin,
+                row_rect.top(),
+                label_w - text_margin,
+                row_rect.height(),
+            )
+            right_rect = QtCore.QRectF(
+                row_rect.right() - right_w,
+                row_rect.top(),
+                right_w - text_margin,
+                row_rect.height(),
+            )
+            bar_rect = QtCore.QRectF(
+                left_rect.right() + bar_gap,
+                row_rect.center().y() - 4.5,
+                max(18.0, right_rect.left() - left_rect.right() - bar_gap * 2.0),
+                9.0,
+            )
+            layout.append((left_rect, right_rect, bar_rect))
+        self._row_layout_key = key
+        self._row_layout = layout
+        self._display_rows_key = None
+        return self._row_layout
+
+    def _rebuild_display_rows(self) -> None:
+        _font, fm = self._ensure_text_metrics()
+        layout = self._ensure_row_layout()
+        metrics_key = tuple(self._text_metrics_key or ())
+        layout_key = tuple(self._row_layout_key or ())
+        rows_key = tuple(self._rows_key or ())
+        display_key = (rows_key, layout_key, metrics_key)
+        if display_key == self._display_rows_key:
+            return
+        display_rows: list[tuple[str, float, str, QtGui.QColor, QtGui.QColor]] = []
+        for row_idx, (left_rect, right_rect, _bar_rect) in enumerate(layout):
+            if row_idx < len(self._rows):
+                left, frac, right = self._rows[row_idx]
+                text_color = self._text_color
+                right_color = self._muted_text_color if not right else text_color
+            else:
+                left, frac, right = self.empty_label, 0.0, ""
+                text_color = self._muted_text_color
+                right_color = self._muted_text_color
+            display_rows.append(
+                (
+                    fm.elidedText(str(left), QtCore.Qt.ElideRight, max(8, int(left_rect.width()))),
+                    float(frac),
+                    fm.elidedText(str(right), QtCore.Qt.ElideLeft, max(8, int(right_rect.width()))),
+                    text_color,
+                    right_color,
+                )
+            )
+        self._display_rows = display_rows
+        self._display_rows_key = display_key
 
     def _ensure_static_background_cache(self) -> Optional[QtGui.QPixmap]:
         key = (int(max(1, self.width())), int(max(1, self.height())), int(self.max_rows))
@@ -7633,80 +7769,47 @@ class _QuickBarListCanvas(QtWidgets.QWidget):
 
     def paintEvent(self, _event: QtGui.QPaintEvent):  # type: ignore[override]
         p = QtGui.QPainter(self)
-        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        p.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
         bg = self._ensure_static_background_cache()
         if bg is not None:
             p.drawPixmap(0, 0, bg)
         else:
             p.fillRect(self.rect(), self._bg_color)
-        outer = QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
-        row_h, row_gap = self._row_metrics(outer, self.max_rows)
-        label_w = min(240.0, max(132.0, outer.width() * 0.42))
-        right_w = min(132.0, max(72.0, outer.width() * 0.22))
-        bar_gap = 8.0
-        text_margin = 8.0
-
-        font_label = p.font()
-        font_right = QtGui.QFont(font_label)
-        try:
-            font_label.setPointSize(max(8, int(font_label.pointSize()) - 1))
-            font_right.setPointSize(max(8, int(font_right.pointSize()) - 1))
-        except Exception:
-            pass
-        fm_label = QtGui.QFontMetrics(font_label)
-        fm_right = QtGui.QFontMetrics(font_right)
-
-        for row_idx in range(self.max_rows):
-            top = outer.top() + row_idx * (row_h + row_gap)
-            row_rect = QtCore.QRectF(outer.left(), top, outer.width(), row_h)
-
-            if row_idx < len(self._rows):
-                left, frac, right = self._rows[row_idx]
-                text_color = self._text_color
+        font, _fm = self._ensure_text_metrics()
+        layout = self._ensure_row_layout()
+        self._rebuild_display_rows()
+        p.setFont(font)
+        for row_idx, (left_rect, right_rect, bar_rect) in enumerate(layout):
+            if row_idx < len(self._display_rows):
+                left_text, frac, right_text, text_color, right_color = self._display_rows[row_idx]
             else:
-                left, frac, right = self.empty_label, 0.0, ""
-                text_color = self._muted_text_color
-
-            left_rect = QtCore.QRectF(
-                row_rect.left() + text_margin,
-                row_rect.top(),
-                label_w - text_margin,
-                row_rect.height(),
-            )
-            right_rect = QtCore.QRectF(
-                row_rect.right() - right_w,
-                row_rect.top(),
-                right_w - text_margin,
-                row_rect.height(),
-            )
-            bar_rect = QtCore.QRectF(
-                left_rect.right() + bar_gap,
-                row_rect.center().y() - 4.5,
-                max(18.0, right_rect.left() - left_rect.right() - bar_gap * 2.0),
-                9.0,
-            )
-
-            p.setFont(font_label)
+                left_text, frac, right_text, text_color, right_color = (
+                    self.empty_label,
+                    0.0,
+                    "",
+                    self._muted_text_color,
+                    self._muted_text_color,
+                )
             p.setPen(text_color)
             p.drawText(
                 left_rect,
                 QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-                fm_label.elidedText(str(left), QtCore.Qt.ElideRight, max(8, int(left_rect.width()))),
+                left_text,
             )
-
             if float(frac) > 1e-6:
                 fill_rect = QtCore.QRectF(bar_rect)
                 fill_rect.setWidth(max(1.0, bar_rect.width() * float(frac)))
+                p.setRenderHint(QtGui.QPainter.Antialiasing, True)
                 p.setPen(QtCore.Qt.NoPen)
                 p.setBrush(self._bar_color)
                 p.drawRoundedRect(fill_rect, 4.0, 4.0)
+                p.setRenderHint(QtGui.QPainter.Antialiasing, False)
 
-            p.setFont(font_right)
-            p.setPen(self._muted_text_color if not right else text_color)
+            p.setPen(right_color)
             p.drawText(
                 right_rect,
                 QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
-                fm_right.elidedText(str(right), QtCore.Qt.ElideLeft, max(8, int(right_rect.width()))),
+                right_text,
             )
 
 
@@ -7716,26 +7819,67 @@ class _QuickTextStripCanvas(QtWidgets.QWidget):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
         self._segments: list[tuple[str, QtGui.QColor]] = []
+        self._segments_layout: list[tuple[str, QtGui.QColor, float]] = []
         self._segments_key: Optional[tuple[tuple[str, int], ...]] = None
+        self._segments_layout_key: Optional[tuple[tuple[Any, ...], tuple[tuple[str, int], ...]]] = None
         self._bg_color = QtGui.QColor(19, 23, 28)
+        self._text_font = QtGui.QFont(self.font())
+        self._text_metrics = QtGui.QFontMetrics(self._text_font)
+        self._text_metrics_key: Optional[tuple[str, int, int, int]] = None
         try:
             self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)
         except Exception:
             pass
         self.setMinimumHeight(18)
 
+    def _ensure_text_metrics(self) -> tuple[QtGui.QFont, QtGui.QFontMetrics]:
+        font = QtGui.QFont(self.font())
+        try:
+            font.setPointSize(max(8, int(font.pointSize()) - 1))
+        except Exception:
+            pass
+        key = (
+            str(font.family()),
+            int(round(float(font.pointSizeF()) * 10.0)),
+            int(font.weight()),
+            int(bool(font.italic())),
+        )
+        if key != self._text_metrics_key:
+            self._text_font = font
+            self._text_metrics = QtGui.QFontMetrics(font)
+            self._text_metrics_key = key
+        return self._text_font, self._text_metrics
+
+    def _rebuild_segment_layout(self) -> None:
+        _font, fm = self._ensure_text_metrics()
+        self._segments_layout = [
+            (text, color, float(fm.horizontalAdvance(text)))
+            for text, color in self._segments
+        ]
+        self._segments_layout_key = (
+            tuple(self._text_metrics_key or ()),
+            tuple(self._segments_key or ()),
+        )
+
     def set_segments(self, segments: Sequence[tuple[str, QtGui.QColor]]) -> None:
         normalized: list[tuple[str, QtGui.QColor]] = []
         key_parts: list[tuple[str, int]] = []
+        _font, fm = self._ensure_text_metrics()
+        layout: list[tuple[str, QtGui.QColor, float]] = []
         for text, color in segments:
+            text_s = str(text)
             qcolor = QtGui.QColor(color)
-            normalized.append((str(text), qcolor))
-            key_parts.append((str(text), int(qcolor.rgba())))
+            normalized.append((text_s, qcolor))
+            key_parts.append((text_s, int(qcolor.rgba())))
+            layout.append((text_s, qcolor, float(fm.horizontalAdvance(text_s))))
         key = tuple(key_parts)
-        if key == self._segments_key:
+        layout_key = (tuple(self._text_metrics_key or ()), key)
+        if layout_key == self._segments_layout_key:
             return
         self._segments = normalized
         self._segments_key = key
+        self._segments_layout = layout
+        self._segments_layout_key = layout_key
         self.update()
 
     def paintEvent(self, _event: QtGui.QPaintEvent):  # type: ignore[override]
@@ -7743,24 +7887,29 @@ class _QuickTextStripCanvas(QtWidgets.QWidget):
         p.fillRect(self.rect(), self._bg_color)
         p.setRenderHints(QtGui.QPainter.TextAntialiasing)
         rect = QtCore.QRectF(self.rect()).adjusted(4.0, 0.0, -4.0, 0.0)
-        font = QtGui.QFont(self.font())
-        try:
-            font.setPointSize(max(8, int(font.pointSize()) - 1))
-        except Exception:
-            pass
+        font, _fm = self._ensure_text_metrics()
+        expected_layout_key = (
+            tuple(self._text_metrics_key or ()),
+            tuple(self._segments_key or ()),
+        )
+        if expected_layout_key != self._segments_layout_key:
+            self._rebuild_segment_layout()
         p.setFont(font)
-        fm = QtGui.QFontMetrics(font)
         x = float(rect.left())
         y = float(rect.top())
         h = float(rect.height())
         spacing = 10.0
-        for text, color in self._segments:
+        last_rgba: Optional[int] = None
+        for text, color, width0 in self._segments_layout:
             if x >= rect.right():
                 break
-            width = min(float(fm.horizontalAdvance(str(text))), max(0.0, rect.right() - x))
+            width = min(float(width0), max(0.0, rect.right() - x))
             seg_rect = QtCore.QRectF(x, y, max(8.0, width + 2.0), h)
-            p.setPen(color)
-            p.drawText(seg_rect, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter, str(text))
+            rgba = int(color.rgba())
+            if rgba != last_rgba:
+                p.setPen(color)
+                last_rgba = rgba
+            p.drawText(seg_rect, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter, text)
             x += max(8.0, width) + spacing
 
 
@@ -8184,8 +8333,12 @@ class _PressureQuickGridCanvas(QtWidgets.QWidget):
         self._card_bg = QtGui.QColor(24, 29, 35)
         self._track = QtGui.QColor(42, 48, 56)
         self._border_pen = QtGui.QPen(QtGui.QColor(60, 68, 80), 1.0)
+        self._value_font = QtGui.QFont(self.font())
+        self._value_text_pen = QtGui.QPen(QtGui.QColor(234, 238, 243))
         try:
             self._border_pen.setCosmetic(True)
+            self._value_text_pen.setCosmetic(True)
+            self._value_font.setPointSize(max(8, int(self._value_font.pointSize()) - 1))
         except Exception:
             pass
 
@@ -8310,17 +8463,12 @@ class _PressureQuickGridCanvas(QtWidgets.QWidget):
             p.drawPixmap(0, 0, bg_pixmap)
         else:
             p.fillRect(self.rect(), self._bg)
-        value_font = QtGui.QFont(p.font())
-        try:
-            value_font.setPointSize(max(8, int(value_font.pointSize()) - 1))
-        except Exception:
-            pass
+        p.setFont(self._value_font)
+        p.setPen(self._value_text_pen)
         for info in metrics.get("cards", []):
             node = str(info.get("node", ""))
             val = self._values.get(node)
             txt = "—" if val is None or not np.isfinite(float(val)) else f"{float(val):.2f} bar(g)"
-            p.setFont(value_font)
-            p.setPen(QtGui.QColor(234, 238, 243))
             p.drawText(
                 info["value_rect"],
                 QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
@@ -8339,6 +8487,7 @@ class _PressureQuickGridCanvas(QtWidgets.QWidget):
                     grad.setColorAt(1.0, QtGui.QColor(217, 83, 79))
                     p.setBrush(QtGui.QBrush(grad))
                     p.drawRoundedRect(fill_rect, 3.5, 3.5)
+                    p.setPen(self._value_text_pen)
 
 
 class PressureQuickPanel(QtWidgets.QWidget):
@@ -9324,6 +9473,18 @@ class _HeatCell(QtWidgets.QWidget):
         self._bg_color = QtGui.QColor(40, 40, 40)
         self._fg_color = QtGui.QColor(235, 235, 235)
         self._border_color = QtGui.QColor(26, 28, 34, 150)
+        self._border_pen = QtGui.QPen(self._border_color, 1.0)
+        self._corner_font = QtGui.QFont(self.font())
+        self._value_font = QtGui.QFont(self.font())
+        try:
+            self._corner_font.setBold(True)
+            self._corner_font.setPointSize(max(8, int(self._corner_font.pointSize())))
+            self._value_font.setBold(False)
+            self._value_font.setPointSize(max(8, int(self._value_font.pointSize()) - 1))
+            self._value_font.setFamilies(["Consolas", "Menlo", "DejaVu Sans Mono"])
+            self._border_pen.setCosmetic(True)
+        except Exception:
+            pass
 
     def set_value(self, value: float, *, text: str, u: float):
         rgb = _heat_rgb(u)
@@ -9345,32 +9506,19 @@ class _HeatCell(QtWidgets.QWidget):
         p = QtGui.QPainter(self)
         rect = QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
         p.setRenderHint(QtGui.QPainter.Antialiasing, True)
-        p.setPen(QtGui.QPen(self._border_color, 1.0))
+        p.setPen(self._border_pen)
         p.setBrush(QtGui.QBrush(self._bg_color))
         p.drawRoundedRect(rect, 8.0, 8.0)
 
         p.setPen(self._fg_color)
-        font_corner = p.font()
-        try:
-            font_corner.setBold(True)
-            font_corner.setPointSize(max(8, int(font_corner.pointSize())))
-        except Exception:
-            pass
-        p.setFont(font_corner)
+        p.setFont(self._corner_font)
         p.drawText(
             QtCore.QRectF(rect.left() + 8.0, rect.top() + 6.0, rect.width() - 16.0, 16.0),
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
             self.corner,
         )
 
-        font_val = p.font()
-        try:
-            font_val.setBold(False)
-            font_val.setPointSize(max(8, int(font_val.pointSize()) - 1))
-            font_val.setFamilies(["Consolas", "Menlo", "DejaVu Sans Mono"])
-        except Exception:
-            pass
-        p.setFont(font_val)
+        p.setFont(self._value_font)
         p.drawText(
             QtCore.QRectF(rect.left() + 8.0, rect.top() + 24.0, rect.width() - 16.0, rect.height() - 30.0),
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
@@ -10368,18 +10516,19 @@ class TelemetryPanel(QtWidgets.QWidget):
         self._emit_visual()
 
     def update_frame(self, b: DataBundle, i: int):
-        t = float(b.t[i])
-        vx = float(b.get("скорость_vx_м_с", 0.0)[i])
-        vy = float(b.get("скорость_vy_м_с", 0.0)[i])
+        summary = _ensure_telemetry_summary_cache(b)
+        t = float(summary["t"][i])
+        vx = float(summary["vx"][i])
+        vy = float(summary["vy"][i])
 
         # Для отображения используем модуль скорости.
         v_mps = math.hypot(vx, vy)
-        yaw = float(b.get("yaw_рад", 0.0)[i])
-        yaw_rate = float(b.get("yaw_rate_рад_с", 0.0)[i])
-        ax = float(b.get("ускорение_продольное_ax_м_с2", 0.0)[i])
-        ay = float(b.get("ускорение_поперечное_ay_м_с2", 0.0)[i])
-        roll = float(b.get("крен_phi_рад", 0.0)[i])
-        pitch = float(b.get("тангаж_theta_рад", 0.0)[i])
+        yaw = float(summary["yaw"][i])
+        yaw_rate = float(summary["yaw_rate"][i])
+        ax = float(summary["ax"][i])
+        ay = float(summary["ay"][i])
+        roll = float(summary["roll"][i])
+        pitch = float(summary["pitch"][i])
 
         R = float("inf")
         if abs(yaw_rate) > 1e-6 and abs(vx) > 1e-3:
@@ -10415,9 +10564,9 @@ class TelemetryPanel(QtWidgets.QWidget):
             except Exception:
                 pass
 
-        zcm = float(b.get("перемещение_рамы_z_м", 0.0)[i])
-        vzcm = float(b.get("скорость_рамы_z_м_с", 0.0)[i])
-        azcm = float(b.get("ускорение_рамы_z_м_с2", 0.0)[i])
+        zcm = float(summary["zcm"][i])
+        vzcm = float(summary["vzcm"][i])
+        azcm = float(summary["azcm"][i])
         if self.lbl_zcm is not None:
             _set_label_text_if_changed(self.lbl_zcm, f"z_cm = {_fmt(zcm, ' m', digits=3)}")
         if self.lbl_vzcm is not None:
@@ -11919,12 +12068,20 @@ class CockpitWidget(QtWidgets.QWidget):
         wheel_w = float(self.geom.wheel_width)
         wb = float(self.geom.wheelbase)
         tr = float(self.geom.track)
+        frame_corner_z_cache = {
+            # Cache canonical frame-corner trajectories once per bundle to keep all
+            # 2D view framing sourced from the same strict helper contract.
+            "ЛП": _np.asarray(b.frame_corner_z("ЛП", default=0.0), dtype=float),
+            "ПП": _np.asarray(b.frame_corner_z("ПП", default=0.0), dtype=float),
+            "ЛЗ": _np.asarray(b.frame_corner_z("ЛЗ", default=0.0), dtype=float),
+            "ПЗ": _np.asarray(b.frame_corner_z("ПЗ", default=0.0), dtype=float),
+        }
 
         # --- Axles (front/rear): x = lateral, y = z
         def _axle_limits(cL: str, cR: str) -> Tuple[float, float]:
             mn, mx = _minmax(
-                b.frame_corner_z(cL, default=0.0),
-                b.frame_corner_z(cR, default=0.0),
+                frame_corner_z_cache[cL],
+                frame_corner_z_cache[cR],
                 b.get(f"перемещение_колеса_{cL}_м", 0.0),
                 b.get(f"перемещение_колеса_{cR}_м", 0.0),
                 b.get(f"дорога_{cL}_м", 0.0),
@@ -11955,8 +12112,8 @@ class CockpitWidget(QtWidgets.QWidget):
         # --- Sides (left/right): x = longitudinal, y = z
         def _side_limits(cF: str, cR: str) -> Tuple[float, float]:
             mn, mx = _minmax(
-                b.frame_corner_z(cF, default=0.0),
-                b.frame_corner_z(cR, default=0.0),
+                frame_corner_z_cache[cF],
+                frame_corner_z_cache[cR],
                 b.get(f"перемещение_колеса_{cF}_м", 0.0),
                 b.get(f"перемещение_колеса_{cR}_м", 0.0),
                 b.get(f"дорога_{cF}_м", 0.0),
@@ -12099,7 +12256,7 @@ class CockpitWidget(QtWidgets.QWidget):
             try:
                 _call_with_qt_update_batch(
                     self.timeline,
-                    lambda: self.timeline.set_index(idx),
+                    lambda: self.timeline.set_playhead_time(self._playback_sample_t_s, idx=idx),
                 )
                 self._record_aux_cadence("dock_timeline", now_ts)
             except Exception:
@@ -12265,7 +12422,7 @@ class CockpitWidget(QtWidgets.QWidget):
                 _call_aux_widget(
                     "dock_timeline",
                     self.timeline,
-                    lambda: self.timeline.set_index(i),
+                    lambda: self.timeline.set_playhead_time(self._playback_sample_t_s, idx=i),
                 )
             if self._dock_is_exposed("dock_trends") and not interactive_scrub:
                 _call_aux_widget(

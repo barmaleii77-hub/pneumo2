@@ -31,6 +31,16 @@ def _make_anim_diag(token: str = "tok-123", reload_inputs: list[str] | None = No
         },
         "anim_latest_updated_utc": "2026-03-11T12:00:00+00:00",
         "anim_latest_meta": {"road_csv": "anim_latest_road_csv.csv"},
+        "anim_latest_mnemo_event_log_ref": "anim_latest.desktop_mnemo_events.json",
+        "anim_latest_mnemo_event_log_path": "/abs/workspace/exports/anim_latest.desktop_mnemo_events.json",
+        "anim_latest_mnemo_event_log_exists": True,
+        "anim_latest_mnemo_event_log_schema_version": "desktop_mnemo_event_log_v1",
+        "anim_latest_mnemo_event_log_updated_utc": "2026-03-11T12:05:00+00:00",
+        "anim_latest_mnemo_event_log_current_mode": "Регуляторный коридор",
+        "anim_latest_mnemo_event_log_event_count": 4,
+        "anim_latest_mnemo_event_log_active_latch_count": 1,
+        "anim_latest_mnemo_event_log_acknowledged_latch_count": 2,
+        "anim_latest_mnemo_event_log_recent_titles": ["Большой перепад давлений", "Смена режима"],
     }
 
 
@@ -50,14 +60,22 @@ def test_generate_triage_report_exposes_anim_latest_diagnostics_from_sidecar(tmp
 
     md, summary = generate_triage_report(tmp_path, keep_last_n=1)
     anim = dict(summary.get("anim_latest") or {})
+    mnemo = dict(summary.get("mnemo_event_log") or {})
     paths = dict(summary.get("paths") or {})
 
     assert anim["source"] == "send_bundle_sidecar"
     assert anim["anim_latest_available"] is True
     assert anim["anim_latest_visual_cache_token"] == "tok-triage"
     assert anim["anim_latest_visual_reload_inputs"] == ["npz", "road_csv"]
+    assert mnemo["severity"] == "critical"
+    assert mnemo["current_mode"] == "Регуляторный коридор"
+    assert summary["severity_counts"]["critical"] == 1
+    assert any("Desktop Mnemo reports 1 active latched event(s)" in flag for flag in summary["red_flags"])
     assert os.path.normcase(paths["latest_anim_pointer_diagnostics_json"]) == os.path.normcase(str((sb_root / ANIM_DIAG_SIDECAR_JSON).resolve()))
     assert os.path.normcase(paths["latest_anim_pointer_diagnostics_md"]) == os.path.normcase(str((sb_root / ANIM_DIAG_SIDECAR_MD).resolve()))
+    assert "## Desktop Mnemo events" in md
+    assert "Регуляторный коридор" in md
+    assert "Большой перепад давлений" in md
     assert "## Anim latest diagnostics" in md
     assert "tok-triage" in md
     assert "npz, road_csv" in md
@@ -86,6 +104,8 @@ def test_sources_wire_anim_latest_diagnostics_into_triage_and_readme() -> None:
     assert '_load_anim_latest_summary' in triage_text
     assert '"anim_latest": anim_summary' in triage_text
     assert '## Anim latest diagnostics' in triage_text
+    assert '## Desktop Mnemo events' in triage_text
+    assert '"mnemo_event_log": mnemo_event_summary' in triage_text
     assert 'ANIM_DIAG_SIDECAR_JSON' in triage_text
     assert 'ANIM_DIAG_SIDECAR_MD' in triage_text
 

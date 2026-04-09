@@ -21,6 +21,9 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from pneumo_solver_ui.entrypoints import desktop_animator_page_rel, desktop_mnemo_page_rel
+from pneumo_solver_ui.run_artifacts import collect_anim_latest_diagnostics_summary
+
 try:
     import plotly.graph_objects as go  # type: ignore
     from plotly.subplots import make_subplots  # type: ignore
@@ -60,6 +63,8 @@ from pneumo_solver_ui.geometry_acceptance_contract import (
 
 
 CORNERS = ["ЛП", "ПП", "ЛЗ", "ПЗ"]
+DESKTOP_MNEMO_PAGE = desktop_mnemo_page_rel(here=__file__)
+DESKTOP_ANIMATOR_PAGE = desktop_animator_page_rel(here=__file__)
 
 
 def _repo_root() -> Path:
@@ -87,6 +92,16 @@ def _default_npz_dirs() -> List[Path]:
             uniq.append(p)
             seen.add(s)
     return uniq
+
+
+def _page_link_or_info(page: str, label: str, *, key: str) -> None:
+    try:
+        if hasattr(st, "page_link"):
+            st.page_link(page, label=label, width="stretch")
+            return
+    except Exception:
+        pass
+    st.caption(f"{label}: {page}")
 
 
 @st.cache_data(show_spinner=False)
@@ -356,6 +371,50 @@ def render_validation_cockpit_web() -> None:
             if rows:
                 st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
             st.text("\n".join(format_geometry_acceptance_summary_lines(geometry_acceptance)))
+
+    st.subheader("Связанные desktop-инструменты")
+    st.caption(
+        "Когда нужен быстрый визуальный sanity-check вне браузера: Desktop Mnemo удобен для пневматики и причинно-следственных связей, "
+        "а Desktop Animator лучше подходит для механики, 2D/3D и дорожного профиля."
+    )
+    tool_col1, tool_col2 = st.columns(2)
+    with tool_col1:
+        _page_link_or_info(DESKTOP_MNEMO_PAGE, "Открыть Desktop Mnemo", key="validation_to_mnemo")
+    with tool_col2:
+        _page_link_or_info(DESKTOP_ANIMATOR_PAGE, "Открыть Desktop Animator", key="validation_to_animator")
+
+    mnemo_event_diag = collect_anim_latest_diagnostics_summary(
+        {
+            "npz_path": pick,
+            "meta": meta if isinstance(meta, dict) else {},
+        },
+        include_meta=False,
+    )
+    st.markdown("**Журнал событий Desktop Mnemo**")
+    if mnemo_event_diag.get("anim_latest_mnemo_event_log_exists"):
+        ev_col1, ev_col2, ev_col3, ev_col4 = st.columns(4)
+        ev_col1.metric("Событий", int(mnemo_event_diag.get("anim_latest_mnemo_event_log_event_count") or 0))
+        ev_col2.metric("Активных latch", int(mnemo_event_diag.get("anim_latest_mnemo_event_log_active_latch_count") or 0))
+        ev_col3.metric("ACK latch", int(mnemo_event_diag.get("anim_latest_mnemo_event_log_acknowledged_latch_count") or 0))
+        ev_col4.metric("Режим", str(mnemo_event_diag.get("anim_latest_mnemo_event_log_current_mode") or "—"))
+        st.caption(
+            "Event-log: "
+            f"{mnemo_event_diag.get('anim_latest_mnemo_event_log_ref') or '—'}; "
+            f"updated={mnemo_event_diag.get('anim_latest_mnemo_event_log_updated_utc') or '—'}; "
+            f"schema={mnemo_event_diag.get('anim_latest_mnemo_event_log_schema_version') or '—'}"
+        )
+        recent_titles = [
+            str(x)
+            for x in (mnemo_event_diag.get("anim_latest_mnemo_event_log_recent_titles") or [])
+            if str(x).strip()
+        ]
+        if recent_titles:
+            st.info("Недавние события: " + " | ".join(recent_titles[:3]))
+    else:
+        st.info(
+            "Для текущего NPZ журнал событий Desktop Mnemo пока не найден. "
+            "Откройте Desktop Mnemo, пройдите сценарий и выполните ACK/экспорт, чтобы добавить event-log в triage."
+        )
 
     # --- animation ---
     st.subheader("Механика + дорога (синхронно по времени)")

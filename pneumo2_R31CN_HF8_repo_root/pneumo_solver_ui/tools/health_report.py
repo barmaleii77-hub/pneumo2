@@ -41,6 +41,7 @@ from .send_bundle_contract import (
     annotate_anim_source_for_bundle,
     choose_anim_snapshot,
     extract_anim_snapshot,
+    summarize_mnemo_event_log,
 )
 
 
@@ -267,6 +268,8 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 anim_sources,
                 preferred_order=("validation", "diagnostics", "local_pointer", "global_pointer", "dashboard"),
             )
+            mnemo_event_log = summarize_mnemo_event_log(anim_summary)
+            anim_summary["mnemo_event_summary"] = dict(mnemo_event_log)
             if ANIM_LOCAL_NPZ in name_set:
                 try:
                     with z.open(ANIM_LOCAL_NPZ, "r") as f:
@@ -298,6 +301,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     anim_summary["geometry_acceptance"] = geom_acc
                     notes.append(str(geom_acc["error"]))
             signals["anim_latest"] = anim_summary
+            signals["mnemo_event_log"] = dict(mnemo_event_log)
             perf_evidence_status = str(anim_summary.get("browser_perf_evidence_status") or "").strip()
             if perf_evidence_status and perf_evidence_status != "trace_bundle_ready":
                 perf_note = (
@@ -314,6 +318,17 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 )
                 if perf_compare_note not in notes:
                     notes.append(perf_compare_note)
+            for flag in mnemo_event_log.get("red_flags") or []:
+                sflag = str(flag).strip()
+                if sflag and sflag not in notes:
+                    notes.append(sflag)
+            if (
+                str(mnemo_event_log.get("severity") or "") == "warn"
+                and mnemo_event_log.get("headline")
+            ):
+                warn_note = str(mnemo_event_log.get("headline") or "").strip()
+                if warn_note and warn_note not in notes:
+                    notes.append(warn_note)
             for msg in anim_summary.get("issues") or []:
                 smsg = str(msg).strip()
                 if smsg and smsg not in notes:
@@ -325,7 +340,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
 
     return HealthReport(
         schema="health_report",
-        schema_version="1.3.0",
+        schema_version="1.4.0",
         created_at=created_at,
         zip_path=str(zip_path),
         ok=bool(ok),
@@ -337,6 +352,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
 def render_health_report_md(rep: HealthReport) -> str:
     val = dict(rep.signals.get("validation") or {})
     anim = dict(rep.signals.get("anim_latest") or {})
+    mnemo = dict(rep.signals.get("mnemo_event_log") or anim.get("mnemo_event_summary") or {})
     artifacts = dict(rep.signals.get("artifacts") or {})
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
     lines = [
@@ -398,6 +414,22 @@ def render_health_report_md(rep: HealthReport) -> str:
         anim_issues = list(anim.get("issues") or [])
         if anim_issues:
             lines += ["", "### Anim latest issues"] + [f"- {x}" for x in anim_issues]
+
+    if mnemo:
+        lines += [
+            "",
+            "## Desktop Mnemo events",
+            f"- severity: {mnemo.get('severity') or 'missing'}",
+            f"- summary: {mnemo.get('headline') or '—'}",
+            f"- event_log: {mnemo.get('ref') or '—'} / exists={mnemo.get('exists')} / schema={mnemo.get('schema_version') or '—'} / updated_utc={mnemo.get('updated_utc') or '—'}",
+            f"- current_mode: {mnemo.get('current_mode') or '—'}",
+            f"- event_state: total={mnemo.get('event_count')} / active={mnemo.get('active_latch_count')} / acked={mnemo.get('acknowledged_latch_count')}",
+        ]
+        recent_titles = [str(x) for x in (mnemo.get("recent_titles") or []) if str(x).strip()]
+        if recent_titles:
+            lines.append(f"- recent_titles: {' | '.join(recent_titles[:3])}")
+        for flag in list(mnemo.get("red_flags") or [])[:3]:
+            lines.append(f"- red_flag: {flag}")
 
     geom = dict(rep.signals.get("geometry_acceptance") or {})
     if geom:

@@ -13,11 +13,13 @@ def test_ui_scenario_ring_hides_whole_ring_plot_under_debug_expander() -> None:
 
 def test_pneumo_ui_app_embedded_animator_falls_back_to_anim_latest_npz_sidecar() -> None:
     src = (ROOT / 'pneumo_solver_ui' / 'pneumo_ui_app.py').read_text(encoding='utf-8')
-    assert 'load_ring_spec_from_npz' in src
-    assert "st.session_state.get('anim_latest_npz')" in src
+    src_cockpit = (ROOT / 'pneumo_solver_ui' / 'animation_cockpit_web.py').read_text(encoding='utf-8')
+    assert 'apply_anim_latest_to_session_global' in src
+    assert 'anim_latest_npz=npz_latest' in src
     assert 'local_anim_latest_export_paths_global(' in src
-    assert '_npz_candidates.append(_anim_latest_npz_path)' in src
-    assert 'load_ring_spec_from_npz(_npz_cand)' in src
+    assert 'ring_visual_latest_export_paths_fn=local_anim_latest_export_paths_global' in src
+    assert 'load_ring_spec_from_npz' in src_cockpit
+    assert 'load_ring_spec_from_npz(pick)' in src_cockpit
 
 
 def test_animation_cockpit_playhead_receives_segment_ranges() -> None:
@@ -34,6 +36,8 @@ def test_playhead_ctrl_has_segment_band_overlay_and_current_segment_label() -> N
     assert 'segNow' in src
     assert 'renderSegmentBands' in src
     assert 'segment_ranges' in src
+    assert 'turn_direction_label' in src
+    assert 'segmentLabel(seg' in src
 
 
 def test_mech_car3d_has_ring_segment_hud_and_current_segment_emphasis() -> None:

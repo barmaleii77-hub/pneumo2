@@ -39,7 +39,6 @@ Profile likelihood (профиль правдоподобия) для парам
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import math
 import time
@@ -77,10 +76,6 @@ def _save_json(obj: Any, path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
-
-
-def load_py_module(path: Path, module_name: str):
-    return load_python_module_from_path(path, module_name)
 
 
 # --------------------------
@@ -390,8 +385,8 @@ def main():
 
     args = ap.parse_args()
 
-    model_mod = load_py_module(Path(args.model), "model_mod_profile")
-    worker_mod = load_py_module(Path(args.worker), "worker_mod_profile")
+    model_mod = load_python_module_from_path(Path(args.model), "model_mod_profile")
+    worker_mod = load_python_module_from_path(Path(args.worker), "worker_mod_profile")
 
     suite_obj = _load_json(Path(args.suite_json))
     tests_suite = load_suite(worker_mod, suite_obj)

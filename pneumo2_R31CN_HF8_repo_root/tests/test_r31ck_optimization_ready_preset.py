@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 UI_ROOT = ROOT / "pneumo_solver_ui"
 PAGE = UI_ROOT / "pages" / "03_Optimization.py"
 APP = UI_ROOT / "pneumo_ui_app.py"
+LAUNCH_PLAN = UI_ROOT / "optimization_launch_plan_runtime.py"
 
 
 def test_r31ck_ready_preset_materializes_valid_30min_suite(tmp_path: Path) -> None:
@@ -59,6 +60,18 @@ def test_r31ck_ready_preset_materializes_valid_30min_suite(tmp_path: Path) -> No
     assert ring["target_мин_зазор_пружина_пружина_м"] == 0.001
     assert ring["target_макс_ошибка_midstroke_t0_м"] == 0.03
     assert ring["target_мин_запас_до_coil_bind_пружины_м"] == 0.003
+    ring_spec = json.loads(Path(ring["scenario_json"]).read_text(encoding="utf-8"))
+    ring_segments = list(ring_spec.get("segments") or [])
+    assert ring_segments
+    assert all("turn_direction" in seg for seg in ring_segments)
+    assert all("speed_end_kph" in seg for seg in ring_segments)
+    assert all("drive_mode" not in seg for seg in ring_segments)
+    assert all("speed_kph" not in seg for seg in ring_segments)
+    assert all("v_end_kph" not in seg for seg in ring_segments)
+    ring_meta = dict(ring_spec.get("_generated_meta") or {})
+    assert abs(float(ring["dt"]) - float(ring_spec["dt_s"])) < 1e-12
+    assert abs(float(ring["t_end"]) - float(ring_meta["lap_time_s"])) < 1e-12
+    assert abs(float(ring["vx0_м_с"]) - (float(ring_spec["v0_kph"]) / 3.6)) < 1e-12
 
     profile = enabled[READY_PROFILE_NAME]
     assert profile["тип"] == "road_profile_csv"
@@ -91,9 +104,11 @@ def test_r31ck_ready_session_defaults_seed_stage_runner_30min() -> None:
 def test_r31ck_page_and_classic_ui_use_optimization_ready_preset() -> None:
     page_src = PAGE.read_text(encoding="utf-8")
     app_src = APP.read_text(encoding="utf-8")
+    launch_plan_src = LAUNCH_PLAN.read_text(encoding="utf-8")
 
-    assert "materialize_optimization_ready_suite_json" in page_src
     assert "seed_optimization_ready_session_state" in page_src
+    assert "build_optimization_launch_plan" in page_src
+    assert "materialize_optimization_ready_suite_json" in launch_plan_src
     assert "return canonical_suite_json_path(_ui_root())" not in page_src
 
     assert "load_optimization_ready_suite_rows" in app_src

@@ -23,9 +23,7 @@ import hashlib
 import inspect
 import subprocess
 import shutil
-import importlib.util
 import logging
-from logging.handlers import RotatingFileHandler
 import traceback
 import threading
 import uuid
@@ -60,8 +58,6 @@ from typing import Dict, Tuple, Any, List, Optional, Callable
 import copy
 import gzip
 
-from contextlib import contextmanager
-
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -88,8 +84,26 @@ from pneumo_solver_ui.ui_cache_helpers import (
     save_last_baseline_ptr as save_ui_last_baseline_ptr,
     stable_obj_hash,
 )
+from pneumo_solver_ui.ui_cache_runtime_helpers import (
+    build_runtime_baseline_cache_dir,
+    load_runtime_baseline_cache,
+    load_runtime_detail_cache,
+    load_runtime_last_baseline_ptr,
+    save_runtime_baseline_cache,
+    save_runtime_detail_cache,
+    save_runtime_last_baseline_ptr,
+)
 from pneumo_solver_ui.ui_data_helpers import decimate_minmax, downsample_df, write_tests_index_csv
 from pneumo_solver_ui.ui_diagnostics_helpers import make_ui_diagnostics_zip_bundle
+from pneumo_solver_ui.ui_diagnostics_profile_helpers import (
+    build_ui_diagnostics_zip_writer,
+)
+from pneumo_solver_ui.ui_event_surface_profile_helpers import (
+    build_mech_pick_consumer,
+    build_playhead_event_consumer,
+    build_plotly_pick_consumer,
+    build_svg_pick_consumer,
+)
 from pneumo_solver_ui.ui_event_sync_helpers import (
     consume_mech_pick_event as _consume_mech_pick_event_core,
     consume_playhead_event as _consume_playhead_event_core,
@@ -104,9 +118,22 @@ from pneumo_solver_ui.ui_interaction_helpers import (
     extract_plotly_selection_points as _extract_plotly_selection_points,
     plotly_points_signature as _plotly_points_signature,
 )
+from pneumo_solver_ui.ui_logging_runtime_helpers import (
+    append_ui_log_lines,
+    configure_runtime_ui_logger,
+    ensure_runtime_file_logger,
+    prepare_runtime_log_dir,
+    publish_session_callback,
+)
 from pneumo_solver_ui.ui_line_plot_helpers import (
-    plot_lines as plot_lines_core,
     prefer_rel0_plot_columns,
+)
+from pneumo_solver_ui.ui_plot_surface_profile_helpers import (
+    build_line_plot_renderer,
+    build_plot_studio_renderer,
+)
+from pneumo_solver_ui.ui_process_profile_helpers import (
+    build_background_worker_starter,
 )
 from pneumo_solver_ui.ui_playhead_helpers import (
     make_playhead_jump_command,
@@ -120,7 +147,7 @@ from pneumo_solver_ui.ui_results_surface_section_helpers import (
 )
 from pneumo_solver_ui.ui_timeline_event_helpers import (
     add_wheels_identical_sanity_event,
-    compute_events as compute_events_core,
+    compute_events_bar_profile as compute_events,
 )
 from pneumo_solver_ui.ui_param_helpers import (
     is_numeric_scalar as _is_numeric_scalar,
@@ -140,9 +167,6 @@ from pneumo_solver_ui.packaging_surface_ui import (
     packaging_surface_result_columns,
     render_packaging_surface_metrics,
 )
-from pneumo_solver_ui.ui_plot_studio_helpers import (
-    plot_studio_timeseries as plot_studio_timeseries_core,
-)
 from pneumo_solver_ui.suspension_family_contract import family_param_meta
 from pneumo_solver_ui.ui_process_helpers import (
     dump_cloudpickle_payload as _dump_detail_cache_payload,
@@ -161,6 +185,10 @@ from pneumo_solver_ui.ui_suite_helpers import (
     load_suite,
     resolve_osc_dir,
 )
+from pneumo_solver_ui.ui_unit_profile_helpers import (
+    build_gauge_pressure_profile,
+    build_ui_unit_profile,
+)
 from pneumo_solver_ui.ui_unit_helpers import (
     gauge_to_pa_abs,
     infer_plot_unit_and_transform,
@@ -178,6 +206,13 @@ from pneumo_solver_ui.ui_simulation_helpers import (
 from pneumo_solver_ui.run_artifacts import (
     apply_anim_latest_to_session as apply_anim_latest_to_session_global,
     local_anim_latest_export_paths as local_anim_latest_export_paths_global,
+)
+from pneumo_solver_ui.ui_streamlit_surface_helpers import (
+    safe_dataframe as render_safe_dataframe,
+    safe_image as render_safe_image,
+    safe_plotly_chart as render_safe_plotly_chart,
+    safe_previewable_dataframe as render_safe_previewable_dataframe,
+    ui_popover as render_ui_popover,
 )
 from pneumo_solver_ui.ui_svg_html_builders import (
     render_svg_flow_animation_html,
@@ -697,57 +732,8 @@ def _save_upload(uploaded_file: Any, prefix: str = "upload") -> Optional[Path]:
     except Exception:
         return None
 
-try:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-except Exception:
-    # РЅРµ РїР°РґР°РµРј, РµСЃР»Рё РЅРµС‚ РїСЂР°РІ РЅР° Р·Р°РїРёСЃСЊ вЂ” РїСЂРѕСЃС‚Рѕ РѕС‚РєР»СЋС‡РёРј С„Р°Р№Р»РѕРІРѕРµ Р»РѕРіРёСЂРѕРІР°РЅРёРµ
-    LOG_DIR = None  # type: ignore
-
-_APP_LOGGER = logging.getLogger("pneumo_ui")
-_APP_LOGGER.setLevel(logging.INFO)
-_APP_LOGGER.propagate = False
-
-
-def _init_file_logger_once() -> None:
-    """РРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°С‚СЊ Р»РѕРіРіРµСЂ РѕРґРёРЅ СЂР°Р· РЅР° СЃРµСЃСЃРёСЋ Streamlit.
-
-    Р’ Streamlit СЃРєСЂРёРїС‚ РїРµСЂРµР·Р°РїСѓСЃРєР°РµС‚СЃСЏ РЅР° РєР°Р¶РґРѕРµ РёР·РјРµРЅРµРЅРёРµ РІРёРґР¶РµС‚РѕРІ.
-    РќРµР»СЊР·СЏ РґРѕР±Р°РІР»СЏС‚СЊ С…РµРЅРґР»РµСЂ РєР°Р¶РґС‹Р№ СЂР°Р·, РёРЅР°С‡Рµ Р±СѓРґСѓС‚ РґСѓР±Р»РёРєР°С‚С‹ СЃС‚СЂРѕРє.
-    """
-
-    # РџР°РїРєР° Р»РѕРіРѕРІ РјРѕР¶РµС‚ Р±С‹С‚СЊ РЅРµРґРѕСЃС‚СѓРїРЅР° (РЅР°РїСЂРёРјРµСЂ, read-only).
-    if LOG_DIR is None:
-        return
-
-    # log_path С…СЂР°РЅРёРј РІ session_state, С‡С‚РѕР±С‹ Р±С‹Р» РѕРґРёРЅ С„Р°Р№Р» РЅР° СЃРµСЃСЃРёСЋ
-    if "_log_path" not in st.session_state:
-        sid = st.session_state.get("_session_id")
-        if not sid:
-            # Prefer launcher-provided run_id (stable folder name), fallback to timestamp+pid
-            sid = (os.environ.get("PNEUMO_RUN_ID") or "").strip()
-            if not sid:
-                sid = datetime.now().strftime("%Y%m%d_%H%M%S") + f"_pid{os.getpid()}"
-            st.session_state["_session_id"] = sid
-            st.session_state.setdefault("_session_started", time.time())
-        st.session_state["_log_path"] = str((LOG_DIR / f"ui_{sid}.log").resolve())
-
-    log_path = st.session_state.get("_log_path")
-    if not log_path:
-        return
-
-    # РџСЂРѕРІРµСЂСЏРµРј: СѓР¶Рµ РµСЃС‚СЊ С…РµРЅРґР»РµСЂ РЅР° СЌС‚РѕС‚ С„Р°Р№Р»?
-    for h in list(_APP_LOGGER.handlers):
-        if isinstance(h, RotatingFileHandler) and getattr(h, "baseFilename", None) == log_path:
-            return
-
-    try:
-        h = RotatingFileHandler(log_path, maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8")
-        fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-        h.setFormatter(fmt)
-        _APP_LOGGER.addHandler(h)
-    except Exception:
-        # РЅРµ С„РµР№Р»РёРј UI РёР·-Р·Р° Р»РѕРіРёСЂРѕРІР°РЅРёСЏ
-        return
+LOG_DIR = prepare_runtime_log_dir(LOG_DIR)
+_APP_LOGGER = configure_runtime_ui_logger("pneumo_ui")
 
 
 def log_event(event: str, **fields: Any) -> None:
@@ -767,7 +753,13 @@ def log_event(event: str, **fields: Any) -> None:
     """
 
     try:
-        _init_file_logger_once()
+        ensure_runtime_file_logger(
+            st.session_state,
+            logger=_APP_LOGGER,
+            log_dir=LOG_DIR,
+            prefer_env_run_id=True,
+            set_session_started=True,
+        )
 
         # lazy imports (avoid startup cost)
         try:
@@ -864,52 +856,14 @@ def log_event(event: str, **fields: Any) -> None:
 
         # 2) JSONL metrics (atomic-ish append)
         if LOG_DIR is not None:
-            mp = LOG_DIR / f"metrics_{sid}.jsonl"
-            # combined metrics jsonl
-            mcp = LOG_DIR / "metrics_combined.jsonl"
-            # optional combined text
-            ucp = LOG_DIR / "ui_combined.log"
-
-            global _UI_LOG_WRITE_LOCK
-            try:
-                _ = _UI_LOG_WRITE_LOCK
-            except NameError:
-                _UI_LOG_WRITE_LOCK = None  # type: ignore
-
-            if _UI_LOG_WRITE_LOCK is None:
-                try:
-                    import threading
-
-                    _UI_LOG_WRITE_LOCK = threading.Lock()  # type: ignore
-                except Exception:
-                    _UI_LOG_WRITE_LOCK = False  # type: ignore
-
-            try:
-                if _UI_LOG_WRITE_LOCK:
-                    with _UI_LOG_WRITE_LOCK:  # type: ignore
-                        with open(mp, "a", encoding="utf-8", errors="replace") as f:
-                            f.write(line + "\n")
-                        with open(mcp, "a", encoding="utf-8", errors="replace") as f:
-                            f.write(line + "\n")
-                        # ui_combined.log: for humans (not jsonl)
-                        try:
-                            with open(ucp, "a", encoding="utf-8", errors="replace") as f:
-                                f.write(line + "\n")
-                        except Exception:
-                            pass
-                else:
-                    # no lock available
-                    with open(mp, "a", encoding="utf-8", errors="replace") as f:
-                        f.write(line + "\n")
-                    with open(mcp, "a", encoding="utf-8", errors="replace") as f:
-                        f.write(line + "\n")
-                    try:
-                        with open(ucp, "a", encoding="utf-8", errors="replace") as f:
-                            f.write(line + "\n")
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+            append_ui_log_lines(
+                LOG_DIR,
+                session_id=str(sid),
+                session_metrics_line=line,
+                combined_text_line=line,
+                use_lock=True,
+                errors="replace",
+            )
 
     except Exception:
         return
@@ -917,11 +871,8 @@ def log_event(event: str, **fields: Any) -> None:
 
 
 # РџСЂРѕР±СЂР°СЃС‹РІР°РµРј callback РґР»СЏ РІРЅСѓС‚СЂРµРЅРЅРёС… РјРѕРґСѓР»РµР№ (fallback-Р°РЅРёРјР°С†РёРё) Р±РµР· РїСЂСЏРјРѕРіРѕ РёРјРїРѕСЂС‚Р° СЌС‚РѕРіРѕ С„Р°Р№Р»Р°.
-try:
-    # Р’ Streamlit-СЃРµСЃСЃРёРё РјРѕР¶РЅРѕ С…СЂР°РЅРёС‚СЊ callable. Р­С‚Рѕ РЅСѓР¶РЅРѕ РґР»СЏ mech_anim_fallback.
-    st.session_state["_log_event_cb"] = log_event
-except Exception:
-    pass
+# Р’ Streamlit-СЃРµСЃСЃРёРё РјРѕР¶РЅРѕ С…СЂР°РЅРёС‚СЊ callable. Р­С‚Рѕ РЅСѓР¶РЅРѕ РґР»СЏ mech_anim_fallback.
+publish_session_callback(st.session_state, "_log_event_cb", log_event)
 
 
 # --- Desktop Animator launcher (best-effort) ---
@@ -1020,22 +971,97 @@ def launch_desktop_animator_follow(pointer_path: str | Path, *, theme: str = 'da
         return False
 
 
+def _watch_desktop_mnemo_process(proc: subprocess.Popen, *, pointer: Path, cmd: list[str]) -> None:
+    def _worker() -> None:
+        try:
+            rc = int(proc.wait())
+        except Exception as e:
+            try:
+                log_event('desktop_mnemo_wait_failed', error=repr(e), pointer=str(pointer), cmd=' '.join(cmd))
+            except Exception:
+                pass
+            return
+        try:
+            log_event('desktop_mnemo_exit', returncode=rc, pointer=str(pointer), cmd=' '.join(cmd))
+        except Exception:
+            pass
 
-consume_svg_pick_event = partial(
-    _consume_svg_pick_event_core,
+    try:
+        threading.Thread(target=_worker, daemon=True, name='desktop_mnemo_exit_watch').start()
+    except Exception:
+        pass
+
+
+def launch_desktop_mnemo_follow(pointer_path: str | Path, *, theme: str = 'dark') -> bool:
+    """Запуск отдельного окна Desktop Mnemo в follow-режиме (best-effort)."""
+    try:
+        ptr = Path(pointer_path).expanduser().resolve()
+        py_exe = sys.executable
+        if os.name == 'nt':
+            try:
+                cand = Path(str(sys.executable)).with_name('pythonw.exe')
+                if cand.exists():
+                    py_exe = str(cand)
+            except Exception:
+                pass
+        cmd = [
+            py_exe,
+            '-m',
+            'pneumo_solver_ui.desktop_mnemo.main',
+            '--follow',
+            '--pointer',
+            str(ptr),
+            '--theme',
+            str(theme),
+        ]
+
+        log_dir = _desktop_animator_log_dir()
+        log_dir.mkdir(parents=True, exist_ok=True)
+        stdout_path = log_dir / 'desktop_mnemo_stdout.log'
+        stderr_path = log_dir / 'desktop_mnemo_stderr.log'
+        with open(stdout_path, 'ab') as f_out, open(stderr_path, 'ab') as f_err:
+            creationflags = 0
+            startupinfo = None
+            if os.name == 'nt':
+                creationflags = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
+                startupinfo = subprocess.STARTUPINFO()  # type: ignore[attr-defined]
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW  # type: ignore[attr-defined]
+            proc = subprocess.Popen(cmd, cwd=str(ROOT_DIR), stdout=f_out, stderr=f_err, creationflags=creationflags, startupinfo=startupinfo)
+
+        _watch_desktop_mnemo_process(proc, pointer=ptr, cmd=cmd)
+        try:
+            log_event(
+                'desktop_mnemo_spawned',
+                cmd=' '.join(cmd),
+                pointer=str(ptr),
+                pid=int(getattr(proc, 'pid', 0) or 0),
+                stdout_log=str(stdout_path),
+                stderr_log=str(stderr_path),
+            )
+        except Exception:
+            pass
+        return True
+    except Exception as e:
+        try:
+            log_event('desktop_mnemo_spawn_failed', error=repr(e), pointer=str(pointer_path))
+        except Exception:
+            pass
+        return False
+
+
+
+consume_svg_pick_event = build_svg_pick_consumer(
     st.session_state,
     apply_pick_list_fn=_apply_pick_list,
 )
 
 
-consume_mech_pick_event = partial(
-    _consume_mech_pick_event_core,
+consume_mech_pick_event = build_mech_pick_consumer(
     st.session_state,
 )
 
 
-consume_plotly_pick_events = partial(
-    _consume_plotly_pick_events_core,
+consume_plotly_pick_events = build_plotly_pick_consumer(
     st.session_state,
     extract_plotly_selection_points_fn=_extract_plotly_selection_points,
     plotly_points_signature_fn=_plotly_points_signature,
@@ -1043,8 +1069,7 @@ consume_plotly_pick_events = partial(
 )
 
 
-consume_playhead_event = partial(
-    _consume_playhead_event_core,
+consume_playhead_event = build_playhead_event_consumer(
     st.session_state,
     persist_browser_perf_snapshot_event_fn=persist_browser_perf_snapshot_event,
     workspace_exports_dir=WORKSPACE_EXPORTS_DIR,
@@ -1055,176 +1080,10 @@ consume_playhead_event = partial(
 
 
 
-def load_py_module(path: Path, module_name: str):
-    """Load a module from a file path with canonical package context.
-
-    Important for project files that use relative imports (``from .x import ...``)
-    and for sibling imports such as ``import road_surface``.
-    """
-    return load_python_module_from_path(
-        path,
-        module_name,
-        log=lambda event, message, **kw: _emit(event, message, **kw),
-    )
-
-
-
-def safe_dataframe(df: pd.DataFrame, height: int = 240, hide_index: bool = False, *, max_cols: int = 10, key: str = ""):
-    """Render a dataframe without forcing users into horizontal scrolling.
-
-    Why:
-    - Wide tables are hard to read and require horizontal scroll (bad UX).
-    - For wide outputs we show a compact preview (first columns) + a row "card" with full details.
-
-    Notes:
-    - This is a UI helper. Return value is not relied upon in the app.
-    - `max_cols` is the number of columns shown in the preview table.
-    """
-    try:
-        if df is None:
-            st.info("РќРµС‚ РґР°РЅРЅС‹С….")
-            return None
-
-        # Defensive conversion: in case df is not a DataFrame
-        if not isinstance(df, pd.DataFrame):
-            try:
-                df = pd.DataFrame(df)
-            except Exception:
-                st.write(df)
-                return None
-
-        ncols = int(df.shape[1]) if hasattr(df, "shape") else 0
-        nrows = int(df.shape[0]) if hasattr(df, "shape") else 0
-
-        if ncols > int(max_cols):
-            # Stable-ish widget key to avoid collisions across multiple calls
-            if not key:
-                h = hashlib.md5((str(list(df.columns)) + f"::{nrows}x{ncols}").encode("utf-8")).hexdigest()[:10]
-                key = f"wide_df_{h}"
-
-            cols_preview = list(df.columns)[: int(max_cols)]
-            st.caption(f"РўР°Р±Р»РёС†Р° С€РёСЂРѕРєР°СЏ: {ncols} РєРѕР»РѕРЅРѕРє. РџРѕРєР°Р·Р°РЅС‹ РїРµСЂРІС‹Рµ {len(cols_preview)}. РџРѕР»РЅС‹Рµ РґР°РЅРЅС‹Рµ вЂ” РІ РєР°СЂС‚РѕС‡РєРµ СЃС‚СЂРѕРєРё РЅРёР¶Рµ.")
-
-            # Preview table (no horizontal scroll)
-            try:
-                st.dataframe(df[cols_preview], width="stretch", height=height, hide_index=hide_index)
-            except TypeError:
-                try:
-                    st.dataframe(df[cols_preview], width="stretch", height=height)
-                except Exception:
-                    st.write(df[cols_preview])
-
-            # Row details (master-detail)
-            with st.expander("Р”РµС‚Р°Р»Рё РІС‹Р±СЂР°РЅРЅРѕР№ СЃС‚СЂРѕРєРё", expanded=False):
-                if nrows <= 0:
-                    st.info("РџСѓСЃС‚Р°СЏ С‚Р°Р±Р»РёС†Р°.")
-                else:
-                    # Prefer slider (no typing) for typical table sizes; fallback to number input for huge tables
-                    if nrows <= 2000:
-                        sel = st.slider("Р’С‹Р±РѕСЂ СЃС‚СЂРѕРєРё", 0, max(0, nrows - 1), 0, step=1, key=f"{key}__row")
-                    else:
-                        sel = st.number_input("РќРѕРјРµСЂ СЃС‚СЂРѕРєРё", min_value=0, max_value=max(0, nrows - 1), value=0, step=1, key=f"{key}__row")
-                    try:
-                        i = int(sel)
-                    except Exception:
-                        i = 0
-
-                    # Optional label for the selected row (helps orientation)
-                    _label_cols = [c for c in ["id", "name", "РёРјСЏ", "РїР°СЂР°РјРµС‚СЂ", "С‚РµСЃС‚", "test", "С„РёРЅР°Р»", "РїРѕРєРѕР»РµРЅРёРµ"] if c in df.columns]
-                    if _label_cols:
-                        try:
-                            st.caption(f"РЎС‚СЂРѕРєР° {i}: {_label_cols[0]} = {df.iloc[i][_label_cols[0]]}")
-                        except Exception:
-                            pass
-
-                    try:
-                        rec = df.iloc[i].to_dict()
-                        st.json(rec)
-                    except Exception:
-                        st.write(df.iloc[i])
-
-            return None
-
-        # Normal case: not wide
-        try:
-            # Newer Streamlit (preferred)
-            return st.dataframe(df, width="stretch", height=height, hide_index=hide_index)
-        except TypeError:
-            try:
-                # Some versions don't have hide_index
-                return st.dataframe(df, width="stretch", height=height)
-            except TypeError:
-                try:
-                    # Older Streamlit
-                    return st.dataframe(df, width="stretch", height=height, hide_index=hide_index)
-                except TypeError:
-                    return st.dataframe(df, width="stretch", height=height)
-    except Exception:
-        # Last resort: plain output
-        st.write(df)
-        return None
-
-
-
-@contextmanager
-def ui_popover(label: str, expanded: bool = False):
-    """Popover if available, otherwise an expander.
-
-    РЈРґРѕР±РЅРѕ РїСЂСЏС‚Р°С‚СЊ СЂРµРґРєРёРµ/СЂР°СЃС€РёСЂРµРЅРЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё, С‡С‚РѕР±С‹ РѕСЃРЅРѕРІРЅРѕР№ UI Р±С‹Р» СЃРїРѕРєРѕР№РЅРµРµ.
-    """
-    pop = getattr(st, "popover", None)
-    if callable(pop):
-        with st.popover(label):
-            yield
-    else:
-        with st.expander(label, expanded=expanded):
-            yield
-
-
-
-def safe_plotly_chart(fig, *, key=None, on_select=None, selection_mode=None):
-    """Р‘РµР·РѕРїР°СЃРЅР°СЏ РѕР±С‘СЂС‚РєР° РЅР°Рґ st.plotly_chart РґР»СЏ СЂР°Р·РЅС‹С… РІРµСЂСЃРёР№ Streamlit.
-
-    Р¦РµР»Рё:
-    - РќР• РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ `use_container_width` РІ РЅРѕСЂРјР°Р»СЊРЅРѕРј СЂРµР¶РёРјРµ (Streamlit РµРіРѕ РґРµРїСЂРµС†РёСЂСѓРµС‚).
-    - РџРѕРґРґРµСЂР¶Р°С‚СЊ СЂР°Р·РЅС‹Рµ СЃРёРіРЅР°С‚СѓСЂС‹ (on_select/selection_mode РјРѕРіР»Рё РјРµРЅСЏС‚СЊСЃСЏ).
-    - РџСЂРё РЅРµСЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё Р°СЂРіСѓРјРµРЅС‚РѕРІ РїСЂРѕР±СѓРµРј Р±РѕР»РµРµ "РїСЂРѕСЃС‚С‹Рµ" РІР°СЂРёР°РЅС‚С‹ РІС‹Р·РѕРІР°.
-    """
-    # 1) РЎР°РјС‹Р№ РЅРѕРІС‹Р№ API: width="stretch" (СЃРј. Streamlit docs).
-    kwargs = {"width": "stretch", "key": key}
-
-    # Р’ РЅРµРєРѕС‚РѕСЂС‹С… РІРµСЂСЃРёСЏС… `on_select` РќР• РїСЂРёРЅРёРјР°РµС‚ None.
-    if on_select is not None:
-        kwargs["on_select"] = on_select
-    if selection_mode is not None:
-        kwargs["selection_mode"] = selection_mode
-
-    try:
-        return st.plotly_chart(fig, **kwargs)
-    except TypeError:
-        # 2) РЈР±РёСЂР°РµРј "РїР»Р°РІР°СЋС‰РёРµ" args, РѕСЃС‚Р°РІР»СЏРµРј С‚РѕР»СЊРєРѕ Р±РµР·РѕРїР°СЃРЅРѕРµ.
-        try:
-            return st.plotly_chart(fig, width="stretch", key=key)
-        except TypeError:
-            # 3) РЎРѕРІСЃРµРј СЃС‚Р°СЂС‹Р№ API: Р±РµР· width -> fallback РЅР° use_container_width.
-            # Р’ РЅРѕРІС‹С… РІРµСЂСЃРёСЏС… СЌС‚Рѕ РґР°СЃС‚ warning, РЅРѕ СЃСЋРґР° РјС‹ РїРѕРїР°РґР°РµРј С‚РѕР»СЊРєРѕ РµСЃР»Рё width РЅРµ РїРѕРґРґРµСЂР¶Р°РЅ.
-            return st.plotly_chart(fig, use_container_width=True, key=key)
-
-
-def safe_image(img, *, caption=None):
-    """Р‘РµР·РѕРїР°СЃРЅС‹Р№ st.image Р±РµР· РґРµРїСЂРµС†РёСЂРѕРІР°РЅРЅРѕРіРѕ use_container_width.
-
-    1) РџСЂРѕР±СѓРµРј РЅРѕРІС‹Р№ API: width="stretch"
-    2) Р•СЃР»Рё РєРѕРЅРєСЂРµС‚РЅР°СЏ РІРµСЂСЃРёСЏ Streamlit РЅРµ РїСЂРёРЅРёРјР°РµС‚ СЃС‚СЂРѕРєРѕРІС‹Р№ width -> РїСЂРѕР±СѓРµРј Р±РѕР»СЊС€РѕР№ int
-    3) Р•СЃР»Рё СЃРѕРІСЃРµРј СЃС‚Р°СЂС‹Р№ Streamlit -> fallback РЅР° use_container_width (С‚Р°Рј РѕР±С‹С‡РЅРѕ РµС‰С‘ РЅРµС‚ РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёСЏ)
-    """
-    try:
-        return st.image(img, caption=caption, width="stretch")
-    except Exception:
-        try:
-            return st.image(img, caption=caption, width=2000)
-        except TypeError:
-            return st.image(img, caption=caption, use_container_width=True)
+safe_dataframe = partial(render_safe_previewable_dataframe, st)
+ui_popover = partial(render_ui_popover, st)
+safe_plotly_chart = partial(render_safe_plotly_chart, st)
+safe_image = partial(render_safe_image, st, int_width_fallback=2000)
 
 
 def _json_safe(obj):
@@ -1237,8 +1096,7 @@ def _json_safe(obj):
     return obj
 
 
-make_ui_diagnostics_zip = partial(
-    make_ui_diagnostics_zip_bundle,
+make_ui_diagnostics_zip = build_ui_diagnostics_zip_writer(
     here=HERE,
     workspace_dir=WORKSPACE_DIR,
     log_dir=LOG_DIR,
@@ -1249,109 +1107,79 @@ make_ui_diagnostics_zip = partial(
 # Р¦РµР»СЊ: РїРѕСЃР»Рµ refresh (РЅРѕРІР°СЏ session_state) РЅРµ РїРµСЂРµСЃС‡РёС‚С‹РІР°С‚СЊ baseline/РґРµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ,
 # Р° РїРѕРґС…РІР°С‚С‹РІР°С‚СЊ СЃ РґРёСЃРєР°. РљСЌС€ С…СЂР°РЅРёС‚СЃСЏ РІ WORKSPACE_DIR/cache/baseline/<key>/...
 
-def baseline_cache_dir(base_hash: str, suite_hash: str, model_file: str) -> Path:
-    """Deterministic cache dir for the given (model, base, suite)."""
-    try:
-        mf = Path(model_file)
-        model_tag = _sanitize_id(mf.stem, max_len=32)
-        # Important: do NOT rely on the absolute path. Users keep unpacking new
-        # releases into new folders, which would invalidate cache and force
-        # baseline recalculation after every update.
-        if mf.is_file():
-            h = hashlib.sha1()
-            with mf.open("rb") as f:
-                for chunk in iter(lambda: f.read(1024 * 1024), b""):
-                    h.update(chunk)
-            model_hash = h.hexdigest()[:12]
-        else:
-            model_hash = stable_obj_hash(str(mf.resolve()))
-    except Exception:
-        model_tag = "model"
-        model_hash = stable_obj_hash(str(model_file))
-    key = f"{base_hash}_{suite_hash}_{model_tag}_{model_hash}"
-    return WORKSPACE_DIR / "cache" / "baseline" / key
+baseline_cache_dir = partial(
+    build_runtime_baseline_cache_dir,
+    WORKSPACE_DIR,
+    sanitize_id_fn=_sanitize_id,
+    stable_obj_hash_fn=stable_obj_hash,
+)
 
 
 # Shared baseline-cache wrappers override the legacy inline copies above.
-def save_last_baseline_ptr(cache_dir: Path, meta: Dict[str, Any]) -> None:
-    return save_ui_last_baseline_ptr(cache_dir, meta, workspace_dir=WORKSPACE_DIR)
+save_last_baseline_ptr = partial(
+    save_runtime_last_baseline_ptr,
+    workspace_dir=WORKSPACE_DIR,
+    save_last_baseline_ptr_fn=save_ui_last_baseline_ptr,
+)
 
+load_last_baseline_ptr = partial(
+    load_runtime_last_baseline_ptr,
+    workspace_dir=WORKSPACE_DIR,
+    load_last_baseline_ptr_fn=load_ui_last_baseline_ptr,
+)
 
-def load_last_baseline_ptr() -> Optional[Dict[str, Any]]:
-    return load_ui_last_baseline_ptr(workspace_dir=WORKSPACE_DIR)
+load_baseline_cache = partial(
+    load_runtime_baseline_cache,
+    load_baseline_cache_fn=load_ui_baseline_cache,
+)
 
-
-def load_baseline_cache(cache_dir: Path) -> Optional[Dict[str, Any]]:
-    return load_ui_baseline_cache(cache_dir)
-
-
-def save_baseline_cache(
-    cache_dir: Path,
-    baseline_df: pd.DataFrame,
-    tests_map: Dict[str, Any],
-    base_override: Dict[str, Any],
-    meta: Dict[str, Any],
-) -> None:
-    return save_ui_baseline_cache(
-        cache_dir,
-        baseline_df,
-        tests_map,
-        base_override,
-        meta,
-        workspace_dir=WORKSPACE_DIR,
-        json_safe_fn=_json_safe,
-        log_event_fn=log_event,
-    )
+save_baseline_cache = partial(
+    save_runtime_baseline_cache,
+    workspace_dir=WORKSPACE_DIR,
+    save_baseline_cache_fn=save_ui_baseline_cache,
+    json_safe_fn=_json_safe,
+    log_event_fn=log_event,
+)
 
 
 # Shared detail-cache wrappers override the legacy inline copies above.
-def save_detail_cache(cache_dir: Path, test_name: str, dt: float, t_end: float, max_points: int, want_full: bool, payload: Dict[str, Any]) -> Optional[Path]:
-    return save_ui_detail_cache(
-        cache_dir,
-        test_name,
-        dt,
-        t_end,
-        max_points,
-        want_full,
-        payload,
-        sanitize_test_name=sanitize_test_name,
-        dump_payload_fn=_dump_detail_cache_payload,
-        float_tag_fn=_float_tag,
-        log_event_fn=log_event,
-    )
+save_detail_cache = partial(
+    save_runtime_detail_cache,
+    save_detail_cache_fn=save_ui_detail_cache,
+    sanitize_test_name=sanitize_test_name,
+    dump_payload_fn=_dump_detail_cache_payload,
+    float_tag_fn=_float_tag,
+    log_event_fn=log_event,
+)
 
-
-def load_detail_cache(cache_dir: Path, test_name: str, dt: float, t_end: float, max_points: int, want_full: bool) -> Optional[Dict[str, Any]]:
-    def _resave_detail_payload(loaded_payload: Dict[str, Any]) -> Optional[Path]:
-        return save_detail_cache(cache_dir, test_name, dt, t_end, max_points, want_full, loaded_payload)
-
-    return load_ui_detail_cache(
-        cache_dir,
-        test_name,
-        dt,
-        t_end,
-        max_points,
-        want_full,
-        sanitize_test_name=sanitize_test_name,
-        load_payload_fn=_load_detail_cache_payload,
-        resave_payload_fn=_resave_detail_payload,
-        float_tag_fn=_float_tag,
-        log_event_fn=log_event,
-    )
+load_detail_cache = partial(
+    load_runtime_detail_cache,
+    load_detail_cache_fn=load_ui_detail_cache,
+    resave_detail_cache_fn=save_detail_cache,
+    sanitize_test_name=sanitize_test_name,
+    load_payload_fn=_load_detail_cache_payload,
+    float_tag_fn=_float_tag,
+    log_event_fn=log_event,
+)
 
 
 # -------------------------------
 # Graph Studio helpers (v7.32)
 # -------------------------------
 
-_infer_unit_and_transform = partial(
-    infer_plot_unit_and_transform,
+_bar_unit_profile = build_ui_unit_profile(
     pressure_unit_label="Р±Р°СЂ (РёР·Р±.)",
     pressure_offset_pa=lambda: P_ATM,
     pressure_divisor_pa=lambda: BAR_PA,
     length_unit_label="РјРј",
     length_scale=1000.0,
+    is_pressure_param_fn=is_pressure_param,
+    is_volume_param_fn=is_volume_param,
+    is_small_volume_param_fn=is_small_volume_param,
+    p_atm=lambda: P_ATM,
+    bar_pa=lambda: BAR_PA,
 )
+_infer_unit_and_transform = _bar_unit_profile.infer_unit_and_transform
 
 
 def _legacy_plot_studio_timeseries_dead(
@@ -1647,8 +1475,7 @@ _GRAPH_STUDIO_PLOTLY_MISSING_MESSAGE = (
     "Р РµС€РµРЅРёРµ: СѓСЃС‚Р°РЅРѕРІРёС‚Рµ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё С‡РµСЂРµР· Р»Р°СѓРЅС‡РµСЂ (РєРЅРѕРїРєР° В«РЈСЃС‚Р°РЅРѕРІРёС‚СЊ Р·Р°РІРёСЃРёРјРѕСЃС‚РёВ») вЂ” Р±РµР· СЂСѓС‡РЅРѕРіРѕ РІРІРѕРґР° РєРѕРјР°РЅРґ."
 )
 
-plot_studio_timeseries = partial(
-    plot_studio_timeseries_core,
+plot_studio_timeseries = build_plot_studio_renderer(
     has_plotly=_HAS_PLOTLY,
     go_module=go,
     make_subplots_fn=make_subplots,
@@ -1911,42 +1738,6 @@ def _legacy_compute_events_dead(
         events = keep
 
     return events
-
-
-def compute_events(
-    df_main: pd.DataFrame | None,
-    df_p: pd.DataFrame | None,
-    df_open: pd.DataFrame | None,
-    params_abs: dict,
-    test: dict,
-    vacuum_min_gauge_bar: float = -0.2,
-    pmax_margin_bar: float = 0.10,
-    chatter_window_s: float = 0.25,
-    chatter_toggle_count: int = 6,
-    max_events: int = 240,
-) -> List[dict]:
-    return compute_events_core(
-        df_main=df_main,
-        df_p=df_p,
-        df_open=df_open,
-        params_abs=params_abs,
-        test=test,
-        vacuum_min_gauge=vacuum_min_gauge_bar,
-        pmax_margin_gauge=pmax_margin_bar,
-        chatter_window_s=chatter_window_s,
-        chatter_toggle_count=chatter_toggle_count,
-        max_events=max_events,
-        gauge_pressure_scale_pa=100000.0,
-        vacuum_unit_label="Р±Р°СЂ(РёР·Р±)",
-        run_starts_fn=_run_starts,
-        shorten_name_fn=_shorten_name,
-        align_pressure_df_to_main=True,
-        align_open_df_to_main=True,
-        use_nan_pressure_reducers=True,
-        extra_event_hook_fn=add_wheels_identical_sanity_event,
-    )
-
-
 def _legacy_plot_lines_dead(
     df: pd.DataFrame,
     x_col: str,
@@ -2190,8 +1981,7 @@ def _prepare_plot_lines_df_and_y_cols(
     return prefer_rel0_plot_columns(df, list(y_cols))
 
 
-plot_lines = partial(
-    plot_lines_core,
+plot_lines = build_line_plot_renderer(
     has_plotly=_HAS_PLOTLY,
     go_module=go,
     safe_plotly_chart_fn=safe_plotly_chart,
@@ -2210,8 +2000,7 @@ plot_lines = partial(
 
 
 # Shared worker/process helpers override the legacy inline copy above.
-start_worker = partial(
-    start_background_worker,
+start_worker = build_background_worker_starter(
     console_python_executable_fn=console_python_executable,
 )
 
@@ -3430,8 +3219,16 @@ try:
         except Exception:
             pass
 
-    worker_mod = load_py_module(Path(resolved_worker_path), "opt_worker_mod")
-    model_mod = load_py_module(Path(resolved_model_path), "pneumo_model_mod")
+    worker_mod = load_python_module_from_path(
+        Path(resolved_worker_path),
+        "opt_worker_mod",
+        log=lambda event, message, **kw: _emit(event, message, **kw),
+    )
+    model_mod = load_python_module_from_path(
+        Path(resolved_model_path),
+        "pneumo_model_mod",
+        log=lambda event, message, **kw: _emit(event, message, **kw),
+    )
 except Exception as e:
     st.error(f"РќРµ РјРѕРіСѓ Р·Р°РіСЂСѓР·РёС‚СЊ РјРѕРґРµР»СЊ/РѕРїС‚РёРјРёР·Р°С‚РѕСЂ: {e}")
     st.stop()
@@ -3444,16 +3241,21 @@ ATM_PA = 101325.0  # legacy
 BAR_PA = 1e5
 
 
-pa_abs_to_bar_g = partial(pa_abs_to_gauge, pressure_offset_pa=P_ATM, pressure_divisor_pa=BAR_PA)
-bar_g_to_pa_abs = partial(gauge_to_pa_abs, pressure_offset_pa=P_ATM, pressure_divisor_pa=BAR_PA)
+pa_abs_to_bar_g = _bar_unit_profile.pressure_from_pa
+bar_g_to_pa_abs = _bar_unit_profile.pressure_to_pa_abs
 
 
 
 # legacy (РѕСЃС‚Р°РІР»РµРЅРѕ РґР»СЏ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё СЃРѕ СЃС‚Р°СЂС‹РјРё РїСЂРѕС„РёР»СЏРјРё)
 # Р’РђР–РќРћ: РЅРµ РїРµСЂРµРѕРїСЂРµРґРµР»СЏРµРј pa_abs_to_bar_g. Р‘Р°СЂ(g) РґРѕР»Р¶РµРЅ РѕСЃС‚Р°РІР°С‚СЊСЃСЏ Р±Р°СЂ(g).
 
-pa_abs_to_atm_g = partial(pa_abs_to_gauge, pressure_offset_pa=P_ATM, pressure_divisor_pa=ATM_PA)
-atm_g_to_pa_abs = partial(gauge_to_pa_abs, pressure_offset_pa=P_ATM, pressure_divisor_pa=ATM_PA)
+_atm_pressure_profile = build_gauge_pressure_profile(
+    unit_label="Р°С‚Рј (РёР·Р±.)",
+    pressure_offset_pa=P_ATM,
+    pressure_divisor_pa=ATM_PA,
+)
+pa_abs_to_atm_g = _atm_pressure_profile.pressure_from_pa
+atm_g_to_pa_abs = _atm_pressure_profile.pressure_to_pa_abs
 is_length_param = is_length_param_name
 
 
@@ -3464,13 +3266,7 @@ is_length_param = is_length_param_name
 # -------------------------------
 
 
-param_unit = partial(
-    param_unit_label,
-    pressure_unit_label="Р±Р°СЂ (РёР·Р±.)",
-    is_pressure_param_fn=is_pressure_param,
-    is_volume_param_fn=is_volume_param,
-    is_small_volume_param_fn=is_small_volume_param,
-)
+param_unit = _bar_unit_profile.param_unit
 
 
 # -------------------------------
@@ -3752,8 +3548,8 @@ def infer_param_meta(k: str) -> Dict[str, str]:
     return {"РіСЂСѓРїРїР°": "РџСЂРѕС‡РµРµ", "РµРґ": "РЎР", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": param_desc(k)}
 
 
-_si_to_ui = partial(si_to_ui_value, p_atm=P_ATM, bar_pa=BAR_PA)
-_ui_to_si = partial(ui_to_si_value, p_atm=P_ATM, bar_pa=BAR_PA)
+_si_to_ui = _bar_unit_profile.si_to_ui
+_ui_to_si = _bar_unit_profile.ui_to_si
 
 
 # РґРѕРїРѕР»РЅСЏРµРј Р±Р°Р·Сѓ Р·РЅР°С‡РµРЅРёСЏРјРё РґР»СЏ РєР»СЋС‡РµР№, РєРѕС‚РѕСЂС‹Рµ РµСЃС‚СЊ РІ РґРёР°РїР°Р·РѕРЅР°С…, РЅРѕ РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‚ РІ base0
@@ -7273,9 +7069,15 @@ else:
                                 st.success('Animator Р·Р°РїСѓС‰РµРЅ (РµСЃР»Рё СЃРёСЃС‚РµРјР° РїРѕР·РІРѕР»СЏРµС‚ GUI).')
                             else:
                                 st.warning('РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РїСѓСЃС‚РёС‚СЊ Animator (СЃРј. Р»РѕРіРё).')
+                        if st.button('Р—Р°РїСѓСЃС‚РёС‚СЊ Mnemo (follow)', key=f'anim_latest_launch_mnemo_{cache_key}'):
+                            ok = launch_desktop_mnemo_follow(ptr_path)
+                            if ok:
+                                st.success('Desktop Mnemo Р·Р°РїСѓС‰РµРЅ (РµСЃР»Рё СЃРёСЃС‚РµРјР° РїРѕР·РІРѕР»СЏРµС‚ GUI).')
+                            else:
+                                st.warning('РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РїСѓСЃС‚РёС‚СЊ Desktop Mnemo (СЃРј. Р»РѕРіРё).')
                     with cols_da[2]:
                         st.caption(f'NPZ: {npz_path}')
-                        st.caption('РџРѕРґСЃРєР°Р·РєР°: РІРєР»СЋС‡РёС‚Рµ **РђРІС‚Рѕ-СЌРєСЃРїРѕСЂС‚ anim_latest** РІ РЅР°СЃС‚СЂРѕР№РєР°С… РґРµС‚Р°Р»СЊРЅРѕРіРѕ РїСЂРѕРіРѕРЅР°.')
+                        st.caption('РџРѕРґСЃРєР°Р·РєР°: РІРєР»СЋС‡РёС‚Рµ **РђРІС‚Рѕ-СЌРєСЃРїРѕСЂС‚ anim_latest** РІ РЅР°СЃС‚СЂРѕР№РєР°С… РґРµС‚Р°Р»СЊРЅРѕРіРѕ РїСЂРѕРіРѕРЅР°. Animator РґР°С‘С‚ 3D/2D РІРёРґС‹, Mnemo РґР°С‘С‚ РѕС‚РґРµР»СЊРЅРѕРµ HMI-РѕРєРЅРѕ СЃ Р°РЅРёРјРёСЂРѕРІР°РЅРЅРѕР№ РјРЅРµРјРѕС…РµРјРѕР№.')
 
                 # -----------------------------------
                 # Global timeline (shared playhead)
@@ -8694,5 +8496,3 @@ try:
     autosave_if_enabled(st)
 except Exception:
     pass
-
-

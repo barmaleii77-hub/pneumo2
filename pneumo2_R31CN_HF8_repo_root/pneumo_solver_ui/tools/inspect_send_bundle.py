@@ -40,6 +40,7 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
     signals = dict(rep.signals or {})
     meta = dict(signals.get("meta") or {})
     anim = dict(signals.get("anim_latest") or {})
+    mnemo = dict(signals.get("mnemo_event_log") or {})
     artifacts = dict(signals.get("artifacts") or {})
     geometry_acceptance = dict(rep.signals.get("geometry_acceptance") or {})
     summary: Dict[str, Any] = {
@@ -51,6 +52,7 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
         "release": meta.get("release") or "",
         "artifacts": artifacts,
         "anim_latest": anim,
+        "mnemo_event_log": mnemo,
         "geometry_acceptance": geometry_acceptance,
         "geometry_acceptance_gate": str(geometry_acceptance.get("release_gate") or "MISSING") if geometry_acceptance else "MISSING",
         "geometry_acceptance_reason": str(geometry_acceptance.get("release_gate_reason") or "") if geometry_acceptance else "",
@@ -79,6 +81,7 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
     rep_obj = summary.get("health_report") or {}
     rep_signals = dict(rep_obj.get("signals") or {})
     anim = dict(summary.get("anim_latest") or {})
+    mnemo = dict(summary.get("mnemo_event_log") or {})
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
     lines = [
         "# Send bundle inspection",
@@ -117,6 +120,18 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
         f"- browser_perf_artifacts_primary: snapshot=`{anim.get('browser_perf_registry_snapshot_ref') or '—'}` / exists=`{anim.get('browser_perf_registry_snapshot_exists')}` / in_bundle=`{anim.get('browser_perf_registry_snapshot_in_bundle')}` ; contract=`{anim.get('browser_perf_contract_ref') or '—'}` / exists=`{anim.get('browser_perf_contract_exists')}` / in_bundle=`{anim.get('browser_perf_contract_in_bundle')}`",
         f"- browser_perf_artifacts_secondary: previous=`{anim.get('browser_perf_previous_snapshot_ref') or '—'}` / exists=`{anim.get('browser_perf_previous_snapshot_exists')}` / in_bundle=`{anim.get('browser_perf_previous_snapshot_in_bundle')}` ; evidence=`{anim.get('browser_perf_evidence_report_ref') or '—'}` / exists=`{anim.get('browser_perf_evidence_report_exists')}` / in_bundle=`{anim.get('browser_perf_evidence_report_in_bundle')}` ; comparison=`{anim.get('browser_perf_comparison_report_ref') or '—'}` / exists=`{anim.get('browser_perf_comparison_report_exists')}` / in_bundle=`{anim.get('browser_perf_comparison_report_in_bundle')}` ; trace=`{anim.get('browser_perf_trace_ref') or '—'}` / exists=`{anim.get('browser_perf_trace_exists')}` / in_bundle=`{anim.get('browser_perf_trace_in_bundle')}`",
     ]
+    if mnemo:
+        lines += [
+            "",
+            "## Desktop Mnemo events",
+            f"- severity: {mnemo.get('severity') or 'missing'}",
+            f"- summary: {mnemo.get('headline') or '—'}",
+            f"- current_mode: {mnemo.get('current_mode') or '—'}",
+            f"- event_state: total=`{mnemo.get('event_count')}` / active=`{mnemo.get('active_latch_count')}` / acked=`{mnemo.get('acknowledged_latch_count')}`",
+        ]
+        recent_titles = [str(x) for x in (mnemo.get("recent_titles") or []) if str(x).strip()]
+        if recent_titles:
+            lines.append(f"- recent_titles: {' | '.join(recent_titles[:3])}")
     issues = list(anim.get("issues") or [])
     if issues:
         lines += ["", "## Anim issues"] + [f"- {x}" for x in issues]

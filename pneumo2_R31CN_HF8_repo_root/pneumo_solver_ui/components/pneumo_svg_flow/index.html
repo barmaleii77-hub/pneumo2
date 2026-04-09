@@ -12,6 +12,11 @@
       --pos: rgba(0,120,255,0.80);
       --neg: rgba(255,80,0,0.80);
       --closed: rgba(180,180,180,0.50);
+      --alert-focus: rgba(0, 146, 168, 0.88);
+      --alert-warn: rgba(208, 61, 38, 0.92);
+      --alert-attention: rgba(226, 146, 0, 0.92);
+      --alert-info: rgba(54, 104, 160, 0.84);
+      --alert-ok: rgba(28, 126, 92, 0.82);
     }
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
     .wrap { display:flex; flex-direction:column; height:100%; min-height: 640px; }
@@ -45,6 +50,36 @@
     .reviewPath.rejected { stroke: rgba(200,40,40,0.90); stroke-dasharray: 6 5; stroke-opacity: 0.55; }
     .reviewPath.unknown  { stroke: rgba(160,160,160,0.80); stroke-opacity: 0.35; }
     .reviewPath.sel { stroke-opacity: 0.85 !important; filter: drop-shadow(0 0 2px rgba(0,0,0,0.35)); }
+
+    .alertPath, .alertNodeRing {
+      pointer-events: none;
+      filter: drop-shadow(0 0 6px rgba(0,0,0,0.16));
+      animation: alertPulse 1.8s ease-in-out infinite;
+    }
+    .alertPath {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-opacity: 0.85;
+    }
+    .alertPath.focus { stroke: var(--alert-focus); stroke-width: 12; }
+    .alertPath.warn { stroke: var(--alert-warn); stroke-width: 13; stroke-dasharray: 10 8; }
+    .alertPath.attention { stroke: var(--alert-attention); stroke-width: 11; }
+    .alertPath.info { stroke: var(--alert-info); stroke-width: 10; stroke-opacity: 0.70; }
+    .alertPath.ok { stroke: var(--alert-ok); stroke-width: 9; stroke-opacity: 0.68; }
+
+    .alertNodeRing { fill: none; stroke-width: 6; }
+    .alertNodeRing.focus { stroke: var(--alert-focus); }
+    .alertNodeRing.warn { stroke: var(--alert-warn); }
+    .alertNodeRing.attention { stroke: var(--alert-attention); }
+    .alertNodeRing.info { stroke: var(--alert-info); }
+    .alertNodeRing.ok { stroke: var(--alert-ok); }
+
+    @keyframes alertPulse {
+      0% { opacity: 0.42; }
+      45% { opacity: 0.96; }
+      100% { opacity: 0.58; }
+    }
     
     .dot { cursor: pointer; }
     .dot.pos { fill: var(--pos); }
@@ -112,6 +147,68 @@
     .hudBtn { flex:1; font-size: 11px; padding: 6px 8px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.18); background:#fff; cursor:pointer; }
     .hudBtn:hover { background: #f7f7f7; }
     .hudHint { font-size: 10px; color: var(--muted); margin-top: 8px; line-height: 1.25; }
+    .alertHud {
+      left: 10px;
+      right: auto;
+      width: 330px;
+      border-color: rgba(13, 79, 110, 0.14);
+      background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(247,250,252,0.93));
+    }
+    .alertHeadline { font-size: 15px; font-weight: 700; color: #143447; line-height: 1.2; }
+    .alertSummary { font-size: 12px; line-height: 1.4; color: #314852; margin-top: 6px; }
+    .alertAction {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(13, 79, 110, 0.06);
+      color: #173746;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .alertChips { display:flex; flex-wrap:wrap; gap:6px; margin-top: 8px; }
+    .alertChip {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 10px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      border: 1px solid rgba(0,0,0,0.10);
+      background: rgba(255,255,255,0.92);
+      color: #173746;
+    }
+    .alertChip.focus { border-color: rgba(0, 146, 168, 0.28); color: #0a5d6b; }
+    .alertChip.warn { border-color: rgba(208, 61, 38, 0.22); color: #92301c; }
+    .alertChip.attention { border-color: rgba(226, 146, 0, 0.24); color: #8a5700; }
+    .alertChip.info { border-color: rgba(54, 104, 160, 0.22); color: #23476e; }
+    .alertChip.ok { border-color: rgba(28, 126, 92, 0.24); color: #14513c; }
+    .alertList { margin-top: 10px; display:flex; flex-direction:column; gap:6px; }
+    .alertItem {
+      display:grid;
+      grid-template-columns: 10px 1fr auto;
+      gap: 8px;
+      align-items: start;
+      font-size: 11px;
+      color: #223740;
+    }
+    .alertDot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      margin-top: 3px;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.92);
+    }
+    .alertDot.focus { background: var(--alert-focus); }
+    .alertDot.warn { background: var(--alert-warn); }
+    .alertDot.attention { background: var(--alert-attention); }
+    .alertDot.info { background: var(--alert-info); }
+    .alertDot.ok { background: var(--alert-ok); }
+    .alertItemText { display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .alertItemName { font-weight: 600; color: #112f3e; word-break: break-word; }
+    .alertItemMeta { color: #4f6570; line-height: 1.25; }
+    .alertItemValue { font-variant-numeric: tabular-nums; color: #173746; white-space: nowrap; }
 /* label pick highlighting (START/END) */
     .labelStart { fill: rgba(0,140,0,0.95) !important; stroke: rgba(0,140,0,0.95) !important; stroke-width: 0.6; paint-order: stroke; }
     .labelEnd   { fill: rgba(180,0,0,0.95) !important; stroke: rgba(180,0,0,0.95) !important; stroke-width: 0.6; paint-order: stroke; }
@@ -136,6 +233,15 @@
     <div class="main">
       <div class="left">
         <div id="svgHost"></div>
+          <div id="alertHud" class="hud alertHud" style="display:none">
+            <div class="hudTitle">Сценарий кадра</div>
+            <div id="alertHudTitle" class="alertHeadline">—</div>
+            <div id="alertHudSummary" class="alertSummary"></div>
+            <div id="alertHudAction" class="alertAction" style="display:none"></div>
+            <div id="alertHudModes" class="alertChips"></div>
+            <div id="alertHudEdges" class="alertList"></div>
+            <div id="alertHudNodes" class="alertList"></div>
+          </div>
           <div id="reviewHud" class="hud" style="display:none">
             <div class="hudTitle">Проверка</div>
             <div class="hudGrid">
@@ -162,6 +268,7 @@
         <label><input id="togGlobalQ" type="checkbox"/>Глоб. шкала Q</label>
           <label><input id="togDots" type="checkbox" checked/>Маркеры</label>
           <label><input id="togNodes" type="checkbox" checked/>Давление</label>
+          <label><input id="togAlerts" type="checkbox" checked/>Алерты</label>
           <label><input id="togLegend" type="checkbox" checked/>Легенда</label>
           <label><input id="togReview" type="checkbox"/>Проверка</label>
         </div>
@@ -170,6 +277,10 @@
           <div class="legendRow"><span class="swatch pos"></span><span>Q ≥ 0 (направление как задано веткой)</span></div>
           <div class="legendRow" style="margin-top:6px"><span class="swatch neg"></span><span>Q &lt; 0 (реверс потока)</span></div>
           <div class="legendRow" style="margin-top:6px"><span class="swatch closed"></span><span>закрыт (элемент закрыт)</span></div>
+          <div class="legendRow" style="margin-top:10px; border-top:1px dashed #eee; padding-top:8px; opacity:0.95"><b>Диагностический слой</b> (ведущий режим и критичные точки)</div>
+          <div class="legendRow"><span class="swatch" style="background: var(--alert-focus)"></span><span>главная ветка / опорный узел</span></div>
+          <div class="legendRow"><span class="swatch" style="background: var(--alert-attention)"></span><span>параллельное внимание / сброс</span></div>
+          <div class="legendRow"><span class="swatch" style="background: var(--alert-warn)"></span><span>критичный перепад / слабое место</span></div>
           <div class="legendRow" style="margin-top:10px; border-top:1px dashed #eee; padding-top:8px; opacity:0.95"><b>Слой проверки</b> (edges_meta.review.status)</div>
           <div class="legendRow"><span class="swatch" style="background: rgba(30,150,60,0.90)"></span><span>одобрено</span></div>
           <div class="legendRow"><span class="swatch" style="background: rgba(230,160,0,0.90)"></span><span>на проверке</span></div>
@@ -252,7 +363,7 @@ function init() {
 
   // wire UI toggles (checkboxes)
   try {
-    ['togPaths','togDots','togNodes','togLegend','togReview'].forEach((id) => {
+    ['togPaths','togDots','togNodes','togAlerts','togLegend','togReview'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('change', (ev) => {
         try { applyToggles(); } catch(e) {}
@@ -296,7 +407,7 @@ function sendDataToPython(data) {
 // ----------------------------------------------------
 // Widget state
 // ----------------------------------------------------
-let DATA = { title: "", svg: "", mapping: {}, time: [], edges: [], nodes: [], selected: {}, label_pick_mode: "", label_picks: {}, height: 740, sync_playhead: false, playhead_storage_key: "pneumo_play_state", dataset_id: "" };
+let DATA = { title: "", svg: "", mapping: {}, time: [], edges: [], nodes: [], selected: {}, label_pick_mode: "", label_picks: {}, height: 740, sync_playhead: false, playhead_storage_key: "pneumo_play_state", dataset_id: "", alerts: {}, show_alert_overlay: true };
 let svg = null;
 let overlay = null;
 let pathLayer = null;
@@ -304,7 +415,9 @@ let dotLayer = null;
 let nodeLayer = null;
 let routeLayer = null;
 let reviewLayer = null;
+let alertLayer = null;
 let reviewSegs = []; // {edgeName, path}
+var __lastArgs = null;
 
 let textEls = [];
 let labelCenters = [];
@@ -363,6 +476,7 @@ const togGlobalQ = document.getElementById('togGlobalQ');
 
 const togDots  = document.getElementById('togDots');
 const togNodes = document.getElementById('togNodes');
+const togAlerts = document.getElementById('togAlerts');
 const togLegend = document.getElementById('togLegend');
 const togReview = document.getElementById('togReview');
 const legendEl = document.getElementById('legend');
@@ -429,6 +543,7 @@ function clearDom() {
   qMax = [];
   reviewSegs = [];
   reviewLayer = null;
+  alertLayer = null;
 }
 
 function applyToggles() {
@@ -438,6 +553,15 @@ function applyToggles() {
   nodeLayer.style.display = (togNodes.checked && nodeObjs.length>0) ? 'block' : 'none';
   legendEl.style.display  = togLegend.checked ? 'block' : 'none';
   nodesListEl.style.display = (togNodes.checked && nodeObjs.length>0) ? 'block' : 'none';
+  if (alertLayer) {
+    const alertAllowed = !!(DATA.show_alert_overlay !== false);
+    alertLayer.style.display = (alertAllowed && togAlerts && togAlerts.checked) ? 'block' : 'none';
+  }
+  const alertHud = document.getElementById('alertHud');
+  if (alertHud) {
+    const alertAllowed = !!(DATA.show_alert_overlay !== false);
+    alertHud.style.display = (alertAllowed && togAlerts && togAlerts.checked && alertHud.dataset.active === '1') ? '' : 'none';
+  }
   // review overlay toggle (controlled by checkbox)
   try {
     if (reviewLayer && typeof togReview !== 'undefined' && togReview) {
@@ -483,6 +607,169 @@ function updateReviewHud(show, counts, selEdge, selStatus, modeLabel) {
     const b = get('hudTogglePendingOnly');
     if (b) b.textContent = String(modeLabel || 'Только «на проверке»');
   } catch(e) {}
+}
+
+function escapeHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function severityLabel(severity) {
+  const sev = String(severity || 'info');
+  if (sev === 'warn') return 'критично';
+  if (sev === 'attention') return 'внимание';
+  if (sev === 'focus') return 'ведущий';
+  if (sev === 'ok') return 'норма';
+  return 'инфо';
+}
+
+function alertRadius(severity) {
+  const sev = String(severity || 'info');
+  if (sev === 'warn') return 21;
+  if (sev === 'attention') return 18;
+  if (sev === 'focus') return 20;
+  if (sev === 'ok') return 15;
+  return 16;
+}
+
+function renderAlertItems(container, title, items) {
+  if (!container) return;
+  container.innerHTML = '';
+  if (!Array.isArray(items) || items.length === 0) return;
+
+  const head = document.createElement('div');
+  head.className = 'hudTitle';
+  head.style.marginBottom = '4px';
+  head.textContent = String(title || '');
+  container.appendChild(head);
+
+  items.forEach((item) => {
+    if (!item || !item.name) return;
+    const sev = String(item.severity || 'info');
+    const row = document.createElement('div');
+    row.className = 'alertItem';
+
+    const dot = document.createElement('span');
+    dot.className = `alertDot ${sev}`;
+    row.appendChild(dot);
+
+    const text = document.createElement('div');
+    text.className = 'alertItemText';
+    text.innerHTML =
+      `<span class="alertItemName">${escapeHtml(item.name)}</span>` +
+      `<span class="alertItemMeta">${escapeHtml(item.label || severityLabel(sev))}` +
+      `${item.summary ? ` • ${escapeHtml(item.summary)}` : ''}</span>`;
+    row.appendChild(text);
+
+    const value = document.createElement('div');
+    value.className = 'alertItemValue';
+    if (item.value !== undefined && item.value !== null && Number.isFinite(Number(item.value))) {
+      value.textContent = `${Number(item.value).toFixed(2)} ${String(item.unit || '').trim()}`.trim();
+    } else {
+      value.textContent = severityLabel(sev);
+    }
+    row.appendChild(value);
+
+    container.appendChild(row);
+  });
+}
+
+function updateAlertHud() {
+  const hud = document.getElementById('alertHud');
+  if (!hud) return;
+
+  const alerts = (DATA && DATA.alerts && typeof DATA.alerts === 'object') ? DATA.alerts : {};
+  const primary = (alerts.primary && typeof alerts.primary === 'object') ? alerts.primary : null;
+  const edgeItems = Array.isArray(alerts.edges) ? alerts.edges : [];
+  const nodeItems = Array.isArray(alerts.nodes) ? alerts.nodes : [];
+  const modeItems = Array.isArray(alerts.mode_badges) ? alerts.mode_badges : [];
+  const shouldShow = !!(DATA.show_alert_overlay !== false) && !!togAlerts && !!togAlerts.checked && !!(
+    (primary && primary.title) || edgeItems.length || nodeItems.length || modeItems.length
+  );
+
+  hud.dataset.active = shouldShow ? '1' : '0';
+  hud.style.display = shouldShow ? '' : 'none';
+  if (!shouldShow) return;
+
+  const titleEl = document.getElementById('alertHudTitle');
+  const summaryEl = document.getElementById('alertHudSummary');
+  const actionEl = document.getElementById('alertHudAction');
+  const modesEl = document.getElementById('alertHudModes');
+
+  if (titleEl) titleEl.textContent = primary && primary.title ? String(primary.title) : 'Ведущий режим';
+  if (summaryEl) summaryEl.textContent = primary && primary.summary ? String(primary.summary) : '';
+  if (actionEl) {
+    const actionText = primary && primary.action ? String(primary.action) : '';
+    actionEl.textContent = actionText;
+    actionEl.style.display = actionText ? '' : 'none';
+  }
+  if (modesEl) {
+    modesEl.innerHTML = '';
+    modeItems.forEach((mode) => {
+      if (!mode || !mode.title) return;
+      const chip = document.createElement('span');
+      chip.className = `alertChip ${String(mode.severity || 'info')}`;
+      chip.textContent = String(mode.title);
+      modesEl.appendChild(chip);
+    });
+  }
+
+  renderAlertItems(document.getElementById('alertHudEdges'), 'Контроль ветвей', edgeItems);
+  renderAlertItems(document.getElementById('alertHudNodes'), 'Контроль узлов', nodeItems);
+}
+
+function updateAlertOverlay() {
+  if (!alertLayer) {
+    updateAlertHud();
+    return;
+  }
+
+  while (alertLayer.firstChild) alertLayer.removeChild(alertLayer.firstChild);
+
+  const alerts = (DATA && DATA.alerts && typeof DATA.alerts === 'object') ? DATA.alerts : {};
+  const showAlerts = !!(DATA.show_alert_overlay !== false) && !!togAlerts && !!togAlerts.checked;
+  alertLayer.style.display = showAlerts ? 'block' : 'none';
+
+  updateAlertHud();
+  if (!showAlerts) return;
+
+  const mapping = DATA.mapping || {};
+  const edgeMap = (mapping.edges && typeof mapping.edges === 'object') ? mapping.edges : {};
+  const nodeMap = (mapping.nodes && typeof mapping.nodes === 'object') ? mapping.nodes : {};
+
+  (Array.isArray(alerts.edges) ? alerts.edges : []).forEach((item) => {
+    if (!item || !item.name) return;
+    const polys = edgeMap[item.name];
+    if (!Array.isArray(polys)) return;
+    polys.forEach((poly) => {
+      if (!poly || poly.length < 2) return;
+      const pth = document.createElementNS(NS, 'path');
+      pth.setAttribute('d', polyToPath(poly));
+      pth.setAttribute('class', `alertPath ${String(item.severity || 'info')}`);
+      const title = document.createElementNS(NS, 'title');
+      title.textContent = `${String(item.label || 'Ветка')}: ${String(item.name)}`;
+      pth.appendChild(title);
+      alertLayer.appendChild(pth);
+    });
+  });
+
+  (Array.isArray(alerts.nodes) ? alerts.nodes : []).forEach((item) => {
+    if (!item || !item.name) return;
+    const xy = nodeMap[item.name];
+    if (!Array.isArray(xy) || xy.length < 2) return;
+    const ring = document.createElementNS(NS, 'circle');
+    ring.setAttribute('cx', String(xy[0]));
+    ring.setAttribute('cy', String(xy[1]));
+    ring.setAttribute('r', String(alertRadius(item.severity)));
+    ring.setAttribute('class', `alertNodeRing ${String(item.severity || 'info')}`);
+    const title = document.createElementNS(NS, 'title');
+    title.textContent = `${String(item.label || 'Узел')}: ${String(item.name)}`;
+    ring.appendChild(title);
+    alertLayer.appendChild(ring);
+  });
 }
 
 function setSelectedEdge(name, send=true) {
@@ -544,7 +831,7 @@ function setSelectedNode(name, send=true) {
 function build(args) {
   clearDom();
   DATA = Object.assign(DATA, args);
-  __lastArgs = args;
+  __lastArgs = Object.assign({}, DATA);
 
   try { if (togReview) togReview.checked = !!DATA.show_review_overlay; } catch(e) {}
 
@@ -703,10 +990,13 @@ function build(args) {
   dotLayer  = document.createElementNS(NS, 'g');
   nodeLayer = document.createElementNS(NS, 'g');
   routeLayer = document.createElementNS(NS, 'g');
+  alertLayer = document.createElementNS(NS, 'g');
+  alertLayer.setAttribute('id', 'pneumo_overlay_alerts');
   overlay.appendChild(pathLayer);
   overlay.appendChild(routeLayer);
   overlay.appendChild(dotLayer);
   overlay.appendChild(nodeLayer);
+  overlay.appendChild(alertLayer);
 
   // route overlay (optional)
   try {
@@ -961,6 +1251,7 @@ const pth = document.createElementNS(NS, 'path');
 
   // toggles
   applyToggles();
+  updateAlertOverlay();
 
   // svg interactions
   svg.addEventListener('wheel', (e) => {
@@ -1011,7 +1302,7 @@ const pth = document.createElementNS(NS, 'path');
 }
 
 // toggles events
-[togPaths, togDots, togNodes, togLegend].forEach(el => el.addEventListener('change', applyToggles));
+[togPaths, togDots, togNodes, togAlerts, togLegend].forEach(el => el.addEventListener('change', applyToggles));
 if (togGlobalQ) {
   togGlobalQ.addEventListener('change', () => {
     try { if (__lastArgs !== null) build(__lastArgs); else build({}); } catch (e) {}

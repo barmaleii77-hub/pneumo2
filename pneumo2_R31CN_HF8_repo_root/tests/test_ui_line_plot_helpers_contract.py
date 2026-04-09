@@ -62,15 +62,13 @@ def test_entrypoints_use_shared_plot_lines_helper_without_public_duplicates() ->
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_line_plot_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_line_plot_helpers import (" in heavy_text
+    assert "from pneumo_solver_ui.ui_plot_surface_profile_helpers import (" in app_text
+    assert "from pneumo_solver_ui.ui_plot_surface_profile_helpers import (" in heavy_text
     assert "def plot_lines(" not in app_text
     assert "def plot_lines(" not in heavy_text
     assert "def _legacy_plot_lines_dead(" in app_text
     assert "def _legacy_plot_lines_dead(" in heavy_text
-    assert "plot_lines = partial(" in app_text
-    assert "plot_lines = partial(" in heavy_text
-    assert "plot_lines_core" in app_text
-    assert "plot_lines_core" in heavy_text
+    assert "plot_lines = build_line_plot_renderer(" in app_text
+    assert "plot_lines = build_line_plot_renderer(" in heavy_text
     assert "preprocess_df_and_y_cols_fn=_prepare_plot_lines_df_and_y_cols" in heavy_text
     assert "prefer_rel0_plot_columns" in heavy_text

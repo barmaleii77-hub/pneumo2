@@ -3152,9 +3152,11 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         'колесо_относительно_дороги_ЛЗ_м': np.zeros(n_steps),
         'колесо_относительно_дороги_ПЗ_м': np.zeros(n_steps),
 
-        # World-frame (минимум): vx и x вдоль дороги + yaw (оценка из ay и vx)
+        # World-frame (минимум): vx/vy, world XY path and yaw.
         'скорость_vx_м_с': np.zeros(n_steps),
+        'скорость_vy_м_с': np.zeros(n_steps),
         'путь_x_м': np.zeros(n_steps),
+        'путь_y_м': np.zeros(n_steps),
         'yaw_rate_рад_с': np.zeros(n_steps),
         'yaw_рад': np.zeros(n_steps),
         'радиус_поворота_м': np.zeros(n_steps),
@@ -3712,8 +3714,9 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     except Exception:
         pass
 
-    # World-frame (минимум): интегрируем ax -> vx -> x, оцениваем yaw по ay и vx
-    # (точно будет заменено на полноценную world-model в EPIC-WORLD).
+    # World-frame (минимум): интегрируем ax -> vx, оцениваем yaw по ay и vx,
+    # затем восстанавливаем мировые vx/vy и world XY path.
+    # Это всё ещё reduced path, но он должен быть самосогласованным внутри экспорта.
     try:
         dt_ = float(dt)        # v0: ABSOLUTE LAW — единственный канонический ключ скорости: vx0_м_с
         v0 = None
@@ -3730,15 +3733,15 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         if v0 is None:
             v0 = 0.0
         vx = out['скорость_vx_м_с']
+        vy = out['скорость_vy_м_с']
         xx = out['путь_x_м']
+        yy = out['путь_y_м']
         ax = out['ускорение_продольное_ax_м_с2']
         n_ = int(len(vx))
         if n_ > 0:
             vx[0] = v0
-            xx[0] = 0.0
             for i in range(1, n_):
                 vx[i] = vx[i-1] + 0.5*(ax[i-1] + ax[i]) * dt_
-                xx[i] = xx[i-1] + 0.5*(vx[i-1] + vx[i]) * dt_
 
         ay = out['ускорение_поперечное_ay_м_с2']
         R = out['радиус_поворота_м']
@@ -3758,6 +3761,17 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             yaw[0] = 0.0
             for i in range(1, n_):
                 yaw[i] = yaw[i-1] + 0.5*(yaw_rate[i-1] + yaw_rate[i]) * dt_
+            vy[0] = float(vx[0] * math.sin(yaw[0]))
+            xx[0] = 0.0
+            yy[0] = 0.0
+            for i in range(1, n_):
+                vxw_prev = float(vx[i-1] * math.cos(yaw[i-1]))
+                vxw_cur = float(vx[i] * math.cos(yaw[i]))
+                vy_prev = float(vx[i-1] * math.sin(yaw[i-1]))
+                vy_cur = float(vx[i] * math.sin(yaw[i]))
+                vy[i] = vy_cur
+                xx[i] = xx[i-1] + 0.5 * (vxw_prev + vxw_cur) * dt_
+                yy[i] = yy[i-1] + 0.5 * (vy_prev + vy_cur) * dt_
     except Exception:
         pass
     df_main = pd.DataFrame(out)
@@ -3878,6 +3892,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             upper_frame_branch_rear_x_m=upper_frame_rear_x,
             upper_hub_branch_front_x_m=upper_hub_front_x,
             upper_hub_branch_rear_x_m=upper_hub_rear_x,
+            wheel_center_xy_mode="canonical_pose",
             log=logging.warning,
         )
     except Exception as _solver_points_ex:

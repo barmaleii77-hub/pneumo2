@@ -75,6 +75,7 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert 'key = f"svc__vertical_view_signal_cache__{wb:.6f}"' in app_src
     assert "def _set_table_row_count_if_changed" in app_src
     assert "def _set_table_fixed_row_height" in app_src
+    assert "if isinstance(widget, (QtWidgets.QGraphicsView, QtWidgets.QTableWidget, TelemetryPanel)):" in app_src
     assert "vh.setSectionResizeMode(QtWidgets.QHeaderView.Fixed)" in app_src
     assert "self._last_xrange" in app_src
     assert "self._last_yrange" in app_src
@@ -105,14 +106,34 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._fit_view_to_scene_if_needed(scene_rect)" in app_src
     assert "class _QuickBarListCanvas" in app_src
     assert "self.rows_canvas = _QuickBarListCanvas" in app_src
+    assert "p.setRenderHint(QtGui.QPainter.TextAntialiasing, True)" in app_src
+    assert "p.setRenderHint(QtGui.QPainter.Antialiasing, False)" in app_src
+    assert "self._row_layout_key: Optional[tuple[int, int, int]] = None" in app_src
+    assert "self._display_rows_key: Optional[tuple[tuple[Any, ...], tuple[int, int, int], tuple[str, int, int, int]]] = None" in app_src
+    assert "def _ensure_text_metrics(self) -> tuple[QtGui.QFont, QtGui.QFontMetrics]:" in app_src
+    assert "def _ensure_row_layout(self) -> list[tuple[QtCore.QRectF, QtCore.QRectF, QtCore.QRectF]]:" in app_src
+    assert "def _rebuild_display_rows(self) -> None:" in app_src
+    assert "self._rebuild_display_rows()" in app_src
+    assert "display_key = (rows_key, layout_key, metrics_key)" in app_src
     assert "class _PressureQuickGridCanvas" in app_src
     assert "self.canvas = _PressureQuickGridCanvas" in app_src
     assert "self._bg_cache_pixmap" in app_src
     assert "def _ensure_background_cache" in app_src
+    assert 'key = "svc__telemetry_summary_cache"' in app_src
+    assert "def _ensure_telemetry_summary_cache(b: DataBundle) -> Dict[str, np.ndarray]:" in app_src
+    assert "self._value_font = QtGui.QFont(self.font())" in app_src
+    assert "self._value_text_pen = QtGui.QPen(QtGui.QColor(234, 238, 243))" in app_src
+    assert "self._value_text_pen.setCosmetic(True)" in app_src
+    assert "p.setFont(self._value_font)" in app_src
+    assert "p.setPen(self._value_text_pen)" in app_src
     assert "self._pressure_series_map: Dict[str, np.ndarray] = {}" in app_src
     assert "self._p_series_map: Dict[str, np.ndarray] = {}" in app_src
     assert "self._last_visual_key: Optional[tuple[int, int, int, int, int, int]] = None" in app_src
     assert "visual_key = (" in app_src
+    assert "summary = _ensure_telemetry_summary_cache(b)" in app_src
+    assert 't = float(summary["t"][i])' in app_src
+    assert 'vx = float(summary["vx"][i])' in app_src
+    assert 'zcm = float(summary["zcm"][i])' in app_src
     assert "def set_compact_dock_mode(self, compact: bool) -> None:" in app_src
     assert "dock.topLevelChanged.connect(" in app_src
     assert 'getattr(widget, "set_compact_dock_mode")(not bool(dock.isFloating()))' in app_src
@@ -263,6 +284,9 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._panel_bg = QtGui.QColor(15, 18, 24)" in app_src
     assert "self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)" in app_src
     assert "def paintEvent(self, event: QtGui.QPaintEvent):  # type: ignore[override]" in app_src
+    assert "self._border_pen = QtGui.QPen(self._border_color, 1.0)" in app_src
+    assert "self._corner_font = QtGui.QFont(self.font())" in app_src
+    assert "self._value_font = QtGui.QFont(self.font())" in app_src
     assert "self.plot.setMaximumHeight(plot_h if compact else 16777215)" in app_src
     assert "world_lo = float(s0 + x_min)" in app_src
     assert "y_range = tuple(cache.get(\"y_range\"" in app_src
@@ -275,6 +299,12 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, QtWidgets.QProgressBar, QtWidgets.QTableWidgetItem]] = []" in app_src
     assert "self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, QtWidgets.QTableWidgetItem, QtWidgets.QProgressBar, QtWidgets.QTableWidgetItem]] = []" in app_src
     assert "class _QuickTextStripCanvas(QtWidgets.QWidget):" in app_src
+    assert "self._segments_layout: list[tuple[str, QtGui.QColor, float]] = []" in app_src
+    assert "self._segments_layout_key" in app_src
+    assert "def _ensure_text_metrics(self) -> tuple[QtGui.QFont, QtGui.QFontMetrics]:" in app_src
+    assert "def _rebuild_segment_layout(self) -> None:" in app_src
+    assert "layout.append((text_s, qcolor, float(fm.horizontalAdvance(text_s))))" in app_src
+    assert "if expected_layout_key != self._segments_layout_key:" in app_src
     assert app_src.count("self._row_binding_keys: list[Optional[int]] = []") >= 2
     assert "order = _top_descending_indices(vals, topn, threshold=(thr if only_active else -1.0))" in app_src
     assert "order = _top_descending_indices(aq, topn, threshold=(thr if only_active else -1.0))" in app_src

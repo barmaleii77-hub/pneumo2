@@ -7291,6 +7291,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             upper_frame_branch_rear_x_m=upper_frame_rear_x,
             upper_hub_branch_front_x_m=upper_hub_front_x,
             upper_hub_branch_rear_x_m=upper_hub_rear_x,
+            wheel_center_xy_mode="canonical_pose",
             log=logging.warning,
         )
     except Exception as _solver_points_ex:

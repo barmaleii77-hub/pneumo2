@@ -52,7 +52,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from .send_bundle_contract import ANIM_DIAG_JSON, ANIM_DIAG_MD, ANIM_DIAG_SIDECAR_JSON, ANIM_DIAG_SIDECAR_MD
+from .send_bundle_contract import (
+    ANIM_DIAG_JSON,
+    ANIM_DIAG_MD,
+    ANIM_DIAG_SIDECAR_JSON,
+    ANIM_DIAG_SIDECAR_MD,
+    build_anim_operator_recommendations,
+    summarize_mnemo_event_log,
+)
 
 try:
     from pneumo_solver_ui.release_info import get_release
@@ -341,22 +348,45 @@ def _load_anim_latest_summary(repo_root: Path, sb_root: Path) -> Dict[str, Any]:
         "diagnostics_md_path": str(diag_md) if diag_md.exists() else None,
     }
 
+    def _merge_missing_fields(base: Dict[str, Any], extra: Dict[str, Any]) -> Dict[str, Any]:
+        merged = dict(base)
+        for key, value in extra.items():
+            if key in {"source", "diagnostics_json_path", "diagnostics_md_path"}:
+                continue
+            cur = merged.get(key)
+            if cur not in (None, "", [], {}):
+                continue
+            if value in (None, "", [], {}):
+                continue
+            if isinstance(value, dict):
+                merged[key] = dict(value)
+            elif isinstance(value, list):
+                merged[key] = list(value)
+            else:
+                merged[key] = value
+        return merged
+
     j = _safe_json_load(diag_json)
-    if isinstance(j, dict):
-        out.update(dict(j))
-        out["source"] = "send_bundle_sidecar"
-        return out
+    global_diag: Optional[Dict[str, Any]] = None
 
     try:
         from pneumo_solver_ui.run_artifacts import collect_anim_latest_diagnostics_summary
 
         j2 = collect_anim_latest_diagnostics_summary(include_meta=True)
         if isinstance(j2, dict):
-            out.update(dict(j2))
-            out["source"] = "global_pointer"
-            return out
+            global_diag = dict(j2)
     except Exception as exc:
         out["error"] = repr(exc)
+
+    if isinstance(j, dict):
+        merged = _merge_missing_fields(dict(j), global_diag or {})
+        out.update(merged)
+        out["source"] = "send_bundle_sidecar"
+        return out
+    if isinstance(global_diag, dict):
+        out.update(global_diag)
+        out["source"] = "global_pointer"
+        return out
 
     out.setdefault("anim_latest_available", False)
     return out
@@ -455,6 +485,8 @@ def generate_triage_report(
 
     # Latest anim_latest diagnostics sidecar / global pointer snapshot
     anim_summary = _load_anim_latest_summary(repo_root, sb_root)
+    mnemo_event_summary = summarize_mnemo_event_log(anim_summary)
+    operator_recommendations = build_anim_operator_recommendations(anim_summary)
 
     # ---- parse autotest summary ----
     autotest_summary: Optional[Dict[str, Any]] = None
@@ -567,6 +599,17 @@ def generate_triage_report(
     rr_brief["recent_failures"] = fails[-20:]
 
     # ---- Build JSON summary ----
+    severity_counts = {"critical": 0, "warn": 0, "info": 0}
+    red_flags: List[str] = []
+    mnemo_severity = str(mnemo_event_summary.get("severity") or "")
+    if mnemo_severity == "critical":
+        severity_counts["critical"] += max(1, int(mnemo_event_summary.get("active_latch_count") or 0))
+        red_flags.extend(str(x) for x in (mnemo_event_summary.get("red_flags") or []) if str(x).strip())
+    elif mnemo_severity == "warn":
+        severity_counts["warn"] += 1
+    elif mnemo_severity == "ok":
+        severity_counts["info"] += 1
+
     summary: Dict[str, Any] = {
         "created_at": _now_iso(),
         "release": RELEASE,
@@ -591,8 +634,12 @@ def generate_triage_report(
         "junit": junit_summary,
         "diagnostics": diag_meta,
         "dist_progress": dist_progress,
+        "severity_counts": severity_counts,
+        "red_flags": red_flags,
         "send_bundle_validation": sb_validation,
         "anim_latest": anim_summary,
+        "mnemo_event_log": mnemo_event_summary,
+        "operator_recommendations": operator_recommendations,
     }
 
     # ---- Markdown ----
@@ -693,6 +740,33 @@ def generate_triage_report(
             lines.append("Warnings (tail):")
             for w in (sb_validation.get('warnings') or [])[:10]:
                 lines.append(f"- {w}")
+
+    lines.append("")
+    lines.append("## Desktop Mnemo events")
+    mnemo = summary.get("mnemo_event_log") or {}
+    lines.append(f"- severity: `{mnemo.get('severity') or 'missing'}`")
+    lines.append(f"- summary: `{mnemo.get('headline') or '—'}`")
+    if mnemo.get("ref") or mnemo.get("path"):
+        lines.append(
+            f"- event_log: `{mnemo.get('ref') or '—'}` → `{_fmt_path(mnemo.get('path'))}` exists=`{mnemo.get('exists')}` schema=`{mnemo.get('schema_version') or '—'}` updated_utc=`{mnemo.get('updated_utc') or '—'}`"
+        )
+    if mnemo.get("current_mode"):
+        lines.append(f"- current_mode: `{mnemo.get('current_mode')}`")
+    if mnemo.get("event_count") is not None:
+        lines.append(
+            f"- event_state: total=`{mnemo.get('event_count')}` active=`{mnemo.get('active_latch_count')}` acked=`{mnemo.get('acknowledged_latch_count')}`"
+        )
+    recent_titles = [str(x) for x in (mnemo.get("recent_titles") or []) if str(x).strip()]
+    if recent_titles:
+        lines.append(f"- recent_titles: {' | '.join(recent_titles[:3])}")
+    for flag in list(mnemo.get("red_flags") or [])[:3]:
+        lines.append(f"- red_flag: `{flag}`")
+
+    if operator_recommendations:
+        lines.append("")
+        lines.append("## Recommended actions")
+        for idx, item in enumerate(operator_recommendations, start=1):
+            lines.append(f"{idx}. {item}")
 
     lines.append("")
     lines.append("## Anim latest diagnostics")

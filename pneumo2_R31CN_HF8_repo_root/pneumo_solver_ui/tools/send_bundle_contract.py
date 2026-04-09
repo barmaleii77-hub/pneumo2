@@ -72,6 +72,19 @@ BROWSER_PERF_FLAT_FIELDS = (
     "browser_perf_max_idle_poll_ms",
 )
 
+MNEMO_EVENT_FLAT_FIELDS = (
+    "anim_latest_mnemo_event_log_ref",
+    "anim_latest_mnemo_event_log_path",
+    "anim_latest_mnemo_event_log_exists",
+    "anim_latest_mnemo_event_log_schema_version",
+    "anim_latest_mnemo_event_log_updated_utc",
+    "anim_latest_mnemo_event_log_current_mode",
+    "anim_latest_mnemo_event_log_event_count",
+    "anim_latest_mnemo_event_log_active_latch_count",
+    "anim_latest_mnemo_event_log_acknowledged_latch_count",
+    "anim_latest_mnemo_event_log_recent_titles",
+)
+
 ANIM_LATEST_REGISTRY_EVENT_FIELDS = (
     "anim_latest_available",
     "anim_latest_global_pointer_json",
@@ -87,6 +100,16 @@ ANIM_LATEST_REGISTRY_EVENT_FIELDS = (
     "anim_latest_npz_in_workspace",
     "anim_latest_usable",
     "anim_latest_issues",
+    "anim_latest_mnemo_event_log_ref",
+    "anim_latest_mnemo_event_log_path",
+    "anim_latest_mnemo_event_log_exists",
+    "anim_latest_mnemo_event_log_schema_version",
+    "anim_latest_mnemo_event_log_updated_utc",
+    "anim_latest_mnemo_event_log_current_mode",
+    "anim_latest_mnemo_event_log_event_count",
+    "anim_latest_mnemo_event_log_active_latch_count",
+    "anim_latest_mnemo_event_log_acknowledged_latch_count",
+    "anim_latest_mnemo_event_log_recent_titles",
 )
 
 ANIM_LATEST_INDEX_FIELDS = (
@@ -103,6 +126,15 @@ ANIM_LATEST_INDEX_FIELDS = (
     "anim_latest_npz_in_workspace",
     "anim_latest_usable",
     "anim_latest_issues",
+    "anim_latest_mnemo_event_log_ref",
+    "anim_latest_mnemo_event_log_exists",
+    "anim_latest_mnemo_event_log_schema_version",
+    "anim_latest_mnemo_event_log_updated_utc",
+    "anim_latest_mnemo_event_log_current_mode",
+    "anim_latest_mnemo_event_log_event_count",
+    "anim_latest_mnemo_event_log_active_latch_count",
+    "anim_latest_mnemo_event_log_acknowledged_latch_count",
+    "anim_latest_mnemo_event_log_recent_titles",
 )
 
 
@@ -118,6 +150,15 @@ def normalize_reload_inputs(value: Any) -> List[str]:
         return out
     sx = str(value).strip()
     return [sx] if sx else []
+
+
+def _int_or_none(value: Any) -> Optional[int]:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except Exception:
+        return None
 
 
 def pick_anim_latest_fields(
@@ -198,7 +239,7 @@ def extract_anim_snapshot(obj: Any, *, source: str) -> Optional[Dict[str, Any]]:
         "npz_path_in_bundle": obj.get("npz_path_in_bundle"),
         "issues": issues,
     }
-    for key in BROWSER_PERF_FLAT_FIELDS:
+    for key in BROWSER_PERF_FLAT_FIELDS + MNEMO_EVENT_FLAT_FIELDS:
         if key in obj:
             value = obj.get(key)
             if isinstance(value, dict):
@@ -280,7 +321,7 @@ def choose_anim_snapshot(
         chosen = dict(sources[first_key])
         chosen["source"] = first_key
 
-    for key in BROWSER_PERF_FLAT_FIELDS:
+    for key in BROWSER_PERF_FLAT_FIELDS + MNEMO_EVENT_FLAT_FIELDS:
         cur = chosen.get(key)
         if key in chosen and cur not in (None, "", [], {}):
             continue
@@ -354,6 +395,152 @@ def normalize_anim_dashboard_obj(obj: Any) -> Dict[str, Any]:
     return out
 
 
+def summarize_mnemo_event_log(anim: Any) -> Dict[str, Any]:
+    norm = normalize_anim_dashboard_obj(anim)
+    if not norm:
+        return {
+            "exists": None,
+            "ref": "",
+            "path": "",
+            "schema_version": "",
+            "updated_utc": "",
+            "current_mode": "",
+            "event_count": None,
+            "active_latch_count": None,
+            "acknowledged_latch_count": None,
+            "recent_titles": [],
+            "severity": "missing",
+            "headline": "Desktop Mnemo event-log not available",
+            "red_flags": [],
+        }
+
+    exists = norm.get("anim_latest_mnemo_event_log_exists")
+    ref = str(norm.get("anim_latest_mnemo_event_log_ref") or "")
+    path = str(norm.get("anim_latest_mnemo_event_log_path") or "")
+    schema_version = str(norm.get("anim_latest_mnemo_event_log_schema_version") or "")
+    updated_utc = str(norm.get("anim_latest_mnemo_event_log_updated_utc") or "")
+    current_mode = str(norm.get("anim_latest_mnemo_event_log_current_mode") or "")
+    event_count = _int_or_none(norm.get("anim_latest_mnemo_event_log_event_count"))
+    active_latch_count = _int_or_none(norm.get("anim_latest_mnemo_event_log_active_latch_count"))
+    acknowledged_latch_count = _int_or_none(norm.get("anim_latest_mnemo_event_log_acknowledged_latch_count"))
+    recent_titles = [str(x) for x in (norm.get("anim_latest_mnemo_event_log_recent_titles") or []) if str(x).strip()]
+    red_flags: List[str] = []
+
+    if (active_latch_count or 0) > 0:
+        severity = "critical"
+        headline = (
+            f"Desktop Mnemo reports {active_latch_count} active latched event(s)"
+            + (f" in mode {current_mode}" if current_mode else "")
+        )
+        red_flags.append(headline)
+    elif (acknowledged_latch_count or 0) > 0:
+        severity = "warn"
+        headline = (
+            f"Desktop Mnemo retains {acknowledged_latch_count} acknowledged latch(es)"
+            + (f" after mode {current_mode}" if current_mode else "")
+        )
+    elif recent_titles:
+        severity = "warn"
+        headline = "Desktop Mnemo recorded recent events"
+    elif exists:
+        severity = "ok"
+        headline = "Desktop Mnemo event-log available"
+    else:
+        severity = "missing"
+        headline = "Desktop Mnemo event-log not available"
+
+    if recent_titles and severity == "critical":
+        red_flags.append("Desktop Mnemo recent: " + " | ".join(recent_titles[:3]))
+
+    return {
+        "exists": exists,
+        "ref": ref,
+        "path": path,
+        "schema_version": schema_version,
+        "updated_utc": updated_utc,
+        "current_mode": current_mode,
+        "event_count": event_count,
+        "active_latch_count": active_latch_count,
+        "acknowledged_latch_count": acknowledged_latch_count,
+        "recent_titles": recent_titles,
+        "severity": severity,
+        "headline": headline,
+        "red_flags": red_flags,
+    }
+
+
+def build_anim_operator_recommendations(anim: Any) -> List[str]:
+    norm = normalize_anim_dashboard_obj(anim)
+    if not norm:
+        return []
+
+    mnemo = summarize_mnemo_event_log(norm)
+    recommendations: List[str] = []
+    current_mode = str(mnemo.get("current_mode") or "").strip()
+    current_mode_text = f" in mode {current_mode}" if current_mode else ""
+
+    if str(mnemo.get("severity") or "") == "critical":
+        recommendations.append(
+            f"Open Desktop Mnemo first and inspect active latched events{current_mode_text} before ACK/reset."
+        )
+    elif str(mnemo.get("severity") or "") == "warn":
+        recommendations.append(
+            f"Review Desktop Mnemo acknowledged/recent events{current_mode_text} before closing pneumatic triage."
+        )
+    elif norm.get("available") and mnemo.get("exists") is not True:
+        recommendations.append(
+            "Generate a Desktop Mnemo event-log from the current anim_latest run so pneumatic history is present in triage."
+        )
+
+    perf_evidence_status = str(norm.get("browser_perf_evidence_status") or "").strip()
+    perf_evidence_level = str(norm.get("browser_perf_evidence_level") or "").strip()
+    perf_bundle_ready = norm.get("browser_perf_bundle_ready")
+    if perf_evidence_status and perf_evidence_status != "trace_bundle_ready":
+        recommendations.append(
+            f"Open browser perf evidence artifacts and refresh the trace; current evidence status is {perf_evidence_status}"
+            + (f" ({perf_evidence_level})" if perf_evidence_level else "")
+            + f", bundle_ready={perf_bundle_ready}."
+        )
+
+    perf_compare_status = str(norm.get("browser_perf_comparison_status") or "").strip()
+    perf_compare_level = str(norm.get("browser_perf_comparison_level") or "").strip()
+    perf_compare_ready = norm.get("browser_perf_comparison_ready")
+    perf_compare_changed = norm.get("browser_perf_comparison_changed")
+    if perf_compare_status == "no_reference":
+        recommendations.append(
+            "Create or refresh a browser perf reference snapshot before marking performance review complete."
+        )
+    elif (
+        perf_compare_status
+        and (
+            perf_compare_ready is False
+            or perf_compare_changed is True
+            or perf_compare_level not in ("", "PASS", "OK")
+        )
+    ):
+        recommendations.append(
+            f"Review the browser perf comparison report before sign-off; status={perf_compare_status}"
+            + (f", level={perf_compare_level}" if perf_compare_level else "")
+            + f", ready={perf_compare_ready}, changed={perf_compare_changed}."
+        )
+
+    if norm.get("pointer_sync_ok") is False:
+        recommendations.append(
+            "Re-export anim_latest from the current workspace to resync pointer/token state across diagnostics sources."
+        )
+    if norm.get("usable_from_bundle") is False:
+        recommendations.append(
+            "Rebuild the send-bundle after re-export so anim_latest is reproducible directly from the archive."
+        )
+
+    deduped: List[str] = []
+    for item in recommendations:
+        text = str(item).strip()
+        if text and text not in deduped:
+            deduped.append(text)
+    return deduped
+
+
 def _safe_read_json_dict(path: Path) -> Dict[str, Any]:
     try:
         obj = json.loads(path.read_text(encoding="utf-8", errors="replace"))
@@ -377,7 +564,8 @@ def load_latest_send_bundle_anim_dashboard(out_dir: Path) -> Dict[str, Any]:
     if isinstance(validation_anim, dict):
         validation_norm = normalize_anim_dashboard_obj(validation_anim)
         if validation_norm.get("visual_cache_token") or validation_norm.get("available") or validation_norm.get("npz_path") or any(
-            validation_norm.get(key) not in (None, "", [], {}) for key in BROWSER_PERF_FLAT_FIELDS
+            validation_norm.get(key) not in (None, "", [], {})
+            for key in BROWSER_PERF_FLAT_FIELDS + MNEMO_EVENT_FLAT_FIELDS
         ):
             sources["validation"] = validation_norm
 
@@ -401,11 +589,28 @@ def format_anim_dashboard_brief_lines(anim: Any) -> List[str]:
     perf_compare_level = str(norm.get("browser_perf_comparison_level") or "")
     perf_bundle_ready = norm.get("browser_perf_bundle_ready")
     perf_compare_ready = norm.get("browser_perf_comparison_ready")
+    mnemo_event_exists = norm.get("anim_latest_mnemo_event_log_exists")
+    mnemo_event_total = norm.get("anim_latest_mnemo_event_log_event_count")
+    mnemo_event_active = norm.get("anim_latest_mnemo_event_log_active_latch_count")
+    mnemo_event_ack = norm.get("anim_latest_mnemo_event_log_acknowledged_latch_count")
+    mnemo_event_mode = str(norm.get("anim_latest_mnemo_event_log_current_mode") or "")
+    mnemo_event_recent = [str(x) for x in (norm.get("anim_latest_mnemo_event_log_recent_titles") or []) if str(x).strip()]
 
     if token:
         lines.append(f"Anim latest token: {token}")
     if reload_inputs:
         lines.append("Anim reload inputs: " + ", ".join(str(x) for x in reload_inputs))
+    if any(value not in (None, "", []) for value in (mnemo_event_exists, mnemo_event_total, mnemo_event_active, mnemo_event_ack, mnemo_event_mode)):
+        lines.append(
+            "Desktop Mnemo events: "
+            f"exists={mnemo_event_exists}"
+            f" / total={mnemo_event_total if mnemo_event_total is not None else '—'}"
+            f" / active={mnemo_event_active if mnemo_event_active is not None else '—'}"
+            f" / acked={mnemo_event_ack if mnemo_event_ack is not None else '—'}"
+            f" / mode={mnemo_event_mode or '—'}"
+        )
+    if mnemo_event_recent:
+        lines.append("Desktop Mnemo recent: " + " | ".join(mnemo_event_recent[:3]))
     if perf_evidence_status or perf_evidence_level:
         lines.append(
             "Browser perf evidence: "
@@ -465,6 +670,26 @@ def render_anim_latest_md(anim: Any) -> str:
         f"- npz_path: {norm.get('npz_path') or '—'}",
         f"- updated_utc: {norm.get('updated_utc') or '—'}",
     ]
+    if any(
+        norm.get(key) not in (None, "", [], {})
+        for key in (
+            "anim_latest_mnemo_event_log_ref",
+            "anim_latest_mnemo_event_log_exists",
+            "anim_latest_mnemo_event_log_current_mode",
+            "anim_latest_mnemo_event_log_event_count",
+            "anim_latest_mnemo_event_log_active_latch_count",
+            "anim_latest_mnemo_event_log_acknowledged_latch_count",
+        )
+    ):
+        lines.append(
+            f"- mnemo_event_log: {norm.get('anim_latest_mnemo_event_log_ref') or '—'} / exists={norm.get('anim_latest_mnemo_event_log_exists')} / schema={norm.get('anim_latest_mnemo_event_log_schema_version') or '—'} / updated_utc={norm.get('anim_latest_mnemo_event_log_updated_utc') or '—'}"
+        )
+        lines.append(
+            f"- mnemo_event_log_state: mode={norm.get('anim_latest_mnemo_event_log_current_mode') or '—'} / total={norm.get('anim_latest_mnemo_event_log_event_count')} / active={norm.get('anim_latest_mnemo_event_log_active_latch_count')} / acked={norm.get('anim_latest_mnemo_event_log_acknowledged_latch_count')}"
+        )
+        recent_titles = [str(x) for x in (norm.get("anim_latest_mnemo_event_log_recent_titles") or []) if str(x).strip()]
+        if recent_titles:
+            lines.append(f"- mnemo_event_log_recent: {' | '.join(recent_titles[:3])}")
     if norm.get("usable_from_bundle") is not None:
         lines.append(f"- usable_from_bundle: {norm.get('usable_from_bundle')}")
     if norm.get("pointer_json_in_bundle") is not None:

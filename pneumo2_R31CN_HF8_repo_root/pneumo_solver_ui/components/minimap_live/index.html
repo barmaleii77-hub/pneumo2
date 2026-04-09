@@ -525,7 +525,9 @@ function updateHud(idx){
   if (badgeSeg){
     const seg = (p && Array.isArray(p.s) && p.s[idx] != null) ? __segmentForS(Number(p.s[idx]||0)) : null;
     const segName = seg ? (String(seg.name || ('S'+String(seg.seg_idx||'')))) : '—';
-    badgeSeg.textContent = 'Сегмент: ' + segName;
+    const segTurn = seg ? String(seg.turn_direction_label || seg.turn_direction || '').trim() : '';
+    const segLabel = (seg && segTurn) ? (segName + ' · ' + segTurn) : segName;
+    badgeSeg.textContent = 'Сегмент: ' + segLabel;
     badgeSeg.style.borderColor = seg && seg.edge_color ? String(seg.edge_color) : 'rgba(0,0,0,0.14)';
   }
 }

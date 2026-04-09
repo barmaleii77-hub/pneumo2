@@ -87,6 +87,7 @@ def test_large_ui_entrypoints_import_shared_diagnostics_zip_helper() -> None:
     for rel in ("pneumo_solver_ui/app.py", "pneumo_solver_ui/pneumo_ui_app.py"):
         src = (ROOT / rel).read_text(encoding="utf-8")
         assert "from pneumo_solver_ui.ui_diagnostics_helpers import make_ui_diagnostics_zip_bundle" in src
-        assert "make_ui_diagnostics_zip = partial(" in src
+        assert "from pneumo_solver_ui.ui_diagnostics_profile_helpers import (" in src
+        assert "make_ui_diagnostics_zip = build_ui_diagnostics_zip_writer(" in src
         assert "make_ui_diagnostics_zip_bundle" in src
         assert "def make_ui_diagnostics_zip(" not in src

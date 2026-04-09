@@ -62,7 +62,9 @@ def test_minimap_and_road_profile_have_segment_overlay_hooks() -> None:
     prof = (ROOT / "pneumo_solver_ui" / "components" / "road_profile_live" / "index.html").read_text(encoding="utf-8")
     assert "drawRingSegmentOverlay" in mini
     assert "badgeSeg" in mini
+    assert "turn_direction_label" in mini
     assert "DATA.ring_visual" in mini
     assert "drawRingSegmentBands" in prof
     assert "segNowName" in prof
+    assert "turn_direction_label" in prof
     assert "DATA.ring_visual" in prof

@@ -308,6 +308,7 @@ def append_solver_points_full_dw2d(
     upper_frame_branch_rear_x_m: Sequence[float] | None = None,
     upper_hub_branch_front_x_m: Sequence[float] | None = None,
     upper_hub_branch_rear_x_m: Sequence[float] | None = None,
+    wheel_center_xy_mode: str = "hardpoints",
     eps_m: float = 1e-9,
     log: LogFn | None = None,
 ) -> pd.DataFrame:
@@ -316,6 +317,13 @@ def append_solver_points_full_dw2d(
     R20 geometry release: when explicit branch/top-X source-data is available we export
     trapezoidal upper/lower arms and longitudinally separated cylinders directly from
     solver/export code. No animator-side invention is allowed.
+
+    ``wheel_center_xy_mode`` controls which already-resolved source defines the wheel
+    center in the XY plane:
+    - ``"hardpoints"``: derive from serialized hub hardpoints (default, preserves the
+      explicit geometric distinction between frame corners and wheel centers).
+    - ``"canonical_pose"``: use the canonical wheel pose from ``x_pos/y_pos`` together
+      with the solved wheel Z signal exported by the producing model.
     """
     n = len(df_main)
     x_path = _optional_series(df_main, x_path_col, n)
@@ -428,6 +436,14 @@ def append_solver_points_full_dw2d(
             log=log,
             context=f"{corner}/arm2",
         )
+        # Reduced vertical models export one resolved wheel/upright pose, not a full
+        # spatial upright kinematic chain. If we keep recomputing the outboard lateral
+        # joint offsets from instantaneous arm-length closure, hub-side hardpoints start
+        # to "breathe" relative to wheel_center and the continuity diagnostics raise a
+        # false wheel/upright drift. Freeze the outboard Y offsets to their t0/static
+        # source-data value while letting Z follow the solved wheel travel.
+        y_joint = np.full(n, float(np.asarray(y_joint, dtype=float)[0]), dtype=float)
+        y_joint2 = np.full(n, float(np.asarray(y_joint2, dtype=float)[0]), dtype=float)
 
         y_top1 = np.full(n, side * 0.5 * float(topsep_c1_arr[i]), dtype=float)
         z_top1_local = np.full(n, float(topz_c1_arr[i]), dtype=float)
@@ -576,8 +592,19 @@ def append_solver_points_full_dw2d(
         branch_name_c2 = c2_branch_arr[i] if c2_branch_arr[i] in ('перед', 'зад') else 'зад'
         c2_bot_x, c2_bot_y, c2_bot_z = _bot_point_world(arm_name_c2, branch_name_c2, f2)
 
-        wheel_x = 0.25 * (lower_hub_front_x + lower_hub_rear_x + upper_hub_front_x + upper_hub_rear_x)
-        wheel_y = 0.25 * (lower_hub_front_y + lower_hub_rear_y + upper_hub_front_y + upper_hub_rear_y)
+        wheel_pose_x, wheel_pose_y = _world_xy(
+            x_local=x_local,
+            y_local=np.full(n, y_wheel, dtype=float),
+            x_path=x_path,
+            y_path=y_path,
+            yaw=yaw,
+        )
+        if str(wheel_center_xy_mode).strip().lower() == "canonical_pose":
+            wheel_x = np.asarray(wheel_pose_x, dtype=float)
+            wheel_y = np.asarray(wheel_pose_y, dtype=float)
+        else:
+            wheel_x = 0.25 * (lower_hub_front_x + lower_hub_rear_x + upper_hub_front_x + upper_hub_rear_x)
+            wheel_y = 0.25 * (lower_hub_front_y + lower_hub_rear_y + upper_hub_front_y + upper_hub_rear_y)
         frame_world = np.asarray(frame_points_world[corner], dtype=float)
         frame_x = frame_world[:, 0]
         frame_y = frame_world[:, 1]

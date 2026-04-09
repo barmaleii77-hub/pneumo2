@@ -22,17 +22,11 @@ import argparse
 import json
 import time
 from pathlib import Path
-import importlib.util
 import sys
 from pneumo_solver_ui.module_loading import load_python_module_from_path
 
 
 HERE = Path(__file__).resolve().parent
-
-
-def load_py_module(path: Path, module_name: str):
-    return load_python_module_from_path(path, module_name)
-
 
 
 def main() -> int:
@@ -53,7 +47,7 @@ def main() -> int:
 
     params = json.loads(base_path.read_text(encoding="utf-8"))
 
-    model = load_py_module(model_path, "_model_for_fp")
+    model = load_python_module_from_path(model_path, "_model_for_fp")
     from scheme_integrity import canonicalize_scheme, fingerprint_scheme
 
     nodes, node_index, edges, B = model.build_network_full(params)

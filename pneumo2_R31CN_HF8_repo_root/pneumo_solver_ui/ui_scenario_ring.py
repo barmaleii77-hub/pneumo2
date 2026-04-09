@@ -75,8 +75,6 @@ def _default_ring_spec() -> Dict[str, Any]:
             {
                 "name": "S1_прямо",
                 "duration_s": 5.0,
-                "drive_mode": "STRAIGHT",
-                "speed_kph": 40.0,
                 "turn_direction": "STRAIGHT",
                 "speed_end_kph": 40.0,
                 "road": {
@@ -114,8 +112,6 @@ def _default_ring_spec() -> Dict[str, Any]:
             {
                 "name": "S2_поворот",
                 "duration_s": 4.0,
-                "drive_mode": "TURN_LEFT",
-                "speed_kph": 40.0,
                 "turn_direction": "LEFT",
                 "speed_end_kph": 40.0,
                 "turn_radius_m": 60.0,
@@ -157,10 +153,8 @@ def _default_ring_spec() -> Dict[str, Any]:
                 "events": [],
             },
             {
-                "name": "S3_разгон",
+                "name": "S3_прямо_55",
                 "duration_s": 3.0,
-                "drive_mode": "ACCEL",
-                "v_end_kph": 55.0,
                 "turn_direction": "STRAIGHT",
                 "speed_end_kph": 55.0,
                 "road": {
@@ -177,10 +171,8 @@ def _default_ring_spec() -> Dict[str, Any]:
                 "events": [],
             },
             {
-                "name": "S4_торможение",
+                "name": "S4_замыкание",
                 "duration_s": 3.0,
-                "drive_mode": "BRAKE",
-                "v_end_kph": 40.0,
                 "turn_direction": "STRAIGHT",
                 "speed_end_kph": 40.0,
                 "road": {
@@ -203,18 +195,25 @@ def _default_ring_spec() -> Dict[str, Any]:
 
 
 
-def _segment_length_estimate_m(v_start_kph: float, seg: Dict[str, Any]) -> float:
+def _segment_length_estimate_m(
+    v_start_kph: float,
+    seg: Dict[str, Any],
+    *,
+    forced_end_kph: Optional[float] = None,
+) -> float:
     """Rough segment length estimate (for preview only).
 
-    ABSOLUTE LAW: alias keys are forbidden.
-      * speed_kph is the only accepted cruise speed key.
-      * v_end_kph is the only accepted accel/brake target speed key.
+    Canonical ring contract:
+      * turn direction is explicit via ``turn_direction``;
+      * the segment owns ``speed_end_kph``;
+      * legacy ``speed_kph`` / ``v_end_kph`` may still be read by the compatibility layer,
+        but they are not the user-facing source of truth anymore.
     """
     dur = float(seg.get("duration_s", 0.0))
     if dur <= 0:
         return 0.0
 
-    motion = _segment_motion_contract(seg, v_start_kph)
+    motion = _segment_motion_contract(seg, v_start_kph, forced_end_kph=forced_end_kph)
     v0 = max(0.0, float(motion["speed_start_kph"]) / 3.6)
     v1 = max(0.0, float(motion["speed_end_kph"]) / 3.6)
     if motion["vary_speed"]:
@@ -222,9 +221,14 @@ def _segment_length_estimate_m(v_start_kph: float, seg: Dict[str, Any]) -> float
     return float(v1 * dur)
 
 
-def _segment_end_speed_kph(v_start_kph: float, seg: Dict[str, Any]) -> float:
+def _segment_end_speed_kph(
+    v_start_kph: float,
+    seg: Dict[str, Any],
+    *,
+    forced_end_kph: Optional[float] = None,
+) -> float:
     """Segment end speed (for preview only)."""
-    return float(_segment_motion_contract(seg, v_start_kph)["speed_end_kph"])
+    return float(_segment_motion_contract(seg, v_start_kph, forced_end_kph=forced_end_kph)["speed_end_kph"])
 
 
 def _turn_direction_label(direction: str) -> str:
@@ -324,10 +328,11 @@ def _render_segment_editor(
     motion = _segment_motion_contract(seg, v_start_kph)
     turn_direction = str(motion["turn_direction"]).upper()
     dur = float(seg.get("duration_s", 5.0))
+    forced_end_kph = float(ring_start_speed_kph) if is_last else None
 
     # Заголовок‑сводка
-    v_end_preview = _segment_end_speed_kph(v_start_kph, seg)
-    est_len = _segment_length_estimate_m(v_start_kph, seg)
+    v_end_preview = _segment_end_speed_kph(v_start_kph, seg, forced_end_kph=forced_end_kph)
+    est_len = _segment_length_estimate_m(v_start_kph, seg, forced_end_kph=forced_end_kph)
     summary = (
         f"{name} · {_turn_direction_label(turn_direction)} · {dur:.1f} c · "
         f"v: {v_start_kph:.1f}→{v_end_preview:.1f} км/ч · ≈{est_len:.1f} м"
@@ -419,21 +424,17 @@ def _render_segment_editor(
 
         start_speed_kph = float(ring_start_speed_kph if is_first else v_start_kph)
         end_speed_kph = float(seg.get("speed_end_kph", start_speed_kph))
-        if turn_direction == "STRAIGHT":
-            if abs(end_speed_kph - start_speed_kph) <= 1e-9:
-                seg["drive_mode"] = "STRAIGHT"
-                seg["speed_kph"] = float(end_speed_kph)
-                seg.pop("v_end_kph", None)
-            else:
-                seg["drive_mode"] = "ACCEL" if end_speed_kph > start_speed_kph else "BRAKE"
-                seg["v_end_kph"] = float(end_speed_kph)
-                seg["speed_kph"] = float(end_speed_kph)
-        else:
-            seg["drive_mode"] = "TURN_LEFT" if turn_direction == "LEFT" else "TURN_RIGHT"
-            seg["speed_kph"] = float(end_speed_kph)
-            seg.pop("v_end_kph", None)
+        # Authored ring spec stays canonical in session_state as well:
+        # only turn_direction + speed_end_kph are user-owned semantics.
+        # Legacy fields remain import/runtime compatibility only.
+        seg.pop("drive_mode", None)
+        seg.pop("speed_kph", None)
+        seg.pop("v_end_kph", None)
 
-        seg["speed_start_kph"] = float(start_speed_kph)
+        if is_first:
+            seg["speed_start_kph"] = float(start_speed_kph)
+        else:
+            seg.pop("speed_start_kph", None)
 
         c4, c5 = st.columns([1.2, 1.2])
         with c4:
@@ -492,6 +493,7 @@ def _render_segment_editor(
                     ),
                 )
             else:
+                road.pop("center_height_start_mm", None)
                 st.metric("Высота дороги на входе", f"{float(road_start_center_mm):.1f} мм")
                 st.caption("Старт сегмента наследуется из конца предыдущего.")
         with cG2:
@@ -525,6 +527,7 @@ def _render_segment_editor(
                     ),
                 )
             else:
+                road.pop("cross_slope_start_pct", None)
                 st.metric("Поперечный уклон на входе", f"{float(road_start_cross_pct):.2f} %")
                 st.caption("Стартовый поперечный уклон наследуется из конца предыдущего сегмента.")
         with cG4:
@@ -1027,8 +1030,8 @@ def _render_segment_editor(
                     except Exception:
                         st.error("Не удалось удалить событие.")
 
-    v_end = _segment_end_speed_kph(v_start_kph, seg)
-    seg["length_m"] = _segment_length_estimate_m(v_start_kph, seg)
+    v_end = _segment_end_speed_kph(v_start_kph, seg, forced_end_kph=forced_end_kph)
+    seg["length_m"] = _segment_length_estimate_m(v_start_kph, seg, forced_end_kph=forced_end_kph)
     return seg, float(v_end)
 
 
@@ -1205,9 +1208,10 @@ def render_ring_scenario_generator(
     for i, seg in enumerate(segs):
         v_start_i = float(v_flow_kph)
         v_starts.append(v_start_i)
+        forced_end_kph = float(v0_kph) if i >= len(segs) - 1 else None
 
-        seg_len = _segment_length_estimate_m(v_start_i, seg)
-        v_end = _segment_end_speed_kph(v_start_i, seg)
+        seg_len = _segment_length_estimate_m(v_start_i, seg, forced_end_kph=forced_end_kph)
+        v_end = _segment_end_speed_kph(v_start_i, seg, forced_end_kph=forced_end_kph)
 
         seg_lens_m.append(float(seg_len))
         v_ends.append(float(v_end))
@@ -1258,11 +1262,15 @@ def render_ring_scenario_generator(
             v_prev = float(src.get("speed_end_kph", src.get("speed_start_kph", 60.0)) or 60.0)
         except Exception:
             v_prev = 60.0
-        out["speed_start_kph"] = v_prev
+        out.pop("speed_start_kph", None)
         out["speed_end_kph"] = v_prev
         out["turn_direction"] = str(out.get("turn_direction") or "STRAIGHT").upper()
-        out["accel_time_s"] = 0.0
-        out["brake_time_s"] = 0.0
+        out.pop("accel_time_s", None)
+        out.pop("brake_time_s", None)
+        road = dict(out.get("road", {}) or {})
+        road.pop("center_height_start_mm", None)
+        road.pop("cross_slope_start_pct", None)
+        out["road"] = road
         return out
 
     # Двухшаговое подтверждение удаления (опасная операция)
@@ -1378,9 +1386,10 @@ def render_ring_scenario_generator(
     try:
         v_flow_kph2 = float(_resolve_initial_speed_kph(spec))
         lap_len_m = 0.0
-        for seg in segs:
-            lap_len_m += float(_segment_length_estimate_m(v_flow_kph2, seg))
-            v_flow_kph2 = float(_segment_end_speed_kph(v_flow_kph2, seg))
+        for i, seg in enumerate(segs):
+            forced_end_kph = float(v0_kph) if i >= len(segs) - 1 else None
+            lap_len_m += float(_segment_length_estimate_m(v_flow_kph2, seg, forced_end_kph=forced_end_kph))
+            v_flow_kph2 = float(_segment_end_speed_kph(v_flow_kph2, seg, forced_end_kph=forced_end_kph))
     except Exception:
         lap_len_m = 0.0
 
@@ -1469,7 +1478,8 @@ def render_ring_scenario_generator(
                     Ljj = float(seg_obj.get("length_m", 0.0) or 0.0)
                     if Ljj <= 0.0:
                         vj = float(v_starts[jj] if 0 <= jj < len(v_starts) else _resolve_initial_speed_kph(spec))
-                        Ljj = float(_segment_length_estimate_m(vj, seg_obj))
+                        forced_end_kph = float(v0_kph) if jj >= len(segs) - 1 else None
+                        Ljj = float(_segment_length_estimate_m(vj, seg_obj, forced_end_kph=forced_end_kph))
                     seg_lengths.append(max(0.0, Ljj))
                 cur_start_m = float(sum(seg_lengths[:cur_idx]))
                 cur_len_m = float(seg_lengths[cur_idx] if 0 <= cur_idx < len(seg_lengths) else 0.0)

@@ -237,6 +237,7 @@ def test_large_ui_entrypoints_import_shared_cache_helpers() -> None:
     for rel in ("pneumo_solver_ui/app.py", "pneumo_solver_ui/pneumo_ui_app.py"):
         src = (ROOT / rel).read_text(encoding="utf-8")
         assert "from pneumo_solver_ui.ui_cache_helpers import (" in src
+        assert "from pneumo_solver_ui.ui_cache_runtime_helpers import (" in src
         assert "detail_cache_path as build_detail_cache_path" in src
         assert "pareto_front_2d" in src
         assert "df_to_excel_bytes" in src
@@ -252,24 +253,26 @@ def test_large_ui_entrypoints_import_shared_cache_helpers() -> None:
         assert "make_detail_cache_key" in src
         assert "# Shared baseline-cache wrappers override the legacy inline copies above." in src
         assert "# Shared detail-cache wrappers override the legacy inline copies above." in src
-        assert "return save_ui_last_baseline_ptr(cache_dir, meta, workspace_dir=WORKSPACE_DIR)" in src
-        assert "return load_ui_last_baseline_ptr(workspace_dir=WORKSPACE_DIR)" in src
-        assert "return load_ui_baseline_cache(cache_dir)" in src
-        assert "return save_ui_detail_cache(" in src
-        assert "return load_ui_detail_cache(" in src
-        assert "return save_ui_baseline_cache(" in src
+        assert "baseline_cache_dir = partial(" in src
+        assert "save_last_baseline_ptr = partial(" in src
+        assert "load_last_baseline_ptr = partial(" in src
+        assert "load_baseline_cache = partial(" in src
+        assert "save_baseline_cache = partial(" in src
+        assert "save_detail_cache = partial(" in src
+        assert "load_detail_cache = partial(" in src
         assert "_legacy_save_last_baseline_ptr_dead" not in src
         assert "_legacy_load_last_baseline_ptr_dead" not in src
         assert "_legacy_load_baseline_cache_dead" not in src
         assert "_legacy_save_baseline_cache_dead" not in src
         assert "_legacy_save_detail_cache_dead" not in src
         assert "_legacy_load_detail_cache_dead" not in src
-        assert src.count("def save_last_baseline_ptr(") == 1
-        assert src.count("def load_last_baseline_ptr(") == 1
-        assert src.count("def load_baseline_cache(") == 1
-        assert src.count("def save_baseline_cache(") == 1
-        assert src.count("def save_detail_cache(") == 1
-        assert src.count("def load_detail_cache(") == 1
+        assert "def baseline_cache_dir(" not in src
+        assert "def save_last_baseline_ptr(" not in src
+        assert "def load_last_baseline_ptr(" not in src
+        assert "def load_baseline_cache(" not in src
+        assert "def save_baseline_cache(" not in src
+        assert "def save_detail_cache(" not in src
+        assert "def load_detail_cache(" not in src
         assert "atomic_write_csv as _atomic_write_csv" not in src
         assert "atomic_write_text as _atomic_write_text" not in src
         assert "baseline_cache_base_path as _baseline_cache_base_path" not in src

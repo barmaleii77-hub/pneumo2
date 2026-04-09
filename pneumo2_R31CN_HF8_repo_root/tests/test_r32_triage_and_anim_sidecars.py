@@ -166,13 +166,39 @@ def test_generate_triage_report_surfaces_road_contract_artifacts(tmp_path: Path,
             "road_csv": str(road_csv),
         },
     )
+    (exports_dir / "anim_latest.desktop_mnemo_events.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "desktop_mnemo_event_log_v1",
+                "updated_utc": "2026-04-10T09:30:00Z",
+                "current_mode": "Регуляторный коридор",
+                "event_count": 4,
+                "active_latch_count": 1,
+                "acknowledged_latch_count": 2,
+                "recent_events": [
+                    {"title": "Большой перепад давлений"},
+                    {"title": "Смена режима"},
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
     md, summary = generate_triage_report(tmp_path, keep_last_n=1)
     anim = dict(summary.get("anim_latest") or {})
+    mnemo = dict(summary.get("mnemo_event_log") or {})
 
     assert anim["anim_latest_road_contract_web_ref"] == "road_contract_web.json"
     assert anim["anim_latest_road_contract_web_exists"] is True
     assert anim["anim_latest_road_contract_desktop_ref"] == "road_contract_desktop.json"
     assert anim["anim_latest_road_contract_desktop_exists"] is True
+    assert anim["anim_latest_mnemo_event_log_exists"] is True
+    assert mnemo["severity"] == "critical"
+    assert mnemo["current_mode"] == "Регуляторный коридор"
+    assert summary["severity_counts"]["critical"] == 1
     assert "anim_latest_road_contract_web" in md
     assert "anim_latest_road_contract_desktop" in md
+    assert "## Desktop Mnemo events" in md
+    assert "Большой перепад давлений" in md

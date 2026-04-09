@@ -43,6 +43,18 @@ class CornerSuspensionSummary:
     max_cyl2_bot_arm_offset_m: float
 
 
+def _derived_cache(bundle: Any) -> Optional[dict[str, Any]]:
+    cache = getattr(bundle, "_derived", None)
+    if isinstance(cache, dict):
+        return cache
+    try:
+        setattr(bundle, "_derived", {})
+    except Exception:
+        return None
+    cache = getattr(bundle, "_derived", None)
+    return cache if isinstance(cache, dict) else None
+
+
 def _point(bundle: DataBundle, kind: str, corner: str) -> Optional[np.ndarray]:
     try:
         arr = bundle.point_xyz(kind, corner)
@@ -119,7 +131,8 @@ def _min_arm_branch_offset(bundle: DataBundle, corner: str, cyl_kind: str) -> fl
 
 def collect_suspension_geometry_status(bundle: DataBundle, tol_m: float = 1e-9) -> dict[str, Any]:
     cache_key = f"_suspension_geometry_status::{float(tol_m):.12g}"
-    cached = bundle._derived.get(cache_key)  # pylint: disable=protected-access
+    cache = _derived_cache(bundle)
+    cached = cache.get(cache_key) if isinstance(cache, dict) else None
     if isinstance(cached, dict):
         return cached
 
@@ -298,7 +311,8 @@ def collect_suspension_geometry_status(bundle: DataBundle, tol_m: float = 1e-9) 
         "cyl2_detached_corners": cyl2_detached_corners,
         "rows": [r.__dict__ for r in rows],
     }
-    bundle._derived[cache_key] = out  # pylint: disable=protected-access
+    if isinstance(cache, dict):
+        cache[cache_key] = out
     return out
 
 

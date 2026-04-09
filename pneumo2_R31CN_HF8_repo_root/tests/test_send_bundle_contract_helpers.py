@@ -101,6 +101,13 @@ def test_dashboard_normalization_and_rendering_use_shared_contract() -> None:
             "anim_latest_npz_path": "/abs/workspace/exports/anim_latest.npz",
             "anim_latest_visual_cache_token": "tok-123",
             "anim_latest_visual_reload_inputs": ["npz"],
+            "anim_latest_mnemo_event_log_ref": "anim_latest.desktop_mnemo_events.json",
+            "anim_latest_mnemo_event_log_exists": True,
+            "anim_latest_mnemo_event_log_current_mode": "Регуляторный коридор",
+            "anim_latest_mnemo_event_log_event_count": 5,
+            "anim_latest_mnemo_event_log_active_latch_count": 1,
+            "anim_latest_mnemo_event_log_acknowledged_latch_count": 2,
+            "anim_latest_mnemo_event_log_recent_titles": ["Большой перепад давлений", "Смена режима"],
             "usable_from_bundle": True,
         }
     )
@@ -110,6 +117,7 @@ def test_dashboard_normalization_and_rendering_use_shared_contract() -> None:
     assert norm["visual_cache_token"] == "tok-123"
     assert norm["visual_reload_inputs"] == ["npz"]
     assert "tok-123" in md
+    assert "mnemo_event_log_state: mode=Регуляторный коридор / total=5 / active=1 / acked=2" in md
     assert "usable_from_bundle: True" in md
 
 
@@ -119,6 +127,8 @@ def test_pick_anim_latest_fields_copies_selected_lists_and_ignores_unknowns() ->
         "anim_latest_visual_reload_inputs": ["npz"],
         "anim_latest_issues": ["warn-1"],
         "anim_latest_visual_cache_dependencies": {"npz": {"path": "x.npz"}},
+        "anim_latest_mnemo_event_log_exists": True,
+        "anim_latest_mnemo_event_log_recent_titles": ["Большой перепад давлений"],
         "browser_perf_status": "snapshot_only",
         "other": "ignore-me",
     }
@@ -130,13 +140,19 @@ def test_pick_anim_latest_fields_copies_selected_lists_and_ignores_unknowns() ->
     assert picked_event["anim_latest_visual_reload_inputs"] == ["npz"]
     assert picked_event["anim_latest_issues"] == ["warn-1"]
     assert picked_event["anim_latest_visual_cache_dependencies"] == {"npz": {"path": "x.npz"}}
+    assert picked_event["anim_latest_mnemo_event_log_exists"] is True
+    assert picked_event["anim_latest_mnemo_event_log_recent_titles"] == ["Большой перепад давлений"]
     assert "other" not in picked_event
     assert "anim_latest_visual_cache_dependencies" not in picked_index
+    assert picked_index["anim_latest_mnemo_event_log_exists"] is True
+    assert picked_index["anim_latest_mnemo_event_log_recent_titles"] == ["Большой перепад давлений"]
 
     raw["anim_latest_visual_reload_inputs"].append("road_csv")
     raw["anim_latest_issues"].append("warn-2")
+    raw["anim_latest_mnemo_event_log_recent_titles"].append("ACK latched-событий")
     assert picked_event["anim_latest_visual_reload_inputs"] == ["npz"]
     assert picked_event["anim_latest_issues"] == ["warn-1"]
+    assert picked_event["anim_latest_mnemo_event_log_recent_titles"] == ["Большой перепад давлений"]
 
 
 def test_load_latest_send_bundle_anim_dashboard_merges_validation_bundle_flags(tmp_path: Path) -> None:
@@ -149,6 +165,13 @@ def test_load_latest_send_bundle_anim_dashboard_merges_validation_bundle_flags(t
                 "anim_latest_npz_path": "/abs/workspace/exports/anim_latest.npz",
                 "anim_latest_visual_cache_token": "tok-123",
                 "anim_latest_visual_reload_inputs": ["npz", "road_csv"],
+                "anim_latest_mnemo_event_log_ref": "anim_latest.desktop_mnemo_events.json",
+                "anim_latest_mnemo_event_log_exists": True,
+                "anim_latest_mnemo_event_log_current_mode": "Регуляторный коридор",
+                "anim_latest_mnemo_event_log_event_count": 4,
+                "anim_latest_mnemo_event_log_active_latch_count": 1,
+                "anim_latest_mnemo_event_log_acknowledged_latch_count": 2,
+                "anim_latest_mnemo_event_log_recent_titles": ["Большой перепад давлений", "Смена режима"],
             },
             ensure_ascii=False,
             indent=2,
@@ -189,6 +212,9 @@ def test_load_latest_send_bundle_anim_dashboard_merges_validation_bundle_flags(t
     assert anim["browser_perf_bundle_ready"] is True
     assert anim["browser_perf_comparison_ready"] is True
     assert anim["browser_perf_evidence_report_in_bundle"] is True
+    assert anim["anim_latest_mnemo_event_log_exists"] is True
     assert any("Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" == line for line in lines)
     assert any("Browser perf comparison: regression_checked / PASS / ready=True" == line for line in lines)
     assert any("Browser perf bundle artifacts:" in line and "trace=True" in line for line in lines)
+    assert any("Desktop Mnemo events: exists=True / total=4 / active=1 / acked=2 / mode=Регуляторный коридор" == line for line in lines)
+    assert any("Desktop Mnemo recent: Большой перепад давлений | Смена режима" == line for line in lines)

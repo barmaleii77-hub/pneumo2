@@ -245,3 +245,73 @@ def compute_events(
         events = keep
 
     return events
+
+
+def compute_events_atm_profile(
+    df_main: pd.DataFrame | None,
+    df_p: pd.DataFrame | None,
+    df_open: pd.DataFrame | None,
+    params_abs: dict,
+    test: dict,
+    vacuum_min_gauge_atm: float = -0.2,
+    pmax_margin_atm: float = 0.10,
+    chatter_window_s: float = 0.25,
+    chatter_toggle_count: int = 6,
+    max_events: int = 240,
+    *,
+    run_starts_fn: Callable[[np.ndarray], List[int]],
+    shorten_name_fn: Callable[[str, int], str],
+) -> List[dict]:
+    return compute_events(
+        df_main=df_main,
+        df_p=df_p,
+        df_open=df_open,
+        params_abs=params_abs,
+        test=test,
+        vacuum_min_gauge=vacuum_min_gauge_atm,
+        pmax_margin_gauge=pmax_margin_atm,
+        chatter_window_s=chatter_window_s,
+        chatter_toggle_count=chatter_toggle_count,
+        max_events=max_events,
+        gauge_pressure_scale_pa=101325.0,
+        vacuum_unit_label="атм(изб)",
+        run_starts_fn=run_starts_fn,
+        shorten_name_fn=shorten_name_fn,
+    )
+
+
+def compute_events_bar_profile(
+    df_main: pd.DataFrame | None,
+    df_p: pd.DataFrame | None,
+    df_open: pd.DataFrame | None,
+    params_abs: dict,
+    test: dict,
+    vacuum_min_gauge_bar: float = -0.2,
+    pmax_margin_bar: float = 0.10,
+    chatter_window_s: float = 0.25,
+    chatter_toggle_count: int = 6,
+    max_events: int = 240,
+    *,
+    run_starts_fn: Callable[[np.ndarray], List[int]],
+    shorten_name_fn: Callable[[str, int], str],
+) -> List[dict]:
+    return compute_events(
+        df_main=df_main,
+        df_p=df_p,
+        df_open=df_open,
+        params_abs=params_abs,
+        test=test,
+        vacuum_min_gauge=vacuum_min_gauge_bar,
+        pmax_margin_gauge=pmax_margin_bar,
+        chatter_window_s=chatter_window_s,
+        chatter_toggle_count=chatter_toggle_count,
+        max_events=max_events,
+        gauge_pressure_scale_pa=100000.0,
+        vacuum_unit_label="бар(изб)",
+        run_starts_fn=run_starts_fn,
+        shorten_name_fn=shorten_name_fn,
+        align_pressure_df_to_main=True,
+        align_open_df_to_main=True,
+        use_nan_pressure_reducers=True,
+        extra_event_hook_fn=add_wheels_identical_sanity_event,
+    )

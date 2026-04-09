@@ -1,0 +1,2 @@
+"""Desktop mnemonic viewer package."""
+

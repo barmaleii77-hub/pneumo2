@@ -38,7 +38,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import math
 import time
@@ -99,10 +98,6 @@ def _fmt(x: Any, nd: int = 6) -> str:
     if ax != 0 and (ax < 1e-4 or ax > 1e6):
         return f"{xf:.{nd}e}"
     return f"{xf:.{nd}f}"
-
-
-def load_py_module(path: Path, module_name: str):
-    return load_python_module_from_path(path, module_name)
 
 
 # --------------------------
@@ -766,7 +761,7 @@ def main() -> None:
     param_list = param_list[: int(args.max_params)]
 
     # load model module
-    mod = load_py_module(model_p, module_name=f"model_influence_{int(time.time())}")
+    mod = load_python_module_from_path(model_p, module_name=f"model_influence_{int(time.time())}")
 
     # reference pressures
     P_ATM = float(getattr(mod, "P_ATM", 101325.0))

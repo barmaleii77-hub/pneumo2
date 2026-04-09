@@ -30,7 +30,6 @@ time_align_v1.py
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import math
 import time
@@ -62,10 +61,6 @@ def _load_json(p: Path) -> Any:
 
 def _save_json(p: Path, obj: Any) -> None:
     p.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def load_py_module(path: Path, module_name: str):
-    return load_python_module_from_path(path, module_name)
 
 
 def parse_model_key(model_key: str) -> Tuple[str, str]:
@@ -344,8 +339,8 @@ def main():
 
     project_root = Path(__file__).resolve().parents[1]
 
-    model_mod = load_py_module(Path(args.model), "model_mod_time_align")
-    worker_mod = load_py_module(Path(args.worker), "worker_mod_time_align")
+    model_mod = load_python_module_from_path(Path(args.model), "model_mod_time_align")
+    worker_mod = load_python_module_from_path(Path(args.worker), "worker_mod_time_align")
 
     suite_obj = _load_json(Path(args.suite_json) if Path(args.suite_json).is_absolute() else (project_root / args.suite_json))
     suite_tests = load_suite(worker_mod, suite_obj)

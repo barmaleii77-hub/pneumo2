@@ -27,6 +27,7 @@ import argparse
 import ast
 import os
 import sys
+import warnings
 
 
 # --- robust import paths (works even if ZIP extracted into nested folder) ---
@@ -447,7 +448,13 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.runs: List[Run] = []
         self.table_names: List[str] = []
         self.current_table: str = "main"
+        self.table_selected: str = "main"
+        self.reference_run_selected: str = ""
+        self.reference_run_selected_path: str = ""
+        self.runs_selected_paths: List[str] = []
+        self._runs_selection_explicit: bool = False
         self.available_signals: List[str] = []
+        self.signals_selected: List[str] = []
         self._signals_selection_explicit: bool = False
         self.events_selected: List[str] = []
         self._events_selection_explicit: bool = False
@@ -513,6 +520,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._inflheat_feat_labels = []
 
         self._load_paths(paths)
+        self._clear_pending_dataset_restore_if_mismatch([getattr(r, 'path', Path('')) for r in getattr(self, 'runs', [])])
         self._apply_restore_after_load()
 
         # crosshair
@@ -863,6 +871,18 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 pass
         try:
+            raw = s.value('last_files')
+            if raw is not None:
+                self._restore_after_load['dataset_paths'] = self._qs_str_list(raw)
+        except Exception:
+            pass
+        try:
+            raw = s.value('runs_selection_explicit')
+            if raw is not None:
+                self._restore_after_load['runs_selection_explicit'] = self._qs_bool(raw, False)
+        except Exception:
+            pass
+        try:
             raw = s.value('signals_selection_explicit')
             if raw is not None:
                 self._restore_after_load['signals_selection_explicit'] = self._qs_bool(raw, False)
@@ -955,8 +975,10 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         if not getattr(self, 'runs', None):
             keep_keys = (
+                'dataset_paths',
                 'runs',
                 'runs_paths',
+                'runs_selection_explicit',
                 'reference_run',
                 'reference_run_path',
                 'table',
@@ -971,22 +993,51 @@ class CompareViewer(QtWidgets.QMainWindow):
         have_runs_restore = ('runs' in stt) or ('runs_paths' in stt)
         want_runs = stt.get('runs') if ('runs' in stt) else None
         want_run_paths = stt.get('runs_paths') if ('runs_paths' in stt) else None
+        legacy_runs_restore = 'runs_selection_explicit' not in stt
+        runs_explicit = self._qs_bool(stt.get('runs_selection_explicit', False), False)
+        run_restore_target_count = 0
+        run_restore_complete = True
+        restored_run_matches = 0
+        want_run_set = set(str(x) for x in (want_runs or []))
+        want_run_path_set = set()
+        for x in (want_run_paths or []):
+            try:
+                want_run_path_set.add(self._normalized_run_path(Path(str(x))))
+            except Exception:
+                pass
+        if legacy_runs_restore:
+            try:
+                dataset_path_set = {
+                    self._normalized_run_path(Path(str(x)))
+                    for x in (stt.get('dataset_paths') or [])
+                    if str(x).strip()
+                }
+            except Exception:
+                dataset_path_set = set()
+            try:
+                current_all_run_paths = {
+                    self._normalized_run_path(getattr(run, "path", Path("")))
+                    for run in getattr(self, 'runs', [])
+                }
+            except Exception:
+                current_all_run_paths = set()
+            if want_run_path_set:
+                baseline_paths = dataset_path_set or current_all_run_paths
+                runs_explicit = bool(baseline_paths) and (want_run_path_set != baseline_paths)
+            elif want_run_set:
+                current_all_labels = {str(getattr(run, "label", "") or "") for run in getattr(self, 'runs', [])}
+                runs_explicit = bool(current_all_labels) and (want_run_set != current_all_labels)
+            else:
+                runs_explicit = False
         try:
-            restored_run_matches = 0
             if have_runs_restore:
                 self.list_runs.blockSignals(True)
                 for i in range(self.list_runs.count()):
                     it = self.list_runs.item(i)
                     if it is not None:
                         it.setSelected(False)
-                want_run_set = set(str(x) for x in (want_runs or []))
-                want_run_path_set = set()
-                for x in (want_run_paths or []):
-                    try:
-                        want_run_path_set.add(self._normalized_run_path(Path(str(x))))
-                    except Exception:
-                        pass
                 if want_run_path_set:
+                    run_restore_target_count = len(want_run_path_set)
                     for i in range(self.list_runs.count()):
                         it = self.list_runs.item(i)
                         if it is None:
@@ -999,11 +1050,14 @@ class CompareViewer(QtWidgets.QMainWindow):
                             it.setSelected(True)
                             restored_run_matches += 1
                 elif want_run_set:
+                    run_restore_target_count = len(want_run_set)
                     for i in range(self.list_runs.count()):
                         it = self.list_runs.item(i)
                         if it is not None and it.text() in want_run_set:
                             it.setSelected(True)
                             restored_run_matches += 1
+                if run_restore_target_count > 0 and restored_run_matches < run_restore_target_count:
+                    run_restore_complete = False
                 self.list_runs.blockSignals(False)
         except Exception:
             try:
@@ -1012,14 +1066,21 @@ class CompareViewer(QtWidgets.QMainWindow):
                 pass
 
         try:
-            if have_runs_restore and ((want_runs and len(want_runs) > 0) or (want_run_paths and len(want_run_paths) > 0)):
-                if restored_run_matches <= 0:
+            if have_runs_restore and (want_run_set or want_run_path_set):
+                if restored_run_matches <= 0 and not runs_explicit:
                     self.list_runs.blockSignals(True)
                     for i in range(self.list_runs.count()):
                         it = self.list_runs.item(i)
                         if it is not None:
                             it.setSelected(True)
                     self.list_runs.blockSignals(False)
+            elif have_runs_restore and (not runs_explicit) and (not self.list_runs.selectedIndexes()):
+                self.list_runs.blockSignals(True)
+                for i in range(self.list_runs.count()):
+                    it = self.list_runs.item(i)
+                    if it is not None:
+                        it.setSelected(True)
+                self.list_runs.blockSignals(False)
             elif (not have_runs_restore) and hasattr(self, 'list_runs') and not self.list_runs.selectedIndexes():
                 self.list_runs.blockSignals(True)
                 for i in range(self.list_runs.count()):
@@ -1034,8 +1095,39 @@ class CompareViewer(QtWidgets.QMainWindow):
                 pass
 
         try:
+            selected_run_keys = [
+                self._normalized_run_path(getattr(run, 'path', Path('')))
+                for run in self._selected_runs()
+            ]
+        except Exception:
+            selected_run_keys = []
+        self._runs_selection_explicit = bool(runs_explicit)
+        if selected_run_keys:
+            self.runs_selected_paths = list(selected_run_keys)
+        elif have_runs_restore and runs_explicit:
+            self.runs_selected_paths = list(want_run_path_set)
+        elif not self._runs_selection_explicit:
+            self.runs_selected_paths = []
+
+        if not run_restore_complete:
+            for k in (
+                'reference_run',
+                'reference_run_path',
+                'table',
+                'signals',
+                'signals_selection_explicit',
+                'events_selected',
+                'events_selection_explicit',
+            ):
+                stt.pop(k, None)
+
+        try:
             preferred_ref_label = str(stt.get('reference_run') or '')
             preferred_ref_path = str(stt.get('reference_run_path') or '').strip()
+            if preferred_ref_label:
+                self.reference_run_selected = str(preferred_ref_label)
+            if preferred_ref_path:
+                self.reference_run_selected_path = self._normalized_run_path(Path(preferred_ref_path))
             if preferred_ref_path:
                 pref_key = self._normalized_run_path(Path(preferred_ref_path))
                 for run in self._selected_runs():
@@ -1053,12 +1145,16 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         try:
             want_table = stt.get('table')
+            if want_table:
+                self.table_selected = str(want_table)
             if want_table and hasattr(self, 'combo_table'):
                 self.combo_table.blockSignals(True)
                 idx = self.combo_table.findText(str(want_table))
                 if idx >= 0:
                     self.combo_table.setCurrentIndex(idx)
                     self.current_table = self.combo_table.currentText() or self.current_table
+                    if self.current_table:
+                        self.table_selected = str(self.current_table)
                 self.combo_table.blockSignals(False)
         except Exception:
             try:
@@ -1076,6 +1172,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         want_sigs = stt.get('signals') if have_sigs_restore else None
         legacy_sigs_restore = 'signals_selection_explicit' not in stt
         sigs_explicit = self._qs_bool(stt.get('signals_selection_explicit', False), False)
+        sig_restore_complete = True
         try:
             restored_sig_matches = 0
             if have_sigs_restore:
@@ -1092,11 +1189,15 @@ class CompareViewer(QtWidgets.QMainWindow):
                             it.setSelected(True)
                             restored_sig_matches += 1
                             restored_sig_set.add(str(it.text()))
+                    sig_restore_complete = restored_sig_matches >= len(want_sig_set)
                 if legacy_sigs_restore:
-                    sigs_explicit = bool(restored_sig_set) and (restored_sig_set != default_sig_set)
+                    if not sig_restore_complete:
+                        sigs_explicit = False
+                    else:
+                        sigs_explicit = bool(restored_sig_set) and (restored_sig_set != default_sig_set)
                 self._signals_selection_explicit = bool(sigs_explicit)
                 self.list_signals.blockSignals(False)
-                if want_sigs and restored_sig_matches <= 0 and not sigs_explicit:
+                if want_sigs and (restored_sig_matches <= 0 or (legacy_sigs_restore and not sig_restore_complete)) and not sigs_explicit:
                     self._select_default_signals()
                 elif (not want_sigs) and (not sigs_explicit):
                     self._select_default_signals()
@@ -1107,7 +1208,15 @@ class CompareViewer(QtWidgets.QMainWindow):
                 self.list_signals.blockSignals(False)
             except Exception:
                 pass
-
+        try:
+            self.signals_selected = list(self._selected_signals())
+            if have_sigs_restore and sigs_explicit and want_sigs and not getattr(self, 'available_signals', []):
+                self.signals_selected = [str(x) for x in want_sigs]
+        except Exception:
+            if have_sigs_restore and sigs_explicit and want_sigs and not getattr(self, 'available_signals', []):
+                self.signals_selected = [str(x) for x in want_sigs]
+            elif not bool(getattr(self, '_signals_selection_explicit', False)):
+                self.signals_selected = []
         try:
             self._refresh_event_list()
             self._refresh_events_table()
@@ -1135,6 +1244,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                     default_ev_set = set(self._default_event_names(default_ev_names))
                     restored_ev_matches = 0
                     restored_ev_set = set()
+                    ev_restore_complete = True
                     self.list_events.blockSignals(True)
                     for i in range(self.list_events.count()):
                         it = self.list_events.item(i)
@@ -1150,11 +1260,24 @@ class CompareViewer(QtWidgets.QMainWindow):
                             restored_ev_matches += 1
                             restored_ev_set.add(sig)
                     self.list_events.blockSignals(False)
+                    if want_ev:
+                        ev_restore_complete = restored_ev_matches >= len(want_set)
                     if legacy_ev_restore:
-                        ev_explicit = bool(restored_ev_set) and (restored_ev_set != default_ev_set)
+                        if not ev_restore_complete:
+                            ev_explicit = False
+                        else:
+                            ev_explicit = bool(restored_ev_set) and (restored_ev_set != default_ev_set)
                     self.events_selected = self._get_selected_event_signals()
+                    if want_ev and ev_explicit and self.list_events.count() <= 0:
+                        self.events_selected = [str(x) for x in want_ev]
                     self._events_selection_explicit = bool(ev_explicit)
-                    if want_ev and restored_ev_matches <= 0 and not ev_explicit:
+                    if want_ev and (restored_ev_matches <= 0 or (legacy_ev_restore and not ev_restore_complete)) and not ev_explicit:
+                        self.list_events.blockSignals(True)
+                        for i in range(self.list_events.count()):
+                            it = self.list_events.item(i)
+                            if it is not None:
+                                it.setCheckState(QtCore.Qt.Unchecked)
+                        self.list_events.blockSignals(False)
                         self.events_selected = []
                         self._events_selection_explicit = False
                         self._refresh_event_list()
@@ -1168,6 +1291,11 @@ class CompareViewer(QtWidgets.QMainWindow):
                     self.list_events.blockSignals(False)
             except Exception:
                 pass
+        try:
+            if not bool(getattr(self, '_events_selection_explicit', False)) and (not getattr(self, 'events_selected', None)):
+                self.events_selected = self._get_selected_event_signals()
+        except Exception:
+            pass
 
         try:
             self._refresh_anim_diag_panel()
@@ -1189,6 +1317,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         s = getattr(self, '_settings', None)
         if s is None:
             return
+        have_runs = bool(getattr(self, 'runs', []))
 
         try:
             s.setValue('geometry', self.saveGeometry())
@@ -1245,37 +1374,63 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             pass
 
-        try:
-            s.setValue('table', self.combo_table.currentText())
-        except Exception:
-            pass
+        if have_runs:
+            try:
+                table_value = str(self.combo_table.currentText() or getattr(self, 'table_selected', '') or self.current_table or '')
+                s.setValue('table', table_value)
+            except Exception:
+                pass
 
-        try:
-            sigs = [it.text() for it in self.list_signals.selectedItems()]
-            s.setValue('signals', json.dumps(sigs))
-            s.setValue('signals_selection_explicit', int(bool(getattr(self, '_signals_selection_explicit', False))))
-        except Exception:
-            pass
+            try:
+                sigs = [it.text() for it in self.list_signals.selectedItems()]
+                if not sigs:
+                    sigs = [str(x) for x in (getattr(self, 'signals_selected', []) or [])]
+                s.setValue('signals', json.dumps(sigs))
+                s.setValue('signals_selection_explicit', int(bool(getattr(self, '_signals_selection_explicit', False))))
+            except Exception:
+                pass
 
-        try:
-            runs = [it.text() for it in self.list_runs.selectedItems()]
-            s.setValue('runs', json.dumps(runs))
-            s.setValue('runs_paths', json.dumps([str(self._absolute_run_path(r.path)) for r in self._selected_runs()]))
-        except Exception:
-            pass
+            try:
+                selected_runs = list(self._selected_runs())
+                run_labels = [str(getattr(r, 'label', '') or '') for r in selected_runs]
+                run_paths = [str(self._absolute_run_path(r.path)) for r in selected_runs]
+                if not run_paths and not bool(getattr(self, '_runs_selection_explicit', False)):
+                    remembered_keys = {
+                        str(x) for x in (getattr(self, 'runs_selected_paths', []) or []) if str(x).strip()
+                    }
+                    if remembered_keys:
+                        for run in getattr(self, 'runs', []):
+                            try:
+                                key = self._normalized_run_path(getattr(run, 'path', Path('')))
+                            except Exception:
+                                continue
+                            if key in remembered_keys:
+                                run_labels.append(str(getattr(run, 'label', '') or ''))
+                                run_paths.append(str(self._absolute_run_path(getattr(run, 'path', Path('')))))
+                s.setValue('runs', json.dumps(run_labels))
+                s.setValue('runs_paths', json.dumps(run_paths))
+                s.setValue('runs_selection_explicit', int(bool(getattr(self, '_runs_selection_explicit', False))))
+            except Exception:
+                pass
 
-        try:
-            s.setValue('reference_run', self._reference_run_label())
-            ref_run = self._reference_run()
-            s.setValue('reference_run_path', str(self._absolute_run_path(ref_run.path)) if ref_run is not None else '')
-        except Exception:
-            pass
+            try:
+                ref_label = str(self._reference_run_label() or getattr(self, 'reference_run_selected', '') or '')
+                s.setValue('reference_run', ref_label)
+                ref_run = self._reference_run()
+                ref_path = ''
+                if ref_run is not None:
+                    ref_path = str(self._absolute_run_path(ref_run.path))
+                else:
+                    ref_path = str(getattr(self, 'reference_run_selected_path', '') or '')
+                s.setValue('reference_run_path', ref_path)
+            except Exception:
+                pass
 
-        try:
-            files = [str(self._absolute_run_path(r.path)) for r in getattr(self, 'runs', [])]
-            s.setValue('last_files', json.dumps(files))
-        except Exception:
-            pass
+            try:
+                files = [str(self._absolute_run_path(r.path)) for r in getattr(self, 'runs', [])]
+                s.setValue('last_files', json.dumps(files))
+            except Exception:
+                pass
 
         # Influence(t) dock
         try:
@@ -1313,10 +1468,17 @@ class CompareViewer(QtWidgets.QMainWindow):
                 s.setValue('events_enabled', int(chk.isChecked()))
             if spn is not None:
                 s.setValue('events_max', int(spn.value()))
-            s.setValue('events_selected', json.dumps(self._get_selected_event_signals()))
-            s.setValue('events_selection_explicit', int(bool(getattr(self, '_events_selection_explicit', False))))
         except Exception:
             pass
+        if have_runs:
+            try:
+                ev_sigs = self._get_selected_event_signals()
+                if not ev_sigs:
+                    ev_sigs = [str(x) for x in (getattr(self, 'events_selected', []) or [])]
+                s.setValue('events_selected', json.dumps(ev_sigs))
+                s.setValue('events_selection_explicit', int(bool(getattr(self, '_events_selection_explicit', False))))
+            except Exception:
+                pass
 
 
     def _build_menu(self):
@@ -1550,6 +1712,9 @@ class CompareViewer(QtWidgets.QMainWindow):
         if Z.size == 0:
             self._clear_heatmap_view("Δ(t) heatmap: нет данных для отображения.")
             return
+        if not np.isfinite(Z).any():
+            self._clear_heatmap_view("Δ(t) heatmap: текущий выбор даёт только NaN/пустые значения.")
+            return
 
         metric = str(self.combo_heat_metric.currentText() if hasattr(self, "combo_heat_metric") else "signed Δ")
 
@@ -1706,8 +1871,30 @@ class CompareViewer(QtWidgets.QMainWindow):
             run_lab = self._heat_run_labels[ix]
             # Add signal to selection and move current focus without altering multi-select state.
             self._select_signal_by_name(str(sig_lab), exclusive=False)
-            self._set_current_list_item_by_text(self.list_runs, str(run_lab))
-            self._rebuild_plots()
+            run_added = False
+            if hasattr(self, 'list_runs'):
+                try:
+                    self.list_runs.blockSignals(True)
+                    for i in range(self.list_runs.count()):
+                        it = self.list_runs.item(i)
+                        if it is None or str(it.text()) != str(run_lab):
+                            continue
+                        if not it.isSelected():
+                            it.setSelected(True)
+                            run_added = True
+                        self._set_current_list_row(self.list_runs, i)
+                        break
+                    self._runs_selection_explicit = True
+                    self.runs_selected_paths = [
+                        self._normalized_run_path(getattr(run, 'path', Path('')))
+                        for run in self._selected_runs()
+                    ]
+                finally:
+                    self.list_runs.blockSignals(False)
+            if run_added:
+                self._on_run_selection_changed()
+            else:
+                self._rebuild_plots()
         except Exception:
             return
 
@@ -1944,6 +2131,9 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         tH = np.asarray(cube_obj.t, dtype=float)
         C = np.asarray(cube_obj.cube, dtype=float)  # (T, n_feat, n_sig)
+        if not np.isfinite(C).any():
+            self._clear_inflheat_view("Influence(t) heatmap: текущий выбор даёт только NaN/пустые значения.")
+            return
 
         # ImageView expects (t, x, y). We want x=sigs, y=features.
         img = np.transpose(C, (0, 2, 1))  # (T, n_sig, n_feat)
@@ -3356,12 +3546,142 @@ class CompareViewer(QtWidgets.QMainWindow):
 
     def _on_event_row_double_clicked(self, row: int, col: int):
         try:
-            it = self.tbl_events.item(int(row), 0)
-            if it is None:
+            _ = int(col)
+            row = int(row)
+            it_t = self.tbl_events.item(row, 0)
+            it_sig = self.tbl_events.item(row, 1)
+            it_tab = self.tbl_events.item(row, 4)
+            if it_t is None:
                 return
-            t = float(str(it.text()).strip())
+            t = float(str(it_t.text()).strip())
             if not np.isfinite(t):
                 return
+            sig = str(it_sig.text()).strip() if it_sig is not None else ""
+            want_table = str(it_tab.text()).strip() if it_tab is not None else ""
+
+            ref = self._reference_run(self._selected_runs())
+            ref_label = str(getattr(ref, "label", "") or "").strip()
+            def _selected_run_labels_now() -> List[str]:
+                return [str(getattr(run, "label", "") or "").strip() for run in self._selected_runs()]
+
+            def _select_run_labels(labels: Sequence[str], *, current_label: str = "") -> bool:
+                if not hasattr(self, 'list_runs'):
+                    return False
+                label_list = [str(x).strip() for x in labels if str(x).strip()]
+                if not label_list:
+                    return False
+                label_set = set(label_list)
+                changed = False
+                picked_paths: List[str] = []
+                current_row = -1
+                try:
+                    self.list_runs.blockSignals(True)
+                    for i in range(self.list_runs.count()):
+                        it = self.list_runs.item(i)
+                        if it is None:
+                            continue
+                        is_target = str(it.text()) in label_set
+                        if it.isSelected() != is_target:
+                            changed = True
+                        it.setSelected(is_target)
+                        if is_target:
+                            key = it.data(QtCore.Qt.UserRole)
+                            key = str(key).strip() if key is not None else ""
+                            if key:
+                                picked_paths.append(key)
+                            if current_label and str(it.text()) == str(current_label):
+                                current_row = i
+                            elif current_row < 0:
+                                current_row = i
+                    if current_row >= 0:
+                        self._set_current_list_row(self.list_runs, current_row)
+                    self._runs_selection_explicit = True
+                    if picked_paths:
+                        self.runs_selected_paths = list(picked_paths)
+                finally:
+                    try:
+                        self.list_runs.blockSignals(False)
+                    except Exception:
+                        pass
+                if ref is not None:
+                    try:
+                        self._remember_reference_run(ref)
+                    except Exception:
+                        pass
+                if changed:
+                    try:
+                        self._on_run_selection_changed()
+                    except Exception:
+                        pass
+                return True
+
+            def _set_table_if_available(name: str) -> bool:
+                if not name or not hasattr(self, "combo_table"):
+                    return False
+                try:
+                    idx = self.combo_table.findText(name)
+                except Exception:
+                    idx = -1
+                if idx < 0:
+                    return False
+                if str(self.combo_table.currentText() or "") != name:
+                    try:
+                        self.combo_table.setCurrentIndex(idx)
+                    except Exception:
+                        return False
+                return True
+
+            current_labels = _selected_run_labels_now()
+            if ref_label and ref_label not in current_labels:
+                _select_run_labels(current_labels + [ref_label], current_label=ref_label)
+                current_labels = _selected_run_labels_now()
+
+            if want_table and not _set_table_if_available(want_table):
+                compat_labels = []
+                for run in self._selected_runs():
+                    try:
+                        if want_table in getattr(run, "tables", {}):
+                            compat_labels.append(str(getattr(run, "label", "") or "").strip())
+                    except Exception:
+                        pass
+                if ref_label and ref is not None:
+                    try:
+                        if want_table in getattr(ref, "tables", {}) and ref_label not in compat_labels:
+                            compat_labels.insert(0, ref_label)
+                    except Exception:
+                        pass
+                if compat_labels:
+                    _select_run_labels(compat_labels, current_label=ref_label or compat_labels[0])
+                    _set_table_if_available(want_table)
+
+            if sig and sig not in list(getattr(self, "available_signals", []) or []):
+                table_name = str(want_table or getattr(self, "current_table", "") or "").strip()
+                compat_labels = []
+                for run in self._selected_runs():
+                    try:
+                        df_sig = getattr(run, "tables", {}).get(table_name)
+                    except Exception:
+                        df_sig = None
+                    if isinstance(df_sig, pd.DataFrame) and sig in df_sig.columns:
+                        compat_labels.append(str(getattr(run, "label", "") or "").strip())
+                if ref_label and ref is not None:
+                    try:
+                        df_ref = getattr(ref, "tables", {}).get(table_name)
+                    except Exception:
+                        df_ref = None
+                    if isinstance(df_ref, pd.DataFrame) and sig in df_ref.columns and ref_label not in compat_labels:
+                        compat_labels.insert(0, ref_label)
+                if compat_labels:
+                    _select_run_labels(compat_labels, current_label=ref_label or compat_labels[0])
+                    if want_table:
+                        _set_table_if_available(want_table)
+
+            try:
+                if sig and self._select_signal_by_name(sig, exclusive=True):
+                    self._rebuild_plots()
+            except Exception:
+                pass
+
             self._set_playhead_time(float(t))
         except Exception:
             return
@@ -3634,6 +3954,17 @@ class CompareViewer(QtWidgets.QMainWindow):
                 is_target = (i == target_row)
                 it.setSelected(is_target)
             self._set_current_list_row(self.list_runs, int(target_row))
+            self._runs_selection_explicit = True
+            picked_paths: List[str] = []
+            for i in range(self.list_runs.count()):
+                it = self.list_runs.item(i)
+                if it is None or not it.isSelected():
+                    continue
+                key = it.data(QtCore.Qt.UserRole)
+                key = str(key).strip() if key is not None else ""
+                if key:
+                    picked_paths.append(key)
+            self.runs_selected_paths = list(picked_paths)
         finally:
             self.list_runs.blockSignals(False)
         return True
@@ -3662,6 +3993,10 @@ class CompareViewer(QtWidgets.QMainWindow):
                 elif exclusive:
                     it.setSelected(False)
             self._signals_selection_explicit = True
+            try:
+                self.signals_selected = self._selected_signals()
+            except Exception:
+                self.signals_selected = []
         finally:
             self.list_signals.blockSignals(False)
         return True
@@ -3670,7 +4005,43 @@ class CompareViewer(QtWidgets.QMainWindow):
         if not self._select_run_by_label(str(run_label)):
             return
         self._on_run_selection_changed()
-        self._select_signal_by_name(str(signal_name), exclusive=True)
+        focused_run = None
+        try:
+            for run in self._selected_runs():
+                if str(getattr(run, "label", "") or "") == str(run_label):
+                    focused_run = run
+                    break
+            if focused_run is not None:
+                self._remember_reference_run(focused_run)
+        except Exception:
+            pass
+        sig_name = str(signal_name)
+        try:
+            if sig_name and sig_name not in list(getattr(self, "available_signals", []) or []) and focused_run is not None:
+                current_table = str(
+                    getattr(self, "combo_table", None).currentText()
+                    if hasattr(self, "combo_table") and getattr(self, "combo_table", None) is not None
+                    else (getattr(self, "current_table", "") or "")
+                ).strip()
+                remembered_table = str(getattr(self, "table_selected", "") or "").strip()
+                matching_tables: List[str] = []
+                for table_name, df in (getattr(focused_run, "tables", {}) or {}).items():
+                    if isinstance(df, pd.DataFrame) and sig_name in df.columns:
+                        matching_tables.append(str(table_name))
+                target_table = ""
+                for candidate in (current_table, remembered_table, "main"):
+                    if candidate and candidate in matching_tables:
+                        target_table = candidate
+                        break
+                if not target_table and matching_tables:
+                    target_table = matching_tables[0]
+                if target_table and hasattr(self, "combo_table"):
+                    idx = self.combo_table.findText(target_table)
+                    if idx >= 0 and str(self.combo_table.currentText() or "") != target_table:
+                        self.combo_table.setCurrentIndex(idx)
+        except Exception:
+            pass
+        self._select_signal_by_name(sig_name, exclusive=True)
         self._rebuild_plots()
 
     def _set_current_list_row(self, widget, row: int) -> None:
@@ -3840,11 +4211,18 @@ class CompareViewer(QtWidgets.QMainWindow):
                 feat_use = [feat_use[ii] for ii in pref_idx]
                 X_use = X_use[:, pref_idx] if pref_idx else X_use
 
-            C = infl_corr_matrix(X_use, Y, min_n=3)  # type: ignore  # features × sigs
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                C = infl_corr_matrix(X_use, Y, min_n=3)  # type: ignore  # features × sigs
+            if np.asarray(C, dtype=float).size == 0 or not np.isfinite(C).any():
+                self._clear_influence_view("Influence(t): текущий выбор даёт только NaN/пустые корреляции.")
+                return
 
             # rank features by max |corr|
             if infl_rank_features_by_max_abs_corr is not None:  # type: ignore
-                feat_sorted = infl_rank_features_by_max_abs_corr(C, feat_use)  # type: ignore
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    feat_sorted = infl_rank_features_by_max_abs_corr(C, feat_use)  # type: ignore
             else:
                 feat_sorted = feat_use
 
@@ -3856,6 +4234,9 @@ class CompareViewer(QtWidgets.QMainWindow):
             idx_map2 = {n: ii for ii, n in enumerate(feat_use)}
             sel_idx = [idx_map2[n] for n in feat_sel if n in idx_map2]
             C_sel = C[sel_idx, :] if sel_idx else C
+            if np.asarray(C_sel, dtype=float).size == 0 or not np.isfinite(C_sel).any():
+                self._clear_influence_view("Influence(t): нет конечных корреляций для текущего выбора.")
+                return
 
             # Fill table
             self.tbl_infl.setRowCount(len(feat_sel))
@@ -4029,7 +4410,11 @@ class CompareViewer(QtWidgets.QMainWindow):
             events=ev_df,
         )
 
-    def _rebuild_runs_ui(self) -> None:
+    def _rebuild_runs_ui(
+        self,
+        preferred_selected_paths: Optional[Sequence[str]] = None,
+        preferred_signals: Optional[Sequence[str]] = None,
+    ) -> None:
         # populate runs list without firing selection storms or duplicating connections
         if bool(getattr(self, "_runs_selection_connected", False)):
             try:
@@ -4037,24 +4422,47 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 pass
             self._runs_selection_connected = False
+        selected_keys = None if preferred_selected_paths is None else {
+            str(p) for p in preferred_selected_paths if str(p).strip()
+        }
         self.list_runs.blockSignals(True)
         try:
             self.list_runs.clear()
             for r in self.runs:
                 it = QtWidgets.QListWidgetItem(r.label)
                 it.setToolTip(str(r.path))
-                it.setData(QtCore.Qt.UserRole, self._normalized_run_path(getattr(r, 'path', Path(''))))
+                run_key = self._normalized_run_path(getattr(r, 'path', Path('')))
+                it.setData(QtCore.Qt.UserRole, run_key)
                 self.list_runs.addItem(it)
-                it.setSelected(True)
+                if selected_keys is None or run_key in selected_keys:
+                    it.setSelected(True)
         finally:
             self.list_runs.blockSignals(False)
+
+        built_selected_keys: List[str] = []
+        try:
+            for i in range(self.list_runs.count()):
+                it = self.list_runs.item(i)
+                if it is None or not it.isSelected():
+                    continue
+                key = it.data(QtCore.Qt.UserRole)
+                key = str(key).strip() if key is not None else ""
+                if key:
+                    built_selected_keys.append(key)
+        except Exception:
+            built_selected_keys = []
+        if built_selected_keys:
+            self.runs_selected_paths = list(built_selected_keys)
+        elif not bool(getattr(self, '_runs_selection_explicit', False)):
+            self.runs_selected_paths = []
 
         self.list_runs.itemSelectionChanged.connect(self._on_run_selection_changed)
         self._runs_selection_connected = True
         self._refresh_reference_runs()
         self._refresh_table_list()
-        self._refresh_signal_list()
-        self._select_default_signals()
+        kept_selected = self._refresh_signal_list(preferred_signals)
+        if (not kept_selected) and self.available_signals and not bool(getattr(self, '_signals_selection_explicit', False)):
+            self._select_default_signals()
         self._refresh_event_list()
         self._refresh_events_table()
         self._refresh_anim_diag_panel()
@@ -4064,7 +4472,49 @@ class CompareViewer(QtWidgets.QMainWindow):
         if not paths:
             return 0
         self._last_load_errors = []
+        had_runs_before = bool(getattr(self, "runs", []))
+        prev_selected_keys: Set[str] = set()
+        prev_runs_explicit = bool(getattr(self, "_runs_selection_explicit", False))
+        prev_runs_selected_paths = [str(x) for x in (getattr(self, "runs_selected_paths", []) or []) if str(x).strip()]
+        prev_signals_explicit = bool(getattr(self, "_signals_selection_explicit", False))
+        prev_events_explicit = bool(getattr(self, "_events_selection_explicit", False))
+        try:
+            prev_signals_selected = [
+                str(x)
+                for x in (
+                    getattr(self, "signals_selected", [])
+                    if prev_signals_explicit
+                    else self._selected_signals()
+                )
+            ]
+        except Exception:
+            prev_signals_selected = []
+        try:
+            prev_events_selected = [
+                str(x)
+                for x in (
+                    getattr(self, "events_selected", [])
+                    if prev_events_explicit
+                    else self._get_selected_event_signals()
+                )
+            ]
+        except Exception:
+            prev_events_selected = []
+        try:
+            for run in self._selected_runs():
+                prev_selected_keys.add(self._normalized_run_path(getattr(run, "path", Path(""))))
+        except Exception:
+            prev_selected_keys = set()
+        if prev_selected_keys and not prev_runs_selected_paths:
+            prev_runs_selected_paths = list(prev_selected_keys)
         base_runs = [] if replace else list(self.runs)
+        old_run_keys: Set[str] = set()
+        if replace:
+            for run in getattr(self, "runs", []):
+                try:
+                    old_run_keys.add(self._normalized_run_path(getattr(run, "path", Path(""))))
+                except Exception:
+                    pass
         seen_paths: Set[str] = set()
         for run in base_runs:
             try:
@@ -4082,12 +4532,19 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         new_runs = list(base_runs)
         loaded_count = 0
+        loaded_run_keys: Set[str] = set()
+        preserve_selection_state = bool(had_runs_before and not replace)
         for p in unique_paths:
             p = self._absolute_run_path(Path(p))
             if not p.exists() or p.suffix.lower() != ".npz":
                 continue
             try:
-                new_runs.append(self._run_from_npz_path(p))
+                run_obj = self._run_from_npz_path(p)
+                new_runs.append(run_obj)
+                try:
+                    loaded_run_keys.add(self._normalized_run_path(getattr(run_obj, "path", p)))
+                except Exception:
+                    pass
                 loaded_count += 1
             except Exception as e:
                 self._last_load_errors.append(f"Failed to load {p}: {e}")
@@ -4097,13 +4554,54 @@ class CompareViewer(QtWidgets.QMainWindow):
                 print(msg)
             return 0
 
+        if replace and old_run_keys:
+            new_run_keys: Set[str] = set()
+            for run in new_runs:
+                try:
+                    new_run_keys.add(self._normalized_run_path(getattr(run, "path", Path(""))))
+                except Exception:
+                    pass
+            if new_run_keys and new_run_keys == old_run_keys:
+                preserve_selection_state = True
+            elif new_run_keys and new_run_keys != old_run_keys:
+                self._clear_runtime_dataset_memory()
+                preserve_selection_state = False
+        else:
+            new_run_keys = set()
+
         self.runs = new_runs
         self._invalidate_run_dependent_caches()
-        self._signals_selection_explicit = False
-        self.events_selected = []
-        self._events_selection_explicit = False
+        if preserve_selection_state:
+            self.runs_selected_paths = list(prev_runs_selected_paths)
+            self._runs_selection_explicit = bool(prev_runs_explicit)
+            self.signals_selected = list(prev_signals_selected)
+            self._signals_selection_explicit = bool(prev_signals_explicit)
+            self.events_selected = list(prev_events_selected)
+            self._events_selection_explicit = bool(prev_events_explicit)
+            preferred_signals = list(prev_signals_selected)
+        else:
+            self.runs_selected_paths = []
+            self._runs_selection_explicit = False
+            self.signals_selected = []
+            self._signals_selection_explicit = False
+            self.events_selected = []
+            self._events_selection_explicit = False
+            preferred_signals = []
         self._ensure_unique_run_labels()
-        self._rebuild_runs_ui()
+        preferred_selected_keys: Optional[Set[str]]
+        if not had_runs_before:
+            preferred_selected_keys = set(loaded_run_keys)
+        elif replace:
+            if new_run_keys and new_run_keys == old_run_keys:
+                preferred_selected_keys = set(prev_selected_keys)
+            else:
+                preferred_selected_keys = None
+        else:
+            if prev_selected_keys:
+                preferred_selected_keys = set(prev_selected_keys) | set(loaded_run_keys)
+            else:
+                preferred_selected_keys = set()
+        self._rebuild_runs_ui(preferred_selected_keys, preferred_signals)
         for msg in self._last_load_errors:
             print(msg)
         return loaded_count
@@ -4133,6 +4631,19 @@ class CompareViewer(QtWidgets.QMainWindow):
         ref = self._reference_run(runs)
         return str(ref.label) if ref is not None else ""
 
+    def _remember_reference_run(self, run: Optional[Run] = None) -> None:
+        ref = run if run is not None else self._reference_run()
+        if ref is None:
+            return
+        try:
+            self.reference_run_selected = str(getattr(ref, "label", "") or "")
+        except Exception:
+            self.reference_run_selected = ""
+        try:
+            self.reference_run_selected_path = self._normalized_run_path(getattr(ref, "path", Path("")))
+        except Exception:
+            self.reference_run_selected_path = ""
+
     def _ordered_runs_for_reference(self, runs: Optional[List[Run]] = None) -> List[Run]:
         runs_use = list(runs) if runs is not None else list(self._selected_runs())
         ref = self._reference_run(runs_use)
@@ -4146,13 +4657,25 @@ class CompareViewer(QtWidgets.QMainWindow):
             return
         runs = self._selected_runs()
         labels = [str(r.label) for r in runs]
+        remembered_label = str(getattr(self, "reference_run_selected", "") or "").strip()
         current = ""
         try:
             current = str(combo.currentText() or "").strip()
         except Exception:
             current = ""
         target = ""
-        for candidate in (str(preferred_label or "").strip(), current):
+        remembered_target = ""
+        remembered_path = str(getattr(self, "reference_run_selected_path", "") or "").strip()
+        if remembered_path:
+            for run in runs:
+                try:
+                    if self._normalized_run_path(getattr(run, "path", Path(""))) == remembered_path:
+                        target = str(run.label)
+                        remembered_target = target
+                        break
+                except Exception:
+                    pass
+        for candidate in (str(preferred_label or "").strip(), remembered_label, target, current):
             if candidate and candidate in labels:
                 target = candidate
                 break
@@ -4167,6 +4690,9 @@ class CompareViewer(QtWidgets.QMainWindow):
                 combo.setCurrentText(target)
         finally:
             combo.blockSignals(False)
+        if labels:
+            if remembered_target or (not remembered_label and not remembered_path):
+                self._remember_reference_run(self._reference_run(runs))
 
     def _ensure_unique_run_labels(self) -> None:
         used: Set[str] = set()
@@ -4208,8 +4734,10 @@ class CompareViewer(QtWidgets.QMainWindow):
         if not isinstance(stt, dict):
             return
         for k in (
+            'dataset_paths',
             'runs',
             'runs_paths',
+            'runs_selection_explicit',
             'reference_run',
             'reference_run_path',
             'table',
@@ -4224,13 +4752,16 @@ class CompareViewer(QtWidgets.QMainWindow):
         stt = getattr(self, '_restore_after_load', None)
         if not isinstance(stt, dict):
             return False
+        dataset_paths = [str(x) for x in (stt.get('dataset_paths') or []) if str(x).strip()]
         want_paths = [str(x) for x in (stt.get('runs_paths') or []) if str(x).strip()]
         ref_path = str(stt.get('reference_run_path') or '').strip()
-        if ref_path:
+        if not dataset_paths and ref_path:
             want_paths.append(ref_path)
-        if not want_paths:
+        if not dataset_paths and not want_paths and not ref_path:
             dataset_keys = (
+                'dataset_paths',
                 'runs',
+                'runs_selection_explicit',
                 'reference_run',
                 'table',
                 'signals',
@@ -4241,12 +4772,62 @@ class CompareViewer(QtWidgets.QMainWindow):
             return not any(k in stt for k in dataset_keys)
         try:
             selected = {self._normalized_run_path(Path(p)) for p in paths}
+            dataset_wanted = {self._normalized_run_path(Path(p)) for p in dataset_paths}
             wanted = {self._normalized_run_path(Path(p)) for p in want_paths}
+            ref_wanted = self._normalized_run_path(Path(ref_path)) if ref_path else ""
         except Exception:
             return True
-        if not selected or not wanted:
+        if not selected:
             return True
-        return bool(selected & wanted)
+        if dataset_wanted:
+            return selected == dataset_wanted
+        if wanted and not wanted.issubset(selected):
+            return False
+        if ref_wanted:
+            return ref_wanted in selected
+        if wanted:
+            return True
+        return False
+
+    def _clear_pending_dataset_restore_if_mismatch(self, paths: Sequence[Path]) -> None:
+        try:
+            real_paths = [Path(p) for p in paths if str(p).strip()]
+        except Exception:
+            return
+        if not real_paths:
+            return
+        if not self._pending_dataset_restore_matches_paths(real_paths):
+            self._clear_pending_dataset_restore()
+
+    def _clear_runtime_dataset_memory(self) -> None:
+        self.runs_selected_paths = []
+        self._runs_selection_explicit = False
+        self.current_table = ""
+        self.table_selected = ""
+        self.reference_run_selected = ""
+        self.reference_run_selected_path = ""
+        self._infl_focus_feat = None
+        self._infl_focus_sig = None
+        combo = getattr(self, "combo_ref", None)
+        if combo is not None:
+            try:
+                combo.blockSignals(True)
+                combo.clear()
+            finally:
+                try:
+                    combo.blockSignals(False)
+                except Exception:
+                    pass
+        table_combo = getattr(self, "combo_table", None)
+        if table_combo is not None:
+            try:
+                table_combo.blockSignals(True)
+                table_combo.clear()
+            finally:
+                try:
+                    table_combo.blockSignals(False)
+                except Exception:
+                    pass
 
     def _invalidate_run_dependent_caches(self) -> None:
         self._invalidate_multivar_cache()
@@ -4297,6 +4878,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 prev_signals = []
             self.current_table = txt
+            self.table_selected = str(txt)
             kept_selected = self._refresh_signal_list(prev_signals)
             if (not kept_selected) and self.available_signals and not bool(getattr(self, '_signals_selection_explicit', False)):
                 self._select_default_signals()
@@ -4304,16 +4886,27 @@ class CompareViewer(QtWidgets.QMainWindow):
 
     def _refresh_table_list(self) -> None:
         runs = self._selected_runs()
-        current = self.combo_table.currentText() if hasattr(self, "combo_table") else str(self.current_table)
+        combo_current = self.combo_table.currentText() if hasattr(self, "combo_table") else ""
+        remembered_table = str(getattr(self, "table_selected", "") or "").strip()
+        current = str(combo_current or self.current_table or remembered_table or "")
         if not runs:
             tables = sorted(set(self.table_names))
         else:
             table_sets = [set(map(str, r.tables.keys())) for r in runs if getattr(r, "tables", None)]
             tables = sorted(set.intersection(*table_sets)) if table_sets else []
         self.table_names = tables
+        target = ""
+        for candidate in (remembered_table, current):
+            if candidate and candidate in tables:
+                target = candidate
+                break
+        if not target and tables:
+            target = "main" if "main" in tables else tables[0]
         if not hasattr(self, "combo_table"):
             if tables:
-                self.current_table = current if current in tables else ("main" if "main" in tables else tables[0])
+                self.current_table = target
+                if self.current_table and ((not remembered_table) or (self.current_table == remembered_table)):
+                    self.table_selected = str(self.current_table)
             else:
                 self.current_table = ""
             return
@@ -4323,13 +4916,10 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.combo_table.addItems(tables)
             self.combo_table.setEnabled(bool(tables))
             if tables:
-                if current in tables:
-                    self.combo_table.setCurrentText(current)
-                elif "main" in tables:
-                    self.combo_table.setCurrentText("main")
-                else:
-                    self.combo_table.setCurrentIndex(0)
+                self.combo_table.setCurrentText(target)
                 self.current_table = self.combo_table.currentText() or self.current_table
+                if self.current_table and ((not remembered_table) or (self.current_table == remembered_table)):
+                    self.table_selected = str(self.current_table)
             else:
                 self.current_table = ""
         finally:
@@ -4365,6 +4955,8 @@ class CompareViewer(QtWidgets.QMainWindow):
             prev_selected = [str(x) for x in (preferred_selected if preferred_selected is not None else self._selected_signals())]
         except Exception:
             prev_selected = []
+        if not prev_selected and bool(getattr(self, '_signals_selection_explicit', False)):
+            prev_selected = [str(x) for x in (getattr(self, 'signals_selected', []) or [])]
         try:
             current_item = self.list_signals.currentItem() if hasattr(self, "list_signals") else None
             prev_current = str(current_item.text()) if current_item is not None else ""
@@ -4374,6 +4966,8 @@ class CompareViewer(QtWidgets.QMainWindow):
         runs = self._selected_runs()
         if not runs:
             self.available_signals = []
+            if not bool(getattr(self, '_signals_selection_explicit', False)):
+                self.signals_selected = []
             try:
                 self.list_signals.blockSignals(True)
                 self.list_signals.clear()
@@ -4457,8 +5051,17 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 pass
         try:
-            return self._selected_signals()
+            picked = self._selected_signals()
+            if picked:
+                self.signals_selected = list(picked)
+            elif not bool(getattr(self, '_signals_selection_explicit', False)):
+                self.signals_selected = []
+            return picked
         except Exception:
+            if kept_selected:
+                self.signals_selected = list(kept_selected)
+            elif not bool(getattr(self, '_signals_selection_explicit', False)):
+                self.signals_selected = []
             return kept_selected
 
     def _on_signal_filter_changed(self, _txt: str) -> None:
@@ -4469,10 +5072,22 @@ class CompareViewer(QtWidgets.QMainWindow):
 
     def _on_signal_selection_changed(self) -> None:
         self._signals_selection_explicit = True
+        try:
+            self.signals_selected = self._selected_signals()
+        except Exception:
+            self.signals_selected = []
         self._rebuild_plots()
 
     def _on_run_selection_changed(self):
         """Runs selection changed → refresh dependent UI then rebuild plots."""
+        self._runs_selection_explicit = True
+        try:
+            self.runs_selected_paths = [
+                self._normalized_run_path(getattr(run, 'path', Path('')))
+                for run in self._selected_runs()
+            ]
+        except Exception:
+            self.runs_selected_paths = []
         try:
             prev_signals = self._selected_signals()
         except Exception:
@@ -4503,6 +5118,10 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._rebuild_plots()
 
     def _on_reference_run_changed(self, _i: int):
+        try:
+            self._remember_reference_run()
+        except Exception:
+            pass
         try:
             self._refresh_event_list()
         except Exception:
@@ -4551,10 +5170,13 @@ class CompareViewer(QtWidgets.QMainWindow):
         if lw is None:
             return
 
+        explicit_events = bool(getattr(self, '_events_selection_explicit', False))
+        remembered_sel = [str(x) for x in (getattr(self, 'events_selected', []) or [])]
         prev_sel = set(self._get_selected_event_signals())
         preserve_empty = False
-        if not prev_sel and bool(getattr(self, '_events_selection_explicit', False)):
-            prev_sel = set(getattr(self, 'events_selected', []) or [])
+        stale_explicit = False
+        if not prev_sel and explicit_events:
+            prev_sel = set(remembered_sel)
             preserve_empty = not prev_sel
 
         counts: Dict[str, int] = {}
@@ -4572,14 +5194,17 @@ class CompareViewer(QtWidgets.QMainWindow):
         lw.clear()
 
         if not counts:
-            self.events_selected = []
+            if not explicit_events:
+                self.events_selected = []
             lw.blockSignals(False)
             return
 
         items = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
         names = [k for (k, _v) in items]
         prev_sel = {name for name in prev_sel if name in names}
-        if not prev_sel and not preserve_empty:
+        if explicit_events and remembered_sel and not prev_sel:
+            stale_explicit = True
+        if not prev_sel and not preserve_empty and not explicit_events:
             prev_sel = set(self._default_event_names(names))
 
         for name, cnt in items:
@@ -4592,7 +5217,10 @@ class CompareViewer(QtWidgets.QMainWindow):
             lw.addItem(it)
 
         lw.blockSignals(False)
-        self.events_selected = [name for name in names if name in prev_sel]
+        if explicit_events and stale_explicit:
+            self.events_selected = list(remembered_sel)
+        else:
+            self.events_selected = [name for name in names if name in prev_sel]
 
     def _refresh_events_table(self):
         tbl = getattr(self, 'tbl_events', None)
@@ -4620,7 +5248,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         if have_filter_items:
             if pick:
                 try:
-                    df = df[df['signal'].astype(str).isin([str(x) for x in pick])]
+                    df = df[df['signal'].astype(str).isin([str(x) for x in pick])].copy()
                 except Exception:
                     pass
             else:
@@ -4628,13 +5256,15 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         max_rows = 500
         if len(df) > max_rows:
-            df = df.sort_values('t', kind='mergesort').head(max_rows)
+            df = df.sort_values('t', kind='mergesort').head(max_rows).copy()
+        else:
+            df = df.copy()
 
         cols = ["t", "signal", "from", "to", "table"]
         for c in cols:
             if c not in df.columns:
-                df[c] = ""
-        df = df[cols].copy()
+                df.loc[:, c] = ""
+        df = df.loc[:, cols].copy()
 
         try:
             tbl.setSortingEnabled(False)
@@ -4707,10 +5337,17 @@ class CompareViewer(QtWidgets.QMainWindow):
                     it.setSelected(True)
         finally:
             self.list_signals.blockSignals(False)
+        try:
+            self.signals_selected = self._selected_signals()
+        except Exception:
+            self.signals_selected = list(want)
 
     def _selected_signals(self) -> List[str]:
         idxs = [i.row() for i in self.list_signals.selectedIndexes()]
-        sigs = [self.available_signals[i] for i in idxs if 0 <= i < len(self.available_signals)]
+        return [self.available_signals[i] for i in idxs if 0 <= i < len(self.available_signals)]
+
+    def _selected_plot_signals(self) -> List[str]:
+        sigs = self._selected_signals()
         max_rows = int(self.spin_rows.value())
         return sigs[:max_rows]
 
@@ -4889,7 +5526,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         """
 
         runs = self._selected_runs()
-        sigs = self._selected_signals()
+        sigs = self._selected_plot_signals()
         if not runs or not sigs:
             self._clear_plots()
             self._clear_playhead_state()
@@ -5349,7 +5986,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             v.setPos(x)
 
         # compute quick readout for hovered signal
-        sigs = self._selected_signals()
+        sigs = self._selected_plot_signals()
         runs = self._selected_runs()
         if not sigs or not runs:
             self.lbl_readout.setText(f"x: {x:.3f}")
@@ -5393,20 +6030,24 @@ class CompareViewer(QtWidgets.QMainWindow):
         dlg.setNameFilter("NPZ files (*.npz)")
         if dlg.exec():
             files = [Path(s) for s in dlg.selectedFiles()]
-            if not self._pending_dataset_restore_matches_paths(files):
-                self._clear_pending_dataset_restore()
             loaded = self._load_paths(files, replace=True)
             if loaded > 0:
+                loaded_paths = [getattr(r, 'path', Path('')) for r in getattr(self, 'runs', [])]
+                self._clear_pending_dataset_restore_if_mismatch(loaded_paths)
                 self._apply_restore_after_load()
                 if self._last_load_errors:
                     details = "\n".join(self._last_load_errors[:6])
                     tail = ""
                     if len(self._last_load_errors) > 6:
                         tail = f"\n... и ещё {len(self._last_load_errors) - 6}"
+                    loaded_labels = ", ".join([str(r.label) for r in getattr(self, 'runs', [])[:6]])
+                    if len(getattr(self, 'runs', [])) > 6:
+                        loaded_labels += ", ..."
                     QtWidgets.QMessageBox.warning(
                         self,
                         "Open NPZ warnings",
-                        f"Загружено {loaded} NPZ, но часть файлов открыть не удалось.\n\n{details}{tail}",
+                        f"Загружено {loaded} NPZ, но часть файлов открыть не удалось.\n"
+                        f"Открыты: {loaded_labels}\n\n{details}{tail}",
                     )
             elif self._last_load_errors:
                 details = "\n".join(self._last_load_errors[:6])
@@ -5556,9 +6197,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         tried = {_normalized_fs_path_key(p) for p in paths}
         fallback = [p for p in _auto_find_npz(max_files=6) if _normalized_fs_path_key(p) not in tried]
         if fallback:
-            w._clear_pending_dataset_restore()
-            w._load_paths(fallback)
-            w._apply_restore_after_load()
+            loaded = w._load_paths(fallback)
+            if loaded > 0:
+                loaded_paths = [getattr(r, 'path', Path('')) for r in getattr(w, 'runs', [])]
+                w._clear_pending_dataset_restore_if_mismatch(loaded_paths)
+                w._apply_restore_after_load()
     # Default size only if there is no saved geometry
     try:
         s = QtCore.QSettings('UnifiedPneumoApp', 'DiagrammyCompareViewer')

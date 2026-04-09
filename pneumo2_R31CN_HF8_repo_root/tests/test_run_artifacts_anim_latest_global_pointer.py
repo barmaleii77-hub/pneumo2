@@ -22,7 +22,7 @@ from pneumo_solver_ui.run_artifacts import (
     write_anim_latest_pointer_json,
 )
 from pneumo_solver_ui.solver_points_contract import CORNERS, POINT_KINDS, point_cols
-from pneumo_solver_ui.ui_preflight import collect_steps
+from pneumo_solver_ui.ui_preflight import collect_steps, _pick_next_page_canonical
 
 
 def _solver_df() -> pd.DataFrame:
@@ -229,6 +229,26 @@ def test_collect_anim_latest_diagnostics_summary_supports_legacy_anim_latest_ali
         ),
         encoding="utf-8",
     )
+    npz_path.with_name("anim_latest.desktop_mnemo_events.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "desktop_mnemo_event_log_v1",
+                "updated_utc": "2026-04-10T08:15:00Z",
+                "npz_path": str(npz_path.resolve()),
+                "current_mode": "Регуляторный коридор",
+                "event_count": 4,
+                "active_latch_count": 1,
+                "acknowledged_latch_count": 2,
+                "recent_events": [
+                    {"title": "Большой перепад давлений"},
+                    {"title": "Смена режима"},
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
     diag = collect_anim_latest_diagnostics_summary(
         {
@@ -249,6 +269,10 @@ def test_collect_anim_latest_diagnostics_summary_supports_legacy_anim_latest_ali
     assert diag["anim_latest_npz_exists"] is True
     assert diag["anim_latest_meta"] == {"source": "legacy-inline"}
     assert diag["anim_latest_issues"] == ["preexisting-warning"]
+    assert diag["anim_latest_mnemo_event_log_exists"] is True
+    assert diag["anim_latest_mnemo_event_log_schema_version"] == "desktop_mnemo_event_log_v1"
+    assert diag["anim_latest_mnemo_event_log_current_mode"] == "Регуляторный коридор"
+    assert diag["anim_latest_mnemo_event_log_recent_titles"] == ["Большой перепад давлений", "Смена режима"]
 
 
 class _FakeSt:
@@ -278,6 +302,32 @@ def test_ui_preflight_export_step_reports_visual_token_and_global_sync(tmp_path:
     assert "global pointer:" in export_step.detail
     assert "global token sync: OK" in export_step.detail
     assert pointer["visual_cache_token"][:8] in export_step.detail
+
+
+def test_ui_preflight_recommends_desktop_mnemo_after_export_is_ready(tmp_path: Path, monkeypatch) -> None:
+    app_dir, npz_path, ptr_path, _pointer = _prepare_anim_export(tmp_path, monkeypatch)
+
+    save_last_baseline_ptr(
+        cache_dir=app_dir / "pneumo_solver_ui" / "workspace" / "baseline",
+        meta={"source": "pytest-baseline"},
+        anim_latest_npz=npz_path,
+        anim_latest_json=ptr_path,
+    )
+
+    steps = collect_steps(_FakeSt(), app_dir)
+
+    assert "mnemo" in steps
+    assert steps["export"].page == "pneumo_solver_ui/pages/08_DesktopMnemo.py"
+    assert steps["mnemo"].page == "pneumo_solver_ui/pages/08_DesktopMnemo.py"
+    assert steps["mnemo"].action_label == "Открыть Desktop Mnemo"
+
+    next_page, next_label = _pick_next_page_canonical(steps)
+    assert next_page in {
+        "pneumo_solver_ui/pages/08_DesktopMnemo.py",
+        "pneumo_solver_ui/pages/09_Validation_Web.py",
+    }
+    if next_page == "pneumo_solver_ui/pages/08_DesktopMnemo.py":
+        assert "Desktop Mnemo" in next_label
 
 
 def test_ui_preflight_send_bundle_step_reports_last_bundle_summary(tmp_path: Path, monkeypatch) -> None:

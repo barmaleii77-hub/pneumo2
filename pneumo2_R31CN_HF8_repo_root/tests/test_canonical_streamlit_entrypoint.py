@@ -9,6 +9,7 @@ from pneumo_solver_ui.entrypoints import (
     canonical_streamlit_entrypoint,
     canonical_streamlit_entrypoint_rel,
     desktop_animator_page_rel,
+    desktop_mnemo_page_rel,
     env_diagnostics_page_rel,
     legacy_single_page_entrypoint,
     legacy_single_page_entrypoint_rel,
@@ -28,6 +29,7 @@ def test_canonical_entrypoint_helper_points_to_root_app_and_home_page() -> None:
     assert canonical_home_page_rel(here=__file__) == "pneumo_solver_ui/pneumo_ui_app.py"
     assert legacy_single_page_entrypoint_rel(here=__file__) == "pneumo_solver_ui/app.py"
     assert desktop_animator_page_rel(here=__file__) == "pneumo_solver_ui/pages/08_DesktopAnimator.py"
+    assert desktop_mnemo_page_rel(here=__file__) == "pneumo_solver_ui/pages/08_DesktopMnemo.py"
     assert validation_web_page_rel(here=__file__) == "pneumo_solver_ui/pages/09_Validation_Web.py"
     assert env_diagnostics_page_rel(here=__file__) == "pneumo_solver_ui/pages/99_EnvDiagnostics.py"
 
@@ -80,12 +82,15 @@ def test_page_registry_and_preflight_use_canonical_relative_targets() -> None:
     for helper_name in [
         "canonical_home_page_rel",
         "desktop_animator_page_rel",
+        "desktop_mnemo_page_rel",
         "validation_web_page_rel",
         "env_diagnostics_page_rel",
         "local_anim_latest_export_paths",
         "extract_anim_snapshot",
         "_pick_next_page_canonical",
         "_pick_next_page = _pick_next_page_canonical",
+        "DESKTOP_MNEMO_PAGE",
+        'steps["mnemo"]',
     ]:
         assert helper_name in ui_preflight
     assert "local_anim_latest_export_paths(exports_dir, ensure_exists=False)" in ui_preflight

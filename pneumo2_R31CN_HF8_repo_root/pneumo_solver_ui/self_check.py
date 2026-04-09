@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import json
 import os
-import importlib.util
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -39,14 +38,9 @@ if str(HERE.parent) not in _sys.path:
 
 
 
-def load_py_module(path: Path, module_name: str):
-    return load_python_module_from_path(path, module_name)
-
-
-
 def main() -> int:
-    worker = load_py_module(HERE / "opt_worker_v3_margins_energy.py", "worker")
-    model = load_py_module(HERE / "model_pneumo_v8_energy_audit_vacuum.py", "model")
+    worker = load_python_module_from_path(HERE / "opt_worker_v3_margins_energy.py", "worker")
+    model = load_python_module_from_path(HERE / "model_pneumo_v8_energy_audit_vacuum.py", "model")
 
     base = json.loads((HERE / "default_base.json").read_text(encoding="utf-8"))
     suite = json.loads((HERE / "default_suite.json").read_text(encoding="utf-8"))
@@ -237,7 +231,7 @@ def main() -> int:
 
     # --- 3g) smoke-test для UI дефолтной модели v9 (dw2d + раздельные штоки Ц1/Ц2) ---
     try:
-        model_v9 = load_py_module(HERE / "model_pneumo_v9_mech_doublewishbone_worldroad.py", "model_v9")
+        model_v9 = load_python_module_from_path(HERE / "model_pneumo_v9_mech_doublewishbone_worldroad.py", "model_v9")
         m_v9 = worker.eval_candidate_once(model_v9, base, test, dt=0.01, t_end=0.2)
         missing_v9 = [k for k in required_metrics if k not in m_v9]
         print(f"[3g] smoke-test v9(dw2d): метрик={len(m_v9)}")
@@ -264,7 +258,7 @@ def main() -> int:
         print("[3g] WARNING: v9 smoke-test failed:", e)
 
     # --- 4) ISO 6358-3 system equivalence sanity checks ---
-    iso_sys = load_py_module(HERE / "iso6358_system.py", "iso_sys")
+    iso_sys = load_python_module_from_path(HERE / "iso6358_system.py", "iso_sys")
 
     pe = 7.0e5   # Pa abs
     Te = 293.15  # K

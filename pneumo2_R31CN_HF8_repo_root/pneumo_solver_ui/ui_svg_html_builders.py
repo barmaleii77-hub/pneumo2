@@ -1129,10 +1129,6 @@ function __frameInParentViewport(){
     return true;
   }
 }
-function __nextIdleMs(visibleMs, hiddenMs, offscreenMs){
-  if (document && document.hidden) return hiddenMs;
-  return __frameInParentViewport() ? visibleMs : offscreenMs;
-}
 let __STEP_HANDLE = 0;
 let __STEP_KIND = '';
 function __clearScheduledStep(){
@@ -1154,9 +1150,13 @@ function __scheduleStep(kind, delayMs){
     __STEP_HANDLE = setTimeout(step, Math.max(0, Number(delayMs) || 0));
   }
 }
-function __wakeStep(){
+function __wakeStep(forceRender){
+  if (forceRender) {
+    lastRenderedIdx = -1;
+    lastRenderedPlaying = null;
+  }
   if (!document.hidden && __frameInParentViewport()) __scheduleStep('raf', 0);
-  else { __STEP_HANDLE = null; }
+  else { __clearScheduledStep(); }
 }
 
 function step(ts) {
@@ -1173,16 +1173,14 @@ function step(ts) {
   if (shouldRender) renderFrame(dt);
 
   if (playing && !document.hidden && __frameInParentViewport()) __scheduleStep('raf', 0);
-  else {
-    __scheduleStep('timeout', __nextIdleMs(60000, 180000, 300000));
-  }
+  else __clearScheduledStep();
 }
 
-window.addEventListener('focus', __wakeStep);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) __wakeStep(); });
-window.addEventListener('scroll', () => { try { __wakeStep(); } catch(_e) {} }, {passive:true});
-window.addEventListener('resize', () => { try { __wakeStep(); } catch(_e) {} }, {passive:true});
-__wakeStep();
+window.addEventListener('focus', () => { try { __wakeStep(true); } catch(_e) {} });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) __wakeStep(true); });
+window.addEventListener('scroll', () => { try { __wakeStep(true); } catch(_e) {} }, {passive:true});
+window.addEventListener('resize', () => { try { __wakeStep(true); } catch(_e) {} }, {passive:true});
+__wakeStep(true);
 </script>
 </body>
 </html>"""
@@ -1191,5 +1189,4 @@ __wakeStep();
     html = html.replace("__JS_DATA__", js_data)
 
     components.html(html, height=height, scrolling=False)
-
 

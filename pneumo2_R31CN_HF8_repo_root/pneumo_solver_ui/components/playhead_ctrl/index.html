@@ -242,6 +242,12 @@ function segmentRanges(){
   return Array.isArray(DATA.segment_ranges) ? DATA.segment_ranges : [];
 }
 
+function segmentLabel(seg, fallbackName) {
+  const name = String((seg && seg.name) || fallbackName || '?').trim();
+  const direction = String((seg && (seg.turn_direction_label || seg.turn_direction)) || '').trim();
+  return direction ? `${name} · ${direction}` : name;
+}
+
 function currentSegment(){
   const ranges = segmentRanges();
   for (let i = 0; i < ranges.length; i++) {
@@ -274,7 +280,7 @@ function renderSegmentBands() {
     div.style.left = `${leftPct}%`;
     div.style.width = `${Math.max(0.8, rightPct - leftPct)}%`;
     div.style.background = String(seg.color || 'rgba(0,120,255,0.85)');
-    div.title = String(seg.name || `S${i+1}`);
+    div.title = segmentLabel(seg, `S${i+1}`);
     elSegmentBar.appendChild(div);
   }
 }
@@ -304,7 +310,7 @@ function uiUpdate() {
   const curSeg = currentSegment();
   if (elSegNow) {
     if (curSeg) {
-      elSegNow.textContent = `seg=${String(curSeg.name || '?')}`;
+      elSegNow.textContent = `seg=${segmentLabel(curSeg, '?')}`;
       elSegNow.style.color = String(curSeg.color || '#222');
       elSegNow.style.fontWeight = '600';
     } else {

@@ -31,7 +31,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import math
 import os
@@ -47,11 +46,6 @@ import pandas as pd
 from pneumo_solver_ui.module_loading import load_python_module_from_path
 
 HERE = Path(__file__).resolve().parent
-
-
-def load_py_module(path: Path, module_name: str):
-    return load_python_module_from_path(path, module_name)
-
 
 
 def load_json(path: Path) -> dict:
@@ -379,8 +373,8 @@ def run_uq(
     X = generate_samples(problem, method=method, N=int(N), seed=int(seed))
 
     # загружаем модель и evaluator
-    model = load_py_module(model_path, 'model')
-    opt = load_py_module((HERE / 'opt_worker_v3_margins_energy.py').resolve(), 'opt_worker')
+    model = load_python_module_from_path(model_path, 'model')
+    opt = load_python_module_from_path((HERE / 'opt_worker_v3_margins_energy.py').resolve(), 'opt_worker')
 
     cfg = {'suite': suite.get('suite', suite) if isinstance(suite, dict) else suite}
 

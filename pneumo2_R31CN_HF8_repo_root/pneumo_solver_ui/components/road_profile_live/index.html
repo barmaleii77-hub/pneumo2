@@ -558,11 +558,13 @@
     subEl.textContent = `t=${fmt(tNow,3)} s · idx=${idx}/${n-1} · s=${fmt(sM,2)} m · окно: ${fmt(DATA.window_m_back,1)}m назад + ${fmt(DATA.window_m_ahead,1)}m вперёд`;
     const segNow = (DATA.path && Array.isArray(DATA.path.s) && DATA.path.s[idx] != null) ? __segmentForS(Number(DATA.path.s[idx]||0)) : null;
     const segNowName = segNow ? String(segNow.name || ('S' + String(segNow.seg_idx || ''))) : '—';
+    const segNowTurn = segNow ? String(segNow.turn_direction_label || segNow.turn_direction || '').trim() : '';
+    const segNowLabel = (segNow && segNowTurn) ? (segNowName + ' · ' + segNowTurn) : segNowName;
     const segSwatch = segNow && segNow.edge_color ? `<span style="display:inline-block;width:12px;height:12px;border-radius:999px;background:${String(segNow.edge_color)};vertical-align:-2px;margin-right:6px;"></span>` : '';
     hudEl.innerHTML = `
       <div><b>t</b>: ${fmt(tNow,3)} s &nbsp; <b>idx</b>: ${idx}/${n-1}</div>
       <div><b>s</b>: ${fmt(sM,2)} m &nbsp; <b>v</b>: ${isFinite(vNow)?fmt(vNow,2)+' m/s':'—'}</div>
-      <div>${segSwatch}<b>сегмент</b>: ${segNowName}</div>
+      <div>${segSwatch}<b>сегмент</b>: ${segNowLabel}</div>
       <div><b>нуль</b>: пунктир · <b>CG</b>: x=0 · <b>колёсная база</b>: ${isFinite(wbM)?fmt(wbM,2)+' m':'—'}</div>
     `;
 

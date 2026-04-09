@@ -68,6 +68,25 @@ def test_make_send_bundle_health_sees_final_triage_and_latest_copy(tmp_path: Pat
     assert npz_path.exists()
     assert pointer_path.exists()
     assert (env_ws / "_pointers" / "anim_latest.json").exists()
+    (exports_dir / "anim_latest.desktop_mnemo_events.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "desktop_mnemo_event_log_v1",
+                "updated_utc": "2026-04-10T09:45:00Z",
+                "current_mode": "Регуляторный коридор",
+                "event_count": 4,
+                "active_latch_count": 1,
+                "acknowledged_latch_count": 2,
+                "recent_events": [
+                    {"title": "Большой перепад давлений"},
+                    {"title": "Смена режима"},
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
     zip_path = make_send_bundle(repo_root=ROOT, out_dir=out_dir, keep_last_n=1, max_file_mb=20)
     latest_zip = out_dir / "latest_send_bundle.zip"
@@ -78,12 +97,17 @@ def test_make_send_bundle_health_sees_final_triage_and_latest_copy(tmp_path: Pat
         assert "triage/triage_report.json" in names
         assert "health/health_report.json" in names
         triage_main = z.read("triage/triage_report.json")
+        triage_json = json.loads(triage_main.decode("utf-8", errors="replace"))
         health = json.loads(z.read("health/health_report.json").decode("utf-8", errors="replace"))
 
     artifacts = dict((health.get("signals") or {}).get("artifacts") or {})
+    mnemo = dict((health.get("signals") or {}).get("mnemo_event_log") or {})
     assert artifacts.get("triage_report") is True
     assert artifacts.get("validation_report") is True
     assert artifacts.get("anim_diagnostics") is True
+    assert triage_json["mnemo_event_log"]["severity"] == "critical"
+    assert mnemo["severity"] == "critical"
+    assert mnemo["current_mode"] == "Регуляторный коридор"
 
     with zipfile.ZipFile(latest_zip, "r") as z:
         latest_names = set(z.namelist())

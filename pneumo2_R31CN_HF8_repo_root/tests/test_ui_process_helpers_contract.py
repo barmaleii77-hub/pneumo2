@@ -48,7 +48,8 @@ def test_large_ui_entrypoints_import_shared_process_helpers() -> None:
         src = (ROOT / rel).read_text(encoding="utf-8")
         assert "from pneumo_solver_ui.ui_process_helpers import (" in src
         assert "start_background_worker" in src
-        assert "start_worker = partial(" in src
+        assert "from pneumo_solver_ui.ui_process_profile_helpers import (" in src
+        assert "start_worker = build_background_worker_starter(" in src
         assert "def _dump_detail_cache_payload(" not in src
         assert "def _load_detail_cache_payload(" not in src
         assert "def start_worker(" not in src

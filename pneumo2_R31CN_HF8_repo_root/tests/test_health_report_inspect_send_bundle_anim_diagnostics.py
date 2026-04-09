@@ -46,6 +46,16 @@ def _make_anim_diag(token: str, reload_inputs: list[str], *, updated_utc: str = 
         "browser_perf_total_wakeups": 10,
         "browser_perf_total_duplicate_guard_hits": 3,
         "browser_perf_max_idle_poll_ms": 60000,
+        "anim_latest_mnemo_event_log_ref": "anim_latest.desktop_mnemo_events.json",
+        "anim_latest_mnemo_event_log_path": "/abs/workspace/exports/anim_latest.desktop_mnemo_events.json",
+        "anim_latest_mnemo_event_log_exists": True,
+        "anim_latest_mnemo_event_log_schema_version": "desktop_mnemo_event_log_v1",
+        "anim_latest_mnemo_event_log_updated_utc": updated_utc,
+        "anim_latest_mnemo_event_log_current_mode": "Регуляторный коридор",
+        "anim_latest_mnemo_event_log_event_count": 4,
+        "anim_latest_mnemo_event_log_active_latch_count": 1,
+        "anim_latest_mnemo_event_log_acknowledged_latch_count": 2,
+        "anim_latest_mnemo_event_log_recent_titles": ["Большой перепад давлений", "Смена режима"],
     }
 
 
@@ -172,12 +182,15 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
 
     rep = json.loads(json_path.read_text(encoding="utf-8"))
     anim = dict(rep.get("signals", {}).get("anim_latest") or {})
+    mnemo = dict(rep.get("signals", {}).get("mnemo_event_log") or {})
     artifacts = dict(rep.get("signals", {}).get("artifacts") or {})
 
     assert rep["schema"] == "health_report"
     assert anim["available"] is True
     assert anim["visual_cache_token"] == "tok-sidecar"
     assert anim["visual_reload_inputs"] == ["npz", "road_csv"]
+    assert mnemo["severity"] == "critical"
+    assert mnemo["current_mode"] == "Регуляторный коридор"
     assert anim["browser_perf_evidence_status"] == "snapshot_only"
     assert anim["browser_perf_bundle_ready"] is False
     assert anim["browser_perf_comparison_status"] == "no_reference"
@@ -191,6 +204,8 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert artifacts["browser_perf_trace"] is False
     assert "visual_cache_token" in md_path.read_text(encoding="utf-8")
     assert "tok-sidecar" in md_path.read_text(encoding="utf-8")
+    assert "## Desktop Mnemo events" in md_path.read_text(encoding="utf-8")
+    assert "Большой перепад давлений" in md_path.read_text(encoding="utf-8")
     assert "browser_perf_evidence_status" in md_path.read_text(encoding="utf-8")
     assert "browser_perf_comparison_status" in md_path.read_text(encoding="utf-8")
     assert "browser_perf_evidence_report: False" in md_path.read_text(encoding="utf-8")
@@ -206,6 +221,7 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert summary["has_browser_perf_comparison_report"] is False
     assert summary["has_browser_perf_trace"] is False
     assert summary["anim_latest"]["visual_cache_token"] == "tok-sidecar"
+    assert summary["mnemo_event_log"]["severity"] == "critical"
     assert summary["anim_latest"]["visual_reload_inputs"] == ["npz", "road_csv"]
     assert summary["anim_latest"]["browser_perf_evidence_status"] == "snapshot_only"
     assert summary["anim_latest"]["browser_perf_comparison_status"] == "no_reference"
@@ -217,6 +233,8 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert summary["anim_latest"]["browser_perf_trace_in_bundle"] is False
     inspect_md = render_inspection_md(summary)
     assert "tok-sidecar" in inspect_md
+    assert "## Desktop Mnemo events" in inspect_md
+    assert "Регуляторный коридор" in inspect_md
     assert "browser_perf_evidence_status" in inspect_md
     assert "browser_perf_comparison_status" in inspect_md
     assert "Browser perf evidence report: False" in inspect_md
@@ -241,6 +259,7 @@ def test_health_report_surfaces_anim_latest_mismatch_from_validation(tmp_path: P
     assert anim["browser_perf_comparison_status"] == "no_reference"
     assert any("visual_cache_token mismatch" in msg for msg in anim.get("issues") or [])
     assert any("visual_cache_token mismatch" in msg for msg in notes)
+    assert any("Desktop Mnemo reports 1 active latched event(s)" in msg for msg in notes)
     assert any("browser perf evidence is not trace_bundle_ready" in msg for msg in notes)
     assert any("browser perf comparison status: no_reference" in msg for msg in notes)
 
@@ -260,11 +279,15 @@ def test_sources_wire_health_report_and_offline_inspector_into_send_bundle_flow(
     assert 'collect_health_report' in health_text
     assert 'render_health_report_md' in health_text
     assert 'signals["anim_latest"]' in health_text
+    assert 'signals["mnemo_event_log"]' in health_text
+    assert '## Desktop Mnemo events' in health_text
     assert 'browser_perf_evidence_report' in health_text
     assert 'browser_perf_trace' in health_text
 
     assert 'inspect_send_bundle' in inspect_text
     assert 'embedded health report is missing' in inspect_text
+    assert 'mnemo_event_log' in inspect_text
+    assert '## Desktop Mnemo events' in inspect_text
     assert 'browser_perf_evidence_status' in inspect_text
     assert 'browser_perf_artifacts_primary' in inspect_text
     assert 'has_browser_perf_evidence_report' in inspect_text

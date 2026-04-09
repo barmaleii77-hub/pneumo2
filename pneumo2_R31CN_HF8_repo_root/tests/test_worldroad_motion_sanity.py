@@ -43,3 +43,26 @@ def test_worldroad_motion_selfcheck_ok():
     # rel0(t0) должен быть около 0
     if 'mech_selfcheck_rel0_t0_maxabs' in df_atm.columns:
         assert float(df_atm.loc[0, 'mech_selfcheck_rel0_t0_maxabs']) <= 1e-9
+
+
+def test_worldroad_exports_world_xy_path_when_yaw_is_nonzero():
+    from pneumo_solver_ui import model_pneumo_v9_mech_doublewishbone_worldroad as m
+
+    params = {
+        'пружина_преднатяг_на_отбое_строго': False,
+        'mechanics_selfcheck': True,
+    }
+    test = {
+        'road_func': lambda t: np.zeros(4, dtype=float),
+        'ax_func': lambda t: 0.0,
+        'ay_func': lambda t: 0.8 if t > 0.05 else 0.0,
+        'vx0_м_с': 8.0,
+    }
+
+    df_main, *_ = m.simulate(params, test, dt=2e-3, t_end=0.20, record_full=False)
+
+    assert 'скорость_vy_м_с' in df_main.columns
+    assert 'путь_y_м' in df_main.columns
+    assert np.all(np.isfinite(np.asarray(df_main['скорость_vy_м_с'], dtype=float)))
+    assert np.all(np.isfinite(np.asarray(df_main['путь_y_м'], dtype=float)))
+    assert abs(float(df_main['путь_y_м'].iloc[-1])) > 1e-6

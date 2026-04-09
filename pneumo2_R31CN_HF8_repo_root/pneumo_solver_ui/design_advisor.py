@@ -32,7 +32,6 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-import importlib.util
 from datetime import datetime
 
 import numpy as np
@@ -40,11 +39,6 @@ import pandas as pd
 from pneumo_solver_ui.module_loading import load_python_module_from_path
 
 HERE = Path(__file__).resolve().parent
-
-
-def load_py_module(path: Path, module_name: str):
-    return load_python_module_from_path(path, module_name)
-
 
 
 def safe_float(x, default: float = float('nan')) -> float:
@@ -419,7 +413,7 @@ def run_cli() -> int:
 
     params = json.loads(base_path.read_text(encoding='utf-8'))
 
-    model = load_py_module(model_path, 'pneumo_model')
+    model = load_python_module_from_path(model_path, 'pneumo_model')
 
     # Minimal baseline test
     if args.test == 'baseline':

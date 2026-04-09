@@ -49,12 +49,7 @@ if run:
             st.stop()
 
     # Подгружаем модуль uncertainty_advisor
-    import importlib.util
-
-    def load_py_module(path: Path, module_name: str):
-        return load_python_module_from_path(path, module_name)
-
-    uq = load_py_module(HERE / 'uncertainty_advisor.py', 'uq_mod')
+    uq = load_python_module_from_path(HERE / 'uncertainty_advisor.py', 'uq_mod')
 
     out_dir = HERE.parent / 'out' / 'uq_streamlit'
     out_dir.mkdir(parents=True, exist_ok=True)

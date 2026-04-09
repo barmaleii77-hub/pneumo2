@@ -105,10 +105,11 @@ def test_large_ui_entrypoints_import_shared_event_sync_helpers() -> None:
     for path in UI_ENTRYPOINTS:
         src = path.read_text(encoding="utf-8")
         assert "from pneumo_solver_ui.ui_event_sync_helpers import (" in src
-        assert "consume_svg_pick_event = partial(" in src
-        assert "consume_mech_pick_event = partial(" in src
-        assert "consume_plotly_pick_events = partial(" in src
-        assert "consume_playhead_event = partial(" in src
+        assert "from pneumo_solver_ui.ui_event_surface_profile_helpers import (" in src
+        assert "consume_svg_pick_event = build_svg_pick_consumer(" in src
+        assert "consume_mech_pick_event = build_mech_pick_consumer(" in src
+        assert "consume_plotly_pick_events = build_plotly_pick_consumer(" in src
+        assert "consume_playhead_event = build_playhead_event_consumer(" in src
         assert "def consume_svg_pick_event(" not in src
         assert "def consume_mech_pick_event(" not in src
         assert "def consume_plotly_pick_events(" not in src

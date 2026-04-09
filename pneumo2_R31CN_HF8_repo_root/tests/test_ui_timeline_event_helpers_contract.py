@@ -98,6 +98,51 @@ def test_compute_events_alignment_and_sanity_hook_are_opt_in() -> None:
     assert "sanity" not in legacy_kinds
 
 
+def test_profile_helpers_match_entrypoint_unit_profiles() -> None:
+    df_main = pd.DataFrame(
+        {
+            "время_с": [0.0, 1.0, 2.0, 3.0],
+            "дорога_ЛП_м": [0.0, 0.01, 0.01, 0.01],
+            "дорога_ПП_м": [0.0, 0.0, 0.0, 0.0],
+            "дорога_ЛЗ_м": [0.0, 0.0, 0.0, 0.0],
+            "дорога_ПЗ_м": [0.0, 0.0, 0.0, 0.0],
+            "перемещение_колеса_ЛП_м": [0.0, 0.0, 0.0, 0.0],
+            "перемещение_колеса_ПП_м": [0.0, 0.0, 0.0, 0.0],
+            "перемещение_колеса_ЛЗ_м": [0.0, 0.0, 0.0, 0.0],
+            "перемещение_колеса_ПЗ_м": [0.0, 0.0, 0.0, 0.0],
+        }
+    )
+    df_p = pd.DataFrame(
+        {
+            "время_с": [0.1, 2.1],
+            "node_a": [101325.0, 1_300_000.0],
+            "node_b": [101325.0, 1_250_000.0],
+        }
+    )
+
+    atm_like = ui_timeline_event_helpers.compute_events_atm_profile(
+        df_main=df_main,
+        df_p=df_p,
+        df_open=None,
+        params_abs={"_P_ATM": 101325.0},
+        test={},
+        run_starts_fn=_run_starts,
+        shorten_name_fn=lambda name, limit: name[:limit],
+    )
+    bar_like = ui_timeline_event_helpers.compute_events_bar_profile(
+        df_main=df_main,
+        df_p=df_p,
+        df_open=None,
+        params_abs={"_P_ATM": 101325.0},
+        test={},
+        run_starts_fn=_run_starts,
+        shorten_name_fn=lambda name, limit: name[:limit],
+    )
+
+    assert not atm_like
+    assert {event["kind"] for event in bar_like} == {"overpressure", "sanity"}
+
+
 def test_entrypoints_delegate_compute_events_to_shared_core() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
@@ -106,10 +151,7 @@ def test_entrypoints_delegate_compute_events_to_shared_core() -> None:
     assert "from pneumo_solver_ui.ui_timeline_event_helpers import (" in heavy_text
     assert "def _legacy_compute_events_dead(" in app_text
     assert "def _legacy_compute_events_dead(" in heavy_text
-    assert "return compute_events_core(" in app_text
-    assert "return compute_events_core(" in heavy_text
-    assert "vacuum_min_gauge_atm" in app_text
-    assert "vacuum_min_gauge_bar" in heavy_text
-    assert "align_pressure_df_to_main=True" in heavy_text
-    assert "align_open_df_to_main=True" in heavy_text
-    assert "extra_event_hook_fn=add_wheels_identical_sanity_event" in heavy_text
+    assert "compute_events_atm_profile as compute_events" in app_text
+    assert "compute_events_bar_profile as compute_events" in heavy_text
+    assert "def compute_events(" not in app_text
+    assert "def compute_events(" not in heavy_text

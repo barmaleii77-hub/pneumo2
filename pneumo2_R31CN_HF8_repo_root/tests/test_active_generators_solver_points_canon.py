@@ -5,6 +5,8 @@ import numpy as np
 
 from pneumo_solver_ui.npz_bundle import export_anim_latest_bundle
 from pneumo_solver_ui.data_contract import build_geometry_meta_from_base
+from pneumo_solver_ui.desktop_animator.data_bundle import load_npz
+from pneumo_solver_ui.desktop_animator.suspension_geometry_diagnostics import collect_suspension_geometry_status
 from pneumo_solver_ui.solver_points_contract import CORNERS, collect_solver_points_contract_issues, point_cols
 from pneumo_solver_ui import model_pneumo_v9_doublewishbone_camozzi as camozzi
 from pneumo_solver_ui import model_pneumo_v9_mech_doublewishbone_worldroad as worldroad
@@ -24,6 +26,32 @@ def _flat_test() -> dict:
         "ax_func": lambda t: 0.0,
         "ay_func": lambda t: 0.0,
         "label_func": lambda t: 0,
+    }
+
+
+def _dynamic_test() -> dict:
+    def _bump(t: float, t0: float, dur: float, amp: float) -> float:
+        if t <= t0:
+            return 0.0
+        if t >= t0 + dur:
+            return float(amp)
+        x = (t - t0) / dur
+        return float(amp) * 0.5 * (1.0 - np.cos(np.pi * x))
+
+    return {
+        "road_func": lambda t: np.array(
+            [
+                _bump(t, 0.10, 0.08, 0.020),
+                _bump(t, 0.14, 0.08, 0.015),
+                _bump(t, 0.22, 0.10, 0.018),
+                _bump(t, 0.26, 0.10, 0.012),
+            ],
+            dtype=float,
+        ),
+        "ax_func": lambda t: -0.8 if t > 0.18 else 0.0,
+        "ay_func": lambda t: 0.5 if 0.20 < t < 0.42 else 0.0,
+        "label_func": lambda t: 3,
+        "vx0_м_с": 7.0,
     }
 
 
@@ -98,6 +126,38 @@ def test_worldroad_active_generator_emits_canonical_solver_points_and_anim_lates
     )
     assert npz_path.exists()
     assert ptr_path.exists()
+
+
+def test_active_generators_keep_wheel_upright_hardpoints_rigid_after_export(tmp_path: Path) -> None:
+    cam_params = _base()
+    cam_params["autoself_checks_in_simulate"] = False
+    df_cam, *_ = camozzi.simulate(cam_params, _dynamic_test(), dt=2e-3, t_end=0.55, record_full=False)
+    cam_npz, _ = export_anim_latest_bundle(
+        exports_dir=tmp_path / "cam",
+        df_main=df_cam,
+        meta={"geometry": build_geometry_meta_from_base(cam_params)},
+        mirror_global_pointer=False,
+    )
+    cam_bundle = load_npz(cam_npz)
+    cam_status = collect_suspension_geometry_status(cam_bundle, tol_m=1e-6)
+    assert cam_status["wheel_drift_corners"] == [], cam_status["issues"]
+
+    world_params = _base()
+    world_params.update({
+        "autoself_checks_in_simulate": False,
+        "пружина_преднатяг_на_отбое_строго": False,
+        "mechanics_selfcheck": True,
+    })
+    df_world, *_ = worldroad.simulate(world_params, _dynamic_test(), dt=2e-3, t_end=0.55, record_full=False)
+    world_npz, _ = export_anim_latest_bundle(
+        exports_dir=tmp_path / "world",
+        df_main=df_world,
+        meta={"geometry": build_geometry_meta_from_base(world_params)},
+        mirror_global_pointer=False,
+    )
+    world_bundle = load_npz(world_npz)
+    world_status = collect_suspension_geometry_status(world_bundle, tol_m=1e-6)
+    assert world_status["wheel_drift_corners"] == [], world_status["issues"]
 
 
 

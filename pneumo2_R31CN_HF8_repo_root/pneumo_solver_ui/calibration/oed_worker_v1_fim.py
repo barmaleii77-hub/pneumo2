@@ -43,7 +43,6 @@ model_key поддерживает префиксы таблиц:
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import inspect
 import json
 import math
@@ -82,10 +81,6 @@ def _save_json(obj: Any, path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
-
-
-def load_py_module(path: Path, module_name: str):
-    return load_python_module_from_path(path, module_name)
 
 
 # --------------------------
@@ -412,7 +407,7 @@ def main():
     progress = ProgressWriter(Path(args.progress_json) if args.progress_json else None, every_sec=args.progress_every_sec)
 
     # load model
-    model_mod = load_py_module(model_path, "model_mod_oed")
+    model_mod = load_python_module_from_path(model_path, "model_mod_oed")
     if not hasattr(model_mod, "simulate"):
         raise SystemExit("Модуль модели должен иметь функцию simulate")
 
@@ -431,7 +426,7 @@ def main():
         return model_mod.simulate(params, test, **kwargs)
 
     # load worker (for suite)
-    worker_mod = load_py_module(worker_path, "worker_mod_oed")
+    worker_mod = load_python_module_from_path(worker_path, "worker_mod_oed")
     if not hasattr(worker_mod, "build_test_suite"):
         raise SystemExit(f"В worker файле {worker_path} не найден build_test_suite")
 

@@ -25,6 +25,7 @@ from typing import Any, Dict, Optional, Tuple
 from pneumo_solver_ui.entrypoints import (
     canonical_home_page_rel,
     desktop_animator_page_rel,
+    desktop_mnemo_page_rel,
     env_diagnostics_page_rel,
     validation_web_page_rel,
 )
@@ -49,6 +50,7 @@ class _Step:
 
 HOME_PAGE = canonical_home_page_rel(here=__file__)
 DESKTOP_ANIMATOR_PAGE = desktop_animator_page_rel(here=__file__)
+DESKTOP_MNEMO_PAGE = desktop_mnemo_page_rel(here=__file__)
 VALIDATION_WEB_PAGE = validation_web_page_rel(here=__file__)
 ENV_DIAGNOSTICS_PAGE = env_diagnostics_page_rel(here=__file__)
 
@@ -239,6 +241,49 @@ def _desktop_deps_info() -> Tuple[bool, str]:
     return False, "Не хватает зависимостей: " + ", ".join(need)
 
 
+def _desktop_mnemo_deps_info() -> Tuple[bool, str]:
+    try:
+        import PySide6  # noqa: F401
+
+        has_pyside6 = True
+    except Exception:
+        has_pyside6 = False
+
+    try:
+        from PySide6 import QtWebChannel  # noqa: F401
+
+        has_webchannel = True
+    except Exception:
+        has_webchannel = False
+
+    try:
+        from PySide6 import QtWebEngineWidgets  # noqa: F401
+
+        has_webengine = True
+    except Exception:
+        has_webengine = False
+
+    try:
+        import pyqtgraph  # noqa: F401
+
+        has_pg = True
+    except Exception:
+        has_pg = False
+
+    ok = bool(has_pyside6 and has_webengine and has_webchannel and has_pg)
+    if ok:
+        return True, "PySide6 + QtWebEngine + QtWebChannel + pyqtgraph готовы."
+
+    need = []
+    if not has_pyside6:
+        need.append("PySide6")
+    if has_pyside6 and (not has_webengine or not has_webchannel):
+        need.append("PySide6 (QtWebEngine/WebChannel)")
+    if not has_pg:
+        need.append("pyqtgraph")
+    return False, "Не хватает зависимостей: " + ", ".join(need)
+
+
 def _resolve_diag_out_dir(st_mod: Any, app_dir: Path) -> Path:
     raw = str(getattr(st_mod, "session_state", {}).get("diag_output_dir", "send_bundles") or "").strip()
     if not raw:
@@ -342,14 +387,27 @@ def collect_steps(st_mod: Any, app_dir: Path) -> Dict[str, _Step]:
         elif global_token:
             detail_lines.append("global token sync: only global token available")
 
+    detail_lines.append("Bundle используется обоими desktop-инструментами: Desktop Mnemo и Desktop Animator.")
+
     steps["export"] = _Step(
         key="export",
-        title="Экспорт для Desktop Animator",
+        title="Экспорт для Desktop Mnemo / Animator",
         ok=ok,
         level="ok" if ok else "warn",
         detail="\n".join(detail_lines),
-        page=DESKTOP_ANIMATOR_PAGE,
-        action_label="Открыть Desktop Animator",
+        page=DESKTOP_MNEMO_PAGE,
+        action_label="Открыть Desktop Mnemo",
+    )
+
+    ok, detail = _desktop_mnemo_deps_info()
+    steps["mnemo"] = _Step(
+        key="mnemo",
+        title="Зависимости Desktop Mnemo",
+        ok=ok,
+        level="ok" if ok else "warn",
+        detail=detail,
+        page=DESKTOP_MNEMO_PAGE,
+        action_label="Открыть Desktop Mnemo",
     )
 
     ok, detail = _desktop_deps_info()
@@ -391,15 +449,17 @@ def collect_steps(st_mod: Any, app_dir: Path) -> Dict[str, _Step]:
 def _pick_next_page(steps: Dict[str, _Step]) -> Tuple[str, str]:
     """Вернуть (page_path, label) для "следующего шага"."""
 
-    # приоритет: suite -> baseline -> export -> desktop -> validation
+    # приоритет: suite -> baseline -> export -> mnemo -> validation
     if not steps.get("suite", _Step("", "", True, "ok", "")).ok:
         return "pneumo_solver_ui/pneumo_ui_app.py", "Открыть Интерфейс и настроить тест‑набор"
     if not steps.get("baseline", _Step("", "", True, "ok", "")).ok:
         return "pneumo_solver_ui/pneumo_ui_app.py", "Запустить Baseline"
     if not steps.get("export", _Step("", "", True, "ok", "")).ok:
         return "pneumo_solver_ui/pneumo_ui_app.py", "Сделать детальный прогон + экспорт anim_latest"
+    if not steps.get("mnemo", _Step("", "", True, "ok", "")).ok:
+        return "pneumo_solver_ui/pages/08_DesktopMnemo.py", "Установить/запустить Desktop Mnemo"
     if not steps.get("desktop", _Step("", "", True, "ok", "")).ok:
-        return "pneumo_solver_ui/pages/08_DesktopAnimator.py", "Установить/запустить Desktop Animator"
+        return "pneumo_solver_ui/pages/08_DesktopMnemo.py", "Открыть Desktop Mnemo и при желании проверить Desktop Animator"
 
     return "pneumo_solver_ui/pages/09_Validation_Web.py", "Перейти к Валидации (Web)"
 
@@ -412,8 +472,10 @@ def _pick_next_page_canonical(steps: Dict[str, _Step]) -> Tuple[str, str]:
         return HOME_PAGE, "Р—Р°РїСѓСЃС‚РёС‚СЊ Baseline"
     if not steps.get("export", _Step("", "", True, "ok", "")).ok:
         return HOME_PAGE, "РЎРґРµР»Р°С‚СЊ РґРµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ + СЌРєСЃРїРѕСЂС‚ anim_latest"
+    if not steps.get("mnemo", _Step("", "", True, "ok", "")).ok:
+        return DESKTOP_MNEMO_PAGE, "РЈСЃС‚Р°РЅРѕРІРёС‚СЊ/Р·Р°РїСѓСЃС‚РёС‚СЊ Desktop Mnemo"
     if not steps.get("desktop", _Step("", "", True, "ok", "")).ok:
-        return DESKTOP_ANIMATOR_PAGE, "РЈСЃС‚Р°РЅРѕРІРёС‚СЊ/Р·Р°РїСѓСЃС‚РёС‚СЊ Desktop Animator"
+        return DESKTOP_MNEMO_PAGE, "РћС‚РєСЂС‹С‚СЊ Desktop Mnemo; Desktop Animator РѕСЃС‚Р°С‘С‚СЃСЏ РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹Рј РёРЅСЃС‚СЂСѓРјРµРЅС‚РѕРј"
     return VALIDATION_WEB_PAGE, "РџРµСЂРµР№С‚Рё Рє Р’Р°Р»РёРґР°С†РёРё (Web)"
 
 
@@ -452,7 +514,7 @@ def render_preflight_sidebar(st_mod: Any, app_dir: Path) -> None:
     _nav_link(st_mod, next_page, "➡️ " + next_label, key="preflight_next")
 
     with st_mod.expander("Статусы", expanded=False):
-        for step in ["autosave", "suite", "baseline", "export", "desktop", "send_bundle", "env"]:
+        for step in ["autosave", "suite", "baseline", "export", "mnemo", "desktop", "send_bundle", "env"]:
             s = steps.get(step)
             if not s:
                 continue
@@ -482,7 +544,7 @@ def render_preflight_page(st_mod: Any, app_dir: Path) -> None:
     st_mod.divider()
     st_mod.subheader("Чеклист")
 
-    for k in ["autosave", "suite", "baseline", "export", "desktop", "send_bundle", "env"]:
+    for k in ["autosave", "suite", "baseline", "export", "mnemo", "desktop", "send_bundle", "env"]:
         s = steps.get(k)
         if not s:
             continue

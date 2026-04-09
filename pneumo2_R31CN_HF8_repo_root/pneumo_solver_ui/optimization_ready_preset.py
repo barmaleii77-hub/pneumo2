@@ -220,8 +220,8 @@ def _ready_ring_spec(*, wheelbase_m: float) -> dict[str, Any]:
             {
                 "name": "S1_прямо_rough",
                 "duration_s": 4.0,
-                "drive_mode": "STRAIGHT",
-                "speed_kph": 20.0,
+                "turn_direction": "STRAIGHT",
+                "speed_end_kph": 20.0,
                 "road": {
                     "mode": "ISO8608",
                     "iso_class": "E",
@@ -253,8 +253,8 @@ def _ready_ring_spec(*, wheelbase_m: float) -> dict[str, Any]:
             {
                 "name": "S2_поворот_влево",
                 "duration_s": 3.5,
-                "drive_mode": "TURN_LEFT",
-                "speed_kph": 20.0,
+                "turn_direction": "LEFT",
+                "speed_end_kph": 20.0,
                 "turn_radius_m": 35.0,
                 "road": {
                     "mode": "SINE",
@@ -270,8 +270,8 @@ def _ready_ring_spec(*, wheelbase_m: float) -> dict[str, Any]:
             {
                 "name": "S3_прямо_city",
                 "duration_s": 4.0,
-                "drive_mode": "STRAIGHT",
-                "speed_kph": 20.0,
+                "turn_direction": "STRAIGHT",
+                "speed_end_kph": 20.0,
                 "road": {
                     "mode": "ISO8608",
                     "iso_class": "D",
@@ -303,8 +303,8 @@ def _ready_ring_spec(*, wheelbase_m: float) -> dict[str, Any]:
             {
                 "name": "S4_поворот_вправо",
                 "duration_s": 3.5,
-                "drive_mode": "TURN_RIGHT",
-                "speed_kph": 20.0,
+                "turn_direction": "RIGHT",
+                "speed_end_kph": 20.0,
                 "turn_radius_m": 35.0,
                 "road": {
                     "mode": "SINE",
@@ -450,6 +450,8 @@ def build_optimization_ready_suite_rows(
     rows = _normalize_suite_rows(source_rows)
     generated_profile = _materialize_generated_profile(paths, wheelbase_m=wheelbase_m)
     generated_ring = _materialize_generated_ring(paths, wheelbase_m=wheelbase_m)
+    generated_ring_meta = dict(generated_ring.get("meta") or {})
+    ring_v0_kph = _safe_float(generated_ring_meta.get("v0_kph"), 20.0)
 
     updated_rows: list[dict[str, Any]] = []
     for rec in rows:
@@ -459,9 +461,9 @@ def build_optimization_ready_suite_rows(
             item["тип"] = "maneuver_csv"
             item["включен"] = True
             item["стадия"] = 2
-            item["dt"] = _safe_float(generated_ring.get("dt_s"), 0.01)
-            item["t_end"] = _safe_float(generated_ring.get("lap_time_s"), 15.0)
-            item["vx0_м_с"] = READY_PROFILE_SPEED_MPS
+            item["dt"] = _safe_float(generated_ring_meta.get("dt_s"), 0.01)
+            item["t_end"] = _safe_float(generated_ring_meta.get("lap_time_s"), 15.0)
+            item["vx0_м_с"] = float(max(0.0, ring_v0_kph / 3.6))
             item["auto_t_end_from_len"] = False
             item["road_csv"] = str(generated_ring.get("road_csv") or "")
             item["axay_csv"] = str(generated_ring.get("axay_csv") or "")

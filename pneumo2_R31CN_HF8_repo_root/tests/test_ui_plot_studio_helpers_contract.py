@@ -42,13 +42,13 @@ def test_entrypoints_use_shared_plot_studio_helper_without_local_duplicates() ->
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_plot_studio_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_plot_studio_helpers import (" in heavy_text
+    assert "from pneumo_solver_ui.ui_plot_surface_profile_helpers import (" in app_text
+    assert "from pneumo_solver_ui.ui_plot_surface_profile_helpers import (" in heavy_text
     assert "def plot_studio_timeseries(" not in app_text
     assert "def plot_studio_timeseries(" not in heavy_text
     assert "def _legacy_plot_studio_timeseries_dead(" in app_text
     assert "def _legacy_plot_studio_timeseries_dead(" in heavy_text
-    assert "plot_studio_timeseries = partial(" in app_text
-    assert "plot_studio_timeseries = partial(" in heavy_text
+    assert "plot_studio_timeseries = build_plot_studio_renderer(" in app_text
+    assert "plot_studio_timeseries = build_plot_studio_renderer(" in heavy_text
     assert "missing_plotly_message=" in app_text
     assert "missing_plotly_message=" in heavy_text

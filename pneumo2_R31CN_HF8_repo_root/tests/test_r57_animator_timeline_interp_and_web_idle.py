@@ -12,6 +12,7 @@ from pneumo_solver_ui.desktop_animator.geom3d_helpers import (
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = (ROOT / 'pneumo_solver_ui' / 'desktop_animator' / 'app.py').read_text(encoding='utf-8')
+HMI = (ROOT / 'pneumo_solver_ui' / 'desktop_animator' / 'hmi_widgets.py').read_text(encoding='utf-8')
 PLAYHEAD = (ROOT / 'pneumo_solver_ui' / 'components' / 'playhead_ctrl' / 'index.html').read_text(encoding='utf-8')
 PLAYHEAD_UNIFIED = (ROOT / 'pneumo_solver_ui' / 'components' / 'playhead_ctrl' / 'index_unified_v1.html').read_text(encoding='utf-8')
 ROAD = (ROOT / 'pneumo_solver_ui' / 'components' / 'road_profile_live' / 'index.html').read_text(encoding='utf-8')
@@ -53,6 +54,11 @@ def test_front_and_side_helper_views_now_accept_continuous_sample_t() -> None:
     assert APP.count('_sample_series_local(') >= 2
     assert 'if panel in (self.hud, self.axleF, self.axleR, self.sideL, self.sideR):' in APP
     assert 'sample_t=self._playback_sample_t_s if bool(playing) else None' in APP
+    assert 'def set_playhead_time(self, sample_t: float | None, *, idx: int):' in HMI
+    assert 'play_t = self._normalized_playhead_time(sample_t, idx_i)' in HMI
+    assert 'u = (play_t - t0) / dt' in HMI
+    assert 'lambda: self.timeline.set_playhead_time(self._playback_sample_t_s, idx=idx),' in APP
+    assert 'lambda: self.timeline.set_playhead_time(self._playback_sample_t_s, idx=i),' in APP
 
 
 def test_playback_service_interval_is_tightened_for_high_speed_without_restoring_busy_loop() -> None:

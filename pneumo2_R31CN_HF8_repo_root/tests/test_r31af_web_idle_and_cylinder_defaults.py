@@ -13,14 +13,19 @@ def _default_base() -> dict:
 
 def test_web_followers_use_very_long_idle_sleep_and_event_driven_wakeups() -> None:
     files = [ROOT / 'pneumo_solver_ui' / 'app.py', ROOT / 'pneumo_solver_ui' / 'pneumo_ui_app.py']
+    html_sources = [
+        ROOT / 'pneumo_solver_ui' / 'ui_flow_panel_helpers.py',
+        ROOT / 'pneumo_solver_ui' / 'ui_svg_html_builders.py',
+    ]
+    files += html_sources
     files += sorted((ROOT / 'pneumo_solver_ui' / 'components').rglob('*.html'))
     for path in files:
         src = path.read_text(encoding='utf-8')
-        if '__nextIdleMs(' not in src:
-            continue
-        assert '__nextIdleMs(60000, 180000, 300000)' in src, str(path)
-        assert '__nextIdleMs(15000, 30000, 60000)' not in src, str(path)
-        assert 'visibilitychange' in src or 'storage' in src or 'focus' in src, str(path)
+        assert '__nextIdleMs(60000, 180000, 300000)' not in src, str(path)
+        if path in html_sources or path.suffix == '.html':
+            assert "window.addEventListener('scroll'" in src, str(path)
+            assert "window.addEventListener('resize'" in src, str(path)
+            assert 'visibilitychange' in src or 'storage' in src or 'focus' in src, str(path)
 
 
 def test_default_frame_side_cylinder_mounts_snap_to_frame_top_and_side_planes() -> None:

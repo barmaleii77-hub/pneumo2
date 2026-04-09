@@ -11,7 +11,6 @@
 
 import json
 from pathlib import Path
-import importlib.util
 import streamlit as st
 from pneumo_solver_ui.ui_bootstrap import bootstrap
 from pneumo_solver_ui.ui_persistence import autosave_if_enabled
@@ -30,10 +29,6 @@ import pandas as pd
 from pneumo_solver_ui.module_loading import load_python_module_from_path
 
 HERE = Path(__file__).resolve().parent.parent
-
-
-def load_py_module(path: Path, module_name: str):
-    return load_python_module_from_path(path, module_name)
 
 
 st.title("Советник по конструкции — анализ узких мест")
@@ -92,8 +87,8 @@ if run:
     else:
         test = {"тип":"диагональ", "amp_m":0.02, "freq_Hz":2.0, "t_end":float(t_end)}
 
-    model = load_py_module(model_path, 'model_for_design')
-    da = load_py_module(HERE / 'design_advisor.py', 'design_advisor')
+    model = load_python_module_from_path(model_path, 'model_for_design')
+    da = load_python_module_from_path(HERE / 'design_advisor.py', 'design_advisor')
 
     st.info("Симуляция запускается с record_full=True (давления/расходы по каждому ребру).")
     df, info = da.analyze_one_run(model, params, test, dt=float(dt), t_end=float(t_end))

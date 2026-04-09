@@ -7,7 +7,12 @@ from typing import Any, Dict, Iterable, Optional
 
 import numpy as np
 
-from .scenario_ring import generate_ring_tracks, summarize_ring_track_segments, generate_ring_drive_profile
+from .scenario_ring import (
+    _segment_motion_contract,
+    generate_ring_drive_profile,
+    generate_ring_tracks,
+    summarize_ring_track_segments,
+)
 
 
 _SEGMENT_PALETTE = [
@@ -20,6 +25,14 @@ _SEGMENT_PALETTE = [
     "#06b6d4",  # cyan
     "#f43f5e",  # rose
 ]
+
+
+def _turn_direction_label(direction: str) -> str:
+    return {
+        "STRAIGHT": "Прямо",
+        "LEFT": "Поворот влево",
+        "RIGHT": "Поворот вправо",
+    }.get(str(direction).upper(), str(direction))
 
 
 def _json_load(path: Path) -> Optional[dict]:
@@ -127,6 +140,14 @@ def build_ring_visual_payload_from_spec(
     segs = list(spec.get("segments") or [])
     for i, row in enumerate(rows):
         seg_src = segs[i] if i < len(segs) and isinstance(segs[i], dict) else {}
+        try:
+            row_v_start_kph = float(row.get("speed_start_kph", 0.0) or 0.0)
+        except Exception:
+            row_v_start_kph = 0.0
+        motion = _segment_motion_contract(seg_src, row_v_start_kph)
+        turn_direction = str(
+            row.get("turn_direction") or motion.get("turn_direction") or "STRAIGHT"
+        ).upper()
         kappa_signed = float(_segment_curvature_signed(seg_src))
         x0 = float(row.get("x_start_m", 0.0) or 0.0)
         x1 = float(row.get("x_end_m", x0) or x0)
@@ -138,6 +159,10 @@ def build_ring_visual_payload_from_spec(
                 "seg_idx": int(row.get("seg_idx", i + 1) or (i + 1)),
                 "name": str(row.get("name") or f"S{i+1}"),
                 "drive_mode": str(row.get("drive_mode") or ""),
+                "turn_direction": turn_direction,
+                "turn_direction_label": _turn_direction_label(turn_direction),
+                "speed_start_kph": float(row.get("speed_start_kph", motion.get("speed_start_kph", 0.0)) or 0.0),
+                "speed_end_kph": float(row.get("speed_end_kph", motion.get("speed_end_kph", 0.0)) or 0.0),
                 "road_mode": str(row.get("road_mode") or ""),
                 "x_start_m": x0,
                 "x_end_m": x1,
@@ -269,6 +294,8 @@ def build_segment_ranges_from_progress(
         out.append({
             "seg_idx": int(seg.get("seg_idx", cur + 1) or (cur + 1)),
             "name": str(seg.get("name") or f"S{cur+1}"),
+            "turn_direction": str(seg.get("turn_direction") or ""),
+            "turn_direction_label": str(seg.get("turn_direction_label") or ""),
             "color": str(seg.get("edge_color") or _SEGMENT_PALETTE[cur % len(_SEGMENT_PALETTE)]),
             "edge_color": str(seg.get("edge_color") or _SEGMENT_PALETTE[cur % len(_SEGMENT_PALETTE)]),
             "idx0": int(start),

@@ -29,7 +29,6 @@ import argparse
 import json
 from pathlib import Path
 from datetime import datetime
-import importlib.util
 
 import numpy as np
 import pandas as pd
@@ -41,11 +40,6 @@ from pneumo_solver_ui.packaging_surface_helpers import (
 
 
 HERE = Path(__file__).resolve().parent
-
-
-def load_py_module(path: Path, module_name: str):
-    return load_python_module_from_path(path, module_name)
-
 
 
 def fmt(x, nd: int = 4):
@@ -75,8 +69,8 @@ def main() -> int:
     base = json.loads(base_path.read_text(encoding='utf-8'))
     suite = json.loads(suite_path.read_text(encoding='utf-8'))
 
-    model = load_py_module(model_path, 'pneumo_model')
-    worker = load_py_module(worker_path, 'pneumo_worker')
+    model = load_python_module_from_path(model_path, 'pneumo_model')
+    worker = load_python_module_from_path(worker_path, 'pneumo_worker')
 
     tests = worker.build_test_suite({'suite': suite})
 

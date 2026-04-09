@@ -41,6 +41,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from pneumo_solver_ui.ui_streamlit_surface_helpers import safe_plotly_chart
 
 # NPZ index / traceability (optional)
 try:
@@ -145,43 +146,6 @@ def _slugify(name: str) -> str:
     s = s.strip("_")
     return s or "session"
 
-
-def safe_plotly_chart(st, fig, *, key: Optional[str] = None, on_select=None, selection_mode=None):
-    """Совместимость со старыми/новыми Streamlit API для Plotly.
-
-    Streamlit постепенно менял сигнатуру plotly_chart:
-      * более новые версии поддерживают width="stretch" + (on_select/selection_mode)
-      * более старые — width="stretch"
-
-    Здесь мы делаем progressive fallback так, чтобы UI не падал.
-    """
-    base_kwargs = {}
-    if key is not None:
-        base_kwargs["key"] = key
-
-    # New API first
-    kwargs = dict(base_kwargs)
-    kwargs["width"] = "stretch"
-    if on_select is not None:
-        kwargs["on_select"] = on_select
-    if selection_mode is not None:
-        kwargs["selection_mode"] = selection_mode
-    try:
-        return st.plotly_chart(fig, **kwargs)
-    except TypeError:
-        pass
-
-    # Retry without selection extras
-    try:
-        return st.plotly_chart(fig, width="stretch", **base_kwargs)
-    except TypeError:
-        pass
-
-    # Old API fallback
-    try:
-        return st.plotly_chart(fig, width="stretch", **base_kwargs)
-    except TypeError:
-        return st.plotly_chart(fig, **base_kwargs)
 
 def _extract_plotly_selection_points(selection_state: Any) -> List[dict]:
     """Best-effort extract list of selected points from Streamlit Plotly selection state."""

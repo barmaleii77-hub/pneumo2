@@ -16,6 +16,10 @@ COMPONENTS = [
     ROOT / 'pneumo_solver_ui' / 'components' / 'playhead_ctrl' / 'index.html',
     ROOT / 'pneumo_solver_ui' / 'components' / 'playhead_ctrl' / 'index_unified_v1.html',
 ]
+EMBEDDED_HTML_SOURCES = [
+    ROOT / 'pneumo_solver_ui' / 'ui_flow_panel_helpers.py',
+    ROOT / 'pneumo_solver_ui' / 'ui_svg_html_builders.py',
+]
 
 
 def test_desktop_animator_uses_display_rate_playback_instead_of_4ms_frame_chasing() -> None:
@@ -51,7 +55,7 @@ def test_auxiliary_panes_are_restored_to_live_cadence_during_playback() -> None:
 
 
 def test_web_followers_stop_idle_polling_and_wake_from_scroll_resize_focus_visibility() -> None:
-    for path in COMPONENTS:
+    for path in COMPONENTS + EMBEDDED_HTML_SOURCES:
         src = path.read_text(encoding='utf-8')
         assert '__nextIdleMs(60000, 180000, 300000)' not in src, path
         assert "window.addEventListener('scroll'" in src, path
@@ -60,5 +64,3 @@ def test_web_followers_stop_idle_polling_and_wake_from_scroll_resize_focus_visib
     for rel in ['pneumo_solver_ui/app.py', 'pneumo_solver_ui/pneumo_ui_app.py']:
         src = (ROOT / rel).read_text(encoding='utf-8')
         assert '__nextIdleMs(60000, 180000, 300000)' not in src, rel
-        assert "window.addEventListener('scroll'" in src, rel
-        assert "window.addEventListener('resize'" in src, rel

@@ -268,6 +268,13 @@ def get_entries() -> list[PageEntry]:
         "06_CompareRuns.py": dict(section="Анализ", group="Сравнение", title="Сравнение прогонов", icon="⚖️"),
         "07_DesktopAnimator.py": dict(section="Визуализация", group="Анимация", title="Анимация (desktop)", icon="🎞️"),
         "08_DesktopAnimator.py": dict(section="Визуализация", group="Анимация", title="Анимация 2 (desktop)", icon="🎞️"),
+        "08_DesktopMnemo.py": dict(
+            section="Визуализация",
+            group="Анимация",
+            title="Мнемосхема (desktop)",
+            icon="🫁",
+            help="Отдельное HMI-окно с анимированной мнемосхемой, follow-режимом и трендами по выбранным узлам.",
+        ),
         "11_AnimationCockpit_Web.py": dict(section="Визуализация", group="Анимация", title="Анимация (web cockpit)", icon="🕹️"),
         "12_ResultsViewer.py": dict(section="Анализ", group="Результаты", title="Просмотр результатов", icon="📊"),
         "20_ParamsGuide.py": dict(section="Справка", group="Параметры", title="Справочник параметров", icon="📌"),

@@ -15,6 +15,12 @@ def test_active_wrappers_use_canonical_module_loading_helper() -> None:
         ROOT / "pneumo_solver_ui" / "self_check.py",
         ROOT / "pneumo_solver_ui" / "uncertainty_advisor.py",
         ROOT / "pneumo_solver_ui" / "generate_scheme_fingerprint.py",
+        ROOT / "pneumo_solver_ui" / "calibration" / "fit_worker_v3_suite_identify.py",
+        ROOT / "pneumo_solver_ui" / "calibration" / "oed_worker_v1_fim.py",
+        ROOT / "pneumo_solver_ui" / "calibration" / "plot_fit_timeseries_v1.py",
+        ROOT / "pneumo_solver_ui" / "calibration" / "profile_worker_v1_likelihood.py",
+        ROOT / "pneumo_solver_ui" / "calibration" / "system_influence_report_v1.py",
+        ROOT / "pneumo_solver_ui" / "calibration" / "time_align_v1.py",
         ROOT / "pneumo_solver_ui" / "pages" / "03_DesignAdvisor.py",
         ROOT / "pneumo_solver_ui" / "pages" / "04_Uncertainty.py",
         ROOT / "pneumo_solver_ui" / "opt_worker_v3_margins_energy.py",
@@ -23,6 +29,8 @@ def test_active_wrappers_use_canonical_module_loading_helper() -> None:
     for path in files:
         text = path.read_text(encoding="utf-8")
         assert "load_python_module_from_path" in text, f"helper missing in {path.name}"
+        if path.name != "eval_core.py":
+            assert "def load_py_module" not in text, f"legacy wrapper still present in {path.name}"
 
     opt_worker = (ROOT / "pneumo_solver_ui" / "opt_worker_v3_margins_energy.py").read_text(encoding="utf-8")
     assert "load_python_module_from_path" in opt_worker

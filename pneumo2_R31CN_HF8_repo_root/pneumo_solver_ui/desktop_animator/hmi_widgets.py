@@ -647,6 +647,8 @@ class EventTimelineWidget(QtWidgets.QWidget):
         self._lanes: List[_Lane] = []
         self._markers: List[int] = []  # segment transitions etc
         self._idx: int = 0
+        self._playhead_t_s: Optional[float] = None
+        self._playhead_px_key: Optional[int] = None
         self._label_w = 120
         self._pad = 6
         self._static_cache_key: Optional[tuple[int, int, Any]] = None
@@ -667,6 +669,7 @@ class EventTimelineWidget(QtWidgets.QWidget):
 
     def resizeEvent(self, event: QtGui.QResizeEvent):  # type: ignore[override]
         self._invalidate_static_cache()
+        self._playhead_px_key = None
         super().resizeEvent(event)
 
     def set_bundle(self, b):
@@ -674,6 +677,8 @@ class EventTimelineWidget(QtWidgets.QWidget):
         t = np.asarray(getattr(b, "t", np.zeros((0,), dtype=float)), dtype=float)
         self._t = t
         self._idx = 0
+        self._playhead_t_s = float(t[0]) if t.size else None
+        self._playhead_px_key = None
         self._lanes = []
         self._markers = []
         self._static_data_key = None
@@ -796,12 +801,45 @@ class EventTimelineWidget(QtWidgets.QWidget):
 
         self.update()
 
-    def set_index(self, idx: int):
-        idx_i = int(max(0, idx))
-        if idx_i == self._idx:
+    def _normalized_playhead_time(self, sample_t: float | None, idx_i: int) -> float:
+        t = self._t
+        if t is None or t.size == 0:
+            return 0.0
+        ii = int(_clamp(idx_i, 0, int(t.size) - 1))
+        if sample_t is None or not np.isfinite(float(sample_t)):
+            return float(t[ii])
+        return float(np.clip(float(sample_t), float(t[0]), float(t[-1])))
+
+    def _playhead_visual_key(self, play_t: float) -> Optional[int]:
+        t = self._t
+        if t is None or t.size == 0:
+            return None
+        x0 = int(self._label_w + self._pad)
+        x1 = int(self.width() - self._pad)
+        w = max(1, x1 - x0)
+        t0 = float(t[0])
+        t1 = float(t[-1])
+        dt = max(1e-9, t1 - t0)
+        u = (float(play_t) - t0) / dt
+        return int(x0 + _clamp(u, 0.0, 1.0) * w)
+
+    def set_playhead_time(self, sample_t: float | None, *, idx: int):
+        t = self._t
+        if t is None or t.size == 0:
             return
+        idx_i = int(_clamp(int(idx), 0, int(t.size) - 1))
+        play_t = self._normalized_playhead_time(sample_t, idx_i)
+        key = self._playhead_visual_key(play_t)
+        idx_changed = idx_i != self._idx
+        key_changed = key != self._playhead_px_key
         self._idx = idx_i
-        self.update()
+        self._playhead_t_s = play_t
+        self._playhead_px_key = key
+        if idx_changed or key_changed:
+            self.update()
+
+    def set_index(self, idx: int):
+        self.set_playhead_time(None, idx=idx)
 
     def mousePressEvent(self, ev: QtGui.QMouseEvent):
         if self._t is None or self._t.size == 0:
@@ -933,6 +971,7 @@ class EventTimelineWidget(QtWidgets.QWidget):
         t = self._t
         n = int(t.size)
         idx = int(_clamp(self._idx, 0, n - 1))
+        play_t = self._normalized_playhead_time(self._playhead_t_s, idx)
 
         pad = self._pad
         label_w = int(self._label_w)
@@ -948,6 +987,6 @@ class EventTimelineWidget(QtWidgets.QWidget):
 
         # playhead line
         p.setPen(QtGui.QPen(self._play, 2))
-        u = (float(t[idx]) - t0) / dt
+        u = (play_t - t0) / dt
         xx = int(x0 + _clamp(u, 0.0, 1.0) * w)
         p.drawLine(xx, top, xx, r.height() - pad)

@@ -211,10 +211,9 @@ def test_entrypoints_use_shared_playhead_value_helpers() -> None:
     assert "safe_dataframe_fn=safe_dataframe_fn" in section_text
     assert "caption_fn=caption_fn" in section_text
     assert "checkbox_fn=checkbox_fn" in section_text
+    assert "stroke_unit=stroke_unit" in section_text
     assert "pressure_from_pa_fn=pa_abs_to_atm_g" in app_text
-    assert 'stroke_unit="м"' in app_text
     assert "pressure_from_pa_fn=pa_abs_to_bar_g" in heavy_text
-    assert 'stroke_unit="мм"' in heavy_text
     assert "from pneumo_solver_ui.ui_playhead_value_helpers import (" not in app_text
     assert "from pneumo_solver_ui.ui_playhead_value_helpers import (" not in heavy_text
     assert "nearest_time_index(df_main, playhead_x)" not in app_text

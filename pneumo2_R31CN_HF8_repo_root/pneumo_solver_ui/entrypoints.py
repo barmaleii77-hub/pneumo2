@@ -48,6 +48,11 @@ def desktop_animator_page(*, here: str | Path | None = None) -> Path:
     return repo_root(here=here) / "pneumo_solver_ui" / "pages" / "08_DesktopAnimator.py"
 
 
+def desktop_mnemo_page(*, here: str | Path | None = None) -> Path:
+    """Desktop Mnemo page inside the multipage UI."""
+    return repo_root(here=here) / "pneumo_solver_ui" / "pages" / "08_DesktopMnemo.py"
+
+
 def validation_web_page(*, here: str | Path | None = None) -> Path:
     """Validation page used as the next step after preflight."""
     return repo_root(here=here) / "pneumo_solver_ui" / "pages" / "09_Validation_Web.py"
@@ -85,6 +90,10 @@ def legacy_single_page_entrypoint_rel(*, here: str | Path | None = None) -> str:
 
 def desktop_animator_page_rel(*, here: str | Path | None = None) -> str:
     return repo_relative(desktop_animator_page(here=here), here=here)
+
+
+def desktop_mnemo_page_rel(*, here: str | Path | None = None) -> str:
+    return repo_relative(desktop_mnemo_page(here=here), here=here)
 
 
 def validation_web_page_rel(*, here: str | Path | None = None) -> str:
@@ -135,6 +144,8 @@ __all__ = [
     "legacy_single_page_entrypoint_rel",
     "desktop_animator_page",
     "desktop_animator_page_rel",
+    "desktop_mnemo_page",
+    "desktop_mnemo_page_rel",
     "validation_web_page",
     "validation_web_page_rel",
     "env_diagnostics_page",

@@ -47,7 +47,6 @@ python calibration/plot_fit_timeseries_v1.py ^
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import math
 import re
@@ -74,10 +73,6 @@ from pneumo_solver_ui.module_loading import load_python_module_from_path
 def _load_json(p: Path) -> Any:
     with open(p, "r", encoding="utf-8") as f:
         return json.load(f)
-
-
-def load_py_module(path: Path, module_name: str):
-    return load_python_module_from_path(path, module_name)
 
 
 def _npz_to_df(cols_key: str, values_key: str, z: np.lib.npyio.NpzFile) -> Optional[pd.DataFrame]:
@@ -262,8 +257,8 @@ def main():
     import matplotlib.pyplot as plt
 
     project_root = Path(__file__).resolve().parents[1]
-    model_mod = load_py_module(project_root / args.model, "model_mod_plot_fit")
-    worker_mod = load_py_module(project_root / args.worker, "worker_mod_plot_fit")
+    model_mod = load_python_module_from_path(project_root / args.model, "model_mod_plot_fit")
+    worker_mod = load_python_module_from_path(project_root / args.worker, "worker_mod_plot_fit")
 
     osc_dir = Path(args.osc_dir)
     suite_obj = _load_json(project_root / args.suite_json)

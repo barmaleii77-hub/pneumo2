@@ -18,8 +18,8 @@ def test_cylinder_visual_stack_contains_shell_chamber_rod_piston_and_frame_mount
 
 
 def test_outer_housing_shell_is_weakened_while_internal_layers_stay_readable() -> None:
-    assert 'edgeColor=(0.18, 0.62, 0.88, 0.38)' in APP
+    assert 'edgeColor=(0.18, 0.62, 0.88, 0.26)' in APP
     assert 'body.setGLOptions("translucent")' in APP
-    assert 'edgeColor=(0.12, 0.84, 1.00, 0.96)' in APP
-    assert 'color=(0.20, 0.74, 0.98, 0.24)' in APP
+    assert 'drawEdges=False' in APP
+    assert 'color=(0.20, 0.74, 0.98, 0.08)' in APP
     assert 'color=(1.00, 0.88, 0.22, 0.88)' in APP

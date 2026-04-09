@@ -91,6 +91,12 @@ def test_entrypoints_use_shared_unit_helpers_without_local_duplicates() -> None:
 
     assert "from pneumo_solver_ui.ui_unit_helpers import (" in app_text
     assert "from pneumo_solver_ui.ui_unit_helpers import (" in heavy_text
+    assert "from pneumo_solver_ui.ui_unit_profile_helpers import (" in app_text
+    assert "from pneumo_solver_ui.ui_unit_profile_helpers import (" in heavy_text
+    assert "build_ui_unit_profile(" in app_text
+    assert "build_ui_unit_profile(" in heavy_text
+    assert "build_gauge_pressure_profile(" not in app_text
+    assert "build_gauge_pressure_profile(" in heavy_text
 
     for pattern in [
         "def _infer_unit_and_transform(",
@@ -115,7 +121,11 @@ def test_entrypoints_use_shared_unit_helpers_without_local_duplicates() -> None:
     ]:
         assert pattern not in heavy_text
 
-    assert "_infer_unit_and_transform = partial(" in app_text
-    assert "_infer_unit_and_transform = partial(" in heavy_text
-    assert "param_unit = partial(" in app_text
-    assert "param_unit = partial(" in heavy_text
+    assert "build_plot_unit_transformer(" not in app_text
+    assert "build_plot_unit_transformer(" not in heavy_text
+    assert "build_pressure_gauge_converters(" not in app_text
+    assert "build_pressure_gauge_converters(" not in heavy_text
+    assert "build_param_unit_labeler(" not in app_text
+    assert "build_param_unit_labeler(" not in heavy_text
+    assert "build_si_ui_converters(" not in app_text
+    assert "build_si_ui_converters(" not in heavy_text
