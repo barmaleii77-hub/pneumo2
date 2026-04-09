@@ -1,78 +1,80 @@
 {
   "recorded_at_local_date": "2026-04-08",
-  "recorded_from_directory": "C:\\Users\\User\\Downloads",
+  "recorded_from_directory": "C:\\Users\\Admin\\Downloads",
   "recording_policy": {
     "raw_external_archives_are_vendored": false,
-    "repo_fixation_strategy": "curated_digest_only",
-    "note": "Raw external snapshots remain outside git; this digest records provenance, authority order and working fields."
+    "repo_fixation_strategy": "tracked_digest_plus_gitignored_workspace_mirror",
+    "gitignored_project_mirror_dir": "workspace/external_context_snapshots",
+    "note": "Raw external snapshots are mirrored into the project workspace for local work, but git tracks only this digest and source notes."
   },
   "authority_chain": {
     "full_canonical_context": {
-      "file": "AI_WISHLIST_CANONICAL_OMNIBUS_DIAGRAMS_CHAT_SUPPLEMENT_2026-04-08.json.gz",
+      "file": "AI_WISHLIST_CANONICAL_OMNIBUS_DIRECT_CHAT_SUPPLEMENT_2026-04-08.json.gz",
       "schema_version": "ai_wishlist_canonical_unified/v3",
-      "generated_at_utc": "2026-04-08T09:44:29Z",
-      "sha256": "b803cf2605091ccbc154c4d4ce362458218370868b2ae04064df4c40e14f4a47",
-      "size_bytes": 29274035,
-      "role": "Most complete external canonical pack with remote registry, MHTML/PDF corpus and branch chronology layers.",
+      "generated_at_utc": "2026-04-08T08:45:16Z",
+      "sha256": "b3de508f78addfa98179d7d3abe86517540b5958f6fd472b36d07c7c76c46dd3",
+      "size_bytes": 29392864,
+      "top_level_keys": 36,
+      "local_project_copy": "workspace/external_context_snapshots/AI_WISHLIST_CANONICAL_OMNIBUS_DIRECT_CHAT_SUPPLEMENT_2026-04-08.json.gz",
+      "role": "Most complete external canonical pack with remote registry, Google Drive provenance, MHTML/PDF context and direct chat snapshots.",
       "preferred_when": [
-        "Need raw machine layers or content store",
-        "Need remote registry or uploaded MHTML evidence",
-        "Need project_context.main_gaps or next_steps_in_code with full provenance"
+        "Need raw provenance or evidence layers",
+        "Need remote source registry or Drive folder context",
+        "Need direct chat MHTML snapshots",
+        "Need full release evidence timeline and runtime history"
+      ],
+      "notable_layers": [
+        "remote_source_registry",
+        "quinary_remote_drive_layer",
+        "senary_mhtml_context_archive_layer",
+        "septenary_pdf_context_archive_layer",
+        "octonary_direct_chat_mhtml_layer"
       ]
     },
     "llm_default_context": {
-      "file": "AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json",
       "gzip_file": "AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json.gz",
       "schema_version": "ai_wishlist_canonical_unified/v3-llm-slim",
-      "profile_id": "omnibus_llm_slim_v1",
       "generated_at_utc": "2026-04-08T10:40:19Z",
-      "sha256": "88205a9ab61b0883f0f3cdb5d94ee130bbcd51c815f4046a864ec2bf8d8360f8",
-      "gzip_sha256": "d584f5ebeb5503a9dfcdc6f9ceb332565e86c29cc6c1aacc063d83f20b1e7c6a",
-      "size_bytes": 10127124,
-      "gzip_size_bytes": 1219883,
-      "parent_full_file": "AI_WISHLIST_CANONICAL_OMNIBUS_DIAGRAMS_CHAT_SUPPLEMENT_2026-04-08.json.gz",
-      "role": "Default external AI working context with high-signal indexes and excerpts, without duplicating raw corpora."
-    },
-    "manifests": {
-      "llm_slim_manifest": {
-        "file": "AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_MANIFEST_2026-04-08.json",
-        "generated_at_utc": "2026-04-08T10:40:19Z",
-        "role": "Links full omnibus snapshot to slim cut and records sizes and checksums."
-      },
-      "mhtml_bridge_manifest": {
-        "file": "AI_WISHLIST_DIAGRAMS_CHAT_MHTML_MANIFEST_2026-04-08.json",
-        "generated_at_utc": "2026-04-08T09:44:29Z",
-        "based_on": "AI_WISHLIST_CANONICAL_OMNIBUS_PDF_SUPPLEMENT_2026-04-08.json.gz",
-        "new_full_file": "AI_WISHLIST_CANONICAL_OMNIBUS_DIAGRAMS_CHAT_SUPPLEMENT_2026-04-08.json",
-        "new_gzip_file": "AI_WISHLIST_CANONICAL_OMNIBUS_DIAGRAMS_CHAT_SUPPLEMENT_2026-04-08.json.gz",
-        "status_override_allowed": false,
-        "selected_current_release_kept": "R176_R31CN_HF8",
-        "role": "Confirms that uploaded MHTML/chat layers enrich provenance but do not override canonical release selection."
-      }
+      "sha256": "d584f5ebeb5503a9dfcdc6f9ceb332565e86c29cc6c1aacc063d83f20b1e7c6a",
+      "size_bytes": 1219883,
+      "top_level_keys": 38,
+      "local_project_copy": "workspace/external_context_snapshots/AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json.gz",
+      "role": "Default external AI working context with high-signal indexes, excerpts and governance/release layers.",
+      "preferred_when": [
+        "Need default external AI context",
+        "Need fast read of current release state and backlog",
+        "Need a compact machine-readable input for future work"
+      ],
+      "notable_layers": [
+        "llm_cut_profile",
+        "normalized_backlog",
+        "current_release_state",
+        "technical_runtime_evidence",
+        "progress_since_base_canonical",
+        "novenary_direct_upload_pending_layer"
+      ]
     }
   },
   "project_identity": {
     "project": "пневмоподвеска",
     "one_liner": "Симулятор пневмоподвески + механики как единой ODE/численной системы, с оптимизацией, телеметрией, анимацией и выходом к реальному Camozzi-прототипу.",
     "primary_objectives": [
-      "Реалистичный симулятор «пневматика + механика» как единая система.",
-      "Многопараметрическая оптимизация под комфорт/устойчивость/ограничения.",
+      "Реалистичный симулятор пневматики и механики как единой системы.",
+      "Многопараметрическая оптимизация под комфорт, устойчивость и ограничения.",
       "Полная проверяемость расчётов через логи, графики, анимацию и диагностику.",
       "Привязка к реальным компонентам Camozzi и подготовка к физическому прототипу."
-    ],
-    "recommended_entry_points": [
-      "`START_PNEUMO_APP.pyw` (Windows GUI launcher, автосоздание venv + зависимости + Streamlit)",
-      "`app.py` как ручная альтернатива"
     ]
   },
   "current_release_anchor": {
     "release": "R176_R31CN_HF8",
     "product_release": "PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03",
     "date_utc": "2026-04-03T00:00:00Z",
-    "base_release": "R176_R31CN_HF7",
+    "snapshot_backlog_items": 55,
     "open_p0_count": 25
   },
   "ai_quickstart": {
+    "default_external_source": "workspace/external_context_snapshots/AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json.gz",
+    "escalation_external_source": "workspace/external_context_snapshots/AI_WISHLIST_CANONICAL_OMNIBUS_DIRECT_CHAT_SUPPLEMENT_2026-04-08.json.gz",
     "recommended_read_order": [
       "absolute_laws",
       "frozen_constants",
@@ -85,23 +87,17 @@
       "normalized_backlog",
       "technical_runtime_evidence",
       "technical_reference_artifacts",
-      "engineering_todo_wishlist_aggregate.top_items_by_source_span",
+      "engineering_todo_wishlist_aggregate",
       "progress_since_base_canonical",
-      "markdown_archive_layer.curated_authoritative_docs",
       "release_evidence_timeline",
       "cross_archive_consistency_checks"
     ],
     "operational_rules_for_ai": [
       "Не придумывать новые параметры, скрытые алиасы или магические преобразования.",
-      "Если exporter или solver truth не хватает, требовать явный contract, паспорт или поле, а не гадать.",
+      "Если truth не хватает, требовать явный contract, паспорт или поле, а не гадать.",
       "Скрытую автоматику заменять явными режимами, логами и видимыми переключателями.",
-      "Для схемы и топологии доверять PNEUMO_SCHEME.json и scheme_fingerprint_v8_r48.",
-      "Для component facts использовать component_passport и явно отмечать missing_data.",
       "Для статуса релиза сначала читать current_release_state и technical_runtime_evidence.",
-      "Открытые governance gaps брать из requirements_governance.open_requirement_clusters.",
-      "Engineering TODO слой рассматривать как backlog для нормализации, а не как done-truth.",
-      "Если новый архив конфликтует с unified current_release_state, доверять unified current_release_state.",
-      "Для быстрого LLM-анализа сначала использовать slim-cut indexes и excerpts, а не raw corpora."
+      "Для быстрого AI-анализа сначала использовать LLM_SLIM, а к DIRECT_CHAT_SUPPLEMENT подниматься только при необходимости provenance или raw evidence."
     ]
   },
   "project_context": {
@@ -117,6 +113,19 @@
       "В default_base.json и default_ranges.json добавить параметры геометрии креплений и включить их в механику через кинематику.",
       "В opt_worker_*.py добавить длинный тест и ранний пакетный прогон по масса × температура × давления.",
       "В UI вывести профиль дороги и HUD по ключевым сигналам в механической анимации."
-    ]
+    ],
+    "storage_result": {
+      "saved_in_project": true,
+      "tracked_digest_files": [
+        "docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.md",
+        "docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.json",
+        "docs/PROJECT_SOURCES.md",
+        "docs/context/AI_SNAPSHOT_WORKING_DELTA_2026-04-08.md"
+      ],
+      "local_workspace_mirror_files": [
+        "workspace/external_context_snapshots/AI_WISHLIST_CANONICAL_OMNIBUS_DIRECT_CHAT_SUPPLEMENT_2026-04-08.json.gz",
+        "workspace/external_context_snapshots/AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json.gz"
+      ]
+    }
   }
 }

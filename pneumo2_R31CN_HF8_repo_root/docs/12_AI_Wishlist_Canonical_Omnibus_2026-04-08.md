@@ -2,120 +2,103 @@
 
 ## Что зафиксировано
 
-8 апреля 2026 я изучил внешний canonical knowledge pack из `C:\Users\User\Downloads` и зафиксировал в проекте его рабочую выжимку.
+8 апреля 2026 я изучил и сохранил в проекте два актуальных внешних snapshot-архива из `C:\Users\Admin\Downloads`:
 
-Речь идет о трех связанных слоях:
+1. `AI_WISHLIST_CANONICAL_OMNIBUS_DIRECT_CHAT_SUPPLEMENT_2026-04-08.json.gz`
+2. `AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json.gz`
 
-1. Полный внешний canonical snapshot:
-   `AI_WISHLIST_CANONICAL_OMNIBUS_DIAGRAMS_CHAT_SUPPLEMENT_2026-04-08.json.gz`
-2. Рабочий LLM-slim snapshot:
-   `AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json`
-   и
-   `AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json.gz`
-3. Manifest/provenance layer:
-   `AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_MANIFEST_2026-04-08.json`
-   и
-   `AI_WISHLIST_DIAGRAMS_CHAT_MHTML_MANIFEST_2026-04-08.json`
+Сырые архивы не вендорятся в git, но теперь лежат в локальном project mirror:
 
-Сырые внешние файлы не вендорятся в repo, чтобы не тащить десятки мегабайт в git. Вместо этого в проекте лежит эта заметка и машинно-читаемый digest рядом.
+- `workspace/external_context_snapshots/AI_WISHLIST_CANONICAL_OMNIBUS_DIRECT_CHAT_SUPPLEMENT_2026-04-08.json.gz`
+- `workspace/external_context_snapshots/AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json.gz`
+
+Это workspace-папка, она gitignored. Трекуемая часть фиксации в repo: эта заметка, JSON digest рядом и запись в `docs/PROJECT_SOURCES.md`.
 
 ## Иерархия источников
 
 ### 1. Full canonical context
 
-- Файл: `AI_WISHLIST_CANONICAL_OMNIBUS_DIAGRAMS_CHAT_SUPPLEMENT_2026-04-08.json.gz`
+- Файл: `AI_WISHLIST_CANONICAL_OMNIBUS_DIRECT_CHAT_SUPPLEMENT_2026-04-08.json.gz`
 - Schema: `ai_wishlist_canonical_unified/v3`
-- `generated_at_utc`: `2026-04-08T09:44:29Z`
-- `sha256`: `b803cf2605091ccbc154c4d4ce362458218370868b2ae04064df4c40e14f4a47`
-- `size_bytes`: `29274035`
+- `generated_at_utc`: `2026-04-08T08:45:16Z`
+- `sha256`: `b3de508f78addfa98179d7d3abe86517540b5958f6fd472b36d07c7c76c46dd3`
+- `size_bytes`: `29392864`
+- Верхних секций: `36`
 
-Использовать, когда нужен полный машинный слой:
+Использовать, когда нужен полный provenance/evidence слой:
 
-- `project_context.main_gaps` и `project_context.next_steps_in_code`
-- remote registry / Google Drive provenance
-- uploaded MHTML turn layer
-- content store / path index / raw highlighted evidence
+- `remote_source_registry`
+- `quinary_remote_drive_layer`
+- `senary_mhtml_context_archive_layer`
+- `septenary_pdf_context_archive_layer`
+- `octonary_direct_chat_mhtml_layer`
+- полный `technical_runtime_evidence` и `release_evidence_timeline`
 
 ### 2. Default LLM working source
 
-- Файл: `AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json`
-- Gzip: `AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json.gz`
+- Файл: `AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json.gz`
 - Schema: `ai_wishlist_canonical_unified/v3-llm-slim`
-- `profile_id`: `omnibus_llm_slim_v1`
 - `generated_at_utc`: `2026-04-08T10:40:19Z`
-- `sha256`: `88205a9ab61b0883f0f3cdb5d94ee130bbcd51c815f4046a864ec2bf8d8360f8`
-- `gzip_sha256`: `d584f5ebeb5503a9dfcdc6f9ceb332565e86c29cc6c1aacc063d83f20b1e7c6a`
-- `size_bytes`: `10127124`
-- `gzip_size_bytes`: `1219883`
+- `sha256`: `d584f5ebeb5503a9dfcdc6f9ceb332565e86c29cc6c1aacc063d83f20b1e7c6a`
+- `size_bytes`: `1219883`
+- Верхних секций: `38`
 
-Это основной внешний источник для AI/LLM-работы. В нем уже оставлены high-signal indexes, excerpts и policy-слой, а тяжелые raw corpora сознательно урезаны.
+Это основной внешний источник для AI-работы по умолчанию. В нем уже сохранены high-signal indexes, excerpts и governance/release слои без тяжелого raw corpus.
 
-### 3. Bridge / provenance manifests
+### 3. Как эти два слоя использовать вместе
 
-#### LLM slim manifest
+- Для обычной работы сначала читать `docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.json`.
+- Если нужен внешний raw context, по умолчанию подниматься к локальной mirror-копии `LLM_SLIM`.
+- Если нужен provenance, remote folder registry, direct chat MHTML или полный архив evidence, подниматься к `DIRECT_CHAT_SUPPLEMENT`.
 
-- Файл: `AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_MANIFEST_2026-04-08.json`
-- Родитель: `AI_WISHLIST_CANONICAL_OMNIBUS_DIAGRAMS_CHAT_SUPPLEMENT_2026-04-08.json.gz`
-- Назначение: связка `full -> slim`, размеры, sha256, retained/slimmed sections
-
-#### MHTML manifest
-
-- Файл: `AI_WISHLIST_DIAGRAMS_CHAT_MHTML_MANIFEST_2026-04-08.json`
-- `generated_at_utc`: `2026-04-08T09:44:29Z`
-- `based_on`: `AI_WISHLIST_CANONICAL_OMNIBUS_PDF_SUPPLEMENT_2026-04-08.json.gz`
-- `new_full_file`: `AI_WISHLIST_CANONICAL_OMNIBUS_DIAGRAMS_CHAT_SUPPLEMENT_2026-04-08.json`
-- `new_gzip_file`: `AI_WISHLIST_CANONICAL_OMNIBUS_DIAGRAMS_CHAT_SUPPLEMENT_2026-04-08.json.gz`
-
-Его главное правило для проекта:
-
-- uploaded MHTML/chat layers добавляют provenance и branch chronology
-- они не имеют права переопределять `absolute_laws`, `current_release_state` и release selection
-- authoritative current release остается `R176_R31CN_HF8`
-
-## Что это говорит о проекте
-
-### Идентичность проекта
-
-- Проект: `пневмоподвеска`
-- One-liner:
-  `Симулятор пневмоподвески + механики как единой ODE/численной системы, с оптимизацией, телеметрией, анимацией и выходом к реальному Camozzi-прототипу.`
-
-### Основные цели
-
-1. Реалистичный симулятор `пневматика + механика` как единая система.
-2. Многопараметрическая оптимизация под комфорт/устойчивость/ограничения.
-3. Полная проверяемость расчётов через логи, графики, анимацию и диагностику.
-4. Привязка к реальным компонентам Camozzi и подготовка к физическому прототипу.
-
-### Entry points из canonical snapshot
-
-1. `START_PNEUMO_APP.pyw`
-2. `app.py`
+## Что архивы подтверждают
 
 ### Release anchor
 
 - Selected release: `R176_R31CN_HF8`
 - Product release: `PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03`
+- Snapshot backlog items: `55`
 - Snapshot `open_p0_count`: `25`
 
-## Рабочие правила для AI и разработчика
+### Основной смысл full direct-chat supplement
 
-Из `ai_quickstart.operational_rules_for_ai` для этого repo особенно важны:
+Этот пакет расширяет обычный omnibus не новой бизнес-истиной, а новым контекстным слоем:
 
-1. Не придумывать новые параметры, скрытые алиасы и магические преобразования.
-2. Если truth не хватает, требовать явный contract/паспорт/поле, а не гадать.
-3. Скрытую автоматику заменять явными режимами, логами и видимыми переключателями.
-4. Для схемы/топологии доверять `PNEUMO_SCHEME.json` и `scheme_fingerprint_v8_r48`.
-5. Для component facts использовать `component_passport` и явно отмечать `missing_data`.
-6. Для статуса релиза сначала читать `current_release_state` и `technical_runtime_evidence`.
-7. Governance gaps брать из `requirements_governance.open_requirement_clusters`.
-8. Engineering TODO слой считать backlog-слоем для нормализации, а не готовым acceptance truth.
-9. При конфликте нового архива с unified `current_release_state` доверять unified `current_release_state`.
-10. Для быстрого LLM-анализа начинать со slim-cut excerpt/index слоев, а не с raw corpora.
+- remote registry источников
+- Google Drive provenance
+- MHTML/PDF context corpus
+- direct chat MHTML snapshots
+
+Он нужен для истории, доказательств, трассировки требований и branch chronology, но не переопределяет локальный канон проекта.
+
+### Основной смысл LLM slim
+
+Это сжатый рабочий срез для ежедневной AI-работы:
+
+- `absolute_laws`
+- `frozen_constants`
+- `project_identity`
+- `current_release_state`
+- `requirements_governance`
+- `project_context`
+- `normalized_backlog`
+- `technical_runtime_evidence`
+- `progress_since_base_canonical`
+
+Именно его удобнее считать default external context source для дальнейшей разработки.
+
+## Рабочие выводы для текущего repo
+
+1. Эти два архива теперь считаются сохраненными project-context источниками.
+2. Локальный tracked digest и `PROJECT_SOURCES` обновлены под них.
+3. Raw gzip-копии доступны прямо внутри проекта в `workspace/external_context_snapshots/`.
+4. При конфликте между этими архивами и локальным каноном проекта приоритет остаётся за:
+   `00_READ_FIRST__ABSOLUTE_LAW.md`,
+   `01_PARAMETER_REGISTRY.md`,
+   `DATA_CONTRACT_UNIFIED_KEYS.md`
+5. Для следующей AI-работы default external source: `LLM_SLIM`, escalation source: `DIRECT_CHAT_SUPPLEMENT`.
 
 ## Recommended read order
-
-Использовать такой порядок чтения:
 
 1. `absolute_laws`
 2. `frozen_constants`
@@ -128,35 +111,18 @@
 9. `normalized_backlog`
 10. `technical_runtime_evidence`
 11. `technical_reference_artifacts`
-12. `engineering_todo_wishlist_aggregate.top_items_by_source_span`
+12. `engineering_todo_wishlist_aggregate`
 13. `progress_since_base_canonical`
-14. `markdown_archive_layer.curated_authoritative_docs`
-15. `release_evidence_timeline`
-16. `cross_archive_consistency_checks`
-
-## Главные gaps и next steps in code
-
-### Main gaps
-
-1. Геометрия крепления цилиндров/рычагов пока не параметризована.
-2. Нет полноценной модели разных пар цилиндров с разным ходом.
-3. Пружинные packaging constraints учтены только частично.
-4. Нужен длинный suite по массе/температуре/давлениям.
-5. Требуется расширить набор сигналов для проверки и логирования.
-
-### Next steps in code
-
-1. В `model_*.py` добавить расширенное логирование:
-   скорости, ускорения, ЦТ, углы рамы, относительные ходы.
-2. В `default_base.json` и `default_ranges.json` добавить параметры геометрии креплений и включить их в механику через кинематику.
-3. В `opt_worker_*.py` добавить длинный тест и ранний пакетный прогон по `(масса × температура × давления)`.
-4. В UI вывести профиль дороги и HUD по ключевым сигналам в механической анимации.
+14. `release_evidence_timeline`
+15. `cross_archive_consistency_checks`
 
 ## Как использовать это в repo
 
 1. Для быстрой ориентации внутри проекта начинать с:
    `docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.json`
    и этой заметки.
-2. Для внешнего AI/context bootstrap по умолчанию считать LLM-slim snapshot рабочим источником.
-3. Если нужен raw evidence / remote layer / branch chronology, подниматься к full gzip snapshot.
+2. Для локальной AI-работы с raw snapshot по умолчанию использовать:
+   `workspace/external_context_snapshots/AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json.gz`
+3. Для глубокого provenance/evidence разбора использовать:
+   `workspace/external_context_snapshots/AI_WISHLIST_CANONICAL_OMNIBUS_DIRECT_CHAT_SUPPLEMENT_2026-04-08.json.gz`
 4. Эти snapshots являются источником контекста и требований, но не переопределяют локальный `ABSOLUTE LAW`, parameter registry и data contract.

@@ -11,8 +11,11 @@
 
 ## Зафиксированные внешние AI snapshots
 
-- `docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.md` — локально зафиксированная human-readable выжимка внешнего canonical omnibus knowledge pack от 2026-04-08.
-- `docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.json` — машинно-читаемый digest того же пакета для AI/bootstrap/use-as-context сценариев.
+- `docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.md` — локально зафиксированная human-readable выжимка актуальной пары external snapshots от 2026-04-08: `DIRECT_CHAT_SUPPLEMENT + LLM_SLIM`.
+- `docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.json` — машинно-читаемый digest той же пары для AI/bootstrap/use-as-context сценариев.
+- `docs/context/AI_SNAPSHOT_WORKING_DELTA_2026-04-08.md` — короткая рабочая delta-заметка: что из snapshot важно помнить для дальнейшей разработки прямо сейчас.
+- `workspace/external_context_snapshots/AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json.gz` — локальная project mirror-копия default external AI source. Workspace-слой gitignored.
+- `workspace/external_context_snapshots/AI_WISHLIST_CANONICAL_OMNIBUS_DIRECT_CHAT_SUPPLEMENT_2026-04-08.json.gz` — локальная project mirror-копия полного provenance/evidence snapshot. Workspace-слой gitignored.
 
 ## Внешние источники контекста (Google Drive)
 
@@ -26,5 +29,5 @@
 
 - Внешние ссылки **не заменяют** локальный канон (`ABSOLUTE LAW`, реестр параметров, data contract).
 - Архивы/доки/экспорты из Google Drive рассматриваются как **источники контекста, истории релизов и требований**.
-- Для AI/bootstrap по умолчанию сначала читать локальный digest `docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.json`, а к full external gzip-пакету подниматься только когда нужен raw provenance/evidence слой.
+- Для AI/bootstrap по умолчанию сначала читать локальный digest `docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.json`, затем локальную mirror-копию `workspace/external_context_snapshots/AI_WISHLIST_CANONICAL_OMNIBUS_LLM_SLIM_2026-04-08.json.gz`, а к `DIRECT_CHAT_SUPPLEMENT` подниматься только когда нужен raw provenance/evidence слой.
 - При конфликте между историческими архивами и текущим каноном исправляется код/экспорт, а не вводятся алиасы и runtime-мосты.
