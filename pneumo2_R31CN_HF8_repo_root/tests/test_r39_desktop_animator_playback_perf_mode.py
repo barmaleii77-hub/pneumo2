@@ -11,7 +11,7 @@ def test_many_docks_mode_uses_lighter_overlays_but_keeps_aux_panels_live() -> No
     assert "self._aux_many_fast_fps: float = 18.0" in SRC
     assert "self._aux_many_slow_fps: float = 10.0" in SRC
     assert "self._many_visible_threshold: int = 12" in SRC
-    assert 'many_visible_budget = bool(playing) and visible_aux >= int(getattr(self, "_many_visible_threshold", 10))' in SRC
+    assert 'many_visible_budget = (bool(playing) or interactive_scrub) and visible_aux >= int(getattr(self, "_many_visible_threshold", 10))' in SRC
     assert "self._playback_perf_mode_active: bool = False" in SRC
     assert "def _visible_aux_dock_count(self) -> int:" in SRC
     assert "def _apply_playback_perf_mode(self, enabled: bool) -> None:" in SRC
@@ -19,7 +19,8 @@ def test_many_docks_mode_uses_lighter_overlays_but_keeps_aux_panels_live() -> No
 
 def test_visible_fast_and_slow_groups_are_refreshed_as_groups() -> None:
     assert "for entry in fast_visible:" in SRC
-    assert "for entry in slow_visible:" in SRC
+    assert "slow_entries = slow_visible" in SRC
+    assert "for entry in slow_entries:" in SRC
     assert "_call_panel(entry)" in SRC
     assert "self.timeline.set_index(i)" in SRC
     assert "self.trends.update_frame(i)" in SRC

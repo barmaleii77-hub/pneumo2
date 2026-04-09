@@ -67,7 +67,7 @@ import time
 import colorsys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
 
@@ -774,12 +774,23 @@ def _sample_series_local(
     default: float = 0.0,
 ) -> float:
     try:
+        arr = series if isinstance(series, np.ndarray) else np.asarray(series, dtype=float)
+        n = int(arr.shape[0]) if getattr(arr, "ndim", 0) >= 1 else 0
+        if n <= 0:
+            return float(default)
+        ii0 = max(0, min(int(i0), n - 1))
+        ii1 = max(0, min(int(i1), n - 1))
+        a = float(alpha)
+        if ii0 == ii1 or a <= 1e-12:
+            return float(arr[ii0])
+        if a >= 1.0 - 1e-12:
+            return float(arr[ii1])
         return float(
             _lerp_series_value(
-                np.asarray(series, dtype=float),
-                i0=int(i0),
-                i1=int(i1),
-                alpha=float(alpha),
+                arr,
+                i0=ii0,
+                i1=ii1,
+                alpha=a,
                 default=float(default),
             )
         )
@@ -2782,6 +2793,8 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
 
         # Text overlay (readability > style)
         self.hud_text = _make_graphics_label_item(self.scene, font_size=9, z=10.0)
+        self.hud_text_context = _make_graphics_label_item(self.scene, font_size=9, z=10.0)
+        self.hud_text_static = _make_graphics_label_item(self.scene, font_size=9, z=10.0)
 
         # Road ribbon fill (under lane edges)
         self.road_fill.setZValue(0)
@@ -2811,6 +2824,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         # Segment boundary markers (помогают связать «где мы сейчас» с тест‑планом/генератором).
         # Рисуем поперечные пунктирные линии на дороге; инструментально и без «гирлянд».
         self._seg_marker_items: list[QtWidgets.QGraphicsLineItem] = []
+        self._seg_marker_active_count: int = 0
         self._seg_marker_pen = QtGui.QPen(QtGui.QColor(255, 255, 255, 90), 1, QtCore.Qt.DashLine)
         try:
             self._seg_marker_pen.setCosmetic(True)  # толщина в пикселях (не зависит от зума)
@@ -2862,15 +2876,21 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         self._hud_polyline_point_budget_min = 160
         self._hud_polyline_point_budget_max = 520
         self._hud_perf_polyline_point_budget_cap = 180
-        self._hud_lane_polyline_scale = 0.62
-        self._hud_lane_polyline_min_points = 96
-        self._hud_perf_lane_polyline_scale = 0.48
-        self._hud_perf_lane_polyline_min_points = 72
+        self._hud_lane_polyline_scale = 0.58
+        self._hud_lane_polyline_min_points = 92
+        self._hud_perf_lane_polyline_scale = 0.46
+        self._hud_perf_lane_polyline_min_points = 68
         self._hud_fill_polyline_scale = 0.42
         self._hud_fill_polyline_min_points = 64
         self._hud_perf_fill_polyline_scale = 0.34
         self._hud_perf_fill_polyline_min_points = 48
+        self._hud_path_visual_key_quant_scale = 2.0
+        self._hud_fill_visual_key_quant_scale = 1.0
         self._hud_elide_cache: Dict[tuple[str, int, str], str] = {}
+        self._hud_static_bundle_key: int = 0
+        self._hud_static_lines: tuple[str, ...] = ()
+        self._hud_static_text_cache_key: Optional[tuple[int, str, int]] = None
+        self._hud_static_text_cache_value: str = ""
 
     def set_px_per_m(self, px_per_m: float):
         self._px_per_m = float(px_per_m)
@@ -2975,10 +2995,20 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
     def _poly_visual_key(self, xa: np.ndarray, ya: np.ndarray, *, closed: bool = False) -> tuple[int, ...]:
         x_arr = np.asarray(xa, dtype=float).reshape(-1)
         y_arr = np.asarray(ya, dtype=float).reshape(-1)
+        return self._poly_visual_key_from_arrays(x_arr, y_arr, closed=closed)
+
+    def _poly_visual_key_from_arrays(
+        self,
+        x_arr: np.ndarray,
+        y_arr: np.ndarray,
+        *,
+        closed: bool = False,
+        quant_scale: float = 2.0,
+    ) -> tuple[int, ...]:
         n = int(min(x_arr.size, y_arr.size))
         if n <= 0:
             return (int(bool(closed)), 0, 0)
-        quant = float(max(1.0, float(self._px_per_m) * 2.0))
+        quant = float(max(1.0, float(self._px_per_m) * float(quant_scale)))
         coords = np.empty((n, 2), dtype=np.int32)
         coords[:, 0] = np.rint(x_arr[:n] * quant).astype(np.int32, copy=False)
         coords[:, 1] = np.rint(y_arr[:n] * quant).astype(np.int32, copy=False)
@@ -2993,11 +3023,13 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         *,
         closed: bool = False,
     ) -> None:
-        key = self._poly_visual_key(xa, ya, closed=closed)
+        x_arr = np.asarray(xa, dtype=float).reshape(-1)
+        y_arr = np.asarray(ya, dtype=float).reshape(-1)
+        key = self._poly_visual_key_from_arrays(x_arr, y_arr, closed=closed)
         if key == getattr(self, attr_name, None):
             return
         setattr(self, attr_name, key)
-        item.setPath(self._path_from_xy(xa, ya, closed=closed))
+        item.setPath(self._path_from_arrays(x_arr, y_arr, closed=closed))
 
     def _set_poly_polygon_if_changed(
         self,
@@ -3006,7 +3038,16 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         xa: np.ndarray,
         ya: np.ndarray,
     ) -> None:
-        key = self._poly_visual_key(xa, ya, closed=True)
+        x_arr = np.asarray(xa, dtype=float).reshape(-1)
+        y_arr = np.asarray(ya, dtype=float).reshape(-1)
+        key = self._poly_visual_key_from_arrays(
+            x_arr,
+            y_arr,
+            closed=True,
+            quant_scale=float(self._hud_fill_visual_key_quant_scale)
+            if attr_name == "_road_fill_poly_key"
+            else float(self._hud_path_visual_key_quant_scale),
+        )
         if key == getattr(self, attr_name, None):
             return
         setattr(self, attr_name, key)
@@ -3014,7 +3055,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             QtGui.QPolygonF(
                 [
                     QtCore.QPointF(float(x), float(y))
-                    for x, y in zip(np.asarray(xa, dtype=float), np.asarray(ya, dtype=float))
+                    for x, y in zip(x_arr, y_arr)
                 ]
             )
         )
@@ -3038,16 +3079,23 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
     # Segment metadata (from segment_id + optional meta_json road.segments)
     # ---------------------------------------------------------------------
     def _clear_segment_markers(self) -> None:
-        """Remove all dynamic segment boundary markers from the scene."""
-        if not self._seg_marker_items:
-            return
-        sc = self.scene()
+        """Hide dynamic segment boundary markers without rebuilding scene items."""
         for it in self._seg_marker_items:
             try:
-                sc.removeItem(it)
+                it.setVisible(False)
             except Exception:
                 pass
-        self._seg_marker_items.clear()
+        self._seg_marker_active_count = 0
+
+    def _ensure_seg_marker_pool(self, n: int) -> None:
+        sc = self.scene()
+        while len(self._seg_marker_items) < int(max(0, n)):
+            it = QtWidgets.QGraphicsLineItem()
+            it.setZValue(1.25)
+            it.setPen(self._seg_marker_pen)
+            it.setVisible(False)
+            sc.addItem(it)
+            self._seg_marker_items.append(it)
 
     def _ensure_seg_fill_pool(self, n: int) -> None:
         """Ensure we have at least N segment overlay items (created lazily)."""
@@ -3128,34 +3176,92 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         limit = int(max(8, max_points))
         if n <= limit:
             return tuple(np.asarray(arr) for arr in arrays)
+        # For n > limit and positive endpoints, np.linspace(..., dtype=int) already
+        # keeps 0..n-1 monotonic and endpoint-preserving, so no extra unique/insert work
+        # is needed on every HUD redraw.
         sel = np.linspace(0, n - 1, num=limit, dtype=int)
-        sel = np.unique(sel)
-        if sel[0] != 0:
-            sel = np.insert(sel, 0, 0)
-        if sel[-1] != (n - 1):
-            sel = np.append(sel, n - 1)
         return tuple(np.asarray(arr)[sel] for arr in arrays)
+
+    @staticmethod
+    def _offset_lane_edges(
+        xa: np.ndarray,
+        ya: np.ndarray,
+        half_width: float,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        x_arr = np.asarray(xa, dtype=float).reshape(-1)
+        y_arr = np.asarray(ya, dtype=float).reshape(-1)
+        if min(x_arr.size, y_arr.size) <= 1:
+            return x_arr, y_arr, x_arr, y_arr
+        dx = np.gradient(x_arr)
+        dy = np.gradient(y_arr)
+        norm = np.sqrt(dx * dx + dy * dy)
+        norm[norm < 1e-9] = 1.0
+        nx = -(dy / norm)
+        ny = dx / norm
+        w = float(half_width)
+        return x_arr + nx * w, y_arr + ny * w, x_arr - nx * w, y_arr - ny * w
 
     @staticmethod
     def _path_from_xy(xa: np.ndarray, ya: np.ndarray, *, closed: bool = False) -> QtGui.QPainterPath:
         x_arr = np.asarray(xa, dtype=float).reshape(-1)
         y_arr = np.asarray(ya, dtype=float).reshape(-1)
+        return RoadHudWidget._path_from_arrays(x_arr, y_arr, closed=closed)
+
+    @staticmethod
+    def _path_from_arrays(x_arr: np.ndarray, y_arr: np.ndarray, *, closed: bool = False) -> QtGui.QPainterPath:
         n = int(min(x_arr.size, y_arr.size))
         if n <= 0:
             return QtGui.QPainterPath()
-        path = QtGui.QPainterPath()
-        pts = [QtCore.QPointF(x, y) for x, y in zip(x_arr[:n], y_arr[:n])]
-        path.addPolygon(QtGui.QPolygonF(pts))
+        path = QtGui.QPainterPath(QtCore.QPointF(float(x_arr[0]), float(y_arr[0])))
+        for x, y in zip(x_arr[1:n], y_arr[1:n]):
+            path.lineTo(float(x), float(y))
         if bool(closed):
             path.closeSubpath()
         return path
 
+    @staticmethod
+    def _hud_font_key(font: QtGui.QFont) -> str:
+        try:
+            return str(font.key())
+        except Exception:
+            return f"{font.family()}|{font.pointSizeF():.2f}|{int(font.weight())}|{int(bool(font.italic()))}"
+
+    def _ensure_hud_static_lines(self, b: DataBundle) -> tuple[str, ...]:
+        bundle_key = int(id(b))
+        if bundle_key == int(getattr(self, "_hud_static_bundle_key", 0)):
+            return tuple(self._hud_static_lines)
+        static_lines: list[str] = []
+        try:
+            acceptance_preview = list(format_acceptance_hud_lines(b, 0))
+            static_lines.extend(str(line) for line in acceptance_preview[1:])
+        except Exception:
+            pass
+        try:
+            static_lines.extend(str(line) for line in format_suspension_hud_lines(b))
+        except Exception:
+            pass
+        self._hud_static_bundle_key = bundle_key
+        self._hud_static_lines = tuple(static_lines)
+        self._hud_static_text_cache_key = None
+        self._hud_static_text_cache_value = ""
+        return tuple(self._hud_static_lines)
+
+    def _hud_static_text(self, b: DataBundle, font: QtGui.QFont, max_px: int) -> str:
+        static_lines = self._ensure_hud_static_lines(b)
+        if not static_lines:
+            return ""
+        width_px = max(10, int(max_px))
+        font_key = self._hud_font_key(font)
+        cache_key = (int(id(b)), font_key, int(width_px))
+        if cache_key != getattr(self, "_hud_static_text_cache_key", None):
+            elided = self._elide_hud_lines(list(static_lines), font, width_px)
+            self._hud_static_text_cache_key = cache_key
+            self._hud_static_text_cache_value = "\n".join(elided)
+        return str(getattr(self, "_hud_static_text_cache_value", "") or "")
+
     def _elide_hud_lines(self, lines: list[str], font: QtGui.QFont, max_px: int) -> list[str]:
         width_px = max(10, int(max_px))
-        try:
-            font_key = str(font.key())
-        except Exception:
-            font_key = f"{font.family()}|{font.pointSizeF():.2f}|{int(font.weight())}|{int(bool(font.italic()))}"
+        font_key = self._hud_font_key(font)
         cache = self._hud_elide_cache
         if len(cache) > 2048:
             cache.clear()
@@ -3795,19 +3901,8 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         if self.show_lanes:
             lane_points = self._lane_polyline_point_budget(len(xl))
             lane_xl, lane_yl, lane_idxs = self._decimate_visible_polyline(lane_points, xl, yl, idxs)
-            dx = np.gradient(lane_xl)
-            dy = np.gradient(lane_yl)
-            norm = np.sqrt(dx * dx + dy * dy)
-            norm[norm < 1e-9] = 1.0
-            tx = dx / norm
-            ty = dy / norm
-            nx = -ty
-            ny = tx
             w = 0.5 * float(self._lane_width)
-            xlL = lane_xl + nx * w
-            ylL = lane_yl + ny * w
-            xlR = lane_xl - nx * w
-            ylR = lane_yl - ny * w
+            xlL, ylL, xlR, ylR = self._offset_lane_edges(lane_xl, lane_yl, w)
             self._set_poly_path_if_changed("_lane_l_path_key", self.lane_l, xlL, ylL)
             self._set_poly_path_if_changed("_lane_r_path_key", self.lane_r, xlR, ylR)
             self.lane_l.show()
@@ -3832,19 +3927,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             # Road ribbon fill between lane edges.
             try:
                 fill_points = self._fill_polyline_point_budget(len(lane_xl))
-                fill_xl, fill_yl, _fill_idxs = self._decimate_visible_polyline(fill_points, lane_xl, lane_yl, lane_idxs)
-                fill_dx = np.gradient(fill_xl)
-                fill_dy = np.gradient(fill_yl)
-                fill_norm = np.sqrt(fill_dx * fill_dx + fill_dy * fill_dy)
-                fill_norm[fill_norm < 1e-9] = 1.0
-                fill_tx = fill_dx / fill_norm
-                fill_ty = fill_dy / fill_norm
-                fill_nx = -fill_ty
-                fill_ny = fill_tx
-                fill_xlL = fill_xl + fill_nx * w
-                fill_ylL = fill_yl + fill_ny * w
-                fill_xlR = fill_xl - fill_nx * w
-                fill_ylR = fill_yl - fill_ny * w
+                fill_xlL, fill_ylL, fill_xlR, fill_ylR, _fill_idxs = self._decimate_visible_polyline(fill_points, xlL, ylL, xlR, ylR, lane_idxs)
                 self._set_poly_polygon_if_changed(
                     "_road_fill_poly_key",
                     self.road_fill,
@@ -3872,7 +3955,9 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
                 self._ensure_segment_cache(b)
                 starts = self._seg_starts
                 if starts is not None and len(starts) > 1 and self._seg_infos:
+                    self._ensure_seg_marker_pool(int(len(starts)))
                     n_all = int(len(xw))
+                    marker_count = 0
 
                     def to_hud(idx: int) -> tuple[float, float]:
                         dx = float(xw[idx] - x0)
@@ -3910,16 +3995,16 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
                         x1, y1 = (cx - nx * half), (cy - ny * half)
                         x2, y2 = (cx + nx * half), (cy + ny * half)
 
-                        it = QtWidgets.QGraphicsLineItem(x1, y1, x2, y2)
-                        it.setZValue(1.25)
-                        it.setPen(self._seg_marker_pen)
-
+                        it = self._seg_marker_items[marker_count]
+                        marker_count += 1
+                        it.setLine(float(x1), float(y1), float(x2), float(y2))
                         j = self._seg_start_to_idx.get(k, None)
                         if j is not None and 0 <= j < len(self._seg_infos):
                             it.setToolTip(self._segment_tooltip(self._seg_infos[j], j + 1, len(self._seg_infos)))
-
-                        self.scene.addItem(it)
-                        self._seg_marker_items.append(it)
+                        else:
+                            it.setToolTip("")
+                        it.setVisible(True)
+                    self._seg_marker_active_count = int(marker_count)
             except Exception:
                 # Optional overlay must never break the cockpit.
                 pass
@@ -4029,33 +4114,58 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             man_line = "Манёвр: " + ", ".join(man_parts)
 
             # Compose HUD lines (Russian; elide per line)
-            lines: list[str] = [f"v  {v_mps*3.6:6.1f} км/ч"]
+            dynamic_lines: list[str] = [f"v  {v_mps*3.6:6.1f} км/ч"]
+            context_lines: list[str] = []
             if seg_line:
-                lines.append(seg_line)
+                context_lines.append(seg_line)
             if road_line:
-                lines.append(road_line)
+                context_lines.append(road_line)
             if man_line:
-                lines.append(man_line)
-            lines += [
+                context_lines.append(man_line)
+            dynamic_lines += [
                 f"ψ̇ {np.degrees(yaw_rate):6.2f} °/с   R {'—' if not np.isfinite(R) else f'{abs(R):.0f} м'}",
                 f"ax {ax:+6.2f} м/с²   ay {ay:+6.2f} м/с²",
             ]
             try:
-                lines.extend(format_acceptance_hud_lines(b, i))
-                lines.extend(format_suspension_hud_lines(b))
+                acceptance_lines = list(format_acceptance_hud_lines(b, i))
+                if acceptance_lines:
+                    dynamic_lines.append(str(acceptance_lines[0]))
             except Exception:
                 pass
 
             max_px = max(260, int(self.viewport().width() * 0.78))
             fnt = self.hud_text.font()
-            lines = self._elide_hud_lines(lines, fnt, max_px)
-            txt = "\n".join(lines)
-            _set_graphics_text_if_changed(self.hud_text, txt)
-            # place near top-left of the scene rect
-            _set_graphics_pos_if_changed(self.hud_text, -7.6, self._lookahead_m - 4.5)
+            dynamic_lines = self._elide_hud_lines(dynamic_lines, fnt, max_px)
+            dynamic_txt = "\n".join(dynamic_lines)
+            _set_graphics_text_if_changed(self.hud_text, dynamic_txt)
+            top_x = -7.6
+            top_y = self._lookahead_m - 4.5
+            _set_graphics_pos_if_changed(self.hud_text, top_x, top_y)
             self.hud_text.show()
+            line_step_m = max(0.001, float(QtGui.QFontMetricsF(fnt).lineSpacing()) / max(1.0, float(self._px_per_m)))
+            context_count = 0
+            if context_lines:
+                context_lines = self._elide_hud_lines(context_lines, fnt, max_px)
+                context_txt = "\n".join(context_lines)
+                _set_graphics_text_if_changed(self.hud_text_context, context_txt)
+                context_y = float(top_y) - (line_step_m * float(len(dynamic_lines)))
+                _set_graphics_pos_if_changed(self.hud_text_context, top_x, context_y)
+                self.hud_text_context.show()
+                context_count = len(context_lines)
+            else:
+                self.hud_text_context.hide()
+            static_txt = self._hud_static_text(b, fnt, max_px)
+            if static_txt:
+                _set_graphics_text_if_changed(self.hud_text_static, static_txt)
+                static_y = float(top_y) - (line_step_m * float(len(dynamic_lines) + context_count))
+                _set_graphics_pos_if_changed(self.hud_text_static, top_x, static_y)
+                self.hud_text_static.show()
+            else:
+                self.hud_text_static.hide()
         else:
             self.hud_text.hide()
+            self.hud_text_context.hide()
+            self.hud_text_static.hide()
 
         # Frame
         scene_rect = QtCore.QRectF(-8.0, -self._history_m - 4.0, 16.0, self._lookahead_m + self._history_m + 8.0)
@@ -6579,8 +6689,8 @@ class RoadProfilePanel(QtWidgets.QWidget):
         self._last_yrange: Optional[tuple[float, float]] = None
         self._last_visual_key: Optional[tuple[Any, ...]] = None
         self._compact_dock_mode = False
-        self._compact_plot_height = 120
-        self._compact_max_height = 170
+        self._compact_plot_height = 110
+        self._compact_max_height = 138
         self._full_plot_min_height = 150
         self._road_profile_point_budget_compact = 176
         self._road_profile_point_budget_full = 288
@@ -6594,7 +6704,8 @@ class RoadProfilePanel(QtWidgets.QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(4)
 
-        ctl = QtWidgets.QHBoxLayout()
+        self.controls_row = QtWidgets.QWidget(self)
+        ctl = QtWidgets.QHBoxLayout(self.controls_row)
         ctl.setContentsMargins(0, 0, 0, 0)
 
         self.sp_hist = QtWidgets.QDoubleSpinBox()
@@ -6609,13 +6720,15 @@ class RoadProfilePanel(QtWidgets.QWidget):
         self.sp_ahead.setValue(35.0)
         self.sp_ahead.setSuffix(" m")
 
-        ctl.addWidget(QtWidgets.QLabel("history:"))
+        self.lbl_hist = QtWidgets.QLabel("history:")
+        ctl.addWidget(self.lbl_hist)
         ctl.addWidget(self.sp_hist)
         ctl.addSpacing(10)
-        ctl.addWidget(QtWidgets.QLabel("lookahead:"))
+        self.lbl_ahead = QtWidgets.QLabel("lookahead:")
+        ctl.addWidget(self.lbl_ahead)
         ctl.addWidget(self.sp_ahead)
         ctl.addStretch(1)
-        lay.addLayout(ctl)
+        lay.addWidget(self.controls_row)
 
         self.lbl_status = QtWidgets.QLabel("")
         self.lbl_status.setWordWrap(True)
@@ -6660,6 +6773,14 @@ class RoadProfilePanel(QtWidgets.QWidget):
             self.plot.setSizePolicy(QtWidgets.QSizePolicy.Preferred, vpol)
             self.plot.setMinimumHeight(plot_h)
             self.plot.setMaximumHeight(plot_h if compact else 16777215)
+        except Exception:
+            pass
+        try:
+            self.controls_row.setVisible(not compact)
+        except Exception:
+            pass
+        try:
+            self.lbl_legend.setVisible(not compact)
         except Exception:
             pass
         try:
@@ -6759,14 +6880,15 @@ class RoadProfilePanel(QtWidgets.QWidget):
             self.set_bundle(b)
 
         wb = float(self._wheelbase)
-        cache = dict(self._profile_cache or {})
+        cache = self._profile_cache or {}
 
         hist = float(self.sp_hist.value())
         ahead = float(self.sp_ahead.value())
         x_min = -hist
         x_max = +ahead
 
-        s = np.asarray(cache.get("s_world", np.zeros((0,), dtype=float)), dtype=float)
+        s_cached = cache.get("s_world")
+        s = s_cached if isinstance(s_cached, np.ndarray) else np.asarray(cache.get("s_world", np.zeros((0,), dtype=float)), dtype=float)
         if len(s) <= 1:
             return
         i = int(_clamp(int(i), 0, len(s) - 1))
@@ -6780,7 +6902,7 @@ class RoadProfilePanel(QtWidgets.QWidget):
         any_curve = False
         curves: Dict[str, tuple[np.ndarray, np.ndarray]] = {}
         markers: Dict[str, Optional[tuple[float, float]]] = {}
-        corners_cache = dict(cache.get("corners", {}) or {})
+        corners_cache = cache.get("corners", {}) or {}
         prepared_corners: List[tuple[str, Dict[str, Any]]] = []
         visual_corner_keys: List[tuple[Any, ...]] = []
         world_lo = float(s0 + x_min)
@@ -6797,8 +6919,10 @@ class RoadProfilePanel(QtWidgets.QWidget):
                 visual_corner_keys.append((name, "missing"))
                 continue
 
-            x_world = np.asarray(corner_cache.get("x_world", np.zeros((0,), dtype=float)), dtype=float)
-            z_arr = np.asarray(corner_cache.get("z", np.zeros((0,), dtype=float)), dtype=float)
+            x_world_cached = corner_cache.get("x_world")
+            x_world = x_world_cached if isinstance(x_world_cached, np.ndarray) else np.asarray(corner_cache.get("x_world", np.zeros((0,), dtype=float)), dtype=float)
+            z_cached = corner_cache.get("z")
+            z_arr = z_cached if isinstance(z_cached, np.ndarray) else np.asarray(corner_cache.get("z", np.zeros((0,), dtype=float)), dtype=float)
             n = int(min(x_world.size, z_arr.size))
             if n <= 1:
                 prepared_corners.append((name, {"missing": False, "empty": True}))
@@ -7586,6 +7710,60 @@ class _QuickBarListCanvas(QtWidgets.QWidget):
             )
 
 
+class _QuickTextStripCanvas(QtWidgets.QWidget):
+    """Compact painter-based header strip for quick panels."""
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self._segments: list[tuple[str, QtGui.QColor]] = []
+        self._segments_key: Optional[tuple[tuple[str, int], ...]] = None
+        self._bg_color = QtGui.QColor(19, 23, 28)
+        try:
+            self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)
+        except Exception:
+            pass
+        self.setMinimumHeight(18)
+
+    def set_segments(self, segments: Sequence[tuple[str, QtGui.QColor]]) -> None:
+        normalized: list[tuple[str, QtGui.QColor]] = []
+        key_parts: list[tuple[str, int]] = []
+        for text, color in segments:
+            qcolor = QtGui.QColor(color)
+            normalized.append((str(text), qcolor))
+            key_parts.append((str(text), int(qcolor.rgba())))
+        key = tuple(key_parts)
+        if key == self._segments_key:
+            return
+        self._segments = normalized
+        self._segments_key = key
+        self.update()
+
+    def paintEvent(self, _event: QtGui.QPaintEvent):  # type: ignore[override]
+        p = QtGui.QPainter(self)
+        p.fillRect(self.rect(), self._bg_color)
+        p.setRenderHints(QtGui.QPainter.TextAntialiasing)
+        rect = QtCore.QRectF(self.rect()).adjusted(4.0, 0.0, -4.0, 0.0)
+        font = QtGui.QFont(self.font())
+        try:
+            font.setPointSize(max(8, int(font.pointSize()) - 1))
+        except Exception:
+            pass
+        p.setFont(font)
+        fm = QtGui.QFontMetrics(font)
+        x = float(rect.left())
+        y = float(rect.top())
+        h = float(rect.height())
+        spacing = 10.0
+        for text, color in self._segments:
+            if x >= rect.right():
+                break
+            width = min(float(fm.horizontalAdvance(str(text))), max(0.0, rect.right() - x))
+            seg_rect = QtCore.QRectF(x, y, max(8.0, width + 2.0), h)
+            p.setPen(color)
+            p.drawText(seg_rect, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter, str(text))
+            x += max(8.0, width) + spacing
+
+
 class FlowQuickPanel(QtWidgets.QWidget):
     """Pinned mini-panel: top mass flows (df_q / mdot) + group counters.
 
@@ -7603,6 +7781,10 @@ class FlowQuickPanel(QtWidgets.QWidget):
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(4)
+
+        self.header_canvas = _QuickTextStripCanvas(self)
+        self.header_canvas.hide()
+        lay.addWidget(self.header_canvas)
 
         self.lbl_groups = QtWidgets.QLabel("FLOW: n/a")
         self.lbl_groups.setStyleSheet("color:#b8c3cf;")
@@ -7635,6 +7817,11 @@ class FlowQuickPanel(QtWidgets.QWidget):
             self.setMaximumHeight(112 if compact else 16777215)
         except Exception:
             pass
+        try:
+            self.header_canvas.setVisible(compact)
+            self.lbl_groups.setVisible(not compact)
+        except Exception:
+            pass
         self.rows_canvas.clear_rows()
         try:
             self.updateGeometry()
@@ -7650,6 +7837,7 @@ class FlowQuickPanel(QtWidgets.QWidget):
         self._kind_codes = np.zeros((0,), dtype=np.int8)
 
         if getattr(b, "q", None) is None:
+            self.header_canvas.set_segments([("FLOW: n/a", QtGui.QColor(184, 195, 207))])
             _set_label_text_if_changed(self.lbl_groups, "FLOW: n/a")
             self._clear_rows()
             return
@@ -7674,6 +7862,7 @@ class FlowQuickPanel(QtWidgets.QWidget):
             kind_codes.append(_kind_code_from_label(kind))
 
         if not idxs:
+            self.header_canvas.set_segments([("FLOW: n/a", QtGui.QColor(184, 195, 207))])
             _set_label_text_if_changed(self.lbl_groups, "FLOW: n/a")
             self._clear_rows()
             return
@@ -7702,6 +7891,7 @@ class FlowQuickPanel(QtWidgets.QWidget):
 
     def update_frame(self, b: DataBundle, i: int):
         if getattr(b, "q", None) is None or self._idxs is None or not self._names:
+            self.header_canvas.set_segments([("FLOW: n/a", QtGui.QColor(184, 195, 207))])
             _set_label_text_if_changed(self.lbl_groups, "FLOW: n/a")
             self._clear_rows()
             return
@@ -7709,6 +7899,7 @@ class FlowQuickPanel(QtWidgets.QWidget):
         try:
             q = np.asarray(b.q.values[i, self._idxs], dtype=float)
         except Exception:
+            self.header_canvas.set_segments([("FLOW: n/a", QtGui.QColor(184, 195, 207))])
             _set_label_text_if_changed(self.lbl_groups, "FLOW: n/a")
             self._clear_rows()
             return
@@ -7728,10 +7919,9 @@ class FlowQuickPanel(QtWidgets.QWidget):
         else:
             c_exh = c_fill = c_chg = c_chk = c_oth = 0
 
-        _set_label_text_if_changed(
-            self.lbl_groups,
-            f"FLOW>|{thr*1000:.1f} g/s|  вых:{c_exh}  подп:{c_fill}  зар:{c_chg}  чек:{c_chk}  проч:{c_oth}"
-        )
+        flow_header = f"FLOW>|{thr*1000:.1f} g/s|  вых:{c_exh}  подп:{c_fill}  зар:{c_chg}  чек:{c_chk}  проч:{c_oth}"
+        self.header_canvas.set_segments([(flow_header, QtGui.QColor(184, 195, 207))])
+        _set_label_text_if_changed(self.lbl_groups, flow_header)
 
         # pick top by abs
         order = _top_descending_indices(aq, self.max_rows, threshold=thr)
@@ -8912,6 +9102,10 @@ class ValveQuickPanel(QtWidgets.QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(4)
 
+        self.header_canvas = _QuickTextStripCanvas(self)
+        self.header_canvas.hide()
+        lay.addWidget(self.header_canvas)
+
         self.lbl = QtWidgets.QLabel("Активные клапаны (top):")
         self.lbl.setStyleSheet("color:#cfcfcf;")
         lay.addWidget(self.lbl)
@@ -8957,6 +9151,14 @@ class ValveQuickPanel(QtWidgets.QWidget):
         self.rows_canvas.setMinimumHeight(int(8 + self.max_rows * 18))
         try:
             self.setMaximumHeight(138 if compact else 16777215)
+        except Exception:
+            pass
+        try:
+            self.header_canvas.setVisible(compact)
+            self.lbl.setVisible(not compact)
+            self.lbl_exh.setVisible(not compact)
+            self.lbl_fill.setVisible(not compact)
+            self.lbl_charge.setVisible(not compact)
         except Exception:
             pass
         self.rows_canvas.clear_rows()
@@ -9042,6 +9244,14 @@ class ValveQuickPanel(QtWidgets.QWidget):
     def update_frame(self, b: DataBundle, i: int):
         # default: clear
         def _clear():
+            self.header_canvas.set_segments(
+                [
+                    ("top: —", QtGui.QColor(207, 207, 207)),
+                    ("вых: —", QtGui.QColor(255, 138, 138)),
+                    ("подп: —", QtGui.QColor(159, 227, 168)),
+                    ("зар: —", QtGui.QColor(246, 213, 122)),
+                ]
+            )
             _set_label_text_if_changed(self.lbl, "Активные клапаны (top): —")
             _set_label_text_if_changed(self.lbl_exh, "выхлоп: —")
             _set_label_text_if_changed(self.lbl_fill, "подпитка: —")
@@ -9073,6 +9283,14 @@ class ValveQuickPanel(QtWidgets.QWidget):
             charge_count = int(np.count_nonzero(active_codes == 2))
         else:
             exh_count = fill_count = charge_count = 0
+        self.header_canvas.set_segments(
+            [
+                (f"top {int(np.count_nonzero(active_mask))}", QtGui.QColor(207, 207, 207)),
+                (f"вых:{exh_count}", QtGui.QColor(255, 138, 138)),
+                (f"подп:{fill_count}", QtGui.QColor(159, 227, 168)),
+                (f"зар:{charge_count}", QtGui.QColor(246, 213, 122)),
+            ]
+        )
         _set_label_text_if_changed(self.lbl_exh, f"выхлоп: {exh_count}")
         _set_label_text_if_changed(self.lbl_fill, f"подпитка: {fill_count}")
         _set_label_text_if_changed(self.lbl_charge, f"заряд: {charge_count}")
@@ -9414,6 +9632,141 @@ class CornerHeatmapPanel(QtWidgets.QWidget):
                 cell.set_value(v, text=txt, u=u)
 
 
+class _CompactTelemetrySummaryCanvas(QtWidgets.QWidget):
+    """Compact painter-based motion summary for docked telemetry mode."""
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self.setMinimumHeight(86)
+        try:
+            self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)
+        except Exception:
+            pass
+        self._items: list[tuple[str, str]] = []
+        self._items_key: Optional[tuple[tuple[str, str], ...]] = None
+        self._layout_cache_key: Optional[tuple[int, int, int]] = None
+        self._layout_cache: list[QtCore.QRectF] = []
+        self._bg_cache_key: Optional[tuple[Any, ...]] = None
+        self._bg_cache_pixmap: Optional[QtGui.QPixmap] = None
+        self._bg = QtGui.QColor(18, 22, 28)
+        self._tile_bg = QtGui.QColor(27, 34, 43)
+        self._tile_border = QtGui.QPen(QtGui.QColor(61, 74, 90), 1.0)
+        self._title_color = QtGui.QColor(154, 168, 184)
+        self._value_color = QtGui.QColor(240, 245, 251)
+        try:
+            self._tile_border.setCosmetic(True)
+        except Exception:
+            pass
+
+    def set_metrics(self, items: Sequence[tuple[str, str]]) -> None:
+        normalized = tuple((str(k), str(v)) for k, v in items)
+        if normalized == self._items_key:
+            return
+        self._items = list(normalized)
+        self._items_key = normalized
+        self.update()
+
+    def _tile_rects(self) -> list[QtCore.QRectF]:
+        count = max(1, int(len(self._items)))
+        w = max(1, int(self.width()))
+        h = max(1, int(self.height()))
+        cols = 4 if w >= 420 else 3 if w >= 300 else 2
+        rows = max(1, int(math.ceil(float(count) / float(cols))))
+        key = (w, h, count)
+        if key == self._layout_cache_key and self._layout_cache:
+            return self._layout_cache
+        gap = 6.0
+        outer = QtCore.QRectF(0.0, 0.0, float(w), float(h))
+        tile_w = max(54.0, (outer.width() - gap * float(cols - 1)) / float(cols))
+        tile_h = max(30.0, (outer.height() - gap * float(rows - 1)) / float(rows))
+        rects: list[QtCore.QRectF] = []
+        for idx in range(count):
+            row = idx // cols
+            col = idx % cols
+            rects.append(
+                QtCore.QRectF(
+                    outer.left() + col * (tile_w + gap),
+                    outer.top() + row * (tile_h + gap),
+                    tile_w,
+                    tile_h,
+                )
+            )
+        self._layout_cache_key = key
+        self._layout_cache = rects
+        return rects
+
+    def _ensure_background_cache(self) -> tuple[Optional[QtGui.QPixmap], list[QtCore.QRectF]]:
+        rects = self._tile_rects()
+        titles = tuple(title for title, _value in self._items)
+        key = (int(self.width()), int(self.height()), titles)
+        if key == self._bg_cache_key and self._bg_cache_pixmap is not None:
+            return self._bg_cache_pixmap, rects
+
+        dpr = 1.0
+        try:
+            dpr = float(max(1.0, self.devicePixelRatioF()))
+        except Exception:
+            dpr = 1.0
+        pix = QtGui.QPixmap(int(max(1.0, float(max(1, self.width())) * dpr)), int(max(1.0, float(max(1, self.height())) * dpr)))
+        try:
+            pix.setDevicePixelRatio(dpr)
+        except Exception:
+            pass
+        pix.fill(self._bg)
+
+        p = QtGui.QPainter(pix)
+        p.setRenderHints(QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing)
+        title_font = QtGui.QFont(self.font())
+        try:
+            title_font.setPointSize(max(7, int(title_font.pointSize()) - 1))
+        except Exception:
+            pass
+        p.setFont(title_font)
+        for idx, rect in enumerate(rects):
+            p.setPen(self._tile_border)
+            p.setBrush(self._tile_bg)
+            p.drawRoundedRect(rect, 7.0, 7.0)
+            if idx < len(titles):
+                p.setPen(self._title_color)
+                p.drawText(
+                    QtCore.QRectF(rect.left() + 8.0, rect.top() + 4.0, rect.width() - 16.0, 14.0),
+                    QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                    titles[idx],
+                )
+        p.end()
+
+        self._bg_cache_key = key
+        self._bg_cache_pixmap = pix
+        return self._bg_cache_pixmap, rects
+
+    def paintEvent(self, _event: QtGui.QPaintEvent):  # type: ignore[override]
+        p = QtGui.QPainter(self)
+        p.setRenderHints(QtGui.QPainter.TextAntialiasing)
+        bg, rects = self._ensure_background_cache()
+        if bg is not None:
+            p.drawPixmap(0, 0, bg)
+        else:
+            p.fillRect(self.rect(), self._bg)
+
+        value_font = QtGui.QFont(self.font())
+        try:
+            value_font.setPointSize(max(9, int(value_font.pointSize())))
+            value_font.setBold(True)
+        except Exception:
+            pass
+        p.setFont(value_font)
+        p.setPen(self._value_color)
+        for idx, rect in enumerate(rects):
+            if idx >= len(self._items):
+                break
+            _title, value = self._items[idx]
+            p.drawText(
+                QtCore.QRectF(rect.left() + 8.0, rect.top() + 18.0, rect.width() - 16.0, max(18.0, rect.height() - 22.0)),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                str(value),
+            )
+
+
 class TelemetryPanel(QtWidgets.QWidget):
     """Right-side telemetry panel.
 
@@ -9428,10 +9781,42 @@ class TelemetryPanel(QtWidgets.QWidget):
 
     visual_changed = QtCore.Signal(dict)
 
+    @staticmethod
+    def _make_compact_toggle_button(text: str, tooltip: str) -> QtWidgets.QToolButton:
+        btn = QtWidgets.QToolButton()
+        btn.setText(str(text))
+        btn.setCheckable(True)
+        btn.setAutoRaise(False)
+        btn.setToolTip(str(tooltip))
+        try:
+            btn.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+            btn.setMinimumHeight(24)
+            btn.setStyleSheet(
+                """
+                QToolButton{
+                    padding:3px 8px;
+                    border:1px solid #364152;
+                    border-radius:6px;
+                    background:#1d2530;
+                    color:#d8dee8;
+                    font-weight:600;
+                }
+                QToolButton:checked{
+                    background:#2f5d8a;
+                    border-color:#5e9ad8;
+                    color:#f6fbff;
+                }
+                """
+            )
+        except Exception:
+            pass
+        return btn
+
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None, *, compact: bool = False):
         super().__init__(parent)
         self.compact = bool(compact)
         self._compact_dock_mode = False
+        self._compact_visual_expanded = False
         self.lbl_zcm: Optional[QtWidgets.QLabel] = None
         self.lbl_vzcm: Optional[QtWidgets.QLabel] = None
         self.lbl_azcm: Optional[QtWidgets.QLabel] = None
@@ -9488,6 +9873,33 @@ class TelemetryPanel(QtWidgets.QWidget):
             lay_sum.addWidget(lab, r, c)
 
         row0.addWidget(gb_sum, stretch=2)
+        self.compact_summary = _CompactTelemetrySummaryCanvas()
+        self.compact_summary.hide()
+        row0.addWidget(self.compact_summary, stretch=2)
+
+        self.compact_vis_strip = QtWidgets.QWidget()
+        strip_lay = QtWidgets.QHBoxLayout(self.compact_vis_strip)
+        strip_lay.setContentsMargins(0, 0, 0, 0)
+        strip_lay.setSpacing(6)
+        self.btn_compact_acc = self._make_compact_toggle_button("a", "Ускорения в видах")
+        self.btn_compact_vel = self._make_compact_toggle_button("v", "Скорости в видах")
+        self.btn_compact_lbl = self._make_compact_toggle_button("lbl", "Подписи в видах")
+        self.btn_compact_hud = self._make_compact_toggle_button("hud", "HUD overlays (lanes/text/accel)")
+        self.btn_compact_3d = self._make_compact_toggle_button("3D", "3D дорога + векторы")
+        self.btn_compact_auto = self._make_compact_toggle_button("auto", "Авто-масштаб векторов")
+        self.btn_compact_more = self._make_compact_toggle_button("...", "Показать полный блок визуализации")
+        for btn in (
+            self.btn_compact_acc,
+            self.btn_compact_vel,
+            self.btn_compact_lbl,
+            self.btn_compact_hud,
+            self.btn_compact_3d,
+            self.btn_compact_auto,
+            self.btn_compact_more,
+        ):
+            strip_lay.addWidget(btn, 0)
+        strip_lay.addStretch(1)
+        row0.addWidget(self.compact_vis_strip, stretch=1)
 
         # ---- Visual controls (pinned) ----
         gb_vis = QtWidgets.QGroupBox("Визуализация")
@@ -9726,10 +10138,27 @@ class TelemetryPanel(QtWidgets.QWidget):
         self.cb_auto_scale.stateChanged.connect(self._on_auto_scale_changed)
         self.sp_acc_scale.valueChanged.connect(self._emit_visual)
         self.sp_vel_scale.valueChanged.connect(self._emit_visual)
+        self.cb_show_acc.stateChanged.connect(self._sync_compact_visual_strip)
+        self.cb_show_vel.stateChanged.connect(self._sync_compact_visual_strip)
+        self.cb_show_lbl.stateChanged.connect(self._sync_compact_visual_strip)
+        self.cb_hud_lanes.stateChanged.connect(self._sync_compact_visual_strip)
+        self.cb_hud_text.stateChanged.connect(self._sync_compact_visual_strip)
+        self.cb_hud_acc.stateChanged.connect(self._sync_compact_visual_strip)
+        self.cb_3d_road.stateChanged.connect(self._sync_compact_visual_strip)
+        self.cb_3d_vec.stateChanged.connect(self._sync_compact_visual_strip)
+        self.cb_auto_scale.stateChanged.connect(self._sync_compact_visual_strip)
+        self.btn_compact_acc.toggled.connect(self.cb_show_acc.setChecked)
+        self.btn_compact_vel.toggled.connect(self.cb_show_vel.setChecked)
+        self.btn_compact_lbl.toggled.connect(self.cb_show_lbl.setChecked)
+        self.btn_compact_auto.toggled.connect(self.cb_auto_scale.setChecked)
+        self.btn_compact_hud.toggled.connect(self._set_compact_hud_enabled)
+        self.btn_compact_3d.toggled.connect(self._set_compact_3d_enabled)
+        self.btn_compact_more.toggled.connect(self._set_compact_visual_expanded)
 
         # emit initial config once (safe even if no receivers yet)
         QtCore.QTimer.singleShot(0, self._on_auto_scale_changed)
         QtCore.QTimer.singleShot(0, self._emit_visual)
+        QtCore.QTimer.singleShot(0, self._sync_compact_visual_strip)
         self.set_compact_dock_mode(False)
 
     def current_visual(self) -> Dict[str, Any]:
@@ -9749,6 +10178,63 @@ class TelemetryPanel(QtWidgets.QWidget):
             "gl_road": bool(self.cb_3d_road.isChecked()),
             "gl_vectors": bool(self.cb_3d_vec.isChecked()),
         }
+
+    def _sync_compact_visual_strip(self, *_args) -> None:
+        state_pairs = (
+            (self.btn_compact_acc, bool(self.cb_show_acc.isChecked())),
+            (self.btn_compact_vel, bool(self.cb_show_vel.isChecked())),
+            (self.btn_compact_lbl, bool(self.cb_show_lbl.isChecked())),
+            (
+                self.btn_compact_hud,
+                bool(self.cb_hud_lanes.isChecked() and self.cb_hud_text.isChecked() and self.cb_hud_acc.isChecked()),
+            ),
+            (
+                self.btn_compact_3d,
+                bool(self.cb_3d_road.isChecked() and self.cb_3d_vec.isChecked()),
+            ),
+            (self.btn_compact_auto, bool(self.cb_auto_scale.isChecked())),
+            (self.btn_compact_more, bool(self._compact_visual_expanded)),
+        )
+        for btn, checked in state_pairs:
+            try:
+                blocked = btn.blockSignals(True)
+                btn.setChecked(bool(checked))
+                btn.blockSignals(blocked)
+            except Exception:
+                pass
+
+    def _set_compact_hud_enabled(self, enabled: bool) -> None:
+        for cb in (self.cb_hud_lanes, self.cb_hud_text, self.cb_hud_acc):
+            try:
+                cb.setChecked(bool(enabled))
+            except Exception:
+                pass
+
+    def _set_compact_3d_enabled(self, enabled: bool) -> None:
+        for cb in (self.cb_3d_road, self.cb_3d_vec):
+            try:
+                cb.setChecked(bool(enabled))
+            except Exception:
+                pass
+
+    def _set_compact_visual_expanded(self, expanded: bool) -> None:
+        self._compact_visual_expanded = bool(expanded)
+        compact_mode = bool(getattr(self, "_compact_dock_mode", False))
+        show_full_vis = bool((not compact_mode) or self._compact_visual_expanded)
+        try:
+            self.gb_vis.setVisible(show_full_vis)
+        except Exception:
+            pass
+        try:
+            self.compact_vis_strip.setVisible(bool(compact_mode and not self._compact_visual_expanded))
+        except Exception:
+            pass
+        self._sync_compact_visual_strip()
+        try:
+            self.updateGeometry()
+            self.adjustSize()
+        except Exception:
+            pass
 
     def set_compact_dock_mode(self, compact: bool) -> None:
         compact = bool(compact)
@@ -9775,6 +10261,17 @@ class TelemetryPanel(QtWidgets.QWidget):
                 gb.setSizePolicy(QtWidgets.QSizePolicy.Preferred, vpol)
             except Exception:
                 pass
+        try:
+            self.gb_sum.setVisible(not compact)
+        except Exception:
+            pass
+        try:
+            self.compact_summary.setVisible(bool(compact))
+            self.compact_summary.setMinimumHeight(86 if compact else 0)
+            self.compact_summary.setMaximumHeight(92 if compact else 16777215)
+            self.compact_summary.setSizePolicy(QtWidgets.QSizePolicy.Preferred, vpol)
+        except Exception:
+            pass
         for child_name in ("press_quick", "valve_quick", "flow_quick", "tank_gauge"):
             child = getattr(self, child_name, None)
             if child is None or not hasattr(child, "set_compact_mode"):
@@ -9783,6 +10280,7 @@ class TelemetryPanel(QtWidgets.QWidget):
                 getattr(child, "set_compact_mode")(compact)
             except Exception:
                 pass
+        self._set_compact_visual_expanded(bool(getattr(self, "_compact_visual_expanded", False)))
         try:
             self.updateGeometry()
             self.adjustSize()
@@ -9888,17 +10386,34 @@ class TelemetryPanel(QtWidgets.QWidget):
             R = vx / yaw_rate
         a_c = ay
 
-        _set_label_text_if_changed(self.lbl_t, f"t = {_fmt(t, ' s', digits=3)}")
-        _set_label_text_if_changed(self.lbl_v, f"vx = {_fmt(vx, ' m/s', digits=2)}")
-        _set_label_text_if_changed(self.lbl_vkmh, f"v = {_fmt(v_mps * 3.6, ' km/h', digits=1)}")
-        _set_label_text_if_changed(self.lbl_ax, f"ax = {_fmt(ax, ' m/s²', digits=2)}")
-        _set_label_text_if_changed(self.lbl_ay, f"ay = {_fmt(ay, ' m/s²', digits=2)}")
-        _set_label_text_if_changed(self.lbl_yaw, f"yaw = {_fmt(np.degrees(yaw), '°', digits=1)}")
-        _set_label_text_if_changed(self.lbl_yawr, f"yaw_rate = {_fmt(np.degrees(yaw_rate), '°/s', digits=2)}")
-        _set_label_text_if_changed(self.lbl_R, "R = —" if not np.isfinite(R) else f"R = {_fmt(R, ' m', digits=1)}")
-        _set_label_text_if_changed(self.lbl_ac, f"a_c = {_fmt(a_c, ' m/s²', digits=2)}")
-        _set_label_text_if_changed(self.lbl_roll, f"roll = {_fmt(np.degrees(roll), '°', digits=2)}")
-        _set_label_text_if_changed(self.lbl_pitch, f"pitch = {_fmt(np.degrees(pitch), '°', digits=2)}")
+        if not bool(getattr(self, "_compact_dock_mode", False)):
+            _set_label_text_if_changed(self.lbl_t, f"t = {_fmt(t, ' s', digits=3)}")
+            _set_label_text_if_changed(self.lbl_v, f"vx = {_fmt(vx, ' m/s', digits=2)}")
+            _set_label_text_if_changed(self.lbl_vkmh, f"v = {_fmt(v_mps * 3.6, ' km/h', digits=1)}")
+            _set_label_text_if_changed(self.lbl_ax, f"ax = {_fmt(ax, ' m/s²', digits=2)}")
+            _set_label_text_if_changed(self.lbl_ay, f"ay = {_fmt(ay, ' m/s²', digits=2)}")
+            _set_label_text_if_changed(self.lbl_yaw, f"yaw = {_fmt(np.degrees(yaw), '°', digits=1)}")
+            _set_label_text_if_changed(self.lbl_yawr, f"yaw_rate = {_fmt(np.degrees(yaw_rate), '°/s', digits=2)}")
+            _set_label_text_if_changed(self.lbl_R, "R = —" if not np.isfinite(R) else f"R = {_fmt(R, ' m', digits=1)}")
+            _set_label_text_if_changed(self.lbl_ac, f"a_c = {_fmt(a_c, ' m/s²', digits=2)}")
+            _set_label_text_if_changed(self.lbl_roll, f"roll = {_fmt(np.degrees(roll), '°', digits=2)}")
+            _set_label_text_if_changed(self.lbl_pitch, f"pitch = {_fmt(np.degrees(pitch), '°', digits=2)}")
+        elif self.compact_summary.isVisible():
+            try:
+                self.compact_summary.set_metrics(
+                    [
+                        ("t", f"{t:.3f} s"),
+                        ("v", f"{(v_mps * 3.6):.1f} km/h"),
+                        ("ax", f"{ax:+.2f} m/s²"),
+                        ("ay", f"{ay:+.2f} m/s²"),
+                        ("yaw", f"{np.degrees(yaw):+.1f}°"),
+                        ("R", "—" if not np.isfinite(R) else f"{R:.1f} m"),
+                        ("roll", f"{np.degrees(roll):+.2f}°"),
+                        ("pitch", f"{np.degrees(pitch):+.2f}°"),
+                    ]
+                )
+            except Exception:
+                pass
 
         zcm = float(b.get("перемещение_рамы_z_м", 0.0)[i])
         vzcm = float(b.get("скорость_рамы_z_м_с", 0.0)[i])

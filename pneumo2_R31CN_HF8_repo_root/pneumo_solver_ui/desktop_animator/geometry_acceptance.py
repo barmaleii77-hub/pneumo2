@@ -170,26 +170,34 @@ def collect_acceptance_status(bundle: DataBundle, *, tol_m: float = 1e-6) -> Dic
     return out
 
 
+def _ensure_acceptance_hud_cache(bundle: DataBundle) -> Dict[str, Any]:
+    cache_key = "_geometry_acceptance_hud_cache"
+    cached = bundle._derived.get(cache_key)  # pylint: disable=protected-access
+    if isinstance(cached, dict):
+        return cached
 
-def format_acceptance_hud_lines(bundle: DataBundle, i: int) -> list[str]:
-    """Compact Russian HUD lines for frame/wheel/road acceptance."""
     status = collect_acceptance_status(bundle)
     missing = list(status.get("missing_triplets") or [])
     if missing:
         preview = ", ".join(missing[:2])
         if len(missing) > 2:
             preview += f", +{len(missing) - 2}"
-        return [f"Геом.check: отсутствуют triplet-ы ({preview})"]
+        out = {"missing_line": f"Геом.check: отсутствуют triplet-ы ({preview})"}
+        bundle._derived[cache_key] = out  # pylint: disable=protected-access
+        return out
 
-    frame_road_vals = []
-    wheel_road_vals = []
+    frame_road_rows: list[np.ndarray] = []
+    wheel_road_rows: list[np.ndarray] = []
     for c in CORNERS:
         acc = corner_acceptance_arrays(bundle, c)
-        frame_road_vals.append(float(np.asarray(acc["frame_road_m"], dtype=float)[i]))
-        wheel_road_vals.append(float(np.asarray(acc["wheel_road_m"], dtype=float)[i]))
+        if not acc.get("ok", False):
+            continue
+        frame_road_rows.append(np.asarray(acc["frame_road_m"], dtype=float).reshape(-1))
+        wheel_road_rows.append(np.asarray(acc["wheel_road_m"], dtype=float).reshape(-1))
 
-    fr_min = min(frame_road_vals) if frame_road_vals else float("nan")
-    wr_min = min(wheel_road_vals) if wheel_road_vals else float("nan")
+    fr_min_series = np.nanmin(np.vstack(frame_road_rows), axis=0) if frame_road_rows else np.zeros((0,), dtype=float)
+    wr_min_series = np.nanmin(np.vstack(wheel_road_rows), axis=0) if wheel_road_rows else np.zeros((0,), dtype=float)
+
     max_inv_mm = float(status.get("max_invariant_err_m", 0.0)) * 1000.0
     max_xy_mm = float(status.get("max_xy_err_m", 0.0)) * 1000.0
     max_xy_fw_mm = float(status.get("max_xy_frame_wheel_offset_m", 0.0)) * 1000.0
@@ -197,8 +205,53 @@ def format_acceptance_hud_lines(bundle: DataBundle, i: int) -> list[str]:
     max_fr_mm = float(status.get("max_scalar_err_frame_road_m", 0.0)) * 1000.0
     max_wr_mm = float(status.get("max_scalar_err_wheel_road_m", 0.0)) * 1000.0
     max_wf_mm = float(status.get("max_scalar_err_wheel_frame_m", 0.0)) * 1000.0
+    frame_wheel_lines = tuple(
+        f"Геом.: рама‑дорога min {float(fr_min):+.3f} м   колесо‑дорога min {float(wr_min):+.3f} м"
+        for fr_min, wr_min in zip(fr_min_series, wr_min_series)
+    )
+
+    out = {
+        "missing_line": "",
+        "frame_road_min_m": fr_min_series,
+        "wheel_road_min_m": wr_min_series,
+        "frame_wheel_lines": frame_wheel_lines,
+        "check_line": (
+            f"Check max: Σ {max_inv_mm:.3f} мм   XYwr {max_xy_mm:.3f} мм   "
+            f"XYfw/XYfr {max_xy_fw_mm:.3f}/{max_xy_fr_mm:.3f} мм   "
+            f"WF/WR/FR {max_wf_mm:.3f}/{max_wr_mm:.3f}/{max_fr_mm:.3f} мм"
+        ),
+    }
+    bundle._derived[cache_key] = out  # pylint: disable=protected-access
+    return out
+
+
+def format_acceptance_hud_lines(bundle: DataBundle, i: int) -> list[str]:
+    """Compact Russian HUD lines for frame/wheel/road acceptance."""
+    cache = _ensure_acceptance_hud_cache(bundle)
+    missing_line = str(cache.get("missing_line") or "")
+    if missing_line:
+        return [missing_line]
+
+    frame_wheel_lines = tuple(cache.get("frame_wheel_lines") or ())
+    if frame_wheel_lines:
+        idx = int(np.clip(int(i), 0, len(frame_wheel_lines) - 1))
+        geom_line = str(frame_wheel_lines[idx])
+    else:
+        frame_road_min = np.asarray(cache.get("frame_road_min_m"), dtype=float).reshape(-1)
+        wheel_road_min = np.asarray(cache.get("wheel_road_min_m"), dtype=float).reshape(-1)
+        if frame_road_min.size:
+            idx = int(np.clip(int(i), 0, frame_road_min.size - 1))
+            fr_min = float(frame_road_min[idx])
+        else:
+            fr_min = float("nan")
+        if wheel_road_min.size:
+            idx = int(np.clip(int(i), 0, wheel_road_min.size - 1))
+            wr_min = float(wheel_road_min[idx])
+        else:
+            wr_min = float("nan")
+        geom_line = f"Геом.: рама‑дорога min {fr_min:+.3f} м   колесо‑дорога min {wr_min:+.3f} м"
 
     return [
-        f"Геом.: рама‑дорога min {fr_min:+.3f} м   колесо‑дорога min {wr_min:+.3f} м",
-        f"Check max: Σ {max_inv_mm:.3f} мм   XYwr {max_xy_mm:.3f} мм   XYfw/XYfr {max_xy_fw_mm:.3f}/{max_xy_fr_mm:.3f} мм   WF/WR/FR {max_wf_mm:.3f}/{max_wr_mm:.3f}/{max_fr_mm:.3f} мм",
+        geom_line,
+        str(cache.get("check_line") or ""),
     ]
