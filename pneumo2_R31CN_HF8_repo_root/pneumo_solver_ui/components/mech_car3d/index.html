@@ -1197,6 +1197,22 @@ const ps = readPlayState();
     return segsRing[segsRing.length - 1] || null;
   }
 
+  function __sameRingSegment(segA, segB) {
+    if (!segA || !segB) return false;
+    const idxA = Number(segA.seg_idx || 0);
+    const idxB = Number(segB.seg_idx || 0);
+    if (Number.isFinite(idxA) && Number.isFinite(idxB) && idxA > 0 && idxB > 0) {
+      return idxA === idxB;
+    }
+    return String(segA.name || '') === String(segB.name || '');
+  }
+
+  function __ringSegmentLabel(seg) {
+    const name = String((seg && seg.name) || ("S" + String((seg && seg.seg_idx) || "")) || "?");
+    const turn = String((seg && (seg.turn_direction_label || seg.turn_direction)) || "").trim();
+    return turn ? (name + " · " + turn) : name;
+  }
+
   function __ringPoint(sVal, lat, yVal) {
     const Rr = Number(ringVisual.ring_radius_m || 0.0);
     const th = __ringTheta(sVal);
@@ -1256,7 +1272,7 @@ const ps = readPlayState();
       const x0s = Number(seg.x_start_m || 0.0);
       const x1s = Number(seg.x_end_m || x0s);
       const col = String(seg.edge_color || 'rgba(0,120,255,0.95)');
-      const isCurrent = !!(currentSeg && String(currentSeg.name || '') === String(seg.name || ''));
+      const isCurrent = __sameRingSegment(currentSeg, seg);
       const lineW = isCurrent ? 7 : 4;
       const boundaryW = isCurrent ? 5 : 3;
       for (let sA = x0s; sA < x1s - 1e-9; sA += edgeStep) {
@@ -1277,7 +1293,7 @@ const ps = readPlayState();
   const currentRingSeg = ringMode ? __ringCurrentSegment(sBody) : null;
   if (pillSeg) {
     if (currentRingSeg) {
-      pillSeg.textContent = "seg: " + String(currentRingSeg.name || ("S" + String(currentRingSeg.seg_idx || "")));
+      pillSeg.textContent = "seg: " + __ringSegmentLabel(currentRingSeg);
       try { pillSeg.style.borderColor = String(currentRingSeg.edge_color || "rgba(0,120,255,0.95)"); } catch(_e) {}
     } else {
       pillSeg.textContent = "seg: –";

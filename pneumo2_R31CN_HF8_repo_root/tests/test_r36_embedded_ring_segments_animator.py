@@ -44,5 +44,8 @@ def test_mech_car3d_has_ring_segment_hud_and_current_segment_emphasis() -> None:
     src = (ROOT / 'pneumo_solver_ui' / 'components' / 'mech_car3d' / 'index.html').read_text(encoding='utf-8')
     assert 'pillSeg' in src
     assert '__ringCurrentSegment' in src
+    assert '__ringSegmentLabel' in src
+    assert 'turn_direction_label' in src
+    assert '__sameRingSegment(currentSeg, seg)' in src
     assert 'const lineW = isCurrent ? 7 : 4;' in src
     assert 'drawRingRoadEmbedded(currentRingSeg);' in src
