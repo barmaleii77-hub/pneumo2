@@ -165,6 +165,69 @@ def test_run_registry_index_last_event_keeps_anim_latest_usability_summary(tmp_p
     assert "anim_latest_visual_cache_dependencies" not in last
 
 
+def test_run_registry_index_keeps_browser_perf_evidence_summary(tmp_path: Path, monkeypatch) -> None:
+    runs_root = tmp_path / "runs"
+    monkeypatch.setattr("pneumo_solver_ui.run_registry._runs_root", lambda: runs_root)
+
+    log_send_bundle_created(
+        zip_path=tmp_path / "bundle.zip",
+        sha256="abc123",
+        size_bytes=123,
+        release="pytest-release",
+        browser_perf_registry_snapshot_exists=True,
+        browser_perf_registry_snapshot_in_bundle=True,
+        browser_perf_previous_snapshot_exists=False,
+        browser_perf_previous_snapshot_in_bundle=False,
+        browser_perf_contract_exists=True,
+        browser_perf_contract_in_bundle=True,
+        browser_perf_evidence_report_exists=True,
+        browser_perf_evidence_report_in_bundle=True,
+        browser_perf_comparison_report_exists=True,
+        browser_perf_comparison_report_in_bundle=True,
+        browser_perf_trace_exists=False,
+        browser_perf_trace_in_bundle=False,
+        browser_perf_status="snapshot_only",
+        browser_perf_level="WARN",
+        browser_perf_evidence_status="snapshot_only",
+        browser_perf_evidence_level="WARN",
+        browser_perf_bundle_ready=False,
+        browser_perf_snapshot_contract_match=True,
+        browser_perf_comparison_status="no_reference",
+        browser_perf_comparison_level="WARN",
+        browser_perf_comparison_ready=False,
+        browser_perf_comparison_changed=None,
+        browser_perf_comparison_delta_total_wakeups=0,
+        browser_perf_comparison_delta_total_duplicate_guard_hits=0,
+        browser_perf_comparison_delta_total_render_count=0,
+        browser_perf_component_count=2,
+        browser_perf_total_wakeups=10,
+        browser_perf_total_duplicate_guard_hits=3,
+    )
+
+    idx = json.loads((runs_root / "index.json").read_text(encoding="utf-8"))
+    last = dict(idx.get("last_event") or {})
+
+    assert last["browser_perf_registry_snapshot_exists"] is True
+    assert last["browser_perf_registry_snapshot_in_bundle"] is True
+    assert last["browser_perf_previous_snapshot_exists"] is False
+    assert last["browser_perf_previous_snapshot_in_bundle"] is False
+    assert last["browser_perf_contract_exists"] is True
+    assert last["browser_perf_contract_in_bundle"] is True
+    assert last["browser_perf_evidence_report_exists"] is True
+    assert last["browser_perf_evidence_report_in_bundle"] is True
+    assert last["browser_perf_comparison_report_exists"] is True
+    assert last["browser_perf_comparison_report_in_bundle"] is True
+    assert last["browser_perf_trace_in_bundle"] is False
+    assert last["browser_perf_status"] == "snapshot_only"
+    assert last["browser_perf_evidence_status"] == "snapshot_only"
+    assert last["browser_perf_bundle_ready"] is False
+    assert last["browser_perf_snapshot_contract_match"] is True
+    assert last["browser_perf_comparison_status"] == "no_reference"
+    assert last["browser_perf_comparison_ready"] is False
+    assert last["browser_perf_comparison_delta_total_wakeups"] == 0
+    assert last["browser_perf_component_count"] == 2
+
+
 def test_sources_wire_anim_diagnostics_into_launcher_and_send_bundle() -> None:
     bundle_text = (ROOT / "pneumo_solver_ui" / "tools" / "make_send_bundle.py").read_text(encoding="utf-8")
     gui_text = (ROOT / "pneumo_solver_ui" / "tools" / "send_results_gui.py").read_text(encoding="utf-8")
@@ -177,6 +240,10 @@ def test_sources_wire_anim_diagnostics_into_launcher_and_send_bundle() -> None:
     assert 'collect_anim_latest_diagnostics_summary' in launcher_text
     assert 'send_results_gui_spawned' in launcher_text
     assert 'ANIM_DIAG_SIDECAR_JSON' in gui_text
-    assert 'Anim latest token:' in gui_text
+    assert 'load_latest_send_bundle_anim_dashboard' in gui_text
+    assert 'format_anim_dashboard_brief_lines' in gui_text
+    assert 'Anim pointer diagnostics:' in gui_text
     assert 'pick_anim_latest_fields' in registry_text
     assert 'ANIM_LATEST_INDEX_FIELDS' in registry_text
+    assert 'browser_perf_registry_snapshot_in_bundle' in registry_text
+    assert 'in_bundle=' in bundle_text

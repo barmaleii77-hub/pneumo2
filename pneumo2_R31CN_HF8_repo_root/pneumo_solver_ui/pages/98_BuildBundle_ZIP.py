@@ -27,6 +27,11 @@ import sys
 import streamlit as st
 from pneumo_solver_ui.ui_bootstrap import bootstrap
 from pneumo_solver_ui.ui_persistence import autosave_if_enabled
+from pneumo_solver_ui.tools.send_bundle_contract import (
+    ANIM_DIAG_SIDECAR_JSON,
+    format_anim_dashboard_brief_lines,
+    load_latest_send_bundle_anim_dashboard,
+)
 
 
 
@@ -82,6 +87,9 @@ def _build_and_read_zip() -> bytes:
             ok = False
         st.session_state["last_send_bundle_zip"] = str(latest)
         st.session_state["last_send_bundle_clipboard_ok"] = bool(ok)
+        st.session_state["last_send_bundle_anim_dashboard"] = load_latest_send_bundle_anim_dashboard(OUT_DIR)
+        diag_json = OUT_DIR / ANIM_DIAG_SIDECAR_JSON
+        st.session_state["last_send_bundle_anim_diag_path"] = str(diag_json) if diag_json.exists() else ""
         return latest.read_bytes()
 
     # fallback (если по какой-то причине latest не создался):
@@ -95,10 +103,15 @@ def _build_and_read_zip() -> bytes:
             ok = False
         st.session_state["last_send_bundle_zip"] = str(picked)
         st.session_state["last_send_bundle_clipboard_ok"] = bool(ok)
+        st.session_state["last_send_bundle_anim_dashboard"] = load_latest_send_bundle_anim_dashboard(OUT_DIR)
+        diag_json = OUT_DIR / ANIM_DIAG_SIDECAR_JSON
+        st.session_state["last_send_bundle_anim_diag_path"] = str(diag_json) if diag_json.exists() else ""
         return picked.read_bytes()
 
     st.session_state["last_send_bundle_zip"] = ""
     st.session_state["last_send_bundle_clipboard_ok"] = False
+    st.session_state["last_send_bundle_anim_dashboard"] = {}
+    st.session_state["last_send_bundle_anim_diag_path"] = ""
     return b""
 
 
@@ -116,10 +129,17 @@ st.markdown(
 if st.session_state.get("last_send_bundle_zip"):
     _p = st.session_state.get("last_send_bundle_zip")
     _ok = st.session_state.get("last_send_bundle_clipboard_ok")
+    _anim = st.session_state.get("last_send_bundle_anim_dashboard") or {}
+    _diag_path = st.session_state.get("last_send_bundle_anim_diag_path") or ""
     if _ok:
         st.success(f"ZIP создан и скопирован в буфер обмена: {_p}")
     else:
         st.info(f"ZIP создан: {_p}")
+    _anim_lines = format_anim_dashboard_brief_lines(_anim)
+    if _anim_lines:
+        st.markdown("\n".join(f"- {line}" for line in _anim_lines))
+    if _diag_path:
+        st.caption(f"Anim pointer diagnostics: {_diag_path}")
 
 st.download_button(
     "⬇️ Скачать ZIP и скопировать в буфер",

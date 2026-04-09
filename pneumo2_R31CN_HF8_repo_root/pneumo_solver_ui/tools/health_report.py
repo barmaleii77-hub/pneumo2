@@ -24,6 +24,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from pneumo_solver_ui.browser_perf_artifacts import (
+    BROWSER_PERF_COMPARISON_REPORT_JSON_NAME,
+    BROWSER_PERF_CONTRACT_JSON_NAME,
+    BROWSER_PERF_EVIDENCE_REPORT_JSON_NAME,
+    BROWSER_PERF_PREVIOUS_SNAPSHOT_JSON_NAME,
+    BROWSER_PERF_REGISTRY_SNAPSHOT_JSON_NAME,
+    BROWSER_PERF_TRACE_CANDIDATE_NAMES,
+)
+
 from .send_bundle_contract import (
     ANIM_DIAG_JSON,
     ANIM_GLOBAL_POINTER,
@@ -125,6 +134,12 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 "triage_report": "triage/triage_report.json" in name_set or "triage/triage_report.md" in name_set,
                 "anim_diagnostics": ANIM_DIAG_JSON in name_set,
                 "health_report_embedded": "health/health_report.json" in name_set or "health/health_report.md" in name_set,
+                "browser_perf_registry_snapshot": f"workspace/exports/{BROWSER_PERF_REGISTRY_SNAPSHOT_JSON_NAME}" in name_set,
+                "browser_perf_previous_snapshot": f"workspace/exports/{BROWSER_PERF_PREVIOUS_SNAPSHOT_JSON_NAME}" in name_set,
+                "browser_perf_contract": f"workspace/exports/{BROWSER_PERF_CONTRACT_JSON_NAME}" in name_set,
+                "browser_perf_evidence_report": f"workspace/exports/{BROWSER_PERF_EVIDENCE_REPORT_JSON_NAME}" in name_set,
+                "browser_perf_comparison_report": f"workspace/exports/{BROWSER_PERF_COMPARISON_REPORT_JSON_NAME}" in name_set,
+                "browser_perf_trace": any(f"workspace/exports/{name}" in name_set for name in BROWSER_PERF_TRACE_CANDIDATE_NAMES),
             }
 
             meta = _read_json_from_zip(z, "bundle/meta.json")
@@ -283,6 +298,22 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     anim_summary["geometry_acceptance"] = geom_acc
                     notes.append(str(geom_acc["error"]))
             signals["anim_latest"] = anim_summary
+            perf_evidence_status = str(anim_summary.get("browser_perf_evidence_status") or "").strip()
+            if perf_evidence_status and perf_evidence_status != "trace_bundle_ready":
+                perf_note = (
+                    "browser perf evidence is not trace_bundle_ready: "
+                    f"{perf_evidence_status}"
+                )
+                if perf_note not in notes:
+                    notes.append(perf_note)
+            perf_compare_status = str(anim_summary.get("browser_perf_comparison_status") or "").strip()
+            if perf_compare_status and perf_compare_status != "unchanged":
+                perf_compare_note = (
+                    "browser perf comparison status: "
+                    f"{perf_compare_status}"
+                )
+                if perf_compare_note not in notes:
+                    notes.append(perf_compare_note)
             for msg in anim_summary.get("issues") or []:
                 smsg = str(msg).strip()
                 if smsg and smsg not in notes:
@@ -321,6 +352,12 @@ def render_health_report_md(rep: HealthReport) -> str:
         f"- triage_report: {artifacts.get('triage_report')}",
         f"- anim_diagnostics: {artifacts.get('anim_diagnostics')}",
         f"- health_report_embedded: {artifacts.get('health_report_embedded')}",
+        f"- browser_perf_registry_snapshot: {artifacts.get('browser_perf_registry_snapshot')}",
+        f"- browser_perf_previous_snapshot: {artifacts.get('browser_perf_previous_snapshot')}",
+        f"- browser_perf_contract: {artifacts.get('browser_perf_contract')}",
+        f"- browser_perf_evidence_report: {artifacts.get('browser_perf_evidence_report')}",
+        f"- browser_perf_comparison_report: {artifacts.get('browser_perf_comparison_report')}",
+        f"- browser_perf_trace: {artifacts.get('browser_perf_trace')}",
     ]
 
     if val:
@@ -348,6 +385,15 @@ def render_health_report_md(rep: HealthReport) -> str:
             f"- usable_from_bundle: {anim.get('usable_from_bundle')}",
             f"- pointer_json_in_bundle: {anim.get('pointer_json_in_bundle')}",
             f"- npz_path_in_bundle: {anim.get('npz_path_in_bundle')}",
+            f"- browser_perf_status: {anim.get('browser_perf_status') or '—'} / level={anim.get('browser_perf_level') or '—'}",
+            f"- browser_perf_evidence_status: {anim.get('browser_perf_evidence_status') or '—'} / level={anim.get('browser_perf_evidence_level') or '—'}",
+            f"- browser_perf_bundle_ready: {anim.get('browser_perf_bundle_ready')}",
+            f"- browser_perf_snapshot_contract_match: {anim.get('browser_perf_snapshot_contract_match')}",
+            f"- browser_perf_comparison_status: {anim.get('browser_perf_comparison_status') or '—'} / level={anim.get('browser_perf_comparison_level') or '—'}",
+            f"- browser_perf_comparison_ready: {anim.get('browser_perf_comparison_ready')}",
+            f"- browser_perf_comparison_changed: {anim.get('browser_perf_comparison_changed')}",
+            f"- browser_perf_comparison_delta_total_wakeups: {anim.get('browser_perf_comparison_delta_total_wakeups')}",
+            f"- browser_perf_comparison_delta_total_duplicate_guard_hits: {anim.get('browser_perf_comparison_delta_total_duplicate_guard_hits')}",
         ]
         anim_issues = list(anim.get("issues") or [])
         if anim_issues:

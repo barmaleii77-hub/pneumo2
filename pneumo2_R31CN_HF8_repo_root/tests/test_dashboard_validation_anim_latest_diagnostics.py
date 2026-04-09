@@ -28,6 +28,39 @@ def _make_anim_diag(token: str, reload_inputs: list[str], *, updated_utc: str = 
         "anim_latest_visual_cache_dependencies": deps,
         "anim_latest_updated_utc": updated_utc,
         "anim_latest_meta": {"road_csv": "anim_latest_road_csv.csv"},
+        "browser_perf_status": "snapshot_only",
+        "browser_perf_level": "WARN",
+        "browser_perf_registry_snapshot_ref": "browser_perf_registry_snapshot.json",
+        "browser_perf_registry_snapshot_path": "/abs/workspace/exports/browser_perf_registry_snapshot.json",
+        "browser_perf_registry_snapshot_exists": True,
+        "browser_perf_contract_ref": "browser_perf_contract.json",
+        "browser_perf_contract_path": "/abs/workspace/exports/browser_perf_contract.json",
+        "browser_perf_contract_exists": True,
+        "browser_perf_evidence_report_ref": "browser_perf_evidence_report.json",
+        "browser_perf_evidence_report_path": "/abs/workspace/exports/browser_perf_evidence_report.json",
+        "browser_perf_evidence_report_exists": True,
+        "browser_perf_comparison_report_ref": "browser_perf_comparison_report.json",
+        "browser_perf_comparison_report_path": "/abs/workspace/exports/browser_perf_comparison_report.json",
+        "browser_perf_comparison_report_exists": True,
+        "browser_perf_trace_ref": "browser_perf_trace.json",
+        "browser_perf_trace_path": "/abs/workspace/exports/browser_perf_trace.json",
+        "browser_perf_trace_exists": False,
+        "browser_perf_evidence_status": "snapshot_only",
+        "browser_perf_evidence_level": "WARN",
+        "browser_perf_bundle_ready": False,
+        "browser_perf_snapshot_contract_match": True,
+        "browser_perf_comparison_status": "no_reference",
+        "browser_perf_comparison_level": "WARN",
+        "browser_perf_comparison_ready": False,
+        "browser_perf_comparison_changed": None,
+        "browser_perf_comparison_delta_total_wakeups": 0,
+        "browser_perf_comparison_delta_total_duplicate_guard_hits": 0,
+        "browser_perf_comparison_delta_total_render_count": 0,
+        "browser_perf_comparison_delta_max_idle_poll_ms": 0,
+        "browser_perf_component_count": 2,
+        "browser_perf_total_wakeups": 10,
+        "browser_perf_total_duplicate_guard_hits": 3,
+        "browser_perf_max_idle_poll_ms": 60000,
     }
 
 
@@ -75,7 +108,14 @@ def _make_global_pointer(token: str, reload_inputs: list[str], *, updated_utc: s
 
 
 
-def _write_minimal_send_bundle(tmp_path: Path, *, global_token: str = "tok-123", local_token: str = "tok-123", diag_token: str = "tok-123") -> Path:
+def _write_minimal_send_bundle(
+    tmp_path: Path,
+    *,
+    global_token: str = "tok-123",
+    local_token: str = "tok-123",
+    diag_token: str = "tok-123",
+    include_browser_perf_files: bool = True,
+) -> Path:
     zip_path = tmp_path / "bundle.zip"
     diag = _make_anim_diag(diag_token, ["npz", "road_csv"])
     local_ptr = _make_local_pointer(local_token, ["npz", "road_csv"])
@@ -97,6 +137,11 @@ def _write_minimal_send_bundle(tmp_path: Path, *, global_token: str = "tok-123",
         zf.writestr("workspace/exports/anim_latest.json", json.dumps(local_ptr, ensure_ascii=False, indent=2))
         zf.writestr("workspace/exports/anim_latest.npz", b"npz bytes")
         zf.writestr("workspace/exports/anim_latest_road_csv.csv", "t,z0,z1,z2,z3\n0,0,0,0,0\n")
+        if include_browser_perf_files:
+            zf.writestr("workspace/exports/browser_perf_registry_snapshot.json", json.dumps({"schema": "browser_perf_registry_snapshot_v1"}, ensure_ascii=False, indent=2))
+            zf.writestr("workspace/exports/browser_perf_contract.json", json.dumps({"schema": "browser_perf_contract_v1"}, ensure_ascii=False, indent=2))
+            zf.writestr("workspace/exports/browser_perf_evidence_report.json", json.dumps({"schema": "browser_perf_evidence_report_v1"}, ensure_ascii=False, indent=2))
+            zf.writestr("workspace/exports/browser_perf_comparison_report.json", json.dumps({"schema": "browser_perf_comparison_report_v1"}, ensure_ascii=False, indent=2))
         zf.writestr("workspace/uploads/placeholder.txt", "u")
         zf.writestr("workspace/road_profiles/placeholder.txt", "r")
         zf.writestr("workspace/maneuvers/placeholder.txt", "m")
@@ -120,11 +165,47 @@ def test_validate_send_bundle_exposes_anim_latest_diagnostics_and_dashboard_rend
     assert anim["pointer_sync_ok"] is True
     assert anim["reload_inputs_sync_ok"] is True
     assert anim["npz_path_sync_ok"] is True
+    assert anim["browser_perf_status"] == "snapshot_only"
+    assert anim["browser_perf_level"] == "WARN"
+    assert anim["browser_perf_registry_snapshot_ref"] == "browser_perf_registry_snapshot.json"
+    assert anim["browser_perf_registry_snapshot_exists"] is True
+    assert anim["browser_perf_registry_snapshot_in_bundle"] is True
+    assert anim["browser_perf_contract_ref"] == "browser_perf_contract.json"
+    assert anim["browser_perf_contract_exists"] is True
+    assert anim["browser_perf_contract_in_bundle"] is True
+    assert anim["browser_perf_evidence_status"] == "snapshot_only"
+    assert anim["browser_perf_evidence_level"] == "WARN"
+    assert anim["browser_perf_evidence_report_ref"] == "browser_perf_evidence_report.json"
+    assert anim["browser_perf_evidence_report_exists"] is True
+    assert anim["browser_perf_evidence_report_in_bundle"] is True
+    assert anim["browser_perf_bundle_ready"] is False
+    assert anim["browser_perf_snapshot_contract_match"] is True
+    assert anim["browser_perf_comparison_status"] == "no_reference"
+    assert anim["browser_perf_comparison_level"] == "WARN"
+    assert anim["browser_perf_comparison_report_ref"] == "browser_perf_comparison_report.json"
+    assert anim["browser_perf_comparison_report_exists"] is True
+    assert anim["browser_perf_comparison_report_in_bundle"] is True
+    assert anim["browser_perf_comparison_ready"] is False
+    assert anim["browser_perf_comparison_changed"] is None
+    assert anim["browser_perf_comparison_delta_total_wakeups"] == 0
+    assert anim["browser_perf_comparison_delta_total_duplicate_guard_hits"] == 0
+    assert anim["browser_perf_comparison_delta_total_render_count"] == 0
+    assert anim["browser_perf_comparison_delta_max_idle_poll_ms"] == 0
+    assert anim["browser_perf_trace_ref"] == "browser_perf_trace.json"
+    assert anim["browser_perf_trace_exists"] is False
+    assert anim["browser_perf_trace_in_bundle"] is False
     assert anim["diagnostics_json_present"] is True
     assert anim["local_pointer_present"] is True
     assert anim["global_pointer_present"] is True
     assert "tok-123" in res.report_md
     assert "workspace/_pointers/anim_latest.json" in res.report_md
+    assert "browser_perf_evidence_status" in res.report_md
+    assert "browser_perf_comparison_status" in res.report_md
+    assert "browser_perf_registry_snapshot.json" in res.report_md
+    assert "browser_perf_evidence_report.json" in res.report_md
+    assert "browser_perf_comparison_report.json" in res.report_md
+    with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("validation/validation_report.json", json.dumps(res.report_json, ensure_ascii=False, indent=2))
 
     repo_root = tmp_path / "repo"
     repo_root.mkdir(parents=True, exist_ok=True)
@@ -138,10 +219,41 @@ def test_validate_send_bundle_exposes_anim_latest_diagnostics_and_dashboard_rend
 
     assert dash_anim["visual_cache_token"] == "tok-123"
     assert dash_anim["visual_reload_inputs"] == ["npz", "road_csv"]
+    assert dash_anim["browser_perf_evidence_status"] == "snapshot_only"
+    assert dash_anim["browser_perf_bundle_ready"] is False
+    assert dash_anim["browser_perf_comparison_status"] == "no_reference"
+    assert dash_anim["browser_perf_comparison_ready"] is False
+    assert dash_anim["browser_perf_registry_snapshot_in_bundle"] is True
+    assert dash_anim["browser_perf_contract_in_bundle"] is True
+    assert dash_anim["browser_perf_evidence_report_in_bundle"] is True
+    assert dash_anim["browser_perf_comparison_report_in_bundle"] is True
+    assert dash_anim["browser_perf_trace_in_bundle"] is False
     assert rep["sections"]["anim_latest"]["json_zip_path"] == "triage/latest_anim_pointer_diagnostics.json"
     assert "Anim latest diagnostics" in html
     assert "tok-123" in html
+    assert "browser_perf.evidence" in html
+    assert "snapshot_only / WARN" in html
+    assert "browser_perf.comparison" in html
+    assert "no_reference / WARN" in html
+    assert "browser_perf_artifacts_primary" in html
 
+
+
+def test_validate_send_bundle_warns_when_browser_perf_reports_are_missing_from_bundle(tmp_path: Path) -> None:
+    zip_path = _write_minimal_send_bundle(tmp_path, include_browser_perf_files=False)
+
+    res = validate_send_bundle(zip_path)
+    anim = dict(res.report_json.get("anim_latest") or {})
+    warnings = [str(x) for x in (res.report_json.get("warnings") or [])]
+
+    assert res.ok is True
+    assert anim["browser_perf_registry_snapshot_in_bundle"] is False
+    assert anim["browser_perf_contract_in_bundle"] is False
+    assert anim["browser_perf_evidence_report_in_bundle"] is False
+    assert anim["browser_perf_comparison_report_in_bundle"] is False
+    assert any("browser_perf_registry_snapshot" in msg and "missing in bundle" in msg for msg in warnings)
+    assert any("browser_perf_evidence_report" in msg and "missing in bundle" in msg for msg in warnings)
+    assert any("browser_perf_comparison_report" in msg and "missing in bundle" in msg for msg in warnings)
 
 
 def test_validate_send_bundle_warns_on_anim_latest_token_mismatch(tmp_path: Path) -> None:

@@ -249,8 +249,9 @@ with st.sidebar:
 
     # Status indicator (last bundle + validation)
     try:
-        from pathlib import Path as _Path
         import json as _json
+        from pathlib import Path as _Path
+        from pneumo_solver_ui.diagnostics_entrypoint import read_last_meta_from_out_dir, summarize_last_bundle_meta
 
         def _resolve_out_dir(raw: str) -> _Path:
             s = (raw or "").strip()
@@ -267,20 +268,17 @@ with st.sidebar:
         _out_dir = _resolve_out_dir(str(diag_out_dir_raw))
         st.caption(f"Каталог ZIP: {_out_dir}")
 
-        meta_p = _out_dir / "last_bundle_meta.json"
-        if meta_p.exists():
-            meta = _json.loads(meta_p.read_text(encoding="utf-8", errors="replace"))
-            ok = meta.get("ok")
-            ts = meta.get("ts")
-            trig = meta.get("trigger")
-            z = meta.get("zip") or {}
-            name = z.get("name") or z.get("path")
-            size_b = z.get("size_bytes")
-            size_mb = (float(size_b) / (1024 * 1024)) if isinstance(size_b, (int, float)) else None
+        meta = summarize_last_bundle_meta(read_last_meta_from_out_dir(_out_dir))
+        if meta.get("zip_name"):
             st.write(
-                f"Последний ZIP: **{name}**" + (f" ({size_mb:.1f} MB)" if size_mb is not None else "")
-                + f" — ok={ok}, trigger={trig}, ts={ts}"
+                f"Последний ZIP: **{meta.get('zip_name')}**"
+                + (f" ({meta.get('zip_size_mb'):.1f} MB)" if meta.get("zip_size_mb") is not None else "")
+                + f" — ok={meta.get('ok')}, trigger={meta.get('trigger')}, ts={meta.get('ts')}"
             )
+            if meta.get("summary_lines"):
+                st.markdown("\n".join(f"- {line}" for line in meta["summary_lines"]))
+            if meta.get("anim_pointer_diagnostics_path"):
+                st.caption(f"Anim pointer diagnostics: {meta['anim_pointer_diagnostics_path']}")
         else:
             st.write("Последний ZIP: —")
 
@@ -405,8 +403,16 @@ with st.sidebar:
             st.session_state["_diag_bundle_path"] = str(zp)
             st.session_state["_diag_bundle_name"] = zp.name
             st.session_state["_diag_bundle_bytes"] = bundle_bytes
+            st.session_state["_diag_bundle_summary_lines"] = list(res.meta.get("summary_lines") or [])
+            st.session_state["_diag_bundle_anim_diag_path"] = str(res.meta.get("anim_pointer_diagnostics_path") or "")
             st.success(f"Готово: {zp.name}")
             st.caption(f"ZIP уже сохранён на диск: {zp}")
+            if st.session_state.get("_diag_bundle_summary_lines"):
+                st.markdown(
+                    "\n".join(f"- {line}" for line in st.session_state["_diag_bundle_summary_lines"])
+                )
+            if st.session_state.get("_diag_bundle_anim_diag_path"):
+                st.caption(f"Anim pointer diagnostics: {st.session_state['_diag_bundle_anim_diag_path']}")
             st.download_button(
                 "Скачать диагностический ZIP",
                 data=bundle_bytes,
@@ -427,6 +433,12 @@ with st.sidebar:
         )
         if st.session_state.get("_diag_bundle_path"):
             st.caption(f"Последний сохранённый ZIP: {st.session_state['_diag_bundle_path']}")
+            _summary_lines = list(st.session_state.get("_diag_bundle_summary_lines") or [])
+            _anim_diag_path = str(st.session_state.get("_diag_bundle_anim_diag_path") or "")
+            if _summary_lines:
+                st.markdown("\n".join(f"- {line}" for line in _summary_lines))
+            if _anim_diag_path:
+                st.caption(f"Anim pointer diagnostics: {_anim_diag_path}")
         else:
             st.caption("Если нужно обновить ZIP после новых прогонов — нажми «Собрать диагностический ZIP» ещё раз.")
 

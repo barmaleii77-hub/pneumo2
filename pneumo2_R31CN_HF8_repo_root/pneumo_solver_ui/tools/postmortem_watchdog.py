@@ -112,6 +112,25 @@ def _log(path: Path, msg: str) -> None:
         pass
 
 
+def _bundle_summary_fields(meta: object) -> dict[str, object]:
+    meta_dict = dict(meta or {}) if isinstance(meta, dict) else {}
+    lines = [str(x) for x in (meta_dict.get("summary_lines") or []) if str(x).strip()]
+    diag_path = str(meta_dict.get("anim_pointer_diagnostics_path") or "").strip()
+    return {
+        "summary_lines": lines,
+        "anim_pointer_diagnostics_path": diag_path,
+    }
+
+
+def _log_bundle_summary(path: Path, meta: object) -> None:
+    summary = _bundle_summary_fields(meta)
+    for line in summary["summary_lines"]:
+        _log(path, f"[watchdog] {line}")
+    diag_path = str(summary.get("anim_pointer_diagnostics_path") or "").strip()
+    if diag_path:
+        _log(path, f"[watchdog] Anim pointer diagnostics: {diag_path}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Postmortem watchdog: ensure Send Bundle after crash/kill")
     ap.add_argument("--target_pid", type=int, required=True, help="PID streamlit/python процесса")
@@ -248,8 +267,10 @@ def main() -> int:
 
         if res.ok and res.zip_path:
             _log(log_path, f"[watchdog] bundle OK: {res.zip_path}")
+            _log_bundle_summary(log_path, getattr(res, "meta", {}))
         else:
             _log(log_path, "[watchdog] bundle FAILED: " + (res.message or "unknown"))
+            _log_bundle_summary(log_path, getattr(res, "meta", {}))
             try:
                 tb = (res.meta or {}).get("traceback")
                 if tb:
@@ -284,6 +305,7 @@ def main() -> int:
                 "session_dir": str(p_session) if p_session else None,
                 "release": os.environ.get("PNEUMO_RELEASE", "R54"),
                 "ts": time.time(),
+                **_bundle_summary_fields(getattr(locals().get("res"), "meta", {})),
             }
         )
     except Exception:

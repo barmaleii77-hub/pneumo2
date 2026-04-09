@@ -35,6 +35,11 @@ from pathlib import Path
 from typing import Optional
 
 import streamlit as st
+from pneumo_solver_ui.tools.send_bundle_contract import (
+    ANIM_DIAG_SIDECAR_JSON,
+    format_anim_dashboard_brief_lines,
+    load_latest_send_bundle_anim_dashboard,
+)
 
 
 HERE = Path(__file__).resolve().parent
@@ -218,6 +223,14 @@ def run_script_page(target: str, *, auto_bundle: bool = False, title: Optional[s
         st.error("❌ Ошибка выполнения страницы")
         if saved_path:
             st.caption(f"Диагностика сохранена: {saved_path}")
+            bundle_dir = Path(saved_path).parent
+            anim_summary = load_latest_send_bundle_anim_dashboard(bundle_dir)
+            anim_lines = format_anim_dashboard_brief_lines(anim_summary)
+            if anim_lines:
+                st.markdown("\n".join(f"- {line}" for line in anim_lines))
+            diag_json = bundle_dir / ANIM_DIAG_SIDECAR_JSON
+            if diag_json.exists():
+                st.caption(f"Anim pointer diagnostics: {diag_json}")
             if clipboard_ok:
                 st.success("ZIP диагностики уже скопирован в буфер обмена.")
             elif clipboard_msg:

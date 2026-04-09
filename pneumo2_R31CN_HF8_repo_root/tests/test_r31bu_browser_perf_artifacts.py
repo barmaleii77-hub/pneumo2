@@ -4,7 +4,10 @@ import json
 from pathlib import Path
 
 from pneumo_solver_ui.browser_perf_artifacts import (
+    BROWSER_PERF_COMPARISON_REPORT_JSON_NAME,
     BROWSER_PERF_CONTRACT_JSON_NAME,
+    BROWSER_PERF_EVIDENCE_REPORT_JSON_NAME,
+    BROWSER_PERF_PREVIOUS_SNAPSHOT_JSON_NAME,
     BROWSER_PERF_REGISTRY_SNAPSHOT_JSON_NAME,
     collect_browser_perf_artifacts_summary,
     persist_browser_perf_snapshot_event,
@@ -64,19 +67,84 @@ def test_write_browser_perf_artifacts_writes_snapshot_and_contract(tmp_path: Pat
     out = write_browser_perf_artifacts(tmp_path, _snapshot(), updated_utc="2026-03-31T00:00:01Z")
 
     snap_path = tmp_path / BROWSER_PERF_REGISTRY_SNAPSHOT_JSON_NAME
+    prev_snap_path = tmp_path / BROWSER_PERF_PREVIOUS_SNAPSHOT_JSON_NAME
     contract_path = tmp_path / BROWSER_PERF_CONTRACT_JSON_NAME
+    report_path = tmp_path / BROWSER_PERF_EVIDENCE_REPORT_JSON_NAME
+    comparison_path = tmp_path / BROWSER_PERF_COMPARISON_REPORT_JSON_NAME
     assert snap_path.exists()
     assert contract_path.exists()
+    assert report_path.exists()
+    assert comparison_path.exists()
+    assert prev_snap_path.exists() is False
     assert out["browser_perf_registry_snapshot"]["exists"] is True
     assert out["browser_perf_contract"]["exists"] is True
+    assert out["browser_perf_evidence_report"]["exists"] is True
+    assert out["browser_perf_comparison_report"]["exists"] is True
 
     snap = json.loads(snap_path.read_text(encoding="utf-8"))
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
     assert snap["schema"] == "browser_perf_registry_snapshot_v1"
     assert snap["summary"]["component_count"] == 2
     assert contract["schema"] == "browser_perf_contract_v1"
     assert contract["status"] == "snapshot_only"
     assert contract["level"] == "WARN"
+    assert report["schema"] == "browser_perf_evidence_report_v1"
+    assert report["status"] == "snapshot_only"
+    assert report["level"] == "WARN"
+    assert report["bundle_ready"] is False
+    assert report["snapshot_contract_match"] is True
+    assert comparison["schema"] == "browser_perf_comparison_report_v1"
+    assert comparison["status"] == "no_reference"
+    assert comparison["level"] == "WARN"
+    assert comparison["comparison_ready"] is False
+
+
+def test_write_browser_perf_artifacts_marks_bundle_ready_when_trace_exists(tmp_path: Path) -> None:
+    (tmp_path / "browser_perf_trace.json").write_text('{"traceEvents":[]}', encoding="utf-8")
+    out = write_browser_perf_artifacts(tmp_path, _snapshot(), updated_utc="2026-03-31T00:00:01Z")
+    report = json.loads((tmp_path / BROWSER_PERF_EVIDENCE_REPORT_JSON_NAME).read_text(encoding="utf-8"))
+
+    assert out["browser_perf_trace"]["exists"] is True
+    assert out["browser_perf_evidence_report"]["status"] == "trace_bundle_ready"
+    assert report["status"] == "trace_bundle_ready"
+    assert report["level"] == "PASS"
+    assert report["bundle_ready"] is True
+
+
+def test_write_browser_perf_artifacts_writes_previous_snapshot_and_comparison_on_second_run(tmp_path: Path) -> None:
+    first = _snapshot()
+    second = _snapshot()
+    second["summary"] = dict(second["summary"])
+    second["summary"]["total_wakeups"] = 14
+    second["summary"]["total_duplicate_guard_hits"] = 5
+    second["summary"]["total_render_count"] = 18
+    second["summary"]["max_idle_poll_ms"] = 120000
+
+    write_browser_perf_artifacts(tmp_path, first, updated_utc="2026-03-31T00:00:01Z")
+    summary = collect_browser_perf_artifacts_summary(tmp_path)
+    assert summary["browser_perf_comparison_status"] == "no_reference"
+    assert summary["browser_perf_previous_snapshot_exists"] is False
+
+    write_browser_perf_artifacts(tmp_path, second, updated_utc="2026-03-31T00:00:02Z")
+    summary = collect_browser_perf_artifacts_summary(tmp_path)
+    prev = json.loads((tmp_path / BROWSER_PERF_PREVIOUS_SNAPSHOT_JSON_NAME).read_text(encoding="utf-8"))
+    comparison = json.loads((tmp_path / BROWSER_PERF_COMPARISON_REPORT_JSON_NAME).read_text(encoding="utf-8"))
+
+    assert prev["summary"]["total_wakeups"] == 10
+    assert summary["browser_perf_previous_snapshot_exists"] is True
+    assert summary["browser_perf_comparison_status"] == "changed"
+    assert summary["browser_perf_comparison_level"] == "PASS"
+    assert summary["browser_perf_comparison_ready"] is True
+    assert summary["browser_perf_comparison_changed"] is True
+    assert summary["browser_perf_comparison_delta_total_wakeups"] == 4
+    assert summary["browser_perf_comparison_delta_total_duplicate_guard_hits"] == 2
+    assert summary["browser_perf_comparison_delta_total_render_count"] == 5
+    assert summary["browser_perf_comparison_delta_max_idle_poll_ms"] == 60000
+    assert comparison["reference_snapshot_exists"] is True
+    assert comparison["status"] == "changed"
+    assert comparison["comparison_ready"] is True
 
 
 def test_persist_browser_perf_snapshot_event_returns_summary(tmp_path: Path) -> None:
@@ -96,6 +164,13 @@ def test_persist_browser_perf_snapshot_event_returns_summary(tmp_path: Path) -> 
     assert summary["browser_perf_component_count"] == 2
     assert summary["browser_perf_total_wakeups"] == 10
     assert summary["browser_perf_total_duplicate_guard_hits"] == 3
+    assert summary["browser_perf_evidence_report_exists"] is True
+    assert summary["browser_perf_evidence_status"] == "snapshot_only"
+    assert summary["browser_perf_bundle_ready"] is False
+    assert summary["browser_perf_snapshot_contract_match"] is True
+    assert summary["browser_perf_comparison_report_exists"] is True
+    assert summary["browser_perf_comparison_status"] == "no_reference"
+    assert summary["browser_perf_comparison_ready"] is False
 
 
 def test_collect_anim_latest_diagnostics_summary_surfaces_browser_perf_artifacts(tmp_path: Path, monkeypatch) -> None:
@@ -110,15 +185,29 @@ def test_collect_anim_latest_diagnostics_summary_surfaces_browser_perf_artifacts
     assert summary["browser_perf_registry_snapshot_exists"] is True
     assert summary["browser_perf_contract_ref"] == BROWSER_PERF_CONTRACT_JSON_NAME
     assert summary["browser_perf_contract_exists"] is True
+    assert summary["browser_perf_evidence_report_ref"] == BROWSER_PERF_EVIDENCE_REPORT_JSON_NAME
+    assert summary["browser_perf_evidence_report_exists"] is True
+    assert summary["browser_perf_comparison_report_ref"] == BROWSER_PERF_COMPARISON_REPORT_JSON_NAME
+    assert summary["browser_perf_comparison_report_exists"] is True
     assert summary["browser_perf_status"] == "snapshot_only"
     assert summary["browser_perf_level"] == "WARN"
+    assert summary["browser_perf_evidence_status"] == "snapshot_only"
+    assert summary["browser_perf_evidence_level"] == "WARN"
+    assert summary["browser_perf_comparison_status"] == "no_reference"
+    assert summary["browser_perf_comparison_level"] == "WARN"
     assert summary["browser_perf_component_count"] == 2
 
     diag, md = _collect_anim_latest_bundle_diagnostics(tmp_path)
     assert diag["browser_perf_registry_snapshot_exists"] is True
     assert diag["browser_perf_contract_exists"] is True
+    assert diag["browser_perf_evidence_report_exists"] is True
+    assert diag["browser_perf_comparison_report_exists"] is True
     assert "browser_perf_registry_snapshot" in md
     assert "browser_perf_status" in md
+    assert "browser_perf_evidence_report" in md
+    assert "browser_perf_evidence_status" in md
+    assert "browser_perf_comparison_report" in md
+    assert "browser_perf_comparison_status" in md
 
 
 def test_generate_triage_report_surfaces_browser_perf_artifacts(tmp_path: Path, monkeypatch) -> None:
@@ -132,9 +221,16 @@ def test_generate_triage_report_surfaces_browser_perf_artifacts(tmp_path: Path, 
     anim = dict(summary.get("anim_latest") or {})
     assert anim["browser_perf_registry_snapshot_exists"] is True
     assert anim["browser_perf_contract_exists"] is True
+    assert anim["browser_perf_evidence_report_exists"] is True
+    assert anim["browser_perf_comparison_report_exists"] is True
     assert anim["browser_perf_status"] == "snapshot_only"
+    assert anim["browser_perf_comparison_status"] == "no_reference"
     assert "browser_perf_registry_snapshot" in md
     assert "browser_perf_status" in md
+    assert "browser_perf_evidence_report" in md
+    assert "browser_perf_evidence_status" in md
+    assert "browser_perf_comparison_report" in md
+    assert "browser_perf_comparison_status" in md
 
 
 def test_playhead_component_exports_browser_perf_snapshot_to_python() -> None:

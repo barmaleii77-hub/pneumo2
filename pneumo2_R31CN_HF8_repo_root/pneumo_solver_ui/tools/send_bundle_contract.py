@@ -7,6 +7,7 @@ place so validation, health-report and dashboard surfaces interpret the same
 bundle payload identically.
 """
 
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
@@ -18,6 +19,58 @@ ANIM_DIAG_SIDECAR_MD = Path(ANIM_DIAG_MD).name
 ANIM_LOCAL_POINTER = "workspace/exports/anim_latest.json"
 ANIM_LOCAL_NPZ = "workspace/exports/anim_latest.npz"
 ANIM_GLOBAL_POINTER = "workspace/_pointers/anim_latest.json"
+LATEST_SEND_BUNDLE_VALIDATION_JSON = "latest_send_bundle_validation.json"
+BROWSER_PERF_FLAT_FIELDS = (
+    "browser_perf_registry_snapshot_ref",
+    "browser_perf_registry_snapshot_path",
+    "browser_perf_registry_snapshot_exists",
+    "browser_perf_registry_snapshot_in_bundle",
+    "browser_perf_previous_snapshot_ref",
+    "browser_perf_previous_snapshot_path",
+    "browser_perf_previous_snapshot_exists",
+    "browser_perf_previous_snapshot_in_bundle",
+    "browser_perf_contract_ref",
+    "browser_perf_contract_path",
+    "browser_perf_contract_exists",
+    "browser_perf_contract_in_bundle",
+    "browser_perf_evidence_report_ref",
+    "browser_perf_evidence_report_path",
+    "browser_perf_evidence_report_exists",
+    "browser_perf_evidence_report_in_bundle",
+    "browser_perf_comparison_report_ref",
+    "browser_perf_comparison_report_path",
+    "browser_perf_comparison_report_exists",
+    "browser_perf_comparison_report_in_bundle",
+    "browser_perf_trace_ref",
+    "browser_perf_trace_path",
+    "browser_perf_trace_exists",
+    "browser_perf_trace_in_bundle",
+    "browser_perf_status",
+    "browser_perf_level",
+    "browser_perf_message",
+    "browser_perf_evidence_status",
+    "browser_perf_evidence_level",
+    "browser_perf_evidence_message",
+    "browser_perf_bundle_ready",
+    "browser_perf_snapshot_contract_match",
+    "browser_perf_comparison_status",
+    "browser_perf_comparison_level",
+    "browser_perf_comparison_message",
+    "browser_perf_comparison_ready",
+    "browser_perf_comparison_changed",
+    "browser_perf_comparison_reference_updated_utc",
+    "browser_perf_comparison_current_updated_utc",
+    "browser_perf_comparison_reference_trace_exists",
+    "browser_perf_comparison_current_trace_exists",
+    "browser_perf_comparison_delta_total_wakeups",
+    "browser_perf_comparison_delta_total_duplicate_guard_hits",
+    "browser_perf_comparison_delta_total_render_count",
+    "browser_perf_comparison_delta_max_idle_poll_ms",
+    "browser_perf_component_count",
+    "browser_perf_total_wakeups",
+    "browser_perf_total_duplicate_guard_hits",
+    "browser_perf_max_idle_poll_ms",
+)
 
 ANIM_LATEST_REGISTRY_EVENT_FIELDS = (
     "anim_latest_available",
@@ -124,7 +177,7 @@ def extract_anim_snapshot(obj: Any, *, source: str) -> Optional[Dict[str, Any]]:
     issues_src = obj.get("issues") or obj.get("anim_latest_issues") or []
     issues = list(issues_src) if isinstance(issues_src, list) else []
 
-    return {
+    out = {
         "source": str(source),
         "available": available,
         "pointer_json": str(obj.get("anim_latest_pointer_json") or obj.get("pointer_json") or obj.get("anim_latest_json") or ""),
@@ -145,6 +198,16 @@ def extract_anim_snapshot(obj: Any, *, source: str) -> Optional[Dict[str, Any]]:
         "npz_path_in_bundle": obj.get("npz_path_in_bundle"),
         "issues": issues,
     }
+    for key in BROWSER_PERF_FLAT_FIELDS:
+        if key in obj:
+            value = obj.get(key)
+            if isinstance(value, dict):
+                out[key] = dict(value)
+            elif isinstance(value, list):
+                out[key] = list(value)
+            else:
+                out[key] = value
+    return out
 
 
 def annotate_anim_source_for_bundle(state: Optional[Dict[str, Any]], *, name_set: set[str]) -> Optional[Dict[str, Any]]:
@@ -217,6 +280,25 @@ def choose_anim_snapshot(
         chosen = dict(sources[first_key])
         chosen["source"] = first_key
 
+    for key in BROWSER_PERF_FLAT_FIELDS:
+        cur = chosen.get(key)
+        if key in chosen and cur not in (None, "", [], {}):
+            continue
+        for src_key in ordered_keys:
+            snap = sources.get(src_key)
+            if not isinstance(snap, dict):
+                continue
+            value = snap.get(key)
+            if value in (None, "", [], {}):
+                continue
+            if isinstance(value, dict):
+                chosen[key] = dict(value)
+            elif isinstance(value, list):
+                chosen[key] = list(value)
+            else:
+                chosen[key] = value
+            break
+
     chosen["sources_present"] = list(sources.keys())
     chosen["sources"] = {k: dict(v) for k, v in sources.items()}
 
@@ -272,6 +354,91 @@ def normalize_anim_dashboard_obj(obj: Any) -> Dict[str, Any]:
     return out
 
 
+def _safe_read_json_dict(path: Path) -> Dict[str, Any]:
+    try:
+        obj = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except Exception:
+        return {}
+    return dict(obj) if isinstance(obj, dict) else {}
+
+
+def load_latest_send_bundle_anim_dashboard(out_dir: Path) -> Dict[str, Any]:
+    root = Path(out_dir).expanduser()
+    sources: Dict[str, Dict[str, Any]] = {}
+
+    diag_obj = _safe_read_json_dict(root / ANIM_DIAG_SIDECAR_JSON)
+    if diag_obj:
+        diag_norm = normalize_anim_dashboard_obj(diag_obj)
+        if diag_norm.get("visual_cache_token") or diag_norm.get("available") or diag_norm.get("npz_path"):
+            sources["diagnostics"] = diag_norm
+
+    validation_obj = _safe_read_json_dict(root / LATEST_SEND_BUNDLE_VALIDATION_JSON)
+    validation_anim = validation_obj.get("anim_latest")
+    if isinstance(validation_anim, dict):
+        validation_norm = normalize_anim_dashboard_obj(validation_anim)
+        if validation_norm.get("visual_cache_token") or validation_norm.get("available") or validation_norm.get("npz_path") or any(
+            validation_norm.get(key) not in (None, "", [], {}) for key in BROWSER_PERF_FLAT_FIELDS
+        ):
+            sources["validation"] = validation_norm
+
+    if not sources:
+        return {}
+    chosen = choose_anim_snapshot(sources, preferred_order=("diagnostics", "validation"))
+    return normalize_anim_dashboard_obj(chosen)
+
+
+def format_anim_dashboard_brief_lines(anim: Any) -> List[str]:
+    norm = normalize_anim_dashboard_obj(anim)
+    if not norm:
+        return []
+
+    lines: List[str] = []
+    token = str(norm.get("visual_cache_token") or "")
+    reload_inputs = list(norm.get("visual_reload_inputs") or [])
+    perf_evidence_status = str(norm.get("browser_perf_evidence_status") or "")
+    perf_evidence_level = str(norm.get("browser_perf_evidence_level") or "")
+    perf_compare_status = str(norm.get("browser_perf_comparison_status") or "")
+    perf_compare_level = str(norm.get("browser_perf_comparison_level") or "")
+    perf_bundle_ready = norm.get("browser_perf_bundle_ready")
+    perf_compare_ready = norm.get("browser_perf_comparison_ready")
+
+    if token:
+        lines.append(f"Anim latest token: {token}")
+    if reload_inputs:
+        lines.append("Anim reload inputs: " + ", ".join(str(x) for x in reload_inputs))
+    if perf_evidence_status or perf_evidence_level:
+        lines.append(
+            "Browser perf evidence: "
+            f"{perf_evidence_status or '—'}"
+            f"{' / ' + perf_evidence_level if perf_evidence_level else ''}"
+            f" / bundle_ready={perf_bundle_ready}"
+        )
+    if perf_compare_status or perf_compare_level:
+        lines.append(
+            "Browser perf comparison: "
+            f"{perf_compare_status or '—'}"
+            f"{' / ' + perf_compare_level if perf_compare_level else ''}"
+            f" / ready={perf_compare_ready}"
+        )
+
+    bundle_bits = []
+    for label, key in (
+        ("snapshot", "browser_perf_registry_snapshot_in_bundle"),
+        ("previous", "browser_perf_previous_snapshot_in_bundle"),
+        ("contract", "browser_perf_contract_in_bundle"),
+        ("evidence", "browser_perf_evidence_report_in_bundle"),
+        ("comparison", "browser_perf_comparison_report_in_bundle"),
+        ("trace", "browser_perf_trace_in_bundle"),
+    ):
+        value = norm.get(key)
+        if value is not None:
+            bundle_bits.append(f"{label}={value}")
+    if bundle_bits:
+        lines.append("Browser perf bundle artifacts: " + ", ".join(bundle_bits))
+
+    return lines
+
+
 def anim_has_signal(anim: Any) -> bool:
     if not isinstance(anim, dict):
         return False
@@ -310,6 +477,46 @@ def render_anim_latest_md(anim: Any) -> str:
         lines.append(f"- reload_inputs_sync_ok: {norm.get('reload_inputs_sync_ok')}")
     if norm.get("npz_path_sync_ok") is not None:
         lines.append(f"- npz_path_sync_ok: {norm.get('npz_path_sync_ok')}")
+    if norm.get("browser_perf_status") or norm.get("browser_perf_level"):
+        lines.append(
+            f"- browser_perf_status: {norm.get('browser_perf_status') or '—'} / level={norm.get('browser_perf_level') or '—'}"
+        )
+    if norm.get("browser_perf_evidence_status") or norm.get("browser_perf_evidence_level"):
+        lines.append(
+            f"- browser_perf_evidence_status: {norm.get('browser_perf_evidence_status') or '—'} / level={norm.get('browser_perf_evidence_level') or '—'} / bundle_ready={norm.get('browser_perf_bundle_ready')} / snapshot_contract_match={norm.get('browser_perf_snapshot_contract_match')}"
+        )
+    if any(
+        norm.get(key) not in (None, "", [], {})
+        for key in (
+            "browser_perf_registry_snapshot_ref",
+            "browser_perf_contract_ref",
+            "browser_perf_evidence_report_ref",
+            "browser_perf_comparison_report_ref",
+            "browser_perf_trace_ref",
+            "browser_perf_registry_snapshot_in_bundle",
+            "browser_perf_contract_in_bundle",
+            "browser_perf_evidence_report_in_bundle",
+            "browser_perf_comparison_report_in_bundle",
+            "browser_perf_trace_in_bundle",
+        )
+    ):
+        lines.append(
+            f"- browser_perf_artifacts_primary: snapshot={norm.get('browser_perf_registry_snapshot_ref') or '—'} / exists={norm.get('browser_perf_registry_snapshot_exists')} / in_bundle={norm.get('browser_perf_registry_snapshot_in_bundle')} ; contract={norm.get('browser_perf_contract_ref') or '—'} / exists={norm.get('browser_perf_contract_exists')} / in_bundle={norm.get('browser_perf_contract_in_bundle')}"
+        )
+        lines.append(
+            f"- browser_perf_artifacts_secondary: previous={norm.get('browser_perf_previous_snapshot_ref') or '—'} / exists={norm.get('browser_perf_previous_snapshot_exists')} / in_bundle={norm.get('browser_perf_previous_snapshot_in_bundle')} ; evidence={norm.get('browser_perf_evidence_report_ref') or '—'} / exists={norm.get('browser_perf_evidence_report_exists')} / in_bundle={norm.get('browser_perf_evidence_report_in_bundle')} ; comparison={norm.get('browser_perf_comparison_report_ref') or '—'} / exists={norm.get('browser_perf_comparison_report_exists')} / in_bundle={norm.get('browser_perf_comparison_report_in_bundle')} ; trace={norm.get('browser_perf_trace_ref') or '—'} / exists={norm.get('browser_perf_trace_exists')} / in_bundle={norm.get('browser_perf_trace_in_bundle')}"
+        )
+    if norm.get("browser_perf_component_count") is not None:
+        lines.append(
+            f"- browser_perf_component_count: {norm.get('browser_perf_component_count')} / total_wakeups={norm.get('browser_perf_total_wakeups')} / total_duplicate_guard_hits={norm.get('browser_perf_total_duplicate_guard_hits')} / max_idle_poll_ms={norm.get('browser_perf_max_idle_poll_ms')}"
+        )
+    if norm.get("browser_perf_comparison_status") or norm.get("browser_perf_comparison_level"):
+        lines.append(
+            f"- browser_perf_comparison_status: {norm.get('browser_perf_comparison_status') or '—'} / level={norm.get('browser_perf_comparison_level') or '—'} / ready={norm.get('browser_perf_comparison_ready')} / changed={norm.get('browser_perf_comparison_changed')}"
+        )
+        lines.append(
+            f"- browser_perf_comparison_delta: wakeups={norm.get('browser_perf_comparison_delta_total_wakeups')} / dup={norm.get('browser_perf_comparison_delta_total_duplicate_guard_hits')} / render={norm.get('browser_perf_comparison_delta_total_render_count')} / max_idle_poll_ms={norm.get('browser_perf_comparison_delta_max_idle_poll_ms')}"
+        )
     issues = [str(x) for x in (norm.get("issues") or []) if str(x).strip()]
     if issues:
         lines.extend(["", "## Issues", *[f"- {x}" for x in issues]])

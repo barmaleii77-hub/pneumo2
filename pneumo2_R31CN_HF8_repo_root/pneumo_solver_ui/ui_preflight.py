@@ -28,6 +28,10 @@ from pneumo_solver_ui.entrypoints import (
     env_diagnostics_page_rel,
     validation_web_page_rel,
 )
+from pneumo_solver_ui.diagnostics_entrypoint import (
+    read_last_meta_from_out_dir,
+    summarize_last_bundle_meta,
+)
 from pneumo_solver_ui.run_artifacts import local_anim_latest_export_paths
 from pneumo_solver_ui.tools.send_bundle_contract import extract_anim_snapshot
 
@@ -235,6 +239,38 @@ def _desktop_deps_info() -> Tuple[bool, str]:
     return False, "Не хватает зависимостей: " + ", ".join(need)
 
 
+def _resolve_diag_out_dir(st_mod: Any, app_dir: Path) -> Path:
+    raw = str(getattr(st_mod, "session_state", {}).get("diag_output_dir", "send_bundles") or "").strip()
+    if not raw:
+        return (app_dir / "send_bundles").resolve()
+    try:
+        p = Path(raw).expanduser()
+        if p.is_absolute():
+            return p.resolve()
+    except Exception:
+        pass
+    return (app_dir / raw).resolve()
+
+
+def _last_send_bundle_info(st_mod: Any, app_dir: Path) -> Tuple[bool, str]:
+    out_dir = _resolve_diag_out_dir(st_mod, app_dir)
+    meta = summarize_last_bundle_meta(read_last_meta_from_out_dir(out_dir))
+    if not meta.get("zip_name"):
+        return False, f"Последний SEND bundle ещё не создан. Каталог: {out_dir}"
+
+    lines = [
+        f"Последний ZIP: {meta.get('zip_name')}",
+        f"ok={meta.get('ok')} trigger={meta.get('trigger')} ts={meta.get('ts')}",
+    ]
+    if meta.get("zip_size_mb") is not None:
+        lines.append(f"size_mb={meta.get('zip_size_mb'):.1f}")
+    for line in list(meta.get("summary_lines") or []):
+        lines.append(str(line))
+    if meta.get("anim_pointer_diagnostics_path"):
+        lines.append(f"Anim pointer diagnostics: {meta.get('anim_pointer_diagnostics_path')}")
+    return bool(meta.get("ok")), "\n".join(lines)
+
+
 def collect_steps(st_mod: Any, app_dir: Path) -> Dict[str, _Step]:
     steps: Dict[str, _Step] = {}
 
@@ -327,6 +363,17 @@ def collect_steps(st_mod: Any, app_dir: Path) -> Dict[str, _Step]:
         action_label="Открыть Desktop Animator",
     )
 
+    ok, detail = _last_send_bundle_info(st_mod, app_dir)
+    steps["send_bundle"] = _Step(
+        key="send_bundle",
+        title="Последний SEND bundle",
+        ok=ok,
+        level="ok" if ok else "warn",
+        detail=detail,
+        page=ENV_DIAGNOSTICS_PAGE,
+        action_label="Диагностика среды",
+    )
+
     # Небольшая подсказка про окружение
     steps["env"] = _Step(
         key="env",
@@ -405,7 +452,7 @@ def render_preflight_sidebar(st_mod: Any, app_dir: Path) -> None:
     _nav_link(st_mod, next_page, "➡️ " + next_label, key="preflight_next")
 
     with st_mod.expander("Статусы", expanded=False):
-        for step in ["autosave", "suite", "baseline", "export", "desktop", "env"]:
+        for step in ["autosave", "suite", "baseline", "export", "desktop", "send_bundle", "env"]:
             s = steps.get(step)
             if not s:
                 continue
@@ -435,7 +482,7 @@ def render_preflight_page(st_mod: Any, app_dir: Path) -> None:
     st_mod.divider()
     st_mod.subheader("Чеклист")
 
-    for k in ["autosave", "suite", "baseline", "export", "desktop", "env"]:
+    for k in ["autosave", "suite", "baseline", "export", "desktop", "send_bundle", "env"]:
         s = steps.get(k)
         if not s:
             continue

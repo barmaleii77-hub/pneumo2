@@ -31,6 +31,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from pneumo_solver_ui.tools.send_bundle_contract import (
+    ANIM_DIAG_SIDECAR_JSON,
+    format_anim_dashboard_brief_lines,
+    load_latest_send_bundle_anim_dashboard,
+)
+
 
 def _repo_root_from_here() -> Path:
     # .../pneumo_solver_ui/diagnostics_entrypoint.py -> parents[1] == repo root
@@ -249,16 +255,48 @@ def _write_last_meta(out_dir: Path, meta: Dict[str, Any]) -> None:
         return
 
 
-def read_last_meta(repo_root: Optional[Path] = None) -> Dict[str, Any]:
-    repo_root = (repo_root or _repo_root_from_here()).resolve()
-    out_dir = (repo_root / "send_bundles").resolve()
-    p = out_dir / "last_bundle_meta.json"
+def read_last_meta_from_out_dir(out_dir: Path) -> Dict[str, Any]:
+    p = Path(out_dir).expanduser() / "last_bundle_meta.json"
     try:
         if p.exists():
-            return json.loads(p.read_text(encoding="utf-8", errors="replace"))
+            obj = json.loads(p.read_text(encoding="utf-8", errors="replace"))
+            return dict(obj) if isinstance(obj, dict) else {}
     except Exception:
         return {}
     return {}
+
+
+def read_last_meta(repo_root: Optional[Path] = None) -> Dict[str, Any]:
+    repo_root = (repo_root or _repo_root_from_here()).resolve()
+    out_dir = (repo_root / "send_bundles").resolve()
+    return read_last_meta_from_out_dir(out_dir)
+
+
+def summarize_last_bundle_meta(meta: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    meta_dict = dict(meta or {})
+    zip_meta = dict(meta_dict.get("zip") or {}) if isinstance(meta_dict.get("zip"), dict) else {}
+    size_b = zip_meta.get("size_bytes")
+    size_mb = (float(size_b) / (1024 * 1024)) if isinstance(size_b, (int, float)) else None
+    return {
+        "ok": meta_dict.get("ok"),
+        "ts": meta_dict.get("ts"),
+        "trigger": meta_dict.get("trigger"),
+        "zip_name": zip_meta.get("name") or zip_meta.get("path") or "",
+        "zip_path": zip_meta.get("path") or "",
+        "zip_size_mb": size_mb,
+        "summary_lines": [str(x) for x in (meta_dict.get("summary_lines") or []) if str(x).strip()],
+        "anim_pointer_diagnostics_path": str(meta_dict.get("anim_pointer_diagnostics_path") or ""),
+    }
+
+
+def _bundle_summary_meta(out_dir: Path) -> Dict[str, Any]:
+    anim_summary = load_latest_send_bundle_anim_dashboard(out_dir)
+    diag_json = out_dir / ANIM_DIAG_SIDECAR_JSON
+    return {
+        "anim_latest_summary": dict(anim_summary) if isinstance(anim_summary, dict) else {},
+        "summary_lines": list(format_anim_dashboard_brief_lines(anim_summary)),
+        "anim_pointer_diagnostics_path": str(diag_json) if diag_json.exists() else "",
+    }
 
 
 def build_full_diagnostics_bundle(
@@ -354,6 +392,7 @@ def build_full_diagnostics_bundle(
         except Exception:
             meta["zip"] = {"path": str(zip_path), "name": str(zip_path.name)}
 
+        meta.update(_bundle_summary_meta(out_dir))
         meta["ok"] = True
         _write_last_meta(out_dir, meta)
 
@@ -374,6 +413,7 @@ def build_full_diagnostics_bundle(
 
         return DiagnosticsBuildResult(ok=True, zip_path=zip_path, message="OK", meta=meta)
     except Exception as e:
+        meta.update(_bundle_summary_meta(out_dir))
         meta["ok"] = False
         meta["error"] = f"{type(e).__name__}: {e}"
         meta["traceback"] = traceback.format_exc(limit=30)

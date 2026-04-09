@@ -50,6 +50,7 @@ from .send_bundle_contract import (
     ANIM_GLOBAL_POINTER,
     ANIM_LOCAL_NPZ,
     ANIM_LOCAL_POINTER,
+    BROWSER_PERF_FLAT_FIELDS,
     annotate_anim_source_for_bundle,
     choose_anim_snapshot,
     extract_anim_snapshot,
@@ -77,6 +78,34 @@ def _safe_json_load_bytes(b: bytes) -> Any:
         return json.loads(b.decode("utf-8", errors="replace"))
     except Exception:
         return None
+
+
+def _browser_perf_default_value(key: str) -> Any:
+    if key.endswith(("_exists", "_ready", "_changed", "_match")):
+        return None
+    if key.endswith(("_count", "_wakeups", "_guard_hits", "_idle_poll_ms")):
+        return 0
+    return ""
+
+
+def _copy_browser_perf_fields(dst: Dict[str, Any], src: Dict[str, Any]) -> None:
+    for key in BROWSER_PERF_FLAT_FIELDS:
+        if key not in src:
+            continue
+        value = src.get(key)
+        if key.endswith(("_count", "_wakeups", "_guard_hits", "_idle_poll_ms")):
+            dst[key] = int(value or 0)
+        elif key.endswith(("_exists", "_ready", "_changed", "_match")):
+            dst[key] = value
+        else:
+            dst[key] = str(value or "")
+
+
+def _ref_present_in_bundle(ref: Any, bundle_basenames: set[str]) -> Optional[bool]:
+    ref_text = str(ref or "").strip()
+    if not ref_text:
+        return None
+    return Path(ref_text).name in bundle_basenames
 
 
 def _md_list(items: List[str]) -> str:
@@ -184,9 +213,16 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
         "usable_from_bundle": None,
         "pointer_json_in_bundle": None,
         "npz_path_in_bundle": None,
+        "browser_perf_registry_snapshot_in_bundle": None,
+        "browser_perf_previous_snapshot_in_bundle": None,
+        "browser_perf_contract_in_bundle": None,
+        "browser_perf_evidence_report_in_bundle": None,
+        "browser_perf_comparison_report_in_bundle": None,
+        "browser_perf_trace_in_bundle": None,
         "issues": [],
         "sources": {},
     }
+    anim_latest.update({key: _browser_perf_default_value(key) for key in BROWSER_PERF_FLAT_FIELDS})
     ui_autosave: Dict[str, Any] = {
         "persistent_state_json_present": False,
         "workspace_ui_state_json_present": False,
@@ -201,6 +237,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
         with zipfile.ZipFile(zp, "r") as z:
             names = z.namelist()
             name_set = set(names)
+            bundle_basenames = {Path(name).name for name in name_set}
 
             missing_required = [p for p in required if p not in name_set]
             if missing_required:
@@ -339,8 +376,71 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                 anim_latest["pointer_sync_ok"] = canonical.get("pointer_sync_ok")
                 anim_latest["reload_inputs_sync_ok"] = canonical.get("reload_inputs_sync_ok")
                 anim_latest["npz_path_sync_ok"] = canonical.get("npz_path_sync_ok")
+                _copy_browser_perf_fields(anim_latest, canonical)
+                anim_latest["browser_perf_registry_snapshot_in_bundle"] = _ref_present_in_bundle(
+                    anim_latest.get("browser_perf_registry_snapshot_ref") or anim_latest.get("browser_perf_registry_snapshot_path"),
+                    bundle_basenames,
+                )
+                anim_latest["browser_perf_previous_snapshot_in_bundle"] = _ref_present_in_bundle(
+                    anim_latest.get("browser_perf_previous_snapshot_ref") or anim_latest.get("browser_perf_previous_snapshot_path"),
+                    bundle_basenames,
+                )
+                anim_latest["browser_perf_contract_in_bundle"] = _ref_present_in_bundle(
+                    anim_latest.get("browser_perf_contract_ref") or anim_latest.get("browser_perf_contract_path"),
+                    bundle_basenames,
+                )
+                anim_latest["browser_perf_evidence_report_in_bundle"] = _ref_present_in_bundle(
+                    anim_latest.get("browser_perf_evidence_report_ref") or anim_latest.get("browser_perf_evidence_report_path"),
+                    bundle_basenames,
+                )
+                anim_latest["browser_perf_comparison_report_in_bundle"] = _ref_present_in_bundle(
+                    anim_latest.get("browser_perf_comparison_report_ref") or anim_latest.get("browser_perf_comparison_report_path"),
+                    bundle_basenames,
+                )
+                anim_latest["browser_perf_trace_in_bundle"] = _ref_present_in_bundle(
+                    anim_latest.get("browser_perf_trace_ref") or anim_latest.get("browser_perf_trace_path"),
+                    bundle_basenames,
+                )
 
             issues: List[str] = [str(x).strip() for x in (canonical.get("issues") or []) if str(x).strip()]
+
+            for label, ref_key, path_key, exists_key, in_bundle_key in (
+                (
+                    "browser_perf_registry_snapshot",
+                    "browser_perf_registry_snapshot_ref",
+                    "browser_perf_registry_snapshot_path",
+                    "browser_perf_registry_snapshot_exists",
+                    "browser_perf_registry_snapshot_in_bundle",
+                ),
+                (
+                    "browser_perf_contract",
+                    "browser_perf_contract_ref",
+                    "browser_perf_contract_path",
+                    "browser_perf_contract_exists",
+                    "browser_perf_contract_in_bundle",
+                ),
+                (
+                    "browser_perf_evidence_report",
+                    "browser_perf_evidence_report_ref",
+                    "browser_perf_evidence_report_path",
+                    "browser_perf_evidence_report_exists",
+                    "browser_perf_evidence_report_in_bundle",
+                ),
+                (
+                    "browser_perf_comparison_report",
+                    "browser_perf_comparison_report_ref",
+                    "browser_perf_comparison_report_path",
+                    "browser_perf_comparison_report_exists",
+                    "browser_perf_comparison_report_in_bundle",
+                ),
+            ):
+                ref_text = str(anim_latest.get(ref_key) or anim_latest.get(path_key) or "").strip()
+                should_exist = anim_latest.get(exists_key)
+                in_bundle = anim_latest.get(in_bundle_key)
+                if ref_text and should_exist and in_bundle is False:
+                    msg = f"{label} referenced by anim_latest diagnostics but missing in bundle: {Path(ref_text).name}"
+                    warnings.append(msg)
+                    issues.append(msg)
 
             token_values = {
                 src: str(state.get("visual_cache_token") or "")
@@ -516,6 +616,12 @@ def _render_md(rep: Dict[str, Any]) -> str:
         f"- pointer_sync_ok: `{anim.get('pointer_sync_ok')}`",
         f"- reload_inputs_sync_ok: `{anim.get('reload_inputs_sync_ok')}`",
         f"- npz_path_sync_ok: `{anim.get('npz_path_sync_ok')}`",
+        f"- browser_perf_status: `{anim.get('browser_perf_status') or '—'}` / level=`{anim.get('browser_perf_level') or '—'}`",
+        f"- browser_perf_artifacts_primary: snapshot=`{anim.get('browser_perf_registry_snapshot_ref') or '—'}` / exists=`{anim.get('browser_perf_registry_snapshot_exists')}` / in_bundle=`{anim.get('browser_perf_registry_snapshot_in_bundle')}` ; contract=`{anim.get('browser_perf_contract_ref') or '—'}` / exists=`{anim.get('browser_perf_contract_exists')}` / in_bundle=`{anim.get('browser_perf_contract_in_bundle')}`",
+        f"- browser_perf_artifacts_secondary: evidence=`{anim.get('browser_perf_evidence_report_ref') or '—'}` / exists=`{anim.get('browser_perf_evidence_report_exists')}` / in_bundle=`{anim.get('browser_perf_evidence_report_in_bundle')}` ; comparison=`{anim.get('browser_perf_comparison_report_ref') or '—'}` / exists=`{anim.get('browser_perf_comparison_report_exists')}` / in_bundle=`{anim.get('browser_perf_comparison_report_in_bundle')}` ; trace=`{anim.get('browser_perf_trace_ref') or '—'}` / exists=`{anim.get('browser_perf_trace_exists')}` / in_bundle=`{anim.get('browser_perf_trace_in_bundle')}`",
+        f"- browser_perf_evidence_status: `{anim.get('browser_perf_evidence_status') or '—'}` / level=`{anim.get('browser_perf_evidence_level') or '—'}` / bundle_ready=`{anim.get('browser_perf_bundle_ready')}` / snapshot_contract_match=`{anim.get('browser_perf_snapshot_contract_match')}`",
+        f"- browser_perf_comparison_status: `{anim.get('browser_perf_comparison_status') or '—'}` / level=`{anim.get('browser_perf_comparison_level') or '—'}` / ready=`{anim.get('browser_perf_comparison_ready')}` / changed=`{anim.get('browser_perf_comparison_changed')}`",
+        f"- browser_perf_comparison_delta: wakeups=`{anim.get('browser_perf_comparison_delta_total_wakeups')}` / dup=`{anim.get('browser_perf_comparison_delta_total_duplicate_guard_hits')}` / render=`{anim.get('browser_perf_comparison_delta_total_render_count')}` / max_idle_poll_ms=`{anim.get('browser_perf_comparison_delta_max_idle_poll_ms')}`",
         "",
         "### Anim latest issues",
         "",

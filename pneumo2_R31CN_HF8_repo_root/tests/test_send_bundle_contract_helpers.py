@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from pneumo_solver_ui.tools.send_bundle_contract import (
     ANIM_LATEST_INDEX_FIELDS,
     ANIM_LATEST_REGISTRY_EVENT_FIELDS,
@@ -9,6 +12,8 @@ from pneumo_solver_ui.tools.send_bundle_contract import (
     annotate_anim_source_for_bundle,
     choose_anim_snapshot,
     extract_anim_snapshot,
+    format_anim_dashboard_brief_lines,
+    load_latest_send_bundle_anim_dashboard,
     normalize_anim_dashboard_obj,
     pick_anim_latest_fields,
     render_anim_latest_md,
@@ -132,3 +137,58 @@ def test_pick_anim_latest_fields_copies_selected_lists_and_ignores_unknowns() ->
     raw["anim_latest_issues"].append("warn-2")
     assert picked_event["anim_latest_visual_reload_inputs"] == ["npz"]
     assert picked_event["anim_latest_issues"] == ["warn-1"]
+
+
+def test_load_latest_send_bundle_anim_dashboard_merges_validation_bundle_flags(tmp_path: Path) -> None:
+    out_dir = tmp_path
+    (out_dir / "latest_anim_pointer_diagnostics.json").write_text(
+        json.dumps(
+            {
+                "anim_latest_available": True,
+                "anim_latest_pointer_json": "/abs/workspace/exports/anim_latest.json",
+                "anim_latest_npz_path": "/abs/workspace/exports/anim_latest.npz",
+                "anim_latest_visual_cache_token": "tok-123",
+                "anim_latest_visual_reload_inputs": ["npz", "road_csv"],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (out_dir / "latest_send_bundle_validation.json").write_text(
+        json.dumps(
+            {
+                "anim_latest": {
+                    "available": True,
+                    "visual_cache_token": "tok-123",
+                    "browser_perf_evidence_status": "trace_bundle_ready",
+                    "browser_perf_evidence_level": "PASS",
+                    "browser_perf_bundle_ready": True,
+                    "browser_perf_comparison_status": "regression_checked",
+                    "browser_perf_comparison_level": "PASS",
+                    "browser_perf_comparison_ready": True,
+                    "browser_perf_registry_snapshot_in_bundle": True,
+                    "browser_perf_previous_snapshot_in_bundle": True,
+                    "browser_perf_contract_in_bundle": True,
+                    "browser_perf_evidence_report_in_bundle": True,
+                    "browser_perf_comparison_report_in_bundle": True,
+                    "browser_perf_trace_in_bundle": True,
+                }
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    anim = load_latest_send_bundle_anim_dashboard(out_dir)
+    lines = format_anim_dashboard_brief_lines(anim)
+
+    assert anim["visual_cache_token"] == "tok-123"
+    assert anim["browser_perf_evidence_status"] == "trace_bundle_ready"
+    assert anim["browser_perf_bundle_ready"] is True
+    assert anim["browser_perf_comparison_ready"] is True
+    assert anim["browser_perf_evidence_report_in_bundle"] is True
+    assert any("Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" == line for line in lines)
+    assert any("Browser perf comparison: regression_checked / PASS / ready=True" == line for line in lines)
+    assert any("Browser perf bundle artifacts:" in line and "trace=True" in line for line in lines)

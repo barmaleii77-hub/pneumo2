@@ -25,6 +25,12 @@ from tkinter import Tk, Text, StringVar, BooleanVar, END
 from tkinter import messagebox
 from tkinter import ttk
 
+from pneumo_solver_ui.tools.send_bundle_contract import (
+    ANIM_DIAG_SIDECAR_JSON,
+    format_anim_dashboard_brief_lines,
+    load_latest_send_bundle_anim_dashboard,
+)
+
 
 @dataclass
 class RunState:
@@ -235,6 +241,11 @@ class App:
             msg_lines.append(f"Run dir: {self.state.last_run_dir}")
         if self.state.last_zip and not self.no_zip.get():
             msg_lines.append(f"ZIP: {self.state.last_zip}")
+            out_dir = Path(self.state.last_zip).expanduser().resolve().parent
+            msg_lines.extend(format_anim_dashboard_brief_lines(load_latest_send_bundle_anim_dashboard(out_dir)))
+            diag_json = out_dir / ANIM_DIAG_SIDECAR_JSON
+            if diag_json.exists():
+                msg_lines.append(f"Anim pointer diagnostics: {diag_json}")
 
         messagebox.showinfo("Autotest", "\n".join(msg_lines))
 

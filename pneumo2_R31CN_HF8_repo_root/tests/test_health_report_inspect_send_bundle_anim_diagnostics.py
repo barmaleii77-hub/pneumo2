@@ -30,6 +30,22 @@ def _make_anim_diag(token: str, reload_inputs: list[str], *, updated_utc: str = 
         "anim_latest_visual_cache_dependencies": deps,
         "anim_latest_updated_utc": updated_utc,
         "anim_latest_meta": {"road_csv": "anim_latest_road_csv.csv"},
+        "browser_perf_status": "snapshot_only",
+        "browser_perf_level": "WARN",
+        "browser_perf_evidence_status": "snapshot_only",
+        "browser_perf_evidence_level": "WARN",
+        "browser_perf_bundle_ready": False,
+        "browser_perf_snapshot_contract_match": True,
+        "browser_perf_comparison_status": "no_reference",
+        "browser_perf_comparison_level": "WARN",
+        "browser_perf_comparison_ready": False,
+        "browser_perf_comparison_changed": None,
+        "browser_perf_comparison_delta_total_wakeups": 0,
+        "browser_perf_comparison_delta_total_duplicate_guard_hits": 0,
+        "browser_perf_component_count": 2,
+        "browser_perf_total_wakeups": 10,
+        "browser_perf_total_duplicate_guard_hits": 3,
+        "browser_perf_max_idle_poll_ms": 60000,
     }
 
 
@@ -56,6 +72,36 @@ def _make_validation_report(token: str, reload_inputs: list[str], *, pointer_syn
             "pointer_sync_ok": pointer_sync_ok,
             "reload_inputs_sync_ok": True,
             "npz_path_sync_ok": True,
+            "browser_perf_status": "snapshot_only",
+            "browser_perf_level": "WARN",
+            "browser_perf_registry_snapshot_ref": "browser_perf_registry_snapshot.json",
+            "browser_perf_registry_snapshot_exists": False,
+            "browser_perf_registry_snapshot_in_bundle": False,
+            "browser_perf_previous_snapshot_ref": "browser_perf_previous_snapshot.json",
+            "browser_perf_previous_snapshot_exists": False,
+            "browser_perf_previous_snapshot_in_bundle": False,
+            "browser_perf_contract_ref": "browser_perf_contract.json",
+            "browser_perf_contract_exists": False,
+            "browser_perf_contract_in_bundle": False,
+            "browser_perf_evidence_report_ref": "browser_perf_evidence_report.json",
+            "browser_perf_evidence_report_exists": False,
+            "browser_perf_evidence_report_in_bundle": False,
+            "browser_perf_comparison_report_ref": "browser_perf_comparison_report.json",
+            "browser_perf_comparison_report_exists": False,
+            "browser_perf_comparison_report_in_bundle": False,
+            "browser_perf_trace_ref": "browser_perf_trace.json",
+            "browser_perf_trace_exists": False,
+            "browser_perf_trace_in_bundle": False,
+            "browser_perf_evidence_status": "snapshot_only",
+            "browser_perf_evidence_level": "WARN",
+            "browser_perf_bundle_ready": False,
+            "browser_perf_snapshot_contract_match": True,
+            "browser_perf_comparison_status": "no_reference",
+            "browser_perf_comparison_level": "WARN",
+            "browser_perf_comparison_ready": False,
+            "browser_perf_comparison_changed": None,
+            "browser_perf_comparison_delta_total_wakeups": 0,
+            "browser_perf_comparison_delta_total_duplicate_guard_hits": 0,
             "issues": [
                 "anim_latest visual_cache_token mismatch between sources: diagnostics=tok-sidecar, global_pointer=tok-global"
             ] if not pointer_sync_ok else [],
@@ -132,17 +178,52 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert anim["available"] is True
     assert anim["visual_cache_token"] == "tok-sidecar"
     assert anim["visual_reload_inputs"] == ["npz", "road_csv"]
+    assert anim["browser_perf_evidence_status"] == "snapshot_only"
+    assert anim["browser_perf_bundle_ready"] is False
+    assert anim["browser_perf_comparison_status"] == "no_reference"
+    assert anim["browser_perf_comparison_ready"] is False
     assert artifacts["health_report_embedded"] is False
+    assert artifacts["browser_perf_registry_snapshot"] is False
+    assert artifacts["browser_perf_previous_snapshot"] is False
+    assert artifacts["browser_perf_contract"] is False
+    assert artifacts["browser_perf_evidence_report"] is False
+    assert artifacts["browser_perf_comparison_report"] is False
+    assert artifacts["browser_perf_trace"] is False
     assert "visual_cache_token" in md_path.read_text(encoding="utf-8")
     assert "tok-sidecar" in md_path.read_text(encoding="utf-8")
+    assert "browser_perf_evidence_status" in md_path.read_text(encoding="utf-8")
+    assert "browser_perf_comparison_status" in md_path.read_text(encoding="utf-8")
+    assert "browser_perf_evidence_report: False" in md_path.read_text(encoding="utf-8")
 
     add_health_report_to_zip(zip_path, json_path, md_path)
     summary = inspect_send_bundle(zip_path)
 
     assert summary["has_embedded_health_report"] is True
+    assert summary["has_browser_perf_registry_snapshot"] is False
+    assert summary["has_browser_perf_previous_snapshot"] is False
+    assert summary["has_browser_perf_contract"] is False
+    assert summary["has_browser_perf_evidence_report"] is False
+    assert summary["has_browser_perf_comparison_report"] is False
+    assert summary["has_browser_perf_trace"] is False
     assert summary["anim_latest"]["visual_cache_token"] == "tok-sidecar"
     assert summary["anim_latest"]["visual_reload_inputs"] == ["npz", "road_csv"]
-    assert "tok-sidecar" in render_inspection_md(summary)
+    assert summary["anim_latest"]["browser_perf_evidence_status"] == "snapshot_only"
+    assert summary["anim_latest"]["browser_perf_comparison_status"] == "no_reference"
+    assert summary["anim_latest"]["browser_perf_registry_snapshot_ref"] == "browser_perf_registry_snapshot.json"
+    assert summary["anim_latest"]["browser_perf_registry_snapshot_in_bundle"] is False
+    assert summary["anim_latest"]["browser_perf_contract_in_bundle"] is False
+    assert summary["anim_latest"]["browser_perf_evidence_report_in_bundle"] is False
+    assert summary["anim_latest"]["browser_perf_comparison_report_in_bundle"] is False
+    assert summary["anim_latest"]["browser_perf_trace_in_bundle"] is False
+    inspect_md = render_inspection_md(summary)
+    assert "tok-sidecar" in inspect_md
+    assert "browser_perf_evidence_status" in inspect_md
+    assert "browser_perf_comparison_status" in inspect_md
+    assert "Browser perf evidence report: False" in inspect_md
+    assert "Browser perf trace: False" in inspect_md
+    assert "browser_perf_artifacts_primary" in inspect_md
+    assert "browser_perf_artifacts_secondary" in inspect_md
+    assert "browser_perf_registry_snapshot.json" in inspect_md
 
 
 
@@ -156,8 +237,12 @@ def test_health_report_surfaces_anim_latest_mismatch_from_validation(tmp_path: P
 
     assert anim["visual_cache_token"] == "tok-global"
     assert anim["pointer_sync_ok"] is False
+    assert anim["browser_perf_evidence_status"] == "snapshot_only"
+    assert anim["browser_perf_comparison_status"] == "no_reference"
     assert any("visual_cache_token mismatch" in msg for msg in anim.get("issues") or [])
     assert any("visual_cache_token mismatch" in msg for msg in notes)
+    assert any("browser perf evidence is not trace_bundle_ready" in msg for msg in notes)
+    assert any("browser perf comparison status: no_reference" in msg for msg in notes)
 
 
 
@@ -175,7 +260,12 @@ def test_sources_wire_health_report_and_offline_inspector_into_send_bundle_flow(
     assert 'collect_health_report' in health_text
     assert 'render_health_report_md' in health_text
     assert 'signals["anim_latest"]' in health_text
+    assert 'browser_perf_evidence_report' in health_text
+    assert 'browser_perf_trace' in health_text
 
     assert 'inspect_send_bundle' in inspect_text
     assert 'embedded health report is missing' in inspect_text
+    assert 'browser_perf_evidence_status' in inspect_text
+    assert 'browser_perf_artifacts_primary' in inspect_text
+    assert 'has_browser_perf_evidence_report' in inspect_text
     assert 'render_inspection_md' in inspect_text

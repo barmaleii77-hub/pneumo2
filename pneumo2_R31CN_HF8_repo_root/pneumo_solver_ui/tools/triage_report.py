@@ -719,13 +719,23 @@ def generate_triage_report(
     if anim.get('anim_latest_road_contract_desktop_ref') or anim.get('anim_latest_road_contract_desktop_path'):
         lines.append(f"- anim_latest_road_contract_desktop: `{anim.get('anim_latest_road_contract_desktop_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_road_contract_desktop_path'))}` exists=`{anim.get('anim_latest_road_contract_desktop_exists')}`")
     if anim.get('browser_perf_registry_snapshot_ref') or anim.get('browser_perf_registry_snapshot_path'):
-        lines.append(f"- browser_perf_registry_snapshot: `{anim.get('browser_perf_registry_snapshot_ref') or '—'}` → `{_fmt_path(anim.get('browser_perf_registry_snapshot_path'))}` exists=`{anim.get('browser_perf_registry_snapshot_exists')}`")
+        lines.append(f"- browser_perf_registry_snapshot: `{anim.get('browser_perf_registry_snapshot_ref') or '—'}` → `{_fmt_path(anim.get('browser_perf_registry_snapshot_path'))}` exists=`{anim.get('browser_perf_registry_snapshot_exists')}` in_bundle=`{anim.get('browser_perf_registry_snapshot_in_bundle')}`")
+    if anim.get('browser_perf_previous_snapshot_ref') or anim.get('browser_perf_previous_snapshot_path'):
+        lines.append(f"- browser_perf_previous_snapshot: `{anim.get('browser_perf_previous_snapshot_ref') or '—'}` → `{_fmt_path(anim.get('browser_perf_previous_snapshot_path'))}` exists=`{anim.get('browser_perf_previous_snapshot_exists')}` in_bundle=`{anim.get('browser_perf_previous_snapshot_in_bundle')}`")
     if anim.get('browser_perf_contract_ref') or anim.get('browser_perf_contract_path'):
-        lines.append(f"- browser_perf_contract: `{anim.get('browser_perf_contract_ref') or '—'}` → `{_fmt_path(anim.get('browser_perf_contract_path'))}` exists=`{anim.get('browser_perf_contract_exists')}`")
+        lines.append(f"- browser_perf_contract: `{anim.get('browser_perf_contract_ref') or '—'}` → `{_fmt_path(anim.get('browser_perf_contract_path'))}` exists=`{anim.get('browser_perf_contract_exists')}` in_bundle=`{anim.get('browser_perf_contract_in_bundle')}`")
+    if anim.get('browser_perf_evidence_report_ref') or anim.get('browser_perf_evidence_report_path'):
+        lines.append(f"- browser_perf_evidence_report: `{anim.get('browser_perf_evidence_report_ref') or '—'}` → `{_fmt_path(anim.get('browser_perf_evidence_report_path'))}` exists=`{anim.get('browser_perf_evidence_report_exists')}` in_bundle=`{anim.get('browser_perf_evidence_report_in_bundle')}`")
+    if anim.get('browser_perf_comparison_report_ref') or anim.get('browser_perf_comparison_report_path'):
+        lines.append(f"- browser_perf_comparison_report: `{anim.get('browser_perf_comparison_report_ref') or '—'}` → `{_fmt_path(anim.get('browser_perf_comparison_report_path'))}` exists=`{anim.get('browser_perf_comparison_report_exists')}` in_bundle=`{anim.get('browser_perf_comparison_report_in_bundle')}`")
     if anim.get('browser_perf_trace_ref') or anim.get('browser_perf_trace_path'):
-        lines.append(f"- browser_perf_trace: `{anim.get('browser_perf_trace_ref') or '—'}` → `{_fmt_path(anim.get('browser_perf_trace_path'))}` exists=`{anim.get('browser_perf_trace_exists')}`")
+        lines.append(f"- browser_perf_trace: `{anim.get('browser_perf_trace_ref') or '—'}` → `{_fmt_path(anim.get('browser_perf_trace_path'))}` exists=`{anim.get('browser_perf_trace_exists')}` in_bundle=`{anim.get('browser_perf_trace_in_bundle')}`")
     if anim.get('browser_perf_status') or anim.get('browser_perf_level'):
         lines.append(f"- browser_perf_status: `{anim.get('browser_perf_status') or '—'}` / level=`{anim.get('browser_perf_level') or '—'}` / components=`{anim.get('browser_perf_component_count')}` / wakeups=`{anim.get('browser_perf_total_wakeups')}` / dup=`{anim.get('browser_perf_total_duplicate_guard_hits')}` / max_idle_poll_ms=`{anim.get('browser_perf_max_idle_poll_ms')}`")
+    if anim.get('browser_perf_evidence_status') or anim.get('browser_perf_evidence_level'):
+        lines.append(f"- browser_perf_evidence_status: `{anim.get('browser_perf_evidence_status') or '—'}` / level=`{anim.get('browser_perf_evidence_level') or '—'}` / bundle_ready=`{anim.get('browser_perf_bundle_ready')}` / snapshot_contract_match=`{anim.get('browser_perf_snapshot_contract_match')}`")
+    if anim.get('browser_perf_comparison_status') or anim.get('browser_perf_comparison_level'):
+        lines.append(f"- browser_perf_comparison_status: `{anim.get('browser_perf_comparison_status') or '—'}` / level=`{anim.get('browser_perf_comparison_level') or '—'}` / ready=`{anim.get('browser_perf_comparison_ready')}` / changed=`{anim.get('browser_perf_comparison_changed')}` / Δwakeups=`{anim.get('browser_perf_comparison_delta_total_wakeups')}` / Δdup=`{anim.get('browser_perf_comparison_delta_total_duplicate_guard_hits')}` / Δrender=`{anim.get('browser_perf_comparison_delta_total_render_count')}` / Δmax_idle_poll_ms=`{anim.get('browser_perf_comparison_delta_max_idle_poll_ms')}`")
     lines.append(f"- anim_latest_visual_cache_token: `{anim.get('anim_latest_visual_cache_token') or '—'}`")
     _reload_inputs = list(anim.get('anim_latest_visual_reload_inputs') or [])
     lines.append(

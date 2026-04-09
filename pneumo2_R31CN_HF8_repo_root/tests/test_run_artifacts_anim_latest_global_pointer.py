@@ -280,6 +280,44 @@ def test_ui_preflight_export_step_reports_visual_token_and_global_sync(tmp_path:
     assert pointer["visual_cache_token"][:8] in export_step.detail
 
 
+def test_ui_preflight_send_bundle_step_reports_last_bundle_summary(tmp_path: Path, monkeypatch) -> None:
+    app_dir, _npz_path, _ptr_path, _pointer = _prepare_anim_export(tmp_path, monkeypatch)
+    send_bundles = app_dir / "send_bundles"
+    send_bundles.mkdir(parents=True, exist_ok=True)
+    (send_bundles / "last_bundle_meta.json").write_text(
+        json.dumps(
+            {
+                "ok": True,
+                "ts": "2026-04-09 12:00:00",
+                "trigger": "manual",
+                "zip": {
+                    "name": "latest_send_bundle.zip",
+                    "path": str(send_bundles / "latest_send_bundle.zip"),
+                    "size_bytes": 3 * 1024 * 1024,
+                },
+                "summary_lines": [
+                    "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True",
+                    "Browser perf comparison: regression_checked / PASS / ready=True",
+                ],
+                "anim_pointer_diagnostics_path": str(send_bundles / "latest_anim_pointer_diagnostics.json"),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    st_mod = _FakeSt()
+    st_mod.session_state["diag_output_dir"] = "send_bundles"
+    steps = collect_steps(st_mod, app_dir)
+    send_bundle_step = steps["send_bundle"]
+
+    assert send_bundle_step.ok is True
+    assert "Последний ZIP: latest_send_bundle.zip" in send_bundle_step.detail
+    assert "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" in send_bundle_step.detail
+    assert "Anim pointer diagnostics:" in send_bundle_step.detail
+
+
 def test_sources_use_run_artifacts_global_anim_pointer_flow() -> None:
     root = Path(__file__).resolve().parents[1]
     ui_text = (root / "pneumo_solver_ui" / "pneumo_ui_app.py").read_text(encoding="utf-8")

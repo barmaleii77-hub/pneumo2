@@ -32,7 +32,11 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from pneumo_solver_ui.tools.clipboard_file import copy_file_to_clipboard
-from pneumo_solver_ui.tools.send_bundle_contract import ANIM_DIAG_SIDECAR_JSON
+from pneumo_solver_ui.tools.send_bundle_contract import (
+    ANIM_DIAG_SIDECAR_JSON,
+    format_anim_dashboard_brief_lines,
+    load_latest_send_bundle_anim_dashboard,
+)
 
 try:
     from pneumo_solver_ui.release_info import get_release
@@ -255,15 +259,10 @@ class SendResultsGUI:
             pass
         try:
             diag_json = self.out_dir / ANIM_DIAG_SIDECAR_JSON
+            d_norm = load_latest_send_bundle_anim_dashboard(self.out_dir)
+            for line in format_anim_dashboard_brief_lines(d_norm):
+                extra += f"\n{line}"
             if diag_json.exists():
-                import json
-                d = json.loads(diag_json.read_text(encoding="utf-8", errors="replace"))
-                tok = str(d.get("anim_latest_visual_cache_token") or "")
-                reload_inputs = list(d.get("anim_latest_visual_reload_inputs") or [])
-                if tok:
-                    extra += f"\nAnim latest token: {tok}"
-                if reload_inputs:
-                    extra += "\nAnim reload inputs: " + ", ".join(str(x) for x in reload_inputs)
                 extra += f"\nAnim pointer diagnostics: {diag_json}"
         except Exception:
             pass

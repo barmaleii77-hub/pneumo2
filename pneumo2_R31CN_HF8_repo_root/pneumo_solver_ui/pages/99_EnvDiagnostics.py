@@ -19,6 +19,10 @@ import datetime
 import traceback
 
 import streamlit as st
+from pneumo_solver_ui.diagnostics_entrypoint import (
+    read_last_meta_from_out_dir,
+    summarize_last_bundle_meta,
+)
 from pneumo_solver_ui.ui_bootstrap import bootstrap
 from pneumo_solver_ui.ui_persistence import autosave_if_enabled
 
@@ -34,6 +38,7 @@ except Exception:
     pass
 
 HERE = Path(__file__).resolve().parent.parent
+REPO_ROOT = HERE.parent
 
 
 def _try_import(name: str):
@@ -226,6 +231,34 @@ else:
 
 
 st.subheader("Диагностический пакет")
+try:
+    raw_out_dir = str(st.session_state.get("diag_output_dir", "send_bundles") or "").strip()
+    if not raw_out_dir:
+        diag_out_dir = (REPO_ROOT / "send_bundles").resolve()
+    else:
+        try:
+            _p = Path(raw_out_dir).expanduser()
+            diag_out_dir = _p.resolve() if _p.is_absolute() else (REPO_ROOT / raw_out_dir).resolve()
+        except Exception:
+            diag_out_dir = (REPO_ROOT / raw_out_dir).resolve()
+
+    last_meta = summarize_last_bundle_meta(read_last_meta_from_out_dir(diag_out_dir))
+    st.caption(f"Каталог SEND bundle: {diag_out_dir}")
+    if last_meta.get("zip_name"):
+        st.write(
+            f"Последний ZIP: **{last_meta.get('zip_name')}**"
+            + (f" ({last_meta.get('zip_size_mb'):.1f} MB)" if last_meta.get("zip_size_mb") is not None else "")
+            + f" — ok={last_meta.get('ok')}, trigger={last_meta.get('trigger')}, ts={last_meta.get('ts')}"
+        )
+        if last_meta.get("summary_lines"):
+            st.markdown("\n".join(f"- {line}" for line in last_meta["summary_lines"]))
+        if last_meta.get("anim_pointer_diagnostics_path"):
+            st.caption(f"Anim pointer diagnostics: {last_meta['anim_pointer_diagnostics_path']}")
+    else:
+        st.write("Последний ZIP: —")
+except Exception as e:
+    st.warning(f"Не удалось прочитать статус последнего SEND bundle: {e!r}")
+
 st.info(
     "Полный архив для отправки (включая результаты расчётов, логи, экспорт и отчёты) "
     "собирается в разделе: **98 — Сборка архива (ZIP)**. "

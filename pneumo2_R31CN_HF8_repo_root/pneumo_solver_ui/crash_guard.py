@@ -159,7 +159,30 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _bundle_summary_event_fields(res: Any) -> Dict[str, Any]:
+    meta = dict(getattr(res, "meta", {}) or {})
+    lines = [str(x) for x in (meta.get("summary_lines") or []) if str(x).strip()]
+    fields: Dict[str, Any] = {
+        "bundle_ok": bool(getattr(res, "ok", False)),
+        "zip_path": str(getattr(res, "zip_path", "") or ""),
+        "summary_lines": lines,
+    }
+    diag_path = str(meta.get("anim_pointer_diagnostics_path") or "").strip()
+    if diag_path:
+        fields["anim_pointer_diagnostics_path"] = diag_path
+    return fields
 
+
+def _emit_bundle_summary_event(event_name: str, *, where: str, res: Any) -> None:
+    try:
+        _event(
+            event_name,
+            f"autosave bundle {where}",
+            where=str(where),
+            **_bundle_summary_event_fields(res),
+        )
+    except Exception:
+        pass
 
 
 def _auto_bundle_on_crash(where: str = "crash", exc: Exception | None = None) -> Path | None:
@@ -192,6 +215,7 @@ def _auto_bundle_on_crash(where: str = "crash", exc: Exception | None = None) ->
             session_state=ss_override,
             open_folder=False,
         )
+        _emit_bundle_summary_event("autosave_bundle_on_crash", where=where, res=res)
         if res.ok and res.zip_path:
             return Path(res.zip_path)
         raise RuntimeError(res.message or "bundle build failed")
@@ -285,6 +309,7 @@ def try_autosave_bundle(*, reason: str = "exit", fatal: bool = False) -> Path | 
             session_state=ss_override,
             open_folder=False,
         )
+        _emit_bundle_summary_event("autosave_bundle", where=reason, res=res)
         if res.ok and res.zip_path:
             return Path(res.zip_path)
         return None

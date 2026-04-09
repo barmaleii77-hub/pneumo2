@@ -40,6 +40,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from pneumo_solver_ui.tools.send_bundle_contract import (
+    ANIM_DIAG_SIDECAR_JSON,
+    format_anim_dashboard_brief_lines,
+    load_latest_send_bundle_anim_dashboard,
+)
 
 @dataclass
 class UnifiedDiagResult:
@@ -338,7 +343,12 @@ def build_unified_diagnostics(
         if open_folder:
             _try_open_folder(Path(zpath).parent)
 
-        return UnifiedDiagResult(ok=True, zip_path=Path(zpath), message="OK")
+        return UnifiedDiagResult(
+            ok=True,
+            zip_path=Path(zpath),
+            message="OK",
+            details=_bundle_summary_details(out_dir),
+        )
 
     except Exception as e:
         try:
@@ -353,7 +363,9 @@ def build_unified_diagnostics(
         except Exception:
             pass
 
-        return UnifiedDiagResult(ok=False, zip_path=None, message=str(e), details={"traceback": traceback.format_exc()})
+        details = {"traceback": traceback.format_exc()}
+        details.update(_bundle_summary_details(out_dir))
+        return UnifiedDiagResult(ok=False, zip_path=None, message=str(e), details=details)
 
 
 def _last_crash_meta_path(repo_root: Path) -> Path:
@@ -375,6 +387,16 @@ def _write_last_crash_meta(repo_root: Path, meta: Dict[str, Any]) -> None:
         _atomic_write_text(_last_crash_meta_path(repo_root), _safe_json_dumps(meta))
     except Exception:
         return
+
+
+def _bundle_summary_details(out_dir: Path) -> Dict[str, Any]:
+    anim_summary = load_latest_send_bundle_anim_dashboard(out_dir)
+    diag_json = out_dir / ANIM_DIAG_SIDECAR_JSON
+    return {
+        "anim_latest_summary": dict(anim_summary) if isinstance(anim_summary, dict) else {},
+        "summary_lines": list(format_anim_dashboard_brief_lines(anim_summary)),
+        "anim_pointer_diagnostics_path": str(diag_json) if diag_json.exists() else "",
+    }
 
 
 def autosave_diagnostics_on_exception(

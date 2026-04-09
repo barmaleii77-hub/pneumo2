@@ -61,6 +61,12 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
         "has_dashboard_report": bool(artifacts.get("dashboard_report")),
         "has_triage_report": bool(artifacts.get("triage_report")),
         "has_anim_diagnostics": bool(artifacts.get("anim_diagnostics")),
+        "has_browser_perf_registry_snapshot": bool(artifacts.get("browser_perf_registry_snapshot")),
+        "has_browser_perf_previous_snapshot": bool(artifacts.get("browser_perf_previous_snapshot")),
+        "has_browser_perf_contract": bool(artifacts.get("browser_perf_contract")),
+        "has_browser_perf_evidence_report": bool(artifacts.get("browser_perf_evidence_report")),
+        "has_browser_perf_comparison_report": bool(artifacts.get("browser_perf_comparison_report")),
+        "has_browser_perf_trace": bool(artifacts.get("browser_perf_trace")),
         "has_geometry_acceptance": bool(geometry_acceptance),
         "zip_entries": len(name_set),
     }
@@ -85,6 +91,12 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
         f"- Dashboard report: {summary.get('has_dashboard_report')}",
         f"- Triage report: {summary.get('has_triage_report')}",
         f"- Anim diagnostics: {summary.get('has_anim_diagnostics')}",
+        f"- Browser perf snapshot: {summary.get('has_browser_perf_registry_snapshot')}",
+        f"- Browser perf previous snapshot: {summary.get('has_browser_perf_previous_snapshot')}",
+        f"- Browser perf contract: {summary.get('has_browser_perf_contract')}",
+        f"- Browser perf evidence report: {summary.get('has_browser_perf_evidence_report')}",
+        f"- Browser perf comparison report: {summary.get('has_browser_perf_comparison_report')}",
+        f"- Browser perf trace: {summary.get('has_browser_perf_trace')}",
         f"- Geometry acceptance: {summary.get('has_geometry_acceptance')}",
         f"- Geometry acceptance gate: {summary.get('geometry_acceptance_gate') or 'MISSING'}",
         f"- Geometry acceptance reason: {summary.get('geometry_acceptance_reason') or '—'}",
@@ -98,6 +110,12 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
         f"- npz_path_sync_ok: {anim.get('npz_path_sync_ok')}",
         f"- npz_path: `{anim.get('npz_path') or '—'}`",
         f"- updated_utc: {anim.get('updated_utc') or '—'}",
+        f"- browser_perf_status: `{anim.get('browser_perf_status') or '—'}` / level=`{anim.get('browser_perf_level') or '—'}`",
+        f"- browser_perf_evidence_status: `{anim.get('browser_perf_evidence_status') or '—'}` / level=`{anim.get('browser_perf_evidence_level') or '—'}` / bundle_ready=`{anim.get('browser_perf_bundle_ready')}` / snapshot_contract_match=`{anim.get('browser_perf_snapshot_contract_match')}`",
+        f"- browser_perf_comparison_status: `{anim.get('browser_perf_comparison_status') or '—'}` / level=`{anim.get('browser_perf_comparison_level') or '—'}` / ready=`{anim.get('browser_perf_comparison_ready')}` / changed=`{anim.get('browser_perf_comparison_changed')}`",
+        f"- browser_perf_comparison_delta: wakeups=`{anim.get('browser_perf_comparison_delta_total_wakeups')}` / dup=`{anim.get('browser_perf_comparison_delta_total_duplicate_guard_hits')}` / render=`{anim.get('browser_perf_comparison_delta_total_render_count')}` / max_idle_poll_ms=`{anim.get('browser_perf_comparison_delta_max_idle_poll_ms')}`",
+        f"- browser_perf_artifacts_primary: snapshot=`{anim.get('browser_perf_registry_snapshot_ref') or '—'}` / exists=`{anim.get('browser_perf_registry_snapshot_exists')}` / in_bundle=`{anim.get('browser_perf_registry_snapshot_in_bundle')}` ; contract=`{anim.get('browser_perf_contract_ref') or '—'}` / exists=`{anim.get('browser_perf_contract_exists')}` / in_bundle=`{anim.get('browser_perf_contract_in_bundle')}`",
+        f"- browser_perf_artifacts_secondary: previous=`{anim.get('browser_perf_previous_snapshot_ref') or '—'}` / exists=`{anim.get('browser_perf_previous_snapshot_exists')}` / in_bundle=`{anim.get('browser_perf_previous_snapshot_in_bundle')}` ; evidence=`{anim.get('browser_perf_evidence_report_ref') or '—'}` / exists=`{anim.get('browser_perf_evidence_report_exists')}` / in_bundle=`{anim.get('browser_perf_evidence_report_in_bundle')}` ; comparison=`{anim.get('browser_perf_comparison_report_ref') or '—'}` / exists=`{anim.get('browser_perf_comparison_report_exists')}` / in_bundle=`{anim.get('browser_perf_comparison_report_in_bundle')}` ; trace=`{anim.get('browser_perf_trace_ref') or '—'}` / exists=`{anim.get('browser_perf_trace_exists')}` / in_bundle=`{anim.get('browser_perf_trace_in_bundle')}`",
     ]
     issues = list(anim.get("issues") or [])
     if issues:

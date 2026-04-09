@@ -51,6 +51,7 @@ from .send_bundle_contract import (
     ANIM_DIAG_SIDECAR_JSON,
     ANIM_DIAG_SIDECAR_MD,
     anim_has_signal,
+    choose_anim_snapshot,
     normalize_anim_dashboard_obj,
     render_anim_latest_md,
 )
@@ -269,16 +270,29 @@ def generate_dashboard_report(
         if isinstance(anim_json, dict):
             rep["warnings"].append("anim_latest diagnostics sidecar not found; using validation summary")
 
-    anim_norm = normalize_anim_dashboard_obj(anim_json)
     val_anim_json = val_json.get("anim_latest") if isinstance(val_json, dict) else None
+    anim_norm = normalize_anim_dashboard_obj(anim_json)
     val_anim_norm = normalize_anim_dashboard_obj(val_anim_json)
-    if (not anim_has_signal(anim_norm)) and anim_has_signal(val_anim_norm):
+    canonical_anim = choose_anim_snapshot(
+        {
+            key: value
+            for key, value in (
+                ("diagnostics", anim_norm if isinstance(anim_norm, dict) else None),
+                ("validation", val_anim_norm if isinstance(val_anim_norm, dict) else None),
+            )
+            if isinstance(value, dict)
+        },
+        preferred_order=("diagnostics", "validation"),
+    )
+    if isinstance(canonical_anim, dict):
+        anim_norm = canonical_anim
+    if (not anim_has_signal(normalize_anim_dashboard_obj(anim_json))) and anim_has_signal(val_anim_norm):
         anim_json = val_anim_json
         anim_norm = val_anim_norm
         rep["warnings"].append("anim_latest ZIP/sidecar diagnostics are empty; using validation summary")
-        anim_md = render_anim_latest_md(anim_json)
-    elif not anim_md and isinstance(anim_json, dict):
-        anim_md = render_anim_latest_md(anim_json)
+        anim_md = render_anim_latest_md(anim_norm)
+    elif isinstance(anim_norm, dict) and (not anim_md or anim_norm != normalize_anim_dashboard_obj(anim_json)):
+        anim_md = render_anim_latest_md(anim_norm)
 
     rep["sections"]["anim_latest"] = {
         "md_path": str(anim_md_path) if anim_md_path.exists() else None,
@@ -366,6 +380,14 @@ def generate_dashboard_report(
     anim_reload_inputs = list(anim_reload_inputs or [])
     anim_pointer_sync = anim_summary.get("pointer_sync_ok")
     anim_bundle_usable = anim_summary.get("usable_from_bundle")
+    anim_browser_perf_status = str(anim_summary.get("browser_perf_status") or "")
+    anim_browser_perf_level = str(anim_summary.get("browser_perf_level") or "")
+    anim_browser_perf_evidence_status = str(anim_summary.get("browser_perf_evidence_status") or "")
+    anim_browser_perf_evidence_level = str(anim_summary.get("browser_perf_evidence_level") or "")
+    anim_browser_perf_bundle_ready = anim_summary.get("browser_perf_bundle_ready")
+    anim_browser_perf_comparison_status = str(anim_summary.get("browser_perf_comparison_status") or "")
+    anim_browser_perf_comparison_level = str(anim_summary.get("browser_perf_comparison_level") or "")
+    anim_browser_perf_comparison_ready = anim_summary.get("browser_perf_comparison_ready")
     if anim_pointer_sync is True:
         anim_pointer_sync_html = '<span class="ok">OK</span>'
     elif anim_pointer_sync is False:
@@ -409,6 +431,11 @@ def generate_dashboard_report(
       <div class=\"k\">anim_latest.pointer_sync</div><div>{anim_pointer_sync_html}</div>
       <div class=\"k\">anim_latest.reload_inputs</div><div>{_html_escape(', '.join(str(x) for x in anim_reload_inputs) if anim_reload_inputs else '—')}</div>
       <div class=\"k\">anim_latest.bundle_usable</div><div>{'<span class="ok">YES</span>' if anim_bundle_usable is True else ('<span class="bad">NO</span>' if anim_bundle_usable is False else '<span class="warn">n/a</span>')}</div>
+      <div class=\"k\">browser_perf.status</div><div>{_html_escape((anim_browser_perf_status or '—') + (f' / {anim_browser_perf_level}' if anim_browser_perf_level else ''))}</div>
+      <div class=\"k\">browser_perf.evidence</div><div>{_html_escape((anim_browser_perf_evidence_status or '—') + (f' / {anim_browser_perf_evidence_level}' if anim_browser_perf_evidence_level else ''))}</div>
+      <div class=\"k\">browser_perf.bundle_ready</div><div>{'<span class="ok">YES</span>' if anim_browser_perf_bundle_ready is True else ('<span class="bad">NO</span>' if anim_browser_perf_bundle_ready is False else '<span class="warn">n/a</span>')}</div>
+      <div class=\"k\">browser_perf.comparison</div><div>{_html_escape((anim_browser_perf_comparison_status or '—') + (f' / {anim_browser_perf_comparison_level}' if anim_browser_perf_comparison_level else ''))}</div>
+      <div class=\"k\">browser_perf.comparison_ready</div><div>{'<span class="ok">YES</span>' if anim_browser_perf_comparison_ready is True else ('<span class="bad">NO</span>' if anim_browser_perf_comparison_ready is False else '<span class="warn">n/a</span>')}</div>
     </div>
   </div>
 
@@ -425,6 +452,11 @@ def generate_dashboard_report(
       <div class=\"k\">visual_reload_inputs</div><div>{_html_escape(', '.join(str(x) for x in anim_reload_inputs) if anim_reload_inputs else '—')}</div>
       <div class=\"k\">pointer_sync_ok</div><div>{anim_pointer_sync_html}</div>
       <div class=\"k\">usable_from_bundle</div><div>{_html_escape(str(anim_bundle_usable))}</div>
+      <div class=\"k\">browser_perf_status</div><div>{_html_escape(anim_browser_perf_status or '—')}</div>
+      <div class=\"k\">browser_perf_evidence_status</div><div>{_html_escape(anim_browser_perf_evidence_status or '—')}</div>
+      <div class=\"k\">browser_perf_bundle_ready</div><div>{_html_escape(str(anim_browser_perf_bundle_ready))}</div>
+      <div class=\"k\">browser_perf_comparison_status</div><div>{_html_escape(anim_browser_perf_comparison_status or '—')}</div>
+      <div class=\"k\">browser_perf_comparison_ready</div><div>{_html_escape(str(anim_browser_perf_comparison_ready))}</div>
     </div>
     <pre>{_html_escape(anim_md if anim_md else '(anim_latest diagnostics not found)')}</pre>
   </details>
