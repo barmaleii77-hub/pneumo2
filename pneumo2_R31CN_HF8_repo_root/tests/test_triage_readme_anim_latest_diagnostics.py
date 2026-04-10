@@ -70,10 +70,12 @@ def test_generate_triage_report_exposes_anim_latest_diagnostics_from_sidecar(tmp
     assert mnemo["severity"] == "critical"
     assert mnemo["current_mode"] == "Регуляторный коридор"
     assert summary["severity_counts"]["critical"] == 1
+    assert summary["operator_recommendations"][0].startswith("Open Desktop Mnemo first")
     assert any("Desktop Mnemo reports 1 active latched event(s)" in flag for flag in summary["red_flags"])
     assert os.path.normcase(paths["latest_anim_pointer_diagnostics_json"]) == os.path.normcase(str((sb_root / ANIM_DIAG_SIDECAR_JSON).resolve()))
     assert os.path.normcase(paths["latest_anim_pointer_diagnostics_md"]) == os.path.normcase(str((sb_root / ANIM_DIAG_SIDECAR_MD).resolve()))
     assert "## Desktop Mnemo events" in md
+    assert "## Recommended actions" in md
     assert "Регуляторный коридор" in md
     assert "Большой перепад давлений" in md
     assert "## Anim latest diagnostics" in md
@@ -91,6 +93,8 @@ def test_build_send_bundle_readme_includes_anim_latest_token_and_reload_inputs()
     assert "SEND BUNDLE (for chat)" in text
     assert "anim_latest_visual_cache_token: tok-readme" in text
     assert "anim_latest_visual_reload_inputs: npz, road_csv" in text
+    assert "Recommended actions (operator-first):" in text
+    assert "Open Desktop Mnemo first" in text
     assert "anim_latest_global_pointer_json: /abs/workspace/_pointers/anim_latest.json" in text
     assert ANIM_DIAG_JSON in text
     assert ANIM_DIAG_MD in text
@@ -106,6 +110,8 @@ def test_sources_wire_anim_latest_diagnostics_into_triage_and_readme() -> None:
     assert '## Anim latest diagnostics' in triage_text
     assert '## Desktop Mnemo events' in triage_text
     assert '"mnemo_event_log": mnemo_event_summary' in triage_text
+    assert '"operator_recommendations": operator_recommendations' in triage_text
+    assert '## Recommended actions' in triage_text
     assert 'ANIM_DIAG_SIDECAR_JSON' in triage_text
     assert 'ANIM_DIAG_SIDECAR_MD' in triage_text
 

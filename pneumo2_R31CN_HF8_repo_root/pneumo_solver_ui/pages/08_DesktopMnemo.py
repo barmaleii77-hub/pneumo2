@@ -19,8 +19,14 @@ from pathlib import Path
 
 import streamlit as st
 
-from pneumo_solver_ui.run_artifacts import local_anim_latest_export_paths
-from pneumo_solver_ui.tools.send_bundle_contract import extract_anim_snapshot
+from pneumo_solver_ui.run_artifacts import (
+    collect_anim_latest_diagnostics_summary,
+    local_anim_latest_export_paths,
+)
+from pneumo_solver_ui.tools.send_bundle_contract import (
+    build_anim_operator_recommendations,
+    extract_anim_snapshot,
+)
 from pneumo_solver_ui.ui_bootstrap import bootstrap
 from pneumo_solver_ui.ui_persistence import autosave_if_enabled
 
@@ -127,6 +133,25 @@ def _pip_install_stream(packages: list[str], label: str) -> tuple[int, str]:
     return rc, "".join(out_lines)
 
 
+def _launch_mnemo(*, theme: str, follow: bool = False, npz_path: Path | None = None) -> tuple[bool, str]:
+    py = _venv_python(prefer_gui=True)
+    cmd = [py, "-m", "pneumo_solver_ui.desktop_mnemo.main"]
+    if follow:
+        cmd += ["--follow", "--pointer", str(POINTER_PATH)]
+    elif npz_path is not None:
+        cmd += ["--npz", str(npz_path)]
+    cmd += ["--theme", str(theme)]
+    try:
+        _spawn_no_console(cmd, cwd=PROJECT_ROOT)
+    except Exception as exc:
+        return False, f"Не удалось запустить: {exc}"
+    if follow:
+        return True, "Desktop Mnemo запущен в follow-режиме."
+    if npz_path is not None:
+        return True, "Desktop Mnemo открыт на текущем NPZ."
+    return True, "Desktop Mnemo открыт."
+
+
 EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 col1, col2 = st.columns([1.2, 1.8])
@@ -176,6 +201,21 @@ else:
         "Pointer ещё не создан. Перейдите в Simulator → Детальный прогон, включите auto-export anim_latest "
         "и выполните прогон. После этого Desktop Mnemo сможет автоматически подхватывать свежие данные."
     )
+
+launcher_diag = collect_anim_latest_diagnostics_summary(
+    {"pointer_json": str(POINTER_PATH)} if POINTER_PATH.exists() else None,
+    include_meta=False,
+)
+operator_recommendations = build_anim_operator_recommendations(launcher_diag)
+if operator_recommendations:
+    st.subheader("Рекомендуемые действия перед запуском")
+    rec_col1, rec_col2, rec_col3, rec_col4 = st.columns(4)
+    rec_col1.metric("Режим", str(launcher_diag.get("anim_latest_mnemo_event_log_current_mode") or "—"))
+    rec_col2.metric("Active latch", int(launcher_diag.get("anim_latest_mnemo_event_log_active_latch_count") or 0))
+    rec_col3.metric("Perf evidence", str(launcher_diag.get("browser_perf_evidence_status") or "—"))
+    rec_col4.metric("Perf compare", str(launcher_diag.get("browser_perf_comparison_status") or "—"))
+    st.warning("Сначала: " + operator_recommendations[0])
+    st.markdown("\n".join(f"{idx}. {item}" for idx, item in enumerate(operator_recommendations, start=1)))
 
 
 st.subheader("Зависимости Desktop Mnemo")
@@ -229,45 +269,62 @@ else:
 
 st.divider()
 
+st.subheader("Сценарный запуск")
+mnemo_active_latch_count = int(launcher_diag.get("anim_latest_mnemo_event_log_active_latch_count") or 0)
+mnemo_preset_label = "Запустить preset: пустое окно"
+mnemo_preset_reason = (
+    "Свежий anim_latest ещё не готов, поэтому launcher предлагает нейтральный пустой старт без привязки к pointer."
+)
+mnemo_preset_follow = False
+mnemo_preset_npz: Path | None = None
+
+if mnemo_active_latch_count > 0 and POINTER_PATH.exists():
+    mnemo_preset_label = "Запустить preset: оперативный follow-разбор"
+    mnemo_preset_reason = (
+        "Есть активные latch-события: follow-режим лучше подходит для живого triage, ACK/reset и наблюдения за новым anim_latest."
+    )
+    mnemo_preset_follow = True
+elif pointer_npz_path and pointer_npz_path.exists():
+    mnemo_preset_label = "Запустить preset: ретроспектива по текущему NPZ"
+    mnemo_preset_reason = (
+        "Критичных latch сейчас нет: удобнее открыть фиксированный NPZ и спокойно разобрать сценарий без скачков на новый pointer."
+    )
+    mnemo_preset_npz = pointer_npz_path
+elif POINTER_PATH.exists():
+    mnemo_preset_label = "Запустить preset: baseline follow"
+    mnemo_preset_reason = (
+        "Pointer уже готов, но отдельного повода для frozen-ретроспективы нет: безопасный базовый режим — follow."
+    )
+    mnemo_preset_follow = True
+
+st.info(mnemo_preset_reason)
+if st.button(mnemo_preset_label, width="stretch"):
+    ok, msg = _launch_mnemo(theme=str(theme), follow=mnemo_preset_follow, npz_path=mnemo_preset_npz)
+    if ok:
+        st.success(msg)
+    else:
+        st.error(msg)
+
+st.divider()
+
 launch_col1, launch_col2, launch_col3 = st.columns([1.2, 1.2, 1.0])
 with launch_col1:
     if st.button("Запустить Desktop Mnemo (follow)", width="stretch"):
-        py = _venv_python(prefer_gui=True)
-        cmd = [
-            py,
-            "-m",
-            "pneumo_solver_ui.desktop_mnemo.main",
-            "--follow",
-            "--pointer",
-            str(POINTER_PATH),
-            "--theme",
-            str(theme),
-        ]
-        try:
-            _spawn_no_console(cmd, cwd=PROJECT_ROOT)
-            st.success("Desktop Mnemo запущен в follow-режиме.")
-        except Exception as exc:
-            st.error(f"Не удалось запустить: {exc}")
+        ok, msg = _launch_mnemo(theme=str(theme), follow=True)
+        if ok:
+            st.success(msg)
+        else:
+            st.error(msg)
 
 with launch_col2:
     disabled_npz = not bool(pointer_npz_path and pointer_npz_path.exists())
     if st.button("Запустить по текущему NPZ", width="stretch", disabled=disabled_npz):
         assert pointer_npz_path is not None
-        py = _venv_python(prefer_gui=True)
-        cmd = [
-            py,
-            "-m",
-            "pneumo_solver_ui.desktop_mnemo.main",
-            "--npz",
-            str(pointer_npz_path),
-            "--theme",
-            str(theme),
-        ]
-        try:
-            _spawn_no_console(cmd, cwd=PROJECT_ROOT)
-            st.success("Desktop Mnemo открыт на текущем NPZ.")
-        except Exception as exc:
-            st.error(f"Не удалось запустить: {exc}")
+        ok, msg = _launch_mnemo(theme=str(theme), npz_path=pointer_npz_path)
+        if ok:
+            st.success(msg)
+        else:
+            st.error(msg)
 
 with launch_col3:
     if st.button("Открыть exports", width="stretch"):
@@ -281,10 +338,8 @@ st.caption(
 st.divider()
 
 if st.button("Запустить Desktop Mnemo (пустой)", width="stretch"):
-    py = _venv_python(prefer_gui=True)
-    cmd = [py, "-m", "pneumo_solver_ui.desktop_mnemo.main", "--theme", str(theme)]
-    try:
-        _spawn_no_console(cmd, cwd=PROJECT_ROOT)
-        st.success("Desktop Mnemo открыт.")
-    except Exception as exc:
-        st.error(f"Не удалось запустить: {exc}")
+    ok, msg = _launch_mnemo(theme=str(theme))
+    if ok:
+        st.success(msg)
+    else:
+        st.error(msg)

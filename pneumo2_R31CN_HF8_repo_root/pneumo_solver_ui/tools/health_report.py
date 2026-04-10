@@ -39,6 +39,7 @@ from .send_bundle_contract import (
     ANIM_LOCAL_NPZ,
     ANIM_LOCAL_POINTER,
     annotate_anim_source_for_bundle,
+    build_anim_operator_recommendations,
     choose_anim_snapshot,
     extract_anim_snapshot,
     summarize_mnemo_event_log,
@@ -269,6 +270,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 preferred_order=("validation", "diagnostics", "local_pointer", "global_pointer", "dashboard"),
             )
             mnemo_event_log = summarize_mnemo_event_log(anim_summary)
+            operator_recommendations = build_anim_operator_recommendations(anim_summary)
             anim_summary["mnemo_event_summary"] = dict(mnemo_event_log)
             if ANIM_LOCAL_NPZ in name_set:
                 try:
@@ -302,6 +304,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     notes.append(str(geom_acc["error"]))
             signals["anim_latest"] = anim_summary
             signals["mnemo_event_log"] = dict(mnemo_event_log)
+            signals["operator_recommendations"] = list(operator_recommendations)
             perf_evidence_status = str(anim_summary.get("browser_perf_evidence_status") or "").strip()
             if perf_evidence_status and perf_evidence_status != "trace_bundle_ready":
                 perf_note = (
@@ -340,7 +343,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
 
     return HealthReport(
         schema="health_report",
-        schema_version="1.4.0",
+        schema_version="1.5.0",
         created_at=created_at,
         zip_path=str(zip_path),
         ok=bool(ok),
@@ -353,6 +356,7 @@ def render_health_report_md(rep: HealthReport) -> str:
     val = dict(rep.signals.get("validation") or {})
     anim = dict(rep.signals.get("anim_latest") or {})
     mnemo = dict(rep.signals.get("mnemo_event_log") or anim.get("mnemo_event_summary") or {})
+    operator_recommendations = [str(x) for x in (rep.signals.get("operator_recommendations") or []) if str(x).strip()]
     artifacts = dict(rep.signals.get("artifacts") or {})
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
     lines = [
@@ -430,6 +434,9 @@ def render_health_report_md(rep: HealthReport) -> str:
             lines.append(f"- recent_titles: {' | '.join(recent_titles[:3])}")
         for flag in list(mnemo.get("red_flags") or [])[:3]:
             lines.append(f"- red_flag: {flag}")
+
+    if operator_recommendations:
+        lines += ["", "## Recommended actions"] + [f"{idx}. {item}" for idx, item in enumerate(operator_recommendations, start=1)]
 
     geom = dict(rep.signals.get("geometry_acceptance") or {})
     if geom:

@@ -183,6 +183,7 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     rep = json.loads(json_path.read_text(encoding="utf-8"))
     anim = dict(rep.get("signals", {}).get("anim_latest") or {})
     mnemo = dict(rep.get("signals", {}).get("mnemo_event_log") or {})
+    recommendations = list(rep.get("signals", {}).get("operator_recommendations") or [])
     artifacts = dict(rep.get("signals", {}).get("artifacts") or {})
 
     assert rep["schema"] == "health_report"
@@ -191,6 +192,8 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert anim["visual_reload_inputs"] == ["npz", "road_csv"]
     assert mnemo["severity"] == "critical"
     assert mnemo["current_mode"] == "Регуляторный коридор"
+    assert recommendations
+    assert recommendations[0].startswith("Open Desktop Mnemo first")
     assert anim["browser_perf_evidence_status"] == "snapshot_only"
     assert anim["browser_perf_bundle_ready"] is False
     assert anim["browser_perf_comparison_status"] == "no_reference"
@@ -205,6 +208,7 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert "visual_cache_token" in md_path.read_text(encoding="utf-8")
     assert "tok-sidecar" in md_path.read_text(encoding="utf-8")
     assert "## Desktop Mnemo events" in md_path.read_text(encoding="utf-8")
+    assert "## Recommended actions" in md_path.read_text(encoding="utf-8")
     assert "Большой перепад давлений" in md_path.read_text(encoding="utf-8")
     assert "browser_perf_evidence_status" in md_path.read_text(encoding="utf-8")
     assert "browser_perf_comparison_status" in md_path.read_text(encoding="utf-8")
@@ -222,6 +226,7 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert summary["has_browser_perf_trace"] is False
     assert summary["anim_latest"]["visual_cache_token"] == "tok-sidecar"
     assert summary["mnemo_event_log"]["severity"] == "critical"
+    assert summary["operator_recommendations"][0].startswith("Open Desktop Mnemo first")
     assert summary["anim_latest"]["visual_reload_inputs"] == ["npz", "road_csv"]
     assert summary["anim_latest"]["browser_perf_evidence_status"] == "snapshot_only"
     assert summary["anim_latest"]["browser_perf_comparison_status"] == "no_reference"
@@ -234,6 +239,7 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     inspect_md = render_inspection_md(summary)
     assert "tok-sidecar" in inspect_md
     assert "## Desktop Mnemo events" in inspect_md
+    assert "## Recommended actions" in inspect_md
     assert "Регуляторный коридор" in inspect_md
     assert "browser_perf_evidence_status" in inspect_md
     assert "browser_perf_comparison_status" in inspect_md
@@ -280,14 +286,18 @@ def test_sources_wire_health_report_and_offline_inspector_into_send_bundle_flow(
     assert 'render_health_report_md' in health_text
     assert 'signals["anim_latest"]' in health_text
     assert 'signals["mnemo_event_log"]' in health_text
+    assert 'signals["operator_recommendations"]' in health_text
     assert '## Desktop Mnemo events' in health_text
+    assert '## Recommended actions' in health_text
     assert 'browser_perf_evidence_report' in health_text
     assert 'browser_perf_trace' in health_text
 
     assert 'inspect_send_bundle' in inspect_text
     assert 'embedded health report is missing' in inspect_text
     assert 'mnemo_event_log' in inspect_text
+    assert 'operator_recommendations' in inspect_text
     assert '## Desktop Mnemo events' in inspect_text
+    assert '## Recommended actions' in inspect_text
     assert 'browser_perf_evidence_status' in inspect_text
     assert 'browser_perf_artifacts_primary' in inspect_text
     assert 'has_browser_perf_evidence_report' in inspect_text

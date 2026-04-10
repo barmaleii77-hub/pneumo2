@@ -50,7 +50,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from .send_bundle_contract import ANIM_DIAG_JSON, ANIM_DIAG_MD, ANIM_DIAG_SIDECAR_JSON, ANIM_DIAG_SIDECAR_MD
+from .send_bundle_contract import (
+    ANIM_DIAG_JSON,
+    ANIM_DIAG_MD,
+    ANIM_DIAG_SIDECAR_JSON,
+    ANIM_DIAG_SIDECAR_MD,
+    build_anim_operator_recommendations,
+)
 
 
 try:
@@ -397,7 +403,13 @@ def _build_send_bundle_readme(anim_diag: Optional[Dict[str, Any]] = None) -> str
     diag = dict(anim_diag or {})
     reload_inputs = list(diag.get("anim_latest_visual_reload_inputs") or [])
     issues = [str(x) for x in (diag.get("anim_latest_issues") or []) if str(x).strip()]
+    operator_recommendations = build_anim_operator_recommendations(diag)
     issues_preview = "; ".join(issues[:3]) if issues else "—"
+    recommendations_preview = (
+        "".join(f"- {item}\n" for item in operator_recommendations[:5])
+        if operator_recommendations
+        else "- none\n"
+    )
     road_ref = diag.get("anim_latest_road_csv_ref") or "—"
     axay_ref = diag.get("anim_latest_axay_csv_ref") or "—"
     scenario_ref = diag.get("anim_latest_scenario_json_ref") or "—"
@@ -454,6 +466,8 @@ def _build_send_bundle_readme(anim_diag: Optional[Dict[str, Any]] = None) -> str
         f"- browser_perf_trace_ref: {browser_perf_trace_ref}\n"
         f"- anim_latest_updated_utc: {diag.get('anim_latest_updated_utc') or '—'}\n"
         f"- anim_latest_issues: {issues_preview}\n"
+        "Recommended actions (operator-first):\n"
+        f"{recommendations_preview}"
         f"- In bundle: {ANIM_DIAG_JSON}\n"
         f"- In bundle: {ANIM_DIAG_MD}\n"
         "- In bundle: health/health_report.json\n"

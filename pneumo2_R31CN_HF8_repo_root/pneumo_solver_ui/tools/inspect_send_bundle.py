@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from .health_report import collect_health_report
+from .send_bundle_contract import build_anim_operator_recommendations
 from pneumo_solver_ui.geometry_acceptance_contract import format_geometry_acceptance_summary_lines
 
 
@@ -41,6 +42,9 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
     meta = dict(signals.get("meta") or {})
     anim = dict(signals.get("anim_latest") or {})
     mnemo = dict(signals.get("mnemo_event_log") or {})
+    operator_recommendations = [
+        str(x) for x in (signals.get("operator_recommendations") or build_anim_operator_recommendations(anim)) if str(x).strip()
+    ]
     artifacts = dict(signals.get("artifacts") or {})
     geometry_acceptance = dict(rep.signals.get("geometry_acceptance") or {})
     summary: Dict[str, Any] = {
@@ -53,6 +57,7 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
         "artifacts": artifacts,
         "anim_latest": anim,
         "mnemo_event_log": mnemo,
+        "operator_recommendations": operator_recommendations,
         "geometry_acceptance": geometry_acceptance,
         "geometry_acceptance_gate": str(geometry_acceptance.get("release_gate") or "MISSING") if geometry_acceptance else "MISSING",
         "geometry_acceptance_reason": str(geometry_acceptance.get("release_gate_reason") or "") if geometry_acceptance else "",
@@ -82,6 +87,7 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
     rep_signals = dict(rep_obj.get("signals") or {})
     anim = dict(summary.get("anim_latest") or {})
     mnemo = dict(summary.get("mnemo_event_log") or {})
+    operator_recommendations = [str(x) for x in (summary.get("operator_recommendations") or []) if str(x).strip()]
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
     lines = [
         "# Send bundle inspection",
@@ -132,6 +138,8 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
         recent_titles = [str(x) for x in (mnemo.get("recent_titles") or []) if str(x).strip()]
         if recent_titles:
             lines.append(f"- recent_titles: {' | '.join(recent_titles[:3])}")
+    if operator_recommendations:
+        lines += ["", "## Recommended actions"] + [f"{idx}. {item}" for idx, item in enumerate(operator_recommendations, start=1)]
     issues = list(anim.get("issues") or [])
     if issues:
         lines += ["", "## Anim issues"] + [f"- {x}" for x in issues]

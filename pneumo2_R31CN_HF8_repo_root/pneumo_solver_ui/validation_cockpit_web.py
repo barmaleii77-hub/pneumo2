@@ -23,6 +23,7 @@ import streamlit as st
 
 from pneumo_solver_ui.entrypoints import desktop_animator_page_rel, desktop_mnemo_page_rel
 from pneumo_solver_ui.run_artifacts import collect_anim_latest_diagnostics_summary
+from pneumo_solver_ui.tools.send_bundle_contract import build_anim_operator_recommendations
 
 try:
     import plotly.graph_objects as go  # type: ignore
@@ -390,6 +391,7 @@ def render_validation_cockpit_web() -> None:
         },
         include_meta=False,
     )
+    operator_recommendations = build_anim_operator_recommendations(mnemo_event_diag)
     st.markdown("**Журнал событий Desktop Mnemo**")
     if mnemo_event_diag.get("anim_latest_mnemo_event_log_exists"):
         ev_col1, ev_col2, ev_col3, ev_col4 = st.columns(4)
@@ -415,6 +417,10 @@ def render_validation_cockpit_web() -> None:
             "Для текущего NPZ журнал событий Desktop Mnemo пока не найден. "
             "Откройте Desktop Mnemo, пройдите сценарий и выполните ACK/экспорт, чтобы добавить event-log в triage."
         )
+    if operator_recommendations:
+        st.markdown("**Рекомендуемые действия**")
+        st.warning("Сначала: " + operator_recommendations[0])
+        st.markdown("\n".join(f"{idx}. {item}" for idx, item in enumerate(operator_recommendations, start=1)))
 
     # --- animation ---
     st.subheader("Механика + дорога (синхронно по времени)")

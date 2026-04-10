@@ -275,6 +275,8 @@ def test_sources_wire_anim_diagnostics_into_launcher_and_send_bundle() -> None:
     assert '("_pointers", False)' in bundle_text
     assert 'ANIM_DIAG_SIDECAR_JSON' in bundle_text
     assert '**anim_diag_event' in bundle_text
+    assert 'build_anim_operator_recommendations' in bundle_text
+    assert 'Recommended actions (operator-first):' in bundle_text
     assert 'anim_latest_mnemo_event_log_state' in bundle_text
     assert 'collect_anim_latest_diagnostics_summary' in launcher_text
     assert 'send_results_gui_spawned' in launcher_text

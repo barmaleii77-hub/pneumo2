@@ -198,7 +198,9 @@ def test_generate_triage_report_surfaces_road_contract_artifacts(tmp_path: Path,
     assert mnemo["severity"] == "critical"
     assert mnemo["current_mode"] == "Регуляторный коридор"
     assert summary["severity_counts"]["critical"] == 1
+    assert summary["operator_recommendations"][0].startswith("Open Desktop Mnemo first")
     assert "anim_latest_road_contract_web" in md
     assert "anim_latest_road_contract_desktop" in md
     assert "## Desktop Mnemo events" in md
+    assert "## Recommended actions" in md
     assert "Большой перепад давлений" in md

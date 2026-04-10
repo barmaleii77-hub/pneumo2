@@ -102,12 +102,15 @@ def test_make_send_bundle_health_sees_final_triage_and_latest_copy(tmp_path: Pat
 
     artifacts = dict((health.get("signals") or {}).get("artifacts") or {})
     mnemo = dict((health.get("signals") or {}).get("mnemo_event_log") or {})
+    recommendations = list((health.get("signals") or {}).get("operator_recommendations") or [])
     assert artifacts.get("triage_report") is True
     assert artifacts.get("validation_report") is True
     assert artifacts.get("anim_diagnostics") is True
     assert triage_json["mnemo_event_log"]["severity"] == "critical"
+    assert triage_json["operator_recommendations"][0].startswith("Open Desktop Mnemo first")
     assert mnemo["severity"] == "critical"
     assert mnemo["current_mode"] == "Регуляторный коридор"
+    assert recommendations[0].startswith("Open Desktop Mnemo first")
 
     with zipfile.ZipFile(latest_zip, "r") as z:
         latest_names = set(z.namelist())

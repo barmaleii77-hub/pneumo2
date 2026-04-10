@@ -10,6 +10,7 @@ from pneumo_solver_ui.tools.send_bundle_contract import (
     ANIM_LOCAL_NPZ,
     ANIM_LOCAL_POINTER,
     annotate_anim_source_for_bundle,
+    build_anim_operator_recommendations,
     choose_anim_snapshot,
     extract_anim_snapshot,
     format_anim_dashboard_brief_lines,
@@ -218,3 +219,33 @@ def test_load_latest_send_bundle_anim_dashboard_merges_validation_bundle_flags(t
     assert any("Browser perf bundle artifacts:" in line and "trace=True" in line for line in lines)
     assert any("Desktop Mnemo events: exists=True / total=4 / active=1 / acked=2 / mode=Регуляторный коридор" == line for line in lines)
     assert any("Desktop Mnemo recent: Большой перепад давлений | Смена режима" == line for line in lines)
+
+
+def test_build_anim_operator_recommendations_prioritizes_mnemo_and_perf_actions() -> None:
+    recommendations = build_anim_operator_recommendations(
+        {
+            "anim_latest_available": True,
+            "anim_latest_pointer_json": "/abs/workspace/exports/anim_latest.json",
+            "anim_latest_npz_path": "/abs/workspace/exports/anim_latest.npz",
+            "anim_latest_mnemo_event_log_exists": True,
+            "anim_latest_mnemo_event_log_current_mode": "Регуляторный коридор",
+            "anim_latest_mnemo_event_log_active_latch_count": 1,
+            "anim_latest_mnemo_event_log_acknowledged_latch_count": 2,
+            "anim_latest_mnemo_event_log_recent_titles": ["Большой перепад давлений"],
+            "browser_perf_evidence_status": "snapshot_only",
+            "browser_perf_evidence_level": "WARN",
+            "browser_perf_bundle_ready": False,
+            "browser_perf_comparison_status": "no_reference",
+            "browser_perf_comparison_level": "WARN",
+            "browser_perf_comparison_ready": False,
+            "pointer_sync_ok": False,
+            "usable_from_bundle": False,
+        }
+    )
+
+    assert recommendations
+    assert recommendations[0].startswith("Open Desktop Mnemo first")
+    assert any("refresh the trace" in item for item in recommendations)
+    assert any("reference snapshot" in item for item in recommendations)
+    assert any("Re-export anim_latest" in item for item in recommendations)
+    assert any("Rebuild the send-bundle" in item for item in recommendations)
