@@ -237,6 +237,9 @@ class _TrendsCanvas(QtWidgets.QWidget):
         self._t: Optional[np.ndarray] = None
         self._series: List[_TrendSeriesData] = []
         self._idx: int = 0
+        self._playhead_t_s: Optional[float] = None
+        self._playhead_px_key: Optional[int] = None
+        self._window_key: Optional[tuple[int, int]] = None
         self.lookback_s = 2.0
         self.lookahead_s = 0.5
         self._layout_cache_key: Optional[tuple[int, int, int]] = None
@@ -269,12 +272,16 @@ class _TrendsCanvas(QtWidgets.QWidget):
         self._layout_cache_key = None
         self._layout_cache = []
         self._invalidate_background_cache()
+        self._playhead_px_key = None
         super().resizeEvent(event)
 
     def set_series(self, t: Sequence[float], series: Sequence[_TrendSeriesData]) -> None:
         self._t = np.asarray(t, dtype=float).reshape(-1)
         self._series = list(series)
         self._idx = 0
+        self._playhead_t_s = float(self._t[0]) if self._t.size else None
+        self._playhead_px_key = None
+        self._window_key = None
         self._layout_cache_key = None
         self._layout_cache = []
         self._invalidate_background_cache()
@@ -289,26 +296,93 @@ class _TrendsCanvas(QtWidgets.QWidget):
         self.lookahead_s = next_la
         self.update()
 
-    def set_index(self, idx: int) -> None:
-        idx_i = int(max(0, idx))
-        if idx_i == self._idx:
-            return
-        self._idx = idx_i
-        self.update()
+    def _normalized_playhead_time(self, sample_t: float | None, idx_i: int) -> float:
+        t = self._t
+        if t is None or t.size == 0:
+            return 0.0
+        ii = int(_clamp(idx_i, 0, int(t.size) - 1))
+        if sample_t is None or not np.isfinite(float(sample_t)):
+            return float(t[ii])
+        return float(np.clip(float(sample_t), float(t[0]), float(t[-1])))
 
-    def _window_indices(self) -> Tuple[int, int]:
+    def _window_indices(self, *, play_t: float | None = None, idx_i: Optional[int] = None) -> Tuple[int, int]:
         if self._t is None or self._t.size == 0:
             return 0, 0
         n = int(self._t.size)
-        i = int(_clamp(self._idx, 0, n - 1))
-        t0 = float(self._t[i])
-        t_lo = t0 - float(self.lookback_s)
-        t_hi = t0 + float(self.lookahead_s)
+        i = int(_clamp(self._idx if idx_i is None else idx_i, 0, n - 1))
+        center_t = self._normalized_playhead_time(play_t, i)
+        t_lo = center_t - float(self.lookback_s)
+        t_hi = center_t + float(self.lookahead_s)
         i0 = int(np.searchsorted(self._t, t_lo, side="left"))
         i1 = int(np.searchsorted(self._t, t_hi, side="right"))
         i0 = int(_clamp(i0, 0, n - 1))
         i1 = int(_clamp(i1, i0 + 1, n))
         return i0, i1
+
+    def _playhead_visual_key(self, play_t: float, *, idx_i: int, i0: int, i1: int) -> Optional[int]:
+        if self._t is None or self._t.size == 0:
+            return None
+        rects = self._panel_rects()
+        if rects:
+            panel = rects[0]
+            plot = QtCore.QRectF(panel.left() + 6.0, panel.top() + 18.0, max(24.0, panel.width() - 98.0), max(18.0, panel.height() - 24.0))
+        else:
+            outer = QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+            plot = QtCore.QRectF(outer.left() + 6.0, outer.top() + 18.0, max(24.0, outer.width() - 98.0), max(18.0, outer.height() - 24.0))
+        tt = np.asarray(self._t[i0:i1], dtype=float)
+        if tt.size < 2:
+            return None
+        t_min = float(tt[0])
+        t_max = float(tt[-1])
+        dt = max(1e-9, t_max - t_min)
+        u = (float(play_t) - t_min) / dt
+        return int(plot.left() + _clamp(u, 0.0, 1.0) * plot.width())
+
+    def set_playhead_time(self, sample_t: float | None, *, idx: int) -> None:
+        t = self._t
+        if t is None or t.size == 0:
+            return
+        idx_i = int(_clamp(int(idx), 0, int(t.size) - 1))
+        play_t = self._normalized_playhead_time(sample_t, idx_i)
+        i0, i1 = self._window_indices(play_t=play_t, idx_i=idx_i)
+        key = self._playhead_visual_key(play_t, idx_i=idx_i, i0=i0, i1=i1)
+        idx_changed = idx_i != self._idx
+        key_changed = key != self._playhead_px_key
+        window_changed = (i0, i1) != self._window_key
+        self._idx = idx_i
+        self._playhead_t_s = play_t
+        self._playhead_px_key = key
+        self._window_key = (i0, i1)
+        if idx_changed or key_changed or window_changed:
+            self.update()
+
+    def set_index(self, idx: int) -> None:
+        self.set_playhead_time(None, idx=idx)
+
+    def _sample_series_value(self, y_all: np.ndarray, play_t: float, idx_i: int) -> float:
+        t = self._t
+        if t is None or t.size == 0 or y_all.size == 0:
+            return 0.0
+        n = int(min(t.size, y_all.size))
+        if n <= 0:
+            return 0.0
+        ii = int(_clamp(idx_i, 0, n - 1))
+        if n == 1:
+            return float(y_all[0])
+        j1 = int(np.searchsorted(t[:n], float(play_t), side="left"))
+        if j1 <= 0:
+            return float(y_all[0])
+        if j1 >= n:
+            return float(y_all[n - 1])
+        j0 = j1 - 1
+        t0 = float(t[j0])
+        t1 = float(t[j1])
+        y0 = float(y_all[j0])
+        y1 = float(y_all[j1])
+        if (not np.isfinite(t0)) or (not np.isfinite(t1)) or abs(t1 - t0) < 1e-12:
+            return float(y_all[ii])
+        a = _clamp((float(play_t) - t0) / (t1 - t0), 0.0, 1.0)
+        return float(y0 + (y1 - y0) * a)
 
     def _panel_rects(self) -> List[QtCore.QRectF]:
         count = max(1, int(len(self._series)))
@@ -408,7 +482,8 @@ class _TrendsCanvas(QtWidgets.QWidget):
 
         n = int(self._t.size)
         idx = int(_clamp(self._idx, 0, n - 1))
-        i0, i1 = self._window_indices()
+        play_t = self._normalized_playhead_time(self._playhead_t_s, idx)
+        i0, i1 = self._window_indices(play_t=play_t, idx_i=idx)
         tt = np.asarray(self._t[i0:i1], dtype=float)
         if tt.size < 2:
             return
@@ -432,7 +507,7 @@ class _TrendsCanvas(QtWidgets.QWidget):
             y_all = np.asarray(series.y, dtype=float)
             if y_all.size == 0:
                 continue
-            y0 = float(y_all[min(idx, y_all.size - 1)])
+            y0 = self._sample_series_value(y_all, play_t, idx)
 
             plot = QtCore.QRectF(panel.left() + 6.0, panel.top() + 18.0, max(24.0, panel.width() - 98.0), max(18.0, panel.height() - 24.0))
             valr = QtCore.QRectF(panel.right() - 86.0, panel.top() + 4.0, 80.0, panel.height() - 8.0)
@@ -473,8 +548,7 @@ class _TrendsCanvas(QtWidgets.QWidget):
             p.setPen(QtGui.QPen(self._line, 1.6))
             p.drawPolyline(poly)
 
-            t_i = float(self._t[idx])
-            x_i = (t_i - t_min) / (t_max - t_min)
+            x_i = (play_t - t_min) / (t_max - t_min)
             xpix = plot.left() + x_i * plot.width()
             p.setPen(QtGui.QPen(self._accent, 1.2))
             p.drawLine(QtCore.QPointF(float(xpix), plot.top()), QtCore.QPointF(float(xpix), plot.bottom()))
@@ -594,8 +668,8 @@ class TrendsPanel(QtWidgets.QWidget):
         self.canvas.set_series(t, series_payload)
         self.canvas.set_window(lookback_s=2.0, lookahead_s=0.5)
 
-    def update_frame(self, i: int):
-        self.canvas.set_index(i)
+    def update_frame(self, i: int, *, sample_t: float | None = None):
+        self.canvas.set_playhead_time(sample_t, idx=i)
 
 
 def _infer_valve_kind(name: str) -> str:

@@ -22,8 +22,32 @@ def test_visible_fast_and_slow_groups_are_refreshed_as_groups() -> None:
     assert "slow_entries = slow_visible" in SRC
     assert "for entry in slow_entries:" in SRC
     assert "_call_panel(entry)" in SRC
-    assert "self.timeline.set_index(i)" in SRC
-    assert "self.trends.update_frame(i)" in SRC
+    assert 'if self._dock_is_exposed("dock_timeline") and (bool(playing) or interactive_scrub or fast_due):' in SRC
+    assert 'if interactive_scrub and self._dock_is_exposed("dock_telemetry"):' in SRC
+    assert 'if interactive_scrub and (not many_visible_budget) and pressure_panel is not None and self._dock_is_exposed("dock_pressures"):' in SRC
+    assert 'if interactive_scrub and (not many_visible_budget) and flow_panel is not None and self._dock_is_exposed("dock_flows"):' in SRC
+    assert 'if interactive_scrub and (not many_visible_budget) and valve_panel is not None and self._dock_is_exposed("dock_valves"):' in SRC
+    assert 'if interactive_scrub and heatmap_panel is not None and self._dock_is_exposed("dock_heatmap"):' in SRC
+    assert 'if interactive_scrub and corner_quick_panel is not None and self._dock_is_exposed("dock_corner_quick"):' in SRC
+    assert 'if interactive_scrub and road_profile_panel is not None and self._dock_is_exposed("dock_road_profile"):' in SRC
+    assert "self.timeline.set_playhead_time(self._playback_sample_t_s, idx=i)" in SRC
+    assert "pressure_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
+    assert "flow_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
+    assert "valve_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
+    assert "heatmap_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
+    assert "corner_quick_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
+    assert "road_profile_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
+    assert 'if interactive_scrub and self._dock_is_exposed("dock_trends"):' in SRC
+    assert "self.trends.update_frame(i, sample_t=self._playback_sample_t_s)" in SRC
+    assert 'heatmap_panel = getattr(self, "telemetry_heatmap", None)' in SRC
+    assert 'corner_quick_panel = getattr(self, "telemetry_corner_quick", None)' in SRC
+    assert 'corner_table_panel = getattr(self, "telemetry_corner_table", None)' in SRC
+    assert 'pressure_panel = getattr(self, "telemetry_press_panel", None)' in SRC
+    assert 'flow_panel = getattr(self, "telemetry_flow_panel", None)' in SRC
+    assert 'valve_panel = getattr(self, "telemetry_valve_panel", None)' in SRC
+    assert 'road_profile_panel = getattr(self, "telemetry_road_profile", None)' in SRC
+    assert "sample_t_panels = (" in SRC
+    assert 'if self._dock_is_exposed("dock_timeline") and not interactive_scrub:' not in SRC
 
 
 def test_views_have_playback_perf_mode_and_hide_expensive_overlays() -> None:

@@ -117,6 +117,7 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "display_key = (rows_key, layout_key, metrics_key)" in app_src
     assert "class _PressureQuickGridCanvas" in app_src
     assert "self.canvas = _PressureQuickGridCanvas" in app_src
+    assert 'self._display_values: Dict[str, str] = {str(x): "—" for x in self._nodes}' in app_src
     assert "self._bg_cache_pixmap" in app_src
     assert "def _ensure_background_cache" in app_src
     assert 'key = "svc__telemetry_summary_cache"' in app_src
@@ -124,16 +125,24 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._value_font = QtGui.QFont(self.font())" in app_src
     assert "self._value_text_pen = QtGui.QPen(QtGui.QColor(234, 238, 243))" in app_src
     assert "self._value_text_pen.setCosmetic(True)" in app_src
+    assert 'display_values[str(node)] = f"{rounded:.2f} bar(g)"' in app_src
+    assert 'str(self._display_values.get(node, "—"))' in app_src
     assert "p.setFont(self._value_font)" in app_src
     assert "p.setPen(self._value_text_pen)" in app_src
     assert "self._pressure_series_map: Dict[str, np.ndarray] = {}" in app_src
+    assert "self._main_pressure_series_map: Dict[str, np.ndarray] = {}" in app_src
+    assert "self._patm_arr, self._patm_default_pa = _infer_patm_source(b)" in app_src
+    assert "P = sample(arr, patm)" in app_src
+    assert 's = "—" if not np.isfinite(bar_g) else f"{bar_g:.2f}"' in app_src
     assert "self._p_series_map: Dict[str, np.ndarray] = {}" in app_src
     assert "self._last_visual_key: Optional[tuple[int, int, int, int, int, int]] = None" in app_src
     assert "visual_key = (" in app_src
     assert "summary = _ensure_telemetry_summary_cache(b)" in app_src
-    assert 't = float(summary["t"][i])' in app_src
-    assert 'vx = float(summary["vx"][i])' in app_src
-    assert 'zcm = float(summary["zcm"][i])' in app_src
+    assert 'sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(' in app_src
+    assert 'sample = _make_series_sampler(i0=int(sample_i0), i1=int(sample_i1), alpha=float(alpha))' in app_src
+    assert 't = sample(summary["t"], 0.0)' in app_src
+    assert 'vx = sample(summary["vx"], 0.0)' in app_src
+    assert 'zcm = sample(summary["zcm"], 0.0)' in app_src
     assert "def set_compact_dock_mode(self, compact: bool) -> None:" in app_src
     assert "dock.topLevelChanged.connect(" in app_src
     assert 'getattr(widget, "set_compact_dock_mode")(not bool(dock.isFloating()))' in app_src
@@ -268,6 +277,22 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self.controls_row = QtWidgets.QWidget(self)" in app_src
     assert "self.controls_row.setVisible(not compact)" in app_src
     assert "self.lbl_legend.setVisible(not compact)" in app_src
+    assert '"t": np.asarray(b.t, dtype=float).reshape(-1)' in app_src
+    assert "zb = sample(sig[\"zb\"], 0.0)" in app_src
+    assert "air = int(sample(sig[\"air\"], 0.0) > 0.5)" in app_src
+    assert "v = sample(arr, 0.0) if isinstance(arr, np.ndarray) else 0.0" in app_src
+    assert "zr = sample(road_arr, float(\"nan\")) if road_arr is not None else float(\"nan\")" in app_src
+    assert "s0 = sample(s, float(s[idx]))" in app_src
+    assert "zc = sample(z_arr, float(\"nan\"))" in app_src
+    assert "self.corner_table.update_frame(b, i, sample_t=sample_t)" in app_src
+    assert "self.corner_heatmap.update_frame(b, i, sample_t=sample_t)" in app_src
+    assert "self.corner_quick.update_frame(b, i, sample_t=sample_t)" in app_src
+    assert "self.road_profile.update_frame(b, i, sample_t=sample_t)" in app_src
+    assert "self.press_panel.update_frame(b, i, sample_t=sample_t)" in app_src
+    assert "self.flow_panel.update_frame(b, i, sample_t=sample_t)" in app_src
+    assert "self.valve_panel.update_frame(b, i, sample_t=sample_t)" in app_src
+    assert "vals0 = np.asarray(b.open.values[i0, self._idxs], dtype=float)" in app_src
+    assert "q0 = np.asarray(b.q.values[i0, self._idxs], dtype=float)" in app_src
     assert "self._compact_visual_expanded = False" in app_src
     assert "class _CompactTelemetrySummaryCanvas(QtWidgets.QWidget):" in app_src
     assert "self.compact_summary = _CompactTelemetrySummaryCanvas()" in app_src

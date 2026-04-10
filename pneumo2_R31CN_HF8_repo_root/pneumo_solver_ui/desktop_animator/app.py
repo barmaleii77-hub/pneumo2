@@ -722,6 +722,7 @@ def _ensure_road_profile_panel_cache(b: DataBundle, wheelbase_m: float) -> Dict[
 
     cache: Dict[str, Any] = {
         "wheelbase_m": wb,
+        "t": np.asarray(b.t, dtype=float).reshape(-1),
         "s_world": s_world,
         "corners": corners,
         "y_range": y_range,
@@ -1182,6 +1183,9 @@ class PointerWatcher(QtCore.QObject):
         self.pointer_path = Path(pointer_path)
         self._last_pointer_sig: Optional[Tuple[bool, int, int]] = None
         self._last_npz: Optional[str] = None
+        self._last_npz_sig: Optional[Tuple[bool, int, int]] = None
+        self._last_road_path: Optional[Path] = None
+        self._last_road_sig: Optional[Tuple[bool, int, int]] = None
         self._last_deps_token: str = ""
         self._current_npz: Optional[Path] = None
 
@@ -1253,10 +1257,28 @@ class PointerWatcher(QtCore.QObject):
             if not npz_path.exists():
                 self.status.emit(f"NPZ missing: {npz_path}")
                 return
+            npz_sig = self._file_sig(npz_path)
+            cached_road_sig = self._file_sig(self._last_road_path)
+            if (
+                not pointer_changed
+                and str(npz_path) == str(self._last_npz or "")
+                and npz_sig == self._last_npz_sig
+                and cached_road_sig == self._last_road_sig
+            ):
+                return
 
             deps = self._collect_follow_deps(npz_path)
             deps_token = visual_cache_dependencies_token(deps) or str(npz_path)
-            deps_changed = deps_token != self._last_deps_token
+            road_path_raw = str(deps.get("road_csv_path") or "").strip()
+            road_path = Path(road_path_raw) if road_path_raw else None
+            road_sig = self._file_sig(road_path)
+            deps_changed = (
+                deps_token != self._last_deps_token
+                or str(npz_path) != str(self._last_npz or "")
+                or npz_sig != self._last_npz_sig
+                or road_path != self._last_road_path
+                or road_sig != self._last_road_sig
+            )
             if not deps_changed:
                 return
 
@@ -1269,6 +1291,9 @@ class PointerWatcher(QtCore.QObject):
 
             self._last_deps_token = deps_token
             self._last_npz = str(npz_path)
+            self._last_npz_sig = npz_sig
+            self._last_road_path = road_path
+            self._last_road_sig = road_sig
             self.status.emit(f"Reload ({reason_text}): {npz_path.name}")
             self.npz_changed.emit(npz_path)
         except Exception as e:
@@ -4261,6 +4286,8 @@ class Car3DWidget(QtWidgets.QWidget):
         self._road_grid_nominal_visible_len_m = float(self._lookbehind_m + self._auto_lookahead(0.0))
         self._road_grid_max_visible_len_m = float(self._road_grid_nominal_visible_len_m)
         self._road_native_long_step_m = 0.06
+        self._bundle_history_m: Optional[float] = None
+        self._bundle_lookahead_m: Optional[float] = None
         self._road_grid_cross_spacing_m: Optional[float] = None
         self._road_grid_cross_spacing_viewport_key: Optional[int] = None
         self._road_surface_spacing_m: Optional[float] = None
@@ -5061,6 +5088,8 @@ class Car3DWidget(QtWidgets.QWidget):
         self._road_path_s_world_cache = None
         self._road_path_nx_world_cache = None
         self._road_path_ny_world_cache = None
+        self._bundle_history_m = None
+        self._bundle_lookahead_m = None
         try:
             self._cylinder_truth_gates = _evaluate_all_cylinder_truth_gates(getattr(bundle, "meta", None) if bundle is not None else None)
             for _gate in self._cylinder_truth_gates.values():
@@ -5089,6 +5118,10 @@ class Car3DWidget(QtWidgets.QWidget):
             v_max = 0.0
         self._road_grid_nominal_visible_len_m = float(max(5.0, self._lookbehind_m + self._auto_lookahead(v_ref)))
         self._road_grid_max_visible_len_m = float(max(self._road_grid_nominal_visible_len_m, self._lookbehind_m + self._auto_lookahead(v_max)))
+        self._bundle_history_m = float(max(0.0, self._lookbehind_m))
+        self._bundle_lookahead_m = float(
+            max(0.0, self._road_grid_nominal_visible_len_m - float(self._bundle_history_m))
+        )
         native_step = None
         try:
             if bundle is not None:
@@ -5219,6 +5252,22 @@ class Car3DWidget(QtWidgets.QWidget):
             self._road_surface_spacing_m = float(cached)
             self._road_surface_spacing_cache_key = cache_key
         return float(max(1e-6, cached))
+
+    def _stable_road_preview_history_m(self) -> float:
+        cached = self._bundle_history_m
+        if cached is None or not np.isfinite(float(cached)):
+            cached = float(self._lookbehind_m)
+        return float(max(0.0, float(cached)))
+
+    def _stable_road_preview_lookahead_m(self) -> float:
+        hist = self._stable_road_preview_history_m()
+        nominal = float(max(0.0, self._road_grid_nominal_visible_len_m - hist))
+        cached = self._bundle_lookahead_m
+        if cached is None or not np.isfinite(float(cached)):
+            cached = nominal
+        max_visible = float(max(self._road_grid_nominal_visible_len_m, self._road_grid_max_visible_len_m))
+        max_lookahead = float(max(0.0, max_visible - hist))
+        return float(max(0.0, min(max_lookahead, max(float(cached), nominal))))
 
     def fit_camera_to_geometry(self) -> None:
         if not _HAS_GL:
@@ -5846,8 +5895,8 @@ class Car3DWidget(QtWidgets.QWidget):
                 x0 = _sample_series_local(xw, i0=i0, i1=i1, alpha=alpha, default=0.0)
                 y0 = _sample_series_local(yw, i0=i0, i1=i1, alpha=alpha, default=0.0)
 
-                la = self._auto_lookahead(vx)
-                s_min = s0 - self._lookbehind_m
+                la = self._stable_road_preview_lookahead_m()
+                s_min = s0 - self._stable_road_preview_history_m()
                 s_max = s0 + la
 
                 wb = float(getattr(self.geom, "wheelbase", 1.5))
@@ -6264,31 +6313,37 @@ class CornerTable(QtWidgets.QTableWidget):
         self._bundle_key = id(b)
         self._corner_cache = _ensure_corner_signal_cache(b)
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
         if int(getattr(self, "_bundle_key", 0) or 0) != id(b):
             self.set_bundle(b)
+        sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+            np.asarray(b.t, dtype=float),
+            sample_t=sample_t,
+            fallback_index=i,
+        )
+        sample = _make_series_sampler(i0=int(sample_i0), i1=int(sample_i1), alpha=float(alpha))
 
         for ci, c in enumerate(CORNERS):
             sig = self._corner_cache.get(str(c))
             if not sig:
                 continue
-            zb = float(sig["zb"][i])
-            vb = float(sig["vb"][i])
-            ab = float(sig["ab"][i])
+            zb = sample(sig["zb"], 0.0)
+            vb = sample(sig["vb"], 0.0)
+            ab = sample(sig["ab"], 0.0)
 
-            zw = float(sig["zw"][i])
-            vw = float(sig["vw"][i])
-            aw = float(sig["aw"][i])
+            zw = sample(sig["zw"], 0.0)
+            vw = sample(sig["vw"], 0.0)
+            aw = sample(sig["aw"], 0.0)
 
             road_arr = sig["zr"]
-            zr = float(road_arr[i]) if road_arr is not None else float("nan")
+            zr = sample(road_arr, float("nan")) if road_arr is not None else float("nan")
 
             z_w_minus_body = zw - zb
             z_w_minus_road = (zw - zr) if np.isfinite(zr) else float("nan")
 
-            s = float(sig["stroke"][i])
-            Ft = float(sig["tireF"][i])
-            air = int(float(sig["air"][i]) > 0.5)
+            s = sample(sig["stroke"], 0.0)
+            Ft = sample(sig["tireF"], 0.0)
+            air = int(sample(sig["air"], 0.0) > 0.5)
 
             vals = [
                 _fmt(zb, digits=3),
@@ -6363,25 +6418,31 @@ class CornerQuickTable(QtWidgets.QTableWidget):
         self._bundle_key = id(b)
         self._corner_cache = _ensure_corner_signal_cache(b)
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
         if int(getattr(self, "_bundle_key", 0) or 0) != id(b):
             self.set_bundle(b)
+        sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+            np.asarray(b.t, dtype=float),
+            sample_t=sample_t,
+            fallback_index=i,
+        )
+        sample = _make_series_sampler(i0=int(sample_i0), i1=int(sample_i1), alpha=float(alpha))
 
         for ci, c in enumerate(CORNERS):
             sig = self._corner_cache.get(str(c))
             if not sig:
                 continue
-            zb = float(sig["zb"][i])
-            zw = float(sig["zw"][i])
+            zb = sample(sig["zb"], 0.0)
+            zw = sample(sig["zw"], 0.0)
             road_arr = sig["zr"]
-            zr = float(road_arr[i]) if road_arr is not None else float("nan")
+            zr = sample(road_arr, float("nan")) if road_arr is not None else float("nan")
 
             z_w_minus_body = zw - zb
             z_w_minus_road = (zw - zr) if np.isfinite(zr) else float("nan")
 
-            s = float(sig["stroke"][i])
-            Ft = float(sig["tireF"][i])
-            air = int(float(sig["air"][i]) > 0.5)
+            s = sample(sig["stroke"], 0.0)
+            Ft = sample(sig["tireF"], 0.0)
+            air = int(sample(sig["air"], 0.0) > 0.5)
 
             vals = [
                 _fmt(zb, digits=3),
@@ -6909,7 +6970,7 @@ class RoadProfilePanel(QtWidgets.QWidget):
         self._apply_recommended_scales()
         self._emit_visual()
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
         if self.plot is None:
             return
         if int(getattr(self, "_bundle_key", 0) or 0) != id(b) or not self._profile_cache:
@@ -6923,12 +6984,20 @@ class RoadProfilePanel(QtWidgets.QWidget):
         x_min = -hist
         x_max = +ahead
 
+        t_cached = cache.get("t")
+        t_series = t_cached if isinstance(t_cached, np.ndarray) else np.asarray(b.t, dtype=float).reshape(-1)
         s_cached = cache.get("s_world")
         s = s_cached if isinstance(s_cached, np.ndarray) else np.asarray(cache.get("s_world", np.zeros((0,), dtype=float)), dtype=float)
         if len(s) <= 1:
             return
-        i = int(_clamp(int(i), 0, len(s) - 1))
-        s0 = float(s[i])
+        idx = int(_clamp(int(i), 0, len(s) - 1))
+        sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+            np.asarray(t_series, dtype=float),
+            sample_t=sample_t,
+            fallback_index=idx,
+        )
+        sample = _make_series_sampler(i0=int(sample_i0), i1=int(sample_i1), alpha=float(alpha))
+        s0 = sample(s, float(s[idx]))
         plot_width_px = int(max(160, float(self.plot.width())))
         budget_cap = self._road_profile_point_budget_compact if bool(self._compact_dock_mode) else self._road_profile_point_budget_full
         max_points = int(max(96, min(int(budget_cap), (plot_width_px // 4) + 24)))
@@ -6980,7 +7049,7 @@ class RoadProfilePanel(QtWidgets.QWidget):
 
             try:
                 marker_x = float(corner_cache.get("marker_x", _road_profile_corner_offset_m(name, wb)))
-                zc = float(z_arr[i]) if i < z_arr.size else float("nan")
+                zc = sample(z_arr, float("nan"))
                 marker_z_bucket = -999999 if not np.isfinite(zc) else int(round(float(zc) * 1000.0))
             except Exception:
                 marker_x = float(_road_profile_corner_offset_m(name, wb))
@@ -7149,14 +7218,35 @@ class PressurePanel(QtWidgets.QWidget):
 
         self._extra_nodes: list[str] = []
         self._has_p = False
+        self._bundle_key: Optional[int] = None
+        self._patm_arr: Optional[np.ndarray] = None
+        self._patm_default_pa: float = float(PATM_PA_DEFAULT)
+        self._pressure_series_map: Dict[str, np.ndarray] = {}
+        self._main_pressure_series_map: Dict[str, np.ndarray] = {}
 
     # NOTE:
     # Dock installation belongs to CockpitWidget, not PressurePanel.
     # Keep PressurePanel focused on pressure gauges / extra nodes only.
 
     def set_bundle(self, b: DataBundle):
+        self._bundle_key = id(b)
         self._extra_nodes = []
         self._has_p = b.p is not None
+        self._pressure_series_map = {}
+        self._main_pressure_series_map = {}
+        self._patm_arr, self._patm_default_pa = _infer_patm_source(b)
+        fallback_mapping = {
+            "Ресивер1": "давление_ресивер1_Па",
+            "Ресивер2": "давление_ресивер2_Па",
+            "Ресивер3": "давление_ресивер3_Па",
+            "Аккумулятор": "давление_аккумулятор_Па",
+        }
+        for node, col in fallback_mapping.items():
+            try:
+                if b.main.has(col):
+                    self._main_pressure_series_map[str(node)] = np.asarray(b.get(col, self._patm_default_pa), dtype=float)
+            except Exception:
+                pass
         if b.p is None:
             return
 
@@ -7179,6 +7269,12 @@ class PressurePanel(QtWidgets.QWidget):
             self._extra_nodes = [c for _s, c in stds[: min(12, len(stds))]]
         except Exception:
             self._extra_nodes = cols[: min(12, len(cols))]
+        for node in list(self.KEY_NODES) + list(self._extra_nodes):
+            try:
+                if b.p.has(node):
+                    self._pressure_series_map[str(node)] = np.asarray(b.p.column(node), dtype=float)
+            except Exception:
+                pass
 
 
     def set_recommended_scales(self, accel_scale: float, vel_scale: float):
@@ -7222,21 +7318,23 @@ class PressurePanel(QtWidgets.QWidget):
         self._apply_recommended_scales()
         self._emit_visual()
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
+        if int(getattr(self, "_bundle_key", 0) or 0) != id(b):
+            self.set_bundle(b)
+        sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+            np.asarray(b.t, dtype=float),
+            sample_t=sample_t,
+            fallback_index=i,
+        )
+        sample = _make_series_sampler(i0=int(sample_i0), i1=int(sample_i1), alpha=float(alpha))
         if b.p is None:
             # Fallback: try df_main "давление_ресиверX_Па"
             # (This is less detailed than df_p, but keeps the panel useful.)
-            patm = _infer_patm_pa(b, i)
-            mapping = {
-                "Ресивер1": "давление_ресивер1_Па",
-                "Ресивер2": "давление_ресивер2_Па",
-                "Ресивер3": "давление_ресивер3_Па",
-                "Аккумулятор": "давление_аккумулятор_Па",
-            }
+            patm = sample(self._patm_arr, self._patm_default_pa)
             for node, g in self.gauges.items():
-                col = mapping.get(node)
-                if col and b.main.has(col):
-                    P = float(b.get(col, patm)[i])
+                arr = self._main_pressure_series_map.get(str(node))
+                if arr is not None:
+                    P = sample(arr, patm)
                     g.set_value_bar_g((P - patm) / BAR_PA)
                 else:
                     g.set_value_bar_g(None)
@@ -7245,11 +7343,12 @@ class PressurePanel(QtWidgets.QWidget):
             _set_table_row_count_if_changed(self.tbl_extra, 0)
             return
 
-        patm = _infer_patm_pa(b, i)
+        patm = sample(self._patm_arr, self._patm_default_pa)
         # Key gauges
         for node, g in self.gauges.items():
-            if b.p.has(node):
-                P = float(b.p.column(node)[i])
+            arr = self._pressure_series_map.get(str(node))
+            if arr is not None:
+                P = sample(arr, float("nan"))
                 g.set_value_bar_g((P - patm) / BAR_PA)
             else:
                 g.set_value_bar_g(None)
@@ -7264,9 +7363,10 @@ class PressurePanel(QtWidgets.QWidget):
         _set_table_row_count_if_changed(self.tbl_extra, len(self._extra_nodes))
         for r, name in enumerate(self._extra_nodes):
             try:
-                P = float(b.p.column(name)[i])
+                arr = self._pressure_series_map.get(str(name))
+                P = sample(arr, float("nan")) if arr is not None else float("nan")
                 bar_g = (P - patm) / BAR_PA
-                s = f"{bar_g:.2f}"
+                s = "—" if not np.isfinite(bar_g) else f"{bar_g:.2f}"
             except Exception:
                 s = "—"
 
@@ -7459,7 +7559,7 @@ class ValvePanel(QtWidgets.QWidget):
         self._apply_recommended_scales()
         self._emit_visual()
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
         if b.open is None or self._idxs is None or not self._names:
             if self._last_display_key == tuple() and int(getattr(self, "_visible_rows", 0)) == 0:
                 return
@@ -7473,7 +7573,22 @@ class ValvePanel(QtWidgets.QWidget):
 
         # values for all valves at time i
         try:
-            vals = np.asarray(b.open.values[i, self._idxs], dtype=float)
+            sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+                np.asarray(b.t, dtype=float),
+                sample_t=sample_t,
+                fallback_index=i,
+            )
+            i0 = int(sample_i0)
+            i1 = int(sample_i1)
+            a = float(alpha)
+            if i0 == i1 or a <= 1e-12:
+                vals = np.asarray(b.open.values[i0, self._idxs], dtype=float)
+            elif a >= 1.0 - 1e-12:
+                vals = np.asarray(b.open.values[i1, self._idxs], dtype=float)
+            else:
+                vals0 = np.asarray(b.open.values[i0, self._idxs], dtype=float)
+                vals1 = np.asarray(b.open.values[i1, self._idxs], dtype=float)
+                vals = vals0 + (vals1 - vals0) * a
         except Exception:
             if self._last_display_key == tuple() and int(getattr(self, "_visible_rows", 0)) == 0:
                 return
@@ -8038,7 +8153,7 @@ class FlowQuickPanel(QtWidgets.QWidget):
     def _clear_rows(self):
         self.rows_canvas.clear_rows()
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
         if getattr(b, "q", None) is None or self._idxs is None or not self._names:
             self.header_canvas.set_segments([("FLOW: n/a", QtGui.QColor(184, 195, 207))])
             _set_label_text_if_changed(self.lbl_groups, "FLOW: n/a")
@@ -8046,7 +8161,22 @@ class FlowQuickPanel(QtWidgets.QWidget):
             return
 
         try:
-            q = np.asarray(b.q.values[i, self._idxs], dtype=float)
+            sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+                np.asarray(b.t, dtype=float),
+                sample_t=sample_t,
+                fallback_index=i,
+            )
+            i0 = int(sample_i0)
+            i1 = int(sample_i1)
+            a = float(alpha)
+            if i0 == i1 or a <= 1e-12:
+                q = np.asarray(b.q.values[i0, self._idxs], dtype=float)
+            elif a >= 1.0 - 1e-12:
+                q = np.asarray(b.q.values[i1, self._idxs], dtype=float)
+            else:
+                q0 = np.asarray(b.q.values[i0, self._idxs], dtype=float)
+                q1 = np.asarray(b.q.values[i1, self._idxs], dtype=float)
+                q = q0 + (q1 - q0) * a
         except Exception:
             self.header_canvas.set_segments([("FLOW: n/a", QtGui.QColor(184, 195, 207))])
             _set_label_text_if_changed(self.lbl_groups, "FLOW: n/a")
@@ -8241,7 +8371,7 @@ class FlowPanel(QtWidgets.QWidget):
                 _set_table_row_hidden_if_changed(self.table, r, True)
         self._visible_rows = target
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
         if getattr(b, "q", None) is None or self._idxs is None or not self._names:
             if self._last_display_key == tuple() and int(getattr(self, "_visible_rows", 0)) == 0:
                 return
@@ -8256,7 +8386,22 @@ class FlowPanel(QtWidgets.QWidget):
         only_active = bool(self.chk_active.isChecked())
 
         try:
-            q = np.asarray(b.q.values[i, self._idxs], dtype=float)
+            sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+                np.asarray(b.t, dtype=float),
+                sample_t=sample_t,
+                fallback_index=i,
+            )
+            i0 = int(sample_i0)
+            i1 = int(sample_i1)
+            a = float(alpha)
+            if i0 == i1 or a <= 1e-12:
+                q = np.asarray(b.q.values[i0, self._idxs], dtype=float)
+            elif a >= 1.0 - 1e-12:
+                q = np.asarray(b.q.values[i1, self._idxs], dtype=float)
+            else:
+                q0 = np.asarray(b.q.values[i0, self._idxs], dtype=float)
+                q1 = np.asarray(b.q.values[i1, self._idxs], dtype=float)
+                q = q0 + (q1 - q0) * a
         except Exception:
             if self._last_display_key == tuple() and int(getattr(self, "_visible_rows", 0)) == 0:
                 return
@@ -8319,6 +8464,7 @@ class _PressureQuickGridCanvas(QtWidgets.QWidget):
         self._nodes = [str(x) for x in nodes]
         self._max_bar_g = float(max_bar_g)
         self._values: Dict[str, Optional[float]] = {str(x): None for x in self._nodes}
+        self._display_values: Dict[str, str] = {str(x): "—" for x in self._nodes}
         self._values_key: Optional[tuple[tuple[str, Optional[float]], ...]] = None
         self._bg_cache_key: Optional[tuple[int, int]] = None
         self._bg_cache_pixmap: Optional[QtGui.QPixmap] = None
@@ -8439,19 +8585,25 @@ class _PressureQuickGridCanvas(QtWidgets.QWidget):
 
     def set_values(self, values: Dict[str, Optional[float]]) -> None:
         normalized = []
+        display_values: Dict[str, str] = {}
         for node in self._nodes:
             val = values.get(str(node))
             if val is None:
                 normalized.append((str(node), None))
+                display_values[str(node)] = "—"
             else:
                 try:
-                    normalized.append((str(node), round(float(val), 2)))
+                    rounded = round(float(val), 2)
+                    normalized.append((str(node), rounded))
+                    display_values[str(node)] = f"{rounded:.2f} bar(g)"
                 except Exception:
                     normalized.append((str(node), None))
+                    display_values[str(node)] = "—"
         key = tuple(normalized)
         if key == self._values_key:
             return
         self._values = {node: val for node, val in normalized}
+        self._display_values = display_values
         self._values_key = key
         self.update()
 
@@ -8468,11 +8620,10 @@ class _PressureQuickGridCanvas(QtWidgets.QWidget):
         for info in metrics.get("cards", []):
             node = str(info.get("node", ""))
             val = self._values.get(node)
-            txt = "—" if val is None or not np.isfinite(float(val)) else f"{float(val):.2f} bar(g)"
             p.drawText(
                 info["value_rect"],
                 QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-                txt,
+                str(self._display_values.get(node, "—")),
             )
 
             bar_rect = info["bar_rect"]
@@ -8593,18 +8744,24 @@ class PressureQuickPanel(QtWidgets.QWidget):
         self._apply_recommended_scales()
         self._emit_visual()
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
         if int(getattr(self, "_bundle_key", 0) or 0) != id(b):
             self.set_bundle(b)
-        patm = _patm_value_from_source(self._patm_arr, self._patm_default_pa, i)
+        sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+            np.asarray(b.t, dtype=float),
+            sample_t=sample_t,
+            fallback_index=i,
+        )
+        sample = _make_series_sampler(i0=int(sample_i0), i1=int(sample_i1), alpha=float(alpha))
+        patm = sample(self._patm_arr, self._patm_default_pa)
         values: Dict[str, Optional[float]] = {}
         for node in self.KEY_NODES:
             arr = self._pressure_series_map.get(str(node))
-            if arr is None or not (0 <= int(i) < int(arr.size)):
+            if arr is None:
                 values[str(node)] = None
                 continue
             try:
-                P = float(arr[int(i)])
+                P = sample(arr, float("nan"))
                 values[str(node)] = float((P - patm) / BAR_PA) if np.isfinite(P) else None
             except Exception:
                 values[str(node)] = None
@@ -8995,15 +9152,21 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
             self._p_name = next(iter(self._p_series_map.keys()))
         self.set_pressure_name(self._p_name)
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
         if int(getattr(self, "_bundle_key", 0) or 0) != id(b):
             self.set_bundle(b)
+        sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+            np.asarray(b.t, dtype=float),
+            sample_t=sample_t,
+            fallback_index=i,
+        )
+        sample = _make_series_sampler(i0=int(sample_i0), i1=int(sample_i1), alpha=float(alpha))
         # pressure
-        patm = _patm_value_from_source(self._patm_arr, self._patm_default_pa, i)
+        patm = sample(self._patm_arr, self._patm_default_pa)
         p_bar_g: Optional[float] = None
         try:
-            if self._p_series_arr is not None and 0 <= int(i) < int(self._p_series_arr.size):
-                P = float(self._p_series_arr[int(i)])
+            if self._p_series_arr is not None:
+                P = sample(self._p_series_arr, float("nan"))
                 if np.isfinite(P):
                     p_bar_g = (P - patm) / BAR_PA
         except Exception:
@@ -9012,12 +9175,12 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
 
         # flows (classified relative to the currently selected receiver/tank)
         try:
-            if self._q_in_arr is not None and 0 <= int(i) < int(len(self._q_in_arr)):
-                self._q_in = float(self._q_in_arr[int(i)])
+            if self._q_in_arr is not None:
+                self._q_in = sample(self._q_in_arr, 0.0)
             else:
                 self._q_in = 0.0
-            if self._q_out_arr is not None and 0 <= int(i) < int(len(self._q_out_arr)):
-                self._q_out = float(self._q_out_arr[int(i)])
+            if self._q_out_arr is not None:
+                self._q_out = sample(self._q_out_arr, 0.0)
             else:
                 self._q_out = 0.0
         except Exception:
@@ -9233,8 +9396,8 @@ class ReceiverTankWidget(QtWidgets.QWidget):
 
         self.canvas.set_bundle(b)
 
-    def update_frame(self, b: DataBundle, i: int):
-        self.canvas.update_frame(b, i)
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
+        self.canvas.update_frame(b, i, sample_t=sample_t)
 
 
 class ValveQuickPanel(QtWidgets.QWidget):
@@ -9390,7 +9553,7 @@ class ValveQuickPanel(QtWidgets.QWidget):
         self._apply_recommended_scales()
         self._emit_visual()
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
         # default: clear
         def _clear():
             self.header_canvas.set_segments(
@@ -9413,7 +9576,22 @@ class ValveQuickPanel(QtWidgets.QWidget):
             return
 
         try:
-            vals = np.asarray(b.open.values[i, self._idxs], dtype=float)
+            sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+                np.asarray(b.t, dtype=float),
+                sample_t=sample_t,
+                fallback_index=i,
+            )
+            i0 = int(sample_i0)
+            i1 = int(sample_i1)
+            a = float(alpha)
+            if i0 == i1 or a <= 1e-12:
+                vals = np.asarray(b.open.values[i0, self._idxs], dtype=float)
+            elif a >= 1.0 - 1e-12:
+                vals = np.asarray(b.open.values[i1, self._idxs], dtype=float)
+            else:
+                vals0 = np.asarray(b.open.values[i0, self._idxs], dtype=float)
+                vals1 = np.asarray(b.open.values[i1, self._idxs], dtype=float)
+                vals = vals0 + (vals1 - vals0) * a
         except Exception:
             _clear()
             return
@@ -9700,10 +9878,16 @@ class CornerHeatmapPanel(QtWidgets.QWidget):
         self._corner_metric_cache = metric_cache
         self._update_max_from_ranges()
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
         if int(getattr(self, "_bundle_key", 0) or 0) != id(b) or not self._corner_metric_cache:
             self.set_bundle(b)
         key = self._metric
+        sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+            np.asarray(b.t, dtype=float),
+            sample_t=sample_t,
+            fallback_index=i,
+        )
+        sample = _make_series_sampler(i0=int(sample_i0), i1=int(sample_i1), alpha=float(alpha))
         # determine max range
         if self._auto:
             mv = float(self._ranges.get(key, 0.0))
@@ -9716,58 +9900,58 @@ class CornerHeatmapPanel(QtWidgets.QWidget):
             v = 0.0
             if key == "az_body":
                 arr = cache.get("az_body")
-                v = float(arr[i]) if isinstance(arr, np.ndarray) and i < arr.size else 0.0
+                v = sample(arr, 0.0) if isinstance(arr, np.ndarray) else 0.0
                 txt = f"{v:+.2f}"
                 u = abs(v) / mv
             elif key == "az_wheel":
                 arr = cache.get("az_wheel")
-                v = float(arr[i]) if isinstance(arr, np.ndarray) and i < arr.size else 0.0
+                v = sample(arr, 0.0) if isinstance(arr, np.ndarray) else 0.0
                 txt = f"{v:+.2f}"
                 u = abs(v) / mv
             elif key == "wheel_road":
                 zw_arr = cache.get("zw")
-                zw = float(zw_arr[i]) if isinstance(zw_arr, np.ndarray) and i < zw_arr.size else 0.0
+                zw = sample(zw_arr, 0.0) if isinstance(zw_arr, np.ndarray) else 0.0
                 road_arr = cache.get("zr")
-                zr = float(road_arr[i]) if isinstance(road_arr, np.ndarray) and i < road_arr.size else float("nan")
+                zr = sample(road_arr, float("nan")) if isinstance(road_arr, np.ndarray) else float("nan")
                 v = zw - zr
                 txt = f"{v:+.3f}"
                 u = abs(v) / mv
             elif key == "wheel_body":
                 zw_arr = cache.get("zw")
                 zb_arr = cache.get("zb")
-                zw = float(zw_arr[i]) if isinstance(zw_arr, np.ndarray) and i < zw_arr.size else 0.0
-                zb = float(zb_arr[i]) if isinstance(zb_arr, np.ndarray) and i < zb_arr.size else 0.0
+                zw = sample(zw_arr, 0.0) if isinstance(zw_arr, np.ndarray) else 0.0
+                zb = sample(zb_arr, 0.0) if isinstance(zb_arr, np.ndarray) else 0.0
                 v = zw - zb
                 txt = f"{v:+.3f}"
                 u = abs(v) / mv
             elif key == "frame_road":
                 arr = cache.get("frame_road_m")
-                v = float(arr[i]) if isinstance(arr, np.ndarray) and i < arr.size else float("nan")
+                v = sample(arr, float("nan")) if isinstance(arr, np.ndarray) else float("nan")
                 txt = "—" if not np.isfinite(v) else f"{v:+.3f}"
                 u = 0.0 if not np.isfinite(v) else abs(v) / mv
             elif key == "inv_sum":
                 arr = cache.get("invariant_err_m")
-                v = (float(arr[i]) * 1000.0) if isinstance(arr, np.ndarray) and i < arr.size else float("nan")
+                v = (sample(arr, float("nan")) * 1000.0) if isinstance(arr, np.ndarray) else float("nan")
                 txt = "—" if not np.isfinite(v) else f"{v:.3f}"
                 u = 0.0 if not np.isfinite(v) else abs(v) / mv
             elif key == "triplet_xy":
                 arr = cache.get("xy_err_wheel_road_m")
-                v = (float(arr[i]) * 1000.0) if isinstance(arr, np.ndarray) and i < arr.size else float("nan")
+                v = (sample(arr, float("nan")) * 1000.0) if isinstance(arr, np.ndarray) else float("nan")
                 txt = "—" if not np.isfinite(v) else f"{v:.3f}"
                 u = 0.0 if not np.isfinite(v) else abs(v) / mv
             elif key == "stroke":
                 arr = cache.get("stroke")
-                v = float(arr[i]) if isinstance(arr, np.ndarray) and i < arr.size else 0.0
+                v = sample(arr, 0.0) if isinstance(arr, np.ndarray) else 0.0
                 txt = f"{v:.3f}"
                 u = abs(v) / mv
             elif key == "tireF":
                 arr = cache.get("tireF")
-                v = float(arr[i]) if isinstance(arr, np.ndarray) and i < arr.size else 0.0
+                v = sample(arr, 0.0) if isinstance(arr, np.ndarray) else 0.0
                 txt = f"{v/1000.0:.1f}k"
                 u = abs(v) / mv
             elif key == "wheel_air":
                 arr = cache.get("air")
-                v = float(arr[i]) if isinstance(arr, np.ndarray) and i < arr.size else 0.0
+                v = sample(arr, 0.0) if isinstance(arr, np.ndarray) else 0.0
                 txt = "AIR" if v > 0.5 else "OK"
                 u = 1.0 if v > 0.5 else 0.0
             else:
@@ -10515,20 +10699,26 @@ class TelemetryPanel(QtWidgets.QWidget):
         self._apply_recommended_scales()
         self._emit_visual()
 
-    def update_frame(self, b: DataBundle, i: int):
+    def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):
         summary = _ensure_telemetry_summary_cache(b)
-        t = float(summary["t"][i])
-        vx = float(summary["vx"][i])
-        vy = float(summary["vy"][i])
+        sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(
+            np.asarray(summary["t"], dtype=float),
+            sample_t=sample_t,
+            fallback_index=i,
+        )
+        sample = _make_series_sampler(i0=int(sample_i0), i1=int(sample_i1), alpha=float(alpha))
+        t = sample(summary["t"], 0.0)
+        vx = sample(summary["vx"], 0.0)
+        vy = sample(summary["vy"], 0.0)
 
         # Для отображения используем модуль скорости.
         v_mps = math.hypot(vx, vy)
-        yaw = float(summary["yaw"][i])
-        yaw_rate = float(summary["yaw_rate"][i])
-        ax = float(summary["ax"][i])
-        ay = float(summary["ay"][i])
-        roll = float(summary["roll"][i])
-        pitch = float(summary["pitch"][i])
+        yaw = sample(summary["yaw"], 0.0)
+        yaw_rate = sample(summary["yaw_rate"], 0.0)
+        ax = sample(summary["ax"], 0.0)
+        ay = sample(summary["ay"], 0.0)
+        roll = sample(summary["roll"], 0.0)
+        pitch = sample(summary["pitch"], 0.0)
 
         R = float("inf")
         if abs(yaw_rate) > 1e-6 and abs(vx) > 1e-3:
@@ -10564,9 +10754,9 @@ class TelemetryPanel(QtWidgets.QWidget):
             except Exception:
                 pass
 
-        zcm = float(summary["zcm"][i])
-        vzcm = float(summary["vzcm"][i])
-        azcm = float(summary["azcm"][i])
+        zcm = sample(summary["zcm"], 0.0)
+        vzcm = sample(summary["vzcm"], 0.0)
+        azcm = sample(summary["azcm"], 0.0)
         if self.lbl_zcm is not None:
             _set_label_text_if_changed(self.lbl_zcm, f"z_cm = {_fmt(zcm, ' m', digits=3)}")
         if self.lbl_vzcm is not None:
@@ -10575,34 +10765,34 @@ class TelemetryPanel(QtWidgets.QWidget):
             _set_label_text_if_changed(self.lbl_azcm, f"az_cm = {_fmt(azcm, ' m/s²', digits=2)}")
 
         if self.corner_table is not None:
-            self.corner_table.update_frame(b, i)
-        self.press_quick.update_frame(b, i)
-        self.valve_quick.update_frame(b, i)
-        self.flow_quick.update_frame(b, i)
-        self.tank_gauge.update_frame(b, i)
+            self.corner_table.update_frame(b, i, sample_t=sample_t)
+        self.press_quick.update_frame(b, i, sample_t=sample_t)
+        self.valve_quick.update_frame(b, i, sample_t=sample_t)
+        self.flow_quick.update_frame(b, i, sample_t=sample_t)
+        self.tank_gauge.update_frame(b, i, sample_t=sample_t)
         if self.press_panel is not None:
-            self.press_panel.update_frame(b, i)
+            self.press_panel.update_frame(b, i, sample_t=sample_t)
         if self.flow_panel is not None:
-            self.flow_panel.update_frame(b, i)
+            self.flow_panel.update_frame(b, i, sample_t=sample_t)
         if self.valve_panel is not None:
-            self.valve_panel.update_frame(b, i)
+            self.valve_panel.update_frame(b, i, sample_t=sample_t)
 
         if self.corner_heatmap is not None:
             try:
-                self.corner_heatmap.update_frame(b, i)
+                self.corner_heatmap.update_frame(b, i, sample_t=sample_t)
             except Exception:
                 pass
 
         # Pinned corners quick table
         if self.corner_quick is not None:
             try:
-                self.corner_quick.update_frame(b, i)
+                self.corner_quick.update_frame(b, i, sample_t=sample_t)
             except Exception:
                 pass
 
         if self.road_profile is not None:
             try:
-                self.road_profile.update_frame(b, i)
+                self.road_profile.update_frame(b, i, sample_t=sample_t)
             except Exception:
                 pass
 
@@ -12242,11 +12432,25 @@ class CockpitWidget(QtWidgets.QWidget):
             visible.append((dock_name, panel, method_name))
 
         batch, done = self._take_interactive_scrub_slow_batch(visible)
+        sample_t_panels = (
+            self.telemetry,
+            getattr(self, "telemetry_heatmap", None),
+            getattr(self, "telemetry_corner_quick", None),
+            getattr(self, "telemetry_corner_table", None),
+            getattr(self, "telemetry_press_panel", None),
+            getattr(self, "telemetry_flow_panel", None),
+            getattr(self, "telemetry_valve_panel", None),
+            getattr(self, "telemetry_road_profile", None),
+        )
         for dock_name, panel, method_name in batch:
             try:
                 _call_with_qt_update_batch(
                     panel,
-                    lambda panel=panel, method_name=method_name: getattr(panel, method_name)(b, idx),
+                    lambda panel=panel, method_name=method_name: (
+                        getattr(panel, method_name)(b, idx, sample_t=self._playback_sample_t_s)
+                        if panel in sample_t_panels
+                        else getattr(panel, method_name)(b, idx)
+                    ),
                 )
                 self._record_aux_cadence(str(dock_name), now_ts)
             except Exception:
@@ -12265,7 +12469,7 @@ class CockpitWidget(QtWidgets.QWidget):
             try:
                 _call_with_qt_update_batch(
                     self.trends,
-                    lambda: self.trends.update_frame(idx),
+                    lambda: self.trends.update_frame(idx, sample_t=self._playback_sample_t_s),
                 )
                 self._record_aux_cadence("dock_trends", now_ts)
             except Exception:
@@ -12357,6 +12561,28 @@ class CockpitWidget(QtWidgets.QWidget):
                 ("dock_right", self.sideR, "update_frame"),
                 *slow_panels,
             ]
+        road_profile_panel = getattr(self, "telemetry_road_profile", None)
+        heatmap_panel = getattr(self, "telemetry_heatmap", None)
+        corner_quick_panel = getattr(self, "telemetry_corner_quick", None)
+        corner_table_panel = getattr(self, "telemetry_corner_table", None)
+        pressure_panel = getattr(self, "telemetry_press_panel", None)
+        flow_panel = getattr(self, "telemetry_flow_panel", None)
+        valve_panel = getattr(self, "telemetry_valve_panel", None)
+        sample_t_panels = (
+            self.hud,
+            self.axleF,
+            self.axleR,
+            self.sideL,
+            self.sideR,
+            self.telemetry,
+            heatmap_panel,
+            corner_quick_panel,
+            corner_table_panel,
+            pressure_panel,
+            flow_panel,
+            valve_panel,
+            road_profile_panel,
+        )
 
         def _visible_panel_entries(entries: List[Tuple[str, Any, str]]) -> List[Tuple[str, Any, str]]:
             out: List[Tuple[str, Any, str]] = []
@@ -12372,7 +12598,7 @@ class CockpitWidget(QtWidgets.QWidget):
             dock_name, panel, method_name = entry
             try:
                 def _update_panel() -> None:
-                    if panel in (self.hud, self.axleF, self.axleR, self.sideL, self.sideR):
+                    if panel in sample_t_panels:
                         getattr(panel, method_name)(
                             b,
                             i,
@@ -12404,6 +12630,60 @@ class CockpitWidget(QtWidgets.QWidget):
             release_only = set(getattr(self, "_interactive_scrub_release_only_docks", set()))
             if release_only:
                 slow_visible = [entry for entry in slow_visible if str(entry[0]) not in release_only]
+        if self._dock_is_exposed("dock_timeline") and (bool(playing) or interactive_scrub or fast_due):
+            _call_aux_widget(
+                "dock_timeline",
+                self.timeline,
+                lambda: self.timeline.set_playhead_time(self._playback_sample_t_s, idx=i),
+            )
+        if interactive_scrub and self._dock_is_exposed("dock_telemetry"):
+            _call_aux_widget(
+                "dock_telemetry",
+                self.telemetry,
+                lambda: self.telemetry.update_frame(b, i, sample_t=self._playback_sample_t_s),
+            )
+        if interactive_scrub and (not many_visible_budget) and pressure_panel is not None and self._dock_is_exposed("dock_pressures"):
+            _call_aux_widget(
+                "dock_pressures",
+                pressure_panel,
+                lambda: pressure_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
+            )
+        if interactive_scrub and (not many_visible_budget) and flow_panel is not None and self._dock_is_exposed("dock_flows"):
+            _call_aux_widget(
+                "dock_flows",
+                flow_panel,
+                lambda: flow_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
+            )
+        if interactive_scrub and (not many_visible_budget) and valve_panel is not None and self._dock_is_exposed("dock_valves"):
+            _call_aux_widget(
+                "dock_valves",
+                valve_panel,
+                lambda: valve_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
+            )
+        if interactive_scrub and heatmap_panel is not None and self._dock_is_exposed("dock_heatmap"):
+            _call_aux_widget(
+                "dock_heatmap",
+                heatmap_panel,
+                lambda: heatmap_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
+            )
+        if interactive_scrub and corner_quick_panel is not None and self._dock_is_exposed("dock_corner_quick"):
+            _call_aux_widget(
+                "dock_corner_quick",
+                corner_quick_panel,
+                lambda: corner_quick_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
+            )
+        if interactive_scrub and road_profile_panel is not None and self._dock_is_exposed("dock_road_profile"):
+            _call_aux_widget(
+                "dock_road_profile",
+                road_profile_panel,
+                lambda: road_profile_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
+            )
+        if interactive_scrub and self._dock_is_exposed("dock_trends"):
+            _call_aux_widget(
+                "dock_trends",
+                self.trends,
+                lambda: self.trends.update_frame(i, sample_t=self._playback_sample_t_s),
+            )
 
         if fast_due:
             self._aux_fast_last_ts = now_ts
@@ -12418,17 +12698,11 @@ class CockpitWidget(QtWidgets.QWidget):
             for entry in slow_entries:
                 _call_panel(entry)
 
-            if self._dock_is_exposed("dock_timeline") and not interactive_scrub:
-                _call_aux_widget(
-                    "dock_timeline",
-                    self.timeline,
-                    lambda: self.timeline.set_playhead_time(self._playback_sample_t_s, idx=i),
-                )
             if self._dock_is_exposed("dock_trends") and not interactive_scrub:
                 _call_aux_widget(
                     "dock_trends",
                     self.trends,
-                    lambda: self.trends.update_frame(i),
+                    lambda: self.trends.update_frame(i, sample_t=self._playback_sample_t_s),
                 )
         if track_aux_cadence and (fast_due or slow_due):
             self._aux_cadence_tracking_active = True

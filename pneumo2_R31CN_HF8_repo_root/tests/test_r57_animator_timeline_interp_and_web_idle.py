@@ -52,13 +52,59 @@ def test_front_and_side_helper_views_now_accept_continuous_sample_t() -> None:
     assert 'def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):' in APP
     assert APP.count('def update_frame(self, b: DataBundle, i: int, *, sample_t: float | None = None):') >= 3
     assert APP.count('_sample_series_local(') >= 2
-    assert 'if panel in (self.hud, self.axleF, self.axleR, self.sideL, self.sideR):' in APP
+    assert 'road_profile_panel = getattr(self, "telemetry_road_profile", None)' in APP
+    assert 'heatmap_panel = getattr(self, "telemetry_heatmap", None)' in APP
+    assert 'corner_quick_panel = getattr(self, "telemetry_corner_quick", None)' in APP
+    assert 'corner_table_panel = getattr(self, "telemetry_corner_table", None)' in APP
+    assert 'pressure_panel = getattr(self, "telemetry_press_panel", None)' in APP
+    assert 'flow_panel = getattr(self, "telemetry_flow_panel", None)' in APP
+    assert 'valve_panel = getattr(self, "telemetry_valve_panel", None)' in APP
+    assert "sample_t_panels = (" in APP
     assert 'sample_t=self._playback_sample_t_s if bool(playing) else None' in APP
+    assert 'if interactive_scrub and self._dock_is_exposed("dock_telemetry"):' in APP
+    assert 'if interactive_scrub and (not many_visible_budget) and pressure_panel is not None and self._dock_is_exposed("dock_pressures"):' in APP
+    assert 'if interactive_scrub and (not many_visible_budget) and flow_panel is not None and self._dock_is_exposed("dock_flows"):' in APP
+    assert 'if interactive_scrub and (not many_visible_budget) and valve_panel is not None and self._dock_is_exposed("dock_valves"):' in APP
+    assert 'if interactive_scrub and heatmap_panel is not None and self._dock_is_exposed("dock_heatmap"):' in APP
+    assert 'if interactive_scrub and corner_quick_panel is not None and self._dock_is_exposed("dock_corner_quick"):' in APP
+    assert 'if interactive_scrub and road_profile_panel is not None and self._dock_is_exposed("dock_road_profile"):' in APP
+    assert 'self.corner_table.update_frame(b, i, sample_t=sample_t)' in APP
+    assert 'self.corner_heatmap.update_frame(b, i, sample_t=sample_t)' in APP
+    assert 'self.corner_quick.update_frame(b, i, sample_t=sample_t)' in APP
+    assert 't = sample(summary["t"], 0.0)' in APP
+    assert 'self.press_quick.update_frame(b, i, sample_t=sample_t)' in APP
+    assert 'self.valve_quick.update_frame(b, i, sample_t=sample_t)' in APP
+    assert 'self.flow_quick.update_frame(b, i, sample_t=sample_t)' in APP
+    assert 'self.tank_gauge.update_frame(b, i, sample_t=sample_t)' in APP
+    assert 'self.press_panel.update_frame(b, i, sample_t=sample_t)' in APP
+    assert 'self.flow_panel.update_frame(b, i, sample_t=sample_t)' in APP
+    assert 'self.valve_panel.update_frame(b, i, sample_t=sample_t)' in APP
+    assert 'zb = sample(sig["zb"], 0.0)' in APP
+    assert 'air = int(sample(sig["air"], 0.0) > 0.5)' in APP
+    assert 'v = sample(arr, 0.0) if isinstance(arr, np.ndarray) else 0.0' in APP
+    assert 'P = sample(arr, patm)' in APP
+    assert "vals0 = np.asarray(b.open.values[i0, self._idxs], dtype=float)" in APP
+    assert "q0 = np.asarray(b.q.values[i0, self._idxs], dtype=float)" in APP
+    assert 'self.road_profile.update_frame(b, i, sample_t=sample_t)' in APP
+    assert 's0 = sample(s, float(s[idx]))' in APP
+    assert 'zc = sample(z_arr, float("nan"))' in APP
+    assert 'def update_frame(self, i: int, *, sample_t: float | None = None):' in HMI
+    assert 'self.canvas.set_playhead_time(sample_t, idx=i)' in HMI
     assert 'def set_playhead_time(self, sample_t: float | None, *, idx: int):' in HMI
     assert 'play_t = self._normalized_playhead_time(sample_t, idx_i)' in HMI
+    assert 'y0 = self._sample_series_value(y_all, play_t, idx)' in HMI
     assert 'u = (play_t - t0) / dt' in HMI
+    assert 'x_i = (play_t - t_min) / (t_max - t_min)' in HMI
     assert 'lambda: self.timeline.set_playhead_time(self._playback_sample_t_s, idx=idx),' in APP
     assert 'lambda: self.timeline.set_playhead_time(self._playback_sample_t_s, idx=i),' in APP
+    assert 'lambda: pressure_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),' in APP
+    assert 'lambda: flow_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),' in APP
+    assert 'lambda: valve_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),' in APP
+    assert 'lambda: heatmap_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),' in APP
+    assert 'lambda: corner_quick_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),' in APP
+    assert 'lambda: road_profile_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),' in APP
+    assert 'lambda: self.trends.update_frame(idx, sample_t=self._playback_sample_t_s),' in APP
+    assert 'lambda: self.trends.update_frame(i, sample_t=self._playback_sample_t_s),' in APP
 
 
 def test_playback_service_interval_is_tightened_for_high_speed_without_restoring_busy_loop() -> None:
