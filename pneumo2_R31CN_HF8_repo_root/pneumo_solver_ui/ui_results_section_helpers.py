@@ -18,7 +18,7 @@ def render_results_section(
     results_graph_section_kwargs: dict[str, Any],
     render_secondary_results_views_fn: Callable[..., bool],
     secondary_results_views_kwargs: dict[str, Any],
-    graph_view_label: str = "Р“СЂР°С„РёРєРё",
+    graph_view_label: str = "Графики",
     radio_fn: Callable[..., str] | None = None,
 ) -> str:
     view_res = render_results_view_selector(

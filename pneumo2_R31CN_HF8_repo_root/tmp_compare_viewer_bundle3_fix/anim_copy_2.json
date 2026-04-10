@@ -1,0 +1,1246 @@
+{
+  "schema_version": "pneumo_npz_meta_v1",
+  "updated_utc": "2026-04-07T11:39:06.011869+00:00",
+  "npz_path": "C:\\Users\\User\\Desktop\\pneumo2_R31CN_HF8_github_push_package\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\workspace\\exports\\anim_latest.npz",
+  "meta": {
+    "source": "ui_detail",
+    "cache_key": "035d1d134375::ring_test_01::dt0p01::t15::mp1200::full1",
+    "test_name": "ring_test_01",
+    "dt": 0.01,
+    "t_end": 15.0,
+    "max_points": 1200,
+    "want_full": true,
+    "app_release": "PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03",
+    "road_csv": "anim_latest_road_csv.csv",
+    "axay_csv": "anim_latest_axay_csv.csv",
+    "scenario_json": "anim_latest_scenario_json.json",
+    "road_len_m": 179.14444444444445,
+    "scenario_kind": "ring",
+    "vx0_м_с": 11.11111111111111,
+    "ring_v0_kph": 40.0,
+    "ring_v0_mps": 11.11111111111111,
+    "ring_nominal_speed_min_mps": 11.11111111111111,
+    "ring_nominal_speed_max_mps": 15.277777777777777,
+    "ring_nominal_speed_mean_mps": 11.94388925901251,
+    "ring_speed_profile_source": "scenario_json",
+    "geometry": {
+      "wheelbase_m": 1.5,
+      "track_m": 1.0,
+      "wheel_radius_front_m": 0.3,
+      "wheel_radius_rear_m": 0.3,
+      "wheel_radius_m": 0.3,
+      "wheel_width_m": 0.22,
+      "frame_length_m": 1.8,
+      "frame_width_m": 0.3,
+      "frame_height_m": 0.6,
+      "cylinder_wall_thickness_m": 0.003,
+      "cyl1_bore_diameter_m": 0.032,
+      "cyl1_rod_diameter_m": 0.016,
+      "cyl2_bore_diameter_m": 0.05,
+      "cyl2_rod_diameter_m": 0.014,
+      "cyl1_stroke_front_m": 0.25,
+      "cyl1_stroke_rear_m": 0.25,
+      "cyl2_stroke_front_m": 0.25,
+      "cyl2_stroke_rear_m": 0.25,
+      "dead_volume_chamber_m3": 1.5e-05,
+      "cyl1_outer_diameter_m": 0.038,
+      "cyl2_outer_diameter_m": 0.056,
+      "cyl1_dead_cap_length_m": 0.018650969893581486,
+      "cyl1_dead_rod_length_m": 0.02486795985810865,
+      "cyl2_dead_cap_length_m": 0.0076394372684109755,
+      "cyl2_dead_rod_length_m": 0.008289319952702882,
+      "cyl1_dead_height_m": 0.018650969893581486,
+      "cyl1_body_length_front_m": 0.29330193978716296,
+      "cyl1_body_length_rear_m": 0.29330193978716296,
+      "cyl2_dead_height_m": 0.0076394372684109755,
+      "cyl2_body_length_front_m": 0.271278874536822,
+      "cyl2_body_length_rear_m": 0.271278874536822,
+      "road_width_m": 1.22
+    },
+    "animator_frame_export": {
+      "enabled": true,
+      "source_points": 1200,
+      "target_points": 2764,
+      "target_dt_s": 0.005430545272681547,
+      "source_median_dt_s": 0.009999999999999787,
+      "source_max_dt_s": 0.02000000000000135,
+      "source_max_distance_step_m": 0.368287142372423,
+      "vmax_mps": 18.414357118621542,
+      "reason": "max_dt_and_distance_step_cap",
+      "max_frame_dt_s": 0.008333333333333333,
+      "max_frame_distance_step_m": 0.1,
+      "max_export_points": 20000
+    },
+    "anim_export_length_repair": {
+      "schema": "anim_export.length_repair.v1",
+      "cylinders": {
+        "cyl1": {
+          "corners": {
+            "ЛП": {
+              "column": "длина_цилиндра_ЛП_м",
+              "candidate_columns": [
+                "длина_цилиндра_ЛП_м",
+                "длина_цилиндра_Ц1_ЛП_м"
+              ],
+              "top_family": "cyl1_top",
+              "bottom_family": "cyl1_bot",
+              "status": "filled_from_endpoint_distance",
+              "filled_points": 2764,
+              "finite_points_after": 2764
+            },
+            "ПП": {
+              "column": "длина_цилиндра_ПП_м",
+              "candidate_columns": [
+                "длина_цилиндра_ПП_м",
+                "длина_цилиндра_Ц1_ПП_м"
+              ],
+              "top_family": "cyl1_top",
+              "bottom_family": "cyl1_bot",
+              "status": "filled_from_endpoint_distance",
+              "filled_points": 2764,
+              "finite_points_after": 2764
+            },
+            "ЛЗ": {
+              "column": "длина_цилиндра_ЛЗ_м",
+              "candidate_columns": [
+                "длина_цилиндра_ЛЗ_м",
+                "длина_цилиндра_Ц1_ЛЗ_м"
+              ],
+              "top_family": "cyl1_top",
+              "bottom_family": "cyl1_bot",
+              "status": "filled_from_endpoint_distance",
+              "filled_points": 2764,
+              "finite_points_after": 2764
+            },
+            "ПЗ": {
+              "column": "длина_цилиндра_ПЗ_м",
+              "candidate_columns": [
+                "длина_цилиндра_ПЗ_м",
+                "длина_цилиндра_Ц1_ПЗ_м"
+              ],
+              "top_family": "cyl1_top",
+              "bottom_family": "cyl1_bot",
+              "status": "filled_from_endpoint_distance",
+              "filled_points": 2764,
+              "finite_points_after": 2764
+            }
+          },
+          "repaired_columns": [
+            "длина_цилиндра_ЛП_м",
+            "длина_цилиндра_ПП_м",
+            "длина_цилиндра_ЛЗ_м",
+            "длина_цилиндра_ПЗ_м"
+          ]
+        },
+        "cyl2": {
+          "corners": {
+            "ЛП": {
+              "column": "длина_цилиндра_Ц2_ЛП_м",
+              "candidate_columns": [
+                "длина_цилиндра_Ц2_ЛП_м"
+              ],
+              "top_family": "cyl2_top",
+              "bottom_family": "cyl2_bot",
+              "status": "filled_from_endpoint_distance",
+              "filled_points": 2764,
+              "finite_points_after": 2764
+            },
+            "ПП": {
+              "column": "длина_цилиндра_Ц2_ПП_м",
+              "candidate_columns": [
+                "длина_цилиндра_Ц2_ПП_м"
+              ],
+              "top_family": "cyl2_top",
+              "bottom_family": "cyl2_bot",
+              "status": "filled_from_endpoint_distance",
+              "filled_points": 2764,
+              "finite_points_after": 2764
+            },
+            "ЛЗ": {
+              "column": "длина_цилиндра_Ц2_ЛЗ_м",
+              "candidate_columns": [
+                "длина_цилиндра_Ц2_ЛЗ_м"
+              ],
+              "top_family": "cyl2_top",
+              "bottom_family": "cyl2_bot",
+              "status": "filled_from_endpoint_distance",
+              "filled_points": 2764,
+              "finite_points_after": 2764
+            },
+            "ПЗ": {
+              "column": "длина_цилиндра_Ц2_ПЗ_м",
+              "candidate_columns": [
+                "длина_цилиндра_Ц2_ПЗ_м"
+              ],
+              "top_family": "cyl2_top",
+              "bottom_family": "cyl2_bot",
+              "status": "filled_from_endpoint_distance",
+              "filled_points": 2764,
+              "finite_points_after": 2764
+            }
+          },
+          "repaired_columns": [
+            "длина_цилиндра_Ц2_ЛП_м",
+            "длина_цилиндра_Ц2_ПП_м",
+            "длина_цилиндра_Ц2_ЛЗ_м",
+            "длина_цилиндра_Ц2_ПЗ_м"
+          ]
+        }
+      }
+    },
+    "solver_points": {
+      "schema": "solver_points.contract.v1",
+      "representation": "explicit_world_xyz_columns_in_npz",
+      "space": "world_m",
+      "source_ref": {
+        "matrix": "main_values",
+        "cols": "main_cols"
+      },
+      "families_present": [
+        "arm_pivot",
+        "arm_joint",
+        "arm2_pivot",
+        "arm2_joint",
+        "cyl1_top",
+        "cyl1_bot",
+        "cyl2_top",
+        "cyl2_bot",
+        "frame_corner",
+        "wheel_center",
+        "road_contact",
+        "lower_arm_frame_front",
+        "lower_arm_frame_rear",
+        "lower_arm_hub_front",
+        "lower_arm_hub_rear",
+        "upper_arm_frame_front",
+        "upper_arm_frame_rear",
+        "upper_arm_hub_front",
+        "upper_arm_hub_rear"
+      ],
+      "families_partial": [],
+      "visible_suspension_skeleton_families": [
+        "cyl1_top",
+        "cyl1_bot",
+        "cyl2_top",
+        "cyl2_bot",
+        "frame_corner",
+        "wheel_center",
+        "road_contact",
+        "lower_arm_frame_front",
+        "lower_arm_frame_rear",
+        "lower_arm_hub_front",
+        "lower_arm_hub_rear",
+        "upper_arm_frame_front",
+        "upper_arm_frame_rear",
+        "upper_arm_hub_front",
+        "upper_arm_hub_rear"
+      ],
+      "partial_visible_suspension_skeleton_families": [],
+      "legacy_alias_families": [
+        "arm_pivot",
+        "arm_joint",
+        "arm2_pivot",
+        "arm2_joint"
+      ],
+      "partial_legacy_alias_families": [],
+      "hardpoints_block_ref": "meta.hardpoints",
+      "notes": [
+        "Animator should prefer explicit family refs from meta.hardpoints when present.",
+        "This block intentionally references NPZ columns and does not duplicate time-series payload."
+      ]
+    },
+    "hardpoints": {
+      "schema": "hardpoints.export.v1",
+      "space": "world_m",
+      "corner_order": [
+        "ЛП",
+        "ПП",
+        "ЛЗ",
+        "ПЗ"
+      ],
+      "canonical_families": [
+        "frame_corner",
+        "wheel_center",
+        "road_contact",
+        "lower_arm_frame_front",
+        "lower_arm_frame_rear",
+        "lower_arm_hub_front",
+        "lower_arm_hub_rear",
+        "upper_arm_frame_front",
+        "upper_arm_frame_rear",
+        "upper_arm_hub_front",
+        "upper_arm_hub_rear",
+        "cyl1_top",
+        "cyl1_bot",
+        "cyl2_top",
+        "cyl2_bot"
+      ],
+      "partial_families": [],
+      "families": {
+        "frame_corner": {
+          "role": "rigid frame corner",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "frame_corner_ЛП_x_м",
+                "y": "frame_corner_ЛП_y_м",
+                "z": "frame_corner_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "frame_corner_ПП_x_м",
+                "y": "frame_corner_ПП_y_м",
+                "z": "frame_corner_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "frame_corner_ЛЗ_x_м",
+                "y": "frame_corner_ЛЗ_y_м",
+                "z": "frame_corner_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "frame_corner_ПЗ_x_м",
+                "y": "frame_corner_ПЗ_y_м",
+                "z": "frame_corner_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "wheel_center": {
+          "role": "wheel center",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "wheel_center_ЛП_x_м",
+                "y": "wheel_center_ЛП_y_м",
+                "z": "wheel_center_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "wheel_center_ПП_x_м",
+                "y": "wheel_center_ПП_y_м",
+                "z": "wheel_center_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "wheel_center_ЛЗ_x_м",
+                "y": "wheel_center_ЛЗ_y_м",
+                "z": "wheel_center_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "wheel_center_ПЗ_x_м",
+                "y": "wheel_center_ПЗ_y_м",
+                "z": "wheel_center_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "road_contact": {
+          "role": "road contact point",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "road_contact_ЛП_x_м",
+                "y": "road_contact_ЛП_y_м",
+                "z": "road_contact_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "road_contact_ПП_x_м",
+                "y": "road_contact_ПП_y_м",
+                "z": "road_contact_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "road_contact_ЛЗ_x_м",
+                "y": "road_contact_ЛЗ_y_м",
+                "z": "road_contact_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "road_contact_ПЗ_x_м",
+                "y": "road_contact_ПЗ_y_м",
+                "z": "road_contact_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "lower_arm_frame_front": {
+          "role": "lower arm frame-front mount",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "lower_arm_frame_front_ЛП_x_м",
+                "y": "lower_arm_frame_front_ЛП_y_м",
+                "z": "lower_arm_frame_front_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "lower_arm_frame_front_ПП_x_м",
+                "y": "lower_arm_frame_front_ПП_y_м",
+                "z": "lower_arm_frame_front_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "lower_arm_frame_front_ЛЗ_x_м",
+                "y": "lower_arm_frame_front_ЛЗ_y_м",
+                "z": "lower_arm_frame_front_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "lower_arm_frame_front_ПЗ_x_м",
+                "y": "lower_arm_frame_front_ПЗ_y_м",
+                "z": "lower_arm_frame_front_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "lower_arm_frame_rear": {
+          "role": "lower arm frame-rear mount",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "lower_arm_frame_rear_ЛП_x_м",
+                "y": "lower_arm_frame_rear_ЛП_y_м",
+                "z": "lower_arm_frame_rear_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "lower_arm_frame_rear_ПП_x_м",
+                "y": "lower_arm_frame_rear_ПП_y_м",
+                "z": "lower_arm_frame_rear_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "lower_arm_frame_rear_ЛЗ_x_м",
+                "y": "lower_arm_frame_rear_ЛЗ_y_м",
+                "z": "lower_arm_frame_rear_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "lower_arm_frame_rear_ПЗ_x_м",
+                "y": "lower_arm_frame_rear_ПЗ_y_м",
+                "z": "lower_arm_frame_rear_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "lower_arm_hub_front": {
+          "role": "lower arm hub-front mount",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "lower_arm_hub_front_ЛП_x_м",
+                "y": "lower_arm_hub_front_ЛП_y_м",
+                "z": "lower_arm_hub_front_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "lower_arm_hub_front_ПП_x_м",
+                "y": "lower_arm_hub_front_ПП_y_м",
+                "z": "lower_arm_hub_front_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "lower_arm_hub_front_ЛЗ_x_м",
+                "y": "lower_arm_hub_front_ЛЗ_y_м",
+                "z": "lower_arm_hub_front_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "lower_arm_hub_front_ПЗ_x_м",
+                "y": "lower_arm_hub_front_ПЗ_y_м",
+                "z": "lower_arm_hub_front_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "lower_arm_hub_rear": {
+          "role": "lower arm hub-rear mount",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "lower_arm_hub_rear_ЛП_x_м",
+                "y": "lower_arm_hub_rear_ЛП_y_м",
+                "z": "lower_arm_hub_rear_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "lower_arm_hub_rear_ПП_x_м",
+                "y": "lower_arm_hub_rear_ПП_y_м",
+                "z": "lower_arm_hub_rear_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "lower_arm_hub_rear_ЛЗ_x_м",
+                "y": "lower_arm_hub_rear_ЛЗ_y_м",
+                "z": "lower_arm_hub_rear_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "lower_arm_hub_rear_ПЗ_x_м",
+                "y": "lower_arm_hub_rear_ПЗ_y_м",
+                "z": "lower_arm_hub_rear_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "upper_arm_frame_front": {
+          "role": "upper arm frame-front mount",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "upper_arm_frame_front_ЛП_x_м",
+                "y": "upper_arm_frame_front_ЛП_y_м",
+                "z": "upper_arm_frame_front_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "upper_arm_frame_front_ПП_x_м",
+                "y": "upper_arm_frame_front_ПП_y_м",
+                "z": "upper_arm_frame_front_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "upper_arm_frame_front_ЛЗ_x_м",
+                "y": "upper_arm_frame_front_ЛЗ_y_м",
+                "z": "upper_arm_frame_front_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "upper_arm_frame_front_ПЗ_x_м",
+                "y": "upper_arm_frame_front_ПЗ_y_м",
+                "z": "upper_arm_frame_front_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "upper_arm_frame_rear": {
+          "role": "upper arm frame-rear mount",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "upper_arm_frame_rear_ЛП_x_м",
+                "y": "upper_arm_frame_rear_ЛП_y_м",
+                "z": "upper_arm_frame_rear_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "upper_arm_frame_rear_ПП_x_м",
+                "y": "upper_arm_frame_rear_ПП_y_м",
+                "z": "upper_arm_frame_rear_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "upper_arm_frame_rear_ЛЗ_x_м",
+                "y": "upper_arm_frame_rear_ЛЗ_y_м",
+                "z": "upper_arm_frame_rear_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "upper_arm_frame_rear_ПЗ_x_м",
+                "y": "upper_arm_frame_rear_ПЗ_y_м",
+                "z": "upper_arm_frame_rear_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "upper_arm_hub_front": {
+          "role": "upper arm hub-front mount",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "upper_arm_hub_front_ЛП_x_м",
+                "y": "upper_arm_hub_front_ЛП_y_м",
+                "z": "upper_arm_hub_front_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "upper_arm_hub_front_ПП_x_м",
+                "y": "upper_arm_hub_front_ПП_y_м",
+                "z": "upper_arm_hub_front_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "upper_arm_hub_front_ЛЗ_x_м",
+                "y": "upper_arm_hub_front_ЛЗ_y_м",
+                "z": "upper_arm_hub_front_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "upper_arm_hub_front_ПЗ_x_м",
+                "y": "upper_arm_hub_front_ПЗ_y_м",
+                "z": "upper_arm_hub_front_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "upper_arm_hub_rear": {
+          "role": "upper arm hub-rear mount",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "upper_arm_hub_rear_ЛП_x_м",
+                "y": "upper_arm_hub_rear_ЛП_y_м",
+                "z": "upper_arm_hub_rear_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "upper_arm_hub_rear_ПП_x_м",
+                "y": "upper_arm_hub_rear_ПП_y_м",
+                "z": "upper_arm_hub_rear_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "upper_arm_hub_rear_ЛЗ_x_м",
+                "y": "upper_arm_hub_rear_ЛЗ_y_м",
+                "z": "upper_arm_hub_rear_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "upper_arm_hub_rear_ПЗ_x_м",
+                "y": "upper_arm_hub_rear_ПЗ_y_м",
+                "z": "upper_arm_hub_rear_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "cyl1_top": {
+          "role": "cylinder 1 top mount on frame",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "cyl1_top_ЛП_x_м",
+                "y": "cyl1_top_ЛП_y_м",
+                "z": "cyl1_top_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "cyl1_top_ПП_x_м",
+                "y": "cyl1_top_ПП_y_м",
+                "z": "cyl1_top_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "cyl1_top_ЛЗ_x_м",
+                "y": "cyl1_top_ЛЗ_y_м",
+                "z": "cyl1_top_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "cyl1_top_ПЗ_x_м",
+                "y": "cyl1_top_ПЗ_y_м",
+                "z": "cyl1_top_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "cyl1_bot": {
+          "role": "cylinder 1 bottom mount on arm",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "cyl1_bot_ЛП_x_м",
+                "y": "cyl1_bot_ЛП_y_м",
+                "z": "cyl1_bot_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "cyl1_bot_ПП_x_м",
+                "y": "cyl1_bot_ПП_y_м",
+                "z": "cyl1_bot_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "cyl1_bot_ЛЗ_x_м",
+                "y": "cyl1_bot_ЛЗ_y_м",
+                "z": "cyl1_bot_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "cyl1_bot_ПЗ_x_м",
+                "y": "cyl1_bot_ПЗ_y_м",
+                "z": "cyl1_bot_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "cyl2_top": {
+          "role": "cylinder 2 top mount on frame",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "cyl2_top_ЛП_x_м",
+                "y": "cyl2_top_ЛП_y_м",
+                "z": "cyl2_top_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "cyl2_top_ПП_x_м",
+                "y": "cyl2_top_ПП_y_м",
+                "z": "cyl2_top_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "cyl2_top_ЛЗ_x_м",
+                "y": "cyl2_top_ЛЗ_y_м",
+                "z": "cyl2_top_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "cyl2_top_ПЗ_x_м",
+                "y": "cyl2_top_ПЗ_y_м",
+                "z": "cyl2_top_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "cyl2_bot": {
+          "role": "cylinder 2 bottom mount on arm",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "cyl2_bot_ЛП_x_м",
+                "y": "cyl2_bot_ЛП_y_м",
+                "z": "cyl2_bot_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "cyl2_bot_ПП_x_м",
+                "y": "cyl2_bot_ПП_y_м",
+                "z": "cyl2_bot_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "cyl2_bot_ЛЗ_x_м",
+                "y": "cyl2_bot_ЛЗ_y_м",
+                "z": "cyl2_bot_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "cyl2_bot_ПЗ_x_м",
+                "y": "cyl2_bot_ПЗ_y_м",
+                "z": "cyl2_bot_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "arm_pivot": {
+          "role": "legacy lower arm inboard pivot alias",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "arm_pivot_ЛП_x_м",
+                "y": "arm_pivot_ЛП_y_м",
+                "z": "arm_pivot_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "arm_pivot_ПП_x_м",
+                "y": "arm_pivot_ПП_y_м",
+                "z": "arm_pivot_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "arm_pivot_ЛЗ_x_м",
+                "y": "arm_pivot_ЛЗ_y_м",
+                "z": "arm_pivot_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "arm_pivot_ПЗ_x_м",
+                "y": "arm_pivot_ПЗ_y_м",
+                "z": "arm_pivot_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "arm_joint": {
+          "role": "legacy lower arm outboard joint alias",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "arm_joint_ЛП_x_м",
+                "y": "arm_joint_ЛП_y_м",
+                "z": "arm_joint_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "arm_joint_ПП_x_м",
+                "y": "arm_joint_ПП_y_м",
+                "z": "arm_joint_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "arm_joint_ЛЗ_x_м",
+                "y": "arm_joint_ЛЗ_y_м",
+                "z": "arm_joint_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "arm_joint_ПЗ_x_м",
+                "y": "arm_joint_ПЗ_y_м",
+                "z": "arm_joint_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "arm2_pivot": {
+          "role": "legacy upper arm inboard pivot alias",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "arm2_pivot_ЛП_x_м",
+                "y": "arm2_pivot_ЛП_y_м",
+                "z": "arm2_pivot_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "arm2_pivot_ПП_x_м",
+                "y": "arm2_pivot_ПП_y_м",
+                "z": "arm2_pivot_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "arm2_pivot_ЛЗ_x_м",
+                "y": "arm2_pivot_ЛЗ_y_м",
+                "z": "arm2_pivot_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "arm2_pivot_ПЗ_x_м",
+                "y": "arm2_pivot_ПЗ_y_м",
+                "z": "arm2_pivot_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        },
+        "arm2_joint": {
+          "role": "legacy upper arm outboard joint alias",
+          "kind": "dynamic_world_point",
+          "coverage": "full",
+          "corners": {
+            "ЛП": {
+              "column_map": {
+                "x": "arm2_joint_ЛП_x_м",
+                "y": "arm2_joint_ЛП_y_м",
+                "z": "arm2_joint_ЛП_z_м"
+              }
+            },
+            "ПП": {
+              "column_map": {
+                "x": "arm2_joint_ПП_x_м",
+                "y": "arm2_joint_ПП_y_м",
+                "z": "arm2_joint_ПП_z_м"
+              }
+            },
+            "ЛЗ": {
+              "column_map": {
+                "x": "arm2_joint_ЛЗ_x_м",
+                "y": "arm2_joint_ЛЗ_y_м",
+                "z": "arm2_joint_ЛЗ_z_м"
+              }
+            },
+            "ПЗ": {
+              "column_map": {
+                "x": "arm2_joint_ПЗ_x_м",
+                "y": "arm2_joint_ПЗ_y_м",
+                "z": "arm2_joint_ПЗ_z_м"
+              }
+            }
+          },
+          "missing_corners": [],
+          "partial_corners": []
+        }
+      },
+      "notes": [
+        "Each family points back to canonical NPZ columns; no geometry is reconstructed here.",
+        "Family coverage may be partial on older bundles that do not export optional wishbone hardpoints."
+      ]
+    },
+    "packaging": {
+      "schema": "cylinder_packaging.contract.v1",
+      "status": "partial",
+      "representation": "geometry_scalars_plus_mount_refs",
+      "required_advanced_fields": [
+        "gland_or_sleeve_position_m",
+        "rod_eye_length_m",
+        "retracted_mount_length_m",
+        "extended_mount_length_m",
+        "cup_or_seat_points_world_m",
+        "explicit_body_axis_world_m",
+        "explicit_piston_pose_inside_body",
+        "cap_side_vs_rod_side_contract"
+      ],
+      "missing_advanced_fields": [
+        "gland_or_sleeve_position_m",
+        "rod_eye_length_m",
+        "retracted_mount_length_m",
+        "extended_mount_length_m",
+        "cup_or_seat_points_world_m",
+        "explicit_body_axis_world_m",
+        "explicit_piston_pose_inside_body",
+        "cap_side_vs_rod_side_contract"
+      ],
+      "cylinders": {
+        "cyl1": {
+          "mount_families": {
+            "top": "cyl1_top",
+            "bottom": "cyl1_bot"
+          },
+          "mount_roles": {
+            "top": "cylinder 1 top mount on frame",
+            "bottom": "cylinder 1 bottom mount on arm"
+          },
+          "stroke_position_columns": {
+            "ЛП": "положение_штока_ЛП_м",
+            "ПП": "положение_штока_ПП_м",
+            "ЛЗ": "положение_штока_ЛЗ_м",
+            "ПЗ": "положение_штока_ПЗ_м"
+          },
+          "length_columns": {
+            "ЛП": "длина_цилиндра_ЛП_м",
+            "ПП": "длина_цилиндра_ПП_м",
+            "ЛЗ": "длина_цилиндра_ЛЗ_м",
+            "ПЗ": "длина_цилиндра_ПЗ_м"
+          },
+          "length_status_by_corner": {
+            "ЛП": "filled_from_endpoint_distance",
+            "ПП": "filled_from_endpoint_distance",
+            "ЛЗ": "filled_from_endpoint_distance",
+            "ПЗ": "filled_from_endpoint_distance"
+          },
+          "geometry_key_refs": {
+            "bore_diameter_m": "geometry.cyl1_bore_diameter_m",
+            "rod_diameter_m": "geometry.cyl1_rod_diameter_m",
+            "outer_diameter_m": "geometry.cyl1_outer_diameter_m",
+            "stroke_front_m": "geometry.cyl1_stroke_front_m",
+            "stroke_rear_m": "geometry.cyl1_stroke_rear_m",
+            "dead_cap_length_m": "geometry.cyl1_dead_cap_length_m",
+            "dead_rod_length_m": "geometry.cyl1_dead_rod_length_m",
+            "dead_height_m": "geometry.cyl1_dead_height_m",
+            "body_length_front_m": "geometry.cyl1_body_length_front_m",
+            "body_length_rear_m": "geometry.cyl1_body_length_rear_m",
+            "wall_thickness_m": "geometry.cylinder_wall_thickness_m",
+            "dead_volume_chamber_m3": "geometry.dead_volume_chamber_m3"
+          },
+          "resolved_geometry": {
+            "bore_diameter_m": 0.032,
+            "rod_diameter_m": 0.016,
+            "outer_diameter_m": 0.038,
+            "stroke_front_m": 0.25,
+            "stroke_rear_m": 0.25,
+            "dead_cap_length_m": 0.018650969893581486,
+            "dead_rod_length_m": 0.02486795985810865,
+            "dead_height_m": 0.018650969893581486,
+            "body_length_front_m": 0.29330193978716296,
+            "body_length_rear_m": 0.29330193978716296,
+            "wall_thickness_m": 0.003,
+            "dead_volume_chamber_m3": 1.5e-05
+          },
+          "missing_geometry_fields": [],
+          "advanced_fields_present": [],
+          "advanced_fields_missing": [
+            "gland_or_sleeve_position_m",
+            "rod_eye_length_m",
+            "retracted_mount_length_m",
+            "extended_mount_length_m",
+            "cup_or_seat_points_world_m",
+            "explicit_body_axis_world_m",
+            "explicit_piston_pose_inside_body",
+            "cap_side_vs_rod_side_contract"
+          ],
+          "contract_complete": false,
+          "notes": [
+            "Animator must not invent missing absolute packaging geometry.",
+            "When advanced fields are absent, consumers should stay in simplified body/rod truth mode and warn explicitly."
+          ]
+        },
+        "cyl2": {
+          "mount_families": {
+            "top": "cyl2_top",
+            "bottom": "cyl2_bot"
+          },
+          "mount_roles": {
+            "top": "cylinder 2 top mount on frame",
+            "bottom": "cylinder 2 bottom mount on arm"
+          },
+          "stroke_position_columns": {
+            "ЛП": "положение_штока_Ц2_ЛП_м",
+            "ПП": "положение_штока_Ц2_ПП_м",
+            "ЛЗ": "положение_штока_Ц2_ЛЗ_м",
+            "ПЗ": "положение_штока_Ц2_ПЗ_м"
+          },
+          "length_columns": {
+            "ЛП": "длина_цилиндра_Ц2_ЛП_м",
+            "ПП": "длина_цилиндра_Ц2_ПП_м",
+            "ЛЗ": "длина_цилиндра_Ц2_ЛЗ_м",
+            "ПЗ": "длина_цилиндра_Ц2_ПЗ_м"
+          },
+          "length_status_by_corner": {
+            "ЛП": "filled_from_endpoint_distance",
+            "ПП": "filled_from_endpoint_distance",
+            "ЛЗ": "filled_from_endpoint_distance",
+            "ПЗ": "filled_from_endpoint_distance"
+          },
+          "geometry_key_refs": {
+            "bore_diameter_m": "geometry.cyl2_bore_diameter_m",
+            "rod_diameter_m": "geometry.cyl2_rod_diameter_m",
+            "outer_diameter_m": "geometry.cyl2_outer_diameter_m",
+            "stroke_front_m": "geometry.cyl2_stroke_front_m",
+            "stroke_rear_m": "geometry.cyl2_stroke_rear_m",
+            "dead_cap_length_m": "geometry.cyl2_dead_cap_length_m",
+            "dead_rod_length_m": "geometry.cyl2_dead_rod_length_m",
+            "dead_height_m": "geometry.cyl2_dead_height_m",
+            "body_length_front_m": "geometry.cyl2_body_length_front_m",
+            "body_length_rear_m": "geometry.cyl2_body_length_rear_m",
+            "wall_thickness_m": "geometry.cylinder_wall_thickness_m",
+            "dead_volume_chamber_m3": "geometry.dead_volume_chamber_m3"
+          },
+          "resolved_geometry": {
+            "bore_diameter_m": 0.05,
+            "rod_diameter_m": 0.014,
+            "outer_diameter_m": 0.056,
+            "stroke_front_m": 0.25,
+            "stroke_rear_m": 0.25,
+            "dead_cap_length_m": 0.0076394372684109755,
+            "dead_rod_length_m": 0.008289319952702882,
+            "dead_height_m": 0.0076394372684109755,
+            "body_length_front_m": 0.271278874536822,
+            "body_length_rear_m": 0.271278874536822,
+            "wall_thickness_m": 0.003,
+            "dead_volume_chamber_m3": 1.5e-05
+          },
+          "missing_geometry_fields": [],
+          "advanced_fields_present": [],
+          "advanced_fields_missing": [
+            "gland_or_sleeve_position_m",
+            "rod_eye_length_m",
+            "retracted_mount_length_m",
+            "extended_mount_length_m",
+            "cup_or_seat_points_world_m",
+            "explicit_body_axis_world_m",
+            "explicit_piston_pose_inside_body",
+            "cap_side_vs_rod_side_contract"
+          ],
+          "contract_complete": false,
+          "notes": [
+            "Animator must not invent missing absolute packaging geometry.",
+            "When advanced fields are absent, consumers should stay in simplified body/rod truth mode and warn explicitly."
+          ]
+        }
+      },
+      "notes": [
+        "Scalar geometry lives in meta.geometry and is referenced here explicitly.",
+        "Mount points are referenced through meta.hardpoints families and main_values/main_cols NPZ refs.",
+        "Length columns may be backfilled from explicit endpoint distance during anim_latest export when the producer emitted NaN-only series."
+      ]
+    },
+    "anim_export_validation": {
+      "has_solver_points_block": true,
+      "has_hardpoints_block": true,
+      "has_packaging_block": true,
+      "packaging_status": "partial",
+      "packaging_missing_advanced_fields": [
+        "gland_or_sleeve_position_m",
+        "rod_eye_length_m",
+        "retracted_mount_length_m",
+        "extended_mount_length_m",
+        "cup_or_seat_points_world_m",
+        "explicit_body_axis_world_m",
+        "explicit_piston_pose_inside_body",
+        "cap_side_vs_rod_side_contract"
+      ],
+      "packaging_truth_ready": false,
+      "visible_hardpoint_family_count": 15,
+      "hardpoints_family_count": 19,
+      "complete_cylinders": [],
+      "complete_cylinder_count": 0,
+      "visible_required_family_count": 15,
+      "visible_present_family_count": 15,
+      "visible_present_families": [
+        "frame_corner",
+        "wheel_center",
+        "road_contact",
+        "lower_arm_frame_front",
+        "lower_arm_frame_rear",
+        "lower_arm_hub_front",
+        "lower_arm_hub_rear",
+        "upper_arm_frame_front",
+        "upper_arm_frame_rear",
+        "upper_arm_hub_front",
+        "upper_arm_hub_rear",
+        "cyl1_top",
+        "cyl1_bot",
+        "cyl2_top",
+        "cyl2_bot"
+      ],
+      "visible_partial_families": [],
+      "visible_missing_families": [],
+      "validation_level": "WARN"
+    },
+    "anim_export_contract_artifacts": {
+      "sidecar": "anim_latest.contract.sidecar.json",
+      "validation_json": "anim_latest.contract.validation.json",
+      "validation_md": "anim_latest.contract.validation.md",
+      "hardpoints_source_of_truth": "HARDPOINTS_SOURCE_OF_TRUTH.json",
+      "cylinder_packaging_passport": "CYLINDER_PACKAGING_PASSPORT.json",
+      "road_contract_web": "road_contract_web.json",
+      "road_contract_desktop": "road_contract_desktop.json"
+    },
+    "anim_export_truth_ready": false
+  },
+  "visual_cache_token": "3e1d696d84e7a0db8a0e5a55854b90d349d4d2be7d8436530d01c7edad1e1adc",
+  "visual_reload_inputs": [
+    "npz",
+    "road_csv"
+  ],
+  "visual_cache_dependencies": {
+    "version": 1,
+    "context": "anim_latest export pointer",
+    "npz": {
+      "path": "C:\\Users\\User\\Desktop\\pneumo2_R31CN_HF8_github_push_package\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\workspace\\exports\\anim_latest.npz",
+      "exists": true,
+      "mtime_ns": 1775561946003623700,
+      "size": 11427155
+    },
+    "road_csv_ref": "anim_latest_road_csv.csv",
+    "road_csv_path": "C:\\Users\\User\\Desktop\\pneumo2_R31CN_HF8_github_push_package\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\workspace\\exports\\anim_latest_road_csv.csv",
+    "road_csv": {
+      "path": "C:\\Users\\User\\Desktop\\pneumo2_R31CN_HF8_github_push_package\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\workspace\\exports\\anim_latest_road_csv.csv",
+      "exists": true,
+      "mtime_ns": 1775561394140928300,
+      "size": 137520
+    }
+  },
+  "anim_export_validation_level": "WARN",
+  "anim_export_truth_ready": false
+}

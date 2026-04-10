@@ -19,7 +19,9 @@ def test_desktop_animator_uses_native_floatable_dock_for_live_gl_and_guards_layo
     assert 'self._register_live_gl_layout_guard("dock_3d", dock_3d)' in src
     assert 'self._gl_layout_pause_timer' in src
     assert 'set_layout_transition_active' in src
-    assert 'self._register_external_panel_window(' not in src
+    assert 'self._register_external_panel_window(' in src
+    assert 'dock_name="dock_3d"' in src
+    assert 'gl_safe_external_window_on_detach' in src
 
 
 def test_old_keep_gl_docked_workaround_is_removed_and_native_dock_can_re_attach() -> None:

@@ -22,10 +22,10 @@ def test_render_results_section_dispatches_graph_branch() -> None:
     calls: list[tuple[str, object]] = []
     original_selector = helpers.render_results_view_selector
     try:
-        helpers.render_results_view_selector = lambda **kwargs: "Р“СЂР°С„РёРєРё"  # type: ignore[assignment]
+        helpers.render_results_view_selector = lambda **kwargs: "Графики"  # type: ignore[assignment]
         selected = helpers.render_results_section(
             _FakeStreamlit(),
-            options=["Р“СЂР°С„РёРєРё", "РџРѕС‚РѕРєРё"],
+            options=["Графики", "Потоки"],
             session_state={"demo": True},
             cur_hash="hash-1",
             test_pick="test-1",
@@ -38,7 +38,7 @@ def test_render_results_section_dispatches_graph_branch() -> None:
     finally:
         helpers.render_results_view_selector = original_selector  # type: ignore[assignment]
 
-    assert selected == "Р“СЂР°С„РёРєРё"
+    assert selected == "Графики"
     assert calls == [("graph", "graph-token")]
 
 
@@ -46,10 +46,10 @@ def test_render_results_section_dispatches_secondary_branch() -> None:
     calls: list[tuple[str, object]] = []
     original_selector = helpers.render_results_view_selector
     try:
-        helpers.render_results_view_selector = lambda **kwargs: "РђРЅРёРјР°С†РёСЏ"  # type: ignore[assignment]
+        helpers.render_results_view_selector = lambda **kwargs: "Анимация"  # type: ignore[assignment]
         selected = helpers.render_results_section(
             _FakeStreamlit(),
-            options=["Р“СЂР°С„РёРєРё", "РђРЅРёРјР°С†РёСЏ"],
+            options=["Графики", "Анимация"],
             session_state={"demo": True},
             cur_hash="hash-2",
             test_pick="test-2",
@@ -58,16 +58,16 @@ def test_render_results_section_dispatches_secondary_branch() -> None:
             results_graph_section_kwargs={"token": "graph-token"},
             render_secondary_results_views_fn=lambda st, **kwargs: calls.append(("secondary", kwargs["view_res"])),
             secondary_results_views_kwargs={
-                "flow_view_label": "РџРѕС‚РѕРєРё",
-                "energy_audit_view_label": "Р­РЅРµСЂРіРѕ-Р°СѓРґРёС‚",
-                "animation_view_label": "РђРЅРёРјР°С†РёСЏ",
+                "flow_view_label": "Потоки",
+                "energy_audit_view_label": "Энерго-аудит",
+                "animation_view_label": "Анимация",
             },
         )
     finally:
         helpers.render_results_view_selector = original_selector  # type: ignore[assignment]
 
-    assert selected == "РђРЅРёРјР°С†РёСЏ"
-    assert calls == [("secondary", "РђРЅРёРјР°С†РёСЏ")]
+    assert selected == "Анимация"
+    assert calls == [("secondary", "Анимация")]
 
 
 def test_entrypoints_use_shared_results_section_helper() -> None:
@@ -95,6 +95,7 @@ def test_entrypoints_use_shared_results_section_helper() -> None:
     assert "render_secondary_results_views(" not in heavy_text
     assert "view_res == " not in app_text
     assert "view_res == " not in heavy_text
+    assert 'graph_view_label: str = "Графики"' in helper_text
     assert "def render_results_section(" in helper_text
     assert "render_results_view_selector(" in helper_text
     assert "render_results_section_fn(st, **results_section_bound_kwargs)" in surface_text

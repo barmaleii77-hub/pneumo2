@@ -253,6 +253,105 @@
     .alertItemName { font-weight: 600; color: #112f3e; word-break: break-word; }
     .alertItemMeta { color: #4f6570; line-height: 1.25; }
     .alertItemValue { font-variant-numeric: tabular-nums; color: #173746; white-space: nowrap; }
+    .mnemoDiagCard {
+      filter: drop-shadow(0 4px 14px rgba(0,0,0,0.22));
+    }
+    .mnemoDiagShell {
+      fill: rgba(7, 18, 25, 0.88);
+      stroke: rgba(207, 224, 232, 0.16);
+      stroke-width: 1.8;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .mnemoDiagCard.selected .mnemoDiagShell {
+      stroke: rgba(248, 193, 92, 0.92);
+      stroke-width: 2.4;
+    }
+    .mnemoDiagTitle {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      fill: rgba(238, 246, 248, 0.96);
+      pointer-events: none;
+    }
+    .mnemoDiagMeta {
+      font-size: 9px;
+      fill: rgba(159, 184, 194, 0.92);
+      pointer-events: none;
+    }
+    .mnemoDiagChamber {
+      stroke: rgba(255,255,255,0.16);
+      stroke-width: 1.1;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .mnemoDiagChamber.sel {
+      stroke: rgba(248, 193, 92, 0.98);
+      stroke-width: 1.8;
+    }
+    .mnemoDiagChamberText {
+      font-size: 10px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+    .mnemoDiagChamberSub {
+      font-size: 8px;
+      pointer-events: none;
+      opacity: 0.92;
+    }
+    .mnemoDiagTrack {
+      fill: rgba(255,255,255,0.08);
+      stroke: rgba(255,255,255,0.12);
+      stroke-width: 0.8;
+      pointer-events: none;
+    }
+    .mnemoDiagPiston {
+      fill: rgba(248, 193, 92, 0.96);
+      stroke: rgba(12, 22, 32, 0.90);
+      stroke-width: 1.2;
+      pointer-events: none;
+    }
+    .mnemoDiagChip {
+      fill: rgba(17, 50, 65, 0.92);
+      stroke: rgba(99, 211, 245, 0.28);
+      stroke-width: 1;
+      pointer-events: none;
+    }
+    .mnemoDiagChipText {
+      font-size: 8px;
+      font-weight: 700;
+      fill: rgba(201, 232, 242, 0.96);
+      pointer-events: none;
+    }
+    .mnemoCompBadge {
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.22));
+      cursor: pointer;
+    }
+    .mnemoCompBadge rect {
+      fill: rgba(7, 18, 25, 0.92);
+      stroke-width: 1.4;
+      pointer-events: auto;
+    }
+    .mnemoCompBadge.selected rect {
+      stroke-width: 2.3;
+    }
+    .mnemoCompBadge text {
+      pointer-events: none;
+    }
+    .mnemoCompKind {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .mnemoCompMeta {
+      font-size: 8px;
+      fill: rgba(207, 224, 232, 0.92);
+    }
+    .mnemoCompDot {
+      pointer-events: none;
+      stroke: rgba(12, 22, 32, 0.92);
+      stroke-width: 1.1;
+    }
 /* label pick highlighting (START/END) */
     .labelStart { fill: rgba(0,140,0,0.95) !important; stroke: rgba(0,140,0,0.95) !important; stroke-width: 0.6; paint-order: stroke; }
     .labelEnd   { fill: rgba(180,0,0,0.95) !important; stroke: rgba(180,0,0,0.95) !important; stroke-width: 0.6; paint-order: stroke; }
@@ -318,6 +417,7 @@
           <label><input id="togAlerts" type="checkbox" checked/>Алерты</label>
           <label><input id="togLegend" type="checkbox" checked/>Легенда</label>
           <label><input id="togReview" type="checkbox"/>Проверка</label>
+          <label><input id="togDiag" type="checkbox" checked/>Overlay</label>
         </div>
 
         <div id="legend" class="legend">
@@ -410,7 +510,7 @@ function init() {
 
   // wire UI toggles (checkboxes)
   try {
-    ['togPaths','togDots','togNodes','togAlerts','togLegend','togReview'].forEach((id) => {
+    ['togPaths','togDots','togNodes','togDiag','togAlerts','togLegend','togReview'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('change', (ev) => {
         try { applyToggles(); } catch(e) {}
@@ -454,7 +554,7 @@ function sendDataToPython(data) {
 // ----------------------------------------------------
 // Widget state
 // ----------------------------------------------------
-let DATA = { title: "", svg: "", mapping: {}, time: [], edges: [], nodes: [], selected: {}, label_pick_mode: "", label_picks: {}, height: 740, sync_playhead: false, playhead_storage_key: "pneumo_play_state", dataset_id: "", alerts: {}, focus_region: null, show_alert_overlay: true };
+let DATA = { title: "", svg: "", mapping: {}, time: [], edges: [], nodes: [], selected: {}, label_pick_mode: "", label_picks: {}, height: 740, sync_playhead: false, playhead_storage_key: "pneumo_play_state", dataset_id: "", alerts: {}, mnemo_diagnostics: null, focus_region: null, show_alert_overlay: true };
 let svg = null;
 let overlay = null;
 let pathLayer = null;
@@ -462,6 +562,7 @@ let dotLayer = null;
 let nodeLayer = null;
 let routeLayer = null;
 let reviewLayer = null;
+let diagLayer = null;
 let alertLayer = null;
 let focusLayer = null;
 let reviewSegs = []; // {edgeName, path}
@@ -530,6 +631,7 @@ const togGlobalQ = document.getElementById('togGlobalQ');
 
 const togDots  = document.getElementById('togDots');
 const togNodes = document.getElementById('togNodes');
+const togDiag = document.getElementById('togDiag');
 const togAlerts = document.getElementById('togAlerts');
 const togLegend = document.getElementById('togLegend');
 const togReview = document.getElementById('togReview');
@@ -672,6 +774,7 @@ function clearDom() {
   qMax = [];
   reviewSegs = [];
   reviewLayer = null;
+  diagLayer = null;
   alertLayer = null;
   focusLayer = null;
   stopFocusAnimation();
@@ -686,6 +789,10 @@ function applyToggles() {
   pathLayer.style.display = togPaths.checked ? 'block' : 'none';
   dotLayer.style.display  = togDots.checked ? 'block' : 'none';
   nodeLayer.style.display = (togNodes.checked && nodeObjs.length>0) ? 'block' : 'none';
+  if (diagLayer) {
+    const allowDiag = !!togDiag && !!togDiag.checked;
+    diagLayer.style.display = allowDiag ? 'block' : 'none';
+  }
   legendEl.style.display  = togLegend.checked ? 'block' : 'none';
   nodesListEl.style.display = (togNodes.checked && nodeObjs.length>0) ? 'block' : 'none';
   if (alertLayer) {
@@ -940,6 +1047,288 @@ function updateAlertOverlay() {
     title.textContent = `${String(item.label || 'Узел')}: ${String(item.name)}`;
     ring.appendChild(title);
     alertLayer.appendChild(ring);
+  });
+}
+
+function diagValueText(value, digits, suffix, emptyText) {
+  const fallback = (emptyText === undefined || emptyText === null) ? '—' : String(emptyText);
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return fallback;
+  return `${Number(value).toFixed(Number.isFinite(Number(digits)) ? Number(digits) : 2)}${suffix || ''}`;
+}
+
+function svgEl(tag, attrs, parent, text) {
+  const el = document.createElementNS(NS, tag);
+  Object.entries(attrs || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) el.setAttribute(key, String(value));
+  });
+  if (text !== undefined && text !== null) el.textContent = String(text);
+  if (parent) parent.appendChild(el);
+  return el;
+}
+
+function polyMidInfo(poly) {
+  if (!Array.isArray(poly) || poly.length < 2) return null;
+  let total = 0;
+  const segments = [];
+  for (let i = 1; i < poly.length; i += 1) {
+    const p0 = poly[i - 1];
+    const p1 = poly[i];
+    if (!Array.isArray(p0) || !Array.isArray(p1) || p0.length < 2 || p1.length < 2) continue;
+    const dx = Number(p1[0]) - Number(p0[0]);
+    const dy = Number(p1[1]) - Number(p0[1]);
+    const len = Math.hypot(dx, dy);
+    if (!Number.isFinite(len) || len <= 1e-9) continue;
+    segments.push({ p0, p1, len, dx, dy });
+    total += len;
+  }
+  if (!segments.length) return null;
+  let target = total * 0.5;
+  for (let i = 0; i < segments.length; i += 1) {
+    const seg = segments[i];
+    if (target > seg.len && i < segments.length - 1) {
+      target -= seg.len;
+      continue;
+    }
+    const t = clamp(target / seg.len, 0, 1);
+    const x = Number(seg.p0[0]) + seg.dx * t;
+    const y = Number(seg.p0[1]) + seg.dy * t;
+    const nx = -seg.dy / seg.len;
+    const ny = seg.dx / seg.len;
+    return { x, y, nx, ny };
+  }
+  const last = segments[segments.length - 1];
+  return { x: Number(last.p1[0]), y: Number(last.p1[1]), nx: -last.dy / last.len, ny: last.dx / last.len };
+}
+
+function componentAnchorForEdge(edgeName, ordinal) {
+  const mapping = DATA.mapping || {};
+  const polys = (mapping.edges && mapping.edges[edgeName]) ? mapping.edges[edgeName] : null;
+  if (!Array.isArray(polys) || !polys.length) return null;
+  const info = polyMidInfo(polys[0]);
+  if (!info) return null;
+  const spread = (((Number(ordinal || 0) % 5) - 2) * 12);
+  const offset = 34 + spread;
+  return {
+    x: info.x + info.nx * offset,
+    y: info.y + info.ny * offset,
+  };
+}
+
+function updateMnemoDiagnostics() {
+  if (!diagLayer) return;
+  while (diagLayer.firstChild) diagLayer.removeChild(diagLayer.firstChild);
+
+  const showDiag = !!togDiag && !!togDiag.checked;
+  diagLayer.style.display = showDiag ? 'block' : 'none';
+  if (!showDiag) return;
+
+  const diag = (DATA && DATA.mnemo_diagnostics && typeof DATA.mnemo_diagnostics === 'object')
+    ? DATA.mnemo_diagnostics
+    : null;
+  if (!diag) return;
+
+  const mapping = DATA.mapping || {};
+  const nodeMap = (mapping.nodes && typeof mapping.nodes === 'object') ? mapping.nodes : {};
+  const selectedNode = String((DATA.selected && DATA.selected.node) || '');
+  const selectedEdge = String((DATA.selected && DATA.selected.edge) || '');
+
+  (Array.isArray(diag.cylinders) ? diag.cylinders : []).forEach((item) => {
+    if (!item || !item.cap || !item.rod) return;
+    const capXY = nodeMap[item.cap.node_name];
+    const rodXY = nodeMap[item.rod.node_name];
+    if (!Array.isArray(capXY) || capXY.length < 2 || !Array.isArray(rodXY) || rodXY.length < 2) return;
+
+    const cx = (Number(capXY[0]) + Number(rodXY[0])) * 0.5;
+    const cy = (Number(capXY[1]) + Number(rodXY[1])) * 0.5;
+    const width = 108;
+    const height = 146;
+    const x = cx - width * 0.5;
+    const y = cy - height * 0.5;
+    const cardSel = selectedNode === String(item.cap.node_name || '') || selectedNode === String(item.rod.node_name || '');
+    const group = svgEl('g', { class: cardSel ? 'mnemoDiagCard selected' : 'mnemoDiagCard' }, diagLayer);
+    const shell = svgEl('rect', { x, y, width, height, rx: 18, ry: 18, class: 'mnemoDiagShell' }, group);
+    const capSel = selectedNode === String(item.cap.node_name || '');
+    const rodSel = selectedNode === String(item.rod.node_name || '');
+    const capY = y + 38;
+    const rodY = y + 86;
+    const cellX = x + 10;
+    const cellW = 74;
+    const cellH = 34;
+    const trackX = x + 90;
+    const trackY = y + 34;
+    const trackH = 82;
+    const ratio = Number.isFinite(Number(item.stroke_ratio)) ? clamp(Number(item.stroke_ratio), 0, 1) : 0.5;
+    const pistonY = trackY + (1.0 - ratio) * trackH;
+    const fillCap = Number.isFinite(Number(item.cap.fill_ratio)) ? clamp(Number(item.cap.fill_ratio), 0, 1) : null;
+    const fillRod = Number.isFinite(Number(item.rod.fill_ratio)) ? clamp(Number(item.rod.fill_ratio), 0, 1) : null;
+
+    svgEl('text', { x: x + 12, y: y + 16, class: 'mnemoDiagTitle' }, group, `${String(item.corner || '')} C${String(item.cyl_index || '')}`);
+    svgEl(
+      'text',
+      { x: x + 12, y: y + 30, class: 'mnemoDiagMeta' },
+      group,
+      `${String(item.motion_short || 'HOLD')}  ΔP ${diagValueText(item.delta_p_bar, 1, '', '—')}`
+    );
+
+    const capRect = svgEl(
+      'rect',
+      {
+        x: cellX,
+        y: capY,
+        width: cellW,
+        height: cellH,
+        rx: 10,
+        ry: 10,
+        class: capSel ? 'mnemoDiagChamber sel' : 'mnemoDiagChamber',
+        fill: item.cap.heat_hex || '#23313a',
+      },
+      group
+    );
+    svgEl(
+      'text',
+      { x: cellX + 8, y: capY + 13, class: 'mnemoDiagChamberText', fill: item.cap.text_hex || '#eef6f8' },
+      group,
+      `CAP ${diagValueText(item.cap.pressure_bar_g, 1, 'b', '—')}`
+    );
+    svgEl(
+      'text',
+      { x: cellX + 8, y: capY + 25, class: 'mnemoDiagChamberSub', fill: item.cap.text_hex || '#eef6f8' },
+      group,
+      item.geometry_ready ? diagValueText(item.cap.volume_l, 2, 'L', '—') : 'P-only'
+    );
+    if (fillCap !== null) {
+      svgEl('rect', { x: cellX + 6, y: capY + 28, width: (cellW - 12) * fillCap, height: 3, rx: 2, ry: 2, fill: 'rgba(7,18,25,0.38)' }, group);
+    }
+
+    const rodRect = svgEl(
+      'rect',
+      {
+        x: cellX,
+        y: rodY,
+        width: cellW,
+        height: cellH,
+        rx: 10,
+        ry: 10,
+        class: rodSel ? 'mnemoDiagChamber sel' : 'mnemoDiagChamber',
+        fill: item.rod.heat_hex || '#23313a',
+      },
+      group
+    );
+    svgEl(
+      'text',
+      { x: cellX + 8, y: rodY + 13, class: 'mnemoDiagChamberText', fill: item.rod.text_hex || '#eef6f8' },
+      group,
+      `ROD ${diagValueText(item.rod.pressure_bar_g, 1, 'b', '—')}`
+    );
+    svgEl(
+      'text',
+      { x: cellX + 8, y: rodY + 25, class: 'mnemoDiagChamberSub', fill: item.rod.text_hex || '#eef6f8' },
+      group,
+      item.geometry_ready ? diagValueText(item.rod.volume_l, 2, 'L', '—') : 'P-only'
+    );
+    if (fillRod !== null) {
+      svgEl('rect', { x: cellX + 6, y: rodY + 28, width: (cellW - 12) * fillRod, height: 3, rx: 2, ry: 2, fill: 'rgba(7,18,25,0.38)' }, group);
+    }
+
+    svgEl('rect', { x: trackX, y: trackY, width: 8, height: trackH, rx: 4, ry: 4, class: 'mnemoDiagTrack' }, group);
+    svgEl('circle', { cx: trackX + 4, cy: pistonY, r: 6, class: 'mnemoDiagPiston' }, group);
+    svgEl(
+      'text',
+      { x: x + 12, y: y + 132, class: 'mnemoDiagMeta' },
+      group,
+      `${diagValueText(item.stroke_m, 3, 'm', '—')} / ${diagValueText(item.stroke_speed_m_s, 2, 'm/s', '—')}`
+    );
+    if (!item.geometry_ready) {
+      svgEl('rect', { x: x + 54, y: y + 124, width: 42, height: 14, rx: 7, ry: 7, class: 'mnemoDiagChip' }, group);
+      svgEl('text', { x: x + 61, y: y + 134, class: 'mnemoDiagChipText' }, group, 'P-only');
+    }
+
+    const tip =
+      `${String(item.corner || '')} C${String(item.cyl_index || '')}\n` +
+      `CAP ${diagValueText(item.cap.pressure_bar_g, 2, ' bar(g)', '—')} / ${diagValueText(item.cap.volume_l, 3, ' L', '—')}\n` +
+      `ROD ${diagValueText(item.rod.pressure_bar_g, 2, ' bar(g)', '—')} / ${diagValueText(item.rod.volume_l, 3, ' L', '—')}\n` +
+      `ΔP ${diagValueText(item.delta_p_bar, 2, ' bar', '—')} / ${diagValueText(item.stroke_m, 3, ' m', '—')}\n` +
+      `${String(item.motion_label || '')}`;
+    svgEl('title', {}, group, tip);
+
+    shell.addEventListener('click', (ev) => {
+      setSelectedNode(String(item.focus_node || item.cap.node_name || ''), true);
+      ev.stopPropagation();
+      ev.preventDefault();
+    });
+    capRect.addEventListener('click', (ev) => {
+      setSelectedNode(String(item.cap.node_name || ''), true);
+      ev.stopPropagation();
+      ev.preventDefault();
+    });
+    rodRect.addEventListener('click', (ev) => {
+      setSelectedNode(String(item.rod.node_name || ''), true);
+      ev.stopPropagation();
+      ev.preventDefault();
+    });
+  });
+
+  (Array.isArray(diag.components) ? diag.components : []).forEach((item, ordinal) => {
+    if (!item || !item.edge_name) return;
+    const anchor = componentAnchorForEdge(String(item.edge_name), Number(item.order || ordinal));
+    if (!anchor) return;
+    const selected = selectedEdge === String(item.edge_name || '');
+    const zoneLabel = Array.isArray(item.corners) && item.corners.length
+      ? item.corners.join('/')
+      : String(item.zone_label || '');
+    const qText = diagValueText(item.q_now, 1, '', '—');
+    const badgeText = `${String(item.component_short || 'LINE')} ${String(item.state_short || '')}`.trim();
+    const subText = `${qText} ${zoneLabel}`.trim();
+    const width = Math.max(78, Math.min(158, 54 + subText.length * 4.4));
+    const height = 38;
+    const x = anchor.x - width * 0.5;
+    const y = anchor.y - height * 0.5;
+    const group = svgEl('g', { class: selected ? 'mnemoCompBadge selected' : 'mnemoCompBadge' }, diagLayer);
+    const rect = svgEl(
+      'rect',
+      {
+        x,
+        y,
+        width,
+        height,
+        rx: 10,
+        ry: 10,
+        stroke: item.flow_hex || '#5c6f7d',
+      },
+      group
+    );
+    rect.style.opacity = item.is_active ? '1' : '0.54';
+    svgEl(
+      'circle',
+      {
+        cx: x + 12,
+        cy: y + 12,
+        r: 5,
+        class: 'mnemoCompDot',
+        fill: String(item.state_short || '') === 'OPEN' ? (item.flow_hex || '#63d3f5') : '#546773',
+      },
+      group
+    );
+    svgEl(
+      'text',
+      { x: x + 22, y: y + 14, class: 'mnemoCompKind', fill: item.text_hex || '#eef6f8' },
+      group,
+      badgeText
+    );
+    svgEl('text', { x: x + 10, y: y + 28, class: 'mnemoCompMeta' }, group, subText);
+    svgEl(
+      'title',
+      {},
+      group,
+      `${String(item.component_kind || item.component_short || '')}: ${String(item.edge_name || '')}\n` +
+      `${String(item.direction_label || '')}\n` +
+      `${String(item.state_label || '')}`
+    );
+    rect.addEventListener('click', (ev) => {
+      setSelectedEdge(String(item.edge_name || ''), true);
+      ev.stopPropagation();
+      ev.preventDefault();
+    });
   });
 }
 
@@ -1346,15 +1735,18 @@ function build(args) {
   pathLayer = document.createElementNS(NS, 'g');
   dotLayer  = document.createElementNS(NS, 'g');
   nodeLayer = document.createElementNS(NS, 'g');
+  diagLayer = document.createElementNS(NS, 'g');
   routeLayer = document.createElementNS(NS, 'g');
   alertLayer = document.createElementNS(NS, 'g');
   focusLayer = document.createElementNS(NS, 'g');
+  diagLayer.setAttribute('id', 'pneumo_overlay_mnemo_diag');
   alertLayer.setAttribute('id', 'pneumo_overlay_alerts');
   focusLayer.setAttribute('id', 'pneumo_overlay_focus');
   overlay.appendChild(pathLayer);
   overlay.appendChild(routeLayer);
   overlay.appendChild(dotLayer);
   overlay.appendChild(nodeLayer);
+  overlay.appendChild(diagLayer);
   overlay.appendChild(alertLayer);
   overlay.appendChild(focusLayer);
 
@@ -1610,6 +2002,7 @@ const pth = document.createElementNS(NS, 'path');
   });
 
   // toggles
+  updateMnemoDiagnostics();
   applyToggles();
   updateAlertOverlay();
 
@@ -1666,7 +2059,7 @@ const pth = document.createElementNS(NS, 'path');
 }
 
 // toggles events
-[togPaths, togDots, togNodes, togAlerts, togLegend].forEach(el => el.addEventListener('change', applyToggles));
+[togPaths, togDots, togNodes, togDiag, togAlerts, togLegend].forEach(el => el.addEventListener('change', applyToggles));
 if (togGlobalQ) {
   togGlobalQ.addEventListener('change', () => {
     try { if (__lastArgs !== null) build(__lastArgs); else build({}); } catch (e) {}
