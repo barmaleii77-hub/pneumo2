@@ -5068,6 +5068,45 @@ def _seed_suite_editor_state(sid: str, rec: Dict[str, Any], *, force: bool = Fal
         _seed(f"pen_tgt_val_{k}", float(_as_float(cur, 0.0) if enabled else 0.0))
 
 
+def _resolve_ring_default_dt_s(df_suite_frame: pd.DataFrame) -> float:
+    fallback_dt_s = 0.01
+
+    def _coerce_dt(value: Any) -> Optional[float]:
+        try:
+            dt_s = float(value)
+        except Exception:
+            return None
+        if (not math.isfinite(dt_s)) or dt_s <= 0.0:
+            return None
+        return float(dt_s)
+
+    try:
+        sel_id = _normalize_suite_id_value(st.session_state.get("ui_suite_selected_id"))
+    except Exception:
+        sel_id = ""
+
+    if sel_id and hasattr(df_suite_frame, "columns") and {"id", "dt"}.issubset(df_suite_frame.columns):
+        try:
+            matches = df_suite_frame.index[df_suite_frame["id"].astype(str) == sel_id].tolist()
+            if matches:
+                selected_dt_s = _coerce_dt(df_suite_frame.loc[int(matches[0]), "dt"])
+                if selected_dt_s is not None:
+                    return selected_dt_s
+        except Exception:
+            pass
+
+    if hasattr(df_suite_frame, "columns") and "dt" in df_suite_frame.columns:
+        try:
+            for value in df_suite_frame["dt"].tolist():
+                dt_s = _coerce_dt(value)
+                if dt_s is not None:
+                    return dt_s
+        except Exception:
+            pass
+
+    return fallback_dt_s
+
+
 def _render_heavy_ring_editor(df_suite_frame: pd.DataFrame) -> pd.DataFrame:
     st.markdown("### Сценарий: сегменты-кольцо")
 
@@ -5081,6 +5120,7 @@ def _render_heavy_ring_editor(df_suite_frame: pd.DataFrame) -> pd.DataFrame:
 
     with st.expander("Открыть редактор сценариев (сегменты-кольцо)", expanded=True):
         try:
+            ring_default_dt_s = _resolve_ring_default_dt_s(df_suite_frame)
             try:
                 ring_wheelbase_m = float(base_override.get("база", 0.0))
             except Exception:
@@ -5104,6 +5144,7 @@ def _render_heavy_ring_editor(df_suite_frame: pd.DataFrame) -> pd.DataFrame:
                 df_suite_frame,
                 work_dir=WORKSPACE_DIR,
                 wheelbase_m=float(ring_wheelbase_m),
+                default_dt_s=float(ring_default_dt_s),
             )
         except Exception as exc:
             st.error(f"Ошибка в редакторе сценариев: {exc}")
