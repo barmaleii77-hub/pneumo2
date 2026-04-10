@@ -20,6 +20,9 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert "build_launch_onboarding_context" in src
     assert "build_onboarding_focus_target" in src
     assert "build_onboarding_focus_region_payload" in src
+    assert "prefer_selected: bool = False" in src
+    assert "startup_time_s: float | None = None" in src
+    assert "startup_time_label: str = \"\"" in src
     assert 'self.startup_banner_action = QtGui.QAction("Onboarding", self)' in src
     assert "focus_requested = QtCore.Signal()" in src
     assert 'self.startup_banner.focus_requested.connect(self._apply_onboarding_focus)' in src
@@ -44,9 +47,32 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert "def set_focus_region(self, focus_region: dict[str, Any] | None) -> None:" in src
     assert "def show_overview(self, meta: dict[str, Any] | None = None) -> None:" in src
     assert "startup_view_mode: str," in src
+    assert "startup_time_s: float | None," in src
+    assert "startup_time_label: str," in src
+    assert "startup_edge: str," in src
+    assert "startup_node: str," in src
+    assert "startup_event_title: str," in src
+    assert "startup_time_ref_npz: str," in src
     assert 'self._persisted_view_mode = self._normalize_view_mode(self.ui_state.get_str("view_mode", "focus"))' in src
     assert "self._startup_view_mode_override = self._parse_startup_view_mode_override(startup_view_mode)" in src
     assert "self._view_mode_override_active = bool(self._startup_view_mode_override)" in src
+    assert "self._startup_time_s = float(startup_time_s) if startup_time_s is not None else None" in src
+    assert "self._startup_time_label = str(startup_time_label or \"\").strip()" in src
+    assert "self._startup_edge = str(startup_edge or \"\").strip()" in src
+    assert "self._startup_node = str(startup_node or \"\").strip()" in src
+    assert "self._startup_event_title = str(startup_event_title or \"\").strip()" in src
+    assert "self._startup_time_consumed = False" in src
+    assert "self._startup_selection_consumed = False" in src
+    assert "self._startup_selection_active = False" in src
+    assert "def _consume_startup_seek_index(self, dataset: MnemoDataset | None) -> int | None:" in src
+    assert "def _consume_startup_focus_selection(" in src
+    assert "def _resolve_startup_event_target(self) -> MnemoTimelineEvent | None:" in src
+    assert "def _render_event_panel(self) -> None:" in src
+    assert "jump {context.startup_time_s:0.3f} s" in src
+    assert "Стартовый jump:" in src
+    assert "Стартовая запись event-memory" in src
+    assert "self._last_startup_anchor_signature = \"\"" in src
+    assert "self.scrollToAnchor(anchor)" in src
     assert "def _parse_startup_view_mode_override(mode: str) -> str:" in src
     assert 'def _set_view_mode(self, mode: str, *, persist: bool) -> str:' in src
     assert "self._startup_view_mode_override = \"\"" in src
@@ -54,6 +80,10 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert 'self.ui_state.set_value("view_mode", str(self.view_mode))' in src
     assert 'self.ui_state.set_value("view_mode", self.view_mode)' in src
     assert "if not self._view_mode_override_active:" in src
+    assert "startup_seek_idx = self._consume_startup_seek_index(self.dataset)" in src
+    assert "startup_focus_edge, startup_focus_node = self._consume_startup_focus_selection(self.dataset)" in src
+    assert 'status += f" • старт у {self._last_startup_seek_applied_label}"' in src
+    assert 'status += f" • фокус {self._last_startup_selection_applied_label}"' in src
     assert 'self._apply_current_view_mode(source="dataset_load", auto_focus=not preserve_selection)' in src
     assert '"focus_region": focus_region' in src
     assert "clear_focus_region: bool = False" in src

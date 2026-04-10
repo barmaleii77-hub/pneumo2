@@ -13,6 +13,7 @@ def test_desktop_mnemo_page_exposes_pointer_preview_and_launcher() -> None:
     assert "build_anim_operator_recommendations" in src
     assert "read_desktop_mnemo_view_mode" in src
     assert "desktop_mnemo_view_mode_label" in src
+    assert "infer_desktop_mnemo_startup_seek" in src
     assert 'persisted_view_mode = read_desktop_mnemo_view_mode(PROJECT_ROOT)' in src
     assert 'persisted_view_mode_label = desktop_mnemo_view_mode_label(persisted_view_mode)' in src
     assert "Рекомендуемые действия перед запуском" in src
@@ -27,9 +28,25 @@ def test_desktop_mnemo_page_exposes_pointer_preview_and_launcher() -> None:
     assert "--startup-preset" in src
     assert "--startup-title" in src
     assert "--startup-view-mode" in src
+    assert "--startup-time-s" in src
+    assert "--startup-time-label" in src
+    assert "--startup-edge" in src
+    assert "--startup-node" in src
+    assert "--startup-event-title" in src
+    assert "--startup-time-ref-npz" in src
     assert "--startup-check" in src
     assert "startup_view_mode: str = \"\"" in src
+    assert "startup_time_s: float | None = None" in src
+    assert "startup_time_label: str = \"\"" in src
+    assert "startup_edge: str = \"\"" in src
+    assert "startup_node: str = \"\"" in src
+    assert "startup_event_title: str = \"\"" in src
+    assert "startup_time_ref_npz: Path | None = None" in src
     assert "startup_view_mode=launch_view_mode" in src
+    assert "pointer_startup_seek = (" in src
+    assert "Старт по времени для текущего anim_latest" in src
+    assert "Стартовый фокус при открытии окна" in src
+    assert 'Стартовая запись в dock "События"' in src
     assert "Сценарный запуск" in src
     assert "Запустить preset:" in src
     assert "оперативный follow-разбор" in src

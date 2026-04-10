@@ -7,6 +7,7 @@ import json
 import math
 import re
 import time
+import hashlib
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from html import escape
@@ -369,6 +370,8 @@ class LaunchOnboardingContext:
     reason: str
     checklist: tuple[str, ...]
     launch_mode: str
+    startup_time_s: float | None
+    startup_time_label: str
 
 
 @dataclass(frozen=True)
@@ -400,12 +403,16 @@ def build_launch_onboarding_context(
     preset_key: str = "",
     title: str = "",
     reason: str = "",
+    startup_time_s: float | None = None,
+    startup_time_label: str = "",
     checklist: list[str] | tuple[str, ...] | None = None,
 ) -> LaunchOnboardingContext:
     launch_mode = "follow" if follow else ("npz" if npz_path is not None else "blank")
     normalized_checks = tuple(str(x).strip() for x in (checklist or []) if str(x).strip())
     pointer_name = Path(pointer_path).name if pointer_path else "anim_latest.json"
     npz_name = Path(npz_path).name if npz_path is not None else "NPZ ещё не выбран"
+    startup_time_value = float(startup_time_s) if startup_time_s is not None else None
+    startup_time_text = str(startup_time_label or "").strip()
 
     if not title:
         if launch_mode == "follow":
@@ -452,6 +459,18 @@ def build_launch_onboarding_context(
                 "Тренды и память событий используйте как подтверждение гипотезы, а не как первый экран чтения.",
             )
 
+    if startup_time_value is not None:
+        if not startup_time_text:
+            startup_time_text = f"{startup_time_value:0.3f} s"
+        reason = (
+            f"{reason} Стартовый кадр смещён к {startup_time_text}, "
+            "чтобы оператор сразу попал в релевантный момент сценария."
+        ).strip()
+        normalized_checks = (
+            f"Сначала проверьте кадр около {startup_time_text} и убедитесь, что режим на схеме совпадает с ожиданием.",
+            *normalized_checks,
+        )
+
     context_key = str(preset_key or launch_mode).strip() or launch_mode
     return LaunchOnboardingContext(
         preset_key=context_key,
@@ -459,6 +478,8 @@ def build_launch_onboarding_context(
         reason=str(reason).strip() or "",
         checklist=normalized_checks,
         launch_mode=launch_mode,
+        startup_time_s=startup_time_value,
+        startup_time_label=startup_time_text,
     )
 
 
@@ -468,6 +489,7 @@ def build_onboarding_focus_target(
     *,
     selected_edge: str | None = None,
     selected_node: str | None = None,
+    prefer_selected: bool = False,
 ) -> OnboardingFocusTarget:
     if dataset is None or dataset.time_s.size == 0:
         return OnboardingFocusTarget(
@@ -479,12 +501,16 @@ def build_onboarding_focus_target(
         )
 
     narrative = _build_frame_narrative(dataset, idx, selected_edge=selected_edge, selected_node=selected_node)
+    selected_edge_name = str(selected_edge) if selected_edge in dataset.edge_names else ""
+    selected_node_name = str(selected_node) if selected_node in dataset.node_names else ""
     edge_name = narrative.top_edge_name if narrative.top_edge_name in dataset.edge_names else ""
-    if not edge_name and selected_edge in dataset.edge_names:
-        edge_name = str(selected_edge)
     node_name = narrative.top_node_name if narrative.top_node_name in dataset.node_names else ""
-    if not node_name and selected_node in dataset.node_names:
-        node_name = str(selected_node)
+    if prefer_selected:
+        edge_name = selected_edge_name or edge_name
+        node_name = selected_node_name or node_name
+    else:
+        edge_name = edge_name or selected_edge_name
+        node_name = node_name or selected_node_name
 
     has_target = bool(edge_name or node_name)
     focus_pair = f"{edge_name or '—'} / {node_name or '—'}"
@@ -507,6 +533,7 @@ def build_onboarding_focus_region_payload(
     *,
     selected_edge: str | None = None,
     selected_node: str | None = None,
+    prefer_selected: bool = False,
     source: str = "onboarding",
     auto_focus: bool = False,
 ) -> dict[str, Any]:
@@ -515,6 +542,7 @@ def build_onboarding_focus_region_payload(
         idx,
         selected_edge=selected_edge,
         selected_node=selected_node,
+        prefer_selected=prefer_selected,
     )
     dataset_id = str(dataset.dataset_id) if dataset is not None else ""
     signature = f"{dataset_id}::{idx}::{focus_target.edge_name}::{focus_target.node_name}::{source}"
@@ -2308,10 +2336,19 @@ class StartupBannerPanel(QtWidgets.QFrame):
         idx: int,
         tracker: MnemoEventTracker,
         follow_enabled: bool,
+        selected_edge: str | None = None,
+        selected_node: str | None = None,
+        prefer_selected_focus: bool = False,
     ) -> None:
         self.title_label.setText(context.title)
         narrative = _build_frame_narrative(dataset, idx, selected_edge=None, selected_node=None)
-        focus_target = build_onboarding_focus_target(dataset, idx)
+        focus_target = build_onboarding_focus_target(
+            dataset,
+            idx,
+            selected_edge=selected_edge,
+            selected_node=selected_node,
+            prefer_selected=prefer_selected_focus,
+        )
         self._focus_available = focus_target.has_target
         self.focus_button.setEnabled(focus_target.has_target)
         self.focus_button.setToolTip(focus_target.summary)
@@ -2345,6 +2382,14 @@ class StartupBannerPanel(QtWidgets.QFrame):
                     bg="rgba(9,33,42,0.72)",
                 )
             )
+        if context.startup_time_s is not None:
+            badges.append(
+                self._pill(
+                    f"jump {context.startup_time_s:0.3f} s",
+                    fg="#f7d18b",
+                    bg="rgba(9,33,42,0.72)",
+                )
+            )
 
         checklist_html = "".join(f"<li>{escape(item)}</li>" for item in context.checklist[:4])
         if dataset is None or dataset.time_s.size == 0:
@@ -2354,11 +2399,18 @@ class StartupBannerPanel(QtWidgets.QFrame):
                 "</p>"
             )
         else:
+            startup_jump_html = ""
+            if context.startup_time_s is not None:
+                startup_jump_html = (
+                    f"<br/><b>Стартовый jump:</b> "
+                    f"{escape(context.startup_time_label or f'{context.startup_time_s:0.3f} s')}"
+                )
             focus_block = (
                 "<p style='margin:8px 0 0 0;'>"
                 f"<b>Первый инженерный фокус:</b> {escape(narrative.top_edge_name)} / {escape(narrative.top_node_name)}"
                 f"<br/><b>Текущий режим:</b> {escape(narrative.primary_title)}"
                 f"<br/><b>Подсветка onboarding:</b> {escape(focus_target.edge_name or '—')} / {escape(focus_target.node_name or '—')}"
+                f"{startup_jump_html}"
                 f"<br/><b>Bundle:</b> {escape(dataset.npz_path.name)}"
                 "</p>"
             )
@@ -2379,6 +2431,7 @@ class EventMemoryPanel(QtWidgets.QTextBrowser):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
         self.setOpenExternalLinks(False)
+        self._last_startup_anchor_signature = ""
 
     @staticmethod
     def _severity_badge(severity: str, title: str) -> str:
@@ -2406,6 +2459,27 @@ class EventMemoryPanel(QtWidgets.QTextBrowser):
         }
         return palette.get(str(severity), "#9cb9c7")
 
+    @staticmethod
+    def _event_anchor(event: MnemoTimelineEvent) -> str:
+        raw = (
+            f"{event.kind}|{event.severity}|{event.frame_idx}|{event.time_s:0.6f}|"
+            f"{event.title}|{event.edge_name}|{event.node_name}"
+        )
+        return f"event_{hashlib.sha1(raw.encode('utf-8')).hexdigest()[:14]}"
+
+    @staticmethod
+    def _event_card_style(*, highlighted: bool, accent: str) -> str:
+        if highlighted:
+            return (
+                "margin:0 0 8px 0; padding:10px 12px; border-radius:12px; "
+                f"background:rgba(27,55,68,0.92); border:1px solid {accent}; "
+                "box-shadow:0 0 0 1px rgba(238,246,248,0.05) inset;"
+            )
+        return (
+            "margin:0 0 8px 0; padding:8px 10px; border-radius:12px; "
+            "background:rgba(10,27,34,0.72); border:1px solid rgba(99,211,245,0.10);"
+        )
+
     def render(
         self,
         dataset: MnemoDataset | None,
@@ -2414,6 +2488,8 @@ class EventMemoryPanel(QtWidgets.QTextBrowser):
         tracker: MnemoEventTracker,
         playing: bool,
         follow_enabled: bool,
+        startup_event: MnemoTimelineEvent | None = None,
+        startup_time_label: str = "",
     ) -> None:
         if dataset is None or dataset.time_s.size == 0:
             self.setHtml(
@@ -2438,6 +2514,8 @@ class EventMemoryPanel(QtWidgets.QTextBrowser):
         state_text = "follow" if follow_enabled else "manual"
         playback_text = "play" if playing else "pause"
         sidecar_path = _event_log_sidecar_path(dataset.npz_path)
+        startup_anchor = self._event_anchor(startup_event) if startup_event is not None else ""
+        startup_anchor_signature = f"{dataset.dataset_id}:{startup_anchor}" if startup_anchor else ""
 
         live_badges = "".join(self._severity_badge(mode.severity, mode.title) for mode in live_modes)
         if not live_badges:
@@ -2445,9 +2523,12 @@ class EventMemoryPanel(QtWidgets.QTextBrowser):
 
         active_rows: list[str] = []
         for event in active_latched:
+            event_anchor = self._event_anchor(event)
+            is_startup_event = bool(startup_anchor and event_anchor == startup_anchor)
             active_rows.append(
-                '<div style="margin:0 0 8px 0; padding:8px 10px; border-radius:12px; '
-                'background:rgba(16,38,48,0.86); border:1px solid rgba(248,193,92,0.20);">'
+                f'<a name="{event_anchor}"></a>'
+                + f'<div style="{self._event_card_style(highlighted=is_startup_event, accent="#f8c15c")}">'
+                + (self._severity_badge("focus", "START") + " " if is_startup_event else "")
                 + self._severity_badge(event.severity, event.title)
                 + f"<div style='margin-top:6px; color:#d2e1e8;'>{escape(event.summary)}</div>"
                 + f"<div style='margin-top:4px; color:#8fb0bc;'>t={event.time_s:5.2f} s"
@@ -2462,9 +2543,12 @@ class EventMemoryPanel(QtWidgets.QTextBrowser):
 
         acked_rows: list[str] = []
         for event in acked_latched:
+            event_anchor = self._event_anchor(event)
+            is_startup_event = bool(startup_anchor and event_anchor == startup_anchor)
             acked_rows.append(
-                '<div style="margin:0 0 8px 0; padding:8px 10px; border-radius:12px; '
-                'background:rgba(10,27,34,0.72); border:1px solid rgba(129,231,163,0.18);">'
+                f'<a name="{event_anchor}"></a>'
+                + f'<div style="{self._event_card_style(highlighted=is_startup_event, accent="#81e7a3")}">'
+                + (self._severity_badge("focus", "START") + " " if is_startup_event else "")
                 + self._severity_badge("ok", "ACK")
                 + " "
                 + self._severity_badge(event.severity, event.title)
@@ -2480,9 +2564,12 @@ class EventMemoryPanel(QtWidgets.QTextBrowser):
 
         recent_rows: list[str] = []
         for event in recent:
+            event_anchor = self._event_anchor(event)
+            is_startup_event = bool(startup_anchor and event_anchor == startup_anchor)
             recent_rows.append(
-                "<div style='margin:0 0 6px 0; padding:8px 10px; border-radius:10px; "
-                "background:rgba(10,27,34,0.65); border:1px solid rgba(99,211,245,0.10);'>"
+                f'<a name="{event_anchor}"></a>'
+                + f"<div style='{self._event_card_style(highlighted=is_startup_event, accent='#63d3f5')}'>"
+                + (self._severity_badge("focus", "START") + " " if is_startup_event else "")
                 + self._severity_badge(event.severity, event.title)
                 + f"<div style='margin-top:5px; color:#d2e1e8;'>{escape(event.summary)}</div>"
                 + f"<div style='margin-top:4px; color:#8fb0bc;'>t={event.time_s:5.2f} s • кадр {event.frame_idx}</div>"
@@ -2500,6 +2587,24 @@ class EventMemoryPanel(QtWidgets.QTextBrowser):
                 f'style="position:absolute; left:calc({left:5.2f}% - 2px); top:{top}px; '
                 f'width:4px; height:{height}px; border-radius:999px; '
                 f'background:{self._severity_color(event.severity)}; opacity:0.92;"></div>'
+            )
+        startup_summary_html = ""
+        if startup_event is not None:
+            startup_summary_html = (
+                "<h4>Стартовая запись event-memory</h4>"
+                '<div style="margin:0 0 10px 0; padding:10px 12px; border-radius:14px; '
+                'background:rgba(16,38,48,0.92); border:1px solid rgba(99,211,245,0.22);">'
+                + self._severity_badge("focus", "START")
+                + " "
+                + self._severity_badge(startup_event.severity, startup_event.title)
+                + f"<div style='margin-top:6px; color:#d2e1e8;'>{escape(startup_event.summary)}</div>"
+                + f"<div style='margin-top:4px; color:#8fb0bc;'>"
+                + escape(startup_time_label or f"{startup_event.time_s:0.3f} s")
+                + (f" • {escape(startup_event.edge_name)}" if startup_event.edge_name else "")
+                + (f" • {escape(startup_event.node_name)}" if startup_event.node_name else "")
+                + "</div>"
+                + "<div style='margin-top:4px; color:#8fb0bc;'>Панель прокручена к этой записи один раз при открытии окна.</div>"
+                + "</div>"
             )
         cursor_left = 100.0 * max(0.0, min(1.0, (time_now - float(dataset.time_s[0])) / span))
         timeline_markers.append(
@@ -2519,13 +2624,14 @@ class EventMemoryPanel(QtWidgets.QTextBrowser):
             + "<p><b>Живые индикаторы кадра:</b><br/>"
             + live_badges
             + "</p>"
-            + "<p style='color:#8fb0bc;'><b>Управление:</b> используйте toolbar или меню "
-            "<b>События</b> для действий <b>ACK</b>, <b>Reset</b> и <b>Экспорт событий</b>."
-            + f"<br/><b>Sidecar:</b> {escape(str(sidecar_path.name))}</p>"
-            + "<h4>Активные latched-события</h4>"
-            + "".join(active_rows)
-            + "<h4>ACK-подтверждённые latched-события</h4>"
-            + "".join(acked_rows)
+             + "<p style='color:#8fb0bc;'><b>Управление:</b> используйте toolbar или меню "
+             "<b>События</b> для действий <b>ACK</b>, <b>Reset</b> и <b>Экспорт событий</b>."
+             + f"<br/><b>Sidecar:</b> {escape(str(sidecar_path.name))}</p>"
+             + startup_summary_html
+             + "<h4>Активные latched-события</h4>"
+             + "".join(active_rows)
+             + "<h4>ACK-подтверждённые latched-события</h4>"
+             + "".join(acked_rows)
             + "<h4>Мини-таймлайн событий</h4>"
             + '<div style="position:relative; height:36px; border-radius:12px; '
             'background:linear-gradient(180deg, rgba(16,38,48,0.95), rgba(9,20,26,0.95)); '
@@ -2534,9 +2640,14 @@ class EventMemoryPanel(QtWidgets.QTextBrowser):
             + "</div>"
             + f"<div style='display:flex; justify-content:space-between; color:#8fb0bc; margin-top:4px;'>"
             + f"<span>{float(dataset.time_s[0]):5.2f} s</span><span>{float(dataset.time_s[-1]):5.2f} s</span></div>"
-            + "<h4>Недавние события</h4>"
-            + ("".join(recent_rows) if recent_rows else "<p style='color:#8fb0bc;'>История пока пуста.</p>")
+             + "<h4>Недавние события</h4>"
+             + ("".join(recent_rows) if recent_rows else "<p style='color:#8fb0bc;'>История пока пуста.</p>")
         )
+        if startup_anchor_signature and startup_anchor_signature != self._last_startup_anchor_signature:
+            self._last_startup_anchor_signature = startup_anchor_signature
+            QtCore.QTimer.singleShot(0, lambda anchor=startup_anchor: self.scrollToAnchor(anchor))
+        elif not startup_anchor_signature:
+            self._last_startup_anchor_signature = ""
 
 
 class TrendsPanel(QtWidgets.QWidget):
@@ -2634,6 +2745,12 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         startup_title: str,
         startup_reason: str,
         startup_view_mode: str,
+        startup_time_s: float | None,
+        startup_time_label: str,
+        startup_edge: str,
+        startup_node: str,
+        startup_event_title: str,
+        startup_time_ref_npz: str,
         startup_checklist: list[str] | tuple[str, ...] | None,
     ):
         super().__init__()
@@ -2657,6 +2774,19 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._play_speed = 1.0
         self.event_tracker = MnemoEventTracker(max_events=96)
         self._last_event_log_path: Path | None = None
+        self._startup_time_s = float(startup_time_s) if startup_time_s is not None else None
+        self._startup_time_label = str(startup_time_label or "").strip()
+        self._startup_edge = str(startup_edge or "").strip()
+        self._startup_node = str(startup_node or "").strip()
+        self._startup_event_title = str(startup_event_title or "").strip()
+        self._startup_time_ref_npz = (
+            Path(startup_time_ref_npz).expanduser().resolve() if str(startup_time_ref_npz or "").strip() else None
+        )
+        self._startup_time_consumed = False
+        self._startup_selection_consumed = False
+        self._startup_selection_active = False
+        self._last_startup_seek_applied_label = ""
+        self._last_startup_selection_applied_label = ""
         self.launch_context = build_launch_onboarding_context(
             npz_path=npz_path,
             follow=self.follow_enabled,
@@ -2664,6 +2794,8 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             preset_key=startup_preset,
             title=startup_title,
             reason=startup_reason,
+            startup_time_s=self._startup_time_s,
+            startup_time_label=self._startup_time_label,
             checklist=startup_checklist,
         )
 
@@ -2687,6 +2819,9 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             idx=0,
             tracker=self.event_tracker,
             follow_enabled=self.follow_enabled,
+            selected_edge=None,
+            selected_node=None,
+            prefer_selected_focus=False,
         )
 
         self._central_host = QtWidgets.QWidget(self)
@@ -2722,7 +2857,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             "а чтение режима и чисел уходит в отдельные docks, как в современных инженерных HMI.</p>"
         )
         self.guide_panel.render(None, 0, selected_edge=None, selected_node=None, playing=self.playing, follow_enabled=self.follow_enabled)
-        self.event_panel.render(None, 0, tracker=self.event_tracker, playing=self.playing, follow_enabled=self.follow_enabled)
+        self._render_event_panel()
 
         self._overview_dock = self._add_dock("Обзор", self.overview_panel, QtCore.Qt.LeftDockWidgetArea, obj_name="dock_overview")
         self._selection_dock = self._add_dock("Выбор", self.selection_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_selection")
@@ -2894,6 +3029,61 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             return raw_mode
         return ""
 
+    def _consume_startup_seek_index(self, dataset: MnemoDataset | None) -> int | None:
+        if dataset is None or dataset.time_s.size == 0:
+            return None
+        if self._startup_time_consumed or self._startup_time_s is None:
+            return None
+        if self._startup_time_ref_npz is not None:
+            try:
+                if dataset.npz_path.resolve() != self._startup_time_ref_npz:
+                    return None
+            except Exception:
+                return None
+
+        target_time = float(self._startup_time_s)
+        idx = int(np.searchsorted(dataset.time_s, target_time, side="left"))
+        if idx >= dataset.time_s.size:
+            idx = dataset.time_s.size - 1
+        if idx > 0:
+            prev_idx = idx - 1
+            if abs(float(dataset.time_s[prev_idx]) - target_time) <= abs(float(dataset.time_s[idx]) - target_time):
+                idx = prev_idx
+        self._startup_time_consumed = True
+        applied_time = float(dataset.time_s[idx])
+        if self.launch_context.startup_time_label:
+            self._last_startup_seek_applied_label = f"{self.launch_context.startup_time_label} -> {applied_time:0.3f} s"
+        else:
+            self._last_startup_seek_applied_label = f"{applied_time:0.3f} s"
+        return int(idx)
+
+    def _consume_startup_focus_selection(
+        self,
+        dataset: MnemoDataset | None,
+    ) -> tuple[str | None, str | None]:
+        if dataset is None or dataset.time_s.size == 0:
+            return None, None
+        if self._startup_selection_consumed:
+            return None, None
+        if not self._startup_edge and not self._startup_node:
+            return None, None
+        if self._startup_time_ref_npz is not None:
+            try:
+                if dataset.npz_path.resolve() != self._startup_time_ref_npz:
+                    return None, None
+            except Exception:
+                return None, None
+
+        startup_edge = self._startup_edge if self._startup_edge in dataset.edge_names else None
+        startup_node = self._startup_node if self._startup_node in dataset.node_names else None
+        self._startup_selection_consumed = True
+        self._startup_selection_active = bool(startup_edge or startup_node)
+        if self._startup_selection_active:
+            self._last_startup_selection_applied_label = f"{startup_edge or '—'} / {startup_node or '—'}"
+        else:
+            self._last_startup_selection_applied_label = ""
+        return startup_edge, startup_node
+
     def _set_view_mode(self, mode: str, *, persist: bool) -> str:
         self.view_mode = self._normalize_view_mode(mode)
         if persist:
@@ -2921,6 +3111,64 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             idx=self.current_idx,
             tracker=self.event_tracker,
             follow_enabled=self.follow_enabled,
+            selected_edge=self.selected_edge,
+            selected_node=self.selected_node,
+            prefer_selected_focus=self._startup_selection_active,
+        )
+
+    def _resolve_startup_event_target(self) -> MnemoTimelineEvent | None:
+        if self.dataset is None or self.dataset.time_s.size == 0:
+            return None
+        if self._startup_time_ref_npz is not None:
+            try:
+                if self.dataset.npz_path.resolve() != self._startup_time_ref_npz:
+                    return None
+            except Exception:
+                return None
+        if not (
+            self._startup_event_title
+            or self._startup_time_s is not None
+            or self._startup_edge
+            or self._startup_node
+        ):
+            return None
+
+        best_event: MnemoTimelineEvent | None = None
+        best_score = float("-inf")
+        for event in self.event_tracker.events:
+            score = 0.0
+            if self._startup_event_title:
+                if event.title == self._startup_event_title:
+                    score += 240.0
+                elif self._startup_event_title in event.summary:
+                    score += 80.0
+                elif event.title and event.title in self._startup_event_title:
+                    score += 40.0
+            if self._startup_edge and event.edge_name == self._startup_edge:
+                score += 60.0
+            if self._startup_node and event.node_name == self._startup_node:
+                score += 60.0
+            if self._startup_time_s is not None:
+                delta = abs(float(event.time_s) - float(self._startup_time_s))
+                score += max(0.0, 36.0 - delta * 120.0)
+            if event.severity in {"warn", "attention", "focus"}:
+                score += 8.0
+            if event.kind == "session":
+                score -= 18.0
+            if score > best_score:
+                best_score = score
+                best_event = event
+        return best_event if best_event is not None and best_score > 0.0 else None
+
+    def _render_event_panel(self) -> None:
+        self.event_panel.render(
+            self.dataset,
+            self.current_idx,
+            tracker=self.event_tracker,
+            playing=self.playing,
+            follow_enabled=self.follow_enabled,
+            startup_event=self._resolve_startup_event_target(),
+            startup_time_label=self._startup_time_label,
         )
 
     def _current_focus_region_payload(self, *, source: str, auto_focus: bool) -> dict[str, Any] | None:
@@ -2931,6 +3179,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.current_idx,
             selected_edge=self.selected_edge,
             selected_node=self.selected_node,
+            prefer_selected=self._startup_selection_active,
             source=source,
             auto_focus=auto_focus,
         )
@@ -2984,6 +3233,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.current_idx,
             selected_edge=self.selected_edge,
             selected_node=self.selected_node,
+            prefer_selected=self._startup_selection_active,
         )
         if not focus_target.has_target:
             self._set_status("Onboarding focus пока не вычислен для текущего кадра.")
@@ -3071,13 +3321,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             playing=self.playing,
             follow_enabled=self.follow_enabled,
         )
-        self.event_panel.render(
-            self.dataset,
-            self.current_idx,
-            tracker=self.event_tracker,
-            playing=self.playing,
-            follow_enabled=self.follow_enabled,
-        )
+        self._render_event_panel()
         self._render_startup_banner()
 
     def _toggle_play(self, checked: bool) -> None:
@@ -3098,13 +3342,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             playing=self.playing,
             follow_enabled=self.follow_enabled,
         )
-        self.event_panel.render(
-            self.dataset,
-            self.current_idx,
-            tracker=self.event_tracker,
-            playing=self.playing,
-            follow_enabled=self.follow_enabled,
-        )
+        self._render_event_panel()
 
     def _jump_to_start(self) -> None:
         self.current_idx = 0
@@ -3117,13 +3355,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         if not acked:
             self._set_status("ACK: активных latched-событий нет.")
             return
-        self.event_panel.render(
-            self.dataset,
-            self.current_idx,
-            tracker=self.event_tracker,
-            playing=self.playing,
-            follow_enabled=self.follow_enabled,
-        )
+        self._render_event_panel()
         self._persist_event_log(silent=True)
         self._set_status(f"ACK: подтверждено {len(acked)} latched-событий.")
 
@@ -3131,13 +3363,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         if self.dataset is None:
             return
         self.event_tracker.reset_memory(self.dataset, idx=self.current_idx)
-        self.event_panel.render(
-            self.dataset,
-            self.current_idx,
-            tracker=self.event_tracker,
-            playing=self.playing,
-            follow_enabled=self.follow_enabled,
-        )
+        self._render_event_panel()
         self._persist_event_log(silent=True)
         self._set_status("Память событий сброшена к текущему кадру.")
 
@@ -3180,8 +3406,17 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         try:
             old_edge = self.selected_edge if preserve_selection else None
             old_node = self.selected_node if preserve_selection else None
+            self._last_startup_seek_applied_label = ""
+            self._last_startup_selection_applied_label = ""
+            if not preserve_selection:
+                self._startup_selection_active = False
             self.dataset = prepare_dataset(Path(npz_path))
-            self.current_idx = min(self.current_idx, max(0, self.dataset.time_s.size - 1))
+            startup_seek_idx = self._consume_startup_seek_index(self.dataset)
+            startup_focus_edge, startup_focus_node = self._consume_startup_focus_selection(self.dataset)
+            if startup_seek_idx is not None:
+                self.current_idx = startup_seek_idx
+            else:
+                self.current_idx = min(self.current_idx, max(0, self.dataset.time_s.size - 1))
             self.scrubber.setMaximum(max(0, self.dataset.time_s.size - 1))
             self.selection_panel.set_inventory(self.dataset.edge_names, self.dataset.node_names)
 
@@ -3200,6 +3435,10 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
                     old_edge = focus_target.edge_name
                 if focus_target.node_name in self.dataset.node_names:
                     old_node = focus_target.node_name
+            if startup_focus_edge in self.dataset.edge_names:
+                old_edge = startup_focus_edge
+            if startup_focus_node in self.dataset.node_names:
+                old_node = startup_focus_node
 
             self.selected_edge = old_edge
             self.selected_node = old_node
@@ -3212,7 +3451,12 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self._persist_event_log(silent=True)
             self._set_dataset_title()
             self._render_startup_banner()
-            self._set_status(f"Загружено: {self.dataset.npz_path.name}")
+            status = f"Загружено: {self.dataset.npz_path.name}"
+            if self._last_startup_seek_applied_label:
+                status += f" • старт у {self._last_startup_seek_applied_label}"
+            if self._last_startup_selection_applied_label:
+                status += f" • фокус {self._last_startup_selection_applied_label}"
+            self._set_status(status)
         except Exception as exc:
             QtWidgets.QMessageBox.critical(self, "Desktop Mnemo", _friendly_error_text(exc))
             self._set_status(f"Ошибка загрузки: {exc}")
@@ -3236,13 +3480,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             playing=self.playing,
             follow_enabled=self.follow_enabled,
         )
-        self.event_panel.render(
-            self.dataset,
-            self.current_idx,
-            tracker=self.event_tracker,
-            playing=self.playing,
-            follow_enabled=self.follow_enabled,
-        )
+        self._render_event_panel()
         if self.startup_banner.isVisible() and not self.playing:
             self._render_startup_banner()
         if new_events:
@@ -3283,12 +3521,14 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
     def _select_edge(self, edge_name: str) -> None:
         if not edge_name or self.dataset is None or edge_name not in self.dataset.edge_names:
             return
+        self._startup_selection_active = False
         self.selected_edge = edge_name
         self._sync_selection_views(clear_focus_region=True)
 
     def _select_node(self, node_name: str) -> None:
         if not node_name or self.dataset is None or node_name not in self.dataset.node_names:
             return
+        self._startup_selection_active = False
         self.selected_node = node_name
         self._sync_selection_views(clear_focus_region=True)
 
@@ -3303,6 +3543,12 @@ def run_app(
     startup_title: str = "",
     startup_reason: str = "",
     startup_view_mode: str = "",
+    startup_time_s: float | None = None,
+    startup_time_label: str = "",
+    startup_edge: str = "",
+    startup_node: str = "",
+    startup_event_title: str = "",
+    startup_time_ref_npz: str = "",
     startup_checklist: list[str] | tuple[str, ...] | None = None,
 ) -> int:
     app = QtWidgets.QApplication.instance()
@@ -3322,6 +3568,12 @@ def run_app(
         startup_title=startup_title,
         startup_reason=startup_reason,
         startup_view_mode=startup_view_mode,
+        startup_time_s=startup_time_s,
+        startup_time_label=startup_time_label,
+        startup_edge=startup_edge,
+        startup_node=startup_node,
+        startup_event_title=startup_event_title,
+        startup_time_ref_npz=startup_time_ref_npz,
         startup_checklist=startup_checklist,
     )
     window.show()

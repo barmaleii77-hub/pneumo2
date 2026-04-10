@@ -21,6 +21,7 @@ import streamlit as st
 
 from pneumo_solver_ui.desktop_mnemo.settings_bridge import (
     desktop_mnemo_view_mode_label,
+    infer_desktop_mnemo_startup_seek,
     read_desktop_mnemo_view_mode,
 )
 from pneumo_solver_ui.run_artifacts import (
@@ -148,6 +149,12 @@ def _launch_mnemo(
     startup_title: str = "",
     startup_reason: str = "",
     startup_view_mode: str = "",
+    startup_time_s: float | None = None,
+    startup_time_label: str = "",
+    startup_edge: str = "",
+    startup_node: str = "",
+    startup_event_title: str = "",
+    startup_time_ref_npz: Path | None = None,
     startup_checks: list[str] | None = None,
 ) -> tuple[bool, str]:
     py = _venv_python(prefer_gui=True)
@@ -165,6 +172,18 @@ def _launch_mnemo(
         cmd += ["--startup-reason", str(startup_reason)]
     if startup_view_mode:
         cmd += ["--startup-view-mode", str(startup_view_mode)]
+    if startup_time_s is not None:
+        cmd += ["--startup-time-s", f"{float(startup_time_s):0.6f}"]
+    if startup_time_label:
+        cmd += ["--startup-time-label", str(startup_time_label)]
+    if startup_edge:
+        cmd += ["--startup-edge", str(startup_edge)]
+    if startup_node:
+        cmd += ["--startup-node", str(startup_node)]
+    if startup_event_title:
+        cmd += ["--startup-event-title", str(startup_event_title)]
+    if startup_time_ref_npz is not None:
+        cmd += ["--startup-time-ref-npz", str(Path(startup_time_ref_npz).expanduser().resolve())]
     for item in startup_checks or []:
         text = str(item).strip()
         if text:
@@ -260,6 +279,11 @@ launcher_diag = collect_anim_latest_diagnostics_summary(
     include_meta=False,
 )
 operator_recommendations = build_anim_operator_recommendations(launcher_diag)
+pointer_startup_seek = (
+    infer_desktop_mnemo_startup_seek(pointer_npz_path)
+    if pointer_npz_path is not None and pointer_npz_path.exists()
+    else {"available": False, "label": "Старт с начала прогона", "reason": ""}
+)
 if operator_recommendations:
     st.subheader("Рекомендуемые действия перед запуском")
     rec_col1, rec_col2, rec_col3, rec_col4, rec_col5 = st.columns(5)
@@ -272,6 +296,15 @@ if operator_recommendations:
     st.markdown("\n".join(f"{idx}. {item}" for idx, item in enumerate(operator_recommendations, start=1)))
 else:
     st.caption(f"Desktop Mnemo сейчас будет открываться в режиме: {persisted_view_mode_label}.")
+if pointer_startup_seek.get("available"):
+    st.caption(
+        "Старт по времени для текущего anim_latest: "
+        f"{pointer_startup_seek.get('label')}. {pointer_startup_seek.get('reason')}"
+    )
+    if pointer_startup_seek.get("focus_label"):
+        st.caption(f"Стартовый фокус при открытии окна: {pointer_startup_seek.get('focus_label')}.")
+    if pointer_startup_seek.get("event_title"):
+        st.caption(f'Стартовая запись в dock "События": {pointer_startup_seek.get("event_title")}.')
 
 
 st.subheader("Зависимости Desktop Mnemo")
@@ -391,6 +424,12 @@ if st.button(mnemo_preset_label, width="stretch"):
         startup_title=mnemo_preset_title,
         startup_reason=mnemo_preset_reason,
         startup_view_mode=launch_view_mode,
+        startup_time_s=(float(pointer_startup_seek["time_s"]) if pointer_startup_seek.get("available") else None),
+        startup_time_label=str(pointer_startup_seek.get("label") or ""),
+        startup_edge=str(pointer_startup_seek.get("edge_name") or ""),
+        startup_node=str(pointer_startup_seek.get("node_name") or ""),
+        startup_event_title=str(pointer_startup_seek.get("event_title") or ""),
+        startup_time_ref_npz=(pointer_npz_path if pointer_npz_path is not None and pointer_npz_path.exists() else None),
         startup_checks=mnemo_preset_checks,
     )
     if ok:
@@ -403,7 +442,17 @@ st.divider()
 launch_col1, launch_col2, launch_col3 = st.columns([1.2, 1.2, 1.0])
 with launch_col1:
     if st.button("Запустить Desktop Mnemo (follow)", width="stretch"):
-        ok, msg = _launch_mnemo(theme=str(theme), follow=True, startup_view_mode=launch_view_mode)
+        ok, msg = _launch_mnemo(
+            theme=str(theme),
+            follow=True,
+            startup_view_mode=launch_view_mode,
+            startup_time_s=(float(pointer_startup_seek["time_s"]) if pointer_startup_seek.get("available") else None),
+            startup_time_label=str(pointer_startup_seek.get("label") or ""),
+            startup_edge=str(pointer_startup_seek.get("edge_name") or ""),
+            startup_node=str(pointer_startup_seek.get("node_name") or ""),
+            startup_event_title=str(pointer_startup_seek.get("event_title") or ""),
+            startup_time_ref_npz=(pointer_npz_path if pointer_npz_path is not None and pointer_npz_path.exists() else None),
+        )
         if ok:
             st.success(msg)
         else:
@@ -413,7 +462,17 @@ with launch_col2:
     disabled_npz = not bool(pointer_npz_path and pointer_npz_path.exists())
     if st.button("Запустить по текущему NPZ", width="stretch", disabled=disabled_npz):
         assert pointer_npz_path is not None
-        ok, msg = _launch_mnemo(theme=str(theme), npz_path=pointer_npz_path, startup_view_mode=launch_view_mode)
+        ok, msg = _launch_mnemo(
+            theme=str(theme),
+            npz_path=pointer_npz_path,
+            startup_view_mode=launch_view_mode,
+            startup_time_s=(float(pointer_startup_seek["time_s"]) if pointer_startup_seek.get("available") else None),
+            startup_time_label=str(pointer_startup_seek.get("label") or ""),
+            startup_edge=str(pointer_startup_seek.get("edge_name") or ""),
+            startup_node=str(pointer_startup_seek.get("node_name") or ""),
+            startup_event_title=str(pointer_startup_seek.get("event_title") or ""),
+            startup_time_ref_npz=pointer_npz_path,
+        )
         if ok:
             st.success(msg)
         else:

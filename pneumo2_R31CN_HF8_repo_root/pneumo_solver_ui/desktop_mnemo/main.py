@@ -33,6 +33,37 @@ def main(argv: list[str] | None = None) -> int:
         default="",
         help="Optional one-off startup view override: focus or overview",
     )
+    ap.add_argument("--startup-time-s", type=float, default=None, help="Optional one-off startup seek time in seconds")
+    ap.add_argument(
+        "--startup-time-label",
+        type=str,
+        default="",
+        help="Optional human-readable startup time label for onboarding banner",
+    )
+    ap.add_argument(
+        "--startup-edge",
+        type=str,
+        default="",
+        help="Optional startup edge selection inferred from Desktop Mnemo event-log",
+    )
+    ap.add_argument(
+        "--startup-node",
+        type=str,
+        default="",
+        help="Optional startup node selection inferred from Desktop Mnemo event-log",
+    )
+    ap.add_argument(
+        "--startup-event-title",
+        type=str,
+        default="",
+        help="Optional startup event title used to focus the event-memory dock",
+    )
+    ap.add_argument(
+        "--startup-time-ref-npz",
+        type=str,
+        default="",
+        help="Optional NPZ path that startup-time hint belongs to; used to avoid applying it to the wrong dataset",
+    )
     ap.add_argument(
         "--startup-check",
         action="append",
@@ -63,6 +94,12 @@ def main(argv: list[str] | None = None) -> int:
             startup_title=str(args.startup_title or ""),
             startup_reason=str(args.startup_reason or ""),
             startup_view_mode=str(args.startup_view_mode or ""),
+            startup_time_s=(float(args.startup_time_s) if args.startup_time_s is not None else None),
+            startup_time_label=str(args.startup_time_label or ""),
+            startup_edge=str(args.startup_edge or ""),
+            startup_node=str(args.startup_node or ""),
+            startup_event_title=str(args.startup_event_title or ""),
+            startup_time_ref_npz=str(args.startup_time_ref_npz or ""),
             startup_checklist=list(args.startup_check or []),
         )
     )

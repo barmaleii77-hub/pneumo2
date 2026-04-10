@@ -27,6 +27,7 @@ import streamlit as st
 
 from pneumo_solver_ui.desktop_mnemo.settings_bridge import (
     desktop_mnemo_view_mode_label,
+    infer_desktop_mnemo_startup_seek,
     read_desktop_mnemo_view_mode,
 )
 from pneumo_solver_ui.entrypoints import desktop_animator_page_rel, desktop_mnemo_page_rel
@@ -140,6 +141,12 @@ def _launch_desktop_mnemo_from_cockpit(
     startup_title: str = "",
     startup_reason: str = "",
     startup_view_mode: str = "",
+    startup_time_s: Optional[float] = None,
+    startup_time_label: str = "",
+    startup_edge: str = "",
+    startup_node: str = "",
+    startup_event_title: str = "",
+    startup_time_ref_npz: Optional[Path] = None,
     startup_checks: Optional[List[str]] = None,
 ) -> tuple[bool, str]:
     py = _desktop_mnemo_python(prefer_gui=True)
@@ -157,6 +164,18 @@ def _launch_desktop_mnemo_from_cockpit(
         cmd += ["--startup-reason", str(startup_reason)]
     if startup_view_mode:
         cmd += ["--startup-view-mode", str(startup_view_mode)]
+    if startup_time_s is not None:
+        cmd += ["--startup-time-s", f"{float(startup_time_s):0.6f}"]
+    if startup_time_label:
+        cmd += ["--startup-time-label", str(startup_time_label)]
+    if startup_edge:
+        cmd += ["--startup-edge", str(startup_edge)]
+    if startup_node:
+        cmd += ["--startup-node", str(startup_node)]
+    if startup_event_title:
+        cmd += ["--startup-event-title", str(startup_event_title)]
+    if startup_time_ref_npz is not None:
+        cmd += ["--startup-time-ref-npz", str(Path(startup_time_ref_npz).expanduser().resolve())]
     for item in startup_checks or []:
         text = str(item).strip()
         if text:
@@ -465,6 +484,7 @@ def render_validation_cockpit_web() -> None:
         include_meta=False,
     )
     operator_recommendations = build_anim_operator_recommendations(mnemo_event_diag)
+    cockpit_startup_seek = infer_desktop_mnemo_startup_seek(current_npz_path)
     cockpit_launch_view_choice = st.radio(
         "Разовый режим запуска Desktop Mnemo из cockpit",
         ["Как сохранено", "Фокусный сценарий", "Полная схема"],
@@ -484,6 +504,15 @@ def render_validation_cockpit_web() -> None:
         "Desktop Mnemo из cockpit откроется в режиме: "
         f"{cockpit_launch_view_label}. Saved default: {_desktop_mnemo_default_view_mode_label()}."
     )
+    if cockpit_startup_seek.get("available"):
+        st.caption(
+            "Старт по времени из cockpit: "
+            f"{cockpit_startup_seek.get('label')}. {cockpit_startup_seek.get('reason')}"
+        )
+        if cockpit_startup_seek.get("focus_label"):
+            st.caption(f"Стартовый фокус окна из cockpit: {cockpit_startup_seek.get('focus_label')}.")
+        if cockpit_startup_seek.get("event_title"):
+            st.caption(f'Стартовая запись в dock "События" из cockpit: {cockpit_startup_seek.get("event_title")}.')
 
     if isinstance(geometry_acceptance, dict) and geometry_acceptance:
         ga_gate = str(geometry_acceptance.get("release_gate") or "MISSING")
@@ -529,6 +558,12 @@ def render_validation_cockpit_web() -> None:
                     f"к причинно-следственной схеме по текущему NPZ {current_npz_path.name}."
                 ),
                 startup_view_mode=cockpit_launch_view_mode,
+                startup_time_s=(float(cockpit_startup_seek["time_s"]) if cockpit_startup_seek.get("available") else None),
+                startup_time_label=str(cockpit_startup_seek.get("label") or ""),
+                startup_edge=str(cockpit_startup_seek.get("edge_name") or ""),
+                startup_node=str(cockpit_startup_seek.get("node_name") or ""),
+                startup_event_title=str(cockpit_startup_seek.get("event_title") or ""),
+                startup_time_ref_npz=current_npz_path,
                 startup_checks=cockpit_mnemo_checks,
             )
             if ok:
@@ -546,6 +581,12 @@ def render_validation_cockpit_web() -> None:
                     "чтобы сопоставить web-наблюдения с текущим pointer и свежими latched-событиями."
                 ),
                 startup_view_mode=cockpit_launch_view_mode,
+                startup_time_s=(float(cockpit_startup_seek["time_s"]) if cockpit_startup_seek.get("available") else None),
+                startup_time_label=str(cockpit_startup_seek.get("label") or ""),
+                startup_edge=str(cockpit_startup_seek.get("edge_name") or ""),
+                startup_node=str(cockpit_startup_seek.get("node_name") or ""),
+                startup_event_title=str(cockpit_startup_seek.get("event_title") or ""),
+                startup_time_ref_npz=current_npz_path,
                 startup_checks=cockpit_mnemo_checks,
             )
             if ok:

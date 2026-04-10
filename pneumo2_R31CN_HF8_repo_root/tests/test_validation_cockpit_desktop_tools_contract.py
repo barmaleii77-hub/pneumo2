@@ -7,6 +7,7 @@ def test_validation_cockpit_links_to_desktop_mnemo_and_animator() -> None:
     src = (Path(__file__).resolve().parents[1] / "pneumo_solver_ui" / "validation_cockpit_web.py").read_text(encoding="utf-8")
 
     assert "from pneumo_solver_ui.desktop_mnemo.settings_bridge import (" in src
+    assert "infer_desktop_mnemo_startup_seek" in src
     assert "from pneumo_solver_ui.entrypoints import desktop_animator_page_rel, desktop_mnemo_page_rel" in src
     assert "from pneumo_solver_ui.run_artifacts import collect_anim_latest_diagnostics_summary, local_anim_latest_export_paths" in src
     assert "from pneumo_solver_ui.tools.send_bundle_contract import build_anim_operator_recommendations" in src
@@ -22,6 +23,14 @@ def test_validation_cockpit_links_to_desktop_mnemo_and_animator() -> None:
     assert "validation_cockpit_npz_review" in src
     assert "validation_cockpit_follow_live" in src
     assert 'startup_view_mode=cockpit_launch_view_mode' in src
+    assert 'startup_time_s=(float(cockpit_startup_seek["time_s"]) if cockpit_startup_seek.get("available") else None)' in src
+    assert "Старт по времени из cockpit" in src
+    assert "--startup-time-label" in src
+    assert "--startup-edge" in src
+    assert "--startup-node" in src
+    assert "--startup-event-title" in src
+    assert "Стартовый фокус окна из cockpit" in src
+    assert 'Стартовая запись в dock "События" из cockpit' in src
     assert "Прямой запуск из cockpit открывает отдельное Windows-окно без перехода на launcher-page." in src
     assert "Открыть Desktop Mnemo" in src
     assert "Открыть Desktop Animator" in src

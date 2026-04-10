@@ -169,6 +169,29 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     assert focus_payload["source"] == "dataset_load"
     assert "Регуляторный коридор" in focus_payload["summary"]
 
+    selected_focus_target = build_onboarding_focus_target(
+        dataset,
+        1,
+        selected_edge="обратный_клапан_Pmid_к_выхлопу",
+        selected_node="узел_после_рег_Pmid",
+        prefer_selected=True,
+    )
+    assert selected_focus_target.edge_name == "обратный_клапан_Pmid_к_выхлопу"
+    assert selected_focus_target.node_name == "узел_после_рег_Pmid"
+
+    selected_focus_payload = build_onboarding_focus_region_payload(
+        dataset,
+        1,
+        selected_edge="обратный_клапан_Pmid_к_выхлопу",
+        selected_node="узел_после_рег_Pmid",
+        prefer_selected=True,
+        source="startup_handoff",
+        auto_focus=True,
+    )
+    assert selected_focus_payload["edge_name"] == "обратный_клапан_Pmid_к_выхлопу"
+    assert selected_focus_payload["node_name"] == "узел_после_рег_Pmid"
+    assert selected_focus_payload["source"] == "startup_handoff"
+
 
 def test_mnemo_event_tracker_latches_warn_and_mode_switches(tmp_path: Path) -> None:
     pytest.importorskip("PySide6")
@@ -322,6 +345,8 @@ def test_build_launch_onboarding_context_supports_defaults_and_explicit_preset()
         preset_key="operational_follow_triage",
         title="Оперативный follow-разбор",
         reason="Есть активные latch-события и нужен live triage.",
+        startup_time_s=1.25,
+        startup_time_label="1.250 s · Большой перепад давлений",
         checklist=[
             "Сначала подтвердите ведущую ветку.",
             "ACK делайте только после сверки со схемой.",
@@ -331,7 +356,10 @@ def test_build_launch_onboarding_context_supports_defaults_and_explicit_preset()
     assert follow_ctx.preset_key == "operational_follow_triage"
     assert follow_ctx.title == "Оперативный follow-разбор"
     assert "live triage" in follow_ctx.reason
-    assert follow_ctx.checklist[0] == "Сначала подтвердите ведущую ветку."
+    assert "1.250 s" in follow_ctx.reason
+    assert follow_ctx.checklist[0] == "Сначала проверьте кадр около 1.250 s · Большой перепад давлений и убедитесь, что режим на схеме совпадает с ожиданием."
+    assert follow_ctx.startup_time_s == pytest.approx(1.25)
+    assert follow_ctx.startup_time_label == "1.250 s · Большой перепад давлений"
 
     review_ctx = build_launch_onboarding_context(
         npz_path=Path("C:/repo/workspace/exports/case_a.npz"),
@@ -342,6 +370,7 @@ def test_build_launch_onboarding_context_supports_defaults_and_explicit_preset()
     assert review_ctx.preset_key == "npz"
     assert review_ctx.title == "Ретроспективный разбор NPZ"
     assert any("фиксированный сценарий" in item for item in review_ctx.checklist)
+    assert review_ctx.startup_time_s is None
 
     waiting_focus = build_onboarding_focus_target(None, 0)
     assert waiting_focus.has_target is False
