@@ -95,8 +95,8 @@ def _parse_divergence(raw_counts: str) -> tuple[int, int]:
     if len(parts) != 2:
         return 0, 0
     try:
-        ahead = int(parts[1])
-        behind = int(parts[0])
+        ahead = int(parts[0])
+        behind = int(parts[1])
     except ValueError:
         return 0, 0
     return ahead, behind
