@@ -12,6 +12,7 @@ from pneumo_solver_ui.ui_svg_mapping_selection_helpers import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+SURFACE_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_svg_mapping_selection_helpers.py"
 SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_svg_animation_section_helpers.py"
 POST_MAPPING_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_svg_post_mapping_helpers.py"
@@ -114,6 +115,7 @@ def test_render_and_prepare_svg_mapping_selection_report() -> None:
 def test_entrypoints_use_shared_svg_mapping_selection_helper() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = SURFACE_HELPERS_PATH.read_text(encoding="utf-8")
     helper_text = HELPERS_PATH.read_text(encoding="utf-8")
     section_text = SECTION_HELPERS_PATH.read_text(encoding="utf-8")
     post_mapping_text = POST_MAPPING_HELPERS_PATH.read_text(encoding="utf-8")
@@ -121,10 +123,8 @@ def test_entrypoints_use_shared_svg_mapping_selection_helper() -> None:
     workbench_text = WORKBENCH_HELPERS_PATH.read_text(encoding="utf-8")
     tools_text = TOOLS_HELPERS_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_svg_scheme_section_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_svg_scheme_section_helpers import (" in heavy_text
-    assert "render_svg_scheme_section(" in app_text
-    assert "render_svg_scheme_section(" in heavy_text
+    assert "from pneumo_solver_ui.ui_svg_scheme_section_helpers import render_svg_scheme_section" in surface_text
+    assert '"render_svg_scheme_section_fn": render_svg_scheme_section' in surface_text
     assert "prepare_svg_mapping_selection(" not in app_text
     assert "prepare_svg_mapping_selection(" not in heavy_text
     assert "ensure_mapping_for_selection," not in app_text

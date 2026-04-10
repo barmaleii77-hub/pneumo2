@@ -18,6 +18,7 @@ def test_extract_anim_sidecar_meta_infers_ring_scenario_and_effective_v0(tmp_pat
         json.dumps(
             {
                 "schema": "ring_v2",
+                "closure_policy": "strict_exact",
                 "v0_kph": 0.0,
                 "segments": [
                     {"name": "S1", "drive_mode": "STRAIGHT", "duration_s": 5.0, "speed_kph": 40.0, "road": {"mode": "ISO8608", "iso_class": "C"}},
@@ -43,6 +44,10 @@ def test_extract_anim_sidecar_meta_infers_ring_scenario_and_effective_v0(tmp_pat
     assert abs(float(meta["vx0_м_с"]) - (40.0 / 3.6)) < 1e-9
     assert abs(float(meta["ring_v0_kph"]) - 40.0) < 1e-9
     assert float(meta["ring_nominal_speed_max_mps"]) >= float(meta["ring_nominal_speed_min_mps"]) > 0.0
+    assert meta["ring_closure_policy"] == "strict_exact"
+    assert "ring_seam_open" in meta
+    assert "ring_seam_max_jump_m" in meta
+    assert "ring_raw_seam_max_jump_m" in meta
 
 
 def test_extract_anim_sidecar_meta_keeps_non_ring_speed() -> None:
@@ -55,6 +60,10 @@ def test_animation_cockpit_passes_ring_visual_to_minimap_and_profile() -> None:
     src = (ROOT / "pneumo_solver_ui" / "animation_cockpit_web.py").read_text(encoding="utf-8")
     assert "ring_visual=ring_visual" in src
     assert src.count("ring_visual=ring_visual") >= 2
+    assert "strict_exact (шов как задан)" in src
+    assert "closed_c1_periodic (плавное замыкание C1)" in src
+    assert "шов открыт" in src
+    assert "шов замкнут" in src
 
 
 def test_minimap_and_road_profile_have_segment_overlay_hooks() -> None:
@@ -63,8 +72,19 @@ def test_minimap_and_road_profile_have_segment_overlay_hooks() -> None:
     assert "drawRingSegmentOverlay" in mini
     assert "badgeSeg" in mini
     assert "turn_direction_label" in mini
+    assert "road_mode_label" in mini
+    assert "const endEps = Math.max(1e-9, 1e-6 * L);" in mini
+    assert "if (Math.abs(x) <= endEps && raw > endEps) return L;" in mini
+    assert "__segContains(seg, sMod, i === segs.length - 1)" in mini
+    assert "return segs[segs.length - 1] || null;" in mini
     assert "DATA.ring_visual" in mini
     assert "drawRingSegmentBands" in prof
     assert "segNowName" in prof
     assert "turn_direction_label" in prof
+    assert "road_mode_label" in prof
+    assert "const endEps = Math.max(1e-9, 1e-6 * L);" in prof
+    assert "if (Math.abs(x) <= endEps && raw > endEps) return L;" in prof
+    assert "const isLast = (i === segs.length - 1);" in prof
+    assert "sMod < x1 - 1e-9 || (isLast && sMod <= x1 + 1e-9)" in prof
+    assert "return segs[segs.length - 1] || null;" in prof
     assert "DATA.ring_visual" in prof

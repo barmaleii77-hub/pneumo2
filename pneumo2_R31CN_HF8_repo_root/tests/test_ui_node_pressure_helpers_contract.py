@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
 GRAPH_SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_graph_section_helpers.py"
+SURFACE_SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 
 
 def test_resolve_default_node_pressure_selection_and_render_expander() -> None:
@@ -74,12 +75,11 @@ def test_resolve_default_node_pressure_selection_and_render_expander() -> None:
 def test_entrypoints_use_shared_node_pressure_helper() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
-    assert "from pneumo_solver_ui.ui_node_pressure_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_node_pressure_helpers import (" in heavy_text
+    surface_text = SURFACE_SECTION_HELPERS_PATH.read_text(encoding="utf-8")
+    assert "from pneumo_solver_ui.ui_node_pressure_helpers import render_node_pressure_expander" in surface_text
     assert "render_node_pressure_expander(" not in app_text
     assert "render_node_pressure_expander(" not in heavy_text
-    assert '"render_node_pressure_expander_fn": render_node_pressure_expander' in app_text
-    assert '"render_node_pressure_expander_fn": render_node_pressure_expander' in heavy_text
+    assert '"render_node_pressure_expander_fn": render_node_pressure_expander' in surface_text
     assert 'with st.expander("Давление узлов (df_p)", expanded=False):' not in app_text
     assert 'with st.expander("Давление узлов (df_p)", expanded=False):' not in heavy_text
     assert 'key="node_pressure_plot"' not in app_text

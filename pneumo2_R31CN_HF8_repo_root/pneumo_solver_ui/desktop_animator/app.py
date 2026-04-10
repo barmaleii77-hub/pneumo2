@@ -427,7 +427,7 @@ def _set_table_item_text_if_changed(item: Optional[QtWidgets.QTableWidgetItem], 
         pass
 
 
-def _set_progress_value_if_changed(pb: Optional[QtWidgets.QProgressBar], value: int) -> None:
+def _set_progress_value_if_changed(pb: Any, value: int) -> None:
     if pb is None:
         return
     try:
@@ -575,10 +575,26 @@ def _call_with_qt_update_batch(widget: Any, fn: Callable[[], None]) -> None:
     # QGraphicsView scene-item updates are already coalesced well enough for our
     # animator hot path; toggling updatesEnabled() on the view/viewport each tick
     # only adds overhead and can force broader invalidation work.
-    # TelemetryPanel is also mostly a coordinator for child widgets; toggling
-    # updatesEnabled() on the container each frame adds churn without helping
-    # the already granular child-level updates.
-    if isinstance(widget, (QtWidgets.QGraphicsView, QtWidgets.QTableWidget, TelemetryPanel)):
+    # Telemetry/detail container panels are mostly coordinators for child widgets;
+    # toggling updatesEnabled() on the container each frame adds churn without
+    # helping the already granular child-level updates. Trends/timeline canvases
+    # are similarly self-contained and already coalesce their own repaint work well.
+    if isinstance(
+        widget,
+        (
+            QtWidgets.QGraphicsView,
+            QtWidgets.QTableWidget,
+            TelemetryPanel,
+            CornerHeatmapPanel,
+            ReceiverTankWidget,
+            RoadProfilePanel,
+            PressurePanel,
+            FlowPanel,
+            ValvePanel,
+            TrendsPanel,
+            EventTimelineWidget,
+        ),
+    ):
         fn()
         return
     handles = _begin_qt_update_batch(widget if isinstance(widget, QtWidgets.QWidget) else None)
@@ -7149,20 +7165,7 @@ class PressureGauge(QtWidgets.QWidget):
         self.lbl_value = QtWidgets.QLabel("—")
         self.lbl_value.setStyleSheet("color: #cfcfcf;")
 
-        self.bar = QtWidgets.QProgressBar()
-        self.bar.setRange(0, int(max(1.0, self.max_bar_g) * 100))
-        self.bar.setTextVisible(False)
-        self.bar.setFixedHeight(10)
-        # Static gradient chunk: readable even without per-frame stylesheet tweaks.
-        self.bar.setStyleSheet(
-            """
-            QProgressBar{border:1px solid #444;border-radius:4px;background:#1b1f24;}
-            QProgressBar::chunk{border-radius:4px;
-                background:qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                    stop:0 #3fa34d, stop:0.65 #f6c244, stop:1 #d9534f);
-            }
-            """
-        )
+        self.bar = _PressureBarCanvas(max_bar_g=self.max_bar_g)
 
         lay.addWidget(self.lbl_name)
         lay.addWidget(self.lbl_value)
@@ -7171,12 +7174,255 @@ class PressureGauge(QtWidgets.QWidget):
     def set_value_bar_g(self, bar_g: Optional[float]):
         if bar_g is None or (isinstance(bar_g, float) and (np.isnan(bar_g) or np.isinf(bar_g))):
             _set_label_text_if_changed(self.lbl_value, "—")
-            _set_progress_value_if_changed(self.bar, 0)
+            self.bar.set_value_bar_g(None)
             return
         v = float(bar_g)
         _set_label_text_if_changed(self.lbl_value, f"{v:.2f} bar(g)")
-        vmax = float(self.max_bar_g)
-        _set_progress_value_if_changed(self.bar, int(_clamp(v, 0.0, vmax) * 100))
+        self.bar.set_value_bar_g(v)
+
+
+class _PressureBarCanvas(QtWidgets.QWidget):
+    """Lightweight static-gradient bar used by PressureGauge."""
+
+    def __init__(self, *, max_bar_g: float, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self.max_bar_g = float(max(1.0, max_bar_g))
+        self._value_bar_g: Optional[float] = None
+        self._fill_frac: float = 0.0
+        self._visual_key: Optional[int] = None
+        self._bg_color = QtGui.QColor(27, 31, 36)
+        self._track_color = QtGui.QColor(27, 31, 36)
+        self._border_pen = QtGui.QPen(QtGui.QColor(68, 68, 68), 1.0)
+        self._bg_cache_key: Optional[tuple[int, int]] = None
+        self._bg_cache_pixmap: Optional[QtGui.QPixmap] = None
+        try:
+            self._border_pen.setCosmetic(True)
+            self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)
+        except Exception:
+            pass
+        self.setFixedHeight(10)
+
+    def resizeEvent(self, event: QtGui.QResizeEvent):  # type: ignore[override]
+        self._bg_cache_key = None
+        self._bg_cache_pixmap = None
+        super().resizeEvent(event)
+
+    def _ensure_background_cache(self) -> Optional[QtGui.QPixmap]:
+        key = (int(max(1, self.width())), int(max(1, self.height())))
+        if key == self._bg_cache_key and self._bg_cache_pixmap is not None:
+            return self._bg_cache_pixmap
+        dpr = 1.0
+        try:
+            dpr = float(max(1.0, self.devicePixelRatioF()))
+        except Exception:
+            dpr = 1.0
+        pix = QtGui.QPixmap(int(max(1.0, float(key[0]) * dpr)), int(max(1.0, float(key[1]) * dpr)))
+        try:
+            pix.setDevicePixelRatio(dpr)
+        except Exception:
+            pass
+        pix.fill(self._bg_color)
+        p = QtGui.QPainter(pix)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        rect = QtCore.QRectF(0.5, 0.5, max(1.0, float(key[0]) - 1.0), max(1.0, float(key[1]) - 1.0))
+        p.setPen(self._border_pen)
+        p.setBrush(self._track_color)
+        p.drawRoundedRect(rect, 4.0, 4.0)
+        p.end()
+        self._bg_cache_key = key
+        self._bg_cache_pixmap = pix
+        return self._bg_cache_pixmap
+
+    def set_value_bar_g(self, bar_g: Optional[float]) -> None:
+        if bar_g is None or (isinstance(bar_g, float) and (np.isnan(bar_g) or np.isinf(bar_g))):
+            frac = 0.0
+            visual_key = -1
+        else:
+            v = float(_clamp(float(bar_g), 0.0, float(self.max_bar_g)))
+            frac = 0.0 if self.max_bar_g <= 1e-12 else float(v / self.max_bar_g)
+            visual_key = int(round(frac * 1000.0))
+        if visual_key == self._visual_key:
+            return
+        self._value_bar_g = None if visual_key < 0 else float(bar_g)
+        self._fill_frac = float(frac)
+        self._visual_key = int(visual_key)
+        self.update()
+
+    def paintEvent(self, event: QtGui.QPaintEvent):  # type: ignore[override]
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        bg = self._ensure_background_cache()
+        if bg is not None:
+            p.drawPixmap(0, 0, bg)
+        frac = float(self._fill_frac)
+        if frac <= 1e-6:
+            return
+        rect = QtCore.QRectF(0.5, 0.5, max(1.0, float(self.width()) - 1.0), max(1.0, float(self.height()) - 1.0))
+        fill_w = max(0.0, (rect.width() - 2.0) * frac)
+        if fill_w <= 0.0:
+            return
+        fill = QtCore.QRectF(rect.left() + 1.0, rect.top() + 1.0, fill_w, max(1.0, rect.height() - 2.0))
+        grad = QtGui.QLinearGradient(fill.topLeft(), fill.topRight())
+        grad.setColorAt(0.0, QtGui.QColor("#3fa34d"))
+        grad.setColorAt(0.65, QtGui.QColor("#f6c244"))
+        grad.setColorAt(1.0, QtGui.QColor("#d9534f"))
+        p.setPen(QtCore.Qt.NoPen)
+        p.setBrush(QtGui.QBrush(grad))
+        p.drawRoundedRect(fill, 3.5, 3.5)
+
+
+class _PercentBarCanvas(QtWidgets.QWidget):
+    """Cheap percent bar for dense detail tables."""
+
+    _bg_cache: Dict[tuple[int, int, int], QtGui.QPixmap] = {}
+
+    def __init__(self, *, fill_color: Any, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self._minimum = 0
+        self._maximum = 100
+        self._value = 0
+        self._fill_frac = 0.0
+        self._format = "%p%"
+        self._text_visible = True
+        self._display_text = "0%"
+        self._bg_color = QtGui.QColor(27, 31, 36)
+        self._track_color = QtGui.QColor(27, 31, 36)
+        self._fill_brush = QtGui.QBrush(QtGui.QColor(fill_color))
+        self._border_pen = QtGui.QPen(QtGui.QColor(68, 68, 68), 1.0)
+        self._text_pen = QtGui.QPen(QtGui.QColor(235, 240, 245))
+        self._text_font = QtGui.QFont(self.font())
+        try:
+            self._border_pen.setCosmetic(True)
+            self._text_pen.setCosmetic(True)
+            self._text_font.setPointSize(max(7, int(self._text_font.pointSize()) - 1))
+            self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)
+        except Exception:
+            pass
+        self.setFixedHeight(12)
+
+    def value(self) -> int:
+        return int(self._value)
+
+    def setRange(self, minimum: int, maximum: int) -> None:
+        mn = int(minimum)
+        mx = int(maximum)
+        if mx < mn:
+            mn, mx = mx, mn
+        if mn == self._minimum and mx == self._maximum:
+            return
+        self._minimum = mn
+        self._maximum = mx
+        self.setValue(self._value)
+
+    def setTextVisible(self, visible: bool) -> None:
+        target = bool(visible)
+        if self._text_visible == target:
+            return
+        self._text_visible = target
+        self._sync_text_state()
+        self.update()
+
+    def setFormat(self, fmt: str) -> None:
+        target = str(fmt or "%p%")
+        if self._format == target:
+            return
+        self._format = target
+        self._sync_text_state()
+        self.update()
+
+    def setValue(self, value: int) -> None:
+        try:
+            target = int(value)
+        except Exception:
+            target = 0
+        target = int(_clamp(float(target), float(self._minimum), float(self._maximum)))
+        if target == self._value:
+            return
+        self._value = target
+        denom = max(1, int(self._maximum - self._minimum))
+        self._fill_frac = float(max(0.0, min(1.0, float(target - self._minimum) / float(denom))))
+        self._sync_text_state()
+        self.update()
+
+    def _sync_text_state(self) -> None:
+        if not bool(self._text_visible):
+            self._display_text = ""
+            return
+        denom = max(1, int(self._maximum - self._minimum))
+        pct = int(round(float(self._value - self._minimum) * 100.0 / float(denom)))
+        self._display_text = str(self._format).replace("%p", str(pct))
+
+    @classmethod
+    def _ensure_bg_cache(
+        cls,
+        key: tuple[int, int, int],
+        *,
+        dpr: float,
+        bg_color: QtGui.QColor,
+        track_color: QtGui.QColor,
+        border_pen: QtGui.QPen,
+    ) -> Optional[QtGui.QPixmap]:
+        cached = cls._bg_cache.get(key)
+        if cached is not None:
+            return cached
+        width, height, _ = key
+        pix = QtGui.QPixmap(int(max(1.0, float(width) * dpr)), int(max(1.0, float(height) * dpr)))
+        try:
+            pix.setDevicePixelRatio(dpr)
+        except Exception:
+            pass
+        pix.fill(bg_color)
+        p = QtGui.QPainter(pix)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        rect = QtCore.QRectF(0.5, 0.5, max(1.0, float(width) - 1.0), max(1.0, float(height) - 1.0))
+        p.setPen(border_pen)
+        p.setBrush(track_color)
+        p.drawRoundedRect(rect, 4.0, 4.0)
+        p.end()
+        if len(cls._bg_cache) > 96:
+            cls._bg_cache.clear()
+        cls._bg_cache[key] = pix
+        return pix
+
+    def _cached_background(self) -> Optional[QtGui.QPixmap]:
+        try:
+            dpr = float(max(1.0, self.devicePixelRatioF()))
+        except Exception:
+            dpr = 1.0
+        key = (
+            int(max(1, self.width())),
+            int(max(1, self.height())),
+            int(round(dpr * 100.0)),
+        )
+        return self._ensure_bg_cache(
+            key,
+            dpr=dpr,
+            bg_color=self._bg_color,
+            track_color=self._track_color,
+            border_pen=self._border_pen,
+        )
+
+    def paintEvent(self, event: QtGui.QPaintEvent):  # type: ignore[override]
+        p = QtGui.QPainter(self)
+        bg = self._cached_background()
+        if bg is not None:
+            p.drawPixmap(0, 0, bg)
+        frac = float(self._fill_frac)
+        if frac > 1e-6:
+            p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            rect = QtCore.QRectF(0.5, 0.5, max(1.0, float(self.width()) - 1.0), max(1.0, float(self.height()) - 1.0))
+            fill_w = max(0.0, (rect.width() - 2.0) * frac)
+            if fill_w > 0.0:
+                fill = QtCore.QRectF(rect.left() + 1.0, rect.top() + 1.0, fill_w, max(1.0, rect.height() - 2.0))
+                p.setPen(QtCore.Qt.NoPen)
+                p.setBrush(self._fill_brush)
+                p.drawRoundedRect(fill, 3.5, 3.5)
+        if self._display_text:
+            p.setRenderHint(QtGui.QPainter.Antialiasing, False)
+            p.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
+            p.setPen(self._text_pen)
+            p.setFont(self._text_font)
+            p.drawText(self.rect(), QtCore.Qt.AlignmentFlag.AlignCenter, self._display_text)
 
 
 class PressurePanel(QtWidgets.QWidget):
@@ -7447,7 +7693,7 @@ class ValvePanel(QtWidgets.QWidget):
         self._names: list[str] = []
         self._kinds: list[str] = []
         self._idxs: np.ndarray | None = None
-        self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, QtWidgets.QProgressBar, QtWidgets.QTableWidgetItem]] = []
+        self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, _PercentBarCanvas, QtWidgets.QTableWidgetItem]] = []
         self._row_binding_keys: list[Optional[int]] = []
         self._last_display_key: Optional[tuple[Any, ...]] = None
         self._visible_rows: int = 0
@@ -7485,17 +7731,10 @@ class ValvePanel(QtWidgets.QWidget):
             _set_table_row_count_if_changed(self.table, rows)
         for r in range(len(self._row_handles), rows):
             it0 = QtWidgets.QTableWidgetItem("")
-            pb = QtWidgets.QProgressBar()
+            pb = _PercentBarCanvas(fill_color="#4aa3df")
             pb.setRange(0, 100)
             pb.setTextVisible(True)
             pb.setFormat("%p%")
-            pb.setFixedHeight(12)
-            pb.setStyleSheet(
-                """
-                QProgressBar{border:1px solid #444;border-radius:4px;background:#1b1f24;}
-                QProgressBar::chunk{border-radius:4px;background:#4aa3df;}
-                """
-            )
             it2 = QtWidgets.QTableWidgetItem("")
             it2.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(r, 0, it0)
@@ -8282,7 +8521,7 @@ class FlowPanel(QtWidgets.QWidget):
         self._idxs: np.ndarray | None = None
         self._maxabs: np.ndarray | None = None
         self._kinds: list[str] = []
-        self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, QtWidgets.QTableWidgetItem, QtWidgets.QProgressBar, QtWidgets.QTableWidgetItem]] = []
+        self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, QtWidgets.QTableWidgetItem, _PercentBarCanvas, QtWidgets.QTableWidgetItem]] = []
         self._row_binding_keys: list[Optional[int]] = []
         self._last_display_key: Optional[tuple[Any, ...]] = None
         self._visible_rows: int = 0
@@ -8338,17 +8577,10 @@ class FlowPanel(QtWidgets.QWidget):
             it0 = QtWidgets.QTableWidgetItem("")
             it1 = QtWidgets.QTableWidgetItem("")
             it1.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
-            pb = QtWidgets.QProgressBar()
+            pb = _PercentBarCanvas(fill_color="#7bd88f")
             pb.setRange(0, 100)
             pb.setTextVisible(True)
             pb.setFormat("%p%")
-            pb.setFixedHeight(12)
-            pb.setStyleSheet(
-                """
-                QProgressBar{border:1px solid #444;border-radius:4px;background:#1b1f24;}
-                QProgressBar::chunk{border-radius:4px;background:#7bd88f;}
-                """
-            )
             it3 = QtWidgets.QTableWidgetItem("")
             it3.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(r, 0, it0)
@@ -8823,7 +9055,13 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
         self._pipe_pen = QtGui.QPen(QtGui.QColor(220, 220, 220), 2)
         self._track_pen = QtGui.QPen(QtGui.QColor(220, 220, 220, 120), 1)
         self._text_pen = QtGui.QPen(QtGui.QColor(240, 240, 240), 1)
-        for pen in (self._tank_pen, self._dash_pen, self._pipe_pen, self._track_pen, self._text_pen):
+        self._marker_active_pen = QtGui.QPen(QtGui.QColor(230, 190, 90, 230), 2)
+        self._marker_active_brush = QtGui.QBrush(QtGui.QColor(230, 190, 90, 230))
+        self._flow_in_brush = QtGui.QBrush(QtGui.QColor(80, 220, 120, 230))
+        self._flow_out_brush = QtGui.QBrush(QtGui.QColor(240, 90, 90, 230))
+        self._pipe_in_brush = QtGui.QBrush(QtGui.QColor(80, 220, 120, 220))
+        self._pipe_out_brush = QtGui.QBrush(QtGui.QColor(240, 90, 90, 220))
+        for pen in (self._tank_pen, self._dash_pen, self._pipe_pen, self._track_pen, self._text_pen, self._marker_active_pen):
             try:
                 pen.setCosmetic(True)
             except Exception:
@@ -9247,16 +9485,10 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
             mk = float(info.get("mk", -1.0))
             if lvl_bar < mk - 1e-6:
                 continue
-            col = QtGui.QColor(230, 190, 90, 230)
-            pen = QtGui.QPen(col, 2)
-            try:
-                pen.setCosmetic(True)
-            except Exception:
-                pass
-            p.setPen(pen)
+            p.setPen(self._marker_active_pen)
             p.drawLine(info["a"], info["b"])
             p.setPen(QtCore.Qt.NoPen)
-            p.setBrush(col)
+            p.setBrush(self._marker_active_brush)
             p.drawEllipse(info["b"], 4.0, 4.0)
 
         # Internal flow "floats" (green=in, red=out): map to 0..1 by q_ref
@@ -9266,9 +9498,9 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
             yin = tank.bottom() - float(self._u_in) * tank.height()
             yout = tank.bottom() - float(self._u_out) * tank.height()
             p.setPen(QtCore.Qt.NoPen)
-            p.setBrush(QtGui.QColor(80, 220, 120, 230))
+            p.setBrush(self._flow_in_brush)
             p.drawEllipse(QtCore.QPointF(xin, yin), 4.2, 4.2)
-            p.setBrush(QtGui.QColor(240, 90, 90, 230))
+            p.setBrush(self._flow_out_brush)
             p.drawEllipse(QtCore.QPointF(xout, yout), 4.2, 4.2)
         except Exception:
             pass
@@ -9279,11 +9511,10 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
         rout = 3.0 + 10.0 * (max(0.0, self._q_out) / qref) ** 0.5
         rin = max(3.0, min(14.0, rin))
         rout = max(3.0, min(14.0, rout))
-
         p.setPen(QtCore.Qt.NoPen)
-        p.setBrush(QtGui.QColor(80, 220, 120, 220))
+        p.setBrush(self._pipe_in_brush)
         p.drawEllipse(metrics.get("in_b", QtCore.QPointF()), rin, rin)
-        p.setBrush(QtGui.QColor(240, 90, 90, 220))
+        p.setBrush(self._pipe_out_brush)
         p.drawEllipse(metrics.get("out_b", QtCore.QPointF()), rout, rout)
 
         # labels
@@ -9652,8 +9883,16 @@ class _HeatCell(QtWidgets.QWidget):
         self._fg_color = QtGui.QColor(235, 235, 235)
         self._border_color = QtGui.QColor(26, 28, 34, 150)
         self._border_pen = QtGui.QPen(self._border_color, 1.0)
+        self._fg_pen = QtGui.QPen(self._fg_color, 1.0)
+        self._bg_brush = QtGui.QBrush(self._bg_color)
         self._corner_font = QtGui.QFont(self.font())
         self._value_font = QtGui.QFont(self.font())
+        self._corner_static_text = QtGui.QStaticText(self.corner)
+        self._value_static_text = QtGui.QStaticText(self._value_text)
+        self._layout_key: Optional[tuple[int, int]] = None
+        self._frame_path = QtGui.QPainterPath()
+        self._corner_pos = QtCore.QPointF()
+        self._value_pos = QtCore.QPointF()
         try:
             self._corner_font.setBold(True)
             self._corner_font.setPointSize(max(8, int(self._corner_font.pointSize())))
@@ -9661,8 +9900,42 @@ class _HeatCell(QtWidgets.QWidget):
             self._value_font.setPointSize(max(8, int(self._value_font.pointSize()) - 1))
             self._value_font.setFamilies(["Consolas", "Menlo", "DejaVu Sans Mono"])
             self._border_pen.setCosmetic(True)
+            self._fg_pen.setCosmetic(True)
         except Exception:
             pass
+        self._prepare_static_text(self._corner_static_text, self._corner_font)
+        self._prepare_static_text(self._value_static_text, self._value_font)
+
+    @staticmethod
+    def _prepare_static_text(text_item: QtGui.QStaticText, font: QtGui.QFont) -> None:
+        try:
+            text_item.setTextFormat(QtCore.Qt.PlainText)
+        except Exception:
+            pass
+        try:
+            text_item.prepare(QtGui.QTransform(), font)
+        except Exception:
+            pass
+
+    def resizeEvent(self, event: QtGui.QResizeEvent):  # type: ignore[override]
+        self._layout_key = None
+        self._frame_path = QtGui.QPainterPath()
+        super().resizeEvent(event)
+
+    def _ensure_layout(self) -> None:
+        key = (int(max(1, self.width())), int(max(1, self.height())))
+        if key == self._layout_key:
+            return
+        rect = QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        path = QtGui.QPainterPath()
+        path.addRoundedRect(rect, 8.0, 8.0)
+        corner_h = float(QtGui.QFontMetrics(self._corner_font).height())
+        value_h = float(QtGui.QFontMetrics(self._value_font).height())
+        self._corner_pos = QtCore.QPointF(rect.left() + 8.0, rect.top() + 6.0 + max(0.0, (16.0 - corner_h) * 0.5))
+        value_top = rect.top() + 24.0 + max(0.0, ((rect.height() - 30.0) - value_h) * 0.5)
+        self._value_pos = QtCore.QPointF(rect.left() + 8.0, value_top)
+        self._frame_path = path
+        self._layout_key = key
 
     def set_value(self, value: float, *, text: str, u: float):
         rgb = _heat_rgb(u)
@@ -9672,36 +9945,33 @@ class _HeatCell(QtWidgets.QWidget):
         if style_key != self._style_key:
             self._bg_color = QtGui.QColor(int(rgb[0]), int(rgb[1]), int(rgb[2]))
             self._fg_color = QtGui.QColor(int(tr), int(tg), int(tb))
+            self._bg_brush.setColor(self._bg_color)
+            self._fg_pen.setColor(self._fg_color)
             self._style_key = style_key
             changed = True
         if str(text) != self._value_text:
             self._value_text = str(text)
+            self._value_static_text.setText(self._value_text)
+            self._prepare_static_text(self._value_static_text, self._value_font)
             changed = True
         if changed:
             self.update()
 
     def paintEvent(self, _event: QtGui.QPaintEvent):  # type: ignore[override]
+        self._ensure_layout()
         p = QtGui.QPainter(self)
-        rect = QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
         p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        p.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
         p.setPen(self._border_pen)
-        p.setBrush(QtGui.QBrush(self._bg_color))
-        p.drawRoundedRect(rect, 8.0, 8.0)
+        p.setBrush(self._bg_brush)
+        p.drawPath(self._frame_path)
 
-        p.setPen(self._fg_color)
+        p.setPen(self._fg_pen)
         p.setFont(self._corner_font)
-        p.drawText(
-            QtCore.QRectF(rect.left() + 8.0, rect.top() + 6.0, rect.width() - 16.0, 16.0),
-            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-            self.corner,
-        )
+        p.drawStaticText(self._corner_pos, self._corner_static_text)
 
         p.setFont(self._value_font)
-        p.drawText(
-            QtCore.QRectF(rect.left() + 8.0, rect.top() + 24.0, rect.width() - 16.0, rect.height() - 30.0),
-            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-            self._value_text,
-        )
+        p.drawStaticText(self._value_pos, self._value_static_text)
 
 
 class CornerHeatmapPanel(QtWidgets.QWidget):

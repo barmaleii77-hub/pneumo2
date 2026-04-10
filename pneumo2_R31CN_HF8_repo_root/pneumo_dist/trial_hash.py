@@ -116,6 +116,20 @@ def hash_vector(x: Sequence[float], *, float_ndigits: int = 12) -> str:
     return sha256_str(s)
 
 
+def stable_hash_params(
+    params: Mapping[str, Any],
+    keys: Sequence[str] | None = None,
+    *,
+    float_ndigits: int = 12,
+) -> str:
+    """Backward-compatible stable hashing surface for parameter dicts."""
+    if keys is None:
+        subset = dict(params)
+    else:
+        subset = {str(k): params[k] for k in keys if k in params}
+    return hash_params(subset, float_ndigits=float_ndigits)
+
+
 @dataclass(frozen=True)
 class ProblemSpec:
     """A minimal, serializable definition of the optimization problem."""
@@ -171,3 +185,54 @@ def hash_problem(spec: ProblemSpec, *, float_ndigits: int = 12) -> str:
     """Hash of the full problem definition."""
     s = canonical_dumps(spec.to_dict(), float_ndigits=float_ndigits)
     return sha256_str(s)
+
+
+def stable_hash_problem(*args: Any, float_ndigits: int = 12, **kwargs: Any) -> str:
+    """Backward-compatible problem hashing wrapper.
+
+    Supports either a single `ProblemSpec` argument or keyword-style inputs with
+    `base/ranges/suite` plus either `model_py/worker_py` or precomputed code hashes.
+    """
+    if len(args) == 1 and not kwargs and isinstance(args[0], ProblemSpec):
+        return hash_problem(args[0], float_ndigits=float_ndigits)
+    if args:
+        raise TypeError("stable_hash_problem supports either a single ProblemSpec or keyword arguments")
+
+    base = kwargs.get("base", {})
+    ranges = kwargs.get("ranges", {})
+    suite = kwargs.get("suite", {})
+    extra = kwargs.get("extra", {})
+
+    if "model_sha256" in kwargs and "worker_sha256" in kwargs:
+        model_sha = str(kwargs.get("model_sha256") or "")
+        worker_sha = str(kwargs.get("worker_sha256") or "")
+    else:
+        model_py = kwargs.get("model_py")
+        worker_py = kwargs.get("worker_py")
+        if model_py is None or worker_py is None:
+            raise TypeError(
+                "stable_hash_problem keyword mode requires either model_sha256/worker_sha256 "
+                "or model_py/worker_py together with base/ranges/suite"
+            )
+        model_sha = hash_file(model_py)
+        worker_sha = hash_file(worker_py)
+
+    try:
+        optim_keys = set(getattr(ranges, "keys")())  # type: ignore[arg-type]
+    except Exception:
+        optim_keys = set()
+    try:
+        base_signature = {k: base[k] for k in base.keys() if k not in optim_keys}  # type: ignore[attr-defined]
+    except Exception:
+        base_signature = base
+
+    payload = {
+        "v": 1,
+        "base_signature": base_signature,
+        "ranges_signature": sorted(str(k) for k in optim_keys),
+        "suite_signature": suite,
+        "model_sha256": model_sha,
+        "worker_sha256": worker_sha,
+        "extra": extra,
+    }
+    return sha256_str(canonical_dumps(payload, float_ndigits=float_ndigits))

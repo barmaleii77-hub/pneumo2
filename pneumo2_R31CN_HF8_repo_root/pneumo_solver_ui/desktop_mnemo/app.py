@@ -177,6 +177,32 @@ BOOTSTRAP_JS = """
       return String(err);
     }
   };
+  window.codexMnemoSetFocusRegion = function(focus) {
+    try {
+      if (!window.__lastArgs) window.__lastArgs = {};
+      window.__lastArgs = Object.assign({}, window.__lastArgs || {}, { focus_region: focus || null });
+      if (typeof DATA !== "undefined" && DATA) DATA.focus_region = focus || null;
+      if (typeof applyFocusRegion === "function") applyFocusRegion(focus || null, { source: "qt-bridge" });
+      return true;
+    } catch (err) {
+      return String(err);
+    }
+  };
+  window.codexMnemoShowOverview = function(meta) {
+    try {
+      if (!window.__lastArgs) window.__lastArgs = {};
+      if (meta && Object.prototype.hasOwnProperty.call(meta, "focus_region")) {
+        window.__lastArgs = Object.assign({}, window.__lastArgs || {}, { focus_region: meta.focus_region || null });
+        if (typeof DATA !== "undefined" && DATA) DATA.focus_region = meta.focus_region || null;
+      }
+      if (typeof showFocusOverview === "function") {
+        return !!showFocusOverview(meta || {});
+      }
+      return false;
+    } catch (err) {
+      return String(err);
+    }
+  };
   return "ok";
 })();
 """
@@ -228,6 +254,25 @@ QHeaderView::section {
 QTableWidget { gridline-color: #16303b; selection-background-color: #1a4654; }
 QSlider::groove:horizontal { height: 8px; background: #12303b; border-radius: 4px; }
 QSlider::handle:horizontal { width: 16px; margin: -5px 0; border-radius: 8px; background: #63d3f5; }
+QFrame#startup_banner {
+  background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #102733, stop:1 #143847);
+  border: 1px solid #1e5365;
+  border-radius: 16px;
+}
+QLabel#startup_banner_title {
+  font-size: 15pt;
+  font-weight: 700;
+  color: #f0f6f9;
+}
+QLabel#startup_banner_caption {
+  color: #9fc5d2;
+  font-size: 9pt;
+}
+QTextBrowser#startup_banner_body {
+  background: transparent;
+  color: #d9e6ed;
+  border: 0;
+}
 """
 
 APP_STYLESHEET_LIGHT = """
@@ -256,6 +301,25 @@ QLineEdit, QTextBrowser, QTableWidget {
   border-radius: 10px;
 }
 QTableWidget { gridline-color: #dce7ec; }
+QFrame#startup_banner {
+  background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ffffff, stop:1 #edf5f8);
+  border: 1px solid #ccd9df;
+  border-radius: 16px;
+}
+QLabel#startup_banner_title {
+  font-size: 15pt;
+  font-weight: 700;
+  color: #102028;
+}
+QLabel#startup_banner_caption {
+  color: #516a75;
+  font-size: 9pt;
+}
+QTextBrowser#startup_banner_body {
+  background: transparent;
+  color: #102028;
+  border: 0;
+}
 """
 
 
@@ -299,6 +363,24 @@ class FrameNarrative:
 
 
 @dataclass(frozen=True)
+class LaunchOnboardingContext:
+    preset_key: str
+    title: str
+    reason: str
+    checklist: tuple[str, ...]
+    launch_mode: str
+
+
+@dataclass(frozen=True)
+class OnboardingFocusTarget:
+    edge_name: str
+    node_name: str
+    mode_title: str
+    summary: str
+    has_target: bool
+
+
+@dataclass(frozen=True)
 class MnemoTimelineEvent:
     frame_idx: int
     time_s: float
@@ -308,6 +390,150 @@ class MnemoTimelineEvent:
     summary: str
     edge_name: str
     node_name: str
+
+
+def build_launch_onboarding_context(
+    *,
+    npz_path: Path | None,
+    follow: bool,
+    pointer_path: Path | None,
+    preset_key: str = "",
+    title: str = "",
+    reason: str = "",
+    checklist: list[str] | tuple[str, ...] | None = None,
+) -> LaunchOnboardingContext:
+    launch_mode = "follow" if follow else ("npz" if npz_path is not None else "blank")
+    normalized_checks = tuple(str(x).strip() for x in (checklist or []) if str(x).strip())
+    pointer_name = Path(pointer_path).name if pointer_path else "anim_latest.json"
+    npz_name = Path(npz_path).name if npz_path is not None else "NPZ ещё не выбран"
+
+    if not title:
+        if launch_mode == "follow":
+            title = "Live follow-разбор"
+        elif launch_mode == "npz":
+            title = "Ретроспективный разбор NPZ"
+        else:
+            title = "Пустой инженерный старт"
+
+    if not reason:
+        if launch_mode == "follow":
+            reason = (
+                f"Окно открыто в follow-режиме и будет держаться за pointer {pointer_name}, "
+                "чтобы оператор видел актуальный сценарий без ручного reopen."
+            )
+        elif launch_mode == "npz":
+            reason = (
+                f"Окно открыто на фиксированном bundle {npz_name}, чтобы спокойно разобрать одну историю "
+                "без переключения на новые экспорты."
+            )
+        else:
+            reason = (
+                "Окно открыто без привязанного bundle. Это безопасный режим для ориентации в интерфейсе, "
+                "перед тем как подключать live pointer или конкретный NPZ."
+            )
+
+    if not normalized_checks:
+        if launch_mode == "follow":
+            normalized_checks = (
+                "Сначала подтвердите ведущую ветку и один опорный узел давления.",
+                "ACK/Reset делайте только после того, как режим на схеме совпал с трендами.",
+                "Если pointer обновится, сравните новый кадр с предыдущим режимом, а не читайте схему заново целиком.",
+            )
+        elif launch_mode == "npz":
+            normalized_checks = (
+                "Держите в голове один фиксированный сценарий и не ожидайте live-обновления pointer.",
+                "Сначала выделите ведущую ветку, затем закрепите один узел давления как эталон.",
+                "Численную проверку проводите через тренды только после того, как топология уже понятна.",
+            )
+        else:
+            normalized_checks = (
+                "Сначала откройте pointer или конкретный NPZ, чтобы схема получила реальный сценарий.",
+                "После загрузки bundle ищите не всю картину сразу, а одну ведущую ветку и один опорный узел.",
+                "Тренды и память событий используйте как подтверждение гипотезы, а не как первый экран чтения.",
+            )
+
+    context_key = str(preset_key or launch_mode).strip() or launch_mode
+    return LaunchOnboardingContext(
+        preset_key=context_key,
+        title=str(title).strip() or "Стартовый сценарий",
+        reason=str(reason).strip() or "",
+        checklist=normalized_checks,
+        launch_mode=launch_mode,
+    )
+
+
+def build_onboarding_focus_target(
+    dataset: MnemoDataset | None,
+    idx: int,
+    *,
+    selected_edge: str | None = None,
+    selected_node: str | None = None,
+) -> OnboardingFocusTarget:
+    if dataset is None or dataset.time_s.size == 0:
+        return OnboardingFocusTarget(
+            edge_name="",
+            node_name="",
+            mode_title="Ожидание данных",
+            summary="Bundle ещё не загружен, поэтому стартовый фокус пока не вычислен.",
+            has_target=False,
+        )
+
+    narrative = _build_frame_narrative(dataset, idx, selected_edge=selected_edge, selected_node=selected_node)
+    edge_name = narrative.top_edge_name if narrative.top_edge_name in dataset.edge_names else ""
+    if not edge_name and selected_edge in dataset.edge_names:
+        edge_name = str(selected_edge)
+    node_name = narrative.top_node_name if narrative.top_node_name in dataset.node_names else ""
+    if not node_name and selected_node in dataset.node_names:
+        node_name = str(selected_node)
+
+    has_target = bool(edge_name or node_name)
+    focus_pair = f"{edge_name or '—'} / {node_name or '—'}"
+    summary = (
+        f"Стартовый фокус для этого кадра: {focus_pair}. "
+        f"{narrative.primary_title}: {narrative.primary_summary}"
+    )
+    return OnboardingFocusTarget(
+        edge_name=edge_name,
+        node_name=node_name,
+        mode_title=narrative.primary_title,
+        summary=summary,
+        has_target=has_target,
+    )
+
+
+def build_onboarding_focus_region_payload(
+    dataset: MnemoDataset | None,
+    idx: int,
+    *,
+    selected_edge: str | None = None,
+    selected_node: str | None = None,
+    source: str = "onboarding",
+    auto_focus: bool = False,
+) -> dict[str, Any]:
+    focus_target = build_onboarding_focus_target(
+        dataset,
+        idx,
+        selected_edge=selected_edge,
+        selected_node=selected_node,
+    )
+    dataset_id = str(dataset.dataset_id) if dataset is not None else ""
+    signature = f"{dataset_id}::{idx}::{focus_target.edge_name}::{focus_target.node_name}::{source}"
+    return {
+        "available": bool(focus_target.has_target),
+        "edge_name": focus_target.edge_name,
+        "node_name": focus_target.node_name,
+        "title": "Onboarding focus",
+        "mode_title": focus_target.mode_title,
+        "summary": focus_target.summary,
+        "source": str(source),
+        "signature": signature,
+        "auto_focus": bool(auto_focus),
+        "animate": True,
+        "duration_ms": 460,
+        "padding": 170,
+        "focus_fill_ratio": 0.42,
+        "ttl_ms": 2600,
+    }
 
 
 def _severity_rank(severity: str) -> int:
@@ -1648,6 +1874,14 @@ class MnemoWebView(QtWidgets.QWidget):
         payload = json.dumps(alerts, ensure_ascii=False)
         self._queue_or_run(f"window.codexMnemoSetAlerts({payload});")
 
+    def set_focus_region(self, focus_region: dict[str, Any] | None) -> None:
+        payload = json.dumps(focus_region, ensure_ascii=False)
+        self._queue_or_run(f"window.codexMnemoSetFocusRegion({payload});")
+
+    def show_overview(self, meta: dict[str, Any] | None = None) -> None:
+        payload = json.dumps(meta or {}, ensure_ascii=False)
+        self._queue_or_run(f"window.codexMnemoShowOverview({payload});")
+
     def _on_bridge_message(self, payload: str) -> None:
         try:
             obj = json.loads(payload)
@@ -2006,6 +2240,141 @@ class GuidancePanel(QtWidgets.QTextBrowser):
         )
 
 
+class StartupBannerPanel(QtWidgets.QFrame):
+    hide_requested = QtCore.Signal()
+    focus_requested = QtCore.Signal()
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self.setObjectName("startup_banner")
+        self._focus_available = False
+
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.setContentsMargins(16, 14, 16, 14)
+        lay.setSpacing(8)
+
+        top_row = QtWidgets.QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 0)
+        top_row.setSpacing(10)
+        lay.addLayout(top_row)
+
+        title_wrap = QtWidgets.QVBoxLayout()
+        title_wrap.setContentsMargins(0, 0, 0, 0)
+        title_wrap.setSpacing(2)
+        top_row.addLayout(title_wrap, 1)
+
+        self.title_label = QtWidgets.QLabel("Рекомендуемый старт")
+        self.title_label.setObjectName("startup_banner_title")
+        title_wrap.addWidget(self.title_label)
+
+        self.caption_label = QtWidgets.QLabel(
+            "Небольшой onboarding-блок снижает когнитивный шум: сначала сценарий, потом числа, потом действие."
+        )
+        self.caption_label.setObjectName("startup_banner_caption")
+        self.caption_label.setWordWrap(True)
+        title_wrap.addWidget(self.caption_label)
+
+        self.focus_button = QtWidgets.QPushButton(self)
+        self.focus_button.setText("Навести фокус на схему")
+        self.focus_button.clicked.connect(lambda _checked=False: self.focus_requested.emit())
+        top_row.addWidget(self.focus_button, 0, QtCore.Qt.AlignTop)
+
+        self.dismiss_button = QtWidgets.QToolButton(self)
+        self.dismiss_button.setText("Скрыть onboarding")
+        self.dismiss_button.clicked.connect(lambda _checked=False: self.hide_requested.emit())
+        top_row.addWidget(self.dismiss_button, 0, QtCore.Qt.AlignTop)
+
+        self.body = QtWidgets.QTextBrowser(self)
+        self.body.setObjectName("startup_banner_body")
+        self.body.setOpenExternalLinks(False)
+        self.body.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.body.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.body.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.body.setMaximumHeight(210)
+        lay.addWidget(self.body)
+
+    @staticmethod
+    def _pill(text: str, *, fg: str, bg: str) -> str:
+        return (
+            f'<span style="display:inline-block; margin:0 6px 6px 0; padding:3px 10px; border-radius:999px; '
+            f'background:{bg}; color:{fg}; font-weight:700; font-size:11px;">{escape(text)}</span>'
+        )
+
+    def render(
+        self,
+        context: LaunchOnboardingContext,
+        *,
+        dataset: MnemoDataset | None,
+        idx: int,
+        tracker: MnemoEventTracker,
+        follow_enabled: bool,
+    ) -> None:
+        self.title_label.setText(context.title)
+        narrative = _build_frame_narrative(dataset, idx, selected_edge=None, selected_node=None)
+        focus_target = build_onboarding_focus_target(dataset, idx)
+        self._focus_available = focus_target.has_target
+        self.focus_button.setEnabled(focus_target.has_target)
+        self.focus_button.setToolTip(focus_target.summary)
+        active_latches = tracker.active_latched_events(limit=6) if dataset is not None else []
+        active_latch_count = len(active_latches)
+        launch_mode_map = {
+            "follow": "FOLLOW",
+            "npz": "NPZ REVIEW",
+            "blank": "EMPTY START",
+        }
+        launch_mode_label = launch_mode_map.get(context.launch_mode, context.launch_mode.upper())
+
+        badges = [
+            self._pill(launch_mode_label, fg="#eef6f8", bg="rgba(9,33,42,0.72)"),
+            self._pill(
+                "live pointer" if follow_enabled else "manual dataset",
+                fg="#63d3f5",
+                bg="rgba(9,33,42,0.72)",
+            ),
+            self._pill(
+                f"active latch {active_latch_count}",
+                fg="#f8c15c" if active_latch_count else "#81e7a3",
+                bg="rgba(9,33,42,0.72)",
+            ),
+        ]
+        if dataset is not None and dataset.time_s.size:
+            badges.append(
+                self._pill(
+                    narrative.primary_title,
+                    fg="#9fdcf0",
+                    bg="rgba(9,33,42,0.72)",
+                )
+            )
+
+        checklist_html = "".join(f"<li>{escape(item)}</li>" for item in context.checklist[:4])
+        if dataset is None or dataset.time_s.size == 0:
+            focus_block = (
+                "<p style='color:#8fb0bc; margin:8px 0 0 0;'>"
+                "Bundle ещё не загружен. Как только появится NPZ, banner уточнит ведущую ветку и опорный узел."
+                "</p>"
+            )
+        else:
+            focus_block = (
+                "<p style='margin:8px 0 0 0;'>"
+                f"<b>Первый инженерный фокус:</b> {escape(narrative.top_edge_name)} / {escape(narrative.top_node_name)}"
+                f"<br/><b>Текущий режим:</b> {escape(narrative.primary_title)}"
+                f"<br/><b>Подсветка onboarding:</b> {escape(focus_target.edge_name or '—')} / {escape(focus_target.node_name or '—')}"
+                f"<br/><b>Bundle:</b> {escape(dataset.npz_path.name)}"
+                "</p>"
+            )
+
+        self.body.setHtml(
+            "<div>"
+            + "".join(badges)
+            + f"<p style='margin:6px 0 0 0;'><b>Почему окно открылось так:</b> {escape(context.reason)}</p>"
+            + focus_block
+            + f"<p style='margin:8px 0 0 0; color:#9fc5d2;'><b>Что сделает кнопка:</b> {escape(focus_target.summary)}</p>"
+            + "<p style='margin:10px 0 4px 0;'><b>Первый чек-лист оператора:</b></p>"
+            + f"<ol style='margin:0 0 0 18px; padding:0;'>{checklist_html}</ol>"
+            + "</div>"
+        )
+
+
 class EventMemoryPanel(QtWidgets.QTextBrowser):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
@@ -2254,7 +2623,19 @@ class TrendsPanel(QtWidgets.QWidget):
 
 
 class MnemoMainWindow(QtWidgets.QMainWindow):
-    def __init__(self, *, npz_path: Path | None, follow: bool, pointer_path: Path, theme: str):
+    def __init__(
+        self,
+        *,
+        npz_path: Path | None,
+        follow: bool,
+        pointer_path: Path,
+        theme: str,
+        startup_preset: str,
+        startup_title: str,
+        startup_reason: str,
+        startup_view_mode: str,
+        startup_checklist: list[str] | tuple[str, ...] | None,
+    ):
         super().__init__()
         self.setWindowTitle("Desktop Pneumo Mnemo")
         self.setMinimumSize(1500, 980)
@@ -2276,15 +2657,45 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._play_speed = 1.0
         self.event_tracker = MnemoEventTracker(max_events=96)
         self._last_event_log_path: Path | None = None
+        self.launch_context = build_launch_onboarding_context(
+            npz_path=npz_path,
+            follow=self.follow_enabled,
+            pointer_path=self.pointer_path,
+            preset_key=startup_preset,
+            title=startup_title,
+            reason=startup_reason,
+            checklist=startup_checklist,
+        )
 
         self.ui_state = UiState(default_settings_path(PROJECT_ROOT), prefix="desktop_mnemo")
+        self._persisted_view_mode = self._normalize_view_mode(self.ui_state.get_str("view_mode", "focus"))
+        self._startup_view_mode_override = self._parse_startup_view_mode_override(startup_view_mode)
+        self._view_mode_override_active = bool(self._startup_view_mode_override)
+        self.view_mode = self._startup_view_mode_override or self._persisted_view_mode
         self.setStyleSheet(APP_STYLESHEET_DARK if self.theme == "dark" else APP_STYLESHEET_LIGHT)
 
         self.web = MnemoWebView(self)
         self.web.edge_picked.connect(self._select_edge)
         self.web.node_picked.connect(self._select_node)
         self.web.status.connect(self._set_status)
-        self.setCentralWidget(self.web)
+        self.startup_banner = StartupBannerPanel(self)
+        self.startup_banner.hide_requested.connect(lambda: self._set_startup_banner_visible(False))
+        self.startup_banner.focus_requested.connect(self._apply_onboarding_focus)
+        self.startup_banner.render(
+            self.launch_context,
+            dataset=None,
+            idx=0,
+            tracker=self.event_tracker,
+            follow_enabled=self.follow_enabled,
+        )
+
+        self._central_host = QtWidgets.QWidget(self)
+        self._central_layout = QtWidgets.QVBoxLayout(self._central_host)
+        self._central_layout.setContentsMargins(8, 8, 8, 0)
+        self._central_layout.setSpacing(8)
+        self._central_layout.addWidget(self.startup_banner, 0)
+        self._central_layout.addWidget(self.web, 1)
+        self.setCentralWidget(self._central_host)
 
         self.overview_panel = OverviewPanel(self)
         self.overview_panel.edge_activated.connect(self._select_edge)
@@ -2323,6 +2734,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._build_toolbar()
         self._build_menus()
         self._build_statusbar()
+        self._set_startup_banner_visible(True)
 
         self.play_timer = QtCore.QTimer(self)
         self.play_timer.setInterval(40)
@@ -2342,6 +2754,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.load_dataset(initial_path, preserve_selection=False)
         else:
             self._set_status(f"Ожидание NPZ. Pointer: {self.pointer_path}")
+            self._render_startup_banner()
 
     def _add_dock(
         self,
@@ -2397,6 +2810,19 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.export_events_action.triggered.connect(self._export_event_log)
         tb.addAction(self.export_events_action)
 
+        self.startup_banner_action = QtGui.QAction("Onboarding", self)
+        self.startup_banner_action.setCheckable(True)
+        self.startup_banner_action.toggled.connect(self._set_startup_banner_visible)
+        tb.addAction(self.startup_banner_action)
+
+        self.return_focus_action = QtGui.QAction("Вернуться к фокусу", self)
+        self.return_focus_action.triggered.connect(self._apply_onboarding_focus)
+        tb.addAction(self.return_focus_action)
+
+        self.full_scheme_action = QtGui.QAction("Вся схема", self)
+        self.full_scheme_action.triggered.connect(self._show_full_scheme_overview)
+        tb.addAction(self.full_scheme_action)
+
         self.speed_combo = QtWidgets.QComboBox()
         for speed in (0.25, 0.5, 1.0, 1.5, 2.0, 4.0):
             self.speed_combo.addItem(f"{speed:.2f}x", speed)
@@ -2434,6 +2860,10 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         view_menu.addAction(self._events_dock.toggleViewAction())
         view_menu.addAction(self._trends_dock.toggleViewAction())
         view_menu.addAction(self._legend_dock.toggleViewAction())
+        view_menu.addSeparator()
+        view_menu.addAction(self.startup_banner_action)
+        view_menu.addAction(self.return_focus_action)
+        view_menu.addAction(self.full_scheme_action)
 
         playback_menu = self.menuBar().addMenu("Анимация")
         playback_menu.addAction(self.play_action)
@@ -2453,6 +2883,129 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.statusBar().addWidget(self.status_text, 1)
         self.statusBar().addPermanentWidget(self.path_text, 1)
 
+    @staticmethod
+    def _normalize_view_mode(mode: str) -> str:
+        return "overview" if str(mode or "").strip().lower() == "overview" else "focus"
+
+    @staticmethod
+    def _parse_startup_view_mode_override(mode: str) -> str:
+        raw_mode = str(mode or "").strip().lower()
+        if raw_mode in {"focus", "overview"}:
+            return raw_mode
+        return ""
+
+    def _set_view_mode(self, mode: str, *, persist: bool) -> str:
+        self.view_mode = self._normalize_view_mode(mode)
+        if persist:
+            self._persisted_view_mode = self.view_mode
+            self._startup_view_mode_override = ""
+            self._view_mode_override_active = False
+            try:
+                self.ui_state.set_value("view_mode", self.view_mode)
+            except Exception:
+                pass
+        return self.view_mode
+
+    def _set_startup_banner_visible(self, visible: bool) -> None:
+        is_visible = bool(visible)
+        if is_visible:
+            self._render_startup_banner()
+        self.startup_banner.setVisible(is_visible)
+        with QtCore.QSignalBlocker(self.startup_banner_action):
+            self.startup_banner_action.setChecked(is_visible)
+
+    def _render_startup_banner(self) -> None:
+        self.startup_banner.render(
+            self.launch_context,
+            dataset=self.dataset,
+            idx=self.current_idx,
+            tracker=self.event_tracker,
+            follow_enabled=self.follow_enabled,
+        )
+
+    def _current_focus_region_payload(self, *, source: str, auto_focus: bool) -> dict[str, Any] | None:
+        if self.dataset is None or self.dataset.time_s.size == 0:
+            return None
+        return build_onboarding_focus_region_payload(
+            self.dataset,
+            self.current_idx,
+            selected_edge=self.selected_edge,
+            selected_node=self.selected_node,
+            source=source,
+            auto_focus=auto_focus,
+        )
+
+    def _apply_current_view_mode(self, *, source: str, auto_focus: bool) -> None:
+        if self.dataset is None or self.dataset.time_s.size == 0:
+            return
+        focus_region = self._current_focus_region_payload(source=source, auto_focus=auto_focus)
+        if self.view_mode == "overview":
+            self.web.show_overview(
+                {
+                    "title": "Полная схема",
+                    "summary": "Сравните рекомендуемый сценарий с полной топологией, не теряя быстрый путь назад к фокусу.",
+                    "focus_region": focus_region,
+                }
+            )
+            return
+        self.web.set_focus_region(focus_region)
+
+    def _sync_selection_views(self, *, clear_focus_region: bool = False) -> None:
+        if self.dataset is None:
+            return
+        if clear_focus_region:
+            self.web.set_focus_region(None)
+        self.selection_panel.set_selection(edge_name=self.selected_edge, node_name=self.selected_node)
+        self.selection_panel.render_details(
+            self.dataset,
+            self.current_idx,
+            edge_name=self.selected_edge,
+            node_name=self.selected_node,
+        )
+        self.trends_panel.set_series(self.dataset, edge_name=self.selected_edge, node_name=self.selected_node)
+        self.guide_panel.render(
+            self.dataset,
+            self.current_idx,
+            selected_edge=self.selected_edge,
+            selected_node=self.selected_node,
+            playing=self.playing,
+            follow_enabled=self.follow_enabled,
+        )
+        self.web.set_selection(edge=self.selected_edge, node=self.selected_node)
+        self._push_alerts()
+        if self.startup_banner.isVisible():
+            self._render_startup_banner()
+
+    def _apply_onboarding_focus(self) -> None:
+        if self.dataset is None or self.dataset.time_s.size == 0:
+            return
+        focus_target = build_onboarding_focus_target(
+            self.dataset,
+            self.current_idx,
+            selected_edge=self.selected_edge,
+            selected_node=self.selected_node,
+        )
+        if not focus_target.has_target:
+            self._set_status("Onboarding focus пока не вычислен для текущего кадра.")
+            return
+        if focus_target.edge_name in self.dataset.edge_names:
+            self.selected_edge = focus_target.edge_name
+        if focus_target.node_name in self.dataset.node_names:
+            self.selected_node = focus_target.node_name
+        self._set_view_mode("focus", persist=True)
+        self._sync_selection_views(clear_focus_region=False)
+        self._apply_current_view_mode(source="startup_banner", auto_focus=False)
+        self._set_status(
+            f"Onboarding focus: {focus_target.edge_name or '—'} / {focus_target.node_name or '—'}"
+        )
+
+    def _show_full_scheme_overview(self) -> None:
+        if self.dataset is None or self.dataset.time_s.size == 0:
+            return
+        self._set_view_mode("overview", persist=True)
+        self._apply_current_view_mode(source="toolbar_overview", auto_focus=False)
+        self._set_status("Overview mode: показана полная схема.")
+
     def _restore_window_state(self) -> None:
         self.ui_state.bind_window_geometry(self, "window/geometry")
         state = self.ui_state.get_bytes("window/state")
@@ -2467,6 +3020,8 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         try:
             self.ui_state.set_value("window/state", self.saveState())
             self.ui_state.set_value("play_speed", float(self._play_speed))
+            if not self._view_mode_override_active:
+                self.ui_state.set_value("view_mode", str(self.view_mode))
             self.ui_state.sync()
         except Exception:
             pass
@@ -2523,6 +3078,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             playing=self.playing,
             follow_enabled=self.follow_enabled,
         )
+        self._render_startup_banner()
 
     def _toggle_play(self, checked: bool) -> None:
         self.playing = bool(checked)
@@ -2633,6 +3189,17 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
                 old_edge = self.dataset.edge_names[0] if self.dataset.edge_names else None
             if old_node not in self.dataset.node_names:
                 old_node = self.dataset.overlay_node_names[0] if self.dataset.overlay_node_names else (self.dataset.node_names[0] if self.dataset.node_names else None)
+            if not preserve_selection:
+                focus_target = build_onboarding_focus_target(
+                    self.dataset,
+                    self.current_idx,
+                    selected_edge=old_edge,
+                    selected_node=old_node,
+                )
+                if focus_target.edge_name in self.dataset.edge_names:
+                    old_edge = focus_target.edge_name
+                if focus_target.node_name in self.dataset.node_names:
+                    old_node = focus_target.node_name
 
             self.selected_edge = old_edge
             self.selected_node = old_node
@@ -2640,9 +3207,11 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.selection_panel.set_selection(edge_name=self.selected_edge, node_name=self.selected_node)
             self.trends_panel.set_series(self.dataset, edge_name=self.selected_edge, node_name=self.selected_node)
             self.web.render_dataset(self.dataset, selected_edge=self.selected_edge, selected_node=self.selected_node)
+            self._apply_current_view_mode(source="dataset_load", auto_focus=not preserve_selection)
             self._refresh_frame(push_to_web=True)
             self._persist_event_log(silent=True)
             self._set_dataset_title()
+            self._render_startup_banner()
             self._set_status(f"Загружено: {self.dataset.npz_path.name}")
         except Exception as exc:
             QtWidgets.QMessageBox.critical(self, "Desktop Mnemo", _friendly_error_text(exc))
@@ -2674,6 +3243,8 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             playing=self.playing,
             follow_enabled=self.follow_enabled,
         )
+        if self.startup_banner.isVisible() and not self.playing:
+            self._render_startup_banner()
         if new_events:
             self._persist_event_log(silent=True)
         if push_to_web:
@@ -2713,40 +3284,27 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         if not edge_name or self.dataset is None or edge_name not in self.dataset.edge_names:
             return
         self.selected_edge = edge_name
-        self.selection_panel.set_selection(edge_name=self.selected_edge, node_name=self.selected_node)
-        self.selection_panel.render_details(self.dataset, self.current_idx, edge_name=self.selected_edge, node_name=self.selected_node)
-        self.trends_panel.set_series(self.dataset, edge_name=self.selected_edge, node_name=self.selected_node)
-        self.guide_panel.render(
-            self.dataset,
-            self.current_idx,
-            selected_edge=self.selected_edge,
-            selected_node=self.selected_node,
-            playing=self.playing,
-            follow_enabled=self.follow_enabled,
-        )
-        self.web.set_selection(edge=self.selected_edge, node=self.selected_node)
-        self._push_alerts()
+        self._sync_selection_views(clear_focus_region=True)
 
     def _select_node(self, node_name: str) -> None:
         if not node_name or self.dataset is None or node_name not in self.dataset.node_names:
             return
         self.selected_node = node_name
-        self.selection_panel.set_selection(edge_name=self.selected_edge, node_name=self.selected_node)
-        self.selection_panel.render_details(self.dataset, self.current_idx, edge_name=self.selected_edge, node_name=self.selected_node)
-        self.trends_panel.set_series(self.dataset, edge_name=self.selected_edge, node_name=self.selected_node)
-        self.guide_panel.render(
-            self.dataset,
-            self.current_idx,
-            selected_edge=self.selected_edge,
-            selected_node=self.selected_node,
-            playing=self.playing,
-            follow_enabled=self.follow_enabled,
-        )
-        self.web.set_selection(edge=self.selected_edge, node=self.selected_node)
-        self._push_alerts()
+        self._sync_selection_views(clear_focus_region=True)
 
 
-def run_app(*, npz_path: Path | None, follow: bool, pointer_path: Path, theme: str) -> int:
+def run_app(
+    *,
+    npz_path: Path | None,
+    follow: bool,
+    pointer_path: Path,
+    theme: str,
+    startup_preset: str = "",
+    startup_title: str = "",
+    startup_reason: str = "",
+    startup_view_mode: str = "",
+    startup_checklist: list[str] | tuple[str, ...] | None = None,
+) -> int:
     app = QtWidgets.QApplication.instance()
     created = False
     if app is None:
@@ -2755,7 +3313,17 @@ def run_app(*, npz_path: Path | None, follow: bool, pointer_path: Path, theme: s
     app.setApplicationName("DesktopMnemo")
     app.setOrganizationName("UnifiedPneumoApp")
 
-    window = MnemoMainWindow(npz_path=npz_path, follow=follow, pointer_path=pointer_path, theme=theme)
+    window = MnemoMainWindow(
+        npz_path=npz_path,
+        follow=follow,
+        pointer_path=pointer_path,
+        theme=theme,
+        startup_preset=startup_preset,
+        startup_title=startup_title,
+        startup_reason=startup_reason,
+        startup_view_mode=startup_view_mode,
+        startup_checklist=startup_checklist,
+    )
     window.show()
     if created:
         return int(app.exec())

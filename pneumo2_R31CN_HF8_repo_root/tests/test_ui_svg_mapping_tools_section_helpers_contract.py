@@ -11,6 +11,7 @@ from pneumo_solver_ui.ui_svg_mapping_tools_section_helpers import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+SURFACE_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_svg_mapping_tools_section_helpers.py"
 SCHEME_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_svg_scheme_section_helpers.py"
 WORKBENCH_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_svg_mapping_workbench_section_helpers.py"
@@ -155,14 +156,13 @@ def test_render_svg_mapping_tools_section_handles_reset_default(monkeypatch, tmp
 def test_entrypoints_use_shared_svg_mapping_tools_section_helper() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = SURFACE_HELPERS_PATH.read_text(encoding="utf-8")
     scheme_text = SCHEME_PATH.read_text(encoding="utf-8")
     helper_text = HELPERS_PATH.read_text(encoding="utf-8")
     workbench_text = WORKBENCH_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_svg_scheme_section_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_svg_scheme_section_helpers import (" in heavy_text
-    assert "render_svg_scheme_section(" in app_text
-    assert "render_svg_scheme_section(" in heavy_text
+    assert "from pneumo_solver_ui.ui_svg_scheme_section_helpers import render_svg_scheme_section" in surface_text
+    assert '"render_svg_scheme_section_fn": render_svg_scheme_section' in surface_text
     assert "render_svg_mapping_tools_section(" not in app_text
     assert "render_svg_mapping_tools_section(" not in heavy_text
     assert "render_svg_edge_mapper_html(" not in app_text

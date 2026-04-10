@@ -1,6 +1,10 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+EMBEDDED_HTML_SOURCES = {
+    'pneumo_solver_ui/ui_flow_panel_helpers.py': '__wakeStep',
+    'pneumo_solver_ui/ui_svg_html_builders.py': '__wakeStep',
+}
 
 COMPONENT_SCHEDULERS = {
     'pneumo_solver_ui/components/corner_heatmap_live/index.html': ('__clearScheduledLoop', '__scheduleLoop', '__wakeLoop'),
@@ -37,10 +41,10 @@ def test_playhead_ctrl_has_browser_perf_overlay_and_json_export() -> None:
     assert 'browser_perf_' in src
 
 
-def test_embedded_html_widgets_in_apps_use_single_flight_step_scheduler() -> None:
-    for rel in ['pneumo_solver_ui/app.py', 'pneumo_solver_ui/pneumo_ui_app.py']:
+def test_embedded_html_widgets_in_helpers_use_single_flight_step_scheduler() -> None:
+    for rel, wake_marker in EMBEDDED_HTML_SOURCES.items():
         src = (ROOT / rel).read_text(encoding='utf-8')
-        assert src.count('__clearScheduledStep') >= 2, rel
-        assert src.count('__scheduleStep') >= 2, rel
-        assert src.count('__wakeStep') >= 2, rel
-        assert src.count("document.addEventListener('visibilitychange', () => { if (!document.hidden) __wakeStep(); });") >= 2, rel
+        assert '__clearScheduledStep' in src, rel
+        assert '__scheduleStep' in src, rel
+        assert wake_marker in src, rel
+        assert "document.addEventListener('visibilitychange', () => { if (!document.hidden) __wakeStep(true); });" in src, rel

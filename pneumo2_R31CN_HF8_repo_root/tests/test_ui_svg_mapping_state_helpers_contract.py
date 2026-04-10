@@ -15,6 +15,7 @@ from pneumo_solver_ui.ui_svg_mapping_state_helpers import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+SURFACE_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_svg_scheme_section_helpers.py"
 CONNECTIVITY_PANEL_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_svg_connectivity_panel_helpers.py"
 AUTO_PANEL_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_svg_route_auto_panel_helpers.py"
@@ -105,12 +106,13 @@ def test_finalize_svg_route_mapping_edit_skips_preview_clear_when_not_assigned()
 def test_entrypoints_use_shared_svg_mapping_state_helpers() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = SURFACE_HELPERS_PATH.read_text(encoding="utf-8")
     section_text = SECTION_HELPERS_PATH.read_text(encoding="utf-8")
     connectivity_text = CONNECTIVITY_PANEL_HELPERS_PATH.read_text(encoding="utf-8")
     auto_panel_text = AUTO_PANEL_HELPERS_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_svg_scheme_section_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_svg_scheme_section_helpers import (" in heavy_text
+    assert "from pneumo_solver_ui.ui_svg_scheme_section_helpers import render_svg_scheme_section" in surface_text
+    assert '"render_svg_scheme_section_fn": render_svg_scheme_section' in surface_text
     assert "from pneumo_solver_ui.ui_svg_connectivity_panel_helpers import (" in section_text
     assert "from pneumo_solver_ui.ui_svg_route_auto_panel_helpers import (" in connectivity_text
     assert "from pneumo_solver_ui.ui_svg_mapping_state_helpers import (" in auto_panel_text

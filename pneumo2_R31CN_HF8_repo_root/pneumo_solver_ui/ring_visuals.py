@@ -35,6 +35,26 @@ def _turn_direction_label(direction: str) -> str:
     }.get(str(direction).upper(), str(direction))
 
 
+def _road_mode_label(mode: str) -> str:
+    norm = str(mode or "").strip().upper()
+    if norm in {"ISO", "ISO8608", "ISO_8608"}:
+        return "ISO 8608 (шероховатость)"
+    if norm in {"SIN", "SINE", "SINUS", "SINUSOID"}:
+        return "Синус L/R"
+    return str(mode or "")
+
+
+def _ring_mod_with_endpoint_preserved(values: np.ndarray, ring_len: float) -> np.ndarray:
+    if not np.isfinite(ring_len) or ring_len <= 0.0:
+        return np.asarray(values, dtype=float)
+    raw = np.asarray(values, dtype=float)
+    s_mod = np.mod(raw, ring_len)
+    end_eps = max(1e-9, 1e-6 * float(ring_len))
+    end_mask = (np.abs(s_mod) <= end_eps) & (raw > end_eps)
+    s_mod[end_mask] = float(ring_len)
+    return s_mod
+
+
 def _json_load(path: Path) -> Optional[dict]:
     try:
         obj = json.loads(path.read_text(encoding="utf-8"))
@@ -116,7 +136,6 @@ def build_ring_visual_payload_from_spec(
         return None
 
     spec_vis = dict(spec)
-    spec_vis["closure_policy"] = "closed_c1_periodic"
     dx_m = float(spec_vis.get("dx_m", 0.02) or 0.02)
     tracks = generate_ring_tracks(spec_vis, dx_m=dx_m, seed=int(seed))
     rows = summarize_ring_track_segments(spec_vis, tracks)
@@ -138,32 +157,78 @@ def build_ring_visual_payload_from_spec(
     curv = np.zeros_like(x, dtype=float)
     curv_signed = np.zeros_like(x, dtype=float)
     segs = list(spec.get("segments") or [])
+    try:
+        v_prev_kph = float(spec.get("v0_kph", 0.0) or 0.0)
+    except Exception:
+        v_prev_kph = 0.0
     for i, row in enumerate(rows):
         seg_src = segs[i] if i < len(segs) and isinstance(segs[i], dict) else {}
+        road_src = seg_src.get("road") if isinstance(seg_src.get("road"), dict) else {}
         try:
-            row_v_start_kph = float(row.get("speed_start_kph", 0.0) or 0.0)
+            if "speed_start_kph" in row and row.get("speed_start_kph") is not None:
+                row_v_start_kph = float(row.get("speed_start_kph"))
+            else:
+                row_v_start_kph = float(v_prev_kph)
         except Exception:
-            row_v_start_kph = 0.0
-        motion = _segment_motion_contract(seg_src, row_v_start_kph)
+            row_v_start_kph = float(v_prev_kph)
+        motion = _segment_motion_contract(
+            seg_src,
+            row_v_start_kph,
+            allow_segment_start_override=(i == 0),
+        )
         turn_direction = str(
             row.get("turn_direction") or motion.get("turn_direction") or "STRAIGHT"
         ).upper()
         kappa_signed = float(_segment_curvature_signed(seg_src))
         x0 = float(row.get("x_start_m", 0.0) or 0.0)
         x1 = float(row.get("x_end_m", x0) or x0)
-        mask = (x >= x0 - 1e-9) & (x <= x1 + 1e-9)
+        if i >= len(rows) - 1:
+            mask = (x >= x0 - 1e-9) & (x <= x1 + 1e-9)
+        else:
+            mask = (x >= x0 - 1e-9) & (x < x1 - 1e-9)
+            if not np.any(mask):
+                mask = (x >= x0 - 1e-9) & (x <= x1 + 1e-9)
         curv_signed[mask] = kappa_signed
         curv[mask] = abs(kappa_signed)
+        road_mode = str(row.get("road_mode") or road_src.get("mode") or "")
+        name = str(row.get("name") or seg_src.get("name") or f"S{i+1}")
+        drive_mode = str(row.get("drive_mode") or motion.get("legacy_mode") or "")
+        try:
+            if "speed_start_kph" in row and row.get("speed_start_kph") is not None:
+                speed_start_kph = float(row.get("speed_start_kph"))
+            else:
+                speed_start_kph = float(motion.get("speed_start_kph", v_prev_kph))
+        except Exception:
+            motion_start = motion.get("speed_start_kph", v_prev_kph)
+            speed_start_kph = float(v_prev_kph if motion_start is None else motion_start)
+        try:
+            if "speed_end_kph" in row and row.get("speed_end_kph") is not None:
+                speed_end_kph = float(row.get("speed_end_kph"))
+            else:
+                speed_end_kph = float(motion.get("speed_end_kph", speed_start_kph))
+        except Exception:
+            motion_end = motion.get("speed_end_kph", speed_start_kph)
+            speed_end_kph = float(speed_start_kph if motion_end is None else motion_end)
+        try:
+            if "turn_radius_m" in row and row.get("turn_radius_m") is not None:
+                turn_radius_m = float(row.get("turn_radius_m"))
+            else:
+                turn_radius_m = float(motion.get("turn_radius_m", 0.0))
+        except Exception:
+            motion_radius = motion.get("turn_radius_m", 0.0)
+            turn_radius_m = float(0.0 if motion_radius is None else motion_radius)
         segments_out.append(
             {
                 "seg_idx": int(row.get("seg_idx", i + 1) or (i + 1)),
-                "name": str(row.get("name") or f"S{i+1}"),
-                "drive_mode": str(row.get("drive_mode") or ""),
+                "name": name,
+                "drive_mode": drive_mode,
                 "turn_direction": turn_direction,
                 "turn_direction_label": _turn_direction_label(turn_direction),
-                "speed_start_kph": float(row.get("speed_start_kph", motion.get("speed_start_kph", 0.0)) or 0.0),
-                "speed_end_kph": float(row.get("speed_end_kph", motion.get("speed_end_kph", 0.0)) or 0.0),
-                "road_mode": str(row.get("road_mode") or ""),
+                "speed_start_kph": speed_start_kph,
+                "speed_end_kph": speed_end_kph,
+                "turn_radius_m": max(0.0, float(turn_radius_m)),
+                "road_mode": road_mode,
+                "road_mode_label": _road_mode_label(road_mode),
                 "x_start_m": x0,
                 "x_end_m": x1,
                 "length_m": float(row.get("length_m", max(0.0, x1 - x0)) or max(0.0, x1 - x0)),
@@ -172,6 +237,7 @@ def build_ring_visual_payload_from_spec(
                 "curvature_abs_m_inv": abs(kappa_signed),
             }
         )
+        v_prev_kph = float(speed_end_kph)
 
     curvature_max = float(np.nanmax(curv)) if curv.size else 0.0
     grid_step_m = float(max(0.2, min(road_width_m / 4.0, 1.0)))
@@ -265,13 +331,7 @@ def build_segment_ranges_from_progress(
     if np.all(np.diff(s_arr) >= -1e-9) and np.nanmax(s_arr) <= (max_seg_end + max(1e-6, 1e-3 * max_seg_end)):
         s_mod = np.asarray(s_arr, dtype=float)
     else:
-        s_mod = np.mod(s_arr, ring_len)
-        try:
-            end_eps = max(1e-9, 1e-6 * ring_len)
-            end_mask = (np.abs(s_mod) <= end_eps) & (s_arr > end_eps)
-            s_mod[end_mask] = ring_len
-        except Exception:
-            pass
+        s_mod = _ring_mod_with_endpoint_preserved(s_arr, ring_len)
 
     labels = np.full(s_mod.shape, fill_value=-1, dtype=int)
     eps = 1e-9
@@ -294,8 +354,14 @@ def build_segment_ranges_from_progress(
         out.append({
             "seg_idx": int(seg.get("seg_idx", cur + 1) or (cur + 1)),
             "name": str(seg.get("name") or f"S{cur+1}"),
+            "drive_mode": str(seg.get("drive_mode") or ""),
             "turn_direction": str(seg.get("turn_direction") or ""),
             "turn_direction_label": str(seg.get("turn_direction_label") or ""),
+            "speed_start_kph": float(seg.get("speed_start_kph") or 0.0),
+            "speed_end_kph": float(seg.get("speed_end_kph") or 0.0),
+            "turn_radius_m": float(seg.get("turn_radius_m") or 0.0),
+            "road_mode": str(seg.get("road_mode") or ""),
+            "road_mode_label": str(seg.get("road_mode_label") or _road_mode_label(str(seg.get("road_mode") or ""))),
             "color": str(seg.get("edge_color") or _SEGMENT_PALETTE[cur % len(_SEGMENT_PALETTE)]),
             "edge_color": str(seg.get("edge_color") or _SEGMENT_PALETTE[cur % len(_SEGMENT_PALETTE)]),
             "idx0": int(start),
@@ -314,16 +380,19 @@ def _sample_signed_curvature_at_s(ring_visual: Dict[str, Any], s_values: np.ndar
     L = float(ring_visual.get("ring_length_m") or 0.0)
     if L <= 0.0 or len(segs) == 0:
         return np.zeros_like(s_values, dtype=float)
-    s_mod = np.mod(np.asarray(s_values, dtype=float), L)
+    s_mod = _ring_mod_with_endpoint_preserved(np.asarray(s_values, dtype=float), L)
     out = np.zeros_like(s_mod, dtype=float)
-    for seg in segs:
+    for i, seg in enumerate(segs):
         try:
             x0 = float(seg.get("x_start_m") or 0.0)
             x1 = float(seg.get("x_end_m") or x0)
             kappa = float(seg.get("curvature_signed_m_inv") or 0.0)
         except Exception:
             continue
-        mask = (s_mod >= x0 - 1e-9) & (s_mod <= x1 + 1e-9)
+        is_last = (i == len(segs) - 1)
+        mask = (s_mod >= x0 - 1e-9) & (s_mod < x1 - 1e-9)
+        if is_last:
+            mask = mask | ((s_mod >= x0 - 1e-9) & (s_mod <= x1 + 1e-9))
         out[mask] = kappa
     return out
 
@@ -354,7 +423,7 @@ def embed_path_payload_on_ring(
     z = -R * np.cos(theta)
     yaw = theta
 
-    kappa_signed = _sample_signed_curvature_at_s(ring_visual, s_mod)
+    kappa_signed = _sample_signed_curvature_at_s(ring_visual, s)
     steer = np.arctan(np.clip(float(wheelbase_m) * kappa_signed, -5.0, 5.0))
 
     out = dict(path_payload)

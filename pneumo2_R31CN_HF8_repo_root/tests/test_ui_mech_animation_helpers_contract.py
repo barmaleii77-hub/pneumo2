@@ -11,6 +11,7 @@ from pneumo_solver_ui import ui_mech_animation_helpers as helpers
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+SURFACE_SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_mech_animation_helpers.py"
 
 
@@ -2180,12 +2181,12 @@ def test_render_mechanical_scheme_asset_expander_delegates_to_shared_assets(tmp_
 def test_entrypoints_use_shared_mechanical_animation_helpers() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = SURFACE_SECTION_HELPERS_PATH.read_text(encoding="utf-8")
     helper_text = HELPERS_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_mech_animation_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_mech_animation_helpers import (" in heavy_text
-    assert '"render_mechanics_panel_fn": render_mechanical_animation_results_panel' in app_text
-    assert '"render_mechanics_panel_fn": render_mechanical_animation_results_panel' in heavy_text
+    assert "from pneumo_solver_ui.ui_mech_animation_helpers import (" in surface_text
+    assert "render_mechanical_animation_results_panel," in surface_text
+    assert '"render_mechanics_panel_fn": render_mechanical_animation_results_panel' in surface_text
     assert "prepare_mechanical_animation_prelude(" not in app_text
     assert "prepare_mechanical_animation_prelude(" not in heavy_text
     assert "prepare_mechanical_animation_runtime_inputs(" not in app_text

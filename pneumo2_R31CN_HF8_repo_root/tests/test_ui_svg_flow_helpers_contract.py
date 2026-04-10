@@ -11,6 +11,7 @@ from pneumo_solver_ui import ui_svg_flow_helpers
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+SURFACE_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_svg_scheme_section_helpers.py"
 INPUT_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_svg_scheme_input_helpers.py"
 
@@ -150,13 +151,12 @@ def test_svg_flow_source_helper_handles_missing_and_uploaded_sources(tmp_path: P
 def test_entrypoints_use_shared_svg_flow_helpers() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = SURFACE_HELPERS_PATH.read_text(encoding="utf-8")
     section_text = SECTION_HELPERS_PATH.read_text(encoding="utf-8")
     input_text = INPUT_HELPERS_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_svg_scheme_section_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_svg_scheme_section_helpers import (" in heavy_text
-    assert "render_svg_scheme_section(" in app_text
-    assert "render_svg_scheme_section(" in heavy_text
+    assert "from pneumo_solver_ui.ui_svg_scheme_section_helpers import render_svg_scheme_section" in surface_text
+    assert '"render_svg_scheme_section_fn": render_svg_scheme_section' in surface_text
     assert "render_svg_click_mode_selector(" not in app_text
     assert "render_svg_click_mode_selector(" not in heavy_text
     assert "render_svg_pressure_node_selector(" not in app_text

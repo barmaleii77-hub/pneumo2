@@ -45,8 +45,8 @@ def test_entrypoints_use_shared_flow_rate_helper_without_inline_formula() -> Non
 
     assert "from pneumo_solver_ui.ui_flow_rate_helpers import (" in app_text
     assert "from pneumo_solver_ui.ui_flow_rate_helpers import (" in heavy_text
-    assert "flow_rate_display_scale_and_unit(" in app_text
-    assert "flow_rate_display_scale_and_unit(" in heavy_text
+    assert "flow_scale_and_unit_fn=flow_rate_display_scale_and_unit" in app_text
+    assert "flow_scale_and_unit_fn=flow_rate_display_scale_and_unit" in heavy_text
     assert "rho_N = float(P_ATM)" not in app_text
     assert "rho_N = float(P_ATM)" not in heavy_text
     assert "scale = 1000.0 * 60.0 / rho_N" not in app_text

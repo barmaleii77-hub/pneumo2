@@ -265,20 +265,25 @@
   function __modRing(sVal){
     const L = __ringLength();
     if (!(L > 0)) return Number(sVal || 0);
-    let x = Number(sVal || 0) % L;
+    const raw = Number(sVal || 0);
+    let x = raw % L;
     if (x < 0) x += L;
+    const endEps = Math.max(1e-9, 1e-6 * L);
+    if (Math.abs(x) <= endEps && raw > endEps) return L;
     return x;
   }
   function __segmentForS(sVal){
     const segs = __ringSegments();
     if (!segs.length) return null;
     const sMod = __modRing(sVal);
-    for (const seg of segs){
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i];
       const x0 = Number(seg.x_start_m || 0);
       const x1 = Number(seg.x_end_m || x0);
-      if (sMod >= x0 - 1e-9 && sMod <= x1 + 1e-9) return seg;
+      const isLast = (i === segs.length - 1);
+      if (sMod >= x0 - 1e-9 && (sMod < x1 - 1e-9 || (isLast && sMod <= x1 + 1e-9))) return seg;
     }
-    return null;
+    return segs[segs.length - 1] || null;
   }
   function drawRingSegmentBands(px0, py0, pw, ph, X, xMin, xMax, s0, distScale){
     const segs = __ringSegments();
@@ -559,7 +564,8 @@
     const segNow = (DATA.path && Array.isArray(DATA.path.s) && DATA.path.s[idx] != null) ? __segmentForS(Number(DATA.path.s[idx]||0)) : null;
     const segNowName = segNow ? String(segNow.name || ('S' + String(segNow.seg_idx || ''))) : '—';
     const segNowTurn = segNow ? String(segNow.turn_direction_label || segNow.turn_direction || '').trim() : '';
-    const segNowLabel = (segNow && segNowTurn) ? (segNowName + ' · ' + segNowTurn) : segNowName;
+    const segNowRoad = segNow ? String(segNow.road_mode_label || segNow.road_mode || '').trim() : '';
+    const segNowLabel = [segNowName, segNowTurn, segNowRoad].filter(Boolean).join(' · ');
     const segSwatch = segNow && segNow.edge_color ? `<span style="display:inline-block;width:12px;height:12px;border-radius:999px;background:${String(segNow.edge_color)};vertical-align:-2px;margin-right:6px;"></span>` : '';
     hudEl.innerHTML = `
       <div><b>t</b>: ${fmt(tNow,3)} s &nbsp; <b>idx</b>: ${idx}/${n-1}</div>

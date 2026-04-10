@@ -133,6 +133,33 @@ def _nominal_ring_speed_stats(spec: Dict[str, Any]) -> Dict[str, float]:
     return {}
 
 
+def _ring_closure_meta(spec: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        from .scenario_ring import generate_ring_tracks
+
+        dx_m = float(spec.get("dx_m", 0.02) or 0.02)
+        if not np.isfinite(dx_m) or dx_m <= 0.0:
+            dx_m = 0.02
+        dx_m = float(min(max(dx_m, 1e-4), 0.25))
+        seed_raw = spec.get("seed", None)
+        try:
+            seed = None if seed_raw is None else int(seed_raw)
+        except Exception:
+            seed = None
+        tracks = generate_ring_tracks(spec, dx_m=dx_m, seed=seed)
+        meta = dict(tracks.get("meta") or {})
+        return {
+            "ring_closure_policy": str(meta.get("closure_policy") or ""),
+            "ring_closure_applied": bool(meta.get("closure_applied", False)),
+            "ring_seam_open": bool(meta.get("seam_open", False)),
+            "ring_seam_max_jump_m": float(meta.get("seam_max_jump_m", 0.0) or 0.0),
+            "ring_raw_seam_max_jump_m": float(meta.get("raw_seam_max_jump_m", 0.0) or 0.0),
+        }
+    except Exception:
+        pass
+    return {}
+
+
 def extract_anim_sidecar_meta(
     test_cfg: Any,
     *,
@@ -223,6 +250,7 @@ def extract_anim_sidecar_meta(
             m["ring_v0_kph"] = float(v0_kph)
             m["ring_v0_mps"] = float(vx0_mps)
         m.update(_nominal_ring_speed_stats(spec))
+        m.update(_ring_closure_meta(spec))
         m["ring_speed_profile_source"] = "scenario_json"
     elif inner.get("vx0_м_с") is not None:
         m["vx0_м_с"] = inner.get("vx0_м_с")

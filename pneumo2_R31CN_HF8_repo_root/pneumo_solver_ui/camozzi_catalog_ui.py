@@ -33,6 +33,17 @@ CATALOG_DIR = Path(__file__).resolve().parent / "catalogs"
 CATALOG_JSON = CATALOG_DIR / "camozzi_catalog.json"
 
 
+def _cache_data(*args, **kwargs):
+    cache_data_fn = getattr(st, "cache_data", None)
+    if callable(cache_data_fn):
+        return cache_data_fn(*args, **kwargs)
+
+    def _decorator(fn):
+        return fn
+
+    return _decorator
+
+
 @dataclass(frozen=True)
 class CamozziCylinderChoice:
     variant_key: str
@@ -42,7 +53,7 @@ class CamozziCylinderChoice:
     stroke_rear_mm: int
 
 
-@st.cache_data(show_spinner=False)
+@_cache_data(show_spinner=False)
 def _load_camozzi_catalog() -> Dict:
     if not CATALOG_JSON.exists():
         return {}

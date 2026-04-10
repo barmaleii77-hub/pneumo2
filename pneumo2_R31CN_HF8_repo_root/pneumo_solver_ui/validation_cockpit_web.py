@@ -14,6 +14,10 @@ Streamlit: "один экран" для быстрой валидации одн
 """
 from __future__ import annotations
 
+import os
+import platform
+import subprocess
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -21,8 +25,12 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from pneumo_solver_ui.desktop_mnemo.settings_bridge import (
+    desktop_mnemo_view_mode_label,
+    read_desktop_mnemo_view_mode,
+)
 from pneumo_solver_ui.entrypoints import desktop_animator_page_rel, desktop_mnemo_page_rel
-from pneumo_solver_ui.run_artifacts import collect_anim_latest_diagnostics_summary
+from pneumo_solver_ui.run_artifacts import collect_anim_latest_diagnostics_summary, local_anim_latest_export_paths
 from pneumo_solver_ui.tools.send_bundle_contract import build_anim_operator_recommendations
 
 try:
@@ -70,6 +78,98 @@ DESKTOP_ANIMATOR_PAGE = desktop_animator_page_rel(here=__file__)
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
+
+
+def _desktop_mnemo_default_view_mode_label() -> str:
+    return desktop_mnemo_view_mode_label(read_desktop_mnemo_view_mode(_repo_root()))
+
+
+def _desktop_mnemo_default_view_mode() -> str:
+    return read_desktop_mnemo_view_mode(_repo_root())
+
+
+def _desktop_mnemo_pointer_path() -> Path:
+    exports_dir = _repo_root() / "pneumo_solver_ui" / "workspace" / "exports"
+    _, pointer_path = local_anim_latest_export_paths(exports_dir, ensure_exists=False)
+    return pointer_path
+
+
+def _desktop_mnemo_python(prefer_gui: bool) -> str:
+    project_root = _repo_root()
+    candidates: List[Path] = []
+    if platform.system() == "Windows":
+        candidates += [
+            project_root / ".venv" / "Scripts" / ("pythonw.exe" if prefer_gui else "python.exe"),
+            project_root / "venv" / "Scripts" / ("pythonw.exe" if prefer_gui else "python.exe"),
+        ]
+    else:
+        candidates += [
+            project_root / ".venv" / "bin" / "python",
+            project_root / "venv" / "bin" / "python",
+        ]
+
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return sys.executable
+
+
+def _spawn_no_console(cmd: List[str], cwd: Path) -> subprocess.Popen:
+    creationflags = 0
+    startupinfo = None
+    if os.name == "nt":
+        creationflags = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
+        startupinfo = subprocess.STARTUPINFO()  # type: ignore[attr-defined]
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW  # type: ignore[attr-defined]
+    return subprocess.Popen(cmd, cwd=str(cwd), creationflags=creationflags, startupinfo=startupinfo)
+
+
+def _validation_cockpit_mnemo_theme() -> str:
+    try:
+        base = str(st.get_option("theme.base") or "").strip().lower()
+    except Exception:
+        base = ""
+    return "light" if base == "light" else "dark"
+
+
+def _launch_desktop_mnemo_from_cockpit(
+    *,
+    follow: bool,
+    npz_path: Path | None = None,
+    startup_preset: str = "",
+    startup_title: str = "",
+    startup_reason: str = "",
+    startup_view_mode: str = "",
+    startup_checks: Optional[List[str]] = None,
+) -> tuple[bool, str]:
+    py = _desktop_mnemo_python(prefer_gui=True)
+    cmd = [py, "-m", "pneumo_solver_ui.desktop_mnemo.main"]
+    if follow:
+        cmd += ["--follow", "--pointer", str(_desktop_mnemo_pointer_path())]
+    elif npz_path is not None:
+        cmd += ["--npz", str(Path(npz_path).expanduser().resolve())]
+    cmd += ["--theme", _validation_cockpit_mnemo_theme()]
+    if startup_preset:
+        cmd += ["--startup-preset", str(startup_preset)]
+    if startup_title:
+        cmd += ["--startup-title", str(startup_title)]
+    if startup_reason:
+        cmd += ["--startup-reason", str(startup_reason)]
+    if startup_view_mode:
+        cmd += ["--startup-view-mode", str(startup_view_mode)]
+    for item in startup_checks or []:
+        text = str(item).strip()
+        if text:
+            cmd += ["--startup-check", text]
+    try:
+        _spawn_no_console(cmd, cwd=_repo_root())
+    except Exception as exc:
+        return False, f"Не удалось запустить Desktop Mnemo: {exc}"
+    if follow:
+        return True, "Desktop Mnemo запущен из Validation Cockpit в follow-режиме."
+    if npz_path is not None:
+        return True, "Desktop Mnemo запущен из Validation Cockpit на текущем NPZ."
+    return True, "Desktop Mnemo запущен из Validation Cockpit."
 
 
 def _default_npz_dirs() -> List[Path]:
@@ -356,6 +456,35 @@ def render_validation_cockpit_web() -> None:
     if visual_contract.get("solver_points_overlay_text"):
         st.warning(str(visual_contract["solver_points_overlay_text"]))
 
+    current_npz_path = Path(pick).expanduser().resolve()
+    mnemo_event_diag = collect_anim_latest_diagnostics_summary(
+        {
+            "npz_path": pick,
+            "meta": meta if isinstance(meta, dict) else {},
+        },
+        include_meta=False,
+    )
+    operator_recommendations = build_anim_operator_recommendations(mnemo_event_diag)
+    cockpit_launch_view_choice = st.radio(
+        "Разовый режим запуска Desktop Mnemo из cockpit",
+        ["Как сохранено", "Фокусный сценарий", "Полная схема"],
+        index=0,
+        horizontal=True,
+        key="validation_cockpit_mnemo_startup_view",
+        help="Это одноразовое переопределение только для запуска из Validation Cockpit. Сохранённый desktop default не меняется.",
+    )
+    cockpit_launch_view_mode = {
+        "Как сохранено": "",
+        "Фокусный сценарий": "focus",
+        "Полная схема": "overview",
+    }[str(cockpit_launch_view_choice)]
+    cockpit_effective_view = cockpit_launch_view_mode or _desktop_mnemo_default_view_mode()
+    cockpit_launch_view_label = desktop_mnemo_view_mode_label(cockpit_effective_view)
+    st.caption(
+        "Desktop Mnemo из cockpit откроется в режиме: "
+        f"{cockpit_launch_view_label}. Saved default: {_desktop_mnemo_default_view_mode_label()}."
+    )
+
     if isinstance(geometry_acceptance, dict) and geometry_acceptance:
         ga_gate = str(geometry_acceptance.get("release_gate") or "MISSING")
         ga_reason = str(geometry_acceptance.get("release_gate_reason") or "")
@@ -378,20 +507,58 @@ def render_validation_cockpit_web() -> None:
         "Когда нужен быстрый визуальный sanity-check вне браузера: Desktop Mnemo удобен для пневматики и причинно-следственных связей, "
         "а Desktop Animator лучше подходит для механики, 2D/3D и дорожного профиля."
     )
+    st.info(
+        "Desktop Mnemo по умолчанию откроется в режиме: "
+        f"{_desktop_mnemo_default_view_mode_label()}."
+    )
+    cockpit_mnemo_checks = operator_recommendations[:3] or [
+        "Сначала найдите одну ведущую ветку, а не пытайтесь читать всю схему сразу.",
+        "Затем проверьте один опорный узел давления и только потом переходите к трендам.",
+        "После этого сопоставьте текущий режим с latched-событиями и недавними переключениями.",
+    ]
+    launch_col1, launch_col2 = st.columns(2)
+    with launch_col1:
+        if st.button("Запустить Desktop Mnemo на текущем NPZ", key="validation_launch_mnemo_npz", width="stretch"):
+            ok, msg = _launch_desktop_mnemo_from_cockpit(
+                follow=False,
+                npz_path=current_npz_path,
+                startup_preset="validation_cockpit_npz_review",
+                startup_title="Validation Cockpit -> Desktop Mnemo",
+                startup_reason=(
+                    "Окно открыто прямо из Validation Cockpit для перехода от web-валидации "
+                    f"к причинно-следственной схеме по текущему NPZ {current_npz_path.name}."
+                ),
+                startup_view_mode=cockpit_launch_view_mode,
+                startup_checks=cockpit_mnemo_checks,
+            )
+            if ok:
+                st.success(msg)
+            else:
+                st.error(msg)
+    with launch_col2:
+        if st.button("Запустить Desktop Mnemo (follow)", key="validation_launch_mnemo_follow", width="stretch"):
+            ok, msg = _launch_desktop_mnemo_from_cockpit(
+                follow=True,
+                startup_preset="validation_cockpit_follow_live",
+                startup_title="Validation Cockpit -> Desktop Mnemo follow",
+                startup_reason=(
+                    "Окно открыто прямо из Validation Cockpit в live follow-режиме, "
+                    "чтобы сопоставить web-наблюдения с текущим pointer и свежими latched-событиями."
+                ),
+                startup_view_mode=cockpit_launch_view_mode,
+                startup_checks=cockpit_mnemo_checks,
+            )
+            if ok:
+                st.success(msg)
+            else:
+                st.error(msg)
+    st.caption("Прямой запуск из cockpit открывает отдельное Windows-окно без перехода на launcher-page.")
     tool_col1, tool_col2 = st.columns(2)
     with tool_col1:
         _page_link_or_info(DESKTOP_MNEMO_PAGE, "Открыть Desktop Mnemo", key="validation_to_mnemo")
     with tool_col2:
         _page_link_or_info(DESKTOP_ANIMATOR_PAGE, "Открыть Desktop Animator", key="validation_to_animator")
 
-    mnemo_event_diag = collect_anim_latest_diagnostics_summary(
-        {
-            "npz_path": pick,
-            "meta": meta if isinstance(meta, dict) else {},
-        },
-        include_meta=False,
-    )
-    operator_recommendations = build_anim_operator_recommendations(mnemo_event_diag)
     st.markdown("**Журнал событий Desktop Mnemo**")
     if mnemo_event_diag.get("anim_latest_mnemo_event_log_exists"):
         ev_col1, ev_col2, ev_col3, ev_col4 = st.columns(4)
@@ -421,6 +588,7 @@ def render_validation_cockpit_web() -> None:
         st.markdown("**Рекомендуемые действия**")
         st.warning("Сначала: " + operator_recommendations[0])
         st.markdown("\n".join(f"{idx}. {item}" for idx, item in enumerate(operator_recommendations, start=1)))
+        st.caption(f"Desktop Mnemo default view: {_desktop_mnemo_default_view_mode_label()}.")
 
     # --- animation ---
     st.subheader("Механика + дорога (синхронно по времени)")

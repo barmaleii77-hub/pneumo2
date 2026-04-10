@@ -24,6 +24,21 @@ def main(argv: list[str] | None = None) -> int:
         help="Pointer json path (default: current workspace global pointer, then session/local fallbacks)",
     )
     ap.add_argument("--theme", type=str, default="dark", choices=["dark", "light"], help="UI theme")
+    ap.add_argument("--startup-preset", type=str, default="", help="Optional launcher preset key for onboarding banner")
+    ap.add_argument("--startup-title", type=str, default="", help="Optional onboarding title shown inside the desktop window")
+    ap.add_argument("--startup-reason", type=str, default="", help="Optional onboarding reason shown inside the desktop window")
+    ap.add_argument(
+        "--startup-view-mode",
+        type=str,
+        default="",
+        help="Optional one-off startup view override: focus or overview",
+    )
+    ap.add_argument(
+        "--startup-check",
+        action="append",
+        default=[],
+        help="Repeatable onboarding checklist item shown inside the desktop window",
+    )
 
     args = ap.parse_args(argv)
 
@@ -44,6 +59,11 @@ def main(argv: list[str] | None = None) -> int:
             follow=bool(args.follow),
             pointer_path=pointer_path,
             theme=str(args.theme),
+            startup_preset=str(args.startup_preset or ""),
+            startup_title=str(args.startup_title or ""),
+            startup_reason=str(args.startup_reason or ""),
+            startup_view_mode=str(args.startup_view_mode or ""),
+            startup_checklist=list(args.startup_check or []),
         )
     )
 

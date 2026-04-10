@@ -15,9 +15,8 @@ def test_road_items_become_visible_after_valid_geometry_update() -> None:
     assert 'self._road_stripes.setVisible(True)' in APP
 
 
-def test_playback_perf_mode_no_longer_suppresses_front_and_rear_axle_views() -> None:
-    assert 'for panel in (self.sideL, self.sideR, self.hud):' in APP
-    assert 'for panel in (self.axleF, self.axleR, self.sideL, self.sideR, self.hud):' not in APP
+def test_playback_perf_mode_applies_consistent_perf_hints_to_all_aux_panels() -> None:
+    assert 'for panel in (self.axleF, self.axleR, self.sideL, self.sideR, self.hud):' in APP
 
 
 def test_web_heavy_components_can_fully_stop_render_loops_when_idle() -> None:

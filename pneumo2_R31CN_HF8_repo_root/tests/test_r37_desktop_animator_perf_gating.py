@@ -75,7 +75,19 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert 'key = f"svc__vertical_view_signal_cache__{wb:.6f}"' in app_src
     assert "def _set_table_row_count_if_changed" in app_src
     assert "def _set_table_fixed_row_height" in app_src
-    assert "if isinstance(widget, (QtWidgets.QGraphicsView, QtWidgets.QTableWidget, TelemetryPanel)):" in app_src
+    assert "ReceiverTankWidget" in app_src
+    assert "RoadProfilePanel" in app_src
+    assert "PressurePanel" in app_src
+    assert "FlowPanel" in app_src
+    assert "ValvePanel" in app_src
+    assert "if isinstance(" in app_src
+    assert "CornerHeatmapPanel," in app_src
+    assert "ReceiverTankWidget," in app_src
+    assert "RoadProfilePanel," in app_src
+    assert "PressurePanel," in app_src
+    assert "FlowPanel," in app_src
+    assert "ValvePanel," in app_src
+    assert "EventTimelineWidget," in app_src
     assert "vh.setSectionResizeMode(QtWidgets.QHeaderView.Fixed)" in app_src
     assert "self._last_xrange" in app_src
     assert "self._last_yrange" in app_src
@@ -135,6 +147,16 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "P = sample(arr, patm)" in app_src
     assert 's = "—" if not np.isfinite(bar_g) else f"{bar_g:.2f}"' in app_src
     assert "self._p_series_map: Dict[str, np.ndarray] = {}" in app_src
+    assert "class _PressureBarCanvas(QtWidgets.QWidget):" in app_src
+    assert "self.bar = _PressureBarCanvas(max_bar_g=self.max_bar_g)" in app_src
+    assert "class _PercentBarCanvas(QtWidgets.QWidget):" in app_src
+    assert "def setValue(self, value: int) -> None:" in app_src
+    assert "self._fill_brush = QtGui.QBrush(QtGui.QColor(fill_color))" in app_src
+    assert "def set_value_bar_g(self, bar_g: Optional[float]) -> None:" in app_src
+    assert "visual_key = int(round(frac * 1000.0))" in app_src
+    assert "self._marker_active_pen = QtGui.QPen(QtGui.QColor(230, 190, 90, 230), 2)" in app_src
+    assert "self._flow_in_brush = QtGui.QBrush(QtGui.QColor(80, 220, 120, 230))" in app_src
+    assert "self._pipe_out_brush = QtGui.QBrush(QtGui.QColor(240, 90, 90, 220))" in app_src
     assert "self._last_visual_key: Optional[tuple[int, int, int, int, int, int]] = None" in app_src
     assert "visual_key = (" in app_src
     assert "summary = _ensure_telemetry_summary_cache(b)" in app_src
@@ -310,8 +332,16 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent, True)" in app_src
     assert "def paintEvent(self, event: QtGui.QPaintEvent):  # type: ignore[override]" in app_src
     assert "self._border_pen = QtGui.QPen(self._border_color, 1.0)" in app_src
+    assert "self._fg_pen = QtGui.QPen(self._fg_color, 1.0)" in app_src
+    assert "self._bg_brush = QtGui.QBrush(self._bg_color)" in app_src
     assert "self._corner_font = QtGui.QFont(self.font())" in app_src
     assert "self._value_font = QtGui.QFont(self.font())" in app_src
+    assert "self._corner_static_text = QtGui.QStaticText(self.corner)" in app_src
+    assert "self._value_static_text = QtGui.QStaticText(self._value_text)" in app_src
+    assert "def _prepare_static_text(text_item: QtGui.QStaticText, font: QtGui.QFont) -> None:" in app_src
+    assert "def _ensure_layout(self) -> None:" in app_src
+    assert "p.drawStaticText(self._corner_pos, self._corner_static_text)" in app_src
+    assert "p.drawStaticText(self._value_pos, self._value_static_text)" in app_src
     assert "self.plot.setMaximumHeight(plot_h if compact else 16777215)" in app_src
     assert "world_lo = float(s0 + x_min)" in app_src
     assert "y_range = tuple(cache.get(\"y_range\"" in app_src
@@ -321,8 +351,8 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "def _top_descending_indices(values: Any, limit: int, *, threshold: float = 0.0) -> np.ndarray:" in app_src
     assert "self._last_display_key: Optional[tuple[Any, ...]] = None" in app_src
     assert "self._visible_rows: int = 0" in app_src
-    assert "self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, QtWidgets.QProgressBar, QtWidgets.QTableWidgetItem]] = []" in app_src
-    assert "self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, QtWidgets.QTableWidgetItem, QtWidgets.QProgressBar, QtWidgets.QTableWidgetItem]] = []" in app_src
+    assert "self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, _PercentBarCanvas, QtWidgets.QTableWidgetItem]] = []" in app_src
+    assert "self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, QtWidgets.QTableWidgetItem, _PercentBarCanvas, QtWidgets.QTableWidgetItem]] = []" in app_src
     assert "class _QuickTextStripCanvas(QtWidgets.QWidget):" in app_src
     assert "self._segments_layout: list[tuple[str, QtGui.QColor, float]] = []" in app_src
     assert "self._segments_layout_key" in app_src
@@ -346,6 +376,7 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self.lbl.setVisible(not compact)" in app_src
     assert "self.header_canvas.set_segments(" in app_src
     assert "_set_progress_value_if_changed(bar" not in app_src
+    assert "QtWidgets.QProgressBar()" not in app_src
     assert "idxs = _top_descending_indices(vals, self.max_rows, threshold=thr)" in app_src
     assert "order = _top_descending_indices(aq, self.max_rows, threshold=thr)" in app_src
     assert "def _decimate_series_for_display" in hmi_src

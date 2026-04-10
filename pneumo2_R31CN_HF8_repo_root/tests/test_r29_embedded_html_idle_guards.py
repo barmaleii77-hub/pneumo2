@@ -5,17 +5,19 @@ def _read(rel: str) -> str:
     return Path(rel).read_text(encoding='utf-8')
 
 
-def test_app_embedded_flow_widgets_have_idle_render_guards() -> None:
-    txt = _read('pneumo_solver_ui/app.py')
-    assert txt.count('lastRenderedIdx = -1') >= 2
-    assert txt.count('const shouldRender = playing || (idx !== lastRenderedIdx) || (lastRenderedPlaying !== playing);') >= 2
-    assert txt.count('__frameInParentViewport') >= 2
-    assert txt.count('__nextIdleMs(60000, 180000, 300000)') >= 2
+EMBEDDED_HTML_SOURCES = [
+    'pneumo_solver_ui/ui_flow_panel_helpers.py',
+    'pneumo_solver_ui/ui_svg_html_builders.py',
+]
 
 
-def test_pneumo_ui_app_embedded_flow_widgets_have_idle_render_guards() -> None:
-    txt = _read('pneumo_solver_ui/pneumo_ui_app.py')
-    assert txt.count('lastRenderedIdx = -1') >= 2
-    assert txt.count('const shouldRender = playing || (idx !== lastRenderedIdx) || (lastRenderedPlaying !== playing);') >= 2
-    assert txt.count('__frameInParentViewport') >= 2
-    assert txt.count('__nextIdleMs(60000, 180000, 300000)') >= 2
+def test_embedded_flow_widgets_keep_render_guard_state_in_helper_sources() -> None:
+    texts = [_read(rel) for rel in EMBEDDED_HTML_SOURCES]
+    assert sum(txt.count('lastRenderedIdx = -1') for txt in texts) >= 2
+    assert sum(
+        txt.count('const shouldRender = playing || (idx !== lastRenderedIdx) || (lastRenderedPlaying !== playing);')
+        for txt in texts
+    ) >= 2
+    assert sum(txt.count('__frameInParentViewport') for txt in texts) >= 2
+    for txt in texts:
+        assert '__nextIdleMs(60000, 180000, 300000)' not in txt

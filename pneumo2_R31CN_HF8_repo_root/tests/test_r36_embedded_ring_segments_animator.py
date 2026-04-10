@@ -45,7 +45,13 @@ def test_mech_car3d_has_ring_segment_hud_and_current_segment_emphasis() -> None:
     assert 'pillSeg' in src
     assert '__ringCurrentSegment' in src
     assert '__ringSegmentLabel' in src
+    assert '__ringClosurePolicyLabel' in src
+    assert 'STRICT EXACT' in src
+    assert 'C1 PERIODIC' in src
     assert 'turn_direction_label' in src
+    assert 'road_mode_label' in src
+    assert 'const endEps = Math.max(1e-9, 1e-6 * ringL);' in src
+    assert 'if (Math.abs(out) <= endEps && raw > endEps) return ringL;' in src
     assert '__sameRingSegment(currentSeg, seg)' in src
     assert 'const lineW = isCurrent ? 7 : 4;' in src
     assert 'drawRingRoadEmbedded(currentRingSeg);' in src

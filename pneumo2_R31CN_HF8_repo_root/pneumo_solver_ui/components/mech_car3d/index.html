@@ -1120,8 +1120,13 @@ const ps = readPlayState();
   const ringMode = !!(ringVisual && ringVisual.mode === "ring_closed_circle" && Number(ringVisual.ring_length_m || 0) > 0);
   const roadAvailableCorners = new Set(Array.isArray(visualContract.road_available_corners) ? visualContract.road_available_corners : []);
   const roadComplete = !!visualContract.road_complete;
+  const ringMeta = (ringVisual && ringVisual.meta) ? ringVisual.meta : {};
+  const ringClosurePolicy = ringMode
+    ? String(ringVisual.closure_policy || ringMeta.closure_policy || ringVisual.source_closure_policy || '')
+    : '';
+  const ringClosureLabel = ringMode ? __ringClosurePolicyLabel(ringClosurePolicy) : '';
   const roadStatusText = ringMode
-    ? (String((((ringVisual && ringVisual.meta) || {}).seam_open) ? 'RING SEAM OPEN' : 'RING CLOSED'))
+    ? ([ringClosureLabel, String((ringMeta || {}).seam_open ? 'RING SEAM OPEN' : 'RING CLOSED')].filter(Boolean).join(' · '))
     : String(visualContract.road_overlay_text || (!roadComplete ? 'NO ROAD DATA' : ''));
   const solverOk = !!visualContract.solver_points_complete;
   const solverStatusText = String(visualContract.solver_points_overlay_text || (!solverOk ? 'NO SOLVER POINTS' : ''));
@@ -1140,8 +1145,11 @@ const ps = readPlayState();
 
   function __ringWrapS(sVal, ringL) {
     if (!(ringL > 0)) return 0.0;
-    let out = Number(sVal || 0.0) % ringL;
+    const raw = Number(sVal || 0.0);
+    let out = raw % ringL;
     if (out < 0) out += ringL;
+    const endEps = Math.max(1e-9, 1e-6 * ringL);
+    if (Math.abs(out) <= endEps && raw > endEps) return ringL;
     return out;
   }
 
@@ -1210,7 +1218,15 @@ const ps = readPlayState();
   function __ringSegmentLabel(seg) {
     const name = String((seg && seg.name) || ("S" + String((seg && seg.seg_idx) || "")) || "?");
     const turn = String((seg && (seg.turn_direction_label || seg.turn_direction)) || "").trim();
-    return turn ? (name + " · " + turn) : name;
+    const road = String((seg && (seg.road_mode_label || seg.road_mode)) || "").trim();
+    return [name, turn, road].filter(Boolean).join(" · ");
+  }
+
+  function __ringClosurePolicyLabel(policy) {
+    const raw = String(policy || "").trim().toLowerCase();
+    if (raw === "strict_exact") return "STRICT EXACT";
+    if (raw === "closed_c1_periodic") return "C1 PERIODIC";
+    return String(policy || "").trim();
   }
 
   function __ringPoint(sVal, lat, yVal) {

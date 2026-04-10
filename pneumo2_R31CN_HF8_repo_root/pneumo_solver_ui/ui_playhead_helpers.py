@@ -65,11 +65,12 @@ def render_results_view_selector(
     cur_hash: str,
     test_pick: str,
     log_event_fn,
-    radio_fn=st.radio,
+    radio_fn=None,
     label: str = "Раздел результатов",
     key: str = "baseline_view_res",
     horizontal: bool = True,
 ) -> str:
+    radio_fn = radio_fn or st.radio
     view = radio_fn(
         label,
         options=list(options),

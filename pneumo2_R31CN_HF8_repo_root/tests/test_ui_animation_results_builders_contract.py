@@ -10,6 +10,7 @@ from pneumo_solver_ui import ui_animation_results_builders as helpers
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+SURFACE_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_animation_results_builders.py"
 SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_animation_results_section_helpers.py"
 
@@ -156,6 +157,7 @@ def test_build_heavy_mechanical_animation_panel_kwargs_supports_rel0_and_heavy_r
 def test_entrypoints_use_shared_animation_results_builders() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = SURFACE_HELPERS_PATH.read_text(encoding="utf-8")
     helper_text = HELPERS_PATH.read_text(encoding="utf-8")
     section_text = SECTION_HELPERS_PATH.read_text(encoding="utf-8")
 
@@ -173,15 +175,16 @@ def test_entrypoints_use_shared_animation_results_builders() -> None:
     assert '"road_column_resolver_fn":' not in heavy_text
     assert '"path_demo_options": [' not in app_text
     assert '"path_demo_options": [' not in heavy_text
+    assert "from pneumo_solver_ui.ui_animation_results_section_helpers import (" in surface_text
+    assert "render_app_animation_results_section," in surface_text
+    assert "render_heavy_animation_results_section," in surface_text
+    assert '"render_flow_panel_html_fn": render_flow_panel_html_fn or render_flow_panel_html' in surface_text
+    assert '"route_write_view_box": route_write_view_box' in surface_text
     assert "from pneumo_solver_ui.ui_animation_results_builders import (" in section_text
     assert "build_app_mechanical_animation_panel_kwargs(" in section_text
     assert "build_heavy_mechanical_animation_panel_kwargs(" in section_text
     assert "build_flow_animation_panel_kwargs(" in section_text
     assert "build_svg_scheme_animation_surface_kwargs(" in section_text
-    assert '"render_flow_panel_html_fn":' in app_text
-    assert '"render_flow_panel_html_fn":' in heavy_text
-    assert '"route_write_view_box": DEFAULT_SVG_VIEWBOX' in app_text
-    assert '"route_write_view_box": DEFAULT_SVG_VIEWBOX' in heavy_text
     assert "def build_flow_animation_panel_kwargs(" in helper_text
     assert "def build_svg_scheme_animation_surface_kwargs(" in helper_text
     assert "def build_app_mechanical_animation_panel_kwargs(" in helper_text

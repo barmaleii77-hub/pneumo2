@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
+import pneumo_solver_ui.scenario_ring as scenario_ring_mod
 from pneumo_solver_ui.scenario_ring import (
     generate_ring_drive_profile,
     generate_ring_scenario_bundle,
@@ -145,7 +146,32 @@ def test_ui_ring_editor_exposes_canonical_direction_and_road_state_controls() ->
     assert "Высота дороги в конце сегмента, мм" in src
     assert "Поперечный уклон в конце, %" in src
     assert "Колея, м" in src
+    assert "Общая шероховатость Gd(n0), ×" in src
+    assert "Баланс длин волн (waviness w)" in src
+    assert "Связь левой и правой колеи" in src
+    assert "Seed ISO-сегмента" in src
+    assert "ISO-пояснение: `Gd(n0)` задаёт общий уровень шероховатости внутри выбранного класса" in src
+    assert "Профиль ВСЕГО кольца: амплитуда A L/R (служебно)" in src
+    assert "Профиль ВСЕГО кольца: полный размах max-min L/R (не A)" in src
+    assert "Локальная амплитуда A L/R" in src
+    assert "Локальный полный размах max-min L/R (не A)" in src
+    assert "Режим замыкания кольца: {closure_policy_label}" in src
+    assert "Плавное замыкание кольца (C1 periodic)" in src
+    assert "Строго как задано, без скрытой коррекции" in src
+    assert '"Л A задано, мм": df_seg["aL_req_mm"].round(2)' in src
+    assert '"Л полный размах, мм": df_seg["L_p2p_mm"].round(2)' in src
+    assert '"П перепад z0→z1, мм": (df_seg["R_z_end_mm"] - df_seg["R_z_start_mm"]).round(2)' in src
+    assert "Сводка ниже специально разделяет амплитуду A (полуразмах) и полный размах max-min." in src
     assert "Legacy `drive_mode` сохраняется только как внутренний совместимый слой." in src
+    assert 'format_func=_road_mode_label' in src
+    assert 'format_func=_iso_class_label' in src
+    assert 'format_func=_iso_gd_pick_label' in src
+    assert 'format_func=_road_event_kind_label' in src
+    assert 'format_func=_road_event_side_label' in src
+    assert '"Поворот": df_seg["turn_direction"].map(_turn_direction_label)' in src
+    assert '"Дорога": df_seg["road_mode"].map(_road_mode_label)' in src
+    assert '"Тип": [_road_event_kind_label(ev.get("kind", "")) for ev in events]' in src
+    assert '"Сторона": [_road_event_side_label(ev.get("side", "")) for ev in events]' in src
 
 
 def test_default_ring_spec_uses_canonical_segment_semantics_without_accel_brake_types() -> None:
@@ -500,6 +526,69 @@ def test_generate_ring_scenario_bundle_auto_closes_last_segment_speed_and_valida
 
     assert any("UI/генератор всё равно замкнёт кольцо по начальной скорости" in msg for msg in report["warnings"])
     assert np.isclose(float(saved["segments"][-1]["speed_end_kph"]), 20.0, atol=1e-9)
+
+
+def test_generate_ring_scenario_bundle_preserves_exact_ring_endpoint_in_road_csv(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    spec = {
+        "closure_policy": "strict_exact",
+        "v0_kph": 10.0,
+        "segments": [
+            {
+                "name": "S1",
+                "duration_s": 1.0,
+                "turn_direction": "STRAIGHT",
+                "speed_end_kph": 10.0,
+                "road": {"mode": "SINE", "aL_mm": 0.0, "aR_mm": 0.0, "lambdaL_m": 2.0, "lambdaR_m": 2.0},
+            }
+        ],
+    }
+
+    def _fake_drive_profile(_spec, *, dt_s, n_laps):
+        assert dt_s == 0.02
+        assert n_laps == 1
+        return {
+            "t_s": np.array([0.0, 1.0], dtype=float),
+            "distance_m": np.array([0.0, 10.0], dtype=float),
+            "ax_mps2": np.array([0.0, 0.0], dtype=float),
+            "ay_mps2": np.array([0.0, 0.0], dtype=float),
+        }
+
+    def _fake_tracks(_spec, *, dx_m, seed):
+        assert dx_m == 0.05
+        assert seed == 0
+        return {
+            "meta": {
+                "L_total_m": 10.0,
+                "closure_policy": "strict_exact",
+                "seam_open": True,
+            },
+            "left_spline": lambda x: np.asarray(x, dtype=float),
+            "right_spline": lambda x: np.asarray(x, dtype=float) + 100.0,
+        }
+
+    monkeypatch.setattr(scenario_ring_mod, "generate_ring_drive_profile", _fake_drive_profile)
+    monkeypatch.setattr(scenario_ring_mod, "generate_ring_tracks", _fake_tracks)
+
+    bundle = generate_ring_scenario_bundle(
+        spec,
+        out_dir=tmp_path,
+        dt_s=0.02,
+        n_laps=1,
+        wheelbase_m=1.5,
+        dx_m=0.05,
+        seed=0,
+        tag="strict_endpoint_ring",
+    )
+    road = np.loadtxt(bundle["road_csv"], delimiter=",", skiprows=1)
+
+    assert np.isclose(float(road[0, 1]), 0.0, atol=1e-9)
+    assert np.isclose(float(road[-1, 1]), 10.0, atol=1e-9)
+    assert np.isclose(float(road[-1, 2]), 110.0, atol=1e-9)
+    assert np.isclose(float(road[-1, 3]), 8.5, atol=1e-9)
+    assert np.isclose(float(road[-1, 4]), 108.5, atol=1e-9)
 
 
 def test_ui_ring_editor_source_keeps_start_only_fields_on_first_segment() -> None:

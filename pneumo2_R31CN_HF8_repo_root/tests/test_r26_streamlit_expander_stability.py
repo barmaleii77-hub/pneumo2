@@ -18,8 +18,10 @@ def test_playhead_and_events_expanders_do_not_use_dynamic_labels() -> None:
         src = _src(rel)
         assert 'with st.expander(f"События/алёрты (' not in src
         assert 'with st.expander(f"Текущие значения при t=' not in src
-        assert 'with st.expander("События/алёрты", expanded=False):' in src
-        assert 'with st.expander("Текущие значения (playhead)", expanded=False):' in src
+    event_src = _src("pneumo_solver_ui/ui_event_panel_helpers.py")
+    playhead_src = _src("pneumo_solver_ui/ui_playhead_value_helpers.py")
+    assert 'with st.expander("События/алёрты", expanded=False):' in event_src
+    assert 'title: str = "Текущие значения (playhead)"' in playhead_src
 
 
 def test_param_influence_pareto_expander_label_is_stable() -> None:

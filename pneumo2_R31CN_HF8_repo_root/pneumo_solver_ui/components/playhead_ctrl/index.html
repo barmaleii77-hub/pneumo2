@@ -245,7 +245,11 @@ function segmentRanges(){
 function segmentLabel(seg, fallbackName) {
   const name = String((seg && seg.name) || fallbackName || '?').trim();
   const direction = String((seg && (seg.turn_direction_label || seg.turn_direction)) || '').trim();
-  return direction ? `${name} · ${direction}` : name;
+  const road = String((seg && (seg.road_mode_label || seg.road_mode)) || '').trim();
+  const parts = [name];
+  if (direction) parts.push(direction);
+  if (road) parts.push(road);
+  return parts.join(' · ');
 }
 
 function currentSegment(){

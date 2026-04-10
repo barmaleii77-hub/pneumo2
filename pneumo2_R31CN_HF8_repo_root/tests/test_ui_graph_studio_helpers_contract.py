@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
 GRAPH_SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_graph_section_helpers.py"
+SURFACE_SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 
 
 class _FakeColumn:
@@ -511,12 +512,11 @@ def test_render_graph_studio_section() -> None:
 def test_entrypoints_use_shared_graph_studio_helpers() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
-    assert "from pneumo_solver_ui.ui_graph_studio_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_graph_studio_helpers import (" in heavy_text
+    surface_text = SURFACE_SECTION_HELPERS_PATH.read_text(encoding="utf-8")
+    assert "from pneumo_solver_ui.ui_graph_studio_helpers import render_graph_studio_section" in surface_text
     assert "render_graph_studio_section(" not in app_text
     assert "render_graph_studio_section(" not in heavy_text
-    assert '"render_graph_studio_section_fn": render_graph_studio_section' in app_text
-    assert '"render_graph_studio_section_fn": render_graph_studio_section' in heavy_text
+    assert '"render_graph_studio_section_fn": render_graph_studio_section' in surface_text
     assert 'sources = {' not in app_text
     assert 'sources = {' not in heavy_text
     assert 'avail_sources = {k: v for k, v in sources.items() if v is not None and hasattr(v, "columns") and len(v)}' not in app_text

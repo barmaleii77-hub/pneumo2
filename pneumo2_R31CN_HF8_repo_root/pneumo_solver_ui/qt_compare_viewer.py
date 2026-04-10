@@ -714,12 +714,14 @@ class CompareViewer(QtWidgets.QMainWindow):
         row_ph = QtWidgets.QHBoxLayout()
         self.btn_play = QtWidgets.QPushButton("▶")
         self.btn_play.setCheckable(True)
+        self.btn_play.setEnabled(False)
         self.btn_play.toggled.connect(self._toggle_play)
         row_ph.addWidget(self.btn_play)
 
         self.spin_fps = QtWidgets.QSpinBox()
         self.spin_fps.setRange(1, 60)
         self.spin_fps.setValue(24)
+        self.spin_fps.setEnabled(False)
         self.spin_fps.setToolTip("Play FPS")
         row_ph.addWidget(QtWidgets.QLabel("FPS"))
         row_ph.addWidget(self.spin_fps)
@@ -727,6 +729,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.slider_time = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.slider_time.setRange(0, 0)
         self.slider_time.setValue(0)
+        self.slider_time.setEnabled(False)
         self.slider_time.valueChanged.connect(self._on_time_slider)
         row_ph.addWidget(self.slider_time, stretch=1)
         lay.addLayout(row_ph)
@@ -1376,13 +1379,16 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         if have_runs:
             try:
-                table_value = str(self.combo_table.currentText() or getattr(self, 'table_selected', '') or self.current_table or '')
+                table_value = str(getattr(self, 'table_selected', '') or self.combo_table.currentText() or self.current_table or '')
                 s.setValue('table', table_value)
             except Exception:
                 pass
 
             try:
-                sigs = [it.text() for it in self.list_signals.selectedItems()]
+                if bool(getattr(self, '_signals_selection_explicit', False)):
+                    sigs = [str(x) for x in (getattr(self, 'signals_selected', []) or [])]
+                else:
+                    sigs = [it.text() for it in self.list_signals.selectedItems()]
                 if not sigs:
                     sigs = [str(x) for x in (getattr(self, 'signals_selected', []) or [])]
                 s.setValue('signals', json.dumps(sigs))
@@ -1414,14 +1420,16 @@ class CompareViewer(QtWidgets.QMainWindow):
                 pass
 
             try:
-                ref_label = str(self._reference_run_label() or getattr(self, 'reference_run_selected', '') or '')
+                ref_label = str(getattr(self, 'reference_run_selected', '') or self._reference_run_label() or '')
                 s.setValue('reference_run', ref_label)
-                ref_run = self._reference_run()
                 ref_path = ''
-                if ref_run is not None:
-                    ref_path = str(self._absolute_run_path(ref_run.path))
+                remembered_ref_path = str(getattr(self, 'reference_run_selected_path', '') or '')
+                if remembered_ref_path:
+                    ref_path = remembered_ref_path
                 else:
-                    ref_path = str(getattr(self, 'reference_run_selected_path', '') or '')
+                    ref_run = self._reference_run()
+                    if ref_run is not None:
+                        ref_path = str(self._absolute_run_path(ref_run.path))
                 s.setValue('reference_run_path', ref_path)
             except Exception:
                 pass
@@ -1472,7 +1480,10 @@ class CompareViewer(QtWidgets.QMainWindow):
             pass
         if have_runs:
             try:
-                ev_sigs = self._get_selected_event_signals()
+                if bool(getattr(self, '_events_selection_explicit', False)):
+                    ev_sigs = [str(x) for x in (getattr(self, 'events_selected', []) or [])]
+                else:
+                    ev_sigs = self._get_selected_event_signals()
                 if not ev_sigs:
                     ev_sigs = [str(x) for x in (getattr(self, 'events_selected', []) or [])]
                 s.setValue('events_selected', json.dumps(ev_sigs))
@@ -1545,6 +1556,12 @@ class CompareViewer(QtWidgets.QMainWindow):
 
 
     # ---------------- Δ(t) Heatmap (3D cube → ImageView) ----------------
+    def _heatmap_default_note(self) -> str:
+        return (
+            "Rows = Signals (в порядке выбора), Cols = Runs (в порядке выбора).\n"
+            "Наведи мышь на ячейку: покажу полные подписи."
+        )
+
     def _build_heatmap_dock(self):
         dock = QtWidgets.QDockWidget("Δ(t) Heatmap", self)
         dock.setObjectName("dock_deltat_heatmap")
@@ -1600,10 +1617,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         row2.addWidget(self.spin_heat_tpts)
         lay.addLayout(row2)
 
-        self.lbl_heat_note = QtWidgets.QLabel(
-            "Rows = Signals (в порядке выбора), Cols = Runs (в порядке выбора).\n"
-            "Наведи мышь на ячейку: покажу полные подписи."
-        )
+        self.lbl_heat_note = QtWidgets.QLabel(self._heatmap_default_note())
         self.lbl_heat_note.setWordWrap(True)
         lay.addWidget(self.lbl_heat_note)
 
@@ -1621,6 +1635,10 @@ class CompareViewer(QtWidgets.QMainWindow):
                 try:
                     self.imv_heat.ui.roiBtn.hide()
                     self.imv_heat.ui.menuBtn.hide()
+                except Exception:
+                    pass
+                try:
+                    self.imv_heat.setEnabled(False)
                 except Exception:
                     pass
                 lay.addWidget(self.imv_heat, stretch=1)
@@ -1770,9 +1788,17 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.imv_heat.setImage(img, xvals=tH, autoLevels=False)
         except TypeError:
             self.imv_heat.setImage(img, xvals=tH)
+        try:
+            self.imv_heat.setEnabled(True)
+        except Exception:
+            pass
 
         try:
             self.imv_heat.setLevels(levels)
+        except Exception:
+            pass
+        try:
+            self.lbl_heat_note.setText(self._heatmap_default_note())
         except Exception:
             pass
         try:
@@ -1801,6 +1827,14 @@ class CompareViewer(QtWidgets.QMainWindow):
                     self.imv_heat.setImage(blank, xvals=np.asarray([0.0], dtype=float), autoLevels=False)
                 except TypeError:
                     self.imv_heat.setImage(blank, xvals=np.asarray([0.0], dtype=float))
+                try:
+                    self.imv_heat.setEnabled(False)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            self.lbl_heat_note.setText(str(note or self._heatmap_default_note()))
         except Exception:
             pass
         try:
@@ -1966,11 +2000,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         row2.addWidget(self.spin_inflheat_tpts)
         lay.addLayout(row2)
 
-        self.lbl_inflheat_note = QtWidgets.QLabel(
-            "Axes: X = Signals, Y = Meta features.\n"
-            "Наведи мышь на ячейку: покажу полные подписи.\n"
-            "Совет: включите Δ-mode, чтобы видеть влияние на Δ(signal) относительно reference run."
-        )
+        self.lbl_inflheat_note = QtWidgets.QLabel(self._inflheat_default_note())
         self.lbl_inflheat_note.setWordWrap(True)
         lay.addWidget(self.lbl_inflheat_note)
 
@@ -1987,6 +2017,10 @@ class CompareViewer(QtWidgets.QMainWindow):
                 try:
                     self.imv_inflheat.ui.roiBtn.hide()
                     self.imv_inflheat.ui.menuBtn.hide()
+                except Exception:
+                    pass
+                try:
+                    self.imv_inflheat.setEnabled(False)
                 except Exception:
                     pass
                 lay.addWidget(self.imv_inflheat, stretch=1)
@@ -2026,6 +2060,13 @@ class CompareViewer(QtWidgets.QMainWindow):
             self._inflheat_timer.start(int(delay_ms))
         except Exception:
             pass
+
+    def _inflheat_default_note(self) -> str:
+        return (
+            "Axes: X = Signals, Y = Meta features.\n"
+            "Наведи мышь на ячейку: покажу полные подписи.\n"
+            "Совет: включите Δ-mode, чтобы видеть влияние на Δ(signal) относительно reference run."
+        )
 
     def _rebuild_infl_heatmap(self):
         if not hasattr(self, "chk_inflheat"):
@@ -2101,26 +2142,28 @@ class CompareViewer(QtWidgets.QMainWindow):
         mode = "delta" if bool(self.chk_delta.isChecked()) else "value"
 
         try:
-            cube_obj = build_influence_t_cube(
-                run_tuples,
-                X=X_use,
-                feat_names=feat_use,
-                table=str(self.current_table),
-                sigs=sigs_use,
-                ref_label=str(ref.label),
-                mode=mode,
-                dist_unit=str(self.dist_unit),
-                angle_unit=str(self.angle_unit),
-                p_atm=float(getattr(self, "p_atm", getattr(self, "P_ATM", 100000.0))),
-                baseline_mode=str(self.baseline_mode),
-                baseline_window_s=float(self.baseline_window_s),
-                baseline_first_n=int(getattr(self, "baseline_first_n", 0) or 0),
-                zero_positions=bool(self.zero_baseline),
-                flow_unit=str(getattr(self, "flow_unit", "raw") or "raw"),
-                time_window=None,
-                max_time_points=int(self.spin_inflheat_tpts.value()) if hasattr(self, "spin_inflheat_tpts") else 2500,
-                max_frames=int(self.spin_inflheat_frames.value()) if hasattr(self, "spin_inflheat_frames") else 120,
-            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                cube_obj = build_influence_t_cube(
+                    run_tuples,
+                    X=X_use,
+                    feat_names=feat_use,
+                    table=str(self.current_table),
+                    sigs=sigs_use,
+                    ref_label=str(ref.label),
+                    mode=mode,
+                    dist_unit=str(self.dist_unit),
+                    angle_unit=str(self.angle_unit),
+                    p_atm=float(getattr(self, "p_atm", getattr(self, "P_ATM", 100000.0))),
+                    baseline_mode=str(self.baseline_mode),
+                    baseline_window_s=float(self.baseline_window_s),
+                    baseline_first_n=int(getattr(self, "baseline_first_n", 0) or 0),
+                    zero_positions=bool(self.zero_baseline),
+                    flow_unit=str(getattr(self, "flow_unit", "raw") or "raw"),
+                    time_window=None,
+                    max_time_points=int(self.spin_inflheat_tpts.value()) if hasattr(self, "spin_inflheat_tpts") else 2500,
+                    max_frames=int(self.spin_inflheat_frames.value()) if hasattr(self, "spin_inflheat_frames") else 120,
+                )
         except Exception:
             self._clear_inflheat_view("Influence(t) heatmap: не удалось пересчитать текущий выбор.")
             return
@@ -2147,9 +2190,17 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.imv_inflheat.setImage(img, xvals=tH, autoLevels=False)
         except TypeError:
             self.imv_inflheat.setImage(img, xvals=tH)
+        try:
+            self.imv_inflheat.setEnabled(True)
+        except Exception:
+            pass
 
         try:
             self.imv_inflheat.setLevels((-1.0, 1.0))
+        except Exception:
+            pass
+        try:
+            self.lbl_inflheat_note.setText(self._inflheat_default_note())
         except Exception:
             pass
         try:
@@ -2178,6 +2229,14 @@ class CompareViewer(QtWidgets.QMainWindow):
                     self.imv_inflheat.setImage(blank, xvals=np.asarray([0.0], dtype=float), autoLevels=False)
                 except TypeError:
                     self.imv_inflheat.setImage(blank, xvals=np.asarray([0.0], dtype=float))
+                try:
+                    self.imv_inflheat.setEnabled(False)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            self.lbl_inflheat_note.setText(str(note or self._inflheat_default_note()))
         except Exception:
             pass
         try:
@@ -2309,6 +2368,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.plot_infl.showGrid(x=True, y=True, alpha=0.25)
         self.plot_infl.setLabel('bottom', 'meta value')
         self.plot_infl.setLabel('left', 'signal value')
+        self.plot_infl.setEnabled(False)
         splitter.addWidget(self.plot_infl)
 
         splitter.setStretchFactor(0, 3)
@@ -2714,11 +2774,24 @@ class CompareViewer(QtWidgets.QMainWindow):
         if not run_labels:
             return
         want = set(str(x) for x in run_labels)
+        target_rows: List[int] = []
+        try:
+            for i in range(self.list_runs.count()):
+                it = self.list_runs.item(i)
+                if it is not None and it.text() in want:
+                    target_rows.append(i)
+        except Exception:
+            target_rows = []
+        if not target_rows:
+            return
         try:
             self.list_runs.blockSignals(True)
             for i in range(self.list_runs.count()):
                 it = self.list_runs.item(i)
-                it.setSelected(it.text() in want)
+                if it is None:
+                    continue
+                it.setSelected(i in target_rows)
+            self._set_current_list_row(self.list_runs, int(target_rows[0]))
         finally:
             self.list_runs.blockSignals(False)
         # rebuild plots after selection change
@@ -2777,7 +2850,12 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 pass
         try:
+            self.tree_mv_cols.setEnabled(False)
+        except Exception:
+            pass
+        try:
             self.txt_mv_map.setPlainText("")
+            self.txt_mv_map.setEnabled(False)
         except Exception:
             pass
         for name in ("combo_mv_color", "combo_mv_color3d", "combo_mv_x", "combo_mv_y", "combo_mv_z", "combo_mv_peb_sig"):
@@ -2796,6 +2874,10 @@ class CompareViewer(QtWidgets.QMainWindow):
                     combo.blockSignals(False)
                 except Exception:
                     pass
+            try:
+                combo.setEnabled(False)
+            except Exception:
+                pass
         self._set_multivar_placeholder(getattr(self, "mv_view_splom", None), "SPLOM", note)
         self._set_multivar_placeholder(getattr(self, "mv_view_par", None), "Parallel", note)
         self._set_multivar_placeholder(getattr(self, "mv_view_3d", None), "3D", note)
@@ -3016,6 +3098,10 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.tree_mv_cols.expandAll()
         finally:
             self.tree_mv_cols.blockSignals(False)
+        try:
+            self.tree_mv_cols.setEnabled(bool(self.tree_mv_cols.topLevelItemCount()))
+        except Exception:
+            pass
 
         # mapping text
         try:
@@ -3023,6 +3109,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             for full, short in sorted(self._mv_map_full_to_short.items(), key=lambda kv: kv[1].lower()):
                 lines.append(f"{short} = {full}")
             self.txt_mv_map.setPlainText("\n".join(lines))
+            self.txt_mv_map.setEnabled(bool(lines))
         except Exception:
             pass
 
@@ -3047,6 +3134,8 @@ class CompareViewer(QtWidgets.QMainWindow):
             _refill(self.combo_mv_x, cols_all, prefer=cols_all[0] if cols_all else "")
             _refill(self.combo_mv_y, cols_all, prefer=cols_all[1] if len(cols_all) > 1 else (cols_all[0] if cols_all else ""))
             _refill(self.combo_mv_z, cols_all, prefer=cols_all[2] if len(cols_all) > 2 else (cols_all[0] if cols_all else ""))
+            for combo in (self.combo_mv_color, self.combo_mv_color3d, self.combo_mv_x, self.combo_mv_y, self.combo_mv_z):
+                combo.setEnabled(bool(combo.count()))
         except Exception:
             pass
 
@@ -3062,6 +3151,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             elif disc:
                 self.combo_mv_peb_sig.setCurrentText(disc[0])
             self.combo_mv_peb_sig.blockSignals(False)
+            self.combo_mv_peb_sig.setEnabled(bool(disc))
         except Exception:
             pass
 
@@ -3426,6 +3516,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.qa_plot.setMouseEnabled(x=False, y=False)
         self.qa_plot.showGrid(x=False, y=False)
         self.qa_plot.invertY(True)
+        self.qa_plot.setEnabled(False)
 
         self.qa_img = pg.ImageItem(axisOrder='row-major')
         self.qa_plot.addItem(self.qa_img)
@@ -3723,6 +3814,9 @@ class CompareViewer(QtWidgets.QMainWindow):
         # Remove obvious time columns
         sigs = [s for s in sigs if str(s).strip().lower() not in ("t", "time", "timestamp")]
         if not sigs:
+            if bool(getattr(self, '_signals_selection_explicit', False)):
+                self._clear_qa_view("QA: выберите хотя бы один сигнал")
+                return
             sigs = [self.list_signals.item(i).text() for i in range(min(8, self.list_signals.count()))]
 
         sens = self._qa_sensitivity_code()
@@ -3802,6 +3896,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.qa_img.setImage(img, autoLevels=False)
             self.qa_plot.setXRange(0, max(1, w), padding=0.02)
             self.qa_plot.setYRange(0, max(1, h), padding=0.02)
+            self.qa_plot.setEnabled(True)
         except Exception:
             pass
 
@@ -3809,6 +3904,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         try:
             self.tbl_qa.setRowCount(0)
             if df is None or df.empty:
+                self.tbl_qa.setEnabled(False)
                 return
             # columns: severity, run, signal, code, t0, message
             rows = df[["severity", "run_label", "signal", "code", "t0", "message"]].values.tolist()
@@ -3817,6 +3913,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 for j, val in enumerate(row):
                     it = QtWidgets.QTableWidgetItem("" if val is None else str(val))
                     self.tbl_qa.setItem(i, j, it)
+            self.tbl_qa.setEnabled(bool(rows))
         except Exception:
             pass
 
@@ -3837,10 +3934,12 @@ class CompareViewer(QtWidgets.QMainWindow):
             pass
         try:
             self.tbl_qa.setRowCount(0)
+            self.tbl_qa.setEnabled(False)
         except Exception:
             pass
         try:
             self.qa_img.setImage(np.zeros((1, 1, 4), dtype=np.ubyte), autoLevels=False)
+            self.qa_plot.setEnabled(False)
         except Exception:
             pass
 
@@ -4002,46 +4101,61 @@ class CompareViewer(QtWidgets.QMainWindow):
         return True
 
     def _focus_run_signal(self, run_label: str, signal_name: str) -> None:
-        if not self._select_run_by_label(str(run_label)):
-            return
-        self._on_run_selection_changed()
-        focused_run = None
+        target_run = None
         try:
-            for run in self._selected_runs():
+            for run in getattr(self, "runs", []):
                 if str(getattr(run, "label", "") or "") == str(run_label):
-                    focused_run = run
+                    target_run = run
                     break
-            if focused_run is not None:
-                self._remember_reference_run(focused_run)
         except Exception:
-            pass
+            target_run = None
+        if target_run is None:
+            return
+
         sig_name = str(signal_name)
-        try:
-            if sig_name and sig_name not in list(getattr(self, "available_signals", []) or []) and focused_run is not None:
+        target_table = ""
+        if sig_name:
+            try:
                 current_table = str(
                     getattr(self, "combo_table", None).currentText()
                     if hasattr(self, "combo_table") and getattr(self, "combo_table", None) is not None
                     else (getattr(self, "current_table", "") or "")
                 ).strip()
-                remembered_table = str(getattr(self, "table_selected", "") or "").strip()
-                matching_tables: List[str] = []
-                for table_name, df in (getattr(focused_run, "tables", {}) or {}).items():
+            except Exception:
+                current_table = str(getattr(self, "current_table", "") or "").strip()
+            remembered_table = str(getattr(self, "table_selected", "") or "").strip()
+            matching_tables: List[str] = []
+            try:
+                for table_name, df in (getattr(target_run, "tables", {}) or {}).items():
                     if isinstance(df, pd.DataFrame) and sig_name in df.columns:
                         matching_tables.append(str(table_name))
-                target_table = ""
-                for candidate in (current_table, remembered_table, "main"):
-                    if candidate and candidate in matching_tables:
-                        target_table = candidate
-                        break
-                if not target_table and matching_tables:
-                    target_table = matching_tables[0]
-                if target_table and hasattr(self, "combo_table"):
-                    idx = self.combo_table.findText(target_table)
-                    if idx >= 0 and str(self.combo_table.currentText() or "") != target_table:
-                        self.combo_table.setCurrentIndex(idx)
+            except Exception:
+                matching_tables = []
+            if not matching_tables:
+                return
+            for candidate in (current_table, remembered_table, "main"):
+                if candidate and candidate in matching_tables:
+                    target_table = candidate
+                    break
+            if not target_table:
+                target_table = matching_tables[0]
+
+        if not self._select_run_by_label(str(run_label)):
+            return
+        self._on_run_selection_changed()
+        try:
+            self._remember_reference_run(target_run)
         except Exception:
             pass
-        self._select_signal_by_name(sig_name, exclusive=True)
+        try:
+            if target_table and hasattr(self, "combo_table"):
+                idx = self.combo_table.findText(target_table)
+                if idx >= 0 and str(self.combo_table.currentText() or "") != target_table:
+                    self.combo_table.setCurrentIndex(idx)
+        except Exception:
+            pass
+        if sig_name and not self._select_signal_by_name(sig_name, exclusive=True):
+            return
         self._rebuild_plots()
 
     def _set_current_list_row(self, widget, row: int) -> None:
@@ -4117,10 +4231,12 @@ class CompareViewer(QtWidgets.QMainWindow):
         try:
             self.tbl_infl.setRowCount(0)
             self.tbl_infl.setColumnCount(0)
+            self.tbl_infl.setEnabled(False)
         except Exception:
             pass
         try:
             self.plot_infl.clear()
+            self.plot_infl.setEnabled(False)
         except Exception:
             pass
         try:
@@ -4241,6 +4357,8 @@ class CompareViewer(QtWidgets.QMainWindow):
             # Fill table
             self.tbl_infl.setRowCount(len(feat_sel))
             self.tbl_infl.setColumnCount(len(sigs))
+            self.tbl_infl.setEnabled(bool(feat_sel) and bool(sigs))
+            self.plot_infl.setEnabled(bool(feat_sel) and bool(sigs))
 
             # headers with trim + tooltip
             def _trim(s: str, n: int = 34) -> str:
@@ -4675,7 +4793,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                         break
                 except Exception:
                     pass
-        for candidate in (str(preferred_label or "").strip(), remembered_label, target, current):
+        for candidate in (str(preferred_label or "").strip(), remembered_target, remembered_label, current):
             if candidate and candidate in labels:
                 target = candidate
                 break
@@ -4890,7 +5008,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         remembered_table = str(getattr(self, "table_selected", "") or "").strip()
         current = str(combo_current or self.current_table or remembered_table or "")
         if not runs:
-            tables = sorted(set(self.table_names))
+            tables = []
         else:
             table_sets = [set(map(str, r.tables.keys())) for r in runs if getattr(r, "tables", None)]
             tables = sorted(set.intersection(*table_sets)) if table_sets else []
@@ -4955,8 +5073,13 @@ class CompareViewer(QtWidgets.QMainWindow):
             prev_selected = [str(x) for x in (preferred_selected if preferred_selected is not None else self._selected_signals())]
         except Exception:
             prev_selected = []
-        if not prev_selected and bool(getattr(self, '_signals_selection_explicit', False)):
-            prev_selected = [str(x) for x in (getattr(self, 'signals_selected', []) or [])]
+        explicit_signals = bool(getattr(self, '_signals_selection_explicit', False))
+        remembered_selected = [str(x) for x in (getattr(self, 'signals_selected', []) or [])]
+        if explicit_signals:
+            if remembered_selected:
+                prev_selected = list(remembered_selected)
+            elif not prev_selected:
+                prev_selected = []
         try:
             current_item = self.list_signals.currentItem() if hasattr(self, "list_signals") else None
             prev_current = str(current_item.text()) if current_item is not None else ""
@@ -4966,7 +5089,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         runs = self._selected_runs()
         if not runs:
             self.available_signals = []
-            if not bool(getattr(self, '_signals_selection_explicit', False)):
+            if not explicit_signals:
                 self.signals_selected = []
             try:
                 self.list_signals.blockSignals(True)
@@ -4977,6 +5100,10 @@ class CompareViewer(QtWidgets.QMainWindow):
                 except Exception:
                     pass
             try:
+                self.list_signals.setEnabled(False)
+            except Exception:
+                pass
+            try:
                 self.combo_nav_signal.blockSignals(True)
                 self.combo_nav_signal.clear()
             finally:
@@ -4984,6 +5111,10 @@ class CompareViewer(QtWidgets.QMainWindow):
                     self.combo_nav_signal.blockSignals(False)
                 except Exception:
                     pass
+            try:
+                self.combo_nav_signal.setEnabled(False)
+            except Exception:
+                pass
             return []
         # intersection by default
         cols_sets = []
@@ -5015,7 +5146,10 @@ class CompareViewer(QtWidgets.QMainWindow):
                     sigs = [s for s in sigs if ql in s.lower()]
             self.available_signals = sigs
 
-        kept_selected = [sig for sig in prev_selected if sig in self.available_signals]
+        if explicit_signals:
+            kept_selected = [sig for sig in prev_selected if sig in self.available_signals]
+        else:
+            kept_selected = [sig for sig in self._default_signal_names() if sig in self.available_signals]
         try:
             self.list_signals.blockSignals(True)
             self.list_signals.clear()
@@ -5024,7 +5158,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 self.list_signals.addItem(it)
                 if s in kept_selected:
                     it.setSelected(True)
-            if prev_current and prev_current in self.available_signals:
+            if explicit_signals and prev_current and prev_current in self.available_signals:
                 self._set_current_list_item_by_text(self.list_signals, prev_current)
             elif kept_selected:
                 self._set_current_list_item_by_text(self.list_signals, kept_selected[0])
@@ -5033,6 +5167,10 @@ class CompareViewer(QtWidgets.QMainWindow):
                 self.list_signals.blockSignals(False)
             except Exception:
                 pass
+        try:
+            self.list_signals.setEnabled(bool(self.available_signals))
+        except Exception:
+            pass
 
         # navigator signals (keep selection if possible)
         try:
@@ -5051,16 +5189,27 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 pass
         try:
+            self.combo_nav_signal.setEnabled(bool(self.available_signals))
+        except Exception:
+            pass
+        try:
             picked = self._selected_signals()
             if picked:
-                self.signals_selected = list(picked)
-            elif not bool(getattr(self, '_signals_selection_explicit', False)):
+                if explicit_signals and remembered_selected:
+                    self.signals_selected = list(remembered_selected)
+                else:
+                    self.signals_selected = list(picked)
+            elif not explicit_signals:
                 self.signals_selected = []
+            elif remembered_selected:
+                self.signals_selected = list(remembered_selected)
             return picked
         except Exception:
-            if kept_selected:
+            if explicit_signals and remembered_selected:
+                self.signals_selected = list(remembered_selected)
+            elif kept_selected:
                 self.signals_selected = list(kept_selected)
-            elif not bool(getattr(self, '_signals_selection_explicit', False)):
+            elif not explicit_signals:
                 self.signals_selected = []
             return kept_selected
 
@@ -5174,7 +5323,6 @@ class CompareViewer(QtWidgets.QMainWindow):
         remembered_sel = [str(x) for x in (getattr(self, 'events_selected', []) or [])]
         prev_sel = set(self._get_selected_event_signals())
         preserve_empty = False
-        stale_explicit = False
         if not prev_sel and explicit_events:
             prev_sel = set(remembered_sel)
             preserve_empty = not prev_sel
@@ -5197,14 +5345,20 @@ class CompareViewer(QtWidgets.QMainWindow):
             if not explicit_events:
                 self.events_selected = []
             lw.blockSignals(False)
+            try:
+                lw.setEnabled(False)
+            except Exception:
+                pass
             return
 
         items = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
         names = [k for (k, _v) in items]
-        prev_sel = {name for name in prev_sel if name in names}
-        if explicit_events and remembered_sel and not prev_sel:
-            stale_explicit = True
-        if not prev_sel and not preserve_empty and not explicit_events:
+        if explicit_events:
+            if remembered_sel:
+                prev_sel = {name for name in remembered_sel if name in names}
+            else:
+                prev_sel = {name for name in prev_sel if name in names}
+        else:
             prev_sel = set(self._default_event_names(names))
 
         for name, cnt in items:
@@ -5217,7 +5371,11 @@ class CompareViewer(QtWidgets.QMainWindow):
             lw.addItem(it)
 
         lw.blockSignals(False)
-        if explicit_events and stale_explicit:
+        try:
+            lw.setEnabled(True)
+        except Exception:
+            pass
+        if explicit_events:
             self.events_selected = list(remembered_sel)
         else:
             self.events_selected = [name for name in names if name in prev_sel]
@@ -5235,6 +5393,10 @@ class CompareViewer(QtWidgets.QMainWindow):
         if not isinstance(df, pd.DataFrame) or df.empty:
             try:
                 tbl.setRowCount(0)
+            except Exception:
+                pass
+            try:
+                tbl.setEnabled(False)
             except Exception:
                 pass
             try:
@@ -5296,6 +5458,10 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         try:
             tbl.setSortingEnabled(True)
+        except Exception:
+            pass
+        try:
+            tbl.setEnabled(bool(len(df)))
         except Exception:
             pass
 
@@ -5859,6 +6025,11 @@ class CompareViewer(QtWidgets.QMainWindow):
                 self.slider_time.setValue(min(self.slider_time.value(), n - 1))
             else:
                 self.slider_time.setValue(0)
+            self.slider_time.setEnabled(bool(n))
+            if hasattr(self, "btn_play"):
+                self.btn_play.setEnabled(bool(n))
+            if hasattr(self, "spin_fps"):
+                self.spin_fps.setEnabled(bool(n))
         finally:
             self._time_slider_updating = False
 
@@ -5927,6 +6098,20 @@ class CompareViewer(QtWidgets.QMainWindow):
             pass
 
     def _toggle_play(self, on: bool) -> None:
+        if bool(on) and self._t_ref.size == 0:
+            self._is_playing = False
+            try:
+                if hasattr(self, "btn_play"):
+                    self.btn_play.blockSignals(True)
+                    self.btn_play.setChecked(False)
+                    self.btn_play.blockSignals(False)
+            except Exception:
+                try:
+                    if hasattr(self, "btn_play"):
+                        self.btn_play.blockSignals(False)
+                except Exception:
+                    pass
+            return
         self._is_playing = bool(on)
         if not self._is_playing:
             try:
@@ -5957,11 +6142,11 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             return super().keyPressEvent(event)
         # Space: play/pause
-        if key == QtCore.Qt.Key_Space and hasattr(self, "btn_play"):
+        if key == QtCore.Qt.Key_Space and hasattr(self, "btn_play") and self.btn_play.isEnabled():
             self.btn_play.setChecked(not self.btn_play.isChecked())
             event.accept(); return
         # Left/Right: step
-        if key in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Right) and hasattr(self, "slider_time"):
+        if key in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Right) and hasattr(self, "slider_time") and self.slider_time.isEnabled():
             step = -1 if key == QtCore.Qt.Key_Left else 1
             self.slider_time.setValue(max(0, min(self.slider_time.maximum(), self.slider_time.value() + step)))
             event.accept(); return

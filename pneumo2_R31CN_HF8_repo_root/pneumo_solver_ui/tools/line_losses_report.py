@@ -18,14 +18,34 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import sys
-import importlib.util
 from pathlib import Path
 
 
 def _load_json(path: Path):
     return json.loads(path.read_text('utf-8'))
+
+
+def _console_safe(value: object) -> str:
+    text = str(value)
+    text = (
+        text.replace('\u2011', '-')
+        .replace('\u2013', '-')
+        .replace('\u2014', '-')
+        .replace('\u2212', '-')
+    )
+    encoding = getattr(sys.stdout, 'encoding', None) or 'utf-8'
+    return text.encode(encoding, errors='replace').decode(encoding, errors='replace')
+
+
+def _load_module_from_candidate(root: Path, path: Path):
+    path = path.resolve()
+    root = root.resolve()
+    if path.parent == root:
+        return importlib.import_module(f'pneumo_solver_ui.{path.stem}')
+    raise RuntimeError(f'unsupported external model path: {path}')
 
 
 def _load_model_from_fingerprint(root: Path):
@@ -54,12 +74,11 @@ def _load_model_from_fingerprint(root: Path):
     for p in candidates:
         if not p.exists():
             continue
-        spec = importlib.util.spec_from_file_location('model_mod', str(p))
-        if spec is None or spec.loader is None:
+        try:
+            mod = _load_module_from_candidate(root, p)
+            return mod, p
+        except Exception:
             continue
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)  # type: ignore
-        return mod, p
 
     raise RuntimeError('No suitable model file found')
 
@@ -67,6 +86,11 @@ def _load_model_from_fingerprint(root: Path):
 def main() -> int:
     root = Path(__file__).resolve().parents[1]  # .../pneumo_solver_ui
     base = _load_json(root / 'default_base.json')
+    if hasattr(sys.stdout, 'reconfigure'):
+        try:
+            sys.stdout.reconfigure(errors='replace')
+        except Exception:
+            pass
 
     # Ensure enabled
     base['line_losses_enable'] = True
@@ -94,8 +118,8 @@ def main() -> int:
 
     affected = rep.get('affected', []) or []
     print(f"# Line losses report\n")
-    print(f"Model: {model_path.name}")
-    print(f"Map: {rep.get('map_file', 'n/a')}")
+    print(f"Model: {_console_safe(model_path.name)}")
+    print(f"Map: {_console_safe(rep.get('map_file', 'n/a'))}")
     print(f"Klen={rep.get('Klen')}  Kfit={rep.get('Kfit')}  min_factor={rep.get('min_factor')}\n")
 
     if not affected:
@@ -105,12 +129,12 @@ def main() -> int:
     print("| edge | factor | L_m | D_mm | n_fittings | note |")
     print("|---|---:|---:|---:|---:|---|")
     for a in affected:
-        name = str(a.get('edge', ''))
+        name = _console_safe(a.get('edge', ''))
         factor = float(a.get('factor', 1.0))
         L_m = a.get('L_m')
         D_mm = a.get('D_mm')
         nf = a.get('n_fittings')
-        note = str(a.get('note', ''))
+        note = _console_safe(a.get('note', ''))
         print(f"| {name} | {factor:.3f} | {L_m} | {D_mm} | {nf} | {note} |")
 
     return 0

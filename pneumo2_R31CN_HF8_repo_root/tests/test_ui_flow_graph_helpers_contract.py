@@ -11,6 +11,7 @@ from pneumo_solver_ui import ui_flow_graph_helpers
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+SURFACE_SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 
 
 class _FakeStreamlit:
@@ -146,11 +147,12 @@ def test_render_flow_edge_graphs_section_without_data() -> None:
 def test_entrypoints_use_shared_flow_graph_helper() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = SURFACE_SECTION_HELPERS_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_flow_graph_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_flow_graph_helpers import (" in heavy_text
-    assert "render_flow_edge_graphs_section(" in app_text
-    assert "render_flow_edge_graphs_section(" in heavy_text
+    assert "from pneumo_solver_ui.ui_flow_graph_helpers import render_flow_edge_graphs_section" in surface_text
+    assert '"render_flow_section_fn": render_flow_edge_graphs_section' in surface_text
+    assert "render_flow_edge_graphs_section(" not in app_text
+    assert "render_flow_edge_graphs_section(" not in heavy_text
     assert 'pick_edges = st.multiselect("Ветки/элементы"' not in app_text
     assert 'pick_edges = st.multiselect("Ветки/элементы"' not in heavy_text
     assert 'title=f"Расход по веткам ({unit})"' not in app_text

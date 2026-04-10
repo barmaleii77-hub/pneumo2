@@ -15,32 +15,31 @@
 - `state0` — начальное состояние,
 - `rhs(state, t)` — правая часть ОДУ (без логирования),
 - `rk2_step(state, t, dt)` — один шаг интегратора RK2 (как в `simulate()`),
-- `project_masses(state)` — физическая «проекция» масс/давлений (p_abs >= p_abs_min),
-- служебные функции `volumes / compute_pressures / compute_flows`,
+- `observe(state, t)` — быстрый снимок ключевых физических величин без `DataFrame`,
+- `dt`, `t_end`, `corner_order`, `wheel_coord_mode`, `wheel_radius_m`,
 - `nodes/edges/node_index` для интерпретации состояния.
+
+Важно: `compile_only`-контракт сейчас сознательно минимален. Внешним tools не стоит
+жёстко рассчитывать на внутренние helper'ы вроде `compute_pressures()` или `time`,
+если модель их явно не экспортирует.
 
 ## Как использовать
 
 ### 1) Получить ядро (без симуляции)
 ```python
-import importlib.util
-
-spec = importlib.util.spec_from_file_location(
-    'm', 'pneumo_solver_ui/model_pneumo_v9_mech_doublewishbone_worldroad.py'
-)
-m = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(m)
+from pneumo_solver_ui import model_pneumo_v9_mech_doublewishbone_worldroad as m
 
 params = {...}
 test = {...}
 ctx = m.simulate(params, test, dt=1e-3, t_end=3.0, compile_only=True)
 
 state = ctx['state0']
+obs0 = ctx['observe'](state, 0.0)
 ```
 
 ### 2) Интегрировать «как в базе» (RK2)
 Этот способ гарантирует, что вы получите **те же** результаты, что и обычный `simulate()`
-(потому что используется тот же RK2 и та же проекция масс).
+(потому что используется тот же RK2 шага модели).
 
 ```python
 state = ctx['state0']
@@ -58,10 +57,9 @@ for _ in range(steps):
 Внешние интеграторы обычно вызывают `fun(t, y)`.
 В модели `rhs` имеет сигнатуру `rhs(state, t)`, поэтому нужен адаптер.
 
-Важно: базовая модель после каждого шага делает `project_masses()`. В непрерывном интеграторе
-это эквивалентно «граничному условию»/проекции. Если хотите максимально совпасть с базой —
-используйте `rk2_step`. Если хотите непрерывность (для автодиффа/adjoint), то проекцию лучше
-заменять на гладкие барьеры/параметризацию (будущий шаг).
+Важно: если вам нужна максимальная воспроизводимость поведения базовой модели, используйте
+`rk2_step`. Для внешних интеграторов ориентируйтесь только на публичный `rhs(state, t)` и не
+завязывайтесь на внутренние детали реализации.
 
 ```python
 from scipy.integrate import solve_ivp
@@ -92,8 +90,9 @@ state_end = sol.y[:, -1]
 
 ## Ограничения текущего шага
 - Это *экспорт ядра* без переписывания на JAX: внутри используются `numpy` и `math`.
-- Проекция `project_masses` — кусочно/гладкая в зависимости от `smooth_pressure_floor`.
-  Для строгой автодифф-цепочки её лучше заменить на параметризацию (например, `m = softplus(u) + m_floor`).
+- `observe()` покрывает только часто используемые KPI/диагностику. Если внешнему коду нужны
+  дополнительные величины, их лучше добавлять в `observe()` или в отдельный стабильный helper,
+  а не читать внутренности `simulate()`.
 
 ## Куда дальше (план)
 - Вынести «чистый rhs» в отдельный модуль без `math.*` и без python-ветвлений (через smooth-гейты),

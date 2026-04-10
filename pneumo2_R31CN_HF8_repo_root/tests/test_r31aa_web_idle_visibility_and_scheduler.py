@@ -1,6 +1,10 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+EMBEDDED_HTML_SOURCES = [
+    'pneumo_solver_ui/ui_flow_panel_helpers.py',
+    'pneumo_solver_ui/ui_svg_html_builders.py',
+]
 
 VISIBILITY_COMPONENTS = [
     'pneumo_solver_ui/components/mech_anim/index.html',
@@ -52,17 +56,23 @@ def test_mech_car3d_and_mech_anim_no_longer_start_parallel_wake_loops() -> None:
     assert "__perfBump('focus_wakeups')" in car3d
 
 
-def test_embedded_html_widgets_use_long_idle_sleep_in_pause() -> None:
-    for rel in ['pneumo_solver_ui/app.py', 'pneumo_solver_ui/pneumo_ui_app.py']:
+def test_embedded_html_widgets_stop_idle_polling_and_wake_on_visibility_events() -> None:
+    for rel in EMBEDDED_HTML_SOURCES:
         src = (ROOT / rel).read_text(encoding='utf-8')
-        assert src.count('__frameInParentViewport') >= 2, rel
-        assert src.count('__nextIdleMs(60000, 180000, 300000)') >= 2, rel
+        assert '__frameInParentViewport' in src, rel
+        assert '__wakeStep' in src, rel
+        assert "window.addEventListener('scroll'" in src, rel
+        assert "window.addEventListener('resize'" in src, rel
+        assert 'visibilitychange' in src, rel
+        assert '__nextIdleMs(60000, 180000, 300000)' not in src, rel
         assert '__nextIdleMs(3500, 10000, 12000)' not in src, rel
 
 
-def test_browser_followers_no_longer_poll_every_4p5s_or_5s_in_pause() -> None:
+def test_browser_followers_no_longer_poll_while_paused_and_offscreen() -> None:
     for rel in VISIBILITY_COMPONENTS:
         src = (ROOT / rel).read_text(encoding='utf-8')
-        assert '__nextIdleMs(60000, 180000, 300000)' in src, rel
+        assert 'addEventListener("focus"' in src or "addEventListener('focus'" in src, rel
+        assert 'visibilitychange' in src, rel
         assert '__nextIdleMs(4500, 12000, 15000)' not in src, rel
         assert '__nextIdleMs(5000, 12000, 15000)' not in src, rel
+        assert '__nextIdleMs(60000, 180000, 300000)' not in src, rel

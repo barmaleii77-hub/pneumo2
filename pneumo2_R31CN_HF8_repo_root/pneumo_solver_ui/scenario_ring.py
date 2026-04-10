@@ -35,6 +35,22 @@ from .scenario_generator import ISO8608Spec, generate_iso8608_profile, write_axa
 log = logging.getLogger(__name__)
 
 
+def _ring_mod_with_endpoint_preserved(values: np.ndarray, ring_length_m: float) -> np.ndarray:
+    """Wrap ring coordinates while preserving exact lap-end samples as ``L``.
+
+    Downstream viewers and ``ring_visual`` already treat the ring as half-open on
+    the right boundary for all segments except the last one. Exported ``road_csv``
+    must use the same convention, otherwise a sample with ``s == L`` quietly jumps
+    back to segment 1 instead of staying on the end of the last segment.
+    """
+    ring_length_m = float(ring_length_m)
+    out = np.mod(np.asarray(values, dtype=float), ring_length_m)
+    end_eps = max(1e-9, 1e-6 * ring_length_m)
+    raw = np.asarray(values, dtype=float)
+    out[(np.abs(out) <= end_eps) & (raw > end_eps)] = ring_length_m
+    return out
+
+
 def _segment_has_explicit_motion_fields(seg: Dict[str, Any]) -> bool:
     return any(k in seg for k in ("turn_direction", "speed_start_kph", "speed_end_kph"))
 
@@ -1350,8 +1366,8 @@ def generate_ring_scenario_bundle(
 
     t = drive["t_s"]
     dist_front = drive["distance_m"]
-    xF = np.mod(dist_front, L_total)
-    xR = np.mod(dist_front - wheelbase_m, L_total)
+    xF = _ring_mod_with_endpoint_preserved(dist_front, L_total)
+    xR = _ring_mod_with_endpoint_preserved(dist_front - wheelbase_m, L_total)
 
     z_fl = left_spline(xF)
     z_fr = right_spline(xF)

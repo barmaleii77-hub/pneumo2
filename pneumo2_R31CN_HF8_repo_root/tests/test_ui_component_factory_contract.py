@@ -8,6 +8,7 @@ from pneumo_solver_ui import ui_components
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+SURFACE_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 
 
 def test_ui_components_exports_canonical_component_factories() -> None:
@@ -21,9 +22,9 @@ def test_ui_components_exports_canonical_component_factories() -> None:
 def test_entrypoints_use_shared_ui_components_without_local_declare_component_blocks() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = SURFACE_HELPERS_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_components import (" in app_text
-    assert "from pneumo_solver_ui.ui_components import (" in heavy_text
+    assert "from pneumo_solver_ui.ui_components import (" in surface_text
 
     for pattern in [
         "def get_pneumo_svg_flow_component(",
@@ -41,11 +42,10 @@ def test_entrypoints_use_shared_ui_components_without_local_declare_component_bl
 
 
 def test_heavy_ui_uses_shared_component_last_error_instead_of_local_err_state() -> None:
-    heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = SURFACE_HELPERS_PATH.read_text(encoding="utf-8")
 
-    assert "last_error as component_last_error" in heavy_text
-    assert 'component_last_error("mech_anim")' in heavy_text
-    assert 'component_last_error("mech_car3d")' in heavy_text
-    assert "_MECH_ANIM_COMPONENT_ERR" not in heavy_text
-    assert "_MECH_CAR3D_COMPONENT_ERR" not in heavy_text
-    assert "ComponentFactoryRebind" not in heavy_text
+    assert "last_error as component_last_error" in surface_text
+    assert '"component_last_error_fn": component_last_error' in surface_text
+    assert "_MECH_ANIM_COMPONENT_ERR" not in surface_text
+    assert "_MECH_CAR3D_COMPONENT_ERR" not in surface_text
+    assert "ComponentFactoryRebind" not in surface_text

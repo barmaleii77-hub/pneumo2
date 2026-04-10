@@ -10,6 +10,7 @@ from pneumo_solver_ui import ui_energy_audit_section_helpers as helpers
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+SURFACE_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_energy_audit_section_helpers.py"
 SECONDARY_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_secondary_views_helpers.py"
 
@@ -125,11 +126,12 @@ def test_render_energy_audit_results_section_swallows_plotly_failures() -> None:
 def test_entrypoints_use_shared_energy_audit_section_helper() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = SURFACE_HELPERS_PATH.read_text(encoding="utf-8")
     helper_text = HELPERS_PATH.read_text(encoding="utf-8")
     secondary_text = SECONDARY_HELPERS_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_energy_audit_section_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_energy_audit_section_helpers import (" in heavy_text
+    assert "from pneumo_solver_ui.ui_energy_audit_section_helpers import (" in surface_text
+    assert "render_energy_audit_results_section," in surface_text
     assert "render_energy_audit_results_section(" not in app_text
     assert "render_energy_audit_results_section(" not in heavy_text
     assert 'st.subheader("Энерго‑аудит")' not in app_text
@@ -138,8 +140,7 @@ def test_entrypoints_use_shared_energy_audit_section_helper() -> None:
     assert 'px.bar(df_Egroups.sort_values("энергия_Дж", ascending=False)' not in heavy_text
     assert 'st.markdown("**TOP‑20 элементов по энергии**")' not in app_text
     assert 'st.markdown("**TOP-20 элементов по энергии**")' not in heavy_text
-    assert '"render_energy_audit_section_fn": render_energy_audit_results_section' in app_text
-    assert '"render_energy_audit_section_fn": render_energy_audit_results_section' in heavy_text
+    assert '"render_energy_audit_section_fn": render_energy_audit_results_section' in surface_text
     assert "energy_audit_section_kwargs" in secondary_text
     assert "def render_energy_audit_results_section(" in helper_text
     assert "px_module.bar(" in helper_text

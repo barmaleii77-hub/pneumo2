@@ -1024,8 +1024,21 @@ def render_animation_cockpit_web() -> None:
         "ring_visual": ring_visual,
     }
     if ring_visual:
+        _ring_meta = dict(ring_visual.get("meta") or {})
+        _ring_closure = str(
+            ring_visual.get("closure_policy")
+            or _ring_meta.get("closure_policy")
+            or ring_visual.get("source_closure_policy")
+            or ""
+        ).strip().lower()
+        _ring_closure_label = (
+            "strict_exact (шов как задан)"
+            if _ring_closure == "strict_exact"
+            else "closed_c1_periodic (плавное замыкание C1)"
+        )
+        _ring_seam_label = "шов открыт" if bool(_ring_meta.get("seam_open", False)) else "шов замкнут"
         st.info(
-            f"3D ring-view: замкнутый контур, толстые крайние линии по сегментам, heatmap кривизны. "
+            f"3D ring-view: {_ring_closure_label}, {_ring_seam_label}, толстые крайние линии по сегментам, heatmap кривизны. "
             f"Длина кольца ≈ {float(ring_visual.get('ring_length_m', 0.0)):.2f} м."
         )
 

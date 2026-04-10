@@ -27,6 +27,7 @@ def test_visible_fast_and_slow_groups_are_refreshed_as_groups() -> None:
     assert 'if interactive_scrub and (not many_visible_budget) and pressure_panel is not None and self._dock_is_exposed("dock_pressures"):' in SRC
     assert 'if interactive_scrub and (not many_visible_budget) and flow_panel is not None and self._dock_is_exposed("dock_flows"):' in SRC
     assert 'if interactive_scrub and (not many_visible_budget) and valve_panel is not None and self._dock_is_exposed("dock_valves"):' in SRC
+    assert 'if interactive_scrub and (not many_visible_budget) and slow_due and corner_table_panel is not None and self._dock_is_exposed("dock_corner_table"):' in SRC
     assert 'if interactive_scrub and heatmap_panel is not None and self._dock_is_exposed("dock_heatmap"):' in SRC
     assert 'if interactive_scrub and corner_quick_panel is not None and self._dock_is_exposed("dock_corner_quick"):' in SRC
     assert 'if interactive_scrub and road_profile_panel is not None and self._dock_is_exposed("dock_road_profile"):' in SRC
@@ -34,6 +35,7 @@ def test_visible_fast_and_slow_groups_are_refreshed_as_groups() -> None:
     assert "pressure_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
     assert "flow_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
     assert "valve_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
+    assert "corner_table_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
     assert "heatmap_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
     assert "corner_quick_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
     assert "road_profile_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC

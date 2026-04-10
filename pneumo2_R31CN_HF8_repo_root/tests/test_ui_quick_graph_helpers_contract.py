@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
 GRAPH_SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_graph_section_helpers.py"
+SURFACE_SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 
 
 def test_present_main_pressure_columns_and_render_main_overview_graphs() -> None:
@@ -68,12 +69,11 @@ def test_present_main_pressure_columns_and_render_main_overview_graphs() -> None
 def test_entrypoints_use_shared_quick_graph_helper() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
-    assert "from pneumo_solver_ui.ui_quick_graph_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_quick_graph_helpers import (" in heavy_text
+    surface_text = SURFACE_SECTION_HELPERS_PATH.read_text(encoding="utf-8")
+    assert "from pneumo_solver_ui.ui_quick_graph_helpers import render_main_overview_graphs" in surface_text
     assert "render_main_overview_graphs(" not in app_text
     assert "render_main_overview_graphs(" not in heavy_text
-    assert '"render_main_overview_graphs_fn": render_main_overview_graphs' in app_text
-    assert '"render_main_overview_graphs_fn": render_main_overview_graphs' in heavy_text
+    assert '"render_main_overview_graphs_fn": render_main_overview_graphs' in surface_text
     assert 'title="Крен/тангаж"' not in app_text
     assert 'title="Крен/тангаж"' not in heavy_text
     assert "press_cols = [c for c in [" not in app_text

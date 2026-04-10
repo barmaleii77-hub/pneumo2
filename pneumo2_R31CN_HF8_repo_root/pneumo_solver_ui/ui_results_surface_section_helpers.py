@@ -61,6 +61,7 @@ def _build_results_playhead_section_kwargs(
     p_atm: float,
     model_module: Any,
     missing_component_fallback_fn: Callable[[], None] | None = None,
+    render_event_alerts_panel_fn: Any | None = None,
 ) -> dict[str, Any]:
     kwargs: dict[str, Any] = {
         "playhead_component": get_playhead_ctrl_component(),
@@ -88,6 +89,8 @@ def _build_results_playhead_section_kwargs(
     }
     if missing_component_fallback_fn is not None:
         kwargs["missing_component_fallback_fn"] = missing_component_fallback_fn
+    if render_event_alerts_panel_fn is not None:
+        kwargs["render_event_alerts_panel_fn"] = render_event_alerts_panel_fn
     return kwargs
 
 
@@ -267,6 +270,9 @@ def render_app_results_surface_section(
     name_score_fn: Any,
     shortest_path_fn: Any,
     evaluate_quality_fn: Any,
+    render_event_alerts_panel_fn: Any = None,
+    render_flow_panel_html_fn: Any = None,
+    render_svg_scheme_section_fn: Any = None,
 ) -> tuple[Any, Any]:
     playhead_results_section_kwargs = _build_results_playhead_section_kwargs(
         st=st,
@@ -286,6 +292,7 @@ def render_app_results_surface_section(
         flow_scale_and_unit_fn=flow_scale_and_unit_fn,
         p_atm=p_atm,
         model_module=model_module,
+        render_event_alerts_panel_fn=render_event_alerts_panel_fn,
     )
     animation_section_kwargs = {
         "cur_hash": cur_hash,
@@ -307,8 +314,8 @@ def render_app_results_surface_section(
         "mech_fallback_module": mech_fallback_module,
         "render_mechanics_panel_fn": render_mechanical_animation_results_panel,
         "render_flow_tool_panel_fn": render_flow_animation_panel,
-        "render_flow_panel_html_fn": render_flow_panel_html,
-        "render_svg_scheme_section_fn": render_svg_scheme_section,
+        "render_flow_panel_html_fn": render_flow_panel_html_fn or render_flow_panel_html,
+        "render_svg_scheme_section_fn": render_svg_scheme_section_fn or render_svg_scheme_section,
         "df_mdot": df_mdot,
         "df_open": df_open,
         "df_p": df_p,
@@ -446,6 +453,9 @@ def render_heavy_results_surface_section(
     shortest_path_fn: Any,
     evaluate_quality_fn: Any,
     missing_playhead_fallback_fn: Callable[[], None],
+    render_event_alerts_panel_fn: Any = None,
+    render_flow_panel_html_fn: Any = None,
+    render_svg_scheme_section_fn: Any = None,
 ) -> tuple[Any, Any]:
     playhead_results_section_kwargs = _build_results_playhead_section_kwargs(
         st=st,
@@ -466,6 +476,7 @@ def render_heavy_results_surface_section(
         p_atm=p_atm,
         model_module=model_module,
         missing_component_fallback_fn=missing_playhead_fallback_fn,
+        render_event_alerts_panel_fn=render_event_alerts_panel_fn,
     )
     animation_section_kwargs = {
         "cur_hash": cur_hash,
@@ -496,8 +507,8 @@ def render_heavy_results_surface_section(
         "ring_visual_base_dir": ring_visual_base_dir,
         "render_mechanics_panel_fn": render_mechanical_animation_results_panel,
         "render_flow_tool_panel_fn": render_flow_animation_panel,
-        "render_flow_panel_html_fn": render_flow_panel_html,
-        "render_svg_scheme_section_fn": render_svg_scheme_section,
+        "render_flow_panel_html_fn": render_flow_panel_html_fn or render_flow_panel_html,
+        "render_svg_scheme_section_fn": render_svg_scheme_section_fn or render_svg_scheme_section,
         "df_mdot": df_mdot,
         "df_open": df_open,
         "df_p": df_p,

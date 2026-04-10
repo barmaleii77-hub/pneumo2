@@ -6,6 +6,11 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+if not hasattr(st, "warning"):
+    st.warning = lambda *args, **kwargs: None  # type: ignore[attr-defined]
+if not hasattr(st, "info"):
+    st.info = lambda *args, **kwargs: None  # type: ignore[attr-defined]
+
 
 def plot_studio_timeseries(
     df: pd.DataFrame,

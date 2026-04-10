@@ -30,12 +30,22 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import math
 import time
 from pathlib import Path
 from typing import Any, Dict
+
+# Allow direct execution (`python pneumo_solver_ui/tools/fast_kpi_worldroad.py`)
+# in addition to package execution (`python -m pneumo_solver_ui.tools.fast_kpi_worldroad`).
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    _ROOT = _Path(__file__).resolve().parents[2]
+    if str(_ROOT) not in _sys.path:
+        _sys.path.insert(0, str(_ROOT))
+    __package__ = "pneumo_solver_ui.tools"
 
 import numpy as np
 
@@ -43,6 +53,64 @@ import numpy as np
 def _load_json(path: Path) -> Any:
     with open(path, 'r', encoding='utf-8') as f:
         return json.load(f)
+
+
+def _first_present(mapping: Dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in mapping:
+            return mapping[key]
+    return None
+
+
+def _build_time_grid(dt: float, t_end: float) -> np.ndarray:
+    dt = float(dt)
+    t_end = float(t_end)
+    if dt <= 0.0:
+        raise ValueError('dt must be > 0')
+    n_steps = int(math.floor(max(0.0, t_end) / dt)) + 1
+    return np.arange(n_steps, dtype=float) * dt
+
+
+def _stroke_vector(ctx: Dict[str, Any], params: Dict[str, Any], key: str) -> np.ndarray:
+    val = ctx.get(key)
+    if val is not None:
+        return np.asarray(val, dtype=float)
+    return np.full(4, float(params.get('ход_штока', 0.250)), dtype=float)
+
+
+def _smooth_flags(ctx: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
+    smooth_info = ctx.get('smooth')
+    if smooth_info is not None:
+        return dict(smooth_info)
+    return {
+        'fully_smooth_mode': bool(params.get('fully_smooth_mode', params.get('полностью_гладкий_режим', False))),
+        'smooth_contacts': bool(params.get('smooth_contacts', False)),
+        'smooth_valves': bool(params.get('smooth_valves', False)),
+    }
+
+
+def _receiver_pressure_pa(obs: Dict[str, Any], node_index: Dict[str, Any]) -> float:
+    p = obs.get('p')
+    idx = node_index.get('Ресивер3')
+    if p is not None and idx is not None:
+        p_arr = np.asarray(p, dtype=float).reshape(-1)
+        if 0 <= int(idx) < p_arr.size:
+            return float(p_arr[int(idx)])
+    val = _first_present(obs, 'давление_ресивер3_Па', 'pR3')
+    return float(val) if val is not None else float('nan')
+
+
+def _rod_state_vector(obs: Dict[str, Any], corner_order: list[str], key_array: str, key_prefix: str, fallback_prefix: str = '') -> np.ndarray:
+    arr = obs.get(key_array)
+    if arr is not None:
+        return np.asarray(arr, dtype=float).reshape(-1)
+    values = []
+    for cname in corner_order[:4]:
+        value = obs.get(f'{key_prefix}{cname}_м')
+        if value is None and fallback_prefix:
+            value = obs.get(f'{fallback_prefix}{cname}_м')
+        values.append(float(value or 0.0))
+    return np.asarray(values, dtype=float)
 
 
 def _first_cross_time(t: float, prev_t: float, x: float, prev_x: float, level: float) -> float | None:
@@ -65,13 +133,18 @@ def eval_fast_kpi_worldroad(model_module, params: Dict[str, Any], test: Dict[str
     step = ctx['rk2_step']
     rhs = ctx['rhs']
     observe = ctx.get('observe', None)
-    time_grid = np.asarray(ctx['time'], dtype=float)
+    if not callable(observe):
+        raise RuntimeError('compile_only context does not expose observe()')
+    dt_eff = float(ctx.get('dt', dt))
+    t_end_eff = float(ctx.get('t_end', t_end))
+    time_grid = _build_time_grid(dt_eff, t_end_eff)
 
     corner_order = list(ctx.get('corner_order', ['ЛП', 'ПП', 'ЛЗ', 'ПЗ']))
+    node_index = dict(ctx.get('node_index', {}))
 
     # Геометрия/ходы штоков из модели (точнее, чем пытаться угадать по params)
-    stroke_C1 = np.asarray(ctx.get('stroke_C1_m', np.full(4, float(params.get('ход_штока', 0.250)))), dtype=float)
-    stroke_C2 = np.asarray(ctx.get('stroke_C2_m', np.full(4, float(params.get('ход_штока', 0.250)))), dtype=float)
+    stroke_C1 = _stroke_vector(ctx, params, 'stroke_C1_m')
+    stroke_C2 = _stroke_vector(ctx, params, 'stroke_C2_m')
 
     # Диагностика «нулевой позы»: ускорения RHS на t=0
     dst0 = np.asarray(rhs(state, float(time_grid[0])), dtype=float)
@@ -105,85 +178,74 @@ def eval_fast_kpi_worldroad(model_module, params: Dict[str, Any], test: Dict[str
     t_cross = None
     prev_pR3 = None
     prev_t = None
+    prev_s1 = None
+    prev_s2 = None
 
     # Проходим по сетке времени
     for k, t in enumerate(time_grid):
-        if observe is not None:
-            obs = observe(state, float(t))
+        obs = observe(state, float(t))
 
-            # давления
-            pR3 = float(obs.get('давление_ресивер3_Па', float('nan')))
-            if np.isfinite(pR3):
-                pR3_max = max(pR3_max, pR3)
+        # давления
+        pR3 = _receiver_pressure_pa(obs, node_index)
+        if np.isfinite(pR3):
+            pR3_max = max(pR3_max, pR3)
 
-            # пересечение Pmid
-            if (Pmid > 0.0) and (float(t) >= t_step):
-                if (prev_pR3 is not None) and (prev_t is not None) and (t_cross is None):
-                    tc = _first_cross_time(float(t), float(prev_t), pR3, float(prev_pR3), Pmid)
-                    if tc is not None:
-                        t_cross = tc
+        # пересечение Pmid
+        if (Pmid > 0.0) and (float(t) >= t_step):
+            if (prev_pR3 is not None) and (prev_t is not None) and (t_cross is None):
+                tc = _first_cross_time(float(t), float(prev_t), pR3, float(prev_pR3), Pmid)
+                if tc is not None:
+                    t_cross = tc
 
-            prev_pR3 = pR3
-            prev_t = float(t)
+        prev_pR3 = pR3
+        prev_t = float(t)
 
-            # крен/тангаж
-            phi = float(obs.get('крен_phi_рад', 0.0))
-            theta = float(obs.get('тангаж_theta_рад', 0.0))
-            roll_max_deg = max(roll_max_deg, abs(phi) * 180.0 / math.pi)
-            pitch_max_deg = max(pitch_max_deg, abs(theta) * 180.0 / math.pi)
+        # крен/тангаж
+        phi = float(_first_present(obs, 'phi', 'крен_phi_рад') or 0.0)
+        theta = float(_first_present(obs, 'theta', 'тангаж_theta_рад') or 0.0)
+        roll_max_deg = max(roll_max_deg, abs(phi) * 180.0 / math.pi)
+        pitch_max_deg = max(pitch_max_deg, abs(theta) * 180.0 / math.pi)
 
-            # RMS вертикального ускорения
-            az = float(obs.get('ускорение_рамы_z_м_с2_rhs', 0.0))
-            if np.isfinite(az):
-                acc2_sum += float(az * az)
-                acc2_n += 1
+        # RMS вертикального ускорения рамы
+        az = float(np.asarray(rhs(state, float(t)), dtype=float)[7])
+        if np.isfinite(az):
+            acc2_sum += float(az * az)
+            acc2_n += 1
 
-            # силы в пятне контакта
-            Ft = obs.get('F_tire', None)
-            wia = obs.get('wheel_in_air', None)
-            if Ft is not None:
-                Ft_arr = np.asarray(Ft, dtype=float).reshape(-1)
-                if Ft_arr.size >= 4:
-                    F_tire_min = min(F_tire_min, float(np.min(Ft_arr)))
-            if wia is not None:
-                wia_arr = np.asarray(wia, dtype=int).reshape(-1)
-                if wia_arr.size >= 4:
-                    any_lift_count += int(np.any(wia_arr > 0))
-                    wheel_lift_count += int(np.sum(wia_arr > 0))
+        # силы в пятне контакта / отрыв колёс
+        Ft_arr = np.asarray(_first_present(obs, 'F_tire', 'tire_Fz_N', 'нормальная_сила_шины'), dtype=float).reshape(-1)
+        if Ft_arr.size >= 4:
+            F_tire_min = min(F_tire_min, float(np.min(Ft_arr)))
+            wia_arr = (Ft_arr[:4] <= 1.0).astype(int)
+            any_lift_count += int(np.any(wia_arr > 0))
+            wheel_lift_count += int(np.sum(wia_arr > 0))
 
-            # штоки: позиции/скорости (по Ц1 и Ц2)
-            s1 = []
-            s2 = []
-            v1 = []
-            v2 = []
-            for i_c, cname in enumerate(corner_order[:4]):
-                s1.append(float(obs.get(f'положение_штока_Ц1_{cname}_м', obs.get(f'положение_штока_{cname}_м', 0.0))))
-                s2.append(float(obs.get(f'положение_штока_Ц2_{cname}_м', 0.0)))
-                v1.append(float(obs.get(f'скорость_штока_Ц1_{cname}_м_с', obs.get(f'скорость_штока_{cname}_м_с', 0.0))))
-                v2.append(float(obs.get(f'скорость_штока_Ц2_{cname}_м_с', 0.0)))
+        # штоки: позиции по Ц1/Ц2; скорость восстанавливаем по конечной разности,
+        # если observe не даёт явные скорости.
+        s1 = _rod_state_vector(obs, corner_order, 's_C1', 'положение_штока_Ц1_', 'положение_штока_')
+        s2 = _rod_state_vector(obs, corner_order, 's_C2', 'положение_штока_Ц2_')
 
-            s1 = np.asarray(s1, dtype=float)
-            s2 = np.asarray(s2, dtype=float)
-            v1 = np.asarray(v1, dtype=float)
-            v2 = np.asarray(v2, dtype=float)
+        rod_margin_C1_min = min(rod_margin_C1_min, float(np.min(np.minimum(s1, stroke_C1 - s1))))
+        rod_margin_C2_min = min(rod_margin_C2_min, float(np.min(np.minimum(s2, stroke_C2 - s2))))
 
-            # margin = min(s, stroke-s)
-            rod_margin_C1_min = min(rod_margin_C1_min, float(np.min(np.minimum(s1, stroke_C1 - s1))))
-            rod_margin_C2_min = min(rod_margin_C2_min, float(np.min(np.minimum(s2, stroke_C2 - s2))))
+        if prev_s1 is not None:
+            rod_speed_C1_max = max(rod_speed_C1_max, float(np.max(np.abs((s1 - prev_s1) / dt_eff))))
+        if prev_s2 is not None:
+            rod_speed_C2_max = max(rod_speed_C2_max, float(np.max(np.abs((s2 - prev_s2) / dt_eff))))
 
-            rod_speed_C1_max = max(rod_speed_C1_max, float(np.max(np.abs(v1))))
-            rod_speed_C2_max = max(rod_speed_C2_max, float(np.max(np.abs(v2))))
+        prev_s1 = s1
+        prev_s2 = s2
 
         # следующий шаг
         if k < (len(time_grid) - 1):
-            state = step(state, float(t), float(dt))
+            state = step(state, float(t), float(dt_eff))
 
     n_obs = max(1, len(time_grid))
     acc_rms = math.sqrt(acc2_sum / max(1, acc2_n))
 
     return {
-        'dt': float(dt),
-        't_end': float(t_end),
+        'dt': float(dt_eff),
+        't_end': float(t_end_eff),
 
         # Нулевая поза (быстрый sanity-check)
         'z_ddot0_mps2': float(z_ddot0),
@@ -213,8 +275,8 @@ def eval_fast_kpi_worldroad(model_module, params: Dict[str, Any], test: Dict[str
         'rod_speed_C2_max_mps': float(rod_speed_C2_max),
 
         # Контекст
-        'wheel_coord_mode': str(ctx.get('wheel_coord_mode', '')), 
-        'smooth': ctx.get('smooth', {}),
+        'wheel_coord_mode': str(ctx.get('wheel_coord_mode', '')),
+        'smooth': _smooth_flags(ctx, params),
     }
 
 
@@ -228,16 +290,9 @@ def main() -> None:
     args = ap.parse_args()
 
     root = Path(__file__).resolve().parents[1]
-    model_path = root / 'model_pneumo_v9_mech_doublewishbone_worldroad.py'
     base_json = root / 'default_base.json'
     suite_json = root / 'default_suite.json'
-
-    # Load model via importlib (Windows-safe)
-    spec = importlib.util.spec_from_file_location('pneumo_model_worldroad', str(model_path))
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f'Не удалось загрузить модель: {model_path}')
-    m = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(m)  # type: ignore
+    from pneumo_solver_ui import model_pneumo_v9_mech_doublewishbone_worldroad as m
 
     params = _load_json(base_json)
     suite = _load_json(suite_json)

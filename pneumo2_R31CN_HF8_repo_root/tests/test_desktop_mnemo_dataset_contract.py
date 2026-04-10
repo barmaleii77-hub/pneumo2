@@ -10,7 +10,13 @@ import pytest
 def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) -> None:
     pytest.importorskip("PySide6")
 
-    from pneumo_solver_ui.desktop_mnemo.app import _build_frame_alert_payload, _build_frame_narrative, prepare_dataset
+    from pneumo_solver_ui.desktop_mnemo.app import (
+        _build_frame_alert_payload,
+        _build_frame_narrative,
+        build_onboarding_focus_target,
+        build_onboarding_focus_region_payload,
+        prepare_dataset,
+    )
 
     t = np.array([0.0, 0.5, 1.0], dtype=float)
     npz_path = tmp_path / "mnemo_bundle.npz"
@@ -136,6 +142,33 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     assert any(item["name"] == "узел_после_рег_Pmid" and item["severity"] == "warn" for item in alerts["nodes"])
     assert any(item["title"] == "Большой перепад давлений" and item["severity"] == "warn" for item in alerts["mode_badges"])
 
+    focus_target = build_onboarding_focus_target(
+        dataset,
+        1,
+        selected_edge="обратный_клапан_Pmid_к_выхлопу",
+        selected_node="узел_после_рег_Pmid",
+    )
+    assert focus_target.has_target is True
+    assert focus_target.edge_name == "регулятор_до_себя_Pmid_сброс"
+    assert focus_target.node_name == "Ресивер3"
+    assert focus_target.mode_title == "Регуляторный коридор"
+    assert "Стартовый фокус" in focus_target.summary
+
+    focus_payload = build_onboarding_focus_region_payload(
+        dataset,
+        1,
+        selected_edge="обратный_клапан_Pmid_к_выхлопу",
+        selected_node="узел_после_рег_Pmid",
+        source="dataset_load",
+        auto_focus=True,
+    )
+    assert focus_payload["available"] is True
+    assert focus_payload["edge_name"] == "регулятор_до_себя_Pmid_сброс"
+    assert focus_payload["node_name"] == "Ресивер3"
+    assert focus_payload["auto_focus"] is True
+    assert focus_payload["source"] == "dataset_load"
+    assert "Регуляторный коридор" in focus_payload["summary"]
+
 
 def test_mnemo_event_tracker_latches_warn_and_mode_switches(tmp_path: Path) -> None:
     pytest.importorskip("PySide6")
@@ -257,7 +290,6 @@ def test_mnemo_event_tracker_latches_warn_and_mode_switches(tmp_path: Path) -> N
     assert payload["acknowledged_latch_count"] >= 1
     assert "Большой перепад давлений" in payload["acknowledged_titles"]
     assert payload["current_mode"] == "Регуляторный коридор"
-
     written = _write_event_log_sidecar(
         dataset,
         tracker,
@@ -272,3 +304,52 @@ def test_mnemo_event_tracker_latches_warn_and_mode_switches(tmp_path: Path) -> N
     assert saved["npz_path"] == str(dataset.npz_path)
     assert saved["acknowledged_latch_count"] >= 1
     assert any(event["title"] == "ACK latched-событий" for event in saved["events"])
+
+
+def test_build_launch_onboarding_context_supports_defaults_and_explicit_preset() -> None:
+    pytest.importorskip("PySide6")
+
+    from pneumo_solver_ui.desktop_mnemo.app import (
+        build_launch_onboarding_context,
+        build_onboarding_focus_region_payload,
+        build_onboarding_focus_target,
+    )
+
+    follow_ctx = build_launch_onboarding_context(
+        npz_path=Path("C:/repo/workspace/exports/anim_latest.npz"),
+        follow=True,
+        pointer_path=Path("C:/repo/workspace/_pointers/anim_latest.json"),
+        preset_key="operational_follow_triage",
+        title="Оперативный follow-разбор",
+        reason="Есть активные latch-события и нужен live triage.",
+        checklist=[
+            "Сначала подтвердите ведущую ветку.",
+            "ACK делайте только после сверки со схемой.",
+        ],
+    )
+    assert follow_ctx.launch_mode == "follow"
+    assert follow_ctx.preset_key == "operational_follow_triage"
+    assert follow_ctx.title == "Оперативный follow-разбор"
+    assert "live triage" in follow_ctx.reason
+    assert follow_ctx.checklist[0] == "Сначала подтвердите ведущую ветку."
+
+    review_ctx = build_launch_onboarding_context(
+        npz_path=Path("C:/repo/workspace/exports/case_a.npz"),
+        follow=False,
+        pointer_path=Path("C:/repo/workspace/_pointers/anim_latest.json"),
+    )
+    assert review_ctx.launch_mode == "npz"
+    assert review_ctx.preset_key == "npz"
+    assert review_ctx.title == "Ретроспективный разбор NPZ"
+    assert any("фиксированный сценарий" in item for item in review_ctx.checklist)
+
+    waiting_focus = build_onboarding_focus_target(None, 0)
+    assert waiting_focus.has_target is False
+    assert waiting_focus.mode_title == "Ожидание данных"
+    assert "не вычислен" in waiting_focus.summary
+
+    waiting_payload = build_onboarding_focus_region_payload(None, 0, source="startup_banner", auto_focus=False)
+    assert waiting_payload["available"] is False
+    assert waiting_payload["edge_name"] == ""
+    assert waiting_payload["node_name"] == ""
+    assert waiting_payload["auto_focus"] is False

@@ -19,6 +19,10 @@ from pathlib import Path
 
 import streamlit as st
 
+from pneumo_solver_ui.desktop_mnemo.settings_bridge import (
+    desktop_mnemo_view_mode_label,
+    read_desktop_mnemo_view_mode,
+)
 from pneumo_solver_ui.run_artifacts import (
     collect_anim_latest_diagnostics_summary,
     local_anim_latest_export_paths,
@@ -44,6 +48,8 @@ st.caption(
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 EXPORTS_DIR = PROJECT_ROOT / "pneumo_solver_ui" / "workspace" / "exports"
 _, POINTER_PATH = local_anim_latest_export_paths(EXPORTS_DIR, ensure_exists=False)
+persisted_view_mode = read_desktop_mnemo_view_mode(PROJECT_ROOT)
+persisted_view_mode_label = desktop_mnemo_view_mode_label(persisted_view_mode)
 
 
 def _venv_python(prefer_gui: bool) -> str:
@@ -133,7 +139,17 @@ def _pip_install_stream(packages: list[str], label: str) -> tuple[int, str]:
     return rc, "".join(out_lines)
 
 
-def _launch_mnemo(*, theme: str, follow: bool = False, npz_path: Path | None = None) -> tuple[bool, str]:
+def _launch_mnemo(
+    *,
+    theme: str,
+    follow: bool = False,
+    npz_path: Path | None = None,
+    startup_preset: str = "",
+    startup_title: str = "",
+    startup_reason: str = "",
+    startup_view_mode: str = "",
+    startup_checks: list[str] | None = None,
+) -> tuple[bool, str]:
     py = _venv_python(prefer_gui=True)
     cmd = [py, "-m", "pneumo_solver_ui.desktop_mnemo.main"]
     if follow:
@@ -141,6 +157,18 @@ def _launch_mnemo(*, theme: str, follow: bool = False, npz_path: Path | None = N
     elif npz_path is not None:
         cmd += ["--npz", str(npz_path)]
     cmd += ["--theme", str(theme)]
+    if startup_preset:
+        cmd += ["--startup-preset", str(startup_preset)]
+    if startup_title:
+        cmd += ["--startup-title", str(startup_title)]
+    if startup_reason:
+        cmd += ["--startup-reason", str(startup_reason)]
+    if startup_view_mode:
+        cmd += ["--startup-view-mode", str(startup_view_mode)]
+    for item in startup_checks or []:
+        text = str(item).strip()
+        if text:
+            cmd += ["--startup-check", text]
     try:
         _spawn_no_console(cmd, cwd=PROJECT_ROOT)
     except Exception as exc:
@@ -160,6 +188,31 @@ with col1:
 with col2:
     st.caption("Где лежит anim_latest pointer")
     st.code(str(POINTER_PATH))
+
+st.info(
+    "Режим открытия отдельного окна по умолчанию: "
+    f"{persisted_view_mode_label}. Это значение берётся из последней сохранённой desktop-сессии `Desktop Mnemo`."
+)
+launch_view_choice = st.radio(
+    "Разовый режим запуска окна",
+    ["Как сохранено", "Фокусный сценарий", "Полная схема"],
+    index=0,
+    horizontal=True,
+    help="Это одноразовое переопределение для текущего запуска. Сохранённый режим по умолчанию не меняется.",
+)
+launch_view_mode = {
+    "Как сохранено": "",
+    "Фокусный сценарий": "focus",
+    "Полная схема": "overview",
+}[str(launch_view_choice)]
+launch_view_label = desktop_mnemo_view_mode_label(launch_view_mode or persisted_view_mode)
+if launch_view_mode:
+    st.caption(
+        "Этот запуск откроет окно в режиме: "
+        f"{launch_view_label}. Сохранённый default останется: {persisted_view_mode_label}."
+    )
+else:
+    st.caption(f"Для этого запуска будет использован сохранённый режим: {persisted_view_mode_label}.")
 
 st.subheader("Зачем это окно")
 st.write(
@@ -209,13 +262,16 @@ launcher_diag = collect_anim_latest_diagnostics_summary(
 operator_recommendations = build_anim_operator_recommendations(launcher_diag)
 if operator_recommendations:
     st.subheader("Рекомендуемые действия перед запуском")
-    rec_col1, rec_col2, rec_col3, rec_col4 = st.columns(4)
+    rec_col1, rec_col2, rec_col3, rec_col4, rec_col5 = st.columns(5)
     rec_col1.metric("Режим", str(launcher_diag.get("anim_latest_mnemo_event_log_current_mode") or "—"))
     rec_col2.metric("Active latch", int(launcher_diag.get("anim_latest_mnemo_event_log_active_latch_count") or 0))
     rec_col3.metric("Perf evidence", str(launcher_diag.get("browser_perf_evidence_status") or "—"))
     rec_col4.metric("Perf compare", str(launcher_diag.get("browser_perf_comparison_status") or "—"))
+    rec_col5.metric("Desktop view", persisted_view_mode_label)
     st.warning("Сначала: " + operator_recommendations[0])
     st.markdown("\n".join(f"{idx}. {item}" for idx, item in enumerate(operator_recommendations, start=1)))
+else:
+    st.caption(f"Desktop Mnemo сейчас будет открываться в режиме: {persisted_view_mode_label}.")
 
 
 st.subheader("Зависимости Desktop Mnemo")
@@ -272,34 +328,71 @@ st.divider()
 st.subheader("Сценарный запуск")
 mnemo_active_latch_count = int(launcher_diag.get("anim_latest_mnemo_event_log_active_latch_count") or 0)
 mnemo_preset_label = "Запустить preset: пустое окно"
+mnemo_preset_title = "Пустой инженерный старт"
 mnemo_preset_reason = (
     "Свежий anim_latest ещё не готов, поэтому launcher предлагает нейтральный пустой старт без привязки к pointer."
 )
+mnemo_preset_key = "blank_start"
+mnemo_preset_checks = [
+    "Сначала подключите pointer или конкретный NPZ, чтобы схема получила живой сценарий.",
+    "После загрузки ищите одну ведущую ветку, а не пытайтесь читать всю схему сразу.",
+    "Тренды и события используйте как подтверждение гипотезы, а не как первый экран.",
+]
 mnemo_preset_follow = False
 mnemo_preset_npz: Path | None = None
 
 if mnemo_active_latch_count > 0 and POINTER_PATH.exists():
     mnemo_preset_label = "Запустить preset: оперативный follow-разбор"
+    mnemo_preset_title = "Оперативный follow-разбор"
     mnemo_preset_reason = (
         "Есть активные latch-события: follow-режим лучше подходит для живого triage, ACK/reset и наблюдения за новым anim_latest."
     )
+    mnemo_preset_key = "operational_follow_triage"
+    mnemo_preset_checks = [
+        "Сначала подтвердите ведущую ветку и активный latch на текущем кадре.",
+        "ACK делайте только после того, как схема и тренды согласованы между собой.",
+        "После ACK смотрите, не появляется ли новый latch уже на следующем обновлении pointer.",
+    ]
     mnemo_preset_follow = True
 elif pointer_npz_path and pointer_npz_path.exists():
     mnemo_preset_label = "Запустить preset: ретроспектива по текущему NPZ"
+    mnemo_preset_title = "Ретроспективный разбор текущего NPZ"
     mnemo_preset_reason = (
         "Критичных latch сейчас нет: удобнее открыть фиксированный NPZ и спокойно разобрать сценарий без скачков на новый pointer."
     )
+    mnemo_preset_key = "npz_retrospective_review"
+    mnemo_preset_checks = [
+        "Держите в голове один фиксированный сценарий и не ждите live-переключения pointer.",
+        "Сначала выделите ведущую ветку, затем один опорный узел давления.",
+        "Только после этого проверяйте численную гипотезу через тренды и event memory.",
+    ]
     mnemo_preset_npz = pointer_npz_path
 elif POINTER_PATH.exists():
     mnemo_preset_label = "Запустить preset: baseline follow"
+    mnemo_preset_title = "Baseline follow"
     mnemo_preset_reason = (
         "Pointer уже готов, но отдельного повода для frozen-ретроспективы нет: безопасный базовый режим — follow."
     )
+    mnemo_preset_key = "baseline_follow"
+    mnemo_preset_checks = [
+        "Сначала поймите текущий режим на схеме, только потом углубляйтесь в детали.",
+        "Если pointer обновится, сравнивайте новый режим с предыдущим, а не начинайте чтение заново.",
+        "Для спокойных кадров держите в фокусе ведущую ветку и один максимум давления.",
+    ]
     mnemo_preset_follow = True
 
 st.info(mnemo_preset_reason)
 if st.button(mnemo_preset_label, width="stretch"):
-    ok, msg = _launch_mnemo(theme=str(theme), follow=mnemo_preset_follow, npz_path=mnemo_preset_npz)
+    ok, msg = _launch_mnemo(
+        theme=str(theme),
+        follow=mnemo_preset_follow,
+        npz_path=mnemo_preset_npz,
+        startup_preset=mnemo_preset_key,
+        startup_title=mnemo_preset_title,
+        startup_reason=mnemo_preset_reason,
+        startup_view_mode=launch_view_mode,
+        startup_checks=mnemo_preset_checks,
+    )
     if ok:
         st.success(msg)
     else:
@@ -310,7 +403,7 @@ st.divider()
 launch_col1, launch_col2, launch_col3 = st.columns([1.2, 1.2, 1.0])
 with launch_col1:
     if st.button("Запустить Desktop Mnemo (follow)", width="stretch"):
-        ok, msg = _launch_mnemo(theme=str(theme), follow=True)
+        ok, msg = _launch_mnemo(theme=str(theme), follow=True, startup_view_mode=launch_view_mode)
         if ok:
             st.success(msg)
         else:
@@ -320,7 +413,7 @@ with launch_col2:
     disabled_npz = not bool(pointer_npz_path and pointer_npz_path.exists())
     if st.button("Запустить по текущему NPZ", width="stretch", disabled=disabled_npz):
         assert pointer_npz_path is not None
-        ok, msg = _launch_mnemo(theme=str(theme), npz_path=pointer_npz_path)
+        ok, msg = _launch_mnemo(theme=str(theme), npz_path=pointer_npz_path, startup_view_mode=launch_view_mode)
         if ok:
             st.success(msg)
         else:
@@ -338,7 +431,7 @@ st.caption(
 st.divider()
 
 if st.button("Запустить Desktop Mnemo (пустой)", width="stretch"):
-    ok, msg = _launch_mnemo(theme=str(theme))
+    ok, msg = _launch_mnemo(theme=str(theme), startup_view_mode=launch_view_mode)
     if ok:
         st.success(msg)
     else:

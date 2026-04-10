@@ -75,6 +75,50 @@
     .alertNodeRing.info { stroke: var(--alert-info); }
     .alertNodeRing.ok { stroke: var(--alert-ok); }
 
+    .focusFrame {
+      fill: rgba(0, 146, 168, 0.05);
+      stroke: rgba(0, 146, 168, 0.92);
+      stroke-width: 10;
+      stroke-dasharray: 18 12;
+      pointer-events: none;
+      animation: focusDash 1.8s linear infinite;
+    }
+    .focusHalo {
+      fill: none;
+      stroke: rgba(0, 146, 168, 0.82);
+      stroke-width: 7;
+      pointer-events: none;
+      animation: focusPulse 1.45s ease-out infinite;
+    }
+    .focusCaptionBg {
+      fill: rgba(9, 33, 42, 0.88);
+      stroke: rgba(99, 211, 245, 0.36);
+      stroke-width: 1.5;
+      pointer-events: none;
+    }
+    .focusCaptionText {
+      fill: rgba(238, 246, 248, 0.96);
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+    }
+    .focusCaptionSub {
+      fill: rgba(159, 220, 240, 0.92);
+      font-size: 18px;
+      font-weight: 500;
+      pointer-events: none;
+    }
+    @keyframes focusPulse {
+      0% { stroke-opacity: 0.92; transform: scale(0.96); transform-origin: center; }
+      70% { stroke-opacity: 0.28; transform: scale(1.06); transform-origin: center; }
+      100% { stroke-opacity: 0.10; transform: scale(1.12); transform-origin: center; }
+    }
+    @keyframes focusDash {
+      0% { stroke-dashoffset: 0; stroke-opacity: 0.95; }
+      100% { stroke-dashoffset: -60; stroke-opacity: 0.68; }
+    }
+
     @keyframes alertPulse {
       0% { opacity: 0.42; }
       45% { opacity: 0.96; }
@@ -227,6 +271,9 @@
       <input id="slider" type="range" min="0" max="0" value="0" step="1"/>
       <span class="time">idx=<span id="idx">0</span></span>
       <button id="resetView" class="btn">↺ Сброс вида</button>
+      <button id="focusReturn" class="btn">🎯 Вернуться к фокусу</button>
+      <button id="showOverview" class="btn">◱ Вся схема</button>
+      <span id="focusModeBadge" class="badge pick" style="display:none"></span>
       <span id="pickBadge" class="badge" style="display:none"></span>
     </div>
 
@@ -407,7 +454,7 @@ function sendDataToPython(data) {
 // ----------------------------------------------------
 // Widget state
 // ----------------------------------------------------
-let DATA = { title: "", svg: "", mapping: {}, time: [], edges: [], nodes: [], selected: {}, label_pick_mode: "", label_picks: {}, height: 740, sync_playhead: false, playhead_storage_key: "pneumo_play_state", dataset_id: "", alerts: {}, show_alert_overlay: true };
+let DATA = { title: "", svg: "", mapping: {}, time: [], edges: [], nodes: [], selected: {}, label_pick_mode: "", label_picks: {}, height: 740, sync_playhead: false, playhead_storage_key: "pneumo_play_state", dataset_id: "", alerts: {}, focus_region: null, show_alert_overlay: true };
 let svg = null;
 let overlay = null;
 let pathLayer = null;
@@ -416,6 +463,7 @@ let nodeLayer = null;
 let routeLayer = null;
 let reviewLayer = null;
 let alertLayer = null;
+let focusLayer = null;
 let reviewSegs = []; // {edgeName, path}
 var __lastArgs = null;
 
@@ -444,6 +492,12 @@ let dragMoved = false;
 
 let selectedEdge = null;
 let selectedNode = null;
+let focusOverlayTimer = null;
+let focusAnimHandle = 0;
+let focusAnimToken = 0;
+let lastAutoFocusSignature = '';
+let focusOverviewMode = false;
+let focusOverviewMeta = null;
 
 
 let syncPlayhead = false;
@@ -482,6 +536,9 @@ const togReview = document.getElementById('togReview');
 const legendEl = document.getElementById('legend');
 
 const pickBadge = document.getElementById('pickBadge');
+const focusModeBadge = document.getElementById('focusModeBadge');
+const focusReturnBtn = document.getElementById('focusReturn');
+const showOverviewBtn = document.getElementById('showOverview');
 
 function parseViewBox(vbStr) {
   const a = (vbStr || '').trim().split(/\s+/).map(parseFloat);
@@ -490,6 +547,78 @@ function parseViewBox(vbStr) {
 }
 function setViewBox(v) { if (svg) svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`); }
 function resetView() { view = {...view0}; setViewBox(view); }
+function stopFocusAnimation() {
+  focusAnimToken += 1;
+  if (focusAnimHandle) {
+    try { cancelAnimationFrame(focusAnimHandle); } catch(_e) {}
+    focusAnimHandle = 0;
+  }
+}
+function clearFocusOverlay(cancelTimer=true) {
+  if (cancelTimer && focusOverlayTimer) {
+    clearTimeout(focusOverlayTimer);
+    focusOverlayTimer = null;
+  }
+  if (!focusLayer) return;
+  while (focusLayer.firstChild) focusLayer.removeChild(focusLayer.firstChild);
+}
+function unionBox(a, b) {
+  if (!a) return b ? {x:b.x, y:b.y, w:b.w, h:b.h} : null;
+  if (!b) return {x:a.x, y:a.y, w:a.w, h:a.h};
+  const x1 = Math.min(a.x, b.x);
+  const y1 = Math.min(a.y, b.y);
+  const x2 = Math.max(a.x + a.w, b.x + b.w);
+  const y2 = Math.max(a.y + a.h, b.y + b.h);
+  return { x: x1, y: y1, w: Math.max(1, x2 - x1), h: Math.max(1, y2 - y1) };
+}
+function padBox(box, pad) {
+  if (!box) return null;
+  const p = Math.max(12, Number(pad || 0));
+  return { x: box.x - p, y: box.y - p, w: box.w + p * 2, h: box.h + p * 2 };
+}
+function clampViewToBaseline(target) {
+  if (!target) return {...view0};
+  const maxW = Math.max(120, Number(view0.w || 1920));
+  const maxH = Math.max(120, Number(view0.h || 1080));
+  const w = clamp(Number(target.w || maxW), Math.max(180, maxW * 0.20), maxW);
+  const h = clamp(Number(target.h || maxH), Math.max(120, maxH * 0.20), maxH);
+  const minX = Number(view0.x || 0);
+  const minY = Number(view0.y || 0);
+  const maxX = minX + maxW - w;
+  const maxY = minY + maxH - h;
+  return {
+    x: clamp(Number(target.x || minX), Math.min(minX, maxX), Math.max(minX, maxX)),
+    y: clamp(Number(target.y || minY), Math.min(minY, maxY), Math.max(minY, maxY)),
+    w,
+    h,
+  };
+}
+function animateViewTo(target, durationMs) {
+  const dst = clampViewToBaseline(target);
+  stopFocusAnimation();
+  const token = focusAnimToken;
+  const start = {x:view.x, y:view.y, w:view.w, h:view.h};
+  const t0 = performance.now();
+  const dur = Math.max(180, Number(durationMs || 420));
+  function tick(ts) {
+    if (token !== focusAnimToken) return;
+    const t = clamp((ts - t0) / dur, 0, 1);
+    const e = 1 - Math.pow(1 - t, 3);
+    view = {
+      x: start.x + (dst.x - start.x) * e,
+      y: start.y + (dst.y - start.y) * e,
+      w: start.w + (dst.w - start.w) * e,
+      h: start.h + (dst.h - start.h) * e,
+    };
+    setViewBox(view);
+    if (t < 1) {
+      focusAnimHandle = requestAnimationFrame(tick);
+    } else {
+      focusAnimHandle = 0;
+    }
+  }
+  focusAnimHandle = requestAnimationFrame(tick);
+}
 
 function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
 
@@ -544,6 +673,12 @@ function clearDom() {
   reviewSegs = [];
   reviewLayer = null;
   alertLayer = null;
+  focusLayer = null;
+  stopFocusAnimation();
+  clearFocusOverlay();
+  focusOverviewMode = false;
+  focusOverviewMeta = null;
+  updateFocusControls();
 }
 
 function applyToggles() {
@@ -586,6 +721,42 @@ function setBadge(kind, name) {
   if (kind === 'edge') cls = 'edge';
   if (kind === 'pick' || kind === 'label') cls = 'pick';
   pickBadge.className = `badge ${cls}`;
+}
+
+function getFocusRegionLabel(focus) {
+  const payload = (focus && typeof focus === 'object') ? focus : null;
+  if (!payload) return '';
+  const edge = payload.edge_name ? String(payload.edge_name) : '—';
+  const node = payload.node_name ? String(payload.node_name) : '—';
+  return `${edge} / ${node}`;
+}
+
+function updateFocusControls() {
+  const focus = (DATA && DATA.focus_region && typeof DATA.focus_region === 'object') ? DATA.focus_region : null;
+  const hasFocus = !!(focus && focus.available !== false && (focus.edge_name || focus.node_name || focus.summary));
+  if (focusReturnBtn) focusReturnBtn.disabled = !hasFocus;
+  if (showOverviewBtn) showOverviewBtn.disabled = !(svg && view0 && Number.isFinite(view0.w));
+  if (!focusModeBadge) return;
+  if (focusOverviewMode) {
+    const label = (focusOverviewMeta && focusOverviewMeta.title) ? String(focusOverviewMeta.title) : 'overview: вся схема';
+    focusModeBadge.style.display = 'inline-block';
+    focusModeBadge.textContent = label;
+    focusModeBadge.className = 'badge pick';
+    focusModeBadge.title = (focusOverviewMeta && focusOverviewMeta.summary)
+      ? String(focusOverviewMeta.summary)
+      : 'Схема раскрыта целиком для сравнения с локальным сценарным фокусом.';
+    return;
+  }
+  if (hasFocus) {
+    focusModeBadge.style.display = 'inline-block';
+    focusModeBadge.textContent = `focus: ${getFocusRegionLabel(focus)}`;
+    focusModeBadge.className = 'badge edge';
+    focusModeBadge.title = String(focus.summary || '');
+    return;
+  }
+  focusModeBadge.style.display = 'none';
+  focusModeBadge.textContent = '';
+  focusModeBadge.title = '';
 }
 
 
@@ -770,6 +941,192 @@ function updateAlertOverlay() {
     ring.appendChild(title);
     alertLayer.appendChild(ring);
   });
+}
+
+function bboxFromSvgElement(el) {
+  if (!el || typeof el.getBBox !== 'function') return null;
+  try {
+    const bb = el.getBBox();
+    if (!Number.isFinite(bb.x) || !Number.isFinite(bb.y) || !Number.isFinite(bb.width) || !Number.isFinite(bb.height)) return null;
+    return { x: bb.x, y: bb.y, w: Math.max(1, bb.width), h: Math.max(1, bb.height) };
+  } catch(_e) {
+    return null;
+  }
+}
+
+function getFocusRegionBox(focus) {
+  const payload = (focus && typeof focus === 'object') ? focus : null;
+  if (!payload) return null;
+  let box = null;
+  const edgeName = payload.edge_name ? String(payload.edge_name) : '';
+  const nodeName = payload.node_name ? String(payload.node_name) : '';
+  if (edgeName && edgeNameToSegs.has(edgeName)) {
+    const arr = edgeNameToSegs.get(edgeName) || [];
+    arr.forEach((seg) => {
+      if (!seg || !seg.path) return;
+      box = unionBox(box, bboxFromSvgElement(seg.path));
+      box = unionBox(box, bboxFromSvgElement(seg.dot));
+    });
+  }
+  if (nodeName && nodeNameToObj.has(nodeName)) {
+    const obj = nodeNameToObj.get(nodeName);
+    if (obj) {
+      box = unionBox(box, bboxFromSvgElement(obj.g || obj.circle));
+      box = unionBox(box, bboxFromSvgElement(obj.text));
+    }
+  }
+  return box;
+}
+
+function buildFocusTargetView(box, focus) {
+  if (!box) return {...view0};
+  const hostRect = (svg && typeof svg.getBoundingClientRect === 'function') ? svg.getBoundingClientRect() : null;
+  const aspect = (hostRect && hostRect.width > 1 && hostRect.height > 1)
+    ? (hostRect.width / hostRect.height)
+    : ((view0.w || 1920) / Math.max(1, view0.h || 1080));
+  const fill = clamp(Number((focus && focus.focus_fill_ratio) || 0.42), 0.22, 0.80);
+  const padded = padBox(box, (focus && focus.padding) || 170) || box;
+  let targetW = Math.max(180, padded.w / fill);
+  let targetH = Math.max(140, padded.h / fill);
+  if ((targetW / targetH) > aspect) targetH = targetW / aspect;
+  else targetW = targetH * aspect;
+  const cx = padded.x + padded.w / 2;
+  const cy = padded.y + padded.h / 2;
+  return clampViewToBaseline({
+    x: cx - targetW / 2,
+    y: cy - targetH / 2,
+    w: targetW,
+    h: targetH,
+  });
+}
+
+function renderFocusOverlay(focus, box) {
+  if (!focusLayer || !box) return;
+  clearFocusOverlay(false);
+
+  const frame = document.createElementNS(NS, 'rect');
+  frame.setAttribute('x', String(box.x));
+  frame.setAttribute('y', String(box.y));
+  frame.setAttribute('width', String(box.w));
+  frame.setAttribute('height', String(box.h));
+  frame.setAttribute('rx', String(Math.max(26, Math.min(60, Math.min(box.w, box.h) * 0.12))));
+  frame.setAttribute('ry', String(Math.max(26, Math.min(60, Math.min(box.w, box.h) * 0.12))));
+  frame.setAttribute('class', 'focusFrame');
+  focusLayer.appendChild(frame);
+
+  const nodeName = focus && focus.node_name ? String(focus.node_name) : '';
+  const nodeObj = nodeName ? nodeNameToObj.get(nodeName) : null;
+  if (nodeObj && nodeObj.circle) {
+    const halo = document.createElementNS(NS, 'circle');
+    const cx = Number(nodeObj.circle.getAttribute('cx') || 0);
+    const cy = Number(nodeObj.circle.getAttribute('cy') || 0);
+    const r = Number(nodeObj.circle.getAttribute('r') || 0);
+    halo.setAttribute('cx', String(cx));
+    halo.setAttribute('cy', String(cy));
+    halo.setAttribute('r', String(Math.max(24, r + 12)));
+    halo.setAttribute('class', 'focusHalo');
+    focusLayer.appendChild(halo);
+  }
+
+  const titleText = String((focus && focus.title) || 'Onboarding focus');
+  const subText = String((focus && focus.mode_title) || '');
+  const labelW = Math.max(220, Math.min(560, 120 + Math.max(titleText.length * 10, subText.length * 8)));
+  const labelX = box.x;
+  const labelY = Math.max((view0.y || 0) + 20, box.y - 92);
+  const labelBg = document.createElementNS(NS, 'rect');
+  labelBg.setAttribute('x', String(labelX));
+  labelBg.setAttribute('y', String(labelY));
+  labelBg.setAttribute('width', String(labelW));
+  labelBg.setAttribute('height', String(subText ? 72 : 46));
+  labelBg.setAttribute('rx', '18');
+  labelBg.setAttribute('ry', '18');
+  labelBg.setAttribute('class', 'focusCaptionBg');
+  focusLayer.appendChild(labelBg);
+
+  const label = document.createElementNS(NS, 'text');
+  label.setAttribute('x', String(labelX + 18));
+  label.setAttribute('y', String(labelY + 30));
+  label.setAttribute('class', 'focusCaptionText');
+  label.textContent = titleText;
+  focusLayer.appendChild(label);
+
+  if (subText) {
+    const sub = document.createElementNS(NS, 'text');
+    sub.setAttribute('x', String(labelX + 18));
+    sub.setAttribute('y', String(labelY + 55));
+    sub.setAttribute('class', 'focusCaptionSub');
+    sub.textContent = subText;
+    focusLayer.appendChild(sub);
+  }
+}
+
+function applyFocusRegion(focus, opts) {
+  const payload = (focus && typeof focus === 'object') ? focus : null;
+  focusOverviewMode = false;
+  focusOverviewMeta = null;
+  DATA.focus_region = payload;
+  if (!payload || payload.available === false) {
+    clearFocusOverlay();
+    stopFocusAnimation();
+    updateFocusControls();
+    return false;
+  }
+  const box = getFocusRegionBox(payload);
+  if (!box) {
+    clearFocusOverlay();
+    updateFocusControls();
+    return false;
+  }
+  renderFocusOverlay(box ? payload : null, padBox(box, 34));
+
+  const signature = String(payload.signature || `${payload.edge_name || ''}/${payload.node_name || ''}`);
+  const shouldAuto = !!payload.auto_focus;
+  const source = opts && opts.source ? String(opts.source) : '';
+  if (shouldAuto && source === 'build' && signature && signature === lastAutoFocusSignature) {
+    return true;
+  }
+  if (shouldAuto && source === 'build') {
+    lastAutoFocusSignature = signature;
+  }
+  if (focusOverlayTimer) {
+    clearTimeout(focusOverlayTimer);
+    focusOverlayTimer = null;
+  }
+  focusOverlayTimer = window.setTimeout(() => {
+    clearFocusOverlay(false);
+    focusOverlayTimer = null;
+  }, Math.max(900, Number(payload.ttl_ms || 2600)));
+
+  if (payload.animate !== false) {
+    animateViewTo(buildFocusTargetView(box, payload), Number(payload.duration_ms || 460));
+  }
+  updateFocusControls();
+  return true;
+}
+
+function showFocusOverview(meta) {
+  stopFocusAnimation();
+  clearFocusOverlay();
+  focusOverviewMode = true;
+  focusOverviewMeta = (meta && typeof meta === 'object') ? meta : {};
+  view = {...view0};
+  setViewBox(view);
+  updateFocusControls();
+  return true;
+}
+
+function returnToFocusMode(focus, opts) {
+  const payload = (focus && typeof focus === 'object' && Object.keys(focus).length)
+    ? focus
+    : ((DATA && DATA.focus_region && typeof DATA.focus_region === 'object') ? DATA.focus_region : null);
+  if (!payload) {
+    focusOverviewMode = false;
+    focusOverviewMeta = null;
+    updateFocusControls();
+    return false;
+  }
+  const patch = Object.assign({}, payload, { auto_focus: false, animate: true });
+  return applyFocusRegion(patch, Object.assign({ source: 'focus-return' }, opts || {}));
 }
 
 function setSelectedEdge(name, send=true) {
@@ -991,12 +1348,15 @@ function build(args) {
   nodeLayer = document.createElementNS(NS, 'g');
   routeLayer = document.createElementNS(NS, 'g');
   alertLayer = document.createElementNS(NS, 'g');
+  focusLayer = document.createElementNS(NS, 'g');
   alertLayer.setAttribute('id', 'pneumo_overlay_alerts');
+  focusLayer.setAttribute('id', 'pneumo_overlay_focus');
   overlay.appendChild(pathLayer);
   overlay.appendChild(routeLayer);
   overlay.appendChild(dotLayer);
   overlay.appendChild(nodeLayer);
   overlay.appendChild(alertLayer);
+  overlay.appendChild(focusLayer);
 
   // route overlay (optional)
   try {
@@ -1256,6 +1616,7 @@ const pth = document.createElementNS(NS, 'path');
   // svg interactions
   svg.addEventListener('wheel', (e) => {
     e.preventDefault();
+    stopFocusAnimation();
     const z = (e.deltaY < 0) ? 0.9 : 1.1;
     const p = getSvgPoint(e.clientX, e.clientY);
     const nx = p.x - (p.x - view.x) * z;
@@ -1265,6 +1626,7 @@ const pth = document.createElementNS(NS, 'path');
   }, {passive:false});
 
   svg.addEventListener('pointerdown', (e) => {
+    stopFocusAnimation();
     dragging = true;
     dragMoved = false;
     svg.setPointerCapture(e.pointerId);
@@ -1291,6 +1653,8 @@ const pth = document.createElementNS(NS, 'path');
   const sel = DATA.selected || {};
   if (sel.edge) setSelectedEdge(sel.edge, false);
   if (sel.node) setSelectedNode(sel.node, false);
+  if (DATA.focus_region) applyFocusRegion(DATA.focus_region, { source: 'build' }); else clearFocusOverlay();
+  updateFocusControls();
 
   // keep label-pick badge visible (if active)
   const pm2 = (DATA.label_pick_mode || '').trim();
@@ -1309,7 +1673,9 @@ if (togGlobalQ) {
   });
 }
 
-document.getElementById('resetView').addEventListener('click', () => resetView());
+document.getElementById('resetView').addEventListener('click', () => { stopFocusAnimation(); resetView(); });
+if (focusReturnBtn) focusReturnBtn.addEventListener('click', () => { returnToFocusMode(null, { source: 'focus-button' }); });
+if (showOverviewBtn) showOverviewBtn.addEventListener('click', () => { showFocusOverview({ title: 'overview: вся схема', summary: 'Полный обзор схемы для сравнения с локальным сценарным фокусом.' }); });
 document.getElementById('play').addEventListener('click', () => { playing = true; __wakeLoop(); });
 document.getElementById('pause').addEventListener('click', () => { playing = false; __wakeLoop(); });
 slider.addEventListener('input', () => { idx = parseInt(slider.value||'0',10) || 0; });

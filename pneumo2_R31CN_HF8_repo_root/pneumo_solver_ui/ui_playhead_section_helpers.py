@@ -38,7 +38,9 @@ def render_playhead_results_section(
     columns_fn,
     checkbox_fn,
     missing_component_fallback_fn: Callable[[], None] | None = None,
+    render_event_alerts_panel_fn=None,
 ) -> str:
+    render_event_alerts_panel_fn = render_event_alerts_panel_fn or render_event_alerts_panel
     _ph_server_sync, ph_send_hz, ph_storage_hz = render_playhead_sync_controls()
 
     playhead_status = render_playhead_component(
@@ -54,7 +56,7 @@ def render_playhead_results_section(
     if playhead_status == "missing" and missing_component_fallback_fn is not None:
         missing_component_fallback_fn()
 
-    render_event_alerts_panel(
+    render_event_alerts_panel_fn(
         events_list,
         safe_dataframe_fn=safe_dataframe_fn,
     )

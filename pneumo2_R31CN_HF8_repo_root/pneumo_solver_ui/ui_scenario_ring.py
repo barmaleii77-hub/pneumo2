@@ -59,6 +59,13 @@ def _format_sine_amplitude_semantics(a_mm: float) -> str:
     )
 
 
+RING_SUMMARY_LABEL_A = "Профиль ВСЕГО кольца: amplitude A L/R (служ.)"
+RING_SUMMARY_LABEL_P2P = "Профиль ВСЕГО кольца: p-p=max-min L/R (НЕ A)"
+# Legacy wording intentionally remains in source for regression-gates and docs parity.
+RING_SUMMARY_LABEL_A_LEGACY = "Профиль ВСЕГО кольца: амплитуда A L/R (служебно)"
+RING_SUMMARY_LABEL_P2P_LEGACY = "Профиль ВСЕГО кольца: полный размах max-min L/R (не A)"
+
+
 def _default_ring_spec() -> Dict[str, Any]:
     """Дефолт: пользовательский канон кольца из последнего принятого ring editor setup."""
     spec = {
@@ -237,6 +244,82 @@ def _turn_direction_label(direction: str) -> str:
         "LEFT": "Поворот влево",
         "RIGHT": "Поворот вправо",
     }.get(str(direction).upper(), str(direction))
+
+
+def _road_mode_label(mode: str) -> str:
+    raw = str(mode).upper()
+    if raw in ("ISO", "ISO8608", "ISO_8608"):
+        return "ISO 8608 (шероховатость)"
+    if raw in ("SIN", "SINE", "SINUS", "SINUSOID"):
+        return "Синус L/R"
+    return str(mode)
+
+
+def _iso_class_label(iso_class: str) -> str:
+    raw = str(iso_class).upper()
+    labels = {
+        "A": "A — очень ровная дорога",
+        "B": "B — почти ровная дорога",
+        "C": "C — умеренная шероховатость",
+        "D": "D — заметно неровная дорога",
+        "E": "E — грубая дорога",
+        "F": "F — очень грубая дорога",
+        "G": "G — крайне грубая дорога",
+        "H": "H — экстремально грубая дорога",
+    }
+    return labels.get(raw, str(iso_class))
+
+
+def _iso_gd_pick_label(level: str) -> str:
+    raw = str(level).lower()
+    labels = {
+        "lower": "Нижняя граница диапазона класса",
+        "mid": "Середина диапазона класса",
+        "upper": "Верхняя граница диапазона класса",
+    }
+    return labels.get(raw, str(level))
+
+
+def _closure_policy_label(policy: str) -> str:
+    raw = str(policy).strip().lower()
+    labels = {
+        "closed_c1_periodic": "Плавное замыкание кольца (C1 periodic)",
+        "strict_exact": "Строго как задано, без скрытой коррекции",
+    }
+    return labels.get(raw, str(policy))
+
+
+def _road_event_kind_label(kind: str) -> str:
+    raw = str(kind).strip().lower()
+    if raw in ("яма", "pothole"):
+        return "Яма"
+    if raw in ("препятствие", "bump", "ступенька", "ступень"):
+        return "Препятствие"
+    return str(kind)
+
+
+def _road_event_side_label(side: str) -> str:
+    raw = str(side).strip().lower()
+    if raw in ("left", "l", "левая", "л"):
+        return "Левая колея"
+    if raw in ("right", "r", "правая", "п"):
+        return "Правая колея"
+    if raw in ("both", "lr", "all", "обе", "обе колеи"):
+        return "Обе колеи"
+    return str(side)
+
+
+def _road_event_short(ev: Dict[str, Any]) -> str:
+    kind = _road_event_kind_label(str(ev.get("kind", "")))
+    side = _road_event_side_label(str(ev.get("side", "")))
+    start = float(ev.get("start_m", 0.0) or 0.0)
+    length = float(ev.get("length_m", 0.0) or 0.0)
+    depth = float(ev.get("depth_mm", 0.0) or 0.0)
+    if kind == "Яма":
+        return f"{kind} · {side}: s={start:.1f} м, L={length:.1f} м, глуб={depth:.0f} мм"
+    if kind == "Препятствие":
+        return f"{kind} · {side}: s={start:.1f} м, L={length:.1f} м, выс={depth:.0f} мм"
+    return f"{kind or 'Событие'} · {side}: s={start:.1f} м"
 
 
 def _derive_ring_road_state_flow(segments: List[Dict[str, Any]]) -> Tuple[List[Dict[str, float]], List[Dict[str, float]]]:
@@ -471,6 +554,7 @@ def _render_segment_editor(
                 options=["ISO8608", "SINE"],
                 index=0 if road_mode.startswith("ISO") else 1,
                 key=f"seg_road_mode_{uid}",
+                format_func=_road_mode_label,
                 help="ISO8608 — спектральная шероховатость по классу дороги. SINE — синус по каждой стороне отдельно.",
             )
         road["mode"] = road_mode
@@ -569,6 +653,7 @@ def _render_segment_editor(
                     options=list("ABCDEFGH"),
                     index=list("ABCDEFGH").index(iso_class),
                     key=f"seg_iso_class_{uid}",
+                    format_func=_iso_class_label,
                     help="Класс A — ровная, H — очень грубая. Внутри используется ISO 8608 спектр.",
                 )
             with cI2:
@@ -577,45 +662,45 @@ def _render_segment_editor(
                     options=gd_pick_options,
                     index=gd_pick_options.index(gd_pick),
                     key=f"seg_iso_gd_pick_{uid}",
-                    format_func=lambda x: {"lower": "нижний", "mid": "средний", "upper": "верхний"}.get(x, x),
+                    format_func=_iso_gd_pick_label,
                     help="Выбор нижней/средней/верхней границы диапазона класса ISO 8608.",
                 )
             with cI3:
                 road["gd_n0_scale"] = st.number_input(
-                    "Масштаб Gd(n0), ×",
+                    "Общая шероховатость Gd(n0), ×",
                     min_value=0.05,
                     max_value=10.0,
                     value=float(road.get("gd_n0_scale", 1.0)),
                     step=0.05,
                     key=f"seg_iso_gd_scale_{uid}",
-                    help="Множитель шероховатости внутри выбранного класса.",
+                    help="1.0 = типичный уровень выбранного класса. Больше 1.0 — грубее, меньше 1.0 — ровнее.",
                 )
 
             cI4, cI5, cI6 = st.columns(3)
             with cI4:
                 road["waviness_w"] = st.number_input(
-                    "Показатель waviness w",
+                    "Баланс длин волн (waviness w)",
                     min_value=1.0,
                     max_value=3.0,
                     value=float(road.get("waviness_w", 2.0)),
                     step=0.1,
                     key=f"seg_iso_w_{uid}",
-                    help="Показатель степенного закона PSD. Типичный инженерный выбор — около 2.",
+                    help="Меняет баланс между длинными и короткими неровностями в ISO-профиле. Типичный инженерный выбор — около 2.",
                 )
             with cI5:
                 road["left_right_coherence"] = st.slider(
-                    "Связь левый/правый трек",
+                    "Связь левой и правой колеи",
                     min_value=0.0,
                     max_value=1.0,
                     value=float(road.get("left_right_coherence", 0.5)),
                     step=0.05,
                     key=f"seg_iso_coh_{uid}",
-                    help="0 = независимые треки, 1 = одинаковые треки.",
+                    help="0 = колеи независимы, 1 = левая и правая колея полностью совпадают.",
                 )
             with cI6:
                 road["seed"] = int(
                     st.number_input(
-                        "Seed сегмента",
+                        "Seed ISO-сегмента",
                         min_value=0,
                         value=int(road.get("seed", 0) or 0),
                         step=1,
@@ -625,6 +710,9 @@ def _render_segment_editor(
                 )
 
             st.caption(
+                "ISO-пояснение: `Gd(n0)` задаёт общий уровень шероховатости внутри выбранного класса, "
+                "`waviness w` меняет баланс длинных и коротких волн, "
+                "`left_right_coherence` задаёт, насколько похожи левая и правая колеи. "
                 "`dx_m` задаётся один раз для всего кольца вверху редактора и сохраняется в ring_v2 spec как технический параметр генерации."
             )
         else:
@@ -917,7 +1005,16 @@ def _render_segment_editor(
         events = list(seg.get("events", []))
         # таблица существующих
         if events:
-            ev_df = pd.DataFrame(events)
+            ev_df = pd.DataFrame(
+                {
+                    "Тип": [_road_event_kind_label(ev.get("kind", "")) for ev in events],
+                    "Сторона": [_road_event_side_label(ev.get("side", "")) for ev in events],
+                    "Начало, м": [float(ev.get("start_m", 0.0) or 0.0) for ev in events],
+                    "Длина, м": [float(ev.get("length_m", 0.0) or 0.0) for ev in events],
+                    "Глубина/высота, мм": [float(ev.get("depth_mm", 0.0) or 0.0) for ev in events],
+                    "Сглаживание, м": [float(ev.get("ramp_m", 0.0) or 0.0) for ev in events],
+                }
+            )
             st.dataframe(ev_df, width="stretch", hide_index=True)
         else:
             st.caption("Событий пока нет.")
@@ -929,6 +1026,7 @@ def _render_segment_editor(
                     "Тип",
                     options=["яма", "препятствие"],
                     key=f"ev_kind_{uid}",
+                    format_func=_road_event_kind_label,
                     help="Яма — отрицательная глубина, препятствие — положительная.",
                 )
             with cE2:
@@ -936,6 +1034,7 @@ def _render_segment_editor(
                     "Сторона",
                     options=["left", "right", "both"],
                     key=f"ev_side_{uid}",
+                    format_func=_road_event_side_label,
                     help="left — левая колея, right — правая, both — обе.",
                 )
             with cE3:
@@ -993,18 +1092,6 @@ def _render_segment_editor(
                 st.rerun()
 
         if events:
-            def _road_event_short(ev: Dict[str, Any]) -> str:
-                kind = str(ev.get("kind", ""))
-                side = str(ev.get("side", ""))
-                start = float(ev.get("start_m", 0.0))
-                length = float(ev.get("length_m", 0.0))
-                depth = float(ev.get("depth_mm", 0.0))
-                if kind == "pothole":
-                    return f"Яма {side}: s={start:.1f} м, L={length:.1f} м, глуб={depth:.0f} мм"
-                if kind == "bump":
-                    return f"Препятствие {side}: s={start:.1f} м, L={length:.1f} м, выс={depth:.0f} мм"
-                return f"{kind or 'Событие'} {side}: s={start:.1f} м"
-
             cDel1, cDel2 = st.columns([3.0, 1.0])
             with cDel1:
                 options = list(range(1, len(events) + 1))
@@ -1217,6 +1304,7 @@ def render_ring_scenario_generator(
         v_ends.append(float(v_end))
         turn_i = str((seg.get("turn_direction") or _segment_motion_contract(seg, v_start_i)["turn_direction"]) or "STRAIGHT").upper()
         road_end_i = road_state_ends[i] if i < len(road_state_ends) else {"center_height_mm": 0.0, "cross_slope_pct": 0.0}
+        road_mode_i = str(((seg.get("road") or {}) if isinstance(seg.get("road"), dict) else {}).get("mode") or "ISO8608").upper()
 
         name_i = str(seg.get("name") or f"S{i+1}")
         seg_summaries.append(
@@ -1228,6 +1316,7 @@ def render_ring_scenario_generator(
                 "№": i + 1,
                 "Название": name_i,
                 "Поворот": _turn_direction_label(turn_i),
+                "Дорога": _road_mode_label(road_mode_i),
                 "v0, км/ч": float(f"{v_start_i:.1f}"),
                 "v1, км/ч": float(f"{v_end:.1f}"),
                 "≈длина, м": float(f"{seg_len:.1f}"),
@@ -1443,18 +1532,19 @@ def render_ring_scenario_generator(
             corrL_mm = float(1000.0 * abs(float((tracks.get("meta", {}) or {}).get("closure_correction_left_max_m", 0.0) or 0.0)))
             corrR_mm = float(1000.0 * abs(float((tracks.get("meta", {}) or {}).get("closure_correction_right_max_m", 0.0) or 0.0)))
             v_end_ring_kph = float(v_flow_kph2)
+            closure_policy_label = _closure_policy_label(closure_policy)
             cM1, cM2, cM3, cM4 = st.columns(4)
-            cM1.metric("Профиль ВСЕГО кольца: amplitude A L/R (служ.)", f"{ampL_mm:.1f} / {ampR_mm:.1f} мм")
-            cM2.metric("Профиль ВСЕГО кольца: p-p=max-min L/R (НЕ A)", f"{spanL_mm:.1f} / {spanR_mm:.1f} мм")
+            cM1.metric(RING_SUMMARY_LABEL_A, f"{ampL_mm:.1f} / {ampR_mm:.1f} мм")
+            cM2.metric(RING_SUMMARY_LABEL_P2P, f"{spanL_mm:.1f} / {spanR_mm:.1f} мм")
             cM3.metric("Шов круга L/R (после closure)", f"{seamL_mm:.1f} / {seamR_mm:.1f} мм")
             cM4.metric("Стык скорости start→end", f"{v0_eff_kph:.1f} → {v_end_ring_kph:.1f} км/ч")
             if str(closure_policy) == "closed_c1_periodic":
                 st.caption(
-                    f"closure_policy={closure_policy}. Кольцо замыкается плавной C1-коррекцией без линейной скрытой 'подтяжки': raw seam L/R = {rawSeamL_mm:.1f}/{rawSeamR_mm:.1f} мм, post seam = {seamL_mm:.1f}/{seamR_mm:.1f} мм, max correction = {corrL_mm:.1f}/{corrR_mm:.1f} мм. Коорд. x конца = {x_end_m:.2f} м."
+                    f"Режим замыкания кольца: {closure_policy_label} (closure_policy={closure_policy}). Кольцо замыкается плавной C1-коррекцией без линейной скрытой 'подтяжки': raw seam L/R = {rawSeamL_mm:.1f}/{rawSeamR_mm:.1f} мм, post seam = {seamL_mm:.1f}/{seamR_mm:.1f} мм, max correction = {corrL_mm:.1f}/{corrR_mm:.1f} мм. Коорд. x конца = {x_end_m:.2f} м."
                 )
             else:
                 st.caption(
-                    f"closure_policy={closure_policy}. Генератор не делает скрытых closure/baseline/mean корректировок: whole-ring p-p и amplitude A разделены намеренно, а шов показывается как есть. Коорд. x конца = {x_end_m:.2f} м."
+                    f"Режим замыкания кольца: {closure_policy_label} (closure_policy={closure_policy}). Генератор не делает скрытых closure/baseline/mean корректировок: whole-ring p-p и amplitude A разделены намеренно, а шов показывается как есть. Коорд. x конца = {x_end_m:.2f} м."
                 )
             if max(spanL_mm, spanR_mm) > 300.0:
                 st.warning(
@@ -1462,7 +1552,7 @@ def render_ring_scenario_generator(
                 )
             if str(closure_policy) == "strict_exact" and seam_mm > 20.0:
                 st.warning(
-                    f"Профиль не замыкается по высоте: шов круга L/R = {seamL_mm:.1f} / {seamR_mm:.1f} мм. Выбран strict_exact — генератор сохраняет профиль строго как задано и не скрывает это closure-коррекцией."
+                    f"Профиль не замыкается по высоте: шов круга L/R = {seamL_mm:.1f} / {seamR_mm:.1f} мм. Выбран режим «{closure_policy_label}» — генератор сохраняет профиль строго как задано и не скрывает это closure-коррекцией."
                 )
             if abs(v_end_ring_kph - v0_eff_kph) > 0.5:
                 st.warning(
@@ -1499,8 +1589,8 @@ def render_ring_scenario_generator(
                     st.markdown("#### Локальный предпросмотр выбранного сегмента")
                     cS1, cS2, cS3 = st.columns(3)
                     cS1.metric("Локальная x длина", f"{float(x_cur[-1] - x_cur[0]):.2f} м")
-                    cS2.metric("Локал. amplitude A L/R", f"{aL_local_mm:.1f} / {aR_local_mm:.1f} мм")
-                    cS3.metric("Локал. p-p=max-min L/R (НЕ A)", f"{spanL_local_mm:.1f} / {spanR_local_mm:.1f} мм")
+                    cS2.metric("Локальная амплитуда A L/R", f"{aL_local_mm:.1f} / {aR_local_mm:.1f} мм")
+                    cS3.metric("Локальный полный размах max-min L/R (не A)", f"{spanL_local_mm:.1f} / {spanR_local_mm:.1f} мм")
                     if cur_mode in ("SIN", "SINE", "SINUS", "SINUSOID"):
                         req_aL_mm = float(cur_road.get("aL_mm", 0.0) or 0.0)
                         req_aR_mm = float(cur_road.get("aR_mm", 0.0) or 0.0)
@@ -1525,23 +1615,23 @@ def render_ring_scenario_generator(
                             "Поворот": df_seg["turn_direction"].map(_turn_direction_label),
                             "v0, км/ч": df_seg["speed_start_kph"].round(2),
                             "v1, км/ч": df_seg["speed_end_kph"].round(2),
-                            "Дорога": df_seg["road_mode"],
+                            "Дорога": df_seg["road_mode"].map(_road_mode_label),
                             "x0, м": df_seg["x_start_m"].round(3),
                             "x1, м": df_seg["x_end_m"].round(3),
                             "L сегм., м": df_seg["length_m"].round(3),
                             "z центра 0→1, мм": (df_seg["center_height_end_mm"] - df_seg["center_height_start_mm"]).round(2),
                             "поперечный уклон 0→1, %": (df_seg["cross_slope_end_pct"] - df_seg["cross_slope_start_pct"]).round(2),
                             "x факт, м": df_seg["generated_x_local_end_m"].round(3),
-                            "Л A зад., мм": df_seg["aL_req_mm"].round(2),
+                            "Л A задано, мм": df_seg["aL_req_mm"].round(2),
                             "Л A факт, мм": df_seg["L_amp_mm"].round(2),
-                            "Л p-p, мм": df_seg["L_p2p_mm"].round(2),
-                            "Л z0→z1, мм": (df_seg["L_z_end_mm"] - df_seg["L_z_start_mm"]).round(2),
-                            "П A зад., мм": df_seg["aR_req_mm"].round(2),
+                            "Л полный размах, мм": df_seg["L_p2p_mm"].round(2),
+                            "Л перепад z0→z1, мм": (df_seg["L_z_end_mm"] - df_seg["L_z_start_mm"]).round(2),
+                            "П A задано, мм": df_seg["aR_req_mm"].round(2),
                             "П A факт, мм": df_seg["R_amp_mm"].round(2),
-                            "П p-p, мм": df_seg["R_p2p_mm"].round(2),
-                            "П z0→z1, мм": (df_seg["R_z_end_mm"] - df_seg["R_z_start_mm"]).round(2),
+                            "П полный размах, мм": df_seg["R_p2p_mm"].round(2),
+                            "П перепад z0→z1, мм": (df_seg["R_z_end_mm"] - df_seg["R_z_start_mm"]).round(2),
                         })
-                        st.caption("Сводка ниже специально разделяет amplitude A и peak-to-peak (p-p = max-min). Для синуса p-p = 2A, поэтому p-p нельзя читать как амплитуду A.")
+                        st.caption("Сводка ниже специально разделяет амплитуду A (полуразмах) и полный размах max-min. Для синуса полный размах = 2A, поэтому его нельзя читать как амплитуду A.")
                         st.dataframe(df_view, width="stretch", hide_index=True)
 
                     try:

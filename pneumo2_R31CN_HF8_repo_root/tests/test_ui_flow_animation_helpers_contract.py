@@ -10,6 +10,7 @@ from pneumo_solver_ui import ui_flow_animation_helpers
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+SURFACE_SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 
 
 class _FakeStreamlit:
@@ -154,11 +155,12 @@ def test_render_flow_animation_panel_empty_states() -> None:
 def test_entrypoints_use_shared_flow_animation_helper() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = SURFACE_SECTION_HELPERS_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_flow_animation_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_flow_animation_helpers import (" in heavy_text
-    assert "render_flow_animation_panel(" in app_text
-    assert "render_flow_animation_panel(" in heavy_text
+    assert "from pneumo_solver_ui.ui_flow_animation_helpers import render_flow_animation_panel" in surface_text
+    assert '"render_flow_tool_panel_fn": render_flow_animation_panel' in surface_text
+    assert "render_flow_animation_panel(" not in app_text
+    assert "render_flow_animation_panel(" not in heavy_text
     assert 'pick_edges = st.multiselect("Ветки для анимации"' not in app_text
     assert 'pick_edges = st.multiselect("Ветки для анимации"' not in heavy_text
     assert 'render_flow_panel_html(time_s=time_s, edge_series=edge_series, height=560)' not in app_text

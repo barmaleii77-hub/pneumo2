@@ -72,6 +72,53 @@ def _fit_linear(X: np.ndarray, y: np.ndarray):
     return float(coef[0]), float(coef[1]), float(r2)
 
 
+def _select_fit_window(df_main: pd.DataFrame, fit_cycles: int, period_s: float) -> pd.DataFrame:
+    if df_main is None or len(df_main) <= 0:
+        raise RuntimeError("simulate() returned empty df_main")
+    t = np.asarray(df_main["время_с"].to_numpy(), dtype=float).reshape(-1)
+    if t.size <= 0:
+        raise RuntimeError("df_main has empty time axis")
+    t_last = float(np.nanmax(t))
+    fit_span = max(0.0, float(fit_cycles) * float(period_s))
+    t0_fit = t_last - fit_span
+    mask = t >= t0_fit - 1e-12
+    dfw = df_main.loc[mask].copy()
+    if len(dfw) >= 3:
+        return dfw
+    tail_rows = max(3, min(len(df_main), 256))
+    return df_main.tail(tail_rows).copy()
+
+
+def _energy_sum_by_group(df_ecat: pd.DataFrame | None, group_substr: str) -> float:
+    if df_ecat is None or len(df_ecat) <= 0:
+        return 0.0
+    if "группа" not in df_ecat.columns:
+        return 0.0
+    energy_col = None
+    for candidate in ("энергия_потерь_Дж", "энергия_Дж"):
+        if candidate in df_ecat.columns:
+            energy_col = candidate
+            break
+    if energy_col is None:
+        return 0.0
+    mask = df_ecat["группа"].astype(str).str.contains(str(group_substr), case=False, regex=False)
+    return float(df_ecat.loc[mask, energy_col].sum())
+
+
+def _dataframe_to_markdown_fallback(df: pd.DataFrame) -> str:
+    try:
+        return str(df.to_markdown(index=False))
+    except Exception:
+        cols = [str(c) for c in list(df.columns)]
+        header = "| " + " | ".join(cols) + " |"
+        sep = "|" + "|".join(["---"] * len(cols)) + "|"
+        rows = []
+        for _, row in df.iterrows():
+            vals = [str(row[c]).replace("\r", " ").replace("\n", " ") for c in df.columns]
+            rows.append("| " + " | ".join(vals) + " |")
+        return "\n".join([header, sep, *rows])
+
+
 def run_once(model_name: str, params: Dict, mode: str, freq_hz: float, A: float, dt: float, settle_cycles: int, fit_cycles: int) -> Dict:
     ui_root = _ensure_repo_importable()
     model = importlib.import_module(model_name)
@@ -92,13 +139,12 @@ def run_once(model_name: str, params: Dict, mode: str, freq_hz: float, A: float,
             "ax_func": (lambda t: 0.0),
             "ay_func": (lambda t: 0.0),
         },
+        dt=dt,
+        t_end=t_end,
     )
 
     # fit window
-    t = df_main["время_с"].to_numpy()
-    t0_fit = t_end - fit_cycles * T
-    mask = t >= t0_fit
-    dfw = df_main.loc[mask].copy()
+    dfw = _select_fit_window(df_main, fit_cycles=fit_cycles, period_s=T)
 
     if mode == "roll":
         y = dfw["момент_крен_подвеска_Нм"].to_numpy()
@@ -119,8 +165,8 @@ def run_once(model_name: str, params: Dict, mode: str, freq_hz: float, A: float,
     K, C, r2 = _fit_linear(np.column_stack([x1, x2]), y)
 
     # basic energy summary
-    E_dross = float(df_Ecat.loc[df_Ecat["группа"].astype(str).str.contains("дрос", case=False, regex=False), "энергия_потерь_Дж"].sum()) if (df_Ecat is not None and len(df_Ecat)) else 0.0
-    E_exh = float(df_Ecat.loc[df_Ecat["группа"].astype(str).str.contains("вых", case=False, regex=False), "энергия_потерь_Дж"].sum()) if (df_Ecat is not None and len(df_Ecat)) else 0.0
+    E_dross = _energy_sum_by_group(df_Ecat, "дрос")
+    E_exh = _energy_sum_by_group(df_Ecat, "вых")
 
     return {
         "mode": mode,
@@ -195,7 +241,7 @@ def main() -> int:
     md.append(f"- freq: {args.freq} Hz, A: {args.A} m, dt: {args.dt} s\n")
     md.append(f"- p3_bar_g: {args.p3_bar_g}\n")
     md.append(f"- pacc_bar_g: {args.pacc_bar_g}\n\n")
-    md.append(df.sort_values(["p3_bar_g", "pacc_bar_g"]).to_markdown(index=False))
+    md.append(_dataframe_to_markdown_fallback(df.sort_values(["p3_bar_g", "pacc_bar_g"])))
     md.append("\n")
 
     (out_dir / "pressure_sweep_report.md").write_text("\n".join(md), encoding="utf-8")

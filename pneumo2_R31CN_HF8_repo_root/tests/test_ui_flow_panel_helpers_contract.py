@@ -8,6 +8,7 @@ from pneumo_solver_ui import ui_flow_panel_helpers
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+SURFACE_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 
 
 def test_render_flow_panel_html_renders_payload_via_components_html(monkeypatch) -> None:
@@ -40,9 +41,10 @@ def test_render_flow_panel_html_renders_payload_via_components_html(monkeypatch)
 def test_entrypoints_use_shared_flow_panel_helper_without_local_duplicates() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    surface_text = SURFACE_HELPERS_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_flow_panel_helpers import render_flow_panel_html" in app_text
-    assert "from pneumo_solver_ui.ui_flow_panel_helpers import render_flow_panel_html" in heavy_text
+    assert "from pneumo_solver_ui.ui_flow_panel_helpers import render_flow_panel_html" in surface_text
+    assert '"render_flow_panel_html_fn": render_flow_panel_html' in surface_text
     assert "def render_flow_panel_html(" not in app_text
     assert "def render_flow_panel_html(" not in heavy_text
     assert "components.html(html, height=height, scrolling=True)" not in app_text

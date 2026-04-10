@@ -8,6 +8,8 @@ from pneumo_solver_ui import ui_event_panel_helpers
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "pneumo_solver_ui" / "app.py"
 HEAVY_PATH = REPO_ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py"
+PLAYHEAD_SECTION_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_playhead_section_helpers.py"
+SURFACE_HELPERS_PATH = REPO_ROOT / "pneumo_solver_ui" / "ui_results_surface_section_helpers.py"
 
 
 class _Context:
@@ -104,11 +106,12 @@ def test_render_event_alerts_panel_updates_playhead_on_jump(monkeypatch) -> None
 def test_entrypoints_use_shared_event_panel_helper() -> None:
     app_text = APP_PATH.read_text(encoding="utf-8")
     heavy_text = HEAVY_PATH.read_text(encoding="utf-8")
+    playhead_text = PLAYHEAD_SECTION_HELPERS_PATH.read_text(encoding="utf-8")
+    surface_text = SURFACE_HELPERS_PATH.read_text(encoding="utf-8")
 
-    assert "from pneumo_solver_ui.ui_event_panel_helpers import (" in app_text
-    assert "from pneumo_solver_ui.ui_event_panel_helpers import (" in heavy_text
-    assert "render_event_alerts_panel(" in app_text
-    assert "render_event_alerts_panel(" in heavy_text
+    assert "from pneumo_solver_ui.ui_event_panel_helpers import render_event_alerts_panel" in playhead_text
+    assert "render_event_alerts_panel_fn(" in playhead_text
+    assert "render_playhead_results_section_fn=render_playhead_results_section" in surface_text
     assert "df_events_view = pd.DataFrame([" not in app_text
     assert "df_events_view = pd.DataFrame([" not in heavy_text
     assert 'st.button("Перейти (jump playhead)", key="events_jump_btn")' not in app_text
