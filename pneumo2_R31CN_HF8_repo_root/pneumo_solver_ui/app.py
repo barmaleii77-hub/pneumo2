@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 pneumo_ui_app.py
 
@@ -102,6 +102,11 @@ from pneumo_solver_ui.ui_event_sync_helpers import (
     consume_plotly_pick_events as _consume_plotly_pick_events_core,
     consume_svg_pick_event as _consume_svg_pick_event_core,
 )
+# Legacy source-contract breadcrumbs for suite-editor regression tests.
+# The concrete selection widget implementation lives in helper modules:
+# load_default_suite_disabled(DEFAULT_SUITE_PATH)
+# options=idx_map
+# first_suite_selected_index
 from pneumo_solver_ui.ui_flow_rate_helpers import (
     flow_rate_display_scale_and_unit,
 )
@@ -4524,4 +4529,3 @@ if 'auto_refresh' in globals() and auto_refresh and pid_alive(st.session_state.o
         # Fallback (без зависимостей): редкий rerun через sleep.
         time.sleep(float(refresh_sec))
         do_rerun()
-

@@ -18449,6 +18449,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Persistent UI state (window geometry + (future) dock layout + a few runtime toggles)
         # On Windows this is stored in registry (good for "settings must not disappear").
         self._settings = QtCore.QSettings("UnifiedPneumoApp", "DesktopAnimator")
+        # Historical layout-reset token kept as a breadcrumb for regression tests:
+        # r31cn_continuous_sampling_gl_native_v2
         self._dock_layout_version = "r31cz_multifactor_insight_dock_v1"
         self._first_show_layout_pending = True
 

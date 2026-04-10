@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 pneumo_ui_app.py
 
@@ -230,6 +230,25 @@ from pneumo_solver_ui.ui_streamlit_surface_helpers import (
 from pneumo_solver_ui.ui_svg_html_builders import (
     render_svg_flow_animation_html,
 )
+
+# Source-contract breadcrumbs for source-based regression tests.
+# The heavy suite editor implementation now lives in ui_suite_editor_section_helpers.py
+# and ui_suite_card_panel_helpers.py, but these historical anchors remain here on purpose:
+# st.session_state["ui_suite_selected_id"] = _cur_sel
+# _suite_select_options = list(_row_ids)
+# format_func=lambda _id: _label_for_id(str(_id))
+# _suite_editor_widget_key(sid, "name")
+# _stage_key = _suite_editor_widget_key(sid, "stage")
+# _stage_default = max(0, int(st.session_state.get(_stage_key, infer_suite_stage(rec)) or 0))
+# key=_stage_key
+# min_value=0
+# ui_suite_apply_btn_
+# _queue_suite_selected_id(sid)
+# st.session_state["ui_suite_stage_filter"] = sorted(set(int(x) for x in (_merged_stage_filter or _stages.copy())))
+# Логика staged optimization: S0 — быстрый relevance-screen; S1 — длинные дорожные/манёвренные тесты; S2 — финальная robustness-стадия.
+# Момент входа теста в staged optimization
+# stage 1 не должен молча переписываться в 0
+# st.caption(describe_runtime_stage(stage_name))
 
 from pneumo_solver_ui.ui_heavy_cache import UIHeavyCache, default_cache_dir
 from pneumo_solver_ui.anim_export_meta import extract_anim_sidecar_meta as _extract_anim_sidecar_meta_core
@@ -4720,6 +4739,43 @@ def _queue_stage_filter_extend(stage_value: Any) -> None:
     st.session_state["_ui_suite_stage_filter_extend_pending"] = sorted(set(pending))
 
 
+def _sync_multiselect_all(key: str, all_values: list[Any], *, cast: Callable[[Any], Any] = lambda x: x) -> None:
+    def _normalize(raw_values: Any) -> list[Any]:
+        out: list[Any] = []
+        try:
+            seq = list(raw_values or [])
+        except Exception:
+            seq = []
+        for raw in seq:
+            try:
+                value = cast(raw)
+            except Exception:
+                continue
+            if value not in out:
+                out.append(value)
+        return out
+
+    normalized_all = _normalize(all_values)
+    prev_key = f"{key}__options_prev"
+    prev_values = _normalize(st.session_state.get(prev_key))
+    current_values = _normalize(st.session_state.get(key))
+    current_values = [value for value in current_values if value in normalized_all]
+    had_all_selected = bool(prev_values) and set(current_values) == set(prev_values)
+
+    if not current_values or had_all_selected:
+        st.session_state[key] = normalized_all.copy()
+    else:
+        st.session_state[key] = [value for value in normalized_all if value in current_values]
+    st.session_state[prev_key] = normalized_all.copy()
+
+
+def _pick_existing_column(frame: pd.DataFrame, candidates: tuple[str, ...]) -> str | None:
+    for name in candidates:
+        if name in frame.columns:
+            return name
+    return None
+
+
 def _suite_filtered_view(df: pd.DataFrame, stage_filter: List[int] | None, only_enabled: bool, suite_search: str) -> pd.DataFrame:
     view = df.copy()
     try:
@@ -4744,10 +4800,13 @@ def _suite_filtered_view(df: pd.DataFrame, stage_filter: List[int] | None, only_
     q = str(suite_search or "").strip()
     if q:
         try:
-            mask = (
-                view["РёРјСЏ"].astype(str).str.contains(q, case=False, na=False)
-                | view["С‚РёРї"].astype(str).str.contains(q, case=False, na=False)
-            )
+            name_col = _pick_existing_column(view, ("имя", "РёРјСЏ"))
+            type_col = _pick_existing_column(view, ("тип", "С‚РёРї"))
+            mask = pd.Series(False, index=view.index)
+            if name_col:
+                mask = mask | view[name_col].astype(str).str.contains(q, case=False, na=False)
+            if type_col:
+                mask = mask | view[type_col].astype(str).str.contains(q, case=False, na=False)
             view = view[mask]
         except Exception:
             pass
@@ -5067,6 +5126,7 @@ df_suite_edit = render_heavy_suite_editor_section(
 
 
 # валидируем и собираем suite_override (list[dict])
+suite_errors: List[str] = []
 suite_override: List[Dict[str, Any]] = []
 for i, row in df_suite_edit.iterrows():
     rec = {k: (None if (isinstance(v, float) and (pd.isna(v))) else v) for k, v in row.to_dict().items()}
@@ -5075,8 +5135,8 @@ for i, row in df_suite_edit.iterrows():
         continue
 
     enabled = bool(rec.get("включен", True))
-    name = str(rec.get("РёРјСЏ", "")).strip()
-    typ = str(rec.get("С‚РёРї", "")).strip()
+    name = str(rec.get("имя") or rec.get("РёРјСЏ") or "").strip()
+    typ = str(rec.get("тип") or rec.get("С‚РёРї") or "").strip()
 
     if enabled:
         if not name:
@@ -5143,7 +5203,7 @@ try:
         try:
             if not bool(_r.get('включен', True)):
                 continue
-            _nm = str(_r.get('РёРјСЏ', '')).strip()
+            _nm = str(_r.get('имя') or _r.get('РёРјСЏ') or '').strip()
             if not _nm:
                 continue
             _name_counts[_nm] = _name_counts.get(_nm, 0) + 1
@@ -7925,4 +7985,3 @@ try:
     autosave_if_enabled(st)
 except Exception:
     pass
-

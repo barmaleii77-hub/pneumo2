@@ -1471,42 +1471,44 @@ class ExperimentDB:
         trials = self.fetch_trials(run_id, status=None, limit=None, order="created_ts")
         metrics = self.fetch_metrics(run_id, key=None, limit=10_000)
 
-        (outp / "run_scope.json").write_text(
-            _json_dumps(run_scope),
-            encoding="utf-8",
-        )
+        def _write_run_scope_sidecars() -> None:
+            run_scope_json = outp / "run_scope.json"
+            with open(run_scope_json, "w", encoding="utf-8", newline="") as f_json:
+                f_json.write(_json_dumps(run_scope))
 
-        run_scope_csv = outp / "run_scope.csv"
-        with run_scope_csv.open("w", encoding="utf-8", newline="") as f:
-            w = csv.writer(f)
-            w.writerow(
-                [
-                    "run_id",
-                    "created_ts",
-                    "backend",
-                    "created_by",
-                    "problem_hash",
-                    "problem_hash_short",
-                    "problem_hash_mode",
-                    "objective_keys_json",
-                    "penalty_key",
-                    "penalty_tol",
-                ]
-            )
-            w.writerow(
-                [
-                    run_scope.get("run_id", ""),
-                    run_scope.get("created_ts"),
-                    run_scope.get("backend", ""),
-                    run_scope.get("created_by", ""),
-                    run_scope.get("problem_hash", ""),
-                    run_scope.get("problem_hash_short", ""),
-                    run_scope.get("problem_hash_mode", ""),
-                    _json_dumps(run_scope.get("objective_keys") or []),
-                    run_scope.get("penalty_key", ""),
-                    run_scope.get("penalty_tol"),
-                ]
-            )
+            run_scope_csv = outp / "run_scope.csv"
+            with open(run_scope_csv, "w", encoding="utf-8", newline="") as f_csv:
+                w = csv.writer(f_csv)
+                w.writerow(
+                    [
+                        "run_id",
+                        "created_ts",
+                        "backend",
+                        "created_by",
+                        "problem_hash",
+                        "problem_hash_short",
+                        "problem_hash_mode",
+                        "objective_keys_json",
+                        "penalty_key",
+                        "penalty_tol",
+                    ]
+                )
+                w.writerow(
+                    [
+                        run_scope.get("run_id", ""),
+                        run_scope.get("created_ts"),
+                        run_scope.get("backend", ""),
+                        run_scope.get("created_by", ""),
+                        run_scope.get("problem_hash", ""),
+                        run_scope.get("problem_hash_short", ""),
+                        run_scope.get("problem_hash_mode", ""),
+                        _json_dumps(run_scope.get("objective_keys") or []),
+                        run_scope.get("penalty_key", ""),
+                        run_scope.get("penalty_tol"),
+                    ]
+                )
+
+        _write_run_scope_sidecars()
 
         # Trials CSV
         trials_csv = outp / "trials.csv"
@@ -1581,3 +1583,6 @@ class ExperimentDB:
                         _json_dumps(m.get("json")),
                     ]
                 )
+
+        if not (outp / "run_scope.json").exists() or not (outp / "run_scope.csv").exists():
+            _write_run_scope_sidecars()
