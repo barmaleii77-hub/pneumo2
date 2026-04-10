@@ -31,6 +31,13 @@ def _run_git_lines(repo_root: Path, *args: str) -> list[str]:
     return [line.rstrip() for line in output.splitlines() if line.strip()]
 
 
+def _git_toplevel(repo_root: Path) -> Path:
+    output = _run_git(repo_root, "rev-parse", "--show-toplevel")
+    if output:
+        return Path(output).resolve()
+    return repo_root.resolve()
+
+
 def _repo_rel(path: Path, repo_root: Path) -> str:
     try:
         return path.resolve().relative_to(repo_root.resolve()).as_posix()
@@ -48,8 +55,8 @@ def _list_relative_files(base_dir: Path, repo_root: Path) -> list[str]:
     )
 
 
-def _list_portable_entries(repo_root: Path) -> list[str]:
-    portable_root = repo_root.parent / "local_portable_release"
+def _list_portable_entries(git_root: Path) -> list[str]:
+    portable_root = git_root / "local_portable_release"
     if not portable_root.exists():
         return []
     return sorted(str(path.resolve()) for path in portable_root.iterdir())
@@ -96,44 +103,55 @@ def _parse_divergence(raw_counts: str) -> tuple[int, int]:
 
 
 def collect_handoff_snapshot(repo_root: Path, notes: list[str] | None = None) -> dict[str, Any]:
-    repo_root = repo_root.resolve()
-    head_commit = _run_git(repo_root, "rev-parse", "HEAD")
-    upstream = _run_git(repo_root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
-    divergence = _run_git(repo_root, "rev-list", "--left-right", "--count", "HEAD...@{u}") if upstream else ""
+    project_root = repo_root.resolve()
+    git_root = _git_toplevel(project_root)
+    head_commit = _run_git(git_root, "rev-parse", "HEAD")
+    upstream = _run_git(git_root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+    divergence = _run_git(git_root, "rev-list", "--left-right", "--count", "HEAD...@{u}") if upstream else ""
     ahead, behind = _parse_divergence(divergence)
-    local_at_head, remote_at_head = _branches_at_head(repo_root, head_commit)
+    local_at_head, remote_at_head = _branches_at_head(git_root, head_commit)
 
-    context_files = _list_relative_files(repo_root / "docs" / "context", repo_root)
+    context_files = _list_relative_files(project_root / "docs" / "context", git_root)
     derived_context_docs = sorted(
-        _repo_rel(path, repo_root)
-        for path in (repo_root / "docs").glob("*RequirementsFromContext*")
+        _repo_rel(path, git_root)
+        for path in (project_root / "docs").glob("*RequirementsFromContext*")
         if path.is_file()
     )
+    handoff_writer = _repo_rel(project_root / "pneumo_solver_ui" / "tools" / "write_codex_handoff.py", git_root)
+    quick_save_command = _repo_rel(project_root / "SAVE_CODEX_CONTEXT_TO_GITHUB.cmd", git_root)
+    handoff_contract_test = _repo_rel(project_root / "tests" / "test_codex_github_handoff_contract.py", git_root)
+    project_root_from_git = _repo_rel(project_root, git_root)
 
     return {
         "generated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
-        "repo_root": str(repo_root),
-        "origin_url": _run_git(repo_root, "remote", "get-url", "origin"),
-        "branch": _run_git(repo_root, "rev-parse", "--abbrev-ref", "HEAD"),
+        "git_root": str(git_root),
+        "project_root": str(project_root),
+        "project_root_from_git": project_root_from_git,
+        "origin_url": _run_git(git_root, "remote", "get-url", "origin"),
+        "branch": _run_git(git_root, "rev-parse", "--abbrev-ref", "HEAD"),
         "head_commit": head_commit,
         "head_short": head_commit[:7] if head_commit else "",
         "upstream": upstream,
         "ahead": ahead,
         "behind": behind,
-        "status_lines": _run_git_lines(repo_root, "status", "--short", "--branch"),
-        "recent_commits": _run_git_lines(repo_root, "log", "--oneline", "-10"),
-        "stash_lines": _run_git_lines(repo_root, "stash", "list", "--max-count=10"),
-        "worktree_lines": _run_git_lines(repo_root, "worktree", "list"),
+        "status_lines": _run_git_lines(git_root, "status", "--short", "--branch"),
+        "recent_commits": _run_git_lines(git_root, "log", "--oneline", "-10"),
+        "stash_lines": _run_git_lines(git_root, "stash", "list", "--max-count=10"),
+        "worktree_lines": _run_git_lines(git_root, "worktree", "list"),
         "local_branches_at_head": local_at_head,
         "remote_branches_at_head": remote_at_head,
         "synced_context_files": context_files,
         "derived_context_docs": derived_context_docs,
-        "portable_entries": _list_portable_entries(repo_root),
+        "portable_entries": _list_portable_entries(git_root),
+        "handoff_writer": handoff_writer,
+        "quick_save_command": quick_save_command,
+        "handoff_contract_test": handoff_contract_test,
+        "resume_prompt": f"Read {project_root_from_git}/docs/context/CODEX_HANDOFF_LATEST.md and continue from the saved branch.",
         "not_synced_items": [
             "live Codex chat thread state",
             "git stashes and local worktrees themselves",
             ".venv virtual environment",
-            "../local_portable_release/",
+            "local_portable_release/ unless explicitly added to git",
         ],
         "notes": list(notes or []),
     }
@@ -165,7 +183,9 @@ def render_handoff_markdown(snapshot: dict[str, Any]) -> str:
     lines.append("# Codex Handoff Latest")
     lines.append("")
     lines.append(f"Generated: `{snapshot.get('generated_at', '')}`")
-    lines.append(f"Repo root: `{snapshot.get('repo_root', '')}`")
+    lines.append(f"Git root: `{snapshot.get('git_root', '')}`")
+    lines.append(f"Project root: `{snapshot.get('project_root', '')}`")
+    lines.append(f"Project root from git: `{snapshot.get('project_root_from_git', '')}`")
     lines.append(f"Origin: `{snapshot.get('origin_url', '')}`")
     lines.append("")
     lines.append("## Current Git state")
@@ -221,6 +241,12 @@ def render_handoff_markdown(snapshot: dict[str, Any]) -> str:
     lines.append("- The generated handoff files: `docs/context/CODEX_HANDOFF_LATEST.md` and `docs/context/CODEX_HANDOFF_LATEST.json`.")
     lines.append("- Existing long-lived context artifacts already committed in this repository.")
     lines.append("")
+    lines.append("## Refresh tools")
+    lines.append("")
+    lines.append(f"- Quick save command: `{snapshot.get('quick_save_command', '')}`")
+    lines.append(f"- Handoff writer: `{snapshot.get('handoff_writer', '')}`")
+    lines.append(f"- Contract test: `{snapshot.get('handoff_contract_test', '')}`")
+    lines.append("")
     lines.append("## What GitHub does not sync")
     lines.append("")
     for item in snapshot.get("not_synced_items", []):
@@ -241,13 +267,21 @@ def render_handoff_markdown(snapshot: dict[str, Any]) -> str:
     for path in derived_docs:
         lines.append(f"- `{path}`")
     lines.append("")
+    lines.append("## Update workflow")
+    lines.append("")
+    lines.append("1. Open the project root recorded above.")
+    lines.append(f"2. Run `{snapshot.get('quick_save_command', '')}`.")
+    lines.append("3. Review `docs/context/CODEX_HANDOFF_LATEST.md`.")
+    lines.append(f"4. Run `{snapshot.get('handoff_contract_test', '')}`.")
+    lines.append("5. Commit and push the refreshed context together with the code changes you want to preserve.")
+    lines.append("")
     lines.append("## Continue on another machine")
     lines.append("")
     lines.append("1. `git pull` the target branch.")
     lines.append("2. Open `docs/context/CODEX_HANDOFF_LATEST.md` and `docs/context/CODEX_GITHUB_SYNC.md` first.")
     lines.append("3. Recreate `.venv` if needed, because environments do not move through Git.")
     lines.append("4. Treat stash/worktree lines in this file as references only; they are not transferred automatically.")
-    lines.append("5. Resume from the branch recorded above, usually with a prompt like: `Read docs/context/CODEX_HANDOFF_LATEST.md and continue from main.`")
+    lines.append(f"5. Resume from the branch recorded above, usually with a prompt like: `{snapshot.get('resume_prompt', '')}`")
     lines.append("")
     return "\n".join(lines) + "\n"
 

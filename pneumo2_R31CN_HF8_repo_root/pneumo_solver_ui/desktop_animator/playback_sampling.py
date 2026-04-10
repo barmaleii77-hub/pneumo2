@@ -87,6 +87,44 @@ def lerp_series_value(
     return float(default)
 
 
+def lerp_wrapped_angle_value(
+    series: np.ndarray | list[float] | tuple[float, ...],
+    *,
+    i0: int,
+    i1: int,
+    alpha: float,
+    default: float = 0.0,
+    period: float = 2.0 * math.pi,
+) -> float:
+    """Return a shortest-path interpolated angle from a wrapped 1D series.
+
+    This avoids false large jumps when the source crosses the wrap boundary
+    (for example, yaw moving from ``+pi`` to ``-pi``).
+    """
+    arr = np.asarray(series, dtype=float).reshape(-1)
+    if arr.size == 0:
+        return float(default)
+    a = int(max(0, min(int(i0), int(arr.size) - 1)))
+    b = int(max(0, min(int(i1), int(arr.size) - 1)))
+    v0 = float(arr[a])
+    if a == b or alpha <= 1e-12:
+        return v0 if math.isfinite(v0) else float(default)
+    v1 = float(arr[b])
+    if not math.isfinite(v0) and not math.isfinite(v1):
+        return float(default)
+    if not math.isfinite(v0):
+        return v1
+    if not math.isfinite(v1):
+        return v0
+    period_v = float(abs(period))
+    if not math.isfinite(period_v) or period_v <= 1e-12:
+        return float((1.0 - float(alpha)) * v0 + float(alpha) * v1)
+    half = 0.5 * period_v
+    delta = float((v1 - v0 + half) % period_v) - half
+    out = float(v0 + float(alpha) * delta)
+    return float((out + half) % period_v) - half
+
+
 def lerp_point_row(
     rows_xyz: np.ndarray,
     *,
