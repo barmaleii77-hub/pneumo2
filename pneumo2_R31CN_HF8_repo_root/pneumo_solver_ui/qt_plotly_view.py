@@ -23,10 +23,25 @@ from typing import Any, Dict, Iterable, List, Optional
 import json
 
 try:
-    from PySide6 import QtCore, QtWidgets
+    from PySide6 import QtCore, QtGui, QtWidgets
 except Exception:  # pragma: no cover
     QtCore = None  # type: ignore
+    QtGui = None  # type: ignore
     QtWidgets = None  # type: ignore
+
+try:
+    import plotly.graph_objects as go  # type: ignore
+    import plotly.io as pio  # type: ignore
+except Exception:  # pragma: no cover
+    go = None  # type: ignore
+    pio = None  # type: ignore
+
+try:  # pragma: no cover - optional runtime dependency
+    import kaleido  # type: ignore  # noqa: F401
+
+    HAVE_KALEIDO = True
+except Exception:  # pragma: no cover
+    HAVE_KALEIDO = False
 
 
 HAVE_QTWEBENGINE = False
@@ -82,6 +97,7 @@ class PlotlyWebView(QtWidgets.QWidget):  # type: ignore[misc]
 
         self._bridge = None
         self._view = None
+        self._last_spec: Optional[PlotlyHtmlSpec] = None
 
         if not HAVE_QTWEBENGINE:
             msg = QtWidgets.QLabel(
@@ -112,6 +128,13 @@ class PlotlyWebView(QtWidgets.QWidget):  # type: ignore[misc]
 
     def set_figure(self, spec: PlotlyHtmlSpec) -> None:
         """Render plotly figure. Safe to call often."""
+
+        self._last_spec = PlotlyHtmlSpec(
+            fig_json=dict(spec.fig_json or {}),
+            title=str(spec.title or ""),
+            allow_select=bool(spec.allow_select),
+            plotly_js=str(spec.plotly_js or "cdn"),
+        )
 
         if not HAVE_QTWEBENGINE or self._view is None:
             return
@@ -198,3 +221,34 @@ gd.on('plotly_click', function(ev){ _sendRuns(_extractRuns(ev)); });
             self._view.setHtml(html)
         except Exception:
             return
+
+    def render_static_qimage(self, *, width: int, height: int, scale: float = 1.0):
+        """Best-effort static Plotly render for PNG export workflows."""
+
+        if QtGui is None or go is None or pio is None or (not HAVE_KALEIDO):
+            return None
+        spec = self._last_spec
+        if spec is None or not isinstance(spec.fig_json, dict) or not spec.fig_json:
+            return None
+        try:
+            fig = go.Figure(spec.fig_json)
+        except Exception:
+            return None
+        try:
+            png_bytes = pio.to_image(
+                fig,
+                format="png",
+                width=max(64, int(width)),
+                height=max(64, int(height)),
+                scale=max(1.0, float(scale)),
+            )
+        except Exception:
+            return None
+        image = QtGui.QImage()
+        try:
+            image.loadFromData(png_bytes, "PNG")
+        except Exception:
+            return None
+        if image.isNull():
+            return None
+        return image
