@@ -250,18 +250,11 @@ def _desktop_mnemo_deps_info() -> Tuple[bool, str]:
         has_pyside6 = False
 
     try:
-        from PySide6 import QtWebChannel  # noqa: F401
+        from PySide6 import QtSvg  # noqa: F401
 
-        has_webchannel = True
+        has_qtsvg = True
     except Exception:
-        has_webchannel = False
-
-    try:
-        from PySide6 import QtWebEngineWidgets  # noqa: F401
-
-        has_webengine = True
-    except Exception:
-        has_webengine = False
+        has_qtsvg = False
 
     try:
         import pyqtgraph  # noqa: F401
@@ -270,15 +263,15 @@ def _desktop_mnemo_deps_info() -> Tuple[bool, str]:
     except Exception:
         has_pg = False
 
-    ok = bool(has_pyside6 and has_webengine and has_webchannel and has_pg)
+    ok = bool(has_pyside6 and has_pg)
     if ok:
-        return True, "PySide6 + QtWebEngine + QtWebChannel + pyqtgraph готовы."
+        if has_qtsvg:
+            return True, "PySide6 + QtSvg + pyqtgraph готовы."
+        return True, "PySide6 + pyqtgraph готовы; QtSvg не найден, будет painter fallback."
 
     need = []
     if not has_pyside6:
         need.append("PySide6")
-    if has_pyside6 and (not has_webengine or not has_webchannel):
-        need.append("PySide6 (QtWebEngine/WebChannel)")
     if not has_pg:
         need.append("pyqtgraph")
     return False, "Не хватает зависимостей: " + ", ".join(need)

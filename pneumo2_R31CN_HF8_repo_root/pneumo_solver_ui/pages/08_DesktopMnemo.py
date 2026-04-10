@@ -316,8 +316,7 @@ try:
 except Exception:
     has_pyside6 = False
 
-has_webengine = bool(has_pyside6 and importlib.util.find_spec("PySide6.QtWebEngineWidgets") is not None)
-has_webchannel = bool(has_pyside6 and importlib.util.find_spec("PySide6.QtWebChannel") is not None)
+has_qtsvg = bool(has_pyside6 and importlib.util.find_spec("PySide6.QtSvg") is not None)
 
 try:
     import pyqtgraph  # noqa: F401
@@ -328,14 +327,13 @@ except Exception:
 
 rows = [
     {"module": "PySide6", "ok": has_pyside6, "note": "Qt окно и docking UI"},
-    {"module": "PySide6.QtWebEngineWidgets", "ok": has_webengine, "note": "рендер анимированной мнемосхемы"},
-    {"module": "PySide6.QtWebChannel", "ok": has_webchannel, "note": "мост между Qt и HTML мнемосхемой"},
+    {"module": "PySide6.QtSvg", "ok": has_qtsvg, "note": "нативный SVG background для мнемосхемы (есть painter fallback)"},
     {"module": "pyqtgraph", "ok": has_pyqtgraph, "note": "тренды и быстрые инженерные графики"},
 ]
 st.dataframe(rows, width="stretch", hide_index=True)
 
 need: list[str] = []
-if not has_pyside6 or not has_webengine or not has_webchannel:
+if not has_pyside6:
     need.append("PySide6")
 if not has_pyqtgraph:
     need.append("pyqtgraph")
@@ -344,7 +342,7 @@ if need:
     deduped = list(dict.fromkeys(need))
     st.warning(
         "Не хватает зависимостей для Desktop Mnemo. Обычно достаточно установить PySide6 и pyqtgraph. "
-        "После установки страница сама перезапустится."
+        "Qt WebEngine больше не нужен: окно рендерит мнемосхему нативно через Qt painter."
     )
     if st.button(f"Установить: {', '.join(deduped)}", width="stretch"):
         rc, _out = _pip_install_stream(deduped, label="Установка Desktop Mnemo")

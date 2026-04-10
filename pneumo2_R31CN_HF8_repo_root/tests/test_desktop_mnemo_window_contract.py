@@ -40,10 +40,20 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert "Экспорт событий" in src
     assert "_write_event_log_sidecar" in src
     assert "desktop_mnemo_events.json" in src
-    assert "window.codexMnemoDispatch" in src
-    assert "window.codexMnemoSetAlerts" in src
-    assert "window.codexMnemoSetFocusRegion" in src
-    assert "window.codexMnemoShowOverview" in src
+    assert "class MnemoNativeCanvas" in src
+    assert 'self.native_canvas = MnemoNativeCanvas(self)' in src
+    assert 'self.setObjectName("mnemo_native_canvas")' in src
+    assert 'self.mode_badge = QtWidgets.QLabel("Native Canvas", header)' in src
+    assert "self.native_canvas.set_alerts(alerts)" in src
+    assert "self.native_canvas.set_diagnostics(diagnostics)" in src
+    assert "self.native_canvas.set_focus_region(focus_region)" in src
+    assert "self.native_canvas.show_overview(overview_meta)" in src
+    assert "Desktop Mnemo switched to native Qt canvas." in src
+    assert "wheel = zoom, drag = pan, click = select" in src
+    assert "QtSvg.QSvgRenderer" in src
+    assert "def set_diagnostics(self, diagnostics: dict[str, Any]) -> None:" in src
+    assert "_build_mnemo_diagnostics_payload" in src
+    assert "self._push_diagnostics()" in src
     assert "def set_focus_region(self, focus_region: dict[str, Any] | None) -> None:" in src
     assert "def show_overview(self, meta: dict[str, Any] | None = None) -> None:" in src
     assert "startup_view_mode: str," in src
@@ -90,33 +100,19 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert 'self.return_focus_action = QtGui.QAction("Вернуться к фокусу", self)' in src
     assert 'self.full_scheme_action = QtGui.QAction("Вся схема", self)' in src
     assert "def _show_full_scheme_overview(self) -> None:" in src
-    assert "show_alert_overlay" in src
     assert "_build_frame_alert_payload" in src
+    assert "self._draw_alert_markers(painter)" in src
     assert 'PLAYHEAD_STORAGE_KEY = "pneumo_desktop_mnemo_playhead"' in src
+    assert "QtWebEngineWidgets" not in src
 
 
-def test_desktop_mnemo_svg_component_has_alert_overlay_contract() -> None:
-    src = (
-        Path(__file__).resolve().parents[1]
-        / "pneumo_solver_ui"
-        / "components"
-        / "pneumo_svg_flow"
-        / "index.html"
-    ).read_text(encoding="utf-8")
+def test_desktop_mnemo_native_canvas_has_overlay_contract() -> None:
+    src = (Path(__file__).resolve().parents[1] / "pneumo_solver_ui" / "desktop_mnemo" / "app.py").read_text(encoding="utf-8")
 
-    assert 'id="alertHud"' in src
-    assert 'id="togAlerts"' in src
-    assert "pneumo_overlay_alerts" in src
-    assert "pneumo_overlay_focus" in src
-    assert "updateAlertOverlay" in src
-    assert "applyFocusRegion" in src
-    assert "showFocusOverview" in src
-    assert "returnToFocusMode" in src
-    assert "focusFrame" in src
-    assert "focusHalo" in src
-    assert 'id="focusReturn"' in src
-    assert 'id="showOverview"' in src
-    assert 'id="focusModeBadge"' in src
-    assert "overview: вся схема" in src
-    assert "alertPath" in src
-    assert "alertNodeRing" in src
+    assert "def _draw_alert_markers(self, painter: QtGui.QPainter) -> None:" in src
+    assert "def _draw_diagnostics_overlay(self, painter: QtGui.QPainter) -> None:" in src
+    assert "def _draw_focus_overlay(self, painter: QtGui.QPainter) -> None:" in src
+    assert "def _draw_cylinder_card(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:" in src
+    assert "def _draw_component_badge(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:" in src
+    assert "self._overlay_targets.append((\"node\", str(cap.get(\"node_name\") or \"\"), cap_rect))" in src
+    assert "self._overlay_targets.append((\"edge\", str(payload.get(\"edge_name\") or \"\"), rect))" in src
