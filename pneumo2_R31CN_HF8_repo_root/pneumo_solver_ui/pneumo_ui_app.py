@@ -3652,17 +3652,32 @@ for k in scalar_keys:
     rows.append({
         "группа": meta.get("группа", "Прочее"),
         "параметр": k,
-        "РµРґРёРЅРёС†Р°": meta.get("РµРґ", "РЎР"),
+        "единица": meta.get("ед") or meta.get("РµРґ") or "СИ",
         "значение": val_ui,
         "оптимизировать": bool(is_opt),
-        "РјРёРЅ": mn_ui,
+        "мин": mn_ui,
         "макс": mx_ui,
         "пояснение": meta.get("описание", ""),
         "_key": k,
         "_kind": kind,
     })
 
-df_params0 = pd.DataFrame(rows)
+def _normalize_params_editor_columns(frame: Any) -> Any:
+    if not isinstance(frame, pd.DataFrame):
+        return frame
+    rename_map: Dict[str, str] = {}
+    if "единица" not in frame.columns and "РµРґРёРЅРёС†Р°" in frame.columns:
+        rename_map["РµРґРёРЅРёС†Р°"] = "единица"
+    if "мин" not in frame.columns and "РјРёРЅ" in frame.columns:
+        rename_map["РјРёРЅ"] = "мин"
+    if "макс" not in frame.columns and "РјР°РєСЃ" in frame.columns:
+        rename_map["РјР°РєСЃ"] = "макс"
+    if not rename_map:
+        return frame
+    return frame.rename(columns=rename_map)
+
+
+df_params0 = _normalize_params_editor_columns(pd.DataFrame(rows))
 
 
 # Streamlit иногда «залипает» на старом key при смене набора параметров.
@@ -3679,6 +3694,8 @@ def _migrate_df_params_edit(prev_df: Any, new_df: pd.DataFrame) -> pd.DataFrame:
     """
     if not isinstance(prev_df, pd.DataFrame):
         return new_df
+    prev_df = _normalize_params_editor_columns(prev_df)
+    new_df = _normalize_params_editor_columns(new_df)
     if "_key" not in prev_df.columns:
         return new_df
 
@@ -3839,7 +3856,7 @@ else:
                 except Exception:
                     continue
 
-                _mn = _row.get("РјРёРЅ")
+                _mn = _row.get("мин")
                 _mx = _row.get("макс")
                 _need = True
                 try:
@@ -3859,7 +3876,7 @@ else:
                         lo = max(0.0, lo)
                         hi = max(lo + 1e-9, hi)
 
-                    df_params_edit.loc[df_params_edit["_key"] == _k, "РјРёРЅ"] = float(min(lo, hi))
+                    df_params_edit.loc[df_params_edit["_key"] == _k, "мин"] = float(min(lo, hi))
                     df_params_edit.loc[df_params_edit["_key"] == _k, "макс"] = float(max(lo, hi))
 
             df_params_edit.loc[df_params_edit["_key"].isin(_keys_order), "оптимизировать"] = True
@@ -3952,7 +3969,7 @@ else:
 
         v0 = _sf(_row.get("значение"), 0.0)
         opt0 = bool(_row.get("оптимизировать", False))
-        mn0 = _sf(_row.get("РјРёРЅ"), None)
+        mn0 = _sf(_row.get("мин"), None)
         mx0 = _sf(_row.get("макс"), None)
 
         nonneg = (_kind in {"pressure_atm_g", "pressure_bar_g", "volume_L", "volume_mL"}) or _pkey.startswith("масса_")
@@ -4038,7 +4055,7 @@ else:
                 df_params_edit.loc[df_params_edit["_key"] == _selected_key, "значение"] = float(val_new)
                 df_params_edit.loc[df_params_edit["_key"] == _selected_key, "оптимизировать"] = bool(opt_new)
                 if opt_new:
-                    df_params_edit.loc[df_params_edit["_key"] == _selected_key, "РјРёРЅ"] = float(min_new)
+                    df_params_edit.loc[df_params_edit["_key"] == _selected_key, "мин"] = float(min_new)
                     df_params_edit.loc[df_params_edit["_key"] == _selected_key, "макс"] = float(max_new)
 
                 st.session_state["df_params_edit"] = df_params_edit
@@ -4077,7 +4094,7 @@ for _, r in df_params_edit.iterrows():
 
     if bool(r["оптимизировать"]):
         try:
-            mn_ui = float(r["РјРёРЅ"])
+            mn_ui = float(r["мин"])
             mx_ui = float(r["макс"])
         except Exception:
             param_errors.append(f"Параметр '{k}': включена оптимизация, но диапазон (мин/макс) не задан.")

@@ -1667,9 +1667,10 @@ def _make_send_bundle_inner(
         # R59 contract: MANIFEST.json must exist (keep also legacy bundle/manifest.json).
         _mjson = json.dumps(manifest, ensure_ascii=False, indent=2)
         z.writestr("bundle/manifest.json", _mjson)
-        # Convenience copies (some users/scripts expect these at ZIP root)
+        # Keep only one root-level manifest name on Windows to avoid
+        # case-insensitive extraction conflicts between MANIFEST.json
+        # and manifest.json.
         z.writestr("MANIFEST.json", _mjson)
-        z.writestr("manifest.json", _mjson)
         z.writestr("bundle/skips.json", json.dumps(skips, ensure_ascii=False, indent=2))
 
         summary = {
