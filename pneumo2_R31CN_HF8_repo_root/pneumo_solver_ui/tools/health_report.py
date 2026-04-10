@@ -32,6 +32,16 @@ from pneumo_solver_ui.browser_perf_artifacts import (
     BROWSER_PERF_REGISTRY_SNAPSHOT_JSON_NAME,
     BROWSER_PERF_TRACE_CANDIDATE_NAMES,
 )
+from pneumo_solver_ui.optimization_scope_compare import (
+    compare_optimizer_scope_sources,
+    evaluate_optimizer_scope_gate,
+    extract_optimizer_scope_from_dashboard,
+    extract_optimizer_scope_from_health,
+    extract_optimizer_scope_from_run_scope,
+    extract_optimizer_scope_from_triage,
+    extract_optimizer_scope_from_validation,
+    optimizer_scope_export_source_name,
+)
 
 from .send_bundle_contract import (
     ANIM_DIAG_JSON,
@@ -154,6 +164,12 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 }
 
             anim_sources: Dict[str, Dict[str, Any]] = {}
+            optimizer_scope_sources: Dict[str, Dict[str, Any]] = {}
+
+            embedded_health = _read_json_from_zip(z, "health/health_report.json")
+            embedded_health_scope = extract_optimizer_scope_from_health(embedded_health)
+            if embedded_health_scope:
+                optimizer_scope_sources[str(embedded_health_scope.get("source") or "health")] = embedded_health_scope
 
             val = _read_json_from_zip(z, "validation/validation_report.json")
             if val is not None:
@@ -176,6 +192,9 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     anim_sources["validation"] = anim_snap
                     if anim_snap.get("issues"):
                         notes.extend(str(x) for x in anim_snap.get("issues") or [] if str(x).strip())
+                val_scope = extract_optimizer_scope_from_validation(val)
+                if val_scope:
+                    optimizer_scope_sources[str(val_scope.get("source") or "validation")] = val_scope
 
             sc = _read_json_from_zip(z, "selfcheck/selfcheck_report.json")
             if sc is not None:
@@ -189,10 +208,16 @@ def collect_health_report(zip_path: Path) -> HealthReport:
             tri = _read_json_from_zip(z, "triage/triage_report.json")
             if tri is not None:
                 sev = tri.get("severity_counts") or {}
+                dist_progress = tri.get("dist_progress") or {}
                 signals["triage"] = {
                     "severity_counts": sev,
                     "red_flags": tri.get("red_flags", []),
                 }
+                if isinstance(dist_progress, dict) and dist_progress:
+                    signals["triage"]["dist_progress"] = dict(dist_progress)
+                    triage_scope = extract_optimizer_scope_from_triage(tri)
+                    if triage_scope:
+                        optimizer_scope_sources[str(triage_scope.get("source") or "triage")] = triage_scope
                 try:
                     if int(sev.get("critical", 0)) > 0:
                         notes.append("triage reports CRITICAL entries")
@@ -213,6 +238,22 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 )
                 if anim_snap is not None:
                     anim_sources["dashboard"] = anim_snap
+                dash_scope = extract_optimizer_scope_from_dashboard(dash)
+                if dash_scope:
+                    optimizer_scope_sources[str(dash_scope.get("source") or "dashboard")] = dash_scope
+
+            for arcname in sorted(
+                name
+                for name in names
+                if name == "run_scope.json" or name.endswith("/export/run_scope.json")
+            ):
+                export_scope = extract_optimizer_scope_from_run_scope(
+                    _read_json_from_zip(z, arcname),
+                    source=optimizer_scope_export_source_name(arcname),
+                    source_path=arcname,
+                )
+                if export_scope:
+                    optimizer_scope_sources[str(export_scope.get("source") or arcname)] = export_scope
 
             diag = _read_json_from_zip(z, ANIM_DIAG_JSON)
             if diag is not None:
@@ -275,6 +316,10 @@ def collect_health_report(zip_path: Path) -> HealthReport:
             operator_recommendations = build_anim_operator_recommendations(anim_summary)
             anim_summary["mnemo_event_summary"] = dict(mnemo_event_log)
             anim_summary["ring_closure_summary"] = dict(ring_closure)
+            optimizer_scope = compare_optimizer_scope_sources(
+                optimizer_scope_sources,
+                preferred_order=("triage", "health", "validation", "dashboard", "export"),
+            )
             if ANIM_LOCAL_NPZ in name_set:
                 try:
                     with z.open(ANIM_LOCAL_NPZ, "r") as f:
@@ -305,6 +350,21 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     signals["geometry_acceptance"] = geom_acc
                     anim_summary["geometry_acceptance"] = geom_acc
                     notes.append(str(geom_acc["error"]))
+            if optimizer_scope:
+                signals["optimizer_scope"] = dict(optimizer_scope)
+                optimizer_scope_gate = evaluate_optimizer_scope_gate(optimizer_scope)
+                signals["optimizer_scope_gate"] = dict(optimizer_scope_gate)
+                for msg in optimizer_scope.get("issues") or []:
+                    smsg = str(msg).strip()
+                    if smsg and smsg not in notes:
+                        notes.append(smsg)
+                if optimizer_scope_gate.get("release_risk"):
+                    risk_msg = (
+                        "optimizer scope release risk: "
+                        f"{optimizer_scope_gate.get('release_gate_reason') or 'mismatch detected'}"
+                    )
+                    if risk_msg not in notes:
+                        notes.append(risk_msg)
             signals["anim_latest"] = anim_summary
             signals["mnemo_event_log"] = dict(mnemo_event_log)
             signals["ring_closure"] = dict(ring_closure)
@@ -374,6 +434,8 @@ def render_health_report_md(rep: HealthReport) -> str:
     ring_closure = dict(rep.signals.get("ring_closure") or anim.get("ring_closure_summary") or {})
     operator_recommendations = [str(x) for x in (rep.signals.get("operator_recommendations") or []) if str(x).strip()]
     artifacts = dict(rep.signals.get("artifacts") or {})
+    optimizer_scope = dict(rep.signals.get("optimizer_scope") or {})
+    optimizer_scope_gate = dict(rep.signals.get("optimizer_scope_gate") or {})
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
     lines = [
         "# Health report",
@@ -404,6 +466,29 @@ def render_health_report_md(rep: HealthReport) -> str:
             f"- errors_count: {val.get('errors_count')}",
             f"- warnings_count: {val.get('warnings_count')}",
         ]
+
+    if optimizer_scope:
+        lines += [
+            "",
+            "## Distributed optimization",
+            f"- status: {optimizer_scope.get('status') or '—'}",
+            f"- scope_gate: `{optimizer_scope_gate.get('release_gate') or '—'}`",
+            f"- scope_gate_reason: `{optimizer_scope_gate.get('release_gate_reason') or '—'}`",
+            f"- scope_release_risk: `{optimizer_scope_gate.get('release_risk')}`",
+            (
+                f"- progress: completed={optimizer_scope.get('completed')} / in_flight={optimizer_scope.get('in_flight')} "
+                f"/ cached={optimizer_scope.get('cached_hits')} / duplicates={optimizer_scope.get('duplicates_skipped')}"
+            ),
+            f"- Problem scope: `{optimizer_scope.get('problem_hash_short') or optimizer_scope.get('problem_hash') or '—'}`",
+            f"- Hash mode: `{optimizer_scope.get('problem_hash_mode') or '—'}`",
+        ]
+        full_problem_hash = str(optimizer_scope.get("problem_hash") or "")
+        short_problem_hash = str(optimizer_scope.get("problem_hash_short") or "")
+        if full_problem_hash and short_problem_hash and full_problem_hash != short_problem_hash:
+            lines.append(f"- problem_hash: `{full_problem_hash}`")
+        lines.append(f"- scope_sync_ok: `{optimizer_scope.get('scope_sync_ok')}`")
+        for issue in list(optimizer_scope.get("issues") or [])[:5]:
+            lines.append(f"- scope_issue: {issue}")
 
     if anim:
         lines += [

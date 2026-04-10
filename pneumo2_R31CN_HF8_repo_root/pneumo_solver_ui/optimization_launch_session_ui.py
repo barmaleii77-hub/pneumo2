@@ -30,6 +30,8 @@ def render_optimization_launch_session_block(
     clear_job_fn: Callable[[], None],
     launch_job_fn: Callable[[], None],
     build_cmd_preview_text_fn: Callable[[], str],
+    current_problem_hash: str = "",
+    current_problem_hash_mode: str = "",
     render_live_panel_fn: Callable[..., Any] = render_live_optimization_job_panel,
     render_finished_panel_fn: Callable[..., Any] = render_finished_optimization_job_panel,
     render_launch_panel_fn: Callable[..., bool] = render_optimization_launch_panel,
@@ -38,7 +40,8 @@ def render_optimization_launch_session_block(
         if is_staged:
             st.markdown(
                 "Будет запущен **opt_stage_runner_v1.py**. Он ведёт staged run, пишет `sp.json`, stage CSV и "
-                "live seed/promotion artifacts. Во время выполнения UI показывает хвост лога, live stage rows и текущую stage policy."
+                "live seed/promotion artifacts. Во время выполнения UI показывает хвост лога, live stage rows и "
+                "текущую stage policy."
             )
         else:
             st.markdown(
@@ -86,9 +89,11 @@ def render_optimization_launch_session_block(
                 hard_only_error_prefix="Не удалось остановить",
                 refresh_label="Обновить",
                 refresh_help="Перечитать лог",
-                auto_refresh_label="Авто‑обновлять страницу (каждые ~2 секунды)",
+                auto_refresh_label="Авто-обновлять страницу (каждые ~2 секунды)",
                 auto_refresh_help="Если включено — UI будет сам обновляться, пока оптимизация активна.",
                 auto_refresh_default=bool(st.session_state.get("__opt_autorefresh_enabled", True)),
+                current_problem_hash=current_problem_hash,
+                current_problem_hash_mode=current_problem_hash_mode,
             )
 
         elif job is not None and job_rc is not None:

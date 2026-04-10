@@ -1,18 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""inspect_send_bundle.py
-
-Лёгкая offline-инспекция send-bundle ZIP.
-
-Назначение:
-- быстро показать, есть ли validation/dashboard/triage/health;
-- не потерять anim_latest diagnostics даже у старых bundle,
-  где embedded health-report ещё не создавался;
-- дать человеку и машине один и тот же компактный summary.
-
-Пример:
-  python -m pneumo_solver_ui.tools.inspect_send_bundle --zip SEND_xxx.zip --print_summary
-"""
+"""Lightweight offline inspection for send-bundle ZIP files."""
 
 from __future__ import annotations
 
@@ -23,9 +11,10 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from pneumo_solver_ui.geometry_acceptance_contract import format_geometry_acceptance_summary_lines
+
 from .health_report import collect_health_report
 from .send_bundle_contract import build_anim_operator_recommendations, summarize_ring_closure
-from pneumo_solver_ui.geometry_acceptance_contract import format_geometry_acceptance_summary_lines
 
 
 def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
@@ -43,14 +32,18 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
     anim = dict(signals.get("anim_latest") or {})
     mnemo = dict(signals.get("mnemo_event_log") or {})
     ring_closure = dict(signals.get("ring_closure") or summarize_ring_closure(anim))
+    optimizer_scope = dict(signals.get("optimizer_scope") or {})
+    optimizer_scope_gate = dict(signals.get("optimizer_scope_gate") or {})
     operator_recommendations = [
-        str(x) for x in (signals.get("operator_recommendations") or build_anim_operator_recommendations(anim)) if str(x).strip()
+        str(x)
+        for x in (signals.get("operator_recommendations") or build_anim_operator_recommendations(anim))
+        if str(x).strip()
     ]
     artifacts = dict(signals.get("artifacts") or {})
     geometry_acceptance = dict(rep.signals.get("geometry_acceptance") or {})
     summary: Dict[str, Any] = {
         "schema": "send_bundle_inspection",
-        "schema_version": "1.1.0",
+        "schema_version": "1.2.0",
         "zip_path": str(zp),
         "zip_name": zp.name,
         "ok": bool(rep.ok),
@@ -59,6 +52,8 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
         "anim_latest": anim,
         "mnemo_event_log": mnemo,
         "ring_closure": ring_closure,
+        "optimizer_scope": optimizer_scope,
+        "optimizer_scope_gate": optimizer_scope_gate,
         "operator_recommendations": operator_recommendations,
         "geometry_acceptance": geometry_acceptance,
         "geometry_acceptance_gate": str(geometry_acceptance.get("release_gate") or "MISSING") if geometry_acceptance else "MISSING",
@@ -90,6 +85,8 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
     anim = dict(summary.get("anim_latest") or {})
     mnemo = dict(summary.get("mnemo_event_log") or {})
     ring_closure = dict(summary.get("ring_closure") or {})
+    optimizer_scope = dict(summary.get("optimizer_scope") or {})
+    optimizer_scope_gate = dict(summary.get("optimizer_scope_gate") or {})
     operator_recommendations = [str(x) for x in (summary.get("operator_recommendations") or []) if str(x).strip()]
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
     lines = [
@@ -112,6 +109,30 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
         f"- Geometry acceptance: {summary.get('has_geometry_acceptance')}",
         f"- Geometry acceptance gate: {summary.get('geometry_acceptance_gate') or 'MISSING'}",
         f"- Geometry acceptance reason: {summary.get('geometry_acceptance_reason') or '—'}",
+    ]
+    if optimizer_scope:
+        lines += [
+            "",
+            "## Distributed optimization",
+            f"- status: {optimizer_scope.get('status') or '—'}",
+            f"- scope_gate: `{optimizer_scope_gate.get('release_gate') or '—'}`",
+            f"- scope_gate_reason: `{optimizer_scope_gate.get('release_gate_reason') or '—'}`",
+            f"- scope_release_risk: `{optimizer_scope_gate.get('release_risk')}`",
+            (
+                f"- progress: completed={optimizer_scope.get('completed')} / in_flight={optimizer_scope.get('in_flight')} "
+                f"/ cached={optimizer_scope.get('cached_hits')} / duplicates={optimizer_scope.get('duplicates_skipped')}"
+            ),
+            f"- Problem scope: `{optimizer_scope.get('problem_hash_short') or optimizer_scope.get('problem_hash') or '—'}`",
+            f"- Hash mode: `{optimizer_scope.get('problem_hash_mode') or '—'}`",
+        ]
+        full_problem_hash = str(optimizer_scope.get("problem_hash") or "")
+        short_problem_hash = str(optimizer_scope.get("problem_hash_short") or "")
+        if full_problem_hash and short_problem_hash and full_problem_hash != short_problem_hash:
+            lines.append(f"- problem_hash: `{full_problem_hash}`")
+        lines.append(f"- scope_sync_ok: `{optimizer_scope.get('scope_sync_ok')}`")
+        for issue in list(optimizer_scope.get("issues") or [])[:5]:
+            lines.append(f"- scope_issue: {issue}")
+    lines += [
         "",
         "## Anim latest",
         f"- available: {anim.get('available')}",

@@ -6,6 +6,11 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from pneumo_solver_ui.optimization_problem_hash_mode import (
+    normalize_problem_hash_mode,
+    write_problem_hash_mode_artifact,
+)
+
 
 def optimization_job_log_path(run_dir: Path, pipeline_mode: str) -> Path:
     mode = str(pipeline_mode or "").strip().lower()
@@ -24,7 +29,9 @@ def launch_optimization_job_payload(
 ) -> dict[str, Any]:
     run_dir.mkdir(parents=True, exist_ok=True)
     env = dict(base_env or os.environ.copy())
-    env["PNEUMO_OPT_PROBLEM_HASH_MODE"] = str(problem_hash_mode or "stable")
+    normalized_mode = normalize_problem_hash_mode(problem_hash_mode, default="stable")
+    env["PNEUMO_OPT_PROBLEM_HASH_MODE"] = normalized_mode
+    write_problem_hash_mode_artifact(run_dir, normalized_mode)
     log_path = optimization_job_log_path(run_dir, getattr(plan, "pipeline_mode", ""))
     popen = popen_factory or subprocess.Popen
     clock = now_fn or time.time

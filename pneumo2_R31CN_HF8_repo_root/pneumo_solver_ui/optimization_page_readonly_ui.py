@@ -30,12 +30,16 @@ def render_last_optimization_overview_block(
     *,
     snapshot: Mapping[str, Any],
     results_page: str,
+    current_problem_hash: str = "",
+    current_problem_hash_mode: str = "",
     render_summary_fn: Callable[..., bool] = render_last_optimization_pointer_summary,
 ) -> None:
     if not render_summary_fn(
         st,
         snapshot,
         compact=False,
+        current_problem_hash=current_problem_hash,
+        current_problem_hash_mode=current_problem_hash_mode,
         missing_message="Последняя оптимизация пока не запускалась (или артефакты не найдены).",
         success_message="Найдены результаты последней оптимизации.",
         packaging_heading="Packaging snapshot (last run)",

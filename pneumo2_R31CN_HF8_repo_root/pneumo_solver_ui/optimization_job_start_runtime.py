@@ -14,7 +14,9 @@ from pneumo_solver_ui.optimization_job_session_runtime import (
 from pneumo_solver_ui.optimization_launch_plan_runtime import (
     app_root_from_ui_root,
     build_optimization_launch_plan,
+    coordinator_resume_run_dir,
     new_optimization_run_dir,
+    staged_resume_run_dir,
     workspace_dir_for_ui_root,
 )
 
@@ -29,6 +31,8 @@ def start_optimization_job(
     workspace_dir_fn: Callable[[Path], Path] = workspace_dir_for_ui_root,
     app_root_fn: Callable[[Path], Path] = app_root_from_ui_root,
     new_run_dir_fn: Callable[[Path, str], Path] = new_optimization_run_dir,
+    resume_run_dir_fn: Callable[..., Path] = coordinator_resume_run_dir,
+    staged_resume_run_dir_fn: Callable[..., Path] = staged_resume_run_dir,
     build_plan_fn: Callable[..., Any] = build_optimization_launch_plan,
     launch_payload_fn: Callable[..., Mapping[str, Any]] = launch_optimization_job_payload,
     save_job_fn: Callable[[MutableMapping[str, Any], DistOptJob], None] = save_job_to_session,
@@ -36,7 +40,26 @@ def start_optimization_job(
     ui_root = Path(ui_root)
     is_staged = bool(session_state.get("opt_use_staged", False))
     workspace_dir = workspace_dir_fn(ui_root)
-    run_dir = new_run_dir_fn(workspace_dir, "staged" if is_staged else "coordinator")
+    if is_staged and bool(session_state.get("opt_stage_resume", False)):
+        run_dir = Path(
+            staged_resume_run_dir_fn(
+                session_state,
+                workspace_dir=workspace_dir,
+                ui_root=ui_root,
+                problem_hash_mode=str(problem_hash_mode or "stable"),
+            )
+        )
+    elif not is_staged and bool(session_state.get("opt_resume", False)):
+        run_dir = Path(
+            resume_run_dir_fn(
+                session_state,
+                workspace_dir=workspace_dir,
+                ui_root=ui_root,
+                problem_hash_mode=str(problem_hash_mode or "stable"),
+            )
+        )
+    else:
+        run_dir = new_run_dir_fn(workspace_dir, "staged" if is_staged else "coordinator")
     plan = build_plan_fn(
         session_state,
         run_dir=run_dir,

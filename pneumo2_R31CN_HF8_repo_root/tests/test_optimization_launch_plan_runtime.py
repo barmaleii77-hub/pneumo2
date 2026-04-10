@@ -4,6 +4,7 @@ from pathlib import Path
 
 from pneumo_solver_ui.optimization_launch_plan_runtime import (
     build_optimization_launch_plan,
+    current_problem_hash_for_launch,
     new_optimization_run_dir,
     ui_root_from_page_path,
     workspace_dir_for_ui_root,
@@ -89,3 +90,31 @@ def test_launch_plan_runtime_builds_coordinator_command_and_uses_real_ui_root() 
     assert "--backend ray" in cmd
     assert "--objective comfort" in cmd
     assert "--objective energy" in cmd
+
+
+def test_current_problem_hash_for_launch_honors_legacy_mode_for_coordinator() -> None:
+    ui_root = _repo_ui_root()
+    workspace = Path("C:/tmp/opt_workspace_mode_demo")
+    session_state = {
+        "opt_use_staged": False,
+        "opt_objectives": "comfort,energy",
+        "opt_penalty_key": "penalty_total",
+        "opt_penalty_tol": 0.0,
+    }
+
+    stable_hash = current_problem_hash_for_launch(
+        session_state,
+        ui_root=ui_root,
+        workspace_dir=workspace,
+        problem_hash_mode="stable",
+    )
+    legacy_hash = current_problem_hash_for_launch(
+        session_state,
+        ui_root=ui_root,
+        workspace_dir=workspace,
+        problem_hash_mode="legacy",
+    )
+
+    assert stable_hash
+    assert legacy_hash
+    assert stable_hash != legacy_hash

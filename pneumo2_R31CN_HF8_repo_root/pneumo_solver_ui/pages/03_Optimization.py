@@ -38,6 +38,8 @@ from pneumo_solver_ui.optimization_job_session_runtime import (
 )
 from pneumo_solver_ui.optimization_launch_plan_runtime import (
     build_optimization_launch_plan,
+    current_problem_hash_for_launch,
+    problem_hash_mode_for_launch,
     ui_root_from_page_path,
     workspace_dir_for_ui_root,
 )
@@ -97,6 +99,17 @@ _UI_JOBS_DEFAULT = int(diagnostics_jobs_default(os.cpu_count(), platform_name=sy
 st.set_page_config(page_title="Пневмо‑UI | Оптимизация", layout="wide")
 
 _UI_ROOT = ui_root_from_page_path(Path(__file__))
+_WORKSPACE_DIR = workspace_dir_for_ui_root(_UI_ROOT)
+_CURRENT_PROBLEM_HASH_MODE = problem_hash_mode_for_launch(st.session_state)
+try:
+    _CURRENT_PROBLEM_HASH = current_problem_hash_for_launch(
+        st.session_state,
+        ui_root=_UI_ROOT,
+        workspace_dir=_WORKSPACE_DIR,
+        problem_hash_mode=_CURRENT_PROBLEM_HASH_MODE,
+    )
+except Exception:
+    _CURRENT_PROBLEM_HASH = ""
 
 # ---------------------------
 # UI
@@ -135,6 +148,8 @@ render_optimization_readonly_expanders(
         st,
         snapshot=load_last_optimization_pointer_snapshot(),
         results_page="pages/20_DistributedOptimization.py",
+        current_problem_hash=_CURRENT_PROBLEM_HASH,
+        current_problem_hash_mode=_CURRENT_PROBLEM_HASH_MODE,
     ),
     physical_label="Физический смысл путей запуска",
     render_physical=lambda: render_physical_workflow_block(
@@ -148,15 +163,17 @@ render_optimization_readonly_expanders(
     history_label="Последовательные запуски в текущем workspace",
     render_history=lambda: render_workspace_run_history_block(
         st,
-        workspace_dir=workspace_dir_for_ui_root(_UI_ROOT),
+        workspace_dir=_WORKSPACE_DIR,
         active_job=load_job_from_session(st.session_state),
         session_state=st.session_state,
+        current_problem_hash=_CURRENT_PROBLEM_HASH,
         default_objectives=DEFAULT_OPTIMIZATION_OBJECTIVES,
         objectives_text_fn=objectives_text,
         penalty_key_default=DIST_OPT_PENALTY_KEY_DEFAULT,
         current_penalty_tol=st.session_state.get("opt_penalty_tol", DIST_OPT_PENALTY_TOL_DEFAULT),
         load_log_text=tail_file_text,
         rerun_fn=request_rerun,
+        current_problem_hash_mode=_CURRENT_PROBLEM_HASH_MODE,
     ),
 )
 
@@ -222,6 +239,8 @@ render_optimization_launch_session_block(
     st,
     job=job,
     is_staged=bool(st.session_state.get("opt_use_staged", DIAGNOSTIC_USE_STAGED_OPT)),
+    current_problem_hash=_CURRENT_PROBLEM_HASH,
+    current_problem_hash_mode=_CURRENT_PROBLEM_HASH_MODE,
     tail_file_text_fn=tail_file_text,
     soft_stop_requested_fn=soft_stop_requested,
     parse_done_from_log_fn=parse_done_from_log,

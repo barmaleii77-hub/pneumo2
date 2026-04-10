@@ -30,7 +30,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, MutableMapping, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -47,7 +47,16 @@ from pneumo_dist.expdb import ExperimentDB
 from pneumo_dist.hv_tools import fit_normalizer, hypervolume_min, infer_reference_point_min
 from pneumo_dist.mobo_propose import propose_qnehvi, propose_random
 from pneumo_dist.trial_hash import hash_params, hash_vector, make_problem_spec, hash_problem, stable_hash_problem
+from pneumo_solver_ui.optimization_problem_hash_mode import (
+    normalize_problem_hash_mode,
+    problem_hash_mode_from_env,
+    write_problem_hash_mode_artifact,
+)
 from pneumo_solver_ui.optimization_objective_contract import objective_contract_payload
+from pneumo_solver_ui.optimization_baseline_source import (
+    resolve_workspace_baseline_source,
+    write_baseline_source_artifact,
+)
 from pneumo_solver_ui.optimization_defaults import (
     DEFAULT_OPTIMIZATION_OBJECTIVES,
     DIST_OPT_BOTORCH_MAXITER_DEFAULT,
@@ -66,6 +75,39 @@ from pneumo_solver_ui.optimization_defaults import (
     DIST_OPT_RAY_RUNTIME_ENV_MODE_DEFAULT,
     DIST_OPT_STALE_TTL_SEC_DEFAULT,
 )
+
+
+def apply_problem_hash_env(
+    problem_hash: str | None,
+    env: Optional[MutableMapping[str, str]] = None,
+) -> MutableMapping[str, str]:
+    target = env if env is not None else os.environ
+    current_problem_hash = str(problem_hash or "").strip()
+    if current_problem_hash:
+        target["PNEUMO_OPT_PROBLEM_HASH"] = current_problem_hash
+    else:
+        target.pop("PNEUMO_OPT_PROBLEM_HASH", None)
+    return target
+
+
+def build_run_record_meta(
+    args: argparse.Namespace,
+    *,
+    objective_keys: Sequence[str],
+    problem_hash_mode: str,
+) -> Dict[str, Any]:
+    return {
+        "created_by": "dist_opt_coordinator_R59",
+        "backend": str(getattr(args, "backend", "")),
+        "seed": int(getattr(args, "seed", 0) or 0),
+        "problem_hash_mode": normalize_problem_hash_mode(problem_hash_mode, default="stable"),
+        "objective_contract": objective_contract_payload(
+            objective_keys=objective_keys,
+            penalty_key=str(getattr(args, "penalty_key", "")),
+            penalty_tol=getattr(args, "penalty_tol", None),
+            source="dist_opt_coordinator_run_meta_v1",
+        ),
+    }
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -454,9 +496,21 @@ def _run_ray(
     # ---- Evaluator actors ----
     @ray.remote
     class EvaluatorActor:
-        def __init__(self, actor_tag: str, *, model_path: str, worker_path: str, base_json: str, ranges_json: str, suite_json: str, cfg: Dict[str, Any]):
+        def __init__(
+            self,
+            actor_tag: str,
+            *,
+            model_path: str,
+            worker_path: str,
+            base_json: str,
+            ranges_json: str,
+            suite_json: str,
+            cfg: Dict[str, Any],
+            problem_hash: str,
+        ):
             os.environ.setdefault("OMP_NUM_THREADS", "1")
             os.environ.setdefault("MKL_NUM_THREADS", "1")
+            apply_problem_hash_env(problem_hash)
             self.actor_tag = actor_tag
             self.core = EvaluatorCore(
                 model_path=model_path,
@@ -495,6 +549,7 @@ def _run_ray(
             ranges_json=ranges_json_p,
             suite_json=suite_json_p,
             cfg=cfg_override,
+            problem_hash=problem_hash,
         )
         for i in range(n_eval)
     ]
@@ -972,6 +1027,7 @@ def _run_dask(
 
     # Task function (each process loads its own core)
     def _eval_task(trial_id: str, x_u: List[float]):
+        apply_problem_hash_env(problem_hash)
         core = EvaluatorCore(
             model_path=model_p,
             worker_path=worker_p,
@@ -1239,7 +1295,12 @@ def main() -> None:
         cfg=spec_cfg,
         include_file_hashes=True,
     )
-    problem_hash = stable_hash_problem(problem_spec)
+    problem_hash_mode = problem_hash_mode_from_env()
+    problem_hash = (
+        hash_problem(problem_spec)
+        if problem_hash_mode == "legacy"
+        else stable_hash_problem(problem_spec)
+    )
 
     # DB
     # For embedded engines the target is a file path; for postgres it is a DSN.
@@ -1268,11 +1329,11 @@ def main() -> None:
             run_id = db.create_run(
                 problem_hash=problem_hash,
                 spec=problem_spec.to_dict(),
-                meta={
-                    "created_by": "dist_opt_coordinator_R59",
-                    "backend": str(args.backend),
-                    "seed": int(args.seed),
-                },
+                meta=build_run_record_meta(
+                    args,
+                    objective_keys=objective_keys,
+                    problem_hash_mode=problem_hash_mode,
+                ),
             )
 
         # Run dir
@@ -1281,7 +1342,15 @@ def main() -> None:
 
         _dump_json(run_dir / "problem_spec.json", problem_spec.to_dict())
         _write_text(run_dir / "problem_hash.txt", problem_hash)
+        write_problem_hash_mode_artifact(run_dir, problem_hash_mode)
         _write_text(run_dir / "run_id.txt", run_id)
+        write_baseline_source_artifact(
+            run_dir,
+            resolve_workspace_baseline_source(
+                problem_hash=problem_hash,
+                env=os.environ,
+            ),
+        )
         _dump_json(
             run_dir / "objective_contract.json",
             objective_contract_payload(
@@ -1293,6 +1362,7 @@ def main() -> None:
         )
 
         # Coordinator-side core for param mapping (fast)
+        apply_problem_hash_env(problem_hash)
         core_local = EvaluatorCore(
             model_path=model_rel,
             worker_path=worker_rel,

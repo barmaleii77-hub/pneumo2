@@ -68,3 +68,4 @@ def test_launch_optimization_job_payload_creates_log_and_sets_problem_hash_env(t
     env_event = next(value for key, value in events if key == "env")
     assert env_event["BASE"] == "1"
     assert env_event["PNEUMO_OPT_PROBLEM_HASH_MODE"] == "stable"
+    assert (run_dir / "problem_hash_mode.txt").read_text(encoding="utf-8") == "stable"

@@ -19,7 +19,23 @@ import csv
 import json
 from typing import Any, Dict, Optional
 
-from pneumo_solver_ui.optimization_objective_contract import objective_contract_payload
+from pneumo_solver_ui.optimization_objective_contract import (
+    normalize_objective_keys,
+    objective_contract_payload,
+)
+from pneumo_solver_ui.optimization_baseline_source import (
+    baseline_source_short_label,
+    read_baseline_source_artifact,
+)
+from pneumo_solver_ui.optimization_problem_hash_mode import (
+    problem_hash_mode_artifact_path,
+    read_problem_hash_mode_artifact,
+)
+from pneumo_solver_ui.optimization_problem_scope import (
+    problem_hash_artifact_path,
+    problem_hash_short_label,
+    read_problem_hash_artifact,
+)
 from pneumo_solver_ui.packaging_surface_helpers import collect_packaging_surface_metrics
 
 
@@ -45,6 +61,13 @@ class OptimizationRunSummary:
     penalty_tol: Optional[float] = None
     objective_source: str = ''
     objective_contract_path: Optional[Path] = None
+    problem_hash: str = ''
+    problem_hash_path: Optional[Path] = None
+    problem_hash_mode: str = ''
+    problem_hash_mode_path: Optional[Path] = None
+    baseline_source_kind: str = ''
+    baseline_source_label: str = ''
+    baseline_source_path: Optional[Path] = None
 
 
 @dataclass(frozen=True)
@@ -215,7 +238,7 @@ def _read_objective_contract(run_dir: Path) -> tuple[Dict[str, Any], Optional[Pa
     cfg = spec_payload.get('cfg') if isinstance(spec_payload.get('cfg'), dict) else {}
     if isinstance(cfg, dict) and cfg:
         payload = objective_contract_payload(
-            objective_keys=cfg.get('objective_keys') if isinstance(cfg.get('objective_keys'), (list, tuple)) else None,
+            objective_keys=cfg.get('objective_keys'),
             penalty_key=str(cfg.get('penalty_key') or ''),
             penalty_tol=cfg.get('penalty_tol') if 'penalty_tol' in cfg else None,
             source='problem_spec_cfg_fallback',
@@ -226,9 +249,7 @@ def _read_objective_contract(run_dir: Path) -> tuple[Dict[str, Any], Optional[Pa
 
 def _objective_contract_fields(run_dir: Path) -> dict[str, Any]:
     payload, payload_path = _read_objective_contract(run_dir)
-    objective_keys = tuple(
-        str(x).strip() for x in (payload.get('objective_keys') or []) if str(x).strip()
-    ) if isinstance(payload.get('objective_keys'), (list, tuple)) else tuple()
+    objective_keys = normalize_objective_keys(payload.get('objective_keys'))
     penalty_key = str(payload.get('penalty_key') or '').strip()
     penalty_tol = _float_or_none(payload.get('penalty_tol')) if 'penalty_tol' in payload else None
     return {
@@ -237,6 +258,35 @@ def _objective_contract_fields(run_dir: Path) -> dict[str, Any]:
         'penalty_tol': penalty_tol,
         'objective_source': str(payload.get('source') or ''),
         'objective_contract_path': payload_path,
+    }
+
+
+def _baseline_source_fields(run_dir: Path) -> dict[str, Any]:
+    payload = read_baseline_source_artifact(run_dir)
+    source_kind = str(payload.get('source_kind') or '').strip().lower()
+    source_label = str(payload.get('source_label') or '').strip()
+    baseline_path_raw = str(payload.get('baseline_path') or '').strip()
+    baseline_path: Optional[Path] = None
+    if baseline_path_raw:
+        try:
+            baseline_path = Path(baseline_path_raw)
+        except Exception:
+            baseline_path = None
+    return {
+        'baseline_source_kind': source_kind,
+        'baseline_source_label': source_label,
+        'baseline_source_path': baseline_path,
+    }
+
+
+def _problem_scope_fields(run_dir: Path) -> dict[str, Any]:
+    problem_hash = read_problem_hash_artifact(run_dir)
+    problem_hash_mode = read_problem_hash_mode_artifact(run_dir)
+    return {
+        'problem_hash': problem_hash,
+        'problem_hash_path': problem_hash_artifact_path(run_dir) if problem_hash else None,
+        'problem_hash_mode': problem_hash_mode,
+        'problem_hash_mode_path': problem_hash_mode_artifact_path(run_dir) if problem_hash_mode else None,
     }
 
 
@@ -284,6 +334,8 @@ def _summarize_staged_run(run_dir: Path, *, active_run_dir: Optional[Path]) -> O
     except Exception:
         updated_ts = 0.0
     contract = _objective_contract_fields(run_dir)
+    problem_scope = _problem_scope_fields(run_dir)
+    baseline_source = _baseline_source_fields(run_dir)
     return OptimizationRunSummary(
         run_dir=run_dir,
         pipeline_mode='staged',
@@ -301,6 +353,13 @@ def _summarize_staged_run(run_dir: Path, *, active_run_dir: Optional[Path]) -> O
         penalty_tol=contract['penalty_tol'],
         objective_source=str(contract['objective_source']),
         objective_contract_path=contract['objective_contract_path'],
+        problem_hash=str(problem_scope['problem_hash']),
+        problem_hash_path=problem_scope['problem_hash_path'],
+        problem_hash_mode=str(problem_scope['problem_hash_mode']),
+        problem_hash_mode_path=problem_scope['problem_hash_mode_path'],
+        baseline_source_kind=str(baseline_source['baseline_source_kind']),
+        baseline_source_label=str(baseline_source['baseline_source_label']),
+        baseline_source_path=baseline_source['baseline_source_path'],
     )
 
 
@@ -369,6 +428,8 @@ def _summarize_coordinator_run(run_dir: Path, *, active_run_dir: Optional[Path])
     except Exception:
         updated_ts = 0.0
     contract = _objective_contract_fields(run_dir)
+    problem_scope = _problem_scope_fields(run_dir)
+    baseline_source = _baseline_source_fields(run_dir)
     return OptimizationRunSummary(
         run_dir=run_dir,
         pipeline_mode='coordinator',
@@ -390,6 +451,13 @@ def _summarize_coordinator_run(run_dir: Path, *, active_run_dir: Optional[Path])
         penalty_tol=contract['penalty_tol'],
         objective_source=str(contract['objective_source']),
         objective_contract_path=contract['objective_contract_path'],
+        problem_hash=str(problem_scope['problem_hash']),
+        problem_hash_path=problem_scope['problem_hash_path'],
+        problem_hash_mode=str(problem_scope['problem_hash_mode']),
+        problem_hash_mode_path=problem_scope['problem_hash_mode_path'],
+        baseline_source_kind=str(baseline_source['baseline_source_kind']),
+        baseline_source_label=str(baseline_source['baseline_source_label']),
+        baseline_source_path=baseline_source['baseline_source_path'],
     )
 
 
@@ -430,6 +498,8 @@ def format_run_choice(summary: OptimizationRunSummary) -> str:
         suffix = f' · rows={summary.row_count}'
     if summary.pipeline_mode == 'coordinator':
         suffix = f' · done={summary.done_count}/run={summary.running_count}/err={summary.error_count}'
+    if summary.baseline_source_kind:
+        suffix += f' · base={baseline_source_short_label(summary.baseline_source_kind)}'
     return f'[{summary.status_label}] {summary.backend} · {summary.run_dir.name}{suffix}'
 
 

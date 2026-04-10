@@ -33,7 +33,7 @@ def render_stage_runner_configuration_controls(
             "influence-aware seed/promotion policy. Именно эти ручки определяют поведение `opt_stage_runner_v1.py`."
         )
 
-        c_s0, c_s1, c_s2 = st.columns([1, 1, 1])
+        c_s0, c_s1, c_s2, c_s3 = st.columns([1, 1, 1, 1])
         with c_s0:
             st.number_input(
                 "Минуты на staged run",
@@ -64,9 +64,23 @@ def render_stage_runner_configuration_controls(
                 key="opt_autoupdate_baseline",
                 help="Если найден кандидат лучше текущего baseline — StageRunner запишет его в workspace/baselines/baseline_best.json.",
             )
-
-        c_s3, c_s4, c_s5, c_s6 = st.columns([1, 1, 1, 1])
         with c_s3:
+            stage_resume_enabled = st.checkbox(
+                "Resume staged run",
+                value=bool(st.session_state.get("opt_stage_resume", False)),
+                key="opt_stage_resume",
+                help=(
+                    "Продолжает staged run в совместимую папку: сначала берёт выбранный staged run из истории, "
+                    "иначе подхватывает последний совместимый run в workspace."
+                ),
+            )
+        if stage_resume_enabled:
+            st.caption(
+                "Resume mode: StageRunner продолжит выбранный staged run из истории или последний совместимый run_dir в workspace."
+            )
+
+        c_s4, c_s5, c_s6, c_s7 = st.columns([1, 1, 1, 1])
+        with c_s4:
             st.number_input(
                 "Seed кандидатов",
                 min_value=0,
@@ -79,7 +93,7 @@ def render_stage_runner_configuration_controls(
                 key="ui_seed_candidates",
                 help="Влияет только на генерацию набора кандидатов в staged optimizer.",
             )
-        with c_s4:
+        with c_s5:
             st.number_input(
                 "Seed условий",
                 min_value=0,
@@ -92,7 +106,7 @@ def render_stage_runner_configuration_controls(
                 key="ui_seed_conditions",
                 help="Влияет на стохастические условия в staged tests (если они включены).",
             )
-        with c_s5:
+        with c_s6:
             st.number_input(
                 "flush_every",
                 min_value=1,
@@ -102,7 +116,7 @@ def render_stage_runner_configuration_controls(
                 key="ui_flush_every",
                 help="Как часто StageRunner сбрасывает строки результатов в CSV на диск.",
             )
-        with c_s6:
+        with c_s7:
             st.number_input(
                 "progress_every_sec",
                 min_value=0.2,

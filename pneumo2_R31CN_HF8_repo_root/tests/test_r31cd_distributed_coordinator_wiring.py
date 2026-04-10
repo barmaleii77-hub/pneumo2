@@ -8,7 +8,11 @@ from pneumo_solver_ui.optimization_distributed_wiring import (
     migrated_ray_runtime_env_json,
     migrated_ray_runtime_env_mode,
 )
-from pneumo_solver_ui.tools.dist_opt_coordinator import build_arg_parser, resolve_proposer_mode
+from pneumo_solver_ui.tools.dist_opt_coordinator import (
+    build_arg_parser,
+    build_run_record_meta,
+    resolve_proposer_mode,
+)
 
 
 def _flag_values(cmd: list[str], flag: str) -> list[str]:
@@ -134,6 +138,27 @@ def test_r31cd_resolve_proposer_mode_honors_warmup_and_feasible_gates() -> None:
     hot_portfolio = resolve_proposer_mode(portfolio_args, done_n=4, feasible_n=2, dim=2)
     assert hot_portfolio["mode"] == "portfolio"
     assert hot_portfolio["portfolio_enabled"] is True
+
+
+def test_r31cd_run_record_meta_persists_hash_mode_and_objective_contract() -> None:
+    meta = build_run_record_meta(
+        SimpleNamespace(
+            backend="ray",
+            seed=17,
+            penalty_key="penalty_total",
+            penalty_tol=0.25,
+        ),
+        objective_keys=["comfort", "energy"],
+        problem_hash_mode="legacy",
+    )
+
+    assert meta["created_by"] == "dist_opt_coordinator_R59"
+    assert meta["backend"] == "ray"
+    assert meta["seed"] == 17
+    assert meta["problem_hash_mode"] == "legacy"
+    assert meta["objective_contract"]["objective_keys"] == ["comfort", "energy"]
+    assert meta["objective_contract"]["penalty_key"] == "penalty_total"
+    assert float(meta["objective_contract"]["penalty_tol"]) == 0.25
 
 
 def test_r31cd_runtime_arg_builder_restores_real_wiring_for_dask_and_ray() -> None:

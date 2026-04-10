@@ -77,13 +77,23 @@ def test_launch_session_ui_routes_running_job_into_live_panel() -> None:
     )
 
     def _render_live(_st, _job, **kwargs):
-        events.append(("live", kwargs["coordinator_done"], kwargs["soft_stop_requested"]))
+        events.append(
+            (
+                "live",
+                kwargs["coordinator_done"],
+                kwargs["soft_stop_requested"],
+                kwargs["current_problem_hash"],
+                kwargs["current_problem_hash_mode"],
+            )
+        )
         return True
 
     render_optimization_launch_session_block(
         st,
         job=job,
         is_staged=False,
+        current_problem_hash="ph_launch_ui_scope",
+        current_problem_hash_mode="legacy",
         tail_file_text_fn=lambda _: "done=5",
         soft_stop_requested_fn=lambda _: True,
         parse_done_from_log_fn=lambda text: 5 if "5" in text else None,
@@ -100,7 +110,7 @@ def test_launch_session_ui_routes_running_job_into_live_panel() -> None:
     )
 
     assert any(kind == "markdown" and "dist_opt_coordinator.py" in text for kind, text in st.calls)
-    assert events == [("live", 5, True)]
+    assert events == [("live", 5, True, "ph_launch_ui_scope", "legacy")]
 
 
 def test_launch_session_ui_routes_finished_job_into_finished_panel() -> None:

@@ -570,6 +570,7 @@ def optimization_ready_session_defaults(
         "ui_jobs": int(diagnostics_jobs_default(cpu_n, platform_name=platform_norm)),
         "opt_use_staged": bool(DIAGNOSTIC_USE_STAGED_OPT),
         "use_staged_opt": bool(DIAGNOSTIC_USE_STAGED_OPT),
+        "opt_stage_resume": False,
         "opt_autoupdate_baseline": True,
         "autoupdate_baseline": True,
         "warmstart_mode": str(DIAGNOSTIC_WARMSTART_MODE),

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Mapping, Optional, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from pneumo_solver_ui.optimization_page_readonly_ui import (
     current_objective_keys,
@@ -30,6 +30,8 @@ def render_workspace_run_history_block(
     current_penalty_tol: Any,
     load_log_text: Callable[[Path], str],
     rerun_fn: Callable[[Any], None],
+    current_problem_hash: str = "",
+    current_problem_hash_mode: str = "",
     discover_runs_fn: Callable[..., list[Any]] = discover_workspace_optimization_runs,
     format_run_choice_fn: Callable[[Any], str] = format_run_choice,
     render_details_fn: Callable[..., Any] = render_selected_optimization_run_details,
@@ -43,7 +45,8 @@ def render_workspace_run_history_block(
 
     st.caption(
         "Если вы запускаете оптимизации последовательно (например, сначала StageRunner, потом coordinator), "
-        "это нормальный инженерный сценарий. staged и coordinator run dirs показаны одновременно, чтобы второй запуск не затирал понимание первого."
+        "это нормальный инженерный сценарий. staged и coordinator run dirs показаны одновременно, чтобы второй запуск "
+        "не затирал понимание первого."
     )
 
     option_map = {str(item.run_dir): item for item in summaries}
@@ -98,6 +101,8 @@ def render_workspace_run_history_block(
         ).strip(),
         current_penalty_tol=current_penalty_tol,
         load_log_text=load_log_text,
+        current_problem_hash=current_problem_hash,
+        current_problem_hash_mode=current_problem_hash_mode,
     )
 
     render_pointer_actions_fn(

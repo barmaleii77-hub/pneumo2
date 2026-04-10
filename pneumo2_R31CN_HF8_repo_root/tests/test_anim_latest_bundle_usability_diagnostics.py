@@ -138,6 +138,13 @@ def test_sources_wire_bundle_usability_diagnostics_everywhere() -> None:
     assert "usable_from_bundle" in validate_text
     assert "pointer_json_in_bundle" in validate_text
     assert "npz_path_in_bundle" in validate_text
+    assert 'rep["optimizer_scope"]' in validate_text
+    assert 'rep["optimizer_scope_gate"]' in validate_text
+    assert "release_risks" in validate_text
     assert "usable_from_bundle" in health_text
+    assert "scope_sync_ok" in health_text
+    assert 'signals["optimizer_scope_gate"]' in health_text
     assert "usable_from_bundle" in dashboard_text
+    assert "optimizer.scope_sync" in dashboard_text
+    assert "optimizer.gate" in dashboard_text
     assert "anim_latest_usable" in triage_text

@@ -69,6 +69,10 @@ def test_selected_run_details_renderer_surfaces_contract_packaging_and_log() -> 
         started_at="2026-04-08 20:00:00",
         note="note text",
         last_error="error text",
+        problem_hash="ph_history_scope_987654",
+        problem_hash_mode="legacy",
+        baseline_source_label="scoped baseline",
+        baseline_source_path=Path("C:/tmp/workspace/baselines/by_problem/p_demo/baseline_best.json"),
         objective_keys=("comfort", "roll"),
         penalty_key="penalty_total",
         penalty_tol=0.25,
@@ -79,15 +83,23 @@ def test_selected_run_details_renderer_surfaces_contract_packaging_and_log() -> 
     render_selected_optimization_run_details(
         st,
         summary,
+        current_problem_hash="ph_current_scope_123456",
         current_objective_keys=("comfort", "pitch"),
         current_penalty_key="other_penalty",
         current_penalty_tol=0.0,
+        current_problem_hash_mode="stable",
         load_log_text=lambda _: "line1\nline2",
     )
 
     assert ("write", "**Pipeline:** ray") in st.calls
     assert ("caption", "note text") in st.calls
     assert ("warning", "Последняя ошибка из артефактов: error text") in st.calls
+    assert ("write", "**Problem scope:** `ph_history_s`") in st.calls
+    assert any(kind == "caption" and "Hash mode:" in text and "legacy" in text for kind, text in st.calls)
+    assert ("write", "**Baseline source:** scoped baseline") in st.calls
+    assert ("caption", r"Baseline override at launch: `C:\tmp\workspace\baselines\by_problem\p_demo\baseline_best.json`") in st.calls
+    assert any(kind == "warning" and "different optimization problem" in text for kind, text in st.calls)
+    assert any(kind == "warning" and "Hash mode differs from current launch contract" in text for kind, text in st.calls)
     assert ("write", "**Objective stack:** comfort, roll") in st.calls
     assert ("write", "**Hard gate:** `penalty_total` (tol=0.25)") in st.calls
     assert any(kind == "info" and "objective stack, penalty key, penalty tol" in text for kind, text in st.calls)

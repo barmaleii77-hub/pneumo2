@@ -45,6 +45,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from pneumo_solver_ui.optimization_scope_compare import (
+    compare_optimizer_scope_sources,
+    evaluate_optimizer_scope_gate,
+    extract_optimizer_scope_from_health,
+    extract_optimizer_scope_from_run_scope,
+    extract_optimizer_scope_from_triage,
+    extract_optimizer_scope_from_validation,
+    optimizer_scope_export_source_name,
+)
+
 from .send_bundle_contract import (
     ANIM_DIAG_JSON,
     ANIM_DIAG_MD,
@@ -178,6 +188,8 @@ def generate_dashboard_report(
         "errors": [],
         "warnings": [],
         "anim_latest": {},
+        "optimizer_scope": {},
+        "optimizer_scope_gate": {},
     }
 
     # -----------------------------
@@ -241,6 +253,56 @@ def generate_dashboard_report(
         "md_path": str(val_md_path) if val_md_path.exists() else None,
         "json_path": str(val_json_path) if val_json_path.exists() else None,
     }
+
+    optimizer_scope_sources: Dict[str, Dict[str, Any]] = {}
+    triage_scope = extract_optimizer_scope_from_triage(triage_json)
+    if triage_scope:
+        optimizer_scope_sources[str(triage_scope.get("source") or "triage")] = triage_scope
+
+    validation_scope = extract_optimizer_scope_from_validation(val_json)
+    if validation_scope:
+        optimizer_scope_sources[str(validation_scope.get("source") or "validation")] = validation_scope
+
+    if zip_path is not None:
+        health_scope = extract_optimizer_scope_from_health(_safe_zip_json_load(zip_path, "health/health_report.json"))
+        if health_scope:
+            optimizer_scope_sources[str(health_scope.get("source") or "health")] = health_scope
+        try:
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                for arcname in sorted(
+                    name
+                    for name in zf.namelist()
+                    if name == "run_scope.json" or name.endswith("/export/run_scope.json")
+                ):
+                    export_scope = extract_optimizer_scope_from_run_scope(
+                        _safe_zip_json_load(zip_path, arcname),
+                        source=optimizer_scope_export_source_name(arcname),
+                        source_path=arcname,
+                    )
+                    if export_scope:
+                        optimizer_scope_sources[str(export_scope.get("source") or arcname)] = export_scope
+        except Exception:
+            rep["warnings"].append("failed to inspect optimizer scope artifacts from ZIP")
+
+    optimizer_scope = compare_optimizer_scope_sources(
+        optimizer_scope_sources,
+        preferred_order=("triage", "health", "validation", "export"),
+    )
+    if optimizer_scope:
+        rep["optimizer_scope"] = optimizer_scope
+        optimizer_scope_gate = evaluate_optimizer_scope_gate(optimizer_scope)
+        rep["optimizer_scope_gate"] = optimizer_scope_gate
+        for issue in optimizer_scope.get("issues") or []:
+            msg = str(issue).strip()
+            if msg and msg not in rep["warnings"]:
+                rep["warnings"].append(msg)
+        if optimizer_scope_gate.get("release_risk"):
+            risk_msg = (
+                "optimizer scope release risk: "
+                f"{optimizer_scope_gate.get('release_gate_reason') or 'mismatch detected'}"
+            )
+            if risk_msg not in rep["warnings"]:
+                rep["warnings"].append(risk_msg)
 
     # -----------------------------
     # Load anim_latest diagnostics
@@ -388,12 +450,42 @@ def generate_dashboard_report(
     anim_browser_perf_comparison_status = str(anim_summary.get("browser_perf_comparison_status") or "")
     anim_browser_perf_comparison_level = str(anim_summary.get("browser_perf_comparison_level") or "")
     anim_browser_perf_comparison_ready = anim_summary.get("browser_perf_comparison_ready")
+    optimizer_scope = dict(rep.get("optimizer_scope") or {})
+    optimizer_scope_gate = dict(rep.get("optimizer_scope_gate") or {})
+    optimizer_problem_scope = str(
+        optimizer_scope.get("problem_hash_short")
+        or optimizer_scope.get("problem_hash")
+        or ""
+    )
+    optimizer_hash_mode = str(optimizer_scope.get("problem_hash_mode") or "")
+    optimizer_scope_sync = optimizer_scope.get("scope_sync_ok")
+    optimizer_scope_source = str(optimizer_scope.get("canonical_source") or "")
+    optimizer_objective_keys = list(optimizer_scope.get("objective_keys") or [])
+    optimizer_scope_gate_name = str(optimizer_scope_gate.get("release_gate") or "")
+    optimizer_scope_release_risk = optimizer_scope_gate.get("release_risk")
+    optimizer_scope_gate_reason = str(optimizer_scope_gate.get("release_gate_reason") or "")
     if anim_pointer_sync is True:
         anim_pointer_sync_html = '<span class="ok">OK</span>'
     elif anim_pointer_sync is False:
         anim_pointer_sync_html = '<span class="bad">MISMATCH</span>'
     else:
         anim_pointer_sync_html = '<span class="warn">n/a</span>'
+    if optimizer_scope_sync is True:
+        optimizer_scope_sync_html = '<span class="ok">OK</span>'
+    elif optimizer_scope_sync is False:
+        optimizer_scope_sync_html = '<span class="bad">MISMATCH</span>'
+    else:
+        optimizer_scope_sync_html = '<span class="warn">n/a</span>'
+    if optimizer_scope_gate_name == "PASS":
+        optimizer_scope_gate_html = '<span class="ok">PASS</span>'
+    elif optimizer_scope_gate_name == "FAIL":
+        optimizer_scope_gate_html = '<span class="bad">FAIL</span>'
+    elif optimizer_scope_gate_name == "WARN":
+        optimizer_scope_gate_html = '<span class="warn">WARN</span>'
+    elif optimizer_scope_gate_name:
+        optimizer_scope_gate_html = f'<span class="warn">{_html_escape(optimizer_scope_gate_name)}</span>'
+    else:
+        optimizer_scope_gate_html = '<span class="warn">n/a</span>'
 
     env_run_id = os.environ.get("PNEUMO_RUN_ID") or ""
 
@@ -436,12 +528,32 @@ def generate_dashboard_report(
       <div class=\"k\">browser_perf.bundle_ready</div><div>{'<span class="ok">YES</span>' if anim_browser_perf_bundle_ready is True else ('<span class="bad">NO</span>' if anim_browser_perf_bundle_ready is False else '<span class="warn">n/a</span>')}</div>
       <div class=\"k\">browser_perf.comparison</div><div>{_html_escape((anim_browser_perf_comparison_status or '—') + (f' / {anim_browser_perf_comparison_level}' if anim_browser_perf_comparison_level else ''))}</div>
       <div class=\"k\">browser_perf.comparison_ready</div><div>{'<span class="ok">YES</span>' if anim_browser_perf_comparison_ready is True else ('<span class="bad">NO</span>' if anim_browser_perf_comparison_ready is False else '<span class="warn">n/a</span>')}</div>
+      <div class=\"k\">optimizer.problem_hash</div><div>{_html_escape(optimizer_problem_scope or 'вЂ”')}</div>
+      <div class=\"k\">optimizer.hash_mode</div><div>{_html_escape(optimizer_hash_mode or 'вЂ”')}</div>
+      <div class=\"k\">optimizer.gate</div><div>{optimizer_scope_gate_html}</div>
+      <div class=\"k\">optimizer.scope_sync</div><div>{optimizer_scope_sync_html}</div>
+      <div class=\"k\">optimizer.scope_source</div><div>{_html_escape(optimizer_scope_source or 'вЂ”')}</div>
     </div>
   </div>
 
   <details open>
     <summary>📌 Triage report (markdown)</summary>
     <pre>{_html_escape(triage_md)}</pre>
+  </details>
+
+  <details>
+    <summary>рџ§­ Optimizer scope</summary>
+    <div class=\"grid\">
+      <div class=\"k\">problem_hash</div><div>{_html_escape(optimizer_problem_scope or 'вЂ”')}</div>
+      <div class=\"k\">problem_hash_mode</div><div>{_html_escape(optimizer_hash_mode or 'вЂ”')}</div>
+      <div class=\"k\">release_gate</div><div>{optimizer_scope_gate_html}</div>
+      <div class=\"k\">release_risk</div><div>{_html_escape(str(optimizer_scope_release_risk))}</div>
+      <div class=\"k\">gate_reason</div><div>{_html_escape(optimizer_scope_gate_reason or 'вЂ”')}</div>
+      <div class=\"k\">scope_sync_ok</div><div>{optimizer_scope_sync_html}</div>
+      <div class=\"k\">canonical_source</div><div>{_html_escape(optimizer_scope_source or 'вЂ”')}</div>
+      <div class=\"k\">objective_keys</div><div>{_html_escape(', '.join(str(x) for x in optimizer_objective_keys) if optimizer_objective_keys else 'вЂ”')}</div>
+    </div>
+    <pre>{_html_escape(_pretty_json(optimizer_scope) if optimizer_scope else '(optimizer scope not found)')}</pre>
   </details>
 
   <details>

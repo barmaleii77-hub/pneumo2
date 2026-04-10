@@ -253,6 +253,13 @@ def _safe_write_text(path: Path, text: str) -> None:
         path.write_text(text, encoding="utf-8", errors="replace")
 
 
+def _format_anim_diag_error(exc: BaseException) -> str:
+    if isinstance(exc, ModuleNotFoundError):
+        missing = str(getattr(exc, "name", "") or "").strip() or "unknown"
+        return f"Отсутствует необязательная зависимость: {missing}"
+    return repr(exc)
+
+
 def _collect_anim_latest_bundle_diagnostics(out_dir: Path) -> Tuple[Dict[str, Any], str]:
     """Build sidecar diagnostics for the current global anim_latest pointer.
 
@@ -266,9 +273,13 @@ def _collect_anim_latest_bundle_diagnostics(out_dir: Path) -> Tuple[Dict[str, An
 
         diag = dict(collect_anim_latest_diagnostics_summary(include_meta=True) or {})
     except Exception as exc:
+        friendly_error = _format_anim_diag_error(exc)
         diag = {
             "anim_latest_available": False,
-            "error": repr(exc),
+            "error": friendly_error,
+            "anim_latest_issues": [
+                f"Не удалось собрать anim_latest diagnostics: {friendly_error}.",
+            ],
         }
 
     deps = dict(diag.get("anim_latest_visual_cache_dependencies") or {})
@@ -927,6 +938,65 @@ def _make_send_bundle_inner(
         anim_diag_event = {"anim_latest_available": False, "error": traceback.format_exc()}
         anim_diag_md = "# Anim Latest Pointer Diagnostics\n\nerror collecting diagnostics\n"
 
+    def _generate_triage_report_payload() -> Tuple[str, Dict[str, Any], Any]:
+        from pneumo_solver_ui.tools.triage_report import generate_triage_report, write_triage_report
+
+        triage_md, triage_json = generate_triage_report(
+            repo_root,
+            keep_last_n=int(keep_last_n),
+            primary_session_dir=primary_session_dir,
+        )
+        return str(triage_md), dict(triage_json or {}), write_triage_report
+
+    def _write_triage_report_entries(
+        zip_handle: zipfile.ZipFile,
+        *,
+        md_arcname: str,
+        json_arcname: str,
+        triage_md: str,
+        triage_json: Dict[str, Any],
+    ) -> None:
+        zip_handle.writestr(md_arcname, triage_md)
+        zip_handle.writestr(json_arcname, json.dumps(triage_json, ensure_ascii=False, indent=2))
+
+    def _persist_triage_sidecars(triage_md: str, triage_json: Dict[str, Any], triage_writer: Any) -> None:
+        triage_writer(out_dir, triage_md, triage_json, stamp=stamp)
+
+    def _run_triage_pass(
+        *,
+        md_arcname: str,
+        json_arcname: str,
+        rewrite_bundle_refs: bool,
+        zip_handle: Optional[zipfile.ZipFile] = None,
+        extra_sidecar_paths: Iterable[Path] = (),
+    ) -> None:
+        _triage_md, _triage_json, _triage_writer = _generate_triage_report_payload()
+        if rewrite_bundle_refs:
+            _triage_md = _rewrite_triage_bundle_refs(_triage_md)
+        if zip_handle is None:
+            with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as _zt:
+                _write_triage_report_entries(
+                    _zt,
+                    md_arcname=md_arcname,
+                    json_arcname=json_arcname,
+                    triage_md=_triage_md,
+                    triage_json=_triage_json,
+                )
+        else:
+            _write_triage_report_entries(
+                zip_handle,
+                md_arcname=md_arcname,
+                json_arcname=json_arcname,
+                triage_md=_triage_md,
+                triage_json=_triage_json,
+            )
+        for _p in extra_sidecar_paths:
+            _embed_triage_sidecars((_p,))
+        try:
+            _persist_triage_sidecars(_triage_md, _triage_json, _triage_writer)
+        except Exception:
+            pass
+
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as z:
         # --- meta & docs inside bundle ---
         z.writestr("bundle/meta.json", json.dumps(meta, ensure_ascii=False, indent=2))
@@ -936,22 +1006,12 @@ def _make_send_bundle_inner(
 
         # --- triage report (best-effort) ---
         try:
-            from pneumo_solver_ui.tools.triage_report import generate_triage_report, write_triage_report
-
-            triage_md, triage_json = generate_triage_report(
-                repo_root,
-                keep_last_n=int(keep_last_n),
-                primary_session_dir=primary_session_dir,
+            _run_triage_pass(
+                md_arcname="triage/triage_report_pre.md",
+                json_arcname="triage/triage_report_pre.json",
+                rewrite_bundle_refs=False,
+                zip_handle=z,
             )
-            z.writestr("triage/triage_report_pre.md", triage_md)
-            z.writestr("triage/triage_report_pre.json", json.dumps(triage_json, ensure_ascii=False, indent=2))
-
-            # Also keep a copy next to bundles (latest_triage_report.*) for quick access.
-            try:
-                write_triage_report(out_dir, triage_md, triage_json, stamp=stamp)
-            except Exception:
-                pass
-
         except Exception:
             # do not fail bundle generation
             z.writestr("triage/triage_failed.txt", traceback.format_exc())
@@ -1627,43 +1687,152 @@ def _make_send_bundle_inner(
     validation_ok: Optional[bool] = None
     validation_errors: int = 0
     validation_warnings: int = 0
-    try:
-        from pneumo_solver_ui.tools.validate_send_bundle import validate_send_bundle
+    validation_release_risks: int = 0
+    optimizer_scope_gate: Dict[str, Any] = {}
+    optimizer_scope_summary: Dict[str, Any] = {}
+    optimizer_scope_release_gate: str = ""
+    optimizer_scope_release_risk: Optional[bool] = None
+    optimizer_scope_release_gate_reason: str = ""
+    optimizer_scope_problem_hash: str = ""
+    optimizer_scope_problem_hash_short: str = ""
+    optimizer_scope_problem_hash_mode: str = ""
+    optimizer_scope_sync_ok: Any = None
+    optimizer_scope_canonical_source: str = ""
+    optimizer_scope_mismatch_fields: List[str] = []
+    latest_validation_md = out_dir / "latest_send_bundle_validation.md"
+    latest_validation_json = out_dir / "latest_send_bundle_validation.json"
+    def _reset_validation_projection() -> None:
+        nonlocal validation_errors, validation_warnings, validation_release_risks
+        nonlocal optimizer_scope_gate, optimizer_scope_summary
+        nonlocal optimizer_scope_release_gate, optimizer_scope_release_risk
+        nonlocal optimizer_scope_release_gate_reason
+        nonlocal optimizer_scope_problem_hash, optimizer_scope_problem_hash_short
+        nonlocal optimizer_scope_problem_hash_mode, optimizer_scope_sync_ok
+        nonlocal optimizer_scope_canonical_source, optimizer_scope_mismatch_fields
 
-        vres = validate_send_bundle(zip_path)
-        validation_ok = bool(vres.ok)
-        try:
-            validation_errors = int(len(vres.report_json.get("errors") or []))
-            validation_warnings = int(len(vres.report_json.get("warnings") or []))
-        except Exception:
-            validation_errors = 0
-            validation_warnings = 0
+        validation_errors = 0
+        validation_warnings = 0
+        validation_release_risks = 0
+        optimizer_scope_gate = {}
+        optimizer_scope_summary = {}
+        optimizer_scope_release_gate = ""
+        optimizer_scope_release_risk = None
+        optimizer_scope_release_gate_reason = ""
+        optimizer_scope_problem_hash = ""
+        optimizer_scope_problem_hash_short = ""
+        optimizer_scope_problem_hash_mode = ""
+        optimizer_scope_sync_ok = None
+        optimizer_scope_canonical_source = ""
+        optimizer_scope_mismatch_fields = []
 
-        # Embed into the same ZIP (append mode).
-        with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as z2:
-            z2.writestr("validation/validation_report.md", vres.report_md)
-            z2.writestr(
+    def _project_validation_report(report_json: Dict[str, Any]) -> None:
+        nonlocal validation_errors, validation_warnings, validation_release_risks
+        nonlocal optimizer_scope_gate, optimizer_scope_summary
+        nonlocal optimizer_scope_release_gate, optimizer_scope_release_risk
+        nonlocal optimizer_scope_release_gate_reason
+        nonlocal optimizer_scope_problem_hash, optimizer_scope_problem_hash_short
+        nonlocal optimizer_scope_problem_hash_mode, optimizer_scope_sync_ok
+        nonlocal optimizer_scope_canonical_source, optimizer_scope_mismatch_fields
+
+        validation_errors = int(len(report_json.get("errors") or []))
+        validation_warnings = int(len(report_json.get("warnings") or []))
+        validation_release_risks = int(len(report_json.get("release_risks") or []))
+        optimizer_scope_gate = dict(report_json.get("optimizer_scope_gate") or {})
+        optimizer_scope_raw = dict(report_json.get("optimizer_scope") or {})
+        optimizer_scope_summary = {}
+        optimizer_scope_release_gate = str(optimizer_scope_gate.get("release_gate") or "").strip().upper()
+        optimizer_scope_release_risk = (
+            bool(optimizer_scope_gate.get("release_risk")) if "release_risk" in optimizer_scope_gate else None
+        )
+        optimizer_scope_release_gate_reason = str(optimizer_scope_gate.get("release_gate_reason") or "").strip()
+        optimizer_scope_problem_hash = str(optimizer_scope_raw.get("problem_hash") or "").strip()
+        optimizer_scope_problem_hash_short = str(optimizer_scope_raw.get("problem_hash_short") or "").strip()
+        optimizer_scope_problem_hash_mode = str(optimizer_scope_raw.get("problem_hash_mode") or "").strip()
+        optimizer_scope_sync_ok = optimizer_scope_raw.get("scope_sync_ok")
+        optimizer_scope_canonical_source = str(
+            optimizer_scope_raw.get("canonical_source") or optimizer_scope_gate.get("canonical_source") or ""
+        ).strip()
+        optimizer_scope_mismatch_fields = [
+            str(x).strip() for x in (optimizer_scope_gate.get("mismatch_fields") or []) if str(x).strip()
+        ]
+        for key in (
+            "problem_hash",
+            "problem_hash_short",
+            "problem_hash_mode",
+            "scope_sync_ok",
+            "canonical_source",
+            "source_count",
+            "penalty_key",
+            "penalty_tol",
+        ):
+            value = optimizer_scope_raw.get(key)
+            if value not in (None, "", [], {}):
+                optimizer_scope_summary[key] = value
+        objective_keys = [str(x).strip() for x in (optimizer_scope_raw.get("objective_keys") or []) if str(x).strip()]
+        if objective_keys:
+            optimizer_scope_summary["objective_keys"] = objective_keys
+        if optimizer_scope_mismatch_fields:
+            optimizer_scope_summary["mismatch_fields"] = list(optimizer_scope_mismatch_fields)
+
+    def _write_validation_sidecars(report_md: str, report_json: Dict[str, Any]) -> None:
+        _safe_write_text(latest_validation_md, report_md)
+        _safe_write_text(
+            latest_validation_json,
+            json.dumps(report_json, ensure_ascii=False, indent=2),
+        )
+
+    def _embed_triage_sidecars(paths: Iterable[Path]) -> None:
+        with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as _zt:
+            for _p in paths:
+                if _p.exists():
+                    _zt.write(_p, arcname=f"triage/{_p.name}")
+
+    def _embed_validation_report(report_md: str, report_json: Dict[str, Any]) -> None:
+        with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as _zv:
+            _zv.writestr("validation/validation_report.md", report_md)
+            _zv.writestr(
                 "validation/validation_report.json",
-                json.dumps(vres.report_json, ensure_ascii=False, indent=2),
+                json.dumps(report_json, ensure_ascii=False, indent=2),
             )
 
-        # Sidecars for quick access (without opening ZIP)
-        try:
-            _safe_write_text(out_dir / "latest_send_bundle_validation.md", vres.report_md)
-            _safe_write_text(
-                out_dir / "latest_send_bundle_validation.json",
-                json.dumps(vres.report_json, ensure_ascii=False, indent=2),
-            )
-        except Exception:
-            pass
+    def _embed_validation_sidecars_into_triage() -> None:
+        _embed_triage_sidecars((latest_validation_md, latest_validation_json))
 
-    except Exception:
-        # best-effort: do not fail bundle creation
+    def _run_validation_pass(*, embed_report: bool, embed_triage_sidecars: bool, failure_name: str) -> None:
+        nonlocal validation_ok
+
         try:
-            with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as z2:
-                z2.writestr("validation/validation_failed.txt", traceback.format_exc())
+            from pneumo_solver_ui.tools.validate_send_bundle import validate_send_bundle as _validate_send_bundle
+
+            _vres = _validate_send_bundle(zip_path)
+            validation_ok = bool(_vres.ok)
+            try:
+                _project_validation_report(dict(_vres.report_json or {}))
+            except Exception:
+                _reset_validation_projection()
+            try:
+                _write_validation_sidecars(_vres.report_md, dict(_vres.report_json or {}))
+            except Exception:
+                pass
+            if embed_report:
+                _embed_validation_report(_vres.report_md, dict(_vres.report_json or {}))
+            if embed_triage_sidecars:
+                try:
+                    _embed_validation_sidecars_into_triage()
+                except Exception:
+                    pass
         except Exception:
-            pass
+            try:
+                with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as z2:
+                    z2.writestr(failure_name, traceback.format_exc())
+            except Exception:
+                pass
+
+    _run_validation_pass(
+        embed_report=False,
+        embed_triage_sidecars=False,
+        failure_name="validation/validation_failed.txt",
+    )
 
 
 
@@ -1671,107 +1840,217 @@ def _make_send_bundle_inner(
     # R52: Unified HTML dashboard (triage + validation + sqlite metrics)
     # ------------------------------------------------------------
     dashboard_created: bool = False
-    try:
-        from pneumo_solver_ui.tools.dashboard_report import generate_dashboard_report, write_dashboard_sidecars
+    dashboard_html_cache: str = ""
+    dashboard_json_cache: Dict[str, Any] = {}
+    dashboard_error_trace: Optional[str] = None
+    def _refresh_dashboard(*, embed_in_zip: bool) -> None:
+        nonlocal dashboard_created, dashboard_html_cache, dashboard_json_cache, dashboard_error_trace
 
-        dash_html, dash_json = generate_dashboard_report(
-            repo_root,
-            out_dir,
-            zip_path=zip_path,
-            keep_last_n=int(keep_last_n),
-        )
+        _dashboard_refresh_error: Optional[str] = None
+        _write_dashboard_sidecars = None
+        try:
+            from pneumo_solver_ui.tools.dashboard_report import generate_dashboard_report, write_dashboard_sidecars
 
-        # Embed into the same ZIP (append mode).
-        with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as z2:
-            z2.writestr("dashboard/index.html", dash_html)
-            z2.writestr(
-                "dashboard/dashboard.json",
-                json.dumps(dash_json, ensure_ascii=False, indent=2),
+            _write_dashboard_sidecars = write_dashboard_sidecars
+            dash_html, dash_json = generate_dashboard_report(
+                repo_root,
+                out_dir,
+                zip_path=zip_path,
+                keep_last_n=int(keep_last_n),
             )
+            dashboard_html_cache = str(dash_html)
+            dashboard_json_cache = dict(dash_json or {})
+            dashboard_created = True
+            dashboard_error_trace = None
+        except Exception:
+            _dashboard_refresh_error = traceback.format_exc()
+            if not dashboard_created or not dashboard_html_cache:
+                dashboard_created = False
+                dashboard_error_trace = _dashboard_refresh_error
 
-        # Sidecars for quick access (without opening ZIP)
         try:
-            write_dashboard_sidecars(out_dir, dash_html, dash_json, stamp=stamp)
+            if dashboard_created and dashboard_html_cache:
+                if embed_in_zip:
+                    with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as _zd:
+                        _zd.writestr("dashboard/index.html", dashboard_html_cache)
+                        _zd.writestr(
+                            "dashboard/dashboard.json",
+                            json.dumps(dashboard_json_cache, ensure_ascii=False, indent=2),
+                        )
+                if _write_dashboard_sidecars is not None:
+                    _write_dashboard_sidecars(out_dir, dashboard_html_cache, dashboard_json_cache, stamp=stamp)
+            elif embed_in_zip and (_dashboard_refresh_error or dashboard_error_trace):
+                with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as _zd:
+                    _zd.writestr("dashboard/dashboard_failed.txt", _dashboard_refresh_error or dashboard_error_trace or "")
         except Exception:
             pass
 
-        dashboard_created = True
-
-    except Exception:
-        dashboard_created = False
-        try:
-            with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as z2:
-                z2.writestr("dashboard/dashboard_failed.txt", traceback.format_exc())
-        except Exception:
-            pass
+    _refresh_dashboard(embed_in_zip=False)
 
     # pointer to latest
     latest_zip = out_dir / "latest_send_bundle.zip"
     latest_txt = out_dir / "latest_send_bundle_path.txt"
+    latest_sha = out_dir / "latest_send_bundle.sha256"
 
-    try:
-        # R54: atomic update of latest pointers (avoid half-written files)
-        _atomic_copy_file(zip_path, latest_zip)
-        _safe_write_text(latest_txt, str(zip_path.resolve()))
+    def _build_bundle_index_record() -> Dict[str, Any]:
+        rec: Dict[str, Any] = {
+            'created_at': meta.get('created_at'),
+            'release': meta.get('release'),
+            'zip_name': zip_path.name,
+            'zip_path': str(zip_path.resolve()),
+            'latest_zip_path': str(latest_zip.resolve()),
+            'size_bytes': int(zip_path.stat().st_size) if zip_path.exists() else None,
+            'sha256': _sha256_file(zip_path) if zip_path.exists() else None,
+            'summary': {
+                'added_files': res_total.added_files,
+                'added_bytes': res_total.added_bytes,
+                'skipped_files': res_total.skipped_files,
+                'skipped_bytes': res_total.skipped_bytes,
+            },
+            'validation': {
+                'ok': validation_ok,
+                'errors': validation_errors,
+                'warnings': validation_warnings,
+                'release_risks': validation_release_risks,
+            },
+            'validation_release_risks': validation_release_risks,
+        }
+        if optimizer_scope_gate:
+            rec['optimizer_scope_gate'] = dict(optimizer_scope_gate)
+        if optimizer_scope_summary:
+            rec['optimizer_scope'] = dict(optimizer_scope_summary)
+        if optimizer_scope_release_gate:
+            rec['optimizer_scope_release_gate'] = optimizer_scope_release_gate
+        if optimizer_scope_release_risk is not None:
+            rec['optimizer_scope_release_risk'] = optimizer_scope_release_risk
+        if optimizer_scope_release_gate_reason:
+            rec['optimizer_scope_release_gate_reason'] = optimizer_scope_release_gate_reason
+        if optimizer_scope_problem_hash:
+            rec['optimizer_scope_problem_hash'] = optimizer_scope_problem_hash
+        if optimizer_scope_problem_hash_short:
+            rec['optimizer_scope_problem_hash_short'] = optimizer_scope_problem_hash_short
+        if optimizer_scope_problem_hash_mode:
+            rec['optimizer_scope_problem_hash_mode'] = optimizer_scope_problem_hash_mode
+        if optimizer_scope_sync_ok is not None:
+            rec['optimizer_scope_sync_ok'] = optimizer_scope_sync_ok
+        if optimizer_scope_canonical_source:
+            rec['optimizer_scope_canonical_source'] = optimizer_scope_canonical_source
+        if optimizer_scope_mismatch_fields:
+            rec['optimizer_scope_mismatch_fields'] = list(optimizer_scope_mismatch_fields)
+        return rec
 
-        # Also write SHA256 for the *latest* bundle to simplify verification / sharing.
-        try:
-            sha = _sha256_file(latest_zip)
-            _safe_write_text(out_dir / 'latest_send_bundle.sha256', sha + '  latest_send_bundle.zip\n')
-        except Exception:
-            pass
-
-        # Maintain a small index.json for bundle history (best-effort, capped).
-        try:
-            idx_path = out_dir / 'index.json'
-            if idx_path.exists():
-                try:
-                    idx = json.loads(idx_path.read_text(encoding='utf-8', errors='replace'))
-                except Exception:
-                    idx = {}
-            else:
+    def _update_bundle_index() -> None:
+        idx_path = out_dir / 'index.json'
+        if idx_path.exists():
+            try:
+                idx = json.loads(idx_path.read_text(encoding='utf-8', errors='replace'))
+            except Exception:
                 idx = {}
+        else:
+            idx = {}
 
-            bundles = idx.get('bundles')
-            if not isinstance(bundles, list):
-                bundles = []
+        bundles = idx.get('bundles')
+        if not isinstance(bundles, list):
+            bundles = []
 
-            rec = {
-                'created_at': meta.get('created_at'),
-                'release': meta.get('release'),
-                'zip_name': zip_path.name,
-                'zip_path': str(zip_path.resolve()),
-                'latest_zip_path': str(latest_zip.resolve()),
-                'size_bytes': int(zip_path.stat().st_size) if zip_path.exists() else None,
-                'sha256': _sha256_file(zip_path) if zip_path.exists() else None,
-                'summary': {
-                    'added_files': res_total.added_files,
-                    'added_bytes': res_total.added_bytes,
-                    'skipped_files': res_total.skipped_files,
-                    'skipped_bytes': res_total.skipped_bytes,
-                },
-            }
+        rec = _build_bundle_index_record()
+        bundles = [b for b in bundles if not (isinstance(b, dict) and b.get('zip_name') == rec['zip_name'])]
+        bundles.insert(0, rec)
+        bundles = bundles[:50]
 
-            # Prepend, deduplicate by zip_name
-            bundles = [b for b in bundles if not (isinstance(b, dict) and b.get('zip_name') == rec['zip_name'])]
-            bundles.insert(0, rec)
-            bundles = bundles[:50]
+        idx['bundles'] = bundles
+        idx['latest'] = {'zip_name': zip_path.name, 'latest_zip_path': str(latest_zip.resolve())}
 
-            idx['bundles'] = bundles
-            idx['latest'] = {'zip_name': zip_path.name, 'latest_zip_path': str(latest_zip.resolve())}
+        tmp = idx_path.with_suffix('.json.tmp')
+        tmp.write_text(json.dumps(idx, ensure_ascii=False, indent=2), encoding='utf-8', errors='replace')
+        tmp.replace(idx_path)
 
-            tmp = idx_path.with_suffix('.json.tmp')
-            tmp.write_text(json.dumps(idx, ensure_ascii=False, indent=2), encoding='utf-8', errors='replace')
-            tmp.replace(idx_path)
-        except Exception:
-            pass
+    def _refresh_latest_bundle(
+        *,
+        write_path: bool,
+        write_sha: bool,
+        update_index: bool,
+        path_on_copy_failure: bool = False,
+    ) -> bool:
+        if not zip_path.exists():
+            if write_path and path_on_copy_failure:
+                try:
+                    _safe_write_text(latest_txt, str(zip_path.resolve()))
+                except Exception:
+                    pass
+            return False
 
-    except Exception:
-        # if copy fails, at least store path
+        _copied = False
         try:
-            _safe_write_text(latest_txt, str(zip_path.resolve()))
+            _atomic_copy_file(zip_path, latest_zip)
+            _copied = True
+        except Exception:
+            _copied = False
+
+        if write_path and (_copied or path_on_copy_failure):
+            try:
+                _safe_write_text(latest_txt, str(zip_path.resolve()))
+            except Exception:
+                pass
+
+        if not _copied:
+            return False
+
+        if write_sha:
+            try:
+                sha = _sha256_file(latest_zip)
+                _safe_write_text(latest_sha, sha + '  latest_send_bundle.zip\n')
+            except Exception:
+                pass
+
+        if update_index:
+            try:
+                _update_bundle_index()
+            except Exception:
+                pass
+
+        return True
+
+    def _rewrite_triage_bundle_refs(triage_md: str) -> str:
+        triage_md = re.sub(
+            r"(?m)^- Latest send bundle path:.*$",
+            f"- Latest send bundle path: triage/{latest_txt.name} (inside this bundle)",
+            triage_md,
+        )
+        triage_md = re.sub(
+            r"(?m)^- Latest send bundle validation:.*$",
+            f"- Latest send bundle validation: triage/{latest_validation_md.name} (inside this bundle)",
+            triage_md,
+        )
+        triage_md = re.sub(
+            r"(?m)^- Latest anim diagnostics json:.*$",
+            f"- Latest anim diagnostics json: {ANIM_DIAG_JSON} (inside this bundle)",
+            triage_md,
+        )
+        triage_md = re.sub(
+            r"(?m)^- Latest anim diagnostics md:.*$",
+            f"- Latest anim diagnostics md: {ANIM_DIAG_MD} (inside this bundle)",
+            triage_md,
+        )
+        return triage_md
+
+    def _run_final_triage_pass() -> None:
+        try:
+            _run_triage_pass(
+                md_arcname="triage/triage_report.md",
+                json_arcname="triage/triage_report.json",
+                rewrite_bundle_refs=True,
+                extra_sidecar_paths=(latest_txt,),
+            )
         except Exception:
             pass
+
+    _refresh_latest_bundle(
+        write_path=True,
+        write_sha=True,
+        update_index=True,
+        path_on_copy_failure=True,
+    )
 
 
 
@@ -1788,16 +2067,11 @@ def _make_send_bundle_inner(
     # so building health here would inspect a stale ZIP and miss triage_report.*.
 
     # R69b: interim latest_send_bundle refresh before run-registry/final triage; final refresh happens after the final health rebuild.
-    try:
-        if zip_path.exists():
-            _atomic_copy_file(zip_path, latest_zip)
-            try:
-                sha = _sha256_file(latest_zip)
-                _safe_write_text(out_dir / 'latest_send_bundle.sha256', sha + '  latest_send_bundle.zip\n')
-            except Exception:
-                pass
-    except Exception:
-        pass
+    _refresh_latest_bundle(
+        write_path=False,
+        write_sha=True,
+        update_index=False,
+    )
 
     # R49: record bundle creation in run registry (best-effort).
     try:
@@ -1816,9 +2090,19 @@ def _make_send_bundle_inner(
             validation_ok=validation_ok,
             validation_errors=validation_errors,
             validation_warnings=validation_warnings,
+            validation_release_risks=validation_release_risks,
             dashboard_created=dashboard_created,
             dashboard_html_path=str((out_dir / "latest_dashboard.html").resolve()) if (out_dir / "latest_dashboard.html").exists() else None,
             env=env_context(),
+            optimizer_scope_release_gate=optimizer_scope_release_gate or None,
+            optimizer_scope_release_risk=optimizer_scope_release_risk,
+            optimizer_scope_release_gate_reason=optimizer_scope_release_gate_reason or None,
+            optimizer_scope_problem_hash=optimizer_scope_problem_hash or None,
+            optimizer_scope_problem_hash_short=optimizer_scope_problem_hash_short or None,
+            optimizer_scope_problem_hash_mode=optimizer_scope_problem_hash_mode or None,
+            optimizer_scope_sync_ok=optimizer_scope_sync_ok,
+            optimizer_scope_canonical_source=optimizer_scope_canonical_source or None,
+            optimizer_scope_mismatch_fields=optimizer_scope_mismatch_fields or None,
             **anim_diag_event,
         )
     except Exception:
@@ -1827,54 +2111,19 @@ def _make_send_bundle_inner(
     # R32: after run-registry write, regenerate triage once more so the bundle
     # and latest sidecars can see the *current* send_bundle_created event instead
     # of a stale older one from a previous workspace/release.
-    try:
-        import re as _re3
-        from pneumo_solver_ui.tools.triage_report import generate_triage_report as _generate_triage_report_final
-        from pneumo_solver_ui.tools.triage_report import write_triage_report as _write_triage_report_final
+    _run_final_triage_pass()
 
-        _latest_txt3 = out_dir / "latest_send_bundle_path.txt"
-        _latest_md3 = out_dir / "latest_send_bundle_validation.md"
-        _latest_json3 = out_dir / "latest_send_bundle_validation.json"
-        _triage3_md, _triage3_json = _generate_triage_report_final(
-            repo_root=repo_root,
-            keep_last_n=keep_last_n,
-            primary_session_dir=primary_session_dir,
-        )
-        _triage3_md = _re3.sub(
-            r"(?m)^- Latest send bundle path:.*$",
-            f"- Latest send bundle path: triage/{_latest_txt3.name} (inside this bundle)",
-            _triage3_md,
-        )
-        _triage3_md = _re3.sub(
-            r"(?m)^- Latest send bundle validation:.*$",
-            f"- Latest send bundle validation: triage/{_latest_md3.name} (inside this bundle)",
-            _triage3_md,
-        )
-        _triage3_md = _re3.sub(
-            r"(?m)^- Latest anim diagnostics json:.*$",
-            f"- Latest anim diagnostics json: {ANIM_DIAG_JSON} (inside this bundle)",
-            _triage3_md,
-        )
-        _triage3_md = _re3.sub(
-            r"(?m)^- Latest anim diagnostics md:.*$",
-            f"- Latest anim diagnostics md: {ANIM_DIAG_MD} (inside this bundle)",
-            _triage3_md,
-        )
-        with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as _z3:
-            _z3.writestr("triage/triage_report.md", _triage3_md)
-            _z3.writestr("triage/triage_report.json", json.dumps(_triage3_json, ensure_ascii=False, indent=2))
-            for _p in (_latest_txt3, _latest_md3, _latest_json3):
-                try:
-                    if _p.exists():
-                        _z3.write(_p, arcname=f"triage/{_p.name}")
-                except Exception:
-                    pass
-        try:
-            _write_triage_report_final(out_dir, _triage3_md, _triage3_json, stamp=stamp)
-        except Exception:
-            pass
-    except Exception:
-        pass
+    # Refresh validation after the final triage rewrite so bundle-level
+    # contracts (including optimizer scope sync) reflect the finalized archive.
+    _run_validation_pass(
+        embed_report=True,
+        embed_triage_sidecars=True,
+        failure_name="validation/validation_failed_final.txt",
+    )
+
+    # Refresh dashboard after final triage/validation so the embedded dashboard
+    # and latest_dashboard sidecars reflect the finalized bundle state.
+    _refresh_dashboard(embed_in_zip=True)
 
     # R69c: now that the run-registry event and final triage files are in place,
     # rebuild the health report against the final ZIP contents and refresh the
@@ -1899,17 +2148,11 @@ def _make_send_bundle_inner(
             except Exception:
                 pass
 
-    try:
-        if zip_path.exists():
-            _atomic_copy_file(zip_path, latest_zip)
-            _safe_write_text(latest_txt, str(zip_path.resolve()))
-            try:
-                sha = _sha256_file(latest_zip)
-                _safe_write_text(out_dir / 'latest_send_bundle.sha256', sha + '  latest_send_bundle.zip\n')
-            except Exception:
-                pass
-    except Exception:
-        pass
+    _refresh_latest_bundle(
+        write_path=True,
+        write_sha=True,
+        update_index=True,
+    )
 
     # ------------------------------------------------------------
     # R53: write session marker (for watchdog + idempotency).

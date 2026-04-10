@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
+from pneumo_solver_ui.optimization_objective_contract import (
+    normalize_objective_keys as normalize_objective_keys_contract,
+)
+
 
 def normalize_objective_keys(raw: Any) -> list[str]:
-    if not isinstance(raw, (list, tuple)):
-        return []
-    return [str(x).strip() for x in raw if str(x).strip()]
+    return list(normalize_objective_keys_contract(raw))
 
 
 def format_hard_gate(penalty_key: Any, penalty_tol: Any = None) -> str:

@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from pneumo_solver_ui.optimization_baseline_source_ui import (
+    render_baseline_source_summary,
+)
+from pneumo_solver_ui.optimization_problem_scope_ui import (
+    render_problem_scope_summary,
+)
+
 
 def render_live_optimization_job_panel(
     st: Any,
@@ -33,6 +40,8 @@ def render_live_optimization_job_panel(
     auto_refresh_label: str,
     auto_refresh_help: str,
     auto_refresh_default: bool,
+    current_problem_hash: str = "",
+    current_problem_hash_mode: str = "",
     auto_refresh_key: str = "__opt_autorefresh_enabled",
     log_tail_chars: int = 8000,
 ) -> bool:
@@ -48,6 +57,17 @@ def render_live_optimization_job_panel(
         budget = int(getattr(job, "budget", 0) or 0)
         st.progress(min(1.0, max(0.0, done / float(budget))))
         st.caption(f"Выполнено: {done} из {budget}")
+
+    render_baseline_source_summary(
+        st,
+        run_dir=getattr(job, "run_dir", None),
+    )
+    render_problem_scope_summary(
+        st,
+        run_dir=getattr(job, "run_dir", None),
+        current_problem_hash=current_problem_hash,
+        current_problem_hash_mode=current_problem_hash_mode,
+    )
 
     st.code(log_text[-log_tail_chars:] if len(log_text) > log_tail_chars else log_text)
 

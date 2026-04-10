@@ -11,6 +11,7 @@ def test_legacy_distributed_db_page_uses_current_api_and_shared_packaging_surfac
 
     assert "find_expdb_paths" in src
     assert "load_packaging_params_for_run" in src
+    assert "load_run_problem_scope" in src
     assert "flatten_trial_rows" in src
     assert "enrich_packaging_surface_df" in src
     assert "apply_packaging_surface_filters" in src
@@ -21,5 +22,8 @@ def test_legacy_distributed_db_page_uses_current_api_and_shared_packaging_surfac
     assert "db.count_by_status(" in src
     assert "db.fetch_metrics(" in src
     assert "db.fetch_trials(" in src
+    assert "problem_hash_mode" in src
+    assert "Selected run scope:" in src
+    assert "resolved_problem_scope" in src
     assert "_exec(" not in src
     assert "list_metrics(" not in src

@@ -13,7 +13,9 @@ Why this module exists:
 """
 
 from typing import Any, Mapping, Optional, Sequence
+import json
 import math
+import re
 
 from pneumo_solver_ui.optimization_defaults import (
     DEFAULT_OPTIMIZATION_OBJECTIVES,
@@ -64,13 +66,38 @@ for _group in _ALIAS_GROUPS:
         _ALIAS_MAP[_key] = cleaned
 
 
-def normalize_objective_keys(objective_keys: Sequence[str] | None = None) -> tuple[str, ...]:
-    raw = objective_keys or DEFAULT_OPTIMIZATION_OBJECTIVES
+def _collect_objective_keys(raw: Any, out: list[str]) -> None:
+    if raw is None:
+        return
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return
+        if text[:1] in {"[", '"'}:
+            try:
+                parsed = json.loads(text)
+            except Exception:
+                parsed = None
+            if parsed is not None and parsed is not raw:
+                _collect_objective_keys(parsed, out)
+                return
+        for piece in re.split(r"[\n,;]+", text):
+            key = str(piece or "").strip()
+            if key and key not in out:
+                out.append(key)
+        return
+    if isinstance(raw, Sequence):
+        for item in raw:
+            _collect_objective_keys(item, out)
+        return
+    key = str(raw or "").strip()
+    if key and key not in out:
+        out.append(key)
+
+
+def normalize_objective_keys(objective_keys: Any | None = None) -> tuple[str, ...]:
     out: list[str] = []
-    for item in raw:
-        key = str(item or '').strip()
-        if key and key not in out:
-            out.append(key)
+    _collect_objective_keys(objective_keys, out)
     return tuple(out or tuple(str(x) for x in DEFAULT_OPTIMIZATION_OBJECTIVES))
 
 
@@ -188,12 +215,12 @@ def score_payload(
 def parse_saved_score_payload(raw: Any) -> Optional[dict[str, Any]]:
     if isinstance(raw, Mapping):
         score = raw.get('score')
-        if not isinstance(score, Sequence):
+        if not isinstance(score, Sequence) or isinstance(score, (str, bytes, bytearray)):
             return None
         penalty_tol = raw.get('penalty_tol') if 'penalty_tol' in raw else None
         return score_payload(
             list(score),
-            objective_keys=raw.get('objective_keys') if isinstance(raw.get('objective_keys'), Sequence) else None,
+            objective_keys=raw.get('objective_keys'),
             penalty_key=str(raw.get('penalty_key') or DIST_OPT_PENALTY_KEY_DEFAULT),
             penalty_tol=penalty_tol,
             source=str(raw.get('source') or raw.get('version') or 'objective_contract_v1'),
@@ -218,7 +245,7 @@ def score_contract_matches(
     if not isinstance(saved, Mapping):
         return False
     saved_pen = normalize_penalty_key(str(saved.get('penalty_key') or ''))
-    saved_obj = normalize_objective_keys(saved.get('objective_keys') if isinstance(saved.get('objective_keys'), Sequence) else None)
+    saved_obj = normalize_objective_keys(saved.get('objective_keys'))
     return saved_pen == normalize_penalty_key(penalty_key) and saved_obj == normalize_objective_keys(objective_keys)
 
 

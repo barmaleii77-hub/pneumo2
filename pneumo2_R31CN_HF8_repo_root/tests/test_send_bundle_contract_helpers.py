@@ -226,7 +226,23 @@ def test_load_latest_send_bundle_anim_dashboard_merges_validation_bundle_flags(t
                     "browser_perf_evidence_report_in_bundle": True,
                     "browser_perf_comparison_report_in_bundle": True,
                     "browser_perf_trace_in_bundle": True,
-                }
+                },
+                "optimizer_scope": {
+                    "problem_hash": "ph_scope_full_1234567890",
+                    "problem_hash_short": "ph_scope_12",
+                    "problem_hash_mode": "stable",
+                    "canonical_source": "triage",
+                    "scope_sync_ok": False,
+                    "mismatch_fields": ["problem_hash", "problem_hash_mode"],
+                },
+                "optimizer_scope_gate": {
+                    "release_gate": "FAIL",
+                    "release_gate_reason": "problem_hash mismatch between sources",
+                    "release_risk": True,
+                    "canonical_source": "triage",
+                    "scope_sync_ok": False,
+                    "mismatch_fields": ["problem_hash", "problem_hash_mode"],
+                },
             },
             ensure_ascii=False,
             indent=2,
@@ -245,6 +261,18 @@ def test_load_latest_send_bundle_anim_dashboard_merges_validation_bundle_flags(t
     assert anim["anim_latest_mnemo_event_log_exists"] is True
     assert anim["ring_closure_policy"] == "strict_exact"
     assert anim["ring_seam_open"] is True
+    assert anim["optimizer_scope_release_gate"] == "FAIL"
+    assert anim["optimizer_scope_release_risk"] is True
+    assert anim["optimizer_scope_problem_hash_short"] == "ph_scope_12"
+    assert anim["optimizer_scope_problem_hash_mode"] == "stable"
+    assert any(
+        "Optimizer scope gate: FAIL / release_risk=True / reason=problem_hash mismatch between sources" == line
+        for line in lines
+    )
+    assert any(
+        "Optimizer scope: scope=ph_scope_12 / mode=stable / source=triage / sync=False / mismatches=problem_hash, problem_hash_mode" == line
+        for line in lines
+    )
     assert any("Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" == line for line in lines)
     assert any("Browser perf comparison: regression_checked / PASS / ready=True" == line for line in lines)
     assert any("Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" == line for line in lines)

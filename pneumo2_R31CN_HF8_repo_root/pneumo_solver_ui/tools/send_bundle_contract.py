@@ -669,9 +669,69 @@ def _safe_read_json_dict(path: Path) -> Dict[str, Any]:
     return dict(obj) if isinstance(obj, dict) else {}
 
 
+def _normalize_optimizer_scope_gate(obj: Any) -> Dict[str, Any]:
+    if not isinstance(obj, dict):
+        return {}
+    out: Dict[str, Any] = {}
+    gate = str(obj.get("release_gate") or "").strip().upper()
+    if gate:
+        out["optimizer_scope_release_gate"] = gate
+    reason = str(obj.get("release_gate_reason") or "").strip()
+    if reason:
+        out["optimizer_scope_release_gate_reason"] = reason
+    if "release_risk" in obj:
+        out["optimizer_scope_release_risk"] = bool(obj.get("release_risk"))
+    if "scope_sync_ok" in obj:
+        out["optimizer_scope_sync_ok"] = obj.get("scope_sync_ok")
+    canonical_source = str(obj.get("canonical_source") or "").strip()
+    if canonical_source:
+        out["optimizer_scope_canonical_source"] = canonical_source
+    mismatch_fields = [str(x).strip() for x in (obj.get("mismatch_fields") or []) if str(x).strip()]
+    if mismatch_fields:
+        out["optimizer_scope_mismatch_fields"] = mismatch_fields
+    return out
+
+
+def _normalize_optimizer_scope_summary(obj: Any) -> Dict[str, Any]:
+    if not isinstance(obj, dict):
+        return {}
+    out: Dict[str, Any] = {}
+    problem_hash = str(obj.get("problem_hash") or "").strip()
+    if problem_hash:
+        out["optimizer_scope_problem_hash"] = problem_hash
+    problem_hash_short = str(obj.get("problem_hash_short") or "").strip()
+    if problem_hash_short:
+        out["optimizer_scope_problem_hash_short"] = problem_hash_short
+    problem_hash_mode = str(obj.get("problem_hash_mode") or "").strip()
+    if problem_hash_mode:
+        out["optimizer_scope_problem_hash_mode"] = problem_hash_mode
+    canonical_source = str(obj.get("canonical_source") or "").strip()
+    if canonical_source:
+        out["optimizer_scope_canonical_source"] = canonical_source
+    if "scope_sync_ok" in obj:
+        out["optimizer_scope_sync_ok"] = obj.get("scope_sync_ok")
+    source_count = _int_or_none(obj.get("source_count"))
+    if source_count is not None:
+        out["optimizer_scope_source_count"] = source_count
+    mismatch_fields = [str(x).strip() for x in (obj.get("mismatch_fields") or []) if str(x).strip()]
+    if mismatch_fields:
+        out["optimizer_scope_mismatch_fields"] = mismatch_fields
+    objective_keys = [str(x).strip() for x in (obj.get("objective_keys") or []) if str(x).strip()]
+    if objective_keys:
+        out["optimizer_scope_objective_keys"] = objective_keys
+    penalty_key = str(obj.get("penalty_key") or "").strip()
+    if penalty_key:
+        out["optimizer_scope_penalty_key"] = penalty_key
+    if obj.get("penalty_tol") not in (None, ""):
+        out["optimizer_scope_penalty_tol"] = obj.get("penalty_tol")
+    return out
+
+
 def load_latest_send_bundle_anim_dashboard(out_dir: Path) -> Dict[str, Any]:
     root = Path(out_dir).expanduser()
     sources: Dict[str, Dict[str, Any]] = {}
+    optimizer_scope_summary: Dict[str, Any] = {}
+    optimizer_scope_gate: Dict[str, Any] = {}
 
     diag_obj = _safe_read_json_dict(root / ANIM_DIAG_SIDECAR_JSON)
     if diag_obj:
@@ -689,10 +749,19 @@ def load_latest_send_bundle_anim_dashboard(out_dir: Path) -> Dict[str, Any]:
         ):
             sources["validation"] = validation_norm
 
-    if not sources:
+    optimizer_scope_summary = _normalize_optimizer_scope_summary(validation_obj.get("optimizer_scope"))
+    optimizer_scope_gate = _normalize_optimizer_scope_gate(validation_obj.get("optimizer_scope_gate"))
+
+    if not sources and not optimizer_scope_summary and not optimizer_scope_gate:
         return {}
-    chosen = choose_anim_snapshot(sources, preferred_order=("diagnostics", "validation"))
-    return normalize_anim_dashboard_obj(chosen)
+
+    out: Dict[str, Any] = {}
+    if sources:
+        chosen = choose_anim_snapshot(sources, preferred_order=("diagnostics", "validation"))
+        out.update(normalize_anim_dashboard_obj(chosen))
+    out.update(optimizer_scope_summary)
+    out.update(optimizer_scope_gate)
+    return out
 
 
 def format_anim_dashboard_brief_lines(anim: Any) -> List[str]:
@@ -720,11 +789,42 @@ def format_anim_dashboard_brief_lines(anim: Any) -> List[str]:
     ring_seam_open = norm.get("ring_seam_open")
     ring_seam_max = norm.get("ring_seam_max_jump_m")
     ring_raw_seam_max = norm.get("ring_raw_seam_max_jump_m")
+    optimizer_scope_gate = str(norm.get("optimizer_scope_release_gate") or "")
+    optimizer_scope_gate_reason = str(norm.get("optimizer_scope_release_gate_reason") or "")
+    optimizer_scope_problem_hash = str(
+        norm.get("optimizer_scope_problem_hash_short")
+        or norm.get("optimizer_scope_problem_hash")
+        or ""
+    )
+    optimizer_scope_problem_hash_mode = str(norm.get("optimizer_scope_problem_hash_mode") or "")
+    optimizer_scope_canonical_source = str(norm.get("optimizer_scope_canonical_source") or "")
+    optimizer_scope_release_risk = norm.get("optimizer_scope_release_risk")
+    optimizer_scope_sync_ok = norm.get("optimizer_scope_sync_ok")
+    optimizer_scope_mismatch_fields = [
+        str(x).strip() for x in (norm.get("optimizer_scope_mismatch_fields") or []) if str(x).strip()
+    ]
 
     if token:
         lines.append(f"Anim latest token: {token}")
     if reload_inputs:
         lines.append("Anim reload inputs: " + ", ".join(str(x) for x in reload_inputs))
+    if optimizer_scope_gate:
+        gate_line = f"Optimizer scope gate: {optimizer_scope_gate}"
+        gate_line += f" / release_risk={optimizer_scope_release_risk}"
+        if optimizer_scope_gate_reason:
+            gate_line += f" / reason={optimizer_scope_gate_reason}"
+        lines.append(gate_line)
+    if optimizer_scope_problem_hash or optimizer_scope_problem_hash_mode or optimizer_scope_canonical_source:
+        scope_line = (
+            "Optimizer scope: "
+            f"scope={optimizer_scope_problem_hash or 'вЂ”'}"
+            f" / mode={optimizer_scope_problem_hash_mode or 'вЂ”'}"
+            f" / source={optimizer_scope_canonical_source or 'вЂ”'}"
+            f" / sync={optimizer_scope_sync_ok}"
+        )
+        if optimizer_scope_mismatch_fields:
+            scope_line += " / mismatches=" + ", ".join(optimizer_scope_mismatch_fields)
+        lines.append(scope_line)
     if ring_kind == "ring" or ring_closure_policy:
         lines.append(
             "Ring seam: "

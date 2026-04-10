@@ -204,3 +204,32 @@ def test_generate_triage_report_surfaces_road_contract_artifacts(tmp_path: Path,
     assert "## Desktop Mnemo events" in md
     assert "## Recommended actions" in md
     assert "Большой перепад давлений" in md
+def test_generate_triage_report_surfaces_distributed_problem_scope_and_hash_mode(tmp_path: Path) -> None:
+    dist_dir = tmp_path / "runs" / "dist_runs" / "DIST_scope_demo"
+    dist_dir.mkdir(parents=True, exist_ok=True)
+    (dist_dir / "progress.json").write_text(
+        json.dumps(
+            {
+                "status": "running",
+                "completed": 7,
+                "in_flight": 2,
+                "cached_hits": 1,
+                "duplicates_skipped": 0,
+                "hv": 0.123,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (dist_dir / "problem_hash.txt").write_text("ph_triage_scope_1234567890", encoding="utf-8")
+    (dist_dir / "problem_hash_mode.txt").write_text("legacy", encoding="utf-8")
+
+    md, summary = generate_triage_report(tmp_path, keep_last_n=1)
+    dist_progress = dict(summary.get("dist_progress") or {})
+
+    assert dist_progress["problem_hash"] == "ph_triage_scope_1234567890"
+    assert dist_progress["problem_hash_short"] == "ph_triage_sc"
+    assert dist_progress["problem_hash_mode"] == "legacy"
+    assert "Problem scope: `ph_triage_sc`" in md
+    assert "Hash mode: `legacy`" in md

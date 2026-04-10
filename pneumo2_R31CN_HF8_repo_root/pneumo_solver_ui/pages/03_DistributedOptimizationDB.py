@@ -10,6 +10,7 @@ from pneumo_solver_ui.distributed_expdb_viewer_helpers import (
     find_expdb_paths,
     flatten_trial_rows,
     load_packaging_params_for_run,
+    load_run_problem_scope,
     safe_float,
 )
 from pneumo_solver_ui.packaging_surface_helpers import enrich_packaging_surface_df
@@ -77,11 +78,13 @@ def main() -> None:
 
         rows = []
         for run in runs:
+            run_scope = load_run_problem_scope(run)
             rows.append(
                 {
                     "run_id": str(run.get("run_id") or ""),
                     "created_ts": run.get("created_ts"),
                     "problem_hash": str(run.get("problem_hash") or ""),
+                    "problem_hash_mode": str(run_scope.get("problem_hash_mode") or ""),
                     "state": db.get_run_state(str(run.get("run_id") or "")),
                 }
             )
@@ -92,20 +95,34 @@ def main() -> None:
         run_ids = df_runs["run_id"].tolist()
         run_id = st.selectbox("Select run_id", run_ids, index=0)
         run_detail = db.get_run(run_id) or {}
-        run_spec = dict(run_detail.get("spec") or {}) if isinstance(run_detail.get("spec"), dict) else {}
-        run_cfg = dict(run_spec.get("cfg") or {}) if isinstance(run_spec.get("cfg"), dict) else {}
+        run_scope = load_run_problem_scope(run_detail)
         objective_keys = [
             str(x).strip()
-            for x in list(run_cfg.get("objective_keys") or [])
+            for x in list(run_scope.get("objective_keys") or [])
             if str(x).strip()
         ]
-        penalty_key = str(run_cfg.get("penalty_key") or "штраф_физичности_сумма")
+        penalty_key = str(run_scope.get("penalty_key") or "штраф_физичности_сумма")
         packaging_params = load_packaging_params_for_run(db, run_id, db_path, REPO_ROOT)
+
+        problem_hash = str(run_scope.get("problem_hash") or "").strip()
+        problem_hash_short = str(run_scope.get("problem_hash_short") or "").strip()
+        problem_hash_mode = str(run_scope.get("problem_hash_mode") or "").strip()
+        scope_caption_parts = []
+        if problem_hash:
+            scope_caption_parts.append(f"problem_hash=`{problem_hash_short or problem_hash}`")
+        else:
+            scope_caption_parts.append("problem_hash=`(missing)`")
+        if problem_hash_mode:
+            scope_caption_parts.append(f"hash mode=`{problem_hash_mode}`")
+        else:
+            scope_caption_parts.append("hash mode=`implicit / unknown`")
+        st.caption("Selected run scope: " + " / ".join(scope_caption_parts))
 
         with st.expander("Run details", expanded=False):
             st.json(
                 {
                     "run_detail": run_detail,
+                    "resolved_problem_scope": run_scope,
                     "resolved_packaging_params": {
                         key: packaging_params.get(key)
                         for key in (

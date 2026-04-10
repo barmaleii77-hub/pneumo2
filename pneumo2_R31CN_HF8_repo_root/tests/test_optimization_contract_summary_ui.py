@@ -25,9 +25,10 @@ class _FakeStreamlit:
 
 def test_contract_summary_helpers_format_and_compare_contracts() -> None:
     assert normalize_objective_keys([" a ", "", "b"]) == ["a", "b"]
+    assert normalize_objective_keys(" comfort,\nroll ; energy ") == ["comfort", "roll", "energy"]
     assert format_hard_gate("penalty_total", 0.5) == "`penalty_total` (tol=0.5)"
     assert compare_objective_contract_to_current(
-        objective_keys=["a", "b"],
+        objective_keys="a,\nb",
         penalty_key="penalty_total",
         penalty_tol=0.5,
         current_objective_keys=["a", "c"],
@@ -41,7 +42,7 @@ def test_contract_summary_helpers_render_summary_and_warning() -> None:
 
     rendered = render_objective_contract_summary(
         st,
-        objective_keys=["comfort", "roll"],
+        objective_keys="comfort,\nroll",
         penalty_key="penalty_total",
         penalty_tol=0.25,
         objective_contract_path="C:/tmp/objective_contract.json",

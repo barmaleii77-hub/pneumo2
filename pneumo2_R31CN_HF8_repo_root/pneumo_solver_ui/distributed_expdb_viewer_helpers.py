@@ -4,6 +4,13 @@ import math
 from pathlib import Path
 from typing import Any, Dict, List
 
+from pneumo_solver_ui.optimization_objective_contract import (
+    normalize_objective_keys,
+    normalize_penalty_key,
+    normalize_penalty_tol,
+)
+from pneumo_solver_ui.optimization_problem_hash_mode import normalize_problem_hash_mode
+from pneumo_solver_ui.optimization_problem_scope import problem_hash_short_label
 from pneumo_solver_ui.packaging_surface_ui import load_packaging_params_from_base_json
 
 try:
@@ -87,6 +94,61 @@ def load_packaging_params_for_run(db: Any, run_id: str, db_path: Path, repo_root
     return {}
 
 
+def load_run_problem_scope(run_detail: Dict[str, Any] | None) -> Dict[str, Any]:
+    run = dict(run_detail or {}) if isinstance(run_detail, dict) else {}
+    spec = dict(run.get("spec") or {}) if isinstance(run.get("spec"), dict) else {}
+    meta = dict(run.get("meta") or {}) if isinstance(run.get("meta"), dict) else {}
+    cfg = dict(spec.get("cfg") or {}) if isinstance(spec.get("cfg"), dict) else {}
+    objective_contract = (
+        dict(meta.get("objective_contract") or {})
+        if isinstance(meta.get("objective_contract"), dict)
+        else {}
+    )
+
+    problem_hash = str(run.get("problem_hash") or meta.get("problem_hash") or "").strip()
+
+    problem_hash_mode = ""
+    for raw_mode in (
+        meta.get("problem_hash_mode"),
+        spec.get("problem_hash_mode"),
+        cfg.get("problem_hash_mode"),
+    ):
+        problem_hash_mode = normalize_problem_hash_mode(raw_mode, default="")
+        if problem_hash_mode:
+            break
+
+    objective_keys_raw = None
+    if "objective_keys" in objective_contract:
+        objective_keys_raw = objective_contract.get("objective_keys")
+    elif "objective_keys" in cfg:
+        objective_keys_raw = cfg.get("objective_keys")
+    objective_keys = (
+        normalize_objective_keys(objective_keys_raw)
+        if objective_keys_raw not in (None, "")
+        else tuple()
+    )
+
+    penalty_key_raw = objective_contract.get("penalty_key")
+    if not str(penalty_key_raw or "").strip():
+        penalty_key_raw = cfg.get("penalty_key")
+    penalty_key = normalize_penalty_key(penalty_key_raw)
+
+    penalty_tol = None
+    if "penalty_tol" in objective_contract:
+        penalty_tol = normalize_penalty_tol(objective_contract.get("penalty_tol"), default=0.0)
+    elif "penalty_tol" in cfg:
+        penalty_tol = normalize_penalty_tol(cfg.get("penalty_tol"), default=0.0)
+
+    return {
+        "problem_hash": problem_hash,
+        "problem_hash_short": problem_hash_short_label(problem_hash),
+        "problem_hash_mode": problem_hash_mode,
+        "objective_keys": objective_keys,
+        "penalty_key": penalty_key,
+        "penalty_tol": penalty_tol,
+    }
+
+
 def flatten_trial_rows(trials: List[Dict[str, Any]]) -> "pd.DataFrame":
     if pd is None:
         raise RuntimeError("pandas is required for distributed viewer")
@@ -167,6 +229,7 @@ __all__ = [
     "finite_float_or_none",
     "flatten_trial_rows",
     "load_packaging_params_for_run",
+    "load_run_problem_scope",
     "resolve_existing_path",
     "safe_float",
 ]

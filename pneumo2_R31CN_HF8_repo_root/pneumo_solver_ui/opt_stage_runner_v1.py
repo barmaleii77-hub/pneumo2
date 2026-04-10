@@ -25,10 +25,12 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
+
+from pneumo_dist.trial_hash import hash_file, stable_hash_problem
 
 _THIS = Path(__file__).resolve()
 _PNEUMO_ROOT = _THIS.parent  # .../pneumo_solver_ui
@@ -56,6 +58,14 @@ except Exception:  # pragma: no cover
 
 
 from pneumo_solver_ui.name_sanitize import sanitize_id
+from pneumo_solver_ui.optimization_baseline_source import (
+    resolve_workspace_baseline_source,
+    write_baseline_source_artifact,
+)
+from pneumo_solver_ui.optimization_problem_hash_mode import (
+    problem_hash_mode_from_env,
+    write_problem_hash_mode_artifact,
+)
 from pneumo_solver_ui.optimization_input_contract import (
     describe_runtime_stage,
     infer_suite_stage,
@@ -472,6 +482,181 @@ def _clip_params_to_ranges(params: Dict[str, Any], ranges: Dict[str, Any]) -> Di
     return out
 
 
+def _archive_contract_payload(rec: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    if not isinstance(rec, Mapping):
+        return None
+    raw = rec.get("objective_contract")
+    if isinstance(raw, Mapping):
+        return raw
+    if isinstance(raw, str):
+        text = raw.strip()
+        if text:
+            try:
+                parsed = json.loads(text)
+            except Exception:
+                parsed = None
+            if isinstance(parsed, Mapping):
+                return parsed
+    raw_score_payload = rec.get("score_payload")
+    if isinstance(raw_score_payload, Mapping):
+        return raw_score_payload
+    if "objective_keys" in rec or "penalty_key" in rec:
+        return rec
+    return None
+
+
+def archive_record_compatibility_kind(
+    rec: Mapping[str, Any] | None,
+    *,
+    objective_keys: Sequence[str] | None = None,
+    penalty_key: str | None = None,
+    problem_hash: str | None = None,
+) -> str:
+    if not isinstance(rec, Mapping):
+        return "invalid"
+    contract_payload = _archive_contract_payload(rec)
+    if contract_payload is not None and not score_contract_matches(
+        contract_payload,
+        objective_keys=objective_keys,
+        penalty_key=penalty_key,
+    ):
+        return "contract_mismatch"
+    current_problem_hash = str(problem_hash or "").strip()
+    saved_problem_hash = str(rec.get("problem_hash") or "").strip()
+    if current_problem_hash and saved_problem_hash and current_problem_hash == saved_problem_hash:
+        return "same_problem"
+    if contract_payload is not None:
+        return "same_contract"
+    return "legacy_unknown"
+
+
+def _preferred_archive_bucket_name(
+    bucketed: Mapping[str, Sequence[Any]] | None,
+    *,
+    min_count: int = 1,
+) -> str:
+    buckets = dict(bucketed or {})
+    same_problem = list(buckets.get("same_problem") or [])
+    same_contract = list(buckets.get("same_contract") or [])
+    legacy_unknown = list(buckets.get("legacy_unknown") or [])
+    min_n = int(max(1, min_count))
+
+    if len(same_problem) >= min_n:
+        return "same_problem"
+    if len(same_contract) >= min_n:
+        return "same_contract"
+    if same_problem:
+        return "same_problem"
+    if same_contract:
+        return "same_contract"
+    if len(legacy_unknown) >= min_n:
+        return "legacy_unknown"
+    if legacy_unknown:
+        return "legacy_unknown"
+    return ""
+
+
+def baseline_problem_scope_dir(baseline_dir: Path, problem_hash: str | None) -> Path:
+    token = sanitize_id(str(problem_hash or "").strip()) or "unknown_problem"
+    return Path(baseline_dir) / "by_problem" / f"p_{token}"
+
+
+def baseline_best_meta_payload(
+    *,
+    problem_hash: str | None,
+    objective_contract: Mapping[str, Any] | None,
+    run_dir: Path,
+    stage_name: str,
+    score: Sequence[float],
+    score_payload_obj: Mapping[str, Any] | None,
+    params: Mapping[str, Any] | None,
+    source: str = "opt_stage_runner_v1_baseline",
+) -> Dict[str, Any]:
+    return {
+        "version": "baseline_best_meta_v1",
+        "source": str(source or "opt_stage_runner_v1_baseline"),
+        "problem_hash": str(problem_hash or "").strip(),
+        "run_dir": str(Path(run_dir)),
+        "stage_name": str(stage_name or "").strip(),
+        "objective_contract": dict(objective_contract or {}),
+        "score": [float(x) for x in score],
+        "score_payload": dict(score_payload_obj or {}),
+        "params": dict(params or {}),
+    }
+
+
+def load_baseline_best_meta(
+    baseline_dir: Path,
+    *,
+    prev_score_raw: Any = None,
+) -> Dict[str, Any]:
+    meta_path = Path(baseline_dir) / "baseline_best_meta.json"
+    if meta_path.exists():
+        try:
+            payload = load_json(meta_path)
+        except Exception:
+            payload = {}
+        if isinstance(payload, dict):
+            return dict(payload)
+
+    raw = prev_score_raw if isinstance(prev_score_raw, Mapping) else {}
+    if not isinstance(raw, Mapping):
+        return {}
+
+    objective_contract = _archive_contract_payload(raw)
+    problem_hash = str(raw.get("problem_hash") or "").strip()
+    if not problem_hash and objective_contract is None:
+        return {}
+
+    return {
+        "version": "baseline_best_meta_fallback_v1",
+        "source": str(raw.get("source") or "baseline_best_score_fallback"),
+        "problem_hash": problem_hash,
+        "run_dir": str(raw.get("run_dir") or "").strip(),
+        "stage_name": str(raw.get("stage_name") or "").strip(),
+        "objective_contract": dict(objective_contract or {}),
+        "score_payload": dict(raw) if isinstance(raw, dict) else {},
+    }
+
+
+def decide_baseline_autoupdate(
+    *,
+    new_score: Sequence[float],
+    objective_keys: Sequence[str] | None,
+    penalty_key: str | None,
+    problem_hash: str | None,
+    prev_score_payload: Mapping[str, Any] | None,
+    prev_meta: Mapping[str, Any] | None,
+) -> Tuple[bool, str]:
+    prev_meta_dict = dict(prev_meta or {})
+    prev_problem_hash = str(prev_meta_dict.get("problem_hash") or "").strip()
+    prev_contract = _archive_contract_payload(prev_meta_dict)
+    prev_scope_explicit = bool(prev_problem_hash or prev_contract)
+    current_problem_hash = str(problem_hash or "").strip()
+
+    if prev_problem_hash and current_problem_hash and prev_problem_hash != current_problem_hash:
+        return False, "different_problem_hash"
+    if prev_contract is not None and not score_contract_matches(
+        prev_contract,
+        objective_keys=objective_keys,
+        penalty_key=penalty_key,
+    ):
+        return False, "different_objective_contract"
+
+    if isinstance(prev_score_payload, Mapping):
+        prev_score_vals = list(prev_score_payload.get("score") or [])
+        if score_contract_matches(prev_score_payload, objective_keys=objective_keys, penalty_key=penalty_key):
+            better = lexicographic_is_better(new_score, prev_score_vals)
+            return better, "better_same_contract" if better else "not_better_same_contract"
+        if prev_scope_explicit:
+            return False, "scoped_baseline_without_comparable_score"
+        return True, "objective_contract_changed"
+
+    if prev_scope_explicit:
+        return False, "scoped_baseline_without_score"
+    return True, "first_score"
+
+
 def collect_seed_points(
     stage_idx: int,
     stage_csvs: List[Tuple[str, Path]],
@@ -488,6 +673,7 @@ def collect_seed_points(
     seed_manifest_csv_path: Optional[Path] = None,
     objective_keys: Sequence[str] | None = None,
     penalty_key: str | None = None,
+    problem_hash: str | None = None,
     max_prev: int = 24,
     max_archive: int = 24,
     max_total: int = 48,
@@ -602,12 +788,17 @@ def collect_seed_points(
     # --- 2) Global archive: collect best promotable rows with sufficient overlap ---
     if max_archive > 0 and archive_path.exists() and archive_path.stat().st_size > 0:
         try:
-            ranked_archive: List[Tuple[Tuple[float, ...], float, Dict[str, Any], int]] = []
+            ranked_archive_by_kind: Dict[str, List[Tuple[Tuple[float, ...], float, Dict[str, Any], int]]] = {
+                "same_problem": [],
+                "same_contract": [],
+                "legacy_unknown": [],
+            }
 
-            def _maybe_trim() -> None:
-                if len(ranked_archive) > max_archive * 10:
-                    ranked_archive.sort(key=lambda t: (t[0], -t[1], t[3]))
-                    del ranked_archive[max_archive * 5 :]
+            def _maybe_trim(kind: str) -> None:
+                bucket = ranked_archive_by_kind.setdefault(str(kind), [])
+                if len(bucket) > max_archive * 10:
+                    bucket.sort(key=lambda t: (t[0], -t[1], t[3]))
+                    del bucket[max_archive * 5 :]
 
             with archive_path.open("r", encoding="utf-8") as f:
                 for archive_order, line in enumerate(f):
@@ -617,6 +808,14 @@ def collect_seed_points(
                     try:
                         rec = json.loads(line)
                     except Exception:
+                        continue
+                    compat_kind = archive_record_compatibility_kind(
+                        rec,
+                        objective_keys=objective_keys,
+                        penalty_key=penalty_key,
+                        problem_hash=problem_hash,
+                    )
+                    if compat_kind == "contract_mismatch":
                         continue
                     if not is_promotable_row(rec):
                         continue
@@ -649,9 +848,12 @@ def collect_seed_points(
                     )
                     if cand is None:
                         continue
-                    ranked_archive.append((s, coverage, cand, int(archive_order)))
-                    _maybe_trim()
+                    cand["archive_match_kind"] = str(compat_kind)
+                    ranked_archive_by_kind.setdefault(str(compat_kind), []).append((s, coverage, cand, int(archive_order)))
+                    _maybe_trim(str(compat_kind))
 
+            chosen_kind = _preferred_archive_bucket_name(ranked_archive_by_kind, min_count=1)
+            ranked_archive = list(ranked_archive_by_kind.get(chosen_kind) or [])
             if ranked_archive:
                 ranked_archive.sort(key=lambda t: (t[0], -t[1], t[3]))
                 archive_candidates = [cand for _s, _cov, cand, _ord in ranked_archive[:max_archive]]
@@ -793,6 +995,7 @@ def collect_seed_points(
                     "source_stage": str(cand.get("source_stage") or ""),
                     "row_id": cand.get("row_id"),
                     "coverage": float(cand.get("coverage", 0.0) or 0.0),
+                    "archive_match_kind": str(cand.get("archive_match_kind") or ""),
                     "influence_alignment": float(cand.get("alignment", 0.0) or 0.0),
                     "off_axis_sprawl": float(cand.get("off_axis_sprawl", 0.0) or 0.0),
                     "priority_touched_count": int(cand.get("priority_touched_count", 0) or 0),
@@ -944,6 +1147,7 @@ def make_initial_cem_state_from_archive(
     ranges: Dict[str, Any],
     objective_keys: Sequence[str] | None = None,
     penalty_key: str | None = None,
+    problem_hash: str | None = None,
     top_k: int = 64,
     min_coverage: float = 0.6,
 ) -> bool:
@@ -977,7 +1181,11 @@ def make_initial_cem_state_from_archive(
         lo, hi = ranges.get(p, (0.0, 1.0))
         return float(lo), float(hi)
 
-    candidates: List[Tuple[Tuple[float, ...], Dict[str, Any]]] = []
+    candidates_by_kind: Dict[str, List[Tuple[Tuple[float, ...], Dict[str, Any]]]] = {
+        "same_problem": [],
+        "same_contract": [],
+        "legacy_unknown": [],
+    }
     with archive_path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -986,6 +1194,14 @@ def make_initial_cem_state_from_archive(
             try:
                 rec = json.loads(line)
             except Exception:
+                continue
+            compat_kind = archive_record_compatibility_kind(
+                rec,
+                objective_keys=objective_keys,
+                penalty_key=penalty_key,
+                problem_hash=problem_hash,
+            )
+            if compat_kind == "contract_mismatch":
                 continue
 
             s = score_row(rec, objective_keys=objective_keys, penalty_key=penalty_key)
@@ -1023,8 +1239,11 @@ def make_initial_cem_state_from_archive(
             rec2 = dict(rec)
             rec2["_x_norm"] = x
             rec2["_coverage"] = coverage
-            candidates.append((s, rec2))
+            rec2["_archive_match_kind"] = str(compat_kind)
+            candidates_by_kind.setdefault(str(compat_kind), []).append((s, rec2))
 
+    chosen_kind = _preferred_archive_bucket_name(candidates_by_kind, min_count=1)
+    candidates = list(candidates_by_kind.get(chosen_kind) or [])
     if not candidates:
         return False
 
@@ -1054,6 +1273,7 @@ def make_initial_cem_state_from_archive(
         "from_archive": True,
         "n_used": int(X.shape[0]),
         "min_coverage": float(min_cov),
+        "archive_match_kind": str(chosen_kind),
     }
     save_json(state, cem_state_path)
     return True
@@ -1067,6 +1287,7 @@ def make_initial_cem_state_from_surrogate(
     ranges: Dict[str, Any],
     objective_keys: Sequence[str] | None = None,
     penalty_key: str | None = None,
+    problem_hash: str | None = None,
     model_sha_prefix: str = "",
     n_samples: int = 8000,
     top_k: int = 64,
@@ -1107,9 +1328,13 @@ def make_initial_cem_state_from_surrogate(
 
     rng = np.random.default_rng(int(seed))
 
-    def _iter_records(filter_model: bool) -> List[Tuple[List[float], float]]:
-        data: List[Tuple[List[float], float]] = []
-        seen = 0
+    def _iter_records(filter_model: bool) -> Dict[str, List[Tuple[List[float], float]]]:
+        data_by_kind: Dict[str, List[Tuple[List[float], float]]] = {
+            "same_problem": [],
+            "same_contract": [],
+            "legacy_unknown": [],
+        }
+        seen_by_kind = {key: 0 for key in data_by_kind}
         with archive_path.open("r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
@@ -1123,6 +1348,14 @@ def make_initial_cem_state_from_surrogate(
                     msha = str(rec.get("model_sha1", ""))
                     if not msha.startswith(model_sha_prefix):
                         continue
+                compat_kind = archive_record_compatibility_kind(
+                    rec,
+                    objective_keys=objective_keys,
+                    penalty_key=penalty_key,
+                    problem_hash=problem_hash,
+                )
+                if compat_kind == "contract_mismatch":
+                    continue
 
                 s = score_row(rec, objective_keys=objective_keys, penalty_key=penalty_key)
                 if not (np.isfinite(s[0]) and np.isfinite(s[1]) and np.isfinite(s[2])):
@@ -1160,19 +1393,29 @@ def make_initial_cem_state_from_surrogate(
                 y = scalarize_score_tuple(s)
 
                 # Reservoir sampling to cap train size
-                if len(data) < int(max_train):
-                    data.append((x, float(y)))
+                bucket = data_by_kind.setdefault(str(compat_kind), [])
+                seen = int(seen_by_kind.get(str(compat_kind), 0))
+                if len(bucket) < int(max_train):
+                    bucket.append((x, float(y)))
                 else:
                     j = int(rng.integers(0, seen + 1))
                     if j < int(max_train):
-                        data[j] = (x, float(y))
-                seen += 1
-        return data
+                        bucket[j] = (x, float(y))
+                seen_by_kind[str(compat_kind)] = seen + 1
+        return data_by_kind
+
+    preferred_train_n = max(50, 5 * len(names))
 
     # Prefer same model sha (transfer learning), but fallback to all if too small
-    data = _iter_records(filter_model=True)
-    if len(data) < max(50, 5 * len(names)):
-        data = _iter_records(filter_model=False)
+    used_model_filter = bool(bool(model_sha_prefix))
+    data_by_kind = _iter_records(filter_model=True)
+    selected_kind = _preferred_archive_bucket_name(data_by_kind, min_count=preferred_train_n)
+    data = list(data_by_kind.get(selected_kind) or [])
+    if len(data) < preferred_train_n:
+        used_model_filter = False
+        data_by_kind = _iter_records(filter_model=False)
+        selected_kind = _preferred_archive_bucket_name(data_by_kind, min_count=preferred_train_n)
+        data = list(data_by_kind.get(selected_kind) or [])
 
     if len(data) < max(20, 3 * len(names)):
         return False
@@ -1211,7 +1454,8 @@ def make_initial_cem_state_from_surrogate(
         "train_n": int(X.shape[0]),
         "samples": int(n_samples),
         "top_k": int(top_k),
-        "model_filter": bool(bool(model_sha_prefix)),
+        "model_filter": bool(used_model_filter),
+        "archive_match_kind": str(selected_kind),
     }
     save_json(state, cem_state_path)
     return True
@@ -1310,6 +1554,32 @@ def _safe_close_fileobj(fh: Optional[object]) -> None:
             fh.close()  # type: ignore[attr-defined]
     except Exception:
         pass
+
+
+def build_stage_worker_env(
+    workspace_dir: Path,
+    problem_hash: str | None,
+    *,
+    base_env: Optional[Mapping[str, str]] = None,
+) -> Dict[str, str]:
+    env = dict(base_env) if base_env is not None else os.environ.copy()
+    env.setdefault("PYTHONUTF8", "1")
+    _prepend_pythonpath(env, _PROJECT_ROOT, _PNEUMO_ROOT)
+    env.setdefault("PNEUMO_GUIDED_MODE", "auto")
+    env["PNEUMO_OPT_PROBLEM_HASH_MODE"] = problem_hash_mode_from_env(env)
+    current_problem_hash = str(problem_hash or "").strip()
+    if current_problem_hash:
+        env["PNEUMO_OPT_PROBLEM_HASH"] = current_problem_hash
+    else:
+        env.pop("PNEUMO_OPT_PROBLEM_HASH", None)
+    env["PNEUMO_WORKSPACE_DIR"] = str(Path(workspace_dir))
+    try:
+        cache_dir = (Path(workspace_dir) / "cache" / "worldroad")
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        env.setdefault("WORLDROAD_CACHE_DIR", str(cache_dir))
+    except Exception:
+        pass
+    return env
 
 
 
@@ -1623,6 +1893,30 @@ def main() -> int:
     if suite_full != suite_full_raw:
         save_json(suite_full, suite_json)
     save_json(optimization_input_audit, run_dir / "optimization_input_audit.json")
+    problem_hash_mode = problem_hash_mode_from_env()
+    problem_hash = str(
+        stable_hash_problem(
+            base=base_params,
+            ranges=ranges_sanitized,
+            suite=suite_full,
+            model_sha256=str(hash_file(model_path)),
+            worker_sha256=str(hash_file(worker_path)),
+            extra={
+                "objective_keys": list(objective_keys),
+                "penalty_key": str(penalty_key),
+            },
+            mode=problem_hash_mode,
+        )
+    )
+    (run_dir / "problem_hash.txt").write_text(problem_hash, encoding="utf-8")
+    write_problem_hash_mode_artifact(run_dir, problem_hash_mode)
+    write_baseline_source_artifact(
+        run_dir,
+        resolve_workspace_baseline_source(
+            problem_hash=problem_hash,
+            workspace_dir=workspace_dir,
+        ),
+    )
 
     # Influence-based parameter staging (pneumatics/kinematics aware)
     staging_dir = run_dir / "staging"
@@ -1922,6 +2216,7 @@ def main() -> int:
                         ranges=rj,
                         objective_keys=objective_keys,
                         penalty_key=penalty_key,
+                        problem_hash=problem_hash,
                         model_sha_prefix=model_sha,
                         n_samples=int(args.surrogate_samples),
                         top_k=int(args.surrogate_top_k),
@@ -1929,9 +2224,25 @@ def main() -> int:
                         max_train=20000,
                     )
                     if not ok:
-                        make_initial_cem_state_from_archive(cem_state_path, archive_path, ranges=rj, objective_keys=objective_keys, penalty_key=penalty_key, top_k=64)
+                        make_initial_cem_state_from_archive(
+                            cem_state_path,
+                            archive_path,
+                            ranges=rj,
+                            objective_keys=objective_keys,
+                            penalty_key=penalty_key,
+                            problem_hash=problem_hash,
+                            top_k=64,
+                        )
                 elif mode == "archive":
-                    make_initial_cem_state_from_archive(cem_state_path, archive_path, ranges=rj, objective_keys=objective_keys, penalty_key=penalty_key, top_k=64)
+                    make_initial_cem_state_from_archive(
+                        cem_state_path,
+                        archive_path,
+                        ranges=rj,
+                        objective_keys=objective_keys,
+                        penalty_key=penalty_key,
+                        problem_hash=problem_hash,
+                        top_k=64,
+                    )
                 else:
                     pass
             except Exception:
@@ -1992,6 +2303,7 @@ def main() -> int:
                     seed_manifest_csv_path=seed_manifest_csv,
                     objective_keys=objective_keys,
                     penalty_key=penalty_key,
+                    problem_hash=problem_hash,
                     max_prev=int(seed_cap),
                     max_archive=int(seed_cap),
                     max_total=int(seed_cap),
@@ -2133,16 +2445,10 @@ def main() -> int:
         })
 
         # Worker environment (defaults): guided_mode=auto + worldroad disk-cache
-        env = os.environ.copy()
-        env.setdefault("PYTHONUTF8", "1")
-        _prepend_pythonpath(env, _PROJECT_ROOT, _PNEUMO_ROOT)
-        env.setdefault("PNEUMO_GUIDED_MODE", "auto")
-        try:
-            cache_dir = (workspace_dir / "cache" / "worldroad")
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            env.setdefault("WORLDROAD_CACHE_DIR", str(cache_dir))
-        except Exception:
-            pass
+        env = build_stage_worker_env(
+            workspace_dir,
+            problem_hash,
+        )
 
         worker_stdout_log = stage_dir / "w_out.log"
         worker_stderr_log = stage_dir / "w_err.log"
@@ -2325,6 +2631,8 @@ def main() -> int:
                 "base_hash": stable_obj_hash(base_params)[:12],
                 "suite_hash": stable_obj_hash(suite_exp)[:12],
                 "ranges_hash": stable_obj_hash(rj)[:12],
+                "problem_hash": str(problem_hash),
+                "objective_contract": dict(objective_contract),
             },
             stage_name=stage_name,
             archived_ids_path=archived_ids_path,
@@ -2395,10 +2703,12 @@ def main() -> int:
     if int(args.autoupdate_baseline) == 1:
         # pick best row from the last finished stage with actual file
         best_row: Optional[Dict[str, Any]] = None
+        best_stage_name = ""
         for stage_name, p in reversed(stage_csvs):
             br = pick_best_row(p, objective_keys=objective_keys, penalty_key=penalty_key)
             if br is not None:
                 best_row = br
+                best_stage_name = str(stage_name or "")
                 break
         if best_row is not None:
             baseline_dir = workspace_dir / "baselines"
@@ -2418,7 +2728,12 @@ def main() -> int:
                 penalty_key=penalty_key,
                 source="opt_stage_runner_v1_baseline",
             )
+            new_score_payload["problem_hash"] = str(problem_hash)
+            new_score_payload["run_dir"] = str(run_dir)
+            new_score_payload["stage_name"] = str(best_stage_name)
+            new_score_payload["objective_contract"] = dict(objective_contract)
             score_path = baseline_dir / "baseline_best_score.json"
+            meta_path = baseline_dir / "baseline_best_meta.json"
             prev_score_raw = None
             prev_score_payload = None
             if score_path.exists():
@@ -2429,20 +2744,38 @@ def main() -> int:
                     prev_score_raw = None
                     prev_score_payload = None
 
-            apply_update = True
-            apply_reason = "first_score"
-            if prev_score_payload is not None:
-                prev_score_vals = list(prev_score_payload.get("score") or [])
-                if score_contract_matches(prev_score_payload, objective_keys=objective_keys, penalty_key=penalty_key):
-                    apply_update = lexicographic_is_better(new_score, prev_score_vals)
-                    apply_reason = "better_same_contract" if apply_update else "not_better_same_contract"
-                else:
-                    apply_update = True
-                    apply_reason = "objective_contract_changed"
+            prev_baseline_meta = load_baseline_best_meta(
+                baseline_dir,
+                prev_score_raw=prev_score_raw,
+            )
+            baseline_meta = baseline_best_meta_payload(
+                problem_hash=problem_hash,
+                objective_contract=objective_contract,
+                run_dir=run_dir,
+                stage_name=best_stage_name,
+                score=new_score,
+                score_payload_obj=new_score_payload,
+                params=clean,
+            )
+            scoped_baseline_dir = baseline_problem_scope_dir(baseline_dir, problem_hash)
+            scoped_baseline_dir.mkdir(parents=True, exist_ok=True)
+            save_json(clean, scoped_baseline_dir / "baseline_best.json")
+            save_json(new_score_payload, scoped_baseline_dir / "baseline_best_score.json")
+            save_json(baseline_meta, scoped_baseline_dir / "baseline_best_meta.json")
+
+            apply_update, apply_reason = decide_baseline_autoupdate(
+                new_score=new_score,
+                objective_keys=objective_keys,
+                penalty_key=penalty_key,
+                problem_hash=problem_hash,
+                prev_score_payload=prev_score_payload,
+                prev_meta=prev_baseline_meta,
+            )
 
             if apply_update:
                 save_json(clean, baseline_dir / "baseline_best.json")
                 save_json(new_score_payload, score_path)
+                save_json(baseline_meta, meta_path)
 
             # history
             hist_path = baseline_dir / "baseline_history.jsonl"
@@ -2456,6 +2789,11 @@ def main() -> int:
                     "apply_reason": str(apply_reason),
                     "prev_score": prev_score_raw,
                     "prev_score_payload": prev_score_payload,
+                    "problem_hash": str(problem_hash),
+                    "objective_contract": dict(objective_contract),
+                    "baseline_meta": baseline_meta,
+                    "prev_baseline_meta": prev_baseline_meta,
+                    "scoped_baseline_dir": str(scoped_baseline_dir),
                     "params": clean,
                 }, ensure_ascii=False) + "\n")
 

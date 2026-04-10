@@ -44,6 +44,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from pneumo_solver_ui.optimization_scope_compare import (
+    compare_optimizer_scope_sources,
+    evaluate_optimizer_scope_gate,
+    extract_optimizer_scope_from_health,
+    extract_optimizer_scope_from_run_scope,
+    extract_optimizer_scope_from_triage,
+    optimizer_scope_export_source_name,
+)
+
 from .send_bundle_contract import (
     ANIM_DIAG_JSON,
     ANIM_DIAG_MD,
@@ -190,8 +199,11 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
         "ok": True,
         "errors": [],
         "warnings": [],
+        "release_risks": [],
         "stats": {},
         "anim_latest": {},
+        "optimizer_scope": {},
+        "optimizer_scope_gate": {},
     }
 
     errors: List[str] = []
@@ -337,6 +349,50 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
             if not isinstance(manifest_obj, dict):
                 errors.append("bundle/manifest.json is not a JSON object")
                 manifest_obj = {}
+
+            optimizer_scope_sources: Dict[str, Dict[str, Any]] = {}
+            triage_scope = extract_optimizer_scope_from_triage(_read_json("triage/triage_report.json"))
+            if triage_scope:
+                optimizer_scope_sources[str(triage_scope.get("source") or "triage")] = triage_scope
+
+            health_scope = extract_optimizer_scope_from_health(_read_json("health/health_report.json"))
+            if health_scope:
+                optimizer_scope_sources[str(health_scope.get("source") or "health")] = health_scope
+
+            for arcname in sorted(
+                n
+                for n in name_set
+                if n == "run_scope.json" or n.endswith("/export/run_scope.json")
+            ):
+                export_scope = extract_optimizer_scope_from_run_scope(
+                    _read_json(arcname),
+                    source=optimizer_scope_export_source_name(arcname),
+                    source_path=arcname,
+                )
+                if export_scope:
+                    optimizer_scope_sources[str(export_scope.get("source") or arcname)] = export_scope
+
+            optimizer_scope = compare_optimizer_scope_sources(
+                optimizer_scope_sources,
+                preferred_order=("triage", "health", "export"),
+            )
+            if optimizer_scope:
+                rep["optimizer_scope"] = optimizer_scope
+                for issue in optimizer_scope.get("issues") or []:
+                    msg = str(issue).strip()
+                    if msg:
+                        warnings.append(msg)
+            optimizer_scope_gate = evaluate_optimizer_scope_gate(rep.get("optimizer_scope"))
+            if optimizer_scope_gate:
+                rep["optimizer_scope_gate"] = optimizer_scope_gate
+                if optimizer_scope_gate.get("release_risk"):
+                    risk_msg = (
+                        "optimizer scope release risk: "
+                        f"{optimizer_scope_gate.get('release_gate_reason') or 'mismatch detected'}"
+                    )
+                    rep["release_risks"].append(risk_msg)
+                    if risk_msg not in warnings:
+                        warnings.append(risk_msg)
 
             # anim_latest diagnostics / pointer consistency (best effort, warning-only)
             anim_latest["diagnostics_json_present"] = ANIM_DIAG_JSON in name_set
@@ -616,7 +672,10 @@ def _render_md(rep: Dict[str, Any]) -> str:
     stats = rep.get("stats") or {}
     errors = rep.get("errors") or []
     warnings = rep.get("warnings") or []
+    release_risks = rep.get("release_risks") or []
     anim = rep.get("anim_latest") or {}
+    optimizer_scope = rep.get("optimizer_scope") or {}
+    optimizer_scope_gate = rep.get("optimizer_scope_gate") or {}
     ui_autosave = rep.get("ui_autosave") or {}
 
     title = "✅ SEND BUNDLE VALIDATION: OK" if ok else "❌ SEND BUNDLE VALIDATION: FAIL"
@@ -632,6 +691,30 @@ def _render_md(rep: Dict[str, Any]) -> str:
         "",
         "```json",
         json.dumps(stats, ensure_ascii=False, indent=2),
+        "```",
+        "",
+        "## Optimizer scope",
+        "",
+        f"- available: `{optimizer_scope.get('available')}`",
+        f"- release_gate: `{optimizer_scope_gate.get('release_gate') or 'n/a'}`",
+        f"- release_gate_reason: `{optimizer_scope_gate.get('release_gate_reason') or 'n/a'}`",
+        f"- release_risk: `{optimizer_scope_gate.get('release_risk')}`",
+        f"- canonical_source: `{optimizer_scope.get('canonical_source') or 'вЂ”'}`",
+        f"- scope_sync_ok: `{optimizer_scope.get('scope_sync_ok')}`",
+        f"- Problem scope: `{optimizer_scope.get('problem_hash_short') or optimizer_scope.get('problem_hash') or 'вЂ”'}`",
+        f"- Hash mode: `{optimizer_scope.get('problem_hash_mode') or 'вЂ”'}`",
+        f"- objective_keys: `{', '.join(str(x) for x in (optimizer_scope.get('objective_keys') or [])) or 'вЂ”'}`",
+        f"- penalty_key: `{optimizer_scope.get('penalty_key') or 'вЂ”'}`",
+        f"- penalty_tol: `{optimizer_scope.get('penalty_tol')}`",
+        "",
+        "### Optimizer scope issues",
+        "",
+        _md_list([str(x) for x in (optimizer_scope.get('issues') or [])]),
+        "",
+        "### Optimizer scope sources",
+        "",
+        "```json",
+        json.dumps(optimizer_scope.get("sources") or {}, ensure_ascii=False, indent=2),
         "```",
         "",
         "## Anim latest diagnostics",
@@ -683,6 +766,10 @@ def _render_md(rep: Dict[str, Any]) -> str:
         "",
         _md_list([str(x) for x in errors]),
         "",
+        "## Release risks",
+        "",
+        _md_list([str(x) for x in release_risks]),
+        "",
         "## Warnings",
         "",
         _md_list([str(x) for x in warnings]),
@@ -692,6 +779,7 @@ def _render_md(rep: Dict[str, Any]) -> str:
         "- Manifest integrity is checked by sha256/size of decompressed bytes for files listed in bundle/manifest.json.",
         "- Files written via z.writestr (meta/triage/etc) are checked by presence and JSON parse (when applicable).",
         "- anim_latest diagnostics are compared across triage sidecar, local pointer and global pointer when these sources are present.",
+        "- optimizer scope is compared across triage/health/export surfaces when scope artifacts are present in the bundle.",
     ]
     return "\n".join(lines) + "\n"
 

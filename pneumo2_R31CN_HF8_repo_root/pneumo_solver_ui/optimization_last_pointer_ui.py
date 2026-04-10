@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from typing import Any
 
+from pneumo_solver_ui.optimization_baseline_source_ui import (
+    render_baseline_source_summary,
+)
 from pneumo_solver_ui.optimization_contract_summary_ui import (
     render_objective_contract_summary,
 )
 from pneumo_solver_ui.optimization_packaging_snapshot_ui import (
     render_packaging_snapshot_summary,
+)
+from pneumo_solver_ui.optimization_problem_scope_ui import (
+    render_problem_scope_summary,
 )
 
 
@@ -33,6 +39,8 @@ def render_last_optimization_pointer_summary(
     success_message: str | None = None,
     packaging_heading: str = "Packaging snapshot (last run)",
     packaging_interference_prefix: str = "В последнем run есть packaging-interference evidence",
+    current_problem_hash: str = "",
+    current_problem_hash_mode: str = "",
 ) -> bool:
     raw = snap.get("raw") or {}
     meta = snap.get("meta") or {}
@@ -66,6 +74,18 @@ def render_last_optimization_pointer_summary(
         objective_keys=meta.get("objective_keys"),
         penalty_key=meta.get("penalty_key"),
         penalty_tol=meta.get("penalty_tol"),
+    )
+    render_baseline_source_summary(
+        st,
+        summary=snap.get("opt_summary"),
+        run_dir=run_dir,
+    )
+    render_problem_scope_summary(
+        st,
+        summary=snap.get("opt_summary"),
+        run_dir=run_dir,
+        current_problem_hash=current_problem_hash,
+        current_problem_hash_mode=current_problem_hash_mode,
     )
 
     sp_payload = snap.get("sp_payload") or {}

@@ -8,11 +8,14 @@ from pneumo_solver_ui.optimization_contract_summary_ui import (
     render_objective_contract_drift_warning,
     render_objective_contract_summary,
 )
-from pneumo_solver_ui.optimization_run_history import (
-    summarize_run_packaging_snapshot,
-)
 from pneumo_solver_ui.optimization_packaging_snapshot_ui import (
     render_packaging_snapshot_summary,
+)
+from pneumo_solver_ui.optimization_problem_scope_ui import (
+    render_problem_scope_summary,
+)
+from pneumo_solver_ui.optimization_run_history import (
+    summarize_run_packaging_snapshot,
 )
 
 
@@ -84,6 +87,8 @@ def render_selected_optimization_run_details(
     current_penalty_key: Any,
     current_penalty_tol: Any,
     load_log_text: Callable[[Path], str],
+    current_problem_hash: str = "",
+    current_problem_hash_mode: str = "",
 ) -> None:
     st.write(f"**Pipeline:** {summary.backend}")
     st.write(f"**run_dir:** `{summary.run_dir}`")
@@ -91,6 +96,19 @@ def render_selected_optimization_run_details(
         st.write(f"**Артефакт результатов:** `{summary.result_path}`")
     if summary.started_at:
         st.write(f"**Started hint:** `{summary.started_at}`")
+    render_problem_scope_summary(
+        st,
+        summary=summary,
+        run_dir=getattr(summary, "run_dir", None),
+        current_problem_hash=current_problem_hash,
+        current_problem_hash_mode=current_problem_hash_mode,
+    )
+    baseline_source_label = str(getattr(summary, "baseline_source_label", "") or "").strip()
+    baseline_source_path = getattr(summary, "baseline_source_path", None)
+    if baseline_source_label:
+        st.write(f"**Baseline source:** {baseline_source_label}")
+        if baseline_source_path is not None:
+            st.caption(f"Baseline override at launch: `{baseline_source_path}`")
     if summary.note:
         st.caption(summary.note)
     if summary.last_error:

@@ -132,7 +132,14 @@ def _make_validation_report(token: str, reload_inputs: list[str], *, pointer_syn
 
 
 
-def _write_minimal_send_bundle(tmp_path: Path, *, validation_token: str = "tok-sidecar", diag_token: str = "tok-sidecar") -> Path:
+def _write_minimal_send_bundle(
+    tmp_path: Path,
+    *,
+    validation_token: str = "tok-sidecar",
+    diag_token: str = "tok-sidecar",
+    dist_progress: dict | None = None,
+    export_scopes: list[tuple[str, dict]] | None = None,
+) -> Path:
     zip_path = tmp_path / "bundle.zip"
     diag = _make_anim_diag(diag_token, ["npz", "road_csv"])
     validation = _make_validation_report(
@@ -164,6 +171,8 @@ def _write_minimal_send_bundle(tmp_path: Path, *, validation_token: str = "tok-s
         "severity_counts": {"critical": 0},
         "red_flags": [],
     }
+    if dist_progress:
+        triage["dist_progress"] = dict(dist_progress)
 
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("bundle/meta.json", json.dumps({"release": "pytest", "created_at": "2026-03-11T12:00:00"}, ensure_ascii=False, indent=2))
@@ -177,6 +186,11 @@ def _write_minimal_send_bundle(tmp_path: Path, *, validation_token: str = "tok-s
         zf.writestr("triage/triage_report.json", json.dumps(triage, ensure_ascii=False, indent=2))
         zf.writestr("triage/latest_anim_pointer_diagnostics.json", json.dumps(diag, ensure_ascii=False, indent=2))
         zf.writestr("triage/latest_anim_pointer_diagnostics.md", "# Anim latest diagnostics\n")
+        for run_name, run_scope in list(export_scopes or []):
+            zf.writestr(
+                f"dist_runs/{run_name}/export/run_scope.json",
+                json.dumps(run_scope, ensure_ascii=False, indent=2),
+            )
     return zip_path
 
 
@@ -316,9 +330,13 @@ def test_sources_wire_health_report_and_offline_inspector_into_send_bundle_flow(
     assert 'collect_health_report' in health_text
     assert 'render_health_report_md' in health_text
     assert 'signals["anim_latest"]' in health_text
+    assert 'signals["optimizer_scope"]' in health_text
+    assert 'signals["optimizer_scope_gate"]' in health_text
     assert 'signals["mnemo_event_log"]' in health_text
     assert 'signals["ring_closure"]' in health_text
     assert 'signals["operator_recommendations"]' in health_text
+    assert '## Distributed optimization' in health_text
+    assert "scope_sync_ok" in health_text
     assert '## Desktop Mnemo events' in health_text
     assert '## Ring closure' in health_text
     assert '## Recommended actions' in health_text
@@ -329,7 +347,12 @@ def test_sources_wire_health_report_and_offline_inspector_into_send_bundle_flow(
     assert 'embedded health report is missing' in inspect_text
     assert 'mnemo_event_log' in inspect_text
     assert 'ring_closure' in inspect_text
+    assert 'optimizer_scope' in inspect_text
+    assert 'optimizer_scope_gate' in inspect_text
     assert 'operator_recommendations' in inspect_text
+    assert '## Distributed optimization' in inspect_text
+    assert "scope_sync_ok" in inspect_text
+    assert "scope_release_risk" in inspect_text
     assert '## Desktop Mnemo events' in inspect_text
     assert '## Ring closure' in inspect_text
     assert '## Recommended actions' in inspect_text
@@ -337,3 +360,107 @@ def test_sources_wire_health_report_and_offline_inspector_into_send_bundle_flow(
     assert 'browser_perf_artifacts_primary' in inspect_text
     assert 'has_browser_perf_evidence_report' in inspect_text
     assert 'render_inspection_md' in inspect_text
+
+
+def test_health_report_and_inspector_surface_optimizer_scope_from_triage(tmp_path: Path) -> None:
+    zip_path = _write_minimal_send_bundle(
+        tmp_path,
+        dist_progress={
+            "status": "running",
+            "completed": 9,
+            "in_flight": 3,
+            "cached_hits": 1,
+            "duplicates_skipped": 2,
+            "problem_hash": "ph_bundle_scope_1234567890",
+            "problem_hash_short": "ph_bundle_sc",
+            "problem_hash_mode": "legacy",
+        },
+    )
+
+    json_path, md_path = build_health_report(zip_path, out_dir=tmp_path)
+    rep = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    optimizer_scope = dict(rep.get("signals", {}).get("optimizer_scope") or {})
+    triage = dict(rep.get("signals", {}).get("triage") or {})
+    triage_dist = dict(triage.get("dist_progress") or {})
+    md_text = Path(md_path).read_text(encoding="utf-8")
+
+    assert optimizer_scope["problem_hash"] == "ph_bundle_scope_1234567890"
+    assert optimizer_scope["problem_hash_short"] == "ph_bundle_sc"
+    assert optimizer_scope["problem_hash_mode"] == "legacy"
+    assert triage_dist["problem_hash_mode"] == "legacy"
+    assert "## Distributed optimization" in md_text
+    assert "Problem scope: `ph_bundle_sc`" in md_text
+    assert "Hash mode: `legacy`" in md_text
+
+    add_health_report_to_zip(zip_path, json_path, md_path)
+    summary = inspect_send_bundle(zip_path)
+    inspect_md = render_inspection_md(summary)
+
+    assert dict(summary.get("optimizer_scope") or {})["problem_hash_mode"] == "legacy"
+    assert "## Distributed optimization" in inspect_md
+    assert "Problem scope: `ph_bundle_sc`" in inspect_md
+    assert "Hash mode: `legacy`" in inspect_md
+
+
+def test_health_report_and_inspector_surface_optimizer_scope_mismatch_between_triage_and_export(tmp_path: Path) -> None:
+    zip_path = _write_minimal_send_bundle(
+        tmp_path,
+        dist_progress={
+            "status": "running",
+            "completed": 4,
+            "in_flight": 1,
+            "cached_hits": 0,
+            "duplicates_skipped": 0,
+            "problem_hash": "ph_bundle_scope_1234567890",
+            "problem_hash_short": "ph_bundle_sc",
+            "problem_hash_mode": "stable",
+        },
+        export_scopes=[
+            (
+                "DIST_SCOPE_B",
+                {
+                    "schema": "expdb_run_scope_v1",
+                    "run_id": "dist-run-002",
+                    "problem_hash": "ph_bundle_scope_mismatch_222222",
+                    "problem_hash_short": "ph_bundle_ex",
+                    "problem_hash_mode": "legacy",
+                    "objective_keys": ["comfort", "energy"],
+                    "penalty_key": "violations",
+                },
+            )
+        ],
+    )
+
+    json_path, md_path = build_health_report(zip_path, out_dir=tmp_path)
+    rep = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    optimizer_scope = dict(rep.get("signals", {}).get("optimizer_scope") or {})
+    optimizer_scope_gate = dict(rep.get("signals", {}).get("optimizer_scope_gate") or {})
+    notes = [str(x) for x in (rep.get("notes") or [])]
+    md_text = Path(md_path).read_text(encoding="utf-8")
+
+    assert optimizer_scope["problem_hash"] == "ph_bundle_scope_1234567890"
+    assert optimizer_scope["problem_hash_mode"] == "stable"
+    assert optimizer_scope["scope_sync_ok"] is False
+    assert optimizer_scope_gate["release_gate"] == "FAIL"
+    assert optimizer_scope_gate["release_risk"] is True
+    assert "export:DIST_SCOPE_B" in optimizer_scope["sources"]
+    assert any("optimizer scope problem_hash mismatch" in msg for msg in optimizer_scope.get("issues") or [])
+    assert any("optimizer scope problem_hash_mode mismatch" in msg for msg in optimizer_scope.get("issues") or [])
+    assert any("optimizer scope problem_hash mismatch" in msg for msg in notes)
+    assert any("optimizer scope release risk" in msg for msg in notes)
+    assert "scope_gate: `FAIL`" in md_text
+    assert "scope_release_risk: `True`" in md_text
+    assert "scope_sync_ok: `False`" in md_text
+    assert "scope_issue: optimizer scope problem_hash mismatch" in md_text
+
+    add_health_report_to_zip(zip_path, json_path, md_path)
+    summary = inspect_send_bundle(zip_path)
+    inspect_md = render_inspection_md(summary)
+
+    assert dict(summary.get("optimizer_scope") or {})["scope_sync_ok"] is False
+    assert dict(summary.get("optimizer_scope_gate") or {})["release_gate"] == "FAIL"
+    assert any("optimizer scope problem_hash mismatch" in msg for msg in (summary.get("notes") or []))
+    assert "scope_gate: `FAIL`" in inspect_md
+    assert "scope_release_risk: `True`" in inspect_md
+    assert "scope_sync_ok: `False`" in inspect_md
+    assert "scope_issue: optimizer scope problem_hash mismatch" in inspect_md

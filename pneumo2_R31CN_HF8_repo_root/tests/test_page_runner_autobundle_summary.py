@@ -94,7 +94,23 @@ def test_run_script_page_autobundle_surfaces_anim_and_browser_perf_summary(tmp_p
                     "browser_perf_evidence_report_in_bundle": True,
                     "browser_perf_comparison_report_in_bundle": True,
                     "browser_perf_trace_in_bundle": True,
-                }
+                },
+                "optimizer_scope": {
+                    "problem_hash": "ph_runner_full_1234567890",
+                    "problem_hash_short": "ph_runner_1",
+                    "problem_hash_mode": "stable",
+                    "canonical_source": "triage",
+                    "scope_sync_ok": False,
+                    "mismatch_fields": ["problem_hash"],
+                },
+                "optimizer_scope_gate": {
+                    "release_gate": "FAIL",
+                    "release_gate_reason": "problem_hash mismatch between sources",
+                    "release_risk": True,
+                    "canonical_source": "triage",
+                    "scope_sync_ok": False,
+                    "mismatch_fields": ["problem_hash"],
+                },
             },
             ensure_ascii=False,
             indent=2,
@@ -116,6 +132,8 @@ def test_run_script_page_autobundle_surfaces_anim_and_browser_perf_summary(tmp_p
 
     assert any("Диагностика сохранена:" in text for text in fake_st.calls["caption"])
     assert any("Anim pointer diagnostics:" in text for text in fake_st.calls["caption"])
+    assert any("Optimizer scope gate: FAIL / release_risk=True / reason=problem_hash mismatch between sources" in text for text in fake_st.calls["markdown"])
+    assert any("Optimizer scope: scope=ph_runner_1 / mode=stable / source=triage / sync=False / mismatches=problem_hash" in text for text in fake_st.calls["markdown"])
     assert any("Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" in text for text in fake_st.calls["markdown"])
     assert any("Browser perf comparison: regression_checked / PASS / ready=True" in text for text in fake_st.calls["markdown"])
     assert any("ZIP диагностики уже скопирован в буфер обмена." in text for text in fake_st.calls["success"])

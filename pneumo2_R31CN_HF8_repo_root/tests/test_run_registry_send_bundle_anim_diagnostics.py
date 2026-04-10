@@ -39,7 +39,6 @@ def _solver_df() -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
-
 def _prepare_anim_export(tmp_path: Path, monkeypatch) -> tuple[Path, Path, dict]:
     workspace_dir = tmp_path / "workspace"
     exports_dir = workspace_dir / "exports"
@@ -87,7 +86,6 @@ def _prepare_anim_export(tmp_path: Path, monkeypatch) -> tuple[Path, Path, dict]
     return npz_path, ptr_path, pointer
 
 
-
 def test_collect_anim_latest_bundle_diagnostics_writes_sidecars(tmp_path: Path, monkeypatch) -> None:
     npz_path, ptr_path, pointer = _prepare_anim_export(tmp_path, monkeypatch)
 
@@ -105,7 +103,6 @@ def test_collect_anim_latest_bundle_diagnostics_writes_sidecars(tmp_path: Path, 
     assert (tmp_path / ANIM_DIAG_SIDECAR_MD).exists()
     assert pointer["visual_cache_token"] in md
     assert "anim_latest_mnemo_event_log_state: mode=Регуляторный коридор / total=4 / active=1 / acked=2" in md
-
 
 
 def test_run_registry_send_bundle_created_accepts_extended_anim_fields(tmp_path: Path, monkeypatch) -> None:
@@ -130,9 +127,19 @@ def test_run_registry_send_bundle_created_accepts_extended_anim_fields(tmp_path:
         validation_ok=True,
         validation_errors=0,
         validation_warnings=1,
+        validation_release_risks=1,
         dashboard_created=True,
         dashboard_html_path=dashboard_html,
         env={"PNEUMO_RUN_ID": "PYTEST"},
+        optimizer_scope_release_gate="FAIL",
+        optimizer_scope_release_risk=True,
+        optimizer_scope_release_gate_reason="problem_hash mismatch between sources",
+        optimizer_scope_problem_hash="ph_registry_full_1234567890",
+        optimizer_scope_problem_hash_short="ph_reg_12",
+        optimizer_scope_problem_hash_mode="stable",
+        optimizer_scope_sync_ok=False,
+        optimizer_scope_canonical_source="triage",
+        optimizer_scope_mismatch_fields=["problem_hash", "problem_hash_mode"],
         scenario_kind="ring",
         ring_closure_policy="strict_exact",
         ring_closure_applied=False,
@@ -149,6 +156,11 @@ def test_run_registry_send_bundle_created_accepts_extended_anim_fields(tmp_path:
     assert rec["zip_path"] == str(zip_path)
     assert rec["latest_zip_path"].endswith("latest_send_bundle.zip")
     assert rec["dashboard_created"] is True
+    assert rec["validation_release_risks"] == 1
+    assert rec["optimizer_scope_release_gate"] == "FAIL"
+    assert rec["optimizer_scope_release_risk"] is True
+    assert rec["optimizer_scope_problem_hash_short"] == "ph_reg_12"
+    assert rec["optimizer_scope_problem_hash_mode"] == "stable"
     assert rec["anim_latest_pointer_json"] == str(ptr_path.resolve())
     assert rec["anim_latest_visual_cache_token"] == pointer["visual_cache_token"]
     assert rec["anim_latest_visual_reload_inputs"] == ["npz", "road_csv"]
@@ -162,7 +174,6 @@ def test_run_registry_send_bundle_created_accepts_extended_anim_fields(tmp_path:
     assert rec["ring_seam_max_jump_m"] == 0.012
     assert rec["ring_raw_seam_max_jump_m"] == 0.015
     assert Path(rec["anim_latest_global_pointer_json"]).parts[-3:] == ("workspace", "_pointers", "anim_latest.json")
-
 
 
 def test_run_registry_index_last_event_keeps_anim_latest_usability_summary(tmp_path: Path, monkeypatch) -> None:
@@ -197,6 +208,19 @@ def test_run_registry_index_last_event_keeps_anim_latest_usability_summary(tmp_p
         anim_latest_mnemo_event_log_active_latch_count=1,
         anim_latest_mnemo_event_log_acknowledged_latch_count=2,
         anim_latest_mnemo_event_log_recent_titles=["Большой перепад давлений", "Смена режима"],
+        validation_ok=True,
+        validation_errors=0,
+        validation_warnings=2,
+        validation_release_risks=1,
+        optimizer_scope_release_gate="FAIL",
+        optimizer_scope_release_risk=True,
+        optimizer_scope_release_gate_reason="problem_hash mismatch between sources",
+        optimizer_scope_problem_hash="ph_registry_full_1234567890",
+        optimizer_scope_problem_hash_short="ph_reg_12",
+        optimizer_scope_problem_hash_mode="stable",
+        optimizer_scope_sync_ok=False,
+        optimizer_scope_canonical_source="triage",
+        optimizer_scope_mismatch_fields=["problem_hash", "problem_hash_mode"],
         scenario_kind="ring",
         ring_closure_policy="strict_exact",
         ring_closure_applied=False,
@@ -218,6 +242,17 @@ def test_run_registry_index_last_event_keeps_anim_latest_usability_summary(tmp_p
     assert last["anim_latest_mnemo_event_log_exists"] is True
     assert last["anim_latest_mnemo_event_log_current_mode"] == "Регуляторный коридор"
     assert last["anim_latest_mnemo_event_log_recent_titles"] == ["Большой перепад давлений", "Смена режима"]
+    assert last["validation_ok"] is True
+    assert last["validation_errors"] == 0
+    assert last["validation_warnings"] == 2
+    assert last["validation_release_risks"] == 1
+    assert last["optimizer_scope_release_gate"] == "FAIL"
+    assert last["optimizer_scope_release_risk"] is True
+    assert last["optimizer_scope_problem_hash_short"] == "ph_reg_12"
+    assert last["optimizer_scope_problem_hash_mode"] == "stable"
+    assert last["optimizer_scope_sync_ok"] is False
+    assert last["optimizer_scope_canonical_source"] == "triage"
+    assert last["optimizer_scope_mismatch_fields"] == ["problem_hash", "problem_hash_mode"]
     assert last["scenario_kind"] == "ring"
     assert last["ring_closure_policy"] == "strict_exact"
     assert last["ring_closure_applied"] is False
@@ -298,6 +333,8 @@ def test_sources_wire_anim_diagnostics_into_launcher_and_send_bundle() -> None:
     contract_text = (ROOT / "pneumo_solver_ui" / "tools" / "send_bundle_contract.py").read_text(encoding="utf-8")
 
     assert '("_pointers", False)' in bundle_text
+    assert "validation_release_risks" in bundle_text
+    assert "optimizer_scope_release_gate" in bundle_text
     assert 'ANIM_DIAG_SIDECAR_JSON' in bundle_text
     assert '**anim_diag_event' in bundle_text
     assert 'build_anim_operator_recommendations' in bundle_text
@@ -310,8 +347,12 @@ def test_sources_wire_anim_diagnostics_into_launcher_and_send_bundle() -> None:
     assert 'format_anim_dashboard_brief_lines' in gui_text
     assert 'Anim pointer diagnostics:' in gui_text
     assert 'pick_anim_latest_fields' in registry_text
+    assert 'validation_release_risks' in registry_text
+    assert 'optimizer_scope_release_gate' in registry_text
     assert 'ANIM_LATEST_INDEX_FIELDS' in registry_text
     assert 'browser_perf_registry_snapshot_in_bundle' in registry_text
     assert 'ring_closure_policy' in contract_text
+    assert 'Optimizer scope gate:' in contract_text
+    assert 'optimizer_scope_problem_hash_mode' in contract_text
     assert 'ring_seam_open' in contract_text
     assert 'in_bundle=' in bundle_text

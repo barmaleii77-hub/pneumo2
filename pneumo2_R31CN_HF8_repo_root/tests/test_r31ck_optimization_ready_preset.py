@@ -89,6 +89,7 @@ def test_r31ck_ready_session_defaults_seed_stage_runner_30min() -> None:
     assert defaults["ui_opt_minutes"] == 30.0
     assert defaults["ui_jobs"] == 24
     assert defaults["opt_use_staged"] is True
+    assert defaults["opt_stage_resume"] is False
     assert defaults["opt_autoupdate_baseline"] is True
     assert defaults["warmstart_mode"] == "surrogate"
     assert defaults["surrogate_samples"] == 8000

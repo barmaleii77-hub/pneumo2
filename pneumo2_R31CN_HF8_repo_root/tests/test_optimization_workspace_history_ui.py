@@ -60,6 +60,8 @@ def test_workspace_history_ui_renders_selected_summary_and_delegates_details() -
         workspace_dir=Path("C:/tmp/workspace"),
         active_job=None,
         session_state={"opt_objectives": "comfort\nroll", "opt_penalty_key": "penalty_total"},
+        current_problem_hash="ph_current_ui_scope",
+        current_problem_hash_mode="legacy",
         default_objectives=("comfort", "roll", "energy"),
         objectives_text_fn=lambda values: "\n".join(values),
         penalty_key_default="penalty_total",
@@ -69,7 +71,14 @@ def test_workspace_history_ui_renders_selected_summary_and_delegates_details() -
         discover_runs_fn=lambda *_args, **_kwargs: [summary],
         format_run_choice_fn=lambda item: item.run_dir.name,
         render_details_fn=lambda _st, item, **kwargs: events.append(
-            ("details", item.run_dir.name, kwargs["current_objective_keys"], kwargs["current_penalty_key"])
+            (
+                "details",
+                item.run_dir.name,
+                kwargs["current_objective_keys"],
+                kwargs["current_penalty_key"],
+                kwargs["current_problem_hash"],
+                kwargs["current_problem_hash_mode"],
+            )
         ),
         render_pointer_actions_fn=lambda _st, item, **kwargs: events.append(
             ("actions", item.run_dir.name, kwargs["make_latest_label"], kwargs["open_results_label"])
@@ -81,6 +90,6 @@ def test_workspace_history_ui_renders_selected_summary_and_delegates_details() -
     assert ("metric", ("RUNNING", 1)) in st.calls
     assert any(kind == "caption" and "Если вы запускаете оптимизации последовательно" in text for kind, text in st.calls)
     assert events == [
-        ("details", "run-1", ("comfort", "roll"), "penalty_total"),
+        ("details", "run-1", ("comfort", "roll"), "penalty_total", "ph_current_ui_scope", "legacy"),
         ("actions", "run-1", "Сделать текущей «последней оптимизацией»", "Открыть результаты выбранного run"),
     ]

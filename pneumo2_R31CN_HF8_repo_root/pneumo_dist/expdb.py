@@ -40,7 +40,9 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import os
+import re
 import socket
 import sqlite3
 import time
@@ -54,6 +56,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 #       For multi-machine distributed evaluation the DB is the single
 #       source of truth for reproducibility and dedup.
 LATEST_SCHEMA_VERSION = 3
+_SCOPE_SPLIT_RE = re.compile(r"[\n,;]+")
 
 
 def _now_ts() -> float:
@@ -71,6 +74,109 @@ def _json_loads(s: str | None) -> Any:
         return json.loads(s)
     except Exception:
         return None
+
+
+def _normalize_problem_hash_mode(value: Any) -> str:
+    mode = str(value or "").strip().lower()
+    return mode if mode in {"stable", "legacy"} else ""
+
+
+def _problem_hash_short_label(problem_hash: Any, *, max_len: int = 12) -> str:
+    value = str(problem_hash or "").strip()
+    if not value:
+        return ""
+    return value if len(value) <= max_len else value[:max_len]
+
+
+def _collect_scope_items(raw: Any, out: List[str]) -> None:
+    if raw is None:
+        return
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return
+        if text[:1] in {"[", '"'}:
+            parsed = _json_loads(text)
+            if parsed is not None and parsed is not raw:
+                _collect_scope_items(parsed, out)
+                return
+        for piece in _SCOPE_SPLIT_RE.split(text):
+            item = str(piece or "").strip()
+            if item and item not in out:
+                out.append(item)
+        return
+    if isinstance(raw, Sequence) and not isinstance(raw, (bytes, bytearray)):
+        for item in raw:
+            _collect_scope_items(item, out)
+
+
+def _normalize_scope_list(raw: Any) -> List[str]:
+    out: List[str] = []
+    _collect_scope_items(raw, out)
+    return out
+
+
+def _finite_float_or_none(value: Any) -> Optional[float]:
+    try:
+        out = float(value)
+    except Exception:
+        return None
+    return out if math.isfinite(out) else None
+
+
+def _export_run_scope_payload(run: Dict[str, Any] | None, *, run_id_default: str = "") -> Dict[str, Any]:
+    run_payload = dict(run or {}) if isinstance(run, dict) else {}
+    spec = dict(run_payload.get("spec") or {}) if isinstance(run_payload.get("spec"), dict) else {}
+    meta = dict(run_payload.get("meta") or {}) if isinstance(run_payload.get("meta"), dict) else {}
+    cfg = dict(spec.get("cfg") or {}) if isinstance(spec.get("cfg"), dict) else {}
+    objective_contract = (
+        dict(meta.get("objective_contract") or {})
+        if isinstance(meta.get("objective_contract"), dict)
+        else {}
+    )
+
+    objective_keys_raw = None
+    if "objective_keys" in objective_contract:
+        objective_keys_raw = objective_contract.get("objective_keys")
+    elif "objective_keys" in cfg:
+        objective_keys_raw = cfg.get("objective_keys")
+    penalty_key_raw = objective_contract.get("penalty_key")
+    if not str(penalty_key_raw or "").strip():
+        penalty_key_raw = cfg.get("penalty_key")
+    penalty_tol_raw = objective_contract.get("penalty_tol")
+    if penalty_tol_raw is None and "penalty_tol" in cfg:
+        penalty_tol_raw = cfg.get("penalty_tol")
+
+    problem_hash = str(run_payload.get("problem_hash") or meta.get("problem_hash") or "").strip()
+    payload: Dict[str, Any] = {
+        "schema": "expdb_run_scope_v1",
+        "run_id": str(run_payload.get("run_id") or run_id_default or ""),
+        "created_ts": run_payload.get("created_ts"),
+        "problem_hash": problem_hash,
+        "problem_hash_short": _problem_hash_short_label(problem_hash),
+        "problem_hash_mode": "",
+        "backend": str(meta.get("backend") or ""),
+        "created_by": str(meta.get("created_by") or ""),
+        "objective_keys": _normalize_scope_list(objective_keys_raw),
+        "penalty_key": str(penalty_key_raw or "").strip(),
+    }
+
+    for raw_mode in (
+        meta.get("problem_hash_mode"),
+        spec.get("problem_hash_mode"),
+        cfg.get("problem_hash_mode"),
+    ):
+        mode = _normalize_problem_hash_mode(raw_mode)
+        if mode:
+            payload["problem_hash_mode"] = mode
+            break
+
+    penalty_tol = _finite_float_or_none(penalty_tol_raw)
+    if penalty_tol is not None:
+        payload["penalty_tol"] = float(penalty_tol)
+    if objective_contract:
+        payload["objective_contract"] = objective_contract
+    return payload
 
 
 def _qmark_to_pyformat(sql: str) -> str:
@@ -1360,8 +1466,47 @@ class ExperimentDB:
         outp = Path(out_dir)
         outp.mkdir(parents=True, exist_ok=True)
 
+        run_detail = self.get_run(run_id) or {}
+        run_scope = _export_run_scope_payload(run_detail, run_id_default=run_id)
         trials = self.fetch_trials(run_id, status=None, limit=None, order="created_ts")
         metrics = self.fetch_metrics(run_id, key=None, limit=10_000)
+
+        (outp / "run_scope.json").write_text(
+            _json_dumps(run_scope),
+            encoding="utf-8",
+        )
+
+        run_scope_csv = outp / "run_scope.csv"
+        with run_scope_csv.open("w", encoding="utf-8", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(
+                [
+                    "run_id",
+                    "created_ts",
+                    "backend",
+                    "created_by",
+                    "problem_hash",
+                    "problem_hash_short",
+                    "problem_hash_mode",
+                    "objective_keys_json",
+                    "penalty_key",
+                    "penalty_tol",
+                ]
+            )
+            w.writerow(
+                [
+                    run_scope.get("run_id", ""),
+                    run_scope.get("created_ts"),
+                    run_scope.get("backend", ""),
+                    run_scope.get("created_by", ""),
+                    run_scope.get("problem_hash", ""),
+                    run_scope.get("problem_hash_short", ""),
+                    run_scope.get("problem_hash_mode", ""),
+                    _json_dumps(run_scope.get("objective_keys") or []),
+                    run_scope.get("penalty_key", ""),
+                    run_scope.get("penalty_tol"),
+                ]
+            )
 
         # Trials CSV
         trials_csv = outp / "trials.csv"
@@ -1369,6 +1514,9 @@ class ExperimentDB:
             w = csv.writer(f)
             w.writerow(
                 [
+                    "run_id",
+                    "problem_hash",
+                    "problem_hash_mode",
                     "trial_id",
                     "status",
                     "attempt",
@@ -1392,6 +1540,9 @@ class ExperimentDB:
             for t in trials:
                 w.writerow(
                     [
+                        run_scope.get("run_id", ""),
+                        run_scope.get("problem_hash", ""),
+                        run_scope.get("problem_hash_mode", ""),
                         t.get("trial_id", ""),
                         t.get("status", ""),
                         t.get("attempt", 0),
@@ -1417,6 +1568,16 @@ class ExperimentDB:
         metrics_csv = outp / "run_metrics.csv"
         with metrics_csv.open("w", encoding="utf-8", newline="") as f:
             w = csv.writer(f)
-            w.writerow(["ts", "key", "value", "json"])
+            w.writerow(["run_id", "problem_hash", "problem_hash_mode", "ts", "key", "value", "json"])
             for m in metrics:
-                w.writerow([m.get("ts"), m.get("key"), m.get("value"), _json_dumps(m.get("json"))])
+                w.writerow(
+                    [
+                        run_scope.get("run_id", ""),
+                        run_scope.get("problem_hash", ""),
+                        run_scope.get("problem_hash_mode", ""),
+                        m.get("ts"),
+                        m.get("key"),
+                        m.get("value"),
+                        _json_dumps(m.get("json")),
+                    ]
+                )

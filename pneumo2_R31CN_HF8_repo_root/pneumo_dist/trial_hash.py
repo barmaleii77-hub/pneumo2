@@ -187,6 +187,44 @@ def hash_problem(spec: ProblemSpec, *, float_ndigits: int = 12) -> str:
     return sha256_str(s)
 
 
+def _safe_load_json(path: str | os.PathLike | None) -> Any:
+    if not path:
+        return {}
+    p = Path(path)
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _stable_problem_extra_from_cfg(cfg: Any) -> Dict[str, Any]:
+    if not isinstance(cfg, dict):
+        return {}
+    extra: Dict[str, Any] = {}
+
+    objective_keys = cfg.get("objective_keys")
+    if isinstance(objective_keys, Sequence) and not isinstance(objective_keys, (str, bytes, bytearray)):
+        extra["objective_keys"] = list(objective_keys)
+
+    penalty_key = str(cfg.get("penalty_key") or "").strip()
+    if penalty_key:
+        extra["penalty_key"] = penalty_key
+
+    if "penalty_tol" in cfg:
+        try:
+            extra["penalty_tol"] = float(cfg.get("penalty_tol"))
+        except Exception:
+            extra["penalty_tol"] = cfg.get("penalty_tol")
+
+    penalty_targets = cfg.get("penalty_targets")
+    if isinstance(penalty_targets, Sequence) and not isinstance(penalty_targets, (str, bytes, bytearray)):
+        extra["penalty_targets"] = list(penalty_targets)
+
+    return extra
+
+
 def stable_hash_problem(*args: Any, float_ndigits: int = 12, **kwargs: Any) -> str:
     """Backward-compatible problem hashing wrapper.
 
@@ -194,10 +232,31 @@ def stable_hash_problem(*args: Any, float_ndigits: int = 12, **kwargs: Any) -> s
     `base/ranges/suite` plus either `model_py/worker_py` or precomputed code hashes.
     """
     if len(args) == 1 and not kwargs and isinstance(args[0], ProblemSpec):
-        return hash_problem(args[0], float_ndigits=float_ndigits)
+        spec: ProblemSpec = args[0]
+        mode = os.environ.get("PNEUMO_OPT_PROBLEM_HASH_MODE", "stable").strip().lower()
+        if mode in {"legacy", "old", "compat"}:
+            return hash_problem(spec, float_ndigits=float_ndigits)
+
+        base = _safe_load_json(spec.base_json)
+        ranges = _safe_load_json(spec.ranges_json)
+        suite = _safe_load_json(spec.suite_json)
+        extra = _stable_problem_extra_from_cfg(spec.cfg)
+        model_sha = str(spec.model_sha256 or hash_file(spec.model_path))
+        worker_sha = str(spec.worker_sha256 or hash_file(spec.worker_path))
+        return stable_hash_problem(
+            base=base,
+            ranges=ranges,
+            suite=suite,
+            model_sha256=model_sha,
+            worker_sha256=worker_sha,
+            extra=extra,
+            mode="stable",
+            float_ndigits=float_ndigits,
+        )
     if args:
         raise TypeError("stable_hash_problem supports either a single ProblemSpec or keyword arguments")
 
+    mode = str(kwargs.pop("mode", None) or os.environ.get("PNEUMO_OPT_PROBLEM_HASH_MODE", "stable")).strip().lower()
     base = kwargs.get("base", {})
     ranges = kwargs.get("ranges", {})
     suite = kwargs.get("suite", {})
@@ -216,6 +275,18 @@ def stable_hash_problem(*args: Any, float_ndigits: int = 12, **kwargs: Any) -> s
             )
         model_sha = hash_file(model_py)
         worker_sha = hash_file(worker_py)
+
+    if mode in {"legacy", "old", "compat"}:
+        payload = {
+            "v": 0,
+            "base": base,
+            "ranges": ranges,
+            "suite": suite,
+            "model_sha256": model_sha,
+            "worker_sha256": worker_sha,
+            "extra": extra,
+        }
+        return sha256_str(canonical_dumps(payload, float_ndigits=float_ndigits))
 
     try:
         optim_keys = set(getattr(ranges, "keys")())  # type: ignore[arg-type]

@@ -45,6 +45,12 @@ for _p in (str(_PROJECT_ROOT), str(_PNEUMO_ROOT)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+from pneumo_solver_ui.name_sanitize import sanitize_id
+from pneumo_solver_ui.optimization_baseline_source import (
+    baseline_problem_scope_dir as _baseline_problem_scope_dir,
+    resolve_workspace_baseline_override_path as _resolve_workspace_baseline_override_path,
+    workspace_baseline_dir as _shared_workspace_baseline_dir,
+)
 from pneumo_solver_ui.optimization_input_contract import sanitize_ranges_for_optimization
 from pneumo_solver_ui.optimization_result_rows import BASELINE_ROLE
 from pneumo_solver_ui.atomic_write_retry import atomic_write_json_retry
@@ -2636,6 +2642,30 @@ def eval_candidate(model, idx: int, params: Dict[str, Any], cfg: Dict[str, float
     return row
 
 
+def _workspace_baseline_dir() -> Path:
+    return _shared_workspace_baseline_dir(env=os.environ)
+
+
+def _scoped_baseline_override_path(problem_hash: str | None, baseline_dir: Path | None = None) -> Optional[Path]:
+    base_dir = Path(baseline_dir) if baseline_dir is not None else _workspace_baseline_dir()
+    path = _baseline_problem_scope_dir(base_dir, problem_hash) / "baseline_best.json"
+    return path if path.exists() else None
+
+
+def resolve_workspace_baseline_override_path(
+    problem_hash: str | None = None,
+    *,
+    env: Optional[Mapping[str, str]] = None,
+    baseline_dir: Path | None = None,
+) -> Optional[Path]:
+    current_baseline_dir = Path(baseline_dir) if baseline_dir is not None else _workspace_baseline_dir()
+    return _resolve_workspace_baseline_override_path(
+        problem_hash=problem_hash,
+        env=env,
+        baseline_dir=current_baseline_dir,
+    )
+
+
 def make_base_and_ranges(P_ATM: float) -> Tuple[Dict[str, Any], Dict[str, Tuple[float, float]]]:
     """
     Источник значений/диапазонов НЕ захардкожен в коде.
@@ -2664,8 +2694,8 @@ def make_base_and_ranges(P_ATM: float) -> Tuple[Dict[str, Any], Dict[str, Tuple[
     # of default_base.json. This lets the app automatically keep improving
     # the baseline between optimization runs without modifying code files.
     # ------------------------------------------------------------------
-    ws_base_path = os.path.join(os.path.dirname(__file__), 'workspace', 'baselines', 'baseline_best.json')
-    if os.path.exists(ws_base_path):
+    ws_base_path = resolve_workspace_baseline_override_path()
+    if ws_base_path is not None:
         try:
             ws_base = load_json(ws_base_path)
             if isinstance(ws_base, dict):

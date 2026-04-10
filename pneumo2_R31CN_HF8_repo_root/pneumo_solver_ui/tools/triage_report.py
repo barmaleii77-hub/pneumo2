@@ -52,6 +52,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from pneumo_solver_ui.optimization_problem_hash_mode import read_problem_hash_mode_artifact
+from pneumo_solver_ui.optimization_problem_scope import (
+    problem_hash_short_label,
+    read_problem_hash_artifact,
+)
 from .send_bundle_contract import (
     ANIM_DIAG_JSON,
     ANIM_DIAG_MD,
@@ -93,6 +98,13 @@ def _safe_json_load(path: Path) -> Any:
         return json.loads(path.read_text(encoding="utf-8", errors="replace"))
     except Exception:
         return None
+
+
+def _format_anim_diag_error(exc: BaseException) -> str:
+    if isinstance(exc, ModuleNotFoundError):
+        missing = str(getattr(exc, "name", "") or "").strip() or "unknown"
+        return f"Отсутствует необязательная зависимость: {missing}"
+    return repr(exc)
 
 
 def _normcase_path_str(value: Any) -> str:
@@ -379,7 +391,7 @@ def _load_anim_latest_summary(repo_root: Path, sb_root: Path) -> Dict[str, Any]:
             snap = extract_anim_snapshot(j2, source="triage_global_pointer")
             global_diag = _merge_missing_fields(dict(j2), dict(snap or {}))
     except Exception as exc:
-        out["error"] = repr(exc)
+        out["error"] = _format_anim_diag_error(exc)
 
     if isinstance(j, dict):
         snap = extract_anim_snapshot(j, source="triage_send_bundle_sidecar")
@@ -453,7 +465,14 @@ def generate_triage_report(
     if dist_dir is not None:
         j = _safe_json_load(dist_dir / "progress.json")
         if isinstance(j, dict):
-            dist_progress = j
+            dist_progress = dict(j)
+            problem_hash = str(read_problem_hash_artifact(dist_dir) or "").strip()
+            if problem_hash:
+                dist_progress["problem_hash"] = problem_hash
+                dist_progress["problem_hash_short"] = problem_hash_short_label(problem_hash)
+            problem_hash_mode = str(read_problem_hash_mode_artifact(dist_dir) or "").strip()
+            if problem_hash_mode:
+                dist_progress["problem_hash_mode"] = problem_hash_mode
 
 
     # Latest send bundle (path file)
@@ -689,6 +708,12 @@ def generate_triage_report(
         lines.append(
             f"Completed: {dp.get('completed')}  In-flight: {dp.get('in_flight')}  Cached: {dp.get('cached_hits')}  Duplicates: {dp.get('duplicates_skipped')}"
         )
+        if dp.get("problem_hash"):
+            lines.append(f"Problem scope: `{dp.get('problem_hash_short') or dp.get('problem_hash')}`")
+            if dp.get("problem_hash_short") and dp.get("problem_hash_short") != dp.get("problem_hash"):
+                lines.append(f"problem_hash: `{dp.get('problem_hash')}`")
+        if dp.get("problem_hash_mode"):
+            lines.append(f"Hash mode: `{dp.get('problem_hash_mode')}`")
         if dp.get("hv") is not None:
             lines.append(f"HV: {dp.get('hv')}")
         if (dp.get("best_obj1") is not None) or (dp.get("best_obj2") is not None):

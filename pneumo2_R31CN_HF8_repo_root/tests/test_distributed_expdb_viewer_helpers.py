@@ -6,6 +6,7 @@ from pathlib import Path
 from pneumo_solver_ui.distributed_expdb_viewer_helpers import (
     find_expdb_paths,
     load_packaging_params_for_run,
+    load_run_problem_scope,
 )
 
 
@@ -48,3 +49,33 @@ def test_load_packaging_params_for_run_resolves_relative_base_json_near_db(tmp_p
     params = load_packaging_params_for_run(fake_db, "run-1", db_path, tmp_path)
 
     assert float(params["autoverif_midstroke_t0_max_error_m"]) == 0.012
+
+
+def test_load_run_problem_scope_prefers_explicit_meta_mode_and_contract() -> None:
+    run_scope = load_run_problem_scope(
+        {
+            "run_id": "run-1",
+            "problem_hash": "ph_demo_scope_1234567890",
+            "spec": {
+                "cfg": {
+                    "objective_keys": ["legacy_obj"],
+                    "penalty_key": "legacy_penalty",
+                }
+            },
+            "meta": {
+                "problem_hash_mode": "legacy",
+                "objective_contract": {
+                    "objective_keys": ["comfort", "energy"],
+                    "penalty_key": "penalty_total",
+                    "penalty_tol": 0.25,
+                },
+            },
+        }
+    )
+
+    assert run_scope["problem_hash"] == "ph_demo_scope_1234567890"
+    assert run_scope["problem_hash_short"] == "ph_demo_scop"
+    assert run_scope["problem_hash_mode"] == "legacy"
+    assert run_scope["objective_keys"] == ("comfort", "energy")
+    assert run_scope["penalty_key"] == "penalty_total"
+    assert float(run_scope["penalty_tol"]) == 0.25

@@ -23,6 +23,7 @@ def test_r31ce_optimization_page_exposes_stage_runner_controls() -> None:
     assert '"stage_policy_mode"' in combined
     assert '"adaptive_influence_eps"' in combined
     assert '"opt_autoupdate_baseline"' in combined
+    assert '"opt_stage_resume"' in combined
     assert '"ui_seed_candidates"' in combined
     assert '"ui_seed_conditions"' in combined
     assert 'stage_seed_policy_summary_text()' in combined

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
@@ -7,11 +8,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
+from pneumo_dist.trial_hash import hash_file, hash_problem, make_problem_spec, stable_hash_problem
 from pneumo_solver_ui.optimization_defaults import (
     DIAGNOSTIC_ADAPTIVE_INFLUENCE_EPS,
     DIAGNOSTIC_ADAPTIVE_INFLUENCE_EPS_GRID,
     DIAGNOSTIC_INFLUENCE_EPS_REL,
     DIAGNOSTIC_OPT_MINUTES_DEFAULT,
+    DIAGNOSTIC_PROBLEM_HASH_MODE,
     DIAGNOSTIC_SEED_CANDIDATES,
     DIAGNOSTIC_SEED_CONDITIONS,
     DIAGNOSTIC_SORT_TESTS_BY_COST,
@@ -36,6 +39,17 @@ from pneumo_solver_ui.optimization_defaults import (
 )
 from pneumo_solver_ui.optimization_distributed_wiring import (
     append_coordinator_runtime_args,
+)
+from pneumo_solver_ui.optimization_input_contract import (
+    sanitize_optimization_inputs,
+)
+from pneumo_solver_ui.optimization_objective_contract import (
+    normalize_objective_keys,
+    normalize_penalty_key,
+    normalize_penalty_tol,
+)
+from pneumo_solver_ui.optimization_problem_hash_mode import (
+    normalize_problem_hash_mode,
 )
 from pneumo_solver_ui.optimization_ready_preset import (
     materialize_optimization_ready_suite_json,
@@ -130,6 +144,283 @@ def new_optimization_run_dir(
     run_id = "staged" if mode == "staged" else "coord"
     problem_hash = f"{mode}_{timestamp_stamp(now_text)}"
     run_dir = build_optimization_run_dir(workspace_dir, run_id, problem_hash)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir
+
+
+def _current_objective_keys(session_state: Mapping[str, Any]) -> tuple[str, ...]:
+    return normalize_objective_keys(session_state.get("opt_objectives"))
+
+
+def problem_hash_mode_for_launch(
+    session_state: Mapping[str, Any],
+    *,
+    problem_hash_mode: str | None = None,
+) -> str:
+    raw = (
+        problem_hash_mode
+        if problem_hash_mode is not None
+        else session_state.get("settings_opt_problem_hash_mode", DIAGNOSTIC_PROBLEM_HASH_MODE)
+    )
+    return normalize_problem_hash_mode(raw, default=DIAGNOSTIC_PROBLEM_HASH_MODE)
+
+
+def _read_json_dict(path: Path) -> dict[str, Any]:
+    try:
+        obj = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return dict(obj) if isinstance(obj, dict) else {}
+
+
+def _optimization_signature_payload(
+    *,
+    model_path: Path,
+    worker_path: Path,
+    base_payload: Mapping[str, Any],
+    ranges_payload: Mapping[str, Any],
+    suite_payload: Any,
+    extra: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "model_sha256": str(hash_file(model_path)),
+        "worker_sha256": str(hash_file(worker_path)),
+        "base_signature": dict(base_payload),
+        "ranges_signature": dict(ranges_payload),
+        "suite_signature": suite_payload,
+        "extra": dict(extra),
+    }
+
+
+def _stage_signature_payload_for_launch(
+    session_state: Mapping[str, Any],
+    *,
+    ui_root: Path,
+    workspace_dir: Path,
+) -> dict[str, Any]:
+    ui_root = Path(ui_root)
+    base_raw = _read_json_dict(default_base_json_path(ui_root))
+    ranges_raw = _read_json_dict(default_ranges_json_path(ui_root))
+    try:
+        suite_raw = json.loads(default_suite_json_path(ui_root, workspace_dir).read_text(encoding="utf-8"))
+    except Exception:
+        suite_raw = []
+    base_clean, ranges_clean, suite_clean, _audit = sanitize_optimization_inputs(base_raw, ranges_raw, suite_raw)
+    return _optimization_signature_payload(
+        model_path=default_model_path(ui_root),
+        worker_path=default_worker_path(ui_root),
+        base_payload=base_clean,
+        ranges_payload=ranges_clean,
+        suite_payload=suite_clean,
+        extra={
+            "objective_keys": list(_current_objective_keys(session_state)),
+            "penalty_key": normalize_penalty_key(session_state.get("opt_penalty_key")),
+        },
+    )
+
+
+def coordinator_problem_hash_for_launch(
+    session_state: Mapping[str, Any],
+    *,
+    ui_root: Path,
+    workspace_dir: Path,
+    problem_hash_mode: str | None = None,
+) -> str:
+    ui_root = Path(ui_root)
+    hash_mode = problem_hash_mode_for_launch(
+        session_state,
+        problem_hash_mode=problem_hash_mode,
+    )
+    suite_path = default_suite_json_path(ui_root, workspace_dir)
+    problem_spec = make_problem_spec(
+        model_path=str(default_model_path(ui_root)),
+        worker_path=str(default_worker_path(ui_root)),
+        base_json=str(default_base_json_path(ui_root)),
+        ranges_json=str(default_ranges_json_path(ui_root)),
+        suite_json=str(suite_path),
+        cfg={
+            "objective_keys": list(_current_objective_keys(session_state)),
+            "penalty_key": normalize_penalty_key(session_state.get("opt_penalty_key")),
+            "penalty_tol": normalize_penalty_tol(session_state.get("opt_penalty_tol")),
+        },
+        include_file_hashes=True,
+    )
+    if hash_mode == "legacy":
+        return str(hash_problem(problem_spec))
+    base_raw = _read_json_dict(default_base_json_path(ui_root))
+    ranges_raw = _read_json_dict(default_ranges_json_path(ui_root))
+    try:
+        suite_raw = json.loads(suite_path.read_text(encoding="utf-8"))
+    except Exception:
+        suite_raw = []
+    return str(
+        stable_hash_problem(
+            base=base_raw,
+            ranges=ranges_raw,
+            suite=suite_raw,
+            model_sha256=str(problem_spec.model_sha256 or ""),
+            worker_sha256=str(problem_spec.worker_sha256 or ""),
+            extra={
+                "objective_keys": list(_current_objective_keys(session_state)),
+                "penalty_key": normalize_penalty_key(session_state.get("opt_penalty_key")),
+                "penalty_tol": normalize_penalty_tol(session_state.get("opt_penalty_tol")),
+            },
+            mode="stable",
+        )
+    )
+
+
+def staged_problem_hash_for_launch(
+    session_state: Mapping[str, Any],
+    *,
+    ui_root: Path,
+    workspace_dir: Path,
+    problem_hash_mode: str | None = None,
+) -> str:
+    hash_mode = problem_hash_mode_for_launch(
+        session_state,
+        problem_hash_mode=problem_hash_mode,
+    )
+    payload = _stage_signature_payload_for_launch(
+        session_state,
+        ui_root=ui_root,
+        workspace_dir=workspace_dir,
+    )
+    return str(
+        stable_hash_problem(
+            base=payload["base_signature"],
+            ranges=payload["ranges_signature"],
+            suite=payload["suite_signature"],
+            model_sha256=payload["model_sha256"],
+            worker_sha256=payload["worker_sha256"],
+            extra=payload["extra"],
+            mode=hash_mode,
+        )
+    )
+
+
+def current_problem_hash_for_launch(
+    session_state: Mapping[str, Any],
+    *,
+    ui_root: Path,
+    workspace_dir: Path,
+    problem_hash_mode: str | None = None,
+) -> str:
+    if bool(session_state.get("opt_use_staged", DIAGNOSTIC_USE_STAGED_OPT)):
+        return staged_problem_hash_for_launch(
+            session_state,
+            ui_root=ui_root,
+            workspace_dir=workspace_dir,
+            problem_hash_mode=problem_hash_mode,
+        )
+    return coordinator_problem_hash_for_launch(
+        session_state,
+        ui_root=ui_root,
+        workspace_dir=workspace_dir,
+        problem_hash_mode=problem_hash_mode,
+    )
+
+
+def _iter_existing_run_dirs(workspace_dir: Path, pipeline_mode: str):
+    mode = str(pipeline_mode or "").strip().lower()
+    run_id = "staged" if mode == "staged" else "coord"
+    root = Path(workspace_dir) / "opt_runs" / run_id
+    if not root.exists():
+        return []
+    try:
+        dirs = [p for p in root.iterdir() if p.is_dir()]
+    except Exception:
+        return []
+    dirs.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0.0, reverse=True)
+    return dirs
+
+
+def _stored_problem_hash(run_dir: Path) -> str:
+    try:
+        return (Path(run_dir) / "problem_hash.txt").read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
+
+
+def _selected_history_run_dir(session_state: Mapping[str, Any], *, pipeline_mode: str) -> Path | None:
+    raw = str(session_state.get("__opt_history_selected_run_dir", "") or "").strip()
+    if not raw:
+        return None
+    run_dir = Path(raw)
+    if not run_dir.exists() or not run_dir.is_dir():
+        return None
+    expected_parent = "staged" if str(pipeline_mode).strip().lower() == "staged" else "coord"
+    if run_dir.parent.name.lower() != expected_parent:
+        return None
+    return run_dir
+
+
+def coordinator_resume_run_dir(
+    session_state: Mapping[str, Any],
+    *,
+    workspace_dir: Path,
+    ui_root: Path,
+    problem_hash_mode: str | None = None,
+) -> Path:
+    workspace_dir = Path(workspace_dir)
+    ui_root = Path(ui_root)
+    explicit_run_id = str(session_state.get("opt_dist_run_id", "") or "").strip()
+    problem_hash = coordinator_problem_hash_for_launch(
+        session_state,
+        ui_root=ui_root,
+        workspace_dir=workspace_dir,
+        problem_hash_mode=problem_hash_mode,
+    )
+    candidates = _iter_existing_run_dirs(workspace_dir, "coordinator")
+
+    if explicit_run_id:
+        for run_dir in candidates:
+            try:
+                if (run_dir / "run_id.txt").read_text(encoding="utf-8").strip() == explicit_run_id:
+                    return run_dir
+            except Exception:
+                continue
+
+    for run_dir in candidates:
+        try:
+            if (run_dir / "problem_hash.txt").read_text(encoding="utf-8").strip() == problem_hash:
+                return run_dir
+        except Exception:
+            continue
+
+    run_dir = build_optimization_run_dir(workspace_dir, "coord", problem_hash)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir
+
+
+def staged_resume_run_dir(
+    session_state: Mapping[str, Any],
+    *,
+    workspace_dir: Path,
+    ui_root: Path,
+    problem_hash_mode: str | None = None,
+) -> Path:
+    workspace_dir = Path(workspace_dir)
+    ui_root = Path(ui_root)
+    problem_hash = staged_problem_hash_for_launch(
+        session_state,
+        ui_root=ui_root,
+        workspace_dir=workspace_dir,
+        problem_hash_mode=problem_hash_mode,
+    )
+
+    selected_run = _selected_history_run_dir(session_state, pipeline_mode="staged")
+    if selected_run is not None:
+        stored = _stored_problem_hash(selected_run)
+        if not stored or stored == problem_hash:
+            return selected_run
+
+    for run_dir in _iter_existing_run_dirs(workspace_dir, "staged"):
+        stored = _stored_problem_hash(run_dir)
+        if stored and stored == problem_hash:
+            return run_dir
+
+    run_dir = build_optimization_run_dir(workspace_dir, "staged", problem_hash)
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
@@ -284,6 +575,9 @@ __all__ = [
     "LaunchPlan",
     "app_root_from_ui_root",
     "build_optimization_launch_plan",
+    "coordinator_problem_hash_for_launch",
+    "coordinator_resume_run_dir",
+    "current_problem_hash_for_launch",
     "default_base_json_path",
     "default_model_path",
     "default_ranges_json_path",
@@ -291,6 +585,9 @@ __all__ = [
     "default_worker_path",
     "env_dir",
     "new_optimization_run_dir",
+    "problem_hash_mode_for_launch",
+    "staged_problem_hash_for_launch",
+    "staged_resume_run_dir",
     "timestamp_stamp",
     "tools_root_from_ui_root",
     "ui_root_from_page_path",

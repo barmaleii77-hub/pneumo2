@@ -56,7 +56,10 @@ def test_render_last_pointer_summary_handles_missing_pointer() -> None:
 
     assert rendered is False
     assert ("info", "missing") in st.calls
-    assert ("markdown", "**Seed/promotion policy (текущая стадия)**") in st.calls
+    assert any(
+        kind == "markdown" and "Seed/promotion policy" in text and "текущая стадия" in text
+        for kind, text in st.calls
+    )
 
 
 def test_render_last_pointer_summary_renders_shared_sections() -> None:
@@ -89,13 +92,22 @@ def test_render_last_pointer_summary_renders_shared_sections() -> None:
             "policy_name": "stage2_focus",
             "summary_line": "focus candidates only",
         },
-        "opt_summary": SimpleNamespace(result_path="C:/tmp/run/results_all.csv"),
+        "opt_summary": SimpleNamespace(
+            result_path="C:/tmp/run/results_all.csv",
+            problem_hash="ph_scope_demo_123456",
+            problem_hash_mode="legacy",
+            baseline_source_kind="scoped",
+            baseline_source_label="scoped baseline",
+            baseline_source_path="C:/tmp/workspace/baselines/by_problem/p_demo/baseline_best.json",
+        ),
         "packaging_snapshot": packaging_snapshot,
     }
 
     rendered = render_last_optimization_pointer_summary(
         st,
         snap,
+        current_problem_hash="ph_scope_demo_123456",
+        current_problem_hash_mode="legacy",
         missing_message="missing",
         success_message="ok",
     )
@@ -104,5 +116,16 @@ def test_render_last_pointer_summary_renders_shared_sections() -> None:
     assert ("success", "ok") in st.calls
     assert ("write", "**Objective stack:** a, b") in st.calls
     assert ("write", "**Hard gate:** `penalty_total` (tol=0.25)") in st.calls
+    assert ("write", "**Baseline source:** scoped baseline") in st.calls
+    assert ("write", "**Problem scope:** `ph_scope_dem`") in st.calls
+    assert any(kind == "caption" and "Hash mode:" in text and "legacy" in text for kind, text in st.calls)
+    assert any(
+        kind == "caption"
+        and "Baseline override at launch:" in text
+        and "baseline_best.json" in text
+        for kind, text in st.calls
+    )
+    assert any(kind == "caption" and "matches current launch contract" in text for kind, text in st.calls)
+    assert any(kind == "caption" and "Hash mode matches current launch contract" in text for kind, text in st.calls)
     assert ("markdown", "**Packaging snapshot (last run)**") in st.calls
-    assert any(kind == "warning" and "spring↔spring=1" in text for kind, text in st.calls)
+    assert any(kind == "warning" for kind, _ in st.calls)

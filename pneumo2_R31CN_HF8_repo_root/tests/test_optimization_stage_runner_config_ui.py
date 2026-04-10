@@ -64,6 +64,7 @@ def test_stage_runner_config_ui_renders_expected_controls() -> None:
     assert ("number_input", "Минуты на staged run") in st.calls
     assert ("number_input", "Jobs (локальный parallel worker pool)") in st.calls
     assert ("checkbox", "Авто-обновлять baseline_best.json") in st.calls
+    assert ("checkbox", "Resume staged run") in st.calls
     assert ("number_input", "Seed кандидатов") in st.calls
     assert ("number_input", "Seed условий") in st.calls
     assert ("selectbox", "Warm-start режим") in st.calls
