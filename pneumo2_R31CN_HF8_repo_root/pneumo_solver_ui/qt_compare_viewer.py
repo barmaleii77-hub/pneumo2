@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import html
 import os
 import sys
 import warnings
@@ -419,7 +420,17 @@ def _knn_density(points01: np.ndarray, k: int = 5) -> np.ndarray:
 class CompareViewer(QtWidgets.QMainWindow):
     def __init__(self, paths: List[Path]):
         super().__init__()
+        self.setObjectName("compareViewerWindow")
         self.setWindowTitle("Pneumo: NPZ Compare Viewer (DiagrammyV680R05)")
+        try:
+            self.setDockOptions(
+                QtWidgets.QMainWindow.AllowTabbedDocks
+                | QtWidgets.QMainWindow.AllowNestedDocks
+                | QtWidgets.QMainWindow.AnimatedDocks
+            )
+            self.setTabPosition(QtCore.Qt.AllDockWidgetAreas, QtWidgets.QTabWidget.North)
+        except Exception:
+            pass
 
         # Display/units defaults (ANR):
         # - 1 bar = 100000 Pa (BAR_PA)
@@ -488,12 +499,18 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._mv_last_key: str = ""
         self._mv_updating: bool = False
         self._mv_restoring_settings: bool = False
+        self._workspace_focus_mode: str = "all"
+        self._insight_heat: Dict[str, object] = {}
+        self._insight_infl: Dict[str, object] = {}
+        self._insight_qa: Dict[str, object] = {}
         self._mv_timer = QtCore.QTimer(self)
         self._mv_timer.setSingleShot(True)
         self._mv_timer.timeout.connect(self._update_multivar_views)
 
         self._build_dock()
         self._build_menu()
+        self._build_status_bar()
+        self._apply_workspace_theme()
 
         # Persistent UI state (desktop): keep user selections across restarts
         self._settings = QtCore.QSettings('UnifiedPneumoApp', 'DiagrammyCompareViewer')
@@ -505,6 +522,8 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._build_multivar_dock()
         self._build_qa_dock()
         self._build_events_dock()
+        self._build_view_menu()
+        self._apply_default_workspace_layout()
 
         # debounce timer for Influence(t) recompute
         self._infl_timer = QtCore.QTimer(self)
@@ -522,6 +541,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._load_paths(paths)
         self._clear_pending_dataset_restore_if_mismatch([getattr(r, 'path', Path('')) for r in getattr(self, 'runs', [])])
         self._apply_restore_after_load()
+        self._update_workspace_status()
 
         # crosshair
         self.proxy = pg.SignalProxy(self.glw.scene().sigMouseMoved, rateLimit=60, slot=self._on_mouse_moved)
@@ -544,6 +564,81 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.lbl_trust.setToolTip("Почему данным нельзя доверять (dt/NaN/не‑монотонность)")
         self.lbl_trust.setStyleSheet("QLabel{padding:6px;border-radius:6px;}")
         lay.addWidget(self.lbl_trust)
+
+        gb_assistant = QtWidgets.QGroupBox("Workspace assistant")
+        ga = QtWidgets.QVBoxLayout(gb_assistant)
+        ga.setContentsMargins(8, 8, 8, 8)
+        ga.setSpacing(6)
+
+        self.lbl_workspace_assistant_title = QtWidgets.QLabel("Load compare bundle")
+        self.lbl_workspace_assistant_title.setObjectName("workspaceAssistantTitle")
+        self.lbl_workspace_assistant_title.setWordWrap(True)
+        ga.addWidget(self.lbl_workspace_assistant_title)
+
+        self.lbl_workspace_assistant = QtWidgets.QLabel(
+            "Open 2+ NPZ runs. Then pick a shared table and a few signals to unlock Heatmaps, QA and Multivariate views."
+        )
+        self.lbl_workspace_assistant.setObjectName("workspaceAssistantBody")
+        self.lbl_workspace_assistant.setWordWrap(True)
+        ga.addWidget(self.lbl_workspace_assistant)
+
+        row_focus = QtWidgets.QHBoxLayout()
+        row_focus.setSpacing(6)
+        self._workspace_focus_buttons = QtWidgets.QButtonGroup(self)
+        self._workspace_focus_buttons.setExclusive(True)
+
+        self.btn_workspace_focus_all = QtWidgets.QPushButton("Overview")
+        self.btn_workspace_focus_all.setObjectName("workspaceFocusAllButton")
+        self.btn_workspace_focus_all.setToolTip("Show the full workspace with all docks.")
+        self.btn_workspace_focus_all.setCheckable(True)
+        self.btn_workspace_focus_all.setChecked(True)
+        self.btn_workspace_focus_all.clicked.connect(lambda _=False: self._focus_workspace_preset("all"))
+        self._workspace_focus_buttons.addButton(self.btn_workspace_focus_all)
+        row_focus.addWidget(self.btn_workspace_focus_all)
+
+        self.btn_workspace_focus_heatmaps = QtWidgets.QPushButton("Heatmaps")
+        self.btn_workspace_focus_heatmaps.setObjectName("workspaceFocusHeatmapsButton")
+        self.btn_workspace_focus_heatmaps.setToolTip("Focus Delta and Influence heatmaps.")
+        self.btn_workspace_focus_heatmaps.setCheckable(True)
+        self.btn_workspace_focus_heatmaps.clicked.connect(lambda _=False: self._focus_workspace_preset("heatmaps"))
+        self._workspace_focus_buttons.addButton(self.btn_workspace_focus_heatmaps)
+        row_focus.addWidget(self.btn_workspace_focus_heatmaps)
+
+        self.btn_workspace_focus_multivar = QtWidgets.QPushButton("Multivar")
+        self.btn_workspace_focus_multivar.setObjectName("workspaceFocusMultivarButton")
+        self.btn_workspace_focus_multivar.setToolTip("Focus SPLOM, Parallel and 3D cloud views.")
+        self.btn_workspace_focus_multivar.setCheckable(True)
+        self.btn_workspace_focus_multivar.clicked.connect(lambda _=False: self._focus_workspace_preset("multivariate"))
+        self._workspace_focus_buttons.addButton(self.btn_workspace_focus_multivar)
+        row_focus.addWidget(self.btn_workspace_focus_multivar)
+
+        self.btn_workspace_focus_qa = QtWidgets.QPushButton("QA / Events")
+        self.btn_workspace_focus_qa.setObjectName("workspaceFocusQaButton")
+        self.btn_workspace_focus_qa.setToolTip("Focus QA and event drill-down tools.")
+        self.btn_workspace_focus_qa.setCheckable(True)
+        self.btn_workspace_focus_qa.clicked.connect(lambda _=False: self._focus_workspace_preset("qa"))
+        self._workspace_focus_buttons.addButton(self.btn_workspace_focus_qa)
+        row_focus.addWidget(self.btn_workspace_focus_qa)
+
+        ga.addLayout(row_focus)
+        lay.addWidget(gb_assistant)
+
+        gb_insights = QtWidgets.QGroupBox("Heuristic insights")
+        gi = QtWidgets.QVBoxLayout(gb_insights)
+        gi.setContentsMargins(8, 8, 8, 8)
+        gi.setSpacing(6)
+
+        self.txt_workspace_insights = QtWidgets.QTextBrowser()
+        self.txt_workspace_insights.setObjectName("workspaceInsightsBrowser")
+        self.txt_workspace_insights.setReadOnly(True)
+        self.txt_workspace_insights.setOpenExternalLinks(False)
+        self.txt_workspace_insights.setOpenLinks(False)
+        self.txt_workspace_insights.setUndoRedoEnabled(False)
+        self.txt_workspace_insights.setMinimumHeight(210)
+        self.txt_workspace_insights.setMaximumHeight(280)
+        self.txt_workspace_insights.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        gi.addWidget(self.txt_workspace_insights)
+        lay.addWidget(gb_insights)
 
         gb_diag = QtWidgets.QGroupBox("Selected run diagnostics")
         gd = QtWidgets.QVBoxLayout(gb_diag)
@@ -737,6 +832,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         lay.addStretch(0)
         dock.setWidget(w)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, dock)
+        self.dock_controls = dock
 
 
     # -------------------------
@@ -1506,10 +1602,827 @@ class CompareViewer(QtWidgets.QMainWindow):
         act_export.triggered.connect(self._export_png)
         file_menu.addAction(act_export)
 
+        act_export_snapshots = QtGui.QAction("Export Snapshot Set...", self)
+        act_export_snapshots.setShortcut("Ctrl+Shift+E")
+        act_export_snapshots.triggered.connect(self._export_snapshot_set_dialog)
+        file_menu.addAction(act_export_snapshots)
+
         act_quit = QtGui.QAction("Quit", self)
         act_quit.setShortcut(QtGui.QKeySequence.Quit)
         act_quit.triggered.connect(self.close)
         file_menu.addAction(act_quit)
+
+    def _build_status_bar(self) -> None:
+        sb = QtWidgets.QStatusBar(self)
+        sb.setObjectName("workspaceStatusBar")
+        sb.setSizeGripEnabled(False)
+        self.setStatusBar(sb)
+
+        self.lbl_status_selection = QtWidgets.QLabel("Runs 0 | Table — | Signals 0")
+        self.lbl_status_selection.setObjectName("statusChipSelection")
+        sb.addPermanentWidget(self.lbl_status_selection)
+
+        self.lbl_status_quality = QtWidgets.QLabel("Events 0 | QA —")
+        self.lbl_status_quality.setObjectName("statusChipQuality")
+        sb.addPermanentWidget(self.lbl_status_quality)
+
+        self.lbl_status_layout = QtWidgets.QLabel("Focus all | Docks 0/0 | Ref —")
+        self.lbl_status_layout.setObjectName("statusChipLayout")
+        sb.addPermanentWidget(self.lbl_status_layout)
+
+    def _apply_workspace_theme(self) -> None:
+        try:
+            self.glw.setBackground("#f2eadf")
+        except Exception:
+            pass
+        try:
+            self.setStyleSheet(
+                """
+                QMainWindow#compareViewerWindow {
+                    background: #efe6d7;
+                }
+                QDockWidget {
+                    color: #2f322b;
+                    font-weight: 600;
+                }
+                QDockWidget::title {
+                    background: #d9ccb4;
+                    color: #2f322b;
+                    padding: 7px 10px;
+                    border-bottom: 1px solid #b9aa90;
+                }
+                QGroupBox {
+                    background: #fbf7ef;
+                    border: 1px solid #d6c8af;
+                    border-radius: 8px;
+                    margin-top: 10px;
+                    padding-top: 6px;
+                    color: #2f322b;
+                }
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    left: 10px;
+                    padding: 0 4px;
+                    color: #695f4b;
+                }
+                QListWidget, QTreeWidget, QPlainTextEdit, QTableWidget,
+                QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
+                    background: #fffdf8;
+                    border: 1px solid #d6c8af;
+                    border-radius: 6px;
+                    color: #1f251f;
+                    selection-background-color: #0f7b64;
+                    selection-color: #f6fbf8;
+                }
+                QHeaderView::section {
+                    background: #e6dcc8;
+                    color: #3e3a32;
+                    border: 0;
+                    border-right: 1px solid #d0c1a7;
+                    border-bottom: 1px solid #d0c1a7;
+                    padding: 5px 6px;
+                }
+                QPushButton {
+                    background: #f7efe2;
+                    color: #2b3028;
+                    border: 1px solid #ccbba0;
+                    border-radius: 6px;
+                    padding: 5px 10px;
+                }
+                QPushButton:hover {
+                    background: #f2e6d4;
+                }
+                QPushButton:checked {
+                    background: #0f7b64;
+                    color: #f6fbf8;
+                    border-color: #0f7b64;
+                }
+                QTabWidget::pane {
+                    border: 1px solid #d6c8af;
+                    background: #fbf7ef;
+                }
+                QTabBar::tab {
+                    background: #e8decc;
+                    color: #4b463d;
+                    border: 1px solid #d0c1a7;
+                    padding: 6px 12px;
+                    margin-right: 2px;
+                }
+                QTabBar::tab:selected {
+                    background: #fffaf1;
+                    color: #1f251f;
+                }
+                QStatusBar#workspaceStatusBar {
+                    background: #ded1b9;
+                    border-top: 1px solid #c7b89d;
+                }
+                QLabel#statusChipSelection,
+                QLabel#statusChipQuality,
+                QLabel#statusChipLayout {
+                    border-radius: 10px;
+                    padding: 4px 10px;
+                    margin: 3px 4px;
+                    font-weight: 600;
+                }
+                QLabel#statusChipSelection {
+                    background: #faf4e8;
+                    border: 1px solid #cfbea1;
+                    color: #3c3a33;
+                }
+                QLabel#statusChipQuality {
+                    background: #eef7f2;
+                    border: 1px solid #98c7b2;
+                    color: #245746;
+                }
+                QLabel#statusChipLayout {
+                    background: #f4efe6;
+                    border: 1px solid #cbbda4;
+                    color: #4d5046;
+                }
+                QLabel#workspaceAssistantTitle {
+                    color: #324136;
+                    font-size: 13px;
+                    font-weight: 700;
+                }
+                QLabel#workspaceAssistantBody {
+                    background: #f8f1e5;
+                    border: 1px solid #d6c8af;
+                    border-radius: 8px;
+                    color: #384136;
+                    padding: 8px 10px;
+                }
+                QTextBrowser#workspaceInsightsBrowser {
+                    background: #fcf8f1;
+                    border: 1px solid #d6c8af;
+                    border-radius: 8px;
+                    padding: 4px;
+                    color: #2f322b;
+                }
+                """
+            )
+        except Exception:
+            pass
+
+    def _set_status_chip_tone(self, label: Optional[QtWidgets.QLabel], tone: str) -> None:
+        if label is None:
+            return
+        tone_map = {
+            "ok": ("#e7f5ee", "#8cc3ae", "#245746"),
+            "warn": ("#fff0d8", "#d9b36a", "#6a4b00"),
+            "alert": ("#fde2de", "#d48f81", "#7c2415"),
+            "neutral": ("#faf4e8", "#cfbea1", "#3c3a33"),
+            "accent": ("#e6f2ef", "#93bbae", "#2d5b4f"),
+        }
+        bg, border, fg = tone_map.get(str(tone), tone_map["neutral"])
+        try:
+            label.setStyleSheet(
+                f"background:{bg}; border:1px solid {border}; color:{fg};"
+                "border-radius:10px; padding:4px 10px; margin:3px 4px; font-weight:600;"
+            )
+        except Exception:
+            pass
+
+    def _set_workspace_assistant_tone(self, tone: str) -> None:
+        label = getattr(self, "lbl_workspace_assistant", None)
+        title = getattr(self, "lbl_workspace_assistant_title", None)
+        if label is None:
+            return
+        tone_map = {
+            "ok": ("#e7f5ee", "#8cc3ae", "#245746"),
+            "warn": ("#fff0d8", "#d9b36a", "#6a4b00"),
+            "alert": ("#fde2de", "#d48f81", "#7c2415"),
+            "neutral": ("#f8f1e5", "#d6c8af", "#384136"),
+            "accent": ("#e6f2ef", "#93bbae", "#2d5b4f"),
+        }
+        bg, border, fg = tone_map.get(str(tone), tone_map["neutral"])
+        try:
+            label.setStyleSheet(
+                f"background:{bg}; border:1px solid {border}; color:{fg};"
+                "border-radius:8px; padding:8px 10px;"
+            )
+        except Exception:
+            pass
+        if title is not None:
+            try:
+                title.setStyleSheet(f"color:{fg}; font-size:13px; font-weight:700;")
+            except Exception:
+                pass
+
+    def _sync_workspace_focus_buttons(self) -> None:
+        mapping = {
+            "all": getattr(self, "btn_workspace_focus_all", None),
+            "heatmaps": getattr(self, "btn_workspace_focus_heatmaps", None),
+            "multivariate": getattr(self, "btn_workspace_focus_multivar", None),
+            "qa": getattr(self, "btn_workspace_focus_qa", None),
+        }
+        mode = str(getattr(self, "_workspace_focus_mode", "all") or "all")
+        for key, button in mapping.items():
+            if button is None:
+                continue
+            prev = False
+            try:
+                prev = button.blockSignals(True)
+                button.setChecked(key == mode)
+            except Exception:
+                pass
+            finally:
+                try:
+                    button.blockSignals(prev)
+                except Exception:
+                    pass
+
+    def _update_workspace_assistant(self) -> None:
+        title_label = getattr(self, "lbl_workspace_assistant_title", None)
+        body_label = getattr(self, "lbl_workspace_assistant", None)
+        if title_label is None or body_label is None:
+            return
+
+        runs = list(self._selected_runs()) if hasattr(self, "list_runs") else []
+        sigs = list(self._selected_signals()) if hasattr(self, "list_signals") else []
+        table = str(getattr(self, "current_table", "") or "-")
+        ref = str(self._reference_run_label(runs) or "auto")
+        mode = str(getattr(self, "_workspace_focus_mode", "all") or "all")
+        trust_visible = bool(getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible())
+
+        events_rows = 0
+        try:
+            if getattr(self, "tbl_events", None) is not None:
+                events_rows = int(self.tbl_events.rowCount())
+        except Exception:
+            events_rows = 0
+
+        qa_issues = 0
+        try:
+            qa_text = str(
+                getattr(self, "lbl_qa_summary", None).text()
+                if getattr(self, "lbl_qa_summary", None) is not None
+                else ""
+            )
+            if "issues=" in qa_text:
+                qa_issues = int(str(qa_text).split("issues=", 1)[1].split()[0].split("(", 1)[0].rstrip(",)"))
+        except Exception:
+            qa_issues = 0
+
+        notes: List[str] = []
+        if trust_visible:
+            notes.append("trust banner active")
+        if qa_issues > 0:
+            notes.append(f"QA issues: {qa_issues}")
+        if events_rows > 0:
+            notes.append(f"event rows: {events_rows}")
+
+        title = "Compare overview"
+        body = (
+            f"Reference run: {ref}. Heatmaps explain time-local differences, "
+            "QA/Events validate anomalies and Multivariate gets stronger as you add more runs and signals."
+        )
+        tone = "accent"
+
+        if not runs:
+            title = "Load compare bundle"
+            body = (
+                "Open 2+ NPZ runs. Then pick a shared table and a few signals to unlock "
+                "Heatmaps, QA and Multivariate views."
+            )
+            tone = "neutral"
+        elif len(runs) < 2:
+            title = "Add one more run"
+            body = (
+                f"Only {len(runs)} run is selected. Add a peer run to make Delta, Influence and "
+                "cross-run QA comparisons informative."
+            )
+            tone = "neutral"
+        elif not sigs:
+            title = "Select signals"
+            body = (
+                f"Table {table} is ready. Pick 2-6 signals on the left. Heatmaps work well for quick contrasts, "
+                "while Multivariate becomes most useful with 3+ signals."
+            )
+            tone = "accent"
+        elif mode == "heatmaps":
+            title = "Heatmap comparison"
+            body = (
+                f"Use Delta and Influence heatmaps to localize where {len(runs)} runs diverge across "
+                f"{len(sigs)} selected signals in table {table}. Review QA or Events when a hotspot needs explanation."
+            )
+            tone = "accent"
+        elif mode == "multivariate":
+            title = "Multivariate scouting"
+            body = (
+                f"{len(runs)} runs and {len(sigs)} signals are ready for SPLOM, Parallel and 3D cloud analysis. "
+                "Use brushing to pull outliers back into the main compare plots."
+            )
+            tone = "ok" if (not trust_visible and qa_issues == 0) else "warn"
+        elif mode == "qa":
+            title = "QA drill-down"
+            if qa_issues > 0:
+                body = (
+                    f"QA found {qa_issues} issue(s). Double-click a QA or Events row to move the playhead, "
+                    "keep the reference run stable and verify the local waveform."
+                )
+                tone = "warn" if not trust_visible and qa_issues < 10 else "alert"
+            else:
+                body = (
+                    f"QA and Events are ready for drill-down on {len(runs)} runs. Use this layout to validate "
+                    "suspicious regions before trusting the prettier charts."
+                )
+                tone = "accent"
+        elif trust_visible:
+            title = "Trust attention"
+            body = (
+                "The trust banner reports data-quality caveats. Review QA and Events first, then return "
+                "to Heatmaps or Multivariate once the suspect runs are understood."
+            )
+            tone = "alert" if qa_issues > 0 else "warn"
+        elif qa_issues > 0:
+            title = "QA findings detected"
+            body = (
+                f"QA found {qa_issues} issue(s). Start with QA / Events, then use Heatmaps to see whether "
+                "the problem is local or systemic across runs."
+            )
+            tone = "warn" if qa_issues < 10 else "alert"
+        elif len(runs) >= 3 and len(sigs) >= 3:
+            title = "Ready for multivariate"
+            body = (
+                f"{len(runs)} runs and {len(sigs)} signals are selected in table {table}. "
+                "Multivariate view should now separate clusters, sparse clouds and outliers clearly."
+            )
+            tone = "ok"
+
+        if notes:
+            body = f"{body} Status: {', '.join(notes)}."
+        if ref and ref != "auto":
+            body = f"{body} Ref: {ref}."
+
+        try:
+            title_label.setText(title)
+            body_label.setText(body)
+        except Exception:
+            pass
+        self._set_workspace_assistant_tone(tone)
+
+    def _insight_html_escape(self, value: object) -> str:
+        try:
+            return html.escape(str(value))
+        except Exception:
+            return ""
+
+    def _workspace_insight_card_html(self, title: str, headline: str, detail: str, *, tone: str = "neutral") -> str:
+        tone_map = {
+            "ok": ("#edf8f2", "#94c8af", "#245746", "#174034"),
+            "warn": ("#fff3de", "#dfbb74", "#7a5608", "#5e4104"),
+            "alert": ("#fde7e3", "#d69c92", "#8c2f20", "#6a2217"),
+            "accent": ("#e9f4f0", "#9bbeb1", "#2f5e53", "#22473f"),
+            "neutral": ("#f8f1e5", "#d6c8af", "#6b624f", "#403a30"),
+        }
+        bg, border, accent, text = tone_map.get(str(tone), tone_map["neutral"])
+        title_html = self._insight_html_escape(title)
+        headline_html = self._insight_html_escape(headline)
+        detail_html = self._insight_html_escape(detail).replace("\n", "<br/>")
+        return (
+            f"<div style='margin:0 0 8px 0; padding:10px 12px; "
+            f"background:{bg}; border:1px solid {border}; border-left:4px solid {accent}; border-radius:10px;'>"
+            f"<div style='font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:{accent};'>{title_html}</div>"
+            f"<div style='margin-top:3px; font-size:14px; font-weight:700; color:{text};'>{headline_html}</div>"
+            f"<div style='margin-top:4px; font-size:11px; line-height:1.45; color:{text};'>{detail_html}</div>"
+            f"</div>"
+        )
+
+    def _update_workspace_insights(self) -> None:
+        browser = getattr(self, "txt_workspace_insights", None)
+        if browser is None:
+            return
+
+        runs = list(self._selected_runs()) if hasattr(self, "list_runs") else []
+        sigs = list(self._selected_signals()) if hasattr(self, "list_signals") else []
+        trust_visible = bool(getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible())
+        table = str(getattr(self, "current_table", "") or "-")
+
+        events_rows = 0
+        try:
+            if getattr(self, "tbl_events", None) is not None:
+                events_rows = int(self.tbl_events.rowCount())
+        except Exception:
+            events_rows = 0
+
+        heat = dict(getattr(self, "_insight_heat", {}) or {})
+        infl = dict(getattr(self, "_insight_infl", {}) or {})
+        qa = dict(getattr(self, "_insight_qa", {}) or {})
+
+        qa_issues = int(qa.get("issues", 0) or 0)
+        qa_err = int(qa.get("err", 0) or 0)
+        qa_warn = int(qa.get("warn", 0) or 0)
+        qa_focus = ""
+        if qa.get("top_signal") and qa.get("top_run"):
+            try:
+                qa_focus = (
+                    f"Top suspect: {qa.get('top_signal')} in {qa.get('top_run')} "
+                    f"@ {float(qa.get('top_time_s', 0.0) or 0.0):.3f}s."
+                )
+            except Exception:
+                qa_focus = f"Top suspect: {qa.get('top_signal')} in {qa.get('top_run')}."
+
+        cards: List[str] = []
+
+        if heat.get("signal"):
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Delta hotspot",
+                    f"{heat.get('signal')} @ {float(heat.get('time_s', 0.0) or 0.0):.3f}s",
+                    f"Run {heat.get('run')} shows the strongest divergence. "
+                    f"Peak {float(heat.get('peak', 0.0) or 0.0):.3g} in {heat.get('metric', 'heatmap')} mode.",
+                    tone="accent",
+                )
+            )
+        elif len(runs) >= 2 and len(sigs) >= 1:
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Delta hotspot",
+                    "Waiting for heatmap refresh",
+                    "Heatmaps are enabled, but no stable hotspot summary is cached yet. "
+                    "Keep 2+ runs and 1+ signals selected.",
+                    tone="neutral",
+                )
+            )
+        else:
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Delta hotspot",
+                    "Need comparison context",
+                    "Select at least 2 runs and a signal to surface the strongest time-local delta zone.",
+                    tone="neutral",
+                )
+            )
+
+        if infl.get("feature") and infl.get("signal"):
+            corr = float(infl.get("corr", 0.0) or 0.0)
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Top meta driver",
+                    f"{infl.get('feature')} -> {infl.get('signal')}",
+                    f"corr={corr:+.2f} at t={float(infl.get('time_s', 0.0) or 0.0):.3f}s. "
+                    f"Runs={int(infl.get('runs', 0) or 0)}, meta shown={int(infl.get('meta_count', 0) or 0)}.",
+                    tone="ok" if abs(corr) >= 0.7 else "accent",
+                )
+            )
+        elif len(runs) >= 3 and len(sigs) >= 1:
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Top meta driver",
+                    "Need influence refresh",
+                    "Influence(t) becomes meaningful with 3+ runs. Move the playhead or keep the current selection stable to rank meta drivers.",
+                    tone="neutral",
+                )
+            )
+        else:
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Top meta driver",
+                    "Need 3+ runs",
+                    "Meta-to-signal heuristics rank which numeric meta parameters explain the current signal shape best.",
+                    tone="neutral",
+                )
+            )
+
+        if not runs:
+            quality_headline = "Load a compare set"
+            quality_detail = "Open 2+ NPZ runs to unlock heatmaps, QA and multivariate clustering."
+            quality_tone = "neutral"
+        elif trust_visible:
+            quality_headline = "Trust attention required"
+            quality_detail = (
+                f"Trust banner is active. QA issues={qa_issues} (err={qa_err}, warn={qa_warn}), events rows={events_rows}. "
+                "Next: QA / Events."
+            )
+            if qa_focus:
+                quality_detail = f"{quality_detail} {qa_focus}"
+            quality_tone = "alert" if qa_err > 0 else "warn"
+        elif qa_issues > 0:
+            quality_headline = f"QA flagged {qa_issues} issue(s)"
+            quality_detail = (
+                f"err={qa_err}, warn={qa_warn}, events rows={events_rows}. "
+                "Next: inspect QA / Events, then return to Heatmaps for root-cause localization."
+            )
+            if qa_focus:
+                quality_detail = f"{quality_detail} {qa_focus}"
+            quality_tone = "warn" if qa_err == 0 else "alert"
+        elif len(runs) >= 3 and len(sigs) >= 3:
+            quality_headline = "Ready for all-to-all scouting"
+            quality_detail = (
+                f"Table {table}, runs={len(runs)}, signals={len(sigs)}, events rows={events_rows}. "
+                "Next: Multivar for clusters and sparse outliers, then Heatmaps for time localization."
+            )
+            quality_tone = "ok"
+        else:
+            quality_headline = "Build comparison density"
+            quality_detail = (
+                f"Table {table}, runs={len(runs)}, signals={len(sigs)}, events rows={events_rows}. "
+                "Add a few more signals to strengthen multivariate separation."
+            )
+            quality_tone = "accent"
+
+        cards.append(
+            self._workspace_insight_card_html(
+                "Quality / next step",
+                quality_headline,
+                quality_detail,
+                tone=quality_tone,
+            )
+        )
+
+        html_doc = (
+            "<html><body style='margin:0; padding:0; font-family:Segoe UI, Arial, sans-serif;'>"
+            + "".join(cards)
+            + "</body></html>"
+        )
+        try:
+            browser.setHtml(html_doc)
+        except Exception:
+            try:
+                browser.setPlainText("\n\n".join([html.unescape(card) for card in cards]))
+            except Exception:
+                pass
+
+    def _workspace_focus_label(self) -> str:
+        mode = str(getattr(self, "_workspace_focus_mode", "all") or "all")
+        labels = {
+            "all": "all",
+            "heatmaps": "heatmaps",
+            "multivariate": "multivar",
+            "qa": "qa/events",
+        }
+        return labels.get(mode, mode)
+
+    def _update_workspace_status(self) -> None:
+        runs = list(self._selected_runs()) if hasattr(self, "list_runs") else []
+        sigs = list(self._selected_signals()) if hasattr(self, "list_signals") else []
+        table = str(getattr(self, "current_table", "") or "—")
+        ref = str(self._reference_run_label(runs) or "—")
+        total_docks = len(self._iter_workspace_docks())
+        visible_docks = 0
+        for dock in self._iter_workspace_docks():
+            try:
+                if not dock.isHidden():
+                    visible_docks += 1
+            except Exception:
+                pass
+        events_rows = 0
+        try:
+            if getattr(self, "tbl_events", None) is not None:
+                events_rows = int(self.tbl_events.rowCount())
+        except Exception:
+            events_rows = 0
+
+        qa_text = str(getattr(self, "lbl_qa_summary", None).text() if getattr(self, "lbl_qa_summary", None) is not None else "QA —")
+        qa_issues = 0
+        try:
+            if "issues=" in qa_text:
+                qa_issues = int(str(qa_text).split("issues=", 1)[1].split()[0].split("(", 1)[0].rstrip(",)"))
+        except Exception:
+            qa_issues = 0
+        trust_visible = bool(getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible())
+
+        selection_text = f"Runs {len(runs)} | Table {table} | Signals {len(sigs)}"
+        quality_text = f"Events {events_rows} | {'Trust attention' if trust_visible else 'Trust ok'} | QA {qa_issues}"
+        layout_text = f"Focus {self._workspace_focus_label()} | Docks {visible_docks}/{total_docks} | Ref {ref}"
+
+        try:
+            self.lbl_status_selection.setText(selection_text)
+            self.lbl_status_quality.setText(quality_text)
+            self.lbl_status_layout.setText(layout_text)
+        except Exception:
+            pass
+
+        self._set_status_chip_tone(self.lbl_status_selection, "accent" if runs else "neutral")
+        if trust_visible or qa_issues > 0:
+            self._set_status_chip_tone(self.lbl_status_quality, "warn" if qa_issues < 10 else "alert")
+        else:
+            self._set_status_chip_tone(self.lbl_status_quality, "ok" if runs else "neutral")
+        self._set_status_chip_tone(self.lbl_status_layout, "accent" if visible_docks else "neutral")
+        self._sync_workspace_focus_buttons()
+        self._update_workspace_assistant()
+        self._update_workspace_insights()
+
+    def _iter_workspace_docks(self) -> List[QtWidgets.QDockWidget]:
+        docks: List[QtWidgets.QDockWidget] = []
+        for attr in (
+            "dock_controls",
+            "dock_heatmap",
+            "dock_influence",
+            "dock_inflheat",
+            "dock_multivar",
+            "dock_qa",
+            "dock_events",
+        ):
+            dock = getattr(self, attr, None)
+            if isinstance(dock, QtWidgets.QDockWidget):
+                docks.append(dock)
+        return docks
+
+    def _show_dock(self, dock: Optional[QtWidgets.QDockWidget]) -> None:
+        if dock is None:
+            return
+        try:
+            dock.setFloating(False)
+        except Exception:
+            pass
+        try:
+            dock.show()
+        except Exception:
+            pass
+
+    def _raise_dock(self, dock: Optional[QtWidgets.QDockWidget]) -> None:
+        if dock is None:
+            return
+        try:
+            dock.raise_()
+        except Exception:
+            pass
+
+    def _apply_default_workspace_layout(self) -> None:
+        self._workspace_focus_mode = "all"
+        controls = getattr(self, "dock_controls", None)
+        heatmap = getattr(self, "dock_heatmap", None)
+        influence = getattr(self, "dock_influence", None)
+        inflheat = getattr(self, "dock_inflheat", None)
+        multivar = getattr(self, "dock_multivar", None)
+        qa = getattr(self, "dock_qa", None)
+        events = getattr(self, "dock_events", None)
+
+        for dock in self._iter_workspace_docks():
+            self._show_dock(dock)
+            try:
+                self.removeDockWidget(dock)
+            except Exception:
+                pass
+
+        if controls is not None:
+            self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, controls)
+
+        analysis_anchor = heatmap or influence or inflheat or multivar
+        if analysis_anchor is not None:
+            self.addDockWidget(QtCore.Qt.RightDockWidgetArea, analysis_anchor)
+
+        if qa is not None:
+            self.addDockWidget(QtCore.Qt.RightDockWidgetArea, qa)
+            if analysis_anchor is not None:
+                try:
+                    self.splitDockWidget(analysis_anchor, qa, QtCore.Qt.Vertical)
+                except Exception:
+                    pass
+
+        if events is not None:
+            if qa is not None:
+                try:
+                    self.tabifyDockWidget(qa, events)
+                except Exception:
+                    pass
+            else:
+                self.addDockWidget(QtCore.Qt.RightDockWidgetArea, events)
+
+        for dock in (heatmap, influence, inflheat, multivar):
+            if dock is None or dock is analysis_anchor:
+                continue
+            self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+            if analysis_anchor is not None:
+                try:
+                    self.tabifyDockWidget(analysis_anchor, dock)
+                except Exception:
+                    pass
+
+        for dock in self._iter_workspace_docks():
+            self._show_dock(dock)
+
+        try:
+            if controls is not None and analysis_anchor is not None:
+                self.resizeDocks([controls, analysis_anchor], [340, 980], QtCore.Qt.Horizontal)
+        except Exception:
+            pass
+        try:
+            if analysis_anchor is not None and qa is not None:
+                self.resizeDocks([analysis_anchor, qa], [620, 280], QtCore.Qt.Vertical)
+        except Exception:
+            pass
+
+        self._raise_dock(heatmap or analysis_anchor)
+        self._raise_dock(qa)
+        self._update_workspace_status()
+
+    def _focus_workspace_preset(self, mode: str) -> None:
+        self._apply_default_workspace_layout()
+        self._workspace_focus_mode = str(mode or "all")
+
+        controls = getattr(self, "dock_controls", None)
+        heatmap = getattr(self, "dock_heatmap", None)
+        influence = getattr(self, "dock_influence", None)
+        inflheat = getattr(self, "dock_inflheat", None)
+        multivar = getattr(self, "dock_multivar", None)
+        qa = getattr(self, "dock_qa", None)
+        events = getattr(self, "dock_events", None)
+
+        show_attrs = {"dock_controls"}
+        active_dock = controls
+        if mode == "heatmaps":
+            show_attrs.update({"dock_heatmap", "dock_influence", "dock_inflheat"})
+            active_dock = heatmap or influence or inflheat or controls
+        elif mode == "multivariate":
+            show_attrs.add("dock_multivar")
+            active_dock = multivar or controls
+        elif mode == "qa":
+            show_attrs.update({"dock_qa", "dock_events"})
+            active_dock = qa or events or controls
+        else:
+            show_attrs.update(
+                {
+                    "dock_heatmap",
+                    "dock_influence",
+                    "dock_inflheat",
+                    "dock_multivar",
+                    "dock_qa",
+                    "dock_events",
+                }
+            )
+            active_dock = heatmap or multivar or qa or controls
+
+        for attr in (
+            "dock_controls",
+            "dock_heatmap",
+            "dock_influence",
+            "dock_inflheat",
+            "dock_multivar",
+            "dock_qa",
+            "dock_events",
+        ):
+            dock = getattr(self, attr, None)
+            if not isinstance(dock, QtWidgets.QDockWidget):
+                continue
+            try:
+                if attr in show_attrs:
+                    self._show_dock(dock)
+                else:
+                    dock.hide()
+            except Exception:
+                pass
+
+        self._raise_dock(active_dock)
+        self._update_workspace_status()
+
+    def _build_view_menu(self) -> None:
+        m = self.menuBar()
+        view_menu = m.addMenu("View")
+        self.menu_view = view_menu
+
+        layout_menu = view_menu.addMenu("Layout")
+        self.menu_view_layout = layout_menu
+
+        self.act_view_reset_workspace = QtGui.QAction("Reset Workspace", self)
+        self.act_view_reset_workspace.setObjectName("act_view_reset_workspace")
+        self.act_view_reset_workspace.setShortcut("Ctrl+Shift+0")
+        self.act_view_reset_workspace.triggered.connect(self._apply_default_workspace_layout)
+        layout_menu.addAction(self.act_view_reset_workspace)
+
+        self.act_view_show_all_docks = QtGui.QAction("Show All Docks", self)
+        self.act_view_show_all_docks.setObjectName("act_view_show_all_docks")
+        self.act_view_show_all_docks.triggered.connect(lambda: self._focus_workspace_preset("all"))
+        layout_menu.addAction(self.act_view_show_all_docks)
+
+        layout_menu.addSeparator()
+
+        self.act_view_focus_heatmaps = QtGui.QAction("Focus Heatmaps", self)
+        self.act_view_focus_heatmaps.setObjectName("act_view_focus_heatmaps")
+        self.act_view_focus_heatmaps.setShortcut("Ctrl+Shift+1")
+        self.act_view_focus_heatmaps.triggered.connect(lambda: self._focus_workspace_preset("heatmaps"))
+        layout_menu.addAction(self.act_view_focus_heatmaps)
+
+        self.act_view_focus_multivar = QtGui.QAction("Focus Multivariate", self)
+        self.act_view_focus_multivar.setObjectName("act_view_focus_multivar")
+        self.act_view_focus_multivar.setShortcut("Ctrl+Shift+2")
+        self.act_view_focus_multivar.triggered.connect(lambda: self._focus_workspace_preset("multivariate"))
+        layout_menu.addAction(self.act_view_focus_multivar)
+
+        self.act_view_focus_qa = QtGui.QAction("Focus QA / Events", self)
+        self.act_view_focus_qa.setObjectName("act_view_focus_qa")
+        self.act_view_focus_qa.setShortcut("Ctrl+Shift+3")
+        self.act_view_focus_qa.triggered.connect(lambda: self._focus_workspace_preset("qa"))
+        layout_menu.addAction(self.act_view_focus_qa)
+
+        docks_menu = view_menu.addMenu("Docks")
+        self.menu_view_docks = docks_menu
+        dock_specs = (
+            ("Controls", getattr(self, "dock_controls", None)),
+            ("Δ(t) Heatmap", getattr(self, "dock_heatmap", None)),
+            ("Influence(t)", getattr(self, "dock_influence", None)),
+            ("Influence(t) Heatmap", getattr(self, "dock_inflheat", None)),
+            ("Multivariate", getattr(self, "dock_multivar", None)),
+            ("QA", getattr(self, "dock_qa", None)),
+            ("Events", getattr(self, "dock_events", None)),
+        )
+        for text, dock in dock_specs:
+            if not isinstance(dock, QtWidgets.QDockWidget):
+                continue
+            act = dock.toggleViewAction()
+            act.setText(text)
+            docks_menu.addAction(act)
 
 
 
@@ -1783,6 +2696,21 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._heat_t = tH
         self._heat_run_labels = list(cube_obj.run_labels)
         self._heat_sig_labels = list(cube_obj.sigs)
+        try:
+            absZ = np.abs(np.asarray(Z, dtype=float))
+            absZ = np.nan_to_num(absZ, nan=-1.0, posinf=-1.0, neginf=-1.0)
+            flat_idx = int(np.argmax(absZ))
+            it_hot, isig_hot, irun_hot = np.unravel_index(flat_idx, absZ.shape)
+            self._insight_heat = {
+                "signal": self._heat_sig_labels[isig_hot] if 0 <= isig_hot < len(self._heat_sig_labels) else "",
+                "run": self._heat_run_labels[irun_hot] if 0 <= irun_hot < len(self._heat_run_labels) else "",
+                "time_s": float(tH[it_hot]) if 0 <= it_hot < len(tH) else float("nan"),
+                "peak": float(absZ[it_hot, isig_hot, irun_hot]) if absZ.size else float("nan"),
+                "metric": metric,
+                "mode": mode,
+            }
+        except Exception:
+            self._insight_heat = {}
 
         try:
             self.imv_heat.setImage(img, xvals=tH, autoLevels=False)
@@ -1814,12 +2742,14 @@ class CompareViewer(QtWidgets.QMainWindow):
                 self._sync_heatmap_to_time(float(self._t_ref[idx]))
         except Exception:
             pass
+        self._update_workspace_status()
 
     def _clear_heatmap_view(self, note: str = "") -> None:
         self._heat_t = np.zeros(0, dtype=float)
         self._heat_run_labels = []
         self._heat_sig_labels = []
         self._heat_enabled = False
+        self._insight_heat = {}
         try:
             if self.imv_heat is not None:
                 blank = np.zeros((1, 1, 1), dtype=float)
@@ -1841,6 +2771,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.lbl_heat_readout.setText(str(note or ""))
         except Exception:
             pass
+        self._update_workspace_status()
 
     def _sync_heatmap_to_time(self, t: float):
         if self.imv_heat is None:
@@ -3044,6 +3975,7 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         finally:
             self._mv_updating = False
+            self._update_workspace_status()
 
 
     def _mv_checked_dims(self) -> List[str]:
@@ -3217,9 +4149,14 @@ class CompareViewer(QtWidgets.QMainWindow):
         keep_idx = [feat_names.index(k) for k in keep_names if k in feat_names]
         Xk = X[:, keep_idx] if keep_idx else np.zeros((len(runs), 0))
 
-        df = pd.DataFrame({"run": [r.label for r in runs]})
-        for j, nm in enumerate(keep_names):
-            df[nm] = Xk[:, j] if Xk.shape[1] > j else np.nan
+        df_parts: List[pd.DataFrame] = [pd.DataFrame({"run": [r.label for r in runs]})]
+        if keep_names:
+            meta_cols = {
+                nm: (Xk[:, j] if Xk.shape[1] > j else np.full(len(runs), np.nan, dtype=float))
+                for j, nm in enumerate(keep_names)
+            }
+            if meta_cols:
+                df_parts.append(pd.DataFrame(meta_cols, index=np.arange(len(runs))))
 
         # --- scalar metrics from signals ---
         ref = self._reference_run(runs) or runs[0]
@@ -3275,9 +4212,17 @@ class CompareViewer(QtWidgets.QMainWindow):
                 vals.append(v)
             metric_vals.append(vals)
 
-        # add metrics
-        for col, vals in zip(metric_cols, metric_vals):
-            df[col] = np.asarray(vals, dtype=float)
+        metric_frame = pd.DataFrame(
+            {
+                col: np.asarray(vals, dtype=float)
+                for col, vals in zip(metric_cols, metric_vals)
+            },
+            index=np.arange(len(runs)),
+        )
+        if not metric_frame.empty:
+            df_parts.append(metric_frame)
+
+        df = pd.concat(df_parts, axis=1)
 
         # aggregate helper metric
         if metric_cols:
@@ -3285,6 +4230,10 @@ class CompareViewer(QtWidgets.QMainWindow):
                 df[f"{metric}_mean"] = df[metric_cols].mean(axis=1, skipna=True)
             except Exception:
                 pass
+        try:
+            df = df.copy()
+        except Exception:
+            pass
 
         # --- make Plotly-friendly short labels ---
         full_cols = [c for c in df.columns if c != "run"]
@@ -3854,6 +4803,8 @@ class CompareViewer(QtWidgets.QMainWindow):
                 self.lbl_qa_summary.setText(f"QA: issues={n} (err={n_err}, warn={n_warn})")
         except Exception:
             pass
+        self._insight_qa = {"issues": int(n), "err": int(n_err), "warn": int(n_warn)}
+        self._update_workspace_status()
 
         run_labels = [r.label for r in runs]
         sig_labels = list(sigs)[:60]
@@ -3862,6 +4813,23 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._qa_run_labels = list(run_labels)
         self._qa_sig_labels = list(sig_labels)
         self._qa_first_t = first_t or {}
+        try:
+            if np.asarray(Z, dtype=float).size and np.isfinite(Z).any():
+                A = np.nan_to_num(np.asarray(Z, dtype=float), nan=0.0)
+                k_top = int(np.argmax(A))
+                isig_top, irun_top = np.unravel_index(k_top, A.shape)
+                top_run = self._qa_run_labels[irun_top] if 0 <= irun_top < len(self._qa_run_labels) else ""
+                top_sig = self._qa_sig_labels[isig_top] if 0 <= isig_top < len(self._qa_sig_labels) else ""
+                self._insight_qa.update(
+                    {
+                        "top_run": top_run,
+                        "top_signal": top_sig,
+                        "top_severity": float(A[isig_top, irun_top]),
+                        "top_time_s": float(self._qa_first_t.get((str(top_run), str(top_sig)), np.nan)),
+                    }
+                )
+        except Exception:
+            pass
 
         # cell codes summary
         cell_codes = {}
@@ -3924,6 +4892,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._qa_sig_labels = []
         self._qa_first_t = {}
         self._qa_cell_codes = {}
+        self._insight_qa = {}
         try:
             self.lbl_qa_summary.setText(str(summary or "QA: —"))
         except Exception:
@@ -3942,6 +4911,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.qa_plot.setEnabled(False)
         except Exception:
             pass
+        self._update_workspace_status()
 
 
     def _qa_pos_to_rc(self, pos: QtCore.QPointF) -> Optional[Tuple[int, int]]:
@@ -4244,6 +5214,8 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             pass
         self._infl_cache = None
+        self._insight_infl = {}
+        self._update_workspace_status()
 
     def _value_at_time(self, run: Run, sig: str, t: float) -> float:
         x, y, _u = self._get_xy(run, sig)
@@ -4402,6 +5374,23 @@ class CompareViewer(QtWidgets.QMainWindow):
                 note += " | mode=value"
             self.lbl_infl_note.setText(note)
 
+            try:
+                A = np.abs(np.asarray(C_sel, dtype=float))
+                A = np.nan_to_num(A, nan=-1.0, posinf=-1.0, neginf=-1.0)
+                k_top = int(np.argmax(A))
+                i_top, j_top = int(k_top // len(sigs)), int(k_top % len(sigs))
+                self._insight_infl = {
+                    "feature": feat_sel[i_top] if 0 <= i_top < len(feat_sel) else "",
+                    "signal": sigs[j_top] if 0 <= j_top < len(sigs) else "",
+                    "corr": float(C_sel[i_top, j_top]) if C_sel.size else float("nan"),
+                    "time_s": float(t0),
+                    "runs": int(len(runs)),
+                    "meta_count": int(len(feat_sel)),
+                    "delta": bool(use_delta),
+                }
+            except Exception:
+                self._insight_infl = {}
+
             # Cache for fast scatter updates
             self._infl_cache = {
                 "t": t0,
@@ -4433,6 +5422,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 pass
 
             self._update_influence_scatter_from_cache()
+            self._update_workspace_status()
 
         except Exception as e:
             self._clear_influence_view(f"Influence(t) ошибка: {e}")
@@ -4722,6 +5712,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._rebuild_runs_ui(preferred_selected_keys, preferred_signals)
         for msg in self._last_load_errors:
             print(msg)
+        self._update_workspace_status()
         return loaded_count
 
     def _selected_runs(self) -> List[Run]:
@@ -4970,6 +5961,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         runs = self._selected_runs()
         if not runs:
             txtw.setPlainText('Нет выбранных прогонов.')
+            self._update_workspace_status()
             return
         blocks: List[str] = []
         for run in runs[:6]:
@@ -4987,6 +5979,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         if len(runs) > 6:
             blocks.append(f'... +{len(runs)-6} more selected runs')
         txtw.setPlainText('\n\n'.join(blocks))
+        self._update_workspace_status()
 
     def _on_table_changed(self, _i: int):
         txt = self.combo_table.currentText()
@@ -5001,6 +5994,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             if (not kept_selected) and self.available_signals and not bool(getattr(self, '_signals_selection_explicit', False)):
                 self._select_default_signals()
             self._rebuild_plots()
+        self._update_workspace_status()
 
     def _refresh_table_list(self) -> None:
         runs = self._selected_runs()
@@ -5218,6 +6212,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         if (not kept_selected) and self.available_signals and not bool(getattr(self, '_signals_selection_explicit', False)):
             self._select_default_signals()
         self._rebuild_plots()
+        self._update_workspace_status()
 
     def _on_signal_selection_changed(self) -> None:
         self._signals_selection_explicit = True
@@ -5226,6 +6221,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             self.signals_selected = []
         self._rebuild_plots()
+        self._update_workspace_status()
 
     def _on_run_selection_changed(self):
         """Runs selection changed → refresh dependent UI then rebuild plots."""
@@ -5265,6 +6261,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             pass
         self._rebuild_plots()
+        self._update_workspace_status()
 
     def _on_reference_run_changed(self, _i: int):
         try:
@@ -5280,6 +6277,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             pass
         self._rebuild_plots()
+        self._update_workspace_status()
 
     def _on_event_selection_changed(self, _item=None) -> None:
         try:
@@ -5293,6 +6291,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             pass
         self._rebuild_plots()
+        self._update_workspace_status()
 
     def _get_selected_event_signals(self) -> List[str]:
         out: List[str] = []
@@ -5349,6 +6348,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 lw.setEnabled(False)
             except Exception:
                 pass
+            self._update_workspace_status()
             return
 
         items = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
@@ -5379,6 +6379,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.events_selected = list(remembered_sel)
         else:
             self.events_selected = [name for name in names if name in prev_sel]
+        self._update_workspace_status()
 
     def _refresh_events_table(self):
         tbl = getattr(self, 'tbl_events', None)
@@ -5403,6 +6404,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 self.lbl_events_info.setText("Events: none")
             except Exception:
                 pass
+            self._update_workspace_status()
             return
 
         pick = set(self._get_selected_event_signals())
@@ -5470,6 +6472,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.lbl_events_info.setText(f"Events: {len(df)} (baseline={ref_run.label if ref_run else ''}){suffix}")
         except Exception:
             pass
+        self._update_workspace_status()
 
     def _default_event_names(self, names: Sequence[str]) -> List[str]:
         return list(names[: min(6, len(names))])
@@ -6007,6 +7010,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             pass
 
         self.glw.nextRow()
+        self._update_workspace_status()
     # ---------------- playhead ----------------
     def _update_time_slider_range(self, x_ref: np.ndarray) -> None:
         try:
@@ -6197,17 +7201,179 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.lbl_readout.setText(" | ".join(parts))
 
     # ---------------- actions ----------------
+    def _iter_visible_plotly_export_widgets(self) -> List[QtWidgets.QWidget]:
+        out: List[QtWidgets.QWidget] = []
+        for attr in ("mv_view_splom", "mv_view_par", "mv_view_3d"):
+            widget = getattr(self, attr, None)
+            if widget is None:
+                continue
+            try:
+                if (not widget.isVisible()) or widget.isHidden():
+                    continue
+            except Exception:
+                continue
+            try:
+                if widget.width() < 64 or widget.height() < 64:
+                    continue
+            except Exception:
+                continue
+            out.append(widget)
+        return out
+
+    def _overlay_plotly_static_exports(self, pixmap: QtGui.QPixmap) -> QtGui.QPixmap:
+        if pixmap.isNull():
+            return pixmap
+        widgets = self._iter_visible_plotly_export_widgets()
+        if not widgets:
+            return pixmap
+
+        painter = QtGui.QPainter(pixmap)
+        try:
+            painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform, True)
+            for widget in widgets:
+                render_static = getattr(widget, "render_static_qimage", None)
+                if not callable(render_static):
+                    continue
+                try:
+                    image = render_static(width=int(widget.width()), height=int(widget.height()), scale=1.5)
+                except Exception:
+                    image = None
+                if image is None or image.isNull():
+                    continue
+                try:
+                    origin = widget.mapTo(self, QtCore.QPoint(0, 0))
+                    target = QtCore.QRect(origin, widget.size())
+                except Exception:
+                    continue
+                try:
+                    painter.fillRect(target, QtGui.QColor("#ffffff"))
+                    painter.drawImage(target, image)
+                    painter.setPen(QtGui.QPen(QtGui.QColor("#d6c8af"), 1))
+                    painter.drawRect(target.adjusted(0, 0, -1, -1))
+                except Exception:
+                    continue
+        finally:
+            try:
+                painter.end()
+            except Exception:
+                pass
+        return pixmap
+
+    def _save_workspace_png(self, path) -> Path:
+        out = _absolute_fs_path(path)
+        try:
+            out.parent.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        try:
+            self.show()
+        except Exception:
+            pass
+        try:
+            self.repaint()
+        except Exception:
+            pass
+        try:
+            QtWidgets.QApplication.processEvents()
+        except Exception:
+            pass
+        pm = self.grab()
+        if pm.isNull():
+            raise RuntimeError("Qt returned an empty workspace snapshot")
+        try:
+            pm = self._overlay_plotly_static_exports(pm)
+        except Exception:
+            pass
+        if not pm.save(str(out), "PNG"):
+            raise RuntimeError("Qt failed to save PNG")
+        return out
+
+    def _export_workspace_snapshot_set(self, out_dir) -> List[Path]:
+        out_root = _absolute_fs_path(out_dir)
+        try:
+            out_root.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+
+        saved_state = None
+        saved_geometry = None
+        try:
+            saved_state = self.saveState()
+            saved_geometry = self.saveGeometry()
+        except Exception:
+            pass
+
+        exports: List[Path] = []
+        try:
+            preset_specs = (
+                ("compare_workspace_overview.png", "all"),
+                ("compare_workspace_heatmaps.png", "heatmaps"),
+                ("compare_workspace_multivariate.png", "multivariate"),
+                ("compare_workspace_qa.png", "qa"),
+            )
+            for filename, mode in preset_specs:
+                self._focus_workspace_preset(mode)
+                if mode == "multivariate":
+                    try:
+                        self._update_multivar_views()
+                    except Exception:
+                        pass
+                try:
+                    QtWidgets.QApplication.processEvents()
+                except Exception:
+                    pass
+                exports.append(self._save_workspace_png(out_root / filename))
+        finally:
+            restored = False
+            try:
+                if saved_geometry is not None:
+                    self.restoreGeometry(saved_geometry)
+                if saved_state is not None:
+                    restored = bool(self.restoreState(saved_state))
+            except Exception:
+                restored = False
+            if not restored:
+                try:
+                    self._apply_default_workspace_layout()
+                except Exception:
+                    pass
+            try:
+                QtWidgets.QApplication.processEvents()
+            except Exception:
+                pass
+
+        return exports
+
     def _export_png(self):
         path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Export PNG", "compare.png", "PNG Images (*.png)")
         if not path:
             return
         try:
-            pm = self.grab()
-            ok = pm.save(path, "PNG")
-            if not ok:
-                raise RuntimeError("Qt failed to save PNG")
+            self._save_workspace_png(path)
         except Exception as e:
             QtWidgets.QMessageBox.warning(self, "Export failed", str(e))
+
+    def _export_snapshot_set_dialog(self):
+        base_dir = str(_absolute_fs_path(Path.cwd()))
+        out_dir = QtWidgets.QFileDialog.getExistingDirectory(
+            self,
+            "Export Workspace Snapshot Set",
+            base_dir,
+        )
+        if not out_dir:
+            return
+        try:
+            exports = self._export_workspace_snapshot_set(out_dir)
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(self, "Export snapshot set failed", str(e))
+            return
+        if exports:
+            lines = "\n".join(str(p) for p in exports[:8])
+            QtWidgets.QMessageBox.information(
+                self,
+                "Snapshot set exported",
+                f"Saved {len(exports)} workspace snapshots.\n\n{lines}",
+            )
 
     def _open_dialog(self):
         dlg = QtWidgets.QFileDialog(self)
