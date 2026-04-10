@@ -8654,6 +8654,122 @@ class Car3DWidget(QtWidgets.QWidget):
             wheel_pose_camber.append(float(camber_rad))
         camera_view_dir = self._camera_view_direction_local_xyz()
 
+        def _set_mesh_from_segment(item: Optional["gl.GLMeshItem"], seg: Optional[tuple[np.ndarray, np.ndarray]], radius_m: float) -> None:
+            if item is None or self._unit_cyl_faces is None:
+                return
+            if seg is None or radius_m <= 0.0:
+                self._invalidate_mesh(item)
+                return
+            verts = self._segment_mesh_vertices(radius_m=float(radius_m), p0_xyz=np.asarray(seg[0], dtype=float), p1_xyz=np.asarray(seg[1], dtype=float))
+            if verts is None:
+                self._invalidate_mesh(item)
+                return
+            try:
+                item.setMeshData(meshdata=gl.MeshData(vertexes=np.asarray(verts, dtype=float), faces=np.asarray(self._unit_cyl_faces, dtype=np.int32)))
+                item.setVisible(True)
+            except Exception:
+                self._invalidate_mesh(item)
+
+        def _set_disc_mesh(item: Optional["gl.GLMeshItem"], center_xyz: Optional[np.ndarray], normal_xyz: Optional[np.ndarray], radius_m: float) -> None:
+            if item is None or getattr(self, '_unit_disc_faces', None) is None:
+                return
+            if center_xyz is None or normal_xyz is None or radius_m <= 0.0:
+                self._invalidate_mesh(item)
+                return
+            verts = self._disc_mesh_vertices(radius_m=float(radius_m), center_xyz=np.asarray(center_xyz, dtype=float), normal_xyz=np.asarray(normal_xyz, dtype=float))
+            if verts is None:
+                self._invalidate_mesh(item)
+                return
+            try:
+                item.setMeshData(meshdata=gl.MeshData(vertexes=np.asarray(verts, dtype=float), faces=np.asarray(self._unit_disc_faces, dtype=np.int32)))
+                item.setVisible(True)
+            except Exception:
+                self._invalidate_mesh(item)
+
+        def _set_poly_mesh(
+            item: Optional["gl.GLMeshItem"],
+            verts_xyz: Optional[np.ndarray],
+            faces_ijk: Optional[np.ndarray],
+            *,
+            face_colors_rgba_u8: Optional[np.ndarray] = None,
+        ) -> None:
+            if item is None or verts_xyz is None or faces_ijk is None:
+                if item is not None:
+                    self._invalidate_mesh(item)
+                return
+            verts = np.asarray(verts_xyz, dtype=float).reshape(-1, 3)
+            faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+            if verts.shape[0] < 3 or faces.shape[0] < 1 or not np.all(np.isfinite(verts)):
+                self._invalidate_mesh(item)
+                return
+            try:
+                mesh_kwargs: Dict[str, Any] = {"vertexes": verts, "faces": faces}
+                if face_colors_rgba_u8 is not None:
+                    face_cols = np.asarray(face_colors_rgba_u8, dtype=np.uint8).reshape(-1, 4)
+                    if face_cols.shape[0] == faces.shape[0]:
+                        mesh_kwargs["faceColors"] = face_cols
+                item.setMeshData(meshdata=gl.MeshData(**mesh_kwargs))
+                item.setVisible(True)
+            except Exception:
+                self._invalidate_mesh(item)
+
+        def _set_line_item_pos(item: Optional["gl.GLLinePlotItem"], pos_xyz: Optional[np.ndarray]) -> None:
+            if item is None:
+                return
+            if pos_xyz is None:
+                try:
+                    item.setData(pos=np.zeros((0, 3), dtype=float))
+                    item.setVisible(False)
+                except Exception:
+                    pass
+                return
+            pos = np.asarray(pos_xyz, dtype=float).reshape(-1, 3)
+            if pos.shape[0] < 2 or not np.all(np.isfinite(pos)):
+                try:
+                    item.setData(pos=np.zeros((0, 3), dtype=float))
+                    item.setVisible(False)
+                except Exception:
+                    pass
+                return
+            try:
+                item.setData(pos=pos)
+                item.setVisible(True)
+            except Exception:
+                try:
+                    item.setData(pos=np.zeros((0, 3), dtype=float))
+                    item.setVisible(False)
+                except Exception:
+                    pass
+
+        def _set_colored_line_item(
+            item: Optional["gl.GLLinePlotItem"],
+            pos_xyz: Optional[np.ndarray],
+            rgba: Tuple[float, float, float, float],
+            *,
+            edge_floor: float = 0.18,
+            exponent: float = 0.82,
+        ) -> None:
+            if item is None:
+                return
+            if pos_xyz is None:
+                _set_line_item_pos(item, None)
+                return
+            pos = np.asarray(pos_xyz, dtype=float).reshape(-1, 3)
+            if pos.shape[0] < 2 or not np.all(np.isfinite(pos)):
+                _set_line_item_pos(item, None)
+                return
+            try:
+                colors = self._tapered_line_color_array(
+                    tuple(float(v) for v in tuple(rgba)),
+                    int(pos.shape[0]),
+                    edge_floor=float(edge_floor),
+                    exponent=float(exponent),
+                )
+                item.setData(pos=pos, color=colors)
+                item.setVisible(True)
+            except Exception:
+                _set_line_item_pos(item, None)
+
         # ---- Place chassis (box)
         body_h = max(0.0, float(getattr(self.geom, "frame_height", 0.0)))
         center_draw = np.asarray([0.0, 0.0, z_body], dtype=float)
@@ -9163,122 +9279,6 @@ class Car3DWidget(QtWidgets.QWidget):
             pos = _segments_from_pairs(cyl2_top_local_pts, cyl2_bot_local_pts)
             self._cyl2_lines.setData(pos=pos)
             self._cyl2_lines.setVisible(bool(pos.shape[0] >= 2))
-
-        def _set_mesh_from_segment(item: Optional["gl.GLMeshItem"], seg: Optional[tuple[np.ndarray, np.ndarray]], radius_m: float) -> None:
-            if item is None or self._unit_cyl_faces is None:
-                return
-            if seg is None or radius_m <= 0.0:
-                self._invalidate_mesh(item)
-                return
-            verts = self._segment_mesh_vertices(radius_m=float(radius_m), p0_xyz=np.asarray(seg[0], dtype=float), p1_xyz=np.asarray(seg[1], dtype=float))
-            if verts is None:
-                self._invalidate_mesh(item)
-                return
-            try:
-                item.setMeshData(meshdata=gl.MeshData(vertexes=np.asarray(verts, dtype=float), faces=np.asarray(self._unit_cyl_faces, dtype=np.int32)))
-                item.setVisible(True)
-            except Exception:
-                self._invalidate_mesh(item)
-
-        def _set_disc_mesh(item: Optional["gl.GLMeshItem"], center_xyz: Optional[np.ndarray], normal_xyz: Optional[np.ndarray], radius_m: float) -> None:
-            if item is None or getattr(self, '_unit_disc_faces', None) is None:
-                return
-            if center_xyz is None or normal_xyz is None or radius_m <= 0.0:
-                self._invalidate_mesh(item)
-                return
-            verts = self._disc_mesh_vertices(radius_m=float(radius_m), center_xyz=np.asarray(center_xyz, dtype=float), normal_xyz=np.asarray(normal_xyz, dtype=float))
-            if verts is None:
-                self._invalidate_mesh(item)
-                return
-            try:
-                item.setMeshData(meshdata=gl.MeshData(vertexes=np.asarray(verts, dtype=float), faces=np.asarray(self._unit_disc_faces, dtype=np.int32)))
-                item.setVisible(True)
-            except Exception:
-                self._invalidate_mesh(item)
-
-        def _set_poly_mesh(
-            item: Optional["gl.GLMeshItem"],
-            verts_xyz: Optional[np.ndarray],
-            faces_ijk: Optional[np.ndarray],
-            *,
-            face_colors_rgba_u8: Optional[np.ndarray] = None,
-        ) -> None:
-            if item is None or verts_xyz is None or faces_ijk is None:
-                if item is not None:
-                    self._invalidate_mesh(item)
-                return
-            verts = np.asarray(verts_xyz, dtype=float).reshape(-1, 3)
-            faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
-            if verts.shape[0] < 3 or faces.shape[0] < 1 or not np.all(np.isfinite(verts)):
-                self._invalidate_mesh(item)
-                return
-            try:
-                mesh_kwargs: Dict[str, Any] = {"vertexes": verts, "faces": faces}
-                if face_colors_rgba_u8 is not None:
-                    face_cols = np.asarray(face_colors_rgba_u8, dtype=np.uint8).reshape(-1, 4)
-                    if face_cols.shape[0] == faces.shape[0]:
-                        mesh_kwargs["faceColors"] = face_cols
-                item.setMeshData(meshdata=gl.MeshData(**mesh_kwargs))
-                item.setVisible(True)
-            except Exception:
-                self._invalidate_mesh(item)
-
-        def _set_line_item_pos(item: Optional["gl.GLLinePlotItem"], pos_xyz: Optional[np.ndarray]) -> None:
-            if item is None:
-                return
-            if pos_xyz is None:
-                try:
-                    item.setData(pos=np.zeros((0, 3), dtype=float))
-                    item.setVisible(False)
-                except Exception:
-                    pass
-                return
-            pos = np.asarray(pos_xyz, dtype=float).reshape(-1, 3)
-            if pos.shape[0] < 2 or not np.all(np.isfinite(pos)):
-                try:
-                    item.setData(pos=np.zeros((0, 3), dtype=float))
-                    item.setVisible(False)
-                except Exception:
-                    pass
-                return
-            try:
-                item.setData(pos=pos)
-                item.setVisible(True)
-            except Exception:
-                try:
-                    item.setData(pos=np.zeros((0, 3), dtype=float))
-                    item.setVisible(False)
-                except Exception:
-                    pass
-
-        def _set_colored_line_item(
-            item: Optional["gl.GLLinePlotItem"],
-            pos_xyz: Optional[np.ndarray],
-            rgba: Tuple[float, float, float, float],
-            *,
-            edge_floor: float = 0.18,
-            exponent: float = 0.82,
-        ) -> None:
-            if item is None:
-                return
-            if pos_xyz is None:
-                _set_line_item_pos(item, None)
-                return
-            pos = np.asarray(pos_xyz, dtype=float).reshape(-1, 3)
-            if pos.shape[0] < 2 or not np.all(np.isfinite(pos)):
-                _set_line_item_pos(item, None)
-                return
-            try:
-                colors = self._tapered_line_color_array(
-                    tuple(float(v) for v in tuple(rgba)),
-                    int(pos.shape[0]),
-                    edge_floor=float(edge_floor),
-                    exponent=float(exponent),
-                )
-                item.setData(pos=pos, color=colors)
-                item.setVisible(True)
-            except Exception:
-                _set_line_item_pos(item, None)
 
         lower_arm_radius = max(0.010, 0.14 * float(self.geom.wheel_radius))
         upper_arm_radius = max(0.008, 0.11 * float(self.geom.wheel_radius))
