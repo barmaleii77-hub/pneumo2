@@ -517,7 +517,7 @@ except Exception:
 # Fallback (без Streamlit Components): matplotlib-визуализация механики.
 # Это лечит типовые проблемы вроде "Unrecognized component API version" / "apiVersion undefined" в некоторых окружениях.
 #
-# Р’Р°Р¶РЅРѕ: fallback-РјРѕРґСѓР»СЊ Р»РµР¶РёС‚ Р’РќРЈРўР Р РїР°РєРµС‚Р° pneumo_solver_ui.
+# Важно: fallback-модуль лежит ВНУТРИ пакета pneumo_solver_ui.
 # Поэтому основной импорт — package import. Если sys.path сломан, пробуем загрузить по абсолютному пути файла.
 import importlib.util as _importlib_util  # noqa: E402
 
@@ -1203,7 +1203,7 @@ _bar_unit_profile = build_ui_unit_profile(
     pressure_unit_label="бар (изб.)",
     pressure_offset_pa=lambda: P_ATM,
     pressure_divisor_pa=lambda: BAR_PA,
-    length_unit_label="РјРј",
+    length_unit_label="мм",
     length_scale=1000.0,
     is_pressure_param_fn=is_pressure_param,
     is_volume_param_fn=is_volume_param,
@@ -2130,7 +2130,7 @@ finally:
             pass
     if _startup_status is not None:
         try:
-            _startup_status.update(label="РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ Р·Р°РІРµСЂС€РµРЅР°", state="complete", expanded=False)
+            _startup_status.update(label="Инициализация завершена", state="complete", expanded=False)
         except Exception:
             pass
     if _startup_first:
@@ -2507,20 +2507,20 @@ with st.sidebar:
             st.subheader("Результаты")
 
             run_name = st.text_input(
-                "РРјСЏ РїСЂРѕРіРѕРЅР°",
+                "Имя прогона",
                 value=str(st.session_state.get("opt_run_name", "main")),
                 key="opt_run_name",
                 help=(
-                    "Р­С‚Рѕ РёРјСЏ РїР°РїРєРё РІ workspace/opt_runs. РСЃРїРѕР»СЊР·СѓР№С‚Рµ СЂР°Р·РЅС‹Рµ РёРјРµРЅР° РґР»СЏ СЂР°Р·РЅС‹С… СЃРµСЂРёР№ СЌРєСЃРїРµСЂРёРјРµРЅС‚РѕРІ "
+                    "Это имя папки в workspace/opt_runs. Используйте разные имена для разных серий экспериментов "
                     "(например: 'main', 'winter', 'camozzi_v1')."
                 ),
             )
 
             out_prefix = st.text_input(
-                "РРјСЏ CSV (РїСЂРµС„РёРєСЃ)",
+                "Имя CSV (префикс)",
                 value=str(st.session_state.get("ui_out_prefix", "results_opt")),
                 key="ui_out_prefix",
-                help="РРјСЏ С„Р°Р№Р»Р° СЂРµР·СѓР»СЊС‚Р°С‚Р° РІРЅСѓС‚СЂРё РїР°РїРєРё РїСЂРѕРіРѕРЅР°. РќР°РїСЂРёРјРµСЂ: results_opt.csv РёР»Рё results_opt_all.csv.",
+                help="Имя файла результата внутри папки прогона. Например: results_opt.csv или results_opt_all.csv.",
             )
 
             st.divider()
@@ -2597,7 +2597,7 @@ with st.sidebar:
                     help="Периодический auto-rerun страницы, чтобы прогресс обновлялся без кликов.",
                 )
                 refresh_sec = st.number_input(
-                    "РРЅС‚РµСЂРІР°Р» Р°РІС‚РѕРѕР±РЅРѕРІР»РµРЅРёСЏ (СЃ)",
+                    "Интервал автообновления (с)",
                     min_value=0.2,
                     max_value=10.0,
                     value=float(st.session_state.get("ui_refresh_sec", 1.0)),
@@ -2681,7 +2681,7 @@ with st.sidebar:
                         ),
                     )
                     adaptive_influence_eps = st.checkbox(
-                        "Adaptive epsilon РґР»СЏ System Influence",
+                        "Adaptive epsilon для System Influence",
                         value=bool(st.session_state.get("adaptive_influence_eps", DIAGNOSTIC_ADAPTIVE_INFLUENCE_EPS)),
                         key="adaptive_influence_eps",
                         help=(
@@ -2855,7 +2855,7 @@ with st.sidebar:
                 )
                 st.caption(
                     "qNEHVI gate: proposer включается не сразу. Сначала coordinator проходит warmup, затем требует feasible history: "
-                    "done >= n_init Рё feasible >= min_feasible. РРЅР°С‡Рµ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ random/LHS path."
+                    "done >= n_init и feasible >= min_feasible. Иначе используется random/LHS path."
                 )
 
             with st.expander("Параллелизм и кластер (Dask / Ray)", expanded=False):
@@ -2985,7 +2985,7 @@ with st.sidebar:
                         value=str(st.session_state.get("ray_runtime_exclude", "") or ""),
                         height=90,
                         key="ray_runtime_exclude",
-                        help="РСЃРєР»СЋС‡РµРЅРёСЏ РїСЂРё СѓРїР°РєРѕРІРєРµ РєРѕРґР° РІ Ray runtime_env.",
+                        help="Исключения при упаковке кода в Ray runtime_env.",
                     )
                     st.number_input(
                         "Ray evaluators",
@@ -2997,7 +2997,7 @@ with st.sidebar:
                         help="0 — coordinator сам выберет.",
                     )
                     st.number_input(
-                        "CPU РЅР° evaluator",
+                        "CPU на evaluator",
                         min_value=0.25,
                         max_value=512.0,
                         value=float(st.session_state.get("ray_cpus_per_evaluator", 1.0) or 1.0),
@@ -3015,7 +3015,7 @@ with st.sidebar:
                         help="0=auto (использовать доступные GPU если qNEHVI).",
                     )
                     st.number_input(
-                        "GPU РЅР° proposer",
+                        "GPU на proposer",
                         min_value=0.0,
                         max_value=16.0,
                         value=float(st.session_state.get("ray_gpus_per_proposer", 1.0) or 1.0),
@@ -3284,7 +3284,7 @@ is_length_param = is_length_param_name
 # -------------------------------
 # Описания/единицы параметров (для UI)
 # ВАЖНО: эти функции должны быть определены ДО того, как мы строим таблицу df_opt.
-# РРЅР°С‡Рµ Python СѓРїР°РґС‘С‚ СЃ NameError, С‚.Рє. РјРѕРґСѓР»СЊ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ СЃРІРµСЂС…Сѓ РІРЅРёР·.
+# Иначе Python упадёт с NameError, т.к. модуль выполняется сверху вниз.
 # -------------------------------
 
 
@@ -3309,7 +3309,7 @@ with colA:
     # редактируемая таблица параметров (простая)
     
 # -------------------------------
-# Р•Р”РРќР«Р™ Р’Р’РћР” РџРђР РђРњР•РўР РћР’ (Р·РЅР°С‡РµРЅРёРµ + РґРёР°РїР°Р·РѕРЅ РѕРїС‚РёРјРёР·Р°С†РёРё)
+# ЕДИНЫЙ ВВОД ПАРАМЕТРОВ (значение + диапазон оптимизации)
 # -------------------------------
 
 st.subheader("Параметры модели и диапазоны оптимизации")
@@ -3338,7 +3338,7 @@ PARAM_META = {
         "группа": "Давление (уставки)",
         "ед": "бар (изб.)",
         "kind": "pressure_atm_g",
-        "РѕРїРёСЃР°РЅРёРµ": "Pmid (СѓСЃС‚Р°РІРєР° В«СЃРµСЂРµРґРёРЅС‹В»): РІС‹С€Рµ вЂ” РїРѕРґРІРµСЃРєР° Р·Р°РјРµС‚РЅРѕ В«Р¶С‘СЃС‚С‡РµВ». РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ РјРµС‚СЂРёРєРµ В«СЂР°РЅСЊС€Рµ-Р¶С‘СЃС‚РєРѕВ»."
+        "описание": "Pmid (уставка «середины»): выше — подвеска заметно «жёстче». Используется в метрике «раньше-жёстко»."
     },
     "давление_Pзаряд_аккумулятора_из_Ресивер3": {
         "группа": "Давление (уставки)",
@@ -3402,90 +3402,90 @@ PARAM_META = {
     "жёсткость_шины": {"группа": "Шина", "ед": "Н/м", "kind": "raw", "описание": "Вертикальная жёсткость шины (линеаризованная)."},
     "демпфирование_шины": {"группа": "Шина", "ед": "Н·с/м", "kind": "raw", "описание": "Вертикальное демпфирование шины (линеаризованное)."},
 
-    # РРЅРµСЂС†РёРё
-    "РјРѕРјРµРЅС‚_РёРЅРµСЂС†РёРё_СЂР°РјС‹_РїРѕ_РєСЂРµРЅСѓ": {"РіСЂСѓРїРїР°": "РРЅРµСЂС†РёСЏ", "РµРґ": "РєРіВ·РјВІ", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РњРѕРјРµРЅС‚ РёРЅРµСЂС†РёРё СЂР°РјС‹ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РѕСЃРё РєСЂРµРЅР°."},
-    "РјРѕРјРµРЅС‚_РёРЅРµСЂС†РёРё_СЂР°РјС‹_РїРѕ_С‚Р°РЅРіР°Р¶Сѓ": {"РіСЂСѓРїРїР°": "РРЅРµСЂС†РёСЏ", "РµРґ": "РєРіВ·РјВІ", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РњРѕРјРµРЅС‚ РёРЅРµСЂС†РёРё СЂР°РјС‹ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РѕСЃРё С‚Р°РЅРіР°Р¶Р°."},
-    "РјРѕРјРµРЅС‚_РёРЅРµСЂС†РёРё_СЂР°РјС‹_РїРѕ_СЂС‹СЃРєР°РЅСЊСЋ": {"РіСЂСѓРїРїР°": "РРЅРµСЂС†РёСЏ", "РµРґ": "РєРіВ·РјВІ", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РњРѕРјРµРЅС‚ РёРЅРµСЂС†РёРё СЂР°РјС‹ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РѕСЃРё СЂС‹СЃРєР°РЅСЊСЏ."},
+    # Инерции
+    "момент_инерции_рамы_по_крену": {"группа": "Инерция", "ед": "кг·м²", "kind": "raw", "описание": "Момент инерции рамы относительно оси крена."},
+    "момент_инерции_рамы_по_тангажу": {"группа": "Инерция", "ед": "кг·м²", "kind": "raw", "описание": "Момент инерции рамы относительно оси тангажа."},
+    "момент_инерции_рамы_по_рысканью": {"группа": "Инерция", "ед": "кг·м²", "kind": "raw", "описание": "Момент инерции рамы относительно оси рысканья."},
 
     # Ограничения/запасы (в UI)
     "лимит_пробоя_крен_град": {"группа": "Ограничения", "ед": "град", "kind": "raw", "описание": "Ограничение по крену (жёсткое/аварийное)."},
     "лимит_пробоя_тангаж_град": {"группа": "Ограничения", "ед": "град", "kind": "raw", "описание": "Ограничение по тангажу (жёсткое/аварийное)."},
     "минимальное_абсолютное_давление_Па": {"группа": "Ограничения", "ед": "кПа (абс.)", "kind": "pressure_kPa_abs", "описание": "Нижняя граница абсолютного давления для численной устойчивости. Вакуум допускаем, но p_abs не может быть < 0."},
 
-    # Р“Р°Р·
+    # Газ
     "температура_газа_К": {"группа": "Газ", "ед": "°C", "kind": "temperature_C", "описание": "Температура газа (внутри модели хранится Кельвин)."},
     "гравитация": {"группа": "Среда", "ед": "м/с²", "kind": "raw", "описание": "Ускорение свободного падения."},
 
     # Геометрия подвески (двойные поперечные рычаги / DW2D)
     "dw_lower_pivot_inboard_перед_м": {
         "группа": "Геометрия подвески (DW2D)",
-        "РµРґ": "Рј",
+        "ед": "м",
         "kind": "raw",
-        "РѕРїРёСЃР°РЅРёРµ": "РЎРјРµС‰РµРЅРёРµ РІРЅСѓС‚СЂРµРЅРЅРµРіРѕ С€Р°СЂРЅРёСЂР° РЅРёР¶РЅРµРіРѕ СЂС‹С‡Р°РіР° (РїРµСЂРµРґ) РІРЅСѓС‚СЂСЊ РѕС‚ С†РµРЅС‚СЂР° РєРѕР»РµСЃР° РїРѕ РѕСЃРё Y. РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ РєРёРЅРµРјР°С‚РёРєРµ dw2d_mounts."
+        "описание": "Смещение внутреннего шарнира нижнего рычага (перед) внутрь от центра колеса по оси Y. Используется в кинематике dw2d_mounts."
     },
     "dw_lower_pivot_inboard_зад_м": {
         "группа": "Геометрия подвески (DW2D)",
-        "РµРґ": "Рј",
+        "ед": "м",
         "kind": "raw",
-        "РѕРїРёСЃР°РЅРёРµ": "РЎРјРµС‰РµРЅРёРµ РІРЅСѓС‚СЂРµРЅРЅРµРіРѕ С€Р°СЂРЅРёСЂР° РЅРёР¶РЅРµРіРѕ СЂС‹С‡Р°РіР° (Р·Р°Рґ) РІРЅСѓС‚СЂСЊ РѕС‚ С†РµРЅС‚СЂР° РєРѕР»РµСЃР° РїРѕ РѕСЃРё Y. РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ РєРёРЅРµРјР°С‚РёРєРµ dw2d_mounts."
+        "описание": "Смещение внутреннего шарнира нижнего рычага (зад) внутрь от центра колеса по оси Y. Используется в кинематике dw2d_mounts."
     },
     "dw_lower_pivot_z_перед_м": {
         "группа": "Геометрия подвески (DW2D)",
-        "РµРґ": "Рј",
+        "ед": "м",
         "kind": "raw",
         "описание": "Высота (Z) внутреннего шарнира нижнего рычага (перед) относительно рамы в статике (z_body для данной точки = 0)."
     },
     "dw_lower_pivot_z_зад_м": {
         "группа": "Геометрия подвески (DW2D)",
-        "РµРґ": "Рј",
+        "ед": "м",
         "kind": "raw",
         "описание": "Высота (Z) внутреннего шарнира нижнего рычага (зад) относительно рамы в статике (z_body для данной точки = 0)."
     },
     "dw_lower_arm_len_перед_м": {
         "группа": "Геометрия подвески (DW2D)",
-        "РµРґ": "Рј",
+        "ед": "м",
         "kind": "raw",
         "описание": "Длина нижнего рычага (перед): расстояние от внутреннего шарнира до шарнира у поворотного кулака/ступицы (в 2D-приближении Y-Z)."
     },
     "dw_lower_arm_len_зад_м": {
         "группа": "Геометрия подвески (DW2D)",
-        "РµРґ": "Рј",
+        "ед": "м",
         "kind": "raw",
         "описание": "Длина нижнего рычага (зад): расстояние от внутреннего шарнира до шарнира у поворотного кулака/ступицы (в 2D-приближении Y-Z)."
     },
     "dw_upper_pivot_inboard_перед_м": {
         "группа": "Геометрия подвески (DW2D)",
-        "РµРґ": "Рј",
+        "ед": "м",
         "kind": "raw",
         "описание": "Смещение внутреннего шарнира верхнего рычага (перед) внутрь от центра колеса по оси Y. Канонический source-data для второго рычага."
     },
     "dw_upper_pivot_inboard_зад_м": {
         "группа": "Геометрия подвески (DW2D)",
-        "РµРґ": "Рј",
+        "ед": "м",
         "kind": "raw",
         "описание": "Смещение внутреннего шарнира верхнего рычага (зад) внутрь от центра колеса по оси Y. Канонический source-data для второго рычага."
     },
     "dw_upper_pivot_z_перед_м": {
         "группа": "Геометрия подвески (DW2D)",
-        "РµРґ": "Рј",
+        "ед": "м",
         "kind": "raw",
         "описание": "Высота (Z) внутреннего шарнира верхнего рычага (перед) относительно рамы в статике. Канонический source-data для второго рычага."
     },
     "dw_upper_pivot_z_зад_м": {
         "группа": "Геометрия подвески (DW2D)",
-        "РµРґ": "Рј",
+        "ед": "м",
         "kind": "raw",
         "описание": "Высота (Z) внутреннего шарнира верхнего рычага (зад) относительно рамы в статике. Канонический source-data для второго рычага."
     },
     "dw_upper_arm_len_перед_м": {
         "группа": "Геометрия подвески (DW2D)",
-        "РµРґ": "Рј",
+        "ед": "м",
         "kind": "raw",
         "описание": "Длина верхнего рычага (перед): расстояние от внутреннего шарнира до шарнира у поворотного кулака/ступицы (в 2D-приближении Y-Z)."
     },
     "dw_upper_arm_len_зад_м": {
         "группа": "Геометрия подвески (DW2D)",
-        "РµРґ": "Рј",
+        "ед": "м",
         "kind": "raw",
         "описание": "Длина верхнего рычага (зад): расстояние от внутреннего шарнира до шарнира у поворотного кулака/ступицы (в 2D-приближении Y-Z)."
     },
@@ -3538,7 +3538,7 @@ for _k, _m in PARAM_META.items():
 for _k, _m in PARAM_META.items():
     if not isinstance(_m, dict):
         continue
-    if is_length_param(_k) and _m.get("kind", "raw") == "raw" and _m.get("РµРґ") in ("Рј", "m"):
+    if is_length_param(_k) and _m.get("kind", "raw") == "raw" and _m.get("ед") in ("м", "m"):
         _m["kind"] = "length_mm"
         _m["ед"] = "мм"
 
@@ -3546,7 +3546,7 @@ for _k, _m in PARAM_META.items():
 def infer_param_meta(k: str) -> Dict[str, str]:
     """Единый источник метаданных параметра для таблицы (группа/единицы/kind/описание).
 
-    Р—Р°РґР°С‡Р°: С‡С‚РѕР±С‹ РІ UI РЅРµ Р±С‹Р»Рѕ В«РєР°С€Р° РёР· РµРґРёРЅРёС†В». Р’РЅСѓС‚СЂРё РјРѕРґРµР»Рё РІСЃС‘ РІ РЎР, РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ вЂ” РїСЂРёРІС‹С‡РЅС‹Рµ.
+    Задача: чтобы в UI не было «каша из единиц». Внутри модели всё в СИ, пользователю — привычные.
     """
     if k in PARAM_META:
         return PARAM_META[k]
@@ -3567,7 +3567,7 @@ def infer_param_meta(k: str) -> Dict[str, str]:
     if k.endswith("_град"):
         return {"группа": "Геометрия (углы)", "ед": "град", "kind": "raw", "описание": param_desc(k)}
     # по умолчанию:
-    return {"РіСЂСѓРїРїР°": "РџСЂРѕС‡РµРµ", "РµРґ": "РЎР", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": param_desc(k)}
+    return {"группа": "Прочее", "ед": "СИ", "kind": "raw", "описание": param_desc(k)}
 
 
 _si_to_ui = _bar_unit_profile.si_to_ui
@@ -3586,7 +3586,7 @@ all_keys = sorted(set(base0.keys()) | set(ranges0.keys()))
 
 # --- Структурированные параметры (списки/таблицы) ---
 # Важно: некоторые параметры (например нелинейная пружина) хранятся как списки чисел.
-# РС… РЅРµР»СЊР·СЏ РїРѕРєР°Р·С‹РІР°С‚СЊ РІ РѕР±С‰РµР№ С‚Р°Р±Р»РёС†Рµ СЃРєР°Р»СЏСЂРѕРІ (РёРЅР°С‡Рµ Р±СѓРґРµС‚ TypeError: float(list)).
+# Их нельзя показывать в общей таблице скаляров (иначе будет TypeError: float(list)).
 
 # 1) Таблица нелинейной пружины (ход_мм -> сила_Н)
 SPR_X = "пружина_таблица_ход_мм"
@@ -3689,8 +3689,8 @@ def _migrate_df_params_edit(prev_df: Any, new_df: pd.DataFrame) -> pd.DataFrame:
 
     Требование проекта: введённые пользователем значения НЕ должны пропадать при обновлении версии.
     Логика:
-      1) Р±РµСЂС‘Рј СЃС‚Р°СЂРѕРµ UI-Р·РЅР°С‡РµРЅРёРµ + СЃС‚Р°СЂС‹Р№ kind -> РїРµСЂРµРІРѕРґРёРј РІ РЎР,
-      2) РїРµСЂРµРІРѕРґРёРј РёР· РЎР РІ РЅРѕРІС‹Р№ UI-kind.
+      1) берём старое UI-значение + старый kind -> переводим в СИ,
+      2) переводим из СИ в новый UI-kind.
     """
     if not isinstance(prev_df, pd.DataFrame):
         return new_df
@@ -3763,7 +3763,7 @@ _SECTION_RULES = {
     "Все разделы": lambda g: True,
     "Пневматика": lambda g: any(s in g for s in ["Давление", "Объём", "Объем", "Дроссел", "Газ", "Среда"]),
     "Геометрия": lambda g: "Геометрия" in g,
-    "РњР°СЃСЃС‹ Рё РёРЅРµСЂС†РёРё": lambda g: any(s in g for s in ["РњРµС…Р°РЅРёРєР°", "РРЅРµСЂС†РёСЏ"]),
+    "Массы и инерции": lambda g: any(s in g for s in ["Механика", "Инерция"]),
     "Шины": lambda g: "Шина" in g,
     "Пружина": lambda g: "Пружина" in g,
     "Ограничения": lambda g: "Огранич" in g,
@@ -3814,7 +3814,7 @@ ui_params_search = st.text_input(
     "Поиск параметра",
     value=st.session_state.get("ui_params_search", ""),
     key="ui_params_search",
-    help="РС‰РµС‚ РїРѕ РєР»СЋС‡Сѓ РїР°СЂР°РјРµС‚СЂР° Рё РїРѕ РїРѕСЏСЃРЅРµРЅРёСЋ.",
+    help="Ищет по ключу параметра и по пояснению.",
 ).strip()
 
 # Отфильтрованный список
@@ -4088,7 +4088,7 @@ for _, r in df_params_edit.iterrows():
         if val_ui <= 0:
             param_errors.append(f"Параметр '{k}': объём должен быть > 0, сейчас {val_ui}")
 
-    # РєРѕРЅРІРµСЂС‚Р°С†РёСЏ РІ РЎР
+    # конвертация в СИ
     val_si = _ui_to_si(k, val_ui, kind)
     base_override[k] = float(val_si)
 
@@ -4135,11 +4135,11 @@ def _is_bool_like(k, v) -> bool:
     # Нормальный случай: в JSON true/false -> bool
     if isinstance(v, (bool, np.bool_)):
         return True
-    # РРЅРѕРіРґР° С„Р»Р°Рі РјРѕР¶РµС‚ Р±С‹С‚СЊ РїСЂРµРґСЃС‚Р°РІР»РµРЅ РєР°Рє 0/1 (РїРѕСЃР»Рµ РІРЅРµС€РЅРµР№ РєРѕРЅРІРµСЂСЃРёРё/СЌРєСЃРїРѕСЂС‚Р°).
+    # Иногда флаг может быть представлен как 0/1 (после внешней конверсии/экспорта).
     # Важно: пользователь прямо попросил "проверь что все булевы вынесены" — поэтому берём 0/1 как bool без эвристик.
     if isinstance(v, int) and v in (0, 1):
         return True
-    # РРЅРѕРіРґР° Р±С‹РІР°РµС‚ СЃС‚СЂРѕРєРѕР№ "true"/"false"/"0"/"1".
+    # Иногда бывает строкой "true"/"false"/"0"/"1".
     if isinstance(v, str):
         vv = v.strip().lower()
         if vv in ("true", "false", "0", "1"):
@@ -4156,9 +4156,9 @@ if bool_keys_ui:
                 return bool(v)
             if isinstance(v, str):
                 vv = v.strip().lower()
-                if vv in ("true", "1", "yes", "y", "РґР°"):
+                if vv in ("true", "1", "yes", "y", "да"):
                     return True
-                if vv in ("false", "0", "no", "n", "РЅРµС‚", ""):
+                if vv in ("false", "0", "no", "n", "нет", ""):
                     return False
             return bool(v)
 
@@ -4218,7 +4218,7 @@ if str_keys_ui:
                 cur = str(base_override.get(k, ""))
                 help_txt = STRING_HELP.get(k, "")
 
-                # 1) РР·РІРµСЃС‚РЅС‹Рµ СЂРµР¶РёРјС‹ вЂ” selectbox
+                # 1) Известные режимы — selectbox
                 if k in STRING_OPTIONS:
                     opts = list(STRING_OPTIONS[k])
                     if cur not in opts:
@@ -4373,7 +4373,7 @@ def _ensure_unique_suite_ids(df: pd.DataFrame, *, context: str = "suite") -> tup
 def ensure_suite_columns(df: pd.DataFrame, *, context: str = "pneumo_ui_app.ensure_suite_columns") -> pd.DataFrame:
     """Ensure canonical suite schema.
 
-    ABSOLUTE LAW (СЃРј. 00_READ_FIRST__ABSOLUTE_LAW.md):
+    ABSOLUTE LAW (см. 00_READ_FIRST__ABSOLUTE_LAW.md):
 
     * Никаких дублей/алиасов колонок внутри suite.
     * Внутри приложения используются **только канонические** имена колонок.
@@ -4381,7 +4381,7 @@ def ensure_suite_columns(df: pd.DataFrame, *, context: str = "pneumo_ui_app.ensu
     Допускается только явная одноразовая миграция legacy-колонок на входе
     (при загрузке/восстановлении suite) с обязательным warning/logging.
     Это не runtime-мост совместимости: legacy-колонки немедленно удаляются
-    РёР· editor state.
+    из editor state.
     Функция обязана быть безопасной: никаких падений из-за кривого файла.
     """
 
@@ -4428,8 +4428,8 @@ def ensure_suite_columns(df: pd.DataFrame, *, context: str = "pneumo_ui_app.ensu
     defaults = {
         # Primary identifying fields
         "id": "",
-        "РёРјСЏ": "",
-        "С‚РёРї": "",
+        "имя": "",
+        "тип": "",
         "включен": True,
         "комментарий": "",
 
@@ -4440,7 +4440,7 @@ def ensure_suite_columns(df: pd.DataFrame, *, context: str = "pneumo_ui_app.ensu
         # World-road controls
         "auto_t_end_from_len": True,
         "road_len_m": 3000.0,
-        "vx0_Рј_СЃ": 20.0 / 3.6,
+        "vx0_м_с": 20.0 / 3.6,
         "road_csv": "",
         "axay_csv": "",
         "road_surface": "rough",
@@ -4449,7 +4449,7 @@ def ensure_suite_columns(df: pd.DataFrame, *, context: str = "pneumo_ui_app.ensu
         # Optional tuning
         "track_m": float('nan'),
         "wheelbase_m": float('nan'),
-        "yaw0_СЂР°Рґ": float('nan'),
+        "yaw0_рад": float('nan'),
 
         # Boolean flags
         "save_npz": True,
@@ -4622,14 +4622,14 @@ def _new_test_row(preset: str = "worldroad_flat") -> dict:
         "включен": True,
         "стадия": 0,
         "имя": "Новый тест",
-        "С‚РёРї": "worldroad",
+        "тип": "worldroad",
         "dt": 0.01,
         "t_end": 10.0,
         "road_csv": "",
         "axay_csv": "",
         "road_surface": "flat",
         "road_len_m": 200.0,
-        "vx0_Рј_СЃ": 20.0,
+        "vx0_м_с": 20.0,
         "auto_t_end_from_len": True,
         "A": 0.02,
         "f": 1.0,
@@ -4664,9 +4664,9 @@ def _new_test_row(preset: str = "worldroad_flat") -> dict:
     if preset == "worldroad_sine_x":
         base.update({
             "имя": "WorldRoad: синус (вдоль)",
-            "С‚РёРї": "worldroad",
+            "тип": "worldroad",
             "road_surface": json.dumps({"type": "sine_x", "A": 0.02, "wavelength": 2.0}, ensure_ascii=False),
-            "vx0_Рј_СЃ": 20.0,
+            "vx0_м_с": 20.0,
             "road_len_m": 200.0,
             "auto_t_end_from_len": True,
             "t_end": 10.0,
@@ -4674,16 +4674,16 @@ def _new_test_row(preset: str = "worldroad_flat") -> dict:
     elif preset == "worldroad_bump":
         base.update({
             "имя": "WorldRoad: бугор",
-            "С‚РёРї": "worldroad",
+            "тип": "worldroad",
             "road_surface": json.dumps({"type": "bump", "h": 0.04, "w": 0.6}, ensure_ascii=False),
-            "vx0_Рј_СЃ": 15.0,
+            "vx0_м_с": 15.0,
             "road_len_m": 150.0,
             "auto_t_end_from_len": True,
             "t_end": 10.0,
         })
     elif preset == "inertia_brake":
         base.update({
-            "РёРјСЏ": "РРЅРµСЂС†РёСЏ: С‚РѕСЂРјРѕР¶РµРЅРёРµ",
+            "имя": "Инерция: торможение",
             # Для продольного ускорения/торможения используется тест "инерция_тангаж".
             # (исправление: раньше был несуществующий тип "inertia_flat", из-за чего тест мог ломаться)
             "тип": "инерция_тангаж",
@@ -4696,7 +4696,7 @@ def _new_test_row(preset: str = "worldroad_flat") -> dict:
     else:
         base.update({
             "имя": "WorldRoad: ровная",
-            "С‚РёРї": "worldroad",
+            "тип": "worldroad",
             "road_surface": "flat",
         })
 
@@ -5007,12 +5007,12 @@ def _seed_suite_editor_state(sid: str, rec: Dict[str, Any], *, force: bool = Fal
         stage_default = max(0, int(rec.get("стадия", 0) or 0))
     except Exception:
         stage_default = 0
-    ttype_default = str(rec.get("С‚РёРї", "worldroad") or "worldroad")
+    ttype_default = str(rec.get("тип", "worldroad") or "worldroad")
     if ttype_default not in ALLOWED_TEST_TYPES:
         ttype_default = "worldroad"
 
     _seed("enabled", bool(rec.get("включен", True)))
-    _seed("name", str(rec.get("РёРјСЏ", "") or ""))
+    _seed("name", str(rec.get("имя", "") or ""))
     _seed("stage", int(stage_default))
     _seed("type", ttype_default)
     _seed("dt", float(_as_float(rec.get("dt", 0.01), 0.01)))
@@ -5020,7 +5020,7 @@ def _seed_suite_editor_state(sid: str, rec: Dict[str, Any], *, force: bool = Fal
     _seed("road_csv", str(rec.get("road_csv", "") or ""))
     _seed("axay_csv", str(rec.get("axay_csv", "") or ""))
     _seed("road_len_m", float(_as_float(rec.get("road_len_m", 200.0), 200.0)))
-    _seed("vx0_mps", float(_as_float(rec.get("vx0_Рј_СЃ", 20.0), 20.0)))
+    _seed("vx0_mps", float(_as_float(rec.get("vx0_м_с", 20.0), 20.0)))
     _seed("auto_t_end_from_len", bool(rec.get("auto_t_end_from_len", False)))
     _seed("ax", float(_as_float(rec.get("ax", 0.0), 0.0)))
     _seed("ay", float(_as_float(rec.get("ay", 0.0), 0.0)))
@@ -5336,7 +5336,7 @@ with colB:
                     st.markdown(f"**base_hash:** `{_base_hash_preview}`  \n**suite_hash:** `{_suite_hash_preview}`")
                     st.caption(f"cache_dir: `{_cache_dir_preview.name}`")
                 with c3:
-                    st.markdown("**autoselfcheck:** вњ… OK" if _self_ok else "**autoselfcheck:** вќЊ FAIL")
+                    st.markdown("**autoselfcheck:** ✅ OK" if _self_ok else "**autoselfcheck:** ❌ FAIL")
                     if not _self_ok:
                         st.caption("Оптимизация и экспорт будут заблокированы по умолчанию.")
                 with c4:
@@ -5467,7 +5467,7 @@ with colB:
             pass
 
         # быстрый sanity-check: вакуум/давления
-        if "pR3_max_Р±Р°СЂ" in df_res.columns:
+        if "pR3_max_бар" in df_res.columns:
             st.write("Макс давление Р3 (бар abs):", float(df_res["pR3_max_бар"].max()))
 
 
@@ -5740,6 +5740,13 @@ else:
 
         # dt/t_end берём из suite для выбранного теста — это часть cache_key и параметров simulate()
         info_pick = tests_map.get(test_pick, {}) if isinstance(tests_map, dict) else {}
+        test_for_events = {}
+        if isinstance(info_pick, dict):
+            raw_test = info_pick.get("test")
+            if isinstance(raw_test, dict):
+                test_for_events = raw_test
+            elif any(k in info_pick for k in ("тип", "type", "road_csv", "axay_csv", "t_end", "dt")):
+                test_for_events = info_pick
         detail_dt = float(info_pick.get("dt", 0.01) or 0.01)
         detail_t_end = float(info_pick.get("t_end", 1.0) or 1.0)
         # сохраняем для других страниц/инструментов
@@ -6031,7 +6038,7 @@ else:
                     st.session_state["detail_auto_pending"] = None
                 # --- autorun guard: protects from endless rerun-loops (autorefresh / playhead sync / компоненты) ---
                 # Если по какой-то причине Streamlit делает частые rerun'ы, auto_detail может стартовать снова и снова.
-                # РњС‹:
+                # Мы:
                 #  - не запускаем второй расчёт, если такой же уже выполняется
                 #  - подавляем повторный автозапуск того же cache_key вскоре после завершения (симптом rerun-loop)
                 #  - всегда сбрасываем флаг in_progress в finally
@@ -6132,7 +6139,7 @@ else:
                         #  (A) baseline_tests_map contract: info={"test": {...}, "dt":..., "t_end":..., ...}
                         #  (B) raw test dict (legacy / live suite): info={...test fields...}
                         if test_j is None and isinstance(info, dict):
-                            looks_like_test = any(k in info for k in ("С‚РёРї", "type", "road_csv", "axay_csv", "t_end", "dt"))
+                            looks_like_test = any(k in info for k in ("тип", "type", "road_csv", "axay_csv", "t_end", "dt"))
                             if looks_like_test:
                                 test_j = info
                                 dt_j = info.get("dt", dt_j)
@@ -6286,7 +6293,7 @@ else:
                                 # optional: pass Patm for gauge calculations
                                 try:
                                     if isinstance(base_override, dict):
-                                        for _k in ('patm_pa', 'p_atm_pa', 'P_ATM', 'P_ATM_РџР°'):
+                                        for _k in ('patm_pa', 'p_atm_pa', 'P_ATM', 'P_ATM_Па'):
                                             if _k in base_override and base_override.get(_k) is not None:
                                                 _meta_anim['patm_pa'] = float(base_override.get(_k))
                                                 break
@@ -6400,9 +6407,9 @@ else:
                             pass
                         try:
                             s = str(v).strip().lower()
-                            if s in ('1','true','yes','y','РґР°'):
+                            if s in ('1','true','yes','y','да'):
                                 return True
-                            if s in ('0','false','no','n','РЅРµС‚',''):
+                            if s in ('0','false','no','n','нет',''):
                                 return False
                         except Exception:
                             pass
@@ -6559,7 +6566,7 @@ else:
                                     pass
                                 try:
                                     if isinstance(base_override, dict):
-                                        for _k in ('patm_pa', 'p_atm_pa', 'P_ATM', 'P_ATM_РџР°'):
+                                        for _k in ('patm_pa', 'p_atm_pa', 'P_ATM', 'P_ATM_Па'):
                                             if _k in base_override and base_override.get(_k) is not None:
                                                 _meta_anim['patm_pa'] = float(base_override.get(_k))
                                                 break
@@ -6666,7 +6673,7 @@ else:
                         "df_main": df_main,
                         "df_p": df_p,
                         "df_open": df_open,
-                        "test": test,
+                        "test": test_for_events,
                         "vacuum_state_key": "events_vacuum_min_bar",
                         "pmax_state_key": "events_pmax_margin_bar",
                         "vacuum_kwarg_name": "vacuum_min_gauge_bar",
@@ -6830,7 +6837,7 @@ if False:
                 "Разрешить оптимизацию несмотря на FAIL",
                 value=False,
                 key="allow_unsafe_opt",
-                help="РРЅРѕРіРґР° РїРѕР»РµР·РЅРѕ РґР»СЏ РѕС‚Р»Р°РґРєРё, РЅРѕ СЂРµР·СѓР»СЊС‚Р°С‚С‹ РјРѕРіСѓС‚ Р±С‹С‚СЊ РЅРµРєРѕСЂСЂРµРєС‚РЅС‹. Р›СѓС‡С€Рµ СЃРЅР°С‡Р°Р»Р° РёСЃРїСЂР°РІРёС‚СЊ РѕС€РёР±РєРё selfcheck.",
+                help="Иногда полезно для отладки, но результаты могут быть некорректны. Лучше сначала исправить ошибки selfcheck.",
             )
 
         _opt_disabled = (
@@ -7540,7 +7547,7 @@ if False:
                     key="osc_mapping_editor",
                 )
             except Exception:
-                # fallback Р±РµР· column_config
+                # fallback без column_config
                 edited_map = safe_dataframe(df_map, hide_index=True)
                 edited_map = df_map
 

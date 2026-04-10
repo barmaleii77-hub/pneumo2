@@ -63,6 +63,22 @@ def test_entrypoints_do_not_contain_question_mark_garbage_in_strings() -> None:
     assert not offenders, ", ".join(offenders)
 
 
+def test_key_ui_files_have_no_c1_controls_after_utf8_decode() -> None:
+    offenders: list[str] = []
+
+    for path in ENTRYPOINTS + SHARED_TEXT_FILES:
+        text = path.read_text(encoding="utf-8")
+        bad_lines = [
+            str(lineno)
+            for lineno, line in enumerate(text.splitlines(), start=1)
+            if any(0x80 <= ord(ch) <= 0x9F for ch in line)
+        ]
+        if bad_lines:
+            offenders.append(f"{path.name}: {', '.join(bad_lines[:10])}")
+
+    assert not offenders, "\n".join(offenders)
+
+
 def test_key_ui_files_keep_clean_visible_russian_labels() -> None:
     app_text = ENTRYPOINTS[0].read_text(encoding="utf-8")
     heavy_text = ENTRYPOINTS[1].read_text(encoding="utf-8")
@@ -77,9 +93,17 @@ def test_key_ui_files_keep_clean_visible_russian_labels() -> None:
     assert "PTR: готов" in app_text
     assert "NPZ: нет" in app_text
     assert "PTR: нет" in app_text
+    assert '"единица": meta.get("ед", "СИ")' in app_text
+    assert '"мин": mn_ui' in app_text
 
     assert "render_heavy_suite_editor_section(" in heavy_text
     assert "legacy dead after extraction" not in heavy_text
+    assert "Инициализация завершена" in heavy_text
+    assert "Имя прогона" in heavy_text
+    assert "Имя CSV (префикс)" in heavy_text
+    assert "Интервал автообновления (с)" in heavy_text
+    assert '"test": test_for_events,' in heavy_text
+    assert '"test": test,' not in heavy_text
 
     assert "4. Продвинутые инженерные настройки" in opt_shell_text
     assert "Как работать с этой страницей" in opt_shell_text

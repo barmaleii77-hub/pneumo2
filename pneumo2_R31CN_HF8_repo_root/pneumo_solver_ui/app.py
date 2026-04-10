@@ -476,7 +476,7 @@ def export_full_log_to_npz(out_path, df_main, df_p=None, df_q=None, df_open=None
         with idx_path.open("a", encoding="utf-8") as f:
             f.write(_json.dumps(rec, ensure_ascii=False) + "\n")
     except Exception:
-        # РРЅРґРµРєСЃ РЅРµ РєСЂРёС‚РёС‡РµРЅ вЂ” СЌРєСЃРїРѕСЂС‚ NPZ РґРѕР»Р¶РµРЅ Р·Р°РІРµСЂС€РёС‚СЊСЃСЏ РґР°Р¶Рµ РµСЃР»Рё РёРЅРґРµРєСЃ РЅРµ РїРёС€РµС‚СЃСЏ.
+        # Индекс не критичен — экспорт NPZ должен завершиться даже если индекс не пишется.
         pass
     return out_path
 
@@ -665,7 +665,7 @@ _unit_profile = build_ui_unit_profile(
     pressure_unit_label="атм (изб.)",
     pressure_offset_pa=lambda: P_ATM,
     pressure_divisor_pa=lambda: ATM_PA,
-    length_unit_label="Рј",
+    length_unit_label="м",
     length_scale=1.0,
     is_pressure_param_fn=is_pressure_param,
     is_volume_param_fn=is_volume_param,
@@ -1688,7 +1688,7 @@ atm_g_to_pa_abs = _unit_profile.pressure_to_pa_abs
 # -------------------------------
 # Описания/единицы параметров (для UI)
 # ВАЖНО: эти функции должны быть определены ДО того, как мы строим таблицу df_opt.
-# РРЅР°С‡Рµ Python СѓРїР°РґС‘С‚ СЃ NameError, С‚.Рє. РјРѕРґСѓР»СЊ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ СЃРІРµСЂС…Сѓ РІРЅРёР·.
+# Иначе Python упадёт с NameError, т.к. модуль выполняется сверху вниз.
 # -------------------------------
 
 
@@ -1708,7 +1708,7 @@ except Exception:
 BASE_STR_KEYS = {k for k, v in base0.items() if isinstance(v, str)}
 
 # -------------------------------
-# Р•Р”РРќР«Р™ Р’Р’РћР” РџРђР РђРњР•РўР РћР’ (Р·РЅР°С‡РµРЅРёРµ + РґРёР°РїР°Р·РѕРЅ РѕРїС‚РёРјРёР·Р°С†РёРё)
+# ЕДИНЫЙ ВВОД ПАРАМЕТРОВ (значение + диапазон оптимизации)
 # -------------------------------
 
 # (UI параметров отображается ниже в разделе "Параметры")
@@ -1733,7 +1733,7 @@ PARAM_META = {
         "группа": "Давление (уставки)",
         "ед": "атм (изб.)",
         "kind": "pressure_atm_g",
-        "РѕРїРёСЃР°РЅРёРµ": "Pmid (СѓСЃС‚Р°РІРєР° В«СЃРµСЂРµРґРёРЅС‹В»): РІС‹С€Рµ вЂ” РїРѕРґРІРµСЃРєР° Р·Р°РјРµС‚РЅРѕ В«Р¶С‘СЃС‚С‡РµВ». РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РІ РјРµС‚СЂРёРєРµ В«СЂР°РЅСЊС€РµвЂ‘Р¶С‘СЃС‚РєРѕВ»."
+        "описание": "Pmid (уставка «середины»): выше — подвеска заметно «жёстче». Используется в метрике «раньше‑жёстко»."
     },
     "давление_Pзаряд_аккумулятора_из_Ресивер3": {
         "группа": "Давление (уставки)",
@@ -1797,17 +1797,17 @@ PARAM_META = {
     "жёсткость_шины": {"группа": "Шина", "ед": "Н/м", "kind": "raw", "описание": "Вертикальная жёсткость шины (линеаризованная)."},
     "демпфирование_шины": {"группа": "Шина", "ед": "Н·с/м", "kind": "raw", "описание": "Вертикальное демпфирование шины (линеаризованное)."},
 
-    # РРЅРµСЂС†РёРё
-    "РјРѕРјРµРЅС‚_РёРЅРµСЂС†РёРё_СЂР°РјС‹_РїРѕ_РєСЂРµРЅСѓ": {"РіСЂСѓРїРїР°": "РРЅРµСЂС†РёСЏ", "РµРґ": "РєРіВ·РјВІ", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РњРѕРјРµРЅС‚ РёРЅРµСЂС†РёРё СЂР°РјС‹ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РѕСЃРё РєСЂРµРЅР°."},
-    "РјРѕРјРµРЅС‚_РёРЅРµСЂС†РёРё_СЂР°РјС‹_РїРѕ_С‚Р°РЅРіР°Р¶Сѓ": {"РіСЂСѓРїРїР°": "РРЅРµСЂС†РёСЏ", "РµРґ": "РєРіВ·РјВІ", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РњРѕРјРµРЅС‚ РёРЅРµСЂС†РёРё СЂР°РјС‹ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РѕСЃРё С‚Р°РЅРіР°Р¶Р°."},
-    "РјРѕРјРµРЅС‚_РёРЅРµСЂС†РёРё_СЂР°РјС‹_РїРѕ_СЂС‹СЃРєР°РЅСЊСЋ": {"РіСЂСѓРїРїР°": "РРЅРµСЂС†РёСЏ", "РµРґ": "РєРіВ·РјВІ", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": "РњРѕРјРµРЅС‚ РёРЅРµСЂС†РёРё СЂР°РјС‹ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РѕСЃРё СЂС‹СЃРєР°РЅСЊСЏ."},
+    # Инерции
+    "момент_инерции_рамы_по_крену": {"группа": "Инерция", "ед": "кг·м²", "kind": "raw", "описание": "Момент инерции рамы относительно оси крена."},
+    "момент_инерции_рамы_по_тангажу": {"группа": "Инерция", "ед": "кг·м²", "kind": "raw", "описание": "Момент инерции рамы относительно оси тангажа."},
+    "момент_инерции_рамы_по_рысканью": {"группа": "Инерция", "ед": "кг·м²", "kind": "raw", "описание": "Момент инерции рамы относительно оси рысканья."},
 
     # Ограничения/запасы (в UI)
     "лимит_пробоя_крен_град": {"группа": "Ограничения", "ед": "град", "kind": "raw", "описание": "Ограничение по крену (жёсткое/аварийное)."},
     "лимит_пробоя_тангаж_град": {"группа": "Ограничения", "ед": "град", "kind": "raw", "описание": "Ограничение по тангажу (жёсткое/аварийное)."},
     "минимальное_абсолютное_давление_Па": {"группа": "Ограничения", "ед": "кПа (абс.)", "kind": "pressure_kPa_abs", "описание": "Нижняя граница абсолютного давления для численной устойчивости. Вакуум допускаем, но p_abs не может быть < 0."},
 
-    # Р“Р°Р·
+    # Газ
     "температура_газа_К": {"группа": "Газ", "ед": "°C", "kind": "temperature_C", "описание": "Температура газа (внутри модели хранится Кельвин)."},
     "гравитация": {"группа": "Среда", "ед": "м/с²", "kind": "raw", "описание": "Ускорение свободного падения."},
 }
@@ -1829,7 +1829,7 @@ all_keys = sorted(set(base0.keys()) | set(ranges0.keys()))
 
 # --- Структурированные параметры (списки/таблицы) ---
 # Важно: некоторые параметры (например нелинейная пружина) хранятся как списки чисел.
-# РС… РЅРµР»СЊР·СЏ РїРѕРєР°Р·С‹РІР°С‚СЊ РІ РѕР±С‰РµР№ С‚Р°Р±Р»РёС†Рµ СЃРєР°Р»СЏСЂРѕРІ (РёРЅР°С‡Рµ Р±СѓРґРµС‚ TypeError: float(list)).
+# Их нельзя показывать в общей таблице скаляров (иначе будет TypeError: float(list)).
 
 # 1) Таблица нелинейной пружины (ход_мм -> сила_Н)
 SPR_X = "пружина_таблица_ход_мм"
@@ -1895,7 +1895,7 @@ non_numeric_keys = [k for k in all_keys if (k not in structured_keys) and (not _
 
 rows = []
 for k in scalar_keys:
-    meta = PARAM_META.get(k) or family_param_meta(k) or {"РіСЂСѓРїРїР°": "РџСЂРѕС‡РµРµ", "РµРґ": "РЎР", "kind": "raw", "РѕРїРёСЃР°РЅРёРµ": ""}
+    meta = PARAM_META.get(k) or family_param_meta(k) or {"группа": "Прочее", "ед": "СИ", "kind": "raw", "описание": ""}
     kind = meta.get("kind", "raw")
     val_ui = _si_to_ui(k, base0.get(k, float("nan")), kind)
     is_opt = k in ranges0
@@ -1909,10 +1909,10 @@ for k in scalar_keys:
     rows.append({
         "группа": meta.get("группа", "Прочее"),
         "параметр": k,
-        "РµРґРёРЅРёС†Р°": meta.get("РµРґ", "РЎР"),
+        "единица": meta.get("ед", "СИ"),
         "значение": val_ui,
         "оптимизировать": bool(is_opt),
-        "РјРёРЅ": mn_ui,
+        "мин": mn_ui,
         "макс": mx_ui,
         "пояснение": meta.get("описание", ""),
         "_key": k,
@@ -1980,7 +1980,7 @@ def _render_param_card_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
     v = _f(row.get("значение"))
     opt = bool(row.get("оптимизировать", False))
-    vmin = _f(row.get("РјРёРЅ"))
+    vmin = _f(row.get("мин"))
     vmax = _f(row.get("макс"))
 
     # Card layout
@@ -2010,7 +2010,7 @@ def _render_param_card_row(row: Dict[str, Any]) -> Dict[str, Any]:
             if not (0.0 <= v <= 1.0):
                 v = max(0.0, min(1.0, v if math.isfinite(v) else 0.0))
 
-        elif kind == "pressure_atm_g" or ("Р°С‚Рј" in unit):
+        elif kind == "pressure_atm_g" or ("атм" in unit):
             use_slider = True
             # leaving some room for vacuum (negative gauge)
             base = v if math.isfinite(v) else 0.0
@@ -2023,15 +2023,15 @@ def _render_param_card_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
         elif ("объём" in k) or (kind.startswith("volume_")) or (unit in ("л", "мл")):
             use_slider = True
-            base = v if math.isfinite(v) else (1.0 if unit == "Р»" else 100.0)
+            base = v if math.isfinite(v) else (1.0 if unit == "л" else 100.0)
             if opt and math.isfinite(vmin) and math.isfinite(vmax) and (vmin < vmax):
                 smin, smax = float(vmin), float(vmax)
             else:
                 # heuristic around current
-                span = max(abs(base) * 0.5, 1.0 if unit == "Р»" else 50.0)
+                span = max(abs(base) * 0.5, 1.0 if unit == "л" else 50.0)
                 smin = max(0.0, base - span)
-                smax = max(smin + (1.0 if unit == "Р»" else 10.0), base + span)
-            step = 0.1 if unit == "Р»" else 1.0
+                smax = max(smin + (1.0 if unit == "л" else 10.0), base + span)
+            step = 0.1 if unit == "л" else 1.0
 
         elif k.endswith("_град") or (unit == "град"):
             use_slider = True
@@ -2069,14 +2069,14 @@ def _render_param_card_row(row: Dict[str, Any]) -> Dict[str, Any]:
             with st.expander("Диапазон оптимизации", expanded=False):
                 c1, c2 = st.columns(2)
                 with c1:
-                    vmin_new = st.number_input("РњРёРЅ", value=float(vmin) if math.isfinite(vmin) else float(v_new), step=None, key=f"pmin__{k}")
+                    vmin_new = st.number_input("Мин", value=float(vmin) if math.isfinite(vmin) else float(v_new), step=None, key=f"pmin__{k}")
                 with c2:
                     vmax_new = st.number_input("Макс", value=float(vmax) if math.isfinite(vmax) else float(v_new), step=None, key=f"pmax__{k}")
         return {
             **row,
             "значение": float(v_new),
             "оптимизировать": bool(opt),
-            "РјРёРЅ": float(vmin_new) if math.isfinite(float(vmin_new)) else float("nan"),
+            "мин": float(vmin_new) if math.isfinite(float(vmin_new)) else float("nan"),
             "макс": float(vmax_new) if math.isfinite(float(vmax_new)) else float("nan"),
         }
 
@@ -2162,13 +2162,13 @@ for _, r in df_params_edit.iterrows():
         if val_ui <= 0:
             param_errors.append(f"Параметр '{k}': объём должен быть > 0, сейчас {val_ui}")
 
-    # РєРѕРЅРІРµСЂС‚Р°С†РёСЏ РІ РЎР
+    # конвертация в СИ
     val_si = _ui_to_si(k, val_ui, kind)
     base_override[k] = float(val_si)
 
     if bool(r["оптимизировать"]):
         try:
-            mn_ui = float(r["РјРёРЅ"])
+            mn_ui = float(r["мин"])
             mx_ui = float(r["макс"])
         except Exception:
             param_errors.append(f"Параметр '{k}': включена оптимизация, но диапазон (мин/макс) не задан.")
@@ -2417,8 +2417,8 @@ for i, row in df_suite_edit.iterrows():
         continue
 
     enabled = bool(rec.get("включен", True))
-    name = str(rec.get("РёРјСЏ", "")).strip()
-    typ = str(rec.get("С‚РёРї", "")).strip()
+    name = str(rec.get("имя", "")).strip()
+    typ = str(rec.get("тип", "")).strip()
 
     if enabled:
         if not name:
@@ -2631,7 +2631,7 @@ if SHOW_RUN:
             pass
 
         # быстрый sanity-check: вакуум/давления
-        if "pR3_max_Р±Р°СЂ" in df_res.columns:
+        if "pR3_max_бар" in df_res.columns:
             st.write("Макс давление Р3 (бар abs):", float(df_res["pR3_max_бар"].max()))
 
 
@@ -3069,7 +3069,7 @@ if SHOW_RESULTS or SHOW_TOOLS:
                         st.session_state["detail_auto_pending"] = None
                     # --- autorun guard: protects from endless rerun-loops (autorefresh / playhead sync / компоненты) ---
                     # Если по какой-то причине Streamlit делает частые rerun'ы, auto_detail может стартовать снова и снова.
-                    # РњС‹:
+                    # Мы:
                     #  - не запускаем второй расчёт, если такой же уже выполняется
                     #  - подавляем повторный автозапуск того же cache_key вскоре после завершения (симптом rerun-loop)
                     #  - всегда сбрасываем флаг in_progress в finally
@@ -3182,7 +3182,7 @@ if SHOW_RESULTS or SHOW_TOOLS:
                             #  (A) baseline_tests_map contract: info={"test": {...}, "dt":..., "t_end":..., ...}
                             #  (B) raw test dict (legacy / live suite): info={...test fields...}
                             if test_j is None and isinstance(info, dict):
-                                looks_like_test = any(k in info for k in ("С‚РёРї", "type", "road_csv", "axay_csv", "t_end", "dt"))
+                                looks_like_test = any(k in info for k in ("тип", "type", "road_csv", "axay_csv", "t_end", "dt"))
                                 if looks_like_test:
                                     test_j = info
                                     dt_j = info.get("dt", dt_j)
@@ -4052,7 +4052,7 @@ if SHOW_TOOLS:
                     key="osc_mapping_editor",
                 )
             except Exception:
-                # fallback Р±РµР· column_config
+                # fallback без column_config
                 edited_map = safe_dataframe(df_map, hide_index=True)
                 edited_map = df_map
 
