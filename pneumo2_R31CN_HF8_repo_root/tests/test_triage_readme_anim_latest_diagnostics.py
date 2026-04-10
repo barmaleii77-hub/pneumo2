@@ -30,7 +30,15 @@ def _make_anim_diag(token: str = "tok-123", reload_inputs: list[str] | None = No
             "road_csv": {"path": "/abs/workspace/exports/anim_latest_road_csv.csv", "exists": True, "size": 77},
         },
         "anim_latest_updated_utc": "2026-03-11T12:00:00+00:00",
-        "anim_latest_meta": {"road_csv": "anim_latest_road_csv.csv"},
+        "anim_latest_meta": {
+            "road_csv": "anim_latest_road_csv.csv",
+            "scenario_kind": "ring",
+            "ring_closure_policy": "strict_exact",
+            "ring_closure_applied": False,
+            "ring_seam_open": True,
+            "ring_seam_max_jump_m": 0.012,
+            "ring_raw_seam_max_jump_m": 0.015,
+        },
         "anim_latest_mnemo_event_log_ref": "anim_latest.desktop_mnemo_events.json",
         "anim_latest_mnemo_event_log_path": "/abs/workspace/exports/anim_latest.desktop_mnemo_events.json",
         "anim_latest_mnemo_event_log_exists": True,
@@ -70,8 +78,13 @@ def test_generate_triage_report_exposes_anim_latest_diagnostics_from_sidecar(tmp
     assert mnemo["severity"] == "critical"
     assert mnemo["current_mode"] == "Регуляторный коридор"
     assert summary["severity_counts"]["critical"] == 1
+    assert summary["severity_counts"]["warn"] >= 1
     assert summary["operator_recommendations"][0].startswith("Open Desktop Mnemo first")
+    assert any("open ring seam is intentional" in item for item in summary["operator_recommendations"])
     assert any("Desktop Mnemo reports 1 active latched event(s)" in flag for flag in summary["red_flags"])
+    assert any("Ring seam remains open under strict_exact" in flag for flag in summary["red_flags"])
+    assert summary["ring_closure"]["severity"] == "warn"
+    assert summary["ring_closure"]["closure_policy"] == "strict_exact"
     assert os.path.normcase(paths["latest_anim_pointer_diagnostics_json"]) == os.path.normcase(str((sb_root / ANIM_DIAG_SIDECAR_JSON).resolve()))
     assert os.path.normcase(paths["latest_anim_pointer_diagnostics_md"]) == os.path.normcase(str((sb_root / ANIM_DIAG_SIDECAR_MD).resolve()))
     assert "## Desktop Mnemo events" in md
@@ -81,6 +94,8 @@ def test_generate_triage_report_exposes_anim_latest_diagnostics_from_sidecar(tmp
     assert "## Anim latest diagnostics" in md
     assert "tok-triage" in md
     assert "npz, road_csv" in md
+    assert "scenario_kind: `ring`" in md
+    assert "ring_closure: policy=`strict_exact` / applied=`False` / seam_open=`True` / seam_max_jump_m=`0.012` / raw_seam_max_jump_m=`0.015`" in md
     assert "Latest anim diagnostics json" in md
 
 
@@ -93,6 +108,8 @@ def test_build_send_bundle_readme_includes_anim_latest_token_and_reload_inputs()
     assert "SEND BUNDLE (for chat)" in text
     assert "anim_latest_visual_cache_token: tok-readme" in text
     assert "anim_latest_visual_reload_inputs: npz, road_csv" in text
+    assert "scenario_kind: ring" in text
+    assert "ring_closure: policy=strict_exact / applied=False / seam_open=True / seam_max_jump_m=0.012 / raw_seam_max_jump_m=0.015" in text
     assert "Recommended actions (operator-first):" in text
     assert "Open Desktop Mnemo first" in text
     assert "anim_latest_global_pointer_json: /abs/workspace/_pointers/anim_latest.json" in text
@@ -108,6 +125,8 @@ def test_sources_wire_anim_latest_diagnostics_into_triage_and_readme() -> None:
     assert '_load_anim_latest_summary' in triage_text
     assert '"anim_latest": anim_summary' in triage_text
     assert '## Anim latest diagnostics' in triage_text
+    assert 'scenario_kind' in triage_text
+    assert 'ring_closure:' in triage_text
     assert '## Desktop Mnemo events' in triage_text
     assert '"mnemo_event_log": mnemo_event_summary' in triage_text
     assert '"operator_recommendations": operator_recommendations' in triage_text
@@ -117,6 +136,8 @@ def test_sources_wire_anim_latest_diagnostics_into_triage_and_readme() -> None:
 
     assert '_build_send_bundle_readme' in bundle_text
     assert 'anim_latest_visual_cache_token' in bundle_text
+    assert 'scenario_kind:' in bundle_text
+    assert 'ring_closure: policy=' in bundle_text
     assert 'ANIM_DIAG_JSON' in bundle_text
     assert 'ANIM_DIAG_MD' in bundle_text
     assert 'readme = _build_send_bundle_readme(anim_diag_event)' in bundle_text

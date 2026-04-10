@@ -72,6 +72,22 @@ BROWSER_PERF_FLAT_FIELDS = (
     "browser_perf_max_idle_poll_ms",
 )
 
+RING_META_FLAT_FIELDS = (
+    "scenario_kind",
+    "scenario_json",
+    "ring_v0_kph",
+    "ring_v0_mps",
+    "ring_nominal_speed_min_mps",
+    "ring_nominal_speed_max_mps",
+    "ring_nominal_speed_mean_mps",
+    "ring_speed_profile_source",
+    "ring_closure_policy",
+    "ring_closure_applied",
+    "ring_seam_open",
+    "ring_seam_max_jump_m",
+    "ring_raw_seam_max_jump_m",
+)
+
 MNEMO_EVENT_FLAT_FIELDS = (
     "anim_latest_mnemo_event_log_ref",
     "anim_latest_mnemo_event_log_path",
@@ -100,6 +116,19 @@ ANIM_LATEST_REGISTRY_EVENT_FIELDS = (
     "anim_latest_npz_in_workspace",
     "anim_latest_usable",
     "anim_latest_issues",
+    "scenario_kind",
+    "scenario_json",
+    "ring_v0_kph",
+    "ring_v0_mps",
+    "ring_nominal_speed_min_mps",
+    "ring_nominal_speed_max_mps",
+    "ring_nominal_speed_mean_mps",
+    "ring_speed_profile_source",
+    "ring_closure_policy",
+    "ring_closure_applied",
+    "ring_seam_open",
+    "ring_seam_max_jump_m",
+    "ring_raw_seam_max_jump_m",
     "anim_latest_mnemo_event_log_ref",
     "anim_latest_mnemo_event_log_path",
     "anim_latest_mnemo_event_log_exists",
@@ -126,6 +155,19 @@ ANIM_LATEST_INDEX_FIELDS = (
     "anim_latest_npz_in_workspace",
     "anim_latest_usable",
     "anim_latest_issues",
+    "scenario_kind",
+    "scenario_json",
+    "ring_v0_kph",
+    "ring_v0_mps",
+    "ring_nominal_speed_min_mps",
+    "ring_nominal_speed_max_mps",
+    "ring_nominal_speed_mean_mps",
+    "ring_speed_profile_source",
+    "ring_closure_policy",
+    "ring_closure_applied",
+    "ring_seam_open",
+    "ring_seam_max_jump_m",
+    "ring_raw_seam_max_jump_m",
     "anim_latest_mnemo_event_log_ref",
     "anim_latest_mnemo_event_log_exists",
     "anim_latest_mnemo_event_log_schema_version",
@@ -248,6 +290,15 @@ def extract_anim_snapshot(obj: Any, *, source: str) -> Optional[Dict[str, Any]]:
                 out[key] = list(value)
             else:
                 out[key] = value
+    meta = out.get("meta") if isinstance(out.get("meta"), dict) else {}
+    for key in RING_META_FLAT_FIELDS:
+        if key in out and out.get(key) not in (None, "", [], {}):
+            continue
+        if key in obj and obj.get(key) not in (None, "", [], {}):
+            out[key] = obj.get(key)
+            continue
+        if key in meta and meta.get(key) not in (None, "", [], {}):
+            out[key] = meta.get(key)
     return out
 
 
@@ -321,7 +372,7 @@ def choose_anim_snapshot(
         chosen = dict(sources[first_key])
         chosen["source"] = first_key
 
-    for key in BROWSER_PERF_FLAT_FIELDS + MNEMO_EVENT_FLAT_FIELDS:
+    for key in BROWSER_PERF_FLAT_FIELDS + MNEMO_EVENT_FLAT_FIELDS + RING_META_FLAT_FIELDS:
         cur = chosen.get(key)
         if key in chosen and cur not in (None, "", [], {}):
             continue
@@ -469,12 +520,71 @@ def summarize_mnemo_event_log(anim: Any) -> Dict[str, Any]:
     }
 
 
+def summarize_ring_closure(anim: Any) -> Dict[str, Any]:
+    norm = normalize_anim_dashboard_obj(anim)
+    if not norm:
+        return {
+            "scenario_kind": "",
+            "closure_policy": "",
+            "closure_applied": None,
+            "seam_open": None,
+            "seam_max_jump_m": None,
+            "raw_seam_max_jump_m": None,
+            "severity": "missing",
+            "headline": "Ring closure diagnostics not available",
+            "red_flags": [],
+        }
+
+    scenario_kind = str(norm.get("scenario_kind") or "").strip()
+    closure_policy = str(norm.get("ring_closure_policy") or "").strip()
+    closure_applied = norm.get("ring_closure_applied")
+    seam_open = norm.get("ring_seam_open")
+    seam_max_jump_m = norm.get("ring_seam_max_jump_m")
+    raw_seam_max_jump_m = norm.get("ring_raw_seam_max_jump_m")
+    red_flags: List[str] = []
+
+    if scenario_kind != "ring" and not closure_policy:
+        severity = "missing"
+        headline = "Ring closure diagnostics not applicable"
+    elif seam_open is True and closure_policy == "strict_exact":
+        severity = "warn"
+        headline = "Ring seam is intentionally open under strict_exact closure"
+        red_flags.append(
+            "Ring seam remains open under strict_exact; verify that open-seam visuals/exports are acceptable for this run."
+        )
+    elif seam_open is True:
+        severity = "critical"
+        headline = "Ring seam remains open"
+        red_flags.append(
+            f"Ring seam is open under closure policy {closure_policy or '—'}; looped viewers/export may not be trustworthy."
+        )
+    elif seam_open is False:
+        severity = "ok"
+        headline = "Ring seam closed"
+    else:
+        severity = "info"
+        headline = "Ring closure policy present, seam state unresolved"
+
+    return {
+        "scenario_kind": scenario_kind,
+        "closure_policy": closure_policy,
+        "closure_applied": closure_applied,
+        "seam_open": seam_open,
+        "seam_max_jump_m": seam_max_jump_m,
+        "raw_seam_max_jump_m": raw_seam_max_jump_m,
+        "severity": severity,
+        "headline": headline,
+        "red_flags": red_flags,
+    }
+
+
 def build_anim_operator_recommendations(anim: Any) -> List[str]:
     norm = normalize_anim_dashboard_obj(anim)
     if not norm:
         return []
 
     mnemo = summarize_mnemo_event_log(norm)
+    ring = summarize_ring_closure(norm)
     recommendations: List[str] = []
     current_mode = str(mnemo.get("current_mode") or "").strip()
     current_mode_text = f" in mode {current_mode}" if current_mode else ""
@@ -490,6 +600,16 @@ def build_anim_operator_recommendations(anim: Any) -> List[str]:
     elif norm.get("available") and mnemo.get("exists") is not True:
         recommendations.append(
             "Generate a Desktop Mnemo event-log from the current anim_latest run so pneumatic history is present in triage."
+        )
+
+    ring_policy = str(ring.get("closure_policy") or "").strip()
+    if str(ring.get("severity") or "") == "critical":
+        recommendations.append(
+            f"Review ring closure before sign-off; current policy is {ring_policy or '—'} and seam_open={ring.get('seam_open')}."
+        )
+    elif str(ring.get("severity") or "") == "warn":
+        recommendations.append(
+            f"Confirm that the open ring seam is intentional for policy {ring_policy or '—'} before treating looped viewers/export as closed."
         )
 
     perf_evidence_status = str(norm.get("browser_perf_evidence_status") or "").strip()
@@ -595,11 +715,24 @@ def format_anim_dashboard_brief_lines(anim: Any) -> List[str]:
     mnemo_event_ack = norm.get("anim_latest_mnemo_event_log_acknowledged_latch_count")
     mnemo_event_mode = str(norm.get("anim_latest_mnemo_event_log_current_mode") or "")
     mnemo_event_recent = [str(x) for x in (norm.get("anim_latest_mnemo_event_log_recent_titles") or []) if str(x).strip()]
+    ring_kind = str(norm.get("scenario_kind") or "")
+    ring_closure_policy = str(norm.get("ring_closure_policy") or "")
+    ring_seam_open = norm.get("ring_seam_open")
+    ring_seam_max = norm.get("ring_seam_max_jump_m")
+    ring_raw_seam_max = norm.get("ring_raw_seam_max_jump_m")
 
     if token:
         lines.append(f"Anim latest token: {token}")
     if reload_inputs:
         lines.append("Anim reload inputs: " + ", ".join(str(x) for x in reload_inputs))
+    if ring_kind == "ring" or ring_closure_policy:
+        lines.append(
+            "Ring seam: "
+            f"closure={ring_closure_policy or '—'}"
+            f" / open={ring_seam_open}"
+            f" / seam_max_m={ring_seam_max if ring_seam_max is not None else '—'}"
+            f" / raw_seam_max_m={ring_raw_seam_max if ring_raw_seam_max is not None else '—'}"
+        )
     if any(value not in (None, "", []) for value in (mnemo_event_exists, mnemo_event_total, mnemo_event_active, mnemo_event_ack, mnemo_event_mode)):
         lines.append(
             "Desktop Mnemo events: "
@@ -670,6 +803,24 @@ def render_anim_latest_md(anim: Any) -> str:
         f"- npz_path: {norm.get('npz_path') or '—'}",
         f"- updated_utc: {norm.get('updated_utc') or '—'}",
     ]
+    if norm.get("scenario_kind") or norm.get("scenario_json"):
+        lines.append(f"- scenario_kind: {norm.get('scenario_kind') or '—'}")
+        lines.append(f"- scenario_json: {norm.get('scenario_json') or '—'}")
+    if any(norm.get(key) not in (None, "", [], {}) for key in ("ring_v0_kph", "ring_nominal_speed_min_mps", "ring_nominal_speed_max_mps")):
+        lines.append(
+            f"- ring_speed_profile: v0_kph={norm.get('ring_v0_kph') if norm.get('ring_v0_kph') is not None else '—'}"
+            f" / min_mps={norm.get('ring_nominal_speed_min_mps') if norm.get('ring_nominal_speed_min_mps') is not None else '—'}"
+            f" / max_mps={norm.get('ring_nominal_speed_max_mps') if norm.get('ring_nominal_speed_max_mps') is not None else '—'}"
+            f" / mean_mps={norm.get('ring_nominal_speed_mean_mps') if norm.get('ring_nominal_speed_mean_mps') is not None else '—'}"
+        )
+    if any(norm.get(key) not in (None, "", [], {}) for key in ("ring_closure_policy", "ring_closure_applied", "ring_seam_open", "ring_seam_max_jump_m", "ring_raw_seam_max_jump_m")):
+        lines.append(
+            f"- ring_closure: policy={norm.get('ring_closure_policy') or '—'}"
+            f" / applied={norm.get('ring_closure_applied')}"
+            f" / seam_open={norm.get('ring_seam_open')}"
+            f" / seam_max_jump_m={norm.get('ring_seam_max_jump_m') if norm.get('ring_seam_max_jump_m') is not None else '—'}"
+            f" / raw_seam_max_jump_m={norm.get('ring_raw_seam_max_jump_m') if norm.get('ring_raw_seam_max_jump_m') is not None else '—'}"
+        )
     if any(
         norm.get(key) not in (None, "", [], {})
         for key in (

@@ -161,12 +161,23 @@ logger = logging.getLogger(__name__)
 
 def _bundle_summary_event_fields(res: Any) -> Dict[str, Any]:
     meta = dict(getattr(res, "meta", {}) or {})
+    anim_summary = dict(meta.get("anim_latest_summary") or {}) if isinstance(meta.get("anim_latest_summary"), dict) else {}
     lines = [str(x) for x in (meta.get("summary_lines") or []) if str(x).strip()]
     fields: Dict[str, Any] = {
         "bundle_ok": bool(getattr(res, "ok", False)),
         "zip_path": str(getattr(res, "zip_path", "") or ""),
         "summary_lines": lines,
     }
+    for key in (
+        "scenario_kind",
+        "ring_closure_policy",
+        "ring_closure_applied",
+        "ring_seam_open",
+        "ring_seam_max_jump_m",
+        "ring_raw_seam_max_jump_m",
+    ):
+        if anim_summary.get(key) is not None:
+            fields[key] = anim_summary.get(key)
     diag_path = str(meta.get("anim_pointer_diagnostics_path") or "").strip()
     if diag_path:
         fields["anim_pointer_diagnostics_path"] = diag_path

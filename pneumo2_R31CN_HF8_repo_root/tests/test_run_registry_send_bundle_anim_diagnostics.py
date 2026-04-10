@@ -133,6 +133,12 @@ def test_run_registry_send_bundle_created_accepts_extended_anim_fields(tmp_path:
         dashboard_created=True,
         dashboard_html_path=dashboard_html,
         env={"PNEUMO_RUN_ID": "PYTEST"},
+        scenario_kind="ring",
+        ring_closure_policy="strict_exact",
+        ring_closure_applied=False,
+        ring_seam_open=True,
+        ring_seam_max_jump_m=0.012,
+        ring_raw_seam_max_jump_m=0.015,
         **diag,
     )
 
@@ -149,6 +155,12 @@ def test_run_registry_send_bundle_created_accepts_extended_anim_fields(tmp_path:
     assert rec["anim_latest_available"] is True
     assert rec["anim_latest_mnemo_event_log_exists"] is True
     assert rec["anim_latest_mnemo_event_log_current_mode"] == "Регуляторный коридор"
+    assert rec["scenario_kind"] == "ring"
+    assert rec["ring_closure_policy"] == "strict_exact"
+    assert rec["ring_closure_applied"] is False
+    assert rec["ring_seam_open"] is True
+    assert rec["ring_seam_max_jump_m"] == 0.012
+    assert rec["ring_raw_seam_max_jump_m"] == 0.015
     assert Path(rec["anim_latest_global_pointer_json"]).parts[-3:] == ("workspace", "_pointers", "anim_latest.json")
 
 
@@ -185,6 +197,12 @@ def test_run_registry_index_last_event_keeps_anim_latest_usability_summary(tmp_p
         anim_latest_mnemo_event_log_active_latch_count=1,
         anim_latest_mnemo_event_log_acknowledged_latch_count=2,
         anim_latest_mnemo_event_log_recent_titles=["Большой перепад давлений", "Смена режима"],
+        scenario_kind="ring",
+        ring_closure_policy="strict_exact",
+        ring_closure_applied=False,
+        ring_seam_open=True,
+        ring_seam_max_jump_m=0.012,
+        ring_raw_seam_max_jump_m=0.015,
     )
 
     idx = json.loads((runs_root / "index.json").read_text(encoding="utf-8"))
@@ -200,6 +218,12 @@ def test_run_registry_index_last_event_keeps_anim_latest_usability_summary(tmp_p
     assert last["anim_latest_mnemo_event_log_exists"] is True
     assert last["anim_latest_mnemo_event_log_current_mode"] == "Регуляторный коридор"
     assert last["anim_latest_mnemo_event_log_recent_titles"] == ["Большой перепад давлений", "Смена режима"]
+    assert last["scenario_kind"] == "ring"
+    assert last["ring_closure_policy"] == "strict_exact"
+    assert last["ring_closure_applied"] is False
+    assert last["ring_seam_open"] is True
+    assert last["ring_seam_max_jump_m"] == 0.012
+    assert last["ring_raw_seam_max_jump_m"] == 0.015
     assert "anim_latest_visual_cache_dependencies" not in last
 
 
@@ -271,6 +295,7 @@ def test_sources_wire_anim_diagnostics_into_launcher_and_send_bundle() -> None:
     gui_text = (ROOT / "pneumo_solver_ui" / "tools" / "send_results_gui.py").read_text(encoding="utf-8")
     launcher_text = (ROOT / "START_PNEUMO_APP.py").read_text(encoding="utf-8")
     registry_text = (ROOT / "pneumo_solver_ui" / "run_registry.py").read_text(encoding="utf-8")
+    contract_text = (ROOT / "pneumo_solver_ui" / "tools" / "send_bundle_contract.py").read_text(encoding="utf-8")
 
     assert '("_pointers", False)' in bundle_text
     assert 'ANIM_DIAG_SIDECAR_JSON' in bundle_text
@@ -287,4 +312,6 @@ def test_sources_wire_anim_diagnostics_into_launcher_and_send_bundle() -> None:
     assert 'pick_anim_latest_fields' in registry_text
     assert 'ANIM_LATEST_INDEX_FIELDS' in registry_text
     assert 'browser_perf_registry_snapshot_in_bundle' in registry_text
+    assert 'ring_closure_policy' in contract_text
+    assert 'ring_seam_open' in contract_text
     assert 'in_bundle=' in bundle_text

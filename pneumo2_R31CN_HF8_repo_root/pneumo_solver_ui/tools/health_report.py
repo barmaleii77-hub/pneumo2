@@ -42,6 +42,7 @@ from .send_bundle_contract import (
     build_anim_operator_recommendations,
     choose_anim_snapshot,
     extract_anim_snapshot,
+    summarize_ring_closure,
     summarize_mnemo_event_log,
 )
 
@@ -270,8 +271,10 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 preferred_order=("validation", "diagnostics", "local_pointer", "global_pointer", "dashboard"),
             )
             mnemo_event_log = summarize_mnemo_event_log(anim_summary)
+            ring_closure = summarize_ring_closure(anim_summary)
             operator_recommendations = build_anim_operator_recommendations(anim_summary)
             anim_summary["mnemo_event_summary"] = dict(mnemo_event_log)
+            anim_summary["ring_closure_summary"] = dict(ring_closure)
             if ANIM_LOCAL_NPZ in name_set:
                 try:
                     with z.open(ANIM_LOCAL_NPZ, "r") as f:
@@ -304,6 +307,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     notes.append(str(geom_acc["error"]))
             signals["anim_latest"] = anim_summary
             signals["mnemo_event_log"] = dict(mnemo_event_log)
+            signals["ring_closure"] = dict(ring_closure)
             signals["operator_recommendations"] = list(operator_recommendations)
             perf_evidence_status = str(anim_summary.get("browser_perf_evidence_status") or "").strip()
             if perf_evidence_status and perf_evidence_status != "trace_bundle_ready":
@@ -332,6 +336,17 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 warn_note = str(mnemo_event_log.get("headline") or "").strip()
                 if warn_note and warn_note not in notes:
                     notes.append(warn_note)
+            for flag in ring_closure.get("red_flags") or []:
+                sflag = str(flag).strip()
+                if sflag and sflag not in notes:
+                    notes.append(sflag)
+            if (
+                str(ring_closure.get("severity") or "") in ("warn", "critical")
+                and ring_closure.get("headline")
+            ):
+                warn_note = str(ring_closure.get("headline") or "").strip()
+                if warn_note and warn_note not in notes:
+                    notes.append(warn_note)
             for msg in anim_summary.get("issues") or []:
                 smsg = str(msg).strip()
                 if smsg and smsg not in notes:
@@ -356,6 +371,7 @@ def render_health_report_md(rep: HealthReport) -> str:
     val = dict(rep.signals.get("validation") or {})
     anim = dict(rep.signals.get("anim_latest") or {})
     mnemo = dict(rep.signals.get("mnemo_event_log") or anim.get("mnemo_event_summary") or {})
+    ring_closure = dict(rep.signals.get("ring_closure") or anim.get("ring_closure_summary") or {})
     operator_recommendations = [str(x) for x in (rep.signals.get("operator_recommendations") or []) if str(x).strip()]
     artifacts = dict(rep.signals.get("artifacts") or {})
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
@@ -402,6 +418,8 @@ def render_health_report_md(rep: HealthReport) -> str:
             f"- npz_path_sync_ok: {anim.get('npz_path_sync_ok')}",
             f"- npz_path: `{anim.get('npz_path') or '—'}`",
             f"- updated_utc: {anim.get('updated_utc') or '—'}",
+            f"- scenario_kind: {anim.get('scenario_kind') or '—'}",
+            f"- ring_closure: policy={anim.get('ring_closure_policy') or '—'} / applied={anim.get('ring_closure_applied')} / seam_open={anim.get('ring_seam_open')} / seam_max_jump_m={anim.get('ring_seam_max_jump_m')} / raw_seam_max_jump_m={anim.get('ring_raw_seam_max_jump_m')}",
             f"- usable_from_bundle: {anim.get('usable_from_bundle')}",
             f"- pointer_json_in_bundle: {anim.get('pointer_json_in_bundle')}",
             f"- npz_path_in_bundle: {anim.get('npz_path_in_bundle')}",
@@ -418,6 +436,17 @@ def render_health_report_md(rep: HealthReport) -> str:
         anim_issues = list(anim.get("issues") or [])
         if anim_issues:
             lines += ["", "### Anim latest issues"] + [f"- {x}" for x in anim_issues]
+    if ring_closure:
+        lines += [
+            "",
+            "## Ring closure",
+            f"- severity: {ring_closure.get('severity') or 'missing'}",
+            f"- summary: {ring_closure.get('headline') or '—'}",
+            f"- policy: {ring_closure.get('closure_policy') or '—'} / applied={ring_closure.get('closure_applied')} / seam_open={ring_closure.get('seam_open')}",
+            f"- seam_jump_m: cooked={ring_closure.get('seam_max_jump_m')} / raw={ring_closure.get('raw_seam_max_jump_m')}",
+        ]
+        for flag in list(ring_closure.get("red_flags") or [])[:3]:
+            lines.append(f"- red_flag: {flag}")
 
     if mnemo:
         lines += [

@@ -27,7 +27,15 @@ def _make_anim_diag(token: str, reload_inputs: list[str], *, updated_utc: str = 
         "anim_latest_visual_reload_inputs": list(reload_inputs),
         "anim_latest_visual_cache_dependencies": deps,
         "anim_latest_updated_utc": updated_utc,
-        "anim_latest_meta": {"road_csv": "anim_latest_road_csv.csv"},
+        "anim_latest_meta": {
+            "road_csv": "anim_latest_road_csv.csv",
+            "scenario_kind": "ring",
+            "ring_closure_policy": "strict_exact",
+            "ring_closure_applied": False,
+            "ring_seam_open": True,
+            "ring_seam_max_jump_m": 0.012,
+            "ring_raw_seam_max_jump_m": 0.015,
+        },
         "browser_perf_status": "snapshot_only",
         "browser_perf_level": "WARN",
         "browser_perf_registry_snapshot_ref": "browser_perf_registry_snapshot.json",
@@ -194,6 +202,12 @@ def test_validate_send_bundle_exposes_anim_latest_diagnostics_and_dashboard_rend
     assert anim["browser_perf_trace_ref"] == "browser_perf_trace.json"
     assert anim["browser_perf_trace_exists"] is False
     assert anim["browser_perf_trace_in_bundle"] is False
+    assert anim["scenario_kind"] == "ring"
+    assert anim["ring_closure_policy"] == "strict_exact"
+    assert anim["ring_closure_applied"] is False
+    assert anim["ring_seam_open"] is True
+    assert anim["ring_seam_max_jump_m"] == 0.012
+    assert anim["ring_raw_seam_max_jump_m"] == 0.015
     assert anim["diagnostics_json_present"] is True
     assert anim["local_pointer_present"] is True
     assert anim["global_pointer_present"] is True
@@ -228,9 +242,18 @@ def test_validate_send_bundle_exposes_anim_latest_diagnostics_and_dashboard_rend
     assert dash_anim["browser_perf_evidence_report_in_bundle"] is True
     assert dash_anim["browser_perf_comparison_report_in_bundle"] is True
     assert dash_anim["browser_perf_trace_in_bundle"] is False
+    assert dash_anim["scenario_kind"] == "ring"
+    assert dash_anim["ring_closure_policy"] == "strict_exact"
+    assert dash_anim["ring_closure_applied"] is False
+    assert dash_anim["ring_seam_open"] is True
+    assert dash_anim["ring_seam_max_jump_m"] == 0.012
+    assert dash_anim["ring_raw_seam_max_jump_m"] == 0.015
     assert rep["sections"]["anim_latest"]["json_zip_path"] == "triage/latest_anim_pointer_diagnostics.json"
     assert "Anim latest diagnostics" in html
     assert "tok-123" in html
+    assert "ring_closure" in html
+    assert "strict_exact" in html
+    assert "seam_open=True" in html
     assert "browser_perf.evidence" in html
     assert "snapshot_only / WARN" in html
     assert "browser_perf.comparison" in html

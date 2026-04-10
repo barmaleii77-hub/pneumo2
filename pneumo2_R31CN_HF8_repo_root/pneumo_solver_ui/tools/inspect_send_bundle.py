@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from .health_report import collect_health_report
-from .send_bundle_contract import build_anim_operator_recommendations
+from .send_bundle_contract import build_anim_operator_recommendations, summarize_ring_closure
 from pneumo_solver_ui.geometry_acceptance_contract import format_geometry_acceptance_summary_lines
 
 
@@ -42,6 +42,7 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
     meta = dict(signals.get("meta") or {})
     anim = dict(signals.get("anim_latest") or {})
     mnemo = dict(signals.get("mnemo_event_log") or {})
+    ring_closure = dict(signals.get("ring_closure") or summarize_ring_closure(anim))
     operator_recommendations = [
         str(x) for x in (signals.get("operator_recommendations") or build_anim_operator_recommendations(anim)) if str(x).strip()
     ]
@@ -57,6 +58,7 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
         "artifacts": artifacts,
         "anim_latest": anim,
         "mnemo_event_log": mnemo,
+        "ring_closure": ring_closure,
         "operator_recommendations": operator_recommendations,
         "geometry_acceptance": geometry_acceptance,
         "geometry_acceptance_gate": str(geometry_acceptance.get("release_gate") or "MISSING") if geometry_acceptance else "MISSING",
@@ -87,6 +89,7 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
     rep_signals = dict(rep_obj.get("signals") or {})
     anim = dict(summary.get("anim_latest") or {})
     mnemo = dict(summary.get("mnemo_event_log") or {})
+    ring_closure = dict(summary.get("ring_closure") or {})
     operator_recommendations = [str(x) for x in (summary.get("operator_recommendations") or []) if str(x).strip()]
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
     lines = [
@@ -119,6 +122,8 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
         f"- npz_path_sync_ok: {anim.get('npz_path_sync_ok')}",
         f"- npz_path: `{anim.get('npz_path') or '—'}`",
         f"- updated_utc: {anim.get('updated_utc') or '—'}",
+        f"- scenario_kind: {anim.get('scenario_kind') or '—'}",
+        f"- ring_closure: policy={anim.get('ring_closure_policy') or '—'} / applied={anim.get('ring_closure_applied')} / seam_open={anim.get('ring_seam_open')} / seam_max_jump_m={anim.get('ring_seam_max_jump_m')} / raw_seam_max_jump_m={anim.get('ring_raw_seam_max_jump_m')}",
         f"- browser_perf_status: `{anim.get('browser_perf_status') or '—'}` / level=`{anim.get('browser_perf_level') or '—'}`",
         f"- browser_perf_evidence_status: `{anim.get('browser_perf_evidence_status') or '—'}` / level=`{anim.get('browser_perf_evidence_level') or '—'}` / bundle_ready=`{anim.get('browser_perf_bundle_ready')}` / snapshot_contract_match=`{anim.get('browser_perf_snapshot_contract_match')}`",
         f"- browser_perf_comparison_status: `{anim.get('browser_perf_comparison_status') or '—'}` / level=`{anim.get('browser_perf_comparison_level') or '—'}` / ready=`{anim.get('browser_perf_comparison_ready')}` / changed=`{anim.get('browser_perf_comparison_changed')}`",
@@ -126,6 +131,17 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
         f"- browser_perf_artifacts_primary: snapshot=`{anim.get('browser_perf_registry_snapshot_ref') or '—'}` / exists=`{anim.get('browser_perf_registry_snapshot_exists')}` / in_bundle=`{anim.get('browser_perf_registry_snapshot_in_bundle')}` ; contract=`{anim.get('browser_perf_contract_ref') or '—'}` / exists=`{anim.get('browser_perf_contract_exists')}` / in_bundle=`{anim.get('browser_perf_contract_in_bundle')}`",
         f"- browser_perf_artifacts_secondary: previous=`{anim.get('browser_perf_previous_snapshot_ref') or '—'}` / exists=`{anim.get('browser_perf_previous_snapshot_exists')}` / in_bundle=`{anim.get('browser_perf_previous_snapshot_in_bundle')}` ; evidence=`{anim.get('browser_perf_evidence_report_ref') or '—'}` / exists=`{anim.get('browser_perf_evidence_report_exists')}` / in_bundle=`{anim.get('browser_perf_evidence_report_in_bundle')}` ; comparison=`{anim.get('browser_perf_comparison_report_ref') or '—'}` / exists=`{anim.get('browser_perf_comparison_report_exists')}` / in_bundle=`{anim.get('browser_perf_comparison_report_in_bundle')}` ; trace=`{anim.get('browser_perf_trace_ref') or '—'}` / exists=`{anim.get('browser_perf_trace_exists')}` / in_bundle=`{anim.get('browser_perf_trace_in_bundle')}`",
     ]
+    if ring_closure:
+        lines += [
+            "",
+            "## Ring closure",
+            f"- severity: {ring_closure.get('severity') or 'missing'}",
+            f"- summary: {ring_closure.get('headline') or '—'}",
+            f"- policy: {ring_closure.get('closure_policy') or '—'} / applied={ring_closure.get('closure_applied')} / seam_open={ring_closure.get('seam_open')}",
+            f"- seam_jump_m: cooked=`{ring_closure.get('seam_max_jump_m')}` / raw=`{ring_closure.get('raw_seam_max_jump_m')}`",
+        ]
+        for flag in list(ring_closure.get("red_flags") or [])[:3]:
+            lines.append(f"- red_flag: {flag}")
     if mnemo:
         lines += [
             "",

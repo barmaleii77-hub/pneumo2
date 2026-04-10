@@ -368,6 +368,51 @@ def test_ui_preflight_send_bundle_step_reports_last_bundle_summary(tmp_path: Pat
     assert "Anim pointer diagnostics:" in send_bundle_step.detail
 
 
+def test_ui_preflight_send_bundle_step_rebuilds_ring_summary_from_anim_latest_summary(tmp_path: Path, monkeypatch) -> None:
+    app_dir, _npz_path, _ptr_path, _pointer = _prepare_anim_export(tmp_path, monkeypatch)
+    send_bundles = app_dir / "send_bundles"
+    send_bundles.mkdir(parents=True, exist_ok=True)
+    (send_bundles / "last_bundle_meta.json").write_text(
+        json.dumps(
+            {
+                "ok": True,
+                "ts": "2026-04-10 12:00:00",
+                "trigger": "manual",
+                "zip": {
+                    "name": "latest_send_bundle.zip",
+                    "path": str(send_bundles / "latest_send_bundle.zip"),
+                    "size_bytes": 3 * 1024 * 1024,
+                },
+                "anim_latest_summary": {
+                    "available": True,
+                    "scenario_kind": "ring",
+                    "ring_closure_policy": "strict_exact",
+                    "ring_closure_applied": False,
+                    "ring_seam_open": True,
+                    "ring_seam_max_jump_m": 0.012,
+                    "ring_raw_seam_max_jump_m": 0.015,
+                    "browser_perf_evidence_status": "trace_bundle_ready",
+                    "browser_perf_evidence_level": "PASS",
+                    "browser_perf_bundle_ready": True,
+                },
+                "anim_pointer_diagnostics_path": str(send_bundles / "latest_anim_pointer_diagnostics.json"),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    st_mod = _FakeSt()
+    st_mod.session_state["diag_output_dir"] = "send_bundles"
+    steps = collect_steps(st_mod, app_dir)
+    send_bundle_step = steps["send_bundle"]
+
+    assert send_bundle_step.ok is True
+    assert "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" in send_bundle_step.detail
+    assert "Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" in send_bundle_step.detail
+
+
 def test_sources_use_run_artifacts_global_anim_pointer_flow() -> None:
     root = Path(__file__).resolve().parents[1]
     ui_text = (root / "pneumo_solver_ui" / "pneumo_ui_app.py").read_text(encoding="utf-8")

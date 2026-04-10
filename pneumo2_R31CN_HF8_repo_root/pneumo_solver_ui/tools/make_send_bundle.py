@@ -56,6 +56,7 @@ from .send_bundle_contract import (
     ANIM_DIAG_SIDECAR_JSON,
     ANIM_DIAG_SIDECAR_MD,
     build_anim_operator_recommendations,
+    extract_anim_snapshot,
 )
 
 
@@ -400,7 +401,13 @@ def _build_send_bundle_readme(anim_diag: Optional[Dict[str, Any]] = None) -> str
     The README must expose the active anim_latest reload reason so the recipient
     does not need to open separate sidecars just to see which bundle/token was active.
     """
-    diag = dict(anim_diag or {})
+    diag_raw = dict(anim_diag or {})
+    diag_snap = extract_anim_snapshot(diag_raw, source="send_bundle_readme")
+    diag = dict(diag_raw)
+    if isinstance(diag_snap, dict):
+        for key, value in diag_snap.items():
+            if diag.get(key) in (None, "", [], {}):
+                diag[key] = value
     reload_inputs = list(diag.get("anim_latest_visual_reload_inputs") or [])
     issues = [str(x) for x in (diag.get("anim_latest_issues") or []) if str(x).strip()]
     operator_recommendations = build_anim_operator_recommendations(diag)
@@ -413,6 +420,12 @@ def _build_send_bundle_readme(anim_diag: Optional[Dict[str, Any]] = None) -> str
     road_ref = diag.get("anim_latest_road_csv_ref") or "—"
     axay_ref = diag.get("anim_latest_axay_csv_ref") or "—"
     scenario_ref = diag.get("anim_latest_scenario_json_ref") or "—"
+    scenario_kind = diag.get("scenario_kind") or "—"
+    ring_closure_policy = diag.get("ring_closure_policy") or "—"
+    ring_closure_applied = diag.get("ring_closure_applied")
+    ring_seam_open = diag.get("ring_seam_open")
+    ring_seam_max = diag.get("ring_seam_max_jump_m")
+    ring_raw_seam_max = diag.get("ring_raw_seam_max_jump_m")
     browser_perf_status = diag.get("browser_perf_status") or "—"
     browser_perf_level = diag.get("browser_perf_level") or "—"
     browser_perf_evidence_status = diag.get("browser_perf_evidence_status") or "—"
@@ -448,9 +461,11 @@ def _build_send_bundle_readme(anim_diag: Optional[Dict[str, Any]] = None) -> str
         f"- anim_latest_global_pointer_json: {diag.get('anim_latest_global_pointer_json') or '—'}\n"
         f"- anim_latest_pointer_json: {diag.get('anim_latest_pointer_json') or '—'}\n"
         f"- anim_latest_npz_path: {diag.get('anim_latest_npz_path') or '—'}\n"
+        f"- scenario_kind: {scenario_kind}\n"
         f"- anim_latest_road_csv_ref: {road_ref}\n"
         f"- anim_latest_axay_csv_ref: {axay_ref}\n"
         f"- anim_latest_scenario_json_ref: {scenario_ref}\n"
+        f"- ring_closure: policy={ring_closure_policy} / applied={ring_closure_applied} / seam_open={ring_seam_open} / seam_max_jump_m={ring_seam_max if ring_seam_max is not None else '—'} / raw_seam_max_jump_m={ring_raw_seam_max if ring_raw_seam_max is not None else '—'}\n"
         f"- anim_latest_contract_sidecar_ref: {diag.get('anim_latest_contract_sidecar_ref') or '—'}\n"
         f"- anim_latest_hardpoints_source_of_truth_ref: {diag.get('anim_latest_hardpoints_source_of_truth_ref') or '—'}\n"
         f"- anim_latest_cylinder_packaging_passport_ref: {diag.get('anim_latest_cylinder_packaging_passport_ref') or '—'}\n"

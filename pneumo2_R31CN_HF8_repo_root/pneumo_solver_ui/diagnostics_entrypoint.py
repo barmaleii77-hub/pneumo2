@@ -275,8 +275,16 @@ def read_last_meta(repo_root: Optional[Path] = None) -> Dict[str, Any]:
 def summarize_last_bundle_meta(meta: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     meta_dict = dict(meta or {})
     zip_meta = dict(meta_dict.get("zip") or {}) if isinstance(meta_dict.get("zip"), dict) else {}
+    anim_latest_summary = (
+        dict(meta_dict.get("anim_latest_summary") or {})
+        if isinstance(meta_dict.get("anim_latest_summary"), dict)
+        else {}
+    )
     size_b = zip_meta.get("size_bytes")
     size_mb = (float(size_b) / (1024 * 1024)) if isinstance(size_b, (int, float)) else None
+    summary_lines = [str(x) for x in (meta_dict.get("summary_lines") or []) if str(x).strip()]
+    if not summary_lines and anim_latest_summary:
+        summary_lines = [str(x) for x in format_anim_dashboard_brief_lines(anim_latest_summary) if str(x).strip()]
     return {
         "ok": meta_dict.get("ok"),
         "ts": meta_dict.get("ts"),
@@ -284,7 +292,14 @@ def summarize_last_bundle_meta(meta: Optional[Dict[str, Any]]) -> Dict[str, Any]
         "zip_name": zip_meta.get("name") or zip_meta.get("path") or "",
         "zip_path": zip_meta.get("path") or "",
         "zip_size_mb": size_mb,
-        "summary_lines": [str(x) for x in (meta_dict.get("summary_lines") or []) if str(x).strip()],
+        "summary_lines": summary_lines,
+        "anim_latest_summary": anim_latest_summary,
+        "scenario_kind": anim_latest_summary.get("scenario_kind"),
+        "ring_closure_policy": anim_latest_summary.get("ring_closure_policy"),
+        "ring_closure_applied": anim_latest_summary.get("ring_closure_applied"),
+        "ring_seam_open": anim_latest_summary.get("ring_seam_open"),
+        "ring_seam_max_jump_m": anim_latest_summary.get("ring_seam_max_jump_m"),
+        "ring_raw_seam_max_jump_m": anim_latest_summary.get("ring_raw_seam_max_jump_m"),
         "anim_pointer_diagnostics_path": str(meta_dict.get("anim_pointer_diagnostics_path") or ""),
     }
 

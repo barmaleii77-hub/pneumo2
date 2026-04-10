@@ -114,12 +114,24 @@ def _log(path: Path, msg: str) -> None:
 
 def _bundle_summary_fields(meta: object) -> dict[str, object]:
     meta_dict = dict(meta or {}) if isinstance(meta, dict) else {}
+    anim_summary = dict(meta_dict.get("anim_latest_summary") or {}) if isinstance(meta_dict.get("anim_latest_summary"), dict) else {}
     lines = [str(x) for x in (meta_dict.get("summary_lines") or []) if str(x).strip()]
     diag_path = str(meta_dict.get("anim_pointer_diagnostics_path") or "").strip()
-    return {
+    out = {
         "summary_lines": lines,
         "anim_pointer_diagnostics_path": diag_path,
     }
+    for key in (
+        "scenario_kind",
+        "ring_closure_policy",
+        "ring_closure_applied",
+        "ring_seam_open",
+        "ring_seam_max_jump_m",
+        "ring_raw_seam_max_jump_m",
+    ):
+        if anim_summary.get(key) is not None:
+            out[key] = anim_summary.get(key)
+    return out
 
 
 def _log_bundle_summary(path: Path, meta: object) -> None:

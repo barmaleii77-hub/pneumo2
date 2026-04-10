@@ -27,7 +27,16 @@ def test_crash_guard_autosave_emits_shared_bundle_summary_event(tmp_path: Path, 
                 "summary_lines": [
                     "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True",
                     "Browser perf comparison: regression_checked / PASS / ready=True",
+                    "Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015",
                 ],
+                "anim_latest_summary": {
+                    "scenario_kind": "ring",
+                    "ring_closure_policy": "strict_exact",
+                    "ring_closure_applied": False,
+                    "ring_seam_open": True,
+                    "ring_seam_max_jump_m": 0.012,
+                    "ring_raw_seam_max_jump_m": 0.015,
+                },
                 "anim_pointer_diagnostics_path": str(zip_path.parent / "latest_anim_pointer_diagnostics.json"),
             },
         )
@@ -48,6 +57,10 @@ def test_crash_guard_autosave_emits_shared_bundle_summary_event(tmp_path: Path, 
     assert fields["where"] == "exit"
     assert fields["bundle_ok"] is True
     assert fields["summary_lines"][0].startswith("Browser perf evidence:")
+    assert fields["scenario_kind"] == "ring"
+    assert fields["ring_closure_policy"] == "strict_exact"
+    assert fields["ring_seam_open"] is True
+    assert fields["ring_seam_max_jump_m"] == 0.012
     assert fields["anim_pointer_diagnostics_path"].endswith("latest_anim_pointer_diagnostics.json")
 
 
@@ -71,7 +84,16 @@ def test_postmortem_watchdog_logs_and_emits_bundle_summary(tmp_path: Path, monke
                 "summary_lines": [
                     "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True",
                     "Browser perf comparison: regression_checked / PASS / ready=True",
+                    "Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015",
                 ],
+                "anim_latest_summary": {
+                    "scenario_kind": "ring",
+                    "ring_closure_policy": "strict_exact",
+                    "ring_closure_applied": False,
+                    "ring_seam_open": True,
+                    "ring_seam_max_jump_m": 0.012,
+                    "ring_raw_seam_max_jump_m": 0.015,
+                },
                 "anim_pointer_diagnostics_path": str(out_dir / "latest_anim_pointer_diagnostics.json"),
             },
         )
@@ -95,7 +117,11 @@ def test_postmortem_watchdog_logs_and_emits_bundle_summary(tmp_path: Path, monke
     assert "bundle OK" in log_text
     assert "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" in log_text
     assert "Browser perf comparison: regression_checked / PASS / ready=True" in log_text
+    assert "Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" in log_text
     assert "Anim pointer diagnostics:" in log_text
     assert captured_events
     assert captured_events[-1]["summary_lines"][0].startswith("Browser perf evidence:")
+    assert captured_events[-1]["scenario_kind"] == "ring"
+    assert captured_events[-1]["ring_closure_policy"] == "strict_exact"
+    assert captured_events[-1]["ring_seam_open"] is True
     assert captured_events[-1]["anim_pointer_diagnostics_path"].endswith("latest_anim_pointer_diagnostics.json")

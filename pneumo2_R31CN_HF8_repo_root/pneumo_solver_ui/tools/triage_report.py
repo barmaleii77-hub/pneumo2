@@ -58,6 +58,8 @@ from .send_bundle_contract import (
     ANIM_DIAG_SIDECAR_JSON,
     ANIM_DIAG_SIDECAR_MD,
     build_anim_operator_recommendations,
+    extract_anim_snapshot,
+    summarize_ring_closure,
     summarize_mnemo_event_log,
 )
 
@@ -374,12 +376,15 @@ def _load_anim_latest_summary(repo_root: Path, sb_root: Path) -> Dict[str, Any]:
 
         j2 = collect_anim_latest_diagnostics_summary(include_meta=True)
         if isinstance(j2, dict):
-            global_diag = dict(j2)
+            snap = extract_anim_snapshot(j2, source="triage_global_pointer")
+            global_diag = _merge_missing_fields(dict(j2), dict(snap or {}))
     except Exception as exc:
         out["error"] = repr(exc)
 
     if isinstance(j, dict):
-        merged = _merge_missing_fields(dict(j), global_diag or {})
+        snap = extract_anim_snapshot(j, source="triage_send_bundle_sidecar")
+        merged = _merge_missing_fields(dict(j), dict(snap or {}))
+        merged = _merge_missing_fields(merged, global_diag or {})
         out.update(merged)
         out["source"] = "send_bundle_sidecar"
         return out
@@ -486,6 +491,7 @@ def generate_triage_report(
     # Latest anim_latest diagnostics sidecar / global pointer snapshot
     anim_summary = _load_anim_latest_summary(repo_root, sb_root)
     mnemo_event_summary = summarize_mnemo_event_log(anim_summary)
+    ring_closure_summary = summarize_ring_closure(anim_summary)
     operator_recommendations = build_anim_operator_recommendations(anim_summary)
 
     # ---- parse autotest summary ----
@@ -610,6 +616,16 @@ def generate_triage_report(
     elif mnemo_severity == "ok":
         severity_counts["info"] += 1
 
+    ring_severity = str(ring_closure_summary.get("severity") or "")
+    if ring_severity == "critical":
+        severity_counts["critical"] += 1
+        red_flags.extend(str(x) for x in (ring_closure_summary.get("red_flags") or []) if str(x).strip())
+    elif ring_severity == "warn":
+        severity_counts["warn"] += 1
+        red_flags.extend(str(x) for x in (ring_closure_summary.get("red_flags") or []) if str(x).strip())
+    elif ring_severity == "ok":
+        severity_counts["info"] += 1
+
     summary: Dict[str, Any] = {
         "created_at": _now_iso(),
         "release": RELEASE,
@@ -639,6 +655,7 @@ def generate_triage_report(
         "send_bundle_validation": sb_validation,
         "anim_latest": anim_summary,
         "mnemo_event_log": mnemo_event_summary,
+        "ring_closure": ring_closure_summary,
         "operator_recommendations": operator_recommendations,
     }
 
@@ -773,6 +790,8 @@ def generate_triage_report(
     anim = summary.get("anim_latest") or {}
     lines.append(f"- Source: {anim.get('source') or '—'}")
     lines.append(f"- anim_latest_available: {bool(anim.get('anim_latest_available'))}")
+    if anim.get("scenario_kind"):
+        lines.append(f"- scenario_kind: `{anim.get('scenario_kind')}`")
     lines.append(f"- anim_latest_global_pointer_json: `{_fmt_path(anim.get('anim_latest_global_pointer_json'))}`")
     lines.append(f"- anim_latest_pointer_json: `{_fmt_path(anim.get('anim_latest_pointer_json'))}`")
     lines.append(f"- anim_latest_npz_path: `{_fmt_path(anim.get('anim_latest_npz_path'))}`")
@@ -815,6 +834,14 @@ def generate_triage_report(
     lines.append(
         f"- anim_latest_visual_reload_inputs: {', '.join(str(x) for x in _reload_inputs) if _reload_inputs else '—'}"
     )
+    if any(anim.get(key) not in (None, "", [], {}) for key in ("ring_closure_policy", "ring_closure_applied", "ring_seam_open", "ring_seam_max_jump_m", "ring_raw_seam_max_jump_m")):
+        lines.append(
+            f"- ring_closure: policy=`{anim.get('ring_closure_policy') or '—'}`"
+            f" / applied=`{anim.get('ring_closure_applied')}`"
+            f" / seam_open=`{anim.get('ring_seam_open')}`"
+            f" / seam_max_jump_m=`{anim.get('ring_seam_max_jump_m') if anim.get('ring_seam_max_jump_m') is not None else '—'}`"
+            f" / raw_seam_max_jump_m=`{anim.get('ring_raw_seam_max_jump_m') if anim.get('ring_raw_seam_max_jump_m') is not None else '—'}`"
+        )
     lines.append(f"- anim_latest_updated_utc: `{anim.get('anim_latest_updated_utc') or '—'}`")
     if anim.get('anim_latest_usable') is not None:
         lines.append(f"- anim_latest_usable: `{anim.get('anim_latest_usable')}`")

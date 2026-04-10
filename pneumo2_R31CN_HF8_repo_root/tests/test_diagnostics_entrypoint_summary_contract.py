@@ -21,6 +21,14 @@ def _write_send_bundle_sidecars(out_dir: Path) -> None:
                 "anim_latest_npz_path": "/abs/workspace/exports/anim_latest.npz",
                 "anim_latest_visual_cache_token": "tok-diag",
                 "anim_latest_visual_reload_inputs": ["npz", "road_csv"],
+                "anim_latest_meta": {
+                    "scenario_kind": "ring",
+                    "ring_closure_policy": "strict_exact",
+                    "ring_closure_applied": False,
+                    "ring_seam_open": True,
+                    "ring_seam_max_jump_m": 0.012,
+                    "ring_raw_seam_max_jump_m": 0.015,
+                },
             },
             ensure_ascii=False,
             indent=2,
@@ -42,6 +50,12 @@ def _write_send_bundle_sidecars(out_dir: Path) -> None:
                     "browser_perf_evidence_report_in_bundle": True,
                     "browser_perf_comparison_report_in_bundle": True,
                     "browser_perf_trace_in_bundle": True,
+                    "scenario_kind": "ring",
+                    "ring_closure_policy": "strict_exact",
+                    "ring_closure_applied": False,
+                    "ring_seam_open": True,
+                    "ring_seam_max_jump_m": 0.012,
+                    "ring_raw_seam_max_jump_m": 0.015,
                 }
             },
             ensure_ascii=False,
@@ -69,12 +83,18 @@ def test_build_full_diagnostics_bundle_returns_shared_summary_lines(tmp_path: Pa
     assert res.ok is True
     assert res.zip_path == zip_path.resolve()
     assert res.meta["anim_latest_summary"]["visual_cache_token"] == "tok-diag"
+    assert res.meta["anim_latest_summary"]["ring_closure_policy"] == "strict_exact"
+    assert res.meta["anim_latest_summary"]["ring_seam_open"] is True
     assert any("Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" == line for line in res.meta["summary_lines"])
+    assert any("Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" == line for line in res.meta["summary_lines"])
     assert str(out_dir / "latest_anim_pointer_diagnostics.json") == res.meta["anim_pointer_diagnostics_path"]
 
     last_meta = summarize_last_bundle_meta(read_last_meta_from_out_dir(out_dir))
     assert last_meta["zip_name"] == "latest_send_bundle.zip"
+    assert last_meta["anim_latest_summary"]["ring_closure_policy"] == "strict_exact"
+    assert last_meta["ring_seam_open"] is True
     assert any("Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" == line for line in last_meta["summary_lines"])
+    assert any("Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" == line for line in last_meta["summary_lines"])
     assert last_meta["anim_pointer_diagnostics_path"].endswith("latest_anim_pointer_diagnostics.json")
 
 
@@ -96,5 +116,37 @@ def test_build_unified_diagnostics_returns_shared_summary_lines(tmp_path: Path, 
     assert res.ok is True
     assert res.zip_path == zip_path
     assert res.details["anim_latest_summary"]["visual_cache_token"] == "tok-diag"
+    assert res.details["anim_latest_summary"]["ring_closure_policy"] == "strict_exact"
+    assert res.details["anim_latest_summary"]["ring_seam_open"] is True
     assert any("Browser perf comparison: regression_checked / PASS / ready=True" == line for line in res.details["summary_lines"])
+    assert any("Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" == line for line in res.details["summary_lines"])
     assert str(out_dir / "latest_anim_pointer_diagnostics.json") == res.details["anim_pointer_diagnostics_path"]
+
+
+def test_summarize_last_bundle_meta_rebuilds_summary_lines_from_anim_latest_summary() -> None:
+    meta = summarize_last_bundle_meta(
+        {
+            "ok": True,
+            "ts": "2026-04-10 12:00:00",
+            "trigger": "manual",
+            "zip": {"name": "latest_send_bundle.zip", "path": "/tmp/latest_send_bundle.zip", "size_bytes": 1024},
+            "anim_latest_summary": {
+                "available": True,
+                "scenario_kind": "ring",
+                "ring_closure_policy": "strict_exact",
+                "ring_closure_applied": False,
+                "ring_seam_open": True,
+                "ring_seam_max_jump_m": 0.012,
+                "ring_raw_seam_max_jump_m": 0.015,
+                "browser_perf_evidence_status": "trace_bundle_ready",
+                "browser_perf_evidence_level": "PASS",
+                "browser_perf_bundle_ready": True,
+            },
+            "anim_pointer_diagnostics_path": "/tmp/latest_anim_pointer_diagnostics.json",
+        }
+    )
+
+    assert meta["anim_latest_summary"]["ring_closure_policy"] == "strict_exact"
+    assert meta["ring_seam_open"] is True
+    assert any("Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" == line for line in meta["summary_lines"])
+    assert any("Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" == line for line in meta["summary_lines"])

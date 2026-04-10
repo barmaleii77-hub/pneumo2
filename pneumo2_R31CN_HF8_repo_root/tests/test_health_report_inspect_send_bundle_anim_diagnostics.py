@@ -29,7 +29,15 @@ def _make_anim_diag(token: str, reload_inputs: list[str], *, updated_utc: str = 
         "anim_latest_visual_reload_inputs": list(reload_inputs),
         "anim_latest_visual_cache_dependencies": deps,
         "anim_latest_updated_utc": updated_utc,
-        "anim_latest_meta": {"road_csv": "anim_latest_road_csv.csv"},
+        "anim_latest_meta": {
+            "road_csv": "anim_latest_road_csv.csv",
+            "scenario_kind": "ring",
+            "ring_closure_policy": "strict_exact",
+            "ring_closure_applied": False,
+            "ring_seam_open": True,
+            "ring_seam_max_jump_m": 0.012,
+            "ring_raw_seam_max_jump_m": 0.015,
+        },
         "browser_perf_status": "snapshot_only",
         "browser_perf_level": "WARN",
         "browser_perf_evidence_status": "snapshot_only",
@@ -183,6 +191,7 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     rep = json.loads(json_path.read_text(encoding="utf-8"))
     anim = dict(rep.get("signals", {}).get("anim_latest") or {})
     mnemo = dict(rep.get("signals", {}).get("mnemo_event_log") or {})
+    ring = dict(rep.get("signals", {}).get("ring_closure") or {})
     recommendations = list(rep.get("signals", {}).get("operator_recommendations") or [])
     artifacts = dict(rep.get("signals", {}).get("artifacts") or {})
 
@@ -194,10 +203,17 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert mnemo["current_mode"] == "Регуляторный коридор"
     assert recommendations
     assert recommendations[0].startswith("Open Desktop Mnemo first")
+    assert any("open ring seam is intentional" in msg for msg in recommendations)
     assert anim["browser_perf_evidence_status"] == "snapshot_only"
     assert anim["browser_perf_bundle_ready"] is False
     assert anim["browser_perf_comparison_status"] == "no_reference"
     assert anim["browser_perf_comparison_ready"] is False
+    assert anim["ring_closure_policy"] == "strict_exact"
+    assert anim["ring_seam_open"] is True
+    assert ring["severity"] == "warn"
+    assert ring["closure_policy"] == "strict_exact"
+    assert ring["seam_open"] is True
+    assert "open-seam visuals/exports are acceptable" in ring["red_flags"][0]
     assert artifacts["health_report_embedded"] is False
     assert artifacts["browser_perf_registry_snapshot"] is False
     assert artifacts["browser_perf_previous_snapshot"] is False
@@ -208,10 +224,14 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert "visual_cache_token" in md_path.read_text(encoding="utf-8")
     assert "tok-sidecar" in md_path.read_text(encoding="utf-8")
     assert "## Desktop Mnemo events" in md_path.read_text(encoding="utf-8")
+    assert "## Ring closure" in md_path.read_text(encoding="utf-8")
     assert "## Recommended actions" in md_path.read_text(encoding="utf-8")
+    assert "severity: warn" in md_path.read_text(encoding="utf-8")
+    assert "Ring seam is intentionally open under strict_exact closure" in md_path.read_text(encoding="utf-8")
     assert "Большой перепад давлений" in md_path.read_text(encoding="utf-8")
     assert "browser_perf_evidence_status" in md_path.read_text(encoding="utf-8")
     assert "browser_perf_comparison_status" in md_path.read_text(encoding="utf-8")
+    assert "ring_closure: policy=strict_exact / applied=False / seam_open=True / seam_max_jump_m=0.012 / raw_seam_max_jump_m=0.015" in md_path.read_text(encoding="utf-8")
     assert "browser_perf_evidence_report: False" in md_path.read_text(encoding="utf-8")
 
     add_health_report_to_zip(zip_path, json_path, md_path)
@@ -230,6 +250,11 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert summary["anim_latest"]["visual_reload_inputs"] == ["npz", "road_csv"]
     assert summary["anim_latest"]["browser_perf_evidence_status"] == "snapshot_only"
     assert summary["anim_latest"]["browser_perf_comparison_status"] == "no_reference"
+    assert summary["anim_latest"]["ring_closure_policy"] == "strict_exact"
+    assert summary["anim_latest"]["ring_seam_open"] is True
+    assert summary["ring_closure"]["severity"] == "warn"
+    assert summary["ring_closure"]["closure_policy"] == "strict_exact"
+    assert summary["ring_closure"]["seam_open"] is True
     assert summary["anim_latest"]["browser_perf_registry_snapshot_ref"] == "browser_perf_registry_snapshot.json"
     assert summary["anim_latest"]["browser_perf_registry_snapshot_in_bundle"] is False
     assert summary["anim_latest"]["browser_perf_contract_in_bundle"] is False
@@ -239,10 +264,14 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     inspect_md = render_inspection_md(summary)
     assert "tok-sidecar" in inspect_md
     assert "## Desktop Mnemo events" in inspect_md
+    assert "## Ring closure" in inspect_md
     assert "## Recommended actions" in inspect_md
+    assert "severity: warn" in inspect_md
+    assert "Ring seam is intentionally open under strict_exact closure" in inspect_md
     assert "Регуляторный коридор" in inspect_md
     assert "browser_perf_evidence_status" in inspect_md
     assert "browser_perf_comparison_status" in inspect_md
+    assert "ring_closure: policy=strict_exact / applied=False / seam_open=True / seam_max_jump_m=0.012 / raw_seam_max_jump_m=0.015" in inspect_md
     assert "Browser perf evidence report: False" in inspect_md
     assert "Browser perf trace: False" in inspect_md
     assert "browser_perf_artifacts_primary" in inspect_md
@@ -266,6 +295,8 @@ def test_health_report_surfaces_anim_latest_mismatch_from_validation(tmp_path: P
     assert any("visual_cache_token mismatch" in msg for msg in anim.get("issues") or [])
     assert any("visual_cache_token mismatch" in msg for msg in notes)
     assert any("Desktop Mnemo reports 1 active latched event(s)" in msg for msg in notes)
+    assert any("Ring seam remains open under strict_exact" in msg for msg in notes)
+    assert any("Ring seam is intentionally open under strict_exact closure" in msg for msg in notes)
     assert any("browser perf evidence is not trace_bundle_ready" in msg for msg in notes)
     assert any("browser perf comparison status: no_reference" in msg for msg in notes)
 
@@ -286,8 +317,10 @@ def test_sources_wire_health_report_and_offline_inspector_into_send_bundle_flow(
     assert 'render_health_report_md' in health_text
     assert 'signals["anim_latest"]' in health_text
     assert 'signals["mnemo_event_log"]' in health_text
+    assert 'signals["ring_closure"]' in health_text
     assert 'signals["operator_recommendations"]' in health_text
     assert '## Desktop Mnemo events' in health_text
+    assert '## Ring closure' in health_text
     assert '## Recommended actions' in health_text
     assert 'browser_perf_evidence_report' in health_text
     assert 'browser_perf_trace' in health_text
@@ -295,8 +328,10 @@ def test_sources_wire_health_report_and_offline_inspector_into_send_bundle_flow(
     assert 'inspect_send_bundle' in inspect_text
     assert 'embedded health report is missing' in inspect_text
     assert 'mnemo_event_log' in inspect_text
+    assert 'ring_closure' in inspect_text
     assert 'operator_recommendations' in inspect_text
     assert '## Desktop Mnemo events' in inspect_text
+    assert '## Ring closure' in inspect_text
     assert '## Recommended actions' in inspect_text
     assert 'browser_perf_evidence_status' in inspect_text
     assert 'browser_perf_artifacts_primary' in inspect_text

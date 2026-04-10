@@ -18,6 +18,7 @@ from pneumo_solver_ui.tools.send_bundle_contract import (
     normalize_anim_dashboard_obj,
     pick_anim_latest_fields,
     render_anim_latest_md,
+    summarize_ring_closure,
 )
 
 
@@ -31,7 +32,14 @@ def test_extract_anim_snapshot_supports_legacy_anim_latest_fields() -> None:
             "anim_latest_visual_cache_token": "tok-123",
             "anim_latest_visual_reload_inputs": ["npz", "road_csv"],
             "anim_latest_updated_utc": "2026-04-07T12:00:00+00:00",
-            "anim_latest_meta": {"road_csv": "anim_latest_road_csv.csv"},
+            "anim_latest_meta": {
+                "road_csv": "anim_latest_road_csv.csv",
+                "scenario_kind": "ring",
+                "ring_closure_policy": "strict_exact",
+                "ring_seam_open": True,
+                "ring_seam_max_jump_m": 0.012,
+                "ring_raw_seam_max_jump_m": 0.015,
+            },
         },
         source="diagnostics",
     )
@@ -43,6 +51,10 @@ def test_extract_anim_snapshot_supports_legacy_anim_latest_fields() -> None:
     assert snap["visual_reload_inputs"] == ["npz", "road_csv"]
     assert snap["pointer_json"].endswith("anim_latest.json")
     assert snap["npz_path"].endswith("anim_latest.npz")
+    assert snap["scenario_kind"] == "ring"
+    assert snap["ring_closure_policy"] == "strict_exact"
+    assert snap["ring_seam_open"] is True
+    assert snap["ring_seam_max_jump_m"] == 0.012
 
 
 def test_annotate_anim_source_for_bundle_marks_mirrored_pointer_and_npz() -> None:
@@ -102,6 +114,13 @@ def test_dashboard_normalization_and_rendering_use_shared_contract() -> None:
             "anim_latest_npz_path": "/abs/workspace/exports/anim_latest.npz",
             "anim_latest_visual_cache_token": "tok-123",
             "anim_latest_visual_reload_inputs": ["npz"],
+            "anim_latest_meta": {
+                "scenario_kind": "ring",
+                "ring_closure_policy": "strict_exact",
+                "ring_seam_open": True,
+                "ring_seam_max_jump_m": 0.012,
+                "ring_raw_seam_max_jump_m": 0.015,
+            },
             "anim_latest_mnemo_event_log_ref": "anim_latest.desktop_mnemo_events.json",
             "anim_latest_mnemo_event_log_exists": True,
             "anim_latest_mnemo_event_log_current_mode": "Регуляторный коридор",
@@ -117,7 +136,10 @@ def test_dashboard_normalization_and_rendering_use_shared_contract() -> None:
     assert norm["available"] is True
     assert norm["visual_cache_token"] == "tok-123"
     assert norm["visual_reload_inputs"] == ["npz"]
+    assert norm["ring_closure_policy"] == "strict_exact"
+    assert norm["ring_seam_open"] is True
     assert "tok-123" in md
+    assert "ring_closure: policy=strict_exact / applied=None / seam_open=True / seam_max_jump_m=0.012 / raw_seam_max_jump_m=0.015" in md
     assert "mnemo_event_log_state: mode=Регуляторный коридор / total=5 / active=1 / acked=2" in md
     assert "usable_from_bundle: True" in md
 
@@ -166,6 +188,13 @@ def test_load_latest_send_bundle_anim_dashboard_merges_validation_bundle_flags(t
                 "anim_latest_npz_path": "/abs/workspace/exports/anim_latest.npz",
                 "anim_latest_visual_cache_token": "tok-123",
                 "anim_latest_visual_reload_inputs": ["npz", "road_csv"],
+                "anim_latest_meta": {
+                    "scenario_kind": "ring",
+                    "ring_closure_policy": "strict_exact",
+                    "ring_seam_open": True,
+                    "ring_seam_max_jump_m": 0.012,
+                    "ring_raw_seam_max_jump_m": 0.015,
+                },
                 "anim_latest_mnemo_event_log_ref": "anim_latest.desktop_mnemo_events.json",
                 "anim_latest_mnemo_event_log_exists": True,
                 "anim_latest_mnemo_event_log_current_mode": "Регуляторный коридор",
@@ -214,8 +243,11 @@ def test_load_latest_send_bundle_anim_dashboard_merges_validation_bundle_flags(t
     assert anim["browser_perf_comparison_ready"] is True
     assert anim["browser_perf_evidence_report_in_bundle"] is True
     assert anim["anim_latest_mnemo_event_log_exists"] is True
+    assert anim["ring_closure_policy"] == "strict_exact"
+    assert anim["ring_seam_open"] is True
     assert any("Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" == line for line in lines)
     assert any("Browser perf comparison: regression_checked / PASS / ready=True" == line for line in lines)
+    assert any("Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" == line for line in lines)
     assert any("Browser perf bundle artifacts:" in line and "trace=True" in line for line in lines)
     assert any("Desktop Mnemo events: exists=True / total=4 / active=1 / acked=2 / mode=Регуляторный коридор" == line for line in lines)
     assert any("Desktop Mnemo recent: Большой перепад давлений | Смена режима" == line for line in lines)
@@ -249,3 +281,25 @@ def test_build_anim_operator_recommendations_prioritizes_mnemo_and_perf_actions(
     assert any("reference snapshot" in item for item in recommendations)
     assert any("Re-export anim_latest" in item for item in recommendations)
     assert any("Rebuild the send-bundle" in item for item in recommendations)
+
+
+def test_ring_closure_summary_and_recommendations_surface_strict_exact_open_seam() -> None:
+    anim = {
+        "anim_latest_available": True,
+        "anim_latest_meta": {
+            "scenario_kind": "ring",
+            "ring_closure_policy": "strict_exact",
+            "ring_closure_applied": False,
+            "ring_seam_open": True,
+            "ring_seam_max_jump_m": 0.012,
+            "ring_raw_seam_max_jump_m": 0.015,
+        },
+    }
+
+    ring = summarize_ring_closure(anim)
+    recommendations = build_anim_operator_recommendations(anim)
+
+    assert ring["severity"] == "warn"
+    assert ring["closure_policy"] == "strict_exact"
+    assert ring["seam_open"] is True
+    assert any("open ring seam is intentional" in item for item in recommendations)

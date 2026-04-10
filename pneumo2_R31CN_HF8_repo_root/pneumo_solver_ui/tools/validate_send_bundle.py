@@ -51,6 +51,7 @@ from .send_bundle_contract import (
     ANIM_LOCAL_NPZ,
     ANIM_LOCAL_POINTER,
     BROWSER_PERF_FLAT_FIELDS,
+    RING_META_FLAT_FIELDS,
     annotate_anim_source_for_bundle,
     choose_anim_snapshot,
     extract_anim_snapshot,
@@ -97,6 +98,37 @@ def _copy_browser_perf_fields(dst: Dict[str, Any], src: Dict[str, Any]) -> None:
             dst[key] = int(value or 0)
         elif key.endswith(("_exists", "_ready", "_changed", "_match")):
             dst[key] = value
+        else:
+            dst[key] = str(value or "")
+
+
+def _copy_ring_meta_fields(dst: Dict[str, Any], src: Dict[str, Any]) -> None:
+    for key in RING_META_FLAT_FIELDS:
+        if key not in src:
+            continue
+        value = src.get(key)
+        if isinstance(value, dict):
+            dst[key] = dict(value)
+        elif isinstance(value, list):
+            dst[key] = list(value)
+        elif key in {"ring_closure_applied", "ring_seam_open"}:
+            dst[key] = value
+        elif key in {
+            "ring_v0_kph",
+            "ring_v0_mps",
+            "ring_nominal_speed_min_mps",
+            "ring_nominal_speed_max_mps",
+            "ring_nominal_speed_mean_mps",
+            "ring_seam_max_jump_m",
+            "ring_raw_seam_max_jump_m",
+        }:
+            if value in (None, ""):
+                dst[key] = None
+            else:
+                try:
+                    dst[key] = float(value)
+                except Exception:
+                    dst[key] = value
         else:
             dst[key] = str(value or "")
 
@@ -377,6 +409,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                 anim_latest["reload_inputs_sync_ok"] = canonical.get("reload_inputs_sync_ok")
                 anim_latest["npz_path_sync_ok"] = canonical.get("npz_path_sync_ok")
                 _copy_browser_perf_fields(anim_latest, canonical)
+                _copy_ring_meta_fields(anim_latest, canonical)
                 anim_latest["browser_perf_registry_snapshot_in_bundle"] = _ref_present_in_bundle(
                     anim_latest.get("browser_perf_registry_snapshot_ref") or anim_latest.get("browser_perf_registry_snapshot_path"),
                     bundle_basenames,
