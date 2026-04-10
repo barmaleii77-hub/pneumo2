@@ -72,6 +72,11 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 import numpy as np
 
 from pneumo_solver_ui.data_contract import read_visual_geometry_meta
+from pneumo_solver_ui.suspension_family_contract import spring_geometry_key
+from pneumo_solver_ui.suspension_family_runtime import (
+    spring_family_active_flag_column,
+    spring_family_runtime_column,
+)
 from pneumo_solver_ui.visual_contract import (
     collect_visual_cache_dependencies,
     visual_cache_dependencies_token,
@@ -240,6 +245,7 @@ except ModuleNotFoundError as e:
 
 from .data_bundle import CORNERS, DataBundle, load_npz
 from .hmi_widgets import EventTimelineWidget, TrendsPanel
+from .engineering_analysis_panel import MultiFactorAnalysisPanel
 from .cylinder_truth_gate import (
     evaluate_all_cylinder_truth_gates as _evaluate_all_cylinder_truth_gates,
     render_cylinder_truth_gate_message as _render_cylinder_truth_gate_message,
@@ -257,6 +263,7 @@ from .geom3d_helpers import (
     cylinder_visual_segments_from_state as _cylinder_visual_segments_from_state,
     cylinder_visual_state_from_packaging as _cylinder_visual_state_from_packaging,
     derive_wheel_pose_from_hardpoints as _derive_wheel_pose_from_hardpoints,
+    ellipse_mesh_on_plane as _ellipse_mesh_on_plane,
     grid_faces_rect as _grid_faces_rect,
     lifted_box_center_from_lower_corners as _lifted_box_center_from_lower_corners,
     localize_world_points_to_car_frame as _localize_world_points_to_car_frame,
@@ -298,6 +305,139 @@ except Exception:
     _HAS_GL = False
 
 _HAS_PG = pg is not None
+
+_ANIMATOR_SOLID_SHADER = "animatorDualLight"
+_ANIMATOR_ROAD_SHADER = "animatorRoadGloss"
+_ANIMATOR_CUSTOM_SHADERS_REGISTERED = False
+
+
+def _register_animator_custom_shaders() -> None:
+    """Register lightweight scene shaders once, with safe fallback to built-ins.
+
+    The goal is to improve scene readability and material separation without adding
+    per-frame CPU work or heavier geometry. Compilation still happens lazily inside
+    pyqtgraph/OpenGL on first use.
+    """
+    global _ANIMATOR_CUSTOM_SHADERS_REGISTERED
+    if _ANIMATOR_CUSTOM_SHADERS_REGISTERED or not _HAS_GL or gl is None:
+        return
+    shader_mod = getattr(gl, "shaders", None)
+    if shader_mod is None:
+        return
+    try:
+        shader_names = getattr(shader_mod.ShaderProgram, "names", {})
+        if _ANIMATOR_SOLID_SHADER not in shader_names:
+            shader_mod.ShaderProgram(
+                _ANIMATOR_SOLID_SHADER,
+                [
+                    shader_mod.VertexShader(
+                        """
+                        uniform mat4 u_mvp;
+                        uniform mat3 u_normal;
+                        attribute vec4 a_position;
+                        attribute vec3 a_normal;
+                        attribute vec4 a_color;
+                        varying vec4 v_color;
+                        varying vec3 v_normal;
+                        void main() {
+                            v_normal = normalize(u_normal * a_normal);
+                            v_color = a_color;
+                            gl_Position = u_mvp * a_position;
+                        }
+                        """
+                    ),
+                    shader_mod.FragmentShader(
+                        """
+                        #ifdef GL_ES
+                        precision mediump float;
+                        #endif
+                        varying vec4 v_color;
+                        varying vec3 v_normal;
+                        void main() {
+                            vec3 n = normalize(v_normal);
+                            vec3 keyDir = normalize(vec3(0.48, -0.72, -0.50));
+                            vec3 fillDir = normalize(vec3(-0.28, 0.24, -0.93));
+                            vec3 halfVec = normalize(keyDir + vec3(0.0, 0.0, -1.0));
+                            float key = max(dot(n, keyDir), 0.0);
+                            float fill = max(dot(n, fillDir), 0.0);
+                            float edge = clamp(n.x*n.x + n.y*n.y, 0.0, 1.0);
+                            float rim = pow(edge, 1.8);
+                            float spec = pow(max(dot(n, halfVec), 0.0), 20.0);
+                            vec3 rgb = v_color.rgb * (0.18 + 0.74 * key + 0.24 * fill);
+                            rgb += vec3(0.05, 0.09, 0.13) * fill;
+                            rgb += vec3(0.10, 0.16, 0.24) * rim * (0.35 + 0.65 * v_color.a);
+                            rgb += vec3(0.28, 0.32, 0.36) * spec;
+                            gl_FragColor = vec4(clamp(rgb, 0.0, 1.0), v_color.a);
+                        }
+                        """
+                    ),
+                ],
+            )
+        if _ANIMATOR_ROAD_SHADER not in shader_names:
+            shader_mod.ShaderProgram(
+                _ANIMATOR_ROAD_SHADER,
+                [
+                    shader_mod.VertexShader(
+                        """
+                        uniform mat4 u_mvp;
+                        uniform mat3 u_normal;
+                        attribute vec4 a_position;
+                        attribute vec3 a_normal;
+                        attribute vec4 a_color;
+                        varying vec4 v_color;
+                        varying vec3 v_normal;
+                        void main() {
+                            v_normal = normalize(u_normal * a_normal);
+                            v_color = a_color;
+                            gl_Position = u_mvp * a_position;
+                        }
+                        """
+                    ),
+                    shader_mod.FragmentShader(
+                        """
+                        #ifdef GL_ES
+                        precision mediump float;
+                        #endif
+                        varying vec4 v_color;
+                        varying vec3 v_normal;
+                        void main() {
+                            vec3 n = normalize(v_normal);
+                            vec3 keyDir = normalize(vec3(0.26, -0.92, -0.28));
+                            vec3 fillDir = normalize(vec3(-0.18, 0.30, -0.94));
+                            vec3 halfVec = normalize(keyDir + vec3(0.0, 0.0, -1.0));
+                            float key = max(dot(n, keyDir), 0.0);
+                            float fill = max(dot(n, fillDir), 0.0);
+                            float edge = clamp(n.x*n.x + n.y*n.y, 0.0, 1.0);
+                            float glaze = pow(max(dot(n, halfVec), 0.0), 26.0);
+                            float haze = pow(edge, 1.25);
+                            vec3 rgb = v_color.rgb * (0.14 + 0.66 * key + 0.22 * fill);
+                            rgb += vec3(0.05, 0.07, 0.09) * haze;
+                            rgb += vec3(0.18, 0.24, 0.30) * glaze;
+                            rgb += vec3(0.02, 0.03, 0.04) * (0.40 + 0.60 * edge);
+                            gl_FragColor = vec4(clamp(rgb, 0.0, 1.0), v_color.a);
+                        }
+                        """
+                    ),
+                ],
+            )
+        _ANIMATOR_CUSTOM_SHADERS_REGISTERED = True
+    except Exception:
+        _ANIMATOR_CUSTOM_SHADERS_REGISTERED = False
+
+
+def _animator_shader_name(preferred: Optional[str], fallback: Optional[str]) -> Optional[str]:
+    if preferred is None or not _HAS_GL or gl is None:
+        return fallback
+    try:
+        shader_names = getattr(gl.shaders.ShaderProgram, "names", {})
+        if preferred in shader_names:
+            return preferred
+    except Exception:
+        pass
+    return fallback
+
+
+_register_animator_custom_shaders()
 
 
 # -----------------------------
@@ -1156,12 +1296,59 @@ def _qt_color(rgb: Tuple[int, int, int], a: int = 255) -> QtGui.QColor:
     return QtGui.QColor(int(r), int(g), int(b), int(a))
 
 
+def _lerp_rgb(a: Tuple[int, int, int], b: Tuple[int, int, int], t: float) -> Tuple[int, int, int]:
+    tt = float(_clamp(float(t), 0.0, 1.0))
+    return tuple(
+        int(round((1.0 - tt) * float(x) + tt * float(y)))
+        for x, y in zip(tuple(a), tuple(b))
+    )
+
+
+def _boost_rgb(rgb: Tuple[int, int, int], gain: float) -> Tuple[int, int, int]:
+    gg = float(max(0.0, gain))
+    return tuple(
+        int(max(0, min(255, round(float(c) + (255.0 - float(c)) * gg))))
+        for c in tuple(rgb)
+    )
+
+
+def _palette_rgb(stops: Sequence[Tuple[float, Tuple[int, int, int]]], u: float) -> Tuple[int, int, int]:
+    uu = float(_clamp(float(u), 0.0, 1.0))
+    if not stops:
+        return 255, 255, 255
+    prev_u, prev_rgb = float(stops[0][0]), tuple(stops[0][1])
+    if uu <= prev_u:
+        return prev_rgb
+    for stop_u, stop_rgb in stops[1:]:
+        su = float(stop_u)
+        srgb = tuple(stop_rgb)
+        if uu <= su:
+            denom = max(1e-9, su - prev_u)
+            return _lerp_rgb(prev_rgb, srgb, (uu - prev_u) / denom)
+        prev_u, prev_rgb = su, srgb
+    return prev_rgb
+
+
 def _heat_rgb(u: float, *, sat: float = 0.95, val: float = 0.95) -> Tuple[int, int, int]:
-    """Blue→Red heat color for u in [0..1]."""
+    """Premium heat palette for u in [0..1]."""
     u = float(_clamp(float(u), 0.0, 1.0))
-    # HSV hue: 0.66 (~240° blue) -> 0.0 (red)
-    h = (1.0 - u) * 0.66
-    r, g, b = colorsys.hsv_to_rgb(h, float(sat), float(val))
+    rgb = _palette_rgb(
+        [
+            (0.00, (18, 44, 84)),
+            (0.18, (18, 116, 225)),
+            (0.42, (24, 202, 255)),
+            (0.66, (166, 245, 92)),
+            (0.84, (255, 196, 71)),
+            (1.00, (255, 91, 77)),
+        ],
+        u,
+    )
+    h, s0, v0 = colorsys.rgb_to_hsv(*(float(c) / 255.0 for c in rgb))
+    r, g, b = colorsys.hsv_to_rgb(
+        h,
+        float(_clamp(s0 * float(sat), 0.0, 1.0)),
+        float(_clamp(v0 * float(val), 0.0, 1.0)),
+    )
     return int(r * 255), int(g * 255), int(b * 255)
 
 
@@ -1328,15 +1515,22 @@ class Arrow2D(QtCore.QObject):
         self.scene = scene
         self.width_m = float(width_m)
         self.gradient_body = bool(gradient_body)
+        self.glow_body = QtWidgets.QGraphicsLineItem()
+        self.glow_head = QtWidgets.QGraphicsPolygonItem()
         self.body = QtWidgets.QGraphicsLineItem()
         self.head = QtWidgets.QGraphicsPolygonItem()
+        self.glow_body.setZValue(8)
+        self.glow_head.setZValue(9)
         self.body.setZValue(10)
         self.head.setZValue(11)
+        self.scene.addItem(self.glow_body)
+        self.scene.addItem(self.glow_head)
         self.scene.addItem(self.body)
         self.scene.addItem(self.head)
         self._hidden = False
         self._last_body_style_key: Optional[tuple[Any, ...]] = None
         self._last_head_style_key: Optional[tuple[Any, ...]] = None
+        self._last_glow_style_key: Optional[tuple[Any, ...]] = None
         self._last_geom_key: Optional[tuple[Any, ...]] = None
         self.hide()
 
@@ -1344,6 +1538,8 @@ class Arrow2D(QtCore.QObject):
         if self._hidden:
             return
         self._hidden = True
+        self.glow_body.setVisible(False)
+        self.glow_head.setVisible(False)
         self.body.setVisible(False)
         self.head.setVisible(False)
 
@@ -1351,6 +1547,8 @@ class Arrow2D(QtCore.QObject):
         if not self._hidden:
             return
         self._hidden = False
+        self.glow_body.setVisible(True)
+        self.glow_head.setVisible(True)
         self.body.setVisible(True)
         self.head.setVisible(True)
 
@@ -1405,6 +1603,38 @@ class Arrow2D(QtCore.QObject):
         self.body.setPen(pen)
         self._last_body_style_key = body_style_key
 
+    def _apply_glow_style(
+        self,
+        p0: QtCore.QPointF,
+        p1: QtCore.QPointF,
+        *,
+        rgb: Tuple[int, int, int],
+        alpha: int,
+        width_m: float,
+    ) -> None:
+        glow_rgb = _boost_rgb(rgb, 0.45)
+        glow_key = (
+            "glow",
+            tuple(int(v) for v in glow_rgb),
+            int(alpha),
+            round(float(width_m), 5),
+            self._geom_key(p0, p1, head_len_m=0.0, head_w_m=0.0),
+        )
+        if glow_key == self._last_glow_style_key:
+            return
+        glow_alpha = int(max(18, min(180, round(float(alpha) * 0.24))))
+        grad = QtGui.QLinearGradient(p0, p1)
+        grad.setColorAt(0.0, _qt_color(glow_rgb, a=0))
+        grad.setColorAt(0.35, _qt_color(glow_rgb, a=max(10, glow_alpha // 2)))
+        grad.setColorAt(1.0, _qt_color(glow_rgb, a=glow_alpha))
+        glow_pen = QtGui.QPen(QtGui.QBrush(grad), float(max(width_m * 2.6, width_m + 0.006)))
+        glow_pen.setCapStyle(QtCore.Qt.RoundCap)
+        glow_pen.setJoinStyle(QtCore.Qt.RoundJoin)
+        self.glow_body.setPen(glow_pen)
+        self.glow_head.setPen(QtGui.QPen(QtCore.Qt.NoPen))
+        self.glow_head.setBrush(QtGui.QBrush(_qt_color(glow_rgb, a=max(10, int(glow_alpha * 0.65)))))
+        self._last_glow_style_key = glow_key
+
     def _apply_head_style(self, *, rgb: Tuple[int, int, int], alpha: int, width_m: float) -> None:
         head_style_key = (tuple(int(v) for v in rgb), int(alpha), round(float(width_m), 5))
         if head_style_key == self._last_head_style_key:
@@ -1443,6 +1673,7 @@ class Arrow2D(QtCore.QObject):
 
         # Body segment ends before head
         body_end = QtCore.QPointF(p1.x() - ux * head_len, p1.y() - uy * head_len)
+        self._apply_glow_style(p0, p1, rgb=rgb, alpha=alpha, width_m=w)
         self._apply_body_style(p0, p1, rgb=rgb, alpha=alpha, width_m=w)
         self._apply_head_style(rgb=rgb, alpha=alpha, width_m=w)
 
@@ -1452,7 +1683,9 @@ class Arrow2D(QtCore.QObject):
         right = QtCore.QPointF(body_end.x() - px * (0.5 * head_w), body_end.y() - py * (0.5 * head_w))
         geom_key = self._geom_key(p0, p1, head_len_m=head_len, head_w_m=head_w)
         if geom_key != self._last_geom_key:
+            self.glow_body.setLine(QtCore.QLineF(p0, body_end))
             self.body.setLine(QtCore.QLineF(p0, body_end))
+            self.glow_head.setPolygon(QtGui.QPolygonF([tip, left, right]))
             self.head.setPolygon(QtGui.QPolygonF([tip, left, right]))
             self._last_geom_key = geom_key
 
@@ -4314,6 +4547,22 @@ class Car3DWidget(QtWidgets.QWidget):
         self._show_piston_markers_debug = False
         self._layout_transition_active = False
         self._cylinder_truth_gates: Dict[str, Dict[str, Any]] = _evaluate_all_cylinder_truth_gates(None)
+        self._glass_ior = 1.52
+        self._glass_f0 = self._schlick_f0_from_ior(self._glass_ior)
+        self._shadow_hover_m = 0.006
+        self._bundle_context_key: Optional[int] = None
+        self._bundle_geometry_meta: Dict[str, Any] = {}
+        self._cyl_pressure_series_map: Dict[str, np.ndarray] = {}
+        self._tire_force_series_map: Dict[str, np.ndarray] = {}
+        self._spring_metric_series_map: Dict[str, np.ndarray] = {}
+        self._spring_active_series_map: Dict[str, np.ndarray] = {}
+        self._patm_arr: Optional[np.ndarray] = None
+        self._patm_default_pa: float = float(PATM_PA_DEFAULT)
+        self._cyl_pressure_visual_min_bar_g: float = -0.35
+        self._cyl_pressure_visual_max_bar_g: float = 10.0
+        self._tire_force_visual_max_n: float = 4500.0
+        self._cyl_pressure_visual_state: Dict[str, Tuple[float, float, float, float]] = {}
+        self._scene_scalar_visual_state: Dict[str, float] = {}
 
         # ---- Vector scales (convert physical units to screen meters)
         self._vel_scale = 0.35    # (m/s)  -> (m)
@@ -4333,7 +4582,7 @@ class Car3DWidget(QtWidgets.QWidget):
             return
 
         self.view = gl.GLViewWidget()
-        self.view.setBackgroundColor(10, 10, 10)
+        self.view.setBackgroundColor(6, 10, 18)
         self.view.opts["distance"] = 9.0
         self.view.opts["elevation"] = 18.0
         self.view.opts["azimuth"] = -55.0
@@ -4368,15 +4617,34 @@ class Car3DWidget(QtWidgets.QWidget):
         self._road_stripes: Optional["gl.GLLinePlotItem"] = None
 
         self._chassis_mesh: Optional["gl.GLMeshItem"] = None
+        self._body_shadow_mesh: Optional["gl.GLMeshItem"] = None
         self._wheel_meshes: List["gl.GLMeshItem"] = []
+        self._wheel_rim_meshes: List["gl.GLMeshItem"] = []
+        self._wheel_hub_meshes: List["gl.GLMeshItem"] = []
+        self._wheel_brake_rotor_meshes: List["gl.GLMeshItem"] = []
+        self._wheel_brake_caliper_meshes: List["gl.GLMeshItem"] = []
+        self._wheel_spin_glow_lines: List["gl.GLLinePlotItem"] = []
+        self._wheel_rotor_streak_lines: List["gl.GLLinePlotItem"] = []
+        self._wheel_shadow_meshes: List["gl.GLMeshItem"] = []
+        self._arm_lower_meshes: List["gl.GLMeshItem"] = []
+        self._arm_upper_meshes: List["gl.GLMeshItem"] = []
         self._cyl_body_meshes: List["gl.GLMeshItem"] = []
         self._cyl_chamber_meshes: List["gl.GLMeshItem"] = []
+        self._cyl_rod_chamber_meshes: List["gl.GLMeshItem"] = []
+        self._cyl_bloom_card_meshes: List["gl.GLMeshItem"] = []
         self._cyl_rod_meshes: List["gl.GLMeshItem"] = []
         self._cyl_piston_meshes: List["gl.GLMeshItem"] = []
         self._cyl_piston_ring_lines: List["gl.GLLinePlotItem"] = []
         self._cyl_rod_core_lines: List["gl.GLLinePlotItem"] = []
+        self._cyl_cap_ring_lines: List["gl.GLLinePlotItem"] = []
+        self._cyl_gland_ring_lines: List["gl.GLLinePlotItem"] = []
+        self._cyl_glass_glint_lines: List["gl.GLLinePlotItem"] = []
+        self._cyl_glass_caustic_lines: List["gl.GLLinePlotItem"] = []
         self._cyl_piston_markers: Optional[Any] = None
         self._cyl_frame_mount_markers: Optional["gl.GLLinePlotItem"] = None
+        self._spring_meshes: List["gl.GLMeshItem"] = []
+        self._spring_seat_meshes: List["gl.GLMeshItem"] = []
+        self._spring_glow_lines: List["gl.GLLinePlotItem"] = []
 
         self._contact_pts: Optional["gl.GLLinePlotItem"] = None
         self._contact_links: Optional["gl.GLLinePlotItem"] = None
@@ -4384,6 +4652,13 @@ class Car3DWidget(QtWidgets.QWidget):
         self._cyl1_lines: Optional["gl.GLLinePlotItem"] = None
         self._cyl2_lines: Optional["gl.GLLinePlotItem"] = None
         self._contact_patch_mesh: Optional["gl.GLMeshItem"] = None
+        self._contact_glaze_meshes: List["gl.GLMeshItem"] = []
+        self._contact_accent_rings: List["gl.GLLinePlotItem"] = []
+        self._scene_fog_meshes: List["gl.GLMeshItem"] = []
+        self._corner_light_shaft_meshes: List["gl.GLMeshItem"] = []
+        self._corner_key_light_lines: List["gl.GLLinePlotItem"] = []
+        self._focus_halo_mesh: Optional["gl.GLMeshItem"] = None
+        self._focus_halo_line: Optional["gl.GLLinePlotItem"] = None
 
         self._vec_vel: Optional["gl.GLLinePlotItem"] = None
         self._vec_acc: Optional["gl.GLLinePlotItem"] = None
@@ -4533,6 +4808,71 @@ class Car3DWidget(QtWidgets.QWidget):
             faces.append([top_center, c, d])
         return verts.astype(float), np.asarray(faces, dtype=np.int32)
 
+    @staticmethod
+    def _schlick_f0_from_ior(ior: float) -> float:
+        n = float(max(1.0, ior))
+        return float(((n - 1.0) / (n + 1.0)) ** 2)
+
+    @staticmethod
+    def _line_color_ramp(
+        pos_xyz: np.ndarray,
+        *,
+        near_rgba: Tuple[float, float, float, float],
+        far_rgba: Tuple[float, float, float, float],
+        power: float = 0.82,
+    ) -> np.ndarray:
+        pos = np.asarray(pos_xyz, dtype=float).reshape(-1, 3)
+        if pos.size == 0:
+            return np.zeros((0, 4), dtype=np.float32)
+        x = np.asarray(pos[:, 0], dtype=float)
+        span = float(max(1e-6, np.nanmax(np.abs(x))))
+        t = np.asarray(np.clip(np.abs(x) / span, 0.0, 1.0), dtype=float) ** float(max(0.2, power))
+        near = np.asarray(near_rgba, dtype=float).reshape(1, 4)
+        far = np.asarray(far_rgba, dtype=float).reshape(1, 4)
+        colors = near * (1.0 - t.reshape(-1, 1)) + far * t.reshape(-1, 1)
+        return np.asarray(colors, dtype=np.float32)
+
+    @staticmethod
+    def _road_face_colors(vertices_xyz: np.ndarray, *, n_long: int, n_lat: int) -> np.ndarray:
+        n_s = int(max(2, n_long))
+        n_l = int(max(2, n_lat))
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(n_s, n_l, 3)
+        z_cell = 0.25 * (
+            verts[:-1, :-1, 2]
+            + verts[1:, :-1, 2]
+            + verts[:-1, 1:, 2]
+            + verts[1:, 1:, 2]
+        )
+        finite = z_cell[np.isfinite(z_cell)]
+        if finite.size:
+            z_lo = float(np.nanpercentile(finite, 5.0))
+            z_hi = float(np.nanpercentile(finite, 95.0))
+        else:
+            z_lo = 0.0
+            z_hi = 1.0
+        z_span = max(1e-6, z_hi - z_lo)
+        z_u = np.clip((z_cell - z_lo) / z_span, 0.0, 1.0)
+        lat_axis = np.linspace(-1.0, 1.0, n_l, dtype=float)
+        lat_u = 0.5 * (lat_axis[:-1] + lat_axis[1:])
+        long_u = np.linspace(0.0, 1.0, n_s - 1, dtype=float)
+        long_g, lat_g = np.meshgrid(long_u, lat_u, indexing="ij")
+        shoulder = np.clip(np.abs(lat_g), 0.0, 1.0)
+        center_band = np.exp(-((lat_g / 0.26) ** 2))
+        # Pebbled-sand tint: stable procedural grain so the road reads as a material,
+        # not as a flat ribbon. The pattern is view-stable because it depends only on
+        # world-stable longitudinal/lateral coordinates.
+        weave = 0.5 + 0.5 * np.sin((17.0 * long_g) + (7.0 * lat_g))
+        pebble = 0.5 + 0.5 * np.sin((43.0 * long_g) + (29.0 * lat_g) + (0.7 * np.sin(11.0 * long_g)))
+        grit = 0.5 + 0.5 * np.cos((71.0 * long_g) - (53.0 * lat_g))
+        grain = np.clip((0.62 * pebble) + (0.38 * grit), 0.0, 1.0)
+        warm_center = 0.55 + 0.45 * center_band
+        r = 0.27 + 0.10 * z_u + 0.14 * warm_center + 0.10 * grain + 0.04 * weave - 0.03 * shoulder
+        g = 0.23 + 0.08 * z_u + 0.10 * warm_center + 0.06 * grain + 0.03 * weave - 0.02 * shoulder
+        b = 0.18 + 0.06 * z_u + 0.03 * center_band + 0.02 * grain + 0.02 * weave - 0.03 * shoulder
+        a = 0.86 + 0.08 * center_band - 0.04 * shoulder + 0.03 * grain
+        rgba = np.stack([np.clip(r, 0.0, 1.0), np.clip(g, 0.0, 1.0), np.clip(b, 0.0, 1.0), np.clip(a, 0.0, 1.0)], axis=-1)
+        return np.repeat((rgba.reshape(-1, 4) * 255.0).astype(np.uint8), 2, axis=0)
+
 
     @staticmethod
     def _rotation_from_y_to_vec(vec_xyz: np.ndarray) -> np.ndarray:
@@ -4587,6 +4927,357 @@ class Car3DWidget(QtWidgets.QWidget):
         return (scaled @ R.T) + center.reshape(1, 3)
 
     @staticmethod
+    def _oriented_box_mesh(
+        *,
+        center_xyz: np.ndarray,
+        axis_x_xyz: np.ndarray,
+        axis_y_xyz: np.ndarray,
+        axis_z_xyz: np.ndarray,
+        size_x_m: float,
+        size_y_m: float,
+        size_z_m: float,
+    ) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_x = np.asarray(axis_x_xyz, dtype=float).reshape(3)
+        axis_y = np.asarray(axis_y_xyz, dtype=float).reshape(3)
+        axis_z = np.asarray(axis_z_xyz, dtype=float).reshape(3)
+        sx = float(max(1e-4, size_x_m))
+        sy = float(max(1e-4, size_y_m))
+        sz = float(max(1e-4, size_z_m))
+        if not np.all(np.isfinite(center)) or not np.all(np.isfinite(axis_x)) or not np.all(np.isfinite(axis_y)) or not np.all(np.isfinite(axis_z)):
+            return None, None
+        nx = float(np.linalg.norm(axis_x))
+        if not np.isfinite(nx) or nx <= 1e-9:
+            return None, None
+        x_axis = axis_x / nx
+        z_axis = axis_z - float(np.dot(axis_z, x_axis)) * x_axis
+        nz = float(np.linalg.norm(z_axis))
+        if not np.isfinite(nz) or nz <= 1e-9:
+            z_axis = np.cross(x_axis, axis_y)
+            nz = float(np.linalg.norm(z_axis))
+        if not np.isfinite(nz) or nz <= 1e-9:
+            return None, None
+        z_axis = z_axis / nz
+        y_axis = axis_y - float(np.dot(axis_y, x_axis)) * x_axis - float(np.dot(axis_y, z_axis)) * z_axis
+        ny = float(np.linalg.norm(y_axis))
+        if not np.isfinite(ny) or ny <= 1e-9:
+            y_axis = np.cross(z_axis, x_axis)
+            ny = float(np.linalg.norm(y_axis))
+        if not np.isfinite(ny) or ny <= 1e-9:
+            return None, None
+        y_axis = y_axis / ny
+        z_axis = np.cross(x_axis, y_axis)
+        nz = float(np.linalg.norm(z_axis))
+        if not np.isfinite(nz) or nz <= 1e-9:
+            return None, None
+        z_axis = z_axis / nz
+        verts_local, faces = Car3DWidget._box_mesh(sx, sy, sz)
+        basis = np.column_stack([x_axis, y_axis, z_axis])
+        verts = (np.asarray(verts_local, dtype=float) @ np.asarray(basis, dtype=float).T) + center.reshape(1, 3)
+        return np.asarray(verts, dtype=float), np.asarray(faces, dtype=np.int32)
+
+    @staticmethod
+    def _concat_mesh_parts(
+        mesh_parts: Sequence[tuple[Optional[np.ndarray], Optional[np.ndarray]]],
+    ) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        verts_all: list[np.ndarray] = []
+        faces_all: list[np.ndarray] = []
+        vert_base = 0
+        for verts_xyz, faces_ijk in mesh_parts:
+            if verts_xyz is None or faces_ijk is None:
+                continue
+            verts = np.asarray(verts_xyz, dtype=float).reshape(-1, 3)
+            faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+            if verts.shape[0] < 3 or faces.shape[0] < 1 or not np.all(np.isfinite(verts)):
+                continue
+            verts_all.append(verts)
+            faces_all.append(np.asarray(faces + int(vert_base), dtype=np.int32))
+            vert_base += int(verts.shape[0])
+        if not verts_all or not faces_all:
+            return None, None
+        return np.vstack(verts_all), np.vstack(faces_all)
+
+    def _deformed_wheel_vertices(
+        self,
+        *,
+        tire_force_n: float,
+        wheel_gap_m: float,
+        in_air: bool,
+        speed_m_s: float,
+    ) -> Optional[np.ndarray]:
+        if self._wheel_base_vertices is None:
+            return None
+        base = np.asarray(self._wheel_base_vertices, dtype=float)
+        if base.size == 0:
+            return None
+        wheel_radius = float(max(1e-4, getattr(self.geom, "wheel_radius", 0.0)))
+        wheel_width = float(max(1e-4, getattr(self.geom, "wheel_width", 0.0)))
+        half_width = 0.5 * wheel_width
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        gap_u = float(_clamp(float(max(0.0, wheel_gap_m)) / max(0.01, 0.34 * wheel_radius), 0.0, 1.0))
+        speed_u = float(_clamp(abs(float(speed_m_s)) / 35.0, 0.0, 1.0))
+        contact_u = 0.0 if bool(in_air) else float(_clamp((0.22 + 0.78 * load_u) * (1.0 - 0.52 * gap_u), 0.0, 1.0))
+        x = np.asarray(base[:, 0], dtype=float)
+        y = np.asarray(base[:, 1], dtype=float)
+        z = np.asarray(base[:, 2], dtype=float)
+        radial_len = np.sqrt((x * x) + (z * z))
+        radial_safe = np.maximum(radial_len, 1e-6)
+        radial_dir = np.column_stack([x / radial_safe, np.zeros_like(y), z / radial_safe])
+        shell_u = np.asarray(np.clip((radial_len - 0.56 * wheel_radius) / max(1e-6, 0.44 * wheel_radius), 0.0, 1.0), dtype=float)
+        sidewall_u = np.asarray(np.clip((np.abs(y) - 0.34 * half_width) / max(1e-6, 0.66 * half_width), 0.0, 1.0), dtype=float)
+        tread_u = np.asarray(np.clip(1.0 - (sidewall_u ** 0.82), 0.0, 1.0), dtype=float)
+        bottom_u = np.asarray(np.clip((-z) / wheel_radius, 0.0, 1.0), dtype=float)
+        top_u = np.asarray(np.clip(z / wheel_radius, 0.0, 1.0), dtype=float)
+        contact_band = np.asarray(np.exp(-((x / max(0.08, 0.56 * wheel_radius)) ** 2)), dtype=float)
+        contact_flat_m = (
+            wheel_radius
+            * (0.014 + 0.048 * contact_u)
+            * (bottom_u ** 2.3)
+            * (0.44 + 0.56 * tread_u)
+            * contact_band
+            * shell_u
+        )
+        sidewall_bulge_m = (
+            wheel_radius
+            * (0.008 + 0.028 * contact_u)
+            * (0.24 + 0.76 * bottom_u)
+            * sidewall_u
+            * shell_u
+        )
+        crown_trim_m = wheel_radius * (0.003 + 0.010 * contact_u) * tread_u * (top_u ** 2.0) * shell_u
+        theta = np.arctan2(z, x)
+        tread_wave_m = (
+            wheel_radius
+            * (0.0015 + 0.0030 * speed_u)
+            * tread_u
+            * shell_u
+            * np.sin((12.0 * theta) + (18.0 * y / max(half_width, 1e-6)))
+        )
+        verts = np.asarray(base, dtype=float).copy()
+        verts += radial_dir * sidewall_bulge_m.reshape(-1, 1)
+        verts -= radial_dir * crown_trim_m.reshape(-1, 1)
+        verts += radial_dir * tread_wave_m.reshape(-1, 1)
+        verts[:, 2] = np.asarray(verts[:, 2], dtype=float) + contact_flat_m
+        return np.asarray(verts, dtype=float)
+
+    def _wheel_rim_mesh(
+        self,
+        *,
+        center_xyz: np.ndarray,
+        axle_xyz: np.ndarray,
+        forward_xyz: np.ndarray,
+        up_xyz: np.ndarray,
+        wheel_radius_m: float,
+        wheel_width_m: float,
+        spin_phase_rad: float = 0.0,
+        spoke_count: int = 5,
+    ) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axle = np.asarray(axle_xyz, dtype=float).reshape(3)
+        forward = np.asarray(forward_xyz, dtype=float).reshape(3)
+        up = np.asarray(up_xyz, dtype=float).reshape(3)
+        if not np.all(np.isfinite(center)) or not np.all(np.isfinite(axle)) or not np.all(np.isfinite(forward)) or not np.all(np.isfinite(up)):
+            return None, None
+        wheel_radius = float(max(0.05, wheel_radius_m))
+        wheel_width = float(max(0.03, wheel_width_m))
+        axle_norm = float(np.linalg.norm(axle))
+        if not np.isfinite(axle_norm) or axle_norm <= 1e-9:
+            return None, None
+        axle = axle / axle_norm
+        fwd = forward - float(np.dot(forward, axle)) * axle
+        fwd_norm = float(np.linalg.norm(fwd))
+        if not np.isfinite(fwd_norm) or fwd_norm <= 1e-9:
+            return None, None
+        fwd = fwd / fwd_norm
+        up_vec = up - float(np.dot(up, axle)) * axle
+        up_norm = float(np.linalg.norm(up_vec))
+        if not np.isfinite(up_norm) or up_norm <= 1e-9:
+            up_vec = np.cross(axle, fwd)
+            up_norm = float(np.linalg.norm(up_vec))
+        if not np.isfinite(up_norm) or up_norm <= 1e-9:
+            return None, None
+        up_vec = up_vec / up_norm
+        rim_radius = float(max(0.05, 0.70 * wheel_radius))
+        ring_tube_radius = float(max(0.006, 0.060 * wheel_radius))
+        ring_offset = float(max(0.010, 0.26 * wheel_width))
+        front_center = center + axle * ring_offset
+        rear_center = center - axle * ring_offset
+        front_path = self._circle_line_vertices(
+            radius_m=rim_radius,
+            center_xyz=front_center,
+            normal_xyz=axle,
+            segments=36,
+        )
+        rear_path = self._circle_line_vertices(
+            radius_m=rim_radius,
+            center_xyz=rear_center,
+            normal_xyz=axle,
+            segments=36,
+        )
+        mesh_parts: list[tuple[Optional[np.ndarray], Optional[np.ndarray]]] = [
+            self._tube_mesh_from_polyline(
+                np.asarray(front_path, dtype=float) if front_path is not None else np.zeros((0, 3), dtype=float),
+                radius_m=ring_tube_radius,
+                sides=10,
+                capped=False,
+            ),
+            self._tube_mesh_from_polyline(
+                np.asarray(rear_path, dtype=float) if rear_path is not None else np.zeros((0, 3), dtype=float),
+                radius_m=ring_tube_radius,
+                sides=10,
+                capped=False,
+            ),
+        ]
+        hub_radius = float(max(0.028, 0.30 * wheel_radius))
+        spoke_n = int(max(4, spoke_count))
+        spoke_half_width = float(max(0.008, 0.028 * wheel_radius))
+        spoke_half_depth = float(max(0.010, 0.18 * wheel_width))
+        spoke_len = float(max(0.03, rim_radius - hub_radius - 1.6 * ring_tube_radius))
+        spoke_mid_radius = hub_radius + 0.5 * spoke_len + 0.35 * ring_tube_radius
+        for spoke_idx in range(spoke_n):
+            ang = (2.0 * np.pi * float(spoke_idx) / float(spoke_n)) + (0.10 * np.pi) + float(spin_phase_rad)
+            radial = np.cos(ang) * fwd + np.sin(ang) * up_vec
+            tangent = np.cross(axle, radial)
+            tangent_norm = float(np.linalg.norm(tangent))
+            if not np.isfinite(tangent_norm) or tangent_norm <= 1e-9:
+                continue
+            tangent = tangent / tangent_norm
+            spoke_center = center + radial * spoke_mid_radius
+            spoke_mesh = self._oriented_box_mesh(
+                center_xyz=spoke_center,
+                axis_x_xyz=radial,
+                axis_y_xyz=axle,
+                axis_z_xyz=tangent,
+                size_x_m=spoke_len,
+                size_y_m=2.0 * spoke_half_depth,
+                size_z_m=2.0 * spoke_half_width,
+            )
+            mesh_parts.append(spoke_mesh)
+        return self._concat_mesh_parts(mesh_parts)
+
+    @staticmethod
+    def _wheel_spin_phase_rad(
+        *,
+        path_progress_m: float,
+        wheel_radius_m: float,
+        speed_m_s: float,
+    ) -> float:
+        radius = float(max(1e-4, wheel_radius_m))
+        progress = float(path_progress_m) if np.isfinite(float(path_progress_m)) else 0.0
+        if np.isfinite(float(speed_m_s)) and float(speed_m_s) < -1e-6:
+            progress = -abs(progress)
+        return float(math.fmod(progress / radius, 2.0 * np.pi))
+
+    @staticmethod
+    def _wheel_spin_arc_vertices(
+        *,
+        center_xyz: np.ndarray,
+        axle_xyz: np.ndarray,
+        forward_xyz: np.ndarray,
+        up_xyz: np.ndarray,
+        radius_m: float,
+        start_rad: float,
+        end_rad: float,
+        axial_offset_m: float = 0.0,
+        segments: int = 42,
+    ) -> Optional[np.ndarray]:
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axle = np.asarray(axle_xyz, dtype=float).reshape(3)
+        forward = np.asarray(forward_xyz, dtype=float).reshape(3)
+        up = np.asarray(up_xyz, dtype=float).reshape(3)
+        radius = float(max(1e-4, radius_m))
+        axial_offset = float(axial_offset_m)
+        if not np.all(np.isfinite(center)) or not np.all(np.isfinite(axle)) or not np.all(np.isfinite(forward)) or not np.all(np.isfinite(up)):
+            return None
+        axle_norm = float(np.linalg.norm(axle))
+        if not np.isfinite(axle_norm) or axle_norm <= 1e-9:
+            return None
+        axle = axle / axle_norm
+        fwd = forward - float(np.dot(forward, axle)) * axle
+        fwd_norm = float(np.linalg.norm(fwd))
+        if not np.isfinite(fwd_norm) or fwd_norm <= 1e-9:
+            return None
+        fwd = fwd / fwd_norm
+        up_vec = up - float(np.dot(up, axle)) * axle
+        up_norm = float(np.linalg.norm(up_vec))
+        if not np.isfinite(up_norm) or up_norm <= 1e-9:
+            up_vec = np.cross(axle, fwd)
+            up_norm = float(np.linalg.norm(up_vec))
+        if not np.isfinite(up_norm) or up_norm <= 1e-9:
+            return None
+        up_vec = up_vec / up_norm
+        ang = np.linspace(float(start_rad), float(end_rad), int(max(12, segments)), endpoint=True)
+        ring_center = center + axle * axial_offset
+        pts = (
+            ring_center.reshape(1, 3)
+            + radius * np.cos(ang).reshape(-1, 1) * fwd.reshape(1, 3)
+            + radius * np.sin(ang).reshape(-1, 1) * up_vec.reshape(1, 3)
+        )
+        return np.asarray(pts, dtype=float)
+
+    def _spring_seat_cup_mesh(
+        self,
+        *,
+        center_xyz: np.ndarray,
+        opening_normal_xyz: np.ndarray,
+        outer_radius_m: float,
+        inner_radius_m: float,
+        depth_m: float,
+        lip_height_m: float = 0.0,
+        segments: int = 28,
+    ) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis = np.asarray(opening_normal_xyz, dtype=float).reshape(3)
+        axis_norm = float(np.linalg.norm(axis))
+        outer_radius = float(max(1e-4, outer_radius_m))
+        inner_radius = float(_clamp(float(inner_radius_m), 0.18 * outer_radius, 0.92 * outer_radius))
+        depth = float(max(1e-4, depth_m))
+        lip_height = float(_clamp(float(lip_height_m) if np.isfinite(float(lip_height_m)) else 0.0, 0.12 * depth, 0.72 * depth))
+        ring_n = int(max(16, segments))
+        if not np.all(np.isfinite(center)) or not np.all(np.isfinite(axis)) or axis_norm <= 1e-9:
+            return None, None
+        axis = axis / axis_norm
+        rings_spec = [
+            (0.0, outer_radius),
+            (-lip_height, max(inner_radius + 0.22 * (outer_radius - inner_radius), 0.82 * outer_radius)),
+            (-depth * 0.64, max(inner_radius, 0.58 * outer_radius)),
+            (-depth, max(0.16 * outer_radius, 0.74 * inner_radius)),
+        ]
+        ang = np.linspace(0.0, 2.0 * np.pi, ring_n, endpoint=False)
+        rings_local: list[np.ndarray] = []
+        for y_off, radius in rings_spec:
+            ring = np.column_stack(
+                [
+                    float(radius) * np.cos(ang),
+                    np.full(ring_n, float(y_off), dtype=float),
+                    float(radius) * np.sin(ang),
+                ]
+            )
+            rings_local.append(np.asarray(ring, dtype=float))
+        verts_local = np.vstack(rings_local + [np.asarray([[0.0, -depth, 0.0]], dtype=float)])
+        faces: list[list[int]] = []
+        for ring_idx in range(len(rings_spec) - 1):
+            base0 = ring_idx * ring_n
+            base1 = (ring_idx + 1) * ring_n
+            for side_idx in range(ring_n):
+                a = base0 + side_idx
+                b = base0 + ((side_idx + 1) % ring_n)
+                c = base1 + ((side_idx + 1) % ring_n)
+                d = base1 + side_idx
+                faces.append([a, b, c])
+                faces.append([a, c, d])
+        cap_center_idx = int(verts_local.shape[0] - 1)
+        last_base = (len(rings_spec) - 1) * ring_n
+        for side_idx in range(ring_n):
+            a = last_base + side_idx
+            b = last_base + ((side_idx + 1) % ring_n)
+            faces.append([cap_center_idx, a, b])
+        R = self._rotation_from_y_to_vec(axis)
+        verts = (np.asarray(verts_local, dtype=float) @ np.asarray(R, dtype=float).T) + center.reshape(1, 3)
+        return np.asarray(verts, dtype=float), np.asarray(faces, dtype=np.int32)
+
+    @staticmethod
     def _circle_line_vertices(*, radius_m: float, center_xyz: np.ndarray, normal_xyz: np.ndarray, segments: int = 40) -> Optional[np.ndarray]:
         radius = float(radius_m)
         if not np.isfinite(radius) or radius <= 0.0:
@@ -4606,6 +5297,66 @@ class Car3DWidget(QtWidgets.QWidget):
         v = np.cross(normal, u)
         ang = np.linspace(0.0, 2.0 * np.pi, int(max(12, segments)) + 1, endpoint=True)
         pts = center.reshape(1, 3) + radius * (np.cos(ang).reshape(-1, 1) * u.reshape(1, 3) + np.sin(ang).reshape(-1, 1) * v.reshape(1, 3))
+        return np.asarray(pts, dtype=float)
+
+    @staticmethod
+    def _ellipse_line_vertices(
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        segments: int = 56,
+    ) -> Optional[np.ndarray]:
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = np.asarray(axis_u_xyz, dtype=float).reshape(3)
+        axis_v = np.asarray(axis_v_xyz, dtype=float).reshape(3)
+        ru = float(radius_u_m)
+        rv = float(radius_v_m)
+        nu = float(np.linalg.norm(axis_u))
+        nv = float(np.linalg.norm(axis_v))
+        if not np.all(np.isfinite(center)) or ru <= 0.0 or rv <= 0.0 or nu <= 1e-9 or nv <= 1e-9:
+            return None
+        axis_u = axis_u / nu
+        axis_v = axis_v / nv
+        ang = np.linspace(0.0, 2.0 * np.pi, int(max(16, segments)) + 1, endpoint=True)
+        pts = (
+            center.reshape(1, 3)
+            + ru * np.cos(ang).reshape(-1, 1) * axis_u.reshape(1, 3)
+            + rv * np.sin(ang).reshape(-1, 1) * axis_v.reshape(1, 3)
+        )
+        return np.asarray(pts, dtype=float)
+
+    @staticmethod
+    def _ellipse_arc_vertices(
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        start_rad: float,
+        end_rad: float,
+        segments: int = 40,
+    ) -> Optional[np.ndarray]:
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = np.asarray(axis_u_xyz, dtype=float).reshape(3)
+        axis_v = np.asarray(axis_v_xyz, dtype=float).reshape(3)
+        ru = float(radius_u_m)
+        rv = float(radius_v_m)
+        nu = float(np.linalg.norm(axis_u))
+        nv = float(np.linalg.norm(axis_v))
+        if not np.all(np.isfinite(center)) or ru <= 0.0 or rv <= 0.0 or nu <= 1e-9 or nv <= 1e-9:
+            return None
+        axis_u = axis_u / nu
+        axis_v = axis_v / nv
+        ang = np.linspace(float(start_rad), float(end_rad), int(max(12, segments)), endpoint=True)
+        pts = (
+            center.reshape(1, 3)
+            + ru * np.cos(ang).reshape(-1, 1) * axis_u.reshape(1, 3)
+            + rv * np.sin(ang).reshape(-1, 1) * axis_v.reshape(1, 3)
+        )
         return np.asarray(pts, dtype=float)
 
     @staticmethod
@@ -4697,6 +5448,1721 @@ class Car3DWidget(QtWidgets.QWidget):
     def _cylinder_name(cyl_index: int) -> str:
         return "cyl1" if int(cyl_index) == 1 else "cyl2"
 
+    @staticmethod
+    def _cylinder_chamber_node_name(cyl_index: int, corner: str, chamber_kind: str) -> str:
+        chamber_code = "БП" if str(chamber_kind).upper() in {"БП", "CAP", "CAP_SIDE", "BODY"} else "ШП"
+        return f"Ц{1 if int(cyl_index) == 1 else 2}_{corner}_{chamber_code}"
+
+    def _sample_patm_pa(self, *, i0: int, i1: int, alpha: float) -> float:
+        patm_arr = getattr(self, "_patm_arr", None)
+        patm_default = float(getattr(self, "_patm_default_pa", PATM_PA_DEFAULT))
+        if patm_arr is None:
+            return patm_default
+        return float(_sample_series_local(patm_arr, i0=i0, i1=i1, alpha=alpha, default=patm_default))
+
+    def _sample_cylinder_chamber_pressure_pa(
+        self,
+        cyl_index: int,
+        corner: str,
+        chamber_kind: str,
+        *,
+        i0: int,
+        i1: int,
+        alpha: float,
+        default_pa: float,
+    ) -> float:
+        node = self._cylinder_chamber_node_name(cyl_index, corner, chamber_kind)
+        arr = getattr(self, "_cyl_pressure_series_map", {}).get(str(node))
+        if arr is None:
+            return float(default_pa)
+        return float(_sample_series_local(arr, i0=i0, i1=i1, alpha=alpha, default=float(default_pa)))
+
+    def _sample_corner_tire_force_n(
+        self,
+        corner: str,
+        *,
+        i0: int,
+        i1: int,
+        alpha: float,
+        default_n: float,
+    ) -> float:
+        arr = getattr(self, "_tire_force_series_map", {}).get(str(corner))
+        if arr is None:
+            return float(default_n)
+        return float(_sample_series_local(arr, i0=i0, i1=i1, alpha=alpha, default=float(default_n)))
+
+    @staticmethod
+    def _blend_rgba(
+        rgba_a: Tuple[float, float, float, float],
+        rgba_b: Tuple[float, float, float, float],
+        t: float,
+    ) -> Tuple[float, float, float, float]:
+        tt = float(_clamp(float(t), 0.0, 1.0))
+        return tuple(
+            float((1.0 - tt) * float(a) + tt * float(b))
+            for a, b in zip(tuple(rgba_a), tuple(rgba_b))
+        )
+
+    def _wheel_tire_material_rgba(
+        self,
+        *,
+        key: str,
+        tire_force_n: float,
+        wheel_gap_m: float,
+        in_air: bool,
+        speed_m_s: float,
+    ) -> tuple[Tuple[float, float, float, float], Tuple[float, float, float, float]]:
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        wheel_radius = float(max(0.05, getattr(self.geom, "wheel_radius", 0.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        gap_u = float(_clamp(float(max(0.0, wheel_gap_m)) / max(0.01, 0.34 * wheel_radius), 0.0, 1.0))
+        speed_u = float(_clamp(abs(float(speed_m_s)) / 35.0, 0.0, 1.0))
+        contact_u = 0.0 if bool(in_air) else float(_clamp((0.20 + 0.80 * load_u) * (1.0 - 0.56 * gap_u), 0.0, 1.0))
+        base_face_rgba = (0.055, 0.058, 0.066, 1.0)
+        base_edge_rgba = (0.26, 0.28, 0.32, 0.98)
+        sheen_rgb = _lerp_rgb((84, 102, 124), (146, 190, 255), 0.10 + 0.42 * speed_u)
+        hot_rgb = _boost_rgb(_heat_rgb(0.10 + 0.82 * contact_u, sat=0.66, val=0.88), 0.04 + 0.10 * contact_u)
+        side_rgb = _lerp_rgb((38, 42, 50), sheen_rgb, 0.18 + 0.20 * speed_u)
+        face_target = self._blend_rgba(
+            base_face_rgba,
+            tuple(float(v) / 255.0 for v in tuple(side_rgb)) + (1.0,),
+            0.12 + 0.18 * speed_u,
+        )
+        face_target = self._blend_rgba(
+            face_target,
+            tuple(float(v) / 255.0 for v in tuple(hot_rgb)) + (1.0,),
+            0.04 + 0.12 * contact_u,
+        )
+        edge_target = self._blend_rgba(
+            base_edge_rgba,
+            tuple(float(v) / 255.0 for v in tuple(_boost_rgb(sheen_rgb, 0.08 + 0.18 * speed_u))) + (0.98,),
+            0.20 + 0.28 * speed_u,
+        )
+        edge_target = self._blend_rgba(
+            edge_target,
+            tuple(float(v) / 255.0 for v in tuple(_boost_rgb(hot_rgb, 0.10 + 0.20 * contact_u))) + (0.98,),
+            0.08 + 0.18 * contact_u,
+        )
+        face_rgba = self._smooth_rgba(f"{key}-face", face_target, response=0.18)
+        edge_rgba = self._smooth_rgba(f"{key}-edge", edge_target, response=0.18)
+        return face_rgba, edge_rgba
+
+    def _wheel_brake_material_rgba(
+        self,
+        *,
+        key: str,
+        tire_force_n: float,
+        speed_m_s: float,
+        kind: str,
+    ) -> tuple[Tuple[float, float, float, float], Tuple[float, float, float, float]]:
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        speed_u = float(_clamp(abs(float(speed_m_s)) / 35.0, 0.0, 1.0))
+        thermal_u = float(_clamp(0.56 * load_u + 0.44 * speed_u, 0.0, 1.0))
+        if str(kind).lower() == "caliper":
+            base_face_rgba = (0.40, 0.22, 0.16, 0.98)
+            base_edge_rgba = (0.94, 0.78, 0.56, 0.90)
+            glow_rgb = _boost_rgb(_heat_rgb(0.18 + 0.62 * thermal_u, sat=0.72, val=0.96), 0.08 + 0.16 * thermal_u)
+            face_target = self._blend_rgba(
+                base_face_rgba,
+                tuple(float(v) / 255.0 for v in tuple(glow_rgb)) + (0.98,),
+                0.10 + 0.18 * thermal_u,
+            )
+            edge_target = self._blend_rgba(
+                base_edge_rgba,
+                tuple(float(v) / 255.0 for v in tuple(_boost_rgb(glow_rgb, 0.12 + 0.18 * thermal_u))) + (0.92,),
+                0.16 + 0.24 * thermal_u,
+            )
+        else:
+            base_face_rgba = (0.60, 0.64, 0.70, 0.98)
+            base_edge_rgba = (0.90, 0.92, 0.96, 0.88)
+            temper_rgb = _lerp_rgb((168, 178, 194), (255, 204, 132), 0.12 + 0.58 * thermal_u)
+            face_target = self._blend_rgba(
+                base_face_rgba,
+                tuple(float(v) / 255.0 for v in tuple(temper_rgb)) + (0.98,),
+                0.08 + 0.16 * thermal_u,
+            )
+            edge_target = self._blend_rgba(
+                base_edge_rgba,
+                tuple(float(v) / 255.0 for v in tuple(_boost_rgb(temper_rgb, 0.08 + 0.20 * thermal_u))) + (0.90,),
+                0.12 + 0.20 * thermal_u,
+            )
+        face_rgba = self._smooth_rgba(f"{key}-face", face_target, response=0.18)
+        edge_rgba = self._smooth_rgba(f"{key}-edge", edge_target, response=0.18)
+        return face_rgba, edge_rgba
+
+    def _wheel_rim_material_rgba(
+        self,
+        *,
+        key: str,
+        tire_force_n: float,
+        speed_m_s: float,
+    ) -> tuple[Tuple[float, float, float, float], Tuple[float, float, float, float]]:
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        speed_u = float(_clamp(abs(float(speed_m_s)) / 35.0, 0.0, 1.0))
+        polish_u = float(_clamp(0.20 + 0.52 * speed_u + 0.20 * load_u, 0.0, 1.0))
+        base_face_rgba = (0.40, 0.44, 0.50, 0.98)
+        base_edge_rgba = (0.84, 0.88, 0.94, 0.88)
+        metal_rgb = _lerp_rgb((102, 112, 126), (192, 214, 246), 0.18 + 0.58 * polish_u)
+        warm_rgb = _lerp_rgb(tuple(metal_rgb), (255, 220, 168), 0.06 + 0.16 * load_u)
+        face_target = self._blend_rgba(
+            base_face_rgba,
+            tuple(float(v) / 255.0 for v in tuple(metal_rgb)) + (0.98,),
+            0.22 + 0.26 * polish_u,
+        )
+        edge_target = self._blend_rgba(
+            base_edge_rgba,
+            tuple(float(v) / 255.0 for v in tuple(_boost_rgb(warm_rgb, 0.10 + 0.18 * polish_u))) + (0.92,),
+            0.26 + 0.28 * polish_u,
+        )
+        face_rgba = self._smooth_rgba(f"{key}-face", face_target, response=0.18)
+        edge_rgba = self._smooth_rgba(f"{key}-edge", edge_target, response=0.18)
+        return face_rgba, edge_rgba
+
+    def _wheel_spin_glow_rgba(
+        self,
+        *,
+        key: str,
+        speed_m_s: float,
+        tire_force_n: float,
+        wheel_gap_m: float,
+        in_air: bool,
+    ) -> tuple[float, float, float, float]:
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        wheel_radius = float(max(0.05, getattr(self.geom, "wheel_radius", 0.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        speed_u = float(_clamp(abs(float(speed_m_s)) / 35.0, 0.0, 1.0))
+        gap_u = float(_clamp(float(max(0.0, wheel_gap_m)) / max(0.01, 0.34 * wheel_radius), 0.0, 1.0))
+        motion_u = 0.0 if speed_u <= 0.02 else float(_clamp((0.26 + 0.74 * speed_u) * (1.0 - 0.46 * gap_u), 0.0, 1.0))
+        if in_air:
+            motion_u *= 0.66
+        base_rgb = _lerp_rgb((84, 140, 214), (146, 224, 255), 0.20 + 0.64 * speed_u)
+        accent_rgb = _boost_rgb(_heat_rgb(0.16 + 0.66 * load_u, sat=0.58, val=0.98), 0.04 + 0.10 * load_u)
+        glow_rgb = _lerp_rgb(base_rgb, accent_rgb, 0.08 + 0.16 * load_u)
+        alpha = float(_clamp(0.02 + 0.18 * motion_u + 0.04 * load_u, 0.0, 0.28))
+        rgba_target = tuple(float(v) / 255.0 for v in glow_rgb) + (alpha,)
+        return self._smooth_rgba(str(key), rgba_target, response=0.18)
+
+    def _wheel_rotor_streak_rgba(
+        self,
+        *,
+        key: str,
+        speed_m_s: float,
+        tire_force_n: float,
+    ) -> tuple[float, float, float, float]:
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        speed_u = float(_clamp(abs(float(speed_m_s)) / 35.0, 0.0, 1.0))
+        thermal_u = float(_clamp(0.58 * load_u + 0.42 * speed_u, 0.0, 1.0))
+        streak_rgb = _boost_rgb(_heat_rgb(0.18 + 0.72 * thermal_u, sat=0.74, val=0.98), 0.08 + 0.18 * thermal_u)
+        alpha = float(_clamp(0.02 + 0.14 * speed_u + 0.08 * thermal_u, 0.0, 0.26))
+        rgba_target = tuple(float(v) / 255.0 for v in streak_rgb) + (alpha,)
+        return self._smooth_rgba(str(key), rgba_target, response=0.18)
+
+    def _smooth_rgba(
+        self,
+        key: str,
+        target_rgba: Tuple[float, float, float, float],
+        *,
+        response: float = 0.32,
+    ) -> Tuple[float, float, float, float]:
+        target = tuple(float(v) for v in tuple(target_rgba))
+        if not bool(getattr(self, "_playback_active", False)):
+            self._cyl_pressure_visual_state[str(key)] = target
+            return target
+        prev = self._cyl_pressure_visual_state.get(str(key))
+        if prev is None:
+            self._cyl_pressure_visual_state[str(key)] = target
+            return target
+        rr = float(_clamp(float(response), 0.05, 1.0))
+        smooth = tuple(float((1.0 - rr) * float(a) + rr * float(b)) for a, b in zip(tuple(prev), target))
+        self._cyl_pressure_visual_state[str(key)] = smooth
+        return smooth
+
+    def _smooth_scalar(
+        self,
+        key: str,
+        target_value: float,
+        *,
+        response: float = 0.24,
+    ) -> float:
+        target = float(target_value)
+        if not bool(getattr(self, "_playback_active", False)):
+            self._scene_scalar_visual_state[str(key)] = target
+            return target
+        prev = getattr(self, "_scene_scalar_visual_state", {}).get(str(key))
+        if prev is None or not np.isfinite(float(prev)):
+            self._scene_scalar_visual_state[str(key)] = target
+            return target
+        rr = float(_clamp(float(response), 0.05, 1.0))
+        smooth = float((1.0 - rr) * float(prev) + rr * target)
+        self._scene_scalar_visual_state[str(key)] = smooth
+        return smooth
+
+    def _scene_grade_profile(
+        self,
+        *,
+        key_prefix: str,
+        camera_view_dir_xyz: np.ndarray,
+        body_forward_xyz: np.ndarray,
+        mean_load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        speed_m_s: float,
+    ) -> dict[str, float]:
+        view = np.asarray(camera_view_dir_xyz, dtype=float).reshape(3)
+        view_norm = float(np.linalg.norm(view))
+        if not np.isfinite(view_norm) or view_norm <= 1e-9:
+            view = np.array([0.64, -0.52, 0.56], dtype=float)
+            view_norm = float(np.linalg.norm(view))
+        view = view / max(view_norm, 1e-12)
+        body = np.asarray(body_forward_xyz, dtype=float).reshape(3)
+        body_norm = float(np.linalg.norm(body))
+        if not np.isfinite(body_norm) or body_norm <= 1e-9:
+            body = np.array([1.0, 0.0, 0.0], dtype=float)
+            body_norm = 1.0
+        body = body / body_norm
+        view_h = np.asarray(view, dtype=float)
+        view_h[2] = 0.0
+        view_h_norm = float(np.linalg.norm(view_h))
+        if not np.isfinite(view_h_norm) or view_h_norm <= 1e-9:
+            view_h = np.asarray(body, dtype=float)
+            view_h_norm = float(np.linalg.norm(view_h))
+        view_h = view_h / max(view_h_norm, 1e-12)
+        frontal_u = float(_clamp(0.5 + 0.5 * float(np.dot(view_h, body)), 0.0, 1.0))
+        pitch_u = float(_clamp(abs(float(view[2])), 0.0, 1.0))
+        speed_u = float(_clamp(abs(float(speed_m_s)) / 35.0, 0.0, 1.0))
+        load_u = float(_clamp(float(mean_load_u), 0.0, 1.0))
+        spring_u = float(_clamp(float(spring_energy_u), 0.0, 1.0))
+        glass_u = float(_clamp(float(glass_energy_u), 0.0, 1.0))
+        energy_u = float(_clamp(0.34 * load_u + 0.28 * spring_u + 0.38 * glass_u, 0.0, 1.0))
+        exposure = self._smooth_scalar(
+            f"{key_prefix}:exposure",
+            0.92 + 0.18 * energy_u + 0.08 * (1.0 - pitch_u) + 0.04 * speed_u - 0.04 * frontal_u,
+            response=0.18,
+        )
+        saturation = self._smooth_scalar(
+            f"{key_prefix}:saturation",
+            0.94 + 0.10 * glass_u + 0.08 * spring_u + 0.04 * speed_u,
+            response=0.18,
+        )
+        warmth = self._smooth_scalar(
+            f"{key_prefix}:warmth",
+            -0.06 + 0.18 * (1.0 - frontal_u) + 0.04 * (load_u - spring_u),
+            response=0.18,
+        )
+        fog_gain = self._smooth_scalar(
+            f"{key_prefix}:fog_gain",
+            0.84 + 0.22 * energy_u + 0.10 * (1.0 - pitch_u),
+            response=0.18,
+        )
+        highlight_gain = self._smooth_scalar(
+            f"{key_prefix}:highlight_gain",
+            0.90 + 0.24 * glass_u + 0.12 * speed_u + 0.08 * energy_u,
+            response=0.18,
+        )
+        alpha_gain = self._smooth_scalar(
+            f"{key_prefix}:alpha_gain",
+            0.92 + 0.10 * energy_u + 0.06 * (1.0 - pitch_u),
+            response=0.18,
+        )
+        return {
+            "exposure": float(exposure),
+            "saturation": float(saturation),
+            "warmth": float(warmth),
+            "fog_gain": float(fog_gain),
+            "highlight_gain": float(highlight_gain),
+            "alpha_gain": float(alpha_gain),
+            "frontal_u": float(frontal_u),
+            "pitch_u": float(pitch_u),
+            "energy_u": float(energy_u),
+        }
+
+    @staticmethod
+    def _scene_grade_color_array(
+        colors_rgba: np.ndarray,
+        *,
+        exposure: float,
+        saturation: float,
+        warmth: float,
+        highlight_gain: float = 1.0,
+        alpha_gain: float = 1.0,
+        output_u8: bool = False,
+    ) -> np.ndarray:
+        cols = np.asarray(colors_rgba)
+        if cols.size == 0:
+            return np.zeros((0, 4), dtype=np.uint8 if output_u8 else np.float32)
+        cols = np.asarray(cols, dtype=float).reshape(-1, 4)
+        if np.nanmax(cols) > 1.0 + 1e-6:
+            cols = cols / 255.0
+        rgb = np.asarray(cols[:, :3], dtype=float)
+        alpha = np.asarray(cols[:, 3], dtype=float)
+        lum = np.dot(rgb, np.asarray([0.2126, 0.7152, 0.0722], dtype=float))
+        rgb = lum.reshape(-1, 1) + (rgb - lum.reshape(-1, 1)) * float(saturation)
+        warm = float(warmth)
+        if warm >= 0.0:
+            rgb = rgb * np.asarray([1.0 + 0.14 * warm, 1.0 + 0.04 * warm, 1.0 - 0.10 * warm], dtype=float).reshape(1, 3)
+        else:
+            cool = abs(warm)
+            rgb = rgb * np.asarray([1.0 - 0.08 * cool, 1.0 + 0.02 * cool, 1.0 + 0.14 * cool], dtype=float).reshape(1, 3)
+        highlight_boost = 1.0 + (float(highlight_gain) - 1.0) * np.asarray(np.clip(lum * 1.35, 0.0, 1.0), dtype=float)
+        rgb = rgb * float(exposure) * highlight_boost.reshape(-1, 1)
+        alpha = alpha * float(alpha_gain)
+        out = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 1.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 1.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 1.0), dtype=float),
+                np.asarray(np.clip(alpha, 0.0, 1.0), dtype=float),
+            ]
+        )
+        if output_u8:
+            return np.asarray(np.clip(out * 255.0, 0.0, 255.0), dtype=np.uint8)
+        return np.asarray(out, dtype=np.float32)
+
+    def _scene_graded_rgba(
+        self,
+        *,
+        key: str,
+        rgba: Tuple[float, float, float, float],
+        exposure: float,
+        saturation: float,
+        warmth: float,
+        highlight_gain: float = 1.0,
+        alpha_gain: float = 1.0,
+        response: float = 0.16,
+    ) -> tuple[float, float, float, float]:
+        graded = self._scene_grade_color_array(
+            np.asarray([tuple(rgba)], dtype=float),
+            exposure=float(exposure),
+            saturation=float(saturation),
+            warmth=float(warmth),
+            highlight_gain=float(highlight_gain),
+            alpha_gain=float(alpha_gain),
+            output_u8=False,
+        )
+        if graded.shape[0] < 1:
+            return tuple(float(v) for v in tuple(rgba))
+        target = tuple(float(v) for v in graded[0].tolist())
+        return self._smooth_rgba(str(key), target, response=float(response))
+
+    def _cylinder_gas_glass_rgba(
+        self,
+        pressure_pa: float,
+        patm_pa: float,
+        *,
+        chamber_kind: str,
+    ) -> tuple[Tuple[float, float, float, float], Tuple[float, float, float, float]]:
+        pressure_u = self._cylinder_pressure_visual_u(pressure_pa=pressure_pa, patm_pa=patm_pa)
+        glass_rgb = _palette_rgb(
+            [
+                (0.00, (86, 198, 255)),
+                (0.22, (70, 232, 255)),
+                (0.54, (72, 255, 190)),
+                (0.82, (255, 214, 96)),
+                (1.00, (255, 126, 76)),
+            ],
+            pressure_u,
+        )
+        rim_rgb = _boost_rgb(glass_rgb, 0.18 + 0.34 * pressure_u + 2.2 * float(self._glass_f0))
+        face_alpha = 0.08 + 0.11 * pressure_u + 0.12 * (pressure_u ** 1.35) + 0.05 * float(self._glass_f0)
+        edge_alpha = 0.22 + 0.30 * pressure_u + 0.16 * float(self._glass_f0)
+        if str(chamber_kind).upper() in {"ШП", "ROD", "ROD_SIDE"}:
+            face_alpha *= 0.82
+            edge_alpha *= 0.92
+        face_rgba = tuple(float(v) / 255.0 for v in glass_rgb) + (float(_clamp(face_alpha, 0.04, 0.42)),)
+        edge_rgba = tuple(float(v) / 255.0 for v in rim_rgb) + (float(_clamp(edge_alpha, 0.14, 0.72)),)
+        return face_rgba, edge_rgba
+
+    def _cylinder_pressure_visual_u(self, *, pressure_pa: float, patm_pa: float) -> float:
+        p_bar_g = float(pressure_pa - patm_pa) / BAR_PA
+        p_min_bar_g = float(getattr(self, "_cyl_pressure_visual_min_bar_g", -0.35))
+        p_max_bar_g = float(getattr(self, "_cyl_pressure_visual_max_bar_g", 10.0))
+        return float(_clamp((p_bar_g - p_min_bar_g) / max(1e-6, p_max_bar_g - p_min_bar_g), 0.0, 1.0))
+
+    def _cylinder_glass_glint_rgba(
+        self,
+        *,
+        key: str,
+        pressure_pa: float,
+        patm_pa: float,
+        chamber_kind: str,
+    ) -> tuple[float, float, float, float]:
+        pressure_u = self._cylinder_pressure_visual_u(pressure_pa=pressure_pa, patm_pa=patm_pa)
+        glint_rgb = _palette_rgb(
+            [
+                (0.00, (124, 222, 255)),
+                (0.24, (132, 255, 232)),
+                (0.56, (255, 226, 132)),
+                (0.82, (255, 154, 194)),
+                (1.00, (188, 162, 255)),
+            ],
+            pressure_u,
+        )
+        glint_rgb = _boost_rgb(glint_rgb, 0.10 + 0.20 * pressure_u + 1.8 * float(self._glass_f0))
+        alpha = 0.16 + 0.18 * pressure_u + 0.28 * float(self._glass_f0)
+        if str(chamber_kind).upper() in {"РЁРџ", "ROD", "ROD_SIDE"}:
+            alpha *= 0.88
+        rgba_target = tuple(float(v) / 255.0 for v in glint_rgb) + (float(_clamp(alpha, 0.08, 0.54)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.24)
+
+    def _cylinder_caustic_halo_rgba(
+        self,
+        *,
+        key: str,
+        pressure_pa: float,
+        patm_pa: float,
+        chamber_kind: str,
+    ) -> tuple[float, float, float, float]:
+        pressure_u = self._cylinder_pressure_visual_u(pressure_pa=pressure_pa, patm_pa=patm_pa)
+        halo_rgb = _palette_rgb(
+            [
+                (0.00, (96, 214, 255)),
+                (0.30, (118, 255, 214)),
+                (0.66, (255, 220, 118)),
+                (1.00, (255, 144, 98)),
+            ],
+            pressure_u,
+        )
+        halo_rgb = _boost_rgb(halo_rgb, 0.06 + 0.18 * pressure_u + 1.4 * float(self._glass_f0))
+        alpha = 0.10 + 0.16 * pressure_u + 0.14 * float(self._glass_f0)
+        if str(chamber_kind).upper() in {"РЁРџ", "ROD", "ROD_SIDE"}:
+            alpha *= 0.82
+        rgba_target = tuple(float(v) / 255.0 for v in halo_rgb) + (float(_clamp(alpha, 0.05, 0.38)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.20)
+
+    def _cylinder_bloom_card_rgba(
+        self,
+        *,
+        key: str,
+        pressure_pa: float,
+        patm_pa: float,
+        chamber_kind: str,
+    ) -> tuple[float, float, float, float]:
+        pressure_u = self._cylinder_pressure_visual_u(pressure_pa=pressure_pa, patm_pa=patm_pa)
+        bloom_rgb = _palette_rgb(
+            [
+                (0.00, (94, 214, 255)),
+                (0.28, (92, 255, 222)),
+                (0.60, (255, 224, 124)),
+                (1.00, (255, 150, 96)),
+            ],
+            pressure_u,
+        )
+        bloom_rgb = _boost_rgb(bloom_rgb, 0.08 + 0.22 * pressure_u + 1.5 * float(self._glass_f0))
+        alpha = 0.06 + 0.12 * pressure_u + 0.10 * float(self._glass_f0)
+        if str(chamber_kind).upper() in {"РЁРџ", "ROD", "ROD_SIDE"}:
+            alpha *= 0.80
+        rgba_target = tuple(float(v) / 255.0 for v in bloom_rgb) + (float(_clamp(alpha, 0.03, 0.28)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.18)
+
+    @staticmethod
+    def _cylinder_surface_glint_vertices(
+        *,
+        seg: Optional[tuple[np.ndarray, np.ndarray]],
+        radius_m: float,
+        phase_rad: float = 0.0,
+        sweep_rad: float = 1.45 * np.pi,
+        segments: int = 36,
+    ) -> Optional[np.ndarray]:
+        if not isinstance(seg, (tuple, list)) or len(seg) != 2:
+            return None
+        p0 = np.asarray(seg[0], dtype=float).reshape(3)
+        p1 = np.asarray(seg[1], dtype=float).reshape(3)
+        if not np.all(np.isfinite(p0)) or not np.all(np.isfinite(p1)):
+            return None
+        axis = p1 - p0
+        length = float(np.linalg.norm(axis))
+        radius = float(max(1e-6, radius_m))
+        if length <= 1e-6 or radius <= 0.0:
+            return None
+        axis = axis / length
+        ref = np.array([0.0, 0.0, 1.0], dtype=float)
+        if abs(float(np.dot(axis, ref))) > 0.92:
+            ref = np.array([1.0, 0.0, 0.0], dtype=float)
+        radial_u = np.cross(axis, ref)
+        radial_u_norm = float(np.linalg.norm(radial_u))
+        if not np.isfinite(radial_u_norm) or radial_u_norm <= 1e-9:
+            return None
+        radial_u = radial_u / radial_u_norm
+        radial_v = np.cross(axis, radial_u)
+        t = np.linspace(0.06, 0.94, int(max(18, segments)), endpoint=True)
+        centerline = p0.reshape(1, 3) + (p1 - p0).reshape(1, 3) * t.reshape(-1, 1)
+        phase = float(phase_rad) + float(sweep_rad) * t
+        radius_profile = radius * (0.98 + 0.06 * np.sin(np.pi * t))
+        radial = (
+            np.cos(phase).reshape(-1, 1) * radial_u.reshape(1, 3)
+            + np.sin(phase).reshape(-1, 1) * radial_v.reshape(1, 3)
+        )
+        return np.asarray(centerline + radius_profile.reshape(-1, 1) * radial, dtype=float)
+
+    def _cylinder_caustic_halo_vertices(
+        self,
+        *,
+        seg: Optional[tuple[np.ndarray, np.ndarray]],
+        radius_m: float,
+        phase_rad: float = 0.0,
+        segments: int = 42,
+    ) -> Optional[np.ndarray]:
+        if not isinstance(seg, (tuple, list)) or len(seg) != 2:
+            return None
+        p0 = np.asarray(seg[0], dtype=float).reshape(3)
+        p1 = np.asarray(seg[1], dtype=float).reshape(3)
+        if not np.all(np.isfinite(p0)) or not np.all(np.isfinite(p1)):
+            return None
+        axis = p1 - p0
+        length = float(np.linalg.norm(axis))
+        radius = float(max(1e-6, radius_m))
+        if length <= 1e-6 or radius <= 0.0:
+            return None
+        axis = axis / length
+        ref = np.array([0.0, 0.0, 1.0], dtype=float)
+        if abs(float(np.dot(axis, ref))) > 0.92:
+            ref = np.array([1.0, 0.0, 0.0], dtype=float)
+        radial_u = np.cross(axis, ref)
+        radial_u_norm = float(np.linalg.norm(radial_u))
+        if not np.isfinite(radial_u_norm) or radial_u_norm <= 1e-9:
+            return None
+        radial_u = radial_u / radial_u_norm
+        radial_v = np.cross(axis, radial_u)
+        radial = math.cos(float(phase_rad)) * radial_u + math.sin(float(phase_rad)) * radial_v
+        tangential = np.cross(axis, radial)
+        tangential_norm = float(np.linalg.norm(tangential))
+        if not np.isfinite(tangential_norm) or tangential_norm <= 1e-9:
+            return None
+        tangential = tangential / tangential_norm
+        center = 0.5 * (p0 + p1) + radial * (0.52 * radius)
+        return self._ellipse_line_vertices(
+            center_xyz=center,
+            axis_u_xyz=axis,
+            axis_v_xyz=tangential,
+            radius_u_m=max(0.010, 0.34 * length),
+            radius_v_m=max(0.012, 1.18 * radius),
+            segments=int(max(18, segments)),
+        )
+
+    def _camera_view_direction_local_xyz(self) -> np.ndarray:
+        try:
+            if self.view is not None and pg is not None:
+                cam_pos = self.view.cameraPosition()
+                center = self.view.opts.get("center", pg.Vector(0.0, 0.0, 0.0))
+                if cam_pos is not None and center is not None:
+                    view_vec = np.asarray(
+                        [
+                            float(cam_pos.x() - center.x()),
+                            float(cam_pos.y() - center.y()),
+                            float(cam_pos.z() - center.z()),
+                        ],
+                        dtype=float,
+                    )
+                    view_norm = float(np.linalg.norm(view_vec))
+                    if np.isfinite(view_norm) and view_norm > 1e-9:
+                        return view_vec / view_norm
+        except Exception:
+            pass
+        try:
+            az_deg = float(self.view.opts.get("azimuth", -55.0)) if self.view is not None else -55.0
+            el_deg = float(self.view.opts.get("elevation", 18.0)) if self.view is not None else 18.0
+        except Exception:
+            az_deg = -55.0
+            el_deg = 18.0
+        az = math.radians(az_deg)
+        el = math.radians(el_deg)
+        fallback = np.asarray(
+            [
+                math.cos(el) * math.cos(az),
+                math.cos(el) * math.sin(az),
+                math.sin(el),
+            ],
+            dtype=float,
+        )
+        fallback_norm = float(np.linalg.norm(fallback))
+        if np.isfinite(fallback_norm) and fallback_norm > 1e-9:
+            return fallback / fallback_norm
+        return np.array([0.64, -0.52, 0.56], dtype=float)
+
+    def _cylinder_bloom_card_state(
+        self,
+        *,
+        seg: Optional[tuple[np.ndarray, np.ndarray]],
+        chamber_radius_m: float,
+        view_dir_xyz: np.ndarray,
+        axial_scale: float = 0.76,
+        radial_scale: float = 1.85,
+        camera_offset_m: float = 0.004,
+        segments: int = 28,
+    ) -> Optional[dict[str, Any]]:
+        if not isinstance(seg, (tuple, list)) or len(seg) != 2:
+            return None
+        p0 = np.asarray(seg[0], dtype=float).reshape(3)
+        p1 = np.asarray(seg[1], dtype=float).reshape(3)
+        if not np.all(np.isfinite(p0)) or not np.all(np.isfinite(p1)):
+            return None
+        axis = p1 - p0
+        length = float(np.linalg.norm(axis))
+        chamber_radius = float(max(1e-6, chamber_radius_m))
+        if length <= 1e-6 or chamber_radius <= 0.0:
+            return None
+        axis = axis / length
+        view_dir = np.asarray(view_dir_xyz, dtype=float).reshape(3)
+        view_norm = float(np.linalg.norm(view_dir))
+        if not np.isfinite(view_norm) or view_norm <= 1e-9:
+            view_dir = np.array([0.64, -0.52, 0.56], dtype=float)
+            view_norm = float(np.linalg.norm(view_dir))
+        view_dir = view_dir / max(view_norm, 1e-12)
+        axis_u = axis - float(np.dot(axis, view_dir)) * view_dir
+        axis_u_norm = float(np.linalg.norm(axis_u))
+        if not np.isfinite(axis_u_norm) or axis_u_norm <= 1e-9:
+            ref = np.array([0.0, 0.0, 1.0], dtype=float)
+            if abs(float(np.dot(view_dir, ref))) > 0.92:
+                ref = np.array([1.0, 0.0, 0.0], dtype=float)
+            axis_u = np.cross(view_dir, ref)
+            axis_u_norm = float(np.linalg.norm(axis_u))
+            if not np.isfinite(axis_u_norm) or axis_u_norm <= 1e-9:
+                return None
+        axis_u = axis_u / axis_u_norm
+        axis_v = np.cross(view_dir, axis_u)
+        axis_v_norm = float(np.linalg.norm(axis_v))
+        if not np.isfinite(axis_v_norm) or axis_v_norm <= 1e-9:
+            return None
+        axis_v = axis_v / axis_v_norm
+        center = 0.5 * (p0 + p1) + view_dir * float(camera_offset_m)
+        radius_u = float(max(0.016, 0.50 * length * float(axial_scale)))
+        radius_v = float(max(0.012, chamber_radius * float(radial_scale)))
+        verts, faces = _ellipse_mesh_on_plane(
+            center_xyz=center,
+            axis_u_xyz=axis_u,
+            axis_v_xyz=axis_v,
+            radius_u_m=radius_u,
+            radius_v_m=radius_v,
+            segments=int(max(16, segments)),
+        )
+        if verts is None or faces is None:
+            return None
+        return {
+            "verts": np.asarray(verts, dtype=float),
+            "faces": np.asarray(faces, dtype=np.int32),
+            "center_xyz": np.asarray(center, dtype=float),
+            "axis_u_xyz": np.asarray(axis_u, dtype=float),
+            "axis_v_xyz": np.asarray(axis_v, dtype=float),
+            "radius_u_m": float(radius_u),
+            "radius_v_m": float(radius_v),
+        }
+
+    def _cylinder_bloom_card_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        pressure_pa: float,
+        patm_pa: float,
+        chamber_kind: str,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = np.asarray(axis_u_xyz, dtype=float).reshape(3)
+        axis_v = np.asarray(axis_v_xyz, dtype=float).reshape(3)
+        axis_u = axis_u / max(1e-12, float(np.linalg.norm(axis_u)))
+        axis_v = axis_v / max(1e-12, float(np.linalg.norm(axis_v)))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        axial = np.exp(-((du / 0.92) ** 2))
+        pressure_u = self._cylinder_pressure_visual_u(pressure_pa=pressure_pa, patm_pa=patm_pa)
+        core_rgb = _palette_rgb(
+            [
+                (0.00, (96, 208, 255)),
+                (0.26, (90, 255, 226)),
+                (0.62, (255, 224, 122)),
+                (1.00, (255, 146, 98)),
+            ],
+            pressure_u,
+        )
+        glow_rgb = _boost_rgb(core_rgb, 0.08 + 0.16 * pressure_u + 1.2 * float(self._glass_f0))
+        fringe_rgb = _lerp_rgb((142, 210, 255), glow_rgb, 0.30 + 0.46 * pressure_u)
+        core = np.exp(-((rr / 0.40) ** 2))
+        veil = np.exp(-(((rr - 0.34) / 0.24) ** 2))
+        fringe = np.exp(-(((rr - 0.88) / 0.20) ** 2))
+        alpha = (0.02 + 0.06 * pressure_u + 0.06 * float(self._glass_f0)) * (0.54 * core + 0.32 * veil + 0.14 * fringe)
+        alpha *= axial
+        if str(chamber_kind).upper() in {"РЁРџ", "ROD", "ROD_SIDE"}:
+            alpha *= 0.82
+        rgb_num = (
+            np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.58 * core + 0.22 * veil).reshape(-1, 1)
+            + np.asarray(glow_rgb, dtype=float).reshape(1, 3) * (0.46 * veil + 0.20 * core).reshape(-1, 1)
+            + np.asarray(fringe_rgb, dtype=float).reshape(1, 3) * (0.24 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.78 * core + 0.46 * veil + 0.24 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    @staticmethod
+    def _tapered_line_color_array(
+        rgba: Tuple[float, float, float, float],
+        count: int,
+        *,
+        edge_floor: float = 0.18,
+        exponent: float = 0.82,
+    ) -> np.ndarray:
+        n = int(max(0, count))
+        if n <= 0:
+            return np.zeros((0, 4), dtype=np.float32)
+        cols = np.repeat(np.asarray(tuple(rgba), dtype=np.float32).reshape(1, 4), n, axis=0)
+        if n == 1:
+            return cols
+        t = np.linspace(0.0, 1.0, n, endpoint=True)
+        envelope = np.sin(np.pi * t)
+        envelope = np.power(np.clip(envelope, 0.0, 1.0), float(max(0.1, exponent)))
+        envelope = float(_clamp(edge_floor, 0.0, 0.98)) + (1.0 - float(_clamp(edge_floor, 0.0, 0.98))) * envelope
+        cols[:, 3] *= np.asarray(envelope, dtype=np.float32)
+        return cols
+
+    def _contact_patch_marker_rgba(
+        self,
+        tire_force_n: float,
+        *,
+        in_air: bool,
+    ) -> Tuple[float, float, float, float]:
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        if in_air:
+            rgb = _palette_rgb(
+                [
+                    (0.00, (255, 146, 88)),
+                    (0.50, (255, 118, 78)),
+                    (1.00, (255, 92, 72)),
+                ],
+                load_u,
+            )
+            alpha = 0.90
+        else:
+            rgb = _boost_rgb(_heat_rgb(0.12 + 0.86 * (load_u ** 0.92), sat=0.92, val=0.98), 0.10 + 0.28 * load_u)
+            alpha = float(_clamp(0.72 + 0.22 * load_u, 0.48, 0.98))
+        return tuple(float(v) / 255.0 for v in rgb) + (alpha,)
+
+    def _contact_patch_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        contact_pt_xyz: np.ndarray,
+        tire_force_n: float,
+        in_air: bool,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        face_centers = np.mean(verts[faces], axis=1)
+        contact_pt = np.asarray(contact_pt_xyz, dtype=float).reshape(1, 3)
+        if not np.all(np.isfinite(contact_pt)):
+            contact_pt = np.mean(face_centers, axis=0, keepdims=True)
+        dist = np.linalg.norm(face_centers - contact_pt, axis=1)
+        dist = np.asarray(np.where(np.isfinite(dist), dist, 0.0), dtype=float)
+        dist_ref = float(np.nanpercentile(dist, 90.0)) if dist.size else 1.0
+        dist_ref = max(1e-6, dist_ref)
+        dist_u = np.asarray(np.clip(dist / dist_ref, 0.0, 1.75), dtype=float)
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        base_rgb = _heat_rgb(0.10 + 0.86 * (load_u ** 0.94), sat=0.90, val=0.98)
+        cool_rgb = _lerp_rgb((18, 46, 86), base_rgb, 0.28 + 0.34 * load_u)
+        hot_rgb = _boost_rgb(base_rgb, 0.14 + 0.30 * load_u)
+        glow_rgb = _boost_rgb(hot_rgb, 0.08 + 0.18 * load_u)
+        core = np.exp(-((dist_u / 0.56) ** 2))
+        glow = np.exp(-(((dist_u - 0.50) / 0.24) ** 2))
+        body_mix = np.asarray(np.clip(0.16 + 0.70 * core + 0.14 * glow, 0.0, 1.0), dtype=float)
+        rgb = (
+            np.asarray(cool_rgb, dtype=float).reshape(1, 3) * (1.0 - body_mix.reshape(-1, 1))
+            + np.asarray(glow_rgb, dtype=float).reshape(1, 3) * body_mix.reshape(-1, 1)
+        )
+        if in_air:
+            rgb = 0.58 * rgb + 0.42 * np.asarray((196.0, 110.0, 84.0), dtype=float).reshape(1, 3)
+            alpha = 0.04 + 0.05 * core
+        else:
+            edge_fade = np.asarray(np.clip(1.0 - 0.38 * (dist_u ** 1.15), 0.24, 1.0), dtype=float)
+            rgb = rgb * edge_fade.reshape(-1, 1)
+            alpha = 0.12 + (0.18 + 0.28 * load_u) * core + (0.08 + 0.12 * load_u) * glow
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _wheel_tire_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        wheel_center_xyz: np.ndarray,
+        axle_xyz: np.ndarray,
+        forward_xyz: np.ndarray,
+        up_xyz: np.ndarray,
+        tire_force_n: float,
+        wheel_gap_m: float,
+        speed_m_s: float,
+        in_air: bool,
+        spin_phase_rad: float = 0.0,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1 or not np.all(np.isfinite(verts)):
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(wheel_center_xyz, dtype=float).reshape(3)
+        axle = np.asarray(axle_xyz, dtype=float).reshape(3)
+        forward = np.asarray(forward_xyz, dtype=float).reshape(3)
+        up = np.asarray(up_xyz, dtype=float).reshape(3)
+        if not np.all(np.isfinite(center)) or not np.all(np.isfinite(axle)) or not np.all(np.isfinite(forward)) or not np.all(np.isfinite(up)):
+            return np.zeros((0, 4), dtype=np.uint8)
+        axle_norm = float(np.linalg.norm(axle))
+        if not np.isfinite(axle_norm) or axle_norm <= 1e-9:
+            return np.zeros((0, 4), dtype=np.uint8)
+        axle = axle / axle_norm
+        fwd = forward - float(np.dot(forward, axle)) * axle
+        fwd_norm = float(np.linalg.norm(fwd))
+        if not np.isfinite(fwd_norm) or fwd_norm <= 1e-9:
+            return np.zeros((0, 4), dtype=np.uint8)
+        fwd = fwd / fwd_norm
+        up_vec = up - float(np.dot(up, axle)) * axle
+        up_norm = float(np.linalg.norm(up_vec))
+        if not np.isfinite(up_norm) or up_norm <= 1e-9:
+            up_vec = np.cross(axle, fwd)
+            up_norm = float(np.linalg.norm(up_vec))
+        if not np.isfinite(up_norm) or up_norm <= 1e-9:
+            return np.zeros((0, 4), dtype=np.uint8)
+        up_vec = up_vec / up_norm
+        face_centers = np.mean(verts[faces], axis=1)
+        rel = face_centers - center.reshape(1, 3)
+        x = np.dot(rel, fwd)
+        y = np.dot(rel, axle)
+        z = np.dot(rel, up_vec)
+        wheel_radius = float(max(0.05, getattr(self.geom, "wheel_radius", 0.0)))
+        wheel_width = float(max(0.04, getattr(self.geom, "wheel_width", 0.0)))
+        half_width = 0.5 * wheel_width
+        radius = np.sqrt((x * x) + (z * z))
+        shell_u = np.asarray(np.clip((radius - 0.52 * wheel_radius) / max(1e-6, 0.48 * wheel_radius), 0.0, 1.0), dtype=float)
+        lat_u = np.asarray(np.clip(np.abs(y) / max(1e-6, half_width), 0.0, 1.0), dtype=float)
+        sidewall_u = np.asarray(np.clip((lat_u - 0.32) / 0.68, 0.0, 1.0), dtype=float)
+        tread_u = np.asarray(np.clip(1.0 - (sidewall_u ** 0.88), 0.0, 1.0), dtype=float)
+        bottom_u = np.asarray(np.clip((-z) / wheel_radius, 0.0, 1.0), dtype=float)
+        top_u = np.asarray(np.clip(z / wheel_radius, 0.0, 1.0), dtype=float)
+        theta = np.arctan2(z, x) - float(spin_phase_rad)
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        gap_u = float(_clamp(float(max(0.0, wheel_gap_m)) / max(0.01, 0.34 * wheel_radius), 0.0, 1.0))
+        speed_u = float(_clamp(abs(float(speed_m_s)) / 35.0, 0.0, 1.0))
+        contact_u = 0.0 if bool(in_air) else float(_clamp((0.22 + 0.78 * load_u) * (1.0 - 0.56 * gap_u), 0.0, 1.0))
+        groove_wave = 0.5 + 0.5 * np.sin((18.0 * theta) + (6.0 * y / max(half_width, 1e-6)))
+        block_wave = 0.5 + 0.5 * np.sin((36.0 * theta) - (10.0 * y / max(half_width, 1e-6)) + 0.8 * np.sin(4.0 * theta))
+        sipe_wave = 0.5 + 0.5 * np.cos((54.0 * theta) + (14.0 * y / max(half_width, 1e-6)))
+        tread_pattern = np.asarray(
+            np.clip(
+                (0.50 * groove_wave) + (0.32 * block_wave) + (0.18 * sipe_wave),
+                0.0,
+                1.0,
+            ),
+            dtype=float,
+        )
+        tread_groove = np.asarray((tread_u ** 1.2) * shell_u * (tread_pattern ** 1.5), dtype=float)
+        shoulder_band = np.asarray(np.exp(-(((lat_u - 0.72) / 0.12) ** 2)), dtype=float)
+        branding_band = np.asarray(sidewall_u * np.exp(-(((radius / wheel_radius) - 0.82) / 0.08) ** 2), dtype=float)
+        branding_wave = 0.5 + 0.5 * np.sin((12.0 * theta) + 0.4)
+        contact_scuff = np.asarray(
+            contact_u * shell_u * (bottom_u ** 2.1) * np.exp(-((x / max(0.10, 0.52 * wheel_radius)) ** 2)),
+            dtype=float,
+        )
+        crown_sheen = np.asarray(tread_u * shell_u * (top_u ** 1.8) * (0.30 + 0.70 * speed_u), dtype=float)
+        base_side_rgb = np.asarray((34.0, 38.0, 46.0), dtype=float).reshape(1, 3)
+        base_tread_rgb = np.asarray((24.0, 26.0, 30.0), dtype=float).reshape(1, 3)
+        shoulder_rgb = np.asarray((42.0, 46.0, 54.0), dtype=float).reshape(1, 3)
+        cool_sheen_rgb = np.asarray(_lerp_rgb((76, 94, 120), (138, 184, 246), 0.16 + 0.48 * speed_u), dtype=float).reshape(1, 3)
+        warm_scuff_rgb = np.asarray(_boost_rgb(_heat_rgb(0.12 + 0.78 * contact_u, sat=0.56, val=0.74), 0.04 + 0.08 * contact_u), dtype=float).reshape(1, 3)
+        tread_mix = np.asarray(np.clip(0.18 + 0.72 * tread_u + 0.10 * shell_u, 0.0, 1.0), dtype=float).reshape(-1, 1)
+        rgb = base_side_rgb * (1.0 - tread_mix) + base_tread_rgb * tread_mix
+        rgb += shoulder_rgb * (0.08 + 0.18 * speed_u) * shoulder_band.reshape(-1, 1)
+        rgb += cool_sheen_rgb * (0.08 + 0.16 * speed_u + 0.06 * crown_sheen).reshape(-1, 1) * (0.35 * sidewall_u + 0.65 * crown_sheen).reshape(-1, 1)
+        rgb += warm_scuff_rgb * (0.10 + 0.22 * contact_scuff).reshape(-1, 1) * contact_scuff.reshape(-1, 1)
+        groove_dark = 0.08 + 0.20 * tread_groove + 0.06 * contact_u
+        rgb *= (1.0 - groove_dark.reshape(-1, 1))
+        branding_light = branding_band * (0.30 + 0.70 * branding_wave)
+        rgb += np.asarray((18.0, 20.0, 24.0), dtype=float).reshape(1, 3) * (0.10 * branding_light).reshape(-1, 1)
+        alpha = 0.94 + 0.04 * shell_u - 0.03 * tread_groove
+        if in_air:
+            rgb = 0.90 * rgb + 0.10 * np.asarray((84.0, 98.0, 126.0), dtype=float).reshape(1, 3)
+            alpha *= 0.98
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _wheel_shadow_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        tire_force_n: float,
+        wheel_gap_m: float,
+        in_air: bool,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        face_centers = np.mean(verts[faces], axis=1)
+        rel = face_centers - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        gap_u = float(_clamp(float(max(0.0, wheel_gap_m)) / max(0.01, 0.45 * rad_u), 0.0, 1.0))
+        core = np.exp(-((rr / (0.40 + 0.10 * gap_u)) ** 2))
+        mid = np.exp(-(((rr - (0.42 + 0.08 * gap_u)) / (0.22 + 0.08 * gap_u)) ** 2))
+        rim = np.exp(-(((rr - (0.80 + 0.10 * gap_u)) / 0.20) ** 2))
+        contact_u = (0.24 if in_air else 1.0) * (0.30 + 0.70 * load_u)
+        alpha = (0.03 + 0.22 * contact_u) * (0.72 * core + 0.22 * mid + 0.06 * rim)
+        alpha *= float(_clamp(1.0 - 0.46 * gap_u, 0.30, 1.0))
+        dark_rgb = np.asarray((4.0, 7.0, 12.0), dtype=float).reshape(1, 3)
+        mid_rgb = np.asarray((8.0, 12.0, 18.0), dtype=float).reshape(1, 3)
+        rim_rgb = np.asarray((14.0, 20.0, 28.0), dtype=float).reshape(1, 3)
+        rgb_num = dark_rgb * core.reshape(-1, 1) + mid_rgb * mid.reshape(-1, 1) + rim_rgb * rim.reshape(-1, 1)
+        rgb_den = np.maximum((core + mid + rim).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _sample_spring_active_flag(
+        self,
+        cyl: str,
+        corner: str,
+        *,
+        i0: int,
+        i1: int,
+        alpha: float,
+        default_active: float = 0.0,
+    ) -> float:
+        col = spring_family_active_flag_column(cyl, corner)
+        arr = getattr(self, "_spring_active_series_map", {}).get(str(col))
+        if arr is not None:
+            return float(_sample_series_local(arr, i0=i0, i1=i1, alpha=alpha, default=float(default_active)))
+        if str(cyl).strip().upper() == "Ц1":
+            legacy = self._sample_spring_runtime_metric_m(
+                cyl,
+                corner,
+                "длина_м",
+                i0=i0,
+                i1=i1,
+                alpha=alpha,
+                default_m=float("nan"),
+            )
+            if np.isfinite(legacy) and legacy > 0.0:
+                return 1.0
+        return float(default_active)
+
+    def _sample_spring_runtime_metric_m(
+        self,
+        cyl: str,
+        corner: str,
+        metric: str,
+        *,
+        i0: int,
+        i1: int,
+        alpha: float,
+        default_m: float = float("nan"),
+    ) -> float:
+        metric_key = spring_family_runtime_column(metric, cyl, corner)
+        arr = getattr(self, "_spring_metric_series_map", {}).get(str(metric_key))
+        if arr is not None:
+            return float(_sample_series_local(arr, i0=i0, i1=i1, alpha=alpha, default=float(default_m)))
+        if str(cyl).strip().upper() == "Ц1":
+            legacy_cols = {
+                "длина_м": f"пружина_длина_{corner}_м",
+                "зазор_до_крышки_м": f"пружина_зазор_до_крышки_{corner}_м",
+                "запас_до_coil_bind_м": f"пружина_запас_до_coil_bind_{corner}_м",
+            }
+            legacy_col = legacy_cols.get(str(metric).strip())
+            if legacy_col:
+                legacy_arr = getattr(self, "_spring_metric_series_map", {}).get(str(legacy_col))
+                if legacy_arr is not None:
+                    return float(_sample_series_local(legacy_arr, i0=i0, i1=i1, alpha=alpha, default=float(default_m)))
+        return float(default_m)
+
+    def _spring_geometry_m(self, cyl: str, corner: str, field: str, default_m: float = 0.0) -> float:
+        axle = "перед" if self._corner_is_front(corner) else "зад"
+        key = spring_geometry_key(field, cyl, axle)
+        geom_meta = dict(getattr(self, "_bundle_geometry_meta", {}) or {})
+        try:
+            value = float(geom_meta.get(key, float("nan")))
+        except Exception:
+            value = float("nan")
+        if np.isfinite(value):
+            return float(value)
+        return float(default_m)
+
+    def _spring_visual_rgba(
+        self,
+        *,
+        cyl: str,
+        corner: str,
+        compression_u: float,
+        coil_margin_m: float,
+        tire_force_n: float,
+    ) -> tuple[
+        tuple[float, float, float, float],
+        tuple[float, float, float, float],
+        tuple[float, float, float, float],
+    ]:
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        compression_u = float(_clamp(compression_u, 0.0, 1.0))
+        coil_margin_ref = 0.018
+        if np.isfinite(coil_margin_m):
+            coil_risk_u = float(_clamp(1.0 - (float(coil_margin_m) / coil_margin_ref), 0.0, 1.0))
+        else:
+            coil_risk_u = compression_u
+        energy_u = float(_clamp(0.48 * compression_u + 0.28 * load_u + 0.24 * coil_risk_u, 0.0, 1.0))
+        metal_rgb = _palette_rgb(
+            [
+                (0.00, (92, 170, 255)),
+                (0.34, (88, 246, 230)),
+                (0.68, (255, 216, 98)),
+                (1.00, (255, 128, 76)),
+            ],
+            energy_u,
+        )
+        face_rgb = _lerp_rgb((30, 44, 58), metal_rgb, 0.78)
+        edge_rgb = _boost_rgb(metal_rgb, 0.16 + 0.28 * energy_u)
+        glow_rgb = _boost_rgb(metal_rgb, 0.24 + 0.34 * energy_u)
+        face_rgba_target = tuple(float(v) / 255.0 for v in face_rgb) + (0.94,)
+        edge_rgba_target = tuple(float(v) / 255.0 for v in edge_rgb) + (float(_clamp(0.62 + 0.22 * energy_u, 0.56, 0.96)),)
+        glow_rgba_target = tuple(float(v) / 255.0 for v in glow_rgb) + (float(_clamp(0.18 + 0.34 * energy_u, 0.12, 0.72)),)
+        face_rgba = self._smooth_rgba(f"spring-face-{cyl}-{corner}", face_rgba_target, response=0.24)
+        edge_rgba = self._smooth_rgba(f"spring-edge-{cyl}-{corner}", edge_rgba_target, response=0.24)
+        glow_rgba = self._smooth_rgba(f"spring-glow-{cyl}-{corner}", glow_rgba_target, response=0.22)
+        return face_rgba, edge_rgba, glow_rgba
+
+    @staticmethod
+    def _spring_centerline_vertices(
+        *,
+        top_xyz: np.ndarray,
+        bot_xyz: np.ndarray,
+        coil_radius_m: float,
+        coil_count: float,
+        samples_per_turn: int = 16,
+    ) -> Optional[np.ndarray]:
+        p0 = np.asarray(top_xyz, dtype=float).reshape(3)
+        p1 = np.asarray(bot_xyz, dtype=float).reshape(3)
+        axis = p1 - p0
+        length = float(np.linalg.norm(axis))
+        radius = float(max(1e-6, coil_radius_m))
+        if not np.all(np.isfinite(p0)) or not np.all(np.isfinite(p1)) or length <= 1e-6 or radius <= 0.0:
+            return None
+        u = axis / max(length, 1e-12)
+        ref = np.array([0.0, 0.0, 1.0], dtype=float)
+        if abs(float(np.dot(u, ref))) > 0.92:
+            ref = np.array([1.0, 0.0, 0.0], dtype=float)
+        n1 = np.cross(u, ref)
+        n1_norm = float(np.linalg.norm(n1))
+        if not np.isfinite(n1_norm) or n1_norm <= 1e-9:
+            return None
+        n1 = n1 / n1_norm
+        n2 = np.cross(u, n1)
+        turns = float(max(3.5, min(14.0, coil_count)))
+        seat_len = float(min(0.18 * length, max(0.012, 1.55 * radius)))
+        active_len = float(max(1e-4, length - 2.0 * seat_len))
+        head = p0 + u * seat_len
+        tail = p1 - u * seat_len
+        n_samples = int(max(32, round(turns * max(8, samples_per_turn))))
+        t = np.linspace(0.0, 1.0, n_samples, endpoint=True)
+        helix_center = head.reshape(1, 3) + (tail - head).reshape(1, 3) * t.reshape(-1, 1)
+        ang = (2.0 * np.pi * turns) * t
+        helix = helix_center + radius * (
+            np.cos(ang).reshape(-1, 1) * n1.reshape(1, 3)
+            + np.sin(ang).reshape(-1, 1) * n2.reshape(1, 3)
+        )
+        lead_top = p0 + u * (0.50 * seat_len)
+        lead_bot = p1 - u * (0.50 * seat_len)
+        path = np.vstack(
+            [
+                p0.reshape(1, 3),
+                lead_top.reshape(1, 3),
+                helix,
+                lead_bot.reshape(1, 3),
+                p1.reshape(1, 3),
+            ]
+        )
+        diffs = np.linalg.norm(np.diff(path, axis=0), axis=1)
+        keep = np.ones(path.shape[0], dtype=bool)
+        keep[1:] = diffs > 1e-6
+        out = np.asarray(path[keep], dtype=float)
+        if out.shape[0] < 4:
+            return None
+        return out
+
+    @staticmethod
+    def _tube_mesh_from_polyline(
+        path_xyz: np.ndarray,
+        *,
+        radius_m: float,
+        sides: int = 10,
+        capped: bool = True,
+    ) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        path = np.asarray(path_xyz, dtype=float).reshape(-1, 3)
+        wire_r = float(max(1e-6, radius_m))
+        if path.shape[0] < 2 or wire_r <= 0.0:
+            return None, None
+        if not np.all(np.isfinite(path)):
+            return None, None
+        step = np.linalg.norm(np.diff(path, axis=0), axis=1)
+        keep = np.ones(path.shape[0], dtype=bool)
+        keep[1:] = step > 1e-6
+        path = np.asarray(path[keep], dtype=float)
+        if path.shape[0] < 2:
+            return None, None
+        ring_n = int(max(6, sides))
+        tangents = np.zeros_like(path, dtype=float)
+        tangents[0] = path[1] - path[0]
+        tangents[-1] = path[-1] - path[-2]
+        if path.shape[0] > 2:
+            tangents[1:-1] = path[2:] - path[:-2]
+        for idx in range(tangents.shape[0]):
+            tn = float(np.linalg.norm(tangents[idx]))
+            if not np.isfinite(tn) or tn <= 1e-9:
+                return None, None
+            tangents[idx] = tangents[idx] / tn
+        normals = np.zeros_like(path, dtype=float)
+        bins = np.zeros_like(path, dtype=float)
+        ref = np.array([0.0, 0.0, 1.0], dtype=float)
+        if abs(float(np.dot(tangents[0], ref))) > 0.92:
+            ref = np.array([1.0, 0.0, 0.0], dtype=float)
+        n0 = np.cross(tangents[0], ref)
+        n0_norm = float(np.linalg.norm(n0))
+        if not np.isfinite(n0_norm) or n0_norm <= 1e-9:
+            return None, None
+        normals[0] = n0 / n0_norm
+        bins[0] = np.cross(tangents[0], normals[0])
+        for idx in range(1, path.shape[0]):
+            t = tangents[idx]
+            n_prev = normals[idx - 1]
+            n = n_prev - float(np.dot(n_prev, t)) * t
+            n_norm = float(np.linalg.norm(n))
+            if not np.isfinite(n_norm) or n_norm <= 1e-9:
+                ref = bins[idx - 1]
+                if abs(float(np.dot(t, ref))) > 0.92:
+                    ref = np.array([1.0, 0.0, 0.0], dtype=float)
+                n = np.cross(t, ref)
+                n_norm = float(np.linalg.norm(n))
+                if not np.isfinite(n_norm) or n_norm <= 1e-9:
+                    return None, None
+            normals[idx] = n / n_norm
+            bins[idx] = np.cross(t, normals[idx])
+        ang = np.linspace(0.0, 2.0 * np.pi, ring_n, endpoint=False)
+        rings: list[np.ndarray] = []
+        for idx in range(path.shape[0]):
+            ring = path[idx].reshape(1, 3) + wire_r * (
+                np.cos(ang).reshape(-1, 1) * normals[idx].reshape(1, 3)
+                + np.sin(ang).reshape(-1, 1) * bins[idx].reshape(1, 3)
+            )
+            rings.append(np.asarray(ring, dtype=float))
+        verts = np.vstack(rings)
+        faces: list[list[int]] = []
+        for ring_idx in range(path.shape[0] - 1):
+            base0 = ring_idx * ring_n
+            base1 = (ring_idx + 1) * ring_n
+            for side_idx in range(ring_n):
+                a = base0 + side_idx
+                b = base0 + ((side_idx + 1) % ring_n)
+                c = base1 + ((side_idx + 1) % ring_n)
+                d = base1 + side_idx
+                faces.append([a, b, c])
+                faces.append([a, c, d])
+        if capped:
+            start_center = int(verts.shape[0])
+            end_center = int(verts.shape[0]) + 1
+            verts = np.vstack([verts, path[0].reshape(1, 3), path[-1].reshape(1, 3)])
+            for side_idx in range(ring_n):
+                a = side_idx
+                b = (side_idx + 1) % ring_n
+                faces.append([start_center, b, a])
+                d = (path.shape[0] - 1) * ring_n + side_idx
+                c = (path.shape[0] - 1) * ring_n + ((side_idx + 1) % ring_n)
+                faces.append([end_center, d, c])
+        return np.asarray(verts, dtype=float), np.asarray(faces, dtype=np.int32)
+
+    def _contact_glaze_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        tire_force_n: float,
+        wheel_gap_m: float,
+        in_air: bool,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = np.asarray(axis_u_xyz, dtype=float).reshape(3)
+        axis_v = np.asarray(axis_v_xyz, dtype=float).reshape(3)
+        axis_u = axis_u / max(1e-12, float(np.linalg.norm(axis_u)))
+        axis_v = axis_v / max(1e-12, float(np.linalg.norm(axis_v)))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        gap_u = float(_clamp(float(max(0.0, wheel_gap_m)) / max(0.01, 0.45 * rad_u), 0.0, 1.0))
+        hot_rgb = _boost_rgb(_heat_rgb(0.12 + 0.84 * (load_u ** 0.92), sat=0.84, val=1.0), 0.12 + 0.24 * load_u)
+        cool_rgb = _lerp_rgb((56, 122, 214), hot_rgb, 0.34 + 0.38 * load_u)
+        rim_rgb = _boost_rgb(hot_rgb, 0.22 + 0.28 * load_u)
+        core = np.exp(-((rr / (0.34 + 0.12 * gap_u)) ** 2))
+        bloom = np.exp(-(((rr - (0.42 + 0.08 * gap_u)) / (0.28 + 0.10 * gap_u)) ** 2))
+        fringe = np.exp(-(((rr - (0.88 + 0.08 * gap_u)) / 0.24) ** 2))
+        light_u = (0.22 if in_air else 1.0) * (0.24 + 0.76 * load_u)
+        alpha = (0.02 + 0.10 * light_u) * (0.56 * core + 0.30 * bloom + 0.14 * fringe)
+        alpha *= float(_clamp(1.0 - 0.38 * gap_u, 0.26, 1.0))
+        rgb_num = (
+            np.asarray(cool_rgb, dtype=float).reshape(1, 3) * (0.50 * core + 0.20 * fringe).reshape(-1, 1)
+            + np.asarray(hot_rgb, dtype=float).reshape(1, 3) * (0.64 * bloom + 0.36 * core).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.24 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.86 * core + 0.64 * bloom + 0.24 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _contact_accent_ring_rgba(
+        self,
+        *,
+        key: str,
+        tire_force_n: float,
+        wheel_gap_m: float,
+        in_air: bool,
+    ) -> tuple[float, float, float, float]:
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        gap_u = float(_clamp(float(max(0.0, wheel_gap_m)) / 0.10, 0.0, 1.0))
+        ring_rgb = _boost_rgb(_heat_rgb(0.16 + 0.80 * load_u, sat=0.86, val=1.0), 0.10 + 0.22 * load_u)
+        alpha = (0.16 if in_air else 0.42) * (0.28 + 0.72 * load_u) * float(_clamp(1.0 - 0.44 * gap_u, 0.18, 1.0))
+        rgba_target = tuple(float(v) / 255.0 for v in ring_rgb) + (float(_clamp(alpha, 0.06, 0.68)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.20)
+
+    def _scene_fog_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        theme_rgb: Tuple[int, int, int],
+        density_u: float,
+        depth_dir_xyz: np.ndarray,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        depth_dir = np.asarray(depth_dir_xyz, dtype=float).reshape(3)
+        depth_dir = depth_dir - float(np.dot(depth_dir, np.cross(axis_u, axis_v))) * np.cross(axis_u, axis_v)
+        depth_dir = _norm_or(depth_dir, axis_u)
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        face_centers = np.mean(verts[faces], axis=1)
+        rel = face_centers - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        depth = np.dot(rel, depth_dir) / max(rad_u, rad_v)
+        depth_u = np.asarray(np.clip(0.5 + 0.5 * depth, 0.0, 1.0), dtype=float)
+        density = float(_clamp(density_u, 0.0, 1.0))
+        core = np.exp(-((rr / 0.56) ** 2))
+        veil = np.exp(-(((rr - 0.34) / 0.24) ** 2))
+        fringe = np.exp(-(((rr - 0.88) / 0.20) ** 2))
+        cool_rgb = _lerp_rgb((18, 34, 64), tuple(theme_rgb), 0.42)
+        glow_rgb = _boost_rgb(tuple(theme_rgb), 0.08 + 0.18 * density)
+        rim_rgb = _lerp_rgb(tuple(theme_rgb), (255, 242, 214), 0.14 + 0.16 * density)
+        alpha = (0.01 + 0.14 * density) * (0.56 * core + 0.30 * veil + 0.14 * fringe)
+        alpha *= np.asarray(np.clip(1.06 - 0.52 * depth_u, 0.26, 1.0), dtype=float)
+        rgb_num = (
+            np.asarray(cool_rgb, dtype=float).reshape(1, 3) * (0.46 * core + 0.18 * fringe).reshape(-1, 1)
+            + np.asarray(glow_rgb, dtype=float).reshape(1, 3) * (0.44 * veil + 0.26 * core).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.18 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.72 * core + 0.44 * veil + 0.18 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _corner_key_light_rgba(
+        self,
+        *,
+        key: str,
+        corner: str,
+        tire_force_n: float,
+        wheel_gap_m: float,
+        in_air: bool,
+        hierarchy_u: float,
+    ) -> tuple[float, float, float, float]:
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        gap_u = float(_clamp(float(max(0.0, wheel_gap_m)) / 0.10, 0.0, 1.0))
+        hierarchy = float(_clamp(hierarchy_u, 0.0, 1.0))
+        if self._corner_is_front(str(corner)):
+            base_rgb = _palette_rgb(
+                [
+                    (0.00, (88, 206, 255)),
+                    (0.60, (112, 255, 234)),
+                    (1.00, (196, 246, 255)),
+                ],
+                0.36 + 0.54 * load_u,
+            )
+        else:
+            base_rgb = _palette_rgb(
+                [
+                    (0.00, (255, 164, 104)),
+                    (0.58, (255, 212, 116)),
+                    (1.00, (255, 236, 182)),
+                ],
+                0.30 + 0.58 * load_u,
+            )
+        base_rgb = _boost_rgb(base_rgb, 0.04 + 0.18 * hierarchy)
+        alpha = (0.08 if in_air else 0.34) * (0.24 + 0.76 * max(load_u, hierarchy)) * float(_clamp(1.0 - 0.40 * gap_u, 0.18, 1.0))
+        rgba_target = tuple(float(v) / 255.0 for v in base_rgb) + (float(_clamp(alpha, 0.04, 0.58)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.18)
+
+    @staticmethod
+    def _camera_facing_card_axes(
+        *,
+        primary_dir_xyz: np.ndarray,
+        view_dir_xyz: np.ndarray,
+        fallback_dir_xyz: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        primary = np.asarray(primary_dir_xyz, dtype=float).reshape(3)
+        view = np.asarray(view_dir_xyz, dtype=float).reshape(3)
+        fallback = np.asarray(fallback_dir_xyz, dtype=float).reshape(3)
+        primary_norm = float(np.linalg.norm(primary))
+        if not np.isfinite(primary_norm) or primary_norm <= 1e-9:
+            primary = np.asarray(fallback, dtype=float).reshape(3)
+            primary_norm = float(np.linalg.norm(primary))
+        if not np.isfinite(primary_norm) or primary_norm <= 1e-9:
+            primary = np.array([1.0, 0.0, 0.0], dtype=float)
+            primary_norm = 1.0
+        primary = primary / primary_norm
+        view_norm = float(np.linalg.norm(view))
+        if not np.isfinite(view_norm) or view_norm <= 1e-9:
+            view = np.array([0.64, -0.52, 0.56], dtype=float)
+            view_norm = float(np.linalg.norm(view))
+        view = view / max(view_norm, 1e-12)
+        axis_u = primary - float(np.dot(primary, view)) * view
+        axis_u_norm = float(np.linalg.norm(axis_u))
+        if not np.isfinite(axis_u_norm) or axis_u_norm <= 1e-9:
+            axis_u = np.asarray(fallback, dtype=float).reshape(3) - float(np.dot(fallback, view)) * view
+            axis_u_norm = float(np.linalg.norm(axis_u))
+        if not np.isfinite(axis_u_norm) or axis_u_norm <= 1e-9:
+            ref = np.array([0.0, 0.0, 1.0], dtype=float)
+            if abs(float(np.dot(view, ref))) > 0.92:
+                ref = np.array([1.0, 0.0, 0.0], dtype=float)
+            axis_u = np.cross(view, ref)
+            axis_u_norm = float(np.linalg.norm(axis_u))
+        axis_u = axis_u / max(axis_u_norm, 1e-12)
+        axis_v = np.cross(view, axis_u)
+        axis_v_norm = float(np.linalg.norm(axis_v))
+        if not np.isfinite(axis_v_norm) or axis_v_norm <= 1e-9:
+            axis_v = np.cross(view, np.array([0.0, 0.0, 1.0], dtype=float))
+            axis_v_norm = float(np.linalg.norm(axis_v))
+        axis_v = axis_v / max(axis_v_norm, 1e-12)
+        return np.asarray(axis_u, dtype=float), np.asarray(axis_v, dtype=float)
+
+    def _corner_light_shaft_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        corner: str,
+        tire_force_n: float,
+        hierarchy_u: float,
+        in_air: bool,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = np.asarray(axis_u_xyz, dtype=float).reshape(3)
+        axis_v = np.asarray(axis_v_xyz, dtype=float).reshape(3)
+        axis_u = axis_u / max(1e-12, float(np.linalg.norm(axis_u)))
+        axis_v = axis_v / max(1e-12, float(np.linalg.norm(axis_v)))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        face_centers = np.mean(verts[faces], axis=1)
+        rel = face_centers - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        long_core = np.exp(-((du / 0.62) ** 2))
+        long_tail = np.exp(-(((du - 0.18) / 0.42) ** 2))
+        cross = np.exp(-((dv / 0.48) ** 2))
+        hierarchy = float(_clamp(hierarchy_u, 0.0, 1.0))
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        if self._corner_is_front(str(corner)):
+            base_rgb = _palette_rgb(
+                [
+                    (0.00, (84, 198, 255)),
+                    (0.58, (120, 255, 236)),
+                    (1.00, (224, 248, 255)),
+                ],
+                0.34 + 0.54 * max(load_u, hierarchy),
+            )
+        else:
+            base_rgb = _palette_rgb(
+                [
+                    (0.00, (255, 166, 104)),
+                    (0.58, (255, 214, 122)),
+                    (1.00, (255, 244, 206)),
+                ],
+                0.30 + 0.58 * max(load_u, hierarchy),
+            )
+        shaft_rgb = _boost_rgb(base_rgb, 0.06 + 0.20 * hierarchy)
+        rim_rgb = _lerp_rgb(base_rgb, (255, 250, 238), 0.12 + 0.14 * hierarchy)
+        alpha = (0.04 if in_air else 0.22) * (0.30 + 0.70 * max(load_u, hierarchy)) * (0.60 * long_core + 0.28 * long_tail + 0.12 * cross)
+        alpha *= np.asarray(np.clip(1.0 - 0.34 * rr, 0.18, 1.0), dtype=float)
+        rgb_num = (
+            np.asarray(base_rgb, dtype=float).reshape(1, 3) * (0.44 * long_core + 0.16 * cross).reshape(-1, 1)
+            + np.asarray(shaft_rgb, dtype=float).reshape(1, 3) * (0.32 * long_tail + 0.22 * long_core).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.16 * cross).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.60 * long_core + 0.32 * long_tail + 0.16 * cross).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _focus_halo_rgba(
+        self,
+        *,
+        key: str,
+        load_u: float,
+        spring_energy_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(_clamp(0.58 * float(load_u) + 0.42 * float(spring_energy_u), 0.0, 1.0))
+        halo_rgb = _palette_rgb(
+            [
+                (0.00, (132, 214, 255)),
+                (0.44, (112, 255, 228)),
+                (0.76, (255, 226, 122)),
+                (1.00, (255, 166, 98)),
+            ],
+            energy,
+        )
+        halo_rgb = _boost_rgb(halo_rgb, 0.06 + 0.18 * energy)
+        alpha = 0.08 + 0.20 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in halo_rgb) + (float(_clamp(alpha, 0.05, 0.32)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.18)
+
+    def _focus_halo_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        load_u: float,
+        spring_energy_u: float,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = np.asarray(axis_u_xyz, dtype=float).reshape(3)
+        axis_v = np.asarray(axis_v_xyz, dtype=float).reshape(3)
+        axis_u = axis_u / max(1e-12, float(np.linalg.norm(axis_u)))
+        axis_v = axis_v / max(1e-12, float(np.linalg.norm(axis_v)))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        energy = float(_clamp(0.58 * float(load_u) + 0.42 * float(spring_energy_u), 0.0, 1.0))
+        core_rgb = _palette_rgb(
+            [
+                (0.00, (102, 214, 255)),
+                (0.42, (108, 255, 226)),
+                (0.80, (255, 224, 122)),
+                (1.00, (255, 154, 96)),
+            ],
+            energy,
+        )
+        glow_rgb = _boost_rgb(core_rgb, 0.08 + 0.16 * energy)
+        veil_rgb = _lerp_rgb((54, 94, 146), core_rgb, 0.38 + 0.36 * energy)
+        core = np.exp(-((rr / 0.38) ** 2))
+        veil = np.exp(-(((rr - 0.32) / 0.24) ** 2))
+        fringe = np.exp(-(((rr - 0.82) / 0.18) ** 2))
+        alpha = (0.02 + 0.10 * energy) * (0.54 * core + 0.32 * veil + 0.14 * fringe)
+        rgb_num = (
+            np.asarray(veil_rgb, dtype=float).reshape(1, 3) * (0.40 * veil + 0.18 * fringe).reshape(-1, 1)
+            + np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.44 * core + 0.16 * veil).reshape(-1, 1)
+            + np.asarray(glow_rgb, dtype=float).reshape(1, 3) * (0.20 * fringe + 0.16 * core).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.56 * core + 0.40 * veil + 0.20 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _contact_bounce_material_rgba(
+        self,
+        *,
+        key: str,
+        base_face_rgba: Tuple[float, float, float, float],
+        base_edge_rgba: Tuple[float, float, float, float],
+        tire_force_n: float,
+        wheel_gap_m: float,
+        in_air: bool,
+        gain: float = 1.0,
+    ) -> tuple[tuple[float, float, float, float], tuple[float, float, float, float]]:
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        gap_u = float(_clamp(float(max(0.0, wheel_gap_m)) / 0.10, 0.0, 1.0))
+        road_u = float(_clamp((0.10 if in_air else 1.0) * (0.24 + 0.76 * load_u) * (1.0 - 0.54 * gap_u), 0.0, 1.0))
+        road_u = float(_clamp(float(gain) * road_u, 0.0, 1.0))
+        warm_rgb = _boost_rgb(_heat_rgb(0.12 + 0.84 * (load_u ** 0.92), sat=0.86, val=1.0), 0.06 + 0.22 * road_u)
+        cool_rgb = _lerp_rgb((62, 128, 214), warm_rgb, 0.34 + 0.44 * load_u)
+        rim_rgb = _boost_rgb(warm_rgb, 0.10 + 0.20 * road_u)
+        face_glow_rgba = tuple(float(v) / 255.0 for v in cool_rgb) + (
+            float(_clamp(float(base_face_rgba[3]) + 0.03 * road_u, float(base_face_rgba[3]), 0.98)),
+        )
+        edge_glow_rgba = tuple(float(v) / 255.0 for v in rim_rgb) + (
+            float(_clamp(float(base_edge_rgba[3]) + 0.12 * road_u, float(base_edge_rgba[3]), 1.0)),
+        )
+        face_target = self._blend_rgba(base_face_rgba, face_glow_rgba, 0.14 + 0.34 * road_u)
+        edge_target = self._blend_rgba(base_edge_rgba, edge_glow_rgba, 0.18 + 0.44 * road_u)
+        face_rgba = self._smooth_rgba(f"{key}-face", face_target, response=0.18)
+        edge_rgba = self._smooth_rgba(f"{key}-edge", edge_target, response=0.18)
+        return face_rgba, edge_rgba
+
+    def _apply_mesh_material(
+        self,
+        item: Optional["gl.GLMeshItem"],
+        *,
+        face_rgba: Tuple[float, float, float, float],
+        edge_rgba: Tuple[float, float, float, float],
+    ) -> None:
+        if item is None:
+            return
+        material_key = tuple(round(float(v), 4) for v in (*face_rgba, *edge_rgba))
+        if getattr(item, "_anim_material_key", None) == material_key:
+            return
+        try:
+            item.setColor(tuple(float(v) for v in face_rgba))
+        except Exception:
+            pass
+        try:
+            item.opts["edgeColor"] = tuple(float(v) for v in edge_rgba)
+            item.update()
+        except Exception:
+            pass
+        try:
+            setattr(item, "_anim_material_key", material_key)
+        except Exception:
+            pass
+
     def _cylinder_truth_gate(self, cyl_index: int) -> Dict[str, Any]:
         gates = getattr(self, "_cylinder_truth_gates", {}) or {}
         key = self._cylinder_name(cyl_index)
@@ -4754,23 +7220,57 @@ class Car3DWidget(QtWidgets.QWidget):
 
         # Remove old items (safe if None)
         for it in [self._road_mesh, self._road_edges, self._road_stripes,
-                   self._chassis_mesh, self._contact_pts, self._contact_links,
+                   self._chassis_mesh, self._body_shadow_mesh, self._contact_pts, self._contact_links,
                    self._arm_lines, self._cyl1_lines, self._cyl2_lines,
                    self._contact_patch_mesh, self._vec_vel, self._vec_acc,
+                   self._focus_halo_line,
                    self._cyl_piston_markers, self._cyl_frame_mount_markers,
-                   *self._cyl_piston_ring_lines, *self._cyl_rod_core_lines]:
+                   *self._cyl_piston_ring_lines, *self._cyl_rod_core_lines,
+                   *self._cyl_cap_ring_lines, *self._cyl_gland_ring_lines,
+                   *self._cyl_glass_glint_lines, *self._cyl_glass_caustic_lines,
+                   *self._spring_glow_lines, *self._contact_accent_rings, *self._corner_key_light_lines,
+                   *self._wheel_spin_glow_lines, *self._wheel_rotor_streak_lines]:
             if it is not None:
                 try:
                     self.view.removeItem(it)
                 except Exception:
                     pass
-        for w in self._wheel_meshes:
+        for w in [*self._wheel_meshes, *self._wheel_rim_meshes, *self._wheel_hub_meshes, *self._wheel_brake_rotor_meshes, *self._wheel_brake_caliper_meshes, *self._wheel_shadow_meshes,
+                  *self._spring_meshes, *self._spring_seat_meshes, *self._contact_glaze_meshes,
+                  *self._cyl_bloom_card_meshes, *self._scene_fog_meshes, *self._corner_light_shaft_meshes, self._focus_halo_mesh]:
             try:
                 self.view.removeItem(w)
             except Exception:
                 pass
         self._wheel_meshes = []
-        for meshes in (self._cyl_body_meshes, self._cyl_chamber_meshes, self._cyl_rod_meshes, self._cyl_piston_meshes):
+        self._wheel_rim_meshes = []
+        self._wheel_hub_meshes = []
+        self._wheel_brake_rotor_meshes = []
+        self._wheel_brake_caliper_meshes = []
+        self._wheel_spin_glow_lines = []
+        self._wheel_rotor_streak_lines = []
+        self._wheel_shadow_meshes = []
+        self._spring_meshes = []
+        self._spring_seat_meshes = []
+        self._spring_glow_lines = []
+        self._contact_glaze_meshes = []
+        self._contact_accent_rings = []
+        self._scene_fog_meshes = []
+        self._corner_light_shaft_meshes = []
+        self._corner_key_light_lines = []
+        self._cyl_bloom_card_meshes = []
+        self._focus_halo_mesh = None
+        self._focus_halo_line = None
+        self._body_shadow_mesh = None
+        for meshes in (
+            self._arm_lower_meshes,
+            self._arm_upper_meshes,
+            self._cyl_body_meshes,
+            self._cyl_chamber_meshes,
+            self._cyl_rod_chamber_meshes,
+            self._cyl_rod_meshes,
+            self._cyl_piston_meshes,
+        ):
             for it in list(meshes):
                 try:
                     self.view.removeItem(it)
@@ -4779,6 +7279,11 @@ class Car3DWidget(QtWidgets.QWidget):
             meshes.clear()
         self._cyl_piston_ring_lines = []
         self._cyl_rod_core_lines = []
+        self._cyl_cap_ring_lines = []
+        self._cyl_gland_ring_lines = []
+        self._cyl_glass_glint_lines = []
+        self._cyl_glass_caustic_lines = []
+        self._cyl_pressure_visual_state = {}
 
         # --- Road: ribbon mesh + edges + stripes
         self._road_mesh = gl.GLMeshItem(
@@ -4786,7 +7291,7 @@ class Car3DWidget(QtWidgets.QWidget):
             smooth=True,
             drawEdges=False,
             color=(0.72, 0.74, 0.77, 0.98),
-            shader="shaded",
+            shader=_animator_shader_name(_ANIMATOR_ROAD_SHADER, "shaded"),
         )
         self._road_mesh.setGLOptions("opaque")
         self._road_mesh.setVisible(False)
@@ -4812,6 +7317,107 @@ class Car3DWidget(QtWidgets.QWidget):
         self._road_stripes.setVisible(False)
         self.view.addItem(self._road_stripes)
 
+        self._body_shadow_mesh = gl.GLMeshItem(
+            meshdata=self._empty_meshdata(),
+            smooth=False,
+            drawEdges=False,
+            color=(0.02, 0.04, 0.06, 0.20),
+            shader=None,
+        )
+        self._body_shadow_mesh.setGLOptions("translucent")
+        self._body_shadow_mesh.setVisible(False)
+        self.view.addItem(self._body_shadow_mesh)
+        for _ in range(4):
+            glaze = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=(0.98, 0.76, 0.24, 0.10),
+                shader=None,
+            )
+            glaze.setGLOptions("translucent")
+            glaze.setVisible(False)
+            self.view.addItem(glaze)
+            self._contact_glaze_meshes.append(glaze)
+            accent_ring = gl.GLLinePlotItem(
+                pos=np.zeros((0, 3), dtype=float),
+                color=(0.98, 0.84, 0.30, 0.42),
+                width=2.4,
+                antialias=True,
+                mode="line_strip",
+            )
+            accent_ring.setVisible(False)
+            self.view.addItem(accent_ring)
+            self._contact_accent_rings.append(accent_ring)
+        for fog_rgba in (
+            (0.18, 0.42, 0.66, 0.08),
+            (0.12, 0.34, 0.58, 0.10),
+            (0.44, 0.26, 0.12, 0.08),
+        ):
+            fog = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=fog_rgba,
+                shader=None,
+            )
+            fog.setGLOptions("translucent")
+            fog.setVisible(False)
+            self.view.addItem(fog)
+            self._scene_fog_meshes.append(fog)
+        for shaft_rgba in (
+            (0.56, 0.90, 1.00, 0.10),
+            (0.56, 0.90, 1.00, 0.10),
+            (1.00, 0.84, 0.50, 0.10),
+            (1.00, 0.84, 0.50, 0.10),
+        ):
+            shaft = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=shaft_rgba,
+                shader=None,
+            )
+            shaft.setGLOptions("translucent")
+            shaft.setVisible(False)
+            self.view.addItem(shaft)
+            self._corner_light_shaft_meshes.append(shaft)
+        for line_rgba, width in (
+            ((0.66, 0.94, 1.00, 0.26), 2.8),
+            ((0.66, 0.94, 1.00, 0.26), 2.8),
+            ((1.00, 0.86, 0.52, 0.26), 2.8),
+            ((1.00, 0.86, 0.52, 0.26), 2.8),
+        ):
+            key_light = gl.GLLinePlotItem(
+                pos=np.zeros((0, 3), dtype=float),
+                color=line_rgba,
+                width=width,
+                antialias=True,
+                mode="line_strip",
+            )
+            key_light.setVisible(False)
+            self.view.addItem(key_light)
+            self._corner_key_light_lines.append(key_light)
+        self._focus_halo_mesh = gl.GLMeshItem(
+            meshdata=self._empty_meshdata(),
+            smooth=False,
+            drawEdges=False,
+            color=(0.62, 0.92, 1.00, 0.10),
+            shader=None,
+        )
+        self._focus_halo_mesh.setGLOptions("translucent")
+        self._focus_halo_mesh.setVisible(False)
+        self.view.addItem(self._focus_halo_mesh)
+        self._focus_halo_line = gl.GLLinePlotItem(
+            pos=np.zeros((0, 3), dtype=float),
+            color=(0.80, 0.96, 1.00, 0.28),
+            width=2.4,
+            antialias=True,
+            mode="line_strip",
+        )
+        self._focus_halo_line.setVisible(False)
+        self.view.addItem(self._focus_halo_line)
+
         # --- Chassis: box mesh
         # IMPORTANT: use explicit frame geometry from meta.geometry only.
         # No hidden derivation from wheelbase/track/radius is allowed here.
@@ -4827,11 +7433,11 @@ class Car3DWidget(QtWidgets.QWidget):
             self._box_faces = np.asarray(f_box, dtype=np.int32)
             self._chassis_mesh = gl.GLMeshItem(
                 meshdata=gl.MeshData(vertexes=self._box_base_vertices, faces=self._box_faces),
-                smooth=False,
+                smooth=True,
                 drawEdges=True,
-                edgeColor=(0.25, 0.25, 0.25, 1.0),
-                color=(0.12, 0.36, 0.62, 0.85),
-                shader="shaded",
+                edgeColor=(0.40, 0.55, 0.72, 0.88),
+                color=(0.10, 0.24, 0.38, 0.95),
+                shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "edgeHilight"),
             )
             self._chassis_mesh.setGLOptions("opaque")
             self.view.addItem(self._chassis_mesh)
@@ -4878,21 +7484,106 @@ class Car3DWidget(QtWidgets.QWidget):
         for _ in range(4):
             w = gl.GLMeshItem(
                 meshdata=cyl_md,
-                smooth=False,
+                smooth=True,
                 drawEdges=True,
-                edgeColor=(0.15, 0.15, 0.15, 1.0),
-                color=(0.05, 0.05, 0.05, 1.0),
-                shader="shaded",
+                edgeColor=(0.30, 0.34, 0.40, 0.96),
+                color=(0.06, 0.07, 0.09, 1.0),
+                shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "edgeHilight"),
             )
             w.setGLOptions("opaque")
             self.view.addItem(w)
             self._wheel_meshes.append(w)
+            rim = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=True,
+                drawEdges=True,
+                edgeColor=(0.84, 0.88, 0.94, 0.88),
+                color=(0.40, 0.44, 0.50, 0.98),
+                shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "edgeHilight"),
+            )
+            rim.setGLOptions("opaque")
+            rim.setVisible(False)
+            self.view.addItem(rim)
+            self._wheel_rim_meshes.append(rim)
+            spin_glow = gl.GLLinePlotItem(
+                pos=np.zeros((0, 3), dtype=float),
+                color=(0.66, 0.94, 1.00, 0.18),
+                width=2.8,
+                antialias=True,
+                mode="line_strip",
+            )
+            spin_glow.setVisible(False)
+            self.view.addItem(spin_glow)
+            self._wheel_spin_glow_lines.append(spin_glow)
+            rotor_streak = gl.GLLinePlotItem(
+                pos=np.zeros((0, 3), dtype=float),
+                color=(1.00, 0.78, 0.34, 0.16),
+                width=2.2,
+                antialias=True,
+                mode="line_strip",
+            )
+            rotor_streak.setVisible(False)
+            self.view.addItem(rotor_streak)
+            self._wheel_rotor_streak_lines.append(rotor_streak)
+        hub_md = self._empty_meshdata()
+        for _ in range(8):
+            hub = gl.GLMeshItem(
+                meshdata=hub_md,
+                smooth=True,
+                drawEdges=True,
+                edgeColor=(0.86, 0.92, 0.98, 0.78),
+                color=(0.62, 0.70, 0.82, 0.92),
+                shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "edgeHilight"),
+            )
+            hub.setGLOptions("opaque")
+            hub.setVisible(False)
+            self.view.addItem(hub)
+            self._wheel_hub_meshes.append(hub)
+        rotor_md = self._empty_meshdata()
+        for _ in range(4):
+            rotor = gl.GLMeshItem(
+                meshdata=rotor_md,
+                smooth=True,
+                drawEdges=True,
+                edgeColor=(0.92, 0.94, 0.98, 0.86),
+                color=(0.62, 0.66, 0.72, 0.96),
+                shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "edgeHilight"),
+            )
+            rotor.setGLOptions("opaque")
+            rotor.setVisible(False)
+            self.view.addItem(rotor)
+            self._wheel_brake_rotor_meshes.append(rotor)
+            caliper = gl.GLMeshItem(
+                meshdata=rotor_md,
+                smooth=True,
+                drawEdges=True,
+                edgeColor=(0.96, 0.82, 0.62, 0.84),
+                color=(0.44, 0.24, 0.16, 0.96),
+                shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "edgeHilight"),
+            )
+            caliper.setGLOptions("opaque")
+            caliper.setVisible(False)
+            self.view.addItem(caliper)
+            self._wheel_brake_caliper_meshes.append(caliper)
+        for _ in range(4):
+            shadow = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=(0.02, 0.04, 0.06, 0.18),
+                shader=None,
+            )
+            shadow.setGLOptions("translucent")
+            shadow.setVisible(False)
+            self.view.addItem(shadow)
+            self._wheel_shadow_meshes.append(shadow)
 
-        # --- Pneumatic cylinders: translucent housing + exact cap-side chamber + external rod
-        # mesh + separate inner rod-core overlay + exact piston plane.
+        # --- Pneumatic cylinders: translucent housing + pressure-colored gas chambers +
+        # external rod mesh + separate inner rod-core overlay + exact piston plane.
         # Honesty policy:
         # - housing shell uses explicit packaging length when the bundle exports it;
-        # - the exact cap-side -> piston split is shown as a separate semi-transparent chamber;
+        # - the gas itself, not the housing, is what reads as glass in both cap-side and rod-side cavities;
+        # - the exact cap-side -> piston split and piston -> gland cavity are shown as separate pressure-colored volumes;
         # - the opaque rod mesh represents only the exposed external rod, while a light line overlay
         #   keeps the internal rod readable through the translucent shell;
         # - piston is rendered from the contract-derived plane only, without fake thickness.
@@ -4905,7 +7596,7 @@ class Car3DWidget(QtWidgets.QWidget):
                 drawEdges=True,
                 edgeColor=(0.18, 0.62, 0.88, 0.26),
                 color=(0.16, 0.52, 0.78, 0.10),
-                shader="shaded",
+                shader="balloon",
             )
             body.setGLOptions("translucent")
             body.setVisible(False)
@@ -4918,12 +7609,37 @@ class Car3DWidget(QtWidgets.QWidget):
                 drawEdges=False,
                 edgeColor=(0.0, 0.0, 0.0, 0.0),
                 color=(0.20, 0.74, 0.98, 0.08),
-                shader="shaded",
+                shader="balloon",
             )
             chamber.setGLOptions("translucent")
             chamber.setVisible(False)
             self.view.addItem(chamber)
             self._cyl_chamber_meshes.append(chamber)
+
+            rod_chamber = gl.GLMeshItem(
+                meshdata=cyl_body_md,
+                smooth=False,
+                drawEdges=False,
+                edgeColor=(0.0, 0.0, 0.0, 0.0),
+                color=(0.18, 0.68, 0.96, 0.06),
+                shader="balloon",
+            )
+            rod_chamber.setGLOptions("translucent")
+            rod_chamber.setVisible(False)
+            self.view.addItem(rod_chamber)
+            self._cyl_rod_chamber_meshes.append(rod_chamber)
+            for bloom_rgba in ((0.20, 0.86, 1.00, 0.10), (0.18, 0.78, 0.98, 0.08)):
+                bloom_card = gl.GLMeshItem(
+                    meshdata=cyl_body_md,
+                    smooth=False,
+                    drawEdges=False,
+                    color=bloom_rgba,
+                    shader=None,
+                )
+                bloom_card.setGLOptions("translucent")
+                bloom_card.setVisible(False)
+                self.view.addItem(bloom_card)
+                self._cyl_bloom_card_meshes.append(bloom_card)
 
             rod = gl.GLMeshItem(
                 meshdata=cyl_body_md,
@@ -4931,7 +7647,7 @@ class Car3DWidget(QtWidgets.QWidget):
                 drawEdges=True,
                 edgeColor=(0.78, 0.82, 0.88, 1.0),
                 color=(0.90, 0.92, 0.96, 0.98),
-                shader="shaded",
+                shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "shaded"),
             )
             rod.setGLOptions("opaque")
             rod.setVisible(False)
@@ -4944,7 +7660,7 @@ class Car3DWidget(QtWidgets.QWidget):
                 drawEdges=True,
                 edgeColor=(1.00, 0.88, 0.18, 1.0),
                 color=(1.00, 0.88, 0.22, 0.88),
-                shader="shaded",
+                shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "shaded"),
             )
             piston.setGLOptions("translucent")
             piston.setVisible(False)
@@ -4973,6 +7689,44 @@ class Car3DWidget(QtWidgets.QWidget):
             self.view.addItem(rod_core)
             self._cyl_rod_core_lines.append(rod_core)
 
+            cap_ring = gl.GLLinePlotItem(
+                pos=np.zeros((0, 3), dtype=float),
+                color=(0.62, 0.90, 1.00, 0.58),
+                width=1.8,
+                antialias=True,
+                mode="line_strip",
+            )
+            cap_ring.setVisible(False)
+            self.view.addItem(cap_ring)
+            self._cyl_cap_ring_lines.append(cap_ring)
+
+            gland_ring = gl.GLLinePlotItem(
+                pos=np.zeros((0, 3), dtype=float),
+                color=(0.72, 0.96, 1.00, 0.54),
+                width=1.7,
+                antialias=True,
+                mode="line_strip",
+            )
+            gland_ring.setVisible(False)
+            self.view.addItem(gland_ring)
+            self._cyl_gland_ring_lines.append(gland_ring)
+            for line_color, width, target in (
+                ((0.84, 0.96, 1.00, 0.34), 2.2, self._cyl_glass_glint_lines),
+                ((0.98, 0.88, 0.52, 0.20), 2.8, self._cyl_glass_caustic_lines),
+                ((0.84, 0.96, 1.00, 0.30), 2.0, self._cyl_glass_glint_lines),
+                ((0.98, 0.88, 0.52, 0.16), 2.4, self._cyl_glass_caustic_lines),
+            ):
+                fx_line = gl.GLLinePlotItem(
+                    pos=np.zeros((0, 3), dtype=float),
+                    color=line_color,
+                    width=width,
+                    antialias=True,
+                    mode="line_strip",
+                )
+                fx_line.setVisible(False)
+                self.view.addItem(fx_line)
+                target.append(fx_line)
+
         # No GL point sprites here: they caused Windows/OpenGL runtime warnings and were
         # easily mistaken for frame mounts or other packaging points.
         self._cyl_piston_markers = None
@@ -4985,6 +7739,69 @@ class Car3DWidget(QtWidgets.QWidget):
         )
         self._cyl_frame_mount_markers.setVisible(False)
         self.view.addItem(self._cyl_frame_mount_markers)
+
+        for _ in range(16):
+            lower_arm = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=True,
+                drawEdges=True,
+                edgeColor=(0.56, 0.76, 0.98, 0.60),
+                color=(0.24, 0.40, 0.58, 0.93),
+                shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "edgeHilight"),
+            )
+            lower_arm.setGLOptions("opaque")
+            lower_arm.setVisible(False)
+            self.view.addItem(lower_arm)
+            self._arm_lower_meshes.append(lower_arm)
+
+            upper_arm = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=True,
+                drawEdges=True,
+                edgeColor=(0.96, 0.84, 0.58, 0.56),
+                color=(0.54, 0.42, 0.24, 0.91),
+                shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "edgeHilight"),
+            )
+            upper_arm.setGLOptions("opaque")
+            upper_arm.setVisible(False)
+            self.view.addItem(upper_arm)
+            self._arm_upper_meshes.append(upper_arm)
+        for _ in range(8):
+            spring = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=True,
+                drawEdges=True,
+                edgeColor=(0.70, 0.86, 0.98, 0.78),
+                color=(0.44, 0.62, 0.82, 0.96),
+                shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "edgeHilight"),
+            )
+            spring.setGLOptions("opaque")
+            spring.setVisible(False)
+            self.view.addItem(spring)
+            self._spring_meshes.append(spring)
+            spring_glow = gl.GLLinePlotItem(
+                pos=np.zeros((0, 3), dtype=float),
+                color=(0.72, 0.94, 1.00, 0.20),
+                width=3.0,
+                antialias=True,
+                mode="line_strip",
+            )
+            spring_glow.setVisible(False)
+            self.view.addItem(spring_glow)
+            self._spring_glow_lines.append(spring_glow)
+        for _ in range(16):
+            spring_seat = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=True,
+                drawEdges=True,
+                edgeColor=(0.82, 0.90, 0.98, 0.70),
+                color=(0.28, 0.38, 0.50, 0.96),
+                shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "edgeHilight"),
+            )
+            spring_seat.setGLOptions("opaque")
+            spring_seat.setVisible(False)
+            self.view.addItem(spring_seat)
+            self._spring_seat_meshes.append(spring_seat)
 
         # --- Contact markers and links
         # Use line-based cross markers instead of GL point sprites: the latter produced
@@ -5012,8 +7829,8 @@ class Car3DWidget(QtWidgets.QWidget):
 
         self._arm_lines = gl.GLLinePlotItem(
             pos=np.zeros((2, 3)),
-            color=(0.82, 0.82, 0.86, 0.95),
-            width=2.0,
+            color=(0.84, 0.88, 0.94, 0.34),
+            width=1.35,
             antialias=True,
             mode="lines",
         )
@@ -5022,8 +7839,8 @@ class Car3DWidget(QtWidgets.QWidget):
 
         self._cyl1_lines = gl.GLLinePlotItem(
             pos=np.zeros((2, 3)),
-            color=(0.30, 0.82, 0.98, 0.95),
-            width=2.0,
+            color=(0.30, 0.82, 0.98, 0.28),
+            width=1.25,
             antialias=True,
             mode="lines",
         )
@@ -5032,8 +7849,8 @@ class Car3DWidget(QtWidgets.QWidget):
 
         self._cyl2_lines = gl.GLLinePlotItem(
             pos=np.zeros((2, 3)),
-            color=(0.98, 0.72, 0.28, 0.95),
-            width=2.0,
+            color=(0.98, 0.72, 0.28, 0.28),
+            width=1.25,
             antialias=True,
             mode="lines",
         )
@@ -5046,7 +7863,7 @@ class Car3DWidget(QtWidgets.QWidget):
             drawEdges=True,
             edgeColor=(0.95, 0.85, 0.25, 0.95),
             color=(0.95, 0.85, 0.25, 0.35),
-            shader="shaded",
+            shader=_animator_shader_name(_ANIMATOR_ROAD_SHADER, "shaded"),
         )
         self._contact_patch_mesh.setGLOptions("translucent")
         self._contact_patch_mesh.setVisible(False)
@@ -5056,7 +7873,7 @@ class Car3DWidget(QtWidgets.QWidget):
         self._vec_vel = gl.GLLinePlotItem(
             pos=np.zeros((6, 3)),
             color=(0.2, 0.75, 0.35, 0.9),
-            width=2.0,
+            width=2.6,
             antialias=True,
             mode="lines",
         )
@@ -5066,7 +7883,7 @@ class Car3DWidget(QtWidgets.QWidget):
         self._vec_acc = gl.GLLinePlotItem(
             pos=np.zeros((6, 3)),
             color=(0.95, 0.55, 0.15, 0.9),
-            width=2.0,
+            width=2.8,
             antialias=True,
             mode="lines",
         )
@@ -5106,6 +7923,114 @@ class Car3DWidget(QtWidgets.QWidget):
         self._road_path_ny_world_cache = None
         self._bundle_history_m = None
         self._bundle_lookahead_m = None
+        self._bundle_context_key = int(id(bundle)) if bundle is not None else None
+        self._bundle_geometry_meta = {}
+        self._cyl_pressure_series_map = {}
+        self._tire_force_series_map = {}
+        self._spring_metric_series_map = {}
+        self._spring_active_series_map = {}
+        self._patm_arr = None
+        self._patm_default_pa = float(PATM_PA_DEFAULT)
+        self._cyl_pressure_visual_min_bar_g = -0.35
+        self._cyl_pressure_visual_max_bar_g = 10.0
+        self._tire_force_visual_max_n = 4500.0
+        self._cyl_pressure_visual_state = {}
+        try:
+            if bundle is not None:
+                self._bundle_geometry_meta = dict(dict(getattr(bundle, "meta", {}) or {}).get("geometry") or {})
+                self._patm_arr, self._patm_default_pa = _infer_patm_source(bundle)
+                corner_cache = _ensure_corner_signal_cache(bundle)
+                for corner in CORNERS:
+                    self._tire_force_series_map[str(corner)] = np.asarray(
+                        corner_cache.get(str(corner), {}).get("tireF", 0.0),
+                        dtype=float,
+                    ).reshape(-1)
+                main_df = getattr(bundle, "main", None)
+                main_cols = set()
+                if main_df is not None and hasattr(main_df, "columns"):
+                    try:
+                        main_cols = {str(col) for col in list(main_df.columns)}
+                    except Exception:
+                        main_cols = set()
+                if main_df is not None and main_cols:
+                    for corner in CORNERS:
+                        for cyl in ("Ц1", "Ц2"):
+                            active_col = spring_family_active_flag_column(cyl, corner)
+                            if active_col in main_cols:
+                                self._spring_active_series_map[str(active_col)] = np.asarray(main_df[active_col], dtype=float).reshape(-1)
+                            for metric in (
+                                "компрессия_м",
+                                "длина_м",
+                                "зазор_до_крышки_м",
+                                "запас_до_coil_bind_м",
+                                "длина_установленная_м",
+                            ):
+                                runtime_col = spring_family_runtime_column(metric, cyl, corner)
+                                if runtime_col in main_cols:
+                                    self._spring_metric_series_map[str(runtime_col)] = np.asarray(main_df[runtime_col], dtype=float).reshape(-1)
+                        for legacy_col in (
+                            f"пружина_длина_{corner}_м",
+                            f"пружина_зазор_до_крышки_{corner}_м",
+                            f"пружина_запас_до_coil_bind_{corner}_м",
+                        ):
+                            if legacy_col in main_cols:
+                                self._spring_metric_series_map[str(legacy_col)] = np.asarray(main_df[legacy_col], dtype=float).reshape(-1)
+                if getattr(bundle, "p", None) is not None:
+                    for corner in CORNERS:
+                        for cyl_index in (1, 2):
+                            for chamber_kind in ("БП", "ШП"):
+                                node = self._cylinder_chamber_node_name(cyl_index, corner, chamber_kind)
+                                if bundle.p.has(node):
+                                    self._cyl_pressure_series_map[str(node)] = np.asarray(bundle.p.column(node), dtype=float).reshape(-1)
+                if self._cyl_pressure_series_map:
+                    gauge_samples: list[np.ndarray] = []
+                    for arr in self._cyl_pressure_series_map.values():
+                        p_arr = np.asarray(arr, dtype=float).reshape(-1)
+                        if p_arr.size == 0:
+                            continue
+                        if self._patm_arr is not None and self._patm_arr.size > 0:
+                            n = int(min(p_arr.size, self._patm_arr.size))
+                            if n <= 0:
+                                continue
+                            patm = np.asarray(self._patm_arr[:n], dtype=float)
+                            valid_patm = np.isfinite(patm) & (np.abs(patm) > 1.0)
+                            patm = np.where(valid_patm, patm, float(self._patm_default_pa))
+                            gauge = (p_arr[:n] - patm) / BAR_PA
+                        else:
+                            gauge = (p_arr - float(self._patm_default_pa)) / BAR_PA
+                        gauge = np.asarray(gauge[np.isfinite(gauge)], dtype=float)
+                        if gauge.size:
+                            gauge_samples.append(gauge)
+                    if gauge_samples:
+                        gauge_all = np.concatenate(gauge_samples, axis=0)
+                        gauge_lo = float(np.nanpercentile(gauge_all, 2.0))
+                        gauge_hi = float(np.nanpercentile(gauge_all, 98.0))
+                        self._cyl_pressure_visual_min_bar_g = float(max(-2.0, min(-0.15, gauge_lo)))
+                        self._cyl_pressure_visual_max_bar_g = float(max(2.5, min(16.0, max(gauge_hi, 2.5))))
+                force_samples = [
+                    np.asarray(arr, dtype=float).reshape(-1)
+                    for arr in self._tire_force_series_map.values()
+                ]
+                if force_samples:
+                    finite_force_parts = [
+                        arr[np.isfinite(arr) & (arr > 1.0)]
+                        for arr in force_samples
+                        if arr.size
+                    ]
+                    finite_force_parts = [arr for arr in finite_force_parts if arr.size]
+                    if finite_force_parts:
+                        finite_force = np.concatenate(finite_force_parts, axis=0)
+                        force_hi = float(np.nanpercentile(finite_force, 98.0))
+                        self._tire_force_visual_max_n = float(max(500.0, min(16000.0, max(force_hi, 500.0))))
+        except Exception:
+            self._bundle_geometry_meta = {}
+            self._cyl_pressure_series_map = {}
+            self._tire_force_series_map = {}
+            self._spring_metric_series_map = {}
+            self._spring_active_series_map = {}
+            self._patm_arr = None
+            self._patm_default_pa = float(PATM_PA_DEFAULT)
+            self._tire_force_visual_max_n = 4500.0
         try:
             self._cylinder_truth_gates = _evaluate_all_cylinder_truth_gates(getattr(bundle, "meta", None) if bundle is not None else None)
             for _gate in self._cylinder_truth_gates.values():
@@ -5328,6 +8253,48 @@ class Car3DWidget(QtWidgets.QWidget):
             self._road_edges.setVisible(False)
         if self._road_stripes and not show_road:
             self._road_stripes.setVisible(False)
+        if self._body_shadow_mesh and not show_road:
+            self._body_shadow_mesh.setVisible(False)
+        for it in self._wheel_shadow_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        for it in self._contact_glaze_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        for it in self._contact_accent_rings:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        for it in self._scene_fog_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        for it in self._corner_light_shaft_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        for it in self._corner_key_light_lines:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        if self._focus_halo_mesh is not None and not show_road:
+            self._focus_halo_mesh.setVisible(False)
+        if self._focus_halo_line is not None and not show_road:
+            self._focus_halo_line.setVisible(False)
 
         if self._contact_pts:
             self._contact_pts.setVisible(True)  # always useful
@@ -5341,10 +8308,36 @@ class Car3DWidget(QtWidgets.QWidget):
             self._cyl2_lines.setVisible(True)
         if self._contact_patch_mesh and not show_road:
             self._contact_patch_mesh.setVisible(False)
+        for it in self._spring_glow_lines:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        for it in self._spring_meshes:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        for it in self._spring_seat_meshes:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        for it in self._wheel_hub_meshes:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        for meshes in (self._arm_lower_meshes, self._arm_upper_meshes):
+            for it in meshes:
+                try:
+                    it.setVisible(bool(it.isVisible()))
+                except Exception:
+                    pass
         # Packaging meshes are shown by the per-frame update only when they carry real
         # geometry. Never force empty startup meshes visible here: that caused black
         # startup scenes and OpenGL warnings before the first valid frame arrived.
-        for meshes in (self._cyl_body_meshes, self._cyl_chamber_meshes, self._cyl_rod_meshes, self._cyl_piston_meshes):
+        for meshes in (self._cyl_body_meshes, self._cyl_chamber_meshes, self._cyl_rod_chamber_meshes, self._cyl_bloom_card_meshes, self._cyl_rod_meshes, self._cyl_piston_meshes):
             for it in meshes:
                 try:
                     it.setVisible(bool(it.isVisible()))
@@ -5358,6 +8351,51 @@ class Car3DWidget(QtWidgets.QWidget):
         for it in self._cyl_rod_core_lines:
             try:
                 it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        for it in self._cyl_cap_ring_lines:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        for it in self._cyl_gland_ring_lines:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        for it in self._cyl_glass_glint_lines:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        for it in self._cyl_glass_caustic_lines:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        for it in self._scene_fog_meshes:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        for it in self._corner_light_shaft_meshes:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        for it in self._corner_key_light_lines:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        if self._focus_halo_mesh is not None:
+            try:
+                self._focus_halo_mesh.setVisible(bool(self._focus_halo_mesh.isVisible()))
+            except Exception:
+                pass
+        if self._focus_halo_line is not None:
+            try:
+                self._focus_halo_line.setVisible(bool(self._focus_halo_line.isVisible()))
             except Exception:
                 pass
         if self._cyl_piston_markers:
@@ -5402,6 +8440,11 @@ class Car3DWidget(QtWidgets.QWidget):
             return
         if bool(getattr(self, '_layout_transition_active', False)):
             return
+        if int(getattr(self, "_bundle_context_key", 0) or 0) != id(b):
+            try:
+                self.set_bundle_context(b)
+            except Exception:
+                pass
 
         i0, i1, alpha, _sample_t = _sample_time_bracket(
             np.asarray(b.t, dtype=float),
@@ -5435,10 +8478,39 @@ class Car3DWidget(QtWidgets.QWidget):
             for c in corners
         ]
         wheel_air = [_g(f"колесо_в_воздухе_{c}", 0.0) for c in corners]
+        tire_forces_n = [
+            float(
+                max(
+                    0.0,
+                    self._sample_corner_tire_force_n(
+                        c,
+                        i0=i0,
+                        i1=i1,
+                        alpha=alpha,
+                        default_n=0.0,
+                    ),
+                )
+            )
+            for c in corners
+        ]
 
         # ---- Canonical local car-frame coordinates (no axis remapping)
         x0 = _g("путь_x_м", 0.0)
         y0 = _g("путь_y_м", 0.0)
+
+        try:
+            s_progress_m = float(
+                _sample_series_local(
+                    np.asarray(b.ensure_s_world(), dtype=float),
+                    i0=i0,
+                    i1=i1,
+                    alpha=alpha,
+                    default=0.0,
+                )
+            )
+        except Exception:
+            speed_sign = -1.0 if float(speed_along_road) < -1e-6 else 1.0
+            s_progress_m = float(speed_sign * math.hypot(float(x0), float(y0)))
 
         wb = float(self.geom.wheelbase)
         tr = float(self.geom.track)
@@ -5470,6 +8542,8 @@ class Car3DWidget(QtWidgets.QWidget):
         cyl1_bot_local_pts: list[Optional[np.ndarray]] = []
         cyl2_top_local_pts: list[Optional[np.ndarray]] = []
         cyl2_bot_local_pts: list[Optional[np.ndarray]] = []
+        spring_visual_states: list[Optional[dict[str, Any]]] = []
+        scene_glass_energy_us: list[float] = []
 
         def _solver_local_point(kind: str, corner: str) -> Optional[np.ndarray]:
             arr = b.point_xyz(kind, corner)
@@ -5578,6 +8652,7 @@ class Car3DWidget(QtWidgets.QWidget):
             wheel_pose_ups.append(_norm_or(up_xyz, np.array([0.0, 0.0, 1.0], dtype=float)))
             wheel_pose_toe.append(float(toe_rad))
             wheel_pose_camber.append(float(camber_rad))
+        camera_view_dir = self._camera_view_direction_local_xyz()
 
         # ---- Place chassis (box)
         body_h = max(0.0, float(getattr(self.geom, "frame_height", 0.0)))
@@ -5600,16 +8675,346 @@ class Car3DWidget(QtWidgets.QWidget):
                 center_draw = np.asarray([0.0, 0.0, z_body], dtype=float)
                 v_box = (np.asarray(self._box_base_vertices, dtype=float) @ R_local.T) + center_draw
             self._chassis_mesh.setMeshData(meshdata=gl.MeshData(vertexes=v_box, faces=self._box_faces))
+        base_mean_load_u = float(
+            _clamp(
+                float(np.nanmean(np.asarray(tire_forces_n, dtype=float))) / float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0))),
+                0.0,
+                1.0,
+            )
+        ) if tire_forces_n else 0.0
+        body_forward_for_grade = _norm_or(np.asarray(R_local[:, 0], dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        scene_grade_base = self._scene_grade_profile(
+            key_prefix="scene-grade-base",
+            camera_view_dir_xyz=camera_view_dir,
+            body_forward_xyz=body_forward_for_grade,
+            mean_load_u=base_mean_load_u,
+            spring_energy_u=base_mean_load_u,
+            glass_energy_u=0.0,
+            speed_m_s=float(speed_along_road),
+        )
+        try:
+            bg_rgba = self._scene_graded_rgba(
+                key="scene-background",
+                rgba=(6.0 / 255.0, 10.0 / 255.0, 18.0 / 255.0, 1.0),
+                exposure=float(scene_grade_base["exposure"]),
+                saturation=float(scene_grade_base["saturation"]),
+                warmth=float(scene_grade_base["warmth"]),
+                highlight_gain=1.0,
+                alpha_gain=1.0,
+                response=0.12,
+            )
+            self.view.setBackgroundColor(
+                int(round(255.0 * float(_clamp(bg_rgba[0], 0.0, 1.0)))),
+                int(round(255.0 * float(_clamp(bg_rgba[1], 0.0, 1.0)))),
+                int(round(255.0 * float(_clamp(bg_rgba[2], 0.0, 1.0)))),
+            )
+        except Exception:
+            pass
 
         # ---- Place wheels using wheel pose derived from explicit hardpoints
         if self._wheel_base_vertices is not None and self._wheel_faces is not None:
-            base_wheel = np.asarray(self._wheel_base_vertices, dtype=float)
             for idx, w in enumerate(self._wheel_meshes):
                 center = np.asarray(wheel_pose_centers[idx], dtype=float)
                 axle = np.asarray(wheel_pose_axles[idx], dtype=float)
+                fwd = _norm_or(
+                    np.asarray(wheel_pose_fwds[idx], dtype=float).reshape(3),
+                    np.array([1.0, 0.0, 0.0], dtype=float),
+                )
+                up = _norm_or(
+                    np.asarray(wheel_pose_ups[idx], dtype=float).reshape(3),
+                    np.array([0.0, 0.0, 1.0], dtype=float),
+                )
+                wheel_contact = np.asarray(road_local_pts[idx], dtype=float).reshape(3)
+                if not np.all(np.isfinite(wheel_contact)):
+                    wheel_contact = np.asarray(center, dtype=float).reshape(3)
+                    wheel_contact[2] = float(wheel_contact[2]) - float(self.geom.wheel_radius)
+                wheel_gap_m_local = float(
+                    max(
+                        0.0,
+                        np.dot(np.asarray(center, dtype=float).reshape(3) - wheel_contact, up) - float(self.geom.wheel_radius),
+                    )
+                )
+                deformed_wheel = self._deformed_wheel_vertices(
+                    tire_force_n=float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0,
+                    wheel_gap_m=wheel_gap_m_local,
+                    in_air=bool(wheel_air[idx] > 0.5) if idx < len(wheel_air) else False,
+                    speed_m_s=float(speed_along_road),
+                )
+                if deformed_wheel is None:
+                    deformed_wheel = np.asarray(self._wheel_base_vertices, dtype=float)
+                wheel_spin_phase = self._wheel_spin_phase_rad(
+                    path_progress_m=s_progress_m,
+                    wheel_radius_m=float(self.geom.wheel_radius),
+                    speed_m_s=float(speed_along_road),
+                )
                 rot = self._rotation_from_y_to_vec(axle)
-                v_wheel = (base_wheel @ np.asarray(rot, dtype=float).T) + center.reshape(1, 3)
-                w.setMeshData(meshdata=gl.MeshData(vertexes=v_wheel, faces=self._wheel_faces))
+                v_wheel = (np.asarray(deformed_wheel, dtype=float) @ np.asarray(rot, dtype=float).T) + center.reshape(1, 3)
+                wheel_face_colors = self._wheel_tire_face_colors(
+                    v_wheel,
+                    self._wheel_faces,
+                    wheel_center_xyz=center,
+                    axle_xyz=axle,
+                    forward_xyz=fwd,
+                    up_xyz=up,
+                    tire_force_n=float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0,
+                    wheel_gap_m=wheel_gap_m_local,
+                    speed_m_s=float(speed_along_road),
+                    in_air=bool(wheel_air[idx] > 0.5) if idx < len(wheel_air) else False,
+                    spin_phase_rad=float(wheel_spin_phase),
+                )
+                wheel_face_colors = self._scene_grade_color_array(
+                    wheel_face_colors,
+                    exposure=float(scene_grade_base["exposure"]),
+                    saturation=float(scene_grade_base["saturation"]),
+                    warmth=float(scene_grade_base["warmth"]),
+                    highlight_gain=float(scene_grade_base["highlight_gain"]) * 1.02,
+                    alpha_gain=1.0,
+                    output_u8=True,
+                )
+                w.setMeshData(meshdata=gl.MeshData(vertexes=v_wheel, faces=self._wheel_faces, faceColors=wheel_face_colors))
+                wheel_face_rgba, wheel_edge_rgba = self._wheel_tire_material_rgba(
+                    key=f"wheel-tire-{corners[idx]}",
+                    tire_force_n=float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0,
+                    wheel_gap_m=wheel_gap_m_local,
+                    in_air=bool(wheel_air[idx] > 0.5) if idx < len(wheel_air) else False,
+                    speed_m_s=float(speed_along_road),
+                )
+                wheel_face_rgba = self._scene_graded_rgba(
+                    key=f"wheel-tire-scene-face-{corners[idx]}",
+                    rgba=wheel_face_rgba,
+                    exposure=float(scene_grade_base["exposure"]),
+                    saturation=float(scene_grade_base["saturation"]),
+                    warmth=float(scene_grade_base["warmth"]),
+                    highlight_gain=float(scene_grade_base["highlight_gain"]),
+                    alpha_gain=1.0,
+                    response=0.18,
+                )
+                wheel_edge_rgba = self._scene_graded_rgba(
+                    key=f"wheel-tire-scene-edge-{corners[idx]}",
+                    rgba=wheel_edge_rgba,
+                    exposure=float(scene_grade_base["exposure"]),
+                    saturation=float(scene_grade_base["saturation"]),
+                    warmth=float(scene_grade_base["warmth"]),
+                    highlight_gain=float(scene_grade_base["highlight_gain"]) * 1.04,
+                    alpha_gain=1.0,
+                    response=0.18,
+                )
+                self._apply_mesh_material(
+                    w,
+                    face_rgba=wheel_face_rgba,
+                    edge_rgba=wheel_edge_rgba,
+                )
+                spin_glow_item = self._wheel_spin_glow_lines[idx] if idx < len(self._wheel_spin_glow_lines) else None
+                rotor_streak_item = self._wheel_rotor_streak_lines[idx] if idx < len(self._wheel_rotor_streak_lines) else None
+                speed_sign = -1.0 if float(speed_along_road) < -1e-6 else 1.0
+                spin_arc_span = speed_sign * (0.40 * np.pi + 0.78 * np.pi * float(_clamp(abs(float(speed_along_road)) / 35.0, 0.0, 1.0)))
+                spin_glow_vertices = self._wheel_spin_arc_vertices(
+                    center_xyz=center + axle * (0.44 * float(self.geom.wheel_width)),
+                    axle_xyz=axle,
+                    forward_xyz=fwd,
+                    up_xyz=up,
+                    radius_m=max(0.05, 1.03 * float(self.geom.wheel_radius)),
+                    start_rad=float(wheel_spin_phase) - 0.14 * np.pi,
+                    end_rad=float(wheel_spin_phase) + float(spin_arc_span),
+                    axial_offset_m=0.0,
+                    segments=44,
+                )
+                spin_glow_rgba = self._wheel_spin_glow_rgba(
+                    key=f"wheel-spin-glow-{corners[idx]}",
+                    speed_m_s=float(speed_along_road),
+                    tire_force_n=float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0,
+                    wheel_gap_m=wheel_gap_m_local,
+                    in_air=bool(wheel_air[idx] > 0.5) if idx < len(wheel_air) else False,
+                )
+                spin_glow_rgba = self._scene_graded_rgba(
+                    key=f"wheel-spin-glow-scene-{corners[idx]}",
+                    rgba=spin_glow_rgba,
+                    exposure=float(scene_grade_base["exposure"]) * float(scene_grade_base["fog_gain"]),
+                    saturation=float(scene_grade_base["saturation"]),
+                    warmth=float(scene_grade_base["warmth"]),
+                    highlight_gain=float(scene_grade_base["highlight_gain"]) * 1.08,
+                    alpha_gain=float(scene_grade_base["alpha_gain"]),
+                    response=0.16,
+                )
+                _set_colored_line_item(
+                    spin_glow_item,
+                    spin_glow_vertices,
+                    spin_glow_rgba,
+                    edge_floor=0.08,
+                    exponent=0.68,
+                )
+                rim_item = self._wheel_rim_meshes[idx] if idx < len(self._wheel_rim_meshes) else None
+                rim_verts, rim_faces = self._wheel_rim_mesh(
+                    center_xyz=center,
+                    axle_xyz=axle,
+                    forward_xyz=fwd,
+                    up_xyz=up,
+                    wheel_radius_m=float(self.geom.wheel_radius),
+                    wheel_width_m=float(self.geom.wheel_width),
+                    spin_phase_rad=float(wheel_spin_phase),
+                    spoke_count=5,
+                )
+                _set_poly_mesh(rim_item, rim_verts, rim_faces)
+                rim_face_rgba, rim_edge_rgba = self._wheel_rim_material_rgba(
+                    key=f"wheel-rim-{corners[idx]}",
+                    tire_force_n=float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0,
+                    speed_m_s=float(speed_along_road),
+                )
+                rim_face_rgba = self._scene_graded_rgba(
+                    key=f"wheel-rim-scene-face-{corners[idx]}",
+                    rgba=rim_face_rgba,
+                    exposure=float(scene_grade_base["exposure"]),
+                    saturation=float(scene_grade_base["saturation"]),
+                    warmth=float(scene_grade_base["warmth"]),
+                    highlight_gain=float(scene_grade_base["highlight_gain"]) * 1.06,
+                    alpha_gain=1.0,
+                    response=0.18,
+                )
+                rim_edge_rgba = self._scene_graded_rgba(
+                    key=f"wheel-rim-scene-edge-{corners[idx]}",
+                    rgba=rim_edge_rgba,
+                    exposure=float(scene_grade_base["exposure"]),
+                    saturation=float(scene_grade_base["saturation"]),
+                    warmth=float(scene_grade_base["warmth"]),
+                    highlight_gain=float(scene_grade_base["highlight_gain"]) * 1.10,
+                    alpha_gain=1.0,
+                    response=0.18,
+                )
+                self._apply_mesh_material(
+                    rim_item,
+                    face_rgba=rim_face_rgba,
+                    edge_rgba=rim_edge_rgba,
+                )
+                rotor_item = self._wheel_brake_rotor_meshes[idx] if idx < len(self._wheel_brake_rotor_meshes) else None
+                caliper_item = self._wheel_brake_caliper_meshes[idx] if idx < len(self._wheel_brake_caliper_meshes) else None
+                rotor_radius = max(0.035, 0.64 * float(self.geom.wheel_radius))
+                rotor_half_thickness = max(0.0035, 0.10 * float(self.geom.wheel_width))
+                rotor_seg = (
+                    np.asarray(center, dtype=float) - np.asarray(axle, dtype=float) * rotor_half_thickness,
+                    np.asarray(center, dtype=float) + np.asarray(axle, dtype=float) * rotor_half_thickness,
+                )
+                _set_mesh_from_segment(rotor_item, rotor_seg, rotor_radius)
+                rotor_face_rgba, rotor_edge_rgba = self._wheel_brake_material_rgba(
+                    key=f"wheel-rotor-{corners[idx]}",
+                    tire_force_n=float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0,
+                    speed_m_s=float(speed_along_road),
+                    kind="rotor",
+                )
+                rotor_face_rgba = self._scene_graded_rgba(
+                    key=f"wheel-rotor-scene-face-{corners[idx]}",
+                    rgba=rotor_face_rgba,
+                    exposure=float(scene_grade_base["exposure"]),
+                    saturation=float(scene_grade_base["saturation"]),
+                    warmth=float(scene_grade_base["warmth"]),
+                    highlight_gain=float(scene_grade_base["highlight_gain"]),
+                    alpha_gain=1.0,
+                    response=0.18,
+                )
+                rotor_edge_rgba = self._scene_graded_rgba(
+                    key=f"wheel-rotor-scene-edge-{corners[idx]}",
+                    rgba=rotor_edge_rgba,
+                    exposure=float(scene_grade_base["exposure"]),
+                    saturation=float(scene_grade_base["saturation"]),
+                    warmth=float(scene_grade_base["warmth"]),
+                    highlight_gain=float(scene_grade_base["highlight_gain"]) * 1.04,
+                    alpha_gain=1.0,
+                    response=0.18,
+                )
+                self._apply_mesh_material(
+                    rotor_item,
+                    face_rgba=rotor_face_rgba,
+                    edge_rgba=rotor_edge_rgba,
+                )
+                rotor_streak_vertices = self._wheel_spin_arc_vertices(
+                    center_xyz=center,
+                    axle_xyz=axle,
+                    forward_xyz=fwd,
+                    up_xyz=up,
+                    radius_m=max(0.03, 0.72 * rotor_radius),
+                    start_rad=float(wheel_spin_phase) + 0.18 * np.pi,
+                    end_rad=float(wheel_spin_phase) + speed_sign * (0.26 * np.pi + 0.62 * np.pi * float(_clamp(abs(float(speed_along_road)) / 35.0, 0.0, 1.0))),
+                    axial_offset_m=0.10 * float(self.geom.wheel_width),
+                    segments=34,
+                )
+                rotor_streak_rgba = self._wheel_rotor_streak_rgba(
+                    key=f"wheel-rotor-streak-{corners[idx]}",
+                    speed_m_s=float(speed_along_road),
+                    tire_force_n=float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0,
+                )
+                rotor_streak_rgba = self._scene_graded_rgba(
+                    key=f"wheel-rotor-streak-scene-{corners[idx]}",
+                    rgba=rotor_streak_rgba,
+                    exposure=float(scene_grade_base["exposure"]) * float(scene_grade_base["fog_gain"]),
+                    saturation=float(scene_grade_base["saturation"]),
+                    warmth=float(scene_grade_base["warmth"]),
+                    highlight_gain=float(scene_grade_base["highlight_gain"]) * 1.06,
+                    alpha_gain=float(scene_grade_base["alpha_gain"]),
+                    response=0.16,
+                )
+                _set_colored_line_item(
+                    rotor_streak_item,
+                    rotor_streak_vertices,
+                    rotor_streak_rgba,
+                    edge_floor=0.10,
+                    exponent=0.72,
+                )
+                caliper_center = (
+                    np.asarray(center, dtype=float)
+                    + np.asarray(up, dtype=float) * (0.42 * rotor_radius)
+                    - np.asarray(fwd, dtype=float) * (0.16 * rotor_radius)
+                    + np.asarray(axle, dtype=float) * (0.18 * float(self.geom.wheel_width))
+                )
+                caliper_verts, caliper_faces = self._oriented_box_mesh(
+                    center_xyz=caliper_center,
+                    axis_x_xyz=fwd,
+                    axis_y_xyz=axle,
+                    axis_z_xyz=up,
+                    size_x_m=max(0.028, 0.24 * rotor_radius),
+                    size_y_m=max(0.016, 0.22 * float(self.geom.wheel_width)),
+                    size_z_m=max(0.032, 0.34 * rotor_radius),
+                )
+                _set_poly_mesh(caliper_item, caliper_verts, caliper_faces)
+                caliper_face_rgba, caliper_edge_rgba = self._wheel_brake_material_rgba(
+                    key=f"wheel-caliper-{corners[idx]}",
+                    tire_force_n=float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0,
+                    speed_m_s=float(speed_along_road),
+                    kind="caliper",
+                )
+                caliper_face_rgba = self._scene_graded_rgba(
+                    key=f"wheel-caliper-scene-face-{corners[idx]}",
+                    rgba=caliper_face_rgba,
+                    exposure=float(scene_grade_base["exposure"]),
+                    saturation=float(scene_grade_base["saturation"]),
+                    warmth=float(scene_grade_base["warmth"]),
+                    highlight_gain=float(scene_grade_base["highlight_gain"]),
+                    alpha_gain=1.0,
+                    response=0.18,
+                )
+                caliper_edge_rgba = self._scene_graded_rgba(
+                    key=f"wheel-caliper-scene-edge-{corners[idx]}",
+                    rgba=caliper_edge_rgba,
+                    exposure=float(scene_grade_base["exposure"]),
+                    saturation=float(scene_grade_base["saturation"]),
+                    warmth=float(scene_grade_base["warmth"]),
+                    highlight_gain=float(scene_grade_base["highlight_gain"]) * 1.04,
+                    alpha_gain=1.0,
+                    response=0.18,
+                )
+                self._apply_mesh_material(
+                    caliper_item,
+                    face_rgba=caliper_face_rgba,
+                    edge_rgba=caliper_edge_rgba,
+                )
+        for mesh_idx in range(len(wheel_pose_centers), len(self._wheel_rim_meshes)):
+            self._invalidate_mesh(self._wheel_rim_meshes[mesh_idx])
+        for mesh_idx in range(len(wheel_pose_centers), len(self._wheel_brake_rotor_meshes)):
+            self._invalidate_mesh(self._wheel_brake_rotor_meshes[mesh_idx])
+        for mesh_idx in range(len(wheel_pose_centers), len(self._wheel_brake_caliper_meshes)):
+            self._invalidate_mesh(self._wheel_brake_caliper_meshes[mesh_idx])
+        for line_idx in range(len(wheel_pose_centers), len(self._wheel_spin_glow_lines)):
+            _set_line_item_pos(self._wheel_spin_glow_lines[line_idx], None)
+        for line_idx in range(len(wheel_pose_centers), len(self._wheel_rotor_streak_lines)):
+            _set_line_item_pos(self._wheel_rotor_streak_lines[line_idx], None)
 
         # ---- Contact points and links (mesh-derived patch is updated later together with road grid)
         if self._contact_pts and self._contact_links:
@@ -5666,6 +9071,82 @@ class Car3DWidget(QtWidgets.QWidget):
                 return np.zeros((0, 3), dtype=float)
             return np.asarray(pts, dtype=float)
 
+        def _segment_list_from_pairs(
+            a_list: list[Optional[np.ndarray]],
+            b_list: list[Optional[np.ndarray]],
+        ) -> list[tuple[np.ndarray, np.ndarray]]:
+            segs: list[tuple[np.ndarray, np.ndarray]] = []
+            for pa, pb in zip(a_list, b_list):
+                if pa is None or pb is None:
+                    continue
+                segs.append((np.asarray(pa, dtype=float), np.asarray(pb, dtype=float)))
+            return segs
+
+        def _segment_list_from_quads(
+            frame_front: list[Optional[np.ndarray]],
+            frame_rear: list[Optional[np.ndarray]],
+            hub_front: list[Optional[np.ndarray]],
+            hub_rear: list[Optional[np.ndarray]],
+        ) -> list[tuple[np.ndarray, np.ndarray]]:
+            segs: list[tuple[np.ndarray, np.ndarray]] = []
+            for ff, fr, hf, hr in zip(frame_front, frame_rear, hub_front, hub_rear):
+                if ff is None or fr is None or hf is None or hr is None:
+                    continue
+                ff = np.asarray(ff, dtype=float)
+                fr = np.asarray(fr, dtype=float)
+                hf = np.asarray(hf, dtype=float)
+                hr = np.asarray(hr, dtype=float)
+                segs.extend([(ff, fr), (hf, hr), (ff, hf), (fr, hr)])
+            return segs
+
+        def _segment_corner_ids_from_pairs(
+            a_list: list[Optional[np.ndarray]],
+            b_list: list[Optional[np.ndarray]],
+        ) -> list[int]:
+            out: list[int] = []
+            for idx, (pa, pb) in enumerate(zip(a_list, b_list)):
+                if pa is None or pb is None:
+                    continue
+                out.append(int(idx))
+            return out
+
+        def _segment_corner_ids_from_quads(
+            frame_front: list[Optional[np.ndarray]],
+            frame_rear: list[Optional[np.ndarray]],
+            hub_front: list[Optional[np.ndarray]],
+            hub_rear: list[Optional[np.ndarray]],
+        ) -> list[int]:
+            out: list[int] = []
+            for idx, (ff, fr, hf, hr) in enumerate(zip(frame_front, frame_rear, hub_front, hub_rear)):
+                if ff is None or fr is None or hf is None or hr is None:
+                    continue
+                out.extend([int(idx), int(idx), int(idx), int(idx)])
+            return out
+
+        lower_arm_segments = _segment_list_from_quads(
+            lower_frame_front_local_pts,
+            lower_frame_rear_local_pts,
+            lower_hub_front_local_pts,
+            lower_hub_rear_local_pts,
+        )
+        lower_arm_corner_ids = _segment_corner_ids_from_quads(
+            lower_frame_front_local_pts,
+            lower_frame_rear_local_pts,
+            lower_hub_front_local_pts,
+            lower_hub_rear_local_pts,
+        )
+        upper_arm_segments = _segment_list_from_quads(
+            upper_frame_front_local_pts,
+            upper_frame_rear_local_pts,
+            upper_hub_front_local_pts,
+            upper_hub_rear_local_pts,
+        )
+        if not lower_arm_segments:
+            lower_arm_segments = _segment_list_from_pairs(arm_pivot_local_pts, arm_joint_local_pts)
+            lower_arm_corner_ids = _segment_corner_ids_from_pairs(arm_pivot_local_pts, arm_joint_local_pts)
+        if not upper_arm_segments:
+            upper_arm_segments = _segment_list_from_pairs(arm2_pivot_local_pts, arm2_joint_local_pts)
+
         if self._arm_lines is not None:
             pos_lower_quad = _segments_from_quads(lower_frame_front_local_pts, lower_frame_rear_local_pts, lower_hub_front_local_pts, lower_hub_rear_local_pts)
             pos_upper_quad = _segments_from_quads(upper_frame_front_local_pts, upper_frame_rear_local_pts, upper_hub_front_local_pts, upper_hub_rear_local_pts)
@@ -5715,6 +9196,33 @@ class Car3DWidget(QtWidgets.QWidget):
             except Exception:
                 self._invalidate_mesh(item)
 
+        def _set_poly_mesh(
+            item: Optional["gl.GLMeshItem"],
+            verts_xyz: Optional[np.ndarray],
+            faces_ijk: Optional[np.ndarray],
+            *,
+            face_colors_rgba_u8: Optional[np.ndarray] = None,
+        ) -> None:
+            if item is None or verts_xyz is None or faces_ijk is None:
+                if item is not None:
+                    self._invalidate_mesh(item)
+                return
+            verts = np.asarray(verts_xyz, dtype=float).reshape(-1, 3)
+            faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+            if verts.shape[0] < 3 or faces.shape[0] < 1 or not np.all(np.isfinite(verts)):
+                self._invalidate_mesh(item)
+                return
+            try:
+                mesh_kwargs: Dict[str, Any] = {"vertexes": verts, "faces": faces}
+                if face_colors_rgba_u8 is not None:
+                    face_cols = np.asarray(face_colors_rgba_u8, dtype=np.uint8).reshape(-1, 4)
+                    if face_cols.shape[0] == faces.shape[0]:
+                        mesh_kwargs["faceColors"] = face_cols
+                item.setMeshData(meshdata=gl.MeshData(**mesh_kwargs))
+                item.setVisible(True)
+            except Exception:
+                self._invalidate_mesh(item)
+
         def _set_line_item_pos(item: Optional["gl.GLLinePlotItem"], pos_xyz: Optional[np.ndarray]) -> None:
             if item is None:
                 return
@@ -5743,22 +9251,153 @@ class Car3DWidget(QtWidgets.QWidget):
                 except Exception:
                     pass
 
+        def _set_colored_line_item(
+            item: Optional["gl.GLLinePlotItem"],
+            pos_xyz: Optional[np.ndarray],
+            rgba: Tuple[float, float, float, float],
+            *,
+            edge_floor: float = 0.18,
+            exponent: float = 0.82,
+        ) -> None:
+            if item is None:
+                return
+            if pos_xyz is None:
+                _set_line_item_pos(item, None)
+                return
+            pos = np.asarray(pos_xyz, dtype=float).reshape(-1, 3)
+            if pos.shape[0] < 2 or not np.all(np.isfinite(pos)):
+                _set_line_item_pos(item, None)
+                return
+            try:
+                colors = self._tapered_line_color_array(
+                    tuple(float(v) for v in tuple(rgba)),
+                    int(pos.shape[0]),
+                    edge_floor=float(edge_floor),
+                    exponent=float(exponent),
+                )
+                item.setData(pos=pos, color=colors)
+                item.setVisible(True)
+            except Exception:
+                _set_line_item_pos(item, None)
+
+        lower_arm_radius = max(0.010, 0.14 * float(self.geom.wheel_radius))
+        upper_arm_radius = max(0.008, 0.11 * float(self.geom.wheel_radius))
+        wheel_radius_m = float(self.geom.wheel_radius)
+        corner_wheel_gap_m: list[float] = []
+        for idx, center in enumerate(wheel_pose_centers):
+            wheel_up = _norm_or(
+                np.asarray(wheel_pose_ups[idx], dtype=float).reshape(3),
+                np.array([0.0, 0.0, 1.0], dtype=float),
+            )
+            wheel_contact = np.asarray(road_local_pts[idx], dtype=float).reshape(3)
+            if not np.all(np.isfinite(wheel_contact)):
+                wheel_contact = np.asarray(center, dtype=float).reshape(3)
+                wheel_contact[2] = float(wheel_contact[2]) - wheel_radius_m
+            gap_m = float(
+                max(
+                    0.0,
+                    np.dot(np.asarray(center, dtype=float).reshape(3) - wheel_contact, wheel_up) - wheel_radius_m,
+                )
+            )
+            corner_wheel_gap_m.append(gap_m)
+        lower_arm_base_face_rgba = (0.24, 0.40, 0.58, 0.93)
+        lower_arm_base_edge_rgba = (0.56, 0.76, 0.98, 0.60)
+        hub_base_face_rgba = (0.62, 0.70, 0.82, 0.92)
+        hub_base_edge_rgba = (0.86, 0.92, 0.98, 0.78)
+        for seg_idx, seg in enumerate(lower_arm_segments):
+            if seg_idx < len(self._arm_lower_meshes):
+                _set_mesh_from_segment(self._arm_lower_meshes[seg_idx], seg, lower_arm_radius)
+                corner_idx = int(lower_arm_corner_ids[seg_idx]) if seg_idx < len(lower_arm_corner_ids) else -1
+                if corner_idx >= 0 and corner_idx < len(corners):
+                    lower_face_rgba, lower_edge_rgba = self._contact_bounce_material_rgba(
+                        key=f"lower-arm-{corners[corner_idx]}-{seg_idx}",
+                        base_face_rgba=lower_arm_base_face_rgba,
+                        base_edge_rgba=lower_arm_base_edge_rgba,
+                        tire_force_n=float(tire_forces_n[corner_idx]) if corner_idx < len(tire_forces_n) else 0.0,
+                        wheel_gap_m=float(corner_wheel_gap_m[corner_idx]) if corner_idx < len(corner_wheel_gap_m) else 0.0,
+                        in_air=bool(wheel_air[corner_idx] > 0.5) if corner_idx < len(wheel_air) else False,
+                        gain=0.68,
+                    )
+                    self._apply_mesh_material(
+                        self._arm_lower_meshes[seg_idx],
+                        face_rgba=lower_face_rgba,
+                        edge_rgba=lower_edge_rgba,
+                    )
+        for seg_idx in range(len(lower_arm_segments), len(self._arm_lower_meshes)):
+            self._invalidate_mesh(self._arm_lower_meshes[seg_idx])
+        for seg_idx, seg in enumerate(upper_arm_segments):
+            if seg_idx < len(self._arm_upper_meshes):
+                _set_mesh_from_segment(self._arm_upper_meshes[seg_idx], seg, upper_arm_radius)
+        for seg_idx in range(len(upper_arm_segments), len(self._arm_upper_meshes)):
+            self._invalidate_mesh(self._arm_upper_meshes[seg_idx])
+
+        hub_radius = max(0.028, 0.52 * float(self.geom.wheel_radius))
+        hub_offset = 0.44 * float(self.geom.wheel_width)
+        for idx, center in enumerate(wheel_pose_centers):
+            axle = np.asarray(wheel_pose_axles[idx], dtype=float)
+            side_a = np.asarray(center, dtype=float) + axle * hub_offset
+            side_b = np.asarray(center, dtype=float) - axle * hub_offset
+            mesh_base = 2 * idx
+            if mesh_base + 1 < len(self._wheel_hub_meshes):
+                _set_disc_mesh(self._wheel_hub_meshes[mesh_base], side_a, axle, hub_radius)
+                _set_disc_mesh(self._wheel_hub_meshes[mesh_base + 1], side_b, -axle, hub_radius)
+                hub_face_rgba, hub_edge_rgba = self._contact_bounce_material_rgba(
+                    key=f"wheel-hub-{corners[idx]}",
+                    base_face_rgba=hub_base_face_rgba,
+                    base_edge_rgba=hub_base_edge_rgba,
+                    tire_force_n=float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0,
+                    wheel_gap_m=float(corner_wheel_gap_m[idx]) if idx < len(corner_wheel_gap_m) else 0.0,
+                    in_air=bool(wheel_air[idx] > 0.5) if idx < len(wheel_air) else False,
+                    gain=0.96,
+                )
+                self._apply_mesh_material(
+                    self._wheel_hub_meshes[mesh_base],
+                    face_rgba=hub_face_rgba,
+                    edge_rgba=hub_edge_rgba,
+                )
+                self._apply_mesh_material(
+                    self._wheel_hub_meshes[mesh_base + 1],
+                    face_rgba=hub_face_rgba,
+                    edge_rgba=hub_edge_rgba,
+                )
+        for mesh_idx in range(2 * len(wheel_pose_centers), len(self._wheel_hub_meshes)):
+            self._invalidate_mesh(self._wheel_hub_meshes[mesh_idx])
+
+        patm_pa = self._sample_patm_pa(i0=i0, i1=i1, alpha=alpha)
         cyl_mesh_idx = 0
         for idx, corner in enumerate(corners):
             for cyl_index, top_list, bot_list in ((1, cyl1_top_local_pts, cyl1_bot_local_pts), (2, cyl2_top_local_pts, cyl2_bot_local_pts)):
+                cyl_name = f"Ц{int(cyl_index)}"
                 top_pt = top_list[idx]
                 bot_pt = bot_list[idx]
                 if top_pt is None or bot_pt is None:
+                    spring_visual_states.append(None)
                     if cyl_mesh_idx < len(self._cyl_body_meshes):
+                        glass_fx_base = 2 * cyl_mesh_idx
+                        bloom_card_base = 2 * cyl_mesh_idx
                         self._invalidate_mesh(self._cyl_body_meshes[cyl_mesh_idx])
                         if cyl_mesh_idx < len(self._cyl_chamber_meshes):
                             self._invalidate_mesh(self._cyl_chamber_meshes[cyl_mesh_idx])
+                        if cyl_mesh_idx < len(self._cyl_rod_chamber_meshes):
+                            self._invalidate_mesh(self._cyl_rod_chamber_meshes[cyl_mesh_idx])
+                        for bloom_idx in range(bloom_card_base, bloom_card_base + 2):
+                            if bloom_idx < len(self._cyl_bloom_card_meshes):
+                                self._invalidate_mesh(self._cyl_bloom_card_meshes[bloom_idx])
                         self._invalidate_mesh(self._cyl_rod_meshes[cyl_mesh_idx])
                         self._invalidate_mesh(self._cyl_piston_meshes[cyl_mesh_idx])
                         if cyl_mesh_idx < len(self._cyl_piston_ring_lines):
                             _set_line_item_pos(self._cyl_piston_ring_lines[cyl_mesh_idx], None)
                         if cyl_mesh_idx < len(self._cyl_rod_core_lines):
                             _set_line_item_pos(self._cyl_rod_core_lines[cyl_mesh_idx], None)
+                        if cyl_mesh_idx < len(self._cyl_cap_ring_lines):
+                            _set_line_item_pos(self._cyl_cap_ring_lines[cyl_mesh_idx], None)
+                        if cyl_mesh_idx < len(self._cyl_gland_ring_lines):
+                            _set_line_item_pos(self._cyl_gland_ring_lines[cyl_mesh_idx], None)
+                        for fx_idx in range(glass_fx_base, glass_fx_base + 2):
+                            if fx_idx < len(self._cyl_glass_glint_lines):
+                                _set_line_item_pos(self._cyl_glass_glint_lines[fx_idx], None)
+                            if fx_idx < len(self._cyl_glass_caustic_lines):
+                                _set_line_item_pos(self._cyl_glass_caustic_lines[fx_idx], None)
                     cyl_mesh_idx += 1
                     continue
                 bore_d, rod_d, outer_d, stroke_len, dead_cap_len, dead_rod_len, dead_height_len, body_len = self._corner_cylinder_contract(cyl_index=cyl_index, corner=corner)
@@ -5785,21 +9424,67 @@ class Car3DWidget(QtWidgets.QWidget):
                     )
                 if cyl_mesh_idx < len(self._cyl_body_meshes):
                     if packaging_state is None:
+                        glass_fx_base = 2 * cyl_mesh_idx
+                        bloom_card_base = 2 * cyl_mesh_idx
                         self._invalidate_mesh(self._cyl_body_meshes[cyl_mesh_idx])
                         if cyl_mesh_idx < len(self._cyl_chamber_meshes):
                             self._invalidate_mesh(self._cyl_chamber_meshes[cyl_mesh_idx])
+                        if cyl_mesh_idx < len(self._cyl_rod_chamber_meshes):
+                            self._invalidate_mesh(self._cyl_rod_chamber_meshes[cyl_mesh_idx])
+                        for bloom_idx in range(bloom_card_base, bloom_card_base + 2):
+                            if bloom_idx < len(self._cyl_bloom_card_meshes):
+                                self._invalidate_mesh(self._cyl_bloom_card_meshes[bloom_idx])
                         self._invalidate_mesh(self._cyl_rod_meshes[cyl_mesh_idx])
                         self._invalidate_mesh(self._cyl_piston_meshes[cyl_mesh_idx])
                         if cyl_mesh_idx < len(self._cyl_piston_ring_lines):
                             _set_line_item_pos(self._cyl_piston_ring_lines[cyl_mesh_idx], None)
                         if cyl_mesh_idx < len(self._cyl_rod_core_lines):
                             _set_line_item_pos(self._cyl_rod_core_lines[cyl_mesh_idx], None)
+                        if cyl_mesh_idx < len(self._cyl_cap_ring_lines):
+                            _set_line_item_pos(self._cyl_cap_ring_lines[cyl_mesh_idx], None)
+                        if cyl_mesh_idx < len(self._cyl_gland_ring_lines):
+                            _set_line_item_pos(self._cyl_gland_ring_lines[cyl_mesh_idx], None)
+                        for fx_idx in range(glass_fx_base, glass_fx_base + 2):
+                            if fx_idx < len(self._cyl_glass_glint_lines):
+                                _set_line_item_pos(self._cyl_glass_glint_lines[fx_idx], None)
+                            if fx_idx < len(self._cyl_glass_caustic_lines):
+                                _set_line_item_pos(self._cyl_glass_caustic_lines[fx_idx], None)
                     else:
                         piston_radius = float(packaging_state.get("piston_radius_m", 0.0) or 0.0)
+                        cap_pressure_pa = patm_pa
+                        rod_pressure_pa = patm_pa
+                        cap_face_rgba, cap_edge_rgba = self._cylinder_gas_glass_rgba(
+                            cap_pressure_pa,
+                            patm_pa,
+                            chamber_kind="БП",
+                        )
+                        rod_face_rgba, rod_edge_rgba = self._cylinder_gas_glass_rgba(
+                            rod_pressure_pa,
+                            patm_pa,
+                            chamber_kind="ШП",
+                        )
+                        cap_face_rgba = self._smooth_rgba(f"{cyl_index}:{corner}:cap_face", cap_face_rgba, response=0.30)
+                        cap_edge_rgba = self._smooth_rgba(f"{cyl_index}:{corner}:cap_edge", cap_edge_rgba, response=0.34)
+                        rod_face_rgba = self._smooth_rgba(f"{cyl_index}:{corner}:rod_face", rod_face_rgba, response=0.30)
+                        rod_edge_rgba = self._smooth_rgba(f"{cyl_index}:{corner}:rod_edge", rod_edge_rgba, response=0.34)
                         _set_mesh_from_segment(
                             self._cyl_body_meshes[cyl_mesh_idx],
                             packaging_state.get("housing_seg") or packaging_state.get("body_seg"),
                             float(packaging_state.get("body_outer_radius_m", 0.0) or 0.0),
+                        )
+                        cyl_body_face_rgba, cyl_body_edge_rgba = self._contact_bounce_material_rgba(
+                            key=f"cyl-body-{cyl_name}-{corner}",
+                            base_face_rgba=(0.16, 0.52, 0.78, 0.10),
+                            base_edge_rgba=(0.18, 0.62, 0.88, 0.26),
+                            tire_force_n=float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0,
+                            wheel_gap_m=float(corner_wheel_gap_m[idx]) if idx < len(corner_wheel_gap_m) else 0.0,
+                            in_air=bool(wheel_air[idx] > 0.5) if idx < len(wheel_air) else False,
+                            gain=0.46,
+                        )
+                        self._apply_mesh_material(
+                            self._cyl_body_meshes[cyl_mesh_idx],
+                            face_rgba=cyl_body_face_rgba,
+                            edge_rgba=cyl_body_edge_rgba,
                         )
                         if cyl_mesh_idx < len(self._cyl_chamber_meshes):
                             _set_mesh_from_segment(
@@ -5807,6 +9492,390 @@ class Car3DWidget(QtWidgets.QWidget):
                                 packaging_state.get("body_seg"),
                                 piston_radius,
                             )
+                            cap_pressure_pa = self._sample_cylinder_chamber_pressure_pa(
+                                cyl_index,
+                                corner,
+                                "БП",
+                                i0=i0,
+                                i1=i1,
+                                alpha=alpha,
+                                default_pa=patm_pa,
+                            )
+                            cap_pressure_u = self._cylinder_pressure_visual_u(pressure_pa=cap_pressure_pa, patm_pa=patm_pa)
+                            scene_glass_energy_us.append(float(cap_pressure_u))
+                            cap_scene_grade = self._scene_grade_profile(
+                                key_prefix=f"scene-grade-{cyl_name}-{corner}-cap",
+                                camera_view_dir_xyz=camera_view_dir,
+                                body_forward_xyz=body_forward_for_grade,
+                                mean_load_u=base_mean_load_u,
+                                spring_energy_u=base_mean_load_u,
+                                glass_energy_u=float(cap_pressure_u),
+                                speed_m_s=float(speed_along_road),
+                            )
+                            cap_face_rgba, cap_edge_rgba = self._cylinder_gas_glass_rgba(
+                                cap_pressure_pa,
+                                patm_pa,
+                                chamber_kind="БП",
+                            )
+                            cap_face_rgba = self._scene_graded_rgba(
+                                key=f"{cyl_name}:{corner}:cap_face_scene_grade",
+                                rgba=cap_face_rgba,
+                                exposure=float(cap_scene_grade["exposure"]),
+                                saturation=float(cap_scene_grade["saturation"]),
+                                warmth=float(cap_scene_grade["warmth"]),
+                                highlight_gain=float(cap_scene_grade["highlight_gain"]),
+                                alpha_gain=float(cap_scene_grade["alpha_gain"]),
+                                response=0.22,
+                            )
+                            cap_edge_rgba = self._scene_graded_rgba(
+                                key=f"{cyl_name}:{corner}:cap_edge_scene_grade",
+                                rgba=cap_edge_rgba,
+                                exposure=float(cap_scene_grade["exposure"]),
+                                saturation=float(cap_scene_grade["saturation"]),
+                                warmth=float(cap_scene_grade["warmth"]),
+                                highlight_gain=float(cap_scene_grade["highlight_gain"]) * 1.04,
+                                alpha_gain=float(cap_scene_grade["alpha_gain"]),
+                                response=0.22,
+                            )
+                            self._apply_mesh_material(
+                                self._cyl_chamber_meshes[cyl_mesh_idx],
+                                face_rgba=cap_face_rgba,
+                                edge_rgba=cap_edge_rgba,
+                            )
+                        rod_chamber_seg = None
+                        if cyl_mesh_idx < len(self._cyl_rod_chamber_meshes):
+                            try:
+                                housing_seg = packaging_state.get("housing_seg")
+                                piston_center = packaging_state.get("piston_center")
+                                if isinstance(housing_seg, (tuple, list)) and len(housing_seg) == 2 and piston_center is not None:
+                                    rod_side_start = np.asarray(piston_center, dtype=float).reshape(3)
+                                    rod_side_stop = np.asarray(housing_seg[1], dtype=float).reshape(3)
+                                    if float(np.linalg.norm(rod_side_stop - rod_side_start)) > 1e-6:
+                                        rod_chamber_seg = (rod_side_start, rod_side_stop)
+                            except Exception:
+                                rod_chamber_seg = None
+                            _set_mesh_from_segment(
+                                self._cyl_rod_chamber_meshes[cyl_mesh_idx],
+                                rod_chamber_seg,
+                                piston_radius,
+                            )
+                            rod_pressure_pa = self._sample_cylinder_chamber_pressure_pa(
+                                cyl_index,
+                                corner,
+                                "ШП",
+                                i0=i0,
+                                i1=i1,
+                                alpha=alpha,
+                                default_pa=patm_pa,
+                            )
+                            rod_pressure_u = self._cylinder_pressure_visual_u(pressure_pa=rod_pressure_pa, patm_pa=patm_pa)
+                            scene_glass_energy_us.append(float(rod_pressure_u))
+                            rod_scene_grade = self._scene_grade_profile(
+                                key_prefix=f"scene-grade-{cyl_name}-{corner}-rod",
+                                camera_view_dir_xyz=camera_view_dir,
+                                body_forward_xyz=body_forward_for_grade,
+                                mean_load_u=base_mean_load_u,
+                                spring_energy_u=base_mean_load_u,
+                                glass_energy_u=float(rod_pressure_u),
+                                speed_m_s=float(speed_along_road),
+                            )
+                            rod_face_rgba, rod_edge_rgba = self._cylinder_gas_glass_rgba(
+                                rod_pressure_pa,
+                                patm_pa,
+                                chamber_kind="ШП",
+                            )
+                            rod_face_rgba = self._scene_graded_rgba(
+                                key=f"{cyl_name}:{corner}:rod_face_scene_grade",
+                                rgba=rod_face_rgba,
+                                exposure=float(rod_scene_grade["exposure"]),
+                                saturation=float(rod_scene_grade["saturation"]),
+                                warmth=float(rod_scene_grade["warmth"]),
+                                highlight_gain=float(rod_scene_grade["highlight_gain"]),
+                                alpha_gain=float(rod_scene_grade["alpha_gain"]),
+                                response=0.22,
+                            )
+                            rod_edge_rgba = self._scene_graded_rgba(
+                                key=f"{cyl_name}:{corner}:rod_edge_scene_grade",
+                                rgba=rod_edge_rgba,
+                                exposure=float(rod_scene_grade["exposure"]),
+                                saturation=float(rod_scene_grade["saturation"]),
+                                warmth=float(rod_scene_grade["warmth"]),
+                                highlight_gain=float(rod_scene_grade["highlight_gain"]) * 1.04,
+                                alpha_gain=float(rod_scene_grade["alpha_gain"]),
+                                response=0.22,
+                            )
+                            self._apply_mesh_material(
+                                self._cyl_rod_chamber_meshes[cyl_mesh_idx],
+                                face_rgba=rod_face_rgba,
+                                edge_rgba=rod_edge_rgba,
+                            )
+                        bloom_card_base = 2 * cyl_mesh_idx
+                        cap_bloom_item = self._cyl_bloom_card_meshes[bloom_card_base] if bloom_card_base < len(self._cyl_bloom_card_meshes) else None
+                        rod_bloom_item = self._cyl_bloom_card_meshes[bloom_card_base + 1] if bloom_card_base + 1 < len(self._cyl_bloom_card_meshes) else None
+                        cap_bloom_state = self._cylinder_bloom_card_state(
+                            seg=packaging_state.get("body_seg"),
+                            chamber_radius_m=max(0.005, 1.02 * piston_radius),
+                            view_dir_xyz=camera_view_dir,
+                            axial_scale=0.82,
+                            radial_scale=1.92,
+                            camera_offset_m=0.004,
+                            segments=26,
+                        )
+                        if isinstance(cap_bloom_state, dict):
+                            cap_bloom_face_rgba = self._cylinder_bloom_card_rgba(
+                                key=f"{cyl_name}:{corner}:cap_bloom",
+                                pressure_pa=cap_pressure_pa,
+                                patm_pa=patm_pa,
+                                chamber_kind="Р‘Рџ",
+                            )
+                            cap_bloom_face_colors = self._cylinder_bloom_card_face_colors(
+                                cap_bloom_state["verts"],
+                                cap_bloom_state["faces"],
+                                center_xyz=cap_bloom_state["center_xyz"],
+                                axis_u_xyz=cap_bloom_state["axis_u_xyz"],
+                                axis_v_xyz=cap_bloom_state["axis_v_xyz"],
+                                radius_u_m=float(cap_bloom_state["radius_u_m"]),
+                                radius_v_m=float(cap_bloom_state["radius_v_m"]),
+                                pressure_pa=cap_pressure_pa,
+                                patm_pa=patm_pa,
+                                chamber_kind="Р‘Рџ",
+                            )
+                            cap_bloom_face_rgba = self._scene_graded_rgba(
+                                key=f"{cyl_name}:{corner}:cap_bloom_face_scene_grade",
+                                rgba=cap_bloom_face_rgba,
+                                exposure=float(cap_scene_grade["exposure"]) * 1.02,
+                                saturation=float(cap_scene_grade["saturation"]),
+                                warmth=float(cap_scene_grade["warmth"]),
+                                highlight_gain=float(cap_scene_grade["highlight_gain"]) * 1.08,
+                                alpha_gain=float(cap_scene_grade["alpha_gain"]) * 1.04,
+                                response=0.18,
+                            )
+                            cap_bloom_face_colors = self._scene_grade_color_array(
+                                cap_bloom_face_colors,
+                                exposure=float(cap_scene_grade["exposure"]) * 1.02,
+                                saturation=float(cap_scene_grade["saturation"]),
+                                warmth=float(cap_scene_grade["warmth"]),
+                                highlight_gain=float(cap_scene_grade["highlight_gain"]) * 1.08,
+                                alpha_gain=float(cap_scene_grade["alpha_gain"]) * 1.04,
+                                output_u8=True,
+                            )
+                            _set_poly_mesh(
+                                cap_bloom_item,
+                                cap_bloom_state["verts"],
+                                cap_bloom_state["faces"],
+                                face_colors_rgba_u8=cap_bloom_face_colors,
+                            )
+                            if cap_bloom_item is not None:
+                                self._apply_mesh_material(
+                                    cap_bloom_item,
+                                    face_rgba=cap_bloom_face_rgba,
+                                    edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                )
+                        else:
+                            self._invalidate_mesh(cap_bloom_item)
+                        rod_bloom_state = self._cylinder_bloom_card_state(
+                            seg=rod_chamber_seg,
+                            chamber_radius_m=max(0.004, 0.94 * piston_radius),
+                            view_dir_xyz=camera_view_dir,
+                            axial_scale=0.74,
+                            radial_scale=1.68,
+                            camera_offset_m=0.0035,
+                            segments=24,
+                        )
+                        if isinstance(rod_bloom_state, dict):
+                            rod_bloom_face_rgba = self._cylinder_bloom_card_rgba(
+                                key=f"{cyl_name}:{corner}:rod_bloom",
+                                pressure_pa=rod_pressure_pa,
+                                patm_pa=patm_pa,
+                                chamber_kind="РЁРџ",
+                            )
+                            rod_bloom_face_colors = self._cylinder_bloom_card_face_colors(
+                                rod_bloom_state["verts"],
+                                rod_bloom_state["faces"],
+                                center_xyz=rod_bloom_state["center_xyz"],
+                                axis_u_xyz=rod_bloom_state["axis_u_xyz"],
+                                axis_v_xyz=rod_bloom_state["axis_v_xyz"],
+                                radius_u_m=float(rod_bloom_state["radius_u_m"]),
+                                radius_v_m=float(rod_bloom_state["radius_v_m"]),
+                                pressure_pa=rod_pressure_pa,
+                                patm_pa=patm_pa,
+                                chamber_kind="РЁРџ",
+                            )
+                            rod_bloom_face_rgba = self._scene_graded_rgba(
+                                key=f"{cyl_name}:{corner}:rod_bloom_face_scene_grade",
+                                rgba=rod_bloom_face_rgba,
+                                exposure=float(rod_scene_grade["exposure"]) * 1.02,
+                                saturation=float(rod_scene_grade["saturation"]),
+                                warmth=float(rod_scene_grade["warmth"]),
+                                highlight_gain=float(rod_scene_grade["highlight_gain"]) * 1.08,
+                                alpha_gain=float(rod_scene_grade["alpha_gain"]) * 1.04,
+                                response=0.18,
+                            )
+                            rod_bloom_face_colors = self._scene_grade_color_array(
+                                rod_bloom_face_colors,
+                                exposure=float(rod_scene_grade["exposure"]) * 1.02,
+                                saturation=float(rod_scene_grade["saturation"]),
+                                warmth=float(rod_scene_grade["warmth"]),
+                                highlight_gain=float(rod_scene_grade["highlight_gain"]) * 1.08,
+                                alpha_gain=float(rod_scene_grade["alpha_gain"]) * 1.04,
+                                output_u8=True,
+                            )
+                            _set_poly_mesh(
+                                rod_bloom_item,
+                                rod_bloom_state["verts"],
+                                rod_bloom_state["faces"],
+                                face_colors_rgba_u8=rod_bloom_face_colors,
+                            )
+                            if rod_bloom_item is not None:
+                                self._apply_mesh_material(
+                                    rod_bloom_item,
+                                    face_rgba=rod_bloom_face_rgba,
+                                    edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                )
+                        else:
+                            self._invalidate_mesh(rod_bloom_item)
+                        glass_fx_base = 2 * cyl_mesh_idx
+                        cap_glint_item = self._cyl_glass_glint_lines[glass_fx_base] if glass_fx_base < len(self._cyl_glass_glint_lines) else None
+                        rod_glint_item = self._cyl_glass_glint_lines[glass_fx_base + 1] if glass_fx_base + 1 < len(self._cyl_glass_glint_lines) else None
+                        cap_caustic_item = self._cyl_glass_caustic_lines[glass_fx_base] if glass_fx_base < len(self._cyl_glass_caustic_lines) else None
+                        rod_caustic_item = self._cyl_glass_caustic_lines[glass_fx_base + 1] if glass_fx_base + 1 < len(self._cyl_glass_caustic_lines) else None
+                        cap_glint_vertices = self._cylinder_surface_glint_vertices(
+                            seg=packaging_state.get("body_seg"),
+                            radius_m=max(0.006, 1.06 * piston_radius),
+                            phase_rad=0.18 * np.pi,
+                            sweep_rad=1.42 * np.pi,
+                            segments=34,
+                        )
+                        cap_caustic_vertices = self._cylinder_caustic_halo_vertices(
+                            seg=packaging_state.get("body_seg"),
+                            radius_m=max(0.008, 1.12 * piston_radius),
+                            phase_rad=0.22 * np.pi,
+                            segments=40,
+                        )
+                        cap_glint_rgba = self._cylinder_glass_glint_rgba(
+                            key=f"{cyl_name}:{corner}:cap_glint",
+                            pressure_pa=cap_pressure_pa,
+                            patm_pa=patm_pa,
+                            chamber_kind="Р‘Рџ",
+                        )
+                        cap_caustic_rgba = self._cylinder_caustic_halo_rgba(
+                            key=f"{cyl_name}:{corner}:cap_caustic",
+                            pressure_pa=cap_pressure_pa,
+                            patm_pa=patm_pa,
+                            chamber_kind="Р‘Рџ",
+                        )
+                        cap_glint_rgba = self._scene_graded_rgba(
+                            key=f"{cyl_name}:{corner}:cap_glint_scene_grade",
+                            rgba=cap_glint_rgba,
+                            exposure=float(cap_scene_grade["exposure"]) * 1.04,
+                            saturation=float(cap_scene_grade["saturation"]),
+                            warmth=float(cap_scene_grade["warmth"]),
+                            highlight_gain=float(cap_scene_grade["highlight_gain"]) * 1.12,
+                            alpha_gain=float(cap_scene_grade["alpha_gain"]),
+                            response=0.18,
+                        )
+                        cap_caustic_rgba = self._scene_graded_rgba(
+                            key=f"{cyl_name}:{corner}:cap_caustic_scene_grade",
+                            rgba=cap_caustic_rgba,
+                            exposure=float(cap_scene_grade["exposure"]) * float(cap_scene_grade["fog_gain"]),
+                            saturation=float(cap_scene_grade["saturation"]),
+                            warmth=float(cap_scene_grade["warmth"]),
+                            highlight_gain=float(cap_scene_grade["highlight_gain"]) * 1.06,
+                            alpha_gain=float(cap_scene_grade["alpha_gain"]) * 1.04,
+                            response=0.18,
+                        )
+                        _set_colored_line_item(cap_glint_item, cap_glint_vertices, cap_glint_rgba, edge_floor=0.10, exponent=0.74)
+                        _set_colored_line_item(cap_caustic_item, cap_caustic_vertices, cap_caustic_rgba, edge_floor=0.28, exponent=0.96)
+                        rod_glint_vertices = self._cylinder_surface_glint_vertices(
+                            seg=rod_chamber_seg,
+                            radius_m=max(0.005, 0.96 * piston_radius),
+                            phase_rad=1.08 * np.pi,
+                            sweep_rad=-1.26 * np.pi,
+                            segments=30,
+                        )
+                        rod_caustic_vertices = self._cylinder_caustic_halo_vertices(
+                            seg=rod_chamber_seg,
+                            radius_m=max(0.006, 1.02 * piston_radius),
+                            phase_rad=1.14 * np.pi,
+                            segments=36,
+                        )
+                        rod_glint_rgba = self._cylinder_glass_glint_rgba(
+                            key=f"{cyl_name}:{corner}:rod_glint",
+                            pressure_pa=rod_pressure_pa,
+                            patm_pa=patm_pa,
+                            chamber_kind="РЁРџ",
+                        )
+                        rod_caustic_rgba = self._cylinder_caustic_halo_rgba(
+                            key=f"{cyl_name}:{corner}:rod_caustic",
+                            pressure_pa=rod_pressure_pa,
+                            patm_pa=patm_pa,
+                            chamber_kind="РЁРџ",
+                        )
+                        rod_glint_rgba = self._scene_graded_rgba(
+                            key=f"{cyl_name}:{corner}:rod_glint_scene_grade",
+                            rgba=rod_glint_rgba,
+                            exposure=float(rod_scene_grade["exposure"]) * 1.04,
+                            saturation=float(rod_scene_grade["saturation"]),
+                            warmth=float(rod_scene_grade["warmth"]),
+                            highlight_gain=float(rod_scene_grade["highlight_gain"]) * 1.12,
+                            alpha_gain=float(rod_scene_grade["alpha_gain"]),
+                            response=0.18,
+                        )
+                        rod_caustic_rgba = self._scene_graded_rgba(
+                            key=f"{cyl_name}:{corner}:rod_caustic_scene_grade",
+                            rgba=rod_caustic_rgba,
+                            exposure=float(rod_scene_grade["exposure"]) * float(rod_scene_grade["fog_gain"]),
+                            saturation=float(rod_scene_grade["saturation"]),
+                            warmth=float(rod_scene_grade["warmth"]),
+                            highlight_gain=float(rod_scene_grade["highlight_gain"]) * 1.06,
+                            alpha_gain=float(rod_scene_grade["alpha_gain"]) * 1.04,
+                            response=0.18,
+                        )
+                        _set_colored_line_item(rod_glint_item, rod_glint_vertices, rod_glint_rgba, edge_floor=0.12, exponent=0.78)
+                        _set_colored_line_item(rod_caustic_item, rod_caustic_vertices, rod_caustic_rgba, edge_floor=0.30, exponent=0.98)
+                        cap_ring_vertices = None
+                        gland_ring_vertices = None
+                        try:
+                            housing_seg = packaging_state.get("housing_seg")
+                            axis_unit = packaging_state.get("axis_unit")
+                            if isinstance(housing_seg, (tuple, list)) and len(housing_seg) == 2 and axis_unit is not None:
+                                cap_ring_vertices = self._circle_line_vertices(
+                                    radius_m=piston_radius,
+                                    center_xyz=np.asarray(housing_seg[0], dtype=float),
+                                    normal_xyz=np.asarray(axis_unit, dtype=float),
+                                    segments=40,
+                                )
+                                gland_ring_vertices = self._circle_line_vertices(
+                                    radius_m=piston_radius,
+                                    center_xyz=np.asarray(housing_seg[1], dtype=float),
+                                    normal_xyz=np.asarray(axis_unit, dtype=float),
+                                    segments=40,
+                                )
+                        except Exception:
+                            cap_ring_vertices = None
+                            gland_ring_vertices = None
+                        if cyl_mesh_idx < len(self._cyl_cap_ring_lines):
+                            _set_line_item_pos(self._cyl_cap_ring_lines[cyl_mesh_idx], cap_ring_vertices)
+                            if cap_ring_vertices is not None:
+                                try:
+                                    cap_ring_rgba = tuple(cap_edge_rgba[:3]) + (float(_clamp(max(cap_edge_rgba[3], 0.54), 0.24, 0.92)),)
+                                    self._cyl_cap_ring_lines[cyl_mesh_idx].setData(
+                                        pos=np.asarray(cap_ring_vertices, dtype=float),
+                                        color=cap_ring_rgba,
+                                    )
+                                except Exception:
+                                    pass
+                        if cyl_mesh_idx < len(self._cyl_gland_ring_lines):
+                            _set_line_item_pos(self._cyl_gland_ring_lines[cyl_mesh_idx], gland_ring_vertices)
+                            if gland_ring_vertices is not None:
+                                try:
+                                    gland_ring_rgba = tuple(rod_edge_rgba[:3]) + (float(_clamp(max(rod_edge_rgba[3], 0.48), 0.22, 0.88)),)
+                                    self._cyl_gland_ring_lines[cyl_mesh_idx].setData(
+                                        pos=np.asarray(gland_ring_vertices, dtype=float),
+                                        color=gland_ring_rgba,
+                                    )
+                                except Exception:
+                                    pass
                         _set_mesh_from_segment(
                             self._cyl_rod_meshes[cyl_mesh_idx],
                             packaging_state.get("rod_seg"),
@@ -5833,12 +9902,289 @@ class Car3DWidget(QtWidgets.QWidget):
                                     extra={"corner": str(corner), "cyl_index": int(cyl_index)},
                                 )
                             _set_line_item_pos(self._cyl_piston_ring_lines[cyl_mesh_idx], ring_vertices)
+                            if ring_vertices is not None:
+                                try:
+                                    delta_bar = abs(float(cap_pressure_pa - rod_pressure_pa)) / BAR_PA
+                                    dominant_rgba = cap_edge_rgba if float(cap_pressure_pa) >= float(rod_pressure_pa) else rod_edge_rgba
+                                    recessive_rgba = rod_edge_rgba if float(cap_pressure_pa) >= float(rod_pressure_pa) else cap_edge_rgba
+                                    blend_t = float(_clamp(0.56 + 0.34 * (delta_bar / max(1.0, float(self._cyl_pressure_visual_max_bar_g))), 0.0, 1.0))
+                                    piston_ring_rgba = self._blend_rgba(recessive_rgba, dominant_rgba, blend_t)
+                                    piston_ring_rgba = tuple(piston_ring_rgba[:3]) + (float(_clamp(0.62 + 0.28 * blend_t, 0.42, 0.98)),)
+                                    piston_ring_rgba = self._smooth_rgba(f"{cyl_index}:{corner}:piston_ring", piston_ring_rgba, response=0.36)
+                                    self._cyl_piston_ring_lines[cyl_mesh_idx].setData(
+                                        pos=np.asarray(ring_vertices, dtype=float),
+                                        color=piston_ring_rgba,
+                                    )
+                                except Exception:
+                                    pass
                         if cyl_mesh_idx < len(self._cyl_rod_core_lines):
+                            rod_core_vertices = _rod_internal_centerline_vertices_from_packaging_state(packaging_state)
                             _set_line_item_pos(
                                 self._cyl_rod_core_lines[cyl_mesh_idx],
-                                _rod_internal_centerline_vertices_from_packaging_state(packaging_state),
+                                rod_core_vertices,
                             )
+                            if rod_core_vertices is not None:
+                                try:
+                                    rod_core_rgba = tuple(rod_edge_rgba[:3]) + (float(_clamp(max(rod_edge_rgba[3], 0.82), 0.42, 0.98)),)
+                                    rod_core_rgba = self._smooth_rgba(f"{cyl_index}:{corner}:rod_core", rod_core_rgba, response=0.36)
+                                    self._cyl_rod_core_lines[cyl_mesh_idx].setData(
+                                        pos=np.asarray(rod_core_vertices, dtype=float),
+                                        color=rod_core_rgba,
+                                    )
+                                except Exception:
+                                    pass
+                spring_host_seg = None
+                spring_host_radius_m = 0.0
+                spring_axis_unit = None
+                if packaging_state is not None:
+                    try:
+                        spring_host_seg = packaging_state.get("housing_seg") or packaging_state.get("body_seg")
+                        spring_host_radius_m = float(packaging_state.get("body_outer_radius_m", 0.0) or 0.0)
+                        spring_axis_unit = packaging_state.get("axis_unit")
+                    except Exception:
+                        spring_host_seg = None
+                        spring_host_radius_m = 0.0
+                        spring_axis_unit = None
+                if not (isinstance(spring_host_seg, (tuple, list)) and len(spring_host_seg) == 2):
+                    spring_host_seg = (np.asarray(top_pt, dtype=float), np.asarray(bot_pt, dtype=float))
+                try:
+                    spring_p0 = np.asarray(spring_host_seg[0], dtype=float).reshape(3)
+                    spring_p1 = np.asarray(spring_host_seg[1], dtype=float).reshape(3)
+                except Exception:
+                    spring_p0 = None
+                    spring_p1 = None
+                spring_state: Optional[dict[str, Any]] = None
+                if spring_p0 is not None and spring_p1 is not None and np.all(np.isfinite(spring_p0)) and np.all(np.isfinite(spring_p1)):
+                    spring_axis = np.asarray(spring_p1 - spring_p0, dtype=float)
+                    spring_axis_len = float(np.linalg.norm(spring_axis))
+                    if spring_axis_len > 1e-6:
+                        spring_axis_unit = _norm_or(
+                            np.asarray(spring_axis_unit, dtype=float).reshape(3) if spring_axis_unit is not None else spring_axis,
+                            spring_axis,
+                        )
+                        spring_active = float(
+                            self._sample_spring_active_flag(
+                                cyl_name,
+                                corner,
+                                i0=i0,
+                                i1=i1,
+                                alpha=alpha,
+                                default_active=0.0,
+                            )
+                        )
+                        spring_installed_len = self._sample_spring_runtime_metric_m(
+                            cyl_name,
+                            corner,
+                            "длина_установленная_м",
+                            i0=i0,
+                            i1=i1,
+                            alpha=alpha,
+                            default_m=float("nan"),
+                        )
+                        if not np.isfinite(spring_installed_len) or spring_installed_len <= 0.0:
+                            spring_installed_len = self._sample_spring_runtime_metric_m(
+                                cyl_name,
+                                corner,
+                                "длина_м",
+                                i0=i0,
+                                i1=i1,
+                                alpha=alpha,
+                                default_m=float("nan"),
+                            )
+                        coil_margin_m = self._sample_spring_runtime_metric_m(
+                            cyl_name,
+                            corner,
+                            "запас_до_coil_bind_м",
+                            i0=i0,
+                            i1=i1,
+                            alpha=alpha,
+                            default_m=float("nan"),
+                        )
+                        free_length_m = self._spring_geometry_m(cyl_name, corner, "free_length_m", default_m=max(0.0, spring_axis_len))
+                        solid_length_m = self._spring_geometry_m(cyl_name, corner, "solid_length_m", default_m=0.0)
+                        top_offset_m = self._spring_geometry_m(cyl_name, corner, "top_offset_m", default_m=0.018)
+                        wire_diameter_m = self._spring_geometry_m(
+                            cyl_name,
+                            corner,
+                            "wire_diameter_m",
+                            default_m=max(0.0045, 0.055 * max(0.01, spring_axis_len)),
+                        )
+                        mean_diameter_m = self._spring_geometry_m(
+                            cyl_name,
+                            corner,
+                            "mean_diameter_m",
+                            default_m=max(0.040, 2.35 * max(spring_host_radius_m, 0.018)),
+                        )
+                        host_radius_m = max(spring_host_radius_m, 0.5 * float(max(0.0, outer_d)))
+                        wire_radius_m = 0.5 * max(0.0035, float(wire_diameter_m))
+                        coil_radius_m = 0.5 * max(mean_diameter_m, 2.4 * host_radius_m + 1.8 * wire_radius_m)
+                        usable_top_offset_m = float(_clamp(top_offset_m, 0.0, max(0.0, spring_axis_len - 4.0 * wire_radius_m)))
+                        available_len_m = float(max(0.0, spring_axis_len - usable_top_offset_m))
+                        if not np.isfinite(spring_installed_len) or spring_installed_len <= 0.0:
+                            spring_installed_len = available_len_m
+                        min_installed_len_m = max(4.0 * wire_radius_m, solid_length_m if np.isfinite(solid_length_m) and solid_length_m > 0.0 else 6.0 * wire_radius_m)
+                        installed_len_m = float(_clamp(spring_installed_len, min_installed_len_m, max(min_installed_len_m, available_len_m)))
+                        spring_top = spring_p0 + spring_axis_unit * usable_top_offset_m
+                        spring_bot = spring_top + spring_axis_unit * installed_len_m
+                        free_ref = max(installed_len_m, float(free_length_m))
+                        compression_u = float(
+                            _clamp(
+                                (free_ref - installed_len_m) / max(1e-6, free_ref - max(0.0, min(float(solid_length_m), free_ref - 1e-6))),
+                                0.0,
+                                1.0,
+                            )
+                        )
+                        coil_pitch_ref_m = max(0.012, 0.80 * max(2.0 * coil_radius_m, wire_diameter_m))
+                        coil_count = float(_clamp(free_ref / coil_pitch_ref_m, 4.5, 14.0))
+                        if spring_active > 0.5 and available_len_m > max(6.0 * wire_radius_m, 0.02):
+                            spring_state = {
+                                "cyl_name": cyl_name,
+                                "corner": corner,
+                                "top_xyz": np.asarray(spring_top, dtype=float),
+                                "bot_xyz": np.asarray(spring_bot, dtype=float),
+                                "axis_unit_xyz": np.asarray(spring_axis_unit, dtype=float),
+                                "coil_radius_m": float(max(coil_radius_m, 2.5 * wire_radius_m)),
+                                "wire_radius_m": float(wire_radius_m),
+                                "coil_count": float(coil_count),
+                                "seat_radius_m": float(max(0.028, coil_radius_m + 1.55 * wire_radius_m)),
+                                "seat_inner_radius_m": float(
+                                    _clamp(
+                                        max(host_radius_m + 0.35 * wire_radius_m, coil_radius_m - 1.20 * wire_radius_m),
+                                        0.38 * max(0.028, coil_radius_m + 1.55 * wire_radius_m),
+                                        0.84 * max(0.028, coil_radius_m + 1.55 * wire_radius_m),
+                                    )
+                                ),
+                                "seat_thickness_m": float(max(0.0055, min(0.022, 1.90 * wire_radius_m))),
+                                "compression_u": float(compression_u),
+                                "coil_margin_m": float(coil_margin_m),
+                                "tire_force_n": float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0,
+                                "wheel_gap_m": float(corner_wheel_gap_m[idx]) if idx < len(corner_wheel_gap_m) else 0.0,
+                                "in_air": bool(wheel_air[idx] > 0.5) if idx < len(wheel_air) else False,
+                                "samples_per_turn": 10 if bool(self._playback_active and self._playback_perf_mode) else 16,
+                                "tube_sides": 7 if bool(self._playback_active and self._playback_perf_mode) else 10,
+                            }
+                spring_visual_states.append(spring_state)
                 cyl_mesh_idx += 1
+        for spring_idx, spring_state in enumerate(spring_visual_states):
+            spring_mesh = self._spring_meshes[spring_idx] if spring_idx < len(self._spring_meshes) else None
+            seat_base = 2 * spring_idx
+            top_seat_mesh = self._spring_seat_meshes[seat_base] if seat_base < len(self._spring_seat_meshes) else None
+            bot_seat_mesh = self._spring_seat_meshes[seat_base + 1] if seat_base + 1 < len(self._spring_seat_meshes) else None
+            spring_glow = self._spring_glow_lines[spring_idx] if spring_idx < len(self._spring_glow_lines) else None
+            if not isinstance(spring_state, dict):
+                if spring_mesh is not None:
+                    self._invalidate_mesh(spring_mesh)
+                if top_seat_mesh is not None:
+                    self._invalidate_mesh(top_seat_mesh)
+                if bot_seat_mesh is not None:
+                    self._invalidate_mesh(bot_seat_mesh)
+                _set_line_item_pos(spring_glow, None)
+                continue
+            spring_path = self._spring_centerline_vertices(
+                top_xyz=np.asarray(spring_state["top_xyz"], dtype=float),
+                bot_xyz=np.asarray(spring_state["bot_xyz"], dtype=float),
+                coil_radius_m=float(spring_state["coil_radius_m"]),
+                coil_count=float(spring_state["coil_count"]),
+                samples_per_turn=int(spring_state["samples_per_turn"]),
+            )
+            spring_verts, spring_faces = self._tube_mesh_from_polyline(
+                np.asarray(spring_path, dtype=float) if spring_path is not None else np.zeros((0, 3), dtype=float),
+                radius_m=float(spring_state["wire_radius_m"]),
+                sides=int(spring_state["tube_sides"]),
+                capped=True,
+            )
+            _set_poly_mesh(spring_mesh, spring_verts, spring_faces)
+            if spring_mesh is not None and spring_verts is not None and spring_faces is not None:
+                spring_face_rgba, spring_edge_rgba, spring_glow_rgba = self._spring_visual_rgba(
+                    cyl=str(spring_state["cyl_name"]),
+                    corner=str(spring_state["corner"]),
+                    compression_u=float(spring_state["compression_u"]),
+                    coil_margin_m=float(spring_state["coil_margin_m"]),
+                    tire_force_n=float(spring_state["tire_force_n"]),
+                )
+                self._apply_mesh_material(
+                    spring_mesh,
+                    face_rgba=spring_face_rgba,
+                    edge_rgba=spring_edge_rgba,
+                )
+                spring_axis_unit = _norm_or(
+                    np.asarray(spring_state.get("axis_unit_xyz", np.array([0.0, 0.0, 1.0], dtype=float)), dtype=float).reshape(3),
+                    np.array([0.0, 0.0, 1.0], dtype=float),
+                )
+                seat_radius_m = float(max(0.016, spring_state.get("seat_radius_m", spring_state["coil_radius_m"])))
+                seat_inner_radius_m = float(
+                    _clamp(
+                        float(spring_state.get("seat_inner_radius_m", 0.62 * seat_radius_m)),
+                        0.34 * seat_radius_m,
+                        0.88 * seat_radius_m,
+                    )
+                )
+                seat_thickness_m = float(max(0.004, spring_state.get("seat_thickness_m", spring_state["wire_radius_m"])))
+                top_seat_verts, top_seat_faces = self._spring_seat_cup_mesh(
+                    center_xyz=np.asarray(spring_state["top_xyz"], dtype=float),
+                    opening_normal_xyz=spring_axis_unit,
+                    outer_radius_m=seat_radius_m,
+                    inner_radius_m=seat_inner_radius_m,
+                    depth_m=seat_thickness_m,
+                    lip_height_m=0.42 * seat_thickness_m,
+                    segments=26,
+                )
+                bot_seat_verts, bot_seat_faces = self._spring_seat_cup_mesh(
+                    center_xyz=np.asarray(spring_state["bot_xyz"], dtype=float),
+                    opening_normal_xyz=-spring_axis_unit,
+                    outer_radius_m=seat_radius_m,
+                    inner_radius_m=seat_inner_radius_m,
+                    depth_m=seat_thickness_m,
+                    lip_height_m=0.52 * seat_thickness_m,
+                    segments=26,
+                )
+                _set_poly_mesh(top_seat_mesh, top_seat_verts, top_seat_faces)
+                _set_poly_mesh(bot_seat_mesh, bot_seat_verts, bot_seat_faces)
+                seat_base_face_rgba = self._blend_rgba(spring_face_rgba, (0.18, 0.24, 0.32, 0.96), 0.28)
+                seat_base_edge_rgba = self._blend_rgba(spring_edge_rgba, (0.92, 0.96, 1.00, 0.82), 0.18)
+                top_seat_face_rgba, top_seat_edge_rgba = self._contact_bounce_material_rgba(
+                    key=f"spring-seat-{spring_state['cyl_name']}-{spring_state['corner']}-top",
+                    base_face_rgba=seat_base_face_rgba,
+                    base_edge_rgba=seat_base_edge_rgba,
+                    tire_force_n=float(spring_state["tire_force_n"]),
+                    wheel_gap_m=float(spring_state.get("wheel_gap_m", 0.0)),
+                    in_air=bool(spring_state.get("in_air", False)),
+                    gain=0.40,
+                )
+                bot_seat_face_rgba, bot_seat_edge_rgba = self._contact_bounce_material_rgba(
+                    key=f"spring-seat-{spring_state['cyl_name']}-{spring_state['corner']}-bot",
+                    base_face_rgba=seat_base_face_rgba,
+                    base_edge_rgba=seat_base_edge_rgba,
+                    tire_force_n=float(spring_state["tire_force_n"]),
+                    wheel_gap_m=float(spring_state.get("wheel_gap_m", 0.0)),
+                    in_air=bool(spring_state.get("in_air", False)),
+                    gain=0.70,
+                )
+                self._apply_mesh_material(
+                    top_seat_mesh,
+                    face_rgba=top_seat_face_rgba,
+                    edge_rgba=top_seat_edge_rgba,
+                )
+                self._apply_mesh_material(
+                    bot_seat_mesh,
+                    face_rgba=bot_seat_face_rgba,
+                    edge_rgba=bot_seat_edge_rgba,
+                )
+                if spring_glow is not None and spring_path is not None:
+                    try:
+                        glow_cols = np.repeat(np.asarray(spring_glow_rgba, dtype=float).reshape(1, 4), np.asarray(spring_path, dtype=float).shape[0], axis=0)
+                        spring_glow.setData(pos=np.asarray(spring_path, dtype=float), color=glow_cols)
+                        spring_glow.setVisible(True)
+                    except Exception:
+                        _set_line_item_pos(spring_glow, None)
+            else:
+                if top_seat_mesh is not None:
+                    self._invalidate_mesh(top_seat_mesh)
+                if bot_seat_mesh is not None:
+                    self._invalidate_mesh(bot_seat_mesh)
+                _set_line_item_pos(spring_glow, None)
+        for seat_idx in range(2 * len(spring_visual_states), len(self._spring_seat_meshes)):
+            self._invalidate_mesh(self._spring_seat_meshes[seat_idx])
         if self._cyl_frame_mount_markers is not None:
             try:
                 frame_mount_pts = [p for p in (cyl1_top_local_pts + cyl2_top_local_pts) if p is not None]
@@ -5864,13 +10210,78 @@ class Car3DWidget(QtWidgets.QWidget):
             except Exception:
                 pass
 
+        active_spring_states = [state for state in spring_visual_states if isinstance(state, dict)]
+        if active_spring_states:
+            mean_spring_energy_u = float(
+                np.nanmean(
+                    np.asarray(
+                        [
+                            0.58 * float(state.get("compression_u", 0.0))
+                            + 0.42 * float(
+                                _clamp(
+                                    1.0 - (float(state.get("coil_margin_m", 0.02)) / 0.018)
+                                    if np.isfinite(float(state.get("coil_margin_m", float("nan"))))
+                                    else float(state.get("compression_u", 0.0)),
+                                    0.0,
+                                    1.0,
+                                )
+                            )
+                            for state in active_spring_states
+                        ],
+                        dtype=float,
+                    )
+                )
+            )
+        else:
+            mean_spring_energy_u = base_mean_load_u
+        scene_glass_energy_u = float(
+            _clamp(
+                float(np.nanmean(np.asarray(scene_glass_energy_us, dtype=float))) if scene_glass_energy_us else base_mean_load_u,
+                0.0,
+                1.0,
+            )
+        )
+        scene_grade = self._scene_grade_profile(
+            key_prefix="scene-grade-main",
+            camera_view_dir_xyz=camera_view_dir,
+            body_forward_xyz=body_forward_for_grade,
+            mean_load_u=base_mean_load_u,
+            spring_energy_u=mean_spring_energy_u,
+            glass_energy_u=scene_glass_energy_u,
+            speed_m_s=float(speed_along_road),
+        )
+        try:
+            bg_rgba = self._scene_graded_rgba(
+                key="scene-background",
+                rgba=(6.0 / 255.0, 10.0 / 255.0, 18.0 / 255.0, 1.0),
+                exposure=float(scene_grade["exposure"]),
+                saturation=float(scene_grade["saturation"]),
+                warmth=float(scene_grade["warmth"]),
+                highlight_gain=1.0,
+                alpha_gain=1.0,
+                response=0.10,
+            )
+            self.view.setBackgroundColor(
+                int(round(255.0 * float(_clamp(bg_rgba[0], 0.0, 1.0)))),
+                int(round(255.0 * float(_clamp(bg_rgba[1], 0.0, 1.0)))),
+                int(round(255.0 * float(_clamp(bg_rgba[2], 0.0, 1.0)))),
+            )
+        except Exception:
+            pass
+
         # ---- Vectors (velocity & acceleration) in local body frame
-        def _arrow_lines_3d(origin_xyz: np.ndarray, vec_xyz: np.ndarray) -> np.ndarray:
+        def _arrow_lines_3d(
+            origin_xyz: np.ndarray,
+            vec_xyz: np.ndarray,
+            *,
+            tail_rgba: Tuple[float, float, float, float],
+            tip_rgba: Tuple[float, float, float, float],
+        ) -> tuple[np.ndarray, np.ndarray]:
             origin = np.asarray(origin_xyz, dtype=float).reshape(3)
             vec = np.asarray(vec_xyz, dtype=float).reshape(3)
             mag = float(np.linalg.norm(vec))
             if not np.isfinite(mag) or mag <= 1e-12:
-                return np.zeros((0, 3), dtype=float)
+                return np.zeros((0, 3), dtype=float), np.zeros((0, 4), dtype=np.float32)
             end = origin + vec
             u = vec / mag
             side = np.cross(u, np.array([0.0, 0.0, 1.0], dtype=float))
@@ -5882,7 +10293,11 @@ class Car3DWidget(QtWidgets.QWidget):
             head = 0.18 * max(0.2, mag)
             leg1 = end + head * (-u + 0.35 * side)
             leg2 = end + head * (-u - 0.35 * side)
-            return np.asarray([origin, end, end, leg1, end, leg2], dtype=float)
+            pos = np.asarray([origin, end, end, leg1, end, leg2], dtype=float)
+            shaft_colors = np.asarray([tail_rgba, tip_rgba], dtype=np.float32)
+            head_colors = np.asarray([tip_rgba, tip_rgba, tip_rgba, tip_rgba], dtype=np.float32)
+            colors = np.vstack([shaft_colors, head_colors])
+            return pos, colors
 
         z_vec_offset = 0.55 * body_h + 0.15 * float(self.geom.wheel_radius)
         vec_origin = np.asarray(center_draw, dtype=float) + np.asarray(R_local[:, 2], dtype=float) * float(z_vec_offset)
@@ -5891,19 +10306,34 @@ class Car3DWidget(QtWidgets.QWidget):
             np.asarray(R_local[:, 0], dtype=float) * float(external_ax * self._accel_scale)
             + np.asarray(R_local[:, 1], dtype=float) * float(external_ay * self._accel_scale)
         )
+        vel_pos, vel_colors = _arrow_lines_3d(
+            vec_origin,
+            vel_vec,
+            tail_rgba=(0.10, 0.92, 0.52, 0.20),
+            tip_rgba=(0.30, 1.00, 0.80, 0.96),
+        )
+        acc_pos, acc_colors = _arrow_lines_3d(
+            vec_origin,
+            acc_vec,
+            tail_rgba=(1.00, 0.62, 0.18, 0.20),
+            tip_rgba=(1.00, 0.84, 0.32, 0.98),
+        )
         if self._vec_vel:
-            self._vec_vel.setData(pos=_arrow_lines_3d(vec_origin, vel_vec))
+            self._vec_vel.setData(pos=vel_pos, color=vel_colors)
         if self._vec_acc:
-            self._vec_acc.setData(pos=_arrow_lines_3d(vec_origin, acc_vec))
+            self._vec_acc.setData(pos=acc_pos, color=acc_colors)
 
         # ---- Road preview (dense surface mesh + lighter visible wire grid)
+        show_road = bool(self._visual.get("show_road", True))
+        road_preview_enabled = bool(show_road and self._road_mesh and self._road_edges and self._road_stripes)
+        rich_road_fx = bool(show_road and not (bool(self._playback_active) and bool(self._playback_perf_mode)))
         try:
             if self._grid is not None:
                 self._grid.setVisible(not bool(self._visual.get("show_road", True)))
         except Exception:
             pass
 
-        if self._visual.get("show_road", True) and self._road_mesh and self._road_edges and self._road_stripes:
+        if road_preview_enabled:
             try:
                 s_world = b.ensure_s_world()
                 xw, yw = b.ensure_world_xy()
@@ -5929,6 +10359,21 @@ class Car3DWidget(QtWidgets.QWidget):
                     if self._contact_patch_mesh is not None:
                         self._contact_patch_mesh.setMeshData(meshdata=gl.MeshData(vertexes=np.zeros((0, 3), dtype=float), faces=np.zeros((0, 3), dtype=np.int32)))
                         self._contact_patch_mesh.setVisible(False)
+                    self._invalidate_mesh(self._body_shadow_mesh)
+                    for shadow_item in self._wheel_shadow_meshes:
+                        self._invalidate_mesh(shadow_item)
+                    for glaze_item in self._contact_glaze_meshes:
+                        self._invalidate_mesh(glaze_item)
+                    for accent_ring in self._contact_accent_rings:
+                        _set_line_item_pos(accent_ring, None)
+                    for fog_item in self._scene_fog_meshes:
+                        self._invalidate_mesh(fog_item)
+                    for shaft_item in self._corner_light_shaft_meshes:
+                        self._invalidate_mesh(shaft_item)
+                    for key_light in self._corner_key_light_lines:
+                        _set_line_item_pos(key_light, None)
+                    self._invalidate_mesh(self._focus_halo_mesh)
+                    _set_line_item_pos(self._focus_halo_line, None)
                     return
 
                 try:
@@ -6070,13 +10515,38 @@ class Car3DWidget(QtWidgets.QWidget):
                 if cache_key not in self._road_faces_cache:
                     self._road_faces_cache[cache_key] = _grid_faces_rect(int(n_long), int(n_lat))
                 faces = np.asarray(self._road_faces_cache[cache_key], dtype=np.int32)
-                self._road_mesh.setMeshData(meshdata=gl.MeshData(vertexes=verts, faces=faces))
+                road_face_colors = self._road_face_colors(verts, n_long=int(n_long), n_lat=int(n_lat))
+                road_face_colors = self._scene_grade_color_array(
+                    road_face_colors,
+                    exposure=float(scene_grade["exposure"]) * 0.96,
+                    saturation=float(scene_grade["saturation"]),
+                    warmth=float(scene_grade["warmth"]),
+                    highlight_gain=1.0 + 0.35 * (float(scene_grade["highlight_gain"]) - 1.0),
+                    alpha_gain=1.0,
+                    output_u8=True,
+                )
+                self._road_mesh.setMeshData(meshdata=gl.MeshData(vertexes=verts, faces=faces, faceColors=road_face_colors))
                 self._road_mesh.setVisible(True)
 
                 left_edge = np.asarray([verts[ii * int(n_lat) + (int(n_lat) - 1)] for ii in range(int(n_long))], dtype=float)
                 right_edge = np.asarray([verts[ii * int(n_lat) + 0] for ii in range(int(n_long))], dtype=float)
                 edge = np.vstack([left_edge, right_edge[::-1]])
-                self._road_edges.setData(pos=edge)
+                edge_colors = self._line_color_ramp(
+                    edge,
+                    near_rgba=(0.32, 0.56, 0.82, 0.92),
+                    far_rgba=(0.08, 0.12, 0.18, 0.34),
+                    power=0.78,
+                )
+                edge_colors = self._scene_grade_color_array(
+                    edge_colors,
+                    exposure=float(scene_grade["exposure"]),
+                    saturation=float(scene_grade["saturation"]),
+                    warmth=float(scene_grade["warmth"]),
+                    highlight_gain=float(scene_grade["highlight_gain"]),
+                    alpha_gain=float(scene_grade["alpha_gain"]),
+                    output_u8=False,
+                )
+                self._road_edges.setData(pos=edge, color=edge_colors)
                 self._road_edges.setVisible(True)
 
                 ds_long = float(max(1e-6, surface_spacing_m))
@@ -6140,12 +10610,28 @@ class Car3DWidget(QtWidgets.QWidget):
                 else:
                     grid_lines = np.asarray(grid_lines, dtype=float)
                     grid_lines[:, 2] += 0.003
-                self._road_stripes.setData(pos=grid_lines)
+                stripe_colors = self._line_color_ramp(
+                    grid_lines,
+                    near_rgba=(0.26, 0.86, 1.00, 0.90),
+                    far_rgba=(0.05, 0.22, 0.42, 0.20),
+                    power=0.72,
+                )
+                stripe_colors = self._scene_grade_color_array(
+                    stripe_colors,
+                    exposure=float(scene_grade["exposure"]) * 1.02,
+                    saturation=float(scene_grade["saturation"]),
+                    warmth=float(scene_grade["warmth"]),
+                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.04,
+                    alpha_gain=float(scene_grade["alpha_gain"]),
+                    output_u8=False,
+                )
+                self._road_stripes.setData(pos=grid_lines, color=stripe_colors)
                 self._road_stripes.setVisible(True)
 
                 if self._contact_patch_mesh is not None or self._contact_pts is not None or self._contact_links is not None:
                     patch_faces_all: list[np.ndarray] = []
                     patch_verts_all: list[np.ndarray] = []
+                    patch_face_colors_all: list[np.ndarray] = []
                     pts: list[list[float]] = []
                     cols: list[list[float]] = []
                     links: list[list[float]] = []
@@ -6202,7 +10688,9 @@ class Car3DWidget(QtWidgets.QWidget):
                             contact_pt = np.asarray(center, dtype=float) - np.asarray(up, dtype=float) * wheel_radius_m
                         pts.append([float(contact_pt[0]), float(contact_pt[1]), float(contact_pt[2])])
                         in_air = bool(wheel_air[idx] > 0.5) or (patch_faces_i.size == 0)
-                        cols.append([1.0, 0.35, 0.2, 1.0] if in_air else [0.2, 0.9, 0.35, 1.0])
+                        tire_force_n = float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0
+                        marker_rgba = self._contact_patch_marker_rgba(tire_force_n, in_air=in_air)
+                        cols.append([float(v) for v in marker_rgba])
                         links.append([float(contact_pt[0]), float(contact_pt[1]), float(contact_pt[2])])
                         link_wheel_pt = np.asarray(center, dtype=float) - np.asarray(up, dtype=float) * wheel_radius_m
                         links.append([float(link_wheel_pt[0]), float(link_wheel_pt[1]), float(link_wheel_pt[2])])
@@ -6210,20 +10698,612 @@ class Car3DWidget(QtWidgets.QWidget):
                             base = sum(arr.shape[0] for arr in patch_verts_all)
                             patch_verts_all.append(np.asarray(patch_verts_i, dtype=float))
                             patch_faces_all.append(np.asarray(np.asarray(patch_faces_i, dtype=np.int32) + int(base), dtype=np.int32))
+                            patch_face_colors_i = self._contact_patch_face_colors(
+                                patch_verts_i,
+                                patch_faces_i,
+                                contact_pt_xyz=contact_pt,
+                                tire_force_n=tire_force_n,
+                                in_air=in_air,
+                            )
+                            patch_face_colors_all.append(np.asarray(patch_face_colors_i, dtype=np.uint8))
 
                     if self._contact_pts is not None:
-                        self._contact_pts.setData(pos=self._contact_marker_line_vertices(np.asarray(pts, dtype=float), size_m=max(0.02, 0.18 * wheel_radius_m)))
+                        marker_pos = self._contact_marker_line_vertices(np.asarray(pts, dtype=float), size_m=max(0.02, 0.18 * wheel_radius_m))
+                        marker_cols = np.repeat(np.asarray(cols, dtype=float).reshape(-1, 4), 6, axis=0) if cols else np.zeros((0, 4), dtype=float)
+                        if marker_cols.shape[0] == marker_pos.shape[0]:
+                            self._contact_pts.setData(pos=marker_pos, color=marker_cols)
+                        else:
+                            self._contact_pts.setData(pos=marker_pos)
                     if self._contact_links is not None:
-                        self._contact_links.setData(pos=np.asarray(links, dtype=float))
+                        link_pos = np.asarray(links, dtype=float)
+                        link_cols = np.repeat(np.asarray(cols, dtype=float).reshape(-1, 4), 2, axis=0) if cols else np.zeros((0, 4), dtype=float)
+                        if link_cols.shape[0] == link_pos.shape[0]:
+                            self._contact_links.setData(pos=link_pos, color=link_cols)
+                        else:
+                            self._contact_links.setData(pos=link_pos)
                     if self._contact_patch_mesh is not None:
-                        if patch_faces_all and patch_verts_all:
+                        if patch_faces_all and patch_verts_all and patch_face_colors_all:
                             patch_faces = np.vstack(patch_faces_all)
                             patch_verts = np.vstack(patch_verts_all)
-                            self._contact_patch_mesh.setMeshData(meshdata=gl.MeshData(vertexes=patch_verts, faces=patch_faces))
+                            patch_face_colors = np.vstack(patch_face_colors_all)
+                            patch_face_colors = self._scene_grade_color_array(
+                                patch_face_colors,
+                                exposure=float(scene_grade["exposure"]) * 1.01,
+                                saturation=float(scene_grade["saturation"]),
+                                warmth=float(scene_grade["warmth"]),
+                                highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                alpha_gain=float(scene_grade["alpha_gain"]),
+                                output_u8=True,
+                            )
+                            if patch_face_colors.shape[0] == patch_faces.shape[0]:
+                                self._contact_patch_mesh.setMeshData(
+                                    meshdata=gl.MeshData(vertexes=patch_verts, faces=patch_faces, faceColors=patch_face_colors)
+                                )
+                            else:
+                                self._contact_patch_mesh.setMeshData(meshdata=gl.MeshData(vertexes=patch_verts, faces=patch_faces))
                             self._contact_patch_mesh.setVisible(bool(self._visual.get("show_road", True)))
                         else:
                             self._contact_patch_mesh.setMeshData(meshdata=gl.MeshData(vertexes=np.zeros((0, 3), dtype=float), faces=np.zeros((0, 3), dtype=np.int32)))
                             self._contact_patch_mesh.setVisible(False)
+
+                    try:
+                        if rich_road_fx:
+                            shadow_floor_z = float(np.nanmin(np.asarray(road_local_pts, dtype=float)[:, 2])) + float(self._shadow_hover_m)
+                            mean_tire_force_n = float(np.nanmean(np.asarray(tire_forces_n, dtype=float))) if tire_forces_n else 0.0
+                            mean_load_u = float(
+                                _clamp(
+                                    mean_tire_force_n / float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0))),
+                                    0.0,
+                                    1.0,
+                                )
+                            )
+                            body_shadow_src = np.asarray(
+                                [frame_local_pts[0], frame_local_pts[1], frame_local_pts[3], frame_local_pts[2]],
+                                dtype=float,
+                            )
+                            if body_shadow_src.shape == (4, 3) and np.all(np.isfinite(body_shadow_src)):
+                                body_xy = np.asarray(body_shadow_src[:, :2], dtype=float)
+                                body_xy_center = np.mean(body_xy, axis=0, keepdims=True)
+                                body_xy = body_xy_center + (body_xy - body_xy_center) * np.asarray(
+                                    [[1.06 + 0.06 * mean_load_u, 1.10 + 0.08 * mean_load_u]],
+                                    dtype=float,
+                                )
+                                body_shadow_verts = np.column_stack(
+                                    [body_xy, np.full(4, shadow_floor_z, dtype=float)]
+                                )
+                                _set_poly_mesh(
+                                    self._body_shadow_mesh,
+                                    body_shadow_verts,
+                                    np.asarray([[0, 1, 2], [0, 2, 3]], dtype=np.int32),
+                                )
+                                self._apply_mesh_material(
+                                    self._body_shadow_mesh,
+                                    face_rgba=(0.02, 0.03, 0.05, float(_clamp(0.14 + 0.10 * mean_load_u, 0.10, 0.26))),
+                                    edge_rgba=(0.02, 0.03, 0.05, float(_clamp(0.16 + 0.12 * mean_load_u, 0.12, 0.30))),
+                                )
+                            else:
+                                self._invalidate_mesh(self._body_shadow_mesh)
+
+                            body_forward = _norm_or(np.asarray(R_local[:, 0], dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+                            body_side = _norm_or(np.asarray(R_local[:, 1], dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+                            road_view_dir = np.asarray(camera_view_dir, dtype=float).reshape(3)
+                            road_view_dir[2] = 0.0
+                            road_view_dir = _norm_or(road_view_dir, body_forward)
+                            valid_road_pts = [
+                                np.asarray(pt, dtype=float).reshape(3)
+                                for pt in road_local_pts
+                                if np.all(np.isfinite(np.asarray(pt, dtype=float).reshape(3)))
+                            ]
+                            road_plane_center = (
+                                np.mean(np.asarray(valid_road_pts, dtype=float), axis=0)
+                                if valid_road_pts
+                                else np.asarray(center_draw, dtype=float).reshape(3)
+                            )
+                            road_plane_center[2] = shadow_floor_z + 0.010
+                            force_cap_n = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+                            front_load_u = float(
+                                _clamp(
+                                    float(np.nanmean(np.asarray(tire_forces_n[:2], dtype=float))) / force_cap_n if len(tire_forces_n) >= 2 else mean_load_u,
+                                    0.0,
+                                    1.0,
+                                )
+                            )
+                            rear_load_u = float(
+                                _clamp(
+                                    float(np.nanmean(np.asarray(tire_forces_n[2:], dtype=float))) / force_cap_n if len(tire_forces_n) >= 4 else mean_load_u,
+                                    0.0,
+                                    1.0,
+                                )
+                            )
+                            fog_specs = (
+                                (0.34 * float(self.geom.wheelbase), 0.026, max(0.32, 0.52 * float(self.geom.wheelbase)), max(0.26, 0.58 * float(self.geom.track)), (86, 206, 255), 0.44 + 0.56 * front_load_u),
+                                (0.00, 0.040, max(0.42, 0.72 * float(self.geom.wheelbase)), max(0.34, 0.76 * float(self.geom.track)), (108, 214, 255), 0.38 + 0.62 * mean_load_u),
+                                (-0.28 * float(self.geom.wheelbase), 0.028, max(0.30, 0.48 * float(self.geom.wheelbase)), max(0.24, 0.54 * float(self.geom.track)), (255, 176, 112), 0.42 + 0.58 * rear_load_u),
+                            )
+                            for fog_idx, (offset_fwd_m, lift_m, fog_radius_u, fog_radius_v, fog_rgb, fog_density_u) in enumerate(fog_specs):
+                                fog_item = self._scene_fog_meshes[fog_idx] if fog_idx < len(self._scene_fog_meshes) else None
+                                fog_center = np.asarray(road_plane_center, dtype=float) + body_forward * float(offset_fwd_m)
+                                fog_center[2] = float(shadow_floor_z) + float(lift_m)
+                                fog_verts, fog_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=fog_center,
+                                    axis_u_xyz=body_forward,
+                                    axis_v_xyz=body_side,
+                                    radius_u_m=float(fog_radius_u),
+                                    radius_v_m=float(fog_radius_v),
+                                    segments=28,
+                                )
+                                fog_face_colors = self._scene_fog_face_colors(
+                                    fog_verts,
+                                    fog_faces,
+                                    center_xyz=fog_center,
+                                    axis_u_xyz=body_forward,
+                                    axis_v_xyz=body_side,
+                                    radius_u_m=float(fog_radius_u),
+                                    radius_v_m=float(fog_radius_v),
+                                    theme_rgb=tuple(fog_rgb),
+                                    density_u=float(fog_density_u),
+                                    depth_dir_xyz=road_view_dir,
+                                )
+                                fog_face_colors = self._scene_grade_color_array(
+                                    fog_face_colors,
+                                    exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]),
+                                    alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                    output_u8=True,
+                                )
+                                _set_poly_mesh(
+                                    fog_item,
+                                    fog_verts,
+                                    fog_faces,
+                                    face_colors_rgba_u8=fog_face_colors,
+                                )
+                                if fog_item is not None:
+                                    fog_face_rgba = tuple(float(v) / 255.0 for v in tuple(fog_rgb)) + (float(_clamp(0.04 + 0.12 * float(fog_density_u), 0.04, 0.22)),)
+                                    fog_face_rgba = self._scene_graded_rgba(
+                                        key=f"scene-fog-material-{fog_idx}",
+                                        rgba=fog_face_rgba,
+                                        exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                        saturation=float(scene_grade["saturation"]),
+                                        warmth=float(scene_grade["warmth"]),
+                                        highlight_gain=float(scene_grade["highlight_gain"]),
+                                        alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                        response=0.16,
+                                    )
+                                    self._apply_mesh_material(
+                                        fog_item,
+                                        face_rgba=fog_face_rgba,
+                                        edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                    )
+                            for fog_idx in range(len(fog_specs), len(self._scene_fog_meshes)):
+                                self._invalidate_mesh(self._scene_fog_meshes[fog_idx])
+
+                            active_spring_states = [state for state in spring_visual_states if isinstance(state, dict)]
+                            if active_spring_states:
+                                mean_spring_energy_u = float(
+                                    np.nanmean(
+                                        np.asarray(
+                                            [
+                                                0.58 * float(state.get("compression_u", 0.0))
+                                                + 0.42 * float(
+                                                    _clamp(
+                                                        1.0 - (float(state.get("coil_margin_m", 0.02)) / 0.018)
+                                                        if np.isfinite(float(state.get("coil_margin_m", float("nan"))))
+                                                        else float(state.get("compression_u", 0.0)),
+                                                        0.0,
+                                                        1.0,
+                                                    )
+                                                )
+                                                for state in active_spring_states
+                                            ],
+                                            dtype=float,
+                                        )
+                                    )
+                                )
+                            else:
+                                mean_spring_energy_u = mean_load_u
+                            focus_candidates: list[np.ndarray] = []
+                            for spring_state in active_spring_states:
+                                for key_name in ("top_xyz", "bot_xyz"):
+                                    try:
+                                        pt = np.asarray(spring_state.get(key_name), dtype=float).reshape(3)
+                                        if np.all(np.isfinite(pt)):
+                                            focus_candidates.append(pt)
+                                    except Exception:
+                                        pass
+                            for pt in [*cyl1_top_local_pts, *cyl2_top_local_pts]:
+                                if pt is None:
+                                    continue
+                                pt_arr = np.asarray(pt, dtype=float).reshape(3)
+                                if np.all(np.isfinite(pt_arr)):
+                                    focus_candidates.append(pt_arr)
+                            focus_center = (
+                                np.mean(np.asarray(focus_candidates, dtype=float), axis=0)
+                                if focus_candidates
+                                else np.asarray(center_draw, dtype=float).reshape(3) + np.asarray(R_local[:, 2], dtype=float).reshape(3) * (0.18 * body_h)
+                            )
+                            focus_axis_u, focus_axis_v = self._camera_facing_card_axes(
+                                primary_dir_xyz=body_forward,
+                                view_dir_xyz=camera_view_dir,
+                                fallback_dir_xyz=body_side,
+                            )
+                            max_corner_force_n = float(max([0.0, *[float(v) for v in tire_forces_n]]))
+                            for idx, shadow_item in enumerate(self._wheel_shadow_meshes):
+                                if idx >= len(wheel_pose_centers):
+                                    self._invalidate_mesh(shadow_item)
+                                    if idx < len(self._contact_glaze_meshes):
+                                        self._invalidate_mesh(self._contact_glaze_meshes[idx])
+                                    if idx < len(self._contact_accent_rings):
+                                        _set_line_item_pos(self._contact_accent_rings[idx], None)
+                                    if idx < len(self._corner_light_shaft_meshes):
+                                        self._invalidate_mesh(self._corner_light_shaft_meshes[idx])
+                                    if idx < len(self._corner_key_light_lines):
+                                        _set_line_item_pos(self._corner_key_light_lines[idx], None)
+                                    continue
+                                shadow_center = np.asarray(road_local_pts[idx], dtype=float).reshape(3)
+                                if not np.all(np.isfinite(shadow_center)):
+                                    shadow_center = np.asarray(wheel_pose_centers[idx], dtype=float).reshape(3)
+                                    shadow_center[2] = float(shadow_center[2]) - float(self.geom.wheel_radius)
+                                shadow_center[2] = float(shadow_center[2]) + float(self._shadow_hover_m)
+                                wheel_up = _norm_or(
+                                    np.asarray(wheel_pose_ups[idx], dtype=float).reshape(3),
+                                    np.array([0.0, 0.0, 1.0], dtype=float),
+                                )
+                                wheel_contact = np.asarray(road_local_pts[idx], dtype=float).reshape(3)
+                                if not np.all(np.isfinite(wheel_contact)):
+                                    wheel_contact = np.asarray(shadow_center, dtype=float)
+                                    wheel_contact[2] = float(wheel_contact[2]) - float(self._shadow_hover_m)
+                                wheel_gap_m = float(
+                                    max(
+                                        0.0,
+                                        np.dot(np.asarray(wheel_pose_centers[idx], dtype=float).reshape(3) - wheel_contact, wheel_up)
+                                        - float(self.geom.wheel_radius),
+                                    )
+                                )
+                                tire_force_n = float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0
+                                load_u = float(
+                                    _clamp(
+                                        tire_force_n / float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0))),
+                                        0.0,
+                                        1.0,
+                                    )
+                                )
+                                gap_u = float(_clamp(wheel_gap_m / max(0.01, 0.35 * wheel_radius_m), 0.0, 1.0))
+                                shadow_fwd = np.asarray(wheel_pose_fwds[idx], dtype=float).reshape(3)
+                                shadow_axle = np.asarray(wheel_pose_axles[idx], dtype=float).reshape(3)
+                                shadow_fwd[2] = 0.0
+                                shadow_axle[2] = 0.0
+                                shadow_fwd = _norm_or(shadow_fwd, np.array([1.0, 0.0, 0.0], dtype=float))
+                                shadow_axle = _norm_or(
+                                    shadow_axle,
+                                    np.array([0.0, 1.0 if float(shadow_center[1]) >= 0.0 else -1.0, 0.0], dtype=float),
+                                )
+                                shadow_radius_u = max(0.05, wheel_radius_m * (0.62 + 0.18 * load_u + 0.24 * gap_u))
+                                shadow_radius_v = max(0.03, wheel_width_m * (0.52 + 0.16 * load_u + 0.20 * gap_u))
+                                shadow_verts, shadow_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=shadow_center,
+                                    axis_u_xyz=shadow_fwd,
+                                    axis_v_xyz=shadow_axle,
+                                    radius_u_m=shadow_radius_u,
+                                    radius_v_m=shadow_radius_v,
+                                    segments=20,
+                                )
+                                shadow_face_colors = self._wheel_shadow_face_colors(
+                                    shadow_verts,
+                                    shadow_faces,
+                                    center_xyz=shadow_center,
+                                    axis_u_xyz=shadow_fwd,
+                                    axis_v_xyz=shadow_axle,
+                                    radius_u_m=shadow_radius_u,
+                                    radius_v_m=shadow_radius_v,
+                                    tire_force_n=tire_force_n,
+                                    wheel_gap_m=wheel_gap_m,
+                                    in_air=bool(wheel_air[idx] > 0.5),
+                                )
+                                _set_poly_mesh(
+                                    shadow_item,
+                                    shadow_verts,
+                                    shadow_faces,
+                                    face_colors_rgba_u8=shadow_face_colors,
+                                )
+                                glaze_item = self._contact_glaze_meshes[idx] if idx < len(self._contact_glaze_meshes) else None
+                                accent_ring = self._contact_accent_rings[idx] if idx < len(self._contact_accent_rings) else None
+                                shaft_item = self._corner_light_shaft_meshes[idx] if idx < len(self._corner_light_shaft_meshes) else None
+                                key_light = self._corner_key_light_lines[idx] if idx < len(self._corner_key_light_lines) else None
+                                glaze_center = np.asarray(shadow_center, dtype=float).reshape(3)
+                                glaze_center[2] = float(glaze_center[2]) + 0.0015
+                                glaze_radius_u = max(0.07, shadow_radius_u * (1.28 + 0.26 * load_u))
+                                glaze_radius_v = max(0.05, shadow_radius_v * (1.60 + 0.24 * load_u))
+                                glaze_verts, glaze_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=glaze_center,
+                                    axis_u_xyz=shadow_fwd,
+                                    axis_v_xyz=shadow_axle,
+                                    radius_u_m=glaze_radius_u,
+                                    radius_v_m=glaze_radius_v,
+                                    segments=22,
+                                )
+                                glaze_face_colors = self._contact_glaze_face_colors(
+                                    glaze_verts,
+                                    glaze_faces,
+                                    center_xyz=glaze_center,
+                                    axis_u_xyz=shadow_fwd,
+                                    axis_v_xyz=shadow_axle,
+                                    radius_u_m=glaze_radius_u,
+                                    radius_v_m=glaze_radius_v,
+                                    tire_force_n=tire_force_n,
+                                    wheel_gap_m=wheel_gap_m,
+                                    in_air=bool(wheel_air[idx] > 0.5),
+                                )
+                                glaze_face_colors = self._scene_grade_color_array(
+                                    glaze_face_colors,
+                                    exposure=float(scene_grade["exposure"]) * 1.02,
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.04,
+                                    alpha_gain=float(scene_grade["alpha_gain"]),
+                                    output_u8=True,
+                                )
+                                _set_poly_mesh(
+                                    glaze_item,
+                                    glaze_verts,
+                                    glaze_faces,
+                                    face_colors_rgba_u8=glaze_face_colors,
+                                )
+                                ring_vertices = self._ellipse_line_vertices(
+                                    center_xyz=glaze_center + np.array([0.0, 0.0, 0.0006], dtype=float),
+                                    axis_u_xyz=shadow_fwd,
+                                    axis_v_xyz=shadow_axle,
+                                    radius_u_m=max(0.04, glaze_radius_u * 0.94),
+                                    radius_v_m=max(0.03, glaze_radius_v * 0.94),
+                                    segments=48,
+                                )
+                                if accent_ring is not None and ring_vertices is not None:
+                                    try:
+                                        accent_rgba = self._contact_accent_ring_rgba(
+                                            key=f"contact-accent-ring-{corners[idx]}-{idx}",
+                                            tire_force_n=tire_force_n,
+                                            wheel_gap_m=wheel_gap_m,
+                                            in_air=bool(wheel_air[idx] > 0.5),
+                                        )
+                                        accent_rgba = self._scene_graded_rgba(
+                                            key=f"contact-accent-ring-scene-grade-{corners[idx]}-{idx}",
+                                            rgba=accent_rgba,
+                                            exposure=float(scene_grade["exposure"]) * 1.02,
+                                            saturation=float(scene_grade["saturation"]),
+                                            warmth=float(scene_grade["warmth"]),
+                                            highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                            alpha_gain=float(scene_grade["alpha_gain"]),
+                                            response=0.16,
+                                        )
+                                        ring_colors = np.repeat(np.asarray(accent_rgba, dtype=float).reshape(1, 4), np.asarray(ring_vertices, dtype=float).shape[0], axis=0)
+                                        accent_ring.setData(pos=np.asarray(ring_vertices, dtype=float), color=ring_colors)
+                                        accent_ring.setVisible(True)
+                                    except Exception:
+                                        _set_line_item_pos(accent_ring, None)
+                                else:
+                                    _set_line_item_pos(accent_ring, None)
+                                hierarchy_u = float(_clamp(tire_force_n / max(1.0, max_corner_force_n), 0.0, 1.0))
+                                key_light_rgba = self._corner_key_light_rgba(
+                                    key=f"corner-key-light-{corners[idx]}-{idx}",
+                                    corner=corners[idx],
+                                    tire_force_n=tire_force_n,
+                                    wheel_gap_m=wheel_gap_m,
+                                    in_air=bool(wheel_air[idx] > 0.5),
+                                    hierarchy_u=hierarchy_u,
+                                )
+                                key_light_rgba = self._scene_graded_rgba(
+                                    key=f"corner-key-light-scene-grade-{corners[idx]}-{idx}",
+                                    rgba=key_light_rgba,
+                                    exposure=float(scene_grade["exposure"]) * 1.02,
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.08,
+                                    alpha_gain=float(scene_grade["alpha_gain"]),
+                                    response=0.16,
+                                )
+                                key_light_center = np.asarray(wheel_pose_centers[idx], dtype=float).reshape(3) + wheel_up * float(0.18 * wheel_radius_m)
+                                key_light_fwd = _project_vector_to_plane(np.asarray(wheel_pose_fwds[idx], dtype=float).reshape(3), wheel_up)
+                                key_light_fwd = _norm_or(np.asarray(key_light_fwd, dtype=float).reshape(3), shadow_fwd)
+                                shaft_primary = key_light_fwd + 0.28 * wheel_up
+                                shaft_axis_u, shaft_axis_v = self._camera_facing_card_axes(
+                                    primary_dir_xyz=shaft_primary,
+                                    view_dir_xyz=camera_view_dir,
+                                    fallback_dir_xyz=wheel_up,
+                                )
+                                shaft_center = key_light_center + key_light_fwd * (0.10 * wheel_radius_m) + wheel_up * (0.06 * wheel_radius_m) + camera_view_dir * 0.006
+                                shaft_radius_u = max(0.10, wheel_radius_m * (1.28 + 0.34 * hierarchy_u))
+                                shaft_radius_v = max(0.07, wheel_radius_m * (0.72 + 0.18 * hierarchy_u))
+                                shaft_verts, shaft_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=shaft_center,
+                                    axis_u_xyz=shaft_axis_u,
+                                    axis_v_xyz=shaft_axis_v,
+                                    radius_u_m=shaft_radius_u,
+                                    radius_v_m=shaft_radius_v,
+                                    segments=22,
+                                )
+                                shaft_face_colors = self._corner_light_shaft_face_colors(
+                                    shaft_verts,
+                                    shaft_faces,
+                                    center_xyz=shaft_center,
+                                    axis_u_xyz=shaft_axis_u,
+                                    axis_v_xyz=shaft_axis_v,
+                                    radius_u_m=shaft_radius_u,
+                                    radius_v_m=shaft_radius_v,
+                                    corner=corners[idx],
+                                    tire_force_n=tire_force_n,
+                                    hierarchy_u=hierarchy_u,
+                                    in_air=bool(wheel_air[idx] > 0.5),
+                                )
+                                shaft_face_colors = self._scene_grade_color_array(
+                                    shaft_face_colors,
+                                    exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.08,
+                                    alpha_gain=float(scene_grade["alpha_gain"]) * 1.04,
+                                    output_u8=True,
+                                )
+                                _set_poly_mesh(
+                                    shaft_item,
+                                    shaft_verts,
+                                    shaft_faces,
+                                    face_colors_rgba_u8=shaft_face_colors,
+                                )
+                                if shaft_item is not None:
+                                    shaft_face_rgba = tuple(float(v) for v in key_light_rgba[:3]) + (float(_clamp(0.08 + 0.14 * hierarchy_u, 0.06, 0.24)),)
+                                    shaft_face_rgba = self._scene_graded_rgba(
+                                        key=f"corner-light-shaft-scene-grade-{corners[idx]}-{idx}",
+                                        rgba=shaft_face_rgba,
+                                        exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                        saturation=float(scene_grade["saturation"]),
+                                        warmth=float(scene_grade["warmth"]),
+                                        highlight_gain=float(scene_grade["highlight_gain"]) * 1.08,
+                                        alpha_gain=float(scene_grade["alpha_gain"]) * 1.04,
+                                        response=0.16,
+                                    )
+                                    self._apply_mesh_material(
+                                        shaft_item,
+                                        face_rgba=shaft_face_rgba,
+                                        edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                    )
+                                key_light_arc = self._ellipse_arc_vertices(
+                                    center_xyz=key_light_center,
+                                    axis_u_xyz=key_light_fwd,
+                                    axis_v_xyz=wheel_up,
+                                    radius_u_m=max(0.06, 0.88 * wheel_radius_m),
+                                    radius_v_m=max(0.05, 0.66 * wheel_radius_m),
+                                    start_rad=-0.18 * np.pi,
+                                    end_rad=1.18 * np.pi,
+                                    segments=42,
+                                )
+                                if key_light is not None and key_light_arc is not None:
+                                    try:
+                                        key_light_colors = self._tapered_line_color_array(
+                                            key_light_rgba,
+                                            int(np.asarray(key_light_arc, dtype=float).shape[0]),
+                                            edge_floor=0.10,
+                                            exponent=0.72,
+                                        )
+                                        key_light.setData(pos=np.asarray(key_light_arc, dtype=float), color=key_light_colors)
+                                        key_light.setVisible(True)
+                                    except Exception:
+                                        _set_line_item_pos(key_light, None)
+                                else:
+                                    _set_line_item_pos(key_light, None)
+                            for shaft_idx in range(len(wheel_pose_centers), len(self._corner_light_shaft_meshes)):
+                                self._invalidate_mesh(self._corner_light_shaft_meshes[shaft_idx])
+                            for light_idx in range(len(wheel_pose_centers), len(self._corner_key_light_lines)):
+                                _set_line_item_pos(self._corner_key_light_lines[light_idx], None)
+                            focus_radius_u = max(0.16, 0.26 * float(self.geom.wheelbase) * (1.0 + 0.16 * mean_spring_energy_u))
+                            focus_radius_v = max(0.10, 0.18 * float(self.geom.track) * (1.0 + 0.12 * mean_load_u))
+                            focus_center = np.asarray(focus_center, dtype=float).reshape(3) + camera_view_dir * 0.008
+                            focus_verts, focus_faces = _ellipse_mesh_on_plane(
+                                center_xyz=focus_center,
+                                axis_u_xyz=focus_axis_u,
+                                axis_v_xyz=focus_axis_v,
+                                radius_u_m=focus_radius_u,
+                                radius_v_m=focus_radius_v,
+                                segments=30,
+                            )
+                            focus_face_colors = self._focus_halo_face_colors(
+                                focus_verts,
+                                focus_faces,
+                                center_xyz=focus_center,
+                                axis_u_xyz=focus_axis_u,
+                                axis_v_xyz=focus_axis_v,
+                                radius_u_m=focus_radius_u,
+                                radius_v_m=focus_radius_v,
+                                load_u=mean_load_u,
+                                spring_energy_u=mean_spring_energy_u,
+                            )
+                            focus_face_colors = self._scene_grade_color_array(
+                                focus_face_colors,
+                                exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                saturation=float(scene_grade["saturation"]),
+                                warmth=float(scene_grade["warmth"]),
+                                highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                alpha_gain=float(scene_grade["alpha_gain"]) * 1.04,
+                                output_u8=True,
+                            )
+                            _set_poly_mesh(
+                                self._focus_halo_mesh,
+                                focus_verts,
+                                focus_faces,
+                                face_colors_rgba_u8=focus_face_colors,
+                            )
+                            focus_rgba = self._focus_halo_rgba(
+                                key="suspension-focus-halo",
+                                load_u=mean_load_u,
+                                spring_energy_u=mean_spring_energy_u,
+                            )
+                            focus_rgba = self._scene_graded_rgba(
+                                key="suspension-focus-halo-scene-grade",
+                                rgba=focus_rgba,
+                                exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                saturation=float(scene_grade["saturation"]),
+                                warmth=float(scene_grade["warmth"]),
+                                highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                alpha_gain=float(scene_grade["alpha_gain"]) * 1.04,
+                                response=0.16,
+                            )
+                            if self._focus_halo_mesh is not None:
+                                self._apply_mesh_material(
+                                    self._focus_halo_mesh,
+                                    face_rgba=focus_rgba,
+                                    edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                )
+                            focus_ring = self._ellipse_line_vertices(
+                                center_xyz=focus_center + camera_view_dir * 0.0012,
+                                axis_u_xyz=focus_axis_u,
+                                axis_v_xyz=focus_axis_v,
+                                radius_u_m=max(0.12, 0.82 * focus_radius_u),
+                                radius_v_m=max(0.08, 0.82 * focus_radius_v),
+                                segments=52,
+                            )
+                            if self._focus_halo_line is not None and focus_ring is not None:
+                                focus_colors = self._tapered_line_color_array(
+                                    focus_rgba,
+                                    int(np.asarray(focus_ring, dtype=float).shape[0]),
+                                    edge_floor=0.12,
+                                    exponent=0.76,
+                                )
+                                self._focus_halo_line.setData(pos=np.asarray(focus_ring, dtype=float), color=focus_colors)
+                                self._focus_halo_line.setVisible(True)
+                            else:
+                                _set_line_item_pos(self._focus_halo_line, None)
+                        else:
+                            self._invalidate_mesh(self._body_shadow_mesh)
+                            for shadow_item in self._wheel_shadow_meshes:
+                                self._invalidate_mesh(shadow_item)
+                            for glaze_item in self._contact_glaze_meshes:
+                                self._invalidate_mesh(glaze_item)
+                            for accent_ring in self._contact_accent_rings:
+                                _set_line_item_pos(accent_ring, None)
+                            for fog_item in self._scene_fog_meshes:
+                                self._invalidate_mesh(fog_item)
+                            for shaft_item in self._corner_light_shaft_meshes:
+                                self._invalidate_mesh(shaft_item)
+                            for key_light in self._corner_key_light_lines:
+                                _set_line_item_pos(key_light, None)
+                            self._invalidate_mesh(self._focus_halo_mesh)
+                            _set_line_item_pos(self._focus_halo_line, None)
+                    except Exception:
+                        self._invalidate_mesh(self._body_shadow_mesh)
+                        for shadow_item in self._wheel_shadow_meshes:
+                            self._invalidate_mesh(shadow_item)
+                        for glaze_item in self._contact_glaze_meshes:
+                            self._invalidate_mesh(glaze_item)
+                        for accent_ring in self._contact_accent_rings:
+                            _set_line_item_pos(accent_ring, None)
+                        for fog_item in self._scene_fog_meshes:
+                            self._invalidate_mesh(fog_item)
+                        for shaft_item in self._corner_light_shaft_meshes:
+                            self._invalidate_mesh(shaft_item)
+                        for key_light in self._corner_key_light_lines:
+                            _set_line_item_pos(key_light, None)
+                        self._invalidate_mesh(self._focus_halo_mesh)
+                        _set_line_item_pos(self._focus_halo_line, None)
             except Exception:
                 try:
                     self._road_mesh.setMeshData(meshdata=gl.MeshData(vertexes=np.zeros((0, 3), float), faces=np.zeros((0, 3), int)))
@@ -6237,6 +11317,37 @@ class Car3DWidget(QtWidgets.QWidget):
                         self._contact_patch_mesh.setVisible(False)
                 except Exception:
                     pass
+                self._invalidate_mesh(self._body_shadow_mesh)
+                for shadow_item in self._wheel_shadow_meshes:
+                    self._invalidate_mesh(shadow_item)
+                for glaze_item in self._contact_glaze_meshes:
+                    self._invalidate_mesh(glaze_item)
+                for accent_ring in self._contact_accent_rings:
+                    _set_line_item_pos(accent_ring, None)
+                for fog_item in self._scene_fog_meshes:
+                    self._invalidate_mesh(fog_item)
+                for shaft_item in self._corner_light_shaft_meshes:
+                    self._invalidate_mesh(shaft_item)
+                for key_light in self._corner_key_light_lines:
+                    _set_line_item_pos(key_light, None)
+                self._invalidate_mesh(self._focus_halo_mesh)
+                _set_line_item_pos(self._focus_halo_line, None)
+        else:
+            self._invalidate_mesh(self._body_shadow_mesh)
+            for shadow_item in self._wheel_shadow_meshes:
+                self._invalidate_mesh(shadow_item)
+            for glaze_item in self._contact_glaze_meshes:
+                self._invalidate_mesh(glaze_item)
+            for accent_ring in self._contact_accent_rings:
+                _set_line_item_pos(accent_ring, None)
+            for fog_item in self._scene_fog_meshes:
+                self._invalidate_mesh(fog_item)
+            for shaft_item in self._corner_light_shaft_meshes:
+                self._invalidate_mesh(shaft_item)
+            for key_light in self._corner_key_light_lines:
+                _set_line_item_pos(key_light, None)
+            self._invalidate_mesh(self._focus_halo_mesh)
+            _set_line_item_pos(self._focus_halo_line, None)
 
 class CornerTable(QtWidgets.QTableWidget):
     """One compact table for 'all 4 corners at once' observability.
@@ -10096,9 +15207,29 @@ class _HeatCell(QtWidgets.QWidget):
         pix.fill(QtCore.Qt.transparent)
         p = QtGui.QPainter(pix)
         p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        frame = QtCore.QRectF(0.5, 0.5, max(1.0, float(w) - 1.0), max(1.0, float(h) - 1.0))
+        top_rgb = _boost_rgb((self._bg_color.red(), self._bg_color.green(), self._bg_color.blue()), 0.28)
+        bot_rgb = _lerp_rgb((self._bg_color.red(), self._bg_color.green(), self._bg_color.blue()), (4, 10, 18), 0.38)
+        grad = QtGui.QLinearGradient(frame.topLeft(), frame.bottomLeft())
+        grad.setColorAt(0.0, _qt_color(top_rgb, a=248))
+        grad.setColorAt(0.42, _qt_color((self._bg_color.red(), self._bg_color.green(), self._bg_color.blue()), a=244))
+        grad.setColorAt(1.0, _qt_color(bot_rgb, a=252))
         p.setPen(self._border_pen)
-        p.setBrush(QtGui.QBrush(self._bg_color))
-        p.drawRoundedRect(QtCore.QRectF(0.5, 0.5, max(1.0, float(w) - 1.0), max(1.0, float(h) - 1.0)), 8.0, 8.0)
+        p.setBrush(QtGui.QBrush(grad))
+        p.drawRoundedRect(frame, 8.0, 8.0)
+        gloss = QtGui.QLinearGradient(frame.topLeft(), QtCore.QPointF(frame.left(), frame.top() + 0.60 * frame.height()))
+        gloss.setColorAt(0.0, QtGui.QColor(255, 255, 255, 72))
+        gloss.setColorAt(0.35, QtGui.QColor(255, 255, 255, 22))
+        gloss.setColorAt(1.0, QtGui.QColor(255, 255, 255, 0))
+        p.setPen(QtGui.QPen(QtCore.Qt.NoPen))
+        p.setBrush(QtGui.QBrush(gloss))
+        p.drawRoundedRect(frame.adjusted(1.5, 1.5, -1.5, -0.40 * frame.height()), 7.0, 7.0)
+        inner = QtGui.QRadialGradient(frame.center().x(), frame.top() + 0.18 * frame.height(), 0.85 * frame.width())
+        inner.setColorAt(0.0, QtGui.QColor(255, 255, 255, 26))
+        inner.setColorAt(0.45, QtGui.QColor(255, 255, 255, 10))
+        inner.setColorAt(1.0, QtGui.QColor(255, 255, 255, 0))
+        p.setBrush(QtGui.QBrush(inner))
+        p.drawRoundedRect(frame.adjusted(2.0, 2.0, -2.0, -2.0), 7.0, 7.0)
         p.end()
         self._bg_cache_key = key
         self._bg_cache_pixmap = pix
@@ -10112,6 +15243,9 @@ class _HeatCell(QtWidgets.QWidget):
         if style_key != self._style_key:
             self._bg_color = QtGui.QColor(int(rgb[0]), int(rgb[1]), int(rgb[2]))
             self._fg_color = QtGui.QColor(int(tr), int(tg), int(tb))
+            border_rgb = _boost_rgb(rgb, 0.16)
+            self._border_color = QtGui.QColor(int(border_rgb[0]), int(border_rgb[1]), int(border_rgb[2]), 168)
+            self._border_pen.setColor(self._border_color)
             self._bg_brush.setColor(self._bg_color)
             self._fg_pen.setColor(self._fg_color)
             self._bg_cache_key = None
@@ -11412,6 +16546,7 @@ class CockpitWidget(QtWidgets.QWidget):
         self._interactive_scrub_release_only_docks: Set[str] = {
             "dock_corner_table",
             "dock_road_profile",
+            "dock_multifactor",
         }
         self._aux_many_fast_fps: float = 18.0
         self._aux_many_slow_fps: float = 10.0
@@ -11462,6 +16597,7 @@ class CockpitWidget(QtWidgets.QWidget):
         self.telemetry_heatmap = CornerHeatmapPanel()
         self.telemetry_corner_quick = CornerQuickTable()
         self.telemetry_road_profile = RoadProfilePanel()
+        self.telemetry_multifactor = MultiFactorAnalysisPanel()
         self.telemetry_corner_table = CornerTable()
         self.telemetry_press_panel = PressurePanel()
         self.telemetry_flow_panel = FlowPanel()
@@ -11621,6 +16757,34 @@ class CockpitWidget(QtWidgets.QWidget):
             sa.setWidget(widget)
             return sa
 
+        def _make_externalizable_host(*, dock_name: str, live_widget: QtWidgets.QWidget, placeholder_text: str) -> QtWidgets.QWidget:
+            name = str(dock_name)
+            host = QtWidgets.QWidget()
+            host.setObjectName(f"{name}_live_host")
+            host_layout = QtWidgets.QVBoxLayout(host)
+            host_layout.setContentsMargins(0, 0, 0, 0)
+            host_layout.setSpacing(0)
+            host_layout.addWidget(live_widget)
+
+            placeholder = QtWidgets.QLabel(str(placeholder_text))
+            placeholder.setObjectName(f"{name}_detached_placeholder")
+            placeholder.setAlignment(QtCore.Qt.AlignCenter)
+            placeholder.setWordWrap(True)
+            placeholder.setStyleSheet(
+                "QLabel{padding:18px;color:#8aa0b6;background:#10161d;border:1px dashed #33414f;border-radius:12px;}"
+            )
+            placeholder.hide()
+
+            self._dock_live_widgets[name] = live_widget
+            self._dock_live_hosts[name] = host
+            self._dock_live_host_layouts[name] = host_layout
+            self._dock_detached_placeholders[name] = placeholder
+            try:
+                self._panel_to_dock_name[id(live_widget)] = name
+            except Exception:
+                pass
+            return host
+
         def _dock(*, obj_name: str, title: str, widget: QtWidgets.QWidget, area: QtCore.Qt.DockWidgetArea, tooltip: str, scroll: bool = False, register_toggle: bool = True) -> QtWidgets.QDockWidget:
             dock = QtWidgets.QDockWidget(title, main)
             dock.setObjectName(obj_name)
@@ -11673,11 +16837,18 @@ class CockpitWidget(QtWidgets.QWidget):
 
         gl_is_live = bool(self.car3d is not None and self.car3d.has_live_gl_context())
 
-        widget_3d: QtWidgets.QWidget
+        widget_3d_live: QtWidgets.QWidget
         if self.car3d is not None:
-            widget_3d = self.car3d
+            widget_3d_live = self.car3d
         else:
             widget_3d = QtWidgets.QLabel("3D отключён (--no-gl)")
+        if self.car3d is None:
+            widget_3d_live = widget_3d
+        widget_3d = _make_externalizable_host(
+            dock_name="dock_3d",
+            live_widget=widget_3d_live,
+            placeholder_text="3D panel is detached into a separate window. Close that window or disable its toggle in the Windows menu to re-dock it here.",
+        )
         dock_3d = _dock(
             obj_name="dock_3d",
             title="3D: Кузов/дорога/контакт",
@@ -11691,6 +16862,15 @@ class CockpitWidget(QtWidgets.QWidget):
         )
         if gl_is_live and self.car3d is not None:
             self._register_live_gl_layout_guard("dock_3d", dock_3d)
+        self._register_external_panel_window(
+            dock_name="dock_3d",
+            title="3D: РљСѓР·РѕРІ/РґРѕСЂРѕРіР°/РєРѕРЅС‚Р°РєС‚",
+            widget=widget_3d_live,
+            tooltip="Safe dedicated top-level 3D window. Used only when you explicitly detach panels so normal dock/re-dock UX stays intact.",
+            menu_windows=menu_windows,
+            main=main,
+            action_text="3D: РљСѓР·РѕРІ/РґРѕСЂРѕРіР°/РєРѕРЅС‚Р°РєС‚ (РѕС‚РґРµР»СЊРЅРѕРµ РѕРєРЅРѕ)",
+        )
 
         _dock(
             obj_name="dock_hud",
@@ -11755,6 +16935,13 @@ class CockpitWidget(QtWidgets.QWidget):
             widget=self.telemetry_road_profile,
             area=QtCore.Qt.BottomDockWidgetArea,
             tooltip="Отдельное окно реального профиля дороги под колёсами.",
+        )
+        _dock(
+            obj_name="dock_multifactor",
+            title="Инсайты: мультифактор",
+            widget=self.telemetry_multifactor,
+            area=QtCore.Qt.BottomDockWidgetArea,
+            tooltip="Авто-инсайты, correlation heatmap и corner cloud для многопараметрического анализа.",
         )
         _dock(
             obj_name="dock_corner_table",
@@ -12035,13 +17222,25 @@ class CockpitWidget(QtWidgets.QWidget):
                 pass
         self._sync_external_panel_action(name, bool(self._uses_external_panel_window(name) and visible))
 
-    def _register_external_panel_window(self, *, dock_name: str, title: str, widget: Optional[QtWidgets.QWidget], tooltip: str, menu_windows: QtWidgets.QMenu, main: QtWidgets.QMainWindow) -> ExternalPanelWindow:
+    def _register_external_panel_window(
+        self,
+        *,
+        dock_name: str,
+        title: str,
+        widget: Optional[QtWidgets.QWidget],
+        tooltip: str,
+        menu_windows: QtWidgets.QMenu,
+        main: QtWidgets.QMainWindow,
+        action_text: Optional[str] = None,
+    ) -> ExternalPanelWindow:
         name = str(dock_name)
         windows = dict(getattr(self, "_external_windows", {}) or {})
         if name in windows:
             return windows[name]
 
-        window = ExternalPanelWindow(dock_name=name, title=title, widget=widget, tooltip=tooltip)
+        # Register the top-level host without stealing the live widget from the docked
+        # layout. The panel is moved into this window only when explicit detach is used.
+        window = ExternalPanelWindow(dock_name=name, title=title, widget=None, tooltip=tooltip)
         try:
             if widget is not None:
                 window.resize(max(820, int(widget.sizeHint().width() or 0)), max(520, int(widget.sizeHint().height() or 0)))
@@ -12060,7 +17259,7 @@ class CockpitWidget(QtWidgets.QWidget):
         except Exception:
             pass
 
-        action = QtGui.QAction(title, main)
+        action = QtGui.QAction(str(action_text or title), main)
         action.setCheckable(True)
         action.setChecked(False)
         action.toggled.connect(lambda checked, _name=name: self._set_external_panel_visible(_name, bool(checked)))
@@ -12192,9 +17391,9 @@ class CockpitWidget(QtWidgets.QWidget):
         span_w = max(1080, int(avail.width() - 2 * margin))
         span_h = max(760, int(avail.height() - 2 * margin))
 
-        # Screen-aware tiling: 4 columns x 5 rows, with a larger dedicated 3D window.
+        # Screen-aware tiling: 4 columns x 6 rows, with a larger dedicated 3D window.
         grid_cols = 4
-        grid_rows = 5
+        grid_rows = 6
         cell_w = max(int(250 * ui_scale), int((span_w - gap * (grid_cols - 1)) / grid_cols))
         cell_h = max(int(146 * ui_scale), int((span_h - gap * (grid_rows - 1)) / grid_rows))
         default_layout = {
@@ -12208,12 +17407,13 @@ class CockpitWidget(QtWidgets.QWidget):
             "dock_heatmap": (2, 2, 1, 1),
             "dock_corner_quick": (2, 3, 1, 1),
             "dock_road_profile": (3, 0, 1, 1),
-            "dock_corner_table": (3, 1, 1, 1),
-            "dock_pressures": (3, 2, 1, 1),
-            "dock_flows": (3, 3, 1, 1),
-            "dock_valves": (4, 0, 1, 1),
-            "dock_trends": (4, 1, 1, 1),
-            "dock_timeline": (4, 2, 1, 2),
+            "dock_multifactor": (3, 1, 1, 2),
+            "dock_corner_table": (3, 3, 1, 1),
+            "dock_pressures": (4, 0, 1, 1),
+            "dock_flows": (4, 1, 1, 1),
+            "dock_valves": (4, 2, 1, 1),
+            "dock_trends": (4, 3, 1, 1),
+            "dock_timeline": (5, 0, 1, 4),
         }
 
         for name, dock in docks.items():
@@ -12618,6 +17818,7 @@ class CockpitWidget(QtWidgets.QWidget):
             getattr(self, "telemetry_heatmap", None),
             getattr(self, "telemetry_corner_quick", None),
             getattr(self, "telemetry_road_profile", None),
+            getattr(self, "telemetry_multifactor", None),
             getattr(self, "telemetry_corner_table", None),
             getattr(self, "telemetry_press_panel", None),
             getattr(self, "telemetry_flow_panel", None),
@@ -12879,6 +18080,7 @@ class CockpitWidget(QtWidgets.QWidget):
             ("dock_heatmap", getattr(self, "telemetry_heatmap", None), "update_frame"),
             ("dock_corner_quick", getattr(self, "telemetry_corner_quick", None), "update_frame"),
             ("dock_road_profile", getattr(self, "telemetry_road_profile", None), "update_frame"),
+            ("dock_multifactor", getattr(self, "telemetry_multifactor", None), "update_frame"),
             ("dock_corner_table", getattr(self, "telemetry_corner_table", None), "update_frame"),
             ("dock_pressures", getattr(self, "telemetry_press_panel", None), "update_frame"),
             ("dock_flows", getattr(self, "telemetry_flow_panel", None), "update_frame"),
@@ -12898,6 +18100,7 @@ class CockpitWidget(QtWidgets.QWidget):
             getattr(self, "telemetry_heatmap", None),
             getattr(self, "telemetry_corner_quick", None),
             getattr(self, "telemetry_corner_table", None),
+            getattr(self, "telemetry_multifactor", None),
             getattr(self, "telemetry_press_panel", None),
             getattr(self, "telemetry_flow_panel", None),
             getattr(self, "telemetry_valve_panel", None),
@@ -13000,6 +18203,7 @@ class CockpitWidget(QtWidgets.QWidget):
             ("dock_heatmap", getattr(self, "telemetry_heatmap", None), "update_frame"),
             ("dock_corner_quick", getattr(self, "telemetry_corner_quick", None), "update_frame"),
             ("dock_road_profile", getattr(self, "telemetry_road_profile", None), "update_frame"),
+            ("dock_multifactor", getattr(self, "telemetry_multifactor", None), "update_frame"),
             ("dock_corner_table", getattr(self, "telemetry_corner_table", None), "update_frame"),
             ("dock_pressures", getattr(self, "telemetry_press_panel", None), "update_frame"),
             ("dock_flows", getattr(self, "telemetry_flow_panel", None), "update_frame"),
@@ -13023,6 +18227,7 @@ class CockpitWidget(QtWidgets.QWidget):
                 *slow_panels,
             ]
         road_profile_panel = getattr(self, "telemetry_road_profile", None)
+        multifactor_panel = getattr(self, "telemetry_multifactor", None)
         heatmap_panel = getattr(self, "telemetry_heatmap", None)
         corner_quick_panel = getattr(self, "telemetry_corner_quick", None)
         corner_table_panel = getattr(self, "telemetry_corner_table", None)
@@ -13039,6 +18244,7 @@ class CockpitWidget(QtWidgets.QWidget):
             heatmap_panel,
             corner_quick_panel,
             corner_table_panel,
+            multifactor_panel,
             pressure_panel,
             flow_panel,
             valve_panel,
@@ -13145,6 +18351,12 @@ class CockpitWidget(QtWidgets.QWidget):
                 road_profile_panel,
                 lambda: road_profile_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
             )
+        if interactive_scrub and multifactor_panel is not None and self._dock_is_exposed("dock_multifactor"):
+            _call_aux_widget(
+                "dock_multifactor",
+                multifactor_panel,
+                lambda: multifactor_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
+            )
         if interactive_scrub and self._dock_is_exposed("dock_trends"):
             _call_aux_widget(
                 "dock_trends",
@@ -13237,7 +18449,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Persistent UI state (window geometry + (future) dock layout + a few runtime toggles)
         # On Windows this is stored in registry (good for "settings must not disappear").
         self._settings = QtCore.QSettings("UnifiedPneumoApp", "DesktopAnimator")
-        self._dock_layout_version = "r31cn_continuous_sampling_gl_native_v2"
+        self._dock_layout_version = "r31cz_multifactor_insight_dock_v1"
         self._first_show_layout_pending = True
 
         self._timer = QtCore.QTimer(self)
