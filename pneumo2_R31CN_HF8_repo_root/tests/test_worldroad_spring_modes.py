@@ -25,6 +25,7 @@ def test_worldroad_spring_pchip_per_corner_smoke():
     )
 
     assert int(df_atm.loc[0, 'mech_selfcheck_ok']) == 1
+    assert df_atm.loc[0, 'spring_static_mode'] == 'auto_midstroke_static'
 
     # Должны появиться расширенные метрики геометрии
     assert float(df_atm.loc[0, 'mech_selfcheck_err_wheel_contact_m']) <= 1e-9

@@ -57,6 +57,38 @@ def test_gas_stiffness_from_geometry_midstroke_symmetry():
     assert abs(k - expected) / expected < 1e-12
 
 
+def test_gas_stiffness_from_geometry_accepts_asymmetric_dead_volumes():
+    from pneumo_solver_ui.pneumo_gas_stiffness import gas_stiffness_axial_from_geometry
+
+    P = 320000.0
+    n = 1.35
+    stroke = 0.22
+    s_ref = 0.08
+    A_cap = 1.1e-2
+    A_rod = 8.4e-3
+    V_cap_dead = 1.8e-5
+    V_rod_dead = 2.7e-5
+
+    k = gas_stiffness_axial_from_geometry(
+        p_ref_abs_Pa=P,
+        A_cap_m2=A_cap,
+        A_rod_m2=A_rod,
+        stroke_m=stroke,
+        V_dead_m3=1e-9,
+        V_cap_dead_m3=V_cap_dead,
+        V_rod_dead_m3=V_rod_dead,
+        s_ref_m=s_ref,
+        n_poly=n,
+        volume_factor=1.0,
+    )
+
+    V_cap = V_cap_dead + A_cap * s_ref
+    V_rod = V_rod_dead + A_rod * (stroke - s_ref)
+    expected = n * P * (A_cap**2 / V_cap + A_rod**2 / V_rod)
+    assert math.isfinite(k)
+    assert abs(k - expected) / expected < 1e-12
+
+
 def test_p_abs_from_param_threshold_behavior():
     from pneumo_solver_ui.pneumo_gas_stiffness import p_abs_from_param
 
@@ -67,6 +99,28 @@ def test_p_abs_from_param_threshold_behavior():
 
     # Large numbers are assumed to be absolute (pass-through)
     assert p_abs_from_param(200000.0, p_atm_Pa=P_ATM) == 200000.0
+
+
+def test_p_abs_from_param_parses_engineering_unit_strings():
+    from pneumo_solver_ui.pneumo_gas_stiffness import p_abs_from_param
+
+    P_ATM = 101325.0
+    assert p_abs_from_param('2.0bar', p_atm_Pa=P_ATM) == 200000.0
+    assert p_abs_from_param('5 barg', p_atm_Pa=P_ATM) == P_ATM + 500000.0
+    assert p_abs_from_param('450kPa', p_atm_Pa=P_ATM) == 450000.0
+    assert p_abs_from_param('0.8MPa', p_atm_Pa=P_ATM) == 800000.0
+    assert p_abs_from_param('1atm', p_atm_Pa=P_ATM) == P_ATM
+
+
+def test_p_abs_from_param_parses_pressure_mappings_and_plain_numeric_strings():
+    from pneumo_solver_ui.pneumo_gas_stiffness import p_abs_from_param
+
+    P_ATM = 101325.0
+    assert p_abs_from_param({'abs_bar': 2.0}, p_atm_Pa=P_ATM) == 200000.0
+    assert p_abs_from_param({'barg': 5.0}, p_atm_Pa=P_ATM) == P_ATM + 500000.0
+    assert p_abs_from_param({'value': 0.75, 'unit': 'MPa'}, p_atm_Pa=P_ATM) == 750000.0
+    assert p_abs_from_param('1000', p_atm_Pa=P_ATM) == P_ATM + 1000.0
+    assert p_abs_from_param('200000', p_atm_Pa=P_ATM) == 200000.0
 
 
 def test_volume_factor_scales_inverse():
@@ -81,4 +135,3 @@ def test_volume_factor_scales_inverse():
     k2 = gas_stiffness_axial_double(P, P, A, A, V, V, n_poly=n, volume_factor=2.0)
     assert k2 > 0.0
     assert abs(k2 - 0.5 * k1) / k1 < 1e-12
-

@@ -4,10 +4,12 @@ from pathlib import Path
 
 import numpy as np
 
+from pneumo_solver_ui.suspension_family_contract import cylinder_axle_geometry_key, cylinder_precharge_key
 from pneumo_solver_ui.suspension_family_runtime import (
     build_spring_family_runtime_snapshot,
     normalize_spring_attachment_mode,
     resolve_cylinder_corner_geometry,
+    resolve_cylinder_precharge_policy,
     resolve_spring_corner_geometry,
     split_dual_spring_force_target,
     spring_family_active_flag_column,
@@ -42,8 +44,76 @@ def test_resolve_cylinder_corner_geometry_uses_family_keys_and_legacy_stroke_ali
     assert np.all(geom["cap_area_m2"] > geom["rod_area_m2"])
 
 
+def test_resolve_cylinder_corner_geometry_exposes_contract_dead_lengths_and_volumes() -> None:
+    params = {
+        "диаметр_поршня_Ц1": 0.031,
+        "диаметр_штока_Ц1": 0.015,
+        "ход_штока": 0.25,
+        cylinder_axle_geometry_key("dead_cap_length_m", "Ц1", "перед"): 0.011,
+        cylinder_axle_geometry_key("dead_rod_length_m", "Ц1", "перед"): 0.019,
+        cylinder_axle_geometry_key("body_length_m", "Ц1", "перед"): 0.280,
+        cylinder_axle_geometry_key("dead_cap_length_m", "Ц1", "зад"): 0.012,
+        cylinder_axle_geometry_key("dead_rod_length_m", "Ц1", "зад"): 0.021,
+        cylinder_axle_geometry_key("body_length_m", "Ц1", "зад"): 0.295,
+    }
+
+    geom = resolve_cylinder_corner_geometry(
+        params,
+        "Ц1",
+        default_bore=0.032,
+        default_rod=0.016,
+        default_stroke=0.25,
+    )
+
+    np.testing.assert_allclose(geom["dead_cap_length_m"], [0.011, 0.011, 0.012, 0.012])
+    np.testing.assert_allclose(geom["dead_rod_length_m"], [0.019, 0.019, 0.021, 0.021])
+    np.testing.assert_allclose(geom["body_length_m"], [0.280, 0.280, 0.295, 0.295])
+    np.testing.assert_allclose(geom["dead_cap_volume_m3"], geom["cap_area_m2"] * geom["dead_cap_length_m"])
+    np.testing.assert_allclose(geom["dead_rod_volume_m3"], geom["rod_area_m2"] * geom["dead_rod_length_m"])
+
+
+def test_resolve_cylinder_corner_geometry_falls_back_to_shared_dead_volume() -> None:
+    shared_dead_volume = 18e-6
+    params = {
+        "диаметр_поршня_Ц2": 0.05,
+        "диаметр_штока_Ц2": 0.014,
+        "ход_штока": 0.24,
+        "dead_volume_chamber_m3": shared_dead_volume,
+    }
+
+    geom = resolve_cylinder_corner_geometry(
+        params,
+        "Ц2",
+        default_bore=0.05,
+        default_rod=0.014,
+        default_stroke=0.24,
+    )
+
+    np.testing.assert_allclose(geom["dead_cap_volume_m3"], np.full(4, shared_dead_volume))
+    np.testing.assert_allclose(geom["dead_rod_volume_m3"], np.full(4, shared_dead_volume))
+    np.testing.assert_allclose(geom["dead_cap_length_m"], shared_dead_volume / geom["cap_area_m2"])
+    np.testing.assert_allclose(geom["dead_rod_length_m"], shared_dead_volume / geom["rod_area_m2"])
+
+
+def test_resolve_cylinder_precharge_policy_uses_family_keys_and_shared_fallback() -> None:
+    params = {
+        cylinder_precharge_key("Ц1", "CAP", "перед"): "2.2bar",
+        cylinder_precharge_key("Ц1", "CAP", "зад"): {"abs_bar": 2.1},
+        "cyl2_rod_precharge_pa": 185000.0,
+    }
+
+    policy = resolve_cylinder_precharge_policy(params, p_atm_Pa=101325.0)
+
+    assert set(policy.keys()) == {"C1", "C2"}
+    assert np.isclose(policy["C1"]["CAP"]["front"], 220000.0)
+    assert np.isclose(policy["C1"]["CAP"]["rear"], 210000.0)
+    assert np.isclose(policy["C2"]["ROD"]["front"], 185000.0)
+    assert np.isclose(policy["C2"]["ROD"]["rear"], 185000.0)
+
+
 def test_resolve_spring_corner_geometry_tracks_active_family() -> None:
     params = {
+        "spring_static_mode": "manual",
         "пружина_масштаб": 1.0,
         "пружина_длина_свободная_м": 0.30,
         "пружина_преднатяг_на_отбое_минимум_м": 0.01,
@@ -64,6 +134,7 @@ def test_resolve_spring_corner_geometry_tracks_active_family() -> None:
     np.testing.assert_allclose(spring_c2["scale"], [1.3, 1.3, 1.4, 1.4])
     np.testing.assert_allclose(spring_c2["free_length_m"], [0.31, 0.31, 0.33, 0.33])
     np.testing.assert_allclose(spring_c2["rebound_preload_min_m"], [0.02, 0.02, 0.03, 0.03])
+    assert spring_c2["static_mode"] == "manual"
     np.testing.assert_allclose(spring_c1["scale"], [1.1, 1.1, 1.2, 1.2])
     np.testing.assert_allclose(spring_delta["scale"], [1.0, 1.0, 1.0, 1.0])
 
@@ -137,11 +208,13 @@ def test_solver_sources_use_family_runtime_helpers() -> None:
     export = (root / "pneumo_solver_ui" / "anim_export_contract.py").read_text(encoding="utf-8")
 
     assert "resolve_cylinder_corner_geometry" in camozzi
+    assert "resolve_cylinder_precharge_policy" in camozzi
     assert "resolve_spring_corner_geometry" in camozzi
     assert "масштаб_пружины_vec" in camozzi
     assert "spring_family_runtime_series_template" in camozzi
     assert "build_spring_family_runtime_snapshot" in camozzi
     assert "resolve_cylinder_corner_geometry" in worldroad
+    assert "resolve_cylinder_precharge_policy" in worldroad
     assert "resolve_spring_corner_geometry" in worldroad
     assert "spring_mode == 'c2'" in worldroad
     assert "spring_family_runtime_series_template" in worldroad

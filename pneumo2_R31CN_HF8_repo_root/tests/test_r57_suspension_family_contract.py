@@ -8,6 +8,7 @@ from pneumo_solver_ui.suspension_family_contract import (
     SPRING_STATIC_MODE_KEY,
     SPRING_STATIC_MODE_MANUAL,
     cylinder_family_key,
+    cylinder_precharge_key,
     family_param_description,
     family_param_meta,
     normalize_component_family_contract,
@@ -118,3 +119,13 @@ def test_family_param_descriptions_are_human_readable() -> None:
     assert "независимый тип" in meta["описание"]
     assert "семейства" in family_param_description(spr_key)
     assert "семейства" in param_desc(spr_key)
+
+
+def test_precharge_family_param_meta_is_pressure_aware() -> None:
+    precharge_key = cylinder_precharge_key("Ц1", "CAP", "перед")
+
+    meta = family_param_meta(precharge_key)
+
+    assert meta is not None
+    assert meta["kind"] == "pressure_kPa_abs"
+    assert "предзаряд" in meta["описание"]

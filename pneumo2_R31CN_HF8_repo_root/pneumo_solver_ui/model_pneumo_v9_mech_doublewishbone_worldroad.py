@@ -79,10 +79,24 @@ except Exception:
     from spring_table import spring_force, spring_inverse_force
 
 try:
+    from .precharge_policy import (
+        apply_precharge_policy_to_nodes,
+        build_precharge_policy_from_node_pressures,
+        merge_nested_mapping,
+    )
+except Exception:
+    from precharge_policy import (
+        apply_precharge_policy_to_nodes,
+        build_precharge_policy_from_node_pressures,
+        merge_nested_mapping,
+    )
+
+try:
     from .suspension_family_runtime import (
         build_spring_family_runtime_snapshot,
         normalize_spring_attachment_mode,
         resolve_cylinder_corner_geometry,
+        resolve_cylinder_precharge_policy,
         resolve_spring_corner_geometry,
         split_dual_spring_force_target,
         spring_family_mode_id,
@@ -93,6 +107,7 @@ except Exception:
         build_spring_family_runtime_snapshot,
         normalize_spring_attachment_mode,
         resolve_cylinder_corner_geometry,
+        resolve_cylinder_precharge_policy,
         resolve_spring_corner_geometry,
         split_dual_spring_force_target,
         spring_family_mode_id,
@@ -530,12 +545,35 @@ def build_network_full(params: dict):
     add_node('узел_после_ОК_Pmin', 'fixed', V_line)
     add_node('узел_после_рег_заряд_аккумулятора', 'fixed', V_line)
 
-    V0_ch = params.get('мёртвый_объём_камеры', 15e-6)
+    V0_ch = float(params.get('мёртвый_объём_камеры', params.get('dead_volume_chamber_m3', 15e-6)))
+    cylinder_stroke_default = float(params.get('ход_штока', 0.250))
+    cyl1_chamber_geom = resolve_cylinder_corner_geometry(
+        params,
+        'Ц1',
+        default_bore=0.032,
+        default_rod=0.016,
+        default_stroke=cylinder_stroke_default,
+        default_dead_volume_m3=V0_ch,
+    )
+    cyl2_chamber_geom = resolve_cylinder_corner_geometry(
+        params,
+        'Ц2',
+        default_bore=0.050,
+        default_rod=0.014,
+        default_stroke=cylinder_stroke_default,
+        default_dead_volume_m3=V0_ch,
+    )
+    C1_cap_dead_volume_m3 = np.asarray(cyl1_chamber_geom['dead_cap_volume_m3'], dtype=float)
+    C1_rod_dead_volume_m3 = np.asarray(cyl1_chamber_geom['dead_rod_volume_m3'], dtype=float)
+    C2_cap_dead_volume_m3 = np.asarray(cyl2_chamber_geom['dead_cap_volume_m3'], dtype=float)
+    C2_rod_dead_volume_m3 = np.asarray(cyl2_chamber_geom['dead_rod_volume_m3'], dtype=float)
+    corner_index_by_name = {name: idx for idx, name in enumerate(corner_order)}
     for c in corner_order:
-        add_node(f'Ц1_{c}_БП', 'chamber', V0_ch, corner=c, chamber='CAP', cyl='C1')
-        add_node(f'Ц1_{c}_ШП', 'chamber', V0_ch, corner=c, chamber='ROD', cyl='C1')
-        add_node(f'Ц2_{c}_БП', 'chamber', V0_ch, corner=c, chamber='CAP', cyl='C2')
-        add_node(f'Ц2_{c}_ШП', 'chamber', V0_ch, corner=c, chamber='ROD', cyl='C2')
+        cidx = int(corner_index_by_name[c])
+        add_node(f'Ц1_{c}_БП', 'chamber', float(C1_cap_dead_volume_m3[cidx]), corner=c, chamber='CAP', cyl='C1')
+        add_node(f'Ц1_{c}_ШП', 'chamber', float(C1_rod_dead_volume_m3[cidx]), corner=c, chamber='ROD', cyl='C1')
+        add_node(f'Ц2_{c}_БП', 'chamber', float(C2_cap_dead_volume_m3[cidx]), corner=c, chamber='CAP', cyl='C2')
+        add_node(f'Ц2_{c}_ШП', 'chamber', float(C2_rod_dead_volume_m3[cidx]), corner=c, chamber='ROD', cyl='C2')
 
     add_node('Магистраль_ЛП2_ПЗ2', 'fixed', V_line)
     add_node('Магистраль_ПП2_ЛЗ2', 'fixed', V_line)
@@ -1280,12 +1318,14 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 sref_frac = float(np.clip(sref_frac, 0.0, 1.0))
 
                 # Cylinder geometry
+                V_dead = float(params.get('мёртвый_объём_камеры', params.get('dead_volume_chamber_m3', params.get('corner_pneumo_dead_volume_m3', 15e-6))))
                 cyl1_geom = resolve_cylinder_corner_geometry(
                     params,
                     'Ц1',
                     default_bore=0.032,
                     default_rod=0.016,
                     default_stroke=float(params.get('ход_штока', 0.250)),
+                    default_dead_volume_m3=V_dead,
                 )
                 cyl2_geom = resolve_cylinder_corner_geometry(
                     params,
@@ -1293,13 +1333,17 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                     default_bore=0.050,
                     default_rod=0.014,
                     default_stroke=float(params.get('ход_штока', 0.250)),
+                    default_dead_volume_m3=V_dead,
                 )
-                V_dead = float(params.get('мёртвый_объём_камеры', params.get('corner_pneumo_dead_volume_m3', 15e-6)))
 
                 A1_cap = np.asarray(cyl1_geom['cap_area_m2'], dtype=float)
                 A1_rod = np.asarray(cyl1_geom['rod_area_m2'], dtype=float)
                 A2_cap = np.asarray(cyl2_geom['cap_area_m2'], dtype=float)
                 A2_rod = np.asarray(cyl2_geom['rod_area_m2'], dtype=float)
+                V1_cap_dead = np.asarray(cyl1_geom['dead_cap_volume_m3'], dtype=float)
+                V1_rod_dead = np.asarray(cyl1_geom['dead_rod_volume_m3'], dtype=float)
+                V2_cap_dead = np.asarray(cyl2_geom['dead_cap_volume_m3'], dtype=float)
+                V2_rod_dead = np.asarray(cyl2_geom['dead_rod_volume_m3'], dtype=float)
                 stroke_C1 = np.asarray(cyl1_geom['stroke_m'], dtype=float)
                 stroke_C2 = np.asarray(cyl2_geom['stroke_m'], dtype=float)
 
@@ -1313,8 +1357,10 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                         p_ref_abs_Pa=float(P_ref_abs),
                         A_cap_m2=float(A1_cap[i]),
                         A_rod_m2=float(A1_rod[i]),
-                        V_dead_m3=float(V_dead),
                         stroke_m=float(stroke_C1[i]),
+                        V_dead_m3=float(V_dead),
+                        V_cap_dead_m3=float(V1_cap_dead[i]),
+                        V_rod_dead_m3=float(V1_rod_dead[i]),
                         s_ref_m=float(s1_ref),
                         n_poly=float(n_poly),
                         volume_factor=float(vol_factor),
@@ -1323,8 +1369,10 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                         p_ref_abs_Pa=float(P_ref_abs),
                         A_cap_m2=float(A2_cap[i]),
                         A_rod_m2=float(A2_rod[i]),
-                        V_dead_m3=float(V_dead),
                         stroke_m=float(stroke_C2[i]),
+                        V_dead_m3=float(V_dead),
+                        V_cap_dead_m3=float(V2_cap_dead[i]),
+                        V_rod_dead_m3=float(V2_rod_dead[i]),
                         s_ref_m=float(s2_ref),
                         n_poly=float(n_poly),
                         volume_factor=float(vol_factor),
@@ -1339,6 +1387,11 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                     'volume_factor': float(vol_factor),
                     'scale': float(k_scale),
                     's_ref_frac': float(sref_frac),
+                    'V_dead_default_m3': float(V_dead),
+                    'V_cap_dead_C1_m3': [float(x) for x in V1_cap_dead],
+                    'V_rod_dead_C1_m3': [float(x) for x in V1_rod_dead],
+                    'V_cap_dead_C2_m3': [float(x) for x in V2_cap_dead],
+                    'V_rod_dead_C2_m3': [float(x) for x in V2_rod_dead],
                     'k_ax_C1_N_m': [float(x) for x in k_ax_C1],
                     'k_ax_C2_N_m': [float(x) for x in k_ax_C2],
                     'k_pneumo_wheel_N_m': [float(x) for x in k_pneumo_wheel],
@@ -1444,6 +1497,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         default_rebound_preload_min=float(params.get('пружина_преднатяг_на_отбое_минимум_м', 0.01)),
         default_coil_bind_margin_min=0.0,
     )
+    spring_static_mode = str(spring_family.get('static_mode', 'auto_midstroke_static'))
     масштаб_пружины = float(np.mean(np.asarray(spring_family['scale'], dtype=float)))
     масштаб_пружины_vec = np.asarray(spring_family['scale'], dtype=float)
     масштаб_пружины_vec_C1 = np.asarray(spring_family_c1['scale'], dtype=float)
@@ -1576,6 +1630,50 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     for name in ['узел_после_предохран_Pmax','узел_после_рег_Pmid','узел_после_ОК_Pmid','узел_после_рег_Pmin_сброс','узел_после_ОК_Pmin','узел_после_рег_заряд_аккумулятора']:
         p0[node_index[name]] = P_ATM
     p0[node_index['узел_после_рег_Pmin_питание_Р2']] = Pmin_abs
+
+    try:
+        from .pneumo_gas_stiffness import p_abs_from_param as _p_abs_from_param_p0
+    except Exception:
+        from pneumo_gas_stiffness import p_abs_from_param as _p_abs_from_param_p0
+
+    precharge_override_report = None
+    precharge_override_policy = {}
+    family_precharge_policy = resolve_cylinder_precharge_policy(
+        params,
+        p_atm_Pa=float(P_ATM),
+    )
+    explicit_precharge_override = params.get('precharge_override', params.get('предзаряд_цилиндров', None))
+    precharge_override = merge_nested_mapping(
+        family_precharge_policy,
+        explicit_precharge_override if isinstance(explicit_precharge_override, dict) else {},
+    )
+    if isinstance(precharge_override, dict) and precharge_override:
+        try:
+            precharge_node_override, precharge_override_policy, precharge_override_report = apply_precharge_policy_to_nodes(
+                precharge_override,
+                nodes=nodes,
+                parse_abs_pressure=lambda raw: _p_abs_from_param_p0(raw, p_atm_Pa=float(P_ATM)),
+            )
+            precharge_override_report['family_policy'] = dict(family_precharge_policy)
+            precharge_override_report['explicit_policy'] = (
+                dict(explicit_precharge_override) if isinstance(explicit_precharge_override, dict) else {}
+            )
+            precharge_override_report['merged_policy'] = dict(precharge_override)
+            for nm, p_abs in precharge_node_override.items():
+                if nm == 'АТМ':
+                    continue
+                if nm in node_index:
+                    p0[node_index[nm]] = float(p_abs)
+            p0[node_index['АТМ']] = P_ATM
+        except Exception as _precharge_ex:
+            precharge_override_report = {
+                'family_policy': dict(family_precharge_policy),
+                'explicit_policy': dict(explicit_precharge_override) if isinstance(explicit_precharge_override, dict) else {},
+                'merged_policy': dict(precharge_override),
+                'normalized_policy': {},
+                'applied': [],
+                'errors': [{'error': repr(_precharge_ex)[:120]}],
+            }
 
     # --- Optional override: p0_override (dict: pattern->pressure) ---
     # Применяется ПОСЛЕ базовой инициализации p0.
@@ -2812,6 +2910,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             'node_index': dict(node_index),
             'spring_x0_m': np.asarray(x0_vec, dtype=float),
             'spring_interp_mode': str(spring_interp_mode),
+            'spring_static_mode': str(spring_static_mode),
             'spring_x0_mode': str(spring_x0_mode_eff),
         }
 
@@ -2827,11 +2926,44 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     static_trim_applied = False
     static_trim_acc0 = None
     static_trim_acc = None
+    static_trim_residual_improved = False
+    static_trim_midstroke_err0_max_m = float('nan')
+    static_trim_midstroke_err_max_m = float('nan')
+    static_trim_body_height_err0_max_m = float('nan')
+    static_trim_body_height_err_max_m = float('nan')
+    static_trim_spring_gap0_min_m = float('nan')
+    static_trim_spring_gap_min_m = float('nan')
+    static_trim_coil_margin0_min_m = float('nan')
+    static_trim_coil_margin_min_m = float('nan')
+    static_trim_pressure_trim_precharge_override = {}
+    static_trim_pressure_trim_p0_override = {}
+    try:
+        static_trim_pressure_trim_bootstrap_pass = int(params.get('_static_trim_pressure_trim_bootstrap_pass', 0))
+    except Exception:
+        static_trim_pressure_trim_bootstrap_pass = 0
+    if static_trim_pressure_trim_bootstrap_pass < 0:
+        static_trim_pressure_trim_bootstrap_pass = 0
+    static_trim_pressure_trim_bootstrap_applied = int(static_trim_pressure_trim_bootstrap_pass > 0)
+    static_trim_pressure_trim_bootstrap_requested = 0
+    static_trim_pressure_trim_bootstrap_source_json = str(params.get('_static_trim_pressure_trim_bootstrap_source_json', '') or '')
+    if static_trim_pressure_trim_bootstrap_source_json:
+        try:
+            static_trim_pressure_trim_precharge_override = json.loads(static_trim_pressure_trim_bootstrap_source_json)
+        except Exception:
+            static_trim_pressure_trim_precharge_override = {}
+    static_trim_pressure_trim_enable = 0
+    static_trim_pressure_trim_mode = 'off'
+    static_trim_pressure_trim_max_abs_scale_delta = float('nan')
+    static_trim_target_midstroke_enable = 0
+    static_trim_target_body_height_enable = 0
+    static_trim_target_spring_gap_enable = 0
+    static_trim_target_spring_coil_enable = 0
     try:
         static_trim_enable = bool(params.get('static_trim_enable', params.get('статический_трим', True)))
         static_trim_force = bool(params.get('static_trim_force', False))
         tol_lin = float(params.get('static_trim_tol_accel_m_s2', 1e-3))
         tol_rot = float(params.get('static_trim_tol_accel_rad_s2', 1e-3))
+        tol_body_height = float(params.get('static_trim_tol_body_height_m', 1e-3))
         max_nfev = int(params.get('static_trim_max_nfev', 80))
         # масштабы для least_squares (нормирование)
         acc_scale = float(params.get('static_trim_scale_accel', 1.0))
@@ -2840,15 +2972,175 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         acc_scale = max(1e-9, acc_scale)
         delta_scale = max(1e-9, delta_scale)
         ang_scale = max(1e-9, ang_scale)
+        static_trim_target_midstroke_enable = int(bool(params.get('static_trim_target_midstroke_enable', True)))
+        midstroke_scale = max(1e-9, float(params.get('static_trim_scale_midstroke_m', delta_scale)))
+        def _try_float(value: Any) -> float:
+            try:
+                return float(value)
+            except Exception:
+                return float('nan')
+
+        def _coerce_corner_target4(raw: Any) -> np.ndarray:
+            if raw is None:
+                return np.full(4, float('nan'), dtype=float)
+            if isinstance(raw, dict):
+                out = np.full(4, float('nan'), dtype=float)
+                all_value = _try_float(raw.get('value', raw.get('all', raw.get('target', None))))
+                if np.isfinite(all_value):
+                    out[:] = all_value
+                front_value = _try_float(raw.get('front', raw.get('перед', None)))
+                rear_value = _try_float(raw.get('rear', raw.get('зад', raw.get('rear_axle', None))))
+                if np.isfinite(front_value):
+                    out[0:2] = front_value
+                if np.isfinite(rear_value):
+                    out[2:4] = rear_value
+                corner_aliases = (
+                    ('LP', 'lp', 'ЛП', 'лп'),
+                    ('PP', 'pp', 'ПП', 'пп'),
+                    ('LZ', 'lz', 'ЛЗ', 'лз'),
+                    ('PZ', 'pz', 'ПЗ', 'пз'),
+                )
+                for idx, aliases in enumerate(corner_aliases):
+                    for alias in aliases:
+                        v = _try_float(raw.get(alias, None))
+                        if np.isfinite(v):
+                            out[idx] = v
+                            break
+                return out
+            if isinstance(raw, (list, tuple, np.ndarray)):
+                arr = np.asarray(raw, dtype=float).reshape(-1)
+                if arr.size == 4:
+                    return arr.astype(float)
+                if arr.size == 2:
+                    return np.array([arr[0], arr[0], arr[1], arr[1]], dtype=float)
+                if arr.size == 1:
+                    return np.full(4, float(arr[0]), dtype=float)
+                return np.full(4, float('nan'), dtype=float)
+            scalar = _try_float(raw)
+            if np.isfinite(scalar):
+                return np.full(4, scalar, dtype=float)
+            return np.full(4, float('nan'), dtype=float)
+
+        def _resolve_corner_target4(*roots: str) -> np.ndarray:
+            for root in roots:
+                direct_key = f'{root}_m'
+                if (direct_key in params) and (params.get(direct_key) is not None):
+                    return _coerce_corner_target4(params.get(direct_key))
+            out = np.full(4, float('nan'), dtype=float)
+            corner_suffixes = ('LP', 'PP', 'LZ', 'PZ')
+            corner_alt_suffixes = ('ЛП', 'ПП', 'ЛЗ', 'ПЗ')
+            for root in roots:
+                front_value = _try_float(params.get(f'{root}_front_m', None))
+                rear_value = _try_float(params.get(f'{root}_rear_m', None))
+                if np.isfinite(front_value):
+                    out[0:2] = front_value
+                if np.isfinite(rear_value):
+                    out[2:4] = rear_value
+                for idx, suffix in enumerate(corner_suffixes):
+                    v = _try_float(params.get(f'{root}_{suffix}_m', None))
+                    if np.isfinite(v):
+                        out[idx] = v
+                for idx, suffix in enumerate(corner_alt_suffixes):
+                    v = _try_float(params.get(f'{root}_{suffix}_м', None))
+                    if np.isfinite(v):
+                        out[idx] = v
+            return out
+
+        body_height_target_m = _resolve_corner_target4(
+            'static_trim_target_body_height',
+            'static_trim_target_ride_height',
+        )
+        body_height_target_finite = np.isfinite(body_height_target_m)
+        static_trim_target_body_height_enable = int(bool(params.get('static_trim_target_body_height_enable', np.any(body_height_target_finite))))
+        static_trim_target_spring_gap_enable = int(bool(params.get('static_trim_target_spring_gap_enable', False)))
+        static_trim_target_spring_coil_enable = int(bool(params.get('static_trim_target_spring_coil_enable', True)))
+        body_height_scale = max(1e-9, float(params.get('static_trim_scale_body_height_m', params.get('static_trim_scale_ride_height_m', delta_scale))))
+        spring_gap_scale = max(1e-9, float(params.get('static_trim_scale_spring_gap_m', delta_scale)))
+        spring_coil_scale = max(1e-9, float(params.get('static_trim_scale_spring_coil_m', delta_scale)))
+
+        def _finite_min_or_nan(values: np.ndarray) -> float:
+            arr = np.asarray(values, dtype=float).reshape(-1)
+            arr = arr[np.isfinite(arr)]
+            if arr.size == 0:
+                return float('nan')
+            return float(np.min(arr))
+
+        def _finite_max_abs_or_nan(values: np.ndarray) -> float:
+            arr = np.asarray(values, dtype=float).reshape(-1)
+            arr = arr[np.isfinite(arr)]
+            if arr.size == 0:
+                return float('nan')
+            return float(np.max(np.abs(arr)))
+
+        def _static_trim_metrics(st: np.ndarray) -> dict[str, np.ndarray | float]:
+            z = float(st[0]); phi = float(st[1]); theta = float(st[2])
+            zw = np.asarray(st[3:7], dtype=float)
+            zw_dot = np.zeros(4, dtype=float)
+            trim_pack = volumes(
+                z, phi, theta, zw, 0.0, 0.0, 0.0, zw_dot
+            )
+            delta = np.asarray(trim_pack[2], dtype=float)
+            z_body = np.asarray(trim_pack[3], dtype=float)
+            s_c1 = np.asarray(trim_pack[6], dtype=float)
+            s_c2 = np.asarray(trim_pack[7], dtype=float)
+            ds1_ddelta = np.asarray(trim_pack[12], dtype=float)
+            ds2_ddelta = np.asarray(trim_pack[13], dtype=float)
+            z_road_raw = road_func(0.0)
+            if isinstance(z_road_raw, (tuple, list)) and len(z_road_raw) == 2:
+                z_road_raw = z_road_raw[0]
+            z_road = np.asarray(z_road_raw, dtype=float).reshape(-1)
+            if z_road.size == 1:
+                z_road = np.full(4, float(z_road[0]), dtype=float)
+            elif z_road.size != 4:
+                z_road = np.full(4, float('nan'), dtype=float)
+            body_height = z_body - z_road
+            spring_state = _build_spring_runtime_state(delta, s_c1, s_c2, ds1_ddelta, ds2_ddelta)
+            gap = np.full(4, np.nan, dtype=float)
+            coil = np.asarray(spring_state.get('coil_bind_margin_m', np.full(4, np.nan, dtype=float)), dtype=float)
+            mid_err_c1 = s_c1 - np.asarray(s0_C1, dtype=float)
+            mid_err_c2 = s_c2 - np.asarray(s0_C2, dtype=float)
+            body_height_err = np.where(body_height_target_finite, body_height - body_height_target_m, np.nan)
+            return {
+                'delta_m': delta,
+                'midstroke_err_c1_m': mid_err_c1,
+                'midstroke_err_c2_m': mid_err_c2,
+                'body_height_m': body_height,
+                'body_height_err_m': body_height_err,
+                'gap_to_cap_m': gap,
+                'coil_bind_margin_m': coil,
+                'max_abs_midstroke_err_m': _finite_max_abs_or_nan(np.concatenate([mid_err_c1, mid_err_c2])),
+                'max_abs_body_height_err_m': _finite_max_abs_or_nan(body_height_err),
+                'min_gap_to_cap_m': _finite_min_or_nan(gap),
+                'min_coil_bind_margin_m': _finite_min_or_nan(coil),
+            }
 
         # Оценка качества статики (без трима)
         d0 = rhs(state0.copy(), 0.0)
         acc0 = np.asarray(d0[7:14], dtype=float)
         static_trim_acc0 = acc0.copy()
+        base_trim_metrics = _static_trim_metrics(state0.copy())
+        static_trim_midstroke_err0_max_m = float(base_trim_metrics['max_abs_midstroke_err_m'])
+        static_trim_midstroke_err_max_m = float(static_trim_midstroke_err0_max_m)
+        static_trim_body_height_err0_max_m = float(base_trim_metrics['max_abs_body_height_err_m'])
+        static_trim_body_height_err_max_m = float(static_trim_body_height_err0_max_m)
+        static_trim_spring_gap0_min_m = float(base_trim_metrics['min_gap_to_cap_m'])
+        static_trim_spring_gap_min_m = float(static_trim_spring_gap0_min_m)
+        static_trim_coil_margin0_min_m = float(base_trim_metrics['min_coil_bind_margin_m'])
+        static_trim_coil_margin_min_m = float(static_trim_coil_margin0_min_m)
         acc_lin_max = float(max(abs(acc0[0]), float(np.max(np.abs(acc0[3:])))))
         acc_rot_max = float(max(abs(acc0[1]), abs(acc0[2])))
 
-        need_trim = static_trim_enable and (static_trim_force or (acc_lin_max > tol_lin) or (acc_rot_max > tol_rot))
+        need_height_trim = bool(
+            static_trim_target_body_height_enable
+            and np.isfinite(static_trim_body_height_err0_max_m)
+            and (static_trim_body_height_err0_max_m > tol_body_height)
+        )
+        need_trim = static_trim_enable and (
+            static_trim_force
+            or need_height_trim
+            or (acc_lin_max > tol_lin)
+            or (acc_rot_max > tol_rot)
+        )
 
         if need_trim:
             try:
@@ -2883,15 +3175,68 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             static_trim_pneumo_mode = str(params.get('static_trim_pneumo_mode', 'pressure')).strip().lower()
             if static_trim_pneumo_mode not in ('pressure', 'mass', 'polytropic'):
                 static_trim_pneumo_mode = 'pressure'
+            static_trim_pressure_trim_mode = str(params.get('static_trim_pressure_trim_mode', 'per_corner')).strip().lower()
+            static_trim_pressure_trim_enable = int(bool(params.get('static_trim_pressure_trim_enable', False)))
+            if (not static_trim_pressure_trim_enable) or (static_trim_pneumo_mode != 'pressure'):
+                static_trim_pressure_trim_mode = 'off'
+            elif static_trim_pressure_trim_mode not in ('global', 'per_axle', 'per_corner'):
+                static_trim_pressure_trim_mode = 'per_corner'
+            pressure_trim_dim = {
+                'off': 0,
+                'global': 1,
+                'per_axle': 2,
+                'per_corner': 4,
+            }.get(static_trim_pressure_trim_mode, 0)
+            pressure_trim_reg_scale = max(1e-9, float(params.get('static_trim_pressure_trim_reg_scale', 2.0)))
+            pressure_trim_min_scale = float(params.get('static_trim_pressure_trim_min_scale', 0.25))
+            pressure_trim_max_scale = float(params.get('static_trim_pressure_trim_max_scale', 8.0))
+            if pressure_trim_max_scale < pressure_trim_min_scale:
+                pressure_trim_min_scale, pressure_trim_max_scale = pressure_trim_max_scale, pressure_trim_min_scale
+            pressure_trim_x0 = np.ones(pressure_trim_dim, dtype=float)
+            pressure_trim_lb = np.full(pressure_trim_dim, pressure_trim_min_scale, dtype=float)
+            pressure_trim_ub = np.full(pressure_trim_dim, pressure_trim_max_scale, dtype=float)
+
+            def _decode_pressure_trim(trim_x: np.ndarray) -> np.ndarray:
+                trim_x = np.asarray(trim_x, dtype=float).reshape(-1)
+                if static_trim_pressure_trim_mode == 'global' and trim_x.size >= 1:
+                    return np.full(4, float(trim_x[0]), dtype=float)
+                if static_trim_pressure_trim_mode == 'per_axle' and trim_x.size >= 2:
+                    return np.array([trim_x[0], trim_x[0], trim_x[1], trim_x[1]], dtype=float)
+                if static_trim_pressure_trim_mode == 'per_corner' and trim_x.size >= 4:
+                    return trim_x[:4].astype(float)
+                return np.ones(4, dtype=float)
+
+            def _build_pressure_trim_p0_override(corner_scale: np.ndarray) -> dict[str, float]:
+                out: dict[str, float] = {}
+                if chamber_indices.size <= 0:
+                    return out
+                corner_scale = np.asarray(corner_scale, dtype=float).reshape(4,)
+                for node_idx, corner_idx in zip(np.asarray(chamber_indices, dtype=int), np.asarray(chamber_corner, dtype=int)):
+                    node_name = nodes[int(node_idx)].name
+                    p_abs = max(P_ATM, float(p0[int(node_idx)]) * float(corner_scale[int(corner_idx)]))
+                    out[str(node_name)] = float(p_abs)
+                return out
+
+            accepted_pressure_trim_scales = np.ones(4, dtype=float)
 
             def _build_state_from_mech(x: np.ndarray) -> np.ndarray:
-                z = float(x[0]); phi = float(x[1]); theta = float(x[2])
-                zw = np.asarray(x[3:7], dtype=float)
+                x = np.asarray(x, dtype=float).reshape(-1)
+                x_mech = x[:7]
+                trim_x = x[7:7 + pressure_trim_dim]
+                z = float(x_mech[0]); phi = float(x_mech[1]); theta = float(x_mech[2])
+                zw = np.asarray(x_mech[3:7], dtype=float)
                 z_dot = 0.0; phi_dot = 0.0; theta_dot = 0.0
                 zw_dot = np.zeros(4, dtype=float)
                 V_init = np.asarray(volumes(z, phi, theta, zw, z_dot, phi_dot, theta_dot, zw_dot)[0], dtype=float)
                 if static_trim_pneumo_mode == 'pressure':
-                    m_init = p0 * V_init / (R_AIR * T_AIR)
+                    p_trim = np.asarray(p0, dtype=float).copy()
+                    if pressure_trim_dim > 0 and chamber_indices.size > 0:
+                        corner_scale = np.maximum(1e-6, _decode_pressure_trim(trim_x))
+                        p_trim[chamber_indices] = np.maximum(
+                            P_ATM,
+                            p_trim[chamber_indices] * corner_scale[chamber_corner],
+                        )
+                    m_init = p_trim * V_init / (R_AIR * T_AIR)
                     m_init[node_index['АТМ']] = P_ATM * V0_vec[node_index['АТМ']] / (R_AIR * T_AIR)
                 else:
                     # mass/polytropic: keep masses (closed system).
@@ -2909,23 +3254,44 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 st = _build_state_from_mech(np.asarray(x, dtype=float))
                 d = rhs(st, 0.0)
                 acc = np.asarray(d[7:14], dtype=float)
-                # δ штрафуем, чтобы штоки оставались около середины хода (нулевая поза)
-                z = float(st[0]); phi = float(st[1]); theta = float(st[2])
-                zw = np.asarray(st[3:7], dtype=float)
-                zw_dot = np.zeros(4, dtype=float)
-                delta = np.asarray(volumes(z, phi, theta, zw, 0.0, 0.0, 0.0, zw_dot)[2], dtype=float)
+                phi = float(st[1]); theta = float(st[2])
+                trim_metrics = _static_trim_metrics(st)
+                delta = np.asarray(trim_metrics['delta_m'], dtype=float)
+                mid_err_c1 = np.asarray(trim_metrics['midstroke_err_c1_m'], dtype=float)
+                mid_err_c2 = np.asarray(trim_metrics['midstroke_err_c2_m'], dtype=float)
+                body_height_err = np.asarray(trim_metrics['body_height_err_m'], dtype=float)
+                gap_to_cap = np.asarray(trim_metrics['gap_to_cap_m'], dtype=float)
+                coil_margin = np.asarray(trim_metrics['coil_bind_margin_m'], dtype=float)
 
                 r = []
                 r.extend((acc / acc_scale).tolist())
                 r.extend((delta / delta_scale).tolist())
+                if static_trim_target_midstroke_enable:
+                    r.extend((mid_err_c1 / midstroke_scale).tolist())
+                    r.extend((mid_err_c2 / midstroke_scale).tolist())
+                if static_trim_target_body_height_enable:
+                    body_height_res = np.where(np.isfinite(body_height_err), body_height_err / body_height_scale, 0.0)
+                    r.extend(body_height_res.tolist())
+                if static_trim_target_spring_gap_enable:
+                    gap_violation = np.where(np.isfinite(gap_to_cap), np.maximum(0.0, -gap_to_cap), 0.0)
+                    r.extend((gap_violation / spring_gap_scale).tolist())
+                if static_trim_target_spring_coil_enable:
+                    coil_violation = np.where(np.isfinite(coil_margin), np.maximum(0.0, -coil_margin), 0.0)
+                    r.extend((coil_violation / spring_coil_scale).tolist())
+                if pressure_trim_dim > 0:
+                    trim_x = np.asarray(x, dtype=float).reshape(-1)[7:7 + pressure_trim_dim]
+                    r.extend(((trim_x - 1.0) / pressure_trim_reg_scale).tolist())
                 r.append(phi / ang_scale)
                 r.append(theta / ang_scale)
                 return np.asarray(r, dtype=float)
 
+            x0_trim = np.concatenate([x0_mech, pressure_trim_x0]).astype(float)
+            lb_trim = np.concatenate([lb, pressure_trim_lb]).astype(float)
+            ub_trim = np.concatenate([ub, pressure_trim_ub]).astype(float)
             rep = run_least_squares(
                 _residual,
-                x0_mech,
-                bounds=(lb, ub),
+                x0_trim,
+                bounds=(lb_trim, ub_trim),
                 max_nfev=max_nfev,
             )
             static_trim_report = rep.to_dict()
@@ -2936,16 +3302,97 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 d1 = rhs(st_sol.copy(), 0.0)
                 acc1 = np.asarray(d1[7:14], dtype=float)
                 static_trim_acc = acc1.copy()
+                sol_trim_metrics = _static_trim_metrics(st_sol)
 
                 # принимаем только если действительно улучшили максимум ускорений
                 max0 = float(np.max(np.abs(acc0)))
                 max1 = float(np.max(np.abs(acc1)))
-                if (max1 <= max0) or static_trim_force:
+                static_trim_residual_improved = bool(
+                    (np.isfinite(rep.max_abs_res0) and np.isfinite(rep.max_abs_res) and (rep.max_abs_res <= (rep.max_abs_res0 + 1e-12)))
+                    or (np.isfinite(rep.rms_res0) and np.isfinite(rep.rms_res) and (rep.rms_res <= (rep.rms_res0 + 1e-12)))
+                )
+                if static_trim_residual_improved or (max1 <= max0) or static_trim_force:
                     state0 = st_sol
                     static_trim_applied = True
+                    static_trim_midstroke_err_max_m = float(sol_trim_metrics['max_abs_midstroke_err_m'])
+                    static_trim_body_height_err_max_m = float(sol_trim_metrics['max_abs_body_height_err_m'])
+                    static_trim_spring_gap_min_m = float(sol_trim_metrics['min_gap_to_cap_m'])
+                    static_trim_coil_margin_min_m = float(sol_trim_metrics['min_coil_bind_margin_m'])
+                    if pressure_trim_dim > 0:
+                        pressure_trim_scales = _decode_pressure_trim(x_sol[7:7 + pressure_trim_dim])
+                        accepted_pressure_trim_scales = np.asarray(pressure_trim_scales, dtype=float)
+                        static_trim_pressure_trim_p0_override = _build_pressure_trim_p0_override(accepted_pressure_trim_scales)
+                        static_trim_pressure_trim_precharge_override = build_precharge_policy_from_node_pressures(
+                            nodes,
+                            static_trim_pressure_trim_p0_override,
+                        )
+                        static_trim_pressure_trim_max_abs_scale_delta = float(
+                            np.max(np.abs(np.asarray(pressure_trim_scales, dtype=float) - 1.0))
+                        )
             # иначе: оставляем как было
-    except Exception:
-        static_trim_report = None
+            if isinstance(static_trim_report, dict):
+                pressure_trim_scales = _decode_pressure_trim(rep.x[7:7 + pressure_trim_dim]) if pressure_trim_dim > 0 else np.ones(4, dtype=float)
+                static_trim_pressure_trim_max_abs_scale_delta = float(
+                    np.max(np.abs(np.asarray(pressure_trim_scales, dtype=float) - 1.0))
+                ) if pressure_trim_dim > 0 else 0.0
+                static_trim_report.update({
+                    'residual_improved': bool(static_trim_residual_improved),
+                    'target_midstroke_enable': bool(static_trim_target_midstroke_enable),
+                    'target_body_height_enable': bool(static_trim_target_body_height_enable),
+                    'target_spring_gap_enable': bool(static_trim_target_spring_gap_enable),
+                    'target_spring_coil_enable': bool(static_trim_target_spring_coil_enable),
+                    'pressure_trim_enable': bool(static_trim_pressure_trim_enable),
+                    'pressure_trim_mode': str(static_trim_pressure_trim_mode),
+                    'pressure_trim_max_abs_scale_delta': float(static_trim_pressure_trim_max_abs_scale_delta),
+                    'pressure_trim_scales': [float(v) for v in np.asarray(pressure_trim_scales, dtype=float)],
+                    'pressure_trim_p0_override': dict(static_trim_pressure_trim_p0_override),
+                    'pressure_trim_precharge_override': dict(static_trim_pressure_trim_precharge_override),
+                    'pressure_trim_bootstrap_pass': int(static_trim_pressure_trim_bootstrap_pass),
+                    'pressure_trim_bootstrap_applied': int(static_trim_pressure_trim_bootstrap_applied),
+                    'body_height_target_m': [float(x) for x in np.asarray(body_height_target_m, dtype=float)],
+                    'midstroke_err0_max_m': float(static_trim_midstroke_err0_max_m),
+                    'midstroke_err_max_m': float(static_trim_midstroke_err_max_m),
+                    'body_height_err0_max_m': float(static_trim_body_height_err0_max_m),
+                    'body_height_err_max_m': float(static_trim_body_height_err_max_m),
+                    'spring_gap0_min_m': float(static_trim_spring_gap0_min_m),
+                    'spring_gap_min_m': float(static_trim_spring_gap_min_m),
+                    'coil_margin0_min_m': float(static_trim_coil_margin0_min_m),
+                    'coil_margin_min_m': float(static_trim_coil_margin_min_m),
+                })
+            static_trim_pressure_trim_bootstrap_requested = int(bool(
+                params.get('static_trim_pressure_trim_bootstrap_rerun', False)
+            ) and bool(static_trim_applied) and bool(static_trim_pressure_trim_p0_override) and (static_trim_pressure_trim_bootstrap_pass < 1))
+            if static_trim_pressure_trim_bootstrap_requested:
+                precharge_override_next = params.get('precharge_override', params.get('предзаряд_цилиндров', None))
+                merged_precharge_override = merge_nested_mapping(
+                    precharge_override_next if isinstance(precharge_override_next, dict) else {},
+                    static_trim_pressure_trim_precharge_override,
+                )
+                rerun_params = dict(params)
+                rerun_params['precharge_override'] = merged_precharge_override
+                rerun_params['_static_trim_pressure_trim_bootstrap_pass'] = int(static_trim_pressure_trim_bootstrap_pass + 1)
+                rerun_params['_static_trim_pressure_trim_bootstrap_source_json'] = json.dumps(
+                    static_trim_pressure_trim_precharge_override,
+                    ensure_ascii=False,
+                )
+                if bool(rerun_params.get('static_trim_pressure_trim_bootstrap_disable_runtime_trim', True)):
+                    rerun_params['static_trim_pressure_trim_enable'] = False
+                return simulate(
+                    rerun_params,
+                    test,
+                    dt=dt,
+                    t_end=t_end,
+                    record_full=record_full,
+                    compile_only=compile_only,
+                    max_steps=max_steps,
+                )
+    except Exception as _static_trim_ex:
+        static_trim_report = {
+            'ok': False,
+            'attempted': False,
+            'success': False,
+            'message': repr(_static_trim_ex),
+        }
         static_trim_applied = False
 
     # -------------------------
@@ -4005,8 +4452,14 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         'cg_left_frac': float(getattr(cg_loads_rep, 'left_frac', 0.5)),
         'cg_msg': str(getattr(cg_loads_rep, 'msg', '')),
         'corner_loads_mode': str(getattr(cg_loads_rep, 'mode', 'cg')),
+        'corner_loads_solver_kind': str(getattr(cg_loads_rep, 'solver_kind', 'n/a')),
+        'corner_loads_active_support_count': int(getattr(cg_loads_rep, 'active_support_count', 0)),
         'corner_loads_cross_weight_frac': float(getattr(cg_loads_rep, 'cross_weight_frac', float('nan'))),
         'corner_loads_diag_bias_N': float(getattr(cg_loads_rep, 'diag_bias_N', float('nan'))),
+        'corner_loads_eq_force_residual_N': float(getattr(cg_loads_rep, 'eq_force_residual_N', float('nan'))),
+        'corner_loads_eq_roll_residual_Nm': float(getattr(cg_loads_rep, 'eq_roll_residual_Nm', float('nan'))),
+        'corner_loads_eq_pitch_residual_Nm': float(getattr(cg_loads_rep, 'eq_pitch_residual_Nm', float('nan'))),
+        'corner_loads_strain_energy_J': float(getattr(cg_loads_rep, 'strain_energy_J', float('nan'))),
         'F_body_corner_ЛП_Н': float(np.asarray(F_body_corner, dtype=float)[0]),
         'F_body_corner_ПП_Н': float(np.asarray(F_body_corner, dtype=float)[1]),
         'F_body_corner_ЛЗ_Н': float(np.asarray(F_body_corner, dtype=float)[2]),
@@ -4032,7 +4485,31 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         'static_trim_max_abs_res': float(static_trim_report.get('max_abs_res', float('nan')) if isinstance(static_trim_report, dict) else float('nan')),
         'static_trim_acc0_max': float(np.max(np.abs(static_trim_acc0)) if isinstance(static_trim_acc0, np.ndarray) and static_trim_acc0.size else float('nan')),
         'static_trim_acc_max': float(np.max(np.abs(static_trim_acc)) if isinstance(static_trim_acc, np.ndarray) and static_trim_acc.size else float('nan')),
+        'static_trim_residual_improved': int(bool(static_trim_residual_improved)),
+        'static_trim_target_midstroke_enable': int(static_trim_target_midstroke_enable),
+        'static_trim_target_body_height_enable': int(static_trim_target_body_height_enable),
+        'static_trim_target_spring_gap_enable': int(static_trim_target_spring_gap_enable),
+        'static_trim_target_spring_coil_enable': int(static_trim_target_spring_coil_enable),
+        'static_trim_pressure_trim_enable': int(static_trim_pressure_trim_enable),
+        'static_trim_pressure_trim_mode': str(static_trim_pressure_trim_mode),
+        'static_trim_pressure_trim_max_abs_scale_delta': float(static_trim_pressure_trim_max_abs_scale_delta),
+        'static_trim_pressure_trim_bootstrap_requested': int(static_trim_pressure_trim_bootstrap_requested),
+        'static_trim_pressure_trim_bootstrap_applied': int(static_trim_pressure_trim_bootstrap_applied),
+        'static_trim_pressure_trim_bootstrap_pass': int(static_trim_pressure_trim_bootstrap_pass),
+        'static_trim_pressure_trim_precharge_override_json': json.dumps(static_trim_pressure_trim_precharge_override, ensure_ascii=False) if isinstance(static_trim_pressure_trim_precharge_override, dict) else '',
+        'static_trim_pressure_trim_p0_override_json': json.dumps(static_trim_pressure_trim_p0_override, ensure_ascii=False) if isinstance(static_trim_pressure_trim_p0_override, dict) else '',
+        'static_trim_midstroke_err0_max_m': float(static_trim_midstroke_err0_max_m),
+        'static_trim_midstroke_err_max_m': float(static_trim_midstroke_err_max_m),
+        'static_trim_body_height_err0_max_m': float(static_trim_body_height_err0_max_m),
+        'static_trim_body_height_err_max_m': float(static_trim_body_height_err_max_m),
+        'static_trim_spring_gap0_min_m': float(static_trim_spring_gap0_min_m),
+        'static_trim_spring_gap_min_m': float(static_trim_spring_gap_min_m),
+        'static_trim_coil_margin0_min_m': float(static_trim_coil_margin0_min_m),
+        'static_trim_coil_margin_min_m': float(static_trim_coil_margin_min_m),
         'static_trim_json': json.dumps(static_trim_report, ensure_ascii=False) if isinstance(static_trim_report, dict) else '',
+        'precharge_override_applied': int(len(precharge_override_report.get('applied', [])) if isinstance(precharge_override_report, dict) else 0),
+        'precharge_override_errors': int(len(precharge_override_report.get('errors', [])) if isinstance(precharge_override_report, dict) else 0),
+        'precharge_override_json': json.dumps(precharge_override_report, ensure_ascii=False) if isinstance(precharge_override_report, dict) else '',
 
         # --- Начальные давления (override) ---
         'p0_override_applied': int(len(p0_override_report.get('applied', [])) if isinstance(p0_override_report, dict) else 0),
@@ -4042,6 +4519,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
 
         # --- Пружина/статика (нулевая поза) ---
         'spring_mode': str(spring_mode),
+        'spring_static_mode': str(spring_static_mode),
         'spring_interp_mode': str(spring_interp_mode),
         'spring_x0_mode': str(spring_x0_mode_eff),
         'spring_x0_m': float(x0_mean),

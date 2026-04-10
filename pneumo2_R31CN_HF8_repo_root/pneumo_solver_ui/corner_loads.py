@@ -47,6 +47,7 @@ Corner order is project convention:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import combinations
 from typing import Any, Dict, Iterable, Tuple, Optional
 
 import numpy as np
@@ -78,6 +79,13 @@ class CornerLoadReport:
     q_phi_rad: float = float('nan')
     q_theta_rad: float = float('nan')
     cond_M: float = float('nan')
+    solver_kind: str = 'n/a'
+    active_support_mask: Optional[np.ndarray] = None
+    active_support_count: int = 0
+    eq_force_residual_N: float = float('nan')
+    eq_roll_residual_Nm: float = float('nan')
+    eq_pitch_residual_Nm: float = float('nan')
+    strain_energy_J: float = float('nan')
 
     def to_dict(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {
@@ -100,9 +108,17 @@ class CornerLoadReport:
             'q_phi_rad': float(self.q_phi_rad),
             'q_theta_rad': float(self.q_theta_rad),
             'cond_M': float(self.cond_M),
+            'solver_kind': str(self.solver_kind),
+            'active_support_count': int(self.active_support_count),
+            'eq_force_residual_N': float(self.eq_force_residual_N),
+            'eq_roll_residual_Nm': float(self.eq_roll_residual_Nm),
+            'eq_pitch_residual_Nm': float(self.eq_pitch_residual_Nm),
+            'strain_energy_J': float(self.strain_energy_J),
         }
         if self.k_corner_N_m is not None:
             out['k_corner_N_m'] = [float(x) for x in np.asarray(self.k_corner_N_m, dtype=float).ravel().tolist()]
+        if self.active_support_mask is not None:
+            out['active_support_mask'] = [bool(x) for x in np.asarray(self.active_support_mask, dtype=bool).ravel().tolist()]
         return out
 
 
@@ -422,6 +438,12 @@ def _fallback_equal(m_body: float, g: float, cg_x_m: float, cg_y_m: float, msg: 
         mode='fallback_equal',
         cross_weight_frac=float((F[0] + F[3]) / max(1e-12, float(W))),
         diag_bias_N=float((F[0] + F[3]) - (F[1] + F[2])),
+        solver_kind='equal_fallback',
+        active_support_mask=np.ones(4, dtype=bool),
+        active_support_count=4,
+        eq_force_residual_N=float(np.sum(F) - W),
+        eq_roll_residual_Nm=0.0,
+        eq_pitch_residual_Nm=0.0,
     )
     return F, rep
 
@@ -488,6 +510,8 @@ def _compute_body_corner_loads_cg(
 
     cross = float((F[0] + F[3]) / max(1e-12, W)) if np.isfinite(W) and (W > 0.0) else float('nan')
     diag_bias = float((F[0] + F[3]) - (F[1] + F[2])) if np.all(np.isfinite(F)) else float('nan')
+    x = np.array([ wheelbase_m/2,  wheelbase_m/2, -wheelbase_m/2, -wheelbase_m/2], dtype=float)
+    y = np.array([ track_m/2,    -track_m/2,      track_m/2,      -track_m/2   ], dtype=float)
 
     rep = CornerLoadReport(
         F_body_corner_N=F,
@@ -505,9 +529,130 @@ def _compute_body_corner_loads_cg(
         mode='cg',
         cross_weight_frac=cross,
         diag_bias_N=diag_bias,
+        solver_kind='separable_cg',
+        active_support_mask=np.ones(4, dtype=bool),
+        active_support_count=4,
+        eq_force_residual_N=float(np.sum(F) - W),
+        eq_roll_residual_Nm=float(np.dot(y, F) - (W * fy_used * track_m)),
+        eq_pitch_residual_Nm=float(np.dot(-x, F) - (-W * fx_used * wheelbase_m)),
     )
 
     return F, rep
+
+
+def _equilibrium_residual(A: np.ndarray, F: np.ndarray, Q: np.ndarray) -> np.ndarray:
+    return np.asarray(A.T @ F - Q, dtype=float).ravel()
+
+
+def _strain_energy(F: np.ndarray, k: np.ndarray) -> float:
+    denom = np.maximum(np.asarray(k, dtype=float), 1e-30)
+    val = 0.5 * np.sum((np.asarray(F, dtype=float) ** 2) / denom)
+    return float(val) if np.isfinite(val) else float('nan')
+
+
+def _solve_minimum_energy_subset(
+    A: np.ndarray,
+    k: np.ndarray,
+    Q: np.ndarray,
+    active_idx: np.ndarray,
+    reg_eps: float,
+) -> Optional[Dict[str, Any]]:
+    """Solve the reduced minimum-energy problem for a fixed active support set."""
+    if active_idx.size < 3:
+        return None
+
+    A_sub = np.asarray(A[active_idx, :], dtype=float)
+    k_sub = np.asarray(k[active_idx], dtype=float)
+    M = A_sub.T @ (k_sub[:, None] * A_sub)
+    try:
+        cond_M = float(np.linalg.cond(M))
+    except Exception:
+        cond_M = float('nan')
+
+    q = None
+    linear_solver = 'solve'
+    M_use = M
+    if np.isfinite(reg_eps) and (float(reg_eps) > 0.0):
+        M_use = M + float(reg_eps) * np.eye(3, dtype=float)
+
+    try:
+        q = np.linalg.solve(M_use, Q)
+    except Exception:
+        linear_solver = 'lstsq'
+        try:
+            q = np.linalg.lstsq(M_use, Q, rcond=None)[0]
+        except Exception:
+            return None
+
+    F_sub = k_sub * (A_sub @ q)
+    F = np.zeros(4, dtype=float)
+    F[active_idx] = F_sub
+    residual = _equilibrium_residual(A, F, Q)
+    return {
+        'F': np.asarray(F, dtype=float),
+        'q': np.asarray(q, dtype=float),
+        'residual': np.asarray(residual, dtype=float),
+        'cond_M': cond_M,
+        'linear_solver': linear_solver,
+        'strain_energy_J': _strain_energy(F_sub, k_sub),
+    }
+
+
+def _select_unilateral_minimum_energy_solution(
+    A: np.ndarray,
+    k: np.ndarray,
+    Q: np.ndarray,
+    reg_eps: float,
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """Enumerate feasible active sets and choose the minimum-energy unilateral solution."""
+    full_candidate = _solve_minimum_energy_subset(A, k, Q, np.arange(4, dtype=int), reg_eps)
+
+    force_scale = max(1.0, abs(float(Q[0])))
+    support_tol_N = max(1e-6, 1e-10 * force_scale)
+    residual_scale = np.array([
+        force_scale,
+        max(1.0, abs(float(Q[1])), force_scale * float(np.max(np.abs(A[:, 1])))),
+        max(1.0, abs(float(Q[2])), force_scale * float(np.max(np.abs(A[:, 2])))),
+    ], dtype=float)
+    residual_tol = np.maximum(1e-8 * residual_scale, np.array([1e-6, 1e-6, 1e-6], dtype=float))
+
+    feasible = []
+    for active_size in (4, 3):
+        for combo in combinations(range(4), active_size):
+            candidate = _solve_minimum_energy_subset(A, k, Q, np.asarray(combo, dtype=int), reg_eps)
+            if candidate is None:
+                continue
+            F = np.asarray(candidate['F'], dtype=float)
+            residual = np.asarray(candidate['residual'], dtype=float)
+            if np.min(F[list(combo)]) < (-support_tol_N):
+                continue
+            if np.any(np.abs(residual) > residual_tol):
+                continue
+            F = np.where(np.abs(F) <= support_tol_N, 0.0, F)
+            positive_mask = np.asarray(F > support_tol_N, dtype=bool)
+            candidate['F'] = F
+            candidate['residual'] = _equilibrium_residual(A, F, Q)
+            candidate['active_support_mask'] = positive_mask
+            candidate['active_support_count'] = int(np.count_nonzero(positive_mask))
+            candidate['solver_kind'] = (
+                'minimum_energy_full_support'
+                if active_size == 4 and int(np.count_nonzero(positive_mask)) == 4
+                else f'minimum_energy_active_set_{int(np.count_nonzero(positive_mask))}of4'
+            )
+            feasible.append(candidate)
+
+    if not feasible:
+        return None, full_candidate
+
+    best = min(
+        feasible,
+        key=lambda c: (
+            float(c.get('strain_energy_J', float('inf'))),
+            int(c.get('active_support_count', 4)),
+            0 if c.get('linear_solver') == 'solve' else 1,
+        ),
+    )
+    return best, full_candidate
 
 
 def _compute_body_corner_loads_stiffness(
@@ -593,20 +738,7 @@ def _compute_body_corner_loads_stiffness(
     # Build A (4x3): [1, y, -x]
     A = np.stack([np.ones(4, dtype=float), y.astype(float), (-x).astype(float)], axis=1)
 
-    # Matrix M = A^T K A  (K is diagonal)
-    M = A.T @ (k[:, None] * A)
-    try:
-        cond_M = float(np.linalg.cond(M))
-    except Exception:
-        cond_M = float('nan')
-
-    # Regularise if requested (for numerical robustness)
     reg_eps = float(reg_eps) if np.isfinite(reg_eps) else 0.0
-    if reg_eps > 0.0:
-        M_reg = M + reg_eps * np.eye(3, dtype=float)
-    else:
-        M_reg = M
-
     Q = np.array([W, W * cg_y_used_m, -W * cg_x_used_m], dtype=float)
 
     msg_parts = []
@@ -615,25 +747,37 @@ def _compute_body_corner_loads_stiffness(
     if cg_y_clipped:
         msg_parts.append(f'cg_y clipped: fy={fy:.3g}->{fy_used:.3g}')
 
-    try:
-        q = np.linalg.solve(M_reg, Q)
-    except Exception:
+    solution, full_candidate = _select_unilateral_minimum_energy_solution(A, k, Q, reg_eps)
+    if solution is None and full_candidate is None:
         F, rep = _compute_body_corner_loads_cg(m_body, g, wheelbase_m, track_m, cg_x_m, cg_y_m, clip_frac)
         rep.mode = 'cg_fallback_solve_failed'
         rep.msg = (rep.msg + '; ' if rep.msg else '') + 'stiffness solve failed'
         return F, rep
 
-    delta = A @ q
-    F = k * delta
-
-    # Ensure non-negative (unilateral support)
-    if np.any(F < 0.0):
-        # Clamp and renormalise to total weight (moments may drift; static_trim fixes)
-        F = np.maximum(0.0, F)
+    if solution is not None:
+        F = np.asarray(solution['F'], dtype=float)
+        q = np.asarray(solution['q'], dtype=float)
+        residual = np.asarray(solution['residual'], dtype=float)
+        cond_M = float(solution.get('cond_M', float('nan')))
+        solver_kind = str(solution.get('solver_kind', 'minimum_energy_full_support'))
+        active_support_mask = np.asarray(solution.get('active_support_mask', F > 0.0), dtype=bool)
+        active_support_count = int(solution.get('active_support_count', np.count_nonzero(active_support_mask)))
+        strain_energy_J = float(solution.get('strain_energy_J', float('nan')))
+        if active_support_count < 4:
+            msg_parts.append(f'unilateral active-set selected ({active_support_count}/4 supports)')
+    else:
+        F = np.maximum(0.0, np.asarray(full_candidate['F'], dtype=float))
         s = float(np.sum(F))
         if s > 0.0 and np.isfinite(W) and (W > 0.0):
             F *= (W / s)
-        msg_parts.append('negative corner load clamped and renormalised')
+        q = np.asarray(full_candidate['q'], dtype=float)
+        residual = _equilibrium_residual(A, F, Q)
+        cond_M = float(full_candidate.get('cond_M', float('nan')))
+        solver_kind = 'clamped_full_renormalized'
+        active_support_mask = np.asarray(F > 0.0, dtype=bool)
+        active_support_count = int(np.count_nonzero(active_support_mask))
+        strain_energy_J = float(_strain_energy(F, k))
+        msg_parts.append('no feasible unilateral active-set solution; negative corner load clamped and renormalised')
 
     cross = float((F[0] + F[3]) / max(1e-12, W)) if np.isfinite(W) and (W > 0.0) else float('nan')
     diag_bias = float((F[0] + F[3]) - (F[1] + F[2])) if np.all(np.isfinite(F)) else float('nan')
@@ -665,5 +809,12 @@ def _compute_body_corner_loads_stiffness(
         q_phi_rad=float(q[1]),
         q_theta_rad=float(q[2]),
         cond_M=cond_M,
+        solver_kind=solver_kind,
+        active_support_mask=active_support_mask,
+        active_support_count=active_support_count,
+        eq_force_residual_N=float(residual[0]),
+        eq_roll_residual_Nm=float(residual[1]),
+        eq_pitch_residual_Nm=float(residual[2]),
+        strain_energy_J=strain_energy_J,
     )
     return np.asarray(F, dtype=float), rep

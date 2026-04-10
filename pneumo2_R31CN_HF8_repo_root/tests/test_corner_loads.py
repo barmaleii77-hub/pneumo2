@@ -102,3 +102,32 @@ def test_corner_loads_stiffness_asymmetry_creates_diagonal_bias():
     assert abs(float(rep_k.diag_bias_N)) > 1e-3
     # Diagonal with higher stiffness should carry more
     assert float(F_k[0] + F_k[3]) > float(F_k[1] + F_k[2])
+
+
+def test_corner_loads_stiffness_uses_unilateral_active_set_without_moment_drift():
+    W = 1000.0
+    m = W / 9.81
+    F_k, rep_k = compute_body_corner_loads(
+        m_body=m,
+        g=9.81,
+        wheelbase_m=2.0,
+        track_m=1.2,
+        cg_x_m=-0.9,
+        cg_y_m=0.0,
+        mode='stiffness',
+        k_corner_N_m=[300000.0, 50000.0, 50000.0, 300000.0],
+    )
+
+    assert rep_k.mode == 'stiffness'
+    assert rep_k.solver_kind == 'minimum_energy_active_set_3of4'
+    assert rep_k.active_support_count == 3
+    assert rep_k.active_support_mask.tolist() == [True, False, True, True]
+    assert np.all(F_k >= 0.0)
+    assert abs(float(F_k[1])) < 1e-9
+    assert abs(float(F_k.sum()) - W) < 1e-9
+    assert abs(float(rep_k.eq_force_residual_N)) < 1e-9
+    assert abs(float(rep_k.eq_roll_residual_Nm)) < 1e-9
+    assert abs(float(rep_k.eq_pitch_residual_Nm)) < 1e-9
+    report_dict = rep_k.to_dict()
+    assert report_dict['active_support_count'] == 3
+    assert report_dict['active_support_mask'] == [True, False, True, True]

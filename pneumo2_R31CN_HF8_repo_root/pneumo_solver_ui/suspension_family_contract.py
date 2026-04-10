@@ -52,13 +52,22 @@ SPRING_GEOMETRY_FIELDS: tuple[str, ...] = (
     "coil_bind_margin_min_m",
     "rebound_preload_min_m",
 )
+CYLINDER_PRECHARGE_CHAMBERS: tuple[str, ...] = ("CAP", "ROD")
 _CANONICAL_AXLE_SLUGS: dict[str, str] = {"перед": "front", "зад": "rear"}
 _CANONICAL_CYL_SLUGS: dict[str, str] = {"Ц1": "cyl1", "Ц2": "cyl2"}
+_CANONICAL_CHAMBER_SLUGS: dict[str, str] = {"CAP": "cap", "ROD": "rod"}
+_REVERSE_CANONICAL_AXLE_SLUGS: dict[str, str] = {v: k for k, v in _CANONICAL_AXLE_SLUGS.items()}
+_REVERSE_CANONICAL_CYL_SLUGS: dict[str, str] = {v: k for k, v in _CANONICAL_CYL_SLUGS.items()}
+_REVERSE_CANONICAL_CHAMBER_SLUGS: dict[str, str] = {v: k for k, v in _CANONICAL_CHAMBER_SLUGS.items()}
 
 _CYLINDER_FIELD_LABELS: dict[str, str] = {
     "bore": "Диаметр поршня",
     "rod": "Диаметр штока",
     "stroke": "Полный ход штока",
+}
+_PRECHARGE_CHAMBER_LABELS: dict[str, str] = {
+    "CAP": "крышечной полости",
+    "ROD": "штоковой полости",
 }
 _AXLE_LABELS: dict[str, str] = {"перед": "спереди", "зад": "сзади"}
 _SPRING_SUFFIX_LABELS: dict[str, tuple[str, str, str]] = {
@@ -126,6 +135,7 @@ _SPRING_SUFFIX_LABELS: dict[str, tuple[str, str, str]] = {
 
 _CYLINDER_RE = re.compile(r"^(диаметр_поршня|диаметр_штока|ход_штока)_(Ц[12])_(перед|зад)(?:_м)?$")
 _SPRING_RE = re.compile(r"^пружина_(Ц[12])_(перед|зад)_(.+)$")
+_PRECHARGE_RE = re.compile(r"^(cyl[12])_(cap|rod)_precharge_(front|rear)_pa$", re.IGNORECASE)
 
 
 def cylinder_family_key(field: str, cyl: str, axle: str) -> str:
@@ -163,6 +173,11 @@ def canonical_axle_slug(axle: str) -> str:
     return _CANONICAL_AXLE_SLUGS.get(axle_key, axle_key)
 
 
+def canonical_chamber_slug(chamber: str) -> str:
+    chamber_key = str(chamber).strip().upper()
+    return _CANONICAL_CHAMBER_SLUGS.get(chamber_key, chamber_key.lower())
+
+
 def cylinder_axle_geometry_key(field: str, cyl: str, axle: str) -> str:
     cyl_slug = canonical_cylinder_slug(cyl)
     axle_slug = canonical_axle_slug(axle)
@@ -179,6 +194,13 @@ def cylinder_axle_geometry_key(field: str, cyl: str, axle: str) -> str:
     if field not in mapping:
         raise KeyError(field)
     return mapping[field]
+
+
+def cylinder_precharge_key(cyl: str, chamber: str, axle: str) -> str:
+    cyl_slug = canonical_cylinder_slug(cyl)
+    chamber_slug = canonical_chamber_slug(chamber)
+    axle_slug = canonical_axle_slug(axle)
+    return f"{cyl_slug}_{chamber_slug}_precharge_{axle_slug}_pa"
 
 
 def spring_geometry_key(field: str, cyl: str, axle: str) -> str:
@@ -276,6 +298,22 @@ def family_param_meta(name: str) -> Dict[str, str] | None:
             "описание": (
                 f"{label} для семейства {cyl} {_AXLE_LABELS.get(axle, axle)}. "
                 "Поле отделено по семействам, чтобы перед/зад и Ц1/Ц2 могли различаться без потери продольной симметрии."
+            ),
+        }
+    m_precharge = _PRECHARGE_RE.match(raw)
+    if m_precharge:
+        cyl_slug, chamber_slug, axle_slug = (str(part).strip().lower() for part in m_precharge.groups())
+        cyl = _REVERSE_CANONICAL_CYL_SLUGS.get(cyl_slug, cyl_slug.upper())
+        chamber = _REVERSE_CANONICAL_CHAMBER_SLUGS.get(chamber_slug, chamber_slug.upper())
+        axle = _REVERSE_CANONICAL_AXLE_SLUGS.get(axle_slug, axle_slug)
+        chamber_label = _PRECHARGE_CHAMBER_LABELS.get(chamber, chamber)
+        return {
+            "группа": "Пневматика по семействам",
+            "ед": "кПа (абс.)",
+            "kind": "pressure_kPa_abs",
+            "описание": (
+                f"Абсолютный предзаряд {chamber_label} семейства {cyl} {_AXLE_LABELS.get(axle, axle)}. "
+                "Ключ входит в канонический family-contract и задаёт симметричное давление для левого и правого угла данной оси."
             ),
         }
     return None
@@ -402,6 +440,7 @@ def normalize_component_family_contract(
 __all__ = [
     "AXLES",
     "CYLINDER_AXLE_GEOMETRY_FIELDS",
+    "CYLINDER_PRECHARGE_CHAMBERS",
     "CYLINDERS",
     "FAMILY_ORDER",
     "SPRING_GEOMETRY_FIELDS",
@@ -409,10 +448,12 @@ __all__ = [
     "SPRING_STATIC_MODE_KEY",
     "SPRING_STATIC_MODE_MANUAL",
     "canonical_axle_slug",
+    "canonical_chamber_slug",
     "canonical_cylinder_slug",
     "cylinder_axle_geometry_key",
     "cylinder_family_key",
     "cylinder_generic_key",
+    "cylinder_precharge_key",
     "family_name",
     "family_param_description",
     "family_param_meta",
