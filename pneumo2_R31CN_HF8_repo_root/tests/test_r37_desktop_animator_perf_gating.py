@@ -123,24 +123,36 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._row_layout_key: Optional[tuple[int, int, int]] = None" in app_src
     assert "self._display_rows_key: Optional[tuple[tuple[Any, ...], tuple[int, int, int], tuple[str, int, int, int]]] = None" in app_src
     assert "def _ensure_text_metrics(self) -> tuple[QtGui.QFont, QtGui.QFontMetrics]:" in app_src
+    assert "def _prepare_static_text(text_item: QtGui.QStaticText, font: QtGui.QFont) -> None:" in app_src
     assert "def _ensure_row_layout(self) -> list[tuple[QtCore.QRectF, QtCore.QRectF, QtCore.QRectF]]:" in app_src
     assert "def _rebuild_display_rows(self) -> None:" in app_src
     assert "self._rebuild_display_rows()" in app_src
     assert "display_key = (rows_key, layout_key, metrics_key)" in app_src
+    assert "left_static = QtGui.QStaticText(left_text)" in app_src
+    assert "right_static = QtGui.QStaticText(right_text)" in app_src
+    assert "p.drawStaticText(left_pos, left_static)" in app_src
+    assert "p.drawStaticText(right_pos, right_static)" in app_src
     assert "class _PressureQuickGridCanvas" in app_src
     assert "self.canvas = _PressureQuickGridCanvas" in app_src
     assert 'self._display_values: Dict[str, str] = {str(x): "—" for x in self._nodes}' in app_src
+    assert 'self._value_static_texts: Dict[str, QtGui.QStaticText] = {str(x): QtGui.QStaticText("—") for x in self._nodes}' in app_src
     assert "self._bg_cache_pixmap" in app_src
     assert "def _ensure_background_cache" in app_src
+    assert "def _prepare_static_text(self, text_item: QtGui.QStaticText) -> None:" in app_src
     assert 'key = "svc__telemetry_summary_cache"' in app_src
     assert "def _ensure_telemetry_summary_cache(b: DataBundle) -> Dict[str, np.ndarray]:" in app_src
     assert "self._value_font = QtGui.QFont(self.font())" in app_src
     assert "self._value_text_pen = QtGui.QPen(QtGui.QColor(234, 238, 243))" in app_src
     assert "self._value_text_pen.setCosmetic(True)" in app_src
     assert 'display_values[str(node)] = f"{rounded:.2f} bar(g)"' in app_src
-    assert 'str(self._display_values.get(node, "—"))' in app_src
+    assert 'text_item.setText(str(text))' in app_src
+    assert 'text_item = self._value_static_texts.get(node)' in app_src
+    assert 'p.drawStaticText(info["value_pos"], text_item)' in app_src
     assert "p.setFont(self._value_font)" in app_src
     assert "p.setPen(self._value_text_pen)" in app_src
+    assert "p.setRenderHint(QtGui.QPainter.Antialiasing, False)" in app_src
+    assert "p.setRenderHint(QtGui.QPainter.TextAntialiasing, True)" in app_src
+    assert "p.setRenderHint(QtGui.QPainter.Antialiasing, True)" in app_src
     assert "self._pressure_series_map: Dict[str, np.ndarray] = {}" in app_src
     assert "self._main_pressure_series_map: Dict[str, np.ndarray] = {}" in app_src
     assert "self._patm_arr, self._patm_default_pa = _infer_patm_source(b)" in app_src
@@ -157,6 +169,14 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._marker_active_pen = QtGui.QPen(QtGui.QColor(230, 190, 90, 230), 2)" in app_src
     assert "self._flow_in_brush = QtGui.QBrush(QtGui.QColor(80, 220, 120, 230))" in app_src
     assert "self._pipe_out_brush = QtGui.QBrush(QtGui.QColor(240, 90, 90, 220))" in app_src
+    assert 'self._pressure_static_text = QtGui.QStaticText("P: —")' in app_src
+    assert 'self._flow_static_text = QtGui.QStaticText("in:   0.0 g/s\\nout:  0.0 g/s")' in app_src
+    assert "def _prepare_static_text(self, text_item: QtGui.QStaticText) -> None:" in app_src
+    assert "def _set_static_text_if_changed(self, text_item: QtGui.QStaticText, text: str) -> None:" in app_src
+    assert 'self._set_static_text_if_changed(self._pressure_static_text, p_txt)' in app_src
+    assert 'self._set_static_text_if_changed(self._flow_static_text, q_txt)' in app_src
+    assert "p.drawStaticText(QtCore.QPointF(max(0.0, 0.5 * (float(w) - p_w)), float(tank.bottom() + 6.0)), self._pressure_static_text)" in app_src
+    assert "p.drawStaticText(QtCore.QPointF(max(0.0, 0.5 * (float(w) - q_w)), float(tank.bottom() + 26.0)), self._flow_static_text)" in app_src
     assert "self._last_visual_key: Optional[tuple[int, int, int, int, int, int]] = None" in app_src
     assert "visual_key = (" in app_src
     assert "summary = _ensure_telemetry_summary_cache(b)" in app_src
@@ -317,9 +337,15 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "q0 = np.asarray(b.q.values[i0, self._idxs], dtype=float)" in app_src
     assert "self._compact_visual_expanded = False" in app_src
     assert "class _CompactTelemetrySummaryCanvas(QtWidgets.QWidget):" in app_src
+    assert "self._value_static_texts: list[QtGui.QStaticText] = []" in app_src
+    assert "self._value_font = QtGui.QFont(self.font())" in app_src
+    assert "def _prepare_static_text(self, text_item: QtGui.QStaticText) -> None:" in app_src
     assert "self.compact_summary = _CompactTelemetrySummaryCanvas()" in app_src
     assert "self.compact_summary.setVisible(bool(compact))" in app_src
     assert "self.compact_summary.set_metrics(" in app_src
+    assert "text_item = QtGui.QStaticText(str(value))" in app_src
+    assert "self._value_static_texts.append(text_item)" in app_src
+    assert "p.drawStaticText(value_pos, text_item)" in app_src
     assert "if not bool(getattr(self, \"_compact_dock_mode\", False)):" in app_src
     assert "elif self.compact_summary.isVisible():" in app_src
     assert "self.compact_vis_strip = QtWidgets.QWidget()" in app_src
@@ -338,8 +364,16 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._value_font = QtGui.QFont(self.font())" in app_src
     assert "self._corner_static_text = QtGui.QStaticText(self.corner)" in app_src
     assert "self._value_static_text = QtGui.QStaticText(self._value_text)" in app_src
+    assert "self._frame_rect = QtCore.QRectF()" in app_src
+    assert "self._bg_cache_key: Optional[tuple[int, int, int, int, int, int]] = None" in app_src
+    assert "self._bg_cache_pixmap: Optional[QtGui.QPixmap] = None" in app_src
     assert "def _prepare_static_text(text_item: QtGui.QStaticText, font: QtGui.QFont) -> None:" in app_src
     assert "def _ensure_layout(self) -> None:" in app_src
+    assert "def _ensure_background_cache(self) -> Optional[QtGui.QPixmap]:" in app_src
+    assert "self._bg_cache_key = None" in app_src
+    assert "bg = self._ensure_background_cache()" in app_src
+    assert "p.drawPixmap(0, 0, bg)" in app_src
+    assert "p.drawRoundedRect(self._frame_rect, 8.0, 8.0)" in app_src
     assert "p.drawStaticText(self._corner_pos, self._corner_static_text)" in app_src
     assert "p.drawStaticText(self._value_pos, self._value_static_text)" in app_src
     assert "self.plot.setMaximumHeight(plot_h if compact else 16777215)" in app_src
@@ -354,12 +388,15 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, _PercentBarCanvas, QtWidgets.QTableWidgetItem]] = []" in app_src
     assert "self._row_handles: list[tuple[QtWidgets.QTableWidgetItem, QtWidgets.QTableWidgetItem, _PercentBarCanvas, QtWidgets.QTableWidgetItem]] = []" in app_src
     assert "class _QuickTextStripCanvas(QtWidgets.QWidget):" in app_src
-    assert "self._segments_layout: list[tuple[str, QtGui.QColor, float]] = []" in app_src
+    assert "self._segments_layout: list[tuple[str, QtGui.QColor, float, QtGui.QStaticText]] = []" in app_src
     assert "self._segments_layout_key" in app_src
     assert "def _ensure_text_metrics(self) -> tuple[QtGui.QFont, QtGui.QFontMetrics]:" in app_src
+    assert "def _prepare_static_text(text_item: QtGui.QStaticText, font: QtGui.QFont) -> None:" in app_src
     assert "def _rebuild_segment_layout(self) -> None:" in app_src
-    assert "layout.append((text_s, qcolor, float(fm.horizontalAdvance(text_s))))" in app_src
+    assert "static_text = QtGui.QStaticText(text_s)" in app_src
+    assert "layout.append((text_s, qcolor, float(fm.horizontalAdvance(text_s)), static_text))" in app_src
     assert "if expected_layout_key != self._segments_layout_key:" in app_src
+    assert "p.drawStaticText(QtCore.QPointF(x, text_y), static_text)" in app_src
     assert app_src.count("self._row_binding_keys: list[Optional[int]] = []") >= 2
     assert "order = _top_descending_indices(vals, topn, threshold=(thr if only_active else -1.0))" in app_src
     assert "order = _top_descending_indices(aq, topn, threshold=(thr if only_active else -1.0))" in app_src

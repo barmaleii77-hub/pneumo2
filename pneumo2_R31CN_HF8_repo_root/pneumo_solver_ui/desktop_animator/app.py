@@ -7918,7 +7918,17 @@ class _QuickBarListCanvas(QtWidgets.QWidget):
         self._row_layout_key: Optional[tuple[int, int, int]] = None
         self._row_layout: list[tuple[QtCore.QRectF, QtCore.QRectF, QtCore.QRectF]] = []
         self._display_rows_key: Optional[tuple[tuple[Any, ...], tuple[int, int, int], tuple[str, int, int, int]]] = None
-        self._display_rows: list[tuple[str, float, str, QtGui.QColor, QtGui.QColor]] = []
+        self._display_rows: list[
+            tuple[
+                QtGui.QStaticText,
+                QtCore.QPointF,
+                float,
+                QtGui.QColor,
+                QtGui.QStaticText,
+                QtCore.QPointF,
+                QtGui.QColor,
+            ]
+        ] = []
         try:
             self._border_pen.setCosmetic(True)
         except Exception:
@@ -7989,6 +7999,17 @@ class _QuickBarListCanvas(QtWidgets.QWidget):
             self._display_rows_key = None
         return self._text_font, self._text_metrics
 
+    @staticmethod
+    def _prepare_static_text(text_item: QtGui.QStaticText, font: QtGui.QFont) -> None:
+        try:
+            text_item.setTextFormat(QtCore.Qt.PlainText)
+        except Exception:
+            pass
+        try:
+            text_item.prepare(QtGui.QTransform(), font)
+        except Exception:
+            pass
+
     def _ensure_row_layout(self) -> list[tuple[QtCore.QRectF, QtCore.QRectF, QtCore.QRectF]]:
         key = (int(max(1, self.width())), int(max(1, self.height())), int(self.max_rows))
         if key == self._row_layout_key and self._row_layout:
@@ -8036,7 +8057,17 @@ class _QuickBarListCanvas(QtWidgets.QWidget):
         display_key = (rows_key, layout_key, metrics_key)
         if display_key == self._display_rows_key:
             return
-        display_rows: list[tuple[str, float, str, QtGui.QColor, QtGui.QColor]] = []
+        display_rows: list[
+            tuple[
+                QtGui.QStaticText,
+                QtCore.QPointF,
+                float,
+                QtGui.QColor,
+                QtGui.QStaticText,
+                QtCore.QPointF,
+                QtGui.QColor,
+            ]
+        ] = []
         for row_idx, (left_rect, right_rect, _bar_rect) in enumerate(layout):
             if row_idx < len(self._rows):
                 left, frac, right = self._rows[row_idx]
@@ -8046,12 +8077,23 @@ class _QuickBarListCanvas(QtWidgets.QWidget):
                 left, frac, right = self.empty_label, 0.0, ""
                 text_color = self._muted_text_color
                 right_color = self._muted_text_color
+            left_text = fm.elidedText(str(left), QtCore.Qt.ElideRight, max(8, int(left_rect.width())))
+            right_text = fm.elidedText(str(right), QtCore.Qt.ElideLeft, max(8, int(right_rect.width())))
+            left_static = QtGui.QStaticText(left_text)
+            right_static = QtGui.QStaticText(right_text)
+            self._prepare_static_text(left_static, self._text_font)
+            self._prepare_static_text(right_static, self._text_font)
+            left_y = float(left_rect.top() + max(0.0, (left_rect.height() - float(fm.height())) * 0.5))
+            right_y = float(right_rect.top() + max(0.0, (right_rect.height() - float(fm.height())) * 0.5))
+            right_w = float(fm.horizontalAdvance(right_text))
             display_rows.append(
                 (
-                    fm.elidedText(str(left), QtCore.Qt.ElideRight, max(8, int(left_rect.width()))),
+                    left_static,
+                    QtCore.QPointF(float(left_rect.left()), left_y),
                     float(frac),
-                    fm.elidedText(str(right), QtCore.Qt.ElideLeft, max(8, int(right_rect.width()))),
                     text_color,
+                    right_static,
+                    QtCore.QPointF(float(max(right_rect.left(), right_rect.right() - right_w)), right_y),
                     right_color,
                 )
             )
@@ -8135,21 +8177,21 @@ class _QuickBarListCanvas(QtWidgets.QWidget):
         p.setFont(font)
         for row_idx, (left_rect, right_rect, bar_rect) in enumerate(layout):
             if row_idx < len(self._display_rows):
-                left_text, frac, right_text, text_color, right_color = self._display_rows[row_idx]
+                left_static, left_pos, frac, text_color, right_static, right_pos, right_color = self._display_rows[row_idx]
             else:
-                left_text, frac, right_text, text_color, right_color = (
-                    self.empty_label,
+                left_static = QtGui.QStaticText(self.empty_label)
+                self._prepare_static_text(left_static, font)
+                right_static = QtGui.QStaticText("")
+                self._prepare_static_text(right_static, font)
+                frac, text_color, right_color = (
                     0.0,
-                    "",
                     self._muted_text_color,
                     self._muted_text_color,
                 )
+                left_pos = QtCore.QPointF(float(left_rect.left()), float(left_rect.top()))
+                right_pos = QtCore.QPointF(float(right_rect.left()), float(right_rect.top()))
             p.setPen(text_color)
-            p.drawText(
-                left_rect,
-                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-                left_text,
-            )
+            p.drawStaticText(left_pos, left_static)
             if float(frac) > 1e-6:
                 fill_rect = QtCore.QRectF(bar_rect)
                 fill_rect.setWidth(max(1.0, bar_rect.width() * float(frac)))
@@ -8160,11 +8202,7 @@ class _QuickBarListCanvas(QtWidgets.QWidget):
                 p.setRenderHint(QtGui.QPainter.Antialiasing, False)
 
             p.setPen(right_color)
-            p.drawText(
-                right_rect,
-                QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
-                right_text,
-            )
+            p.drawStaticText(right_pos, right_static)
 
 
 class _QuickTextStripCanvas(QtWidgets.QWidget):
@@ -8173,7 +8211,7 @@ class _QuickTextStripCanvas(QtWidgets.QWidget):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
         self._segments: list[tuple[str, QtGui.QColor]] = []
-        self._segments_layout: list[tuple[str, QtGui.QColor, float]] = []
+        self._segments_layout: list[tuple[str, QtGui.QColor, float, QtGui.QStaticText]] = []
         self._segments_key: Optional[tuple[tuple[str, int], ...]] = None
         self._segments_layout_key: Optional[tuple[tuple[Any, ...], tuple[tuple[str, int], ...]]] = None
         self._bg_color = QtGui.QColor(19, 23, 28)
@@ -8185,6 +8223,17 @@ class _QuickTextStripCanvas(QtWidgets.QWidget):
         except Exception:
             pass
         self.setMinimumHeight(18)
+
+    @staticmethod
+    def _prepare_static_text(text_item: QtGui.QStaticText, font: QtGui.QFont) -> None:
+        try:
+            text_item.setTextFormat(QtCore.Qt.PlainText)
+        except Exception:
+            pass
+        try:
+            text_item.prepare(QtGui.QTransform(), font)
+        except Exception:
+            pass
 
     def _ensure_text_metrics(self) -> tuple[QtGui.QFont, QtGui.QFontMetrics]:
         font = QtGui.QFont(self.font())
@@ -8205,11 +8254,18 @@ class _QuickTextStripCanvas(QtWidgets.QWidget):
         return self._text_font, self._text_metrics
 
     def _rebuild_segment_layout(self) -> None:
-        _font, fm = self._ensure_text_metrics()
+        font, fm = self._ensure_text_metrics()
         self._segments_layout = [
-            (text, color, float(fm.horizontalAdvance(text)))
+            (
+                text,
+                color,
+                float(fm.horizontalAdvance(text)),
+                QtGui.QStaticText(text),
+            )
             for text, color in self._segments
         ]
+        for _text, _color, _width, static_text in self._segments_layout:
+            self._prepare_static_text(static_text, font)
         self._segments_layout_key = (
             tuple(self._text_metrics_key or ()),
             tuple(self._segments_key or ()),
@@ -8218,14 +8274,16 @@ class _QuickTextStripCanvas(QtWidgets.QWidget):
     def set_segments(self, segments: Sequence[tuple[str, QtGui.QColor]]) -> None:
         normalized: list[tuple[str, QtGui.QColor]] = []
         key_parts: list[tuple[str, int]] = []
-        _font, fm = self._ensure_text_metrics()
-        layout: list[tuple[str, QtGui.QColor, float]] = []
+        font, fm = self._ensure_text_metrics()
+        layout: list[tuple[str, QtGui.QColor, float, QtGui.QStaticText]] = []
         for text, color in segments:
             text_s = str(text)
             qcolor = QtGui.QColor(color)
             normalized.append((text_s, qcolor))
             key_parts.append((text_s, int(qcolor.rgba())))
-            layout.append((text_s, qcolor, float(fm.horizontalAdvance(text_s))))
+            static_text = QtGui.QStaticText(text_s)
+            self._prepare_static_text(static_text, font)
+            layout.append((text_s, qcolor, float(fm.horizontalAdvance(text_s)), static_text))
         key = tuple(key_parts)
         layout_key = (tuple(self._text_metrics_key or ()), key)
         if layout_key == self._segments_layout_key:
@@ -8254,16 +8312,16 @@ class _QuickTextStripCanvas(QtWidgets.QWidget):
         h = float(rect.height())
         spacing = 10.0
         last_rgba: Optional[int] = None
-        for text, color, width0 in self._segments_layout:
+        for text, color, width0, static_text in self._segments_layout:
             if x >= rect.right():
                 break
             width = min(float(width0), max(0.0, rect.right() - x))
-            seg_rect = QtCore.QRectF(x, y, max(8.0, width + 2.0), h)
             rgba = int(color.rgba())
             if rgba != last_rgba:
                 p.setPen(color)
                 last_rgba = rgba
-            p.drawText(seg_rect, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter, text)
+            text_y = float(y + max(0.0, (h - float(_fm.height())) * 0.5))
+            p.drawStaticText(QtCore.QPointF(x, text_y), static_text)
             x += max(8.0, width) + spacing
 
 
@@ -8697,6 +8755,7 @@ class _PressureQuickGridCanvas(QtWidgets.QWidget):
         self._max_bar_g = float(max_bar_g)
         self._values: Dict[str, Optional[float]] = {str(x): None for x in self._nodes}
         self._display_values: Dict[str, str] = {str(x): "—" for x in self._nodes}
+        self._value_static_texts: Dict[str, QtGui.QStaticText] = {str(x): QtGui.QStaticText("—") for x in self._nodes}
         self._values_key: Optional[tuple[tuple[str, Optional[float]], ...]] = None
         self._bg_cache_key: Optional[tuple[int, int]] = None
         self._bg_cache_pixmap: Optional[QtGui.QPixmap] = None
@@ -8719,10 +8778,22 @@ class _PressureQuickGridCanvas(QtWidgets.QWidget):
             self._value_font.setPointSize(max(8, int(self._value_font.pointSize()) - 1))
         except Exception:
             pass
+        for text_item in self._value_static_texts.values():
+            self._prepare_static_text(text_item)
 
     def _invalidate_background_cache(self) -> None:
         self._bg_cache_key = None
         self._bg_cache_pixmap = None
+
+    def _prepare_static_text(self, text_item: QtGui.QStaticText) -> None:
+        try:
+            text_item.setTextFormat(QtCore.Qt.PlainText)
+        except Exception:
+            pass
+        try:
+            text_item.prepare(QtGui.QTransform(), self._value_font)
+        except Exception:
+            pass
 
     def resizeEvent(self, event: QtGui.QResizeEvent):  # type: ignore[override]
         self._layout_cache_key = None
@@ -8760,6 +8831,10 @@ class _PressureQuickGridCanvas(QtWidgets.QWidget):
                     "card": card,
                     "title_rect": QtCore.QRectF(card.left() + 8.0, card.top() + 4.0, card.width() - 16.0, 14.0),
                     "value_rect": QtCore.QRectF(card.left() + 8.0, card.top() + 18.0, card.width() - 16.0, 14.0),
+                    "value_pos": QtCore.QPointF(
+                        card.left() + 8.0,
+                        card.top() + 18.0 + max(0.0, (14.0 - float(QtGui.QFontMetrics(self._value_font).height())) * 0.5),
+                    ),
                     "bar_rect": QtCore.QRectF(card.left() + 8.0, card.bottom() - 12.0, card.width() - 16.0, 7.0),
                 }
             )
@@ -8836,13 +8911,26 @@ class _PressureQuickGridCanvas(QtWidgets.QWidget):
             return
         self._values = {node: val for node, val in normalized}
         self._display_values = display_values
+        for node, text in display_values.items():
+            text_item = self._value_static_texts.get(str(node))
+            if text_item is None:
+                text_item = QtGui.QStaticText(str(text))
+                self._value_static_texts[str(node)] = text_item
+            else:
+                try:
+                    if text_item.text() != str(text):
+                        text_item.setText(str(text))
+                except Exception:
+                    text_item.setText(str(text))
+            self._prepare_static_text(text_item)
         self._values_key = key
         self.update()
 
     def paintEvent(self, _event: QtGui.QPaintEvent):  # type: ignore[override]
         p = QtGui.QPainter(self)
         bg_pixmap, metrics = self._ensure_background_cache()
-        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, False)
+        p.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
         if bg_pixmap is not None:
             p.drawPixmap(0, 0, bg_pixmap)
         else:
@@ -8852,11 +8940,9 @@ class _PressureQuickGridCanvas(QtWidgets.QWidget):
         for info in metrics.get("cards", []):
             node = str(info.get("node", ""))
             val = self._values.get(node)
-            p.drawText(
-                info["value_rect"],
-                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-                str(self._display_values.get(node, "—")),
-            )
+            text_item = self._value_static_texts.get(node)
+            if text_item is not None:
+                p.drawStaticText(info["value_pos"], text_item)
 
             bar_rect = info["bar_rect"]
             if val is not None and np.isfinite(float(val)):
@@ -8868,8 +8954,11 @@ class _PressureQuickGridCanvas(QtWidgets.QWidget):
                     grad.setColorAt(0.0, QtGui.QColor(63, 163, 77))
                     grad.setColorAt(0.65, QtGui.QColor(246, 194, 68))
                     grad.setColorAt(1.0, QtGui.QColor(217, 83, 79))
+                    p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+                    p.setPen(QtCore.Qt.NoPen)
                     p.setBrush(QtGui.QBrush(grad))
                     p.drawRoundedRect(fill_rect, 3.5, 3.5)
+                    p.setRenderHint(QtGui.QPainter.Antialiasing, False)
                     p.setPen(self._value_text_pen)
 
 
@@ -9061,11 +9150,41 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
         self._flow_out_brush = QtGui.QBrush(QtGui.QColor(240, 90, 90, 230))
         self._pipe_in_brush = QtGui.QBrush(QtGui.QColor(80, 220, 120, 220))
         self._pipe_out_brush = QtGui.QBrush(QtGui.QColor(240, 90, 90, 220))
+        self._text_font = QtGui.QFont(self.font())
+        self._pressure_static_text = QtGui.QStaticText("P: —")
+        self._flow_static_text = QtGui.QStaticText("in:   0.0 g/s\nout:  0.0 g/s")
         for pen in (self._tank_pen, self._dash_pen, self._pipe_pen, self._track_pen, self._text_pen, self._marker_active_pen):
             try:
                 pen.setCosmetic(True)
             except Exception:
                 pass
+        try:
+            self._text_pen.setCosmetic(True)
+            self._text_font.setPointSize(max(8, int(self._text_font.pointSize()) - 1))
+        except Exception:
+            pass
+        self._prepare_static_text(self._pressure_static_text)
+        self._prepare_static_text(self._flow_static_text)
+
+    def _prepare_static_text(self, text_item: QtGui.QStaticText) -> None:
+        try:
+            text_item.setTextFormat(QtCore.Qt.PlainText)
+        except Exception:
+            pass
+        try:
+            text_item.prepare(QtGui.QTransform(), self._text_font)
+        except Exception:
+            pass
+
+    def _set_static_text_if_changed(self, text_item: QtGui.QStaticText, text: str) -> None:
+        target = str(text)
+        try:
+            if text_item.text() == target:
+                return
+        except Exception:
+            pass
+        text_item.setText(target)
+        self._prepare_static_text(text_item)
 
     @staticmethod
     def _normalize_flow_edge_name(name: str) -> str:
@@ -9450,6 +9569,13 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
         if visual_key == self._last_visual_key:
             return
         self._last_visual_key = visual_key
+        if self._p_bar_g is None:
+            p_txt = "P: —"
+        else:
+            p_txt = f"P: {self._p_bar_g:4.1f} бар"
+        q_txt = f"in: {self._q_in*1000:5.1f} g/s\nout:{self._q_out*1000:5.1f} g/s"
+        self._set_static_text_if_changed(self._pressure_static_text, p_txt)
+        self._set_static_text_if_changed(self._flow_static_text, q_txt)
         self.update()
 
     def paintEvent(self, ev: QtGui.QPaintEvent):  # type: ignore
@@ -9518,14 +9644,20 @@ class _ReceiverTankCanvas(QtWidgets.QWidget):
         p.drawEllipse(metrics.get("out_b", QtCore.QPointF()), rout, rout)
 
         # labels
+        p.setRenderHint(QtGui.QPainter.Antialiasing, False)
+        p.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
+        p.setFont(self._text_font)
         p.setPen(self._text_pen)
-        if self._p_bar_g is None:
-            p_txt = "P: —"
-        else:
-            p_txt = f"P: {self._p_bar_g:4.1f} бар"
-        q_txt = f"in: {self._q_in*1000:5.1f} g/s\nout:{self._q_out*1000:5.1f} g/s"
-        p.drawText(QtCore.QRectF(0, tank.bottom() + 6, w, h - tank.bottom() - 6), QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop, p_txt)
-        p.drawText(QtCore.QRectF(0, tank.bottom() + 26, w, h - tank.bottom() - 26), QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop, q_txt)
+        try:
+            p_w = float(self._pressure_static_text.size().width())
+        except Exception:
+            p_w = 0.0
+        try:
+            q_w = float(self._flow_static_text.size().width())
+        except Exception:
+            q_w = 0.0
+        p.drawStaticText(QtCore.QPointF(max(0.0, 0.5 * (float(w) - p_w)), float(tank.bottom() + 6.0)), self._pressure_static_text)
+        p.drawStaticText(QtCore.QPointF(max(0.0, 0.5 * (float(w) - q_w)), float(tank.bottom() + 26.0)), self._flow_static_text)
 
 
 class ReceiverTankWidget(QtWidgets.QWidget):
@@ -9890,9 +10022,11 @@ class _HeatCell(QtWidgets.QWidget):
         self._corner_static_text = QtGui.QStaticText(self.corner)
         self._value_static_text = QtGui.QStaticText(self._value_text)
         self._layout_key: Optional[tuple[int, int]] = None
-        self._frame_path = QtGui.QPainterPath()
+        self._frame_rect = QtCore.QRectF()
         self._corner_pos = QtCore.QPointF()
         self._value_pos = QtCore.QPointF()
+        self._bg_cache_key: Optional[tuple[int, int, int, int, int, int]] = None
+        self._bg_cache_pixmap: Optional[QtGui.QPixmap] = None
         try:
             self._corner_font.setBold(True)
             self._corner_font.setPointSize(max(8, int(self._corner_font.pointSize())))
@@ -9919,7 +10053,9 @@ class _HeatCell(QtWidgets.QWidget):
 
     def resizeEvent(self, event: QtGui.QResizeEvent):  # type: ignore[override]
         self._layout_key = None
-        self._frame_path = QtGui.QPainterPath()
+        self._frame_rect = QtCore.QRectF()
+        self._bg_cache_key = None
+        self._bg_cache_pixmap = None
         super().resizeEvent(event)
 
     def _ensure_layout(self) -> None:
@@ -9927,15 +10063,46 @@ class _HeatCell(QtWidgets.QWidget):
         if key == self._layout_key:
             return
         rect = QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
-        path = QtGui.QPainterPath()
-        path.addRoundedRect(rect, 8.0, 8.0)
         corner_h = float(QtGui.QFontMetrics(self._corner_font).height())
         value_h = float(QtGui.QFontMetrics(self._value_font).height())
         self._corner_pos = QtCore.QPointF(rect.left() + 8.0, rect.top() + 6.0 + max(0.0, (16.0 - corner_h) * 0.5))
         value_top = rect.top() + 24.0 + max(0.0, ((rect.height() - 30.0) - value_h) * 0.5)
         self._value_pos = QtCore.QPointF(rect.left() + 8.0, value_top)
-        self._frame_path = path
+        self._frame_rect = rect
         self._layout_key = key
+
+    def _ensure_background_cache(self) -> Optional[QtGui.QPixmap]:
+        w = int(max(1, self.width()))
+        h = int(max(1, self.height()))
+        try:
+            dpr = float(max(1.0, self.devicePixelRatioF()))
+        except Exception:
+            dpr = 1.0
+        key = (
+            w,
+            h,
+            int(round(dpr * 100.0)),
+            int(self._bg_color.red()),
+            int(self._bg_color.green()),
+            int(self._bg_color.blue()),
+        )
+        if key == self._bg_cache_key and self._bg_cache_pixmap is not None:
+            return self._bg_cache_pixmap
+        pix = QtGui.QPixmap(int(max(1.0, float(w) * dpr)), int(max(1.0, float(h) * dpr)))
+        try:
+            pix.setDevicePixelRatio(dpr)
+        except Exception:
+            pass
+        pix.fill(QtCore.Qt.transparent)
+        p = QtGui.QPainter(pix)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        p.setPen(self._border_pen)
+        p.setBrush(QtGui.QBrush(self._bg_color))
+        p.drawRoundedRect(QtCore.QRectF(0.5, 0.5, max(1.0, float(w) - 1.0), max(1.0, float(h) - 1.0)), 8.0, 8.0)
+        p.end()
+        self._bg_cache_key = key
+        self._bg_cache_pixmap = pix
+        return self._bg_cache_pixmap
 
     def set_value(self, value: float, *, text: str, u: float):
         rgb = _heat_rgb(u)
@@ -9947,6 +10114,8 @@ class _HeatCell(QtWidgets.QWidget):
             self._fg_color = QtGui.QColor(int(tr), int(tg), int(tb))
             self._bg_brush.setColor(self._bg_color)
             self._fg_pen.setColor(self._fg_color)
+            self._bg_cache_key = None
+            self._bg_cache_pixmap = None
             self._style_key = style_key
             changed = True
         if str(text) != self._value_text:
@@ -9960,12 +10129,17 @@ class _HeatCell(QtWidgets.QWidget):
     def paintEvent(self, _event: QtGui.QPaintEvent):  # type: ignore[override]
         self._ensure_layout()
         p = QtGui.QPainter(self)
-        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
-        p.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
-        p.setPen(self._border_pen)
-        p.setBrush(self._bg_brush)
-        p.drawPath(self._frame_path)
+        bg = self._ensure_background_cache()
+        if bg is not None:
+            p.drawPixmap(0, 0, bg)
+        else:
+            p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            p.setPen(self._border_pen)
+            p.setBrush(self._bg_brush)
+            p.drawRoundedRect(self._frame_rect, 8.0, 8.0)
 
+        p.setRenderHint(QtGui.QPainter.Antialiasing, False)
+        p.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
         p.setPen(self._fg_pen)
         p.setFont(self._corner_font)
         p.drawStaticText(self._corner_pos, self._corner_static_text)
@@ -10246,6 +10420,7 @@ class _CompactTelemetrySummaryCanvas(QtWidgets.QWidget):
             pass
         self._items: list[tuple[str, str]] = []
         self._items_key: Optional[tuple[tuple[str, str], ...]] = None
+        self._value_static_texts: list[QtGui.QStaticText] = []
         self._layout_cache_key: Optional[tuple[int, int, int]] = None
         self._layout_cache: list[QtCore.QRectF] = []
         self._bg_cache_key: Optional[tuple[Any, ...]] = None
@@ -10255,8 +10430,21 @@ class _CompactTelemetrySummaryCanvas(QtWidgets.QWidget):
         self._tile_border = QtGui.QPen(QtGui.QColor(61, 74, 90), 1.0)
         self._title_color = QtGui.QColor(154, 168, 184)
         self._value_color = QtGui.QColor(240, 245, 251)
+        self._value_font = QtGui.QFont(self.font())
         try:
             self._tile_border.setCosmetic(True)
+            self._value_font.setPointSize(max(9, int(self._value_font.pointSize())))
+            self._value_font.setBold(True)
+        except Exception:
+            pass
+
+    def _prepare_static_text(self, text_item: QtGui.QStaticText) -> None:
+        try:
+            text_item.setTextFormat(QtCore.Qt.PlainText)
+        except Exception:
+            pass
+        try:
+            text_item.prepare(QtGui.QTransform(), self._value_font)
         except Exception:
             pass
 
@@ -10265,6 +10453,11 @@ class _CompactTelemetrySummaryCanvas(QtWidgets.QWidget):
         if normalized == self._items_key:
             return
         self._items = list(normalized)
+        self._value_static_texts = []
+        for _title, value in self._items:
+            text_item = QtGui.QStaticText(str(value))
+            self._prepare_static_text(text_item)
+            self._value_static_texts.append(text_item)
         self._items_key = normalized
         self.update()
 
@@ -10350,23 +10543,21 @@ class _CompactTelemetrySummaryCanvas(QtWidgets.QWidget):
         else:
             p.fillRect(self.rect(), self._bg)
 
-        value_font = QtGui.QFont(self.font())
-        try:
-            value_font.setPointSize(max(9, int(value_font.pointSize())))
-            value_font.setBold(True)
-        except Exception:
-            pass
-        p.setFont(value_font)
+        p.setFont(self._value_font)
         p.setPen(self._value_color)
+        fm = QtGui.QFontMetrics(self._value_font)
         for idx, rect in enumerate(rects):
             if idx >= len(self._items):
                 break
-            _title, value = self._items[idx]
-            p.drawText(
-                QtCore.QRectF(rect.left() + 8.0, rect.top() + 18.0, rect.width() - 16.0, max(18.0, rect.height() - 22.0)),
-                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-                str(value),
+            text_item = self._value_static_texts[idx] if idx < len(self._value_static_texts) else None
+            if text_item is None:
+                continue
+            value_rect = QtCore.QRectF(rect.left() + 8.0, rect.top() + 18.0, rect.width() - 16.0, max(18.0, rect.height() - 22.0))
+            value_pos = QtCore.QPointF(
+                float(value_rect.left()),
+                float(value_rect.top() + max(0.0, (value_rect.height() - float(fm.height())) * 0.5)),
             )
+            p.drawStaticText(value_pos, text_item)
 
 
 class TelemetryPanel(QtWidgets.QWidget):
