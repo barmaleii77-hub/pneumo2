@@ -53,7 +53,8 @@ def test_desktop_mnemo_page_exposes_pointer_preview_and_launcher() -> None:
     assert "ретроспектива по текущему NPZ" in src
     assert "operational_follow_triage" in src
     assert "npz_retrospective_review" in src
-    assert 'importlib.util.find_spec("PySide6.QtWebEngineWidgets")' in src
+    assert 'importlib.util.find_spec("PySide6.QtSvg")' in src
+    assert "Qt WebEngine больше не нужен" in src
     assert '"pneumo_solver_ui.desktop_mnemo.main"' in src
     assert "Запустить Desktop Mnemo (follow)" in src
     assert "Запустить по текущему NPZ" in src

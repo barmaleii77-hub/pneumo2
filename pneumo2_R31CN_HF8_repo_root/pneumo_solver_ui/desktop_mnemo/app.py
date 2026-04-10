@@ -19,13 +19,9 @@ import numpy as np
 from PySide6 import QtCore, QtGui, QtWidgets
 
 try:
-    from PySide6 import QtWebChannel, QtWebEngineWidgets
-
-    _HAS_WEBENGINE = True
+    from PySide6 import QtSvg
 except Exception:
-    QtWebChannel = None  # type: ignore[assignment]
-    QtWebEngineWidgets = None  # type: ignore[assignment]
-    _HAS_WEBENGINE = False
+    QtSvg = None  # type: ignore[assignment]
 
 try:
     import pyqtgraph as pg
@@ -38,6 +34,7 @@ except Exception:
 
 from pneumo_solver_ui.desktop_animator.data_bundle import DataBundle, load_npz
 from pneumo_solver_ui.desktop_animator.ui_state import UiState, default_settings_path
+from pneumo_solver_ui.data_contract import read_visual_geometry_meta
 from pneumo_solver_ui.ui_svg_flow_helpers import default_svg_pressure_nodes
 
 
@@ -51,6 +48,18 @@ VIEWBOX_H = 1500.0
 VIEWBOX = f"0 0 {int(VIEWBOX_W)} {int(VIEWBOX_H)}"
 PLAYHEAD_STORAGE_KEY = "pneumo_desktop_mnemo_playhead"
 EVENT_LOG_SCHEMA_VERSION = "desktop_mnemo_event_log_v1"
+CORNER_ORDER: tuple[str, str, str, str] = ("ЛП", "ПП", "ЛЗ", "ПЗ")
+
+PRESSURE_HEAT_STOPS: tuple[tuple[float, tuple[int, int, int]], ...] = (
+    (0.00, (86, 198, 255)),
+    (0.22, (70, 232, 255)),
+    (0.54, (72, 255, 190)),
+    (0.82, (255, 214, 96)),
+    (1.00, (255, 126, 76)),
+)
+FLOW_FORWARD_RGB = (99, 211, 245)
+FLOW_REVERSE_RGB = (240, 147, 107)
+FLOW_IDLE_RGB = (77, 106, 118)
 
 SUPPLY_POSITIONS: dict[str, tuple[float, float]] = {
     "АТМ": (180.0, 150.0),
@@ -173,6 +182,17 @@ BOOTSTRAP_JS = """
       window.__lastArgs = Object.assign({}, window.__lastArgs || {}, { alerts: alerts || {} });
       if (typeof DATA !== "undefined" && DATA) DATA.alerts = alerts || {};
       if (typeof updateAlertOverlay === "function") updateAlertOverlay();
+      return true;
+    } catch (err) {
+      return String(err);
+    }
+  };
+  window.codexMnemoSetDiagnostics = function(diag) {
+    try {
+      if (!window.__lastArgs) window.__lastArgs = {};
+      window.__lastArgs = Object.assign({}, window.__lastArgs || {}, { mnemo_diagnostics: diag || {} });
+      if (typeof DATA !== "undefined" && DATA) DATA.mnemo_diagnostics = diag || {};
+      if (typeof updateMnemoDiagnostics === "function") updateMnemoDiagnostics();
       return true;
     } catch (err) {
       return String(err);
@@ -341,6 +361,10 @@ class MnemoDataset:
     q_scale: float
     q_unit: str
     p_atm: float
+    node_edges: dict[str, list[str]]
+    visual_geometry: dict[str, Any]
+    geometry_issues: list[str]
+    geometry_warnings: list[str]
 
 
 @dataclass
@@ -393,6 +417,45 @@ class MnemoTimelineEvent:
     summary: str
     edge_name: str
     node_name: str
+
+
+@dataclass(frozen=True)
+class ChamberSnapshot:
+    node_name: str
+    chamber_key: str
+    pressure_bar_g: float | None
+    pressure_min_bar_g: float | None
+    pressure_max_bar_g: float | None
+    volume_l: float | None
+    fill_ratio: float | None
+
+
+@dataclass(frozen=True)
+class CylinderSnapshot:
+    corner: str
+    cyl_index: int
+    stroke_m: float | None
+    stroke_speed_m_s: float | None
+    stroke_ratio: float | None
+    stroke_len_m: float | None
+    cap: ChamberSnapshot
+    rod: ChamberSnapshot
+    delta_p_bar: float | None
+    motion_label: str
+    volume_mode: str
+    geometry_ready: bool
+    focus_node: str
+
+
+@dataclass(frozen=True)
+class EdgeActivitySnapshot:
+    edge_name: str
+    component_kind: str
+    q_now: float
+    direction_label: str
+    state_label: str
+    zone_label: str
+    corners: tuple[str, ...]
 
 
 def build_launch_onboarding_context(
@@ -971,6 +1034,19 @@ def _load_canonical_edges() -> tuple[list[str], dict[str, dict[str, Any]]]:
             "kind": str(edge.get("kind") or ""),
         }
     return nodes, edge_defs
+
+
+def _build_node_edges(edge_defs: dict[str, dict[str, Any]], edge_names: list[str]) -> dict[str, list[str]]:
+    node_edges: dict[str, list[str]] = {}
+    for edge_name in edge_names:
+        edge_def = edge_defs.get(edge_name)
+        if not edge_def:
+            continue
+        for node_name in (str(edge_def.get("n1") or ""), str(edge_def.get("n2") or "")):
+            if not node_name:
+                continue
+            node_edges.setdefault(node_name, []).append(edge_name)
+    return node_edges
 
 
 def _p_atm_from_meta(meta: dict[str, Any]) -> float:
@@ -1690,6 +1766,14 @@ def prepare_dataset(npz_path: Path) -> MnemoDataset:
     overlay_node_names = _pick_overlay_nodes(node_names)
     edge_series = _build_edge_series(bundle, edge_names, q_scale, q_unit)
     node_series = _build_node_series(bundle, overlay_node_names, p_atm)
+    node_edges = _build_node_edges(edge_defs, edge_names)
+    visual_geometry = read_visual_geometry_meta(
+        bundle.meta if isinstance(bundle.meta, dict) else {},
+        context="Desktop Mnemo visual geometry",
+        log=None,
+    )
+    geometry_issues = [str(item) for item in visual_geometry.get("issues", []) if str(item).strip()]
+    geometry_warnings = [str(item) for item in visual_geometry.get("warnings", []) if str(item).strip()]
     time_s = np.asarray(bundle.t, dtype=float)
     dataset_id = f"{npz_path.resolve()}::{npz_path.stat().st_mtime_ns}"
 
@@ -1709,7 +1793,731 @@ def prepare_dataset(npz_path: Path) -> MnemoDataset:
         q_scale=q_scale,
         q_unit=q_unit,
         p_atm=p_atm,
+        node_edges=node_edges,
+        visual_geometry=visual_geometry,
+        geometry_issues=geometry_issues,
+        geometry_warnings=geometry_warnings,
     )
+
+
+def _finite_or_none(value: Any) -> float | None:
+    try:
+        value_f = float(value)
+    except Exception:
+        return None
+    if not np.isfinite(value_f):
+        return None
+    return float(value_f)
+
+
+def _clamp01(value: float) -> float:
+    return float(max(0.0, min(1.0, float(value))))
+
+
+def _mix_rgb(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tuple[int, int, int]:
+    tt = _clamp01(t)
+    return tuple(
+        int(round((1.0 - tt) * float(av) + tt * float(bv)))
+        for av, bv in zip(a, b)
+    )
+
+
+def _palette_rgb(stops: tuple[tuple[float, tuple[int, int, int]], ...], value: float) -> tuple[int, int, int]:
+    if not stops:
+        return (128, 128, 128)
+    v = _clamp01(value)
+    prev_pos, prev_rgb = stops[0]
+    for pos, rgb in stops[1:]:
+        if v <= pos:
+            span = max(1.0e-9, float(pos) - float(prev_pos))
+            t = (v - float(prev_pos)) / span
+            return _mix_rgb(prev_rgb, rgb, t)
+        prev_pos, prev_rgb = pos, rgb
+    return tuple(prev_rgb)
+
+
+def _rgb_hex(rgb: tuple[int, int, int]) -> str:
+    return "#{:02x}{:02x}{:02x}".format(*tuple(int(max(0, min(255, c))) for c in rgb))
+
+
+def _text_color_for_rgb(rgb: tuple[int, int, int]) -> str:
+    luminance = 0.299 * float(rgb[0]) + 0.587 * float(rgb[1]) + 0.114 * float(rgb[2])
+    return "#0c1620" if luminance >= 170.0 else "#eef6f8"
+
+
+def _pressure_to_heat_rgb(pressure_bar_g: float | None) -> tuple[int, int, int]:
+    if pressure_bar_g is None:
+        return (34, 48, 58)
+    normalized = _clamp01((float(pressure_bar_g) + 0.35) / 10.35)
+    return _palette_rgb(PRESSURE_HEAT_STOPS, normalized)
+
+
+def _flow_to_heat_rgb(flow_value: float, *, max_abs_flow: float) -> tuple[int, int, int]:
+    if not np.isfinite(flow_value) or abs(float(flow_value)) <= 1.0e-9 or max_abs_flow <= 1.0e-9:
+        return FLOW_IDLE_RGB
+    base = FLOW_FORWARD_RGB if float(flow_value) >= 0.0 else FLOW_REVERSE_RGB
+    strength = _clamp01(abs(float(flow_value)) / float(max_abs_flow))
+    return _mix_rgb(FLOW_IDLE_RGB, base, 0.20 + 0.80 * strength)
+
+
+def _corner_is_front(corner: str) -> bool:
+    return str(corner) in {"ЛП", "ПП"}
+
+
+def _short_node_label(node_name: str) -> str:
+    label = str(node_name or "").strip()
+    if not label:
+        return "—"
+    if label in SUPPLY_LABELS:
+        return str(SUPPLY_LABELS[label][0])
+    chamber_match = CHAMBER_RE.match(label)
+    if chamber_match:
+        return (
+            f"Ц{chamber_match.group('cyl')} "
+            f"{chamber_match.group('corner')} "
+            f"{chamber_match.group('ch')}"
+        )
+    diagonal_match = DIAGONAL_RE.match(label)
+    if diagonal_match:
+        src_corner = str(diagonal_match.group("src_corner"))
+        dst_corner = str(diagonal_match.group("dst_corner"))
+        src_ch = _chamber_short(str(diagonal_match.group("src_ch")))
+        dst_ch = _chamber_short(str(diagonal_match.group("dst_ch")))
+        return f"{src_corner}/{src_ch} → {dst_corner}/{dst_ch}"
+    if label.startswith("узел_после_"):
+        return label.replace("узел_после_", "", 1)
+    return label
+
+
+def _edge_open_state(dataset: MnemoDataset, edge_name: str, idx: int) -> str:
+    if dataset.bundle.open is None:
+        return "нет сигнала"
+    open_arr = dataset.bundle.open.column(edge_name, default=None)
+    if open_arr is None:
+        return "нет сигнала"
+    clamped_idx = int(max(0, min(idx, max(0, len(open_arr) - 1))))
+    return "открыт" if int(np.asarray(open_arr, dtype=int)[clamped_idx]) else "закрыт"
+
+
+def _edge_zone_corners(edge_name: str, edge_def: dict[str, Any]) -> tuple[str, ...]:
+    corners: list[str] = []
+    for node_name in (str(edge_def.get("n1") or ""), str(edge_def.get("n2") or "")):
+        chamber_match = CHAMBER_RE.match(node_name)
+        if chamber_match:
+            corners.append(str(chamber_match.group("corner")))
+        diagonal_match = DIAGONAL_RE.match(node_name)
+        if diagonal_match:
+            corners.extend(
+                (
+                    str(diagonal_match.group("src_corner")),
+                    str(diagonal_match.group("dst_corner")),
+                )
+            )
+    if not corners:
+        for corner in CORNER_ORDER:
+            if corner in str(edge_name):
+                corners.append(corner)
+    ordered = [corner for corner in CORNER_ORDER if corner in corners]
+    return tuple(dict.fromkeys(ordered))
+
+
+def _edge_zone_label(edge_name: str, edge_def: dict[str, Any]) -> str:
+    corners = _edge_zone_corners(edge_name, edge_def)
+    if corners:
+        return " / ".join(corners)
+    endpoints = [str(edge_def.get("n1") or ""), str(edge_def.get("n2") or "")]
+    named = [_short_node_label(item) for item in endpoints if item]
+    if named:
+        return " · ".join(named[:2])
+    return "магистраль"
+
+
+def _edge_component_kind(edge_name: str, edge_def: dict[str, Any]) -> str:
+    lower_name = str(edge_name).lower()
+    if any(token in lower_name for token in ("обратн", "check", "chk", "клапан", "ok_")):
+        return "РћР±СЂР°С‚РЅС‹Р№ РєР»Р°РїР°РЅ"
+    if any(token in lower_name for token in ("регулятор", "regulator", "reg_")):
+        return "Р РµРіСѓР»СЏС‚РѕСЂ"
+    if any(token in lower_name for token in ("дроссель", "throttle", "drossel", "dr_")):
+        return "Р”СЂРѕСЃСЃРµР»СЊ"
+    if "обратн" in lower_name:
+        return "Обратный клапан"
+    if "регулятор" in lower_name:
+        return "Регулятор"
+    if "дроссель" in lower_name:
+        return "Дроссель"
+    role = _edge_role(edge_name, edge_def)
+    if role == "vent":
+        return "Сброс"
+    if role == "diagonal":
+        return "Диагональ"
+    if role == "supply":
+        return "Питание"
+    if role == "actuator":
+        return "Исполнительная ветвь"
+    return "Линия"
+
+
+def _stroke_arrays_for_corner(dataset: MnemoDataset, corner: str) -> tuple[np.ndarray | None, np.ndarray | None]:
+    stroke_arr = dataset.bundle.main.column(f"положение_штока_{corner}_м", default=None)
+    if stroke_arr is None:
+        return None, None
+    stroke_vals = np.asarray(stroke_arr, dtype=float).reshape(-1)
+    speed_arr = dataset.bundle.main.column(f"скорость_штока_{corner}_м_с", default=None)
+    if speed_arr is not None:
+        speed_vals = np.asarray(speed_arr, dtype=float).reshape(-1)
+    elif stroke_vals.size >= 2 and dataset.time_s.size == stroke_vals.size:
+        try:
+            speed_vals = np.asarray(np.gradient(stroke_vals, dataset.time_s), dtype=float)
+        except Exception:
+            speed_vals = np.zeros_like(stroke_vals)
+    else:
+        speed_vals = np.zeros_like(stroke_vals)
+    return stroke_vals, speed_vals
+
+
+def _cylinder_geometry_for_corner(
+    dataset: MnemoDataset,
+    *,
+    cyl_index: int,
+    corner: str,
+) -> dict[str, float | None]:
+    geom = dataset.visual_geometry if isinstance(dataset.visual_geometry, dict) else {}
+    stroke_key = f"cyl{int(cyl_index)}_stroke_front_m" if _corner_is_front(corner) else f"cyl{int(cyl_index)}_stroke_rear_m"
+    return {
+        "bore_diameter_m": _finite_or_none(geom.get(f"cyl{int(cyl_index)}_bore_diameter_m")),
+        "rod_diameter_m": _finite_or_none(geom.get(f"cyl{int(cyl_index)}_rod_diameter_m")),
+        "stroke_len_m": _finite_or_none(geom.get(stroke_key)),
+        "dead_cap_length_m": _finite_or_none(geom.get(f"cyl{int(cyl_index)}_dead_cap_length_m")),
+        "dead_rod_length_m": _finite_or_none(geom.get(f"cyl{int(cyl_index)}_dead_rod_length_m")),
+    }
+
+
+def _pressure_triplet(dataset: MnemoDataset, idx: int, node_name: str) -> tuple[float | None, float | None, float | None]:
+    if dataset.bundle.p is None:
+        return None, None, None
+    p_arr = dataset.bundle.p.column(node_name, default=None)
+    if p_arr is None:
+        return None, None, None
+    p_vals = _bar_g(np.asarray(p_arr, dtype=float), dataset.p_atm)
+    if p_vals.size == 0:
+        return None, None, None
+    clamped_idx = int(max(0, min(idx, p_vals.size - 1)))
+    return (
+        float(p_vals[clamped_idx]),
+        float(np.nanmin(p_vals)),
+        float(np.nanmax(p_vals)),
+    )
+
+
+def _chamber_volume_snapshot(
+    *,
+    chamber_key: str,
+    stroke_m: float | None,
+    geometry: dict[str, float | None],
+) -> tuple[float | None, float | None, bool]:
+    bore_diameter = geometry.get("bore_diameter_m")
+    rod_diameter = geometry.get("rod_diameter_m")
+    stroke_len = geometry.get("stroke_len_m")
+    dead_cap = geometry.get("dead_cap_length_m")
+    dead_rod = geometry.get("dead_rod_length_m")
+    if None in {bore_diameter, rod_diameter, stroke_len, dead_cap, dead_rod} or stroke_m is None:
+        return None, None, False
+
+    bore_radius = 0.5 * float(bore_diameter)
+    rod_radius = 0.5 * float(rod_diameter)
+    cap_area = math.pi * bore_radius * bore_radius
+    rod_area = cap_area - math.pi * rod_radius * rod_radius
+    if not (cap_area > 0.0 and rod_area > 0.0):
+        return None, None, False
+
+    stroke_clamped = max(0.0, min(float(stroke_m), float(stroke_len)))
+    cap_len = float(dead_cap) + max(0.0, float(stroke_len) - stroke_clamped)
+    rod_len = float(dead_rod) + stroke_clamped
+    if str(chamber_key) == "БП":
+        max_len = max(1.0e-9, float(dead_cap) + float(stroke_len))
+        return float(cap_area * cap_len * 1000.0), _clamp01(cap_len / max_len), True
+    max_len = max(1.0e-9, float(dead_rod) + float(stroke_len))
+    return float(rod_area * rod_len * 1000.0), _clamp01(rod_len / max_len), True
+
+
+def _build_cylinder_snapshots(dataset: MnemoDataset | None, idx: int) -> list[CylinderSnapshot]:
+    if dataset is None or dataset.time_s.size == 0:
+        return []
+
+    snapshots: list[CylinderSnapshot] = []
+    for corner in CORNER_ORDER:
+        stroke_vals, speed_vals = _stroke_arrays_for_corner(dataset, corner)
+        clamped_idx = int(max(0, min(idx, dataset.time_s.size - 1)))
+        stroke_m = None if stroke_vals is None or stroke_vals.size == 0 else float(stroke_vals[min(clamped_idx, stroke_vals.size - 1)])
+        stroke_speed_m_s = None if speed_vals is None or speed_vals.size == 0 else float(speed_vals[min(clamped_idx, speed_vals.size - 1)])
+
+        for cyl_index in (1, 2):
+            cap_name = f"Ц{cyl_index}_{corner}_БП"
+            rod_name = f"Ц{cyl_index}_{corner}_ШП"
+            cap_p, cap_min, cap_max = _pressure_triplet(dataset, clamped_idx, cap_name)
+            rod_p, rod_min, rod_max = _pressure_triplet(dataset, clamped_idx, rod_name)
+            geometry = _cylinder_geometry_for_corner(dataset, cyl_index=cyl_index, corner=corner)
+            stroke_len_m = geometry.get("stroke_len_m")
+            stroke_ratio = None
+            if stroke_len_m is not None and stroke_len_m > 1.0e-9 and stroke_m is not None:
+                stroke_ratio = _clamp01(float(stroke_m) / float(stroke_len_m))
+            cap_volume_l, cap_fill_ratio, cap_volume_ready = _chamber_volume_snapshot(
+                chamber_key="БП",
+                stroke_m=stroke_m,
+                geometry=geometry,
+            )
+            rod_volume_l, rod_fill_ratio, rod_volume_ready = _chamber_volume_snapshot(
+                chamber_key="ШП",
+                stroke_m=stroke_m,
+                geometry=geometry,
+            )
+            delta_p_bar = None
+            if cap_p is not None and rod_p is not None:
+                delta_p_bar = float(cap_p - rod_p)
+            if stroke_speed_m_s is None:
+                motion_label = "нет сигнала хода"
+            elif stroke_speed_m_s > 1.0e-4:
+                motion_label = "шток выдвигается"
+            elif stroke_speed_m_s < -1.0e-4:
+                motion_label = "шток втягивается"
+            else:
+                motion_label = "шток удерживается"
+
+            cap_snapshot = ChamberSnapshot(
+                node_name=cap_name,
+                chamber_key="БП",
+                pressure_bar_g=cap_p,
+                pressure_min_bar_g=cap_min,
+                pressure_max_bar_g=cap_max,
+                volume_l=cap_volume_l,
+                fill_ratio=cap_fill_ratio,
+            )
+            rod_snapshot = ChamberSnapshot(
+                node_name=rod_name,
+                chamber_key="ШП",
+                pressure_bar_g=rod_p,
+                pressure_min_bar_g=rod_min,
+                pressure_max_bar_g=rod_max,
+                volume_l=rod_volume_l,
+                fill_ratio=rod_fill_ratio,
+            )
+            focus_node = cap_name
+            if (rod_p or float("-inf")) > (cap_p or float("-inf")):
+                focus_node = rod_name
+
+            snapshots.append(
+                CylinderSnapshot(
+                    corner=corner,
+                    cyl_index=cyl_index,
+                    stroke_m=stroke_m,
+                    stroke_speed_m_s=stroke_speed_m_s,
+                    stroke_ratio=stroke_ratio,
+                    stroke_len_m=stroke_len_m,
+                    cap=cap_snapshot,
+                    rod=rod_snapshot,
+                    delta_p_bar=delta_p_bar,
+                    motion_label=motion_label,
+                    volume_mode="absolute" if cap_volume_ready and rod_volume_ready else "pressure_only",
+                    geometry_ready=bool(cap_volume_ready and rod_volume_ready),
+                    focus_node=focus_node,
+                )
+            )
+    return snapshots
+
+
+def _build_edge_activity_snapshots(dataset: MnemoDataset | None, idx: int) -> list[EdgeActivitySnapshot]:
+    if dataset is None or dataset.time_s.size == 0:
+        return []
+
+    rows: list[EdgeActivitySnapshot] = []
+    for edge_name, q_now in _edge_rows_for_index(dataset, idx)[:12]:
+        edge_def = dataset.edge_defs.get(edge_name, {})
+        n1 = str(edge_def.get("n1") or "")
+        n2 = str(edge_def.get("n2") or "")
+        if q_now >= 0.0:
+            direction_label = f"{_short_node_label(n1)} → {_short_node_label(n2)}"
+        else:
+            direction_label = f"{_short_node_label(n2)} → {_short_node_label(n1)}"
+        corners = _edge_zone_corners(edge_name, edge_def)
+        rows.append(
+            EdgeActivitySnapshot(
+                edge_name=edge_name,
+                component_kind=_edge_component_kind(edge_name, edge_def),
+                q_now=float(q_now),
+                direction_label=direction_label,
+                state_label=_edge_open_state(dataset, edge_name, idx),
+                zone_label=_edge_zone_label(edge_name, edge_def),
+                corners=corners,
+            )
+        )
+    return rows
+
+
+def _build_edge_activity_snapshots_full(dataset: MnemoDataset | None, idx: int) -> list[EdgeActivitySnapshot]:
+    if dataset is None or dataset.time_s.size == 0:
+        return []
+
+    rows: list[EdgeActivitySnapshot] = []
+    for edge_name, q_now in _edge_rows_for_index(dataset, idx):
+        edge_def = dataset.edge_defs.get(edge_name, {})
+        n1 = str(edge_def.get("n1") or "")
+        n2 = str(edge_def.get("n2") or "")
+        if q_now >= 0.0:
+            direction_label = f"{_short_node_label(n1)} в†’ {_short_node_label(n2)}"
+        else:
+            direction_label = f"{_short_node_label(n2)} в†’ {_short_node_label(n1)}"
+        corners = _edge_zone_corners(edge_name, edge_def)
+        rows.append(
+            EdgeActivitySnapshot(
+                edge_name=edge_name,
+                component_kind=_edge_component_kind(edge_name, edge_def),
+                q_now=float(q_now),
+                direction_label=direction_label,
+                state_label=_edge_open_state(dataset, edge_name, idx),
+                zone_label=_edge_zone_label(edge_name, edge_def),
+                corners=corners,
+            )
+        )
+    return rows
+
+
+def _build_corner_snapshot_cards(
+    cylinder_rows: list[CylinderSnapshot],
+    edge_rows: list[EdgeActivitySnapshot],
+) -> dict[str, dict[str, Any]]:
+    max_abs_flow = max((abs(float(item.q_now)) for item in edge_rows), default=0.0)
+    cards: dict[str, dict[str, Any]] = {}
+    for corner in CORNER_ORDER:
+        corner_cylinders = [item for item in cylinder_rows if item.corner == corner]
+        corner_edges = [item for item in edge_rows if corner in item.corners]
+        pressures = [
+            value
+            for item in corner_cylinders
+            for value in (item.cap.pressure_bar_g, item.rod.pressure_bar_g)
+            if value is not None
+        ]
+        max_pressure = max(pressures) if pressures else None
+        delta_candidates = [abs(float(item.delta_p_bar)) for item in corner_cylinders if item.delta_p_bar is not None]
+        delta_peak = max(delta_candidates) if delta_candidates else 0.0
+        stroke_ratio = next((item.stroke_ratio for item in corner_cylinders if item.stroke_ratio is not None), None)
+        stroke_speed = next((item.stroke_speed_m_s for item in corner_cylinders if item.stroke_speed_m_s is not None), None)
+        dominant_flow = max(corner_edges, key=lambda item: abs(float(item.q_now)), default=None)
+        cards[corner] = {
+            "corner": corner,
+            "max_pressure_bar_g": max_pressure,
+            "pressure_rgb": _pressure_to_heat_rgb(max_pressure),
+            "delta_peak_bar": float(delta_peak),
+            "stroke_ratio": stroke_ratio,
+            "stroke_speed_m_s": stroke_speed,
+            "dominant_flow_q": None if dominant_flow is None else float(dominant_flow.q_now),
+            "dominant_flow_rgb": _flow_to_heat_rgb(
+                0.0 if dominant_flow is None else float(dominant_flow.q_now),
+                max_abs_flow=max_abs_flow,
+            ),
+            "flow_zone_label": "—" if dominant_flow is None else dominant_flow.zone_label,
+            "motion_label": next((item.motion_label for item in corner_cylinders if item.motion_label), "нет сигнала"),
+        }
+    return cards
+
+
+def _find_cylinder_snapshot_for_node(
+    rows: list[CylinderSnapshot],
+    node_name: str,
+) -> tuple[CylinderSnapshot, ChamberSnapshot] | None:
+    for item in rows:
+        if item.cap.node_name == node_name:
+            return item, item.cap
+        if item.rod.node_name == node_name:
+            return item, item.rod
+    return None
+
+
+def _focus_corner_from_selection(
+    dataset: MnemoDataset | None,
+    *,
+    edge_name: str | None,
+    node_name: str | None,
+) -> str | None:
+    if node_name:
+        chamber_match = CHAMBER_RE.match(node_name)
+        if chamber_match:
+            return str(chamber_match.group("corner"))
+    if dataset is None or not edge_name:
+        return None
+    corners = _edge_zone_corners(edge_name, dataset.edge_defs.get(edge_name, {}))
+    if len(corners) == 1:
+        return str(corners[0])
+    return None
+
+
+def _component_kind_short_label(kind: str) -> str:
+    mapping = {
+        "РћР±СЂР°С‚РЅС‹Р№ РєР»Р°РїР°РЅ": "CHK",
+        "Р РµРіСѓР»СЏС‚РѕСЂ": "REG",
+        "Р”СЂРѕСЃСЃРµР»СЊ": "THR",
+        "РЎР±СЂРѕСЃ": "VENT",
+        "Р”РёР°РіРѕРЅР°Р»СЊ": "XOVR",
+        "РџРёС‚Р°РЅРёРµ": "SUP",
+        "РСЃРїРѕР»РЅРёС‚РµР»СЊРЅР°СЏ РІРµС‚РІСЊ": "ACT",
+        "Р›РёРЅРёСЏ": "LINE",
+    }
+    return mapping.get(str(kind), "LINE")
+
+
+def _state_short_label(state_label: str) -> str:
+    lowered = str(state_label).lower()
+    if "РѕС‚РєСЂ" in lowered:
+        return "OPEN"
+    if "Р·Р°РєСЂ" in lowered:
+        return "SHUT"
+    return "SIG?"
+
+
+def _motion_short_label(stroke_speed_m_s: float | None) -> str:
+    if stroke_speed_m_s is None:
+        return "SIG?"
+    if stroke_speed_m_s > 1.0e-4:
+        return "EXT"
+    if stroke_speed_m_s < -1.0e-4:
+        return "RET"
+    return "HOLD"
+
+
+def _serialize_chamber_overlay(chamber: ChamberSnapshot) -> dict[str, Any]:
+    heat_rgb = _pressure_to_heat_rgb(chamber.pressure_bar_g)
+    return {
+        "node_name": chamber.node_name,
+        "chamber_key": chamber.chamber_key,
+        "pressure_bar_g": _finite_or_none(chamber.pressure_bar_g),
+        "pressure_min_bar_g": _finite_or_none(chamber.pressure_min_bar_g),
+        "pressure_max_bar_g": _finite_or_none(chamber.pressure_max_bar_g),
+        "volume_l": _finite_or_none(chamber.volume_l),
+        "fill_ratio": _finite_or_none(chamber.fill_ratio),
+        "heat_hex": _rgb_hex(heat_rgb),
+        "text_hex": _text_color_for_rgb(heat_rgb),
+    }
+
+
+def _serialize_cylinder_overlay(snapshot: CylinderSnapshot) -> dict[str, Any]:
+    delta_value = _finite_or_none(snapshot.delta_p_bar)
+    delta_rgb = _pressure_to_heat_rgb(abs(delta_value) if delta_value is not None else None)
+    return {
+        "id": f"cyl{snapshot.cyl_index}_{snapshot.corner}",
+        "corner": snapshot.corner,
+        "cyl_index": int(snapshot.cyl_index),
+        "stroke_m": _finite_or_none(snapshot.stroke_m),
+        "stroke_speed_m_s": _finite_or_none(snapshot.stroke_speed_m_s),
+        "stroke_ratio": _finite_or_none(snapshot.stroke_ratio),
+        "stroke_len_m": _finite_or_none(snapshot.stroke_len_m),
+        "delta_p_bar": delta_value,
+        "delta_hex": _rgb_hex(delta_rgb),
+        "delta_text_hex": _text_color_for_rgb(delta_rgb),
+        "motion_label": snapshot.motion_label,
+        "motion_short": _motion_short_label(snapshot.stroke_speed_m_s),
+        "volume_mode": snapshot.volume_mode,
+        "geometry_ready": bool(snapshot.geometry_ready),
+        "focus_node": snapshot.focus_node,
+        "cap": _serialize_chamber_overlay(snapshot.cap),
+        "rod": _serialize_chamber_overlay(snapshot.rod),
+    }
+
+
+def _build_component_overlay_rows(
+    dataset: MnemoDataset | None,
+    idx: int,
+    *,
+    selected_edge: str | None,
+) -> list[dict[str, Any]]:
+    all_rows = _build_edge_activity_snapshots_full(dataset, idx)
+    if not all_rows:
+        return []
+
+    selected_name = str(selected_edge or "")
+    relevant_kinds = {
+        "РћР±СЂР°С‚РЅС‹Р№ РєР»Р°РїР°РЅ",
+        "Р РµРіСѓР»СЏС‚РѕСЂ",
+        "Р”СЂРѕСЃСЃРµР»СЊ",
+        "РЎР±СЂРѕСЃ",
+        "Р”РёР°РіРѕРЅР°Р»СЊ",
+    }
+    max_abs_flow = max((abs(float(item.q_now)) for item in all_rows), default=0.0)
+    diagonal_floor = max_abs_flow * 0.08 if max_abs_flow > 1.0e-9 else 0.0
+
+    payload_rows: list[dict[str, Any]] = []
+    for order, item in enumerate(all_rows):
+        if item.edge_name != selected_name and item.component_kind not in relevant_kinds:
+            continue
+        if (
+            item.edge_name != selected_name
+            and item.component_kind == "Р”РёР°РіРѕРЅР°Р»СЊ"
+            and abs(float(item.q_now)) < diagonal_floor
+        ):
+            continue
+        flow_rgb = _flow_to_heat_rgb(item.q_now, max_abs_flow=max_abs_flow)
+        payload_rows.append(
+            {
+                "edge_name": item.edge_name,
+                "component_kind": item.component_kind,
+                "component_short": _component_kind_short_label(item.component_kind),
+                "q_now": _finite_or_none(item.q_now),
+                "flow_abs": _finite_or_none(abs(float(item.q_now))),
+                "direction_label": item.direction_label,
+                "state_label": item.state_label,
+                "state_short": _state_short_label(item.state_label),
+                "zone_label": item.zone_label,
+                "corners": list(item.corners),
+                "flow_hex": _rgb_hex(flow_rgb),
+                "text_hex": _text_color_for_rgb(flow_rgb),
+                "is_selected": bool(item.edge_name == selected_name),
+                "is_active": bool(
+                    abs(float(item.q_now)) >= max_abs_flow * 0.04 if max_abs_flow > 1.0e-9 else item.edge_name == selected_name
+                ),
+                "order": int(order),
+            }
+        )
+
+    payload_rows.sort(
+        key=lambda item: (
+            0 if item.get("is_selected") else 1,
+            -float(item.get("flow_abs") or 0.0),
+            str(item.get("edge_name") or ""),
+        )
+    )
+    return payload_rows[:18]
+
+
+def _build_mnemo_diagnostics_payload(
+    dataset: MnemoDataset | None,
+    idx: int,
+    *,
+    selected_edge: str | None,
+    selected_node: str | None,
+) -> dict[str, Any]:
+    cylinder_rows = _build_cylinder_snapshots(dataset, idx)
+    component_rows = _build_component_overlay_rows(dataset, idx, selected_edge=selected_edge)
+    focus_corner = _focus_corner_from_selection(dataset, edge_name=selected_edge, node_name=selected_node)
+    return {
+        "frame_idx": int(max(0, idx)),
+        "focus_corner": focus_corner,
+        "selected_edge": str(selected_edge or ""),
+        "selected_node": str(selected_node or ""),
+        "geometry_warnings": list(dataset.geometry_warnings) if dataset is not None else [],
+        "geometry_issues": list(dataset.geometry_issues) if dataset is not None else [],
+        "cylinders": [_serialize_cylinder_overlay(item) for item in cylinder_rows],
+        "components": component_rows,
+    }
+
+
+def _edge_component_kind(edge_name: str, edge_def: dict[str, Any]) -> str:
+    lower_name = str(edge_name).lower()
+    if any(token in lower_name for token in ("обратн", "check", "chk", "клапан", "ok_")):
+        return "Обратный клапан"
+    if any(token in lower_name for token in ("регулятор", "regulator", "reg_")):
+        return "Регулятор"
+    if any(token in lower_name for token in ("дроссель", "throttle", "drossel", "dr_")):
+        return "Дроссель"
+    role = _edge_role(edge_name, edge_def)
+    if role == "vent":
+        return "Сброс"
+    if role == "diagonal":
+        return "Диагональ"
+    if role == "supply":
+        return "Питание"
+    if role == "actuator":
+        return "Исполнительная ветвь"
+    return "Линия"
+
+
+def _component_kind_short_label(kind: str) -> str:
+    mapping = {
+        "Обратный клапан": "CHK",
+        "Регулятор": "REG",
+        "Дроссель": "THR",
+        "Сброс": "VENT",
+        "Диагональ": "XOVR",
+        "Питание": "SUP",
+        "Исполнительная ветвь": "ACT",
+        "Линия": "LINE",
+        "РћР±СЂР°С‚РЅС‹Р№ РєР»Р°РїР°РЅ": "CHK",
+        "Р РµРіСѓР»СЏС‚РѕСЂ": "REG",
+        "Р”СЂРѕСЃСЃРµР»СЊ": "THR",
+        "РЎР±СЂРѕСЃ": "VENT",
+        "Р”РёР°РіРѕРЅР°Р»СЊ": "XOVR",
+        "РџРёС‚Р°РЅРёРµ": "SUP",
+        "РСЃРїРѕР»РЅРёС‚РµР»СЊРЅР°СЏ РІРµС‚РІСЊ": "ACT",
+        "Р›РёРЅРёСЏ": "LINE",
+    }
+    return mapping.get(str(kind), "LINE")
+
+
+def _state_short_label(state_label: str) -> str:
+    lowered = str(state_label).lower()
+    if any(token in lowered for token in ("откр", "рѕс‚рєсЂ")):
+        return "OPEN"
+    if any(token in lowered for token in ("закр", "р·р°рєсЂ")):
+        return "SHUT"
+    return "SIG?"
+
+
+def _build_component_overlay_rows(
+    dataset: MnemoDataset | None,
+    idx: int,
+    *,
+    selected_edge: str | None,
+) -> list[dict[str, Any]]:
+    all_rows = _build_edge_activity_snapshots_full(dataset, idx)
+    if not all_rows:
+        return []
+
+    selected_name = str(selected_edge or "")
+    relevant_kinds = {
+        "Обратный клапан",
+        "Регулятор",
+        "Дроссель",
+        "Сброс",
+        "Диагональ",
+    }
+    max_abs_flow = max((abs(float(item.q_now)) for item in all_rows), default=0.0)
+    diagonal_floor = max_abs_flow * 0.08 if max_abs_flow > 1.0e-9 else 0.0
+
+    payload_rows: list[dict[str, Any]] = []
+    for order, item in enumerate(all_rows):
+        if item.edge_name != selected_name and item.component_kind not in relevant_kinds:
+            continue
+        if item.edge_name != selected_name and item.component_kind == "Диагональ" and abs(float(item.q_now)) < diagonal_floor:
+            continue
+        flow_rgb = _flow_to_heat_rgb(item.q_now, max_abs_flow=max_abs_flow)
+        payload_rows.append(
+            {
+                "edge_name": item.edge_name,
+                "component_kind": item.component_kind,
+                "component_short": _component_kind_short_label(item.component_kind),
+                "q_now": _finite_or_none(item.q_now),
+                "flow_abs": _finite_or_none(abs(float(item.q_now))),
+                "direction_label": item.direction_label,
+                "state_label": item.state_label,
+                "state_short": _state_short_label(item.state_label),
+                "zone_label": item.zone_label,
+                "corners": list(item.corners),
+                "flow_hex": _rgb_hex(flow_rgb),
+                "text_hex": _text_color_for_rgb(flow_rgb),
+                "is_selected": bool(item.edge_name == selected_name),
+                "is_active": bool(
+                    abs(float(item.q_now)) >= max_abs_flow * 0.04 if max_abs_flow > 1.0e-9 else item.edge_name == selected_name
+                ),
+                "order": int(order),
+            }
+        )
+
+    payload_rows.sort(
+        key=lambda item: (
+            0 if item.get("is_selected") else 1,
+            -float(item.get("flow_abs") or 0.0),
+            str(item.get("edge_name") or ""),
+        )
+    )
+    return payload_rows[:18]
 
 
 class PointerWatcher(QtCore.QObject):
@@ -1802,129 +2610,469 @@ class MnemoWebView(QtWidgets.QWidget):
         super().__init__(parent)
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(8)
 
-        self._loaded = False
-        self._bridge: BridgeObject | None = None
-        self._pending_js: list[str] = []
+        header = QtWidgets.QFrame(self)
+        header.setObjectName("mnemo_native_header")
+        header_lay = QtWidgets.QHBoxLayout(header)
+        header_lay.setContentsMargins(12, 10, 12, 10)
+        header_lay.setSpacing(12)
 
-        if not _HAS_WEBENGINE:
-            fallback = QtWidgets.QTextBrowser()
-            fallback.setHtml(
-                "<h3>Qt WebEngine не найден</h3>"
-                "<p>Для анимированной мнемосхемы нужен модуль <code>PySide6.QtWebEngineWidgets</code>.</p>"
-            )
-            lay.addWidget(fallback)
-            self.view = None
-            return
+        self.mode_badge = QtWidgets.QLabel("Native Canvas", header)
+        self.mode_badge.setObjectName("mnemo_native_mode_badge")
+        self.mode_badge.setStyleSheet(
+            "QLabel#mnemo_native_mode_badge {"
+            "background:#102c36; color:#9fe7f7; border:1px solid #265563; "
+            "border-radius:10px; padding:6px 10px; font-weight:700; }"
+        )
+        header_lay.addWidget(self.mode_badge, 0)
 
-        assert QtWebEngineWidgets is not None
-        assert QtWebChannel is not None
-        self.view = QtWebEngineWidgets.QWebEngineView(self)
-        lay.addWidget(self.view)
+        text_col = QtWidgets.QVBoxLayout()
+        text_col.setSpacing(2)
+        self.summary_label = QtWidgets.QLabel(
+            "Нативная Windows/Qt мнемосхема без WebEngine: один экран для давления, расходов, состояний арматуры и хода цилиндров.",
+            header,
+        )
+        self.summary_label.setWordWrap(True)
+        self.summary_label.setStyleSheet("color:#d9eef2; font-weight:600;")
+        self.hint_label = QtWidgets.QLabel("Колесо: zoom • drag: pan • click: выбрать ветвь или узел", header)
+        self.hint_label.setStyleSheet("color:#89aeb8;")
+        text_col.addWidget(self.summary_label)
+        text_col.addWidget(self.hint_label)
+        header_lay.addLayout(text_col, 1)
+        lay.addWidget(header, 0)
 
-        self._bridge = BridgeObject()
-        self._bridge.message_received.connect(self._on_bridge_message)
-        channel = QtWebChannel.QWebChannel(self.view.page())
-        channel.registerObject("codexBridge", self._bridge)
-        self.view.page().setWebChannel(channel)
-        self.view.loadFinished.connect(self._on_load_finished)
-        self._load_component_html()
-
-    def _load_component_html(self) -> None:
-        if self.view is None:
-            return
-        html_text = COMPONENT_HTML_PATH.read_text(encoding="utf-8")
-        if "qrc:///qtwebchannel/qwebchannel.js" not in html_text:
-            html_text = html_text.replace("</head>", '  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>\n</head>', 1)
-        self.view.setHtml(html_text, QtCore.QUrl.fromLocalFile(str(COMPONENT_HTML_PATH.resolve())))
-
-    def _on_load_finished(self, ok: bool) -> None:
-        if not ok or self.view is None:
-            self.status.emit("Не удалось загрузить HTML-компонент мнемосхемы.")
-            return
-        self._loaded = True
-        self.view.page().runJavaScript(BOOTSTRAP_JS)
-        QtCore.QTimer.singleShot(0, self._flush_pending)
-
-    def _queue_or_run(self, js_code: str) -> None:
-        if self.view is None:
-            return
-        if not self._loaded:
-            self._pending_js.append(js_code)
-            return
-        self.view.page().runJavaScript(js_code)
-
-    def _flush_pending(self) -> None:
-        if self.view is None or not self._loaded:
-            return
-        pending = list(self._pending_js)
-        self._pending_js.clear()
-        for js_code in pending:
-            self.view.page().runJavaScript(js_code)
+        self.native_canvas = MnemoNativeCanvas(self)
+        self.native_canvas.edge_picked.connect(self.edge_picked.emit)
+        self.native_canvas.node_picked.connect(self.node_picked.emit)
+        self.native_canvas.status.connect(self.status.emit)
+        lay.addWidget(self.native_canvas, 1)
 
     def render_dataset(self, dataset: MnemoDataset, *, selected_edge: str | None, selected_node: str | None) -> None:
-        args = {
-            "title": "Пневмосхема: desktop mnemonic",
-            "svg": dataset.svg_inline,
-            "mapping": dataset.mapping,
-            "time": dataset.time_s.astype(float).tolist(),
-            "edges": dataset.edge_series,
-            "nodes": dataset.node_series,
-            "selected": {"edge": selected_edge, "node": selected_node},
-            "sync_playhead": True,
-            "playhead_storage_key": PLAYHEAD_STORAGE_KEY,
-            "dataset_id": dataset.dataset_id,
-            "height": 1260,
-            "show_review_overlay": False,
-            "show_alert_overlay": True,
-            "alerts": _build_frame_alert_payload(
-                dataset,
-                0,
-                selected_edge=selected_edge,
-                selected_node=selected_node,
-            ),
-        }
-        payload = json.dumps(args, ensure_ascii=False)
-        self._queue_or_run(f"window.codexMnemoDispatch({payload});")
+        self.mode_badge.setText("Native Canvas")
+        self.summary_label.setText(
+            f"{dataset.npz_path.name}: нативный canvas держит full-system мнемосхему и живые overlays на одном экране."
+        )
+        self.native_canvas.render_dataset(dataset, selected_edge=selected_edge, selected_node=selected_node)
 
     def set_playhead(self, idx: int, playing: bool, dataset_id: str) -> None:
-        state = json.dumps(
-            {"idx": int(idx), "playing": bool(playing), "dataset_id": str(dataset_id), "key": PLAYHEAD_STORAGE_KEY},
-            ensure_ascii=False,
-        )
-        self._queue_or_run(f"window.codexMnemoSetPlayhead({state});")
+        self.mode_badge.setText("Playback" if playing else "Hold")
+        self.native_canvas.set_frame_state(idx, playing, dataset_id)
 
     def set_selection(self, *, edge: str | None, node: str | None) -> None:
-        payload = json.dumps({"edge": edge, "node": node}, ensure_ascii=False)
-        self._queue_or_run(f"window.codexMnemoSetSelection({payload});")
+        label = edge or node or "Native Canvas"
+        self.mode_badge.setText(str(label))
+        self.native_canvas.set_selection(edge=edge, node=node)
 
     def set_alerts(self, alerts: dict[str, Any]) -> None:
-        payload = json.dumps(alerts, ensure_ascii=False)
-        self._queue_or_run(f"window.codexMnemoSetAlerts({payload});")
+        primary = dict(alerts.get("primary") or {})
+        severity = str(primary.get("severity") or "")
+        if primary:
+            self.summary_label.setText(str(primary.get("summary") or self.summary_label.text()))
+            if severity:
+                self.mode_badge.setText(str(primary.get("title") or severity))
+        self.native_canvas.set_alerts(alerts)
+
+    def set_diagnostics(self, diagnostics: dict[str, Any]) -> None:
+        warnings = len(list(diagnostics.get("geometry_warnings") or []))
+        issues = len(list(diagnostics.get("geometry_issues") or []))
+        self.hint_label.setText(
+            f"Native overlay: cylinders {len(list(diagnostics.get('cylinders') or []))}, components {len(list(diagnostics.get('components') or []))}, geometry {warnings}/{issues}"
+        )
+        self.native_canvas.set_diagnostics(diagnostics)
 
     def set_focus_region(self, focus_region: dict[str, Any] | None) -> None:
-        payload = json.dumps(focus_region, ensure_ascii=False)
-        self._queue_or_run(f"window.codexMnemoSetFocusRegion({payload});")
+        if focus_region:
+            self.mode_badge.setText("Focus")
+            self.summary_label.setText(str(focus_region.get("summary") or "Фокусный сценарий"))
+        self.native_canvas.set_focus_region(focus_region)
 
     def show_overview(self, meta: dict[str, Any] | None = None) -> None:
-        payload = json.dumps(meta or {}, ensure_ascii=False)
-        self._queue_or_run(f"window.codexMnemoShowOverview({payload});")
+        overview_meta = dict(meta or {})
+        self.mode_badge.setText("Overview")
+        self.summary_label.setText(
+            str(overview_meta.get("summary") or "Полная схема: сравните активный сценарий с целой топологией и вернитесь к фокусу через toolbar.")
+        )
+        self.native_canvas.show_overview(overview_meta)
 
-    def _on_bridge_message(self, payload: str) -> None:
-        try:
-            obj = json.loads(payload)
-        except Exception:
+
+class CornerHeatmapWidget(QtWidgets.QWidget):
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self._cards: dict[str, dict[str, Any]] = {}
+        self.setMinimumHeight(220)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+
+    def set_cards(self, cards: dict[str, dict[str, Any]]) -> None:
+        self._cards = dict(cards or {})
+        self.update()
+
+    @staticmethod
+    def _fmt(value: float | None, *, suffix: str, digits: int = 2) -> str:
+        if value is None or not np.isfinite(value):
+            return f"— {suffix}".strip()
+        return f"{float(value):.{digits}f} {suffix}".strip()
+
+    def paintEvent(self, event: QtGui.QPaintEvent) -> None:  # type: ignore[override]
+        super().paintEvent(event)
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+
+        full_rect = self.rect().adjusted(8, 8, -8, -8)
+        painter.fillRect(self.rect(), QtGui.QColor("#0b1720"))
+        if full_rect.width() <= 20 or full_rect.height() <= 20:
             return
-        if not isinstance(obj, dict):
+
+        if not self._cards:
+            painter.setPen(QtGui.QColor("#8fb0bc"))
+            painter.drawText(full_rect, QtCore.Qt.AlignCenter, "Теплокарта углов ждёт данные bundle.")
             return
-        if obj.get("type") == "streamlit:setFrameHeight":
+
+        gap = 10
+        cell_width = max(40, int((full_rect.width() - gap) / 2))
+        cell_height = max(60, int((full_rect.height() - gap) / 2))
+        title_font = QtGui.QFont(self.font())
+        title_font.setBold(True)
+        title_font.setPointSize(title_font.pointSize() + 2)
+        body_font = QtGui.QFont(self.font())
+        body_font.setPointSize(max(8, body_font.pointSize() - 1))
+        caption_font = QtGui.QFont(self.font())
+        caption_font.setPointSize(max(8, caption_font.pointSize() - 2))
+
+        for index, corner in enumerate(CORNER_ORDER):
+            row = 0 if index < 2 else 1
+            col = index % 2
+            left = full_rect.left() + col * (cell_width + gap)
+            top = full_rect.top() + row * (cell_height + gap)
+            rect = QtCore.QRectF(left, top, cell_width, cell_height)
+            card = self._cards.get(corner, {})
+            pressure_rgb = tuple(card.get("pressure_rgb", (34, 48, 58)))
+            pressure_color = QtGui.QColor(*pressure_rgb)
+            flow_rgb = tuple(card.get("dominant_flow_rgb", FLOW_IDLE_RGB))
+            flow_color = QtGui.QColor(*flow_rgb)
+            text_color = QtGui.QColor(_text_color_for_rgb(pressure_rgb))
+            border_color = QtGui.QColor(flow_color)
+            border_color.setAlpha(190)
+
+            grad = QtGui.QLinearGradient(rect.topLeft(), rect.bottomRight())
+            grad.setColorAt(0.0, pressure_color.lighter(118))
+            grad.setColorAt(1.0, pressure_color.darker(235))
+            painter.setBrush(QtGui.QBrush(grad))
+            painter.setPen(QtGui.QPen(border_color, 1.6))
+            painter.drawRoundedRect(rect, 14.0, 14.0)
+
+            flow_bar_rect = QtCore.QRectF(rect.left() + 10.0, rect.bottom() - 16.0, rect.width() - 20.0, 7.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(QtGui.QColor(18, 31, 40, 165))
+            painter.drawRoundedRect(flow_bar_rect, 4.0, 4.0)
+            painter.setBrush(flow_color)
+            painter.drawRoundedRect(flow_bar_rect, 4.0, 4.0)
+
+            painter.setPen(text_color)
+            painter.setFont(title_font)
+            painter.drawText(
+                QtCore.QRectF(rect.left() + 12.0, rect.top() + 10.0, rect.width() - 24.0, 24.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                corner,
+            )
+            painter.setFont(body_font)
+            painter.drawText(
+                QtCore.QRectF(rect.left() + 12.0, rect.top() + 40.0, rect.width() - 24.0, 20.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                f"Pmax {self._fmt(card.get('max_pressure_bar_g'), suffix='бар(g)', digits=2)}",
+            )
+            painter.drawText(
+                QtCore.QRectF(rect.left() + 12.0, rect.top() + 62.0, rect.width() - 24.0, 20.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                f"ΔPпик {self._fmt(card.get('delta_peak_bar'), suffix='бар', digits=2)}",
+            )
+
+            stroke_ratio = card.get("stroke_ratio")
+            if stroke_ratio is None:
+                stroke_text = "Ход —"
+            else:
+                stroke_text = f"Ход {int(round(100.0 * float(stroke_ratio))):d}%"
+            stroke_speed = card.get("stroke_speed_m_s")
+            if stroke_speed is None:
+                speed_text = "vшт —"
+            else:
+                speed_text = f"vшт {float(stroke_speed):+0.3f} м/с"
+            painter.drawText(
+                QtCore.QRectF(rect.left() + 12.0, rect.top() + 84.0, rect.width() - 24.0, 20.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                f"{stroke_text} · {speed_text}",
+            )
+
+            painter.setFont(caption_font)
+            painter.drawText(
+                QtCore.QRectF(rect.left() + 12.0, rect.top() + 108.0, rect.width() - 24.0, 16.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                str(card.get("motion_label") or "нет сигнала"),
+            )
+            painter.drawText(
+                QtCore.QRectF(rect.left() + 12.0, rect.bottom() - 38.0, rect.width() - 24.0, 16.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                f"Зона потока: {str(card.get('flow_zone_label') or '—')}",
+            )
+
+
+class PneumoSnapshotPanel(QtWidgets.QWidget):
+    edge_selected = QtCore.Signal(str)
+    node_selected = QtCore.Signal(str)
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setSpacing(8)
+
+        self.summary = QtWidgets.QTextBrowser()
+        self.summary.setMaximumHeight(152)
+        lay.addWidget(self.summary)
+
+        self.heatmap = CornerHeatmapWidget(self)
+        lay.addWidget(self.heatmap)
+
+        lay.addWidget(self._section_label("Полости / штоки"))
+        self.actuator_table = QtWidgets.QTableWidget(0, 9)
+        self.actuator_table.setHorizontalHeaderLabels(
+            ["Угол", "Цил", "P БП", "P ШП", "ΔP", "Ход", "vшт", "V БП", "V ШП"]
+        )
+        self.actuator_table.verticalHeader().setVisible(False)
+        self.actuator_table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
+        self.actuator_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
+        self.actuator_table.horizontalHeader().setSectionResizeMode(8, QtWidgets.QHeaderView.ResizeToContents)
+        for col in range(2, 8):
+            self.actuator_table.horizontalHeader().setSectionResizeMode(col, QtWidgets.QHeaderView.Stretch)
+        self.actuator_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.actuator_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.actuator_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.actuator_table.cellClicked.connect(self._actuator_clicked)
+        lay.addWidget(self.actuator_table, 1)
+
+        lay.addWidget(self._section_label("Активная арматура"))
+        self.components_table = QtWidgets.QTableWidget(0, 6)
+        self.components_table.setHorizontalHeaderLabels(
+            ["Элемент", "Тип", "Q", "Направление", "Состояние", "Зона"]
+        )
+        self.components_table.verticalHeader().setVisible(False)
+        self.components_table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
+        self.components_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
+        self.components_table.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)
+        self.components_table.horizontalHeader().setSectionResizeMode(3, QtWidgets.QHeaderView.Stretch)
+        self.components_table.horizontalHeader().setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)
+        self.components_table.horizontalHeader().setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeToContents)
+        self.components_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.components_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.components_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.components_table.cellClicked.connect(self._component_clicked)
+        lay.addWidget(self.components_table, 1)
+
+    @staticmethod
+    def _section_label(text: str) -> QtWidgets.QLabel:
+        label = QtWidgets.QLabel(text)
+        label.setStyleSheet("font-weight:700; color:#eef6f8; padding-top:4px;")
+        return label
+
+    @staticmethod
+    def _fmt(value: float | None, *, suffix: str, digits: int = 2) -> str:
+        if value is None or not np.isfinite(value):
+            return "—"
+        return f"{float(value):.{digits}f} {suffix}".strip()
+
+    @staticmethod
+    def _make_item(
+        text: str,
+        *,
+        align: QtCore.Qt.AlignmentFlag = QtCore.Qt.AlignCenter,
+        user_data: Any = None,
+        background_rgb: tuple[int, int, int] | None = None,
+    ) -> QtWidgets.QTableWidgetItem:
+        item = QtWidgets.QTableWidgetItem(str(text))
+        item.setTextAlignment(int(align | QtCore.Qt.AlignVCenter))
+        if user_data is not None:
+            item.setData(QtCore.Qt.UserRole, user_data)
+        if background_rgb is not None:
+            item.setBackground(QtGui.QBrush(QtGui.QColor(*background_rgb)))
+            item.setForeground(QtGui.QBrush(QtGui.QColor(_text_color_for_rgb(background_rgb))))
+        return item
+
+    def _fill_actuator_table(self, rows: list[CylinderSnapshot]) -> None:
+        max_abs_dp = max((abs(float(item.delta_p_bar)) for item in rows if item.delta_p_bar is not None), default=0.0)
+        self.actuator_table.setRowCount(len(rows))
+        for row_idx, item in enumerate(rows):
+            stroke_rgb = _mix_rgb((24, 40, 50), FLOW_FORWARD_RGB, 0.0 if item.stroke_ratio is None else float(item.stroke_ratio))
+            speed_rgb = _flow_to_heat_rgb(
+                0.0 if item.stroke_speed_m_s is None else float(item.stroke_speed_m_s),
+                max_abs_flow=max(
+                    1.0e-6,
+                    max((abs(float(row.stroke_speed_m_s)) for row in rows if row.stroke_speed_m_s is not None), default=0.0),
+                ),
+            )
+            delta_rgb = _flow_to_heat_rgb(
+                0.0 if item.delta_p_bar is None else float(item.delta_p_bar),
+                max_abs_flow=max_abs_dp,
+            )
+            mode_suffix = "abs" if item.geometry_ready else "P only"
+            self.actuator_table.setItem(
+                row_idx,
+                0,
+                self._make_item(
+                    item.corner,
+                    align=QtCore.Qt.AlignLeft,
+                    user_data={"node": item.focus_node},
+                ),
+            )
+            self.actuator_table.setItem(row_idx, 1, self._make_item(f"Ц{item.cyl_index}"))
+            self.actuator_table.setItem(
+                row_idx,
+                2,
+                self._make_item(
+                    self._fmt(item.cap.pressure_bar_g, suffix="бар(g)"),
+                    background_rgb=_pressure_to_heat_rgb(item.cap.pressure_bar_g),
+                ),
+            )
+            self.actuator_table.setItem(
+                row_idx,
+                3,
+                self._make_item(
+                    self._fmt(item.rod.pressure_bar_g, suffix="бар(g)"),
+                    background_rgb=_pressure_to_heat_rgb(item.rod.pressure_bar_g),
+                ),
+            )
+            self.actuator_table.setItem(
+                row_idx,
+                4,
+                self._make_item(self._fmt(item.delta_p_bar, suffix="бар"), background_rgb=delta_rgb),
+            )
+            self.actuator_table.setItem(
+                row_idx,
+                5,
+                self._make_item(
+                    "—" if item.stroke_m is None else f"{float(item.stroke_m):0.3f} м / {0 if item.stroke_ratio is None else int(round(100.0 * float(item.stroke_ratio))):d}%",
+                    background_rgb=stroke_rgb,
+                ),
+            )
+            self.actuator_table.setItem(
+                row_idx,
+                6,
+                self._make_item(
+                    "—" if item.stroke_speed_m_s is None else f"{float(item.stroke_speed_m_s):+0.3f} м/с",
+                    background_rgb=speed_rgb,
+                ),
+            )
+            self.actuator_table.setItem(
+                row_idx,
+                7,
+                self._make_item("—" if item.cap.volume_l is None else f"{float(item.cap.volume_l):0.2f} л"),
+            )
+            self.actuator_table.setItem(
+                row_idx,
+                8,
+                self._make_item(
+                    ("—" if item.rod.volume_l is None else f"{float(item.rod.volume_l):0.2f} л")
+                    + f" · {mode_suffix}",
+                    align=QtCore.Qt.AlignLeft,
+                ),
+            )
+            self.actuator_table.setVerticalHeaderItem(row_idx, QtWidgets.QTableWidgetItem(item.motion_label))
+
+    def _fill_components_table(self, dataset: MnemoDataset, rows: list[EdgeActivitySnapshot]) -> None:
+        max_abs_flow = max((abs(float(item.q_now)) for item in rows), default=0.0)
+        self.components_table.setRowCount(len(rows))
+        for row_idx, item in enumerate(rows):
+            flow_rgb = _flow_to_heat_rgb(float(item.q_now), max_abs_flow=max_abs_flow)
+            state_rgb = (53, 110, 83) if item.state_label == "открыт" else ((83, 89, 94) if item.state_label == "закрыт" else (44, 57, 66))
+            self.components_table.setItem(
+                row_idx,
+                0,
+                self._make_item(
+                    item.edge_name,
+                    align=QtCore.Qt.AlignLeft,
+                    user_data=item.edge_name,
+                ),
+            )
+            self.components_table.setItem(row_idx, 1, self._make_item(item.component_kind))
+            self.components_table.setItem(
+                row_idx,
+                2,
+                self._make_item(f"{float(item.q_now):8.2f} {dataset.q_unit}", background_rgb=flow_rgb),
+            )
+            self.components_table.setItem(
+                row_idx,
+                3,
+                self._make_item(item.direction_label, align=QtCore.Qt.AlignLeft),
+            )
+            self.components_table.setItem(
+                row_idx,
+                4,
+                self._make_item(item.state_label, background_rgb=state_rgb),
+            )
+            self.components_table.setItem(
+                row_idx,
+                5,
+                self._make_item(item.zone_label, align=QtCore.Qt.AlignLeft),
+            )
+
+    def update_frame(self, dataset: MnemoDataset | None, idx: int) -> None:
+        if dataset is None or dataset.time_s.size == 0:
+            self.summary.setHtml("<p>Snapshot ждёт NPZ bundle.</p>")
+            self.heatmap.set_cards({})
+            self.actuator_table.setRowCount(0)
+            self.components_table.setRowCount(0)
             return
-        kind = str(obj.get("kind") or "")
-        name = str(obj.get("name") or "")
-        if kind == "edge" and name:
-            self.edge_picked.emit(name)
-        elif kind == "node" and name:
-            self.node_picked.emit(name)
+
+        clamped_idx = int(max(0, min(idx, dataset.time_s.size - 1)))
+        time_s = float(dataset.time_s[clamped_idx])
+        narrative = _build_frame_narrative(dataset, clamped_idx, selected_edge=None, selected_node=None)
+        cylinder_rows = _build_cylinder_snapshots(dataset, clamped_idx)
+        edge_rows = _build_edge_activity_snapshots(dataset, clamped_idx)
+        corner_cards = _build_corner_snapshot_cards(cylinder_rows, edge_rows)
+        geometry_ready = sum(1 for item in cylinder_rows if item.geometry_ready)
+        fastest = max(
+            (item for item in cylinder_rows if item.stroke_speed_m_s is not None),
+            key=lambda item: abs(float(item.stroke_speed_m_s)),
+            default=None,
+        )
+        geometry_note = f"Абсолютные объёмы доступны для {geometry_ready}/{len(cylinder_rows)} цилиндров."
+        if dataset.geometry_issues:
+            geometry_note += " Есть contract-issues в geometry."
+        elif dataset.geometry_warnings:
+            geometry_note += " Geometry читается с предупреждениями."
+
+        fastest_text = "Самый быстрый шток: нет сигнала."
+        if fastest is not None and fastest.stroke_speed_m_s is not None:
+            fastest_text = (
+                f"Самый быстрый шток: {fastest.corner} / Ц{fastest.cyl_index} "
+                f"{float(fastest.stroke_speed_m_s):+0.3f} м/с."
+            )
+
+        active_devices = [item for item in edge_rows if item.state_label == "открыт"]
+        self.summary.setHtml(
+            "<b>Snapshot:</b> "
+            + escape(narrative.primary_title)
+            + f"<br/><b>t:</b> {time_s:0.3f} s"
+            + f"<br/><b>Активная арматура:</b> {len(active_devices)} из {len(edge_rows)} верхних ветвей открыты."
+            + f"<br/><b>{escape(fastest_text)}</b>"
+            + f"<br/><b>Geometry:</b> {escape(geometry_note)}"
+        )
+        self.heatmap.set_cards(corner_cards)
+        self._fill_actuator_table(cylinder_rows)
+        self._fill_components_table(dataset, edge_rows)
+
+    def _actuator_clicked(self, row: int, _column: int) -> None:
+        item = self.actuator_table.item(row, 0)
+        payload = item.data(QtCore.Qt.UserRole) if item is not None else None
+        if isinstance(payload, dict):
+            node_name = str(payload.get("node") or "")
+            if node_name:
+                self.node_selected.emit(node_name)
+
+    def _component_clicked(self, row: int, _column: int) -> None:
+        item = self.components_table.item(row, 0)
+        edge_name = str(item.data(QtCore.Qt.UserRole) or item.text()) if item is not None else ""
+        if edge_name:
+            self.edge_selected.emit(edge_name)
 
 
 class OverviewPanel(QtWidgets.QWidget):
@@ -2166,6 +3314,32 @@ class SelectionPanel(QtWidgets.QWidget):
                     + f"{p_min:6.2f} ... {p_max:6.2f} бар(g)"
                     + "<br/><b>Тип отображения:</b> cognitive overlay / contextual details</p>"
                 )
+                chamber_context = _find_cylinder_snapshot_for_node(_build_cylinder_snapshots(dataset, idx), node_name)
+                if chamber_context is not None:
+                    cylinder_snapshot, chamber_snapshot = chamber_context
+                    sister_snapshot = cylinder_snapshot.rod if chamber_snapshot.chamber_key == "БП" else cylinder_snapshot.cap
+                    chunks.append(
+                        "<p><b>Исполнительный контур:</b> "
+                        + f"Ц{cylinder_snapshot.cyl_index} / {escape(cylinder_snapshot.corner)}"
+                        + "<br/><b>Ход штока:</b> "
+                        + ("—" if cylinder_snapshot.stroke_m is None else f"{cylinder_snapshot.stroke_m:0.3f} м")
+                        + (""
+                           if cylinder_snapshot.stroke_ratio is None
+                           else f" ({int(round(100.0 * cylinder_snapshot.stroke_ratio))}% хода)")
+                        + "<br/><b>Скорость штока:</b> "
+                        + ("—" if cylinder_snapshot.stroke_speed_m_s is None else f"{cylinder_snapshot.stroke_speed_m_s:+0.3f} м/с")
+                        + "<br/><b>Парная полость:</b> "
+                        + escape(sister_snapshot.node_name)
+                        + " / "
+                        + ("—" if sister_snapshot.pressure_bar_g is None else f"{sister_snapshot.pressure_bar_g:0.2f} бар(g)")
+                        + "<br/><b>ΔP БП-ШП:</b> "
+                        + ("—" if cylinder_snapshot.delta_p_bar is None else f"{cylinder_snapshot.delta_p_bar:+0.2f} бар")
+                        + "<br/><b>Объём текущей полости:</b> "
+                        + ("—" if chamber_snapshot.volume_l is None else f"{chamber_snapshot.volume_l:0.2f} л")
+                        + "<br/><b>Режим:</b> "
+                        + escape(cylinder_snapshot.motion_label)
+                        + "</p>"
+                    )
 
         if len(chunks) == 1:
             chunks.append(
@@ -2664,16 +3838,20 @@ class TrendsPanel(QtWidgets.QWidget):
             lay.addWidget(msg)
             self.flow_plot = None
             self.pressure_plot = None
+            self.stroke_plot = None
             self.flow_curve = None
             self.pressure_curve = None
+            self.stroke_curve = None
             self.flow_marker = None
             self.pressure_marker = None
+            self.stroke_marker = None
             return
 
         assert pg is not None
         self.flow_plot = pg.PlotWidget()
         self.pressure_plot = pg.PlotWidget()
-        for plot in (self.flow_plot, self.pressure_plot):
+        self.stroke_plot = pg.PlotWidget()
+        for plot in (self.flow_plot, self.pressure_plot, self.stroke_plot):
             plot.setBackground((9, 20, 26))
             plot.showGrid(x=True, y=True, alpha=0.2)
             plot.getAxis("left").setTextPen("#d9e6ed")
@@ -2687,21 +3865,28 @@ class TrendsPanel(QtWidgets.QWidget):
         self.flow_plot.setLabel("bottom", "t", units="s")
         self.pressure_plot.setLabel("left", "P", units="бар(g)")
         self.pressure_plot.setLabel("bottom", "t", units="s")
+        self.stroke_plot.setLabel("left", "sшт", units="м")
+        self.stroke_plot.setLabel("bottom", "t", units="s")
 
         self.flow_curve = self.flow_plot.plot(pen=pg.mkPen("#63d3f5", width=2), name="Q")
         self.pressure_curve = self.pressure_plot.plot(pen=pg.mkPen("#81e7a3", width=2), name="P")
+        self.stroke_curve = self.stroke_plot.plot(pen=pg.mkPen("#f8c15c", width=2), name="sшт")
         self.flow_marker = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen("#f8c15c", width=1.2))
         self.pressure_marker = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen("#f8c15c", width=1.2))
+        self.stroke_marker = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen("#63d3f5", width=1.2))
         self.flow_plot.addItem(self.flow_marker)
         self.pressure_plot.addItem(self.pressure_marker)
+        self.stroke_plot.addItem(self.stroke_marker)
 
     def set_series(self, dataset: MnemoDataset | None, *, edge_name: str | None, node_name: str | None) -> None:
         if not self._has_pg or dataset is None:
             return
         assert self.flow_curve is not None
         assert self.pressure_curve is not None
+        assert self.stroke_curve is not None
         assert self.flow_plot is not None
         assert self.pressure_plot is not None
+        assert self.stroke_plot is not None
 
         if edge_name and dataset.bundle.q is not None:
             q_arr = dataset.bundle.q.column(edge_name, default=None)
@@ -2723,15 +3908,945 @@ class TrendsPanel(QtWidgets.QWidget):
             self.pressure_curve.setData([], [])
             self.pressure_plot.setTitle("P: выберите узел", color="#88a3af")
 
+        focus_corner = _focus_corner_from_selection(dataset, edge_name=edge_name, node_name=node_name)
+        if focus_corner:
+            stroke_arr = dataset.bundle.main.column(f"положение_штока_{focus_corner}_м", default=None)
+            if stroke_arr is not None:
+                stroke_vals = np.asarray(stroke_arr, dtype=float)
+                self.stroke_curve.setData(dataset.time_s, stroke_vals, name=focus_corner)
+                self.stroke_plot.setTitle(f"Шток: {focus_corner}", color="#d9e6ed")
+            else:
+                self.stroke_curve.setData([], [])
+                self.stroke_plot.setTitle("Шток: нет сигнала", color="#88a3af")
+        else:
+            self.stroke_curve.setData([], [])
+            self.stroke_plot.setTitle("Шток: выберите полость/угол", color="#88a3af")
+
     def set_index(self, dataset: MnemoDataset | None, idx: int) -> None:
         if not self._has_pg or dataset is None or dataset.time_s.size == 0:
             return
         time_value = float(dataset.time_s[max(0, min(idx, dataset.time_s.size - 1))])
         assert self.flow_marker is not None
         assert self.pressure_marker is not None
+        assert self.stroke_marker is not None
         self.flow_marker.setValue(time_value)
         self.pressure_marker.setValue(time_value)
+        self.stroke_marker.setValue(time_value)
 
+
+class MnemoNativeCanvas(QtWidgets.QWidget):
+    edge_picked = QtCore.Signal(str)
+    node_picked = QtCore.Signal(str)
+    status = QtCore.Signal(str)
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self.setObjectName("mnemo_native_canvas")
+        self.setMouseTracking(True)
+        self.setFocusPolicy(QtCore.Qt.StrongFocus)
+        self.setMinimumSize(760, 520)
+
+        self._scene_rect = QtCore.QRectF(0.0, 0.0, VIEWBOX_W, VIEWBOX_H)
+        self._camera_rect = QtCore.QRectF(self._scene_rect)
+        self._dataset: MnemoDataset | None = None
+        self._dataset_id = ""
+        self._frame_idx = 0
+        self._playing = False
+        self._selected_edge = ""
+        self._selected_node = ""
+        self._alerts: dict[str, Any] = {}
+        self._diagnostics: dict[str, Any] = {}
+        self._focus_region: dict[str, Any] | None = None
+        self._overview_meta: dict[str, Any] = {}
+        self._mode = "overview"
+        self._edge_series_map: dict[str, dict[str, Any]] = {}
+        self._node_series_map: dict[str, dict[str, Any]] = {}
+        self._edge_paths: dict[str, QtGui.QPainterPath] = {}
+        self._edge_hit_paths: dict[str, QtGui.QPainterPath] = {}
+        self._edge_midpoints: dict[str, QtCore.QPointF] = {}
+        self._node_points: dict[str, QtCore.QPointF] = {}
+        self._node_hit_rects: dict[str, QtCore.QRectF] = {}
+        self._overlay_targets: list[tuple[str, str, QtCore.QRectF]] = []
+        self._svg_renderer: Any = None
+        self._background_cache: QtGui.QPixmap | None = None
+        self._background_cache_key: tuple[Any, ...] | None = None
+        self._last_mouse_pos = QtCore.QPoint()
+        self._dragging = False
+        self._hover_kind = ""
+        self._hover_name = ""
+        self._flow_phase = 0.0
+        self._anim_timer = QtCore.QTimer(self)
+        self._anim_timer.setInterval(40)
+        self._anim_timer.timeout.connect(self._advance_flow_phase)
+
+    def render_dataset(self, dataset: MnemoDataset, *, selected_edge: str | None, selected_node: str | None) -> None:
+        self._dataset = dataset
+        self._dataset_id = str(dataset.dataset_id)
+        self._frame_idx = 0
+        self._selected_edge = str(selected_edge or "")
+        self._selected_node = str(selected_node or "")
+        self._edge_series_map = {str(item.get("name") or ""): item for item in dataset.edge_series}
+        self._node_series_map = {str(item.get("name") or ""): item for item in dataset.node_series}
+        self._build_native_scene_cache()
+        self._load_svg_renderer(dataset.svg_inline)
+        if self._mode == "overview":
+            self._fit_camera(self._scene_rect)
+        self._invalidate_background_cache()
+        self.update()
+        self.status.emit("Desktop Mnemo switched to native Qt canvas.")
+
+    def set_frame_state(self, idx: int, playing: bool, dataset_id: str) -> None:
+        self._frame_idx = int(max(0, idx))
+        self._playing = bool(playing)
+        self._dataset_id = str(dataset_id or self._dataset_id)
+        if self._playing:
+            if not self._anim_timer.isActive():
+                self._anim_timer.start()
+        else:
+            self._anim_timer.stop()
+        self.update()
+
+    def set_selection(self, *, edge: str | None, node: str | None) -> None:
+        self._selected_edge = str(edge or "")
+        self._selected_node = str(node or "")
+        self.update()
+
+    def set_alerts(self, alerts: dict[str, Any]) -> None:
+        self._alerts = dict(alerts or {})
+        self.update()
+
+    def set_diagnostics(self, diagnostics: dict[str, Any]) -> None:
+        self._diagnostics = dict(diagnostics or {})
+        self.update()
+
+    def set_focus_region(self, focus_region: dict[str, Any] | None) -> None:
+        self._focus_region = dict(focus_region) if isinstance(focus_region, dict) else None
+        if self._focus_region:
+            self._mode = "focus"
+            target_rect = self._focus_scene_rect(self._focus_region)
+            if target_rect is not None:
+                self._fit_camera(target_rect)
+            self.status.emit(
+                f"Фокус: {self._focus_region.get('edge_name') or self._focus_region.get('node_name') or 'scene'}"
+            )
+        self._invalidate_background_cache()
+        self.update()
+
+    def show_overview(self, meta: dict[str, Any] | None = None) -> None:
+        self._mode = "overview"
+        self._overview_meta = dict(meta or {})
+        focus_region = self._overview_meta.get("focus_region")
+        self._focus_region = dict(focus_region) if isinstance(focus_region, dict) else self._focus_region
+        self._fit_camera(self._scene_rect)
+        self._invalidate_background_cache()
+        self.update()
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._invalidate_background_cache()
+
+    def wheelEvent(self, event: QtGui.QWheelEvent) -> None:  # type: ignore[override]
+        if self._dataset is None:
+            return
+        delta_y = event.angleDelta().y()
+        if delta_y == 0:
+            return
+        cursor_scene = self._widget_to_scene(event.position())
+        factor = 0.84 if delta_y > 0 else 1.18
+        new_rect = QtCore.QRectF(self._camera_rect)
+        new_rect.setWidth(max(260.0, min(self._scene_rect.width() * 1.04, new_rect.width() * factor)))
+        new_rect.setHeight(max(180.0, min(self._scene_rect.height() * 1.04, new_rect.height() * factor)))
+        rx = 0.5 if self.width() <= 1 else float(event.position().x()) / float(max(1, self.width()))
+        ry = 0.5 if self.height() <= 1 else float(event.position().y()) / float(max(1, self.height()))
+        new_rect.moveTo(
+            float(cursor_scene.x()) - new_rect.width() * rx,
+            float(cursor_scene.y()) - new_rect.height() * ry,
+        )
+        self._camera_rect = self._clamped_camera_rect(new_rect)
+        self._invalidate_background_cache()
+        self.update()
+        event.accept()
+
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:  # type: ignore[override]
+        if event.button() == QtCore.Qt.LeftButton:
+            scene_pos = self._widget_to_scene(event.position())
+            hit_kind, hit_name = self._hit_test(scene_pos)
+            if hit_kind == "node" and hit_name:
+                self.node_picked.emit(hit_name)
+                self.status.emit(f"Узел: {_short_node_label(hit_name)}")
+                event.accept()
+                return
+            if hit_kind == "edge" and hit_name:
+                self.edge_picked.emit(hit_name)
+                self.status.emit(f"Ветка: {hit_name}")
+                event.accept()
+                return
+            self._dragging = True
+            self._last_mouse_pos = event.pos()
+            self.setCursor(QtCore.Qt.ClosedHandCursor)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:  # type: ignore[override]
+        if self._dragging:
+            delta = event.pos() - self._last_mouse_pos
+            self._last_mouse_pos = event.pos()
+            self._pan_camera(delta)
+            event.accept()
+            return
+
+        scene_pos = self._widget_to_scene(event.position())
+        hit_kind, hit_name = self._hit_test(scene_pos)
+        if hit_kind != self._hover_kind or hit_name != self._hover_name:
+            self._hover_kind = hit_kind
+            self._hover_name = hit_name
+            self.setCursor(QtCore.Qt.PointingHandCursor if hit_kind else QtCore.Qt.ArrowCursor)
+            self.update()
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:  # type: ignore[override]
+        if event.button() == QtCore.Qt.LeftButton and self._dragging:
+            self._dragging = False
+            self.setCursor(QtCore.Qt.ArrowCursor)
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def mouseDoubleClickEvent(self, event: QtGui.QMouseEvent) -> None:  # type: ignore[override]
+        if event.button() == QtCore.Qt.LeftButton:
+            target_rect = self._focus_scene_rect(self._focus_region) if self._mode == "focus" else self._scene_rect
+            self._fit_camera(target_rect or self._scene_rect)
+            self._invalidate_background_cache()
+            self.update()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
+    def leaveEvent(self, event: QtCore.QEvent) -> None:  # type: ignore[override]
+        self._hover_kind = ""
+        self._hover_name = ""
+        self._dragging = False
+        self.setCursor(QtCore.Qt.ArrowCursor)
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event: QtGui.QPaintEvent) -> None:  # type: ignore[override]
+        del event
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        painter.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
+        painter.drawPixmap(0, 0, self._background_pixmap())
+        if self._dataset is None:
+            self._draw_empty_state(painter)
+            return
+
+        painter.save()
+        painter.setClipRect(self._content_rect())
+        painter.setTransform(self._scene_transform())
+        self._overlay_targets.clear()
+        self._draw_live_edges(painter)
+        self._draw_live_nodes(painter)
+        self._draw_focus_overlay(painter)
+        self._draw_alert_markers(painter)
+        self._draw_diagnostics_overlay(painter)
+        painter.restore()
+        self._draw_hud(painter)
+
+    def _advance_flow_phase(self) -> None:
+        self._flow_phase = (self._flow_phase + 6.0) % 1000.0
+        self.update()
+
+    def _content_rect(self) -> QtCore.QRectF:
+        return QtCore.QRectF(self.rect()).adjusted(12.0, 12.0, -12.0, -12.0)
+
+    def _build_native_scene_cache(self) -> None:
+        self._edge_paths.clear()
+        self._edge_hit_paths.clear()
+        self._edge_midpoints.clear()
+        self._node_points.clear()
+        self._node_hit_rects.clear()
+        if self._dataset is None:
+            return
+
+        mapping = self._dataset.mapping if isinstance(self._dataset.mapping, dict) else {}
+        for node_name, coords in dict(mapping.get("nodes") or {}).items():
+            if not isinstance(coords, (list, tuple)) or len(coords) < 2:
+                continue
+            point = QtCore.QPointF(float(coords[0]), float(coords[1]))
+            self._node_points[str(node_name)] = point
+            self._node_hit_rects[str(node_name)] = QtCore.QRectF(point.x() - 18.0, point.y() - 18.0, 36.0, 36.0)
+
+        for edge_name, lanes in dict(mapping.get("edges") or {}).items():
+            path = QtGui.QPainterPath()
+            sampled_points: list[QtCore.QPointF] = []
+            for lane in list(lanes or []):
+                points = [QtCore.QPointF(float(pt[0]), float(pt[1])) for pt in list(lane or []) if len(pt) >= 2]
+                if not points:
+                    continue
+                sampled_points.extend(points)
+                path.moveTo(points[0])
+                for point in points[1:]:
+                    path.lineTo(point)
+            if path.isEmpty():
+                continue
+            self._edge_paths[str(edge_name)] = path
+            stroker = QtGui.QPainterPathStroker()
+            stroker.setCapStyle(QtCore.Qt.RoundCap)
+            stroker.setJoinStyle(QtCore.Qt.RoundJoin)
+            stroker.setWidth(30.0)
+            self._edge_hit_paths[str(edge_name)] = stroker.createStroke(path)
+            self._edge_midpoints[str(edge_name)] = self._polyline_midpoint(sampled_points) or path.boundingRect().center()
+
+    def _load_svg_renderer(self, svg_inline: str) -> None:
+        self._svg_renderer = None
+        if QtSvg is None or not svg_inline:
+            return
+        try:
+            renderer = QtSvg.QSvgRenderer(QtCore.QByteArray(svg_inline.encode("utf-8")), self)
+            if renderer.isValid():
+                self._svg_renderer = renderer
+        except Exception:
+            self._svg_renderer = None
+
+    def _invalidate_background_cache(self) -> None:
+        self._background_cache = None
+        self._background_cache_key = None
+
+    def _background_pixmap(self) -> QtGui.QPixmap:
+        key = (
+            int(self.width()),
+            int(self.height()),
+            round(float(self._camera_rect.left()), 2),
+            round(float(self._camera_rect.top()), 2),
+            round(float(self._camera_rect.width()), 2),
+            round(float(self._camera_rect.height()), 2),
+            str(self._dataset_id),
+            bool(self._svg_renderer is not None),
+        )
+        if self._background_cache is not None and self._background_cache_key == key:
+            return self._background_cache
+
+        device_ratio = max(1.0, float(self.devicePixelRatioF()))
+        pixmap = QtGui.QPixmap(max(1, int(self.width() * device_ratio)), max(1, int(self.height() * device_ratio)))
+        pixmap.setDevicePixelRatio(device_ratio)
+        pixmap.fill(QtGui.QColor("#071117"))
+
+        painter = QtGui.QPainter(pixmap)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        painter.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
+        painter.fillRect(self.rect(), QtGui.QColor("#071117"))
+        painter.save()
+        painter.setClipRect(self._content_rect())
+        painter.setTransform(self._scene_transform())
+        self._draw_static_scene(painter)
+        painter.restore()
+        painter.end()
+
+        self._background_cache = pixmap
+        self._background_cache_key = key
+        return pixmap
+
+    def _scene_transform(self) -> QtGui.QTransform:
+        content_rect = self._content_rect()
+        if content_rect.width() <= 1.0 or content_rect.height() <= 1.0:
+            return QtGui.QTransform()
+        sx = content_rect.width() / max(1.0, self._camera_rect.width())
+        sy = content_rect.height() / max(1.0, self._camera_rect.height())
+        tx = content_rect.left() - self._camera_rect.left() * sx
+        ty = content_rect.top() - self._camera_rect.top() * sy
+        return QtGui.QTransform(sx, 0.0, 0.0, sy, tx, ty)
+
+    def _widget_to_scene(self, point: QtCore.QPointF) -> QtCore.QPointF:
+        inverted, ok = self._scene_transform().inverted()
+        if ok:
+            return inverted.map(point)
+        return QtCore.QPointF(point)
+
+    def _fit_camera(self, target_rect: QtCore.QRectF) -> None:
+        normalized = QtCore.QRectF(target_rect if target_rect.isValid() else self._scene_rect)
+        if normalized.width() < 10.0 or normalized.height() < 10.0:
+            normalized = QtCore.QRectF(self._scene_rect)
+        padding = max(40.0, min(180.0, 0.10 * max(normalized.width(), normalized.height())))
+        normalized.adjust(-padding, -padding, padding, padding)
+        self._camera_rect = self._clamped_camera_rect(normalized)
+
+    def _clamped_camera_rect(self, rect: QtCore.QRectF) -> QtCore.QRectF:
+        content_rect = self._content_rect()
+        if content_rect.width() <= 1.0 or content_rect.height() <= 1.0:
+            return QtCore.QRectF(self._scene_rect)
+
+        target = QtCore.QRectF(rect)
+        target_width = max(220.0, min(self._scene_rect.width() * 1.04, target.width()))
+        target_height = max(160.0, min(self._scene_rect.height() * 1.04, target.height()))
+        aspect = content_rect.width() / max(1.0, content_rect.height())
+        if target_width / max(1.0, target_height) > aspect:
+            target_height = target_width / aspect
+        else:
+            target_width = target_height * aspect
+        target_width = min(self._scene_rect.width() * 1.04, target_width)
+        target_height = min(self._scene_rect.height() * 1.04, target_height)
+        center = target.center()
+        out = QtCore.QRectF(
+            center.x() - target_width * 0.5,
+            center.y() - target_height * 0.5,
+            target_width,
+            target_height,
+        )
+        if out.width() >= self._scene_rect.width():
+            out.moveLeft(self._scene_rect.left() - (out.width() - self._scene_rect.width()) * 0.5)
+        else:
+            out.moveLeft(min(max(out.left(), self._scene_rect.left()), self._scene_rect.right() - out.width()))
+        if out.height() >= self._scene_rect.height():
+            out.moveTop(self._scene_rect.top() - (out.height() - self._scene_rect.height()) * 0.5)
+        else:
+            out.moveTop(min(max(out.top(), self._scene_rect.top()), self._scene_rect.bottom() - out.height()))
+        return out
+
+    def _pan_camera(self, delta_px: QtCore.QPoint) -> None:
+        if self._dataset is None:
+            return
+        content_rect = self._content_rect()
+        if content_rect.width() <= 1.0 or content_rect.height() <= 1.0:
+            return
+        dx = -float(delta_px.x()) * self._camera_rect.width() / float(content_rect.width())
+        dy = -float(delta_px.y()) * self._camera_rect.height() / float(content_rect.height())
+        target = QtCore.QRectF(self._camera_rect)
+        target.translate(dx, dy)
+        self._camera_rect = self._clamped_camera_rect(target)
+        self._invalidate_background_cache()
+        self.update()
+
+    def _focus_scene_rect(self, focus_region: dict[str, Any] | None) -> QtCore.QRectF | None:
+        if self._dataset is None or not focus_region:
+            return None
+        target_rect: QtCore.QRectF | None = None
+        edge_name = str(focus_region.get("edge_name") or "")
+        node_name = str(focus_region.get("node_name") or "")
+        if edge_name and edge_name in self._edge_paths:
+            target_rect = QtCore.QRectF(self._edge_paths[edge_name].boundingRect())
+        if node_name and node_name in self._node_points:
+            point = self._node_points[node_name]
+            node_rect = QtCore.QRectF(point.x() - 42.0, point.y() - 42.0, 84.0, 84.0)
+            target_rect = node_rect if target_rect is None else target_rect.united(node_rect)
+        if target_rect is None:
+            return None
+        padding = float(focus_region.get("padding") or 150.0)
+        target_rect.adjust(-padding, -padding, padding, padding)
+        return target_rect
+
+    def _hit_test(self, scene_pos: QtCore.QPointF) -> tuple[str, str]:
+        for kind, name, rect in reversed(self._overlay_targets):
+            if rect.contains(scene_pos):
+                return kind, name
+        for node_name, rect in self._node_hit_rects.items():
+            if rect.contains(scene_pos):
+                return "node", node_name
+        for edge_name, hit_path in self._edge_hit_paths.items():
+            if hit_path.contains(scene_pos):
+                return "edge", edge_name
+        return "", ""
+
+    def _draw_static_scene(self, painter: QtGui.QPainter) -> None:
+        if self._svg_renderer is not None:
+            self._svg_renderer.render(painter, self._scene_rect)
+            return
+
+        painter.fillRect(self._scene_rect, QtGui.QColor("#071117"))
+        pen = QtGui.QPen(QtGui.QColor(255, 255, 255, 14), 1.0)
+        painter.setPen(pen)
+        step = 48
+        for x in range(0, int(VIEWBOX_W) + step, step):
+            painter.drawLine(x, 0, x, int(VIEWBOX_H))
+        for y in range(0, int(VIEWBOX_H) + step, step):
+            painter.drawLine(0, y, int(VIEWBOX_W), y)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(13, 33, 42, 185))
+        painter.drawRoundedRect(QtCore.QRectF(60.0, 70.0, 2080.0, 220.0), 28.0, 28.0)
+        painter.drawRoundedRect(QtCore.QRectF(60.0, 320.0, 2080.0, 290.0), 28.0, 28.0)
+        painter.drawRoundedRect(QtCore.QRectF(60.0, 650.0, 2080.0, 760.0), 36.0, 36.0)
+
+    def _draw_live_edges(self, painter: QtGui.QPainter) -> None:
+        if self._dataset is None:
+            return
+        flows = [abs(self._current_edge_flow(edge_name)) for edge_name in self._dataset.edge_names]
+        max_abs_flow = max(flows, default=0.0)
+        for edge_name in self._dataset.edge_names:
+            path = self._edge_paths.get(edge_name)
+            if path is None:
+                continue
+            flow_value = self._current_edge_flow(edge_name)
+            flow_rgb = _flow_to_heat_rgb(flow_value, max_abs_flow=max_abs_flow)
+            flow_color = QtGui.QColor(*flow_rgb)
+            magnitude = 0.0 if max_abs_flow <= 1.0e-9 else _clamp01(abs(flow_value) / max_abs_flow)
+            open_state = self._current_edge_open(edge_name)
+            base_width = 6.0 + 14.0 * math.sqrt(max(0.0, magnitude))
+            glow_color = QtGui.QColor(flow_color)
+            glow_color.setAlpha(70 if open_state is False else 135)
+            core_color = QtGui.QColor(flow_color)
+            core_color.setAlpha(90 if open_state is False else 245)
+
+            painter.setPen(
+                QtGui.QPen(glow_color, base_width + 8.0, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin)
+            )
+            painter.drawPath(path)
+
+            dash_pen = QtGui.QPen(core_color, base_width, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin)
+            dash_pen.setDashPattern([24.0, 15.0])
+            dash_pen.setDashOffset((self._flow_phase + self._frame_idx * 3.0) * (-1.0 if flow_value >= 0.0 else 1.0))
+            painter.setPen(
+                dash_pen
+                if abs(flow_value) > 1.0e-9
+                else QtGui.QPen(core_color, max(3.0, base_width * 0.55), QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin)
+            )
+            painter.drawPath(path)
+
+            if edge_name == self._selected_edge or (self._hover_kind == "edge" and edge_name == self._hover_name):
+                accent = QtGui.QColor("#fff4c7" if edge_name == self._selected_edge else "#d5f7ff")
+                painter.setPen(
+                    QtGui.QPen(accent, base_width + 2.5, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin)
+                )
+                painter.drawPath(path)
+
+    def _draw_live_nodes(self, painter: QtGui.QPainter) -> None:
+        if self._dataset is None:
+            return
+        spotlight_nodes: set[str] = set(self._dataset.overlay_node_names)
+        spotlight_nodes.update(str(item.get("name") or "") for item in list(self._alerts.get("nodes") or []))
+        if self._selected_node:
+            spotlight_nodes.add(self._selected_node)
+
+        for node_name, point in self._node_points.items():
+            pressure = self._current_node_pressure(node_name)
+            rgb = _pressure_to_heat_rgb(pressure)
+            fill = QtGui.QColor(*rgb)
+            radius = 12.0 if node_name in spotlight_nodes else 9.0
+            if node_name == self._selected_node:
+                radius = 14.0
+            painter.setPen(QtGui.QPen(QtGui.QColor("#f7fbff" if node_name == self._selected_node else "#102028"), 2.0))
+            painter.setBrush(fill)
+            painter.drawEllipse(point, radius, radius)
+
+            if node_name not in spotlight_nodes:
+                continue
+            label_rect = QtCore.QRectF(point.x() - 82.0, point.y() - 54.0, 164.0, 34.0)
+            label_bg = QtGui.QColor(fill)
+            label_bg.setAlpha(228)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(label_bg)
+            painter.drawRoundedRect(label_rect, 12.0, 12.0)
+            painter.setPen(QtGui.QColor(_text_color_for_rgb(rgb)))
+            label_font = QtGui.QFont(self.font())
+            label_font.setPointSizeF(10.0)
+            label_font.setBold(True)
+            painter.setFont(label_font)
+            painter.drawText(
+                label_rect.adjusted(10.0, 6.0, -10.0, -6.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                _short_node_label(node_name),
+            )
+
+            value_rect = QtCore.QRectF(point.x() - 72.0, point.y() - 18.0, 144.0, 24.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(QtGui.QColor(7, 17, 23, 212))
+            painter.drawRoundedRect(value_rect, 9.0, 9.0)
+            painter.setPen(QtGui.QColor("#d8eef2"))
+            value_font = QtGui.QFont(self.font())
+            value_font.setPointSizeF(8.5)
+            painter.setFont(value_font)
+            painter.drawText(
+                value_rect.adjusted(8.0, 3.0, -8.0, -3.0),
+                QtCore.Qt.AlignCenter,
+                self._fmt_value(pressure, "бар(g)", digits=2),
+            )
+            self._overlay_targets.append(("node", node_name, label_rect.united(value_rect)))
+
+    def _draw_focus_overlay(self, painter: QtGui.QPainter) -> None:
+        if not self._focus_region:
+            return
+        target_rect = self._focus_scene_rect(self._focus_region)
+        if target_rect is None:
+            return
+        glow_color = QtGui.QColor("#f8c15c" if self._mode == "focus" else "#63d3f5")
+        glow_color.setAlpha(135 if self._mode == "focus" else 96)
+        fill_color = QtGui.QColor(glow_color)
+        fill_color.setAlpha(28 if self._mode == "focus" else 16)
+        painter.setBrush(fill_color)
+        painter.setPen(
+            QtGui.QPen(
+                glow_color,
+                8.0 if self._mode == "focus" else 5.0,
+                QtCore.Qt.DashLine,
+                QtCore.Qt.RoundCap,
+                QtCore.Qt.RoundJoin,
+            )
+        )
+        painter.drawRoundedRect(target_rect, 36.0, 36.0)
+
+    def _draw_alert_markers(self, painter: QtGui.QPainter) -> None:
+        if not self._alerts:
+            return
+        for item in list(self._alerts.get("edges") or []):
+            edge_name = str(item.get("name") or "")
+            midpoint = self._edge_midpoints.get(edge_name)
+            if midpoint is None:
+                continue
+            rect = QtCore.QRectF(midpoint.x() - 68.0, midpoint.y() - 80.0, 136.0, 26.0)
+            self._draw_chip(
+                painter,
+                rect,
+                text=str(item.get("label") or item.get("severity") or "edge"),
+                color_hex=self._severity_color_hex(str(item.get("severity") or "info")),
+                text_hex="#f7fbff",
+            )
+
+        for item in list(self._alerts.get("nodes") or []):
+            node_name = str(item.get("name") or "")
+            point = self._node_points.get(node_name)
+            if point is None:
+                continue
+            painter.setPen(
+                QtGui.QPen(QtGui.QColor(self._severity_color_hex(str(item.get("severity") or "info"))), 4.0)
+            )
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawEllipse(point, 22.0, 22.0)
+
+    def _draw_diagnostics_overlay(self, painter: QtGui.QPainter) -> None:
+        diagnostics = self._diagnostics if isinstance(self._diagnostics, dict) else {}
+        for payload in list(diagnostics.get("cylinders") or []):
+            if not isinstance(payload, dict):
+                continue
+            rect = self._cylinder_card_rect(payload)
+            self._draw_cylinder_card(painter, rect, payload)
+        for payload in list(diagnostics.get("components") or []):
+            if not isinstance(payload, dict):
+                continue
+            rect = self._component_badge_rect(payload)
+            if rect is None:
+                continue
+            self._draw_component_badge(painter, rect, payload)
+
+    def _draw_hud(self, painter: QtGui.QPainter) -> None:
+        content_rect = self._content_rect()
+        left_hud = QtCore.QRectF(content_rect.left() + 16.0, content_rect.top() + 16.0, 360.0, 88.0)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(7, 17, 23, 210))
+        painter.drawRoundedRect(left_hud, 16.0, 16.0)
+
+        title_font = QtGui.QFont(self.font())
+        title_font.setPointSizeF(11.5)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.setPen(QtGui.QColor("#f4fbff"))
+        painter.drawText(
+            left_hud.adjusted(16.0, 12.0, -16.0, -48.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            "Native Mnemo canvas",
+        )
+
+        body_font = QtGui.QFont(self.font())
+        body_font.setPointSizeF(8.8)
+        painter.setFont(body_font)
+        painter.setPen(QtGui.QColor("#b8d1d9"))
+        painter.drawText(
+            left_hud.adjusted(16.0, 38.0, -16.0, -26.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            " • ".join(
+                [
+                    f"t idx {self._frame_idx}",
+                    "focus" if self._mode == "focus" else "overview",
+                    "play" if self._playing else "hold",
+                ]
+            ),
+        )
+        painter.drawText(
+            left_hud.adjusted(16.0, 58.0, -16.0, -10.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            "wheel = zoom, drag = pan, click = select",
+        )
+
+        if not self._diagnostics:
+            return
+        warnings = len(list(self._diagnostics.get("geometry_warnings") or []))
+        issues = len(list(self._diagnostics.get("geometry_issues") or []))
+        right_hud = QtCore.QRectF(content_rect.right() - 324.0, content_rect.top() + 16.0, 308.0, 88.0)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(7, 17, 23, 204))
+        painter.drawRoundedRect(right_hud, 16.0, 16.0)
+        painter.setPen(QtGui.QColor("#d9eef2"))
+        painter.setFont(title_font)
+        painter.drawText(
+            right_hud.adjusted(16.0, 12.0, -16.0, -48.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            "Diagnostics",
+        )
+        painter.setFont(body_font)
+        painter.setPen(QtGui.QColor("#b8d1d9"))
+        painter.drawText(
+            right_hud.adjusted(16.0, 38.0, -16.0, -26.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Cylinders {len(list(self._diagnostics.get('cylinders') or []))} • Components {len(list(self._diagnostics.get('components') or []))}",
+        )
+        painter.drawText(
+            right_hud.adjusted(16.0, 58.0, -16.0, -10.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Geometry warnings {warnings} • issues {issues}",
+        )
+
+    def _draw_empty_state(self, painter: QtGui.QPainter) -> None:
+        painter.fillRect(self.rect(), QtGui.QColor("#071117"))
+        rect = self.rect().adjusted(40, 40, -40, -40)
+        painter.setPen(QtGui.QPen(QtGui.QColor("#63d3f5"), 2.0))
+        painter.setBrush(QtGui.QColor(9, 24, 31, 220))
+        painter.drawRoundedRect(rect, 24.0, 24.0)
+        painter.setPen(QtGui.QColor("#eef7fa"))
+        font = QtGui.QFont(self.font())
+        font.setPointSizeF(14.0)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.drawText(rect.adjusted(20, 24, -20, -80), QtCore.Qt.AlignCenter, "Desktop Mnemo ждёт bundle")
+        font.setPointSizeF(10.5)
+        font.setBold(False)
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor("#b3cbd3"))
+        painter.drawText(
+            rect.adjusted(30, 72, -30, -26),
+            QtCore.Qt.AlignCenter | QtCore.Qt.TextWordWrap,
+            "Нативное Windows/Qt окно без WebEngine. Загрузите NPZ или включите follow, чтобы увидеть давление, расход, направления потоков и ход цилиндров на одной схеме.",
+        )
+
+    def _draw_chip(
+        self,
+        painter: QtGui.QPainter,
+        rect: QtCore.QRectF,
+        *,
+        text: str,
+        color_hex: str,
+        text_hex: str,
+    ) -> None:
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(color_hex))
+        painter.drawRoundedRect(rect, 11.0, 11.0)
+        painter.setPen(QtGui.QColor(text_hex))
+        font = QtGui.QFont(self.font())
+        font.setPointSizeF(8.5)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.drawText(rect.adjusted(10.0, 4.0, -10.0, -4.0), QtCore.Qt.AlignCenter, str(text))
+
+    def _cylinder_card_rect(self, payload: dict[str, Any]) -> QtCore.QRectF:
+        corner = str(payload.get("corner") or "")
+        cyl_index = int(payload.get("cyl_index") or 1)
+        base_x, base_y = CORNER_ANCHORS.get(corner, (360.0, 820.0))
+        return QtCore.QRectF(
+            float(base_x) - 206.0 + float(cyl_index - 1) * 212.0,
+            float(base_y) - 188.0,
+            196.0,
+            170.0,
+        )
+
+    def _component_badge_rect(self, payload: dict[str, Any]) -> QtCore.QRectF | None:
+        edge_name = str(payload.get("edge_name") or "")
+        midpoint = self._edge_midpoints.get(edge_name)
+        if midpoint is None:
+            return None
+        order = int(payload.get("order") or 0)
+        shift_x = -48.0 if order % 2 else 48.0
+        shift_y = -46.0 - float(order % 3) * 36.0
+        return QtCore.QRectF(midpoint.x() + shift_x - 76.0, midpoint.y() + shift_y - 24.0, 152.0, 48.0)
+
+    def _draw_cylinder_card(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:
+        cap = dict(payload.get("cap") or {})
+        rod = dict(payload.get("rod") or {})
+        focus_corner = str(self._diagnostics.get("focus_corner") or "")
+        is_focus = str(payload.get("corner") or "") == focus_corner or str(payload.get("focus_node") or "") == self._selected_node
+        border = QtGui.QColor("#f8c15c" if is_focus else "#63d3f5")
+        border.setAlpha(220 if is_focus else 120)
+        painter.setPen(QtGui.QPen(border, 3.0 if is_focus else 2.0))
+        painter.setBrush(QtGui.QColor(8, 20, 28, 216))
+        painter.drawRoundedRect(rect, 18.0, 18.0)
+
+        title_rect = QtCore.QRectF(rect.left() + 12.0, rect.top() + 10.0, rect.width() - 24.0, 24.0)
+        title_font = QtGui.QFont(self.font())
+        title_font.setPointSizeF(9.5)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.setPen(QtGui.QColor("#eff9fb"))
+        painter.drawText(
+            title_rect,
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"{payload.get('corner')} • Ц{int(payload.get('cyl_index') or 1)} • {payload.get('motion_short') or 'SIG?'}",
+        )
+
+        cap_rect = QtCore.QRectF(rect.left() + 12.0, rect.top() + 42.0, rect.width() - 24.0, 50.0)
+        rod_rect = QtCore.QRectF(rect.left() + 12.0, rect.top() + 96.0, rect.width() - 24.0, 50.0)
+        self._draw_chamber_panel(painter, cap_rect, cap, caption="БП")
+        self._draw_chamber_panel(painter, rod_rect, rod, caption="ШП")
+        self._overlay_targets.append(("node", str(cap.get("node_name") or ""), cap_rect))
+        self._overlay_targets.append(("node", str(rod.get("node_name") or ""), rod_rect))
+
+        footer_rect = QtCore.QRectF(rect.left() + 12.0, rect.bottom() - 30.0, rect.width() - 24.0, 18.0)
+        footer_font = QtGui.QFont(self.font())
+        footer_font.setPointSizeF(7.8)
+        painter.setFont(footer_font)
+        painter.setPen(QtGui.QColor("#c8dce2"))
+        painter.drawText(
+            footer_rect,
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"ΔP {self._fmt_value(payload.get('delta_p_bar'), 'бар', digits=2)}",
+        )
+        painter.drawText(
+            footer_rect,
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            f"x {self._fmt_value(payload.get('stroke_m'), 'м', digits=3)} / v {self._fmt_value(payload.get('stroke_speed_m_s'), 'м/с', digits=3)}",
+        )
+
+    def _draw_chamber_panel(
+        self,
+        painter: QtGui.QPainter,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+        *,
+        caption: str,
+    ) -> None:
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(str(payload.get("heat_hex") or "#22303a")))
+        painter.drawRoundedRect(rect, 12.0, 12.0)
+        painter.setPen(QtGui.QColor(str(payload.get("text_hex") or "#eef7fa")))
+        title_font = QtGui.QFont(self.font())
+        title_font.setPointSizeF(8.2)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.drawText(
+            rect.adjusted(10.0, 4.0, -10.0, -22.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"{caption} • {_short_node_label(str(payload.get('node_name') or ''))}",
+        )
+        body_font = QtGui.QFont(self.font())
+        body_font.setPointSizeF(7.6)
+        painter.setFont(body_font)
+        painter.drawText(
+            rect.adjusted(10.0, 20.0, -10.0, -8.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"P {self._fmt_value(payload.get('pressure_bar_g'), 'бар(g)', digits=2)}",
+        )
+        painter.drawText(
+            rect.adjusted(10.0, 20.0, -10.0, -8.0),
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            f"V {self._fmt_value(payload.get('volume_l'), 'л', digits=2)}",
+        )
+
+    def _draw_component_badge(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:
+        flow_hex = str(payload.get("flow_hex") or "#304754")
+        text_hex = str(payload.get("text_hex") or "#eef7fa")
+        is_selected = bool(payload.get("is_selected"))
+        painter.setPen(QtGui.QPen(QtGui.QColor("#fff4c7" if is_selected else "#0c1620"), 2.0))
+        painter.setBrush(QtGui.QColor(flow_hex))
+        painter.drawRoundedRect(rect, 14.0, 14.0)
+        painter.setPen(QtGui.QColor(text_hex))
+        title_font = QtGui.QFont(self.font())
+        title_font.setPointSizeF(8.8)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.drawText(
+            rect.adjusted(10.0, 4.0, -10.0, -20.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"{payload.get('component_short') or 'LINE'} • {payload.get('state_short') or 'SIG?'}",
+        )
+        body_font = QtGui.QFont(self.font())
+        body_font.setPointSizeF(7.4)
+        painter.setFont(body_font)
+        painter.drawText(
+            rect.adjusted(10.0, 18.0, -10.0, -4.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            self._fmt_value(payload.get("q_now"), self._dataset.q_unit if self._dataset is not None else "", digits=2),
+        )
+        painter.drawText(
+            rect.adjusted(10.0, 18.0, -10.0, -4.0),
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            str(payload.get("zone_label") or ""),
+        )
+        self._overlay_targets.append(("edge", str(payload.get("edge_name") or ""), rect))
+
+    def _current_edge_flow(self, edge_name: str) -> float:
+        series = self._edge_series_map.get(edge_name)
+        if not isinstance(series, dict):
+            return 0.0
+        values = list(series.get("q") or [])
+        if not values:
+            return 0.0
+        idx = max(0, min(int(self._frame_idx), len(values) - 1))
+        try:
+            return float(values[idx])
+        except Exception:
+            return 0.0
+
+    def _current_edge_open(self, edge_name: str) -> bool | None:
+        series = self._edge_series_map.get(edge_name)
+        if not isinstance(series, dict):
+            return None
+        values = series.get("open")
+        if not isinstance(values, list) or not values:
+            return None
+        idx = max(0, min(int(self._frame_idx), len(values) - 1))
+        try:
+            return bool(int(values[idx]))
+        except Exception:
+            return None
+
+    def _current_node_pressure(self, node_name: str) -> float | None:
+        series = self._node_series_map.get(node_name)
+        if not isinstance(series, dict):
+            return None
+        values = list(series.get("p") or [])
+        if not values:
+            return None
+        idx = max(0, min(int(self._frame_idx), len(values) - 1))
+        return _finite_or_none(values[idx])
+
+    @staticmethod
+    def _polyline_midpoint(points: list[QtCore.QPointF]) -> QtCore.QPointF | None:
+        if not points:
+            return None
+        if len(points) == 1:
+            return QtCore.QPointF(points[0])
+        lengths: list[float] = []
+        total = 0.0
+        for p1, p2 in zip(points[:-1], points[1:]):
+            seg = math.hypot(float(p2.x() - p1.x()), float(p2.y() - p1.y()))
+            lengths.append(seg)
+            total += seg
+        if total <= 1.0e-9:
+            return QtCore.QPointF(points[len(points) // 2])
+        target = total * 0.5
+        acc = 0.0
+        for seg, p1, p2 in zip(lengths, points[:-1], points[1:]):
+            if acc + seg >= target:
+                ratio = 0.0 if seg <= 1.0e-9 else (target - acc) / seg
+                return QtCore.QPointF(
+                    float(p1.x()) + (float(p2.x()) - float(p1.x())) * ratio,
+                    float(p1.y()) + (float(p2.y()) - float(p1.y())) * ratio,
+                )
+            acc += seg
+        return QtCore.QPointF(points[-1])
+
+    @staticmethod
+    def _fmt_value(value: Any, unit: str, *, digits: int) -> str:
+        finite = _finite_or_none(value)
+        if finite is None:
+            return f"— {unit}".strip()
+        return f"{finite:.{int(digits)}f} {unit}".strip()
+
+    @staticmethod
+    def _severity_color_hex(severity: str) -> str:
+        mapping = {
+            "warn": "#ff9c66",
+            "attention": "#f8c15c",
+            "focus": "#8be2f8",
+            "info": "#63d3f5",
+            "ok": "#7fe4a7",
+        }
+        return mapping.get(str(severity or "").strip().lower(), "#63d3f5")
 
 class MnemoMainWindow(QtWidgets.QMainWindow):
     def __init__(
@@ -2835,6 +4950,9 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.overview_panel = OverviewPanel(self)
         self.overview_panel.edge_activated.connect(self._select_edge)
         self.overview_panel.node_activated.connect(self._select_node)
+        self.snapshot_panel = PneumoSnapshotPanel(self)
+        self.snapshot_panel.edge_selected.connect(self._select_edge)
+        self.snapshot_panel.node_selected.connect(self._select_node)
         self.selection_panel = SelectionPanel(self)
         self.selection_panel.edge_selected.connect(self._select_edge)
         self.selection_panel.node_selected.connect(self._select_node)
@@ -2850,6 +4968,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             "<p><b>Что где читать:</b><br/>"
             "<b>Центр</b> — топология и причинно-следственная картина.<br/>"
             "<b>Обзор</b> — что сейчас доминирует.<br/>"
+            "<b>Приводы</b> — полости, штоки, объёмы, heatmap углов и активная арматура.<br/>"
             "<b>Диагностические сценарии</b> — как интерпретировать текущий кадр.<br/>"
             "<b>События</b> — latched-память и недавние переключения.<br/>"
             "<b>Тренды</b> — численная проверка гипотезы.</p>"
@@ -2860,6 +4979,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._render_event_panel()
 
         self._overview_dock = self._add_dock("Обзор", self.overview_panel, QtCore.Qt.LeftDockWidgetArea, obj_name="dock_overview")
+        self._snapshot_dock = self._add_dock("Приводы", self.snapshot_panel, QtCore.Qt.LeftDockWidgetArea, obj_name="dock_snapshot")
         self._selection_dock = self._add_dock("Выбор", self.selection_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_selection")
         self._guide_dock = self._add_dock("Диагностика", self.guide_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_guide")
         self._events_dock = self._add_dock("События", self.event_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_events")
@@ -2990,6 +5110,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
 
         view_menu = self.menuBar().addMenu("Вид")
         view_menu.addAction(self._overview_dock.toggleViewAction())
+        view_menu.addAction(self._snapshot_dock.toggleViewAction())
         view_menu.addAction(self._selection_dock.toggleViewAction())
         view_menu.addAction(self._guide_dock.toggleViewAction())
         view_menu.addAction(self._events_dock.toggleViewAction())
@@ -3221,6 +5342,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             follow_enabled=self.follow_enabled,
         )
         self.web.set_selection(edge=self.selected_edge, node=self.selected_node)
+        self._push_diagnostics()
         self._push_alerts()
         if self.startup_banner.isVisible():
             self._render_startup_banner()
@@ -3313,6 +5435,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.pointer_watcher.stop()
         self._set_status(f"Follow {'ON' if self.follow_enabled else 'OFF'}")
         self.overview_panel.update_frame(self.dataset, self.current_idx, playing=self.playing, follow_enabled=self.follow_enabled)
+        self.snapshot_panel.update_frame(self.dataset, self.current_idx)
         self.guide_panel.render(
             self.dataset,
             self.current_idx,
@@ -3334,6 +5457,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.play_timer.stop()
         self._push_playhead()
         self.overview_panel.update_frame(self.dataset, self.current_idx, playing=self.playing, follow_enabled=self.follow_enabled)
+        self.snapshot_panel.update_frame(self.dataset, self.current_idx)
         self.guide_panel.render(
             self.dataset,
             self.current_idx,
@@ -3470,6 +5594,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.scrubber.setValue(self.current_idx)
         self.time_label.setText(f"t = {float(self.dataset.time_s[self.current_idx]):6.3f} s")
         self.overview_panel.update_frame(self.dataset, self.current_idx, playing=self.playing, follow_enabled=self.follow_enabled)
+        self.snapshot_panel.update_frame(self.dataset, self.current_idx)
         self.selection_panel.render_details(self.dataset, self.current_idx, edge_name=self.selected_edge, node_name=self.selected_node)
         self.trends_panel.set_index(self.dataset, self.current_idx)
         self.guide_panel.render(
@@ -3486,6 +5611,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         if new_events:
             self._persist_event_log(silent=True)
         if push_to_web:
+            self._push_diagnostics()
             self._push_alerts()
             self._push_playhead()
 
@@ -3502,6 +5628,15 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             selected_node=self.selected_node,
         )
         self.web.set_alerts(alerts)
+
+    def _push_diagnostics(self) -> None:
+        diagnostics = _build_mnemo_diagnostics_payload(
+            self.dataset,
+            self.current_idx,
+            selected_edge=self.selected_edge,
+            selected_node=self.selected_node,
+        )
+        self.web.set_diagnostics(diagnostics)
 
     def _persist_event_log(self, *, silent: bool) -> Path | None:
         path = _write_event_log_sidecar(
