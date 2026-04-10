@@ -6,11 +6,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_pneumo_ui_app_has_ring_visual_npz_fallback_and_exports_dir_sidecar_search() -> None:
-    src = (ROOT / 'pneumo_solver_ui' / 'pneumo_ui_app.py').read_text(encoding='utf-8')
-    assert 'load_ring_spec_from_npz' in src
-    assert 'WORKSPACE_EXPORTS_DIR' in src
-    assert "st.session_state.get('anim_latest_npz')" in src
-    assert 'ring_visual_loaded_from_npz_sidecar' in src
+    ui_src = (ROOT / 'pneumo_solver_ui' / 'pneumo_ui_app.py').read_text(encoding='utf-8')
+    helper_src = (ROOT / 'pneumo_solver_ui' / 'ui_mech_animation_helpers.py').read_text(encoding='utf-8')
+    assert 'load_ring_spec_from_npz' in ui_src
+    assert 'WORKSPACE_EXPORTS_DIR' in ui_src
+    assert 'session_state.get("anim_latest_npz")' in helper_src
+    assert 'ring_visual_loaded_from_npz_sidecar' in helper_src
 
 
 def test_ui_scenario_ring_keeps_whole_ring_overlay_only_in_debug_expander() -> None:

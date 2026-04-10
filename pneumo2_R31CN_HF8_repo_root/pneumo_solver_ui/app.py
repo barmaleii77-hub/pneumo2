@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 pneumo_ui_app.py
 
@@ -3812,7 +3812,7 @@ if SHOW_RUN:
                         stage_elapsed_sec = staged_summary.get("stage_elapsed_sec", None)
                         stage_budget_sec = staged_summary.get("stage_budget_sec", None)
 
-                        st.write(f"РЎС‚Р°РґРёСЏ: **{stage_name}** (idx={stage_idx}, 0-based; РІСЃРµРіРѕ СЃС‚Р°РґРёР№: {max(1, stage_total)})")
+                        st.write(f"Стадия: **{stage_name}** (idx={stage_idx}, 0-based; всего стадий: {max(1, stage_total)})")
                         st.caption(describe_runtime_stage(stage_name))
                         st.write(f"Готово (суммарно): {total_done}  |  Записано в файл: {total_done_in_file}")
                         st.write(f"РўРµРєСѓС‰Р°СЏ СЃС‚Р°РґРёСЏ: rows РІ CSV = **{stage_rows_current}**  |  РїРѕ progress worker = {worker_done_current}/{worker_written_current}")

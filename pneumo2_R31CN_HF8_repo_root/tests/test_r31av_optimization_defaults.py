@@ -41,12 +41,17 @@ def test_r31av_default_suite_contains_diagnostics_selected_id() -> None:
 
 def test_r31av_optimization_page_wires_canonical_paths_and_os_import() -> None:
     page_path = Path(__file__).resolve().parents[1] / "pneumo_solver_ui" / "pages" / "03_Optimization.py"
-    src = page_path.read_text(encoding="utf-8")
-    assert "import os" in src
-    assert "_UI_JOBS_DEFAULT = int(diagnostics_jobs_default(os.cpu_count(), platform_name=sys.platform))" in src
-    assert "diagnostics_jobs_default()" not in src
+    launch_plan_path = Path(__file__).resolve().parents[1] / "pneumo_solver_ui" / "optimization_launch_plan_runtime.py"
+    page_src = page_path.read_text(encoding="utf-8")
+    launch_src = launch_plan_path.read_text(encoding="utf-8")
+    assert "import os" in page_src
+    assert "_UI_JOBS_DEFAULT = int(diagnostics_jobs_default(os.cpu_count(), platform_name=sys.platform))" in page_src
+    assert "diagnostics_jobs_default()" not in page_src
+    assert "build_optimization_launch_plan(" in page_src
+    for token in ["--model", "--worker", "--base_json", "--ranges_json", "--suite_json"]:
+        assert token in launch_src
     for token in ["--model", "--worker", "--base-json", "--ranges-json", "--suite-json"]:
-        assert token in src
+        assert token in launch_src
 
 
 def test_r31av_coordinator_scripts_add_project_root_to_syspath() -> None:

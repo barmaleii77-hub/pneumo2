@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from typing import Any, Dict, List
 
-import streamlit.components.v1 as components
+try:
+    import streamlit.components.v1 as components
+except Exception:
+    components = SimpleNamespace(html=lambda *args, **kwargs: None)
 
 def render_svg_edge_mapper_html(
     svg_inline: str,
@@ -1189,4 +1193,3 @@ __wakeStep(true);
     html = html.replace("__JS_DATA__", js_data)
 
     components.html(html, height=height, scrolling=False)
-

@@ -21,7 +21,7 @@ def test_desktop_animator_skips_non_exposed_docks_on_playback_updates() -> None:
     assert 'self.sideL.update_frame(b, i)' not in src
     assert 'self.sideR.update_frame(b, i)' not in src
     assert 'self.telemetry.update_frame(b, i)' not in src
-    assert 'self.timeline.set_index(i)' in src
+    assert 'self.timeline.set_playhead_time(self._playback_sample_t_s, idx=i)' in src
 
 
 def test_desktop_animator_refreshes_current_frame_when_dock_becomes_visible() -> None:

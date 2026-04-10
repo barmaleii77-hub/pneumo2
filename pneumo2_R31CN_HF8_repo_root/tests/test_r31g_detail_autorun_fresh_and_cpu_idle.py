@@ -42,6 +42,8 @@ def test_plotly_playhead_html_avoids_unconditional_setinterval():
 
 
 def test_worldroad_sine_amplitude_label_is_semantic_half_range():
-    src = (ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py").read_text(encoding="utf-8")
-    assert "Амплитуда A (полуразмах), м" in src
-    assert "профиль идёт от" in src and "полный размах p-p = 2A" in src
+    src = (ROOT / "pneumo_solver_ui" / "ui_scenario_ring.py").read_text(encoding="utf-8")
+    assert "Амплитуда A (полуразмах), мм" in src
+    assert "профиль идёт от" in src
+    assert "полный размах p-p =" in src
+    assert "A=100 мм" in src

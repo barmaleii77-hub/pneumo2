@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 pneumo_ui_app.py
 
@@ -2404,46 +2404,46 @@ with st.sidebar:
     _clamp_state_number("stop_pen_stage1", 25.0, min_value=0.0, max_value=1e9, cast=float)
     _clamp_state_number("stop_pen_stage2", 15.0, min_value=0.0, max_value=1e9, cast=float)
 
-    # Р“Р»Р°РІРЅР°СЏ Р±РѕР»СЊС€Рµ РЅРµ РґРµСЂР¶РёС‚ РІС‚РѕСЂРѕР№ optimization control plane.
-    # Р—РґРµСЃСЊ РѕСЃС‚Р°С‘С‚СЃСЏ С‚РѕР»СЊРєРѕ РёРЅР¶РµРЅРµСЂРЅС‹Р№ gateway + read-only snapshot,
-    # Р° Р·Р°РїСѓСЃРє/stop/resume/monitoring Р¶РёРІСѓС‚ РЅР° РѕС‚РґРµР»СЊРЅРѕР№ СЃС‚СЂР°РЅРёС†Рµ.
+    # Главная больше не держит второй launcher оптимизации.
+    # Здесь остаётся только инженерный gateway + read-only snapshot,
+    # а запуск/stop/resume/monitoring живут на отдельной странице.
     auto_refresh = False
     refresh_sec = float(st.session_state.get("ui_refresh_sec", 1.0) or 1.0)
 
-    st.subheader("РћРїС‚РёРјРёР·Р°С†РёСЏ вЂ” РѕС‚РґРµР»СЊРЅР°СЏ СЃС‚СЂР°РЅРёС†Р°")
+    st.subheader("Оптимизация — отдельная страница")
     st.caption(
-        "РќР° РіР»Р°РІРЅРѕР№ РѕСЃС‚Р°СЋС‚СЃСЏ search-space contract Рё РІС…РѕРґРЅС‹Рµ РґР°РЅРЅС‹Рµ: С‚Р°Р±Р»РёС†Р° РїР°СЂР°РјРµС‚СЂРѕРІ, СЂРµР¶РёРјС‹ Рё suite. "
-        "Р—Р°РїСѓСЃРє, stop/resume, monitoring Рё РІСЃРµ РЅР°СЃС‚СЂРѕР№РєРё РѕРїС‚РёРјРёР·Р°С†РёРё СЃРѕР±СЂР°РЅС‹ РЅР° РѕС‚РґРµР»СЊРЅРѕР№ СЃС‚СЂР°РЅРёС†Рµ В«РћРїС‚РёРјРёР·Р°С†РёСЏВ»."
+        "На главной остаются search-space contract и входные данные: таблица параметров, режимы и suite. "
+        "Запуск, stop/resume, monitoring и все настройки оптимизации собраны на отдельной странице «Оптимизация»."
     )
 
     _render_home_opt_config_snapshot(compact=True)
     _render_home_opt_last_pointer_summary(compact=True)
 
     st.caption(
-        "Р“СЂР°РЅРёС†С‹ РїР°СЂР°РјРµС‚СЂРѕРІ Рё test-suite Р·Р°РґР°СЋС‚СЃСЏ РЅР° РіР»Р°РІРЅРѕР№ РІ С‚РµРєСѓС‰РёС… СЂР°Р·РґРµР»Р°С…; Р°Р»РіРѕСЂРёС‚Рј, backend, "
-        "РѕСЃС‚Р°РЅРѕРІРєР° Рё РїСЂРѕСЃРјРѕС‚СЂ live-СЃС‚Р°С‚СѓСЃР° вЂ” РЅР° РѕС‚РґРµР»СЊРЅРѕР№ СЃС‚СЂР°РЅРёС†Рµ РѕРїС‚РёРјРёР·Р°С†РёРё."
+        "Границы параметров и test-suite задаются на главной в текущих разделах; алгоритм, backend, "
+        "остановка и просмотр live-статуса — на отдельной странице оптимизации."
     )
 
     _opt_gateway_nav(
         "pneumo_solver_ui/pages/30_Optimization.py",
-        "рџЋЇ РћС‚РєСЂС‹С‚СЊ СЃС‚СЂР°РЅРёС†Сѓ РѕРїС‚РёРјРёР·Р°С†РёРё",
+        "🎯 Открыть страницу оптимизации",
         key="home_opt_gateway_sidebar_go_optimization",
-        help_text="Р’СЃРµ СЂСѓС‡РєРё Р·Р°РїСѓСЃРєР°, stop/resume, РјРѕРЅРёС‚РѕСЂРёРЅРі Рё С‚РµРєСѓС‰РёР№ Р»РѕРі РѕРїС‚РёРјРёР·Р°С†РёРё.",
+        help_text="Все ручки запуска, stop/resume, мониторинг и текущий лог оптимизации.",
     )
     _opt_gateway_nav(
         "pneumo_solver_ui/pages/20_DistributedOptimization.py",
-        "рџ“Љ Р РµР·СѓР»СЊС‚Р°С‚С‹ РѕРїС‚РёРјРёР·Р°С†РёРё / ExperimentDB",
+        "📊 Результаты оптимизации / ExperimentDB",
         key="home_opt_gateway_sidebar_go_results",
-        help_text="РџСЂРѕСЃРјРѕС‚СЂ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ Рё distributed ExperimentDB.",
+        help_text="Просмотр результатов и distributed ExperimentDB.",
     )
     _opt_gateway_nav(
         "pneumo_solver_ui/pages/31_OptDatabase.py",
-        "рџ—„пёЏ Р‘Р°Р·Р° РѕРїС‚РёРјРёР·Р°С†РёР№",
+        "🗄️ База оптимизаций",
         key="home_opt_gateway_sidebar_go_db",
-        help_text="РћС‚РґРµР»СЊРЅР°СЏ СЃС‚СЂР°РЅРёС†Р° Р±Р°Р·С‹ РѕРїС‚РёРјРёР·Р°С†РёР№.",
+        help_text="Отдельная страница базы оптимизаций.",
     )
 
-    # Legacy home control plane retained only as dormant source surface
+    # Legacy home optimization block retained only as dormant source surface
     # for regression/source guards. Live launch path = dedicated Optimization page.
     if False:
             # --- РћСЃРЅРѕРІРЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё (РёСЃРїРѕР»СЊР·СѓСЋС‚СЃСЏ РїРѕС‡С‚Рё РІСЃРµРіРґР°)
@@ -5163,6 +5163,8 @@ with f1:
         help="РџРѕРєР°Р·С‹РІР°С‚СЊ С‚РµСЃС‚С‹ РІС‹Р±СЂР°РЅРЅС‹С… СЃС‚Р°РґРёР№.",
         key="ui_suite_stage_filter",
     )
+st.caption("Логика staged optimization: S0 — быстрый relevance-screen; S1 — длинные дорожные/манёвренные тесты; S2 — финальная robustness-стадия.")
+st.caption("Явно заданный stage 1 не должен молча переписываться в 0 при фильтрации, редактировании и staged-normalization.")
 with f2:
     only_enabled = st.checkbox(
         "РўРѕР»СЊРєРѕ РІРєР»СЋС‡С‘РЅРЅС‹Рµ",
@@ -5425,7 +5427,7 @@ with right:
             min_value=0,
             step=1,
             key=_stage_key,
-            help="РњРѕРјРµРЅС‚ РІС…РѕРґР° С‚РµСЃС‚Р° РІ staged optimization. РЎРµРјР°РЅС‚РёРєР° РЅР°РєРѕРїРёС‚РµР»СЊРЅР°СЏ: stage 0 РёРґС‘С‚ С‚РѕР»СЊРєРѕ СЃ S0; stage 1 РІРїРµСЂРІС‹Рµ РІРєР»СЋС‡Р°РµС‚СЃСЏ СЃ S1 Рё Р·Р°С‚РµРј РёРґС‘С‚ Рё РІ S2; stage 2 вЂ” С‚РѕР»СЊРєРѕ РІ С„РёРЅР°Р»СЊРЅРѕР№ СЃС‚Р°РґРёРё. РќСѓРјРµСЂР°С†РёСЏ 0-based: РїРµСЂРІР°СЏ СЃС‚Р°РґРёСЏ = 0.",
+            help="Момент входа теста в staged optimization. Семантика накопительная: stage 0 идёт только с S0; stage 1 впервые включается с S1 и затем идёт и в S2; stage 2 — только в финальной стадии. Нумерация 0-based: первая стадия = 0. Явно заданный stage 1 не должен молча переписываться в 0.",
         )
 
         _type_default = str(st.session_state.get(_type_key, rec.get("С‚РёРї", "worldroad")) or "worldroad")
@@ -7375,7 +7377,7 @@ if False:
                         stage_elapsed_sec = staged_summary.get("stage_elapsed_sec", None)
                         stage_budget_sec = staged_summary.get("stage_budget_sec", None)
 
-                        st.write(f"РЎС‚Р°РґРёСЏ: **{stage_name}** (idx={stage_idx}, 0-based; РІСЃРµРіРѕ СЃС‚Р°РґРёР№: {max(1, stage_total)})")
+                        st.write(f"Стадия: **{stage_name}** (idx={stage_idx}, 0-based; всего стадий: {max(1, stage_total)})")
                         st.caption(describe_runtime_stage(stage_name))
                         st.write(f"Готово (суммарно): {total_done}  |  Записано в файл: {total_done_in_file}")
                         st.write(f"РўРµРєСѓС‰Р°СЏ СЃС‚Р°РґРёСЏ: rows РІ CSV = **{stage_rows_current}**  |  РїРѕ progress worker = {worker_done_current}/{worker_written_current}")

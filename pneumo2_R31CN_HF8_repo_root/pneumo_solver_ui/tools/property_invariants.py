@@ -35,6 +35,31 @@ def _clip(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
 
+def _pick_smoke_test(worker: Any, suite_cfg: Dict[str, Any]) -> Tuple[str, Dict[str, Any], float, float]:
+    """Pick one numerically soft test for property-style invariants.
+
+    Current optimization-ready defaults may intentionally keep every suite row disabled.
+    Preflight must not crash on that configuration, so we first try the explicit suite,
+    then fall back to the worker's built-in canonical test set, and finally synthesize a
+    minimal micro-sine scenario if even that is unavailable.
+    """
+    tests = list(worker.build_test_suite(suite_cfg) or [])
+    if not tests:
+        tests = list(worker.build_test_suite({}) or [])
+    for name, test_dict, dt, t_end, _targets in tests:
+        if "микро" in str(name).lower():
+            return str(name), dict(test_dict), float(dt), float(t_end)
+    if tests:
+        name, test_dict, dt, t_end, _targets = tests[0]
+        return str(name), dict(test_dict), float(dt), float(t_end)
+    return (
+        "микро_синфаза_fallback",
+        dict(worker.make_test_micro_sin(A=0.004, f=3.0)),
+        0.003,
+        1.6,
+    )
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[1]  # .../pneumo_solver_ui
     base = _load_json(root / "default_base.json")
@@ -53,19 +78,7 @@ def main() -> int:
     sys.modules["worker"] = worker
     spec_w.loader.exec_module(worker)  # type: ignore
 
-    tests = worker.build_test_suite(suite_cfg)
-
-    # Выбираем «мягкий» тест: микро-синфаза (или первый доступный)
-    pick = None
-    for name, test_dict, dt, t_end, targets in tests:
-        if "микро" in name.lower():
-            pick = (name, test_dict, float(dt), float(t_end))
-            break
-    if pick is None:
-        name, test_dict, dt, t_end, _ = tests[0]
-        pick = (name, test_dict, float(dt), float(t_end))
-
-    test_name, test_dict, dt0, t_end0 = pick
+    test_name, test_dict, dt0, t_end0 = _pick_smoke_test(worker, suite_cfg)
     dt = max(5e-4, min(0.01, dt0))
     t_end = min(0.2, t_end0)
 

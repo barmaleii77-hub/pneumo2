@@ -1522,7 +1522,7 @@ def render_ring_scenario_generator(
                         df_view = pd.DataFrame({
                             "Сегмент": df_seg["seg_idx"],
                             "Имя": df_seg["name"],
-                            "Поворот": df_seg["turn_direction"],
+                            "Поворот": df_seg["turn_direction"].map(_turn_direction_label),
                             "v0, км/ч": df_seg["speed_start_kph"].round(2),
                             "v1, км/ч": df_seg["speed_end_kph"].round(2),
                             "Дорога": df_seg["road_mode"],
@@ -1635,7 +1635,6 @@ def render_ring_scenario_generator(
             _ring_stage_default = max(0, int(st.session_state.get("ring_stage_num", _guess_suite_stage(df_suite_edit)) or 0))
         except Exception:
             _ring_stage_default = max(0, int(_guess_suite_stage(df_suite_edit) or 0))
-        st.session_state["ring_stage_num"] = int(_ring_stage_default)
         stage_num = int(
             st.number_input(
                 "Стадия",

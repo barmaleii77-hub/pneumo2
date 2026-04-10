@@ -35,7 +35,7 @@ def test_select_adaptive_eps_candidate_prefers_stable_local_plateau() -> None:
 
 def test_ui_and_stage_runner_sources_expose_influence_eps_controls() -> None:
     root = Path(__file__).resolve().parents[1] / "pneumo_solver_ui"
-    ui_src = (root / "pneumo_ui_app.py").read_text(encoding="utf-8")
+    ui_src = (root / "optimization_stage_runner_config_ui.py").read_text(encoding="utf-8")
     stage_src = (root / "opt_stage_runner_v1.py").read_text(encoding="utf-8")
     assert '"System Influence eps_rel"' in ui_src
     assert '"Adaptive epsilon для System Influence"' in ui_src

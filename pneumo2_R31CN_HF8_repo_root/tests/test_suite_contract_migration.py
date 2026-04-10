@@ -83,10 +83,12 @@ def test_migrated_suite_speed_reaches_build_test_suite_for_bump_diag() -> None:
 def test_streamlit_suite_editors_use_canonical_speed_key_only() -> None:
     app_src = Path(__file__).resolve().parents[1] / "pneumo_solver_ui" / "app.py"
     ui_src = Path(__file__).resolve().parents[1] / "pneumo_solver_ui" / "pneumo_ui_app.py"
+    ring_src = Path(__file__).resolve().parents[1] / "pneumo_solver_ui" / "ui_scenario_ring.py"
     app_text = app_src.read_text(encoding="utf-8")
     ui_text = ui_src.read_text(encoding="utf-8")
+    ring_text = ring_src.read_text(encoding="utf-8")
 
     assert '"скорость_м_с"' not in app_text
     assert '"скорость_м_с"' not in ui_text
-    assert '"vx0_м_с"' in app_text
-    assert '"vx0_м_с"' in ui_text
+    assert '"vx0_м_с"' in ring_text
+    assert '"скорость_м_с"' not in ring_text

@@ -20,11 +20,12 @@ def test_live_gl_layout_change_auto_pauses_and_restores_native_dock() -> None:
     assert 'self._resume_after_gl_layout_transition = True' in APP
     assert 'dock.topLevelChanged.connect' in APP
     assert 'dock.dockLocationChanged.connect' in APP
-    assert 'self._layout_pause_placeholder.show()' in APP
-    assert 'self.view.hide()' in APP
+    assert 'self.view.setUpdatesEnabled(not active)' in APP
+    assert 'self._layout_pause_placeholder.setVisible(False)' in APP
+    assert 'self.view.hide()' not in APP
 
 
 def test_layout_version_gate_prevents_old_special_window_state_from_returning() -> None:
     assert 'layout_matches = bool(saved_layout_version == str(getattr(self, "_dock_layout_version", "")))' in APP
     assert 'self.cockpit.show_all_docks()' in APP
-    assert 'r31ai_native_gl_pauseplaceholder_v1' in APP
+    assert 'r31cn_continuous_sampling_gl_native_v2' in APP

@@ -94,9 +94,10 @@ def test_collect_seed_points_writes_seed_manifest_and_live_summary(tmp_path: Pat
 
 def test_sources_expose_current_screen_stage_policy_observability() -> None:
     root = Path(__file__).resolve().parents[1] / "pneumo_solver_ui"
-    ui_src = (root / "pneumo_ui_app.py").read_text(encoding="utf-8")
+    ui_src = (root / "optimization_stage_policy_runtime_ui.py").read_text(encoding="utf-8")
+    block_src = (root / "optimization_stage_runtime_block.py").read_text(encoding="utf-8")
     runner_src = (root / "opt_stage_runner_v1.py").read_text(encoding="utf-8")
     assert "Seed/promotion policy (текущая стадия)" in ui_src
-    assert "summarize_stage_policy_runtime" in ui_src
+    assert "summarize_stage_policy_runtime" in block_src
     assert "seed_points_manifest.json" in runner_src
     assert "stage_seed_manifest_json" in runner_src

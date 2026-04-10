@@ -1361,17 +1361,20 @@ def build_system_influence_cmd(
     adaptive_eps_strategy: str = "balanced",
     stage_name: str = "",
 ) -> List[str]:
+    def _cli_arg_path(path: Path) -> str:
+        return str(path).replace("\\", "/")
+
     cmd = [
         console_python_executable(sys.executable) or sys.executable,
-        str((worker_path.parent / "calibration" / "system_influence_report_v1.py")),
+        _cli_arg_path(worker_path.parent / "calibration" / "system_influence_report_v1.py"),
         "--run_dir",
-        str(staging_dir),
+        _cli_arg_path(staging_dir),
         "--model",
-        str(model_path),
+        _cli_arg_path(model_path),
         "--base_json",
-        str(base_json),
+        _cli_arg_path(base_json),
         "--fit_ranges_json",
-        str(ranges_json),
+        _cli_arg_path(ranges_json),
         "--eps_rel",
         str(float(eps_rel)),
     ]
@@ -1515,15 +1518,18 @@ def ensure_stage_aware_influence_reports(
 
 
 def build_param_staging_cmd(*, worker_path: Path, ranges_json: Path, system_influence_json: Path, staging_dir: Path) -> List[str]:
+    def _cli_arg_path(path: Path) -> str:
+        return str(path).replace("\\", "/")
+
     return [
         console_python_executable(sys.executable) or sys.executable,
-        str((worker_path.parent / "calibration" / "param_staging_v3_influence.py")),
+        _cli_arg_path(worker_path.parent / "calibration" / "param_staging_v3_influence.py"),
         "--fit_ranges_json",
-        str(ranges_json),
+        _cli_arg_path(ranges_json),
         "--system_influence_json",
-        str(system_influence_json),
+        _cli_arg_path(system_influence_json),
         "--out_dir",
-        str(staging_dir),
+        _cli_arg_path(staging_dir),
     ]
 
 

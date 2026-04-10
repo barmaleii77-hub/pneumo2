@@ -12660,6 +12660,12 @@ class CockpitWidget(QtWidgets.QWidget):
                 valve_panel,
                 lambda: valve_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
             )
+        if interactive_scrub and (not many_visible_budget) and slow_due and corner_table_panel is not None and self._dock_is_exposed("dock_corner_table"):
+            _call_aux_widget(
+                "dock_corner_table",
+                corner_table_panel,
+                lambda: corner_table_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
+            )
         if interactive_scrub and heatmap_panel is not None and self._dock_is_exposed("dock_heatmap"):
             _call_aux_widget(
                 "dock_heatmap",

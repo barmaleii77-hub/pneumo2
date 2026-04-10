@@ -10,8 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_r31bj_ring_editor_uses_explicit_widget_key_and_zero_min() -> None:
     src = (ROOT / 'pneumo_solver_ui' / 'ui_scenario_ring.py').read_text(encoding='utf-8')
     assert 'key="ring_stage_num"' in src
-    assert 'st.session_state["ring_stage_num"] = int(_ring_stage_default)' in src
+    assert '_ring_stage_default = max(0, int(st.session_state.get("ring_stage_num", _guess_suite_stage(df_suite_edit)) or 0))' in src
+    assert 'st.session_state["ring_stage_num"] = int(_ring_stage_default)' not in src
     assert 'min_value=0,' in src
+    assert 'value=int(_ring_stage_default),' in src
 
 
 def test_r31bj_suite_card_stage_uses_explicit_key_and_zero_default() -> None:

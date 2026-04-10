@@ -6,7 +6,10 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence
 
 import numpy as np
-import pandas as pd
+try:
+    import pandas as pd
+except Exception:  # pragma: no cover - optional dependency for lightweight diagnostics
+    pd = None  # type: ignore[assignment]
 
 from pneumo_solver_ui.data_contract import read_visual_geometry_meta, supplement_animator_geometry_meta
 from pneumo_solver_ui.solver_points_contract import collect_solver_points_contract_issues
@@ -24,6 +27,10 @@ def _emit(msg: str, log: LogFn | None) -> None:
         pass
 
 
+def _is_dataframe(value: Any) -> bool:
+    return bool(pd is not None and isinstance(value, pd.DataFrame))
+
+
 def format_missing_preview(items: List[str], *, limit: int = 4) -> str:
     if not items:
         return ""
@@ -33,7 +40,7 @@ def format_missing_preview(items: List[str], *, limit: int = 4) -> str:
 
 
 def _coerce_columns(df_main_or_columns: Any) -> set[str]:
-    if isinstance(df_main_or_columns, pd.DataFrame):
+    if _is_dataframe(df_main_or_columns):
         return {str(c) for c in df_main_or_columns.columns}
     if df_main_or_columns is None:
         return set()
@@ -51,7 +58,7 @@ def _coerce_time_vector(df_main_or_columns: Any, time_vector: Sequence[float] | 
                 return arr
         except Exception:
             return None
-    if isinstance(df_main_or_columns, pd.DataFrame) and "время_с" in df_main_or_columns.columns:
+    if _is_dataframe(df_main_or_columns) and "время_с" in df_main_or_columns.columns:
         try:
             arr = np.asarray(df_main_or_columns["время_с"], dtype=float)
             if arr.ndim == 1 and arr.size:
@@ -469,6 +476,12 @@ def load_visual_road_sidecar(
     if not resolved.exists():
         _issue(
             f"[contract] {context} references road_csv '{resolved}', but the file does not exist."
+        )
+        return out
+
+    if pd is None:
+        _warn(
+            f"[contract] pandas is unavailable; skipping road_csv content validation for '{resolved}'."
         )
         return out
 

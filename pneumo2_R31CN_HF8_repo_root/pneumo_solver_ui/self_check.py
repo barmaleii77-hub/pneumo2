@@ -37,6 +37,24 @@ if str(HERE.parent) not in _sys.path:
     _sys.path.insert(0, str(HERE.parent))
 
 
+def _build_suite_type_probe_rows(suite_rows):
+    """Make a non-destructive probe suite for parser/type self-checks.
+
+    Shipped `default_suite.json` may intentionally keep every row disabled so the UI
+    starts from a safe blank selection. For parser self-checks we still need to verify
+    that `build_test_suite()` understands the row types present in that file, so here we
+    clone rows and force-enable only the probe copy.
+    """
+    out = []
+    for row in list(suite_rows or []):
+        if not isinstance(row, dict):
+            continue
+        probe = dict(row)
+        probe["включен"] = True
+        out.append(probe)
+    return out
+
+
 
 def main() -> int:
     worker = load_python_module_from_path(HERE / "opt_worker_v3_margins_energy.py", "worker")
@@ -91,12 +109,13 @@ def main() -> int:
         return rc
 
     # --- 1) suite types ---
-    tests = worker.build_test_suite({"suite": suite})
+    tests = worker.build_test_suite({"suite": _build_suite_type_probe_rows(suite)})
     names = [t[0] for t in tests]
 
     print(f"[1] build_test_suite(): тестов собрано = {len(tests)}")
     if not any("комбо" in n for n in names):
         print("  !! ВНИМАНИЕ: среди тестов нет ни одного с 'комбо' в имени. Проверь default_suite.json")
+        _add('WARN', '1', "suite type probe did not produce any combo test names", test_names=list(names))
     else:
         print("  OK: комбо-тест присутствует")
 
