@@ -2106,7 +2106,7 @@ if SHOW_PARAMS:
         only_opt = st.checkbox("Только оптимизируемые", value=bool(st.session_state.get("param_only_opt", False)), key="param_only_opt")
 
     df_view = df_in.copy()
-    if grp != "(РІСЃРµ)":
+    if grp != "(все)":
         df_view = df_view[df_view["группа"] == grp]
     if q.strip():
         qq = q.strip().lower()
@@ -2545,7 +2545,7 @@ if SHOW_RUN:
         st.session_state.baseline_full_cache = {}  # сброс детальных прогонов (параметры могли измениться)
         with st.spinner("Считаю..."):
             for name, test, dt_i, t_end_i, targets in tests:
-                if pick != "(РІСЃРµ)" and name != pick:
+                if pick != "(все)" and name != pick:
                     continue
                 try:
                     m = worker_mod.eval_candidate_once(model_mod, base_override, test, dt=dt_i, t_end=t_end_i)

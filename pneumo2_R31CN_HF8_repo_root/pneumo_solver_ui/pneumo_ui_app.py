@@ -5380,7 +5380,7 @@ with colB:
         st.session_state.baseline_full_cache = {}  # сброс детальных прогонов (параметры могли измениться)
         with st.spinner("Считаю..."):
             for name, test, dt_i, t_end_i, targets in tests:
-                if pick != "(РІСЃРµ)" and name != pick:
+                if pick != "(все)" and name != pick:
                     continue
                 try:
                     m = worker_mod.eval_candidate_once(model_mod, base_override, test, dt=dt_i, t_end=t_end_i)
