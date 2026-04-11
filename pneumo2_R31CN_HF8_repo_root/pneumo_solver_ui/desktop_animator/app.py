@@ -1102,6 +1102,59 @@ def _sample_angle_series_local(
         return float(default)
 
 
+def _sample_signed_speed_along_world_path_local(
+    b: DataBundle,
+    *,
+    i0: int,
+    i1: int,
+    alpha: float,
+    default_signed_m_s: float = 0.0,
+) -> float:
+    try:
+        xw_arr, yw_arr = b.ensure_world_xy()
+        vxw_arr, vyw_arr = b.ensure_world_velocity_xy()
+        xw_path = np.asarray(xw_arr, dtype=float).reshape(-1)
+        yw_path = np.asarray(yw_arr, dtype=float).reshape(-1)
+        vxw_path = np.asarray(vxw_arr, dtype=float).reshape(-1)
+        vyw_path = np.asarray(vyw_arr, dtype=float).reshape(-1)
+        n_path = int(min(xw_path.size, yw_path.size, vxw_path.size, vyw_path.size))
+        if n_path >= 2:
+            ii_lo = int(_clamp(min(int(i0), int(i1)), 0, n_path - 1))
+            ii_hi = int(_clamp(max(int(i0), int(i1)), 0, n_path - 1))
+            ii_prev = int(max(0, ii_lo - 1))
+            ii_next = int(min(n_path - 1, ii_hi + 1))
+            tx = float(xw_path[ii_next] - xw_path[ii_prev])
+            ty = float(yw_path[ii_next] - yw_path[ii_prev])
+            tangent_norm = float(math.hypot(tx, ty))
+            if np.isfinite(tangent_norm) and tangent_norm > 1e-9:
+                tangent_x = float(tx / tangent_norm)
+                tangent_y = float(ty / tangent_norm)
+                vxw = float(
+                    _sample_series_local(
+                        vxw_arr,
+                        i0=i0,
+                        i1=i1,
+                        alpha=alpha,
+                        default=0.0,
+                    )
+                )
+                vyw = float(
+                    _sample_series_local(
+                        vyw_arr,
+                        i0=i0,
+                        i1=i1,
+                        alpha=alpha,
+                        default=0.0,
+                    )
+                )
+                v_proj = float(vxw * tangent_x + vyw * tangent_y)
+                if np.isfinite(v_proj) and abs(v_proj) > 1e-9:
+                    return float(v_proj)
+    except Exception:
+        pass
+    return float(default_signed_m_s)
+
+
 def _make_series_sampler(*, i0: int, i1: int, alpha: float) -> Callable[[Any, float], float]:
     def _sample(series: Any, default: float = 0.0) -> float:
         return _sample_series_local(series, i0=int(i0), i1=int(i1), alpha=float(alpha), default=float(default))
