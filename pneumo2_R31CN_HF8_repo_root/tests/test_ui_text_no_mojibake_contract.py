@@ -192,10 +192,14 @@ def test_key_ui_files_keep_clean_visible_russian_labels() -> None:
     assert 'xaxis_title="Сценарий"' in heavy_text
     assert 'labels=dict(x="Сценарий", y="Критерий", color="Штраф")' in heavy_text
     assert "Сначала запустите опорный прогон. Затем выберите один сценарий" in heavy_text
+    assert "получите расширенный лог расчёта" in heavy_text
+    assert "Расширенный лог (потоки и состояния)" in heavy_text
     assert "Рассчитать полный лог ДЛЯ ВСЕХ сценариев" in heavy_text
     assert "Экспорт NPZ ДЛЯ ВСЕХ сценариев (из кэша)" in heavy_text
     assert "Считаю полный лог для всех сценариев" in heavy_text
     assert "Экспортирую NPZ для всех сценариев" in heavy_text
+    assert "Для массового расчёта включите расширенный лог расчёта" in heavy_text
+    assert "Экспорт NPZ доступен только для расширенного лога расчёта" in heavy_text
     assert "Нужно для запуска oneclick/autopilot." in heavy_text
     assert "Сопоставление файлов ➜ Txx_osc.npz" in heavy_text
     assert "Калибровочные пайплайны по умолчанию ищут файлы" in heavy_text
@@ -209,27 +213,58 @@ def test_key_ui_files_keep_clean_visible_russian_labels() -> None:
     assert "Калибровка и пакетные пайплайны (NPZ/CSV) — эксперимент" in heavy_text
     assert "Калибровочные пайплайны и Autopilot читают Txx_osc.npz" in heavy_text
     assert "2) Полный лог + NPZ ➜ oneclick-пайплайн" in heavy_text
-    assert "Код завершения oneclick:" in heavy_text
+    assert "Код завершения пайплайна oneclick:" in heavy_text
     assert "Пайплайн oneclick завершился с ошибкой" in heavy_text
-    assert "Пайплайн oneclick выполнен. Результаты сохранены в out_dir." in heavy_text
+    assert "Пайплайн oneclick выполнен. Результаты сохранены в рабочей папке запуска." in heavy_text
     assert "3) Полный лог + NPZ ➜ Autopilot (минимальный режим)" in heavy_text
-    assert "Код завершения Autopilot:" in heavy_text
+    assert "Код завершения пайплайна Autopilot:" in heavy_text
     assert "Пайплайн Autopilot завершился с ошибкой" in heavy_text
-    assert "Пайплайн Autopilot выполнен. Результаты сохранены в out_dir." in heavy_text
+    assert "Пайплайн Autopilot выполнен. Результаты сохранены в рабочей папке запуска." in heavy_text
     assert "Запустить пайплайн oneclick" in heavy_text
     assert "Запустить пайплайн Autopilot v19 (по NPZ)" in heavy_text
     assert "Desktop Animator (по последней выгрузке anim_latest)" in heavy_text
     assert "Авто-экспорт последней анимационной выгрузки (anim_latest)" in heavy_text
+    assert "с указанием последней выгрузки" in heavy_text
     assert "Desktop Animator подхватит их автоматически." in heavy_text
     assert "Авто-запуск Desktop Animator при экспорте" in heavy_text
     assert "🖥 Desktop Animator (внешнее окно, по выгрузке anim_latest)" in heavy_text
     assert "Desktop Animator читает последнюю выгрузку из папки workspace/exports" in heavy_text
     assert "Экспортировать последнюю выгрузку (anim_latest)" in heavy_text
     assert "Не удалось экспортировать последнюю анимационную выгрузку:" in heavy_text
+    assert "Последняя анимационная выгрузка сохранена:" in heavy_text
+    assert "Файл NPZ:" in heavy_text
     assert "Без OpenGL (режим совместимости)" in heavy_text
     assert "Запустить Desktop Animator" in heavy_text
     assert "Desktop Animator запущен (если система позволяет GUI)." in heavy_text
     assert "Не удалось запустить Desktop Animator (см. логи)." in heavy_text
+    assert "Подвеска: кинематика и перемещения, плюс проверка DW2D" in heavy_text
+    assert "Кинематика и перемещения: в норме" in heavy_text
+    assert "Кинематика и перемещения: требуют внимания" in heavy_text
+    assert "Кинематика и перемещения: данных нет" in heavy_text
+    assert "Рабочий диапазон DW2D: в норме" in heavy_text
+    assert "Рабочий диапазон DW2D: требует внимания" in heavy_text
+    assert "Рабочий диапазон DW2D: данных нет" in heavy_text
+    assert "Проверка рабочего диапазона DW2D" in heavy_text
+    assert "Нулевая поза в начале расчёта (t=0)" in heavy_text
+    assert "Нулевая поза: в норме" in heavy_text
+    assert "Нулевая поза: требует внимания" in heavy_text
+    assert "Нулевая поза: данных нет" in heavy_text
+    assert "Полный отчёт самопроверки (JSON)" in heavy_text
+    assert "Стабилизатор:" in heavy_text
+    assert "включён" in heavy_text
+    assert "выключен (по умолчанию)" in heavy_text
+    assert "Сообщение по механике:" in heavy_text
+    assert "Настройка геометрии DW2D доступна на странице" in heavy_text
+    assert "Файл прогресса обновлён" in heavy_text
+    assert "служебный progress.json" in heavy_text
+    assert "строк в CSV текущей стадии" in heavy_text
+    assert "по данным progress-файла" in heavy_text
+    assert "отстаёт от фактического CSV текущей стадии" in heavy_text
+    assert "Угол подвески" in heavy_text
+    assert "Уровень дороги, м" in heavy_text
+    assert "Колесо относительно рамы, м" in heavy_text
+    assert "Шток C1, доля хода" in heavy_text
+    assert "Шток C2, доля хода" in heavy_text
     assert "Диагностика — собрать архив ZIP для отправки" in heavy_text
     assert "Основная кнопка диагностики находится в боковой панели" in heavy_text
     assert "включите режим старых страниц" in heavy_text
@@ -269,10 +304,12 @@ def test_key_ui_files_keep_clean_visible_russian_labels() -> None:
     assert "В тест-наборе есть ошибки" not in heavy_text
     assert "Опорный прогон тестов" not in heavy_text
     assert "Не удалось собрать тест‑набор:" not in heavy_text
+    assert "полный лог (record_full=True)" not in heavy_text
     assert 'st.selectbox("Тест", options=["(все)"] + test_names, index=0)' not in heavy_text
     assert "В таблице опорного прогона нет доступных тестов" not in heavy_text
     assert 'st.selectbox("Тест для детального прогона"' not in heavy_text
     assert "Авто-расчёт при выборе теста" not in heavy_text
+    assert '"record_full (потоки/состояния)"' not in heavy_text
     assert 'st.metric("Опорный прогон: тестов", _n_total)' not in heavy_text
     assert "Показывать график худших тестов" not in heavy_text
     assert "Строит Plotly‑график по худшим тестам" not in heavy_text
@@ -292,6 +329,8 @@ def test_key_ui_files_keep_clean_visible_russian_labels() -> None:
     assert "Экспорт NPZ ДЛЯ ВСЕХ (из кэша)" not in heavy_text
     assert "Считаю полный лог для всех тестов" not in heavy_text
     assert "Экспортирую NPZ для всех тестов" not in heavy_text
+    assert "Для массового расчёта включи record_full" not in heavy_text
+    assert "Экспорт NPZ имеет смысл только при record_full=True" not in heavy_text
     assert "Нужно для oneclick/autopilot." not in heavy_text
     assert "Mapping файлов ➜ Txx_osc.npz" not in heavy_text
     assert "Применить mapping (создать/обновить Txx_osc.npz)" not in heavy_text
@@ -303,6 +342,11 @@ def test_key_ui_files_keep_clean_visible_russian_labels() -> None:
     assert "и гонять пайплайны oneclick/autopilot как самопроверку" not in heavy_text
     assert "Калибровка и Autopilot (NPZ/CSV) — эксперимент" not in heavy_text
     assert "Калибровка и Autopilot читают Txx_osc.npz" not in heavy_text
+    assert "Код завершения oneclick:" not in heavy_text
+    assert "Код завершения Autopilot:" not in heavy_text
+    assert "Пайплайн oneclick выполнен. Результаты сохранены в out_dir." not in heavy_text
+    assert "Пайплайн Autopilot выполнен. Результаты сохранены в out_dir." not in heavy_text
+    assert "см. stdout/stderr ниже и файлы в out_dir." not in heavy_text
     assert "Диагностика — собрать ZIP (для отправки)" not in heavy_text
     assert "Единая кнопка диагностики находится в боковой панели" not in heavy_text
     assert "включите Legacy-режим" not in heavy_text
@@ -315,10 +359,34 @@ def test_key_ui_files_keep_clean_visible_russian_labels() -> None:
     assert "st.caption('Animator читает последнюю выгрузку" not in heavy_text
     assert "if st.button('Экспортировать anim_latest сейчас'" not in heavy_text
     assert "st.error(f'Экспорт anim_latest не удался:" not in heavy_text
+    assert "st.success(f'OK: {npz_latest.name}')" not in heavy_text
     assert "st.checkbox('no-gl (compat)'" not in heavy_text
     assert "if st.button('Запустить Animator (follow)'" not in heavy_text
     assert "st.success('Animator запущен (если система позволяет GUI).')" not in heavy_text
     assert "st.warning('Не удалось запустить Animator (см. логи).')" not in heavy_text
+    assert "st.markdown('**DW2D dynamic range**')" not in heavy_text
+    assert "st.markdown('**Полный autoself_post_json**')" not in heavy_text
+    assert "st.success('Кинематика/перемещения: OK')" not in heavy_text
+    assert "st.error('Кинематика/перемещения: FAIL')" not in heavy_text
+    assert "st.info('Кинематика/перемещения: —')" not in heavy_text
+    assert "'Рабочий диапазон DW2D: OK' if _dw_ok else 'Рабочий диапазон DW2D: ПРОБЛЕМА'" not in heavy_text
+    assert "st.info('Рабочий диапазон DW2D: —')" not in heavy_text
+    assert "'Нулевая поза: OK' if _pz_ok else 'Нулевая поза: ПРОБЛЕМА'" not in heavy_text
+    assert "st.info('Нулевая поза: —')" not in heavy_text
+    assert "st.write('Механика:', mech_msg)" not in heavy_text
+    assert "st.write('Стабилизатор:', 'ВКЛ' if _stab_on else 'выкл (по умолчанию)')" not in heavy_text
+    assert "Геометрия DW2D настраивается на странице:" not in heavy_text
+    assert "Прогресс-файл обновлён" not in heavy_text
+    assert "worker пишет progress.json" not in heavy_text
+    assert "rows в CSV =" not in heavy_text
+    assert "по progress worker =" not in heavy_text
+    assert "Вложенный progress.json отстаёт от live CSV текущей стадии" not in heavy_text
+    assert "st.caption(f'NPZ: {npz_path}')" not in heavy_text
+    assert "'corner': _c" not in heavy_text
+    assert "'road_m': _d.get('road_m', float('nan'))" not in heavy_text
+    assert "'wheel_rel_frame_m': _d.get('wheel_rel_frame_m', float('nan'))" not in heavy_text
+    assert "'rod_C1_frac': _d.get('rod_C1_frac', float('nan'))" not in heavy_text
+    assert "'rod_C2_frac': _d.get('rod_C2_frac', float('nan'))" not in heavy_text
     assert 'if st.button("2) Полный лог + NPZ ➜ oneclick", key="oneclick_full_then_oneclick")' not in heavy_text
     assert 'st.write(f"oneclick exit code: {rc}")' not in heavy_text
     assert 'st.error("oneclick завершился с ошибкой — см. stdout/stderr ниже и файлы в out_dir.")' not in heavy_text

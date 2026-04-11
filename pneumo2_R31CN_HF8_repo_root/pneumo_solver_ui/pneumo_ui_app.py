@@ -5660,7 +5660,7 @@ if st.session_state.get("baseline_df") is not None:
 st.divider()
 st.header("Графики и анимация (опорный прогон)")
 st.caption(
-    "Сначала запустите опорный прогон. Затем выберите один сценарий и получите полный лог (record_full=True): "
+    "Сначала запустите опорный прогон. Затем выберите один сценарий и получите расширенный лог расчёта: "
     "графики P/Q/крен/тангаж/силы и MVP-анимацию потоков."
 )
 
@@ -5718,7 +5718,7 @@ else:
                     help="Меньше — быстрее UI/графики; больше — точнее форма сигналов.",
                 )
                 want_full = st.checkbox(
-                    "record_full (потоки/состояния)",
+                    "Расширенный лог (потоки и состояния)",
                     value=bool(st.session_state.get("detail_want_full", True)),
                     key="detail_want_full",
                 )
@@ -5743,8 +5743,9 @@ else:
                     value=bool(st.session_state.get('auto_export_anim_latest', True)),
                     key='auto_export_anim_latest',
                     help=(
-                        'После детального прогона сохраняет workspace/exports/anim_latest.npz '
-                        'и anim_latest.json (pointer). Desktop Animator подхватит их автоматически.'
+                        'После детального прогона сохраняет файлы '
+                        'workspace/exports/anim_latest.npz и anim_latest.json '
+                        'с указанием последней выгрузки. Desktop Animator подхватит их автоматически.'
                     ),
                 )
                 st.checkbox(
@@ -5841,7 +5842,7 @@ else:
         # - экспорт NPZ для всех сценариев
         if run_detail_all:
             if not want_full:
-                st.warning("Для массового расчёта включи record_full (потоки/состояния) — иначе NPZ будет неполный.")
+                st.warning("Для массового расчёта включите расширенный лог расчёта — иначе файл NPZ будет неполным.")
             else:
                 with st.spinner("Считаю полный лог для всех сценариев… (может быть долго)"):
                     prog = st.progress(0.0)
@@ -5937,7 +5938,7 @@ else:
 
         if export_npz_all:
             if not want_full:
-                st.warning("Экспорт NPZ имеет смысл только при record_full=True (иначе нет p/q/open).")
+                st.warning("Экспорт NPZ доступен только для расширенного лога расчёта — иначе не будет данных p/q/open.")
             else:
                 with st.spinner("Экспортирую NPZ для всех сценариев, которые уже посчитаны…"):
                     prog = st.progress(0.0)
@@ -6462,22 +6463,22 @@ else:
                                 break
 
                     st.subheader('Самопроверки (детальный прогон)')
-                    st.caption('Подвеска: кинематика/перемещения + проверка DW2D по фактическому диапазону хода из симуляции.')
+                    st.caption('Подвеска: кинематика и перемещения, плюс проверка DW2D по фактическому рабочему диапазону хода из симуляции.')
 
                     cS1, cS2, cS3 = st.columns(3)
                     with cS1:
                         if mech_ok is True:
-                            st.success('Кинематика/перемещения: OK')
+                            st.success('Кинематика и перемещения: в норме')
                         elif mech_ok is False:
-                            st.error('Кинематика/перемещения: FAIL')
+                            st.error('Кинематика и перемещения: требуют внимания')
                         else:
-                            st.info('Кинематика/перемещения: —')
+                            st.info('Кинематика и перемещения: данных нет')
 
                     with cS2:
                         if isinstance(dw_item, dict):
                             _dw_ok = bool(dw_item.get('ok', True))
                             _dw_sev = str(dw_item.get('severity', 'info') or 'info')
-                            _label = 'DW2D диапазон: OK' if _dw_ok else 'DW2D диапазон: ПРОБЛЕМА'
+                            _label = 'Рабочий диапазон DW2D: в норме' if _dw_ok else 'Рабочий диапазон DW2D: требует внимания'
                             if _dw_ok:
                                 st.success(_label)
                             else:
@@ -6486,17 +6487,17 @@ else:
                                 else:
                                     st.warning(_label)
                         else:
-                            st.info('DW2D диапазон: —')
+                            st.info('Рабочий диапазон DW2D: данных нет')
 
                     with cS3:
                         _stab_on = bool(base_override.get('стабилизатор_вкл', False))
-                        st.write('Стабилизатор:', 'ВКЛ' if _stab_on else 'выкл (по умолчанию)')
+                        st.write('Стабилизатор:', 'включён' if _stab_on else 'выключен (по умолчанию)')
 
                     # Нулевая поза (t=0): дорога=0, штоки ~ середина хода
                     if isinstance(pose_item, dict):
                         _pz_ok = bool(pose_item.get('ok', True))
                         _pz_sev = str(pose_item.get('severity', 'info') or 'info')
-                        _pz_label = 'Нулевая поза: OK' if _pz_ok else 'Нулевая поза: ПРОБЛЕМА'
+                        _pz_label = 'Нулевая поза: в норме' if _pz_ok else 'Нулевая поза: требует внимания'
                         if _pz_ok:
                             st.success(_pz_label)
                         else:
@@ -6505,11 +6506,11 @@ else:
                             else:
                                 st.warning(_pz_label)
                     else:
-                        st.info('Нулевая поза: —')
+                        st.info('Нулевая поза: данных нет')
 
                     with st.expander('Детали самопроверок', expanded=False):
                         if mech_msg:
-                            st.write('Механика:', mech_msg)
+                            st.write('Сообщение по механике:', mech_msg)
                         _mj = _r0.get('mech_selfcheck_json', None)
                         if isinstance(_mj, str) and _mj.strip():
                             try:
@@ -6517,13 +6518,13 @@ else:
                             except Exception:
                                 st.code(_mj)
                         if isinstance(dw_item, dict) and (dw_item.get('message') or dw_item.get('value')):
-                            st.markdown('**DW2D dynamic range**')
+                            st.markdown('**Проверка рабочего диапазона DW2D**')
                             if dw_item.get('message'):
                                 st.write(str(dw_item.get('message')))
                             if dw_item.get('value') is not None:
                                 st.json(dw_item.get('value'))
                         if isinstance(pose_item, dict) and (pose_item.get('message') or pose_item.get('value')):
-                            st.markdown('**Нулевая поза (t=0)**')
+                            st.markdown('**Нулевая поза в начале расчёта (t=0)**')
                             if pose_item.get('message'):
                                 st.write(str(pose_item.get('message')))
                             try:
@@ -6535,11 +6536,11 @@ else:
                                         if not isinstance(_d, dict):
                                             continue
                                         _rows.append({
-                                            'corner': _c,
-                                            'road_m': _d.get('road_m', float('nan')),
-                                            'wheel_rel_frame_m': _d.get('wheel_rel_frame_m', float('nan')),
-                                            'rod_C1_frac': _d.get('rod_C1_frac', float('nan')),
-                                            'rod_C2_frac': _d.get('rod_C2_frac', float('nan')),
+                                            'Угол подвески': _c,
+                                            'Уровень дороги, м': _d.get('road_m', float('nan')),
+                                            'Колесо относительно рамы, м': _d.get('wheel_rel_frame_m', float('nan')),
+                                            'Шток C1, доля хода': _d.get('rod_C1_frac', float('nan')),
+                                            'Шток C2, доля хода': _d.get('rod_C2_frac', float('nan')),
                                         })
                                     if _rows:
                                         st.dataframe(pd.DataFrame(_rows), hide_index=True, width="stretch")
@@ -6548,10 +6549,10 @@ else:
                             if pose_item.get('value') is not None:
                                 st.json(pose_item.get('value'))
                         if isinstance(rep_post, dict):
-                            st.markdown('**Полный autoself_post_json**')
+                            st.markdown('**Полный отчёт самопроверки (JSON)**')
                             st.json(rep_post)
 
-                    st.caption('Геометрия DW2D настраивается на странице: «Геометрия подвески (DW2D)» (в меню слева).')
+                    st.caption('Настройка геометрии DW2D доступна на странице «Геометрия подвески (DW2D)» в меню слева.')
 
 
                 # -----------------------------------
@@ -6608,7 +6609,7 @@ else:
                                     'pointer_json': ptr_latest,
                                     'meta': dict(_meta_anim or {}),
                                 }
-                                st.success(f'OK: {npz_latest.name}')
+                                st.success(f'Последняя анимационная выгрузка сохранена: {npz_latest.name}')
                                 log_event('anim_latest_exported_manual', npz=str(npz_latest), pointer=str(ptr_latest), test=str(test_pick))
                                 try:
                                     from pneumo_solver_ui.run_artifacts import save_last_baseline_ptr as save_last_baseline_ptr_global
@@ -6650,7 +6651,7 @@ else:
                             else:
                                 st.warning('Не удалось запустить Desktop Mnemo (см. логи).')
                     with cols_da[2]:
-                        st.caption(f'NPZ: {npz_path}')
+                        st.caption(f'Файл NPZ: {npz_path}')
                         st.caption('Подсказка: включите **Авто-экспорт anim_latest** в настройках детального прогона. Animator даёт 3D/2D виды, Mnemo даёт отдельное HMI-окно с анимированной мнемохемой.')
 
                 # -----------------------------------
@@ -6905,10 +6906,10 @@ if False:
                     try:
                         _mtime = os.path.getmtime(progress_path)
                         _age = time.time() - float(_mtime)
-                        st.caption(f"Прогресс-файл обновлён {_age:.1f} с назад: {progress_path}")
+                        st.caption(f"Файл прогресса обновлён {_age:.1f} с назад: {progress_path}")
                         # Если процесс жив, а файл давно не обновлялся — вероятно завис/упал или пишет в другой каталог.
                         if pid_alive(st.session_state.opt_proc) and (_age > max(300.0, 10.0*float(refresh_sec) + 5.0)):
-                            st.caption("⚠️ Прогресс-файл давно не обновлялся. Если это неожиданно — проверьте, что worker пишет progress.json в тот же каталог и что расчёт не завис.")
+                            st.caption("⚠️ Файл прогресса давно не обновлялся. Если это неожиданно, проверьте, что worker пишет служебный progress.json в тот же каталог и что расчёт не завис.")
                     except Exception:
                         pass
 
@@ -6958,7 +6959,7 @@ if False:
                         st.write(f"Стадия: **{stage_name}** (idx={stage_idx}, 0-based; всего стадий: {max(1, stage_total)})")
                         st.caption(describe_runtime_stage(stage_name))
                         st.write(f"Готово (суммарно): {total_done}  |  Записано в файл: {total_done_in_file}")
-                        st.write(f"Текущая стадия: rows в CSV = **{stage_rows_current}**  |  по progress worker = {worker_done_current}/{worker_written_current}")
+                        st.write(f"Текущая стадия: строк в CSV текущей стадии = **{stage_rows_current}**  |  по данным progress-файла = {worker_done_current}/{worker_written_current}")
                         if stage_rows_done_before > 0:
                             st.caption(f"Завершённые предыдущие стадии уже дали строк: {stage_rows_done_before}")
                         if stage_budget_sec is not None and float(stage_budget_sec) > 0:
@@ -6968,7 +6969,7 @@ if False:
                             frac_t = max(0.0, min(1.0, elapsed_sec_live / (time_limit_min * 60.0)))
                             st.progress(frac_t, text=f"Прогресс по времени: {frac_t*100:.1f}% (статус: {status_text})")
                         if bool(staged_summary.get("worker_progress_stale", False)):
-                            st.caption("⚠️ Вложенный progress.json отстаёт от live CSV текущей стадии; UI показывает производные счётчики по фактическим строкам stage CSV.")
+                            st.caption("⚠️ Вложенный progress.json отстаёт от фактического CSV текущей стадии; интерфейс показывает производные счётчики по реально записанным строкам stage CSV.")
                         try:
                             policy_run_dir = None
                             if st.session_state.get("opt_run_dir"):
@@ -7903,13 +7904,13 @@ if False:
                             "--use_smoothing_defaults",
                         ],
                     )
-                    st.write(f"Код завершения oneclick: {rc}")
+                    st.write(f"Код завершения пайплайна oneclick: {rc}")
                     if rc != 0:
-                        st.error("Пайплайн oneclick завершился с ошибкой — см. stdout/stderr ниже и файлы в out_dir.")
+                        st.error("Пайплайн oneclick завершился с ошибкой. Подробности ниже; файлы запуска сохранены в рабочей папке.")
                         st.code(so[-4000:] if so else "", language="text")
                         st.code(se[-4000:] if se else "", language="text")
                     else:
-                        st.success("Пайплайн oneclick выполнен. Результаты сохранены в out_dir.")
+                        st.success("Пайплайн oneclick выполнен. Результаты сохранены в рабочей папке запуска.")
                         st.code(str(out_dir), language="text")
                 else:
                     st.error(msg)
@@ -7933,13 +7934,13 @@ if False:
                             "minimal",
                         ],
                     )
-                    st.write(f"Код завершения Autopilot: {rc}")
+                    st.write(f"Код завершения пайплайна Autopilot: {rc}")
                     if rc != 0:
-                        st.error("Пайплайн Autopilot завершился с ошибкой — см. stdout/stderr ниже и файлы в out_dir.")
+                        st.error("Пайплайн Autopilot завершился с ошибкой. Подробности ниже; файлы запуска сохранены в рабочей папке.")
                         st.code(so[-4000:] if so else "", language="text")
                         st.code(se[-4000:] if se else "", language="text")
                     else:
-                        st.success("Пайплайн Autopilot выполнен. Результаты сохранены в out_dir.")
+                        st.success("Пайплайн Autopilot выполнен. Результаты сохранены в рабочей папке запуска.")
                         st.code(str(out_dir), language="text")
                 else:
                     st.error(msg)

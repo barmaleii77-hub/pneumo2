@@ -3648,7 +3648,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         row_s.addWidget(QtWidgets.QLabel("Color:"))
         self.combo_mv_color = QtWidgets.QComboBox()
         self.combo_mv_color.setToolTip("Чем раскрашивать точки (метрика/параметр).")
-        self.combo_mv_color.currentIndexChanged.connect(lambda _=None: self._schedule_multivar_update())
+        self.combo_mv_color.currentIndexChanged.connect(self._on_mv_projection_combo_changed)
         row_s.addWidget(self.combo_mv_color, 1)
         row_s.addStretch(1)
         sv.addLayout(row_s)
@@ -3698,20 +3698,20 @@ class CompareViewer(QtWidgets.QMainWindow):
         row3 = QtWidgets.QHBoxLayout()
         row3.setSpacing(8)
         row3.addWidget(QtWidgets.QLabel("X:"))
-        self.combo_mv_x = QtWidgets.QComboBox(); self.combo_mv_x.currentIndexChanged.connect(lambda _=None: self._schedule_multivar_update())
+        self.combo_mv_x = QtWidgets.QComboBox(); self.combo_mv_x.currentIndexChanged.connect(self._on_mv_projection_combo_changed)
         row3.addWidget(self.combo_mv_x, 1)
         row3.addWidget(QtWidgets.QLabel("Y:"))
-        self.combo_mv_y = QtWidgets.QComboBox(); self.combo_mv_y.currentIndexChanged.connect(lambda _=None: self._schedule_multivar_update())
+        self.combo_mv_y = QtWidgets.QComboBox(); self.combo_mv_y.currentIndexChanged.connect(self._on_mv_projection_combo_changed)
         row3.addWidget(self.combo_mv_y, 1)
         row3.addWidget(QtWidgets.QLabel("Z:"))
-        self.combo_mv_z = QtWidgets.QComboBox(); self.combo_mv_z.currentIndexChanged.connect(lambda _=None: self._schedule_multivar_update())
+        self.combo_mv_z = QtWidgets.QComboBox(); self.combo_mv_z.currentIndexChanged.connect(self._on_mv_projection_combo_changed)
         row3.addWidget(self.combo_mv_z, 1)
         tv.addLayout(row3)
 
         row3b = QtWidgets.QHBoxLayout()
         row3b.setSpacing(8)
         row3b.addWidget(QtWidgets.QLabel("3D color:"))
-        self.combo_mv_color3d = QtWidgets.QComboBox(); self.combo_mv_color3d.currentIndexChanged.connect(lambda _=None: self._schedule_multivar_update())
+        self.combo_mv_color3d = QtWidgets.QComboBox(); self.combo_mv_color3d.currentIndexChanged.connect(self._on_mv_projection_combo_changed)
         row3b.addWidget(self.combo_mv_color3d, 1)
 
         row3b.addWidget(QtWidgets.QLabel("Max pts:"))
@@ -3925,6 +3925,26 @@ class CompareViewer(QtWidgets.QMainWindow):
             self._mv_peb_sig_selected = ""
         self._schedule_multivar_update()
 
+    def _on_mv_projection_combo_changed(self, _index: int) -> None:
+        sender = self.sender()
+        attr_name = None
+        for candidate_attr, combo_name in (
+            ("_mv_color_selected", "combo_mv_color"),
+            ("_mv_color3d_selected", "combo_mv_color3d"),
+            ("_mv_x_selected", "combo_mv_x"),
+            ("_mv_y_selected", "combo_mv_y"),
+            ("_mv_z_selected", "combo_mv_z"),
+        ):
+            if sender is getattr(self, combo_name, None):
+                attr_name = candidate_attr
+                break
+        if attr_name:
+            try:
+                setattr(self, attr_name, str(sender.currentText() or "").strip())
+            except Exception:
+                pass
+        self._schedule_multivar_update()
+
     def _remember_multivar_projection_state(self) -> None:
         for attr_name, combo_name in (
             ("_mv_color_selected", "combo_mv_color"),
@@ -3939,10 +3959,13 @@ class CompareViewer(QtWidgets.QMainWindow):
             try:
                 if int(combo.count()) <= 0:
                     continue
-                val = str(combo.currentText() or "")
+                val = str(combo.currentText() or "").strip()
                 if not val:
                     continue
-                setattr(self, attr_name, val)
+                remembered = str(getattr(self, attr_name, "") or "").strip()
+                remembered_available = bool(remembered) and (combo.findText(remembered) >= 0)
+                if (not remembered) or remembered_available or (val == remembered):
+                    setattr(self, attr_name, val)
             except Exception:
                 pass
 
@@ -4295,7 +4318,13 @@ class CompareViewer(QtWidgets.QMainWindow):
         # pebbles signals options (from events / discrete detection)
         try:
             disc = self._mv_discrete_signal_options()
-            cur = str(getattr(self, "_mv_peb_sig_selected", "") or self.combo_mv_peb_sig.currentText() or "")
+            remembered_peb = str(getattr(self, "_mv_peb_sig_selected", "") or "").strip()
+            remembered_available = bool(remembered_peb) and (remembered_peb in disc)
+            cur = str(
+                remembered_peb
+                if remembered_available
+                else (self.combo_mv_peb_sig.currentText() or remembered_peb or "")
+            ).strip()
             self.combo_mv_peb_sig.blockSignals(True)
             self.combo_mv_peb_sig.clear()
             self.combo_mv_peb_sig.addItems([""] + disc)
@@ -4305,7 +4334,9 @@ class CompareViewer(QtWidgets.QMainWindow):
                 self.combo_mv_peb_sig.setCurrentText(disc[0])
             self.combo_mv_peb_sig.blockSignals(False)
             self.combo_mv_peb_sig.setEnabled(bool(disc))
-            self._mv_peb_sig_selected = str(self.combo_mv_peb_sig.currentText() or "")
+            current_peb = str(self.combo_mv_peb_sig.currentText() or "").strip()
+            if current_peb and (not remembered_peb or remembered_available or current_peb == remembered_peb):
+                self._mv_peb_sig_selected = current_peb
         except Exception:
             pass
 
@@ -6616,7 +6647,8 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             cur = ''
         remembered_nav = str(getattr(self, 'navigator_signal_selected', '') or '').strip()
-        nav_target = str(cur or remembered_nav or '').strip()
+        remembered_nav_available = bool(remembered_nav) and self._signal_exists_in_current_context(remembered_nav)
+        nav_target = str(remembered_nav if remembered_nav_available else (cur or remembered_nav or '')).strip()
         nav_options = list(self.available_signals[: min(200, len(self.available_signals))])
         if nav_target and nav_target not in nav_options and self._signal_exists_in_current_context(nav_target):
             nav_options = [str(nav_target)] + nav_options
@@ -6637,7 +6669,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             pass
         try:
             current_nav = str(self.combo_nav_signal.currentText() or '').strip()
-            if current_nav:
+            if current_nav and (not remembered_nav or remembered_nav_available or current_nav == remembered_nav):
                 self.navigator_signal_selected = current_nav
         except Exception:
             pass

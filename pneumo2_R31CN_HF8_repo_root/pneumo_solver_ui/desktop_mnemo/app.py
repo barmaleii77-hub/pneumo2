@@ -3718,6 +3718,90 @@ def _edge_operator_hint_meta(
     }
 
 
+def _edge_operator_checklist_meta(
+    *,
+    component_kind: str,
+    canonical_kind: str,
+    operator_hint_badge: str,
+    phase_ribbon_bottleneck_kind: str,
+    operability_status: str,
+    consistency_status: str,
+) -> dict[str, Any]:
+    component = str(component_kind or "").strip().lower()
+    canonical = str(canonical_kind or "").strip().lower()
+    hint_badge = str(operator_hint_badge or "")
+    bottleneck_kind = str(phase_ribbon_bottleneck_kind or "")
+    operability = str(operability_status or "")
+    consistency = str(consistency_status or "")
+
+    items: list[str]
+    if hint_badge == "ACT leak":
+        items = [
+            "герметичность седла и фактическое закрытие арматуры",
+            "обходные ветви и скрытый реверс через соседние линии",
+            "совпадает ли open-state с фактическим перекрытием ветви",
+        ]
+    elif hint_badge == "ACT rev":
+        items = [
+            "стрелку элемента и паспортное направление ветви",
+            "знак ΔP на концах ветви в момент хода",
+            "нет ли перепутанного upstream/downstream маршрута",
+        ]
+    elif bottleneck_kind == "контур управления":
+        items = [
+            "момент прихода команды на ветвь",
+            "собирается ли ΔP сразу после команды",
+            "не тормозит ли управляющая арматура открытие",
+        ]
+        if canonical in {"reg_after"} or "регулятор" in component:
+            items[2] = "не тормозит ли регулятор или pilot-часть открытие"
+        elif canonical in {"check"} or "обратный клапан" in component:
+            items[2] = "не зависает ли односторонний клапан до появления ΔP"
+    elif bottleneck_kind == "расходный отклик":
+        items = [
+            "проходит ли расход через элемент после сборки ΔP",
+            "нет ли узкого сечения или дросселирования downstream",
+            "не забирает ли downstream-объём весь отклик ветви",
+        ]
+        if canonical == "orifice" or "дроссель" in component:
+            items[1] = "настроен ли дроссель и не слишком ли зажат проход"
+        elif canonical in {"check", "reg_after"} or "обратный клапан" in component or "регулятор" in component:
+            items[1] = "не ограничивает ли арматура проход при уже собранном ΔP"
+    elif "конфликтует" in consistency or "закрыт, но расход есть" in operability:
+        items = [
+            "реальное состояние закрытия ветви",
+            "паразитный обходной проход",
+            "нет ли реверса через соседнюю арматуру",
+        ]
+    else:
+        items = [
+            "порядок SIG → ΔP → Q в текущем окне",
+            "совпадает ли bottleneck с поведением ветви на схеме",
+            "нет ли соседнего контура, который перехватывает ход",
+        ]
+
+    focus_tone = "neutral"
+    if hint_badge in {"ACT leak", "ACT rev"} or "конфликтует" in consistency or "закрыт, но расход есть" in operability:
+        focus_tone = "warn"
+    elif bottleneck_kind in {"контур управления", "расходный отклик"}:
+        focus_tone = "info"
+    rows = [
+        {
+            "index_label": f"{idx + 1:02d}",
+            "title": item,
+            "tone": focus_tone if idx == 0 else ("info" if idx == 1 and focus_tone != "warn" else "neutral"),
+            "is_focus": idx == 0,
+        }
+        for idx, item in enumerate(items[:3])
+    ]
+    summary = " • ".join(items[:2])
+    return {
+        "operator_checklist_items": items,
+        "operator_checklist_rows": rows,
+        "operator_checklist_summary": summary,
+    }
+
+
 def _component_icon_key(kind: str, canonical_kind: str) -> str:
     canonical = str(canonical_kind or "").strip().lower()
     if canonical in {"check", "orifice", "relief", "reg_after"}:
@@ -4662,6 +4746,14 @@ class SelectionPanel(QtWidgets.QWidget):
                     phase_ribbon_bottleneck_comment=str(phase_ribbon_meta.get("phase_ribbon_bottleneck_comment") or ""),
                     phase_ribbon_focus_hint=str(phase_ribbon_meta.get("phase_ribbon_focus_hint") or ""),
                 )
+                operator_checklist_meta = _edge_operator_checklist_meta(
+                    component_kind=component_kind,
+                    canonical_kind=canonical_kind,
+                    operator_hint_badge=str(operator_hint_meta.get("operator_hint_badge") or ""),
+                    phase_ribbon_bottleneck_kind=str(phase_ribbon_meta.get("phase_ribbon_bottleneck_kind") or ""),
+                    operability_status=str(operability_meta.get("operability_status") or ""),
+                    consistency_status=str(consistency_meta.get("consistency_status") or ""),
+                )
                 chunks.append(
                     "<p><b>Ветка:</b> "
                     + escape(edge_name)
@@ -4765,6 +4857,15 @@ class SelectionPanel(QtWidgets.QWidget):
                     + escape(str(operator_hint_meta.get("operator_hint_title") or "—"))
                     + "<br/><b>Комментарий приоритета:</b> "
                     + escape(str(operator_hint_meta.get("operator_hint_label") or "—"))
+                    + "<br/><b>Чек-лист разбора:</b> "
+                    + escape(str(operator_checklist_meta.get("operator_checklist_summary") or "—"))
+                    + "".join(
+                        "<br/>"
+                        + escape(str(item.get("index_label") or "•"))
+                        + " "
+                        + escape(str(item.get("title") or "—"))
+                        for item in list(operator_checklist_meta.get("operator_checklist_rows") or [])[:3]
+                    )
                     + "<br/><b>Зона:</b> "
                     + escape(zone_label)
                     + "<br/><b>Класс прокладки:</b> "
@@ -6199,6 +6300,14 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             phase_ribbon_bottleneck_comment=str(phase_ribbon_meta.get("phase_ribbon_bottleneck_comment") or ""),
             phase_ribbon_focus_hint=str(phase_ribbon_meta.get("phase_ribbon_focus_hint") or ""),
         )
+        operator_checklist_meta = _edge_operator_checklist_meta(
+            component_kind=component_kind,
+            canonical_kind=canonical_kind,
+            operator_hint_badge=str(operator_hint_meta.get("operator_hint_badge") or ""),
+            phase_ribbon_bottleneck_kind=str(phase_ribbon_meta.get("phase_ribbon_bottleneck_kind") or ""),
+            operability_status=str(operability_meta.get("operability_status") or ""),
+            consistency_status=str(consistency_meta.get("consistency_status") or ""),
+        )
         return {
             "edge_name": edge_name,
             "path": path,
@@ -6304,6 +6413,9 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             "operator_hint_label": str(operator_hint_meta.get("operator_hint_label") or ""),
             "operator_hint_badge": str(operator_hint_meta.get("operator_hint_badge") or ""),
             "operator_hint_tone": str(operator_hint_meta.get("operator_hint_tone") or "neutral"),
+            "operator_checklist_items": list(operator_checklist_meta.get("operator_checklist_items") or []),
+            "operator_checklist_rows": list(operator_checklist_meta.get("operator_checklist_rows") or []),
+            "operator_checklist_summary": str(operator_checklist_meta.get("operator_checklist_summary") or ""),
         }
 
     def _draw_selected_edge_terminal_overlay(self, painter: QtGui.QPainter) -> None:
@@ -6439,7 +6551,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         if abs(normal.x()) <= 1.0e-6 and abs(normal.y()) <= 1.0e-6:
             normal = QtCore.QPointF(0.0, -1.0)
         center = QtCore.QPointF(anchor.x() + normal.x() * 96.0, anchor.y() + normal.y() * 96.0)
-        card_rect = QtCore.QRectF(center.x() - 202.0, center.y() - 144.0, 404.0, 408.0)
+        card_rect = QtCore.QRectF(center.x() - 202.0, center.y() - 177.0, 404.0, 486.0)
         safe_rect = self._scene_rect.adjusted(36.0, 36.0, -36.0, -36.0)
         if card_rect.left() < safe_rect.left():
             card_rect.moveLeft(safe_rect.left())
@@ -6730,6 +6842,18 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             card_rect.adjusted(14.0, 252.0, -12.0, 194.0),
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
             f"Сначала: {payload.get('operator_hint_title') or '—'}",
+        )
+        painter.setPen(operator_hint_color)
+        painter.drawText(
+            card_rect.adjusted(14.0, 272.0, -12.0, 214.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Проверь: {payload.get('operator_checklist_summary') or '—'}",
+        )
+        checklist_rect = QtCore.QRectF(card_rect.left() + 14.0, card_rect.top() + 296.0, card_rect.width() - 28.0, 58.0)
+        self._draw_edge_operator_checklist(
+            painter,
+            rect=checklist_rect,
+            payload=payload,
         )
         phase_ribbon_rect = QtCore.QRectF(card_rect.left() + 14.0, card_rect.bottom() - 128.0, card_rect.width() - 28.0, 24.0)
         self._draw_edge_phase_ribbon(
@@ -7102,6 +7226,77 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.setFont(font)
         painter.setPen(QtGui.QColor(_text_color_for_rgb((color.red(), color.green(), color.blue()))))
         painter.drawText(chip_rect, QtCore.Qt.AlignCenter, label)
+        painter.restore()
+
+    def _draw_edge_operator_checklist(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+    ) -> None:
+        rows = list(payload.get("operator_checklist_rows") or [])[:3]
+        if not rows:
+            return
+
+        painter.save()
+        gap = 4.0
+        row_h = max(16.0, min(18.0, (rect.height() - gap * (len(rows) - 1)) / max(1, len(rows))))
+        index_w = 30.0
+        text_font = QtGui.QFont(self.font())
+        text_font.setPointSizeF(6.35)
+        number_font = QtGui.QFont(self.font())
+        number_font.setPointSizeF(6.1)
+        number_font.setBold(True)
+        y = rect.top()
+
+        for row in rows:
+            tone = str(row.get("tone") or "neutral")
+            is_focus = bool(row.get("is_focus"))
+            fill = QtGui.QColor(24, 36, 45, 216)
+            border = QtGui.QColor("#4f6470")
+            number_fill = QtGui.QColor(69, 84, 95, 228)
+            text_color = QtGui.QColor("#eef7fa")
+            number_color = QtGui.QColor("#eef7fa")
+            if tone == "warn":
+                fill = QtGui.QColor(72, 47, 34, 226)
+                border = QtGui.QColor("#ffb587")
+                number_fill = QtGui.QColor(255, 156, 102, 236)
+                text_color = QtGui.QColor("#fff4ed")
+                number_color = QtGui.QColor("#071117")
+            elif tone == "info":
+                fill = QtGui.QColor(22, 44, 54, 220)
+                border = QtGui.QColor("#7fcde0")
+                number_fill = QtGui.QColor(138, 226, 248, 210)
+                text_color = QtGui.QColor("#eef7fa")
+                number_color = QtGui.QColor("#071117")
+            if is_focus and tone == "neutral":
+                border = QtGui.QColor("#f6d98b")
+
+            row_rect = QtCore.QRectF(rect.left(), y, rect.width(), row_h)
+            number_rect = QtCore.QRectF(row_rect.left(), row_rect.top(), index_w, row_rect.height())
+            text_rect = QtCore.QRectF(row_rect.left() + index_w + 6.0, row_rect.top(), row_rect.width() - index_w - 6.0, row_rect.height())
+            painter.setPen(QtGui.QPen(border, 1.4 if is_focus else 1.0))
+            painter.setBrush(fill)
+            painter.drawRoundedRect(text_rect, 8.0, 8.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(number_fill)
+            painter.drawRoundedRect(number_rect, 8.0, 8.0)
+
+            painter.setFont(number_font)
+            painter.setPen(number_color)
+            painter.drawText(number_rect, QtCore.Qt.AlignCenter, str(row.get("index_label") or "—"))
+
+            painter.setFont(text_font)
+            painter.setPen(text_color)
+            metrics = QtGui.QFontMetrics(text_font)
+            elided = metrics.elidedText(str(row.get("title") or "—"), QtCore.Qt.ElideRight, max(20, int(text_rect.width() - 12.0)))
+            painter.drawText(
+                text_rect.adjusted(10.0, 0.0, -8.0, 0.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                elided,
+            )
+            y += row_h + gap
         painter.restore()
 
     def _draw_focus_overlay(self, painter: QtGui.QPainter) -> None:

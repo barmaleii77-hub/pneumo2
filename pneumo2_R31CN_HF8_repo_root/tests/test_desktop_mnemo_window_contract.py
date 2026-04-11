@@ -175,6 +175,7 @@ def test_desktop_mnemo_native_canvas_has_overlay_contract() -> None:
     assert "def _edge_recent_latency_summary(" in src
     assert "def _edge_phase_ribbon_meta(" in src
     assert "def _edge_operator_hint_meta(" in src
+    assert "def _edge_operator_checklist_meta(" in src
     assert "def _draw_selected_edge_terminal_overlay(self, painter: QtGui.QPainter) -> None:" in src
     assert "def _draw_terminal_role_badges(" in src
     assert "def _draw_selected_edge_direction_overlay(self, painter: QtGui.QPainter) -> None:" in src
@@ -236,6 +237,7 @@ def test_desktop_mnemo_native_canvas_has_overlay_contract() -> None:
     assert "Подсказка фокуса:" in src
     assert "Операторский приоритет:" in src
     assert "Комментарий приоритета:" in src
+    assert "Чек-лист разбора:" in src
     assert "ΔP-контур • " in src
     assert "Последние " in src
     assert "self._draw_selected_edge_terminal_overlay(painter)" in src
@@ -248,6 +250,9 @@ def test_desktop_mnemo_native_canvas_has_overlay_contract() -> None:
     assert "Фаза:" in src
     assert "Узкое место:" in src
     assert "Сначала:" in src
+    assert "Проверь:" in src
+    assert "operator_checklist_rows" in src
+    assert "def _draw_edge_operator_checklist(" in src
     assert "def _draw_edge_phase_ribbon(" in src
     assert "phase_ribbon_intervals" in src
     assert "phase_ribbon_interval_label" in src

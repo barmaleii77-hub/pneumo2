@@ -1123,6 +1123,59 @@ def _sample_angle_series_local(
         return float(default)
 
 
+def _sample_signed_speed_along_world_path_local(
+    b: DataBundle,
+    *,
+    i0: int,
+    i1: int,
+    alpha: float,
+    default_signed_m_s: float = 0.0,
+) -> float:
+    try:
+        xw_arr, yw_arr = b.ensure_world_xy()
+        vxw_arr, vyw_arr = b.ensure_world_velocity_xy()
+        xw_path = np.asarray(xw_arr, dtype=float).reshape(-1)
+        yw_path = np.asarray(yw_arr, dtype=float).reshape(-1)
+        vxw_path = np.asarray(vxw_arr, dtype=float).reshape(-1)
+        vyw_path = np.asarray(vyw_arr, dtype=float).reshape(-1)
+        n_path = int(min(xw_path.size, yw_path.size, vxw_path.size, vyw_path.size))
+        if n_path >= 2:
+            ii_lo = int(_clamp(min(int(i0), int(i1)), 0, n_path - 1))
+            ii_hi = int(_clamp(max(int(i0), int(i1)), 0, n_path - 1))
+            ii_prev = int(max(0, ii_lo - 1))
+            ii_next = int(min(n_path - 1, ii_hi + 1))
+            tx = float(xw_path[ii_next] - xw_path[ii_prev])
+            ty = float(yw_path[ii_next] - yw_path[ii_prev])
+            tangent_norm = float(math.hypot(tx, ty))
+            if np.isfinite(tangent_norm) and tangent_norm > 1e-9:
+                tangent_x = float(tx / tangent_norm)
+                tangent_y = float(ty / tangent_norm)
+                vxw = float(
+                    _sample_series_local(
+                        vxw_arr,
+                        i0=i0,
+                        i1=i1,
+                        alpha=alpha,
+                        default=0.0,
+                    )
+                )
+                vyw = float(
+                    _sample_series_local(
+                        vyw_arr,
+                        i0=i0,
+                        i1=i1,
+                        alpha=alpha,
+                        default=0.0,
+                    )
+                )
+                v_proj = float(vxw * tangent_x + vyw * tangent_y)
+                if np.isfinite(v_proj) and abs(v_proj) > 1e-9:
+                    return float(v_proj)
+    except Exception:
+        pass
+    return float(default_signed_m_s)
+
+
 def _make_series_sampler(*, i0: int, i1: int, alpha: float) -> Callable[[Any, float], float]:
     def _sample(series: Any, default: float = 0.0) -> float:
         return _sample_series_local(series, i0=int(i0), i1=int(i1), alpha=float(alpha), default=float(default))
@@ -4321,7 +4374,13 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         x0 = sample(xw, float(xw[idx_ref]))
         y0 = sample(yw, float(yw[idx_ref]))
         v_mps = math.hypot(sample(vxb_series, 0.0), sample(vyb_series, 0.0))
-        v_forward_signed_m_s = float(sample(vxb_series, 0.0))
+        v_forward_signed_m_s = _sample_signed_speed_along_world_path_local(
+            b,
+            i0=sample_i0,
+            i1=sample_i1,
+            alpha=alpha,
+            default_signed_m_s=float(sample(vxb_series, 0.0)),
+        )
 
         # Auto lookahead scaling: more road shown at higher speed (instrument-cluster style)
         if getattr(self, "auto_lookahead", False):
@@ -11393,10 +11452,14 @@ class Car3DWidget(QtWidgets.QWidget):
                                 if focus_candidates
                                 else np.asarray(center_draw, dtype=float).reshape(3) + np.array([0.0, 0.0, 0.18 * body_h], dtype=float)
                             )
+                            focus_primary_dir = _norm_or(
+                                np.asarray(road_motion_forward, dtype=float).reshape(3),
+                                np.asarray(body_forward, dtype=float).reshape(3),
+                            )
                             focus_axis_u, focus_axis_v = self._camera_facing_card_axes(
-                                primary_dir_xyz=body_forward,
+                                primary_dir_xyz=focus_primary_dir,
                                 view_dir_xyz=camera_view_dir,
-                                fallback_dir_xyz=body_side,
+                                fallback_dir_xyz=road_side,
                             )
                             max_corner_force_n = float(max([0.0, *[float(v) for v in tire_forces_n]]))
                             for idx, shadow_item in enumerate(self._wheel_shadow_meshes):
@@ -11445,6 +11508,11 @@ class Car3DWidget(QtWidgets.QWidget):
                                 shadow_fwd[2] = 0.0
                                 shadow_axle[2] = 0.0
                                 shadow_fwd = _norm_or(shadow_fwd, np.array([1.0, 0.0, 0.0], dtype=float))
+                                shadow_motion_fwd = (
+                                    np.asarray(shadow_fwd, dtype=float)
+                                    if float(speed_along_road) >= -1e-6
+                                    else -np.asarray(shadow_fwd, dtype=float)
+                                )
                                 shadow_axle = _norm_or(
                                     shadow_axle,
                                     np.array([0.0, 1.0 if float(shadow_center[1]) >= 0.0 else -1.0, 0.0], dtype=float),
@@ -11573,8 +11641,8 @@ class Car3DWidget(QtWidgets.QWidget):
                                     response=0.16,
                                 )
                                 key_light_center = np.asarray(wheel_pose_centers[idx], dtype=float).reshape(3) + wheel_up * float(0.18 * wheel_radius_m)
-                                key_light_fwd = _project_vector_to_plane(np.asarray(wheel_pose_fwds[idx], dtype=float).reshape(3), wheel_up)
-                                key_light_fwd = _norm_or(np.asarray(key_light_fwd, dtype=float).reshape(3), shadow_fwd)
+                                key_light_fwd = _project_vector_to_plane(np.asarray(shadow_motion_fwd, dtype=float).reshape(3), wheel_up)
+                                key_light_fwd = _norm_or(np.asarray(key_light_fwd, dtype=float).reshape(3), shadow_motion_fwd)
                                 shaft_primary = key_light_fwd + 0.28 * wheel_up
                                 shaft_axis_u, shaft_axis_v = self._camera_facing_card_axes(
                                     primary_dir_xyz=shaft_primary,

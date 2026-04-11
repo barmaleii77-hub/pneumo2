@@ -190,7 +190,14 @@ def test_desktop_animator_world_progress_falls_back_to_xy_arclength_for_truthful
 def test_desktop_animator_hud_lookahead_uses_sampled_body_speed_truth() -> None:
     assert 'vxb_series, vyb_series = b.ensure_body_velocity_xy()' in APP
     assert 'v_mps = math.hypot(sample(vxb_series, 0.0), sample(vyb_series, 0.0))' in APP
-    assert 'v_forward_signed_m_s = float(sample(vxb_series, 0.0))' in APP
+    assert 'def _sample_signed_speed_along_world_path_local(' in APP
+    assert 'xw_arr, yw_arr = b.ensure_world_xy()' in APP
+    assert 'vxw_arr, vyw_arr = b.ensure_world_velocity_xy()' in APP
+    assert 'tangent_x = float(tx / tangent_norm)' in APP
+    assert 'tangent_y = float(ty / tangent_norm)' in APP
+    assert 'v_proj = float(vxw * tangent_x + vyw * tangent_y)' in APP
+    assert 'v_forward_signed_m_s = _sample_signed_speed_along_world_path_local(' in APP
+    assert 'default_signed_m_s=float(sample(vxb_series, 0.0)),' in APP
     assert 'self._lookahead_m = float(_clamp(20.0 + v_mps * 4.0, 40.0, 140.0))' in APP
     assert 'self._history_m = float(_clamp(8.0 + v_mps * 1.5, 15.0, 60.0))' in APP
     assert 'def _hud_motion_window_extents(self, *, signed_body_forward_m_s: float) -> tuple[float, float]:' in APP
@@ -201,6 +208,7 @@ def test_desktop_animator_hud_lookahead_uses_sampled_body_speed_truth() -> None:
     assert 'top_y = float(hud_forward_m) - 4.5' in APP
     assert 'scene_rect = QtCore.QRectF(-8.0, -float(hud_rear_m) - 4.0, 16.0, float(hud_forward_m + hud_rear_m) + 8.0)' in APP
     assert 'vx0 = sample(vx_series, 0.0)' not in APP
+    assert 'v_forward_signed_m_s = float(sample(vxb_series, 0.0))' not in APP
     assert 'def _sampled_road_preview_window_m(' in APP
     assert 'signed_speed_m_s: float,' in APP
     assert 'return float(-lookahead_m), float(history_m)' in APP

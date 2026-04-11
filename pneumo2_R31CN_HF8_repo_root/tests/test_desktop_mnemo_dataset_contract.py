@@ -427,6 +427,7 @@ def test_edge_direction_meta_distinguishes_passport_and_live_flow() -> None:
         _edge_recent_latency_summary,
         _edge_phase_ribbon_meta,
         _edge_operator_hint_meta,
+        _edge_operator_checklist_meta,
         _edge_recent_pressure_meta,
         _edge_recent_pressure_summary,
         _edge_temporal_meta,
@@ -720,3 +721,18 @@ def test_edge_direction_meta_distinguishes_passport_and_live_flow() -> None:
     assert "регулятор" in operator_hint["operator_hint_label"]
     assert operator_hint["operator_hint_badge"] == "ACT ctrl"
     assert operator_hint["operator_hint_tone"] == "info"
+
+    operator_checklist = _edge_operator_checklist_meta(
+        component_kind="Регулятор",
+        canonical_kind="reg_after",
+        operator_hint_badge=operator_hint["operator_hint_badge"],
+        phase_ribbon_bottleneck_kind=phase_ribbon["phase_ribbon_bottleneck_kind"],
+        operability_status=healthy_operability["operability_status"],
+        consistency_status=healthy_consistency["consistency_status"],
+    )
+    assert operator_checklist["operator_checklist_items"][0] == "момент прихода команды на ветвь"
+    assert operator_checklist["operator_checklist_rows"][0]["index_label"] == "01"
+    assert operator_checklist["operator_checklist_rows"][0]["title"] == "момент прихода команды на ветвь"
+    assert operator_checklist["operator_checklist_rows"][0]["is_focus"] is True
+    assert operator_checklist["operator_checklist_rows"][0]["tone"] == "info"
+    assert "ΔP сразу после команды" in operator_checklist["operator_checklist_summary"]

@@ -35,3 +35,17 @@ def test_run_autotest_quick_computation_path_passes(tmp_path: Path) -> None:
     summary = json.loads((run_dirs[0] / "summary" / "summary.json").read_text(encoding="utf-8"))
     assert bool(summary["ok"]) is True
     assert int(summary["rc"]) == 0
+
+
+def test_run_autotest_script_help_bootstraps_package_context() -> None:
+    script = ROOT / "pneumo_solver_ui" / "tools" / "run_autotest.py"
+    proc = subprocess.run(
+        [sys.executable, str(script), "--help"],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    assert "run_autotest.py" in proc.stdout
+    assert "--level" in proc.stdout

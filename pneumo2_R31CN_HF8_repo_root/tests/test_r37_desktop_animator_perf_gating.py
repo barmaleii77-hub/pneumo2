@@ -257,6 +257,15 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "axis_u_xyz=road_motion_forward," in app_src
     assert "fog_center = np.asarray(road_plane_center, dtype=float) + road_forward * float(offset_fwd_m)" not in app_src
     assert "axis_u_xyz=road_forward," not in app_src
+    assert "focus_primary_dir = _norm_or(" in app_src
+    assert "np.asarray(road_motion_forward, dtype=float).reshape(3)," in app_src
+    assert "np.asarray(body_forward, dtype=float).reshape(3)," in app_src
+    assert "primary_dir_xyz=focus_primary_dir," in app_src
+    assert "fallback_dir_xyz=road_side," in app_src
+    assert "shadow_motion_fwd = (" in app_src
+    assert "key_light_fwd = _project_vector_to_plane(np.asarray(shadow_motion_fwd, dtype=float).reshape(3), wheel_up)" in app_src
+    assert "key_light_fwd = _norm_or(np.asarray(key_light_fwd, dtype=float).reshape(3), shadow_motion_fwd)" in app_src
+    assert "key_light_fwd = _project_vector_to_plane(np.asarray(wheel_pose_fwds[idx], dtype=float).reshape(3), wheel_up)" not in app_src
     assert "motion_forward_for_grade = (" in app_src
     assert "body_forward_xyz=motion_forward_for_grade," in app_src
     assert "body_forward_xyz=body_forward_for_grade," not in app_src
@@ -265,13 +274,21 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "view_h = np.asarray(body_h, dtype=float)" in app_src
     assert "frontal_u = float(_clamp(0.5 + 0.5 * float(np.dot(view_h, body_h)), 0.0, 1.0))" in app_src
     assert "frontal_u = float(_clamp(0.5 + 0.5 * float(np.dot(view_h, body)), 0.0, 1.0))" not in app_src
+    assert "def _sample_signed_speed_along_world_path_local(" in app_src
+    assert "xw_arr, yw_arr = b.ensure_world_xy()" in app_src
+    assert "vxw_arr, vyw_arr = b.ensure_world_velocity_xy()" in app_src
+    assert "tangent_x = float(tx / tangent_norm)" in app_src
+    assert "tangent_y = float(ty / tangent_norm)" in app_src
+    assert "v_proj = float(vxw * tangent_x + vyw * tangent_y)" in app_src
     assert "def _hud_motion_window_extents(self, *, signed_body_forward_m_s: float) -> tuple[float, float]:" in app_src
-    assert "v_forward_signed_m_s = float(sample(vxb_series, 0.0))" in app_src
+    assert "v_forward_signed_m_s = _sample_signed_speed_along_world_path_local(" in app_src
+    assert "default_signed_m_s=float(sample(vxb_series, 0.0))," in app_src
     assert "hud_rear_m, hud_forward_m = self._hud_motion_window_extents(" in app_src
     assert "self._apply_lane_pens_if_needed(rear_m=float(hud_rear_m), forward_m=float(hud_forward_m))" in app_src
     assert "mask = (yl >= -float(hud_rear_m)) & (yl <= float(hud_forward_m))" in app_src
     assert "top_y = float(hud_forward_m) - 4.5" in app_src
     assert "scene_rect = QtCore.QRectF(-8.0, -float(hud_rear_m) - 4.0, 16.0, float(hud_forward_m + hud_rear_m) + 8.0)" in app_src
+    assert "v_forward_signed_m_s = float(sample(vxb_series, 0.0))" not in app_src
     assert "axis_v_xyz=road_side," in app_src
     assert "def _camera_view_direction_local_xyz(self, *, target_xyz: Optional[np.ndarray] = None) -> np.ndarray:" in app_src
     assert "if target_xyz is not None:" in app_src
