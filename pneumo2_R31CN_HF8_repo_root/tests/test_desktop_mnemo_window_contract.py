@@ -120,6 +120,25 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert "def _rect_close_enough(current: QtCore.QRectF, target: QtCore.QRectF) -> bool:" in src
     assert "def _inline_route_symbol_payloads(self, *, max_abs_flow: float) -> dict[str, dict[str, Any]]:" in src
     assert "def _draw_inline_route_symbol(self, painter: QtGui.QPainter, *, edge_name: str, payload: dict[str, Any]) -> None:" in src
+    assert "def _edge_direction_meta(edge_def: dict[str, Any], q_now: float | None) -> dict[str, Any]:" in src
+    assert "Паспортное направление:" in src
+    assert "Поток в кадре:" in src
+    assert "Статус направления:" in src
+    assert "Элемент vs поток:" in src
+    assert "Комментарий элемента:" in src
+    assert "Источник / приёмник:" in src
+    assert "Концы ветви:" in src
+    assert "ΔP ветви (n1-n2):" in src
+    assert "Ведущее давление:" in src
+    assert "Q vs ΔP:" in src
+    assert "Оценка ΔP:" in src
+    assert "Инженерный verdict:" in src
+    assert "Комментарий verdict:" in src
+    assert "Согласованность сигналов:" in src
+    assert "Комментарий согласованности:" in src
+    assert "Временной ход:" in src
+    assert "Комментарий хода:" in src
+    assert "Окно анализа:" in src
     assert "def _path_angle_deg(path: QtGui.QPainterPath, percent: float) -> float:" in src
     assert "_build_frame_alert_payload" in src
     assert "self._draw_alert_markers(painter)" in src
@@ -141,6 +160,108 @@ def test_desktop_mnemo_native_canvas_has_overlay_contract() -> None:
     assert "def _draw_alert_markers(self, painter: QtGui.QPainter) -> None:" in src
     assert "def _draw_diagnostics_overlay(self, painter: QtGui.QPainter) -> None:" in src
     assert "def _draw_focus_overlay(self, painter: QtGui.QPainter) -> None:" in src
+    assert "def _edge_pressure_drive_meta(" in src
+    assert "def _edge_element_flow_contract_meta(" in src
+    assert "def _edge_operability_meta(" in src
+    assert "def _edge_consistency_meta(" in src
+    assert "def _edge_temporal_meta(" in src
+    assert "def _edge_recent_history_meta(" in src
+    assert "def _edge_recent_history_summary(" in src
+    assert "def _edge_recent_pressure_meta(" in src
+    assert "def _edge_recent_pressure_summary(" in src
+    assert "def _edge_recent_causality_meta(" in src
+    assert "def _edge_recent_causality_summary(" in src
+    assert "def _edge_recent_latency_meta(" in src
+    assert "def _edge_recent_latency_summary(" in src
+    assert "def _edge_phase_ribbon_meta(" in src
+    assert "def _edge_operator_hint_meta(" in src
+    assert "def _draw_selected_edge_terminal_overlay(self, painter: QtGui.QPainter) -> None:" in src
+    assert "def _draw_terminal_role_badges(" in src
+    assert "def _draw_selected_edge_direction_overlay(self, painter: QtGui.QPainter) -> None:" in src
+    assert "def _draw_edge_recent_history_strip(" in src
+    assert "def _draw_edge_recent_pressure_strip(" in src
+    assert "def _draw_edge_direction_marker(" in src
+    assert "ЭЛ-вход" in src
+    assert "ЭЛ-выход" in src
+    assert "P+" in src
+    assert "P-" in src
+    assert "P≈" in src
+    assert "Q-ист" in src
+    assert "Q-прием" in src
+    assert "Q-пауза" in src
+    assert "ΔP ok" in src
+    assert "ΔP rev" in src
+    assert "ΔP≈" in src
+    assert "EL ok" in src
+    assert "EL rev" in src
+    assert "EL bi" in src
+    assert "EL dir" in src
+    assert "EL gen" in src
+    assert "OP leak" in src
+    assert "OP ok" in src
+    assert "OP hold" in src
+    assert "OP shut" in src
+    assert "OP ctx" in src
+    assert "CS q" in src
+    assert "CS ok" in src
+    assert "CS hold" in src
+    assert "CS el" in src
+    assert "CS dp" in src
+    assert "CS ctx" in src
+    assert "TM ramp" in src
+    assert "TM steady" in src
+    assert "TM osc" in src
+    assert "TM flip" in src
+    assert "TM idle" in src
+    assert "CX ok" in src
+    assert "CX leak" in src
+    assert "CX wait" in src
+    assert "LG ok" in src
+    assert "LG wait" in src
+    assert "LG soft" in src
+    assert "LG late" in src
+    assert "Последнее окно:" in src
+    assert "ΔP-контур:" in src
+    assert "Причинная связка:" in src
+    assert "Комментарий связки:" in src
+    assert "Лаг реакции:" in src
+    assert "Комментарий лага:" in src
+    assert "Фаза окна:" in src
+    assert "Фазовая лента:" in src
+    assert "Интервалы фаз:" in src
+    assert "Узкое место фазы:" in src
+    assert "Тип узкого места:" in src
+    assert "Комментарий узкого места:" in src
+    assert "Фокус узкого места:" in src
+    assert "Подсказка фокуса:" in src
+    assert "Операторский приоритет:" in src
+    assert "Комментарий приоритета:" in src
+    assert "ΔP-контур • " in src
+    assert "Последние " in src
+    assert "self._draw_selected_edge_terminal_overlay(painter)" in src
+    assert "Направление выбранной ветви" in src
+    assert "Вердикт:" in src
+    assert "Сигналы:" in src
+    assert "Динамика:" in src
+    assert "Причинность:" in src
+    assert "Лаг:" in src
+    assert "Фаза:" in src
+    assert "Узкое место:" in src
+    assert "Сначала:" in src
+    assert "def _draw_edge_phase_ribbon(" in src
+    assert "phase_ribbon_intervals" in src
+    assert "phase_ribbon_interval_label" in src
+    assert "phase_ribbon_bottleneck_label" in src
+    assert "phase_ribbon_bottleneck_kind" in src
+    assert "phase_ribbon_focus_pair_label" in src
+    assert "phase_ribbon_focus_stage_labels" in src
+    assert "self._draw_edge_recent_history_strip(" in src
+    assert "self._draw_edge_recent_pressure_strip(" in src
+    assert "self._draw_edge_phase_ribbon(" in src
+    assert "def _draw_strip_marker(" in src
+    assert "emphasized: bool = False" in src
+    assert '"SIG"' in src
+    assert "self._draw_selected_edge_direction_overlay(painter)" in src
     assert "def _draw_cylinder_card(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:" in src
     assert "def _draw_component_badge(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:" in src
     assert "def _draw_component_icon(" in src

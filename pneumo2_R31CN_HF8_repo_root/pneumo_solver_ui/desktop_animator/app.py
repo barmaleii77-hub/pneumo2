@@ -786,15 +786,53 @@ def _ensure_world_progress_series(b: DataBundle) -> np.ndarray:
         use_xy_fallback = True
 
     if use_xy_fallback:
-        s_world_xy = _cumulative_path_length_series(
-            np.asarray(b.get("путь_x_м", 0.0), dtype=float).reshape(-1),
-            np.asarray(b.get("путь_y_м", 0.0), dtype=float).reshape(-1),
-        )
+        try:
+            xw, yw = b.ensure_world_xy()
+        except Exception:
+            xw = np.asarray(b.get("путь_x_м", 0.0), dtype=float).reshape(-1)
+            yw = np.asarray(b.get("путь_y_м", 0.0), dtype=float).reshape(-1)
+        s_world_xy = _cumulative_path_length_series(xw, yw)
         if int(s_world_xy.size) > 0:
             s_world = np.asarray(s_world_xy, dtype=float)
 
     b._derived[key] = s_world  # type: ignore[assignment]
     return s_world
+
+
+def _ensure_body_longitudinal_progress_series(b: DataBundle) -> np.ndarray:
+    key = "svc__body_longitudinal_progress_series"
+    cached = b._derived.get(key)
+    if isinstance(cached, np.ndarray):
+        return cached
+
+    try:
+        vxb_arr, _ = b.ensure_body_velocity_xy()
+    except Exception:
+        vxb_arr = np.asarray(b.get("скорость_vx_м_с", 0.0), dtype=float).reshape(-1)
+    try:
+        t_arr = np.asarray(b.t, dtype=float).reshape(-1)
+    except Exception:
+        t_arr = np.zeros((0,), dtype=float)
+
+    vx_body = np.asarray(vxb_arr, dtype=float).reshape(-1)
+    n = int(min(vx_body.size, t_arr.size))
+    if n <= 0:
+        s_long = np.zeros((0,), dtype=float)
+    elif n == 1:
+        s_long = np.zeros((1,), dtype=float)
+    else:
+        t = np.asarray(t_arr[:n], dtype=float)
+        vx = np.asarray(vx_body[:n], dtype=float)
+        vx = np.where(np.isfinite(vx), vx, 0.0)
+        dt = np.diff(t)
+        dt = np.where(np.isfinite(dt), np.maximum(dt, 0.0), 0.0)
+        vx_mid = 0.5 * (vx[:-1] + vx[1:])
+        vx_mid = np.where(np.isfinite(vx_mid), vx_mid, 0.0)
+        ds = vx_mid * dt
+        s_long = np.concatenate(([0.0], np.cumsum(ds, dtype=float))).astype(float, copy=False)
+
+    b._derived[key] = s_long  # type: ignore[assignment]
+    return s_long
 
 
 def _ensure_corner_signal_cache(b: DataBundle) -> Dict[str, Dict[str, Any]]:
@@ -943,14 +981,33 @@ def _ensure_telemetry_summary_cache(b: DataBundle) -> Dict[str, np.ndarray]:
     def _series(name: str, default: float = 0.0) -> np.ndarray:
         return np.asarray(b.get(name, default), dtype=float).reshape(-1)
 
+    try:
+        vxb, vyb = b.ensure_body_velocity_xy()
+        vx_series = np.asarray(vxb, dtype=float).reshape(-1)
+        vy_series = np.asarray(vyb, dtype=float).reshape(-1)
+    except Exception:
+        vx_series = _series("скорость_vx_м_с", 0.0)
+        vy_series = _series("скорость_vy_м_с", 0.0)
+    try:
+        yaw_rate_series = np.asarray(b.ensure_yaw_rate_rad_s(), dtype=float).reshape(-1)
+    except Exception:
+        yaw_rate_series = _series("yaw_rate_рад_с", 0.0)
+    try:
+        axb, ayb = b.ensure_body_acceleration_xy()
+        ax_series = np.asarray(axb, dtype=float).reshape(-1)
+        ay_series = np.asarray(ayb, dtype=float).reshape(-1)
+    except Exception:
+        ax_series = _series("ускорение_продольное_ax_м_с2", 0.0)
+        ay_series = _series("ускорение_поперечное_ay_м_с2", 0.0)
+
     cache: Dict[str, np.ndarray] = {
         "t": np.asarray(b.t, dtype=float).reshape(-1),
-        "vx": _series("скорость_vx_м_с", 0.0),
-        "vy": _series("скорость_vy_м_с", 0.0),
+        "vx": vx_series,
+        "vy": vy_series,
         "yaw": _series("yaw_рад", 0.0),
-        "yaw_rate": _series("yaw_rate_рад_с", 0.0),
-        "ax": _series("ускорение_продольное_ax_м_с2", 0.0),
-        "ay": _series("ускорение_поперечное_ay_м_с2", 0.0),
+        "yaw_rate": yaw_rate_series,
+        "ax": ax_series,
+        "ay": ay_series,
         "roll": _series("крен_phi_рад", 0.0),
         "pitch": _series("тангаж_theta_рад", 0.0),
         "zcm": _series("перемещение_рамы_z_м", 0.0),
@@ -1034,6 +1091,34 @@ def _sample_series_local(
                 default=float(default),
             )
         )
+    except Exception:
+        return float(default)
+
+
+def _sample_angle_series_local(
+    series: Any,
+    *,
+    i0: int,
+    i1: int,
+    alpha: float,
+    default: float = 0.0,
+) -> float:
+    try:
+        arr = series if isinstance(series, np.ndarray) else np.asarray(series, dtype=float)
+        n = int(arr.shape[0]) if getattr(arr, "ndim", 0) >= 1 else 0
+        if n <= 0:
+            return float(default)
+        ii0 = max(0, min(int(i0), n - 1))
+        ii1 = max(0, min(int(i1), n - 1))
+        a = float(alpha)
+        a0 = float(arr[ii0])
+        if ii0 == ii1 or a <= 1e-12:
+            return a0
+        a1 = float(arr[ii1])
+        if a >= 1.0 - 1e-12:
+            return a1
+        delta = math.atan2(math.sin(a1 - a0), math.cos(a1 - a0))
+        return float(a0 + a * delta)
     except Exception:
         return float(default)
 
@@ -2251,14 +2336,24 @@ class FrontViewWidget(QtWidgets.QGraphicsView):
             # стабильного s_world, ни мировой траектории x/y.
             s_world = np.arange(n, dtype=float)
 
-        # Canonical channels (no aliases / no silent compatibility bridges).
-        vx = b.get("скорость_vx_м_с", 0.0)
-        vy = b.get("скорость_vy_м_с", 0.0)
+        # Canonical motion truth: use derived body-frame velocity if available so
+        # segment stats stay consistent with the rest of desktop animator.
+        try:
+            vx, vy = b.ensure_body_velocity_xy()
+        except Exception:
+            vx = b.get("скорость_vx_м_с", 0.0)
+            vy = b.get("скорость_vy_м_с", 0.0)
+        try:
+            yaw_rate = b.ensure_yaw_rate_rad_s()
+        except Exception:
+            yaw_rate = b.get("yaw_rate_рад_с", 0.0)
+        try:
+            ax, ay = b.ensure_body_acceleration_xy()
+        except Exception:
+            ax = b.get("ускорение_продольное_ax_м_с2", 0.0)
+            ay = b.get("ускорение_поперечное_ay_м_с2", 0.0)
         # ABSOLUTE LAW: speed is DERIVED from model outputs (vx, vy); we do NOT invent an alternative channel.
         speed = np.hypot(vx, vy)
-        yaw_rate = b.get("yaw_rate_рад_с", 0.0)
-        ax = b.get("ускорение_продольное_ax_м_с2", 0.0)
-        ay = b.get("ускорение_поперечное_ay_м_с2", 0.0)
 
         # Roughness: std(z_center) within segment, if road profile exists.
         zc = None
@@ -3848,18 +3943,25 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         base.setAlpha(90 if is_current else 45)
         return base
 
-    def _apply_lane_pens_if_needed(self) -> None:
+    def _hud_motion_window_extents(self, *, signed_body_forward_m_s: float) -> tuple[float, float]:
+        rear_m = float(self._history_m)
+        forward_m = float(self._lookahead_m)
+        if np.isfinite(float(signed_body_forward_m_s)) and float(signed_body_forward_m_s) < -1e-6:
+            return float(forward_m), float(rear_m)
+        return float(rear_m), float(forward_m)
+
+    def _apply_lane_pens_if_needed(self, *, rear_m: float, forward_m: float) -> None:
         key = (
-            int(round(float(self._history_m) * 10.0)),
-            int(round(float(self._lookahead_m) * 10.0)),
+            int(round(float(rear_m) * 10.0)),
+            int(round(float(forward_m) * 10.0)),
         )
         if key == self._last_lane_pen_key:
             return
         self._last_lane_pen_key = key
         try:
-            tot = float(self._history_m + self._lookahead_m + 1e-9)
-            k0 = float(self._history_m / tot)
-            g_lane = QtGui.QLinearGradient(QtCore.QPointF(0.0, -self._history_m), QtCore.QPointF(0.0, self._lookahead_m))
+            tot = float(rear_m + forward_m + 1e-9)
+            k0 = float(rear_m / tot)
+            g_lane = QtGui.QLinearGradient(QtCore.QPointF(0.0, -rear_m), QtCore.QPointF(0.0, forward_m))
             g_lane.setColorAt(0.0, QtGui.QColor(80, 80, 80, 35))
             g_lane.setColorAt(_clamp(k0, 0.0, 1.0), QtGui.QColor(130, 130, 130, 200))
             g_lane.setColorAt(1.0, QtGui.QColor(80, 80, 80, 70))
@@ -3867,7 +3969,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             self.lane_l.setPen(pen_lane)
             self.lane_r.setPen(pen_lane)
 
-            g_c = QtGui.QLinearGradient(QtCore.QPointF(0.0, -self._history_m), QtCore.QPointF(0.0, self._lookahead_m))
+            g_c = QtGui.QLinearGradient(QtCore.QPointF(0.0, -rear_m), QtCore.QPointF(0.0, forward_m))
             g_c.setColorAt(0.0, QtGui.QColor(120, 120, 120, 25))
             g_c.setColorAt(_clamp(k0, 0.0, 1.0), QtGui.QColor(180, 180, 180, 160))
             g_c.setColorAt(1.0, QtGui.QColor(120, 120, 120, 60))
@@ -3903,9 +4005,11 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         x0: float,
         y0: float,
         yaw: float,
+        rear_m: float,
+        forward_m: float,
     ) -> tuple[int, ...]:
         pixel_world_step = max(1e-4, 1.0 / max(1e-3, float(self._px_per_m)))
-        span_m = max(1.0, float(self._lookahead_m + self._history_m + 4.0))
+        span_m = max(1.0, float(rear_m + forward_m + 4.0))
         yaw_step = max(1e-4, pixel_world_step / span_m)
         try:
             vp = self.viewport()
@@ -3917,8 +4021,8 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             int(round(float(x0) / pixel_world_step)),
             int(round(float(y0) / pixel_world_step)),
             int(round(float(yaw) / yaw_step)),
-            int(round(float(self._lookahead_m) * 10.0)),
-            int(round(float(self._history_m) * 10.0)),
+            int(round(float(forward_m) * 10.0)),
+            int(round(float(rear_m) * 10.0)),
             int(viewport_w),
             int(viewport_h),
             int(bool(self.show_lanes)),
@@ -4189,28 +4293,52 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
 
         idx_ref = int(_clamp(int(i), 0, n - 1))
         yaw_series = b.get("yaw_рад", 0.0)
-        vx_series = b.get("скорость_vx_м_с", 0.0)
-        vy_series = b.get("скорость_vy_м_с", 0.0)
-        yaw_rate_series = b.get("yaw_rate_рад_с", 0.0)
-        ax_series = b.get("ускорение_продольное_ax_м_с2", 0.0)
-        ay_series = b.get("ускорение_поперечное_ay_м_с2", 0.0)
+        try:
+            vxb_series, vyb_series = b.ensure_body_velocity_xy()
+        except Exception:
+            vxb_series = b.get("скорость_vx_м_с", 0.0)
+            vyb_series = b.get("скорость_vy_м_с", 0.0)
+        try:
+            yaw_rate_series = b.ensure_yaw_rate_rad_s()
+        except Exception:
+            yaw_rate_series = b.get("yaw_rate_рад_с", 0.0)
+        try:
+            axb_series, ayb_series = b.ensure_body_acceleration_xy()
+        except Exception:
+            axb_series = b.get("ускорение_продольное_ax_м_с2", 0.0)
+            ayb_series = b.get("ускорение_поперечное_ay_м_с2", 0.0)
+        ax_series = axb_series
+        ay_series = ayb_series
         s_world = _ensure_world_progress_series(b)
 
-        yaw = sample(yaw_series, 0.0)
+        yaw = _sample_angle_series_local(
+            yaw_series,
+            i0=sample_i0,
+            i1=sample_i1,
+            alpha=alpha,
+            default=0.0,
+        )
         x0 = sample(xw, float(xw[idx_ref]))
         y0 = sample(yw, float(yw[idx_ref]))
+        v_mps = math.hypot(sample(vxb_series, 0.0), sample(vyb_series, 0.0))
+        v_forward_signed_m_s = float(sample(vxb_series, 0.0))
 
         # Auto lookahead scaling: more road shown at higher speed (instrument-cluster style)
         if getattr(self, "auto_lookahead", False):
-            try:
-                vx0 = sample(vx_series, 0.0)
-            except Exception:
-                vx0 = 0.0
-            self._lookahead_m = float(_clamp(20.0 + vx0 * 4.0, 40.0, 140.0))
-            self._history_m = float(_clamp(8.0 + vx0 * 1.5, 15.0, 60.0))
+            self._lookahead_m = float(_clamp(20.0 + v_mps * 4.0, 40.0, 140.0))
+            self._history_m = float(_clamp(8.0 + v_mps * 1.5, 15.0, 60.0))
+        hud_rear_m, hud_forward_m = self._hud_motion_window_extents(
+            signed_body_forward_m_s=v_forward_signed_m_s,
+        )
 
         if bool(self._playback_perf_mode):
-            perf_visual_key = self._perf_visual_key(x0=float(x0), y0=float(y0), yaw=float(yaw))
+            perf_visual_key = self._perf_visual_key(
+                x0=float(x0),
+                y0=float(y0),
+                yaw=float(yaw),
+                rear_m=float(hud_rear_m),
+                forward_m=float(hud_forward_m),
+            )
             if perf_visual_key == self._last_perf_visual_key:
                 return
         else:
@@ -4218,7 +4346,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             self._last_perf_visual_key = None
 
         # Pen gradients: brighter near the car, softer far away (instrument-cluster style)
-        self._apply_lane_pens_if_needed()
+        self._apply_lane_pens_if_needed(rear_m=float(hud_rear_m), forward_m=float(hud_forward_m))
 
         # Convert world points to car-local coordinates (car at origin).
         # Car frame: X forward, Y left. HUD scene: X right, Y forward (up).
@@ -4237,7 +4365,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         yl = x_fwd
 
         # Keep only forward range for lookahead and some history
-        mask = (yl >= -self._history_m) & (yl <= self._lookahead_m)
+        mask = (yl >= -float(hud_rear_m)) & (yl <= float(hud_forward_m))
         xl = xl[mask]
         yl = yl[mask]
 
@@ -4386,9 +4514,6 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
 
         # Overlay text: speed/turn/accels + segment progress (no text overlap).
         if eff_show_text:
-            vx = sample(vx_series, 0.0)
-            vy = sample(vy_series, 0.0)
-            v_mps = math.hypot(vx, vy)  # DERIVED from model outputs (vx, vy)
             yaw_rate = sample(yaw_rate_series, 0.0)
             ax = sample(ax_series, 0.0)
             ay = sample(ay_series, 0.0)
@@ -4497,7 +4622,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             dynamic_txt = "\n".join(dynamic_lines)
             _set_graphics_text_if_changed(self.hud_text, dynamic_txt)
             top_x = -7.6
-            top_y = self._lookahead_m - 4.5
+            top_y = float(hud_forward_m) - 4.5
             _set_graphics_pos_if_changed(self.hud_text, top_x, top_y)
             self.hud_text.show()
             line_step_m = max(0.001, float(QtGui.QFontMetricsF(fnt).lineSpacing()) / max(1.0, float(self._px_per_m)))
@@ -4526,7 +4651,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             self.hud_text_static.hide()
 
         # Frame
-        scene_rect = QtCore.QRectF(-8.0, -self._history_m - 4.0, 16.0, self._lookahead_m + self._history_m + 8.0)
+        scene_rect = QtCore.QRectF(-8.0, -float(hud_rear_m) - 4.0, 16.0, float(hud_forward_m + hud_rear_m) + 8.0)
         self.scene.setSceneRect(scene_rect)
         if bool(getattr(self, "_auto_view_fit", True)):
             self._fit_view_to_scene_if_needed(scene_rect)
@@ -5207,14 +5332,11 @@ class Car3DWidget(QtWidgets.QWidget):
     @staticmethod
     def _wheel_spin_phase_rad(
         *,
-        path_progress_m: float,
+        rolling_progress_m: float,
         wheel_radius_m: float,
-        speed_m_s: float,
     ) -> float:
         radius = float(max(1e-4, wheel_radius_m))
-        progress = float(path_progress_m) if np.isfinite(float(path_progress_m)) else 0.0
-        if np.isfinite(float(speed_m_s)) and float(speed_m_s) < -1e-6:
-            progress = -abs(progress)
+        progress = float(rolling_progress_m) if np.isfinite(float(rolling_progress_m)) else 0.0
         return float(math.fmod(progress / radius, 2.0 * np.pi))
 
     @staticmethod
@@ -5771,14 +5893,21 @@ class Car3DWidget(QtWidgets.QWidget):
             body = np.array([1.0, 0.0, 0.0], dtype=float)
             body_norm = 1.0
         body = body / body_norm
+        body_h = np.asarray(body, dtype=float)
+        body_h[2] = 0.0
+        body_h_norm = float(np.linalg.norm(body_h))
+        if not np.isfinite(body_h_norm) or body_h_norm <= 1e-9:
+            body_h = np.array([1.0, 0.0, 0.0], dtype=float)
+            body_h_norm = 1.0
+        body_h = body_h / max(body_h_norm, 1e-12)
         view_h = np.asarray(view, dtype=float)
         view_h[2] = 0.0
         view_h_norm = float(np.linalg.norm(view_h))
         if not np.isfinite(view_h_norm) or view_h_norm <= 1e-9:
-            view_h = np.asarray(body, dtype=float)
+            view_h = np.asarray(body_h, dtype=float)
             view_h_norm = float(np.linalg.norm(view_h))
         view_h = view_h / max(view_h_norm, 1e-12)
-        frontal_u = float(_clamp(0.5 + 0.5 * float(np.dot(view_h, body)), 0.0, 1.0))
+        frontal_u = float(_clamp(0.5 + 0.5 * float(np.dot(view_h, body_h)), 0.0, 1.0))
         pitch_u = float(_clamp(abs(float(view[2])), 0.0, 1.0))
         speed_u = float(_clamp(abs(float(speed_m_s)) / 35.0, 0.0, 1.0))
         load_u = float(_clamp(float(mean_load_u), 0.0, 1.0))
@@ -6090,17 +6219,30 @@ class Car3DWidget(QtWidgets.QWidget):
             segments=int(max(18, segments)),
         )
 
-    def _camera_view_direction_local_xyz(self) -> np.ndarray:
+    def _camera_view_direction_local_xyz(self, *, target_xyz: Optional[np.ndarray] = None) -> np.ndarray:
         try:
             if self.view is not None and pg is not None:
                 cam_pos = self.view.cameraPosition()
                 center = self.view.opts.get("center", pg.Vector(0.0, 0.0, 0.0))
                 if cam_pos is not None and center is not None:
+                    if target_xyz is not None:
+                        target = np.asarray(target_xyz, dtype=float).reshape(3)
+                    else:
+                        target = np.asarray(
+                            [
+                                float(center.x()),
+                                float(center.y()),
+                                float(center.z()),
+                            ],
+                            dtype=float,
+                        )
+                    if not np.all(np.isfinite(target)):
+                        raise ValueError("non-finite camera target")
                     view_vec = np.asarray(
                         [
-                            float(cam_pos.x() - center.x()),
-                            float(cam_pos.y() - center.y()),
-                            float(cam_pos.z() - center.z()),
+                            float(cam_pos.x()) - float(target[0]),
+                            float(cam_pos.y()) - float(target[1]),
+                            float(cam_pos.z()) - float(target[2]),
                         ],
                         dtype=float,
                     )
@@ -8156,8 +8298,9 @@ class Car3DWidget(QtWidgets.QWidget):
             if bundle is None:
                 raise ValueError('missing bundle')
             s_path = np.asarray(_ensure_world_progress_series(bundle), dtype=float).reshape(-1)
-            x_path = np.asarray(bundle.get("путь_x_м", 0.0), dtype=float).reshape(-1)
-            y_path = np.asarray(bundle.get("путь_y_м", 0.0), dtype=float).reshape(-1)
+            x_path_arr, y_path_arr = bundle.ensure_world_xy()
+            x_path = np.asarray(x_path_arr, dtype=float).reshape(-1)
+            y_path = np.asarray(y_path_arr, dtype=float).reshape(-1)
             mask = np.isfinite(s_path) & np.isfinite(x_path) & np.isfinite(y_path)
             if int(np.count_nonzero(mask)) < 2:
                 raise ValueError('insufficient finite path samples')
@@ -8270,6 +8413,25 @@ class Car3DWidget(QtWidgets.QWidget):
         max_visible = float(max(self._road_grid_nominal_visible_len_m, self._road_grid_max_visible_len_m))
         max_lookahead = float(max(0.0, max_visible - hist))
         return float(max(0.0, min(max_lookahead, max(float(cached), nominal))))
+
+    def _sampled_road_preview_lookahead_m(self, speed_m_s: float) -> float:
+        hist = self._stable_road_preview_history_m()
+        max_visible = float(max(self._road_grid_nominal_visible_len_m, self._road_grid_max_visible_len_m))
+        max_lookahead = float(max(0.0, max_visible - hist))
+        sampled = float(max(0.0, self._auto_lookahead(float(abs(speed_m_s)))))
+        return float(max(0.0, min(max_lookahead, sampled)))
+
+    def _sampled_road_preview_window_m(
+        self,
+        *,
+        speed_m_s: float,
+        signed_speed_m_s: float,
+    ) -> Tuple[float, float]:
+        history_m = float(self._stable_road_preview_history_m())
+        lookahead_m = float(self._sampled_road_preview_lookahead_m(speed_m_s))
+        if np.isfinite(float(signed_speed_m_s)) and float(signed_speed_m_s) < -1e-6:
+            return float(-lookahead_m), float(history_m)
+        return float(-history_m), float(lookahead_m)
 
     def fit_camera_to_geometry(self) -> None:
         if not _HAS_GL:
@@ -8489,15 +8651,93 @@ class Car3DWidget(QtWidgets.QWidget):
         alpha: float,
         s_progress_series: Optional[np.ndarray] = None,
     ) -> float:
+        body_vx = float("nan")
+        body_vy = float("nan")
         try:
-            vx = float(get_value("скорость_vx_м_с", 0.0))
+            vxb_arr, vyb_arr = b.ensure_body_velocity_xy()
+            body_vx = float(
+                _sample_series_local(
+                    vxb_arr,
+                    i0=i0,
+                    i1=i1,
+                    alpha=alpha,
+                    default=float("nan"),
+                )
+            )
+            body_vy = float(
+                _sample_series_local(
+                    vyb_arr,
+                    i0=i0,
+                    i1=i1,
+                    alpha=alpha,
+                    default=float("nan"),
+                )
+            )
         except Exception:
-            vx = 0.0
+            pass
+        if not np.isfinite(body_vx):
+            try:
+                body_vx = float(get_value("скорость_vx_м_с", 0.0))
+            except Exception:
+                body_vx = 0.0
+        if not np.isfinite(body_vy):
+            try:
+                body_vy = float(get_value("скорость_vy_м_с", 0.0))
+            except Exception:
+                body_vy = 0.0
         try:
-            vy = float(get_value("скорость_vy_м_с", 0.0))
+            solver_speed_mag = float(math.hypot(body_vx, body_vy)) if (np.isfinite(body_vx) or np.isfinite(body_vy)) else 0.0
         except Exception:
-            vy = 0.0
-        solver_speed_mag = float(math.hypot(vx, vy)) if (np.isfinite(vx) or np.isfinite(vy)) else 0.0
+            solver_speed_mag = 0.0
+        try:
+            xw_arr, yw_arr = b.ensure_world_xy()
+            vxw_arr, vyw_arr = b.ensure_world_velocity_xy()
+            xw_path = np.asarray(xw_arr, dtype=float).reshape(-1)
+            yw_path = np.asarray(yw_arr, dtype=float).reshape(-1)
+            vxw_path = np.asarray(vxw_arr, dtype=float).reshape(-1)
+            vyw_path = np.asarray(vyw_arr, dtype=float).reshape(-1)
+            n_path = int(
+                min(
+                    xw_path.size,
+                    yw_path.size,
+                    vxw_path.size,
+                    vyw_path.size,
+                )
+            )
+            if n_path >= 2:
+                ii_lo = int(_clamp(min(int(i0), int(i1)), 0, n_path - 1))
+                ii_hi = int(_clamp(max(int(i0), int(i1)), 0, n_path - 1))
+                ii_prev = int(max(0, ii_lo - 1))
+                ii_next = int(min(n_path - 1, ii_hi + 1))
+                tx = float(xw_path[ii_next] - xw_path[ii_prev])
+                ty = float(yw_path[ii_next] - yw_path[ii_prev])
+                tangent_norm = float(math.hypot(tx, ty))
+                if np.isfinite(tangent_norm) and tangent_norm > 1e-9:
+                    tangent_x = float(tx / tangent_norm)
+                    tangent_y = float(ty / tangent_norm)
+                    vxw = float(
+                        _sample_series_local(
+                            vxw_arr,
+                            i0=i0,
+                            i1=i1,
+                            alpha=alpha,
+                            default=0.0,
+                        )
+                    )
+                    vyw = float(
+                        _sample_series_local(
+                            vyw_arr,
+                            i0=i0,
+                            i1=i1,
+                            alpha=alpha,
+                            default=0.0,
+                        )
+                    )
+                    v_proj = float(vxw * tangent_x + vyw * tangent_y)
+                    if np.isfinite(v_proj) and abs(v_proj) > 1e-9:
+                        return float(v_proj)
+        except Exception:
+            pass
         try:
             s_path = np.asarray(
                 _ensure_world_progress_series(b) if s_progress_series is None else s_progress_series,
@@ -8525,13 +8765,29 @@ class Car3DWidget(QtWidgets.QWidget):
             speed_mag = solver_speed_mag
         if not np.isfinite(speed_mag) or speed_mag <= 1e-9:
             return 0.0
-        if np.isfinite(vx) and abs(vx) > 1e-6:
-            return float(math.copysign(speed_mag, vx))
+        if np.isfinite(body_vx) and abs(body_vx) > 1e-6:
+            return float(math.copysign(speed_mag, body_vx))
         if np.isfinite(solver_speed_mag) and solver_speed_mag > 1e-9:
             return float(speed_mag)
         return 0.0
 
-    def _solver_external_acceleration_xy(self, get_value) -> tuple[float, float]:
+    def _solver_external_acceleration_xy(
+        self,
+        b: DataBundle,
+        get_value,
+        *,
+        i0: int,
+        i1: int,
+        alpha: float,
+    ) -> tuple[float, float]:
+        try:
+            axb_arr, ayb_arr = b.ensure_body_acceleration_xy()
+            return (
+                float(_sample_series_local(axb_arr, i0=i0, i1=i1, alpha=alpha, default=float(get_value("ускорение_продольное_ax_м_с2", 0.0)))),
+                float(_sample_series_local(ayb_arr, i0=i0, i1=i1, alpha=alpha, default=float(get_value("ускорение_поперечное_ay_м_с2", 0.0)))),
+            )
+        except Exception:
+            pass
         try:
             return (
                 float(get_value("ускорение_продольное_ax_м_с2", 0.0)),
@@ -8568,6 +8824,7 @@ class Car3DWidget(QtWidgets.QWidget):
         # Canonical solver-truth channels only. The user-facing 3D arrows intentionally stay
         # in the road plane and do not mix in heave channels or reconstructed body helpers.
         s_progress_series = np.asarray(_ensure_world_progress_series(b), dtype=float)
+        spin_progress_series = np.asarray(_ensure_body_longitudinal_progress_series(b), dtype=float)
         speed_along_road = self._solver_signed_speed_along_road(
             b,
             _g,
@@ -8599,9 +8856,26 @@ class Car3DWidget(QtWidgets.QWidget):
                 default=float(_g("скорость_vy_м_с", 0.0)),
             )
         )
-        external_ax, external_ay = self._solver_external_acceleration_xy(_g)
+        external_ax, external_ay = self._solver_external_acceleration_xy(
+            b,
+            _g,
+            i0=i0,
+            i1=i1,
+            alpha=alpha,
+        )
 
-        yaw0 = _g("yaw_рад", 0.0)
+        yaw0 = _sample_angle_series_local(
+            b.get("yaw_рад", 0.0),
+            i0=i0,
+            i1=i1,
+            alpha=alpha,
+            default=0.0,
+        )
+        try:
+            xw_arr, yw_arr = b.ensure_world_xy()
+        except Exception:
+            xw_arr = b.get("путь_x_м", 0.0)
+            yw_arr = b.get("путь_y_м", 0.0)
 
         roll = _g("крен_phi_рад", 0.0)
         pitch = _g("тангаж_theta_рад", 0.0)
@@ -8633,8 +8907,24 @@ class Car3DWidget(QtWidgets.QWidget):
         ]
 
         # ---- Canonical local car-frame coordinates (no axis remapping)
-        x0 = _g("путь_x_м", 0.0)
-        y0 = _g("путь_y_м", 0.0)
+        x0 = float(
+            _sample_series_local(
+                xw_arr,
+                i0=i0,
+                i1=i1,
+                alpha=alpha,
+                default=float(_g("путь_x_м", 0.0)),
+            )
+        )
+        y0 = float(
+            _sample_series_local(
+                yw_arr,
+                i0=i0,
+                i1=i1,
+                alpha=alpha,
+                default=float(_g("путь_y_м", 0.0)),
+            )
+        )
 
         s_progress_m = float(
             _sample_series_local(
@@ -8786,8 +9076,6 @@ class Car3DWidget(QtWidgets.QWidget):
             wheel_pose_ups.append(_norm_or(up_xyz, np.array([0.0, 0.0, 1.0], dtype=float)))
             wheel_pose_toe.append(float(toe_rad))
             wheel_pose_camber.append(float(camber_rad))
-        camera_view_dir = self._camera_view_direction_local_xyz()
-
         def _set_mesh_from_segment(item: Optional["gl.GLMeshItem"], seg: Optional[tuple[np.ndarray, np.ndarray]], radius_m: float) -> None:
             if item is None or self._unit_cyl_faces is None:
                 return
@@ -8932,11 +9220,17 @@ class Car3DWidget(QtWidgets.QWidget):
                 1.0,
             )
         ) if tire_forces_n else 0.0
+        camera_view_dir = self._camera_view_direction_local_xyz(target_xyz=np.asarray(center_draw, dtype=float))
         body_forward_for_grade = _norm_or(np.asarray(R_local[:, 0], dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        motion_forward_for_grade = (
+            np.asarray(body_forward_for_grade, dtype=float)
+            if float(speed_along_road) >= -1e-6
+            else -np.asarray(body_forward_for_grade, dtype=float)
+        )
         scene_grade_base = self._scene_grade_profile(
             key_prefix="scene-grade-base",
             camera_view_dir_xyz=camera_view_dir,
-            body_forward_xyz=body_forward_for_grade,
+            body_forward_xyz=motion_forward_for_grade,
             mean_load_u=base_mean_load_u,
             spring_energy_u=base_mean_load_u,
             glass_energy_u=0.0,
@@ -8992,10 +9286,18 @@ class Car3DWidget(QtWidgets.QWidget):
                 )
                 if deformed_wheel is None:
                     deformed_wheel = np.asarray(self._wheel_base_vertices, dtype=float)
+                spin_progress_m = float(
+                    _sample_series_local(
+                        spin_progress_series,
+                        i0=i0,
+                        i1=i1,
+                        alpha=alpha,
+                        default=0.0,
+                    )
+                )
                 wheel_spin_phase = self._wheel_spin_phase_rad(
-                    path_progress_m=s_progress_m,
+                    rolling_progress_m=spin_progress_m,
                     wheel_radius_m=float(self.geom.wheel_radius),
-                    speed_m_s=float(speed_along_road),
                 )
                 rot = self._rotation_from_y_to_vec(axle)
                 v_wheel = (np.asarray(deformed_wheel, dtype=float) @ np.asarray(rot, dtype=float).T) + center.reshape(1, 3)
@@ -9640,7 +9942,7 @@ class Car3DWidget(QtWidgets.QWidget):
                             cap_scene_grade = self._scene_grade_profile(
                                 key_prefix=f"scene-grade-{cyl_name}-{corner}-cap",
                                 camera_view_dir_xyz=camera_view_dir,
-                                body_forward_xyz=body_forward_for_grade,
+                                body_forward_xyz=motion_forward_for_grade,
                                 mean_load_u=base_mean_load_u,
                                 spring_energy_u=base_mean_load_u,
                                 glass_energy_u=float(cap_pressure_u),
@@ -9707,7 +10009,7 @@ class Car3DWidget(QtWidgets.QWidget):
                             rod_scene_grade = self._scene_grade_profile(
                                 key_prefix=f"scene-grade-{cyl_name}-{corner}-rod",
                                 camera_view_dir_xyz=camera_view_dir,
-                                body_forward_xyz=body_forward_for_grade,
+                                body_forward_xyz=motion_forward_for_grade,
                                 mean_load_u=base_mean_load_u,
                                 spring_energy_u=base_mean_load_u,
                                 glass_energy_u=float(rod_pressure_u),
@@ -10378,7 +10680,7 @@ class Car3DWidget(QtWidgets.QWidget):
         scene_grade = self._scene_grade_profile(
             key_prefix="scene-grade-main",
             camera_view_dir_xyz=camera_view_dir,
-            body_forward_xyz=body_forward_for_grade,
+            body_forward_xyz=motion_forward_for_grade,
             mean_load_u=base_mean_load_u,
             spring_energy_u=mean_spring_energy_u,
             glass_energy_u=scene_glass_energy_u,
@@ -10434,7 +10736,10 @@ class Car3DWidget(QtWidgets.QWidget):
             return pos, colors
 
         z_vec_offset = 0.55 * body_h + 0.15 * float(self.geom.wheel_radius)
-        vec_origin = np.asarray(center_draw, dtype=float) + np.asarray(R_local[:, 2], dtype=float) * float(z_vec_offset)
+        vec_origin = np.asarray(center_draw, dtype=float) + np.array(
+            [0.0, 0.0, float(z_vec_offset)],
+            dtype=float,
+        )
         vel_vec = np.asarray(
             [
                 float(vel_body_x * self._vel_scale),
@@ -10486,9 +10791,13 @@ class Car3DWidget(QtWidgets.QWidget):
                 x0 = _sample_series_local(xw, i0=i0, i1=i1, alpha=alpha, default=0.0)
                 y0 = _sample_series_local(yw, i0=i0, i1=i1, alpha=alpha, default=0.0)
 
-                la = self._stable_road_preview_lookahead_m()
-                s_min = s0 - self._stable_road_preview_history_m()
-                s_max = s0 + la
+                current_speed_m_s = float(math.hypot(vel_body_x, vel_body_y))
+                preview_back_m, preview_fwd_m = self._sampled_road_preview_window_m(
+                    speed_m_s=current_speed_m_s,
+                    signed_speed_m_s=float(speed_along_road),
+                )
+                s_min = s0 + float(preview_back_m)
+                s_max = s0 + float(preview_fwd_m)
 
                 wb = float(getattr(self.geom, "wheelbase", 1.5))
                 s_c, z_c = b.ensure_road_profile(wheelbase_m=wb, mode="center")
@@ -10937,6 +11246,11 @@ class Car3DWidget(QtWidgets.QWidget):
                                 plane_normal_xyz=road_up,
                                 fallback_xyz=np.array([1.0, 0.0, 0.0], dtype=float),
                             )
+                            road_motion_forward = (
+                                np.asarray(road_forward, dtype=float)
+                                if float(speed_along_road) >= -1e-6
+                                else -np.asarray(road_forward, dtype=float)
+                            )
                             road_side = _project_vector_to_plane(
                                 body_side,
                                 plane_normal_xyz=road_up,
@@ -10944,7 +11258,7 @@ class Car3DWidget(QtWidgets.QWidget):
                             )
                             road_view_dir = np.asarray(camera_view_dir, dtype=float).reshape(3)
                             road_view_dir[2] = 0.0
-                            road_view_dir = _norm_or(road_view_dir, road_forward)
+                            road_view_dir = _norm_or(road_view_dir, road_motion_forward)
                             valid_road_pts = [
                                 np.asarray(pt, dtype=float).reshape(3)
                                 for pt in road_local_pts
@@ -10978,11 +11292,11 @@ class Car3DWidget(QtWidgets.QWidget):
                             )
                             for fog_idx, (offset_fwd_m, lift_m, fog_radius_u, fog_radius_v, fog_rgb, fog_density_u) in enumerate(fog_specs):
                                 fog_item = self._scene_fog_meshes[fog_idx] if fog_idx < len(self._scene_fog_meshes) else None
-                                fog_center = np.asarray(road_plane_center, dtype=float) + road_forward * float(offset_fwd_m)
+                                fog_center = np.asarray(road_plane_center, dtype=float) + road_motion_forward * float(offset_fwd_m)
                                 fog_center[2] = float(shadow_floor_z) + float(lift_m)
                                 fog_verts, fog_faces = _ellipse_mesh_on_plane(
                                     center_xyz=fog_center,
-                                    axis_u_xyz=road_forward,
+                                    axis_u_xyz=road_motion_forward,
                                     axis_v_xyz=road_side,
                                     radius_u_m=float(fog_radius_u),
                                     radius_v_m=float(fog_radius_v),
@@ -10992,7 +11306,7 @@ class Car3DWidget(QtWidgets.QWidget):
                                     fog_verts,
                                     fog_faces,
                                     center_xyz=fog_center,
-                                    axis_u_xyz=road_forward,
+                                    axis_u_xyz=road_motion_forward,
                                     axis_v_xyz=road_side,
                                     radius_u_m=float(fog_radius_u),
                                     radius_v_m=float(fog_radius_v),
@@ -11077,7 +11391,7 @@ class Car3DWidget(QtWidgets.QWidget):
                             focus_center = (
                                 np.mean(np.asarray(focus_candidates, dtype=float), axis=0)
                                 if focus_candidates
-                                else np.asarray(center_draw, dtype=float).reshape(3) + np.asarray(R_local[:, 2], dtype=float).reshape(3) * (0.18 * body_h)
+                                else np.asarray(center_draw, dtype=float).reshape(3) + np.array([0.0, 0.0, 0.18 * body_h], dtype=float)
                             )
                             focus_axis_u, focus_axis_v = self._camera_facing_card_axes(
                                 primary_dir_xyz=body_forward,
@@ -16464,7 +16778,14 @@ class TelemetryPanel(QtWidgets.QWidget):
 
         # Для отображения используем модуль скорости.
         v_mps = math.hypot(vx, vy)
-        yaw = sample(summary["yaw"], 0.0)
+        yaw = _sample_angle_series_local(
+            summary["yaw"],
+            i0=int(sample_i0),
+            i1=int(sample_i1),
+            alpha=float(alpha),
+            default=0.0,
+        )
+        yaw_display = math.atan2(math.sin(yaw), math.cos(yaw))
         yaw_rate = sample(summary["yaw_rate"], 0.0)
         ax = sample(summary["ax"], 0.0)
         ay = sample(summary["ay"], 0.0)
@@ -16482,7 +16803,7 @@ class TelemetryPanel(QtWidgets.QWidget):
             _set_label_text_if_changed(self.lbl_vkmh, f"v = {_fmt(v_mps * 3.6, ' km/h', digits=1)}")
             _set_label_text_if_changed(self.lbl_ax, f"ax = {_fmt(ax, ' m/s²', digits=2)}")
             _set_label_text_if_changed(self.lbl_ay, f"ay = {_fmt(ay, ' m/s²', digits=2)}")
-            _set_label_text_if_changed(self.lbl_yaw, f"yaw = {_fmt(np.degrees(yaw), '°', digits=1)}")
+            _set_label_text_if_changed(self.lbl_yaw, f"yaw = {_fmt(np.degrees(yaw_display), '°', digits=1)}")
             _set_label_text_if_changed(self.lbl_yawr, f"yaw_rate = {_fmt(np.degrees(yaw_rate), '°/s', digits=2)}")
             _set_label_text_if_changed(self.lbl_R, "R = —" if not np.isfinite(R) else f"R = {_fmt(R, ' m', digits=1)}")
             _set_label_text_if_changed(self.lbl_ac, f"a_c = {_fmt(a_c, ' m/s²', digits=2)}")
@@ -16496,7 +16817,7 @@ class TelemetryPanel(QtWidgets.QWidget):
                         ("v", f"{(v_mps * 3.6):.1f} km/h"),
                         ("ax", f"{ax:+.2f} m/s²"),
                         ("ay", f"{ay:+.2f} m/s²"),
-                        ("yaw", f"{np.degrees(yaw):+.1f}°"),
+                        ("yaw", f"{np.degrees(yaw_display):+.1f}°"),
                         ("R", "—" if not np.isfinite(R) else f"{R:.1f} m"),
                         ("roll", f"{np.degrees(roll):+.2f}°"),
                         ("pitch", f"{np.degrees(pitch):+.2f}°"),
@@ -19270,17 +19591,26 @@ class MainWindow(QtWidgets.QMainWindow):
             if np.isfinite(float(vx_status)) or np.isfinite(float(vy_status)):
                 v = float(math.hypot(float(vx_status), float(vy_status)))
             else:
-                v = float(
-                    abs(
-                        _sample_series_local(
-                            b.get("скорость_vx_м_с", 0.0),
-                            i0=sample_i0,
-                            i1=sample_i1,
-                            alpha=alpha,
-                            default=0.0,
-                        )
-                    )
+                try:
+                    vxb_status, vyb_status = b.ensure_body_velocity_xy()
+                except Exception:
+                    vxb_status = b.get("скорость_vx_м_с", 0.0)
+                    vyb_status = b.get("скорость_vy_м_с", 0.0)
+                vb_x = _sample_series_local(
+                    vxb_status,
+                    i0=sample_i0,
+                    i1=sample_i1,
+                    alpha=alpha,
+                    default=0.0,
                 )
+                vb_y = _sample_series_local(
+                    vyb_status,
+                    i0=sample_i0,
+                    i1=sample_i1,
+                    alpha=alpha,
+                    default=0.0,
+                )
+                v = float(math.hypot(float(vb_x), float(vb_y)))
             self._status(f"t={t:.3f}s, v={v:.2f}m/s, file={b.npz_path.name}")
         except Exception:
             pass

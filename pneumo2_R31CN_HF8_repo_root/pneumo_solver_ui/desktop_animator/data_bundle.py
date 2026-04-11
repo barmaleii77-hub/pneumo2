@@ -652,11 +652,43 @@ class DataBundle:
         self._derived[key_y] = np.asarray(vyb, dtype=float)
         return self._derived[key_x], self._derived[key_y]
 
+    def ensure_yaw_rate_rad_s(self) -> np.ndarray:
+        """Yaw-rate ``ψ̇`` in rad/s from canonical channel or from unwrapped yaw derivative."""
+        key = "svc__yaw_rate_рад_с"
+        if key in self._derived:
+            return self._derived[key]
+
+        t = np.asarray(self.t, dtype=float)
+        n = int(len(t))
+        if n <= 0:
+            self._derived[key] = np.zeros((0,), dtype=float)
+            return self._derived[key]
+
+        try:
+            if self.main.has("yaw_rate_рад_с"):
+                yaw_rate = _align_series_length(self.get("yaw_rate_рад_с", default=0.0), n, fill=0.0)
+                self._derived[key] = np.asarray(yaw_rate, dtype=float)
+                return self._derived[key]
+        except Exception:
+            pass
+
+        yaw = _align_series_length(self.get("yaw_рад", default=0.0), n, fill=0.0)
+        yaw = np.asarray(np.unwrap(np.asarray(yaw, dtype=float)), dtype=float)
+        try:
+            if n >= 2:
+                yaw_rate = np.asarray(np.gradient(yaw, t, edge_order=1), dtype=float)
+            else:
+                yaw_rate = np.zeros((n,), dtype=float)
+        except Exception:
+            yaw_rate = np.zeros((n,), dtype=float)
+        self._derived[key] = np.asarray(yaw_rate, dtype=float)
+        return self._derived[key]
+
     def ensure_world_acceleration_xy(self) -> Tuple[np.ndarray, np.ndarray]:
         """World-frame XY acceleration.
 
         Priority:
-          1) derivative of explicit world-path velocity;
+          1) derivative of world-frame velocity from ``ensure_world_velocity_xy()``;
           2) rotation of canonical body-frame ``ax/ay`` into world frame.
         """
         key_x = "svc__ax_world_м_с2"
@@ -672,7 +704,7 @@ class DataBundle:
             return self._derived[key_x], self._derived[key_y]
 
         try:
-            if self.main.has("путь_x_м") and self.main.has("путь_y_м") and n >= 2:
+            if n >= 2:
                 vxw, vyw = self.ensure_world_velocity_xy()
                 axw = np.asarray(np.gradient(vxw, t, edge_order=1), dtype=float)
                 ayw = np.asarray(np.gradient(vyw, t, edge_order=1), dtype=float)
@@ -921,6 +953,7 @@ class DataBundle:
             if self.main.has("путь_x_м") and self.main.has("путь_y_м"):
                 xw, yw = self.ensure_world_xy()
                 ds = np.hypot(np.diff(xw, prepend=xw[0]), np.diff(yw, prepend=yw[0]))
+                ds = np.where(np.isfinite(ds), np.maximum(ds, 0.0), 0.0)
                 s = np.cumsum(ds, dtype=float)
                 if s.size:
                     s[0] = 0.0
@@ -949,6 +982,7 @@ class DataBundle:
             vy = np.zeros((n,), dtype=float)
 
         v = np.asarray(np.hypot(vx, vy), dtype=float)
+        v = np.where(np.isfinite(v), np.maximum(v, 0.0), 0.0)
         dt = np.diff(t, prepend=t[0])
         dt[0] = 0.0
         s = np.zeros((n,), dtype=float)

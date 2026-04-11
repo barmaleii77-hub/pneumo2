@@ -13,6 +13,8 @@ def test_suite_editor_panel_helper_contains_master_detail_orchestration() -> Non
 
     assert "def render_app_suite_master_detail_panel(" in text
     assert "def render_heavy_suite_master_detail_panel(" in text
+    assert '"Новый сценарий ' in text
+    assert "(копия)" in text
     assert 'st.columns([1.0, 1.2], gap="large")' in text
     assert 'st.columns([1.05, 1.0], gap="large")' in text
     assert "render_app_suite_search_box(" in text
@@ -20,6 +22,7 @@ def test_suite_editor_panel_helper_contains_master_detail_orchestration() -> Non
     assert "render_heavy_suite_left_panel(" in text
     assert "render_app_suite_right_card_panel(" in text
     assert "render_heavy_suite_right_card_panel(" in text
+    assert "_copy" not in text
 
 
 def test_suite_editor_section_helper_uses_master_detail_panel() -> None:

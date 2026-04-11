@@ -21,9 +21,9 @@ from pneumo_solver_ui.ui_suite_editor_shell_helpers import (
 
 HEAVY_STAGE_GUIDANCE_TEXT = (
     "Логика оптимизации по стадиям: S0 — быстрый предварительный отсев; "
-    "S1 — длинные дорожные и манёвренные тесты; "
+    "S1 — длинные дорожные и манёвренные сценарии; "
     "S2 — финальная проверка устойчивости. "
-    "Колонка «Стадия» показывает, с какого этапа тест впервые участвует в расчёте; "
+    "Колонка «Стадия» показывает, с какого этапа сценарий впервые участвует в расчёте; "
     "значение 1 не должно молча превращаться в 0."
 )
 
@@ -53,9 +53,9 @@ def render_app_suite_editor_section(
 
         with colIE1:
             suite_upload = st.file_uploader(
-                "Импорт набора тестов (JSON)",
+                "Импорт набора сценариев (JSON)",
                 type=["json"],
-                help="Загрузите ранее сохранённый файл `suite.json` с набором тестов.",
+                help="Загрузите ранее сохранённый файл `suite.json` с набором сценариев.",
                 key="suite_upload_json",
             )
             if suite_upload is not None:
@@ -68,10 +68,10 @@ def render_app_suite_editor_section(
                         )
                         st.session_state["df_suite_edit"] = loaded_df
                         st.session_state["suite_sel"] = first_suite_selected_index_fn(loaded_df)
-                        st.success("Набор тестов загружен.")
+                        st.success("Набор сценариев загружен.")
                         st.rerun()
                     else:
-                        st.error("JSON должен содержать список тестов.")
+                        st.error("JSON должен содержать список сценариев.")
                 except Exception as exc:
                     st.error(f"Не удалось прочитать JSON: {exc}")
 

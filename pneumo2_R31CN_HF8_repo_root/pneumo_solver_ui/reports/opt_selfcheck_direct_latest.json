@@ -1,0 +1,37 @@
+{
+  "ts": 1775914098.5413465,
+  "mode": "fast",
+  "files": {
+    "model": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\model_pneumo_v9_mech_doublewishbone_worldroad.py",
+    "worker": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\opt_worker_v3_margins_energy.py",
+    "base_json": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\default_base.json",
+    "ranges_json": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\default_ranges.json",
+    "suite_json": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\default_suite.json"
+  },
+  "errors": [],
+  "warnings": [],
+  "checks": {
+    "files": {
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    },
+    "ranges": {
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    },
+    "suite": {
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    },
+    "scenario_expansion": {
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    }
+  },
+  "ok": true,
+  "dt_sec": 0.3122539520263672
+}

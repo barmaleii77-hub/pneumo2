@@ -1,0 +1,7 @@
+=== LOGSTATS ===
+Path: C:\Users\Admin\Documents\GitHub\pneumo2\pneumo2_R31CN_HF8_repo_root\pneumo_solver_ui\autotest_runs_probe\RUN_20260411_183144_autotest_quick\autotest_events.jsonl
+Files: 1
+Records: 9
+Parse errors: 0
+Report JSON: C:\Users\Admin\Documents\GitHub\pneumo2\pneumo2_R31CN_HF8_repo_root\pneumo_solver_ui\autotest_runs_probe\RUN_20260411_183144_autotest_quick\logstats\harness\logstats.json
+Report MD:   C:\Users\Admin\Documents\GitHub\pneumo2\pneumo2_R31CN_HF8_repo_root\pneumo_solver_ui\autotest_runs_probe\RUN_20260411_183144_autotest_quick\logstats\harness\logstats.md

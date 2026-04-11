@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 from pneumo_solver_ui import self_check
@@ -28,3 +30,15 @@ def test_shipped_default_suite_type_probe_builds_combo_test() -> None:
     names = [str(t[0]) for t in tests]
     assert names
     assert any("комбо" in name for name in names)
+
+
+def test_self_check_direct_script_runs_ok() -> None:
+    proc = subprocess.run(
+        [sys.executable, str(UI_ROOT / "self_check.py")],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    assert "SELF-CHECK: OK" in proc.stdout

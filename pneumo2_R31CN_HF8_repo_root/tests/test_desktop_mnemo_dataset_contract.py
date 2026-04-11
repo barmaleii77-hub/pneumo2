@@ -408,3 +408,315 @@ def test_build_launch_onboarding_context_supports_defaults_and_explicit_preset()
     assert waiting_payload["edge_name"] == ""
     assert waiting_payload["node_name"] == ""
     assert waiting_payload["auto_focus"] is False
+
+
+def test_edge_direction_meta_distinguishes_passport_and_live_flow() -> None:
+    pytest.importorskip("PySide6")
+
+    from pneumo_solver_ui.desktop_mnemo.app import (
+        _edge_consistency_meta,
+        _edge_direction_meta,
+        _edge_element_flow_contract_meta,
+        _edge_operability_meta,
+        _edge_pressure_drive_meta,
+        _edge_recent_causality_meta,
+        _edge_recent_causality_summary,
+        _edge_recent_history_meta,
+        _edge_recent_history_summary,
+        _edge_recent_latency_meta,
+        _edge_recent_latency_summary,
+        _edge_phase_ribbon_meta,
+        _edge_operator_hint_meta,
+        _edge_recent_pressure_meta,
+        _edge_recent_pressure_summary,
+        _edge_temporal_meta,
+    )
+
+    edge_def = {
+        "n1": "Ресивер3",
+        "n2": "узел_после_рег_Pmid",
+    }
+
+    forward_meta = _edge_direction_meta(edge_def, 48.0)
+    assert forward_meta["canonical_direction_label"] == "Ресивер 3 → Pmid reg"
+    assert forward_meta["flow_direction_label"] == "Ресивер 3 → Pmid reg"
+    assert forward_meta["flow_status_label"] == "по паспорту"
+    assert forward_meta["canonical_source_short"] == "Ресивер 3"
+    assert forward_meta["canonical_sink_short"] == "Pmid reg"
+    assert forward_meta["flow_source_short"] == "Ресивер 3"
+    assert forward_meta["flow_sink_short"] == "Pmid reg"
+    assert forward_meta["flow_matches_canonical"] is True
+    assert forward_meta["flow_forward"] is True
+
+    reverse_meta = _edge_direction_meta(edge_def, -12.0)
+    assert reverse_meta["canonical_direction_label"] == "Ресивер 3 → Pmid reg"
+    assert reverse_meta["flow_direction_label"] == "Pmid reg → Ресивер 3"
+    assert reverse_meta["flow_status_label"] == "реверс к паспорту"
+    assert reverse_meta["flow_source_short"] == "Pmid reg"
+    assert reverse_meta["flow_sink_short"] == "Ресивер 3"
+    assert reverse_meta["flow_matches_canonical"] is False
+    assert reverse_meta["flow_forward"] is False
+
+    idle_meta = _edge_direction_meta(edge_def, 0.0)
+    assert idle_meta["canonical_direction_label"] == "Ресивер 3 → Pmid reg"
+    assert idle_meta["flow_direction_label"] == "нет выраженного потока"
+    assert idle_meta["flow_status_label"] == "стагнация / переход"
+    assert idle_meta["flow_source_short"] == ""
+    assert idle_meta["flow_sink_short"] == ""
+    assert idle_meta["flow_matches_canonical"] is None
+    assert idle_meta["flow_forward"] is None
+
+    forward_pressure = _edge_pressure_drive_meta(
+        forward_meta,
+        p1_bar_g=5.10,
+        p2_bar_g=2.75,
+        q_now=48.0,
+    )
+    assert forward_pressure["delta_p_bar"] == pytest.approx(2.35)
+    assert forward_pressure["pressure_drive_label"] == "Ресивер 3 > Pmid reg"
+    assert forward_pressure["pressure_drive_status"] == "согласовано с ΔP"
+    assert forward_pressure["pressure_drive_badge"] == "ΔP ok"
+    assert forward_pressure["endpoint_1_pressure_role"] == "P+"
+    assert forward_pressure["endpoint_2_pressure_role"] == "P-"
+    assert forward_pressure["flow_vs_pressure"] == "по перепаду"
+
+    reverse_pressure = _edge_pressure_drive_meta(
+        reverse_meta,
+        p1_bar_g=5.10,
+        p2_bar_g=2.75,
+        q_now=-12.0,
+    )
+    assert reverse_pressure["pressure_drive_status"] == "реверс к ΔP"
+    assert reverse_pressure["pressure_drive_badge"] == "ΔP rev"
+    assert reverse_pressure["flow_vs_pressure"] == "против перепада"
+
+    equalized_pressure = _edge_pressure_drive_meta(
+        forward_meta,
+        p1_bar_g=3.01,
+        p2_bar_g=2.99,
+        q_now=0.0,
+    )
+    assert equalized_pressure["pressure_drive_badge"] == "ΔP≈"
+    assert equalized_pressure["endpoint_1_pressure_role"] == "P≈"
+    assert equalized_pressure["endpoint_2_pressure_role"] == "P≈"
+
+    check_forward = _edge_element_flow_contract_meta(
+        "check",
+        "Обратный клапан",
+        forward_meta,
+        q_now=48.0,
+    )
+    assert check_forward["element_flow_status"] == "по направлению элемента"
+    assert check_forward["element_flow_badge"] == "EL ok"
+    assert check_forward["element_flow_tone"] == "ok"
+
+    check_reverse = _edge_element_flow_contract_meta(
+        "check",
+        "Обратный клапан",
+        reverse_meta,
+        q_now=-12.0,
+    )
+    assert check_reverse["element_flow_status"] == "против направления элемента"
+    assert check_reverse["element_flow_badge"] == "EL rev"
+    assert check_reverse["element_flow_tone"] == "warn"
+
+    orifice_reverse = _edge_element_flow_contract_meta(
+        "orifice",
+        "Дроссель",
+        reverse_meta,
+        q_now=-12.0,
+    )
+    assert orifice_reverse["element_flow_status"] == "двусторонний дроссель"
+    assert orifice_reverse["element_flow_badge"] == "EL bi"
+    assert orifice_reverse["element_flow_tone"] == "info"
+
+    leak_operability = _edge_operability_meta(
+        "закрыт",
+        q_now=12.0,
+        pressure_meta=forward_pressure,
+        element_meta=check_forward,
+    )
+    assert leak_operability["operability_status"] == "закрыт, но расход есть"
+    assert leak_operability["operability_badge"] == "OP leak"
+    assert leak_operability["operability_tone"] == "warn"
+
+    healthy_operability = _edge_operability_meta(
+        "открыт",
+        q_now=48.0,
+        pressure_meta=forward_pressure,
+        element_meta=check_forward,
+    )
+    assert healthy_operability["operability_status"] == "ветвь ведёт себя согласованно"
+    assert healthy_operability["operability_badge"] == "OP ok"
+    assert healthy_operability["operability_tone"] == "ok"
+
+    hold_operability = _edge_operability_meta(
+        "открыт",
+        q_now=0.0,
+        pressure_meta=forward_pressure,
+        element_meta=check_forward,
+    )
+    assert hold_operability["operability_status"] == "открыт, но расход не набран"
+    assert hold_operability["operability_badge"] == "OP hold"
+    assert hold_operability["operability_tone"] == "info"
+
+    closed_conflict = _edge_consistency_meta(
+        "закрыт",
+        q_now=12.0,
+        pressure_meta=forward_pressure,
+        element_meta=check_forward,
+    )
+    assert closed_conflict["consistency_status"] == "сигнал закрытия конфликтует с расходом"
+    assert closed_conflict["consistency_badge"] == "CS q"
+    assert closed_conflict["consistency_tone"] == "warn"
+
+    healthy_consistency = _edge_consistency_meta(
+        "открыт",
+        q_now=48.0,
+        pressure_meta=forward_pressure,
+        element_meta=check_forward,
+    )
+    assert healthy_consistency["consistency_status"] == "сигналы ветви согласованы"
+    assert healthy_consistency["consistency_badge"] == "CS ok"
+    assert healthy_consistency["consistency_tone"] == "ok"
+
+    delayed_consistency = _edge_consistency_meta(
+        "открыт",
+        q_now=0.0,
+        pressure_meta={"pressure_drive_badge": "ΔP ok"},
+        element_meta=check_forward,
+    )
+    assert delayed_consistency["consistency_status"] == "открыт, но расход запаздывает"
+    assert delayed_consistency["consistency_badge"] == "CS hold"
+    assert delayed_consistency["consistency_tone"] == "info"
+
+    ramp_temporal = _edge_temporal_meta(
+        time_s=np.array([0.0, 0.2, 0.4, 0.6], dtype=float),
+        q_values=np.array([0.0, 8.0, 18.0, 36.0], dtype=float),
+        open_values=np.array([1, 1, 1, 1], dtype=int),
+        idx=3,
+    )
+    assert ramp_temporal["temporal_status"] == "набор расхода"
+    assert ramp_temporal["temporal_badge"] == "TM ramp"
+    assert ramp_temporal["temporal_tone"] == "info"
+
+    steady_temporal = _edge_temporal_meta(
+        time_s=np.array([0.0, 0.2, 0.4, 0.6], dtype=float),
+        q_values=np.array([28.0, 30.0, 29.0, 30.0], dtype=float),
+        open_values=np.array([1, 1, 1, 1], dtype=int),
+        idx=3,
+    )
+    assert steady_temporal["temporal_status"] == "устойчивый ход"
+    assert steady_temporal["temporal_badge"] == "TM steady"
+    assert steady_temporal["temporal_tone"] == "ok"
+
+    oscillation_temporal = _edge_temporal_meta(
+        time_s=np.array([0.0, 0.2, 0.4, 0.6], dtype=float),
+        q_values=np.array([18.0, -20.0, 22.0, -19.0], dtype=float),
+        open_values=np.array([1, 1, 1, 1], dtype=int),
+        idx=3,
+    )
+    assert oscillation_temporal["temporal_status"] == "колебание расхода"
+    assert oscillation_temporal["temporal_badge"] == "TM osc"
+    assert oscillation_temporal["temporal_tone"] == "warn"
+
+    recent_history = _edge_recent_history_meta(
+        time_s=np.array([0.0, 0.2, 0.4, 0.6], dtype=float),
+        q_values=np.array([0.0, 8.0, 18.0, 36.0], dtype=float),
+        open_values=np.array([0, 1, 1, 1], dtype=int),
+        idx=3,
+        max_points=4,
+    )
+    assert recent_history["history_available"] is True
+    assert recent_history["history_sample_count"] == 4
+    assert recent_history["history_peak_abs"] == pytest.approx(36.0)
+    assert recent_history["history_span_s"] == pytest.approx(0.6)
+    assert recent_history["history_open_ratio"] == pytest.approx(0.75)
+    assert len(recent_history["history_points"]) == 4
+    assert len(recent_history["history_open_blocks"]) == 4
+    assert _edge_recent_history_summary(recent_history, "л/мин").startswith("0.60 s")
+
+    recent_pressure = _edge_recent_pressure_meta(
+        time_s=np.array([0.0, 0.2, 0.4, 0.6], dtype=float),
+        p1_values=np.array([5.2, 5.0, 4.4, 3.6], dtype=float),
+        p2_values=np.array([2.0, 2.1, 2.3, 2.6], dtype=float),
+        idx=3,
+        max_points=4,
+    )
+    assert recent_pressure["pressure_history_available"] is True
+    assert recent_pressure["pressure_history_sample_count"] == 4
+    assert recent_pressure["pressure_history_peak_abs"] == pytest.approx(3.2)
+    assert recent_pressure["pressure_history_last_delta"] == pytest.approx(1.0)
+    assert recent_pressure["pressure_history_status"] == "ΔP заметно перестраивается"
+    assert recent_pressure["pressure_history_tone"] == "info"
+    assert len(recent_pressure["pressure_history_points"]) == 4
+    assert _edge_recent_pressure_summary(recent_pressure).startswith("0.60 s")
+
+    causality_meta = _edge_recent_causality_meta(
+        state_label="открыт",
+        history_meta=recent_history,
+        pressure_meta=recent_pressure,
+        temporal_meta=ramp_temporal,
+        consistency_meta=healthy_consistency,
+    )
+    assert causality_meta["causality_status"] == "Q откликается на открытие и ΔP"
+    assert causality_meta["causality_badge"] == "CX ok"
+    assert causality_meta["causality_tone"] == "ok"
+    assert _edge_recent_causality_summary(causality_meta, recent_history).startswith("Q откликается")
+
+    latency_meta = _edge_recent_latency_meta(
+        time_s=np.array([0.0, 0.2, 0.4, 0.6], dtype=float),
+        q_values=np.array([0.0, 0.0, 8.0, 20.0], dtype=float),
+        open_values=np.array([0, 1, 1, 1], dtype=int),
+        p1_values=np.array([2.0, 2.0, 5.0, 5.0], dtype=float),
+        p2_values=np.array([2.0, 2.0, 2.0, 2.0], dtype=float),
+        idx=3,
+        max_points=4,
+    )
+    assert latency_meta["latency_status"] == "Q подключается с умеренным лагом"
+    assert latency_meta["latency_badge"] == "LG soft"
+    assert latency_meta["latency_tone"] == "info"
+    assert latency_meta["latency_s"] == pytest.approx(0.2)
+    assert latency_meta["latency_cause"] == "открытия"
+    assert latency_meta["latency_phase_label"] == "SIG → ΔP → Q"
+    assert latency_meta["latency_signal_x"] == pytest.approx(1.0 / 3.0)
+    assert latency_meta["latency_dp_x"] == pytest.approx(2.0 / 3.0)
+    assert latency_meta["latency_q_x"] == pytest.approx(2.0 / 3.0)
+    assert _edge_recent_latency_summary(latency_meta).startswith("Q подключается")
+
+    phase_ribbon = _edge_phase_ribbon_meta(latency_meta)
+    assert phase_ribbon["phase_ribbon_label"] == "SIG(1) → ΔP(2) → Q(3)"
+    assert phase_ribbon["phase_ribbon_interval_label"] == "SIG→ΔP +0.20s • ΔP→Q 0.00s"
+    assert phase_ribbon["phase_ribbon_bottleneck_label"] == "SIG→ΔP +0.20s"
+    assert phase_ribbon["phase_ribbon_bottleneck_status"] == "умеренный интервал"
+    assert phase_ribbon["phase_ribbon_bottleneck_tone"] == "info"
+    assert phase_ribbon["phase_ribbon_bottleneck_kind"] == "контур управления"
+    assert "между командой" in phase_ribbon["phase_ribbon_bottleneck_comment"]
+    assert phase_ribbon["phase_ribbon_focus_pair_label"] == "SIG → ΔP"
+    assert phase_ribbon["phase_ribbon_focus_stage_labels"] == ["SIG", "ΔP"]
+    assert "сигнала и набора ΔP" in phase_ribbon["phase_ribbon_focus_hint"]
+    stages = list(phase_ribbon["phase_ribbon_stages"])
+    assert [stage["label"] for stage in stages] == ["SIG", "ΔP", "Q"]
+    assert [stage["chip_text"] for stage in stages] == ["1 SIG", "2 ΔP", "3 Q"]
+    assert stages[-1]["tone"] == "info"
+    intervals = list(phase_ribbon["phase_ribbon_intervals"])
+    assert [interval["chip_text"] for interval in intervals] == ["+0.20s", "0.00s"]
+    assert [interval["tone"] for interval in intervals] == ["info", "ok"]
+    assert [interval["is_bottleneck"] for interval in intervals] == [True, False]
+    assert [interval["kind_label"] for interval in intervals] == ["контур управления", "расходный отклик"]
+
+    operator_hint = _edge_operator_hint_meta(
+        component_kind="Регулятор",
+        canonical_kind="reg_after",
+        operability_status=healthy_operability["operability_status"],
+        consistency_status=healthy_consistency["consistency_status"],
+        pressure_drive_status=forward_pressure["pressure_drive_status"],
+        latency_status=latency_meta["latency_status"],
+        phase_ribbon_bottleneck_kind=phase_ribbon["phase_ribbon_bottleneck_kind"],
+        phase_ribbon_bottleneck_comment=phase_ribbon["phase_ribbon_bottleneck_comment"],
+        phase_ribbon_focus_hint=phase_ribbon["phase_ribbon_focus_hint"],
+    )
+    assert operator_hint["operator_hint_title"] == "проверить команду и сборку ΔP"
+    assert "регулятор" in operator_hint["operator_hint_label"]
+    assert operator_hint["operator_hint_badge"] == "ACT ctrl"
+    assert operator_hint["operator_hint_tone"] == "info"

@@ -66,6 +66,113 @@ def _write_alias_value(df: pd.DataFrame, idx: int, keys: tuple[str, ...], value:
         df.at[idx, keys[0]] = value
 
 
+def _normalize_saved_road_surface_spec(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, dict):
+        spec = dict(raw)
+    else:
+        text = str(raw or "").strip()
+        if not text or text == "flat":
+            return {"type": "flat"}
+        try:
+            parsed = json.loads(text)
+        except Exception:
+            return {"type": "flat"}
+        if not isinstance(parsed, dict):
+            return {"type": "flat"}
+        spec = dict(parsed)
+
+    surface_type = str(spec.get("type", "flat") or "flat").strip()
+    if surface_type not in {"flat", "sine_x", "sine_y", "bump", "ridge_x", "ridge_cosine_bump"}:
+        surface_type = "flat"
+    return {
+        "type": surface_type,
+        "A": float(_safe_float(spec.get("A"), 0.02)),
+        "wavelength": float(_safe_float(spec.get("wavelength"), 2.0)),
+        "h": float(_safe_float(spec.get("h"), 0.04)),
+        "w": float(_safe_float(spec.get("w"), 0.6)),
+        "k": float(_safe_float(spec.get("k"), 1.0)),
+    }
+
+
+def _resolve_numeric_choice(choice_state: Any, custom_state: Any, default_value: float) -> float:
+    choice_text = str(choice_state or "").strip()
+    if choice_text == "другое":
+        return float(_safe_float(custom_state, default_value))
+    return float(_safe_float(choice_state, default_value))
+
+
+def _load_penalty_target_specs_map() -> dict[str, dict[str, str]]:
+    try:
+        from pneumo_solver_ui.opt_worker_v3_margins_energy import PENALTY_TARGET_SPECS
+    except Exception:
+        return {}
+    out: dict[str, dict[str, str]] = {}
+    for spec in PENALTY_TARGET_SPECS or []:
+        key = str((spec or {}).get("key", "") or "").strip()
+        if key:
+            out[key] = dict(spec)
+    return out
+
+
+def _resolve_suite_transport_mode(test_type: Any) -> str:
+    key = str(test_type or "").strip()
+    if key == "worldroad":
+        return "worldroad"
+    if key == "road_profile_csv":
+        return "road_profile_csv"
+    if key == "maneuver_csv":
+        return "maneuver_csv"
+    return "builtin"
+
+
+def _normalize_suite_transport_fields(
+    *,
+    test_type: str,
+    road_csv: Any,
+    axay_csv: Any,
+    road_surface: Any,
+    road_len_m: Any,
+    auto_t_end_from_len: Any,
+) -> dict[str, Any]:
+    normalized = {
+        "road_csv": str(road_csv or ""),
+        "axay_csv": str(axay_csv or ""),
+        "road_surface": str(road_surface or "flat") or "flat",
+        "road_len_m": float(_safe_float(road_len_m, 200.0)),
+        "auto_t_end_from_len": bool(auto_t_end_from_len),
+    }
+    transport_mode = _resolve_suite_transport_mode(test_type)
+    if transport_mode == "worldroad":
+        normalized["road_csv"] = ""
+        normalized["axay_csv"] = ""
+    elif transport_mode == "road_profile_csv":
+        normalized["axay_csv"] = ""
+        normalized["road_surface"] = "flat"
+        normalized["auto_t_end_from_len"] = False
+    elif transport_mode == "maneuver_csv":
+        normalized["road_surface"] = "flat"
+        normalized["auto_t_end_from_len"] = False
+    else:
+        normalized["road_csv"] = ""
+        normalized["axay_csv"] = ""
+        normalized["road_surface"] = "flat"
+        normalized["auto_t_end_from_len"] = False
+    return normalized
+
+
+def _resolve_suite_effective_t_end(
+    *,
+    test_type: str,
+    t_end: Any,
+    road_len_m: Any,
+    speed_mps: Any,
+    auto_t_end_from_len: Any,
+) -> float:
+    if _resolve_suite_transport_mode(test_type) == "worldroad" and bool(auto_t_end_from_len):
+        return float(_safe_float(road_len_m, 0.0)) / max(float(_safe_float(speed_mps, 0.0)), 1e-6)
+    return float(_safe_float(t_end, 0.0))
+
+
 def render_app_suite_right_card_panel(
     st: Any,
     *,
@@ -80,7 +187,7 @@ def render_app_suite_right_card_panel(
 
     row = df_suite_edit.loc[sel_i].to_dict()
     enabled = bool(_row_get(row, ENABLED_KEYS, True))
-    name = str(_row_get(row, NAME_KEYS, f"test_{sel_i}") or f"test_{sel_i}")
+    name = str(_row_get(row, NAME_KEYS, f"Сценарий {sel_i + 1}") or f"Сценарий {sel_i + 1}")
     typ = str(_row_get(row, TYPE_KEYS, (allowed_test_types[0] if allowed_test_types else "")) or "")
 
     dt0 = _safe_float(row.get("dt"), 0.01)
@@ -95,6 +202,51 @@ def render_app_suite_right_card_panel(
     amplitude = _safe_float(row.get("A"), 0.0)
     freq_hz = _safe_float(row.get("f"), 0.0)
     angle_deg = _safe_float(_row_get(row, ANGLE_KEYS, 0.0), 0.0)
+    road_csv0 = str(row.get("road_csv", "") or "")
+    axay_csv0 = str(row.get("axay_csv", "") or "")
+    road_len_m0 = _safe_float(row.get("road_len_m"), 200.0)
+    auto_t_end_from_len0 = bool(row.get("auto_t_end_from_len", False))
+    road_surface_defaults = _normalize_saved_road_surface_spec(row.get("road_surface", "flat"))
+    params_override0 = str(row.get("params_override", "") or "")
+    penalty_target_specs = _load_penalty_target_specs_map()
+
+    road_csv_key = f"suite_road_csv__{sel_i}"
+    axay_csv_key = f"suite_axay_csv__{sel_i}"
+    road_len_key = f"suite_road_len__{sel_i}"
+    auto_t_end_key = f"suite_auto_t_end__{sel_i}"
+    type_key = f"suite_type__{sel_i}"
+    dt_choice_key = f"suite_dt_choice__{sel_i}"
+    dt_value_key = f"suite_dt__{sel_i}"
+    te_choice_key = f"suite_te_choice__{sel_i}"
+    te_value_key = f"suite_te__{sel_i}"
+    surface_type_key = f"suite_surface_type__{sel_i}"
+    surface_sine_a_key = f"suite_surface_sine_a__{sel_i}"
+    surface_sine_wl_key = f"suite_surface_sine_wl__{sel_i}"
+    surface_hw_h_key = f"suite_surface_hw_h__{sel_i}"
+    surface_hw_w_key = f"suite_surface_hw_w__{sel_i}"
+    surface_cos_h_key = f"suite_surface_cos_h__{sel_i}"
+    surface_cos_w_key = f"suite_surface_cos_w__{sel_i}"
+    surface_cos_k_key = f"suite_surface_cos_k__{sel_i}"
+    params_override_key = f"suite_params_override__{sel_i}"
+
+    state_defaults = {
+        road_csv_key: road_csv0,
+        axay_csv_key: axay_csv0,
+        road_len_key: float(road_len_m0),
+        auto_t_end_key: bool(auto_t_end_from_len0),
+        surface_type_key: str(road_surface_defaults["type"]),
+        surface_sine_a_key: float(road_surface_defaults["A"]),
+        surface_sine_wl_key: float(road_surface_defaults["wavelength"]),
+        surface_hw_h_key: float(road_surface_defaults["h"]),
+        surface_hw_w_key: float(road_surface_defaults["w"]),
+        surface_cos_h_key: float(road_surface_defaults["h"]),
+        surface_cos_w_key: float(road_surface_defaults["w"]),
+        surface_cos_k_key: float(road_surface_defaults["k"]),
+        params_override_key: params_override0,
+    }
+    for state_key, state_value in state_defaults.items():
+        if state_key not in st.session_state:
+            st.session_state[state_key] = state_value
 
     def _render_primary_section() -> None:
         c_a, c_b = st.columns([1.0, 1.0], gap="medium")
@@ -106,7 +258,7 @@ def render_app_suite_right_card_panel(
                 "Тип",
                 options=allowed_test_types,
                 index=(allowed_test_types.index(typ) if typ in allowed_test_types else 0),
-                key=f"suite_type__{sel_i}",
+                key=type_key,
                 format_func=format_suite_test_type_label,
             )
 
@@ -114,49 +266,140 @@ def render_app_suite_right_card_panel(
         c1, c2 = st.columns(2, gap="medium")
         with c1:
             dt_choice = st.selectbox(
-                "Шаг dt (с)",
+                "Шаг интегрирования, с",
                 options=dt_presets + ["другое"],
                 index=(dt_presets.index(dt0) if dt0 in dt_presets else len(dt_presets)),
-                key=f"suite_dt_choice__{sel_i}",
+                key=dt_choice_key,
             )
             if dt_choice == "другое":
-                st.number_input("dt (с)", value=float(dt0), step=None, key=f"suite_dt__{sel_i}")
+                st.number_input("Своё значение шага, с", value=float(dt0), step=None, key=dt_value_key)
         with c2:
             te_choice = st.selectbox(
-                "Длительность t_end (с)",
+                "Длительность сценария, с",
                 options=te_presets + ["другое"],
                 index=(te_presets.index(tend0) if tend0 in te_presets else len(te_presets)),
-                key=f"suite_te_choice__{sel_i}",
+                key=te_choice_key,
             )
             if te_choice == "другое":
-                st.number_input("t_end (с)", value=float(tend0), step=None, key=f"suite_te__{sel_i}")
+                st.number_input("Своя длительность, с", value=float(tend0), step=None, key=te_value_key)
 
     def _render_motion_section() -> None:
+        current_type = str(st.session_state.get(type_key, typ) or typ)
+        transport_mode = _resolve_suite_transport_mode(current_type)
         c3, c4, c5 = st.columns(3, gap="small")
         with c3:
-            st.slider("ax (м/с²)", min_value=-20.0, max_value=20.0, value=float(max(-20.0, min(20.0, ax))), step=0.1, key=f"suite_ax__{sel_i}")
+            st.slider("Продольное ускорение ax, м/с²", min_value=-20.0, max_value=20.0, value=float(max(-20.0, min(20.0, ax))), step=0.1, key=f"suite_ax__{sel_i}")
         with c4:
-            st.slider("ay (м/с²)", min_value=-20.0, max_value=20.0, value=float(max(-20.0, min(20.0, ay))), step=0.1, key=f"suite_ay__{sel_i}")
+            st.slider("Поперечное ускорение ay, м/с²", min_value=-20.0, max_value=20.0, value=float(max(-20.0, min(20.0, ay))), step=0.1, key=f"suite_ay__{sel_i}")
         with c5:
-            st.slider("Скорость (м/с)", min_value=0.0, max_value=40.0, value=float(max(0.0, min(40.0, speed))), step=0.5, key=f"suite_speed__{sel_i}")
+            st.slider("Начальная скорость, м/с", min_value=0.0, max_value=40.0, value=float(max(0.0, min(40.0, speed))), step=0.5, key=f"suite_speed__{sel_i}")
 
         c6, c7, c8 = st.columns(3, gap="small")
         with c6:
-            st.slider("A (м)", min_value=0.0, max_value=0.3, value=float(max(0.0, min(0.3, amplitude))), step=0.001, key=f"suite_A__{sel_i}")
+            st.slider("Амплитуда A (полуразмах), м", min_value=0.0, max_value=0.3, value=float(max(0.0, min(0.3, amplitude))), step=0.001, key=f"suite_A__{sel_i}")
         with c7:
-            st.slider("f (Гц)", min_value=0.0, max_value=25.0, value=float(max(0.0, min(25.0, freq_hz))), step=0.1, key=f"suite_f__{sel_i}")
+            st.slider("Частота f, Гц", min_value=0.0, max_value=25.0, value=float(max(0.0, min(25.0, freq_hz))), step=0.1, key=f"suite_f__{sel_i}")
         with c8:
-            st.slider("Угол (град)", min_value=-45.0, max_value=45.0, value=float(max(-45.0, min(45.0, angle_deg))), step=0.5, key=f"suite_angle__{sel_i}")
+            st.slider("Угол, град", min_value=-45.0, max_value=45.0, value=float(max(-45.0, min(45.0, angle_deg))), step=0.5, key=f"suite_angle__{sel_i}")
+
+        st.markdown("##### Источник дороги и манёвра")
+
+        if transport_mode == "worldroad":
+            c_len, c_auto = st.columns([1.0, 1.0], gap="small")
+            with c_len:
+                st.number_input("Длина участка, м", min_value=1.0, step=10.0, key=road_len_key)
+            with c_auto:
+                st.checkbox(
+                    "Авто: длительность = длина / скорость",
+                    key=auto_t_end_key,
+                    help="Если включено, длительность сценария будет вычисляться автоматически по длине участка и начальной скорости с защитой от деления на ноль.",
+                )
+
+            current_speed = float(_safe_float(st.session_state.get(f"suite_speed__{sel_i}", speed), speed))
+            current_road_len = float(_safe_float(st.session_state.get(road_len_key, road_len_m0), road_len_m0))
+            current_t_end = _resolve_numeric_choice(
+                st.session_state.get(te_choice_key, tend0 if tend0 in te_presets else "другое"),
+                st.session_state.get(te_value_key, tend0),
+                float(tend0),
+            )
+            auto_enabled = bool(st.session_state.get(auto_t_end_key, auto_t_end_from_len0))
+            if auto_enabled:
+                auto_t_end = float(current_road_len) / max(float(current_speed), 1e-6)
+                st.info(
+                    f"Длительность сценария будет вычислена автоматически: **{auto_t_end:.6g} с** "
+                    f"(вместо введённого значения {float(current_t_end):.6g} с)."
+                )
+            else:
+                length_effective = float(current_speed) * float(current_t_end)
+                st.caption(
+                    f"Расчётная длина проезда = скорость × длительность = {length_effective:.6g} м. "
+                    f"Поле длины участка используется только в авто-режиме."
+                )
+
+            surface_map = {
+                "flat": "Ровная дорога",
+                "sine_x": "Синус вдоль",
+                "sine_y": "Синус поперёк",
+                "bump": "Бугор",
+                "ridge_x": "Порог",
+                "ridge_cosine_bump": "Косинусный бугор",
+            }
+            surface_type = str(
+                st.selectbox(
+                    "Тип поверхности",
+                    options=list(surface_map.keys()),
+                    index=list(surface_map.keys()).index(str(st.session_state.get(surface_type_key, "flat") or "flat")),
+                    format_func=lambda key: surface_map.get(str(key), str(key)),
+                        key=surface_type_key,
+                )
+            )
+
+            if surface_type in {"sine_x", "sine_y"}:
+                st.number_input("Амплитуда A (полуразмах), м", min_value=0.0, step=0.005, format="%.6g", key=surface_sine_a_key)
+                st.number_input("Длина волны, м", min_value=0.01, step=0.1, format="%.6g", key=surface_sine_wl_key)
+            elif surface_type in {"bump", "ridge_x"}:
+                st.number_input("Высота, м", min_value=0.0, step=0.005, format="%.6g", key=surface_hw_h_key)
+                st.number_input("Ширина, м", min_value=0.01, step=0.05, format="%.6g", key=surface_hw_w_key)
+            elif surface_type == "ridge_cosine_bump":
+                st.number_input("Высота, м", min_value=0.0, step=0.005, format="%.6g", key=surface_cos_h_key)
+                st.number_input("Ширина, м", min_value=0.01, step=0.05, format="%.6g", key=surface_cos_w_key)
+                st.number_input("Коэффициент формы", min_value=0.1, step=0.1, format="%.6g", key=surface_cos_k_key)
+
+        elif transport_mode == "road_profile_csv":
+            st.text_input("Путь к CSV дороги", key=road_csv_key)
+            st.caption("Профиль дороги будет прочитан из CSV-файла для этого сценария.")
+        elif transport_mode == "maneuver_csv":
+            st.text_input("Путь к CSV дороги", key=road_csv_key)
+            st.text_input("Путь к CSV манёвра (ax/ay)", key=axay_csv_key)
+            st.caption("Манёвр и, при необходимости, дорога будут прочитаны из CSV-файлов.")
+        else:
+            st.caption("Для этого типа сценария отдельные файлы дороги и манёвра не используются.")
 
     def _render_targets_section() -> None:
-        with st.expander("Порог, уставки и расширенные параметры", expanded=True):
+        st.caption(
+            "Оптимизация учитывает только включённые ограничения и целевые значения. "
+            "В этой упрощённой карточке значения редактируются напрямую для текущего сценария."
+        )
+        with st.expander("Что проверять и настраивать в этом сценарии", expanded=True):
             for key in expected_suite_cols:
                 if not key.startswith("target_"):
                     continue
                 value0 = row.get(key, np.nan)
                 if isinstance(value0, float) and pd.isna(value0):
                     value0 = 0.0
-                row[key] = st.number_input(key, value=float(value0) if value0 is not None else 0.0, step=None, key=f"suite_tgt__{key}__{sel_i}")
+                spec_key = str(key[len("target_") :])
+                spec = penalty_target_specs.get(spec_key, {})
+                label = str(spec.get("label", key))
+                unit = str(spec.get("unit", "")).strip()
+                help_text = str(spec.get("help", "") or "")
+                ui_label = f"{label}{(' [' + unit + ']') if unit else ''}"
+                row[key] = st.number_input(
+                    ui_label,
+                    value=float(value0) if value0 is not None else 0.0,
+                    step=None,
+                    key=f"suite_tgt__{key}__{sel_i}",
+                    help=help_text or None,
+                )
 
             for key_group in [
                 ("t_step",),
@@ -179,6 +422,15 @@ def render_app_suite_right_card_panel(
                     key=f"suite_extra__{key_group[0]}__{sel_i}",
                 )
 
+        with st.expander("Переопределения параметров (сценарий)", expanded=True):
+            st.text_area(
+                "Переопределения параметров в формате JSON (необязательно)",
+                value=params_override0,
+                height=120,
+                key=params_override_key,
+                help="Здесь можно задать JSON со значениями параметров, которые будут применены только в этом сценарии.",
+            )
+
     render_app_suite_right_card_shell(
         st,
         name=name,
@@ -190,13 +442,19 @@ def render_app_suite_right_card_panel(
 
     enabled = bool(st.session_state.get(f"suite_enabled__{sel_i}", enabled))
     name = str(st.session_state.get(f"suite_name__{sel_i}", name) or name)
-    typ = str(st.session_state.get(f"suite_type__{sel_i}", typ) or typ)
+    typ = str(st.session_state.get(type_key, typ) or typ)
 
-    dt_choice_state = st.session_state.get(f"suite_dt_choice__{sel_i}", dt0 if dt0 in dt_presets else "другое")
-    dt = float(st.session_state.get(f"suite_dt__{sel_i}", dt0)) if dt_choice_state == "другое" else float(dt_choice_state)
+    dt = _resolve_numeric_choice(
+        st.session_state.get(dt_choice_key, dt0 if dt0 in dt_presets else "другое"),
+        st.session_state.get(dt_value_key, dt0),
+        float(dt0),
+    )
 
-    te_choice_state = st.session_state.get(f"suite_te_choice__{sel_i}", tend0 if tend0 in te_presets else "другое")
-    t_end = float(st.session_state.get(f"suite_te__{sel_i}", tend0)) if te_choice_state == "другое" else float(te_choice_state)
+    t_end = _resolve_numeric_choice(
+        st.session_state.get(te_choice_key, tend0 if tend0 in te_presets else "другое"),
+        st.session_state.get(te_value_key, tend0),
+        float(tend0),
+    )
 
     ax = float(st.session_state.get(f"suite_ax__{sel_i}", ax))
     ay = float(st.session_state.get(f"suite_ay__{sel_i}", ay))
@@ -204,6 +462,62 @@ def render_app_suite_right_card_panel(
     amplitude = float(st.session_state.get(f"suite_A__{sel_i}", amplitude))
     freq_hz = float(st.session_state.get(f"suite_f__{sel_i}", freq_hz))
     angle_deg = float(st.session_state.get(f"suite_angle__{sel_i}", angle_deg))
+    road_csv = str(st.session_state.get(road_csv_key, road_csv0) or "")
+    axay_csv = str(st.session_state.get(axay_csv_key, axay_csv0) or "")
+    road_len_m = float(_safe_float(st.session_state.get(road_len_key, road_len_m0), road_len_m0))
+    auto_t_end_from_len = bool(st.session_state.get(auto_t_end_key, auto_t_end_from_len0))
+    params_override = str(st.session_state.get(params_override_key, params_override0) or "")
+
+    if typ == "worldroad":
+        surface_type = str(st.session_state.get(surface_type_key, "flat") or "flat")
+        if surface_type in {"sine_x", "sine_y"}:
+            road_surface = json.dumps(
+                {
+                    "type": surface_type,
+                    "A": float(_safe_float(st.session_state.get(surface_sine_a_key, road_surface_defaults["A"]), road_surface_defaults["A"])),
+                    "wavelength": float(_safe_float(st.session_state.get(surface_sine_wl_key, road_surface_defaults["wavelength"]), road_surface_defaults["wavelength"])),
+                },
+                ensure_ascii=False,
+            )
+        elif surface_type in {"bump", "ridge_x"}:
+            road_surface = json.dumps(
+                {
+                    "type": surface_type,
+                    "h": float(_safe_float(st.session_state.get(surface_hw_h_key, road_surface_defaults["h"]), road_surface_defaults["h"])),
+                    "w": float(_safe_float(st.session_state.get(surface_hw_w_key, road_surface_defaults["w"]), road_surface_defaults["w"])),
+                },
+                ensure_ascii=False,
+            )
+        elif surface_type == "ridge_cosine_bump":
+            road_surface = json.dumps(
+                {
+                    "type": surface_type,
+                    "h": float(_safe_float(st.session_state.get(surface_cos_h_key, road_surface_defaults["h"]), road_surface_defaults["h"])),
+                    "w": float(_safe_float(st.session_state.get(surface_cos_w_key, road_surface_defaults["w"]), road_surface_defaults["w"])),
+                    "k": float(_safe_float(st.session_state.get(surface_cos_k_key, road_surface_defaults["k"]), road_surface_defaults["k"])),
+                },
+                ensure_ascii=False,
+            )
+        else:
+            road_surface = "flat"
+    else:
+        road_surface = str(row.get("road_surface", "flat") or "flat")
+
+    transport_fields = _normalize_suite_transport_fields(
+        test_type=typ,
+        road_csv=road_csv,
+        axay_csv=axay_csv,
+        road_surface=road_surface,
+        road_len_m=road_len_m,
+        auto_t_end_from_len=auto_t_end_from_len,
+    )
+    t_end_effective = _resolve_suite_effective_t_end(
+        test_type=typ,
+        t_end=t_end,
+        road_len_m=transport_fields["road_len_m"],
+        speed_mps=speed,
+        auto_t_end_from_len=transport_fields["auto_t_end_from_len"],
+    )
 
     if st.button("✅ Применить", key=f"suite_apply__{sel_i}"):
         df2 = st.session_state["df_suite_edit"].copy()
@@ -211,7 +525,13 @@ def render_app_suite_right_card_panel(
         _write_alias_value(df2, sel_i, NAME_KEYS, str(name))
         _write_alias_value(df2, sel_i, TYPE_KEYS, str(typ))
         df2.loc[sel_i, "dt"] = float(dt)
-        df2.loc[sel_i, "t_end"] = float(t_end)
+        df2.loc[sel_i, "t_end"] = float(t_end_effective)
+        df2.loc[sel_i, "road_csv"] = str(transport_fields["road_csv"])
+        df2.loc[sel_i, "axay_csv"] = str(transport_fields["axay_csv"])
+        df2.loc[sel_i, "road_len_m"] = float(transport_fields["road_len_m"])
+        df2.loc[sel_i, "auto_t_end_from_len"] = bool(transport_fields["auto_t_end_from_len"])
+        df2.loc[sel_i, "road_surface"] = str(transport_fields["road_surface"])
+        df2.loc[sel_i, "params_override"] = str(params_override)
 
         for key_group, value in {
             ("ax",): ax,
@@ -286,7 +606,7 @@ def render_heavy_suite_right_card_panel(
 
     rec = df_suite_edit.loc[idx].to_dict()
     sid = str(rec.get("id") or selected_id or idx)
-    title = str(_row_get(rec, NAME_KEYS, "Тест") or "Тест")
+    title = str(_row_get(rec, NAME_KEYS, "Сценарий") or "Сценарий")
 
     seed_suite_editor_state_fn(sid, rec)
 
@@ -350,16 +670,16 @@ def render_heavy_suite_right_card_panel(
         st.checkbox("Включён", key=enabled_key)
         st.text_input("Имя", key=name_key)
         st.number_input(
-            "Стадия",
-            value=int(stage_default),
-            min_value=0,
-            step=1,
-            key=stage_key,
-            help=(
-                "С какой стадии тест начинает участвовать в оптимизации по стадиям. "
-                "Логика накопительная: стадия 0 участвует только в S0; стадия 1 впервые "
-                "включается в S1 и затем остаётся в S2; стадия 2 участвует только в "
-                "финальной стадии. Нумерация начинается с 0: первая стадия = 0. "
+                "Стадия",
+                value=int(stage_default),
+                min_value=0,
+                step=1,
+                key=stage_key,
+                help=(
+                    "С какой стадии сценарий начинает участвовать в оптимизации по стадиям. "
+                    "Логика накопительная: стадия 0 участвует только в S0; стадия 1 впервые "
+                    "включается в S1 и затем остаётся в S2; стадия 2 участвует только в "
+                    "финальной стадии. Нумерация начинается с 0: первая стадия = 0. "
                 "Явно заданная стадия 1 не должна молча переписываться в 0."
             ),
         )
@@ -373,12 +693,13 @@ def render_heavy_suite_right_card_panel(
 
     def _render_timing_section() -> None:
         st.number_input("Шаг интегрирования, с", min_value=1e-5, step=0.001, format="%.6g", key=dt_key)
-        st.number_input("Длительность теста, с", min_value=0.01, step=0.1, format="%.6g", key=t_end_key)
+        st.number_input("Длительность сценария, с", min_value=0.01, step=0.1, format="%.6g", key=t_end_key)
 
     def _render_motion_section() -> None:
         st.markdown("##### Дорога и режим движения")
+        transport_mode = _resolve_suite_transport_mode(test_type)
 
-        if test_type == "worldroad":
+        if transport_mode == "worldroad":
             c1, c2 = st.columns([1, 1], gap="small")
             with c1:
                 st.number_input("Начальная скорость, м/с", min_value=0.0, step=0.5, key=vx0_key)
@@ -388,7 +709,7 @@ def render_heavy_suite_right_card_panel(
             st.checkbox(
                 "Авто: длительность = длина / скорость",
                 key=auto_t_end_key,
-                help="Если включено, длительность теста будет вычисляться автоматически по длине участка и начальной скорости с защитой от деления на ноль.",
+                help="Если включено, длительность сценария будет вычисляться автоматически по длине участка и начальной скорости с защитой от деления на ноль.",
             )
 
             current_speed = float(_safe_float(st.session_state.get(vx0_key, vx0_mps), vx0_mps))
@@ -399,7 +720,7 @@ def render_heavy_suite_right_card_panel(
             if auto_enabled:
                 auto_t_end = float(current_road_len) / max(float(current_speed), eps_v)
                 st.info(
-                    f"Длительность теста будет вычислена автоматически: **{auto_t_end:.6g} с** "
+                    f"Длительность сценария будет вычислена автоматически: **{auto_t_end:.6g} с** "
                     f"(вместо введённого значения {float(current_t_end):.6g} с)."
                 )
             else:
@@ -462,10 +783,18 @@ def render_heavy_suite_right_card_panel(
 
             nonlocal_road_surface = "flat" if spec_obj.get("type") == "flat" else json.dumps(spec_obj, ensure_ascii=False)
             st.session_state[suite_editor_widget_key_fn(sid, "derived_road_surface")] = nonlocal_road_surface
-        else:
+        elif transport_mode == "road_profile_csv":
+            st.text_input("Путь к CSV дороги", key=road_csv_key)
+            st.caption("Профиль дороги будет прочитан из CSV-файла для этого сценария.")
+            st.session_state[suite_editor_widget_key_fn(sid, "derived_road_surface")] = "flat"
+        elif transport_mode == "maneuver_csv":
             st.text_input("Путь к CSV дороги", key=road_csv_key)
             st.text_input("Путь к CSV манёвра (ax/ay)", key=axay_csv_key)
-            st.session_state[suite_editor_widget_key_fn(sid, "derived_road_surface")] = str(rec.get("road_surface", "flat") or "flat")
+            st.caption("Манёвр и, при необходимости, дорога будут прочитаны из CSV-файлов.")
+            st.session_state[suite_editor_widget_key_fn(sid, "derived_road_surface")] = "flat"
+        else:
+            st.caption("Для этого типа сценария отдельные файлы дороги и манёвра не используются.")
+            st.session_state[suite_editor_widget_key_fn(sid, "derived_road_surface")] = "flat"
 
         st.markdown("##### Манёвр (если применимо)")
         st.number_input("Продольное ускорение ax, м/с²", step=0.1, format="%.6g", key=ax_key)
@@ -541,12 +870,26 @@ def render_heavy_suite_right_card_panel(
     ay = float(_safe_float(st.session_state.get(ay_key, ay), ay))
     params_override = str(st.session_state.get(params_override_key, params_override) or "")
 
-    if test_type == "worldroad":
+    if _resolve_suite_transport_mode(test_type) == "worldroad":
         road_surface = str(st.session_state.get(suite_editor_widget_key_fn(sid, "derived_road_surface"), "flat") or "flat")
     else:
         road_surface = str(rec.get("road_surface", "flat") or "flat")
 
-    t_end_effective = float(road_len_m) / max(float(vx0_mps), 1e-6) if auto_t_end_from_len else float(t_end)
+    transport_fields = _normalize_suite_transport_fields(
+        test_type=test_type,
+        road_csv=road_csv,
+        axay_csv=axay_csv,
+        road_surface=road_surface,
+        road_len_m=road_len_m,
+        auto_t_end_from_len=auto_t_end_from_len,
+    )
+    t_end_effective = _resolve_suite_effective_t_end(
+        test_type=test_type,
+        t_end=t_end,
+        road_len_m=transport_fields["road_len_m"],
+        speed_mps=vx0_mps,
+        auto_t_end_from_len=transport_fields["auto_t_end_from_len"],
+    )
 
     try:
         from pneumo_solver_ui.opt_worker_v3_margins_energy import PENALTY_TARGET_SPECS
@@ -580,11 +923,11 @@ def render_heavy_suite_right_card_panel(
         _write_alias_value(df_suite_edit, idx, TYPE_KEYS, str(test_type))
         df_suite_edit.at[idx, "dt"] = float(dt)
         df_suite_edit.at[idx, "t_end"] = float(t_end_effective)
-        df_suite_edit.at[idx, "auto_t_end_from_len"] = bool(auto_t_end_from_len)
-        df_suite_edit.at[idx, "road_csv"] = str(road_csv)
-        df_suite_edit.at[idx, "axay_csv"] = str(axay_csv)
-        df_suite_edit.at[idx, "road_surface"] = str(road_surface)
-        df_suite_edit.at[idx, "road_len_m"] = float(road_len_m)
+        df_suite_edit.at[idx, "auto_t_end_from_len"] = bool(transport_fields["auto_t_end_from_len"])
+        df_suite_edit.at[idx, "road_csv"] = str(transport_fields["road_csv"])
+        df_suite_edit.at[idx, "axay_csv"] = str(transport_fields["axay_csv"])
+        df_suite_edit.at[idx, "road_surface"] = str(transport_fields["road_surface"])
+        df_suite_edit.at[idx, "road_len_m"] = float(transport_fields["road_len_m"])
         _write_alias_value(df_suite_edit, idx, SPEED_KEYS, float(vx0_mps))
         df_suite_edit.at[idx, "ax"] = float(ax)
         df_suite_edit.at[idx, "ay"] = float(ay)
@@ -602,5 +945,5 @@ def render_heavy_suite_right_card_panel(
         queue_suite_selected_id_fn(sid)
         ensure_stage_visible_in_filter_fn(stage)
         st.session_state["_ui_suite_autosave_pending"] = True
-        set_flash_fn("success", "Тест обновлён.")
+        set_flash_fn("success", "Сценарий обновлён.")
         st.rerun()

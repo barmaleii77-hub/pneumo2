@@ -23,6 +23,10 @@ def test_suite_card_shell_helper_keeps_clean_russian_copy() -> None:
     assert "CSV профиля дороги / маневра (опционально)" in text
     assert "Используется в сценариях с дорожным профилем из CSV" in text
     assert "Используется в сценариях с маневром из CSV" in text
+    assert "длительность сценария" in text
+    assert "в других сценариях" in text
+    assert "длительность теста" not in text
+    assert "в других тестах" not in text
     assert "render_app_suite_right_card_shell(" in text
     assert "render_heavy_suite_right_card_shell(" in text
     assert "Р С›РЎРѓР Р…Р С•Р Р†Р Р…Р С•Р Вµ" not in text

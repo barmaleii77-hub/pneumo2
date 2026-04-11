@@ -19,3 +19,17 @@ def test_line_losses_report_runs_as_module() -> None:
     assert proc.returncode == 0, proc.stderr or proc.stdout
     assert "# Line losses report" in proc.stdout
     assert "| edge | factor |" in proc.stdout
+
+
+def test_line_losses_report_runs_as_script() -> None:
+    script = ROOT / "pneumo_solver_ui" / "tools" / "line_losses_report.py"
+    proc = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    assert "# Line losses report" in proc.stdout
+    assert "| edge | factor |" in proc.stdout

@@ -1,0 +1,3 @@
+[log2sqlite] db=C:\Users\Admin\Documents\GitHub\pneumo2\pneumo2_R31CN_HF8_repo_root\pneumo_solver_ui\autotest_runs_probe\RUN_20260411_183144_autotest_quick\sqlite\metrics.sqlite
+[log2sqlite] events_total=11
+[log2sqlite] source harness: 11

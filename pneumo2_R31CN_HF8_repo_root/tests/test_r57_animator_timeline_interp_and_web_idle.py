@@ -112,41 +112,114 @@ def test_front_and_side_helper_views_now_accept_continuous_sample_t() -> None:
 
 def test_desktop_animator_world_progress_falls_back_to_xy_arclength_for_truthful_motion() -> None:
     assert 'key = "svc__world_progress_series"' in APP
+    assert 'key = "svc__body_longitudinal_progress_series"' in APP
     assert 'def _cumulative_path_length_series(x_series: Any, y_series: Any) -> np.ndarray:' in APP
     assert 'def _ensure_world_progress_series(b: DataBundle) -> np.ndarray:' in APP
+    assert 'def _ensure_body_longitudinal_progress_series(b: DataBundle) -> np.ndarray:' in APP
+    assert 'xw, yw = b.ensure_world_xy()' in APP
     assert 's_world_xy = _cumulative_path_length_series(' in APP
     assert 'monotonic_non_decreasing = bool(np.all(~np.isfinite(ds) | (ds >= -1e-9)))' in APP
+    assert 'vxb_arr, _ = b.ensure_body_velocity_xy()' in APP
+    assert 'vx_mid = 0.5 * (vx[:-1] + vx[1:])' in APP
+    assert 'ds = vx_mid * dt' in APP
     assert 's_progress_series = np.asarray(_ensure_world_progress_series(b), dtype=float)' in APP
+    assert 'spin_progress_series = np.asarray(_ensure_body_longitudinal_progress_series(b), dtype=float)' in APP
     assert 's_path = np.asarray(_ensure_world_progress_series(bundle), dtype=float).reshape(-1)' in APP
     assert 's_world = _ensure_world_progress_series(b)' in APP
     assert 'def _solver_signed_speed_along_road(' in APP
+    assert 'vx, vy = b.ensure_body_velocity_xy()' in APP
+    assert 'yaw_rate = b.ensure_yaw_rate_rad_s()' in APP
+    assert 'ax, ay = b.ensure_body_acceleration_xy()' in APP
+    assert 'vxb_arr, vyb_arr = b.ensure_body_velocity_xy()' in APP
+    assert 'body_vx = float("nan")' in APP
+    assert 'body_vy = float("nan")' in APP
+    assert 'body_vx = float(get_value("скорость_vx_м_с", 0.0))' in APP
+    assert 'body_vy = float(get_value("скорость_vy_м_с", 0.0))' in APP
+    assert 'solver_speed_mag = float(math.hypot(body_vx, body_vy))' in APP
     assert 'speed_mag = abs(ds / dt)' in APP
-    assert 'return float(math.copysign(speed_mag, vx))' in APP
+    assert 'return float(math.copysign(speed_mag, body_vx))' in APP
+    assert 'rolling_progress_m=spin_progress_m' in APP
+    assert 'path_progress_m=s_progress_m' not in APP
     assert 'speed_sign * math.hypot(float(x0), float(y0))' not in APP
     assert 'sample_i0, sample_i1, alpha, _status_sample_t = _sample_time_bracket(' in APP
     assert 'vx_status = _sample_series_local(vxw, i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in APP
     assert 'vy_status = _sample_series_local(vyw, i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in APP
+    assert 'vxb_status, vyb_status = b.ensure_body_velocity_xy()' in APP
+    assert 'vb_x = _sample_series_local(' in APP
+    assert 'vb_y = _sample_series_local(' in APP
     assert 'v = float(math.hypot(float(vx_status), float(vy_status)))' in APP
+    assert 'v = float(math.hypot(float(vb_x), float(vb_y)))' in APP
+    assert 'x_path_arr, y_path_arr = bundle.ensure_world_xy()' in APP
+    assert 'xw_arr, yw_arr = b.ensure_world_xy()' in APP
+    assert 'x0 = float(' in APP
+    assert 'y0 = float(' in APP
+    assert 'default=float(_g("путь_x_м", 0.0)),' in APP
+    assert 'default=float(_g("путь_y_м", 0.0)),' in APP
     assert "deriving world XY from скорость_vx_м_с + скорость_vy_м_с + yaw_рад as SERVICE/DERIVED." in DATA_BUNDLE
     assert "def _align_series_length(arr: Any, n: int, *, fill: float = 0.0) -> np.ndarray:" in DATA_BUNDLE
     assert "without cyclic wraparound" in DATA_BUNDLE
     assert "pad_value = float(vec[-1]) if np.isfinite(float(vec[-1])) else float(fill)" in DATA_BUNDLE
+    assert "def ensure_yaw_rate_rad_s(self) -> np.ndarray:" in DATA_BUNDLE
+    assert 'yaw_rate = _align_series_length(self.get("yaw_rate_рад_с", default=0.0), n, fill=0.0)' in DATA_BUNDLE
+    assert 'yaw = np.asarray(np.unwrap(np.asarray(yaw, dtype=float)), dtype=float)' in DATA_BUNDLE
+    assert 'yaw_rate = np.asarray(np.gradient(yaw, t, edge_order=1), dtype=float)' in DATA_BUNDLE
+    assert "1) derivative of world-frame velocity from ``ensure_world_velocity_xy()``;" in DATA_BUNDLE
+    assert 'vxw, vyw = self.ensure_world_velocity_xy()' in DATA_BUNDLE
+    assert 'axw = np.asarray(np.gradient(vxw, t, edge_order=1), dtype=float)' in DATA_BUNDLE
+    assert 'ayw = np.asarray(np.gradient(vyw, t, edge_order=1), dtype=float)' in DATA_BUNDLE
     assert 'yaw = _align_series_length(self.get("yaw_рад", default=0.0), int(len(vxw)), fill=0.0)' in DATA_BUNDLE
     assert 'yaw = _align_series_length(self.get("yaw_рад", default=0.0), n, fill=0.0)' in DATA_BUNDLE
     assert 'axb = _align_series_length(self.get("ускорение_продольное_ax_м_с2", default=0.0), n, fill=0.0)' in DATA_BUNDLE
     assert 'ayb = _align_series_length(self.get("ускорение_поперечное_ay_м_с2", default=0.0), n, fill=0.0)' in DATA_BUNDLE
     assert "2) trapezoidal integration of canonical body-speed magnitude" in DATA_BUNDLE
     assert "hypot(скорость_vx_м_с, скорость_vy_м_с)" in DATA_BUNDLE
+    assert "ds = np.where(np.isfinite(ds), np.maximum(ds, 0.0), 0.0)" in DATA_BUNDLE
     assert 'dx = vx * np.cos(yaw) - vy * np.sin(yaw)' in DATA_BUNDLE
     assert 'dy = vx * np.sin(yaw) + vy * np.cos(yaw)' in DATA_BUNDLE
     assert 'vxw = vx * np.cos(yaw) - vy * np.sin(yaw)' in DATA_BUNDLE
     assert 'vyw = vx * np.sin(yaw) + vy * np.cos(yaw)' in DATA_BUNDLE
     assert 'v = np.asarray(np.hypot(vx, vy), dtype=float)' in DATA_BUNDLE
+    assert "v = np.where(np.isfinite(v), np.maximum(v, 0.0), 0.0)" in DATA_BUNDLE
     assert 'v = np.asarray(vx, dtype=float)' not in DATA_BUNDLE
     assert 'np.resize(vx, n)' not in DATA_BUNDLE
     assert 'np.resize(vy, n)' not in DATA_BUNDLE
     assert 'np.resize(yaw, n)' not in DATA_BUNDLE
     assert "deriving world XY from скорость_vx_м_с + yaw_рад as SERVICE/DERIVED." not in DATA_BUNDLE
+
+
+def test_desktop_animator_hud_lookahead_uses_sampled_body_speed_truth() -> None:
+    assert 'vxb_series, vyb_series = b.ensure_body_velocity_xy()' in APP
+    assert 'v_mps = math.hypot(sample(vxb_series, 0.0), sample(vyb_series, 0.0))' in APP
+    assert 'v_forward_signed_m_s = float(sample(vxb_series, 0.0))' in APP
+    assert 'self._lookahead_m = float(_clamp(20.0 + v_mps * 4.0, 40.0, 140.0))' in APP
+    assert 'self._history_m = float(_clamp(8.0 + v_mps * 1.5, 15.0, 60.0))' in APP
+    assert 'def _hud_motion_window_extents(self, *, signed_body_forward_m_s: float) -> tuple[float, float]:' in APP
+    assert 'if np.isfinite(float(signed_body_forward_m_s)) and float(signed_body_forward_m_s) < -1e-6:' in APP
+    assert 'hud_rear_m, hud_forward_m = self._hud_motion_window_extents(' in APP
+    assert 'signed_body_forward_m_s=v_forward_signed_m_s,' in APP
+    assert 'mask = (yl >= -float(hud_rear_m)) & (yl <= float(hud_forward_m))' in APP
+    assert 'top_y = float(hud_forward_m) - 4.5' in APP
+    assert 'scene_rect = QtCore.QRectF(-8.0, -float(hud_rear_m) - 4.0, 16.0, float(hud_forward_m + hud_rear_m) + 8.0)' in APP
+    assert 'vx0 = sample(vx_series, 0.0)' not in APP
+    assert 'def _sampled_road_preview_window_m(' in APP
+    assert 'signed_speed_m_s: float,' in APP
+    assert 'return float(-lookahead_m), float(history_m)' in APP
+    assert 'preview_back_m, preview_fwd_m = self._sampled_road_preview_window_m(' in APP
+    assert 'signed_speed_m_s=float(speed_along_road),' in APP
+
+
+def test_desktop_animator_subframe_yaw_uses_shortest_arc_sampling() -> None:
+    assert 'def _sample_angle_series_local(' in APP
+    assert 'delta = math.atan2(math.sin(a1 - a0), math.cos(a1 - a0))' in APP
+    assert 'yaw = _sample_angle_series_local(' in APP
+    assert 'yaw_series,' in APP
+    assert 'yaw0 = _sample_angle_series_local(' in APP
+    assert 'b.get("yaw_рад", 0.0),' in APP
+    assert 'summary["yaw"],' in APP
+    assert 'yaw_display = math.atan2(math.sin(yaw), math.cos(yaw))' in APP
+    assert 'yaw = sample(yaw_series, 0.0)' not in APP
+    assert 'yaw0 = _g("yaw_рад", 0.0)' not in APP
+    assert 'yaw = sample(summary["yaw"], 0.0)' not in APP
 
 
 def test_playback_service_interval_is_tightened_for_high_speed_without_restoring_busy_loop() -> None:

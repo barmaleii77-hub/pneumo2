@@ -1,0 +1,11 @@
+{
+  "generated_at": "20260411_183839",
+  "model": "model_pneumo_v8_energy_audit_vacuum_patched_smooth_all",
+  "params": "default_base.json",
+  "suite": "default_suite.json",
+  "t_end_cap": 1.2,
+  "dt_min": 0.003,
+  "rel_th": 0.25,
+  "pdv_th": 0.005,
+  "rows": []
+}

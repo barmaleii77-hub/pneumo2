@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-04-11T18:31:57",
+  "tool_version": "R39",
+  "events_total": 11,
+  "events_by_source": [
+    {
+      "source": "harness",
+      "count": 11
+    }
+  ],
+  "top_events": [
+    {
+      "event": "step",
+      "count": 9
+    },
+    {
+      "event": "env_override",
+      "count": 1
+    },
+    {
+      "event": "start",
+      "count": 1
+    }
+  ],
+  "error_like": [],
+  "spans_slowest": [],
+  "first_ts": "2026-04-11T18:31:44",
+  "last_ts": "2026-04-11T18:31:56",
+  "imports": [],
+  "errors": []
+}

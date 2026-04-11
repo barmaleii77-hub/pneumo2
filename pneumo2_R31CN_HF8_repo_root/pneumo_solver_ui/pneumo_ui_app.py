@@ -2540,12 +2540,13 @@ with st.sidebar:
             st.session_state["use_staged_opt"] = bool(opt_use_staged)
 
             opt_autoupdate_baseline = st.checkbox(
-                "Авто‑обновлять baseline_best.json",
+                "Авто‑обновлять лучший опорный прогон",
                 value=bool(st.session_state.get("opt_autoupdate_baseline", True)),
                 key="opt_autoupdate_baseline",
                 help=(
-                    "Если найден кандидат лучше текущего опорного прогона, StageRunner запишет его в "
-                    "workspace/baselines/baseline_best.json. Этот файл можно использовать как новый старт."
+                    "Если найден кандидат лучше текущего опорного прогона, StageRunner сохранит его "
+                    "как новый стартовый файл в workspace/baselines/baseline_best.json. "
+                    "Этот файл можно использовать как следующую стартовую точку."
                 ),
             )
             st.session_state["autoupdate_baseline"] = bool(opt_autoupdate_baseline)
@@ -4307,11 +4308,11 @@ else:
     st.info("В базе нет строковых режимов (string).")
 
 # -------------------------------
-# Тест-набор и пороги (редактируется из UI)
+# Набор сценариев и ограничения (редактируется из UI)
 # -------------------------------
-st.subheader("Тест-набор и пороги")
+st.subheader("Набор сценариев и ограничения")
 st.caption(
-    "Здесь задаются параметры тестов и целевые запасы/ограничения. "
+    "Здесь задаются параметры сценариев и целевые запасы/ограничения. "
     "Редактирование — только в UI (файлы вручную править не нужно)."
 )
 
@@ -4531,7 +4532,11 @@ else:
 # upload suite из файла
 colSU1, colSU2 = st.columns([1.2, 1.0], gap="large")
 with colSU1:
-    suite_upload = st.file_uploader("Загрузить тест-набор (JSON)", type=["json"], help="Можно загрузить ранее сохранённый suite.json")
+    suite_upload = st.file_uploader(
+        "Загрузить набор сценариев (JSON)",
+        type=["json"],
+        help="Можно загрузить ранее сохранённый файл suite.json с набором сценариев.",
+    )
     if suite_upload is not None:
         try:
             suite_loaded = json.loads(suite_upload.read().decode("utf-8"))
@@ -4542,14 +4547,14 @@ with colSU1:
                 )
                 st.session_state["df_suite_edit"] = _loaded_df
                 st.session_state["ui_suite_selected_id"] = first_suite_selected_id(_loaded_df)
-                st.success("Тест-набор загружен.")
+                st.success("Набор сценариев загружен.")
                 try:
                     from pneumo_solver_ui.ui_persistence import autosave_now
                     autosave_now(st)
                 except Exception:
                     pass
             else:
-                st.error("suite.json должен быть списком объектов (list[dict]).")
+                st.error("Файл JSON должен содержать список сценариев.")
         except Exception as e:
             st.error(f"Не удалось прочитать JSON: {e}")
 
@@ -4569,7 +4574,7 @@ with colSU2:
         pass
 
     suite_bytes = json.dumps(df_suite_export.to_dict(orient="records"), ensure_ascii=False, indent=2).encode("utf-8")
-    st.download_button("Скачать тест-набор (JSON)", data=suite_bytes, file_name="suite.json", mime="application/json")
+    st.download_button("Скачать набор сценариев (JSON)", data=suite_bytes, file_name="suite.json", mime="application/json")
 
 
 # --- Новый редактор тест-набора: список + карточка (без горизонтального скролла) ---
@@ -4901,9 +4906,9 @@ def _suite_add_preset_callback(preset: str) -> None:
         st.session_state["ui_suite_only_enabled"] = False
         _ensure_stage_visible_in_filter(row_new.get("стадия", 0))
         st.session_state["_ui_suite_autosave_pending"] = True
-        _suite_set_flash("success", "Тест-шаблон добавлен в набор.")
+        _suite_set_flash("success", "Шаблон сценария добавлен в набор.")
     except Exception as exc:
-        _suite_set_flash("error", f"Не удалось добавить тест-шаблон: {exc}")
+        _suite_set_flash("error", f"Не удалось добавить шаблон сценария: {exc}")
 
 
 def _suite_set_enabled_visible_callback(enabled: bool) -> None:
@@ -4918,9 +4923,9 @@ def _suite_set_enabled_visible_callback(enabled: bool) -> None:
         df.loc[df["id"].astype(str).isin(row_ids), "включен"] = bool(enabled)
         st.session_state["df_suite_edit"] = ensure_suite_columns(df, context="pneumo_ui_app.toggle_visible_callback.final")
         st.session_state["_ui_suite_autosave_pending"] = True
-        _suite_set_flash("success", "Видимые тесты обновлены.")
+        _suite_set_flash("success", "Видимые сценарии обновлены.")
     except Exception as exc:
-        _suite_set_flash("error", f"Не удалось обновить видимые тесты: {exc}")
+        _suite_set_flash("error", f"Не удалось обновить видимые сценарии: {exc}")
 
 
 def _suite_duplicate_selected_callback() -> None:
@@ -4938,16 +4943,16 @@ def _suite_duplicate_selected_callback() -> None:
         src_idx = int(matches[0])
         row = df.loc[src_idx].to_dict()
         row["id"] = str(uuid.uuid4())
-        row["имя"] = f"{row.get('имя', 'Тест')} (копия)"
+        row["имя"] = f"{row.get('имя', 'Сценарий')} (копия)"
         df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
         df = ensure_suite_columns(df, context="pneumo_ui_app.duplicate_selected_callback.final")
         st.session_state["df_suite_edit"] = df
         _queue_suite_selected_id(str(row["id"]))
         _ensure_stage_visible_in_filter(row.get("стадия", 0))
         st.session_state["_ui_suite_autosave_pending"] = True
-        _suite_set_flash("success", "Выбранный тест продублирован.")
+        _suite_set_flash("success", "Выбранный сценарий продублирован.")
     except Exception as exc:
-        _suite_set_flash("error", f"Не удалось продублировать тест: {exc}")
+        _suite_set_flash("error", f"Не удалось продублировать сценарий: {exc}")
 
 
 def _suite_delete_selected_callback() -> None:
@@ -4977,9 +4982,9 @@ def _suite_delete_selected_callback() -> None:
         except Exception:
             _queue_suite_selected_id(first_suite_selected_id(df))
         st.session_state["_ui_suite_autosave_pending"] = True
-        _suite_set_flash("success", "Выбранный тест удалён из набора.")
+        _suite_set_flash("success", "Выбранный сценарий удалён из набора.")
     except Exception as exc:
-        _suite_set_flash("error", f"Не удалось удалить тест: {exc}")
+        _suite_set_flash("error", f"Не удалось удалить сценарий: {exc}")
 
 
 def _suite_editor_widget_key(sid: str, field: str) -> str:
@@ -5198,30 +5203,30 @@ for i, row in df_suite_edit.iterrows():
 
     if enabled:
         if not name:
-            suite_errors.append(f"Строка {i+1}: пустое имя теста")
+            suite_errors.append(f"Строка {i+1}: пустое имя сценария")
         if typ not in ALLOWED_TEST_TYPES:
-            suite_errors.append(f"Тест '{name or i+1}': неизвестный тип '{typ}'")
+            suite_errors.append(f"Сценарий '{name or i+1}': неизвестный тип '{typ}'")
         try:
             dt_i = float(rec.get("dt"))
             if dt_i <= 0:
-                suite_errors.append(f"Тест '{name}': dt должен быть > 0")
+                suite_errors.append(f"Сценарий '{name}': dt должен быть > 0")
         except Exception:
-            suite_errors.append(f"Тест '{name}': dt не задан")
+            suite_errors.append(f"Сценарий '{name}': dt не задан")
         try:
             t_end_i = float(rec.get("t_end"))
             if t_end_i <= 0:
-                suite_errors.append(f"Тест '{name}': t_end должен быть > 0")
+                suite_errors.append(f"Сценарий '{name}': t_end должен быть > 0")
         except Exception:
-            suite_errors.append(f"Тест '{name}': t_end не задан")
+            suite_errors.append(f"Сценарий '{name}': t_end не задан")
 
         # физика: доля отрыва 0..1
         if rec.get("target_макс_доля_отрыва") is not None:
             try:
                 frac = float(rec["target_макс_доля_отрыва"])
                 if not (0.0 <= frac <= 1.0):
-                    suite_errors.append(f"Тест '{name}': target_макс_доля_отрыва должна быть 0..1")
+                    suite_errors.append(f"Сценарий '{name}': target_макс_доля_отрыва должна быть 0..1")
             except Exception:
-                suite_errors.append(f"Тест '{name}': target_макс_доля_отрыва некорректна")
+                suite_errors.append(f"Сценарий '{name}': target_макс_доля_отрыва некорректна")
 
         # JSON sanity: road_surface / params_override (если похоже на JSON — проверяем)
         for _fld in ("road_surface", "params_override"):
@@ -5232,7 +5237,7 @@ for i, row in df_suite_edit.iterrows():
                     try:
                         json.loads(_s)
                     except Exception as _e_json:
-                        suite_errors.append(f"Тест '{name}': поле '{_fld}' содержит некорректный JSON: {_e_json}")
+                        suite_errors.append(f"Сценарий '{name}': поле '{_fld}' содержит некорректный JSON: {_e_json}")
 
         # sidecar sanity: CSV-файлы должны существовать (чтобы не было «тихих» нулей)
         if typ in ("road_profile_csv", "maneuver_csv", "csv", "worldroad"):
@@ -5241,16 +5246,16 @@ for i, row in df_suite_edit.iterrows():
                 if not _p:
                     # road_csv обязателен для road_profile_csv
                     if (_csv_fld == "road_csv") and (typ in ("road_profile_csv", "worldroad")):
-                        suite_errors.append(f"Тест '{name}': не задан road_csv")
+                        suite_errors.append(f"Сценарий '{name}': не задан road_csv")
                     continue
                 try:
                     _pp = Path(str(_p))
                     if not _pp.is_absolute():
                         _pp = (ROOT_DIR / _pp).resolve()
                     if not _pp.exists():
-                        suite_errors.append(f"Тест '{name}': файл '{_csv_fld}' не найден: {str(_p)}")
+                        suite_errors.append(f"Сценарий '{name}': файл '{_csv_fld}' не найден: {str(_p)}")
                 except Exception as _e_p:
-                    suite_errors.append(f"Тест '{name}': не удалось проверить '{_csv_fld}': {_e_p}")
+                    suite_errors.append(f"Сценарий '{name}': не удалось проверить '{_csv_fld}': {_e_p}")
 
     suite_override.append(rec)
 
@@ -5269,19 +5274,19 @@ try:
             continue
     _dups = sorted([n for n, c in _name_counts.items() if c > 1])
     if _dups:
-        suite_errors.append("Дубли имён тестов (включенных): " + ", ".join(_dups))
+        suite_errors.append("Дубли имён включённых сценариев: " + ", ".join(_dups))
 except Exception:
     pass
 
 if suite_errors:
-    st.error("В тест-наборе есть ошибки (исправьте перед запуском):\n- " + "\n- ".join(suite_errors))
+    st.error("В наборе сценариев есть ошибки (исправьте перед запуском):\n- " + "\n- ".join(suite_errors))
 
 
 # -------------------------------
 # Одиночные тесты
 # -------------------------------
 with colB:
-    st.subheader("Опорный прогон тестов")
+    st.subheader("Опорный прогон сценариев")
     st.caption("Проверка адекватности модели на текущих параметрах.")
 
     tests_cfg = {"suite": suite_override}
@@ -5290,7 +5295,7 @@ with colB:
         try:
             tests = worker_mod.build_test_suite(tests_cfg)
         except Exception as e:
-            st.error(f"Не удалось собрать тест‑набор: {e}")
+            st.error(f"Не удалось собрать набор сценариев: {e}")
             tests = []
 
     # --- persistent baseline cache (auto-load after refresh / new session) ---
@@ -5327,20 +5332,32 @@ with colB:
             except Exception:
                 pass
 
-            with truth_slot:
-                c1, c2, c3, c4 = st.columns([1.25, 1.15, 1.05, 1.05])
-                with c1:
-                    st.markdown(f"**Release:** `{APP_RELEASE}`  \n**Model:** `{getattr(model_path, 'name', str(model_path))}`")
-                    st.caption(_baseline_summary)
-                with c2:
-                    st.markdown(f"**base_hash:** `{_base_hash_preview}`  \n**suite_hash:** `{_suite_hash_preview}`")
-                    st.caption(f"cache_dir: `{_cache_dir_preview.name}`")
-                with c3:
-                    st.markdown("**autoselfcheck:** ✅ OK" if _self_ok else "**autoselfcheck:** ❌ FAIL")
-                    if not _self_ok:
-                        st.caption("Оптимизация и экспорт будут заблокированы по умолчанию.")
-                with c4:
-                    st.markdown(f"**stabilizer:** {'ON' if _stab_on else 'OFF'}")
+                with truth_slot:
+                    c1, c2, c3, c4 = st.columns([1.25, 1.15, 1.05, 1.05])
+                    with c1:
+                        st.markdown(
+                            f"**Версия интерфейса:** `{APP_RELEASE}`  \n"
+                            f"**Файл модели:** `{getattr(model_path, 'name', str(model_path))}`"
+                        )
+                        st.caption(_baseline_summary)
+                    with c2:
+                        st.markdown(
+                            f"**Контрольная сумма параметров:** `{_base_hash_preview}`  \n"
+                            f"**Контрольная сумма набора сценариев:** `{_suite_hash_preview}`"
+                        )
+                        st.caption(f"Папка сохранённого кэша: `{_cache_dir_preview.name}`")
+                    with c3:
+                        st.markdown(
+                            "**Самопроверка интерфейса:** ✅ OK"
+                            if _self_ok
+                            else "**Самопроверка интерфейса:** ❌ FAIL"
+                        )
+                        if not _self_ok:
+                            st.caption("Оптимизация и экспорт будут заблокированы по умолчанию.")
+                    with c4:
+                        st.markdown(
+                            f"**Стабилизатор интерфейса:** {'включён' if _stab_on else 'выключен'}"
+                        )
         except Exception:
             pass
 
@@ -5352,12 +5369,12 @@ with colB:
                 st.session_state.baseline_param_hash = _base_hash_preview
                 # детальные прогоны не грузим целиком — будут подхвачены по запросу
                 log_event("baseline_loaded_cache", cache_dir=str(_cache_dir_preview))
-                st.info(f"Опорный прогон загружен из кэша: {_cache_dir_preview.name}")
+                st.info(f"Опорный прогон восстановлен из сохранённого кэша: {_cache_dir_preview.name}")
     except Exception:
         pass
 
     test_names = [x[0] for x in tests]
-    pick = st.selectbox("Тест", options=["(все)"] + test_names, index=0)
+    pick = st.selectbox("Сценарий", options=["(все)"] + test_names, index=0)
 
     _disable_baseline = bool(suite_errors) or bool(param_errors) or (len(tests) == 0)
     if st.button("Запустить опорный прогон", disabled=_disable_baseline):
@@ -5490,7 +5507,7 @@ if st.session_state.get("baseline_df") is not None:
 
             cM1, cM2, cM3, cM4 = st.columns(4)
             with cM1:
-                st.metric("Опорный прогон: тестов", _n_total)
+                st.metric("Опорный прогон: сценариев", _n_total)
             with cM2:
                 st.metric("Прошло", _n_pass if _n_pass is not None else "—")
             with cM3:
@@ -5507,9 +5524,9 @@ if st.session_state.get("baseline_df") is not None:
                 _ov_c1, _ov_c2 = st.columns([1, 1])
                 with _ov_c1:
                     _show_overview_plot = st.checkbox(
-                        "Показывать график худших тестов",
+                        "Показывать график худших сценариев",
                         value=False,
-                        help="Строит Plotly‑график по худшим тестам (может быть тяжело на больших наборах).",
+                        help="Строит Plotly‑график по худшим сценариям (может быть тяжело на больших наборах).",
                         key="gate_baseline_overview_plot",
                     )
                     _show_full_table = st.checkbox(
@@ -5529,11 +5546,11 @@ if st.session_state.get("baseline_df") is not None:
                     _show_penalty_table = st.checkbox(
                         "Показывать таблицу штрафов (pen_*)",
                         value=False,
-                        help="Показывает таблицу pen_* по тестам (удобно для экспорта/проверок).",
+                        help="Показывает таблицу pen_* по сценариям (удобно для экспорта и проверок).",
                         key="gate_baseline_overview_table_pen",
                     )
 
-                # Худшие тесты по суммарному штрафу (дешево)
+                # Худшие сценарии по суммарному штрафу (дешево)
                 _bdf2 = _bdf.copy()
                 if "penalty" not in _bdf2.columns:
                     _bdf2["penalty"] = 0.0
@@ -5542,7 +5559,7 @@ if st.session_state.get("baseline_df") is not None:
 
                 _worst = _bdf2.head(10)
                 _pairs = [(str(r.get("test_id", "?")), float(r.get("penalty", 0.0))) for _, r in _worst.iterrows()]
-                st.write("Худшие тесты по суммарному штрафу:", ", ".join([f"{tid} ({pen:.3g})" for tid, pen in _pairs]))
+                st.write("Худшие сценарии по суммарному штрафу:", ", ".join([f"{tid} ({pen:.3g})" for tid, pen in _pairs]))
 
                 def _render_cached_plotly(_key: str, _build_fn):
                     _fig_json = _UI_HEAVY_CACHE.get_json(_key)
@@ -5560,7 +5577,7 @@ if st.session_state.get("baseline_df") is not None:
                     except Exception:
                         return _build_fn()
 
-                # 1) График худших тестов
+                # 1) График худших сценариев
                 if _show_overview_plot:
                     if not _HAS_PLOTLY:
                         st.warning("Plotly недоступен: график не построен.")
@@ -5582,8 +5599,8 @@ if st.session_state.get("baseline_df") is not None:
                                 )
                             )
                             _fig.update_layout(
-                                title="Худшие тесты (суммарный штраф)",
-                                xaxis_title="Тест",
+                                title="Худшие сценарии (суммарный штраф)",
+                                xaxis_title="Сценарий",
                                 yaxis_title="Штраф (безразм.)",
                                 height=340,
                                 margin=dict(l=20, r=20, t=60, b=40),
@@ -5612,7 +5629,7 @@ if st.session_state.get("baseline_df") is not None:
                                     aspect="auto",
                                     color_continuous_scale="RdBu",
                                     origin="lower",
-                                    labels=dict(x="Тест", y="Критерий", color="Штраф"),
+                                    labels=dict(x="Сценарий", y="Критерий", color="Штраф"),
                                     title="Теплокарта штрафов (pen_*)",
                                 )
                                 _fig.update_layout(height=420, margin=dict(l=20, r=20, t=70, b=40))
@@ -5643,7 +5660,7 @@ if st.session_state.get("baseline_df") is not None:
 st.divider()
 st.header("Графики и анимация (опорный прогон)")
 st.caption(
-    "Сначала запустите опорный прогон. Затем выберите один тест и получите полный лог (record_full=True): "
+    "Сначала запустите опорный прогон. Затем выберите один сценарий и получите полный лог (record_full=True): "
     "графики P/Q/крен/тангаж/силы и MVP-анимацию потоков."
 )
 
@@ -5682,11 +5699,11 @@ else:
     
     avail = [t for t in tests_map.keys()]
     if not avail:
-        st.info("В таблице опорного прогона нет доступных тестов (проверьте тест‑набор).")
+        st.info("В таблице опорного прогона нет доступных сценариев (проверьте набор сценариев).")
     else:
         colG1, colG2 = st.columns([1.35, 0.65], gap="large")
         with colG1:
-            test_pick = st.selectbox("Тест для детального прогона", options=avail, index=0, key="detail_test_pick")
+            test_pick = st.selectbox("Сценарий для детального прогона", options=avail, index=0, key="detail_test_pick")
 
         # Расширенные настройки — прячем, чтобы главный экран не захламлять
         with colG2:
@@ -5706,7 +5723,7 @@ else:
                     key="detail_want_full",
                 )
                 auto_detail_on_select = st.checkbox(
-                    "Авто-расчёт при выборе теста",
+                    "Авто-расчёт при выборе сценария",
                     value=bool(st.session_state.get("auto_detail_on_select", True)),
                     key="auto_detail_on_select",
                     help="Если включено и кэш пуст, будет считаться детальный прогон (может грузить CPU).",
@@ -5717,24 +5734,24 @@ else:
                     "Авто-экспорт NPZ (osc_dir)",
                     value=bool(st.session_state.get("auto_export_npz", True)),
                     key="auto_export_npz",
-                    help="Экспортирует Txx_osc.npz в папку osc_dir (см. Калибровка). Нужно для oneclick/autopilot.",
+                    help="Экспортирует Txx_osc.npz в папку osc_dir (см. раздел калибровки). Нужно для запуска oneclick/autopilot.",
                 )
 
-                st.caption('Desktop Animator (follow)')
+                st.caption('Desktop Animator (по последней выгрузке anim_latest)')
                 st.checkbox(
-                    'Авто-экспорт anim_latest (Desktop Animator)',
+                    'Авто-экспорт последней анимационной выгрузки (anim_latest)',
                     value=bool(st.session_state.get('auto_export_anim_latest', True)),
                     key='auto_export_anim_latest',
                     help=(
-                        'После детального прогона сохраняет workspace/exports/anim_latest.npz и anim_latest.json (pointer). '
-                        'Desktop Animator в follow-режиме подхватит автоматически.'
+                        'После детального прогона сохраняет workspace/exports/anim_latest.npz '
+                        'и anim_latest.json (pointer). Desktop Animator подхватит их автоматически.'
                     ),
                 )
                 st.checkbox(
                     'Авто-запуск Desktop Animator при экспорте',
                     value=bool(st.session_state.get('auto_launch_animator', False)),
                     key='auto_launch_animator',
-                    help='Если среда позволяет запуск GUI: откроет Desktop Animator (follow) сразу после экспорта.',
+                    help='Если среда позволяет запуск GUI: откроет Desktop Animator сразу после экспорта.',
                 )
                 st.caption(f'Папка exports: {WORKSPACE_EXPORTS_DIR}')
 
@@ -5783,9 +5800,9 @@ else:
 
         colDAll1, colDAll2 = st.columns([1.0, 1.0])
         with colDAll1:
-            run_detail_all = st.button("Рассчитать полный лог ДЛЯ ВСЕХ тестов", key="run_detail_all", disabled=_detail_in_progress)
+            run_detail_all = st.button("Рассчитать полный лог ДЛЯ ВСЕХ сценариев", key="run_detail_all", disabled=_detail_in_progress)
         with colDAll2:
-            export_npz_all = st.button("Экспорт NPZ ДЛЯ ВСЕХ (из кэша)", key="export_npz_all", disabled=_detail_in_progress)
+            export_npz_all = st.button("Экспорт NPZ ДЛЯ ВСЕХ сценариев (из кэша)", key="export_npz_all", disabled=_detail_in_progress)
 
             cache_key = make_detail_cache_key(cur_hash, test_pick, detail_dt, detail_t_end, max_points, want_full)
 
@@ -5820,13 +5837,13 @@ else:
             log_event("auto_detail_pending_after_baseline", test=test_pick, cache_key=cache_key, force_fresh=True)
 
         # Массовые действия
-        # - полный лог для всех тестов
-        # - экспорт NPZ для всех тестов
+        # - полный лог для всех сценариев
+        # - экспорт NPZ для всех сценариев
         if run_detail_all:
             if not want_full:
                 st.warning("Для массового расчёта включи record_full (потоки/состояния) — иначе NPZ будет неполный.")
             else:
-                with st.spinner("Считаю полный лог для всех тестов… (может быть долго)"):
+                with st.spinner("Считаю полный лог для всех сценариев… (может быть долго)"):
                     prog = st.progress(0.0)
                     n_total = max(1, len(avail))
 
@@ -5913,7 +5930,7 @@ else:
                                 except Exception as _e:
                                     st.warning(f"NPZ экспорт не удался для {tn}: {_e}")
                         except Exception as e:
-                            st.error(f"Ошибка в тесте {tn}: {e}")
+                            st.error(f"Ошибка в сценарии {tn}: {e}")
                         prog.progress(j / n_total)
                     prog.empty()
                 log_event("detail_all_done", n_tests=len(avail), want_full=bool(want_full), max_points=int(max_points))
@@ -5922,7 +5939,7 @@ else:
             if not want_full:
                 st.warning("Экспорт NPZ имеет смысл только при record_full=True (иначе нет p/q/open).")
             else:
-                with st.spinner("Экспортирую NPZ для всех тестов, которые уже посчитаны…"):
+                with st.spinner("Экспортирую NPZ для всех сценариев, которые уже посчитаны…"):
                     prog = st.progress(0.0)
                     n_total = max(1, len(avail))
 
@@ -5984,7 +6001,10 @@ else:
                 _cache_dir = Path(_bcd) if _bcd else None
                 _force_fresh_after_baseline = should_bypass_detail_disk_cache(st.session_state, cache_key=str(cache_key))
                 if _force_fresh_after_baseline:
-                    st.info("После свежего baseline выполняется принудительный пересчёт детального лога: старый detail cache для этого теста игнорируется.")
+                    st.info(
+                        "После свежего опорного прогона выполняется принудительный пересчёт детального лога: "
+                        "старый сохранённый детальный лог для этого сценария игнорируется."
+                    )
                     log_event("detail_cache_bypassed_after_baseline", test=str(test_pick), cache_key=str(cache_key))
                 if (not _force_fresh_after_baseline) and _cache_dir and _cache_dir.exists() and cache_key not in st.session_state.baseline_full_cache:
                     _det_disk = load_detail_cache(_cache_dir, test_pick, float(detail_dt), float(detail_t_end), int(max_points), bool(want_full))
@@ -6025,7 +6045,7 @@ else:
                                 )
                             ),
                         )
-                        st.info("Детальный лог для текущего теста загружен из кэша. Для принудительного пересчёта нажмите 'Рассчитать полный лог и показать'.")
+                        st.info("Детальный лог для текущего сценария загружен из кэша. Для принудительного пересчёта нажмите 'Рассчитать полный лог и показать'.")
             except Exception:
                 pass
 
@@ -6108,7 +6128,7 @@ else:
                     _dg["suppressed"] = int(_dg.get("suppressed") or 0) + 1
                     st.session_state["detail_guard"] = _dg
                     st.warning(
-                        "Подавлен повторный автозапуск детального прогона для текущего теста: обнаружен rerun-loop. "
+                        "Подавлен повторный автозапуск детального прогона для текущего сценария: обнаружен rerun-loop. "
                         "Проверь: (1) отключена ли «Синхронизация playhead с сервером»; (2) не включён ли Play в fallback; "
                         "(3) нет ли автоперерисовки/обновления. Для принудительного пересчёта нажми кнопку «Пересчитать полный лог»."
                     )
@@ -6145,7 +6165,7 @@ else:
                                 dt_j = info.get("dt", dt_j)
                                 t_end_j = info.get("t_end", t_end_j)
                         if test_j is None:
-                            raise RuntimeError(f"Не найден тест '{test_pick}' в suite")
+                            raise RuntimeError(f"Не найден сценарий '{test_pick}' в наборе")
                         # fallback: allow dt/t_end embedded in test dict
                         if dt_j is None and isinstance(test_j, dict):
                             dt_j = test_j.get("dt", None)
@@ -6342,7 +6362,7 @@ else:
                                 if bool(st.session_state.get('auto_launch_animator', False)):
                                     launch_desktop_animator_follow(ptr_latest)
                         except Exception as _e_animexp:
-                            st.warning(f'Авто-экспорт anim_latest не удался: {_e_animexp}')
+                            st.warning(f'Авто-экспорт последней анимационной выгрузки не удался: {_e_animexp}')
                             log_event('anim_latest_export_error', err=str(_e_animexp), test=str(test_pick))
                         _dg_ok = dict(st.session_state.get("detail_guard") or {})
                         _dg_ok["failed_key"] = None
@@ -6537,16 +6557,16 @@ else:
                 # -----------------------------------
                 # Desktop Animator integration (follow-mode)
                 # -----------------------------------
-                with st.expander('🖥 Desktop Animator (внешнее окно, follow anim_latest)', expanded=False):
+                with st.expander('🖥 Desktop Animator (внешнее окно, по выгрузке anim_latest)', expanded=False):
                     npz_path, ptr_path = local_anim_latest_export_paths_global(
                         WORKSPACE_EXPORTS_DIR,
                         ensure_exists=False,
                     )
-                    st.caption('Animator читает последнюю выгрузку из workspace/exports (anim_latest.*).')
+                    st.caption('Desktop Animator читает последнюю выгрузку из папки workspace/exports (файлы anim_latest.*).')
                     st.code(str(ptr_path))
                     cols_da = st.columns([1, 1, 1])
                     with cols_da[0]:
-                        if st.button('Экспортировать anim_latest сейчас', key=f'anim_latest_export_now_{cache_key}'):
+                        if st.button('Экспортировать последнюю выгрузку (anim_latest)', key=f'anim_latest_export_now_{cache_key}'):
                             try:
                                 if not (_HAS_NPZ_BUNDLE and export_anim_latest_bundle is not None):
                                     raise RuntimeError('npz_bundle недоступен (проверьте pneumo_solver_ui/npz_bundle.py)')
@@ -6613,16 +6633,16 @@ else:
                                 except Exception:
                                     pass
                             except Exception as e:
-                                st.error(f'Экспорт anim_latest не удался: {e}')
+                                st.error(f'Не удалось экспортировать последнюю анимационную выгрузку: {e}')
                                 log_event('anim_latest_export_error_manual', err=str(e), test=str(test_pick))
                     with cols_da[1]:
-                        no_gl = st.checkbox('no-gl (compat)', value=False, key=f'anim_latest_no_gl_{cache_key}')
-                        if st.button('Запустить Animator (follow)', key=f'anim_latest_launch_{cache_key}'):
+                        no_gl = st.checkbox('Без OpenGL (режим совместимости)', value=False, key=f'anim_latest_no_gl_{cache_key}')
+                        if st.button('Запустить Desktop Animator', key=f'anim_latest_launch_{cache_key}'):
                             ok = launch_desktop_animator_follow(ptr_path, no_gl=bool(no_gl))
                             if ok:
-                                st.success('Animator запущен (если система позволяет GUI).')
+                                st.success('Desktop Animator запущен (если система позволяет GUI).')
                             else:
-                                st.warning('Не удалось запустить Animator (см. логи).')
+                                st.warning('Не удалось запустить Desktop Animator (см. логи).')
                         if st.button('Запустить Mnemo (follow)', key=f'anim_latest_launch_mnemo_{cache_key}'):
                             ok = launch_desktop_mnemo_follow(ptr_path)
                             if ok:
@@ -6832,12 +6852,18 @@ if False:
         _self_ok = bool(st.session_state.get("_autoselfcheck_v1_ok", True))
         _allow_unsafe_opt = True
         if not _self_ok:
-            st.error("autoselfcheck: FAIL. Оптимизация по умолчанию заблокирована, чтобы не получать мусорные результаты.")
+            st.error(
+                "Самопроверка интерфейса не пройдена. "
+                "Оптимизация по умолчанию заблокирована, чтобы не получать недостоверные результаты."
+            )
             _allow_unsafe_opt = st.checkbox(
-                "Разрешить оптимизацию несмотря на FAIL",
+                "Разрешить оптимизацию несмотря на сбой самопроверки",
                 value=False,
                 key="allow_unsafe_opt",
-                help="Иногда полезно для отладки, но результаты могут быть некорректны. Лучше сначала исправить ошибки selfcheck.",
+                help=(
+                    "Иногда это полезно для отладки, но результаты могут быть некорректны. "
+                    "Лучше сначала исправить ошибки самопроверки."
+                ),
             )
 
         _opt_disabled = (
@@ -7246,10 +7272,10 @@ if False:
         try:
             df_all_raw = pd.read_csv(csv_to_view)
             show_service_rows = st.checkbox(
-                "Показывать baseline/service rows",
+                "Показывать опорные и служебные строки",
                 value=bool(st.session_state.get("opt_show_service_rows", False)),
                 key="opt_show_service_rows",
-                help="Служебные baseline-anchor строки не считаются реальными кандидатами и обычно скрыты по умолчанию.",
+                help="Опорные и служебные строки не считаются реальными кандидатами и обычно скрыты по умолчанию.",
             )
             try:
                 from pneumo_solver_ui.optimization_result_rows import filter_display_df as _filter_opt_display_df
@@ -7261,7 +7287,7 @@ if False:
                 df_all = enrich_packaging_surface_df(df_all, params=_opt_packaging_params)
             st.write(f"Строк: {len(df_all)}")
             if len(df_all) != len(df_all_raw):
-                st.caption(f"Скрыто служебных baseline/service rows: {int(len(df_all_raw) - len(df_all))}")
+                st.caption(f"Скрыто опорных и служебных строк: {int(len(df_all_raw) - len(df_all))}")
             render_packaging_surface_metrics(st, df_all)
 
             st.markdown("### Быстрый TOP по суммарному штрафу")
@@ -7403,7 +7429,7 @@ if False:
     # -------------------------------
     # Калибровка / Autopilot (NPZ/CSV) — UI
     # -------------------------------
-    with st.expander("Калибровка и Autopilot (NPZ/CSV) — эксперимент", expanded=False):
+    with st.expander("Калибровка и пакетные пайплайны (NPZ/CSV) — эксперимент", expanded=False):
         st.markdown(
             """
             ...
@@ -7416,7 +7442,7 @@ if False:
             value=str(st.session_state.get("osc_dir_path", WORKSPACE_OSC_DIR)),
             key="osc_dir_path",
             help=(
-                "Калибровка и Autopilot читают Txx_osc.npz из этой папки. "
+                "Калибровочные пайплайны и Autopilot читают Txx_osc.npz из этой папки. "
                 "По умолчанию это pneumo_solver_ui/workspace/osc, но можно выбрать любую локальную директорию."
             ),
         )
@@ -7493,10 +7519,11 @@ if False:
         # -------------------------------------------------
         # Mapping: произвольные файлы -> ожидаемые Txx_osc.npz
         # -------------------------------------------------
-        st.markdown("### Mapping файлов ➜ Txx_osc.npz (без ручной писанины в консоли)")
+        st.markdown("### Сопоставление файлов ➜ Txx_osc.npz (без работы в консоли)")
         st.caption(
-            "Autopilot/калибровка по умолчанию ищут файлы с именами T01_osc.npz, T02_osc.npz, ... "
-            "Если у тебя файлы называются иначе — выбери соответствие здесь и нажми «Применить mapping»."
+            "Калибровочные пайплайны по умолчанию ищут файлы с именами "
+            "T01_osc.npz, T02_osc.npz, ... Если ваши файлы называются иначе — "
+            "выберите соответствие здесь и нажмите «Применить сопоставление»."
         )
 
         _all_files = sorted([p.name for p in (npz_files + csv_files)])
@@ -7539,7 +7566,7 @@ if False:
                     column_config={
                         "source_file": st.column_config.SelectboxColumn(
                             "source_file",
-                            help="Выбери файл (NPZ/CSV) для этого теста",
+                            help="Выберите файл (NPZ/CSV) для этого сценария",
                             options=file_opts,
                             required=True,
                         )
@@ -7553,7 +7580,7 @@ if False:
 
             col_m1, col_m2 = st.columns(2)
             with col_m1:
-                if st.button("Применить mapping (создать/обновить Txx_osc.npz)", key="apply_tests_file_mapping"):
+                if st.button("Применить сопоставление (создать/обновить Txx_osc.npz)", key="apply_tests_file_mapping"):
                     created = 0
                     missing = 0
                     for _, r in edited_map.iterrows():
@@ -7608,19 +7635,30 @@ if False:
                     )
                     st.success(f"Готово: подготовлено {created} файлов Txx_osc.npz (пропусков: {missing})")
             with col_m2:
-                if st.button("Открыть osc_dir (путь)", key="show_osc_dir_hint"):
+                if st.button("Показать путь к osc_dir", key="show_osc_dir_hint"):
                     st.info(str(osc_dir))
         else:
-            st.info("Для построения mapping нужны: (1) набор опорных тестов (список тестов) и (2) хотя бы один файл NPZ/CSV в папке osc_dir.")
+            st.info(
+                "Для сопоставления файлов нужны: (1) набор опорных сценариев "
+                "(список сценариев) и (2) хотя бы один файл NPZ/CSV в папке osc_dir."
+            )
 
         st.markdown("---")
-        st.write("Конвертация CSV ➜ NPZ (минимальный режим: CSV=таблица чисел, сохраняем как main_cols/main_values).")
+        st.write(
+            "Преобразование CSV ➜ NPZ "
+            "(упрощённый режим: CSV читается как таблица чисел и сохраняется в NPZ)."
+        )
         if csv_files:
             csv_pick = st.selectbox(
                 "CSV для конвертации", options=[f.name for f in csv_files], index=0, key="csv_to_npz_pick"
             )
             csv_test_num = st.number_input(
-                "В какой номер теста положить (Txx_osc.npz)", min_value=1, max_value=99, value=1, step=1, key="csv_to_npz_num"
+                "К какому номеру сценария привязать (Txx_osc.npz)",
+                min_value=1,
+                max_value=99,
+                value=1,
+                step=1,
+                key="csv_to_npz_num",
             )
             if st.button("Конвертировать CSV ➜ NPZ", key="csv_to_npz_btn"):
                 src = osc_dir / csv_pick
@@ -7638,7 +7676,7 @@ if False:
                     st.error(f"Не удалось конвертировать: {e}")
 
         st.markdown("---")
-        st.write("Запуск пайплайнов калибровки (они используют файлы Txx_osc.npz из osc_dir).")
+        st.write("Запуск калибровочных пайплайнов (они используют файлы Txx_osc.npz из osc_dir).")
 
         calib_mode = st.selectbox(
             "Режим калибровки", options=["minimal", "full"], index=["minimal", "full"].index(str(st.session_state.get("calib_mode_pick", DIAGNOSTIC_CALIB_MODE) or DIAGNOSTIC_CALIB_MODE)) if str(st.session_state.get("calib_mode_pick", DIAGNOSTIC_CALIB_MODE) or DIAGNOSTIC_CALIB_MODE) in ["minimal", "full"] else 0, key="calib_mode_pick"
@@ -7673,22 +7711,25 @@ if False:
                 return 999, "", str(e)
 
     
-        st.markdown("### Автоматизация (без консоли): полный расчёт ➜ NPZ ➜ oneclick/autopilot")
+        st.markdown("### Автоматизация (без консоли): полный расчёт ➜ NPZ ➜ калибровочный пайплайн")
         st.caption(
             "Если реальных замеров пока нет — можно генерировать «расчётные» NPZ из текущего опорного прогона "
-            "и гонять пайплайны oneclick/autopilot как самопроверку форматов и обвязки."
+            "и запускать пайплайны oneclick/autopilot как самопроверку форматов и обвязки."
         )
 
         col_fc1, col_fc2, col_fc3 = st.columns(3)
 
         def _ensure_full_npz_for_all_tests(_mode_label: str) -> tuple[bool, str]:
-            """Гарантирует, что в osc_dir есть Txx_osc.npz для всех тестов набора опорных тестов.
+            """Гарантирует, что в osc_dir есть Txx_osc.npz для всех сценариев опорного прогона.
 
             Возвращает (ok, message).
             """
             _tests = list((_tests_map or {}).items())
             if not _tests:
-                return False, "Нет набора опорных тестов (списка тестов). Сначала выполните опорный прогон."
+                return False, (
+                    "Нет набора опорных сценариев (списка сценариев). "
+                    "Сначала выполните опорный прогон."
+                )
             if model_mod is None:
                 return False, "Модель не загружена (model_mod=None)."
             try:
@@ -7820,7 +7861,7 @@ if False:
             return True, f"NPZ подготовлены: OK={ok_cnt}, пропусков/ошибок={missing}, время={dt_s:.1f} сек."
 
         with col_fc1:
-            if st.button("1) Полный лог + NPZ (все тесты)", key="oneclick_full_logs_npz"):
+            if st.button("1) Полный лог + NPZ (все сценарии)", key="oneclick_full_logs_npz"):
                 ok, msg = _ensure_full_npz_for_all_tests("full_npz")
                 if ok:
                     st.success(msg)
@@ -7828,7 +7869,7 @@ if False:
                     st.error(msg)
 
         with col_fc2:
-            if st.button("2) Полный лог + NPZ ➜ oneclick", key="oneclick_full_then_oneclick"):
+            if st.button("2) Полный лог + NPZ ➜ oneclick-пайплайн", key="oneclick_full_then_oneclick"):
                 ok, msg = _ensure_full_npz_for_all_tests("full_then_oneclick")
                 if ok:
                     st.success(msg)
@@ -7862,19 +7903,19 @@ if False:
                             "--use_smoothing_defaults",
                         ],
                     )
-                    st.write(f"oneclick exit code: {rc}")
+                    st.write(f"Код завершения oneclick: {rc}")
                     if rc != 0:
-                        st.error("oneclick завершился с ошибкой — см. stdout/stderr ниже и файлы в out_dir.")
+                        st.error("Пайплайн oneclick завершился с ошибкой — см. stdout/stderr ниже и файлы в out_dir.")
                         st.code(so[-4000:] if so else "", language="text")
                         st.code(se[-4000:] if se else "", language="text")
                     else:
-                        st.success("oneclick выполнен. Результаты в out_dir.")
+                        st.success("Пайплайн oneclick выполнен. Результаты сохранены в out_dir.")
                         st.code(str(out_dir), language="text")
                 else:
                     st.error(msg)
 
         with col_fc3:
-            if st.button("3) Полный лог + NPZ ➜ autopilot (minimal)", key="oneclick_full_then_autopilot"):
+            if st.button("3) Полный лог + NPZ ➜ Autopilot (минимальный режим)", key="oneclick_full_then_autopilot"):
                 ok, msg = _ensure_full_npz_for_all_tests("full_then_autopilot")
                 if ok:
                     st.success(msg)
@@ -7892,13 +7933,13 @@ if False:
                             "minimal",
                         ],
                     )
-                    st.write(f"autopilot exit code: {rc}")
+                    st.write(f"Код завершения Autopilot: {rc}")
                     if rc != 0:
-                        st.error("autopilot завершился с ошибкой — см. stdout/stderr ниже и файлы в out_dir.")
+                        st.error("Пайплайн Autopilot завершился с ошибкой — см. stdout/stderr ниже и файлы в out_dir.")
                         st.code(so[-4000:] if so else "", language="text")
                         st.code(se[-4000:] if se else "", language="text")
                     else:
-                        st.success("autopilot выполнен. Результаты в out_dir.")
+                        st.success("Пайплайн Autopilot выполнен. Результаты сохранены в out_dir.")
                         st.code(str(out_dir), language="text")
                 else:
                     st.error(msg)
@@ -7906,7 +7947,7 @@ if False:
         st.markdown("---")
         col_cal1, col_cal2 = st.columns(2)
         with col_cal1:
-            if st.button("Запустить калибровку (oneclick)", key="run_calib_oneclick"):
+            if st.button("Запустить пайплайн oneclick", key="run_calib_oneclick"):
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 out_dir = WORKSPACE_CALIB_RUNS_DIR / f"RUN_{ts}_oneclick"
                 rc, so, se = _run_pipeline(
@@ -7928,7 +7969,7 @@ if False:
                     st.error(f"Ошибка (код {rc}) — см. pipeline_stderr.txt")
 
         with col_cal2:
-            if st.button("Запустить Autopilot (NPZ) v19", key="run_autopilot_v19"):
+            if st.button("Запустить пайплайн Autopilot v19 (по NPZ)", key="run_autopilot_v19"):
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 out_dir = WORKSPACE_CALIB_RUNS_DIR / f"RUN_{ts}_autopilot_v19"
                 rc, so, se = _run_pipeline(
@@ -7956,7 +7997,7 @@ if False:
     # -------------------------------
     # Диагностика (ZIP для отправки)
     # -------------------------------
-    with st.expander("Диагностика — собрать ZIP (для отправки)", expanded=False):
+    with st.expander("Диагностика — собрать архив ZIP для отправки", expanded=False):
         # По умолчанию в приложении есть **одна** кнопка диагностики (в боковой панели):
         # «Сохранить диагностику (ZIP)». Этот UI-блок оставлен только для Legacy-режима,
         # чтобы не плодить дублирующие кнопки.
@@ -7967,19 +8008,21 @@ if False:
 
         if not show_legacy_tools:
             st.info(
-                "Единая кнопка диагностики находится в боковой панели: **Сохранить диагностику (ZIP)**. "
+                "Основная кнопка диагностики находится в боковой панели: **Сохранить диагностику (ZIP)**. "
                 "Этот UI-блок скрыт в основном режиме, чтобы не плодить дублирующие кнопки."
             )
             st.caption(
-                "Если нужно собрать UI-диагностику именно отсюда: включите Legacy-режим "
+                "Если нужно собрать UI-диагностику именно отсюда: включите режим старых страниц "
                 "в боковой панели (Режим интерфейса → Показать страницы Legacy)."
             )
         else:
             st.markdown(
                 """
-                Это **локальный** ZIP, который удобно отправлять вместо всей папки.
+                Это **локальный архив ZIP**, который удобно отправлять вместо всей папки проекта.
 
-                Внутри: логи UI, результаты, **workspace/osc** (NPZ/CSV), **calibration_runs** (oneclick/autopilot) и снимок текущих JSON (base/suite/ranges).
+                Внутри: логи UI, результаты, **workspace/osc** (NPZ/CSV),
+                **calibration_runs** (результаты oneclick/autopilot) и снимок текущих
+                файлов настроек: база параметров, набор сценариев и диапазоны подбора.
                 """
             )
             diag_tag = st.text_input("Тэг (опционально)", value="ui", key="ui_diag_tag")

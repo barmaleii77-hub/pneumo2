@@ -20,7 +20,7 @@ def render_suite_card_primary_section_intro(st: Any) -> None:
 def render_suite_card_timing_section_intro(st: Any) -> None:
     st.markdown("#### 2. Время расчета")
     st.caption(
-        "Проверьте шаг интегрирования и длительность теста. Эти параметры "
+        "Проверьте шаг интегрирования и длительность сценария. Эти параметры "
         "влияют и на устойчивость расчета, и на его стоимость."
     )
 
@@ -68,7 +68,7 @@ def render_suite_csv_upload_panel(
             key=f"suite_road_csv_upload_{sid}",
             help=(
                 "Используется в сценариях с дорожным профилем из CSV "
-                "и при необходимости в других тестах."
+                "и при необходимости в других сценариях."
             ),
         )
         if up_road is not None:
@@ -82,7 +82,7 @@ def render_suite_csv_upload_panel(
             key=f"suite_axay_csv_upload_{sid}",
             help=(
                 "Используется в сценариях с маневром из CSV "
-                "и при необходимости в других тестах."
+                "и при необходимости в других сценариях."
             ),
         )
         if up_axay is not None:

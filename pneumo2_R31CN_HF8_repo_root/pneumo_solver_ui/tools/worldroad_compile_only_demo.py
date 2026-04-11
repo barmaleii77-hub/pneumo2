@@ -28,8 +28,16 @@ import argparse
 import json
 import math
 from pathlib import Path
+import sys
 
 import numpy as np
+
+
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    _ROOT = Path(__file__).resolve().parents[2]
+    if str(_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ROOT))
+    __package__ = "pneumo_solver_ui.tools"
 
 
 def _load_json(path: Path) -> dict:

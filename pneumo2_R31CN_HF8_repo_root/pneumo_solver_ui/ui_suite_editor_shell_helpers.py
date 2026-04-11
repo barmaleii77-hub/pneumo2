@@ -34,10 +34,10 @@ def format_suite_test_type_label(value: Any) -> str:
 
 
 def render_app_suite_editor_intro(st: Any) -> None:
-    st.subheader("2. Тестовый набор")
+    st.subheader("2. Набор сценариев")
     st.caption(
-        "Сначала соберите или загрузите набор тестов, затем выберите один сценарий слева "
-        "и редактируйте его карточку справа. Так проще держать структуру тестов под "
+        "Сначала соберите или загрузите набор сценариев, затем выберите один сценарий слева "
+        "и редактируйте его карточку справа. Так проще держать структуру сценариев под "
         "контролем и не теряться в длинных таблицах."
     )
 
@@ -45,7 +45,7 @@ def render_app_suite_editor_intro(st: Any) -> None:
 def render_heavy_suite_editor_intro(st: Any) -> None:
     st.caption(
         "Работайте по шагам: сначала настройте фильтры и найдите нужный сценарий, "
-        "затем проверьте карточку справа, и только после этого меняйте стадию теста, тип теста "
+        "затем проверьте карточку справа, и только после этого меняйте стадию сценария, тип сценария "
         "и параметры дороги или манёвра."
     )
 
@@ -66,10 +66,10 @@ def render_heavy_suite_preset_wizard(
     with wiz_l:
         preset = str(
             st.selectbox(
-                "Добавить тест-шаблон",
+                "Добавить сценарий по шаблону",
                 options=preset_options,
                 format_func=lambda value: SUITE_PRESET_LABELS.get(str(value), str(value)),
-                help="Шаблон добавит новый тест с разумными настройками. Затем его можно "
+                help="Шаблон добавит новый сценарий с разумными настройками. Затем его можно "
                 "уточнить в карточке справа.",
                 index=preset_options.index(current_preset),
                 key=preset_key,
@@ -98,7 +98,7 @@ def render_app_suite_search_box(
 ) -> str:
     return str(
         st.text_input(
-            "Поиск теста",
+            "Поиск сценария",
             value=st.session_state.get(key, ""),
             key=key,
             placeholder=placeholder,
@@ -124,12 +124,12 @@ def render_heavy_suite_filter_row(
             "Стадии",
             options=stages,
             default=default_stages,
-            help="Показывать тесты выбранных стадий.",
+            help="Показывать сценарии выбранных стадий.",
             key=stage_filter_key,
         )
     st.caption(
         "Логика оптимизации по стадиям: S0 — быстрый предварительный отсев; "
-        "S1 — длинные дорожные и манёвренные тесты; "
+        "S1 — длинные дорожные и манёвренные сценарии; "
         "S2 — финальная стадия проверки устойчивости."
     )
     st.caption(
@@ -142,7 +142,7 @@ def render_heavy_suite_filter_row(
                 "Только включённые",
                 value=False,
                 key=only_enabled_key,
-                help="Скрывает выключенные тесты.",
+                help="Скрывает выключенные сценарии.",
             )
         )
     with f3:
@@ -151,7 +151,7 @@ def render_heavy_suite_filter_row(
                 "Поиск",
                 value=st.session_state.get(search_key, ""),
                 key=search_key,
-                help="Ищет по имени теста и типу.",
+                help="Ищет по имени сценария и типу.",
             )
             or ""
         ).strip()
@@ -211,7 +211,7 @@ def render_suite_selection_box(
 
 
 def render_suite_total_count_caption(st: Any, *, total_count: int) -> None:
-    st.caption(f"Всего тестов: {int(total_count)}")
+    st.caption(f"Всего сценариев: {int(total_count)}")
 
 
 def build_app_suite_selection_options(
@@ -474,13 +474,13 @@ def render_heavy_suite_action_row(
 
 def render_suite_empty_list_state(st: Any, *, filtered: bool) -> None:
     if filtered:
-        st.info("По текущим условиям отбора тестов не найдено. Ослабьте фильтры или измените строку поиска.")
+        st.info("По текущим условиям отбора сценарии не найдены. Ослабьте фильтры или измените строку поиска.")
     else:
-        st.info("Набор тестов пока пуст. Добавьте первый сценарий, чтобы начать настройку.")
+        st.info("Набор сценариев пока пуст. Добавьте первый сценарий, чтобы начать настройку.")
 
 
 def render_suite_empty_card_state(st: Any) -> None:
-    st.info("Выберите тест слева, чтобы открыть карточку редактирования.")
+    st.info("Выберите сценарий слева, чтобы открыть карточку редактирования.")
 
 
 def render_suite_missing_card_state(st: Any) -> None:
@@ -512,6 +512,6 @@ def build_suite_filter_summary(*, total_count: int, visible_count: int) -> str |
     if hidden_count <= 0:
         return None
     return (
-        f"Показано **{visible_count}** из **{total_count}** тестов. "
+        f"Показано **{visible_count}** из **{total_count}** сценариев. "
         f"Скрыто **{hidden_count}** — проверьте фильтр по стадиям, флаг включения и строку поиска."
     )

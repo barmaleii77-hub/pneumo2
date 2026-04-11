@@ -654,7 +654,10 @@ def make_test_bump_diag(
 # ---------------------------
 
 def rms(x: np.ndarray) -> float:
-    return float(np.sqrt(np.mean(np.square(x))))
+    arr = np.asarray(x, dtype=float).reshape(-1)
+    if arr.size == 0:
+        return float("nan")
+    return float(np.sqrt(np.mean(np.square(arr))))
 
 
 def first_cross_time(t: np.ndarray, y: np.ndarray, thr: float, t_after: float, margin: float = 0.0) -> float:
@@ -673,7 +676,10 @@ def compute_body_acc_rms(df: pd.DataFrame, col_z: str = "перемещение_
     dt = float(np.mean(np.diff(t)))
     zdd = np.gradient(np.gradient(z, dt), dt)
     i0 = int(max(0, t_skip / dt))
-    return rms(zdd[i0:])
+    tail = np.asarray(zdd[i0:], dtype=float)
+    if tail.size == 0:
+        tail = np.asarray(zdd, dtype=float)
+    return rms(tail)
 
 
 def energy_from_frames(df_energy_drossel: Optional[pd.DataFrame], df_energy_edges: Optional[pd.DataFrame]) -> Tuple[float, float, float]:

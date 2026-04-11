@@ -36,3 +36,17 @@ def test_worldroad_compile_only_demo_emits_json_summary() -> None:
     assert payload["note"] == "compile_only demo (no pandas DataFrame build)"
     assert float(payload["dt_s"]) > 0.0
     assert int(payload["n_steps"]) >= 1
+
+
+def test_worldroad_compile_only_demo_runs_as_script() -> None:
+    script = ROOT / "pneumo_solver_ui" / "tools" / "worldroad_compile_only_demo.py"
+    proc = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    payload = json.loads(proc.stdout)
+    assert payload["note"] == "compile_only demo (no pandas DataFrame build)"
