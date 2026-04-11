@@ -296,6 +296,11 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._set_poly_polygon_if_changed(" in app_src
     assert "if perf_visual_key == self._last_perf_visual_key:" in app_src
     assert "self._last_perf_visual_key = perf_visual_key" in app_src
+    assert "def _current_segment_index_for_sample(self, *, idx: int, s_value: float) -> int:" in app_src
+    assert "v0_mps = math.hypot(vx0, vy0)" in app_src
+    assert "self._lookahead_m = float(_clamp(20.0 + v0_mps * 4.0, 40.0, 140.0))" in app_src
+    assert "cur_seg_idx = self._current_segment_index_for_sample(idx=idx_ref, s_value=s_now)" in app_src
+    assert 'seg_id = int(info.get("id", info.get("seg_id", 0)))' in app_src
     assert "dynamic_lines: list[str] = [f\"v  {v_mps*3.6:6.1f} км/ч\"]" in app_src
     assert "context_lines: list[str] = []" in app_src
     assert "acceptance_lines = list(format_acceptance_hud_lines(b, i))" in app_src

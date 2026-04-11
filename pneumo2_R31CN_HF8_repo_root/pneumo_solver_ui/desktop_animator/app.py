@@ -4121,6 +4121,36 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             self._seg_start_to_idx[int(st)] = int(j)
             self._seg_id_to_info[int(sid)] = info
 
+    def _current_segment_index_for_sample(self, *, idx: int, s_value: float) -> int:
+        if not self._seg_infos:
+            return 0
+        try:
+            s_now = float(s_value)
+        except Exception:
+            s_now = float("nan")
+
+        seg_s0 = self._seg_s0
+        seg_s1 = self._seg_s1
+        if seg_s0 is not None and seg_s1 is not None:
+            try:
+                seg_lo = np.minimum(np.asarray(seg_s0, dtype=float), np.asarray(seg_s1, dtype=float))
+                seg_hi = np.maximum(np.asarray(seg_s0, dtype=float), np.asarray(seg_s1, dtype=float))
+                if seg_lo.size == seg_hi.size == len(self._seg_infos) and np.isfinite(s_now):
+                    hits = np.flatnonzero((s_now >= (seg_lo - 1e-6)) & (s_now <= (seg_hi + 1e-6)))
+                    if hits.size > 0:
+                        return int(hits[0])
+                    if np.all(np.isfinite(seg_hi)):
+                        j = int(np.searchsorted(seg_hi, s_now, side="left"))
+                        return int(max(0, min(j, len(self._seg_infos) - 1)))
+            except Exception:
+                pass
+
+        starts = self._seg_starts
+        if starts is None or len(starts) <= 0:
+            return 0
+        j = int(np.searchsorted(starts, int(idx), side="right") - 1)
+        return int(max(0, min(j, len(self._seg_infos) - 1)))
+
     def _update_segment_fills(self, b: DataBundle, idxs: np.ndarray, xL: np.ndarray, yL: np.ndarray, xR: np.ndarray, yR: np.ndarray, cur_seg_id: Optional[int]) -> None:
         """Update (or hide) muted segment fills on the road ribbon."""
         if not getattr(self, "show_seg_colors", True):
@@ -4262,15 +4292,15 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         yaw = _sample_angle_series_local(yaw_series, i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)
         x0 = sample(xw, float(xw[idx_ref]))
         y0 = sample(yw, float(yw[idx_ref]))
+        vx0 = sample(vx_series, 0.0)
+        vy0 = sample(vy_series, 0.0)
+        v0_mps = math.hypot(vx0, vy0)
+        s_now = sample(s_world, 0.0)
 
         # Auto lookahead scaling: more road shown at higher speed (instrument-cluster style)
         if getattr(self, "auto_lookahead", False):
-            try:
-                vx0 = sample(vx_series, 0.0)
-            except Exception:
-                vx0 = 0.0
-            self._lookahead_m = float(_clamp(20.0 + vx0 * 4.0, 40.0, 140.0))
-            self._history_m = float(_clamp(8.0 + vx0 * 1.5, 15.0, 60.0))
+            self._lookahead_m = float(_clamp(20.0 + v0_mps * 4.0, 40.0, 140.0))
+            self._history_m = float(_clamp(8.0 + v0_mps * 1.5, 15.0, 60.0))
 
         if bool(self._playback_perf_mode):
             perf_visual_key = self._perf_visual_key(x0=float(x0), y0=float(y0), yaw=float(yaw))
@@ -4314,6 +4344,21 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         # Indices in the original arrays corresponding to the visible road window
         idxs = np.arange(win_i0, win_i1)[mask]
 
+        cur_seg_idx: Optional[int] = None
+        cur_seg_id: Optional[int] = None
+        cur_seg_info: dict = {}
+        try:
+            self._ensure_segment_cache(b)
+            if self._seg_infos:
+                cur_seg_idx = self._current_segment_index_for_sample(idx=idx_ref, s_value=s_now)
+                cur_seg_idx = int(max(0, min(int(cur_seg_idx), len(self._seg_infos) - 1)))
+                cur_seg_info = dict(self._seg_infos[cur_seg_idx] or {})
+                cur_seg_id = int(cur_seg_info.get("id", cur_seg_info.get("seg_id", 0)))
+        except Exception:
+            cur_seg_idx = None
+            cur_seg_id = None
+            cur_seg_info = {}
+
         max_points = self._visible_polyline_point_budget()
         xl, yl, idxs = self._decimate_visible_polyline(max_points, xl, yl, idxs)
         self._set_poly_path_if_changed("_centerline_path_key", self.centerline, xl, yl)
@@ -4332,11 +4377,6 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
 
             # Segment tint overlays (muted, non-flashing)
             try:
-                self._ensure_segment_cache(b)
-                cur_seg_id = None
-                seg_full = self._seg_full
-                if seg_full is not None:
-                    cur_seg_id = int(seg_full[i])
                 if eff_show_seg_colors:
                     self._update_segment_fills(b, lane_idxs, xlL, ylL, xlR, ylR, cur_seg_id)
                 else:
@@ -4455,7 +4495,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             yaw_rate = sample(yaw_rate_series, 0.0)
             ax = sample(ax_series, 0.0)
             ay = sample(ay_series, 0.0)
-            s = sample(s_world, 0.0)
+            s = float(s_now)
 
             # Signed radius estimate
             R = float("inf")
@@ -4465,15 +4505,11 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             # Segment / progress
             seg_line = ""
             road_line = ""
-            cur_seg_info: dict = {}
             try:
-                self._ensure_segment_cache(b)
-                if self._seg_starts is not None and self._seg_infos:
-                    j = int(np.searchsorted(self._seg_starts, i, side="right") - 1)
-                    j = max(0, min(j, len(self._seg_infos) - 1))
-                    info = self._seg_infos[j]
-                    cur_seg_info = info
-                    seg_id = int(info.get("seg_id", 0))
+                if cur_seg_info and self._seg_infos:
+                    info = cur_seg_info
+                    j = int(cur_seg_idx if cur_seg_idx is not None else int(info.get("idx", 0)))
+                    seg_id = int(info.get("id", info.get("seg_id", 0)))
                     s0 = float(info.get("s0", 0.0))
                     s1 = float(info.get("s1", 0.0))
 
@@ -21907,12 +21943,6 @@ class CockpitWidget(QtWidgets.QWidget):
                 "dock_road_profile",
                 road_profile_panel,
                 lambda: road_profile_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
-            )
-        if interactive_scrub and multifactor_panel is not None and self._dock_is_exposed("dock_multifactor"):
-            _call_aux_widget(
-                "dock_multifactor",
-                multifactor_panel,
-                lambda: multifactor_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
             )
         if interactive_scrub and self._dock_is_exposed("dock_trends"):
             _call_aux_widget(

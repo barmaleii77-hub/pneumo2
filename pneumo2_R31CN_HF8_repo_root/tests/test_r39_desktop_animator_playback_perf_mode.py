@@ -31,6 +31,9 @@ def test_visible_fast_and_slow_groups_are_refreshed_as_groups() -> None:
     assert 'if interactive_scrub and heatmap_panel is not None and self._dock_is_exposed("dock_heatmap"):' in SRC
     assert 'if interactive_scrub and corner_quick_panel is not None and self._dock_is_exposed("dock_corner_quick"):' in SRC
     assert 'if interactive_scrub and road_profile_panel is not None and self._dock_is_exposed("dock_road_profile"):' in SRC
+    assert '"dock_multifactor",' in SRC
+    assert '("dock_multifactor", getattr(self, "telemetry_multifactor", None), "update_frame"),' in SRC
+    assert 'if interactive_scrub and multifactor_panel is not None and self._dock_is_exposed("dock_multifactor"):' not in SRC
     assert "self.timeline.set_playhead_time(self._playback_sample_t_s, idx=i)" in SRC
     assert "pressure_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
     assert "flow_panel.update_frame(b, i, sample_t=self._playback_sample_t_s)" in SRC
