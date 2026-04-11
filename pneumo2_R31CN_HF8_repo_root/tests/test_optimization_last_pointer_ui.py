@@ -57,7 +57,7 @@ def test_render_last_pointer_summary_handles_missing_pointer() -> None:
     assert rendered is False
     assert ("info", "missing") in st.calls
     assert any(
-        kind == "markdown" and "Seed/promotion policy" in text and "текущая стадия" in text
+        kind == "markdown" and "Политика отбора и продвижения" in text and "текущая стадия" in text
         for kind, text in st.calls
     )
 
@@ -114,8 +114,8 @@ def test_render_last_pointer_summary_renders_shared_sections() -> None:
 
     assert rendered is True
     assert ("success", "ok") in st.calls
-    assert ("write", "**Objective stack:** a, b") in st.calls
-    assert ("write", "**Hard gate:** `penalty_total` (tol=0.25)") in st.calls
+    assert ("write", "**Набор целей оптимизации:** a, b") in st.calls
+    assert ("write", "**Жёсткий порог по штрафу:** `penalty_total` (tol=0.25)") in st.calls
     assert ("write", "**Baseline source:** scoped baseline") in st.calls
     assert ("write", "**Problem scope:** `ph_scope_dem`") in st.calls
     assert any(kind == "caption" and "Hash mode:" in text and "legacy" in text for kind, text in st.calls)
@@ -127,5 +127,5 @@ def test_render_last_pointer_summary_renders_shared_sections() -> None:
     )
     assert any(kind == "caption" and "matches current launch contract" in text for kind, text in st.calls)
     assert any(kind == "caption" and "Hash mode matches current launch contract" in text for kind, text in st.calls)
-    assert ("markdown", "**Packaging snapshot (last run)**") in st.calls
+    assert ("markdown", "**Сводка по геометрии узлов (последний run)**") in st.calls
     assert any(kind == "warning" for kind, _ in st.calls)

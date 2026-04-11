@@ -11,6 +11,7 @@ from pneumo_solver_ui.ui_suite_card_shell_helpers import (
     render_heavy_suite_right_card_shell,
 )
 from pneumo_solver_ui.ui_suite_editor_shell_helpers import (
+    format_suite_test_type_label,
     render_suite_empty_card_state,
     render_suite_missing_card_state,
 )
@@ -106,6 +107,7 @@ def render_app_suite_right_card_panel(
                 options=allowed_test_types,
                 index=(allowed_test_types.index(typ) if typ in allowed_test_types else 0),
                 key=f"suite_type__{sel_i}",
+                format_func=format_suite_test_type_label,
             )
 
     def _render_timing_section() -> None:
@@ -354,10 +356,11 @@ def render_heavy_suite_right_card_panel(
             step=1,
             key=stage_key,
             help=(
-                "Момент входа теста в staged optimization. Семантика накопительная: "
-                "stage 0 идёт только с S0; stage 1 впервые включается с S1 и затем идёт "
-                "и в S2; stage 2 — только в финальной стадии. Нумерация 0-based: "
-                "первая стадия = 0. Явно заданный stage 1 не должен молча переписываться в 0."
+                "С какой стадии тест начинает участвовать в оптимизации по стадиям. "
+                "Логика накопительная: стадия 0 участвует только в S0; стадия 1 впервые "
+                "включается в S1 и затем остаётся в S2; стадия 2 участвует только в "
+                "финальной стадии. Нумерация начинается с 0: первая стадия = 0. "
+                "Явно заданная стадия 1 не должна молча переписываться в 0."
             ),
         )
         st.selectbox(
@@ -365,11 +368,12 @@ def render_heavy_suite_right_card_panel(
             options=allowed_test_types,
             index=max(0, allowed_test_types.index(type_default)),
             key=type_key,
+            format_func=format_suite_test_type_label,
         )
 
     def _render_timing_section() -> None:
-        st.number_input("dt, с", min_value=1e-5, step=0.001, format="%.6g", key=dt_key)
-        st.number_input("t_end, с", min_value=0.01, step=0.1, format="%.6g", key=t_end_key)
+        st.number_input("Шаг интегрирования, с", min_value=1e-5, step=0.001, format="%.6g", key=dt_key)
+        st.number_input("Длительность теста, с", min_value=0.01, step=0.1, format="%.6g", key=t_end_key)
 
     def _render_motion_section() -> None:
         st.markdown("##### Дорога и режим движения")
@@ -377,14 +381,14 @@ def render_heavy_suite_right_card_panel(
         if test_type == "worldroad":
             c1, c2 = st.columns([1, 1], gap="small")
             with c1:
-                st.number_input("Скорость (vx0_м_с), м/с", min_value=0.0, step=0.5, key=vx0_key)
+                st.number_input("Начальная скорость, м/с", min_value=0.0, step=0.5, key=vx0_key)
             with c2:
                 st.number_input("Длина участка, м", min_value=1.0, step=10.0, key=road_len_key)
 
             st.checkbox(
-                "Авто: t_end = (длина / скорость)",
+                "Авто: длительность = длина / скорость",
                 key=auto_t_end_key,
-                help="Если включено, t_end будет вычисляться как road_len_m / max(vx0_м_с, eps).",
+                help="Если включено, длительность теста будет вычисляться автоматически по длине участка и начальной скорости с защитой от деления на ноль.",
             )
 
             current_speed = float(_safe_float(st.session_state.get(vx0_key, vx0_mps), vx0_mps))
@@ -394,29 +398,35 @@ def render_heavy_suite_right_card_panel(
             eps_v = 1e-6
             if auto_enabled:
                 auto_t_end = float(current_road_len) / max(float(current_speed), eps_v)
-                st.info(f"t_end будет вычислен автоматически: **{auto_t_end:.6g} с** (вместо введённого {float(current_t_end):.6g} с)")
+                st.info(
+                    f"Длительность теста будет вычислена автоматически: **{auto_t_end:.6g} с** "
+                    f"(вместо введённого значения {float(current_t_end):.6g} с)."
+                )
             else:
                 length_effective = float(current_speed) * float(current_t_end)
-                st.caption(f"Факт. длина проезда = speed * t_end = {length_effective:.6g} м. (road_len_m используется только в авто-режиме)")
+                st.caption(
+                    f"Расчётная длина проезда = скорость × длительность = {length_effective:.6g} м. "
+                    f"Поле длины участка используется только в авто-режиме."
+                )
                 try:
                     if float(current_road_len) > 1e-9:
                         rel = abs(length_effective - float(current_road_len)) / max(float(current_road_len), 1e-9)
                         if rel > 0.05:
                             st.warning(
-                                f"road_len_m = {float(current_road_len):.6g} м **не влияет**, потому что авто-режим выключен. "
-                                f"Сейчас по speed/t_end получается {length_effective:.6g} м."
+                                f"Длина участка {float(current_road_len):.6g} м сейчас **не влияет**, потому что авто-режим выключен. "
+                                f"По скорости и длительности получается {length_effective:.6g} м."
                             )
                 except Exception:
                     pass
 
-            st.caption("Профиль дороги (WorldRoad)")
+            st.caption("Профиль дороги для сценария с дорожным профилем")
             surface_map = {
-                "flat": "Ровная (flat)",
-                "sine_x": "Синус вдоль (sine_x)",
-                "sine_y": "Синус поперёк (sine_y)",
-                "bump": "Бугор (bump)",
-                "ridge_x": "Порог (ridge_x)",
-                "ridge_cosine_bump": "Косинусный бугор (ridge_cosine_bump)",
+                "flat": "Ровная дорога",
+                "sine_x": "Синус вдоль",
+                "sine_y": "Синус поперёк",
+                "bump": "Бугор",
+                "ridge_x": "Порог",
+                "ridge_cosine_bump": "Косинусный бугор",
             }
             surface_type_default = str(st.session_state.get(surface_type_key, "flat") or "flat")
             if surface_type_default not in surface_map:
@@ -433,19 +443,19 @@ def render_heavy_suite_right_card_panel(
             if surface_type in {"sine_x", "sine_y"}:
                 amplitude = st.number_input("Амплитуда A (полуразмах), м", min_value=0.0, step=0.005, format="%.6g", key=surface_sine_a_key)
                 st.caption(
-                    f"Синус задаётся как z = A·sin(...). Это значит: профиль идёт от {-float(amplitude):.6g} до +{float(amplitude):.6g} м, "
-                    f"а полный размах p-p = 2A = {2.0 * float(amplitude):.6g} м."
+                    f"Амплитуда A задаёт полуразмах синусоиды: профиль идёт от {-float(amplitude):.6g} до +{float(amplitude):.6g} м, "
+                    f"а полный размах между минимумом и максимумом равен 2A = {2.0 * float(amplitude):.6g} м."
                 )
                 wavelength = st.number_input("Длина волны, м", min_value=0.01, step=0.1, format="%.6g", key=surface_sine_wl_key)
                 spec_obj = {"type": surface_type, "A": float(amplitude), "wavelength": float(wavelength)}
             elif surface_type in {"bump", "ridge_x"}:
-                height = st.number_input("Высота h, м", min_value=0.0, step=0.005, format="%.6g", key=surface_hw_h_key)
-                width = st.number_input("Ширина w, м", min_value=0.01, step=0.05, format="%.6g", key=surface_hw_w_key)
+                height = st.number_input("Высота, м", min_value=0.0, step=0.005, format="%.6g", key=surface_hw_h_key)
+                width = st.number_input("Ширина, м", min_value=0.01, step=0.05, format="%.6g", key=surface_hw_w_key)
                 spec_obj = {"type": surface_type, "h": float(height), "w": float(width)}
             elif surface_type == "ridge_cosine_bump":
-                height = st.number_input("Высота h, м", min_value=0.0, step=0.005, format="%.6g", key=surface_cos_h_key)
-                width = st.number_input("Ширина w, м", min_value=0.01, step=0.05, format="%.6g", key=surface_cos_w_key)
-                shape = st.number_input("Форма k", min_value=0.1, step=0.1, format="%.6g", key=surface_cos_k_key)
+                height = st.number_input("Высота, м", min_value=0.0, step=0.005, format="%.6g", key=surface_cos_h_key)
+                width = st.number_input("Ширина, м", min_value=0.01, step=0.05, format="%.6g", key=surface_cos_w_key)
+                shape = st.number_input("Коэффициент формы", min_value=0.1, step=0.1, format="%.6g", key=surface_cos_k_key)
                 spec_obj = {"type": surface_type, "h": float(height), "w": float(width), "k": float(shape)}
             else:
                 spec_obj = {"type": "flat"}
@@ -453,18 +463,18 @@ def render_heavy_suite_right_card_panel(
             nonlocal_road_surface = "flat" if spec_obj.get("type") == "flat" else json.dumps(spec_obj, ensure_ascii=False)
             st.session_state[suite_editor_widget_key_fn(sid, "derived_road_surface")] = nonlocal_road_surface
         else:
-            st.text_input("Путь к road_csv", key=road_csv_key)
-            st.text_input("Путь к axay_csv", key=axay_csv_key)
+            st.text_input("Путь к CSV дороги", key=road_csv_key)
+            st.text_input("Путь к CSV манёвра (ax/ay)", key=axay_csv_key)
             st.session_state[suite_editor_widget_key_fn(sid, "derived_road_surface")] = str(rec.get("road_surface", "flat") or "flat")
 
         st.markdown("##### Манёвр (если применимо)")
-        st.number_input("ax, м/с²", step=0.1, format="%.6g", key=ax_key)
-        st.number_input("ay, м/с²", step=0.1, format="%.6g", key=ay_key)
+        st.number_input("Продольное ускорение ax, м/с²", step=0.1, format="%.6g", key=ax_key)
+        st.number_input("Поперечное ускорение ay, м/с²", step=0.1, format="%.6g", key=ay_key)
 
     def _render_targets_section() -> None:
         st.caption(
-            "Штраф оптимизации учитывает только target_*, включённые ниже. "
-            "Если ничего не включено — penalty=0, оптимизация может стать бессмысленной."
+            "Оптимизация учитывает только включённые ниже ограничения и целевые значения. "
+            "Если здесь ничего не включено, этот сценарий почти не будет влиять на итоговую оценку."
         )
 
         try:
@@ -472,7 +482,7 @@ def render_heavy_suite_right_card_panel(
         except Exception:
             PENALTY_TARGET_SPECS = []
 
-        with st.expander("Список penalty targets (target_*)", expanded=True):
+        with st.expander("Что проверять в этом сценарии", expanded=True):
             for spec in (PENALTY_TARGET_SPECS or []):
                 key = str(spec.get("key", "") or "").strip()
                 if not key:
@@ -489,7 +499,7 @@ def render_heavy_suite_right_card_panel(
                 )
                 if enabled_local:
                     st.number_input(
-                        f"Значение: target_{key}",
+                        "Порог или целевое значение",
                         step=0.1,
                         format="%.6g",
                         key=value_key_local,
@@ -498,10 +508,10 @@ def render_heavy_suite_right_card_panel(
 
         with st.expander("Переопределения параметров (сценарий)", expanded=True):
             st.text_area(
-                "JSON (необязательно)",
+                "Переопределения параметров в формате JSON (необязательно)",
                 height=120,
                 key=params_override_key,
-                help="Можно задать JSON со значениями параметров, которые будут применены только в этом тесте.",
+                help="Здесь можно задать JSON со значениями параметров, которые будут применены только в этом сценарии.",
             )
 
     render_heavy_suite_right_card_shell(

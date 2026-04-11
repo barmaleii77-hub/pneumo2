@@ -421,8 +421,8 @@ def _render_home_opt_config_snapshot(*, compact: bool = False) -> None:
             st.metric("Run", run_name)
         st.caption(f"CSV prefix: {out_prefix}")
 
-    st.caption(f"Seed/promotion policy: {stage_policy_mode}")
-    st.caption("Stage-specific seed/promotion profile: " + stage_seed_policy_summary_text())
+    st.caption(f"Политика отбора и продвижения: {stage_policy_mode}")
+    st.caption("Профиль стадийного отбора и продвижения: " + stage_seed_policy_summary_text())
     st.caption(f"System Influence eps_rel: {influence_eps_rel:g}")
     st.caption("Adaptive epsilon для анализа System Influence: " + ("on" if adaptive_influence_eps else "off"))
 
@@ -464,8 +464,8 @@ def _render_home_opt_last_pointer_summary(*, compact: bool = False) -> None:
         snap,
         compact=compact,
         missing_message="Последняя оптимизация пока не запускалась (или указатель ещё не записан).",
-        packaging_heading="Packaging snapshot (last run)",
-        packaging_interference_prefix="В последнем run есть packaging-interference evidence",
+        packaging_heading="Сводка по геометрии узлов (последний run)",
+        packaging_interference_prefix="В последнем run есть признаки пересечений по геометрии узлов",
     )
 
 
@@ -2692,7 +2692,7 @@ with st.sidebar:
                         ),
                     )
                     stage_policy_mode = st.selectbox(
-                        "Seed/promotion policy",
+                        "Политика отбора и продвижения",
                         options=["influence_weighted", "static"],
                         index=["influence_weighted", "static"].index(str(st.session_state.get("stage_policy_mode", DEFAULT_STAGE_POLICY_MODE) or DEFAULT_STAGE_POLICY_MODE)) if str(st.session_state.get("stage_policy_mode", DEFAULT_STAGE_POLICY_MODE) or DEFAULT_STAGE_POLICY_MODE) in ["influence_weighted", "static"] else 0,
                         key="stage_policy_mode",
@@ -2702,10 +2702,10 @@ with st.sidebar:
                             "static — историческое поведение: только score/ranges без приоритизации параметров по стадии."
                         ),
                     )
-                    st.caption("Stage-specific seed/promotion profile: " + stage_seed_policy_summary_text())
+                    st.caption("Профиль стадийного отбора и продвижения: " + stage_seed_policy_summary_text())
                     if adaptive_influence_eps:
                         st.caption(
-                            "Stage-aware adaptive epsilon: "
+                            "Адаптивный epsilon по стадиям: "
                             + stage_aware_influence_profiles_text(
                                 requested_eps_rel=float(influence_eps_rel),
                                 base_grid=DIAGNOSTIC_ADAPTIVE_INFLUENCE_EPS_GRID,
@@ -6957,7 +6957,7 @@ if False:
                         except Exception:
                             live_policy = {}
                         if bool(live_policy.get("available")):
-                            st.markdown("**Seed/promotion policy (текущая стадия)**")
+                            st.markdown("**Политика отбора и продвижения (текущая стадия)**")
                             policy_name = str(live_policy.get("policy_name") or "")
                             effective_mode = str(live_policy.get("effective_mode") or "")
                             requested_mode_live = str(live_policy.get("requested_mode") or "")
@@ -6975,7 +6975,7 @@ if False:
                                 f"focus/explore selected={int(seed_bucket_counts.get('focus', 0) or 0)}/{int(seed_bucket_counts.get('explore', 0) or 0)}",
                             )
                             if priority_params_live:
-                                st.caption("Priority params for this stage: " + ", ".join(str(x) for x in priority_params_live[:8]))
+                                st.caption("Приоритетные параметры этой стадии: " + ", ".join(str(x) for x in priority_params_live[:8]))
                             if int(live_policy.get("promotion_selected_count", 0) or 0) > 0:
                                 st.caption(
                                     "Promotion decisions selected: "

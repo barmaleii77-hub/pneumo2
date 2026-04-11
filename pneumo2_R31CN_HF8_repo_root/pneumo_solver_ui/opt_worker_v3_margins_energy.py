@@ -59,7 +59,7 @@ from pneumo_solver_ui.data_contract import build_geometry_meta_from_base
 from pneumo_solver_ui.module_loading import load_python_module_from_path
 from pneumo_solver_ui.project_path_resolution import resolve_project_py_path
 from pneumo_solver_ui.suspension_family_contract import normalize_component_family_contract
-from typing import Dict, List, Tuple, Any, Optional, Iterable
+from typing import Dict, List, Tuple, Any, Optional, Iterable, Mapping
 
 import numpy as np
 import pandas as pd

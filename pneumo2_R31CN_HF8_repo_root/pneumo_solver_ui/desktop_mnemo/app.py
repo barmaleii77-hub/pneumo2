@@ -8,6 +8,7 @@ import math
 import re
 import time
 import hashlib
+from collections import Counter
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from html import escape
@@ -40,7 +41,6 @@ from pneumo_solver_ui.ui_svg_flow_helpers import default_svg_pressure_nodes
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 UI_ROOT = PROJECT_ROOT / "pneumo_solver_ui"
-COMPONENT_HTML_PATH = UI_ROOT / "components" / "pneumo_svg_flow" / "index.html"
 SCHEME_JSON_PATH = UI_ROOT / "PNEUMO_SCHEME.json"
 
 VIEWBOX_W = 2200.0
@@ -49,6 +49,11 @@ VIEWBOX = f"0 0 {int(VIEWBOX_W)} {int(VIEWBOX_H)}"
 PLAYHEAD_STORAGE_KEY = "pneumo_desktop_mnemo_playhead"
 EVENT_LOG_SCHEMA_VERSION = "desktop_mnemo_event_log_v1"
 CORNER_ORDER: tuple[str, str, str, str] = ("ЛП", "ПП", "ЛЗ", "ПЗ")
+DETAIL_MODE_LABELS: dict[str, str] = {
+    "quiet": "Тихо",
+    "operator": "Оператор",
+    "full": "Полно",
+}
 
 PRESSURE_HEAT_STOPS: tuple[tuple[float, tuple[int, int, int]], ...] = (
     (0.00, (86, 198, 255)),
@@ -119,114 +124,6 @@ CHAMBER_RE = re.compile(r"^Ц(?P<cyl>[12])_(?P<corner>ЛП|ПП|ЛЗ|ПЗ)_(?P<c
 DIAGONAL_RE = re.compile(
     r"^узел_(?P<src_corner>ЛП|ПП|ЛЗ|ПЗ)(?P<src_ch>CAP|ROD)_к_(?P<dst_corner>ЛП|ПП|ЛЗ|ПЗ)(?P<dst_ch>CAP|ROD)_(?P<stage>междуОКиДР|послеДР)$"
 )
-
-BOOTSTRAP_JS = """
-(function() {
-  if (window.__codexMnemoBootstrapInstalled) return "ok";
-  window.__codexMnemoBootstrapInstalled = true;
-  function installBridge(channel) {
-    window.codexBridge = channel.objects.codexBridge;
-    try {
-      if (window.parent && typeof window.parent === "object") {
-        window.parent.postMessage = function(data, _target) {
-          try {
-            window.codexBridge.postMessage(JSON.stringify(data || null));
-          } catch (err) {
-            console.error("codex bridge postMessage failed", err);
-          }
-        };
-      }
-    } catch (err) {
-      console.error("codex bridge patch failed", err);
-    }
-  }
-  if (window.QWebChannel && window.qt && window.qt.webChannelTransport) {
-    new QWebChannel(qt.webChannelTransport, function(channel) {
-      installBridge(channel);
-    });
-  }
-  window.codexMnemoDispatch = function(args) {
-    window.dispatchEvent(new MessageEvent("message", { data: { type: "streamlit:render", args: args || {} } }));
-    return true;
-  };
-  window.codexMnemoSetPlayhead = function(state) {
-    try {
-      var key = String((state && state.key) || (window.DATA && DATA.playhead_storage_key) || "pneumo_desktop_mnemo_playhead");
-      localStorage.setItem(key, JSON.stringify(state || {}));
-      if (state && state.idx !== undefined && state.idx !== null && typeof slider !== "undefined" && slider) {
-        idx = Number(state.idx) || 0;
-        slider.value = String(idx);
-      }
-      if (typeof __FLOW_DIRTY !== "undefined") __FLOW_DIRTY = true;
-      if (typeof __wakeLoop === "function") __wakeLoop();
-      return true;
-    } catch (err) {
-      return String(err);
-    }
-  };
-  window.codexMnemoSetSelection = function(sel) {
-    try {
-      if (!window.__lastArgs) return false;
-      var args = Object.assign({}, window.__lastArgs || {});
-      args.selected = sel || {};
-      window.__lastArgs = args;
-      build(args);
-      return true;
-    } catch (err) {
-      return String(err);
-    }
-  };
-  window.codexMnemoSetAlerts = function(alerts) {
-    try {
-      if (!window.__lastArgs) window.__lastArgs = {};
-      window.__lastArgs = Object.assign({}, window.__lastArgs || {}, { alerts: alerts || {} });
-      if (typeof DATA !== "undefined" && DATA) DATA.alerts = alerts || {};
-      if (typeof updateAlertOverlay === "function") updateAlertOverlay();
-      return true;
-    } catch (err) {
-      return String(err);
-    }
-  };
-  window.codexMnemoSetDiagnostics = function(diag) {
-    try {
-      if (!window.__lastArgs) window.__lastArgs = {};
-      window.__lastArgs = Object.assign({}, window.__lastArgs || {}, { mnemo_diagnostics: diag || {} });
-      if (typeof DATA !== "undefined" && DATA) DATA.mnemo_diagnostics = diag || {};
-      if (typeof updateMnemoDiagnostics === "function") updateMnemoDiagnostics();
-      return true;
-    } catch (err) {
-      return String(err);
-    }
-  };
-  window.codexMnemoSetFocusRegion = function(focus) {
-    try {
-      if (!window.__lastArgs) window.__lastArgs = {};
-      window.__lastArgs = Object.assign({}, window.__lastArgs || {}, { focus_region: focus || null });
-      if (typeof DATA !== "undefined" && DATA) DATA.focus_region = focus || null;
-      if (typeof applyFocusRegion === "function") applyFocusRegion(focus || null, { source: "qt-bridge" });
-      return true;
-    } catch (err) {
-      return String(err);
-    }
-  };
-  window.codexMnemoShowOverview = function(meta) {
-    try {
-      if (!window.__lastArgs) window.__lastArgs = {};
-      if (meta && Object.prototype.hasOwnProperty.call(meta, "focus_region")) {
-        window.__lastArgs = Object.assign({}, window.__lastArgs || {}, { focus_region: meta.focus_region || null });
-        if (typeof DATA !== "undefined" && DATA) DATA.focus_region = meta.focus_region || null;
-      }
-      if (typeof showFocusOverview === "function") {
-        return !!showFocusOverview(meta || {});
-      }
-      return false;
-    } catch (err) {
-      return String(err);
-    }
-  };
-  return "ok";
-})();
-"""
 
 APP_STYLESHEET_DARK = """
 QMainWindow, QWidget {
@@ -357,6 +254,8 @@ class MnemoDataset:
     edge_series: list[dict[str, Any]]
     node_series: list[dict[str, Any]]
     edge_defs: dict[str, dict[str, Any]]
+    canonical_node_names: list[str]
+    canonical_edge_names: list[str]
     time_s: np.ndarray
     q_scale: float
     q_unit: str
@@ -365,6 +264,7 @@ class MnemoDataset:
     visual_geometry: dict[str, Any]
     geometry_issues: list[str]
     geometry_warnings: list[str]
+    scheme_fidelity: dict[str, Any]
 
 
 @dataclass
@@ -1032,6 +932,7 @@ def _load_canonical_edges() -> tuple[list[str], dict[str, dict[str, Any]]]:
             "n1": str(edge.get("n1") or ""),
             "n2": str(edge.get("n2") or ""),
             "kind": str(edge.get("kind") or ""),
+            "camozzi_code": str(edge.get("camozzi_код") or edge.get("camozzi_code") or ""),
         }
     return nodes, edge_defs
 
@@ -1346,6 +1247,82 @@ def _build_mapping(
     return mapping
 
 
+def _mapping_route_issues(mapping: dict[str, Any]) -> list[str]:
+    issues: list[str] = []
+    for edge_name, payload in dict(mapping.get("edges_meta") or {}).items():
+        route_name = str(dict(payload or {}).get("mnemo_route") or "")
+        if route_name in {"fallback_lane", "missing_endpoint"}:
+            issues.append(str(edge_name))
+    return sorted(issues)
+
+
+def _mapping_route_counts(mapping: dict[str, Any]) -> dict[str, int]:
+    counts = Counter(str(dict(payload or {}).get("mnemo_route") or "unknown") for payload in dict(mapping.get("edges_meta") or {}).values())
+    return {str(name): int(count) for name, count in sorted(counts.items()) if int(count) > 0}
+
+
+def _build_scheme_fidelity_report(
+    *,
+    canonical_node_names: list[str],
+    edge_defs: dict[str, dict[str, Any]],
+    bundle_edge_names: list[str],
+    bundle_node_names: list[str],
+    node_positions: dict[str, tuple[float, float]],
+    bundle_mapping: dict[str, Any],
+) -> dict[str, Any]:
+    canonical_nodes = [str(name) for name in canonical_node_names if str(name).strip()]
+    canonical_edge_names = [str(name) for name in edge_defs.keys() if str(name).strip()]
+    canonical_node_set = set(canonical_nodes)
+    canonical_edge_set = set(canonical_edge_names)
+    canonical_mapping = _build_mapping(canonical_edge_names, canonical_nodes, edge_defs, node_positions)
+    canonical_missing_nodes = sorted(name for name in canonical_nodes if name not in node_positions)
+    canonical_route_issues = _mapping_route_issues(canonical_mapping)
+    bundle_route_issues = _mapping_route_issues(bundle_mapping)
+    bundle_extra_edges = sorted(name for name in bundle_edge_names if name not in canonical_edge_set)
+    bundle_extra_nodes = sorted(name for name in bundle_node_names if name not in canonical_node_set)
+    bundle_known_edges = [name for name in bundle_edge_names if name in canonical_edge_set]
+    bundle_known_nodes = [name for name in bundle_node_names if name in canonical_node_set]
+    canonical_nodes_positioned = len(canonical_nodes) - len(canonical_missing_nodes)
+    canonical_edges_routed = len(canonical_edge_names) - len(canonical_route_issues)
+    status = "ok"
+    if canonical_missing_nodes or canonical_route_issues or bundle_route_issues or bundle_extra_edges:
+        status = "warn"
+    elif bundle_extra_nodes:
+        status = "attention"
+    summary = (
+        f"Canonical-схема покрыта нативной мнемосхемой: {canonical_nodes_positioned}/{len(canonical_nodes)} узлов размещены, "
+        f"{canonical_edges_routed}/{len(canonical_edge_names)} ветвей маршрутизированы без fallback."
+    )
+    bundle_summary = (
+        f"Текущий bundle распознан по canonical-словарю: {len(bundle_known_edges)}/{len(bundle_edge_names)} ветвей и "
+        f"{len(bundle_known_nodes)}/{len(bundle_node_names)} pressure-узлов."
+    )
+    if bundle_extra_edges:
+        bundle_summary += f" Вне canonical осталось {len(bundle_extra_edges)} ветвей."
+    elif bundle_extra_nodes:
+        bundle_summary += f" Вне canonical осталось {len(bundle_extra_nodes)} узлов."
+    return {
+        "status": status,
+        "summary": summary,
+        "bundle_summary": bundle_summary,
+        "canonical_nodes_total": len(canonical_nodes),
+        "canonical_nodes_positioned": canonical_nodes_positioned,
+        "canonical_edges_total": len(canonical_edge_names),
+        "canonical_edges_routed": canonical_edges_routed,
+        "canonical_missing_nodes": canonical_missing_nodes,
+        "canonical_route_issues": canonical_route_issues,
+        "bundle_edges_total": len(bundle_edge_names),
+        "bundle_edges_known": len(bundle_known_edges),
+        "bundle_nodes_total": len(bundle_node_names),
+        "bundle_nodes_known": len(bundle_known_nodes),
+        "bundle_extra_edges": bundle_extra_edges,
+        "bundle_extra_nodes": bundle_extra_nodes,
+        "bundle_route_issues": bundle_route_issues,
+        "canonical_route_counts": _mapping_route_counts(canonical_mapping),
+        "bundle_route_counts": _mapping_route_counts(bundle_mapping),
+    }
+
+
 def _pick_overlay_nodes(all_nodes: list[str]) -> list[str]:
     preferred = default_svg_pressure_nodes(all_nodes, limit=10)
     seen: set[str] = set()
@@ -1640,6 +1617,7 @@ def _build_frame_alert_payload(
                 "action": primary_mode.action,
                 "severity": primary_mode.severity,
             },
+            "scheme_fidelity": {},
             "edges": [],
             "nodes": [],
             "mode_badges": [{"title": mode.title, "severity": mode.severity} for mode in narrative.modes[:3]],
@@ -1742,6 +1720,7 @@ def _build_frame_alert_payload(
             "action": primary_mode.action,
             "severity": primary_mode.severity,
         },
+        "scheme_fidelity": dict(dataset.scheme_fidelity),
         "edges": edge_items,
         "nodes": node_items,
         "mode_badges": [{"title": mode.title, "severity": mode.severity} for mode in narrative.modes[:3]],
@@ -1753,13 +1732,21 @@ def prepare_dataset(npz_path: Path) -> MnemoDataset:
     if bundle.q is None:
         raise ValueError("NPZ bundle has no q_values table for pneumatic mnemonic.")
 
-    all_scheme_nodes, edge_defs = _load_canonical_edges()
+    canonical_node_names, edge_defs = _load_canonical_edges()
     edge_names = [name for name in bundle.q.cols if name != "время_с"]
     node_names = [name for name in (bundle.p.cols if bundle.p is not None else []) if name != "время_с"]
-    full_node_inventory = list(dict.fromkeys([*all_scheme_nodes, *node_names]))
+    full_node_inventory = list(dict.fromkeys([*canonical_node_names, *node_names]))
     node_positions = _build_node_positions(full_node_inventory)
     svg_inline = _build_semantic_svg(node_positions)
     mapping = _build_mapping(edge_names, full_node_inventory, edge_defs, node_positions)
+    scheme_fidelity = _build_scheme_fidelity_report(
+        canonical_node_names=canonical_node_names,
+        edge_defs=edge_defs,
+        bundle_edge_names=edge_names,
+        bundle_node_names=node_names,
+        node_positions=node_positions,
+        bundle_mapping=mapping,
+    )
 
     p_atm = _p_atm_from_meta(bundle.meta if isinstance(bundle.meta, dict) else {})
     q_scale, q_unit = _flow_scale_and_unit(p_atm)
@@ -1789,6 +1776,8 @@ def prepare_dataset(npz_path: Path) -> MnemoDataset:
         edge_series=edge_series,
         node_series=node_series,
         edge_defs=edge_defs,
+        canonical_node_names=list(canonical_node_names),
+        canonical_edge_names=list(edge_defs.keys()),
         time_s=time_s,
         q_scale=q_scale,
         q_unit=q_unit,
@@ -1797,6 +1786,7 @@ def prepare_dataset(npz_path: Path) -> MnemoDataset:
         visual_geometry=visual_geometry,
         geometry_issues=geometry_issues,
         geometry_warnings=geometry_warnings,
+        scheme_fidelity=scheme_fidelity,
     )
 
 
@@ -2402,6 +2392,7 @@ def _build_mnemo_diagnostics_payload(
         "focus_corner": focus_corner,
         "selected_edge": str(selected_edge or ""),
         "selected_node": str(selected_node or ""),
+        "scheme_fidelity": dict(dataset.scheme_fidelity) if dataset is not None else {},
         "geometry_warnings": list(dataset.geometry_warnings) if dataset is not None else [],
         "geometry_issues": list(dataset.geometry_issues) if dataset is not None else [],
         "cylinders": [_serialize_cylinder_overlay(item) for item in cylinder_rows],
@@ -2451,6 +2442,32 @@ def _component_kind_short_label(kind: str) -> str:
     return mapping.get(str(kind), "LINE")
 
 
+def _canonical_kind_label(kind: str) -> str:
+    mapping = {
+        "check": "check valve",
+        "orifice": "orifice",
+        "relief": "relief regulator",
+        "reg_after": "after-self regulator",
+    }
+    return mapping.get(str(kind or "").strip().lower(), "generic line")
+
+
+def _component_icon_key(kind: str, canonical_kind: str) -> str:
+    canonical = str(canonical_kind or "").strip().lower()
+    if canonical in {"check", "orifice", "relief", "reg_after"}:
+        return canonical
+    normalized = str(kind or "").strip().lower()
+    if "диагон" in normalized:
+        return "diagonal"
+    if "сброс" in normalized:
+        return "vent"
+    if "питание" in normalized:
+        return "supply"
+    if "исполнитель" in normalized:
+        return "actuator"
+    return "line"
+
+
 def _state_short_label(state_label: str) -> str:
     lowered = str(state_label).lower()
     if any(token in lowered for token in ("откр", "рѕс‚рєсЂ")):
@@ -2488,11 +2505,17 @@ def _build_component_overlay_rows(
         if item.edge_name != selected_name and item.component_kind == "Диагональ" and abs(float(item.q_now)) < diagonal_floor:
             continue
         flow_rgb = _flow_to_heat_rgb(item.q_now, max_abs_flow=max_abs_flow)
+        edge_def = dataset.edge_defs.get(item.edge_name, {}) if dataset is not None else {}
+        canonical_kind = str(edge_def.get("kind") or "")
         payload_rows.append(
             {
                 "edge_name": item.edge_name,
                 "component_kind": item.component_kind,
                 "component_short": _component_kind_short_label(item.component_kind),
+                "canonical_kind": canonical_kind,
+                "canonical_kind_label": _canonical_kind_label(canonical_kind),
+                "camozzi_code": str(edge_def.get("camozzi_code") or ""),
+                "icon_key": _component_icon_key(item.component_kind, canonical_kind),
                 "q_now": _finite_or_none(item.q_now),
                 "flow_abs": _finite_or_none(abs(float(item.q_now))),
                 "direction_label": item.direction_label,
@@ -2593,21 +2616,14 @@ class PointerWatcher(QtCore.QObject):
             self.status.emit(f"Follow error: {exc}")
 
 
-class BridgeObject(QtCore.QObject):
-    message_received = QtCore.Signal(str)
-
-    @QtCore.Slot(str)
-    def postMessage(self, payload: str) -> None:
-        self.message_received.emit(str(payload))
-
-
-class MnemoWebView(QtWidgets.QWidget):
+class MnemoNativeView(QtWidgets.QWidget):
     edge_picked = QtCore.Signal(str)
     node_picked = QtCore.Signal(str)
     status = QtCore.Signal(str)
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
+        self._detail_mode = "operator"
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(8)
@@ -2655,6 +2671,17 @@ class MnemoWebView(QtWidgets.QWidget):
         )
         self.native_canvas.render_dataset(dataset, selected_edge=selected_edge, selected_node=selected_node)
 
+    @staticmethod
+    def _detail_mode_label(mode: str) -> str:
+        return str(DETAIL_MODE_LABELS.get(str(mode or "").strip().lower(), DETAIL_MODE_LABELS["operator"]))
+
+    def set_detail_mode(self, mode: str) -> None:
+        self._detail_mode = self.native_canvas.set_detail_mode(mode)
+        self.hint_label.setText(
+            "Колесо: zoom • drag: pan • click: выбрать ветвь или узел"
+            + f" • слой: {self._detail_mode_label(self._detail_mode)}"
+        )
+
     def set_playhead(self, idx: int, playing: bool, dataset_id: str) -> None:
         self.mode_badge.setText("Playback" if playing else "Hold")
         self.native_canvas.set_frame_state(idx, playing, dataset_id)
@@ -2674,10 +2701,19 @@ class MnemoWebView(QtWidgets.QWidget):
         self.native_canvas.set_alerts(alerts)
 
     def set_diagnostics(self, diagnostics: dict[str, Any]) -> None:
+        fidelity = dict(diagnostics.get("scheme_fidelity") or {})
+        canonical_nodes_positioned = int(fidelity.get("canonical_nodes_positioned") or 0)
+        canonical_nodes_total = int(fidelity.get("canonical_nodes_total") or 0)
+        canonical_edges_routed = int(fidelity.get("canonical_edges_routed") or 0)
+        canonical_edges_total = int(fidelity.get("canonical_edges_total") or 0)
         warnings = len(list(diagnostics.get("geometry_warnings") or []))
         issues = len(list(diagnostics.get("geometry_issues") or []))
         self.hint_label.setText(
-            f"Native overlay: cylinders {len(list(diagnostics.get('cylinders') or []))}, components {len(list(diagnostics.get('components') or []))}, geometry {warnings}/{issues}"
+            "Native overlay: "
+            + f"schema {canonical_nodes_positioned}/{canonical_nodes_total} nodes, "
+            + f"{canonical_edges_routed}/{canonical_edges_total} routes, "
+            + f"geometry {warnings}/{issues}"
+            + f" • слой {self._detail_mode_label(self._detail_mode)}"
         )
         self.native_canvas.set_diagnostics(diagnostics)
 
@@ -3277,8 +3313,15 @@ class SelectionPanel(QtWidgets.QWidget):
                 q_now = float(q_vals[idx])
                 q_peak = float(np.max(np.abs(q_vals))) if q_vals.size else 0.0
                 edge_def = dataset.edge_defs.get(edge_name, {})
+                edge_meta = dict(dataset.mapping.get("edges_meta", {}).get(edge_name) or {})
                 endpoint_1 = str(edge_def.get("n1") or "—")
                 endpoint_2 = str(edge_def.get("n2") or "—")
+                component_kind = _edge_component_kind(edge_name, edge_def)
+                canonical_kind = str(edge_def.get("kind") or "")
+                route_class = str(edge_meta.get("mnemo_route") or "—")
+                zone_label = _edge_zone_label(edge_name, edge_def)
+                direction_label = f"{_short_node_label(endpoint_1)} → {_short_node_label(endpoint_2)}"
+                camozzi_code = str(edge_def.get("camozzi_code") or "").strip() or "—"
                 state = "открыт"
                 if open_arr is not None:
                     state = "открыт" if int(np.asarray(open_arr, dtype=int)[idx]) else "закрыт"
@@ -3291,10 +3334,22 @@ class SelectionPanel(QtWidgets.QWidget):
                     + f"{q_peak:8.2f} {dataset.q_unit}"
                     + "<br/><b>Состояние:</b> "
                     + escape(state)
+                    + "<br/><b>Элемент:</b> "
+                    + escape(component_kind)
+                    + " / "
+                    + escape(_canonical_kind_label(canonical_kind))
                     + "<br/><b>Маршрут:</b> "
                     + escape(endpoint_1)
                     + " → "
                     + escape(endpoint_2)
+                    + "<br/><b>Направление элемента:</b> "
+                    + escape(direction_label)
+                    + "<br/><b>Зона:</b> "
+                    + escape(zone_label)
+                    + "<br/><b>Класс прокладки:</b> "
+                    + escape(route_class)
+                    + "<br/><b>Каталог / серия:</b> "
+                    + escape(camozzi_code)
                     + "</p>"
                 )
 
@@ -3439,6 +3494,84 @@ class GuidancePanel(QtWidgets.QTextBrowser):
             + escape(narrative.primary_summary)
             + "</p>"
             + "".join(mode_cards)
+        )
+
+
+class SchemeFidelityPanel(QtWidgets.QTextBrowser):
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self.setOpenExternalLinks(False)
+
+    @staticmethod
+    def _badge(status: str) -> str:
+        palette = {
+            "ok": ("#81e7a3", "#0f2a1c"),
+            "attention": ("#f8c15c", "#2b1c09"),
+            "warn": ("#f0936b", "#30150f"),
+        }
+        fg, bg = palette.get(str(status), ("#9cb9c7", "#17252d"))
+        return (
+            f'<span style="display:inline-block; padding:2px 8px; border-radius:999px; '
+            f'background:{bg}; color:{fg}; font-weight:700; font-size:11px;">{escape(str(status).upper())}</span>'
+        )
+
+    @staticmethod
+    def _route_counts_html(route_counts: dict[str, Any]) -> str:
+        if not route_counts:
+            return "нет данных"
+        return " • ".join(f"{escape(str(name))}: {int(count)}" for name, count in sorted(route_counts.items()))
+
+    @staticmethod
+    def _issue_list_html(items: list[str], *, empty_text: str, limit: int = 8) -> str:
+        if not items:
+            return f"<p>{escape(empty_text)}</p>"
+        preview = "".join(f"<li>{escape(str(item))}</li>" for item in items[:limit])
+        tail = ""
+        if len(items) > limit:
+            tail = f"<li>… ещё {len(items) - limit}</li>"
+        return f"<ul>{preview}{tail}</ul>"
+
+    def render(self, dataset: MnemoDataset | None) -> None:
+        if dataset is None:
+            self.setHtml(
+                "<h3>Соответствие схеме</h3>"
+                "<p>Панель проверяет, насколько native-мнемосхема совпадает с canonical-пневмосхемой из "
+                "<code>PNEUMO_SCHEME.json</code>.</p>"
+                "<p>После загрузки bundle здесь появятся покрытие узлов, маршрутов и все отклонения без web-прослойки.</p>"
+            )
+            return
+
+        fidelity = dict(dataset.scheme_fidelity or {})
+        self.setHtml(
+            "<h3>Соответствие схеме</h3>"
+            + "<p>"
+            + self._badge(str(fidelity.get("status") or "ok"))
+            + f" <span style='margin-left:8px;'>{escape(str(fidelity.get('summary') or ''))}</span></p>"
+            + f"<p><b>Bundle:</b> {escape(str(fidelity.get('bundle_summary') or ''))}</p>"
+            + "<p><b>Canonical layout:</b><br/>"
+            + f"узлы {int(fidelity.get('canonical_nodes_positioned') or 0)}/{int(fidelity.get('canonical_nodes_total') or 0)}"
+            + " • "
+            + f"ветви {int(fidelity.get('canonical_edges_routed') or 0)}/{int(fidelity.get('canonical_edges_total') or 0)}</p>"
+            + "<p><b>Профиль маршрутов:</b><br/>"
+            + escape(self._route_counts_html(dict(fidelity.get("canonical_route_counts") or {})))
+            + "</p>"
+            + "<p><b>Проблемы canonical layout:</b></p>"
+            + self._issue_list_html(
+                list(fidelity.get("canonical_missing_nodes") or []) + list(fidelity.get("canonical_route_issues") or []),
+                empty_text="Критичных расхождений между mnemonic layout и canonical-схемой не найдено.",
+            )
+            + "<p><b>Отклонения текущего bundle:</b></p>"
+            + self._issue_list_html(
+                list(fidelity.get("bundle_extra_edges") or [])
+                + list(fidelity.get("bundle_extra_nodes") or [])
+                + list(fidelity.get("bundle_route_issues") or []),
+                empty_text="Все текущие ветви и pressure-узлы распознаны в рамках canonical-словаря.",
+            )
+            + (
+                "<p><b>Geometry contract:</b> есть issues/warnings, проверьте панель приводов и diagnostics.</p>"
+                if dataset.geometry_issues or dataset.geometry_warnings
+                else "<p><b>Geometry contract:</b> читается чисто.</p>"
+            )
         )
 
 
@@ -3948,8 +4081,10 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
 
         self._scene_rect = QtCore.QRectF(0.0, 0.0, VIEWBOX_W, VIEWBOX_H)
         self._camera_rect = QtCore.QRectF(self._scene_rect)
+        self._camera_target_rect: QtCore.QRectF | None = None
         self._dataset: MnemoDataset | None = None
         self._dataset_id = ""
+        self._detail_mode = "operator"
         self._frame_idx = 0
         self._playing = False
         self._selected_edge = ""
@@ -3977,7 +4112,21 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._flow_phase = 0.0
         self._anim_timer = QtCore.QTimer(self)
         self._anim_timer.setInterval(40)
-        self._anim_timer.timeout.connect(self._advance_flow_phase)
+        self._anim_timer.timeout.connect(self._advance_animations)
+
+    @staticmethod
+    def _normalize_detail_mode(mode: str) -> str:
+        raw_mode = str(mode or "").strip().lower()
+        return raw_mode if raw_mode in DETAIL_MODE_LABELS else "operator"
+
+    def set_detail_mode(self, mode: str) -> str:
+        self._detail_mode = self._normalize_detail_mode(mode)
+        self._invalidate_background_cache()
+        self.update()
+        return self._detail_mode
+
+    def _detail_mode_label(self) -> str:
+        return str(DETAIL_MODE_LABELS.get(self._detail_mode, DETAIL_MODE_LABELS["operator"]))
 
     def render_dataset(self, dataset: MnemoDataset, *, selected_edge: str | None, selected_node: str | None) -> None:
         self._dataset = dataset
@@ -3985,12 +4134,13 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._frame_idx = 0
         self._selected_edge = str(selected_edge or "")
         self._selected_node = str(selected_node or "")
+        self._camera_target_rect = None
         self._edge_series_map = {str(item.get("name") or ""): item for item in dataset.edge_series}
         self._node_series_map = {str(item.get("name") or ""): item for item in dataset.node_series}
         self._build_native_scene_cache()
         self._load_svg_renderer(dataset.svg_inline)
         if self._mode == "overview":
-            self._fit_camera(self._scene_rect)
+            self._set_camera_target(self._scene_rect, immediate=True)
         self._invalidate_background_cache()
         self.update()
         self.status.emit("Desktop Mnemo switched to native Qt canvas.")
@@ -3999,11 +4149,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._frame_idx = int(max(0, idx))
         self._playing = bool(playing)
         self._dataset_id = str(dataset_id or self._dataset_id)
-        if self._playing:
-            if not self._anim_timer.isActive():
-                self._anim_timer.start()
-        else:
-            self._anim_timer.stop()
+        self._sync_anim_timer()
         self.update()
 
     def set_selection(self, *, edge: str | None, node: str | None) -> None:
@@ -4025,7 +4171,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             self._mode = "focus"
             target_rect = self._focus_scene_rect(self._focus_region)
             if target_rect is not None:
-                self._fit_camera(target_rect)
+                self._set_camera_target(target_rect)
             self.status.emit(
                 f"Фокус: {self._focus_region.get('edge_name') or self._focus_region.get('node_name') or 'scene'}"
             )
@@ -4037,7 +4183,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._overview_meta = dict(meta or {})
         focus_region = self._overview_meta.get("focus_region")
         self._focus_region = dict(focus_region) if isinstance(focus_region, dict) else self._focus_region
-        self._fit_camera(self._scene_rect)
+        self._set_camera_target(self._scene_rect)
         self._invalidate_background_cache()
         self.update()
 
@@ -4062,9 +4208,11 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             float(cursor_scene.x()) - new_rect.width() * rx,
             float(cursor_scene.y()) - new_rect.height() * ry,
         )
+        self._camera_target_rect = None
         self._camera_rect = self._clamped_camera_rect(new_rect)
         self._invalidate_background_cache()
         self.update()
+        self._sync_anim_timer()
         event.accept()
 
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:  # type: ignore[override]
@@ -4116,7 +4264,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
     def mouseDoubleClickEvent(self, event: QtGui.QMouseEvent) -> None:  # type: ignore[override]
         if event.button() == QtCore.Qt.LeftButton:
             target_rect = self._focus_scene_rect(self._focus_region) if self._mode == "focus" else self._scene_rect
-            self._fit_camera(target_rect or self._scene_rect)
+            self._set_camera_target(target_rect or self._scene_rect)
             self._invalidate_background_cache()
             self.update()
             event.accept()
@@ -4153,9 +4301,22 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.restore()
         self._draw_hud(painter)
 
-    def _advance_flow_phase(self) -> None:
-        self._flow_phase = (self._flow_phase + 6.0) % 1000.0
-        self.update()
+    def _advance_animations(self) -> None:
+        dirty = False
+        if self._playing:
+            self._flow_phase = (self._flow_phase + 6.0) % 1000.0
+            dirty = True
+        if self._camera_target_rect is not None:
+            next_rect = self._interpolate_rect(self._camera_rect, self._camera_target_rect, 0.22)
+            if self._rect_close_enough(next_rect, self._camera_target_rect):
+                next_rect = QtCore.QRectF(self._camera_target_rect)
+                self._camera_target_rect = None
+            self._camera_rect = self._clamped_camera_rect(next_rect)
+            self._invalidate_background_cache()
+            dirty = True
+        if dirty:
+            self.update()
+        self._sync_anim_timer()
 
     def _content_rect(self) -> QtCore.QRectF:
         return QtCore.QRectF(self.rect()).adjusted(12.0, 12.0, -12.0, -12.0)
@@ -4264,12 +4425,53 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         return QtCore.QPointF(point)
 
     def _fit_camera(self, target_rect: QtCore.QRectF) -> None:
+        self._camera_rect = self._resolved_camera_rect(target_rect)
+
+    def _resolved_camera_rect(self, target_rect: QtCore.QRectF) -> QtCore.QRectF:
         normalized = QtCore.QRectF(target_rect if target_rect.isValid() else self._scene_rect)
         if normalized.width() < 10.0 or normalized.height() < 10.0:
             normalized = QtCore.QRectF(self._scene_rect)
         padding = max(40.0, min(180.0, 0.10 * max(normalized.width(), normalized.height())))
         normalized.adjust(-padding, -padding, padding, padding)
-        self._camera_rect = self._clamped_camera_rect(normalized)
+        return self._clamped_camera_rect(normalized)
+
+    def _set_camera_target(self, target_rect: QtCore.QRectF, *, immediate: bool = False) -> None:
+        resolved = self._resolved_camera_rect(target_rect)
+        if immediate:
+            self._camera_rect = QtCore.QRectF(resolved)
+            self._camera_target_rect = None
+            self._invalidate_background_cache()
+            self.update()
+            self._sync_anim_timer()
+            return
+        self._camera_target_rect = resolved
+        self._sync_anim_timer()
+
+    def _sync_anim_timer(self) -> None:
+        should_run = bool(self._playing or self._camera_target_rect is not None)
+        if should_run and not self._anim_timer.isActive():
+            self._anim_timer.start()
+        elif not should_run and self._anim_timer.isActive():
+            self._anim_timer.stop()
+
+    @staticmethod
+    def _interpolate_rect(current: QtCore.QRectF, target: QtCore.QRectF, factor: float) -> QtCore.QRectF:
+        t = max(0.0, min(1.0, float(factor)))
+        return QtCore.QRectF(
+            current.left() + (target.left() - current.left()) * t,
+            current.top() + (target.top() - current.top()) * t,
+            current.width() + (target.width() - current.width()) * t,
+            current.height() + (target.height() - current.height()) * t,
+        )
+
+    @staticmethod
+    def _rect_close_enough(current: QtCore.QRectF, target: QtCore.QRectF) -> bool:
+        return (
+            abs(current.left() - target.left()) <= 1.5
+            and abs(current.top() - target.top()) <= 1.5
+            and abs(current.width() - target.width()) <= 1.5
+            and abs(current.height() - target.height()) <= 1.5
+        )
 
     def _clamped_camera_rect(self, rect: QtCore.QRectF) -> QtCore.QRectF:
         content_rect = self._content_rect()
@@ -4313,9 +4515,11 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         dy = -float(delta_px.y()) * self._camera_rect.height() / float(content_rect.height())
         target = QtCore.QRectF(self._camera_rect)
         target.translate(dx, dy)
+        self._camera_target_rect = None
         self._camera_rect = self._clamped_camera_rect(target)
         self._invalidate_background_cache()
         self.update()
+        self._sync_anim_timer()
 
     def _focus_scene_rect(self, focus_region: dict[str, Any] | None) -> QtCore.QRectF | None:
         if self._dataset is None or not focus_region:
@@ -4371,6 +4575,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             return
         flows = [abs(self._current_edge_flow(edge_name)) for edge_name in self._dataset.edge_names]
         max_abs_flow = max(flows, default=0.0)
+        inline_symbols = self._inline_route_symbol_payloads(max_abs_flow=max_abs_flow)
         for edge_name in self._dataset.edge_names:
             path = self._edge_paths.get(edge_name)
             if path is None:
@@ -4407,14 +4612,24 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                     QtGui.QPen(accent, base_width + 2.5, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin)
                 )
                 painter.drawPath(path)
+            inline_payload = inline_symbols.get(edge_name)
+            if inline_payload is not None:
+                self._draw_inline_route_symbol(painter, edge_name=edge_name, payload=inline_payload)
 
     def _draw_live_nodes(self, painter: QtGui.QPainter) -> None:
         if self._dataset is None:
             return
-        spotlight_nodes: set[str] = set(self._dataset.overlay_node_names)
+        if self._detail_mode == "quiet":
+            spotlight_nodes: set[str] = set()
+        elif self._detail_mode == "full":
+            spotlight_nodes = set(self._node_points.keys())
+        else:
+            spotlight_nodes = set(self._dataset.overlay_node_names)
         spotlight_nodes.update(str(item.get("name") or "") for item in list(self._alerts.get("nodes") or []))
         if self._selected_node:
             spotlight_nodes.add(self._selected_node)
+        if self._hover_kind == "node" and self._hover_name:
+            spotlight_nodes.add(self._hover_name)
 
         for node_name, point in self._node_points.items():
             pressure = self._current_node_pressure(node_name)
@@ -4486,7 +4701,10 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
     def _draw_alert_markers(self, painter: QtGui.QPainter) -> None:
         if not self._alerts:
             return
-        for item in list(self._alerts.get("edges") or []):
+        edge_items = list(self._alerts.get("edges") or [])
+        if self._detail_mode == "quiet":
+            edge_items = [item for item in edge_items if str(item.get("name") or "") == self._selected_edge][:1] or edge_items[:1]
+        for item in edge_items:
             edge_name = str(item.get("name") or "")
             midpoint = self._edge_midpoints.get(edge_name)
             if midpoint is None:
@@ -4513,12 +4731,26 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
 
     def _draw_diagnostics_overlay(self, painter: QtGui.QPainter) -> None:
         diagnostics = self._diagnostics if isinstance(self._diagnostics, dict) else {}
-        for payload in list(diagnostics.get("cylinders") or []):
+        cylinder_payloads = list(diagnostics.get("cylinders") or [])
+        component_payloads = list(diagnostics.get("components") or [])
+        if self._detail_mode == "quiet":
+            focus_corner = str(diagnostics.get("focus_corner") or "")
+            selected_node = str(diagnostics.get("selected_node") or "")
+            filtered = [
+                payload
+                for payload in cylinder_payloads
+                if str(payload.get("corner") or "") == focus_corner or str(payload.get("focus_node") or "") == selected_node
+            ]
+            cylinder_payloads = filtered[:2] if filtered else cylinder_payloads[:1]
+            component_payloads = []
+        elif self._detail_mode == "operator":
+            component_payloads = component_payloads[:8]
+        for payload in cylinder_payloads:
             if not isinstance(payload, dict):
                 continue
             rect = self._cylinder_card_rect(payload)
             self._draw_cylinder_card(painter, rect, payload)
-        for payload in list(diagnostics.get("components") or []):
+        for payload in component_payloads:
             if not isinstance(payload, dict):
                 continue
             rect = self._component_badge_rect(payload)
@@ -4556,6 +4788,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                     f"t idx {self._frame_idx}",
                     "focus" if self._mode == "focus" else "overview",
                     "play" if self._playing else "hold",
+                    self._detail_mode_label().lower(),
                 ]
             ),
         )
@@ -4567,9 +4800,10 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
 
         if not self._diagnostics:
             return
+        fidelity = dict(self._diagnostics.get("scheme_fidelity") or {})
         warnings = len(list(self._diagnostics.get("geometry_warnings") or []))
         issues = len(list(self._diagnostics.get("geometry_issues") or []))
-        right_hud = QtCore.QRectF(content_rect.right() - 324.0, content_rect.top() + 16.0, 308.0, 88.0)
+        right_hud = QtCore.QRectF(content_rect.right() - 360.0, content_rect.top() + 16.0, 344.0, 108.0)
         painter.setPen(QtCore.Qt.NoPen)
         painter.setBrush(QtGui.QColor(7, 17, 23, 204))
         painter.drawRoundedRect(right_hud, 16.0, 16.0)
@@ -4583,12 +4817,20 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.setFont(body_font)
         painter.setPen(QtGui.QColor("#b8d1d9"))
         painter.drawText(
-            right_hud.adjusted(16.0, 38.0, -16.0, -26.0),
+            right_hud.adjusted(16.0, 34.0, -16.0, -52.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            "Schema "
+            + f"{int(fidelity.get('canonical_nodes_positioned') or 0)}/{int(fidelity.get('canonical_nodes_total') or 0)} nodes"
+            + " • "
+            + f"{int(fidelity.get('canonical_edges_routed') or 0)}/{int(fidelity.get('canonical_edges_total') or 0)} routes",
+        )
+        painter.drawText(
+            right_hud.adjusted(16.0, 56.0, -16.0, -30.0),
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
             f"Cylinders {len(list(self._diagnostics.get('cylinders') or []))} • Components {len(list(self._diagnostics.get('components') or []))}",
         )
         painter.drawText(
-            right_hud.adjusted(16.0, 58.0, -16.0, -10.0),
+            right_hud.adjusted(16.0, 78.0, -16.0, -8.0),
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
             f"Geometry warnings {warnings} • issues {issues}",
         )
@@ -4653,7 +4895,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         order = int(payload.get("order") or 0)
         shift_x = -48.0 if order % 2 else 48.0
         shift_y = -46.0 - float(order % 3) * 36.0
-        return QtCore.QRectF(midpoint.x() + shift_x - 76.0, midpoint.y() + shift_y - 24.0, 152.0, 48.0)
+        return QtCore.QRectF(midpoint.x() + shift_x - 86.0, midpoint.y() + shift_y - 26.0, 172.0, 52.0)
 
     def _draw_cylinder_card(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:
         cap = dict(payload.get("cap") or {})
@@ -4743,13 +4985,15 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.setPen(QtGui.QPen(QtGui.QColor("#fff4c7" if is_selected else "#0c1620"), 2.0))
         painter.setBrush(QtGui.QColor(flow_hex))
         painter.drawRoundedRect(rect, 14.0, 14.0)
+        icon_rect = QtCore.QRectF(rect.left() + 8.0, rect.top() + 8.0, 32.0, rect.height() - 16.0)
+        self._draw_component_icon(painter, icon_rect, payload, text_hex=text_hex)
         painter.setPen(QtGui.QColor(text_hex))
         title_font = QtGui.QFont(self.font())
         title_font.setPointSizeF(8.8)
         title_font.setBold(True)
         painter.setFont(title_font)
         painter.drawText(
-            rect.adjusted(10.0, 4.0, -10.0, -20.0),
+            rect.adjusted(46.0, 4.0, -10.0, -22.0),
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
             f"{payload.get('component_short') or 'LINE'} • {payload.get('state_short') or 'SIG?'}",
         )
@@ -4757,16 +5001,207 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         body_font.setPointSizeF(7.4)
         painter.setFont(body_font)
         painter.drawText(
-            rect.adjusted(10.0, 18.0, -10.0, -4.0),
+            rect.adjusted(46.0, 18.0, -10.0, -4.0),
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
             self._fmt_value(payload.get("q_now"), self._dataset.q_unit if self._dataset is not None else "", digits=2),
         )
         painter.drawText(
-            rect.adjusted(10.0, 18.0, -10.0, -4.0),
+            rect.adjusted(46.0, 18.0, -10.0, -4.0),
             QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
             str(payload.get("zone_label") or ""),
         )
         self._overlay_targets.append(("edge", str(payload.get("edge_name") or ""), rect))
+
+    def _inline_route_symbol_payloads(self, *, max_abs_flow: float) -> dict[str, dict[str, Any]]:
+        if self._dataset is None:
+            return {}
+        payloads: dict[str, dict[str, Any]] = {}
+        alert_edges = {
+            str(item.get("name") or ""): dict(item)
+            for item in list(self._alerts.get("edges") or [])
+            if str(item.get("name") or "").strip()
+        }
+        candidates: list[dict[str, Any]] = []
+        if self._detail_mode == "quiet":
+            active_floor = max(28.0, float(max_abs_flow) * 0.35) if max_abs_flow > 1.0e-9 else 0.0
+            max_symbols = 3
+        elif self._detail_mode == "full":
+            active_floor = max(8.0, float(max_abs_flow) * 0.12) if max_abs_flow > 1.0e-9 else 0.0
+            max_symbols = 10
+        else:
+            active_floor = max(18.0, float(max_abs_flow) * 0.22) if max_abs_flow > 1.0e-9 else 0.0
+            max_symbols = 6
+        for edge_name in self._dataset.edge_names:
+            edge_def = dict(self._dataset.edge_defs.get(edge_name) or {})
+            component_kind = _edge_component_kind(edge_name, edge_def)
+            canonical_kind = str(edge_def.get("kind") or "")
+            icon_key = _component_icon_key(component_kind, canonical_kind)
+            if icon_key == "line":
+                continue
+            flow_value = self._current_edge_flow(edge_name)
+            flow_abs = abs(float(flow_value))
+            is_selected = edge_name == self._selected_edge
+            alert_meta = alert_edges.get(edge_name, {})
+            is_alert = bool(alert_meta)
+            if not (is_selected or is_alert or flow_abs >= active_floor):
+                continue
+            candidates.append(
+                {
+                    "edge_name": edge_name,
+                    "component_kind": component_kind,
+                    "component_short": _component_kind_short_label(component_kind),
+                    "canonical_kind": canonical_kind,
+                    "canonical_kind_label": _canonical_kind_label(canonical_kind),
+                    "icon_key": icon_key,
+                    "camozzi_code": str(edge_def.get("camozzi_code") or ""),
+                    "zone_label": _edge_zone_label(edge_name, edge_def),
+                    "flow_value": flow_value,
+                    "flow_abs": flow_abs,
+                    "is_selected": is_selected,
+                    "is_alert": is_alert,
+                    "severity": str(alert_meta.get("severity") or ("focus" if is_selected else "info")),
+                    "symbol_t": 0.42 if is_selected else 0.5,
+                }
+            )
+        candidates.sort(
+            key=lambda item: (
+                0 if item.get("is_selected") else 1,
+                0 if item.get("is_alert") else 1,
+                -float(item.get("flow_abs") or 0.0),
+                str(item.get("edge_name") or ""),
+            )
+        )
+        for item in candidates[:max_symbols]:
+            payloads[str(item.get("edge_name") or "")] = item
+        return payloads
+
+    def _draw_inline_route_symbol(self, painter: QtGui.QPainter, *, edge_name: str, payload: dict[str, Any]) -> None:
+        path = self._edge_paths.get(edge_name)
+        if path is None or path.isEmpty():
+            return
+        t = max(0.1, min(0.9, float(payload.get("symbol_t") or 0.5)))
+        center = path.pointAtPercent(t)
+        angle = self._path_angle_deg(path, t)
+        is_selected = bool(payload.get("is_selected"))
+        width = 62.0 if is_selected else 54.0
+        height = 28.0 if is_selected else 24.0
+        border_hex = "#fff4c7" if is_selected else self._severity_color_hex(str(payload.get("severity") or "info"))
+        fill = QtGui.QColor(7, 17, 23, 228 if is_selected else 212)
+        painter.save()
+        painter.translate(center)
+        painter.rotate(angle)
+        plate = QtCore.QRectF(-width * 0.5, -height * 0.5, width, height)
+        painter.setPen(QtGui.QPen(QtGui.QColor(border_hex), 2.2 if is_selected else 1.8))
+        painter.setBrush(fill)
+        painter.drawRoundedRect(plate, 11.0, 11.0)
+        icon_rect = QtCore.QRectF(plate.left() + 4.0, plate.top() + 4.0, 18.0, plate.height() - 8.0)
+        self._draw_component_icon(
+            painter,
+            icon_rect,
+            payload,
+            text_hex="#eef7fa",
+            draw_backplate=False,
+            stroke_width=1.45,
+        )
+        text_rect = QtCore.QRectF(icon_rect.right() + 4.0, plate.top() + 1.0, plate.width() - 28.0, plate.height() - 2.0)
+        font = QtGui.QFont(self.font())
+        font.setPointSizeF(7.2 if is_selected else 6.8)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor("#eef7fa"))
+        painter.drawText(
+            text_rect,
+            QtCore.Qt.AlignCenter,
+            str(payload.get("component_short") or "LINE"),
+        )
+        painter.restore()
+
+    @staticmethod
+    def _path_angle_deg(path: QtGui.QPainterPath, percent: float) -> float:
+        p1 = path.pointAtPercent(max(0.0, float(percent) - 0.03))
+        p2 = path.pointAtPercent(min(1.0, float(percent) + 0.03))
+        dx = float(p2.x() - p1.x())
+        dy = float(p2.y() - p1.y())
+        if abs(dx) <= 1.0e-9 and abs(dy) <= 1.0e-9:
+            return 0.0
+        return math.degrees(math.atan2(dy, dx))
+
+    def _draw_component_icon(
+        self,
+        painter: QtGui.QPainter,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+        *,
+        text_hex: str,
+        draw_backplate: bool = True,
+        stroke_width: float = 1.8,
+    ) -> None:
+        painter.save()
+        if draw_backplate:
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(QtGui.QColor(7, 17, 23, 132))
+            painter.drawRoundedRect(rect, 10.0, 10.0)
+        pen = QtGui.QPen(QtGui.QColor(text_hex), float(stroke_width), QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin)
+        painter.setPen(pen)
+        painter.setBrush(QtGui.QBrush(QtGui.QColor(text_hex)))
+        key = str(payload.get("icon_key") or "line")
+        cx = rect.center().x()
+        cy = rect.center().y()
+        left = rect.left() + 6.0
+        right = rect.right() - 6.0
+        top = rect.top() + 6.0
+        bottom = rect.bottom() - 6.0
+        if key == "check":
+            painter.drawLine(left, cy, right - 10.0, cy)
+            painter.drawLine(right - 6.0, top + 1.0, right - 6.0, bottom - 1.0)
+            triangle = QtGui.QPolygonF(
+                [
+                    QtCore.QPointF(cx - 6.0, top + 2.0),
+                    QtCore.QPointF(cx - 6.0, bottom - 2.0),
+                    QtCore.QPointF(right - 8.0, cy),
+                ]
+            )
+            painter.drawPolygon(triangle)
+        elif key == "orifice":
+            painter.drawLine(left, cy, cx - 7.0, cy)
+            painter.drawLine(cx + 7.0, cy, right, cy)
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawLine(cx - 7.0, top + 3.0, cx + 1.0, bottom - 3.0)
+            painter.drawLine(cx + 7.0, top + 3.0, cx - 1.0, bottom - 3.0)
+        elif key == "relief":
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawRect(QtCore.QRectF(left + 2.0, top + 3.0, rect.width() - 14.0, rect.height() - 10.0))
+            painter.drawLine(cx, top + 2.0, cx, top - 2.0)
+            painter.drawLine(cx - 5.0, top - 1.0, cx + 5.0, top - 1.0)
+            painter.drawLine(left + 2.0, bottom - 2.0, right - 2.0, bottom - 2.0)
+        elif key == "reg_after":
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawRect(QtCore.QRectF(left + 2.0, top + 3.0, rect.width() - 14.0, rect.height() - 10.0))
+            painter.drawLine(cx, top + 5.0, cx, bottom - 5.0)
+            painter.drawLine(cx - 5.0, cy, cx, cy - 5.0)
+            painter.drawLine(cx - 5.0, cy, cx, cy + 5.0)
+            painter.drawLine(cx, cy, cx + 6.0, cy)
+        elif key == "diagonal":
+            painter.drawLine(left, top, right, bottom)
+            painter.drawLine(left, bottom, right, top)
+        elif key == "vent":
+            painter.drawLine(cx, top + 2.0, cx, cy + 2.0)
+            painter.drawLine(cx - 8.0, cy + 2.0, cx + 8.0, cy + 2.0)
+            painter.drawLine(cx - 6.0, cy + 6.0, cx + 6.0, cy + 6.0)
+            painter.drawLine(cx - 4.0, cy + 10.0, cx + 4.0, cy + 10.0)
+        elif key == "supply":
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawEllipse(QtCore.QRectF(cx - 8.0, cy - 8.0, 16.0, 16.0))
+            painter.drawLine(cx + 8.0, cy, right, cy)
+        elif key == "actuator":
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawRect(QtCore.QRectF(left + 2.0, cy - 7.0, 14.0, 14.0))
+            painter.drawLine(left + 16.0, cy, right, cy)
+            painter.drawLine(right - 5.0, cy - 4.0, right, cy)
+            painter.drawLine(right - 5.0, cy + 4.0, right, cy)
+        else:
+            painter.drawLine(left, cy, right, cy)
+        painter.restore()
 
     def _current_edge_flow(self, edge_name: str) -> float:
         series = self._edge_series_map.get(edge_name)
@@ -4919,12 +5354,14 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._startup_view_mode_override = self._parse_startup_view_mode_override(startup_view_mode)
         self._view_mode_override_active = bool(self._startup_view_mode_override)
         self.view_mode = self._startup_view_mode_override or self._persisted_view_mode
+        self.detail_mode = self._normalize_detail_mode(self.ui_state.get_str("detail_mode", "operator"))
         self.setStyleSheet(APP_STYLESHEET_DARK if self.theme == "dark" else APP_STYLESHEET_LIGHT)
 
-        self.web = MnemoWebView(self)
-        self.web.edge_picked.connect(self._select_edge)
-        self.web.node_picked.connect(self._select_node)
-        self.web.status.connect(self._set_status)
+        self.mnemo_view = MnemoNativeView(self)
+        self.mnemo_view.set_detail_mode(self.detail_mode)
+        self.mnemo_view.edge_picked.connect(self._select_edge)
+        self.mnemo_view.node_picked.connect(self._select_node)
+        self.mnemo_view.status.connect(self._set_status)
         self.startup_banner = StartupBannerPanel(self)
         self.startup_banner.hide_requested.connect(lambda: self._set_startup_banner_visible(False))
         self.startup_banner.focus_requested.connect(self._apply_onboarding_focus)
@@ -4944,7 +5381,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._central_layout.setContentsMargins(8, 8, 8, 0)
         self._central_layout.setSpacing(8)
         self._central_layout.addWidget(self.startup_banner, 0)
-        self._central_layout.addWidget(self.web, 1)
+        self._central_layout.addWidget(self.mnemo_view, 1)
         self.setCentralWidget(self._central_host)
 
         self.overview_panel = OverviewPanel(self)
@@ -4958,30 +5395,39 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.selection_panel.node_selected.connect(self._select_node)
         self.trends_panel = TrendsPanel(self)
         self.guide_panel = GuidancePanel(self)
+        self.fidelity_panel = SchemeFidelityPanel(self)
         self.event_panel = EventMemoryPanel(self)
         self.legend_panel = QtWidgets.QTextBrowser(self)
         self.legend_panel.setHtml(
             "<h3>Легенда и UX-правила</h3>"
             "<p><b>Бирюзовый</b> — поток по направлению ветки.<br/>"
             "<b>Оранжевый</b> — реверс потока.<br/>"
-            "<b>Серый</b> — закрытый элемент.</p>"
+            "<b>Серый</b> — закрытый элемент.<br/>"
+            "<b>Inline symbol</b> — canonical-тип арматуры прямо на линии маршрута.</p>"
+            "<p><b>Плотность overlays:</b><br/>"
+            "<b>Тихо</b> — только основной контекст и минимум карточек.<br/>"
+            "<b>Оператор</b> — сбалансированный рабочий режим.<br/>"
+            "<b>Полно</b> — максимум labels и inline-символов для разборов схемы.</p>"
             "<p><b>Что где читать:</b><br/>"
             "<b>Центр</b> — топология и причинно-следственная картина.<br/>"
             "<b>Обзор</b> — что сейчас доминирует.<br/>"
             "<b>Приводы</b> — полости, штоки, объёмы, heatmap углов и активная арматура.<br/>"
             "<b>Диагностические сценарии</b> — как интерпретировать текущий кадр.<br/>"
+            "<b>Соответствие схеме</b> — покрытие canonical-узлов и ветвей без fallback.<br/>"
             "<b>События</b> — latched-память и недавние переключения.<br/>"
             "<b>Тренды</b> — численная проверка гипотезы.</p>"
             "<p>Такое разделение снижает когнитивное переключение: в центре остаётся только схема, "
             "а чтение режима и чисел уходит в отдельные docks, как в современных инженерных HMI.</p>"
         )
         self.guide_panel.render(None, 0, selected_edge=None, selected_node=None, playing=self.playing, follow_enabled=self.follow_enabled)
+        self.fidelity_panel.render(None)
         self._render_event_panel()
 
         self._overview_dock = self._add_dock("Обзор", self.overview_panel, QtCore.Qt.LeftDockWidgetArea, obj_name="dock_overview")
         self._snapshot_dock = self._add_dock("Приводы", self.snapshot_panel, QtCore.Qt.LeftDockWidgetArea, obj_name="dock_snapshot")
         self._selection_dock = self._add_dock("Выбор", self.selection_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_selection")
         self._guide_dock = self._add_dock("Диагностика", self.guide_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_guide")
+        self._fidelity_dock = self._add_dock("Соответствие", self.fidelity_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_fidelity")
         self._events_dock = self._add_dock("События", self.event_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_events")
         self._trends_dock = self._add_dock("Тренды", self.trends_panel, QtCore.Qt.BottomDockWidgetArea, obj_name="dock_trends")
         self._legend_dock = self._add_dock("Легенда", self.legend_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_legend")
@@ -5087,6 +5533,16 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.speed_combo.currentIndexChanged.connect(self._speed_changed)
         tb.addWidget(self.speed_combo)
 
+        self.detail_combo = QtWidgets.QComboBox()
+        self.detail_combo.setObjectName("mnemo_detail_combo")
+        self.detail_combo.addItem("Тихо", "quiet")
+        self.detail_combo.addItem("Оператор", "operator")
+        self.detail_combo.addItem("Полно", "full")
+        detail_idx = max(0, self.detail_combo.findData(self.detail_mode))
+        self.detail_combo.setCurrentIndex(detail_idx)
+        self.detail_combo.currentIndexChanged.connect(self._detail_mode_changed)
+        tb.addWidget(self.detail_combo)
+
         self.scrubber = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.scrubber.setMinimum(0)
         self.scrubber.setMaximum(0)
@@ -5120,6 +5576,10 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         view_menu.addAction(self.startup_banner_action)
         view_menu.addAction(self.return_focus_action)
         view_menu.addAction(self.full_scheme_action)
+        detail_menu = view_menu.addMenu("Плотность overlays")
+        for mode in ("quiet", "operator", "full"):
+            action = detail_menu.addAction(DETAIL_MODE_LABELS[mode])
+            action.triggered.connect(lambda _checked=False, mode=mode: self._set_detail_mode(mode, announce=True))
 
         playback_menu = self.menuBar().addMenu("Анимация")
         playback_menu.addAction(self.play_action)
@@ -5142,6 +5602,11 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
     @staticmethod
     def _normalize_view_mode(mode: str) -> str:
         return "overview" if str(mode or "").strip().lower() == "overview" else "focus"
+
+    @staticmethod
+    def _normalize_detail_mode(mode: str) -> str:
+        raw_mode = str(mode or "").strip().lower()
+        return raw_mode if raw_mode in DETAIL_MODE_LABELS else "operator"
 
     @staticmethod
     def _parse_startup_view_mode_override(mode: str) -> str:
@@ -5216,6 +5681,21 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             except Exception:
                 pass
         return self.view_mode
+
+    def _set_detail_mode(self, mode: str, *, announce: bool) -> str:
+        self.detail_mode = self._normalize_detail_mode(mode)
+        self.mnemo_view.set_detail_mode(self.detail_mode)
+        if hasattr(self, "detail_combo"):
+            with QtCore.QSignalBlocker(self.detail_combo):
+                idx = max(0, self.detail_combo.findData(self.detail_mode))
+                self.detail_combo.setCurrentIndex(idx)
+        try:
+            self.ui_state.set_value("detail_mode", self.detail_mode)
+        except Exception:
+            pass
+        if announce:
+            self._set_status(f"Плотность overlays: {DETAIL_MODE_LABELS[self.detail_mode]}")
+        return self.detail_mode
 
     def _set_startup_banner_visible(self, visible: bool) -> None:
         is_visible = bool(visible)
@@ -5292,6 +5772,10 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             startup_time_label=self._startup_time_label,
         )
 
+    def _detail_mode_changed(self, index: int) -> None:
+        mode = str(self.detail_combo.itemData(index) or "operator")
+        self._set_detail_mode(mode, announce=True)
+
     def _current_focus_region_payload(self, *, source: str, auto_focus: bool) -> dict[str, Any] | None:
         if self.dataset is None or self.dataset.time_s.size == 0:
             return None
@@ -5310,7 +5794,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             return
         focus_region = self._current_focus_region_payload(source=source, auto_focus=auto_focus)
         if self.view_mode == "overview":
-            self.web.show_overview(
+            self.mnemo_view.show_overview(
                 {
                     "title": "Полная схема",
                     "summary": "Сравните рекомендуемый сценарий с полной топологией, не теряя быстрый путь назад к фокусу.",
@@ -5318,13 +5802,13 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
                 }
             )
             return
-        self.web.set_focus_region(focus_region)
+        self.mnemo_view.set_focus_region(focus_region)
 
     def _sync_selection_views(self, *, clear_focus_region: bool = False) -> None:
         if self.dataset is None:
             return
         if clear_focus_region:
-            self.web.set_focus_region(None)
+            self.mnemo_view.set_focus_region(None)
         self.selection_panel.set_selection(edge_name=self.selected_edge, node_name=self.selected_node)
         self.selection_panel.render_details(
             self.dataset,
@@ -5341,7 +5825,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             playing=self.playing,
             follow_enabled=self.follow_enabled,
         )
-        self.web.set_selection(edge=self.selected_edge, node=self.selected_node)
+        self.mnemo_view.set_selection(edge=self.selected_edge, node=self.selected_node)
         self._push_diagnostics()
         self._push_alerts()
         if self.startup_banner.isVisible():
@@ -5392,6 +5876,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         try:
             self.ui_state.set_value("window/state", self.saveState())
             self.ui_state.set_value("play_speed", float(self._play_speed))
+            self.ui_state.set_value("detail_mode", str(self.detail_mode))
             if not self._view_mode_override_active:
                 self.ui_state.set_value("view_mode", str(self.view_mode))
             self.ui_state.sync()
@@ -5508,7 +5993,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         if self.dataset is None:
             return
         self.current_idx = int(max(0, min(value, self.dataset.time_s.size - 1)))
-        self._refresh_frame(push_to_web=True)
+        self._refresh_frame(push_to_view=True)
 
     def _advance_playback(self) -> None:
         if not self.playing or self.dataset is None or self.dataset.time_s.size <= 1:
@@ -5524,7 +6009,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         if new_idx >= self.dataset.time_s.size:
             new_idx = 0
         self.current_idx = new_idx
-        self._refresh_frame(push_to_web=True)
+        self._refresh_frame(push_to_view=True)
 
     def load_dataset(self, npz_path: Path, *, preserve_selection: bool) -> None:
         try:
@@ -5569,9 +6054,10 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.event_tracker.bind_dataset(self.dataset, idx=self.current_idx)
             self.selection_panel.set_selection(edge_name=self.selected_edge, node_name=self.selected_node)
             self.trends_panel.set_series(self.dataset, edge_name=self.selected_edge, node_name=self.selected_node)
-            self.web.render_dataset(self.dataset, selected_edge=self.selected_edge, selected_node=self.selected_node)
+            self.fidelity_panel.render(self.dataset)
+            self.mnemo_view.render_dataset(self.dataset, selected_edge=self.selected_edge, selected_node=self.selected_node)
             self._apply_current_view_mode(source="dataset_load", auto_focus=not preserve_selection)
-            self._refresh_frame(push_to_web=True)
+            self._refresh_frame(push_to_view=True)
             self._persist_event_log(silent=True)
             self._set_dataset_title()
             self._render_startup_banner()
@@ -5585,7 +6071,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.critical(self, "Desktop Mnemo", _friendly_error_text(exc))
             self._set_status(f"Ошибка загрузки: {exc}")
 
-    def _refresh_frame(self, *, push_to_web: bool = False) -> None:
+    def _refresh_frame(self, *, push_to_view: bool = False) -> None:
         if self.dataset is None or self.dataset.time_s.size == 0:
             return
         self.current_idx = int(max(0, min(self.current_idx, self.dataset.time_s.size - 1)))
@@ -5610,7 +6096,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self._render_startup_banner()
         if new_events:
             self._persist_event_log(silent=True)
-        if push_to_web:
+        if push_to_view:
             self._push_diagnostics()
             self._push_alerts()
             self._push_playhead()
@@ -5618,7 +6104,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
     def _push_playhead(self) -> None:
         if self.dataset is None:
             return
-        self.web.set_playhead(self.current_idx, self.playing, self.dataset.dataset_id)
+        self.mnemo_view.set_playhead(self.current_idx, self.playing, self.dataset.dataset_id)
 
     def _push_alerts(self) -> None:
         alerts = _build_frame_alert_payload(
@@ -5627,7 +6113,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             selected_edge=self.selected_edge,
             selected_node=self.selected_node,
         )
-        self.web.set_alerts(alerts)
+        self.mnemo_view.set_alerts(alerts)
 
     def _push_diagnostics(self) -> None:
         diagnostics = _build_mnemo_diagnostics_payload(
@@ -5636,7 +6122,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             selected_edge=self.selected_edge,
             selected_node=self.selected_node,
         )
-        self.web.set_diagnostics(diagnostics)
+        self.mnemo_view.set_diagnostics(diagnostics)
 
     def _persist_event_log(self, *, silent: bool) -> Path | None:
         path = _write_event_log_sidecar(

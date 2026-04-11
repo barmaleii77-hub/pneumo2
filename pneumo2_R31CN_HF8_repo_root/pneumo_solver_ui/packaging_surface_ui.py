@@ -34,13 +34,13 @@ def render_packaging_surface_metrics(st: Any, df: pd.DataFrame | None) -> None:
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.metric("Packaging PASS", pack_pass)
+        st.metric("Геометрия OK", pack_pass)
     with c2:
-        st.metric("Packaging FAIL", pack_fail)
+        st.metric("Геометрия: есть проблемы", pack_fail)
     with c3:
-        st.metric("Truth-ready", pack_truth)
+        st.metric("Данных достаточно", pack_truth)
     with c4:
-        st.metric("Runtime fallback", pack_fallback)
+        st.metric("Служебный fallback", pack_fallback)
 
 
 def apply_packaging_surface_filters(
@@ -55,7 +55,7 @@ def apply_packaging_surface_filters(
 
     out = df.copy()
     use_pass = st.checkbox(
-        "Только packaging PASS",
+        "Только с OK по геометрии",
         value=bool(st.session_state.get(f"{key_prefix}_packaging_pass_filter", False)),
         key=f"{key_prefix}_packaging_pass_filter",
     )
@@ -63,7 +63,7 @@ def apply_packaging_surface_filters(
         out = out[pd.to_numeric(out["pass_packaging"], errors="coerce").fillna(0) >= 1.0]
 
     use_truth = st.checkbox(
-        "Только packaging truth_ready",
+        "Только с достаточными данными",
         value=bool(st.session_state.get(f"{key_prefix}_packaging_truth_ready", False)),
         key=f"{key_prefix}_packaging_truth_ready",
     )
@@ -71,7 +71,7 @@ def apply_packaging_surface_filters(
         out = out[pd.to_numeric(out["packaging_truth_ready"], errors="coerce").fillna(0) >= 1.0]
 
     hide_fallback = st.checkbox(
-        "Скрыть runtime_fallback пружин",
+        "Скрыть служебный fallback пружин",
         value=bool(st.session_state.get(f"{key_prefix}_packaging_no_fallback", False)),
         key=f"{key_prefix}_packaging_no_fallback",
     )
@@ -79,7 +79,7 @@ def apply_packaging_surface_filters(
         out = out[pd.to_numeric(out["число_runtime_fallback_пружины"], errors="coerce").fillna(0) <= 0.0]
 
     no_interference = st.checkbox(
-        "Только без spring-interference",
+        "Только без пересечений пружин",
         value=bool(st.session_state.get(f"{key_prefix}_packaging_no_interference", False)),
         key=f"{key_prefix}_packaging_no_interference",
     )
@@ -90,7 +90,7 @@ def apply_packaging_surface_filters(
             out = out[pd.to_numeric(out["число_пересечений_пружина_пружина"], errors="coerce").fillna(0) <= 0.0]
 
     if not compact:
-        st.caption(f"После packaging filters: {len(out)} / {len(df)}")
+        st.caption(f"После фильтров по геометрии узлов: {len(out)} / {len(df)}")
     return out
 
 

@@ -74,7 +74,7 @@ def test_page_readonly_last_overview_renders_actions() -> None:
 
 
 def test_page_readonly_physical_workflow_can_restore_default_objectives() -> None:
-    st = _FakeStreamlit(buttons={"Вернуть канонический objective stack (comfort / roll / energy)": True})
+    st = _FakeStreamlit(buttons={"Вернуть канонический набор целей (comfort / roll / energy)": True})
     st.session_state["opt_objectives"] = "custom_metric"
     rerun_events: list[str] = []
 
@@ -87,7 +87,7 @@ def test_page_readonly_physical_workflow_can_restore_default_objectives() -> Non
         rerun_fn=lambda _st: rerun_events.append("rerun"),
     )
 
-    assert ("metric", ("Physics-first path", "StageRunner")) in st.calls
-    assert ("metric", ("Trade-study path", "Distributed")) in st.calls
+    assert ("metric", ("Быстрый путь по физике", "StageRunner")) in st.calls
+    assert ("metric", ("Длинный перебор", "Distributed")) in st.calls
     assert st.session_state["opt_objectives"] == "comfort\nroll\nenergy"
     assert rerun_events == ["rerun"]

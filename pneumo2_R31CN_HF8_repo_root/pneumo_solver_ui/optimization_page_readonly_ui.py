@@ -42,8 +42,8 @@ def render_last_optimization_overview_block(
         current_problem_hash_mode=current_problem_hash_mode,
         missing_message="Последняя оптимизация пока не запускалась (или артефакты не найдены).",
         success_message="Найдены результаты последней оптимизации.",
-        packaging_heading="Packaging snapshot (last run)",
-        packaging_interference_prefix="В последнем run есть packaging-interference evidence",
+        packaging_heading="Сводка по геометрии узлов (последний run)",
+        packaging_interference_prefix="В последнем run есть признаки пересечений по геометрии узлов",
     ):
         return
 
@@ -75,12 +75,12 @@ def render_physical_workflow_block(
     )
     cols = st.columns([1, 1, 1])
     with cols[0]:
-        st.metric("Physics-first path", "StageRunner")
+        st.metric("Быстрый путь по физике", "StageRunner")
     with cols[1]:
-        st.metric("Trade-study path", "Distributed")
+        st.metric("Длинный перебор", "Distributed")
     with cols[2]:
         st.metric(
-            "Hard gate",
+            "Жёсткий порог",
             str(session_state.get("opt_penalty_key", penalty_key_default) or penalty_key_default),
         )
 
@@ -89,28 +89,28 @@ def render_physical_workflow_block(
         "Честный физический scope текущего оптимизатора — сигналы подвески, дороги и реакции кузова."
     )
     st.caption(
-        "StageRunner — physics-first путь: дешёвые стадии и ранний отсев. Быстрый stop/fail на stage0/stage1 — это штатно, "
+        "StageRunner — быстрый путь по физике: дешёвые стадии и ранний отсев. Быстрый stop/fail на stage0/stage1 — это штатно, "
         "если кандидат сразу выбивается по физике или penalty gate."
     )
     st.caption(
-        "Distributed coordinator — длинный trade study после того, как search-space и suite уже стабилизированы. "
-        "Он нужен не вместо physical gate, а после него."
+        "Distributed coordinator — длинный перебор вариантов после того, как search-space и suite уже стабилизированы. "
+        "Он нужен не вместо физического фильтра, а после него."
     )
     st.caption(
-        "Канонический minimize-safe стек целей для coordinator и StageRunner promotion/baseline: "
+        "Канонический набор целей для coordinator и StageRunner promotion/baseline: "
         + ", ".join(str(item) for item in default_objectives)
     )
-    st.caption("Текущий objective stack: " + ", ".join(current_obj))
+    st.caption("Текущий набор целей: " + ", ".join(current_obj))
     st.caption(
-        "Если нужна другая постановка — правьте objective keys ниже вручную. И coordinator, и StageRunner будут читать один и тот же stack; блок ничего не скрывает и не режет настройки."
+        "Если нужна другая постановка — правьте objective keys ниже вручную. И coordinator, и StageRunner будут читать один и тот же набор целей; блок ничего не скрывает и не режет настройки."
     )
     if st.button(
-        "Вернуть канонический objective stack (comfort / roll / energy)",
+        "Вернуть канонический набор целей (comfort / roll / energy)",
         key="opt_restore_default_objectives",
         help="Подставляет текущий канонический стек целей в editable objective textarea ниже.",
     ):
         session_state["opt_objectives"] = objectives_text_fn(default_objectives)
-        st.success("Канонический objective stack подставлен в editable поле ниже.")
+        st.success("Канонический набор целей подставлен в editable поле ниже.")
         rerun_fn(st)
 
 

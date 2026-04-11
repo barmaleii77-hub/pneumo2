@@ -62,14 +62,14 @@ def test_render_packaging_snapshot_summary_handles_compact_and_full_modes() -> N
         st_full,
         snapshot,
         compact=False,
-        heading="Packaging snapshot по выбранному run",
-        interference_prefix="В выбранном run есть packaging-interference evidence",
+        heading="Сводка по геометрии узлов (выбранный run)",
+        interference_prefix="В выбранном run есть признаки пересечений по геометрии узлов",
     )
-    assert any("Packaging snapshot по выбранному run" in text for text in st_full.markdowns)
-    assert any("Packaging status rows" in text for text in st_full.captions)
-    assert any("В выбранном run есть packaging-interference evidence" in text for text in st_full.warnings)
+    assert any("Сводка по геометрии узлов (выбранный run)" in text for text in st_full.markdowns)
+    assert any("Статусы по строкам" in text for text in st_full.captions)
+    assert any("В выбранном run есть признаки пересечений по геометрии узлов" in text for text in st_full.warnings)
 
     st_compact = _FakeSt()
     assert render_packaging_snapshot_summary(st_compact, snapshot, compact=True)
-    assert any("Packaging snapshot:" in text for text in st_compact.captions)
-    assert any("Interference:" in text for text in st_compact.captions)
+    assert any("Геометрия узлов:" in text for text in st_compact.captions)
+    assert any("Пересечения:" in text for text in st_compact.captions)

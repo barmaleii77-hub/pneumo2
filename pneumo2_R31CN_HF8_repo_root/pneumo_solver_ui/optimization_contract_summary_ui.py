@@ -24,6 +24,15 @@ def format_hard_gate(penalty_key: Any, penalty_tol: Any = None) -> str:
     return hard_gate
 
 
+def _contract_diff_label(name: Any) -> str:
+    key = str(name or "").strip()
+    return {
+        "objective stack": "набор целей",
+        "penalty key": "ключ штрафа",
+        "penalty tol": "допуск по штрафу",
+    }.get(key, key)
+
+
 def render_objective_contract_summary(
     st: Any,
     *,
@@ -35,16 +44,16 @@ def render_objective_contract_summary(
     rendered = False
     normalized_objectives = normalize_objective_keys(objective_keys)
     if normalized_objectives:
-        st.write("**Objective stack:** " + ", ".join(normalized_objectives))
+        st.write("**Набор целей оптимизации:** " + ", ".join(normalized_objectives))
         rendered = True
 
     hard_gate = format_hard_gate(penalty_key, penalty_tol)
     if hard_gate:
-        st.write(f"**Hard gate:** {hard_gate}")
+        st.write(f"**Жёсткий порог по штрафу:** {hard_gate}")
         rendered = True
 
     if objective_contract_path is not None:
-        st.caption(f"Objective contract artifact: {objective_contract_path}")
+        st.caption(f"Файл objective-contract: {objective_contract_path}")
         rendered = True
 
     return rendered
@@ -87,7 +96,7 @@ def render_objective_contract_drift_warning(
     subject: str = "Выбранный run",
     against: str = "текущие поля UI",
 ) -> bool:
-    normalized = [str(x).strip() for x in diff_bits if str(x).strip()]
+    normalized = [_contract_diff_label(x) for x in diff_bits if str(x).strip()]
     if not normalized:
         return False
     st.info(

@@ -74,11 +74,11 @@ def test_stage_policy_runtime_ui_renders_metrics_and_policy_details() -> None:
 
     assert rendered is True
     assert ("metric", "Стадия=stage1_long") in st.calls
-    assert ("metric", "Stage rows=7") in st.calls
-    assert ("metric", "Всего live rows=15") in st.calls
+    assert ("metric", "Строк в стадии=7") in st.calls
+    assert ("metric", "Всего live-строк=15") in st.calls
     assert ("metric", "Время стадии, с=42.0") in st.calls
-    assert ("markdown", "**Seed/promotion policy (текущая стадия)**") in st.calls
-    assert ("metric", "Target seeds=5") in st.calls
-    assert ("metric", "Selected=4") in st.calls
-    assert any(kind == "warning" and "Seed budget underfilled" in text for kind, text in st.calls)
-    assert any(kind == "caption" and "Main gate reasons: penalty gate" in text for kind, text in st.calls)
+    assert ("markdown", "**Политика отбора и продвижения (текущая стадия)**") in st.calls
+    assert ("metric", "Целевой объём seed=5") in st.calls
+    assert ("metric", "Отобрано=4") in st.calls
+    assert any(kind == "warning" and "Seed-бюджет заполнен не полностью" in text for kind, text in st.calls)
+    assert any(kind == "caption" and "Главные причины отсечения: penalty gate" in text for kind, text in st.calls)

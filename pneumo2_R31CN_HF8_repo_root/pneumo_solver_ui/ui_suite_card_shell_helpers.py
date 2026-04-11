@@ -43,8 +43,8 @@ def render_suite_card_targets_section_intro(st: Any) -> None:
 
 def render_suite_card_draft_notice(st: Any) -> None:
     st.caption(
-        "Черновик карточки живет в UI-state: обычный rerun не должен "
-        "откатывать несохраненные поля."
+        "Черновик карточки хранится в состоянии интерфейса: обычное обновление страницы "
+        "не должно откатывать несохранённые поля."
     )
 
 

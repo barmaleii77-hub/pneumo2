@@ -95,6 +95,21 @@ def _safe_float(x: Any, default: float) -> float:
         return float(default)
 
 
+def _align_series_length(arr: Any, n: int, *, fill: float = 0.0) -> np.ndarray:
+    """Align a 1D numeric series to length ``n`` without cyclic wraparound."""
+    n = int(max(0, n))
+    if n <= 0:
+        return np.zeros((0,), dtype=float)
+    vec = np.asarray(arr, dtype=float).reshape(-1)
+    if vec.size >= n:
+        return np.asarray(vec[:n], dtype=float)
+    if vec.size <= 0:
+        return np.full((n,), float(fill), dtype=float)
+    pad_value = float(vec[-1]) if np.isfinite(float(vec[-1])) else float(fill)
+    pad = np.full((n - vec.size,), pad_value, dtype=float)
+    return np.concatenate([np.asarray(vec, dtype=float), pad], axis=0)
+
+
 def _infer_wheelbase_from_meta(meta: Dict[str, Any]) -> Optional[float]:
     """Read wheelbase (meters) for visual consumers strictly from nested geometry.
 
@@ -568,15 +583,16 @@ class DataBundle:
 
         self._warn_once(
             "ensure_world_xy::integrated_fallback",
-            "[Animator] Missing canonical path columns 'путь_x_м'/'путь_y_м'; deriving world XY from скорость_vx_м_с + yaw_рад as SERVICE/DERIVED.",
+            "[Animator] Missing canonical path columns 'путь_x_м'/'путь_y_м'; deriving world XY from скорость_vx_м_с + скорость_vy_м_с + yaw_рад as SERVICE/DERIVED.",
         )
-        vx = np.asarray(self.get("скорость_vx_м_с", default=0.0), dtype=float)
-        yaw = np.asarray(self.get("yaw_рад", default=0.0), dtype=float)
+        vx = _align_series_length(self.get("скорость_vx_м_с", default=0.0), n, fill=0.0)
+        vy = _align_series_length(self.get("скорость_vy_м_с", default=0.0), n, fill=0.0)
+        yaw = _align_series_length(self.get("yaw_рад", default=0.0), n, fill=0.0)
 
         dt = np.diff(t, prepend=t[0])
         dt[0] = 0.0
-        dx = vx * np.cos(yaw)
-        dy = vx * np.sin(yaw)
+        dx = vx * np.cos(yaw) - vy * np.sin(yaw)
+        dy = vx * np.sin(yaw) + vy * np.cos(yaw)
 
         xw = np.zeros((n,), dtype=float)
         yw = np.zeros((n,), dtype=float)
@@ -589,7 +605,7 @@ class DataBundle:
         return xw, yw
 
     def ensure_world_velocity_xy(self) -> Tuple[np.ndarray, np.ndarray]:
-        """World-frame XY velocity from explicit path if available, else from vx/yaw."""
+        """World-frame XY velocity from explicit path if available, else from body vx/vy/yaw."""
         key_x = "svc__vx_world_м_с"
         key_y = "svc__vy_world_м_с"
         if key_x in self._derived and key_y in self._derived:
@@ -611,10 +627,11 @@ class DataBundle:
                 vxw = np.zeros((n,), dtype=float)
                 vyw = np.zeros((n,), dtype=float)
         except Exception:
-            yaw = np.asarray(self.get("yaw_рад", default=0.0), dtype=float)
-            vx = np.asarray(self.get("скорость_vx_м_с", default=0.0), dtype=float)
-            vxw = vx * np.cos(yaw)
-            vyw = vx * np.sin(yaw)
+            yaw = _align_series_length(self.get("yaw_рад", default=0.0), n, fill=0.0)
+            vx = _align_series_length(self.get("скорость_vx_м_с", default=0.0), n, fill=0.0)
+            vy = _align_series_length(self.get("скорость_vy_м_с", default=0.0), n, fill=0.0)
+            vxw = vx * np.cos(yaw) - vy * np.sin(yaw)
+            vyw = vx * np.sin(yaw) + vy * np.cos(yaw)
         self._derived[key_x] = vxw
         self._derived[key_y] = vyw
         return vxw, vyw
@@ -626,7 +643,7 @@ class DataBundle:
         if key_x in self._derived and key_y in self._derived:
             return self._derived[key_x], self._derived[key_y]
         vxw, vyw = self.ensure_world_velocity_xy()
-        yaw = np.asarray(self.get("yaw_рад", default=0.0), dtype=float)
+        yaw = _align_series_length(self.get("yaw_рад", default=0.0), int(len(vxw)), fill=0.0)
         c = np.cos(yaw)
         s = np.sin(yaw)
         vxb = c * vxw + s * vyw
@@ -665,9 +682,9 @@ class DataBundle:
         except Exception:
             pass
 
-        yaw = np.asarray(self.get("yaw_рад", default=0.0), dtype=float)
-        axb = np.asarray(self.get("ускорение_продольное_ax_м_с2", default=0.0), dtype=float)
-        ayb = np.asarray(self.get("ускорение_поперечное_ay_м_с2", default=0.0), dtype=float)
+        yaw = _align_series_length(self.get("yaw_рад", default=0.0), n, fill=0.0)
+        axb = _align_series_length(self.get("ускорение_продольное_ax_м_с2", default=0.0), n, fill=0.0)
+        ayb = _align_series_length(self.get("ускорение_поперечное_ay_м_с2", default=0.0), n, fill=0.0)
         c = np.cos(yaw)
         s = np.sin(yaw)
         axw = c * axb - s * ayb
@@ -685,8 +702,9 @@ class DataBundle:
 
         try:
             if self.main.has("ускорение_продольное_ax_м_с2") and self.main.has("ускорение_поперечное_ay_м_с2"):
-                axb = np.asarray(self.get("ускорение_продольное_ax_м_с2", default=0.0), dtype=float)
-                ayb = np.asarray(self.get("ускорение_поперечное_ay_м_с2", default=0.0), dtype=float)
+                n = int(len(self.t))
+                axb = _align_series_length(self.get("ускорение_продольное_ax_м_с2", default=0.0), n, fill=0.0)
+                ayb = _align_series_length(self.get("ускорение_поперечное_ay_м_с2", default=0.0), n, fill=0.0)
                 self._derived[key_x] = axb
                 self._derived[key_y] = ayb
                 return axb, ayb
@@ -694,7 +712,7 @@ class DataBundle:
             pass
 
         axw, ayw = self.ensure_world_acceleration_xy()
-        yaw = np.asarray(self.get("yaw_рад", default=0.0), dtype=float)
+        yaw = _align_series_length(self.get("yaw_рад", default=0.0), int(len(axw)), fill=0.0)
         c = np.cos(yaw)
         s = np.sin(yaw)
         axb = c * axw + s * ayw
@@ -886,7 +904,8 @@ class DataBundle:
 
         Source priority (no hidden aliases):
           1) arc length of explicit canonical path ``путь_x_м``/``путь_y_м``;
-          2) trapezoidal integration of canonical ``скорость_vx_м_с``.
+          2) trapezoidal integration of canonical body-speed magnitude
+             ``hypot(скорость_vx_м_с, скорость_vy_м_с)``.
         """
         key = "svc__s_world_м"
         if key in self._derived:
@@ -911,19 +930,25 @@ class DataBundle:
             pass
 
         vx = None
+        vy = None
         try:
             if self.main.has("скорость_vx_м_с"):
-                vx = np.asarray(self.get("скорость_vx_м_с", default=0.0), dtype=float)
+                vx = _align_series_length(self.get("скорость_vx_м_с", default=0.0), n, fill=0.0)
+            if self.main.has("скорость_vy_м_с"):
+                vy = _align_series_length(self.get("скорость_vy_м_с", default=0.0), n, fill=0.0)
         except Exception:
             vx = None
+            vy = None
 
         if vx is None:
             logger.warning(
                 "[Animator] Missing signal 'скорость_vx_м_с' in NPZ. s_world axis will be zero (no inferred speed)."
             )
             vx = np.zeros((n,), dtype=float)
+        if vy is None:
+            vy = np.zeros((n,), dtype=float)
 
-        v = np.asarray(vx, dtype=float)
+        v = np.asarray(np.hypot(vx, vy), dtype=float)
         dt = np.diff(t, prepend=t[0])
         dt[0] = 0.0
         s = np.zeros((n,), dtype=float)

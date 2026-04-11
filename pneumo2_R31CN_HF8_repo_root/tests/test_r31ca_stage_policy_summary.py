@@ -121,7 +121,7 @@ def test_ui_and_stage_runner_sources_expose_stage_policy_controls() -> None:
     root = Path(__file__).resolve().parents[1] / "pneumo_solver_ui"
     ui_src = (root / "pneumo_ui_app.py").read_text(encoding="utf-8")
     runner_src = (root / "opt_stage_runner_v1.py").read_text(encoding="utf-8")
-    assert '"Seed/promotion policy"' in ui_src
+    assert '"Политика отбора и продвижения"' in ui_src
     assert 'stage_seed_policy_summary_text()' in ui_src
     assert '"--stage_policy_mode"' in runner_src
     assert 'stage_specific_influence_summary.json' in runner_src

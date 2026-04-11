@@ -16,7 +16,7 @@ def test_home_page_exposes_gateway_and_not_second_live_control_plane() -> None:
     assert 'Главная больше не держит второй launcher оптимизации' in src
     assert 'Legacy home optimization block retained only as dormant source surface' in src
     assert 'Live launch path = dedicated Optimization page.' in src
-    assert '"Seed/promotion policy"' in src
+    assert '"Политика отбора и продвижения"' in src
     assert 'load_last_optimization_pointer_snapshot' in src
     assert 'return load_last_optimization_pointer_snapshot()' in src
     assert 'render_last_optimization_pointer_summary' in src

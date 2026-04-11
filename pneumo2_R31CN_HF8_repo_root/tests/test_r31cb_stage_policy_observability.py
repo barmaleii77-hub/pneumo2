@@ -97,7 +97,7 @@ def test_sources_expose_current_screen_stage_policy_observability() -> None:
     ui_src = (root / "optimization_stage_policy_runtime_ui.py").read_text(encoding="utf-8")
     block_src = (root / "optimization_stage_runtime_block.py").read_text(encoding="utf-8")
     runner_src = (root / "opt_stage_runner_v1.py").read_text(encoding="utf-8")
-    assert "Seed/promotion policy (текущая стадия)" in ui_src
+    assert "Политика отбора и продвижения (текущая стадия)" in ui_src
     assert "summarize_stage_policy_runtime" in block_src
     assert "seed_points_manifest.json" in runner_src
     assert "stage_seed_manifest_json" in runner_src

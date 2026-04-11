@@ -17,14 +17,14 @@ def test_r31cs_optimization_page_surfaces_physical_workflow_and_sequential_histo
     combined = src + "\n" + readonly_src + "\n" + history_src + "\n" + launch_session_src
     assert '"Физический смысл путей запуска"' in src
     assert 'render_physical_workflow_block' in src
-    assert 'StageRunner — physics-first путь' in combined
-    assert 'Distributed coordinator — длинный trade study' in combined
+    assert 'StageRunner — быстрый путь по физике' in combined
+    assert 'Distributed coordinator — длинный перебор вариантов' in combined
     assert 'powertrain / engine-map модели в live optimization contract сейчас нет' in combined
-    assert '"Вернуть канонический objective stack (comfort / roll / energy)"' in combined
+    assert '"Вернуть канонический набор целей (comfort / roll / energy)"' in combined
     assert 'discover_workspace_optimization_runs' in combined
     assert 'format_run_choice' in combined
     assert '"Последовательные запуски в текущем workspace"' in src
     assert 'render_workspace_run_history_block' in src
     assert '"Сделать текущей «последней оптимизацией»"' in combined
     assert '"Открыть результаты выбранного run"' in combined
-    assert 'Нормальный инженерный сценарий: сначала StageRunner как быстрый physical gate' in combined
+    assert 'Нормальный инженерный сценарий: сначала StageRunner как быстрый физический фильтр' in combined

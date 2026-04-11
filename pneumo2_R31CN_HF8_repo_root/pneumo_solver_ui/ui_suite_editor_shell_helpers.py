@@ -6,11 +6,31 @@ from pneumo_solver_ui.optimization_input_contract import infer_suite_stage
 
 
 SUITE_PRESET_LABELS = {
-    "worldroad_flat": "WorldRoad: ровная дорога",
-    "worldroad_sine_x": "WorldRoad: синус вдоль (A=2 см, λ=2 м)",
-    "worldroad_bump": "WorldRoad: бугор (h=4 см, w=0.6 м)",
+    "worldroad_flat": "Ровная дорога (WorldRoad)",
+    "worldroad_sine_x": "Синус вдоль (A=2 см, λ=2 м)",
+    "worldroad_bump": "Бугор (h=4 см, w=0.6 м)",
     "inertia_brake": "Инерция: торможение ax=-3 м/с²",
 }
+
+SUITE_TEST_TYPE_LABELS = {
+    "worldroad": "Дорожный профиль (WorldRoad)",
+    "road_profile_csv": "Дорога из CSV",
+    "maneuver_csv": "Манёвр из CSV (ax/ay)",
+    "инерция_крен": "Инерция: крен",
+    "инерция_тангаж": "Инерция: тангаж",
+    "микро_синфаза": "Микроход: синфаза",
+    "микро_разнофаза": "Микроход: разнофаза",
+    "кочка_одно_колесо": "Кочка: одно колесо",
+    "кочка_диагональ": "Кочка: диагональ",
+    "комбо_крен_плюс_микро": "Комбо: крен + микроход",
+}
+
+
+def format_suite_test_type_label(value: Any) -> str:
+    key = str(value or "").strip()
+    if not key:
+        return "тип не задан"
+    return str(SUITE_TEST_TYPE_LABELS.get(key, key))
 
 
 def render_app_suite_editor_intro(st: Any) -> None:
@@ -25,7 +45,7 @@ def render_app_suite_editor_intro(st: Any) -> None:
 def render_heavy_suite_editor_intro(st: Any) -> None:
     st.caption(
         "Работайте по шагам: сначала настройте фильтры и найдите нужный сценарий, "
-        "затем проверьте карточку справа, и только после этого меняйте stage, тип теста "
+        "затем проверьте карточку справа, и только после этого меняйте стадию теста, тип теста "
         "и параметры дороги или манёвра."
     )
 
@@ -67,7 +87,7 @@ def render_heavy_suite_preset_wizard(
 
 
 def render_suite_list_caption(st: Any) -> None:
-    st.caption("Список тестов. Слева выбирается сценарий, справа редактируется его карточка.")
+    st.caption("Список сценариев набора. Слева выбирается сценарий, справа редактируется его карточка.")
 
 
 def render_app_suite_search_box(
@@ -108,13 +128,13 @@ def render_heavy_suite_filter_row(
             key=stage_filter_key,
         )
     st.caption(
-        "Логика staged optimization: S0 — быстрый relevance-screen; "
+        "Логика оптимизации по стадиям: S0 — быстрый предварительный отсев; "
         "S1 — длинные дорожные и манёвренные тесты; "
-        "S2 — финальная robustness-стадия."
+        "S2 — финальная стадия проверки устойчивости."
     )
     st.caption(
-        "Явно заданный stage 1 не должен молча переписываться в 0 при фильтрации, "
-        "редактировании и staged-normalization."
+        "Явно заданная стадия 1 не должна молча переписываться в 0 при фильтрации, "
+        "редактировании и нормализации стадий."
     )
     with f2:
         only_enabled = bool(
@@ -162,7 +182,7 @@ def render_suite_hidden_summary(
     with cols_info[1]:
         if show_all_button_key and on_show_all is not None:
             st.button(
-                "Показать все",
+                "Показать весь набор",
                 key=show_all_button_key,
                 width="stretch",
                 on_click=on_show_all,
@@ -238,7 +258,7 @@ def render_app_suite_list_panel(
 
     selected = render_suite_selection_box(
         st,
-        label="Тест",
+        label="Сценарий",
         options=idx_map,
         index=idx_map.index(st.session_state[selection_key]) if st.session_state[selection_key] in idx_map else 0,
         format_func=lambda i: (labels[idx_map.index(i)] if i in idx_map else str(i)),
@@ -255,8 +275,8 @@ def build_heavy_suite_list_label(df_view: Any, suite_id: str) -> str:
     try:
         row = df_view[df_view["id"].astype(str) == str(suite_id)].iloc[0].to_dict()
         stage = int(infer_suite_stage(row))
-        name = str(row.get("имя", "")).strip() or "<без имени>"
-        typ = str(row.get("тип", "")).strip() or "<без типа>"
+        name = str(row.get("имя", "")).strip() or "без названия"
+        typ = str(row.get("тип", "")).strip() or "тип не задан"
         return build_suite_option_label(
             enabled=bool(row.get("включен", False)),
             name=name,
@@ -269,11 +289,12 @@ def build_heavy_suite_list_label(df_view: Any, suite_id: str) -> str:
 
 def build_heavy_suite_list_frame(df_view: Any) -> Any:
     list_df = df_view[["включен", "стадия", "имя", "тип"]].copy()
+    list_df["тип"] = list_df["тип"].map(format_suite_test_type_label)
     return list_df.rename(
         columns={
             "включен": "Вкл.",
             "стадия": "Стадия",
-            "имя": "Тест",
+            "имя": "Сценарий",
             "тип": "Тип",
         }
     )
@@ -298,12 +319,12 @@ def render_heavy_suite_list_panel(
     if row_ids:
         render_suite_selection_box(
             st,
-            label="Выбранный тест",
+            label="Сценарий для редактирования",
             options=list(row_ids),
             index=row_ids.index(current_selected_id) if current_selected_id in row_ids else 0,
             format_func=lambda suite_id: build_heavy_suite_list_label(df_view, str(suite_id)),
             key=selection_key,
-            help_text="Выбор теста для карточки редактирования справа.",
+            help_text="Выберите сценарий, который хотите редактировать в карточке справа.",
         )
 
     st.dataframe(
@@ -417,7 +438,7 @@ def render_heavy_suite_action_row(
     a1, a2, a3, a4 = st.columns([1, 1, 1, 1], gap="small")
     with a1:
         st.button(
-            "Включить все",
+            "Включить все видимые",
             width="stretch",
             key="ui_suite_enable_visible_btn",
             on_click=on_enable_visible,
@@ -426,7 +447,7 @@ def render_heavy_suite_action_row(
         )
     with a2:
         st.button(
-            "Выключить все",
+            "Выключить все видимые",
             width="stretch",
             key="ui_suite_disable_visible_btn",
             on_click=on_disable_visible,
@@ -435,7 +456,7 @@ def render_heavy_suite_action_row(
         )
     with a3:
         st.button(
-            "Дублировать выбранный",
+            "Дублировать выбранный сценарий",
             width="stretch",
             key="ui_suite_duplicate_selected_btn",
             on_click=on_duplicate_selected,
@@ -443,7 +464,7 @@ def render_heavy_suite_action_row(
         )
     with a4:
         st.button(
-            "Удалить выбранный",
+            "Удалить выбранный сценарий",
             width="stretch",
             key="ui_suite_delete_selected_btn",
             on_click=on_delete_selected,
@@ -453,9 +474,9 @@ def render_heavy_suite_action_row(
 
 def render_suite_empty_list_state(st: Any, *, filtered: bool) -> None:
     if filtered:
-        st.info("Список пуст в текущем фильтре. Ослабьте фильтры или измените строку поиска.")
+        st.info("По текущим условиям отбора тестов не найдено. Ослабьте фильтры или измените строку поиска.")
     else:
-        st.info("Список тестов пуст. Добавьте первый сценарий, чтобы начать настройку набора.")
+        st.info("Набор тестов пока пуст. Добавьте первый сценарий, чтобы начать настройку.")
 
 
 def render_suite_empty_card_state(st: Any) -> None:
@@ -463,7 +484,7 @@ def render_suite_empty_card_state(st: Any) -> None:
 
 
 def render_suite_missing_card_state(st: Any) -> None:
-    st.error("Выбранный тест не найден в текущем наборе. Проверьте фильтры или обновите выбор.")
+    st.error("Выбранный сценарий не найден в текущем наборе. Проверьте фильтры или обновите выбор.")
 
 
 def render_suite_card_heading(st: Any, title: str) -> None:
@@ -479,8 +500,8 @@ def build_suite_option_label(
     stage: int | None = None,
 ) -> str:
     marker = "✓" if enabled else "○"
-    name_text = name.strip() or "<без имени>"
-    type_text = typ.strip() or "<без типа>"
+    name_text = name.strip() or "без названия"
+    type_text = format_suite_test_type_label(typ)
     if stage is None:
         return f"{marker} {name_text} · {type_text}"
     return f"{marker} [S{stage}] {name_text} — {type_text}"
@@ -492,5 +513,5 @@ def build_suite_filter_summary(*, total_count: int, visible_count: int) -> str |
         return None
     return (
         f"Показано **{visible_count}** из **{total_count}** тестов. "
-        f"Скрыто **{hidden_count}** — проверьте stage-фильтр, флаг включения и строку поиска."
+        f"Скрыто **{hidden_count}** — проверьте фильтр по стадиям, флаг включения и строку поиска."
     )

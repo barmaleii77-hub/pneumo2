@@ -12,6 +12,7 @@ from pneumo_solver_ui.desktop_animator.geom3d_helpers import (
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = (ROOT / 'pneumo_solver_ui' / 'desktop_animator' / 'app.py').read_text(encoding='utf-8')
+DATA_BUNDLE = (ROOT / 'pneumo_solver_ui' / 'desktop_animator' / 'data_bundle.py').read_text(encoding='utf-8')
 HMI = (ROOT / 'pneumo_solver_ui' / 'desktop_animator' / 'hmi_widgets.py').read_text(encoding='utf-8')
 PLAYHEAD = (ROOT / 'pneumo_solver_ui' / 'components' / 'playhead_ctrl' / 'index.html').read_text(encoding='utf-8')
 PLAYHEAD_UNIFIED = (ROOT / 'pneumo_solver_ui' / 'components' / 'playhead_ctrl' / 'index_unified_v1.html').read_text(encoding='utf-8')
@@ -107,6 +108,45 @@ def test_front_and_side_helper_views_now_accept_continuous_sample_t() -> None:
     assert 'lambda: road_profile_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),' in APP
     assert 'lambda: self.trends.update_frame(idx, sample_t=self._playback_sample_t_s),' in APP
     assert 'lambda: self.trends.update_frame(i, sample_t=self._playback_sample_t_s),' in APP
+
+
+def test_desktop_animator_world_progress_falls_back_to_xy_arclength_for_truthful_motion() -> None:
+    assert 'key = "svc__world_progress_series"' in APP
+    assert 'def _cumulative_path_length_series(x_series: Any, y_series: Any) -> np.ndarray:' in APP
+    assert 'def _ensure_world_progress_series(b: DataBundle) -> np.ndarray:' in APP
+    assert 's_world_xy = _cumulative_path_length_series(' in APP
+    assert 'monotonic_non_decreasing = bool(np.all(~np.isfinite(ds) | (ds >= -1e-9)))' in APP
+    assert 's_progress_series = np.asarray(_ensure_world_progress_series(b), dtype=float)' in APP
+    assert 's_path = np.asarray(_ensure_world_progress_series(bundle), dtype=float).reshape(-1)' in APP
+    assert 's_world = _ensure_world_progress_series(b)' in APP
+    assert 'def _solver_signed_speed_along_road(' in APP
+    assert 'speed_mag = abs(ds / dt)' in APP
+    assert 'return float(math.copysign(speed_mag, vx))' in APP
+    assert 'speed_sign * math.hypot(float(x0), float(y0))' not in APP
+    assert 'sample_i0, sample_i1, alpha, _status_sample_t = _sample_time_bracket(' in APP
+    assert 'vx_status = _sample_series_local(vxw, i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in APP
+    assert 'vy_status = _sample_series_local(vyw, i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in APP
+    assert 'v = float(math.hypot(float(vx_status), float(vy_status)))' in APP
+    assert "deriving world XY from скорость_vx_м_с + скорость_vy_м_с + yaw_рад as SERVICE/DERIVED." in DATA_BUNDLE
+    assert "def _align_series_length(arr: Any, n: int, *, fill: float = 0.0) -> np.ndarray:" in DATA_BUNDLE
+    assert "without cyclic wraparound" in DATA_BUNDLE
+    assert "pad_value = float(vec[-1]) if np.isfinite(float(vec[-1])) else float(fill)" in DATA_BUNDLE
+    assert 'yaw = _align_series_length(self.get("yaw_рад", default=0.0), int(len(vxw)), fill=0.0)' in DATA_BUNDLE
+    assert 'yaw = _align_series_length(self.get("yaw_рад", default=0.0), n, fill=0.0)' in DATA_BUNDLE
+    assert 'axb = _align_series_length(self.get("ускорение_продольное_ax_м_с2", default=0.0), n, fill=0.0)' in DATA_BUNDLE
+    assert 'ayb = _align_series_length(self.get("ускорение_поперечное_ay_м_с2", default=0.0), n, fill=0.0)' in DATA_BUNDLE
+    assert "2) trapezoidal integration of canonical body-speed magnitude" in DATA_BUNDLE
+    assert "hypot(скорость_vx_м_с, скорость_vy_м_с)" in DATA_BUNDLE
+    assert 'dx = vx * np.cos(yaw) - vy * np.sin(yaw)' in DATA_BUNDLE
+    assert 'dy = vx * np.sin(yaw) + vy * np.cos(yaw)' in DATA_BUNDLE
+    assert 'vxw = vx * np.cos(yaw) - vy * np.sin(yaw)' in DATA_BUNDLE
+    assert 'vyw = vx * np.sin(yaw) + vy * np.cos(yaw)' in DATA_BUNDLE
+    assert 'v = np.asarray(np.hypot(vx, vy), dtype=float)' in DATA_BUNDLE
+    assert 'v = np.asarray(vx, dtype=float)' not in DATA_BUNDLE
+    assert 'np.resize(vx, n)' not in DATA_BUNDLE
+    assert 'np.resize(vy, n)' not in DATA_BUNDLE
+    assert 'np.resize(yaw, n)' not in DATA_BUNDLE
+    assert "deriving world XY from скорость_vx_м_с + yaw_рад as SERVICE/DERIVED." not in DATA_BUNDLE
 
 
 def test_playback_service_interval_is_tightened_for_high_speed_without_restoring_busy_loop() -> None:

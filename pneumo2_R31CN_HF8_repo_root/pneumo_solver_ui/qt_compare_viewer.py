@@ -961,6 +961,12 @@ class CompareViewer(QtWidgets.QMainWindow):
             self._restore_after_load['table'] = str(s.value('table', ''))
         except Exception:
             pass
+        try:
+            raw = s.value('signal_filter')
+            if raw is not None:
+                self._restore_after_load['signal_filter'] = str(raw or '')
+        except Exception:
+            pass
         for k in ('signals','runs','runs_paths'):
             try:
                 raw = s.value(k)
@@ -1081,6 +1087,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 'reference_run',
                 'reference_run_path',
                 'table',
+                'signal_filter',
                 'signals',
                 'signals_selection_explicit',
                 'events_selected',
@@ -1259,6 +1266,19 @@ class CompareViewer(QtWidgets.QMainWindow):
             try:
                 if hasattr(self, 'combo_table'):
                     self.combo_table.blockSignals(False)
+            except Exception:
+                pass
+
+        try:
+            want_filter = str(stt.get('signal_filter') or '')
+            if hasattr(self, 'edit_filter'):
+                self.edit_filter.blockSignals(True)
+                self.edit_filter.setText(want_filter)
+                self.edit_filter.blockSignals(False)
+        except Exception:
+            try:
+                if hasattr(self, 'edit_filter'):
+                    self.edit_filter.blockSignals(False)
             except Exception:
                 pass
 
@@ -1477,6 +1497,12 @@ class CompareViewer(QtWidgets.QMainWindow):
             try:
                 table_value = str(getattr(self, 'table_selected', '') or self.combo_table.currentText() or self.current_table or '')
                 s.setValue('table', table_value)
+            except Exception:
+                pass
+
+            try:
+                if hasattr(self, 'edit_filter'):
+                    s.setValue('signal_filter', str(self.edit_filter.text() or ''))
             except Exception:
                 pass
 
@@ -2834,21 +2860,28 @@ class CompareViewer(QtWidgets.QMainWindow):
                 return
             sig_lab = self._heat_sig_labels[iy]
             run_lab = self._heat_run_labels[ix]
+            target_run_row = -1
+            if hasattr(self, 'list_runs'):
+                for i in range(self.list_runs.count()):
+                    it = self.list_runs.item(i)
+                    if it is not None and str(it.text()) == str(run_lab):
+                        target_run_row = i
+                        break
+            if (not self._signal_exists_in_current_context(str(sig_lab))) or target_run_row < 0:
+                return
             # Add signal to selection and move current focus without altering multi-select state.
-            self._select_signal_by_name(str(sig_lab), exclusive=False)
+            if not self._select_signal_by_name(str(sig_lab), exclusive=False):
+                return
             run_added = False
             if hasattr(self, 'list_runs'):
                 try:
                     self.list_runs.blockSignals(True)
-                    for i in range(self.list_runs.count()):
-                        it = self.list_runs.item(i)
-                        if it is None or str(it.text()) != str(run_lab):
-                            continue
+                    it = self.list_runs.item(target_run_row)
+                    if it is not None:
                         if not it.isSelected():
                             it.setSelected(True)
                             run_added = True
-                        self._set_current_list_row(self.list_runs, i)
-                        break
+                        self._set_current_list_row(self.list_runs, target_run_row)
                     self._runs_selection_explicit = True
                     self.runs_selected_paths = [
                         self._normalized_run_path(getattr(run, 'path', Path('')))
@@ -4601,6 +4634,33 @@ class CompareViewer(QtWidgets.QMainWindow):
 
             ref = self._reference_run(self._selected_runs())
             ref_label = str(getattr(ref, "label", "") or "").strip()
+            candidate_runs = list(self._selected_runs())
+            if ref is not None and all(str(getattr(run, "label", "") or "").strip() != ref_label for run in candidate_runs):
+                candidate_runs.append(ref)
+            probe_table = str(want_table or getattr(self, "current_table", "") or "").strip()
+            if want_table:
+                table_possible = False
+                for run in candidate_runs:
+                    try:
+                        if want_table in getattr(run, "tables", {}):
+                            table_possible = True
+                            break
+                    except Exception:
+                        pass
+                if not table_possible:
+                    return
+            if sig and probe_table:
+                sig_possible = False
+                for run in candidate_runs:
+                    try:
+                        df_probe = getattr(run, "tables", {}).get(probe_table)
+                    except Exception:
+                        df_probe = None
+                    if isinstance(df_probe, pd.DataFrame) and sig in df_probe.columns:
+                        sig_possible = True
+                        break
+                if not sig_possible:
+                    return
             def _selected_run_labels_now() -> List[str]:
                 return [str(getattr(run, "label", "") or "").strip() for run in self._selected_runs()]
 
@@ -4716,11 +4776,17 @@ class CompareViewer(QtWidgets.QMainWindow):
                     if want_table:
                         _set_table_if_available(want_table)
 
+            focus_ok = not bool(sig)
             try:
-                if sig and self._select_signal_by_name(sig, exclusive=True):
-                    self._rebuild_plots()
+                if sig:
+                    focus_ok = bool(self._select_signal_by_name(sig, exclusive=True))
+                    if focus_ok:
+                        self._rebuild_plots()
             except Exception:
-                pass
+                focus_ok = False
+
+            if not focus_ok:
+                return
 
             self._set_playhead_time(float(t))
         except Exception:
@@ -4756,8 +4822,9 @@ class CompareViewer(QtWidgets.QMainWindow):
             self._clear_qa_view("QA: выберите хотя бы один прогон")
             return
 
-        if bool(getattr(self, 'chk_qa_all', None) and self.chk_qa_all.isChecked()):
-            sigs = [self.list_signals.item(i).text() for i in range(self.list_signals.count())]
+        qa_all = bool(getattr(self, 'chk_qa_all', None) and self.chk_qa_all.isChecked())
+        if qa_all:
+            sigs = self._current_context_signal_names(apply_filter=False)
         else:
             sigs = [it.text() for it in self.list_signals.selectedItems()]
         # Remove obvious time columns
@@ -4766,7 +4833,10 @@ class CompareViewer(QtWidgets.QMainWindow):
             if bool(getattr(self, '_signals_selection_explicit', False)):
                 self._clear_qa_view("QA: выберите хотя бы один сигнал")
                 return
-            sigs = [self.list_signals.item(i).text() for i in range(min(8, self.list_signals.count()))]
+            if qa_all:
+                sigs = self._current_context_signal_names(apply_filter=False)[:8]
+            else:
+                sigs = [self.list_signals.item(i).text() for i in range(min(8, self.list_signals.count()))]
 
         sens = self._qa_sensitivity_code()
         key = (tuple([r.label for r in runs]), table, tuple(sigs[:60]), sens)
@@ -4969,20 +5039,23 @@ class CompareViewer(QtWidgets.QMainWindow):
             return
 
         # Select run + signal
+        focused = False
         try:
-            self._focus_run_signal(str(run), str(sig))
+            focused = bool(self._focus_run_signal(str(run), str(sig)))
         except Exception:
-            pass
+            focused = False
 
         # Move playhead to first issue time if available
-        t0 = self._qa_first_t.get((str(run), str(sig)))
-        if t0 is not None and isinstance(t0, (int, float)) and np.isfinite(float(t0)):
-            try:
-                self._set_playhead_time(float(t0))
-            except Exception:
-                pass
+        if focused:
+            t0 = self._qa_first_t.get((str(run), str(sig)))
+            if t0 is not None and isinstance(t0, (int, float)) and np.isfinite(float(t0)):
+                try:
+                    self._set_playhead_time(float(t0))
+                except Exception:
+                    pass
 
-        self._rebuild_plots()
+        if focused:
+            self._rebuild_plots()
 
 
     def _on_qa_table_double_clicked(self, row: int, _col: int):
@@ -4992,17 +5065,19 @@ class CompareViewer(QtWidgets.QMainWindow):
             t0_txt = self.tbl_qa.item(row, 4).text()
         except Exception:
             return
+        focused = False
         try:
-            self._focus_run_signal(str(run), str(sig))
+            focused = bool(self._focus_run_signal(str(run), str(sig)))
         except Exception:
-            pass
-        try:
-            t0 = float(t0_txt)
-            if np.isfinite(t0):
-                self._set_playhead_time(t0)
-        except Exception:
-            pass
-        self._rebuild_plots()
+            focused = False
+        if focused:
+            try:
+                t0 = float(t0_txt)
+                if np.isfinite(t0):
+                    self._set_playhead_time(t0)
+            except Exception:
+                pass
+            self._rebuild_plots()
 
 
     def _select_run_by_label(self, label: str) -> bool:
@@ -5038,6 +5113,87 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.list_runs.blockSignals(False)
         return True
 
+    def _current_context_signal_names(self, apply_filter: bool = True) -> List[str]:
+        table_name = str(getattr(self, "current_table", "") or "").strip()
+        if not table_name:
+            return []
+        runs = list(self._selected_runs())
+        if not runs:
+            return []
+        cols_sets = []
+        for run in runs:
+            try:
+                df = getattr(run, "tables", {}).get(table_name)
+            except Exception:
+                df = None
+            if isinstance(df, pd.DataFrame) and len(df.columns):
+                cols_sets.append(set(map(str, df.columns)))
+        if not cols_sets:
+            return []
+        try:
+            common = set.intersection(*cols_sets)
+        except Exception:
+            common = set()
+        if not common:
+            return []
+        try:
+            df0 = getattr(runs[0], "tables", {}).get(table_name)
+            if isinstance(df0, pd.DataFrame) and not df0.empty:
+                common.discard(detect_time_col(df0))
+        except Exception:
+            pass
+        sigs = sorted(common)
+        if apply_filter:
+            try:
+                q = str(self.edit_filter.text() or "").strip()
+            except Exception:
+                q = ""
+            if q:
+                try:
+                    import re
+
+                    rx = re.compile(q, flags=re.IGNORECASE)
+                    sigs = [s for s in sigs if rx.search(s)]
+                except Exception:
+                    ql = q.lower()
+                    sigs = [s for s in sigs if ql in s.lower()]
+        return sigs
+
+    def _signal_exists_in_current_context(self, name: str) -> bool:
+        sig_name = str(name).strip()
+        if not sig_name:
+            return False
+        return sig_name in self._current_context_signal_names(apply_filter=False)
+
+    def _ensure_signal_visible(self, name: str) -> bool:
+        sig_name = str(name).strip()
+        if not sig_name or not hasattr(self, "edit_filter"):
+            return False
+        try:
+            current_filter = str(self.edit_filter.text() or "")
+        except Exception:
+            current_filter = ""
+        if not current_filter:
+            return False
+        if not self._signal_exists_in_current_context(sig_name):
+            return False
+        try:
+            self.edit_filter.blockSignals(True)
+            self.edit_filter.clear()
+        finally:
+            try:
+                self.edit_filter.blockSignals(False)
+            except Exception:
+                pass
+        try:
+            self._refresh_signal_list()
+        except Exception:
+            return False
+        try:
+            self._update_workspace_status()
+        except Exception:
+            pass
+        return sig_name in list(getattr(self, "available_signals", []) or [])
 
     def _select_signal_by_name(self, name: str, *, exclusive: bool = False) -> bool:
         if not hasattr(self, 'list_signals'):
@@ -5049,6 +5205,12 @@ class CompareViewer(QtWidgets.QMainWindow):
             if it is not None and str(it.text()) == str(name):
                 target_row = i
                 break
+        if target_row is None and self._ensure_signal_visible(str(name)):
+            for i in range(self.list_signals.count()):
+                it = self.list_signals.item(i)
+                if it is not None and str(it.text()) == str(name):
+                    target_row = i
+                    break
         if target_row is None:
             return False
         try:
@@ -5070,7 +5232,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.list_signals.blockSignals(False)
         return True
 
-    def _focus_run_signal(self, run_label: str, signal_name: str) -> None:
+    def _focus_run_signal(self, run_label: str, signal_name: str) -> bool:
         target_run = None
         try:
             for run in getattr(self, "runs", []):
@@ -5080,7 +5242,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             target_run = None
         if target_run is None:
-            return
+            return False
 
         sig_name = str(signal_name)
         target_table = ""
@@ -5102,7 +5264,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 matching_tables = []
             if not matching_tables:
-                return
+                return False
             for candidate in (current_table, remembered_table, "main"):
                 if candidate and candidate in matching_tables:
                     target_table = candidate
@@ -5111,7 +5273,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 target_table = matching_tables[0]
 
         if not self._select_run_by_label(str(run_label)):
-            return
+            return False
         self._on_run_selection_changed()
         try:
             self._remember_reference_run(target_run)
@@ -5123,10 +5285,11 @@ class CompareViewer(QtWidgets.QMainWindow):
                 if idx >= 0 and str(self.combo_table.currentText() or "") != target_table:
                     self.combo_table.setCurrentIndex(idx)
         except Exception:
-            pass
+            return False
         if sig_name and not self._select_signal_by_name(sig_name, exclusive=True):
-            return
+            return False
         self._rebuild_plots()
+        return True
 
     def _set_current_list_row(self, widget, row: int) -> None:
         try:
@@ -6110,35 +6273,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 pass
             return []
-        # intersection by default
-        cols_sets = []
-        for r in runs:
-            df = r.tables.get(self.current_table)
-            if isinstance(df, pd.DataFrame) and len(df.columns):
-                cols_sets.append(set(map(str, df.columns)))
-        if not cols_sets:
-            self.available_signals = []
-        else:
-            common = set.intersection(*cols_sets)
-            # remove time col (from first run)
-            df0 = runs[0].tables.get(self.current_table)
-            if df0 is not None and not df0.empty:
-                tcol = detect_time_col(df0)
-                common.discard(tcol)
-            sigs = sorted(common)
-
-            # apply filter
-            q = self.edit_filter.text().strip()
-            if q:
-                try:
-                    import re
-
-                    rx = re.compile(q, flags=re.IGNORECASE)
-                    sigs = [s for s in sigs if rx.search(s)]
-                except Exception:
-                    ql = q.lower()
-                    sigs = [s for s in sigs if ql in s.lower()]
-            self.available_signals = sigs
+        self.available_signals = self._current_context_signal_names(apply_filter=True)
 
         if explicit_signals:
             kept_selected = [sig for sig in prev_selected if sig in self.available_signals]

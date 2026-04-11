@@ -13,6 +13,7 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     from pneumo_solver_ui.desktop_mnemo.app import (
         _build_frame_alert_payload,
         _build_frame_narrative,
+        _build_mnemo_diagnostics_payload,
         build_onboarding_focus_target,
         build_onboarding_focus_region_payload,
         prepare_dataset,
@@ -111,9 +112,21 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     assert dataset.overlay_node_names
     assert {"Ресивер1", "Ресивер3", "узел_после_рег_Pmid"}.issubset(set(dataset.overlay_node_names))
     assert "Пневматическая мнемосхема" in dataset.svg_inline
+    assert len(dataset.canonical_node_names) == 46
+    assert len(dataset.canonical_edge_names) == 70
+    assert dataset.scheme_fidelity["canonical_nodes_total"] == 46
+    assert dataset.scheme_fidelity["canonical_nodes_positioned"] == 46
+    assert dataset.scheme_fidelity["canonical_edges_total"] == 70
+    assert dataset.scheme_fidelity["canonical_edges_routed"] == 70
+    assert dataset.scheme_fidelity["canonical_route_issues"] == []
+    assert dataset.scheme_fidelity["bundle_edges_known"] == 3
+    assert dataset.scheme_fidelity["bundle_nodes_known"] == 4
+    assert dataset.scheme_fidelity["status"] == "ok"
     assert dataset.mapping["edges_meta"]["регулятор_до_себя_Pmid_сброс"]["mnemo_route"] == "rail"
     assert dataset.mapping["edges_meta"]["обратный_клапан_Pmid_к_выхлопу"]["mnemo_route"] == "regulator_bus"
     assert dataset.mapping["edges_meta"]["дроссель_выхлоп_Pmid"]["endpoints"] == ["узел_после_ОК_Pmid", "АТМ"]
+    assert dataset.edge_defs["регулятор_до_себя_Pmid_сброс"]["camozzi_code"] == "VMR 1/8-B10"
+    assert dataset.edge_defs["обратный_клапан_Pmid_к_выхлопу"]["kind"] == "check"
     assert len(dataset.edge_series) == 3
     assert dataset.edge_series[0]["open"] == [1, 1, 0]
     assert [item["name"] for item in dataset.node_series] == dataset.overlay_node_names
@@ -141,6 +154,19 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     assert any(item["name"] == "Ресивер3" and item["severity"] == "warn" for item in alerts["nodes"])
     assert any(item["name"] == "узел_после_рег_Pmid" and item["severity"] == "warn" for item in alerts["nodes"])
     assert any(item["title"] == "Большой перепад давлений" and item["severity"] == "warn" for item in alerts["mode_badges"])
+    assert alerts["scheme_fidelity"]["canonical_edges_routed"] == 70
+    assert alerts["scheme_fidelity"]["bundle_edges_known"] == 3
+
+    diagnostics = _build_mnemo_diagnostics_payload(
+        dataset,
+        1,
+        selected_edge="обратный_клапан_Pmid_к_выхлопу",
+        selected_node="узел_после_рег_Pmid",
+    )
+    assert diagnostics["scheme_fidelity"]["canonical_nodes_positioned"] == 46
+    assert any(item["canonical_kind"] == "check" for item in diagnostics["components"])
+    assert any(item["camozzi_code"] == "VNR-238-3/8" for item in diagnostics["components"])
+    assert any(item["icon_key"] == "check" for item in diagnostics["components"])
 
     focus_target = build_onboarding_focus_target(
         dataset,

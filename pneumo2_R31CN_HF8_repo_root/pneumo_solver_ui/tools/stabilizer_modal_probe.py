@@ -38,6 +38,7 @@ Stabilizer / modal probe runner (headless).
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import math
 import sys
@@ -110,6 +111,98 @@ def _fit_linear(KC_X: np.ndarray, y: np.ndarray) -> Tuple[float, float, float]:
     return float(coef[0]), float(coef[1]), float(r2)
 
 
+def _select_fit_window(df_main: pd.DataFrame, fit_cycles: int, period_s: float) -> pd.DataFrame:
+    if df_main is None or len(df_main) <= 0:
+        raise RuntimeError("simulate() returned empty df_main")
+    t = np.asarray(df_main["время_с"].to_numpy(), dtype=float).reshape(-1)
+    if t.size <= 0:
+        raise RuntimeError("df_main has empty time axis")
+    t_last = float(np.nanmax(t))
+    fit_span = max(0.0, float(fit_cycles) * float(period_s))
+    t0_fit = t_last - fit_span
+    mask = t >= t0_fit - 1e-12
+    dfw = df_main.loc[mask].copy()
+    if len(dfw) >= 3:
+        return dfw
+    tail_rows = max(3, min(len(df_main), 256))
+    return df_main.tail(tail_rows).copy()
+
+
+def _require_series(df: pd.DataFrame, *names: str) -> np.ndarray:
+    for name in names:
+        if name in df.columns:
+            return np.asarray(df[name].to_numpy(), dtype=float).reshape(-1)
+    raise KeyError(names[0] if names else "required column is missing")
+
+
+def _optional_series(df: pd.DataFrame, *names: str) -> np.ndarray | None:
+    for name in names:
+        if name in df.columns:
+            return np.asarray(df[name].to_numpy(), dtype=float).reshape(-1)
+    return None
+
+
+def _numeric_derivative(t: np.ndarray, x: np.ndarray) -> np.ndarray:
+    t = np.asarray(t, dtype=float).reshape(-1)
+    x = np.asarray(x, dtype=float).reshape(-1)
+    if x.size <= 1 or t.size != x.size:
+        return np.zeros_like(x, dtype=float)
+    if float(np.nanmax(t) - np.nanmin(t)) <= 1e-12:
+        return np.zeros_like(x, dtype=float)
+    return np.asarray(np.gradient(x, t), dtype=float).reshape(-1)
+
+
+def _corner_force_matrix(df: pd.DataFrame) -> np.ndarray:
+    cols_susp = [
+        "сила_подвески_ЛП_Н",
+        "сила_подвески_ПП_Н",
+        "сила_подвески_ЛЗ_Н",
+        "сила_подвески_ПЗ_Н",
+    ]
+    cols_tire = [
+        "нормальная_сила_шины_ЛП_Н",
+        "нормальная_сила_шины_ПП_Н",
+        "нормальная_сила_шины_ЛЗ_Н",
+        "нормальная_сила_шины_ПЗ_Н",
+    ]
+    for cols in (cols_susp, cols_tire):
+        if all(col in df.columns for col in cols):
+            return np.column_stack([np.asarray(df[col].to_numpy(), dtype=float) for col in cols])
+    raise KeyError("corner force columns are missing")
+
+
+def _support_moment_from_forces(forces: np.ndarray, params: Dict, axis: str) -> np.ndarray:
+    track = float(params.get("колея", params.get("track", 1.2)) or 1.2)
+    wheelbase = float(params.get("база", params.get("wheelbase", 2.3)) or 2.3)
+    x_pos = np.array([wheelbase / 2.0, wheelbase / 2.0, -wheelbase / 2.0, -wheelbase / 2.0], dtype=float)
+    y_pos = np.array([track / 2.0, -track / 2.0, track / 2.0, -track / 2.0], dtype=float)
+    if axis == "roll":
+        return np.asarray(forces @ y_pos, dtype=float).reshape(-1)
+    if axis == "pitch":
+        return np.asarray(forces @ (-x_pos), dtype=float).reshape(-1)
+    raise ValueError(axis)
+
+
+def _centered_fit_arrays(x1: np.ndarray, x2: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    x1 = np.asarray(x1, dtype=float).reshape(-1)
+    x2 = np.asarray(x2, dtype=float).reshape(-1)
+    y = np.asarray(y, dtype=float).reshape(-1)
+    mask = np.isfinite(x1) & np.isfinite(x2) & np.isfinite(y)
+    x1 = x1[mask]
+    x2 = x2[mask]
+    y = y[mask]
+    if x1.size < 3:
+        raise RuntimeError("not enough finite samples for modal fit")
+    X = np.column_stack([x1 - float(np.mean(x1)), x2 - float(np.mean(x2))])
+    y0 = y - float(np.mean(y))
+    return X, y0
+
+
+def _load_modal_model(model_name: str):
+    _ensure_repo_importable()
+    return importlib.import_module(str(model_name))
+
+
 def _extract_energy_groups(df_Ecat: pd.DataFrame) -> Tuple[float, float]:
     """Возвращает (E_drossels, E_exhaust) по итогам прогона."""
     if df_Ecat is None or len(df_Ecat) == 0:
@@ -154,9 +247,8 @@ def _df_to_markdown_table(df: pd.DataFrame) -> str:
 
 
 
-def run_probe(params: Dict, mode: str, freq_hz: float, A: float, settle_cycles: int, fit_cycles: int, dt: float) -> ProbeResult:
-    ui_root = _ensure_repo_importable()
-    import model_pneumo_v8_energy_audit_vacuum as model  # noqa
+def run_probe(params: Dict, mode: str, freq_hz: float, A: float, settle_cycles: int, fit_cycles: int, dt: float, model_name: str = "model_pneumo_v8_energy_audit_vacuum") -> ProbeResult:
+    model = _load_modal_model(model_name)
 
     w = 2 * math.pi * freq_hz
     T = 1.0 / freq_hz
@@ -175,38 +267,49 @@ def run_probe(params: Dict, mode: str, freq_hz: float, A: float, settle_cycles: 
             "ax_func": (lambda t: 0.0),
             "ay_func": (lambda t: 0.0),
         },
+        dt=dt,
+        t_end=t_end,
     )
 
     # Окно для фитинга: последние fit_cycles
-    t = df_main["время_с"].to_numpy()
-    t0_fit = t_end - fit_cycles * T
-    mask = t >= t0_fit
-    dfw = df_main.loc[mask].copy()
+    dfw = _select_fit_window(df_main, fit_cycles=fit_cycles, period_s=T)
+    t_fit = _require_series(dfw, "время_с")
 
     # Амплитуда входа: A
     amp_in = A
 
     if mode == "roll":
-        y = dfw["момент_крен_подвеска_Нм"].to_numpy()
-        x1 = dfw["крен_phi_рад"].to_numpy()
-        x2 = dfw["скорость_крен_phi_рад_с"].to_numpy()
+        y = _optional_series(dfw, "момент_крен_подвеска_Нм")
+        if y is None:
+            y = _support_moment_from_forces(_corner_force_matrix(dfw), params, axis="roll")
+        x1 = _require_series(dfw, "крен_phi_рад")
+        x2 = _optional_series(dfw, "скорость_крен_phi_рад_с")
+        if x2 is None:
+            x2 = _numeric_derivative(t_fit, x1)
         amp_state = float(0.5 * (np.max(x1) - np.min(x1)))
     elif mode == "pitch":
-        y = dfw["момент_тангаж_подвеска_Нм"].to_numpy()
-        x1 = dfw["тангаж_theta_рад"].to_numpy()
-        x2 = dfw["скорость_тангаж_theta_рад_с"].to_numpy()
+        y = _optional_series(dfw, "момент_тангаж_подвеска_Нм")
+        if y is None:
+            y = _support_moment_from_forces(_corner_force_matrix(dfw), params, axis="pitch")
+        x1 = _require_series(dfw, "тангаж_theta_рад")
+        x2 = _optional_series(dfw, "скорость_тангаж_theta_рад_с")
+        if x2 is None:
+            x2 = _numeric_derivative(t_fit, x1)
         amp_state = float(0.5 * (np.max(x1) - np.min(x1)))
     elif mode == "heave":
-        # Сила подвески — сумма по колёсам
-        y = (dfw["сила_подвески_ЛП_Н"] + dfw["сила_подвески_ПП_Н"] + dfw["сила_подвески_ЛЗ_Н"] + dfw["сила_подвески_ПЗ_Н"]).to_numpy()
-        x1 = dfw["перемещение_рамы_z_м"].to_numpy()
-        x2 = dfw["скорость_рамы_z_м_с"].to_numpy()
+        # Сила поддержки в heave: предпочтительно сумма сил подвески, fallback — сумма
+        # нормальных сил шин, если модель не экспортирует отдельный suspension-force канал.
+        y = np.sum(_corner_force_matrix(dfw), axis=1)
+        x1 = _require_series(dfw, "перемещение_рамы_z_м")
+        x2 = _optional_series(dfw, "скорость_рамы_z_м_с")
+        if x2 is None:
+            x2 = _numeric_derivative(t_fit, x1)
         amp_state = float(0.5 * (np.max(x1) - np.min(x1)))
     else:
         raise ValueError(mode)
 
-    KC_X = np.column_stack([x1, x2])
-    K, C, r2 = _fit_linear(KC_X, y)
+    KC_X, y_fit = _centered_fit_arrays(x1, x2, y)
+    K, C, r2 = _fit_linear(KC_X, y_fit)
 
     E_dross, E_exh = _extract_energy_groups(df_Ecat)
 
@@ -226,6 +329,7 @@ def run_probe(params: Dict, mode: str, freq_hz: float, A: float, settle_cycles: 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--params", type=str, default="pneumo_solver_ui/default_base.json", help="Путь к json параметров")
+    ap.add_argument("--model", type=str, default="model_pneumo_v8_energy_audit_vacuum", help="Имя python-модуля модели")
     ap.add_argument("--freq", type=float, nargs="+", default=[0.5, 1.0, 2.0, 4.0], help="Частоты, Гц")
     ap.add_argument("--A", type=float, default=0.002, help="Амплитуда входа (м)")
     ap.add_argument("--dt", type=float, default=0.002, help="Шаг интегрирования (с)")
@@ -247,7 +351,7 @@ def main() -> int:
     for mode in args.modes:
         for f in args.freq:
             print(f"[probe] mode={mode} f={f}Hz A={args.A}m dt={args.dt}s")
-            res = run_probe(params=params, mode=mode, freq_hz=f, A=float(args.A), settle_cycles=int(args.settle_cycles), fit_cycles=int(args.fit_cycles), dt=float(args.dt))
+            res = run_probe(params=params, mode=mode, freq_hz=f, A=float(args.A), settle_cycles=int(args.settle_cycles), fit_cycles=int(args.fit_cycles), dt=float(args.dt), model_name=str(args.model))
             results.append(res)
 
     df = pd.DataFrame([r.__dict__ for r in results])
@@ -256,6 +360,7 @@ def main() -> int:
     # Markdown report
     md = []
     md.append(f"# Modal probe report\n\n")
+    md.append(f"- model: `{args.model}`\n")
     md.append(f"- params: `{params_path}`\n")
     md.append(f"- A: {args.A} m, dt: {args.dt} s\n")
     md.append(f"- settle_cycles: {args.settle_cycles}, fit_cycles: {args.fit_cycles}\n\n")

@@ -744,6 +744,59 @@ def _call_with_qt_update_batch(widget: Any, fn: Callable[[], None]) -> None:
         _end_qt_update_batch(handles)
 
 
+def _cumulative_path_length_series(x_series: Any, y_series: Any) -> np.ndarray:
+    try:
+        x_arr = np.asarray(x_series, dtype=float).reshape(-1)
+        y_arr = np.asarray(y_series, dtype=float).reshape(-1)
+    except Exception:
+        return np.zeros((0,), dtype=float)
+    n = int(min(x_arr.size, y_arr.size))
+    if n <= 0:
+        return np.zeros((0,), dtype=float)
+    if n == 1:
+        return np.zeros((1,), dtype=float)
+    x = np.asarray(x_arr[:n], dtype=float)
+    y = np.asarray(y_arr[:n], dtype=float)
+    dx = np.diff(x)
+    dy = np.diff(y)
+    ds = np.sqrt(dx * dx + dy * dy)
+    ds = np.where(np.isfinite(ds), ds, 0.0)
+    return np.concatenate(([0.0], np.cumsum(ds, dtype=float))).astype(float, copy=False)
+
+
+def _ensure_world_progress_series(b: DataBundle) -> np.ndarray:
+    key = "svc__world_progress_series"
+    cached = b._derived.get(key)
+    if isinstance(cached, np.ndarray):
+        return cached
+
+    s_world = np.zeros((0,), dtype=float)
+    use_xy_fallback = True
+    try:
+        s_world = np.asarray(b.ensure_s_world(), dtype=float).reshape(-1)
+        if s_world.size >= 2:
+            ds = np.diff(s_world)
+            positive_steps = ds[np.isfinite(ds) & (ds > 1e-9)]
+            monotonic_non_decreasing = bool(np.all(~np.isfinite(ds) | (ds >= -1e-9)))
+            use_xy_fallback = (int(positive_steps.size) == 0) or (not monotonic_non_decreasing)
+        else:
+            use_xy_fallback = int(s_world.size) == 0
+    except Exception:
+        s_world = np.zeros((0,), dtype=float)
+        use_xy_fallback = True
+
+    if use_xy_fallback:
+        s_world_xy = _cumulative_path_length_series(
+            np.asarray(b.get("путь_x_м", 0.0), dtype=float).reshape(-1),
+            np.asarray(b.get("путь_y_м", 0.0), dtype=float).reshape(-1),
+        )
+        if int(s_world_xy.size) > 0:
+            s_world = np.asarray(s_world_xy, dtype=float)
+
+    b._derived[key] = s_world  # type: ignore[assignment]
+    return s_world
+
+
 def _ensure_corner_signal_cache(b: DataBundle) -> Dict[str, Dict[str, Any]]:
     key = "svc__corner_signal_cache"
     cached = b._derived.get(key)
@@ -781,10 +834,7 @@ def _ensure_vertical_view_signal_cache(b: DataBundle, wheelbase_m: float) -> Dic
         "vz_com": np.asarray(b.get("скорость_рамы_z_м_с", 0.0), dtype=float),
         "az_com": np.asarray(b.get("ускорение_рамы_z_м_с2", 0.0), dtype=float),
     }
-    try:
-        s_world = np.asarray(b.ensure_s_world(), dtype=float)
-    except Exception:
-        s_world = np.zeros((0,), dtype=float)
+    s_world = np.asarray(_ensure_world_progress_series(b), dtype=float)
 
     road_profiles: Dict[str, tuple[np.ndarray, np.ndarray]] = {}
     for mode in ("center", "left", "right"):
@@ -818,10 +868,7 @@ def _ensure_road_profile_panel_cache(b: DataBundle, wheelbase_m: float) -> Dict[
     if isinstance(cached, dict):
         return cached  # type: ignore[return-value]
 
-    try:
-        s_world = np.asarray(b.ensure_s_world(), dtype=float).reshape(-1)
-    except Exception:
-        s_world = np.zeros((0,), dtype=float)
+    s_world = np.asarray(_ensure_world_progress_series(b), dtype=float).reshape(-1)
 
     corners: Dict[str, Dict[str, Any]] = {}
     z_min = float("inf")
@@ -2198,9 +2245,10 @@ class FrontViewWidget(QtWidgets.QGraphicsView):
 
         # 3) Базовая статистика по сегментам (для «инженерного» текста и tooltips)
         try:
-            s_world = b.ensure_s_world()
+            s_world = _ensure_world_progress_series(b)
         except Exception:
-            # fallback: просто индекс как «расстояние»
+            # fallback: индекс допустим только как крайняя страховка, когда нет ни
+            # стабильного s_world, ни мировой траектории x/y.
             s_world = np.arange(n, dtype=float)
 
         # Canonical channels (no aliases / no silent compatibility bridges).
@@ -3916,7 +3964,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
 
         # World distance (SERVICE/DERIVED) and time axis (canonical).
         try:
-            s_world_arr = np.asarray(b.ensure_s_world(), dtype=float).reshape(-1)
+            s_world_arr = np.asarray(_ensure_world_progress_series(b), dtype=float).reshape(-1)
         except Exception:
             s_world_arr = None
         try:
@@ -4146,7 +4194,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         yaw_rate_series = b.get("yaw_rate_рад_с", 0.0)
         ax_series = b.get("ускорение_продольное_ax_м_с2", 0.0)
         ay_series = b.get("ускорение_поперечное_ay_м_с2", 0.0)
-        s_world = b.ensure_s_world()
+        s_world = _ensure_world_progress_series(b)
 
         yaw = sample(yaw_series, 0.0)
         x0 = sample(xw, float(xw[idx_ref]))
@@ -8045,8 +8093,21 @@ class Car3DWidget(QtWidgets.QWidget):
         try:
             if bundle is None:
                 raise ValueError('missing bundle')
-            vx = np.asarray(bundle.get("скорость_vx_м_с", 0.0), dtype=float).reshape(-1)
-            finite_v = np.asarray(np.abs(vx[np.isfinite(vx)]), dtype=float)
+            try:
+                vxb, vyb = bundle.ensure_body_velocity_xy()
+                v_mag = np.hypot(
+                    np.asarray(vxb, dtype=float).reshape(-1),
+                    np.asarray(vyb, dtype=float).reshape(-1),
+                )
+            except Exception:
+                vx = np.asarray(bundle.get("скорость_vx_м_с", 0.0), dtype=float).reshape(-1)
+                vy = np.asarray(bundle.get("скорость_vy_м_с", 0.0), dtype=float).reshape(-1)
+                n_v = int(min(vx.size, vy.size)) if vy.size > 0 else int(vx.size)
+                if n_v > 0 and vy.size > 0:
+                    v_mag = np.hypot(vx[:n_v], vy[:n_v])
+                else:
+                    v_mag = np.abs(vx)
+            finite_v = np.asarray(v_mag[np.isfinite(v_mag)], dtype=float)
             if finite_v.size > 0:
                 v_ref = float(np.nanmedian(finite_v))
                 v_max = float(np.nanmax(finite_v))
@@ -8077,7 +8138,7 @@ class Car3DWidget(QtWidgets.QWidget):
         if native_step is None:
             try:
                 if bundle is not None:
-                    s_world = np.asarray(bundle.ensure_s_world(), dtype=float).reshape(-1)
+                    s_world = np.asarray(_ensure_world_progress_series(bundle), dtype=float).reshape(-1)
                     ds = np.diff(s_world)
                     ds = ds[np.isfinite(ds) & (ds > 1e-9)]
                     if ds.size > 0:
@@ -8094,7 +8155,7 @@ class Car3DWidget(QtWidgets.QWidget):
         try:
             if bundle is None:
                 raise ValueError('missing bundle')
-            s_path = np.asarray(bundle.ensure_s_world(), dtype=float).reshape(-1)
+            s_path = np.asarray(_ensure_world_progress_series(bundle), dtype=float).reshape(-1)
             x_path = np.asarray(bundle.get("путь_x_м", 0.0), dtype=float).reshape(-1)
             y_path = np.asarray(bundle.get("путь_y_м", 0.0), dtype=float).reshape(-1)
             mask = np.isfinite(s_path) & np.isfinite(x_path) & np.isfinite(y_path)
@@ -8418,11 +8479,57 @@ class Car3DWidget(QtWidgets.QWidget):
         if accel_scale is not None:
             self._accel_scale = float(accel_scale)
 
-    def _solver_signed_speed_along_road(self, get_value) -> float:
+    def _solver_signed_speed_along_road(
+        self,
+        b: DataBundle,
+        get_value,
+        *,
+        i0: int,
+        i1: int,
+        alpha: float,
+        s_progress_series: Optional[np.ndarray] = None,
+    ) -> float:
         try:
-            return float(get_value("скорость_vx_м_с", 0.0))
+            vx = float(get_value("скорость_vx_м_с", 0.0))
         except Exception:
+            vx = 0.0
+        try:
+            vy = float(get_value("скорость_vy_м_с", 0.0))
+        except Exception:
+            vy = 0.0
+        solver_speed_mag = float(math.hypot(vx, vy)) if (np.isfinite(vx) or np.isfinite(vy)) else 0.0
+        try:
+            s_path = np.asarray(
+                _ensure_world_progress_series(b) if s_progress_series is None else s_progress_series,
+                dtype=float,
+            ).reshape(-1)
+            t_arr = np.asarray(b.t, dtype=float).reshape(-1)
+            n = int(min(s_path.size, t_arr.size))
+            if n > 1:
+                ii0 = int(_clamp(int(i0), 0, n - 1))
+                ii1 = int(_clamp(int(i1), 0, n - 1))
+                if ii1 != ii0:
+                    dt = float(t_arr[ii1] - t_arr[ii0])
+                    if np.isfinite(dt) and abs(dt) > 1e-9:
+                        ds = float(s_path[ii1] - s_path[ii0])
+                        speed_mag = abs(ds / dt)
+                    else:
+                        speed_mag = solver_speed_mag
+                else:
+                    speed_mag = solver_speed_mag
+            else:
+                speed_mag = solver_speed_mag
+        except Exception:
+            speed_mag = solver_speed_mag
+        if not np.isfinite(speed_mag):
+            speed_mag = solver_speed_mag
+        if not np.isfinite(speed_mag) or speed_mag <= 1e-9:
             return 0.0
+        if np.isfinite(vx) and abs(vx) > 1e-6:
+            return float(math.copysign(speed_mag, vx))
+        if np.isfinite(solver_speed_mag) and solver_speed_mag > 1e-9:
+            return float(speed_mag)
+        return 0.0
 
     def _solver_external_acceleration_xy(self, get_value) -> tuple[float, float]:
         try:
@@ -8460,7 +8567,38 @@ class Car3DWidget(QtWidgets.QWidget):
 
         # Canonical solver-truth channels only. The user-facing 3D arrows intentionally stay
         # in the road plane and do not mix in heave channels or reconstructed body helpers.
-        speed_along_road = self._solver_signed_speed_along_road(_g)
+        s_progress_series = np.asarray(_ensure_world_progress_series(b), dtype=float)
+        speed_along_road = self._solver_signed_speed_along_road(
+            b,
+            _g,
+            i0=i0,
+            i1=i1,
+            alpha=alpha,
+            s_progress_series=s_progress_series,
+        )
+        try:
+            vxb_arr, vyb_arr = b.ensure_body_velocity_xy()
+        except Exception:
+            vxb_arr = b.get("скорость_vx_м_с", 0.0)
+            vyb_arr = b.get("скорость_vy_м_с", 0.0)
+        vel_body_x = float(
+            _sample_series_local(
+                vxb_arr,
+                i0=i0,
+                i1=i1,
+                alpha=alpha,
+                default=float(_g("скорость_vx_м_с", 0.0)),
+            )
+        )
+        vel_body_y = float(
+            _sample_series_local(
+                vyb_arr,
+                i0=i0,
+                i1=i1,
+                alpha=alpha,
+                default=float(_g("скорость_vy_м_с", 0.0)),
+            )
+        )
         external_ax, external_ay = self._solver_external_acceleration_xy(_g)
 
         yaw0 = _g("yaw_рад", 0.0)
@@ -8498,19 +8636,15 @@ class Car3DWidget(QtWidgets.QWidget):
         x0 = _g("путь_x_м", 0.0)
         y0 = _g("путь_y_м", 0.0)
 
-        try:
-            s_progress_m = float(
-                _sample_series_local(
-                    np.asarray(b.ensure_s_world(), dtype=float),
-                    i0=i0,
-                    i1=i1,
-                    alpha=alpha,
-                    default=0.0,
-                )
+        s_progress_m = float(
+            _sample_series_local(
+                s_progress_series,
+                i0=i0,
+                i1=i1,
+                alpha=alpha,
+                default=0.0,
             )
-        except Exception:
-            speed_sign = -1.0 if float(speed_along_road) < -1e-6 else 1.0
-            s_progress_m = float(speed_sign * math.hypot(float(x0), float(y0)))
+        )
 
         wb = float(self.geom.wheelbase)
         tr = float(self.geom.track)
@@ -10269,7 +10403,7 @@ class Car3DWidget(QtWidgets.QWidget):
         except Exception:
             pass
 
-        # ---- Vectors (velocity & acceleration) in local body frame
+        # ---- Vectors (velocity & acceleration) in local road plane
         def _arrow_lines_3d(
             origin_xyz: np.ndarray,
             vec_xyz: np.ndarray,
@@ -10301,10 +10435,21 @@ class Car3DWidget(QtWidgets.QWidget):
 
         z_vec_offset = 0.55 * body_h + 0.15 * float(self.geom.wheel_radius)
         vec_origin = np.asarray(center_draw, dtype=float) + np.asarray(R_local[:, 2], dtype=float) * float(z_vec_offset)
-        vel_vec = np.asarray(R_local[:, 0], dtype=float) * float(speed_along_road * self._vel_scale)
-        acc_vec = (
-            np.asarray(R_local[:, 0], dtype=float) * float(external_ax * self._accel_scale)
-            + np.asarray(R_local[:, 1], dtype=float) * float(external_ay * self._accel_scale)
+        vel_vec = np.asarray(
+            [
+                float(vel_body_x * self._vel_scale),
+                float(vel_body_y * self._vel_scale),
+                0.0,
+            ],
+            dtype=float,
+        )
+        acc_vec = np.asarray(
+            [
+                float(external_ax * self._accel_scale),
+                float(external_ay * self._accel_scale),
+                0.0,
+            ],
+            dtype=float,
         )
         vel_pos, vel_colors = _arrow_lines_3d(
             vec_origin,
@@ -10335,7 +10480,7 @@ class Car3DWidget(QtWidgets.QWidget):
 
         if road_preview_enabled:
             try:
-                s_world = b.ensure_s_world()
+                s_world = _ensure_world_progress_series(b)
                 xw, yw = b.ensure_world_xy()
                 s0 = _sample_series_local(s_world, i0=i0, i1=i1, alpha=alpha, default=0.0)
                 x0 = _sample_series_local(xw, i0=i0, i1=i1, alpha=alpha, default=0.0)
@@ -10786,9 +10931,20 @@ class Car3DWidget(QtWidgets.QWidget):
 
                             body_forward = _norm_or(np.asarray(R_local[:, 0], dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
                             body_side = _norm_or(np.asarray(R_local[:, 1], dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+                            road_up = np.array([0.0, 0.0, 1.0], dtype=float)
+                            road_forward = _project_vector_to_plane(
+                                body_forward,
+                                plane_normal_xyz=road_up,
+                                fallback_xyz=np.array([1.0, 0.0, 0.0], dtype=float),
+                            )
+                            road_side = _project_vector_to_plane(
+                                body_side,
+                                plane_normal_xyz=road_up,
+                                fallback_xyz=np.array([0.0, 1.0, 0.0], dtype=float),
+                            )
                             road_view_dir = np.asarray(camera_view_dir, dtype=float).reshape(3)
                             road_view_dir[2] = 0.0
-                            road_view_dir = _norm_or(road_view_dir, body_forward)
+                            road_view_dir = _norm_or(road_view_dir, road_forward)
                             valid_road_pts = [
                                 np.asarray(pt, dtype=float).reshape(3)
                                 for pt in road_local_pts
@@ -10822,12 +10978,12 @@ class Car3DWidget(QtWidgets.QWidget):
                             )
                             for fog_idx, (offset_fwd_m, lift_m, fog_radius_u, fog_radius_v, fog_rgb, fog_density_u) in enumerate(fog_specs):
                                 fog_item = self._scene_fog_meshes[fog_idx] if fog_idx < len(self._scene_fog_meshes) else None
-                                fog_center = np.asarray(road_plane_center, dtype=float) + body_forward * float(offset_fwd_m)
+                                fog_center = np.asarray(road_plane_center, dtype=float) + road_forward * float(offset_fwd_m)
                                 fog_center[2] = float(shadow_floor_z) + float(lift_m)
                                 fog_verts, fog_faces = _ellipse_mesh_on_plane(
                                     center_xyz=fog_center,
-                                    axis_u_xyz=body_forward,
-                                    axis_v_xyz=body_side,
+                                    axis_u_xyz=road_forward,
+                                    axis_v_xyz=road_side,
                                     radius_u_m=float(fog_radius_u),
                                     radius_v_m=float(fog_radius_v),
                                     segments=28,
@@ -10836,8 +10992,8 @@ class Car3DWidget(QtWidgets.QWidget):
                                     fog_verts,
                                     fog_faces,
                                     center_xyz=fog_center,
-                                    axis_u_xyz=body_forward,
-                                    axis_v_xyz=body_side,
+                                    axis_u_xyz=road_forward,
+                                    axis_v_xyz=road_side,
                                     radius_u_m=float(fog_radius_u),
                                     radius_v_m=float(fog_radius_v),
                                     theme_rgb=tuple(fog_rgb),
@@ -15776,7 +15932,7 @@ class TelemetryPanel(QtWidgets.QWidget):
         self.gb_sum = gb_sum
 
         self.lbl_t = QtWidgets.QLabel("t = —")
-        self.lbl_v = QtWidgets.QLabel("vx = —")
+        self.lbl_v = QtWidgets.QLabel("v = —")
         self.lbl_vkmh = QtWidgets.QLabel("v = —")
         self.lbl_ax = QtWidgets.QLabel("ax = —")
         self.lbl_ay = QtWidgets.QLabel("ay = —")
@@ -16316,13 +16472,13 @@ class TelemetryPanel(QtWidgets.QWidget):
         pitch = sample(summary["pitch"], 0.0)
 
         R = float("inf")
-        if abs(yaw_rate) > 1e-6 and abs(vx) > 1e-3:
-            R = vx / yaw_rate
+        if abs(yaw_rate) > 1e-6 and abs(v_mps) > 1e-3:
+            R = v_mps / yaw_rate
         a_c = ay
 
         if not bool(getattr(self, "_compact_dock_mode", False)):
             _set_label_text_if_changed(self.lbl_t, f"t = {_fmt(t, ' s', digits=3)}")
-            _set_label_text_if_changed(self.lbl_v, f"vx = {_fmt(vx, ' m/s', digits=2)}")
+            _set_label_text_if_changed(self.lbl_v, f"v = {_fmt(v_mps, ' m/s', digits=2)}")
             _set_label_text_if_changed(self.lbl_vkmh, f"v = {_fmt(v_mps * 3.6, ' km/h', digits=1)}")
             _set_label_text_if_changed(self.lbl_ax, f"ax = {_fmt(ax, ' m/s²', digits=2)}")
             _set_label_text_if_changed(self.lbl_ay, f"ay = {_fmt(ay, ' m/s²', digits=2)}")
@@ -19103,8 +19259,28 @@ class MainWindow(QtWidgets.QMainWindow):
         # status line: time + speed
         try:
             t = float(sample_time)
+            sample_i0, sample_i1, alpha, _status_sample_t = _sample_time_bracket(
+                np.asarray(b.t, dtype=float),
+                sample_t=sample_time,
+                fallback_index=idx,
+            )
             vxw, vyw = b.ensure_world_velocity_xy()
-            v = math.hypot(float(vxw[idx]), float(vyw[idx])) if len(vxw) > idx and len(vyw) > idx else float(abs(b.get("скорость_vx_м_с", 0.0)[idx]))
+            vx_status = _sample_series_local(vxw, i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)
+            vy_status = _sample_series_local(vyw, i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)
+            if np.isfinite(float(vx_status)) or np.isfinite(float(vy_status)):
+                v = float(math.hypot(float(vx_status), float(vy_status)))
+            else:
+                v = float(
+                    abs(
+                        _sample_series_local(
+                            b.get("скорость_vx_м_с", 0.0),
+                            i0=sample_i0,
+                            i1=sample_i1,
+                            alpha=alpha,
+                            default=0.0,
+                        )
+                    )
+                )
             self._status(f"t={t:.3f}s, v={v:.2f}m/s, file={b.npz_path.name}")
         except Exception:
             pass

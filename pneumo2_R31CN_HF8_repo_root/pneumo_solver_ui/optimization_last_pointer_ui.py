@@ -17,7 +17,7 @@ from pneumo_solver_ui.optimization_problem_scope_ui import (
 
 
 def _render_last_pointer_live_policy(st: Any, live_policy: dict[str, Any]) -> None:
-    st.markdown("**Seed/promotion policy (текущая стадия)**")
+    st.markdown("**Политика отбора и продвижения (текущая стадия)**")
     if bool(live_policy.get("available")):
         st.caption(
             f"requested={live_policy.get('requested_mode') or '—'} → "
@@ -37,8 +37,8 @@ def render_last_optimization_pointer_summary(
     compact: bool = False,
     missing_message: str,
     success_message: str | None = None,
-    packaging_heading: str = "Packaging snapshot (last run)",
-    packaging_interference_prefix: str = "В последнем run есть packaging-interference evidence",
+    packaging_heading: str = "Сводка по геометрии узлов (последний run)",
+    packaging_interference_prefix: str = "В последнем run есть признаки пересечений по геометрии узлов",
     current_problem_hash: str = "",
     current_problem_hash_mode: str = "",
 ) -> bool:
@@ -91,7 +91,7 @@ def render_last_optimization_pointer_summary(
     sp_payload = snap.get("sp_payload") or {}
     if sp_payload:
         st.caption(
-            "StageRunner pointer: "
+            "Указатель StageRunner: "
             f"status={sp_payload.get('status') or '—'}, ts={sp_payload.get('ts') or '—'}"
         )
 

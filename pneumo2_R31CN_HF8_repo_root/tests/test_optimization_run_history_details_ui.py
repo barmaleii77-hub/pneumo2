@@ -100,7 +100,7 @@ def test_selected_run_details_renderer_surfaces_contract_packaging_and_log() -> 
     assert ("caption", r"Baseline override at launch: `C:\tmp\workspace\baselines\by_problem\p_demo\baseline_best.json`") in st.calls
     assert any(kind == "warning" and "different optimization problem" in text for kind, text in st.calls)
     assert any(kind == "warning" and "Hash mode differs from current launch contract" in text for kind, text in st.calls)
-    assert ("write", "**Objective stack:** comfort, roll") in st.calls
-    assert ("write", "**Hard gate:** `penalty_total` (tol=0.25)") in st.calls
-    assert any(kind == "info" and "objective stack, penalty key, penalty tol" in text for kind, text in st.calls)
+    assert ("write", "**Набор целей оптимизации:** comfort, roll") in st.calls
+    assert ("write", "**Жёсткий порог по штрафу:** `penalty_total` (tol=0.25)") in st.calls
+    assert any(kind == "info" and "набор целей, ключ штрафа, допуск по штрафу" in text for kind, text in st.calls)
     assert ("code", "line1\nline2") in st.calls

@@ -19,7 +19,7 @@ def test_r31cx_coordinator_and_ui_surface_objective_contract_persistence() -> No
     assert 'objective_contract_payload(' in coord_src
     assert 'penalty_tol=float(args.penalty_tol)' in coord_src
 
-    assert 'Objective contract artifact:' in summary_src
+    assert 'Файл objective-contract:' in summary_src
     assert 'contract_diff_bits = compare_objective_contract_to_current(' in details_src
     assert 'resume/cache уже различает такие контракты по problem_hash' in summary_src
 

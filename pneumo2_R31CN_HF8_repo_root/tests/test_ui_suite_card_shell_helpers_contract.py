@@ -16,7 +16,10 @@ def test_suite_card_shell_helper_keeps_clean_russian_copy() -> None:
     assert "#### 1. Основное" in text
     assert "#### 2. Время расчета" in text
     assert "#### 4. Цели и ограничения" in text
-    assert "Черновик карточки живет в UI-state" in text
+    assert "Черновик карточки хранится в состоянии интерфейса" in text
+    assert "обычное обновление страницы" in text
+    assert "UI-state" not in text
+    assert "обычный rerun" not in text
     assert "CSV профиля дороги / маневра (опционально)" in text
     assert "Используется в сценариях с дорожным профилем из CSV" in text
     assert "Используется в сценариях с маневром из CSV" in text
