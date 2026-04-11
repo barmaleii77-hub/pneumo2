@@ -6345,18 +6345,39 @@ class Car3DWidget(QtWidgets.QWidget):
             segments=int(max(18, segments)),
         )
 
-    def _camera_view_direction_local_xyz(self) -> np.ndarray:
+    def _camera_view_direction_local_xyz(self, target_xyz: Optional[np.ndarray] = None) -> np.ndarray:
         try:
             if self.view is not None and pg is not None:
                 cam_pos = self.view.cameraPosition()
-                center = self.view.opts.get("center", pg.Vector(0.0, 0.0, 0.0))
-                if cam_pos is not None and center is not None:
-                    view_vec = np.asarray(
+                if cam_pos is not None:
+                    cam_xyz = np.asarray(
                         [
-                            float(cam_pos.x() - center.x()),
-                            float(cam_pos.y() - center.y()),
-                            float(cam_pos.z() - center.z()),
+                            float(cam_pos.x()),
+                            float(cam_pos.y()),
+                            float(cam_pos.z()),
                         ],
+                        dtype=float,
+                    )
+                    center_xyz = None
+                    if target_xyz is not None:
+                        center_arr = np.asarray(target_xyz, dtype=float).reshape(3)
+                        if np.all(np.isfinite(center_arr)):
+                            center_xyz = center_arr
+                    if center_xyz is None:
+                        center = self.view.opts.get("center", pg.Vector(0.0, 0.0, 0.0))
+                        if center is not None:
+                            center_xyz = np.asarray(
+                                [
+                                    float(center.x()),
+                                    float(center.y()),
+                                    float(center.z()),
+                                ],
+                                dtype=float,
+                            )
+                    if center_xyz is None:
+                        center_xyz = np.zeros(3, dtype=float)
+                    view_vec = np.asarray(
+                        cam_xyz - center_xyz,
                         dtype=float,
                     )
                     view_norm = float(np.linalg.norm(view_vec))
@@ -10126,8 +10147,12 @@ class Car3DWidget(QtWidgets.QWidget):
         try:
             if bundle is None:
                 raise ValueError('missing bundle')
-            vx = np.asarray(bundle.get("скорость_vx_м_с", 0.0), dtype=float).reshape(-1)
-            finite_v = np.asarray(np.abs(vx[np.isfinite(vx)]), dtype=float)
+            vx_body, vy_body = bundle.ensure_body_velocity_xy()
+            speed_mag = np.hypot(
+                np.asarray(vx_body, dtype=float).reshape(-1),
+                np.asarray(vy_body, dtype=float).reshape(-1),
+            )
+            finite_v = np.asarray(speed_mag[np.isfinite(speed_mag)], dtype=float)
             if finite_v.size > 0:
                 v_ref = float(np.nanmedian(finite_v))
                 v_max = float(np.nanmax(finite_v))
@@ -10176,8 +10201,9 @@ class Car3DWidget(QtWidgets.QWidget):
             if bundle is None:
                 raise ValueError('missing bundle')
             s_path = np.asarray(bundle.ensure_s_world(), dtype=float).reshape(-1)
-            x_path = np.asarray(bundle.get("путь_x_м", 0.0), dtype=float).reshape(-1)
-            y_path = np.asarray(bundle.get("путь_y_м", 0.0), dtype=float).reshape(-1)
+            x_path, y_path = bundle.ensure_world_xy()
+            x_path = np.asarray(x_path, dtype=float).reshape(-1)
+            y_path = np.asarray(y_path, dtype=float).reshape(-1)
             mask = np.isfinite(s_path) & np.isfinite(x_path) & np.isfinite(y_path)
             if int(np.count_nonzero(mask)) < 2:
                 raise ValueError('insufficient finite path samples')
@@ -10623,11 +10649,28 @@ class Car3DWidget(QtWidgets.QWidget):
         if accel_scale is not None:
             self._accel_scale = float(accel_scale)
 
-    def _solver_signed_speed_along_road(self, get_value) -> float:
+    def _solver_signed_speed_along_road(
+        self,
+        b: DataBundle,
+        *,
+        i0: int,
+        i1: int,
+        alpha: float,
+        get_value,
+    ) -> float:
         try:
-            return float(get_value("скорость_vx_м_с", 0.0))
+            return _sample_signed_speed_along_world_path_local(
+                b,
+                i0=int(i0),
+                i1=int(i1),
+                alpha=float(alpha),
+                default_signed_m_s=float(get_value("скорость_vx_м_с", 0.0)),
+            )
         except Exception:
-            return 0.0
+            try:
+                return float(get_value("скорость_vx_м_с", 0.0))
+            except Exception:
+                return 0.0
 
     def _solver_external_acceleration_xy(self, get_value) -> tuple[float, float]:
         try:
@@ -10668,7 +10711,13 @@ class Car3DWidget(QtWidgets.QWidget):
 
         # Canonical solver-truth channels only. The user-facing 3D arrows intentionally stay
         # in the road plane and do not mix in heave channels or reconstructed body helpers.
-        speed_along_road = self._solver_signed_speed_along_road(_g)
+        speed_along_road = self._solver_signed_speed_along_road(
+            b,
+            i0=i0,
+            i1=i1,
+            alpha=alpha,
+            get_value=_g,
+        )
         external_ax, external_ay = self._solver_external_acceleration_xy(_g)
 
         yaw0 = _ga("yaw_рад", 0.0)
@@ -10860,8 +10909,6 @@ class Car3DWidget(QtWidgets.QWidget):
             wheel_pose_ups.append(_norm_or(up_xyz, np.array([0.0, 0.0, 1.0], dtype=float)))
             wheel_pose_toe.append(float(toe_rad))
             wheel_pose_camber.append(float(camber_rad))
-        camera_view_dir = self._camera_view_direction_local_xyz()
-
         def _set_mesh_from_segment(item: Optional["gl.GLMeshItem"], seg: Optional[tuple[np.ndarray, np.ndarray]], radius_m: float) -> None:
             if item is None or self._unit_cyl_faces is None:
                 return
@@ -10999,6 +11046,7 @@ class Car3DWidget(QtWidgets.QWidget):
                 center_draw = np.asarray([0.0, 0.0, z_body], dtype=float)
                 v_box = (np.asarray(self._box_base_vertices, dtype=float) @ R_local.T) + center_draw
             self._chassis_mesh.setMeshData(meshdata=gl.MeshData(vertexes=v_box, faces=self._box_faces))
+        camera_view_dir = self._camera_view_direction_local_xyz(target_xyz=np.asarray(center_draw, dtype=float).reshape(3))
         base_mean_load_u = float(
             _clamp(
                 float(np.nanmean(np.asarray(tire_forces_n, dtype=float))) / float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0))),
@@ -13148,9 +13196,18 @@ class Car3DWidget(QtWidgets.QWidget):
 
                             body_forward = _norm_or(np.asarray(R_local[:, 0], dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
                             body_side = _norm_or(np.asarray(R_local[:, 1], dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+                            road_forward = _project_vector_to_plane(body_forward, np.array([0.0, 0.0, 1.0], dtype=float))
+                            road_forward = _norm_or(np.asarray(road_forward, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+                            road_motion_forward = (
+                                np.asarray(road_forward, dtype=float)
+                                if float(speed_along_road) >= -1e-6
+                                else -np.asarray(road_forward, dtype=float)
+                            )
+                            road_side = _project_vector_to_plane(body_side, np.array([0.0, 0.0, 1.0], dtype=float))
+                            road_side = _norm_or(np.asarray(road_side, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
                             road_view_dir = np.asarray(camera_view_dir, dtype=float).reshape(3)
                             road_view_dir[2] = 0.0
-                            road_view_dir = _norm_or(road_view_dir, body_forward)
+                            road_view_dir = _norm_or(road_view_dir, road_motion_forward)
                             valid_road_pts = [
                                 np.asarray(pt, dtype=float).reshape(3)
                                 for pt in road_local_pts
@@ -13184,12 +13241,12 @@ class Car3DWidget(QtWidgets.QWidget):
                             )
                             for fog_idx, (offset_fwd_m, lift_m, fog_radius_u, fog_radius_v, fog_rgb, fog_density_u) in enumerate(fog_specs):
                                 fog_item = self._scene_fog_meshes[fog_idx] if fog_idx < len(self._scene_fog_meshes) else None
-                                fog_center = np.asarray(road_plane_center, dtype=float) + body_forward * float(offset_fwd_m)
+                                fog_center = np.asarray(road_plane_center, dtype=float) + road_motion_forward * float(offset_fwd_m)
                                 fog_center[2] = float(shadow_floor_z) + float(lift_m)
                                 fog_verts, fog_faces = _ellipse_mesh_on_plane(
                                     center_xyz=fog_center,
-                                    axis_u_xyz=body_forward,
-                                    axis_v_xyz=body_side,
+                                    axis_u_xyz=road_motion_forward,
+                                    axis_v_xyz=road_side,
                                     radius_u_m=float(fog_radius_u),
                                     radius_v_m=float(fog_radius_v),
                                     segments=28,
@@ -13198,8 +13255,8 @@ class Car3DWidget(QtWidgets.QWidget):
                                     fog_verts,
                                     fog_faces,
                                     center_xyz=fog_center,
-                                    axis_u_xyz=body_forward,
-                                    axis_v_xyz=body_side,
+                                    axis_u_xyz=road_motion_forward,
+                                    axis_v_xyz=road_side,
                                     radius_u_m=float(fog_radius_u),
                                     radius_v_m=float(fog_radius_v),
                                     theme_rgb=tuple(fog_rgb),
@@ -13283,12 +13340,12 @@ class Car3DWidget(QtWidgets.QWidget):
                             focus_center = (
                                 np.mean(np.asarray(focus_candidates, dtype=float), axis=0)
                                 if focus_candidates
-                                else np.asarray(center_draw, dtype=float).reshape(3) + np.asarray(R_local[:, 2], dtype=float).reshape(3) * (0.18 * body_h)
+                                else np.asarray(center_draw, dtype=float).reshape(3) + np.array([0.0, 0.0, 0.18 * body_h], dtype=float)
                             )
                             focus_axis_u, focus_axis_v = self._camera_facing_card_axes(
-                                primary_dir_xyz=body_forward,
+                                primary_dir_xyz=road_motion_forward,
                                 view_dir_xyz=camera_view_dir,
-                                fallback_dir_xyz=body_side,
+                                fallback_dir_xyz=road_side,
                             )
                             max_corner_force_n = float(max([0.0, *[float(v) for v in tire_forces_n]]))
                             speed_u = float(_clamp(abs(float(speed_along_road)) / 35.0, 0.0, 1.0))
@@ -13340,6 +13397,11 @@ class Car3DWidget(QtWidgets.QWidget):
                                 shadow_fwd[2] = 0.0
                                 shadow_axle[2] = 0.0
                                 shadow_fwd = _norm_or(shadow_fwd, np.array([1.0, 0.0, 0.0], dtype=float))
+                                shadow_motion_fwd = (
+                                    np.asarray(shadow_fwd, dtype=float)
+                                    if float(speed_along_road) >= -1e-6
+                                    else -np.asarray(shadow_fwd, dtype=float)
+                                )
                                 shadow_axle = _norm_or(
                                     shadow_axle,
                                     np.array([0.0, 1.0 if float(shadow_center[1]) >= 0.0 else -1.0, 0.0], dtype=float),
@@ -13542,8 +13604,8 @@ class Car3DWidget(QtWidgets.QWidget):
                                     response=0.16,
                                 )
                                 key_light_center = np.asarray(wheel_pose_centers[idx], dtype=float).reshape(3) + wheel_up * float(0.18 * wheel_radius_m)
-                                key_light_fwd = _project_vector_to_plane(np.asarray(wheel_pose_fwds[idx], dtype=float).reshape(3), wheel_up)
-                                key_light_fwd = _norm_or(np.asarray(key_light_fwd, dtype=float).reshape(3), shadow_fwd)
+                                key_light_fwd = _project_vector_to_plane(np.asarray(shadow_motion_fwd, dtype=float).reshape(3), wheel_up)
+                                key_light_fwd = _norm_or(np.asarray(key_light_fwd, dtype=float).reshape(3), shadow_motion_fwd)
                                 shaft_primary = key_light_fwd + 0.28 * wheel_up
                                 shaft_axis_u, shaft_axis_v = self._camera_facing_card_axes(
                                     primary_dir_xyz=shaft_primary,

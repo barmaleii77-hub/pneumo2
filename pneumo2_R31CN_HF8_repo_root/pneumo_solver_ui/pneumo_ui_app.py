@@ -409,51 +409,51 @@ def _render_home_opt_config_snapshot(*, compact: bool = False) -> None:
     else:
         cols = st.columns(4)
     with cols[0]:
-        st.metric("Активный путь", "StageRunner" if opt_use_staged else "Distributed")
+        st.metric("Активный путь", "По стадиям" if opt_use_staged else "Распределённый")
     with cols[1]:
         st.metric("Лимит, мин", f"{minutes:g}")
     if compact:
-        st.caption(f"jobs={jobs}; run={run_name}; csv={out_prefix}")
+        st.caption(f"Параллельных задач: {jobs}; запуск: {run_name}; префикс CSV: {out_prefix}")
     else:
         with cols[2]:
-            st.metric("jobs", str(jobs))
+            st.metric("Параллельных задач", str(jobs))
         with cols[3]:
-            st.metric("Run", run_name)
-        st.caption(f"CSV prefix: {out_prefix}")
+            st.metric("Имя запуска", run_name)
+        st.caption(f"Префикс CSV: {out_prefix}")
 
-    st.caption(f"Seed/promotion policy: {stage_policy_mode}")
-    st.caption("Stage-specific seed/promotion profile: " + stage_seed_policy_summary_text())
-    st.caption(f"System Influence eps_rel: {influence_eps_rel:g}")
-    st.caption("Adaptive epsilon для анализа System Influence: " + ("on" if adaptive_influence_eps else "off"))
+    st.caption(f"Политика отбора и продвижения: {stage_policy_mode}")
+    st.caption("Профиль отбора и продвижения по стадиям: " + stage_seed_policy_summary_text())
+    st.caption(f"Относительный шаг System Influence (eps_rel): {influence_eps_rel:g}")
+    st.caption("Адаптивный epsilon для анализа System Influence: " + ("включён" if adaptive_influence_eps else "выключен"))
 
     if opt_use_staged:
         st.caption(
-            "StageRunner: "
-            f"warmstart={str(st.session_state.get('warmstart_mode', DIAGNOSTIC_WARMSTART_MODE) or DIAGNOSTIC_WARMSTART_MODE)}, "
-            f"surrogate_samples={int(st.session_state.get('surrogate_samples', DIAGNOSTIC_SURROGATE_SAMPLES) or DIAGNOSTIC_SURROGATE_SAMPLES)}, "
-            f"surrogate_top_k={int(st.session_state.get('surrogate_top_k', DIAGNOSTIC_SURROGATE_TOP_K) or DIAGNOSTIC_SURROGATE_TOP_K)}"
+            "Режим по стадиям: "
+            f"тёплый старт={str(st.session_state.get('warmstart_mode', DIAGNOSTIC_WARMSTART_MODE) or DIAGNOSTIC_WARMSTART_MODE)}, "
+            f"точек для surrogate-модели={int(st.session_state.get('surrogate_samples', DIAGNOSTIC_SURROGATE_SAMPLES) or DIAGNOSTIC_SURROGATE_SAMPLES)}, "
+            f"размер элиты surrogate-модели={int(st.session_state.get('surrogate_top_k', DIAGNOSTIC_SURROGATE_TOP_K) or DIAGNOSTIC_SURROGATE_TOP_K)}"
         )
         st.caption(
-            "StageRunner seeds/filters: "
-            f"seed_candidates={int(st.session_state.get('ui_seed_candidates', DIAGNOSTIC_SEED_CANDIDATES) or DIAGNOSTIC_SEED_CANDIDATES)}, "
-            f"seed_conditions={int(st.session_state.get('ui_seed_conditions', DIAGNOSTIC_SEED_CONDITIONS) or DIAGNOSTIC_SEED_CONDITIONS)}, "
-            f"sort_tests_by_cost={bool(st.session_state.get('sort_tests_by_cost', DIAGNOSTIC_SORT_TESTS_BY_COST))}, "
-            f"autoupdate_baseline={bool(st.session_state.get('opt_autoupdate_baseline', True))}"
+            "Режим по стадиям, отбор и фильтры: "
+            f"кандидатов для отбора={int(st.session_state.get('ui_seed_candidates', DIAGNOSTIC_SEED_CANDIDATES) or DIAGNOSTIC_SEED_CANDIDATES)}, "
+            f"условий отбора={int(st.session_state.get('ui_seed_conditions', DIAGNOSTIC_SEED_CONDITIONS) or DIAGNOSTIC_SEED_CONDITIONS)}, "
+            f"дешёвые тесты первыми={bool(st.session_state.get('sort_tests_by_cost', DIAGNOSTIC_SORT_TESTS_BY_COST))}, "
+            f"авто-обновление лучшего опорного прогона={bool(st.session_state.get('opt_autoupdate_baseline', True))}"
         )
     else:
         st.caption(
-            "Distributed / BoTorch / coordinator: "
-            f"backend={str(st.session_state.get('opt_backend', 'Dask') or 'Dask')}, "
-            f"proposer={str(st.session_state.get('opt_proposer', DIST_OPT_PROPOSER_DEFAULT) or DIST_OPT_PROPOSER_DEFAULT)}, "
-            f"budget={int(st.session_state.get('opt_budget', DIST_OPT_BUDGET_DEFAULT) or DIST_OPT_BUDGET_DEFAULT)}, "
-            f"q={int(st.session_state.get('opt_q', DIST_OPT_Q_DEFAULT) or DIST_OPT_Q_DEFAULT)}, "
-            f"device={str(st.session_state.get('opt_device', DIST_OPT_DEVICE_DEFAULT) or DIST_OPT_DEVICE_DEFAULT)}"
+            "Распределённый режим / BoTorch / координатор: "
+            f"движок={str(st.session_state.get('opt_backend', 'Dask') or 'Dask')}, "
+            f"метод выбора кандидатов={str(st.session_state.get('opt_proposer', DIST_OPT_PROPOSER_DEFAULT) or DIST_OPT_PROPOSER_DEFAULT)}, "
+            f"бюджет={int(st.session_state.get('opt_budget', DIST_OPT_BUDGET_DEFAULT) or DIST_OPT_BUDGET_DEFAULT)}, "
+            f"размер пакета q={int(st.session_state.get('opt_q', DIST_OPT_Q_DEFAULT) or DIST_OPT_Q_DEFAULT)}, "
+            f"вычислительное устройство={str(st.session_state.get('opt_device', DIST_OPT_DEVICE_DEFAULT) or DIST_OPT_DEVICE_DEFAULT)}"
         )
         st.caption(
-            "Distributed runtime/env: "
-            f"ray_runtime_env_mode={str(st.session_state.get('ray_runtime_env_mode', DIST_OPT_RAY_RUNTIME_ENV_MODE_DEFAULT) or DIST_OPT_RAY_RUNTIME_ENV_MODE_DEFAULT)}, "
-            f"opt_botorch_n_init={int(st.session_state.get('opt_botorch_n_init', DIST_OPT_BOTORCH_N_INIT_DEFAULT) or DIST_OPT_BOTORCH_N_INIT_DEFAULT)}, "
-            f"opt_botorch_min_feasible={int(st.session_state.get('opt_botorch_min_feasible', DIST_OPT_BOTORCH_MIN_FEASIBLE_DEFAULT) or DIST_OPT_BOTORCH_MIN_FEASIBLE_DEFAULT)}"
+            "Среда распределённого расчёта: "
+            f"режим runtime_env Ray={str(st.session_state.get('ray_runtime_env_mode', DIST_OPT_RAY_RUNTIME_ENV_MODE_DEFAULT) or DIST_OPT_RAY_RUNTIME_ENV_MODE_DEFAULT)}, "
+            f"начальных точек BoTorch={int(st.session_state.get('opt_botorch_n_init', DIST_OPT_BOTORCH_N_INIT_DEFAULT) or DIST_OPT_BOTORCH_N_INIT_DEFAULT)}, "
+            f"минимум допустимых точек для BoTorch={int(st.session_state.get('opt_botorch_min_feasible', DIST_OPT_BOTORCH_MIN_FEASIBLE_DEFAULT) or DIST_OPT_BOTORCH_MIN_FEASIBLE_DEFAULT)}"
         )
 
 
@@ -2527,13 +2527,13 @@ with st.sidebar:
             st.subheader("Режим запуска")
 
             opt_use_staged = st.checkbox(
-                "Режим по стадиям (StageRunner) — рекомендуется",
+                "Режим по стадиям — рекомендуется",
                 value=bool(st.session_state.get("opt_use_staged", DIAGNOSTIC_USE_STAGED_OPT)),
                 key="opt_use_staged",
                 help=(
-                    "StageRunner сначала прогоняет дешёвые тесты и отсеивает плохие кандидаты, "
+                    "Режим по стадиям сначала прогоняет дешёвые тесты и отсеивает плохие кандидаты, "
                     "затем добавляет дорогие тесты. Обычно это быстрее и устойчивее, чем «всё сразу». "
-                    "Нумерация стадий 0-based: первая стадия = 0."
+                    "Нумерация стадий начинается с нуля: первая стадия имеет номер 0."
                 ),
             )
             # алиас для старых сохранений/кода (не удаляем резко)
@@ -2544,7 +2544,7 @@ with st.sidebar:
                 value=bool(st.session_state.get("opt_autoupdate_baseline", True)),
                 key="opt_autoupdate_baseline",
                 help=(
-                    "Если найден кандидат лучше текущего опорного прогона, StageRunner запишет его в "
+                    "Если найден кандидат лучше текущего опорного прогона, режим по стадиям запишет его в "
                     "workspace/baselines/baseline_best.json. Этот файл можно использовать как новый старт."
                 ),
             )
@@ -2608,31 +2608,31 @@ with st.sidebar:
 
             # --- StageRunner advanced (показываем только если выбран StageRunner)
             if bool(opt_use_staged):
-                with st.expander("StageRunner: ускорение поиска (обычно не трогать)", expanded=True):
+                with st.expander("Режим по стадиям: ускорение поиска (обычно не трогать)", expanded=True):
                     warmstart_mode = st.selectbox(
-                        "Warm‑start режим",
+                        "Режим тёплого старта",
                         options=["surrogate", "archive", "none"],
                         index=["surrogate", "archive", "none"].index(st.session_state.get("warmstart_mode", DIAGNOSTIC_WARMSTART_MODE)),
                         key="warmstart_mode",
                         help=(
-                            "surrogate: обучает быстрый surrogate на истории и выбирает элиту по предсказанию; "
-                            "archive: берёт топ‑N из глобального архива; "
-                            "none: без warm-start."
+                            "surrogate: обучает быструю surrogate-модель на истории и выбирает элиту по предсказанию; "
+                            "archive: берёт top-N из глобального архива; "
+                            "none: без тёплого старта."
                         ),
                     )
 
                     surrogate_samples = st.number_input(
-                        "Surrogate samples",
+                        "Точек для surrogate-модели",
                         min_value=500,
                         max_value=50000,
                         value=int(st.session_state.get("surrogate_samples", DIAGNOSTIC_SURROGATE_SAMPLES)),
                         step=500,
                         key="surrogate_samples",
-                        help="Сколько случайных точек ранжировать в surrogate warm‑start (больше = точнее, но медленнее).",
+                        help="Сколько случайных точек ранжировать на этапе surrogate warm-start (больше = точнее, но медленнее).",
                     )
 
                     surrogate_top_k = st.number_input(
-                        "Surrogate top-k",
+                        "Размер элиты surrogate-модели (top-k)",
                         min_value=8,
                         max_value=512,
                         value=int(st.session_state.get("surrogate_top_k", DIAGNOSTIC_SURROGATE_TOP_K)),
@@ -2642,7 +2642,7 @@ with st.sidebar:
                     )
 
                     stop_pen_stage1 = st.number_input(
-                        "Early‑stop штраф (stage1)",
+                        "Порог досрочной остановки по штрафу (стадия 1)",
                         min_value=0.0,
                         max_value=1e9,
                         value=float(st.session_state.get("stop_pen_stage1", 25.0)),
@@ -2651,7 +2651,7 @@ with st.sidebar:
                         help="Если накопленный штраф > порога — прерывает оставшиеся тесты для кандидата (ускоряет длинные стадии).",
                     )
                     stop_pen_stage2 = st.number_input(
-                        "Early‑stop штраф (stage2)",
+                        "Порог досрочной остановки по штрафу (стадия 2)",
                         min_value=0.0,
                         max_value=1e9,
                         value=float(st.session_state.get("stop_pen_stage2", 15.0)),
@@ -2668,7 +2668,7 @@ with st.sidebar:
                     )
 
                     influence_eps_rel = st.number_input(
-                        "System Influence eps_rel",
+                        "Относительный шаг System Influence (eps_rel)",
                         min_value=1e-6,
                         max_value=0.25,
                         value=float(st.session_state.get("influence_eps_rel", DIAGNOSTIC_INFLUENCE_EPS_REL)),
@@ -2677,35 +2677,35 @@ with st.sidebar:
                         key="influence_eps_rel",
                         help=(
                             "Относительный шаг возмущения для system_influence_report_v1. "
-                            "StageRunner теперь передаёт это значение явно, вместо скрытого дефолта внутри скрипта."
+                            "Режим по стадиям теперь передаёт это значение явно, вместо скрытого значения по умолчанию внутри скрипта."
                         ),
                     )
                     adaptive_influence_eps = st.checkbox(
-                        "Adaptive epsilon для System Influence",
+                        "Адаптивный epsilon для System Influence",
                         value=bool(st.session_state.get("adaptive_influence_eps", DIAGNOSTIC_ADAPTIVE_INFLUENCE_EPS)),
                         key="adaptive_influence_eps",
                         help=(
                             "System Influence прогоняет небольшой набор eps_rel и выбирает наиболее устойчивый шаг "
                             f"для каждого параметра. Базовая сетка: {influence_eps_grid_text(DIAGNOSTIC_ADAPTIVE_INFLUENCE_EPS_GRID)}. "
-                            "Для StageRunner поверх неё автоматически строятся stage-aware профили: "
-                            "stage0 = coarse, stage1 = balanced, stage2 = fine."
+                            "Для режима по стадиям поверх неё автоматически строятся профили по стадиям: "
+                            "stage0 = грубый, stage1 = сбалансированный, stage2 = точный."
                         ),
                     )
                     stage_policy_mode = st.selectbox(
-                        "Seed/promotion policy",
+                        "Политика отбора и продвижения",
                         options=["influence_weighted", "static"],
                         index=["influence_weighted", "static"].index(str(st.session_state.get("stage_policy_mode", DEFAULT_STAGE_POLICY_MODE) or DEFAULT_STAGE_POLICY_MODE)) if str(st.session_state.get("stage_policy_mode", DEFAULT_STAGE_POLICY_MODE) or DEFAULT_STAGE_POLICY_MODE) in ["influence_weighted", "static"] else 0,
                         key="stage_policy_mode",
                         help=(
-                            "influence_weighted — seed budgeting и promotion учитывают stage-specific influence summary: "
+                            "influence_weighted — бюджет отбора и продвижение учитывают сводку influence по стадиям: "
                             "stage0 остаётся широким, stage1 уже фокусируется, stage2 продвигает только узко релевантные параметры.\n"
-                            "static — историческое поведение: только score/ranges без приоритизации параметров по стадии."
+                            "static — историческое поведение: только score/ranges без приоритизации параметров по стадиям."
                         ),
                     )
-                    st.caption("Stage-specific seed/promotion profile: " + stage_seed_policy_summary_text())
+                    st.caption("Профиль отбора и продвижения по стадиям: " + stage_seed_policy_summary_text())
                     if adaptive_influence_eps:
                         st.caption(
-                            "Stage-aware adaptive epsilon: "
+                            "Адаптивный epsilon по стадиям: "
                             + stage_aware_influence_profiles_text(
                                 requested_eps_rel=float(influence_eps_rel),
                                 base_grid=DIAGNOSTIC_ADAPTIVE_INFLUENCE_EPS_GRID,
@@ -6929,7 +6929,7 @@ if False:
                         stage_elapsed_sec = staged_summary.get("stage_elapsed_sec", None)
                         stage_budget_sec = staged_summary.get("stage_budget_sec", None)
 
-                        st.write(f"Стадия: **{stage_name}** (idx={stage_idx}, 0-based; всего стадий: {max(1, stage_total)})")
+                        st.write(f"Стадия: **{stage_name}** (этап {stage_idx + 1} из {max(1, stage_total)})")
                         st.caption(describe_runtime_stage(stage_name))
                         st.write(f"Готово (суммарно): {total_done}  |  Записано в файл: {total_done_in_file}")
                         st.write(f"Текущая стадия: rows в CSV = **{stage_rows_current}**  |  по progress worker = {worker_done_current}/{worker_written_current}")
@@ -6957,7 +6957,7 @@ if False:
                         except Exception:
                             live_policy = {}
                         if bool(live_policy.get("available")):
-                            st.markdown("**Seed/promotion policy (текущая стадия)**")
+                            st.markdown("**Политика отбора и продвижения (текущая стадия)**")
                             policy_name = str(live_policy.get("policy_name") or "")
                             effective_mode = str(live_policy.get("effective_mode") or "")
                             requested_mode_live = str(live_policy.get("requested_mode") or "")
@@ -6965,22 +6965,23 @@ if False:
                             priority_params_live = list(live_policy.get("priority_params") or [])
                             seed_bucket_counts = dict(live_policy.get("seed_bucket_counts") or {})
                             st.caption(
-                                f"policy={policy_name or '—'} · requested={requested_mode_live or '—'} · effective={effective_mode or '—'} · summary={summary_status_live or '—'}"
+                                f"Профиль: {policy_name or '—'} · запрошенный режим: {requested_mode_live or '—'} · "
+                                f"фактический режим: {effective_mode or '—'} · итог: {summary_status_live or '—'}"
                             )
                             st.write(
-                                "Seed budget:",
-                                f"explore={int(live_policy.get('explore_budget', 0) or 0)}",
-                                f"focus={int(live_policy.get('focus_budget', 0) or 0)}",
-                                f"selected={int(live_policy.get('seed_count', 0) or 0)}",
-                                f"focus/explore selected={int(seed_bucket_counts.get('focus', 0) or 0)}/{int(seed_bucket_counts.get('explore', 0) or 0)}",
+                                "Бюджет отбора:",
+                                f"разведка={int(live_policy.get('explore_budget', 0) or 0)}",
+                                f"фокус={int(live_policy.get('focus_budget', 0) or 0)}",
+                                f"выбрано={int(live_policy.get('seed_count', 0) or 0)}",
+                                f"выбрано по группам фокус/разведка={int(seed_bucket_counts.get('focus', 0) or 0)}/{int(seed_bucket_counts.get('explore', 0) or 0)}",
                             )
                             if priority_params_live:
-                                st.caption("Priority params for this stage: " + ", ".join(str(x) for x in priority_params_live[:8]))
+                                st.caption("Приоритетные параметры текущей стадии: " + ", ".join(str(x) for x in priority_params_live[:8]))
                             if int(live_policy.get("promotion_selected_count", 0) or 0) > 0:
                                 st.caption(
-                                    "Promotion decisions selected: "
+                                    "Решений для продвижения выбрано: "
                                     + str(int(live_policy.get("promotion_selected_count", 0) or 0))
-                                    + f" (focus={int(live_policy.get('promotion_selected_focus_count', 0) or 0)}, explore={int(live_policy.get('promotion_selected_explore_count', 0) or 0)})"
+                                    + f" (фокус={int(live_policy.get('promotion_selected_focus_count', 0) or 0)}, разведка={int(live_policy.get('promotion_selected_explore_count', 0) or 0)})"
                                 )
                             seed_preview_rows = list(live_policy.get("seed_preview") or [])
                             if seed_preview_rows:
@@ -6995,12 +6996,12 @@ if False:
                         st.write(f"Готово кандидатов: **{total_done}**")
 
                     if ok is not None and err is not None:
-                        st.write(f"В последнем батче: OK={ok}, ERR={err}")
+                        st.write(f"В последнем пакете: успешно={ok}, с ошибкой={err}")
                     # диагностика: процесс умер, но статус ещё «идёт»
                     if (not pid_alive(st.session_state.opt_proc)) and status_text in ["запущено", "идёт", "stage_running", "baseline_eval", "seed_eval"]:
                         st.error(
-                            "Похоже, worker/staged-runner завершился аварийно или был остановлен до финального статуса, а прогресс не дошёл до 'завершено'. "
-                            "Смотрите log/CSV/staged_progress и stage_*_progress.json."
+                            "Похоже, процесс расчёта завершился аварийно или был остановлен до финального статуса, а прогресс не дошёл до 'завершено'. "
+                            "Проверьте логи и файлы staged_progress / stage_*_progress.json."
                         )
                 else:
                     st.caption(f"Файл прогресса ещё не создан. Ожидаемый путь: {progress_path}")

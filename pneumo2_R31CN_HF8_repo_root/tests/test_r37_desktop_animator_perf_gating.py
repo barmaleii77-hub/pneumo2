@@ -153,6 +153,12 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "p.setRenderHint(QtGui.QPainter.Antialiasing, False)" in app_src
     assert "p.setRenderHint(QtGui.QPainter.TextAntialiasing, True)" in app_src
     assert "p.setRenderHint(QtGui.QPainter.Antialiasing, True)" in app_src
+    assert "vx_body, vy_body = bundle.ensure_body_velocity_xy()" in app_src
+    assert "speed_mag = np.hypot(" in app_src
+    assert "finite_v = np.asarray(speed_mag[np.isfinite(speed_mag)], dtype=float)" in app_src
+    assert "x_path, y_path = bundle.ensure_world_xy()" in app_src
+    assert "x_path = np.asarray(x_path, dtype=float).reshape(-1)" in app_src
+    assert "y_path = np.asarray(y_path, dtype=float).reshape(-1)" in app_src
     assert "self._pressure_series_map: Dict[str, np.ndarray] = {}" in app_src
     assert "self._main_pressure_series_map: Dict[str, np.ndarray] = {}" in app_src
     assert "self._patm_arr, self._patm_default_pa = _infer_patm_source(b)" in app_src
@@ -211,6 +217,15 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "if int(getattr(self, \"_bundle_key\", 0) or 0) != id(b) or not self._signal_cache:" in app_src
     assert "sample_i0, sample_i1, alpha, _sample_t = _sample_time_bracket(" in app_src
     assert "sample = _make_series_sampler(i0=sample_i0, i1=sample_i1, alpha=alpha)" in app_src
+    assert "def _sample_signed_speed_along_world_path_local(" in app_src
+    assert "def _solver_signed_speed_along_road(" in app_src
+    assert "return _sample_signed_speed_along_world_path_local(" in app_src
+    assert "default_signed_m_s=float(get_value(\"скорость_vx_м_с\", 0.0))" in app_src
+    assert "speed_along_road = self._solver_signed_speed_along_road(" in app_src
+    assert "i0=i0," in app_src
+    assert "i1=i1," in app_src
+    assert "alpha=alpha," in app_src
+    assert "get_value=_g," in app_src
     assert "arr = series if isinstance(series, np.ndarray) else np.asarray(series, dtype=float)" in app_src
     assert "if ii0 == ii1 or a <= 1e-12:" in app_src
     assert "if a >= 1.0 - 1e-12:" in app_src
@@ -265,6 +280,29 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "def _ensure_hud_static_lines(self, b: DataBundle) -> tuple[str, ...]:" in app_src
     assert "def _hud_static_text(self, b: DataBundle, font: QtGui.QFont, max_px: int) -> str:" in app_src
     assert "def _elide_hud_lines(self, lines: list[str], font: QtGui.QFont, max_px: int) -> list[str]:" in app_src
+    assert "def _camera_view_direction_local_xyz(self, target_xyz: Optional[np.ndarray] = None) -> np.ndarray:" in app_src
+    assert "cam_xyz - center_xyz" in app_src
+    assert "camera_view_dir = self._camera_view_direction_local_xyz(target_xyz=np.asarray(center_draw, dtype=float).reshape(3))" in app_src
+    assert "camera_view_dir = self._camera_view_direction_local_xyz()" not in app_src
+    assert "road_forward = _project_vector_to_plane(body_forward, np.array([0.0, 0.0, 1.0], dtype=float))" in app_src
+    assert "road_motion_forward = (" in app_src
+    assert "if float(speed_along_road) >= -1e-6" in app_src
+    assert "road_side = _project_vector_to_plane(body_side, np.array([0.0, 0.0, 1.0], dtype=float))" in app_src
+    assert "road_view_dir = _norm_or(road_view_dir, road_motion_forward)" in app_src
+    assert "fog_center = np.asarray(road_plane_center, dtype=float) + road_motion_forward * float(offset_fwd_m)" in app_src
+    assert "axis_u_xyz=road_motion_forward," in app_src
+    assert "axis_v_xyz=road_side," in app_src
+    assert "fog_center = np.asarray(road_plane_center, dtype=float) + body_forward * float(offset_fwd_m)" not in app_src
+    assert "center_xyz=fog_center,\n                                    axis_u_xyz=body_forward," not in app_src
+    assert "center_xyz=fog_center,\n                                    axis_u_xyz=body_forward,\n                                    axis_v_xyz=body_side," not in app_src
+    assert "else np.asarray(center_draw, dtype=float).reshape(3) + np.array([0.0, 0.0, 0.18 * body_h], dtype=float)" in app_src
+    assert "else np.asarray(center_draw, dtype=float).reshape(3) + np.asarray(R_local[:, 2], dtype=float).reshape(3) * (0.18 * body_h)" not in app_src
+    assert "primary_dir_xyz=road_motion_forward," in app_src
+    assert "fallback_dir_xyz=road_side," in app_src
+    assert "shadow_motion_fwd = (" in app_src
+    assert "key_light_fwd = _project_vector_to_plane(np.asarray(shadow_motion_fwd, dtype=float).reshape(3), wheel_up)" in app_src
+    assert "key_light_fwd = _norm_or(np.asarray(key_light_fwd, dtype=float).reshape(3), shadow_motion_fwd)" in app_src
+    assert "key_light_fwd = _project_vector_to_plane(np.asarray(wheel_pose_fwds[idx], dtype=float).reshape(3), wheel_up)" not in app_src
     assert "self.road_fill = QtWidgets.QGraphicsPolygonItem()" in app_src
     assert "path = QtGui.QPainterPath(QtCore.QPointF(float(x_arr[0]), float(y_arr[0])))" in app_src
     assert "path.lineTo(float(x), float(y))" in app_src

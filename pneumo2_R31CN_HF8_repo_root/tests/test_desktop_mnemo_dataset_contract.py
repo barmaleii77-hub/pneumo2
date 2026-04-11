@@ -13,6 +13,7 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     from pneumo_solver_ui.desktop_mnemo.app import (
         _build_frame_alert_payload,
         _build_frame_narrative,
+        _build_selected_edge_focus_meta,
         build_onboarding_focus_target,
         build_onboarding_focus_region_payload,
         prepare_dataset,
@@ -191,6 +192,25 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     assert selected_focus_payload["edge_name"] == "обратный_клапан_Pmid_к_выхлопу"
     assert selected_focus_payload["node_name"] == "узел_после_рег_Pmid"
     assert selected_focus_payload["source"] == "startup_handoff"
+
+    edge_focus = _build_selected_edge_focus_meta(
+        dataset,
+        1,
+        edge_name="регулятор_до_себя_Pmid_сброс",
+    )
+    assert edge_focus["edge_name"] == "регулятор_до_себя_Pmid_сброс"
+    assert edge_focus["phase_sequence_label"] == "SIG → ΔP → Q"
+    assert [item["phase_label"] for item in edge_focus["phase_items"]] == ["SIG", "ΔP", "Q"]
+    assert edge_focus["step_rows"][0]["index_label"] == "01"
+    assert edge_focus["step_rows"][0]["target_idx"] == 2
+    assert edge_focus["step_rows"][0]["target_time_s"] == pytest.approx(1.0)
+    assert edge_focus["step_rows"][1]["phase_label"] == "ΔP"
+    assert edge_focus["step_rows"][1]["target_idx"] == 1
+    assert edge_focus["step_rows"][2]["target_idx"] == 1
+    assert any(item["badge_text"] == "P+" for item in edge_focus["terminal_markers"])
+    assert any(item["badge_text"] == "P-" for item in edge_focus["terminal_markers"])
+    assert any(item["badge_text"] == "SRC" for item in edge_focus["terminal_markers"])
+    assert any(item["badge_text"] == "SNK" for item in edge_focus["terminal_markers"])
 
 
 def test_mnemo_event_tracker_latches_warn_and_mode_switches(tmp_path: Path) -> None:

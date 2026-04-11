@@ -3,6 +3,13 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
+
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    _ROOT = Path(__file__).resolve().parents[2]
+    if str(_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ROOT))
+    __package__ = "pneumo_solver_ui.tools"
 
 from pneumo_solver_ui.desktop_animator.data_bundle import load_npz
 from pneumo_solver_ui.desktop_animator.suspension_geometry_diagnostics import collect_suspension_geometry_status

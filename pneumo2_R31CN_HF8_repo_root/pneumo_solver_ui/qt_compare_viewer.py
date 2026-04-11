@@ -497,6 +497,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._mv_map_full_to_short: Dict[str, str] = {}
         self._mv_map_short_to_full: Dict[str, str] = {}
         self._mv_last_key: str = ""
+        self._mv_checked_dims_selected: Optional[List[str]] = None
         self._mv_updating: bool = False
         self._mv_restoring_settings: bool = False
         self._workspace_focus_mode: str = "all"
@@ -3437,7 +3438,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.tree_mv_cols.setHeaderLabels(["Поля (коротко)"])
         self.tree_mv_cols.setToolTip("Отметьте поля, которые хотите видеть в SPLOM/Parallel.\n3D использует отдельные оси.")
         self.tree_mv_cols.header().setStretchLastSection(True)
-        self.tree_mv_cols.itemChanged.connect(lambda _it=None, _col=None: self._schedule_multivar_update())
+        self.tree_mv_cols.itemChanged.connect(self._on_mv_dims_changed)
         lv.addWidget(self.tree_mv_cols, 2)
 
         self.txt_mv_map = QtWidgets.QPlainTextEdit()
@@ -3660,6 +3661,8 @@ class CompareViewer(QtWidgets.QMainWindow):
                 )
             )
             self.combo_mv_peb_mode.setCurrentText(str(s.value("mv_peb_mode", "occurred")))
+            if s.contains("mv_checked_dims"):
+                self._mv_checked_dims_selected = self._qs_str_list(s.value("mv_checked_dims"))
         except Exception:
             pass
         finally:
@@ -3690,6 +3693,10 @@ class CompareViewer(QtWidgets.QMainWindow):
                 s.setValue("mv_keepmode", str(self.combo_mv_keepmode.currentText()))
                 s.setValue("mv_pebbles", bool(self.chk_mv_pebbles.isChecked()))
                 s.setValue("mv_peb_mode", str(self.combo_mv_peb_mode.currentText()))
+                mv_checked_dims = getattr(self, "_mv_checked_dims_selected", None)
+                if mv_checked_dims is None:
+                    mv_checked_dims = self._mv_checked_dims()
+                s.setValue("mv_checked_dims", json.dumps([str(x) for x in (mv_checked_dims or []) if str(x).strip()]))
             except Exception:
                 pass
 
@@ -3994,6 +4001,14 @@ class CompareViewer(QtWidgets.QMainWindow):
         return out
 
 
+    def _on_mv_dims_changed(self, _item=None, _column=None) -> None:
+        try:
+            self._mv_checked_dims_selected = list(self._mv_checked_dims())
+        except Exception:
+            self._mv_checked_dims_selected = []
+        self._schedule_multivar_update()
+
+
     def _mv_refresh_columns_ui(self) -> None:
         """Populate tree + combos using current df_plot."""
         dfp = self._mv_df_plot
@@ -4001,7 +4016,11 @@ class CompareViewer(QtWidgets.QMainWindow):
             return
 
         # preserve checked dims
-        prev_checked = set(self._mv_checked_dims())
+        remembered_checked = getattr(self, "_mv_checked_dims_selected", None)
+        if remembered_checked is None:
+            prev_checked = set(self._mv_checked_dims())
+        else:
+            prev_checked = {str(x) for x in remembered_checked if str(x).strip()}
 
         self.tree_mv_cols.blockSignals(True)
         try:
@@ -5915,6 +5934,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.table_selected = ""
         self.reference_run_selected = ""
         self.reference_run_selected_path = ""
+        self._mv_checked_dims_selected = None
         self._infl_focus_feat = None
         self._infl_focus_sig = None
         combo = getattr(self, "combo_ref", None)
