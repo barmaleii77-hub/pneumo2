@@ -212,6 +212,29 @@ def test_key_ui_files_keep_clean_visible_russian_labels() -> None:
     assert "и запускать пайплайны oneclick/autopilot как самопроверку" in heavy_text
     assert "Калибровка и пакетные пайплайны (NPZ/CSV) — эксперимент" in heavy_text
     assert "Калибровочные пайплайны и Autopilot читают Txx_osc.npz" in heavy_text
+    assert "Случайное зерно для координатора" in heavy_text
+    assert "Размер пакета q (сколько кандидатов предлагать за шаг)" in heavy_text
+    assert "Вычислительное устройство для модели" in heavy_text
+    assert "qNEHVI включается не сразу" in heavy_text
+    assert "Режим runtime_env для Ray" in heavy_text
+    assert "Дополнительный JSON для runtime_env Ray (необязательно)" in heavy_text
+    assert "Evaluator-процессов Ray" in heavy_text
+    assert "CPU на evaluator-процесс" in heavy_text
+    assert "Proposer-процессов Ray" in heavy_text
+    assert "GPU на proposer-процесс" in heavy_text
+    assert "Движок базы данных" in heavy_text
+    assert "Продолжить существующий запуск" in heavy_text
+    assert "Явный run_id (необязательно)" in heavy_text
+    assert "Срок устаревания, с" in heavy_text
+    assert "Интервал экспорта, шагов" in heavy_text
+    assert "BoTorch / qNEHVI: дополнительные настройки" in heavy_text
+    assert "Начальных точек до qNEHVI (n-init)" in heavy_text
+    assert "Минимум допустимых точек (min-feasible)" in heavy_text
+    assert "Число перезапусков оптимизатора" in heavy_text
+    assert "Число сырых выборок" in heavy_text
+    assert "Макс. итераций оптимизатора" in heavy_text
+    assert "Запас опорной точки (ref_margin)" in heavy_text
+    assert "Нормализовать цели перед GP-fit" in heavy_text
     assert "2) Полный лог + NPZ ➜ oneclick-пайплайн" in heavy_text
     assert "Код завершения пайплайна oneclick:" in heavy_text
     assert "Пайплайн oneclick завершился с ошибкой" in heavy_text
@@ -342,6 +365,29 @@ def test_key_ui_files_keep_clean_visible_russian_labels() -> None:
     assert "и гонять пайплайны oneclick/autopilot как самопроверку" not in heavy_text
     assert "Калибровка и Autopilot (NPZ/CSV) — эксперимент" not in heavy_text
     assert "Калибровка и Autopilot читают Txx_osc.npz" not in heavy_text
+    assert "Seed (distributed / coordinator)" not in heavy_text
+    assert '"q (сколько кандидатов предлагать за шаг)"' not in heavy_text
+    assert "Устройство для модели (device)" not in heavy_text
+    assert "qNEHVI gate: proposer включается не сразу" not in heavy_text
+    assert '"Ray runtime_env mode"' not in heavy_text
+    assert '"Ray runtime_env JSON merge (optional)"' not in heavy_text
+    assert '"Ray evaluators"' not in heavy_text
+    assert '"CPU на evaluator"' not in heavy_text
+    assert '"Ray proposers"' not in heavy_text
+    assert '"GPU на proposer"' not in heavy_text
+    assert '"DB engine"' not in heavy_text
+    assert '"Resume from existing run"' not in heavy_text
+    assert '"Explicit run_id (optional)"' not in heavy_text
+    assert '"stale-ttl-sec"' not in heavy_text
+    assert '"export-every"' not in heavy_text
+    assert "BoTorch / qNEHVI advanced" not in heavy_text
+    assert '"n-init (warmup before qNEHVI)"' not in heavy_text
+    assert '"min-feasible"' not in heavy_text
+    assert '"num_restarts"' not in heavy_text
+    assert '"raw_samples"' not in heavy_text
+    assert '"maxiter"' not in heavy_text
+    assert '"ref_margin"' not in heavy_text
+    assert '"Normalize objectives before GP fit"' not in heavy_text
     assert "Код завершения oneclick:" not in heavy_text
     assert "Код завершения Autopilot:" not in heavy_text
     assert "Пайплайн oneclick выполнен. Результаты сохранены в out_dir." not in heavy_text

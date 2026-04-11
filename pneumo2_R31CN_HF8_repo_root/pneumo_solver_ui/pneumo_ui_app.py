@@ -2782,13 +2782,13 @@ with st.sidebar:
                 c_alg4, c_alg5, c_alg6 = st.columns([2, 2, 2])
                 with c_alg4:
                     st.number_input(
-                        "Seed (distributed / coordinator)",
+                        "Случайное зерно для координатора",
                         min_value=0,
                         max_value=2**31 - 1,
                         value=int(st.session_state.get("opt_seed", DIST_OPT_SEED_DEFAULT) or DIST_OPT_SEED_DEFAULT),
                         step=1,
                         key="opt_seed",
-                        help="Seed для coordinator / proposer path. Отличается от seed_candidates/seed_conditions локального StageRunner.",
+                        help="Случайное зерно для coordinator / proposer path. Отличается от локальных настроек отбора в режиме по стадиям.",
                     )
                 with c_alg5:
                     st.text_input(
@@ -2825,19 +2825,19 @@ with st.sidebar:
                     )
                 with c_alg8:
                     st.number_input(
-                        "q (сколько кандидатов предлагать за шаг)",
+                        "Размер пакета q (сколько кандидатов предлагать за шаг)",
                         min_value=1,
                         max_value=256,
                         value=int(st.session_state.get("opt_q", DIST_OPT_Q_DEFAULT) or DIST_OPT_Q_DEFAULT),
                         step=1,
                         key="opt_q",
-                        help="Для qNEHVI/portfolio можно предлагать пачку кандидатов за итерацию.",
+                        help="Для qNEHVI/portfolio можно предлагать несколько кандидатов за одну итерацию.",
                     )
                 with c_alg9:
                     _dev_opts = ["auto", "cpu", "cuda"]
                     _dev_val = str(st.session_state.get("opt_device", DIST_OPT_DEVICE_DEFAULT) or DIST_OPT_DEVICE_DEFAULT)
                     st.selectbox(
-                        "Устройство для модели (device)",
+                        "Вычислительное устройство для модели",
                         options=_dev_opts,
                         index=_dev_opts.index(_dev_val) if _dev_val in _dev_opts else 0,
                         key="opt_device",
@@ -2855,8 +2855,8 @@ with st.sidebar:
                     ),
                 )
                 st.caption(
-                    "qNEHVI gate: proposer включается не сразу. Сначала coordinator проходит warmup, затем требует feasible history: "
-                    "done >= n_init и feasible >= min_feasible. Иначе используется random/LHS path."
+                    "qNEHVI включается не сразу: сначала coordinator проходит разогрев, затем ждёт достаточное число допустимых точек. "
+                    "Пока пороги n_init и min-feasible не выполнены, используется random/LHS path."
                 )
 
             with st.expander("Параллелизм и кластер (Dask / Ray)", expanded=False):
@@ -2964,22 +2964,22 @@ with st.sidebar:
                 with c_adv1:
                     _rt_mode_val = migrated_ray_runtime_env_mode(st.session_state)
                     st.selectbox(
-                        "Ray runtime_env mode",
+                        "Режим runtime_env для Ray",
                         options=list(RAY_RUNTIME_ENV_MODES),
                         index=list(RAY_RUNTIME_ENV_MODES).index(_rt_mode_val) if _rt_mode_val in RAY_RUNTIME_ENV_MODES else list(RAY_RUNTIME_ENV_MODES).index(DIST_OPT_RAY_RUNTIME_ENV_MODE_DEFAULT),
                         key="ray_runtime_env_mode",
                         help=(
                             "auto — включать runtime_env только для внешнего Ray-кластера; "
-                            "on — принудительно упаковывать working_dir в runtime_env; "
+                            "on — принудительно упаковывать рабочую папку в runtime_env; "
                             "off — не использовать runtime_env."
                         ),
                     )
                     st.text_area(
-                        "Ray runtime_env JSON merge (optional)",
+                        "Дополнительный JSON для runtime_env Ray (необязательно)",
                         value=migrated_ray_runtime_env_json(st.session_state),
                         height=120,
                         key="ray_runtime_env_json",
-                        help="Опциональный JSON-объект, который будет слит с базовым runtime_env координатора.",
+                        help="Необязательный JSON-объект, который будет слит с базовым runtime_env координатора.",
                     )
                     st.text_area(
                         "Ray runtime exclude (по одному паттерну в строке)",
@@ -2989,7 +2989,7 @@ with st.sidebar:
                         help="Исключения при упаковке кода в Ray runtime_env.",
                     )
                     st.number_input(
-                        "Ray evaluators",
+                        "Evaluator-процессов Ray",
                         min_value=0,
                         max_value=4096,
                         value=int(st.session_state.get("ray_num_evaluators", 0) or 0),
@@ -2998,7 +2998,7 @@ with st.sidebar:
                         help="0 — coordinator сам выберет.",
                     )
                     st.number_input(
-                        "CPU на evaluator",
+                        "CPU на evaluator-процесс",
                         min_value=0.25,
                         max_value=512.0,
                         value=float(st.session_state.get("ray_cpus_per_evaluator", 1.0) or 1.0),
@@ -3007,16 +3007,16 @@ with st.sidebar:
                         key="ray_cpus_per_evaluator",
                     )
                     st.number_input(
-                        "Ray proposers",
+                        "Proposer-процессов Ray",
                         min_value=0,
                         max_value=512,
                         value=int(st.session_state.get("ray_num_proposers", 0) or 0),
                         step=1,
                         key="ray_num_proposers",
-                        help="0=auto (использовать доступные GPU если qNEHVI).",
+                        help="0 — автоматически (использовать доступные GPU при qNEHVI).",
                     )
                     st.number_input(
-                        "GPU на proposer",
+                        "GPU на proposer-процесс",
                         min_value=0.0,
                         max_value=16.0,
                         value=float(st.session_state.get("ray_gpus_per_proposer", 1.0) or 1.0),
@@ -3042,23 +3042,23 @@ with st.sidebar:
                     _db_engine_opts = ["sqlite", "duckdb", "postgres"]
                     _db_engine_val = str(st.session_state.get("opt_db_engine", DIST_OPT_DB_ENGINE_DEFAULT) or DIST_OPT_DB_ENGINE_DEFAULT).strip().lower()
                     st.selectbox(
-                        "DB engine",
+                        "Движок базы данных",
                         options=_db_engine_opts,
                         index=_db_engine_opts.index(_db_engine_val) if _db_engine_val in _db_engine_opts else _db_engine_opts.index(DIST_OPT_DB_ENGINE_DEFAULT),
                         key="opt_db_engine",
                     )
                     st.checkbox(
-                        "Resume from existing run",
+                        "Продолжить существующий запуск",
                         value=bool(st.session_state.get("opt_resume", False)),
                         key="opt_resume",
                     )
                     st.text_input(
-                        "Explicit run_id (optional)",
+                        "Явный run_id (необязательно)",
                         value=str(st.session_state.get("opt_dist_run_id", "") or ""),
                         key="opt_dist_run_id",
                     )
                     st.number_input(
-                        "stale-ttl-sec",
+                        "Срок устаревания, с",
                         min_value=0,
                         max_value=604800,
                         value=int(st.session_state.get("opt_stale_ttl_sec", DIST_OPT_STALE_TTL_SEC_DEFAULT) or DIST_OPT_STALE_TTL_SEC_DEFAULT),
@@ -3069,10 +3069,10 @@ with st.sidebar:
                         "Писать hypervolume log",
                         value=bool(st.session_state.get("opt_hv_log", DIST_OPT_HV_LOG_DEFAULT)),
                         key="opt_hv_log",
-                        help="Если включено — coordinator пишет progress_hv.csv по feasible Pareto-front.",
+                        help="Если включено — coordinator пишет progress_hv.csv по допустимому Pareto-front.",
                     )
                     st.number_input(
-                        "export-every",
+                        "Интервал экспорта, шагов",
                         min_value=1,
                         max_value=100000,
                         value=int(st.session_state.get("opt_export_every", DIST_OPT_EXPORT_EVERY_DEFAULT) or DIST_OPT_EXPORT_EVERY_DEFAULT),
@@ -3080,15 +3080,15 @@ with st.sidebar:
                         key="opt_export_every",
                     )
 
-            with st.expander("BoTorch / qNEHVI advanced", expanded=False):
+            with st.expander("BoTorch / qNEHVI: дополнительные настройки", expanded=False):
                 st.caption(
-                    "qNEHVI включается честно: coordinator сначала проходит warmup, затем проверяет feasible-point gate. "
+                    "qNEHVI включается по условиям: coordinator сначала проходит разогрев, затем проверяет число допустимых точек. "
                     "Если done < n_init или feasible < min_feasible, proposer временно откатывается в random/LHS path."
                 )
                 c_b1, c_b2, c_b3 = st.columns([1, 1, 1])
                 with c_b1:
                     st.number_input(
-                        "n-init (warmup before qNEHVI)",
+                        "Начальных точек до qNEHVI (n-init)",
                         min_value=0,
                         max_value=100000,
                         value=int(st.session_state.get("opt_botorch_n_init", DIST_OPT_BOTORCH_N_INIT_DEFAULT) or DIST_OPT_BOTORCH_N_INIT_DEFAULT),
@@ -3097,16 +3097,16 @@ with st.sidebar:
                         help="0 — auto threshold (~2×(dim+1), но не меньше 10).",
                     )
                     st.number_input(
-                        "min-feasible",
+                        "Минимум допустимых точек (min-feasible)",
                         min_value=0,
                         max_value=100000,
                         value=int(st.session_state.get("opt_botorch_min_feasible", DIST_OPT_BOTORCH_MIN_FEASIBLE_DEFAULT) or DIST_OPT_BOTORCH_MIN_FEASIBLE_DEFAULT),
                         step=1,
                         key="opt_botorch_min_feasible",
-                        help="0 — gate отключён.",
+                        help="0 — порог допустимых точек отключён.",
                     )
                     st.number_input(
-                        "num_restarts",
+                        "Число перезапусков оптимизатора",
                         min_value=1,
                         max_value=4096,
                         value=int(st.session_state.get("opt_botorch_num_restarts", DIST_OPT_BOTORCH_NUM_RESTARTS_DEFAULT) or DIST_OPT_BOTORCH_NUM_RESTARTS_DEFAULT),
@@ -3115,7 +3115,7 @@ with st.sidebar:
                     )
                 with c_b2:
                     st.number_input(
-                        "raw_samples",
+                        "Число сырых выборок",
                         min_value=8,
                         max_value=131072,
                         value=int(st.session_state.get("opt_botorch_raw_samples", DIST_OPT_BOTORCH_RAW_SAMPLES_DEFAULT) or DIST_OPT_BOTORCH_RAW_SAMPLES_DEFAULT),
@@ -3123,7 +3123,7 @@ with st.sidebar:
                         key="opt_botorch_raw_samples",
                     )
                     st.number_input(
-                        "maxiter",
+                        "Макс. итераций оптимизатора",
                         min_value=1,
                         max_value=100000,
                         value=int(st.session_state.get("opt_botorch_maxiter", DIST_OPT_BOTORCH_MAXITER_DEFAULT) or DIST_OPT_BOTORCH_MAXITER_DEFAULT),
@@ -3131,7 +3131,7 @@ with st.sidebar:
                         key="opt_botorch_maxiter",
                     )
                     st.number_input(
-                        "ref_margin",
+                        "Запас опорной точки (ref_margin)",
                         min_value=0.0,
                         max_value=10.0,
                         value=float(st.session_state.get("opt_botorch_ref_margin", DIST_OPT_BOTORCH_REF_MARGIN_DEFAULT) or DIST_OPT_BOTORCH_REF_MARGIN_DEFAULT),
@@ -3141,10 +3141,10 @@ with st.sidebar:
                     )
                 with c_b3:
                     st.checkbox(
-                        "Normalize objectives before GP fit",
+                        "Нормализовать цели перед GP-fit",
                         value=bool(st.session_state.get("opt_botorch_normalize_objectives", DIST_OPT_BOTORCH_NORMALIZE_OBJECTIVES_DEFAULT)),
                         key="opt_botorch_normalize_objectives",
-                        help="Обычно это стоит оставить включённым; отключать только для осознанной диагностики qNEHVI path.",
+                        help="Обычно это стоит оставить включённым; отключать только для осознанной диагностики пути qNEHVI.",
                     )
                     st.info(
                         "Эти ручки действуют и для локального proposer path, и для Ray proposer actors. "
