@@ -71,6 +71,20 @@ def _build_probe_enabled_suite(suite_rows: List[Dict[str, Any]] | List[Any]) -> 
     return out
 
 
+def _probe_row_assets_exist(test: Dict[str, Any], repo_root: Path) -> bool:
+    """Return True when probe-only external inputs are locally resolvable."""
+    for key in ("road_csv", "axay_csv", "scenario_json"):
+        raw = test.get(key)
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        path = Path(raw)
+        if not path.is_absolute():
+            path = (repo_root / path).resolve()
+        if not path.exists():
+            return False
+    return True
+
+
 def _as_bool(v: Any, default: bool = True) -> bool:
     if v is None:
         return default
@@ -184,6 +198,7 @@ def main(argv: List[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     root = Path(__file__).resolve().parents[1]
+    repo_root = root.parent
     base_path = (root / args.base).resolve() if not Path(args.base).is_absolute() else Path(args.base)
     suite_path = (root / args.suite).resolve() if not Path(args.suite).is_absolute() else Path(args.suite)
     model_path = (root / args.model).resolve() if not Path(args.model).is_absolute() else Path(args.model)
@@ -210,9 +225,13 @@ def main(argv: List[str] | None = None) -> int:
     ]
     effective_suite = enabled_suite
     if not effective_suite:
-        effective_suite = _build_probe_enabled_suite(suite)
+        probe_suite = _build_probe_enabled_suite(suite)
+        effective_suite = [test for test in probe_suite if _probe_row_assets_exist(test, repo_root)]
         if effective_suite:
             print("INFO: suite has no enabled rows; running forced-enable probe copy for mech selfcheck")
+            skipped = len(probe_suite) - len(effective_suite)
+            if skipped > 0:
+                print(f"INFO: skipped {skipped} probe rows with unresolved external time-series inputs")
     if not effective_suite:
         print("ERROR: suite does not contain any runnable dict rows", file=sys.stderr)
         return 2

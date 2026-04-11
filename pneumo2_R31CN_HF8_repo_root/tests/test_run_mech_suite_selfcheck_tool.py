@@ -74,6 +74,11 @@ def test_main_runs_probe_suite_when_all_rows_disabled(
         json.dumps(
             [
                 {
+                    "имя": "workspace_demo_missing",
+                    "включен": False,
+                    "road_csv": "workspace/scenarios/missing_road.csv",
+                },
+                {
                     "имя": "probe_case",
                     "включен": False,
                     "dt": 0.02,
@@ -130,6 +135,7 @@ def test_main_runs_probe_suite_when_all_rows_disabled(
     captured = capsys.readouterr()
     assert rc == 0
     assert "suite has no enabled rows" in captured.out
+    assert "skipped 1 probe rows" in captured.out
     assert "tests=1" in captured.out
     assert len(calls) == 1
     assert calls[0]["name"] == "probe_case"
