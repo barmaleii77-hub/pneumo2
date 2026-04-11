@@ -13,7 +13,6 @@ Goals:
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import math
 import os
@@ -22,6 +21,17 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
+
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    _ROOT = Path(__file__).resolve().parents[1]
+    if str(_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ROOT))
+    __package__ = "pneumo_solver_ui"
+
+try:
+    from .module_loading import load_python_module_from_path
+except Exception:
+    from pneumo_solver_ui.module_loading import load_python_module_from_path
 
 
 def _read_json(path: Path) -> Any:
@@ -44,12 +54,7 @@ def _is_finite_number(x: Any) -> bool:
 
 
 def _import_module_from_path(mod_name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(mod_name, str(path))
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Cannot import {mod_name} from {path}")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)  # type: ignore
-    return mod
+    return load_python_module_from_path(path, mod_name)
 
 
 @dataclass
@@ -129,7 +134,7 @@ def check_scenario_expansion(stage_runner_path: Path, base: Dict[str, Any], suit
     warnings: List[str] = []
     try:
         sr = _import_module_from_path("opt_stage_runner_v1", stage_runner_path)
-        scenarios = sr.build_default_scenarios()
+        scenarios = sr.build_default_scenarios(base)
         expanded = sr.expand_suite_by_scenarios(
             suite, scenarios, base, scenario_ids=["nominal", "heavy"]
         )

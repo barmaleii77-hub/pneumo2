@@ -19,11 +19,25 @@
 from __future__ import annotations
 
 import json
-import math
 import heapq
-from dataclasses import asdict
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
+
+# Allow direct execution (`python pneumo_solver_ui/tools/iso_network_bottleneck_report.py`)
+# in addition to package execution (`python -m pneumo_solver_ui.tools.iso_network_bottleneck_report`).
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    _ROOT = _Path(__file__).resolve().parents[2]
+    if str(_ROOT) not in _sys.path:
+        _sys.path.insert(0, str(_ROOT))
+    __package__ = "pneumo_solver_ui.tools"
+
+try:
+    from ..module_loading import load_python_module_from_path
+except Exception:
+    from pneumo_solver_ui.module_loading import load_python_module_from_path
 
 
 def _load_json(p: Path):
@@ -86,8 +100,6 @@ def main() -> int:
     base = _load_json(root / "default_base.json")
 
     # Импортируем "каноническую" модель по scheme_fingerprint.json (fallback -> v9 camozzi -> v8 energy)
-    import importlib.util, sys
-
     def _pick_model_path() -> Path:
         fp = root / "scheme_fingerprint.json"
         if fp.exists():
@@ -107,13 +119,7 @@ def main() -> int:
         return root / "model_pneumo_v8_energy_audit_vacuum.py"
 
     model_path = _pick_model_path()
-    spec = importlib.util.spec_from_file_location("model", str(model_path))
-    if spec is None or spec.loader is None:
-        print("Не удалось загрузить модель:", model_path)
-        return 2
-    model = importlib.util.module_from_spec(spec)
-    sys.modules["model"] = model
-    spec.loader.exec_module(model)  # type: ignore
+    model = load_python_module_from_path(model_path, "iso_bottleneck_model")
 
     nodes, node_index, edges, B = model.build_network_full(base)
 

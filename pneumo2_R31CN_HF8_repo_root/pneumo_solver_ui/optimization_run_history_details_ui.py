@@ -43,8 +43,8 @@ def render_optimization_run_packaging_details(
     st: Any,
     result_path: Path | None,
     *,
-    heading: str = "Packaging snapshot по выбранному run",
-    interference_prefix: str = "В выбранном run есть packaging-interference evidence",
+    heading: str = "Сводка по геометрии узлов (выбранный run)",
+    interference_prefix: str = "В выбранном run есть признаки пересечений по геометрии узлов",
 ) -> bool:
     packaging_snapshot = summarize_run_packaging_snapshot(result_path)
     if render_packaging_snapshot_summary(
@@ -56,18 +56,18 @@ def render_optimization_run_packaging_details(
     ):
         pc5, pc6, pc7 = st.columns([1, 1, 2])
         with pc5:
-            st.metric("Status=complete", int(packaging_snapshot.packaging_complete_rows))
+            st.metric("Полных строк", int(packaging_snapshot.packaging_complete_rows))
         with pc6:
             st.metric(
-                "Spring interference",
+                "Пересечения пружин и цилиндров",
                 int(packaging_snapshot.spring_pair_interference_rows + packaging_snapshot.spring_host_interference_rows),
             )
         with pc7:
             st.caption(
-                f"Packaging evidence rows: {int(packaging_snapshot.rows_with_packaging)} / "
+                f"Строк с evidence по геометрии: {int(packaging_snapshot.rows_with_packaging)} / "
                 f"{int(packaging_snapshot.rows_considered)} done-rows. Этот snapshot нарочно не переоценивает "
-                "historical run по сегодняшнему base_json: здесь показаны только threshold-independent packaging "
-                "truth / autoverif / interference сигналы."
+                "historical run по сегодняшнему base_json: здесь показаны только threshold-independent сигналы "
+                "по достаточности данных, автопроверке и пересечениям."
             )
         return True
 

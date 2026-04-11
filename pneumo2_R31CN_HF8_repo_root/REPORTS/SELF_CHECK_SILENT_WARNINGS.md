@@ -6,4 +6,3 @@
 - rc: 0
 - fail_count: 0
 - warn_count: 0
-

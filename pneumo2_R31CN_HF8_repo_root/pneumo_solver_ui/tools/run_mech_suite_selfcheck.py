@@ -34,6 +34,7 @@ Exit code
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import sys
 import time
@@ -49,6 +50,39 @@ if str(_REPO_ROOT) not in sys.path:
 from typing import Any, Dict, List
 
 import pandas as pd
+
+
+def _build_probe_enabled_suite(suite_rows: List[Dict[str, Any]] | List[Any]) -> List[Dict[str, Any]]:
+    """Force-enable a non-destructive probe copy of suite rows.
+
+    Shipped `default_suite.json` may intentionally keep every row disabled so the UI
+    starts from a safe blank selection. This tool is an explicit selfcheck entrypoint,
+    so when no rows are enabled we still want to execute the mechanical checks on a
+    cloned probe suite instead of reporting a misleading green `tests=0`.
+    """
+    out: List[Dict[str, Any]] = []
+    for row in list(suite_rows or []):
+        if not isinstance(row, dict):
+            continue
+        probe = dict(row)
+        probe["enabled"] = True
+        probe["включен"] = True
+        out.append(probe)
+    return out
+
+
+def _probe_row_assets_exist(test: Dict[str, Any], repo_root: Path) -> bool:
+    """Return True when probe-only external inputs are locally resolvable."""
+    for key in ("road_csv", "axay_csv", "scenario_json"):
+        raw = test.get(key)
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        path = Path(raw)
+        if not path.is_absolute():
+            path = (repo_root / path).resolve()
+        if not path.exists():
+            return False
+    return True
 
 
 def _as_bool(v: Any, default: bool = True) -> bool:
@@ -88,6 +122,49 @@ def _collect_targets(test: Dict[str, Any]) -> Dict[str, float]:
     return out
 
 
+def _eval_worker_metrics(
+    worker,
+    model,
+    params: Dict[str, Any],
+    test: Dict[str, Any],
+    *,
+    dt: float,
+    t_end: float,
+    targets: Dict[str, float],
+    record_full: bool,
+) -> Dict[str, Any]:
+    """Call worker evaluation through the currently supported contract.
+
+    Historical worker versions expose metrics-only `eval_candidate_once(...)`, while
+    newer flows may also provide `eval_candidate_once_full(...)` for full time-series
+    logging. The mech selfcheck only needs metrics, so we adapt to either shape instead
+    of assuming a `record_full=` keyword that older workers do not accept.
+    """
+    if record_full and hasattr(worker, "eval_candidate_once_full"):
+        metrics, _out = worker.eval_candidate_once_full(
+            model,
+            params,
+            test,
+            dt=dt,
+            t_end=t_end,
+            targets=targets,
+        )
+        return metrics
+
+    eval_once = worker.eval_candidate_once
+    kwargs = {
+        "dt": dt,
+        "t_end": t_end,
+        "targets": targets,
+    }
+    try:
+        if "record_full" in inspect.signature(eval_once).parameters:
+            kwargs["record_full"] = bool(record_full)
+    except Exception:
+        pass
+    return eval_once(model, params, test, **kwargs)
+
+
 def main(argv: List[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Run mech selfcheck for all tests in a suite")
     ap.add_argument(
@@ -121,6 +198,7 @@ def main(argv: List[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     root = Path(__file__).resolve().parents[1]
+    repo_root = root.parent
     base_path = (root / args.base).resolve() if not Path(args.base).is_absolute() else Path(args.base)
     suite_path = (root / args.suite).resolve() if not Path(args.suite).is_absolute() else Path(args.suite)
     model_path = (root / args.model).resolve() if not Path(args.model).is_absolute() else Path(args.model)
@@ -140,17 +218,30 @@ def main(argv: List[str] | None = None) -> int:
         print("ERROR: suite must be a JSON list", file=sys.stderr)
         return 2
 
+    enabled_suite = [
+        test
+        for test in suite
+        if isinstance(test, dict) and _as_bool(test.get("enabled", test.get("включен", True)), True)
+    ]
+    effective_suite = enabled_suite
+    if not effective_suite:
+        probe_suite = _build_probe_enabled_suite(suite)
+        effective_suite = [test for test in probe_suite if _probe_row_assets_exist(test, repo_root)]
+        if effective_suite:
+            print("INFO: suite has no enabled rows; running forced-enable probe copy for mech selfcheck")
+            skipped = len(probe_suite) - len(effective_suite)
+            if skipped > 0:
+                print(f"INFO: skipped {skipped} probe rows with unresolved external time-series inputs")
+    if not effective_suite:
+        print("ERROR: suite does not contain any runnable dict rows", file=sys.stderr)
+        return 2
+
     model = worker.load_model(str(model_path))
 
     rows: List[Dict[str, Any]] = []
     all_ok = True
 
-    for test in suite:
-        if not isinstance(test, dict):
-            continue
-        if not _as_bool(test.get("enabled", test.get("включен", True)), True):
-            continue
-
+    for test in effective_suite:
         name = _test_name(test)
         dt = float(test.get("dt", args.dt))
         t_end = float(test.get("t_end", test.get("t_end_s", args.t_end)))
@@ -158,7 +249,8 @@ def main(argv: List[str] | None = None) -> int:
 
         t0 = time.time()
         try:
-            metrics = worker.eval_candidate_once(
+            metrics = _eval_worker_metrics(
+                worker,
                 model,
                 params,
                 test,

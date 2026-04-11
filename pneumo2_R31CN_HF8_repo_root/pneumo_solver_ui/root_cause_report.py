@@ -29,17 +29,46 @@ import argparse
 import json
 from pathlib import Path
 from datetime import datetime
+import sys
 
 import numpy as np
 import pandas as pd
+
+HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+if str(HERE.parent) not in sys.path:
+    sys.path.insert(0, str(HERE.parent))
+
 from pneumo_solver_ui.module_loading import load_python_module_from_path
 from pneumo_solver_ui.packaging_surface_helpers import (
     collect_packaging_surface_metrics,
     format_packaging_markdown_lines,
 )
 
+def _build_probe_enabled_suite(suite_rows):
+    out = []
+    for row in list(suite_rows or []):
+        if not isinstance(row, dict):
+            continue
+        probe = dict(row)
+        probe["enabled"] = True
+        probe["включен"] = True
+        out.append(probe)
+    return out
 
-HERE = Path(__file__).resolve().parent
+
+def _probe_row_assets_exist(test, repo_root: Path) -> bool:
+    for key in ("road_csv", "axay_csv", "scenario_json"):
+        raw = test.get(key)
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        path = Path(raw)
+        if not path.is_absolute():
+            path = (repo_root / path).resolve()
+        if not path.exists():
+            return False
+    return True
 
 
 def fmt(x, nd: int = 4):
@@ -71,8 +100,28 @@ def main() -> int:
 
     model = load_python_module_from_path(model_path, 'pneumo_model')
     worker = load_python_module_from_path(worker_path, 'pneumo_worker')
+    repo_root = HERE.parent
+    suite_rows = suite if isinstance(suite, list) else []
+    enabled_suite = [
+        row
+        for row in suite_rows
+        if isinstance(row, dict) and bool(row.get("enabled", row.get("включен", True)))
+    ]
+    effective_suite = enabled_suite
+    if not effective_suite:
+        probe_suite = _build_probe_enabled_suite(suite_rows)
+        effective_suite = [row for row in probe_suite if _probe_row_assets_exist(row, repo_root)]
+        if effective_suite:
+            print("INFO: suite has no enabled rows; running forced-enable probe copy for root-cause baseline")
+            skipped = len(probe_suite) - len(effective_suite)
+            if skipped > 0:
+                print(f"INFO: skipped {skipped} probe rows with unresolved external time-series inputs")
 
-    tests = worker.build_test_suite({'suite': suite})
+    tests = worker.build_test_suite({'suite': effective_suite}) if effective_suite else []
+    if not tests:
+        tests = worker.build_test_suite({})
+        if tests:
+            print("INFO: effective suite produced 0 tests; falling back to worker builtin suite")
 
     rows = []
 
@@ -154,6 +203,7 @@ def main() -> int:
     df = pd.DataFrame(rows)
 
     out_prefix = (HERE / args.out).resolve()
+    out_prefix.parent.mkdir(parents=True, exist_ok=True)
     csv_path = str(out_prefix) + '.csv'
     md_path = str(out_prefix) + '.md'
 

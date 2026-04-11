@@ -30,11 +30,11 @@ HERE = Path(__file__).resolve().parent
 # Some dynamically-loaded models use fallback `from scheme_integrity import ...`.
 # That requires the pneumo_solver_ui directory to be on sys.path.
 import sys as _sys
-from pneumo_solver_ui.module_loading import load_python_module_from_path
 if str(HERE) not in _sys.path:
     _sys.path.insert(0, str(HERE))
 if str(HERE.parent) not in _sys.path:
     _sys.path.insert(0, str(HERE.parent))
+from pneumo_solver_ui.module_loading import load_python_module_from_path
 
 
 def _build_suite_type_probe_rows(suite_rows):

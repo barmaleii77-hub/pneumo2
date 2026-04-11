@@ -8,6 +8,7 @@ import math
 import re
 import time
 import hashlib
+from collections import Counter
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from html import escape
@@ -48,6 +49,11 @@ VIEWBOX = f"0 0 {int(VIEWBOX_W)} {int(VIEWBOX_H)}"
 PLAYHEAD_STORAGE_KEY = "pneumo_desktop_mnemo_playhead"
 EVENT_LOG_SCHEMA_VERSION = "desktop_mnemo_event_log_v1"
 CORNER_ORDER: tuple[str, str, str, str] = ("ЛП", "ПП", "ЛЗ", "ПЗ")
+DETAIL_MODE_LABELS: dict[str, str] = {
+    "quiet": "Тихо",
+    "operator": "Оператор",
+    "full": "Полно",
+}
 
 PRESSURE_HEAT_STOPS: tuple[tuple[float, tuple[int, int, int]], ...] = (
     (0.00, (86, 198, 255)),
@@ -248,6 +254,8 @@ class MnemoDataset:
     edge_series: list[dict[str, Any]]
     node_series: list[dict[str, Any]]
     edge_defs: dict[str, dict[str, Any]]
+    canonical_node_names: list[str]
+    canonical_edge_names: list[str]
     time_s: np.ndarray
     q_scale: float
     q_unit: str
@@ -256,6 +264,7 @@ class MnemoDataset:
     visual_geometry: dict[str, Any]
     geometry_issues: list[str]
     geometry_warnings: list[str]
+    scheme_fidelity: dict[str, Any]
 
 
 @dataclass
@@ -923,6 +932,7 @@ def _load_canonical_edges() -> tuple[list[str], dict[str, dict[str, Any]]]:
             "n1": str(edge.get("n1") or ""),
             "n2": str(edge.get("n2") or ""),
             "kind": str(edge.get("kind") or ""),
+            "camozzi_code": str(edge.get("camozzi_код") or edge.get("camozzi_code") or ""),
         }
     return nodes, edge_defs
 
@@ -1237,6 +1247,82 @@ def _build_mapping(
     return mapping
 
 
+def _mapping_route_issues(mapping: dict[str, Any]) -> list[str]:
+    issues: list[str] = []
+    for edge_name, payload in dict(mapping.get("edges_meta") or {}).items():
+        route_name = str(dict(payload or {}).get("mnemo_route") or "")
+        if route_name in {"fallback_lane", "missing_endpoint"}:
+            issues.append(str(edge_name))
+    return sorted(issues)
+
+
+def _mapping_route_counts(mapping: dict[str, Any]) -> dict[str, int]:
+    counts = Counter(str(dict(payload or {}).get("mnemo_route") or "unknown") for payload in dict(mapping.get("edges_meta") or {}).values())
+    return {str(name): int(count) for name, count in sorted(counts.items()) if int(count) > 0}
+
+
+def _build_scheme_fidelity_report(
+    *,
+    canonical_node_names: list[str],
+    edge_defs: dict[str, dict[str, Any]],
+    bundle_edge_names: list[str],
+    bundle_node_names: list[str],
+    node_positions: dict[str, tuple[float, float]],
+    bundle_mapping: dict[str, Any],
+) -> dict[str, Any]:
+    canonical_nodes = [str(name) for name in canonical_node_names if str(name).strip()]
+    canonical_edge_names = [str(name) for name in edge_defs.keys() if str(name).strip()]
+    canonical_node_set = set(canonical_nodes)
+    canonical_edge_set = set(canonical_edge_names)
+    canonical_mapping = _build_mapping(canonical_edge_names, canonical_nodes, edge_defs, node_positions)
+    canonical_missing_nodes = sorted(name for name in canonical_nodes if name not in node_positions)
+    canonical_route_issues = _mapping_route_issues(canonical_mapping)
+    bundle_route_issues = _mapping_route_issues(bundle_mapping)
+    bundle_extra_edges = sorted(name for name in bundle_edge_names if name not in canonical_edge_set)
+    bundle_extra_nodes = sorted(name for name in bundle_node_names if name not in canonical_node_set)
+    bundle_known_edges = [name for name in bundle_edge_names if name in canonical_edge_set]
+    bundle_known_nodes = [name for name in bundle_node_names if name in canonical_node_set]
+    canonical_nodes_positioned = len(canonical_nodes) - len(canonical_missing_nodes)
+    canonical_edges_routed = len(canonical_edge_names) - len(canonical_route_issues)
+    status = "ok"
+    if canonical_missing_nodes or canonical_route_issues or bundle_route_issues or bundle_extra_edges:
+        status = "warn"
+    elif bundle_extra_nodes:
+        status = "attention"
+    summary = (
+        f"Canonical-схема покрыта нативной мнемосхемой: {canonical_nodes_positioned}/{len(canonical_nodes)} узлов размещены, "
+        f"{canonical_edges_routed}/{len(canonical_edge_names)} ветвей маршрутизированы без fallback."
+    )
+    bundle_summary = (
+        f"Текущий bundle распознан по canonical-словарю: {len(bundle_known_edges)}/{len(bundle_edge_names)} ветвей и "
+        f"{len(bundle_known_nodes)}/{len(bundle_node_names)} pressure-узлов."
+    )
+    if bundle_extra_edges:
+        bundle_summary += f" Вне canonical осталось {len(bundle_extra_edges)} ветвей."
+    elif bundle_extra_nodes:
+        bundle_summary += f" Вне canonical осталось {len(bundle_extra_nodes)} узлов."
+    return {
+        "status": status,
+        "summary": summary,
+        "bundle_summary": bundle_summary,
+        "canonical_nodes_total": len(canonical_nodes),
+        "canonical_nodes_positioned": canonical_nodes_positioned,
+        "canonical_edges_total": len(canonical_edge_names),
+        "canonical_edges_routed": canonical_edges_routed,
+        "canonical_missing_nodes": canonical_missing_nodes,
+        "canonical_route_issues": canonical_route_issues,
+        "bundle_edges_total": len(bundle_edge_names),
+        "bundle_edges_known": len(bundle_known_edges),
+        "bundle_nodes_total": len(bundle_node_names),
+        "bundle_nodes_known": len(bundle_known_nodes),
+        "bundle_extra_edges": bundle_extra_edges,
+        "bundle_extra_nodes": bundle_extra_nodes,
+        "bundle_route_issues": bundle_route_issues,
+        "canonical_route_counts": _mapping_route_counts(canonical_mapping),
+        "bundle_route_counts": _mapping_route_counts(bundle_mapping),
+    }
+
+
 def _pick_overlay_nodes(all_nodes: list[str]) -> list[str]:
     preferred = default_svg_pressure_nodes(all_nodes, limit=10)
     seen: set[str] = set()
@@ -1531,6 +1617,7 @@ def _build_frame_alert_payload(
                 "action": primary_mode.action,
                 "severity": primary_mode.severity,
             },
+            "scheme_fidelity": {},
             "edges": [],
             "nodes": [],
             "mode_badges": [{"title": mode.title, "severity": mode.severity} for mode in narrative.modes[:3]],
@@ -1633,6 +1720,7 @@ def _build_frame_alert_payload(
             "action": primary_mode.action,
             "severity": primary_mode.severity,
         },
+        "scheme_fidelity": dict(dataset.scheme_fidelity),
         "edges": edge_items,
         "nodes": node_items,
         "mode_badges": [{"title": mode.title, "severity": mode.severity} for mode in narrative.modes[:3]],
@@ -1644,13 +1732,21 @@ def prepare_dataset(npz_path: Path) -> MnemoDataset:
     if bundle.q is None:
         raise ValueError("NPZ bundle has no q_values table for pneumatic mnemonic.")
 
-    all_scheme_nodes, edge_defs = _load_canonical_edges()
+    canonical_node_names, edge_defs = _load_canonical_edges()
     edge_names = [name for name in bundle.q.cols if name != "время_с"]
     node_names = [name for name in (bundle.p.cols if bundle.p is not None else []) if name != "время_с"]
-    full_node_inventory = list(dict.fromkeys([*all_scheme_nodes, *node_names]))
+    full_node_inventory = list(dict.fromkeys([*canonical_node_names, *node_names]))
     node_positions = _build_node_positions(full_node_inventory)
     svg_inline = _build_semantic_svg(node_positions)
     mapping = _build_mapping(edge_names, full_node_inventory, edge_defs, node_positions)
+    scheme_fidelity = _build_scheme_fidelity_report(
+        canonical_node_names=canonical_node_names,
+        edge_defs=edge_defs,
+        bundle_edge_names=edge_names,
+        bundle_node_names=node_names,
+        node_positions=node_positions,
+        bundle_mapping=mapping,
+    )
 
     p_atm = _p_atm_from_meta(bundle.meta if isinstance(bundle.meta, dict) else {})
     q_scale, q_unit = _flow_scale_and_unit(p_atm)
@@ -1680,6 +1776,8 @@ def prepare_dataset(npz_path: Path) -> MnemoDataset:
         edge_series=edge_series,
         node_series=node_series,
         edge_defs=edge_defs,
+        canonical_node_names=list(canonical_node_names),
+        canonical_edge_names=list(edge_defs.keys()),
         time_s=time_s,
         q_scale=q_scale,
         q_unit=q_unit,
@@ -1688,6 +1786,7 @@ def prepare_dataset(npz_path: Path) -> MnemoDataset:
         visual_geometry=visual_geometry,
         geometry_issues=geometry_issues,
         geometry_warnings=geometry_warnings,
+        scheme_fidelity=scheme_fidelity,
     )
 
 
@@ -2293,6 +2392,7 @@ def _build_mnemo_diagnostics_payload(
         "focus_corner": focus_corner,
         "selected_edge": str(selected_edge or ""),
         "selected_node": str(selected_node or ""),
+        "scheme_fidelity": dict(dataset.scheme_fidelity) if dataset is not None else {},
         "geometry_warnings": list(dataset.geometry_warnings) if dataset is not None else [],
         "geometry_issues": list(dataset.geometry_issues) if dataset is not None else [],
         "cylinders": [_serialize_cylinder_overlay(item) for item in cylinder_rows],
@@ -2340,6 +2440,1382 @@ def _component_kind_short_label(kind: str) -> str:
         "Р›РёРЅРёСЏ": "LINE",
     }
     return mapping.get(str(kind), "LINE")
+
+
+def _canonical_kind_label(kind: str) -> str:
+    mapping = {
+        "check": "check valve",
+        "orifice": "orifice",
+        "relief": "relief regulator",
+        "reg_after": "after-self regulator",
+    }
+    return mapping.get(str(kind or "").strip().lower(), "generic line")
+
+
+def _edge_direction_meta(edge_def: dict[str, Any], q_now: float | None) -> dict[str, Any]:
+    endpoint_1 = str(edge_def.get("n1") or "")
+    endpoint_2 = str(edge_def.get("n2") or "")
+    endpoint_1_short = _short_node_label(endpoint_1)
+    endpoint_2_short = _short_node_label(endpoint_2)
+    canonical_direction_label = (
+        f"{endpoint_1_short} → {endpoint_2_short}" if endpoint_1 or endpoint_2 else "—"
+    )
+    q_value = _finite_or_none(q_now)
+    flow_active = q_value is not None and abs(float(q_value)) > 1.0e-6
+    if not flow_active:
+        return {
+            "endpoint_1": endpoint_1,
+            "endpoint_2": endpoint_2,
+            "endpoint_1_short": endpoint_1_short,
+            "endpoint_2_short": endpoint_2_short,
+            "canonical_direction_label": canonical_direction_label,
+            "flow_direction_label": "нет выраженного потока",
+            "flow_status_label": "стагнация / переход",
+            "canonical_source": endpoint_1,
+            "canonical_sink": endpoint_2,
+            "canonical_source_short": endpoint_1_short,
+            "canonical_sink_short": endpoint_2_short,
+            "flow_source": "",
+            "flow_sink": "",
+            "flow_source_short": "",
+            "flow_sink_short": "",
+            "flow_matches_canonical": None,
+            "flow_forward": None,
+        }
+    flow_forward = bool(float(q_value) >= 0.0)
+    if flow_forward:
+        flow_direction_label = f"{endpoint_1_short} → {endpoint_2_short}"
+        flow_status_label = "по паспорту"
+        flow_source = endpoint_1
+        flow_sink = endpoint_2
+        flow_source_short = endpoint_1_short
+        flow_sink_short = endpoint_2_short
+    else:
+        flow_direction_label = f"{endpoint_2_short} → {endpoint_1_short}"
+        flow_status_label = "реверс к паспорту"
+        flow_source = endpoint_2
+        flow_sink = endpoint_1
+        flow_source_short = endpoint_2_short
+        flow_sink_short = endpoint_1_short
+    return {
+        "endpoint_1": endpoint_1,
+        "endpoint_2": endpoint_2,
+        "endpoint_1_short": endpoint_1_short,
+        "endpoint_2_short": endpoint_2_short,
+        "canonical_direction_label": canonical_direction_label,
+        "flow_direction_label": flow_direction_label,
+        "flow_status_label": flow_status_label,
+        "canonical_source": endpoint_1,
+        "canonical_sink": endpoint_2,
+        "canonical_source_short": endpoint_1_short,
+        "canonical_sink_short": endpoint_2_short,
+        "flow_source": flow_source,
+        "flow_sink": flow_sink,
+        "flow_source_short": flow_source_short,
+        "flow_sink_short": flow_sink_short,
+        "flow_matches_canonical": flow_forward,
+        "flow_forward": flow_forward,
+    }
+
+
+def _edge_pressure_drive_meta(
+    direction_meta: dict[str, Any],
+    *,
+    p1_bar_g: float | None,
+    p2_bar_g: float | None,
+    q_now: float | None,
+) -> dict[str, Any]:
+    endpoint_1_short = str(direction_meta.get("endpoint_1_short") or "—")
+    endpoint_2_short = str(direction_meta.get("endpoint_2_short") or "—")
+    delta_p_bar = (
+        float(p1_bar_g) - float(p2_bar_g)
+        if p1_bar_g is not None and p2_bar_g is not None
+        else None
+    )
+    if delta_p_bar is None:
+        return {
+            "delta_p_bar": None,
+            "pressure_drive_label": "нет данных по давлениям",
+            "pressure_drive_status": "нет данных",
+            "pressure_drive_badge": "ΔP ?",
+            "pressure_lead": "",
+            "pressure_sink": "",
+            "pressure_lead_short": "",
+            "pressure_sink_short": "",
+            "endpoint_1_pressure_role": "P?",
+            "endpoint_2_pressure_role": "P?",
+        }
+
+    near_zero = abs(float(delta_p_bar)) <= 0.05
+    if near_zero:
+        flow_active = q_now is not None and np.isfinite(float(q_now)) and abs(float(q_now)) > 1.0e-6
+        return {
+            "delta_p_bar": float(delta_p_bar),
+            "pressure_drive_label": f"{endpoint_1_short} ≈ {endpoint_2_short}",
+            "pressure_drive_status": "перепад мал",
+            "pressure_drive_badge": "ΔP≈",
+            "pressure_lead": "",
+            "pressure_sink": "",
+            "pressure_lead_short": "",
+            "pressure_sink_short": "",
+            "endpoint_1_pressure_role": "P≈",
+            "endpoint_2_pressure_role": "P≈",
+            "flow_vs_pressure": "перепад мал" if flow_active else "нет выраженного потока",
+        }
+
+    endpoint_1 = str(direction_meta.get("endpoint_1") or "")
+    endpoint_2 = str(direction_meta.get("endpoint_2") or "")
+    lead_is_n1 = bool(delta_p_bar >= 0.0)
+    pressure_lead = endpoint_1 if lead_is_n1 else endpoint_2
+    pressure_sink = endpoint_2 if lead_is_n1 else endpoint_1
+    pressure_lead_short = endpoint_1_short if lead_is_n1 else endpoint_2_short
+    pressure_sink_short = endpoint_2_short if lead_is_n1 else endpoint_1_short
+    endpoint_1_pressure_role = "P+" if lead_is_n1 else "P-"
+    endpoint_2_pressure_role = "P-" if lead_is_n1 else "P+"
+    q_value = _finite_or_none(q_now)
+    if q_value is None or abs(float(q_value)) <= 1.0e-6:
+        flow_vs_pressure = "нет выраженного потока"
+        pressure_drive_status = "ведущий перепад"
+        pressure_drive_badge = "ΔP lead"
+    else:
+        flow_source = str(direction_meta.get("flow_source") or "")
+        if flow_source and flow_source == pressure_lead:
+            flow_vs_pressure = "по перепаду"
+            pressure_drive_status = "согласовано с ΔP"
+            pressure_drive_badge = "ΔP ok"
+        else:
+            flow_vs_pressure = "против перепада"
+            pressure_drive_status = "реверс к ΔP"
+            pressure_drive_badge = "ΔP rev"
+    return {
+        "delta_p_bar": float(delta_p_bar),
+        "pressure_drive_label": f"{pressure_lead_short} > {pressure_sink_short}",
+        "pressure_drive_status": pressure_drive_status,
+        "pressure_drive_badge": pressure_drive_badge,
+        "pressure_lead": pressure_lead,
+        "pressure_sink": pressure_sink,
+        "pressure_lead_short": pressure_lead_short,
+        "pressure_sink_short": pressure_sink_short,
+        "endpoint_1_pressure_role": endpoint_1_pressure_role,
+        "endpoint_2_pressure_role": endpoint_2_pressure_role,
+        "flow_vs_pressure": flow_vs_pressure,
+    }
+
+
+def _edge_element_flow_contract_meta(
+    canonical_kind: str,
+    component_kind: str,
+    direction_meta: dict[str, Any],
+    *,
+    q_now: float | None,
+) -> dict[str, Any]:
+    canonical = str(canonical_kind or "").strip().lower()
+    component = str(component_kind or "").strip()
+    q_value = _finite_or_none(q_now)
+    flow_active = q_value is not None and abs(float(q_value)) > 1.0e-6
+    flow_matches = direction_meta.get("flow_matches_canonical")
+
+    if canonical == "orifice":
+        if not flow_active:
+            return {
+                "element_flow_status": "двусторонний дроссель без выраженного потока",
+                "element_flow_label": "реверс допустим, элемент симметричен по направлению",
+                "element_flow_badge": "EL bi",
+                "element_flow_tone": "info",
+            }
+        return {
+            "element_flow_status": "двусторонний дроссель",
+            "element_flow_label": "реверс допустим для orifice",
+            "element_flow_badge": "EL bi",
+            "element_flow_tone": "info",
+        }
+
+    if canonical in {"check", "reg_after"} or component in {"Обратный клапан", "Регулятор"}:
+        if not flow_active:
+            return {
+                "element_flow_status": "односторонний элемент, поток не выражен",
+                "element_flow_label": "направление элемента задано, но активный ход не наблюдается",
+                "element_flow_badge": "EL dir",
+                "element_flow_tone": "neutral",
+            }
+        if flow_matches is True:
+            return {
+                "element_flow_status": "по направлению элемента",
+                "element_flow_label": "ход согласован с односторонней арматурой",
+                "element_flow_badge": "EL ok",
+                "element_flow_tone": "ok",
+            }
+        return {
+            "element_flow_status": "против направления элемента",
+            "element_flow_label": "обратный ход для односторонней арматуры",
+            "element_flow_badge": "EL rev",
+            "element_flow_tone": "warn",
+        }
+
+    if canonical == "relief" or component == "Сброс":
+        if not flow_active:
+            return {
+                "element_flow_status": "разгрузочный элемент без активного хода",
+                "element_flow_label": "разгрузка не выражена в текущем кадре",
+                "element_flow_badge": "EL vent",
+                "element_flow_tone": "neutral",
+            }
+        if flow_matches is True:
+            return {
+                "element_flow_status": "разгрузка по схеме",
+                "element_flow_label": "ход согласован с relief-направлением",
+                "element_flow_badge": "EL vent",
+                "element_flow_tone": "ok",
+            }
+        return {
+            "element_flow_status": "нетипичный реверс для relief",
+            "element_flow_label": "обратный ход относительно relief-направления",
+            "element_flow_badge": "EL rev",
+            "element_flow_tone": "warn",
+        }
+
+    if not flow_active:
+        return {
+            "element_flow_status": "линия без выраженного потока",
+            "element_flow_label": "тип элемента не ограничивает ход в текущем кадре",
+            "element_flow_badge": "EL gen",
+            "element_flow_tone": "neutral",
+        }
+    return {
+        "element_flow_status": "линия без жёсткого directional-ограничения",
+        "element_flow_label": "направление читается по Q и ΔP, а не по типу элемента",
+        "element_flow_badge": "EL gen",
+        "element_flow_tone": "info",
+    }
+
+
+def _edge_operability_meta(
+    state_label: str,
+    *,
+    q_now: float | None,
+    pressure_meta: dict[str, Any],
+    element_meta: dict[str, Any],
+) -> dict[str, Any]:
+    state = str(state_label or "").strip().lower()
+    q_value = _finite_or_none(q_now)
+    flow_active = q_value is not None and abs(float(q_value)) > 1.0e-6
+    delta_p_bar = _finite_or_none(pressure_meta.get("delta_p_bar"))
+    delta_active = delta_p_bar is not None and abs(float(delta_p_bar)) >= 0.25
+    pressure_badge = str(pressure_meta.get("pressure_drive_badge") or "")
+    element_tone = str(element_meta.get("element_flow_tone") or "neutral")
+    element_status = str(element_meta.get("element_flow_status") or "—")
+
+    if "закрыт" in state:
+        if flow_active:
+            return {
+                "operability_status": "закрыт, но расход есть",
+                "operability_label": "проверьте отсечку, байпас или утечку через элемент",
+                "operability_badge": "OP leak",
+                "operability_tone": "warn",
+            }
+        return {
+            "operability_status": "закрыт и потока нет",
+            "operability_label": "сигнал закрытия согласован с кадром",
+            "operability_badge": "OP shut",
+            "operability_tone": "neutral",
+        }
+
+    if element_tone == "warn" and flow_active:
+        return {
+            "operability_status": "поток конфликтует с арматурой",
+            "operability_label": element_status,
+            "operability_badge": "OP elem",
+            "operability_tone": "warn",
+        }
+
+    if pressure_badge == "ΔP rev" and flow_active:
+        return {
+            "operability_status": "поток идёт против ведущего перепада",
+            "operability_label": "проверьте локальный обход, переходный режим или ошибку знака",
+            "operability_badge": "OP dp",
+            "operability_tone": "warn",
+        }
+
+    if "открыт" in state:
+        if flow_active and pressure_badge in {"ΔP ok", "ΔP lead", "ΔP≈"} and element_tone != "warn":
+            return {
+                "operability_status": "ветвь ведёт себя согласованно",
+                "operability_label": "сигнал, поток и перепад не противоречат друг другу",
+                "operability_badge": "OP ok",
+                "operability_tone": "ok",
+            }
+        if not flow_active and delta_active:
+            return {
+                "operability_status": "открыт, но расход не набран",
+                "operability_label": "перепад уже есть, а поток ещё не развивается",
+                "operability_badge": "OP hold",
+                "operability_tone": "info",
+            }
+        if not flow_active:
+            return {
+                "operability_status": "открыт, ожидание расхода",
+                "operability_label": "ветвь готова, но текущий кадр ещё без выраженного хода",
+                "operability_badge": "OP idle",
+                "operability_tone": "neutral",
+            }
+
+    return {
+        "operability_status": "состояние ветви требует контекста",
+        "operability_label": "оценка опирается на Q, ΔP и тип элемента без надёжного сигнала открытия",
+        "operability_badge": "OP ctx",
+        "operability_tone": "info",
+    }
+
+
+def _edge_consistency_meta(
+    state_label: str,
+    *,
+    q_now: float | None,
+    pressure_meta: dict[str, Any],
+    element_meta: dict[str, Any],
+) -> dict[str, Any]:
+    state = str(state_label or "").strip().lower()
+    q_value = _finite_or_none(q_now)
+    flow_active = q_value is not None and abs(float(q_value)) > 1.0e-6
+    pressure_badge = str(pressure_meta.get("pressure_drive_badge") or "")
+    element_tone = str(element_meta.get("element_flow_tone") or "neutral")
+
+    if "закрыт" in state and flow_active:
+        return {
+            "consistency_status": "сигнал закрытия конфликтует с расходом",
+            "consistency_label": "ветвь закрыта по сигналу, но расход уже наблюдается",
+            "consistency_badge": "CS q",
+            "consistency_tone": "warn",
+        }
+    if element_tone == "warn" and flow_active:
+        return {
+            "consistency_status": "поток конфликтует с типом элемента",
+            "consistency_label": str(element_meta.get("element_flow_status") or "—"),
+            "consistency_badge": "CS el",
+            "consistency_tone": "warn",
+        }
+    if pressure_badge == "ΔP rev" and flow_active:
+        return {
+            "consistency_status": "расход конфликтует с ведущим перепадом",
+            "consistency_label": "текущий ход не поддержан знаком ΔP",
+            "consistency_badge": "CS dp",
+            "consistency_tone": "warn",
+        }
+    if "открыт" in state and not flow_active and pressure_badge in {"ΔP ok", "ΔP lead"}:
+        return {
+            "consistency_status": "открыт, но расход запаздывает",
+            "consistency_label": "сигнал и ΔP уже согласованы, а поток ещё не набран",
+            "consistency_badge": "CS hold",
+            "consistency_tone": "info",
+        }
+    if ("открыт" in state and flow_active and pressure_badge in {"ΔP ok", "ΔP lead", "ΔP≈"} and element_tone != "warn"):
+        return {
+            "consistency_status": "сигналы ветви согласованы",
+            "consistency_label": "open-state, Q, ΔP и тип элемента не противоречат друг другу",
+            "consistency_badge": "CS ok",
+            "consistency_tone": "ok",
+        }
+    return {
+        "consistency_status": "сигналы неполные или переходные",
+        "consistency_label": "оценка требует дополнительного контекста по соседним ветвям",
+        "consistency_badge": "CS ctx",
+        "consistency_tone": "neutral",
+    }
+
+
+def _edge_temporal_meta(
+    *,
+    time_s: np.ndarray | list[float],
+    q_values: np.ndarray | list[float],
+    open_values: np.ndarray | list[int] | None,
+    idx: int,
+) -> dict[str, Any]:
+    q_arr = np.asarray(q_values, dtype=float).reshape(-1)
+    if q_arr.size == 0:
+        return {
+            "temporal_status": "нет временного ряда",
+            "temporal_label": "для ветви нет истории расхода",
+            "temporal_badge": "TM ?",
+            "temporal_tone": "neutral",
+            "window_s": 0.0,
+            "dq_dt": None,
+        }
+    t_arr = np.asarray(time_s, dtype=float).reshape(-1)
+    if t_arr.size != q_arr.size:
+        t_arr = np.arange(q_arr.size, dtype=float)
+    clamped_idx = int(max(0, min(idx, q_arr.size - 1, t_arr.size - 1)))
+    start_idx = max(0, clamped_idx - 3)
+    recent_q = q_arr[start_idx : clamped_idx + 1]
+    recent_t = t_arr[start_idx : clamped_idx + 1]
+    recent_open = None
+    if open_values is not None:
+        open_arr = np.asarray(open_values, dtype=int).reshape(-1)
+        if open_arr.size:
+            recent_open = open_arr[start_idx : min(clamped_idx + 1, open_arr.size)]
+
+    q_now = float(recent_q[-1])
+    q_prev = float(recent_q[-2]) if recent_q.size >= 2 else float(recent_q[-1])
+    dt = float(recent_t[-1] - recent_t[-2]) if recent_t.size >= 2 else 0.0
+    dq_dt = None if abs(dt) <= 1.0e-9 else float((q_now - q_prev) / dt)
+    window_s = float(recent_t[-1] - recent_t[0]) if recent_t.size >= 2 else 0.0
+    global_peak = float(np.max(np.abs(q_arr))) if q_arr.size else 0.0
+    active_floor = max(1.0e-6, global_peak * 0.08)
+    flow_active = abs(float(q_now)) > active_floor
+    change_floor = max(active_floor * 0.35, global_peak * 0.12)
+    delta_abs = abs(float(q_now)) - abs(float(q_prev))
+    active_signs = [int(np.sign(val)) for val in recent_q if abs(float(val)) > active_floor]
+    sign_changes = sum(1 for prev, nxt in zip(active_signs[:-1], active_signs[1:]) if prev != nxt)
+    open_changed = bool(
+        recent_open is not None
+        and recent_open.size >= 2
+        and np.any(recent_open[1:] != recent_open[:-1])
+    )
+
+    if sign_changes >= 2:
+        return {
+            "temporal_status": "колебание расхода",
+            "temporal_label": "ветвь несколько раз меняет знак в коротком окне",
+            "temporal_badge": "TM osc",
+            "temporal_tone": "warn",
+            "window_s": window_s,
+            "dq_dt": dq_dt,
+        }
+    if sign_changes == 1 and flow_active:
+        return {
+            "temporal_status": "смена направления",
+            "temporal_label": "ветвь развернула ход в недавнем окне",
+            "temporal_badge": "TM flip",
+            "temporal_tone": "warn",
+            "window_s": window_s,
+            "dq_dt": dq_dt,
+        }
+    if open_changed and flow_active:
+        return {
+            "temporal_status": "ход после переключения",
+            "temporal_label": "ветвь недавно переключилась и уже набирает расход",
+            "temporal_badge": "TM gate",
+            "temporal_tone": "info",
+            "window_s": window_s,
+            "dq_dt": dq_dt,
+        }
+    if not flow_active and float(np.max(np.abs(recent_q))) <= active_floor:
+        return {
+            "temporal_status": "спокойный кадр",
+            "temporal_label": "в недавнем окне ветвь остаётся без выраженного хода",
+            "temporal_badge": "TM idle",
+            "temporal_tone": "neutral",
+            "window_s": window_s,
+            "dq_dt": dq_dt,
+        }
+    if delta_abs > change_floor:
+        return {
+            "temporal_status": "набор расхода",
+            "temporal_label": "амплитуда расхода растёт в последних кадрах",
+            "temporal_badge": "TM ramp",
+            "temporal_tone": "info",
+            "window_s": window_s,
+            "dq_dt": dq_dt,
+        }
+    if delta_abs < -change_floor:
+        return {
+            "temporal_status": "затухание расхода",
+            "temporal_label": "амплитуда расхода снижается в последних кадрах",
+            "temporal_badge": "TM fall",
+            "temporal_tone": "info",
+            "window_s": window_s,
+            "dq_dt": dq_dt,
+        }
+    if flow_active:
+        return {
+            "temporal_status": "устойчивый ход",
+            "temporal_label": "ветвь держит направление и уровень расхода без резких срывов",
+            "temporal_badge": "TM steady",
+            "temporal_tone": "ok",
+            "window_s": window_s,
+            "dq_dt": dq_dt,
+        }
+    return {
+        "temporal_status": "переходная пауза",
+        "temporal_label": "ход ослаб, но ветвь ещё находится в переходном окне",
+        "temporal_badge": "TM soft",
+        "temporal_tone": "neutral",
+        "window_s": window_s,
+        "dq_dt": dq_dt,
+    }
+
+
+def _edge_recent_history_meta(
+    *,
+    time_s: np.ndarray | list[float],
+    q_values: np.ndarray | list[float],
+    open_values: np.ndarray | list[int] | None,
+    idx: int,
+    max_points: int = 8,
+) -> dict[str, Any]:
+    q_arr = np.asarray(q_values, dtype=float).reshape(-1)
+    if q_arr.size == 0:
+        return {
+            "history_available": False,
+            "history_points": [],
+            "history_open_blocks": [],
+            "history_span_s": 0.0,
+            "history_sample_count": 0,
+            "history_peak_abs": 0.0,
+            "history_open_ratio": None,
+            "history_zero_y": 0.5,
+        }
+
+    t_arr = np.asarray(time_s, dtype=float).reshape(-1)
+    if t_arr.size != q_arr.size:
+        t_arr = np.arange(q_arr.size, dtype=float)
+    clamped_idx = int(max(0, min(idx, q_arr.size - 1, t_arr.size - 1)))
+    history_points_count = max(2, int(max_points))
+    start_idx = max(0, clamped_idx - history_points_count + 1)
+    recent_q = q_arr[start_idx : clamped_idx + 1]
+    recent_t = t_arr[start_idx : clamped_idx + 1]
+
+    peak_abs = float(np.max(np.abs(recent_q))) if recent_q.size else 0.0
+    amplitude = peak_abs if peak_abs > 1.0e-9 else 1.0
+    points: list[tuple[float, float]] = []
+    for point_idx, q_value in enumerate(recent_q):
+        x_norm = 0.0 if recent_q.size <= 1 else float(point_idx / max(1, recent_q.size - 1))
+        y_norm = 0.5 - max(-0.42, min(0.42, 0.42 * float(q_value) / amplitude))
+        points.append((x_norm, float(y_norm)))
+
+    open_ratio = None
+    open_blocks: list[dict[str, Any]] = []
+    if open_values is not None:
+        open_arr = np.asarray(open_values, dtype=int).reshape(-1)
+        if open_arr.size:
+            recent_open = open_arr[start_idx : min(clamped_idx + 1, open_arr.size)]
+            if recent_open.size:
+                open_ratio = float(np.mean(recent_open > 0))
+                segment_count = max(1, int(recent_open.size))
+                for segment_idx, state in enumerate(recent_open):
+                    x0 = float(segment_idx / segment_count)
+                    x1 = float((segment_idx + 1) / segment_count)
+                    open_blocks.append(
+                        {
+                            "x0": x0,
+                            "x1": x1,
+                            "open": bool(int(state)),
+                        }
+                    )
+
+    span_s = float(recent_t[-1] - recent_t[0]) if recent_t.size >= 2 else 0.0
+    return {
+        "history_available": True,
+        "history_points": points,
+        "history_open_blocks": open_blocks,
+        "history_span_s": span_s,
+        "history_sample_count": int(recent_q.size),
+        "history_peak_abs": peak_abs,
+        "history_open_ratio": open_ratio,
+        "history_zero_y": 0.5,
+    }
+
+
+def _edge_recent_history_summary(history_meta: dict[str, Any], q_unit: str) -> str:
+    if not bool(history_meta.get("history_available")):
+        return "история ветви ещё не накоплена"
+
+    span_s = float(history_meta.get("history_span_s") or 0.0)
+    sample_count = int(history_meta.get("history_sample_count") or 0)
+    peak_abs = float(history_meta.get("history_peak_abs") or 0.0)
+    summary = f"{span_s:0.2f} s • {sample_count} кадр."
+    if peak_abs > 0.0:
+        summary += f" • пик |Q| {peak_abs:0.2f} {q_unit}"
+    else:
+        summary += " • без выраженного расхода"
+    open_ratio = history_meta.get("history_open_ratio")
+    if open_ratio is not None:
+        summary += f" • открыт {float(open_ratio) * 100.0:0.0f}% окна"
+    return summary
+
+
+def _edge_recent_pressure_meta(
+    *,
+    time_s: np.ndarray | list[float],
+    p1_values: np.ndarray | list[float] | None,
+    p2_values: np.ndarray | list[float] | None,
+    idx: int,
+    max_points: int = 8,
+) -> dict[str, Any]:
+    if p1_values is None or p2_values is None:
+        return {
+            "pressure_history_available": False,
+            "pressure_history_points": [],
+            "pressure_history_span_s": 0.0,
+            "pressure_history_sample_count": 0,
+            "pressure_history_peak_abs": 0.0,
+            "pressure_history_last_delta": None,
+            "pressure_history_status": "нет данных по давлениям",
+            "pressure_history_tone": "neutral",
+            "pressure_history_zero_y": 0.5,
+        }
+
+    p1_arr = np.asarray(p1_values, dtype=float).reshape(-1)
+    p2_arr = np.asarray(p2_values, dtype=float).reshape(-1)
+    sample_count = min(p1_arr.size, p2_arr.size)
+    if sample_count <= 0:
+        return {
+            "pressure_history_available": False,
+            "pressure_history_points": [],
+            "pressure_history_span_s": 0.0,
+            "pressure_history_sample_count": 0,
+            "pressure_history_peak_abs": 0.0,
+            "pressure_history_last_delta": None,
+            "pressure_history_status": "нет данных по давлениям",
+            "pressure_history_tone": "neutral",
+            "pressure_history_zero_y": 0.5,
+        }
+
+    delta_arr = (p1_arr[:sample_count] - p2_arr[:sample_count]).astype(float)
+    t_arr = np.asarray(time_s, dtype=float).reshape(-1)
+    if t_arr.size != sample_count:
+        t_arr = np.arange(sample_count, dtype=float)
+    clamped_idx = int(max(0, min(idx, sample_count - 1, t_arr.size - 1)))
+    history_points_count = max(2, int(max_points))
+    start_idx = max(0, clamped_idx - history_points_count + 1)
+    recent_delta = delta_arr[start_idx : clamped_idx + 1]
+    recent_t = t_arr[start_idx : clamped_idx + 1]
+    peak_abs = float(np.max(np.abs(recent_delta))) if recent_delta.size else 0.0
+    amplitude = peak_abs if peak_abs > 1.0e-9 else 1.0
+    points: list[tuple[float, float]] = []
+    for point_idx, delta_value in enumerate(recent_delta):
+        x_norm = 0.0 if recent_delta.size <= 1 else float(point_idx / max(1, recent_delta.size - 1))
+        y_norm = 0.5 - max(-0.42, min(0.42, 0.42 * float(delta_value) / amplitude))
+        points.append((x_norm, float(y_norm)))
+
+    span_s = float(recent_t[-1] - recent_t[0]) if recent_t.size >= 2 else 0.0
+    last_delta = float(recent_delta[-1]) if recent_delta.size else None
+    prev_delta = float(recent_delta[-2]) if recent_delta.size >= 2 else float(recent_delta[-1])
+    stable_floor = max(0.05, peak_abs * 0.14)
+    delta_step = abs(float(last_delta or 0.0) - float(prev_delta))
+    active_signs = [int(np.sign(val)) for val in recent_delta if abs(float(val)) > stable_floor]
+    sign_changes = sum(1 for prev, nxt in zip(active_signs[:-1], active_signs[1:]) if prev != nxt)
+    if peak_abs <= 0.05:
+        status = "ΔP почти выровнен"
+        tone = "neutral"
+    elif sign_changes >= 1:
+        status = "ΔP сменил знак"
+        tone = "warn"
+    elif delta_step > stable_floor:
+        status = "ΔP заметно перестраивается"
+        tone = "info"
+    else:
+        status = "ΔP удерживается"
+        tone = "ok"
+
+    return {
+        "pressure_history_available": True,
+        "pressure_history_points": points,
+        "pressure_history_span_s": span_s,
+        "pressure_history_sample_count": int(recent_delta.size),
+        "pressure_history_peak_abs": peak_abs,
+        "pressure_history_last_delta": last_delta,
+        "pressure_history_status": status,
+        "pressure_history_tone": tone,
+        "pressure_history_zero_y": 0.5,
+    }
+
+
+def _edge_recent_pressure_summary(pressure_meta: dict[str, Any]) -> str:
+    if not bool(pressure_meta.get("pressure_history_available")):
+        return "контур ΔP ещё не вычислен"
+
+    span_s = float(pressure_meta.get("pressure_history_span_s") or 0.0)
+    sample_count = int(pressure_meta.get("pressure_history_sample_count") or 0)
+    peak_abs = float(pressure_meta.get("pressure_history_peak_abs") or 0.0)
+    summary = (
+        f"{span_s:0.2f} s • {sample_count} кадр. • "
+        f"{str(pressure_meta.get('pressure_history_status') or 'ΔP без статуса')}"
+    )
+    if peak_abs > 0.0:
+        summary += f" • |ΔP|max {peak_abs:0.2f} бар"
+    last_delta = pressure_meta.get("pressure_history_last_delta")
+    if last_delta is not None:
+        summary += f" • текущее {float(last_delta):+0.2f} бар"
+    return summary
+
+
+def _edge_recent_causality_meta(
+    *,
+    state_label: str,
+    history_meta: dict[str, Any],
+    pressure_meta: dict[str, Any],
+    temporal_meta: dict[str, Any],
+    consistency_meta: dict[str, Any],
+) -> dict[str, Any]:
+    flow_peak = float(history_meta.get("history_peak_abs") or 0.0)
+    pressure_peak = float(pressure_meta.get("pressure_history_peak_abs") or 0.0)
+    open_ratio_raw = history_meta.get("history_open_ratio")
+    open_ratio = None if open_ratio_raw is None else float(open_ratio_raw)
+    pressure_status = str(pressure_meta.get("pressure_history_status") or "")
+    temporal_status = str(temporal_meta.get("temporal_status") or "")
+    consistency_status = str(consistency_meta.get("consistency_status") or "")
+    last_delta = pressure_meta.get("pressure_history_last_delta")
+
+    flow_recent = flow_peak > 1.0e-6
+    pressure_recent = pressure_peak > 0.05
+    open_high = open_ratio is not None and open_ratio >= 0.55
+    open_low = open_ratio is not None and open_ratio <= 0.25
+    state_lower = str(state_label or "").lower()
+
+    if not flow_recent and not pressure_recent:
+        return {
+            "causality_status": "ветвь остаётся в покое",
+            "causality_label": "в недавнем окне нет ни выраженного ΔP, ни выраженного расхода",
+            "causality_badge": "CX idle",
+            "causality_tone": "neutral",
+        }
+    if open_low and flow_recent:
+        return {
+            "causality_status": "поток идёт без устойчивого открытия",
+            "causality_label": "расход уже проявлен, но окно почти не подтверждает open-state",
+            "causality_badge": "CX leak",
+            "causality_tone": "warn",
+        }
+    if pressure_status == "ΔP сменил знак" and flow_recent:
+        return {
+            "causality_status": "ветвь проходит через смену причинности",
+            "causality_label": "перепад и расход одновременно перестраивают направление",
+            "causality_badge": "CX flip",
+            "causality_tone": "warn",
+        }
+    if open_high and pressure_recent and not flow_recent:
+        return {
+            "causality_status": "ветвь подготовлена, но Q запаздывает",
+            "causality_label": "открытие и ΔP уже собраны, а расход ещё не развился",
+            "causality_badge": "CX wait",
+            "causality_tone": "info",
+        }
+    if open_high and flow_recent and pressure_recent:
+        if "почти выровнен" in pressure_status or (last_delta is not None and abs(float(last_delta)) <= 0.05):
+            return {
+                "causality_status": "ветвь уже разгружается после хода",
+                "causality_label": "расход выражен, а перепад на концах ветви уже почти снят",
+                "causality_badge": "CX dump",
+                "causality_tone": "info",
+            }
+        if (
+            "согласованы" in consistency_status
+            or temporal_status in {"устойчивый ход", "набор расхода", "затухание расхода", "ход после переключения"}
+            or "открыт" in state_lower
+        ):
+            return {
+                "causality_status": "Q откликается на открытие и ΔP",
+                "causality_label": "недавнее окно подтверждает причинную связку между сигналом, перепадом и ходом",
+                "causality_badge": "CX ok",
+                "causality_tone": "ok",
+            }
+    if pressure_recent and flow_recent:
+        return {
+            "causality_status": "Q и ΔP движутся вместе, но без явной команды",
+            "causality_label": "динамика ветви связана, но open-state в окне выражен слабо",
+            "causality_badge": "CX mix",
+            "causality_tone": "info",
+        }
+    if pressure_recent and not flow_recent:
+        return {
+            "causality_status": "ΔP собирается без расхода",
+            "causality_label": "ветвь накапливает перепад, но ход пока не развился",
+            "causality_badge": "CX hold",
+            "causality_tone": "info",
+        }
+    return {
+        "causality_status": "причинная связка требует контекста",
+        "causality_label": "для уверенного вывода нужен соседний контур или большее временное окно",
+        "causality_badge": "CX ctx",
+        "causality_tone": "neutral",
+    }
+
+
+def _edge_recent_causality_summary(causality_meta: dict[str, Any], history_meta: dict[str, Any]) -> str:
+    status = str(causality_meta.get("causality_status") or "причинная связка не определена")
+    summary = status
+    open_ratio = history_meta.get("history_open_ratio")
+    if open_ratio is not None:
+        summary += f" • открыт {float(open_ratio) * 100.0:0.0f}% окна"
+    return summary
+
+
+def _edge_recent_latency_meta(
+    *,
+    time_s: np.ndarray | list[float],
+    q_values: np.ndarray | list[float],
+    open_values: np.ndarray | list[int] | None,
+    p1_values: np.ndarray | list[float] | None,
+    p2_values: np.ndarray | list[float] | None,
+    idx: int,
+    max_points: int = 8,
+) -> dict[str, Any]:
+    q_arr = np.asarray(q_values, dtype=float).reshape(-1)
+    if q_arr.size == 0:
+        return {
+            "latency_status": "нет окна для оценки лага",
+            "latency_label": "история ветви ещё не накоплена",
+            "latency_badge": "LG ?",
+            "latency_tone": "neutral",
+            "latency_s": None,
+            "latency_cause": "",
+        }
+
+    t_arr = np.asarray(time_s, dtype=float).reshape(-1)
+    if t_arr.size != q_arr.size:
+        t_arr = np.arange(q_arr.size, dtype=float)
+    clamped_idx = int(max(0, min(idx, q_arr.size - 1, t_arr.size - 1)))
+    history_points_count = max(2, int(max_points))
+    start_idx = max(0, clamped_idx - history_points_count + 1)
+    recent_q = q_arr[start_idx : clamped_idx + 1]
+    recent_t = t_arr[start_idx : clamped_idx + 1]
+    if recent_q.size == 0 or recent_t.size == 0:
+        return {
+            "latency_status": "нет окна для оценки лага",
+            "latency_label": "история ветви ещё не накоплена",
+            "latency_badge": "LG ?",
+            "latency_tone": "neutral",
+            "latency_s": None,
+            "latency_cause": "",
+        }
+
+    dt_nominal = float(np.median(np.diff(recent_t))) if recent_t.size >= 2 else 0.0
+    tolerance_s = max(0.04, dt_nominal * 0.55)
+    q_peak = float(np.max(np.abs(recent_q))) if recent_q.size else 0.0
+    q_floor = max(1.0e-6, q_peak * 0.12)
+
+    recent_open = None
+    if open_values is not None:
+        open_arr = np.asarray(open_values, dtype=int).reshape(-1)
+        if open_arr.size:
+            recent_open = open_arr[start_idx : min(clamped_idx + 1, open_arr.size)]
+
+    recent_delta = None
+    if p1_values is not None and p2_values is not None:
+        p1_arr = np.asarray(p1_values, dtype=float).reshape(-1)
+        p2_arr = np.asarray(p2_values, dtype=float).reshape(-1)
+        sample_count = min(p1_arr.size, p2_arr.size, t_arr.size)
+        if sample_count > 0:
+            delta_arr = (p1_arr[:sample_count] - p2_arr[:sample_count]).astype(float)
+            recent_delta = delta_arr[start_idx : min(clamped_idx + 1, sample_count)]
+
+    def _first_match_index(values: np.ndarray | None, predicate: Any) -> int | None:
+        if values is None or values.size == 0:
+            return None
+        for local_idx, value in enumerate(values):
+            if predicate(value):
+                return local_idx
+        return None
+
+    def _marker_x(local_idx: int | None, size: int) -> float | None:
+        if local_idx is None or size <= 0:
+            return None
+        if size <= 1:
+            return 0.0
+        return float(local_idx / max(1, size - 1))
+
+    q_idx = _first_match_index(recent_q, lambda value: abs(float(value)) > q_floor)
+    open_idx = _first_match_index(recent_open, lambda value: int(value) > 0)
+    dp_idx = None
+    if recent_delta is not None and recent_delta.size:
+        dp_peak = float(np.max(np.abs(recent_delta)))
+        dp_floor = max(0.05, dp_peak * 0.18)
+        dp_idx = _first_match_index(recent_delta, lambda value: abs(float(value)) > dp_floor)
+
+    phase_events: list[tuple[int, int, str]] = []
+    if open_idx is not None:
+        phase_events.append((open_idx, 0, "SIG"))
+    if dp_idx is not None:
+        phase_events.append((dp_idx, 1, "ΔP"))
+    if q_idx is not None:
+        phase_events.append((q_idx, 2, "Q"))
+    phase_label = "нет выраженной фазы"
+    if phase_events:
+        phase_label = " → ".join(label for _, _, label in sorted(phase_events, key=lambda item: (item[0], item[1])))
+
+    signal_to_dp_s = (
+        None if open_idx is None or dp_idx is None else float(recent_t[dp_idx] - recent_t[open_idx])
+    )
+    dp_to_q_s = None if dp_idx is None or q_idx is None else float(recent_t[q_idx] - recent_t[dp_idx])
+    signal_to_q_s = None if open_idx is None or q_idx is None else float(recent_t[q_idx] - recent_t[open_idx])
+    base_latency_meta = {
+        "latency_phase_label": phase_label,
+        "latency_signal_x": _marker_x(open_idx, recent_q.size),
+        "latency_dp_x": _marker_x(dp_idx, recent_q.size),
+        "latency_q_x": _marker_x(q_idx, recent_q.size),
+        "latency_sig_to_dp_s": signal_to_dp_s,
+        "latency_dp_to_q_s": dp_to_q_s,
+        "latency_sig_to_q_s": signal_to_q_s,
+    }
+
+    def _payload(**kwargs: Any) -> dict[str, Any]:
+        return {**base_latency_meta, **kwargs}
+
+    cause_candidates: list[tuple[int, str]] = []
+    if open_idx is not None:
+        cause_candidates.append((open_idx, "открытия"))
+    if dp_idx is not None:
+        cause_candidates.append((dp_idx, "сборки ΔP"))
+
+    if q_idx is None and not cause_candidates:
+        return _payload(
+            latency_status="нет выраженного лага",
+            latency_label="в окне нет ни команды, ни расхода, ни ΔP для сравнения",
+            latency_badge="LG idle",
+            latency_tone="neutral",
+            latency_s=None,
+            latency_cause="",
+        )
+    if q_idx is None and cause_candidates:
+        cause_idx, cause_label = min(cause_candidates, key=lambda item: item[0])
+        waiting_s = float(recent_t[-1] - recent_t[cause_idx])
+        return _payload(
+            latency_status="Q ещё не дошёл до ветви",
+            latency_label=f"после {cause_label} прошло {waiting_s:0.2f} s, а расход в окне ещё не проявился",
+            latency_badge="LG wait",
+            latency_tone="info",
+            latency_s=waiting_s,
+            latency_cause=cause_label,
+        )
+    if q_idx is not None and not cause_candidates:
+        return _payload(
+            latency_status="Q появляется раньше причины",
+            latency_label="расход проявляется без явного открытия или выраженного ΔP в текущем окне",
+            latency_badge="LG early",
+            latency_tone="warn",
+            latency_s=None,
+            latency_cause="",
+        )
+
+    cause_idx, cause_label = min(cause_candidates, key=lambda item: item[0])
+    lag_s = float(recent_t[q_idx] - recent_t[cause_idx]) if q_idx is not None else None
+    if lag_s is None:
+        return _payload(
+            latency_status="лаг не определён",
+            latency_label="окно недостаточно для уверенной оценки задержки",
+            latency_badge="LG ?",
+            latency_tone="neutral",
+            latency_s=None,
+            latency_cause=cause_label,
+        )
+    if lag_s < -tolerance_s:
+        return _payload(
+            latency_status="Q опережает окно причины",
+            latency_label=f"расход появляется на {abs(lag_s):0.2f} s раньше {cause_label}",
+            latency_badge="LG early",
+            latency_tone="warn",
+            latency_s=lag_s,
+            latency_cause=cause_label,
+        )
+    if abs(lag_s) <= tolerance_s:
+        return _payload(
+            latency_status="Q подключается почти без лага",
+            latency_label=f"между {cause_label} и расходом нет заметной задержки",
+            latency_badge="LG ok",
+            latency_tone="ok",
+            latency_s=lag_s,
+            latency_cause=cause_label,
+        )
+    if lag_s <= max(0.25, tolerance_s * 3.0):
+        return _payload(
+            latency_status="Q подключается с умеренным лагом",
+            latency_label=f"расход приходит через {lag_s:0.2f} s после {cause_label}",
+            latency_badge="LG soft",
+            latency_tone="info",
+            latency_s=lag_s,
+            latency_cause=cause_label,
+        )
+    return _payload(
+        latency_status="Q заметно запаздывает",
+        latency_label=f"между {cause_label} и расходом накопилась задержка {lag_s:0.2f} s",
+        latency_badge="LG late",
+        latency_tone="warn",
+        latency_s=lag_s,
+        latency_cause=cause_label,
+    )
+
+
+def _edge_recent_latency_summary(latency_meta: dict[str, Any]) -> str:
+    status = str(latency_meta.get("latency_status") or "лаг не определён")
+    lag_s = latency_meta.get("latency_s")
+    cause_label = str(latency_meta.get("latency_cause") or "")
+    summary = status
+    if lag_s is not None:
+        summary += f" • Δt {float(lag_s):+0.2f} s"
+    if cause_label:
+        summary += f" • от {cause_label}"
+    phase_label = str(latency_meta.get("latency_phase_label") or "")
+    if phase_label:
+        summary += f" • {phase_label}"
+    return summary
+
+
+def _edge_phase_ribbon_meta(latency_meta: dict[str, Any]) -> dict[str, Any]:
+    phase_label = str(latency_meta.get("latency_phase_label") or "")
+    parts = [part.strip() for part in phase_label.split("→") if part.strip()]
+    order_map = {label: idx + 1 for idx, label in enumerate(parts)}
+    latency_status = str(latency_meta.get("latency_status") or "")
+    latency_tone = str(latency_meta.get("latency_tone") or "neutral")
+
+    stages: list[dict[str, Any]] = []
+    for label in ("SIG", "ΔP", "Q"):
+        order = order_map.get(label)
+        present = order is not None
+        tone = "neutral"
+        status = "нет в окне"
+        if present:
+            status = f"этап {order}"
+            if label == "SIG":
+                tone = "info"
+            elif label == "ΔP":
+                tone = "info"
+            else:
+                tone = latency_tone if latency_tone in {"ok", "info", "warn"} else "ok"
+                if "раньше" in latency_status or "опережает" in latency_status:
+                    status = f"этап {order} • раньше причины"
+                elif "запаздывает" in latency_status:
+                    status = f"этап {order} • с заметным лагом"
+                elif "умеренным лагом" in latency_status:
+                    status = f"этап {order} • с умеренным лагом"
+                else:
+                    status = f"этап {order} • в фазе"
+        elif label == "Q" and "не дошёл" in latency_status:
+            tone = "info"
+            status = "ещё не дошёл"
+        elif label in {"SIG", "ΔP"} and "раньше причины" in latency_status:
+            tone = "warn"
+            status = "не пойман в окне"
+        stages.append(
+            {
+                "label": label,
+                "order": int(order or 0),
+                "present": bool(present),
+                "tone": tone,
+                "status": status,
+                "chip_text": f"{order} {label}" if present else f"· {label}",
+            }
+        )
+
+    def _interval_kind(from_label: str, to_label: str) -> tuple[str, str]:
+        if from_label == "SIG" and to_label == "ΔP":
+            return "control", "контур управления"
+        if from_label == "ΔP" and to_label == "Q":
+            return "response", "расходный отклик"
+        return "phase", "фазовый порядок"
+
+    def _interval_payload(from_label: str, to_label: str, dt_value: float | None) -> dict[str, Any]:
+        interval_kind, interval_kind_label = _interval_kind(from_label, to_label)
+        if dt_value is None:
+            return {
+                "from_label": from_label,
+                "to_label": to_label,
+                "kind": interval_kind,
+                "kind_label": interval_kind_label,
+                "chip_text": "miss",
+                "tone": "neutral",
+                "status": "нет полного интервала",
+            }
+        dt_float = float(dt_value)
+        if dt_float < -0.04:
+            return {
+                "from_label": from_label,
+                "to_label": to_label,
+                "kind": interval_kind,
+                "kind_label": interval_kind_label,
+                "dt_s": dt_float,
+                "chip_text": f"{dt_float:+0.2f}s",
+                "tone": "warn",
+                "status": "обратный порядок",
+            }
+        if abs(dt_float) <= 0.04:
+            return {
+                "from_label": from_label,
+                "to_label": to_label,
+                "kind": interval_kind,
+                "kind_label": interval_kind_label,
+                "dt_s": dt_float,
+                "chip_text": "0.00s",
+                "tone": "ok",
+                "status": "почти синхронно",
+            }
+        if dt_float <= 0.25:
+            return {
+                "from_label": from_label,
+                "to_label": to_label,
+                "kind": interval_kind,
+                "kind_label": interval_kind_label,
+                "dt_s": dt_float,
+                "chip_text": f"+{dt_float:0.2f}s",
+                "tone": "info",
+                "status": "умеренный интервал",
+            }
+        return {
+            "from_label": from_label,
+            "to_label": to_label,
+            "kind": interval_kind,
+            "kind_label": interval_kind_label,
+            "dt_s": dt_float,
+            "chip_text": f"+{dt_float:0.2f}s",
+            "tone": "warn",
+            "status": "длинный интервал",
+        }
+
+    intervals = [
+        _interval_payload("SIG", "ΔP", _finite_or_none(latency_meta.get("latency_sig_to_dp_s"))),
+        _interval_payload("ΔP", "Q", _finite_or_none(latency_meta.get("latency_dp_to_q_s"))),
+    ]
+    tone_rank = {"neutral": 0, "ok": 1, "info": 2, "warn": 3}
+    bottleneck: dict[str, Any] | None = None
+    for interval in intervals:
+        interval["is_bottleneck"] = False
+        score = (
+            tone_rank.get(str(interval.get("tone") or "neutral"), 0),
+            abs(float(_finite_or_none(interval.get("dt_s")) or 0.0)),
+        )
+        if bottleneck is None:
+            bottleneck = dict(interval)
+            bottleneck["_score"] = score
+            continue
+        if score > tuple(bottleneck.get("_score") or (0, 0.0)):
+            bottleneck = dict(interval)
+            bottleneck["_score"] = score
+
+    bottleneck_label = "нет доминирующего узкого места"
+    bottleneck_status = "фазовые интервалы не выделяются"
+    bottleneck_tone = "neutral"
+    bottleneck_kind = "нет доминирующего bottleneck"
+    bottleneck_comment = "интервалы перехода не требуют отдельного операторского внимания"
+    focus_pair_label = "нет фокусной пары"
+    focus_stage_labels: list[str] = []
+    focus_hint = "фазовая лента не требует дополнительного визуального акцента"
+    if bottleneck is not None:
+        bottleneck_label = (
+            f"{str(bottleneck.get('from_label') or '—')}→{str(bottleneck.get('to_label') or '—')} "
+            f"{str(bottleneck.get('chip_text') or '—')}"
+        )
+        bottleneck_status = str(bottleneck.get("status") or bottleneck_status)
+        bottleneck_tone = str(bottleneck.get("tone") or "neutral")
+        bottleneck_kind = str(bottleneck.get("kind_label") or bottleneck_kind)
+        focus_pair_label = f"{str(bottleneck.get('from_label') or '—')} → {str(bottleneck.get('to_label') or '—')}"
+        focus_stage_labels = [
+            str(bottleneck.get("from_label") or ""),
+            str(bottleneck.get("to_label") or ""),
+        ]
+        if str(bottleneck.get("kind") or "") == "control":
+            bottleneck_comment = "задержка копится между командой и формированием перепада на ветви"
+            focus_hint = "смотрите связку сигнала и набора ΔP: bottleneck сидит в управленческой части ветви"
+        elif str(bottleneck.get("kind") or "") == "response":
+            bottleneck_comment = "перепад уже собран, а расход подключается позже и даёт основной лаг"
+            focus_hint = "смотрите связку ΔP и Q: bottleneck сидит в отклике расхода на уже собранный перепад"
+        else:
+            bottleneck_comment = "этапы проходят в нетипичном порядке и требуют проверки последовательности"
+            focus_hint = "смотрите полный порядок фаз: bottleneck связан с нетипичным прохождением этапов"
+        for interval in intervals:
+            if (
+                str(interval.get("from_label") or "") == str(bottleneck.get("from_label") or "")
+                and str(interval.get("to_label") or "") == str(bottleneck.get("to_label") or "")
+                and str(interval.get("chip_text") or "") == str(bottleneck.get("chip_text") or "")
+            ):
+                interval["is_bottleneck"] = True
+                break
+
+    ribbon_label = "нет выраженной фазовой ленты"
+    if parts:
+        ribbon_label = " → ".join(f"{label}({order_map.get(label, 0)})" for label in parts)
+    interval_label = " • ".join(
+        f"{item.get('from_label')}→{item.get('to_label')} {item.get('chip_text')}"
+        for item in intervals
+    )
+    return {
+        "phase_ribbon_label": ribbon_label,
+        "phase_ribbon_stages": stages,
+        "phase_ribbon_intervals": intervals,
+        "phase_ribbon_interval_label": interval_label,
+        "phase_ribbon_bottleneck_label": bottleneck_label,
+        "phase_ribbon_bottleneck_status": bottleneck_status,
+        "phase_ribbon_bottleneck_tone": bottleneck_tone,
+        "phase_ribbon_bottleneck_kind": bottleneck_kind,
+        "phase_ribbon_bottleneck_comment": bottleneck_comment,
+        "phase_ribbon_focus_pair_label": focus_pair_label,
+        "phase_ribbon_focus_stage_labels": focus_stage_labels,
+        "phase_ribbon_focus_hint": focus_hint,
+    }
+
+
+def _edge_operator_hint_meta(
+    *,
+    component_kind: str,
+    canonical_kind: str,
+    operability_status: str,
+    consistency_status: str,
+    pressure_drive_status: str,
+    latency_status: str,
+    phase_ribbon_bottleneck_kind: str,
+    phase_ribbon_bottleneck_comment: str,
+    phase_ribbon_focus_hint: str,
+) -> dict[str, Any]:
+    component = str(component_kind or "").strip().lower()
+    canonical = str(canonical_kind or "").strip().lower()
+    operability = str(operability_status or "")
+    consistency = str(consistency_status or "")
+    pressure_status = str(pressure_drive_status or "")
+    latency = str(latency_status or "")
+    bottleneck_kind = str(phase_ribbon_bottleneck_kind or "")
+    focus_hint = str(phase_ribbon_focus_hint or "")
+
+    if "закрыт, но расход есть" in operability or "конфликтует с расходом" in consistency:
+        return {
+            "operator_hint_title": "проверить паразитный проход ветви",
+            "operator_hint_label": "ищите негерметичный клапан, обходной путь или скрытый реверс через арматуру",
+            "operator_hint_badge": "ACT leak",
+            "operator_hint_tone": "warn",
+        }
+    if "реверс" in pressure_status or "против" in consistency:
+        return {
+            "operator_hint_title": "проверить реверс и направление ветви",
+            "operator_hint_label": "сопоставьте стрелку элемента, знак ΔP и фактический ход Q; вероятен обратный проход или перепутанный маршрут",
+            "operator_hint_badge": "ACT rev",
+            "operator_hint_tone": "warn",
+        }
+    if bottleneck_kind == "контур управления":
+        title = "проверить команду и сборку ΔP"
+        label = "смотрите upstream-команду ветви и момент появления перепада до развития расхода"
+        if canonical in {"reg_after"} or "регулятор" in component:
+            label = "проверьте регулятор/управляющую арматуру и появляется ли перепад на ветви сразу после команды"
+        elif canonical in {"check"} or "обратный клапан" in component:
+            label = "проверьте момент открытия одностороннего элемента и набор перепада до появления расхода"
+        return {
+            "operator_hint_title": title,
+            "operator_hint_label": label,
+            "operator_hint_badge": "ACT ctrl",
+            "operator_hint_tone": "warn" if "длинный" in latency or "запаздывает" in latency else "info",
+        }
+    if bottleneck_kind == "расходный отклик":
+        title = "проверить проход и downstream отклик"
+        label = "ΔP уже собран; ищите, где ветвь тормозит развитие расхода после перепада"
+        if canonical == "orifice" or "дроссель" in component:
+            label = "ΔP уже собран; сначала проверьте дроссель, узкое сечение и downstream-объём"
+        elif canonical in {"check", "reg_after"} or "обратный клапан" in component or "регулятор" in component:
+            label = "ΔP уже собран; проверьте проход через арматуру и downstream-нагрузку ветви"
+        return {
+            "operator_hint_title": title,
+            "operator_hint_label": label,
+            "operator_hint_badge": "ACT flow",
+            "operator_hint_tone": "warn" if "запаздывает" in latency else "info",
+        }
+    if "раньше причины" in latency or "опережает" in latency:
+        return {
+            "operator_hint_title": "проверить порядок фаз и источник обходного хода",
+            "operator_hint_label": "расход появляется раньше ожидаемой причины; проверьте синхронизацию сигналов и скрытый bypass",
+            "operator_hint_badge": "ACT seq",
+            "operator_hint_tone": "warn",
+        }
+    return {
+        "operator_hint_title": "проверить последовательность фазы",
+        "operator_hint_label": focus_hint or phase_ribbon_bottleneck_comment or "сопоставьте SIG, ΔP и Q на выбранной ветви",
+        "operator_hint_badge": "ACT ctx",
+        "operator_hint_tone": "neutral",
+    }
+
+
+def _edge_operator_checklist_meta(
+    *,
+    component_kind: str,
+    canonical_kind: str,
+    operator_hint_badge: str,
+    phase_ribbon_bottleneck_kind: str,
+    operability_status: str,
+    consistency_status: str,
+) -> dict[str, Any]:
+    component = str(component_kind or "").strip().lower()
+    canonical = str(canonical_kind or "").strip().lower()
+    hint_badge = str(operator_hint_badge or "")
+    bottleneck_kind = str(phase_ribbon_bottleneck_kind or "")
+    operability = str(operability_status or "")
+    consistency = str(consistency_status or "")
+
+    items: list[str]
+    if hint_badge == "ACT leak":
+        items = [
+            "герметичность седла и фактическое закрытие арматуры",
+            "обходные ветви и скрытый реверс через соседние линии",
+            "совпадает ли open-state с фактическим перекрытием ветви",
+        ]
+    elif hint_badge == "ACT rev":
+        items = [
+            "стрелку элемента и паспортное направление ветви",
+            "знак ΔP на концах ветви в момент хода",
+            "нет ли перепутанного upstream/downstream маршрута",
+        ]
+    elif bottleneck_kind == "контур управления":
+        items = [
+            "момент прихода команды на ветвь",
+            "собирается ли ΔP сразу после команды",
+            "не тормозит ли управляющая арматура открытие",
+        ]
+        if canonical in {"reg_after"} or "регулятор" in component:
+            items[2] = "не тормозит ли регулятор или pilot-часть открытие"
+        elif canonical in {"check"} or "обратный клапан" in component:
+            items[2] = "не зависает ли односторонний клапан до появления ΔP"
+    elif bottleneck_kind == "расходный отклик":
+        items = [
+            "проходит ли расход через элемент после сборки ΔP",
+            "нет ли узкого сечения или дросселирования downstream",
+            "не забирает ли downstream-объём весь отклик ветви",
+        ]
+        if canonical == "orifice" or "дроссель" in component:
+            items[1] = "настроен ли дроссель и не слишком ли зажат проход"
+        elif canonical in {"check", "reg_after"} or "обратный клапан" in component or "регулятор" in component:
+            items[1] = "не ограничивает ли арматура проход при уже собранном ΔP"
+    elif "конфликтует" in consistency or "закрыт, но расход есть" in operability:
+        items = [
+            "реальное состояние закрытия ветви",
+            "паразитный обходной проход",
+            "нет ли реверса через соседнюю арматуру",
+        ]
+    else:
+        items = [
+            "порядок SIG → ΔP → Q в текущем окне",
+            "совпадает ли bottleneck с поведением ветви на схеме",
+            "нет ли соседнего контура, который перехватывает ход",
+        ]
+
+    focus_tone = "neutral"
+    if hint_badge in {"ACT leak", "ACT rev"} or "конфликтует" in consistency or "закрыт, но расход есть" in operability:
+        focus_tone = "warn"
+    elif bottleneck_kind in {"контур управления", "расходный отклик"}:
+        focus_tone = "info"
+    rows = [
+        {
+            "index_label": f"{idx + 1:02d}",
+            "title": item,
+            "tone": focus_tone if idx == 0 else ("info" if idx == 1 and focus_tone != "warn" else "neutral"),
+            "is_focus": idx == 0,
+        }
+        for idx, item in enumerate(items[:3])
+    ]
+    summary = " • ".join(items[:2])
+    return {
+        "operator_checklist_items": items,
+        "operator_checklist_rows": rows,
+        "operator_checklist_summary": summary,
+    }
+
+
+def _component_icon_key(kind: str, canonical_kind: str) -> str:
+    canonical = str(canonical_kind or "").strip().lower()
+    if canonical in {"check", "orifice", "relief", "reg_after"}:
+        return canonical
+    normalized = str(kind or "").strip().lower()
+    if "диагон" in normalized:
+        return "diagonal"
+    if "сброс" in normalized:
+        return "vent"
+    if "питание" in normalized:
+        return "supply"
+    if "исполнитель" in normalized:
+        return "actuator"
+    return "line"
 
 
 def _state_short_label(state_label: str) -> str:
@@ -2589,11 +4065,17 @@ def _build_component_overlay_rows(
         if item.edge_name != selected_name and item.component_kind == "Диагональ" and abs(float(item.q_now)) < diagonal_floor:
             continue
         flow_rgb = _flow_to_heat_rgb(item.q_now, max_abs_flow=max_abs_flow)
+        edge_def = dataset.edge_defs.get(item.edge_name, {}) if dataset is not None else {}
+        canonical_kind = str(edge_def.get("kind") or "")
         payload_rows.append(
             {
                 "edge_name": item.edge_name,
                 "component_kind": item.component_kind,
                 "component_short": _component_kind_short_label(item.component_kind),
+                "canonical_kind": canonical_kind,
+                "canonical_kind_label": _canonical_kind_label(canonical_kind),
+                "camozzi_code": str(edge_def.get("camozzi_code") or ""),
+                "icon_key": _component_icon_key(item.component_kind, canonical_kind),
                 "q_now": _finite_or_none(item.q_now),
                 "flow_abs": _finite_or_none(abs(float(item.q_now))),
                 "direction_label": item.direction_label,
@@ -2702,6 +4184,7 @@ class MnemoNativeView(QtWidgets.QWidget):
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
+        self._detail_mode = "operator"
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(8)
@@ -2750,6 +4233,17 @@ class MnemoNativeView(QtWidgets.QWidget):
         )
         self.native_canvas.render_dataset(dataset, selected_edge=selected_edge, selected_node=selected_node)
 
+    @staticmethod
+    def _detail_mode_label(mode: str) -> str:
+        return str(DETAIL_MODE_LABELS.get(str(mode or "").strip().lower(), DETAIL_MODE_LABELS["operator"]))
+
+    def set_detail_mode(self, mode: str) -> None:
+        self._detail_mode = self.native_canvas.set_detail_mode(mode)
+        self.hint_label.setText(
+            "Колесо: zoom • drag: pan • click: выбрать ветвь или узел"
+            + f" • слой: {self._detail_mode_label(self._detail_mode)}"
+        )
+
     def set_playhead(self, idx: int, playing: bool, dataset_id: str) -> None:
         self.mode_badge.setText("Playback" if playing else "Hold")
         self.native_canvas.set_frame_state(idx, playing, dataset_id)
@@ -2769,10 +4263,19 @@ class MnemoNativeView(QtWidgets.QWidget):
         self.native_canvas.set_alerts(alerts)
 
     def set_diagnostics(self, diagnostics: dict[str, Any]) -> None:
+        fidelity = dict(diagnostics.get("scheme_fidelity") or {})
+        canonical_nodes_positioned = int(fidelity.get("canonical_nodes_positioned") or 0)
+        canonical_nodes_total = int(fidelity.get("canonical_nodes_total") or 0)
+        canonical_edges_routed = int(fidelity.get("canonical_edges_routed") or 0)
+        canonical_edges_total = int(fidelity.get("canonical_edges_total") or 0)
         warnings = len(list(diagnostics.get("geometry_warnings") or []))
         issues = len(list(diagnostics.get("geometry_issues") or []))
         self.hint_label.setText(
-            f"Native overlay: cylinders {len(list(diagnostics.get('cylinders') or []))}, components {len(list(diagnostics.get('components') or []))}, geometry {warnings}/{issues}"
+            "Native overlay: "
+            + f"schema {canonical_nodes_positioned}/{canonical_nodes_total} nodes, "
+            + f"{canonical_edges_routed}/{canonical_edges_total} routes, "
+            + f"geometry {warnings}/{issues}"
+            + f" • слой {self._detail_mode_label(self._detail_mode)}"
         )
         self.native_canvas.set_diagnostics(diagnostics)
 
@@ -3372,11 +4875,97 @@ class SelectionPanel(QtWidgets.QWidget):
                 q_now = float(q_vals[idx])
                 q_peak = float(np.max(np.abs(q_vals))) if q_vals.size else 0.0
                 edge_def = dataset.edge_defs.get(edge_name, {})
+                edge_meta = dict(dataset.mapping.get("edges_meta", {}).get(edge_name) or {})
                 endpoint_1 = str(edge_def.get("n1") or "—")
                 endpoint_2 = str(edge_def.get("n2") or "—")
+                component_kind = _edge_component_kind(edge_name, edge_def)
+                canonical_kind = str(edge_def.get("kind") or "")
+                route_class = str(edge_meta.get("mnemo_route") or "—")
+                zone_label = _edge_zone_label(edge_name, edge_def)
+                direction_meta = _edge_direction_meta(edge_def, q_now)
+                p1_now, _, _ = _pressure_triplet(dataset, idx, endpoint_1)
+                p2_now, _, _ = _pressure_triplet(dataset, idx, endpoint_2)
+                element_meta = _edge_element_flow_contract_meta(
+                    canonical_kind,
+                    component_kind,
+                    direction_meta,
+                    q_now=q_now,
+                )
+                pressure_meta = _edge_pressure_drive_meta(
+                    direction_meta,
+                    p1_bar_g=p1_now,
+                    p2_bar_g=p2_now,
+                    q_now=q_now,
+                )
+                camozzi_code = str(edge_def.get("camozzi_code") or "").strip() or "—"
                 state = "открыт"
                 if open_arr is not None:
                     state = "открыт" if int(np.asarray(open_arr, dtype=int)[idx]) else "закрыт"
+                operability_meta = _edge_operability_meta(
+                    state,
+                    q_now=q_now,
+                    pressure_meta=pressure_meta,
+                    element_meta=element_meta,
+                )
+                consistency_meta = _edge_consistency_meta(
+                    state,
+                    q_now=q_now,
+                    pressure_meta=pressure_meta,
+                    element_meta=element_meta,
+                )
+                temporal_meta = _edge_temporal_meta(
+                    time_s=dataset.time_s,
+                    q_values=q_vals,
+                    open_values=None if open_arr is None else np.asarray(open_arr, dtype=int),
+                    idx=idx,
+                )
+                pressure_history_meta = _edge_recent_pressure_meta(
+                    time_s=dataset.time_s,
+                    p1_values=None if endpoint_1 == "" or dataset.bundle.p is None else _bar_g(np.asarray(dataset.bundle.p.column(endpoint_1, default=[]), dtype=float), dataset.p_atm),
+                    p2_values=None if endpoint_2 == "" or dataset.bundle.p is None else _bar_g(np.asarray(dataset.bundle.p.column(endpoint_2, default=[]), dtype=float), dataset.p_atm),
+                    idx=idx,
+                )
+                history_meta = _edge_recent_history_meta(
+                    time_s=dataset.time_s,
+                    q_values=q_vals,
+                    open_values=None if open_arr is None else np.asarray(open_arr, dtype=int),
+                    idx=idx,
+                )
+                causality_meta = _edge_recent_causality_meta(
+                    state_label=state,
+                    history_meta=history_meta,
+                    pressure_meta=pressure_history_meta,
+                    temporal_meta=temporal_meta,
+                    consistency_meta=consistency_meta,
+                )
+                latency_meta = _edge_recent_latency_meta(
+                    time_s=dataset.time_s,
+                    q_values=q_vals,
+                    open_values=None if open_arr is None else np.asarray(open_arr, dtype=int),
+                    p1_values=None if endpoint_1 == "" or dataset.bundle.p is None else _bar_g(np.asarray(dataset.bundle.p.column(endpoint_1, default=[]), dtype=float), dataset.p_atm),
+                    p2_values=None if endpoint_2 == "" or dataset.bundle.p is None else _bar_g(np.asarray(dataset.bundle.p.column(endpoint_2, default=[]), dtype=float), dataset.p_atm),
+                    idx=idx,
+                )
+                phase_ribbon_meta = _edge_phase_ribbon_meta(latency_meta)
+                operator_hint_meta = _edge_operator_hint_meta(
+                    component_kind=component_kind,
+                    canonical_kind=canonical_kind,
+                    operability_status=str(operability_meta.get("operability_status") or ""),
+                    consistency_status=str(consistency_meta.get("consistency_status") or ""),
+                    pressure_drive_status=str(pressure_meta.get("pressure_drive_status") or ""),
+                    latency_status=str(latency_meta.get("latency_status") or ""),
+                    phase_ribbon_bottleneck_kind=str(phase_ribbon_meta.get("phase_ribbon_bottleneck_kind") or ""),
+                    phase_ribbon_bottleneck_comment=str(phase_ribbon_meta.get("phase_ribbon_bottleneck_comment") or ""),
+                    phase_ribbon_focus_hint=str(phase_ribbon_meta.get("phase_ribbon_focus_hint") or ""),
+                )
+                operator_checklist_meta = _edge_operator_checklist_meta(
+                    component_kind=component_kind,
+                    canonical_kind=canonical_kind,
+                    operator_hint_badge=str(operator_hint_meta.get("operator_hint_badge") or ""),
+                    phase_ribbon_bottleneck_kind=str(phase_ribbon_meta.get("phase_ribbon_bottleneck_kind") or ""),
+                    operability_status=str(operability_meta.get("operability_status") or ""),
+                    consistency_status=str(consistency_meta.get("consistency_status") or ""),
+                )
                 chunks.append(
                     "<p><b>Ветка:</b> "
                     + escape(edge_name)
@@ -3386,10 +4975,115 @@ class SelectionPanel(QtWidgets.QWidget):
                     + f"{q_peak:8.2f} {dataset.q_unit}"
                     + "<br/><b>Состояние:</b> "
                     + escape(state)
+                    + "<br/><b>Элемент:</b> "
+                    + escape(component_kind)
+                    + " / "
+                    + escape(_canonical_kind_label(canonical_kind))
                     + "<br/><b>Маршрут:</b> "
                     + escape(endpoint_1)
                     + " → "
                     + escape(endpoint_2)
+                    + "<br/><b>Паспортное направление:</b> "
+                    + escape(str(direction_meta.get("canonical_direction_label") or "—"))
+                    + "<br/><b>Поток в кадре:</b> "
+                    + escape(str(direction_meta.get("flow_direction_label") or "—"))
+                    + "<br/><b>Статус направления:</b> "
+                    + escape(str(direction_meta.get("flow_status_label") or "—"))
+                    + "<br/><b>Элемент vs поток:</b> "
+                    + escape(str(element_meta.get("element_flow_status") or "—"))
+                    + "<br/><b>Комментарий элемента:</b> "
+                    + escape(str(element_meta.get("element_flow_label") or "—"))
+                    + "<br/><b>Источник / приёмник:</b> "
+                    + escape(
+                        (
+                            f"{direction_meta.get('flow_source_short') or '—'} → {direction_meta.get('flow_sink_short') or '—'}"
+                            if direction_meta.get("flow_source_short")
+                            else "неустойчиво / пауза"
+                        )
+                    )
+                    + "<br/><b>Концы ветви:</b> "
+                    + escape(str(direction_meta.get("endpoint_1_short") or "—"))
+                    + " "
+                    + ("—" if p1_now is None else f"{float(p1_now):0.2f} бар(g)")
+                    + " / "
+                    + escape(str(direction_meta.get("endpoint_2_short") or "—"))
+                    + " "
+                    + ("—" if p2_now is None else f"{float(p2_now):0.2f} бар(g)")
+                    + "<br/><b>ΔP ветви (n1-n2):</b> "
+                    + ("—" if pressure_meta.get("delta_p_bar") is None else f"{float(pressure_meta.get('delta_p_bar') or 0.0):+0.2f} бар")
+                    + "<br/><b>Ведущее давление:</b> "
+                    + escape(str(pressure_meta.get("pressure_drive_label") or "—"))
+                    + "<br/><b>Q vs ΔP:</b> "
+                    + escape(str(pressure_meta.get("flow_vs_pressure") or "—"))
+                    + "<br/><b>Оценка ΔP:</b> "
+                    + escape(str(pressure_meta.get("pressure_drive_status") or "—"))
+                    + "<br/><b>Инженерный verdict:</b> "
+                    + escape(str(operability_meta.get("operability_status") or "—"))
+                    + "<br/><b>Комментарий verdict:</b> "
+                    + escape(str(operability_meta.get("operability_label") or "—"))
+                    + "<br/><b>Согласованность сигналов:</b> "
+                    + escape(str(consistency_meta.get("consistency_status") or "—"))
+                    + "<br/><b>Комментарий согласованности:</b> "
+                    + escape(str(consistency_meta.get("consistency_label") or "—"))
+                    + "<br/><b>Временной ход:</b> "
+                    + escape(str(temporal_meta.get("temporal_status") or "—"))
+                    + "<br/><b>Комментарий хода:</b> "
+                    + escape(str(temporal_meta.get("temporal_label") or "—"))
+                    + "<br/><b>Окно анализа:</b> "
+                    + f"{float(temporal_meta.get('window_s') or 0.0):0.2f} s"
+                    + " / dQ/dt "
+                    + (
+                        "—"
+                        if temporal_meta.get("dq_dt") is None
+                        else f"{float(temporal_meta.get('dq_dt') or 0.0):+0.2f} {dataset.q_unit}/s"
+                    )
+                    + "<br/><b>Последнее окно:</b> "
+                    + escape(_edge_recent_history_summary(history_meta, dataset.q_unit))
+                    + "<br/><b>ΔP-контур:</b> "
+                    + escape(_edge_recent_pressure_summary(pressure_history_meta))
+                    + "<br/><b>Причинная связка:</b> "
+                    + escape(str(causality_meta.get("causality_status") or "—"))
+                    + "<br/><b>Комментарий связки:</b> "
+                    + escape(str(causality_meta.get("causality_label") or "—"))
+                    + "<br/><b>Лаг реакции:</b> "
+                    + escape(str(latency_meta.get("latency_status") or "—"))
+                    + "<br/><b>Комментарий лага:</b> "
+                    + escape(str(latency_meta.get("latency_label") or "—"))
+                    + "<br/><b>Фаза окна:</b> "
+                    + escape(str(latency_meta.get("latency_phase_label") or "—"))
+                    + "<br/><b>Фазовая лента:</b> "
+                    + escape(str(phase_ribbon_meta.get("phase_ribbon_label") or "—"))
+                    + "<br/><b>Интервалы фаз:</b> "
+                    + escape(str(phase_ribbon_meta.get("phase_ribbon_interval_label") or "—"))
+                    + "<br/><b>Узкое место фазы:</b> "
+                    + escape(str(phase_ribbon_meta.get("phase_ribbon_bottleneck_label") or "—"))
+                    + "<br/><b>Тип узкого места:</b> "
+                    + escape(str(phase_ribbon_meta.get("phase_ribbon_bottleneck_kind") or "—"))
+                    + "<br/><b>Комментарий узкого места:</b> "
+                    + escape(str(phase_ribbon_meta.get("phase_ribbon_bottleneck_comment") or "—"))
+                    + "<br/><b>Фокус узкого места:</b> "
+                    + escape(str(phase_ribbon_meta.get("phase_ribbon_focus_pair_label") or "—"))
+                    + "<br/><b>Подсказка фокуса:</b> "
+                    + escape(str(phase_ribbon_meta.get("phase_ribbon_focus_hint") or "—"))
+                    + "<br/><b>Операторский приоритет:</b> "
+                    + escape(str(operator_hint_meta.get("operator_hint_title") or "—"))
+                    + "<br/><b>Комментарий приоритета:</b> "
+                    + escape(str(operator_hint_meta.get("operator_hint_label") or "—"))
+                    + "<br/><b>Чек-лист разбора:</b> "
+                    + escape(str(operator_checklist_meta.get("operator_checklist_summary") or "—"))
+                    + "".join(
+                        "<br/>"
+                        + escape(str(item.get("index_label") or "•"))
+                        + " "
+                        + escape(str(item.get("title") or "—"))
+                        for item in list(operator_checklist_meta.get("operator_checklist_rows") or [])[:3]
+                    )
+                    + "<br/><b>Зона:</b> "
+                    + escape(zone_label)
+                    + "<br/><b>Класс прокладки:</b> "
+                    + escape(route_class)
+                    + "<br/><b>Каталог / серия:</b> "
+                    + escape(camozzi_code)
                     + "</p>"
                 )
                 focus_meta = _build_selected_edge_focus_meta(dataset, idx, edge_name=edge_name)
@@ -3562,6 +5256,84 @@ class GuidancePanel(QtWidgets.QTextBrowser):
             + escape(narrative.primary_summary)
             + "</p>"
             + "".join(mode_cards)
+        )
+
+
+class SchemeFidelityPanel(QtWidgets.QTextBrowser):
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self.setOpenExternalLinks(False)
+
+    @staticmethod
+    def _badge(status: str) -> str:
+        palette = {
+            "ok": ("#81e7a3", "#0f2a1c"),
+            "attention": ("#f8c15c", "#2b1c09"),
+            "warn": ("#f0936b", "#30150f"),
+        }
+        fg, bg = palette.get(str(status), ("#9cb9c7", "#17252d"))
+        return (
+            f'<span style="display:inline-block; padding:2px 8px; border-radius:999px; '
+            f'background:{bg}; color:{fg}; font-weight:700; font-size:11px;">{escape(str(status).upper())}</span>'
+        )
+
+    @staticmethod
+    def _route_counts_html(route_counts: dict[str, Any]) -> str:
+        if not route_counts:
+            return "нет данных"
+        return " • ".join(f"{escape(str(name))}: {int(count)}" for name, count in sorted(route_counts.items()))
+
+    @staticmethod
+    def _issue_list_html(items: list[str], *, empty_text: str, limit: int = 8) -> str:
+        if not items:
+            return f"<p>{escape(empty_text)}</p>"
+        preview = "".join(f"<li>{escape(str(item))}</li>" for item in items[:limit])
+        tail = ""
+        if len(items) > limit:
+            tail = f"<li>… ещё {len(items) - limit}</li>"
+        return f"<ul>{preview}{tail}</ul>"
+
+    def render(self, dataset: MnemoDataset | None) -> None:
+        if dataset is None:
+            self.setHtml(
+                "<h3>Соответствие схеме</h3>"
+                "<p>Панель проверяет, насколько native-мнемосхема совпадает с canonical-пневмосхемой из "
+                "<code>PNEUMO_SCHEME.json</code>.</p>"
+                "<p>После загрузки bundle здесь появятся покрытие узлов, маршрутов и все отклонения без web-прослойки.</p>"
+            )
+            return
+
+        fidelity = dict(dataset.scheme_fidelity or {})
+        self.setHtml(
+            "<h3>Соответствие схеме</h3>"
+            + "<p>"
+            + self._badge(str(fidelity.get("status") or "ok"))
+            + f" <span style='margin-left:8px;'>{escape(str(fidelity.get('summary') or ''))}</span></p>"
+            + f"<p><b>Bundle:</b> {escape(str(fidelity.get('bundle_summary') or ''))}</p>"
+            + "<p><b>Canonical layout:</b><br/>"
+            + f"узлы {int(fidelity.get('canonical_nodes_positioned') or 0)}/{int(fidelity.get('canonical_nodes_total') or 0)}"
+            + " • "
+            + f"ветви {int(fidelity.get('canonical_edges_routed') or 0)}/{int(fidelity.get('canonical_edges_total') or 0)}</p>"
+            + "<p><b>Профиль маршрутов:</b><br/>"
+            + escape(self._route_counts_html(dict(fidelity.get("canonical_route_counts") or {})))
+            + "</p>"
+            + "<p><b>Проблемы canonical layout:</b></p>"
+            + self._issue_list_html(
+                list(fidelity.get("canonical_missing_nodes") or []) + list(fidelity.get("canonical_route_issues") or []),
+                empty_text="Критичных расхождений между mnemonic layout и canonical-схемой не найдено.",
+            )
+            + "<p><b>Отклонения текущего bundle:</b></p>"
+            + self._issue_list_html(
+                list(fidelity.get("bundle_extra_edges") or [])
+                + list(fidelity.get("bundle_extra_nodes") or [])
+                + list(fidelity.get("bundle_route_issues") or []),
+                empty_text="Все текущие ветви и pressure-узлы распознаны в рамках canonical-словаря.",
+            )
+            + (
+                "<p><b>Geometry contract:</b> есть issues/warnings, проверьте панель приводов и diagnostics.</p>"
+                if dataset.geometry_issues or dataset.geometry_warnings
+                else "<p><b>Geometry contract:</b> читается чисто.</p>"
+            )
         )
 
 
@@ -4072,8 +5844,10 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
 
         self._scene_rect = QtCore.QRectF(0.0, 0.0, VIEWBOX_W, VIEWBOX_H)
         self._camera_rect = QtCore.QRectF(self._scene_rect)
+        self._camera_target_rect: QtCore.QRectF | None = None
         self._dataset: MnemoDataset | None = None
         self._dataset_id = ""
+        self._detail_mode = "operator"
         self._frame_idx = 0
         self._playing = False
         self._selected_edge = ""
@@ -4102,7 +5876,21 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._flow_phase = 0.0
         self._anim_timer = QtCore.QTimer(self)
         self._anim_timer.setInterval(40)
-        self._anim_timer.timeout.connect(self._advance_flow_phase)
+        self._anim_timer.timeout.connect(self._advance_animations)
+
+    @staticmethod
+    def _normalize_detail_mode(mode: str) -> str:
+        raw_mode = str(mode or "").strip().lower()
+        return raw_mode if raw_mode in DETAIL_MODE_LABELS else "operator"
+
+    def set_detail_mode(self, mode: str) -> str:
+        self._detail_mode = self._normalize_detail_mode(mode)
+        self._invalidate_background_cache()
+        self.update()
+        return self._detail_mode
+
+    def _detail_mode_label(self) -> str:
+        return str(DETAIL_MODE_LABELS.get(self._detail_mode, DETAIL_MODE_LABELS["operator"]))
 
     def render_dataset(self, dataset: MnemoDataset, *, selected_edge: str | None, selected_node: str | None) -> None:
         self._dataset = dataset
@@ -4110,13 +5898,14 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._frame_idx = 0
         self._selected_edge = str(selected_edge or "")
         self._selected_node = str(selected_node or "")
+        self._camera_target_rect = None
         self._edge_series_map = {str(item.get("name") or ""): item for item in dataset.edge_series}
         self._node_series_map = {str(item.get("name") or ""): item for item in dataset.node_series}
         self._selected_focus_step = ""
         self._build_native_scene_cache()
         self._load_svg_renderer(dataset.svg_inline)
         if self._mode == "overview":
-            self._fit_camera(self._scene_rect)
+            self._set_camera_target(self._scene_rect, immediate=True)
         self._invalidate_background_cache()
         self.update()
         self.status.emit("Desktop Mnemo switched to native Qt canvas.")
@@ -4125,11 +5914,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._frame_idx = int(max(0, idx))
         self._playing = bool(playing)
         self._dataset_id = str(dataset_id or self._dataset_id)
-        if self._playing:
-            if not self._anim_timer.isActive():
-                self._anim_timer.start()
-        else:
-            self._anim_timer.stop()
+        self._sync_anim_timer()
         self.update()
 
     def set_selection(self, *, edge: str | None, node: str | None) -> None:
@@ -4154,7 +5939,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             self._mode = "focus"
             target_rect = self._focus_scene_rect(self._focus_region)
             if target_rect is not None:
-                self._fit_camera(target_rect)
+                self._set_camera_target(target_rect)
             self.status.emit(
                 f"Фокус: {self._focus_region.get('edge_name') or self._focus_region.get('node_name') or 'scene'}"
             )
@@ -4166,7 +5951,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._overview_meta = dict(meta or {})
         focus_region = self._overview_meta.get("focus_region")
         self._focus_region = dict(focus_region) if isinstance(focus_region, dict) else self._focus_region
-        self._fit_camera(self._scene_rect)
+        self._set_camera_target(self._scene_rect)
         self._invalidate_background_cache()
         self.update()
 
@@ -4191,9 +5976,11 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             float(cursor_scene.x()) - new_rect.width() * rx,
             float(cursor_scene.y()) - new_rect.height() * ry,
         )
+        self._camera_target_rect = None
         self._camera_rect = self._clamped_camera_rect(new_rect)
         self._invalidate_background_cache()
         self.update()
+        self._sync_anim_timer()
         event.accept()
 
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:  # type: ignore[override]
@@ -4249,7 +6036,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
     def mouseDoubleClickEvent(self, event: QtGui.QMouseEvent) -> None:  # type: ignore[override]
         if event.button() == QtCore.Qt.LeftButton:
             target_rect = self._focus_scene_rect(self._focus_region) if self._mode == "focus" else self._scene_rect
-            self._fit_camera(target_rect or self._scene_rect)
+            self._set_camera_target(target_rect or self._scene_rect)
             self._invalidate_background_cache()
             self.update()
             event.accept()
@@ -4280,6 +6067,8 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._overlay_targets.clear()
         self._draw_live_edges(painter)
         self._draw_live_nodes(painter)
+        self._draw_selected_edge_terminal_overlay(painter)
+        self._draw_selected_edge_direction_overlay(painter)
         self._draw_focus_overlay(painter)
         self._draw_alert_markers(painter)
         self._draw_diagnostics_overlay(painter)
@@ -4287,9 +6076,22 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.restore()
         self._draw_hud(painter)
 
-    def _advance_flow_phase(self) -> None:
-        self._flow_phase = (self._flow_phase + 6.0) % 1000.0
-        self.update()
+    def _advance_animations(self) -> None:
+        dirty = False
+        if self._playing:
+            self._flow_phase = (self._flow_phase + 6.0) % 1000.0
+            dirty = True
+        if self._camera_target_rect is not None:
+            next_rect = self._interpolate_rect(self._camera_rect, self._camera_target_rect, 0.22)
+            if self._rect_close_enough(next_rect, self._camera_target_rect):
+                next_rect = QtCore.QRectF(self._camera_target_rect)
+                self._camera_target_rect = None
+            self._camera_rect = self._clamped_camera_rect(next_rect)
+            self._invalidate_background_cache()
+            dirty = True
+        if dirty:
+            self.update()
+        self._sync_anim_timer()
 
     def _toggle_focus_step(self, step_label: str) -> None:
         normalized = str(step_label or "").strip()
@@ -4428,12 +6230,53 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         return QtCore.QPointF(point)
 
     def _fit_camera(self, target_rect: QtCore.QRectF) -> None:
+        self._camera_rect = self._resolved_camera_rect(target_rect)
+
+    def _resolved_camera_rect(self, target_rect: QtCore.QRectF) -> QtCore.QRectF:
         normalized = QtCore.QRectF(target_rect if target_rect.isValid() else self._scene_rect)
         if normalized.width() < 10.0 or normalized.height() < 10.0:
             normalized = QtCore.QRectF(self._scene_rect)
         padding = max(40.0, min(180.0, 0.10 * max(normalized.width(), normalized.height())))
         normalized.adjust(-padding, -padding, padding, padding)
-        self._camera_rect = self._clamped_camera_rect(normalized)
+        return self._clamped_camera_rect(normalized)
+
+    def _set_camera_target(self, target_rect: QtCore.QRectF, *, immediate: bool = False) -> None:
+        resolved = self._resolved_camera_rect(target_rect)
+        if immediate:
+            self._camera_rect = QtCore.QRectF(resolved)
+            self._camera_target_rect = None
+            self._invalidate_background_cache()
+            self.update()
+            self._sync_anim_timer()
+            return
+        self._camera_target_rect = resolved
+        self._sync_anim_timer()
+
+    def _sync_anim_timer(self) -> None:
+        should_run = bool(self._playing or self._camera_target_rect is not None)
+        if should_run and not self._anim_timer.isActive():
+            self._anim_timer.start()
+        elif not should_run and self._anim_timer.isActive():
+            self._anim_timer.stop()
+
+    @staticmethod
+    def _interpolate_rect(current: QtCore.QRectF, target: QtCore.QRectF, factor: float) -> QtCore.QRectF:
+        t = max(0.0, min(1.0, float(factor)))
+        return QtCore.QRectF(
+            current.left() + (target.left() - current.left()) * t,
+            current.top() + (target.top() - current.top()) * t,
+            current.width() + (target.width() - current.width()) * t,
+            current.height() + (target.height() - current.height()) * t,
+        )
+
+    @staticmethod
+    def _rect_close_enough(current: QtCore.QRectF, target: QtCore.QRectF) -> bool:
+        return (
+            abs(current.left() - target.left()) <= 1.5
+            and abs(current.top() - target.top()) <= 1.5
+            and abs(current.width() - target.width()) <= 1.5
+            and abs(current.height() - target.height()) <= 1.5
+        )
 
     def _clamped_camera_rect(self, rect: QtCore.QRectF) -> QtCore.QRectF:
         content_rect = self._content_rect()
@@ -4477,9 +6320,11 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         dy = -float(delta_px.y()) * self._camera_rect.height() / float(content_rect.height())
         target = QtCore.QRectF(self._camera_rect)
         target.translate(dx, dy)
+        self._camera_target_rect = None
         self._camera_rect = self._clamped_camera_rect(target)
         self._invalidate_background_cache()
         self.update()
+        self._sync_anim_timer()
 
     def _focus_scene_rect(self, focus_region: dict[str, Any] | None) -> QtCore.QRectF | None:
         if self._dataset is None or not focus_region:
@@ -4535,6 +6380,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             return
         flows = [abs(self._current_edge_flow(edge_name)) for edge_name in self._dataset.edge_names]
         max_abs_flow = max(flows, default=0.0)
+        inline_symbols = self._inline_route_symbol_payloads(max_abs_flow=max_abs_flow)
         for edge_name in self._dataset.edge_names:
             path = self._edge_paths.get(edge_name)
             if path is None:
@@ -4571,14 +6417,28 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                     QtGui.QPen(accent, base_width + 2.5, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin)
                 )
                 painter.drawPath(path)
+            inline_payload = inline_symbols.get(edge_name)
+            if inline_payload is not None:
+                self._draw_inline_route_symbol(painter, edge_name=edge_name, payload=inline_payload)
 
     def _draw_live_nodes(self, painter: QtGui.QPainter) -> None:
         if self._dataset is None:
             return
-        spotlight_nodes: set[str] = set(self._dataset.overlay_node_names)
+        if self._detail_mode == "quiet":
+            spotlight_nodes: set[str] = set()
+        elif self._detail_mode == "full":
+            spotlight_nodes = set(self._node_points.keys())
+        else:
+            spotlight_nodes = set(self._dataset.overlay_node_names)
         spotlight_nodes.update(str(item.get("name") or "") for item in list(self._alerts.get("nodes") or []))
         if self._selected_node:
             spotlight_nodes.add(self._selected_node)
+        if self._selected_edge:
+            edge_def = dict(self._dataset.edge_defs.get(str(self._selected_edge)) or {})
+            spotlight_nodes.add(str(edge_def.get("n1") or ""))
+            spotlight_nodes.add(str(edge_def.get("n2") or ""))
+        if self._hover_kind == "node" and self._hover_name:
+            spotlight_nodes.add(self._hover_name)
 
         for node_name, point in self._node_points.items():
             pressure = self._current_node_pressure(node_name)
@@ -4625,6 +6485,1101 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             )
             self._overlay_targets.append(("node", node_name, label_rect.united(value_rect)))
 
+    def _selected_edge_direction_payload(self, *, max_abs_flow: float) -> dict[str, Any] | None:
+        if self._dataset is None or not self._selected_edge:
+            return None
+        edge_name = str(self._selected_edge)
+        series = self._edge_series_map.get(edge_name)
+        path = self._edge_paths.get(edge_name)
+        if path is None or path.isEmpty():
+            return None
+        edge_def = dict(self._dataset.edge_defs.get(edge_name) or {})
+        flow_value = self._current_edge_flow(edge_name)
+        direction_meta = _edge_direction_meta(edge_def, flow_value)
+        flow_rgb = _flow_to_heat_rgb(flow_value, max_abs_flow=max_abs_flow)
+        endpoint_1 = str(direction_meta.get("endpoint_1") or "")
+        endpoint_2 = str(direction_meta.get("endpoint_2") or "")
+        endpoint_1_pressure = self._current_node_pressure(endpoint_1) if endpoint_1 else None
+        endpoint_2_pressure = self._current_node_pressure(endpoint_2) if endpoint_2 else None
+        component_kind = _edge_component_kind(edge_name, edge_def)
+        canonical_kind = str(edge_def.get("kind") or "")
+        element_meta = _edge_element_flow_contract_meta(
+            canonical_kind,
+            component_kind,
+            direction_meta,
+            q_now=flow_value,
+        )
+        pressure_meta = _edge_pressure_drive_meta(
+            direction_meta,
+            p1_bar_g=endpoint_1_pressure,
+            p2_bar_g=endpoint_2_pressure,
+            q_now=flow_value,
+        )
+        open_state = self._current_edge_open(edge_name)
+        if open_state is True:
+            state_label = "открыт"
+        elif open_state is False:
+            state_label = "закрыт"
+        else:
+            state_label = "нет сигнала"
+        operability_meta = _edge_operability_meta(
+            state_label,
+            q_now=flow_value,
+            pressure_meta=pressure_meta,
+            element_meta=element_meta,
+        )
+        consistency_meta = _edge_consistency_meta(
+            state_label,
+            q_now=flow_value,
+            pressure_meta=pressure_meta,
+            element_meta=element_meta,
+        )
+        temporal_meta = _edge_temporal_meta(
+            time_s=self._dataset.time_s,
+            q_values=list(series.get("q") or []) if isinstance(series, dict) else [],
+            open_values=list(series.get("open") or []) if isinstance(series, dict) else None,
+            idx=self._frame_idx,
+        )
+        endpoint_1_series = self._node_series_map.get(endpoint_1) if endpoint_1 else None
+        endpoint_2_series = self._node_series_map.get(endpoint_2) if endpoint_2 else None
+        pressure_history_meta = _edge_recent_pressure_meta(
+            time_s=self._dataset.time_s,
+            p1_values=list(endpoint_1_series.get("p") or []) if isinstance(endpoint_1_series, dict) else None,
+            p2_values=list(endpoint_2_series.get("p") or []) if isinstance(endpoint_2_series, dict) else None,
+            idx=self._frame_idx,
+        )
+        history_meta = _edge_recent_history_meta(
+            time_s=self._dataset.time_s,
+            q_values=list(series.get("q") or []) if isinstance(series, dict) else [],
+            open_values=list(series.get("open") or []) if isinstance(series, dict) else None,
+            idx=self._frame_idx,
+        )
+        causality_meta = _edge_recent_causality_meta(
+            state_label=state_label,
+            history_meta=history_meta,
+            pressure_meta=pressure_history_meta,
+            temporal_meta=temporal_meta,
+            consistency_meta=consistency_meta,
+        )
+        latency_meta = _edge_recent_latency_meta(
+            time_s=self._dataset.time_s,
+            q_values=list(series.get("q") or []) if isinstance(series, dict) else [],
+            open_values=list(series.get("open") or []) if isinstance(series, dict) else None,
+            p1_values=list(endpoint_1_series.get("p") or []) if isinstance(endpoint_1_series, dict) else None,
+            p2_values=list(endpoint_2_series.get("p") or []) if isinstance(endpoint_2_series, dict) else None,
+            idx=self._frame_idx,
+        )
+        phase_ribbon_meta = _edge_phase_ribbon_meta(latency_meta)
+        operator_hint_meta = _edge_operator_hint_meta(
+            component_kind=component_kind,
+            canonical_kind=canonical_kind,
+            operability_status=str(operability_meta.get("operability_status") or ""),
+            consistency_status=str(consistency_meta.get("consistency_status") or ""),
+            pressure_drive_status=str(pressure_meta.get("pressure_drive_status") or ""),
+            latency_status=str(latency_meta.get("latency_status") or ""),
+            phase_ribbon_bottleneck_kind=str(phase_ribbon_meta.get("phase_ribbon_bottleneck_kind") or ""),
+            phase_ribbon_bottleneck_comment=str(phase_ribbon_meta.get("phase_ribbon_bottleneck_comment") or ""),
+            phase_ribbon_focus_hint=str(phase_ribbon_meta.get("phase_ribbon_focus_hint") or ""),
+        )
+        operator_checklist_meta = _edge_operator_checklist_meta(
+            component_kind=component_kind,
+            canonical_kind=canonical_kind,
+            operator_hint_badge=str(operator_hint_meta.get("operator_hint_badge") or ""),
+            phase_ribbon_bottleneck_kind=str(phase_ribbon_meta.get("phase_ribbon_bottleneck_kind") or ""),
+            operability_status=str(operability_meta.get("operability_status") or ""),
+            consistency_status=str(consistency_meta.get("consistency_status") or ""),
+        )
+        return {
+            "edge_name": edge_name,
+            "path": path,
+            "flow_value": float(flow_value),
+            "flow_rgb": flow_rgb,
+            "flow_hex": _rgb_hex(flow_rgb),
+            "flow_text_hex": _text_color_for_rgb(flow_rgb),
+            "component_kind": component_kind,
+            "canonical_kind": canonical_kind,
+            "state_label": state_label,
+            "endpoint_1": endpoint_1,
+            "endpoint_2": endpoint_2,
+            "endpoint_1_short": str(direction_meta.get("endpoint_1_short") or "—"),
+            "endpoint_2_short": str(direction_meta.get("endpoint_2_short") or "—"),
+            "endpoint_1_pressure": endpoint_1_pressure,
+            "endpoint_2_pressure": endpoint_2_pressure,
+            "canonical_direction_label": str(direction_meta.get("canonical_direction_label") or "—"),
+            "flow_direction_label": str(direction_meta.get("flow_direction_label") or "—"),
+            "flow_status_label": str(direction_meta.get("flow_status_label") or "—"),
+            "canonical_source": str(direction_meta.get("canonical_source") or ""),
+            "canonical_sink": str(direction_meta.get("canonical_sink") or ""),
+            "canonical_source_short": str(direction_meta.get("canonical_source_short") or ""),
+            "canonical_sink_short": str(direction_meta.get("canonical_sink_short") or ""),
+            "flow_source": str(direction_meta.get("flow_source") or ""),
+            "flow_sink": str(direction_meta.get("flow_sink") or ""),
+            "flow_source_short": str(direction_meta.get("flow_source_short") or ""),
+            "flow_sink_short": str(direction_meta.get("flow_sink_short") or ""),
+            "flow_forward": direction_meta.get("flow_forward"),
+            "flow_matches_canonical": direction_meta.get("flow_matches_canonical"),
+            "pressure_drive_label": str(pressure_meta.get("pressure_drive_label") or ""),
+            "pressure_drive_status": str(pressure_meta.get("pressure_drive_status") or ""),
+            "pressure_drive_badge": str(pressure_meta.get("pressure_drive_badge") or ""),
+            "pressure_lead_short": str(pressure_meta.get("pressure_lead_short") or ""),
+            "pressure_sink_short": str(pressure_meta.get("pressure_sink_short") or ""),
+            "endpoint_1_pressure_role": str(pressure_meta.get("endpoint_1_pressure_role") or "P?"),
+            "endpoint_2_pressure_role": str(pressure_meta.get("endpoint_2_pressure_role") or "P?"),
+            "flow_vs_pressure": str(pressure_meta.get("flow_vs_pressure") or ""),
+            "delta_p_bar": pressure_meta.get("delta_p_bar"),
+            "element_flow_status": str(element_meta.get("element_flow_status") or ""),
+            "element_flow_label": str(element_meta.get("element_flow_label") or ""),
+            "element_flow_badge": str(element_meta.get("element_flow_badge") or ""),
+            "element_flow_tone": str(element_meta.get("element_flow_tone") or "neutral"),
+            "operability_status": str(operability_meta.get("operability_status") or ""),
+            "operability_label": str(operability_meta.get("operability_label") or ""),
+            "operability_badge": str(operability_meta.get("operability_badge") or ""),
+            "operability_tone": str(operability_meta.get("operability_tone") or "neutral"),
+            "consistency_status": str(consistency_meta.get("consistency_status") or ""),
+            "consistency_label": str(consistency_meta.get("consistency_label") or ""),
+            "consistency_badge": str(consistency_meta.get("consistency_badge") or ""),
+            "consistency_tone": str(consistency_meta.get("consistency_tone") or "neutral"),
+            "temporal_status": str(temporal_meta.get("temporal_status") or ""),
+            "temporal_label": str(temporal_meta.get("temporal_label") or ""),
+            "temporal_badge": str(temporal_meta.get("temporal_badge") or ""),
+            "temporal_tone": str(temporal_meta.get("temporal_tone") or "neutral"),
+            "temporal_window_s": float(temporal_meta.get("window_s") or 0.0),
+            "temporal_dq_dt": temporal_meta.get("dq_dt"),
+            "history_summary": _edge_recent_history_summary(history_meta, self._dataset.q_unit),
+            "history_points": list(history_meta.get("history_points") or []),
+            "history_open_blocks": list(history_meta.get("history_open_blocks") or []),
+            "history_span_s": float(history_meta.get("history_span_s") or 0.0),
+            "history_sample_count": int(history_meta.get("history_sample_count") or 0),
+            "history_peak_abs": float(history_meta.get("history_peak_abs") or 0.0),
+            "history_open_ratio": history_meta.get("history_open_ratio"),
+            "history_zero_y": float(history_meta.get("history_zero_y") or 0.5),
+            "pressure_history_summary": _edge_recent_pressure_summary(pressure_history_meta),
+            "pressure_history_points": list(pressure_history_meta.get("pressure_history_points") or []),
+            "pressure_history_span_s": float(pressure_history_meta.get("pressure_history_span_s") or 0.0),
+            "pressure_history_sample_count": int(pressure_history_meta.get("pressure_history_sample_count") or 0),
+            "pressure_history_peak_abs": float(pressure_history_meta.get("pressure_history_peak_abs") or 0.0),
+            "pressure_history_last_delta": pressure_history_meta.get("pressure_history_last_delta"),
+            "pressure_history_status": str(pressure_history_meta.get("pressure_history_status") or ""),
+            "pressure_history_tone": str(pressure_history_meta.get("pressure_history_tone") or "neutral"),
+            "pressure_history_zero_y": float(pressure_history_meta.get("pressure_history_zero_y") or 0.5),
+            "causality_status": str(causality_meta.get("causality_status") or ""),
+            "causality_label": str(causality_meta.get("causality_label") or ""),
+            "causality_badge": str(causality_meta.get("causality_badge") or ""),
+            "causality_tone": str(causality_meta.get("causality_tone") or "neutral"),
+            "causality_summary": _edge_recent_causality_summary(causality_meta, history_meta),
+            "latency_status": str(latency_meta.get("latency_status") or ""),
+            "latency_label": str(latency_meta.get("latency_label") or ""),
+            "latency_badge": str(latency_meta.get("latency_badge") or ""),
+            "latency_tone": str(latency_meta.get("latency_tone") or "neutral"),
+            "latency_s": latency_meta.get("latency_s"),
+            "latency_cause": str(latency_meta.get("latency_cause") or ""),
+            "latency_phase_label": str(latency_meta.get("latency_phase_label") or ""),
+            "latency_signal_x": latency_meta.get("latency_signal_x"),
+            "latency_dp_x": latency_meta.get("latency_dp_x"),
+            "latency_q_x": latency_meta.get("latency_q_x"),
+            "latency_summary": _edge_recent_latency_summary(latency_meta),
+            "phase_ribbon_label": str(phase_ribbon_meta.get("phase_ribbon_label") or ""),
+            "phase_ribbon_stages": list(phase_ribbon_meta.get("phase_ribbon_stages") or []),
+            "phase_ribbon_intervals": list(phase_ribbon_meta.get("phase_ribbon_intervals") or []),
+            "phase_ribbon_interval_label": str(phase_ribbon_meta.get("phase_ribbon_interval_label") or ""),
+            "phase_ribbon_bottleneck_label": str(phase_ribbon_meta.get("phase_ribbon_bottleneck_label") or ""),
+            "phase_ribbon_bottleneck_status": str(phase_ribbon_meta.get("phase_ribbon_bottleneck_status") or ""),
+            "phase_ribbon_bottleneck_tone": str(phase_ribbon_meta.get("phase_ribbon_bottleneck_tone") or "neutral"),
+            "phase_ribbon_bottleneck_kind": str(phase_ribbon_meta.get("phase_ribbon_bottleneck_kind") or ""),
+            "phase_ribbon_bottleneck_comment": str(phase_ribbon_meta.get("phase_ribbon_bottleneck_comment") or ""),
+            "phase_ribbon_focus_pair_label": str(phase_ribbon_meta.get("phase_ribbon_focus_pair_label") or ""),
+            "phase_ribbon_focus_stage_labels": list(phase_ribbon_meta.get("phase_ribbon_focus_stage_labels") or []),
+            "phase_ribbon_focus_hint": str(phase_ribbon_meta.get("phase_ribbon_focus_hint") or ""),
+            "operator_hint_title": str(operator_hint_meta.get("operator_hint_title") or ""),
+            "operator_hint_label": str(operator_hint_meta.get("operator_hint_label") or ""),
+            "operator_hint_badge": str(operator_hint_meta.get("operator_hint_badge") or ""),
+            "operator_hint_tone": str(operator_hint_meta.get("operator_hint_tone") or "neutral"),
+            "operator_checklist_items": list(operator_checklist_meta.get("operator_checklist_items") or []),
+            "operator_checklist_rows": list(operator_checklist_meta.get("operator_checklist_rows") or []),
+            "operator_checklist_summary": str(operator_checklist_meta.get("operator_checklist_summary") or ""),
+        }
+
+    def _draw_selected_edge_terminal_overlay(self, painter: QtGui.QPainter) -> None:
+        if self._dataset is None or not self._selected_edge:
+            return
+        max_abs_flow = max(
+            (abs(self._current_edge_flow(edge_name)) for edge_name in self._dataset.edge_names),
+            default=0.0,
+        )
+        payload = self._selected_edge_direction_payload(max_abs_flow=max_abs_flow)
+        if payload is None:
+            return
+        for endpoint_key, canonical_role in (
+            ("endpoint_1", "ЭЛ-вход"),
+            ("endpoint_2", "ЭЛ-выход"),
+        ):
+            node_name = str(payload.get(endpoint_key) or "")
+            if not node_name:
+                continue
+            point = self._node_points.get(node_name)
+            if point is None:
+                continue
+            if node_name == str(payload.get("flow_source") or ""):
+                flow_role = "Q-ист"
+            elif node_name == str(payload.get("flow_sink") or ""):
+                flow_role = "Q-прием"
+            else:
+                flow_role = "Q-пауза"
+            pressure = _finite_or_none(payload.get(f"{endpoint_key}_pressure"))
+            pressure_rgb = _pressure_to_heat_rgb(pressure)
+            self._draw_terminal_role_badges(
+                painter,
+                point=point,
+                pressure_rgb=pressure_rgb,
+                canonical_role=canonical_role,
+                pressure_role=str(payload.get(f"{endpoint_key}_pressure_role") or "P?"),
+                flow_role=flow_role,
+                flow_rgb=tuple(payload.get("flow_rgb") or FLOW_IDLE_RGB),
+            )
+
+    def _draw_terminal_role_badges(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        point: QtCore.QPointF,
+        pressure_rgb: tuple[int, int, int],
+        canonical_role: str,
+        pressure_role: str,
+        flow_role: str,
+        flow_rgb: tuple[int, int, int],
+    ) -> None:
+        side = 1.0 if point.x() < self._scene_rect.center().x() else -1.0
+        chip_w = 82.0
+        chip_h = 20.0
+        x = point.x() + side * 28.0 + (0.0 if side > 0.0 else -chip_w)
+        role_w = 54.0
+        top_y = point.y() - 42.0
+        pressure_rect = QtCore.QRectF(x + (chip_w - role_w) * 0.5, top_y, role_w, 16.0)
+        canonical_rect = QtCore.QRectF(x, top_y + 18.0, chip_w, chip_h)
+        flow_rect = QtCore.QRectF(x, top_y + 18.0 + chip_h + 4.0, chip_w, chip_h)
+        ring_rgb = _mix_rgb(pressure_rgb, (255, 244, 199), 0.36)
+        flow_fill_rgb = flow_rgb if flow_role != "Q-пауза" else (66, 80, 90)
+
+        painter.save()
+        painter.setPen(QtGui.QPen(QtGui.QColor(*ring_rgb), 3.2))
+        painter.setBrush(QtCore.Qt.NoBrush)
+        painter.drawEllipse(point, 19.0, 19.0)
+        painter.setPen(QtGui.QPen(QtGui.QColor("#071117"), 1.0))
+        painter.setBrush(QtGui.QColor(*ring_rgb))
+        painter.drawRoundedRect(pressure_rect, 8.0, 8.0)
+        painter.setPen(QtGui.QPen(QtGui.QColor("#071117"), 1.0))
+        painter.setBrush(QtGui.QColor(7, 17, 23, 228))
+        painter.drawRoundedRect(canonical_rect, 10.0, 10.0)
+        font = QtGui.QFont(self.font())
+        font.setPointSizeF(6.9)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor("#071117"))
+        painter.drawText(pressure_rect, QtCore.Qt.AlignCenter, pressure_role)
+        painter.setPen(QtGui.QColor("#f6d98b"))
+        painter.drawText(canonical_rect, QtCore.Qt.AlignCenter, canonical_role)
+
+        painter.setPen(QtGui.QPen(QtGui.QColor("#071117"), 1.0))
+        painter.setBrush(QtGui.QColor(*flow_fill_rgb))
+        painter.drawRoundedRect(flow_rect, 10.0, 10.0)
+        painter.setPen(QtGui.QColor(_text_color_for_rgb(flow_fill_rgb)))
+        painter.drawText(flow_rect, QtCore.Qt.AlignCenter, flow_role)
+        painter.restore()
+
+    def _draw_selected_edge_direction_overlay(self, painter: QtGui.QPainter) -> None:
+        if self._dataset is None or not self._selected_edge:
+            return
+        max_abs_flow = max(
+            (abs(self._current_edge_flow(edge_name)) for edge_name in self._dataset.edge_names),
+            default=0.0,
+        )
+        payload = self._selected_edge_direction_payload(max_abs_flow=max_abs_flow)
+        if payload is None:
+            return
+        path = payload.get("path")
+        if not isinstance(path, QtGui.QPainterPath):
+            return
+
+        self._draw_edge_direction_marker(
+            painter,
+            path=path,
+            percent=0.28,
+            forward=True,
+            label="EL",
+            fill_color=QtGui.QColor(7, 17, 23, 228),
+            border_color=QtGui.QColor("#f6d98b"),
+            text_color=QtGui.QColor("#f6d98b"),
+        )
+        flow_forward = payload.get("flow_forward")
+        if isinstance(flow_forward, bool):
+            flow_color = QtGui.QColor(str(payload.get("flow_hex") or "#63d3f5"))
+            self._draw_edge_direction_marker(
+                painter,
+                path=path,
+                percent=0.72 if flow_forward else 0.36,
+                forward=flow_forward,
+                label="Q",
+                fill_color=flow_color,
+                border_color=QtGui.QColor("#071117"),
+                text_color=QtGui.QColor(str(payload.get("flow_text_hex") or "#eef7fa")),
+            )
+
+        anchor_t = 0.52
+        anchor = path.pointAtPercent(anchor_t)
+        angle_deg = self._path_angle_deg(path, anchor_t)
+        angle_rad = math.radians(angle_deg)
+        normal = QtCore.QPointF(-math.sin(angle_rad), math.cos(angle_rad))
+        if abs(normal.x()) <= 1.0e-6 and abs(normal.y()) <= 1.0e-6:
+            normal = QtCore.QPointF(0.0, -1.0)
+        center = QtCore.QPointF(anchor.x() + normal.x() * 96.0, anchor.y() + normal.y() * 96.0)
+        card_rect = QtCore.QRectF(center.x() - 202.0, center.y() - 177.0, 404.0, 486.0)
+        safe_rect = self._scene_rect.adjusted(36.0, 36.0, -36.0, -36.0)
+        if card_rect.left() < safe_rect.left():
+            card_rect.moveLeft(safe_rect.left())
+        if card_rect.right() > safe_rect.right():
+            card_rect.moveRight(safe_rect.right())
+        if card_rect.top() < safe_rect.top():
+            card_rect.moveTop(safe_rect.top())
+        if card_rect.bottom() > safe_rect.bottom():
+            card_rect.moveBottom(safe_rect.bottom())
+
+        flow_matches = payload.get("flow_matches_canonical")
+        if flow_matches is True:
+            badge_fill = QtGui.QColor(91, 192, 231, 220)
+            badge_text = QtGui.QColor("#071117")
+        elif flow_matches is False:
+            badge_fill = QtGui.QColor(248, 193, 92, 232)
+            badge_text = QtGui.QColor("#071117")
+        else:
+            badge_fill = QtGui.QColor(80, 96, 106, 224)
+            badge_text = QtGui.QColor("#eef7fa")
+
+        painter.save()
+        painter.setPen(QtGui.QPen(QtGui.QColor("#f6d98b" if flow_matches is False else "#bfdce6"), 2.0))
+        painter.setBrush(QtGui.QColor(7, 17, 23, 224))
+        painter.drawRoundedRect(card_rect, 16.0, 16.0)
+
+        title_font = QtGui.QFont(self.font())
+        title_font.setPointSizeF(8.8)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.setPen(QtGui.QColor("#eef7fa"))
+        painter.drawText(
+            card_rect.adjusted(12.0, 6.0, -104.0, -50.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            "Направление выбранной ветви",
+        )
+
+        badge_rect = QtCore.QRectF(card_rect.right() - 96.0, card_rect.top() + 8.0, 84.0, 20.0)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(badge_fill)
+        painter.drawRoundedRect(badge_rect, 10.0, 10.0)
+        badge_font = QtGui.QFont(self.font())
+        badge_font.setPointSizeF(7.0)
+        badge_font.setBold(True)
+        painter.setFont(badge_font)
+        painter.setPen(badge_text)
+        painter.drawText(
+            badge_rect,
+            QtCore.Qt.AlignCenter,
+            str(payload.get("flow_status_label") or "—"),
+        )
+        pressure_badge = str(payload.get("pressure_drive_badge") or "")
+        if pressure_badge:
+            pressure_fill = QtGui.QColor(91, 192, 231, 220)
+            pressure_text = QtGui.QColor("#071117")
+            if pressure_badge == "ΔP rev":
+                pressure_fill = QtGui.QColor(248, 193, 92, 232)
+            elif pressure_badge == "ΔP ?":
+                pressure_fill = QtGui.QColor(80, 96, 106, 224)
+                pressure_text = QtGui.QColor("#eef7fa")
+            second_badge_rect = QtCore.QRectF(card_rect.right() - 182.0, card_rect.top() + 8.0, 78.0, 20.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(pressure_fill)
+            painter.drawRoundedRect(second_badge_rect, 10.0, 10.0)
+            painter.setPen(pressure_text)
+            painter.drawText(second_badge_rect, QtCore.Qt.AlignCenter, pressure_badge)
+        element_badge = str(payload.get("element_flow_badge") or "")
+        if element_badge:
+            element_tone = str(payload.get("element_flow_tone") or "neutral")
+            element_fill = QtGui.QColor(80, 96, 106, 224)
+            element_text = QtGui.QColor("#eef7fa")
+            if element_tone == "ok":
+                element_fill = QtGui.QColor(91, 192, 231, 220)
+                element_text = QtGui.QColor("#071117")
+            elif element_tone == "warn":
+                element_fill = QtGui.QColor(248, 193, 92, 232)
+                element_text = QtGui.QColor("#071117")
+            elif element_tone == "info":
+                element_fill = QtGui.QColor(138, 226, 248, 210)
+                element_text = QtGui.QColor("#071117")
+            third_badge_rect = QtCore.QRectF(card_rect.right() - 266.0, card_rect.top() + 8.0, 78.0, 20.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(element_fill)
+            painter.drawRoundedRect(third_badge_rect, 10.0, 10.0)
+            painter.setPen(element_text)
+            painter.drawText(third_badge_rect, QtCore.Qt.AlignCenter, element_badge)
+        operability_badge = str(payload.get("operability_badge") or "")
+        if operability_badge:
+            operability_tone = str(payload.get("operability_tone") or "neutral")
+            operability_fill = QtGui.QColor(80, 96, 106, 224)
+            operability_text = QtGui.QColor("#eef7fa")
+            if operability_tone == "ok":
+                operability_fill = QtGui.QColor(127, 228, 167, 220)
+                operability_text = QtGui.QColor("#071117")
+            elif operability_tone == "warn":
+                operability_fill = QtGui.QColor(255, 156, 102, 236)
+                operability_text = QtGui.QColor("#071117")
+            elif operability_tone == "info":
+                operability_fill = QtGui.QColor(138, 226, 248, 210)
+                operability_text = QtGui.QColor("#071117")
+            fourth_badge_rect = QtCore.QRectF(card_rect.right() - 350.0, card_rect.top() + 8.0, 78.0, 20.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(operability_fill)
+            painter.drawRoundedRect(fourth_badge_rect, 10.0, 10.0)
+            painter.setPen(operability_text)
+            painter.drawText(fourth_badge_rect, QtCore.Qt.AlignCenter, operability_badge)
+        consistency_badge = str(payload.get("consistency_badge") or "")
+        if consistency_badge:
+            consistency_tone = str(payload.get("consistency_tone") or "neutral")
+            consistency_fill = QtGui.QColor(80, 96, 106, 224)
+            consistency_text = QtGui.QColor("#eef7fa")
+            if consistency_tone == "ok":
+                consistency_fill = QtGui.QColor(127, 228, 167, 220)
+                consistency_text = QtGui.QColor("#071117")
+            elif consistency_tone == "warn":
+                consistency_fill = QtGui.QColor(255, 156, 102, 236)
+                consistency_text = QtGui.QColor("#071117")
+            elif consistency_tone == "info":
+                consistency_fill = QtGui.QColor(138, 226, 248, 210)
+                consistency_text = QtGui.QColor("#071117")
+            fifth_badge_rect = QtCore.QRectF(card_rect.right() - 434.0, card_rect.top() + 8.0, 78.0, 20.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(consistency_fill)
+            painter.drawRoundedRect(fifth_badge_rect, 10.0, 10.0)
+            painter.setPen(consistency_text)
+            painter.drawText(fifth_badge_rect, QtCore.Qt.AlignCenter, consistency_badge)
+        temporal_badge = str(payload.get("temporal_badge") or "")
+        if temporal_badge:
+            temporal_tone = str(payload.get("temporal_tone") or "neutral")
+            temporal_fill = QtGui.QColor(80, 96, 106, 224)
+            temporal_text = QtGui.QColor("#eef7fa")
+            if temporal_tone == "ok":
+                temporal_fill = QtGui.QColor(127, 228, 167, 220)
+                temporal_text = QtGui.QColor("#071117")
+            elif temporal_tone == "warn":
+                temporal_fill = QtGui.QColor(255, 156, 102, 236)
+                temporal_text = QtGui.QColor("#071117")
+            elif temporal_tone == "info":
+                temporal_fill = QtGui.QColor(138, 226, 248, 210)
+                temporal_text = QtGui.QColor("#071117")
+            sixth_badge_rect = QtCore.QRectF(card_rect.left() + 14.0, card_rect.top() + 30.0, 78.0, 20.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(temporal_fill)
+            painter.drawRoundedRect(sixth_badge_rect, 10.0, 10.0)
+            painter.setPen(temporal_text)
+            painter.drawText(sixth_badge_rect, QtCore.Qt.AlignCenter, temporal_badge)
+
+        row_font = QtGui.QFont(self.font())
+        row_font.setPointSizeF(7.7)
+        painter.setFont(row_font)
+        painter.setPen(QtGui.QColor("#f6d98b"))
+        painter.drawText(
+            card_rect.adjusted(14.0, 28.0, -12.0, -28.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Элемент: {payload.get('canonical_direction_label') or '—'}",
+        )
+        painter.setPen(QtGui.QColor(str(payload.get("flow_hex") or "#63d3f5")))
+        painter.drawText(
+            card_rect.adjusted(14.0, 50.0, -12.0, -8.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Поток: {payload.get('flow_direction_label') or '—'}",
+        )
+        pressure_line = (
+            f"ΔP: {float(payload.get('delta_p_bar') or 0.0):+0.2f} бар • "
+            f"{payload.get('pressure_drive_label') or '—'} • "
+            f"{payload.get('flow_vs_pressure') or '—'}"
+            if payload.get("delta_p_bar") is not None
+            else "ΔP: нет данных по давлениям"
+        )
+        painter.setPen(QtGui.QColor("#a7d8e5"))
+        painter.drawText(
+            card_rect.adjusted(14.0, 72.0, -12.0, 14.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            pressure_line,
+        )
+        painter.setPen(QtGui.QColor("#f5e4b0"))
+        painter.drawText(
+            card_rect.adjusted(14.0, 92.0, -12.0, 34.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Элемент: {payload.get('element_flow_status') or '—'}",
+        )
+        verdict_color = QtGui.QColor("#a7f0c6")
+        if str(payload.get("operability_tone") or "neutral") == "warn":
+            verdict_color = QtGui.QColor("#ffbf9f")
+        elif str(payload.get("operability_tone") or "neutral") == "info":
+            verdict_color = QtGui.QColor("#a7d8e5")
+        elif str(payload.get("operability_tone") or "neutral") == "neutral":
+            verdict_color = QtGui.QColor("#c5d2d8")
+        painter.setPen(verdict_color)
+        painter.drawText(
+            card_rect.adjusted(14.0, 112.0, -12.0, 54.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Вердикт: {payload.get('operability_status') or '—'}",
+        )
+        consistency_color = QtGui.QColor("#a7f0c6")
+        if str(payload.get("consistency_tone") or "neutral") == "warn":
+            consistency_color = QtGui.QColor("#ffbf9f")
+        elif str(payload.get("consistency_tone") or "neutral") == "info":
+            consistency_color = QtGui.QColor("#a7d8e5")
+        elif str(payload.get("consistency_tone") or "neutral") == "neutral":
+            consistency_color = QtGui.QColor("#c5d2d8")
+        painter.setPen(consistency_color)
+        painter.drawText(
+            card_rect.adjusted(14.0, 132.0, -12.0, 74.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Сигналы: {payload.get('consistency_status') or '—'}",
+        )
+        temporal_color = QtGui.QColor("#a7f0c6")
+        if str(payload.get("temporal_tone") or "neutral") == "warn":
+            temporal_color = QtGui.QColor("#ffbf9f")
+        elif str(payload.get("temporal_tone") or "neutral") == "info":
+            temporal_color = QtGui.QColor("#a7d8e5")
+        elif str(payload.get("temporal_tone") or "neutral") == "neutral":
+            temporal_color = QtGui.QColor("#c5d2d8")
+        temporal_line = (
+            f"Динамика: {payload.get('temporal_status') or '—'}"
+            f" • {float(payload.get('temporal_window_s') or 0.0):0.2f} s"
+        )
+        if payload.get("temporal_dq_dt") is not None and self._dataset is not None:
+            temporal_line += f" • dQ/dt {float(payload.get('temporal_dq_dt') or 0.0):+0.2f} {self._dataset.q_unit}/s"
+        painter.setPen(temporal_color)
+        painter.drawText(
+            card_rect.adjusted(14.0, 152.0, -12.0, 94.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            temporal_line,
+        )
+        causality_color = QtGui.QColor("#a7f0c6")
+        if str(payload.get("causality_tone") or "neutral") == "warn":
+            causality_color = QtGui.QColor("#ffbf9f")
+        elif str(payload.get("causality_tone") or "neutral") == "info":
+            causality_color = QtGui.QColor("#a7d8e5")
+        elif str(payload.get("causality_tone") or "neutral") == "neutral":
+            causality_color = QtGui.QColor("#c5d2d8")
+        painter.setPen(causality_color)
+        painter.drawText(
+            card_rect.adjusted(14.0, 172.0, -12.0, 114.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Причинность: {payload.get('causality_status') or '—'}",
+        )
+        latency_color = QtGui.QColor("#a7f0c6")
+        if str(payload.get("latency_tone") or "neutral") == "warn":
+            latency_color = QtGui.QColor("#ffbf9f")
+        elif str(payload.get("latency_tone") or "neutral") == "info":
+            latency_color = QtGui.QColor("#a7d8e5")
+        elif str(payload.get("latency_tone") or "neutral") == "neutral":
+            latency_color = QtGui.QColor("#c5d2d8")
+        latency_line = f"Лаг: {payload.get('latency_status') or '—'}"
+        if payload.get("latency_s") is not None:
+            latency_line += f" • Δt {float(payload.get('latency_s') or 0.0):+0.2f} s"
+        painter.setPen(latency_color)
+        painter.drawText(
+            card_rect.adjusted(14.0, 192.0, -12.0, 134.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            latency_line,
+        )
+        painter.setPen(QtGui.QColor("#bfdce6"))
+        painter.drawText(
+            card_rect.adjusted(14.0, 212.0, -12.0, 154.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Фаза: {payload.get('latency_phase_label') or '—'}",
+        )
+        bottleneck_color = QtGui.QColor("#bfdce6")
+        if str(payload.get("phase_ribbon_bottleneck_tone") or "neutral") == "warn":
+            bottleneck_color = QtGui.QColor("#ffbf9f")
+        elif str(payload.get("phase_ribbon_bottleneck_tone") or "neutral") == "info":
+            bottleneck_color = QtGui.QColor("#a7d8e5")
+        elif str(payload.get("phase_ribbon_bottleneck_tone") or "neutral") == "ok":
+            bottleneck_color = QtGui.QColor("#a7f0c6")
+        painter.setPen(bottleneck_color)
+        bottleneck_line = f"Узкое место: {payload.get('phase_ribbon_bottleneck_label') or '—'}"
+        bottleneck_kind = str(payload.get("phase_ribbon_bottleneck_kind") or "")
+        if bottleneck_kind:
+            bottleneck_line += f" • {bottleneck_kind}"
+        painter.drawText(
+            card_rect.adjusted(14.0, 232.0, -12.0, 174.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            bottleneck_line,
+        )
+        operator_hint_color = QtGui.QColor("#bfdce6")
+        if str(payload.get("operator_hint_tone") or "neutral") == "warn":
+            operator_hint_color = QtGui.QColor("#ffbf9f")
+        elif str(payload.get("operator_hint_tone") or "neutral") == "info":
+            operator_hint_color = QtGui.QColor("#a7d8e5")
+        elif str(payload.get("operator_hint_tone") or "neutral") == "ok":
+            operator_hint_color = QtGui.QColor("#a7f0c6")
+        painter.setPen(operator_hint_color)
+        painter.drawText(
+            card_rect.adjusted(14.0, 252.0, -12.0, 194.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Сначала: {payload.get('operator_hint_title') or '—'}",
+        )
+        painter.setPen(operator_hint_color)
+        painter.drawText(
+            card_rect.adjusted(14.0, 272.0, -12.0, 214.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Проверь: {payload.get('operator_checklist_summary') or '—'}",
+        )
+        checklist_rect = QtCore.QRectF(card_rect.left() + 14.0, card_rect.top() + 296.0, card_rect.width() - 28.0, 58.0)
+        self._draw_edge_operator_checklist(
+            painter,
+            rect=checklist_rect,
+            payload=payload,
+        )
+        phase_ribbon_rect = QtCore.QRectF(card_rect.left() + 14.0, card_rect.bottom() - 128.0, card_rect.width() - 28.0, 24.0)
+        self._draw_edge_phase_ribbon(
+            painter,
+            rect=phase_ribbon_rect,
+            payload=payload,
+        )
+        history_strip_rect = QtCore.QRectF(card_rect.left() + 14.0, card_rect.bottom() - 92.0, card_rect.width() - 28.0, 28.0)
+        self._draw_edge_recent_history_strip(
+            painter,
+            rect=history_strip_rect,
+            payload=payload,
+        )
+        pressure_history_strip_rect = QtCore.QRectF(card_rect.left() + 14.0, card_rect.bottom() - 54.0, card_rect.width() - 28.0, 24.0)
+        self._draw_edge_recent_pressure_strip(
+            painter,
+            rect=pressure_history_strip_rect,
+            payload=payload,
+        )
+        painter.restore()
+
+    def _draw_edge_direction_marker(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        path: QtGui.QPainterPath,
+        percent: float,
+        forward: bool,
+        label: str,
+        fill_color: QtGui.QColor,
+        border_color: QtGui.QColor,
+        text_color: QtGui.QColor,
+    ) -> None:
+        center = path.pointAtPercent(max(0.08, min(0.92, float(percent))))
+        angle = self._path_angle_deg(path, percent)
+        if not forward:
+            angle += 180.0
+        painter.save()
+        painter.translate(center)
+        painter.rotate(angle)
+        body_w = 42.0
+        body_h = 20.0
+        tip_w = 10.0
+        arrow = QtGui.QPainterPath()
+        arrow.moveTo(-body_w * 0.5, -body_h * 0.5)
+        arrow.lineTo(body_w * 0.5 - tip_w, -body_h * 0.5)
+        arrow.lineTo(body_w * 0.5, 0.0)
+        arrow.lineTo(body_w * 0.5 - tip_w, body_h * 0.5)
+        arrow.lineTo(-body_w * 0.5, body_h * 0.5)
+        arrow.closeSubpath()
+        painter.setPen(QtGui.QPen(border_color, 1.6))
+        painter.setBrush(fill_color)
+        painter.drawPath(arrow)
+        font = QtGui.QFont(self.font())
+        font.setPointSizeF(6.6)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(text_color)
+        painter.drawText(
+            QtCore.QRectF(-body_w * 0.5 + 3.0, -body_h * 0.5, body_w - tip_w - 4.0, body_h),
+            QtCore.Qt.AlignCenter,
+            str(label or ""),
+        )
+        painter.restore()
+
+    def _draw_edge_recent_history_strip(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+    ) -> None:
+        points = list(payload.get("history_points") or [])
+        if not points:
+            return
+
+        painter.save()
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(11, 26, 34, 232))
+        painter.drawRoundedRect(rect, 11.0, 11.0)
+
+        title_font = QtGui.QFont(self.font())
+        title_font.setPointSizeF(6.4)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.setPen(QtGui.QColor("#bfdce6"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 8.0, rect.top() + 2.0, 210.0, 12.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Последние {float(payload.get('history_span_s') or 0.0):0.2f} s",
+        )
+        painter.drawText(
+            QtCore.QRectF(rect.right() - 168.0, rect.top() + 2.0, 160.0, 12.0),
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            f"|Q|max {float(payload.get('history_peak_abs') or 0.0):0.1f}",
+        )
+
+        trace_rect = QtCore.QRectF(rect.left() + 8.0, rect.top() + 13.0, rect.width() - 16.0, rect.height() - 17.0)
+        zero_y = trace_rect.top() + trace_rect.height() * float(payload.get("history_zero_y") or 0.5)
+        painter.setPen(QtGui.QPen(QtGui.QColor(112, 134, 146, 110), 1.0, QtCore.Qt.DashLine))
+        painter.drawLine(QtCore.QPointF(trace_rect.left(), zero_y), QtCore.QPointF(trace_rect.right(), zero_y))
+
+        open_blocks = list(payload.get("history_open_blocks") or [])
+        if open_blocks:
+            gate_rect = QtCore.QRectF(trace_rect.left(), trace_rect.bottom() - 5.0, trace_rect.width(), 5.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            for block in open_blocks:
+                x0 = float(block.get("x0") or 0.0)
+                x1 = float(block.get("x1") or 0.0)
+                block_rect = QtCore.QRectF(
+                    gate_rect.left() + gate_rect.width() * x0,
+                    gate_rect.top(),
+                    max(2.0, gate_rect.width() * max(0.0, x1 - x0) - 1.0),
+                    gate_rect.height(),
+                )
+                block_fill = QtGui.QColor(127, 228, 167, 190) if bool(block.get("open")) else QtGui.QColor(70, 84, 95, 175)
+                painter.setBrush(block_fill)
+                painter.drawRoundedRect(block_rect, 2.0, 2.0)
+
+        trace_height = max(8.0, trace_rect.height() - 8.0)
+        line_path = QtGui.QPainterPath()
+        for point_idx, point in enumerate(points):
+            x_norm = float(point[0]) if len(point) >= 1 else 0.0
+            y_norm = float(point[1]) if len(point) >= 2 else 0.5
+            trace_point = QtCore.QPointF(
+                trace_rect.left() + trace_rect.width() * x_norm,
+                trace_rect.top() + max(0.0, min(1.0, y_norm)) * trace_height,
+            )
+            if point_idx == 0:
+                line_path.moveTo(trace_point)
+            else:
+                line_path.lineTo(trace_point)
+
+        flow_color = QtGui.QColor(str(payload.get("flow_hex") or "#63d3f5"))
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        painter.setPen(QtGui.QPen(flow_color.lighter(115), 4.4, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
+        painter.drawPath(line_path)
+        painter.setPen(QtGui.QPen(flow_color, 2.2, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
+        painter.drawPath(line_path)
+
+        self._draw_strip_marker(
+            painter,
+            rect=trace_rect,
+            x_norm=payload.get("latency_signal_x"),
+            label="SIG",
+            color=QtGui.QColor("#f6d98b"),
+            emphasized="SIG" in list(payload.get("phase_ribbon_focus_stage_labels") or []),
+        )
+        self._draw_strip_marker(
+            painter,
+            rect=trace_rect,
+            x_norm=payload.get("latency_q_x"),
+            label="Q",
+            color=flow_color,
+            emphasized="Q" in list(payload.get("phase_ribbon_focus_stage_labels") or []),
+        )
+
+        last_point = line_path.currentPosition()
+        painter.setPen(QtGui.QPen(QtGui.QColor("#071117"), 1.0))
+        painter.setBrush(flow_color)
+        painter.drawEllipse(last_point, 3.2, 3.2)
+        painter.restore()
+
+    def _draw_edge_recent_pressure_strip(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+    ) -> None:
+        points = list(payload.get("pressure_history_points") or [])
+        if not points:
+            return
+
+        tone = str(payload.get("pressure_history_tone") or "neutral")
+        trace_color = QtGui.QColor("#a7d8e5")
+        if tone == "warn":
+            trace_color = QtGui.QColor("#f8c15c")
+        elif tone == "ok":
+            trace_color = QtGui.QColor("#8ee7b8")
+        elif tone == "info":
+            trace_color = QtGui.QColor("#9de1ff")
+
+        painter.save()
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(9, 21, 30, 228))
+        painter.drawRoundedRect(rect, 10.0, 10.0)
+
+        caption_font = QtGui.QFont(self.font())
+        caption_font.setPointSizeF(6.2)
+        caption_font.setBold(True)
+        painter.setFont(caption_font)
+        painter.setPen(QtGui.QColor("#bfdce6"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 8.0, rect.top() + 1.0, 188.0, 10.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"ΔP-контур • {str(payload.get('pressure_history_status') or '—')}",
+        )
+        painter.drawText(
+            QtCore.QRectF(rect.right() - 160.0, rect.top() + 1.0, 152.0, 10.0),
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            f"|ΔP|max {float(payload.get('pressure_history_peak_abs') or 0.0):0.2f}",
+        )
+
+        trace_rect = QtCore.QRectF(rect.left() + 8.0, rect.top() + 11.0, rect.width() - 16.0, rect.height() - 14.0)
+        zero_y = trace_rect.top() + trace_rect.height() * float(payload.get("pressure_history_zero_y") or 0.5)
+        painter.setPen(QtGui.QPen(QtGui.QColor(112, 134, 146, 110), 1.0, QtCore.Qt.DashLine))
+        painter.drawLine(QtCore.QPointF(trace_rect.left(), zero_y), QtCore.QPointF(trace_rect.right(), zero_y))
+
+        line_path = QtGui.QPainterPath()
+        for point_idx, point in enumerate(points):
+            x_norm = float(point[0]) if len(point) >= 1 else 0.0
+            y_norm = float(point[1]) if len(point) >= 2 else 0.5
+            trace_point = QtCore.QPointF(
+                trace_rect.left() + trace_rect.width() * x_norm,
+                trace_rect.top() + max(0.0, min(1.0, y_norm)) * trace_rect.height(),
+            )
+            if point_idx == 0:
+                line_path.moveTo(trace_point)
+            else:
+                line_path.lineTo(trace_point)
+
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        painter.setPen(QtGui.QPen(trace_color.lighter(115), 3.6, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
+        painter.drawPath(line_path)
+        painter.setPen(QtGui.QPen(trace_color, 1.8, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
+        painter.drawPath(line_path)
+        self._draw_strip_marker(
+            painter,
+            rect=trace_rect,
+            x_norm=payload.get("latency_dp_x"),
+            label="ΔP",
+            color=trace_color,
+            emphasized="ΔP" in list(payload.get("phase_ribbon_focus_stage_labels") or []),
+        )
+        last_point = line_path.currentPosition()
+        painter.setPen(QtGui.QPen(QtGui.QColor("#071117"), 1.0))
+        painter.setBrush(trace_color)
+        painter.drawEllipse(last_point, 2.8, 2.8)
+        painter.restore()
+
+    def _draw_edge_phase_ribbon(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+    ) -> None:
+        stages = list(payload.get("phase_ribbon_stages") or [])
+        if not stages:
+            return
+
+        painter.save()
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(10, 22, 31, 228))
+        painter.drawRoundedRect(rect, 10.0, 10.0)
+
+        centers: list[QtCore.QPointF] = []
+        step = rect.width() / max(1, len(stages))
+        for idx, _stage in enumerate(stages):
+            centers.append(QtCore.QPointF(rect.left() + step * (idx + 0.5), rect.center().y()))
+
+        painter.setPen(QtGui.QPen(QtGui.QColor(88, 110, 122, 168), 2.0))
+        intervals = list(payload.get("phase_ribbon_intervals") or [])
+        for pair_idx, (p1, p2) in enumerate(zip(centers[:-1], centers[1:])):
+            if pair_idx >= len(intervals):
+                painter.setPen(QtGui.QPen(QtGui.QColor(88, 110, 122, 168), 2.0))
+                painter.drawLine(QtCore.QPointF(p1.x() + 34.0, p1.y()), QtCore.QPointF(p2.x() - 34.0, p2.y()))
+                continue
+            interval = intervals[pair_idx]
+            connector_color = QtGui.QColor(88, 110, 122, 168)
+            connector_width = 2.0
+            if bool(interval.get("is_bottleneck")):
+                interval_kind = str(interval.get("kind") or "")
+                if interval_kind == "control":
+                    connector_color = QtGui.QColor("#f6d98b")
+                elif interval_kind == "response":
+                    connector_color = QtGui.QColor("#63d3f5")
+                else:
+                    connector_color = QtGui.QColor("#ff9c66")
+                connector_width = 3.0
+            painter.setPen(QtGui.QPen(connector_color, connector_width))
+            painter.drawLine(QtCore.QPointF(p1.x() + 34.0, p1.y()), QtCore.QPointF(p2.x() - 34.0, p2.y()))
+            interval_tone = str(interval.get("tone") or "neutral")
+            interval_fill = QtGui.QColor(70, 84, 95, 220)
+            interval_text = QtGui.QColor("#eef7fa")
+            if interval_tone == "ok":
+                interval_fill = QtGui.QColor(127, 228, 167, 220)
+                interval_text = QtGui.QColor("#071117")
+            elif interval_tone == "info":
+                interval_fill = QtGui.QColor(138, 226, 248, 210)
+                interval_text = QtGui.QColor("#071117")
+            elif interval_tone == "warn":
+                interval_fill = QtGui.QColor(255, 156, 102, 236)
+                interval_text = QtGui.QColor("#071117")
+            mid_x = (p1.x() + p2.x()) * 0.5
+            mid_y = p1.y() - 0.5
+            interval_rect = QtCore.QRectF(mid_x - 24.0, mid_y - 7.0, 48.0, 14.0)
+            border_color = QtGui.QColor("#071117")
+            border_width = 1.0
+            if bool(interval.get("is_bottleneck")):
+                border_color = QtGui.QColor("#f6d98b")
+                border_width = 2.0
+            painter.setPen(QtGui.QPen(border_color, border_width))
+            painter.setBrush(interval_fill)
+            painter.drawRoundedRect(interval_rect, 6.0, 6.0)
+            painter.setPen(interval_text)
+            painter.drawText(interval_rect, QtCore.Qt.AlignCenter, str(interval.get("chip_text") or "—"))
+
+        chip_w = min(90.0, max(74.0, step - 20.0))
+        chip_h = rect.height() - 8.0
+        font = QtGui.QFont(self.font())
+        font.setPointSizeF(6.1)
+        font.setBold(True)
+        painter.setFont(font)
+
+        for center, stage in zip(centers, stages):
+            tone = str(stage.get("tone") or "neutral")
+            fill = QtGui.QColor(70, 84, 95, 220)
+            text = QtGui.QColor("#eef7fa")
+            if tone == "ok":
+                fill = QtGui.QColor(127, 228, 167, 220)
+                text = QtGui.QColor("#071117")
+            elif tone == "info":
+                fill = QtGui.QColor(138, 226, 248, 210)
+                text = QtGui.QColor("#071117")
+            elif tone == "warn":
+                fill = QtGui.QColor(255, 156, 102, 236)
+                text = QtGui.QColor("#071117")
+            chip_rect = QtCore.QRectF(center.x() - chip_w * 0.5, center.y() - chip_h * 0.5, chip_w, chip_h)
+            stage_border = QtGui.QColor("#071117")
+            stage_border_width = 1.0
+            if str(stage.get("label") or "") in list(payload.get("phase_ribbon_focus_stage_labels") or []):
+                stage_border = QtGui.QColor("#f6d98b")
+                stage_border_width = 2.0
+            painter.setPen(QtGui.QPen(stage_border, stage_border_width))
+            painter.setBrush(fill)
+            painter.drawRoundedRect(chip_rect, 9.0, 9.0)
+            painter.setPen(text)
+            painter.drawText(chip_rect, QtCore.Qt.AlignCenter, str(stage.get("chip_text") or stage.get("label") or "—"))
+        painter.restore()
+
+    def _draw_strip_marker(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        x_norm: Any,
+        label: str,
+        color: QtGui.QColor,
+        emphasized: bool = False,
+    ) -> None:
+        marker_x = _finite_or_none(x_norm)
+        if marker_x is None:
+            return
+        x = rect.left() + rect.width() * max(0.0, min(1.0, float(marker_x)))
+        painter.save()
+        line_width = 2.2 if emphasized else 1.2
+        painter.setPen(QtGui.QPen(color, line_width, QtCore.Qt.DashLine))
+        painter.drawLine(QtCore.QPointF(x, rect.top()), QtCore.QPointF(x, rect.bottom()))
+        chip_rect = QtCore.QRectF(x - 16.0, rect.top() - 2.0, 32.0, 12.0) if emphasized else QtCore.QRectF(x - 15.0, rect.top() - 1.0, 30.0, 10.0)
+        chip_border = QtGui.QColor("#f6d98b") if emphasized else QtGui.QColor("#071117")
+        chip_border_width = 1.8 if emphasized else 1.0
+        painter.setPen(QtGui.QPen(chip_border, chip_border_width))
+        painter.setBrush(color)
+        painter.drawRoundedRect(chip_rect, 4.0, 4.0)
+        font = QtGui.QFont(self.font())
+        font.setPointSizeF(5.8 if emphasized else 5.6)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor(_text_color_for_rgb((color.red(), color.green(), color.blue()))))
+        painter.drawText(chip_rect, QtCore.Qt.AlignCenter, label)
+        painter.restore()
+
+    def _draw_edge_operator_checklist(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+    ) -> None:
+        rows = list(payload.get("operator_checklist_rows") or [])[:3]
+        if not rows:
+            return
+
+        painter.save()
+        gap = 4.0
+        row_h = max(16.0, min(18.0, (rect.height() - gap * (len(rows) - 1)) / max(1, len(rows))))
+        index_w = 30.0
+        text_font = QtGui.QFont(self.font())
+        text_font.setPointSizeF(6.35)
+        number_font = QtGui.QFont(self.font())
+        number_font.setPointSizeF(6.1)
+        number_font.setBold(True)
+        y = rect.top()
+
+        for row in rows:
+            tone = str(row.get("tone") or "neutral")
+            is_focus = bool(row.get("is_focus"))
+            fill = QtGui.QColor(24, 36, 45, 216)
+            border = QtGui.QColor("#4f6470")
+            number_fill = QtGui.QColor(69, 84, 95, 228)
+            text_color = QtGui.QColor("#eef7fa")
+            number_color = QtGui.QColor("#eef7fa")
+            if tone == "warn":
+                fill = QtGui.QColor(72, 47, 34, 226)
+                border = QtGui.QColor("#ffb587")
+                number_fill = QtGui.QColor(255, 156, 102, 236)
+                text_color = QtGui.QColor("#fff4ed")
+                number_color = QtGui.QColor("#071117")
+            elif tone == "info":
+                fill = QtGui.QColor(22, 44, 54, 220)
+                border = QtGui.QColor("#7fcde0")
+                number_fill = QtGui.QColor(138, 226, 248, 210)
+                text_color = QtGui.QColor("#eef7fa")
+                number_color = QtGui.QColor("#071117")
+            if is_focus and tone == "neutral":
+                border = QtGui.QColor("#f6d98b")
+
+            row_rect = QtCore.QRectF(rect.left(), y, rect.width(), row_h)
+            number_rect = QtCore.QRectF(row_rect.left(), row_rect.top(), index_w, row_rect.height())
+            text_rect = QtCore.QRectF(row_rect.left() + index_w + 6.0, row_rect.top(), row_rect.width() - index_w - 6.0, row_rect.height())
+            painter.setPen(QtGui.QPen(border, 1.4 if is_focus else 1.0))
+            painter.setBrush(fill)
+            painter.drawRoundedRect(text_rect, 8.0, 8.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(number_fill)
+            painter.drawRoundedRect(number_rect, 8.0, 8.0)
+
+            painter.setFont(number_font)
+            painter.setPen(number_color)
+            painter.drawText(number_rect, QtCore.Qt.AlignCenter, str(row.get("index_label") or "—"))
+
+            painter.setFont(text_font)
+            painter.setPen(text_color)
+            metrics = QtGui.QFontMetrics(text_font)
+            elided = metrics.elidedText(str(row.get("title") or "—"), QtCore.Qt.ElideRight, max(20, int(text_rect.width() - 12.0)))
+            painter.drawText(
+                text_rect.adjusted(10.0, 0.0, -8.0, 0.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                elided,
+            )
+            y += row_h + gap
+        painter.restore()
+
     def _draw_focus_overlay(self, painter: QtGui.QPainter) -> None:
         if not self._focus_region:
             return
@@ -4650,7 +7605,10 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
     def _draw_alert_markers(self, painter: QtGui.QPainter) -> None:
         if not self._alerts:
             return
-        for item in list(self._alerts.get("edges") or []):
+        edge_items = list(self._alerts.get("edges") or [])
+        if self._detail_mode == "quiet":
+            edge_items = [item for item in edge_items if str(item.get("name") or "") == self._selected_edge][:1] or edge_items[:1]
+        for item in edge_items:
             edge_name = str(item.get("name") or "")
             midpoint = self._edge_midpoints.get(edge_name)
             if midpoint is None:
@@ -4677,12 +7635,26 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
 
     def _draw_diagnostics_overlay(self, painter: QtGui.QPainter) -> None:
         diagnostics = self._diagnostics if isinstance(self._diagnostics, dict) else {}
-        for payload in list(diagnostics.get("cylinders") or []):
+        cylinder_payloads = list(diagnostics.get("cylinders") or [])
+        component_payloads = list(diagnostics.get("components") or [])
+        if self._detail_mode == "quiet":
+            focus_corner = str(diagnostics.get("focus_corner") or "")
+            selected_node = str(diagnostics.get("selected_node") or "")
+            filtered = [
+                payload
+                for payload in cylinder_payloads
+                if str(payload.get("corner") or "") == focus_corner or str(payload.get("focus_node") or "") == selected_node
+            ]
+            cylinder_payloads = filtered[:2] if filtered else cylinder_payloads[:1]
+            component_payloads = []
+        elif self._detail_mode == "operator":
+            component_payloads = component_payloads[:8]
+        for payload in cylinder_payloads:
             if not isinstance(payload, dict):
                 continue
             rect = self._cylinder_card_rect(payload)
             self._draw_cylinder_card(painter, rect, payload)
-        for payload in list(diagnostics.get("components") or []):
+        for payload in component_payloads:
             if not isinstance(payload, dict):
                 continue
             rect = self._component_badge_rect(payload)
@@ -4970,6 +7942,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                     f"t idx {self._frame_idx}",
                     "focus" if self._mode == "focus" else "overview",
                     "play" if self._playing else "hold",
+                    self._detail_mode_label().lower(),
                 ]
             ),
         )
@@ -4981,9 +7954,10 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
 
         if not self._diagnostics:
             return
+        fidelity = dict(self._diagnostics.get("scheme_fidelity") or {})
         warnings = len(list(self._diagnostics.get("geometry_warnings") or []))
         issues = len(list(self._diagnostics.get("geometry_issues") or []))
-        right_hud = QtCore.QRectF(content_rect.right() - 324.0, content_rect.top() + 16.0, 308.0, 88.0)
+        right_hud = QtCore.QRectF(content_rect.right() - 360.0, content_rect.top() + 16.0, 344.0, 108.0)
         painter.setPen(QtCore.Qt.NoPen)
         painter.setBrush(QtGui.QColor(7, 17, 23, 204))
         painter.drawRoundedRect(right_hud, 16.0, 16.0)
@@ -4997,12 +7971,20 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.setFont(body_font)
         painter.setPen(QtGui.QColor("#b8d1d9"))
         painter.drawText(
-            right_hud.adjusted(16.0, 38.0, -16.0, -26.0),
+            right_hud.adjusted(16.0, 34.0, -16.0, -52.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            "Schema "
+            + f"{int(fidelity.get('canonical_nodes_positioned') or 0)}/{int(fidelity.get('canonical_nodes_total') or 0)} nodes"
+            + " • "
+            + f"{int(fidelity.get('canonical_edges_routed') or 0)}/{int(fidelity.get('canonical_edges_total') or 0)} routes",
+        )
+        painter.drawText(
+            right_hud.adjusted(16.0, 56.0, -16.0, -30.0),
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
             f"Cylinders {len(list(self._diagnostics.get('cylinders') or []))} • Components {len(list(self._diagnostics.get('components') or []))}",
         )
         painter.drawText(
-            right_hud.adjusted(16.0, 58.0, -16.0, -10.0),
+            right_hud.adjusted(16.0, 78.0, -16.0, -8.0),
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
             f"Geometry warnings {warnings} • issues {issues}",
         )
@@ -5067,7 +8049,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         order = int(payload.get("order") or 0)
         shift_x = -48.0 if order % 2 else 48.0
         shift_y = -46.0 - float(order % 3) * 36.0
-        return QtCore.QRectF(midpoint.x() + shift_x - 76.0, midpoint.y() + shift_y - 24.0, 152.0, 48.0)
+        return QtCore.QRectF(midpoint.x() + shift_x - 86.0, midpoint.y() + shift_y - 26.0, 172.0, 52.0)
 
     def _draw_cylinder_card(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:
         cap = dict(payload.get("cap") or {})
@@ -5157,13 +8139,15 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.setPen(QtGui.QPen(QtGui.QColor("#fff4c7" if is_selected else "#0c1620"), 2.0))
         painter.setBrush(QtGui.QColor(flow_hex))
         painter.drawRoundedRect(rect, 14.0, 14.0)
+        icon_rect = QtCore.QRectF(rect.left() + 8.0, rect.top() + 8.0, 32.0, rect.height() - 16.0)
+        self._draw_component_icon(painter, icon_rect, payload, text_hex=text_hex)
         painter.setPen(QtGui.QColor(text_hex))
         title_font = QtGui.QFont(self.font())
         title_font.setPointSizeF(8.8)
         title_font.setBold(True)
         painter.setFont(title_font)
         painter.drawText(
-            rect.adjusted(10.0, 4.0, -10.0, -20.0),
+            rect.adjusted(46.0, 4.0, -10.0, -22.0),
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
             f"{payload.get('component_short') or 'LINE'} • {payload.get('state_short') or 'SIG?'}",
         )
@@ -5171,16 +8155,207 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         body_font.setPointSizeF(7.4)
         painter.setFont(body_font)
         painter.drawText(
-            rect.adjusted(10.0, 18.0, -10.0, -4.0),
+            rect.adjusted(46.0, 18.0, -10.0, -4.0),
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
             self._fmt_value(payload.get("q_now"), self._dataset.q_unit if self._dataset is not None else "", digits=2),
         )
         painter.drawText(
-            rect.adjusted(10.0, 18.0, -10.0, -4.0),
+            rect.adjusted(46.0, 18.0, -10.0, -4.0),
             QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
             str(payload.get("zone_label") or ""),
         )
         self._overlay_targets.append(("edge", str(payload.get("edge_name") or ""), rect))
+
+    def _inline_route_symbol_payloads(self, *, max_abs_flow: float) -> dict[str, dict[str, Any]]:
+        if self._dataset is None:
+            return {}
+        payloads: dict[str, dict[str, Any]] = {}
+        alert_edges = {
+            str(item.get("name") or ""): dict(item)
+            for item in list(self._alerts.get("edges") or [])
+            if str(item.get("name") or "").strip()
+        }
+        candidates: list[dict[str, Any]] = []
+        if self._detail_mode == "quiet":
+            active_floor = max(28.0, float(max_abs_flow) * 0.35) if max_abs_flow > 1.0e-9 else 0.0
+            max_symbols = 3
+        elif self._detail_mode == "full":
+            active_floor = max(8.0, float(max_abs_flow) * 0.12) if max_abs_flow > 1.0e-9 else 0.0
+            max_symbols = 10
+        else:
+            active_floor = max(18.0, float(max_abs_flow) * 0.22) if max_abs_flow > 1.0e-9 else 0.0
+            max_symbols = 6
+        for edge_name in self._dataset.edge_names:
+            edge_def = dict(self._dataset.edge_defs.get(edge_name) or {})
+            component_kind = _edge_component_kind(edge_name, edge_def)
+            canonical_kind = str(edge_def.get("kind") or "")
+            icon_key = _component_icon_key(component_kind, canonical_kind)
+            if icon_key == "line":
+                continue
+            flow_value = self._current_edge_flow(edge_name)
+            flow_abs = abs(float(flow_value))
+            is_selected = edge_name == self._selected_edge
+            alert_meta = alert_edges.get(edge_name, {})
+            is_alert = bool(alert_meta)
+            if not (is_selected or is_alert or flow_abs >= active_floor):
+                continue
+            candidates.append(
+                {
+                    "edge_name": edge_name,
+                    "component_kind": component_kind,
+                    "component_short": _component_kind_short_label(component_kind),
+                    "canonical_kind": canonical_kind,
+                    "canonical_kind_label": _canonical_kind_label(canonical_kind),
+                    "icon_key": icon_key,
+                    "camozzi_code": str(edge_def.get("camozzi_code") or ""),
+                    "zone_label": _edge_zone_label(edge_name, edge_def),
+                    "flow_value": flow_value,
+                    "flow_abs": flow_abs,
+                    "is_selected": is_selected,
+                    "is_alert": is_alert,
+                    "severity": str(alert_meta.get("severity") or ("focus" if is_selected else "info")),
+                    "symbol_t": 0.42 if is_selected else 0.5,
+                }
+            )
+        candidates.sort(
+            key=lambda item: (
+                0 if item.get("is_selected") else 1,
+                0 if item.get("is_alert") else 1,
+                -float(item.get("flow_abs") or 0.0),
+                str(item.get("edge_name") or ""),
+            )
+        )
+        for item in candidates[:max_symbols]:
+            payloads[str(item.get("edge_name") or "")] = item
+        return payloads
+
+    def _draw_inline_route_symbol(self, painter: QtGui.QPainter, *, edge_name: str, payload: dict[str, Any]) -> None:
+        path = self._edge_paths.get(edge_name)
+        if path is None or path.isEmpty():
+            return
+        t = max(0.1, min(0.9, float(payload.get("symbol_t") or 0.5)))
+        center = path.pointAtPercent(t)
+        angle = self._path_angle_deg(path, t)
+        is_selected = bool(payload.get("is_selected"))
+        width = 62.0 if is_selected else 54.0
+        height = 28.0 if is_selected else 24.0
+        border_hex = "#fff4c7" if is_selected else self._severity_color_hex(str(payload.get("severity") or "info"))
+        fill = QtGui.QColor(7, 17, 23, 228 if is_selected else 212)
+        painter.save()
+        painter.translate(center)
+        painter.rotate(angle)
+        plate = QtCore.QRectF(-width * 0.5, -height * 0.5, width, height)
+        painter.setPen(QtGui.QPen(QtGui.QColor(border_hex), 2.2 if is_selected else 1.8))
+        painter.setBrush(fill)
+        painter.drawRoundedRect(plate, 11.0, 11.0)
+        icon_rect = QtCore.QRectF(plate.left() + 4.0, plate.top() + 4.0, 18.0, plate.height() - 8.0)
+        self._draw_component_icon(
+            painter,
+            icon_rect,
+            payload,
+            text_hex="#eef7fa",
+            draw_backplate=False,
+            stroke_width=1.45,
+        )
+        text_rect = QtCore.QRectF(icon_rect.right() + 4.0, plate.top() + 1.0, plate.width() - 28.0, plate.height() - 2.0)
+        font = QtGui.QFont(self.font())
+        font.setPointSizeF(7.2 if is_selected else 6.8)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor("#eef7fa"))
+        painter.drawText(
+            text_rect,
+            QtCore.Qt.AlignCenter,
+            str(payload.get("component_short") or "LINE"),
+        )
+        painter.restore()
+
+    @staticmethod
+    def _path_angle_deg(path: QtGui.QPainterPath, percent: float) -> float:
+        p1 = path.pointAtPercent(max(0.0, float(percent) - 0.03))
+        p2 = path.pointAtPercent(min(1.0, float(percent) + 0.03))
+        dx = float(p2.x() - p1.x())
+        dy = float(p2.y() - p1.y())
+        if abs(dx) <= 1.0e-9 and abs(dy) <= 1.0e-9:
+            return 0.0
+        return math.degrees(math.atan2(dy, dx))
+
+    def _draw_component_icon(
+        self,
+        painter: QtGui.QPainter,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+        *,
+        text_hex: str,
+        draw_backplate: bool = True,
+        stroke_width: float = 1.8,
+    ) -> None:
+        painter.save()
+        if draw_backplate:
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(QtGui.QColor(7, 17, 23, 132))
+            painter.drawRoundedRect(rect, 10.0, 10.0)
+        pen = QtGui.QPen(QtGui.QColor(text_hex), float(stroke_width), QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin)
+        painter.setPen(pen)
+        painter.setBrush(QtGui.QBrush(QtGui.QColor(text_hex)))
+        key = str(payload.get("icon_key") or "line")
+        cx = rect.center().x()
+        cy = rect.center().y()
+        left = rect.left() + 6.0
+        right = rect.right() - 6.0
+        top = rect.top() + 6.0
+        bottom = rect.bottom() - 6.0
+        if key == "check":
+            painter.drawLine(left, cy, right - 10.0, cy)
+            painter.drawLine(right - 6.0, top + 1.0, right - 6.0, bottom - 1.0)
+            triangle = QtGui.QPolygonF(
+                [
+                    QtCore.QPointF(cx - 6.0, top + 2.0),
+                    QtCore.QPointF(cx - 6.0, bottom - 2.0),
+                    QtCore.QPointF(right - 8.0, cy),
+                ]
+            )
+            painter.drawPolygon(triangle)
+        elif key == "orifice":
+            painter.drawLine(left, cy, cx - 7.0, cy)
+            painter.drawLine(cx + 7.0, cy, right, cy)
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawLine(cx - 7.0, top + 3.0, cx + 1.0, bottom - 3.0)
+            painter.drawLine(cx + 7.0, top + 3.0, cx - 1.0, bottom - 3.0)
+        elif key == "relief":
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawRect(QtCore.QRectF(left + 2.0, top + 3.0, rect.width() - 14.0, rect.height() - 10.0))
+            painter.drawLine(cx, top + 2.0, cx, top - 2.0)
+            painter.drawLine(cx - 5.0, top - 1.0, cx + 5.0, top - 1.0)
+            painter.drawLine(left + 2.0, bottom - 2.0, right - 2.0, bottom - 2.0)
+        elif key == "reg_after":
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawRect(QtCore.QRectF(left + 2.0, top + 3.0, rect.width() - 14.0, rect.height() - 10.0))
+            painter.drawLine(cx, top + 5.0, cx, bottom - 5.0)
+            painter.drawLine(cx - 5.0, cy, cx, cy - 5.0)
+            painter.drawLine(cx - 5.0, cy, cx, cy + 5.0)
+            painter.drawLine(cx, cy, cx + 6.0, cy)
+        elif key == "diagonal":
+            painter.drawLine(left, top, right, bottom)
+            painter.drawLine(left, bottom, right, top)
+        elif key == "vent":
+            painter.drawLine(cx, top + 2.0, cx, cy + 2.0)
+            painter.drawLine(cx - 8.0, cy + 2.0, cx + 8.0, cy + 2.0)
+            painter.drawLine(cx - 6.0, cy + 6.0, cx + 6.0, cy + 6.0)
+            painter.drawLine(cx - 4.0, cy + 10.0, cx + 4.0, cy + 10.0)
+        elif key == "supply":
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawEllipse(QtCore.QRectF(cx - 8.0, cy - 8.0, 16.0, 16.0))
+            painter.drawLine(cx + 8.0, cy, right, cy)
+        elif key == "actuator":
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawRect(QtCore.QRectF(left + 2.0, cy - 7.0, 14.0, 14.0))
+            painter.drawLine(left + 16.0, cy, right, cy)
+            painter.drawLine(right - 5.0, cy - 4.0, right, cy)
+            painter.drawLine(right - 5.0, cy + 4.0, right, cy)
+        else:
+            painter.drawLine(left, cy, right, cy)
+        painter.restore()
 
     def _current_edge_flow(self, edge_name: str) -> float:
         series = self._edge_series_map.get(edge_name)
@@ -5333,13 +8508,16 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._startup_view_mode_override = self._parse_startup_view_mode_override(startup_view_mode)
         self._view_mode_override_active = bool(self._startup_view_mode_override)
         self.view_mode = self._startup_view_mode_override or self._persisted_view_mode
+        self.detail_mode = self._normalize_detail_mode(self.ui_state.get_str("detail_mode", "operator"))
         self.setStyleSheet(APP_STYLESHEET_DARK if self.theme == "dark" else APP_STYLESHEET_LIGHT)
 
-        self.native_view = MnemoNativeView(self)
-        self.native_view.edge_picked.connect(self._select_edge)
-        self.native_view.node_picked.connect(self._select_node)
-        self.native_view.status.connect(self._set_status)
-        self.native_view.focus_step_jump_requested.connect(self._jump_to_focus_step)
+        self.mnemo_view = MnemoNativeView(self)
+        self.native_view = self.mnemo_view
+        self.mnemo_view.set_detail_mode(self.detail_mode)
+        self.mnemo_view.edge_picked.connect(self._select_edge)
+        self.mnemo_view.node_picked.connect(self._select_node)
+        self.mnemo_view.status.connect(self._set_status)
+        self.mnemo_view.focus_step_jump_requested.connect(self._jump_to_focus_step)
         self.startup_banner = StartupBannerPanel(self)
         self.startup_banner.hide_requested.connect(lambda: self._set_startup_banner_visible(False))
         self.startup_banner.focus_requested.connect(self._apply_onboarding_focus)
@@ -5359,7 +8537,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._central_layout.setContentsMargins(8, 8, 8, 0)
         self._central_layout.setSpacing(8)
         self._central_layout.addWidget(self.startup_banner, 0)
-        self._central_layout.addWidget(self.native_view, 1)
+        self._central_layout.addWidget(self.mnemo_view, 1)
         self.setCentralWidget(self._central_host)
 
         self.overview_panel = OverviewPanel(self)
@@ -5373,30 +8551,39 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.selection_panel.node_selected.connect(self._select_node)
         self.trends_panel = TrendsPanel(self)
         self.guide_panel = GuidancePanel(self)
+        self.fidelity_panel = SchemeFidelityPanel(self)
         self.event_panel = EventMemoryPanel(self)
         self.legend_panel = QtWidgets.QTextBrowser(self)
         self.legend_panel.setHtml(
             "<h3>Легенда и UX-правила</h3>"
             "<p><b>Бирюзовый</b> — поток по направлению ветки.<br/>"
             "<b>Оранжевый</b> — реверс потока.<br/>"
-            "<b>Серый</b> — закрытый элемент.</p>"
+            "<b>Серый</b> — закрытый элемент.<br/>"
+            "<b>Inline symbol</b> — canonical-тип арматуры прямо на линии маршрута.</p>"
+            "<p><b>Плотность overlays:</b><br/>"
+            "<b>Тихо</b> — только основной контекст и минимум карточек.<br/>"
+            "<b>Оператор</b> — сбалансированный рабочий режим.<br/>"
+            "<b>Полно</b> — максимум labels и inline-символов для разборов схемы.</p>"
             "<p><b>Что где читать:</b><br/>"
             "<b>Центр</b> — топология и причинно-следственная картина.<br/>"
             "<b>Обзор</b> — что сейчас доминирует.<br/>"
             "<b>Приводы</b> — полости, штоки, объёмы, heatmap углов и активная арматура.<br/>"
             "<b>Диагностические сценарии</b> — как интерпретировать текущий кадр.<br/>"
+            "<b>Соответствие схеме</b> — покрытие canonical-узлов и ветвей без fallback.<br/>"
             "<b>События</b> — latched-память и недавние переключения.<br/>"
             "<b>Тренды</b> — численная проверка гипотезы.</p>"
             "<p>Такое разделение снижает когнитивное переключение: в центре остаётся только схема, "
             "а чтение режима и чисел уходит в отдельные docks, как в современных инженерных HMI.</p>"
         )
         self.guide_panel.render(None, 0, selected_edge=None, selected_node=None, playing=self.playing, follow_enabled=self.follow_enabled)
+        self.fidelity_panel.render(None)
         self._render_event_panel()
 
         self._overview_dock = self._add_dock("Обзор", self.overview_panel, QtCore.Qt.LeftDockWidgetArea, obj_name="dock_overview")
         self._snapshot_dock = self._add_dock("Приводы", self.snapshot_panel, QtCore.Qt.LeftDockWidgetArea, obj_name="dock_snapshot")
         self._selection_dock = self._add_dock("Выбор", self.selection_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_selection")
         self._guide_dock = self._add_dock("Диагностика", self.guide_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_guide")
+        self._fidelity_dock = self._add_dock("Соответствие", self.fidelity_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_fidelity")
         self._events_dock = self._add_dock("События", self.event_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_events")
         self._trends_dock = self._add_dock("Тренды", self.trends_panel, QtCore.Qt.BottomDockWidgetArea, obj_name="dock_trends")
         self._legend_dock = self._add_dock("Легенда", self.legend_panel, QtCore.Qt.RightDockWidgetArea, obj_name="dock_legend")
@@ -5502,6 +8689,16 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.speed_combo.currentIndexChanged.connect(self._speed_changed)
         tb.addWidget(self.speed_combo)
 
+        self.detail_combo = QtWidgets.QComboBox()
+        self.detail_combo.setObjectName("mnemo_detail_combo")
+        self.detail_combo.addItem("Тихо", "quiet")
+        self.detail_combo.addItem("Оператор", "operator")
+        self.detail_combo.addItem("Полно", "full")
+        detail_idx = max(0, self.detail_combo.findData(self.detail_mode))
+        self.detail_combo.setCurrentIndex(detail_idx)
+        self.detail_combo.currentIndexChanged.connect(self._detail_mode_changed)
+        tb.addWidget(self.detail_combo)
+
         self.scrubber = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.scrubber.setMinimum(0)
         self.scrubber.setMaximum(0)
@@ -5535,6 +8732,10 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         view_menu.addAction(self.startup_banner_action)
         view_menu.addAction(self.return_focus_action)
         view_menu.addAction(self.full_scheme_action)
+        detail_menu = view_menu.addMenu("Плотность overlays")
+        for mode in ("quiet", "operator", "full"):
+            action = detail_menu.addAction(DETAIL_MODE_LABELS[mode])
+            action.triggered.connect(lambda _checked=False, mode=mode: self._set_detail_mode(mode, announce=True))
 
         playback_menu = self.menuBar().addMenu("Анимация")
         playback_menu.addAction(self.play_action)
@@ -5557,6 +8758,11 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
     @staticmethod
     def _normalize_view_mode(mode: str) -> str:
         return "overview" if str(mode or "").strip().lower() == "overview" else "focus"
+
+    @staticmethod
+    def _normalize_detail_mode(mode: str) -> str:
+        raw_mode = str(mode or "").strip().lower()
+        return raw_mode if raw_mode in DETAIL_MODE_LABELS else "operator"
 
     @staticmethod
     def _parse_startup_view_mode_override(mode: str) -> str:
@@ -5631,6 +8837,21 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             except Exception:
                 pass
         return self.view_mode
+
+    def _set_detail_mode(self, mode: str, *, announce: bool) -> str:
+        self.detail_mode = self._normalize_detail_mode(mode)
+        self.mnemo_view.set_detail_mode(self.detail_mode)
+        if hasattr(self, "detail_combo"):
+            with QtCore.QSignalBlocker(self.detail_combo):
+                idx = max(0, self.detail_combo.findData(self.detail_mode))
+                self.detail_combo.setCurrentIndex(idx)
+        try:
+            self.ui_state.set_value("detail_mode", self.detail_mode)
+        except Exception:
+            pass
+        if announce:
+            self._set_status(f"Плотность overlays: {DETAIL_MODE_LABELS[self.detail_mode]}")
+        return self.detail_mode
 
     def _set_startup_banner_visible(self, visible: bool) -> None:
         is_visible = bool(visible)
@@ -5707,6 +8928,10 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             startup_time_label=self._startup_time_label,
         )
 
+    def _detail_mode_changed(self, index: int) -> None:
+        mode = str(self.detail_combo.itemData(index) or "operator")
+        self._set_detail_mode(mode, announce=True)
+
     def _current_focus_region_payload(self, *, source: str, auto_focus: bool) -> dict[str, Any] | None:
         if self.dataset is None or self.dataset.time_s.size == 0:
             return None
@@ -5725,7 +8950,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             return
         focus_region = self._current_focus_region_payload(source=source, auto_focus=auto_focus)
         if self.view_mode == "overview":
-            self.native_view.show_overview(
+            self.mnemo_view.show_overview(
                 {
                     "title": "Полная схема",
                     "summary": "Сравните рекомендуемый сценарий с полной топологией, не теряя быстрый путь назад к фокусу.",
@@ -5733,13 +8958,13 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
                 }
             )
             return
-        self.native_view.set_focus_region(focus_region)
+        self.mnemo_view.set_focus_region(focus_region)
 
     def _sync_selection_views(self, *, clear_focus_region: bool = False) -> None:
         if self.dataset is None:
             return
         if clear_focus_region:
-            self.native_view.set_focus_region(None)
+            self.mnemo_view.set_focus_region(None)
         self.selection_panel.set_selection(edge_name=self.selected_edge, node_name=self.selected_node)
         self.selection_panel.render_details(
             self.dataset,
@@ -5756,7 +8981,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             playing=self.playing,
             follow_enabled=self.follow_enabled,
         )
-        self.native_view.set_selection(edge=self.selected_edge, node=self.selected_node)
+        self.mnemo_view.set_selection(edge=self.selected_edge, node=self.selected_node)
         self._push_diagnostics()
         self._push_alerts()
         if self.startup_banner.isVisible():
@@ -5807,6 +9032,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         try:
             self.ui_state.set_value("window/state", self.saveState())
             self.ui_state.set_value("play_speed", float(self._play_speed))
+            self.ui_state.set_value("detail_mode", str(self.detail_mode))
             if not self._view_mode_override_active:
                 self.ui_state.set_value("view_mode", str(self.view_mode))
             self.ui_state.sync()
@@ -5995,7 +9221,8 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.event_tracker.bind_dataset(self.dataset, idx=self.current_idx)
             self.selection_panel.set_selection(edge_name=self.selected_edge, node_name=self.selected_node)
             self.trends_panel.set_series(self.dataset, edge_name=self.selected_edge, node_name=self.selected_node)
-            self.native_view.render_dataset(self.dataset, selected_edge=self.selected_edge, selected_node=self.selected_node)
+            self.fidelity_panel.render(self.dataset)
+            self.mnemo_view.render_dataset(self.dataset, selected_edge=self.selected_edge, selected_node=self.selected_node)
             self._apply_current_view_mode(source="dataset_load", auto_focus=not preserve_selection)
             self._refresh_frame(push_to_view=True)
             self._persist_event_log(silent=True)
@@ -6044,7 +9271,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
     def _push_playhead(self) -> None:
         if self.dataset is None:
             return
-        self.native_view.set_playhead(self.current_idx, self.playing, self.dataset.dataset_id)
+        self.mnemo_view.set_playhead(self.current_idx, self.playing, self.dataset.dataset_id)
 
     def _push_alerts(self) -> None:
         alerts = _build_frame_alert_payload(
@@ -6053,7 +9280,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             selected_edge=self.selected_edge,
             selected_node=self.selected_node,
         )
-        self.native_view.set_alerts(alerts)
+        self.mnemo_view.set_alerts(alerts)
 
     def _push_diagnostics(self) -> None:
         diagnostics = _build_mnemo_diagnostics_payload(
@@ -6062,7 +9289,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             selected_edge=self.selected_edge,
             selected_node=self.selected_node,
         )
-        self.native_view.set_diagnostics(diagnostics)
+        self.mnemo_view.set_diagnostics(diagnostics)
 
     def _persist_event_log(self, *, silent: bool) -> Path | None:
         path = _write_event_log_sidecar(

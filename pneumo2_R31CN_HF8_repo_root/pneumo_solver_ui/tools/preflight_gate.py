@@ -22,18 +22,35 @@
 
 from __future__ import annotations
 
-import importlib.util
 import sys
 from pathlib import Path
 from typing import Callable, Tuple
 
+# Allow direct execution (`python pneumo_solver_ui/tools/preflight_gate.py`)
+# in addition to package execution (`python -m pneumo_solver_ui.tools.preflight_gate`).
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    from pathlib import Path as _Path
 
-def _load_module(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, str(path))
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)  # type: ignore
-    return mod
+    _ROOT = _Path(__file__).resolve().parents[2]
+    if str(_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ROOT))
+    __package__ = "pneumo_solver_ui.tools"
+
+from ..module_loading import load_python_module_from_path
+
+
+def _canonical_module_name(path: Path, ui_root: Path) -> str:
+    path = path.resolve()
+    ui_root = ui_root.resolve()
+    if path.parent == (ui_root / "tools").resolve():
+        return f"pneumo_solver_ui.tools.{path.stem}"
+    if path.parent == ui_root:
+        return f"pneumo_solver_ui.{path.stem}"
+    return path.stem
+
+
+def _load_module(path: Path, ui_root: Path):
+    return load_python_module_from_path(path, _canonical_module_name(path, ui_root))
 
 
 def _run_step(label: str, fn: Callable[[], int]) -> Tuple[bool, int]:
@@ -65,35 +82,35 @@ def main() -> int:
     steps = []
 
     # 1) contracts
-    mod_contracts = _load_module("param_contract_check", tools / "param_contract_check.py")
+    mod_contracts = _load_module(tools / "param_contract_check.py", root)
     steps.append(("param_contract_check", mod_contracts.main))
 
     # 2) passport
-    mod_passport = _load_module("passport_check", root / "passport_check.py")
+    mod_passport = _load_module(root / "passport_check.py", root)
     steps.append(("passport_check", mod_passport.main))
 
     # 3) self_check
-    mod_self = _load_module("self_check", root / "self_check.py")
+    mod_self = _load_module(root / "self_check.py", root)
     steps.append(("self_check", mod_self.main))
 
     # 3b) contact models consistency (smooth contacts)
-    mod_contact = _load_module("contact_models_property_check", tools / "contact_models_property_check.py")
+    mod_contact = _load_module(tools / "contact_models_property_check.py", root)
     steps.append(("contact_models_property_check", mod_contact.main))
 
     # 4) invariants
-    mod_inv = _load_module("property_invariants", tools / "property_invariants.py")
+    mod_inv = _load_module(tools / "property_invariants.py", root)
     steps.append(("property_invariants", mod_inv.main))
 
     # 4b) integrator autotune smoke-check
-    mod_integ = _load_module("integrator_autotune_smoke_check", tools / "integrator_autotune_smoke_check.py")
+    mod_integ = _load_module(tools / "integrator_autotune_smoke_check.py", root)
     steps.append(("integrator_autotune_smoke_check", mod_integ.main))
 
     # 4c) mech energy audit smoke-check (баланс механической энергии + p·dV) (баланс механической энергии + p·dV)
-    mod_mech = _load_module("mech_energy_smoke_check", tools / "mech_energy_smoke_check.py")
+    mod_mech = _load_module(tools / "mech_energy_smoke_check.py", root)
     steps.append(("mech_energy_smoke_check", mod_mech.main))
 
     # 5) ISO bottlenecks report (не блокирует запуск)
-    mod_iso = _load_module("iso_network_bottleneck_report", tools / "iso_network_bottleneck_report.py")
+    mod_iso = _load_module(tools / "iso_network_bottleneck_report.py", root)
 
     print("\n=== PREFLIGHT GATE ===")
     all_ok = True

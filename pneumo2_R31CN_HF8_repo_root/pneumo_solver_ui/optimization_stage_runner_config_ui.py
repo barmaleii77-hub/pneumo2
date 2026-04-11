@@ -27,10 +27,10 @@ def render_stage_runner_configuration_controls(
     *,
     ui_jobs_default: int,
 ) -> None:
-    with st.expander("StageRunner: warm-start, influence и staged seed/promotion", expanded=True):
+    with st.expander("StageRunner: warm-start, influence и стадийный отбор", expanded=True):
         st.markdown(
             "Этот блок управляет **стадийным pipeline**: длительность запуска, seeds, warm-start, early-stop и "
-            "influence-aware seed/promotion policy. Именно эти ручки определяют поведение `opt_stage_runner_v1.py`."
+            "influence-aware политикой отбора и продвижения. Именно эти ручки определяют поведение `opt_stage_runner_v1.py`."
         )
 
         c_s0, c_s1, c_s2, c_s3 = st.columns([1, 1, 1, 1])
@@ -235,7 +235,7 @@ def render_stage_runner_configuration_controls(
                 else 0
             )
             st.selectbox(
-                "Seed/promotion policy",
+                "Политика отбора и продвижения",
                 options=stage_policy_options,
                 index=stage_policy_index,
                 key="stage_policy_mode",
@@ -245,10 +245,10 @@ def render_stage_runner_configuration_controls(
                 ),
             )
 
-        st.caption("Stage-specific seed/promotion profile: " + stage_seed_policy_summary_text())
+        st.caption("Профиль стадийного отбора и продвижения: " + stage_seed_policy_summary_text())
         if adaptive_influence_eps:
             st.caption(
-                "Stage-aware adaptive epsilon: "
+                "Адаптивный epsilon по стадиям: "
                 + stage_aware_influence_profiles_text(
                     requested_eps_rel=float(influence_eps_rel),
                     base_grid=DIAGNOSTIC_ADAPTIVE_INFLUENCE_EPS_GRID,

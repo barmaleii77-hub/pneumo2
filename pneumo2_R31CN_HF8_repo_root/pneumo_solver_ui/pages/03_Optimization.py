@@ -194,13 +194,13 @@ opt_use_staged = render_optimization_launch_mode_block(
     ),
     single_path_message="Сейчас активен только один путь запуска. Нажимать нужно одну кнопку в блоке «Запуск оптимизации» ниже.",
     staged_message=(
-        "Активен StageRunner: это рекомендованный physics-first путь. Ниже показываются только "
+        "Активен StageRunner: это рекомендованный быстрый путь по физике. Ниже показываются только "
         "staged-настройки и одна кнопка «Запустить StageRunner». Быстрый stop/fail на ранних стадиях — "
-        "штатный признак того, что physical gate сработал рано."
+        "штатный признак того, что физический фильтр сработал рано."
     ),
     coordinator_message=(
-        "Активен distributed coordinator path. Ниже показываются только настройки Dask/Ray/BoTorch и одна "
-        "кнопка «Запустить distributed coordinator». Это длинный trade-study путь после того, как search-space "
+        "Активен distributed coordinator. Ниже показываются только настройки Dask/Ray/BoTorch и одна "
+        "кнопка «Запустить distributed coordinator». Это длинный путь перебора вариантов после того, как search-space "
         "и suite уже приведены в порядок."
     ),
 )

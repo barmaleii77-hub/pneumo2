@@ -60,7 +60,7 @@ def test_stage_runner_config_ui_renders_expected_controls() -> None:
 
     render_stage_runner_configuration_controls(st, ui_jobs_default=7)
 
-    assert ("expander", ("StageRunner: warm-start, influence и staged seed/promotion", True)) in st.calls
+    assert ("expander", ("StageRunner: warm-start, influence и стадийный отбор", True)) in st.calls
     assert ("number_input", "Минуты на staged run") in st.calls
     assert ("number_input", "Jobs (локальный parallel worker pool)") in st.calls
     assert ("checkbox", "Авто-обновлять baseline_best.json") in st.calls
@@ -72,5 +72,5 @@ def test_stage_runner_config_ui_renders_expected_controls() -> None:
     assert ("number_input", "Surrogate top-k") in st.calls
     assert ("number_input", "Early-stop штраф (stage1)") in st.calls
     assert ("checkbox", "Adaptive epsilon для System Influence") in st.calls
-    assert ("selectbox", "Seed/promotion policy") in st.calls
-    assert any(kind == "caption" and "Stage-specific seed/promotion profile" in text for kind, text in st.calls)
+    assert ("selectbox", "Политика отбора и продвижения") in st.calls
+    assert any(kind == "caption" and "Профиль стадийного отбора и продвижения" in text for kind, text in st.calls)

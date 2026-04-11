@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-04-11T18:31:56",
+  "path": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\autotest_events.jsonl",
+  "recursive": false,
+  "files": 1,
+  "total_records": 9,
+  "total_parse_errors": 0,
+  "top_events": [
+    [
+      "step",
+      7
+    ],
+    [
+      "start",
+      1
+    ],
+    [
+      "env_override",
+      1
+    ]
+  ],
+  "top_error_like_events": [],
+  "spans": {},
+  "per_file": {
+    "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\autotest_events.jsonl": {
+      "records": 9,
+      "parse_errors": 0
+    }
+  }
+}

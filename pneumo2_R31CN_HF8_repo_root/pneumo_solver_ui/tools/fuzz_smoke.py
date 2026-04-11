@@ -31,6 +31,20 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    _ROOT = _Path(__file__).resolve().parents[2]
+    if str(_ROOT) not in _sys.path:
+        _sys.path.insert(0, str(_ROOT))
+    __package__ = "pneumo_solver_ui.tools"
+
+try:
+    from ..module_loading import load_python_module_from_path
+except Exception:
+    from pneumo_solver_ui.module_loading import load_python_module_from_path
+
 
 def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
@@ -42,17 +56,32 @@ def _load_json(path: Path) -> Any:
 
 def _load_module(path: Path, module_name: str):
     """Load a .py file as a module by absolute path."""
-    import importlib.util
-    import sys
+    return load_python_module_from_path(path.resolve(), module_name)
 
-    path = path.resolve()
-    spec = importlib.util.spec_from_file_location(module_name, str(path))
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Cannot import module from {path}")
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = mod
-    spec.loader.exec_module(mod)  # type: ignore[attr-defined]
-    return mod
+
+def _build_probe_enabled_suite(suite_rows: List[Dict[str, Any]] | List[Any]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for row in list(suite_rows or []):
+        if not isinstance(row, dict):
+            continue
+        probe = dict(row)
+        probe["enabled"] = True
+        probe["включен"] = True
+        out.append(probe)
+    return out
+
+
+def _probe_row_assets_exist(test: Dict[str, Any], repo_root: Path) -> bool:
+    for key in ("road_csv", "axay_csv", "scenario_json"):
+        raw = test.get(key)
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        path = Path(raw)
+        if not path.is_absolute():
+            path = (repo_root / path).resolve()
+        if not path.exists():
+            return False
+    return True
 
 
 def _isfinite_number(x: Any) -> bool:
@@ -157,9 +186,20 @@ def main() -> int:
     suite = _load_json(suite_path)
     ranges = _load_json(ranges_path)
 
+    repo_root = Path(__file__).resolve().parents[2]
     tests = worker.build_test_suite({"suite": suite})
     if not tests:
-        raise SystemExit("suite is empty")
+        probe_suite = _build_probe_enabled_suite(suite if isinstance(suite, list) else [])
+        probe_suite = [row for row in probe_suite if _probe_row_assets_exist(row, repo_root)]
+        if probe_suite:
+            print(f"[fuzz_smoke] INFO: suite produced 0 tests; using forced-enable probe copy ({len(probe_suite)} rows)")
+            tests = worker.build_test_suite({"suite": probe_suite})
+        if not tests:
+            tests = worker.build_test_suite({})
+            if tests:
+                print("[fuzz_smoke] INFO: probe suite still empty; falling back to worker builtin suite")
+        if not tests:
+            raise SystemExit("suite is empty")
 
     # choose one representative test (first enabled)
     test_name, test_cfg, dt, t_end, targets = tests[0]

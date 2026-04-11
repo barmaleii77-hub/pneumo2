@@ -1,0 +1,17 @@
+{
+  "generated_at": "2026-04-11T18:31:56",
+  "schema": "harness",
+  "strict": true,
+  "check_seq": true,
+  "check_spans": true,
+  "files_checked": 1,
+  "total_records": 7,
+  "total_errors": 0,
+  "per_file": {
+    "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\autotest_events.jsonl": {
+      "records": 7,
+      "errors": 0
+    }
+  },
+  "errors": []
+}

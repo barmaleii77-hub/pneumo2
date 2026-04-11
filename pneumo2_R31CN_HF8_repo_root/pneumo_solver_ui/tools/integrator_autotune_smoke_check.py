@@ -28,8 +28,17 @@ from __future__ import annotations
 
 import argparse
 from typing import Any, Dict, Optional
+import sys
+from pathlib import Path
 
 import numpy as np
+
+
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    _ROOT = Path(__file__).resolve().parents[2]
+    if str(_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ROOT))
+    __package__ = "pneumo_solver_ui.tools"
 
 
 def _smooth_bump(t: float, t0: float = 0.01, dur: float = 0.02, A: float = 0.02) -> float:

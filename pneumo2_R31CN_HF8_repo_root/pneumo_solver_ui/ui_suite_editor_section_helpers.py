@@ -20,10 +20,10 @@ from pneumo_solver_ui.ui_suite_editor_shell_helpers import (
 
 
 HEAVY_STAGE_GUIDANCE_TEXT = (
-    "Логика staged-оптимизации: S0 — быстрый предварительный экран; "
-    "S1 — длинные дорожные и манёвренные тесты; "
+    "Логика оптимизации по стадиям: S0 — быстрый предварительный отсев; "
+    "S1 — длинные дорожные и манёвренные сценарии; "
     "S2 — финальная проверка устойчивости. "
-    "Колонка «Стадия» показывает, с какого этапа тест впервые участвует в расчёте; "
+    "Колонка «Стадия» показывает, с какого этапа сценарий впервые участвует в расчёте; "
     "значение 1 не должно молча превращаться в 0."
 )
 
@@ -48,14 +48,14 @@ def render_app_suite_editor_section(
 ) -> pd.DataFrame:
     render_app_suite_editor_intro(st)
 
-    with st.expander("Импорт, экспорт и сброс", expanded=True):
+    with st.expander("Импорт, экспорт и восстановление набора", expanded=True):
         colIE1, colIE2, colIE3 = st.columns([1.2, 1.0, 1.0], gap="medium")
 
         with colIE1:
             suite_upload = st.file_uploader(
-                "Импорт набора тестов (suite, JSON)",
+                "Импорт набора сценариев (JSON)",
                 type=["json"],
-                help="Загрузите ранее сохранённый suite.json (список словарей).",
+                help="Загрузите ранее сохранённый файл `suite.json` с набором сценариев.",
                 key="suite_upload_json",
             )
             if suite_upload is not None:
@@ -68,15 +68,15 @@ def render_app_suite_editor_section(
                         )
                         st.session_state["df_suite_edit"] = loaded_df
                         st.session_state["suite_sel"] = first_suite_selected_index_fn(loaded_df)
-                        st.success("Suite загружен.")
+                        st.success("Набор сценариев загружен.")
                         st.rerun()
                     else:
-                        st.error("JSON должен быть списком объектов (list[dict]).")
+                        st.error("JSON должен содержать список сценариев.")
                 except Exception as exc:
                     st.error(f"Не удалось прочитать JSON: {exc}")
 
         with colIE2:
-            if st.button("Сбросить к default_suite.json", key="suite_reset_default"):
+            if st.button("Вернуть набор по умолчанию", key="suite_reset_default"):
                 default_df = normalize_suite_df_for_editor_fn(
                     pd.DataFrame(load_default_suite_disabled_fn(default_suite_path)),
                     context="app.suite_reset_default",
@@ -103,7 +103,7 @@ def render_app_suite_editor_section(
             except Exception:
                 suite_json = "[]"
             st.download_button(
-                "Экспорт suite.json",
+                "Скачать suite.json",
                 data=suite_json,
                 file_name="suite_export.json",
                 mime="application/json",

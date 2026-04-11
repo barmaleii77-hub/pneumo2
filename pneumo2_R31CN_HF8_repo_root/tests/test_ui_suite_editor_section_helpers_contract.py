@@ -18,8 +18,24 @@ def test_suite_editor_section_helper_contains_app_and_heavy_orchestration() -> N
     assert "render_heavy_suite_editor_intro(" in text
     assert "render_app_suite_master_detail_panel(" in text
     assert "render_heavy_suite_master_detail_panel(" in text
-    assert 'with st.expander("Импорт, экспорт и сброс", expanded=True):' in text
+    assert 'with st.expander("Импорт, экспорт и восстановление набора", expanded=True):' in text
     assert "HEAVY_STAGE_GUIDANCE_TEXT" in text
+    assert "Логика оптимизации по стадиям" in text
+    assert "быстрый предварительный отсев" in text
+    assert "длинные дорожные и манёвренные сценарии" in text
+    assert "с какого этапа сценарий впервые участвует в расчёте" in text
+    assert "Импорт набора сценариев (JSON)" in text
+    assert "Набор сценариев загружен." in text
+    assert "JSON должен содержать список сценариев." in text
+    assert "Вернуть набор по умолчанию" in text
+    assert "Скачать suite.json" in text
+    assert "staged-оптимизации" not in text
+    assert "Suite загружен." not in text
+    assert "списком объектов (list[dict])" not in text
+    assert "Сбросить к default_suite.json" not in text
+    assert "Импорт набора тестов (JSON)" not in text
+    assert "Набор тестов загружен." not in text
+    assert "JSON должен содержать список тестов." not in text
 
 
 def test_entrypoints_use_suite_editor_section_helper() -> None:

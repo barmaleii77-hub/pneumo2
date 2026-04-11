@@ -42,6 +42,7 @@ def test_render_home_workflow_header_uses_clean_russian_labels() -> None:
     assert fake_st.titles == ["Пневмоподвеска: модель, расчёт и оптимизация"]
     assert "Рабочее место" in fake_st.captions[0]
     assert "Результаты" in fake_st.captions[0]
+    assert "запуск расчёта и разбор результатов" in fake_st.captions[0]
 
 
 def test_render_heavy_workflow_header_uses_clean_russian_labels() -> None:
@@ -50,7 +51,7 @@ def test_render_heavy_workflow_header_uses_clean_russian_labels() -> None:
     helpers.render_heavy_workflow_header(fake_st)
 
     assert fake_st.titles == ["Пневмоподвеска: инженерный центр"]
-    assert "оптимизацию как отдельную страницу" in fake_st.captions[0]
+    assert "оптимизацию как отдельную страницу настройки и запуска" in fake_st.captions[0]
 
 
 def test_render_workflow_mode_and_section_and_visibility_contract() -> None:

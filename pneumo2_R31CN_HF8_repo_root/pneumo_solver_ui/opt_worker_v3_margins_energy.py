@@ -654,7 +654,7 @@ def make_test_bump_diag(
 # ---------------------------
 
 def rms(x: np.ndarray) -> float:
-    arr = np.asarray(x, dtype=float)
+    arr = np.asarray(x, dtype=float).reshape(-1)
     if arr.size == 0:
         return float("nan")
     return float(np.sqrt(np.mean(np.square(arr))))

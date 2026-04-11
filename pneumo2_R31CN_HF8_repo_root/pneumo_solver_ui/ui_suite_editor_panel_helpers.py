@@ -55,7 +55,7 @@ def render_app_suite_master_detail_panel(
         if app_suite_actions["add_clicked"]:
             new_row = {column: np.nan for column in expected_suite_cols}
             new_row["включен"] = True
-            new_row["имя"] = f"new_test_{len(df_suite_edit)+1}"
+            new_row["имя"] = f"Новый сценарий {len(df_suite_edit)+1}"
             new_row["тип"] = allowed_test_types[0] if allowed_test_types else "инерция_крен"
             new_row["dt"] = 0.01
             new_row["t_end"] = 3.0
@@ -66,7 +66,7 @@ def render_app_suite_master_detail_panel(
 
         if app_suite_actions["duplicate_clicked"] and sel_i is not None:
             row = df_suite_edit.loc[sel_i].to_dict()
-            row["имя"] = str(row.get("имя") or "copy") + "_copy"
+            row["имя"] = f"{str(row.get('имя') or 'Сценарий')} (копия)"
             df_suite_edit = pd.concat([df_suite_edit, pd.DataFrame([row])], ignore_index=True)
             st.session_state["df_suite_edit"] = df_suite_edit
             st.session_state["suite_sel"] = int(len(df_suite_edit) - 1)

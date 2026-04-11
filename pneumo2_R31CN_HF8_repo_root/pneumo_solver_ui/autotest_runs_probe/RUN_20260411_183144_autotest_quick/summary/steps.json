@@ -1,0 +1,256 @@
+{
+  "steps": [
+    {
+      "name": "pip_freeze",
+      "returncode": 0,
+      "duration_s": 0.33344769999894197,
+      "cmd": [
+        "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+        "-m",
+        "pip",
+        "freeze"
+      ],
+      "sys_before": {
+        "ts": "2026-04-11T18:31:44",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      },
+      "sys_after": {
+        "ts": "2026-04-11T18:31:44",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      }
+    },
+    {
+      "name": "pip_check",
+      "returncode": 0,
+      "duration_s": 0.41253320000032545,
+      "cmd": [
+        "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "sys_before": {
+        "ts": "2026-04-11T18:31:44",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      },
+      "sys_after": {
+        "ts": "2026-04-11T18:31:44",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      }
+    },
+    {
+      "name": "compileall",
+      "returncode": 0,
+      "duration_s": 0.2241188999996666,
+      "cmd": [
+        "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+        "-m",
+        "compileall",
+        "-q",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui"
+      ],
+      "sys_before": {
+        "ts": "2026-04-11T18:31:44",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      },
+      "sys_after": {
+        "ts": "2026-04-11T18:31:45",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      }
+    },
+    {
+      "name": "self_check",
+      "returncode": 0,
+      "duration_s": 10.74922770000012,
+      "cmd": [
+        "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\self_check.py"
+      ],
+      "sys_before": {
+        "ts": "2026-04-11T18:31:45",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      },
+      "sys_after": {
+        "ts": "2026-04-11T18:31:55",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      }
+    },
+    {
+      "name": "passport_check",
+      "returncode": 0,
+      "duration_s": 0.6339165999997931,
+      "cmd": [
+        "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\passport_check.py"
+      ],
+      "sys_before": {
+        "ts": "2026-04-11T18:31:55",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      },
+      "sys_after": {
+        "ts": "2026-04-11T18:31:56",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      }
+    },
+    {
+      "name": "loglint_harness",
+      "returncode": 0,
+      "duration_s": 0.15644040000006498,
+      "cmd": [
+        "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\loglint.py",
+        "--strict",
+        "--path",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\autotest_events.jsonl",
+        "--schema",
+        "harness",
+        "--out_dir",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\loglint\\harness"
+      ],
+      "sys_before": {
+        "ts": "2026-04-11T18:31:56",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      },
+      "sys_after": {
+        "ts": "2026-04-11T18:31:56",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      }
+    },
+    {
+      "name": "loglint_ui",
+      "returncode": 0,
+      "duration_s": 0.07446859999981825,
+      "cmd": [
+        "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\loglint.py",
+        "--strict",
+        "--path",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\logs",
+        "--recursive",
+        "--schema",
+        "ui",
+        "--out_dir",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\loglint\\ui"
+      ],
+      "sys_before": {
+        "ts": "2026-04-11T18:31:56",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      },
+      "sys_after": {
+        "ts": "2026-04-11T18:31:56",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      }
+    },
+    {
+      "name": "logstats_harness",
+      "returncode": 0,
+      "duration_s": 0.07348110000020824,
+      "cmd": [
+        "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\logstats.py",
+        "--path",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\autotest_events.jsonl",
+        "--out_dir",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\logstats\\harness"
+      ],
+      "sys_before": {
+        "ts": "2026-04-11T18:31:56",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      },
+      "sys_after": {
+        "ts": "2026-04-11T18:31:56",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      }
+    },
+    {
+      "name": "logstats_ui",
+      "returncode": 0,
+      "duration_s": 0.07545249999930093,
+      "cmd": [
+        "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\logstats.py",
+        "--path",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\logs",
+        "--recursive",
+        "--out_dir",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\logstats\\ui"
+      ],
+      "sys_before": {
+        "ts": "2026-04-11T18:31:56",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      },
+      "sys_after": {
+        "ts": "2026-04-11T18:31:56",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      }
+    },
+    {
+      "name": "log2sqlite_harness",
+      "returncode": 0,
+      "duration_s": 0.19762489999993704,
+      "cmd": [
+        "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\log2sqlite.py",
+        "--input",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\autotest_events.jsonl",
+        "--db",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\sqlite\\metrics.sqlite",
+        "--source",
+        "harness"
+      ],
+      "sys_before": {
+        "ts": "2026-04-11T18:31:56",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      },
+      "sys_after": {
+        "ts": "2026-04-11T18:31:57",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      }
+    },
+    {
+      "name": "log2sqlite_ui",
+      "returncode": 0,
+      "duration_s": 0.1894838999996864,
+      "cmd": [
+        "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\log2sqlite.py",
+        "--input",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\logs",
+        "--recursive",
+        "--db",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\sqlite\\metrics.sqlite",
+        "--source",
+        "ui",
+        "--append"
+      ],
+      "sys_before": {
+        "ts": "2026-04-11T18:31:57",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      },
+      "sys_after": {
+        "ts": "2026-04-11T18:31:57",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      }
+    },
+    {
+      "name": "sqlite_report",
+      "returncode": 0,
+      "duration_s": 0.19409900000027847,
+      "cmd": [
+        "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\log2sqlite.py",
+        "--db",
+        "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe\\RUN_20260411_183144_autotest_quick\\sqlite\\metrics.sqlite",
+        "--report_only"
+      ],
+      "sys_before": {
+        "ts": "2026-04-11T18:31:57",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      },
+      "sys_after": {
+        "ts": "2026-04-11T18:31:57",
+        "psutil_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py\", line 183, in _sys_snapshot\n    import psutil  # type: ignore\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'psutil'\n"
+      }
+    }
+  ]
+}

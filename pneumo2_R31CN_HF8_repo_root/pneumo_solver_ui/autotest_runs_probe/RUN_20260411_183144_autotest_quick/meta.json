@@ -1,0 +1,21 @@
+{
+  "ts": "20260411_183144",
+  "release": "PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03",
+  "run_id": "RUN_20260411_183144_autotest_quick",
+  "level": "quick",
+  "python_exe": "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+  "sys_executable": "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.13.12 (tags/v3.13.12:1cbe481, Feb  3 2026, 18:22:25) [MSC v.1944 64 bit (AMD64)]",
+  "cwd": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root",
+  "repo_root": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root",
+  "pneumo_dir": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui",
+  "argv": [
+    "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\tools\\run_autotest.py",
+    "--level",
+    "quick",
+    "--no_zip",
+    "--out_root",
+    "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\autotest_runs_probe"
+  ]
+}

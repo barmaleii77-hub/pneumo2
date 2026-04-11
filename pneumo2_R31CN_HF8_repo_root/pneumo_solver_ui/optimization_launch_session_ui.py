@@ -118,8 +118,8 @@ def render_optimization_launch_session_block(
                     f"**{launch_button_label}**. Другой путь запуска сейчас не активен."
                 ),
                 workflow_caption=(
-                    "Нормальный инженерный сценарий: сначала StageRunner как быстрый physical gate, затем distributed "
-                    "coordinator как длинный trade study. Эти run dirs не считаются параллельными и сохраняются отдельно "
+                    "Нормальный инженерный сценарий: сначала StageRunner как быстрый физический фильтр, затем distributed "
+                    "coordinator как длинный перебор вариантов. Эти run dirs не считаются параллельными и сохраняются отдельно "
                     "в журнале последовательных запусков выше."
                 ),
                 cmd_preview_text=build_cmd_preview_text_fn(),

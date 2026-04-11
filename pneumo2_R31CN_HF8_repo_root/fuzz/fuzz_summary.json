@@ -1,0 +1,16 @@
+{
+  "ts": "2026-04-11T18:24:20",
+  "n": 12,
+  "seed": 11,
+  "allow_failures": 0,
+  "fail_count": 0,
+  "ok": true,
+  "test_used": {
+    "name": "инерция_крен_ay2",
+    "dt": 0.003,
+    "t_end": 0.05
+  },
+  "paths": {
+    "csv": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\fuzz\\fuzz_results.csv"
+  }
+}

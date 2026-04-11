@@ -45,6 +45,29 @@ def test_desktop_animator_acceptance_hud_lines_use_bundle_cache() -> None:
     assert "frame_wheel_lines = tuple(cache.get(\"frame_wheel_lines\") or ())" in src
 
 
+def test_desktop_animator_3d_road_preview_uses_speed_magnitude_for_truthful_lookahead() -> None:
+    src = APP.read_text(encoding="utf-8")
+
+    assert "vxb, vyb = bundle.ensure_body_velocity_xy()" in src
+    assert "v_mag = np.hypot(" in src
+    assert 'np.asarray(vxb, dtype=float).reshape(-1)' in src
+    assert 'np.asarray(vyb, dtype=float).reshape(-1)' in src
+    assert 'vx = np.asarray(bundle.get("скорость_vx_м_с", 0.0), dtype=float).reshape(-1)' in src
+    assert 'vy = np.asarray(bundle.get("скорость_vy_м_с", 0.0), dtype=float).reshape(-1)' in src
+    assert "v_mag = np.hypot(vx[:n_v], vy[:n_v])" in src
+    assert "finite_v = np.asarray(v_mag[np.isfinite(v_mag)], dtype=float)" in src
+    assert 'finite_v = np.asarray(np.abs(vx[np.isfinite(vx)]), dtype=float)' not in src
+    assert "def _sampled_road_preview_lookahead_m(self, speed_m_s: float) -> float:" in src
+    assert "def _sampled_road_preview_window_m(" in src
+    assert "sampled = float(max(0.0, self._auto_lookahead(float(abs(speed_m_s)))))" in src
+    assert "current_speed_m_s = float(math.hypot(vel_body_x, vel_body_y))" in src
+    assert "preview_back_m, preview_fwd_m = self._sampled_road_preview_window_m(" in src
+    assert "signed_speed_m_s=float(speed_along_road)," in src
+    assert "return float(-lookahead_m), float(history_m)" in src
+    assert "return float(-history_m), float(lookahead_m)" in src
+    assert "la = self._sampled_road_preview_lookahead_m(current_speed_m_s)" not in src
+
+
 def test_desktop_animator_geometry_overlays_use_live_viewgeometry_fields() -> None:
     src = APP.read_text(encoding="utf-8")
 
@@ -141,6 +164,13 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "def _prepare_static_text(self, text_item: QtGui.QStaticText) -> None:" in app_src
     assert 'key = "svc__telemetry_summary_cache"' in app_src
     assert "def _ensure_telemetry_summary_cache(b: DataBundle) -> Dict[str, np.ndarray]:" in app_src
+    assert "vxb, vyb = b.ensure_body_velocity_xy()" in app_src
+    assert "vx_series = np.asarray(vxb, dtype=float).reshape(-1)" in app_src
+    assert "vy_series = np.asarray(vyb, dtype=float).reshape(-1)" in app_src
+    assert "yaw_rate_series = np.asarray(b.ensure_yaw_rate_rad_s(), dtype=float).reshape(-1)" in app_src
+    assert "axb, ayb = b.ensure_body_acceleration_xy()" in app_src
+    assert "ax_series = np.asarray(axb, dtype=float).reshape(-1)" in app_src
+    assert "ay_series = np.asarray(ayb, dtype=float).reshape(-1)" in app_src
     assert "self._value_font = QtGui.QFont(self.font())" in app_src
     assert "self._value_text_pen = QtGui.QPen(QtGui.QColor(234, 238, 243))" in app_src
     assert "self._value_text_pen.setCosmetic(True)" in app_src
@@ -164,6 +194,112 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._patm_arr, self._patm_default_pa = _infer_patm_source(b)" in app_src
     assert "P = sample(arr, patm)" in app_src
     assert 's = "—" if not np.isfinite(bar_g) else f"{bar_g:.2f}"' in app_src
+    assert 'key = "svc__world_progress_series"' in app_src
+    assert 'key = "svc__body_longitudinal_progress_series"' in app_src
+    assert "def _cumulative_path_length_series(x_series: Any, y_series: Any) -> np.ndarray:" in app_src
+    assert "def _ensure_world_progress_series(b: DataBundle) -> np.ndarray:" in app_src
+    assert "def _ensure_body_longitudinal_progress_series(b: DataBundle) -> np.ndarray:" in app_src
+    assert "return np.concatenate(([0.0], np.cumsum(ds, dtype=float))).astype(float, copy=False)" in app_src
+    assert 'np.asarray(b.get("путь_x_м", 0.0), dtype=float).reshape(-1)' in app_src
+    assert 'np.asarray(b.get("путь_y_м", 0.0), dtype=float).reshape(-1)' in app_src
+    assert "vxb_arr, _ = b.ensure_body_velocity_xy()" in app_src
+    assert "vx_mid = 0.5 * (vx[:-1] + vx[1:])" in app_src
+    assert "ds = vx_mid * dt" in app_src
+    assert "def _solver_signed_speed_along_road(" in app_src
+    assert "_ensure_world_progress_series(b) if s_progress_series is None else s_progress_series" in app_src
+    assert "speed_mag = abs(ds / dt)" in app_src
+    assert "xw_arr, yw_arr = b.ensure_world_xy()" in app_src
+    assert "vxw_arr, vyw_arr = b.ensure_world_velocity_xy()" in app_src
+    assert "vxb_arr, vyb_arr = b.ensure_body_velocity_xy()" in app_src
+    assert 'body_vx = float("nan")' in app_src
+    assert 'body_vy = float("nan")' in app_src
+    assert 'body_vx = float(get_value("скорость_vx_м_с", 0.0))' in app_src
+    assert 'body_vy = float(get_value("скорость_vy_м_с", 0.0))' in app_src
+    assert "solver_speed_mag = float(math.hypot(body_vx, body_vy))" in app_src
+    assert "tangent_x = float(tx / tangent_norm)" in app_src
+    assert "tangent_y = float(ty / tangent_norm)" in app_src
+    assert "v_proj = float(vxw * tangent_x + vyw * tangent_y)" in app_src
+    assert "return float(v_proj)" in app_src
+    assert "return float(math.copysign(speed_mag, body_vx))" in app_src
+    assert "vxb_arr, vyb_arr = b.ensure_body_velocity_xy()" in app_src
+    assert "yaw_rate = b.ensure_yaw_rate_rad_s()" in app_src
+    assert "axb_arr, ayb_arr = b.ensure_body_acceleration_xy()" in app_src
+    assert 'vxb_arr = b.get("скорость_vx_м_с", 0.0)' in app_src
+    assert 'vyb_arr = b.get("скорость_vy_м_с", 0.0)' in app_src
+    assert 'axb_series, ayb_series = b.ensure_body_acceleration_xy()' in app_src
+    assert 'ax_series = axb_series' in app_src
+    assert 'ay_series = ayb_series' in app_src
+    assert "vel_body_x = float(" in app_src
+    assert "vel_body_y = float(" in app_src
+    assert "spin_progress_series = np.asarray(_ensure_body_longitudinal_progress_series(b), dtype=float)" in app_src
+    assert "spin_progress_m = float(" in app_src
+    assert "rolling_progress_m=spin_progress_m" in app_src
+    assert "path_progress_m=s_progress_m" not in app_src
+    assert "if np.isfinite(float(speed_m_s)) and float(speed_m_s) < -1e-6:" not in app_src
+    assert "# ---- Vectors (velocity & acceleration) in local road plane" in app_src
+    assert "vec_origin = np.asarray(center_draw, dtype=float) + np.array(" in app_src
+    assert "[0.0, 0.0, float(z_vec_offset)]" in app_src
+    assert "vel_vec = np.asarray(" in app_src
+    assert "float(vel_body_x * self._vel_scale)" in app_src
+    assert "float(vel_body_y * self._vel_scale)" in app_src
+    assert "acc_vec = np.asarray(" in app_src
+    assert "float(external_ax * self._accel_scale)" in app_src
+    assert "float(external_ay * self._accel_scale)" in app_src
+    assert "np.asarray(R_local[:, 1], dtype=float) * float(vel_body_y * self._vel_scale)" not in app_src
+    assert 'vec_origin = np.asarray(center_draw, dtype=float) + np.asarray(R_local[:, 2], dtype=float) * float(z_vec_offset)' not in app_src
+    assert "focus_center = (" in app_src
+    assert "else np.asarray(center_draw, dtype=float).reshape(3) + np.array([0.0, 0.0, 0.18 * body_h], dtype=float)" in app_src
+    assert "else np.asarray(center_draw, dtype=float).reshape(3) + np.asarray(R_local[:, 2], dtype=float).reshape(3) * (0.18 * body_h)" not in app_src
+    assert 'self.lbl_v = QtWidgets.QLabel("v = —")' in app_src
+    assert "if abs(yaw_rate) > 1e-6 and abs(v_mps) > 1e-3:" in app_src
+    assert "R = v_mps / yaw_rate" in app_src
+    assert "_set_label_text_if_changed(self.lbl_v, f\"v = {_fmt(v_mps, ' m/s', digits=2)}\")" in app_src
+    assert "road_forward = _project_vector_to_plane(" in app_src
+    assert "road_motion_forward = (" in app_src
+    assert "if float(speed_along_road) >= -1e-6" in app_src
+    assert "road_side = _project_vector_to_plane(" in app_src
+    assert "road_view_dir = _norm_or(road_view_dir, road_motion_forward)" in app_src
+    assert "fog_center = np.asarray(road_plane_center, dtype=float) + road_motion_forward * float(offset_fwd_m)" in app_src
+    assert "axis_u_xyz=road_motion_forward," in app_src
+    assert "fog_center = np.asarray(road_plane_center, dtype=float) + road_forward * float(offset_fwd_m)" not in app_src
+    assert "axis_u_xyz=road_forward," not in app_src
+    assert "focus_primary_dir = _norm_or(" in app_src
+    assert "np.asarray(road_motion_forward, dtype=float).reshape(3)," in app_src
+    assert "np.asarray(body_forward, dtype=float).reshape(3)," in app_src
+    assert "primary_dir_xyz=focus_primary_dir," in app_src
+    assert "fallback_dir_xyz=road_side," in app_src
+    assert "shadow_motion_fwd = (" in app_src
+    assert "key_light_fwd = _project_vector_to_plane(np.asarray(shadow_motion_fwd, dtype=float).reshape(3), wheel_up)" in app_src
+    assert "key_light_fwd = _norm_or(np.asarray(key_light_fwd, dtype=float).reshape(3), shadow_motion_fwd)" in app_src
+    assert "key_light_fwd = _project_vector_to_plane(np.asarray(wheel_pose_fwds[idx], dtype=float).reshape(3), wheel_up)" not in app_src
+    assert "motion_forward_for_grade = (" in app_src
+    assert "body_forward_xyz=motion_forward_for_grade," in app_src
+    assert "body_forward_xyz=body_forward_for_grade," not in app_src
+    assert "body_h = np.asarray(body, dtype=float)" in app_src
+    assert "body_h[2] = 0.0" in app_src
+    assert "view_h = np.asarray(body_h, dtype=float)" in app_src
+    assert "frontal_u = float(_clamp(0.5 + 0.5 * float(np.dot(view_h, body_h)), 0.0, 1.0))" in app_src
+    assert "frontal_u = float(_clamp(0.5 + 0.5 * float(np.dot(view_h, body)), 0.0, 1.0))" not in app_src
+    assert "def _sample_signed_speed_along_world_path_local(" in app_src
+    assert "xw_arr, yw_arr = b.ensure_world_xy()" in app_src
+    assert "vxw_arr, vyw_arr = b.ensure_world_velocity_xy()" in app_src
+    assert "tangent_x = float(tx / tangent_norm)" in app_src
+    assert "tangent_y = float(ty / tangent_norm)" in app_src
+    assert "v_proj = float(vxw * tangent_x + vyw * tangent_y)" in app_src
+    assert "def _hud_motion_window_extents(self, *, signed_body_forward_m_s: float) -> tuple[float, float]:" in app_src
+    assert "v_forward_signed_m_s = _sample_signed_speed_along_world_path_local(" in app_src
+    assert "default_signed_m_s=float(sample(vxb_series, 0.0))," in app_src
+    assert "hud_rear_m, hud_forward_m = self._hud_motion_window_extents(" in app_src
+    assert "self._apply_lane_pens_if_needed(rear_m=float(hud_rear_m), forward_m=float(hud_forward_m))" in app_src
+    assert "mask = (yl >= -float(hud_rear_m)) & (yl <= float(hud_forward_m))" in app_src
+    assert "top_y = float(hud_forward_m) - 4.5" in app_src
+    assert "scene_rect = QtCore.QRectF(-8.0, -float(hud_rear_m) - 4.0, 16.0, float(hud_forward_m + hud_rear_m) + 8.0)" in app_src
+    assert "v_forward_signed_m_s = float(sample(vxb_series, 0.0))" not in app_src
+    assert "axis_v_xyz=road_side," in app_src
+    assert "def _camera_view_direction_local_xyz(self, *, target_xyz: Optional[np.ndarray] = None) -> np.ndarray:" in app_src
+    assert "if target_xyz is not None:" in app_src
+    assert 'target = np.asarray(target_xyz, dtype=float).reshape(3)' in app_src
+    assert 'camera_view_dir = self._camera_view_direction_local_xyz(target_xyz=np.asarray(center_draw, dtype=float))' in app_src
     assert "self._p_series_map: Dict[str, np.ndarray] = {}" in app_src
     assert "class _PressureBarCanvas(QtWidgets.QWidget):" in app_src
     assert "self.bar = _PressureBarCanvas(max_bar_g=self.max_bar_g)" in app_src
@@ -190,6 +326,10 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert 'sample = _make_series_sampler(i0=int(sample_i0), i1=int(sample_i1), alpha=float(alpha))' in app_src
     assert 't = sample(summary["t"], 0.0)' in app_src
     assert 'vx = sample(summary["vx"], 0.0)' in app_src
+    assert 'vy = sample(summary["vy"], 0.0)' in app_src
+    assert 'yaw_rate = sample(summary["yaw_rate"], 0.0)' in app_src
+    assert 'ax = sample(summary["ax"], 0.0)' in app_src
+    assert 'ay = sample(summary["ay"], 0.0)' in app_src
     assert 'zcm = sample(summary["zcm"], 0.0)' in app_src
     assert "def set_compact_dock_mode(self, compact: bool) -> None:" in app_src
     assert "dock.topLevelChanged.connect(" in app_src
@@ -210,6 +350,8 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._road_x_nodes_cache = np.linspace" in app_src
     assert "def _ensure_road_profile_panel_cache(b: DataBundle, wheelbase_m: float) -> Dict[str, Any]:" in app_src
     assert 'key = f"svc__road_profile_panel_cache__{wb:.6f}"' in app_src
+    assert "s_world = np.asarray(_ensure_world_progress_series(b), dtype=float)" in app_src
+    assert "s_world = np.asarray(_ensure_world_progress_series(b), dtype=float).reshape(-1)" in app_src
     assert "self._bg_cache_pixmap: Optional[QtGui.QPixmap] = None" in app_src
     assert "def _invalidate_background_cache(self) -> None:" in app_src
     assert "def _ensure_background_cache(" in app_src
@@ -319,7 +461,7 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "np.concatenate((fill_xlL, fill_xlR[::-1]))" in app_src
     assert "it = self._seg_marker_items[marker_count]" in app_src
     assert "it.setLine(float(x1), float(y1), float(x2), float(y2))" in app_src
-    assert "def _apply_lane_pens_if_needed(self) -> None:" in app_src
+    assert "def _apply_lane_pens_if_needed(self, *, rear_m: float, forward_m: float) -> None:" in app_src
     assert "key = self._poly_visual_key_from_arrays(x_arr, y_arr, closed=closed)" in app_src
     assert "quant_scale: float = 2.0" in app_src
     assert "if attr_name == \"_road_fill_poly_key\"" in app_src
@@ -340,6 +482,7 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "cur_seg_idx = self._current_segment_index_for_sample(idx=idx_ref, s_value=s_now)" in app_src
     assert 'seg_id = int(info.get("id", info.get("seg_id", 0)))' in app_src
     assert "dynamic_lines: list[str] = [f\"v  {v_mps*3.6:6.1f} км/ч\"]" in app_src
+    assert "s_world = _ensure_world_progress_series(b)" in app_src
     assert "context_lines: list[str] = []" in app_src
     assert "acceptance_lines = list(format_acceptance_hud_lines(b, i))" in app_src
     assert "dynamic_lines = self._elide_hud_lines(dynamic_lines, fnt, max_px)" in app_src
@@ -369,6 +512,9 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "zr = sample(road_arr, float(\"nan\")) if road_arr is not None else float(\"nan\")" in app_src
     assert "s0 = sample(s, float(s[idx]))" in app_src
     assert "zc = sample(z_arr, float(\"nan\"))" in app_src
+    assert "s_progress_series = np.asarray(_ensure_world_progress_series(b), dtype=float)" in app_src
+    assert "s_path = np.asarray(_ensure_world_progress_series(bundle), dtype=float).reshape(-1)" in app_src
+    assert "speed_sign * math.hypot(float(x0), float(y0))" not in app_src
     assert "self.corner_table.update_frame(b, i, sample_t=sample_t)" in app_src
     assert "self.corner_heatmap.update_frame(b, i, sample_t=sample_t)" in app_src
     assert "self.corner_quick.update_frame(b, i, sample_t=sample_t)" in app_src

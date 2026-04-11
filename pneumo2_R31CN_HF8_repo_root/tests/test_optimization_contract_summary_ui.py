@@ -54,7 +54,7 @@ def test_contract_summary_helpers_render_summary_and_warning() -> None:
 
     assert rendered is True
     assert warned is True
-    assert ("write", "**Objective stack:** comfort, roll") in st.calls
-    assert ("write", "**Hard gate:** `penalty_total` (tol=0.25)") in st.calls
-    assert ("caption", "Objective contract artifact: C:/tmp/objective_contract.json") in st.calls
-    assert any(kind == "info" and "objective stack, penalty key" in text for kind, text in st.calls)
+    assert ("write", "**Набор целей оптимизации:** comfort, roll") in st.calls
+    assert ("write", "**Жёсткий порог по штрафу:** `penalty_total` (tol=0.25)") in st.calls
+    assert ("caption", "Файл objective-contract: C:/tmp/objective_contract.json") in st.calls
+    assert any(kind == "info" and "набор целей, ключ штрафа" in text for kind, text in st.calls)
