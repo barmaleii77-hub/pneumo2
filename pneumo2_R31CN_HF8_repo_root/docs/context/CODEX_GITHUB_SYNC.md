@@ -1,52 +1,79 @@
 # Codex GitHub Sync
 
-Purpose: continue work on another machine by moving the project context through GitHub.
+Purpose: save the Codex continuation context into Git-tracked files so work can be resumed
+on another machine after `git pull`.
 
-This setup does not sync the live Codex chat window itself. It syncs Git-tracked context
-and handoff files inside the repository so another machine can `git pull` and continue.
+This workflow does not sync the live Codex chat UI itself. It syncs the repository state,
+the tracked context files, and the generated handoff snapshot.
 
-## Canonical handoff files
+## Paths That Matter
 
-- `docs/context/CODEX_HANDOFF_LATEST.md`
-- `docs/context/CODEX_HANDOFF_LATEST.json`
-- `docs/context/context_pn_main_chat.txt`
-- `docs/context/AI_SNAPSHOT_WORKING_DELTA_2026-04-08.md`
-- `docs/context/PROJECT_CONTEXT_ANALYSIS_v2.md`
-- `docs/context/WISHLIST.json`
-- `docs/01_RequirementsFromContext.md`
-- `docs/01_RequirementsFromContext.json`
+- Git root: `C:\Users\User\Desktop\pneumo2_R31CN_HF8_github_push_package`
+- Project root inside the repo: `pneumo2_R31CN_HF8_repo_root`
+- Quick refresh command: `pneumo2_R31CN_HF8_repo_root\SAVE_CODEX_CONTEXT_TO_GITHUB.cmd`
+- Handoff generator: `pneumo2_R31CN_HF8_repo_root\pneumo_solver_ui\tools\write_codex_handoff.py`
+- Contract test: `pneumo2_R31CN_HF8_repo_root\tests\test_codex_github_handoff_contract.py`
 
-## Update the handoff on the current machine
+## Canonical Handoff Files
 
-1. Run `SAVE_CODEX_CONTEXT_TO_GITHUB.cmd` from the repository root.
-2. Review `docs/context/CODEX_HANDOFF_LATEST.md`.
-3. Commit and push the updated handoff files:
+- `pneumo2_R31CN_HF8_repo_root/docs/context/CODEX_GITHUB_SYNC.md`
+- `pneumo2_R31CN_HF8_repo_root/docs/context/CODEX_HANDOFF_LATEST.md`
+- `pneumo2_R31CN_HF8_repo_root/docs/context/CODEX_HANDOFF_LATEST.json`
+- `pneumo2_R31CN_HF8_repo_root/docs/context/context_pn_main_chat.txt`
+- `pneumo2_R31CN_HF8_repo_root/docs/context/AI_SNAPSHOT_WORKING_DELTA_2026-04-08.md`
+- `pneumo2_R31CN_HF8_repo_root/docs/context/PROJECT_CONTEXT_ANALYSIS_v2.md`
+- `pneumo2_R31CN_HF8_repo_root/docs/context/WISHLIST.json`
+- `pneumo2_R31CN_HF8_repo_root/docs/01_RequirementsFromContext.md`
+- `pneumo2_R31CN_HF8_repo_root/docs/01_RequirementsFromContext.json`
+
+## Update Workflow
+
+How to update on the current machine:
+
+1. Open a shell in `pneumo2_R31CN_HF8_repo_root`.
+2. Run `SAVE_CODEX_CONTEXT_TO_GITHUB.cmd`.
+3. Review `docs/context/CODEX_HANDOFF_LATEST.md`.
+4. Run the contract check:
 
 ```powershell
-git add docs/context/CODEX_HANDOFF_LATEST.md docs/context/CODEX_HANDOFF_LATEST.json docs/context/CODEX_GITHUB_SYNC.md SAVE_CODEX_CONTEXT_TO_GITHUB.cmd
-git commit -m "Update Codex handoff"
-git push
+pytest tests/test_codex_github_handoff_contract.py
 ```
 
-## Continue on another machine
+5. Stage and push the refreshed context together with the code changes you want to preserve:
 
-1. Clone or pull the repository.
-2. Open `docs/context/CODEX_HANDOFF_LATEST.md` first.
-3. Open `docs/context/CODEX_GITHUB_SYNC.md` if you need the workflow.
+```powershell
+git -C .. add pneumo2_R31CN_HF8_repo_root
+git -C .. commit -m "Update Codex handoff and sync context"
+git -C .. push
+```
+
+If you are already at the git root instead of the project root, run:
+
+```powershell
+.\pneumo2_R31CN_HF8_repo_root\SAVE_CODEX_CONTEXT_TO_GITHUB.cmd
+```
+
+## Continue Workflow
+
+How to continue on another machine:
+
+1. Clone or pull the repository and checkout the branch recorded in `CODEX_HANDOFF_LATEST.md`.
+2. Open `pneumo2_R31CN_HF8_repo_root/docs/context/CODEX_HANDOFF_LATEST.md` first.
+3. Open `pneumo2_R31CN_HF8_repo_root/docs/context/CODEX_GITHUB_SYNC.md` if you need the workflow.
 4. Recreate `.venv` if needed.
-5. Start the next Codex session with a short prompt such as:
+5. Start the next Codex session with a prompt like:
 
 ```text
-Read docs/context/CODEX_HANDOFF_LATEST.md and continue from main.
+Read pneumo2_R31CN_HF8_repo_root/docs/context/CODEX_HANDOFF_LATEST.md and continue from the saved branch.
 ```
 
-## Not synced by GitHub
+## Not Synced By GitHub
 
 - live Codex chat UI/thread state
 - git stashes
 - local worktrees
 - `.venv`
-- sibling folders outside the repository, including `../local_portable_release/`
+- `local_portable_release/` unless it is explicitly added to git
 
-Use `docs/context/CODEX_HANDOFF_LATEST.md` as the source of truth for what existed locally
-when the last handoff snapshot was created.
+Use `pneumo2_R31CN_HF8_repo_root/docs/context/CODEX_HANDOFF_LATEST.md` as the source of truth
+for the last saved git/context snapshot.

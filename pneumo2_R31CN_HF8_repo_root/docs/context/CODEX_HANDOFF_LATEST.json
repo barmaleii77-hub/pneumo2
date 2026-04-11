@@ -1,93 +1,80 @@
 {
-  "generated_at": "2026-04-10T15:14:38+03:00",
-  "repo_root": "C:\\Users\\User\\Desktop\\pneumo2_R31CN_HF8_github_push_package\\pneumo2_R31CN_HF8_repo_root",
+  "generated_at": "2026-04-10T16:54:24+03:00",
+  "git_root": "C:\\Users\\User\\Desktop\\pneumo2_R31CN_HF8_github_push_package",
+  "project_root": "C:\\Users\\User\\Desktop\\pneumo2_R31CN_HF8_github_push_package\\pneumo2_R31CN_HF8_repo_root",
+  "project_root_from_git": "pneumo2_R31CN_HF8_repo_root",
   "origin_url": "https://github.com/barmaleii77-hub/pneumo2.git",
-  "branch": "main",
-  "head_commit": "2dd4d8060a3fb4471ec8bff6924a7751d4e15f3d",
-  "head_short": "2dd4d80",
-  "upstream": "origin/main",
-  "ahead": 0,
+  "branch": "codex/desktop-animator-cinematic-pass-r76",
+  "head_commit": "7cfa972f934d5d808b712a74ccbbf89bc56a9ae7",
+  "head_short": "7cfa972",
+  "upstream": "origin/codex/desktop-animator-cinematic-pass-r76",
+  "ahead": 2,
   "behind": 0,
   "status_lines": [
-    "## main...origin/main",
-    "?? ../local_portable_release/",
-    "?? SAVE_CODEX_CONTEXT_TO_GITHUB.cmd",
-    "?? docs/context/CODEX_GITHUB_SYNC.md",
-    "?? docs/context/CODEX_HANDOFF_LATEST.json",
-    "?? docs/context/CODEX_HANDOFF_LATEST.md",
-    "?? pneumo_solver_ui/tools/write_codex_handoff.py",
-    "?? tests/test_codex_github_handoff_contract.py"
+    "## codex/desktop-animator-cinematic-pass-r76...origin/codex/desktop-animator-cinematic-pass-r76 [ahead 2]",
+    " M pneumo2_R31CN_HF8_repo_root/docs/context/CODEX_HANDOFF_LATEST.json",
+    " M pneumo2_R31CN_HF8_repo_root/docs/context/CODEX_HANDOFF_LATEST.md",
+    "?? local_portable_release/"
   ],
   "recent_commits": [
+    "7cfa972 Fix Codex handoff divergence parsing",
+    "e9c1c68 Save animator progress and Codex handoff tooling",
+    "93e99b8 Add GitHub-backed Codex handoff sync",
     "2dd4d80 Fix animator update_frame helper scope",
     "0319c77 Fix UI mojibake and heavy results event context",
     "4bdf3ba Fix baseline all-tests mojibake filter",
     "9c6f760 Fix ring editor default dt contract",
     "de5d08a Fix portable UI params columns and bundle manifest casing",
     "a514321 Fix UI regression contracts and expdb scope export",
-    "919bfd0 Merge branch 'codex/desktop-animator-cinematic-pass-r76' into codex/merge-main-hf8",
-    "cd95a8d Merge branch 'codex/qt-viewer-heuristic-visual-pass' into codex/merge-main-hf8",
-    "7aacde4 Merge branch 'codex/native-desktop-mnemo-canvas' into codex/merge-main-hf8",
-    "35b1e1c Add mnemonic diagnostics overlay to SVG flow UI"
+    "919bfd0 Merge branch 'codex/desktop-animator-cinematic-pass-r76' into codex/merge-main-hf8"
   ],
   "stash_lines": [
     "stash@{0}: On codex/merge-main-hf8: codex-merge-main-hf8-before-align-to-main-2026-04-10",
     "stash@{1}: On main: codex-pre-main-merge-runtime-artifacts-2026-04-10"
   ],
   "worktree_lines": [
-    "C:/Users/User/Desktop/pneumo2_R31CN_HF8_github_push_package 2dd4d80 [main]",
+    "C:/Users/User/Desktop/pneumo2_R31CN_HF8_github_push_package 7cfa972 [codex/desktop-animator-cinematic-pass-r76]",
     "C:/Users/User/Desktop/pneumo2_R31CN_HF8_main_integration    2dd4d80 (detached HEAD)"
   ],
   "local_branches_at_head": [
-    "codex/desktop-animator-cinematic-pass-r76",
-    "codex/merge-main-hf8",
-    "codex/native-desktop-mnemo-canvas",
-    "codex/optimizer-scope-bundle-contract",
-    "codex/qt-viewer-heuristic-visual-pass",
-    "codex/shared-ui-helper-refactor",
-    "codex/suspension-precharge-contract",
-    "main"
+    "codex/desktop-animator-cinematic-pass-r76"
   ],
-  "remote_branches_at_head": [
-    "origin/codex/desktop-animator-cinematic-pass-r76",
-    "origin/codex/native-desktop-mnemo-canvas",
-    "origin/codex/optimizer-scope-bundle-contract",
-    "origin/codex/qt-viewer-heuristic-visual-pass",
-    "origin/codex/shared-ui-helper-refactor",
-    "origin/main"
-  ],
+  "remote_branches_at_head": [],
   "synced_context_files": [
-    "docs/context/AI_SNAPSHOT_WORKING_DELTA_2026-04-08.md",
-    "docs/context/CODEX_GITHUB_SYNC.md",
-    "docs/context/CODEX_HANDOFF_LATEST.json",
-    "docs/context/CODEX_HANDOFF_LATEST.md",
-    "docs/context/PROJECT_CONTEXT_ANALYSIS.md",
-    "docs/context/PROJECT_CONTEXT_ANALYSIS_v2.md",
-    "docs/context/WISHLIST.json",
-    "docs/context/WISHLIST.md",
-    "docs/context/WISHLIST_v2.md",
-    "docs/context/context_pn_main_chat.txt"
+    "pneumo2_R31CN_HF8_repo_root/docs/context/AI_SNAPSHOT_WORKING_DELTA_2026-04-08.md",
+    "pneumo2_R31CN_HF8_repo_root/docs/context/CODEX_GITHUB_SYNC.md",
+    "pneumo2_R31CN_HF8_repo_root/docs/context/CODEX_HANDOFF_LATEST.json",
+    "pneumo2_R31CN_HF8_repo_root/docs/context/CODEX_HANDOFF_LATEST.md",
+    "pneumo2_R31CN_HF8_repo_root/docs/context/PROJECT_CONTEXT_ANALYSIS.md",
+    "pneumo2_R31CN_HF8_repo_root/docs/context/PROJECT_CONTEXT_ANALYSIS_v2.md",
+    "pneumo2_R31CN_HF8_repo_root/docs/context/WISHLIST.json",
+    "pneumo2_R31CN_HF8_repo_root/docs/context/WISHLIST.md",
+    "pneumo2_R31CN_HF8_repo_root/docs/context/WISHLIST_v2.md",
+    "pneumo2_R31CN_HF8_repo_root/docs/context/context_pn_main_chat.txt"
   ],
   "derived_context_docs": [
-    "docs/01_RequirementsFromContext.json",
-    "docs/01_RequirementsFromContext.md",
-    "docs/01_RequirementsFromContext_RAW.md"
+    "pneumo2_R31CN_HF8_repo_root/docs/01_RequirementsFromContext.json",
+    "pneumo2_R31CN_HF8_repo_root/docs/01_RequirementsFromContext.md",
+    "pneumo2_R31CN_HF8_repo_root/docs/01_RequirementsFromContext_RAW.md"
   ],
   "portable_entries": [
     "C:\\Users\\User\\Desktop\\pneumo2_R31CN_HF8_github_push_package\\local_portable_release\\PneumoApp_R31CN_HF8_portable_20260410",
     "C:\\Users\\User\\Desktop\\pneumo2_R31CN_HF8_github_push_package\\local_portable_release\\PneumoApp_R31CN_HF8_portable_20260410.zip",
     "C:\\Users\\User\\Desktop\\pneumo2_R31CN_HF8_github_push_package\\local_portable_release\\PneumoApp_R31CN_HF8_portable_20260410.zip.manifest.json"
   ],
+  "handoff_writer": "pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/tools/write_codex_handoff.py",
+  "quick_save_command": "pneumo2_R31CN_HF8_repo_root/SAVE_CODEX_CONTEXT_TO_GITHUB.cmd",
+  "handoff_contract_test": "pneumo2_R31CN_HF8_repo_root/tests/test_codex_github_handoff_contract.py",
+  "resume_prompt": "Read pneumo2_R31CN_HF8_repo_root/docs/context/CODEX_HANDOFF_LATEST.md and continue from the saved branch.",
   "not_synced_items": [
     "live Codex chat thread state",
     "git stashes and local worktrees themselves",
     ".venv virtual environment",
-    "../local_portable_release/"
+    "local_portable_release/ unless explicitly added to git"
   ],
   "notes": [
-    "All local and remote project branches are aligned to main at 2dd4d80.",
-    "Portable release lives in the sibling local_portable_release directory and is not synced through git.",
-    "The repo is clean on tracked files; the only visible status entry is the sibling local_portable_release directory.",
-    "The integration worktree changes were preserved in stash codex-merge-main-hf8-before-align-to-main-2026-04-10."
+    "Snapshot captures saved work commit 7cfa972 on branch codex/desktop-animator-cinematic-pass-r76.",
+    "Validated in .venv with the targeted playback/render/handoff test subset before sync.",
+    "local_portable_release remains local-only unless it is explicitly added to git."
   ]
 }

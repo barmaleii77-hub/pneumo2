@@ -24,6 +24,7 @@ Env:
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -38,6 +39,29 @@ def _fenv(name: str, default: float) -> float:
 
 def main(argv: list[str] | None = None) -> int:
     try:
+        ap = argparse.ArgumentParser(
+            description="Quick thermodynamic smoke-check for the v8 model."
+        )
+        ap.add_argument(
+            "--dt",
+            type=float,
+            default=None,
+            help="Override integration step. Default comes from PNEUMO_THERMO_DT or 0.01.",
+        )
+        ap.add_argument(
+            "--t-end",
+            type=float,
+            default=None,
+            help="Override run duration. Default comes from PNEUMO_THERMO_TEND or 0.2.",
+        )
+        ap.add_argument(
+            "--e-rel-max",
+            type=float,
+            default=None,
+            help="Override max relative gas-energy error. Default comes from PNEUMO_THERMO_E_REL_MAX or 1e-3.",
+        )
+        ns = ap.parse_args(argv)
+
         # Надёжно находим корень pneumo_solver_ui независимо от способа запуска
         here = Path(__file__).resolve().parent
         root = here.parent
@@ -52,9 +76,9 @@ def main(argv: list[str] | None = None) -> int:
 
         base = json.loads((root / 'default_base.json').read_text(encoding='utf-8'))
 
-        dt = _fenv('PNEUMO_THERMO_DT', 0.01)
-        t_end = _fenv('PNEUMO_THERMO_TEND', 0.2)
-        e_rel_max = _fenv('PNEUMO_THERMO_E_REL_MAX', 1e-3)
+        dt = float(ns.dt) if ns.dt is not None else _fenv('PNEUMO_THERMO_DT', 0.01)
+        t_end = float(ns.t_end) if ns.t_end is not None else _fenv('PNEUMO_THERMO_TEND', 0.2)
+        e_rel_max = float(ns.e_rel_max) if ns.e_rel_max is not None else _fenv('PNEUMO_THERMO_E_REL_MAX', 1e-3)
 
         test = worker.make_test_roll(t_step=0.05, ay=2.0)
 

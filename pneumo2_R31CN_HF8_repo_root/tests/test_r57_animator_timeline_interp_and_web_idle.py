@@ -69,10 +69,16 @@ def test_front_and_side_helper_views_now_accept_continuous_sample_t() -> None:
     assert 'if interactive_scrub and heatmap_panel is not None and self._dock_is_exposed("dock_heatmap"):' in APP
     assert 'if interactive_scrub and corner_quick_panel is not None and self._dock_is_exposed("dock_corner_quick"):' in APP
     assert 'if interactive_scrub and road_profile_panel is not None and self._dock_is_exposed("dock_road_profile"):' in APP
+    assert '"dock_multifactor",' in APP
+    assert '("dock_multifactor", getattr(self, "telemetry_multifactor", None), "update_frame"),' in APP
+    assert 'if interactive_scrub and multifactor_panel is not None and self._dock_is_exposed("dock_multifactor"):' not in APP
     assert 'self.corner_table.update_frame(b, i, sample_t=sample_t)' in APP
     assert 'self.corner_heatmap.update_frame(b, i, sample_t=sample_t)' in APP
     assert 'self.corner_quick.update_frame(b, i, sample_t=sample_t)' in APP
     assert 't = sample(summary["t"], 0.0)' in APP
+    assert "def _current_segment_index_for_sample(self, *, idx: int, s_value: float) -> int:" in APP
+    assert "v0_mps = math.hypot(vx0, vy0)" in APP
+    assert "cur_seg_idx = self._current_segment_index_for_sample(idx=idx_ref, s_value=s_now)" in APP
     assert 'self.press_quick.update_frame(b, i, sample_t=sample_t)' in APP
     assert 'self.valve_quick.update_frame(b, i, sample_t=sample_t)' in APP
     assert 'self.flow_quick.update_frame(b, i, sample_t=sample_t)' in APP

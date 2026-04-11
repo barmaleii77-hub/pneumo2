@@ -126,6 +126,81 @@ def _max_visible_advances_per_tick(speed: float) -> int:
     return 4
 
 
+def _nominal_positive_dt_s(t_axis: Any) -> float:
+    try:
+        t = np.asarray(t_axis, dtype=float).reshape(-1)
+        if t.size < 2:
+            return float("nan")
+        dt = np.diff(t)
+        good = dt[np.isfinite(dt) & (dt > 1e-6)]
+        if good.size <= 0:
+            return float("nan")
+        return float(np.median(good))
+    except Exception:
+        return float("nan")
+
+
+def _playback_interval_ms_for_speed(speed: float, *, source_dt_s: float | None = None) -> int:
+    # Playback is display-oriented, not source-frame-oriented.  The old 4 ms service
+    # timer tried to chase every dense source frame inside the GUI thread, which made
+    # a simple animation look far more expensive than it really is.  We now render at
+    # a display cadence and select the source frame from a continuous playhead time.
+    spd = float(max(0.05, speed))
+    if spd <= 1.0:
+        base_ms = 12.0  # ~83 Hz keeps x1.0 visibly alive without source-frame chasing.
+    elif spd <= 2.0:
+        base_ms = 10.0  # ~100 Hz for moderate fast-forward.
+    elif spd <= 4.0:
+        base_ms = 8.0   # ~125 Hz.
+    else:
+        base_ms = 6.0   # ~166 Hz upper service cadence on Windows precise timer.
+    dense_dt_s = float(source_dt_s) if source_dt_s is not None else float("nan")
+    if np.isfinite(dense_dt_s) and dense_dt_s > 1e-6:
+        # Dense exported bundles deserve a slightly tighter service cadence at higher
+        # speeds; otherwise x2/x4 fast-forward can skip too many source intervals per
+        # visible tick even when the source is dense enough to render more smoothly.
+        target_ms = (1000.0 * 3.0 * dense_dt_s) / spd
+        base_ms = min(float(base_ms), float(target_ms))
+    return int(max(6, min(20, round(base_ms))))
+
+
+def _playback_visible_step_budget_s(speed: float, *, interval_ms: int) -> float:
+    interval_s = max(0.001, float(interval_ms) / 1000.0)
+    spd = float(max(0.05, speed))
+    return float(interval_s * spd * float(max(1, _max_visible_advances_per_tick(spd))))
+
+
+def _sanitize_playback_wall_dt_s(wall_dt_s: float, *, interval_ms: int) -> float:
+    wall_dt = float(max(0.0, wall_dt_s))
+    interval_s = max(0.001, float(interval_ms) / 1000.0)
+    # Long GUI stalls (dock churn, resize, debugger break, brief laptop sleep) should
+    # not explode into a single visible playhead jump on the next timer wake-up.
+    if wall_dt > max(0.18, 6.0 * interval_s):
+        return float(interval_s)
+    return float(wall_dt)
+
+
+def _advance_playback_cursor_limited(
+    play_cursor_t_s: float,
+    *,
+    raw_wall_dt_s: float,
+    speed: float,
+    interval_ms: int,
+    carry_s: float,
+) -> tuple[float, float]:
+    carry = float(max(0.0, carry_s))
+    carry += _sanitize_playback_wall_dt_s(raw_wall_dt_s, interval_ms=interval_ms) * float(max(0.05, speed))
+    step_s = min(carry, _playback_visible_step_budget_s(speed, interval_ms=interval_ms))
+    return float(play_cursor_t_s) + float(step_s), float(max(0.0, carry - step_s))
+
+
+def _playback_source_index_for_time(t: np.ndarray, sample_t_s: float) -> int:
+    if t.size <= 1:
+        return 0
+    idx = int(np.searchsorted(t, float(sample_t_s), side="right") - 1)
+    return int(_clamp(idx, 0, int(t.size) - 1))
+
+
 def _infer_patm_pa(b: "DataBundle", i: int) -> float:
     """Best-effort atmospheric pressure inference.
 
@@ -251,6 +326,7 @@ from .cylinder_truth_gate import (
     render_cylinder_truth_gate_message as _render_cylinder_truth_gate_message,
 )
 from .playback_sampling import (
+    lerp_wrapped_angle_value as _lerp_wrapped_angle_value,
     lerp_point_row as _lerp_point_row,
     lerp_series_value as _lerp_series_value,
     sample_time_bracket as _sample_time_bracket,
@@ -989,6 +1065,94 @@ def _sample_series_local(
         )
     except Exception:
         return float(default)
+
+
+def _sample_angle_series_local(
+    series: Any,
+    *,
+    i0: int,
+    i1: int,
+    alpha: float,
+    default: float = 0.0,
+    period_rad: float = 2.0 * math.pi,
+) -> float:
+    try:
+        arr = series if isinstance(series, np.ndarray) else np.asarray(series, dtype=float)
+        n = int(arr.shape[0]) if getattr(arr, "ndim", 0) >= 1 else 0
+        if n <= 0:
+            return float(default)
+        ii0 = max(0, min(int(i0), n - 1))
+        ii1 = max(0, min(int(i1), n - 1))
+        a = float(alpha)
+        if ii0 == ii1 or a <= 1e-12:
+            return float(arr[ii0])
+        if a >= 1.0 - 1e-12:
+            return float(arr[ii1])
+        return float(
+            _lerp_wrapped_angle_value(
+                arr,
+                i0=ii0,
+                i1=ii1,
+                alpha=a,
+                default=float(default),
+                period=float(period_rad),
+            )
+        )
+    except Exception:
+        return float(default)
+
+
+def _sample_signed_speed_along_world_path_local(
+    b: DataBundle,
+    *,
+    i0: int,
+    i1: int,
+    alpha: float,
+    default_signed_m_s: float = 0.0,
+) -> float:
+    try:
+        xw_arr, yw_arr = b.ensure_world_xy()
+        vxw_arr, vyw_arr = b.ensure_world_velocity_xy()
+        xw_path = np.asarray(xw_arr, dtype=float).reshape(-1)
+        yw_path = np.asarray(yw_arr, dtype=float).reshape(-1)
+        vxw_path = np.asarray(vxw_arr, dtype=float).reshape(-1)
+        vyw_path = np.asarray(vyw_arr, dtype=float).reshape(-1)
+        n_path = int(min(xw_path.size, yw_path.size, vxw_path.size, vyw_path.size))
+        if n_path >= 2:
+            ii_lo = int(_clamp(min(int(i0), int(i1)), 0, n_path - 1))
+            ii_hi = int(_clamp(max(int(i0), int(i1)), 0, n_path - 1))
+            ii_prev = int(max(0, ii_lo - 1))
+            ii_next = int(min(n_path - 1, ii_hi + 1))
+            tx = float(xw_path[ii_next] - xw_path[ii_prev])
+            ty = float(yw_path[ii_next] - yw_path[ii_prev])
+            tangent_norm = float(math.hypot(tx, ty))
+            if np.isfinite(tangent_norm) and tangent_norm > 1e-9:
+                tangent_x = float(tx / tangent_norm)
+                tangent_y = float(ty / tangent_norm)
+                vxw = float(
+                    _sample_series_local(
+                        vxw_arr,
+                        i0=i0,
+                        i1=i1,
+                        alpha=alpha,
+                        default=0.0,
+                    )
+                )
+                vyw = float(
+                    _sample_series_local(
+                        vyw_arr,
+                        i0=i0,
+                        i1=i1,
+                        alpha=alpha,
+                        default=0.0,
+                    )
+                )
+                v_proj = float(vxw * tangent_x + vyw * tangent_y)
+                if np.isfinite(v_proj) and abs(v_proj) > 1e-9:
+                    return float(v_proj)
+    except Exception:
+        pass
+    return float(default_signed_m_s)
 
 
 def _make_series_sampler(*, i0: int, i1: int, alpha: float) -> Callable[[Any, float], float]:
@@ -4010,6 +4174,36 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             self._seg_start_to_idx[int(st)] = int(j)
             self._seg_id_to_info[int(sid)] = info
 
+    def _current_segment_index_for_sample(self, *, idx: int, s_value: float) -> int:
+        if not self._seg_infos:
+            return 0
+        try:
+            s_now = float(s_value)
+        except Exception:
+            s_now = float("nan")
+
+        seg_s0 = self._seg_s0
+        seg_s1 = self._seg_s1
+        if seg_s0 is not None and seg_s1 is not None:
+            try:
+                seg_lo = np.minimum(np.asarray(seg_s0, dtype=float), np.asarray(seg_s1, dtype=float))
+                seg_hi = np.maximum(np.asarray(seg_s0, dtype=float), np.asarray(seg_s1, dtype=float))
+                if seg_lo.size == seg_hi.size == len(self._seg_infos) and np.isfinite(s_now):
+                    hits = np.flatnonzero((s_now >= (seg_lo - 1e-6)) & (s_now <= (seg_hi + 1e-6)))
+                    if hits.size > 0:
+                        return int(hits[0])
+                    if np.all(np.isfinite(seg_hi)):
+                        j = int(np.searchsorted(seg_hi, s_now, side="left"))
+                        return int(max(0, min(j, len(self._seg_infos) - 1)))
+            except Exception:
+                pass
+
+        starts = self._seg_starts
+        if starts is None or len(starts) <= 0:
+            return 0
+        j = int(np.searchsorted(starts, int(idx), side="right") - 1)
+        return int(max(0, min(j, len(self._seg_infos) - 1)))
+
     def _update_segment_fills(self, b: DataBundle, idxs: np.ndarray, xL: np.ndarray, yL: np.ndarray, xR: np.ndarray, yR: np.ndarray, cur_seg_id: Optional[int]) -> None:
         """Update (or hide) muted segment fills on the road ribbon."""
         if not getattr(self, "show_seg_colors", True):
@@ -4148,18 +4342,18 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         ay_series = b.get("ускорение_поперечное_ay_м_с2", 0.0)
         s_world = b.ensure_s_world()
 
-        yaw = sample(yaw_series, 0.0)
+        yaw = _sample_angle_series_local(yaw_series, i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)
         x0 = sample(xw, float(xw[idx_ref]))
         y0 = sample(yw, float(yw[idx_ref]))
+        vx0 = sample(vx_series, 0.0)
+        vy0 = sample(vy_series, 0.0)
+        v0_mps = math.hypot(vx0, vy0)
+        s_now = sample(s_world, 0.0)
 
         # Auto lookahead scaling: more road shown at higher speed (instrument-cluster style)
         if getattr(self, "auto_lookahead", False):
-            try:
-                vx0 = sample(vx_series, 0.0)
-            except Exception:
-                vx0 = 0.0
-            self._lookahead_m = float(_clamp(20.0 + vx0 * 4.0, 40.0, 140.0))
-            self._history_m = float(_clamp(8.0 + vx0 * 1.5, 15.0, 60.0))
+            self._lookahead_m = float(_clamp(20.0 + v0_mps * 4.0, 40.0, 140.0))
+            self._history_m = float(_clamp(8.0 + v0_mps * 1.5, 15.0, 60.0))
 
         if bool(self._playback_perf_mode):
             perf_visual_key = self._perf_visual_key(x0=float(x0), y0=float(y0), yaw=float(yaw))
@@ -4203,6 +4397,21 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
         # Indices in the original arrays corresponding to the visible road window
         idxs = np.arange(win_i0, win_i1)[mask]
 
+        cur_seg_idx: Optional[int] = None
+        cur_seg_id: Optional[int] = None
+        cur_seg_info: dict = {}
+        try:
+            self._ensure_segment_cache(b)
+            if self._seg_infos:
+                cur_seg_idx = self._current_segment_index_for_sample(idx=idx_ref, s_value=s_now)
+                cur_seg_idx = int(max(0, min(int(cur_seg_idx), len(self._seg_infos) - 1)))
+                cur_seg_info = dict(self._seg_infos[cur_seg_idx] or {})
+                cur_seg_id = int(cur_seg_info.get("id", cur_seg_info.get("seg_id", 0)))
+        except Exception:
+            cur_seg_idx = None
+            cur_seg_id = None
+            cur_seg_info = {}
+
         max_points = self._visible_polyline_point_budget()
         xl, yl, idxs = self._decimate_visible_polyline(max_points, xl, yl, idxs)
         self._set_poly_path_if_changed("_centerline_path_key", self.centerline, xl, yl)
@@ -4221,11 +4430,6 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
 
             # Segment tint overlays (muted, non-flashing)
             try:
-                self._ensure_segment_cache(b)
-                cur_seg_id = None
-                seg_full = self._seg_full
-                if seg_full is not None:
-                    cur_seg_id = int(seg_full[i])
                 if eff_show_seg_colors:
                     self._update_segment_fills(b, lane_idxs, xlL, ylL, xlR, ylR, cur_seg_id)
                 else:
@@ -4344,7 +4548,7 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             yaw_rate = sample(yaw_rate_series, 0.0)
             ax = sample(ax_series, 0.0)
             ay = sample(ay_series, 0.0)
-            s = sample(s_world, 0.0)
+            s = float(s_now)
 
             # Signed radius estimate
             R = float("inf")
@@ -4354,15 +4558,11 @@ class RoadHudWidget(QtWidgets.QGraphicsView):
             # Segment / progress
             seg_line = ""
             road_line = ""
-            cur_seg_info: dict = {}
             try:
-                self._ensure_segment_cache(b)
-                if self._seg_starts is not None and self._seg_infos:
-                    j = int(np.searchsorted(self._seg_starts, i, side="right") - 1)
-                    j = max(0, min(j, len(self._seg_infos) - 1))
-                    info = self._seg_infos[j]
-                    cur_seg_info = info
-                    seg_id = int(info.get("seg_id", 0))
+                if cur_seg_info and self._seg_infos:
+                    info = cur_seg_info
+                    j = int(cur_seg_idx if cur_seg_idx is not None else int(info.get("idx", 0)))
+                    seg_id = int(info.get("id", info.get("seg_id", 0)))
                     s0 = float(info.get("s0", 0.0))
                     s1 = float(info.get("s1", 0.0))
 
@@ -4624,6 +4824,7 @@ class Car3DWidget(QtWidgets.QWidget):
         self._wheel_brake_rotor_meshes: List["gl.GLMeshItem"] = []
         self._wheel_brake_caliper_meshes: List["gl.GLMeshItem"] = []
         self._wheel_spin_glow_lines: List["gl.GLLinePlotItem"] = []
+        self._wheel_crown_glint_lines: List["gl.GLLinePlotItem"] = []
         self._wheel_rotor_streak_lines: List["gl.GLLinePlotItem"] = []
         self._wheel_shadow_meshes: List["gl.GLMeshItem"] = []
         self._arm_lower_meshes: List["gl.GLMeshItem"] = []
@@ -4653,12 +4854,29 @@ class Car3DWidget(QtWidgets.QWidget):
         self._cyl2_lines: Optional["gl.GLLinePlotItem"] = None
         self._contact_patch_mesh: Optional["gl.GLMeshItem"] = None
         self._contact_glaze_meshes: List["gl.GLMeshItem"] = []
+        self._contact_reflection_meshes: List["gl.GLMeshItem"] = []
         self._contact_accent_rings: List["gl.GLLinePlotItem"] = []
         self._scene_fog_meshes: List["gl.GLMeshItem"] = []
         self._corner_light_shaft_meshes: List["gl.GLMeshItem"] = []
         self._corner_key_light_lines: List["gl.GLLinePlotItem"] = []
         self._focus_halo_mesh: Optional["gl.GLMeshItem"] = None
         self._focus_halo_line: Optional["gl.GLLinePlotItem"] = None
+        self._underbody_glow_mesh: Optional["gl.GLMeshItem"] = None
+        self._body_silhouette_line: Optional["gl.GLLinePlotItem"] = None
+        self._body_top_sheen_mesh: Optional["gl.GLMeshItem"] = None
+        self._body_top_sweep_line: Optional["gl.GLLinePlotItem"] = None
+        self._body_end_aura_meshes: List["gl.GLMeshItem"] = []
+        self._body_spine_line: Optional["gl.GLLinePlotItem"] = None
+        self._scene_side_curtain_meshes: List["gl.GLMeshItem"] = []
+        self._scene_portal_line: Optional["gl.GLLinePlotItem"] = None
+        self._speed_corridor_meshes: List["gl.GLMeshItem"] = []
+        self._rear_wake_meshes: List["gl.GLMeshItem"] = []
+        self._road_speed_spine_mesh: Optional["gl.GLMeshItem"] = None
+        self._front_bow_wave_meshes: List["gl.GLMeshItem"] = []
+        self._front_corner_shear_meshes: List["gl.GLMeshItem"] = []
+        self._wheel_lane_streak_meshes: List["gl.GLMeshItem"] = []
+        self._track_shoulder_meshes: List["gl.GLMeshItem"] = []
+        self._axle_wash_meshes: List["gl.GLMeshItem"] = []
 
         self._vec_vel: Optional["gl.GLLinePlotItem"] = None
         self._vec_acc: Optional["gl.GLLinePlotItem"] = None
@@ -4997,6 +5215,63 @@ class Car3DWidget(QtWidgets.QWidget):
             return None, None
         return np.vstack(verts_all), np.vstack(faces_all)
 
+    @staticmethod
+    def _wishbone_plate_mesh(
+        frame_front_xyz: np.ndarray,
+        frame_rear_xyz: np.ndarray,
+        hub_front_xyz: np.ndarray,
+        hub_rear_xyz: np.ndarray,
+        *,
+        thickness_m: float,
+    ) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        ff = np.asarray(frame_front_xyz, dtype=float).reshape(3)
+        fr = np.asarray(frame_rear_xyz, dtype=float).reshape(3)
+        hf = np.asarray(hub_front_xyz, dtype=float).reshape(3)
+        hr = np.asarray(hub_rear_xyz, dtype=float).reshape(3)
+        if not (
+            np.all(np.isfinite(ff))
+            and np.all(np.isfinite(fr))
+            and np.all(np.isfinite(hf))
+            and np.all(np.isfinite(hr))
+        ):
+            return None, None
+        loop = np.vstack([ff, hf, hr, fr]).astype(float)
+        n0 = np.cross(hf - ff, fr - ff)
+        n1 = np.cross(hr - hf, ff - hf)
+        normal = np.asarray(n0 + n1, dtype=float).reshape(3)
+        normal_norm = float(np.linalg.norm(normal))
+        if not np.isfinite(normal_norm) or normal_norm <= 1e-9:
+            alt = np.cross(fr - ff, hr - hf)
+            alt_norm = float(np.linalg.norm(alt))
+            if not np.isfinite(alt_norm) or alt_norm <= 1e-9:
+                return None, None
+            normal = alt / alt_norm
+        else:
+            normal = normal / normal_norm
+        thickness = float(max(0.002, thickness_m))
+        offset = 0.5 * thickness * normal.reshape(1, 3)
+        top = loop + offset
+        bot = loop - offset
+        verts = np.vstack([top, bot]).astype(float)
+        faces = np.asarray(
+            [
+                [0, 1, 2],
+                [0, 2, 3],
+                [4, 6, 5],
+                [4, 7, 6],
+                [0, 4, 5],
+                [0, 5, 1],
+                [1, 5, 6],
+                [1, 6, 2],
+                [2, 6, 7],
+                [2, 7, 3],
+                [3, 7, 4],
+                [3, 4, 0],
+            ],
+            dtype=np.int32,
+        )
+        return verts, faces
+
     def _deformed_wheel_vertices(
         self,
         *,
@@ -5021,6 +5296,7 @@ class Car3DWidget(QtWidgets.QWidget):
         x = np.asarray(base[:, 0], dtype=float)
         y = np.asarray(base[:, 1], dtype=float)
         z = np.asarray(base[:, 2], dtype=float)
+        side_sign = np.sign(y)
         radial_len = np.sqrt((x * x) + (z * z))
         radial_safe = np.maximum(radial_len, 1e-6)
         radial_dir = np.column_stack([x / radial_safe, np.zeros_like(y), z / radial_safe])
@@ -5039,12 +5315,12 @@ class Car3DWidget(QtWidgets.QWidget):
             * shell_u
         )
         sidewall_bulge_m = (
-            wheel_radius
-            * (0.008 + 0.028 * contact_u)
+            half_width
+            * (0.060 + 0.110 * contact_u)
             * (0.24 + 0.76 * bottom_u)
             * sidewall_u
-            * shell_u
         )
+        shoulder_swell_m = wheel_radius * (0.002 + 0.009 * contact_u) * shell_u * sidewall_u * (0.18 + 0.82 * bottom_u)
         crown_trim_m = wheel_radius * (0.003 + 0.010 * contact_u) * tread_u * (top_u ** 2.0) * shell_u
         theta = np.arctan2(z, x)
         tread_wave_m = (
@@ -5055,7 +5331,8 @@ class Car3DWidget(QtWidgets.QWidget):
             * np.sin((12.0 * theta) + (18.0 * y / max(half_width, 1e-6)))
         )
         verts = np.asarray(base, dtype=float).copy()
-        verts += radial_dir * sidewall_bulge_m.reshape(-1, 1)
+        verts[:, 1] = np.asarray(verts[:, 1], dtype=float) + (side_sign * sidewall_bulge_m)
+        verts += radial_dir * shoulder_swell_m.reshape(-1, 1)
         verts -= radial_dir * crown_trim_m.reshape(-1, 1)
         verts += radial_dir * tread_wave_m.reshape(-1, 1)
         verts[:, 2] = np.asarray(verts[:, 2], dtype=float) + contact_flat_m
@@ -5098,9 +5375,9 @@ class Car3DWidget(QtWidgets.QWidget):
         if not np.isfinite(up_norm) or up_norm <= 1e-9:
             return None, None
         up_vec = up_vec / up_norm
-        rim_radius = float(max(0.05, 0.70 * wheel_radius))
-        ring_tube_radius = float(max(0.006, 0.060 * wheel_radius))
-        ring_offset = float(max(0.010, 0.26 * wheel_width))
+        rim_radius = float(max(0.05, 0.66 * wheel_radius))
+        ring_tube_radius = float(max(0.0045, 0.034 * wheel_radius))
+        ring_offset = float(max(0.008, 0.19 * wheel_width))
         front_center = center + axle * ring_offset
         rear_center = center - axle * ring_offset
         front_path = self._circle_line_vertices(
@@ -5129,31 +5406,34 @@ class Car3DWidget(QtWidgets.QWidget):
                 capped=False,
             ),
         ]
-        hub_radius = float(max(0.028, 0.30 * wheel_radius))
-        spoke_n = int(max(4, spoke_count))
-        spoke_half_width = float(max(0.008, 0.028 * wheel_radius))
-        spoke_half_depth = float(max(0.010, 0.18 * wheel_width))
-        spoke_len = float(max(0.03, rim_radius - hub_radius - 1.6 * ring_tube_radius))
+        hub_radius = float(max(0.020, 0.18 * wheel_radius))
+        spoke_n = int(max(5, spoke_count))
+        spoke_half_width = float(max(0.0045, 0.013 * wheel_radius))
+        spoke_half_depth = float(max(0.0040, 0.060 * wheel_width))
+        spoke_len = float(max(0.02, rim_radius - hub_radius - 1.2 * ring_tube_radius))
         spoke_mid_radius = hub_radius + 0.5 * spoke_len + 0.35 * ring_tube_radius
+        spoke_split_rad = 0.055 * np.pi
         for spoke_idx in range(spoke_n):
-            ang = (2.0 * np.pi * float(spoke_idx) / float(spoke_n)) + (0.10 * np.pi) + float(spin_phase_rad)
-            radial = np.cos(ang) * fwd + np.sin(ang) * up_vec
-            tangent = np.cross(axle, radial)
-            tangent_norm = float(np.linalg.norm(tangent))
-            if not np.isfinite(tangent_norm) or tangent_norm <= 1e-9:
-                continue
-            tangent = tangent / tangent_norm
-            spoke_center = center + radial * spoke_mid_radius
-            spoke_mesh = self._oriented_box_mesh(
-                center_xyz=spoke_center,
-                axis_x_xyz=radial,
-                axis_y_xyz=axle,
-                axis_z_xyz=tangent,
-                size_x_m=spoke_len,
-                size_y_m=2.0 * spoke_half_depth,
-                size_z_m=2.0 * spoke_half_width,
-            )
-            mesh_parts.append(spoke_mesh)
+            base_ang = (2.0 * np.pi * float(spoke_idx) / float(spoke_n)) + float(spin_phase_rad)
+            for split_sign in (-1.0, 1.0):
+                ang = base_ang + split_sign * spoke_split_rad
+                radial = np.cos(ang) * fwd + np.sin(ang) * up_vec
+                tangent = np.cross(axle, radial)
+                tangent_norm = float(np.linalg.norm(tangent))
+                if not np.isfinite(tangent_norm) or tangent_norm <= 1e-9:
+                    continue
+                tangent = tangent / tangent_norm
+                spoke_center = center + radial * spoke_mid_radius
+                spoke_mesh = self._oriented_box_mesh(
+                    center_xyz=spoke_center,
+                    axis_x_xyz=radial,
+                    axis_y_xyz=axle,
+                    axis_z_xyz=tangent,
+                    size_x_m=0.96 * spoke_len,
+                    size_y_m=2.0 * spoke_half_depth,
+                    size_z_m=2.0 * spoke_half_width,
+                )
+                mesh_parts.append(spoke_mesh)
         return self._concat_mesh_parts(mesh_parts)
 
     @staticmethod
@@ -5644,6 +5924,29 @@ class Car3DWidget(QtWidgets.QWidget):
         rgba_target = tuple(float(v) / 255.0 for v in glow_rgb) + (alpha,)
         return self._smooth_rgba(str(key), rgba_target, response=0.18)
 
+    def _wheel_crown_glint_rgba(
+        self,
+        *,
+        key: str,
+        speed_m_s: float,
+        tire_force_n: float,
+        wheel_gap_m: float,
+        in_air: bool,
+    ) -> tuple[float, float, float, float]:
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        wheel_radius = float(max(0.05, getattr(self.geom, "wheel_radius", 0.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        speed_u = float(_clamp(abs(float(speed_m_s)) / 35.0, 0.0, 1.0))
+        gap_u = float(_clamp(float(max(0.0, wheel_gap_m)) / max(0.01, 0.34 * wheel_radius), 0.0, 1.0))
+        motion_u = 0.0 if speed_u <= 0.02 else float(_clamp((0.24 + 0.76 * speed_u) * (1.0 - 0.42 * gap_u), 0.0, 1.0))
+        if in_air:
+            motion_u *= 0.72
+        base_rgb = _lerp_rgb((182, 212, 248), (255, 224, 170), 0.12 + 0.26 * load_u)
+        glint_rgb = _boost_rgb(base_rgb, 0.10 + 0.20 * motion_u + 0.08 * load_u)
+        alpha = float(_clamp(0.01 + 0.12 * motion_u + 0.04 * load_u, 0.0, 0.22))
+        rgba_target = tuple(float(v) / 255.0 for v in glint_rgb) + (alpha,)
+        return self._smooth_rgba(str(key), rgba_target, response=0.16)
+
     def _wheel_rotor_streak_rgba(
         self,
         *,
@@ -6042,18 +6345,39 @@ class Car3DWidget(QtWidgets.QWidget):
             segments=int(max(18, segments)),
         )
 
-    def _camera_view_direction_local_xyz(self) -> np.ndarray:
+    def _camera_view_direction_local_xyz(self, target_xyz: Optional[np.ndarray] = None) -> np.ndarray:
         try:
             if self.view is not None and pg is not None:
                 cam_pos = self.view.cameraPosition()
-                center = self.view.opts.get("center", pg.Vector(0.0, 0.0, 0.0))
-                if cam_pos is not None and center is not None:
-                    view_vec = np.asarray(
+                if cam_pos is not None:
+                    cam_xyz = np.asarray(
                         [
-                            float(cam_pos.x() - center.x()),
-                            float(cam_pos.y() - center.y()),
-                            float(cam_pos.z() - center.z()),
+                            float(cam_pos.x()),
+                            float(cam_pos.y()),
+                            float(cam_pos.z()),
                         ],
+                        dtype=float,
+                    )
+                    center_xyz = None
+                    if target_xyz is not None:
+                        center_arr = np.asarray(target_xyz, dtype=float).reshape(3)
+                        if np.all(np.isfinite(center_arr)):
+                            center_xyz = center_arr
+                    if center_xyz is None:
+                        center = self.view.opts.get("center", pg.Vector(0.0, 0.0, 0.0))
+                        if center is not None:
+                            center_xyz = np.asarray(
+                                [
+                                    float(center.x()),
+                                    float(center.y()),
+                                    float(center.z()),
+                                ],
+                                dtype=float,
+                            )
+                    if center_xyz is None:
+                        center_xyz = np.zeros(3, dtype=float)
+                    view_vec = np.asarray(
+                        cam_xyz - center_xyz,
                         dtype=float,
                     )
                     view_norm = float(np.linalg.norm(view_vec))
@@ -6301,7 +6625,8 @@ class Car3DWidget(QtWidgets.QWidget):
         else:
             edge_fade = np.asarray(np.clip(1.0 - 0.38 * (dist_u ** 1.15), 0.24, 1.0), dtype=float)
             rgb = rgb * edge_fade.reshape(-1, 1)
-            alpha = 0.12 + (0.18 + 0.28 * load_u) * core + (0.08 + 0.12 * load_u) * glow
+            rgb += np.asarray(glow_rgb, dtype=float).reshape(1, 3) * (0.06 + 0.12 * load_u) * core.reshape(-1, 1)
+            alpha = 0.20 + (0.22 + 0.30 * load_u) * core + (0.10 + 0.14 * load_u) * glow
         rgba = np.column_stack(
             [
                 np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
@@ -6405,10 +6730,14 @@ class Car3DWidget(QtWidgets.QWidget):
         rgb += shoulder_rgb * (0.08 + 0.18 * speed_u) * shoulder_band.reshape(-1, 1)
         rgb += cool_sheen_rgb * (0.08 + 0.16 * speed_u + 0.06 * crown_sheen).reshape(-1, 1) * (0.35 * sidewall_u + 0.65 * crown_sheen).reshape(-1, 1)
         rgb += warm_scuff_rgb * (0.10 + 0.22 * contact_scuff).reshape(-1, 1) * contact_scuff.reshape(-1, 1)
-        groove_dark = 0.08 + 0.20 * tread_groove + 0.06 * contact_u
+        groove_dark = 0.12 + 0.26 * tread_groove + 0.08 * contact_u
         rgb *= (1.0 - groove_dark.reshape(-1, 1))
-        branding_light = branding_band * (0.30 + 0.70 * branding_wave)
-        rgb += np.asarray((18.0, 20.0, 24.0), dtype=float).reshape(1, 3) * (0.10 * branding_light).reshape(-1, 1)
+        branding_light = branding_band * (0.42 + 0.58 * branding_wave)
+        rgb += (
+            np.asarray((132.0, 136.0, 146.0), dtype=float).reshape(1, 3)
+            * (0.10 + 0.16 * branding_light).reshape(-1, 1)
+            * branding_light.reshape(-1, 1)
+        )
         alpha = 0.94 + 0.04 * shell_u - 0.03 * tread_groove
         if in_air:
             rgb = 0.90 * rgb + 0.10 * np.asarray((84.0, 98.0, 126.0), dtype=float).reshape(1, 3)
@@ -6792,6 +7121,127 @@ class Car3DWidget(QtWidgets.QWidget):
         )
         return np.asarray(rgba, dtype=np.uint8)
 
+    def _road_reflection_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        corner: str,
+        tire_force_n: float,
+        wheel_gap_m: float,
+        speed_m_s: float,
+        hierarchy_u: float,
+        in_air: bool,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        gap_u = float(_clamp(float(max(0.0, wheel_gap_m)) / 0.10, 0.0, 1.0))
+        speed_u = float(_clamp(abs(float(speed_m_s)) / 35.0, 0.0, 1.0))
+        hierarchy = float(_clamp(hierarchy_u, 0.0, 1.0))
+        if self._corner_is_front(str(corner)):
+            base_rgb = _palette_rgb(
+                [
+                    (0.00, (102, 214, 255)),
+                    (0.54, (152, 255, 240)),
+                    (1.00, (236, 248, 255)),
+                ],
+                0.30 + 0.50 * max(load_u, hierarchy),
+            )
+        else:
+            base_rgb = _palette_rgb(
+                [
+                    (0.00, (255, 172, 116)),
+                    (0.52, (255, 216, 132)),
+                    (1.00, (255, 242, 194)),
+                ],
+                0.26 + 0.56 * max(load_u, hierarchy),
+            )
+        streak_rgb = _boost_rgb(base_rgb, 0.08 + 0.18 * speed_u + 0.16 * hierarchy)
+        hot_rgb = _boost_rgb(_heat_rgb(0.12 + 0.80 * load_u, sat=0.76, val=1.0), 0.04 + 0.12 * load_u)
+        core = np.exp(-((du / (0.22 + 0.14 * speed_u)) ** 2) - ((dv / (0.20 + 0.08 * load_u)) ** 2))
+        trail = np.exp(-(((du - (0.18 + 0.18 * speed_u)) / (0.40 + 0.22 * speed_u)) ** 2)) * np.exp(-((dv / (0.16 + 0.10 * load_u)) ** 2))
+        fringe = np.exp(-(((rr - (0.82 + 0.06 * speed_u)) / (0.18 + 0.04 * load_u)) ** 2))
+        alpha = (0.01 + 0.10 * max(load_u, speed_u, hierarchy)) * (0.34 * core + 0.50 * trail + 0.16 * fringe)
+        if in_air:
+            alpha *= 0.34
+        alpha *= float(_clamp(1.0 - 0.44 * gap_u, 0.18, 1.0))
+        rgb_num = (
+            np.asarray(base_rgb, dtype=float).reshape(1, 3) * (0.34 * core + 0.10 * fringe).reshape(-1, 1)
+            + np.asarray(streak_rgb, dtype=float).reshape(1, 3) * (0.58 * trail + 0.18 * core).reshape(-1, 1)
+            + np.asarray(hot_rgb, dtype=float).reshape(1, 3) * (0.20 * fringe + 0.08 * core).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.44 * core + 0.58 * trail + 0.20 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _road_reflection_rgba(
+        self,
+        *,
+        key: str,
+        corner: str,
+        tire_force_n: float,
+        wheel_gap_m: float,
+        speed_m_s: float,
+        hierarchy_u: float,
+        in_air: bool,
+    ) -> tuple[float, float, float, float]:
+        force_cap = float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0)))
+        load_u = float(_clamp(float(max(0.0, tire_force_n)) / force_cap, 0.0, 1.0))
+        gap_u = float(_clamp(float(max(0.0, wheel_gap_m)) / 0.10, 0.0, 1.0))
+        speed_u = float(_clamp(abs(float(speed_m_s)) / 35.0, 0.0, 1.0))
+        hierarchy = float(_clamp(hierarchy_u, 0.0, 1.0))
+        if self._corner_is_front(str(corner)):
+            base_rgb = _palette_rgb(
+                [
+                    (0.00, (92, 206, 255)),
+                    (0.58, (142, 255, 238)),
+                    (1.00, (228, 246, 255)),
+                ],
+                0.30 + 0.52 * max(load_u, hierarchy),
+            )
+        else:
+            base_rgb = _palette_rgb(
+                [
+                    (0.00, (255, 164, 106)),
+                    (0.58, (255, 214, 126)),
+                    (1.00, (255, 242, 196)),
+                ],
+                0.26 + 0.56 * max(load_u, hierarchy),
+            )
+        refl_rgb = _boost_rgb(base_rgb, 0.08 + 0.18 * speed_u + 0.10 * hierarchy)
+        alpha = 0.02 + 0.12 * max(load_u, speed_u, hierarchy)
+        if in_air:
+            alpha *= 0.34
+        alpha *= float(_clamp(1.0 - 0.48 * gap_u, 0.16, 1.0))
+        rgba_target = tuple(float(v) / 255.0 for v in refl_rgb) + (float(_clamp(alpha, 0.02, 0.22)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.16)
+
     def _contact_accent_ring_rgba(
         self,
         *,
@@ -7106,6 +7556,1434 @@ class Car3DWidget(QtWidgets.QWidget):
         )
         return np.asarray(rgba, dtype=np.uint8)
 
+    def _underbody_glow_rgba(
+        self,
+        *,
+        key: str,
+        load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(_clamp(0.38 * float(load_u) + 0.36 * float(spring_energy_u) + 0.26 * float(glass_energy_u), 0.0, 1.0))
+        glow_rgb = _palette_rgb(
+            [
+                (0.00, (86, 180, 255)),
+                (0.46, (120, 255, 232)),
+                (0.78, (255, 222, 124)),
+                (1.00, (255, 160, 96)),
+            ],
+            energy,
+        )
+        glow_rgb = _boost_rgb(glow_rgb, 0.06 + 0.18 * energy)
+        alpha = 0.04 + 0.14 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in glow_rgb) + (float(_clamp(alpha, 0.03, 0.20)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.16)
+
+    def _underbody_glow_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        view_dir_xyz: np.ndarray,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        view_dir = _norm_or(np.asarray(view_dir_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        view_bias = np.asarray(np.clip(0.5 + 0.5 * np.dot(rel, view_dir) / max(rad_u, rad_v), 0.0, 1.0), dtype=float)
+        energy = float(_clamp(0.38 * float(load_u) + 0.36 * float(spring_energy_u) + 0.26 * float(glass_energy_u), 0.0, 1.0))
+        core_rgb = _palette_rgb(
+            [
+                (0.00, (90, 194, 255)),
+                (0.42, (120, 255, 234)),
+                (0.76, (255, 222, 124)),
+                (1.00, (255, 160, 96)),
+            ],
+            energy,
+        )
+        veil_rgb = _lerp_rgb((48, 90, 148), core_rgb, 0.38 + 0.34 * energy)
+        rim_rgb = _boost_rgb(core_rgb, 0.10 + 0.16 * energy)
+        core = np.exp(-((rr / 0.42) ** 2))
+        veil = np.exp(-(((rr - 0.34) / 0.26) ** 2))
+        fringe = np.exp(-(((rr - 0.86) / 0.16) ** 2))
+        alpha = (0.02 + 0.10 * energy) * (0.54 * core + 0.30 * veil + 0.16 * fringe)
+        alpha *= np.asarray(np.clip(0.78 + 0.36 * view_bias, 0.40, 1.0), dtype=float)
+        rgb_num = (
+            np.asarray(veil_rgb, dtype=float).reshape(1, 3) * (0.40 * veil + 0.18 * fringe).reshape(-1, 1)
+            + np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.42 * core + 0.18 * veil).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.18 * fringe + 0.12 * core).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.54 * core + 0.40 * veil + 0.18 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _body_silhouette_rgba(
+        self,
+        *,
+        key: str,
+        load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        view_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(_clamp(0.34 * float(load_u) + 0.34 * float(spring_energy_u) + 0.20 * float(glass_energy_u) + 0.12 * float(view_u), 0.0, 1.0))
+        line_rgb = _palette_rgb(
+            [
+                (0.00, (156, 220, 255)),
+                (0.42, (132, 255, 236)),
+                (0.78, (255, 226, 132)),
+                (1.00, (255, 178, 112)),
+            ],
+            energy,
+        )
+        line_rgb = _boost_rgb(line_rgb, 0.08 + 0.18 * energy)
+        alpha = 0.10 + 0.20 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in line_rgb) + (float(_clamp(alpha, 0.08, 0.34)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.16)
+
+    def _body_top_sheen_rgba(
+        self,
+        *,
+        key: str,
+        load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        view_u: float,
+        speed_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(
+            _clamp(
+                0.24 * float(load_u)
+                + 0.22 * float(spring_energy_u)
+                + 0.26 * float(glass_energy_u)
+                + 0.18 * float(view_u)
+                + 0.10 * float(speed_u),
+                0.0,
+                1.0,
+            )
+        )
+        sheen_rgb = _palette_rgb(
+            [
+                (0.00, (150, 214, 255)),
+                (0.42, (136, 255, 238)),
+                (0.78, (255, 230, 138)),
+                (1.00, (255, 184, 118)),
+            ],
+            energy,
+        )
+        sheen_rgb = _boost_rgb(sheen_rgb, 0.08 + 0.18 * energy)
+        alpha = 0.03 + 0.12 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in sheen_rgb) + (float(_clamp(alpha, 0.02, 0.18)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.16)
+
+    def _body_top_sheen_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        view_dir_xyz: np.ndarray,
+        speed_u: float,
+        sweep_phase_u: float,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        view_dir = _norm_or(np.asarray(view_dir_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        view_bias = np.asarray(np.clip(0.5 + 0.5 * np.dot(rel, view_dir) / max(rad_u, rad_v), 0.0, 1.0), dtype=float)
+        energy = float(
+            _clamp(
+                0.24 * float(load_u)
+                + 0.22 * float(spring_energy_u)
+                + 0.26 * float(glass_energy_u)
+                + 0.18 * float(speed_u)
+                + 0.10 * float(sweep_phase_u),
+                0.0,
+                1.0,
+            )
+        )
+        core_rgb = _palette_rgb(
+            [
+                (0.00, (142, 212, 255)),
+                (0.40, (134, 255, 238)),
+                (0.78, (255, 228, 134)),
+                (1.00, (255, 182, 114)),
+            ],
+            energy,
+        )
+        veil_rgb = _lerp_rgb((72, 108, 168), core_rgb, 0.34 + 0.34 * energy)
+        sweep_rgb = _boost_rgb(core_rgb, 0.12 + 0.18 * energy)
+        core = np.exp(-((rr / 0.44) ** 2))
+        sweep = np.exp(-(((du - (-0.22 + 0.44 * float(sweep_phase_u))) / (0.20 + 0.10 * float(speed_u))) ** 2)) * np.exp(-((dv / 0.22) ** 2))
+        fringe = np.exp(-(((rr - 0.86) / 0.16) ** 2))
+        alpha = (0.02 + 0.08 * energy) * (0.42 * core + 0.42 * sweep + 0.16 * fringe)
+        alpha *= np.asarray(np.clip(0.72 + 0.40 * view_bias, 0.38, 1.0), dtype=float)
+        rgb_num = (
+            np.asarray(veil_rgb, dtype=float).reshape(1, 3) * (0.40 * core + 0.16 * fringe).reshape(-1, 1)
+            + np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.32 * core + 0.18 * sweep).reshape(-1, 1)
+            + np.asarray(sweep_rgb, dtype=float).reshape(1, 3) * (0.44 * sweep + 0.16 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.56 * core + 0.44 * sweep + 0.16 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _body_top_sweep_rgba(
+        self,
+        *,
+        key: str,
+        load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(_clamp(0.22 * float(load_u) + 0.20 * float(spring_energy_u) + 0.22 * float(glass_energy_u) + 0.36 * float(speed_u), 0.0, 1.0))
+        sweep_rgb = _palette_rgb(
+            [
+                (0.00, (176, 226, 255)),
+                (0.44, (154, 255, 242)),
+                (0.80, (255, 232, 142)),
+                (1.00, (255, 188, 120)),
+            ],
+            energy,
+        )
+        sweep_rgb = _boost_rgb(sweep_rgb, 0.10 + 0.20 * energy)
+        alpha = 0.06 + 0.16 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in sweep_rgb) + (float(_clamp(alpha, 0.04, 0.24)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.14)
+
+    def _body_end_aura_rgba(
+        self,
+        *,
+        key: str,
+        front: bool,
+        load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+        view_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(
+            _clamp(
+                0.30 * float(load_u)
+                + 0.24 * float(glass_energy_u)
+                + 0.22 * float(speed_u)
+                + 0.24 * float(view_u),
+                0.0,
+                1.0,
+            )
+        )
+        if bool(front):
+            aura_rgb = _palette_rgb(
+                [
+                    (0.00, (132, 214, 255)),
+                    (0.42, (138, 255, 242)),
+                    (1.00, (230, 246, 255)),
+                ],
+                energy,
+            )
+        else:
+            aura_rgb = _palette_rgb(
+                [
+                    (0.00, (255, 172, 116)),
+                    (0.46, (255, 220, 136)),
+                    (1.00, (255, 242, 202)),
+                ],
+                energy,
+            )
+        aura_rgb = _boost_rgb(aura_rgb, 0.10 + 0.18 * energy)
+        alpha = 0.03 + 0.12 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in aura_rgb) + (float(_clamp(alpha, 0.02, 0.18)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.16)
+
+    def _body_end_aura_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        front: bool,
+        load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+        view_u: float,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        energy = float(
+            _clamp(
+                0.30 * float(load_u)
+                + 0.24 * float(glass_energy_u)
+                + 0.22 * float(speed_u)
+                + 0.24 * float(view_u),
+                0.0,
+                1.0,
+            )
+        )
+        if bool(front):
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (122, 212, 255)),
+                    (0.46, (134, 255, 242)),
+                    (1.00, (228, 244, 255)),
+                ],
+                energy,
+            )
+            veil_rgb = _lerp_rgb((72, 114, 170), core_rgb, 0.36 + 0.32 * energy)
+        else:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (255, 174, 118)),
+                    (0.48, (255, 220, 136)),
+                    (1.00, (255, 242, 202)),
+                ],
+                energy,
+            )
+            veil_rgb = _lerp_rgb((128, 82, 64), core_rgb, 0.34 + 0.34 * energy)
+        rim_rgb = _boost_rgb(core_rgb, 0.10 + 0.16 * energy)
+        core = np.exp(-((rr / 0.40) ** 2))
+        bloom = np.exp(-(((du - (-0.06 if front else 0.06)) / (0.28 + 0.10 * speed_u)) ** 2)) * np.exp(-((dv / 0.32) ** 2))
+        fringe = np.exp(-(((rr - 0.84) / 0.18) ** 2))
+        alpha = (0.02 + 0.10 * energy) * (0.40 * core + 0.40 * bloom + 0.20 * fringe)
+        rgb_num = (
+            np.asarray(veil_rgb, dtype=float).reshape(1, 3) * (0.36 * core + 0.18 * fringe).reshape(-1, 1)
+            + np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.26 * core + 0.26 * bloom).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.36 * bloom + 0.14 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.48 * core + 0.40 * bloom + 0.20 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _body_spine_rgba(
+        self,
+        *,
+        key: str,
+        load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(_clamp(0.20 * float(load_u) + 0.24 * float(spring_energy_u) + 0.28 * float(glass_energy_u) + 0.28 * float(speed_u), 0.0, 1.0))
+        spine_rgb = _palette_rgb(
+            [
+                (0.00, (186, 232, 255)),
+                (0.44, (164, 255, 244)),
+                (0.82, (255, 236, 148)),
+                (1.00, (255, 196, 126)),
+            ],
+            energy,
+        )
+        spine_rgb = _boost_rgb(spine_rgb, 0.08 + 0.18 * energy)
+        alpha = 0.08 + 0.18 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in spine_rgb) + (float(_clamp(alpha, 0.06, 0.28)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.14)
+
+    def _scene_side_curtain_rgba(
+        self,
+        *,
+        key: str,
+        side_sign: float,
+        mean_load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+        view_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(
+            _clamp(
+                0.24 * float(mean_load_u)
+                + 0.22 * float(glass_energy_u)
+                + 0.22 * float(speed_u)
+                + 0.32 * float(view_u),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        base_rgb = _palette_rgb(
+            [
+                (0.00, (114, 206, 255) if left_side else (255, 176, 116)),
+                (0.46, (138, 255, 242) if left_side else (255, 220, 136)),
+                (1.00, (226, 244, 255) if left_side else (255, 242, 204)),
+            ],
+            energy,
+        )
+        base_rgb = _boost_rgb(base_rgb, 0.08 + 0.18 * energy)
+        alpha = 0.03 + 0.12 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in base_rgb) + (float(_clamp(alpha, 0.02, 0.18)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.16)
+
+    def _scene_side_curtain_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        side_sign: float,
+        mean_load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+        view_u: float,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        energy = float(
+            _clamp(
+                0.24 * float(mean_load_u)
+                + 0.22 * float(glass_energy_u)
+                + 0.22 * float(speed_u)
+                + 0.32 * float(view_u),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        if left_side:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (108, 202, 255)),
+                    (0.48, (136, 255, 242)),
+                    (1.00, (224, 242, 255)),
+                ],
+                energy,
+            )
+            veil_rgb = _lerp_rgb((62, 112, 172), core_rgb, 0.34 + 0.34 * energy)
+        else:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (255, 174, 118)),
+                    (0.48, (255, 220, 138)),
+                    (1.00, (255, 242, 204)),
+                ],
+                energy,
+            )
+            veil_rgb = _lerp_rgb((132, 84, 62), core_rgb, 0.34 + 0.34 * energy)
+        rim_rgb = _boost_rgb(core_rgb, 0.10 + 0.16 * energy)
+        core = np.exp(-((rr / 0.44) ** 2))
+        veil = np.exp(-(((du - 0.12 * float(np.sign(side_sign) or 1.0)) / (0.34 + 0.10 * speed_u)) ** 2)) * np.exp(-((dv / 0.54) ** 2))
+        fringe = np.exp(-(((rr - 0.88) / 0.18) ** 2))
+        alpha = (0.02 + 0.10 * energy) * (0.42 * core + 0.36 * veil + 0.22 * fringe)
+        rgb_num = (
+            np.asarray(veil_rgb, dtype=float).reshape(1, 3) * (0.34 * core + 0.18 * fringe).reshape(-1, 1)
+            + np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.30 * core + 0.22 * veil).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.32 * veil + 0.18 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.46 * core + 0.36 * veil + 0.22 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _scene_portal_rgba(
+        self,
+        *,
+        key: str,
+        mean_load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(_clamp(0.22 * float(mean_load_u) + 0.22 * float(spring_energy_u) + 0.24 * float(glass_energy_u) + 0.32 * float(speed_u), 0.0, 1.0))
+        portal_rgb = _palette_rgb(
+            [
+                (0.00, (184, 228, 255)),
+                (0.46, (162, 255, 244)),
+                (0.84, (255, 234, 146)),
+                (1.00, (255, 196, 126)),
+            ],
+            energy,
+        )
+        portal_rgb = _boost_rgb(portal_rgb, 0.10 + 0.20 * energy)
+        alpha = 0.08 + 0.18 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in portal_rgb) + (float(_clamp(alpha, 0.06, 0.26)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.14)
+
+    def _speed_corridor_rgba(
+        self,
+        *,
+        key: str,
+        side_sign: float,
+        mean_load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(
+            _clamp(
+                0.22 * float(mean_load_u)
+                + 0.24 * float(glass_energy_u)
+                + 0.54 * float(speed_u),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        base_rgb = _palette_rgb(
+            [
+                (0.00, (98, 194, 255) if left_side else (255, 176, 116)),
+                (0.46, (132, 255, 240) if left_side else (255, 220, 138)),
+                (1.00, (220, 242, 255) if left_side else (255, 242, 204)),
+            ],
+            energy,
+        )
+        base_rgb = _boost_rgb(base_rgb, 0.10 + 0.18 * energy)
+        alpha = 0.03 + 0.14 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in base_rgb) + (float(_clamp(alpha, 0.02, 0.20)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.16)
+
+    def _speed_corridor_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        side_sign: float,
+        mean_load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        side_signed = dv * float(1.0 if float(side_sign) >= 0.0 else -1.0)
+        energy = float(
+            _clamp(
+                0.22 * float(mean_load_u)
+                + 0.24 * float(glass_energy_u)
+                + 0.54 * float(speed_u),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        if left_side:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (92, 188, 255)),
+                    (0.48, (130, 255, 240)),
+                    (1.00, (218, 240, 255)),
+                ],
+                energy,
+            )
+            veil_rgb = _lerp_rgb((56, 110, 176), core_rgb, 0.34 + 0.34 * energy)
+        else:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (255, 176, 118)),
+                    (0.48, (255, 220, 140)),
+                    (1.00, (255, 242, 204)),
+                ],
+                energy,
+            )
+            veil_rgb = _lerp_rgb((138, 88, 62), core_rgb, 0.34 + 0.34 * energy)
+        rim_rgb = _boost_rgb(core_rgb, 0.12 + 0.18 * energy)
+        core = np.exp(-((du / (0.38 + 0.24 * speed_u)) ** 2) - ((dv / 0.28) ** 2))
+        trail = np.exp(-(((du - 0.20) / (0.44 + 0.30 * speed_u)) ** 2)) * np.exp(-(((side_signed + 0.10) / 0.24) ** 2))
+        fringe = np.exp(-(((rr - 0.86) / 0.18) ** 2))
+        alpha = (0.02 + 0.12 * energy) * (0.34 * core + 0.46 * trail + 0.20 * fringe)
+        rgb_num = (
+            np.asarray(veil_rgb, dtype=float).reshape(1, 3) * (0.30 * core + 0.18 * fringe).reshape(-1, 1)
+            + np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.26 * core + 0.24 * trail).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.40 * trail + 0.18 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.42 * core + 0.46 * trail + 0.20 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _rear_wake_rgba(
+        self,
+        *,
+        key: str,
+        side_sign: float,
+        mean_load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(
+            _clamp(
+                0.16 * float(mean_load_u)
+                + 0.20 * float(glass_energy_u)
+                + 0.64 * float(speed_u),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        base_rgb = _palette_rgb(
+            [
+                (0.00, (88, 168, 238) if left_side else (224, 144, 102)),
+                (0.54, (124, 230, 255) if left_side else (255, 196, 126)),
+                (1.00, (210, 236, 255) if left_side else (255, 232, 188)),
+            ],
+            energy,
+        )
+        base_rgb = _boost_rgb(base_rgb, 0.08 + 0.20 * energy)
+        alpha = 0.02 + 0.16 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in base_rgb) + (float(_clamp(alpha, 0.02, 0.22)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.16)
+
+    def _rear_wake_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        side_sign: float,
+        mean_load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        side_signed = dv * float(1.0 if float(side_sign) >= 0.0 else -1.0)
+        energy = float(
+            _clamp(
+                0.16 * float(mean_load_u)
+                + 0.20 * float(glass_energy_u)
+                + 0.64 * float(speed_u),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        if left_side:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (86, 166, 236)),
+                    (0.52, (120, 230, 255)),
+                    (1.00, (208, 236, 255)),
+                ],
+                energy,
+            )
+            wake_rgb = _lerp_rgb((48, 92, 156), core_rgb, 0.28 + 0.42 * energy)
+        else:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (224, 144, 102)),
+                    (0.52, (255, 196, 126)),
+                    (1.00, (255, 232, 188)),
+                ],
+                energy,
+            )
+            wake_rgb = _lerp_rgb((124, 76, 54), core_rgb, 0.28 + 0.42 * energy)
+        rim_rgb = _boost_rgb(core_rgb, 0.10 + 0.18 * energy)
+        core = np.exp(-(((du + 0.04) / (0.22 + 0.16 * speed_u)) ** 2) - ((dv / 0.20) ** 2))
+        wake = np.exp(-(((du + 0.30) / (0.44 + 0.40 * speed_u)) ** 2)) * np.exp(-(((side_signed - 0.04) / 0.26) ** 2))
+        fringe = np.exp(-(((rr - 0.82) / 0.20) ** 2))
+        alpha = (0.02 + 0.14 * energy) * (0.28 * core + 0.56 * wake + 0.16 * fringe)
+        rgb_num = (
+            np.asarray(wake_rgb, dtype=float).reshape(1, 3) * (0.40 * wake + 0.14 * fringe).reshape(-1, 1)
+            + np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.28 * core + 0.14 * wake).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.18 * core + 0.22 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.28 * core + 0.54 * wake + 0.18 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _road_speed_spine_rgba(
+        self,
+        *,
+        key: str,
+        mean_load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(
+            _clamp(
+                0.18 * float(mean_load_u)
+                + 0.18 * float(spring_energy_u)
+                + 0.20 * float(glass_energy_u)
+                + 0.44 * float(speed_u),
+                0.0,
+                1.0,
+            )
+        )
+        base_rgb = _palette_rgb(
+            [
+                (0.00, (118, 210, 255)),
+                (0.48, (168, 255, 238)),
+                (0.84, (255, 234, 146)),
+                (1.00, (255, 206, 132)),
+            ],
+            energy,
+        )
+        base_rgb = _boost_rgb(base_rgb, 0.10 + 0.20 * energy)
+        alpha = 0.03 + 0.16 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in base_rgb) + (float(_clamp(alpha, 0.03, 0.24)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.15)
+
+    def _road_speed_spine_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        mean_load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        energy = float(
+            _clamp(
+                0.18 * float(mean_load_u)
+                + 0.18 * float(spring_energy_u)
+                + 0.20 * float(glass_energy_u)
+                + 0.44 * float(speed_u),
+                0.0,
+                1.0,
+            )
+        )
+        core_rgb = _palette_rgb(
+            [
+                (0.00, (112, 206, 255)),
+                (0.48, (162, 255, 236)),
+                (0.84, (255, 232, 142)),
+                (1.00, (255, 202, 128)),
+            ],
+            energy,
+        )
+        beam_rgb = _lerp_rgb((76, 126, 194), core_rgb, 0.30 + 0.46 * energy)
+        rim_rgb = _boost_rgb(core_rgb, 0.12 + 0.18 * energy)
+        core = np.exp(-((du / (0.24 + 0.18 * speed_u)) ** 2) - ((dv / 0.22) ** 2))
+        beam = np.exp(-((du / (0.48 + 0.34 * speed_u)) ** 2)) * np.exp(-((dv / 0.12) ** 2))
+        fringe = np.exp(-(((rr - 0.80) / 0.20) ** 2))
+        alpha = (0.02 + 0.14 * energy) * (0.34 * core + 0.48 * beam + 0.18 * fringe)
+        rgb_num = (
+            np.asarray(beam_rgb, dtype=float).reshape(1, 3) * (0.40 * beam + 0.12 * fringe).reshape(-1, 1)
+            + np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.30 * core + 0.16 * beam).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.12 * core + 0.20 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.30 * core + 0.48 * beam + 0.22 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _front_bow_wave_rgba(
+        self,
+        *,
+        key: str,
+        side_sign: float,
+        mean_load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(
+            _clamp(
+                0.14 * float(mean_load_u)
+                + 0.18 * float(spring_energy_u)
+                + 0.18 * float(glass_energy_u)
+                + 0.50 * float(speed_u),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        base_rgb = _palette_rgb(
+            [
+                (0.00, (112, 204, 255) if left_side else (255, 178, 118)),
+                (0.50, (156, 255, 236) if left_side else (255, 220, 136)),
+                (1.00, (232, 244, 255) if left_side else (255, 240, 196)),
+            ],
+            energy,
+        )
+        base_rgb = _boost_rgb(base_rgb, 0.08 + 0.20 * energy)
+        alpha = 0.03 + 0.15 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in base_rgb) + (float(_clamp(alpha, 0.03, 0.22)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.15)
+
+    def _front_bow_wave_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        side_sign: float,
+        mean_load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        side_signed = dv * float(1.0 if float(side_sign) >= 0.0 else -1.0)
+        energy = float(
+            _clamp(
+                0.14 * float(mean_load_u)
+                + 0.18 * float(spring_energy_u)
+                + 0.18 * float(glass_energy_u)
+                + 0.50 * float(speed_u),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        if left_side:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (106, 198, 255)),
+                    (0.50, (152, 255, 234)),
+                    (1.00, (230, 242, 255)),
+                ],
+                energy,
+            )
+            wave_rgb = _lerp_rgb((64, 114, 184), core_rgb, 0.32 + 0.40 * energy)
+        else:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (255, 176, 118)),
+                    (0.50, (255, 220, 134)),
+                    (1.00, (255, 240, 194)),
+                ],
+                energy,
+            )
+            wave_rgb = _lerp_rgb((142, 88, 60), core_rgb, 0.32 + 0.40 * energy)
+        rim_rgb = _boost_rgb(core_rgb, 0.10 + 0.18 * energy)
+        core = np.exp(-(((du + 0.08) / (0.26 + 0.18 * speed_u)) ** 2) - ((dv / 0.20) ** 2))
+        wave = np.exp(-(((du - 0.22) / (0.28 + 0.24 * speed_u)) ** 2)) * np.exp(-(((side_signed - 0.10) / 0.22) ** 2))
+        fringe = np.exp(-(((rr - 0.82) / 0.18) ** 2))
+        alpha = (0.02 + 0.14 * energy) * (0.28 * core + 0.54 * wave + 0.18 * fringe)
+        rgb_num = (
+            np.asarray(wave_rgb, dtype=float).reshape(1, 3) * (0.42 * wave + 0.12 * fringe).reshape(-1, 1)
+            + np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.26 * core + 0.16 * wave).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.14 * core + 0.18 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.28 * core + 0.52 * wave + 0.20 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _front_corner_shear_rgba(
+        self,
+        *,
+        key: str,
+        side_sign: float,
+        mean_load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(
+            _clamp(
+                0.16 * float(mean_load_u)
+                + 0.18 * float(spring_energy_u)
+                + 0.18 * float(glass_energy_u)
+                + 0.48 * float(speed_u),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        base_rgb = _palette_rgb(
+            [
+                (0.00, (118, 210, 255) if left_side else (255, 182, 124)),
+                (0.48, (164, 255, 238) if left_side else (255, 224, 142)),
+                (1.00, (236, 246, 255) if left_side else (255, 242, 204)),
+            ],
+            energy,
+        )
+        base_rgb = _boost_rgb(base_rgb, 0.08 + 0.18 * energy)
+        alpha = 0.03 + 0.14 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in base_rgb) + (float(_clamp(alpha, 0.03, 0.20)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.15)
+
+    def _front_corner_shear_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        side_sign: float,
+        mean_load_u: float,
+        spring_energy_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        side_signed = dv * float(1.0 if float(side_sign) >= 0.0 else -1.0)
+        energy = float(
+            _clamp(
+                0.16 * float(mean_load_u)
+                + 0.18 * float(spring_energy_u)
+                + 0.18 * float(glass_energy_u)
+                + 0.48 * float(speed_u),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        if left_side:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (112, 206, 255)),
+                    (0.48, (160, 255, 236)),
+                    (1.00, (234, 244, 255)),
+                ],
+                energy,
+            )
+            shear_rgb = _lerp_rgb((76, 124, 194), core_rgb, 0.30 + 0.42 * energy)
+        else:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (255, 180, 122)),
+                    (0.48, (255, 224, 140)),
+                    (1.00, (255, 242, 202)),
+                ],
+                energy,
+            )
+            shear_rgb = _lerp_rgb((146, 92, 62), core_rgb, 0.30 + 0.42 * energy)
+        rim_rgb = _boost_rgb(core_rgb, 0.10 + 0.18 * energy)
+        core = np.exp(-(((du + 0.02) / (0.24 + 0.16 * speed_u)) ** 2) - ((dv / 0.18) ** 2))
+        shear = np.exp(-(((du - 0.16) / (0.30 + 0.20 * speed_u)) ** 2)) * np.exp(-(((side_signed - 0.06) / 0.20) ** 2))
+        fringe = np.exp(-(((rr - 0.84) / 0.18) ** 2))
+        alpha = (0.02 + 0.13 * energy) * (0.28 * core + 0.54 * shear + 0.18 * fringe)
+        rgb_num = (
+            np.asarray(shear_rgb, dtype=float).reshape(1, 3) * (0.42 * shear + 0.12 * fringe).reshape(-1, 1)
+            + np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.26 * core + 0.16 * shear).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.14 * core + 0.18 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.28 * core + 0.52 * shear + 0.20 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _wheel_lane_streak_rgba(
+        self,
+        *,
+        key: str,
+        side_sign: float,
+        front: bool,
+        load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(
+            _clamp(
+                0.24 * float(load_u)
+                + 0.18 * float(glass_energy_u)
+                + 0.48 * float(speed_u)
+                + (0.10 if bool(front) else 0.04),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        base_rgb = _palette_rgb(
+            [
+                (0.00, (104, 194, 255) if left_side else (255, 174, 116)),
+                (0.48, (148, 255, 236) if left_side else (255, 220, 138)),
+                (1.00, (232, 244, 255) if left_side else (255, 238, 198)),
+            ],
+            energy,
+        )
+        base_rgb = _boost_rgb(base_rgb, 0.08 + 0.18 * energy)
+        alpha = (0.02 + 0.12 * energy) * (1.06 if bool(front) else 0.94)
+        rgba_target = tuple(float(v) / 255.0 for v in base_rgb) + (float(_clamp(alpha, 0.02, 0.18)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.15)
+
+    def _wheel_lane_streak_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        side_sign: float,
+        front: bool,
+        load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        side_signed = dv * float(1.0 if float(side_sign) >= 0.0 else -1.0)
+        energy = float(
+            _clamp(
+                0.24 * float(load_u)
+                + 0.18 * float(glass_energy_u)
+                + 0.48 * float(speed_u)
+                + (0.10 if bool(front) else 0.04),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        if left_side:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (100, 190, 255)),
+                    (0.48, (144, 255, 234)),
+                    (1.00, (230, 242, 255)),
+                ],
+                energy,
+            )
+            trail_rgb = _lerp_rgb((72, 118, 188), core_rgb, 0.30 + 0.40 * energy)
+        else:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (255, 172, 114)),
+                    (0.48, (255, 218, 136)),
+                    (1.00, (255, 238, 196)),
+                ],
+                energy,
+            )
+            trail_rgb = _lerp_rgb((142, 88, 60), core_rgb, 0.30 + 0.40 * energy)
+        rim_rgb = _boost_rgb(core_rgb, 0.10 + 0.18 * energy)
+        core = np.exp(-((du / (0.26 + 0.18 * speed_u)) ** 2) - ((dv / 0.14) ** 2))
+        trail = np.exp(-(((du + (0.06 if bool(front) else 0.10)) / (0.42 + 0.22 * speed_u)) ** 2)) * np.exp(-(((side_signed - 0.02) / 0.16) ** 2))
+        fringe = np.exp(-(((rr - 0.88) / 0.16) ** 2))
+        alpha = (0.02 + 0.12 * energy) * (0.30 * core + 0.52 * trail + 0.18 * fringe)
+        rgb_num = (
+            np.asarray(trail_rgb, dtype=float).reshape(1, 3) * (0.42 * trail + 0.12 * fringe).reshape(-1, 1)
+            + np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.26 * core + 0.16 * trail).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.12 * core + 0.18 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.28 * core + 0.52 * trail + 0.20 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _track_shoulder_rgba(
+        self,
+        *,
+        key: str,
+        side_sign: float,
+        mean_load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(
+            _clamp(
+                0.22 * float(mean_load_u)
+                + 0.18 * float(glass_energy_u)
+                + 0.50 * float(speed_u),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        base_rgb = _palette_rgb(
+            [
+                (0.00, (96, 186, 248) if left_side else (230, 160, 108)),
+                (0.48, (138, 244, 246) if left_side else (255, 208, 130)),
+                (1.00, (218, 238, 255) if left_side else (255, 234, 188)),
+            ],
+            energy,
+        )
+        base_rgb = _boost_rgb(base_rgb, 0.06 + 0.16 * energy)
+        alpha = 0.02 + 0.12 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in base_rgb) + (float(_clamp(alpha, 0.02, 0.17)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.16)
+
+    def _track_shoulder_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        side_sign: float,
+        mean_load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        side_signed = dv * float(1.0 if float(side_sign) >= 0.0 else -1.0)
+        energy = float(
+            _clamp(
+                0.22 * float(mean_load_u)
+                + 0.18 * float(glass_energy_u)
+                + 0.50 * float(speed_u),
+                0.0,
+                1.0,
+            )
+        )
+        left_side = float(side_sign) >= 0.0
+        if left_side:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (94, 182, 246)),
+                    (0.48, (136, 242, 244)),
+                    (1.00, (216, 236, 255)),
+                ],
+                energy,
+            )
+            veil_rgb = _lerp_rgb((64, 108, 176), core_rgb, 0.30 + 0.36 * energy)
+        else:
+            core_rgb = _palette_rgb(
+                [
+                    (0.00, (228, 158, 106)),
+                    (0.48, (255, 206, 128)),
+                    (1.00, (255, 232, 186)),
+                ],
+                energy,
+            )
+            veil_rgb = _lerp_rgb((132, 84, 58), core_rgb, 0.30 + 0.36 * energy)
+        rim_rgb = _boost_rgb(core_rgb, 0.08 + 0.16 * energy)
+        core = np.exp(-((du / (0.42 + 0.20 * speed_u)) ** 2) - ((dv / 0.28) ** 2))
+        sweep = np.exp(-((du / (0.56 + 0.26 * speed_u)) ** 2)) * np.exp(-(((side_signed - 0.08) / 0.32) ** 2))
+        fringe = np.exp(-(((rr - 0.84) / 0.18) ** 2))
+        alpha = (0.02 + 0.10 * energy) * (0.32 * core + 0.46 * sweep + 0.22 * fringe)
+        rgb_num = (
+            np.asarray(veil_rgb, dtype=float).reshape(1, 3) * (0.34 * sweep + 0.12 * fringe).reshape(-1, 1)
+            + np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.26 * core + 0.16 * sweep).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.12 * core + 0.18 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.28 * core + 0.50 * sweep + 0.22 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
+    def _axle_wash_rgba(
+        self,
+        *,
+        key: str,
+        front: bool,
+        load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> tuple[float, float, float, float]:
+        energy = float(
+            _clamp(
+                0.26 * float(load_u)
+                + 0.16 * float(glass_energy_u)
+                + 0.42 * float(speed_u)
+                + (0.10 if bool(front) else 0.04),
+                0.0,
+                1.0,
+            )
+        )
+        base_rgb = _palette_rgb(
+            [
+                (0.00, (126, 210, 255) if bool(front) else (112, 194, 244)),
+                (0.54, (182, 255, 224) if bool(front) else (152, 234, 255)),
+                (1.00, (255, 236, 150) if bool(front) else (224, 238, 255)),
+            ],
+            energy,
+        )
+        base_rgb = _boost_rgb(base_rgb, 0.08 + 0.16 * energy)
+        alpha = 0.02 + 0.13 * energy
+        rgba_target = tuple(float(v) / 255.0 for v in base_rgb) + (float(_clamp(alpha, 0.02, 0.18)),)
+        return self._smooth_rgba(str(key), rgba_target, response=0.16)
+
+    def _axle_wash_face_colors(
+        self,
+        vertices_xyz: np.ndarray,
+        faces_ijk: np.ndarray,
+        *,
+        center_xyz: np.ndarray,
+        axis_u_xyz: np.ndarray,
+        axis_v_xyz: np.ndarray,
+        radius_u_m: float,
+        radius_v_m: float,
+        front: bool,
+        load_u: float,
+        glass_energy_u: float,
+        speed_u: float,
+    ) -> np.ndarray:
+        verts = np.asarray(vertices_xyz, dtype=float).reshape(-1, 3)
+        faces = np.asarray(faces_ijk, dtype=np.int32).reshape(-1, 3)
+        if verts.shape[0] < 3 or faces.shape[0] < 1:
+            return np.zeros((0, 4), dtype=np.uint8)
+        center = np.asarray(center_xyz, dtype=float).reshape(3)
+        axis_u = _norm_or(np.asarray(axis_u_xyz, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+        axis_v = _norm_or(np.asarray(axis_v_xyz, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+        rad_u = float(max(1e-6, radius_u_m))
+        rad_v = float(max(1e-6, radius_v_m))
+        rel = np.mean(verts[faces], axis=1) - center.reshape(1, 3)
+        du = np.dot(rel, axis_u) / rad_u
+        dv = np.dot(rel, axis_v) / rad_v
+        rr = np.sqrt((du * du) + (dv * dv))
+        energy = float(
+            _clamp(
+                0.26 * float(load_u)
+                + 0.16 * float(glass_energy_u)
+                + 0.42 * float(speed_u)
+                + (0.10 if bool(front) else 0.04),
+                0.0,
+                1.0,
+            )
+        )
+        core_rgb = _palette_rgb(
+            [
+                (0.00, (122, 206, 255) if bool(front) else (108, 190, 242)),
+                (0.54, (178, 255, 222) if bool(front) else (148, 232, 255)),
+                (1.00, (255, 234, 148) if bool(front) else (222, 236, 255)),
+            ],
+            energy,
+        )
+        wash_rgb = _lerp_rgb((84, 124, 188) if bool(front) else (70, 108, 170), core_rgb, 0.30 + 0.40 * energy)
+        rim_rgb = _boost_rgb(core_rgb, 0.10 + 0.16 * energy)
+        core = np.exp(-((du / 0.22) ** 2) - ((dv / (0.42 + 0.14 * speed_u)) ** 2))
+        wash = np.exp(-(((du - (0.08 if bool(front) else -0.08)) / 0.24) ** 2)) * np.exp(-((dv / (0.62 + 0.18 * speed_u)) ** 2))
+        fringe = np.exp(-(((rr - 0.84) / 0.18) ** 2))
+        alpha = (0.02 + 0.11 * energy) * (0.34 * core + 0.44 * wash + 0.22 * fringe)
+        rgb_num = (
+            np.asarray(wash_rgb, dtype=float).reshape(1, 3) * (0.38 * wash + 0.14 * fringe).reshape(-1, 1)
+            + np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.26 * core + 0.18 * wash).reshape(-1, 1)
+            + np.asarray(rim_rgb, dtype=float).reshape(1, 3) * (0.12 * core + 0.18 * fringe).reshape(-1, 1)
+        )
+        rgb_den = np.maximum((0.28 * core + 0.50 * wash + 0.22 * fringe).reshape(-1, 1), 1e-6)
+        rgb = rgb_num / rgb_den
+        rgba = np.column_stack(
+            [
+                np.asarray(np.clip(rgb[:, 0], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 1], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(rgb[:, 2], 0.0, 255.0), dtype=float),
+                np.asarray(np.clip(alpha * 255.0, 0.0, 255.0), dtype=float),
+            ]
+        )
+        return np.asarray(rgba, dtype=np.uint8)
+
     def _contact_bounce_material_rgba(
         self,
         *,
@@ -7229,15 +9107,21 @@ class Car3DWidget(QtWidgets.QWidget):
                    *self._cyl_cap_ring_lines, *self._cyl_gland_ring_lines,
                    *self._cyl_glass_glint_lines, *self._cyl_glass_caustic_lines,
                    *self._spring_glow_lines, *self._contact_accent_rings, *self._corner_key_light_lines,
-                   *self._wheel_spin_glow_lines, *self._wheel_rotor_streak_lines]:
+                   *self._wheel_spin_glow_lines, *self._wheel_crown_glint_lines, *self._wheel_rotor_streak_lines]:
+            if it is not None:
+                try:
+                    self.view.removeItem(it)
+                except Exception:
+                    pass
+        for it in [self._body_silhouette_line, self._body_top_sweep_line, self._body_spine_line, self._scene_portal_line]:
             if it is not None:
                 try:
                     self.view.removeItem(it)
                 except Exception:
                     pass
         for w in [*self._wheel_meshes, *self._wheel_rim_meshes, *self._wheel_hub_meshes, *self._wheel_brake_rotor_meshes, *self._wheel_brake_caliper_meshes, *self._wheel_shadow_meshes,
-                  *self._spring_meshes, *self._spring_seat_meshes, *self._contact_glaze_meshes,
-                  *self._cyl_bloom_card_meshes, *self._scene_fog_meshes, *self._corner_light_shaft_meshes, self._focus_halo_mesh]:
+                  *self._spring_meshes, *self._spring_seat_meshes, *self._contact_glaze_meshes, *self._contact_reflection_meshes,
+                  *self._cyl_bloom_card_meshes, *self._scene_fog_meshes, *self._corner_light_shaft_meshes, self._focus_halo_mesh, self._underbody_glow_mesh, self._body_top_sheen_mesh, *self._body_end_aura_meshes, *self._scene_side_curtain_meshes, *self._speed_corridor_meshes, *self._rear_wake_meshes, self._road_speed_spine_mesh, *self._front_bow_wave_meshes, *self._front_corner_shear_meshes, *self._wheel_lane_streak_meshes, *self._track_shoulder_meshes, *self._axle_wash_meshes]:
             try:
                 self.view.removeItem(w)
             except Exception:
@@ -7248,12 +9132,14 @@ class Car3DWidget(QtWidgets.QWidget):
         self._wheel_brake_rotor_meshes = []
         self._wheel_brake_caliper_meshes = []
         self._wheel_spin_glow_lines = []
+        self._wheel_crown_glint_lines = []
         self._wheel_rotor_streak_lines = []
         self._wheel_shadow_meshes = []
         self._spring_meshes = []
         self._spring_seat_meshes = []
         self._spring_glow_lines = []
         self._contact_glaze_meshes = []
+        self._contact_reflection_meshes = []
         self._contact_accent_rings = []
         self._scene_fog_meshes = []
         self._corner_light_shaft_meshes = []
@@ -7261,6 +9147,22 @@ class Car3DWidget(QtWidgets.QWidget):
         self._cyl_bloom_card_meshes = []
         self._focus_halo_mesh = None
         self._focus_halo_line = None
+        self._underbody_glow_mesh = None
+        self._body_silhouette_line = None
+        self._body_top_sheen_mesh = None
+        self._body_top_sweep_line = None
+        self._body_end_aura_meshes = []
+        self._body_spine_line = None
+        self._scene_side_curtain_meshes = []
+        self._scene_portal_line = None
+        self._speed_corridor_meshes = []
+        self._rear_wake_meshes = []
+        self._road_speed_spine_mesh = None
+        self._front_bow_wave_meshes = []
+        self._front_corner_shear_meshes = []
+        self._wheel_lane_streak_meshes = []
+        self._track_shoulder_meshes = []
+        self._axle_wash_meshes = []
         self._body_shadow_mesh = None
         for meshes in (
             self._arm_lower_meshes,
@@ -7339,6 +9241,17 @@ class Car3DWidget(QtWidgets.QWidget):
             glaze.setVisible(False)
             self.view.addItem(glaze)
             self._contact_glaze_meshes.append(glaze)
+            reflection = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=(0.84, 0.92, 1.00, 0.08),
+                shader=None,
+            )
+            reflection.setGLOptions("translucent")
+            reflection.setVisible(False)
+            self.view.addItem(reflection)
+            self._contact_reflection_meshes.append(reflection)
             accent_ring = gl.GLLinePlotItem(
                 pos=np.zeros((0, 3), dtype=float),
                 color=(0.98, 0.84, 0.30, 0.42),
@@ -7417,6 +9330,185 @@ class Car3DWidget(QtWidgets.QWidget):
         )
         self._focus_halo_line.setVisible(False)
         self.view.addItem(self._focus_halo_line)
+        self._underbody_glow_mesh = gl.GLMeshItem(
+            meshdata=self._empty_meshdata(),
+            smooth=False,
+            drawEdges=False,
+            color=(0.64, 0.94, 1.00, 0.08),
+            shader=None,
+        )
+        self._underbody_glow_mesh.setGLOptions("translucent")
+        self._underbody_glow_mesh.setVisible(False)
+        self.view.addItem(self._underbody_glow_mesh)
+        self._body_silhouette_line = gl.GLLinePlotItem(
+            pos=np.zeros((0, 3), dtype=float),
+            color=(0.88, 0.96, 1.00, 0.24),
+            width=2.8,
+            antialias=True,
+            mode="line_strip",
+        )
+        self._body_silhouette_line.setVisible(False)
+        self.view.addItem(self._body_silhouette_line)
+        self._body_top_sheen_mesh = gl.GLMeshItem(
+            meshdata=self._empty_meshdata(),
+            smooth=False,
+            drawEdges=False,
+            color=(0.82, 0.96, 1.00, 0.08),
+            shader=None,
+        )
+        self._body_top_sheen_mesh.setGLOptions("translucent")
+        self._body_top_sheen_mesh.setVisible(False)
+        self.view.addItem(self._body_top_sheen_mesh)
+        self._body_top_sweep_line = gl.GLLinePlotItem(
+            pos=np.zeros((0, 3), dtype=float),
+            color=(0.92, 0.98, 1.00, 0.20),
+            width=2.4,
+            antialias=True,
+            mode="line_strip",
+        )
+        self._body_top_sweep_line.setVisible(False)
+        self.view.addItem(self._body_top_sweep_line)
+        for aura_rgba in ((0.66, 0.94, 1.00, 0.08), (1.00, 0.86, 0.56, 0.08)):
+            aura = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=aura_rgba,
+                shader=None,
+            )
+            aura.setGLOptions("translucent")
+            aura.setVisible(False)
+            self.view.addItem(aura)
+            self._body_end_aura_meshes.append(aura)
+        self._body_spine_line = gl.GLLinePlotItem(
+            pos=np.zeros((0, 3), dtype=float),
+            color=(0.92, 0.98, 1.00, 0.18),
+            width=2.2,
+            antialias=True,
+            mode="line_strip",
+        )
+        self._body_spine_line.setVisible(False)
+        self.view.addItem(self._body_spine_line)
+        for curtain_rgba in ((0.64, 0.92, 1.00, 0.08), (1.00, 0.86, 0.58, 0.08)):
+            curtain = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=curtain_rgba,
+                shader=None,
+            )
+            curtain.setGLOptions("translucent")
+            curtain.setVisible(False)
+            self.view.addItem(curtain)
+            self._scene_side_curtain_meshes.append(curtain)
+        self._scene_portal_line = gl.GLLinePlotItem(
+            pos=np.zeros((0, 3), dtype=float),
+            color=(0.90, 0.98, 1.00, 0.16),
+            width=2.0,
+            antialias=True,
+            mode="line_strip",
+        )
+        self._scene_portal_line.setVisible(False)
+        self.view.addItem(self._scene_portal_line)
+        for corridor_rgba in ((0.66, 0.94, 1.00, 0.07), (1.00, 0.86, 0.58, 0.07)):
+            corridor = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=corridor_rgba,
+                shader=None,
+            )
+            corridor.setGLOptions("translucent")
+            corridor.setVisible(False)
+            self.view.addItem(corridor)
+            self._speed_corridor_meshes.append(corridor)
+        for wake_rgba in ((0.58, 0.90, 1.00, 0.06), (1.00, 0.82, 0.54, 0.06)):
+            wake = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=wake_rgba,
+                shader=None,
+            )
+            wake.setGLOptions("translucent")
+            wake.setVisible(False)
+            self.view.addItem(wake)
+            self._rear_wake_meshes.append(wake)
+        self._road_speed_spine_mesh = gl.GLMeshItem(
+            meshdata=self._empty_meshdata(),
+            smooth=False,
+            drawEdges=False,
+            color=(0.82, 0.96, 1.00, 0.08),
+            shader=None,
+        )
+        self._road_speed_spine_mesh.setGLOptions("translucent")
+        self._road_speed_spine_mesh.setVisible(False)
+        self.view.addItem(self._road_speed_spine_mesh)
+        for bow_rgba in ((0.66, 0.94, 1.00, 0.06), (1.00, 0.86, 0.58, 0.06)):
+            bow = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=bow_rgba,
+                shader=None,
+            )
+            bow.setGLOptions("translucent")
+            bow.setVisible(False)
+            self.view.addItem(bow)
+            self._front_bow_wave_meshes.append(bow)
+        for shear_rgba in ((0.62, 0.92, 1.00, 0.05), (1.00, 0.84, 0.56, 0.05)):
+            shear = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=shear_rgba,
+                shader=None,
+            )
+            shear.setGLOptions("translucent")
+            shear.setVisible(False)
+            self.view.addItem(shear)
+            self._front_corner_shear_meshes.append(shear)
+        for lane_rgba in (
+            (0.62, 0.92, 1.00, 0.05),
+            (1.00, 0.84, 0.56, 0.05),
+            (0.54, 0.86, 1.00, 0.04),
+            (1.00, 0.80, 0.50, 0.04),
+        ):
+            lane = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=lane_rgba,
+                shader=None,
+            )
+            lane.setGLOptions("translucent")
+            lane.setVisible(False)
+            self.view.addItem(lane)
+            self._wheel_lane_streak_meshes.append(lane)
+        for shoulder_rgba in ((0.56, 0.88, 1.00, 0.04), (1.00, 0.82, 0.54, 0.04)):
+            shoulder = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=shoulder_rgba,
+                shader=None,
+            )
+            shoulder.setGLOptions("translucent")
+            shoulder.setVisible(False)
+            self.view.addItem(shoulder)
+            self._track_shoulder_meshes.append(shoulder)
+        for axle_rgba in ((0.62, 0.92, 1.00, 0.04), (0.56, 0.88, 1.00, 0.04)):
+            axle = gl.GLMeshItem(
+                meshdata=self._empty_meshdata(),
+                smooth=False,
+                drawEdges=False,
+                color=axle_rgba,
+                shader=None,
+            )
+            axle.setGLOptions("translucent")
+            axle.setVisible(False)
+            self.view.addItem(axle)
+            self._axle_wash_meshes.append(axle)
 
         # --- Chassis: box mesh
         # IMPORTANT: use explicit frame geometry from meta.geometry only.
@@ -7515,6 +9607,16 @@ class Car3DWidget(QtWidgets.QWidget):
             spin_glow.setVisible(False)
             self.view.addItem(spin_glow)
             self._wheel_spin_glow_lines.append(spin_glow)
+            crown_glint = gl.GLLinePlotItem(
+                pos=np.zeros((0, 3), dtype=float),
+                color=(0.92, 0.96, 1.00, 0.18),
+                width=2.6,
+                antialias=True,
+                mode="line_strip",
+            )
+            crown_glint.setVisible(False)
+            self.view.addItem(crown_glint)
+            self._wheel_crown_glint_lines.append(crown_glint)
             rotor_streak = gl.GLLinePlotItem(
                 pos=np.zeros((0, 3), dtype=float),
                 color=(1.00, 0.78, 0.34, 0.16),
@@ -7863,7 +9965,7 @@ class Car3DWidget(QtWidgets.QWidget):
             drawEdges=True,
             edgeColor=(0.95, 0.85, 0.25, 0.95),
             color=(0.95, 0.85, 0.25, 0.35),
-            shader=_animator_shader_name(_ANIMATOR_ROAD_SHADER, "shaded"),
+            shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "shaded"),
         )
         self._contact_patch_mesh.setGLOptions("translucent")
         self._contact_patch_mesh.setVisible(False)
@@ -8045,8 +10147,12 @@ class Car3DWidget(QtWidgets.QWidget):
         try:
             if bundle is None:
                 raise ValueError('missing bundle')
-            vx = np.asarray(bundle.get("скорость_vx_м_с", 0.0), dtype=float).reshape(-1)
-            finite_v = np.asarray(np.abs(vx[np.isfinite(vx)]), dtype=float)
+            vx_body, vy_body = bundle.ensure_body_velocity_xy()
+            speed_mag = np.hypot(
+                np.asarray(vx_body, dtype=float).reshape(-1),
+                np.asarray(vy_body, dtype=float).reshape(-1),
+            )
+            finite_v = np.asarray(speed_mag[np.isfinite(speed_mag)], dtype=float)
             if finite_v.size > 0:
                 v_ref = float(np.nanmedian(finite_v))
                 v_max = float(np.nanmax(finite_v))
@@ -8095,8 +10201,9 @@ class Car3DWidget(QtWidgets.QWidget):
             if bundle is None:
                 raise ValueError('missing bundle')
             s_path = np.asarray(bundle.ensure_s_world(), dtype=float).reshape(-1)
-            x_path = np.asarray(bundle.get("путь_x_м", 0.0), dtype=float).reshape(-1)
-            y_path = np.asarray(bundle.get("путь_y_м", 0.0), dtype=float).reshape(-1)
+            x_path, y_path = bundle.ensure_world_xy()
+            x_path = np.asarray(x_path, dtype=float).reshape(-1)
+            y_path = np.asarray(y_path, dtype=float).reshape(-1)
             mask = np.isfinite(s_path) & np.isfinite(x_path) & np.isfinite(y_path)
             if int(np.count_nonzero(mask)) < 2:
                 raise ValueError('insufficient finite path samples')
@@ -8267,6 +10374,12 @@ class Car3DWidget(QtWidgets.QWidget):
                     it.setVisible(False)
             except Exception:
                 pass
+        for it in self._contact_reflection_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
         for it in self._contact_accent_rings:
             try:
                 if not show_road:
@@ -8295,6 +10408,74 @@ class Car3DWidget(QtWidgets.QWidget):
             self._focus_halo_mesh.setVisible(False)
         if self._focus_halo_line is not None and not show_road:
             self._focus_halo_line.setVisible(False)
+        if self._underbody_glow_mesh is not None and not show_road:
+            self._underbody_glow_mesh.setVisible(False)
+        if self._body_silhouette_line is not None and not show_road:
+            self._body_silhouette_line.setVisible(False)
+        if self._body_top_sheen_mesh is not None and not show_road:
+            self._body_top_sheen_mesh.setVisible(False)
+        if self._body_top_sweep_line is not None and not show_road:
+            self._body_top_sweep_line.setVisible(False)
+        for it in self._body_end_aura_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        if self._body_spine_line is not None and not show_road:
+            self._body_spine_line.setVisible(False)
+        for it in self._scene_side_curtain_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        if self._scene_portal_line is not None and not show_road:
+            self._scene_portal_line.setVisible(False)
+        for it in self._speed_corridor_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        for it in self._rear_wake_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        if self._road_speed_spine_mesh is not None and not show_road:
+            self._road_speed_spine_mesh.setVisible(False)
+        for it in self._front_bow_wave_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        for it in self._front_corner_shear_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        for it in self._wheel_lane_streak_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        for it in self._track_shoulder_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
+        for it in self._axle_wash_meshes:
+            try:
+                if not show_road:
+                    it.setVisible(False)
+            except Exception:
+                pass
 
         if self._contact_pts:
             self._contact_pts.setVisible(True)  # always useful
@@ -8309,6 +10490,11 @@ class Car3DWidget(QtWidgets.QWidget):
         if self._contact_patch_mesh and not show_road:
             self._contact_patch_mesh.setVisible(False)
         for it in self._spring_glow_lines:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        for it in self._wheel_crown_glint_lines:
             try:
                 it.setVisible(bool(it.isVisible()))
             except Exception:
@@ -8378,6 +10564,11 @@ class Car3DWidget(QtWidgets.QWidget):
                 it.setVisible(bool(it.isVisible()))
             except Exception:
                 pass
+        for it in self._contact_reflection_meshes:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
         for it in self._corner_light_shaft_meshes:
             try:
                 it.setVisible(bool(it.isVisible()))
@@ -8396,6 +10587,46 @@ class Car3DWidget(QtWidgets.QWidget):
         if self._focus_halo_line is not None:
             try:
                 self._focus_halo_line.setVisible(bool(self._focus_halo_line.isVisible()))
+            except Exception:
+                pass
+        if self._underbody_glow_mesh is not None:
+            try:
+                self._underbody_glow_mesh.setVisible(bool(self._underbody_glow_mesh.isVisible()))
+            except Exception:
+                pass
+        if self._body_silhouette_line is not None:
+            try:
+                self._body_silhouette_line.setVisible(bool(self._body_silhouette_line.isVisible()))
+            except Exception:
+                pass
+        if self._body_top_sheen_mesh is not None:
+            try:
+                self._body_top_sheen_mesh.setVisible(bool(self._body_top_sheen_mesh.isVisible()))
+            except Exception:
+                pass
+        if self._body_top_sweep_line is not None:
+            try:
+                self._body_top_sweep_line.setVisible(bool(self._body_top_sweep_line.isVisible()))
+            except Exception:
+                pass
+        for it in self._body_end_aura_meshes:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        if self._body_spine_line is not None:
+            try:
+                self._body_spine_line.setVisible(bool(self._body_spine_line.isVisible()))
+            except Exception:
+                pass
+        for it in self._scene_side_curtain_meshes:
+            try:
+                it.setVisible(bool(it.isVisible()))
+            except Exception:
+                pass
+        if self._scene_portal_line is not None:
+            try:
+                self._scene_portal_line.setVisible(bool(self._scene_portal_line.isVisible()))
             except Exception:
                 pass
         if self._cyl_piston_markers:
@@ -8418,11 +10649,28 @@ class Car3DWidget(QtWidgets.QWidget):
         if accel_scale is not None:
             self._accel_scale = float(accel_scale)
 
-    def _solver_signed_speed_along_road(self, get_value) -> float:
+    def _solver_signed_speed_along_road(
+        self,
+        b: DataBundle,
+        *,
+        i0: int,
+        i1: int,
+        alpha: float,
+        get_value,
+    ) -> float:
         try:
-            return float(get_value("скорость_vx_м_с", 0.0))
+            return _sample_signed_speed_along_world_path_local(
+                b,
+                i0=int(i0),
+                i1=int(i1),
+                alpha=float(alpha),
+                default_signed_m_s=float(get_value("скорость_vx_м_с", 0.0)),
+            )
         except Exception:
-            return 0.0
+            try:
+                return float(get_value("скорость_vx_м_с", 0.0))
+            except Exception:
+                return 0.0
 
     def _solver_external_acceleration_xy(self, get_value) -> tuple[float, float]:
         try:
@@ -8458,15 +10706,24 @@ class Car3DWidget(QtWidgets.QWidget):
         def _g(name: str, default: float = 0.0) -> float:
             return _sample_series_local(b.get(name, default), i0=i0, i1=i1, alpha=alpha, default=default)
 
+        def _ga(name: str, default: float = 0.0) -> float:
+            return _sample_angle_series_local(b.get(name, default), i0=i0, i1=i1, alpha=alpha, default=default)
+
         # Canonical solver-truth channels only. The user-facing 3D arrows intentionally stay
         # in the road plane and do not mix in heave channels or reconstructed body helpers.
-        speed_along_road = self._solver_signed_speed_along_road(_g)
+        speed_along_road = self._solver_signed_speed_along_road(
+            b,
+            i0=i0,
+            i1=i1,
+            alpha=alpha,
+            get_value=_g,
+        )
         external_ax, external_ay = self._solver_external_acceleration_xy(_g)
 
-        yaw0 = _g("yaw_рад", 0.0)
+        yaw0 = _ga("yaw_рад", 0.0)
 
-        roll = _g("крен_phi_рад", 0.0)
-        pitch = _g("тангаж_theta_рад", 0.0)
+        roll = _ga("крен_phi_рад", 0.0)
+        pitch = _ga("тангаж_theta_рад", 0.0)
         z_body = _g("перемещение_рамы_z_м", 0.0)
 
         # ---- Wheel & road heights (per-corner)
@@ -8652,8 +10909,6 @@ class Car3DWidget(QtWidgets.QWidget):
             wheel_pose_ups.append(_norm_or(up_xyz, np.array([0.0, 0.0, 1.0], dtype=float)))
             wheel_pose_toe.append(float(toe_rad))
             wheel_pose_camber.append(float(camber_rad))
-        camera_view_dir = self._camera_view_direction_local_xyz()
-
         def _set_mesh_from_segment(item: Optional["gl.GLMeshItem"], seg: Optional[tuple[np.ndarray, np.ndarray]], radius_m: float) -> None:
             if item is None or self._unit_cyl_faces is None:
                 return
@@ -8791,6 +11046,7 @@ class Car3DWidget(QtWidgets.QWidget):
                 center_draw = np.asarray([0.0, 0.0, z_body], dtype=float)
                 v_box = (np.asarray(self._box_base_vertices, dtype=float) @ R_local.T) + center_draw
             self._chassis_mesh.setMeshData(meshdata=gl.MeshData(vertexes=v_box, faces=self._box_faces))
+        camera_view_dir = self._camera_view_direction_local_xyz(target_xyz=np.asarray(center_draw, dtype=float).reshape(3))
         base_mean_load_u = float(
             _clamp(
                 float(np.nanmean(np.asarray(tire_forces_n, dtype=float))) / float(max(1.0, getattr(self, "_tire_force_visual_max_n", 4500.0))),
@@ -8921,8 +11177,10 @@ class Car3DWidget(QtWidgets.QWidget):
                     edge_rgba=wheel_edge_rgba,
                 )
                 spin_glow_item = self._wheel_spin_glow_lines[idx] if idx < len(self._wheel_spin_glow_lines) else None
+                crown_glint_item = self._wheel_crown_glint_lines[idx] if idx < len(self._wheel_crown_glint_lines) else None
                 rotor_streak_item = self._wheel_rotor_streak_lines[idx] if idx < len(self._wheel_rotor_streak_lines) else None
                 speed_sign = -1.0 if float(speed_along_road) < -1e-6 else 1.0
+                speed_u = float(_clamp(abs(float(speed_along_road)) / 35.0, 0.0, 1.0))
                 spin_arc_span = speed_sign * (0.40 * np.pi + 0.78 * np.pi * float(_clamp(abs(float(speed_along_road)) / 35.0, 0.0, 1.0)))
                 spin_glow_vertices = self._wheel_spin_arc_vertices(
                     center_xyz=center + axle * (0.44 * float(self.geom.wheel_width)),
@@ -8959,6 +11217,43 @@ class Car3DWidget(QtWidgets.QWidget):
                     edge_floor=0.08,
                     exponent=0.68,
                 )
+                glint_side_sign = 1.0 if float(np.dot(axle, camera_view_dir)) >= 0.0 else -1.0
+                view_phase_sign = 1.0 if float(np.dot(fwd, camera_view_dir)) >= 0.0 else -1.0
+                crown_glint_vertices = self._wheel_spin_arc_vertices(
+                    center_xyz=center + axle * (glint_side_sign * 0.46 * float(self.geom.wheel_width)),
+                    axle_xyz=axle,
+                    forward_xyz=fwd,
+                    up_xyz=up,
+                    radius_m=max(0.045, 0.92 * float(self.geom.wheel_radius)),
+                    start_rad=float(wheel_spin_phase) + view_phase_sign * 0.06 * np.pi,
+                    end_rad=float(wheel_spin_phase) + view_phase_sign * (0.24 * np.pi + 0.26 * np.pi * speed_u),
+                    axial_offset_m=0.0,
+                    segments=30,
+                )
+                crown_glint_rgba = self._wheel_crown_glint_rgba(
+                    key=f"wheel-crown-glint-{corners[idx]}",
+                    speed_m_s=float(speed_along_road),
+                    tire_force_n=float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0,
+                    wheel_gap_m=wheel_gap_m_local,
+                    in_air=bool(wheel_air[idx] > 0.5) if idx < len(wheel_air) else False,
+                )
+                crown_glint_rgba = self._scene_graded_rgba(
+                    key=f"wheel-crown-glint-scene-{corners[idx]}",
+                    rgba=crown_glint_rgba,
+                    exposure=float(scene_grade_base["exposure"]) * float(scene_grade_base["fog_gain"]),
+                    saturation=float(scene_grade_base["saturation"]),
+                    warmth=float(scene_grade_base["warmth"]),
+                    highlight_gain=float(scene_grade_base["highlight_gain"]) * 1.10,
+                    alpha_gain=float(scene_grade_base["alpha_gain"]),
+                    response=0.16,
+                )
+                _set_colored_line_item(
+                    crown_glint_item,
+                    crown_glint_vertices,
+                    crown_glint_rgba,
+                    edge_floor=0.06,
+                    exponent=0.62,
+                )
                 rim_item = self._wheel_rim_meshes[idx] if idx < len(self._wheel_rim_meshes) else None
                 rim_verts, rim_faces = self._wheel_rim_mesh(
                     center_xyz=center,
@@ -8968,7 +11263,7 @@ class Car3DWidget(QtWidgets.QWidget):
                     wheel_radius_m=float(self.geom.wheel_radius),
                     wheel_width_m=float(self.geom.wheel_width),
                     spin_phase_rad=float(wheel_spin_phase),
-                    spoke_count=5,
+                    spoke_count=6,
                 )
                 _set_poly_mesh(rim_item, rim_verts, rim_faces)
                 rim_face_rgba, rim_edge_rgba = self._wheel_rim_material_rgba(
@@ -9003,8 +11298,8 @@ class Car3DWidget(QtWidgets.QWidget):
                 )
                 rotor_item = self._wheel_brake_rotor_meshes[idx] if idx < len(self._wheel_brake_rotor_meshes) else None
                 caliper_item = self._wheel_brake_caliper_meshes[idx] if idx < len(self._wheel_brake_caliper_meshes) else None
-                rotor_radius = max(0.035, 0.64 * float(self.geom.wheel_radius))
-                rotor_half_thickness = max(0.0035, 0.10 * float(self.geom.wheel_width))
+                rotor_radius = max(0.028, 0.46 * float(self.geom.wheel_radius))
+                rotor_half_thickness = max(0.0025, 0.032 * float(self.geom.wheel_width))
                 rotor_seg = (
                     np.asarray(center, dtype=float) - np.asarray(axle, dtype=float) * rotor_half_thickness,
                     np.asarray(center, dtype=float) + np.asarray(axle, dtype=float) * rotor_half_thickness,
@@ -9046,7 +11341,7 @@ class Car3DWidget(QtWidgets.QWidget):
                     axle_xyz=axle,
                     forward_xyz=fwd,
                     up_xyz=up,
-                    radius_m=max(0.03, 0.72 * rotor_radius),
+                    radius_m=max(0.026, 0.84 * rotor_radius),
                     start_rad=float(wheel_spin_phase) + 0.18 * np.pi,
                     end_rad=float(wheel_spin_phase) + speed_sign * (0.26 * np.pi + 0.62 * np.pi * float(_clamp(abs(float(speed_along_road)) / 35.0, 0.0, 1.0))),
                     axial_offset_m=0.10 * float(self.geom.wheel_width),
@@ -9076,18 +11371,18 @@ class Car3DWidget(QtWidgets.QWidget):
                 )
                 caliper_center = (
                     np.asarray(center, dtype=float)
-                    + np.asarray(up, dtype=float) * (0.42 * rotor_radius)
-                    - np.asarray(fwd, dtype=float) * (0.16 * rotor_radius)
-                    + np.asarray(axle, dtype=float) * (0.18 * float(self.geom.wheel_width))
+                    + np.asarray(up, dtype=float) * (0.60 * rotor_radius)
+                    - np.asarray(fwd, dtype=float) * (0.10 * rotor_radius)
+                    + np.asarray(axle, dtype=float) * (0.16 * float(self.geom.wheel_width))
                 )
                 caliper_verts, caliper_faces = self._oriented_box_mesh(
                     center_xyz=caliper_center,
                     axis_x_xyz=fwd,
                     axis_y_xyz=axle,
                     axis_z_xyz=up,
-                    size_x_m=max(0.028, 0.24 * rotor_radius),
-                    size_y_m=max(0.016, 0.22 * float(self.geom.wheel_width)),
-                    size_z_m=max(0.032, 0.34 * rotor_radius),
+                    size_x_m=max(0.018, 0.14 * rotor_radius),
+                    size_y_m=max(0.010, 0.14 * float(self.geom.wheel_width)),
+                    size_z_m=max(0.018, 0.22 * rotor_radius),
                 )
                 _set_poly_mesh(caliper_item, caliper_verts, caliper_faces)
                 caliper_face_rgba, caliper_edge_rgba = self._wheel_brake_material_rgba(
@@ -9129,6 +11424,8 @@ class Car3DWidget(QtWidgets.QWidget):
             self._invalidate_mesh(self._wheel_brake_caliper_meshes[mesh_idx])
         for line_idx in range(len(wheel_pose_centers), len(self._wheel_spin_glow_lines)):
             _set_line_item_pos(self._wheel_spin_glow_lines[line_idx], None)
+        for line_idx in range(len(wheel_pose_centers), len(self._wheel_crown_glint_lines)):
+            _set_line_item_pos(self._wheel_crown_glint_lines[line_idx], None)
         for line_idx in range(len(wheel_pose_centers), len(self._wheel_rotor_streak_lines)):
             _set_line_item_pos(self._wheel_rotor_streak_lines[line_idx], None)
 
@@ -9182,7 +11479,7 @@ class Car3DWidget(QtWidgets.QWidget):
                 fr = np.asarray(fr, dtype=float)
                 hf = np.asarray(hf, dtype=float)
                 hr = np.asarray(hr, dtype=float)
-                pts.extend([ff.tolist(), fr.tolist(), hf.tolist(), hr.tolist(), ff.tolist(), hf.tolist(), fr.tolist(), hr.tolist()])
+                pts.extend([ff.tolist(), hf.tolist(), hf.tolist(), hr.tolist(), hr.tolist(), fr.tolist(), fr.tolist(), ff.tolist()])
             if not pts:
                 return np.zeros((0, 3), dtype=float)
             return np.asarray(pts, dtype=float)
@@ -9212,8 +11509,38 @@ class Car3DWidget(QtWidgets.QWidget):
                 fr = np.asarray(fr, dtype=float)
                 hf = np.asarray(hf, dtype=float)
                 hr = np.asarray(hr, dtype=float)
-                segs.extend([(ff, fr), (hf, hr), (ff, hf), (fr, hr)])
+                segs.extend([(ff, hf), (hf, hr), (hr, fr), (fr, ff)])
             return segs
+
+        def _wishbone_payloads_from_quads(
+            frame_front: list[Optional[np.ndarray]],
+            frame_rear: list[Optional[np.ndarray]],
+            hub_front: list[Optional[np.ndarray]],
+            hub_rear: list[Optional[np.ndarray]],
+            *,
+            thickness_m: float,
+        ) -> list[dict[str, Any]]:
+            payloads: list[dict[str, Any]] = []
+            for idx, (ff, fr, hf, hr) in enumerate(zip(frame_front, frame_rear, hub_front, hub_rear)):
+                if ff is None or fr is None or hf is None or hr is None:
+                    continue
+                verts_i, faces_i = self._wishbone_plate_mesh(
+                    ff,
+                    fr,
+                    hf,
+                    hr,
+                    thickness_m=float(thickness_m),
+                )
+                if verts_i is None or faces_i is None:
+                    continue
+                payloads.append(
+                    {
+                        "corner_idx": int(idx),
+                        "verts": np.asarray(verts_i, dtype=float),
+                        "faces": np.asarray(faces_i, dtype=np.int32),
+                    }
+                )
+            return payloads
 
         def _segment_corner_ids_from_pairs(
             a_list: list[Optional[np.ndarray]],
@@ -9239,6 +11566,18 @@ class Car3DWidget(QtWidgets.QWidget):
                 out.extend([int(idx), int(idx), int(idx), int(idx)])
             return out
 
+        wheel_radius_m = float(self.geom.wheel_radius)
+        lower_arm_thickness = max(0.0075, 0.060 * wheel_radius_m)
+        upper_arm_thickness = max(0.0065, 0.048 * wheel_radius_m)
+        lower_arm_radius = max(0.0060, 0.038 * wheel_radius_m)
+        upper_arm_radius = max(0.0050, 0.032 * wheel_radius_m)
+        lower_arm_payloads = _wishbone_payloads_from_quads(
+            lower_frame_front_local_pts,
+            lower_frame_rear_local_pts,
+            lower_hub_front_local_pts,
+            lower_hub_rear_local_pts,
+            thickness_m=lower_arm_thickness,
+        )
         lower_arm_segments = _segment_list_from_quads(
             lower_frame_front_local_pts,
             lower_frame_rear_local_pts,
@@ -9250,6 +11589,13 @@ class Car3DWidget(QtWidgets.QWidget):
             lower_frame_rear_local_pts,
             lower_hub_front_local_pts,
             lower_hub_rear_local_pts,
+        )
+        upper_arm_payloads = _wishbone_payloads_from_quads(
+            upper_frame_front_local_pts,
+            upper_frame_rear_local_pts,
+            upper_hub_front_local_pts,
+            upper_hub_rear_local_pts,
+            thickness_m=upper_arm_thickness,
         )
         upper_arm_segments = _segment_list_from_quads(
             upper_frame_front_local_pts,
@@ -9280,9 +11626,6 @@ class Car3DWidget(QtWidgets.QWidget):
             self._cyl2_lines.setData(pos=pos)
             self._cyl2_lines.setVisible(bool(pos.shape[0] >= 2))
 
-        lower_arm_radius = max(0.010, 0.14 * float(self.geom.wheel_radius))
-        upper_arm_radius = max(0.008, 0.11 * float(self.geom.wheel_radius))
-        wheel_radius_m = float(self.geom.wheel_radius)
         corner_wheel_gap_m: list[float] = []
         for idx, center in enumerate(wheel_pose_centers):
             wheel_up = _norm_or(
@@ -9304,35 +11647,74 @@ class Car3DWidget(QtWidgets.QWidget):
         lower_arm_base_edge_rgba = (0.56, 0.76, 0.98, 0.60)
         hub_base_face_rgba = (0.62, 0.70, 0.82, 0.92)
         hub_base_edge_rgba = (0.86, 0.92, 0.98, 0.78)
-        for seg_idx, seg in enumerate(lower_arm_segments):
-            if seg_idx < len(self._arm_lower_meshes):
-                _set_mesh_from_segment(self._arm_lower_meshes[seg_idx], seg, lower_arm_radius)
-                corner_idx = int(lower_arm_corner_ids[seg_idx]) if seg_idx < len(lower_arm_corner_ids) else -1
-                if corner_idx >= 0 and corner_idx < len(corners):
-                    lower_face_rgba, lower_edge_rgba = self._contact_bounce_material_rgba(
-                        key=f"lower-arm-{corners[corner_idx]}-{seg_idx}",
-                        base_face_rgba=lower_arm_base_face_rgba,
-                        base_edge_rgba=lower_arm_base_edge_rgba,
-                        tire_force_n=float(tire_forces_n[corner_idx]) if corner_idx < len(tire_forces_n) else 0.0,
-                        wheel_gap_m=float(corner_wheel_gap_m[corner_idx]) if corner_idx < len(corner_wheel_gap_m) else 0.0,
-                        in_air=bool(wheel_air[corner_idx] > 0.5) if corner_idx < len(wheel_air) else False,
-                        gain=0.68,
-                    )
-                    self._apply_mesh_material(
-                        self._arm_lower_meshes[seg_idx],
-                        face_rgba=lower_face_rgba,
-                        edge_rgba=lower_edge_rgba,
-                    )
-        for seg_idx in range(len(lower_arm_segments), len(self._arm_lower_meshes)):
-            self._invalidate_mesh(self._arm_lower_meshes[seg_idx])
-        for seg_idx, seg in enumerate(upper_arm_segments):
-            if seg_idx < len(self._arm_upper_meshes):
-                _set_mesh_from_segment(self._arm_upper_meshes[seg_idx], seg, upper_arm_radius)
-        for seg_idx in range(len(upper_arm_segments), len(self._arm_upper_meshes)):
-            self._invalidate_mesh(self._arm_upper_meshes[seg_idx])
+        if lower_arm_payloads:
+            for mesh_idx, payload in enumerate(lower_arm_payloads):
+                if mesh_idx >= len(self._arm_lower_meshes):
+                    break
+                _set_poly_mesh(
+                    self._arm_lower_meshes[mesh_idx],
+                    payload["verts"],
+                    payload["faces"],
+                )
+                corner_idx = int(payload["corner_idx"])
+                lower_face_rgba, lower_edge_rgba = self._contact_bounce_material_rgba(
+                    key=f"lower-arm-{corners[corner_idx]}-wishbone",
+                    base_face_rgba=lower_arm_base_face_rgba,
+                    base_edge_rgba=lower_arm_base_edge_rgba,
+                    tire_force_n=float(tire_forces_n[corner_idx]) if corner_idx < len(tire_forces_n) else 0.0,
+                    wheel_gap_m=float(corner_wheel_gap_m[corner_idx]) if corner_idx < len(corner_wheel_gap_m) else 0.0,
+                    in_air=bool(wheel_air[corner_idx] > 0.5) if corner_idx < len(wheel_air) else False,
+                    gain=0.68,
+                )
+                self._apply_mesh_material(
+                    self._arm_lower_meshes[mesh_idx],
+                    face_rgba=lower_face_rgba,
+                    edge_rgba=lower_edge_rgba,
+                )
+            for mesh_idx in range(len(lower_arm_payloads), len(self._arm_lower_meshes)):
+                self._invalidate_mesh(self._arm_lower_meshes[mesh_idx])
+        else:
+            for seg_idx, seg in enumerate(lower_arm_segments):
+                if seg_idx < len(self._arm_lower_meshes):
+                    _set_mesh_from_segment(self._arm_lower_meshes[seg_idx], seg, lower_arm_radius)
+                    corner_idx = int(lower_arm_corner_ids[seg_idx]) if seg_idx < len(lower_arm_corner_ids) else -1
+                    if corner_idx >= 0 and corner_idx < len(corners):
+                        lower_face_rgba, lower_edge_rgba = self._contact_bounce_material_rgba(
+                            key=f"lower-arm-{corners[corner_idx]}-{seg_idx}",
+                            base_face_rgba=lower_arm_base_face_rgba,
+                            base_edge_rgba=lower_arm_base_edge_rgba,
+                            tire_force_n=float(tire_forces_n[corner_idx]) if corner_idx < len(tire_forces_n) else 0.0,
+                            wheel_gap_m=float(corner_wheel_gap_m[corner_idx]) if corner_idx < len(corner_wheel_gap_m) else 0.0,
+                            in_air=bool(wheel_air[corner_idx] > 0.5) if corner_idx < len(wheel_air) else False,
+                            gain=0.68,
+                        )
+                        self._apply_mesh_material(
+                            self._arm_lower_meshes[seg_idx],
+                            face_rgba=lower_face_rgba,
+                            edge_rgba=lower_edge_rgba,
+                        )
+            for seg_idx in range(len(lower_arm_segments), len(self._arm_lower_meshes)):
+                self._invalidate_mesh(self._arm_lower_meshes[seg_idx])
+        if upper_arm_payloads:
+            for mesh_idx, payload in enumerate(upper_arm_payloads):
+                if mesh_idx >= len(self._arm_upper_meshes):
+                    break
+                _set_poly_mesh(
+                    self._arm_upper_meshes[mesh_idx],
+                    payload["verts"],
+                    payload["faces"],
+                )
+            for mesh_idx in range(len(upper_arm_payloads), len(self._arm_upper_meshes)):
+                self._invalidate_mesh(self._arm_upper_meshes[mesh_idx])
+        else:
+            for seg_idx, seg in enumerate(upper_arm_segments):
+                if seg_idx < len(self._arm_upper_meshes):
+                    _set_mesh_from_segment(self._arm_upper_meshes[seg_idx], seg, upper_arm_radius)
+            for seg_idx in range(len(upper_arm_segments), len(self._arm_upper_meshes)):
+                self._invalidate_mesh(self._arm_upper_meshes[seg_idx])
 
-        hub_radius = max(0.028, 0.52 * float(self.geom.wheel_radius))
-        hub_offset = 0.44 * float(self.geom.wheel_width)
+        hub_radius = max(0.020, 0.18 * float(self.geom.wheel_radius))
+        hub_offset = 0.30 * float(self.geom.wheel_width)
         for idx, center in enumerate(wheel_pose_centers):
             axle = np.asarray(wheel_pose_axles[idx], dtype=float)
             side_a = np.asarray(center, dtype=float) + axle * hub_offset
@@ -10364,6 +12746,8 @@ class Car3DWidget(QtWidgets.QWidget):
                         self._invalidate_mesh(shadow_item)
                     for glaze_item in self._contact_glaze_meshes:
                         self._invalidate_mesh(glaze_item)
+                    for reflection_item in self._contact_reflection_meshes:
+                        self._invalidate_mesh(reflection_item)
                     for accent_ring in self._contact_accent_rings:
                         _set_line_item_pos(accent_ring, None)
                     for fog_item in self._scene_fog_meshes:
@@ -10374,6 +12758,31 @@ class Car3DWidget(QtWidgets.QWidget):
                         _set_line_item_pos(key_light, None)
                     self._invalidate_mesh(self._focus_halo_mesh)
                     _set_line_item_pos(self._focus_halo_line, None)
+                    self._invalidate_mesh(self._underbody_glow_mesh)
+                    _set_line_item_pos(self._body_silhouette_line, None)
+                    self._invalidate_mesh(self._body_top_sheen_mesh)
+                    _set_line_item_pos(self._body_top_sweep_line, None)
+                    for aura_item in self._body_end_aura_meshes:
+                        self._invalidate_mesh(aura_item)
+                    _set_line_item_pos(self._body_spine_line, None)
+                    for curtain_item in self._scene_side_curtain_meshes:
+                        self._invalidate_mesh(curtain_item)
+                    _set_line_item_pos(self._scene_portal_line, None)
+                    for corridor_item in self._speed_corridor_meshes:
+                        self._invalidate_mesh(corridor_item)
+                    for wake_item in self._rear_wake_meshes:
+                        self._invalidate_mesh(wake_item)
+                    self._invalidate_mesh(self._road_speed_spine_mesh)
+                    for bow_item in self._front_bow_wave_meshes:
+                        self._invalidate_mesh(bow_item)
+                    for shear_item in self._front_corner_shear_meshes:
+                        self._invalidate_mesh(shear_item)
+                    for lane_item in self._wheel_lane_streak_meshes:
+                        self._invalidate_mesh(lane_item)
+                    for shoulder_item in self._track_shoulder_meshes:
+                        self._invalidate_mesh(shoulder_item)
+                    for axle_item in self._axle_wash_meshes:
+                        self._invalidate_mesh(axle_item)
                     return
 
                 try:
@@ -10721,13 +13130,14 @@ class Car3DWidget(QtWidgets.QWidget):
                             self._contact_links.setData(pos=link_pos, color=link_cols)
                         else:
                             self._contact_links.setData(pos=link_pos)
-                    if self._contact_patch_mesh is not None:
-                        if patch_faces_all and patch_verts_all and patch_face_colors_all:
-                            patch_faces = np.vstack(patch_faces_all)
-                            patch_verts = np.vstack(patch_verts_all)
-                            patch_face_colors = np.vstack(patch_face_colors_all)
-                            patch_face_colors = self._scene_grade_color_array(
-                                patch_face_colors,
+                        if self._contact_patch_mesh is not None:
+                            if patch_faces_all and patch_verts_all and patch_face_colors_all:
+                                patch_faces = np.vstack(patch_faces_all)
+                                patch_verts = np.vstack(patch_verts_all)
+                                patch_verts[:, 2] = np.asarray(patch_verts[:, 2], dtype=float) + max(0.0015, 0.008 * wheel_radius_m)
+                                patch_face_colors = np.vstack(patch_face_colors_all)
+                                patch_face_colors = self._scene_grade_color_array(
+                                    patch_face_colors,
                                 exposure=float(scene_grade["exposure"]) * 1.01,
                                 saturation=float(scene_grade["saturation"]),
                                 warmth=float(scene_grade["warmth"]),
@@ -10786,9 +13196,18 @@ class Car3DWidget(QtWidgets.QWidget):
 
                             body_forward = _norm_or(np.asarray(R_local[:, 0], dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
                             body_side = _norm_or(np.asarray(R_local[:, 1], dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
+                            road_forward = _project_vector_to_plane(body_forward, np.array([0.0, 0.0, 1.0], dtype=float))
+                            road_forward = _norm_or(np.asarray(road_forward, dtype=float).reshape(3), np.array([1.0, 0.0, 0.0], dtype=float))
+                            road_motion_forward = (
+                                np.asarray(road_forward, dtype=float)
+                                if float(speed_along_road) >= -1e-6
+                                else -np.asarray(road_forward, dtype=float)
+                            )
+                            road_side = _project_vector_to_plane(body_side, np.array([0.0, 0.0, 1.0], dtype=float))
+                            road_side = _norm_or(np.asarray(road_side, dtype=float).reshape(3), np.array([0.0, 1.0, 0.0], dtype=float))
                             road_view_dir = np.asarray(camera_view_dir, dtype=float).reshape(3)
                             road_view_dir[2] = 0.0
-                            road_view_dir = _norm_or(road_view_dir, body_forward)
+                            road_view_dir = _norm_or(road_view_dir, road_motion_forward)
                             valid_road_pts = [
                                 np.asarray(pt, dtype=float).reshape(3)
                                 for pt in road_local_pts
@@ -10822,12 +13241,12 @@ class Car3DWidget(QtWidgets.QWidget):
                             )
                             for fog_idx, (offset_fwd_m, lift_m, fog_radius_u, fog_radius_v, fog_rgb, fog_density_u) in enumerate(fog_specs):
                                 fog_item = self._scene_fog_meshes[fog_idx] if fog_idx < len(self._scene_fog_meshes) else None
-                                fog_center = np.asarray(road_plane_center, dtype=float) + body_forward * float(offset_fwd_m)
+                                fog_center = np.asarray(road_plane_center, dtype=float) + road_motion_forward * float(offset_fwd_m)
                                 fog_center[2] = float(shadow_floor_z) + float(lift_m)
                                 fog_verts, fog_faces = _ellipse_mesh_on_plane(
                                     center_xyz=fog_center,
-                                    axis_u_xyz=body_forward,
-                                    axis_v_xyz=body_side,
+                                    axis_u_xyz=road_motion_forward,
+                                    axis_v_xyz=road_side,
                                     radius_u_m=float(fog_radius_u),
                                     radius_v_m=float(fog_radius_v),
                                     segments=28,
@@ -10836,8 +13255,8 @@ class Car3DWidget(QtWidgets.QWidget):
                                     fog_verts,
                                     fog_faces,
                                     center_xyz=fog_center,
-                                    axis_u_xyz=body_forward,
-                                    axis_v_xyz=body_side,
+                                    axis_u_xyz=road_motion_forward,
+                                    axis_v_xyz=road_side,
                                     radius_u_m=float(fog_radius_u),
                                     radius_v_m=float(fog_radius_v),
                                     theme_rgb=tuple(fog_rgb),
@@ -10921,19 +13340,22 @@ class Car3DWidget(QtWidgets.QWidget):
                             focus_center = (
                                 np.mean(np.asarray(focus_candidates, dtype=float), axis=0)
                                 if focus_candidates
-                                else np.asarray(center_draw, dtype=float).reshape(3) + np.asarray(R_local[:, 2], dtype=float).reshape(3) * (0.18 * body_h)
+                                else np.asarray(center_draw, dtype=float).reshape(3) + np.array([0.0, 0.0, 0.18 * body_h], dtype=float)
                             )
                             focus_axis_u, focus_axis_v = self._camera_facing_card_axes(
-                                primary_dir_xyz=body_forward,
+                                primary_dir_xyz=road_motion_forward,
                                 view_dir_xyz=camera_view_dir,
-                                fallback_dir_xyz=body_side,
+                                fallback_dir_xyz=road_side,
                             )
                             max_corner_force_n = float(max([0.0, *[float(v) for v in tire_forces_n]]))
+                            speed_u = float(_clamp(abs(float(speed_along_road)) / 35.0, 0.0, 1.0))
                             for idx, shadow_item in enumerate(self._wheel_shadow_meshes):
                                 if idx >= len(wheel_pose_centers):
                                     self._invalidate_mesh(shadow_item)
                                     if idx < len(self._contact_glaze_meshes):
                                         self._invalidate_mesh(self._contact_glaze_meshes[idx])
+                                    if idx < len(self._contact_reflection_meshes):
+                                        self._invalidate_mesh(self._contact_reflection_meshes[idx])
                                     if idx < len(self._contact_accent_rings):
                                         _set_line_item_pos(self._contact_accent_rings[idx], None)
                                     if idx < len(self._corner_light_shaft_meshes):
@@ -10975,6 +13397,11 @@ class Car3DWidget(QtWidgets.QWidget):
                                 shadow_fwd[2] = 0.0
                                 shadow_axle[2] = 0.0
                                 shadow_fwd = _norm_or(shadow_fwd, np.array([1.0, 0.0, 0.0], dtype=float))
+                                shadow_motion_fwd = (
+                                    np.asarray(shadow_fwd, dtype=float)
+                                    if float(speed_along_road) >= -1e-6
+                                    else -np.asarray(shadow_fwd, dtype=float)
+                                )
                                 shadow_axle = _norm_or(
                                     shadow_axle,
                                     np.array([0.0, 1.0 if float(shadow_center[1]) >= 0.0 else -1.0, 0.0], dtype=float),
@@ -11008,6 +13435,7 @@ class Car3DWidget(QtWidgets.QWidget):
                                     face_colors_rgba_u8=shadow_face_colors,
                                 )
                                 glaze_item = self._contact_glaze_meshes[idx] if idx < len(self._contact_glaze_meshes) else None
+                                reflection_item = self._contact_reflection_meshes[idx] if idx < len(self._contact_reflection_meshes) else None
                                 accent_ring = self._contact_accent_rings[idx] if idx < len(self._contact_accent_rings) else None
                                 shaft_item = self._corner_light_shaft_meshes[idx] if idx < len(self._corner_light_shaft_meshes) else None
                                 key_light = self._corner_key_light_lines[idx] if idx < len(self._corner_key_light_lines) else None
@@ -11015,6 +13443,7 @@ class Car3DWidget(QtWidgets.QWidget):
                                 glaze_center[2] = float(glaze_center[2]) + 0.0015
                                 glaze_radius_u = max(0.07, shadow_radius_u * (1.28 + 0.26 * load_u))
                                 glaze_radius_v = max(0.05, shadow_radius_v * (1.60 + 0.24 * load_u))
+                                hierarchy_u = float(_clamp(tire_force_n / max(1.0, max_corner_force_n), 0.0, 1.0))
                                 glaze_verts, glaze_faces = _ellipse_mesh_on_plane(
                                     center_xyz=glaze_center,
                                     axis_u_xyz=shadow_fwd,
@@ -11050,6 +13479,79 @@ class Car3DWidget(QtWidgets.QWidget):
                                     glaze_faces,
                                     face_colors_rgba_u8=glaze_face_colors,
                                 )
+                                road_normal = np.array([0.0, 0.0, 1.0], dtype=float)
+                                reflection_axis_u = _norm_or(0.72 * road_view_dir + 0.40 * shadow_fwd, shadow_fwd)
+                                reflection_axis_v = _norm_or(np.cross(road_normal, reflection_axis_u), shadow_axle)
+                                if float(np.dot(reflection_axis_v, shadow_axle)) < 0.0:
+                                    reflection_axis_v = -reflection_axis_v
+                                reflection_offset_sign = 1.0 if float(np.dot(reflection_axis_u, road_view_dir)) >= 0.0 else -1.0
+                                reflection_center = np.asarray(glaze_center, dtype=float).reshape(3) + reflection_axis_u * (reflection_offset_sign * (0.08 * wheel_radius_m))
+                                reflection_center[2] = float(reflection_center[2]) + 0.0008
+                                reflection_radius_u = max(0.10, glaze_radius_u * (1.34 + 0.24 * hierarchy_u + 0.18 * speed_u))
+                                reflection_radius_v = max(0.04, glaze_radius_v * (0.52 + 0.12 * load_u))
+                                reflection_verts, reflection_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=reflection_center,
+                                    axis_u_xyz=reflection_axis_u,
+                                    axis_v_xyz=reflection_axis_v,
+                                    radius_u_m=reflection_radius_u,
+                                    radius_v_m=reflection_radius_v,
+                                    segments=24,
+                                )
+                                reflection_face_colors = self._road_reflection_face_colors(
+                                    reflection_verts,
+                                    reflection_faces,
+                                    center_xyz=reflection_center,
+                                    axis_u_xyz=reflection_axis_u,
+                                    axis_v_xyz=reflection_axis_v,
+                                    radius_u_m=reflection_radius_u,
+                                    radius_v_m=reflection_radius_v,
+                                    corner=corners[idx],
+                                    tire_force_n=tire_force_n,
+                                    wheel_gap_m=wheel_gap_m,
+                                    speed_m_s=float(speed_along_road),
+                                    hierarchy_u=hierarchy_u,
+                                    in_air=bool(wheel_air[idx] > 0.5),
+                                )
+                                reflection_face_colors = self._scene_grade_color_array(
+                                    reflection_face_colors,
+                                    exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.10,
+                                    alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                    output_u8=True,
+                                )
+                                _set_poly_mesh(
+                                    reflection_item,
+                                    reflection_verts,
+                                    reflection_faces,
+                                    face_colors_rgba_u8=reflection_face_colors,
+                                )
+                                if reflection_item is not None:
+                                    reflection_face_rgba = self._road_reflection_rgba(
+                                        key=f"road-reflection-{corners[idx]}-{idx}",
+                                        corner=corners[idx],
+                                        tire_force_n=tire_force_n,
+                                        wheel_gap_m=wheel_gap_m,
+                                        speed_m_s=float(speed_along_road),
+                                        hierarchy_u=hierarchy_u,
+                                        in_air=bool(wheel_air[idx] > 0.5),
+                                    )
+                                    reflection_face_rgba = self._scene_graded_rgba(
+                                        key=f"road-reflection-scene-grade-{corners[idx]}-{idx}",
+                                        rgba=reflection_face_rgba,
+                                        exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                        saturation=float(scene_grade["saturation"]),
+                                        warmth=float(scene_grade["warmth"]),
+                                        highlight_gain=float(scene_grade["highlight_gain"]) * 1.10,
+                                        alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                        response=0.16,
+                                    )
+                                    self._apply_mesh_material(
+                                        reflection_item,
+                                        face_rgba=reflection_face_rgba,
+                                        edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                    )
                                 ring_vertices = self._ellipse_line_vertices(
                                     center_xyz=glaze_center + np.array([0.0, 0.0, 0.0006], dtype=float),
                                     axis_u_xyz=shadow_fwd,
@@ -11083,7 +13585,6 @@ class Car3DWidget(QtWidgets.QWidget):
                                         _set_line_item_pos(accent_ring, None)
                                 else:
                                     _set_line_item_pos(accent_ring, None)
-                                hierarchy_u = float(_clamp(tire_force_n / max(1.0, max_corner_force_n), 0.0, 1.0))
                                 key_light_rgba = self._corner_key_light_rgba(
                                     key=f"corner-key-light-{corners[idx]}-{idx}",
                                     corner=corners[idx],
@@ -11103,8 +13604,8 @@ class Car3DWidget(QtWidgets.QWidget):
                                     response=0.16,
                                 )
                                 key_light_center = np.asarray(wheel_pose_centers[idx], dtype=float).reshape(3) + wheel_up * float(0.18 * wheel_radius_m)
-                                key_light_fwd = _project_vector_to_plane(np.asarray(wheel_pose_fwds[idx], dtype=float).reshape(3), wheel_up)
-                                key_light_fwd = _norm_or(np.asarray(key_light_fwd, dtype=float).reshape(3), shadow_fwd)
+                                key_light_fwd = _project_vector_to_plane(np.asarray(shadow_motion_fwd, dtype=float).reshape(3), wheel_up)
+                                key_light_fwd = _norm_or(np.asarray(key_light_fwd, dtype=float).reshape(3), shadow_motion_fwd)
                                 shaft_primary = key_light_fwd + 0.28 * wheel_up
                                 shaft_axis_u, shaft_axis_v = self._camera_facing_card_axes(
                                     primary_dir_xyz=shaft_primary,
@@ -11193,8 +13694,1107 @@ class Car3DWidget(QtWidgets.QWidget):
                                     _set_line_item_pos(key_light, None)
                             for shaft_idx in range(len(wheel_pose_centers), len(self._corner_light_shaft_meshes)):
                                 self._invalidate_mesh(self._corner_light_shaft_meshes[shaft_idx])
+                            for reflection_idx in range(len(wheel_pose_centers), len(self._contact_reflection_meshes)):
+                                self._invalidate_mesh(self._contact_reflection_meshes[reflection_idx])
                             for light_idx in range(len(wheel_pose_centers), len(self._corner_key_light_lines)):
                                 _set_line_item_pos(self._corner_key_light_lines[light_idx], None)
+                            body_up = _norm_or(np.asarray(R_local[:, 2], dtype=float).reshape(3), np.array([0.0, 0.0, 1.0], dtype=float))
+                            underbody_center = np.asarray(center_draw, dtype=float).reshape(3) - body_up * (0.12 * body_h) + camera_view_dir * 0.004
+                            underbody_radius_u = max(0.18, 0.34 * float(self.geom.wheelbase) * (1.0 + 0.10 * speed_u))
+                            underbody_radius_v = max(0.12, 0.28 * float(self.geom.track) * (1.0 + 0.10 * mean_load_u))
+                            underbody_verts, underbody_faces = _ellipse_mesh_on_plane(
+                                center_xyz=underbody_center,
+                                axis_u_xyz=body_forward,
+                                axis_v_xyz=body_side,
+                                radius_u_m=underbody_radius_u,
+                                radius_v_m=underbody_radius_v,
+                                segments=28,
+                            )
+                            underbody_face_colors = self._underbody_glow_face_colors(
+                                underbody_verts,
+                                underbody_faces,
+                                center_xyz=underbody_center,
+                                axis_u_xyz=body_forward,
+                                axis_v_xyz=body_side,
+                                radius_u_m=underbody_radius_u,
+                                radius_v_m=underbody_radius_v,
+                                load_u=mean_load_u,
+                                spring_energy_u=mean_spring_energy_u,
+                                glass_energy_u=scene_glass_energy_u,
+                                view_dir_xyz=camera_view_dir,
+                            )
+                            underbody_face_colors = self._scene_grade_color_array(
+                                underbody_face_colors,
+                                exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                saturation=float(scene_grade["saturation"]),
+                                warmth=float(scene_grade["warmth"]),
+                                highlight_gain=float(scene_grade["highlight_gain"]) * 1.08,
+                                alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                output_u8=True,
+                            )
+                            _set_poly_mesh(
+                                self._underbody_glow_mesh,
+                                underbody_verts,
+                                underbody_faces,
+                                face_colors_rgba_u8=underbody_face_colors,
+                            )
+                            underbody_rgba = self._underbody_glow_rgba(
+                                key="underbody-glow",
+                                load_u=mean_load_u,
+                                spring_energy_u=mean_spring_energy_u,
+                                glass_energy_u=scene_glass_energy_u,
+                            )
+                            underbody_rgba = self._scene_graded_rgba(
+                                key="underbody-glow-scene-grade",
+                                rgba=underbody_rgba,
+                                exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                saturation=float(scene_grade["saturation"]),
+                                warmth=float(scene_grade["warmth"]),
+                                highlight_gain=float(scene_grade["highlight_gain"]) * 1.08,
+                                alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                response=0.16,
+                            )
+                            if self._underbody_glow_mesh is not None:
+                                self._apply_mesh_material(
+                                    self._underbody_glow_mesh,
+                                    face_rgba=underbody_rgba,
+                                    edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                )
+                            if self._body_silhouette_line is not None and len(frame_local_pts) >= 4:
+                                camera_side_sign = 1.0 if float(np.dot(body_side, camera_view_dir)) >= 0.0 else -1.0
+                                lower_front = np.asarray(frame_local_pts[0 if camera_side_sign >= 0.0 else 1], dtype=float).reshape(3)
+                                lower_rear = np.asarray(frame_local_pts[2 if camera_side_sign >= 0.0 else 3], dtype=float).reshape(3)
+                                body_out = body_side * camera_side_sign
+                                silhouette_vertices = np.asarray(
+                                    [
+                                        lower_front + body_out * (0.016 * float(self.geom.track)) + body_up * (0.12 * body_h) + body_forward * (0.10 * float(self.geom.wheelbase)),
+                                        lower_front + body_out * (0.020 * float(self.geom.track)) + body_up * (0.74 * body_h) + body_forward * (0.14 * float(self.geom.wheelbase)) + camera_view_dir * 0.003,
+                                        0.5 * (lower_front + lower_rear)
+                                        + body_out * (0.022 * float(self.geom.track))
+                                        + body_up * (0.90 * body_h)
+                                        + camera_view_dir * 0.004,
+                                        lower_rear + body_out * (0.020 * float(self.geom.track)) + body_up * (0.70 * body_h) - body_forward * (0.14 * float(self.geom.wheelbase)) + camera_view_dir * 0.003,
+                                        lower_rear + body_out * (0.016 * float(self.geom.track)) + body_up * (0.10 * body_h) - body_forward * (0.10 * float(self.geom.wheelbase)),
+                                    ],
+                                    dtype=float,
+                                )
+                                body_rim_rgba = self._body_silhouette_rgba(
+                                    key="body-silhouette-rim",
+                                    load_u=mean_load_u,
+                                    spring_energy_u=mean_spring_energy_u,
+                                    glass_energy_u=scene_glass_energy_u,
+                                    view_u=float(_clamp(abs(float(np.dot(body_out, camera_view_dir))), 0.0, 1.0)),
+                                )
+                                body_rim_rgba = self._scene_graded_rgba(
+                                    key="body-silhouette-rim-scene-grade",
+                                    rgba=body_rim_rgba,
+                                    exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.08,
+                                    alpha_gain=float(scene_grade["alpha_gain"]),
+                                    response=0.16,
+                                )
+                                body_rim_colors = self._tapered_line_color_array(
+                                    body_rim_rgba,
+                                    int(silhouette_vertices.shape[0]),
+                                    edge_floor=0.12,
+                                    exponent=0.70,
+                                )
+                                self._body_silhouette_line.setData(pos=silhouette_vertices, color=body_rim_colors)
+                                self._body_silhouette_line.setVisible(True)
+                            else:
+                                _set_line_item_pos(self._body_silhouette_line, None)
+                            roof_center = np.asarray(center_draw, dtype=float).reshape(3) + body_up * (0.56 * body_h) + camera_view_dir * 0.004
+                            roof_radius_u = max(0.16, 0.32 * float(self.geom.wheelbase))
+                            roof_radius_v = max(0.10, 0.24 * float(self.geom.track))
+                            roof_view_u = float(_clamp(abs(float(np.dot(body_up, camera_view_dir))), 0.0, 1.0))
+                            sweep_phase_u = float(0.5 + 0.5 * math.sin((float(s_progress_m) / max(0.18, 0.42 * float(self.geom.wheel_radius))) + 0.7 * float(speed_u)))
+                            roof_verts, roof_faces = _ellipse_mesh_on_plane(
+                                center_xyz=roof_center,
+                                axis_u_xyz=body_forward,
+                                axis_v_xyz=body_side,
+                                radius_u_m=roof_radius_u,
+                                radius_v_m=roof_radius_v,
+                                segments=28,
+                            )
+                            roof_face_colors = self._body_top_sheen_face_colors(
+                                roof_verts,
+                                roof_faces,
+                                center_xyz=roof_center,
+                                axis_u_xyz=body_forward,
+                                axis_v_xyz=body_side,
+                                radius_u_m=roof_radius_u,
+                                radius_v_m=roof_radius_v,
+                                load_u=mean_load_u,
+                                spring_energy_u=mean_spring_energy_u,
+                                glass_energy_u=scene_glass_energy_u,
+                                view_dir_xyz=camera_view_dir,
+                                speed_u=speed_u,
+                                sweep_phase_u=sweep_phase_u,
+                            )
+                            roof_face_colors = self._scene_grade_color_array(
+                                roof_face_colors,
+                                exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                saturation=float(scene_grade["saturation"]),
+                                warmth=float(scene_grade["warmth"]),
+                                highlight_gain=float(scene_grade["highlight_gain"]) * 1.08,
+                                alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                output_u8=True,
+                            )
+                            _set_poly_mesh(
+                                self._body_top_sheen_mesh,
+                                roof_verts,
+                                roof_faces,
+                                face_colors_rgba_u8=roof_face_colors,
+                            )
+                            roof_rgba = self._body_top_sheen_rgba(
+                                key="body-top-sheen",
+                                load_u=mean_load_u,
+                                spring_energy_u=mean_spring_energy_u,
+                                glass_energy_u=scene_glass_energy_u,
+                                view_u=roof_view_u,
+                                speed_u=speed_u,
+                            )
+                            roof_rgba = self._scene_graded_rgba(
+                                key="body-top-sheen-scene-grade",
+                                rgba=roof_rgba,
+                                exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                saturation=float(scene_grade["saturation"]),
+                                warmth=float(scene_grade["warmth"]),
+                                highlight_gain=float(scene_grade["highlight_gain"]) * 1.08,
+                                alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                response=0.16,
+                            )
+                            if self._body_top_sheen_mesh is not None:
+                                self._apply_mesh_material(
+                                    self._body_top_sheen_mesh,
+                                    face_rgba=roof_rgba,
+                                    edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                )
+                            sweep_offset_u = -0.26 + 0.52 * sweep_phase_u
+                            sweep_center = roof_center + body_forward * (sweep_offset_u * roof_radius_u) + body_up * 0.002
+                            sweep_vertices = np.asarray(
+                                [
+                                    sweep_center - body_side * (0.84 * roof_radius_v) - body_forward * (0.08 * roof_radius_u),
+                                    sweep_center - body_side * (0.44 * roof_radius_v) + body_up * (0.04 * body_h),
+                                    sweep_center,
+                                    sweep_center + body_side * (0.44 * roof_radius_v) + body_up * (0.04 * body_h),
+                                    sweep_center + body_side * (0.84 * roof_radius_v) - body_forward * (0.08 * roof_radius_u),
+                                ],
+                                dtype=float,
+                            )
+                            roof_sweep_rgba = self._body_top_sweep_rgba(
+                                key="body-top-sweep",
+                                load_u=mean_load_u,
+                                spring_energy_u=mean_spring_energy_u,
+                                glass_energy_u=scene_glass_energy_u,
+                                speed_u=speed_u,
+                            )
+                            roof_sweep_rgba = self._scene_graded_rgba(
+                                key="body-top-sweep-scene-grade",
+                                rgba=roof_sweep_rgba,
+                                exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                saturation=float(scene_grade["saturation"]),
+                                warmth=float(scene_grade["warmth"]),
+                                highlight_gain=float(scene_grade["highlight_gain"]) * 1.10,
+                                alpha_gain=float(scene_grade["alpha_gain"]),
+                                response=0.14,
+                            )
+                            roof_sweep_colors = self._tapered_line_color_array(
+                                roof_sweep_rgba,
+                                int(sweep_vertices.shape[0]),
+                                edge_floor=0.08,
+                                exponent=0.62,
+                            )
+                            if self._body_top_sweep_line is not None:
+                                self._body_top_sweep_line.setData(pos=sweep_vertices, color=roof_sweep_colors)
+                                self._body_top_sweep_line.setVisible(True)
+                            aura_axis_u, aura_axis_v = self._camera_facing_card_axes(
+                                primary_dir_xyz=body_side,
+                                view_dir_xyz=camera_view_dir,
+                                fallback_dir_xyz=body_up,
+                            )
+                            body_view_u = float(_clamp(abs(float(np.dot(body_forward, camera_view_dir))), 0.0, 1.0))
+                            aura_specs = (
+                                (
+                                    True,
+                                    np.asarray(center_draw, dtype=float).reshape(3) + body_forward * (0.48 * float(self.geom.wheelbase)) + body_up * (0.38 * body_h) + camera_view_dir * 0.006,
+                                    max(0.12, 0.24 * float(self.geom.track)),
+                                    max(0.10, 0.28 * body_h),
+                                    front_load_u,
+                                ),
+                                (
+                                    False,
+                                    np.asarray(center_draw, dtype=float).reshape(3) - body_forward * (0.48 * float(self.geom.wheelbase)) + body_up * (0.34 * body_h) + camera_view_dir * 0.006,
+                                    max(0.12, 0.22 * float(self.geom.track)),
+                                    max(0.09, 0.24 * body_h),
+                                    rear_load_u,
+                                ),
+                            )
+                            for aura_idx, (is_front, aura_center, aura_radius_u, aura_radius_v, aura_load_u) in enumerate(aura_specs):
+                                aura_item = self._body_end_aura_meshes[aura_idx] if aura_idx < len(self._body_end_aura_meshes) else None
+                                aura_verts, aura_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=aura_center,
+                                    axis_u_xyz=aura_axis_u,
+                                    axis_v_xyz=aura_axis_v,
+                                    radius_u_m=aura_radius_u,
+                                    radius_v_m=aura_radius_v,
+                                    segments=24,
+                                )
+                                aura_face_colors = self._body_end_aura_face_colors(
+                                    aura_verts,
+                                    aura_faces,
+                                    center_xyz=aura_center,
+                                    axis_u_xyz=aura_axis_u,
+                                    axis_v_xyz=aura_axis_v,
+                                    radius_u_m=aura_radius_u,
+                                    radius_v_m=aura_radius_v,
+                                    front=bool(is_front),
+                                    load_u=float(aura_load_u),
+                                    glass_energy_u=scene_glass_energy_u,
+                                    speed_u=speed_u,
+                                    view_u=body_view_u,
+                                )
+                                aura_face_colors = self._scene_grade_color_array(
+                                    aura_face_colors,
+                                    exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                    alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                    output_u8=True,
+                                )
+                                _set_poly_mesh(
+                                    aura_item,
+                                    aura_verts,
+                                    aura_faces,
+                                    face_colors_rgba_u8=aura_face_colors,
+                                )
+                                if aura_item is not None:
+                                    aura_rgba = self._body_end_aura_rgba(
+                                        key=f"body-end-aura-{'front' if is_front else 'rear'}",
+                                        front=bool(is_front),
+                                        load_u=float(aura_load_u),
+                                        glass_energy_u=scene_glass_energy_u,
+                                        speed_u=speed_u,
+                                        view_u=body_view_u,
+                                    )
+                                    aura_rgba = self._scene_graded_rgba(
+                                        key=f"body-end-aura-scene-grade-{aura_idx}",
+                                        rgba=aura_rgba,
+                                        exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                        saturation=float(scene_grade["saturation"]),
+                                        warmth=float(scene_grade["warmth"]),
+                                        highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                        alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                        response=0.16,
+                                    )
+                                    self._apply_mesh_material(
+                                        aura_item,
+                                        face_rgba=aura_rgba,
+                                        edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                    )
+                            for aura_idx in range(len(aura_specs), len(self._body_end_aura_meshes)):
+                                self._invalidate_mesh(self._body_end_aura_meshes[aura_idx])
+                            spine_vertices = np.asarray(
+                                [
+                                    np.asarray(center_draw, dtype=float).reshape(3) - body_forward * (0.36 * float(self.geom.wheelbase)) + body_up * (0.62 * body_h),
+                                    np.asarray(center_draw, dtype=float).reshape(3) - body_forward * (0.12 * float(self.geom.wheelbase)) + body_up * (0.70 * body_h) + camera_view_dir * 0.002,
+                                    np.asarray(center_draw, dtype=float).reshape(3) + body_up * (0.76 * body_h) + camera_view_dir * 0.003,
+                                    np.asarray(center_draw, dtype=float).reshape(3) + body_forward * (0.12 * float(self.geom.wheelbase)) + body_up * (0.70 * body_h) + camera_view_dir * 0.002,
+                                    np.asarray(center_draw, dtype=float).reshape(3) + body_forward * (0.36 * float(self.geom.wheelbase)) + body_up * (0.62 * body_h),
+                                ],
+                                dtype=float,
+                            )
+                            spine_rgba = self._body_spine_rgba(
+                                key="body-spine-highlight",
+                                load_u=mean_load_u,
+                                spring_energy_u=mean_spring_energy_u,
+                                glass_energy_u=scene_glass_energy_u,
+                                speed_u=speed_u,
+                            )
+                            spine_rgba = self._scene_graded_rgba(
+                                key="body-spine-highlight-scene-grade",
+                                rgba=spine_rgba,
+                                exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                saturation=float(scene_grade["saturation"]),
+                                warmth=float(scene_grade["warmth"]),
+                                highlight_gain=float(scene_grade["highlight_gain"]) * 1.08,
+                                alpha_gain=float(scene_grade["alpha_gain"]),
+                                response=0.14,
+                            )
+                            spine_colors = self._tapered_line_color_array(
+                                spine_rgba,
+                                int(spine_vertices.shape[0]),
+                                edge_floor=0.10,
+                                exponent=0.66,
+                            )
+                            if self._body_spine_line is not None:
+                                self._body_spine_line.setData(pos=spine_vertices, color=spine_colors)
+                                self._body_spine_line.setVisible(True)
+                            curtain_axis_u, curtain_axis_v = self._camera_facing_card_axes(
+                                primary_dir_xyz=body_up,
+                                view_dir_xyz=camera_view_dir,
+                                fallback_dir_xyz=body_forward,
+                            )
+                            side_view_u = float(_clamp(abs(float(np.dot(body_side, camera_view_dir))), 0.0, 1.0))
+                            curtain_specs = (
+                                (
+                                    +1.0,
+                                    np.asarray(center_draw, dtype=float).reshape(3) + body_side * (0.86 * float(self.geom.track)) + body_up * (0.34 * body_h) + camera_view_dir * 0.010,
+                                    max(0.20, 0.22 * float(self.geom.wheelbase)),
+                                    max(0.18, 0.46 * body_h),
+                                ),
+                                (
+                                    -1.0,
+                                    np.asarray(center_draw, dtype=float).reshape(3) - body_side * (0.86 * float(self.geom.track)) + body_up * (0.34 * body_h) + camera_view_dir * 0.010,
+                                    max(0.20, 0.22 * float(self.geom.wheelbase)),
+                                    max(0.18, 0.46 * body_h),
+                                ),
+                            )
+                            for curtain_idx, (side_sign, curtain_center, curtain_radius_u, curtain_radius_v) in enumerate(curtain_specs):
+                                curtain_item = self._scene_side_curtain_meshes[curtain_idx] if curtain_idx < len(self._scene_side_curtain_meshes) else None
+                                curtain_verts, curtain_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=curtain_center,
+                                    axis_u_xyz=curtain_axis_u,
+                                    axis_v_xyz=curtain_axis_v,
+                                    radius_u_m=curtain_radius_u,
+                                    radius_v_m=curtain_radius_v,
+                                    segments=24,
+                                )
+                                curtain_face_colors = self._scene_side_curtain_face_colors(
+                                    curtain_verts,
+                                    curtain_faces,
+                                    center_xyz=curtain_center,
+                                    axis_u_xyz=curtain_axis_u,
+                                    axis_v_xyz=curtain_axis_v,
+                                    radius_u_m=curtain_radius_u,
+                                    radius_v_m=curtain_radius_v,
+                                    side_sign=float(side_sign),
+                                    mean_load_u=mean_load_u,
+                                    glass_energy_u=scene_glass_energy_u,
+                                    speed_u=speed_u,
+                                    view_u=side_view_u,
+                                )
+                                curtain_face_colors = self._scene_grade_color_array(
+                                    curtain_face_colors,
+                                    exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.04,
+                                    alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                    output_u8=True,
+                                )
+                                _set_poly_mesh(
+                                    curtain_item,
+                                    curtain_verts,
+                                    curtain_faces,
+                                    face_colors_rgba_u8=curtain_face_colors,
+                                )
+                                if curtain_item is not None:
+                                    curtain_rgba = self._scene_side_curtain_rgba(
+                                        key=f"scene-side-curtain-{curtain_idx}",
+                                        side_sign=float(side_sign),
+                                        mean_load_u=mean_load_u,
+                                        glass_energy_u=scene_glass_energy_u,
+                                        speed_u=speed_u,
+                                        view_u=side_view_u,
+                                    )
+                                    curtain_rgba = self._scene_graded_rgba(
+                                        key=f"scene-side-curtain-scene-grade-{curtain_idx}",
+                                        rgba=curtain_rgba,
+                                        exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                        saturation=float(scene_grade["saturation"]),
+                                        warmth=float(scene_grade["warmth"]),
+                                        highlight_gain=float(scene_grade["highlight_gain"]) * 1.04,
+                                        alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                        response=0.16,
+                                    )
+                                    self._apply_mesh_material(
+                                        curtain_item,
+                                        face_rgba=curtain_rgba,
+                                        edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                    )
+                            for curtain_idx in range(len(curtain_specs), len(self._scene_side_curtain_meshes)):
+                                self._invalidate_mesh(self._scene_side_curtain_meshes[curtain_idx])
+                            portal_center = np.asarray(center_draw, dtype=float).reshape(3) + body_up * (0.36 * body_h)
+                            portal_vertices = self._ellipse_arc_vertices(
+                                center_xyz=portal_center,
+                                axis_u_xyz=body_side,
+                                axis_v_xyz=body_up,
+                                radius_u_m=max(0.26, 0.76 * float(self.geom.track)),
+                                radius_v_m=max(0.22, 0.96 * body_h + 0.12 * float(self.geom.wheelbase)),
+                                start_rad=-0.08 * np.pi,
+                                end_rad=1.08 * np.pi,
+                                segments=46,
+                            )
+                            portal_rgba = self._scene_portal_rgba(
+                                key="scene-portal-line",
+                                mean_load_u=mean_load_u,
+                                spring_energy_u=mean_spring_energy_u,
+                                glass_energy_u=scene_glass_energy_u,
+                                speed_u=speed_u,
+                            )
+                            portal_rgba = self._scene_graded_rgba(
+                                key="scene-portal-line-scene-grade",
+                                rgba=portal_rgba,
+                                exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                saturation=float(scene_grade["saturation"]),
+                                warmth=float(scene_grade["warmth"]),
+                                highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                alpha_gain=float(scene_grade["alpha_gain"]),
+                                response=0.14,
+                            )
+                            portal_colors = self._tapered_line_color_array(
+                                portal_rgba,
+                                int(np.asarray(portal_vertices, dtype=float).shape[0]) if portal_vertices is not None else 0,
+                                edge_floor=0.10,
+                                exponent=0.70,
+                            ) if portal_vertices is not None else np.zeros((0, 4), dtype=float)
+                            if self._scene_portal_line is not None and portal_vertices is not None:
+                                self._scene_portal_line.setData(pos=np.asarray(portal_vertices, dtype=float), color=portal_colors)
+                                self._scene_portal_line.setVisible(True)
+                            else:
+                                _set_line_item_pos(self._scene_portal_line, None)
+                            corridor_axis_u = body_forward
+                            corridor_axis_v = body_side
+                            corridor_specs = (
+                                (
+                                    +1.0,
+                                    np.asarray(road_plane_center, dtype=float).reshape(3)
+                                    + body_side * (0.54 * float(self.geom.track))
+                                    + body_forward * ((0.06 + 0.12 * speed_u) * float(self.geom.wheelbase)),
+                                    max(0.34, 0.30 * float(self.geom.wheelbase) * (1.0 + 0.80 * speed_u)),
+                                    max(0.11, 0.16 * float(self.geom.track) * (1.0 + 0.10 * mean_load_u)),
+                                ),
+                                (
+                                    -1.0,
+                                    np.asarray(road_plane_center, dtype=float).reshape(3)
+                                    - body_side * (0.54 * float(self.geom.track))
+                                    + body_forward * ((0.06 + 0.12 * speed_u) * float(self.geom.wheelbase)),
+                                    max(0.34, 0.30 * float(self.geom.wheelbase) * (1.0 + 0.80 * speed_u)),
+                                    max(0.11, 0.16 * float(self.geom.track) * (1.0 + 0.10 * mean_load_u)),
+                                ),
+                            )
+                            for corridor_idx, (side_sign, corridor_center, corridor_radius_u, corridor_radius_v) in enumerate(corridor_specs):
+                                corridor_item = self._speed_corridor_meshes[corridor_idx] if corridor_idx < len(self._speed_corridor_meshes) else None
+                                corridor_center = np.asarray(corridor_center, dtype=float).reshape(3)
+                                corridor_center[2] = float(shadow_floor_z) + 0.0115
+                                corridor_verts, corridor_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=corridor_center,
+                                    axis_u_xyz=corridor_axis_u,
+                                    axis_v_xyz=corridor_axis_v,
+                                    radius_u_m=corridor_radius_u,
+                                    radius_v_m=corridor_radius_v,
+                                    segments=28,
+                                )
+                                corridor_face_colors = self._speed_corridor_face_colors(
+                                    corridor_verts,
+                                    corridor_faces,
+                                    center_xyz=corridor_center,
+                                    axis_u_xyz=corridor_axis_u,
+                                    axis_v_xyz=corridor_axis_v,
+                                    radius_u_m=corridor_radius_u,
+                                    radius_v_m=corridor_radius_v,
+                                    side_sign=float(side_sign),
+                                    mean_load_u=mean_load_u,
+                                    glass_energy_u=scene_glass_energy_u,
+                                    speed_u=speed_u,
+                                )
+                                corridor_face_colors = self._scene_grade_color_array(
+                                    corridor_face_colors,
+                                    exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                    alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                    output_u8=True,
+                                )
+                                _set_poly_mesh(
+                                    corridor_item,
+                                    corridor_verts,
+                                    corridor_faces,
+                                    face_colors_rgba_u8=corridor_face_colors,
+                                )
+                                if corridor_item is not None:
+                                    corridor_rgba = self._speed_corridor_rgba(
+                                        key=f"speed-corridor-{corridor_idx}",
+                                        side_sign=float(side_sign),
+                                        mean_load_u=mean_load_u,
+                                        glass_energy_u=scene_glass_energy_u,
+                                        speed_u=speed_u,
+                                    )
+                                    corridor_rgba = self._scene_graded_rgba(
+                                        key=f"speed-corridor-scene-grade-{corridor_idx}",
+                                        rgba=corridor_rgba,
+                                        exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                        saturation=float(scene_grade["saturation"]),
+                                        warmth=float(scene_grade["warmth"]),
+                                        highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                        alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                        response=0.16,
+                                    )
+                                    self._apply_mesh_material(
+                                        corridor_item,
+                                        face_rgba=corridor_rgba,
+                                        edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                    )
+                            for corridor_idx in range(len(corridor_specs), len(self._speed_corridor_meshes)):
+                                self._invalidate_mesh(self._speed_corridor_meshes[corridor_idx])
+                            wake_axis_u = body_forward
+                            wake_axis_v = body_side
+                            wake_specs = (
+                                (
+                                    +1.0,
+                                    np.asarray(road_plane_center, dtype=float).reshape(3)
+                                    + body_side * (0.30 * float(self.geom.track))
+                                    - body_forward * ((0.34 + 0.32 * speed_u) * float(self.geom.wheelbase)),
+                                    max(0.28, 0.34 * float(self.geom.wheelbase) * (1.0 + 1.00 * speed_u)),
+                                    max(0.10, 0.12 * float(self.geom.track) * (1.0 + 0.10 * mean_load_u)),
+                                ),
+                                (
+                                    -1.0,
+                                    np.asarray(road_plane_center, dtype=float).reshape(3)
+                                    - body_side * (0.30 * float(self.geom.track))
+                                    - body_forward * ((0.34 + 0.32 * speed_u) * float(self.geom.wheelbase)),
+                                    max(0.28, 0.34 * float(self.geom.wheelbase) * (1.0 + 1.00 * speed_u)),
+                                    max(0.10, 0.12 * float(self.geom.track) * (1.0 + 0.10 * mean_load_u)),
+                                ),
+                            )
+                            for wake_idx, (side_sign, wake_center, wake_radius_u, wake_radius_v) in enumerate(wake_specs):
+                                wake_item = self._rear_wake_meshes[wake_idx] if wake_idx < len(self._rear_wake_meshes) else None
+                                wake_center = np.asarray(wake_center, dtype=float).reshape(3)
+                                wake_center[2] = float(shadow_floor_z) + 0.0108
+                                wake_verts, wake_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=wake_center,
+                                    axis_u_xyz=wake_axis_u,
+                                    axis_v_xyz=wake_axis_v,
+                                    radius_u_m=wake_radius_u,
+                                    radius_v_m=wake_radius_v,
+                                    segments=28,
+                                )
+                                wake_face_colors = self._rear_wake_face_colors(
+                                    wake_verts,
+                                    wake_faces,
+                                    center_xyz=wake_center,
+                                    axis_u_xyz=wake_axis_u,
+                                    axis_v_xyz=wake_axis_v,
+                                    radius_u_m=wake_radius_u,
+                                    radius_v_m=wake_radius_v,
+                                    side_sign=float(side_sign),
+                                    mean_load_u=mean_load_u,
+                                    glass_energy_u=scene_glass_energy_u,
+                                    speed_u=speed_u,
+                                )
+                                wake_face_colors = self._scene_grade_color_array(
+                                    wake_face_colors,
+                                    exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.04,
+                                    alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                    output_u8=True,
+                                )
+                                _set_poly_mesh(
+                                    wake_item,
+                                    wake_verts,
+                                    wake_faces,
+                                    face_colors_rgba_u8=wake_face_colors,
+                                )
+                                if wake_item is not None:
+                                    wake_rgba = self._rear_wake_rgba(
+                                        key=f"rear-wake-{wake_idx}",
+                                        side_sign=float(side_sign),
+                                        mean_load_u=mean_load_u,
+                                        glass_energy_u=scene_glass_energy_u,
+                                        speed_u=speed_u,
+                                    )
+                                    wake_rgba = self._scene_graded_rgba(
+                                        key=f"rear-wake-scene-grade-{wake_idx}",
+                                        rgba=wake_rgba,
+                                        exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                        saturation=float(scene_grade["saturation"]),
+                                        warmth=float(scene_grade["warmth"]),
+                                        highlight_gain=float(scene_grade["highlight_gain"]) * 1.04,
+                                        alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                        response=0.16,
+                                    )
+                                    self._apply_mesh_material(
+                                        wake_item,
+                                        face_rgba=wake_rgba,
+                                        edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                    )
+                            for wake_idx in range(len(wake_specs), len(self._rear_wake_meshes)):
+                                self._invalidate_mesh(self._rear_wake_meshes[wake_idx])
+                            spine_center = (
+                                np.asarray(road_plane_center, dtype=float).reshape(3)
+                                - body_forward * ((0.10 + 0.08 * speed_u) * float(self.geom.wheelbase))
+                            )
+                            spine_center[2] = float(shadow_floor_z) + 0.0112
+                            spine_radius_u = max(0.32, 0.42 * float(self.geom.wheelbase) * (1.0 + 0.70 * speed_u))
+                            spine_radius_v = max(0.08, 0.10 * float(self.geom.track) * (1.0 + 0.08 * mean_load_u))
+                            spine_verts, spine_faces = _ellipse_mesh_on_plane(
+                                center_xyz=spine_center,
+                                axis_u_xyz=body_forward,
+                                axis_v_xyz=body_side,
+                                radius_u_m=spine_radius_u,
+                                radius_v_m=spine_radius_v,
+                                segments=30,
+                            )
+                            spine_face_colors = self._road_speed_spine_face_colors(
+                                spine_verts,
+                                spine_faces,
+                                center_xyz=spine_center,
+                                axis_u_xyz=body_forward,
+                                axis_v_xyz=body_side,
+                                radius_u_m=spine_radius_u,
+                                radius_v_m=spine_radius_v,
+                                mean_load_u=mean_load_u,
+                                spring_energy_u=mean_spring_energy_u,
+                                glass_energy_u=scene_glass_energy_u,
+                                speed_u=speed_u,
+                            )
+                            spine_face_colors = self._scene_grade_color_array(
+                                spine_face_colors,
+                                exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                saturation=float(scene_grade["saturation"]),
+                                warmth=float(scene_grade["warmth"]),
+                                highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                output_u8=True,
+                            )
+                            _set_poly_mesh(
+                                self._road_speed_spine_mesh,
+                                spine_verts,
+                                spine_faces,
+                                face_colors_rgba_u8=spine_face_colors,
+                            )
+                            spine_rgba = self._road_speed_spine_rgba(
+                                key="road-speed-spine",
+                                mean_load_u=mean_load_u,
+                                spring_energy_u=mean_spring_energy_u,
+                                glass_energy_u=scene_glass_energy_u,
+                                speed_u=speed_u,
+                            )
+                            spine_rgba = self._scene_graded_rgba(
+                                key="road-speed-spine-scene-grade",
+                                rgba=spine_rgba,
+                                exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                saturation=float(scene_grade["saturation"]),
+                                warmth=float(scene_grade["warmth"]),
+                                highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                response=0.15,
+                            )
+                            if self._road_speed_spine_mesh is not None:
+                                self._apply_mesh_material(
+                                    self._road_speed_spine_mesh,
+                                    face_rgba=spine_rgba,
+                                    edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                )
+                            bow_specs = (
+                                (
+                                    +1.0,
+                                    np.asarray(road_plane_center, dtype=float).reshape(3)
+                                    + body_side * (0.20 * float(self.geom.track))
+                                    + body_forward * ((0.38 + 0.28 * speed_u) * float(self.geom.wheelbase)),
+                                    max(0.24, 0.26 * float(self.geom.wheelbase) * (1.0 + 0.70 * speed_u)),
+                                    max(0.10, 0.12 * float(self.geom.track) * (1.0 + 0.08 * mean_load_u)),
+                                ),
+                                (
+                                    -1.0,
+                                    np.asarray(road_plane_center, dtype=float).reshape(3)
+                                    - body_side * (0.20 * float(self.geom.track))
+                                    + body_forward * ((0.38 + 0.28 * speed_u) * float(self.geom.wheelbase)),
+                                    max(0.24, 0.26 * float(self.geom.wheelbase) * (1.0 + 0.70 * speed_u)),
+                                    max(0.10, 0.12 * float(self.geom.track) * (1.0 + 0.08 * mean_load_u)),
+                                ),
+                            )
+                            for bow_idx, (side_sign, bow_center, bow_radius_u, bow_radius_v) in enumerate(bow_specs):
+                                bow_item = self._front_bow_wave_meshes[bow_idx] if bow_idx < len(self._front_bow_wave_meshes) else None
+                                bow_center = np.asarray(bow_center, dtype=float).reshape(3)
+                                bow_center[2] = float(shadow_floor_z) + 0.0110
+                                bow_verts, bow_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=bow_center,
+                                    axis_u_xyz=body_forward,
+                                    axis_v_xyz=body_side,
+                                    radius_u_m=bow_radius_u,
+                                    radius_v_m=bow_radius_v,
+                                    segments=28,
+                                )
+                                bow_face_colors = self._front_bow_wave_face_colors(
+                                    bow_verts,
+                                    bow_faces,
+                                    center_xyz=bow_center,
+                                    axis_u_xyz=body_forward,
+                                    axis_v_xyz=body_side,
+                                    radius_u_m=bow_radius_u,
+                                    radius_v_m=bow_radius_v,
+                                    side_sign=float(side_sign),
+                                    mean_load_u=mean_load_u,
+                                    spring_energy_u=mean_spring_energy_u,
+                                    glass_energy_u=scene_glass_energy_u,
+                                    speed_u=speed_u,
+                                )
+                                bow_face_colors = self._scene_grade_color_array(
+                                    bow_face_colors,
+                                    exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                    alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                    output_u8=True,
+                                )
+                                _set_poly_mesh(
+                                    bow_item,
+                                    bow_verts,
+                                    bow_faces,
+                                    face_colors_rgba_u8=bow_face_colors,
+                                )
+                                if bow_item is not None:
+                                    bow_rgba = self._front_bow_wave_rgba(
+                                        key=f"front-bow-wave-{bow_idx}",
+                                        side_sign=float(side_sign),
+                                        mean_load_u=mean_load_u,
+                                        spring_energy_u=mean_spring_energy_u,
+                                        glass_energy_u=scene_glass_energy_u,
+                                        speed_u=speed_u,
+                                    )
+                                    bow_rgba = self._scene_graded_rgba(
+                                        key=f"front-bow-wave-scene-grade-{bow_idx}",
+                                        rgba=bow_rgba,
+                                        exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                        saturation=float(scene_grade["saturation"]),
+                                        warmth=float(scene_grade["warmth"]),
+                                        highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                        alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                        response=0.15,
+                                    )
+                                    self._apply_mesh_material(
+                                        bow_item,
+                                        face_rgba=bow_rgba,
+                                        edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                    )
+                            for bow_idx in range(len(bow_specs), len(self._front_bow_wave_meshes)):
+                                self._invalidate_mesh(self._front_bow_wave_meshes[bow_idx])
+                            for shear_idx, side_sign in enumerate((+1.0, -1.0)):
+                                shear_item = self._front_corner_shear_meshes[shear_idx] if shear_idx < len(self._front_corner_shear_meshes) else None
+                                shear_axis_u = _norm_or(
+                                    body_forward * (0.88 + 0.12 * speed_u) + body_side * (side_sign * 0.52),
+                                    body_forward + body_side * (side_sign * 0.52),
+                                )
+                                shear_axis_v = _norm_or(
+                                    body_side * side_sign - body_forward * 0.24,
+                                    body_side * side_sign,
+                                )
+                                shear_center = (
+                                    np.asarray(road_plane_center, dtype=float).reshape(3)
+                                    + body_forward * ((0.30 + 0.18 * speed_u) * float(self.geom.wheelbase))
+                                    + body_side * (side_sign * 0.46 * float(self.geom.track))
+                                )
+                                shear_center = np.asarray(shear_center, dtype=float).reshape(3)
+                                shear_center[2] = float(shadow_floor_z) + 0.0114
+                                shear_radius_u = max(0.18, 0.22 * float(self.geom.wheelbase) * (1.0 + 0.56 * speed_u))
+                                shear_radius_v = max(0.08, 0.10 * float(self.geom.track) * (1.0 + 0.08 * mean_load_u))
+                                shear_verts, shear_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=shear_center,
+                                    axis_u_xyz=shear_axis_u,
+                                    axis_v_xyz=shear_axis_v,
+                                    radius_u_m=shear_radius_u,
+                                    radius_v_m=shear_radius_v,
+                                    segments=26,
+                                )
+                                shear_face_colors = self._front_corner_shear_face_colors(
+                                    shear_verts,
+                                    shear_faces,
+                                    center_xyz=shear_center,
+                                    axis_u_xyz=shear_axis_u,
+                                    axis_v_xyz=shear_axis_v,
+                                    radius_u_m=shear_radius_u,
+                                    radius_v_m=shear_radius_v,
+                                    side_sign=float(side_sign),
+                                    mean_load_u=mean_load_u,
+                                    spring_energy_u=mean_spring_energy_u,
+                                    glass_energy_u=scene_glass_energy_u,
+                                    speed_u=speed_u,
+                                )
+                                shear_face_colors = self._scene_grade_color_array(
+                                    shear_face_colors,
+                                    exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                    alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                    output_u8=True,
+                                )
+                                _set_poly_mesh(
+                                    shear_item,
+                                    shear_verts,
+                                    shear_faces,
+                                    face_colors_rgba_u8=shear_face_colors,
+                                )
+                                if shear_item is not None:
+                                    shear_rgba = self._front_corner_shear_rgba(
+                                        key=f"front-corner-shear-{shear_idx}",
+                                        side_sign=float(side_sign),
+                                        mean_load_u=mean_load_u,
+                                        spring_energy_u=mean_spring_energy_u,
+                                        glass_energy_u=scene_glass_energy_u,
+                                        speed_u=speed_u,
+                                    )
+                                    shear_rgba = self._scene_graded_rgba(
+                                        key=f"front-corner-shear-scene-grade-{shear_idx}",
+                                        rgba=shear_rgba,
+                                        exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                        saturation=float(scene_grade["saturation"]),
+                                        warmth=float(scene_grade["warmth"]),
+                                        highlight_gain=float(scene_grade["highlight_gain"]) * 1.06,
+                                        alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                        response=0.15,
+                                    )
+                                    self._apply_mesh_material(
+                                        shear_item,
+                                        face_rgba=shear_rgba,
+                                        edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                    )
+                            for shear_idx in range(2, len(self._front_corner_shear_meshes)):
+                                self._invalidate_mesh(self._front_corner_shear_meshes[shear_idx])
+                            lane_specs = (
+                                (+1.0, True, front_load_u, np.asarray(road_plane_center, dtype=float).reshape(3) + body_forward * (0.16 * float(self.geom.wheelbase)) + body_side * (0.50 * float(self.geom.track))),
+                                (-1.0, True, front_load_u, np.asarray(road_plane_center, dtype=float).reshape(3) + body_forward * (0.16 * float(self.geom.wheelbase)) - body_side * (0.50 * float(self.geom.track))),
+                                (+1.0, False, rear_load_u, np.asarray(road_plane_center, dtype=float).reshape(3) - body_forward * (0.16 * float(self.geom.wheelbase)) + body_side * (0.50 * float(self.geom.track))),
+                                (-1.0, False, rear_load_u, np.asarray(road_plane_center, dtype=float).reshape(3) - body_forward * (0.16 * float(self.geom.wheelbase)) - body_side * (0.50 * float(self.geom.track))),
+                            )
+                            for lane_idx, (side_sign, front, load_u, lane_center) in enumerate(lane_specs):
+                                lane_item = self._wheel_lane_streak_meshes[lane_idx] if lane_idx < len(self._wheel_lane_streak_meshes) else None
+                                lane_center = np.asarray(lane_center, dtype=float).reshape(3)
+                                lane_center[2] = float(shadow_floor_z) + 0.0109
+                                lane_radius_u = max(0.18, 0.18 * float(self.geom.wheelbase) * (1.0 + 0.54 * speed_u))
+                                lane_radius_v = max(0.05, 0.06 * float(self.geom.track) * (1.0 + 0.12 * load_u))
+                                lane_verts, lane_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=lane_center,
+                                    axis_u_xyz=body_forward,
+                                    axis_v_xyz=body_side,
+                                    radius_u_m=lane_radius_u,
+                                    radius_v_m=lane_radius_v,
+                                    segments=24,
+                                )
+                                lane_face_colors = self._wheel_lane_streak_face_colors(
+                                    lane_verts,
+                                    lane_faces,
+                                    center_xyz=lane_center,
+                                    axis_u_xyz=body_forward,
+                                    axis_v_xyz=body_side,
+                                    radius_u_m=lane_radius_u,
+                                    radius_v_m=lane_radius_v,
+                                    side_sign=float(side_sign),
+                                    front=bool(front),
+                                    load_u=float(load_u),
+                                    glass_energy_u=scene_glass_energy_u,
+                                    speed_u=speed_u,
+                                )
+                                lane_face_colors = self._scene_grade_color_array(
+                                    lane_face_colors,
+                                    exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.04,
+                                    alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                    output_u8=True,
+                                )
+                                _set_poly_mesh(
+                                    lane_item,
+                                    lane_verts,
+                                    lane_faces,
+                                    face_colors_rgba_u8=lane_face_colors,
+                                )
+                                if lane_item is not None:
+                                    lane_rgba = self._wheel_lane_streak_rgba(
+                                        key=f"wheel-lane-streak-{lane_idx}",
+                                        side_sign=float(side_sign),
+                                        front=bool(front),
+                                        load_u=float(load_u),
+                                        glass_energy_u=scene_glass_energy_u,
+                                        speed_u=speed_u,
+                                    )
+                                    lane_rgba = self._scene_graded_rgba(
+                                        key=f"wheel-lane-streak-scene-grade-{lane_idx}",
+                                        rgba=lane_rgba,
+                                        exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                        saturation=float(scene_grade["saturation"]),
+                                        warmth=float(scene_grade["warmth"]),
+                                        highlight_gain=float(scene_grade["highlight_gain"]) * 1.04,
+                                        alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                        response=0.15,
+                                    )
+                                    self._apply_mesh_material(
+                                        lane_item,
+                                        face_rgba=lane_rgba,
+                                        edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                    )
+                            for lane_idx in range(len(lane_specs), len(self._wheel_lane_streak_meshes)):
+                                self._invalidate_mesh(self._wheel_lane_streak_meshes[lane_idx])
+                            shoulder_specs = (
+                                (
+                                    +1.0,
+                                    np.asarray(road_plane_center, dtype=float).reshape(3) + body_side * (0.66 * float(self.geom.track)),
+                                    max(0.36, 0.38 * float(self.geom.wheelbase) * (1.0 + 0.64 * speed_u)),
+                                    max(0.10, 0.12 * float(self.geom.track) * (1.0 + 0.10 * mean_load_u)),
+                                ),
+                                (
+                                    -1.0,
+                                    np.asarray(road_plane_center, dtype=float).reshape(3) - body_side * (0.66 * float(self.geom.track)),
+                                    max(0.36, 0.38 * float(self.geom.wheelbase) * (1.0 + 0.64 * speed_u)),
+                                    max(0.10, 0.12 * float(self.geom.track) * (1.0 + 0.10 * mean_load_u)),
+                                ),
+                            )
+                            for shoulder_idx, (side_sign, shoulder_center, shoulder_radius_u, shoulder_radius_v) in enumerate(shoulder_specs):
+                                shoulder_item = self._track_shoulder_meshes[shoulder_idx] if shoulder_idx < len(self._track_shoulder_meshes) else None
+                                shoulder_center = np.asarray(shoulder_center, dtype=float).reshape(3)
+                                shoulder_center[2] = float(shadow_floor_z) + 0.0107
+                                shoulder_verts, shoulder_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=shoulder_center,
+                                    axis_u_xyz=body_forward,
+                                    axis_v_xyz=body_side,
+                                    radius_u_m=shoulder_radius_u,
+                                    radius_v_m=shoulder_radius_v,
+                                    segments=26,
+                                )
+                                shoulder_face_colors = self._track_shoulder_face_colors(
+                                    shoulder_verts,
+                                    shoulder_faces,
+                                    center_xyz=shoulder_center,
+                                    axis_u_xyz=body_forward,
+                                    axis_v_xyz=body_side,
+                                    radius_u_m=shoulder_radius_u,
+                                    radius_v_m=shoulder_radius_v,
+                                    side_sign=float(side_sign),
+                                    mean_load_u=mean_load_u,
+                                    glass_energy_u=scene_glass_energy_u,
+                                    speed_u=speed_u,
+                                )
+                                shoulder_face_colors = self._scene_grade_color_array(
+                                    shoulder_face_colors,
+                                    exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.02,
+                                    alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                    output_u8=True,
+                                )
+                                _set_poly_mesh(
+                                    shoulder_item,
+                                    shoulder_verts,
+                                    shoulder_faces,
+                                    face_colors_rgba_u8=shoulder_face_colors,
+                                )
+                                if shoulder_item is not None:
+                                    shoulder_rgba = self._track_shoulder_rgba(
+                                        key=f"track-shoulder-{shoulder_idx}",
+                                        side_sign=float(side_sign),
+                                        mean_load_u=mean_load_u,
+                                        glass_energy_u=scene_glass_energy_u,
+                                        speed_u=speed_u,
+                                    )
+                                    shoulder_rgba = self._scene_graded_rgba(
+                                        key=f"track-shoulder-scene-grade-{shoulder_idx}",
+                                        rgba=shoulder_rgba,
+                                        exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                        saturation=float(scene_grade["saturation"]),
+                                        warmth=float(scene_grade["warmth"]),
+                                        highlight_gain=float(scene_grade["highlight_gain"]) * 1.02,
+                                        alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                        response=0.16,
+                                    )
+                                    self._apply_mesh_material(
+                                        shoulder_item,
+                                        face_rgba=shoulder_rgba,
+                                        edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                    )
+                            for shoulder_idx in range(len(shoulder_specs), len(self._track_shoulder_meshes)):
+                                self._invalidate_mesh(self._track_shoulder_meshes[shoulder_idx])
+                            axle_specs = (
+                                (
+                                    True,
+                                    front_load_u,
+                                    np.asarray(road_plane_center, dtype=float).reshape(3) + body_forward * (0.24 * float(self.geom.wheelbase)),
+                                    max(0.10, 0.11 * float(self.geom.wheelbase) * (1.0 + 0.10 * front_load_u)),
+                                    max(0.20, 0.34 * float(self.geom.track) * (1.0 + 0.36 * speed_u)),
+                                ),
+                                (
+                                    False,
+                                    rear_load_u,
+                                    np.asarray(road_plane_center, dtype=float).reshape(3) - body_forward * (0.24 * float(self.geom.wheelbase)),
+                                    max(0.10, 0.11 * float(self.geom.wheelbase) * (1.0 + 0.10 * rear_load_u)),
+                                    max(0.18, 0.30 * float(self.geom.track) * (1.0 + 0.30 * speed_u)),
+                                ),
+                            )
+                            for axle_idx, (front, axle_load_u, axle_center, axle_radius_u, axle_radius_v) in enumerate(axle_specs):
+                                axle_item = self._axle_wash_meshes[axle_idx] if axle_idx < len(self._axle_wash_meshes) else None
+                                axle_center = np.asarray(axle_center, dtype=float).reshape(3)
+                                axle_center[2] = float(shadow_floor_z) + 0.0108
+                                axle_verts, axle_faces = _ellipse_mesh_on_plane(
+                                    center_xyz=axle_center,
+                                    axis_u_xyz=body_forward,
+                                    axis_v_xyz=body_side,
+                                    radius_u_m=axle_radius_u,
+                                    radius_v_m=axle_radius_v,
+                                    segments=28,
+                                )
+                                axle_face_colors = self._axle_wash_face_colors(
+                                    axle_verts,
+                                    axle_faces,
+                                    center_xyz=axle_center,
+                                    axis_u_xyz=body_forward,
+                                    axis_v_xyz=body_side,
+                                    radius_u_m=axle_radius_u,
+                                    radius_v_m=axle_radius_v,
+                                    front=bool(front),
+                                    load_u=float(axle_load_u),
+                                    glass_energy_u=scene_glass_energy_u,
+                                    speed_u=speed_u,
+                                )
+                                axle_face_colors = self._scene_grade_color_array(
+                                    axle_face_colors,
+                                    exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                    saturation=float(scene_grade["saturation"]),
+                                    warmth=float(scene_grade["warmth"]),
+                                    highlight_gain=float(scene_grade["highlight_gain"]) * 1.03,
+                                    alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                    output_u8=True,
+                                )
+                                _set_poly_mesh(
+                                    axle_item,
+                                    axle_verts,
+                                    axle_faces,
+                                    face_colors_rgba_u8=axle_face_colors,
+                                )
+                                if axle_item is not None:
+                                    axle_rgba = self._axle_wash_rgba(
+                                        key=f"axle-wash-{axle_idx}",
+                                        front=bool(front),
+                                        load_u=float(axle_load_u),
+                                        glass_energy_u=scene_glass_energy_u,
+                                        speed_u=speed_u,
+                                    )
+                                    axle_rgba = self._scene_graded_rgba(
+                                        key=f"axle-wash-scene-grade-{axle_idx}",
+                                        rgba=axle_rgba,
+                                        exposure=float(scene_grade["exposure"]) * float(scene_grade["fog_gain"]),
+                                        saturation=float(scene_grade["saturation"]),
+                                        warmth=float(scene_grade["warmth"]),
+                                        highlight_gain=float(scene_grade["highlight_gain"]) * 1.03,
+                                        alpha_gain=float(scene_grade["alpha_gain"]) * float(scene_grade["fog_gain"]),
+                                        response=0.16,
+                                    )
+                                    self._apply_mesh_material(
+                                        axle_item,
+                                        face_rgba=axle_rgba,
+                                        edge_rgba=(0.0, 0.0, 0.0, 0.0),
+                                    )
+                            for axle_idx in range(len(axle_specs), len(self._axle_wash_meshes)):
+                                self._invalidate_mesh(self._axle_wash_meshes[axle_idx])
                             focus_radius_u = max(0.16, 0.26 * float(self.geom.wheelbase) * (1.0 + 0.16 * mean_spring_energy_u))
                             focus_radius_v = max(0.10, 0.18 * float(self.geom.track) * (1.0 + 0.12 * mean_load_u))
                             focus_center = np.asarray(focus_center, dtype=float).reshape(3) + camera_view_dir * 0.008
@@ -11278,6 +14878,8 @@ class Car3DWidget(QtWidgets.QWidget):
                                 self._invalidate_mesh(shadow_item)
                             for glaze_item in self._contact_glaze_meshes:
                                 self._invalidate_mesh(glaze_item)
+                            for reflection_item in self._contact_reflection_meshes:
+                                self._invalidate_mesh(reflection_item)
                             for accent_ring in self._contact_accent_rings:
                                 _set_line_item_pos(accent_ring, None)
                             for fog_item in self._scene_fog_meshes:
@@ -11288,12 +14890,39 @@ class Car3DWidget(QtWidgets.QWidget):
                                 _set_line_item_pos(key_light, None)
                             self._invalidate_mesh(self._focus_halo_mesh)
                             _set_line_item_pos(self._focus_halo_line, None)
+                            self._invalidate_mesh(self._underbody_glow_mesh)
+                            _set_line_item_pos(self._body_silhouette_line, None)
+                            self._invalidate_mesh(self._body_top_sheen_mesh)
+                            _set_line_item_pos(self._body_top_sweep_line, None)
+                            for aura_item in self._body_end_aura_meshes:
+                                self._invalidate_mesh(aura_item)
+                            _set_line_item_pos(self._body_spine_line, None)
+                            for curtain_item in self._scene_side_curtain_meshes:
+                                self._invalidate_mesh(curtain_item)
+                            _set_line_item_pos(self._scene_portal_line, None)
+                            for corridor_item in self._speed_corridor_meshes:
+                                self._invalidate_mesh(corridor_item)
+                            for wake_item in self._rear_wake_meshes:
+                                self._invalidate_mesh(wake_item)
+                            self._invalidate_mesh(self._road_speed_spine_mesh)
+                            for bow_item in self._front_bow_wave_meshes:
+                                self._invalidate_mesh(bow_item)
+                            for shear_item in self._front_corner_shear_meshes:
+                                self._invalidate_mesh(shear_item)
+                            for lane_item in self._wheel_lane_streak_meshes:
+                                self._invalidate_mesh(lane_item)
+                            for shoulder_item in self._track_shoulder_meshes:
+                                self._invalidate_mesh(shoulder_item)
+                            for axle_item in self._axle_wash_meshes:
+                                self._invalidate_mesh(axle_item)
                     except Exception:
                         self._invalidate_mesh(self._body_shadow_mesh)
                         for shadow_item in self._wheel_shadow_meshes:
                             self._invalidate_mesh(shadow_item)
                         for glaze_item in self._contact_glaze_meshes:
                             self._invalidate_mesh(glaze_item)
+                        for reflection_item in self._contact_reflection_meshes:
+                            self._invalidate_mesh(reflection_item)
                         for accent_ring in self._contact_accent_rings:
                             _set_line_item_pos(accent_ring, None)
                         for fog_item in self._scene_fog_meshes:
@@ -11304,6 +14933,31 @@ class Car3DWidget(QtWidgets.QWidget):
                             _set_line_item_pos(key_light, None)
                         self._invalidate_mesh(self._focus_halo_mesh)
                         _set_line_item_pos(self._focus_halo_line, None)
+                        self._invalidate_mesh(self._underbody_glow_mesh)
+                        _set_line_item_pos(self._body_silhouette_line, None)
+                        self._invalidate_mesh(self._body_top_sheen_mesh)
+                        _set_line_item_pos(self._body_top_sweep_line, None)
+                        for aura_item in self._body_end_aura_meshes:
+                            self._invalidate_mesh(aura_item)
+                        _set_line_item_pos(self._body_spine_line, None)
+                        for curtain_item in self._scene_side_curtain_meshes:
+                            self._invalidate_mesh(curtain_item)
+                        _set_line_item_pos(self._scene_portal_line, None)
+                        for corridor_item in self._speed_corridor_meshes:
+                            self._invalidate_mesh(corridor_item)
+                        for wake_item in self._rear_wake_meshes:
+                            self._invalidate_mesh(wake_item)
+                        self._invalidate_mesh(self._road_speed_spine_mesh)
+                        for bow_item in self._front_bow_wave_meshes:
+                            self._invalidate_mesh(bow_item)
+                        for shear_item in self._front_corner_shear_meshes:
+                            self._invalidate_mesh(shear_item)
+                        for lane_item in self._wheel_lane_streak_meshes:
+                            self._invalidate_mesh(lane_item)
+                        for shoulder_item in self._track_shoulder_meshes:
+                            self._invalidate_mesh(shoulder_item)
+                        for axle_item in self._axle_wash_meshes:
+                            self._invalidate_mesh(axle_item)
             except Exception:
                 try:
                     self._road_mesh.setMeshData(meshdata=gl.MeshData(vertexes=np.zeros((0, 3), float), faces=np.zeros((0, 3), int)))
@@ -11322,6 +14976,8 @@ class Car3DWidget(QtWidgets.QWidget):
                     self._invalidate_mesh(shadow_item)
                 for glaze_item in self._contact_glaze_meshes:
                     self._invalidate_mesh(glaze_item)
+                for reflection_item in self._contact_reflection_meshes:
+                    self._invalidate_mesh(reflection_item)
                 for accent_ring in self._contact_accent_rings:
                     _set_line_item_pos(accent_ring, None)
                 for fog_item in self._scene_fog_meshes:
@@ -11332,12 +14988,39 @@ class Car3DWidget(QtWidgets.QWidget):
                     _set_line_item_pos(key_light, None)
                 self._invalidate_mesh(self._focus_halo_mesh)
                 _set_line_item_pos(self._focus_halo_line, None)
+                self._invalidate_mesh(self._underbody_glow_mesh)
+                _set_line_item_pos(self._body_silhouette_line, None)
+                self._invalidate_mesh(self._body_top_sheen_mesh)
+                _set_line_item_pos(self._body_top_sweep_line, None)
+                for aura_item in self._body_end_aura_meshes:
+                    self._invalidate_mesh(aura_item)
+                _set_line_item_pos(self._body_spine_line, None)
+                for curtain_item in self._scene_side_curtain_meshes:
+                    self._invalidate_mesh(curtain_item)
+                _set_line_item_pos(self._scene_portal_line, None)
+                for corridor_item in self._speed_corridor_meshes:
+                    self._invalidate_mesh(corridor_item)
+                for wake_item in self._rear_wake_meshes:
+                    self._invalidate_mesh(wake_item)
+                self._invalidate_mesh(self._road_speed_spine_mesh)
+                for bow_item in self._front_bow_wave_meshes:
+                    self._invalidate_mesh(bow_item)
+                for shear_item in self._front_corner_shear_meshes:
+                    self._invalidate_mesh(shear_item)
+                for lane_item in self._wheel_lane_streak_meshes:
+                    self._invalidate_mesh(lane_item)
+                for shoulder_item in self._track_shoulder_meshes:
+                    self._invalidate_mesh(shoulder_item)
+                for axle_item in self._axle_wash_meshes:
+                    self._invalidate_mesh(axle_item)
         else:
             self._invalidate_mesh(self._body_shadow_mesh)
             for shadow_item in self._wheel_shadow_meshes:
                 self._invalidate_mesh(shadow_item)
             for glaze_item in self._contact_glaze_meshes:
                 self._invalidate_mesh(glaze_item)
+            for reflection_item in self._contact_reflection_meshes:
+                self._invalidate_mesh(reflection_item)
             for accent_ring in self._contact_accent_rings:
                 _set_line_item_pos(accent_ring, None)
             for fog_item in self._scene_fog_meshes:
@@ -11348,6 +15031,31 @@ class Car3DWidget(QtWidgets.QWidget):
                 _set_line_item_pos(key_light, None)
             self._invalidate_mesh(self._focus_halo_mesh)
             _set_line_item_pos(self._focus_halo_line, None)
+            self._invalidate_mesh(self._underbody_glow_mesh)
+            _set_line_item_pos(self._body_silhouette_line, None)
+            self._invalidate_mesh(self._body_top_sheen_mesh)
+            _set_line_item_pos(self._body_top_sweep_line, None)
+            for aura_item in self._body_end_aura_meshes:
+                self._invalidate_mesh(aura_item)
+            _set_line_item_pos(self._body_spine_line, None)
+            for curtain_item in self._scene_side_curtain_meshes:
+                self._invalidate_mesh(curtain_item)
+            _set_line_item_pos(self._scene_portal_line, None)
+            for corridor_item in self._speed_corridor_meshes:
+                self._invalidate_mesh(corridor_item)
+            for wake_item in self._rear_wake_meshes:
+                self._invalidate_mesh(wake_item)
+            self._invalidate_mesh(self._road_speed_spine_mesh)
+            for bow_item in self._front_bow_wave_meshes:
+                self._invalidate_mesh(bow_item)
+            for shear_item in self._front_corner_shear_meshes:
+                self._invalidate_mesh(shear_item)
+            for lane_item in self._wheel_lane_streak_meshes:
+                self._invalidate_mesh(lane_item)
+            for shoulder_item in self._track_shoulder_meshes:
+                self._invalidate_mesh(shoulder_item)
+            for axle_item in self._axle_wash_meshes:
+                self._invalidate_mesh(axle_item)
 
 class CornerTable(QtWidgets.QTableWidget):
     """One compact table for 'all 4 corners at once' observability.
@@ -16308,12 +20016,12 @@ class TelemetryPanel(QtWidgets.QWidget):
 
         # Для отображения используем модуль скорости.
         v_mps = math.hypot(vx, vy)
-        yaw = sample(summary["yaw"], 0.0)
+        yaw = _sample_angle_series_local(summary["yaw"], i0=int(sample_i0), i1=int(sample_i1), alpha=float(alpha), default=0.0)
         yaw_rate = sample(summary["yaw_rate"], 0.0)
         ax = sample(summary["ax"], 0.0)
         ay = sample(summary["ay"], 0.0)
-        roll = sample(summary["roll"], 0.0)
-        pitch = sample(summary["pitch"], 0.0)
+        roll = _sample_angle_series_local(summary["roll"], i0=int(sample_i0), i1=int(sample_i1), alpha=float(alpha), default=0.0)
+        pitch = _sample_angle_series_local(summary["pitch"], i0=int(sample_i0), i1=int(sample_i1), alpha=float(alpha), default=0.0)
 
         R = float("inf")
         if abs(yaw_rate) > 1e-6 and abs(vx) > 1e-3:
@@ -18351,12 +22059,6 @@ class CockpitWidget(QtWidgets.QWidget):
                 road_profile_panel,
                 lambda: road_profile_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
             )
-        if interactive_scrub and multifactor_panel is not None and self._dock_is_exposed("dock_multifactor"):
-            _call_aux_widget(
-                "dock_multifactor",
-                multifactor_panel,
-                lambda: multifactor_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),
-            )
         if interactive_scrub and self._dock_is_exposed("dock_trends"):
             _call_aux_widget(
                 "dock_trends",
@@ -18403,7 +22105,7 @@ class CockpitWidget(QtWidgets.QWidget):
             self.car3d.update_frame(
                 b,
                 i,
-                sample_t=self._playback_sample_t_s if bool(playing) else None,
+                sample_t=self._playback_sample_t_s,
             )
 
 # -----------------------------
@@ -18443,6 +22145,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._play_wall_ts = 0.0
         self._play_accum_s = 0.0
         self._play_cursor_t_s = 0.0
+        self._playback_source_dt_s = float("nan")
 
         self._idx = 0
 
@@ -18901,6 +22604,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _set_speed(self, v: float):
         self._speed = float(v)
         if self._playing:
+            self._play_accum_s = 0.0
             self._play_wall_ts = float(time.perf_counter())
             self._arm_next_playback_tick()
 
@@ -18959,20 +22663,12 @@ class MainWindow(QtWidgets.QMainWindow):
         return float(t[i])
 
     def _playback_interval_ms_for_index(self, idx: int) -> int:
-        # Playback is display-oriented, not source-frame-oriented.  The old 4 ms service
-        # timer tried to chase every dense source frame inside the GUI thread, which made
-        # a simple animation look far more expensive than it really is.  We now render at
-        # a display cadence and select the source frame from a continuous playhead time.
-        speed = float(max(0.05, self._speed))
-        if speed <= 1.0:
-            base_ms = 12.0  # ~83 Hz keeps x1.0 visibly alive without source-frame chasing.
-        elif speed <= 2.0:
-            base_ms = 10.0  # ~100 Hz for moderate fast-forward.
-        elif speed <= 4.0:
-            base_ms = 8.0   # ~125 Hz.
-        else:
-            base_ms = 6.0   # ~166 Hz upper service cadence on Windows precise timer.
-        return int(max(6, min(20, round(base_ms))))
+        return int(
+            _playback_interval_ms_for_speed(
+                self._speed,
+                source_dt_s=float(getattr(self, "_playback_source_dt_s", float("nan"))),
+            )
+        )
 
     def _arm_next_playback_tick(self) -> None:
         if self.bundle is None or not self._playing:
@@ -19033,17 +22729,24 @@ class MainWindow(QtWidgets.QMainWindow):
         t = np.asarray(b.t, dtype=float)
         if t.size == 0:
             return
+        interval_ms = int(self._playback_interval_ms_for_index(int(self._idx)))
 
         now = float(time.perf_counter())
         last = float(self._play_wall_ts) if self._play_wall_ts else now
-        wall_dt = max(0.0, now - last)
+        raw_wall_dt = max(0.0, now - last)
         self._play_wall_ts = now
 
         start_t = float(t[0])
         end_t = float(t[-1])
         if not np.isfinite(getattr(self, '_play_cursor_t_s', np.nan)):
             self._play_cursor_t_s = float(t[int(_clamp(self._idx, 0, len(t) - 1))])
-        self._play_cursor_t_s = float(self._play_cursor_t_s) + wall_dt * float(max(0.05, self._speed))
+        self._play_cursor_t_s, self._play_accum_s = _advance_playback_cursor_limited(
+            float(self._play_cursor_t_s),
+            raw_wall_dt_s=raw_wall_dt,
+            speed=float(self._speed),
+            interval_ms=int(interval_ms),
+            carry_s=float(self._play_accum_s),
+        )
 
         advanced = False
         if self._play_cursor_t_s >= end_t - 1e-12:
@@ -19051,32 +22754,24 @@ class MainWindow(QtWidgets.QMainWindow):
                 span = max(1e-9, end_t - start_t)
                 rel = (float(self._play_cursor_t_s) - start_t) % span
                 self._play_cursor_t_s = start_t + rel
+                self._play_accum_s = 0.0
             else:
                 self._play_cursor_t_s = end_t
+                self._play_accum_s = 0.0
                 self._idx = len(t) - 1
                 self._playing = False
                 self.btn_play.setText("▶ Пуск")
                 self._timer.stop()
 
         if self._playing:
-            idx = int(np.searchsorted(t, float(self._play_cursor_t_s), side='left'))
-            if idx <= 0:
-                idx = 0
-            elif idx >= len(t):
-                idx = len(t) - 1
-            else:
-                prev_idx = idx - 1
-                if abs(float(self._play_cursor_t_s) - float(t[prev_idx])) <= abs(float(t[idx]) - float(self._play_cursor_t_s)):
-                    idx = prev_idx
+            idx = int(_playback_source_index_for_time(t, float(self._play_cursor_t_s)))
             advanced = idx != int(self._idx)
             self._idx = int(idx)
 
-        if advanced or not self._playing:
+        if advanced:
             self.slider.blockSignals(True)
             self.slider.setValue(int(self._idx))
             self.slider.blockSignals(False)
-            self._update_frame(int(self._idx), sample_t=self._play_cursor_t_s if self._playing else None)
-        # Continuous playback sampling only helps if we actually redraw every service tick.
         if self._playing:
             self._update_frame(int(self._idx), sample_t=self._play_cursor_t_s)
         if not self._playing:
@@ -19104,7 +22799,26 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             t = float(sample_time)
             vxw, vyw = b.ensure_world_velocity_xy()
-            v = math.hypot(float(vxw[idx]), float(vyw[idx])) if len(vxw) > idx and len(vyw) > idx else float(abs(b.get("скорость_vx_м_с", 0.0)[idx]))
+            sample_i0, sample_i1, sample_alpha, _sample_t = _sample_time_bracket(
+                np.asarray(b.t, dtype=float),
+                sample_t=sample_time,
+                fallback_index=idx,
+            )
+            vx_sample = _sample_series_local(
+                vxw,
+                i0=int(sample_i0),
+                i1=int(sample_i1),
+                alpha=float(sample_alpha),
+                default=float(vxw[idx]) if len(vxw) > idx else 0.0,
+            )
+            vy_sample = _sample_series_local(
+                vyw,
+                i0=int(sample_i0),
+                i1=int(sample_i1),
+                alpha=float(sample_alpha),
+                default=float(vyw[idx]) if len(vyw) > idx else 0.0,
+            )
+            v = math.hypot(float(vx_sample), float(vy_sample)) if len(vxw) and len(vyw) else float(abs(b.get("скорость_vx_м_с", 0.0)[idx]))
             self._status(f"t={t:.3f}s, v={v:.2f}m/s, file={b.npz_path.name}")
         except Exception:
             pass
@@ -19133,6 +22847,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._idx = 0
         self._playing = False
+        self._play_accum_s = 0.0
+        self._play_wall_ts = 0.0
+        self._playback_source_dt_s = _nominal_positive_dt_s(np.asarray(b.t, dtype=float))
         self.btn_play.setText("▶ Пуск")
         self._timer.stop()
 

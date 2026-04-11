@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 import importlib.util
 import re
@@ -43,9 +44,19 @@ def _pattern_ok(txt: str, pattern: str) -> bool:
     return re.search(pattern, txt, flags=re.MULTILINE) is not None
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(
+        description="Check energy-consistency of smooth contact models against potential energy."
+    )
+    ap.add_argument(
+        "--model-path",
+        default="",
+        help="Optional path to the model .py file. Default: canonical v8 smooth-all model.",
+    )
+    ns = ap.parse_args(argv)
+
     root = Path(__file__).resolve().parents[1]  # .../pneumo_solver_ui
-    model_path = root / "model_pneumo_v8_energy_audit_vacuum_patched_smooth_all.py"
+    model_path = Path(ns.model_path).resolve() if ns.model_path else (root / "model_pneumo_v8_energy_audit_vacuum_patched_smooth_all.py")
     if not model_path.exists():
         print(f"!! Не найден файл модели: {model_path}")
         return 2

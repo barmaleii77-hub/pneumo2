@@ -40,7 +40,6 @@ from pneumo_solver_ui.ui_svg_flow_helpers import default_svg_pressure_nodes
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 UI_ROOT = PROJECT_ROOT / "pneumo_solver_ui"
-COMPONENT_HTML_PATH = UI_ROOT / "components" / "pneumo_svg_flow" / "index.html"
 SCHEME_JSON_PATH = UI_ROOT / "PNEUMO_SCHEME.json"
 
 VIEWBOX_W = 2200.0
@@ -119,114 +118,6 @@ CHAMBER_RE = re.compile(r"^Ц(?P<cyl>[12])_(?P<corner>ЛП|ПП|ЛЗ|ПЗ)_(?P<c
 DIAGONAL_RE = re.compile(
     r"^узел_(?P<src_corner>ЛП|ПП|ЛЗ|ПЗ)(?P<src_ch>CAP|ROD)_к_(?P<dst_corner>ЛП|ПП|ЛЗ|ПЗ)(?P<dst_ch>CAP|ROD)_(?P<stage>междуОКиДР|послеДР)$"
 )
-
-BOOTSTRAP_JS = """
-(function() {
-  if (window.__codexMnemoBootstrapInstalled) return "ok";
-  window.__codexMnemoBootstrapInstalled = true;
-  function installBridge(channel) {
-    window.codexBridge = channel.objects.codexBridge;
-    try {
-      if (window.parent && typeof window.parent === "object") {
-        window.parent.postMessage = function(data, _target) {
-          try {
-            window.codexBridge.postMessage(JSON.stringify(data || null));
-          } catch (err) {
-            console.error("codex bridge postMessage failed", err);
-          }
-        };
-      }
-    } catch (err) {
-      console.error("codex bridge patch failed", err);
-    }
-  }
-  if (window.QWebChannel && window.qt && window.qt.webChannelTransport) {
-    new QWebChannel(qt.webChannelTransport, function(channel) {
-      installBridge(channel);
-    });
-  }
-  window.codexMnemoDispatch = function(args) {
-    window.dispatchEvent(new MessageEvent("message", { data: { type: "streamlit:render", args: args || {} } }));
-    return true;
-  };
-  window.codexMnemoSetPlayhead = function(state) {
-    try {
-      var key = String((state && state.key) || (window.DATA && DATA.playhead_storage_key) || "pneumo_desktop_mnemo_playhead");
-      localStorage.setItem(key, JSON.stringify(state || {}));
-      if (state && state.idx !== undefined && state.idx !== null && typeof slider !== "undefined" && slider) {
-        idx = Number(state.idx) || 0;
-        slider.value = String(idx);
-      }
-      if (typeof __FLOW_DIRTY !== "undefined") __FLOW_DIRTY = true;
-      if (typeof __wakeLoop === "function") __wakeLoop();
-      return true;
-    } catch (err) {
-      return String(err);
-    }
-  };
-  window.codexMnemoSetSelection = function(sel) {
-    try {
-      if (!window.__lastArgs) return false;
-      var args = Object.assign({}, window.__lastArgs || {});
-      args.selected = sel || {};
-      window.__lastArgs = args;
-      build(args);
-      return true;
-    } catch (err) {
-      return String(err);
-    }
-  };
-  window.codexMnemoSetAlerts = function(alerts) {
-    try {
-      if (!window.__lastArgs) window.__lastArgs = {};
-      window.__lastArgs = Object.assign({}, window.__lastArgs || {}, { alerts: alerts || {} });
-      if (typeof DATA !== "undefined" && DATA) DATA.alerts = alerts || {};
-      if (typeof updateAlertOverlay === "function") updateAlertOverlay();
-      return true;
-    } catch (err) {
-      return String(err);
-    }
-  };
-  window.codexMnemoSetDiagnostics = function(diag) {
-    try {
-      if (!window.__lastArgs) window.__lastArgs = {};
-      window.__lastArgs = Object.assign({}, window.__lastArgs || {}, { mnemo_diagnostics: diag || {} });
-      if (typeof DATA !== "undefined" && DATA) DATA.mnemo_diagnostics = diag || {};
-      if (typeof updateMnemoDiagnostics === "function") updateMnemoDiagnostics();
-      return true;
-    } catch (err) {
-      return String(err);
-    }
-  };
-  window.codexMnemoSetFocusRegion = function(focus) {
-    try {
-      if (!window.__lastArgs) window.__lastArgs = {};
-      window.__lastArgs = Object.assign({}, window.__lastArgs || {}, { focus_region: focus || null });
-      if (typeof DATA !== "undefined" && DATA) DATA.focus_region = focus || null;
-      if (typeof applyFocusRegion === "function") applyFocusRegion(focus || null, { source: "qt-bridge" });
-      return true;
-    } catch (err) {
-      return String(err);
-    }
-  };
-  window.codexMnemoShowOverview = function(meta) {
-    try {
-      if (!window.__lastArgs) window.__lastArgs = {};
-      if (meta && Object.prototype.hasOwnProperty.call(meta, "focus_region")) {
-        window.__lastArgs = Object.assign({}, window.__lastArgs || {}, { focus_region: meta.focus_region || null });
-        if (typeof DATA !== "undefined" && DATA) DATA.focus_region = meta.focus_region || null;
-      }
-      if (typeof showFocusOverview === "function") {
-        return !!showFocusOverview(meta || {});
-      }
-      return false;
-    } catch (err) {
-      return String(err);
-    }
-  };
-  return "ok";
-})();
-"""
 
 APP_STYLESHEET_DARK = """
 QMainWindow, QWidget {
@@ -2460,6 +2351,216 @@ def _state_short_label(state_label: str) -> str:
     return "SIG?"
 
 
+def _build_selected_edge_focus_meta(
+    dataset: MnemoDataset | None,
+    idx: int,
+    *,
+    edge_name: str | None,
+) -> dict[str, Any]:
+    if dataset is None or dataset.time_s.size == 0:
+        return {}
+    selected_edge = str(edge_name or "")
+    if not selected_edge or selected_edge not in dataset.edge_names:
+        return {}
+
+    clamped_idx = int(max(0, min(idx, dataset.time_s.size - 1)))
+    edge_def = dataset.edge_defs.get(selected_edge, {})
+    n1 = str(edge_def.get("n1") or "")
+    n2 = str(edge_def.get("n2") or "")
+    if not n1 and not n2:
+        return {}
+
+    q_now = 0.0
+    if dataset.bundle.q is not None:
+        q_arr = dataset.bundle.q.column(selected_edge, default=None)
+        if q_arr is not None:
+            q_vals = np.asarray(q_arr, dtype=float) * dataset.q_scale
+            q_now = float(q_vals[clamped_idx])
+
+    p1 = None
+    p2 = None
+    if dataset.bundle.p is not None:
+        if n1:
+            p_arr = dataset.bundle.p.column(n1, default=None)
+            if p_arr is not None:
+                p1 = _finite_or_none(_bar_g(np.asarray(p_arr, dtype=float), dataset.p_atm)[clamped_idx])
+        if n2:
+            p_arr = dataset.bundle.p.column(n2, default=None)
+            if p_arr is not None:
+                p2 = _finite_or_none(_bar_g(np.asarray(p_arr, dtype=float), dataset.p_atm)[clamped_idx])
+
+    component_kind = _edge_component_kind(selected_edge, edge_def)
+    component_short = _component_kind_short_label(component_kind)
+    state_label = _edge_open_state(dataset, selected_edge, clamped_idx)
+    state_short = _state_short_label(state_label)
+    zone_label = _edge_zone_label(selected_edge, edge_def)
+    q_abs = abs(float(q_now))
+    flow_source = n1 if q_now >= 0.0 else n2
+    flow_sink = n2 if q_now >= 0.0 else n1
+    flow_label = (
+        f"{_short_node_label(flow_source)} → {_short_node_label(flow_sink)}"
+        if q_abs > 1.0e-9 and flow_source and flow_sink
+        else "Q на ветви пока близок к нулю"
+    )
+
+    delta_p_bar = None if p1 is None or p2 is None else float(p1 - p2)
+    pressure_source = ""
+    pressure_sink = ""
+    if delta_p_bar is not None and abs(delta_p_bar) > 0.05:
+        pressure_source = n1 if delta_p_bar >= 0.0 else n2
+        pressure_sink = n2 if delta_p_bar >= 0.0 else n1
+        pressure_label = f"{_short_node_label(pressure_source)} → {_short_node_label(pressure_sink)}"
+    elif delta_p_bar is not None:
+        pressure_label = "концы ветви близки к выравниванию"
+    else:
+        pressure_label = "давление на концах ветви недоступно"
+
+    step_01_tone = "neutral"
+    if state_short == "SHUT" and q_abs > 1.0e-9:
+        step_01_tone = "warn"
+    elif state_short == "OPEN":
+        step_01_tone = "info"
+
+    step_02_tone = "neutral"
+    if delta_p_bar is not None and abs(delta_p_bar) > 0.05:
+        step_02_tone = "info"
+        if q_abs > 1.0e-9 and pressure_source and flow_source and pressure_source != flow_source:
+            step_02_tone = "warn"
+
+    step_03_tone = "neutral"
+    if q_abs > 1.0e-9:
+        step_03_tone = "warn" if state_short == "SHUT" else "ok"
+
+    step_01_idx = clamped_idx
+    if dataset.bundle.open is not None:
+        open_arr = dataset.bundle.open.column(selected_edge, default=None)
+        if open_arr is not None:
+            open_vals = np.asarray(open_arr, dtype=int)
+            change_idx = np.flatnonzero(np.diff(open_vals) != 0) + 1
+            if change_idx.size:
+                step_01_idx = int(change_idx[np.argmin(np.abs(change_idx - clamped_idx))])
+
+    step_02_idx = clamped_idx
+    if delta_p_bar is not None and dataset.bundle.p is not None and n1 and n2:
+        p1_arr = dataset.bundle.p.column(n1, default=None)
+        p2_arr = dataset.bundle.p.column(n2, default=None)
+        if p1_arr is not None and p2_arr is not None:
+            p1_vals = _bar_g(np.asarray(p1_arr, dtype=float), dataset.p_atm)
+            p2_vals = _bar_g(np.asarray(p2_arr, dtype=float), dataset.p_atm)
+            dp_vals = np.abs(np.asarray(p1_vals - p2_vals, dtype=float))
+            if dp_vals.size:
+                dp_peak = float(np.max(dp_vals))
+                if dp_peak > 1.0e-9:
+                    candidate_idx = np.flatnonzero(dp_vals >= max(0.05, dp_peak * 0.55))
+                    if candidate_idx.size:
+                        step_02_idx = int(candidate_idx[np.argmin(np.abs(candidate_idx - clamped_idx))])
+                    else:
+                        step_02_idx = int(np.argmax(dp_vals))
+
+    step_03_idx = clamped_idx
+    if dataset.bundle.q is not None:
+        q_arr = dataset.bundle.q.column(selected_edge, default=None)
+        if q_arr is not None:
+            q_vals = np.abs(np.asarray(q_arr, dtype=float) * dataset.q_scale)
+            if q_vals.size:
+                q_peak = float(np.max(q_vals))
+                if q_peak > 1.0e-9:
+                    candidate_idx = np.flatnonzero(q_vals >= max(1.0e-6, q_peak * 0.55))
+                    if candidate_idx.size:
+                        step_03_idx = int(candidate_idx[np.argmin(np.abs(candidate_idx - clamped_idx))])
+                    else:
+                        step_03_idx = int(np.argmax(q_vals))
+
+    step_rows = [
+        {
+            "index_label": "01",
+            "phase_label": "SIG",
+            "title": f"{component_short} / {state_label}",
+            "tone": step_01_tone,
+            "target_idx": step_01_idx,
+            "target_time_s": float(dataset.time_s[step_01_idx]),
+        },
+        {
+            "index_label": "02",
+            "phase_label": "ΔP",
+            "title": (
+                f"{pressure_label} • {delta_p_bar:+0.2f} бар"
+                if delta_p_bar is not None
+                else pressure_label
+            ),
+            "tone": step_02_tone,
+            "target_idx": step_02_idx,
+            "target_time_s": float(dataset.time_s[step_02_idx]),
+        },
+        {
+            "index_label": "03",
+            "phase_label": "Q",
+            "title": (
+                f"{flow_label} • {q_abs:0.2f} {dataset.q_unit}"
+                if q_abs > 1.0e-9
+                else flow_label
+            ),
+            "tone": step_03_tone,
+            "target_idx": step_03_idx,
+            "target_time_s": float(dataset.time_s[step_03_idx]),
+        },
+    ]
+    phase_items = [
+        {
+            "step_label": row["index_label"],
+            "phase_label": row["phase_label"],
+            "title": row["title"],
+            "tone": row["tone"],
+            "target_idx": row["target_idx"],
+            "target_time_s": row["target_time_s"],
+        }
+        for row in step_rows
+    ]
+
+    terminal_markers: list[dict[str, Any]] = []
+    if pressure_source and pressure_sink:
+        terminal_markers.extend(
+            [
+                {"node_name": pressure_source, "step_label": "02", "badge_text": "P+", "tone": step_02_tone},
+                {"node_name": pressure_sink, "step_label": "02", "badge_text": "P-", "tone": step_02_tone},
+            ]
+        )
+    if q_abs > 1.0e-9 and flow_source and flow_sink:
+        terminal_markers.extend(
+            [
+                {"node_name": flow_source, "step_label": "03", "badge_text": "SRC", "tone": step_03_tone},
+                {"node_name": flow_sink, "step_label": "03", "badge_text": "SNK", "tone": step_03_tone},
+            ]
+        )
+
+    return {
+        "edge_name": selected_edge,
+        "component_kind": component_kind,
+        "component_short": component_short,
+        "state_label": state_label,
+        "state_short": state_short,
+        "zone_label": zone_label,
+        "q_now": q_now,
+        "q_unit": dataset.q_unit,
+        "q_abs": q_abs,
+        "flow_label": flow_label,
+        "flow_source": flow_source,
+        "flow_sink": flow_sink,
+        "n1": n1,
+        "n2": n2,
+        "p1_bar_g": p1,
+        "p2_bar_g": p2,
+        "delta_p_bar": delta_p_bar,
+        "pressure_label": pressure_label,
+        "pressure_source": pressure_source,
+        "pressure_sink": pressure_sink,
+        "phase_sequence_label": "SIG → ΔP → Q",
+        "step_rows": step_rows,
+        "phase_items": phase_items,
+        "terminal_markers": terminal_markers,
+    }
+
+
 def _build_component_overlay_rows(
     dataset: MnemoDataset | None,
     idx: int,
@@ -2593,18 +2694,11 @@ class PointerWatcher(QtCore.QObject):
             self.status.emit(f"Follow error: {exc}")
 
 
-class BridgeObject(QtCore.QObject):
-    message_received = QtCore.Signal(str)
-
-    @QtCore.Slot(str)
-    def postMessage(self, payload: str) -> None:
-        self.message_received.emit(str(payload))
-
-
-class MnemoWebView(QtWidgets.QWidget):
+class MnemoNativeView(QtWidgets.QWidget):
     edge_picked = QtCore.Signal(str)
     node_picked = QtCore.Signal(str)
     status = QtCore.Signal(str)
+    focus_step_jump_requested = QtCore.Signal(str, int)
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
@@ -2646,6 +2740,7 @@ class MnemoWebView(QtWidgets.QWidget):
         self.native_canvas.edge_picked.connect(self.edge_picked.emit)
         self.native_canvas.node_picked.connect(self.node_picked.emit)
         self.native_canvas.status.connect(self.status.emit)
+        self.native_canvas.focus_step_jump_requested.connect(self.focus_step_jump_requested.emit)
         lay.addWidget(self.native_canvas, 1)
 
     def render_dataset(self, dataset: MnemoDataset, *, selected_edge: str | None, selected_node: str | None) -> None:
@@ -3297,6 +3392,34 @@ class SelectionPanel(QtWidgets.QWidget):
                     + escape(endpoint_2)
                     + "</p>"
                 )
+                focus_meta = _build_selected_edge_focus_meta(dataset, idx, edge_name=edge_name)
+                if focus_meta:
+                    steps_html = "".join(
+                        "<li><b>"
+                        + escape(str(item.get("index_label") or "—"))
+                        + " "
+                        + escape(str(item.get("phase_label") or "—"))
+                        + ":</b> "
+                        + escape(str(item.get("title") or "—"))
+                        + (
+                            ""
+                            if item.get("target_time_s") is None
+                            else f" <span style='color:#8fb0bc;'>@ t≈{float(item.get('target_time_s') or 0.0):0.3f}s</span>"
+                        )
+                        + "</li>"
+                        for item in list(focus_meta.get("step_rows") or [])[:3]
+                    )
+                    chunks.append(
+                        "<p><b>Инженерный фокус ветви:</b> "
+                        + escape(str(focus_meta.get("phase_sequence_label") or "SIG → ΔP → Q"))
+                        + "<br/><b>Зона:</b> "
+                        + escape(str(focus_meta.get("zone_label") or "—"))
+                        + "<br/><b>Что искать на схеме:</b> "
+                        + "шаги уже подсвечены на фазовой ленте и концах выбранной ветви.</p>"
+                        + "<ol style='margin:0 0 8px 18px; padding:0;'>"
+                        + steps_html
+                        + "</ol>"
+                    )
 
         if node_name and dataset.bundle.p is not None:
             p_arr = dataset.bundle.p.column(node_name, default=None)
@@ -3938,6 +4061,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
     edge_picked = QtCore.Signal(str)
     node_picked = QtCore.Signal(str)
     status = QtCore.Signal(str)
+    focus_step_jump_requested = QtCore.Signal(str, int)
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
@@ -3974,6 +4098,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._dragging = False
         self._hover_kind = ""
         self._hover_name = ""
+        self._selected_focus_step = ""
         self._flow_phase = 0.0
         self._anim_timer = QtCore.QTimer(self)
         self._anim_timer.setInterval(40)
@@ -3987,6 +4112,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._selected_node = str(selected_node or "")
         self._edge_series_map = {str(item.get("name") or ""): item for item in dataset.edge_series}
         self._node_series_map = {str(item.get("name") or ""): item for item in dataset.node_series}
+        self._selected_focus_step = ""
         self._build_native_scene_cache()
         self._load_svg_renderer(dataset.svg_inline)
         if self._mode == "overview":
@@ -4007,7 +4133,10 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self.update()
 
     def set_selection(self, *, edge: str | None, node: str | None) -> None:
-        self._selected_edge = str(edge or "")
+        new_edge = str(edge or "")
+        if new_edge != self._selected_edge:
+            self._selected_focus_step = ""
+        self._selected_edge = new_edge
         self._selected_node = str(node or "")
         self.update()
 
@@ -4081,6 +4210,10 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                 self.status.emit(f"Ветка: {hit_name}")
                 event.accept()
                 return
+            if hit_kind == "focus_step" and hit_name:
+                self._toggle_focus_step(hit_name)
+                event.accept()
+                return
             self._dragging = True
             self._last_mouse_pos = event.pos()
             self.setCursor(QtCore.Qt.ClosedHandCursor)
@@ -4150,11 +4283,42 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._draw_focus_overlay(painter)
         self._draw_alert_markers(painter)
         self._draw_diagnostics_overlay(painter)
+        self._draw_selected_edge_focus_overlay(painter)
         painter.restore()
         self._draw_hud(painter)
 
     def _advance_flow_phase(self) -> None:
         self._flow_phase = (self._flow_phase + 6.0) % 1000.0
+        self.update()
+
+    def _toggle_focus_step(self, step_label: str) -> None:
+        normalized = str(step_label or "").strip()
+        if normalized not in {"01", "02", "03"}:
+            return
+        self._selected_focus_step = "" if self._selected_focus_step == normalized else normalized
+        if not self._selected_focus_step:
+            self.status.emit("Фокус шага снят: показана полная локальная последовательность ветви.")
+            self.update()
+            return
+        payload = self._selected_edge_focus_payload()
+        target_idx = None
+        target_time_s = None
+        if payload is not None:
+            for row in list(payload.get("step_rows") or []):
+                if str(row.get("index_label") or "") == self._selected_focus_step:
+                    raw_target_idx = row.get("target_idx")
+                    target_idx = int(raw_target_idx) if raw_target_idx is not None else None
+                    raw_target_time = row.get("target_time_s")
+                    target_time_s = float(raw_target_time) if raw_target_time is not None else None
+                    break
+        if target_idx is not None and target_idx != self._frame_idx:
+            self.focus_step_jump_requested.emit(self._selected_focus_step, int(target_idx))
+            if target_time_s is not None:
+                self.status.emit(
+                    f"Фокус шага {self._selected_focus_step}: переход к ближайшему кадру {target_time_s:0.3f} s."
+                )
+        else:
+            self.status.emit(f"Фокус шага {self._selected_focus_step}: усилен локальный этап ветви.")
         self.update()
 
     def _content_rect(self) -> QtCore.QRectF:
@@ -4525,6 +4689,256 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             if rect is None:
                 continue
             self._draw_component_badge(painter, rect, payload)
+
+    def _selected_edge_focus_payload(self) -> dict[str, Any] | None:
+        payload = _build_selected_edge_focus_meta(self._dataset, self._frame_idx, edge_name=self._selected_edge)
+        if not payload:
+            return None
+        active_step = str(self._selected_focus_step or "")
+        payload["active_step_label"] = active_step
+        if active_step:
+            payload["phase_items"] = [
+                {
+                    **dict(item),
+                    "is_active": str(item.get("step_label") or "") == active_step,
+                }
+                for item in list(payload.get("phase_items") or [])
+            ]
+            payload["terminal_markers"] = [
+                {
+                    **dict(item),
+                    "is_active": str(item.get("step_label") or "") == active_step,
+                }
+                for item in list(payload.get("terminal_markers") or [])
+            ]
+            payload["step_rows"] = [
+                {
+                    **dict(item),
+                    "is_active": str(item.get("index_label") or "") == active_step,
+                }
+                for item in list(payload.get("step_rows") or [])
+            ]
+        return payload
+
+    @staticmethod
+    def _focus_tone_colors(tone: str) -> tuple[QtGui.QColor, QtGui.QColor, QtGui.QColor]:
+        key = str(tone or "neutral").strip().lower()
+        if key == "warn":
+            return QtGui.QColor(72, 47, 34, 228), QtGui.QColor("#ffb587"), QtGui.QColor("#fff4ed")
+        if key == "info":
+            return QtGui.QColor(22, 44, 54, 222), QtGui.QColor("#7fcde0"), QtGui.QColor("#eef7fa")
+        if key == "ok":
+            return QtGui.QColor(26, 52, 40, 224), QtGui.QColor("#9ce8ba"), QtGui.QColor("#effdf5")
+        return QtGui.QColor(24, 36, 45, 216), QtGui.QColor("#4f6470"), QtGui.QColor("#eef7fa")
+
+    def _draw_selected_edge_focus_overlay(self, painter: QtGui.QPainter) -> None:
+        payload = self._selected_edge_focus_payload()
+        if payload is None:
+            return
+        edge_name = str(payload.get("edge_name") or "")
+        midpoint = self._edge_midpoints.get(edge_name)
+        if midpoint is None:
+            return
+
+        self._draw_selected_edge_focus_terminals(painter, payload)
+
+        card_rect = QtCore.QRectF(midpoint.x() - 190.0, midpoint.y() - 154.0, 380.0, 164.0)
+        safe_rect = self._scene_rect.adjusted(28.0, 28.0, -28.0, -28.0)
+        if card_rect.left() < safe_rect.left():
+            card_rect.moveLeft(safe_rect.left())
+        if card_rect.right() > safe_rect.right():
+            card_rect.moveRight(safe_rect.right())
+        if card_rect.top() < safe_rect.top():
+            card_rect.moveTop(safe_rect.top())
+        if card_rect.bottom() > safe_rect.bottom():
+            card_rect.moveBottom(safe_rect.bottom())
+
+        painter.save()
+        painter.setPen(QtGui.QPen(QtGui.QColor("#f6d98b"), 2.0))
+        painter.setBrush(QtGui.QColor(7, 17, 23, 228))
+        painter.drawRoundedRect(card_rect, 18.0, 18.0)
+        self._overlay_targets.append(("edge", edge_name, card_rect))
+
+        title_font = QtGui.QFont(self.font())
+        title_font.setPointSizeF(8.9)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.setPen(QtGui.QColor("#eef7fa"))
+        painter.drawText(
+            card_rect.adjusted(14.0, 10.0, -14.0, -126.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            "Инженерный фокус ветви",
+        )
+
+        body_font = QtGui.QFont(self.font())
+        body_font.setPointSizeF(7.4)
+        painter.setFont(body_font)
+        painter.setPen(QtGui.QColor("#9fc5d2"))
+        painter.drawText(
+            card_rect.adjusted(14.0, 30.0, -14.0, -102.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"{payload.get('edge_name') or '—'} • {payload.get('component_kind') or '—'} • {payload.get('zone_label') or '—'}",
+        )
+        painter.drawText(
+            card_rect.adjusted(14.0, 46.0, -14.0, -86.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            "Клик по 01/02/03 усиливает локальный этап и при необходимости подводит playhead",
+        )
+
+        step_rows = list(payload.get("step_rows") or [])[:3]
+        row_top = card_rect.top() + 64.0
+        row_h = 20.0
+        for idx, row in enumerate(step_rows):
+            row_rect = QtCore.QRectF(card_rect.left() + 14.0, row_top + idx * (row_h + 4.0), card_rect.width() - 28.0, row_h)
+            fill, border, text = self._focus_tone_colors(str(row.get("tone") or "neutral"))
+            is_active = bool(row.get("is_active"))
+            number_rect = QtCore.QRectF(row_rect.left(), row_rect.top(), 34.0, row_rect.height())
+            phase_rect = QtCore.QRectF(row_rect.right() - 42.0, row_rect.top(), 42.0, row_rect.height())
+            text_rect = QtCore.QRectF(number_rect.right() + 6.0, row_rect.top(), row_rect.width() - 88.0, row_rect.height())
+
+            painter.setPen(QtGui.QPen(QtGui.QColor("#f6d98b") if is_active else border, 2.0 if is_active else 1.2))
+            painter.setBrush(fill)
+            painter.drawRoundedRect(text_rect, 8.0, 8.0)
+            painter.drawRoundedRect(number_rect, 8.0, 8.0)
+            painter.drawRoundedRect(phase_rect, 8.0, 8.0)
+
+            num_font = QtGui.QFont(self.font())
+            num_font.setPointSizeF(6.2)
+            num_font.setBold(True)
+            painter.setFont(num_font)
+            painter.setPen(text)
+            painter.drawText(number_rect, QtCore.Qt.AlignCenter, str(row.get("index_label") or "—"))
+            painter.drawText(phase_rect, QtCore.Qt.AlignCenter, str(row.get("phase_label") or "—"))
+
+            painter.setFont(body_font)
+            metrics = QtGui.QFontMetrics(body_font)
+            label = metrics.elidedText(str(row.get("title") or "—"), QtCore.Qt.ElideRight, max(40, int(text_rect.width() - 12.0)))
+            painter.drawText(
+                text_rect.adjusted(10.0, 0.0, -10.0, 0.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                label,
+            )
+            jump_time_s = row.get("target_time_s")
+            if jump_time_s is not None:
+                jump_font = QtGui.QFont(self.font())
+                jump_font.setPointSizeF(5.4 if is_active else 5.2)
+                painter.setFont(jump_font)
+                painter.setPen(QtGui.QColor("#9fc5d2"))
+                painter.drawText(
+                    text_rect.adjusted(0.0, 0.0, -6.0, 0.0),
+                    QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+                    f"t≈{float(jump_time_s):0.3f}s",
+                )
+            self._overlay_targets.append(("focus_step", str(row.get("index_label") or ""), row_rect))
+
+        phase_rect = QtCore.QRectF(card_rect.left() + 14.0, card_rect.bottom() - 30.0, card_rect.width() - 28.0, 18.0)
+        self._draw_selected_edge_phase_ribbon(painter, rect=phase_rect, payload=payload)
+        painter.restore()
+
+    def _draw_selected_edge_focus_terminals(self, painter: QtGui.QPainter, payload: dict[str, Any]) -> None:
+        edge_name = str(payload.get("edge_name") or "")
+        midpoint = self._edge_midpoints.get(edge_name)
+        if midpoint is None:
+            return
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for marker in list(payload.get("terminal_markers") or []):
+            node_name = str(marker.get("node_name") or "")
+            if not node_name:
+                continue
+            grouped.setdefault(node_name, []).append(dict(marker))
+
+        for node_name, markers in grouped.items():
+            point = self._node_points.get(node_name)
+            if point is None:
+                continue
+            has_active = any(bool(marker.get("is_active")) for marker in markers)
+            ring_color = QtGui.QColor("#f6d98b")
+            if any(str(marker.get("tone") or "") == "warn" for marker in markers):
+                ring_color = QtGui.QColor("#ffb587")
+            elif any(str(marker.get("tone") or "") == "ok" for marker in markers):
+                ring_color = QtGui.QColor("#9ce8ba")
+            ring_color.setAlpha(255 if has_active else 214)
+            painter.setPen(QtGui.QPen(ring_color, 3.4 if has_active else 2.4))
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawEllipse(point, 22.0 if has_active else 20.0, 22.0 if has_active else 20.0)
+
+            side = 1.0 if point.x() <= midpoint.x() else -1.0
+            chip_w = 54.0
+            chip_h = 16.0
+            base_x = point.x() + 14.0 if side > 0.0 else point.x() - chip_w - 14.0
+            base_y = point.y() - ((len(markers) * chip_h + max(0, len(markers) - 1) * 4.0) * 0.5)
+            for idx, marker in enumerate(markers):
+                is_active = bool(marker.get("is_active"))
+                rect = QtCore.QRectF(base_x, base_y + idx * (chip_h + 4.0), chip_w, chip_h)
+                fill, border, text = self._focus_tone_colors(str(marker.get("tone") or "neutral"))
+                if is_active:
+                    border = QtGui.QColor("#f6d98b")
+                fill.setAlpha(244 if is_active else fill.alpha())
+                painter.setPen(QtGui.QPen(border, 2.0 if is_active else 1.2))
+                painter.setBrush(fill)
+                painter.drawRoundedRect(rect, 7.0, 7.0)
+                chip_font = QtGui.QFont(self.font())
+                chip_font.setPointSizeF(6.2 if is_active else 5.9)
+                chip_font.setBold(True)
+                painter.setFont(chip_font)
+                painter.setPen(text)
+                painter.drawText(
+                    rect,
+                    QtCore.Qt.AlignCenter,
+                    f"{marker.get('step_label') or '—'} {marker.get('badge_text') or ''}".strip(),
+                )
+
+    def _draw_selected_edge_phase_ribbon(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+    ) -> None:
+        items = list(payload.get("phase_items") or [])
+        if not items:
+            return
+
+        painter.save()
+        painter.setPen(QtGui.QPen(QtGui.QColor("#324650"), 1.2))
+        painter.setBrush(QtGui.QColor(10, 22, 31, 220))
+        painter.drawRoundedRect(rect, 9.0, 9.0)
+        centers: list[QtCore.QPointF] = []
+        step = rect.width() / max(1, len(items))
+        for idx in range(len(items)):
+            centers.append(QtCore.QPointF(rect.left() + step * (idx + 0.5), rect.center().y()))
+        active_step = str(payload.get("active_step_label") or "")
+        for pair_idx, (p1, p2) in enumerate(zip(centers[:-1], centers[1:])):
+            left_item = items[pair_idx]
+            right_item = items[pair_idx + 1]
+            is_active_segment = active_step and (
+                str(left_item.get("step_label") or "") == active_step or str(right_item.get("step_label") or "") == active_step
+            )
+            segment_color = QtGui.QColor("#f6d98b") if is_active_segment else QtGui.QColor("#4f6470")
+            painter.setPen(QtGui.QPen(segment_color, 2.6 if is_active_segment else 1.6))
+            painter.drawLine(QtCore.QPointF(p1.x() + 26.0, p1.y()), QtCore.QPointF(p2.x() - 26.0, p2.y()))
+
+        stage_font = QtGui.QFont(self.font())
+        stage_font.setPointSizeF(6.1)
+        stage_font.setBold(True)
+        painter.setFont(stage_font)
+        for center, item in zip(centers, items):
+            fill, border, text = self._focus_tone_colors(str(item.get("tone") or "neutral"))
+            is_active = bool(item.get("is_active"))
+            chip_rect = QtCore.QRectF(center.x() - 34.0, center.y() - 8.0, 68.0, 16.0)
+            if is_active:
+                border = QtGui.QColor("#f6d98b")
+            fill.setAlpha(244 if is_active else fill.alpha())
+            painter.setPen(QtGui.QPen(border, 2.0 if is_active else 1.2))
+            painter.setBrush(fill)
+            painter.drawRoundedRect(chip_rect, 8.0, 8.0)
+            painter.setPen(text)
+            painter.drawText(
+                chip_rect,
+                QtCore.Qt.AlignCenter,
+                f"{item.get('step_label') or '—'} {item.get('phase_label') or '—'}",
+            )
+        painter.restore()
 
     def _draw_hud(self, painter: QtGui.QPainter) -> None:
         content_rect = self._content_rect()
@@ -4921,10 +5335,11 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.view_mode = self._startup_view_mode_override or self._persisted_view_mode
         self.setStyleSheet(APP_STYLESHEET_DARK if self.theme == "dark" else APP_STYLESHEET_LIGHT)
 
-        self.web = MnemoWebView(self)
-        self.web.edge_picked.connect(self._select_edge)
-        self.web.node_picked.connect(self._select_node)
-        self.web.status.connect(self._set_status)
+        self.native_view = MnemoNativeView(self)
+        self.native_view.edge_picked.connect(self._select_edge)
+        self.native_view.node_picked.connect(self._select_node)
+        self.native_view.status.connect(self._set_status)
+        self.native_view.focus_step_jump_requested.connect(self._jump_to_focus_step)
         self.startup_banner = StartupBannerPanel(self)
         self.startup_banner.hide_requested.connect(lambda: self._set_startup_banner_visible(False))
         self.startup_banner.focus_requested.connect(self._apply_onboarding_focus)
@@ -4944,7 +5359,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._central_layout.setContentsMargins(8, 8, 8, 0)
         self._central_layout.setSpacing(8)
         self._central_layout.addWidget(self.startup_banner, 0)
-        self._central_layout.addWidget(self.web, 1)
+        self._central_layout.addWidget(self.native_view, 1)
         self.setCentralWidget(self._central_host)
 
         self.overview_panel = OverviewPanel(self)
@@ -5310,7 +5725,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             return
         focus_region = self._current_focus_region_payload(source=source, auto_focus=auto_focus)
         if self.view_mode == "overview":
-            self.web.show_overview(
+            self.native_view.show_overview(
                 {
                     "title": "Полная схема",
                     "summary": "Сравните рекомендуемый сценарий с полной топологией, не теряя быстрый путь назад к фокусу.",
@@ -5318,13 +5733,13 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
                 }
             )
             return
-        self.web.set_focus_region(focus_region)
+        self.native_view.set_focus_region(focus_region)
 
     def _sync_selection_views(self, *, clear_focus_region: bool = False) -> None:
         if self.dataset is None:
             return
         if clear_focus_region:
-            self.web.set_focus_region(None)
+            self.native_view.set_focus_region(None)
         self.selection_panel.set_selection(edge_name=self.selected_edge, node_name=self.selected_node)
         self.selection_panel.render_details(
             self.dataset,
@@ -5341,7 +5756,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             playing=self.playing,
             follow_enabled=self.follow_enabled,
         )
-        self.web.set_selection(edge=self.selected_edge, node=self.selected_node)
+        self.native_view.set_selection(edge=self.selected_edge, node=self.selected_node)
         self._push_diagnostics()
         self._push_alerts()
         if self.startup_banner.isVisible():
@@ -5472,6 +5887,17 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.current_idx = 0
         self._refresh_frame()
 
+    def _jump_to_focus_step(self, step_label: str, target_idx: int) -> None:
+        if self.dataset is None or self.dataset.time_s.size == 0:
+            return
+        clamped_idx = int(max(0, min(int(target_idx), self.dataset.time_s.size - 1)))
+        if self.playing:
+            self.play_action.setChecked(False)
+        self.current_idx = clamped_idx
+        self._refresh_frame(push_to_view=True)
+        target_time_s = float(self.dataset.time_s[clamped_idx])
+        self._set_status(f"Jump к шагу {str(step_label or '—')}: t = {target_time_s:0.3f} s")
+
     def _acknowledge_events(self) -> None:
         if self.dataset is None:
             return
@@ -5508,7 +5934,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         if self.dataset is None:
             return
         self.current_idx = int(max(0, min(value, self.dataset.time_s.size - 1)))
-        self._refresh_frame(push_to_web=True)
+        self._refresh_frame(push_to_view=True)
 
     def _advance_playback(self) -> None:
         if not self.playing or self.dataset is None or self.dataset.time_s.size <= 1:
@@ -5524,7 +5950,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         if new_idx >= self.dataset.time_s.size:
             new_idx = 0
         self.current_idx = new_idx
-        self._refresh_frame(push_to_web=True)
+        self._refresh_frame(push_to_view=True)
 
     def load_dataset(self, npz_path: Path, *, preserve_selection: bool) -> None:
         try:
@@ -5569,9 +5995,9 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.event_tracker.bind_dataset(self.dataset, idx=self.current_idx)
             self.selection_panel.set_selection(edge_name=self.selected_edge, node_name=self.selected_node)
             self.trends_panel.set_series(self.dataset, edge_name=self.selected_edge, node_name=self.selected_node)
-            self.web.render_dataset(self.dataset, selected_edge=self.selected_edge, selected_node=self.selected_node)
+            self.native_view.render_dataset(self.dataset, selected_edge=self.selected_edge, selected_node=self.selected_node)
             self._apply_current_view_mode(source="dataset_load", auto_focus=not preserve_selection)
-            self._refresh_frame(push_to_web=True)
+            self._refresh_frame(push_to_view=True)
             self._persist_event_log(silent=True)
             self._set_dataset_title()
             self._render_startup_banner()
@@ -5585,7 +6011,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.critical(self, "Desktop Mnemo", _friendly_error_text(exc))
             self._set_status(f"Ошибка загрузки: {exc}")
 
-    def _refresh_frame(self, *, push_to_web: bool = False) -> None:
+    def _refresh_frame(self, *, push_to_view: bool = False) -> None:
         if self.dataset is None or self.dataset.time_s.size == 0:
             return
         self.current_idx = int(max(0, min(self.current_idx, self.dataset.time_s.size - 1)))
@@ -5610,7 +6036,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self._render_startup_banner()
         if new_events:
             self._persist_event_log(silent=True)
-        if push_to_web:
+        if push_to_view:
             self._push_diagnostics()
             self._push_alerts()
             self._push_playhead()
@@ -5618,7 +6044,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
     def _push_playhead(self) -> None:
         if self.dataset is None:
             return
-        self.web.set_playhead(self.current_idx, self.playing, self.dataset.dataset_id)
+        self.native_view.set_playhead(self.current_idx, self.playing, self.dataset.dataset_id)
 
     def _push_alerts(self) -> None:
         alerts = _build_frame_alert_payload(
@@ -5627,7 +6053,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             selected_edge=self.selected_edge,
             selected_node=self.selected_node,
         )
-        self.web.set_alerts(alerts)
+        self.native_view.set_alerts(alerts)
 
     def _push_diagnostics(self) -> None:
         diagnostics = _build_mnemo_diagnostics_payload(
@@ -5636,7 +6062,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             selected_edge=self.selected_edge,
             selected_node=self.selected_node,
         )
-        self.web.set_diagnostics(diagnostics)
+        self.native_view.set_diagnostics(diagnostics)
 
     def _persist_event_log(self, *, silent: bool) -> Path | None:
         path = _write_event_log_sidecar(

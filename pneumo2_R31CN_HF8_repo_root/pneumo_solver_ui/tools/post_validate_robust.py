@@ -35,9 +35,16 @@ import argparse
 import json
 import math
 from pathlib import Path
+import sys
 from typing import Any, Dict, List, Tuple
 
 import pandas as pd
+
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    _ROOT = Path(__file__).resolve().parents[2]
+    if str(_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ROOT))
+    __package__ = "pneumo_solver_ui.tools"
 
 # Важно: используем логику метрик/штрафов из opt_worker, чтобы робастная
 # проверка совпадала с оптимизацией.
@@ -224,6 +231,7 @@ def main() -> int:
     df_out.sort_values("robust_total", ascending=True, inplace=True)
 
     out_csv = Path(args.out_csv) if args.out_csv else results_path.with_name(results_path.stem + "_robust.csv")
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
     df_out.to_csv(out_csv, index=False)
     print(f"Wrote: {out_csv}")
     return 0

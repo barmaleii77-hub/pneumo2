@@ -19,10 +19,16 @@ def _complete_packaging_meta() -> dict:
                 "cyl1": {
                     "contract_complete": True,
                     "length_status_by_corner": {
-                        "ЛП": "already_finite",
-                        "ПП": "filled_from_endpoint_distance",
-                        "ЛЗ": "patched_nonfinite_from_endpoint_distance",
-                        "ПЗ": "already_finite",
+                        "FL": "already_finite",
+                        "FR": "filled_from_endpoint_distance",
+                        "RL": "patched_nonfinite_from_endpoint_distance",
+                        "RR": "already_finite",
+                    },
+                    "resolved_geometry": {
+                        "bore_diameter_m": 0.032,
+                        "rod_diameter_m": 0.016,
+                        "outer_diameter_m": 0.038,
+                        "body_length_front_m": 0.293,
                     },
                     "advanced_fields_missing": [],
                     "mount_families": {"top": "cyl1_top", "bottom": "cyl1_bot"},
@@ -30,10 +36,16 @@ def _complete_packaging_meta() -> dict:
                 "cyl2": {
                     "contract_complete": True,
                     "length_status_by_corner": {
-                        "ЛП": "already_finite",
-                        "ПП": "already_finite",
-                        "ЛЗ": "already_finite",
-                        "ПЗ": "already_finite",
+                        "FL": "already_finite",
+                        "FR": "already_finite",
+                        "RL": "already_finite",
+                        "RR": "already_finite",
+                    },
+                    "resolved_geometry": {
+                        "bore_diameter_m": 0.050,
+                        "rod_diameter_m": 0.014,
+                        "outer_diameter_m": 0.056,
+                        "body_length_front_m": 0.271,
                     },
                     "advanced_fields_missing": [],
                     "mount_families": {"top": "cyl2_top", "bottom": "cyl2_bot"},
@@ -41,7 +53,6 @@ def _complete_packaging_meta() -> dict:
             },
         }
     }
-
 
 
 def test_missing_packaging_forces_axis_only_honesty_mode() -> None:
@@ -52,15 +63,23 @@ def test_missing_packaging_forces_axis_only_honesty_mode() -> None:
     assert "axis-only honesty mode" in render_cylinder_truth_gate_message(gate)
 
 
-
-def test_partial_packaging_with_missing_advanced_fields_stays_axis_only() -> None:
+def test_partial_packaging_with_missing_advanced_fields_enables_axis_derived_mode_when_basic_geometry_is_resolved() -> None:
     meta = {
         "packaging": {
             "status": "partial",
             "cylinders": {
                 "cyl1": {
                     "contract_complete": False,
-                    "length_status_by_corner": {"ЛП": "filled_from_endpoint_distance"},
+                    "length_status_by_corner": {
+                        "FL": "filled_from_endpoint_distance",
+                        "FR": "filled_from_endpoint_distance",
+                    },
+                    "resolved_geometry": {
+                        "bore_diameter_m": 0.032,
+                        "rod_diameter_m": 0.016,
+                        "outer_diameter_m": 0.038,
+                        "body_length_front_m": 0.293,
+                    },
                     "advanced_fields_missing": ["gland_or_sleeve_position_m", "rod_eye_length_m"],
                     "mount_families": {"top": "cyl1_top", "bottom": "cyl1_bot"},
                 }
@@ -68,13 +87,13 @@ def test_partial_packaging_with_missing_advanced_fields_stays_axis_only() -> Non
         }
     }
     gate = evaluate_cylinder_truth_gate(meta, "cyl1")
-    assert gate["enabled"] is False
-    assert gate["mode"] == "axis_only"
-    assert gate["reason"] == "cyl1_advanced_packaging_missing"
+    assert gate["enabled"] is True
+    assert gate["mode"] == "axis_derived_packaging"
+    assert gate["reason"] == "cyl1_axis_derived_packaging_ready"
     msg = render_cylinder_truth_gate_message(gate)
+    assert "axis-derived packaging mode enabled" in msg
     assert "gland_or_sleeve_position_m" in msg
     assert "rod_eye_length_m" in msg
-
 
 
 def test_complete_packaging_enables_truth_mode_for_both_cylinders() -> None:
@@ -83,7 +102,6 @@ def test_complete_packaging_enables_truth_mode_for_both_cylinders() -> None:
     assert gates["cyl1"]["mode"] == "body_rod_piston"
     assert gates["cyl2"]["enabled"] is True
     assert gates["cyl2"]["mode"] == "body_rod_piston"
-
 
 
 def test_animator_source_uses_truth_gate_to_disable_packaging_meshes_until_contract_complete() -> None:

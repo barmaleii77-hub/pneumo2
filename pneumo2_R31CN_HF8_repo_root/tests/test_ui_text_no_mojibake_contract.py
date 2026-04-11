@@ -133,3 +133,105 @@ def test_key_ui_files_keep_clean_visible_russian_labels() -> None:
     assert '"ay, м/с²"' in suite_card_panel_text
     assert '"Применить изменения"' in suite_card_panel_text
     assert '"Тест обновлён."' in suite_card_panel_text
+
+
+def test_heavy_progress_and_stage_policy_use_human_labels() -> None:
+    heavy_text = ENTRYPOINTS[1].read_text(encoding="utf-8")
+
+    assert 'st.metric("Активный путь", "По стадиям" if opt_use_staged else "Распределённый")' in heavy_text
+    assert "Параллельных задач" in heavy_text
+    assert "Имя запуска" in heavy_text
+    assert "Префикс CSV:" in heavy_text
+    assert "Параллельных задач: {jobs}; запуск: {run_name}; префикс CSV: {out_prefix}" in heavy_text
+    assert "тёплый старт=" in heavy_text
+    assert "точек для surrogate-модели=" in heavy_text
+    assert "размер элиты surrogate-модели=" in heavy_text
+    assert "кандидатов для отбора=" in heavy_text
+    assert "условий отбора=" in heavy_text
+    assert "дешёвые тесты первыми=" in heavy_text
+    assert "авто-обновление лучшего опорного прогона=" in heavy_text
+    assert "Распределённый режим / BoTorch / координатор:" in heavy_text
+    assert "движок=" in heavy_text
+    assert "метод выбора кандидатов=" in heavy_text
+    assert "размер пакета q=" in heavy_text
+    assert "вычислительное устройство=" in heavy_text
+    assert "Среда распределённого расчёта:" in heavy_text
+    assert "режим runtime_env Ray=" in heavy_text
+    assert "начальных точек BoTorch=" in heavy_text
+    assert "минимум допустимых точек для BoTorch=" in heavy_text
+    assert "Режим по стадиям — рекомендуется" in heavy_text
+    assert "Нумерация стадий начинается с нуля" in heavy_text
+    assert "Режим по стадиям: ускорение поиска (обычно не трогать)" in heavy_text
+    assert "Режим тёплого старта" in heavy_text
+    assert "Точек для surrogate-модели" in heavy_text
+    assert "Размер элиты surrogate-модели (top-k)" in heavy_text
+    assert "Порог досрочной остановки по штрафу (стадия 1)" in heavy_text
+    assert "Порог досрочной остановки по штрафу (стадия 2)" in heavy_text
+    assert "Относительный шаг System Influence (eps_rel)" in heavy_text
+    assert "Адаптивный epsilon для System Influence" in heavy_text
+    assert "Политика отбора и продвижения" in heavy_text
+    assert "Профиль отбора и продвижения по стадиям" in heavy_text
+    assert "Адаптивный epsilon по стадиям" in heavy_text
+    assert "Стадия: **{stage_name}** (этап {stage_idx + 1} из {max(1, stage_total)})" in heavy_text
+    assert "Политика отбора и продвижения (текущая стадия)" in heavy_text
+    assert "Профиль: {policy_name or '—'}" in heavy_text
+    assert "запрошенный режим:" in heavy_text
+    assert "фактический режим:" in heavy_text
+    assert "Бюджет отбора:" in heavy_text
+    assert "разведка=" in heavy_text
+    assert "фокус=" in heavy_text
+    assert "выбрано=" in heavy_text
+    assert "выбрано по группам фокус/разведка=" in heavy_text
+    assert "Приоритетные параметры текущей стадии:" in heavy_text
+    assert "Решений для продвижения выбрано:" in heavy_text
+    assert "В последнем пакете: успешно={ok}, с ошибкой={err}" in heavy_text
+    assert "процесс расчёта завершился аварийно" in heavy_text
+    assert "Проверьте логи и файлы staged_progress / stage_*_progress.json." in heavy_text
+
+    assert '"jobs"' not in heavy_text
+    assert '"Run"' not in heavy_text
+    assert "jobs={jobs}; run={run_name}; csv={out_prefix}" not in heavy_text
+    assert "CSV prefix:" not in heavy_text
+    assert 'st.metric("Активный путь", "StageRunner" if opt_use_staged else "Distributed")' not in heavy_text
+    assert "warmstart=" not in heavy_text
+    assert "surrogate_samples=" not in heavy_text
+    assert "surrogate_top_k=" not in heavy_text
+    assert "seed_candidates=" not in heavy_text
+    assert "seed_conditions=" not in heavy_text
+    assert "sort_tests_by_cost=" not in heavy_text
+    assert "autoupdate_baseline=" not in heavy_text
+    assert "Distributed / BoTorch / coordinator:" not in heavy_text
+    assert "Distributed runtime/env:" not in heavy_text
+    assert "backend=" not in heavy_text
+    assert "proposer=" not in heavy_text
+    assert "device=" not in heavy_text
+    assert "f\"q={int(st.session_state.get('opt_q', DIST_OPT_Q_DEFAULT) or DIST_OPT_Q_DEFAULT)}" not in heavy_text
+    assert "ray_runtime_env_mode=" not in heavy_text
+    assert "opt_botorch_n_init=" not in heavy_text
+    assert "opt_botorch_min_feasible=" not in heavy_text
+    assert "минимум feasible для BoTorch=" not in heavy_text
+    assert "Режим по стадиям (StageRunner) — рекомендуется" not in heavy_text
+    assert "Нумерация стадий 0-based" not in heavy_text
+    assert "StageRunner: ускорение поиска (обычно не трогать)" not in heavy_text
+    assert "Warm‑start режим" not in heavy_text
+    assert '"Surrogate samples"' not in heavy_text
+    assert '"Surrogate top-k"' not in heavy_text
+    assert "Early‑stop штраф (stage1)" not in heavy_text
+    assert "Early‑stop штраф (stage2)" not in heavy_text
+    assert '"System Influence eps_rel"' not in heavy_text
+    assert "Adaptive epsilon для System Influence" not in heavy_text
+    assert "Stage-specific seed/promotion profile" not in heavy_text
+    assert "Stage-aware adaptive epsilon" not in heavy_text
+    assert "idx={stage_idx}, 0-based" not in heavy_text
+    assert "Seed/promotion policy (текущая стадия)" not in heavy_text
+    assert "policy={policy_name or '—'}" not in heavy_text
+    assert "requested={requested_mode_live or '—'}" not in heavy_text
+    assert "effective={effective_mode or '—'}" not in heavy_text
+    assert "summary={summary_status_live or '—'}" not in heavy_text
+    assert '"Seed budget:"' not in heavy_text
+    assert "focus/explore selected=" not in heavy_text
+    assert "Priority params for this stage:" not in heavy_text
+    assert "Promotion decisions selected:" not in heavy_text
+    assert "В последнем батче: OK={ok}, ERR={err}" not in heavy_text
+    assert "worker/staged-runner" not in heavy_text
+    assert "Смотрите log/CSV/staged_progress" not in heavy_text
