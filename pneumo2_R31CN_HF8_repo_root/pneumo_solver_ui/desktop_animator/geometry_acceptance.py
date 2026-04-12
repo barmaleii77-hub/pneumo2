@@ -17,6 +17,7 @@ from typing import Any, Dict, List
 import numpy as np
 
 from .data_bundle import CORNERS, DataBundle
+from .playback_sampling import lerp_series_value, sample_time_bracket
 
 
 def _series_or_none(bundle: DataBundle, name: str) -> np.ndarray | None:
@@ -225,31 +226,48 @@ def _ensure_acceptance_hud_cache(bundle: DataBundle) -> Dict[str, Any]:
     return out
 
 
-def format_acceptance_hud_lines(bundle: DataBundle, i: int) -> list[str]:
+def format_acceptance_hud_lines(
+    bundle: DataBundle,
+    i: int,
+    *,
+    sample_t: float | None = None,
+) -> list[str]:
     """Compact Russian HUD lines for frame/wheel/road acceptance."""
     cache = _ensure_acceptance_hud_cache(bundle)
     missing_line = str(cache.get("missing_line") or "")
     if missing_line:
         return [missing_line]
 
-    frame_wheel_lines = tuple(cache.get("frame_wheel_lines") or ())
-    if frame_wheel_lines:
-        idx = int(np.clip(int(i), 0, len(frame_wheel_lines) - 1))
-        geom_line = str(frame_wheel_lines[idx])
-    else:
-        frame_road_min = np.asarray(cache.get("frame_road_min_m"), dtype=float).reshape(-1)
-        wheel_road_min = np.asarray(cache.get("wheel_road_min_m"), dtype=float).reshape(-1)
-        if frame_road_min.size:
-            idx = int(np.clip(int(i), 0, frame_road_min.size - 1))
-            fr_min = float(frame_road_min[idx])
-        else:
-            fr_min = float("nan")
-        if wheel_road_min.size:
-            idx = int(np.clip(int(i), 0, wheel_road_min.size - 1))
-            wr_min = float(wheel_road_min[idx])
-        else:
-            wr_min = float("nan")
+    frame_road_min = np.asarray(cache.get("frame_road_min_m"), dtype=float).reshape(-1)
+    wheel_road_min = np.asarray(cache.get("wheel_road_min_m"), dtype=float).reshape(-1)
+    sample_i0, sample_i1, alpha, _sample_t = sample_time_bracket(
+        np.asarray(bundle.t, dtype=float),
+        sample_t=sample_t,
+        fallback_index=i,
+    )
+    if frame_road_min.size or wheel_road_min.size:
+        fr_min = lerp_series_value(
+            frame_road_min,
+            i0=sample_i0,
+            i1=sample_i1,
+            alpha=alpha,
+            default=float("nan"),
+        )
+        wr_min = lerp_series_value(
+            wheel_road_min,
+            i0=sample_i0,
+            i1=sample_i1,
+            alpha=alpha,
+            default=float("nan"),
+        )
         geom_line = f"Геом.: рама‑дорога min {fr_min:+.3f} м   колесо‑дорога min {wr_min:+.3f} м"
+    else:
+        frame_wheel_lines = tuple(cache.get("frame_wheel_lines") or ())
+        if frame_wheel_lines:
+            idx = int(np.clip(int(i), 0, len(frame_wheel_lines) - 1))
+            geom_line = str(frame_wheel_lines[idx])
+        else:
+            geom_line = "Геом.: рама‑дорога min +nan м   колесо‑дорога min +nan м"
 
     return [
         geom_line,

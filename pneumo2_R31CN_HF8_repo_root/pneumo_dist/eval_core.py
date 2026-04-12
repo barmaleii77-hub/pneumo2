@@ -196,6 +196,17 @@ class EvaluatorCore:
             p[nm] = float(v)
         return p
 
+    def params_to_u(self, params: Dict[str, Any]) -> List[float]:
+        p = dict(self.base)
+        if isinstance(params, dict):
+            p.update(params)
+        span = self.bounds_hi - self.bounds_lo
+        span_safe = np.where(np.abs(span) > 1e-12, span, 1.0)
+        vals = np.asarray([float(p.get(nm, self.base.get(nm, self.bounds_lo[i]))) for i, nm in enumerate(self.names)], dtype=float)
+        x = (vals - self.bounds_lo) / span_safe
+        x = np.clip(x, 0.0, 1.0)
+        return [float(v) for v in x.tolist()]
+
     # ---- evaluation ----
 
     def evaluate(self, *, trial_id: str, x_u: Sequence[float]) -> Tuple[List[float], List[float], Dict[str, Any]]:

@@ -104,6 +104,10 @@ def test_geometry_acceptance_helpers_and_hud_lines(tmp_path: Path):
     assert any("рама‑дорога min" in line for line in lines)
     assert any("Σ" in line and "XYwr" in line for line in lines)
 
+    lines_mid = format_acceptance_hud_lines(bundle, 0, sample_t=0.05)
+    assert any("+0.505 м" in line for line in lines_mid)
+    assert any("+0.305 м" in line for line in lines_mid)
+
 
 def test_geometry_acceptance_ignores_frame_xy_offset_in_acceptance_gate(tmp_path: Path):
     bundle = load_npz(_write_bundle(tmp_path))

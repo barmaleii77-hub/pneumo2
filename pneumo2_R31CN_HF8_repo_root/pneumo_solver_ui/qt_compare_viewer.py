@@ -27,6 +27,7 @@ import argparse
 import ast
 import html
 import os
+import re
 import sys
 import warnings
 
@@ -421,7 +422,8 @@ class CompareViewer(QtWidgets.QMainWindow):
     def __init__(self, paths: List[Path]):
         super().__init__()
         self.setObjectName("compareViewerWindow")
-        self.setWindowTitle("Pneumo: NPZ Compare Viewer (DiagrammyV680R05)")
+        self._window_title_base = "Pneumo: NPZ Compare Viewer (DiagrammyV680R05)"
+        self.setWindowTitle(self._window_title_base)
         try:
             self.setDockOptions(
                 QtWidgets.QMainWindow.AllowTabbedDocks
@@ -512,9 +514,11 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._mv_updating: bool = False
         self._mv_restoring_settings: bool = False
         self._workspace_focus_mode: str = "all"
+        self._workspace_analysis_mode: str = "all_to_all"
         self._insight_heat: Dict[str, object] = {}
         self._insight_infl: Dict[str, object] = {}
         self._insight_qa: Dict[str, object] = {}
+        self._insight_events: Dict[str, object] = {}
         self._mv_timer = QtCore.QTimer(self)
         self._mv_timer.setSingleShot(True)
         self._mv_timer.timeout.connect(self._update_multivar_views)
@@ -618,7 +622,7 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         self.btn_workspace_focus_multivar = QtWidgets.QPushButton("Multivar")
         self.btn_workspace_focus_multivar.setObjectName("workspaceFocusMultivarButton")
-        self.btn_workspace_focus_multivar.setToolTip("Focus SPLOM, Parallel and 3D cloud views.")
+        self.btn_workspace_focus_multivar.setToolTip("Focus SPLOM, Parallel and 3D melting-cloud / pebbles views.")
         self.btn_workspace_focus_multivar.setCheckable(True)
         self.btn_workspace_focus_multivar.clicked.connect(lambda _=False: self._focus_workspace_preset("multivariate"))
         self._workspace_focus_buttons.addButton(self.btn_workspace_focus_multivar)
@@ -633,6 +637,52 @@ class CompareViewer(QtWidgets.QMainWindow):
         row_focus.addWidget(self.btn_workspace_focus_qa)
 
         ga.addLayout(row_focus)
+
+        self.btn_workspace_follow_hint = QtWidgets.QPushButton("Follow weakest link")
+        self.btn_workspace_follow_hint.setObjectName("workspaceFollowHintButton")
+        self.btn_workspace_follow_hint.setToolTip("Jump to the dock preset that best repairs the current weakest link.")
+        self.btn_workspace_follow_hint.clicked.connect(self._follow_workspace_heuristic_focus)
+        ga.addWidget(self.btn_workspace_follow_hint)
+
+        row_analysis = QtWidgets.QHBoxLayout()
+        row_analysis.setSpacing(6)
+        self._workspace_analysis_buttons = QtWidgets.QButtonGroup(self)
+        self._workspace_analysis_buttons.setExclusive(True)
+
+        self.btn_workspace_analysis_one_to_all = QtWidgets.QPushButton("1 -> all")
+        self.btn_workspace_analysis_one_to_all.setObjectName("workspaceAnalysisOneToAllButton")
+        self.btn_workspace_analysis_one_to_all.setToolTip("Trace one driver or hotspot across many responses.")
+        self.btn_workspace_analysis_one_to_all.setCheckable(True)
+        self.btn_workspace_analysis_one_to_all.clicked.connect(
+            lambda _=False: self._set_workspace_analysis_mode("one_to_all")
+        )
+        self._workspace_analysis_buttons.addButton(self.btn_workspace_analysis_one_to_all)
+        row_analysis.addWidget(self.btn_workspace_analysis_one_to_all)
+
+        self.btn_workspace_analysis_all_to_one = QtWidgets.QPushButton("all -> 1")
+        self.btn_workspace_analysis_all_to_one.setObjectName("workspaceAnalysisAllToOneButton")
+        self.btn_workspace_analysis_all_to_one.setToolTip("Explain one target waveform through many candidate drivers.")
+        self.btn_workspace_analysis_all_to_one.setCheckable(True)
+        self.btn_workspace_analysis_all_to_one.clicked.connect(
+            lambda _=False: self._set_workspace_analysis_mode("all_to_one")
+        )
+        self._workspace_analysis_buttons.addButton(self.btn_workspace_analysis_all_to_one)
+        row_analysis.addWidget(self.btn_workspace_analysis_all_to_one)
+
+        self.btn_workspace_analysis_all_to_all = QtWidgets.QPushButton("all -> all")
+        self.btn_workspace_analysis_all_to_all.setObjectName("workspaceAnalysisAllToAllButton")
+        self.btn_workspace_analysis_all_to_all.setToolTip(
+            "Scout clusters, melting clouds and pebbles across the full multivariate field."
+        )
+        self.btn_workspace_analysis_all_to_all.setCheckable(True)
+        self.btn_workspace_analysis_all_to_all.setChecked(True)
+        self.btn_workspace_analysis_all_to_all.clicked.connect(
+            lambda _=False: self._set_workspace_analysis_mode("all_to_all")
+        )
+        self._workspace_analysis_buttons.addButton(self.btn_workspace_analysis_all_to_all)
+        row_analysis.addWidget(self.btn_workspace_analysis_all_to_all)
+
+        ga.addLayout(row_analysis)
         lay.addWidget(gb_assistant)
 
         gb_insights = QtWidgets.QGroupBox("Heuristic insights")
@@ -945,6 +995,10 @@ class CompareViewer(QtWidgets.QMainWindow):
         try:
             self.chk_nav.setChecked(self._qs_bool(s.value('nav_enabled', self.chk_nav.isChecked()), self.chk_nav.isChecked()))
             self.chk_delta.setChecked(self._qs_bool(s.value('mode_delta', self.chk_delta.isChecked()), self.chk_delta.isChecked()))
+            self._workspace_analysis_mode = str(
+                s.value('workspace_analysis_mode', getattr(self, '_workspace_analysis_mode', 'all_to_all'))
+                or getattr(self, '_workspace_analysis_mode', 'all_to_all')
+            )
             if hasattr(self, 'spin_rows'):
                 self.spin_rows.setValue(self._qs_int(s.value('plot_rows', self.spin_rows.value()), self.spin_rows.value()))
             if hasattr(self, 'spin_fps'):
@@ -1548,6 +1602,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         try:
             s.setValue('nav_enabled', int(self.chk_nav.isChecked()))
             s.setValue('mode_delta', int(self.chk_delta.isChecked()))
+            s.setValue('workspace_analysis_mode', str(getattr(self, '_workspace_analysis_mode', 'all_to_all') or 'all_to_all'))
             s.setValue('plot_rows', int(self.spin_rows.value()))
             s.setValue('play_fps', int(self.spin_fps.value()))
             s.setValue('zero_baseline', int(self.chk_zero_baseline.isChecked()))
@@ -1998,6 +2053,419 @@ class CompareViewer(QtWidgets.QMainWindow):
                 except Exception:
                     pass
 
+    def _update_workspace_focus_button_hints(
+        self,
+        *,
+        analysis_mode: Optional[str] = None,
+        trust_visible: Optional[bool] = None,
+        qa_issues: Optional[int] = None,
+    ) -> None:
+        mode = str(analysis_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        trust_flag = bool(trust_visible if trust_visible is not None else (getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible()))
+        qa_count = int(qa_issues if qa_issues is not None else 0)
+        recommended = self._workspace_contextual_focus_recommendation(
+            analysis_mode=mode,
+            trust_visible=trust_flag,
+            qa_issues=qa_count,
+        )
+        reason = self._workspace_contextual_focus_reason(
+            analysis_mode=mode,
+            trust_visible=trust_flag,
+            qa_issues=qa_count,
+        )
+        current_anchor = self._workspace_analysis_anchor_label(analysis_mode=mode)
+
+        mapping = {
+            "all": (
+                getattr(self, "btn_workspace_focus_all", None),
+                "Show the full workspace with all docks."
+            ),
+            "heatmaps": (
+                getattr(self, "btn_workspace_focus_heatmaps", None),
+                "Focus Delta and Influence heatmaps."
+            ),
+            "multivariate": (
+                getattr(self, "btn_workspace_focus_multivar", None),
+                "Focus SPLOM, Parallel and 3D melting-cloud / pebbles views."
+            ),
+            "qa": (
+                getattr(self, "btn_workspace_focus_qa", None),
+                "Focus QA and event drill-down tools."
+            ),
+        }
+        for key, spec in mapping.items():
+            button, base = spec
+            if button is None:
+                continue
+            hint = base
+            if key == recommended:
+                hint = f"{hint} Recommended right now because {reason}."
+            if key == "heatmaps" and mode in {"one_to_all", "all_to_one"}:
+                hint = f"{hint} Current anchor: {current_anchor}."
+            elif key == "multivariate" and mode == "all_to_all":
+                hint = f"{hint} Current anchor: {current_anchor}."
+            elif key == "qa" and (trust_flag or qa_count > 0):
+                hint = f"{hint} Recommended when trust warnings or QA issues need confirmation."
+            try:
+                button.setToolTip(hint)
+            except Exception:
+                pass
+
+    def _workspace_analysis_label(self) -> str:
+        mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        labels = {
+            "one_to_all": "1->all",
+            "all_to_one": "all->1",
+            "all_to_all": "all->all",
+        }
+        return labels.get(mode, labels["all_to_all"])
+
+    def _sync_workspace_analysis_buttons(self) -> None:
+        mapping = {
+            "one_to_all": getattr(self, "btn_workspace_analysis_one_to_all", None),
+            "all_to_one": getattr(self, "btn_workspace_analysis_all_to_one", None),
+            "all_to_all": getattr(self, "btn_workspace_analysis_all_to_all", None),
+        }
+        mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        if mode not in mapping:
+            mode = "all_to_all"
+        for key, button in mapping.items():
+            if button is None:
+                continue
+            prev = False
+            try:
+                prev = button.blockSignals(True)
+                button.setChecked(key == mode)
+            except Exception:
+                pass
+            finally:
+                try:
+                    button.blockSignals(prev)
+                except Exception:
+                    pass
+
+    def _update_workspace_analysis_button_hints(self, *, current_mode: Optional[str] = None) -> None:
+        mode = str(current_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        infl_lens = self._workspace_influence_lens_summary()
+        mv_lens = self._workspace_multivar_lens_summary()
+        trust_visible = bool(getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible())
+        qa_issues = int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
+        events_insight = dict(getattr(self, "_insight_events", {}) or {})
+        hints = {
+            "one_to_all": (
+                getattr(self, "btn_workspace_analysis_one_to_all", None),
+                "One driver to many responses.",
+                self._workspace_analysis_anchor_label(
+                    analysis_mode="one_to_all",
+                    infl_lens=infl_lens,
+                    mv_lens=mv_lens,
+                ),
+                self._workspace_contextual_focus_recommendation(
+                    analysis_mode="one_to_all",
+                    trust_visible=trust_visible,
+                    qa_issues=qa_issues,
+                    events_insight=events_insight,
+                ),
+                self._workspace_contextual_focus_reason(
+                    analysis_mode="one_to_all",
+                    trust_visible=trust_visible,
+                    qa_issues=qa_issues,
+                    events_insight=events_insight,
+                ),
+            ),
+            "all_to_one": (
+                getattr(self, "btn_workspace_analysis_all_to_one", None),
+                "Many drivers to one target response.",
+                self._workspace_analysis_anchor_label(
+                    analysis_mode="all_to_one",
+                    infl_lens=infl_lens,
+                    mv_lens=mv_lens,
+                ),
+                self._workspace_contextual_focus_recommendation(
+                    analysis_mode="all_to_one",
+                    trust_visible=trust_visible,
+                    qa_issues=qa_issues,
+                    events_insight=events_insight,
+                ),
+                self._workspace_contextual_focus_reason(
+                    analysis_mode="all_to_one",
+                    trust_visible=trust_visible,
+                    qa_issues=qa_issues,
+                    events_insight=events_insight,
+                ),
+            ),
+            "all_to_all": (
+                getattr(self, "btn_workspace_analysis_all_to_all", None),
+                "Cross-coupled field scouting with clouds and pebbles.",
+                self._workspace_analysis_anchor_label(
+                    analysis_mode="all_to_all",
+                    infl_lens=infl_lens,
+                    mv_lens=mv_lens,
+                ),
+                self._workspace_contextual_focus_recommendation(
+                    analysis_mode="all_to_all",
+                    trust_visible=trust_visible,
+                    qa_issues=qa_issues,
+                    events_insight=events_insight,
+                ),
+                self._workspace_contextual_focus_reason(
+                    analysis_mode="all_to_all",
+                    trust_visible=trust_visible,
+                    qa_issues=qa_issues,
+                    events_insight=events_insight,
+                ),
+            ),
+        }
+        for key, spec in hints.items():
+            button, base, anchor, focus, reason = spec
+            if button is None:
+                continue
+            hint = f"{base} Anchor: {anchor}. Recommended focus: {focus} because {reason}."
+            if key == mode:
+                hint = f"{hint} Current lens."
+            try:
+                button.setToolTip(hint)
+            except Exception:
+                pass
+
+    def _sync_workspace_analysis_actions(self, *, current_mode: Optional[str] = None) -> None:
+        mode = str(current_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        mapping = {
+            "one_to_all": getattr(self, "act_view_analysis_one_to_all", None),
+            "all_to_one": getattr(self, "act_view_analysis_all_to_one", None),
+            "all_to_all": getattr(self, "act_view_analysis_all_to_all", None),
+        }
+        if mode not in mapping:
+            mode = "all_to_all"
+        for key, action in mapping.items():
+            if action is None:
+                continue
+            prev = False
+            try:
+                prev = action.blockSignals(True)
+                action.setChecked(key == mode)
+            except Exception:
+                pass
+            finally:
+                try:
+                    action.blockSignals(prev)
+                except Exception:
+                    pass
+
+    def _update_workspace_analysis_action_hints(self, *, current_mode: Optional[str] = None) -> None:
+        mode = str(current_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        infl_lens = self._workspace_influence_lens_summary()
+        mv_lens = self._workspace_multivar_lens_summary()
+        trust_visible = bool(getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible())
+        qa_issues = int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
+        events_insight = dict(getattr(self, "_insight_events", {}) or {})
+        action_specs = {
+            "one_to_all": (
+                getattr(self, "act_view_analysis_one_to_all", None),
+                "One driver to many responses.",
+            ),
+            "all_to_one": (
+                getattr(self, "act_view_analysis_all_to_one", None),
+                "Many drivers to one target response.",
+            ),
+            "all_to_all": (
+                getattr(self, "act_view_analysis_all_to_all", None),
+                "Cross-coupled field scouting with clouds and pebbles.",
+            ),
+        }
+        for key, spec in action_specs.items():
+            action, base = spec
+            if action is None:
+                continue
+            anchor = self._workspace_analysis_anchor_label(
+                analysis_mode=key,
+                infl_lens=infl_lens,
+                mv_lens=mv_lens,
+            )
+            focus = self._workspace_contextual_focus_recommendation(
+                analysis_mode=key,
+                trust_visible=trust_visible,
+                qa_issues=qa_issues,
+                events_insight=events_insight,
+            )
+            reason = self._workspace_contextual_focus_reason(
+                analysis_mode=key,
+                trust_visible=trust_visible,
+                qa_issues=qa_issues,
+                events_insight=events_insight,
+            )
+            hint = f"{base} Anchor: {anchor}. Recommended focus: {focus} because {reason}."
+            if key == mode:
+                hint = f"{hint} Current lens."
+            try:
+                action.setToolTip(hint)
+                action.setStatusTip(hint)
+            except Exception:
+                pass
+
+    def _workspace_recommended_focus_for_analysis(self, mode: str) -> str:
+        mode = str(mode or "all_to_all")
+        mapping = {
+            "one_to_all": "heatmaps",
+            "all_to_one": "heatmaps",
+            "all_to_all": "multivariate",
+        }
+        return mapping.get(mode, "all")
+
+    def _workspace_contextual_focus_recommendation(
+        self,
+        *,
+        analysis_mode: Optional[str] = None,
+        trust_visible: Optional[bool] = None,
+        qa_issues: Optional[int] = None,
+        events_rows: Optional[int] = None,
+        events_insight: Optional[Dict[str, object]] = None,
+        causal_story: Optional[Dict[str, object]] = None,
+    ) -> str:
+        mode = str(analysis_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        base = self._workspace_recommended_focus_for_analysis(mode)
+        trust_flag = bool(
+            trust_visible if trust_visible is not None else (
+                getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible()
+            )
+        )
+        qa_count = int(
+            qa_issues if qa_issues is not None else int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
+        )
+        events = dict(events_insight if events_insight is not None else (getattr(self, "_insight_events", {}) or {}))
+        rows = int(events_rows if events_rows is not None else int(events.get("rows", 0) or 0))
+        source_rows = int(events.get("source_rows", rows) or rows)
+        no_signals_selected = bool(events.get("no_signals_selected", False))
+        if trust_flag or qa_count > 0:
+            return "qa"
+        if no_signals_selected and source_rows > 0 and mode in {"one_to_all", "all_to_one"}:
+            return "qa"
+        story = dict(
+            causal_story
+            if causal_story is not None
+            else self._workspace_causal_story_summary(
+                analysis_mode=mode,
+                heat=dict(getattr(self, "_insight_heat", {}) or {}),
+                infl=dict(getattr(self, "_insight_infl", {}) or {}),
+                infl_lens=self._workspace_influence_lens_summary(),
+                events=events,
+                trust_visible=trust_flag,
+                qa_issues=qa_count,
+            )
+        )
+        story_conf = str(story.get("confidence") or "").strip()
+        repair_lane = str(story.get("repair_lane") or "").strip()
+        if repair_lane in {"heatmaps", "qa", "multivariate"}:
+            return repair_lane
+        if story_conf == "partial":
+            if mode in {"one_to_all", "all_to_one"}:
+                return "qa" if (rows > 0 or source_rows > 0) else "heatmaps"
+            if mode == "all_to_all":
+                return "heatmaps"
+        if story_conf == "tentative":
+            if mode in {"one_to_all", "all_to_one"}:
+                return "heatmaps"
+        return base
+
+    def _workspace_contextual_focus_reason(
+        self,
+        *,
+        analysis_mode: Optional[str] = None,
+        trust_visible: Optional[bool] = None,
+        qa_issues: Optional[int] = None,
+        events_rows: Optional[int] = None,
+        events_insight: Optional[Dict[str, object]] = None,
+        causal_story: Optional[Dict[str, object]] = None,
+    ) -> str:
+        mode = str(analysis_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        trust_flag = bool(
+            trust_visible if trust_visible is not None else (
+                getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible()
+            )
+        )
+        qa_count = int(
+            qa_issues if qa_issues is not None else int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
+        )
+        events = dict(events_insight if events_insight is not None else (getattr(self, "_insight_events", {}) or {}))
+        rows = int(events_rows if events_rows is not None else int(events.get("rows", 0) or 0))
+        source_rows = int(events.get("source_rows", rows) or rows)
+        no_signals_selected = bool(events.get("no_signals_selected", False))
+        if trust_flag:
+            return "trust banner is active, so evidence should be checked before pattern hunting"
+        if qa_count > 0:
+            return f"QA found {qa_count} issue(s), so suspicious regions should be validated first"
+        if no_signals_selected and source_rows > 0 and mode in {"one_to_all", "all_to_one"}:
+            return "event channels are muted, so causal timing support is missing"
+        story = dict(
+            causal_story
+            if causal_story is not None
+            else self._workspace_causal_story_summary(
+                analysis_mode=mode,
+                heat=dict(getattr(self, "_insight_heat", {}) or {}),
+                infl=dict(getattr(self, "_insight_infl", {}) or {}),
+                infl_lens=self._workspace_influence_lens_summary(),
+                events=events,
+                trust_visible=trust_flag,
+                qa_issues=qa_count,
+            )
+        )
+        story_conf = str(story.get("confidence") or "").strip()
+        repair_lane = str(story.get("repair_lane") or "").strip()
+        repair_hint = str(story.get("repair_hint") or "").strip()
+        if repair_lane == "qa":
+            return (
+                f"the weakest link is event / evidence support, so QA / Events should repair it"
+                f"{': ' + repair_hint if repair_hint else ''}"
+            )
+        if repair_lane == "heatmaps":
+            return (
+                f"the weakest link is time-local alignment, so Heatmaps should repair it"
+                f"{': ' + repair_hint if repair_hint else ''}"
+            )
+        if repair_lane == "multivariate":
+            return (
+                f"the weakest link is field structure, so Multivariate should repair it"
+                f"{': ' + repair_hint if repair_hint else ''}"
+            )
+        if story_conf == "partial":
+            if mode in {"one_to_all", "all_to_one"}:
+                return "the causal story is only partially aligned, so QA / Events should repair the missing link"
+            if mode == "all_to_all":
+                return "the corridor is only partially aligned, so Heatmaps should localize the missing link in time"
+        if story_conf == "tentative":
+            if mode in {"one_to_all", "all_to_one"}:
+                return "the causal story is still tentative, so Heatmaps should stabilize the time-local explanation"
+            if mode == "all_to_all":
+                return "the field story is still tentative, so Multivariate should strengthen the structure before drill-down"
+        if mode == "one_to_all":
+            return "heatmaps are the fastest way to trace one driver fanning out across many responses"
+        if mode == "all_to_one":
+            return "heatmaps keep one target waveform aligned with many competing drivers"
+        if mode == "all_to_all":
+            return "multivariate views are best for melting-cloud and pebbles-on-sand structure scouting"
+        return "full workspace gives the broadest context"
+
+    def _workspace_should_follow_analysis_focus(self, previous_analysis_mode: str, current_focus_mode: str) -> bool:
+        current_focus = str(current_focus_mode or "all")
+        if current_focus == "all":
+            return True
+        prev_recommended = self._workspace_contextual_focus_recommendation(analysis_mode=previous_analysis_mode)
+        return current_focus == prev_recommended
+
+    def _set_workspace_analysis_mode(self, mode: str) -> None:
+        valid = {"one_to_all", "all_to_one", "all_to_all"}
+        previous_analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        current_focus_mode = str(getattr(self, "_workspace_focus_mode", "all") or "all")
+        self._workspace_analysis_mode = str(mode or "all_to_all")
+        if self._workspace_analysis_mode not in valid:
+            self._workspace_analysis_mode = "all_to_all"
+        if self._workspace_should_follow_analysis_focus(previous_analysis_mode, current_focus_mode):
+            recommended_focus = self._workspace_contextual_focus_recommendation(analysis_mode=self._workspace_analysis_mode)
+            if recommended_focus and (recommended_focus != current_focus_mode):
+                self._focus_workspace_preset(recommended_focus)
+                return
+        self._update_workspace_status()
+
     def _update_workspace_assistant(self) -> None:
         title_label = getattr(self, "lbl_workspace_assistant_title", None)
         body_label = getattr(self, "lbl_workspace_assistant", None)
@@ -2009,6 +2477,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         table = str(getattr(self, "current_table", "") or "-")
         ref = str(self._reference_run_label(runs) or "auto")
         mode = str(getattr(self, "_workspace_focus_mode", "all") or "all")
+        analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
         trust_visible = bool(getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible())
 
         events_rows = 0
@@ -2017,8 +2486,9 @@ class CompareViewer(QtWidgets.QMainWindow):
                 events_rows = int(self.tbl_events.rowCount())
         except Exception:
             events_rows = 0
+        events = dict(getattr(self, "_insight_events", {}) or {})
 
-        qa_issues = 0
+        qa_issues = int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
         try:
             qa_text = str(
                 getattr(self, "lbl_qa_summary", None).text()
@@ -2028,15 +2498,110 @@ class CompareViewer(QtWidgets.QMainWindow):
             if "issues=" in qa_text:
                 qa_issues = int(str(qa_text).split("issues=", 1)[1].split()[0].split("(", 1)[0].rstrip(",)"))
         except Exception:
-            qa_issues = 0
+            qa_issues = int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
+
+        event_focus = ""
+        event_name = str(events.get("top_signal") or events.get("sample_signal") or "")
+        if event_name:
+            try:
+                event_time = float(events.get("sample_time_s", 0.0) or 0.0)
+                if np.isfinite(event_time):
+                    event_focus = f"{event_name} @ {event_time:.3f}s"
+                else:
+                    event_focus = event_name
+            except Exception:
+                event_focus = event_name
 
         notes: List[str] = []
         if trust_visible:
             notes.append("trust banner active")
         if qa_issues > 0:
             notes.append(f"QA issues: {qa_issues}")
-        if events_rows > 0:
+        if bool(events.get("no_signals_selected", False)):
+            notes.append("events muted")
+        elif event_name:
+            notes.append(f"event anchor: {event_name}")
+        elif events_rows > 0:
             notes.append(f"event rows: {events_rows}")
+
+        infl_lens = self._workspace_influence_lens_summary()
+        mv_lens = self._workspace_multivar_lens_summary()
+        causal_story = self._workspace_causal_story_summary(
+            analysis_mode=analysis_mode,
+            heat=dict(getattr(self, "_insight_heat", {}) or {}),
+            infl=dict(getattr(self, "_insight_infl", {}) or {}),
+            infl_lens=infl_lens,
+            events=events,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+        )
+        recommended_focus = self._workspace_contextual_focus_recommendation(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+            events_rows=events_rows,
+            events_insight=events,
+            causal_story=causal_story,
+        )
+        focus_labels = {
+            "all": "all",
+            "heatmaps": "heatmaps",
+            "multivariate": "multivar",
+            "qa": "qa/events",
+        }
+        recommended_focus_label = focus_labels.get(str(recommended_focus), str(recommended_focus or "all"))
+        focus_reason = self._workspace_contextual_focus_reason(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+            events_rows=events_rows,
+            events_insight=events,
+            causal_story=causal_story,
+        )
+        story_label = self._workspace_causal_story_label(causal_story)
+        story_confidence = str(causal_story.get("confidence") or "").strip()
+        story_confidence_title = story_confidence.title() if story_confidence else ""
+        repair_summary = self._workspace_repair_lane_summary(
+            causal_story=causal_story,
+            analysis_mode=analysis_mode,
+        )
+        follow_target = self._workspace_follow_target_summary(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+            events_rows=events_rows,
+            events_insight=events,
+            causal_story=causal_story,
+        )
+        follow_button = getattr(self, "btn_workspace_follow_hint", None)
+        if isinstance(follow_button, QtWidgets.QPushButton):
+            follow_headline = str(repair_summary.get("headline") or "Weakest link")
+            follow_detail = str(repair_summary.get("detail") or focus_reason)
+            try:
+                follow_button.setText(
+                    f"Follow weakest link -> {str(follow_target.get('focus_label') or recommended_focus_label)}: "
+                    f"{str(follow_target.get('dock_label') or 'dock')}"
+                )
+                follow_button.setEnabled(bool(runs))
+                follow_button.setToolTip(f"{follow_headline}. {follow_detail}")
+            except Exception:
+                pass
+        follow_action = getattr(self, "act_view_focus_hint", None)
+        if isinstance(follow_action, QtGui.QAction):
+            try:
+                follow_action.setText(
+                    f"Follow Weakest Link ({str(follow_target.get('focus_label') or recommended_focus_label)}: "
+                    f"{str(follow_target.get('dock_label') or 'dock')})"
+                )
+                follow_action.setStatusTip(f"{str(repair_summary.get('headline') or 'Weakest link')}. {str(repair_summary.get('detail') or focus_reason)}")
+                follow_action.setToolTip(f"{str(repair_summary.get('headline') or 'Weakest link')}. {str(repair_summary.get('detail') or focus_reason)}")
+                follow_action.setEnabled(bool(runs))
+            except Exception:
+                pass
+        follow_target_label = (
+            f"{str(follow_target.get('focus_label') or recommended_focus_label)}: "
+            f"{str(follow_target.get('dock_label') or 'dock')}"
+        )
 
         title = "Compare overview"
         body = (
@@ -2066,6 +2631,114 @@ class CompareViewer(QtWidgets.QMainWindow):
                 "while Multivariate becomes most useful with 3+ signals."
             )
             tone = "accent"
+        elif analysis_mode == "one_to_all":
+            top_feat = str((getattr(self, "_insight_infl", {}) or {}).get("feature") or "")
+            top_sig = str((getattr(self, "_insight_infl", {}) or {}).get("signal") or "")
+            title = "1 -> all driver sweep"
+            if len(runs) < 3:
+                body = (
+                    "For one-driver-to-many-response analysis, keep 3+ runs selected so Influence(t) can rank "
+                    "one meta parameter against many signals."
+                )
+                tone = "neutral"
+            elif len(sigs) < 2:
+                body = (
+                    f"Reference run: {ref}. Add more signals in table {table} so one parameter can fan out across "
+                    "multiple responses in Delta / Influence heatmaps."
+                )
+                tone = "accent"
+            elif infl_lens.get("fanout_feature"):
+                examples = ", ".join(
+                    f"{sig} {corr:+.2f}" for sig, corr in (infl_lens.get("fanout_examples", []) or [])[:3]
+                )
+                body = (
+                    f"Primary fan-out candidate is {infl_lens.get('fanout_feature')}: it already reaches "
+                    f"{int(infl_lens.get('fanout_count', 0) or 0)}/{int(infl_lens.get('signal_count', 0) or 0)} signals "
+                    f"at t={float(infl_lens.get('time_s', 0.0) or 0.0):.3f}s."
+                )
+                if examples:
+                    body = f"{body} Start with {examples}, then validate the hotspot in QA / Events."
+                tone = "ok" if not trust_visible and qa_issues == 0 else "warn"
+            elif top_feat and top_sig:
+                body = (
+                    f"Current strongest candidate is {top_feat} -> {top_sig}. Stay in Heatmaps / Influence to see "
+                    "how one meta driver spreads across many signals and time zones."
+                )
+                tone = "ok" if not trust_visible and qa_issues == 0 else "warn"
+            else:
+                body = (
+                    f"Use Influence(t) and Influence(t) Heatmap to broadcast one parameter across {len(sigs)} signals. "
+                    "Then confirm hot spots with QA / Events."
+                )
+                tone = "accent"
+        elif analysis_mode == "all_to_one":
+            target_sig = str(sigs[0] if sigs else "")
+            title = "all -> 1 target explanation"
+            if len(runs) < 3:
+                body = (
+                    "Explaining one target signal from many drivers works best with 3+ runs. Add more runs, then keep "
+                    "the target waveform stable while moving the playhead."
+                )
+                tone = "neutral"
+            elif len(sigs) > 2:
+                body = (
+                    f"{len(sigs)} signals are selected. Narrow to 1-2 target signals so Heatmaps and Influence rank "
+                    "many meta drivers against one response, not a mixed bundle."
+                )
+                tone = "accent"
+            elif infl_lens.get("target_signal") and infl_lens.get("target_examples"):
+                examples = ", ".join(
+                    f"{feat} {corr:+.2f}" for feat, corr in (infl_lens.get("target_examples", []) or [])[:3]
+                )
+                body = (
+                    f"Treat {infl_lens.get('target_signal')} as the outcome. Right now the clearest drivers are "
+                    f"{examples} at t={float(infl_lens.get('time_s', 0.0) or 0.0):.3f}s."
+                )
+                if events_rows > 0:
+                    body = f"{body} Use Events to see whether local triggers reinforce that explanation."
+                tone = "ok" if len(sigs) == 1 and not trust_visible and qa_issues == 0 else "accent"
+            else:
+                body = (
+                    f"Treat {target_sig or 'the current waveform'} as the outcome. Use Delta, Influence and Events to "
+                    "explain one response from many parameters and local event triggers."
+                )
+                tone = "ok" if len(sigs) == 1 and not trust_visible else "accent"
+        elif analysis_mode == "all_to_all":
+            title = "all -> all structure scouting"
+            if mv_lens and int(mv_lens.get("checked_dim_count", 0) or 0) < 3:
+                body = (
+                    f"Cloud is under-described: only {int(mv_lens.get('checked_dim_count', 0) or 0)} checked dimensions are active. "
+                    "Check at least 3-4 fields in Multivariate so SPLOM, Parallel and 3D can separate regimes instead of flattening them."
+                )
+                tone = "accent"
+            elif mv_lens and int(mv_lens.get("keep_pct", 100) or 100) <= 15 and int(mv_lens.get("runs", 0) or 0) >= 4:
+                body = (
+                    f"Melting cloud is very thin at {int(mv_lens.get('keep_pct', 100) or 100)}%. "
+                    f"If you are scouting rare outliers keep sparse-first; if you want regime cores, raise keep% or switch to {('dense-first' if str(mv_lens.get('keep_mode') or '') == 'sparse-first' else 'sparse-first')}."
+                )
+                tone = "warn"
+            elif mv_lens and bool(mv_lens.get("pebbles", False)) and not str(mv_lens.get("peb_signal", "") or "").strip():
+                body = (
+                    "Cloud geometry is ready, but pebbles have no discrete signal yet. Pick an event signal in Multivariate so the sand/grain overlay can show where structure changes are event-driven."
+                )
+                tone = "accent"
+            elif len(runs) >= 3 and len(sigs) >= 3:
+                body = (
+                    f"{len(runs)} runs and {len(sigs)} signals are ready for SPLOM, Parallel and 3D melting cloud. "
+                    "Use pebbles-on-sand overlays to see where event structure separates clusters."
+                )
+                if mv_lens:
+                    body = (
+                        f"{body} Current 3D lens is {mv_lens.get('x') or '—'}/{mv_lens.get('y') or '—'}/{mv_lens.get('z') or '—'} "
+                        f"with keep={int(mv_lens.get('keep_pct', 100) or 100)}% in {mv_lens.get('keep_mode') or 'sparse-first'} mode."
+                    )
+                tone = "ok" if not trust_visible and qa_issues == 0 else "warn"
+            else:
+                body = (
+                    f"Build density for all-to-all analysis: keep 3+ runs and 3+ signals in table {table}. "
+                    "That is where clouds, sparse outliers and pebbles become visually useful."
+                )
+                tone = "accent"
         elif mode == "heatmaps":
             title = "Heatmap comparison"
             body = (
@@ -2075,11 +2748,22 @@ class CompareViewer(QtWidgets.QMainWindow):
             tone = "accent"
         elif mode == "multivariate":
             title = "Multivariate scouting"
-            body = (
-                f"{len(runs)} runs and {len(sigs)} signals are ready for SPLOM, Parallel and 3D cloud analysis. "
-                "Use brushing to pull outliers back into the main compare plots."
-            )
-            tone = "ok" if (not trust_visible and qa_issues == 0) else "warn"
+            if mv_lens:
+                body = (
+                    f"Checked fields: {int(mv_lens.get('checked_dim_count', 0) or 0)} out of {int(mv_lens.get('field_count', 0) or 0)}. "
+                    f"3D = {mv_lens.get('x') or '—'}/{mv_lens.get('y') or '—'}/{mv_lens.get('z') or '—'}, "
+                    f"keep={int(mv_lens.get('keep_pct', 100) or 100)}% ({mv_lens.get('keep_mode') or 'sparse-first'}). "
+                    "Use brushing to pull clusters or sparse outliers back into the main compare plots."
+                )
+                if bool(mv_lens.get("pebbles", False)) and str(mv_lens.get("peb_signal", "") or "").strip():
+                    body = f"{body} Pebbles are anchored to {mv_lens.get('peb_signal')}."
+                tone = "ok" if (not trust_visible and qa_issues == 0 and int(mv_lens.get('checked_dim_count', 0) or 0) >= 3) else "warn"
+            else:
+                body = (
+                    f"{len(runs)} runs and {len(sigs)} signals are ready for SPLOM, Parallel and 3D cloud analysis. "
+                    "Use brushing to pull outliers back into the main compare plots."
+                )
+                tone = "ok" if (not trust_visible and qa_issues == 0) else "warn"
         elif mode == "qa":
             title = "QA drill-down"
             if qa_issues > 0:
@@ -2115,6 +2799,46 @@ class CompareViewer(QtWidgets.QMainWindow):
                 "Multivariate view should now separate clusters, sparse clouds and outliers clearly."
             )
             tone = "ok"
+
+        if (not runs) or len(runs) < 2 or (not sigs):
+            if analysis_mode == "one_to_all":
+                body = (
+                    f"{body} Setup for 1 -> all: aim for 3+ runs, keep one candidate driver in mind and select 2+ signals "
+                    "so Influence(t) can show how one parameter fans out into many responses."
+                )
+            elif analysis_mode == "all_to_one":
+                body = (
+                    f"{body} Setup for all -> 1: aim for 3+ runs and narrow the target to 1-2 signals, then explain one waveform "
+                    "through many drivers and local event markers."
+                )
+            else:
+                body = (
+                    f"{body} Setup for all -> all: aim for 3+ runs and 3+ signals so melting clouds, sparse outliers and "
+                    "pebbles-on-sand overlays become visually informative."
+                )
+
+        if runs:
+            if bool(events.get("no_signals_selected", False)):
+                body = f"{body} Events are currently muted: pick one or more event channels to add local trigger evidence."
+            elif event_focus:
+                if analysis_mode == "one_to_all":
+                    body = f"{body} Event anchor: {event_focus}. Check whether the current fan-out starts near that trigger."
+                elif analysis_mode == "all_to_one":
+                    body = f"{body} Event anchor: {event_focus}. Use it to test whether the target change is trigger-driven or only parameter-driven."
+                else:
+                    body = f"{body} Event anchor: {event_focus}. Compare it against cloud clusters and pebbles to see whether structure is event-driven."
+            if story_label:
+                title = f"Causal read ({story_confidence_title or 'Story'}): {story_label}" if story_confidence_title else f"Causal read: {story_label}"
+                body = f"{body} Current causal story: {story_label}."
+                if story_confidence:
+                    body = f"{body} Story confidence: {story_confidence}."
+                if str(causal_story.get('confidence_detail') or '').strip():
+                    body = f"{body} {str(causal_story.get('confidence_detail') or '').strip()}"
+                if str(causal_story.get('repair_hint') or '').strip():
+                    body = f"{body} Main gap: {str(causal_story.get('repair_hint') or '').strip()}"
+                if str(repair_summary.get("headline") or "").strip():
+                    body = f"{body} {str(repair_summary.get('headline') or '').strip()}."
+            body = f"{body} Recommended follow target: {follow_target_label}. Recommended focus: {recommended_focus_label} because {focus_reason}."
 
         if notes:
             body = f"{body} Status: {', '.join(notes)}."
@@ -2155,6 +2879,838 @@ class CompareViewer(QtWidgets.QMainWindow):
             f"</div>"
         )
 
+    def _workspace_analysis_target_signal(self, valid_sigs: Optional[List[str]] = None) -> str:
+        valid = [str(x) for x in (valid_sigs or []) if str(x).strip()]
+        valid_set = set(valid)
+        picked: List[str] = []
+        try:
+            picked = [str(x) for x in self._selected_signals()]
+        except Exception:
+            picked = []
+        candidates: List[str] = []
+        if len(picked) == 1:
+            candidates.extend(picked)
+        for cand in (
+            getattr(self, "_infl_focus_sig", ""),
+            getattr(self, "navigator_signal_selected", ""),
+            str(self.combo_nav_signal.currentText() or "") if hasattr(self, "combo_nav_signal") else "",
+            picked[0] if picked else "",
+            valid[0] if valid else "",
+        ):
+            cand = str(cand or "").strip()
+            if cand:
+                candidates.append(cand)
+        for cand in candidates:
+            if cand and ((not valid_set) or (cand in valid_set)):
+                return cand
+        return valid[0] if valid else ""
+
+    def _workspace_analysis_anchor_label(
+        self,
+        *,
+        analysis_mode: Optional[str] = None,
+        infl_lens: Optional[Dict[str, object]] = None,
+        mv_lens: Optional[Dict[str, object]] = None,
+    ) -> str:
+        mode = str(analysis_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        infl_lens = dict(infl_lens or self._workspace_influence_lens_summary() or {})
+        mv_lens = dict(mv_lens or self._workspace_multivar_lens_summary() or {})
+
+        if mode == "one_to_all":
+            feat = str(infl_lens.get("fanout_feature") or "").strip()
+            return f"Driver {feat}" if feat else "Driver —"
+
+        if mode == "all_to_one":
+            target = str(infl_lens.get("target_signal") or self._workspace_analysis_target_signal() or "").strip()
+            return f"Target {target}" if target else "Target —"
+
+        if mode == "all_to_all":
+            dims = [str(x) for x in (mv_lens.get("checked_dims") or []) if str(x).strip()]
+            if len(dims) >= 3:
+                return f"Cloud {'/'.join(dims[:3])}"
+            feat = str(infl_lens.get("top_pair_feature") or "").strip()
+            sig = str(infl_lens.get("top_pair_signal") or "").strip()
+            if feat and sig:
+                return f"Corr {feat}->{sig}"
+            return "Cloud —"
+
+        return "Anchor —"
+
+    def _workspace_influence_lens_summary(self) -> Dict[str, object]:
+        cache = getattr(self, "_infl_cache", None)
+        if not isinstance(cache, dict):
+            return {}
+        feat_sel = [str(x) for x in (cache.get("feat_sel") or []) if str(x).strip()]
+        sigs = [str(x) for x in (cache.get("sigs") or []) if str(x).strip()]
+        C = np.asarray(cache.get("C_sel", np.asarray([])), dtype=float)
+        if C.ndim != 2 or C.size == 0 or not feat_sel or not sigs:
+            return {}
+        n_feat = min(len(feat_sel), int(C.shape[0]))
+        n_sig = min(len(sigs), int(C.shape[1]))
+        if n_feat <= 0 or n_sig <= 0:
+            return {}
+        feat_sel = feat_sel[:n_feat]
+        sigs = sigs[:n_sig]
+        C = C[:n_feat, :n_sig]
+        finite = np.isfinite(C)
+        if not finite.any():
+            return {}
+
+        strong_thr = 0.45
+        A = np.abs(C)
+        A_nan = np.where(finite, A, np.nan)
+        strong_mask = finite & (A >= strong_thr)
+
+        row_counts = np.asarray([int(strong_mask[i].sum()) for i in range(n_feat)], dtype=int)
+        row_mean = np.asarray(
+            [
+                float(np.nanmean(A_nan[i])) if np.isfinite(A_nan[i]).any() else float("nan")
+                for i in range(n_feat)
+            ],
+            dtype=float,
+        )
+        row_max = np.asarray(
+            [
+                float(np.nanmax(A_nan[i])) if np.isfinite(A_nan[i]).any() else float("nan")
+                for i in range(n_feat)
+            ],
+            dtype=float,
+        )
+        col_mean = np.asarray(
+            [
+                float(np.nanmean(A_nan[:, j])) if np.isfinite(A_nan[:, j]).any() else float("nan")
+                for j in range(n_sig)
+            ],
+            dtype=float,
+        )
+
+        fanout_idx = max(
+            range(n_feat),
+            key=lambda i: (
+                int(row_counts[i]),
+                float(np.nan_to_num(row_mean[i], nan=-1.0)),
+                float(np.nan_to_num(row_max[i], nan=-1.0)),
+            ),
+        )
+        fanout_order = np.argsort(np.nan_to_num(A_nan[fanout_idx], nan=-1.0))[::-1]
+        fanout_examples: List[Tuple[str, float]] = []
+        for j in fanout_order[:3]:
+            if not finite[fanout_idx, j]:
+                continue
+            fanout_examples.append((str(sigs[int(j)]), float(C[fanout_idx, int(j)])))
+
+        target_sig = self._workspace_analysis_target_signal(sigs)
+        if target_sig in sigs:
+            target_idx = sigs.index(target_sig)
+        else:
+            target_idx = int(np.argmax(np.nan_to_num(col_mean, nan=-1.0))) if len(col_mean) else -1
+            target_sig = str(sigs[target_idx]) if 0 <= target_idx < len(sigs) else ""
+        target_examples: List[Tuple[str, float]] = []
+        if 0 <= target_idx < n_sig:
+            target_order = np.argsort(np.nan_to_num(A_nan[:, target_idx], nan=-1.0))[::-1]
+            for i in target_order[:3]:
+                if not finite[int(i), target_idx]:
+                    continue
+                target_examples.append((str(feat_sel[int(i)]), float(C[int(i), target_idx])))
+
+        A_rank = np.nan_to_num(A_nan, nan=-1.0)
+        k_top = int(np.argmax(A_rank))
+        i_top, j_top = int(k_top // n_sig), int(k_top % n_sig)
+        strong_links = int(strong_mask.sum())
+        total_links = int(finite.sum())
+        density = (float(strong_links) / float(total_links)) if total_links else 0.0
+
+        return {
+            "time_s": float(cache.get("t", 0.0) or 0.0),
+            "runs": int(len(cache.get("runs") or [])),
+            "signal_count": int(n_sig),
+            "feature_count": int(n_feat),
+            "strong_threshold": float(strong_thr),
+            "strong_links": strong_links,
+            "total_links": total_links,
+            "density": float(density),
+            "fanout_feature": str(feat_sel[fanout_idx]),
+            "fanout_count": int(row_counts[fanout_idx]),
+            "fanout_examples": fanout_examples,
+            "target_signal": str(target_sig),
+            "target_examples": target_examples,
+            "top_pair_feature": str(feat_sel[i_top]) if 0 <= i_top < len(feat_sel) else "",
+            "top_pair_signal": str(sigs[j_top]) if 0 <= j_top < len(sigs) else "",
+            "top_pair_corr": float(C[i_top, j_top]) if C.size else float("nan"),
+            "delta": bool(cache.get("use_delta", False)),
+            "ref_label": str(cache.get("ref_label") or ""),
+        }
+
+    def _workspace_multivar_lens_summary(self) -> Dict[str, object]:
+        dfp = getattr(self, "_mv_df_plot", None)
+        if not isinstance(dfp, pd.DataFrame) or dfp.empty:
+            return {}
+
+        cols = [str(c) for c in dfp.columns if str(c) != "run"]
+        if not cols:
+            return {}
+
+        checked_now: List[str] = []
+        try:
+            checked_now = [str(x) for x in self._mv_checked_dims() if str(x).strip()]
+        except Exception:
+            checked_now = []
+        remembered_checked = [str(x) for x in (getattr(self, "_mv_checked_dims_selected", None) or []) if str(x).strip()]
+        checked = [c for c in (checked_now or remembered_checked) if c in cols]
+        if not checked:
+            checked = cols[: min(6, len(cols))]
+
+        keep_pct = 100
+        try:
+            keep_pct = int(self.slider_mv_keep.value())
+        except Exception:
+            keep_pct = 100
+        keep_pct = max(1, min(100, keep_pct))
+
+        keep_mode = str(self.combo_mv_keepmode.currentText() or "sparse-first") if hasattr(self, "combo_mv_keepmode") else "sparse-first"
+        metric = str(self.combo_mv_metric.currentText() or "RMS") if hasattr(self, "combo_mv_metric") else "RMS"
+        use_view = bool(self.chk_mv_use_view.isChecked()) if hasattr(self, "chk_mv_use_view") else False
+        pebbles = bool(self.chk_mv_pebbles.isChecked()) if hasattr(self, "chk_mv_pebbles") else False
+        peb_signal = str(
+            getattr(self, "_mv_peb_sig_selected", "")
+            or (self.combo_mv_peb_sig.currentText() if hasattr(self, "combo_mv_peb_sig") else "")
+            or ""
+        ).strip()
+        peb_mode = str(self.combo_mv_peb_mode.currentText() or "occurred") if hasattr(self, "combo_mv_peb_mode") else "occurred"
+
+        max_pts = int(len(dfp))
+        try:
+            max_pts = max(1, int(self.spin_mv_maxpts.value()))
+        except Exception:
+            max_pts = int(len(dfp))
+        approx_after_keep = max(1, int(round(float(len(dfp)) * keep_pct / 100.0))) if len(dfp) else 0
+        approx_cloud = min(int(len(dfp)), int(max_pts), int(approx_after_keep)) if len(dfp) else 0
+
+        xcol = str(self.combo_mv_x.currentText() or "") if hasattr(self, "combo_mv_x") else ""
+        ycol = str(self.combo_mv_y.currentText() or "") if hasattr(self, "combo_mv_y") else ""
+        zcol = str(self.combo_mv_z.currentText() or "") if hasattr(self, "combo_mv_z") else ""
+        c3 = str(self.combo_mv_color3d.currentText() or "") if hasattr(self, "combo_mv_color3d") else ""
+
+        return {
+            "runs": int(len(dfp)),
+            "field_count": int(len(cols)),
+            "checked_dims": checked,
+            "checked_dim_count": int(len(checked)),
+            "keep_pct": int(keep_pct),
+            "keep_mode": keep_mode,
+            "metric": metric,
+            "use_view": bool(use_view),
+            "pebbles": bool(pebbles),
+            "peb_signal": peb_signal,
+            "peb_mode": peb_mode,
+            "max_pts": int(max_pts),
+            "approx_cloud_points": int(approx_cloud),
+            "x": xcol,
+            "y": ycol,
+            "z": zcol,
+            "color3d": c3,
+        }
+
+    def _workspace_next_move_summary(
+        self,
+        *,
+        analysis_mode: str,
+        runs: List[object],
+        sigs: List[str],
+        table: str,
+        events_rows: int,
+        trust_visible: bool,
+        qa_issues: int,
+        infl_lens: Dict[str, object],
+        mv_lens: Dict[str, object],
+        causal_story: Optional[Dict[str, object]] = None,
+    ) -> Dict[str, str]:
+        if trust_visible or qa_issues > 0:
+            detail = (
+                f"Pause exploration and validate the suspect zone in QA / Events first. "
+                f"Then return to {self._workspace_analysis_label()} only after the anomaly is understood."
+            )
+            if qa_issues > 0:
+                detail = f"{detail} Current QA issues: {qa_issues}."
+            return {"headline": "Validate anomalies first", "detail": detail, "tone": "warn" if qa_issues < 10 else "alert"}
+
+        story = dict(causal_story or {})
+        story_conf = str(story.get("confidence") or "").strip()
+        story_label = str(story.get("headline") or "").strip()
+        repair_lane = str(story.get("repair_lane") or "").strip()
+        repair_hint = str(story.get("repair_hint") or "").strip()
+        if story_conf == "aligned":
+            if analysis_mode == "one_to_all":
+                return {
+                    "headline": "Stress-test the aligned fan-out",
+                    "detail": f"The current chain {story_label or 'driver -> responses'} is aligned. Sweep nearby times and confirm that the same fan-out survives outside the hotspot window.",
+                    "tone": "ok",
+                }
+            if analysis_mode == "all_to_one":
+                return {
+                    "headline": "Stress-test the aligned target chain",
+                    "detail": f"The chain {story_label or 'driver -> target'} is aligned. Keep the target fixed and check whether it survives adjacent frames and event windows.",
+                    "tone": "ok",
+                }
+            if analysis_mode == "all_to_all":
+                return {
+                    "headline": "Stress-test the aligned corridor",
+                    "detail": f"The field chain {story_label or 'corridor'} is aligned. Now test whether it stays dominant inside each visual cluster instead of only globally.",
+                    "tone": "ok",
+                }
+        if story_conf == "partial":
+            if repair_lane == "qa":
+                return {
+                    "headline": "Repair the event anchor",
+                    "detail": (
+                        f"The chain {story_label or 'story'} is only partially aligned because its evidence link is weak. "
+                        f"{repair_hint or 'Use QA / Events to restore the missing local trigger support.'}"
+                    ),
+                    "tone": "warn",
+                }
+            if repair_lane == "heatmaps":
+                return {
+                    "headline": "Repair the time-local link",
+                    "detail": (
+                        f"The chain {story_label or 'story'} is only partially aligned in time. "
+                        f"{repair_hint or 'Use Heatmaps to lock the hotspot onto the active response or target.'}"
+                    ),
+                    "tone": "warn",
+                }
+            if repair_lane == "multivariate":
+                return {
+                    "headline": "Repair the field structure",
+                    "detail": (
+                        f"The field story {story_label or 'corridor'} is only partially aligned structurally. "
+                        f"{repair_hint or 'Use Multivariate to test whether the corridor survives inside the cloud clusters.'}"
+                    ),
+                    "tone": "warn",
+                }
+            if analysis_mode in {"one_to_all", "all_to_one"}:
+                return {
+                    "headline": "Repair the missing link",
+                    "detail": f"The current chain {story_label or 'story'} is only partially aligned. Use QA / Events to find which timing or waveform segment is breaking the explanation.",
+                    "tone": "warn",
+                }
+            if analysis_mode == "all_to_all":
+                return {
+                    "headline": "Localize the weak corridor link",
+                    "detail": f"The field story {story_label or 'corridor'} is only partially aligned. Jump to Heatmaps and locate where the corridor and hotspot stop agreeing.",
+                    "tone": "warn",
+                }
+        if story_conf == "tentative":
+            if repair_lane == "qa":
+                return {
+                    "headline": "Rebuild evidence support",
+                    "detail": (
+                        f"The current chain {story_label or 'story'} is still tentative because its trigger evidence is thin. "
+                        f"{repair_hint or 'Use QA / Events to anchor the candidate chain before drilling deeper.'}"
+                    ),
+                    "tone": "accent",
+                }
+            if repair_lane == "heatmaps":
+                return {
+                    "headline": "Stabilize the time gate",
+                    "detail": (
+                        f"The current chain {story_label or 'story'} is still tentative in time. "
+                        f"{repair_hint or 'Use Heatmaps to find a stable hotspot before trusting the driver ranking.'}"
+                    ),
+                    "tone": "accent",
+                }
+            if repair_lane == "multivariate":
+                return {
+                    "headline": "Strengthen the field structure",
+                    "detail": (
+                        f"The current field story {story_label or 'corridor'} is still tentative structurally. "
+                        f"{repair_hint or 'Use Multivariate to build a stronger cloud separation before trusting the corridor.'}"
+                    ),
+                    "tone": "accent",
+                }
+            if analysis_mode in {"one_to_all", "all_to_one"}:
+                return {
+                    "headline": "Strengthen the causal chain",
+                    "detail": "The current influence story is still tentative. Hold the selection stable and move through Heatmaps until hotspot, driver and event timing begin to lock together.",
+                    "tone": "accent",
+                }
+            if analysis_mode == "all_to_all":
+                return {
+                    "headline": "Strengthen the field story",
+                    "detail": "The current corridor is still tentative. Build more structure in Multivariate, then return to time-local heatmaps for confirmation.",
+                    "tone": "accent",
+                }
+
+        if analysis_mode == "one_to_all":
+            if infl_lens.get("fanout_feature"):
+                examples = [str(sig) for sig, _corr in (infl_lens.get("fanout_examples", []) or [])[:2] if str(sig)]
+                example_txt = f" Start with {', '.join(examples)}." if examples else ""
+                return {
+                    "headline": "Pin one driver, sweep many responses",
+                    "detail": (
+                        f"Hold {infl_lens.get('fanout_feature')} as the candidate driver at "
+                        f"t={float(infl_lens.get('time_s', 0.0) or 0.0):.3f}s and compare how it fans out across the selected signals.{example_txt}"
+                    ),
+                    "tone": "ok",
+                }
+            return {
+                "headline": "Build a driver sweep",
+                "detail": (
+                    f"Keep 3+ runs and at least 2 signals in table {table}, then move the playhead until one meta feature starts dominating Influence(t)."
+                ),
+                "tone": "accent",
+            }
+
+        if analysis_mode == "all_to_one":
+            target_signal = str(infl_lens.get("target_signal") or (sigs[0] if sigs else "the target waveform"))
+            if len(sigs) > 2:
+                return {
+                    "headline": "Narrow the target bundle",
+                    "detail": f"Reduce the selection to 1-2 signals so {target_signal} can be explained cleanly by many drivers instead of a mixed target bundle.",
+                    "tone": "accent",
+                }
+            if infl_lens.get("target_examples"):
+                first_feat, first_corr = (infl_lens.get("target_examples") or [("", 0.0)])[0]
+                return {
+                    "headline": "Test the lead explanation",
+                    "detail": (
+                        f"Keep {target_signal} as the outcome and verify whether {first_feat} ({float(first_corr):+.2f}) still leads after you cross-check Events and Delta around the current playhead."
+                    ),
+                    "tone": "ok",
+                }
+            return {
+                "headline": "Stabilize one target",
+                "detail": f"Keep one target signal visible, move the playhead to a sharp local change, then let Influence(t) rank many drivers against {target_signal}.",
+                "tone": "accent",
+            }
+
+        if analysis_mode == "all_to_all":
+            if not mv_lens:
+                return {
+                    "headline": "Build the multivariate field",
+                    "detail": "Select 3+ runs and 3+ signals so the window can derive enough fields for SPLOM, Parallel and 3D cloud scouting.",
+                    "tone": "neutral",
+                }
+            checked_dim_count = int(mv_lens.get("checked_dim_count", 0) or 0)
+            if checked_dim_count < 3:
+                return {
+                    "headline": "Add dimensions before scouting",
+                    "detail": f"Check 1-2 more dimensions in Multivariate. With only {checked_dim_count} active fields the cloud will flatten instead of separating regimes.",
+                    "tone": "accent",
+                }
+            keep_pct = int(mv_lens.get("keep_pct", 100) or 100)
+            keep_mode = str(mv_lens.get("keep_mode") or "sparse-first")
+            if keep_pct <= 15 and int(mv_lens.get("runs", 0) or 0) >= 4:
+                return {
+                    "headline": "Decide between outliers and cores",
+                    "detail": (
+                        f"Keep is only {keep_pct}%. Stay in {keep_mode} if you are hunting rare outliers; otherwise raise keep% or switch mode to expose regime cores before clustering by eye."
+                    ),
+                    "tone": "warn",
+                }
+            pebbles = bool(mv_lens.get("pebbles", False))
+            peb_signal = str(mv_lens.get("peb_signal", "") or "")
+            if pebbles and not peb_signal:
+                return {
+                    "headline": "Anchor the sand with events",
+                    "detail": "Pebbles are enabled but not tied to a discrete event. Pick an event signal so cluster boundaries can be checked against real trigger structure.",
+                    "tone": "accent",
+                }
+            if (not pebbles) and events_rows > 0:
+                return {
+                    "headline": "Turn events into pebbles",
+                    "detail": "Event rows are available. Enable pebbles and bind them to a discrete signal to see whether cloud separation is structural or event-driven.",
+                    "tone": "accent",
+                }
+            if infl_lens.get("top_pair_feature") and infl_lens.get("top_pair_signal"):
+                return {
+                    "headline": "Cross-check the dominant corridor",
+                    "detail": (
+                        f"Use the cloud to separate regimes, then verify whether {infl_lens.get('top_pair_feature')} -> {infl_lens.get('top_pair_signal')} remains dominant inside each visual cluster."
+                    ),
+                    "tone": "ok",
+                }
+            return {
+                "headline": "Scout clusters, then localize time",
+                "detail": "Use SPLOM / 3D to split the field into regimes, then jump back to Heatmaps to see where each visual cluster separates in time.",
+                "tone": "ok",
+            }
+
+        return {
+            "headline": "Move from overview to evidence",
+            "detail": "Use the current lens to find a promising hotspot or cluster, then validate it with Heatmaps, QA and Events before trusting the pattern.",
+            "tone": "accent",
+        }
+
+    def _workspace_causal_story_summary(
+        self,
+        *,
+        analysis_mode: str,
+        heat: Dict[str, object],
+        infl: Dict[str, object],
+        infl_lens: Dict[str, object],
+        events: Dict[str, object],
+        trust_visible: bool,
+        qa_issues: int,
+    ) -> Dict[str, str]:
+        def _time_close(a: float, b: float, tol_s: float = 0.35) -> bool:
+            try:
+                return bool(np.isfinite(a) and np.isfinite(b) and abs(float(a) - float(b)) <= float(tol_s))
+            except Exception:
+                return False
+
+        if trust_visible or qa_issues > 0:
+            return {
+                "headline": "Candidate chain needs validation",
+                "detail": (
+                    "QA / trust warnings are active, so treat any influence chain as provisional until the suspect zone is checked."
+                ),
+                "tone": "warn" if qa_issues < 10 else "alert",
+                "confidence": "validate first",
+                "confidence_detail": "The data-quality layer is warning before the influence story is fully trusted.",
+                "repair_hint": "Resolve the trust / QA warnings first, then rebuild the causal story on the cleaned evidence.",
+                "repair_lane": "qa",
+            }
+
+        heat_sig = str(heat.get("signal") or "").strip()
+        heat_run = str(heat.get("run") or "").strip()
+        heat_time = float(heat.get("time_s", np.nan))
+        heat_peak = float(heat.get("peak", np.nan))
+        event_sig = str(events.get("top_signal") or events.get("sample_signal") or "").strip()
+        event_time = float(events.get("sample_time_s", np.nan))
+        infl_time = float(infl_lens.get("time_s", infl.get("time_s", np.nan)))
+        infl_time_txt = f" @ {infl_time:.3f}s" if np.isfinite(infl_time) else ""
+
+        if analysis_mode == "one_to_all":
+            driver = str(infl_lens.get("fanout_feature") or infl.get("feature") or "").strip()
+            fanout_examples = [str(sig) for sig, _corr in (infl_lens.get("fanout_examples", []) or []) if str(sig).strip()]
+            response = heat_sig or (fanout_examples[0] if fanout_examples else "")
+            if driver and response:
+                chain = f"{driver} -> {response}"
+                if event_sig:
+                    chain = f"{event_sig} -> {chain}"
+                align_score = 0
+                response_in_fanout = bool(response and response in fanout_examples)
+                fanout_multi = bool(int(infl_lens.get("fanout_count", 0) or 0) >= 2)
+                event_aligned = bool(
+                    event_sig
+                    and np.isfinite(event_time)
+                    and (_time_close(event_time, heat_time) or _time_close(event_time, infl_time))
+                )
+                detail = (
+                    f"Best current story: {driver} is the fan-out candidate, while the strongest visible response is "
+                    f"{response}{f' in {heat_run}' if heat_run else ''}"
+                )
+                if np.isfinite(heat_time):
+                    detail = f"{detail} @ {heat_time:.3f}s"
+                if np.isfinite(heat_peak):
+                    detail = f"{detail} with peak {heat_peak:.3g}"
+                detail = f"{detail}."
+                if response_in_fanout:
+                    align_score += 1
+                    detail = f"{detail} The hotspot signal is already inside the top fan-out responses."
+                if fanout_multi:
+                    align_score += 1
+                if event_sig:
+                    if np.isfinite(event_time) and np.isfinite(heat_time):
+                        detail = f"{detail} Event anchor {event_sig} sits at {event_time:.3f}s, so check whether it gates that spread."
+                        if event_aligned:
+                            align_score += 1
+                    else:
+                        detail = f"{detail} Event anchor {event_sig} can be used as the gate for this spread."
+                confidence = "aligned" if align_score >= 3 else ("partial" if align_score >= 2 else "tentative")
+                confidence_detail = {
+                    "aligned": "Driver ranking, hotspot response and event timing all point in the same direction.",
+                    "partial": "Two parts of the chain agree, but one link still needs a closer check.",
+                    "tentative": "The chain is plausible, but it is still resting on incomplete agreement.",
+                }[confidence]
+                if confidence == "aligned":
+                    repair_hint = "Sweep a few nearby frames and confirm that the same response set stays inside the fan-out."
+                    repair_lane = "heatmaps"
+                elif confidence == "partial":
+                    if not response_in_fanout:
+                        repair_hint = "The hotspot response is outside the top fan-out set, so re-check the local frame or response selection."
+                        repair_lane = "heatmaps"
+                    elif event_sig and not event_aligned:
+                        repair_hint = "The fan-out is visible, but event timing is not yet locking the spread; inspect nearby Events and Delta frames."
+                        repair_lane = "qa"
+                    else:
+                        repair_hint = "One link in the spread is still weak, so keep the driver fixed and verify the local gate."
+                        repair_lane = "heatmaps"
+                else:
+                    repair_hint = "Hold one driver steady and step through time until the hotspot response and event gate begin to agree."
+                    repair_lane = "heatmaps"
+                return {
+                    "headline": chain,
+                    "detail": detail,
+                    "tone": "ok" if confidence == "aligned" else "accent",
+                    "confidence": confidence,
+                    "confidence_detail": confidence_detail,
+                    "repair_hint": repair_hint,
+                    "repair_lane": repair_lane,
+                }
+
+        if analysis_mode == "all_to_one":
+            target = str(infl_lens.get("target_signal") or infl.get("signal") or heat_sig or "").strip()
+            lead_examples = infl_lens.get("target_examples", []) or []
+            lead_driver = str(lead_examples[0][0] if lead_examples else (infl.get("feature") or "")).strip()
+            if target and lead_driver:
+                chain = f"{lead_driver} -> {target}"
+                if event_sig:
+                    chain = f"{event_sig} -> {chain}"
+                align_score = 1 if lead_examples else 0
+                target_match = bool(heat_sig and heat_sig == target)
+                event_aligned = bool(
+                    event_sig
+                    and np.isfinite(event_time)
+                    and (_time_close(event_time, heat_time) or _time_close(event_time, infl_time))
+                )
+                detail = f"Best current explanation is {lead_driver} driving {target}{infl_time_txt}."
+                if heat_sig:
+                    if target_match:
+                        align_score += 1
+                        detail = f"{detail} The heat hotspot is already on the target waveform"
+                    else:
+                        detail = f"{detail} The current heat hotspot is on {heat_sig}, so compare it against the target"
+                    if heat_run:
+                        detail = f"{detail} in {heat_run}"
+                    if np.isfinite(heat_time):
+                        detail = f"{detail} @ {heat_time:.3f}s"
+                    detail = f"{detail}."
+                if event_sig:
+                    if np.isfinite(event_time):
+                        detail = f"{detail} Event anchor {event_sig} @ {event_time:.3f}s is the local trigger check."
+                        if event_aligned:
+                            align_score += 1
+                    else:
+                        detail = f"{detail} Event anchor {event_sig} is the local trigger check."
+                confidence = "aligned" if align_score >= 3 else ("partial" if align_score >= 2 else "tentative")
+                confidence_detail = {
+                    "aligned": "Driver ranking, target hotspot and local trigger all reinforce the same target explanation.",
+                    "partial": "The target explanation is promising, but one part of the chain is still weakly aligned.",
+                    "tentative": "The target explanation exists, but the supporting pieces have not fully locked together yet.",
+                }[confidence]
+                if confidence == "aligned":
+                    repair_hint = "Move a few frames around the target and confirm that the same lead driver keeps winning."
+                    repair_lane = "heatmaps"
+                elif confidence == "partial":
+                    if not target_match and heat_sig:
+                        repair_hint = "The heat hotspot is still off-target, so move Delta onto the target waveform before trusting the chain."
+                        repair_lane = "heatmaps"
+                    elif event_sig and not event_aligned:
+                        repair_hint = "Driver and target agree, but event timing is still drifting; inspect Events around the current frame."
+                        repair_lane = "qa"
+                    else:
+                        repair_hint = "The target chain is close, but one local confirmation is still missing."
+                        repair_lane = "heatmaps"
+                else:
+                    repair_hint = "Narrow the target, hold the playhead steady and wait until hotspot, driver and event timing start to lock together."
+                    repair_lane = "heatmaps"
+                return {
+                    "headline": chain,
+                    "detail": detail,
+                    "tone": "ok" if confidence == "aligned" else "accent",
+                    "confidence": confidence,
+                    "confidence_detail": confidence_detail,
+                    "repair_hint": repair_hint,
+                    "repair_lane": repair_lane,
+                }
+
+        corridor_feat = str(infl_lens.get("top_pair_feature") or infl.get("feature") or "").strip()
+        corridor_sig = str(infl_lens.get("top_pair_signal") or infl.get("signal") or heat_sig or "").strip()
+        if corridor_feat and corridor_sig:
+            chain = f"{corridor_feat} -> {corridor_sig}"
+            if event_sig:
+                chain = f"{event_sig} -> {chain}"
+            align_score = 1
+            corridor_matches_hotspot = bool(heat_sig and heat_sig == corridor_sig)
+            event_aligned = bool(
+                event_sig
+                and np.isfinite(event_time)
+                and (_time_close(event_time, heat_time) or _time_close(event_time, infl_time))
+            )
+            detail = f"Field story: dominant corridor is {corridor_feat} -> {corridor_sig}{infl_time_txt}."
+            if heat_sig:
+                detail = f"{detail} Current hotspot is {heat_sig}{f' in {heat_run}' if heat_run else ''}"
+                if np.isfinite(heat_time):
+                    detail = f"{detail} @ {heat_time:.3f}s"
+                detail = f"{detail}, so use it as the time gate for this corridor."
+                if corridor_matches_hotspot:
+                    align_score += 1
+            if event_sig:
+                peb_signal = str(events.get("top_signal") or events.get("sample_signal") or "")
+                detail = f"{detail} Event anchor {peb_signal} can act as the pebble check for whether the corridor is trigger-driven."
+                if event_aligned:
+                    align_score += 1
+            confidence = "aligned" if align_score >= 3 else ("partial" if align_score >= 2 else "tentative")
+            confidence_detail = {
+                "aligned": "Corridor, hotspot gate and event anchor are mutually consistent.",
+                "partial": "The field story has two supporting anchors, but one layer is still weaker than the others.",
+                "tentative": "The corridor exists, but the time/event anchoring is still thin.",
+            }[confidence]
+            if confidence == "aligned":
+                repair_hint = "Probe each cloud cluster and confirm that the same corridor survives inside the local structure."
+                repair_lane = "multivariate"
+            elif confidence == "partial":
+                if not corridor_matches_hotspot and heat_sig:
+                    repair_hint = "The dominant corridor and Delta hotspot disagree on the active response, so localize the split in Heatmaps."
+                    repair_lane = "heatmaps"
+                elif event_sig and not event_aligned:
+                    repair_hint = "The corridor is visible, but event timing is not anchoring it yet; compare against pebbles or nearby Events."
+                    repair_lane = "multivariate"
+                else:
+                    repair_hint = "One field anchor is still weaker than the others, so keep cross-checking time-local heatmaps against the cloud."
+                    repair_lane = "heatmaps"
+            else:
+                repair_hint = "Add stronger time or event anchoring before trusting the cloud corridor as a real field pattern."
+                repair_lane = "multivariate"
+            return {
+                "headline": chain,
+                "detail": detail,
+                "tone": "ok" if confidence == "aligned" else "accent",
+                "confidence": confidence,
+                "confidence_detail": confidence_detail,
+                "repair_hint": repair_hint,
+                "repair_lane": repair_lane,
+            }
+
+        return {
+            "headline": "Causal story is still thin",
+            "detail": "Keep Heatmaps, Influence and Events stable for a moment so the window can propose a stronger influence chain.",
+            "tone": "neutral",
+            "confidence": "tentative",
+            "confidence_detail": "There is not enough agreement yet between the available evidence layers.",
+            "repair_hint": "Stabilize one frame and one target or corridor before asking the window for a stronger causal story.",
+            "repair_lane": "multivariate" if analysis_mode == "all_to_all" else "heatmaps",
+        }
+
+    def _workspace_causal_story_label(self, causal_story: Optional[Dict[str, object]] = None) -> str:
+        story = dict(causal_story or {})
+        headline = str(story.get("headline") or "").strip()
+        if not headline or headline in {"Causal story is still thin", "Candidate chain needs validation"}:
+            return ""
+        if len(headline) > 44:
+            headline = f"{headline[:41]}..."
+        return headline
+
+    def _workspace_repair_lane_summary(
+        self,
+        *,
+        causal_story: Optional[Dict[str, object]] = None,
+        analysis_mode: Optional[str] = None,
+    ) -> Dict[str, str]:
+        story = dict(causal_story or {})
+        mode = str(analysis_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        lane = str(story.get("repair_lane") or "").strip()
+        confidence = str(story.get("confidence") or "").strip()
+        hint = str(story.get("repair_hint") or "").strip()
+        if lane not in {"heatmaps", "qa", "multivariate"}:
+            lane = "multivariate" if mode == "all_to_all" else "heatmaps"
+
+        lane_titles = {
+            "heatmaps": "time-local alignment",
+            "qa": "event / evidence support",
+            "multivariate": "field structure",
+        }
+        lane_status = {
+            "heatmaps": "time gate",
+            "qa": "event evidence",
+            "multivariate": "field structure",
+        }
+        lane_title = lane_titles.get(lane, lane)
+        status_label = lane_status.get(lane, lane)
+
+        if confidence == "validate first":
+            return {
+                "headline": "Weakest link: trust / QA",
+                "detail": hint or "Resolve trust or QA warnings before relying on the causal story.",
+                "tone": "alert",
+                "status_label": "trust / QA",
+            }
+        if confidence == "aligned":
+            return {
+                "headline": f"Validation lane: {lane_title}",
+                "detail": hint or "The chain is aligned; use this lane to stress-test it rather than to repair it.",
+                "tone": "ok",
+                "status_label": status_label,
+            }
+        return {
+            "headline": f"Weakest link: {lane_title}",
+            "detail": hint or f"Use {lane_title} as the primary repair lane for the current causal story.",
+            "tone": "warn" if confidence == "partial" else "accent",
+            "status_label": status_label,
+        }
+
+    def _workspace_follow_target_summary(
+        self,
+        *,
+        analysis_mode: Optional[str] = None,
+        trust_visible: Optional[bool] = None,
+        qa_issues: Optional[int] = None,
+        events_rows: Optional[int] = None,
+        events_insight: Optional[Dict[str, object]] = None,
+        causal_story: Optional[Dict[str, object]] = None,
+    ) -> Dict[str, str]:
+        mode = str(analysis_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        trust_flag = bool(
+            trust_visible if trust_visible is not None else (
+                getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible()
+            )
+        )
+        qa_count = int(
+            qa_issues if qa_issues is not None else int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
+        )
+        events = dict(events_insight if events_insight is not None else (getattr(self, "_insight_events", {}) or {}))
+        rows = int(events_rows if events_rows is not None else int(events.get("rows", 0) or 0))
+        story = dict(causal_story or {})
+        focus = str(
+            self._workspace_contextual_focus_recommendation(
+                analysis_mode=mode,
+                trust_visible=trust_flag,
+                qa_issues=qa_count,
+                events_rows=rows,
+                events_insight=events,
+                causal_story=story,
+            ) or "all"
+        )
+        focus_label_map = {
+            "all": "Overview",
+            "heatmaps": "Heatmaps",
+            "multivariate": "Multivar",
+            "qa": "QA / Events",
+        }
+        focus_label = focus_label_map.get(focus, focus)
+        repair_lane = str(story.get("repair_lane") or "").strip()
+        repair_hint = str(story.get("repair_hint") or "").strip().lower()
+        dock_attr = "dock_controls"
+        dock_label = "Controls"
+        if focus == "heatmaps":
+            dock_attr = "dock_heatmap"
+            dock_label = "Δ(t)"
+            if mode in {"one_to_all", "all_to_one"} and any(
+                token in repair_hint for token in ("driver", "fan-out", "lead driver", "keeps winning")
+            ):
+                dock_attr = "dock_inflheat"
+                dock_label = "Influence(t) Heatmap"
+        elif focus == "multivariate":
+            dock_attr = "dock_multivar"
+            dock_label = "Multivariate"
+        elif focus == "qa":
+            dock_attr = "dock_qa"
+            dock_label = "QA"
+            if trust_flag or qa_count > 0:
+                dock_attr = "dock_qa"
+                dock_label = "QA"
+            elif repair_lane == "qa" and (
+                "event" in repair_hint or "trigger" in repair_hint or int(rows or 0) > 0
+            ):
+                dock_attr = "dock_events"
+                dock_label = "Events"
+        return {
+            "focus": focus,
+            "focus_label": focus_label,
+            "dock_attr": dock_attr,
+            "dock_label": dock_label,
+        }
+
     def _update_workspace_insights(self) -> None:
         browser = getattr(self, "txt_workspace_insights", None)
         if browser is None:
@@ -2162,6 +3718,7 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         runs = list(self._selected_runs()) if hasattr(self, "list_runs") else []
         sigs = list(self._selected_signals()) if hasattr(self, "list_signals") else []
+        analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
         trust_visible = bool(getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible())
         table = str(getattr(self, "current_table", "") or "-")
 
@@ -2175,6 +3732,9 @@ class CompareViewer(QtWidgets.QMainWindow):
         heat = dict(getattr(self, "_insight_heat", {}) or {})
         infl = dict(getattr(self, "_insight_infl", {}) or {})
         qa = dict(getattr(self, "_insight_qa", {}) or {})
+        events = dict(getattr(self, "_insight_events", {}) or {})
+        infl_lens = self._workspace_influence_lens_summary()
+        mv_lens = self._workspace_multivar_lens_summary()
 
         qa_issues = int(qa.get("issues", 0) or 0)
         qa_err = int(qa.get("err", 0) or 0)
@@ -2189,7 +3749,251 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 qa_focus = f"Top suspect: {qa.get('top_signal')} in {qa.get('top_run')}."
 
+        events_focus = ""
+        if events.get("top_signal") or events.get("sample_signal"):
+            try:
+                events_name = str(events.get("top_signal") or events.get("sample_signal") or "")
+                events_time = float(events.get("sample_time_s", 0.0) or 0.0)
+                if events_name and np.isfinite(events_time):
+                    events_focus = f"{events_name} @ {events_time:.3f}s"
+                else:
+                    events_focus = events_name
+            except Exception:
+                events_focus = str(events.get("top_signal") or events.get("sample_signal") or "")
+
+        causal_story = self._workspace_causal_story_summary(
+            analysis_mode=analysis_mode,
+            heat=heat,
+            infl=infl,
+            infl_lens=infl_lens,
+            events=events,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+        )
+        next_move = self._workspace_next_move_summary(
+            analysis_mode=analysis_mode,
+            runs=runs,
+            sigs=sigs,
+            table=table,
+            events_rows=events_rows,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+            infl_lens=infl_lens,
+            mv_lens=mv_lens,
+            causal_story=causal_story,
+        )
+        recommended_focus = self._workspace_contextual_focus_recommendation(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+            events_rows=events_rows,
+            events_insight=events,
+            causal_story=causal_story,
+        )
+        focus_labels = {
+            "all": "all",
+            "heatmaps": "heatmaps",
+            "multivariate": "multivar",
+            "qa": "qa/events",
+        }
+        recommended_focus_label = focus_labels.get(str(recommended_focus), str(recommended_focus or "all"))
+        focus_reason = self._workspace_contextual_focus_reason(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+            events_rows=events_rows,
+            events_insight=events,
+            causal_story=causal_story,
+        )
+        story_confidence = str(causal_story.get("confidence") or "").strip()
+        story_confidence_title = story_confidence.title() if story_confidence else ""
+        repair_summary = self._workspace_repair_lane_summary(
+            causal_story=causal_story,
+            analysis_mode=analysis_mode,
+        )
+        follow_target = self._workspace_follow_target_summary(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+            events_rows=events_rows,
+            events_insight=events,
+            causal_story=causal_story,
+        )
+
         cards: List[str] = []
+
+        lens_headline = "all -> all structure"
+        lens_detail = (
+            "Use multivariate clouds, melting density and pebbles to scout clusters, sparse outliers and cross-coupled regimes."
+        )
+        lens_tone = "accent"
+        if analysis_mode == "one_to_all":
+            lens_headline = "1 -> all driver sweep"
+            lens_detail = (
+                "Hold one candidate driver or hotspot fixed, then inspect how it fans out across many signals via Influence(t) and heatmaps."
+            )
+            lens_tone = "ok" if len(runs) >= 3 and len(sigs) >= 2 else "neutral"
+        elif analysis_mode == "all_to_one":
+            target_sig = str(sigs[0] if sigs else "")
+            lens_headline = "all -> 1 target explanation"
+            lens_detail = (
+                f"Treat {target_sig or 'the current waveform'} as the outcome and rank many drivers against one response with local event support."
+            )
+            lens_tone = "ok" if len(runs) >= 3 and len(sigs) <= 2 and len(sigs) >= 1 else "neutral"
+        elif len(runs) >= 3 and len(sigs) >= 3:
+            lens_tone = "ok"
+        cards.append(
+            self._workspace_insight_card_html(
+                "Analysis lens",
+                lens_headline,
+                lens_detail,
+                tone=lens_tone,
+            )
+        )
+        cards.append(
+            self._workspace_insight_card_html(
+                "Recommended focus",
+                f"{str(follow_target.get('focus_label') or recommended_focus_label)} -> {str(follow_target.get('dock_label') or 'dock')}",
+                f"Open {str(follow_target.get('dock_label') or 'the suggested dock')} now. Why now: {focus_reason}.",
+                tone="warn" if recommended_focus == "qa" else ("ok" if recommended_focus == "multivariate" else "accent"),
+            )
+        )
+        cards.append(
+            self._workspace_insight_card_html(
+                "Causal story",
+                (
+                    f"{story_confidence_title} | {str(causal_story.get('headline') or 'Causal story')}"
+                    if story_confidence_title
+                    else str(causal_story.get("headline") or "Causal story")
+                ),
+                (
+                    f"Confidence: {story_confidence}. {str(causal_story.get('confidence_detail') or '').strip()} "
+                    f"{str(causal_story.get('detail') or '').strip()} "
+                    f"{('Repair hint: ' + str(causal_story.get('repair_hint') or '').strip()) if str(causal_story.get('repair_hint') or '').strip() else ''}"
+                ).strip(),
+                tone=str(causal_story.get("tone") or "neutral"),
+            )
+        )
+        cards.append(
+            self._workspace_insight_card_html(
+                "Weakest link",
+                str(repair_summary.get("headline") or "Weakest link"),
+                str(repair_summary.get("detail") or ""),
+                tone=str(repair_summary.get("tone") or "accent"),
+            )
+        )
+
+        if analysis_mode == "one_to_all" and infl_lens.get("fanout_feature"):
+            examples = ", ".join(
+                f"{sig} {corr:+.2f}" for sig, corr in infl_lens.get("fanout_examples", [])[:3]
+            )
+            detail = (
+                f"{infl_lens.get('fanout_feature')} reaches {int(infl_lens.get('fanout_count', 0) or 0)}/"
+                f"{int(infl_lens.get('signal_count', 0) or 0)} signals at |corr|≥"
+                f"{float(infl_lens.get('strong_threshold', 0.45) or 0.45):.2f}. "
+                f"t={float(infl_lens.get('time_s', 0.0) or 0.0):.3f}s."
+            )
+            if examples:
+                detail = f"{detail} Strongest fan-out: {examples}."
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Driver fan-out",
+                    f"{infl_lens.get('fanout_feature')} -> {int(infl_lens.get('fanout_count', 0) or 0)} signals",
+                    detail,
+                    tone="ok" if int(infl_lens.get("fanout_count", 0) or 0) >= 2 else "accent",
+                )
+            )
+        elif analysis_mode == "all_to_one" and infl_lens.get("target_signal"):
+            examples = ", ".join(
+                f"{feat} {corr:+.2f}" for feat, corr in infl_lens.get("target_examples", [])[:3]
+            )
+            detail = (
+                f"Target signal {infl_lens.get('target_signal')} is ranked against "
+                f"{int(infl_lens.get('feature_count', 0) or 0)} meta drivers at "
+                f"t={float(infl_lens.get('time_s', 0.0) or 0.0):.3f}s."
+            )
+            if examples:
+                detail = f"{detail} Top drivers: {examples}."
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Target drivers",
+                    str(infl_lens.get("target_signal") or "Target signal"),
+                    detail,
+                    tone="ok" if len(infl_lens.get("target_examples", []) or []) >= 2 else "accent",
+                )
+            )
+        elif analysis_mode == "all_to_all" and infl_lens.get("top_pair_feature"):
+            detail = (
+                f"Strong links: {int(infl_lens.get('strong_links', 0) or 0)}/"
+                f"{int(infl_lens.get('total_links', 0) or 0)} "
+                f"({100.0 * float(infl_lens.get('density', 0.0) or 0.0):.0f}% dense) at "
+                f"t={float(infl_lens.get('time_s', 0.0) or 0.0):.3f}s. "
+                f"Dominant corridor: {infl_lens.get('top_pair_feature')} -> {infl_lens.get('top_pair_signal')} "
+                f"({float(infl_lens.get('top_pair_corr', 0.0) or 0.0):+.2f})."
+            )
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Coupling field",
+                    f"{int(infl_lens.get('strong_links', 0) or 0)} strong links in play",
+                    detail,
+                    tone="ok" if float(infl_lens.get("density", 0.0) or 0.0) >= 0.25 else "accent",
+                )
+            )
+
+        if analysis_mode == "all_to_all":
+            if mv_lens:
+                keep_mode = str(mv_lens.get("keep_mode") or "sparse-first")
+                keep_focus = (
+                    "preserving sparse contours and outliers"
+                    if keep_mode == "sparse-first"
+                    else "preserving dense regime cores"
+                )
+                peb_signal = str(mv_lens.get("peb_signal") or "")
+                pebbles = bool(mv_lens.get("pebbles", False))
+                if pebbles and peb_signal:
+                    pebbles_text = f"Pebbles pin event structure from {peb_signal} ({mv_lens.get('peb_mode', 'occurred')})."
+                elif pebbles:
+                    pebbles_text = "Pebbles are on, but pick a discrete signal so event grains can separate clusters."
+                else:
+                    pebbles_text = "Pebbles are off, so the view is showing only cloud geometry."
+                dims_preview = ", ".join([str(x) for x in mv_lens.get("checked_dims", [])[:4]])
+                if int(mv_lens.get("runs", 0) or 0) < 3:
+                    mv_headline = "Need more runs for cloud scouting"
+                    mv_tone = "neutral"
+                elif int(mv_lens.get("checked_dim_count", 0) or 0) < 3:
+                    mv_headline = "Need 3 checked dimensions"
+                    mv_tone = "accent"
+                elif int(mv_lens.get("keep_pct", 100) or 100) <= 15 and int(mv_lens.get("runs", 0) or 0) >= 4:
+                    mv_headline = "Cloud is very thin"
+                    mv_tone = "warn"
+                else:
+                    mv_headline = "Melting cloud ready"
+                    mv_tone = "ok"
+                mv_detail = (
+                    f"Fields={int(mv_lens.get('field_count', 0) or 0)}, checked={int(mv_lens.get('checked_dim_count', 0) or 0)}"
+                    f" ({dims_preview or 'auto'}). Keep={int(mv_lens.get('keep_pct', 100) or 100)}% -> ~"
+                    f"{int(mv_lens.get('approx_cloud_points', 0) or 0)}/{int(mv_lens.get('runs', 0) or 0)} points, "
+                    f"{keep_mode} means {keep_focus}. 3D={mv_lens.get('x') or '—'}/{mv_lens.get('y') or '—'}/{mv_lens.get('z') or '—'}; "
+                    f"color={mv_lens.get('color3d') or '—'}; metric={mv_lens.get('metric') or 'RMS'}. "
+                    f"{'Current view only.' if mv_lens.get('use_view') else 'Whole-run metrics.'} {pebbles_text}"
+                )
+                cards.append(
+                    self._workspace_insight_card_html(
+                        "Cloud / pebbles",
+                        mv_headline,
+                        mv_detail,
+                        tone=mv_tone,
+                    )
+                )
+            else:
+                cards.append(
+                    self._workspace_insight_card_html(
+                        "Cloud / pebbles",
+                        "Build multivariate field",
+                        "Select 2+ runs and 1+ signals so the window can derive run-level fields for SPLOM, 3D melting cloud and pebbles-on-sand overlays.",
+                        tone="neutral",
+                    )
+                )
 
         if heat.get("signal"):
             cards.append(
@@ -2251,6 +4055,55 @@ class CompareViewer(QtWidgets.QMainWindow):
                 )
             )
 
+        if bool(events.get("no_signals_selected", False)):
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Event context",
+                    "Event filter is muted",
+                    "No event signals are selected right now. Pick one or more event channels so local triggers can support the current explanation.",
+                    tone="accent",
+                )
+            )
+        elif events_rows > 0:
+            event_headline = "Visible event context"
+            event_detail = (
+                f"Baseline={events.get('baseline') or '—'}, visible rows={int(events.get('rows', events_rows) or events_rows)}"
+                f"/{int(events.get('source_rows', events_rows) or events_rows)}."
+            )
+            if events_focus:
+                event_detail = f"{event_detail} First visible anchor: {events_focus}."
+            if events.get("top_signal"):
+                event_detail = (
+                    f"{event_detail} Dominant visible event is {events.get('top_signal')} "
+                    f"({int(events.get('top_count', 0) or 0)} row(s))."
+                )
+            if analysis_mode == "one_to_all":
+                event_headline = f"Trigger gate: {events.get('top_signal') or events.get('sample_signal') or 'events'}"
+                event_detail = f"{event_detail} Use this trigger gate to test whether one driver fans out into several responses."
+            elif analysis_mode == "all_to_one":
+                event_headline = f"Target-side trigger: {events.get('top_signal') or events.get('sample_signal') or 'events'}"
+                event_detail = f"{event_detail} Use this local event context to confirm or reject the current target-driver explanation."
+            elif analysis_mode == "all_to_all":
+                event_headline = f"Pebble anchor: {events.get('top_signal') or events.get('sample_signal') or 'events'}"
+                event_detail = f"{event_detail} Compare these grains with cloud clusters to see whether separation is event-driven."
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Event context",
+                    event_headline,
+                    event_detail,
+                    tone="ok" if events_focus else "accent",
+                )
+            )
+        elif int(events.get("source_rows", 0) or 0) > 0:
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Event context",
+                    "No visible events after filtering",
+                    "The baseline run has event rows, but none are currently visible. Revisit the event filter or the current reference run.",
+                    tone="accent",
+                )
+            )
+
         if not runs:
             quality_headline = "Load a compare set"
             quality_detail = "Open 2+ NPZ runs to unlock heatmaps, QA and multivariate clustering."
@@ -2263,6 +4116,8 @@ class CompareViewer(QtWidgets.QMainWindow):
             )
             if qa_focus:
                 quality_detail = f"{quality_detail} {qa_focus}"
+            if events_focus:
+                quality_detail = f"{quality_detail} Event anchor: {events_focus}."
             quality_tone = "alert" if qa_err > 0 else "warn"
         elif qa_issues > 0:
             quality_headline = f"QA flagged {qa_issues} issue(s)"
@@ -2272,6 +4127,8 @@ class CompareViewer(QtWidgets.QMainWindow):
             )
             if qa_focus:
                 quality_detail = f"{quality_detail} {qa_focus}"
+            if events_focus:
+                quality_detail = f"{quality_detail} Event anchor: {events_focus}."
             quality_tone = "warn" if qa_err == 0 else "alert"
         elif len(runs) >= 3 and len(sigs) >= 3:
             quality_headline = "Ready for all-to-all scouting"
@@ -2294,6 +4151,14 @@ class CompareViewer(QtWidgets.QMainWindow):
                 quality_headline,
                 quality_detail,
                 tone=quality_tone,
+            )
+        )
+        cards.append(
+            self._workspace_insight_card_html(
+                "Heuristic next move",
+                str(next_move.get("headline") or "Next move"),
+                str(next_move.get("detail") or ""),
+                tone=str(next_move.get("tone") or "accent"),
             )
         )
 
@@ -2320,11 +4185,185 @@ class CompareViewer(QtWidgets.QMainWindow):
         }
         return labels.get(mode, mode)
 
+    def _set_workspace_dock_title(self, attr: str, title: str) -> None:
+        dock = getattr(self, attr, None)
+        if not isinstance(dock, QtWidgets.QDockWidget):
+            return
+        try:
+            dock.setWindowTitle(str(title))
+        except Exception:
+            pass
+
+    def _update_workspace_window_title(
+        self,
+        *,
+        analysis_mode: str,
+        anchor_label: str,
+        ref: str,
+        runs_count: int,
+        sig_count: int,
+        table: str,
+    ) -> None:
+        base = str(getattr(self, "_window_title_base", "") or "Pneumo: NPZ Compare Viewer")
+        parts: List[str] = []
+        lens_label = self._workspace_analysis_label()
+        if lens_label:
+            parts.append(f"Lens {lens_label}")
+        anchor = str(anchor_label or "").strip()
+        if anchor and ("—" not in anchor):
+            if len(anchor) > 42:
+                anchor = f"{anchor[:39]}..."
+            parts.append(anchor)
+        if ref and ref != "—":
+            parts.append(f"Ref {ref}")
+        if table and table != "—":
+            parts.append(f"Table {table}")
+        if runs_count or sig_count:
+            parts.append(f"{int(runs_count)} run(s) / {int(sig_count)} signal(s)")
+        title = base if not parts else f"{base} | {' | '.join(parts)}"
+        try:
+            self.setWindowTitle(title)
+        except Exception:
+            pass
+
+    def _workspace_export_slugify(self, value: str, *, fallback: str = "") -> str:
+        txt = str(value or "").strip().lower()
+        if not txt:
+            return fallback
+        txt = txt.replace("->", "_to_").replace("→", "_to_").replace("Δ", "delta").replace("δ", "delta")
+        txt = re.sub(r"[^a-z0-9]+", "_", txt)
+        txt = txt.strip("_")
+        return txt or fallback
+
+    def _workspace_export_context_slug(self) -> str:
+        analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        runs = list(self._selected_runs()) if hasattr(self, "list_runs") else []
+        ref = str(self._reference_run_label(runs) or "").strip()
+        table = str(getattr(self, "current_table", "") or "").strip()
+        infl_lens = self._workspace_influence_lens_summary()
+        mv_lens = self._workspace_multivar_lens_summary()
+        anchor = self._workspace_analysis_anchor_label(
+            analysis_mode=analysis_mode,
+            infl_lens=infl_lens,
+            mv_lens=mv_lens,
+        )
+
+        parts: List[str] = []
+        lens_slug = self._workspace_export_slugify(analysis_mode, fallback="all_to_all")
+        if lens_slug:
+            parts.append(f"lens_{lens_slug}")
+        anchor_slug = self._workspace_export_slugify(anchor)
+        if anchor_slug and ("cloud" not in anchor_slug or len(anchor_slug) > 5):
+            parts.append(anchor_slug[:36].rstrip("_"))
+        ref_slug = self._workspace_export_slugify(ref)
+        if ref_slug:
+            parts.append(f"ref_{ref_slug[:20]}")
+        table_slug = self._workspace_export_slugify(table)
+        if table_slug:
+            parts.append(f"table_{table_slug[:20]}")
+        slug = "__".join([p for p in parts if p]).strip("_")
+        if len(slug) > 96:
+            slug = slug[:96].rstrip("_")
+        return slug
+
+    def _workspace_export_filename(self, stem: str, *, suffix: str = ".png") -> str:
+        base = self._workspace_export_slugify(stem, fallback="compare")
+        ctx = self._workspace_export_context_slug()
+        if ctx:
+            return f"{base}__{ctx}{suffix}"
+        return f"{base}{suffix}"
+
+    def _update_workspace_dock_titles(
+        self,
+        *,
+        analysis_mode: str,
+        anchor_label: str,
+        qa_issues: int,
+        events_rows: int,
+    ) -> None:
+        mode = str(analysis_mode or "all_to_all")
+        anchor = str(anchor_label or "").strip()
+        anchor_ready = "—" not in anchor if anchor else False
+        trust_visible = bool(getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible())
+        infl_lens = self._workspace_influence_lens_summary()
+        mv_lens = self._workspace_multivar_lens_summary()
+        events = dict(getattr(self, "_insight_events", {}) or {})
+        causal_story = self._workspace_causal_story_summary(
+            analysis_mode=mode,
+            heat=dict(getattr(self, "_insight_heat", {}) or {}),
+            infl=dict(getattr(self, "_insight_infl", {}) or {}),
+            infl_lens=infl_lens,
+            events=events,
+            trust_visible=trust_visible,
+            qa_issues=int(qa_issues or 0),
+        )
+        follow_target = self._workspace_follow_target_summary(
+            analysis_mode=mode,
+            trust_visible=trust_visible,
+            qa_issues=int(qa_issues or 0),
+            events_rows=int(events_rows or 0),
+            events_insight=events,
+            causal_story=causal_story,
+        )
+        repair_lane = str(causal_story.get("repair_lane") or "").strip()
+        repair_badge = ""
+        if repair_lane in {"heatmaps", "qa", "multivariate"}:
+            repair_badge = " | Validation lane" if str(causal_story.get("confidence") or "").strip() == "aligned" else " | Repair lane"
+        target_attr = str(follow_target.get("dock_attr") or "").strip()
+        target_badge = ""
+        if target_attr:
+            target_badge = (
+                " | Validation target"
+                if str(causal_story.get("confidence") or "").strip() == "aligned"
+                else " | Follow target"
+            )
+
+        self._set_workspace_dock_title("dock_controls", "Controls")
+
+        heat_suffix = ""
+        if mode in {"one_to_all", "all_to_one"} and anchor_ready:
+            heat_suffix = f" | {anchor}"
+        heat_lane_suffix = repair_badge if repair_lane == "heatmaps" else ""
+        heat_follow_suffix = target_badge if target_attr == "dock_heatmap" else ""
+        infl_follow_suffix = target_badge if target_attr == "dock_influence" else ""
+        inflheat_follow_suffix = target_badge if target_attr == "dock_inflheat" else ""
+        self._set_workspace_dock_title("dock_heatmap", f"Δ(t) Heatmap{heat_suffix}{heat_lane_suffix}{heat_follow_suffix}")
+        self._set_workspace_dock_title("dock_influence", f"Influence(t): meta → signals{heat_suffix}{heat_lane_suffix}{infl_follow_suffix}")
+        self._set_workspace_dock_title("dock_inflheat", f"Influence(t) Heatmap{heat_suffix}{heat_lane_suffix}{inflheat_follow_suffix}")
+
+        multivar_title = "Multivariate: SPLOM / Parallel / 3D"
+        if mode == "all_to_all" and anchor_ready:
+            multivar_title = f"{multivar_title} | {anchor}"
+        if repair_lane == "multivariate":
+            multivar_title = f"{multivar_title}{repair_badge}"
+        if target_attr == "dock_multivar":
+            multivar_title = f"{multivar_title}{target_badge}"
+        self._set_workspace_dock_title("dock_multivar", multivar_title)
+
+        qa_title = "QA: suspicious signals"
+        if int(qa_issues or 0) > 0:
+            qa_title = f"{qa_title} | {int(qa_issues)} issue(s)"
+        if repair_lane == "qa":
+            qa_title = f"{qa_title}{repair_badge}"
+        if target_attr == "dock_qa":
+            qa_title = f"{qa_title}{target_badge}"
+        self._set_workspace_dock_title("dock_qa", qa_title)
+
+        events_title = "Events"
+        if int(events_rows or 0) > 0:
+            events_title = f"{events_title} | {int(events_rows)} row(s)"
+        if repair_lane == "qa":
+            events_title = f"{events_title}{repair_badge}"
+        if target_attr == "dock_events":
+            events_title = f"{events_title}{target_badge}"
+        self._set_workspace_dock_title("dock_events", events_title)
+
     def _update_workspace_status(self) -> None:
         runs = list(self._selected_runs()) if hasattr(self, "list_runs") else []
         sigs = list(self._selected_signals()) if hasattr(self, "list_signals") else []
         table = str(getattr(self, "current_table", "") or "—")
         ref = str(self._reference_run_label(runs) or "—")
+        analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
         total_docks = len(self._iter_workspace_docks())
         visible_docks = 0
         for dock in self._iter_workspace_docks():
@@ -2339,19 +4378,83 @@ class CompareViewer(QtWidgets.QMainWindow):
                 events_rows = int(self.tbl_events.rowCount())
         except Exception:
             events_rows = 0
+        events_insight = dict(getattr(self, "_insight_events", {}) or {})
 
         qa_text = str(getattr(self, "lbl_qa_summary", None).text() if getattr(self, "lbl_qa_summary", None) is not None else "QA —")
-        qa_issues = 0
+        qa_issues = int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
         try:
             if "issues=" in qa_text:
                 qa_issues = int(str(qa_text).split("issues=", 1)[1].split()[0].split("(", 1)[0].rstrip(",)"))
         except Exception:
-            qa_issues = 0
+            qa_issues = int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
         trust_visible = bool(getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible())
+        infl_lens = self._workspace_influence_lens_summary()
+        mv_lens = self._workspace_multivar_lens_summary()
+        anchor_label = self._workspace_analysis_anchor_label(
+            analysis_mode=analysis_mode,
+            infl_lens=infl_lens,
+            mv_lens=mv_lens,
+        )
+        causal_story = self._workspace_causal_story_summary(
+            analysis_mode=analysis_mode,
+            heat=dict(getattr(self, "_insight_heat", {}) or {}),
+            infl=dict(getattr(self, "_insight_infl", {}) or {}),
+            infl_lens=infl_lens,
+            events=events_insight,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+        )
+        recommended_focus = self._workspace_contextual_focus_recommendation(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+            events_rows=events_rows,
+            events_insight=events_insight,
+            causal_story=causal_story,
+        )
+        story_label = self._workspace_causal_story_label(causal_story)
+        story_confidence = str(causal_story.get("confidence") or "").strip()
+        repair_summary = self._workspace_repair_lane_summary(
+            causal_story=causal_story,
+            analysis_mode=analysis_mode,
+        )
+        follow_target = self._workspace_follow_target_summary(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+            events_rows=events_rows,
+            events_insight=events_insight,
+            causal_story=causal_story,
+        )
+        focus_labels = {
+            "all": "all",
+            "heatmaps": "heatmaps",
+            "multivariate": "multivar",
+            "qa": "qa/events",
+        }
+        recommended_focus_label = focus_labels.get(str(recommended_focus), str(recommended_focus or "all"))
 
         selection_text = f"Runs {len(runs)} | Table {table} | Signals {len(sigs)}"
-        quality_text = f"Events {events_rows} | {'Trust attention' if trust_visible else 'Trust ok'} | QA {qa_issues}"
-        layout_text = f"Focus {self._workspace_focus_label()} | Docks {visible_docks}/{total_docks} | Ref {ref}"
+        weakest_status = str(repair_summary.get("status_label") or "").strip()
+        next_target_status = (
+            f"{str(follow_target.get('focus_label') or recommended_focus_label)}: "
+            f"{str(follow_target.get('dock_label') or 'dock')}"
+        )
+        quality_text = (
+            f"Events {events_rows} | {'Trust attention' if trust_visible else 'Trust ok'} | "
+            f"QA {qa_issues} | Next {next_target_status}"
+        )
+        if weakest_status:
+            quality_text = f"{quality_text} | Weakest {weakest_status}"
+        layout_text = (
+            f"Focus {self._workspace_focus_label()} | Lens {self._workspace_analysis_label()} | "
+            f"{anchor_label} | Docks {visible_docks}/{total_docks} | Ref {ref}"
+        )
+        if story_label:
+            if story_confidence:
+                layout_text = f"{layout_text} | Story {story_confidence}: {story_label}"
+            else:
+                layout_text = f"{layout_text} | Story {story_label}"
 
         try:
             self.lbl_status_selection.setText(selection_text)
@@ -2365,8 +4468,35 @@ class CompareViewer(QtWidgets.QMainWindow):
             self._set_status_chip_tone(self.lbl_status_quality, "warn" if qa_issues < 10 else "alert")
         else:
             self._set_status_chip_tone(self.lbl_status_quality, "ok" if runs else "neutral")
-        self._set_status_chip_tone(self.lbl_status_layout, "accent" if visible_docks else "neutral")
+        anchor_ready = "—" not in str(anchor_label or "")
+        self._set_status_chip_tone(
+            self.lbl_status_layout,
+            "ok" if (visible_docks and anchor_ready) else ("accent" if visible_docks else "neutral"),
+        )
+        self._update_workspace_window_title(
+            analysis_mode=analysis_mode,
+            anchor_label=anchor_label,
+            ref=ref,
+            runs_count=len(runs),
+            sig_count=len(sigs),
+            table=table,
+        )
+        self._update_workspace_dock_titles(
+            analysis_mode=analysis_mode,
+            anchor_label=anchor_label,
+            qa_issues=qa_issues,
+            events_rows=events_rows,
+        )
         self._sync_workspace_focus_buttons()
+        self._sync_workspace_analysis_buttons()
+        self._sync_workspace_analysis_actions(current_mode=analysis_mode)
+        self._update_workspace_focus_button_hints(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+        )
+        self._update_workspace_analysis_button_hints(current_mode=analysis_mode)
+        self._update_workspace_analysis_action_hints(current_mode=analysis_mode)
         self._update_workspace_assistant()
         self._update_workspace_insights()
 
@@ -2534,6 +4664,40 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._raise_dock(active_dock)
         self._update_workspace_status()
 
+    def _follow_workspace_heuristic_focus(self) -> None:
+        analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        events_rows = 0
+        try:
+            if getattr(self, "tbl_events", None) is not None:
+                events_rows = int(self.tbl_events.rowCount())
+        except Exception:
+            events_rows = 0
+        qa_issues = int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
+        trust_visible = bool(getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible())
+        events = dict(getattr(self, "_insight_events", {}) or {})
+        causal_story = self._workspace_causal_story_summary(
+            analysis_mode=analysis_mode,
+            heat=dict(getattr(self, "_insight_heat", {}) or {}),
+            infl=dict(getattr(self, "_insight_infl", {}) or {}),
+            infl_lens=self._workspace_influence_lens_summary(),
+            events=events,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+        )
+        follow_target = self._workspace_follow_target_summary(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+            events_rows=events_rows,
+            events_insight=events,
+            causal_story=causal_story,
+        )
+        focus = str(follow_target.get("focus") or "all")
+        self._focus_workspace_preset(focus)
+        dock = getattr(self, str(follow_target.get("dock_attr") or ""), None)
+        if isinstance(dock, QtWidgets.QDockWidget):
+            self._raise_dock(dock)
+
     def _build_view_menu(self) -> None:
         m = self.menuBar()
         view_menu = m.addMenu("View")
@@ -2573,6 +4737,41 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.act_view_focus_qa.triggered.connect(lambda: self._focus_workspace_preset("qa"))
         layout_menu.addAction(self.act_view_focus_qa)
 
+        self.act_view_focus_hint = QtGui.QAction("Follow Weakest Link", self)
+        self.act_view_focus_hint.setObjectName("act_view_focus_hint")
+        self.act_view_focus_hint.setShortcut("Ctrl+Shift+4")
+        self.act_view_focus_hint.triggered.connect(self._follow_workspace_heuristic_focus)
+        layout_menu.addAction(self.act_view_focus_hint)
+
+        analysis_menu = view_menu.addMenu("Analysis Lens")
+        self.menu_view_analysis = analysis_menu
+        self._workspace_analysis_action_group = QtGui.QActionGroup(self)
+        self._workspace_analysis_action_group.setExclusive(True)
+
+        self.act_view_analysis_one_to_all = QtGui.QAction("1 -> all", self)
+        self.act_view_analysis_one_to_all.setObjectName("act_view_analysis_one_to_all")
+        self.act_view_analysis_one_to_all.setCheckable(True)
+        self.act_view_analysis_one_to_all.setShortcut("Ctrl+Alt+1")
+        self.act_view_analysis_one_to_all.triggered.connect(lambda: self._set_workspace_analysis_mode("one_to_all"))
+        self._workspace_analysis_action_group.addAction(self.act_view_analysis_one_to_all)
+        analysis_menu.addAction(self.act_view_analysis_one_to_all)
+
+        self.act_view_analysis_all_to_one = QtGui.QAction("all -> 1", self)
+        self.act_view_analysis_all_to_one.setObjectName("act_view_analysis_all_to_one")
+        self.act_view_analysis_all_to_one.setCheckable(True)
+        self.act_view_analysis_all_to_one.setShortcut("Ctrl+Alt+2")
+        self.act_view_analysis_all_to_one.triggered.connect(lambda: self._set_workspace_analysis_mode("all_to_one"))
+        self._workspace_analysis_action_group.addAction(self.act_view_analysis_all_to_one)
+        analysis_menu.addAction(self.act_view_analysis_all_to_one)
+
+        self.act_view_analysis_all_to_all = QtGui.QAction("all -> all", self)
+        self.act_view_analysis_all_to_all.setObjectName("act_view_analysis_all_to_all")
+        self.act_view_analysis_all_to_all.setCheckable(True)
+        self.act_view_analysis_all_to_all.setShortcut("Ctrl+Alt+3")
+        self.act_view_analysis_all_to_all.triggered.connect(lambda: self._set_workspace_analysis_mode("all_to_all"))
+        self._workspace_analysis_action_group.addAction(self.act_view_analysis_all_to_all)
+        analysis_menu.addAction(self.act_view_analysis_all_to_all)
+
         docks_menu = view_menu.addMenu("Docks")
         self.menu_view_docks = docks_menu
         dock_specs = (
@@ -2590,6 +4789,9 @@ class CompareViewer(QtWidgets.QMainWindow):
             act = dock.toggleViewAction()
             act.setText(text)
             docks_menu.addAction(act)
+
+        self._sync_workspace_analysis_actions()
+        self._update_workspace_analysis_action_hints()
 
 
 
@@ -2641,6 +4843,45 @@ class CompareViewer(QtWidgets.QMainWindow):
             "Rows = Signals (в порядке выбора), Cols = Runs (в порядке выбора).\n"
             "Наведи мышь на ячейку: покажу полные подписи."
         )
+
+    def _heatmap_status_text(
+        self,
+        *,
+        metric: str,
+        mode: str,
+        ref_label: str,
+        runs_count: int,
+        sigs_count: int,
+        hotspot_signal: str,
+        hotspot_run: str,
+        hotspot_time: float,
+        hotspot_peak: float,
+    ) -> str:
+        mode_txt = f"Δ vs {ref_label}" if str(mode) == "delta" else "value"
+        line1 = (
+            f"Rows=Signals | Cols=Runs | metric={metric} | mode={mode_txt} | "
+            f"runs={int(runs_count)} | signals={int(sigs_count)}"
+        )
+        if hotspot_signal and hotspot_run and np.isfinite(float(hotspot_time)) and np.isfinite(float(hotspot_peak)):
+            line2 = (
+                f"Hotspot: {hotspot_signal} in {hotspot_run} @ {float(hotspot_time):.4f}s "
+                f"(peak {float(hotspot_peak):.3g})"
+            )
+        else:
+            line2 = "Hotspot: move through time to find the strongest local divergence."
+
+        analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        if analysis_mode == "one_to_all":
+            hint = "Use the hotspot as a gate, then check Influence(t) to see whether one driver fans out across nearby signals."
+        elif analysis_mode == "all_to_one":
+            target_sig = self._workspace_analysis_target_signal([str(hotspot_signal)]) if str(hotspot_signal or "").strip() else ""
+            hint = (
+                f"Treat {target_sig or hotspot_signal or 'the hotspot signal'} as the target and test which drivers still explain it around this time."
+            )
+        else:
+            hint = "Use the hotspot as a time-local gate, then compare it against cloud clusters and the dominant influence corridor."
+        line3 = f"Heuristic: {hint}"
+        return "\n".join([line1, line2, line3])
 
     def _build_heatmap_dock(self):
         dock = QtWidgets.QDockWidget("Δ(t) Heatmap", self)
@@ -2894,7 +5135,20 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             pass
         try:
-            self.lbl_heat_note.setText(self._heatmap_default_note())
+            heat_info = dict(getattr(self, "_insight_heat", {}) or {})
+            self.lbl_heat_note.setText(
+                self._heatmap_status_text(
+                    metric=metric,
+                    mode=mode,
+                    ref_label=str(ref.label),
+                    runs_count=len(runs),
+                    sigs_count=len(sigs_use),
+                    hotspot_signal=str(heat_info.get("signal") or ""),
+                    hotspot_run=str(heat_info.get("run") or ""),
+                    hotspot_time=float(heat_info.get("time_s", float("nan")) or float("nan")),
+                    hotspot_peak=float(heat_info.get("peak", float("nan")) or float("nan")),
+                )
+            )
         except Exception:
             pass
         try:
@@ -3174,6 +5428,102 @@ class CompareViewer(QtWidgets.QMainWindow):
             "Совет: включите Δ-mode, чтобы видеть влияние на Δ(signal) относительно reference run."
         )
 
+    def _update_inflheat_note_for_index(self, idx: int) -> None:
+        cube_obj = getattr(self, "_inflheat", None)
+        if cube_obj is None:
+            try:
+                self.lbl_inflheat_note.setText(self._inflheat_default_note())
+            except Exception:
+                pass
+            return
+
+        try:
+            tH = np.asarray(getattr(self, "_inflheat_t", np.asarray([])), dtype=float)
+            C = np.asarray(getattr(cube_obj, "cube", np.asarray([])), dtype=float)
+            sigs = list(getattr(self, "_inflheat_sig_labels", []) or [])
+            feats = list(getattr(self, "_inflheat_feat_labels", []) or [])
+            if C.ndim != 3 or C.size == 0 or not sigs or not feats or tH.size == 0:
+                self.lbl_inflheat_note.setText(self._inflheat_default_note())
+                return
+            idx = max(0, min(int(idx), int(len(tH) - 1), int(C.shape[0] - 1)))
+            frame = np.asarray(C[idx], dtype=float)  # (n_feat, n_sig)
+            if frame.ndim != 2 or frame.size == 0 or not np.isfinite(frame).any():
+                self.lbl_inflheat_note.setText(self._inflheat_default_note())
+                return
+        except Exception:
+            try:
+                self.lbl_inflheat_note.setText(self._inflheat_default_note())
+            except Exception:
+                pass
+            return
+
+        analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        mode = str(getattr(self, "_inflheat_mode", "value") or "value")
+        ref_label = str(getattr(self, "_inflheat_ref_label", "") or "")
+        runs_count = int(getattr(self, "_inflheat_runs_count", 0) or 0)
+        t0 = float(tH[idx])
+        abs_frame = np.abs(frame)
+        finite = np.isfinite(frame)
+        abs_rank = np.nan_to_num(abs_frame, nan=-1.0, posinf=-1.0, neginf=-1.0)
+        strong_thr = 0.45
+        strong_mask = finite & (abs_frame >= strong_thr)
+
+        line1 = (
+            f"X=Signals | Y=Meta | t={t0:.4f}s | runs={runs_count} | sigs={len(sigs)} | meta={len(feats)} | "
+            f"mode={'Δ vs ' + ref_label if mode == 'delta' and ref_label else mode}"
+        )
+
+        if analysis_mode == "one_to_all":
+            row_counts = np.asarray([int(strong_mask[i].sum()) for i in range(frame.shape[0])], dtype=int)
+            row_mean = np.asarray(
+                [
+                    float(np.nanmean(np.where(finite[i], abs_frame[i], np.nan))) if np.isfinite(np.where(finite[i], abs_frame[i], np.nan)).any() else float("nan")
+                    for i in range(frame.shape[0])
+                ],
+                dtype=float,
+            )
+            fan_idx = max(
+                range(frame.shape[0]),
+                key=lambda i: (
+                    int(row_counts[i]),
+                    float(np.nan_to_num(row_mean[i], nan=-1.0)),
+                ),
+            )
+            fan_order = np.argsort(np.nan_to_num(np.where(finite[fan_idx], abs_frame[fan_idx], np.nan), nan=-1.0))[::-1]
+            examples = []
+            for j in fan_order[:3]:
+                if finite[fan_idx, int(j)]:
+                    examples.append(f"{sigs[int(j)]} {float(frame[fan_idx, int(j)]):+.2f}")
+            line2 = (
+                f"Frame fan-out: {feats[fan_idx]} -> {int(row_counts[fan_idx])}/{len(sigs)} signals at |corr|≥{strong_thr:.2f}"
+                + (f" | top: {', '.join(examples)}" if examples else "")
+            )
+            line3 = "Heuristic: sweep nearby frames to see whether one driver stays broad or collapses to a local hotspot."
+        elif analysis_mode == "all_to_one":
+            target_sig = self._workspace_analysis_target_signal(sigs)
+            target_idx = sigs.index(target_sig) if target_sig in sigs else int(np.argmax(np.nan_to_num(np.nanmean(np.where(finite, abs_frame, np.nan), axis=0), nan=-1.0)))
+            col = frame[:, target_idx]
+            col_rank = np.nan_to_num(np.abs(col), nan=-1.0, posinf=-1.0, neginf=-1.0)
+            feat_idx = int(np.argmax(col_rank))
+            line2 = f"Target: {sigs[target_idx]} | lead driver at this frame: {feats[feat_idx]} ({float(frame[feat_idx, target_idx]):+.2f})"
+            line3 = "Heuristic: keep the target fixed and watch whether the driver ranking swaps as time moves."
+        else:
+            k_top = int(np.argmax(abs_rank))
+            i_top, j_top = int(k_top // frame.shape[1]), int(k_top % frame.shape[1])
+            strong_links = int(strong_mask.sum())
+            total_links = int(finite.sum())
+            density = (100.0 * float(strong_links) / float(total_links)) if total_links else 0.0
+            line2 = (
+                f"Frame corridor: {feats[i_top]} -> {sigs[j_top]} ({float(frame[i_top, j_top]):+.2f}) | "
+                f"strong links {strong_links}/{total_links} ({density:.0f}% dense)"
+            )
+            line3 = "Heuristic: use this frame as a gate, then compare it against cloud clusters and the dominant scatter corridor."
+
+        try:
+            self.lbl_inflheat_note.setText("\n".join([line1, line2, line3]))
+        except Exception:
+            pass
+
     def _rebuild_infl_heatmap(self):
         if not hasattr(self, "chk_inflheat"):
             return
@@ -3291,6 +5641,9 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._inflheat_t = tH
         self._inflheat_sig_labels = list(cube_obj.sigs)
         self._inflheat_feat_labels = list(cube_obj.feat_names)
+        self._inflheat_mode = str(mode)
+        self._inflheat_ref_label = str(ref.label)
+        self._inflheat_runs_count = int(len(runs))
 
         try:
             self.imv_inflheat.setImage(img, xvals=tH, autoLevels=False)
@@ -3306,7 +5659,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             pass
         try:
-            self.lbl_inflheat_note.setText(self._inflheat_default_note())
+            self._update_inflheat_note_for_index(0)
         except Exception:
             pass
         try:
@@ -3328,6 +5681,9 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._inflheat_t = np.zeros(0, dtype=float)
         self._inflheat_sig_labels = []
         self._inflheat_feat_labels = []
+        self._inflheat_mode = ""
+        self._inflheat_ref_label = ""
+        self._inflheat_runs_count = 0
         try:
             if self.imv_inflheat is not None:
                 blank = np.zeros((1, 1, 1), dtype=float)
@@ -3360,6 +5716,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             idx = max(0, min(idx, int(len(self._inflheat_t) - 1)))
             if hasattr(self.imv_inflheat, "setCurrentIndex"):
                 self.imv_inflheat.setCurrentIndex(idx)
+            self._update_inflheat_note_for_index(idx)
         except Exception:
             return
 
@@ -4062,6 +6419,52 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             pass
 
+    def _multivar_status_text(
+        self,
+        *,
+        runs_count: int,
+        sigs_count: int,
+        field_count: int,
+        metric: str,
+        delta_mode: bool,
+        dims: List[str],
+        xcol: str,
+        ycol: str,
+        zcol: str,
+        keep_pct: int,
+        keep_mode: str,
+        pebbles: bool,
+        peb_signal: str,
+        peb_mode: str,
+        use_view: bool,
+    ) -> str:
+        dims_preview = ", ".join([str(x) for x in dims[:4]])
+        line1 = (
+            f"Runs: {int(runs_count)} | Signals: {int(sigs_count)} | Fields: {int(field_count)} | "
+            f"Metric: {metric} | Δ-mode: {bool(delta_mode)}"
+        )
+        line2 = (
+            f"Dims: {dims_preview or 'auto'} | 3D: {xcol or '—'}/{ycol or '—'}/{zcol or '—'} | "
+            f"Keep {int(keep_pct)}% ({keep_mode}) | "
+            f"{'View-window metrics' if use_view else 'Whole-run metrics'}"
+        )
+        if pebbles:
+            peb_txt = f"Pebbles: {peb_signal} ({peb_mode})" if str(peb_signal or '').strip() else "Pebbles: choose event signal"
+        else:
+            peb_txt = "Pebbles: off"
+        if len(dims) < 3:
+            hint = "add 1-2 dims before scouting regimes"
+        elif int(keep_pct) <= 15 and int(runs_count) >= 4:
+            hint = "very thin cloud: good for outliers, weak for regime cores"
+        elif pebbles and (not str(peb_signal or '').strip()):
+            hint = "pick a pebble signal to test event-driven separation"
+        elif pebbles and str(peb_signal or '').strip():
+            hint = "compare cloud geometry with pebble-triggered grains"
+        else:
+            hint = "brush clusters back into compare plots"
+        line3 = f"{peb_txt} | Heuristic: {hint}"
+        return "\n".join([line1, line2, line3])
+
 
     def _update_multivar_views(self) -> None:
         """Compute multivariate table and render SPLOM/Parallel/3D."""
@@ -4214,8 +6617,23 @@ class CompareViewer(QtWidgets.QMainWindow):
 
             # status
             self.lbl_mv_status.setText(
-                f"Runs: {len(runs)} | Signals: {len(sigs)} | Fields: {len(dfp.columns)-1} | "
-                f"Metric: {metric} | Δ-mode: {bool(getattr(self,'chk_delta',None) and self.chk_delta.isChecked())}"
+                self._multivar_status_text(
+                    runs_count=len(runs),
+                    sigs_count=len(sigs),
+                    field_count=max(0, len(dfp.columns) - 1),
+                    metric=metric,
+                    delta_mode=bool(getattr(self, 'chk_delta', None) and self.chk_delta.isChecked()),
+                    dims=list(dims),
+                    xcol=xcol,
+                    ycol=ycol,
+                    zcol=zcol,
+                    keep_pct=int(round(keep_frac * 100.0)),
+                    keep_mode=keep_mode,
+                    pebbles=use_peb,
+                    peb_signal=peb_sig,
+                    peb_mode=peb_mode,
+                    use_view=use_view,
+                )
             )
 
         finally:
@@ -4811,6 +7229,85 @@ class CompareViewer(QtWidgets.QMainWindow):
         # First paint
         self._rebuild_qa(force=True)
 
+    def _qa_status_text(
+        self,
+        *,
+        table: str,
+        runs_count: int,
+        sigs_count: int,
+        sensitivity: str,
+        issues_count: int,
+        err_count: int,
+        warn_count: int,
+        top_run: str = "",
+        top_sig: str = "",
+        top_time_s: float = float("nan"),
+        top_severity: float = float("nan"),
+    ) -> str:
+        line1 = (
+            f"QA: issues={int(issues_count)} (err={int(err_count)}, warn={int(warn_count)}) | "
+            f"table={table or '—'} | runs={int(runs_count)} | sigs={int(sigs_count)} | sens={sensitivity}"
+        )
+        if int(issues_count) <= 0:
+            line2 = "Top suspect: none"
+        elif top_run and top_sig and np.isfinite(float(top_time_s)):
+            sev_txt = f" | sev={float(top_severity):g}" if np.isfinite(float(top_severity)) else ""
+            line2 = f"Top suspect: {top_sig} in {top_run} @ {float(top_time_s):.4f}s{sev_txt}"
+        else:
+            line2 = "Top suspect: see the brightest QA cell or first table row"
+
+        analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        if int(issues_count) <= 0:
+            if analysis_mode == "all_to_all":
+                hint = "No obvious QA blockers: compare cloud clusters with heatmap hotspots instead of debugging data quality first."
+            else:
+                hint = "No obvious QA blockers: move on to heatmaps / influence and test the current explanation."
+        elif analysis_mode == "one_to_all":
+            hint = "Use QA as a guardrail: if the hotspot is artefactual, do not trust fan-out conclusions yet."
+        elif analysis_mode == "all_to_one":
+            hint = "Validate the target waveform here before accepting any lead driver from Influence(t)."
+        else:
+            hint = "Treat QA as the veto layer before trusting cluster separation or corridor structure."
+        return "\n".join([line1, line2, f"Heuristic: {hint}"])
+
+    def _events_status_text(
+        self,
+        *,
+        baseline_label: str,
+        rows_count: int,
+        selected_signals: Sequence[str],
+        have_filter_items: bool,
+        no_signals_selected: bool,
+        sample_signal: str = "",
+        sample_time_s: float = float("nan"),
+    ) -> str:
+        pick = [str(x) for x in (selected_signals or []) if str(x).strip()]
+        line1 = (
+            f"Events: {int(rows_count)} | baseline={baseline_label or '—'} | "
+            f"filters={len(pick) if have_filter_items else 0}"
+        )
+        if no_signals_selected:
+            line2 = "Focus: no event signals selected"
+        elif sample_signal and np.isfinite(float(sample_time_s)):
+            line2 = f"Focus: {sample_signal} @ {float(sample_time_s):.4f}s"
+        elif sample_signal:
+            line2 = f"Focus: {sample_signal}"
+        elif rows_count > 0:
+            line2 = "Focus: earliest visible event"
+        else:
+            line2 = "Focus: no visible events"
+
+        analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        if no_signals_selected:
+            hint = "Pick one or more event signals to turn the table into an explanatory filter, not just a log."
+        elif analysis_mode == "one_to_all":
+            hint = "Check whether one discrete trigger propagates into several nearby response hotspots."
+        elif analysis_mode == "all_to_one":
+            hint = "Use nearby events to confirm or reject the current target-driver explanation."
+        else:
+            hint = "Compare these event grains with cloud clusters and pebbles to see whether structure is event-driven."
+        return "\n".join([line1, line2, f"Heuristic: {hint}"])
+
 
     def _build_events_dock(self):
         """Dock: discrete events table for baseline run (first selected)."""
@@ -4830,6 +7327,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         lay.addWidget(lbl)
 
         self.lbl_events_info = QtWidgets.QLabel("Events: none")
+        self.lbl_events_info.setWordWrap(True)
         lay.addWidget(self.lbl_events_info)
 
         self.tbl_events = QtWidgets.QTableWidget(0, 5)
@@ -5105,15 +7603,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         n_err = int(summ.get('n_err', 0) or 0)
         n_warn = int(summ.get('n_warn', 0) or 0)
 
-        try:
-            if n == 0:
-                self.lbl_qa_summary.setText("QA: явных проблем не найдено")
-            else:
-                self.lbl_qa_summary.setText(f"QA: issues={n} (err={n_err}, warn={n_warn})")
-        except Exception:
-            pass
         self._insight_qa = {"issues": int(n), "err": int(n_err), "warn": int(n_warn)}
-        self._update_workspace_status()
 
         run_labels = [r.label for r in runs]
         sig_labels = list(sigs)[:60]
@@ -5139,6 +7629,26 @@ class CompareViewer(QtWidgets.QMainWindow):
                 )
         except Exception:
             pass
+
+        try:
+            self.lbl_qa_summary.setText(
+                self._qa_status_text(
+                    table=table,
+                    runs_count=len(runs),
+                    sigs_count=len(sigs),
+                    sensitivity=sens,
+                    issues_count=n,
+                    err_count=n_err,
+                    warn_count=n_warn,
+                    top_run=str(self._insight_qa.get("top_run") or ""),
+                    top_sig=str(self._insight_qa.get("top_signal") or ""),
+                    top_time_s=float(self._insight_qa.get("top_time_s", np.nan)),
+                    top_severity=float(self._insight_qa.get("top_severity", np.nan)),
+                )
+            )
+        except Exception:
+            pass
+        self._update_workspace_status()
 
         # cell codes summary
         cell_codes = {}
@@ -5699,6 +8209,48 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             return QtGui.QColor(245, 245, 245)
 
+    def _influence_status_text(
+        self,
+        *,
+        t0: float,
+        runs_count: int,
+        sigs_count: int,
+        feat_all_count: int,
+        feat_sel_count: int,
+        use_delta: bool,
+        ref_label: str,
+        top_feature: str,
+        top_signal: str,
+        top_corr: float,
+    ) -> str:
+        mode_txt = f"Δ vs {ref_label}" if use_delta else "value"
+        line1 = (
+            f"t={float(t0):.4f}s | runs={int(runs_count)} | sigs={int(sigs_count)} | "
+            f"meta(all)={int(feat_all_count)} shown={int(feat_sel_count)} | mode={mode_txt}"
+        )
+        analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        target_signal = self._workspace_analysis_target_signal([str(top_signal)]) if str(top_signal or "").strip() else ""
+        if analysis_mode == "one_to_all":
+            line2 = (
+                f"Driver candidate: {top_feature or '—'} | strongest visible response: {top_signal or '—'} "
+                f"({float(top_corr):+.2f})"
+            )
+            hint = "Sweep nearby times to see whether one driver keeps fanning out across multiple signals."
+        elif analysis_mode == "all_to_one":
+            line2 = (
+                f"Target: {target_signal or top_signal or '—'} | lead driver: {top_feature or '—'} "
+                f"({float(top_corr):+.2f})"
+            )
+            hint = "Keep one target stable and cross-check the lead driver with Events / Delta."
+        else:
+            line2 = (
+                f"Dominant corridor: {top_feature or '—'} -> {top_signal or '—'} "
+                f"({float(top_corr):+.2f})"
+            )
+            hint = "Compare this corridor against the current cloud/clusters before trusting the coupling."
+        line3 = f"Heuristic: {hint} Click a cell to open the scatter below."
+        return "\n".join([line1, line2, line3])
+
     def _clear_influence_view(self, note: str = "") -> None:
         try:
             self.tbl_infl.setRowCount(0)
@@ -5869,13 +8421,6 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 pass
 
-            note = f"t={t0:.4f}s | runs={len(runs)} | sigs={len(sigs)} | meta(all)={len(feat_all)} показано={len(feat_sel)}"
-            if use_delta:
-                note += f" | mode=Δ относительно {ref_run.label}"
-            else:
-                note += " | mode=value"
-            self.lbl_infl_note.setText(note)
-
             try:
                 A = np.abs(np.asarray(C_sel, dtype=float))
                 A = np.nan_to_num(A, nan=-1.0, posinf=-1.0, neginf=-1.0)
@@ -5892,6 +8437,24 @@ class CompareViewer(QtWidgets.QMainWindow):
                 }
             except Exception:
                 self._insight_infl = {}
+
+            top_feature = str((self._insight_infl or {}).get("feature") or "")
+            top_signal = str((self._insight_infl or {}).get("signal") or "")
+            top_corr = float((self._insight_infl or {}).get("corr", float("nan")) or float("nan"))
+            self.lbl_infl_note.setText(
+                self._influence_status_text(
+                    t0=float(t0),
+                    runs_count=len(runs),
+                    sigs_count=len(sigs),
+                    feat_all_count=len(feat_all),
+                    feat_sel_count=len(feat_sel),
+                    use_delta=bool(use_delta),
+                    ref_label=str(ref_run.label),
+                    top_feature=top_feature,
+                    top_signal=top_signal,
+                    top_corr=top_corr,
+                )
+            )
 
             # Cache for fast scatter updates
             self._infl_cache = {
@@ -6437,6 +9000,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.playhead_index_selected = None
         self.reference_run_selected = ""
         self.reference_run_selected_path = ""
+        self._insight_events = {}
         self._mv_checked_dims_selected = None
         self._infl_focus_feat = None
         self._infl_focus_sig = None
@@ -6905,7 +9469,23 @@ class CompareViewer(QtWidgets.QMainWindow):
         ref_run = self._reference_run(sel)
 
         df = getattr(ref_run, 'events', None) if ref_run is not None else None
+        pick = self._get_selected_event_signals()
+        have_filter_items = bool(getattr(self, 'list_events', None) is not None and self.list_events.count() > 0)
+        baseline_label = str(ref_run.label) if ref_run is not None else ""
         if not isinstance(df, pd.DataFrame) or df.empty:
+            self._insight_events = {
+                "baseline": baseline_label,
+                "rows": 0,
+                "source_rows": 0,
+                "selected_signals": list(pick),
+                "filter_items": int(self.list_events.count()) if have_filter_items and getattr(self, "list_events", None) is not None else 0,
+                "no_signals_selected": bool(have_filter_items and not pick),
+                "top_signal": "",
+                "top_count": 0,
+                "sample_signal": "",
+                "sample_time_s": float("nan"),
+                "table_count": 0,
+            }
             try:
                 tbl.setRowCount(0)
             except Exception:
@@ -6915,14 +9495,29 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 pass
             try:
-                self.lbl_events_info.setText("Events: none")
+                self.lbl_events_info.setText(
+                    self._events_status_text(
+                        baseline_label=str(ref_run.label) if ref_run is not None else "",
+                        rows_count=0,
+                        selected_signals=list(pick),
+                        have_filter_items=have_filter_items,
+                        no_signals_selected=bool(have_filter_items and not pick),
+                    )
+                )
             except Exception:
                 pass
             self._update_workspace_status()
             return
 
-        pick = set(self._get_selected_event_signals())
-        have_filter_items = bool(getattr(self, 'list_events', None) is not None and self.list_events.count() > 0)
+        try:
+            source_rows = int(len(df))
+        except Exception:
+            source_rows = 0
+        try:
+            source_table_count = int(pd.Series(df.get('table', pd.Series([], dtype=object))).astype(str).nunique())
+        except Exception:
+            source_table_count = 0
+        pick = set(pick)
         if have_filter_items:
             if pick:
                 try:
@@ -6943,6 +9538,43 @@ class CompareViewer(QtWidgets.QMainWindow):
             if c not in df.columns:
                 df.loc[:, c] = ""
         df = df.loc[:, cols].copy()
+
+        sample_signal = ""
+        sample_time_s = np.nan
+        top_signal = ""
+        top_count = 0
+        try:
+            if len(df):
+                df_focus = df.sort_values('t', kind='mergesort') if 't' in df.columns else df
+                first_row = df_focus.iloc[0]
+                sample_signal = str(first_row.get("signal", "") or "")
+                try:
+                    sample_time_s = float(first_row.get("t", np.nan))
+                except Exception:
+                    sample_time_s = np.nan
+                vc = df['signal'].astype(str).value_counts()
+                if len(vc):
+                    top_signal = str(vc.index[0])
+                    top_count = int(vc.iloc[0])
+        except Exception:
+            sample_signal = ""
+            sample_time_s = np.nan
+            top_signal = ""
+            top_count = 0
+
+        self._insight_events = {
+            "baseline": baseline_label,
+            "rows": int(len(df)),
+            "source_rows": int(source_rows),
+            "selected_signals": [str(x) for x in pick],
+            "filter_items": int(self.list_events.count()) if have_filter_items and getattr(self, "list_events", None) is not None else 0,
+            "no_signals_selected": bool(have_filter_items and not pick),
+            "top_signal": top_signal,
+            "top_count": int(top_count),
+            "sample_signal": sample_signal,
+            "sample_time_s": float(sample_time_s) if np.isfinite(sample_time_s) else float("nan"),
+            "table_count": int(source_table_count),
+        }
 
         try:
             tbl.setSortingEnabled(False)
@@ -6982,8 +9614,17 @@ class CompareViewer(QtWidgets.QMainWindow):
             pass
 
         try:
-            suffix = " | no signals selected" if have_filter_items and not pick else ""
-            self.lbl_events_info.setText(f"Events: {len(df)} (baseline={ref_run.label if ref_run else ''}){suffix}")
+            self.lbl_events_info.setText(
+                self._events_status_text(
+                    baseline_label=baseline_label,
+                    rows_count=len(df),
+                    selected_signals=list(pick),
+                    have_filter_items=have_filter_items,
+                    no_signals_selected=bool(have_filter_items and not pick),
+                    sample_signal=sample_signal,
+                    sample_time_s=sample_time_s,
+                )
+            )
         except Exception:
             pass
         self._update_workspace_status()
@@ -7633,6 +10274,11 @@ class CompareViewer(QtWidgets.QMainWindow):
                 self._sync_heatmap_to_time(float(x))
         except Exception:
             pass
+        try:
+            if getattr(self, "_inflheat", None) is not None:
+                self._sync_inflheat_to_time(float(x))
+        except Exception:
+            pass
         return idx, x
 
     def _ensure_playhead_visible_in_view(self) -> Optional[Tuple[int, float]]:
@@ -7935,12 +10581,12 @@ class CompareViewer(QtWidgets.QMainWindow):
         exports: List[Path] = []
         try:
             preset_specs = (
-                ("compare_workspace_overview.png", "all"),
-                ("compare_workspace_heatmaps.png", "heatmaps"),
-                ("compare_workspace_multivariate.png", "multivariate"),
-                ("compare_workspace_qa.png", "qa"),
+                ("compare_workspace_overview", "all"),
+                ("compare_workspace_heatmaps", "heatmaps"),
+                ("compare_workspace_multivariate", "multivariate"),
+                ("compare_workspace_qa", "qa"),
             )
-            for filename, mode in preset_specs:
+            for stem, mode in preset_specs:
                 self._focus_workspace_preset(mode)
                 if mode == "multivariate":
                     try:
@@ -7951,6 +10597,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                     QtWidgets.QApplication.processEvents()
                 except Exception:
                     pass
+                filename = self._workspace_export_filename(stem)
                 exports.append(self._save_workspace_png(out_root / filename))
         finally:
             restored = False
@@ -7974,7 +10621,8 @@ class CompareViewer(QtWidgets.QMainWindow):
         return exports
 
     def _export_png(self):
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Export PNG", "compare.png", "PNG Images (*.png)")
+        default_name = self._workspace_export_filename("compare")
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Export PNG", default_name, "PNG Images (*.png)")
         if not path:
             return
         try:

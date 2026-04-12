@@ -19,6 +19,12 @@ import csv
 import json
 from typing import Any, Dict, Optional
 
+from pneumo_solver_ui.optimization_coordinator_handoff_runtime import (
+    coordinator_handoff_plan_path,
+)
+from pneumo_solver_ui.optimization_coordinator_handoff_summary import (
+    summarize_handoff_payload,
+)
 from pneumo_solver_ui.optimization_objective_contract import (
     normalize_objective_keys,
     objective_contract_payload,
@@ -68,6 +74,25 @@ class OptimizationRunSummary:
     baseline_source_kind: str = ''
     baseline_source_label: str = ''
     baseline_source_path: Optional[Path] = None
+    handoff_available: bool = False
+    handoff_plan_path: Optional[Path] = None
+    handoff_target_run_dir: Optional[Path] = None
+    handoff_preset_tag: str = ''
+    handoff_backend: str = ''
+    handoff_proposer: str = ''
+    handoff_q: int = 0
+    handoff_budget: int = 0
+    handoff_seed_count: int = 0
+    handoff_suite_family: str = ''
+    handoff_requires_full_ring_validation: bool = False
+    handoff_fragment_count: int = 0
+    handoff_has_full_ring: bool = False
+    handoff_staged_rows_ok: int = 0
+    handoff_promotable_rows: int = 0
+    handoff_unique_param_candidates: int = 0
+    handoff_selection_pool: str = ''
+    handoff_pipeline_hint: str = ''
+    handoff_reason_lines: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -290,6 +315,57 @@ def _problem_scope_fields(run_dir: Path) -> dict[str, Any]:
     }
 
 
+def _handoff_fields(run_dir: Path) -> dict[str, Any]:
+    plan_path = coordinator_handoff_plan_path(run_dir)
+    if not plan_path.exists():
+        return {
+            'handoff_available': False,
+            'handoff_plan_path': None,
+            'handoff_target_run_dir': None,
+            'handoff_preset_tag': '',
+            'handoff_backend': '',
+            'handoff_proposer': '',
+            'handoff_q': 0,
+            'handoff_budget': 0,
+            'handoff_seed_count': 0,
+            'handoff_suite_family': '',
+            'handoff_requires_full_ring_validation': False,
+            'handoff_fragment_count': 0,
+            'handoff_has_full_ring': False,
+            'handoff_staged_rows_ok': 0,
+            'handoff_promotable_rows': 0,
+            'handoff_unique_param_candidates': 0,
+            'handoff_selection_pool': '',
+            'handoff_pipeline_hint': '',
+            'handoff_reason_lines': (),
+        }
+    payload = _safe_json(plan_path)
+    summary = summarize_handoff_payload(payload, source_run_dir=run_dir, plan_path=plan_path) if payload else {}
+    reason = dict(summary.get('recommendation_reason') or {})
+    seed_bridge = dict(reason.get('seed_bridge') or {})
+    return {
+        'handoff_available': bool(summary.get('available')),
+        'handoff_plan_path': plan_path if bool(summary.get('available')) else None,
+        'handoff_target_run_dir': summary.get('target_run_dir'),
+        'handoff_preset_tag': str(summary.get('preset_tag') or ''),
+        'handoff_backend': str(summary.get('backend') or ''),
+        'handoff_proposer': str(summary.get('proposer') or ''),
+        'handoff_q': int(summary.get('q', 0) or 0),
+        'handoff_budget': int(summary.get('budget', 0) or 0),
+        'handoff_seed_count': int(summary.get('seed_count', 0) or 0),
+        'handoff_suite_family': str(summary.get('suite_family') or ''),
+        'handoff_requires_full_ring_validation': bool(summary.get('requires_full_ring_validation', False)),
+        'handoff_fragment_count': int(reason.get('fragment_count', 0) or 0),
+        'handoff_has_full_ring': bool(reason.get('has_full_ring', False)),
+        'handoff_staged_rows_ok': int(seed_bridge.get('staged_rows_ok', 0) or 0),
+        'handoff_promotable_rows': int(seed_bridge.get('promotable_rows', 0) or 0),
+        'handoff_unique_param_candidates': int(seed_bridge.get('unique_param_candidates', 0) or 0),
+        'handoff_selection_pool': str(seed_bridge.get('selection_pool') or ''),
+        'handoff_pipeline_hint': str(reason.get('pipeline_hint') or ''),
+        'handoff_reason_lines': tuple(str(x) for x in (summary.get('reason_lines') or ()) if str(x).strip()),
+    }
+
+
 def _summarize_staged_run(run_dir: Path, *, active_run_dir: Optional[Path]) -> OptimizationRunSummary:
     sp_path = run_dir / 'sp.json'
     payload = _safe_json(sp_path)
@@ -336,6 +412,7 @@ def _summarize_staged_run(run_dir: Path, *, active_run_dir: Optional[Path]) -> O
     contract = _objective_contract_fields(run_dir)
     problem_scope = _problem_scope_fields(run_dir)
     baseline_source = _baseline_source_fields(run_dir)
+    handoff = _handoff_fields(run_dir)
     return OptimizationRunSummary(
         run_dir=run_dir,
         pipeline_mode='staged',
@@ -360,6 +437,25 @@ def _summarize_staged_run(run_dir: Path, *, active_run_dir: Optional[Path]) -> O
         baseline_source_kind=str(baseline_source['baseline_source_kind']),
         baseline_source_label=str(baseline_source['baseline_source_label']),
         baseline_source_path=baseline_source['baseline_source_path'],
+        handoff_available=bool(handoff['handoff_available']),
+        handoff_plan_path=handoff['handoff_plan_path'],
+        handoff_target_run_dir=handoff['handoff_target_run_dir'],
+        handoff_preset_tag=str(handoff['handoff_preset_tag']),
+        handoff_backend=str(handoff['handoff_backend']),
+        handoff_proposer=str(handoff['handoff_proposer']),
+        handoff_q=int(handoff['handoff_q']),
+        handoff_budget=int(handoff['handoff_budget']),
+        handoff_seed_count=int(handoff['handoff_seed_count']),
+        handoff_suite_family=str(handoff['handoff_suite_family']),
+        handoff_requires_full_ring_validation=bool(handoff['handoff_requires_full_ring_validation']),
+        handoff_fragment_count=int(handoff['handoff_fragment_count']),
+        handoff_has_full_ring=bool(handoff['handoff_has_full_ring']),
+        handoff_staged_rows_ok=int(handoff['handoff_staged_rows_ok']),
+        handoff_promotable_rows=int(handoff['handoff_promotable_rows']),
+        handoff_unique_param_candidates=int(handoff['handoff_unique_param_candidates']),
+        handoff_selection_pool=str(handoff['handoff_selection_pool']),
+        handoff_pipeline_hint=str(handoff['handoff_pipeline_hint']),
+        handoff_reason_lines=tuple(handoff['handoff_reason_lines']),
     )
 
 
@@ -500,6 +596,8 @@ def format_run_choice(summary: OptimizationRunSummary) -> str:
         suffix = f' · done={summary.done_count}/run={summary.running_count}/err={summary.error_count}'
     if summary.baseline_source_kind:
         suffix += f' · base={baseline_source_short_label(summary.baseline_source_kind)}'
+    if summary.pipeline_mode == 'staged' and str(summary.handoff_preset_tag or '').strip():
+        suffix += f' · handoff={summary.handoff_preset_tag}'
     return f'[{summary.status_label}] {summary.backend} · {summary.run_dir.name}{suffix}'
 
 

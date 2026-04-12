@@ -25,6 +25,6 @@ def test_animator_source_scene_grade_drives_body_end_auras_and_spine_runtime() -
         'key=f"body-end-aura-scene-grade-{aura_idx}"',
         "spine_rgba = self._body_spine_rgba(",
         'key="body-spine-highlight-scene-grade"',
-        "self._body_spine_line.setData(pos=spine_vertices, color=spine_colors)",
+        "_set_line_item_data(self._body_spine_line, spine_vertices, colors_rgba=spine_colors)",
     ):
         assert needle in APP

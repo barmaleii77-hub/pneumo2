@@ -52,6 +52,7 @@ def test_visible_fast_and_slow_groups_are_refreshed_as_groups() -> None:
     assert 'valve_panel = getattr(self, "telemetry_valve_panel", None)' in SRC
     assert 'road_profile_panel = getattr(self, "telemetry_road_profile", None)' in SRC
     assert "sample_t_panels = (" in SRC
+    assert "sample_t=self._playback_sample_t_s," in SRC
     assert 'if self._dock_is_exposed("dock_timeline") and not interactive_scrub:' not in SRC
 
 

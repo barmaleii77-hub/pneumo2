@@ -24,7 +24,7 @@ def test_animator_source_scene_grade_drives_underbody_and_body_rim_runtime() -> 
         "underbody_face_colors = self._underbody_glow_face_colors(",
         'key="underbody-glow-scene-grade"',
         "if self._underbody_glow_mesh is not None:",
-        "self._body_silhouette_line.setData(pos=silhouette_vertices, color=body_rim_colors)",
+        "_set_line_item_data(self._body_silhouette_line, silhouette_vertices, colors_rgba=body_rim_colors)",
         'key="body-silhouette-rim-scene-grade"',
     ):
         assert needle in APP

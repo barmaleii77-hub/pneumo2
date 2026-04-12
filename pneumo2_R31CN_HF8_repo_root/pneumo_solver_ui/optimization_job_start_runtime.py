@@ -7,6 +7,9 @@ from typing import Any, Callable, Mapping, MutableMapping
 from pneumo_solver_ui.optimization_job_launch_runtime import (
     launch_optimization_job_payload,
 )
+from pneumo_solver_ui.optimization_coordinator_handoff_runtime import (
+    build_coordinator_handoff_launch_plan,
+)
 from pneumo_solver_ui.optimization_job_session_runtime import (
     DistOptJob,
     save_job_to_session,
@@ -79,6 +82,41 @@ def start_optimization_job(
     return job
 
 
+def start_coordinator_handoff_job(
+    session_state: MutableMapping[str, Any],
+    *,
+    source_run_dir: Path,
+    ui_root: Path,
+    problem_hash_mode: str,
+    python_executable: str | None = None,
+    app_root_fn: Callable[[Path], Path] = app_root_from_ui_root,
+    build_handoff_plan_fn: Callable[..., Any] = build_coordinator_handoff_launch_plan,
+    launch_payload_fn: Callable[..., Mapping[str, Any]] = launch_optimization_job_payload,
+    save_job_fn: Callable[[MutableMapping[str, Any], DistOptJob], None] = save_job_to_session,
+) -> DistOptJob:
+    ui_root = Path(ui_root)
+    plan = build_handoff_plan_fn(
+        source_run_dir=Path(source_run_dir),
+        ui_root=ui_root,
+        python_executable=str(python_executable or sys.executable),
+    )
+    raw_run_dir = getattr(plan, "launch_run_dir", None)
+    if raw_run_dir is None or not str(raw_run_dir):
+        raise RuntimeError("Coordinator handoff plan does not define launch_run_dir")
+    run_dir = Path(raw_run_dir)
+    job = DistOptJob(
+        **launch_payload_fn(
+            app_root_fn(ui_root),
+            run_dir,
+            plan,
+            problem_hash_mode=str(problem_hash_mode or "stable"),
+        )
+    )
+    save_job_fn(session_state, job)
+    return job
+
+
 __all__ = [
+    "start_coordinator_handoff_job",
     "start_optimization_job",
 ]

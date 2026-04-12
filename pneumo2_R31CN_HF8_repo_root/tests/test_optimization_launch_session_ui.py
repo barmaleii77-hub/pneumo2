@@ -28,6 +28,9 @@ class _FakeStreamlit:
     def markdown(self, text: str) -> None:
         self.calls.append(("markdown", text))
 
+    def success(self, text: str) -> None:
+        self.calls.append(("success", text))
+
 
 class _FakeProc:
     def __init__(self, poll_result):
@@ -67,6 +70,13 @@ def test_launch_session_ui_calls_launch_callback_for_idle_stage_runner() -> None
 
 def test_launch_session_ui_routes_running_job_into_live_panel() -> None:
     st = _FakeStreamlit()
+    st.session_state["__opt_active_launch_context"] = {
+        "kind": "handoff",
+        "run_dir": str(Path("C:/tmp/run-1").resolve()),
+        "pipeline_mode": "coordinator",
+        "backend": "Handoff/ray/portfolio/q2",
+        "source_run_dir": str(Path("C:/tmp/staged-run").resolve()),
+    }
     events: list[tuple[str, object]] = []
     job = SimpleNamespace(
         proc=_FakeProc(None),
@@ -110,6 +120,13 @@ def test_launch_session_ui_routes_running_job_into_live_panel() -> None:
     )
 
     assert any(kind == "markdown" and "dist_opt_coordinator.py" in text for kind, text in st.calls)
+    assert any(
+        kind == "success"
+        and "seeded full-ring coordinator handoff" in text
+        and "staged-run" in text
+        and "run-1" in text
+        for kind, text in st.calls
+    )
     assert events == [("live", 5, True, "ph_launch_ui_scope", "legacy")]
 
 
@@ -125,7 +142,8 @@ def test_launch_session_ui_routes_finished_job_into_finished_panel() -> None:
     )
 
     def _render_finished(_st, _job, **kwargs):
-        events.append(("finished", kwargs["rc"], kwargs["soft_stop_requested"]))
+        started = bool(kwargs["start_handoff_fn"] and kwargs["start_handoff_fn"]())
+        events.append(("finished", kwargs["rc"], kwargs["soft_stop_requested"], started))
         return True
 
     render_optimization_launch_session_block(
@@ -142,9 +160,14 @@ def test_launch_session_ui_routes_finished_job_into_finished_panel() -> None:
         sleep_fn=lambda _: None,
         clear_job_fn=lambda: None,
         launch_job_fn=lambda: events.append(("launch", None)),
+        start_handoff_job_fn=lambda run_dir: events.append(("handoff_start", run_dir)) or True,
         build_cmd_preview_text_fn=lambda: "python staged.py\n",
         render_finished_panel_fn=_render_finished,
         render_launch_panel_fn=lambda _st, **kwargs: events.append(("launch_panel", kwargs["launch_button_label"])) or False,
     )
 
-    assert events == [("finished", 0, False), ("launch_panel", "Запустить StageRunner")]
+    assert events == [
+        ("handoff_start", Path("C:/tmp/run-2")),
+        ("finished", 0, False, True),
+        ("launch_panel", "Запустить StageRunner"),
+    ]

@@ -61,7 +61,8 @@ def test_front_and_side_helper_views_now_accept_continuous_sample_t() -> None:
     assert 'flow_panel = getattr(self, "telemetry_flow_panel", None)' in APP
     assert 'valve_panel = getattr(self, "telemetry_valve_panel", None)' in APP
     assert "sample_t_panels = (" in APP
-    assert 'sample_t=self._playback_sample_t_s if bool(playing) else None' in APP
+    assert 'sample_t=self._playback_sample_t_s,' in APP
+    assert 'sample_t=self._playback_sample_t_s if bool(playing) else None' not in APP
     assert 'if interactive_scrub and self._dock_is_exposed("dock_telemetry"):' in APP
     assert 'if interactive_scrub and (not many_visible_budget) and pressure_panel is not None and self._dock_is_exposed("dock_pressures"):' in APP
     assert 'if interactive_scrub and (not many_visible_budget) and flow_panel is not None and self._dock_is_exposed("dock_flows"):' in APP
@@ -94,7 +95,8 @@ def test_front_and_side_helper_views_now_accept_continuous_sample_t() -> None:
     assert "vals0 = np.asarray(b.open.values[i0, self._idxs], dtype=float)" in APP
     assert "q0 = np.asarray(b.q.values[i0, self._idxs], dtype=float)" in APP
     assert 'self.road_profile.update_frame(b, i, sample_t=sample_t)' in APP
-    assert 's0 = sample(s, float(s[idx]))' in APP
+    assert 'idx_ref = int(_clamp(int(sample_i0 if float(alpha) < 0.5 else sample_i1), 0, len(s) - 1))' in APP
+    assert 's0 = sample(s, float(s[idx_ref]))' in APP
     assert 'zc = sample(z_arr, float("nan"))' in APP
     assert 'def update_frame(self, i: int, *, sample_t: float | None = None):' in HMI
     assert 'self.canvas.set_playhead_time(sample_t, idx=i)' in HMI
@@ -114,6 +116,22 @@ def test_front_and_side_helper_views_now_accept_continuous_sample_t() -> None:
     assert 'lambda: road_profile_panel.update_frame(b, i, sample_t=self._playback_sample_t_s),' in APP
     assert 'lambda: self.trends.update_frame(idx, sample_t=self._playback_sample_t_s),' in APP
     assert 'lambda: self.trends.update_frame(i, sample_t=self._playback_sample_t_s),' in APP
+
+
+def test_event_timeline_click_to_seek_carries_exact_sample_time() -> None:
+    assert "seek_sample = QtCore.Signal(int, float)" in HMI
+    assert "tc = t0 + u * (t1 - t0)" in HMI
+    assert 'idx = int(np.searchsorted(self._t, tc, side="right") - 1)' in HMI
+    assert "self.seek_sample.emit(idx, float(tc))" in HMI
+    assert "seek_sample_requested = QtCore.Signal(int, float)" in APP
+    assert "self.timeline.seek_sample.connect(self.seek_sample_requested.emit)" in APP
+    assert "self.timeline.seek_index.connect(self.seek_requested.emit)" not in APP
+    assert "self.cockpit.seek_sample_requested.connect(self._on_seek_sample_requested)" in APP
+    assert "def _apply_seek_request(self, idx: int, *, sample_t: float | None = None) -> None:" in APP
+    assert "self._idx = int(_playback_source_index_for_time(t_arr, seek_t))" in APP
+    assert "self._play_cursor_t_s = seek_t" in APP
+    assert "def _on_seek_sample_requested(self, idx: int, sample_t: float):" in APP
+    assert "self._apply_seek_request(idx, sample_t=float(sample_t))" in APP
 
 
 def test_desktop_animator_world_progress_falls_back_to_xy_arclength_for_truthful_motion() -> None:
@@ -148,13 +166,35 @@ def test_desktop_animator_world_progress_falls_back_to_xy_arclength_for_truthful
     assert 'path_progress_m=s_progress_m' not in APP
     assert 'speed_sign * math.hypot(float(x0), float(y0))' not in APP
     assert 'sample_i0, sample_i1, alpha, _status_sample_t = _sample_time_bracket(' in APP
+    assert 'summary = _ensure_telemetry_summary_cache(b)' in APP
+    assert 't_status = _sample_series_local(summary["t"], i0=sample_i0, i1=sample_i1, alpha=alpha, default=t)' in APP
+    assert 'vx_status = _sample_series_local(summary["vx"], i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in APP
+    assert 'vy_status = _sample_series_local(summary["vy"], i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in APP
+    assert 'v = float(math.hypot(float(vx_status), float(vy_status)))' in APP
     assert 'vx_status = _sample_series_local(vxw, i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in APP
     assert 'vy_status = _sample_series_local(vyw, i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in APP
-    assert 'vxb_status, vyb_status = b.ensure_body_velocity_xy()' in APP
-    assert 'vb_x = _sample_series_local(' in APP
-    assert 'vb_y = _sample_series_local(' in APP
-    assert 'v = float(math.hypot(float(vx_status), float(vy_status)))' in APP
-    assert 'v = float(math.hypot(float(vb_x), float(vb_y)))' in APP
+    assert 'vxb, vyb = b.ensure_body_velocity_xy()' in HMI
+    assert 'vx_arr = np.asarray(vxb, dtype=float).reshape(-1)' in HMI
+    assert 'vy_arr = np.asarray(vyb, dtype=float).reshape(-1)' in HMI
+    assert 'y_v[:n_v] = np.asarray(np.hypot(vx_arr[:n_v], vy_arr[:n_v]), dtype=float)' in HMI
+    assert 'vx_raw = _align_series_length(b.get("скорость_vx_м_с", 0.0), n_t, fill=0.0)' in HMI
+    assert 'vy_raw = _align_series_length(b.get("скорость_vy_м_с", 0.0), n_t, fill=0.0)' in HMI
+    assert 'y_v = np.asarray(np.hypot(vx_raw, vy_raw), dtype=float)' in HMI
+    assert 'y_az = _align_series_length(b.get("ускорение_рамы_z_м_с2", 0.0), n_t, fill=0.0)' in HMI
+    assert 'y_roll = np.degrees(_align_series_length(b.get("крен_phi_рад", 0.0), n_t, fill=0.0))' in HMI
+    assert 'y_pitch = np.degrees(_align_series_length(b.get("тангаж_theta_рад", 0.0), n_t, fill=0.0))' in HMI
+    assert 'bar_g = _align_series_length((pacc - patm) / 1e5, n_t, fill=0.0)' in HMI
+    assert 'cnt = _align_series_length(np.sum(mat[:, idxs] > thr, axis=1).astype(float), n_t, fill=0.0)' in HMI
+    assert 'mdot_max = _align_series_length(np.nanmax(aq, axis=1) * 1000.0, n_t, fill=0.0)' in HMI
+    assert 'mdot_active = _align_series_length(np.sum(aq > thr, axis=1).astype(float), n_t, fill=0.0)' in HMI
+    assert 'a_fl = (_align_series_length(b.get("колесо_в_воздухе_ЛП", 0.0), n_t, fill=0.0) > 0.5).astype(float)' in HMI
+    assert 'from .data_bundle import _align_series_length' in HMI
+    assert 'm = _align_series_length(b.get(col, 0.0), n, fill=0.0) > 0.5' in HMI
+    assert 'np.any(mat[:, idxs] > thr, axis=1),' in HMI
+    assert 'np.any(np.abs(matq[:, idxs]) > thr_q, axis=1),' in HMI
+    assert 'sid = _align_series_length(b.get("сегмент_id", 0.0), n, fill=0.0)' in HMI
+    assert 'sid = np.rint(np.where(np.isfinite(sid), sid, 0.0)).astype(np.int32, copy=False)' in HMI
+    assert 'if sid.size >= n and n > 1:' in HMI
     assert 'x_path_arr, y_path_arr = bundle.ensure_world_xy()' in APP
     assert 'xw_arr, yw_arr = b.ensure_world_xy()' in APP
     assert 'x0 = float(' in APP
@@ -165,6 +205,28 @@ def test_desktop_animator_world_progress_falls_back_to_xy_arclength_for_truthful
     assert "def _align_series_length(arr: Any, n: int, *, fill: float = 0.0) -> np.ndarray:" in DATA_BUNDLE
     assert "without cyclic wraparound" in DATA_BUNDLE
     assert "pad_value = float(vec[-1]) if np.isfinite(float(vec[-1])) else float(fill)" in DATA_BUNDLE
+    assert "from .data_bundle import CORNERS, DataBundle, _align_series_length, load_npz" in APP
+    assert 't_series = np.asarray(b.t, dtype=float).reshape(-1)' in APP
+    assert 'n_t = int(t_series.size)' in APP
+    assert 'return _align_series_length(b.get(name, default), n_t, fill=float(default))' in APP
+    assert 'vx_series = _align_series_length(vxb, n_t, fill=0.0)' in APP
+    assert 'vy_series = _align_series_length(vyb, n_t, fill=0.0)' in APP
+    assert 'yaw_rate_series = _align_series_length(b.ensure_yaw_rate_rad_s(), n_t, fill=0.0)' in APP
+    assert 'ax_series = _align_series_length(axb, n_t, fill=0.0)' in APP
+    assert 'ay_series = _align_series_length(ayb, n_t, fill=0.0)' in APP
+    assert '"t": t_series,' in APP
+    assert "seg_arr = _align_series_length(seg, int(n), fill=0.0)" in APP
+    assert "seg = _align_series_length(seg, n, fill=0.0)" in APP
+    assert "seg_full = _align_series_length(seg_full, required_n, fill=0.0)" in APP
+    assert "s_world = _align_series_length(s_world, n, fill=0.0)" in APP
+    assert "vx = _align_series_length(vx, n, fill=0.0)" in APP
+    assert "vy = _align_series_length(vy, n, fill=0.0)" in APP
+    assert "yaw_rate = _align_series_length(yaw_rate, n, fill=0.0)" in APP
+    assert "ax = _align_series_length(ax, n, fill=0.0)" in APP
+    assert "ay = _align_series_length(ay, n, fill=0.0)" in APP
+    assert "speed = np.asarray(np.hypot(vx, vy), dtype=float)" in APP
+    assert "zc = _align_series_length(zc, n, fill=0.0)" in APP
+    assert "np.resize(seg, n)" not in APP
     assert "def ensure_yaw_rate_rad_s(self) -> np.ndarray:" in DATA_BUNDLE
     assert 'yaw_rate = _align_series_length(self.get("yaw_rate_рад_с", default=0.0), n, fill=0.0)' in DATA_BUNDLE
     assert 'yaw = np.asarray(np.unwrap(np.asarray(yaw, dtype=float)), dtype=float)' in DATA_BUNDLE
@@ -194,14 +256,27 @@ def test_desktop_animator_world_progress_falls_back_to_xy_arclength_for_truthful
 
 
 def test_desktop_animator_hud_lookahead_uses_sampled_body_speed_truth() -> None:
-    assert 'vxb_series, vyb_series = b.ensure_body_velocity_xy()' in APP
+    assert 'summary = _ensure_telemetry_summary_cache(b)' in APP
+    assert 'np.asarray(summary["t"], dtype=float)' in APP
+    assert 'yaw_series = summary["yaw"]' in APP
+    assert 'vxb_series = summary["vx"]' in APP
+    assert 'vyb_series = summary["vy"]' in APP
+    assert 'yaw_rate_series = summary["yaw_rate"]' in APP
+    assert 'ax_series = summary["ax"]' in APP
+    assert 'ay_series = summary["ay"]' in APP
     assert 'v_mps = math.hypot(sample(vxb_series, 0.0), sample(vyb_series, 0.0))' in APP
     assert 'def _sample_signed_speed_along_world_path_local(' in APP
     assert 'xw_arr, yw_arr = b.ensure_world_xy()' in APP
     assert 'vxw_arr, vyw_arr = b.ensure_world_velocity_xy()' in APP
+    assert 'yaw_value = float(' in APP
+    assert '_sample_angle_series_local(' in APP
+    assert 'vxw = float(body_vx * math.cos(yaw_value) - body_vy * math.sin(yaw_value))' in APP
+    assert 'vyw = float(body_vx * math.sin(yaw_value) + body_vy * math.cos(yaw_value))' in APP
     assert 'tangent_x = float(tx / tangent_norm)' in APP
     assert 'tangent_y = float(ty / tangent_norm)' in APP
     assert 'v_proj = float(vxw * tangent_x + vyw * tangent_y)' in APP
+    assert 'signed_speed_hint = _sample_signed_speed_along_world_path_local(' in APP
+    assert 'return float(math.copysign(speed_mag, signed_speed_hint))' in APP
     assert 'v_forward_signed_m_s = _sample_signed_speed_along_world_path_local(' in APP
     assert 'default_signed_m_s=float(sample(vxb_series, 0.0)),' in APP
     assert 'self._lookahead_m = float(_clamp(20.0 + v_mps * 4.0, 40.0, 140.0))' in APP
@@ -210,6 +285,12 @@ def test_desktop_animator_hud_lookahead_uses_sampled_body_speed_truth() -> None:
     assert 'if np.isfinite(float(signed_body_forward_m_s)) and float(signed_body_forward_m_s) < -1e-6:' in APP
     assert 'hud_rear_m, hud_forward_m = self._hud_motion_window_extents(' in APP
     assert 'signed_body_forward_m_s=v_forward_signed_m_s,' in APP
+    assert 'idx_ref = int(_clamp(int(sample_i0 if float(alpha) < 0.5 else sample_i1), 0, n - 1))' in APP
+    assert 'win_i0 = max(0, idx_ref - 200)' in APP
+    assert 'win_i1 = min(n, idx_ref + 400)' in APP
+    assert 's0 = sample(s, float(s[idx_ref]))' in APP
+    assert 's_idx_ref = int(_clamp(int(sample_i0 if float(alpha) < 0.5 else sample_i1), 0, max(0, len(s_world) - 1)))' in APP
+    assert 'float(s_world[s_idx_ref])' in APP
     assert 'mask = (yl >= -float(hud_rear_m)) & (yl <= float(hud_forward_m))' in APP
     assert 'top_y = float(hud_forward_m) - 4.5' in APP
     assert 'scene_rect = QtCore.QRectF(-8.0, -float(hud_rear_m) - 4.0, 16.0, float(hud_forward_m + hud_rear_m) + 8.0)' in APP
@@ -237,10 +318,9 @@ def test_desktop_animator_subframe_yaw_uses_shortest_arc_sampling() -> None:
 
 
 def test_playback_service_interval_is_tightened_for_high_speed_without_restoring_busy_loop() -> None:
-    assert 'base_ms = 12.0  # ~83 Hz keeps x1.0 visibly alive without source-frame chasing.' in APP
-    assert 'base_ms = 10.0  # ~100 Hz for moderate fast-forward.' in APP
-    assert 'base_ms = 8.0   # ~125 Hz.' in APP
-    assert 'base_ms = 6.0   # ~166 Hz upper service cadence on Windows precise timer.' in APP
+    assert 'base_ms = 8.0  # ~125 Hz stable display cadence across playback speeds.' in APP
+    assert 'changing playback speed' in APP
+    assert 'target_ms = 1000.0 * 1.5 * dense_dt_s' in APP
     assert '4 ms' in APP
 
 

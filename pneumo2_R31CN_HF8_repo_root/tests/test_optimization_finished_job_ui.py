@@ -91,3 +91,54 @@ def test_finished_job_panel_warns_when_artifacts_are_not_usable() -> None:
     assert rendered is True
     assert ("error", "Оптимизация завершилась с ошибкой (код=1).") in st.calls
     assert any(kind == "warning" and "usable optimization artifacts" in text for kind, text in st.calls)
+
+
+def test_finished_job_panel_exposes_handoff_action_for_successful_staged_run() -> None:
+    st = _FakeStreamlit()
+    events: list[tuple[str, object]] = []
+    job = SimpleNamespace(run_dir=Path("C:/tmp/run"), backend="ray", pipeline_mode="staged")
+    summary = SimpleNamespace(
+        pipeline_mode="staged",
+        status="done",
+        row_count=12,
+        done_count=12,
+        running_count=0,
+        error_count=0,
+        objective_keys=("comfort",),
+        penalty_key="penalty_total",
+        penalty_tol=0.0,
+    )
+
+    rendered = render_finished_optimization_job_panel(
+        st,
+        job,
+        rc=0,
+        soft_stop_requested=False,
+        clear_job_fn=lambda: events.append(("clear", None)),
+        rerun_fn=lambda _: events.append(("rerun", None)),
+        summarize_run_fn=lambda _: summary,
+        save_ptr_fn=lambda run_dir, meta: events.append(("save", run_dir, dict(meta))),
+        autoload_session_fn=lambda _: events.append(("autoload", None)),
+        start_handoff_fn=lambda run_dir: events.append(("handoff_start", run_dir)) or True,
+        render_handoff_action_fn=lambda _st, **kwargs: events.append(
+            (
+                "handoff_render",
+                kwargs["source_run_dir"],
+                kwargs["start_handoff_fn"] is not None,
+                kwargs["button_key"],
+                kwargs.get("recommended_action", True),
+                kwargs.get("button_label", ""),
+            )
+        ) or False,
+    )
+
+    assert rendered is True
+    assert ("success", "Оптимизация завершена успешно (код=0).") in st.calls
+    assert (
+        "handoff_render",
+        Path("C:/tmp/run"),
+        True,
+        "finished_job_start_coordinator_handoff",
+        True,
+        "",
+    ) in events

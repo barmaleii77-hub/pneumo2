@@ -31,6 +31,6 @@ def test_animator_source_adds_focus_halo_for_central_suspension_cluster() -> Non
         'key="suspension-focus-halo"',
         "_set_poly_mesh(",
         "self._focus_halo_mesh,",
-        "self._focus_halo_line.setData(",
+        "_set_line_item_data(self._focus_halo_line, np.asarray(focus_ring, dtype=float), colors_rgba=focus_colors)",
     ):
         assert needle in APP

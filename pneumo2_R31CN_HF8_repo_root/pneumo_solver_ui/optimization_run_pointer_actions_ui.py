@@ -24,6 +24,9 @@ def build_run_pointer_meta_from_summary(
         "objective_keys": list(getattr(summary, "objective_keys", ()) or ()),
         "penalty_key": getattr(summary, "penalty_key", ""),
         "penalty_tol": getattr(summary, "penalty_tol", None),
+        "handoff_preset": getattr(summary, "handoff_preset_tag", ""),
+        "handoff_budget": int(getattr(summary, "handoff_budget", 0) or 0),
+        "handoff_seed_count": int(getattr(summary, "handoff_seed_count", 0) or 0),
         "selected_from": str(selected_from or "optimization_history"),
         "ts": str(now_text or time.strftime("%Y-%m-%d %H:%M:%S")),
     }

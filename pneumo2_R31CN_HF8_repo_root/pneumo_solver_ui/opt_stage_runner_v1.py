@@ -71,6 +71,12 @@ from pneumo_solver_ui.optimization_input_contract import (
     infer_suite_stage,
     sanitize_optimization_inputs,
 )
+from pneumo_solver_ui.optimization_auto_tuner_plan import (
+    resolve_stage_tuner_stage_config,
+)
+from pneumo_solver_ui.optimization_coordinator_handoff import (
+    materialize_coordinator_handoff_plan,
+)
 from pneumo_solver_ui.optimization_defaults import (
     build_stage_aware_influence_profile,
     influence_eps_grid_text,
@@ -147,6 +153,73 @@ def load_json(path: Path) -> Any:
 def save_json(obj: Any, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _read_json_mapping(path: Path | str | None) -> Dict[str, Any]:
+    if path is None:
+        return {}
+    try:
+        raw = load_json(Path(path))
+    except Exception:
+        return {}
+    return dict(raw) if isinstance(raw, Mapping) else {}
+
+
+def _normalize_stage_tuner_config(
+    raw_cfg: Mapping[str, Any] | None,
+    *,
+    fallback_warmstart_mode: str,
+    fallback_surrogate_samples: int,
+    fallback_surrogate_top_k: int,
+    fallback_sort_tests_by_cost: int,
+) -> Dict[str, Any]:
+    rec = dict(raw_cfg or {})
+    warmstart_mode = str(rec.get("warmstart_mode") or fallback_warmstart_mode).strip().lower()
+    if warmstart_mode not in {"surrogate", "archive", "none"}:
+        warmstart_mode = str(fallback_warmstart_mode or "surrogate").strip().lower() or "surrogate"
+
+    try:
+        surrogate_samples = int(rec.get("surrogate_samples") or fallback_surrogate_samples or 0)
+    except Exception:
+        surrogate_samples = int(fallback_surrogate_samples or 0)
+    try:
+        surrogate_top_k = int(rec.get("surrogate_top_k") or fallback_surrogate_top_k or 0)
+    except Exception:
+        surrogate_top_k = int(fallback_surrogate_top_k or 0)
+    if warmstart_mode == "surrogate":
+        surrogate_samples = max(1, surrogate_samples)
+        surrogate_top_k = max(1, surrogate_top_k)
+    else:
+        surrogate_samples = max(0, surrogate_samples)
+        surrogate_top_k = max(0, surrogate_top_k)
+
+    env_overrides_raw = rec.get("env_overrides")
+    env_overrides: Dict[str, str] = {}
+    if isinstance(env_overrides_raw, Mapping):
+        for key, value in env_overrides_raw.items():
+            name = str(key or "").strip()
+            if not name:
+                continue
+            env_overrides[name] = str(value)
+    guided_mode = str(rec.get("guided_mode") or env_overrides.get("PNEUMO_GUIDED_MODE") or "").strip().lower()
+    if guided_mode:
+        env_overrides["PNEUMO_GUIDED_MODE"] = guided_mode
+
+    try:
+        sort_tests_by_cost = int(rec.get("sort_tests_by_cost", fallback_sort_tests_by_cost))
+    except Exception:
+        sort_tests_by_cost = int(fallback_sort_tests_by_cost)
+
+    return {
+        "stage_name": str(rec.get("stage_name") or "").strip(),
+        "profile_name": str(rec.get("profile_name") or "").strip(),
+        "warmstart_mode": str(warmstart_mode),
+        "surrogate_samples": int(surrogate_samples),
+        "surrogate_top_k": int(surrogate_top_k),
+        "sort_tests_by_cost": int(sort_tests_by_cost),
+        "guided_mode": str(guided_mode),
+        "env_overrides": dict(env_overrides),
+    }
 
 
 def parse_jsonish(x: Any) -> Any:
@@ -1561,6 +1634,7 @@ def build_stage_worker_env(
     problem_hash: str | None,
     *,
     base_env: Optional[Mapping[str, str]] = None,
+    env_overrides: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, str]:
     env = dict(base_env) if base_env is not None else os.environ.copy()
     env.setdefault("PYTHONUTF8", "1")
@@ -1579,6 +1653,15 @@ def build_stage_worker_env(
         env.setdefault("WORLDROAD_CACHE_DIR", str(cache_dir))
     except Exception:
         pass
+    if isinstance(env_overrides, Mapping):
+        for key, value in env_overrides.items():
+            name = str(key or "").strip()
+            if not name:
+                continue
+            if value is None:
+                env.pop(name, None)
+            else:
+                env[name] = str(value)
     return env
 
 
@@ -1837,6 +1920,7 @@ def main() -> int:
     ap.add_argument("--eps_rel", "--influence_eps_rel", dest="influence_eps_rel", type=float, default=1e-2, help="Относительный шаг возмущения для system_influence_report_v1")
     ap.add_argument("--adaptive_influence_eps", action="store_true", help="Включить adaptive epsilon scan в system_influence_report_v1")
     ap.add_argument("--adaptive_influence_eps_grid", default="", help="Опциональная сетка eps_rel для adaptive epsilon в system_influence_report_v1")
+    ap.add_argument("--stage_tuner_json", default="", help="Optional JSON with per-stage warm-start / guided-search profiles for staged runs.")
     ap.add_argument(
         "--stage_policy_mode",
         choices=("influence_weighted", "static"),
@@ -2156,6 +2240,12 @@ def main() -> int:
         })
     save_json(stage_preview, run_dir / "stage_plan_preview.json")
 
+    stage_tuner_plan_path = Path(str(args.stage_tuner_json or "")).resolve() if str(args.stage_tuner_json or "").strip() else None
+    stage_tuner_plan = _read_json_mapping(stage_tuner_plan_path)
+    if stage_tuner_plan:
+        stage_tuner_plan["source_path"] = str(stage_tuner_plan_path) if stage_tuner_plan_path is not None else ""
+        save_json(stage_tuner_plan, run_dir / "stage_tuner_plan.json")
+
     stage_csvs: List[Tuple[str, Path]] = []
 
     for i, stg in enumerate(stage_plan):
@@ -2203,11 +2293,23 @@ def main() -> int:
             rj = load_json(ranges_json)
         save_json(rj, stage_ranges_json)
 
+        stage_tuner_cfg = _normalize_stage_tuner_config(
+            resolve_stage_tuner_stage_config(stage_tuner_plan, stage_name),
+            fallback_warmstart_mode=str(args.warmstart_mode),
+            fallback_surrogate_samples=int(args.surrogate_samples),
+            fallback_surrogate_top_k=int(args.surrogate_top_k),
+            fallback_sort_tests_by_cost=int(args.sort_tests_by_cost),
+        )
+        save_json({
+            **dict(stage_tuner_cfg),
+            "source_path": str(stage_tuner_plan_path) if stage_tuner_plan_path is not None else "",
+        }, stage_dir / "stage_tuner_effective.json")
+
         # Warm-start: инициализация распределения поиска (cem_state) ДО первого запуска worker
         cem_state_path = Path(str(stage_out_csv) + "_cem_state.json")
         if not cem_state_path.exists():
             try:
-                mode = str(args.warmstart_mode).strip().lower()
+                mode = str(stage_tuner_cfg.get("warmstart_mode") or args.warmstart_mode).strip().lower()
                 model_sha = _file_sha1(model_path)[:12] if model_path.exists() else ""
                 if mode == "surrogate":
                     ok = make_initial_cem_state_from_surrogate(
@@ -2218,8 +2320,8 @@ def main() -> int:
                         penalty_key=penalty_key,
                         problem_hash=problem_hash,
                         model_sha_prefix=model_sha,
-                        n_samples=int(args.surrogate_samples),
-                        top_k=int(args.surrogate_top_k),
+                        n_samples=int(stage_tuner_cfg.get("surrogate_samples") or args.surrogate_samples),
+                        top_k=int(stage_tuner_cfg.get("surrogate_top_k") or args.surrogate_top_k),
                         seed=int(1 + i),
                         max_train=20000,
                     )
@@ -2400,7 +2502,7 @@ def main() -> int:
             "--stop_if_pen_gt",
             str(float(stg.get("stop_if_pen_gt", float("inf")))),
             "--sort_tests_by_cost",
-            str(int(args.sort_tests_by_cost)),
+            str(int(stage_tuner_cfg.get("sort_tests_by_cost", args.sort_tests_by_cost))),
             "--stop_file",
             str(stop_file),
             "--skip_baseline",
@@ -2432,6 +2534,12 @@ def main() -> int:
             "stage_seed_focus_budget": int(stage_seed_plan.get("focus_budget", 0) or 0),
             "stage_policy_name": str(stage_seed_plan.get("policy_name") or ""),
             "stage_priority_params": list(stage_influence_summary.get("top_params") or []),
+            "stage_tuner_profile_name": str(stage_tuner_cfg.get("profile_name") or ""),
+            "stage_tuner_warmstart_mode": str(stage_tuner_cfg.get("warmstart_mode") or ""),
+            "stage_tuner_guided_mode": str(stage_tuner_cfg.get("guided_mode") or ""),
+            "stage_tuner_surrogate_samples": int(stage_tuner_cfg.get("surrogate_samples") or 0),
+            "stage_tuner_surrogate_top_k": int(stage_tuner_cfg.get("surrogate_top_k") or 0),
+            "stage_tuner_json": str(stage_tuner_plan_path) if stage_tuner_plan_path is not None else "",
             "stage_seed_manifest_json": str(seed_manifest_json) if seed_manifest_json.exists() else "",
             "stage_seed_manifest_csv": str(seed_manifest_csv) if seed_manifest_csv.exists() else "",
             "stage_seed_bucket_counts": {
@@ -2448,6 +2556,7 @@ def main() -> int:
         env = build_stage_worker_env(
             workspace_dir,
             problem_hash,
+            env_overrides=stage_tuner_cfg.get("env_overrides"),
         )
 
         worker_stdout_log = stage_dir / "w_out.log"
@@ -2797,11 +2906,37 @@ def main() -> int:
                     "params": clean,
                 }, ensure_ascii=False) + "\n")
 
+    handoff_plan_path = None
+    if stage_tuner_plan:
+        try:
+            handoff_plan_path = materialize_coordinator_handoff_plan(
+                run_dir,
+                model_path=model_path,
+                worker_path=worker_path,
+                base_json_path=base_json,
+                ranges_json_path=ranges_json,
+                suite_json_path=suite_json,
+                staged_results_csv=out_csv,
+                objective_keys=objective_keys,
+                penalty_key=penalty_key,
+                stage_tuner_plan=stage_tuner_plan,
+            )
+        except Exception as exc:
+            save_json(
+                {
+                    "status": "error",
+                    "error": repr(exc),
+                    "source_path": str(stage_tuner_plan_path) if stage_tuner_plan_path is not None else "",
+                },
+                run_dir / "coordinator_handoff_error.json",
+            )
+
     write_progress(progress_json, {
         "status": "done",
         "run_dir": str(run_dir),
         "combined_csv": str(out_csv),
         "archive": str(archive_path),
+        "coordinator_handoff_plan": str(handoff_plan_path) if handoff_plan_path is not None else "",
     })
 
     return 0

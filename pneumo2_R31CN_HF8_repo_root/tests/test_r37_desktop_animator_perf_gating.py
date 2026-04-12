@@ -45,13 +45,59 @@ def test_desktop_animator_acceptance_hud_lines_use_bundle_cache() -> None:
     assert "frame_wheel_lines = tuple(cache.get(\"frame_wheel_lines\") or ())" in src
 
 
+def test_desktop_animator_3d_springs_and_pneumo_visuals_use_real_force_channels() -> None:
+    src = APP.read_text(encoding="utf-8")
+
+    assert "self._visual_sample_dt_s: float = 1.0 / 120.0" in src
+    assert "self._last_visual_sample_t_s: float | None = None" in src
+    assert "def _time_scaled_smoothing_response(self, response: float) -> float:" in src
+    assert "def _update_visual_sample_dt(self, sample_t_s: float | None) -> None:" in src
+    assert "dt_ratio = float(_clamp(float(dt_s / nominal_dt_s), 0.25, 6.0))" in src
+    assert "rr = 1.0 - ((1.0 - base_rr) ** dt_ratio)" in src
+    assert "rr = self._time_scaled_smoothing_response(response)" in src
+    assert "self._update_visual_sample_dt(_sample_t)" in src
+    assert "self._last_visual_sample_t_s = None" in src
+    assert "self._spring_force_series_map = {}" in src
+    assert "self._pneumo_force_series_map = {}" in src
+    assert 'corner_cache.get(str(corner), {}).get("springF", 0.0)' in src
+    assert 'corner_cache.get(str(corner), {}).get("pneumoF", 0.0)' in src
+    assert 'pneumo_force_col = f"сила_пневматики_{cyl}_{corner}_Н"' in src
+    assert "def _sample_spring_force_n(" in src
+    assert "def _sample_cylinder_pneumatic_force_n(" in src
+    assert "def _sample_cylinder_chamber_pressure_fallback_pa(" in src
+    assert "self._sample_cylinder_chamber_pressure_fallback_pa(" in src
+    assert "active_gauge_pa = float(abs(pneumo_force_n) / (cap_area_m2 if pneumo_force_n >= 0.0 else annulus_area_m2))" in src
+    assert "chamber_gauge_pa = active_gauge_pa if ((pneumo_force_n >= 0.0) == bool(is_cap)) else residual_gauge_pa" in src
+    assert "spring_force_n: float," in src
+    assert "spring_load_u = float(_clamp(abs(float(spring_force_n)) / spring_force_cap, 0.0, 1.0))" in src
+    assert '"spring_force_n": float(' in src
+    assert 'spring_force_n=float(spring_state.get("spring_force_n", 0.0))' in src
+    assert "pneumo_force_u = float(" in src
+    assert "glass_energy_u = float(max(cap_pressure_u, pneumo_force_u))" in src
+    assert "glass_energy_u = float(max(rod_pressure_u, pneumo_force_u))" in src
+    assert "spring_energy_u=float(pneumo_force_u)" in src
+
+
+def test_desktop_animator_3d_road_wire_grid_uses_square_world_cells() -> None:
+    src = APP.read_text(encoding="utf-8")
+
+    assert "def _square_road_grid_lateral_stride(*, half_width_m: float, lateral_count: int, cross_spacing_m: float) -> int:" in src
+    assert "lateral_step = (2.0 * half_width) / float(max(1, lat_count - 1))" in src
+    assert "lateral_stride = int(" in src
+    assert "_square_road_grid_lateral_stride(" in src
+    assert "cross_spacing_m=float(grid_cross_spacing_m)," in src
+
+
 def test_desktop_animator_3d_road_preview_uses_speed_magnitude_for_truthful_lookahead() -> None:
     src = APP.read_text(encoding="utf-8")
 
+    assert 'summary = _ensure_telemetry_summary_cache(bundle)' in src
+    assert 'np.asarray(summary["vx"], dtype=float).reshape(-1)' in src
+    assert 'np.asarray(summary["vy"], dtype=float).reshape(-1)' in src
     assert "vxb, vyb = bundle.ensure_body_velocity_xy()" in src
     assert "v_mag = np.hypot(" in src
-    assert 'np.asarray(vxb, dtype=float).reshape(-1)' in src
-    assert 'np.asarray(vyb, dtype=float).reshape(-1)' in src
+    assert 'np.asarray(vx_body, dtype=float).reshape(-1)' in src
+    assert 'np.asarray(vy_body, dtype=float).reshape(-1)' in src
     assert 'vx = np.asarray(bundle.get("скорость_vx_м_с", 0.0), dtype=float).reshape(-1)' in src
     assert 'vy = np.asarray(bundle.get("скорость_vy_м_с", 0.0), dtype=float).reshape(-1)' in src
     assert "v_mag = np.hypot(vx[:n_v], vy[:n_v])" in src
@@ -66,6 +112,21 @@ def test_desktop_animator_3d_road_preview_uses_speed_magnitude_for_truthful_look
     assert "return float(-lookahead_m), float(history_m)" in src
     assert "return float(-history_m), float(lookahead_m)" in src
     assert "la = self._sampled_road_preview_lookahead_m(current_speed_m_s)" not in src
+
+
+def test_desktop_animator_status_line_uses_aligned_summary_speed_truth() -> None:
+    src = APP.read_text(encoding="utf-8")
+    anchor = 'self._status(f"t={t:.3f}s, v={v:.2f}m/s, file={b.npz_path.name}")'
+    assert anchor in src
+    tail = src.split(anchor)[0][-1400:]
+
+    assert 'summary = _ensure_telemetry_summary_cache(b)' in tail
+    assert 't_status = _sample_series_local(summary["t"], i0=sample_i0, i1=sample_i1, alpha=alpha, default=t)' in tail
+    assert 'vx_status = _sample_series_local(summary["vx"], i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in tail
+    assert 'vy_status = _sample_series_local(summary["vy"], i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in tail
+    assert 'if np.isfinite(float(t_status)):' in tail
+    assert "vxb_status = b.get(" not in tail
+    assert "vyb_status = b.get(" not in tail
 
 
 def test_desktop_animator_geometry_overlays_use_live_viewgeometry_fields() -> None:
@@ -128,8 +189,23 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "interactive_scrub=bool(interactive_scrub or coalesced_seek)" in app_src
     assert "self._scrub_release_timer.start(int(max(0, getattr(self, \"_paused_seek_settle_delay_ms\", 20))))" in app_src
     assert 'key = "svc__corner_signal_cache"' in app_src
+    assert '"stroke": np.asarray(b.get(f"сжатие_подвески_шток_{c}_м", 0.0), dtype=float)' in app_src
+    assert '"strokePos": np.asarray(b.get(f"положение_штока_{c}_м", 0.0), dtype=float)' in app_src
+    assert '"strokeFrac": np.asarray(b.get(f"доля_хода_штока_{c}", 0.0), dtype=float)' in app_src
+    assert '"suspF": np.asarray(b.get(f"сила_подвески_{c}_Н", 0.0), dtype=float)' in app_src
+    assert '"springF": np.asarray(b.get(f"сила_пружины_{c}_Н", 0.0), dtype=float)' in app_src
+    assert '"pneumoF": np.asarray(b.get(f"сила_пневматики_{c}_Н", 0.0), dtype=float)' in app_src
+    assert '"tireCompression": np.asarray(b.get(f"сжатие_шины_{c}_м", 0.0), dtype=float)' in app_src
     assert "self._cell_items" in app_src
     assert "self._corner_cache = _ensure_corner_signal_cache(b)" in app_src
+    assert '"Fподв (Н)"' in app_src
+    assert '"Fпруж (Н)"' in app_src
+    assert '"Fпневм (Н)"' in app_src
+    assert '"Шток Δ (м)"' in app_src
+    assert '"Шина сжатие (м)"' in app_src
+    assert 'title="3D: Кузов/дорога/контакт"' in app_src
+    assert 'action_text="3D: Кузов/дорога/контакт (отдельное окно)"' in app_src
+    assert 'РљСѓР·РѕРІ/РґРѕСЂРѕРіР°/РєРѕРЅС‚Р°РєС‚' not in app_src
     assert "self._corner_metric_cache: Dict[str, Dict[str, Any]] = {}" in app_src
     assert "corner_cache = _ensure_corner_signal_cache(b)" in app_src
     assert "self._corner_metric_cache = metric_cache" in app_src
@@ -164,13 +240,15 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "def _prepare_static_text(self, text_item: QtGui.QStaticText) -> None:" in app_src
     assert 'key = "svc__telemetry_summary_cache"' in app_src
     assert "def _ensure_telemetry_summary_cache(b: DataBundle) -> Dict[str, np.ndarray]:" in app_src
+    assert "t_series = np.asarray(b.t, dtype=float).reshape(-1)" in app_src
+    assert "n_t = int(t_series.size)" in app_src
     assert "vxb, vyb = b.ensure_body_velocity_xy()" in app_src
-    assert "vx_series = np.asarray(vxb, dtype=float).reshape(-1)" in app_src
-    assert "vy_series = np.asarray(vyb, dtype=float).reshape(-1)" in app_src
-    assert "yaw_rate_series = np.asarray(b.ensure_yaw_rate_rad_s(), dtype=float).reshape(-1)" in app_src
+    assert "vx_series = _align_series_length(vxb, n_t, fill=0.0)" in app_src
+    assert "vy_series = _align_series_length(vyb, n_t, fill=0.0)" in app_src
+    assert "yaw_rate_series = _align_series_length(b.ensure_yaw_rate_rad_s(), n_t, fill=0.0)" in app_src
     assert "axb, ayb = b.ensure_body_acceleration_xy()" in app_src
-    assert "ax_series = np.asarray(axb, dtype=float).reshape(-1)" in app_src
-    assert "ay_series = np.asarray(ayb, dtype=float).reshape(-1)" in app_src
+    assert "ax_series = _align_series_length(axb, n_t, fill=0.0)" in app_src
+    assert "ay_series = _align_series_length(ayb, n_t, fill=0.0)" in app_src
     assert "self._value_font = QtGui.QFont(self.font())" in app_src
     assert "self._value_text_pen = QtGui.QPen(QtGui.QColor(234, 238, 243))" in app_src
     assert "self._value_text_pen.setCosmetic(True)" in app_src
@@ -226,14 +304,21 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "axb_arr, ayb_arr = b.ensure_body_acceleration_xy()" in app_src
     assert 'vxb_arr = b.get("скорость_vx_м_с", 0.0)' in app_src
     assert 'vyb_arr = b.get("скорость_vy_м_с", 0.0)' in app_src
-    assert 'axb_series, ayb_series = b.ensure_body_acceleration_xy()' in app_src
-    assert 'ax_series = axb_series' in app_src
-    assert 'ay_series = ayb_series' in app_src
+    assert 'summary = _ensure_telemetry_summary_cache(b)' in app_src
+    assert 'yaw_series = summary["yaw"]' in app_src
+    assert 'vxb_series = summary["vx"]' in app_src
+    assert 'vyb_series = summary["vy"]' in app_src
+    assert 'yaw_rate_series = summary["yaw_rate"]' in app_src
+    assert 'ax_series = summary["ax"]' in app_src
+    assert 'ay_series = summary["ay"]' in app_src
     assert "vel_body_x = float(" in app_src
     assert "vel_body_y = float(" in app_src
     assert "spin_progress_series = np.asarray(_ensure_body_longitudinal_progress_series(b), dtype=float)" in app_src
     assert "spin_progress_m = float(" in app_src
     assert "rolling_progress_m=spin_progress_m" in app_src
+    assert "self._tire_compression_series_map[str(corner)] = np.asarray(" in app_src
+    assert "def _sample_corner_tire_compression_m(" in app_src
+    assert "tire_compressions_m = [" in app_src
     assert "path_progress_m=s_progress_m" not in app_src
     assert "if np.isfinite(float(speed_m_s)) and float(speed_m_s) < -1e-6:" not in app_src
     assert "# ---- Vectors (velocity & acceleration) in local road plane" in app_src
@@ -253,6 +338,8 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert 'self.lbl_v = QtWidgets.QLabel("v = —")' in app_src
     assert "if abs(yaw_rate) > 1e-6 and abs(v_mps) > 1e-3:" in app_src
     assert "R = v_mps / yaw_rate" in app_src
+    assert "a_c = v_mps * yaw_rate" in app_src
+    assert "a_c = ay" not in app_src
     assert "_set_label_text_if_changed(self.lbl_v, f\"v = {_fmt(v_mps, ' m/s', digits=2)}\")" in app_src
     assert "road_forward = _project_vector_to_plane(" in app_src
     assert "road_motion_forward = (" in app_src
@@ -283,9 +370,16 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "def _sample_signed_speed_along_world_path_local(" in app_src
     assert "xw_arr, yw_arr = b.ensure_world_xy()" in app_src
     assert "vxw_arr, vyw_arr = b.ensure_world_velocity_xy()" in app_src
+    assert "yaw_series = b.get(\"yaw_рад\", 0.0)" in app_src
+    assert "yaw_value = float(" in app_src
+    assert "_sample_angle_series_local(" in app_src
+    assert "vxw = float(body_vx * math.cos(yaw_value) - body_vy * math.sin(yaw_value))" in app_src
+    assert "vyw = float(body_vx * math.sin(yaw_value) + body_vy * math.cos(yaw_value))" in app_src
     assert "tangent_x = float(tx / tangent_norm)" in app_src
     assert "tangent_y = float(ty / tangent_norm)" in app_src
     assert "v_proj = float(vxw * tangent_x + vyw * tangent_y)" in app_src
+    assert "signed_speed_hint = _sample_signed_speed_along_world_path_local(" in app_src
+    assert "return float(math.copysign(speed_mag, signed_speed_hint))" in app_src
     assert "def _hud_motion_window_extents(self, *, signed_body_forward_m_s: float) -> tuple[float, float]:" in app_src
     assert "v_forward_signed_m_s = _sample_signed_speed_along_world_path_local(" in app_src
     assert "default_signed_m_s=float(sample(vxb_series, 0.0))," in app_src
@@ -297,6 +391,12 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "v_forward_signed_m_s = float(sample(vxb_series, 0.0))" not in app_src
     assert "axis_v_xyz=road_side," in app_src
     assert "def _camera_view_direction_local_xyz(self, *, target_xyz: Optional[np.ndarray] = None) -> np.ndarray:" in app_src
+    assert "def _set_camera_center_if_needed(self, center_xyz: np.ndarray) -> None:" in app_src
+    assert "follow_center = np.array(" in app_src
+    assert "0.2 * float(max(0.1, self.geom.frame_height))" in app_src
+    assert 'self.view.opts["center"] = pg.Vector(float(follow_center[0]), float(follow_center[1]), float(follow_center[2]))' in app_src
+    assert "self._last_camera_center_key: Optional[tuple[int, int, int]] = None" in app_src
+    assert "self._set_camera_center_if_needed(np.asarray(center_draw, dtype=float).reshape(3))" in app_src
     assert "if target_xyz is not None:" in app_src
     assert 'target = np.asarray(target_xyz, dtype=float).reshape(3)' in app_src
     assert 'camera_view_dir = self._camera_view_direction_local_xyz(target_xyz=np.asarray(center_draw, dtype=float))' in app_src
@@ -313,6 +413,10 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._pipe_out_brush = QtGui.QBrush(QtGui.QColor(240, 90, 90, 220))" in app_src
     assert 'self._pressure_static_text = QtGui.QStaticText("P: —")' in app_src
     assert 'self._flow_static_text = QtGui.QStaticText("in:   0.0 g/s\\nout:  0.0 g/s")' in app_src
+    assert "self._last_sample_t_s: float | None = None" in app_src
+    assert "def _time_scaled_indicator_response(self, sample_t_s: float | None, *, base_response: float = 0.18) -> float:" in app_src
+    assert "flow_response = self._time_scaled_indicator_response(_sample_t, base_response=0.18)" in app_src
+    assert "a = float(flow_response)" in app_src
     assert "def _prepare_static_text(self, text_item: QtGui.QStaticText) -> None:" in app_src
     assert "def _set_static_text_if_changed(self, text_item: QtGui.QStaticText, text: str) -> None:" in app_src
     assert 'self._set_static_text_if_changed(self._pressure_static_text, p_txt)' in app_src
@@ -371,8 +475,9 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "arr = series if isinstance(series, np.ndarray) else np.asarray(series, dtype=float)" in app_src
     assert "if ii0 == ii1 or a <= 1e-12:" in app_src
     assert "if a >= 1.0 - 1e-12:" in app_src
-    assert "win_i0 = max(0, i - 200)" in app_src
-    assert "win_i1 = min(n, i + 400)" in app_src
+    assert 'idx_ref = int(_clamp(int(sample_i0 if float(alpha) < 0.5 else sample_i1), 0, n - 1))' in app_src
+    assert "win_i0 = max(0, idx_ref - 200)" in app_src
+    assert "win_i1 = min(n, idx_ref + 400)" in app_src
     assert "for panel in (self.axleF, self.axleR, self.sideL, self.sideR):" in app_src
     assert "panel.set_bundle(b)" in app_src
     assert "def _geom_key(" in app_src
@@ -484,7 +589,7 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "dynamic_lines: list[str] = [f\"v  {v_mps*3.6:6.1f} км/ч\"]" in app_src
     assert "s_world = _ensure_world_progress_series(b)" in app_src
     assert "context_lines: list[str] = []" in app_src
-    assert "acceptance_lines = list(format_acceptance_hud_lines(b, i))" in app_src
+    assert "acceptance_lines = list(format_acceptance_hud_lines(b, i, sample_t=_sample_t))" in app_src
     assert "dynamic_lines = self._elide_hud_lines(dynamic_lines, fnt, max_px)" in app_src
     assert "context_lines = self._elide_hud_lines(context_lines, fnt, max_px)" in app_src
     assert "static_txt = self._hud_static_text(b, fnt, max_px)" in app_src
@@ -510,7 +615,8 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "air = int(sample(sig[\"air\"], 0.0) > 0.5)" in app_src
     assert "v = sample(arr, 0.0) if isinstance(arr, np.ndarray) else 0.0" in app_src
     assert "zr = sample(road_arr, float(\"nan\")) if road_arr is not None else float(\"nan\")" in app_src
-    assert "s0 = sample(s, float(s[idx]))" in app_src
+    assert 'idx_ref = int(_clamp(int(sample_i0 if float(alpha) < 0.5 else sample_i1), 0, len(s) - 1))' in app_src
+    assert "s0 = sample(s, float(s[idx_ref]))" in app_src
     assert "zc = sample(z_arr, float(\"nan\"))" in app_src
     assert "s_progress_series = np.asarray(_ensure_world_progress_series(b), dtype=float)" in app_src
     assert "s_path = np.asarray(_ensure_world_progress_series(bundle), dtype=float).reshape(-1)" in app_src
@@ -612,3 +718,38 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "if idx_i == self._idx:" in hmi_src
     assert "# The rounded panel chrome is already cached with AA; dynamic trend redraw only needs crisp text." in hmi_src
     assert "p.setRenderHints(QtGui.QPainter.TextAntialiasing)" in hmi_src
+
+
+def test_desktop_animator_source_routes_hot_3d_draw_paths_through_safe_helpers() -> None:
+    app_src = APP.read_text(encoding="utf-8")
+
+    for needle in (
+        "def _set_line_item_data(",
+        "or np.any(faces < 0)",
+        "or np.any(faces >= verts.shape[0])",
+        "_set_poly_mesh(self._chassis_mesh, v_box, self._box_faces)",
+        "face_colors_rgba_u8=wheel_face_colors",
+        "_set_line_item_data(self._contact_pts, marker_pos, colors_rgba=marker_cols)",
+        "_set_line_item_data(self._contact_links, link_pos, colors_rgba=link_cols)",
+        "face_colors_rgba_u8=road_face_colors",
+        "_set_line_item_data(self._road_edges, edge, colors_rgba=edge_colors)",
+        "_set_line_item_data(self._road_stripes, grid_lines, colors_rgba=stripe_colors)",
+    ):
+        assert needle in app_src
+
+
+def test_desktop_animator_source_uses_named_gl_draw_diagnostics() -> None:
+    app_src = APP.read_text(encoding="utf-8")
+
+    for needle in (
+        "class _DiagnosticGLViewWidget(gl.GLViewWidget):",
+        "self._anim_draw_failure_counts: Dict[str, int] = {}",
+        'self.view = _DiagnosticGLViewWidget() if _DiagnosticGLViewWidget is not None else gl.GLViewWidget()',
+        'print(f"Error while drawing item {name} ({type(i).__name__}).")',
+        'print(f"Further draw errors for item {name} are suppressed.")',
+        "def _refresh_gl_debug_names(self) -> None:",
+        '_set_gl_item_debug_name(self._grid, "grid")',
+        '("_road_mesh", "road_mesh")',
+        '("_wheel_meshes", "wheel_mesh")',
+    ):
+        assert needle in app_src

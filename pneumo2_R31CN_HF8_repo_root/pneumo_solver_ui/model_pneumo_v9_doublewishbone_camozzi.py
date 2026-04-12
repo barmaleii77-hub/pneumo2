@@ -1536,8 +1536,8 @@ def build_network_full(params: dict):
     # Два дросселя (две линии) для раздельной настройки: CAP→ROD и ROD→CAP (условно: сжатие/отбой)
     alpha_дроссель_диагональ_CAP_ROD = params.get('открытие_дросселя_Ц2_CAP_в_ROD', 0.35)
     alpha_дроссель_диагональ_ROD_CAP = params.get('открытие_дросселя_Ц2_ROD_в_CAP', 0.35)
-    alpha_дроссель_выхлоп_Pmin = params.get('открытие_дросселя_выхлоп_Pmin', 0.30)
-    alpha_дроссель_выхлоп_Pmid = params.get('открытие_дросселя_выхлоп_Pmid', 0.45)
+    alpha_дроссель_выхлоп_Pmin = params.get('открытие_дросселя_выхлоп_Pmin', 0.08)
+    alpha_дроссель_выхлоп_Pmid = params.get('открытие_дросселя_выхлоп_Pmid', 0.18)
     alpha_дроссель_выхлоп_Pmax = params.get('открытие_дросселя_выхлоп_Pmax', 0.70)
 
 
@@ -1664,8 +1664,8 @@ def build_network_full(params: dict):
     # Сброс/предохранение Ресивер3 -> АТМ  (адаптивность)
     # -------------------------
     Pmax = params.get('давление_Pmax_предохран', P_ATM + 8e5)
-    Pmid = params.get('давление_Pmid_сброс', P_ATM + 4e5)
-    Pmin_rel = params.get('давление_Pmin_сброс', P_ATM + 2e5)
+    Pmid = params.get('давление_Pmid_сброс', P_ATM + 6.8e5)
+    Pmin_rel = params.get('давление_Pmin_сброс', P_ATM + 4.5e5)
 
     # Предохранительный клапан (эквивалент Camozzi VMR 1/8-B10 как "overpressure exhaust valve")
     # В модели это "relief" элемент: открывается при p(Р3) > Pmax
@@ -1964,7 +1964,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             k_pneumo_wheel = np.zeros(4, dtype=float)
             pneumo_rep = {}
             if include_pneumo:
-                P_ref_raw = params.get('corner_pneumo_pressure_ref_Pa', params.get('углы_пневмо_P_ref_Па', params.get('давление_Pmid_сброс', P_ATM + 4e5)))
+                P_ref_raw = params.get('corner_pneumo_pressure_ref_Pa', params.get('углы_пневмо_P_ref_Па', params.get('давление_Pmid_сброс', P_ATM + 6.8e5)))
                 P_ref_abs = p_abs_from_param(P_ref_raw, p_atm_Pa=float(P_ATM))
                 n_poly = float(params.get('corner_pneumo_stiffness_n', params.get('углы_пневмо_n', 1.4)))
                 vol_factor = float(params.get('corner_pneumo_stiffness_volume_factor', params.get('углы_пневмо_коэф_объема', 1.0)))
@@ -2734,7 +2734,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     # -------------------------
     # Начальные давления
     # -------------------------
-    Pmin_abs = params.get('давление_Pmin_сброс', P_ATM + 2e5)
+    Pmin_abs = params.get('давление_Pmin_сброс', P_ATM + 4.5e5)
     Pacc_abs = params.get('начальное_давление_аккумулятора', P_ATM + 6e5)
 
     p0 = np.ones(N) * Pmin_abs
@@ -8677,16 +8677,16 @@ def run_default_and_export_excel(output_path: str = 'результаты_пол
     params = {
         # Уставки адаптивности (ресивер 3) и питание Р2 из аккумулятора
         'давление_Pmin_питание_Ресивер2': P_ATM + 2e5,
-        'давление_Pmin_сброс': P_ATM + 2e5,
-        'давление_Pmid_сброс': P_ATM + 4e5,
+        'давление_Pmin_сброс': P_ATM + 4.5e5,
+        'давление_Pmid_сброс': P_ATM + 6.8e5,
         'давление_Pmax_предохран': P_ATM + 8e5,
         'начальное_давление_аккумулятора': P_ATM + 6e5,
 
         # Открытия дросселей SCO (0..1) = доля от максимального прохода по d_max выбранной модели
         'открытие_дросселя_Ц2_CAP_в_ROD': 0.35,
         'открытие_дросселя_Ц2_ROD_в_CAP': 0.35,
-        'открытие_дросселя_выхлоп_Pmin': 0.30,
-        'открытие_дросселя_выхлоп_Pmid': 0.45,
+        'открытие_дросселя_выхлоп_Pmin': 0.08,
+        'открытие_дросселя_выхлоп_Pmid': 0.18,
         'открытие_дросселя_выхлоп_Pmax': 0.70,
 
         # Нелинейная пружина: табличная добавочная сила относительно точки "середина хода"

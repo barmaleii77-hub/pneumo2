@@ -25,6 +25,6 @@ def test_animator_source_scene_grade_drives_body_top_runtime() -> None:
         'key="body-top-sheen-scene-grade"',
         "roof_sweep_rgba = self._body_top_sweep_rgba(",
         'key="body-top-sweep-scene-grade"',
-        "self._body_top_sweep_line.setData(pos=sweep_vertices, color=roof_sweep_colors)",
+        "_set_line_item_data(self._body_top_sweep_line, sweep_vertices, colors_rgba=roof_sweep_colors)",
     ):
         assert needle in APP

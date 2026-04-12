@@ -78,6 +78,16 @@ def test_selected_run_details_renderer_surfaces_contract_packaging_and_log() -> 
         penalty_tol=0.25,
         objective_contract_path=Path("C:/tmp/objective_contract.json"),
         log_path=Path("C:/tmp/run.log"),
+        handoff_preset_tag="ray/portfolio/q2",
+        handoff_budget=84,
+        handoff_seed_count=6,
+        handoff_suite_family="auto_ring",
+        handoff_requires_full_ring_validation=True,
+        handoff_reason_lines=(
+            "Почему этот preset: ring-fragments=4, full-ring=yes; seed-bridge взял 6 кандидатов.",
+            "Источник handoff-профиля: staged_then_coordinator; proposer=portfolio (auto_tuner), q=2 (auto_tuner), budget=84.",
+        ),
+        handoff_plan_path=Path("C:/tmp/run/coordinator_handoff/coordinator_handoff_plan.json"),
     )
 
     render_selected_optimization_run_details(
@@ -100,7 +110,65 @@ def test_selected_run_details_renderer_surfaces_contract_packaging_and_log() -> 
     assert ("caption", r"Baseline override at launch: `C:\tmp\workspace\baselines\by_problem\p_demo\baseline_best.json`") in st.calls
     assert any(kind == "warning" and "different optimization problem" in text for kind, text in st.calls)
     assert any(kind == "warning" and "Hash mode differs from current launch contract" in text for kind, text in st.calls)
+    assert ("write", "**Coordinator handoff:** ray/portfolio/q2") in st.calls
+    assert any(kind == "caption" and "budget=84" in text and "seed-candidates=6" in text for kind, text in st.calls)
+    assert any(kind == "caption" and "seed-bridge взял 6 кандидатов" in text for kind, text in st.calls)
+    assert any(kind == "caption" and "Handoff plan:" in text for kind, text in st.calls)
     assert ("write", "**Набор целей оптимизации:** comfort, roll") in st.calls
     assert ("write", "**Жёсткий порог по штрафу:** `penalty_total` (tol=0.25)") in st.calls
     assert any(kind == "info" and "набор целей, ключ штрафа, допуск по штрафу" in text for kind, text in st.calls)
     assert ("code", "line1\nline2") in st.calls
+
+
+def test_selected_run_details_renderer_passes_handoff_callback_for_staged_run() -> None:
+    st = _FakeStreamlit()
+    events: list[tuple[str, object]] = []
+    summary = SimpleNamespace(
+        backend="stage",
+        run_dir=Path("C:/tmp/staged_run"),
+        result_path=None,
+        started_at="2026-04-08 20:00:00",
+        note="",
+        last_error="",
+        problem_hash="",
+        problem_hash_mode="stable",
+        baseline_source_label="",
+        baseline_source_path=None,
+        objective_keys=("comfort",),
+        penalty_key="penalty_total",
+        penalty_tol=0.0,
+        objective_contract_path=None,
+        log_path=Path("C:/tmp/run.log"),
+        pipeline_mode="staged",
+    )
+
+    render_selected_optimization_run_details(
+        st,
+        summary,
+        current_problem_hash="",
+        current_objective_keys=("comfort",),
+        current_penalty_key="penalty_total",
+        current_penalty_tol=0.0,
+        current_problem_hash_mode="stable",
+        load_log_text=lambda _: "ok",
+        start_handoff_fn=lambda run_dir: events.append(("start", run_dir)) or True,
+        render_handoff_action_fn=lambda _st, **kwargs: events.append(
+            (
+                "handoff",
+                kwargs["source_run_dir"],
+                kwargs["start_handoff_fn"] is not None,
+                kwargs["button_key"],
+                kwargs.get("recommended_action", True),
+                kwargs.get("button_label", ""),
+            )
+        ) or False,
+    )
+
+    assert (
+        "handoff",
+        Path("C:/tmp/staged_run"),
+        True,
+        "history_start_handoff_staged_run",
+        True,
+        "",
+    ) in events

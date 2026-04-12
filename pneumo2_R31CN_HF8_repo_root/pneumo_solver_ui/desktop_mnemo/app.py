@@ -42,10 +42,18 @@ from pneumo_solver_ui.ui_svg_flow_helpers import default_svg_pressure_nodes
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 UI_ROOT = PROJECT_ROOT / "pneumo_solver_ui"
 SCHEME_JSON_PATH = UI_ROOT / "PNEUMO_SCHEME.json"
+CANONICAL_PNEUMO_SCHEME_SVG_PATHS: tuple[Path, ...] = (
+    UI_ROOT / "data" / "pneumo_scheme" / "pneumo_scheme.svg",
+    UI_ROOT / "assets" / "pneumo_scheme.svg",
+)
+SOURCE_OF_TRUTH_PNEUMO_IMAGE_PATH = PROJECT_ROOT / "docs" / "PneumoScheme_source_of_truth" / "PneumoScheme_corrected2.png"
 
 VIEWBOX_W = 2200.0
 VIEWBOX_H = 1500.0
 VIEWBOX = f"0 0 {int(VIEWBOX_W)} {int(VIEWBOX_H)}"
+REFERENCE_SCHEME_VIEWBOX_W = 1920.0
+REFERENCE_SCHEME_VIEWBOX_H = 1080.0
+REFERENCE_SCHEME_SCENE_INSET = (84.0, 150.0, 84.0, 140.0)
 PLAYHEAD_STORAGE_KEY = "pneumo_desktop_mnemo_playhead"
 EVENT_LOG_SCHEMA_VERSION = "desktop_mnemo_event_log_v1"
 CORNER_ORDER: tuple[str, str, str, str] = ("ЛП", "ПП", "ЛЗ", "ПЗ")
@@ -65,6 +73,48 @@ PRESSURE_HEAT_STOPS: tuple[tuple[float, tuple[int, int, int]], ...] = (
 FLOW_FORWARD_RGB = (99, 211, 245)
 FLOW_REVERSE_RGB = (240, 147, 107)
 FLOW_IDLE_RGB = (77, 106, 118)
+
+REFERENCE_COMPONENT_NODE_ANCHORS_SVG: dict[str, tuple[float, float]] = {
+    "Ресивер1": (557.455, 540.0),
+    "Ресивер2": (627.585, 540.0),
+    "Аккумулятор": (1041.35, 540.0),
+    "Ресивер3": (1244.73, 540.0),
+}
+
+REFERENCE_INDICATOR_NODE_ANCHORS_SVG: dict[str, tuple[float, float]] = {
+    "узел_после_рег_Pmin_питание_Р2": (873.8483, 541.6678),
+    "узел_после_рег_заряд_аккумулятора": (1112.2898, 541.6678),
+    "узел_после_предохран_Pmax": (1317.8694, 541.6865),
+    "узел_после_рег_Pmid": (1285.2229, 510.3164),
+    "узел_после_ОК_Pmid": (1373.9732, 485.5826),
+    "узел_после_рег_Pmin_сброс": (1285.1964, 573.4269),
+    "узел_после_ОК_Pmin": (1373.9732, 597.7904),
+}
+
+REFERENCE_CHAMBER_NODE_ANCHORS_SVG: dict[str, tuple[float, float]] = {
+    "Ц1_ЛП_БП": (616.6456, 145.1721),
+    "Ц1_ЛП_ШП": (616.6456, 369.5877),
+    "Ц2_ЛП_БП": (719.6435, 145.1721),
+    "Ц2_ЛП_ШП": (719.6435, 369.5877),
+    "Ц1_ПП_БП": (1037.4248, 145.1721),
+    "Ц1_ПП_ШП": (1037.4248, 313.4838),
+    "Ц2_ПП_БП": (1317.9442, 145.1721),
+    "Ц2_ПП_ШП": (1317.9442, 313.4838),
+    "Ц1_ЛЗ_БП": (616.6456, 706.2111),
+    "Ц1_ЛЗ_ШП": (616.6456, 930.6267),
+    "Ц2_ЛЗ_БП": (719.6435, 706.2111),
+    "Ц2_ЛЗ_ШП": (719.6435, 930.6267),
+    "Ц1_ПЗ_БП": (1037.4248, 762.3150),
+    "Ц1_ПЗ_ШП": (1037.4248, 930.6267),
+    "Ц2_ПЗ_БП": (1317.9442, 762.3150),
+    "Ц2_ПЗ_ШП": (1317.9442, 930.6267),
+}
+
+REFERENCE_NODE_ANCHORS_SVG: dict[str, tuple[float, float]] = {
+    **REFERENCE_COMPONENT_NODE_ANCHORS_SVG,
+    **REFERENCE_INDICATOR_NODE_ANCHORS_SVG,
+    **REFERENCE_CHAMBER_NODE_ANCHORS_SVG,
+}
 
 SUPPLY_POSITIONS: dict[str, tuple[float, float]] = {
     "АТМ": (180.0, 150.0),
@@ -247,6 +297,8 @@ class MnemoDataset:
     bundle: DataBundle
     dataset_id: str
     svg_inline: str
+    reference_svg_inline: str
+    reference_scheme_source: str
     mapping: dict[str, Any]
     edge_names: list[str]
     node_names: list[str]
@@ -919,6 +971,76 @@ def _write_event_log_sidecar(
     return out_path
 
 
+def _load_canonical_pneumo_scheme_svg() -> tuple[str, str]:
+    for path in CANONICAL_PNEUMO_SCHEME_SVG_PATHS:
+        try:
+            if not path.exists():
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+        if "<svg" in text:
+            return text, str(path.resolve())
+    return "", ""
+
+
+def _reference_scheme_scene_rect_tuple() -> tuple[float, float, float, float]:
+    left_inset, top_inset, right_inset, bottom_inset = REFERENCE_SCHEME_SCENE_INSET
+    bounds_width = VIEWBOX_W - left_inset - right_inset
+    bounds_height = VIEWBOX_H - top_inset - bottom_inset
+    scale = min(
+        bounds_width / max(1.0, REFERENCE_SCHEME_VIEWBOX_W),
+        bounds_height / max(1.0, REFERENCE_SCHEME_VIEWBOX_H),
+    )
+    width = REFERENCE_SCHEME_VIEWBOX_W * scale
+    height = REFERENCE_SCHEME_VIEWBOX_H * scale
+    left = left_inset + (bounds_width - width) * 0.5
+    top = top_inset + (bounds_height - height) * 0.5
+    return (left, top, width, height)
+
+
+def _reference_svg_point_to_scene(x: float, y: float) -> tuple[float, float]:
+    left, top, width, height = _reference_scheme_scene_rect_tuple()
+    scene_x = left + (float(x) / max(1.0, REFERENCE_SCHEME_VIEWBOX_W)) * width
+    scene_y = top + (float(y) / max(1.0, REFERENCE_SCHEME_VIEWBOX_H)) * height
+    return (scene_x, scene_y)
+
+
+def _reference_node_anchor_positions(node_names: list[str]) -> dict[str, tuple[float, float]]:
+    node_set = {str(name) for name in node_names if str(name).strip()}
+    anchors: dict[str, tuple[float, float]] = {}
+    for node_name, svg_point in REFERENCE_NODE_ANCHORS_SVG.items():
+        if node_name not in node_set:
+            continue
+        anchors[node_name] = _reference_svg_point_to_scene(*svg_point)
+    return anchors
+
+
+def _reference_diagonal_geometry_positions(node_names: list[str]) -> dict[str, tuple[float, float]]:
+    node_set = {str(name) for name in node_names if str(name).strip()}
+    positions: dict[str, tuple[float, float]] = {}
+    for node_name in node_set:
+        match = DIAGONAL_RE.match(node_name)
+        if not match:
+            continue
+        src_corner = str(match.group("src_corner"))
+        src_ch = "БП" if match.group("src_ch") == "CAP" else "ШП"
+        dst_corner = str(match.group("dst_corner"))
+        dst_ch = "БП" if match.group("dst_ch") == "CAP" else "ШП"
+        src_name = f"Ц2_{src_corner}_{src_ch}"
+        dst_name = f"Ц2_{dst_corner}_{dst_ch}"
+        a = REFERENCE_CHAMBER_NODE_ANCHORS_SVG.get(src_name)
+        b = REFERENCE_CHAMBER_NODE_ANCHORS_SVG.get(dst_name)
+        if a is None or b is None:
+            continue
+        offset = 24.0 if match.group("src_ch") == "CAP" else -24.0
+        if src_corner in {"ПП", "ПЗ"}:
+            offset *= -1.0
+        t = 0.35 if str(match.group("stage")) == "междуОКиДР" else 0.68
+        positions[node_name] = _reference_svg_point_to_scene(*_offset_point_along_perp(a, b, t, offset))
+    return positions
+
+
 def _load_canonical_edges() -> tuple[list[str], dict[str, dict[str, Any]]]:
     obj = json.loads(SCHEME_JSON_PATH.read_text(encoding="utf-8"))
     nodes = [str(item.get("name")) for item in obj.get("canonical", {}).get("nodes", []) if item.get("name")]
@@ -1051,11 +1173,16 @@ def _edge_mid_rail(edge_def: dict[str, Any]) -> float | None:
 
 def _build_node_positions(node_names: list[str]) -> dict[str, tuple[float, float]]:
     positions = dict(SUPPLY_POSITIONS)
+    positions.update(_reference_node_anchor_positions(node_names))
+    positions.update(_reference_diagonal_geometry_positions(node_names))
     chamber_positions: dict[str, tuple[float, float]] = {}
 
     for node_name in node_names:
         match = CHAMBER_RE.match(node_name)
         if not match:
+            continue
+        if node_name in positions:
+            chamber_positions[node_name] = positions[node_name]
             continue
         corner = str(match.group("corner"))
         cyl = str(match.group("cyl"))
@@ -1401,6 +1528,888 @@ def _node_rows_for_index(dataset: MnemoDataset, idx: int, *, overlay_only: bool 
     return rows
 
 
+def _node_pressure_for_index(dataset: MnemoDataset | None, node_name: str, idx: int) -> float | None:
+    if dataset is None or dataset.bundle.p is None or not node_name:
+        return None
+    p_arr = dataset.bundle.p.column(node_name, default=None)
+    if p_arr is None:
+        return None
+    p_vals = _bar_g(np.asarray(p_arr, dtype=float), dataset.p_atm)
+    if p_vals.size == 0:
+        return None
+    clamped = max(0, min(int(idx), p_vals.size - 1))
+    return _finite_or_none(p_vals[clamped])
+
+
+def _node_pressure_series_bar_g(dataset: MnemoDataset | None, node_name: str) -> np.ndarray | None:
+    if dataset is None or dataset.bundle.p is None or not node_name:
+        return None
+    p_arr = dataset.bundle.p.column(node_name, default=None)
+    if p_arr is None:
+        return None
+    p_vals = _bar_g(np.asarray(p_arr, dtype=float), dataset.p_atm)
+    if p_vals.size == 0:
+        return None
+    return np.asarray(p_vals, dtype=float)
+
+
+def _edge_flow_series_scaled(dataset: MnemoDataset | None, edge_name: str) -> np.ndarray | None:
+    if dataset is None or dataset.bundle.q is None or not edge_name:
+        return None
+    q_arr = dataset.bundle.q.column(edge_name, default=None)
+    if q_arr is None:
+        return None
+    q_vals = np.asarray(q_arr, dtype=float) * float(dataset.q_scale)
+    if q_vals.size == 0:
+        return None
+    return np.asarray(q_vals, dtype=float)
+
+
+def _edge_open_series(dataset: MnemoDataset | None, edge_name: str) -> np.ndarray | None:
+    if dataset is None or dataset.bundle.open is None or not edge_name:
+        return None
+    open_arr = dataset.bundle.open.column(edge_name, default=None)
+    if open_arr is None:
+        return None
+    values = np.asarray(open_arr, dtype=int)
+    if values.size == 0:
+        return None
+    return values.reshape(-1)
+
+
+def _route_pressure_strip_trend_meta(
+    *,
+    time_s: np.ndarray | list[float],
+    p1_values: np.ndarray | list[float] | None,
+    p2_values: np.ndarray | list[float] | None,
+    idx: int,
+    max_points: int = 6,
+) -> dict[str, Any]:
+    pressure_meta = _edge_recent_pressure_meta(
+        time_s=time_s,
+        p1_values=p1_values,
+        p2_values=p2_values,
+        idx=idx,
+        max_points=max_points,
+    )
+    if not bool(pressure_meta.get("pressure_history_available")):
+        return {
+            "trend_available": False,
+            "trend_status": "ΔP без истории",
+            "trend_badge": "ΔP?",
+            "trend_tone": "neutral",
+            "trend_summary": "Нужны хотя бы два соседних кадра давления.",
+        }
+
+    p1_arr = np.asarray(p1_values, dtype=float).reshape(-1)
+    p2_arr = np.asarray(p2_values, dtype=float).reshape(-1)
+    sample_count = min(p1_arr.size, p2_arr.size)
+    if sample_count <= 0:
+        return {
+            "trend_available": False,
+            "trend_status": "ΔP без истории",
+            "trend_badge": "ΔP?",
+            "trend_tone": "neutral",
+            "trend_summary": "Нужны хотя бы два соседних кадра давления.",
+        }
+
+    delta_arr = (p1_arr[:sample_count] - p2_arr[:sample_count]).astype(float)
+    clamped_idx = int(max(0, min(idx, sample_count - 1)))
+    start_idx = max(0, clamped_idx - max(2, int(max_points)) + 1)
+    recent_delta = delta_arr[start_idx : clamped_idx + 1]
+    last_delta = float(recent_delta[-1]) if recent_delta.size else 0.0
+    prev_delta = float(recent_delta[-2]) if recent_delta.size >= 2 else float(last_delta)
+    peak_abs = float(np.max(np.abs(recent_delta))) if recent_delta.size else 0.0
+    delta_step = float(last_delta - prev_delta)
+    step_floor = max(0.006, peak_abs * 0.005)
+    near_zero_floor = max(0.05, peak_abs * 0.12)
+    sign_changes = sum(
+        1
+        for prev, nxt in zip(recent_delta[:-1], recent_delta[1:])
+        if abs(float(prev)) > near_zero_floor
+        and abs(float(nxt)) > near_zero_floor
+        and math.copysign(1.0, float(prev)) != math.copysign(1.0, float(nxt))
+    )
+
+    if peak_abs <= 0.05:
+        status = "ΔP выровнен"
+        badge = "ΔP≈"
+        tone = "neutral"
+    elif sign_changes >= 1:
+        status = "ΔP сменил знак"
+        badge = "ΔP↕"
+        tone = "warn"
+    elif abs(last_delta) <= near_zero_floor and abs(prev_delta) > abs(last_delta) and delta_step < -step_floor:
+        status = "ΔP выравнивается"
+        badge = "ΔP≈"
+        tone = "info"
+    elif delta_step > step_floor:
+        status = "ΔP нарастает"
+        badge = "ΔP↑"
+        tone = "info"
+    elif delta_step < -step_floor:
+        status = "ΔP спадает"
+        badge = "ΔP↓"
+        tone = "info"
+    else:
+        status = "ΔP удерживается"
+        badge = "ΔP="
+        tone = "ok"
+
+    span_s = float(pressure_meta.get("pressure_history_span_s") or 0.0)
+    return {
+        "trend_available": True,
+        "trend_status": status,
+        "trend_badge": badge,
+        "trend_tone": tone,
+        "trend_last_delta": last_delta,
+        "trend_prev_delta": prev_delta,
+        "trend_summary": f"{status} • {span_s:0.2f} s • текущее {last_delta:+0.2f} бар",
+    }
+
+
+def _route_pressure_strip_flow_meta(
+    *,
+    time_s: np.ndarray | list[float],
+    q_values: np.ndarray | list[float] | None,
+    open_values: np.ndarray | list[int] | None,
+    idx: int,
+    q_unit: str,
+    max_points: int = 6,
+) -> dict[str, Any]:
+    if q_values is None:
+        return {
+            "q_available": False,
+            "q_status": "Q без истории",
+            "q_badge": "Q?",
+            "q_tone": "neutral",
+            "q_summary": "Нужны хотя бы два соседних кадра расхода.",
+        }
+
+    q_arr = np.asarray(q_values, dtype=float).reshape(-1)
+    if q_arr.size <= 1:
+        return {
+            "q_available": False,
+            "q_status": "Q без истории",
+            "q_badge": "Q?",
+            "q_tone": "neutral",
+            "q_summary": "Нужны хотя бы два соседних кадра расхода.",
+        }
+
+    t_arr = np.asarray(time_s, dtype=float).reshape(-1)
+    if t_arr.size != q_arr.size:
+        t_arr = np.arange(q_arr.size, dtype=float)
+
+    clamped_idx = int(max(0, min(idx, q_arr.size - 1, t_arr.size - 1)))
+    start_idx = max(0, clamped_idx - max(2, int(max_points)) + 1)
+    recent_q = q_arr[start_idx : clamped_idx + 1]
+    recent_t = t_arr[start_idx : clamped_idx + 1]
+    recent_open = None
+    if open_values is not None:
+        open_arr = np.asarray(open_values, dtype=int).reshape(-1)
+        if open_arr.size:
+            recent_open = open_arr[start_idx : min(clamped_idx + 1, open_arr.size)]
+
+    if recent_q.size <= 1:
+        return {
+            "q_available": False,
+            "q_status": "Q без истории",
+            "q_badge": "Q?",
+            "q_tone": "neutral",
+            "q_summary": "Нужны хотя бы два соседних кадра расхода.",
+        }
+
+    q_now = float(recent_q[-1])
+    q_prev = float(recent_q[-2])
+    peak_abs = float(np.max(np.abs(q_arr))) if q_arr.size else 0.0
+    active_floor = max(1.0e-6, peak_abs * 0.08)
+    change_floor = max(active_floor * 0.35, peak_abs * 0.12)
+    delta_abs = abs(q_now) - abs(q_prev)
+    active_signs = [int(np.sign(val)) for val in recent_q if abs(float(val)) > active_floor]
+    sign_changes = sum(1 for prev, nxt in zip(active_signs[:-1], active_signs[1:]) if prev != nxt)
+    open_changed = bool(
+        recent_open is not None
+        and recent_open.size >= 2
+        and np.any(recent_open[1:] != recent_open[:-1])
+    )
+    span_s = float(recent_t[-1] - recent_t[0]) if recent_t.size >= 2 else 0.0
+
+    if peak_abs <= active_floor and abs(q_now) <= active_floor:
+        status = "Q спокоен"
+        badge = "Q≈"
+        tone = "neutral"
+    elif sign_changes >= 1 and abs(q_now) > active_floor:
+        status = "Q сменил знак"
+        badge = "Q↕"
+        tone = "warn"
+    elif open_changed and abs(q_now) > active_floor and delta_abs > (change_floor * 0.5):
+        status = "Q после переключения"
+        badge = "Q⇢"
+        tone = "info"
+    elif delta_abs > change_floor:
+        status = "Q нарастает"
+        badge = "Q↑"
+        tone = "info"
+    elif delta_abs < -change_floor:
+        status = "Q спадает"
+        badge = "Q↓"
+        tone = "info"
+    elif abs(q_now) > active_floor:
+        status = "Q удерживается"
+        badge = "Q="
+        tone = "ok"
+    else:
+        status = "Q затихает"
+        badge = "Q≈"
+        tone = "neutral"
+
+    return {
+        "q_available": True,
+        "q_status": status,
+        "q_badge": badge,
+        "q_tone": tone,
+        "q_summary": f"{status} • {span_s:0.2f} s • текущее {q_now:+0.1f} {q_unit}",
+        "q_now": q_now,
+        "q_prev": q_prev,
+    }
+
+
+def _route_pressure_strip_history_meta(
+    *,
+    time_s: np.ndarray | list[float],
+    q_values: np.ndarray | list[float] | None,
+    open_values: np.ndarray | list[int] | None,
+    idx: int,
+    q_unit: str,
+    max_points: int = 6,
+) -> dict[str, Any]:
+    if q_values is None:
+        return {
+            "q_history_available": False,
+            "q_history_summary": "история расхода ещё не накоплена",
+            "q_history_points": [],
+            "q_history_open_blocks": [],
+            "q_history_span_s": 0.0,
+            "q_history_peak_abs": 0.0,
+            "q_history_zero_y": 0.5,
+        }
+
+    history_meta = _edge_recent_history_meta(
+        time_s=time_s,
+        q_values=q_values,
+        open_values=open_values,
+        idx=idx,
+        max_points=max_points,
+    )
+    return {
+        "q_history_available": bool(history_meta.get("history_available")),
+        "q_history_summary": _edge_recent_history_summary(history_meta, q_unit),
+        "q_history_points": list(history_meta.get("history_points") or []),
+        "q_history_open_blocks": list(history_meta.get("history_open_blocks") or []),
+        "q_history_span_s": float(history_meta.get("history_span_s") or 0.0),
+        "q_history_peak_abs": float(history_meta.get("history_peak_abs") or 0.0),
+        "q_history_zero_y": float(history_meta.get("history_zero_y") or 0.5),
+    }
+
+
+def _route_pressure_strip_cause_effect_meta(
+    *,
+    trend_meta: dict[str, Any],
+    flow_meta: dict[str, Any],
+) -> dict[str, Any]:
+    trend_available = bool(trend_meta.get("trend_available"))
+    q_available = bool(flow_meta.get("q_available"))
+    if not trend_available or not q_available:
+        return {
+            "cause_effect_available": False,
+            "cause_effect_status": "Связка ΔP→Q не определена",
+            "cause_effect_badge": "ΔP→Q ?",
+            "cause_effect_tone": "neutral",
+            "cause_effect_summary": "Недостаточно истории, чтобы сопоставить перепад и расход.",
+        }
+
+    trend_status = str(trend_meta.get("trend_status") or "")
+    q_status = str(flow_meta.get("q_status") or "")
+
+    trend_rising = trend_status in {"ΔP нарастает", "ΔP удерживается"}
+    trend_falling = trend_status in {"ΔP спадает", "ΔP выравнивается", "ΔP выровнен"}
+    trend_flip = trend_status == "ΔP сменил знак"
+    q_rising = q_status in {"Q нарастает", "Q после переключения"}
+    q_active = q_status in {"Q нарастает", "Q после переключения", "Q удерживается"}
+    q_falling = q_status in {"Q спадает", "Q затихает", "Q спокоен"}
+    q_flip = q_status == "Q сменил знак"
+
+    if trend_flip or q_flip:
+        status = "Q спорит с ΔP"
+        badge = "ΔP↔Q"
+        tone = "warn"
+    elif trend_rising and q_rising:
+        status = "Q догоняет ΔP"
+        badge = "ΔP→Q ok"
+        tone = "ok"
+    elif trend_rising and q_active:
+        status = "Q держится на ΔP"
+        badge = "ΔP→Q hold"
+        tone = "ok"
+    elif trend_rising:
+        status = "Q запаздывает за ΔP"
+        badge = "ΔP→Q lag"
+        tone = "warn"
+    elif trend_falling and q_falling:
+        status = "Q гаснет вместе с ΔP"
+        badge = "ΔP→Q soft"
+        tone = "info"
+    elif trend_falling and q_active:
+        status = "Q тянется после ΔP"
+        badge = "ΔP→Q tail"
+        tone = "warn"
+    else:
+        status = "Q спокоен при ровном ΔP"
+        badge = "ΔP→Q idle"
+        tone = "neutral"
+
+    return {
+        "cause_effect_available": True,
+        "cause_effect_status": status,
+        "cause_effect_badge": badge,
+        "cause_effect_tone": tone,
+        "cause_effect_summary": f"{status} • {trend_status} / {q_status}",
+    }
+
+
+def _route_pressure_strip_intermediate_nodes_meta(
+    dataset: MnemoDataset | None,
+    diagnostics: dict[str, Any] | None,
+    payload: dict[str, Any] | None,
+    *,
+    idx: int,
+) -> list[dict[str, Any]]:
+    if dataset is None or payload is None:
+        return []
+
+    item = dict(payload or {})
+    edge_name = str(item.get("edge_name") or "")
+    role = str(item.get("role") or "")
+    start_node = str(item.get("start_node") or "")
+    end_node = str(item.get("end_node") or "")
+    terminal_meta = _route_pressure_strip_terminal_meta(item)
+    leading_node_name = str(terminal_meta.get("leading_node") or "")
+    leading_pressure_bar_g = _node_pressure_for_index(dataset, leading_node_name, idx) if leading_node_name else None
+    endpoint_names = {name for name in [start_node, end_node] if name}
+    if not edge_name:
+        return []
+
+    rows: list[dict[str, Any]] = []
+    seen = set(endpoint_names)
+
+    def _badge_for_node(node_name: str) -> str:
+        kind = _node_kind(node_name)
+        if kind == "regulator":
+            return "REG"
+        if kind == "diagonal":
+            return "MID"
+        if kind == "chamber":
+            match = CHAMBER_RE.match(node_name)
+            if match:
+                return _chamber_short(str(match.group("ch")))
+            return "CAM"
+        if kind == "mainline":
+            return "MAG"
+        if kind == "receiver":
+            return "RES"
+        if kind == "accumulator":
+            return "ACC"
+        return "MID"
+
+    def _tone_for_kind(kind: str) -> str:
+        if kind == "regulator":
+            return "info"
+        if kind == "diagonal":
+            return "ok"
+        if kind == "chamber":
+            return "neutral"
+        return "neutral"
+
+    def _role_label(kind: str, source: str) -> str:
+        if kind == "regulator":
+            return "Регуляторный узел"
+        if kind == "diagonal":
+            return "Узел диагонали"
+        if kind == "chamber":
+            return "Камерный узел"
+        if kind == "mainline":
+            return "Магистральный узел"
+        if kind == "receiver":
+            return "Ресиверный узел"
+        if kind == "accumulator":
+            return "Аккумуляторный узел"
+        return "Промежуточный узел" if source == "adjacent" else "Узел маршрута"
+
+    def _lead_hint_text(pressure_bar_g: float | None) -> str:
+        if pressure_bar_g is None or leading_pressure_bar_g is None or not leading_node_name:
+            return "Δ к ведущему: —"
+        delta = float(pressure_bar_g) - float(leading_pressure_bar_g)
+        if abs(delta) <= 0.08:
+            return "Почти как ведущий конец"
+        if delta < 0.0:
+            return f"Ниже ведущего на {abs(delta):0.2f} бар"
+        return f"Выше ведущего на {abs(delta):0.2f} бар"
+
+    def _lead_trend_text(node_name: str) -> str:
+        if not leading_node_name:
+            return "Ход к ведущему: —"
+        node_series = _node_pressure_series_bar_g(dataset, node_name)
+        lead_series = _node_pressure_series_bar_g(dataset, leading_node_name)
+        if node_series is None or lead_series is None:
+            return "Ход к ведущему: —"
+        sample_count = min(int(node_series.size), int(lead_series.size))
+        if sample_count <= 1:
+            return "Ход к ведущему: —"
+        clamped_idx = int(max(0, min(idx, sample_count - 1)))
+        if clamped_idx <= 0:
+            return "Ход к ведущему: —"
+        delta_now = float(node_series[clamped_idx] - lead_series[clamped_idx])
+        delta_prev = float(node_series[clamped_idx - 1] - lead_series[clamped_idx - 1])
+        abs_now = abs(delta_now)
+        abs_prev = abs(delta_prev)
+        spread_floor = max(0.01, max(abs_now, abs_prev) * 0.03)
+        if abs_now <= 0.08 and abs_prev > abs_now + spread_floor * 0.5:
+            return "Идёт к выравниванию"
+        if math.copysign(1.0, delta_now) != math.copysign(1.0, delta_prev) and abs_prev > 0.08 and abs_now > 0.08:
+            return "Переходит через уровень ведущего"
+        if abs_now < abs_prev - spread_floor:
+            return "Сближается с ведущим"
+        if abs_now > abs_prev + spread_floor:
+            return "Уходит от ведущего"
+        return "Держит разброс к ведущему"
+
+    def _add_node(node_name: str, source: str) -> None:
+        name = str(node_name or "")
+        if not name or name in seen or name not in dataset.node_names:
+            return
+        seen.add(name)
+        kind = _node_kind(name)
+        pressure_bar_g = _node_pressure_for_index(dataset, name, idx)
+        role_label = _role_label(kind, source)
+        pressure_label = f"{float(pressure_bar_g):0.2f} бар(g)" if pressure_bar_g is not None else "давление —"
+        lead_hint = _lead_hint_text(pressure_bar_g)
+        lead_trend = _lead_trend_text(name)
+        rows.append(
+            {
+                "name": name,
+                "label": _short_node_label(name),
+                "kind": kind,
+                "badge_text": _badge_for_node(name),
+                "tone": _tone_for_kind(kind),
+                "pressure_bar_g": pressure_bar_g,
+                "role_label": role_label,
+                "summary_text": f"{role_label} • {pressure_label}",
+                "lead_hint_text": lead_hint,
+                "lead_trend_text": lead_trend,
+                "source": source,
+            }
+        )
+
+    allowed_kinds: set[str] = set()
+    if role == "regulator":
+        allowed_kinds = {"regulator"}
+    elif role == "diagonal":
+        allowed_kinds = {"diagonal", "chamber"}
+    elif role == "supply":
+        allowed_kinds = {"mainline", "receiver", "accumulator", "regulator"}
+
+    if role == "diagonal":
+        diagonal_focus = dict((diagnostics or {}).get("diagonal_focus") or {})
+        for node_item in list(diagonal_focus.get("nodes") or []):
+            row = dict(node_item or {})
+            node_name = str(row.get("name") or "")
+            edge_names = {str(name) for name in list(row.get("edge_names") or []) if str(name)}
+            if edge_name in edge_names:
+                _add_node(node_name, "diagonal_focus")
+
+    frontier = [name for name in [start_node, end_node] if name]
+    visited = set(frontier)
+    for _depth in range(2):
+        next_frontier: list[str] = []
+        for seed_node in frontier:
+            for neighbor_edge in list(dataset.node_edges.get(seed_node) or []):
+                edge_def = dict(dataset.edge_defs.get(str(neighbor_edge)) or {})
+                for neighbor_node in [str(edge_def.get("n1") or ""), str(edge_def.get("n2") or "")]:
+                    if not neighbor_node or neighbor_node in visited:
+                        continue
+                    visited.add(neighbor_node)
+                    kind = _node_kind(neighbor_node)
+                    if kind in allowed_kinds:
+                        _add_node(neighbor_node, "adjacent")
+                    if kind in allowed_kinds or kind == "other":
+                        next_frontier.append(neighbor_node)
+        frontier = next_frontier
+
+    rows.sort(
+        key=lambda row: (
+            0 if str(row.get("source") or "") == "diagonal_focus" else 1,
+            0 if str(row.get("kind") or "") == "regulator" else 1,
+            str(row.get("name") or ""),
+        )
+    )
+    return rows[:3]
+
+
+def _build_active_diagonal_focus_meta(
+    dataset: MnemoDataset | None,
+    idx: int,
+    *,
+    selected_edge: str | None,
+) -> dict[str, Any]:
+    if dataset is None or dataset.time_s.size == 0:
+        return {"edges": [], "nodes": [], "node_names": []}
+
+    edge_rows = _edge_rows_for_index(dataset, idx)
+    if not edge_rows:
+        return {"edges": [], "nodes": [], "node_names": []}
+
+    selected_edge_name = str(selected_edge or "") if selected_edge in dataset.edge_names else ""
+    top_abs_flow = abs(float(edge_rows[0][1])) if edge_rows else 0.0
+    activation_threshold = max(6.0, top_abs_flow * 0.24)
+
+    edge_items: list[dict[str, Any]] = []
+    node_bucket: dict[str, dict[str, Any]] = {}
+
+    for rank, (edge_name, q_now) in enumerate(edge_rows[:12], start=1):
+        edge_def = dict(dataset.edge_defs.get(edge_name) or {})
+        endpoints = [str(edge_def.get("n1") or ""), str(edge_def.get("n2") or "")]
+        focus_nodes = [name for name in endpoints if DIAGONAL_RE.match(name) or CHAMBER_RE.match(name)]
+        role = _edge_role(edge_name, edge_def)
+        if role != "diagonal" and not focus_nodes:
+            continue
+        if edge_name != selected_edge_name and abs(float(q_now)) < activation_threshold:
+            continue
+
+        pressure_pairs = [(name, _node_pressure_for_index(dataset, name, idx)) for name in focus_nodes]
+        known_pressures = [float(value) for _, value in pressure_pairs if value is not None]
+        pressure_span = max(known_pressures) - min(known_pressures) if len(known_pressures) >= 2 else None
+        severity = "focus" if edge_name == selected_edge_name or rank == 1 else "attention"
+        if severity != "focus" and pressure_span is not None and pressure_span >= 1.2:
+            severity = "warn"
+
+        edge_items.append(
+            {
+                "name": edge_name,
+                "flow": float(q_now),
+                "severity": severity,
+                "node_names": focus_nodes,
+                "pressure_span_bar": pressure_span,
+                "label": "Активная диагональ" if edge_name != selected_edge_name else "Выбранная диагональ",
+                "summary": (
+                    f"{edge_name}: |Q|={abs(float(q_now)):4.1f} {dataset.q_unit}"
+                    + (
+                        f", ΔP по узлам {pressure_span:4.2f} бар(g)."
+                        if pressure_span is not None
+                        else "."
+                    )
+                ),
+            }
+        )
+
+        for node_name, pressure in pressure_pairs:
+            if not node_name:
+                continue
+            item = node_bucket.setdefault(
+                node_name,
+                {
+                    "name": node_name,
+                    "severity": severity,
+                    "pressure_bar_g": pressure,
+                    "max_abs_flow": abs(float(q_now)),
+                    "edge_names": [],
+                    "label": "Узел диагонали" if DIAGONAL_RE.match(node_name) else "Порт диагонали",
+                    "summary": "Участвует в активной диагональной связи.",
+                },
+            )
+            if _severity_rank(severity) > _severity_rank(str(item.get("severity") or "")):
+                item["severity"] = severity
+            if pressure is not None and item.get("pressure_bar_g") is None:
+                item["pressure_bar_g"] = pressure
+            item["max_abs_flow"] = max(float(item.get("max_abs_flow") or 0.0), abs(float(q_now)))
+            item.setdefault("edge_names", []).append(edge_name)
+
+    node_items = sorted(
+        node_bucket.values(),
+        key=lambda item: (
+            -_severity_rank(str(item.get("severity") or "")),
+            -float(item.get("max_abs_flow") or 0.0),
+            str(item.get("name") or ""),
+        ),
+    )
+    for item in node_items:
+        item["edge_names"] = sorted({str(name) for name in list(item.get("edge_names") or []) if str(name)})
+        item["short_label"] = _short_node_label(str(item.get("name") or ""))
+    return {
+        "edges": edge_items[:4],
+        "nodes": node_items[:6],
+        "node_names": [str(item.get("name") or "") for item in node_items[:6] if str(item.get("name") or "")],
+        "selected_edge": selected_edge_name,
+        "activation_threshold": float(activation_threshold),
+    }
+
+
+def _build_route_pressure_strip_payloads(
+    dataset: MnemoDataset | None,
+    idx: int,
+    *,
+    selected_edge: str | None,
+) -> list[dict[str, Any]]:
+    if dataset is None or dataset.time_s.size == 0:
+        return []
+
+    edge_rows = _edge_rows_for_index(dataset, idx)
+    if not edge_rows:
+        return []
+
+    payloads: list[dict[str, Any]] = []
+    selected_edge_name = str(selected_edge or "") if selected_edge in dataset.edge_names else ""
+    top_abs_flow = abs(float(edge_rows[0][1])) if edge_rows else 0.0
+    activation_threshold = max(6.0, top_abs_flow * 0.18)
+
+    for rank, (edge_name, q_now) in enumerate(edge_rows[:18], start=1):
+        edge_name = str(edge_name or "")
+        if not edge_name:
+            continue
+        edge_def = dict(dataset.edge_defs.get(edge_name) or {})
+        role = _edge_role(edge_name, edge_def)
+        if role not in {"diagonal", "regulator", "supply"}:
+            continue
+        if edge_name != selected_edge_name and abs(float(q_now)) < activation_threshold:
+            continue
+
+        node_1 = str(edge_def.get("n1") or "")
+        node_2 = str(edge_def.get("n2") or "")
+        if not node_1 and not node_2:
+            continue
+
+        p1_bar_g = _node_pressure_for_index(dataset, node_1, idx) if node_1 else None
+        p2_bar_g = _node_pressure_for_index(dataset, node_2, idx) if node_2 else None
+        if p1_bar_g is None and p2_bar_g is None:
+            continue
+        p1_series_bar_g = _node_pressure_series_bar_g(dataset, node_1) if node_1 else None
+        p2_series_bar_g = _node_pressure_series_bar_g(dataset, node_2) if node_2 else None
+        q_series = _edge_flow_series_scaled(dataset, edge_name)
+        open_series = _edge_open_series(dataset, edge_name)
+
+        delta_p_bar = None
+        if p1_bar_g is not None and p2_bar_g is not None:
+            delta_p_bar = abs(float(p1_bar_g) - float(p2_bar_g))
+        trend_meta = _route_pressure_strip_trend_meta(
+            time_s=dataset.time_s,
+            p1_values=p1_series_bar_g,
+            p2_values=p2_series_bar_g,
+            idx=idx,
+        )
+        flow_meta = _route_pressure_strip_flow_meta(
+            time_s=dataset.time_s,
+            q_values=q_series,
+            open_values=open_series,
+            idx=idx,
+            q_unit=dataset.q_unit,
+        )
+        history_meta = _route_pressure_strip_history_meta(
+            time_s=dataset.time_s,
+            q_values=q_series,
+            open_values=open_series,
+            idx=idx,
+            q_unit=dataset.q_unit,
+        )
+        cause_effect_meta = _route_pressure_strip_cause_effect_meta(
+            trend_meta=trend_meta,
+            flow_meta=flow_meta,
+        )
+
+        severity = "focus" if edge_name == selected_edge_name or rank == 1 else "attention"
+        if severity != "focus" and delta_p_bar is not None and delta_p_bar >= (1.0 if role == "diagonal" else 1.4):
+            severity = "warn"
+        role_label = {
+            "diagonal": "диагонали",
+            "regulator": "регулятора",
+            "supply": "питания",
+        }.get(role, "ветви")
+        payloads.append(
+            {
+                "edge_name": edge_name,
+                "role": role,
+                "severity": severity,
+                "order": int(len(payloads)),
+                "selected": edge_name == selected_edge_name,
+                "node_names": [node_1, node_2],
+                "start_node": node_1,
+                "end_node": node_2,
+                "start_label": _short_node_label(node_1),
+                "end_label": _short_node_label(node_2),
+                "p1_bar_g": _finite_or_none(p1_bar_g),
+                "p2_bar_g": _finite_or_none(p2_bar_g),
+                "delta_p_bar": _finite_or_none(delta_p_bar),
+                "flow": _finite_or_none(q_now),
+                "label": f"ΔP фокус-{role_label}" if edge_name == selected_edge_name else f"ΔP {role_label}",
+                "pressure_label": (
+                    f"{float(p1_bar_g):0.2f} → {float(p2_bar_g):0.2f} бар(g)"
+                    if p1_bar_g is not None and p2_bar_g is not None
+                    else (
+                        f"{float(p1_bar_g):0.2f} бар(g)"
+                        if p1_bar_g is not None
+                        else f"{float(p2_bar_g):0.2f} бар(g)"
+                    )
+                ),
+                "delta_label": f"ΔP {float(delta_p_bar):0.2f}" if delta_p_bar is not None else "ΔP —",
+                "summary": (
+                    f"{_short_node_label(node_1)} → {_short_node_label(node_2)}"
+                    + (
+                        f" • {float(p1_bar_g):0.2f} → {float(p2_bar_g):0.2f} бар(g)"
+                        if p1_bar_g is not None and p2_bar_g is not None
+                        else ""
+                    )
+                )
+                + f" • роль {role_label}",
+                "trend_status": str(trend_meta.get("trend_status") or ""),
+                "trend_badge": str(trend_meta.get("trend_badge") or ""),
+                "trend_tone": str(trend_meta.get("trend_tone") or "neutral"),
+                "trend_summary": str(trend_meta.get("trend_summary") or ""),
+                "q_status": str(flow_meta.get("q_status") or ""),
+                "q_badge": str(flow_meta.get("q_badge") or ""),
+                "q_tone": str(flow_meta.get("q_tone") or "neutral"),
+                "q_summary": str(flow_meta.get("q_summary") or ""),
+                "q_history_available": bool(history_meta.get("q_history_available")),
+                "q_history_summary": str(history_meta.get("q_history_summary") or ""),
+                "q_history_points": list(history_meta.get("q_history_points") or []),
+                "q_history_open_blocks": list(history_meta.get("q_history_open_blocks") or []),
+                "q_history_span_s": float(history_meta.get("q_history_span_s") or 0.0),
+                "q_history_peak_abs": float(history_meta.get("q_history_peak_abs") or 0.0),
+                "q_history_zero_y": float(history_meta.get("q_history_zero_y") or 0.5),
+                "cause_effect_status": str(cause_effect_meta.get("cause_effect_status") or ""),
+                "cause_effect_badge": str(cause_effect_meta.get("cause_effect_badge") or ""),
+                "cause_effect_tone": str(cause_effect_meta.get("cause_effect_tone") or "neutral"),
+                "cause_effect_summary": str(cause_effect_meta.get("cause_effect_summary") or ""),
+            }
+        )
+
+    payloads.sort(
+        key=lambda payload: (
+            -_severity_rank(str(payload.get("severity") or "")),
+            0 if bool(payload.get("selected")) else 1,
+            -abs(float(payload.get("flow") or 0.0)),
+            str(payload.get("edge_name") or ""),
+        )
+    )
+    return payloads[:6]
+
+
+def _route_pressure_strip_terminal_meta(payload: dict[str, Any] | None) -> dict[str, Any]:
+    item = dict(payload or {})
+    start_node = str(item.get("start_node") or "")
+    end_node = str(item.get("end_node") or "")
+    start_label = str(item.get("start_label") or _short_node_label(start_node))
+    end_label = str(item.get("end_label") or _short_node_label(end_node))
+    p1_bar_g = _finite_or_none(item.get("p1_bar_g"))
+    p2_bar_g = _finite_or_none(item.get("p2_bar_g"))
+    equalized = False
+    leading_node = ""
+    leading_label = ""
+    trailing_node = ""
+    trailing_label = ""
+    start_badge = "P?"
+    end_badge = "P?"
+    leader_summary = "Ведущий конец не определён"
+    tone = str(item.get("severity") or "info")
+
+    if p1_bar_g is not None and p2_bar_g is not None:
+        delta = float(p1_bar_g) - float(p2_bar_g)
+        if abs(delta) <= 0.12:
+            equalized = True
+            start_badge = "P≈"
+            end_badge = "P≈"
+            leader_summary = "Давления почти выровнены"
+            tone = "info" if tone not in {"focus", "warn"} else tone
+        elif delta > 0.0:
+            leading_node = start_node
+            leading_label = start_label
+            trailing_node = end_node
+            trailing_label = end_label
+            start_badge = "P+"
+            end_badge = "P-"
+            leader_summary = f"Ведёт: {start_label}"
+        else:
+            leading_node = end_node
+            leading_label = end_label
+            trailing_node = start_node
+            trailing_label = start_label
+            start_badge = "P-"
+            end_badge = "P+"
+            leader_summary = f"Ведёт: {end_label}"
+    elif p1_bar_g is not None:
+        leading_node = start_node
+        leading_label = start_label
+        start_badge = "P"
+        end_badge = "P?"
+        leader_summary = f"Опорный конец: {start_label}"
+    elif p2_bar_g is not None:
+        leading_node = end_node
+        leading_label = end_label
+        start_badge = "P?"
+        end_badge = "P"
+        leader_summary = f"Опорный конец: {end_label}"
+
+    return {
+        "edge_name": str(item.get("edge_name") or ""),
+        "role": str(item.get("role") or ""),
+        "severity": tone,
+        "selected": bool(item.get("selected")),
+        "equalized": bool(equalized),
+        "leading_node": leading_node,
+        "leading_label": leading_label,
+        "trailing_node": trailing_node,
+        "trailing_label": trailing_label,
+        "leader_summary": leader_summary,
+        "start_node": start_node,
+        "end_node": end_node,
+        "start_label": start_label,
+        "end_label": end_label,
+        "start_badge": start_badge,
+        "end_badge": end_badge,
+        "start_pressure_label": f"{float(p1_bar_g):0.2f} бар(g)" if p1_bar_g is not None else "—",
+        "end_pressure_label": f"{float(p2_bar_g):0.2f} бар(g)" if p2_bar_g is not None else "—",
+        "trend_status": str(item.get("trend_status") or ""),
+        "trend_badge": str(item.get("trend_badge") or ""),
+        "trend_tone": str(item.get("trend_tone") or "neutral"),
+        "trend_summary": str(item.get("trend_summary") or ""),
+        "q_status": str(item.get("q_status") or ""),
+        "q_badge": str(item.get("q_badge") or ""),
+        "q_tone": str(item.get("q_tone") or "neutral"),
+        "q_summary": str(item.get("q_summary") or ""),
+        "q_history_available": bool(item.get("q_history_available")),
+        "q_history_summary": str(item.get("q_history_summary") or ""),
+        "q_history_points": list(item.get("q_history_points") or []),
+        "q_history_open_blocks": list(item.get("q_history_open_blocks") or []),
+        "q_history_span_s": float(item.get("q_history_span_s") or 0.0),
+        "q_history_peak_abs": float(item.get("q_history_peak_abs") or 0.0),
+        "q_history_zero_y": float(item.get("q_history_zero_y") or 0.5),
+        "cause_effect_status": str(item.get("cause_effect_status") or ""),
+        "cause_effect_badge": str(item.get("cause_effect_badge") or ""),
+        "cause_effect_tone": str(item.get("cause_effect_tone") or "neutral"),
+        "cause_effect_summary": str(item.get("cause_effect_summary") or ""),
+    }
+
+
+def _build_diagonal_pressure_strip_payloads(
+    dataset: MnemoDataset | None,
+    idx: int,
+    *,
+    selected_edge: str | None,
+) -> list[dict[str, Any]]:
+    return [
+        dict(item)
+        for item in _build_route_pressure_strip_payloads(dataset, idx, selected_edge=selected_edge)
+        if str(dict(item).get("role") or "") == "diagonal"
+    ]
+
+
 def _edge_role(edge_name: str, edge_def: dict[str, Any]) -> str:
     _ = edge_name
     n1 = str(edge_def.get("n1") or "")
@@ -1625,9 +2634,9 @@ def _build_frame_alert_payload(
 
     edge_rows = _edge_rows_for_index(dataset, idx)
     node_rows = _node_rows_for_index(dataset, idx, overlay_only=True) or _node_rows_for_index(dataset, idx)
-
     focus_edge = selected_edge if selected_edge in dataset.edge_names else narrative.top_edge_name
     focus_node = selected_node if selected_node in dataset.node_names else narrative.top_node_name
+    diagonal_focus = _build_active_diagonal_focus_meta(dataset, idx, selected_edge=focus_edge)
 
     edge_markers: dict[str, dict[str, Any]] = {}
     node_markers: dict[str, dict[str, Any]] = {}
@@ -1673,6 +2682,29 @@ def _build_frame_alert_payload(
                     unit=dataset.q_unit,
                 )
                 break
+    diagonal_edges = list(diagonal_focus.get("edges") or [])
+    if diagonal_edges:
+        first_diagonal = dict(diagonal_edges[0] or {})
+        _merge_alert_marker(
+            edge_markers,
+            name=str(first_diagonal.get("name") or ""),
+            severity=str(first_diagonal.get("severity") or "attention"),
+            label=str(first_diagonal.get("label") or "Активная диагональ"),
+            summary=str(first_diagonal.get("summary") or "Диагональная связь заметно участвует в текущем кадре."),
+            value=_finite_or_none(first_diagonal.get("flow")),
+            unit=dataset.q_unit,
+        )
+        for item in list(diagonal_focus.get("nodes") or [])[:3]:
+            marker_name = str(item.get("name") or "")
+            _merge_alert_marker(
+                node_markers,
+                name=marker_name,
+                severity=str(item.get("severity") or "attention"),
+                label=str(item.get("label") or "Узел диагонали"),
+                summary=str(item.get("summary") or "Участвует в активной диагональной связи."),
+                value=_finite_or_none(item.get("pressure_bar_g")),
+                unit="бар(g)",
+            )
 
     if node_rows:
         top_node_name, top_node_value = node_rows[0]
@@ -1724,6 +2756,7 @@ def _build_frame_alert_payload(
         "edges": edge_items,
         "nodes": node_items,
         "mode_badges": [{"title": mode.title, "severity": mode.severity} for mode in narrative.modes[:3]],
+        "diagonal_focus": diagonal_focus,
     }
 
 
@@ -1738,6 +2771,7 @@ def prepare_dataset(npz_path: Path) -> MnemoDataset:
     full_node_inventory = list(dict.fromkeys([*canonical_node_names, *node_names]))
     node_positions = _build_node_positions(full_node_inventory)
     svg_inline = _build_semantic_svg(node_positions)
+    reference_svg_inline, reference_scheme_source = _load_canonical_pneumo_scheme_svg()
     mapping = _build_mapping(edge_names, full_node_inventory, edge_defs, node_positions)
     scheme_fidelity = _build_scheme_fidelity_report(
         canonical_node_names=canonical_node_names,
@@ -1747,12 +2781,36 @@ def prepare_dataset(npz_path: Path) -> MnemoDataset:
         node_positions=node_positions,
         bundle_mapping=mapping,
     )
+    reference_anchor_positions = _reference_node_anchor_positions(full_node_inventory)
+    reference_component_names = sorted(name for name in reference_anchor_positions if name in REFERENCE_COMPONENT_NODE_ANCHORS_SVG)
+    reference_indicator_names = sorted(name for name in reference_anchor_positions if name in REFERENCE_INDICATOR_NODE_ANCHORS_SVG)
+    reference_chamber_names = sorted(name for name in reference_anchor_positions if name in REFERENCE_CHAMBER_NODE_ANCHORS_SVG)
+    reference_diagonal_positions = _reference_diagonal_geometry_positions(full_node_inventory)
+    reference_diagonal_names = sorted(reference_diagonal_positions)
+    scheme_fidelity["reference_scheme_source"] = reference_scheme_source
+    scheme_fidelity["reference_scheme_available"] = bool(reference_svg_inline)
+    scheme_fidelity["reference_scheme_mode"] = "native_underlay" if reference_svg_inline else "semantic_fallback"
+    scheme_fidelity["reference_scheme_image_source"] = (
+        str(SOURCE_OF_TRUTH_PNEUMO_IMAGE_PATH.resolve()) if SOURCE_OF_TRUTH_PNEUMO_IMAGE_PATH.exists() else ""
+    )
+    scheme_fidelity["reference_component_nodes_total"] = len(REFERENCE_COMPONENT_NODE_ANCHORS_SVG)
+    scheme_fidelity["reference_component_nodes_snapped"] = len(reference_component_names)
+    scheme_fidelity["reference_component_node_names"] = reference_component_names
+    scheme_fidelity["reference_indicator_nodes_total"] = len(REFERENCE_INDICATOR_NODE_ANCHORS_SVG)
+    scheme_fidelity["reference_indicator_nodes_snapped"] = len(reference_indicator_names)
+    scheme_fidelity["reference_indicator_node_names"] = reference_indicator_names
+    scheme_fidelity["reference_chamber_nodes_total"] = len(REFERENCE_CHAMBER_NODE_ANCHORS_SVG)
+    scheme_fidelity["reference_chamber_nodes_snapped"] = len(reference_chamber_names)
+    scheme_fidelity["reference_chamber_node_names"] = reference_chamber_names
+    scheme_fidelity["reference_diagonal_nodes_total"] = len([name for name in canonical_node_names if DIAGONAL_RE.match(name)])
+    scheme_fidelity["reference_diagonal_nodes_geometry_locked"] = len(reference_diagonal_names)
+    scheme_fidelity["reference_diagonal_node_names"] = reference_diagonal_names
 
     p_atm = _p_atm_from_meta(bundle.meta if isinstance(bundle.meta, dict) else {})
     q_scale, q_unit = _flow_scale_and_unit(p_atm)
     overlay_node_names = _pick_overlay_nodes(node_names)
     edge_series = _build_edge_series(bundle, edge_names, q_scale, q_unit)
-    node_series = _build_node_series(bundle, overlay_node_names, p_atm)
+    node_series = _build_node_series(bundle, node_names, p_atm)
     node_edges = _build_node_edges(edge_defs, edge_names)
     visual_geometry = read_visual_geometry_meta(
         bundle.meta if isinstance(bundle.meta, dict) else {},
@@ -1769,6 +2827,8 @@ def prepare_dataset(npz_path: Path) -> MnemoDataset:
         bundle=bundle,
         dataset_id=dataset_id,
         svg_inline=svg_inline,
+        reference_svg_inline=reference_svg_inline,
+        reference_scheme_source=reference_scheme_source,
         mapping=mapping,
         edge_names=edge_names,
         node_names=node_names,
@@ -2387,6 +3447,9 @@ def _build_mnemo_diagnostics_payload(
     cylinder_rows = _build_cylinder_snapshots(dataset, idx)
     component_rows = _build_component_overlay_rows(dataset, idx, selected_edge=selected_edge)
     focus_corner = _focus_corner_from_selection(dataset, edge_name=selected_edge, node_name=selected_node)
+    diagonal_focus = _build_active_diagonal_focus_meta(dataset, idx, selected_edge=selected_edge)
+    route_pressure_strips = _build_route_pressure_strip_payloads(dataset, idx, selected_edge=selected_edge)
+    diagonal_pressure_strips = _build_diagonal_pressure_strip_payloads(dataset, idx, selected_edge=selected_edge)
     return {
         "frame_idx": int(max(0, idx)),
         "focus_corner": focus_corner,
@@ -2397,6 +3460,9 @@ def _build_mnemo_diagnostics_payload(
         "geometry_issues": list(dataset.geometry_issues) if dataset is not None else [],
         "cylinders": [_serialize_cylinder_overlay(item) for item in cylinder_rows],
         "components": component_rows,
+        "diagonal_focus": diagonal_focus,
+        "route_pressure_strips": route_pressure_strips,
+        "diagonal_pressure_strips": diagonal_pressure_strips,
     }
 
 
@@ -4230,6 +5296,7 @@ class MnemoNativeView(QtWidgets.QWidget):
         self.mode_badge.setText("Native Canvas")
         self.summary_label.setText(
             f"{dataset.npz_path.name}: нативный canvas держит full-system мнемосхему и живые overlays на одном экране."
+            + (" Базовая ориентация идёт по исходной пневмосхеме проекта." if dataset.reference_scheme_source else "")
         )
         self.native_canvas.render_dataset(dataset, selected_edge=selected_edge, selected_node=selected_node)
 
@@ -4270,14 +5337,19 @@ class MnemoNativeView(QtWidgets.QWidget):
         canonical_edges_total = int(fidelity.get("canonical_edges_total") or 0)
         warnings = len(list(diagnostics.get("geometry_warnings") or []))
         issues = len(list(diagnostics.get("geometry_issues") or []))
+        reference_mode = str(fidelity.get("reference_scheme_mode") or "")
         self.hint_label.setText(
             "Native overlay: "
             + f"schema {canonical_nodes_positioned}/{canonical_nodes_total} nodes, "
             + f"{canonical_edges_routed}/{canonical_edges_total} routes, "
             + f"geometry {warnings}/{issues}"
+            + (f" • фон {reference_mode}" if reference_mode else "")
             + f" • слой {self._detail_mode_label(self._detail_mode)}"
         )
         self.native_canvas.set_diagnostics(diagnostics)
+
+    def set_reference_scheme_visible(self, visible: bool) -> bool:
+        return self.native_canvas.set_reference_scheme_visible(visible)
 
     def set_focus_region(self, focus_region: dict[str, Any] | None) -> None:
         if focus_region:
@@ -5304,12 +6376,31 @@ class SchemeFidelityPanel(QtWidgets.QTextBrowser):
             return
 
         fidelity = dict(dataset.scheme_fidelity or {})
+        reference_scheme_source = str(fidelity.get("reference_scheme_source") or "—")
+        reference_scheme_mode = str(fidelity.get("reference_scheme_mode") or "semantic_fallback")
+        reference_scheme_image_source = str(fidelity.get("reference_scheme_image_source") or "—")
+        reference_component_nodes_snapped = int(fidelity.get("reference_component_nodes_snapped") or 0)
+        reference_component_nodes_total = int(fidelity.get("reference_component_nodes_total") or 0)
+        reference_indicator_nodes_snapped = int(fidelity.get("reference_indicator_nodes_snapped") or 0)
+        reference_indicator_nodes_total = int(fidelity.get("reference_indicator_nodes_total") or 0)
+        reference_chamber_nodes_snapped = int(fidelity.get("reference_chamber_nodes_snapped") or 0)
+        reference_chamber_nodes_total = int(fidelity.get("reference_chamber_nodes_total") or 0)
+        reference_diagonal_nodes_locked = int(fidelity.get("reference_diagonal_nodes_geometry_locked") or 0)
+        reference_diagonal_nodes_total = int(fidelity.get("reference_diagonal_nodes_total") or 0)
         self.setHtml(
             "<h3>Соответствие схеме</h3>"
             + "<p>"
             + self._badge(str(fidelity.get("status") or "ok"))
             + f" <span style='margin-left:8px;'>{escape(str(fidelity.get('summary') or ''))}</span></p>"
             + f"<p><b>Bundle:</b> {escape(str(fidelity.get('bundle_summary') or ''))}</p>"
+            + "<p><b>Source-of-truth:</b><br/>"
+            + f"native underlay = {escape(reference_scheme_mode)}"
+            + f"<br/>svg = <code>{escape(reference_scheme_source)}</code>"
+            + f"<br/>image = <code>{escape(reference_scheme_image_source)}</code>"
+            + f"<br/>component anchors = {reference_component_nodes_snapped}/{reference_component_nodes_total}"
+            + f"<br/>critical indicator anchors = {reference_indicator_nodes_snapped}/{reference_indicator_nodes_total}"
+            + f"<br/>chamber indicator anchors = {reference_chamber_nodes_snapped}/{reference_chamber_nodes_total}"
+            + f"<br/>diagonal geometry from source scheme = {reference_diagonal_nodes_locked}/{reference_diagonal_nodes_total}</p>"
             + "<p><b>Canonical layout:</b><br/>"
             + f"узлы {int(fidelity.get('canonical_nodes_positioned') or 0)}/{int(fidelity.get('canonical_nodes_total') or 0)}"
             + " • "
@@ -5866,12 +6957,17 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._node_hit_rects: dict[str, QtCore.QRectF] = {}
         self._overlay_targets: list[tuple[str, str, QtCore.QRectF]] = []
         self._svg_renderer: Any = None
+        self._reference_svg_renderer: Any = None
+        self._reference_scheme_source = ""
+        self._show_reference_scheme = True
         self._background_cache: QtGui.QPixmap | None = None
         self._background_cache_key: tuple[Any, ...] | None = None
         self._last_mouse_pos = QtCore.QPoint()
         self._dragging = False
         self._hover_kind = ""
         self._hover_name = ""
+        self._hover_focus_edge = ""
+        self._hover_focus_restore_rect: QtCore.QRectF | None = None
         self._selected_focus_step = ""
         self._flow_phase = 0.0
         self._anim_timer = QtCore.QTimer(self)
@@ -5889,6 +6985,12 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self.update()
         return self._detail_mode
 
+    def set_reference_scheme_visible(self, visible: bool) -> bool:
+        self._show_reference_scheme = bool(visible)
+        self._invalidate_background_cache()
+        self.update()
+        return self._show_reference_scheme
+
     def _detail_mode_label(self) -> str:
         return str(DETAIL_MODE_LABELS.get(self._detail_mode, DETAIL_MODE_LABELS["operator"]))
 
@@ -5896,6 +6998,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._dataset = dataset
         self._dataset_id = str(dataset.dataset_id)
         self._frame_idx = 0
+        self._dismiss_hover_route_pressure_focus(restore=False)
         self._selected_edge = str(selected_edge or "")
         self._selected_node = str(selected_node or "")
         self._camera_target_rect = None
@@ -5904,6 +7007,8 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._selected_focus_step = ""
         self._build_native_scene_cache()
         self._load_svg_renderer(dataset.svg_inline)
+        self._load_reference_svg_renderer(dataset.reference_svg_inline)
+        self._reference_scheme_source = str(dataset.reference_scheme_source or "")
         if self._mode == "overview":
             self._set_camera_target(self._scene_rect, immediate=True)
         self._invalidate_background_cache()
@@ -5918,6 +7023,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self.update()
 
     def set_selection(self, *, edge: str | None, node: str | None) -> None:
+        self._dismiss_hover_route_pressure_focus(restore=False)
         new_edge = str(edge or "")
         if new_edge != self._selected_edge:
             self._selected_focus_step = ""
@@ -5934,6 +7040,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self.update()
 
     def set_focus_region(self, focus_region: dict[str, Any] | None) -> None:
+        self._dismiss_hover_route_pressure_focus(restore=False)
         self._focus_region = dict(focus_region) if isinstance(focus_region, dict) else None
         if self._focus_region:
             self._mode = "focus"
@@ -5947,6 +7054,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self.update()
 
     def show_overview(self, meta: dict[str, Any] | None = None) -> None:
+        self._dismiss_hover_route_pressure_focus(restore=False)
         self._mode = "overview"
         self._overview_meta = dict(meta or {})
         focus_region = self._overview_meta.get("focus_region")
@@ -5962,6 +7070,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
     def wheelEvent(self, event: QtGui.QWheelEvent) -> None:  # type: ignore[override]
         if self._dataset is None:
             return
+        self._dismiss_hover_route_pressure_focus(restore=False)
         delta_y = event.angleDelta().y()
         if delta_y == 0:
             return
@@ -6022,6 +7131,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             self._hover_kind = hit_kind
             self._hover_name = hit_name
             self.setCursor(QtCore.Qt.PointingHandCursor if hit_kind else QtCore.Qt.ArrowCursor)
+            self._update_hover_route_pressure_focus()
             self.update()
         super().mouseMoveEvent(event)
 
@@ -6044,6 +7154,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         super().mouseDoubleClickEvent(event)
 
     def leaveEvent(self, event: QtCore.QEvent) -> None:  # type: ignore[override]
+        self._dismiss_hover_route_pressure_focus(restore=True)
         self._hover_kind = ""
         self._hover_name = ""
         self._dragging = False
@@ -6066,7 +7177,9 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.setTransform(self._scene_transform())
         self._overlay_targets.clear()
         self._draw_live_edges(painter)
+        self._draw_diagonal_focus_pressure_strips(painter)
         self._draw_live_nodes(painter)
+        self._draw_route_pressure_strip_terminal_focus(painter)
         self._draw_selected_edge_terminal_overlay(painter)
         self._draw_selected_edge_direction_overlay(painter)
         self._draw_focus_overlay(painter)
@@ -6175,6 +7288,17 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         except Exception:
             self._svg_renderer = None
 
+    def _load_reference_svg_renderer(self, svg_inline: str) -> None:
+        self._reference_svg_renderer = None
+        if QtSvg is None or not svg_inline:
+            return
+        try:
+            renderer = QtSvg.QSvgRenderer(QtCore.QByteArray(svg_inline.encode("utf-8")), self)
+            if renderer.isValid():
+                self._reference_svg_renderer = renderer
+        except Exception:
+            self._reference_svg_renderer = None
+
     def _invalidate_background_cache(self) -> None:
         self._background_cache = None
         self._background_cache_key = None
@@ -6189,6 +7313,9 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             round(float(self._camera_rect.height()), 2),
             str(self._dataset_id),
             bool(self._svg_renderer is not None),
+            bool(self._reference_svg_renderer is not None),
+            bool(self._show_reference_scheme),
+            str(self._reference_scheme_source),
         )
         if self._background_cache is not None and self._background_cache_key == key:
             return self._background_cache
@@ -6313,6 +7440,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
     def _pan_camera(self, delta_px: QtCore.QPoint) -> None:
         if self._dataset is None:
             return
+        self._dismiss_hover_route_pressure_focus(restore=False)
         content_rect = self._content_rect()
         if content_rect.width() <= 1.0 or content_rect.height() <= 1.0:
             return
@@ -6344,6 +7472,67 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         target_rect.adjust(-padding, -padding, padding, padding)
         return target_rect
 
+    def _route_pressure_strip_payload_for_edge(self, edge_name: str) -> dict[str, Any] | None:
+        edge_key = str(edge_name or "")
+        if not edge_key:
+            return None
+        diagnostics = self._diagnostics if isinstance(self._diagnostics, dict) else {}
+        for item in list(diagnostics.get("route_pressure_strips") or []):
+            payload = dict(item or {})
+            if str(payload.get("edge_name") or "") == edge_key:
+                return payload
+        return None
+
+    def _route_pressure_strip_focus_rect(self, payload: dict[str, Any] | None) -> QtCore.QRectF | None:
+        item = dict(payload or {})
+        edge_name = str(item.get("edge_name") or "")
+        if not edge_name:
+            return None
+        target_rect: QtCore.QRectF | None = None
+        path = self._edge_paths.get(edge_name)
+        if isinstance(path, QtGui.QPainterPath) and not path.isEmpty():
+            target_rect = QtCore.QRectF(path.boundingRect())
+        for node_name in [str(item.get("start_node") or ""), str(item.get("end_node") or "")]:
+            point = self._node_points.get(node_name)
+            if point is None:
+                continue
+            node_rect = QtCore.QRectF(point.x() - 46.0, point.y() - 46.0, 92.0, 92.0)
+            target_rect = node_rect if target_rect is None else target_rect.united(node_rect)
+        if target_rect is None:
+            return None
+        target_rect.adjust(-120.0, -120.0, 120.0, 120.0)
+        return target_rect
+
+    def _camera_contains_rect(self, rect: QtCore.QRectF, *, margin: float = 48.0) -> bool:
+        expanded = QtCore.QRectF(self._camera_rect).adjusted(margin, margin, -margin, -margin)
+        return expanded.contains(rect)
+
+    def _update_hover_route_pressure_focus(self) -> None:
+        hover_edge = str(self._hover_name or "") if self._hover_kind == "edge" else ""
+        payload = self._route_pressure_strip_payload_for_edge(hover_edge)
+        if payload is None or self._detail_mode == "quiet":
+            self._dismiss_hover_route_pressure_focus(restore=True)
+            return
+
+        focus_rect = self._route_pressure_strip_focus_rect(payload)
+        if focus_rect is None:
+            self._dismiss_hover_route_pressure_focus(restore=True)
+            return
+        if self._camera_contains_rect(focus_rect, margin=54.0):
+            return
+        if self._hover_focus_restore_rect is None:
+            self._hover_focus_restore_rect = QtCore.QRectF(self._camera_rect)
+        self._hover_focus_edge = hover_edge
+        self._set_camera_target(focus_rect)
+
+    def _dismiss_hover_route_pressure_focus(self, *, restore: bool) -> None:
+        restore_rect = QtCore.QRectF(self._hover_focus_restore_rect) if self._hover_focus_restore_rect is not None else None
+        had_focus = bool(self._hover_focus_edge)
+        self._hover_focus_edge = ""
+        self._hover_focus_restore_rect = None
+        if restore and had_focus and restore_rect is not None:
+            self._set_camera_target(restore_rect)
+
     def _hit_test(self, scene_pos: QtCore.QPointF) -> tuple[str, str]:
         for kind, name, rect in reversed(self._overlay_targets):
             if rect.contains(scene_pos):
@@ -6356,7 +7545,57 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                 return "edge", edge_name
         return "", ""
 
+    def _reference_scheme_rect(self) -> QtCore.QRectF:
+        left_inset, top_inset, right_inset, bottom_inset = REFERENCE_SCHEME_SCENE_INSET
+        bounds = QtCore.QRectF(self._scene_rect).adjusted(left_inset, top_inset, -right_inset, -bottom_inset)
+        if bounds.width() <= 10.0 or bounds.height() <= 10.0:
+            return QtCore.QRectF(self._scene_rect)
+        source_width = REFERENCE_SCHEME_VIEWBOX_W
+        source_height = REFERENCE_SCHEME_VIEWBOX_H
+        if self._reference_svg_renderer is not None:
+            try:
+                view_box = self._reference_svg_renderer.viewBoxF()
+                if view_box.isValid() and view_box.width() > 1.0 and view_box.height() > 1.0:
+                    source_width = float(view_box.width())
+                    source_height = float(view_box.height())
+            except Exception:
+                pass
+        scale = min(bounds.width() / max(1.0, source_width), bounds.height() / max(1.0, source_height))
+        width = source_width * scale
+        height = source_height * scale
+        center = bounds.center()
+        return QtCore.QRectF(center.x() - width * 0.5, center.y() - height * 0.5, width, height)
+
     def _draw_static_scene(self, painter: QtGui.QPainter) -> None:
+        if self._reference_svg_renderer is not None and self._show_reference_scheme:
+            painter.fillRect(self._scene_rect, QtGui.QColor("#071117"))
+            reference_rect = self._reference_scheme_rect()
+            frame_rect = reference_rect.adjusted(-16.0, -16.0, 16.0, 16.0)
+            painter.save()
+            painter.setPen(QtGui.QPen(QtGui.QColor(99, 211, 245, 46), 2.0))
+            painter.setBrush(QtGui.QColor(7, 17, 23, 14))
+            painter.drawRoundedRect(frame_rect, 28.0, 28.0)
+            painter.restore()
+            painter.save()
+            painter.setOpacity(0.44 if self._detail_mode == "quiet" else 0.58)
+            self._reference_svg_renderer.render(painter, reference_rect)
+            painter.restore()
+            painter.save()
+            badge_rect = QtCore.QRectF(reference_rect.left() + 18.0, reference_rect.top() + 16.0, 330.0, 34.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(QtGui.QColor(9, 20, 26, 198))
+            painter.drawRoundedRect(badge_rect, 12.0, 12.0)
+            painter.setPen(QtGui.QColor("#9fe7f7"))
+            font = QtGui.QFont("Bahnschrift SemiCondensed", 12)
+            font.setBold(True)
+            painter.setFont(font)
+            painter.drawText(
+                badge_rect.adjusted(12.0, 0.0, -12.0, 0.0),
+                QtCore.Qt.AlignVCenter | QtCore.Qt.AlignLeft,
+                "Исходная пневмосхема • pneumo_scheme.svg",
+            )
+            painter.restore()
+            return
         if self._svg_renderer is not None:
             self._svg_renderer.render(painter, self._scene_rect)
             return
@@ -6421,15 +7660,477 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             if inline_payload is not None:
                 self._draw_inline_route_symbol(painter, edge_name=edge_name, payload=inline_payload)
 
+    def _draw_diagonal_focus_pressure_strips(self, painter: QtGui.QPainter) -> None:
+        diagnostics = self._diagnostics if isinstance(self._diagnostics, dict) else {}
+        strip_payloads = list(diagnostics.get("route_pressure_strips") or diagnostics.get("diagonal_pressure_strips") or [])
+        if not strip_payloads:
+            return
+        if self._detail_mode == "quiet":
+            selected = [
+                dict(item or {})
+                for item in strip_payloads
+                if str(dict(item or {}).get("edge_name") or "") == str(self._selected_edge or "")
+            ]
+            strip_payloads = selected[:1] if selected else strip_payloads[:1]
+        elif self._detail_mode == "operator":
+            strip_payloads = strip_payloads[:3]
+        else:
+            strip_payloads = strip_payloads[:6]
+
+        safe_rect = self._scene_rect.adjusted(24.0, 24.0, -24.0, -24.0)
+        for item in strip_payloads:
+            payload = dict(item or {})
+            edge_name = str(payload.get("edge_name") or "")
+            path = self._edge_paths.get(edge_name)
+            if not isinstance(path, QtGui.QPainterPath) or path.isEmpty():
+                continue
+
+            severity = str(payload.get("severity") or "attention")
+            p1_bar_g = _finite_or_none(payload.get("p1_bar_g"))
+            p2_bar_g = _finite_or_none(payload.get("p2_bar_g"))
+            order = int(payload.get("order") or 0)
+            is_selected = bool(payload.get("selected"))
+            severity_color = QtGui.QColor(self._severity_color_hex(severity))
+            severity_color.setAlpha(84 if not is_selected else 118)
+            start_color = QtGui.QColor(
+                *(_pressure_to_heat_rgb(p1_bar_g) if p1_bar_g is not None else _flow_to_heat_rgb(0.0, max_abs_flow=1.0))
+            )
+            end_color = QtGui.QColor(
+                *(_pressure_to_heat_rgb(p2_bar_g) if p2_bar_g is not None else _flow_to_heat_rgb(0.0, max_abs_flow=1.0))
+            )
+            start_color.setAlpha(232 if is_selected else 210)
+            end_color.setAlpha(232 if is_selected else 210)
+            gradient = QtGui.QLinearGradient(path.pointAtPercent(0.0), path.pointAtPercent(1.0))
+            gradient.setColorAt(0.0, start_color)
+            gradient.setColorAt(1.0, end_color)
+
+            painter.save()
+            painter.setPen(
+                QtGui.QPen(
+                    severity_color,
+                    10.0 if is_selected else 8.0,
+                    QtCore.Qt.SolidLine,
+                    QtCore.Qt.RoundCap,
+                    QtCore.Qt.RoundJoin,
+                )
+            )
+            painter.drawPath(path)
+            painter.setPen(
+                QtGui.QPen(
+                    QtGui.QBrush(gradient),
+                    5.6 if is_selected else 4.6,
+                    QtCore.Qt.SolidLine,
+                    QtCore.Qt.RoundCap,
+                    QtCore.Qt.RoundJoin,
+                )
+            )
+            painter.drawPath(path)
+            self._draw_route_pressure_strip_cause_effect_accent(
+                painter,
+                path=path,
+                payload=payload,
+                is_selected=is_selected,
+                order=order,
+            )
+
+            anchor_percent = min(0.78, 0.34 + float(order) * 0.22)
+            anchor = path.pointAtPercent(anchor_percent)
+            angle_deg = _path_angle_deg(path, anchor_percent)
+            angle_rad = math.radians(angle_deg)
+            side = -1.0 if order % 2 else 1.0
+            offset = 34.0 + 8.0 * float(order)
+            anchor = QtCore.QPointF(
+                anchor.x() + (-math.sin(angle_rad) * offset * side),
+                anchor.y() + (math.cos(angle_rad) * offset * side),
+            )
+            chip_rect = QtCore.QRectF(anchor.x() - 88.0, anchor.y() - 22.0, 176.0, 44.0)
+            if chip_rect.left() < safe_rect.left():
+                chip_rect.moveLeft(safe_rect.left())
+            if chip_rect.right() > safe_rect.right():
+                chip_rect.moveRight(safe_rect.right())
+            if chip_rect.top() < safe_rect.top():
+                chip_rect.moveTop(safe_rect.top())
+            if chip_rect.bottom() > safe_rect.bottom():
+                chip_rect.moveBottom(safe_rect.bottom())
+
+            painter.setPen(QtGui.QPen(QtGui.QColor("#f7fbff" if is_selected else severity_color), 1.6))
+            painter.setBrush(QtGui.QColor(7, 17, 23, 222))
+            painter.drawRoundedRect(chip_rect, 12.0, 12.0)
+
+            title_font = QtGui.QFont(self.font())
+            title_font.setPointSizeF(6.2)
+            title_font.setBold(True)
+            painter.setFont(title_font)
+            painter.setPen(QtGui.QColor("#eef7fa"))
+            painter.drawText(
+                chip_rect.adjusted(10.0, 5.0, -10.0, -22.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                str(payload.get("label") or "ΔP диагонали"),
+            )
+            painter.setPen(QtGui.QColor("#9fc5d2"))
+            painter.drawText(
+                chip_rect.adjusted(10.0, 5.0, -10.0, -22.0),
+                QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+                str(payload.get("delta_label") or "ΔP —"),
+            )
+
+            body_font = QtGui.QFont(self.font())
+            body_font.setPointSizeF(5.9)
+            painter.setFont(body_font)
+            painter.setPen(QtGui.QColor("#d6e8ee"))
+            painter.drawText(
+                chip_rect.adjusted(10.0, 18.0, -10.0, -4.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                f"{payload.get('start_label') or '—'} → {payload.get('end_label') or '—'}",
+            )
+            painter.setPen(QtGui.QColor("#8be2f8"))
+            painter.drawText(
+                chip_rect.adjusted(10.0, 18.0, -10.0, -4.0),
+                QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+                str(payload.get("pressure_label") or "—"),
+            )
+            self._overlay_targets.append(("edge", edge_name, chip_rect))
+            painter.restore()
+
+    def _draw_route_pressure_strip_cause_effect_accent(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        path: QtGui.QPainterPath,
+        payload: dict[str, Any],
+        is_selected: bool,
+        order: int,
+    ) -> None:
+        if path.isEmpty():
+            return
+        badge_text = str(payload.get("cause_effect_badge") or "")
+        if not badge_text:
+            return
+
+        tone = str(payload.get("cause_effect_tone") or "neutral")
+        fill, border, text_color = self._focus_tone_colors(tone)
+        accent_percent = min(0.68, 0.48 + float(order) * 0.04)
+        start_percent = max(0.10, accent_percent - 0.10)
+        end_percent = min(0.92, accent_percent + 0.10)
+        start_point = path.pointAtPercent(start_percent)
+        end_point = path.pointAtPercent(end_percent)
+
+        painter.save()
+        accent_pen = QtGui.QPen(border, 7.2 if is_selected else 6.0, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin)
+        painter.setPen(accent_pen)
+        painter.drawLine(start_point, end_point)
+
+        anchor = path.pointAtPercent(accent_percent)
+        angle_deg = _path_angle_deg(path, accent_percent)
+        angle_rad = math.radians(angle_deg)
+        side = -1.0 if order % 2 else 1.0
+        offset = 18.0 if is_selected else 14.0
+        chip_center = QtCore.QPointF(
+            anchor.x() + (-math.sin(angle_rad) * offset * side),
+            anchor.y() + (math.cos(angle_rad) * offset * side),
+        )
+        chip_width = max(52.0, min(94.0, 24.0 + float(len(badge_text)) * 4.6))
+        chip_rect = QtCore.QRectF(chip_center.x() - chip_width * 0.5, chip_center.y() - 7.0, chip_width, 14.0)
+
+        painter.setPen(QtGui.QPen(border, 0.9))
+        painter.setBrush(fill)
+        painter.drawRoundedRect(chip_rect, 6.0, 6.0)
+        chip_font = QtGui.QFont(self.font())
+        chip_font.setPointSizeF(4.8 if is_selected else 4.6)
+        chip_font.setBold(True)
+        painter.setFont(chip_font)
+        painter.setPen(text_color)
+        painter.drawText(
+            chip_rect.adjusted(4.0, 0.0, -4.0, 0.0),
+            QtCore.Qt.AlignCenter,
+            badge_text,
+        )
+        painter.restore()
+
+    def _active_route_pressure_strip_payload(self) -> dict[str, Any] | None:
+        diagnostics = self._diagnostics if isinstance(self._diagnostics, dict) else {}
+        strip_payloads = [dict(item or {}) for item in list(diagnostics.get("route_pressure_strips") or []) if isinstance(item, dict)]
+        if not strip_payloads:
+            return None
+        hover_edge = str(self._hover_name or "") if self._hover_kind == "edge" else ""
+        if hover_edge:
+            for payload in strip_payloads:
+                if str(payload.get("edge_name") or "") == hover_edge:
+                    payload["hovered"] = True
+                    return payload
+        selected_edge = str(self._selected_edge or "")
+        if selected_edge:
+            for payload in strip_payloads:
+                if str(payload.get("edge_name") or "") == selected_edge:
+                    payload["hovered"] = False
+                    return payload
+        return None
+
+    def _active_route_pressure_terminal_meta(self) -> dict[str, Any] | None:
+        payload = self._active_route_pressure_strip_payload()
+        if payload is None:
+            return None
+        return _route_pressure_strip_terminal_meta(payload)
+
+    def _draw_route_pressure_strip_terminal_focus(self, painter: QtGui.QPainter) -> None:
+        payload = self._active_route_pressure_strip_payload()
+        if payload is None:
+            return
+        terminal_meta = _route_pressure_strip_terminal_meta(payload)
+        edge_name = str(terminal_meta.get("edge_name") or "")
+        midpoint = self._edge_midpoints.get(edge_name)
+        if midpoint is None:
+            return
+
+        severity = str(terminal_meta.get("severity") or "info")
+        highlight = QtGui.QColor(self._severity_color_hex(severity))
+        if bool(payload.get("hovered")):
+            highlight = QtGui.QColor("#f6d98b")
+        endpoint_rows = [
+            (
+                str(terminal_meta.get("start_node") or ""),
+                str(terminal_meta.get("start_badge") or "P?"),
+                str(terminal_meta.get("start_pressure_label") or "—"),
+                str(terminal_meta.get("start_label") or "—"),
+            ),
+            (
+                str(terminal_meta.get("end_node") or ""),
+                str(terminal_meta.get("end_badge") or "P?"),
+                str(terminal_meta.get("end_pressure_label") or "—"),
+                str(terminal_meta.get("end_label") or "—"),
+            ),
+        ]
+
+        painter.save()
+        for node_name, badge_text, pressure_text, label_text in endpoint_rows:
+            point = self._node_points.get(node_name)
+            if point is None:
+                continue
+            is_leading = node_name and node_name == str(terminal_meta.get("leading_node") or "")
+            ring_color = QtGui.QColor(highlight)
+            ring_color.setAlpha(255 if is_leading else 214)
+            painter.setPen(QtGui.QPen(ring_color, 3.6 if is_leading else 2.4))
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawEllipse(point, 26.0 if is_leading else 22.0, 26.0 if is_leading else 22.0)
+
+            side = 1.0 if point.x() <= midpoint.x() else -1.0
+            chip_rect = QtCore.QRectF(
+                point.x() + (18.0 if side > 0.0 else -106.0),
+                point.y() - 14.0,
+                88.0,
+                28.0,
+            )
+            painter.setPen(QtGui.QPen(ring_color, 1.8 if is_leading else 1.2))
+            painter.setBrush(QtGui.QColor(7, 17, 23, 232))
+            painter.drawRoundedRect(chip_rect, 9.0, 9.0)
+
+            chip_font = QtGui.QFont(self.font())
+            chip_font.setPointSizeF(6.0 if is_leading else 5.8)
+            chip_font.setBold(True)
+            painter.setFont(chip_font)
+            painter.setPen(QtGui.QColor("#eef7fa"))
+            painter.drawText(
+                chip_rect.adjusted(8.0, 2.0, -8.0, -12.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                f"{badge_text} {pressure_text}",
+            )
+            painter.setPen(QtGui.QColor("#8be2f8" if is_leading else "#9fc5d2"))
+            painter.drawText(
+                chip_rect.adjusted(8.0, 12.0, -8.0, -2.0),
+                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                label_text,
+            )
+            self._overlay_targets.append(("node", node_name, chip_rect))
+
+        trend_fill, trend_border, trend_text = self._focus_tone_colors(str(terminal_meta.get("trend_tone") or "neutral"))
+        q_fill, q_border, q_text = self._focus_tone_colors(str(terminal_meta.get("q_tone") or "neutral"))
+        cause_fill, cause_border, cause_text = self._focus_tone_colors(str(terminal_meta.get("cause_effect_tone") or "neutral"))
+        summary_rect = QtCore.QRectF(midpoint.x() - 92.0, midpoint.y() - 98.0, 184.0, 102.0)
+        painter.setPen(QtGui.QPen(highlight, 1.4))
+        painter.setBrush(QtGui.QColor(8, 20, 28, 228))
+        painter.drawRoundedRect(summary_rect, 9.0, 9.0)
+        summary_font = QtGui.QFont(self.font())
+        summary_font.setPointSizeF(5.9)
+        summary_font.setBold(True)
+        painter.setFont(summary_font)
+        painter.setPen(QtGui.QColor("#eef7fa"))
+        painter.drawText(
+            summary_rect.adjusted(8.0, 1.0, -8.0, -73.0),
+            QtCore.Qt.AlignCenter | QtCore.Qt.AlignVCenter,
+            str(terminal_meta.get("leader_summary") or "Ведущий конец не определён"),
+        )
+        trend_rect = QtCore.QRectF(summary_rect.left() + 10.0, summary_rect.top() + 20.0, summary_rect.width() - 20.0, 13.0)
+        painter.setPen(QtGui.QPen(trend_border, 1.0))
+        painter.setBrush(trend_fill)
+        painter.drawRoundedRect(trend_rect, 7.0, 7.0)
+        trend_font = QtGui.QFont(self.font())
+        trend_font.setPointSizeF(5.5)
+        trend_font.setBold(True)
+        painter.setFont(trend_font)
+        painter.setPen(trend_text)
+        painter.drawText(
+            trend_rect.adjusted(6.0, 0.0, -6.0, 0.0),
+            QtCore.Qt.AlignCenter,
+            f"{terminal_meta.get('trend_badge') or 'ΔP?'} • {terminal_meta.get('trend_status') or 'ΔP без истории'}",
+        )
+        q_rect = QtCore.QRectF(summary_rect.left() + 10.0, summary_rect.top() + 36.0, summary_rect.width() - 20.0, 13.0)
+        painter.setPen(QtGui.QPen(q_border, 1.0))
+        painter.setBrush(q_fill)
+        painter.drawRoundedRect(q_rect, 7.0, 7.0)
+        q_font = QtGui.QFont(self.font())
+        q_font.setPointSizeF(5.5)
+        q_font.setBold(True)
+        painter.setFont(q_font)
+        painter.setPen(q_text)
+        painter.drawText(
+            q_rect.adjusted(6.0, 0.0, -6.0, 0.0),
+            QtCore.Qt.AlignCenter,
+            f"{terminal_meta.get('q_badge') or 'Q?'} • {terminal_meta.get('q_status') or 'Q без истории'}",
+        )
+        cause_rect = QtCore.QRectF(summary_rect.left() + 10.0, summary_rect.top() + 52.0, summary_rect.width() - 20.0, 10.0)
+        painter.setPen(QtGui.QPen(cause_border, 0.9))
+        painter.setBrush(cause_fill)
+        painter.drawRoundedRect(cause_rect, 5.0, 5.0)
+        cause_font = QtGui.QFont(self.font())
+        cause_font.setPointSizeF(4.7)
+        cause_font.setBold(True)
+        painter.setFont(cause_font)
+        painter.setPen(cause_text)
+        painter.drawText(
+            cause_rect.adjusted(4.0, 0.0, -4.0, 0.0),
+            QtCore.Qt.AlignCenter,
+            str(terminal_meta.get("cause_effect_badge") or "ΔP→Q ?"),
+        )
+        history_rect = QtCore.QRectF(summary_rect.left() + 10.0, summary_rect.top() + 66.0, summary_rect.width() - 20.0, 22.0)
+        self._draw_route_pressure_strip_flow_history(
+            painter,
+            rect=history_rect,
+            payload=terminal_meta,
+            accent=q_border,
+        )
+        self._overlay_targets.append(("edge", edge_name, summary_rect))
+        painter.restore()
+
+    def _draw_route_pressure_strip_flow_history(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+        accent: QtGui.QColor,
+    ) -> None:
+        points = list(payload.get("q_history_points") or [])
+        if not points:
+            return
+
+        painter.save()
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(10, 23, 31, 224))
+        painter.drawRoundedRect(rect, 6.0, 6.0)
+
+        caption_font = QtGui.QFont(self.font())
+        caption_font.setPointSizeF(4.9)
+        caption_font.setBold(True)
+        painter.setFont(caption_font)
+        painter.setPen(QtGui.QColor("#bfdce6"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 6.0, rect.top() + 1.0, 66.0, 8.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            "Q-лента",
+        )
+        painter.drawText(
+            QtCore.QRectF(rect.right() - 76.0, rect.top() + 1.0, 70.0, 8.0),
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            f"|Q|max {float(payload.get('q_history_peak_abs') or 0.0):0.0f}",
+        )
+
+        trace_rect = QtCore.QRectF(rect.left() + 6.0, rect.top() + 8.0, rect.width() - 12.0, rect.height() - 11.0)
+        zero_y = trace_rect.top() + trace_rect.height() * float(payload.get("q_history_zero_y") or 0.5)
+        painter.setPen(QtGui.QPen(QtGui.QColor(112, 134, 146, 96), 1.0, QtCore.Qt.DashLine))
+        painter.drawLine(QtCore.QPointF(trace_rect.left(), zero_y), QtCore.QPointF(trace_rect.right(), zero_y))
+
+        open_blocks = list(payload.get("q_history_open_blocks") or [])
+        if open_blocks:
+            gate_rect = QtCore.QRectF(trace_rect.left(), trace_rect.bottom() - 3.0, trace_rect.width(), 3.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            for block in open_blocks:
+                x0 = float(block.get("x0") or 0.0)
+                x1 = float(block.get("x1") or 0.0)
+                block_rect = QtCore.QRectF(
+                    gate_rect.left() + gate_rect.width() * x0,
+                    gate_rect.top(),
+                    max(1.5, gate_rect.width() * max(0.0, x1 - x0) - 0.8),
+                    gate_rect.height(),
+                )
+                block_fill = QtGui.QColor(127, 228, 167, 178) if bool(block.get("open")) else QtGui.QColor(70, 84, 95, 150)
+                painter.setBrush(block_fill)
+                painter.drawRoundedRect(block_rect, 1.5, 1.5)
+
+        trace_height = max(6.0, trace_rect.height() - 3.0)
+        line_path = QtGui.QPainterPath()
+        for point_idx, point in enumerate(points):
+            x_norm = float(point[0]) if len(point) >= 1 else 0.0
+            y_norm = float(point[1]) if len(point) >= 2 else 0.5
+            trace_point = QtCore.QPointF(
+                trace_rect.left() + trace_rect.width() * x_norm,
+                trace_rect.top() + max(0.0, min(1.0, y_norm)) * trace_height,
+            )
+            if point_idx == 0:
+                line_path.moveTo(trace_point)
+            else:
+                line_path.lineTo(trace_point)
+
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        glow = QtGui.QColor(accent)
+        glow.setAlpha(220)
+        line = QtGui.QColor(accent)
+        line.setAlpha(255)
+        painter.setPen(QtGui.QPen(glow.lighter(118), 3.0, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
+        painter.drawPath(line_path)
+        painter.setPen(QtGui.QPen(line, 1.6, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
+        painter.drawPath(line_path)
+        last_point = line_path.currentPosition()
+        painter.setPen(QtGui.QPen(QtGui.QColor("#071117"), 0.8))
+        painter.setBrush(line)
+        painter.drawEllipse(last_point, 2.1, 2.1)
+        painter.restore()
+
     def _draw_live_nodes(self, painter: QtGui.QPainter) -> None:
         if self._dataset is None:
             return
+        diagnostics = self._diagnostics if isinstance(self._diagnostics, dict) else {}
+        route_payload = self._active_route_pressure_strip_payload()
+        route_terminal_meta = self._active_route_pressure_terminal_meta()
+        route_intermediate_items = _route_pressure_strip_intermediate_nodes_meta(
+            self._dataset,
+            diagnostics,
+            route_payload,
+            idx=self._frame_idx,
+        )
+        route_intermediate_lookup = {
+            str(item.get("name") or ""): dict(item or {})
+            for item in route_intermediate_items
+            if str(dict(item or {}).get("name") or "").strip()
+        }
+        diagonal_focus = dict(diagnostics.get("diagonal_focus") or {})
+        diagonal_focus_nodes = {
+            str(name)
+            for name in list(diagonal_focus.get("node_names") or [])
+            if str(name).strip()
+        }
+        diagonal_focus_lookup = {
+            str(item.get("name") or ""): dict(item or {})
+            for item in list(diagonal_focus.get("nodes") or [])
+            if str(dict(item or {}).get("name") or "").strip()
+        }
         if self._detail_mode == "quiet":
             spotlight_nodes: set[str] = set()
         elif self._detail_mode == "full":
             spotlight_nodes = set(self._node_points.keys())
         else:
             spotlight_nodes = set(self._dataset.overlay_node_names)
+        if self._detail_mode != "quiet":
+            spotlight_nodes.update(diagonal_focus_nodes)
         spotlight_nodes.update(str(item.get("name") or "") for item in list(self._alerts.get("nodes") or []))
         if self._selected_node:
             spotlight_nodes.add(self._selected_node)
@@ -6439,6 +8140,18 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             spotlight_nodes.add(str(edge_def.get("n2") or ""))
         if self._hover_kind == "node" and self._hover_name:
             spotlight_nodes.add(self._hover_name)
+        if route_terminal_meta:
+            spotlight_nodes.update(
+                name
+                for name in [
+                    str(route_terminal_meta.get("start_node") or ""),
+                    str(route_terminal_meta.get("end_node") or ""),
+                    str(route_terminal_meta.get("leading_node") or ""),
+                    str(route_terminal_meta.get("trailing_node") or ""),
+                ]
+                if name
+            )
+        spotlight_nodes.update(route_intermediate_lookup.keys())
 
         for node_name, point in self._node_points.items():
             pressure = self._current_node_pressure(node_name)
@@ -6447,6 +8160,75 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             radius = 12.0 if node_name in spotlight_nodes else 9.0
             if node_name == self._selected_node:
                 radius = 14.0
+            diagonal_meta = diagonal_focus_lookup.get(node_name)
+            if diagonal_meta:
+                ring_color = QtGui.QColor("#9fe7f7")
+                severity = str(diagonal_meta.get("severity") or "attention")
+                if severity == "warn":
+                    ring_color = QtGui.QColor("#f8c15c")
+                elif severity == "focus":
+                    ring_color = QtGui.QColor("#f7fbff")
+                painter.setPen(QtGui.QPen(ring_color, 3.0))
+                painter.setBrush(QtCore.Qt.NoBrush)
+                painter.drawEllipse(point, radius + 7.0, radius + 7.0)
+            route_badge = ""
+            route_ring_color: QtGui.QColor | None = None
+            route_badge_fill: QtGui.QColor | None = None
+            if route_terminal_meta:
+                leading_node = str(route_terminal_meta.get("leading_node") or "")
+                trailing_node = str(route_terminal_meta.get("trailing_node") or "")
+                start_node = str(route_terminal_meta.get("start_node") or "")
+                end_node = str(route_terminal_meta.get("end_node") or "")
+                if node_name and node_name == leading_node:
+                    route_badge = (
+                        str(route_terminal_meta.get("start_badge") or "")
+                        if node_name == start_node
+                        else str(route_terminal_meta.get("end_badge") or "")
+                    )
+                    route_ring_color = QtGui.QColor("#f6d98b")
+                    route_badge_fill = QtGui.QColor(76, 56, 24, 228)
+                elif node_name and node_name == trailing_node:
+                    route_badge = (
+                        str(route_terminal_meta.get("start_badge") or "")
+                        if node_name == start_node
+                        else str(route_terminal_meta.get("end_badge") or "")
+                    )
+                    route_ring_color = QtGui.QColor("#8be2f8")
+                    route_badge_fill = QtGui.QColor(16, 46, 58, 228)
+                elif node_name and node_name in {start_node, end_node}:
+                    route_badge = (
+                        str(route_terminal_meta.get("start_badge") or "")
+                        if node_name == start_node
+                        else str(route_terminal_meta.get("end_badge") or "")
+                    )
+                    route_ring_color = QtGui.QColor("#d6e8ee")
+                    route_badge_fill = QtGui.QColor(22, 36, 45, 228)
+            if not route_badge and node_name in route_intermediate_lookup:
+                intermediate_item = route_intermediate_lookup.get(node_name) or {}
+                route_badge = str(intermediate_item.get("badge_text") or "")
+                kind = str(intermediate_item.get("kind") or "")
+                if kind == "regulator":
+                    route_ring_color = QtGui.QColor("#9fe7f7")
+                    route_badge_fill = QtGui.QColor(18, 52, 64, 228)
+                elif kind == "diagonal":
+                    route_ring_color = QtGui.QColor("#9ce8ba")
+                    route_badge_fill = QtGui.QColor(18, 56, 42, 228)
+                elif kind == "chamber":
+                    route_ring_color = QtGui.QColor("#d6e8ee")
+                    route_badge_fill = QtGui.QColor(26, 40, 49, 228)
+                else:
+                    route_ring_color = QtGui.QColor("#bfdce6")
+                    route_badge_fill = QtGui.QColor(24, 36, 45, 228)
+            if route_ring_color is not None:
+                route_leading_node = str(route_terminal_meta.get("leading_node") or "") if route_terminal_meta else ""
+                painter.setPen(
+                    QtGui.QPen(
+                        route_ring_color,
+                        3.4 if node_name == route_leading_node else 2.6,
+                    )
+                )
+                painter.setBrush(QtCore.Qt.NoBrush)
+                painter.drawEllipse(point, radius + 10.0, radius + 10.0)
             painter.setPen(QtGui.QPen(QtGui.QColor("#f7fbff" if node_name == self._selected_node else "#102028"), 2.0))
             painter.setBrush(fill)
             painter.drawEllipse(point, radius, radius)
@@ -6483,6 +8265,63 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                 QtCore.Qt.AlignCenter,
                 self._fmt_value(pressure, "бар(g)", digits=2),
             )
+            if route_badge and route_badge_fill is not None and route_ring_color is not None:
+                badge_rect = QtCore.QRectF(point.x() + 16.0, point.y() - 38.0, 40.0, 18.0)
+                painter.setPen(QtGui.QPen(route_ring_color, 1.0))
+                painter.setBrush(route_badge_fill)
+                painter.drawRoundedRect(badge_rect, 8.0, 8.0)
+                badge_font = QtGui.QFont(self.font())
+                badge_font.setPointSizeF(7.2)
+                badge_font.setBold(True)
+                painter.setFont(badge_font)
+                painter.setPen(QtGui.QColor("#f7fbff"))
+                painter.drawText(
+                    badge_rect.adjusted(4.0, 0.0, -4.0, 0.0),
+                    QtCore.Qt.AlignCenter,
+                    route_badge,
+                )
+                self._overlay_targets.append(("node", node_name, badge_rect))
+            intermediate_hover_item = route_intermediate_lookup.get(node_name) or {}
+            if (
+                intermediate_hover_item
+                and self._hover_kind == "node"
+                and str(self._hover_name or "") == node_name
+            ):
+                summary_rect = QtCore.QRectF(point.x() - 92.0, point.y() + 12.0, 184.0, 42.0)
+                summary_fill, summary_border, summary_text = self._focus_tone_colors(
+                    str(intermediate_hover_item.get("tone") or "neutral")
+                )
+                painter.setPen(QtGui.QPen(summary_border, 1.0))
+                painter.setBrush(summary_fill)
+                painter.drawRoundedRect(summary_rect, 8.0, 8.0)
+                summary_font = QtGui.QFont(self.font())
+                summary_font.setPointSizeF(5.2)
+                summary_font.setBold(True)
+                painter.setFont(summary_font)
+                painter.setPen(summary_text)
+                painter.drawText(
+                    summary_rect.adjusted(6.0, -16.0, -6.0, 0.0),
+                    QtCore.Qt.AlignCenter,
+                    str(intermediate_hover_item.get("summary_text") or ""),
+                )
+                hint_font = QtGui.QFont(self.font())
+                hint_font.setPointSizeF(4.8)
+                hint_font.setBold(True)
+                painter.setFont(hint_font)
+                painter.drawText(
+                    summary_rect.adjusted(6.0, -1.0, -6.0, 0.0),
+                    QtCore.Qt.AlignCenter,
+                    str(intermediate_hover_item.get("lead_hint_text") or ""),
+                )
+                trend_font = QtGui.QFont(self.font())
+                trend_font.setPointSizeF(4.6)
+                trend_font.setBold(True)
+                painter.setFont(trend_font)
+                painter.drawText(
+                    summary_rect.adjusted(6.0, 15.0, -6.0, 0.0),
+                    QtCore.Qt.AlignCenter,
+                    str(intermediate_hover_item.get("lead_trend_text") or ""),
+                )
             self._overlay_targets.append(("node", node_name, label_rect.united(value_rect)))
 
     def _selected_edge_direction_payload(self, *, max_abs_flow: float) -> dict[str, Any] | None:
@@ -8509,11 +10348,13 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._view_mode_override_active = bool(self._startup_view_mode_override)
         self.view_mode = self._startup_view_mode_override or self._persisted_view_mode
         self.detail_mode = self._normalize_detail_mode(self.ui_state.get_str("detail_mode", "operator"))
+        self.reference_scheme_visible = bool(self.ui_state.get_bool("reference_scheme_visible", True))
         self.setStyleSheet(APP_STYLESHEET_DARK if self.theme == "dark" else APP_STYLESHEET_LIGHT)
 
         self.mnemo_view = MnemoNativeView(self)
         self.native_view = self.mnemo_view
         self.mnemo_view.set_detail_mode(self.detail_mode)
+        self.mnemo_view.set_reference_scheme_visible(self.reference_scheme_visible)
         self.mnemo_view.edge_picked.connect(self._select_edge)
         self.mnemo_view.node_picked.connect(self._select_node)
         self.mnemo_view.status.connect(self._set_status)
@@ -8667,6 +10508,12 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.export_events_action.triggered.connect(self._export_event_log)
         tb.addAction(self.export_events_action)
 
+        self.reference_scheme_action = QtGui.QAction("Исходная пневмосхема", self)
+        self.reference_scheme_action.setCheckable(True)
+        self.reference_scheme_action.setChecked(self.reference_scheme_visible)
+        self.reference_scheme_action.toggled.connect(self._toggle_reference_scheme)
+        tb.addAction(self.reference_scheme_action)
+
         self.startup_banner_action = QtGui.QAction("Onboarding", self)
         self.startup_banner_action.setCheckable(True)
         self.startup_banner_action.toggled.connect(self._set_startup_banner_visible)
@@ -8729,6 +10576,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         view_menu.addAction(self._trends_dock.toggleViewAction())
         view_menu.addAction(self._legend_dock.toggleViewAction())
         view_menu.addSeparator()
+        view_menu.addAction(self.reference_scheme_action)
         view_menu.addAction(self.startup_banner_action)
         view_menu.addAction(self.return_focus_action)
         view_menu.addAction(self.full_scheme_action)
@@ -8931,6 +10779,15 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
     def _detail_mode_changed(self, index: int) -> None:
         mode = str(self.detail_combo.itemData(index) or "operator")
         self._set_detail_mode(mode, announce=True)
+
+    def _toggle_reference_scheme(self, checked: bool) -> None:
+        self.reference_scheme_visible = bool(checked)
+        try:
+            self.ui_state.set_value("reference_scheme_visible", self.reference_scheme_visible)
+        except Exception:
+            pass
+        self.mnemo_view.set_reference_scheme_visible(self.reference_scheme_visible)
+        self._set_status("Исходная пневмосхема показана." if self.reference_scheme_visible else "Исходная пневмосхема скрыта.")
 
     def _current_focus_region_payload(self, *, source: str, auto_focus: bool) -> dict[str, Any] | None:
         if self.dataset is None or self.dataset.time_s.size == 0:

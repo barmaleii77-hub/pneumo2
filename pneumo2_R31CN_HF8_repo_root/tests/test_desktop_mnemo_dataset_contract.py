@@ -11,10 +11,21 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     pytest.importorskip("PySide6")
 
     from pneumo_solver_ui.desktop_mnemo.app import (
+        _build_active_diagonal_focus_meta,
+        _build_route_pressure_strip_payloads,
+        _route_pressure_strip_cause_effect_meta,
+        _route_pressure_strip_flow_meta,
+        _route_pressure_strip_history_meta,
+        _route_pressure_strip_intermediate_nodes_meta,
+        _route_pressure_strip_terminal_meta,
+        _route_pressure_strip_trend_meta,
+        _build_diagonal_pressure_strip_payloads,
         _build_frame_alert_payload,
         _build_frame_narrative,
-        _build_selected_edge_focus_meta,
         _build_mnemo_diagnostics_payload,
+        _reference_diagonal_geometry_positions,
+        _build_selected_edge_focus_meta,
+        _reference_node_anchor_positions,
         build_onboarding_focus_target,
         build_onboarding_focus_region_payload,
         prepare_dataset,
@@ -113,6 +124,8 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     assert dataset.overlay_node_names
     assert {"Ресивер1", "Ресивер3", "узел_после_рег_Pmid"}.issubset(set(dataset.overlay_node_names))
     assert "Пневматическая мнемосхема" in dataset.svg_inline
+    assert "<svg" in dataset.reference_svg_inline
+    assert dataset.reference_scheme_source.endswith("pneumo_scheme.svg")
     assert len(dataset.canonical_node_names) == 46
     assert len(dataset.canonical_edge_names) == 70
     assert dataset.scheme_fidelity["canonical_nodes_total"] == 46
@@ -123,6 +136,33 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     assert dataset.scheme_fidelity["bundle_edges_known"] == 3
     assert dataset.scheme_fidelity["bundle_nodes_known"] == 4
     assert dataset.scheme_fidelity["status"] == "ok"
+    assert dataset.scheme_fidelity["reference_scheme_available"] is True
+    assert dataset.scheme_fidelity["reference_scheme_mode"] == "native_underlay"
+    assert str(dataset.scheme_fidelity["reference_scheme_source"]).endswith("pneumo_scheme.svg")
+    assert dataset.scheme_fidelity["reference_component_nodes_total"] == 4
+    assert dataset.scheme_fidelity["reference_component_nodes_snapped"] == 4
+    assert dataset.scheme_fidelity["reference_indicator_nodes_total"] == 7
+    assert dataset.scheme_fidelity["reference_indicator_nodes_snapped"] == 7
+    assert dataset.scheme_fidelity["reference_chamber_nodes_total"] == 16
+    assert dataset.scheme_fidelity["reference_chamber_nodes_snapped"] == 16
+    assert dataset.scheme_fidelity["reference_diagonal_nodes_total"] == 16
+    assert dataset.scheme_fidelity["reference_diagonal_nodes_geometry_locked"] == 16
+    expected_reference_nodes = _reference_node_anchor_positions(dataset.canonical_node_names)
+    expected_diagonal_nodes = _reference_diagonal_geometry_positions(dataset.canonical_node_names)
+    assert dataset.mapping["nodes"]["Ресивер1"] == pytest.approx(expected_reference_nodes["Ресивер1"])
+    assert dataset.mapping["nodes"]["Ресивер3"] == pytest.approx(expected_reference_nodes["Ресивер3"])
+    assert dataset.mapping["nodes"]["узел_после_рег_Pmid"] == pytest.approx(expected_reference_nodes["узел_после_рег_Pmid"])
+    assert dataset.mapping["nodes"]["узел_после_ОК_Pmid"] == pytest.approx(expected_reference_nodes["узел_после_ОК_Pmid"])
+    assert dataset.mapping["nodes"]["Ц1_ЛП_БП"] == pytest.approx(expected_reference_nodes["Ц1_ЛП_БП"])
+    assert dataset.mapping["nodes"]["Ц2_ПП_ШП"] == pytest.approx(expected_reference_nodes["Ц2_ПП_ШП"])
+    assert dataset.mapping["nodes"]["Ц1_ЛЗ_БП"] == pytest.approx(expected_reference_nodes["Ц1_ЛЗ_БП"])
+    assert dataset.mapping["nodes"]["Ц2_ПЗ_ШП"] == pytest.approx(expected_reference_nodes["Ц2_ПЗ_ШП"])
+    assert dataset.mapping["nodes"]["узел_ЛПCAP_к_ПЗROD_междуОКиДР"] == pytest.approx(
+        expected_diagonal_nodes["узел_ЛПCAP_к_ПЗROD_междуОКиДР"]
+    )
+    assert dataset.mapping["nodes"]["узел_ППROD_к_ЛЗCAP_послеДР"] == pytest.approx(
+        expected_diagonal_nodes["узел_ППROD_к_ЛЗCAP_послеДР"]
+    )
     assert dataset.mapping["edges_meta"]["регулятор_до_себя_Pmid_сброс"]["mnemo_route"] == "rail"
     assert dataset.mapping["edges_meta"]["обратный_клапан_Pmid_к_выхлопу"]["mnemo_route"] == "regulator_bus"
     assert dataset.mapping["edges_meta"]["дроссель_выхлоп_Pmid"]["endpoints"] == ["узел_после_ОК_Pmid", "АТМ"]
@@ -130,7 +170,7 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     assert dataset.edge_defs["обратный_клапан_Pmid_к_выхлопу"]["kind"] == "check"
     assert len(dataset.edge_series) == 3
     assert dataset.edge_series[0]["open"] == [1, 1, 0]
-    assert [item["name"] for item in dataset.node_series] == dataset.overlay_node_names
+    assert [item["name"] for item in dataset.node_series] == dataset.node_names
 
     narrative = _build_frame_narrative(
         dataset,
@@ -168,6 +208,47 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     assert any(item["canonical_kind"] == "check" for item in diagnostics["components"])
     assert any(item["camozzi_code"] == "VNR-238-3/8" for item in diagnostics["components"])
     assert any(item["icon_key"] == "check" for item in diagnostics["components"])
+    assert diagnostics["diagonal_focus"]["edges"] == []
+    route_pressure_strips = _build_route_pressure_strip_payloads(
+        dataset,
+        1,
+        selected_edge="регулятор_до_себя_Pmid_сброс",
+    )
+    assert route_pressure_strips
+    regulator_strip = next(item for item in route_pressure_strips if item["edge_name"] == "регулятор_до_себя_Pmid_сброс")
+    assert regulator_strip["role"] == "regulator"
+    assert regulator_strip["label"] == "ΔP фокус-регулятора"
+    assert "бар(g)" in regulator_strip["pressure_label"]
+    assert regulator_strip["trend_status"] == "ΔP спадает"
+    assert regulator_strip["trend_badge"] == "ΔP↓"
+    assert regulator_strip["q_status"] == "Q нарастает"
+    assert regulator_strip["q_badge"] == "Q↑"
+    assert regulator_strip["q_history_points"]
+    assert regulator_strip["q_history_peak_abs"] > 0.0
+    assert regulator_strip["cause_effect_status"] == "Q тянется после ΔP"
+    assert regulator_strip["cause_effect_badge"] == "ΔP→Q tail"
+    regulator_terminals = _route_pressure_strip_terminal_meta(regulator_strip)
+    assert regulator_terminals["leading_node"] == "Ресивер3"
+    assert regulator_terminals["start_badge"] == "P+"
+    assert regulator_terminals["end_badge"] == "P-"
+    assert regulator_terminals["leader_summary"] == "Ведёт: Ресивер 3"
+    assert regulator_terminals["trend_status"] == "ΔP спадает"
+    assert regulator_terminals["q_status"] == "Q нарастает"
+    assert regulator_terminals["q_history_points"]
+    assert regulator_terminals["cause_effect_status"] == "Q тянется после ΔP"
+    regulator_intermediate = _route_pressure_strip_intermediate_nodes_meta(
+        dataset,
+        diagnostics,
+        regulator_strip,
+        idx=1,
+    )
+    assert any(item["name"] == "узел_после_ОК_Pmid" for item in regulator_intermediate)
+    assert any(item["badge_text"] == "REG" for item in regulator_intermediate)
+    assert any("Регуляторный узел" in str(item["summary_text"]) for item in regulator_intermediate)
+    assert any("ведущего" in str(item["lead_hint_text"]).lower() for item in regulator_intermediate)
+    assert any(str(item["lead_trend_text"]) for item in regulator_intermediate)
+    assert diagnostics["route_pressure_strips"]
+    assert any(item["role"] == "regulator" for item in diagnostics["route_pressure_strips"])
 
     focus_target = build_onboarding_focus_target(
         dataset,
@@ -237,6 +318,226 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     assert any(item["badge_text"] == "P-" for item in edge_focus["terminal_markers"])
     assert any(item["badge_text"] == "SRC" for item in edge_focus["terminal_markers"])
     assert any(item["badge_text"] == "SNK" for item in edge_focus["terminal_markers"])
+
+
+def test_active_diagonal_focus_meta_surfaces_diagonal_nodes_and_alerts(tmp_path: Path) -> None:
+    pytest.importorskip("PySide6")
+
+    from pneumo_solver_ui.desktop_mnemo.app import (
+        _build_active_diagonal_focus_meta,
+        _build_route_pressure_strip_payloads,
+        _route_pressure_strip_cause_effect_meta,
+        _route_pressure_strip_flow_meta,
+        _route_pressure_strip_history_meta,
+        _route_pressure_strip_intermediate_nodes_meta,
+        _route_pressure_strip_terminal_meta,
+        _route_pressure_strip_trend_meta,
+        _build_diagonal_pressure_strip_payloads,
+        _build_frame_alert_payload,
+        _build_mnemo_diagnostics_payload,
+        prepare_dataset,
+    )
+
+    t = np.array([0.0, 0.5, 1.0], dtype=float)
+    npz_path = tmp_path / "mnemo_diagonal_focus_bundle.npz"
+
+    meta = {
+        "P_ATM": 101325.0,
+        "geometry": {
+            "wheelbase_m": 2.8,
+            "track_m": 1.6,
+            "wheel_radius_m": 0.32,
+            "wheel_width_m": 0.24,
+            "frame_length_m": 3.2,
+            "frame_width_m": 1.7,
+            "frame_height_m": 0.25,
+        },
+    }
+
+    p_cols = np.array(
+        [
+            "время_с",
+            "Ц2_ЛП_БП",
+            "узел_ЛПCAP_к_ПЗROD_междуОКиДР",
+            "узел_ЛПCAP_к_ПЗROD_послеДР",
+            "Ц2_ПЗ_ШП",
+        ],
+        dtype=object,
+    )
+    q_cols = np.array(
+        [
+            "время_с",
+            "обратный_клапан‑выход‑из‑Ц2‑ЛП‑CAP‑в‑диагональ‑к‑ПЗ‑ROD",
+            "дроссель‑диагональ‑Ц2‑линия_CAP→ROD‑ЛПCAP→ПЗROD",
+            "обратный_клапан‑вход‑в‑Ц2‑ПЗ‑ROD‑из‑диагонали‑ЛПCAP→ПЗROD",
+        ],
+        dtype=object,
+    )
+    open_cols = q_cols.copy()
+
+    np.savez(
+        npz_path,
+        main_cols=np.array(["время_с"], dtype=object),
+        main_values=np.column_stack([t]).astype(float),
+        p_cols=p_cols,
+        p_values=np.column_stack(
+            [
+                t,
+                np.array([322000.0, 332000.0, 340000.0], dtype=float),
+                np.array([285000.0, 296000.0, 304000.0], dtype=float),
+                np.array([246000.0, 256000.0, 264000.0], dtype=float),
+                np.array([198000.0, 206000.0, 214000.0], dtype=float),
+            ]
+        ).astype(float),
+        q_cols=q_cols,
+        q_values=np.column_stack(
+            [
+                t,
+                np.array([0.0008, 0.0010, 0.0007], dtype=float),
+                np.array([0.0012, 0.0014, 0.0011], dtype=float),
+                np.array([0.0006, 0.0009, 0.0008], dtype=float),
+            ]
+        ).astype(float),
+        open_cols=open_cols,
+        open_values=np.column_stack(
+            [
+                t,
+                np.array([1, 1, 1], dtype=float),
+                np.array([1, 1, 1], dtype=float),
+                np.array([0, 1, 1], dtype=float),
+            ]
+        ).astype(float),
+        meta_json=np.array(json.dumps(meta, ensure_ascii=False), dtype=object),
+    )
+
+    dataset = prepare_dataset(npz_path)
+    selected_edge = "дроссель‑диагональ‑Ц2‑линия_CAP→ROD‑ЛПCAP→ПЗROD"
+
+    diagonal_focus = _build_active_diagonal_focus_meta(dataset, 1, selected_edge=selected_edge)
+    assert diagonal_focus["edges"]
+    assert diagonal_focus["selected_edge"] == selected_edge
+    assert diagonal_focus["edges"][0]["name"] == selected_edge
+    assert diagonal_focus["edges"][0]["severity"] == "focus"
+    assert diagonal_focus["edges"][0]["label"] == "Выбранная диагональ"
+    assert "узел_ЛПCAP_к_ПЗROD_междуОКиДР" in diagonal_focus["node_names"]
+    assert "узел_ЛПCAP_к_ПЗROD_послеДР" in diagonal_focus["node_names"]
+
+    pressure_strips = _build_diagonal_pressure_strip_payloads(dataset, 1, selected_edge=selected_edge)
+    assert pressure_strips
+    selected_strip = next(item for item in pressure_strips if item["edge_name"] == selected_edge)
+    assert selected_strip["label"] == "ΔP фокус-диагонали"
+    assert selected_strip["start_node"] == "узел_ЛПCAP_к_ПЗROD_междуОКиДР"
+    assert selected_strip["end_node"] == "узел_ЛПCAP_к_ПЗROD_послеДР"
+    assert selected_strip["delta_p_bar"] == pytest.approx(0.40, rel=1.0e-3)
+    assert "бар(g)" in selected_strip["pressure_label"]
+    assert selected_strip["trend_status"] == "ΔP нарастает"
+    assert selected_strip["trend_badge"] == "ΔP↑"
+    assert selected_strip["q_status"] == "Q нарастает"
+    assert selected_strip["q_badge"] == "Q↑"
+    assert selected_strip["q_history_points"]
+    assert selected_strip["q_history_peak_abs"] > 0.0
+    assert selected_strip["cause_effect_status"] == "Q догоняет ΔP"
+    assert selected_strip["cause_effect_badge"] == "ΔP→Q ok"
+    selected_terminal_meta = _route_pressure_strip_terminal_meta(selected_strip)
+    assert selected_terminal_meta["leading_node"] == "узел_ЛПCAP_к_ПЗROD_междуОКиДР"
+    assert selected_terminal_meta["start_badge"] == "P+"
+    assert selected_terminal_meta["end_badge"] == "P-"
+    assert selected_terminal_meta["leader_summary"] == "Ведёт: ЛП/БП → ПЗ/ШП"
+    assert selected_terminal_meta["trend_status"] == "ΔP нарастает"
+    assert selected_terminal_meta["q_status"] == "Q нарастает"
+    assert selected_terminal_meta["q_history_points"]
+    assert selected_terminal_meta["cause_effect_status"] == "Q догоняет ΔP"
+    diagonal_intermediate = _route_pressure_strip_intermediate_nodes_meta(
+        dataset,
+        {"diagonal_focus": diagonal_focus},
+        selected_strip,
+        idx=1,
+    )
+    assert any(item["name"] == "Ц2_ЛП_БП" for item in diagonal_intermediate)
+    assert any(item["name"] == "Ц2_ПЗ_ШП" for item in diagonal_intermediate)
+    assert any("Камерный узел" in str(item["summary_text"]) for item in diagonal_intermediate)
+    assert any("ведущего" in str(item["lead_hint_text"]).lower() for item in diagonal_intermediate)
+    assert any(str(item["lead_trend_text"]) for item in diagonal_intermediate)
+    route_pressure_strips = _build_route_pressure_strip_payloads(dataset, 1, selected_edge=selected_edge)
+    assert route_pressure_strips
+    assert any(item["role"] == "diagonal" for item in route_pressure_strips)
+    assert any(item["edge_name"] == selected_edge and item["label"] == "ΔP фокус-диагонали" for item in route_pressure_strips)
+    trend_meta = _route_pressure_strip_trend_meta(
+        time_s=t,
+        p1_values=np.array([1.83675, 1.94675, 2.02675], dtype=float),
+        p2_values=np.array([1.44675, 1.54675, 1.62675], dtype=float),
+        idx=1,
+    )
+    assert trend_meta["trend_status"] == "ΔP нарастает"
+    assert trend_meta["trend_badge"] == "ΔP↑"
+    flow_meta = _route_pressure_strip_flow_meta(
+        time_s=t,
+        q_values=np.array([72.0, 84.0, 66.0], dtype=float),
+        open_values=np.array([1, 1, 1], dtype=int),
+        idx=1,
+        q_unit="Нл/мин",
+    )
+    assert flow_meta["q_status"] == "Q нарастает"
+    assert flow_meta["q_badge"] == "Q↑"
+    flow_fall_meta = _route_pressure_strip_flow_meta(
+        time_s=t,
+        q_values=np.array([84.0, 72.0, 60.0], dtype=float),
+        open_values=np.array([1, 1, 1], dtype=int),
+        idx=1,
+        q_unit="Нл/мин",
+    )
+    assert flow_fall_meta["q_status"] == "Q спадает"
+    assert flow_fall_meta["q_badge"] == "Q↓"
+    history_meta = _route_pressure_strip_history_meta(
+        time_s=t,
+        q_values=np.array([72.0, 84.0, 66.0], dtype=float),
+        open_values=np.array([1, 1, 0], dtype=int),
+        idx=1,
+        q_unit="Нл/мин",
+    )
+    assert history_meta["q_history_available"] is True
+    assert len(history_meta["q_history_points"]) >= 2
+    assert history_meta["q_history_peak_abs"] == pytest.approx(84.0)
+    assert "пик |Q|" in history_meta["q_history_summary"]
+    cause_effect_meta = _route_pressure_strip_cause_effect_meta(
+        trend_meta={"trend_available": True, "trend_status": "ΔP нарастает"},
+        flow_meta={"q_available": True, "q_status": "Q нарастает"},
+    )
+    assert cause_effect_meta["cause_effect_status"] == "Q догоняет ΔP"
+    assert cause_effect_meta["cause_effect_badge"] == "ΔP→Q ok"
+    tail_meta = _route_pressure_strip_cause_effect_meta(
+        trend_meta={"trend_available": True, "trend_status": "ΔP спадает"},
+        flow_meta={"q_available": True, "q_status": "Q нарастает"},
+    )
+    assert tail_meta["cause_effect_status"] == "Q тянется после ΔP"
+    assert tail_meta["cause_effect_badge"] == "ΔP→Q tail"
+
+    alerts = _build_frame_alert_payload(
+        dataset,
+        1,
+        selected_edge=selected_edge,
+        selected_node="узел_ЛПCAP_к_ПЗROD_междуОКиДР",
+    )
+    assert alerts["diagonal_focus"]["edges"]
+    assert alerts["diagonal_focus"]["edges"][0]["label"] in {"Активная диагональ", "Выбранная диагональ"}
+    assert "узел_ЛПCAP_к_ПЗROD_междуОКиДР" in alerts["diagonal_focus"]["node_names"]
+
+    diagnostics = _build_mnemo_diagnostics_payload(
+        dataset,
+        1,
+        selected_edge=selected_edge,
+        selected_node="узел_ЛПCAP_к_ПЗROD_междуОКиДР",
+    )
+    assert diagnostics["diagonal_focus"]["edges"]
+    assert diagnostics["diagonal_focus"]["edges"][0]["name"] == selected_edge
+    assert diagnostics["route_pressure_strips"]
+    assert any(item["role"] == "diagonal" for item in diagnostics["route_pressure_strips"])
+    assert diagnostics["diagonal_pressure_strips"]
+    assert any(item["edge_name"] == selected_edge for item in diagnostics["diagonal_pressure_strips"])
+    assert diagnostics["diagonal_focus"]["node_names"][:2] == [
+        "узел_ЛПCAP_к_ПЗROD_междуОКиДР",
+        "узел_ЛПCAP_к_ПЗROD_послеДР",
+    ]
 
 
 def test_mnemo_event_tracker_latches_warn_and_mode_switches(tmp_path: Path) -> None:

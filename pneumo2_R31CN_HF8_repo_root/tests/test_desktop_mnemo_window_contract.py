@@ -61,11 +61,59 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert "Desktop Mnemo switched to native Qt canvas." in src
     assert "wheel = zoom, drag = pan, click = select" in src
     assert "QtSvg.QSvgRenderer" in src
+    assert "CANONICAL_PNEUMO_SCHEME_SVG_PATHS" in src
+    assert "SOURCE_OF_TRUTH_PNEUMO_IMAGE_PATH" in src
+    assert "REFERENCE_COMPONENT_NODE_ANCHORS_SVG" in src
+    assert "REFERENCE_INDICATOR_NODE_ANCHORS_SVG" in src
+    assert "REFERENCE_CHAMBER_NODE_ANCHORS_SVG" in src
+    assert "def _reference_scheme_scene_rect_tuple() -> tuple[float, float, float, float]:" in src
+    assert "def _reference_svg_point_to_scene(x: float, y: float) -> tuple[float, float]:" in src
+    assert "def _reference_node_anchor_positions(node_names: list[str]) -> dict[str, tuple[float, float]]:" in src
+    assert "def _reference_diagonal_geometry_positions(node_names: list[str]) -> dict[str, tuple[float, float]]:" in src
+    assert "def _node_pressure_for_index(dataset: MnemoDataset | None, node_name: str, idx: int) -> float | None:" in src
+    assert "def _node_pressure_series_bar_g(dataset: MnemoDataset | None, node_name: str) -> np.ndarray | None:" in src
+    assert "def _route_pressure_strip_trend_meta(" in src
+    assert "def _build_route_pressure_strip_payloads(" in src
+    assert "def _route_pressure_strip_terminal_meta(" in src
+    assert "def _build_active_diagonal_focus_meta(" in src
+    assert "def _build_diagonal_pressure_strip_payloads(" in src
+    assert "reference_svg_inline: str" in src
+    assert "reference_scheme_source: str" in src
+    assert "def _load_canonical_pneumo_scheme_svg() -> tuple[str, str]:" in src
+    assert 'self.reference_scheme_action = QtGui.QAction("Исходная пневмосхема", self)' in src
+    assert "self.reference_scheme_action.toggled.connect(self._toggle_reference_scheme)" in src
+    assert "def _toggle_reference_scheme(self, checked: bool) -> None:" in src
+    assert "def set_reference_scheme_visible(self, visible: bool) -> bool:" in src
+    assert "self._reference_svg_renderer: Any = None" in src
+    assert "self._show_reference_scheme = True" in src
+    assert 'self._hover_focus_edge = ""' in src
+    assert "self._hover_focus_restore_rect: QtCore.QRectF | None = None" in src
+    assert "def _load_reference_svg_renderer(self, svg_inline: str) -> None:" in src
+    assert "def _reference_scheme_rect(self) -> QtCore.QRectF:" in src
+    assert "Исходная пневмосхема • pneumo_scheme.svg" in src
+    assert '"reference_scheme_mode"] = "native_underlay"' in src
+    assert '"reference_indicator_nodes_snapped"] = len(reference_indicator_names)' in src
+    assert '"reference_component_nodes_snapped"] = len(reference_component_names)' in src
+    assert '"reference_chamber_nodes_snapped"] = len(reference_chamber_names)' in src
+    assert '"reference_diagonal_nodes_geometry_locked"] = len(reference_diagonal_names)' in src
+    assert "critical indicator anchors = " in src
+    assert "chamber indicator anchors = " in src
+    assert "diagonal geometry from source scheme = " in src
+    assert "node_series = _build_node_series(bundle, node_names, p_atm)" in src
+    assert '"diagonal_focus": diagonal_focus' in src
+    assert '"route_pressure_strips": route_pressure_strips' in src
+    assert '"diagonal_pressure_strips": diagonal_pressure_strips' in src
     assert "def set_diagnostics(self, diagnostics: dict[str, Any]) -> None:" in src
     assert "_build_mnemo_diagnostics_payload" in src
     assert "self._push_diagnostics()" in src
     assert "def set_focus_region(self, focus_region: dict[str, Any] | None) -> None:" in src
     assert "def show_overview(self, meta: dict[str, Any] | None = None) -> None:" in src
+    assert "def _route_pressure_strip_payload_for_edge(self, edge_name: str) -> dict[str, Any] | None:" in src
+    assert "def _active_route_pressure_terminal_meta(self) -> dict[str, Any] | None:" in src
+    assert "def _route_pressure_strip_focus_rect(self, payload: dict[str, Any] | None) -> QtCore.QRectF | None:" in src
+    assert "def _camera_contains_rect(self, rect: QtCore.QRectF, *, margin: float = 48.0) -> bool:" in src
+    assert "def _update_hover_route_pressure_focus(self) -> None:" in src
+    assert "def _dismiss_hover_route_pressure_focus(self, *, restore: bool) -> None:" in src
     assert "startup_view_mode: str," in src
     assert "startup_time_s: float | None," in src
     assert "startup_time_label: str," in src
@@ -166,6 +214,9 @@ def test_desktop_mnemo_native_canvas_has_overlay_contract() -> None:
 
     assert "def _build_selected_edge_focus_meta(" in src
     assert "def _draw_alert_markers(self, painter: QtGui.QPainter) -> None:" in src
+    assert "def _draw_diagonal_focus_pressure_strips(self, painter: QtGui.QPainter) -> None:" in src
+    assert "def _active_route_pressure_strip_payload(self) -> dict[str, Any] | None:" in src
+    assert "def _draw_route_pressure_strip_terminal_focus(self, painter: QtGui.QPainter) -> None:" in src
     assert "def _draw_diagnostics_overlay(self, painter: QtGui.QPainter) -> None:" in src
     assert "def _draw_focus_overlay(self, painter: QtGui.QPainter) -> None:" in src
     assert "def _draw_selected_edge_focus_overlay(self, painter: QtGui.QPainter) -> None:" in src
@@ -236,6 +287,8 @@ def test_desktop_mnemo_native_canvas_has_overlay_contract() -> None:
     assert "LG late" in src
     assert "Последнее окно:" in src
     assert "ΔP-контур:" in src
+    assert '"regulator": "регулятора"' in src
+    assert '"supply": "питания"' in src
     assert "Причинная связка:" in src
     assert "Комментарий связки:" in src
     assert "Лаг реакции:" in src
@@ -252,8 +305,50 @@ def test_desktop_mnemo_native_canvas_has_overlay_contract() -> None:
     assert "Комментарий приоритета:" in src
     assert "Чек-лист разбора:" in src
     assert "ΔP-контур • " in src
+    assert "ΔP диагонали" in src
+    assert "ΔP↑" in src
+    assert "ΔP↓" in src
+    assert "ΔP=" in src
+    assert "ΔP без истории" in src
+    assert "def _edge_flow_series_scaled(dataset: MnemoDataset | None, edge_name: str) -> np.ndarray | None:" in src
+    assert "def _route_pressure_strip_flow_meta(" in src
+    assert "def _route_pressure_strip_history_meta(" in src
+    assert "def _route_pressure_strip_cause_effect_meta(" in src
+    assert "def _route_pressure_strip_intermediate_nodes_meta(" in src
+    assert "Регуляторный узел" in src
+    assert "Камерный узел" in src
+    assert "Почти как ведущий конец" in src
+    assert "Ниже ведущего на " in src
+    assert "Выше ведущего на " in src
+    assert "Идёт к выравниванию" in src
+    assert "Сближается с ведущим" in src
+    assert "Уходит от ведущего" in src
+    assert "Держит разброс к ведущему" in src
+    assert "Q↑" in src
+    assert "Q↓" in src
+    assert "Q=" in src
+    assert "Q без истории" in src
+    assert "Q-лента" in src
+    assert "ΔP→Q ok" in src
+    assert "ΔP→Q lag" in src
+    assert "ΔP→Q tail" in src
+    assert "def _draw_route_pressure_strip_cause_effect_accent(" in src
+    assert "Ведёт:" in src
+    assert "Ведущий конец не определён" in src
     assert "Последние " in src
+    assert "self._draw_route_pressure_strip_terminal_focus(painter)" in src
+    assert "self._draw_route_pressure_strip_cause_effect_accent(" in src
+    assert "def _draw_route_pressure_strip_flow_history(" in src
+    assert "self._update_hover_route_pressure_focus()" in src
+    assert "route_terminal_meta = self._active_route_pressure_terminal_meta()" in src
+    assert "route_intermediate_items = _route_pressure_strip_intermediate_nodes_meta(" in src
+    assert 'intermediate_hover_item = route_intermediate_lookup.get(node_name) or {}' in src
+    assert 'str(intermediate_hover_item.get("lead_hint_text") or "")' in src
+    assert 'str(intermediate_hover_item.get("lead_trend_text") or "")' in src
+    assert 'and self._hover_kind == "node"' in src
     assert "self._draw_selected_edge_terminal_overlay(painter)" in src
+    assert "self._draw_diagonal_focus_pressure_strips(painter)" in src
+    assert "spotlight_nodes.update(diagonal_focus_nodes)" in src
     assert "Направление выбранной ветви" in src
     assert "Вердикт:" in src
     assert "Сигналы:" in src
@@ -293,6 +388,7 @@ def test_desktop_mnemo_native_canvas_has_overlay_contract() -> None:
     assert '"badge_text": "SRC"' in src
     assert "t≈" in src
     assert "self._overlay_targets.append((\"node\", str(cap.get(\"node_name\") or \"\"), cap_rect))" in src
+    assert "self._overlay_targets.append((\"node\", node_name, chip_rect))" in src
     assert "self._overlay_targets.append((\"edge\", str(payload.get(\"edge_name\") or \"\"), rect))" in src
     assert "Каталог / серия" in src
     assert "\"canonical_kind\"" in src

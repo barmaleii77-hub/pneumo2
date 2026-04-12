@@ -99,6 +99,15 @@ def test_render_last_pointer_summary_renders_shared_sections() -> None:
             baseline_source_kind="scoped",
             baseline_source_label="scoped baseline",
             baseline_source_path="C:/tmp/workspace/baselines/by_problem/p_demo/baseline_best.json",
+            handoff_preset_tag="ray/portfolio/q2",
+            handoff_budget=84,
+            handoff_seed_count=6,
+            handoff_suite_family="auto_ring",
+            handoff_requires_full_ring_validation=True,
+            handoff_reason_lines=(
+                "Почему этот preset: ring-fragments=4, full-ring=yes; seed-bridge взял 6 кандидатов.",
+                "Источник handoff-профиля: staged_then_coordinator; proposer=portfolio (auto_tuner), q=2 (auto_tuner), budget=84.",
+            ),
         ),
         "packaging_snapshot": packaging_snapshot,
     }
@@ -127,5 +136,8 @@ def test_render_last_pointer_summary_renders_shared_sections() -> None:
     )
     assert any(kind == "caption" and "matches current launch contract" in text for kind, text in st.calls)
     assert any(kind == "caption" and "Hash mode matches current launch contract" in text for kind, text in st.calls)
+    assert ("write", "**Coordinator handoff:** ray/portfolio/q2") in st.calls
+    assert any(kind == "caption" and "budget=84" in text and "seed-candidates=6" in text for kind, text in st.calls)
+    assert any(kind == "caption" and "seed-bridge взял 6 кандидатов" in text for kind, text in st.calls)
     assert ("markdown", "**Сводка по геометрии узлов (последний run)**") in st.calls
     assert any(kind == "warning" for kind, _ in st.calls)

@@ -13,6 +13,43 @@ from pneumo_solver_ui.optimization_live_job_panel_ui import (
     render_live_optimization_job_panel,
 )
 
+_ACTIVE_LAUNCH_CONTEXT_KEY = "__opt_active_launch_context"
+
+
+def _resolved_path_text(raw: Any) -> str:
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    try:
+        return str(Path(text).resolve())
+    except Exception:
+        return text
+
+
+def _active_launch_context_for_job(st: Any, job: Any) -> dict[str, Any]:
+    session_state = getattr(st, "session_state", None)
+    if session_state is None:
+        return {}
+    raw = session_state.get(_ACTIVE_LAUNCH_CONTEXT_KEY)
+    if not isinstance(raw, dict):
+        return {}
+    current_run_dir = _resolved_path_text(getattr(job, "run_dir", None))
+    ctx_run_dir = _resolved_path_text(raw.get("run_dir"))
+    if not current_run_dir or current_run_dir != ctx_run_dir:
+        return {}
+    return dict(raw)
+
+
+def _render_active_launch_context_banner(st: Any, context: dict[str, Any], *, job: Any) -> None:
+    if str(context.get("kind") or "").strip() != "handoff":
+        return
+    source_run_dir = _resolved_path_text(context.get("source_run_dir"))
+    source_name = Path(source_run_dir).name if source_run_dir else "staged run"
+    st.success(
+        "Сейчас активен seeded full-ring coordinator handoff из staged run "
+        f"`{source_name}`. Ниже показаны live progress и лог нового запуска `{getattr(job, 'run_dir').name}`."
+    )
+
 
 def render_optimization_launch_session_block(
     st: Any,
@@ -30,6 +67,7 @@ def render_optimization_launch_session_block(
     clear_job_fn: Callable[[], None],
     launch_job_fn: Callable[[], None],
     build_cmd_preview_text_fn: Callable[[], str],
+    start_handoff_job_fn: Callable[[Path], bool] | None = None,
     current_problem_hash: str = "",
     current_problem_hash_mode: str = "",
     render_live_panel_fn: Callable[..., Any] = render_live_optimization_job_panel,
@@ -52,6 +90,9 @@ def render_optimization_launch_session_block(
         job_rc = None if job is None else getattr(getattr(job, "proc", None), "poll", lambda: None)()
 
         if job is not None and job_rc is None:
+            launch_context = _active_launch_context_for_job(st, job)
+            if launch_context:
+                _render_active_launch_context_banner(st, launch_context, job=job)
             log_text = tail_file_text_fn(getattr(job, "log_path"))
             render_live_panel_fn(
                 st,
@@ -104,6 +145,11 @@ def render_optimization_launch_session_block(
                 soft_stop_requested=soft_stop_requested_fn(job),
                 clear_job_fn=clear_job_fn,
                 rerun_fn=rerun_fn,
+                start_handoff_fn=(
+                    (lambda run_dir=getattr(job, "run_dir", None): start_handoff_job_fn(Path(run_dir)) if run_dir is not None else False)
+                    if start_handoff_job_fn is not None
+                    else None
+                ),
             )
 
         if job is None or job_rc is not None:

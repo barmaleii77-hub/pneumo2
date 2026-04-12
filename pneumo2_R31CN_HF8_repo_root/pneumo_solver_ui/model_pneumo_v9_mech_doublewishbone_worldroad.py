@@ -605,8 +605,8 @@ def build_network_full(params: dict):
     # Два дросселя (две линии) для раздельной настройки: CAP→ROD и ROD→CAP (условно: сжатие/отбой)
     alpha_дроссель_диагональ_CAP_ROD = params.get('открытие_дросселя_Ц2_CAP_в_ROD', 0.35)
     alpha_дроссель_диагональ_ROD_CAP = params.get('открытие_дросселя_Ц2_ROD_в_CAP', 0.35)
-    alpha_дроссель_выхлоп_Pmin = params.get('открытие_дросселя_выхлоп_Pmin', 0.30)
-    alpha_дроссель_выхлоп_Pmid = params.get('открытие_дросселя_выхлоп_Pmid', 0.45)
+    alpha_дроссель_выхлоп_Pmin = params.get('открытие_дросселя_выхлоп_Pmin', 0.08)
+    alpha_дроссель_выхлоп_Pmid = params.get('открытие_дросселя_выхлоп_Pmid', 0.18)
     alpha_дроссель_выхлоп_Pmax = params.get('открытие_дросселя_выхлоп_Pmax', 0.70)
 
 
@@ -733,8 +733,8 @@ def build_network_full(params: dict):
     # Сброс/предохранение Ресивер3 -> АТМ  (адаптивность)
     # -------------------------
     Pmax = params.get('давление_Pmax_предохран', P_ATM + 8e5)
-    Pmid = params.get('давление_Pmid_сброс', P_ATM + 4e5)
-    Pmin_rel = params.get('давление_Pmin_сброс', P_ATM + 2e5)
+    Pmid = params.get('давление_Pmid_сброс', P_ATM + 6.8e5)
+    Pmin_rel = params.get('давление_Pmin_сброс', P_ATM + 4.5e5)
 
     # Предохранительный клапан (эквивалент Camozzi VMR 1/8-B10 как "overpressure exhaust valve")
     # В модели это "relief" элемент: открывается при p(Р3) > Pmax
@@ -1309,7 +1309,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             pneumo_rep = {}
             if include_pneumo:
                 # Reference pressure / polytropic exponent
-                P_ref_raw = params.get('corner_pneumo_pressure_ref_Pa', params.get('углы_пневмо_P_ref_Па', params.get('давление_Pmid_сброс', P_ATM + 4e5)))
+                P_ref_raw = params.get('corner_pneumo_pressure_ref_Pa', params.get('углы_пневмо_P_ref_Па', params.get('давление_Pmid_сброс', P_ATM + 6.8e5)))
                 P_ref_abs = p_abs_from_param(P_ref_raw, p_atm_Pa=float(P_ATM))
                 n_poly = float(params.get('corner_pneumo_stiffness_n', params.get('углы_пневмо_n', 1.4)))
                 vol_factor = float(params.get('corner_pneumo_stiffness_volume_factor', params.get('углы_пневмо_коэф_объема', 1.0)))
@@ -1610,7 +1610,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     # -------------------------
     # Начальные давления
     # -------------------------
-    Pmin_abs = float(params.get('давление_Pmin_сброс', P_ATM + 2e5))
+    Pmin_abs = float(params.get('давление_Pmin_сброс', P_ATM + 4.5e5))
     Pacc_abs = float(params.get('начальное_давление_аккумулятора', P_ATM + 6e5))
 
     # Разрешаем задавать начальные давления ресиверов явно (abs, Па).
@@ -2684,13 +2684,14 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
 
         F_cyl1 = -F1_ax * ds1_ddelta
         F_cyl2 = -F2_ax * ds2_ddelta
+        F_cyl = F_cyl1 + F_cyl2
 
         # Пружина: по умолчанию привязана к ходу Ц1 (coilover), но можно
         # переключить в "legacy" режим (по δ) параметром механика_пружина_режим.
         spring_state_now = _build_spring_runtime_state(delta, s_C1, s_C2, ds1_ddelta, ds2_ddelta)
         F_spr = np.asarray(spring_state_now["force_wheel_N"], dtype=float)
 
-        F_susp = F_spr + F_cyl1 + F_cyl2
+        F_susp = F_spr + F_cyl
 
         # Ограничители хода по каждому цилиндру отдельно (шток 0..stroke)
         k_stop = float(params.get('жёсткость_отбойника', 1.0e6))
@@ -2735,12 +2736,15 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         F_stop_ax_C2 = stop_force_axial(s_raw_C2, s2_raw_dot, stroke_C2)
         F_stop = (-F_stop_ax_C1 * ds1_ddelta) + (-F_stop_ax_C2 * ds2_ddelta)
         F_susp = F_susp + F_stop
+        F_susp_no_arb = F_susp.copy()
         # ------------------------------------------------------------
         # Стабилизатор поперечной устойчивости (опционально)
         # ------------------------------------------------------------
         # Модель: эквивалентные вертикальные силы, пропорциональные разности ходов слева/справа.
         # diff = delta_L - delta_R (по оси), F = k*diff + c*diff_dot.
         # На левом колесе +F, на правом -F.
+        F_arb_f = 0.0
+        F_arb_r = 0.0
         if bool(params.get('стабилизатор_вкл', False)):
             k_arb_f = float(params.get('стабилизатор_перед_жесткость_Н_м', 0.0) or 0.0)
             c_arb_f = float(params.get('стабилизатор_перед_демпфирование_Н_с_м', 0.0) or 0.0)
@@ -2761,14 +2765,18 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             F_susp[2] += F_arb_r
             F_susp[3] -= F_arb_r
 
-
-
+        F_arb_vec = np.array([F_arb_f, -F_arb_f, F_arb_r, -F_arb_r], dtype=float)
 
         # Моменты от сил и инерции (инерц. моменты через высоту ЦМ)
         ax_t = ax_func(t)
         ay_t = ay_func(t)
         M_roll = np.sum(F_susp * y_pos) + m_body*ay_t*h_cg
         M_pitch = -np.sum(F_susp * x_pos) + m_body*ax_t*h_cg
+        M_roll_susp = float(np.sum(F_susp_no_arb * y_pos))
+        M_pitch_susp = float(-np.sum(F_susp_no_arb * x_pos))
+        M_roll_arb = float(np.sum(F_arb_vec * y_pos))
+        M_roll_inert = float(m_body * ay_t * h_cg)
+        M_pitch_inert = float(m_body * ax_t * h_cg)
 
         z_ddot = (np.sum(F_susp) - m_body*g) / m_body
         phi_ddot = M_roll / I_roll
@@ -2814,6 +2822,25 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         dst[9] = theta_ddot
         dst[10:14] = zw_ddot
         dst[14:] = dm_dt
+        last_mech.clear()
+        last_mech.update({
+            'F_susp': np.asarray(F_susp, dtype=float).copy(),
+            'F_spr': np.asarray(F_spr, dtype=float).copy(),
+            'F_cyl': np.asarray(F_cyl, dtype=float).copy(),
+            'F_cyl1': np.asarray(F_cyl1, dtype=float).copy(),
+            'F_cyl2': np.asarray(F_cyl2, dtype=float).copy(),
+            'F_stop': np.asarray(F_stop, dtype=float).copy(),
+            'F_arb': np.asarray(F_arb_vec, dtype=float).copy(),
+            'F_arb_front': float(F_arb_f),
+            'F_arb_rear': float(F_arb_r),
+            'M_roll_susp': float(M_roll_susp),
+            'M_roll_arb': float(M_roll_arb),
+            'M_roll_inert': float(M_roll_inert),
+            'M_roll_total': float(M_roll),
+            'M_pitch_susp': float(M_pitch_susp),
+            'M_pitch_inert': float(M_pitch_inert),
+            'M_pitch_total': float(M_pitch),
+        })
         return dst
 
     # ---------------------------------------------------------
@@ -3531,6 +3558,43 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         'колесо_в_воздухе_ЛЗ': np.zeros(n_steps, dtype=int),
         'колесо_в_воздухе_ПЗ': np.zeros(n_steps, dtype=int),
 
+        # Силовой breakdown подвески — нужен для отладки вклада пружины,
+        # пневматики, отбойников и стабилизатора в общую реакцию.
+        'сила_подвески_ЛП_Н': np.zeros(n_steps),
+        'сила_подвески_ПП_Н': np.zeros(n_steps),
+        'сила_подвески_ЛЗ_Н': np.zeros(n_steps),
+        'сила_подвески_ПЗ_Н': np.zeros(n_steps),
+        'сила_подвески_итого_Н': np.zeros(n_steps),
+        'сила_пружины_ЛП_Н': np.zeros(n_steps),
+        'сила_пружины_ПП_Н': np.zeros(n_steps),
+        'сила_пружины_ЛЗ_Н': np.zeros(n_steps),
+        'сила_пружины_ПЗ_Н': np.zeros(n_steps),
+        'сила_пружины_итого_Н': np.zeros(n_steps),
+        'сила_пневматики_ЛП_Н': np.zeros(n_steps),
+        'сила_пневматики_ПП_Н': np.zeros(n_steps),
+        'сила_пневматики_ЛЗ_Н': np.zeros(n_steps),
+        'сила_пневматики_ПЗ_Н': np.zeros(n_steps),
+        'сила_пневматики_итого_Н': np.zeros(n_steps),
+        'сила_пневматики_Ц1_ЛП_Н': np.zeros(n_steps),
+        'сила_пневматики_Ц1_ПП_Н': np.zeros(n_steps),
+        'сила_пневматики_Ц1_ЛЗ_Н': np.zeros(n_steps),
+        'сила_пневматики_Ц1_ПЗ_Н': np.zeros(n_steps),
+        'сила_пневматики_Ц2_ЛП_Н': np.zeros(n_steps),
+        'сила_пневматики_Ц2_ПП_Н': np.zeros(n_steps),
+        'сила_пневматики_Ц2_ЛЗ_Н': np.zeros(n_steps),
+        'сила_пневматики_Ц2_ПЗ_Н': np.zeros(n_steps),
+        'сила_отбойника_ЛП_Н': np.zeros(n_steps),
+        'сила_отбойника_ПП_Н': np.zeros(n_steps),
+        'сила_отбойника_ЛЗ_Н': np.zeros(n_steps),
+        'сила_отбойника_ПЗ_Н': np.zeros(n_steps),
+        'сила_отбойника_итого_Н': np.zeros(n_steps),
+        'момент_крен_подвеска_Нм': np.zeros(n_steps),
+        'момент_крен_инерция_Нм': np.zeros(n_steps),
+        'момент_крен_итого_Нм': np.zeros(n_steps),
+        'момент_тангаж_подвеска_Нм': np.zeros(n_steps),
+        'момент_тангаж_инерция_Нм': np.zeros(n_steps),
+        'момент_тангаж_итого_Нм': np.zeros(n_steps),
+
         # Дорога под каждым колесом
         'дорога_ЛП_м': np.zeros(n_steps),
         'дорога_ПП_м': np.zeros(n_steps),
@@ -3667,6 +3731,8 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     integ_h_min = float(params.get('интегратор_h_min_с', 1e-7))
     if (not np.isfinite(integ_h_min)) or (integ_h_min <= 0.0):
         integ_h_min = 1e-7
+
+    last_mech: Dict[str, Any] = {}
 
     def _project_masses(_state: np.ndarray) -> None:
         # Удерживаем массы не ниже floor (p_abs_min) и не даём отрицательных масс.
@@ -3997,6 +4063,54 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         )
         for _name, _value in spring_family_runtime_now.items():
             out[_name][k] = float(_value)
+
+        # Force breakdown синхронизируем с теми же формулами, что и rhs().
+        _ = rhs(state, float(t))
+        F_susp_dbg = np.asarray(last_mech.get("F_susp", np.zeros(4, dtype=float)), dtype=float)
+        F_spr_dbg = np.asarray(last_mech.get("F_spr", np.zeros(4, dtype=float)), dtype=float)
+        F_cyl_dbg = np.asarray(last_mech.get("F_cyl", np.zeros(4, dtype=float)), dtype=float)
+        F_cyl1_dbg = np.asarray(last_mech.get("F_cyl1", np.zeros(4, dtype=float)), dtype=float)
+        F_cyl2_dbg = np.asarray(last_mech.get("F_cyl2", np.zeros(4, dtype=float)), dtype=float)
+        F_stop_dbg = np.asarray(last_mech.get("F_stop", np.zeros(4, dtype=float)), dtype=float)
+
+        out['сила_подвески_ЛП_Н'][k] = float(F_susp_dbg[0])
+        out['сила_подвески_ПП_Н'][k] = float(F_susp_dbg[1])
+        out['сила_подвески_ЛЗ_Н'][k] = float(F_susp_dbg[2])
+        out['сила_подвески_ПЗ_Н'][k] = float(F_susp_dbg[3])
+        out['сила_подвески_итого_Н'][k] = float(np.sum(F_susp_dbg))
+
+        out['сила_пружины_ЛП_Н'][k] = float(F_spr_dbg[0])
+        out['сила_пружины_ПП_Н'][k] = float(F_spr_dbg[1])
+        out['сила_пружины_ЛЗ_Н'][k] = float(F_spr_dbg[2])
+        out['сила_пружины_ПЗ_Н'][k] = float(F_spr_dbg[3])
+        out['сила_пружины_итого_Н'][k] = float(np.sum(F_spr_dbg))
+
+        out['сила_пневматики_ЛП_Н'][k] = float(F_cyl_dbg[0])
+        out['сила_пневматики_ПП_Н'][k] = float(F_cyl_dbg[1])
+        out['сила_пневматики_ЛЗ_Н'][k] = float(F_cyl_dbg[2])
+        out['сила_пневматики_ПЗ_Н'][k] = float(F_cyl_dbg[3])
+        out['сила_пневматики_итого_Н'][k] = float(np.sum(F_cyl_dbg))
+        out['сила_пневматики_Ц1_ЛП_Н'][k] = float(F_cyl1_dbg[0])
+        out['сила_пневматики_Ц1_ПП_Н'][k] = float(F_cyl1_dbg[1])
+        out['сила_пневматики_Ц1_ЛЗ_Н'][k] = float(F_cyl1_dbg[2])
+        out['сила_пневматики_Ц1_ПЗ_Н'][k] = float(F_cyl1_dbg[3])
+        out['сила_пневматики_Ц2_ЛП_Н'][k] = float(F_cyl2_dbg[0])
+        out['сила_пневматики_Ц2_ПП_Н'][k] = float(F_cyl2_dbg[1])
+        out['сила_пневматики_Ц2_ЛЗ_Н'][k] = float(F_cyl2_dbg[2])
+        out['сила_пневматики_Ц2_ПЗ_Н'][k] = float(F_cyl2_dbg[3])
+
+        out['сила_отбойника_ЛП_Н'][k] = float(F_stop_dbg[0])
+        out['сила_отбойника_ПП_Н'][k] = float(F_stop_dbg[1])
+        out['сила_отбойника_ЛЗ_Н'][k] = float(F_stop_dbg[2])
+        out['сила_отбойника_ПЗ_Н'][k] = float(F_stop_dbg[3])
+        out['сила_отбойника_итого_Н'][k] = float(np.sum(F_stop_dbg))
+
+        out['момент_крен_подвеска_Нм'][k] = float(last_mech.get("M_roll_susp", 0.0))
+        out['момент_крен_инерция_Нм'][k] = float(last_mech.get("M_roll_inert", 0.0))
+        out['момент_крен_итого_Нм'][k] = float(last_mech.get("M_roll_total", 0.0))
+        out['момент_тангаж_подвеска_Нм'][k] = float(last_mech.get("M_pitch_susp", 0.0))
+        out['момент_тангаж_инерция_Нм'][k] = float(last_mech.get("M_pitch_inert", 0.0))
+        out['момент_тангаж_итого_Нм'][k] = float(last_mech.get("M_pitch_total", 0.0))
 
         # Дорога и контактные реакции шин (для контроля отрыва)
         z_road = road_func(t)
@@ -4916,16 +5030,16 @@ def run_default_and_export_excel(output_path: str = 'результаты_пол
     params = {
         # Уставки адаптивности (ресивер 3) и питание Р2 из аккумулятора
         'давление_Pmin_питание_Ресивер2': P_ATM + 2e5,
-        'давление_Pmin_сброс': P_ATM + 2e5,
-        'давление_Pmid_сброс': P_ATM + 4e5,
+        'давление_Pmin_сброс': P_ATM + 4.5e5,
+        'давление_Pmid_сброс': P_ATM + 6.8e5,
         'давление_Pmax_предохран': P_ATM + 8e5,
         'начальное_давление_аккумулятора': P_ATM + 6e5,
 
         # Открытия дросселей SCO (0..1) = доля от максимального прохода по d_max выбранной модели
         'открытие_дросселя_Ц2_CAP_в_ROD': 0.35,
         'открытие_дросселя_Ц2_ROD_в_CAP': 0.35,
-        'открытие_дросселя_выхлоп_Pmin': 0.30,
-        'открытие_дросселя_выхлоп_Pmid': 0.45,
+        'открытие_дросселя_выхлоп_Pmin': 0.08,
+        'открытие_дросселя_выхлоп_Pmid': 0.18,
         'открытие_дросселя_выхлоп_Pmax': 0.70,
 
         # Нелинейная пружина: табличная добавочная сила относительно точки "середина хода"

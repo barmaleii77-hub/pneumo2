@@ -40,6 +40,9 @@ def test_build_run_pointer_meta_from_summary_keeps_history_contract_fields() -> 
         objective_keys=("comfort", "roll"),
         penalty_key="penalty_total",
         penalty_tol=0.25,
+        handoff_preset_tag="ray/portfolio/q2",
+        handoff_budget=84,
+        handoff_seed_count=6,
     )
 
     meta = build_run_pointer_meta_from_summary(summary, now_text="2026-04-08 20:00:00")
@@ -50,6 +53,9 @@ def test_build_run_pointer_meta_from_summary_keeps_history_contract_fields() -> 
     assert meta["objective_keys"] == ["comfort", "roll"]
     assert meta["penalty_key"] == "penalty_total"
     assert meta["penalty_tol"] == 0.25
+    assert meta["handoff_preset"] == "ray/portfolio/q2"
+    assert meta["handoff_budget"] == 84
+    assert meta["handoff_seed_count"] == 6
     assert meta["selected_from"] == "optimization_history"
     assert meta["ts"] == "2026-04-08 20:00:00"
 

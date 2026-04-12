@@ -30,7 +30,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, MutableMapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -191,6 +191,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--budget", type=int, default=200, help="Number of successful (DONE) trials to collect")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--max-inflight", type=int, default=0, help="0=auto (2*workers)")
+    p.add_argument(
+        "--seed-json",
+        default="",
+        help="Optional JSON with seed candidates from staged optimization. Supports [{params...}], [{'params': {...}}], or [{'x_u': [...]}].",
+    )
 
     # Proposer
     p.add_argument("--proposer", choices=["random", "qnehvi", "auto", "portfolio"], default="auto")
@@ -255,6 +260,69 @@ def _dump_json(path: Path, obj: Any) -> None:
 
 def _write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
+
+
+def _load_seed_vectors(
+    core: EvaluatorCore,
+    seed_json: str | Path | None,
+) -> Tuple[List[List[float]], Dict[str, Any]]:
+    path_s = str(seed_json or "").strip()
+    if not path_s:
+        return [], {"seed_json": "", "loaded": 0, "invalid": 0, "duplicates": 0}
+    path = Path(path_s)
+    if not path.exists():
+        return [], {"seed_json": str(path), "loaded": 0, "invalid": 0, "duplicates": 0, "missing": True}
+
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [], {"seed_json": str(path), "loaded": 0, "invalid": 1, "duplicates": 0, "error": repr(exc)}
+
+    if not isinstance(raw, list):
+        return [], {"seed_json": str(path), "loaded": 0, "invalid": 1, "duplicates": 0, "error": "seed json must be a list"}
+
+    dim = int(core.dim())
+    loaded: List[List[float]] = []
+    invalid = 0
+    duplicates = 0
+    seen: set[str] = set()
+
+    for item in raw:
+        x_u: Optional[List[float]] = None
+        try:
+            if isinstance(item, Mapping):
+                if isinstance(item.get("x_u"), list):
+                    x_arr = np.asarray(item.get("x_u"), dtype=float)
+                    if x_arr.shape == (dim,) and np.isfinite(x_arr).all():
+                        x_u = [float(v) for v in np.clip(x_arr, 0.0, 1.0).tolist()]
+                elif isinstance(item.get("params"), Mapping):
+                    x_u = list(core.params_to_u(dict(item.get("params") or {})))
+                else:
+                    x_u = list(core.params_to_u(dict(item)))
+            elif isinstance(item, list):
+                x_arr = np.asarray(item, dtype=float)
+                if x_arr.shape == (dim,) and np.isfinite(x_arr).all():
+                    x_u = [float(v) for v in np.clip(x_arr, 0.0, 1.0).tolist()]
+        except Exception:
+            x_u = None
+
+        if x_u is None:
+            invalid += 1
+            continue
+        sig = str(hash_vector(x_u, float_ndigits=12))
+        if sig in seen:
+            duplicates += 1
+            continue
+        seen.add(sig)
+        loaded.append(list(x_u))
+
+    return loaded, {
+        "seed_json": str(path.resolve()),
+        "loaded": int(len(loaded)),
+        "invalid": int(invalid),
+        "duplicates": int(duplicates),
+        "dim": int(dim),
+    }
 
 
 def _normalize_dask_memory_limit(raw: Any) -> Any:
@@ -635,6 +703,10 @@ def _run_ray(
 
     done_success = len(X_done)
     budget = int(args.budget)
+    seed_vectors, seed_meta = _load_seed_vectors(core_local, getattr(args, "seed_json", ""))
+    _dump_json(run_dir / "seed_info.json", dict(seed_meta))
+    seed_queue = [] if bool(args.resume) else list(seed_vectors)
+    seed_queue = [] if bool(args.resume) else list(seed_vectors)
 
     # Resume: requeue stale and pick up pending from DB
     if args.resume:
@@ -661,6 +733,10 @@ def _run_ray(
             "ray_cluster_resources": cluster,
             "ray_num_evaluators": int(n_eval),
             "ray_num_proposers": len(proposer_actors),
+            "seed_json": str(seed_meta.get("seed_json") or ""),
+            "seed_loaded": int(seed_meta.get("loaded") or 0),
+            "seed_invalid": int(seed_meta.get("invalid") or 0),
+            "seed_duplicates": int(seed_meta.get("duplicates") or 0),
         },
     )
 
@@ -671,11 +747,13 @@ def _run_ray(
 
     # ---- Candidate buffer ----
     candidate_buf: List[List[float]] = []
+    candidate_buf.extend(list(x_u) for x_u in seed_queue)
 
     # Seed LHS warmup for a new run
     dim = int(core_local.dim())
     auto_n_init = max(8, 2 * (dim + 1))
-    lhs_pool_n = max(auto_n_init, int(getattr(args, "n_init", 0) or 0))
+    lhs_target = max(auto_n_init, int(getattr(args, "n_init", 0) or 0))
+    lhs_pool_n = max(0, int(lhs_target - done_success - len(seed_queue)))
     lhs_pool = sample_lhs(n=int(lhs_pool_n), d=dim, seed=int(args.seed))
     lhs_i = 0
     if args.resume:
@@ -1062,6 +1140,8 @@ def _run_dask(
 
     done_success = len(X_done)
     budget = int(args.budget)
+    seed_vectors, seed_meta = _load_seed_vectors(core_local, getattr(args, "seed_json", ""))
+    _dump_json(run_dir / "seed_info.json", dict(seed_meta))
 
     if args.resume:
         n_re = db.requeue_stale(run_id, ttl_sec=float(args.stale_ttl_sec))
@@ -1071,13 +1151,15 @@ def _run_dask(
     pending_rows = db.fetch_trials(run_id, status="PENDING") if args.resume else []
 
     candidate_buf: List[List[float]] = []
+    candidate_buf.extend(list(x_u) for x_u in seed_queue)
     for pr in pending_rows:
         if isinstance(pr.get("x_u"), list):
             candidate_buf.append(list(pr["x_u"]))
 
     dim = int(core_local.dim())
     auto_n_init = max(8, 2 * (dim + 1))
-    lhs_pool_n = max(auto_n_init, int(getattr(args, "n_init", 0) or 0))
+    lhs_target = max(auto_n_init, int(getattr(args, "n_init", 0) or 0))
+    lhs_pool_n = max(0, int(lhs_target - done_success - len(seed_queue)))
     lhs_pool = sample_lhs(n=int(lhs_pool_n), d=dim, seed=int(args.seed))
     lhs_i = lhs_pool.shape[0] if args.resume else 0
 

@@ -59,6 +59,7 @@ from pneumo_solver_ui.optimization_stage_runner_config_ui import (
     render_stage_runner_configuration_controls,
 )
 from pneumo_solver_ui.optimization_job_start_ui import (
+    start_coordinator_handoff_job_with_feedback,
     start_optimization_job_with_feedback,
 )
 from pneumo_solver_ui.optimization_page_readonly_ui import (
@@ -173,6 +174,17 @@ render_optimization_readonly_expanders(
         current_penalty_tol=st.session_state.get("opt_penalty_tol", DIST_OPT_PENALTY_TOL_DEFAULT),
         load_log_text=tail_file_text,
         rerun_fn=request_rerun,
+        start_handoff_fn=lambda source_run_dir: start_coordinator_handoff_job_with_feedback(
+            st,
+            session_state=st.session_state,
+            source_run_dir=Path(source_run_dir),
+            ui_root=_UI_ROOT,
+            python_executable=sys.executable,
+            problem_hash_mode=str(
+                st.session_state.get("settings_opt_problem_hash_mode", "stable") or "stable"
+            ),
+            rerun_fn=request_rerun,
+        ),
         current_problem_hash_mode=_CURRENT_PROBLEM_HASH_MODE,
     ),
 )
@@ -255,6 +267,17 @@ render_optimization_launch_session_block(
         session_state=st.session_state,
         ui_root=_UI_ROOT,
         ui_jobs_default=_UI_JOBS_DEFAULT,
+        python_executable=sys.executable,
+        problem_hash_mode=str(
+            st.session_state.get("settings_opt_problem_hash_mode", "stable") or "stable"
+        ),
+        rerun_fn=request_rerun,
+    ),
+    start_handoff_job_fn=lambda source_run_dir: start_coordinator_handoff_job_with_feedback(
+        st,
+        session_state=st.session_state,
+        source_run_dir=Path(source_run_dir),
+        ui_root=_UI_ROOT,
         python_executable=sys.executable,
         problem_hash_mode=str(
             st.session_state.get("settings_opt_problem_hash_mode", "stable") or "stable"

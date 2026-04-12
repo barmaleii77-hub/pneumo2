@@ -43,6 +43,13 @@ from pneumo_solver_ui.optimization_distributed_wiring import (
 from pneumo_solver_ui.optimization_input_contract import (
     sanitize_optimization_inputs,
 )
+from pneumo_solver_ui.optimization_auto_ring_suite import (
+    materialize_optimization_auto_ring_suite_json,
+)
+from pneumo_solver_ui.optimization_auto_tuner_plan import (
+    is_auto_ring_suite_json,
+    materialize_optimization_auto_tuner_plan_json,
+)
 from pneumo_solver_ui.optimization_objective_contract import (
     normalize_objective_keys,
     normalize_penalty_key,
@@ -72,6 +79,7 @@ class LaunchPlan:
     progress_path: Optional[Path]
     budget: int
     stop_file: Optional[Path] = None
+    launch_run_dir: Optional[Path] = None
 
 
 def ui_root_from_page_path(page_path: Path) -> Path:
@@ -122,11 +130,121 @@ def default_ranges_json_path(ui_root: Path) -> Path:
     return canonical_ranges_json_path(Path(ui_root))
 
 
-def default_suite_json_path(ui_root: Path, workspace_dir: Path) -> Path:
+def _read_json_mapping(path: Path) -> Mapping[str, Any] | None:
+    try:
+        obj = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return obj if isinstance(obj, Mapping) else None
+
+
+def _looks_like_ring_scenario_json(path: Path) -> bool:
+    payload = _read_json_mapping(path)
+    if not isinstance(payload, Mapping):
+        return False
+    if list(payload.get("segments") or []):
+        return True
+    schema_version = str(payload.get("schema_version") or "").strip().lower()
+    if schema_version.startswith("ring_") or schema_version.startswith("ring"):
+        return True
+    meta = payload.get("_generated_meta")
+    return isinstance(meta, Mapping) and ("lap_time_s" in meta or "ring_length_m" in meta)
+
+
+def _existing_path(raw: Any) -> Path | None:
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    try:
+        path = Path(text).expanduser().resolve()
+    except Exception:
+        return None
+    return path if path.exists() else None
+
+
+def _session_auto_ring_sidecars(
+    session_state: Mapping[str, Any] | None,
+    workspace_dir: Path,
+) -> dict[str, Path] | None:
+    if session_state is None:
+        return None
+    if not bool(session_state.get("opt_auto_ring_suite_enabled", True)):
+        return None
+
+    explicit_key_sets = [
+        ("opt_auto_ring_road_csv", "opt_auto_ring_axay_csv", "opt_auto_ring_scenario_json"),
+        ("auto_ring_road_csv", "auto_ring_axay_csv", "auto_ring_scenario_json"),
+    ]
+    for road_key, axay_key, scenario_key in explicit_key_sets:
+        road = _existing_path(session_state.get(road_key))
+        axay = _existing_path(session_state.get(axay_key))
+        scenario = _existing_path(session_state.get(scenario_key))
+        if road and axay and scenario and _looks_like_ring_scenario_json(scenario):
+            return {"road_csv": road, "axay_csv": axay, "scenario_json": scenario}
+
+    exports_dir = Path(workspace_dir) / "exports"
+    road = exports_dir / "anim_latest_road_csv.csv"
+    axay = exports_dir / "anim_latest_axay_csv.csv"
+    scenario = exports_dir / "anim_latest_scenario_json.json"
+    if road.exists() and axay.exists() and scenario.exists() and _looks_like_ring_scenario_json(scenario):
+        return {"road_csv": road.resolve(), "axay_csv": axay.resolve(), "scenario_json": scenario.resolve()}
+    return None
+
+
+def default_suite_json_path(
+    ui_root: Path,
+    workspace_dir: Path,
+    *,
+    session_state: Mapping[str, Any] | None = None,
+) -> Path:
+    auto_ring = _session_auto_ring_sidecars(session_state, Path(workspace_dir))
+    if auto_ring is not None:
+        return materialize_optimization_auto_ring_suite_json(
+            workspace_dir,
+            suite_source_path=canonical_suite_json_path(Path(ui_root)),
+            road_csv=auto_ring["road_csv"],
+            axay_csv=auto_ring["axay_csv"],
+            scenario_json=auto_ring["scenario_json"],
+        )
     return materialize_optimization_ready_suite_json(
         workspace_dir,
         base_json_path=default_base_json_path(ui_root),
         suite_source_path=canonical_suite_json_path(Path(ui_root)),
+    )
+
+
+def default_stage_tuner_json_path(
+    ui_root: Path,
+    workspace_dir: Path,
+    *,
+    session_state: Mapping[str, Any] | None = None,
+    suite_json_path: Path | None = None,
+    jobs_hint: int = 8,
+) -> Path | None:
+    if session_state is None:
+        return None
+    if not bool(session_state.get("opt_auto_stage_tuner_enabled", True)):
+        return None
+
+    explicit = _existing_path(
+        session_state.get("opt_stage_tuner_json")
+        or session_state.get("stage_tuner_json")
+    )
+    if explicit is not None:
+        return explicit
+
+    suite_path = Path(suite_json_path or default_suite_json_path(ui_root, workspace_dir, session_state=session_state)).resolve()
+    if not is_auto_ring_suite_json(suite_path):
+        return None
+
+    return materialize_optimization_auto_tuner_plan_json(
+        workspace_dir,
+        suite_json_path=suite_path,
+        minutes_total=float(
+            session_state.get("ui_opt_minutes", DIAGNOSTIC_OPT_MINUTES_DEFAULT)
+            or DIAGNOSTIC_OPT_MINUTES_DEFAULT
+        ),
+        jobs_hint=int(session_state.get("ui_jobs", jobs_hint) or jobs_hint),
     )
 
 
@@ -201,8 +319,9 @@ def _stage_signature_payload_for_launch(
     ui_root = Path(ui_root)
     base_raw = _read_json_dict(default_base_json_path(ui_root))
     ranges_raw = _read_json_dict(default_ranges_json_path(ui_root))
+    suite_path = default_suite_json_path(ui_root, workspace_dir, session_state=session_state)
     try:
-        suite_raw = json.loads(default_suite_json_path(ui_root, workspace_dir).read_text(encoding="utf-8"))
+        suite_raw = json.loads(suite_path.read_text(encoding="utf-8"))
     except Exception:
         suite_raw = []
     base_clean, ranges_clean, suite_clean, _audit = sanitize_optimization_inputs(base_raw, ranges_raw, suite_raw)
@@ -231,7 +350,7 @@ def coordinator_problem_hash_for_launch(
         session_state,
         problem_hash_mode=problem_hash_mode,
     )
-    suite_path = default_suite_json_path(ui_root, workspace_dir)
+    suite_path = default_suite_json_path(ui_root, workspace_dir, session_state=session_state)
     problem_spec = make_problem_spec(
         model_path=str(default_model_path(ui_root)),
         worker_path=str(default_worker_path(ui_root)),
@@ -439,6 +558,14 @@ def build_optimization_launch_plan(
     tools_root = tools_root_from_ui_root(ui_root)
     workspace_dir = workspace_dir_for_ui_root(ui_root, env=env)
     use_staged = bool(session_state.get("opt_use_staged", DIAGNOSTIC_USE_STAGED_OPT))
+    suite_path = default_suite_json_path(ui_root, workspace_dir, session_state=session_state)
+    stage_tuner_path = default_stage_tuner_json_path(
+        ui_root,
+        workspace_dir,
+        session_state=session_state,
+        suite_json_path=suite_path,
+        jobs_hint=int(session_state.get("ui_jobs", ui_jobs_default) or ui_jobs_default),
+    ) if use_staged else None
 
     obj_raw = str(session_state.get("opt_objectives", "") or "").strip()
     obj_keys = [item.strip() for item in re.split(r"[\n,;]+", obj_raw) if item.strip()]
@@ -466,7 +593,7 @@ def build_optimization_launch_plan(
             "--ranges_json",
             str(default_ranges_json_path(ui_root)),
             "--suite_json",
-            str(default_suite_json_path(ui_root, workspace_dir)),
+            str(suite_path),
             "--out_csv",
             str(out_csv),
             "--progress_json",
@@ -508,6 +635,8 @@ def build_optimization_launch_plan(
         ]
         for key in obj_keys:
             cmd += ["--objective", key]
+        if stage_tuner_path is not None:
+            cmd += ["--stage_tuner_json", str(stage_tuner_path)]
         if bool(session_state.get("adaptive_influence_eps", DIAGNOSTIC_ADAPTIVE_INFLUENCE_EPS)):
             cmd.append("--adaptive_influence_eps")
             cmd += [
@@ -541,7 +670,7 @@ def build_optimization_launch_plan(
         "--ranges-json",
         str(default_ranges_json_path(ui_root)),
         "--suite-json",
-        str(default_suite_json_path(ui_root, workspace_dir)),
+        str(suite_path),
         "--budget",
         str(int(session_state.get("opt_budget", DIST_OPT_BUDGET_DEFAULT) or DIST_OPT_BUDGET_DEFAULT)),
         "--seed",
@@ -582,6 +711,7 @@ __all__ = [
     "default_model_path",
     "default_ranges_json_path",
     "default_suite_json_path",
+    "default_stage_tuner_json_path",
     "default_worker_path",
     "env_dir",
     "new_optimization_run_dir",

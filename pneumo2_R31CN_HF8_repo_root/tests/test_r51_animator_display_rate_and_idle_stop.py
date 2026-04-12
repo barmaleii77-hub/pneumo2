@@ -27,11 +27,9 @@ def test_desktop_animator_uses_display_rate_playback_instead_of_4ms_frame_chasin
     assert 'Display cadence' in APP or 'display cadence' in APP
     assert 'def _nominal_positive_dt_s(t_axis: Any) -> float:' in APP
     assert 'def _playback_interval_ms_for_speed(speed: float, *, source_dt_s: float | None = None) -> int:' in APP
-    assert 'base_ms = 12.0  # ~83 Hz keeps x1.0 visibly alive without source-frame chasing.' in APP
-    assert 'base_ms = 10.0  # ~100 Hz for moderate fast-forward.' in APP
-    assert 'base_ms = 8.0   # ~125 Hz.' in APP
-    assert 'base_ms = 6.0   # ~166 Hz upper service cadence on Windows precise timer.' in APP
-    assert 'target_ms = (1000.0 * 3.0 * dense_dt_s) / spd' in APP
+    assert 'base_ms = 8.0  # ~125 Hz stable display cadence across playback speeds.' in APP
+    assert 'changing playback speed' in APP
+    assert 'target_ms = 1000.0 * 1.5 * dense_dt_s' in APP
     assert 'base_ms = min(float(base_ms), float(target_ms))' in APP
     assert 'def _advance_playback_cursor_limited(' in APP
     assert 'if wall_dt > max(0.18, 6.0 * interval_s):' in APP

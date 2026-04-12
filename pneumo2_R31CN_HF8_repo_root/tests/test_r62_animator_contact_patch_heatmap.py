@@ -22,12 +22,14 @@ def test_animator_source_builds_pressure_style_heatmap_colors_for_contact_patch_
     for needle in (
         "def _contact_patch_marker_rgba(",
         "def _contact_patch_face_colors(",
+        "def _set_line_item_data(",
         "patch_face_colors_all: list[np.ndarray] = []",
         "tire_force_n = float(",
         "marker_rgba = self._contact_patch_marker_rgba(tire_force_n, in_air=in_air)",
         "patch_face_colors_i = self._contact_patch_face_colors(",
-        "self._contact_pts.setData(pos=marker_pos, color=marker_cols)",
-        "self._contact_links.setData(pos=link_pos, color=link_cols)",
-        "meshdata=gl.MeshData(vertexes=patch_verts, faces=patch_faces, faceColors=patch_face_colors)",
+        "_set_line_item_data(self._contact_pts, marker_pos, colors_rgba=marker_cols)",
+        "_set_line_item_data(self._contact_links, link_pos, colors_rgba=link_cols)",
+        "_set_poly_mesh(",
+        "face_colors_rgba_u8=patch_face_colors",
     ):
         assert needle in APP

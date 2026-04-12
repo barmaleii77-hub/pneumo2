@@ -11,6 +11,9 @@ def test_animator_source_adds_tire_face_color_texture_helper() -> None:
         "def _wheel_tire_face_colors(",
         "groove_wave = 0.5 + 0.5 * np.sin(",
         "block_wave = 0.5 + 0.5 * np.sin(",
+        "chevron_wave = 0.5 + 0.5 * np.sin(",
+        "shoulder_lug_wave = 0.5 + 0.5 * np.sin(",
+        "lug_highlight = np.asarray(",
         "branding_band = np.asarray(",
         "contact_scuff = np.asarray(",
         "return np.asarray(rgba, dtype=np.uint8)",
@@ -26,6 +29,7 @@ def test_animator_source_applies_tire_face_colors_to_wheel_mesh() -> None:
         "forward_xyz=fwd,",
         "up_xyz=up,",
         "wheel_face_colors = self._scene_grade_color_array(",
-        "w.setMeshData(meshdata=gl.MeshData(vertexes=v_wheel, faces=self._wheel_faces, faceColors=wheel_face_colors))",
+        "_set_poly_mesh(",
+        "face_colors_rgba_u8=wheel_face_colors",
     ):
         assert needle in APP

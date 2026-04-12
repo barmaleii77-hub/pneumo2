@@ -14,6 +14,7 @@ This helper builds a curated runtime archive with a short path budget.
 
 import fnmatch
 import json
+import shutil
 import zipfile
 from pathlib import Path, PureWindowsPath
 from typing import Dict, Iterable, Iterator, List, Sequence, Tuple
@@ -21,6 +22,10 @@ from typing import Dict, Iterable, Iterator, List, Sequence, Tuple
 PORTABLE_TOPLEVEL_NAMES: tuple[str, ...] = (
     ".streamlit",
     "app.py",
+    "START_DESKTOP_CONTROL_CENTER.cmd",
+    "START_DESKTOP_CONTROL_CENTER.py",
+    "START_DESKTOP_CONTROL_CENTER.pyw",
+    "START_DESKTOP_CONTROL_CENTER.vbs",
     "START_PNEUMO_APP.cmd",
     "START_PNEUMO_APP.py",
     "START_PNEUMO_APP.pyw",
@@ -46,10 +51,25 @@ PORTABLE_DOCS_NAMES: tuple[str, ...] = (
 DEFAULT_EXCLUDE_DIR_NAMES: tuple[str, ...] = (
     "__pycache__",
     ".pytest_cache",
+    "autotest_runs",
+    "autotest_runs_probe",
     "diagnostics_runs",
+    "fuzz",
+    "modal_probe_runs",
     "runs",
     "send_bundles",
+    "tmp_bundle_analysis",
+    "tmp_compare_viewer_bundle3",
+    "tmp_compare_viewer_bundle3_fix",
+    "tmp_compare_viewer_insights_demo",
+    "tmp_compare_viewer_snapshots",
+    "tmp_compare_viewer_snapshots_bundle3",
+    "tmp_compare_viewer_snapshots_bundle3_fix",
+    "tmp_mnemo_crops",
+    "tmp_mnemo_svg_crops",
+    "tmp_mnemo_svg_crops_focus",
     "workspace",
+    "_verification_ws_opt_ready",
     "DOCS_SOURCES",
     "tests",
     ".git",
@@ -152,6 +172,38 @@ def windows_extract_path_stats(member_names: Iterable[str], *, dest_dir: str) ->
     }
 
 
+def build_portable_release_tree(
+    project_root: Path,
+    out_dir: Path,
+    *,
+    extra_files: Sequence[Path | str] | None = None,
+    clean: bool = False,
+) -> Dict[str, object]:
+    project_root = Path(project_root).resolve()
+    out_dir = Path(out_dir).resolve()
+    if clean and out_dir.exists():
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    members = sorted(iter_portable_release_members(project_root, extra_files=extra_files), key=lambda x: x[1])
+    for src, arc in members:
+        dst = out_dir / Path(arc)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+
+    stats = windows_extract_path_stats([arc for _, arc in members], dest_dir=str(out_dir))
+    manifest = {
+        "out_dir": str(out_dir),
+        "member_count": len(members),
+        "max_abs_path_len_output": stats["max_abs_path_len"],
+        "worst_paths": stats["worst_paths"],
+        "members": [arc for _, arc in members],
+    }
+    manifest_path = out_dir / "portable_release_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    return manifest
+
+
 def build_portable_release_zip(
     project_root: Path,
     out_zip: Path,
@@ -188,5 +240,6 @@ __all__ = [
     "DEFAULT_EXCLUDE_PATTERNS",
     "iter_portable_release_members",
     "windows_extract_path_stats",
+    "build_portable_release_tree",
     "build_portable_release_zip",
 ]

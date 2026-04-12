@@ -4,6 +4,9 @@ import time
 from typing import Any, Callable
 
 from pneumo_solver_ui import run_artifacts
+from pneumo_solver_ui.optimization_coordinator_handoff_ui import (
+    render_coordinator_handoff_action,
+)
 from pneumo_solver_ui.optimization_run_history import summarize_optimization_run
 from pneumo_solver_ui.optimization_run_pointer_actions_ui import (
     build_run_pointer_meta_from_summary,
@@ -56,6 +59,8 @@ def render_finished_optimization_job_panel(
     summarize_run_fn: Callable[[Any], Any] | None = None,
     save_ptr_fn: Callable[[Any, dict[str, Any]], None] | None = None,
     autoload_session_fn: Callable[[Any], None] | None = None,
+    start_handoff_fn: Callable[[Any], bool] | None = None,
+    render_handoff_action_fn: Callable[..., bool] = render_coordinator_handoff_action,
 ) -> bool:
     _render_finished_job_status(st, rc=rc, soft_stop_requested=soft_stop_requested)
 
@@ -74,6 +79,22 @@ def render_finished_optimization_job_panel(
         )
     except Exception as exc:
         st.warning(f"Не удалось сохранить указатель на последнюю оптимизацию: {exc}")
+
+    if (
+        int(rc) == 0
+        and str(getattr(job, "pipeline_mode", "") or "") == "staged"
+        and render_handoff_action_fn is not None
+    ):
+        render_handoff_action_fn(
+            st,
+            source_run_dir=getattr(job, "run_dir"),
+            start_handoff_fn=start_handoff_fn,
+            button_key="finished_job_start_coordinator_handoff",
+            missing_caption=(
+                "Coordinator handoff пока не собран для этого staged run. "
+                "Он появляется после успешного завершения staged-пайплайна с auto tuner plan."
+            ),
+        )
 
     if st.button("Очистить статус запуска", help="Скрыть завершённую задачу и вернуться к настройкам"):
         clear_job_fn()

@@ -23,6 +23,8 @@ import numpy as np
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from .data_bundle import _align_series_length
+
 
 def _clamp(x: float, a: float, b: float) -> float:
     return float(max(a, min(b, x)))
@@ -572,6 +574,7 @@ class TrendsPanel(QtWidgets.QWidget):
         if t.size == 0:
             self.canvas.set_series(np.zeros((0,), dtype=float), [])
             return
+        n_t = int(t.size)
 
         # helper for pressures: prefer df_p("Аккумулятор") if present, else df_main
         def _patm_pa(i: int = 0) -> float:
@@ -582,20 +585,31 @@ class TrendsPanel(QtWidgets.QWidget):
                 pass
             return 101325.0
 
-        y_v = np.asarray(b.get("скорость_vx_м_с", 0.0), dtype=float)
-        y_az = np.asarray(b.get("ускорение_рамы_z_м_с2", 0.0), dtype=float)
-        y_roll = np.degrees(np.asarray(b.get("крен_phi_рад", 0.0), dtype=float))
-        y_pitch = np.degrees(np.asarray(b.get("тангаж_theta_рад", 0.0), dtype=float))
+        try:
+            vxb, vyb = b.ensure_body_velocity_xy()
+            vx_arr = np.asarray(vxb, dtype=float).reshape(-1)
+            vy_arr = np.asarray(vyb, dtype=float).reshape(-1)
+            n_v = int(min(n_t, vx_arr.size, vy_arr.size))
+            y_v = np.zeros((n_t,), dtype=float)
+            if n_v > 0:
+                y_v[:n_v] = np.asarray(np.hypot(vx_arr[:n_v], vy_arr[:n_v]), dtype=float)
+        except Exception:
+            vx_raw = _align_series_length(b.get("скорость_vx_м_с", 0.0), n_t, fill=0.0)
+            vy_raw = _align_series_length(b.get("скорость_vy_м_с", 0.0), n_t, fill=0.0)
+            y_v = np.asarray(np.hypot(vx_raw, vy_raw), dtype=float)
+        y_az = _align_series_length(b.get("ускорение_рамы_z_м_с2", 0.0), n_t, fill=0.0)
+        y_roll = np.degrees(_align_series_length(b.get("крен_phi_рад", 0.0), n_t, fill=0.0))
+        y_pitch = np.degrees(_align_series_length(b.get("тангаж_theta_рад", 0.0), n_t, fill=0.0))
 
         # P accumulator in bar(g)
         patm0 = _patm_pa(0)
         if getattr(b, "p", None) is not None and b.p.has("Аккумулятор"):
             pacc = np.asarray(b.p.column("Аккумулятор"), dtype=float)
             patm = np.asarray(b.p.column("АТМ", patm0), dtype=float) if b.p.has("АТМ") else np.full_like(pacc, patm0)
-            bar_g = (pacc - patm) / 1e5
+            bar_g = _align_series_length((pacc - patm) / 1e5, n_t, fill=0.0)
         else:
             pacc = np.asarray(b.get("давление_аккумулятор_Па", patm0), dtype=float)
-            bar_g = (pacc - patm0) / 1e5
+            bar_g = _align_series_length((pacc - patm0) / 1e5, n_t, fill=0.0)
         # valves_open count (df_open)
         if getattr(b, "open", None) is not None:
             try:
@@ -605,13 +619,13 @@ class TrendsPanel(QtWidgets.QWidget):
                 idxs = [j for j, c in enumerate(cols) if str(c) != "время_с"]
                 if idxs:
                     thr = 0.05
-                    cnt = np.sum(mat[:, idxs] > thr, axis=1).astype(float)
+                    cnt = _align_series_length(np.sum(mat[:, idxs] > thr, axis=1).astype(float), n_t, fill=0.0)
                 else:
-                    cnt = np.zeros((t.size,), dtype=float)
+                    cnt = np.zeros((n_t,), dtype=float)
             except Exception:
-                cnt = np.zeros((t.size,), dtype=float)
+                cnt = np.zeros((n_t,), dtype=float)
         else:
-            cnt = np.zeros((t.size,), dtype=float)
+            cnt = np.zeros((n_t,), dtype=float)
 
         # mdot / mass flow (glanceable)
         if getattr(b, "q", None) is not None:
@@ -622,28 +636,28 @@ class TrendsPanel(QtWidgets.QWidget):
                 if idxs:
                     qv = matq[:, idxs]
                     aq = np.abs(qv)
-                    mdot_max = np.nanmax(aq, axis=1) * 1000.0  # g/s
+                    mdot_max = _align_series_length(np.nanmax(aq, axis=1) * 1000.0, n_t, fill=0.0)  # g/s
                     thr = 0.001  # kg/s == 1 g/s
-                    mdot_active = np.sum(aq > thr, axis=1).astype(float)
+                    mdot_active = _align_series_length(np.sum(aq > thr, axis=1).astype(float), n_t, fill=0.0)
                 else:
-                    mdot_max = np.zeros((t.size,), dtype=float)
-                    mdot_active = np.zeros((t.size,), dtype=float)
+                    mdot_max = np.zeros((n_t,), dtype=float)
+                    mdot_active = np.zeros((n_t,), dtype=float)
             except Exception:
-                mdot_max = np.zeros((t.size,), dtype=float)
-                mdot_active = np.zeros((t.size,), dtype=float)
+                mdot_max = np.zeros((n_t,), dtype=float)
+                mdot_active = np.zeros((n_t,), dtype=float)
         else:
-            mdot_max = np.zeros((t.size,), dtype=float)
-            mdot_active = np.zeros((t.size,), dtype=float)
+            mdot_max = np.zeros((n_t,), dtype=float)
+            mdot_active = np.zeros((n_t,), dtype=float)
 
         # Wheels airborne count (0..4)
         try:
-            a_fl = (np.asarray(b.get("колесо_в_воздухе_ЛП", 0.0), dtype=float) > 0.5).astype(float)
-            a_fr = (np.asarray(b.get("колесо_в_воздухе_ПП", 0.0), dtype=float) > 0.5).astype(float)
-            a_rl = (np.asarray(b.get("колесо_в_воздухе_ЛЗ", 0.0), dtype=float) > 0.5).astype(float)
-            a_rr = (np.asarray(b.get("колесо_в_воздухе_ПЗ", 0.0), dtype=float) > 0.5).astype(float)
+            a_fl = (_align_series_length(b.get("колесо_в_воздухе_ЛП", 0.0), n_t, fill=0.0) > 0.5).astype(float)
+            a_fr = (_align_series_length(b.get("колесо_в_воздухе_ПП", 0.0), n_t, fill=0.0) > 0.5).astype(float)
+            a_rl = (_align_series_length(b.get("колесо_в_воздухе_ЛЗ", 0.0), n_t, fill=0.0) > 0.5).astype(float)
+            a_rr = (_align_series_length(b.get("колесо_в_воздухе_ПЗ", 0.0), n_t, fill=0.0) > 0.5).astype(float)
             air_cnt = a_fl + a_fr + a_rl + a_rr
         except Exception:
-            air_cnt = np.zeros((t.size,), dtype=float)
+            air_cnt = np.zeros((n_t,), dtype=float)
 
         series_defs = [
             ("v", "m/s", y_v),
@@ -711,6 +725,7 @@ class EventTimelineWidget(QtWidgets.QWidget):
     """Event timeline (flags / activations) with click-to-seek."""
 
     seek_index = QtCore.Signal(int)
+    seek_sample = QtCore.Signal(int, float)
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
@@ -773,7 +788,7 @@ class EventTimelineWidget(QtWidgets.QWidget):
         }
         for nm, (col, colr) in corner_map.items():
             try:
-                m = np.asarray(b.get(col, 0.0), dtype=float) > 0.5
+                m = _align_series_length(b.get(col, 0.0), n, fill=0.0) > 0.5
             except Exception:
                 m = np.zeros((n,), dtype=bool)
             self._lanes.append(_Lane(nm, colr, _segments_from_mask(m)))
@@ -797,7 +812,11 @@ class EventTimelineWidget(QtWidgets.QWidget):
                         m = np.zeros((n,), dtype=bool)
                     else:
                         try:
-                            m = np.any(mat[:, idxs] > thr, axis=1)
+                            m = _align_series_length(
+                                np.any(mat[:, idxs] > thr, axis=1),
+                                n,
+                                fill=0.0,
+                            ) > 0.5
                         except Exception:
                             m = np.zeros((n,), dtype=bool)
                     if kind == "exhaust":
@@ -831,7 +850,11 @@ class EventTimelineWidget(QtWidgets.QWidget):
                     if not idxs:
                         continue
                     try:
-                        m = np.any(np.abs(matq[:, idxs]) > thr_q, axis=1)
+                        m = _align_series_length(
+                            np.any(np.abs(matq[:, idxs]) > thr_q, axis=1),
+                            n,
+                            fill=0.0,
+                        ) > 0.5
                     except Exception:
                         m = np.zeros((n,), dtype=bool)
 
@@ -851,8 +874,9 @@ class EventTimelineWidget(QtWidgets.QWidget):
 
         # Segment transitions marker (if present)
         try:
-            sid = np.asarray(b.get("сегмент_id", 0.0), dtype=float).astype(int)
-            if sid.size == n and n > 1:
+            sid = _align_series_length(b.get("сегмент_id", 0.0), n, fill=0.0)
+            sid = np.rint(np.where(np.isfinite(sid), sid, 0.0)).astype(np.int32, copy=False)
+            if sid.size >= n and n > 1:
                 ch = np.where(sid[1:] != sid[:-1])[0]
                 self._markers = [int(x + 1) for x in ch.tolist()]
         except Exception:
@@ -932,10 +956,14 @@ class EventTimelineWidget(QtWidgets.QWidget):
         t0 = float(self._t[0])
         t1 = float(self._t[-1])
         tc = t0 + u * (t1 - t0)
-        idx = int(np.searchsorted(self._t, tc, side="left"))
+        idx = int(np.searchsorted(self._t, tc, side="right") - 1)
         idx = int(_clamp(idx, 0, int(self._t.size) - 1))
         try:
             self.seek_index.emit(idx)
+        except Exception:
+            pass
+        try:
+            self.seek_sample.emit(idx, float(tc))
         except Exception:
             pass
 

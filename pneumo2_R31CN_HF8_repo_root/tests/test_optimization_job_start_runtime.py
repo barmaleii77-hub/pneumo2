@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from pneumo_solver_ui.optimization_job_start_runtime import (
+    start_coordinator_handoff_job,
     start_optimization_job,
 )
 
@@ -167,4 +168,52 @@ def test_job_start_runtime_uses_staged_resume_run_dir_when_requested() -> None:
         ("app_root", Path("C:/repo/pneumo_solver_ui")),
         ("launch", Path("C:/repo"), Path("C:/workspace/opt_runs/staged/p_stage_resume"), "staged", "stable"),
         ("save", Path("C:/workspace/opt_runs/staged/p_stage_resume"), "staged"),
+    ]
+
+
+def test_job_start_runtime_launches_coordinator_handoff_from_source_run() -> None:
+    session_state = {}
+    events: list[tuple[str, object]] = []
+
+    job = start_coordinator_handoff_job(
+        session_state,
+        source_run_dir=Path("C:/workspace/opt_runs/staged/run_1"),
+        ui_root=Path("C:/repo/pneumo_solver_ui"),
+        python_executable="python",
+        problem_hash_mode="stable",
+        app_root_fn=lambda ui_root: events.append(("app_root", ui_root)) or Path("C:/repo"),
+        build_handoff_plan_fn=lambda **kwargs: events.append(("handoff_plan", kwargs["source_run_dir"], kwargs["ui_root"], kwargs["python_executable"])) or type(
+            "Plan",
+            (),
+            {
+                "cmd": ["python", "dist_opt_coordinator.py", "--budget", "64"],
+                "budget": 64,
+                "label": "Handoff/ray",
+                "pipeline_mode": "coordinator",
+                "progress_path": None,
+                "stop_file": None,
+                "launch_run_dir": Path("C:/workspace/opt_runs/coord/handoff_1"),
+            },
+        )(),
+        launch_payload_fn=lambda app_root, run_dir, plan, **kwargs: events.append(("launch", app_root, run_dir, plan.pipeline_mode, kwargs["problem_hash_mode"])) or {
+            "proc": type("Proc", (), {"pid": 111})(),
+            "run_dir": run_dir,
+            "log_path": Path("C:/workspace/opt_runs/coord/handoff_1/coordinator.log"),
+            "started_ts": 1.0,
+            "budget": plan.budget,
+            "backend": plan.label,
+            "pipeline_mode": plan.pipeline_mode,
+            "progress_path": plan.progress_path,
+            "stop_file": plan.stop_file,
+        },
+        save_job_fn=lambda state, job_obj: events.append(("save", job_obj.run_dir, job_obj.pipeline_mode)),
+    )
+
+    assert job.run_dir == Path("C:/workspace/opt_runs/coord/handoff_1")
+    assert job.pipeline_mode == "coordinator"
+    assert events == [
+        ("handoff_plan", Path("C:/workspace/opt_runs/staged/run_1"), Path("C:/repo/pneumo_solver_ui"), "python"),
+        ("app_root", Path("C:/repo/pneumo_solver_ui")),
+        ("launch", Path("C:/repo"), Path("C:/workspace/opt_runs/coord/handoff_1"), "coordinator", "stable"),
+        ("save", Path("C:/workspace/opt_runs/coord/handoff_1"), "coordinator"),
     ]

@@ -25,6 +25,6 @@ def test_animator_source_scene_grade_drives_scene_curtains_and_portal_runtime() 
         'key=f"scene-side-curtain-scene-grade-{curtain_idx}"',
         "portal_rgba = self._scene_portal_rgba(",
         'key="scene-portal-line-scene-grade"',
-        "self._scene_portal_line.setData(pos=np.asarray(portal_vertices, dtype=float), color=portal_colors)",
+        "_set_line_item_data(self._scene_portal_line, np.asarray(portal_vertices, dtype=float), colors_rgba=portal_colors)",
     ):
         assert needle in APP

@@ -87,6 +87,21 @@ def render_last_optimization_pointer_summary(
         current_problem_hash=current_problem_hash,
         current_problem_hash_mode=current_problem_hash_mode,
     )
+    opt_summary = snap.get("opt_summary")
+    if opt_summary is not None and str(getattr(opt_summary, "handoff_preset_tag", "") or "").strip():
+        st.write("**Coordinator handoff:** " + str(getattr(opt_summary, "handoff_preset_tag", "") or ""))
+        st.caption(
+            "Рекомендуемый full-ring handoff: "
+            f"budget={int(getattr(opt_summary, 'handoff_budget', 0) or 0)}, "
+            f"seed-candidates={int(getattr(opt_summary, 'handoff_seed_count', 0) or 0)}, "
+            f"suite={str(getattr(opt_summary, 'handoff_suite_family', '') or 'unknown')}."
+        )
+        for line in tuple(getattr(opt_summary, "handoff_reason_lines", ()) or ()):
+            st.caption(str(line))
+        if bool(getattr(opt_summary, "handoff_requires_full_ring_validation", False)):
+            st.caption(
+                "Этот handoff сохраняет обязательную full-ring проверку на длинных пользовательских кольцах."
+            )
 
     sp_payload = snap.get("sp_payload") or {}
     if sp_payload:
@@ -97,7 +112,6 @@ def render_last_optimization_pointer_summary(
 
     _render_last_pointer_live_policy(st, snap.get("live_policy") or {})
 
-    opt_summary = snap.get("opt_summary")
     packaging_snapshot = snap.get("packaging_snapshot")
     if render_packaging_snapshot_summary(
         st,

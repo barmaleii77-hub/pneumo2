@@ -22,13 +22,14 @@ def test_road_preview_window_is_frozen_per_bundle_not_by_instantaneous_speed() -
     assert 'self.car3d.set_bundle_context(b)' in APP
     assert 'self._bundle_lookahead_m: Optional[float] = None' in APP
     assert 'self._bundle_history_m: Optional[float] = None' in APP
-    assert 'la = self._stable_road_preview_lookahead_m()' in APP
+    assert 'def _stable_road_preview_lookahead_m(self) -> float:' in APP
+    assert 'def _sampled_road_preview_window_m(' in APP
+    assert 'preview_back_m, preview_fwd_m = self._sampled_road_preview_window_m(' in APP
     assert 'la = self._auto_lookahead(vx)' not in APP
 
 
 def test_playback_tick_redraws_every_service_tick_so_sample_t_affects_visible_geometry() -> None:
-    assert 'Continuous playback sampling only helps if we actually redraw every service tick.' in APP
-    assert 'self._update_frame(int(self._idx), sample_t=self._play_cursor_t_s if self._playing else None)' in APP
+    assert 'self._play_cursor_t_s, self._play_accum_s = _advance_playback_cursor_limited(' in APP
     assert 'if self._playing:' in APP
     assert 'self._update_frame(int(self._idx), sample_t=self._play_cursor_t_s)' in APP
-    assert 'sample_t=self._playback_sample_t_s if bool(playing) else None' in APP
+    assert 'sample_t=self._playback_sample_t_s,' in APP

@@ -3,6 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from pneumo_solver_ui.optimization_coordinator_handoff_ui import (
+    render_coordinator_handoff_action,
+)
 from pneumo_solver_ui.optimization_contract_summary_ui import (
     compare_objective_contract_to_current,
     render_objective_contract_drift_warning,
@@ -89,6 +92,8 @@ def render_selected_optimization_run_details(
     load_log_text: Callable[[Path], str],
     current_problem_hash: str = "",
     current_problem_hash_mode: str = "",
+    start_handoff_fn: Callable[[Path], bool] | None = None,
+    render_handoff_action_fn: Callable[..., bool] = render_coordinator_handoff_action,
 ) -> None:
     st.write(f"**Pipeline:** {summary.backend}")
     st.write(f"**run_dir:** `{summary.run_dir}`")
@@ -113,6 +118,26 @@ def render_selected_optimization_run_details(
         st.caption(summary.note)
     if summary.last_error:
         st.warning("Последняя ошибка из артефактов: " + summary.last_error)
+    if str(getattr(summary, "handoff_preset_tag", "") or "").strip():
+        st.write(
+            "**Coordinator handoff:** "
+            + str(getattr(summary, "handoff_preset_tag", "") or "")
+        )
+        st.caption(
+            "Рекомендуемый full-ring handoff: "
+            f"budget={int(getattr(summary, 'handoff_budget', 0) or 0)}, "
+            f"seed-candidates={int(getattr(summary, 'handoff_seed_count', 0) or 0)}, "
+            f"suite={str(getattr(summary, 'handoff_suite_family', '') or 'unknown')}."
+        )
+        for line in tuple(getattr(summary, "handoff_reason_lines", ()) or ()):
+            st.caption(str(line))
+        if bool(getattr(summary, "handoff_requires_full_ring_validation", False)):
+            st.caption(
+                "Этот historical handoff требовал обязательную проверку на полном пользовательском кольце."
+            )
+        handoff_plan_path = getattr(summary, "handoff_plan_path", None)
+        if handoff_plan_path is not None:
+            st.caption(f"Handoff plan: `{handoff_plan_path}`")
 
     render_objective_contract_summary(
         st,
@@ -134,6 +159,14 @@ def render_selected_optimization_run_details(
 
     render_optimization_run_packaging_details(st, summary.result_path)
     render_optimization_run_log_tail(st, summary.log_path, load_log_text=load_log_text)
+    if str(getattr(summary, "pipeline_mode", "") or "") == "staged" and render_handoff_action_fn is not None:
+        render_handoff_action_fn(
+            st,
+            source_run_dir=getattr(summary, "run_dir"),
+            start_handoff_fn=start_handoff_fn,
+            button_key=f"history_start_handoff_{Path(getattr(summary, 'run_dir')).name}",
+            missing_caption="Для выбранного staged run на диске пока нет coordinator handoff плана.",
+        )
 
 
 __all__ = [
