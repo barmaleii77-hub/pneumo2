@@ -128,6 +128,7 @@ class DesktopInputEditor:
         self._field_row_by_key: dict[str, int] = {}
         self._field_tabs_by_key: dict[str, ScrollableSection] = {}
         self._section_tree_ids: dict[str, str] = {}
+        self._section_tree_sync_in_progress = False
         self._section_title_by_key = {
             spec.key: section.title
             for section in DESKTOP_INPUT_SECTIONS
@@ -279,16 +280,38 @@ class DesktopInputEditor:
         self._service_container: ttk.Frame | None = None
         self._service_toggle_anchor: ttk.Frame | None = None
         self._service_panels_visible = False
-        self.service_toggle_text_var = tk.StringVar(value="Показать файлы и сервис")
+        self.service_toggle_text_var = tk.StringVar(value="Показать сервисные панели")
         self.status_var = tk.StringVar()
         self.path_var = tk.StringVar()
         self._task_running = False
         self._host_closed = False
-        self._set_status("Готово. Открыт черновик на основе default_base.json.")
+        self._initial_load_done = False
+        self._initial_load_after_id: str | None = None
+        self._set_status("Подготавливаю экран данных на основе default_base.json…")
         self._configure_launch_summary_styles()
         self._configure_route_button_styles()
         self._build_ui()
         self._bind_summary_var_traces()
+        self._schedule_initial_load()
+
+    def _set_status(self, text: str) -> None:
+        self.status_var.set(text)
+
+    def _schedule_initial_load(self) -> None:
+        if self._initial_load_done or self._host_closed:
+            return
+        if self._initial_load_after_id:
+            return
+        try:
+            self._initial_load_after_id = self.root.after_idle(self._complete_initial_load)
+        except Exception:
+            self._initial_load_after_id = None
+            self._complete_initial_load()
+
+    def _complete_initial_load(self) -> None:
+        self._initial_load_after_id = None
+        if self._initial_load_done or self._host_closed:
+            return
         self._refresh_safe_action_history_view()
         self._refresh_section_route_summary()
         self._refresh_preview_surface_controls()
@@ -305,9 +328,8 @@ class DesktopInputEditor:
         self._refresh_latest_preview_summary()
         self._refresh_latest_selfcheck_summary()
         self._refresh_latest_run_summary()
-
-    def _set_status(self, text: str) -> None:
-        self.status_var.set(text)
+        self._initial_load_done = True
+        self._set_status("Готово. Открыт черновик на основе default_base.json.")
 
     def _set_service_panels_visible(self, visible: bool) -> None:
         container = self._service_container
@@ -321,12 +343,12 @@ class DesktopInputEditor:
                 pack_kwargs["after"] = anchor
             if not container.winfo_manager():
                 container.pack(**pack_kwargs)
-            self.service_toggle_text_var.set("Скрыть файлы и сервис")
+            self.service_toggle_text_var.set("Скрыть сервисные панели")
             self._set_status("Открыт сервисный слой: файлы, профили, история и запуск.")
             return
         if container.winfo_manager():
             container.pack_forget()
-        self.service_toggle_text_var.set("Показать файлы и сервис")
+        self.service_toggle_text_var.set("Показать сервисные панели")
 
     def _toggle_service_panels(self) -> None:
         self._set_service_panels_visible(not self._service_panels_visible)
@@ -441,14 +463,27 @@ class DesktopInputEditor:
         if not self.section_titles:
             return
         safe_index = max(0, min(int(index), len(self.section_titles) - 1))
+        section_title = self.section_titles[safe_index]
         self.section_notebook.select(safe_index)
-        self.current_section_title_var.set(self.section_titles[safe_index])
+        if str(self.current_section_title_var.get() or "") != section_title:
+            self.current_section_title_var.set(section_title)
         if hasattr(self, "section_tree"):
-            item_id = self._section_tree_ids.get(self.section_titles[safe_index])
+            item_id = self._section_tree_ids.get(section_title)
             if item_id:
-                self.section_tree.selection_set(item_id)
-                self.section_tree.focus(item_id)
-                self.section_tree.see(item_id)
+                selected = tuple(self.section_tree.selection())
+                focused = str(self.section_tree.focus() or "")
+                needs_selection = selected != (item_id,)
+                needs_focus = focused != item_id
+                if needs_selection or needs_focus:
+                    self._section_tree_sync_in_progress = True
+                    try:
+                        if needs_selection:
+                            self.section_tree.selection_set(item_id)
+                        if needs_focus:
+                            self.section_tree.focus(item_id)
+                        self.section_tree.see(item_id)
+                    finally:
+                        self._section_tree_sync_in_progress = False
         self._refresh_section_route_summary()
         if self._field_search_tracks_current_section():
             self._refresh_active_field_search_view()
@@ -469,10 +504,15 @@ class DesktopInputEditor:
     def _on_section_tree_selected(self, _event: object | None = None) -> None:
         if not hasattr(self, "section_tree"):
             return
+        if self._section_tree_sync_in_progress:
+            return
         selected = self.section_tree.selection()
         if not selected:
             return
         item_id = str(selected[0])
+        current_title = self._current_section_title()
+        if self._section_tree_ids.get(current_title) == item_id:
+            return
         for index, title in enumerate(self.section_titles):
             if self._section_tree_ids.get(title) == item_id:
                 self._select_section_index(index)
@@ -1489,7 +1529,7 @@ class DesktopInputEditor:
         quick_actions.pack(fill="x", pady=(0, 10))
         ttk.Label(
             quick_actions,
-            text="Данные машины",
+            text="Setup / Исходные данные",
             font=("Segoe UI", 13, "bold"),
         ).pack(side="left")
         ttk.Button(quick_actions, text="Загрузить данные...", command=self._load_json).pack(side="left")
@@ -1499,12 +1539,12 @@ class DesktopInputEditor:
             textvariable=self.service_toggle_text_var,
             command=self._toggle_service_panels,
         ).pack(side="left", padx=(8, 0))
-        ttk.Button(quick_actions, text="Настроить расчёт", command=self._open_run_setup_center).pack(side="left", padx=(8, 0))
+        ttk.Button(quick_actions, text="Baseline и проверки", command=self._open_run_setup_center).pack(side="left", padx=(8, 0))
         ttk.Button(quick_actions, text="Справочники и геометрия", command=self._open_geometry_reference_center).pack(
             side="left",
             padx=(8, 0),
         )
-        ttk.Button(quick_actions, text="Диагностика и отправка", command=self._open_diagnostics_center).pack(
+        ttk.Button(quick_actions, text="Собрать диагностику", command=self._open_diagnostics_center).pack(
             side="left",
             padx=(8, 0),
         )
@@ -1539,9 +1579,8 @@ class DesktopInputEditor:
             host.body.columnconfigure(0, weight=1)
             service_notebook.add(host, text=title)
 
-        overview_frame = ttk.LabelFrame(outer, text="Главное сейчас", padding=10)
+        overview_frame = ttk.LabelFrame(outer, text="Readiness и source-of-truth", padding=10)
         overview_frame.pack(fill="x", pady=(0, 12))
-        overview_frame.pack_forget()
         overview_frame.columnconfigure(1, weight=1)
         ttk.Label(overview_frame, text="Источник данных:").grid(row=0, column=0, sticky="w")
         ttk.Label(
@@ -1568,8 +1607,9 @@ class DesktopInputEditor:
         ttk.Label(
             overview_frame,
             text=(
-                "Здесь остаются только параметры машины, навигация, поиск и графическое сопровождение. "
-                "Файлы, профили, история, пресеты, проверка, запуск и артефакты открываются по кнопке слева."
+                "Этот экран остаётся master copy для параметров машины и solver defaults. "
+                "Preview, профили, baseline, история и артефакты вынесены в сервисные панели, "
+                "чтобы не смешивать редактирование source-of-truth с производными представлениями."
             ),
             wraplength=1040,
             justify="left",
@@ -5288,6 +5328,12 @@ class DesktopInputEditor:
 
     def on_host_close(self) -> None:
         self._host_closed = True
+        if self._initial_load_after_id:
+            try:
+                self.root.after_cancel(self._initial_load_after_id)
+            except Exception:
+                pass
+            self._initial_load_after_id = None
         try:
             if self._run_setup_center is not None:
                 self._run_setup_center.on_host_close()

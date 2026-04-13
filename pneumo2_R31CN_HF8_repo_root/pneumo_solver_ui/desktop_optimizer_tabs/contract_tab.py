@@ -9,6 +9,7 @@ from pneumo_solver_ui.desktop_optimizer_panels import (
     TextReportPanel,
     replace_text,
 )
+from pneumo_solver_ui.optimization_contract_summary_ui import format_hard_gate
 
 
 class DesktopOptimizerContractTab(ttk.Frame):
@@ -21,14 +22,14 @@ class DesktopOptimizerContractTab(ttk.Frame):
 
         ttk.Label(
             body,
-            text="Контракт оптимизации",
+            text="Baseline и runtime contract",
             font=("Segoe UI", 14, "bold"),
         ).grid(row=0, column=0, sticky="w")
         ttk.Label(
             body,
             text=(
                 "Desktop center показывает честный scope текущего optimization contract: "
-                "канонические model/base/ranges/suite, objective contract, problem hash и baseline provenance."
+                "baseline source-of-truth, objective stack, hard gate, canonical model/base/ranges/suite и problem hash."
             ),
             wraplength=980,
             justify="left",
@@ -158,10 +159,26 @@ class DesktopOptimizerContractTab(ttk.Frame):
         sample_params = ", ".join(tuple(getattr(snapshot, "sample_search_params", ()) or ())) or "—"
         self.summary_panel.set_rows(
             [
-                ("Workspace", str(getattr(snapshot, "workspace_dir", ""))),
+                ("Рабочая область", str(getattr(snapshot, "workspace_dir", ""))),
+                ("Objective stack", ", ".join(tuple(getattr(snapshot, "objective_keys", ()) or ())) or "—"),
+                (
+                    "Hard gate",
+                    format_hard_gate(
+                        getattr(snapshot, "penalty_key", ""),
+                        getattr(snapshot, "penalty_tol", None),
+                    )
+                    or "—",
+                ),
                 ("Problem hash", str(getattr(snapshot, "problem_hash", "")) or "—"),
                 ("Hash mode", str(getattr(snapshot, "problem_hash_mode", "")) or "—"),
-                ("Baseline source", str(getattr(snapshot, "baseline_source_label", "")) or "default_base.json only"),
+                (
+                    "Baseline source",
+                    str(getattr(snapshot, "baseline_source_label", "")) or "default_base.json only",
+                ),
+                (
+                    "Автообновление baseline",
+                    "включено" if bool(self.controller.var("opt_autoupdate_baseline").get()) else "выключено",
+                ),
                 (
                     "Search-space",
                     f"base params={int(getattr(snapshot, 'base_param_count', 0) or 0)}, "

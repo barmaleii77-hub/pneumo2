@@ -1,0 +1,145 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from difflib import SequenceMatcher
+from typing import Iterable
+
+from .contracts import DesktopShellToolSpec
+
+
+@dataclass(frozen=True)
+class ShellCommandSearchEntry:
+    label: str
+    location: str
+    summary: str
+    action_kind: str
+    action_value: str
+    keywords: tuple[str, ...] = ()
+
+
+def _normalize_search_text(value: str) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def build_shell_command_search_entries(
+    specs: Iterable[DesktopShellToolSpec],
+) -> tuple[ShellCommandSearchEntry, ...]:
+    entries: list[ShellCommandSearchEntry] = [
+        ShellCommandSearchEntry(
+            label="Обзор рабочего места",
+            location="Главное окно -> Обзор",
+            summary="Открывает обзор shell с основным инженерным маршрутом и быстрыми переходами.",
+            action_kind="command",
+            action_value="home",
+            keywords=("главная", "обзор", "маршрут", "рабочее место"),
+        ),
+        ShellCommandSearchEntry(
+            label="Собрать диагностику",
+            location="Главное окно -> Верхняя командная зона",
+            summary="Открывает центр диагностики и отправки как главный глобальный путь для health-check и bundle.",
+            action_kind="tool",
+            action_value="desktop_diagnostics_center",
+            keywords=("diagnostics", "bundle", "отправка", "health", "self-check"),
+        ),
+        ShellCommandSearchEntry(
+            label="Открыть в аниматоре",
+            location="Главное окно -> Верхняя командная зона",
+            summary="Запускает Desktop Animator для текущего инженерного контекста.",
+            action_kind="tool",
+            action_value="desktop_animator",
+            keywords=("3d", "анимация", "animation", "viewport", "viewcube"),
+        ),
+        ShellCommandSearchEntry(
+            label="Открыть сравнение прогонов",
+            location="Главное окно -> Верхняя командная зона",
+            summary="Запускает Compare Viewer для сравнения результатов и артефактов.",
+            action_kind="tool",
+            action_value="compare_viewer",
+            keywords=("compare", "сравнение", "npz", "results"),
+        ),
+    ]
+    for spec in specs:
+        label = spec.title
+        location = f"{spec.menu_section} -> {spec.title}"
+        summary = spec.details or spec.description
+        keywords = tuple(
+            sorted(
+                {
+                    spec.title,
+                    spec.description,
+                    spec.details,
+                    spec.menu_section,
+                    spec.nav_section,
+                    *spec.capability_ids,
+                    *spec.launch_contexts,
+                }
+            )
+        )
+        entries.append(
+            ShellCommandSearchEntry(
+                label=label,
+                location=location,
+                summary=summary,
+                action_kind="tool",
+                action_value=spec.key,
+                keywords=keywords,
+            )
+        )
+    return tuple(entries)
+
+
+def rank_shell_command_search_entries(
+    query: str,
+    entries: Iterable[ShellCommandSearchEntry],
+) -> tuple[ShellCommandSearchEntry, ...]:
+    normalized_query = _normalize_search_text(query)
+    if not normalized_query:
+        return tuple(entries)
+
+    scored: list[tuple[float, ShellCommandSearchEntry]] = []
+    query_tokens = tuple(token for token in normalized_query.split(" ") if token)
+    for entry in entries:
+        label_text = _normalize_search_text(entry.label)
+        location_text = _normalize_search_text(entry.location)
+        summary_text = _normalize_search_text(entry.summary)
+        keyword_text = _normalize_search_text(" ".join(entry.keywords))
+        haystack = " ".join(
+            part for part in (label_text, location_text, summary_text, keyword_text) if part
+        )
+        if not haystack:
+            continue
+        score = 0.0
+        if normalized_query == label_text:
+            score += 1000.0
+        if normalized_query in label_text:
+            score += 250.0
+        if normalized_query in keyword_text:
+            score += 170.0
+        if normalized_query in location_text:
+            score += 120.0
+        if normalized_query in summary_text:
+            score += 80.0
+        token_hits = sum(1 for token in query_tokens if token in haystack)
+        if token_hits:
+            score += float(token_hits * 24)
+        score += SequenceMatcher(None, normalized_query, label_text).ratio() * 40.0
+        score += SequenceMatcher(None, normalized_query, haystack).ratio() * 10.0
+        if score <= 0.0:
+            continue
+        scored.append((score, entry))
+
+    scored.sort(
+        key=lambda item: (
+            -item[0],
+            len(item[1].label),
+            item[1].label.lower(),
+        )
+    )
+    return tuple(entry for _score, entry in scored)
+
+
+__all__ = [
+    "ShellCommandSearchEntry",
+    "build_shell_command_search_entries",
+    "rank_shell_command_search_entries",
+]

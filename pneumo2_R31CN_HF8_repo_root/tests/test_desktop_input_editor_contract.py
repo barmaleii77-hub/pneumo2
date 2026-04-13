@@ -811,11 +811,15 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
         errors="replace",
     )
 
-    assert 'text="Данные машины"' in editor_src
+    assert 'text="Setup / Исходные данные"' in editor_src
     assert 'ttk.Panedwindow(outer, orient="horizontal")' in editor_src
     assert 'text="Дерево разделов"' in editor_src
     assert "build_scrolled_treeview(" in editor_src
     assert 'self.section_tree.bind("<<TreeviewSelect>>", self._on_section_tree_selected)' in editor_src
+    assert "self._section_tree_sync_in_progress = False" in editor_src
+    assert "if self._section_tree_sync_in_progress:" in editor_src
+    assert "if self._section_tree_ids.get(current_title) == item_id:" in editor_src
+    assert "needs_selection = selected != (item_id,)" in editor_src
     assert 'text="Свойства и связи"' in editor_src
     assert "self.graphics_panel = DesktopInputGraphicPanel(inspector_panel)" in editor_src
     assert "textvariable=self.inspector_unit_var" in editor_src
@@ -936,6 +940,10 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "_refresh_latest_run_summary" in editor_src
     assert "_current_latest_run_dir" in editor_src
     assert "_latest_run_cache_dir_from_summary" in editor_src
+    assert "_schedule_initial_load" in editor_src
+    assert "_complete_initial_load" in editor_src
+    assert "self.root.after_idle(self._complete_initial_load)" in editor_src
+    assert "self._initial_load_after_id" in editor_src
     assert "Обновить сводку" in editor_src
     assert "Открыть папку запуска" in editor_src
     assert "Открыть run_summary.json" in editor_src
@@ -1091,7 +1099,7 @@ def test_desktop_input_editor_hides_service_layers_behind_explicit_toggle() -> N
     assert "_toggle_service_panels" in editor_src
     assert "_set_service_panels_visible" in editor_src
     assert 'textvariable=self.service_toggle_text_var' in editor_src
-    assert 'overview_frame = ttk.LabelFrame(outer, text="Главное сейчас", padding=10)' in editor_src
+    assert 'overview_frame = ttk.LabelFrame(outer, text="Readiness и source-of-truth", padding=10)' in editor_src
     assert 'self._service_container = ttk.Frame(outer)' in editor_src
     assert 'service_notebook = ttk.Notebook(self._service_container)' in editor_src
     assert '(files_service_tab, "Файлы")' in editor_src

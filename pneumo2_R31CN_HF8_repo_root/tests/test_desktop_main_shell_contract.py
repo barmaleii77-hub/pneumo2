@@ -70,7 +70,7 @@ def test_desktop_main_shell_registry_exposes_shared_standalone_launch_catalog() 
     assert "pneumo_solver_ui.tools.desktop_diagnostics_center" in modules
     assert "pneumo_solver_ui.qt_compare_viewer" in modules
     assert "pneumo_solver_ui.desktop_animator.app" in modules
-    assert "pneumo_solver_ui.desktop_mnemo.app" in modules
+    assert "pneumo_solver_ui.desktop_mnemo.main" in modules
 
 
 def test_desktop_main_shell_keeps_classic_menu_and_workspace_shell() -> None:

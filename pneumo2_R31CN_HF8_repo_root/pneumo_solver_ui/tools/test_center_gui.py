@@ -145,7 +145,7 @@ class App:
         self._hosted = bool(hosted or not self._owns_root)
         self.root = host if host is not None else Tk()
         if self._owns_root:
-            self.root.title(f"Центр тестов и проверки результатов ({RELEASE})")
+            self.root.title(f"Центр baseline, тестов и проверки ({RELEASE})")
             self.root.geometry("1180x760")
             self.root.minsize(1040, 720)
 
@@ -168,7 +168,7 @@ class App:
         self.auto_open_folder = BooleanVar(value=False)
         self.continue_on_failure = BooleanVar(value=True)
         self.context_summary = StringVar(
-            value="Слева настройки прогона, справа журнал и быстрый переход к результатам."
+            value="Слева контракт baseline и тестового прогона, справа журнал, результаты и быстрый переход к диагностике."
         )
         self.status = StringVar(value="Готов.")
 
@@ -185,7 +185,7 @@ class App:
         header.pack(fill="x")
         title_box = ttk.Frame(header)
         title_box.pack(side="left", fill="x", expand=True)
-        ttk.Label(title_box, text="Центр тестов и проверки результатов", font=("Segoe UI", 14, "bold")).pack(anchor="w")
+        ttk.Label(title_box, text="Центр baseline, тестов и проверки", font=("Segoe UI", 14, "bold")).pack(anchor="w")
         ttk.Label(
             title_box,
             textvariable=self.context_summary,
@@ -205,7 +205,7 @@ class App:
             self.notebook,
             runtime=self.results_runtime,
         )
-        self.notebook.add(run_tab, text="Тесты и проверка")
+        self.notebook.add(run_tab, text="Baseline и тесты")
         self.notebook.add(self.results_center, text="Результаты и анализ")
 
         run_split = ttk.Panedwindow(run_tab, orient="horizontal")
@@ -273,7 +273,7 @@ class App:
         # Buttons
         btns = ttk.LabelFrame(config_body, text="Команды", padding=pad)
         btns.pack(fill="x", padx=pad, pady=(0, pad))
-        self.btn_run = ttk.Button(btns, text="▶ Запустить автономное тестирование", command=self._on_run)
+        self.btn_run = ttk.Button(btns, text="▶ Запустить baseline / автономное тестирование", command=self._on_run)
         self.btn_run.pack(side="left")
 
         self.btn_stop = ttk.Button(btns, text="■ Остановить", command=self._on_stop, state="disabled")

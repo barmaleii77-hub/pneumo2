@@ -168,6 +168,8 @@ class DesktopResultsCenter(ttk.Frame):
         ttk.Button(actions, text="Обновить", command=self.refresh).pack(side="left")
         self.btn_open_selected = ttk.Button(actions, text="Открыть выбранное", command=self._open_selected)
         self.btn_open_selected.pack(side="left", padx=(8, 0))
+        self.btn_diagnostics = ttk.Button(actions, text="Собрать диагностику", command=self._launch_full_diagnostics_gui)
+        self.btn_diagnostics.pack(side="left", padx=(8, 0))
         self.btn_compare = ttk.Button(actions, text="Сравнение", command=self._launch_compare_viewer)
         self.btn_compare.pack(side="left", padx=(8, 0))
         self.btn_animator = ttk.Button(actions, text="Аниматор", command=self._launch_animator)
@@ -300,7 +302,7 @@ class DesktopResultsCenter(ttk.Frame):
         tools = ttk.LabelFrame(summary_body, text="Инструменты", padding=10)
         tools.pack(fill="x", pady=(10, 0))
         ttk.Button(tools, text="Открыть send_bundles", command=self._open_send_bundles).pack(fill="x")
-        ttk.Button(tools, text="Открыть GUI диагностики", command=self._launch_full_diagnostics_gui).pack(fill="x", pady=(6, 0))
+        ttk.Button(tools, text="Собрать диагностику", command=self._launch_full_diagnostics_gui).pack(fill="x", pady=(6, 0))
         ttk.Button(tools, text="Открыть центр отправки", command=self._launch_send_results_gui).pack(fill="x", pady=(6, 0))
 
         overview = ttk.LabelFrame(left_pane, text="Обзор проверок", padding=8)
