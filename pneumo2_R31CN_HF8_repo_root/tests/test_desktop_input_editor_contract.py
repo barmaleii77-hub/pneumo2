@@ -645,7 +645,7 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "default_base.json" in editor_src
     assert "Сохранить рабочую копию" in editor_src
     assert "Рабочие профили" in editor_src
-    assert "Снимки перед запуском" in editor_src
+    assert 'profile_details_notebook.add(snapshots, text="Снимки")' in editor_src
     assert "Сохранить профиль" in editor_src
     assert "Загрузить профиль" in editor_src
     assert "Удалить профиль" in editor_src
@@ -681,7 +681,7 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "изменено параметров" in editor_src
     assert "отличий нет" in editor_src
     assert "· изменено" in editor_src
-    assert "Что изменилось по секциям" in editor_src
+    assert 'profile_details_notebook.add(diff_frame, text="Сравнение")' in editor_src
     assert 'text="Параметр"' in editor_src
     assert 'text="Текущее"' in editor_src
     assert 'text="Профиль"' in editor_src
@@ -813,13 +813,18 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
 
     assert 'text="Данные машины"' in editor_src
     assert 'ttk.Panedwindow(outer, orient="horizontal")' in editor_src
-    assert 'text="Разделы данных"' in editor_src
-    assert "self.section_listbox = tk.Listbox(" in editor_src
-    assert 'self.section_listbox.bind("<<ListboxSelect>>", self._on_section_listbox_selected)' in editor_src
-    assert 'text="Свойства и пояснение"' in editor_src
+    assert 'text="Дерево разделов"' in editor_src
+    assert "build_scrolled_treeview(" in editor_src
+    assert 'self.section_tree.bind("<<TreeviewSelect>>", self._on_section_tree_selected)' in editor_src
+    assert 'text="Свойства и связи"' in editor_src
     assert "self.graphics_panel = DesktopInputGraphicPanel(inspector_panel)" in editor_src
     assert "textvariable=self.inspector_unit_var" in editor_src
     assert 'text="?"' in editor_src
+    assert 'text="Текущее поле"' in editor_src
+    assert 'text="Связанные параметры"' in editor_src
+    assert "inspector_related_tree" in editor_src
+    assert "_refresh_inspector_related_fields" in editor_src
+    assert "_jump_to_inspector_related_field" in editor_src
     assert "spec.display_choices or spec.choices" in editor_src
     assert "show_help_dialog(" in editor_src
     assert "field_search_summary_var" in editor_src
@@ -895,10 +900,10 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "describe_selfcheck_gate_status" in editor_src
     assert "_current_selfcheck_subject_signature" in editor_src
     assert "_selfcheck_freshness_state" in editor_src
-    assert "Preview использует временный worldroad-сценарий с текущей скоростью из раздела «Статическая настройка»." in editor_src
     assert "статическая настройка, компоненты и справочные данные" in editor_src
     assert "автоснимок включён" in run_setup_model_src
-    assert "Последний baseline / preview" in editor_src
+    assert 'artifacts_notebook = ttk.Notebook(actions)' in editor_src
+    assert 'artifacts_notebook.add(latest_preview_frame, text="Preview")' in editor_src
     assert "latest_preview_summary_var" in editor_src
     assert "active_preview_report_path" in editor_src
     assert "active_preview_log_path" in editor_src
@@ -911,7 +916,7 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "_open_run_setup_cache_root" in editor_src
     assert "_open_run_setup_log_root" in editor_src
     assert "_runtime_preview_report_path" in editor_src
-    assert "Последний auto-check / selfcheck" in editor_src
+    assert 'artifacts_notebook.add(latest_selfcheck_frame, text="Самопроверка")' in editor_src
     assert "latest_selfcheck_summary_var" in editor_src
     assert "active_selfcheck_report_path" in editor_src
     assert "active_selfcheck_log_path" in editor_src
@@ -922,7 +927,7 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "_open_latest_selfcheck_report_json" in editor_src
     assert "_open_latest_selfcheck_log" in editor_src
     assert "_runtime_selfcheck_report_path" in editor_src
-    assert "Последний подробный расчёт" in editor_src
+    assert 'artifacts_notebook.add(latest_run_frame, text="Подробный расчёт")' in editor_src
     assert "latest_run_summary_var" in editor_src
     assert "active_run_dir" in editor_src
     assert "active_run_summary_path" in editor_src
@@ -1088,13 +1093,41 @@ def test_desktop_input_editor_hides_service_layers_behind_explicit_toggle() -> N
     assert 'textvariable=self.service_toggle_text_var' in editor_src
     assert 'overview_frame = ttk.LabelFrame(outer, text="Главное сейчас", padding=10)' in editor_src
     assert 'self._service_container = ttk.Frame(outer)' in editor_src
-    assert 'ttk.LabelFrame(self._service_container, text="Файл параметров", padding=10)' in editor_src
-    assert 'ttk.LabelFrame(self._service_container, text="Рабочие профили", padding=10)' in editor_src
-    assert 'ttk.LabelFrame(self._service_container, text="Быстрые пресеты", padding=10)' in editor_src
-    assert 'ttk.LabelFrame(self._service_container, text="История последних действий", padding=10)' in editor_src
-    assert 'ttk.LabelFrame(self._service_container, text="Проверка и расчёт", padding=10)' in editor_src
-    assert 'ttk.LabelFrame(self._service_container, text="Пошаговый маршрут настройки", padding=10)' in editor_src
-    assert 'ttk.LabelFrame(self._service_container, text="Быстрый поиск по параметрам", padding=10)' in editor_src
-    assert 'ttk.LabelFrame(self._service_container, text="Журнал проверки и расчёта", padding=8)' in editor_src
+    assert 'service_notebook = ttk.Notebook(self._service_container)' in editor_src
+    assert '(files_service_tab, "Файлы")' in editor_src
+    assert '(profiles_service_tab, "Профили и снимки")' in editor_src
+    assert '(actions_service_tab, "Расчёт и действия")' in editor_src
+    assert '(tools_service_tab, "Навигация и поиск")' in editor_src
+    assert 'ttk.LabelFrame(files_service_tab.body, text="Файл параметров", padding=10)' in editor_src
+    assert 'profiles_workspace = ttk.Panedwindow(profiles_service_tab.body, orient="horizontal")' in editor_src
+    assert 'actions_workspace = ttk.Panedwindow(actions_service_tab.body, orient="horizontal")' in editor_src
+    assert 'ttk.LabelFrame(profiles_left_col, text="Рабочие профили", padding=10)' in editor_src
+    assert 'profile_details_notebook = ttk.Notebook(profiles_right_col)' in editor_src
+    assert 'profile_details_notebook.add(snapshots, text="Снимки")' in editor_src
+    assert 'profile_details_notebook.add(diff_frame, text="Сравнение")' in editor_src
+    assert 'ttk.LabelFrame(actions_left_col, text="Сводка конфигурации перед запуском", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(actions_left_col, text="Быстрые пресеты", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(actions_left_col, text="История последних действий", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(actions_right_col, text="Проверка и расчёт", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(tools_service_tab.body, text="Пошаговый маршрут настройки", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(tools_service_tab.body, text="Быстрый поиск по параметрам", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(actions_service_tab.body, text="Журнал проверки и расчёта", padding=8)' in editor_src
     assert "_set_service_panels_visible(False)" in editor_src
     assert "before=toolbar" not in editor_src
+
+
+def test_desktop_input_editor_uses_dense_field_rows_instead_of_large_cards() -> None:
+    editor_src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_input_editor.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert 'field_row = ttk.Frame(tab.body, padding=(8, 4))' in editor_src
+    assert 'name_label = ttk.Label(' in editor_src
+    assert 'rowspan=2' in editor_src
+    assert 'wraplength=220' in editor_src
+    assert 'ttk.Separator(frame, orient="horizontal")' in editor_src
+    assert 'frame.columnconfigure(1, weight=1)' in editor_src
+    assert 'value_label.grid(row=1, column=1, columnspan=5, sticky="w", pady=(4, 0))' in editor_src
+    assert 'ttk.LabelFrame(tab.body, text=spec.label, padding=10)' not in editor_src
+    assert 'field_desc_label = ttk.Label(' not in editor_src

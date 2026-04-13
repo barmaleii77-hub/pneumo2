@@ -20,7 +20,9 @@ def test_desktop_mnemo_window_exposes_snapshot_dock() -> None:
     assert "class CornerHeatmapWidget" in src
     assert "class PneumoSnapshotPanel" in src
     assert 'self._snapshot_dock = self._add_dock("Приводы", self.snapshot_panel' in src
-    assert "self.snapshot_panel.update_frame(self.dataset, self.current_idx)" in src
+    assert "self.snapshot_panel.update_frame(" in src
+    assert "flow_display_mode=self.flow_display_mode," in src
+    assert "pressure_display_mode=self.pressure_display_mode," in src
     assert "Шток: выберите полость/угол" in src
 
 

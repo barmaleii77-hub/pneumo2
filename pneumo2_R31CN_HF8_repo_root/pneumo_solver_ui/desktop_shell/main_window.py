@@ -96,6 +96,8 @@ class DesktopMainShell:
         # Temporary placeholder above; real controller is rebuilt after workspace init below.
         self.toolbar.frame.destroy()
 
+        for child in tuple(header.pack_slaves())[1:]:
+            child.pack_forget()
         body = ttk.Panedwindow(outer, orient="horizontal")
         body.pack(fill="both", expand=True)
 

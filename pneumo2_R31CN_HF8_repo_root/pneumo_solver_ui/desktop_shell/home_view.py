@@ -175,6 +175,9 @@ def build_shell_home_view(
         justify="left",
     ).pack(anchor="w", pady=(6, 14))
 
+    for child in tuple(parent.pack_slaves()):
+        if isinstance(child, ttk.Label):
+            child.pack_forget()
     summary = ttk.Frame(parent)
     summary.pack(fill="x", pady=(0, 14))
     summary.columnconfigure(0, weight=1)

@@ -263,6 +263,8 @@ class DesktopRingScenarioEditor:
         ttk.Button(actions, text="Сбросить по умолчанию", command=self._reset_defaults).grid(row=0, column=3, padx=(0, 6))
         ttk.Button(actions, text="Пересчитать диагностику", command=self._force_refresh).grid(row=0, column=4)
 
+        for child in header.grid_slaves(row=1, column=0):
+            child.grid_remove()
         self.segment_panel = SegmentListPanel(
             outer,
             on_select=self._on_segment_selected,

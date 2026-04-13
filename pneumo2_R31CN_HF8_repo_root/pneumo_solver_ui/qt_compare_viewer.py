@@ -425,7 +425,7 @@ class CompareViewer(QtWidgets.QMainWindow):
     def __init__(self, paths: List[Path]):
         super().__init__()
         self.setObjectName("compareViewerWindow")
-        self._window_title_base = "Pneumo: NPZ Compare Viewer (DiagrammyV680R05)"
+        self._window_title_base = "PneumoApp: \u0446\u0435\u043d\u0442\u0440 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f NPZ"
         self.setWindowTitle(self._window_title_base)
         self.setMinimumSize(1220, 820)
         try:
@@ -606,9 +606,432 @@ class CompareViewer(QtWidgets.QMainWindow):
 
     # ---------------- UI ----------------
     def _build_dock(self):
-        dock = QtWidgets.QDockWidget("Controls", self)
+        dock = QtWidgets.QDockWidget("\u041f\u0443\u043b\u044c\u0442", self)
+        dock.setObjectName("dock_controls")
+        dock.setWindowTitle("\u041f\u0443\u043b\u044c\u0442")
+        dock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+        dock.setMinimumWidth(280)
+
+        content = QtWidgets.QWidget()
+        lay = QtWidgets.QVBoxLayout(content)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(6)
+
+        self.lbl_trust = QtWidgets.QLabel("")
+        self.lbl_trust.setWordWrap(True)
+        self.lbl_trust.setVisible(False)
+        self.lbl_trust.setToolTip(
+            "\u041f\u043e\u0447\u0435\u043c\u0443 \u0434\u0430\u043d\u043d\u044b\u043c "
+            "\u043d\u0435\u043b\u044c\u0437\u044f \u0434\u043e\u0432\u0435\u0440\u044f\u0442\u044c: "
+            "dt / NaN / \u043d\u0435\u043c\u043e\u043d\u043e\u0442\u043e\u043d\u043d\u043e\u0441\u0442\u044c."
+        )
+        self.lbl_trust.setStyleSheet("QLabel{padding:6px;border-radius:6px;}")
+        lay.addWidget(self.lbl_trust)
+
+        self.controls_top_tabs = QtWidgets.QTabWidget()
+        self.controls_top_tabs.setObjectName("controlsTopTabs")
+        self.controls_top_tabs.setDocumentMode(True)
+        lay.addWidget(self.controls_top_tabs, 0)
+
+        page_route = QtWidgets.QWidget()
+        route_lay = QtWidgets.QVBoxLayout(page_route)
+        route_lay.setContentsMargins(0, 0, 0, 0)
+        route_lay.setSpacing(6)
+        route_idx = self.controls_top_tabs.addTab(page_route, "\u041c\u0430\u0440\u0448\u0440\u0443\u0442")
+
+        page_help = QtWidgets.QWidget()
+        help_lay = QtWidgets.QVBoxLayout(page_help)
+        help_lay.setContentsMargins(0, 0, 0, 0)
+        help_lay.setSpacing(6)
+        help_idx = self.controls_top_tabs.addTab(page_help, "\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0438")
+        self.controls_top_tabs.setCurrentIndex(route_idx)
+        self.controls_top_tabs.setTabToolTip(
+            route_idx,
+            "\u041a\u043e\u043c\u043f\u0430\u043a\u0442\u043d\u044b\u0439 \u043c\u0430\u0440\u0448\u0440\u0443\u0442 "
+            "\u0440\u0430\u0431\u043e\u0442\u044b \u043f\u043e \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044e.",
+        )
+        self.controls_top_tabs.setTabToolTip(
+            help_idx,
+            "\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0438, \u0440\u0430\u0431\u043e\u0447\u0438\u0435 "
+            "\u0432\u044b\u0432\u043e\u0434\u044b \u0438 \u0434\u0438\u0430\u0433\u043d\u043e\u0441\u0442\u0438\u043a\u0430.",
+        )
+
+        gb_assistant = QtWidgets.QGroupBox("\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f")
+        ga = QtWidgets.QVBoxLayout(gb_assistant)
+        ga.setContentsMargins(8, 8, 8, 8)
+        ga.setSpacing(6)
+
+        self.lbl_workspace_assistant_title = QtWidgets.QLabel(
+            "\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 \u043d\u0430\u0431\u043e\u0440 \u0434\u043b\u044f \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f"
+        )
+        self.lbl_workspace_assistant_title.setObjectName("workspaceAssistantTitle")
+        self.lbl_workspace_assistant_title.setWordWrap(True)
+        ga.addWidget(self.lbl_workspace_assistant_title)
+
+        self.lbl_workspace_assistant = QtWidgets.QLabel(
+            "\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 2+ \u043f\u0440\u043e\u0433\u043e\u043d\u0430 NPZ, "
+            "\u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043e\u0431\u0449\u0443\u044e \u0442\u0430\u0431\u043b\u0438\u0446\u0443 "
+            "\u0438 \u043e\u0442\u043c\u0435\u0442\u044c\u0442\u0435 \u043d\u0443\u0436\u043d\u044b\u0435 \u0441\u0438\u0433\u043d\u0430\u043b\u044b."
+        )
+        self.lbl_workspace_assistant.setObjectName("workspaceAssistantBody")
+        self.lbl_workspace_assistant.setWordWrap(True)
+        ga.addWidget(self.lbl_workspace_assistant)
+
+        row_focus = QtWidgets.QHBoxLayout()
+        row_focus.setSpacing(6)
+        self._workspace_focus_buttons = QtWidgets.QButtonGroup(self)
+        self._workspace_focus_buttons.setExclusive(True)
+
+        self.btn_workspace_focus_all = QtWidgets.QPushButton("\u041e\u0431\u0437\u043e\u0440")
+        self.btn_workspace_focus_all.setObjectName("workspaceFocusAllButton")
+        self.btn_workspace_focus_all.setToolTip(
+            "\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u0432\u0441\u0435 \u043f\u0430\u043d\u0435\u043b\u0438 "
+            "\u0440\u0430\u0431\u043e\u0447\u0435\u0433\u043e \u043c\u0435\u0441\u0442\u0430."
+        )
+        self.btn_workspace_focus_all.setCheckable(True)
+        self.btn_workspace_focus_all.setChecked(True)
+        self.btn_workspace_focus_all.clicked.connect(lambda _=False: self._activate_workspace_focus_mode("all"))
+        self._workspace_focus_buttons.addButton(self.btn_workspace_focus_all)
+        row_focus.addWidget(self.btn_workspace_focus_all)
+
+        self.btn_workspace_focus_heatmaps = QtWidgets.QPushButton("\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u044b")
+        self.btn_workspace_focus_heatmaps.setObjectName("workspaceFocusHeatmapsButton")
+        self.btn_workspace_focus_heatmaps.setToolTip(
+            "\u0421\u043e\u0441\u0440\u0435\u0434\u043e\u0442\u043e\u0447\u0438\u0442\u044c\u0441\u044f "
+            "\u043d\u0430 \u0442\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430\u0445 \u0394(t) \u0438 "
+            "\u0442\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0435 \u0432\u043b\u0438\u044f\u043d\u0438\u044f."
+        )
+        self.btn_workspace_focus_heatmaps.setCheckable(True)
+        self.btn_workspace_focus_heatmaps.clicked.connect(lambda _=False: self._activate_workspace_focus_mode("heatmaps"))
+        self._workspace_focus_buttons.addButton(self.btn_workspace_focus_heatmaps)
+        row_focus.addWidget(self.btn_workspace_focus_heatmaps)
+
+        self.btn_workspace_focus_multivar = QtWidgets.QPushButton("\u041c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439")
+        self.btn_workspace_focus_multivar.setObjectName("workspaceFocusMultivarButton")
+        self.btn_workspace_focus_multivar.setToolTip(
+            "\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c SPLOM, Parallel "
+            "\u0438 3D-\u0432\u0438\u0434\u044b \u0434\u043b\u044f \u043c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u043e\u0433\u043e \u0430\u043d\u0430\u043b\u0438\u0437\u0430."
+        )
+        self.btn_workspace_focus_multivar.setCheckable(True)
+        self.btn_workspace_focus_multivar.clicked.connect(lambda _=False: self._activate_workspace_focus_mode("multivariate"))
+        self._workspace_focus_buttons.addButton(self.btn_workspace_focus_multivar)
+        row_focus.addWidget(self.btn_workspace_focus_multivar)
+
+        self.btn_workspace_focus_qa = QtWidgets.QPushButton("\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 / \u0441\u043e\u0431\u044b\u0442\u0438\u044f")
+        self.btn_workspace_focus_qa.setObjectName("workspaceFocusQaButton")
+        self.btn_workspace_focus_qa.setToolTip(
+            "\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043f\u0430\u043d\u0435\u043b\u0438 "
+            "\u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438 \u0438 \u0440\u0430\u0437\u0431\u043e\u0440\u0430 \u0441\u043e\u0431\u044b\u0442\u0438\u0439."
+        )
+        self.btn_workspace_focus_qa.setCheckable(True)
+        self.btn_workspace_focus_qa.clicked.connect(lambda _=False: self._activate_workspace_focus_mode("qa"))
+        self._workspace_focus_buttons.addButton(self.btn_workspace_focus_qa)
+        row_focus.addWidget(self.btn_workspace_focus_qa)
+        ga.addLayout(row_focus)
+
+        self.btn_workspace_follow_hint = QtWidgets.QPushButton("\u041a \u0441\u043b\u0430\u0431\u043e\u043c\u0443 \u043c\u0435\u0441\u0442\u0443")
+        self.btn_workspace_follow_hint.setObjectName("workspaceFollowHintButton")
+        self.btn_workspace_follow_hint.setToolTip(
+            "\u041f\u0435\u0440\u0435\u0439\u0442\u0438 \u043a \u0442\u043e\u043c\u0443 \u043c\u0435\u0441\u0442\u0443 "
+            "\u0430\u043d\u0430\u043b\u0438\u0437\u0430, \u0433\u0434\u0435 \u0441\u0435\u0439\u0447\u0430\u0441 \u043d\u0443\u0436\u043d\u043e \u0440\u0430\u0431\u043e\u0442\u0430\u0442\u044c."
+        )
+        self.btn_workspace_follow_hint.clicked.connect(self._follow_workspace_heuristic_focus)
+        ga.addWidget(self.btn_workspace_follow_hint)
+
+        row_analysis = QtWidgets.QHBoxLayout()
+        row_analysis.setSpacing(6)
+        self._workspace_analysis_buttons = QtWidgets.QButtonGroup(self)
+        self._workspace_analysis_buttons.setExclusive(True)
+
+        self.btn_workspace_analysis_one_to_all = QtWidgets.QPushButton("1 \u2192 \u0432\u0441\u0435")
+        self.btn_workspace_analysis_one_to_all.setObjectName("workspaceAnalysisOneToAllButton")
+        self.btn_workspace_analysis_one_to_all.setToolTip(
+            "\u041e\u0434\u0438\u043d \u0434\u0440\u0430\u0439\u0432\u0435\u0440 \u0438\u043b\u0438 \u043f\u0438\u043a "
+            "\u0441\u0440\u0430\u0432\u043d\u0438\u0432\u0430\u0435\u0442\u0441\u044f \u0441 \u043c\u043d\u043e\u0433\u0438\u043c\u0438 \u043e\u0442\u043a\u043b\u0438\u043a\u0430\u043c\u0438."
+        )
+        self.btn_workspace_analysis_one_to_all.setCheckable(True)
+        self.btn_workspace_analysis_one_to_all.clicked.connect(
+            lambda _=False: self._set_workspace_analysis_mode("one_to_all")
+        )
+        self._workspace_analysis_buttons.addButton(self.btn_workspace_analysis_one_to_all)
+        row_analysis.addWidget(self.btn_workspace_analysis_one_to_all)
+
+        self.btn_workspace_analysis_all_to_one = QtWidgets.QPushButton("\u0432\u0441\u0435 \u2192 1")
+        self.btn_workspace_analysis_all_to_one.setObjectName("workspaceAnalysisAllToOneButton")
+        self.btn_workspace_analysis_all_to_one.setToolTip(
+            "\u041e\u0434\u0438\u043d \u0446\u0435\u043b\u0435\u0432\u043e\u0439 \u0441\u0438\u0433\u043d\u0430\u043b "
+            "\u043e\u0431\u044a\u044f\u0441\u043d\u044f\u0435\u0442\u0441\u044f \u0447\u0435\u0440\u0435\u0437 \u043d\u0435\u0441\u043a\u043e\u043b\u044c\u043a\u043e "
+            "\u0432\u043e\u0437\u043c\u043e\u0436\u043d\u044b\u0445 \u0434\u0440\u0430\u0439\u0432\u0435\u0440\u043e\u0432."
+        )
+        self.btn_workspace_analysis_all_to_one.setCheckable(True)
+        self.btn_workspace_analysis_all_to_one.clicked.connect(
+            lambda _=False: self._set_workspace_analysis_mode("all_to_one")
+        )
+        self._workspace_analysis_buttons.addButton(self.btn_workspace_analysis_all_to_one)
+        row_analysis.addWidget(self.btn_workspace_analysis_all_to_one)
+
+        self.btn_workspace_analysis_all_to_all = QtWidgets.QPushButton("\u0432\u0441\u0435 \u2192 \u0432\u0441\u0435")
+        self.btn_workspace_analysis_all_to_all.setObjectName("workspaceAnalysisAllToAllButton")
+        self.btn_workspace_analysis_all_to_all.setToolTip(
+            "\u041e\u0431\u0449\u0438\u0439 \u043c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439 "
+            "\u043e\u0431\u0445\u043e\u0434: \u043e\u0431\u043b\u0430\u043a\u0430, \u043a\u043b\u0430\u0441\u0442\u0435\u0440\u044b \u0438 \u043f\u0438\u043a\u0438."
+        )
+        self.btn_workspace_analysis_all_to_all.setCheckable(True)
+        self.btn_workspace_analysis_all_to_all.setChecked(True)
+        self.btn_workspace_analysis_all_to_all.clicked.connect(
+            lambda _=False: self._set_workspace_analysis_mode("all_to_all")
+        )
+        self._workspace_analysis_buttons.addButton(self.btn_workspace_analysis_all_to_all)
+        row_analysis.addWidget(self.btn_workspace_analysis_all_to_all)
+        ga.addLayout(row_analysis)
+        route_lay.addWidget(gb_assistant)
+        route_lay.addStretch(1)
+
+        gb_insights = QtWidgets.QGroupBox("\u0420\u0430\u0431\u043e\u0447\u0438\u0435 \u0432\u044b\u0432\u043e\u0434\u044b")
+        gi = QtWidgets.QVBoxLayout(gb_insights)
+        gi.setContentsMargins(8, 8, 8, 8)
+        gi.setSpacing(6)
+        self.txt_workspace_insights = QtWidgets.QTextBrowser()
+        self.txt_workspace_insights.setObjectName("workspaceInsightsBrowser")
+        self.txt_workspace_insights.setReadOnly(True)
+        self.txt_workspace_insights.setOpenExternalLinks(False)
+        self.txt_workspace_insights.setOpenLinks(False)
+        self.txt_workspace_insights.setUndoRedoEnabled(False)
+        self.txt_workspace_insights.setMinimumHeight(150)
+        self.txt_workspace_insights.setMaximumHeight(220)
+        self.txt_workspace_insights.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        gi.addWidget(self.txt_workspace_insights)
+        help_lay.addWidget(gb_insights)
+
+        gb_diag = QtWidgets.QGroupBox(
+            "\u0414\u0438\u0430\u0433\u043d\u043e\u0441\u0442\u0438\u043a\u0430 "
+            "\u0432\u044b\u0431\u0440\u0430\u043d\u043d\u043e\u0433\u043e \u043f\u0440\u043e\u0433\u043e\u043d\u0430"
+        )
+        gd = QtWidgets.QVBoxLayout(gb_diag)
+        gd.setContentsMargins(6, 6, 6, 6)
+        self.txt_anim_diag = QtWidgets.QPlainTextEdit()
+        self.txt_anim_diag.setReadOnly(True)
+        self.txt_anim_diag.setPlaceholderText(
+            "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u0440\u043e\u0433\u043e\u043d, "
+            "\u0447\u0442\u043e\u0431\u044b \u0443\u0432\u0438\u0434\u0435\u0442\u044c \u0441\u0432\u043e\u0434\u043a\u0443 "
+            "\u0442\u0435\u043a\u0443\u0449\u0435\u0439 \u043f\u043e\u0437\u0438\u0446\u0438\u0438 \u0438 \u0441\u0442\u0430\u0442\u0443\u0441 \u0441\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0430\u0446\u0438\u0438."
+        )
+        self.txt_anim_diag.setMinimumHeight(120)
+        gd.addWidget(self.txt_anim_diag)
+        help_lay.addWidget(gb_diag)
+        help_lay.addStretch(1)
+
+        lay.addWidget(QtWidgets.QLabel("\u041f\u0440\u043e\u0433\u043e\u043d\u044b"))
+        self.list_runs = QtWidgets.QListWidget()
+        self.list_runs.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        lay.addWidget(self.list_runs, stretch=1)
+
+        self.combo_table = QtWidgets.QComboBox()
+        self.combo_table.currentIndexChanged.connect(self._on_table_changed)
+        lay.addWidget(QtWidgets.QLabel("\u0422\u0430\u0431\u043b\u0438\u0446\u0430"))
+        lay.addWidget(self.combo_table)
+
+        lay.addWidget(QtWidgets.QLabel("\u0424\u0438\u043b\u044c\u0442\u0440 \u0441\u0438\u0433\u043d\u0430\u043b\u043e\u0432"))
+        self.edit_filter = QtWidgets.QLineEdit()
+        self.edit_filter.setPlaceholderText(
+            "\u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: \u0434\u0430\u0432\u043b\u0435\u043d\u0438\u0435|\u0448\u0442\u043e\u043a\u0430"
+        )
+        self.edit_filter.textChanged.connect(self._on_signal_filter_changed)
+        lay.addWidget(self.edit_filter)
+
+        lay.addWidget(QtWidgets.QLabel("\u0421\u0438\u0433\u043d\u0430\u043b\u044b"))
+        self.list_signals = QtWidgets.QListWidget()
+        self.list_signals.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        lay.addWidget(self.list_signals, stretch=2)
+        self.list_signals.itemSelectionChanged.connect(self._on_signal_selection_changed)
+
+        lay.addWidget(QtWidgets.QLabel("\u041d\u0430\u0432\u0438\u0433\u0430\u0442\u043e\u0440"))
+        self.chk_nav = QtWidgets.QCheckBox(
+            "\u0412\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u043d\u0430\u0432\u0438\u0433\u0430\u0442\u043e\u0440"
+        )
+        self.chk_nav.setChecked(True)
+        self.chk_nav.stateChanged.connect(self._rebuild_plots)
+        lay.addWidget(self.chk_nav)
+
+        self.combo_nav_signal = QtWidgets.QComboBox()
+        self.combo_nav_signal.currentIndexChanged.connect(self._on_navigator_signal_changed)
+        lay.addWidget(QtWidgets.QLabel("\u0421\u0438\u0433\u043d\u0430\u043b \u043d\u0430\u0432\u0438\u0433\u0430\u0442\u043e\u0440\u0430"))
+        lay.addWidget(self.combo_nav_signal)
+
+        opt_row = QtWidgets.QHBoxLayout()
+        self.spin_rows = QtWidgets.QSpinBox()
+        self.spin_rows.setRange(1, 24)
+        self.spin_rows.setValue(6)
+        self.spin_rows.valueChanged.connect(self._rebuild_plots)
+        opt_row.addWidget(QtWidgets.QLabel("\u041c\u0430\u043a\u0441. \u0440\u044f\u0434\u043e\u0432"))
+        opt_row.addWidget(self.spin_rows)
+        lay.addLayout(opt_row)
+
+        self.chk_delta = QtWidgets.QCheckBox(
+            "\u0420\u0430\u0437\u043d\u043e\u0441\u0442\u044c \u043e\u0442\u043d\u043e\u0441\u0438\u0442\u0435\u043b\u044c\u043d\u043e \u044d\u0442\u0430\u043b\u043e\u043d\u0430"
+        )
+        self.chk_delta.stateChanged.connect(self._rebuild_plots)
+        lay.addWidget(self.chk_delta)
+
+        ref_row = QtWidgets.QHBoxLayout()
+        ref_row.addWidget(QtWidgets.QLabel("\u042d\u0442\u0430\u043b\u043e\u043d\u043d\u044b\u0439 \u043f\u0440\u043e\u0433\u043e\u043d"))
+        self.combo_ref = QtWidgets.QComboBox()
+        self.combo_ref.setEnabled(False)
+        self.combo_ref.setToolTip(
+            "\u042d\u0442\u0430\u043b\u043e\u043d \u0434\u043b\u044f \u0440\u0435\u0436\u0438\u043c\u0430 \u0394, "
+            "\u0432\u043b\u0438\u044f\u043d\u0438\u044f \u0432\u043e \u0432\u0440\u0435\u043c\u0435\u043d\u0438 \u0438 "
+            "\u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f \u0441 \u0431\u0430\u0437\u043e\u0432\u044b\u043c \u043f\u0440\u043e\u0433\u043e\u043d\u043e\u043c."
+        )
+        self.combo_ref.currentIndexChanged.connect(self._on_reference_run_changed)
+        ref_row.addWidget(self.combo_ref, stretch=1)
+        lay.addLayout(ref_row)
+
+        gb = QtWidgets.QGroupBox("\u041e\u0442\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435 / \u0448\u043a\u0430\u043b\u044b")
+        g = QtWidgets.QGridLayout(gb)
+        g.setContentsMargins(8, 8, 8, 8)
+        g.setHorizontalSpacing(8)
+        g.setVerticalSpacing(4)
+
+        g.addWidget(QtWidgets.QLabel("\u0420\u0430\u0441\u0441\u0442\u043e\u044f\u043d\u0438\u0435"), 0, 0)
+        self.combo_dist_unit = QtWidgets.QComboBox()
+        self.combo_dist_unit.addItems(["mm", "m"])
+        self.combo_dist_unit.setCurrentText(str(getattr(self, "dist_unit", "mm")))
+        self.combo_dist_unit.currentIndexChanged.connect(self._on_display_opts_changed)
+        g.addWidget(self.combo_dist_unit, 0, 1)
+
+        g.addWidget(QtWidgets.QLabel("\u0423\u0433\u043e\u043b"), 0, 2)
+        self.combo_angle_unit = QtWidgets.QComboBox()
+        self.combo_angle_unit.addItems(["deg", "rad"])
+        self.combo_angle_unit.setCurrentText(str(getattr(self, "angle_unit", "deg")))
+        self.combo_angle_unit.currentIndexChanged.connect(self._on_display_opts_changed)
+        g.addWidget(self.combo_angle_unit, 0, 3)
+
+        self.chk_zero_baseline = QtWidgets.QCheckBox(
+            "\u041d\u0443\u043b\u0435\u0432\u043e\u0439 \u0431\u0430\u0437\u043e\u0432\u044b\u0439 "
+            "\u0443\u0440\u043e\u0432\u0435\u043d\u044c (\u043f\u0435\u0440\u0435\u043c\u0435\u0449\u0435\u043d\u0438\u0435/\u0443\u0433\u043e\u043b)"
+        )
+        self.chk_zero_baseline.setChecked(bool(getattr(self, "zero_baseline", True)))
+        self.chk_zero_baseline.stateChanged.connect(self._on_display_opts_changed)
+        g.addWidget(self.chk_zero_baseline, 1, 0, 1, 2)
+
+        g.addWidget(QtWidgets.QLabel("\u041e\u043a\u043d\u043e \u0431\u0430\u0437\u043e\u0432\u043e\u0433\u043e \u0443\u0440\u043e\u0432\u043d\u044f, \u0441"), 1, 2)
+        self.spin_baseline_s = QtWidgets.QDoubleSpinBox()
+        self.spin_baseline_s.setRange(0.0, 5.0)
+        self.spin_baseline_s.setSingleStep(0.05)
+        self.spin_baseline_s.setDecimals(3)
+        self.spin_baseline_s.setValue(float(getattr(self, "baseline_window_s", 0.0) or 0.0))
+        self.spin_baseline_s.valueChanged.connect(self._on_display_opts_changed)
+        g.addWidget(self.spin_baseline_s, 1, 3)
+
+        self.chk_lock_y = QtWidgets.QCheckBox(
+            "\u041e\u0431\u0449\u0430\u044f Y-\u0448\u043a\u0430\u043b\u0430 \u043f\u043e \u0441\u0438\u0433\u043d\u0430\u043b\u0443"
+        )
+        self.chk_lock_y.setChecked(bool(getattr(self, "lock_y", True)))
+        self.chk_lock_y.stateChanged.connect(self._on_display_opts_changed)
+        g.addWidget(self.chk_lock_y, 2, 0, 1, 2)
+
+        self.chk_lock_y_unit = QtWidgets.QCheckBox(
+            "\u041e\u0431\u0449\u0430\u044f Y-\u0448\u043a\u0430\u043b\u0430 \u043f\u043e \u0435\u0434\u0438\u043d\u0438\u0446\u0435"
+        )
+        self.chk_lock_y_unit.setChecked(bool(getattr(self, "lock_y_by_unit", False)))
+        self.chk_lock_y_unit.stateChanged.connect(self._on_display_opts_changed)
+        g.addWidget(self.chk_lock_y_unit, 2, 2, 1, 2)
+
+        self.chk_sym_y = QtWidgets.QCheckBox("\u0421\u0438\u043c\u043c\u0435\u0442\u0440\u0438\u044f Y \u0432\u043e\u043a\u0440\u0443\u0433 0")
+        self.chk_sym_y.setChecked(bool(getattr(self, "sym_y", True)))
+        self.chk_sym_y.stateChanged.connect(self._on_display_opts_changed)
+        g.addWidget(self.chk_sym_y, 3, 0, 1, 2)
+        lay.addWidget(gb)
+
+        gb_ev = QtWidgets.QGroupBox("\u0414\u0438\u0441\u043a\u0440\u0435\u0442\u043d\u044b\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u044f")
+        ge = QtWidgets.QGridLayout(gb_ev)
+        ge.setContentsMargins(8, 8, 8, 8)
+        ge.setHorizontalSpacing(8)
+        ge.setVerticalSpacing(4)
+
+        self.chk_events = QtWidgets.QCheckBox(
+            "\u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c \u043c\u0430\u0440\u043a\u0435\u0440\u044b \u0441\u043e\u0431\u044b\u0442\u0438\u0439"
+        )
+        self.chk_events.setChecked(bool(getattr(self, "events_enabled", False)))
+        self.chk_events.setToolTip(
+            "\u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c \u043c\u043e\u043c\u0435\u043d\u0442\u044b "
+            "\u043f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u044f \u0434\u0438\u0441\u043a\u0440\u0435\u0442\u043d\u044b\u0445 "
+            "\u0441\u0438\u0433\u043d\u0430\u043b\u043e\u0432 \u043a\u0430\u043a \u043c\u0430\u0440\u043a\u0435\u0440\u044b \u043d\u0430 \u0433\u0440\u0430\u0444\u0438\u043a\u0430\u0445."
+        )
+        self.chk_events.stateChanged.connect(self._rebuild_plots)
+        ge.addWidget(self.chk_events, 0, 0, 1, 2)
+
+        ge.addWidget(QtWidgets.QLabel("\u041c\u0430\u043a\u0441. \u043c\u0430\u0440\u043a\u0435\u0440\u043e\u0432"), 1, 0)
+        self.spin_events_max = QtWidgets.QSpinBox()
+        self.spin_events_max.setRange(0, 300)
+        self.spin_events_max.setSingleStep(10)
+        self.spin_events_max.setValue(int(getattr(self, "events_max", 60) or 60))
+        self.spin_events_max.setToolTip(
+            "\u041e\u0433\u0440\u0430\u043d\u0438\u0447\u0438\u0442\u044c \u0447\u0438\u0441\u043b\u043e "
+            "\u043c\u0430\u0440\u043a\u0435\u0440\u043e\u0432, \u0447\u0442\u043e\u0431\u044b \u0433\u0440\u0430\u0444\u0438\u043a\u0438 "
+            "\u043e\u0441\u0442\u0430\u0432\u0430\u043b\u0438\u0441\u044c \u0447\u0438\u0442\u0430\u0435\u043c\u044b\u043c\u0438."
+        )
+        self.spin_events_max.valueChanged.connect(self._rebuild_plots)
+        ge.addWidget(self.spin_events_max, 1, 1)
+
+        ge.addWidget(QtWidgets.QLabel("\u0421\u0438\u0433\u043d\u0430\u043b\u044b \u0441\u043e\u0431\u044b\u0442\u0438\u0439 (\u0430\u0432\u0442\u043e)"), 2, 0, 1, 2)
+        self.list_events = QtWidgets.QListWidget()
+        self.list_events.setToolTip(
+            "\u0421\u043f\u0438\u0441\u043e\u043a \u0441\u0438\u0433\u043d\u0430\u043b\u043e\u0432 "
+            "\u0441\u043e\u0431\u044b\u0442\u0438\u0439 \u0444\u043e\u0440\u043c\u0438\u0440\u0443\u0435\u0442\u0441\u044f \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438."
+        )
+        self.list_events.setMinimumHeight(110)
+        self.list_events.itemChanged.connect(self._on_event_selection_changed)
+        ge.addWidget(self.list_events, 3, 0, 1, 2)
+        lay.addWidget(gb_ev)
+
+        self.lbl_readout = QtWidgets.QLabel("x: \u2014")
+        self.lbl_readout.setWordWrap(True)
+        lay.addWidget(self.lbl_readout)
+
+        lay.addWidget(QtWidgets.QLabel("\u041f\u043e\u0437\u0438\u0446\u0438\u044f \u043f\u043e \u0432\u0440\u0435\u043c\u0435\u043d\u0438"))
+        row_ph = QtWidgets.QHBoxLayout()
+        self.btn_play = QtWidgets.QPushButton("\u25b6")
+        self.btn_play.setCheckable(True)
+        self.btn_play.setEnabled(False)
+        self.btn_play.toggled.connect(self._toggle_play)
+        row_ph.addWidget(self.btn_play)
+
+        self.spin_fps = QtWidgets.QSpinBox()
+        self.spin_fps.setRange(1, 60)
+        self.spin_fps.setValue(24)
+        self.spin_fps.setEnabled(False)
+        self.spin_fps.setToolTip("\u0427\u0430\u0441\u0442\u043e\u0442\u0430 \u043a\u0430\u0434\u0440\u043e\u0432")
+        self.spin_fps.valueChanged.connect(self._on_fps_changed)
+        row_ph.addWidget(QtWidgets.QLabel("\u041a\u0430\u0434\u0440/\u0441"))
+        row_ph.addWidget(self.spin_fps)
+
+        self.slider_time = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.slider_time.setRange(0, 0)
+        self.slider_time.setValue(0)
+        self.slider_time.setEnabled(False)
+        self.slider_time.valueChanged.connect(self._on_time_slider)
+        row_ph.addWidget(self.slider_time, stretch=1)
+        lay.addLayout(row_ph)
+        lay.addStretch(1)
+
+        scroll = QtWidgets.QScrollArea()
+        scroll.setObjectName("controlsScrollArea")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(content)
+
+        dock.setWidget(scroll)
+        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, dock)
+        self.controls_scroll = scroll
+        self.dock_controls = dock
+
+    def _build_dock_legacy(self):
+        dock = QtWidgets.QDockWidget("Пульт", self)
         dock.setObjectName("dock_controls")
         dock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+        dock.setMinimumWidth(300)
 
         w = QtWidgets.QWidget()
         lay = QtWidgets.QVBoxLayout(w)
@@ -623,18 +1046,35 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.lbl_trust.setStyleSheet("QLabel{padding:6px;border-radius:6px;}")
         lay.addWidget(self.lbl_trust)
 
-        gb_assistant = QtWidgets.QGroupBox("Workspace assistant")
+        self.controls_top_tabs = QtWidgets.QTabWidget()
+        self.controls_top_tabs.setObjectName("controlsTopTabs")
+        self.controls_top_tabs.setDocumentMode(True)
+        lay.addWidget(self.controls_top_tabs, 0)
+
+        page_route = QtWidgets.QWidget()
+        route_lay = QtWidgets.QVBoxLayout(page_route)
+        route_lay.setContentsMargins(0, 0, 0, 0)
+        route_lay.setSpacing(6)
+        self.controls_top_tabs.addTab(page_route, "Маршрут")
+
+        page_help = QtWidgets.QWidget()
+        help_lay = QtWidgets.QVBoxLayout(page_help)
+        help_lay.setContentsMargins(0, 0, 0, 0)
+        help_lay.setSpacing(6)
+        self.controls_top_tabs.addTab(page_help, "Подсказки")
+
+        gb_assistant = QtWidgets.QGroupBox("Контекст сравнения")
         ga = QtWidgets.QVBoxLayout(gb_assistant)
         ga.setContentsMargins(8, 8, 8, 8)
         ga.setSpacing(6)
 
-        self.lbl_workspace_assistant_title = QtWidgets.QLabel("Load compare bundle")
+        self.lbl_workspace_assistant_title = QtWidgets.QLabel("Загрузите набор для сравнения")
         self.lbl_workspace_assistant_title.setObjectName("workspaceAssistantTitle")
         self.lbl_workspace_assistant_title.setWordWrap(True)
         ga.addWidget(self.lbl_workspace_assistant_title)
 
         self.lbl_workspace_assistant = QtWidgets.QLabel(
-            "Open 2+ NPZ runs. Then pick a shared table and a few signals to unlock Heatmaps, QA and Multivariate views."
+            "Откройте 2+ прогона NPZ, затем выберите общую таблицу и несколько сигналов."
         )
         self.lbl_workspace_assistant.setObjectName("workspaceAssistantBody")
         self.lbl_workspace_assistant.setWordWrap(True)
@@ -645,7 +1085,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._workspace_focus_buttons = QtWidgets.QButtonGroup(self)
         self._workspace_focus_buttons.setExclusive(True)
 
-        self.btn_workspace_focus_all = QtWidgets.QPushButton("Overview")
+        self.btn_workspace_focus_all = QtWidgets.QPushButton("Обзор")
         self.btn_workspace_focus_all.setObjectName("workspaceFocusAllButton")
         self.btn_workspace_focus_all.setToolTip("Show the full workspace with all docks.")
         self.btn_workspace_focus_all.setCheckable(True)
@@ -654,7 +1094,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._workspace_focus_buttons.addButton(self.btn_workspace_focus_all)
         row_focus.addWidget(self.btn_workspace_focus_all)
 
-        self.btn_workspace_focus_heatmaps = QtWidgets.QPushButton("Heatmaps")
+        self.btn_workspace_focus_heatmaps = QtWidgets.QPushButton("Теплокарты")
         self.btn_workspace_focus_heatmaps.setObjectName("workspaceFocusHeatmapsButton")
         self.btn_workspace_focus_heatmaps.setToolTip("Focus Delta and Influence heatmaps.")
         self.btn_workspace_focus_heatmaps.setCheckable(True)
@@ -662,7 +1102,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._workspace_focus_buttons.addButton(self.btn_workspace_focus_heatmaps)
         row_focus.addWidget(self.btn_workspace_focus_heatmaps)
 
-        self.btn_workspace_focus_multivar = QtWidgets.QPushButton("Multivar")
+        self.btn_workspace_focus_multivar = QtWidgets.QPushButton("Многомерный")
         self.btn_workspace_focus_multivar.setObjectName("workspaceFocusMultivarButton")
         self.btn_workspace_focus_multivar.setToolTip("Focus SPLOM, Parallel and 3D melting-cloud / pebbles views.")
         self.btn_workspace_focus_multivar.setCheckable(True)
@@ -670,7 +1110,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._workspace_focus_buttons.addButton(self.btn_workspace_focus_multivar)
         row_focus.addWidget(self.btn_workspace_focus_multivar)
 
-        self.btn_workspace_focus_qa = QtWidgets.QPushButton("QA / Events")
+        self.btn_workspace_focus_qa = QtWidgets.QPushButton("Проверка / события")
         self.btn_workspace_focus_qa.setObjectName("workspaceFocusQaButton")
         self.btn_workspace_focus_qa.setToolTip("Focus QA and event drill-down tools.")
         self.btn_workspace_focus_qa.setCheckable(True)
@@ -680,7 +1120,7 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         ga.addLayout(row_focus)
 
-        self.btn_workspace_follow_hint = QtWidgets.QPushButton("Follow weakest link")
+        self.btn_workspace_follow_hint = QtWidgets.QPushButton("К слабому месту")
         self.btn_workspace_follow_hint.setObjectName("workspaceFollowHintButton")
         self.btn_workspace_follow_hint.setToolTip("Jump to the dock preset that best repairs the current weakest link.")
         self.btn_workspace_follow_hint.clicked.connect(self._follow_workspace_heuristic_focus)
@@ -725,9 +1165,10 @@ class CompareViewer(QtWidgets.QMainWindow):
         row_analysis.addWidget(self.btn_workspace_analysis_all_to_all)
 
         ga.addLayout(row_analysis)
-        lay.addWidget(gb_assistant)
+        route_lay.addWidget(gb_assistant)
+        route_lay.addStretch(1)
 
-        gb_insights = QtWidgets.QGroupBox("Heuristic insights")
+        gb_insights = QtWidgets.QGroupBox("Рабочие выводы")
         gi = QtWidgets.QVBoxLayout(gb_insights)
         gi.setContentsMargins(8, 8, 8, 8)
         gi.setSpacing(6)
@@ -738,24 +1179,25 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.txt_workspace_insights.setOpenExternalLinks(False)
         self.txt_workspace_insights.setOpenLinks(False)
         self.txt_workspace_insights.setUndoRedoEnabled(False)
-        self.txt_workspace_insights.setMinimumHeight(210)
-        self.txt_workspace_insights.setMaximumHeight(280)
+        self.txt_workspace_insights.setMinimumHeight(150)
+        self.txt_workspace_insights.setMaximumHeight(220)
         self.txt_workspace_insights.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         gi.addWidget(self.txt_workspace_insights)
-        lay.addWidget(gb_insights)
+        help_lay.addWidget(gb_insights)
 
-        gb_diag = QtWidgets.QGroupBox("Selected run diagnostics")
+        gb_diag = QtWidgets.QGroupBox("Диагностика выбранного прогона")
         gd = QtWidgets.QVBoxLayout(gb_diag)
         gd.setContentsMargins(6, 6, 6, 6)
         self.txt_anim_diag = QtWidgets.QPlainTextEdit()
         self.txt_anim_diag.setReadOnly(True)
         self.txt_anim_diag.setPlaceholderText("Выберите прогон, чтобы увидеть current/pointer visual tokens и sync-статус.")
-        self.txt_anim_diag.setMinimumHeight(160)
+        self.txt_anim_diag.setMinimumHeight(120)
         gd.addWidget(self.txt_anim_diag)
-        lay.addWidget(gb_diag)
+        help_lay.addWidget(gb_diag)
+        help_lay.addStretch(1)
 
         # runs
-        lay.addWidget(QtWidgets.QLabel("Runs"))
+        lay.addWidget(QtWidgets.QLabel("Прогоны"))
         self.list_runs = QtWidgets.QListWidget()
         self.list_runs.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         lay.addWidget(self.list_runs, stretch=1)
@@ -763,33 +1205,33 @@ class CompareViewer(QtWidgets.QMainWindow):
         # table
         self.combo_table = QtWidgets.QComboBox()
         self.combo_table.currentIndexChanged.connect(self._on_table_changed)
-        lay.addWidget(QtWidgets.QLabel("Table"))
+        lay.addWidget(QtWidgets.QLabel("Таблица"))
         lay.addWidget(self.combo_table)
 
         # signal filter
-        lay.addWidget(QtWidgets.QLabel("Signal filter (substring or regex)"))
+        lay.addWidget(QtWidgets.QLabel("Фильтр сигналов"))
         self.edit_filter = QtWidgets.QLineEdit()
-        self.edit_filter.setPlaceholderText("e.g. давление|штока")
+        self.edit_filter.setPlaceholderText("Например: давление|штока")
         self.edit_filter.textChanged.connect(self._on_signal_filter_changed)
         lay.addWidget(self.edit_filter)
 
         # signals
-        lay.addWidget(QtWidgets.QLabel("Signals (select multiple)"))
+        lay.addWidget(QtWidgets.QLabel("Сигналы"))
         self.list_signals = QtWidgets.QListWidget()
         self.list_signals.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         lay.addWidget(self.list_signals, stretch=2)
         self.list_signals.itemSelectionChanged.connect(self._on_signal_selection_changed)
 
         # navigator (overview+detail)
-        lay.addWidget(QtWidgets.QLabel("Navigator (overview+detail)"))
-        self.chk_nav = QtWidgets.QCheckBox("Enable navigator")
+        lay.addWidget(QtWidgets.QLabel("Навигатор"))
+        self.chk_nav = QtWidgets.QCheckBox("Включить навигатор")
         self.chk_nav.setChecked(True)
         self.chk_nav.stateChanged.connect(self._rebuild_plots)
         lay.addWidget(self.chk_nav)
 
         self.combo_nav_signal = QtWidgets.QComboBox()
         self.combo_nav_signal.currentIndexChanged.connect(self._on_navigator_signal_changed)
-        lay.addWidget(QtWidgets.QLabel("Navigator signal"))
+        lay.addWidget(QtWidgets.QLabel("Сигнал навигатора"))
         lay.addWidget(self.combo_nav_signal)
 
         # options
@@ -798,16 +1240,16 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.spin_rows.setRange(1, 24)
         self.spin_rows.setValue(6)
         self.spin_rows.valueChanged.connect(self._rebuild_plots)
-        opt_row.addWidget(QtWidgets.QLabel("Max rows"))
+        opt_row.addWidget(QtWidgets.QLabel("Макс. рядов"))
         opt_row.addWidget(self.spin_rows)
         lay.addLayout(opt_row)
 
-        self.chk_delta = QtWidgets.QCheckBox("Delta to reference run")
+        self.chk_delta = QtWidgets.QCheckBox("Разность относительно эталона")
         self.chk_delta.stateChanged.connect(self._rebuild_plots)
         lay.addWidget(self.chk_delta)
 
         ref_row = QtWidgets.QHBoxLayout()
-        ref_row.addWidget(QtWidgets.QLabel("Reference run"))
+        ref_row.addWidget(QtWidgets.QLabel("Эталонный прогон"))
         self.combo_ref = QtWidgets.QComboBox()
         self.combo_ref.setEnabled(False)
         self.combo_ref.setToolTip("Эталон для Δ-режима, Influence(t), heatmap, multivar и baseline событий.")
@@ -816,7 +1258,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         lay.addLayout(ref_row)
 
         # display options (baseline, units, scale locking)
-        gb = QtWidgets.QGroupBox("Display / Scales")
+        gb = QtWidgets.QGroupBox("Отображение / шкалы")
         g = QtWidgets.QGridLayout(gb)
         g.setContentsMargins(8, 8, 8, 8)
         g.setHorizontalSpacing(8)
@@ -1925,24 +2367,24 @@ class CompareViewer(QtWidgets.QMainWindow):
 
     def _build_menu(self):
         m = self.menuBar()
-        file_menu = m.addMenu("File")
+        file_menu = m.addMenu("\u0424\u0430\u0439\u043b")
 
-        act_open = QtGui.QAction("Open NPZ...", self)
+        act_open = QtGui.QAction("\u041e\u0442\u043a\u0440\u044b\u0442\u044c NPZ...", self)
         act_open.setShortcut(QtGui.QKeySequence.Open)
         act_open.triggered.connect(self._open_dialog)
         file_menu.addAction(act_open)
 
-        act_export = QtGui.QAction("Export PNG...", self)
+        act_export = QtGui.QAction("\u042d\u043a\u0441\u043f\u043e\u0440\u0442 PNG...", self)
         act_export.setShortcut("Ctrl+E")
         act_export.triggered.connect(self._export_png)
         file_menu.addAction(act_export)
 
-        act_export_snapshots = QtGui.QAction("Export Snapshot Set...", self)
+        act_export_snapshots = QtGui.QAction("\u042d\u043a\u0441\u043f\u043e\u0440\u0442 \u043d\u0430\u0431\u043e\u0440\u0430 \u0441\u043d\u0438\u043c\u043a\u043e\u0432...", self)
         act_export_snapshots.setShortcut("Ctrl+Shift+E")
         act_export_snapshots.triggered.connect(self._export_snapshot_set_dialog)
         file_menu.addAction(act_export_snapshots)
 
-        act_quit = QtGui.QAction("Quit", self)
+        act_quit = QtGui.QAction("\u0412\u044b\u0445\u043e\u0434", self)
         act_quit.setShortcut(QtGui.QKeySequence.Quit)
         act_quit.triggered.connect(self.close)
         file_menu.addAction(act_quit)
@@ -1950,18 +2392,24 @@ class CompareViewer(QtWidgets.QMainWindow):
     def _build_status_bar(self) -> None:
         sb = QtWidgets.QStatusBar(self)
         sb.setObjectName("workspaceStatusBar")
-        sb.setSizeGripEnabled(False)
+        sb.setSizeGripEnabled(True)
         self.setStatusBar(sb)
 
-        self.lbl_status_selection = QtWidgets.QLabel("Runs 0 | Table — | Signals 0")
+        self.lbl_status_selection = QtWidgets.QLabel(
+            "\u041f\u0440\u043e\u0433\u043e\u043d\u044b 0 | \u0422\u0430\u0431\u043b\u0438\u0446\u0430 \u2014 | \u0421\u0438\u0433\u043d\u0430\u043b\u044b 0"
+        )
         self.lbl_status_selection.setObjectName("statusChipSelection")
         sb.addPermanentWidget(self.lbl_status_selection)
 
-        self.lbl_status_quality = QtWidgets.QLabel("Events 0 | QA —")
+        self.lbl_status_quality = QtWidgets.QLabel(
+            "\u0421\u043e\u0431\u044b\u0442\u0438\u044f 0 | \u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u2014"
+        )
         self.lbl_status_quality.setObjectName("statusChipQuality")
         sb.addPermanentWidget(self.lbl_status_quality)
 
-        self.lbl_status_layout = QtWidgets.QLabel("Focus Overview | Docks 0/0 | Ref —")
+        self.lbl_status_layout = QtWidgets.QLabel(
+            "\u0424\u043e\u043a\u0443\u0441 \u041e\u0431\u0437\u043e\u0440 | \u041f\u0430\u043d\u0435\u043b\u0438 0/0 | \u042d\u0442\u0430\u043b\u043e\u043d \u2014"
+        )
         self.lbl_status_layout.setObjectName("statusChipLayout")
         sb.addPermanentWidget(self.lbl_status_layout)
 
@@ -2175,32 +2623,34 @@ class CompareViewer(QtWidgets.QMainWindow):
     ) -> str:
         mode = str(focus_mode or "all")
         base_labels = {
-            "all": "Show All Docks" if for_action else "Overview",
-            "heatmaps": "Focus Heatmaps" if for_action else "Heatmaps",
-            "multivariate": "Focus Multivariate" if for_action else "Multivar",
-            "qa": "Focus QA / Events" if for_action else "QA / Events",
+            "all": "\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u0432\u0441\u0435 \u043f\u0430\u043d\u0435\u043b\u0438" if for_action else "\u041e\u0431\u0437\u043e\u0440",
+            "heatmaps": "\u0424\u043e\u043a\u0443\u0441: \u0442\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u044b" if for_action else "\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u044b",
+            "multivariate": "\u0424\u043e\u043a\u0443\u0441: \u043c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439 \u0430\u043d\u0430\u043b\u0438\u0437" if for_action else "\u041c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439",
+            "qa": "\u0424\u043e\u043a\u0443\u0441: \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 / \u0441\u043e\u0431\u044b\u0442\u0438\u044f" if for_action else "\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 / \u0441\u043e\u0431\u044b\u0442\u0438\u044f",
         }
         label = base_labels.get(mode, base_labels["all"])
+        if not for_action:
+            return label
         target = dict(follow_target or {})
         target_focus = str(target.get("focus") or "").strip()
         target_dock = str(target.get("dock_label") or "").strip()
-        if target_dock == "Influence(t) Heatmap":
-            target_short = "Influence(t)"
+        if target_dock == "\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0432\u043b\u0438\u044f\u043d\u0438\u044f":
+            target_short = "\u0412\u043b\u0438\u044f\u043d\u0438\u0435(t)"
         else:
             target_short = target_dock
         current_short = self._workspace_current_dock_label(short=True)
         if mode == "all" and target_short:
             if current_short and current_short != target_short:
-                return f"{label} ({current_short}) -> Next {target_short}"
-            return f"{label} -> Next {target_short}"
+                return f"{label} ({current_short}) \u2192 {target_short}"
+            return f"{label} \u2192 {target_short}"
         if mode == "all" and current_short:
             return f"{label} ({current_short})"
         if mode != target_focus or not target_dock:
             return label
         if mode == "heatmaps":
-            return f"{label} -> {target_short}"
+            return f"{label} \u2192 {target_short}"
         if mode == "qa":
-            return f"{label} -> {target_dock}"
+            return f"{label} \u2192 {target_dock}"
         return label
 
     def _update_workspace_focus_labels(
@@ -2352,9 +2802,9 @@ class CompareViewer(QtWidgets.QMainWindow):
     def _workspace_analysis_label(self) -> str:
         mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
         labels = {
-            "one_to_all": "1->all",
-            "all_to_one": "all->1",
-            "all_to_all": "all->all",
+            "one_to_all": "1\u2192\u0432\u0441\u0435",
+            "all_to_one": "\u0432\u0441\u0435\u21921",
+            "all_to_all": "\u0432\u0441\u0435\u2192\u0432\u0441\u0435",
         }
         return labels.get(mode, labels["all_to_all"])
 
@@ -2386,8 +2836,8 @@ class CompareViewer(QtWidgets.QMainWindow):
         self,
         follow_target: Optional[Dict[str, object]] = None,
         *,
-        separator: str = " -> ",
-        fallback: str = "Overview",
+        separator: str = " \u2192 ",
+        fallback: str = "\u041e\u0431\u0437\u043e\u0440",
     ) -> str:
         target = dict(follow_target or {})
         focus_label = str(target.get("focus_label") or "").strip()
@@ -2413,23 +2863,23 @@ class CompareViewer(QtWidgets.QMainWindow):
         if dock is None:
             return {}
         focus_label_map = {
-            "heatmaps": "Heatmaps",
-            "multivariate": "Multivar",
-            "qa": "QA / Events",
+            "heatmaps": "\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u044b",
+            "multivariate": "\u041c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439",
+            "qa": "\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 / \u0441\u043e\u0431\u044b\u0442\u0438\u044f",
         }
         dock_label_map = {
-            "dock_controls": "Controls",
-            "dock_heatmap": "Δ(t)",
-            "dock_peak_heatmap": "Peak |Δ|",
-            "dock_open_timeline": "Valves (open)",
-            "dock_influence": "Influence(t)",
-            "dock_run_metrics": "Run metrics",
-            "dock_static_stroke": "Static (t0)",
-            "dock_inflheat": "Influence(t) Heatmap",
-            "dock_multivar": "Multivariate",
-            "dock_qa": "QA",
-            "dock_events": "Events",
-            "dock_geometry_acceptance": "Geometry acceptance",
+            "dock_controls": "\u041f\u0443\u043b\u044c\u0442",
+            "dock_heatmap": "\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0394(t)",
+            "dock_peak_heatmap": "\u041f\u0438\u043a\u0438 |\u0394|",
+            "dock_open_timeline": "\u0425\u043e\u0434 \u043a\u043b\u0430\u043f\u0430\u043d\u043e\u0432",
+            "dock_influence": "\u0412\u043b\u0438\u044f\u043d\u0438\u0435(t)",
+            "dock_run_metrics": "\u041c\u0435\u0442\u0440\u0438\u043a\u0438 \u043f\u0440\u043e\u0433\u043e\u043d\u043e\u0432",
+            "dock_static_stroke": "\u0421\u0442\u0430\u0442\u0438\u043a\u0430 / \u0445\u043e\u0434 \u0448\u0442\u043e\u043a\u0430",
+            "dock_inflheat": "\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0432\u043b\u0438\u044f\u043d\u0438\u044f",
+            "dock_multivar": "\u041c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439 \u0430\u043d\u0430\u043b\u0438\u0437",
+            "dock_qa": "\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u0430",
+            "dock_events": "\u0421\u043e\u0431\u044b\u0442\u0438\u044f",
+            "dock_geometry_acceptance": "\u0413\u0435\u043e\u043c\u0435\u0442\u0440\u0438\u0447\u0435\u0441\u043a\u0430\u044f \u043f\u0440\u0438\u0435\u043c\u043a\u0430",
         }
         if attr == "dock_events":
             return {
@@ -2450,23 +2900,23 @@ class CompareViewer(QtWidgets.QMainWindow):
         if not attr or attr == "dock_controls":
             return ""
         label_map = {
-            "dock_heatmap": "Δ(t)",
-            "dock_peak_heatmap": "Peak |Δ|",
-            "dock_open_timeline": "Valves (open)",
-            "dock_influence": "Influence(t)",
-            "dock_run_metrics": "Run metrics",
-            "dock_static_stroke": "Static (t0)",
-            "dock_inflheat": "Influence(t) Heatmap",
-            "dock_multivar": "Multivariate",
-            "dock_qa": "QA",
-            "dock_events": "Events",
-            "dock_geometry_acceptance": "Geometry acceptance",
+            "dock_heatmap": "\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0394(t)",
+            "dock_peak_heatmap": "\u041f\u0438\u043a\u0438 |\u0394|",
+            "dock_open_timeline": "\u0425\u043e\u0434 \u043a\u043b\u0430\u043f\u0430\u043d\u043e\u0432",
+            "dock_influence": "\u0412\u043b\u0438\u044f\u043d\u0438\u0435(t)",
+            "dock_run_metrics": "\u041c\u0435\u0442\u0440\u0438\u043a\u0438 \u043f\u0440\u043e\u0433\u043e\u043d\u043e\u0432",
+            "dock_static_stroke": "\u0421\u0442\u0430\u0442\u0438\u043a\u0430 / \u0445\u043e\u0434 \u0448\u0442\u043e\u043a\u0430",
+            "dock_inflheat": "\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0432\u043b\u0438\u044f\u043d\u0438\u044f",
+            "dock_multivar": "\u041c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439",
+            "dock_qa": "\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430",
+            "dock_events": "\u0421\u043e\u0431\u044b\u0442\u0438\u044f",
+            "dock_geometry_acceptance": "\u0413\u0435\u043e\u043c\u0435\u0442\u0440\u0438\u0447\u0435\u0441\u043a\u0430\u044f \u043f\u0440\u0438\u0435\u043c\u043a\u0430",
         }
         if attr == "dock_events":
             return self._events_dock_route_label(self._events_dock_current_subtarget(), short=short)
         label = str(label_map.get(attr, "") or "")
-        if short and label == "Influence(t) Heatmap":
-            return "Influence(t)"
+        if short and label == "\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0432\u043b\u0438\u044f\u043d\u0438\u044f":
+            return "\u0412\u043b\u0438\u044f\u043d\u0438\u0435(t)"
         return label
 
     def _workspace_route_label(
@@ -3406,6 +3856,50 @@ class CompareViewer(QtWidgets.QMainWindow):
             body = f"{body} Status: {', '.join(notes)}."
         if ref and ref != "auto":
             body = f"{body} Ref: {ref}."
+
+        title_map = {
+            "Compare overview": "\u041e\u0431\u0437\u043e\u0440 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f",
+            "Load compare bundle": "\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 \u043d\u0430\u0431\u043e\u0440 \u0434\u043b\u044f \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f",
+            "Heatmap comparison": "\u0421\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u0435 \u043f\u043e \u0442\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430\u043c",
+            "Multivariate scouting": "\u041c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439 \u043e\u0431\u0437\u043e\u0440",
+            "QA drill-down": "\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u0438 \u0440\u0430\u0437\u0431\u043e\u0440",
+            "QA findings detected": "\u041d\u0430\u0439\u0434\u0435\u043d\u044b \u0437\u0430\u043c\u0435\u0447\u0430\u043d\u0438\u044f",
+        }
+        body_map = {
+            "Load compare bundle": (
+                "\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 2+ \u043f\u0440\u043e\u0433\u043e\u043d\u0430 NPZ, "
+                "\u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043e\u0431\u0449\u0443\u044e \u0442\u0430\u0431\u043b\u0438\u0446\u0443 "
+                "\u0438 \u043d\u0435\u0441\u043a\u043e\u043b\u044c\u043a\u043e \u0441\u0438\u0433\u043d\u0430\u043b\u043e\u0432."
+            ),
+            "Heatmap comparison": (
+                "\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u044b \u0433\u043e\u0442\u043e\u0432\u044b. "
+                "\u0421\u0440\u0430\u0432\u043d\u0438\u0442\u0435 \u0437\u043e\u043d\u044b \u03b4(t) \u0438 "
+                "\u0432\u043b\u0438\u044f\u043d\u0438\u0435 \u0432\u043e \u0432\u0440\u0435\u043c\u0435\u043d\u0438."
+            ),
+            "Multivariate scouting": (
+                "\u0418\u0434\u0438\u0442\u0435 \u0432 SPLOM, Parallel \u0438 3D, "
+                "\u0447\u0442\u043e\u0431\u044b \u0431\u044b\u0441\u0442\u0440\u043e \u043d\u0430\u0439\u0442\u0438 "
+                "\u043a\u043b\u0430\u0441\u0442\u0435\u0440\u044b \u0438 \u0432\u044b\u0431\u0440\u043e\u0441\u044b."
+            ),
+        }
+        title_key = str(title or "").strip()
+        if title_key in title_map:
+            title = title_map[title_key]
+        if title_key in body_map:
+            body = body_map[title_key]
+
+        try:
+            title = re.sub(r"\s+", " ", str(title or "")).strip()
+            body = re.sub(r"\s+", " ", str(body or "")).strip()
+        except Exception:
+            title = str(title or "").strip()
+            body = str(body or "").strip()
+        if not title:
+            title = "\u0421\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u0435"
+        if len(title) > 56:
+            title = f"{title[:53].rstrip()}..."
+        if len(body) > 220:
+            body = f"{body[:217].rsplit(' ', 1)[0].rstrip(' ,;:.')}..."
 
         try:
             title_label.setText(title)
@@ -4695,46 +5189,46 @@ class CompareViewer(QtWidgets.QMainWindow):
             ) or "all"
         )
         focus_label_map = {
-            "all": "Overview",
-            "heatmaps": "Heatmaps",
-            "multivariate": "Multivar",
-            "qa": "QA / Events",
+            "all": "\u041e\u0431\u0437\u043e\u0440",
+            "heatmaps": "\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u044b",
+            "multivariate": "\u041c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439",
+            "qa": "\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 / \u0441\u043e\u0431\u044b\u0442\u0438\u044f",
         }
         focus_label = focus_label_map.get(focus, focus)
         repair_lane = str(story.get("repair_lane") or "").strip()
         repair_surface = str(story.get("repair_surface") or "").strip()
         dock_attr = "dock_controls"
-        dock_label = "Controls"
+        dock_label = "\u041f\u0443\u043b\u044c\u0442"
         dock_subtarget = ""
         if focus == "heatmaps":
             dock_attr = "dock_heatmap"
-            dock_label = "Δ(t)"
+            dock_label = "\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0394(t)"
             if repair_surface == "influence_heatmap":
                 dock_attr = "dock_inflheat"
-                dock_label = "Influence(t) Heatmap"
+                dock_label = "\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0432\u043b\u0438\u044f\u043d\u0438\u044f"
         elif focus == "multivariate":
             dock_attr = "dock_multivar"
-            dock_label = "Multivariate"
+            dock_label = "\u041c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439 \u0430\u043d\u0430\u043b\u0438\u0437"
         elif focus == "qa":
             dock_attr = "dock_qa"
-            dock_label = "QA"
+            dock_label = "\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u0430"
             if trust_flag or qa_count > 0:
                 dock_attr = "dock_qa"
-                dock_label = "QA"
+                dock_label = "\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u0430"
             elif repair_surface == "events":
                 dock_attr = "dock_events"
                 if len(list(self._selected_runs())) > 1 and int(rows or 0) > 0:
                     dock_label = self._events_dock_route_label("Runs raster")
                     dock_subtarget = "Runs raster"
                 else:
-                    dock_label = "Events"
+                    dock_label = "\u0421\u043e\u0431\u044b\u0442\u0438\u044f"
             elif repair_lane == "qa" and int(rows or 0) > 0:
                 dock_attr = "dock_events"
                 if len(list(self._selected_runs())) > 1:
                     dock_label = self._events_dock_route_label("Runs raster")
                     dock_subtarget = "Runs raster"
                 else:
-                    dock_label = "Events"
+                    dock_label = "\u0421\u043e\u0431\u044b\u0442\u0438\u044f"
         if focus == "heatmaps":
             peak_bridge = self._workspace_peak_heat_bridge_summary(
                 analysis_mode=mode,
@@ -5357,30 +5851,36 @@ class CompareViewer(QtWidgets.QMainWindow):
         sig_count: int,
         table: str,
     ) -> None:
-        base = str(getattr(self, "_window_title_base", "") or "Pneumo: NPZ Compare Viewer")
+        base = str(
+            getattr(self, "_window_title_base", "")
+            or "PneumoApp: \u0446\u0435\u043d\u0442\u0440 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f NPZ"
+        )
         parts: List[str] = []
         focus_mode = str(getattr(self, "_workspace_focus_mode", "all") or "all")
         focus_label = str(self._workspace_focus_label(follow_target=follow_target) or "").strip()
         if focus_label:
-            parts.append(f"Focus {focus_label}")
+            parts.append(f"\u0424\u043e\u043a\u0443\u0441 {focus_label}")
         if focus_mode == "all":
             next_label = self._workspace_follow_target_label(follow_target, separator=": ", fallback="")
             if next_label:
-                parts.append(f"Next {next_label}")
+                parts.append(f"\u0414\u0430\u043b\u0435\u0435 {next_label}")
         lens_label = self._workspace_analysis_label()
         if lens_label:
-            parts.append(f"Lens {lens_label}")
+            parts.append(f"\u0410\u043d\u0430\u043b\u0438\u0437 {lens_label}")
         anchor = str(anchor_label or "").strip()
         if anchor and ("—" not in anchor):
             if len(anchor) > 42:
                 anchor = f"{anchor[:39]}..."
             parts.append(anchor)
         if ref and ref != "—":
-            parts.append(f"Ref {ref}")
+            parts.append(f"\u042d\u0442\u0430\u043b\u043e\u043d {ref}")
         if table and table != "—":
-            parts.append(f"Table {table}")
+            parts.append(f"\u0422\u0430\u0431\u043b\u0438\u0446\u0430 {table}")
         if runs_count or sig_count:
-            parts.append(f"{int(runs_count)} run(s) / {int(sig_count)} signal(s)")
+            parts.append(
+                f"{int(runs_count)} \u043f\u0440\u043e\u0433\u043e\u043d\u0430 / "
+                f"{int(sig_count)} \u0441\u0438\u0433\u043d\u0430\u043b\u0430"
+            )
         title = base if not parts else f"{base} | {' | '.join(parts)}"
         try:
             self.setWindowTitle(title)
@@ -5488,17 +5988,21 @@ class CompareViewer(QtWidgets.QMainWindow):
         repair_lane = str(causal_story.get("repair_lane") or "").strip()
         repair_badge = ""
         if repair_lane in {"heatmaps", "qa", "multivariate"}:
-            repair_badge = " | Validation lane" if str(causal_story.get("confidence") or "").strip() == "aligned" else " | Repair lane"
+            repair_badge = (
+                " | \u041a\u043e\u043d\u0442\u0443\u0440 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438"
+                if str(causal_story.get("confidence") or "").strip() == "aligned"
+                else " | \u041a\u043e\u043d\u0442\u0443\u0440 \u0438\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f"
+            )
         target_attr = str(follow_target.get("dock_attr") or "").strip()
         target_badge = ""
         if target_attr:
             target_badge = (
-                f" | Validate {str(follow_target.get('dock_label') or 'target')}"
+                f" | \u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c {str(follow_target.get('dock_label') or 'target')}"
                 if str(causal_story.get("confidence") or "").strip() == "aligned"
-                else f" | Follow {str(follow_target.get('dock_label') or 'target')}"
+                else f" | \u041f\u0435\u0440\u0435\u0439\u0442\u0438: {str(follow_target.get('dock_label') or 'target')}"
             )
 
-        self._set_workspace_dock_title("dock_controls", "Controls")
+        self._set_workspace_dock_title("dock_controls", "\u041f\u0443\u043b\u044c\u0442")
 
         heat_suffix = ""
         if mode in {"one_to_all", "all_to_one"} and anchor_ready:
@@ -5511,15 +6015,15 @@ class CompareViewer(QtWidgets.QMainWindow):
         dist_follow_suffix = target_badge if target_attr == "dock_run_metrics" else ""
         static_follow_suffix = target_badge if target_attr == "dock_static_stroke" else ""
         inflheat_follow_suffix = target_badge if target_attr == "dock_inflheat" else ""
-        self._set_workspace_dock_title("dock_heatmap", f"Δ(t) Heatmap{heat_suffix}{heat_lane_suffix}{heat_follow_suffix}")
-        self._set_workspace_dock_title("dock_open_timeline", f"Valves (open) timeline{heat_suffix}{heat_lane_suffix}{open_follow_suffix}")
-        self._set_workspace_dock_title("dock_influence", f"Influence(t): meta → signals{heat_suffix}{heat_lane_suffix}{infl_follow_suffix}")
-        self._set_workspace_dock_title("dock_peak_heatmap", f"Peak |Δ| heatmap{heat_suffix}{heat_lane_suffix}{peak_follow_suffix}")
-        self._set_workspace_dock_title("dock_run_metrics", f"Run metrics / distributions{heat_suffix}{heat_lane_suffix}{dist_follow_suffix}")
-        self._set_workspace_dock_title("dock_static_stroke", f"Static (t0) / stroke check{heat_suffix}{heat_lane_suffix}{static_follow_suffix}")
-        self._set_workspace_dock_title("dock_inflheat", f"Influence(t) Heatmap{heat_suffix}{heat_lane_suffix}{inflheat_follow_suffix}")
+        self._set_workspace_dock_title("dock_heatmap", f"\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0394(t){heat_suffix}{heat_lane_suffix}{heat_follow_suffix}")
+        self._set_workspace_dock_title("dock_open_timeline", f"\u0425\u043e\u0434 \u043a\u043b\u0430\u043f\u0430\u043d\u043e\u0432{heat_suffix}{heat_lane_suffix}{open_follow_suffix}")
+        self._set_workspace_dock_title("dock_influence", f"\u0412\u043b\u0438\u044f\u043d\u0438\u0435(t): \u043c\u0435\u0442\u0430 \u2192 \u0441\u0438\u0433\u043d\u0430\u043b\u044b{heat_suffix}{heat_lane_suffix}{infl_follow_suffix}")
+        self._set_workspace_dock_title("dock_peak_heatmap", f"\u041f\u0438\u043a\u0438 |\u0394|{heat_suffix}{heat_lane_suffix}{peak_follow_suffix}")
+        self._set_workspace_dock_title("dock_run_metrics", f"\u041c\u0435\u0442\u0440\u0438\u043a\u0438 \u043f\u0440\u043e\u0433\u043e\u043d\u043e\u0432 / \u0440\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0435\u043d\u0438\u044f{heat_suffix}{heat_lane_suffix}{dist_follow_suffix}")
+        self._set_workspace_dock_title("dock_static_stroke", f"\u0421\u0442\u0430\u0442\u0438\u043a\u0430 / \u0445\u043e\u0434 \u0448\u0442\u043e\u043a\u0430{heat_suffix}{heat_lane_suffix}{static_follow_suffix}")
+        self._set_workspace_dock_title("dock_inflheat", f"\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0432\u043b\u0438\u044f\u043d\u0438\u044f{heat_suffix}{heat_lane_suffix}{inflheat_follow_suffix}")
 
-        multivar_title = "Multivariate: SPLOM / Parallel / 3D"
+        multivar_title = "\u041c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439 \u0430\u043d\u0430\u043b\u0438\u0437: SPLOM / Parallel / 3D"
         if mode == "all_to_all" and anchor_ready:
             multivar_title = f"{multivar_title} | {anchor}"
         if repair_lane == "multivariate":
@@ -5528,33 +6032,33 @@ class CompareViewer(QtWidgets.QMainWindow):
             multivar_title = f"{multivar_title}{target_badge}"
         self._set_workspace_dock_title("dock_multivar", multivar_title)
 
-        qa_title = "QA: suspicious signals"
+        qa_title = "\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430: \u043f\u043e\u0434\u043e\u0437\u0440\u0438\u0442\u0435\u043b\u044c\u043d\u044b\u0435 \u0441\u0438\u0433\u043d\u0430\u043b\u044b"
         if int(qa_issues or 0) > 0:
-            qa_title = f"{qa_title} | {int(qa_issues)} issue(s)"
+            qa_title = f"{qa_title} | {int(qa_issues)} \u0437\u0430\u043c\u0435\u0447\u0430\u043d\u0438\u0439"
         if repair_lane == "qa":
             qa_title = f"{qa_title}{repair_badge}"
         if target_attr == "dock_qa":
             qa_title = f"{qa_title}{target_badge}"
         self._set_workspace_dock_title("dock_qa", qa_title)
 
-        events_title = "Events"
+        events_title = "\u0421\u043e\u0431\u044b\u0442\u0438\u044f"
         if int(events_rows or 0) > 0:
-            events_title = f"{events_title} | {int(events_rows)} row(s)"
+            events_title = f"{events_title} | {int(events_rows)} \u0441\u0442\u0440\u043e\u043a"
         if repair_lane == "qa":
             events_title = f"{events_title}{repair_badge}"
         if target_attr == "dock_events":
             events_title = f"{events_title}{target_badge}"
         self._set_workspace_dock_title("dock_events", events_title)
 
-        ga_title = "Geometry acceptance"
+        ga_title = "\u0413\u0435\u043e\u043c\u0435\u0442\u0440\u0438\u0447\u0435\u0441\u043a\u0430\u044f \u043f\u0440\u0438\u0435\u043c\u043a\u0430"
         ga_cache = dict(getattr(self, "_geometry_acceptance_cache", {}) or {})
         gate_counts = dict(ga_cache.get("gate_counts") or {})
         fail_n = int(gate_counts.get("FAIL", 0) or 0)
         warn_n = int(gate_counts.get("WARN", 0) or 0)
         if fail_n > 0:
-            ga_title = f"{ga_title} | FAIL {fail_n}"
+            ga_title = f"{ga_title} | \u041e\u0442\u043a\u0430\u0437 {fail_n}"
         elif warn_n > 0:
-            ga_title = f"{ga_title} | WARN {warn_n}"
+            ga_title = f"{ga_title} | \u041f\u0440\u0435\u0434\u0443\u043f\u0440. {warn_n}"
         if repair_lane == "qa":
             ga_title = f"{ga_title}{repair_badge}"
         if target_attr == "dock_geometry_acceptance":
@@ -5630,34 +6134,41 @@ class CompareViewer(QtWidgets.QMainWindow):
             causal_story=causal_story,
         )
         focus_labels = {
-            "all": "all",
-            "heatmaps": "heatmaps",
-            "multivariate": "multivar",
-            "qa": "qa/events",
+            "all": "\u043e\u0431\u0437\u043e\u0440",
+            "heatmaps": "\u0442\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u044b",
+            "multivariate": "\u043c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439",
+            "qa": "\u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430/\u0441\u043e\u0431\u044b\u0442\u0438\u044f",
         }
         recommended_focus_label = focus_labels.get(str(recommended_focus), str(recommended_focus or "all"))
 
-        selection_text = f"Runs {len(runs)} | Table {table} | Signals {len(sigs)}"
+        selection_text = (
+            f"\u041f\u0440\u043e\u0433\u043e\u043d\u044b {len(runs)} | "
+            f"\u0422\u0430\u0431\u043b\u0438\u0446\u0430 {table} | "
+            f"\u0421\u0438\u0433\u043d\u0430\u043b\u044b {len(sigs)}"
+        )
         weakest_status = str(repair_summary.get("status_label") or "").strip()
         next_target_status = (
             f"{str(follow_target.get('focus_label') or recommended_focus_label)}: "
             f"{str(follow_target.get('dock_label') or 'dock')}"
         )
         quality_text = (
-            f"Events {events_rows} | {'Trust attention' if trust_visible else 'Trust ok'} | "
-            f"QA {qa_issues} | Next {next_target_status}"
+            f"\u0421\u043e\u0431\u044b\u0442\u0438\u044f {events_rows} | "
+            f"{'\u0414\u043e\u0432\u0435\u0440\u0438\u0435: \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c' if trust_visible else '\u0414\u043e\u0432\u0435\u0440\u0438\u0435: \u043d\u043e\u0440\u043c\u0430'} | "
+            f"\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 {qa_issues} | \u0414\u0430\u043b\u0435\u0435 {next_target_status}"
         )
         if weakest_status:
-            quality_text = f"{quality_text} | Weakest {weakest_status}"
+            quality_text = f"{quality_text} | \u0421\u043b\u0430\u0431\u043e\u0435 \u043c\u0435\u0441\u0442\u043e {weakest_status}"
         layout_text = (
-            f"Focus {self._workspace_focus_label(follow_target=follow_target)} | Lens {self._workspace_analysis_label()} | "
-            f"{anchor_label} | Docks {visible_docks}/{total_docks} | Ref {ref}"
+            f"\u0424\u043e\u043a\u0443\u0441 {self._workspace_focus_label(follow_target=follow_target)} | "
+            f"\u0410\u043d\u0430\u043b\u0438\u0437 {self._workspace_analysis_label()} | "
+            f"{anchor_label} | \u041f\u0430\u043d\u0435\u043b\u0438 {visible_docks}/{total_docks} | "
+            f"\u042d\u0442\u0430\u043b\u043e\u043d {ref}"
         )
         if story_label:
             if story_confidence:
-                layout_text = f"{layout_text} | Story {story_confidence}: {story_label}"
+                layout_text = f"{layout_text} | \u0421\u0446\u0435\u043d\u0430\u0440\u0438\u0439 {story_confidence}: {story_label}"
             else:
-                layout_text = f"{layout_text} | Story {story_label}"
+                layout_text = f"{layout_text} | \u0421\u0446\u0435\u043d\u0430\u0440\u0438\u0439 {story_label}"
 
         try:
             self.lbl_status_selection.setText(selection_text)
@@ -5950,7 +6461,7 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         try:
             if controls is not None and analysis_anchor is not None:
-                self.resizeDocks([controls, analysis_anchor], [340, 980], QtCore.Qt.Horizontal)
+                self.resizeDocks([controls, analysis_anchor], [300, 1080], QtCore.Qt.Horizontal)
         except Exception:
             pass
         try:
@@ -6042,55 +6553,73 @@ class CompareViewer(QtWidgets.QMainWindow):
 
     def _build_view_menu(self) -> None:
         m = self.menuBar()
-        view_menu = m.addMenu("View")
+        view_menu = m.addMenu("\u0412\u0438\u0434")
         self.menu_view = view_menu
 
-        layout_menu = view_menu.addMenu("Layout")
+        layout_menu = view_menu.addMenu("\u0420\u0430\u0441\u043a\u043b\u0430\u0434\u043a\u0430")
         self.menu_view_layout = layout_menu
 
-        self.act_view_reset_workspace = QtGui.QAction("Reset Workspace", self)
+        self.act_view_reset_workspace = QtGui.QAction(
+            "\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c \u0440\u0430\u0441\u043a\u043b\u0430\u0434\u043a\u0443",
+            self,
+        )
         self.act_view_reset_workspace.setObjectName("act_view_reset_workspace")
         self.act_view_reset_workspace.setShortcut("Ctrl+Shift+0")
         self.act_view_reset_workspace.triggered.connect(self._apply_default_workspace_layout)
         layout_menu.addAction(self.act_view_reset_workspace)
 
-        self.act_view_show_all_docks = QtGui.QAction("Show All Docks", self)
+        self.act_view_show_all_docks = QtGui.QAction(
+            "\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u0432\u0441\u0435 \u043f\u0430\u043d\u0435\u043b\u0438",
+            self,
+        )
         self.act_view_show_all_docks.setObjectName("act_view_show_all_docks")
         self.act_view_show_all_docks.triggered.connect(lambda: self._activate_workspace_focus_mode("all"))
         layout_menu.addAction(self.act_view_show_all_docks)
 
         layout_menu.addSeparator()
 
-        self.act_view_focus_heatmaps = QtGui.QAction("Focus Heatmaps", self)
+        self.act_view_focus_heatmaps = QtGui.QAction(
+            "\u0424\u043e\u043a\u0443\u0441: \u0442\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u044b",
+            self,
+        )
         self.act_view_focus_heatmaps.setObjectName("act_view_focus_heatmaps")
         self.act_view_focus_heatmaps.setShortcut("Ctrl+Shift+1")
         self.act_view_focus_heatmaps.triggered.connect(lambda: self._activate_workspace_focus_mode("heatmaps"))
         layout_menu.addAction(self.act_view_focus_heatmaps)
 
-        self.act_view_focus_multivar = QtGui.QAction("Focus Multivariate", self)
+        self.act_view_focus_multivar = QtGui.QAction(
+            "\u0424\u043e\u043a\u0443\u0441: \u043c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439",
+            self,
+        )
         self.act_view_focus_multivar.setObjectName("act_view_focus_multivar")
         self.act_view_focus_multivar.setShortcut("Ctrl+Shift+2")
         self.act_view_focus_multivar.triggered.connect(lambda: self._activate_workspace_focus_mode("multivariate"))
         layout_menu.addAction(self.act_view_focus_multivar)
 
-        self.act_view_focus_qa = QtGui.QAction("Focus QA / Events", self)
+        self.act_view_focus_qa = QtGui.QAction(
+            "\u0424\u043e\u043a\u0443\u0441: \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 / \u0441\u043e\u0431\u044b\u0442\u0438\u044f",
+            self,
+        )
         self.act_view_focus_qa.setObjectName("act_view_focus_qa")
         self.act_view_focus_qa.setShortcut("Ctrl+Shift+3")
         self.act_view_focus_qa.triggered.connect(lambda: self._activate_workspace_focus_mode("qa"))
         layout_menu.addAction(self.act_view_focus_qa)
 
-        self.act_view_focus_hint = QtGui.QAction("Follow Weakest Link", self)
+        self.act_view_focus_hint = QtGui.QAction(
+            "\u041a \u0441\u043b\u0430\u0431\u043e\u043c\u0443 \u043c\u0435\u0441\u0442\u0443",
+            self,
+        )
         self.act_view_focus_hint.setObjectName("act_view_focus_hint")
         self.act_view_focus_hint.setShortcut("Ctrl+Shift+4")
         self.act_view_focus_hint.triggered.connect(self._follow_workspace_heuristic_focus)
         layout_menu.addAction(self.act_view_focus_hint)
 
-        analysis_menu = view_menu.addMenu("Analysis Lens")
+        analysis_menu = view_menu.addMenu("\u0420\u0435\u0436\u0438\u043c \u0430\u043d\u0430\u043b\u0438\u0437\u0430")
         self.menu_view_analysis = analysis_menu
         self._workspace_analysis_action_group = QtGui.QActionGroup(self)
         self._workspace_analysis_action_group.setExclusive(True)
 
-        self.act_view_analysis_one_to_all = QtGui.QAction("1 -> all", self)
+        self.act_view_analysis_one_to_all = QtGui.QAction("1 \u2192 \u0432\u0441\u0435", self)
         self.act_view_analysis_one_to_all.setObjectName("act_view_analysis_one_to_all")
         self.act_view_analysis_one_to_all.setCheckable(True)
         self.act_view_analysis_one_to_all.setShortcut("Ctrl+Alt+1")
@@ -6098,7 +6627,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._workspace_analysis_action_group.addAction(self.act_view_analysis_one_to_all)
         analysis_menu.addAction(self.act_view_analysis_one_to_all)
 
-        self.act_view_analysis_all_to_one = QtGui.QAction("all -> 1", self)
+        self.act_view_analysis_all_to_one = QtGui.QAction("\u0432\u0441\u0435 \u2192 1", self)
         self.act_view_analysis_all_to_one.setObjectName("act_view_analysis_all_to_one")
         self.act_view_analysis_all_to_one.setCheckable(True)
         self.act_view_analysis_all_to_one.setShortcut("Ctrl+Alt+2")
@@ -6106,7 +6635,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._workspace_analysis_action_group.addAction(self.act_view_analysis_all_to_one)
         analysis_menu.addAction(self.act_view_analysis_all_to_one)
 
-        self.act_view_analysis_all_to_all = QtGui.QAction("all -> all", self)
+        self.act_view_analysis_all_to_all = QtGui.QAction("\u0432\u0441\u0435 \u2192 \u0432\u0441\u0435", self)
         self.act_view_analysis_all_to_all.setObjectName("act_view_analysis_all_to_all")
         self.act_view_analysis_all_to_all.setCheckable(True)
         self.act_view_analysis_all_to_all.setShortcut("Ctrl+Alt+3")
@@ -6114,21 +6643,21 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._workspace_analysis_action_group.addAction(self.act_view_analysis_all_to_all)
         analysis_menu.addAction(self.act_view_analysis_all_to_all)
 
-        docks_menu = view_menu.addMenu("Docks")
+        docks_menu = view_menu.addMenu("\u041f\u0430\u043d\u0435\u043b\u0438")
         self.menu_view_docks = docks_menu
         dock_specs = (
-            ("Controls", getattr(self, "dock_controls", None)),
-            ("Δ(t) Heatmap", getattr(self, "dock_heatmap", None)),
-            ("Peak |Δ| Heatmap", getattr(self, "dock_peak_heatmap", None)),
-            ("Valves (open) timeline", getattr(self, "dock_open_timeline", None)),
-            ("Influence(t)", getattr(self, "dock_influence", None)),
-            ("Run metrics", getattr(self, "dock_run_metrics", None)),
-            ("Static (t0) / stroke check", getattr(self, "dock_static_stroke", None)),
-            ("Influence(t) Heatmap", getattr(self, "dock_inflheat", None)),
-            ("Multivariate", getattr(self, "dock_multivar", None)),
-            ("QA", getattr(self, "dock_qa", None)),
-            ("Events", getattr(self, "dock_events", None)),
-            ("Geometry acceptance", getattr(self, "dock_geometry_acceptance", None)),
+            ("\u041f\u0443\u043b\u044c\u0442", getattr(self, "dock_controls", None)),
+            ("\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0394(t)", getattr(self, "dock_heatmap", None)),
+            ("\u041f\u0438\u043a\u0438 |\u0394|", getattr(self, "dock_peak_heatmap", None)),
+            ("\u0425\u043e\u0434 \u043a\u043b\u0430\u043f\u0430\u043d\u043e\u0432", getattr(self, "dock_open_timeline", None)),
+            ("\u0412\u043b\u0438\u044f\u043d\u0438\u0435(t)", getattr(self, "dock_influence", None)),
+            ("\u041c\u0435\u0442\u0440\u0438\u043a\u0438 \u043f\u0440\u043e\u0433\u043e\u043d\u043e\u0432", getattr(self, "dock_run_metrics", None)),
+            ("\u0421\u0442\u0430\u0442\u0438\u043a\u0430 / \u0445\u043e\u0434 \u0448\u0442\u043e\u043a\u0430", getattr(self, "dock_static_stroke", None)),
+            ("\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0432\u043b\u0438\u044f\u043d\u0438\u044f", getattr(self, "dock_inflheat", None)),
+            ("\u041c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439 \u0430\u043d\u0430\u043b\u0438\u0437", getattr(self, "dock_multivar", None)),
+            ("\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430", getattr(self, "dock_qa", None)),
+            ("\u0421\u043e\u0431\u044b\u0442\u0438\u044f", getattr(self, "dock_events", None)),
+            ("\u0413\u0435\u043e\u043c\u0435\u0442\u0440\u0438\u0447\u0435\u0441\u043a\u0430\u044f \u043f\u0440\u0438\u0435\u043c\u043a\u0430", getattr(self, "dock_geometry_acceptance", None)),
         )
         for text, dock in dock_specs:
             if not isinstance(dock, QtWidgets.QDockWidget):
@@ -12432,12 +12961,12 @@ class CompareViewer(QtWidgets.QMainWindow):
     def _events_dock_route_label(self, subtarget: str, *, short: bool = False) -> str:
         key = str(subtarget or "").strip()
         mapping = {
-            "Table": "Events",
-            "Timeline": "Events timeline" if not short else "Timeline",
-            "Mismatch vs ref": "Event mismatch" if not short else "Mismatch",
-            "Runs raster": "Runs raster",
+            "Table": "\u0421\u043e\u0431\u044b\u0442\u0438\u044f",
+            "Timeline": "\u041b\u0435\u043d\u0442\u0430 \u0441\u043e\u0431\u044b\u0442\u0438\u0439" if not short else "\u041b\u0435\u043d\u0442\u0430",
+            "Mismatch vs ref": "\u041e\u0442\u043a\u043b\u043e\u043d\u0435\u043d\u0438\u044f \u043e\u0442 \u044d\u0442\u0430\u043b\u043e\u043d\u0430" if not short else "\u041e\u0442\u043a\u043b\u043e\u043d\u0435\u043d\u0438\u044f",
+            "Runs raster": "\u0420\u0430\u0441\u0442\u0440 \u043f\u0440\u043e\u0433\u043e\u043d\u043e\u0432",
         }
-        return str(mapping.get(key, "Events") or "Events")
+        return str(mapping.get(key, "\u0421\u043e\u0431\u044b\u0442\u0438\u044f") or "\u0421\u043e\u0431\u044b\u0442\u0438\u044f")
 
     def _set_events_dock_tab(self, subtarget: str) -> bool:
         tabs = getattr(self, "tabs_events_panel", None)

@@ -456,8 +456,8 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
             DesktopInputFieldSpec("макс_число_внутренних_шагов_на_dt", "Макс. внутренних шагов на dt", "шагов", "Защита от зависания интегратора на одном шаге dt.", control="int", min_value=1000, max_value=1000000, step=1000, digits=0),
             DesktopInputFieldSpec("autoverif_enable", "Включить автопроверку", "", "Проверять физические и численные ограничения после расчёта.", control="bool"),
             DesktopInputFieldSpec("mechanics_selfcheck", "Включить самопроверку механики", "", "Проверять кинематику и механические ограничения.", control="bool"),
-            DesktopInputFieldSpec("пружина_длина_солид_м", "Solid length пружины", "мм", "Справочная длина пружины в сомкнутом состоянии.", min_value=0.0, max_value=400.0, step=1.0, ui_scale=1000.0, digits=0),
-            DesktopInputFieldSpec("пружина_запас_до_coil_bind_минимум_м", "Минимальный запас до coil bind", "мм", "Допустимый минимальный запас до coil bind для reference-проверок.", min_value=0.0, max_value=120.0, step=1.0, ui_scale=1000.0, digits=0),
+            DesktopInputFieldSpec("пружина_длина_солид_м", "Сомкнутая длина пружины", "мм", "Справочная длина пружины в полностью сомкнутом состоянии.", min_value=0.0, max_value=400.0, step=1.0, ui_scale=1000.0, digits=0),
+            DesktopInputFieldSpec("пружина_запас_до_coil_bind_минимум_м", "Минимальный запас до смыкания витков", "мм", "Допустимый минимальный запас до смыкания витков для справочных проверок.", min_value=0.0, max_value=120.0, step=1.0, ui_scale=1000.0, digits=0),
         ),
     ),
 )
@@ -980,9 +980,9 @@ def evaluate_desktop_section_readiness(
     if _safe_float(current, "макс_число_внутренних_шагов_на_dt") < 1000.0:
         reference_issues.append("лимит внутренних шагов")
     if _safe_float(current, "пружина_длина_солид_м") < 0.0:
-        reference_issues.append("solid length пружины")
+        reference_issues.append("сомкнутая длина пружины")
     if _safe_float(current, "пружина_запас_до_coil_bind_минимум_м") < 0.0:
-        reference_issues.append("запас до coil bind")
+        reference_issues.append("запас до смыкания витков")
     if (not _safe_bool(current, "autoverif_enable")) and (not _safe_bool(current, "mechanics_selfcheck")):
         reference_issues.append("выключены все инженерные проверки")
     rows.append(
@@ -1245,15 +1245,15 @@ _SECTION_ISSUE_FOCUS_MAP = {
             "Лимит внутренних шагов",
             "Лимит внутренних шагов слишком мал для устойчивого расчёта.",
         ),
-        "solid length пружины": _issue_focus_entry(
+        "сомкнутая длина пружины": _issue_focus_entry(
             "пружина_длина_солид_м",
-            "Solid length пружины",
-            "Solid length пружины не может быть отрицательной.",
+            "Сомкнутая длина пружины",
+            "Сомкнутая длина пружины не может быть отрицательной.",
         ),
-        "запас до coil bind": _issue_focus_entry(
+        "запас до смыкания витков": _issue_focus_entry(
             "пружина_запас_до_coil_bind_минимум_м",
-            "Запас до coil bind",
-            "Запас до coil bind не может быть отрицательным.",
+            "Запас до смыкания витков",
+            "Запас до смыкания витков не может быть отрицательным.",
         ),
         "выключены все инженерные проверки": _issue_focus_entry(
             "autoverif_enable",
@@ -1444,7 +1444,7 @@ def build_desktop_section_summary_cards(
             "details": (
                 f"Autoverif {_fmt_bool_flag(current.get('autoverif_enable'))}; "
                 f"mech selfcheck {_fmt_bool_flag(current.get('mechanics_selfcheck'))}; "
-                f"coil bind {_fmt_mm_from_m(current.get('пружина_запас_до_coil_bind_минимум_м'))}. "
+                f"запас до смыкания {_fmt_mm_from_m(current.get('пружина_запас_до_coil_bind_минимум_м'))}. "
                 f"{reference_detail}"
             ),
             **reference_focus,

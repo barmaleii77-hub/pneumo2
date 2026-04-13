@@ -167,6 +167,10 @@ class App:
         self.open_send_gui = BooleanVar(value=False)
         self.auto_open_folder = BooleanVar(value=False)
         self.continue_on_failure = BooleanVar(value=True)
+        self.context_summary = StringVar(
+            value="Слева настройки прогона, справа журнал и быстрый переход к результатам."
+        )
+        self.status = StringVar(value="Готов.")
 
         self.q: "queue.Queue[str]" = queue.Queue()
         self.state = RunState()
@@ -177,9 +181,24 @@ class App:
 
     def _build_ui(self) -> None:
         pad = 10
+        header = ttk.Frame(self.root, padding=(pad, pad, pad, 0))
+        header.pack(fill="x")
+        title_box = ttk.Frame(header)
+        title_box.pack(side="left", fill="x", expand=True)
+        ttk.Label(title_box, text="Центр тестов и проверки результатов", font=("Segoe UI", 14, "bold")).pack(anchor="w")
+        ttk.Label(
+            title_box,
+            textvariable=self.context_summary,
+            wraplength=760,
+            justify="left",
+        ).pack(anchor="w", pady=(4, 0))
+        header_actions = ttk.Frame(header)
+        header_actions.pack(side="right", anchor="ne")
+        ttk.Button(header_actions, text="Тесты", command=lambda: self.notebook.select(0)).pack(side="left")
+        ttk.Button(header_actions, text="Результаты", command=lambda: self.notebook.select(self.results_center)).pack(side="left", padx=(8, 0))
 
         self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill="both", expand=True)
+        self.notebook.pack(fill="both", expand=True, padx=pad, pady=(8, 0))
 
         run_tab = ttk.Frame(self.notebook)
         self.results_center = DesktopResultsCenter(
@@ -189,25 +208,34 @@ class App:
         self.notebook.add(run_tab, text="Тесты и проверка")
         self.notebook.add(self.results_center, text="Результаты и анализ")
 
-        run_split = ttk.Panedwindow(run_tab, orient="vertical")
+        run_split = ttk.Panedwindow(run_tab, orient="horizontal")
         run_split.pack(fill="both", expand=True)
         config_scroll = ScrollableFrame(run_split)
-        run_split.add(config_scroll, weight=0)
+        run_split.add(config_scroll, weight=2)
         log_frame = ttk.LabelFrame(run_split, text="Журнал выполнения", padding=pad)
-        run_split.add(log_frame, weight=1)
+        run_split.add(log_frame, weight=4)
         config_body = config_scroll.body
         config_body.columnconfigure(0, weight=1)
 
-        top = ttk.Frame(config_body, padding=pad)
-        top.pack(fill="x")
+        summary_box = ttk.LabelFrame(config_body, text="Контекст", padding=pad)
+        summary_box.pack(fill="x", padx=pad, pady=(pad, pad))
+        ttk.Label(
+            summary_box,
+            textvariable=self.context_summary,
+            wraplength=320,
+            justify="left",
+        ).pack(anchor="w")
+
+        top = ttk.LabelFrame(config_body, text="Что запускать", padding=pad)
+        top.pack(fill="x", padx=pad)
 
         ttk.Label(top, text="Что запускать:").grid(row=0, column=0, sticky="w")
         ttk.Checkbutton(top, text="Автотест", variable=self.do_autotest).grid(row=0, column=1, sticky="w", padx=(8, 0))
         ttk.Checkbutton(top, text="Полная диагностика", variable=self.do_diagnostics).grid(row=0, column=2, sticky="w", padx=(8, 0))
 
         # Levels
-        lvl = ttk.Frame(config_body, padding=(pad, 0, pad, pad))
-        lvl.pack(fill="x")
+        lvl = ttk.LabelFrame(config_body, text="Уровни и режим", padding=pad)
+        lvl.pack(fill="x", padx=pad, pady=(0, pad))
 
         ttk.Label(lvl, text="Уровень автотеста:").grid(row=0, column=0, sticky="w")
         ttk.Combobox(lvl, textvariable=self.autotest_level, values=["quick", "standard", "full"], width=12, state="readonly").grid(row=0, column=1, sticky="w", padx=(6, 16))
@@ -243,8 +271,8 @@ class App:
         aft.columnconfigure(3, weight=1)
 
         # Buttons
-        btns = ttk.Frame(config_body, padding=(pad, 0, pad, pad))
-        btns.pack(fill="x")
+        btns = ttk.LabelFrame(config_body, text="Команды", padding=pad)
+        btns.pack(fill="x", padx=pad, pady=(0, pad))
         self.btn_run = ttk.Button(btns, text="▶ Запустить автономное тестирование", command=self._on_run)
         self.btn_run.pack(side="left")
 
@@ -259,8 +287,6 @@ class App:
             text="Результаты и анализ",
             command=lambda: self.notebook.select(self.results_center),
         ).pack(side="left", padx=(8, 0))
-
-        self.status = StringVar(value="Готов.")
         ttk.Label(btns, textvariable=self.status).pack(side="right")
 
         output_body, self.text = build_scrolled_text(log_frame, wrap="word", height=16)

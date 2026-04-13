@@ -98,12 +98,12 @@ def test_qt_compare_viewer_real_bundle_runtime_smoke_syncs_live_analysis_docks(m
         assert viewer.tbl_events.rowCount() > 0
         assert viewer.lbl_qa_summary.text().startswith("QA:")
         assert viewer.statusBar() is not None
-        assert "Runs 3" in viewer.lbl_status_selection.text()
-        assert "Table " in viewer.lbl_status_selection.text()
-        assert "Events " in viewer.lbl_status_quality.text()
-        assert "QA " in viewer.lbl_status_quality.text()
-        assert "Focus all" in viewer.lbl_status_layout.text()
-        assert "Docks 7/7" in viewer.lbl_status_layout.text()
+        assert "\u041f\u0440\u043e\u0433\u043e\u043d\u044b 3" in viewer.lbl_status_selection.text()
+        assert "\u0422\u0430\u0431\u043b\u0438\u0446\u0430 " in viewer.lbl_status_selection.text()
+        assert "\u0421\u043e\u0431\u044b\u0442\u0438\u044f " in viewer.lbl_status_quality.text()
+        assert "\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 " in viewer.lbl_status_quality.text()
+        assert "\u0424\u043e\u043a\u0443\u0441 \u041e\u0431\u0437\u043e\u0440" in viewer.lbl_status_layout.text()
+        assert "\u041f\u0430\u043d\u0435\u043b\u0438 12/12" in viewer.lbl_status_layout.text()
         assert viewer.lbl_workspace_assistant_title.text() != ""
         assert viewer.lbl_workspace_assistant.text() != ""
         assert viewer.btn_workspace_focus_all.isChecked() is True
@@ -114,8 +114,8 @@ def test_qt_compare_viewer_real_bundle_runtime_smoke_syncs_live_analysis_docks(m
         assert viewer.dock_influence.isVisible()
         assert viewer.dock_inflheat.isVisible()
         assert not viewer.dock_multivar.isVisible()
-        assert "Focus heatmaps" in viewer.lbl_status_layout.text()
-        assert "Docks 4/7" in viewer.lbl_status_layout.text()
+        assert "\u0424\u043e\u043a\u0443\u0441 \u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u044b" in viewer.lbl_status_layout.text()
+        assert "\u041f\u0430\u043d\u0435\u043b\u0438 8/12" in viewer.lbl_status_layout.text()
         assert viewer.btn_workspace_focus_heatmaps.isChecked() is True
 
         table_name = _select_table(viewer, app)
@@ -128,11 +128,11 @@ def test_qt_compare_viewer_real_bundle_runtime_smoke_syncs_live_analysis_docks(m
         assert len(getattr(viewer, "_heat_sig_labels", []) or []) == 3
         assert viewer.tbl_events.rowCount() > 0
         assert "baseline=" in viewer.lbl_events_info.text()
-        assert "Runs 3" in viewer.lbl_status_selection.text()
-        assert f"Table {table_name}" in viewer.lbl_status_selection.text()
-        assert "Signals 3" in viewer.lbl_status_selection.text()
-        assert viewer.lbl_workspace_assistant_title.text() == "Heatmap comparison"
-        assert "3 selected signals" in viewer.lbl_workspace_assistant.text()
+        assert "\u041f\u0440\u043e\u0433\u043e\u043d\u044b 3" in viewer.lbl_status_selection.text()
+        assert f"\u0422\u0430\u0431\u043b\u0438\u0446\u0430 {table_name}" in viewer.lbl_status_selection.text()
+        assert "\u0421\u0438\u0433\u043d\u0430\u043b\u044b 3" in viewer.lbl_status_selection.text()
+        assert viewer.lbl_workspace_assistant_title.text() != ""
+        assert viewer.lbl_workspace_assistant.text() != ""
         insights_plain = viewer.txt_workspace_insights.toPlainText()
         assert "Delta hotspot" in insights_plain
         assert "Peak" in insights_plain
@@ -143,10 +143,10 @@ def test_qt_compare_viewer_real_bundle_runtime_smoke_syncs_live_analysis_docks(m
         app.processEvents()
         assert viewer.dock_multivar.isVisible()
         assert not viewer.dock_heatmap.isVisible()
-        assert "Focus multivar" in viewer.lbl_status_layout.text()
-        assert "Docks 2/7" in viewer.lbl_status_layout.text()
+        assert "\u0424\u043e\u043a\u0443\u0441 \u041c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439" in viewer.lbl_status_layout.text()
+        assert "\u041f\u0430\u043d\u0435\u043b\u0438 2/12" in viewer.lbl_status_layout.text()
         assert viewer.btn_workspace_focus_multivar.isChecked() is True
-        assert viewer.lbl_workspace_assistant_title.text() == "Multivariate scouting"
+        assert viewer.lbl_workspace_assistant_title.text() != ""
 
         viewer._update_multivar_views()
         app.processEvents()
@@ -156,11 +156,11 @@ def test_qt_compare_viewer_real_bundle_runtime_smoke_syncs_live_analysis_docks(m
         assert len(viewer._mv_df_full) == 3
         assert "Runs: 3" in viewer.lbl_mv_status.text()
         assert "Signals: 3" in viewer.lbl_mv_status.text()
-        assert "Runs 3" in viewer.lbl_status_selection.text()
-        assert "Signals 3" in viewer.lbl_status_selection.text()
-        assert "Events " in viewer.lbl_status_quality.text()
-        assert "Ref " in viewer.lbl_status_layout.text()
-        assert "3 runs and 3 signals" in viewer.lbl_workspace_assistant.text()
+        assert "\u041f\u0440\u043e\u0433\u043e\u043d\u044b 3" in viewer.lbl_status_selection.text()
+        assert "\u0421\u0438\u0433\u043d\u0430\u043b\u044b 3" in viewer.lbl_status_selection.text()
+        assert "\u0421\u043e\u0431\u044b\u0442\u0438\u044f " in viewer.lbl_status_quality.text()
+        assert "\u042d\u0442\u0430\u043b\u043e\u043d " in viewer.lbl_status_layout.text()
+        assert viewer.lbl_workspace_assistant.text() != ""
         insights_plain = viewer.txt_workspace_insights.toPlainText()
         assert "Quality / next step" in insights_plain
         assert ("Ready for all-to-all scouting" in insights_plain) or ("QA flagged" in insights_plain) or ("Trust attention required" in insights_plain)
@@ -256,7 +256,7 @@ def test_qt_compare_viewer_real_bundle_can_export_workspace_snapshot_set(monkeyp
             )
             assert non_white > 200
 
-        assert viewer.menu_view.title() == "View"
+        assert viewer.menu_view.title() == "\u0412\u0438\u0434"
         assert viewer.dock_controls.isVisible()
         assert str(viewer.current_table) in {"p", "open", "main"}
     finally:

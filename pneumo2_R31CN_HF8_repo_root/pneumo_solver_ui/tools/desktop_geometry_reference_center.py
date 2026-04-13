@@ -52,6 +52,10 @@ class DesktopGeometryReferenceCenter:
             master=self.root,
             value="Справочный центр готов: геометрия, цилиндры, пружины и инженерные подсказки собраны в одном окне.",
         )
+        self.context_summary_var = tk.StringVar(
+            master=self.root,
+            value="Контекст: слева источник и переходы, справа рабочие вкладки по подвеске, цилиндрам, пружинам и параметрам.",
+        )
         self.geometry_summary_var = tk.StringVar(master=self.root)
         self.component_fit_summary_var = tk.StringVar(master=self.root)
         self.dw_min_var = tk.DoubleVar(master=self.root, value=-100.0)
@@ -96,33 +100,53 @@ class DesktopGeometryReferenceCenter:
         outer = ttk.Frame(self.root, padding=10)
         outer.pack(fill="both", expand=True)
 
+        header = ttk.Frame(outer)
+        header.pack(fill="x", pady=(0, 8))
+        title_box = ttk.Frame(header)
+        title_box.pack(side="left", fill="x", expand=True)
         ttk.Label(
-            outer,
+            title_box,
             text="Справочный центр геометрии и компонентов",
             font=("Segoe UI", 16, "bold"),
         ).pack(anchor="w")
         ttk.Label(
-            outer,
-            text=(
-                "Отдельный справочно-инженерный рабочий центр для анализа геометрии подвески, "
-                "подбора цилиндров, расчёта геометрии пружин и быстрого доступа к параметрам. "
-                "Центр не редактирует исходные данные напрямую и не повторяет web-компоновку; он помогает принимать инженерные решения."
-            ),
-            wraplength=1420,
+            title_box,
+            textvariable=self.context_summary_var,
+            wraplength=820,
             justify="left",
-        ).pack(anchor="w", pady=(6, 10))
+        ).pack(anchor="w", pady=(2, 0))
 
-        source = ttk.LabelFrame(outer, text="Источник опорных данных", padding=10)
-        source.pack(fill="x", expand=False)
+        header_actions = ttk.Frame(header)
+        header_actions.pack(side="right", anchor="ne")
+        ttk.Button(header_actions, text="Подвеска", command=lambda: self.notebook.select(0)).pack(side="left")
+        ttk.Button(header_actions, text="Цилиндры", command=lambda: self.notebook.select(1)).pack(side="left", padx=(8, 0))
+        ttk.Button(header_actions, text="Пружины", command=lambda: self.notebook.select(2)).pack(side="left", padx=(8, 0))
+        ttk.Button(header_actions, text="Параметры", command=lambda: self.notebook.select(3)).pack(side="left", padx=(8, 0))
+        ttk.Button(header_actions, text="Обновить", command=self.refresh_all).pack(side="left", padx=(12, 0))
+
+        workspace = ttk.Panedwindow(outer, orient="horizontal")
+        workspace.pack(fill="both", expand=True)
+
+        sidebar = ttk.Frame(workspace, padding=(0, 0, 8, 0))
+        sidebar.columnconfigure(0, weight=1)
+
+        source = ttk.LabelFrame(sidebar, text="Источник", padding=10)
         source.columnconfigure(1, weight=1)
         ttk.Label(source, text="Базовый JSON:").grid(row=0, column=0, sticky="w")
         ttk.Entry(source, textvariable=self.base_path_var).grid(row=0, column=1, sticky="ew", padx=8)
         ttk.Button(source, text="Выбрать...", command=self._browse_base_path).grid(row=0, column=2, padx=(0, 6))
         ttk.Button(source, text="По умолчанию", command=self._use_default_base).grid(row=0, column=3, padx=(0, 6))
         ttk.Button(source, text="Обновить всё", command=self.refresh_all).grid(row=0, column=4)
+        source.pack(fill="x", expand=False)
 
-        self.notebook = ttk.Notebook(outer)
-        self.notebook.pack(fill="both", expand=True, pady=(10, 0))
+        quick = ttk.LabelFrame(sidebar, text="Переходы", padding=8)
+        quick.pack(fill="x", pady=(8, 0))
+        ttk.Button(quick, text="Подвеска", command=lambda: self.notebook.select(0)).pack(fill="x")
+        ttk.Button(quick, text="Цилиндры", command=lambda: self.notebook.select(1)).pack(fill="x", pady=(6, 0))
+        ttk.Button(quick, text="Пружины", command=lambda: self.notebook.select(2)).pack(fill="x", pady=(6, 0))
+        ttk.Button(quick, text="Параметры", command=lambda: self.notebook.select(3)).pack(fill="x", pady=(6, 0))
+
+        self.notebook = ttk.Notebook(workspace)
 
         geometry_tab_host, self.geometry_tab = create_scrollable_tab(self.notebook, padding=10)
         cylinder_tab_host, self.cylinder_tab = create_scrollable_tab(self.notebook, padding=10)
@@ -137,6 +161,8 @@ class DesktopGeometryReferenceCenter:
         self._build_cylinder_tab(family_names=family_names)
         self._build_spring_tab(family_names=family_names)
         self._build_guide_tab()
+        workspace.add(sidebar, weight=1)
+        workspace.add(self.notebook, weight=5)
 
         footer = build_status_strip(outer, primary_var=self.status_var, reserve_columns=1)
         footer.pack(fill="x", pady=(10, 0))

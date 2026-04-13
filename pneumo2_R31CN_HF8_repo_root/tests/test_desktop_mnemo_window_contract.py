@@ -25,7 +25,7 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert "prefer_selected: bool = False" in src
     assert "startup_time_s: float | None = None" in src
     assert "startup_time_label: str = \"\"" in src
-    assert 'self.startup_banner_action = QtGui.QAction("Onboarding", self)' in src
+    assert 'self.startup_banner_action = QtGui.QAction("Стартовая панель", self)' in src
     assert "focus_requested = QtCore.Signal()" in src
     assert 'self.startup_banner.focus_requested.connect(self._apply_onboarding_focus)' in src
     assert "Скрыть onboarding" in src
@@ -37,8 +37,8 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert "MnemoEventTracker" in src
     assert "Диагностические сценарии" in src
     assert "Латчи и события" in src
-    assert "ACK события" in src
-    assert "Reset события" in src
+    assert "Подтвердить события" in src
+    assert "Сбросить события" in src
     assert "Экспорт событий" in src
     assert "_write_event_log_sidecar" in src
     assert "desktop_mnemo_events.json" in src
@@ -50,7 +50,7 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert 'self.native_canvas = MnemoNativeCanvas(self)' in src
     assert "self.native_canvas.focus_step_jump_requested.connect(self.focus_step_jump_requested.emit)" in src
     assert 'self.setObjectName("mnemo_native_canvas")' in src
-    assert 'self.mode_badge = QtWidgets.QLabel("Native Canvas", header)' in src
+    assert 'self.mode_badge = QtWidgets.QLabel("Схема", header)' in src
     assert "self.native_canvas.set_alerts(alerts)" in src
     assert "self.native_canvas.set_diagnostics(diagnostics)" in src
     assert "self.native_canvas.set_focus_region(focus_region)" in src
@@ -58,9 +58,10 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert "self.native_canvas.set_display_modes(" in src
     assert 'self.fidelity_panel.render(self.dataset)' in src
     assert 'self._central_layout.addWidget(self.mnemo_view, 1)' in src
+    assert 'self._set_startup_banner_visible(False)' in src
     assert "self.mnemo_view.focus_step_jump_requested.connect(self._jump_to_focus_step)" in src
     assert "Desktop Mnemo switched to native Qt canvas." in src
-    assert "wheel = zoom, drag = pan, click = select" in src
+    assert "Колесо — масштаб, перетаскивание — панорама, щелчок — выбор элемента" in src
     assert "QtSvg.QSvgRenderer" in src
     assert "CANONICAL_PNEUMO_SCHEME_SVG_PATHS" in src
     assert "SOURCE_OF_TRUTH_PNEUMO_IMAGE_PATH" in src
@@ -85,6 +86,9 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert "self.reference_scheme_action.toggled.connect(self._toggle_reference_scheme)" in src
     assert "def _toggle_reference_scheme(self, checked: bool) -> None:" in src
     assert "def set_reference_scheme_visible(self, visible: bool) -> bool:" in src
+    assert "def _apply_default_workplace_layout(self) -> None:" in src
+    assert "self.tabifyDockWidget(self._selection_dock, self._guide_dock)" in src
+    assert "self.resizeDocks([self._overview_dock, self._selection_dock], [320, 360], QtCore.Qt.Horizontal)" in src
     assert "self._reference_svg_renderer: Any = None" in src
     assert "self._show_reference_scheme = True" in src
     assert 'self._hover_focus_edge = ""' in src
@@ -215,7 +219,7 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert 'self.detail_combo.addItem("Тихо", "quiet")' in src
     assert 'self.detail_combo.addItem("Оператор", "operator")' in src
     assert 'self.detail_combo.addItem("Полно", "full")' in src
-    assert 'detail_menu = view_menu.addMenu("Плотность overlays")' in src
+    assert 'detail_menu = view_menu.addMenu("Насыщенность наложений")' in src
     assert "def _set_flow_display_mode(self, mode: str, *, announce: bool) -> str:" in src
     assert "def _set_pressure_display_mode(self, mode: str, *, announce: bool) -> str:" in src
     assert "def _flow_unit_changed(self, index: int) -> None:" in src

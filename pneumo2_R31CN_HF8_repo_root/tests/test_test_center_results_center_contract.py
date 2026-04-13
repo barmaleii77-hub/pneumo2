@@ -46,6 +46,31 @@ def test_desktop_results_center_browse_filter_matches_category_and_query() -> No
     assert not _artifact_matches_filters(artifact, category="validation", query="animator")
 
 
+def test_desktop_results_center_uses_split_workspace_and_scrollable_summary_panel() -> None:
+    src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_results_center.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert 'workspace = ttk.Panedwindow(self, orient="horizontal")' in src
+    assert 'left_pane = ttk.Panedwindow(left_column, orient="vertical")' in src
+    assert 'right_pane = ttk.Panedwindow(right_column, orient="vertical")' in src
+    assert "summary_host = ScrollableFrame(right_pane)" in src
+    assert 'ttk.Sizegrip(footer).pack(side="right")' in src
+
+
+def test_test_center_gui_uses_left_controls_and_right_log_workspace() -> None:
+    tool_src = (UI_ROOT / "tools" / "test_center_gui.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert 'run_split = ttk.Panedwindow(run_tab, orient="horizontal")' in tool_src
+    assert 'summary_box = ttk.LabelFrame(config_body, text="Контекст", padding=pad)' in tool_src
+    assert 'btns = ttk.LabelFrame(config_body, text="Команды", padding=pad)' in tool_src
+    assert 'ttk.Button(header_actions, text="Результаты", command=lambda: self.notebook.select(self.results_center)).pack(side="left", padx=(8, 0))' in tool_src
+
+
 def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_path: Path, monkeypatch) -> None:
     repo_root = tmp_path / "repo"
     send_bundles = repo_root / "send_bundles"

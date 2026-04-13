@@ -212,6 +212,20 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "self.root.after_cancel(self._poll_after_id)" in center_src
 
 
+def test_desktop_diagnostics_center_uses_split_workspace_and_sidebar_actions() -> None:
+    center_src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_diagnostics_center.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert 'workspace = ttk.Panedwindow(outer, orient="horizontal")' in center_src
+    assert 'context_box = ttk.LabelFrame(sidebar, text="Состояние", padding=8)' in center_src
+    assert 'quick_box = ttk.LabelFrame(sidebar, text="Быстрые действия", padding=8)' in center_src
+    assert 'ttk.Button(header_actions, text="Диагностика", command=lambda: self.notebook.select(self.diag_tab)).pack(side="left")' in center_src
+    assert "def _start_run(self) -> None:" in center_src
+    assert "def _open_bundle_dir(self) -> None:" in center_src
+
+
 def test_test_center_integration_reuses_existing_latest_bundle_when_opening_send_center() -> None:
     src = (ROOT / "pneumo_solver_ui" / "tools" / "test_center_gui.py").read_text(
         encoding="utf-8",

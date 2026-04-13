@@ -144,6 +144,9 @@ class DesktopDiagnosticsCenter:
 
         self.status_var = StringVar(value="Готово. Откройте нужный этап в одном инженерном центре.")
         self.machine_state_var = StringVar(value="")
+        self.context_summary_var = StringVar(
+            value="Контекст: диагностика, сборка пакета и отправка доступны в одном окне."
+        )
         self.send_title_var = StringVar(value="ZIP для отправки в чат ещё не готов.")
         self.send_path_var = StringVar(value="(ещё не готово)")
         self.send_meta_var = StringVar(value="")
@@ -222,24 +225,70 @@ class DesktopDiagnosticsCenter:
     def _build_ui(self) -> None:
         outer = ttk.Frame(self.root, padding=12)
         outer.pack(fill="both", expand=True)
-
+        header = ttk.Frame(outer)
+        header.pack(fill="x", pady=(0, 8))
+        title_box = ttk.Frame(header)
+        title_box.pack(side="left", fill="x", expand=True)
         ttk.Label(
-            outer,
+            title_box,
             text="Центр диагностики и отправки",
             font=("Segoe UI", 15, "bold"),
         ).pack(anchor="w")
         ttk.Label(
-            outer,
-            text=(
-                "Единый рабочий центр для полной диагностики, сборки пакета отправки, сводки, "
-                "проверки состояния и передачи результатов без возврата в web-интерфейс."
-            ),
-            wraplength=980,
+            title_box,
+            textvariable=self.context_summary_var,
+            wraplength=720,
             justify="left",
-        ).pack(anchor="w", pady=(4, 10))
+        ).pack(anchor="w", pady=(2, 0))
 
-        self.notebook = ttk.Notebook(outer)
-        self.notebook.pack(fill="both", expand=True)
+        header_actions = ttk.Frame(header)
+        header_actions.pack(side="right", anchor="ne")
+        ttk.Button(header_actions, text="Диагностика", command=lambda: self.notebook.select(self.diag_tab)).pack(side="left")
+        ttk.Button(header_actions, text="Пакет", command=lambda: self.notebook.select(self.bundle_tab)).pack(side="left", padx=(8, 0))
+        ttk.Button(header_actions, text="Отправка", command=lambda: self.notebook.select(self.send_tab)).pack(side="left", padx=(8, 0))
+        ttk.Button(
+            header_actions,
+            text="Обновить",
+            command=lambda: self._refresh_bundle_views(regenerate_reports=False),
+        ).pack(side="left", padx=(12, 0))
+
+        workspace = ttk.Panedwindow(outer, orient="horizontal")
+        workspace.pack(fill="both", expand=True)
+
+        sidebar = ttk.Frame(workspace, padding=(0, 0, 8, 0))
+        sidebar.columnconfigure(0, weight=1)
+        context_box = ttk.LabelFrame(sidebar, text="Состояние", padding=8)
+        context_box.pack(fill="x")
+        ttk.Label(
+            context_box,
+            textvariable=self.machine_state_var,
+            wraplength=260,
+            justify="left",
+        ).pack(anchor="w")
+        quick_box = ttk.LabelFrame(sidebar, text="Быстрые действия", padding=8)
+        quick_box.pack(fill="x", pady=(8, 0))
+        ttk.Button(
+            quick_box,
+            text="Запустить диагностику",
+            command=self._start_run,
+        ).pack(fill="x")
+        ttk.Button(
+            quick_box,
+            text="Собрать пакет",
+            command=lambda: self._start_bundle_build(auto_copy_on_ready=False),
+        ).pack(fill="x", pady=(6, 0))
+        ttk.Button(
+            quick_box,
+            text="Открыть последний ZIP",
+            command=self._open_latest_bundle,
+        ).pack(fill="x", pady=(6, 0))
+        ttk.Button(
+            quick_box,
+            text="Открыть каталог",
+            command=self._open_bundle_dir,
+        ).pack(fill="x", pady=(6, 0))
+
+        self.notebook = ttk.Notebook(workspace)
 
         self.diag_tab, self.diag_body = create_scrollable_tab(self.notebook, padding=8)
         self.bundle_tab, self.bundle_body = create_scrollable_tab(self.notebook, padding=8)
@@ -252,6 +301,8 @@ class DesktopDiagnosticsCenter:
         self._build_bundle_tab()
         self._build_send_tab()
         self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed, add="+")
+        workspace.add(sidebar, weight=1)
+        workspace.add(self.notebook, weight=4)
 
         footer = build_status_strip(
             outer,
@@ -571,6 +622,14 @@ class DesktopDiagnosticsCenter:
         self._external_state_signature = self._compute_external_state_signature()
 
     def _on_tab_changed(self, _event=None) -> None:
+        try:
+            current = self.notebook.tab(self.notebook.select(), "text")
+        except Exception:
+            current = ""
+        if current:
+            self.context_summary_var.set(
+                f"Контекст: активная вкладка «{current}». Слева быстрые действия, справа рабочая область."
+            )
         if self._last_bundle_record is None:
             return
         try:
@@ -578,6 +637,16 @@ class DesktopDiagnosticsCenter:
         except Exception:
             summary_text = self._render_summary_text(self._last_bundle_record, bundle_out_dir=self._active_bundle_out_dir())
         self._write_center_state_snapshot(self._last_bundle_record, summary_text=summary_text)
+
+    def _start_run(self) -> None:
+        try:
+            self.notebook.select(self.diag_tab)
+        except Exception:
+            pass
+        self._run()
+
+    def _open_bundle_dir(self) -> None:
+        self._open_bundle_out_dir()
 
     def _pick_osc_dir(self) -> None:
         picked = filedialog.askdirectory(title="Выберите папку osc_dir (NPZ)")

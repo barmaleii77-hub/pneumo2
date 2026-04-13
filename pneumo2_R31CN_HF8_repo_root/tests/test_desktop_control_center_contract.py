@@ -68,3 +68,16 @@ def test_root_desktop_control_center_wrappers_delegate_to_launcher() -> None:
     assert 'Path(__file__).with_name("START_DESKTOP_CONTROL_CENTER.py")' in pyw
     assert "ensure_root_launcher_runtime" in py
     assert 'MODULE = "pneumo_solver_ui.tools.desktop_control_center"' in py
+
+
+def test_desktop_control_center_uses_list_detail_workspace_instead_of_cards() -> None:
+    src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_control_center.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert 'workspace = ttk.Panedwindow(outer, orient="horizontal")' in src
+    assert 'list_box = ttk.LabelFrame(left, text="Инженерные окна", padding=8)' in src
+    assert 'right_split = ttk.Panedwindow(right, orient="vertical")' in src
+    assert 'tree_frame, self.tree = build_scrolled_treeview(' in src
+    assert "def _launch_selected_target(self) -> None:" in src

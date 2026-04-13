@@ -32,6 +32,18 @@ def test_desktop_optimizer_center_is_registered_as_hosted_shell_tool() -> None:
     assert "pneumo_solver_ui.tools.desktop_optimizer_center" in catalog_modules
 
 
+def test_desktop_optimizer_center_uses_workspace_layout_instead_of_big_intro_panels() -> None:
+    src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_optimizer_center.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert 'workspace = ttk.Panedwindow(outer, orient="horizontal")' in src
+    assert 'context_frame = ttk.LabelFrame(sidebar, text="Контекст", padding=8)' in src
+    assert 'nav_frame = ttk.LabelFrame(sidebar, text="Переходы", padding=8)' in src
+    assert 'ttk.Sizegrip(footer).pack(side="right", padx=(10, 0))' in src
+
+
 def test_root_desktop_optimizer_center_wrappers_delegate_to_launcher() -> None:
     cmd = (ROOT / "START_DESKTOP_OPTIMIZER_CENTER.cmd").read_text(
         encoding="utf-8",

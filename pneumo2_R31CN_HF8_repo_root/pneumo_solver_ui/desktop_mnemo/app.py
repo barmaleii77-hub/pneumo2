@@ -3728,6 +3728,7 @@ def _build_edge_activity_snapshots(dataset: MnemoDataset | None, idx: int) -> li
     rows: list[EdgeActivitySnapshot] = []
     for edge_name, q_now in _edge_rows_for_index(dataset, idx)[:12]:
         edge_def = dataset.edge_defs.get(edge_name, {})
+        canonical_kind = str(edge_def.get("kind") or "")
         n1 = str(edge_def.get("n1") or "")
         n2 = str(edge_def.get("n2") or "")
         if q_now >= 0.0:
@@ -3739,6 +3740,7 @@ def _build_edge_activity_snapshots(dataset: MnemoDataset | None, idx: int) -> li
             EdgeActivitySnapshot(
                 edge_name=edge_name,
                 component_kind=_edge_component_kind(edge_name, edge_def),
+                canonical_kind=canonical_kind,
                 q_now=float(q_now),
                 direction_label=direction_label,
                 state_label=_edge_open_state(dataset, edge_name, idx),
@@ -5894,7 +5896,7 @@ class PointerWatcher(QtCore.QObject):
             return None
 
     def start(self) -> None:
-        self.status.emit(f"Follow: {self.pointer_path}")
+        self.status.emit(f"Слежение: {self.pointer_path}")
         self._timer.start()
 
     def stop(self) -> None:
@@ -5909,7 +5911,7 @@ class PointerWatcher(QtCore.QObject):
                 resolved = self._resolve_pointer_npz()
                 if resolved is not None:
                     self._current_npz = resolved
-                    self.status.emit(f"Pointer -> {resolved.name}")
+                    self.status.emit(f"Указатель -> {resolved.name}")
 
             if self._current_npz is None:
                 self._current_npz = self._resolve_pointer_npz()
@@ -5919,10 +5921,10 @@ class PointerWatcher(QtCore.QObject):
             npz_sig = self._file_sig(self._current_npz)
             if npz_sig[0] and npz_sig != self._last_npz_sig:
                 self._last_npz_sig = npz_sig
-                self.status.emit(f"Reload: {self._current_npz.name}")
+                self.status.emit(f"Обновить: {self._current_npz.name}")
                 self.npz_changed.emit(self._current_npz)
         except Exception as exc:
-            self.status.emit(f"Follow error: {exc}")
+            self.status.emit(f"Ошибка слежения: {exc}")
 
 
 class MnemoNativeView(QtWidgets.QWidget):
@@ -5946,7 +5948,7 @@ class MnemoNativeView(QtWidgets.QWidget):
         header_lay.setContentsMargins(12, 10, 12, 10)
         header_lay.setSpacing(12)
 
-        self.mode_badge = QtWidgets.QLabel("Native Canvas", header)
+        self.mode_badge = QtWidgets.QLabel("Схема", header)
         self.mode_badge.setObjectName("mnemo_native_mode_badge")
         self.mode_badge.setStyleSheet(
             "QLabel#mnemo_native_mode_badge {"
@@ -5958,12 +5960,12 @@ class MnemoNativeView(QtWidgets.QWidget):
         text_col = QtWidgets.QVBoxLayout()
         text_col.setSpacing(2)
         self.summary_label = QtWidgets.QLabel(
-            "Нативная Windows/Qt мнемосхема без WebEngine: один экран для давления, расходов, состояний арматуры и хода цилиндров.",
+            "Центральная схема пневмосистемы. Слева — обзор и приводы, справа — выбор, диагностика и события.",
             header,
         )
         self.summary_label.setWordWrap(True)
         self.summary_label.setStyleSheet("color:#d9eef2; font-weight:600;")
-        self.hint_label = QtWidgets.QLabel("Колесо: zoom • drag: pan • click: выбрать ветвь или узел", header)
+        self.hint_label = QtWidgets.QLabel("Колесо — масштаб, перетаскивание — панорама, щелчок — выбор элемента", header)
         self.hint_label.setStyleSheet("color:#89aeb8;")
         text_col.addWidget(self.summary_label)
         text_col.addWidget(self.hint_label)
@@ -5978,10 +5980,10 @@ class MnemoNativeView(QtWidgets.QWidget):
         lay.addWidget(self.native_canvas, 1)
 
     def render_dataset(self, dataset: MnemoDataset, *, selected_edge: str | None, selected_node: str | None) -> None:
-        self.mode_badge.setText("Native Canvas")
+        self.mode_badge.setText("Схема")
         self.summary_label.setText(
-            f"{dataset.npz_path.name}: нативный canvas держит full-system мнемосхему и живые overlays на одном экране."
-            + (" Базовая ориентация идёт по исходной пневмосхеме проекта." if dataset.reference_scheme_source else "")
+            f"{dataset.npz_path.name}: рабочая мнемосхема с текущими наложениями давления, расхода и состояния элементов."
+            + (" Базовая ориентация опирается на исходную пневмосхему проекта." if dataset.reference_scheme_source else "")
         )
         self.native_canvas.render_dataset(dataset, selected_edge=selected_edge, selected_node=selected_node)
 
@@ -5992,7 +5994,7 @@ class MnemoNativeView(QtWidgets.QWidget):
     def set_detail_mode(self, mode: str) -> None:
         self._detail_mode = self.native_canvas.set_detail_mode(mode)
         self.hint_label.setText(
-            "Колесо: zoom • drag: pan • click: выбрать ветвь или узел"
+            "Колесо — масштаб, перетаскивание — панорама, щелчок — выбор элемента"
             + f" • слой: {self._detail_mode_label(self._detail_mode)}"
         )
 
@@ -6005,11 +6007,11 @@ class MnemoNativeView(QtWidgets.QWidget):
         )
 
     def set_playhead(self, idx: int, playing: bool, dataset_id: str) -> None:
-        self.mode_badge.setText("Playback" if playing else "Hold")
+        self.mode_badge.setText("Воспроизведение" if playing else "Пауза")
         self.native_canvas.set_frame_state(idx, playing, dataset_id)
 
     def set_selection(self, *, edge: str | None, node: str | None) -> None:
-        label = edge or node or "Native Canvas"
+        label = edge or node or "Схема"
         self.mode_badge.setText(str(label))
         self.native_canvas.set_selection(edge=edge, node=node)
 
@@ -6032,10 +6034,10 @@ class MnemoNativeView(QtWidgets.QWidget):
         issues = len(list(diagnostics.get("geometry_issues") or []))
         reference_mode = str(fidelity.get("reference_scheme_mode") or "")
         self.hint_label.setText(
-            "Native overlay: "
-            + f"schema {canonical_nodes_positioned}/{canonical_nodes_total} nodes, "
-            + f"{canonical_edges_routed}/{canonical_edges_total} routes, "
-            + f"geometry {warnings}/{issues}"
+            "Покрытие схемы: "
+            + f"узлы {canonical_nodes_positioned}/{canonical_nodes_total}, "
+            + f"маршруты {canonical_edges_routed}/{canonical_edges_total}, "
+            + f"геометрия {warnings}/{issues}"
             + (f" • фон {reference_mode}" if reference_mode else "")
             + f" • слой {self._detail_mode_label(self._detail_mode)}"
         )
@@ -6046,15 +6048,15 @@ class MnemoNativeView(QtWidgets.QWidget):
 
     def set_focus_region(self, focus_region: dict[str, Any] | None) -> None:
         if focus_region:
-            self.mode_badge.setText("Focus")
+            self.mode_badge.setText("Фокус")
             self.summary_label.setText(str(focus_region.get("summary") or "Фокусный сценарий"))
         self.native_canvas.set_focus_region(focus_region)
 
     def show_overview(self, meta: dict[str, Any] | None = None) -> None:
         overview_meta = dict(meta or {})
-        self.mode_badge.setText("Overview")
+        self.mode_badge.setText("Обзор")
         self.summary_label.setText(
-            str(overview_meta.get("summary") or "Полная схема: сравните активный сценарий с целой топологией и вернитесь к фокусу через toolbar.")
+            str(overview_meta.get("summary") or "Полная схема: сравните активный сценарий с целой топологией и вернитесь к фокусу через панель действий.")
         )
         self.native_canvas.show_overview(overview_meta)
 
@@ -12813,7 +12815,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         startup_checklist: list[str] | tuple[str, ...] | None,
     ):
         super().__init__()
-        self.setWindowTitle("Desktop Pneumo Mnemo")
+        self.setWindowTitle("Мнемосхема пневмосистемы")
         self.setMinimumSize(1500, 980)
         self.setDockOptions(
             QtWidgets.QMainWindow.AllowNestedDocks
@@ -12966,7 +12968,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._build_toolbar()
         self._build_menus()
         self._build_statusbar()
-        self._set_startup_banner_visible(True)
+        self._set_startup_banner_visible(False)
 
         self.play_timer = QtCore.QTimer(self)
         self.play_timer.setInterval(40)
@@ -12985,7 +12987,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         if initial_path is not None and initial_path.exists():
             self.load_dataset(initial_path, preserve_selection=False)
         else:
-            self._set_status(f"Ожидание NPZ. Pointer: {self.pointer_path}")
+            self._set_status(f"Ожидание NPZ. Указатель: {self.pointer_path}")
             self._render_startup_banner()
 
     def _add_dock(
@@ -13009,32 +13011,32 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         return dock
 
     def _build_toolbar(self) -> None:
-        tb = self.addToolBar("Mnemo")
+        tb = self.addToolBar("Мнемосхема")
         tb.setMovable(False)
 
         open_action = QtGui.QAction("Открыть NPZ", self)
         open_action.triggered.connect(self._open_npz_dialog)
         tb.addAction(open_action)
 
-        reload_action = QtGui.QAction("Reload", self)
+        reload_action = QtGui.QAction("Обновить", self)
         reload_action.triggered.connect(self._reload_current)
         tb.addAction(reload_action)
 
-        self.follow_action = QtGui.QAction("Follow", self)
+        self.follow_action = QtGui.QAction("Следить", self)
         self.follow_action.setCheckable(True)
         self.follow_action.toggled.connect(self._toggle_follow)
         tb.addAction(self.follow_action)
 
-        self.play_action = QtGui.QAction("Play", self)
+        self.play_action = QtGui.QAction("Пуск", self)
         self.play_action.setCheckable(True)
         self.play_action.toggled.connect(self._toggle_play)
         tb.addAction(self.play_action)
 
-        self.ack_events_action = QtGui.QAction("ACK события", self)
+        self.ack_events_action = QtGui.QAction("Подтвердить события", self)
         self.ack_events_action.triggered.connect(self._acknowledge_events)
         tb.addAction(self.ack_events_action)
 
-        self.reset_events_action = QtGui.QAction("Reset события", self)
+        self.reset_events_action = QtGui.QAction("Сбросить события", self)
         self.reset_events_action.triggered.connect(self._reset_events_memory)
         tb.addAction(self.reset_events_action)
 
@@ -13048,7 +13050,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.reference_scheme_action.toggled.connect(self._toggle_reference_scheme)
         tb.addAction(self.reference_scheme_action)
 
-        self.startup_banner_action = QtGui.QAction("Onboarding", self)
+        self.startup_banner_action = QtGui.QAction("Стартовая панель", self)
         self.startup_banner_action.setCheckable(True)
         self.startup_banner_action.toggled.connect(self._set_startup_banner_visible)
         tb.addAction(self.startup_banner_action)
@@ -13113,7 +13115,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         file_menu = self.menuBar().addMenu("Файл")
         action_open = file_menu.addAction("Открыть NPZ…")
         action_open.triggered.connect(self._open_npz_dialog)
-        action_reload = file_menu.addAction("Reload")
+        action_reload = file_menu.addAction("Обновить")
         action_reload.triggered.connect(self._reload_current)
         file_menu.addSeparator()
         action_quit = file_menu.addAction("Выход")
@@ -13132,7 +13134,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         view_menu.addAction(self.startup_banner_action)
         view_menu.addAction(self.return_focus_action)
         view_menu.addAction(self.full_scheme_action)
-        detail_menu = view_menu.addMenu("Плотность overlays")
+        detail_menu = view_menu.addMenu("Насыщенность наложений")
         for mode in ("quiet", "operator", "full"):
             action = detail_menu.addAction(DETAIL_MODE_LABELS[mode])
             action.triggered.connect(lambda _checked=False, mode=mode: self._set_detail_mode(mode, announce=True))
@@ -13409,7 +13411,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             prefer_selected=self._startup_selection_active,
         )
         if not focus_target.has_target:
-            self._set_status("Onboarding focus пока не вычислен для текущего кадра.")
+            self._set_status("Стартовый фокус пока не вычислен для текущего кадра.")
             return
         if focus_target.edge_name in self.dataset.edge_names:
             self.selected_edge = focus_target.edge_name
@@ -13418,16 +13420,14 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._set_view_mode("focus", persist=True)
         self._sync_selection_views(clear_focus_region=False)
         self._apply_current_view_mode(source="startup_banner", auto_focus=False)
-        self._set_status(
-            f"Onboarding focus: {focus_target.edge_name or '—'} / {focus_target.node_name or '—'}"
-        )
+        self._set_status(f"Стартовый фокус: {focus_target.edge_name or '—'} / {focus_target.node_name or '—'}")
 
     def _show_full_scheme_overview(self) -> None:
         if self.dataset is None or self.dataset.time_s.size == 0:
             return
         self._set_view_mode("overview", persist=True)
         self._apply_current_view_mode(source="toolbar_overview", auto_focus=False)
-        self._set_status("Overview mode: показана полная схема.")
+        self._set_status("Режим обзора: показана полная схема.")
 
     def _restore_window_state(self) -> None:
         self.ui_state.bind_window_geometry(self, "window/geometry")
@@ -13435,8 +13435,28 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         if state is not None:
             try:
                 self.restoreState(state)
+                return
             except Exception:
                 pass
+        self._apply_default_workplace_layout()
+
+    def _apply_default_workplace_layout(self) -> None:
+        self._overview_dock.show()
+        self._snapshot_dock.show()
+        self._selection_dock.show()
+        self._guide_dock.show()
+        self._events_dock.show()
+        self._trends_dock.show()
+        self._fidelity_dock.hide()
+        self._legend_dock.hide()
+        self.splitDockWidget(self._overview_dock, self._snapshot_dock, QtCore.Qt.Vertical)
+        self.tabifyDockWidget(self._selection_dock, self._guide_dock)
+        self.tabifyDockWidget(self._guide_dock, self._events_dock)
+        self.tabifyDockWidget(self._events_dock, self._fidelity_dock)
+        self.tabifyDockWidget(self._fidelity_dock, self._legend_dock)
+        self._guide_dock.raise_()
+        self.resizeDocks([self._overview_dock, self._selection_dock], [320, 360], QtCore.Qt.Horizontal)
+        self.resizeDocks([self._overview_dock, self._trends_dock], [760, 260], QtCore.Qt.Vertical)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # type: ignore[override]
         self.ui_state.save_window_geometry(self, "window/geometry")
@@ -13456,10 +13476,10 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
 
     def _set_dataset_title(self) -> None:
         if self.dataset is None:
-            self.setWindowTitle("Desktop Pneumo Mnemo")
+            self.setWindowTitle("Мнемосхема пневмосистемы")
             self.path_text.setText("")
             return
-        self.setWindowTitle(f"Desktop Pneumo Mnemo • {self.dataset.npz_path.name}")
+        self.setWindowTitle(f"Мнемосхема пневмосистемы • {self.dataset.npz_path.name}")
         self.path_text.setText(str(self.dataset.npz_path))
 
     def _open_npz_dialog(self) -> None:
@@ -13485,7 +13505,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.pointer_watcher.start()
         else:
             self.pointer_watcher.stop()
-        self._set_status(f"Follow {'ON' if self.follow_enabled else 'OFF'}")
+        self._set_status("Слежение: включено" if self.follow_enabled else "Слежение: выключено")
         self.overview_panel.update_frame(
             self.dataset,
             self.current_idx,
@@ -13513,7 +13533,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
 
     def _toggle_play(self, checked: bool) -> None:
         self.playing = bool(checked)
-        self.play_action.setText("Pause" if self.playing else "Play")
+        self.play_action.setText("Пауза" if self.playing else "Пуск")
         self._last_tick = time.perf_counter()
         if self.playing:
             self.play_timer.start()

@@ -74,6 +74,12 @@ class DesktopOptimizerCenter:
         self.status_var = tk.StringVar(
             value="Готово. Автоматизированная оптимизация доступна в отдельном инженерном центре."
         )
+        self.mode_summary_var = tk.StringVar(
+            value="Режим: автоматический подбор и ручная настройка доступны во вкладках."
+        )
+        self.workspace_summary_var = tk.StringVar(
+            value="Контекст: контракт, история прогонов и готовые выпуски будут показаны после первого обновления."
+        )
         self._poll_after_id: str | None = None
         self._host_closed = False
         self._selected_run_dir = ""
@@ -101,37 +107,68 @@ class DesktopOptimizerCenter:
     def _build_ui(self) -> None:
         outer = ttk.Frame(self.root, padding=10)
         outer.pack(fill="both", expand=True)
+        header = ttk.Frame(outer)
+        header.pack(fill="x", pady=(0, 8))
+        title_box = ttk.Frame(header)
+        title_box.pack(side="left", fill="x", expand=True)
         ttk.Label(
-            outer,
+            title_box,
             text="Центр автоматизированной оптимизации",
             font=("Segoe UI", 16, "bold"),
         ).pack(anchor="w")
         ttk.Label(
-            outer,
-            text=(
-                "Инженерный центр автоматизированной оптимизации: подготовка кольцевых сценариев, "
-                "поэтапный запуск оптимизаторов, распределённые вычисления, история прогонов и выпуск результатов "
-                "без web-оболочки."
-            ),
-            wraplength=1320,
+            title_box,
+            textvariable=self.mode_summary_var,
             justify="left",
-        ).pack(anchor="w", pady=(6, 10))
+            wraplength=760,
+        ).pack(anchor="w", pady=(2, 0))
 
-        auto_frame = ttk.LabelFrame(outer, text="Режим работы", padding=10)
-        auto_frame.pack(fill="x", pady=(0, 10))
+        header_actions = ttk.Frame(header)
+        header_actions.pack(side="right", anchor="ne")
+        ttk.Button(
+            header_actions,
+            text="Маршрут",
+            command=self.show_dashboard_tab,
+        ).pack(side="left")
+        ttk.Button(
+            header_actions,
+            text="Вычисления",
+            command=self.show_runtime_tab,
+        ).pack(side="left", padx=(8, 0))
+        ttk.Button(
+            header_actions,
+            text="История",
+            command=self.show_history_tab,
+        ).pack(side="left", padx=(8, 0))
+        ttk.Button(
+            header_actions,
+            text="Обновить",
+            command=self.refresh_all,
+        ).pack(side="left", padx=(12, 0))
+
+        workspace = ttk.Panedwindow(outer, orient="horizontal")
+        workspace.pack(fill="both", expand=True)
+
+        sidebar = ttk.Frame(workspace, padding=(0, 0, 8, 0))
+        sidebar.columnconfigure(0, weight=1)
+        context_frame = ttk.LabelFrame(sidebar, text="Контекст", padding=8)
+        context_frame.pack(fill="x")
         ttk.Label(
-            auto_frame,
-            text=(
-                "Автоматически: пользователь задаёт кольцевой сценарий и цель, а система сама собирает стадии и запускает оптимизаторы.\n"
-                "Настраиваемо: можно менять состав сценариев, стадии, веса и ограничения.\n"
-                "Экспертно: доступны все внутренние параметры библиотек и распределённого запуска."
-            ),
-            wraplength=1320,
+            context_frame,
+            textvariable=self.workspace_summary_var,
             justify="left",
+            wraplength=300,
         ).pack(anchor="w")
 
-        self.notebook = ttk.Notebook(outer)
-        self.notebook.pack(fill="both", expand=True)
+        nav_frame = ttk.LabelFrame(sidebar, text="Переходы", padding=8)
+        nav_frame.pack(fill="x", pady=(8, 0))
+        ttk.Button(nav_frame, text="Контракт", command=self.show_contract_tab).pack(fill="x")
+        ttk.Button(nav_frame, text="История", command=self.show_history_tab).pack(fill="x", pady=(6, 0))
+        ttk.Button(nav_frame, text="Готовые прогоны", command=self.show_finished_tab).pack(fill="x", pady=(6, 0))
+        ttk.Button(nav_frame, text="Передача стадий", command=self.show_handoff_tab).pack(fill="x", pady=(6, 0))
+        ttk.Button(nav_frame, text="Упаковка", command=self.show_packaging_tab).pack(fill="x", pady=(6, 0))
+
+        self.notebook = ttk.Notebook(workspace)
 
         self.dashboard_tab = DesktopOptimizerDashboardTab(self.notebook, self)
         self.contract_tab = DesktopOptimizerContractTab(self.notebook, self)
@@ -147,11 +184,14 @@ class DesktopOptimizerCenter:
         self.notebook.add(self.finished_tab, text="Готовые прогоны")
         self.notebook.add(self.handoff_tab, text="Передача стадий")
         self.notebook.add(self.packaging_tab, text="Упаковка и выпуск")
+        workspace.add(sidebar, weight=1)
+        workspace.add(self.notebook, weight=5)
 
         footer = ttk.Frame(outer)
         footer.pack(fill="x", pady=(10, 0))
         ttk.Label(footer, textvariable=self.status_var).pack(side="left")
         ttk.Button(footer, text="Обновить всё", command=self.refresh_all).pack(side="right")
+        ttk.Sizegrip(footer).pack(side="right", padx=(10, 0))
 
         if self._owns_root:
             self.root.protocol("WM_DELETE_WINDOW", self._request_close)
@@ -441,6 +481,39 @@ class DesktopOptimizerCenter:
                 f"risk={int(best.get('interference_rows', 0) or 0)}"
             )
         return "\n".join(lines)
+
+    def _format_compact_mode_summary(self) -> str:
+        payload = self.runtime.launch_profile_summary()
+        profile = str(payload.get("profile_label") or "Автоматический маршрут")
+        pipeline = str(payload.get("launch_pipeline") or "—")
+        backend = str(payload.get("backend") or "—")
+        drift_keys = tuple(str(key) for key in payload.get("drift_keys") or ())
+        summary = f"Режим: {profile} | Контур: {pipeline} | Исполнитель: {backend}"
+        if drift_keys:
+            summary += " | Изменено вручную: " + ", ".join(drift_keys[:3])
+            if len(drift_keys) > 3:
+                summary += "..."
+        return summary
+
+    def _format_compact_workspace_summary(self) -> str:
+        snapshot = self._contract_snapshot
+        if snapshot is None:
+            snapshot = self.runtime.contract_snapshot()
+        return "\n".join(
+            [
+                f"Хэш задачи: {getattr(snapshot, 'problem_hash', '') or '—'}",
+                (
+                    "Сценарии: "
+                    f"всего {int(getattr(snapshot, 'suite_row_count', 0) or 0)}, "
+                    f"активно {int(getattr(snapshot, 'enabled_suite_total', 0) or 0)}"
+                ),
+                (
+                    "Параметры поиска: "
+                    f"{int(getattr(snapshot, 'search_param_count', 0) or 0)}"
+                ),
+                "Рабочая зона: история, handoff и выпуск открываются справа во вкладках.",
+            ]
+        )
 
     def _format_dashboard_pointer_text(self, dashboard: dict[str, Any]) -> str:
         pointer = dict(dashboard.get("latest_pointer") or {})
@@ -1209,6 +1282,8 @@ class DesktopOptimizerCenter:
 
     def refresh_all(self) -> None:
         self.refresh_contract()
+        self.mode_summary_var.set(self._format_compact_mode_summary())
+        self.workspace_summary_var.set(self._format_compact_workspace_summary())
         surface = self.runtime.active_job_surface()
         readiness = self.runtime.launch_readiness_summary()
         self.runtime_tab.render(

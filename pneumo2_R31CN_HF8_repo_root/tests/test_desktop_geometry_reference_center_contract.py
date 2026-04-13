@@ -62,6 +62,19 @@ def test_desktop_geometry_reference_runtime_builds_reference_snapshots() -> None
     assert any("давление" in row.label.lower() or "давление" in row.description.lower() for row in guide)
 
 
+def test_desktop_geometry_reference_center_uses_split_workspace_with_sidebar() -> None:
+    src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_geometry_reference_center.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert 'workspace = ttk.Panedwindow(outer, orient="horizontal")' in src
+    assert 'source = ttk.LabelFrame(sidebar, text="Источник", padding=10)' in src
+    assert 'quick = ttk.LabelFrame(sidebar, text="Переходы", padding=8)' in src
+    assert 'ttk.Button(header_actions, text="Подвеска", command=lambda: self.notebook.select(0)).pack(side="left")' in src
+    assert "workspace.add(self.notebook, weight=5)" in src
+
+
 def test_desktop_geometry_reference_runtime_filters_catalog_variants_and_search() -> None:
     runtime = DesktopGeometryReferenceRuntime(ui_root=UI_ROOT)
 

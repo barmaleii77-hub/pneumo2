@@ -8,7 +8,12 @@ from pneumo_solver_ui.desktop_input_model import (
     DESKTOP_PREVIEW_SURFACE_OPTIONS,
     DESKTOP_RUN_PRESET_OPTIONS,
 )
-from pneumo_solver_ui.desktop_ui_core import ScrollableFrame, build_status_strip
+from pneumo_solver_ui.desktop_ui_core import (
+    ScrollableFrame,
+    build_scrolled_treeview,
+    build_status_strip,
+    create_scrollable_tab,
+)
 from pneumo_solver_ui.desktop_run_setup_model import (
     DESKTOP_RUN_CACHE_POLICY_OPTIONS,
     DESKTOP_RUN_PROFILE_OPTIONS,
@@ -28,11 +33,17 @@ class DesktopRunSetupCenter:
         self.editor = editor
         self.window = tk.Toplevel(editor.root)
         self.window.title("Настройка расчёта")
-        self.window.geometry("980x860")
-        self.window.minsize(900, 760)
+        self.window.geometry("1180x860")
+        self.window.minsize(1020, 760)
+        self.window.resizable(True, True)
         self.window.protocol("WM_DELETE_WINDOW", self._on_close)
         self._host_closed = False
         self._trace_tokens: list[str] = []
+        self._section_tab_ids: dict[str, str] = {}
+        self._tab_hosts: dict[str, ScrollableFrame] = {}
+        self._syncing_tree = False
+        self.section_tree: ttk.Treeview | None = None
+        self.notebook: ttk.Notebook | None = None
         self.launch_action_hint_var = tk.StringVar()
         self.launch_with_check_button: ttk.Button | None = None
         self.launch_plain_button: ttk.Button | None = None
@@ -76,6 +87,20 @@ class DesktopRunSetupCenter:
         self.editor.run_secondary_spin = None
 
     def _build_ui(self) -> None:
+        self.window.columnconfigure(0, weight=1)
+        self.window.rowconfigure(0, weight=1)
+
+        outer = ttk.Frame(self.window, padding=12)
+        outer.grid(row=0, column=0, sticky="nsew")
+        outer.columnconfigure(0, weight=1)
+        outer.rowconfigure(1, weight=1)
+
+        self._build_workspace_ui(outer)
+        self.editor._refresh_run_policy_hints()
+        self._refresh_runtime_summaries()
+        self._select_section("profile")
+        return
+
         outer = ttk.Frame(self.window, padding=12)
         outer.pack(fill="both", expand=True)
 
@@ -651,6 +676,766 @@ class DesktopRunSetupCenter:
 
         self.editor._refresh_run_policy_hints()
         self._refresh_runtime_summaries()
+
+    def _build_workspace_ui(self, outer: ttk.Frame) -> None:
+        header = ttk.Frame(outer)
+        header.grid(row=0, column=0, sticky="ew")
+        header.columnconfigure(1, weight=1)
+
+        title_box = ttk.Frame(header)
+        title_box.grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            title_box,
+            text="Расчёт",
+            font=("Segoe UI", 16, "bold"),
+        ).pack(anchor="w")
+        ttk.Label(
+            title_box,
+            text="Режимы запуска, предпросмотр дороги, выгрузка и последние результаты.",
+            foreground="#555555",
+        ).pack(anchor="w", pady=(4, 0))
+
+        header_actions = ttk.Frame(header)
+        header_actions.grid(row=0, column=1, sticky="e")
+        ttk.Button(
+            header_actions,
+            text="Проверить",
+            command=self.editor._run_config_check,
+        ).pack(side="left")
+        self.launch_with_check_button = ttk.Button(
+            header_actions,
+            text="Проверить и запустить",
+            command=self._run_selected_profile_with_check,
+        )
+        self.launch_with_check_button.pack(side="left", padx=(8, 0))
+        self.launch_plain_button = ttk.Button(
+            header_actions,
+            text="Запустить",
+            command=self._run_selected_profile,
+        )
+        self.launch_plain_button.pack(side="left", padx=(8, 0))
+        ttk.Button(
+            header_actions,
+            text="Папка запусков",
+            command=self.editor._open_desktop_runs_dir,
+        ).pack(side="left", padx=(8, 0))
+
+        workspace = ttk.Panedwindow(outer, orient="horizontal")
+        workspace.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+
+        sidebar = ttk.Frame(workspace, padding=(0, 0, 12, 0))
+        sidebar.columnconfigure(0, weight=1)
+        content = ttk.Frame(workspace)
+        content.columnconfigure(0, weight=1)
+        content.rowconfigure(0, weight=1)
+
+        workspace.add(sidebar, weight=0)
+        workspace.add(content, weight=1)
+
+        context_box = ttk.LabelFrame(sidebar, text="Контекст", padding=8)
+        context_box.grid(row=0, column=0, sticky="ew")
+        ttk.Label(
+            context_box,
+            textvariable=self.editor.run_summary_var,
+            wraplength=260,
+            justify="left",
+            foreground="#334455",
+        ).grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            context_box,
+            textvariable=self.editor.preview_surface_summary_var,
+            wraplength=260,
+            justify="left",
+            foreground="#555555",
+        ).grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(
+            context_box,
+            textvariable=self.editor.run_mode_summary_var,
+            wraplength=260,
+            justify="left",
+            foreground="#1f5d50",
+        ).grid(row=2, column=0, sticky="w", pady=(8, 0))
+
+        nav_box = ttk.LabelFrame(sidebar, text="Разделы", padding=8)
+        nav_box.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+        sidebar.rowconfigure(1, weight=1)
+        tree_host, self.section_tree = build_scrolled_treeview(
+            nav_box,
+            show="tree",
+            selectmode="browse",
+            height=8,
+        )
+        tree_host.pack(fill="both", expand=True)
+        self.section_tree.bind("<<TreeviewSelect>>", self._on_section_tree_select, add="+")
+
+        quick_box = ttk.LabelFrame(sidebar, text="Быстрые действия", padding=8)
+        quick_box.grid(row=2, column=0, sticky="ew", pady=(12, 0))
+        ttk.Button(
+            quick_box,
+            text="Профиль запуска",
+            command=lambda: self._select_section("profile"),
+        ).grid(row=0, column=0, sticky="ew")
+        ttk.Button(
+            quick_box,
+            text="Предпросмотр дороги",
+            command=lambda: self._select_section("preview"),
+        ).grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        ttk.Button(
+            quick_box,
+            text="Политики и выгрузка",
+            command=lambda: self._select_section("policy"),
+        ).grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        ttk.Button(
+            quick_box,
+            text="Обновить сводки",
+            command=self._refresh_runtime_summaries,
+        ).grid(row=3, column=0, sticky="ew", pady=(8, 0))
+        quick_box.columnconfigure(0, weight=1)
+
+        hint_box = ttk.LabelFrame(sidebar, text="Подсказка запуска", padding=8)
+        hint_box.grid(row=3, column=0, sticky="ew", pady=(12, 0))
+        ttk.Label(
+            hint_box,
+            textvariable=self.launch_action_hint_var,
+            wraplength=260,
+            justify="left",
+            foreground="#355c7d",
+        ).grid(row=0, column=0, sticky="w")
+
+        self.notebook = ttk.Notebook(content)
+        self.notebook.grid(row=0, column=0, sticky="nsew")
+        self.notebook.bind("<<NotebookTabChanged>>", self._sync_section_tree_from_notebook, add="+")
+
+        self._build_profile_tab()
+        self._build_preview_tab()
+        self._build_run_tab()
+        self._build_policy_tab()
+        self._build_launch_tab()
+        self._build_artifacts_tab()
+        self._populate_section_tree()
+
+        footer = build_status_strip(
+            outer,
+            primary_var=self.launch_action_hint_var,
+        )
+        footer.grid(row=2, column=0, sticky="ew", pady=(10, 0))
+
+    def _create_tab(self, key: str, title: str) -> ttk.Frame:
+        if self.notebook is None:
+            raise RuntimeError("Notebook is not initialized")
+        host, body = create_scrollable_tab(
+            self.notebook,
+            padding=12,
+            yscroll=True,
+            xscroll=False,
+            fit_width=True,
+        )
+        body.columnconfigure(0, weight=1)
+        self.notebook.add(host, text=title)
+        self._section_tab_ids[key] = str(host)
+        self._tab_hosts[key] = host
+        return body
+
+    def _populate_section_tree(self) -> None:
+        if self.section_tree is None:
+            return
+        titles = {
+            "profile": "Профиль запуска",
+            "preview": "Предпросмотр дороги",
+            "run": "Режим расчёта",
+            "policy": "Политики и выгрузка",
+            "launch": "Запуск",
+            "artifacts": "Результаты и журналы",
+        }
+        for key, title in titles.items():
+            self.section_tree.insert("", "end", iid=key, text=title)
+
+    def _select_section(self, key: str) -> None:
+        if self.notebook is not None:
+            tab_id = self._section_tab_ids.get(key)
+            if tab_id is not None:
+                self.notebook.select(tab_id)
+        if self.section_tree is not None:
+            self._syncing_tree = True
+            try:
+                self.section_tree.selection_set(key)
+                self.section_tree.focus(key)
+                self.section_tree.see(key)
+            finally:
+                self._syncing_tree = False
+
+    def _on_section_tree_select(self, _event: tk.Event[tk.Misc] | None = None) -> None:
+        if self._syncing_tree or self.section_tree is None or self.notebook is None:
+            return
+        selection = self.section_tree.selection()
+        if not selection:
+            return
+        tab_id = self._section_tab_ids.get(selection[0])
+        if tab_id is not None:
+            self.notebook.select(tab_id)
+
+    def _sync_section_tree_from_notebook(self, _event: tk.Event[tk.Misc] | None = None) -> None:
+        if self.section_tree is None or self.notebook is None:
+            return
+        active_tab = str(self.notebook.select())
+        for key, tab_id in self._section_tab_ids.items():
+            if tab_id == active_tab:
+                self._syncing_tree = True
+                try:
+                    self.section_tree.selection_set(key)
+                    self.section_tree.focus(key)
+                    self.section_tree.see(key)
+                finally:
+                    self._syncing_tree = False
+                return
+
+    def _build_profile_tab(self) -> None:
+        body = self._create_tab("profile", "Профиль запуска")
+        profile_frame = ttk.LabelFrame(body, text="Профиль запуска", padding=10)
+        profile_frame.grid(row=0, column=0, sticky="ew")
+        for idx, (profile_key, profile_label, _profile_desc) in enumerate(DESKTOP_RUN_PROFILE_OPTIONS):
+            ttk.Radiobutton(
+                profile_frame,
+                text=profile_label,
+                value=profile_key,
+                variable=self.editor.run_profile_var,
+                command=lambda key=profile_key: self.editor._apply_run_setup_profile(key),
+            ).grid(row=0, column=idx, sticky="w", padx=(0 if idx == 0 else 12, 0))
+        ttk.Label(
+            profile_frame,
+            textvariable=self.editor.run_profile_hint_var,
+            wraplength=860,
+            justify="left",
+            foreground="#555555",
+        ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(10, 0))
+
+    def _build_preview_tab(self) -> None:
+        body = self._create_tab("preview", "Предпросмотр дороги")
+        preview_frame = ttk.LabelFrame(body, text="Предпросмотр дороги", padding=10)
+        preview_frame.grid(row=0, column=0, sticky="ew")
+        preview_frame.columnconfigure(5, weight=1)
+
+        ttk.Label(preview_frame, text="Тип профиля").grid(row=0, column=0, sticky="w")
+        preview_combo = ttk.Combobox(
+            preview_frame,
+            textvariable=self.editor.preview_surface_var,
+            values=[label for _key, label in DESKTOP_PREVIEW_SURFACE_OPTIONS],
+            state="readonly",
+            width=28,
+        )
+        preview_combo.grid(row=0, column=1, sticky="w", padx=(8, 0))
+        preview_combo.bind(
+            "<<ComboboxSelected>>",
+            lambda _event: self.editor._refresh_preview_surface_controls(),
+        )
+        ttk.Label(
+            preview_frame,
+            textvariable=self.editor.preview_surface_summary_var,
+            foreground="#555555",
+            wraplength=620,
+            justify="left",
+        ).grid(row=0, column=2, columnspan=4, sticky="w", padx=(16, 0))
+
+        ttk.Label(preview_frame, text="Шаг по времени, с").grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Spinbox(
+            preview_frame,
+            from_=0.001,
+            to=0.1,
+            increment=0.001,
+            textvariable=self.editor.preview_dt_var,
+            width=10,
+            format="%.3f",
+        ).grid(row=1, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
+
+        ttk.Label(preview_frame, text="Длительность, с").grid(
+            row=1, column=2, sticky="w", padx=(16, 0), pady=(10, 0)
+        )
+        ttk.Spinbox(
+            preview_frame,
+            from_=0.2,
+            to=60.0,
+            increment=0.1,
+            textvariable=self.editor.preview_t_end_var,
+            width=10,
+            format="%.1f",
+        ).grid(row=1, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
+
+        ttk.Label(preview_frame, text="Длина участка, м").grid(
+            row=1, column=4, sticky="w", padx=(16, 0), pady=(10, 0)
+        )
+        ttk.Spinbox(
+            preview_frame,
+            from_=5.0,
+            to=5000.0,
+            increment=1.0,
+            textvariable=self.editor.preview_road_len_var,
+            width=10,
+            format="%.1f",
+        ).grid(row=1, column=5, sticky="w", padx=(8, 0), pady=(10, 0))
+
+        ttk.Label(preview_frame, textvariable=self.editor.preview_surface_primary_label_var).grid(
+            row=2, column=0, sticky="w", pady=(10, 0)
+        )
+        self.editor.preview_surface_primary_spin = ttk.Spinbox(
+            preview_frame,
+            from_=0.0,
+            to=2.0,
+            increment=0.005,
+            textvariable=self.editor.preview_surface_primary_value_var,
+            width=10,
+            format="%.3f",
+        )
+        self.editor.preview_surface_primary_spin.grid(
+            row=2, column=1, sticky="w", padx=(8, 0), pady=(10, 0)
+        )
+
+        ttk.Label(preview_frame, textvariable=self.editor.preview_surface_secondary_label_var).grid(
+            row=2, column=2, sticky="w", padx=(16, 0), pady=(10, 0)
+        )
+        self.editor.preview_surface_secondary_spin = ttk.Spinbox(
+            preview_frame,
+            from_=0.01,
+            to=50.0,
+            increment=0.05,
+            textvariable=self.editor.preview_surface_secondary_value_var,
+            width=10,
+            format="%.3f",
+        )
+        self.editor.preview_surface_secondary_spin.grid(
+            row=2, column=3, sticky="w", padx=(8, 0), pady=(10, 0)
+        )
+
+        ttk.Label(preview_frame, text="Начало профиля, м").grid(
+            row=2, column=4, sticky="w", padx=(16, 0), pady=(10, 0)
+        )
+        self.editor.preview_surface_start_spin = ttk.Spinbox(
+            preview_frame,
+            from_=0.0,
+            to=500.0,
+            increment=0.1,
+            textvariable=self.editor.preview_surface_start_var,
+            width=10,
+            format="%.2f",
+        )
+        self.editor.preview_surface_start_spin.grid(
+            row=2, column=5, sticky="w", padx=(8, 0), pady=(10, 0)
+        )
+
+        ttk.Label(preview_frame, text="Угол гребня, град").grid(row=3, column=0, sticky="w", pady=(10, 0))
+        self.editor.preview_surface_angle_spin = ttk.Spinbox(
+            preview_frame,
+            from_=-90.0,
+            to=90.0,
+            increment=1.0,
+            textvariable=self.editor.preview_surface_angle_var,
+            width=10,
+            format="%.1f",
+        )
+        self.editor.preview_surface_angle_spin.grid(
+            row=3, column=1, sticky="w", padx=(8, 0), pady=(10, 0)
+        )
+
+        ttk.Label(preview_frame, text="Коэффициент формы").grid(
+            row=3, column=2, sticky="w", padx=(16, 0), pady=(10, 0)
+        )
+        self.editor.preview_surface_shape_spin = ttk.Spinbox(
+            preview_frame,
+            from_=0.1,
+            to=10.0,
+            increment=0.1,
+            textvariable=self.editor.preview_surface_shape_var,
+            width=10,
+            format="%.2f",
+        )
+        self.editor.preview_surface_shape_spin.grid(
+            row=3, column=3, sticky="w", padx=(8, 0), pady=(10, 0)
+        )
+
+    def _build_run_tab(self) -> None:
+        body = self._create_tab("run", "Режим расчёта")
+        detail_frame = ttk.LabelFrame(body, text="Параметры запуска расчёта", padding=10)
+        detail_frame.grid(row=0, column=0, sticky="ew")
+        detail_frame.columnconfigure(5, weight=1)
+
+        ttk.Label(detail_frame, text="Сценарий").grid(row=0, column=0, sticky="w")
+        run_combo = ttk.Combobox(
+            detail_frame,
+            textvariable=self.editor.run_scenario_var,
+            values=list(self.editor.run_scenario_key_to_label.values()),
+            state="readonly",
+            width=30,
+        )
+        run_combo.grid(row=0, column=1, sticky="w", padx=(8, 0))
+        run_combo.bind(
+            "<<ComboboxSelected>>",
+            lambda _event: self.editor._refresh_run_scenario_controls(),
+        )
+        ttk.Label(
+            detail_frame,
+            textvariable=self.editor.run_summary_var,
+            foreground="#555555",
+            wraplength=720,
+            justify="left",
+        ).grid(row=0, column=2, columnspan=4, sticky="w", padx=(16, 0))
+
+        ttk.Label(detail_frame, text="Шаг по времени, с").grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Spinbox(
+            detail_frame,
+            from_=0.001,
+            to=0.1,
+            increment=0.001,
+            textvariable=self.editor.run_dt_var,
+            width=10,
+            format="%.3f",
+        ).grid(row=1, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
+
+        ttk.Label(detail_frame, text="Длительность, с").grid(
+            row=1, column=2, sticky="w", padx=(16, 0), pady=(10, 0)
+        )
+        ttk.Spinbox(
+            detail_frame,
+            from_=0.2,
+            to=60.0,
+            increment=0.1,
+            textvariable=self.editor.run_t_end_var,
+            width=10,
+            format="%.1f",
+        ).grid(row=1, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
+
+        ttk.Checkbutton(
+            detail_frame,
+            text="Сохранять расширенный лог давления и потоков",
+            variable=self.editor.run_record_full_var,
+        ).grid(row=1, column=4, columnspan=2, sticky="w", padx=(16, 0), pady=(10, 0))
+
+        ttk.Label(detail_frame, textvariable=self.editor.run_primary_label_var).grid(
+            row=2, column=0, sticky="w", pady=(10, 0)
+        )
+        self.editor.run_primary_spin = ttk.Spinbox(
+            detail_frame,
+            from_=0.0,
+            to=50.0,
+            increment=0.1,
+            textvariable=self.editor.run_primary_value_var,
+            width=10,
+            format="%.3f",
+        )
+        self.editor.run_primary_spin.grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
+
+        ttk.Label(detail_frame, textvariable=self.editor.run_secondary_label_var).grid(
+            row=2, column=2, sticky="w", padx=(16, 0), pady=(10, 0)
+        )
+        self.editor.run_secondary_spin = ttk.Spinbox(
+            detail_frame,
+            from_=0.0,
+            to=50.0,
+            increment=0.1,
+            textvariable=self.editor.run_secondary_value_var,
+            width=10,
+            format="%.3f",
+        )
+        self.editor.run_secondary_spin.grid(row=2, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
+
+        preset_frame = ttk.LabelFrame(body, text="Быстрые пресеты", padding=10)
+        preset_frame.grid(row=1, column=0, sticky="ew", pady=(12, 0))
+        for idx, (preset_key, preset_label_text, _preset_desc) in enumerate(DESKTOP_RUN_PRESET_OPTIONS):
+            ttk.Button(
+                preset_frame,
+                text=preset_label_text,
+                command=lambda key=preset_key: self.editor._apply_run_preset(key),
+            ).grid(row=0, column=idx, sticky="ew", padx=(0 if idx == 0 else 8, 0))
+            preset_frame.columnconfigure(idx, weight=1)
+
+        ttk.Label(
+            preset_frame,
+            textvariable=self.editor.run_mode_summary_var,
+            foreground="#334455",
+            wraplength=860,
+            justify="left",
+        ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(10, 0))
+        ttk.Label(
+            preset_frame,
+            textvariable=self.editor.run_mode_cost_var,
+            foreground="#6b4d00",
+            wraplength=860,
+            justify="left",
+        ).grid(row=2, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        ttk.Label(
+            preset_frame,
+            textvariable=self.editor.run_mode_advice_var,
+            foreground="#1f5d50",
+            wraplength=860,
+            justify="left",
+        ).grid(row=3, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        ttk.Label(
+            preset_frame,
+            textvariable=self.editor.run_mode_usage_var,
+            foreground="#355c7d",
+            wraplength=860,
+            justify="left",
+        ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        ttk.Label(
+            preset_frame,
+            textvariable=self.editor.run_preset_hint_var,
+            foreground="#555555",
+            wraplength=860,
+            justify="left",
+        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(8, 0))
+
+    def _build_policy_tab(self) -> None:
+        body = self._create_tab("policy", "Политики и выгрузка")
+        runtime_frame = ttk.LabelFrame(body, text="Поведение расчёта и выгрузка", padding=10)
+        runtime_frame.grid(row=0, column=0, sticky="ew")
+        runtime_frame.columnconfigure(0, weight=1)
+        runtime_frame.columnconfigure(1, weight=1)
+
+        cache_frame = ttk.LabelFrame(runtime_frame, text="Кэш расчёта", padding=8)
+        cache_frame.grid(row=0, column=0, sticky="nsew")
+        for idx, (policy_key, policy_label, _policy_desc) in enumerate(DESKTOP_RUN_CACHE_POLICY_OPTIONS):
+            ttk.Radiobutton(
+                cache_frame,
+                text=policy_label,
+                value=policy_key,
+                variable=self.editor.run_cache_policy_var,
+            ).grid(row=idx, column=0, sticky="w")
+        ttk.Label(
+            cache_frame,
+            textvariable=self.editor.run_cache_hint_var,
+            wraplength=380,
+            justify="left",
+            foreground="#555555",
+        ).grid(row=4, column=0, sticky="w", pady=(8, 0))
+
+        runtime_policy_frame = ttk.LabelFrame(runtime_frame, text="Политика выполнения", padding=8)
+        runtime_policy_frame.grid(row=0, column=1, sticky="nsew", padx=(12, 0))
+        for idx, (policy_key, policy_label, _policy_desc) in enumerate(DESKTOP_RUN_RUNTIME_POLICY_OPTIONS):
+            ttk.Radiobutton(
+                runtime_policy_frame,
+                text=policy_label,
+                value=policy_key,
+                variable=self.editor.run_runtime_policy_var,
+            ).grid(row=idx, column=0, sticky="w")
+        ttk.Label(
+            runtime_policy_frame,
+            textvariable=self.editor.run_runtime_policy_hint_var,
+            wraplength=380,
+            justify="left",
+            foreground="#555555",
+        ).grid(row=4, column=0, sticky="w", pady=(8, 0))
+
+        flags_frame = ttk.LabelFrame(body, text="Флаги запуска", padding=10)
+        flags_frame.grid(row=1, column=0, sticky="ew", pady=(12, 0))
+        ttk.Checkbutton(
+            flags_frame,
+            text="Выгружать таблицы CSV для подробных режимов",
+            variable=self.editor.run_export_csv_var,
+        ).grid(row=0, column=0, sticky="w")
+        ttk.Checkbutton(
+            flags_frame,
+            text="Выгружать набор NPZ для подробных режимов",
+            variable=self.editor.run_export_npz_var,
+        ).grid(row=0, column=1, sticky="w", padx=(16, 0))
+        ttk.Checkbutton(
+            flags_frame,
+            text="Запускать самопроверку перед расчётом",
+            variable=self.editor.run_auto_check_var,
+        ).grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ttk.Checkbutton(
+            flags_frame,
+            text="Сохранять журнал запуска в файл",
+            variable=self.editor.run_log_to_file_var,
+        ).grid(row=1, column=1, sticky="w", padx=(16, 0), pady=(8, 0))
+        ttk.Label(
+            flags_frame,
+            text=(
+                "Кэш и выгрузка важны для подробных режимов. "
+                "Краткий предпросмотр всегда пишет короткую сводку, а самопроверка и журнал доступны для всех режимов."
+            ),
+            wraplength=860,
+            justify="left",
+            foreground="#555555",
+        ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
+
+    def _build_launch_tab(self) -> None:
+        body = self._create_tab("launch", "Запуск")
+        summary_frame = ttk.LabelFrame(body, text="Что будет запущено", padding=10)
+        summary_frame.grid(row=0, column=0, sticky="ew")
+        ttk.Label(
+            summary_frame,
+            textvariable=self.editor.run_launch_summary_var,
+            wraplength=880,
+            justify="left",
+            foreground="#334455",
+        ).grid(row=0, column=0, columnspan=4, sticky="w")
+        ttk.Button(
+            summary_frame,
+            text="Проверить конфигурацию",
+            command=self.editor._run_config_check,
+        ).grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(
+            summary_frame,
+            text="Проверить и запустить",
+            command=self._run_selected_profile_with_check,
+        ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            summary_frame,
+            text="Запустить выбранный режим",
+            command=self._run_selected_profile,
+        ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            summary_frame,
+            text="Открыть папку запусков",
+            command=self.editor._open_desktop_runs_dir,
+        ).grid(row=1, column=3, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Label(
+            summary_frame,
+            textvariable=self.launch_action_hint_var,
+            wraplength=880,
+            justify="left",
+            foreground="#1f5d50",
+        ).grid(row=2, column=0, columnspan=4, sticky="w", pady=(10, 0))
+
+    def _build_artifacts_tab(self) -> None:
+        body = self._create_tab("artifacts", "Результаты и журналы")
+        recent_frame = ttk.LabelFrame(body, text="Последние результаты", padding=10)
+        recent_frame.grid(row=0, column=0, sticky="ew")
+        recent_frame.columnconfigure(0, weight=1)
+        recent_frame.columnconfigure(1, weight=1)
+
+        preview_recent_frame = ttk.LabelFrame(
+            recent_frame,
+            text="Последний предпросмотр",
+            padding=8,
+        )
+        preview_recent_frame.grid(row=0, column=0, sticky="nsew")
+        ttk.Label(
+            preview_recent_frame,
+            textvariable=self.editor.latest_preview_summary_var,
+            wraplength=400,
+            justify="left",
+            foreground="#334455",
+        ).grid(row=0, column=0, columnspan=3, sticky="w")
+        ttk.Button(
+            preview_recent_frame,
+            text="Обновить сводку",
+            command=self.editor._refresh_latest_preview_summary,
+        ).grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(
+            preview_recent_frame,
+            text="Открыть сводку (JSON)",
+            command=self.editor._open_latest_preview_report_json,
+        ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            preview_recent_frame,
+            text="Открыть журнал",
+            command=self.editor._open_latest_preview_log,
+        ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
+
+        run_recent_frame = ttk.LabelFrame(
+            recent_frame,
+            text="Последний подробный расчёт",
+            padding=8,
+        )
+        run_recent_frame.grid(row=0, column=1, sticky="nsew", padx=(12, 0))
+        ttk.Label(
+            run_recent_frame,
+            textvariable=self.editor.latest_run_summary_var,
+            wraplength=400,
+            justify="left",
+            foreground="#334455",
+        ).grid(row=0, column=0, columnspan=4, sticky="w")
+        ttk.Button(
+            run_recent_frame,
+            text="Обновить сводку",
+            command=self.editor._refresh_latest_run_summary,
+        ).grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(
+            run_recent_frame,
+            text="Открыть сводку (JSON)",
+            command=self.editor._open_latest_run_summary_json,
+        ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            run_recent_frame,
+            text="Открыть журнал",
+            command=self.editor._open_latest_run_log,
+        ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            run_recent_frame,
+            text="Открыть основную таблицу CSV",
+            command=self.editor._open_latest_df_main_csv,
+        ).grid(row=1, column=3, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            run_recent_frame,
+            text="Открыть набор NPZ",
+            command=self.editor._open_latest_npz_bundle,
+        ).grid(row=2, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(
+            run_recent_frame,
+            text="Открыть каталог кэша",
+            command=self.editor._open_latest_run_cache_dir,
+        ).grid(row=2, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            run_recent_frame,
+            text="Открыть папку запусков",
+            command=self.editor._open_desktop_runs_dir,
+        ).grid(row=2, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
+
+        check_recent_frame = ttk.LabelFrame(
+            body,
+            text="Последняя самопроверка",
+            padding=10,
+        )
+        check_recent_frame.grid(row=1, column=0, sticky="ew", pady=(12, 0))
+        ttk.Label(
+            check_recent_frame,
+            textvariable=self.editor.latest_selfcheck_summary_var,
+            wraplength=860,
+            justify="left",
+            foreground="#334455",
+        ).grid(row=0, column=0, columnspan=3, sticky="w")
+        ttk.Button(
+            check_recent_frame,
+            text="Обновить сводку",
+            command=self.editor._refresh_latest_selfcheck_summary,
+        ).grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(
+            check_recent_frame,
+            text="Открыть сводку (JSON)",
+            command=self.editor._open_latest_selfcheck_report_json,
+        ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            check_recent_frame,
+            text="Открыть журнал",
+            command=self.editor._open_latest_selfcheck_log,
+        ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
+
+        support_frame = ttk.LabelFrame(body, text="Кэш и журналы", padding=10)
+        support_frame.grid(row=2, column=0, sticky="ew", pady=(12, 0))
+        ttk.Label(
+            support_frame,
+            text=(
+                "Здесь собраны только служебные каталоги расчёта. "
+                "Открывайте их, когда нужно проверить кэш, журнал запуска или ручную выгрузку."
+            ),
+            wraplength=860,
+            justify="left",
+            foreground="#555555",
+        ).grid(row=0, column=0, columnspan=3, sticky="w")
+        ttk.Button(
+            support_frame,
+            text="Открыть кэш расчёта",
+            command=self.editor._open_run_setup_cache_root,
+        ).grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(
+            support_frame,
+            text="Открыть папку журналов",
+            command=self.editor._open_run_setup_log_root,
+        ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            support_frame,
+            text="Обновить все сводки",
+            command=self._refresh_runtime_summaries,
+        ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
 
     def _bind_live_refreshes(self) -> None:
         self._trace_tokens.append(

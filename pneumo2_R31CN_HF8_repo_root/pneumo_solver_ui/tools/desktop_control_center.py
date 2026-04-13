@@ -31,7 +31,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from pneumo_solver_ui.desktop_ui_core import build_scrolled_text, build_status_strip
+from pneumo_solver_ui.desktop_ui_core import build_scrolled_text, build_scrolled_treeview, build_status_strip
 from pneumo_solver_ui.desktop_shell.external_launch import repo_root as shell_repo_root
 from pneumo_solver_ui.desktop_shell.external_launch import spawn_module
 from pneumo_solver_ui.desktop_shell.launcher_catalog import (
@@ -62,53 +62,88 @@ class DesktopControlCenter:
         self.root.geometry("860x540")
         self.root.minsize(820, 500)
         self.launch_targets = build_desktop_launch_catalog(include_mnemo=False)
+        self.target_by_iid: dict[str, DesktopLaunchCatalogItem] = {}
 
         self.status_var = tk.StringVar(value="Готово. Выберите нужное инженерное окно.")
+        self.details_var = tk.StringVar(
+            value="Слева список инженерных окон, справа описание выбранного окна и журнал запуска."
+        )
         self._build_ui()
 
     def _build_ui(self) -> None:
         outer = ttk.Frame(self.root, padding=16)
         outer.pack(fill="both", expand=True)
 
+        header = ttk.Frame(outer)
+        header.pack(fill="x", pady=(0, 10))
+        title_box = ttk.Frame(header)
+        title_box.pack(side="left", fill="x", expand=True)
         ttk.Label(
-            outer,
+            title_box,
             text="Центр запуска инженерных окон",
             font=("Segoe UI", 16, "bold"),
         ).pack(anchor="w")
-
         ttk.Label(
-            outer,
-            text=(
-                "Единая точка входа для инженерных окон проекта. "
-                "Этот центр запуска работает без web-интерфейса и не включает отдельную мнемосхему."
-            ),
-            wraplength=780,
+            title_box,
+            textvariable=self.details_var,
+            wraplength=620,
             justify="left",
-        ).pack(anchor="w", pady=(6, 14))
+        ).pack(anchor="w", pady=(4, 0))
 
-        cards = ttk.Frame(outer)
-        cards.pack(fill="x", expand=False)
-        cards.columnconfigure(0, weight=1)
-        cards.columnconfigure(1, weight=1)
+        header_actions = ttk.Frame(header)
+        header_actions.pack(side="right", anchor="ne")
+        ttk.Button(header_actions, text="Открыть проект", command=self._open_repo_root).pack(side="left")
 
-        for idx, target in enumerate(self.launch_targets):
-            row = idx // 2
-            col = idx % 2
-            box = ttk.LabelFrame(cards, text=target.title, padding=12)
-            box.grid(row=row, column=col, padx=6, pady=6, sticky="nsew")
+        workspace = ttk.Panedwindow(outer, orient="horizontal")
+        workspace.pack(fill="both", expand=True)
 
-            ttk.Label(
-                box,
-                text=target.description,
-                wraplength=320,
-                justify="left",
-            ).pack(anchor="w", fill="x")
+        left = ttk.Frame(workspace, padding=(0, 0, 8, 0))
+        right = ttk.Frame(workspace)
 
-            ttk.Button(
-                box,
-                text=f"Открыть: {target.title}",
-                command=lambda t=target: self._launch(t),
-            ).pack(anchor="w", pady=(10, 0))
+        list_box = ttk.LabelFrame(left, text="Инженерные окна", padding=8)
+        list_box.pack(fill="both", expand=True)
+        tree_frame, self.tree = build_scrolled_treeview(
+            list_box,
+            columns=("kind",),
+            show="tree headings",
+            height=14,
+        )
+        self.tree.heading("#0", text="Окно")
+        self.tree.heading("kind", text="Тип")
+        self.tree.column("#0", width=250, anchor="w")
+        self.tree.column("kind", width=90, anchor="w")
+        tree_frame.pack(fill="both", expand=True)
+        self.tree.bind("<<TreeviewSelect>>", self._on_select_target)
+        self.tree.bind("<Double-1>", self._on_open_selected_target)
+
+        left_actions = ttk.Frame(list_box)
+        left_actions.pack(fill="x", pady=(8, 0))
+        ttk.Button(left_actions, text="Открыть выбранное", command=self._launch_selected_target).pack(side="left")
+        ttk.Button(left_actions, text="Папка проекта", command=self._open_repo_root).pack(side="left", padx=(8, 0))
+
+        right_split = ttk.Panedwindow(right, orient="vertical")
+        right_split.pack(fill="both", expand=True)
+
+        detail_box = ttk.LabelFrame(right_split, text="Описание", padding=10)
+        ttk.Label(
+            detail_box,
+            textvariable=self.details_var,
+            wraplength=520,
+            justify="left",
+        ).pack(anchor="w")
+        detail_actions = ttk.Frame(detail_box)
+        detail_actions.pack(fill="x", pady=(10, 0))
+        ttk.Button(detail_actions, text="Открыть выбранное окно", command=self._launch_selected_target).pack(side="left")
+
+        log_frame = ttk.LabelFrame(right_split, text="Журнал запуска", padding=8)
+        log_body, self.log = build_scrolled_text(log_frame, height=12, wrap="word")
+        log_body.pack(fill="both", expand=True)
+        self.log.configure(state="disabled")
+
+        right_split.add(detail_box, weight=1)
+        right_split.add(log_frame, weight=3)
+        workspace.add(left, weight=2)
+        workspace.add(right, weight=3)
 
         footer = build_status_strip(outer, primary_var=self.status_var, reserve_columns=1)
         footer.pack(fill="x", pady=(14, 8))
@@ -118,14 +153,50 @@ class DesktopControlCenter:
             command=self._open_repo_root,
         ).grid(row=0, column=1, sticky="e", padx=(12, 0))
 
-        log_frame = ttk.LabelFrame(outer, text="Журнал запуска", padding=8)
-        log_frame.pack(fill="both", expand=True, pady=(8, 0))
-
-        log_body, self.log = build_scrolled_text(log_frame, height=12, wrap="word")
-        log_body.pack(fill="both", expand=True)
-        self.log.configure(state="disabled")
-
+        self._populate_targets()
         self._append_log("Центр запуска готов. Для этих окон web-интерфейс не требуется.")
+
+    def _populate_targets(self) -> None:
+        self.target_by_iid.clear()
+        self.tree.delete(*self.tree.get_children())
+        for idx, target in enumerate(self.launch_targets):
+            iid = f"target_{idx}"
+            self.target_by_iid[iid] = target
+            self.tree.insert("", "end", iid=iid, text=target.title, values=("Окно",))
+        if self.target_by_iid:
+            first_iid = next(iter(self.target_by_iid))
+            self.tree.selection_set(first_iid)
+            self.tree.focus(first_iid)
+            self._render_selected_target(first_iid)
+
+    def _render_selected_target(self, iid: str) -> None:
+        target = self.target_by_iid.get(iid)
+        if target is None:
+            self.details_var.set(
+                "Слева список инженерных окон, справа описание выбранного окна и журнал запуска."
+            )
+            return
+        self.details_var.set(
+            f"{target.title}\n\n{target.description}\n\nМодуль запуска: {target.module}"
+        )
+
+    def _selected_target(self) -> DesktopLaunchCatalogItem | None:
+        iid = next(iter(self.tree.selection() or ()), "")
+        return self.target_by_iid.get(iid)
+
+    def _on_select_target(self, _event=None) -> None:
+        iid = next(iter(self.tree.selection() or ()), "")
+        if iid:
+            self._render_selected_target(iid)
+
+    def _on_open_selected_target(self, _event=None) -> None:
+        self._launch_selected_target()
+
+    def _launch_selected_target(self) -> None:
+        target = self._selected_target()
+        if target is None:
+            return
+        self._launch(target)
 
     def _append_log(self, text: str) -> None:
         self.log.configure(state="normal")

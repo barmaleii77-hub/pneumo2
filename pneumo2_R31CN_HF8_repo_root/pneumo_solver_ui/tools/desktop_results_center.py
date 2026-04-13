@@ -19,7 +19,7 @@ from pneumo_solver_ui.desktop_results_model import (
     format_validation_summary,
 )
 from pneumo_solver_ui.desktop_results_runtime import DesktopResultsRuntime
-from pneumo_solver_ui.desktop_ui_core import build_scrolled_text, build_scrolled_treeview
+from pneumo_solver_ui.desktop_ui_core import ScrollableFrame, build_scrolled_text, build_scrolled_treeview
 from pneumo_solver_ui.release_info import get_release
 
 
@@ -147,42 +147,71 @@ class DesktopResultsCenter(ttk.Frame):
         self.refresh()
 
     def _build_ui(self) -> None:
+        header = ttk.Frame(self)
+        header.pack(fill="x", pady=(0, 8))
+        title_box = ttk.Frame(header)
+        title_box.pack(side="left", fill="x", expand=True)
         ttk.Label(
-            self,
+            title_box,
             text="Результаты и анализ",
             font=("Segoe UI", 14, "bold"),
         ).pack(anchor="w")
         ttk.Label(
-            self,
-            text=(
-                "Единый центр обзора последних результатов расчёта, проверок и артефактов оптимизации. "
-                "Отсюда удобно переходить к сравнению, визуализации, диагностике и передаче материалов без работы с внутренними файлами."
-            ),
-            wraplength=1120,
+            title_box,
+            textvariable=self.validation_var,
             justify="left",
-        ).pack(anchor="w", pady=(4, 10))
+            wraplength=760,
+        ).pack(anchor="w", pady=(2, 0))
 
-        summary = ttk.LabelFrame(self, text="Сводка", padding=10)
+        actions = ttk.Frame(header)
+        actions.pack(side="right", anchor="ne")
+        ttk.Button(actions, text="Обновить", command=self.refresh).pack(side="left")
+        self.btn_open_selected = ttk.Button(actions, text="Открыть выбранное", command=self._open_selected)
+        self.btn_open_selected.pack(side="left", padx=(8, 0))
+        self.btn_compare = ttk.Button(actions, text="Сравнение", command=self._launch_compare_viewer)
+        self.btn_compare.pack(side="left", padx=(8, 0))
+        self.btn_animator = ttk.Button(actions, text="Аниматор", command=self._launch_animator)
+        self.btn_animator.pack(side="left", padx=(8, 0))
+        self.btn_animator_follow = ttk.Button(actions, text="Сопровождение", command=self._launch_animator_follow)
+        self.btn_animator_follow.pack(side="left", padx=(8, 0))
+
+        workspace = ttk.Panedwindow(self, orient="horizontal")
+        workspace.pack(fill="both", expand=True)
+
+        left_column = ttk.Frame(workspace)
+        left_pane = ttk.Panedwindow(left_column, orient="vertical")
+        left_pane.pack(fill="both", expand=True)
+
+        right_column = ttk.Frame(workspace)
+        right_pane = ttk.Panedwindow(right_column, orient="vertical")
+        right_pane.pack(fill="both", expand=True)
+
+        summary_host = ScrollableFrame(right_pane)
+        summary_body = ttk.Frame(summary_host.body, padding=4)
+        summary_body.pack(fill="both", expand=True)
+        summary_body.columnconfigure(0, weight=1)
+
+        summary = ttk.LabelFrame(summary_body, text="Сводка", padding=10)
         summary.pack(fill="x")
-        ttk.Label(summary, textvariable=self.validation_var).pack(anchor="w")
-        ttk.Label(summary, textvariable=self.optimizer_var).pack(anchor="w", pady=(4, 0))
-        ttk.Label(summary, textvariable=self.triage_var).pack(anchor="w", pady=(4, 0))
-        ttk.Label(summary, textvariable=self.npz_var).pack(anchor="w", pady=(4, 0))
-        ttk.Label(summary, textvariable=self.runs_var).pack(anchor="w", pady=(4, 0))
+        ttk.Label(summary, textvariable=self.validation_var, wraplength=420, justify="left").pack(anchor="w")
+        ttk.Label(summary, textvariable=self.optimizer_var, wraplength=420, justify="left").pack(anchor="w", pady=(4, 0))
+        ttk.Label(summary, textvariable=self.triage_var, wraplength=420, justify="left").pack(anchor="w", pady=(4, 0))
+        ttk.Label(summary, textvariable=self.npz_var, wraplength=420, justify="left").pack(anchor="w", pady=(4, 0))
+        ttk.Label(summary, textvariable=self.runs_var, wraplength=420, justify="left").pack(anchor="w", pady=(4, 0))
 
-        handoff = ttk.LabelFrame(self, text="Рекомендуемое следующее действие", padding=10)
+        handoff = ttk.LabelFrame(summary_body, text="Следующий шаг", padding=10)
         handoff.pack(fill="x", pady=(10, 0))
         ttk.Label(
             handoff,
             textvariable=self.next_step_var,
             font=("Segoe UI", 10, "bold"),
-            wraplength=1120,
+            wraplength=420,
             justify="left",
         ).pack(anchor="w")
         ttk.Label(
             handoff,
             textvariable=self.next_detail_var,
-            wraplength=1120,
+            wraplength=420,
             justify="left",
         ).pack(anchor="w", pady=(4, 0))
         handoff_actions = ttk.Frame(handoff)
@@ -194,25 +223,25 @@ class DesktopResultsCenter(ttk.Frame):
         )
         self.btn_run_next_step.pack(side="left")
 
-        run_handoff = ttk.LabelFrame(self, text="Передача последнего прогона", padding=10)
+        run_handoff = ttk.LabelFrame(summary_body, text="Передача последнего прогона", padding=10)
         run_handoff.pack(fill="x", pady=(10, 0))
         ttk.Label(
             run_handoff,
             textvariable=self.handoff_summary_var,
             font=("Segoe UI", 10, "bold"),
-            wraplength=1120,
+            wraplength=420,
             justify="left",
         ).pack(anchor="w")
         ttk.Label(
             run_handoff,
             textvariable=self.handoff_detail_var,
-            wraplength=1120,
+            wraplength=420,
             justify="left",
         ).pack(anchor="w", pady=(4, 0))
         ttk.Label(
             run_handoff,
             textvariable=self.handoff_steps_var,
-            wraplength=1120,
+            wraplength=420,
             justify="left",
         ).pack(anchor="w", pady=(4, 0))
         run_handoff_actions = ttk.Frame(run_handoff)
@@ -268,8 +297,13 @@ class DesktopResultsCenter(ttk.Frame):
         )
         self.btn_handoff_animator.pack(side="left", padx=(8, 0))
 
-        overview = ttk.LabelFrame(self, text="Обзор проверок", padding=8)
-        overview.pack(fill="x", pady=(10, 0))
+        tools = ttk.LabelFrame(summary_body, text="Инструменты", padding=10)
+        tools.pack(fill="x", pady=(10, 0))
+        ttk.Button(tools, text="Открыть send_bundles", command=self._open_send_bundles).pack(fill="x")
+        ttk.Button(tools, text="Открыть GUI диагностики", command=self._launch_full_diagnostics_gui).pack(fill="x", pady=(6, 0))
+        ttk.Button(tools, text="Открыть центр отправки", command=self._launch_send_results_gui).pack(fill="x", pady=(6, 0))
+
+        overview = ttk.LabelFrame(left_pane, text="Обзор проверок", padding=8)
         overview_tree_frame, self.overview_tree = build_scrolled_treeview(
             overview,
             columns=("status", "detail", "next_action", "evidence"),
@@ -286,7 +320,7 @@ class DesktopResultsCenter(ttk.Frame):
         self.overview_tree.column("detail", width=340, anchor="w")
         self.overview_tree.column("next_action", width=220, anchor="w")
         self.overview_tree.column("evidence", width=340, anchor="w")
-        overview_tree_frame.pack(fill="x", expand=False)
+        overview_tree_frame.pack(fill="both", expand=True)
         self.overview_tree.bind("<<TreeviewSelect>>", self._on_overview_select)
         self.overview_tree.bind("<Double-1>", self._on_overview_open)
         overview_actions = ttk.Frame(overview)
@@ -297,32 +331,9 @@ class DesktopResultsCenter(ttk.Frame):
             command=self._run_selected_overview_action,
         )
         self.btn_overview_action.pack(side="left")
+        left_pane.add(overview, weight=2)
 
-        actions = ttk.Frame(self)
-        actions.pack(fill="x", pady=(10, 8))
-        ttk.Button(actions, text="Обновить обзор", command=self.refresh).pack(side="left")
-        self.btn_open_selected = ttk.Button(actions, text="Открыть выбранный артефакт", command=self._open_selected)
-        self.btn_open_selected.pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Открыть send_bundles", command=self._open_send_bundles).pack(side="left", padx=(8, 0))
-        self.btn_compare = ttk.Button(actions, text="Открыть сравнение", command=self._launch_compare_viewer)
-        self.btn_compare.pack(side="left", padx=(8, 0))
-        self.btn_animator = ttk.Button(actions, text="Открыть аниматор", command=self._launch_animator)
-        self.btn_animator.pack(side="left", padx=(8, 0))
-        self.btn_animator_follow = ttk.Button(actions, text="Аниматор: сопровождение", command=self._launch_animator_follow)
-        self.btn_animator_follow.pack(side="left", padx=(8, 0))
-
-        tools = ttk.Frame(self)
-        tools.pack(fill="x", pady=(0, 8))
-        ttk.Button(tools, text="Открыть GUI диагностики", command=self._launch_full_diagnostics_gui).pack(side="left")
-        ttk.Button(tools, text="Открыть центр отправки", command=self._launch_send_results_gui).pack(side="left", padx=(8, 0))
-
-        body = ttk.Panedwindow(self, orient="horizontal")
-        body.pack(fill="both", expand=True)
-
-        browse = ttk.LabelFrame(body, text="Просмотр материалов", padding=8)
-        details = ttk.LabelFrame(body, text="Подробности", padding=8)
-        body.add(browse, weight=3)
-        body.add(details, weight=4)
+        browse = ttk.LabelFrame(left_pane, text="Материалы", padding=8)
 
         browse_controls = ttk.Frame(browse)
         browse_controls.pack(fill="x", pady=(0, 8))
@@ -379,14 +390,21 @@ class DesktopResultsCenter(ttk.Frame):
         artifact_tree_frame.pack(fill="both", expand=True)
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
         self.tree.bind("<Double-1>", self._on_open_selected)
+        left_pane.add(browse, weight=3)
 
+        details = ttk.LabelFrame(right_pane, text="Подробности", padding=8)
         details_body, self.details = build_scrolled_text(details, wrap="word", height=16)
         details_body.pack(fill="both", expand=True)
         self.details.configure(state="disabled")
+        right_pane.add(details, weight=4)
+        right_pane.add(summary_host, weight=3)
+        workspace.add(left_column, weight=3)
+        workspace.add(right_column, weight=4)
 
         footer = ttk.Frame(self)
         footer.pack(fill="x", pady=(8, 0))
         ttk.Label(footer, textvariable=self.status_var).pack(side="left")
+        ttk.Sizegrip(footer).pack(side="right")
 
     def refresh(self) -> None:
         self.snapshot_state = self.runtime.snapshot()
