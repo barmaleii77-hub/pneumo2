@@ -75,43 +75,43 @@ class DesktopResultsSnapshot:
 
 def format_validation_summary(snapshot: DesktopResultsSnapshot) -> str:
     if snapshot.validation_ok is None:
-        return "Validation: latest send bundle validation not found yet."
-    status = "PASS" if snapshot.validation_ok else "FAIL"
+        return "Проверка: свежий отчёт пока не найден."
+    status = "Норма" if snapshot.validation_ok else "Ошибка"
     return (
-        f"Validation: {status} | "
-        f"errors={int(snapshot.validation_error_count)} | "
-        f"warnings={int(snapshot.validation_warning_count)}"
+        f"Проверка: {status} | "
+        f"ошибок={int(snapshot.validation_error_count)} | "
+        f"предупреждений={int(snapshot.validation_warning_count)}"
     )
 
 
 def format_optimizer_gate_summary(snapshot: DesktopResultsSnapshot) -> str:
-    gate = str(snapshot.optimizer_scope_gate or "").strip() or "n/a"
+    gate = str(snapshot.optimizer_scope_gate or "").strip() or "нет данных"
     risk = snapshot.optimizer_scope_release_risk
     if risk is None:
-        return f"Optimizer gate: {gate}"
-    return f"Optimizer gate: {gate} | release_risk={bool(risk)}"
+        return f"Шлюз оптимизации: {gate}"
+    return f"Шлюз оптимизации: {gate} | риск выпуска={bool(risk)}"
 
 
 def format_triage_summary(snapshot: DesktopResultsSnapshot) -> str:
     return (
-        "Triage: "
-        f"critical={int(snapshot.triage_critical_count)} | "
-        f"warn={int(snapshot.triage_warn_count)} | "
-        f"info={int(snapshot.triage_info_count)} | "
-        f"red_flags={len(snapshot.triage_red_flags)}"
+        "Разбор замечаний: "
+        f"критичных={int(snapshot.triage_critical_count)} | "
+        f"предупреждений={int(snapshot.triage_warn_count)} | "
+        f"справочных={int(snapshot.triage_info_count)} | "
+        f"красных флагов={len(snapshot.triage_red_flags)}"
     )
 
 
 def format_npz_summary(snapshot: DesktopResultsSnapshot) -> str:
     if snapshot.latest_npz_path is None:
-        return "Latest NPZ: not available yet."
-    return f"Latest NPZ: {snapshot.latest_npz_path.name}"
+        return "Последний NPZ: пока недоступен."
+    return f"Последний NPZ: {snapshot.latest_npz_path.name}"
 
 
 def format_recent_runs_summary(snapshot: DesktopResultsSnapshot) -> str:
     autotest = snapshot.latest_autotest_run_dir.name if snapshot.latest_autotest_run_dir else "—"
     diagnostics = snapshot.latest_diagnostics_run_dir.name if snapshot.latest_diagnostics_run_dir else "—"
-    return f"Recent runs: autotest={autotest} | diagnostics={diagnostics}"
+    return f"Последние прогоны: автотест={autotest} | диагностика={diagnostics}"
 
 
 __all__ = [

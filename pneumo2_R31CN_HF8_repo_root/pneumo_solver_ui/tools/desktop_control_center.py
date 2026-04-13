@@ -31,6 +31,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from pneumo_solver_ui.desktop_ui_core import build_scrolled_text, build_status_strip
 from pneumo_solver_ui.desktop_shell.external_launch import repo_root as shell_repo_root
 from pneumo_solver_ui.desktop_shell.external_launch import spawn_module
 from pneumo_solver_ui.desktop_shell.launcher_catalog import (
@@ -57,12 +58,12 @@ def _spawn_module(module: str) -> subprocess.Popen:
 class DesktopControlCenter:
     def __init__(self) -> None:
         self.root = tk.Tk()
-        self.root.title(f"Pneumo Desktop Control Center — {RELEASE}")
+        self.root.title(f"Центр запуска инженерных окон — {RELEASE}")
         self.root.geometry("860x540")
         self.root.minsize(820, 500)
         self.launch_targets = build_desktop_launch_catalog(include_mnemo=False)
 
-        self.status_var = tk.StringVar(value="Готово. Выберите desktop-инструмент.")
+        self.status_var = tk.StringVar(value="Готово. Выберите нужное инженерное окно.")
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -71,15 +72,15 @@ class DesktopControlCenter:
 
         ttk.Label(
             outer,
-            text="Pneumo Desktop Control Center",
+            text="Центр запуска инженерных окон",
             font=("Segoe UI", 16, "bold"),
         ).pack(anchor="w")
 
         ttk.Label(
             outer,
             text=(
-                "Единая точка входа для desktop-инструментов проекта. "
-                "Этот launcher не использует WEB UI и не включает Desktop Mnemo."
+                "Единая точка входа для инженерных окон проекта. "
+                "Этот центр запуска работает без web-интерфейса и не включает отдельную мнемосхему."
             ),
             wraplength=780,
             justify="left",
@@ -109,25 +110,22 @@ class DesktopControlCenter:
                 command=lambda t=target: self._launch(t),
             ).pack(anchor="w", pady=(10, 0))
 
-        footer = ttk.Frame(outer)
+        footer = build_status_strip(outer, primary_var=self.status_var, reserve_columns=1)
         footer.pack(fill="x", pady=(14, 8))
-
-        ttk.Label(footer, textvariable=self.status_var).pack(side="left", anchor="w")
-
         ttk.Button(
             footer,
             text="Открыть папку проекта",
             command=self._open_repo_root,
-        ).pack(side="right")
+        ).grid(row=0, column=1, sticky="e", padx=(12, 0))
 
-        log_frame = ttk.LabelFrame(outer, text="Журнал launcher", padding=8)
+        log_frame = ttk.LabelFrame(outer, text="Журнал запуска", padding=8)
         log_frame.pack(fill="both", expand=True, pady=(8, 0))
 
-        self.log = tk.Text(log_frame, height=12, wrap="word")
-        self.log.pack(fill="both", expand=True)
+        log_body, self.log = build_scrolled_text(log_frame, height=12, wrap="word")
+        log_body.pack(fill="both", expand=True)
         self.log.configure(state="disabled")
 
-        self._append_log("Launcher готов. WEB UI для этих инструментов не требуется.")
+        self._append_log("Центр запуска готов. Для этих окон web-интерфейс не требуется.")
 
     def _append_log(self, text: str) -> None:
         self.log.configure(state="normal")
@@ -147,7 +145,7 @@ class DesktopControlCenter:
             self.status_var.set(f"Открыта папка проекта: {root}")
             self._append_log(f"[open] repo: {root}")
         except Exception as exc:
-            messagebox.showerror("Desktop Control Center", f"Не удалось открыть папку проекта:\n{exc}")
+            messagebox.showerror("Центр запуска инженерных окон", f"Не удалось открыть папку проекта:\n{exc}")
             self._append_log("[error] open repo\n" + traceback.format_exc())
 
     def _launch(self, target: DesktopLaunchCatalogItem) -> None:
@@ -161,7 +159,7 @@ class DesktopControlCenter:
             )
         except Exception as exc:
             messagebox.showerror(
-                "Desktop Control Center",
+                "Центр запуска инженерных окон",
                 f"Не удалось запустить «{target.title}»:\n{exc}",
             )
             self.status_var.set(f"Ошибка запуска: {target.title}")

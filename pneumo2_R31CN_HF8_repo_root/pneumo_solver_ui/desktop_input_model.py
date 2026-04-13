@@ -16,6 +16,222 @@ from pathlib import Path
 from typing import Any
 
 
+DESKTOP_ADVANCED_FIELD_KEYS: frozenset[str] = frozenset(
+    {
+        "corner_loads_mode",
+        "static_trim_force",
+        "static_trim_pneumo_mode",
+        "использовать_паспорт_компонентов",
+        "enforce_camozzi_only",
+        "enforce_scheme_integrity",
+        "пружина_геометрия_согласовать_с_цилиндром",
+        "газ_модель_теплоемкости",
+        "макс_шаг_интегрирования_с",
+        "макс_число_внутренних_шагов_на_dt",
+        "autoverif_enable",
+        "mechanics_selfcheck",
+        "пружина_длина_solid_м",
+        "пружина_запас_до_coil_bind_минимум_м",
+    }
+)
+
+
+DESKTOP_HELP_OVERRIDES: dict[str, dict[str, str]] = {
+    "база": {
+        "tooltip": "Расстояние между передней и задней осями. Влияет на продольную устойчивость, посадку и кинематику.",
+        "help_title": "Колёсная база",
+        "help_body": (
+            "Колёсная база задаёт расстояние между осями.\n\n"
+            "Единица: метры.\n"
+            "Влияет на распределение масс, геометрию подвески и реакцию машины на продольные возмущения.\n"
+            "Обычно меняется редко и соответствует геометрии конкретного шасси."
+        ),
+    },
+    "колея": {
+        "tooltip": "Расстояние между левым и правым колесом на оси. Влияет на поперечную устойчивость.",
+        "help_title": "Колея",
+        "help_body": (
+            "Колея задаёт поперечный размер оси.\n\n"
+            "Единица: метры.\n"
+            "Используется в расчёте поперечной устойчивости, крена и распределения нагрузки."
+        ),
+    },
+    "ход_штока": {
+        "tooltip": "Полный рабочий ход цилиндра. Для этого поля важны и миллиметры, и визуальный контроль положения в ходе.",
+        "help_title": "Полный ход штока",
+        "help_body": (
+            "Полный ход штока определяет доступный диапазон перемещения цилиндра.\n\n"
+            "Единица: миллиметры.\n"
+            "Используется в статической посадке, в аниматоре и при контроле выхода в отбой или сжатие."
+        ),
+    },
+    "zero_pose_target_stroke_frac": {
+        "tooltip": "Целевое положение штока в статике как доля полного хода.",
+        "help_title": "Целевая доля хода",
+        "help_body": (
+            "Показывает, где должен находиться шток в нулевой позе.\n\n"
+            "Единица: доля полного хода.\n"
+            "Значение 0.50 означает середину хода, 0.30 ближе к отбою, 0.70 ближе к сжатию."
+        ),
+    },
+}
+
+
+DESKTOP_GRAPHIC_CONTEXT_OVERRIDES: dict[str, str] = {
+    **{
+        key: "frame_dimensions"
+        for key in (
+            "база",
+            "длина_рамы",
+            "ширина_рамы",
+            "высота_рамы",
+        )
+    },
+    "колея": "track",
+    "высота_центра_масс": "cg_height",
+    **{
+        key: "wheel"
+        for key in (
+            "радиус_колеса_м",
+            "wheel_width_m",
+        )
+    },
+    "ход_штока": "stroke",
+    **{
+        key: "pressure"
+        for key in (
+            "начальное_давление_Ресивер1",
+            "начальное_давление_Ресивер2",
+            "начальное_давление_Ресивер3",
+            "начальное_давление_аккумулятора",
+        )
+    },
+    **{
+        key: "volume"
+        for key in (
+            "объём_ресивера_1",
+            "объём_ресивера_2",
+            "объём_ресивера_3",
+            "объём_аккумулятора",
+        )
+    },
+    **{
+        key: "piston"
+        for key in (
+            "диаметр_поршня_Ц1",
+            "диаметр_поршня_Ц2",
+        )
+    },
+    **{
+        key: "rod"
+        for key in (
+            "диаметр_штока_Ц1",
+            "диаметр_штока_Ц2",
+        )
+    },
+    "масса_рамы": "mass_sprung",
+    "масса_неподрессоренная_на_угол": "mass_unsprung",
+    "жёсткость_шины": "tyre_stiffness",
+    "демпфирование_шины": "tyre_damping",
+    **{
+        key: "spring"
+        for key in (
+            "пружина_длина_свободная_м",
+            "пружина_масштаб",
+        )
+    },
+    **{
+        key: "stabilizer"
+        for key in (
+            "стабилизатор_вкл",
+            "стабилизатор_перед_жесткость_Н_м",
+            "стабилизатор_зад_жесткость_Н_м",
+        )
+    },
+    "vx0_м_с": "speed",
+    **{
+        key: "cg_plan"
+        for key in (
+            "cg_x_м",
+            "cg_y_м",
+        )
+    },
+    "corner_loads_mode": "load_distribution",
+    **{
+        key: "trim_mode"
+        for key in (
+            "static_trim_enable",
+            "static_trim_force",
+            "static_trim_pneumo_mode",
+        )
+    },
+    **{
+        key: "trim_target"
+        for key in (
+            "zero_pose_target_stroke_frac",
+            "zero_pose_tol_stroke_frac",
+        )
+    },
+    **{
+        key: "kinematics"
+        for key in (
+            "механика_кинематика",
+            "колесо_координата",
+        )
+    },
+    **{
+        key: "compatibility"
+        for key in (
+            "использовать_паспорт_компонентов",
+            "enforce_camozzi_only",
+            "enforce_scheme_integrity",
+        )
+    },
+    **{
+        key: "spring_link"
+        for key in (
+            "пружина_по_цилиндру",
+            "пружина_геометрия_согласовать_с_цилиндром",
+        )
+    },
+    **{
+        key: "gas_model"
+        for key in (
+            "термодинамика",
+            "газ_модель_теплоемкости",
+        )
+    },
+    **{
+        key: "temperature"
+        for key in (
+            "температура_окр_К",
+            "T_AIR_К",
+        )
+    },
+    **{
+        key: "integration"
+        for key in (
+            "макс_шаг_интегрирования_с",
+            "макс_число_внутренних_шагов_на_dt",
+        )
+    },
+    **{
+        key: "checks"
+        for key in (
+            "autoverif_enable",
+            "mechanics_selfcheck",
+        )
+    },
+    **{
+        key: "reference_limits"
+        for key in (
+            "пружина_длина_солид_м",
+            "пружина_запас_до_coil_bind_минимум_м",
+        )
+    },
+}
+
+
 @dataclass(frozen=True)
 class DesktopInputFieldSpec:
     key: str
@@ -30,12 +246,19 @@ class DesktopInputFieldSpec:
     ui_offset: float = 0.0
     digits: int = 3
     choices: tuple[str, ...] = ()
+    choice_labels: tuple[tuple[str, str], ...] = ()
+    tooltip_text: str = ""
+    help_title: str = ""
+    help_body: str = ""
+    user_level: str = "basic"
+    graphic_context: str = ""
 
     def to_ui(self, base_value: Any) -> Any:
         if self.control == "bool":
             return bool(base_value)
         if self.control == "choice":
-            return str(base_value or (self.choices[0] if self.choices else ""))
+            raw_value = str(base_value or (self.choices[0] if self.choices else ""))
+            return self.choice_label_map.get(raw_value, raw_value)
         if self.control == "int":
             try:
                 return int(round((float(base_value) + float(self.ui_offset)) * float(self.ui_scale)))
@@ -52,7 +275,8 @@ class DesktopInputFieldSpec:
         if self.control == "bool":
             return bool(ui_value)
         if self.control == "choice":
-            return str(ui_value or "")
+            raw_value = str(ui_value or "").strip()
+            return self.choice_value_map.get(raw_value, raw_value)
         if self.control == "int":
             try:
                 return int(round(float(ui_value) / float(self.ui_scale) - float(self.ui_offset)))
@@ -62,6 +286,78 @@ class DesktopInputFieldSpec:
             return float(ui_value) / float(self.ui_scale) - float(self.ui_offset)
         except Exception:
             return 0.0
+
+    @property
+    def effective_user_level(self) -> str:
+        if str(self.user_level or "").strip():
+            if self.user_level != "basic":
+                return self.user_level
+        if self.key in DESKTOP_ADVANCED_FIELD_KEYS:
+            return "advanced"
+        return "basic"
+
+    @property
+    def effective_tooltip_text(self) -> str:
+        override = DESKTOP_HELP_OVERRIDES.get(self.key, {})
+        value = str(self.tooltip_text or override.get("tooltip") or self.description or "").strip()
+        return value
+
+    @property
+    def effective_help_title(self) -> str:
+        override = DESKTOP_HELP_OVERRIDES.get(self.key, {})
+        value = str(self.help_title or override.get("help_title") or self.label or "").strip()
+        return value
+
+    @property
+    def effective_help_body(self) -> str:
+        override = DESKTOP_HELP_OVERRIDES.get(self.key, {})
+        body = str(self.help_body or override.get("help_body") or self.description or "").strip()
+        if self.unit_label:
+            unit_line = f"Единица измерения: {self.unit_label}."
+            if unit_line not in body:
+                body = f"{body}\n\n{unit_line}"
+        if self.min_value is not None or self.max_value is not None:
+            range_line = f"Рабочий диапазон: {self.range_text}."
+            if range_line not in body:
+                body = f"{body}\n{range_line}"
+        return body.strip()
+
+    @property
+    def effective_graphic_context(self) -> str:
+        return str(
+            self.graphic_context
+            or DESKTOP_GRAPHIC_CONTEXT_OVERRIDES.get(self.key, "")
+            or ""
+        ).strip()
+
+    @property
+    def range_text(self) -> str:
+        if self.min_value is None and self.max_value is None:
+            return "не задан"
+        if self.min_value is None:
+            return f"до {self.max_value}"
+        if self.max_value is None:
+            return f"от {self.min_value}"
+        return f"от {self.min_value} до {self.max_value}"
+
+    @property
+    def choice_label_map(self) -> dict[str, str]:
+        return {str(key): str(label) for key, label in self.choice_labels}
+
+    @property
+    def choice_value_map(self) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        for key, label in self.choice_labels:
+            mapping[str(label)] = str(key)
+        for raw_choice in self.choices:
+            mapping.setdefault(str(raw_choice), str(raw_choice))
+        return mapping
+
+    @property
+    def display_choices(self) -> tuple[str, ...]:
+        if self.control != "choice":
+            return ()
+        return tuple(self.choice_label_map.get(choice, choice) for choice in self.choices)
 
 
 @dataclass(frozen=True)
@@ -127,10 +423,10 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
             DesktopInputFieldSpec("vx0_м_с", "Начальная скорость", "м/с", "Начальная продольная скорость модели.", min_value=0.0, max_value=80.0, step=0.1, digits=2),
             DesktopInputFieldSpec("cg_x_м", "Смещение ЦТ по базе", "м", "Продольное смещение центра тяжести относительно середины базы.", min_value=-1.5, max_value=1.5, step=0.005, digits=3),
             DesktopInputFieldSpec("cg_y_м", "Смещение ЦТ по колее", "м", "Поперечное смещение центра тяжести относительно продольной оси.", min_value=-1.0, max_value=1.0, step=0.005, digits=3),
-            DesktopInputFieldSpec("corner_loads_mode", "Режим распределения веса по углам", "", "Как распределять вес по углам при инициализации: через ЦТ или через эффективные жёсткости.", control="choice", choices=("cg", "stiffness")),
+            DesktopInputFieldSpec("corner_loads_mode", "Режим распределения веса по углам", "", "Как распределять вес по углам при инициализации: через ЦТ или через эффективные жёсткости.", control="choice", choices=("cg", "stiffness"), choice_labels=(("cg", "Через центр тяжести"), ("stiffness", "Через жёсткости"))),
             DesktopInputFieldSpec("static_trim_enable", "Искать статическую посадку", "", "Перед основным расчётом подобрать статическое равновесие.", control="bool"),
             DesktopInputFieldSpec("static_trim_force", "Форсировать статическую посадку", "", "Принудительно выполнять static trim даже при существующем состоянии.", control="bool"),
-            DesktopInputFieldSpec("static_trim_pneumo_mode", "Режим static trim по пневматике", "", "Как корректировать пневматику при поиске посадки: давлением, массой или политропой.", control="choice", choices=("pressure", "mass", "polytropic")),
+            DesktopInputFieldSpec("static_trim_pneumo_mode", "Режим static trim по пневматике", "", "Как корректировать пневматику при поиске посадки: давлением, массой или политропой.", control="choice", choices=("pressure", "mass", "polytropic"), choice_labels=(("pressure", "Коррекция давлением"), ("mass", "Коррекция массой"), ("polytropic", "Политропная коррекция"))),
             DesktopInputFieldSpec("zero_pose_target_stroke_frac", "Целевая доля хода в нуле", "доля", "Желаемое положение штока в статике как доля полного хода.", min_value=0.0, max_value=1.0, step=0.01, digits=2),
             DesktopInputFieldSpec("zero_pose_tol_stroke_frac", "Допуск по доле хода", "доля", "Разрешённое отклонение от целевого положения штока в статике.", min_value=0.0, max_value=0.5, step=0.01, digits=2),
         ),
@@ -139,12 +435,12 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
         title="Компоненты",
         description="Выбор активной кинематики, привязки пружины и правил работы с паспортом компонентов.",
         fields=(
-            DesktopInputFieldSpec("механика_кинематика", "Кинематика подвески", "", "Активный вариант кинематики в модели.", control="choice", choices=("dw2d", "dw2d_mounts", "mr", "table")),
-            DesktopInputFieldSpec("колесо_координата", "Режим колесо_координата", "", "Как интерпретируется координата колеса: центр колеса или пятно контакта.", control="choice", choices=("center", "contact")),
+            DesktopInputFieldSpec("механика_кинематика", "Кинематика подвески", "", "Активный вариант кинематики в модели.", control="choice", choices=("dw2d", "dw2d_mounts", "mr", "table"), choice_labels=(("dw2d", "Двухрычажная 2D"), ("dw2d_mounts", "2D с точками крепления"), ("mr", "Через передаточное отношение"), ("table", "По табличной характеристике"))),
+            DesktopInputFieldSpec("колесо_координата", "Режим колесо_координата", "", "Как интерпретируется координата колеса: центр колеса или пятно контакта.", control="choice", choices=("center", "contact"), choice_labels=(("center", "Центр колеса"), ("contact", "Пятно контакта"))),
             DesktopInputFieldSpec("использовать_паспорт_компонентов", "Использовать паспорт компонентов", "", "Подтягивать параметры компонентов из component passport.", control="bool"),
             DesktopInputFieldSpec("enforce_camozzi_only", "Только Camozzi-коды", "", "Контролировать, что схема использует только Camozzi-коды из паспорта компонентов.", control="bool"),
             DesktopInputFieldSpec("enforce_scheme_integrity", "Контроль целостности схемы", "", "Следить за fingerprint схемы и не терять инженерную целостность конфигурации.", control="bool"),
-            DesktopInputFieldSpec("пружина_по_цилиндру", "Опорный цилиндр для пружины", "", "К какому цилиндру привязывать пружину в механической модели.", control="choice", choices=("C1", "C2", "DELTA")),
+            DesktopInputFieldSpec("пружина_по_цилиндру", "Опорный цилиндр для пружины", "", "К какому цилиндру привязывать пружину в механической модели.", control="choice", choices=("C1", "C2", "DELTA"), choice_labels=(("C1", "Цилиндр C1"), ("C2", "Цилиндр C2"), ("DELTA", "Разность C1-C2"))),
             DesktopInputFieldSpec("пружина_геометрия_согласовать_с_цилиндром", "Согласовывать геометрию пружины с цилиндром", "", "Поддерживать совместимость геометрии пружины с выбранным цилиндром.", control="bool"),
         ),
     ),
@@ -152,12 +448,12 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
         title="Справочные данные",
         description="Режимы газа, температурные reference-параметры и служебные инженерные проверки.",
         fields=(
-            DesktopInputFieldSpec("термодинамика", "Режим термодинамики", "", "Модель газа: изотерма, адиабата или тепловой режим со стенкой.", control="choice", choices=("thermal", "isothermal", "adiabatic")),
-            DesktopInputFieldSpec("газ_модель_теплоемкости", "Модель теплоёмкости воздуха", "", "Постоянные теплоёмкости или T-зависимая reference-модель nist_air.", control="choice", choices=("constant", "nist_air")),
+            DesktopInputFieldSpec("термодинамика", "Режим термодинамики", "", "Модель газа: изотерма, адиабата или тепловой режим со стенкой.", control="choice", choices=("thermal", "isothermal", "adiabatic"), choice_labels=(("thermal", "Теплообмен со стенкой"), ("isothermal", "Изотермический"), ("adiabatic", "Адиабатический"))),
+            DesktopInputFieldSpec("газ_модель_теплоемкости", "Модель теплоёмкости воздуха", "", "Постоянные теплоёмкости или T-зависимая reference-модель nist_air.", control="choice", choices=("constant", "nist_air"), choice_labels=(("constant", "Постоянные теплоёмкости"), ("nist_air", "Справочная модель воздуха NIST"))),
             DesktopInputFieldSpec("температура_окр_К", "Температура окружающей среды", "К", "Температура среды, в которой работает система.", min_value=200.0, max_value=400.0, step=1.0, digits=1),
             DesktopInputFieldSpec("T_AIR_К", "Начальная температура воздуха", "К", "Базовая температура воздуха для начального состояния газа.", min_value=200.0, max_value=400.0, step=1.0, digits=1),
             DesktopInputFieldSpec("макс_шаг_интегрирования_с", "Максимальный шаг интегрирования", "мс", "Ограничение шага интегратора.", min_value=0.01, max_value=10.0, step=0.01, ui_scale=1000.0, digits=2),
-            DesktopInputFieldSpec("макс_число_внутренних_шагов_на_dt", "Макс. внутренних шагов на dt", "", "Защита от зависания интегратора на одном шаге dt.", control="int", min_value=1000, max_value=1000000, step=1000, digits=0),
+            DesktopInputFieldSpec("макс_число_внутренних_шагов_на_dt", "Макс. внутренних шагов на dt", "шагов", "Защита от зависания интегратора на одном шаге dt.", control="int", min_value=1000, max_value=1000000, step=1000, digits=0),
             DesktopInputFieldSpec("autoverif_enable", "Включить автопроверку", "", "Проверять физические и численные ограничения после расчёта.", control="bool"),
             DesktopInputFieldSpec("mechanics_selfcheck", "Включить самопроверку механики", "", "Проверять кинематику и механические ограничения.", control="bool"),
             DesktopInputFieldSpec("пружина_длина_солид_м", "Solid length пружины", "мм", "Справочная длина пружины в сомкнутом состоянии.", min_value=0.0, max_value=400.0, step=1.0, ui_scale=1000.0, digits=0),

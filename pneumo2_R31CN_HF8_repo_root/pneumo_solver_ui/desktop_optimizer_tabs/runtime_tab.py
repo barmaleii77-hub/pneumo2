@@ -22,7 +22,7 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
 
         ttk.Label(
             body,
-            text="Runtime launch and live progress",
+            text="Запуск и ход оптимизации",
             font=("Segoe UI", 14, "bold"),
         ).grid(row=0, column=0, sticky="w")
         ttk.Label(
@@ -37,10 +37,10 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
         self.profile_var = tk.StringVar(
             value=launch_profile_label(str(controller.var("opt_launch_profile").get() or ""))
         )
-        profile_frame = ttk.LabelFrame(body, text="Launch profiles", padding=10)
+        profile_frame = ttk.LabelFrame(body, text="Профили запуска", padding=10)
         profile_frame.grid(row=2, column=0, sticky="ew")
         profile_frame.columnconfigure(1, weight=1)
-        ttk.Label(profile_frame, text="Operator preset").grid(row=0, column=0, sticky="w")
+        ttk.Label(profile_frame, text="Готовый профиль").grid(row=0, column=0, sticky="w")
         ttk.Combobox(
             profile_frame,
             textvariable=self.profile_var,
@@ -50,7 +50,7 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
         ).grid(row=0, column=1, sticky="ew", padx=(8, 12))
         ttk.Button(
             profile_frame,
-            text="Apply profile",
+            text="Применить профиль",
             command=lambda: controller.apply_launch_profile_label(self.selected_profile_label()),
         ).grid(row=0, column=2, sticky="e")
         ttk.Label(
@@ -63,40 +63,40 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
             justify="left",
         ).grid(row=1, column=0, columnspan=3, sticky="ew", pady=(8, 0))
 
-        self.profile_panel = TextReportPanel(body, text="Profile guidance", height=7)
+        self.profile_panel = TextReportPanel(body, text="Пояснение по профилю", height=7)
         self.profile_panel.grid(row=3, column=0, sticky="ew", pady=(10, 0))
 
-        self.readiness_panel = TextReportPanel(body, text="Launch readiness", height=10)
+        self.readiness_panel = TextReportPanel(body, text="Готовность к запуску", height=10)
         self.readiness_panel.grid(row=4, column=0, sticky="ew", pady=(10, 0))
 
-        mode_frame = ttk.LabelFrame(body, text="Launch mode", padding=10)
+        mode_frame = ttk.LabelFrame(body, text="Режим запуска", padding=10)
         mode_frame.grid(row=5, column=0, sticky="ew")
         ttk.Radiobutton(
             mode_frame,
-            text="StageRunner",
+            text="Поэтапный запуск",
             variable=controller.var("opt_use_staged"),
             value=True,
             command=controller.refresh_all,
         ).pack(side="left")
         ttk.Radiobutton(
             mode_frame,
-            text="Distributed coordinator",
+            text="Распределённый координатор",
             variable=controller.var("opt_use_staged"),
             value=False,
             command=controller.refresh_all,
         ).pack(side="left", padx=(12, 0))
         ttk.Checkbutton(
             mode_frame,
-            text="Stage resume",
+            text="Продолжить стадии",
             variable=controller.var("opt_stage_resume"),
         ).pack(side="left", padx=(18, 0))
         ttk.Checkbutton(
             mode_frame,
-            text="Coordinator resume",
+            text="Продолжить координатор",
             variable=controller.var("opt_resume"),
         ).pack(side="left", padx=(12, 0))
 
-        staged_frame = ttk.LabelFrame(body, text="StageRunner controls", padding=10)
+        staged_frame = ttk.LabelFrame(body, text="Параметры поэтапного запуска", padding=10)
         staged_frame.grid(row=6, column=0, sticky="ew", pady=(10, 0))
         for col in range(6):
             staged_frame.columnconfigure(col, weight=1)
@@ -127,7 +127,7 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
             variable=controller.var("sort_tests_by_cost"),
         ).grid(row=4, column=2, columnspan=2, sticky="w", pady=(6, 0))
 
-        dist_frame = ttk.LabelFrame(body, text="Distributed settings", padding=10)
+        dist_frame = ttk.LabelFrame(body, text="Параметры распределённого запуска", padding=10)
         dist_frame.grid(row=7, column=0, sticky="ew", pady=(10, 0))
         for col in range(6):
             dist_frame.columnconfigure(col, weight=1)
@@ -154,12 +154,12 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
         self._add_entry(dist_frame, row=6, col=4, label="Buffer", var_name="proposer_buffer")
         ttk.Checkbutton(
             dist_frame,
-            text="HV log",
+            text="Журнал гиперобъёма",
             variable=controller.var("opt_hv_log"),
         ).grid(row=7, column=0, sticky="w", pady=(6, 0))
         ttk.Checkbutton(
             dist_frame,
-            text="Normalize BoTorch objectives",
+            text="Нормализовать цели BoTorch",
             variable=controller.var("opt_botorch_normalize_objectives"),
         ).grid(row=7, column=2, columnspan=2, sticky="w", pady=(6, 0))
         ttk.Label(
@@ -168,7 +168,7 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
             foreground="#555555",
         ).grid(row=7, column=4, columnspan=2, sticky="e", pady=(6, 0))
 
-        botorch_frame = ttk.LabelFrame(body, text="BoTorch advanced", padding=10)
+        botorch_frame = ttk.LabelFrame(body, text="BoTorch: дополнительные параметры", padding=10)
         botorch_frame.grid(row=8, column=0, sticky="ew", pady=(10, 0))
         for col in range(6):
             botorch_frame.columnconfigure(col, weight=1)
@@ -179,28 +179,28 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
         self._add_entry(botorch_frame, row=1, col=2, label="maxiter", var_name="opt_botorch_maxiter")
         self._add_entry(botorch_frame, row=1, col=4, label="ref margin", var_name="opt_botorch_ref_margin")
 
-        launch_frame = ttk.LabelFrame(body, text="Launch controls", padding=10)
+        launch_frame = ttk.LabelFrame(body, text="Команды запуска", padding=10)
         launch_frame.grid(row=9, column=0, sticky="ew", pady=(10, 0))
         ttk.Button(launch_frame, text="Обновить preview", command=controller.refresh_all).pack(side="left")
         ttk.Button(
             launch_frame,
-            text="Next recommended surface",
+            text="Следующий рекомендуемый шаг",
             command=controller.follow_launch_readiness_next_action,
         ).pack(side="left", padx=(8, 0))
         ttk.Button(launch_frame, text="Запустить", command=controller.launch_job).pack(side="left", padx=(8, 0))
-        ttk.Button(launch_frame, text="Soft stop", command=controller.soft_stop_job).pack(side="left", padx=(8, 0))
-        ttk.Button(launch_frame, text="Hard stop", command=controller.hard_stop_job).pack(side="left", padx=(8, 0))
+        ttk.Button(launch_frame, text="Мягкая остановка", command=controller.soft_stop_job).pack(side="left", padx=(8, 0))
+        ttk.Button(launch_frame, text="Жёсткая остановка", command=controller.hard_stop_job).pack(side="left", padx=(8, 0))
         ttk.Button(launch_frame, text="Очистить статус", command=controller.clear_job_status).pack(side="left", padx=(8, 0))
 
-        self.resume_panel = TextReportPanel(body, text="Resume target", height=6)
+        self.resume_panel = TextReportPanel(body, text="Источник продолжения", height=6)
         self.resume_panel.grid(row=10, column=0, sticky="ew", pady=(10, 0))
-        self.status_panel = TextReportPanel(body, text="Live runtime summary", height=8)
+        self.status_panel = TextReportPanel(body, text="Текущее состояние", height=8)
         self.status_panel.grid(row=11, column=0, sticky="ew", pady=(10, 0))
-        self.stage_runtime_panel = TextReportPanel(body, text="Stage policy runtime", height=8)
+        self.stage_runtime_panel = TextReportPanel(body, text="Ход стадий", height=8)
         self.stage_runtime_panel.grid(row=12, column=0, sticky="ew", pady=(10, 0))
-        self.command_panel = TextReportPanel(body, text="Command preview", height=8, wrap="none")
+        self.command_panel = TextReportPanel(body, text="Предпросмотр команды", height=8, wrap="none")
         self.command_panel.grid(row=13, column=0, sticky="ew", pady=(10, 0))
-        self.log_panel = TextReportPanel(body, text="Live log tail", height=14, wrap="none")
+        self.log_panel = TextReportPanel(body, text="Последние строки журнала", height=14, wrap="none")
         self.log_panel.grid(row=14, column=0, sticky="ew", pady=(10, 0))
 
     def _add_entry(

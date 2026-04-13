@@ -188,7 +188,7 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "load_desktop_diagnostics_bundle_record" in send_src
     assert "ttk.Notebook" in center_src
     assert "write_desktop_diagnostics_center_state" in center_src
-    assert "machine-readable" in center_src.lower()
+    assert "Машиночитаемые пути" in center_src
     assert "copy_latest_bundle_to_clipboard(" in center_src
     assert "out_dir=self._active_bundle_out_dir()" in center_src
     assert "def _schedule_poll(self) -> None:" in center_src
@@ -201,10 +201,10 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "def _restore_bundle_state_from_last_center_state(self) -> None:" in center_src
     assert "def _restore_diagnostics_request_from_last_center_state(self) -> None:" in center_src
     assert "def _resolve_initial_tab_name(self, initial_tab: str) -> str:" in center_src
-    assert "## Last diagnostics run" in center_src
+    assert "## Последний прогон диагностики" in center_src
     assert "status=\"running\"" in center_src
     assert "status=\"stopping\"" in center_src
-    assert "- status:" in center_src
+    assert "- Состояние:" in center_src
     assert "latest_desktop_diagnostics_summary.md" in center_src
     assert 'DesktopDiagnosticsCenter(root, initial_tab="restore")' in center_src
     assert "<<NotebookTabChanged>>" in center_src
@@ -222,9 +222,8 @@ def test_test_center_integration_reuses_existing_latest_bundle_when_opening_send
         errors="replace",
     )
 
-    assert "Diagnostics / Send Center" in src
     assert 'env["PNEUMO_SEND_RESULTS_REUSE_LATEST"] = "1"' in src
-    assert "launch_send_results_gui(env=env)" in src or "subprocess.Popen([self.py, str(send_gui)], cwd=str(self.repo), env=env)" in src
+    assert "launch_send_results_gui(env=env)" in src or "results_runtime.launch_send_results_gui(env=env)" in src or "subprocess.Popen([self.py, str(send_gui)], cwd=str(self.repo), env=env)" in src
     assert 'os.environ.get("PNEUMO_SEND_RESULTS_REUSE_LATEST", "0")' in send_src
     assert "auto_build_bundle=(not reuse_latest) or (not bundle_state.latest_zip_path)" in send_src
 

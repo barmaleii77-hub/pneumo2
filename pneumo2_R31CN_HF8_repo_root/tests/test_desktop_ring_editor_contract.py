@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import tkinter as tk
 from pathlib import Path
 from types import SimpleNamespace
 
+from pneumo_solver_ui.desktop_ring_editor_panels import RoadPanel
 from pneumo_solver_ui.desktop_ring_editor_model import (
     apply_ring_preset,
     apply_segment_preset_to_selected,
@@ -58,6 +60,17 @@ class _FakeVar:
 
     def get(self) -> object:
         return self.value
+
+
+def _canvas_texts(canvas: tk.Canvas) -> list[str]:
+    texts: list[str] = []
+    for item in canvas.find_all():
+        if canvas.type(item) != "text":
+            continue
+        text = str(canvas.itemcget(item, "text") or "").strip()
+        if text:
+            texts.append(text)
+    return texts
 
 
 def _make_stub_editor(tmp_path: Path) -> DesktopRingScenarioEditor:
@@ -119,6 +132,7 @@ def test_root_desktop_ring_editor_wrappers_delegate_to_launcher() -> None:
     assert "wscript.shell" in vbs
     assert "start_desktop_ring_editor.pyw" in vbs
     assert 'Path(__file__).with_name("START_DESKTOP_RING_EDITOR.py")' in pyw
+    assert "ensure_root_launcher_runtime" in py
     assert 'MODULE = "pneumo_solver_ui.tools.desktop_ring_scenario_editor"' in py
 
 
@@ -145,9 +159,10 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "ExportPanel" in tool_src
     assert "PreviewPanel" in tool_src
     assert "def on_host_close(self) -> None:" in tool_src
-    assert "Apply ring" in tool_src
-    assert "Apply segment" in tool_src
-    assert "Insert segment" in tool_src
+    assert "Редактор кольцевых сценариев" in tool_src
+    assert "Пресет кольца" in tool_src
+    assert "Применить" in tool_src
+    assert "Вставить сегмент" in tool_src
     assert "def _install_window_bindings" in tool_src
     assert 'WM_DELETE_WINDOW' in tool_src
     assert '"<Control-s>"' in tool_src
@@ -166,43 +181,91 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "def _open_anim_latest_exports" in tool_src
     assert "artifacts_stale" in tool_src
     assert "opt_suite_stale" in tool_src
-    assert "bundle: " in tool_src
-    assert "opt-suite: " in tool_src
-    assert "bundle meta: ring_length_m=" in tool_src
-    assert "seam_max_mm=" in tool_src
+    assert "Состояние файлов сценария:" in tool_src
+    assert "Состояние набора оптимизации:" in tool_src
+    assert "Длина кольца:" in tool_src
+    assert "Максимальный шов замыкания:" in tool_src
     assert "build_ring_bundle_optimization_preview" in tool_src
     assert "build_ring_bundle_optimization_suite_preview" in tool_src
-    assert "opt_windows=" in tool_src
-    assert "opt_rows=" in tool_src
-    assert "anim_latest sidecars" in tool_src
+    assert "Фрагментов оптимизации:" in tool_src
+    assert "Строк набора:" in tool_src
+    assert "Копия для анимации:" in tool_src
+    assert "self.road_panel.render(diagnostics, selected_index)" in tool_src
+    assert 'self.notebook.add(self.road_tab_scroll, text="Дорога")' in tool_src
+    assert "ttk.PanedWindow(right, orient=\"vertical\")" in tool_src
+    assert "ScrollablePanel(self.notebook)" in tool_src
 
     assert "class SegmentListPanel" in panels_src
+    assert "class ScrollablePanel" in panels_src
     assert "class PreviewPanel" in panels_src
     assert "class MotionPanel" in panels_src
     assert "class RoadPanel" in panels_src
+    assert 'text="Профиль дороги"' in panels_src
+    assert "def render(self, diagnostics: RingEditorDiagnostics, selected_index: int) -> None:" in panels_src
+    assert "self.profile_canvas" in panels_src
     assert "class EventsPanel" in panels_src
     assert "class DiagnosticsPanel" in panels_src
     assert "class ExportPanel" in panels_src
-    assert "Build opt suite" in panels_src
-    assert "Optimization handoff" in panels_src
-    assert "Optimization windows" in panels_src
-    assert "Optimization suite preview" in panels_src
-    assert "Optimization suite rows" in panels_src
-    assert "Open opt workspace" in panels_src
-    assert "Open last suite" in panels_src
-    assert "Quick open last artifacts" in panels_src
-    assert "Open last spec" in panels_src
-    assert "Open last road" in panels_src
-    assert "Open last axay" in panels_src
-    assert "Open anim_latest exports" in panels_src
-    assert "Профиль ВСЕГО кольца: амплитуда A L/R (служебно)" in panels_src
-    assert "Профиль ВСЕГО кольца: полный размах max-min L/R (не A)" in panels_src
-    assert "Локальная амплитуда A L/R" in panels_src
-    assert "Локальный полный размах max-min L/R (не A)" in panels_src
-    assert "Сводка ниже специально разделяет амплитуду A (полуразмах) и полный размах max-min." in panels_src
-    assert "fragment_window_s" in panels_src
+    assert "Сегменты" in panels_src
+    assert "Предпросмотр кольца" in panels_src
+    assert "Параметры дороги" in panels_src
+    assert "Передача в оптимизацию" in panels_src
+    assert "Окна оптимизации" in panels_src
+    assert "Строки набора оптимизации" in panels_src
+    assert "Открыть каталог оптимизации" in panels_src
+    assert "Открыть последний набор" in panels_src
+    assert "Последние артефакты" in panels_src
+    assert "Загрузить сценарий" in panels_src
+    assert "Сохранить сценарий" in panels_src
+    assert "Построить набор оптимизации" in panels_src
+    assert "Начальная скорость, км/ч" in panels_src
+    assert "Зерно генерации" in panels_src
+    assert "Шаг профиля, м" in panels_src
+    assert "Шаг времени, с" in panels_src
+    assert "Число кругов" in panels_src
+    assert "Колёсная база, м" in panels_src
+    assert "Колея, м" in panels_src
+    assert "Длительность, с" in panels_src
+    assert "Скорость в конце, км/ч" in panels_src
+    assert "Радиус поворота, м" in panels_src
+    assert "Стартовая скорость:" in panels_src
+    assert "Длина сегмента:" in panels_src
+    assert "Изменение скорости:" in panels_src
+    assert "Длина кольца примерно" in panels_src
+    assert "Профиль всего кольца: амплитуда (A) левого/правого следа, мм" in panels_src
+    assert "Профиль всего кольца: полный размах левого/правого следа, мм" in panels_src
+    assert "Шов замыкания слева/справа" in panels_src
+    assert "КОЛЬЦО\\nСЦЕНАРИЙ" in panels_src
+    assert "scroll_to_top" in panels_src
+    assert 'label="v0, км/ч"' not in panels_src
+    assert 'label="seed"' not in panels_src
+    assert 'label="dx, м"' not in panels_src
+    assert 'label="dt, c"' not in panels_src
+    assert 'label="n_laps"' not in panels_src
+    assert 'label="wheelbase, м"' not in panels_src
+    assert 'label="track, м"' not in panels_src
+    assert 'label="duration, c"' not in panels_src
+    assert 'label="speed_end, км/ч"' not in panels_src
+    assert 'label="turn_radius, м"' not in panels_src
+    assert "L сегм." not in panels_src
+    assert "Δv:" not in panels_src
+    assert "Профиль ВСЕГО кольца: амплитуда A L/R (служебно)" not in panels_src
+    assert "Профиль ВСЕГО кольца: полный размах max-min L/R (не A)" not in panels_src
+    assert "Локальная амплитуда (A) левого/правого следа" in panels_src
+    assert "Локальный полный размах левого/правого следа" in panels_src
+    assert "Сводка ниже специально разделяет амплитуду (A) и полный размах профиля." in panels_src
+    assert "Diagnostics не собраны." not in panels_src
+    assert "Optimization suite preview ещё не готов." not in panels_src
+    assert "Открыть последний axay" not in panels_src
+    assert "Открыть exports anim_latest" not in panels_src
+    assert "Собрать сценарий/дорогу/axay" not in panels_src
+    assert "файл ускорений" in panels_src
+    assert "Окно фрагмента, с" in panels_src
 
     assert "class RingEditorDiagnostics" in runtime_src
+    assert "class RingRoadProfilePreview" in runtime_src
+    assert "road_profile: RingRoadProfilePreview | None" in runtime_src
+    assert "def _build_road_profile_preview" in runtime_src
     assert "def build_ring_editor_diagnostics" in runtime_src
     assert "def export_ring_scenario_bundle" in runtime_src
     assert "def mirror_ring_bundle_to_anim_latest_exports" in runtime_src
@@ -215,26 +278,28 @@ def test_desktop_ring_editor_presets_apply_ring_and_segment_templates() -> None:
     state = create_editor_state()
     base_uid = str(state.spec["segments"][0]["uid"])
 
-    assert "ISO endurance" in list_ring_preset_names()
-    assert "Left turn sine" in list_segment_preset_names()
+    assert "Ресурсный круг ISO 8608" in list_ring_preset_names()
+    assert "Левый поворот с синусоидой" in list_segment_preset_names()
 
-    apply_ring_preset(state, "ISO endurance")
+    apply_ring_preset(state, "Ресурсный круг ISO 8608")
     assert state.spec["n_laps"] == 3
     assert len(state.spec["segments"]) == 4
     assert state.spec["segments"][1]["turn_direction"] == "LEFT"
 
-    apply_segment_preset_to_selected(state, "Left turn sine")
+    apply_segment_preset_to_selected(state, "Левый поворот с синусоидой")
     assert str(state.spec["segments"][0]["uid"]) == str(state.selected_segment_uid)
     assert state.spec["segments"][0]["turn_direction"] == "LEFT"
     assert str(state.spec["segments"][0]["road"]["mode"]).upper() == "SINE"
 
     before_count = len(state.spec["segments"])
-    insert_segment_preset_after_selection(state, "Obstacle stress")
+    insert_segment_preset_after_selection(state, "Препятствия и ямы")
     assert len(state.spec["segments"]) == before_count + 1
     inserted = next(seg for seg in state.spec["segments"] if str(seg["uid"]) == str(state.selected_segment_uid))
     assert inserted["events"]
     assert str(inserted["road"]["mode"]).upper() == "ISO8608"
     assert base_uid != str(inserted["uid"])
+    apply_ring_preset(state, "ISO endurance")
+    apply_segment_preset_to_selected(state, "Left turn sine")
 
 
 def test_desktop_ring_editor_default_spec_builds_preview_and_bundle(tmp_path: Path) -> None:
@@ -244,6 +309,7 @@ def test_desktop_ring_editor_default_spec_builds_preview_and_bundle(tmp_path: Pa
     assert diagnostics.errors == []
     assert diagnostics.segment_rows
     assert diagnostics.preview_segments
+    assert diagnostics.road_profile is not None
     assert diagnostics.metrics["ring_length_m"] > 0.0
     assert diagnostics.metrics["ring_amp_left_mm"] >= 0.0
     assert diagnostics.metrics["ring_p2p_left_mm"] >= diagnostics.metrics["ring_amp_left_mm"]
@@ -251,6 +317,10 @@ def test_desktop_ring_editor_default_spec_builds_preview_and_bundle(tmp_path: Pa
     assert "L_p2p_mm" in diagnostics.segment_rows[0]
     assert "R_amp_mm" in diagnostics.segment_rows[0]
     assert "R_p2p_mm" in diagnostics.segment_rows[0]
+    assert len(diagnostics.road_profile.x_m) >= 16
+    assert len(diagnostics.road_profile.x_m) == len(diagnostics.road_profile.left_mm)
+    assert len(diagnostics.road_profile.x_m) == len(diagnostics.road_profile.right_mm)
+    assert float(diagnostics.segment_rows[0]["x_end_m"]) > float(diagnostics.segment_rows[0]["x_start_m"])
 
     bundle = export_ring_scenario_bundle(spec, output_dir=tmp_path, tag="desktop_ring")
     spec_path = Path(str(bundle["scenario_json"]))
@@ -316,6 +386,29 @@ def test_desktop_ring_editor_can_materialize_optimization_auto_ring_suite(tmp_pa
     assert float(suite_info["window_s"]) == 6.5
     assert Path(str(suite_info["workspace_dir"])).resolve() == workspace_dir.resolve()
     assert meta["input_ring"]["scenario_json"].endswith("anim_latest_scenario_json.json")
+
+
+def test_desktop_ring_road_panel_renders_whole_and_local_profile() -> None:
+    root = tk.Tk()
+    root.withdraw()
+    panel = RoadPanel(root)
+    panel.pack(fill="both", expand=True)
+    try:
+        diagnostics = build_ring_editor_diagnostics(build_default_ring_spec())
+        panel.render(diagnostics, 0)
+        root.update_idletasks()
+
+        assert diagnostics.road_profile is not None
+        assert "Профиль кольца" in str(panel.profile_stats_var.get() or "")
+        canvas_text = " ".join(_canvas_texts(panel.profile_canvas))
+        assert "Профиль кольца" in canvas_text
+        assert "Выбранный сегмент" in canvas_text
+        assert "Левый след" in canvas_text
+        assert "Правый след" in canvas_text
+        assert "мм" in canvas_text
+        assert len(panel.profile_canvas.find_all()) >= 12
+    finally:
+        root.destroy()
 
 
 def test_desktop_ring_editor_can_build_optimization_preview_rows_from_bundle(tmp_path: Path) -> None:

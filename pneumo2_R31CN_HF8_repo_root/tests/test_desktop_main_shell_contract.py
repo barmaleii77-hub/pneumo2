@@ -41,12 +41,17 @@ def test_desktop_main_shell_registry_separates_hosted_and_external_tools() -> No
     assert by_key["desktop_input_editor"].mode == "hosted"
     assert by_key["test_center"].mode == "hosted"
     assert by_key["autotest_gui"].mode == "hosted"
-    assert by_key["full_diagnostics_gui"].mode == "hosted"
-    assert by_key["send_results_gui"].mode == "hosted"
+    assert by_key["desktop_geometry_reference_center"].mode == "hosted"
+    assert by_key["desktop_diagnostics_center"].mode == "hosted"
 
     assert by_key["compare_viewer"].mode == "external"
     assert by_key["desktop_animator"].mode == "external"
     assert by_key["desktop_mnemo"].mode == "external"
+
+    assert by_key["desktop_input_editor"].entry_kind == "main"
+    assert by_key["desktop_geometry_reference_center"].entry_kind == "tool"
+    assert by_key["desktop_diagnostics_center"].entry_kind == "tool"
+    assert by_key["compare_viewer"].entry_kind == "external"
 
     assert by_key["desktop_input_editor"].group == "Встроенные окна"
     assert by_key["desktop_animator"].group == "Внешние окна"
@@ -59,10 +64,10 @@ def test_desktop_main_shell_registry_exposes_shared_standalone_launch_catalog() 
     modules = {item.module for item in catalog}
 
     assert "pneumo_solver_ui.tools.desktop_input_editor" in modules
+    assert "pneumo_solver_ui.tools.desktop_geometry_reference_center" in modules
     assert "pneumo_solver_ui.tools.test_center_gui" in modules
     assert "pneumo_solver_ui.tools.run_autotest_gui" in modules
-    assert "pneumo_solver_ui.tools.run_full_diagnostics_gui" in modules
-    assert "pneumo_solver_ui.tools.send_results_gui" in modules
+    assert "pneumo_solver_ui.tools.desktop_diagnostics_center" in modules
     assert "pneumo_solver_ui.qt_compare_viewer" in modules
     assert "pneumo_solver_ui.desktop_animator.app" in modules
     assert "pneumo_solver_ui.desktop_mnemo.app" in modules
@@ -75,7 +80,8 @@ def test_desktop_main_shell_keeps_classic_menu_and_workspace_shell() -> None:
     )
 
     assert "class DesktopMainShell" in src
-    assert 'self.root.title(f"Pneumo Desktop Shell - {RELEASE}")' in src
+    assert 'self.root.title(f"PneumoApp - Рабочее место инженера ({RELEASE})")' in src
+    assert "ttk.Panedwindow" in src
     assert "ttk.Notebook" in src
     assert "build_shell_menubar" in src
     assert "build_shell_toolbar" in src
@@ -88,22 +94,21 @@ def test_desktop_main_shell_keeps_classic_menu_and_workspace_shell() -> None:
     assert "self._startup_tool_keys = startup_tool_keys" in src
     assert "self._startup_route_applied = False" in src
     assert 'self.workflow_var = tk.StringVar(value="Маршрут: недоступен")' in src
-    assert 'self.workspace_var = tk.StringVar(value="Главная | Встроенных окон: 0")' in src
+    assert 'self.workspace_var = tk.StringVar(value="Обзор | Открытых окон: 0")' in src
+    assert 'self.details_title_var = tk.StringVar(value="Обзор")' in src
+    assert 'self.details_meta_var = tk.StringVar(value="Основное рабочее место")' in src
     assert "self.home_view = build_shell_home_view(" in src
     assert "self.toolbar = build_shell_toolbar(" in src
     assert "self.workspace_context_menu = build_shell_workspace_context_menu(" in src
     assert "workflow_specs=self._workflow_specs()" in src
     assert "continue_workflow=self.continue_workflow_route" in src
-    assert "has_open_workflow_sessions=self.workspace.has_open_workflow_sessions" in src
     assert "select_previous_workflow=self.select_previous_workflow_tab" in src
     assert "select_next_workflow=self.select_next_workflow_tab" in src
-    assert "list_open_sessions=self.workspace.list_open_sessions" in src
-    assert "selected_workspace_key=self.workspace.selected_workspace_key" in src
-    assert "list_recently_closed_specs=self.workspace.list_recently_closed_specs" in src
-    assert "reopen_recently_closed_at_index=self.workspace.reopen_recently_closed_at_index" in src
-    assert "workspace_tab_index_at_pointer=self.workspace.workspace_tab_index_at_pointer" in src
-    assert "select_workspace_at_index=self.workspace.select_workspace_at_index" in src
-    assert "self.toolbar.frame.pack(fill=\"x\", before=self.notebook)" in src
+    assert "self._build_navigation_panel(left_panel)" in src
+    assert "self._build_details_panel(right_panel)" in src
+    assert "self._rebuild_navigation_tree()" in src
+    assert "self._refresh_details_panel()" in src
+    assert "self.toolbar.frame.pack(fill=\"x\", before=body)" in src
     assert 'external_specs=self._specs_for_group("Внешние окна")' in src
     assert "select_hosted_session=self.select_hosted_session" in src
     assert "select_hosted_session_at_index=self.select_hosted_session_at_index" in src
@@ -121,7 +126,10 @@ def test_desktop_main_shell_keeps_classic_menu_and_workspace_shell() -> None:
     assert "status.columnconfigure(2, weight=0)" in src
     assert "ttk.Label(status, textvariable=self.workflow_var)" in src
     assert "def _workflow_specs(self) -> tuple[DesktopShellToolSpec, ...]:" in src
-    assert 'return ordered_workflow_specs(self._specs_for_group("Встроенные окна"))' in src
+    assert "def _main_nav_specs(self) -> tuple[DesktopShellToolSpec, ...]:" in src
+    assert 'return tuple(spec for spec in self.specs if spec.entry_kind == "main")' in src
+    assert "return ordered_workflow_specs(self._main_nav_specs())" in src
+    assert "def _entry_kind_label(self, spec: DesktopShellToolSpec) -> str:" in src
     assert "def continue_workflow_route(self) -> None:" in src
     assert "def select_next_workflow_tab(self) -> None:" in src
     assert "def select_previous_workflow_tab(self) -> None:" in src
@@ -135,6 +143,9 @@ def test_desktop_main_shell_keeps_classic_menu_and_workspace_shell() -> None:
     assert "for key in self._startup_tool_keys:" in src
     assert "spec = self.spec_by_key.get(key)" in src
     assert 'self.status_var.set(f"Неизвестный ключ окна: {key}")' in src
+    assert "def open_capability(self, capability_id: str) -> bool:" in src
+    assert 'if capability == "calculation.run_setup":' in src
+    assert 'if capability in spec.capability_ids:' in src
     assert "def close_current_tab(self) -> None:" in src
     assert "def reload_current_tab(self) -> None:" in src
     assert "def close_all_hosted_tabs(self) -> None:" in src
@@ -293,11 +304,15 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
     assert "describe_workflow_progress(self.workflow_specs, open_keys)" in src
     assert 'self.continue_workflow_button.configure(state="normal")' in src
     assert 'self.continue_workflow_button.configure(state="disabled")' in src
-    assert "workflow_specs = ordered_workflow_specs(hosted_specs)" in src
+    assert 'main_specs = tuple(spec for spec in hosted_specs if spec.entry_kind == "main")' in src
+    assert 'tool_specs = tuple(spec for spec in hosted_specs if spec.entry_kind != "main")' in src
+    assert "workflow_specs = ordered_workflow_specs(main_specs)" in src
     assert "continue_workflow=continue_workflow" in src
     assert '"Открыто в рабочей области" if key in open_keys else "Готово к открытию"' in src
     assert 'button.configure(text="Перейти к окну" if key in open_keys else "Открыть этап")' in src
     assert 'status_var = tk.StringVar(value="Готово к открытию")' in src
+    assert '_build_group_box(cards, 0, "Справочники и служебные центры", tool_specs, open_tool)' in src
+    assert '_build_group_box(cards, 1, "Анализ и визуализация", external_specs, open_tool)' in src
     assert 'textvariable=status_var' in src
     assert "numbered_recently_closed_label(spec, index)" in src
     assert '"Недавно закрытых встроенных окон пока нет. История появится после закрытия вкладок."' in src
@@ -305,8 +320,8 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
     assert "controller = ShellHomeViewController(" in src
     assert "reopen_button.configure(command=controller.reopen_selected_recently_closed)" in src
     assert "numbered_session_label(session, index)" in src
-    assert '_build_group_box(cards, 0, "Встроенные окна"' in src
-    assert '_build_group_box(cards, 1, "Внешние окна"' in src
+    assert '_build_group_box(cards, 0, "Справочники и служебные центры"' in src
+    assert '_build_group_box(cards, 1, "Анализ и визуализация"' in src
     assert 'text="Открыть"' in src
 
 
@@ -382,44 +397,39 @@ def test_desktop_main_shell_extracts_menu_builder_with_classic_navigation_comman
     assert "class ShellWorkspaceContextMenuController" in src
     assert "def build_shell_workspace_context_menu(" in src
     assert "def build_shell_menubar(" in src
+    assert "def _menu_sections(" in src
     assert "def _workflow_shortcut_label(index: int) -> str:" in src
     assert 'menubar.add_cascade(label="Файл", menu=file_menu)' in src
-    assert 'menubar.add_cascade(label="Встроенные окна", menu=hosted_menu)' in src
-    assert 'menubar.add_cascade(label="Внешние окна", menu=external_menu)' in src
-    assert 'menubar.add_cascade(label="Маршрут", menu=workflow_menu)' in src
-    assert 'menubar.add_cascade(label="Навигация", menu=navigation_menu)' in src
+    assert '"Данные",' in src
+    assert '"Сценарии",' in src
+    assert '"Расчёт",' in src
+    assert '"Оптимизация",' in src
+    assert '"Результаты",' in src
+    assert '"Анализ",' in src
+    assert '"Визуализация",' in src
+    assert '"Инструменты",' in src
     assert 'menubar.add_cascade(label="Окно", menu=window_menu)' in src
+    assert 'menubar.add_cascade(label="Справка", menu=help_menu)' in src
     assert "workflow_specs: tuple[DesktopShellToolSpec, ...]" in src
     assert "continue_workflow: Callable[[], None]" in src
     assert "has_open_workflow_sessions: Callable[[], bool]" in src
     assert "select_previous_workflow: Callable[[], None]" in src
     assert "select_next_workflow: Callable[[], None]" in src
-    assert "workflow_menu = Menu(menubar, tearoff=False)" in src
-    assert "def _rebuild_workflow_menu() -> None:" in src
-    assert 'label="Основной маршрут недоступен"' in src
-    assert "label=describe_workflow_progress(workflow_specs, open_keys)" in src
     assert "label=describe_workflow_status(self.workflow_specs, open_keys)" in src
     assert 'label="Продолжить основной маршрут\\tCtrl+Shift+N"' in src
-    assert 'label="Предыдущий открытый этап маршрута\\tCtrl+Alt+Left"' in src
-    assert 'label="Следующий открытый этап маршрута\\tCtrl+Alt+Right"' in src
-    assert '_workflow_shortcut_label(index)' in src
-    assert 'label=f"Шаг {index}. {spec.title}{suffix}{accelerator}"' in src
-    assert 'suffix = " (открыт)" if spec.key in open_keys else ""' in src
-    assert 'label="Следующее встроенное окно\\tCtrl+Tab"' in src
-    assert 'label="Предыдущее встроенное окно\\tCtrl+Shift+Tab"' in src
+    assert 'label="Предыдущий этап маршрута\\tCtrl+Alt+Left"' in src
+    assert 'label="Следующий этап маршрута\\tCtrl+Alt+Right"' in src
+    assert 'label="Следующее окно\\tCtrl+Tab"' in src
+    assert 'label="Предыдущее окно\\tCtrl+Shift+Tab"' in src
     assert 'label="Перезагрузить текущее окно\\tF5"' in src
     assert 'label="Закрыть текущее окно\\tCtrl+W"' in src
     assert "select_hosted_session_at_index: Callable[[int], bool]" in src
     assert "MAX_DIRECT_SESSION_SHORTCUT" in src
     assert "def _current_workspace_title(open_sessions: tuple[HostedToolSession, ...]) -> str:" in src
-    assert 'label=f"Текущий контекст: {_current_workspace_title(open_sessions)}"' in src
     assert 'state="normal" if has_sessions else "disabled"' in src
-    assert 'accelerator = f"\\tCtrl+{index}" if index <= MAX_DIRECT_SESSION_SHORTCUT else ""' in src
     assert "selected_workspace_key: Callable[[], str | None]" in src
     assert "selected_window_var = tk.StringVar(master=root, value=HOME_WORKSPACE_KEY)" in src
     assert "numbered_session_label(session, index)" in src
-    assert 'label=f"Открыто встроенных окон: {len(open_sessions)}"' in src
-    assert 'label=f"Текущее окно: {_current_workspace_title(open_sessions)}"' in src
     assert 'state="normal" if has_active_hosted_session else "disabled"' in src
     assert "close_other_hosted: Callable[[], None]" in src
     assert "reopen_last_closed: Callable[[], None]" in src
@@ -431,11 +441,11 @@ def test_desktop_main_shell_extracts_menu_builder_with_classic_navigation_comman
     assert "self.select_workspace_at_index(tab_index)" in src
     assert 'label=f"Текущая вкладка: {current_label}"' in src
     assert 'label=describe_workflow_status(self.workflow_specs, open_keys)' in src
-    assert 'label="Перейти на главную"' in src
+    assert 'label="Перейти к обзору"' in src
     assert 'state="normal" if has_workflow_sessions else "disabled"' in src
-    assert 'label="Закрыть остальные встроенные окна"' in src
-    assert 'label="Повторно открыть последнее окно"' in src
-    assert 'label="Закрыть все встроенные окна"' in src
+    assert 'label="Закрыть остальные окна"' in src
+    assert 'label="Вернуть последнее закрытое окно' in src
+    assert 'label="Закрыть все окна"' in src
     assert 'def _bind_action(' in src
     assert '_bind_action(root, "<Control-Tab>"' in src
     assert '_bind_action(root, "<Control-Shift-Tab>"' in src
@@ -584,6 +594,7 @@ def test_root_desktop_main_shell_wrappers_delegate_to_shell_launcher() -> None:
     assert "wscript.shell" in vbs
     assert "start_desktop_main_shell.pyw" in vbs
     assert 'Path(__file__).with_name("START_DESKTOP_MAIN_SHELL.py")' in pyw
+    assert "ensure_root_launcher_runtime" in py
     assert 'MODULE = "pneumo_solver_ui.tools.desktop_main_shell"' in py
 
 
@@ -622,22 +633,22 @@ def test_desktop_main_shell_launcher_validates_registry_keys_and_formats_catalog
 def test_navigation_helpers_keep_primary_workflow_order_and_progress_text() -> None:
     specs = (
         DesktopShellToolSpec(
-            key="send_results_gui",
-            title="Отправка результатов",
+            key="desktop_results_center",
+            title="Результаты и анализ",
             description="",
             group="Встроенные окна",
             mode="hosted",
         ),
         DesktopShellToolSpec(
             key="desktop_input_editor",
-            title="Исходные данные и расчет",
+            title="Данные машины",
             description="",
             group="Встроенные окна",
             mode="hosted",
         ),
         DesktopShellToolSpec(
-            key="full_diagnostics_gui",
-            title="Полная диагностика",
+            key="desktop_optimizer_center",
+            title="Оптимизация",
             description="",
             group="Встроенные окна",
             mode="hosted",
@@ -661,27 +672,39 @@ def test_navigation_helpers_keep_primary_workflow_order_and_progress_text() -> N
     ordered = ordered_workflow_specs(specs)
     assert tuple(spec.key for spec in ordered) == (
         "desktop_input_editor",
+        "desktop_ring_editor",
         "test_center",
-        "full_diagnostics_gui",
-        "send_results_gui",
+        "desktop_optimizer_center",
+        "desktop_results_center",
     )
     assert next_workflow_spec(specs, {"desktop_input_editor"}) is not None
-    assert next_workflow_spec(specs, {"desktop_input_editor"}).key == "test_center"
+    assert next_workflow_spec(specs, {"desktop_input_editor"}).key == "desktop_ring_editor"
 
     progress = describe_workflow_progress(specs, {"desktop_input_editor"})
-    assert "Открыто этапов маршрута: 1/4." in progress
-    assert "Следующий рекомендуемый этап: Центр проверок." in progress
+    assert "Открыто этапов маршрута: 1/5." in progress
+    assert "Следующий рекомендуемый этап: Редактор кольцевых сценариев." in progress
     assert (
         describe_workflow_status(specs, {"desktop_input_editor"})
-        == "Маршрут: 1/4 -> Центр проверок"
+        == "Маршрут: 1/5 -> Редактор кольцевых сценариев"
     )
     assert workflow_step_index("desktop_input_editor") == 1
-    assert workflow_step_index("send_results_gui") == 5
-    assert workflow_step_index("desktop_ring_editor") is None
-    assert workflow_step_badge("test_center") == "(Шаг 2)"
-    assert workflow_step_badge("desktop_ring_editor") is None
+    assert workflow_step_index("desktop_ring_editor") == 2
+    assert workflow_step_index("desktop_results_center") == 5
+    assert workflow_step_index("send_results_gui") is None
+    assert workflow_step_badge("desktop_ring_editor") == "(Шаг 2)"
+    assert workflow_step_badge("desktop_results_center") == "(Шаг 5)"
 
     workflow_session = SimpleNamespace(
+        key="desktop_results_center",
+        spec=DesktopShellToolSpec(
+            key="desktop_results_center",
+            title="Результаты и анализ",
+            description="",
+            group="Встроенные окна",
+            mode="hosted",
+        ),
+    )
+    non_workflow_session = SimpleNamespace(
         key="send_results_gui",
         spec=DesktopShellToolSpec(
             key="send_results_gui",
@@ -691,26 +714,19 @@ def test_navigation_helpers_keep_primary_workflow_order_and_progress_text() -> N
             mode="hosted",
         ),
     )
-    non_workflow_session = SimpleNamespace(
-        key="desktop_ring_editor",
-        spec=DesktopShellToolSpec(
-            key="desktop_ring_editor",
-            title="Редактор кольцевых сценариев",
-            description="",
-            group="Встроенные окна",
-            mode="hosted",
-        ),
-    )
-    assert numbered_session_label(workflow_session, 3) == "3. (Шаг 5) Отправка результатов"
-    assert numbered_session_label(non_workflow_session, 2) == "2. Редактор кольцевых сценариев"
+    assert numbered_session_label(workflow_session, 3) == "3. (Шаг 5) Результаты и анализ"
+    assert numbered_session_label(non_workflow_session, 2) == "2. Отправка результатов"
     assert (
         numbered_recently_closed_label(workflow_session.spec, 1)
-        == "1. (Шаг 5) Отправка результатов"
+        == "1. (Шаг 5) Результаты и анализ"
     )
 
 
 def test_workspace_manager_tracks_recently_closed_history_and_can_reopen_by_index() -> None:
-    root = tk.Tk()
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip(f"Tk runtime is unavailable in this environment: {exc}")
     try:
         notebook = ttk.Notebook(root)
         notebook.pack()
@@ -766,21 +782,21 @@ def test_workspace_manager_tracks_recently_closed_history_and_can_reopen_by_inde
 def test_navigation_helpers_keep_open_workflow_sessions_in_route_order() -> None:
     workflow_input = DesktopShellToolSpec(
         key="desktop_input_editor",
-        title="Исходные данные и расчет",
+        title="Данные машины",
         description="",
         group="Встроенные окна",
         mode="hosted",
     )
-    workflow_test = DesktopShellToolSpec(
-        key="test_center",
-        title="Центр проверок",
+    workflow_ring = DesktopShellToolSpec(
+        key="desktop_ring_editor",
+        title="Редактор кольцевых сценариев",
         description="",
         group="Встроенные окна",
         mode="hosted",
     )
-    workflow_send = DesktopShellToolSpec(
-        key="send_results_gui",
-        title="Отправка результатов",
+    workflow_results = DesktopShellToolSpec(
+        key="desktop_results_center",
+        title="Результаты и анализ",
         description="",
         group="Встроенные окна",
         mode="hosted",
@@ -789,9 +805,9 @@ def test_navigation_helpers_keep_open_workflow_sessions_in_route_order() -> None
     existing_frame = SimpleNamespace(winfo_exists=lambda: 1)
     missing_frame = SimpleNamespace(winfo_exists=lambda: 0)
     sessions = {
-        "send_results_gui": SimpleNamespace(
-            key="send_results_gui",
-            spec=workflow_send,
+        "desktop_results_center": SimpleNamespace(
+            key="desktop_results_center",
+            spec=workflow_results,
             frame=existing_frame,
         ),
         "extra_tool": SimpleNamespace(
@@ -810,18 +826,30 @@ def test_navigation_helpers_keep_open_workflow_sessions_in_route_order() -> None
             spec=workflow_input,
             frame=existing_frame,
         ),
-        "test_center": SimpleNamespace(
-            key="test_center",
-            spec=workflow_test,
+        "desktop_ring_editor": SimpleNamespace(
+            key="desktop_ring_editor",
+            spec=workflow_ring,
+            frame=existing_frame,
+        ),
+        "desktop_optimizer_center": SimpleNamespace(
+            key="desktop_optimizer_center",
+            spec=DesktopShellToolSpec(
+                key="desktop_optimizer_center",
+                title="Оптимизация",
+                description="",
+                group="Встроенные окна",
+                mode="hosted",
+            ),
             frame=missing_frame,
         ),
     }
 
     ordered = ordered_open_workflow_sessions(
         sessions,
-        (workflow_send, workflow_input, workflow_test),
+        (workflow_results, workflow_input, workflow_ring),
     )
     assert tuple(session.key for session in ordered) == (
         "desktop_input_editor",
-        "send_results_gui",
+        "desktop_ring_editor",
+        "desktop_results_center",
     )

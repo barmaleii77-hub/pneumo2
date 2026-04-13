@@ -77,6 +77,7 @@ from tkinter import Tk, Text, StringVar, BooleanVar, IntVar, END
 from tkinter import messagebox
 from tkinter import ttk
 
+from pneumo_solver_ui.desktop_ui_core import ScrollableFrame, build_scrolled_text, build_status_strip
 from pneumo_solver_ui.desktop_results_runtime import DesktopResultsRuntime
 from pneumo_solver_ui.desktop_results_model import DesktopResultsSessionHandoff
 from pneumo_solver_ui.tools.desktop_results_center import DesktopResultsCenter
@@ -144,8 +145,9 @@ class App:
         self._hosted = bool(hosted or not self._owns_root)
         self.root = host if host is not None else Tk()
         if self._owns_root:
-            self.root.title(f"Test Validation Results Center ({RELEASE})")
+            self.root.title(f"Центр тестов и проверки результатов ({RELEASE})")
             self.root.geometry("1180x760")
+            self.root.minsize(1040, 720)
 
         # What to run
         self.do_autotest = BooleanVar(value=True)
@@ -184,55 +186,64 @@ class App:
             self.notebook,
             runtime=self.results_runtime,
         )
-        self.notebook.add(run_tab, text="Run Tests")
-        self.notebook.add(self.results_center, text="Validation & Results")
+        self.notebook.add(run_tab, text="Тесты и проверка")
+        self.notebook.add(self.results_center, text="Результаты и анализ")
 
-        top = ttk.Frame(run_tab, padding=pad)
+        run_split = ttk.Panedwindow(run_tab, orient="vertical")
+        run_split.pack(fill="both", expand=True)
+        config_scroll = ScrollableFrame(run_split)
+        run_split.add(config_scroll, weight=0)
+        log_frame = ttk.LabelFrame(run_split, text="Журнал выполнения", padding=pad)
+        run_split.add(log_frame, weight=1)
+        config_body = config_scroll.body
+        config_body.columnconfigure(0, weight=1)
+
+        top = ttk.Frame(config_body, padding=pad)
         top.pack(fill="x")
 
         ttk.Label(top, text="Что запускать:").grid(row=0, column=0, sticky="w")
-        ttk.Checkbutton(top, text="Autotest Harness", variable=self.do_autotest).grid(row=0, column=1, sticky="w", padx=(8, 0))
-        ttk.Checkbutton(top, text="Full Diagnostics", variable=self.do_diagnostics).grid(row=0, column=2, sticky="w", padx=(8, 0))
+        ttk.Checkbutton(top, text="Автотест", variable=self.do_autotest).grid(row=0, column=1, sticky="w", padx=(8, 0))
+        ttk.Checkbutton(top, text="Полная диагностика", variable=self.do_diagnostics).grid(row=0, column=2, sticky="w", padx=(8, 0))
 
         # Levels
-        lvl = ttk.Frame(run_tab, padding=(pad, 0, pad, pad))
+        lvl = ttk.Frame(config_body, padding=(pad, 0, pad, pad))
         lvl.pack(fill="x")
 
-        ttk.Label(lvl, text="Autotest уровень:").grid(row=0, column=0, sticky="w")
+        ttk.Label(lvl, text="Уровень автотеста:").grid(row=0, column=0, sticky="w")
         ttk.Combobox(lvl, textvariable=self.autotest_level, values=["quick", "standard", "full"], width=12, state="readonly").grid(row=0, column=1, sticky="w", padx=(6, 16))
 
-        ttk.Label(lvl, text="Diagnostics уровень:").grid(row=0, column=2, sticky="w")
+        ttk.Label(lvl, text="Уровень диагностики:").grid(row=0, column=2, sticky="w")
         ttk.Combobox(lvl, textvariable=self.diagnostics_level, values=["minimal", "standard", "full"], width=12, state="readonly").grid(row=0, column=3, sticky="w", padx=(6, 16))
 
         ttk.Checkbutton(lvl, text="Продолжать при ошибках", variable=self.continue_on_failure).grid(row=0, column=4, sticky="w")
         lvl.columnconfigure(5, weight=1)
 
         # Diagnostics options
-        diag = ttk.LabelFrame(run_tab, text="Опции Full Diagnostics", padding=pad)
+        diag = ttk.LabelFrame(config_body, text="Опции полной диагностики", padding=pad)
         diag.pack(fill="x", padx=pad, pady=(0, pad))
 
-        ttk.Checkbutton(diag, text="Пропустить UI smoke-test (не запускать Streamlit)", variable=self.skip_ui_smoke).grid(row=0, column=0, sticky="w")
-        ttk.Checkbutton(diag, text="Optimization smoke-test", variable=self.run_opt_smoke).grid(row=1, column=0, sticky="w", pady=(6, 0))
+        ttk.Checkbutton(diag, text="Пропустить быструю проверку интерфейса (не запускать Streamlit)", variable=self.skip_ui_smoke).grid(row=0, column=0, sticky="w")
+        ttk.Checkbutton(diag, text="Быстрая проверка оптимизации", variable=self.run_opt_smoke).grid(row=1, column=0, sticky="w", pady=(6, 0))
 
         row = ttk.Frame(diag)
         row.grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(6, 0))
-        ttk.Label(row, text="minutes:").pack(side="left")
+        ttk.Label(row, text="минут:").pack(side="left")
         ttk.Spinbox(row, from_=1, to=60, textvariable=self.opt_minutes, width=6).pack(side="left", padx=(6, 16))
-        ttk.Label(row, text="jobs:").pack(side="left")
+        ttk.Label(row, text="задач:").pack(side="left")
         ttk.Spinbox(row, from_=1, to=32, textvariable=self.opt_jobs, width=6).pack(side="left", padx=(6, 0))
 
         diag.columnconfigure(2, weight=1)
 
         # After run
-        aft = ttk.LabelFrame(run_tab, text="После завершения", padding=pad)
+        aft = ttk.LabelFrame(config_body, text="После завершения", padding=pad)
         aft.pack(fill="x", padx=pad, pady=(0, pad))
-        ttk.Checkbutton(aft, text="Создать Send Bundle (ZIP для чата)", variable=self.make_send_bundle).grid(row=0, column=0, sticky="w")
-        ttk.Checkbutton(aft, text="Сразу открыть Diagnostics / Send Center", variable=self.open_send_gui).grid(row=0, column=1, sticky="w", padx=(16, 0))
-        ttk.Checkbutton(aft, text="Открыть папку send_bundles", variable=self.auto_open_folder).grid(row=0, column=2, sticky="w", padx=(16, 0))
+        ttk.Checkbutton(aft, text="Создать пакет для отправки (ZIP для чата)", variable=self.make_send_bundle).grid(row=0, column=0, sticky="w")
+        ttk.Checkbutton(aft, text="Сразу открыть центр диагностики и отправки", variable=self.open_send_gui).grid(row=0, column=1, sticky="w", padx=(16, 0))
+        ttk.Checkbutton(aft, text="Открыть папку пакетов отправки", variable=self.auto_open_folder).grid(row=0, column=2, sticky="w", padx=(16, 0))
         aft.columnconfigure(3, weight=1)
 
         # Buttons
-        btns = ttk.Frame(run_tab, padding=(pad, 0, pad, pad))
+        btns = ttk.Frame(config_body, padding=(pad, 0, pad, pad))
         btns.pack(fill="x")
         self.btn_run = ttk.Button(btns, text="▶ Запустить автономное тестирование", command=self._on_run)
         self.btn_run.pack(side="left")
@@ -240,22 +251,24 @@ class App:
         self.btn_stop = ttk.Button(btns, text="■ Остановить", command=self._on_stop, state="disabled")
         self.btn_stop.pack(side="left", padx=(8, 0))
 
-        ttk.Button(btns, text="📂 Открыть send_bundles", command=self._open_send_bundles).pack(side="left", padx=(8, 0))
-        ttk.Button(btns, text="📂 Открыть autotest_runs", command=self._open_autotest_runs).pack(side="left", padx=(8, 0))
-        ttk.Button(btns, text="📂 Открыть diagnostics_runs", command=self._open_diagnostics_runs).pack(side="left", padx=(8, 0))
+        ttk.Button(btns, text="📂 Пакеты отправки", command=self._open_send_bundles).pack(side="left", padx=(8, 0))
+        ttk.Button(btns, text="📂 Папка автотеста", command=self._open_autotest_runs).pack(side="left", padx=(8, 0))
+        ttk.Button(btns, text="📂 Папка диагностики", command=self._open_diagnostics_runs).pack(side="left", padx=(8, 0))
         ttk.Button(
             btns,
-            text="Validation & Results",
+            text="Результаты и анализ",
             command=lambda: self.notebook.select(self.results_center),
         ).pack(side="left", padx=(8, 0))
 
         self.status = StringVar(value="Готов.")
         ttk.Label(btns, textvariable=self.status).pack(side="right")
 
-        # Output
-        self.text = Text(run_tab, wrap="word")
-        self.text.pack(fill="both", expand=True, padx=pad, pady=(0, pad))
-        self._append("Test Validation Results Center ready.\n")
+        output_body, self.text = build_scrolled_text(log_frame, wrap="word", height=16)
+        output_body.pack(fill="both", expand=True)
+        self._append("Центр тестов и проверки результатов готов.\n")
+
+        footer = build_status_strip(self.root, primary_var=self.status)
+        footer.pack(fill="x", padx=pad, pady=(0, pad))
 
     def _append(self, s: str) -> None:
         self.text.insert(END, s)
@@ -357,12 +370,12 @@ class App:
         try:
             if self.do_autotest.get():
                 cmd = [self.py, "-u", str(self.repo / "pneumo_solver_ui" / "tools" / "run_autotest.py"), "--level", self.autotest_level.get().strip()]
-                rc = self._run_cmd(cmd, f"Autotest ({self.autotest_level.get()})")
+                rc = self._run_cmd(cmd, f"Автотест ({self.autotest_level.get()})")
                 self.state.autotest_rc = rc
                 if rc != 0:
                     final_rc = rc
                     if not self.continue_on_failure.get():
-                        self.q.put("[ABORT] Stopping due to failure (continue_on_failure=0).\n")
+                        self.q.put("[ОСТАНОВ] Прекращаем после ошибки (continue_on_failure=0).\n")
                         self.q.put("__ALL_DONE__" + str(final_rc))
                         return
 
@@ -372,18 +385,18 @@ class App:
                     cmd.append("--skip_ui_smoke")
                 if self.run_opt_smoke.get():
                     cmd += ["--run_opt_smoke", "--opt_minutes", str(int(self.opt_minutes.get())), "--opt_jobs", str(int(self.opt_jobs.get()))]
-                rc = self._run_cmd(cmd, f"Full Diagnostics ({self.diagnostics_level.get()})")
+                rc = self._run_cmd(cmd, f"Полная диагностика ({self.diagnostics_level.get()})")
                 self.state.diagnostics_rc = rc
                 if rc != 0:
                     final_rc = rc
                     if not self.continue_on_failure.get():
-                        self.q.put("[ABORT] Stopping due to failure (continue_on_failure=0).\n")
+                        self.q.put("[ОСТАНОВ] Прекращаем после ошибки (continue_on_failure=0).\n")
                         self.q.put("__ALL_DONE__" + str(final_rc))
                         return
 
             if self.make_send_bundle.get():
                 self.q.put("\n" + "=" * 80 + "\n")
-                self.q.put("[STEP] Send Bundle (make_send_bundle)\n")
+                self.q.put("[ШАГ] Сборка пакета отправки\n")
                 self.q.put("=" * 80 + "\n")
                 _rr("send_bundle_start")
                 try:
@@ -401,7 +414,7 @@ class App:
                     self.state.send_bundle_ok = False
                     self.state.send_bundle_error = str(e)
                     _rr("send_bundle_failed", error=repr(e))
-                    self.q.put(f"[Send Bundle failed] {e}\n")
+                    self.q.put(f"[Ошибка сборки пакета отправки] {e}\n")
                     if final_rc == 0:
                         final_rc = 2
 
@@ -445,27 +458,27 @@ class App:
         step_lines: list[str] = []
         if self.state.requested_autotest:
             step_lines.append(
-                f"Autotest ({self.autotest_level.get()}): rc={self.state.autotest_rc}"
+                f"Автотест ({self.autotest_level.get()}): rc={self.state.autotest_rc}"
             )
         if self.state.requested_diagnostics:
             step_lines.append(
-                f"Full Diagnostics ({self.diagnostics_level.get()}): rc={self.state.diagnostics_rc}"
+                f"Полная диагностика ({self.diagnostics_level.get()}): rc={self.state.diagnostics_rc}"
             )
         if self.state.requested_send_bundle:
             if self.state.send_bundle_ok:
-                step_lines.append("Send bundle: ready")
+                step_lines.append("Пакет отправки: готов")
             elif self.state.send_bundle_ok is False:
-                step_lines.append("Send bundle: failed")
+                step_lines.append("Пакет отправки: ошибка")
         if self.open_send_gui.get():
-            step_lines.append("Auto-open Send Center: on")
+            step_lines.append("Автооткрытие центра отправки: вкл")
         if self.auto_open_folder.get():
-            step_lines.append("Auto-open send_bundles folder: on")
+            step_lines.append("Автооткрытие папки пакетов: вкл")
         handoff_detail = (
-            f"Run finished with rc={rc} in {dur:.1f} s. "
-            "Use the suggested branch below to continue validation/inspection."
+            f"Прогон завершён с кодом {rc} за {dur:.1f} с. "
+            "Ниже подготовлен рекомендуемый следующий шаг для проверки и разбора результатов."
         )
         if self.state.send_bundle_error:
-            handoff_detail = handoff_detail + f" Send bundle error: {self.state.send_bundle_error}"
+            handoff_detail = handoff_detail + f" Ошибка пакета отправки: {self.state.send_bundle_error}"
         self.results_center.set_session_handoff(
             DesktopResultsSessionHandoff(
                 summary=f"rc={rc} | duration={dur:.1f}s",
@@ -486,7 +499,7 @@ class App:
 
         msg_lines = [
             f"Автономное тестирование завершено (rc={rc}, {dur:.1f} s).",
-            "Validation & Results overview обновлён во второй вкладке.",
+            "Сводка проверки и результатов обновлена во второй вкладке.",
         ]
         if self.state.last_zip:
             msg_lines.append(f"ZIP: {self.state.last_zip}")
@@ -494,9 +507,9 @@ class App:
             msg_lines.extend(format_anim_dashboard_brief_lines(load_latest_send_bundle_anim_dashboard(out_dir)))
             diag_json = out_dir / ANIM_DIAG_SIDECAR_JSON
             if diag_json.exists():
-                msg_lines.append(f"Anim pointer diagnostics: {diag_json}")
+                msg_lines.append(f"Диагностика указателя анимации: {diag_json}")
 
-        messagebox.showinfo("Autonomous testing", "\n".join(msg_lines))
+        messagebox.showinfo("Автономное тестирование", "\n".join(msg_lines))
 
         if self.auto_open_folder.get():
             try:

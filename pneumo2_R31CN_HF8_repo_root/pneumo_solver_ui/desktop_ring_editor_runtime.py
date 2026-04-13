@@ -65,6 +65,13 @@ class RingPreviewSegment:
     event_count: int
 
 
+@dataclass(frozen=True)
+class RingRoadProfilePreview:
+    x_m: tuple[float, ...]
+    left_mm: tuple[float, ...]
+    right_mm: tuple[float, ...]
+
+
 @dataclass
 class RingEditorDiagnostics:
     errors: list[str]
@@ -72,6 +79,7 @@ class RingEditorDiagnostics:
     metrics: dict[str, float | str]
     segment_rows: list[dict[str, Any]]
     preview_segments: list[RingPreviewSegment]
+    road_profile: RingRoadProfilePreview | None
     summary_text: str
 
 
@@ -119,6 +127,30 @@ def _build_preview_segments(
             )
         )
     return segments
+
+
+def _downsample_profile_indices(size: int, *, limit: int = 1600) -> np.ndarray:
+    if size <= max(2, limit):
+        return np.arange(size, dtype=int)
+    idx = np.linspace(0, size - 1, num=limit, dtype=int)
+    return np.unique(idx)
+
+
+def _build_road_profile_preview(tracks: dict[str, Any]) -> RingRoadProfilePreview | None:
+    x = np.asarray(tracks.get("x_m", []), dtype=float).reshape(-1)
+    z_left = np.asarray(tracks.get("zL_m", []), dtype=float).reshape(-1)
+    z_right = np.asarray(tracks.get("zR_m", []), dtype=float).reshape(-1)
+    if x.size < 2 or z_left.size != x.size or z_right.size != x.size:
+        return None
+    pick = _downsample_profile_indices(int(x.size))
+    x_pick = np.asarray(x[pick], dtype=float).reshape(-1)
+    z_left_pick = np.asarray(z_left[pick], dtype=float).reshape(-1)
+    z_right_pick = np.asarray(z_right[pick], dtype=float).reshape(-1)
+    return RingRoadProfilePreview(
+        x_m=tuple(float(value) for value in x_pick),
+        left_mm=tuple(float(value) * 1000.0 for value in z_left_pick),
+        right_mm=tuple(float(value) * 1000.0 for value in z_right_pick),
+    )
 
 
 def _build_summary_text(errors: list[str], warnings: list[str], metrics: dict[str, float | str]) -> str:
@@ -184,6 +216,7 @@ def build_ring_editor_diagnostics(spec: dict[str, Any]) -> RingEditorDiagnostics
     ring_p2p_right_mm = 0.0
     closure_policy = str(spec.get("closure_policy", "closed_c1_periodic") or "closed_c1_periodic")
     visual_segments: list[dict[str, Any]] = []
+    road_profile: RingRoadProfilePreview | None = None
 
     if not errors:
         try:
@@ -195,6 +228,7 @@ def build_ring_editor_diagnostics(spec: dict[str, Any]) -> RingEditorDiagnostics
             ring_length_m = float((tracks.get("meta", {}) or {}).get("L_total_m", ring_length_m) or ring_length_m)
             z_left = np.asarray(tracks.get("zL_m", []), dtype=float).reshape(-1)
             z_right = np.asarray(tracks.get("zR_m", []), dtype=float).reshape(-1)
+            road_profile = _build_road_profile_preview(tracks)
             if z_left.size >= 2 and z_right.size >= 2:
                 seam_left_mm = float(abs(z_left[-1] - z_left[0]) * 1000.0)
                 seam_right_mm = float(abs(z_right[-1] - z_right[0]) * 1000.0)
@@ -256,6 +290,7 @@ def build_ring_editor_diagnostics(spec: dict[str, Any]) -> RingEditorDiagnostics
         metrics=metrics,
         segment_rows=list(segment_rows),
         preview_segments=preview_segments,
+        road_profile=road_profile,
         summary_text=summary_text,
     )
 

@@ -34,6 +34,11 @@ from pneumo_solver_ui.desktop_diagnostics_runtime import (
     write_desktop_diagnostics_summary_md,
     write_desktop_diagnostics_center_state,
 )
+from pneumo_solver_ui.desktop_ui_core import (
+    build_scrolled_text,
+    build_status_strip,
+    create_scrollable_tab,
+)
 from pneumo_solver_ui.diagnostics_entrypoint import build_full_diagnostics_bundle
 
 try:
@@ -95,8 +100,9 @@ class DesktopDiagnosticsCenter:
         self.root = root
         self._hosted = bool(hosted)
         if not self._hosted:
-            self.root.title(f"Diagnostics And Send Bundle Center — {RELEASE}")
+            self.root.title(f"Центр диагностики и отправки — {RELEASE}")
             self.root.geometry("1040x760")
+            self.root.minsize(980, 720)
 
         self.repo_root = ROOT
         self.tools_dir = TOOLS_DIR
@@ -136,7 +142,7 @@ class DesktopDiagnosticsCenter:
         self.sha256 = ""
         self.size_mb = 0.0
 
-        self.status_var = StringVar(value="Готово. Откройте нужный этап в одном desktop-центре.")
+        self.status_var = StringVar(value="Готово. Откройте нужный этап в одном инженерном центре.")
         self.machine_state_var = StringVar(value="")
         self.send_title_var = StringVar(value="ZIP для отправки в чат ещё не готов.")
         self.send_path_var = StringVar(value="(ещё не готово)")
@@ -219,14 +225,14 @@ class DesktopDiagnosticsCenter:
 
         ttk.Label(
             outer,
-            text="Diagnostics And Send Bundle Center",
+            text="Центр диагностики и отправки",
             font=("Segoe UI", 15, "bold"),
         ).pack(anchor="w")
         ttk.Label(
             outer,
             text=(
-                "Единый desktop-центр для полной диагностики, сборки bundle, summary, inspect, "
-                "health и отправки результатов без возврата в WEB UI."
+                "Единый рабочий центр для полной диагностики, сборки пакета отправки, сводки, "
+                "проверки состояния и передачи результатов без возврата в web-интерфейс."
             ),
             wraplength=980,
             justify="left",
@@ -235,11 +241,11 @@ class DesktopDiagnosticsCenter:
         self.notebook = ttk.Notebook(outer)
         self.notebook.pack(fill="both", expand=True)
 
-        self.diag_tab = ttk.Frame(self.notebook, padding=8)
-        self.bundle_tab = ttk.Frame(self.notebook, padding=8)
-        self.send_tab = ttk.Frame(self.notebook, padding=8)
+        self.diag_tab, self.diag_body = create_scrollable_tab(self.notebook, padding=8)
+        self.bundle_tab, self.bundle_body = create_scrollable_tab(self.notebook, padding=8)
+        self.send_tab, self.send_body = create_scrollable_tab(self.notebook, padding=8)
         self.notebook.add(self.diag_tab, text="Диагностика")
-        self.notebook.add(self.bundle_tab, text="Bundle / Inspect / Health")
+        self.notebook.add(self.bundle_tab, text="Пакет и проверка")
         self.notebook.add(self.send_tab, text="Отправка")
 
         self._build_diag_tab()
@@ -247,15 +253,17 @@ class DesktopDiagnosticsCenter:
         self._build_send_tab()
         self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed, add="+")
 
-        footer = ttk.Frame(outer)
+        footer = build_status_strip(
+            outer,
+            primary_var=self.status_var,
+            secondary_vars=(self.machine_state_var,),
+        )
         footer.pack(fill="x", pady=(10, 0))
-        ttk.Label(footer, textvariable=self.status_var).pack(side="left", anchor="w")
-        ttk.Label(footer, textvariable=self.machine_state_var, foreground="#555555").pack(side="right", anchor="e")
 
     def _build_diag_tab(self) -> None:
         pad = {"padx": 10, "pady": 6}
 
-        level_box = ttk.LabelFrame(self.diag_tab, text="Уровень диагностики")
+        level_box = ttk.LabelFrame(self.diag_body, text="Уровень диагностики")
         level_box.pack(fill="x", **pad)
         for value, text in [
             ("minimal", "minimal — быстро, только sanity"),
@@ -264,11 +272,11 @@ class DesktopDiagnosticsCenter:
         ]:
             ttk.Radiobutton(level_box, text=text, value=value, variable=self.level).pack(anchor="w", padx=10, pady=2)
 
-        options_box = ttk.LabelFrame(self.diag_tab, text="Опции")
+        options_box = ttk.LabelFrame(self.diag_body, text="Опции")
         options_box.pack(fill="x", **pad)
         ttk.Checkbutton(
             options_box,
-            text="Пропустить UI smoke-test (без запуска Streamlit)",
+            text="Пропустить быструю проверку интерфейса (без запуска Streamlit)",
             variable=self.skip_ui_smoke,
         ).pack(anchor="w", padx=10, pady=2)
         ttk.Checkbutton(
@@ -281,7 +289,7 @@ class DesktopDiagnosticsCenter:
         opt_row.pack(fill="x", padx=10, pady=4)
         ttk.Checkbutton(
             opt_row,
-            text="Запустить Optimization smoke-test",
+            text="Запустить быструю проверку оптимизации",
             variable=self.run_opt_smoke,
         ).grid(row=0, column=0, sticky="w")
         ttk.Label(opt_row, text="minutes:").grid(row=0, column=1, sticky="e", padx=(12, 2))
@@ -290,22 +298,22 @@ class DesktopDiagnosticsCenter:
         ttk.Spinbox(opt_row, from_=1, to=32, textvariable=self.opt_jobs, width=6).grid(row=0, column=4, sticky="w")
         opt_row.columnconfigure(5, weight=1)
 
-        path_box = ttk.LabelFrame(self.diag_tab, text="Пути (если нужно)")
+        path_box = ttk.LabelFrame(self.diag_body, text="Пути (если нужно)")
         path_box.pack(fill="x", **pad)
 
         osc_row = ttk.Frame(path_box)
         osc_row.pack(fill="x", padx=10, pady=4)
-        ttk.Label(osc_row, text="osc_dir (NPZ):").pack(side="left")
+        ttk.Label(osc_row, text="Папка osc (NPZ):").pack(side="left")
         ttk.Entry(osc_row, textvariable=self.osc_dir).pack(side="left", fill="x", expand=True, padx=6)
         ttk.Button(osc_row, text="...", width=3, command=self._pick_osc_dir).pack(side="left")
 
         out_row = ttk.Frame(path_box)
         out_row.pack(fill="x", padx=10, pady=4)
-        ttk.Label(out_row, text="out_root:").pack(side="left")
+        ttk.Label(out_row, text="Папка результатов:").pack(side="left")
         ttk.Entry(out_row, textvariable=self.out_root).pack(side="left", fill="x", expand=True, padx=6)
         ttk.Button(out_row, text="...", width=3, command=self._pick_out_root).pack(side="left")
 
-        ctrl = ttk.Frame(self.diag_tab)
+        ctrl = ttk.Frame(self.diag_body)
         ctrl.pack(fill="x", **pad)
         self.btn_run = ttk.Button(ctrl, text="▶ Запустить", command=self._run)
         self.btn_run.pack(side="left")
@@ -313,55 +321,43 @@ class DesktopDiagnosticsCenter:
         self.btn_stop.pack(side="left", padx=8)
         self.btn_open = ttk.Button(ctrl, text="📂 Открыть результат", command=self._open_result, state="disabled")
         self.btn_open.pack(side="left", padx=8)
-        ttk.Button(ctrl, text="📂 Открыть out_root", command=self._open_diagnostics_out_root).pack(side="left", padx=8)
+        ttk.Button(ctrl, text="📂 Открыть папку результатов", command=self._open_diagnostics_out_root).pack(side="left", padx=8)
 
-        log_box = ttk.LabelFrame(self.diag_tab, text="Вывод")
+        log_box = ttk.LabelFrame(self.diag_body, text="Вывод")
         log_box.pack(fill="both", expand=True, **pad)
-        self.txt = tk.Text(log_box, wrap="word", height=16)
-        self.txt.pack(side="left", fill="both", expand=True)
-        scr = ttk.Scrollbar(log_box, command=self.txt.yview)
-        scr.pack(side="right", fill="y")
-        self.txt.configure(yscrollcommand=scr.set)
-        self._append("Готово. Здесь запускается headless run_full_diagnostics.py и пишется machine-readable manifest.\n")
+        log_body, self.txt = build_scrolled_text(log_box, wrap="word", height=16)
+        log_body.pack(fill="both", expand=True)
+        self._append("Готово. Здесь запускается автономная диагностика и формируется машинно-читаемый манифест.\n")
 
     def _build_bundle_tab(self) -> None:
-        top = ttk.Frame(self.bundle_tab)
+        top = ttk.Frame(self.bundle_body)
         top.pack(fill="x", pady=(0, 8))
-        ttk.Button(top, text="Обновить summary / inspect / health", command=lambda: self._refresh_bundle_views(regenerate_reports=True)).pack(side="left")
-        ttk.Button(top, text="Собрать bundle сейчас", command=lambda: self._start_bundle_build(auto_copy_on_ready=False)).pack(side="left", padx=(8, 0))
+        ttk.Button(top, text="Обновить сводку и проверки", command=lambda: self._refresh_bundle_views(regenerate_reports=True)).pack(side="left")
+        ttk.Button(top, text="Собрать пакет сейчас", command=lambda: self._start_bundle_build(auto_copy_on_ready=False)).pack(side="left", padx=(8, 0))
         self.btn_open_latest_zip = ttk.Button(top, text="📂 Открыть ZIP", command=self._open_latest_bundle, state="disabled")
         self.btn_open_latest_zip.pack(side="left", padx=(8, 0))
-        ttk.Button(top, text="📂 Открыть send_bundles", command=self._open_bundle_out_dir).pack(side="left", padx=(8, 0))
+        ttk.Button(top, text="📂 Открыть папку пакетов", command=self._open_bundle_out_dir).pack(side="left", padx=(8, 0))
 
-        summary_box = ttk.LabelFrame(self.bundle_tab, text="Summary + machine-readable paths")
+        summary_box = ttk.LabelFrame(self.bundle_body, text="Сводка и машинно-читаемые пути")
         summary_box.pack(fill="both", expand=False, pady=(0, 8))
-        self.summary_text = tk.Text(summary_box, wrap="word", height=13)
-        self.summary_text.pack(side="left", fill="both", expand=True)
-        summary_scr = ttk.Scrollbar(summary_box, command=self.summary_text.yview)
-        summary_scr.pack(side="right", fill="y")
-        self.summary_text.configure(yscrollcommand=summary_scr.set)
+        summary_body, self.summary_text = build_scrolled_text(summary_box, wrap="word", height=13)
+        summary_body.pack(fill="both", expand=True)
 
-        preview_book = ttk.Notebook(self.bundle_tab)
+        preview_book = ttk.Notebook(self.bundle_body)
         preview_book.pack(fill="both", expand=True)
         inspect_tab = ttk.Frame(preview_book, padding=6)
         health_tab = ttk.Frame(preview_book, padding=6)
-        preview_book.add(inspect_tab, text="Inspect")
-        preview_book.add(health_tab, text="Health")
+        preview_book.add(inspect_tab, text="Проверка пакета")
+        preview_book.add(health_tab, text="Состояние")
 
-        self.inspect_text = tk.Text(inspect_tab, wrap="word")
-        self.inspect_text.pack(side="left", fill="both", expand=True)
-        inspect_scr = ttk.Scrollbar(inspect_tab, command=self.inspect_text.yview)
-        inspect_scr.pack(side="right", fill="y")
-        self.inspect_text.configure(yscrollcommand=inspect_scr.set)
+        inspect_body, self.inspect_text = build_scrolled_text(inspect_tab, wrap="word", height=16)
+        inspect_body.pack(fill="both", expand=True)
 
-        self.health_text = tk.Text(health_tab, wrap="word")
-        self.health_text.pack(side="left", fill="both", expand=True)
-        health_scr = ttk.Scrollbar(health_tab, command=self.health_text.yview)
-        health_scr.pack(side="right", fill="y")
-        self.health_text.configure(yscrollcommand=health_scr.set)
+        health_body, self.health_text = build_scrolled_text(health_tab, wrap="word", height=16)
+        health_body.pack(fill="both", expand=True)
 
     def _build_send_tab(self) -> None:
-        frm = ttk.Frame(self.send_tab, padding=14)
+        frm = ttk.Frame(self.send_body, padding=14)
         frm.pack(fill="both", expand=True)
 
         self.lbl_title = ttk.Label(frm, textvariable=self.send_title_var, font=("Segoe UI", 12, "bold"))
@@ -377,8 +373,8 @@ class DesktopDiagnosticsCenter:
         ttk.Label(
             frm,
             text=(
-                "Из этого центра можно собрать bundle, посмотреть summary / inspect / health и "
-                "подготовить ZIP к отправке без WEB-потока."
+                "Из этого центра можно собрать пакет отправки, просмотреть сводку, проверку и состояние, "
+                "а затем подготовить ZIP к передаче без web-потока."
             ),
             wraplength=860,
             justify="left",
@@ -389,11 +385,11 @@ class DesktopDiagnosticsCenter:
 
         btn_row = ttk.Frame(frm)
         btn_row.pack(fill="x", pady=(6, 0))
-        ttk.Button(btn_row, text="Собрать / обновить bundle", command=lambda: self._start_bundle_build(auto_copy_on_ready=False)).pack(side="left")
+        ttk.Button(btn_row, text="Собрать или обновить пакет", command=lambda: self._start_bundle_build(auto_copy_on_ready=False)).pack(side="left")
         self.btn_copy = ttk.Button(btn_row, text="📋 Скопировать ZIP в буфер обмена", command=self._copy)
         self.btn_copy.state(["disabled"])
         self.btn_copy.pack(side="left", padx=(8, 0), ipadx=10, ipady=6)
-        ttk.Button(btn_row, text="📂 Открыть папку bundle", command=self._open_bundle_out_dir).pack(side="left", padx=(8, 0))
+        ttk.Button(btn_row, text="📂 Открыть папку пакета", command=self._open_bundle_out_dir).pack(side="left", padx=(8, 0))
 
     def _select_initial_tab(self, initial_tab: str) -> None:
         lookup = {
@@ -626,7 +622,7 @@ class DesktopDiagnosticsCenter:
         cmd = self._build_cmd()
         self._current_run_lines = []
         self._append("\n=== Запуск ===\n" + " ".join(cmd) + "\n\n")
-        self.status_var.set("Запущен headless diagnostics run...")
+        self.status_var.set("Запущен автономный прогон диагностики...")
         self.btn_run.configure(state="disabled")
         self.btn_stop.configure(state="normal")
         self.btn_open.configure(state="disabled")
@@ -738,7 +734,7 @@ class DesktopDiagnosticsCenter:
                     self.btn_run.configure(state="normal")
                     self.btn_stop.configure(state="disabled")
                     self.btn_open.configure(state="normal" if (last_zip or last_run_dir) else "disabled")
-                    self.status_var.set(f"Diagnostics finished with rc={rc}.")
+                    self.status_var.set(f"Диагностика завершена с кодом {rc}.")
                     self._refresh_bundle_views(regenerate_reports=False)
 
                     msg = f"Диагностика завершена с кодом {rc}."
@@ -747,11 +743,11 @@ class DesktopDiagnosticsCenter:
                     if last_run_dir:
                         msg += f"\n\nDIR: {last_run_dir}"
                     if self._last_run_record and self._last_run_record.state_path:
-                        msg += f"\n\nRun state: {self._last_run_record.state_path}"
+                        msg += f"\n\nФайл состояния: {self._last_run_record.state_path}"
                     if rc == 0:
-                        messagebox.showinfo("Diagnostics", msg)
+                        messagebox.showinfo("Диагностика", msg)
                     else:
-                        messagebox.showwarning("Diagnostics", msg)
+                        messagebox.showwarning("Диагностика", msg)
 
                 self.root.after(0, done_ui)
             except Exception as exc:
@@ -782,7 +778,7 @@ class DesktopDiagnosticsCenter:
                     self.btn_open.configure(state="disabled")
                     self.status_var.set("Ошибка запуска диагностики.")
                     self._refresh_bundle_views(regenerate_reports=False)
-                    messagebox.showerror("Diagnostics", f"Не удалось запустить диагностику:\n{exc}")
+                    messagebox.showerror("Диагностика", f"Не удалось запустить диагностику:\n{exc}")
 
                 self.root.after(0, err_ui)
 
@@ -844,49 +840,49 @@ class DesktopDiagnosticsCenter:
         bundle_out_dir = bundle_out_dir or self._active_bundle_out_dir()
         center_state_path = bundle_out_dir / LATEST_DESKTOP_DIAGNOSTICS_CENTER_JSON
         summary_md_path = bundle_out_dir / LATEST_DESKTOP_DIAGNOSTICS_SUMMARY_MD
-        lines = ["# Desktop diagnostics/send summary", ""]
+        lines = ["# Сводка диагностики и пакета отправки", ""]
         if bundle.latest_zip_path:
-            lines.append(f"- Latest ZIP: {bundle.latest_zip_path}")
+            lines.append(f"- Последний ZIP: {bundle.latest_zip_path}")
         else:
-            lines.append("- Latest ZIP: (not available yet)")
+            lines.append("- Последний ZIP: (ещё не готов)")
         if self._last_run_record is not None:
             lines.extend(
                 [
                     "",
-                    "## Last diagnostics run",
-                    f"- ok: {self._last_run_record.ok}",
-                    f"- status: {self._last_run_record.status or '—'}",
-                    f"- returncode: {self._last_run_record.returncode}",
-                    f"- started_at: {self._last_run_record.started_at or '—'}",
-                    f"- finished_at: {self._last_run_record.finished_at or '—'}",
-                    f"- run_dir: {self._last_run_record.run_dir or '—'}",
-                    f"- zip_path: {self._last_run_record.zip_path or '—'}",
-                    f"- state_json: {self._last_run_record.state_path or '—'}",
-                    f"- log_path: {self._last_run_record.log_path or '—'}",
-                    f"- message: {self._last_run_record.last_message or '—'}",
+                    "## Последний прогон диагностики",
+                    f"- Успех: {self._last_run_record.ok}",
+                    f"- Состояние: {self._last_run_record.status or '—'}",
+                    f"- Код возврата: {self._last_run_record.returncode}",
+                    f"- Запущено: {self._last_run_record.started_at or '—'}",
+                    f"- Завершено: {self._last_run_record.finished_at or '—'}",
+                    f"- Каталог прогона: {self._last_run_record.run_dir or '—'}",
+                    f"- Путь к ZIP: {self._last_run_record.zip_path or '—'}",
+                    f"- Файл состояния: {self._last_run_record.state_path or '—'}",
+                    f"- Файл журнала: {self._last_run_record.log_path or '—'}",
+                    f"- Сообщение: {self._last_run_record.last_message or '—'}",
                 ]
             )
         if bundle.summary_lines:
-            lines.extend(["", "## Shared summary"])
+            lines.extend(["", "## Общая сводка"])
             lines.extend(f"- {line}" for line in bundle.summary_lines)
         lines.extend(
             [
                 "",
-                "## Machine-readable paths",
-                f"- center_state_json: {path_str(center_state_path)}",
-                f"- latest_summary_md: {path_str(summary_md_path)}",
-                f"- latest_bundle_meta_json: {bundle.latest_bundle_meta_path or '—'}",
-                f"- latest_bundle_inspection_json: {bundle.latest_inspection_json_path or '—'}",
-                f"- latest_bundle_inspection_md: {bundle.latest_inspection_md_path or '—'}",
-                f"- latest_health_report_json: {bundle.latest_health_json_path or '—'}",
-                f"- latest_health_report_md: {bundle.latest_health_md_path or '—'}",
-                f"- latest_validation_json: {bundle.latest_validation_json_path or '—'}",
-                f"- latest_validation_md: {bundle.latest_validation_md_path or '—'}",
-                f"- latest_triage_md: {bundle.latest_triage_md_path or '—'}",
-                f"- latest_clipboard_status_json: {bundle.latest_clipboard_status_path or '—'}",
-                f"- anim_pointer_diagnostics_json: {bundle.anim_pointer_diagnostics_path or '—'}",
-                f"- latest_run_state_json: {self._last_run_record.state_path if self._last_run_record else '—'}",
-                f"- latest_run_log: {self._last_run_record.log_path if self._last_run_record else '—'}",
+                "## Машиночитаемые пути",
+                f"- Снимок состояния центра: {path_str(center_state_path)}",
+                f"- Последняя сводка Markdown: {path_str(summary_md_path)}",
+                f"- Метаданные пакета JSON: {bundle.latest_bundle_meta_path or '—'}",
+                f"- Проверка пакета JSON: {bundle.latest_inspection_json_path or '—'}",
+                f"- Проверка пакета Markdown: {bundle.latest_inspection_md_path or '—'}",
+                f"- Отчёт о состоянии JSON: {bundle.latest_health_json_path or '—'}",
+                f"- Отчёт о состоянии Markdown: {bundle.latest_health_md_path or '—'}",
+                f"- Проверка содержимого JSON: {bundle.latest_validation_json_path or '—'}",
+                f"- Проверка содержимого Markdown: {bundle.latest_validation_md_path or '—'}",
+                f"- Разбор замечаний Markdown: {bundle.latest_triage_md_path or '—'}",
+                f"- Статус буфера обмена JSON: {bundle.latest_clipboard_status_path or '—'}",
+                f"- Диагностика указателя анимации JSON: {bundle.anim_pointer_diagnostics_path or '—'}",
+                f"- Последний файл состояния прогона JSON: {self._last_run_record.state_path if self._last_run_record else '—'}",
+                f"- Последний журнал прогона: {self._last_run_record.log_path if self._last_run_record else '—'}",
             ]
         )
         return "\n".join(lines) + "\n"
@@ -914,8 +910,8 @@ class DesktopDiagnosticsCenter:
         self._refresh_diagnostics_log_view()
         summary_text = self._render_summary_text(bundle, bundle_out_dir=self.out_dir)
         self._set_text_widget(self.summary_text, summary_text)
-        inspect_md = "(inspection is not available yet)"
-        health_md = "(health report is not available yet)"
+        inspect_md = "(проверка пакета пока недоступна)"
+        health_md = "(отчёт о состоянии пока недоступен)"
         if bundle.latest_inspection_md_path:
             inspect_md = Path(bundle.latest_inspection_md_path).read_text(encoding="utf-8", errors="replace")
         if bundle.latest_health_md_path:
@@ -946,9 +942,9 @@ class DesktopDiagnosticsCenter:
         if bundle.summary_lines:
             meta_bits.extend(bundle.summary_lines)
         if bundle.anim_pointer_diagnostics_path:
-            meta_bits.append(f"Anim pointer diagnostics: {bundle.anim_pointer_diagnostics_path}")
+            meta_bits.append(f"Диагностика указателя анимации: {bundle.anim_pointer_diagnostics_path}")
         if bundle.clipboard_ok is not None:
-            meta_bits.append(f"Clipboard: ok={bundle.clipboard_ok} msg={bundle.clipboard_message}")
+            meta_bits.append(f"Буфер обмена: ok={bundle.clipboard_ok} msg={bundle.clipboard_message}")
         self.send_meta_var.set("\n".join(meta_bits))
 
         self._clipboard_ok = bool(bundle.clipboard_ok) if bundle.clipboard_ok is not None else False
@@ -993,7 +989,7 @@ class DesktopDiagnosticsCenter:
         self.btn_copy.state(["disabled"])
         self.pb.configure(mode="indeterminate")
         self.pb.start(10)
-        self.status_var.set("Сборка shared send-bundle...")
+        self.status_var.set("Сборка пакета отправки...")
 
         def worker() -> None:
             result = build_full_diagnostics_bundle(
@@ -1010,7 +1006,7 @@ class DesktopDiagnosticsCenter:
         self._bundle_busy = False
         self._worker_done = True
         self._worker_exc = None if ok else message
-        self.status_var.set("Bundle refreshed." if ok else f"Bundle build failed: {message}")
+        self.status_var.set("Пакет обновлён." if ok else f"Не удалось собрать пакет: {message}")
         self._refresh_bundle_views(regenerate_reports=True)
         if zip_path:
             try:
@@ -1020,7 +1016,7 @@ class DesktopDiagnosticsCenter:
         if self._bundle_auto_copy_on_ready:
             self._attempt_clipboard_copy_once()
         if not ok and not self._host_closed:
-            messagebox.showerror("Bundle", message or "Не удалось собрать bundle.")
+            messagebox.showerror("Пакет отправки", message or "Не удалось собрать пакет отправки.")
 
     def _attempt_clipboard_copy_once(self) -> None:
         if self._clipboard_attempted:

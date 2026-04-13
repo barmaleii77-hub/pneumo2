@@ -33,11 +33,11 @@ def test_launcher_catalog_keeps_shared_desktop_tool_list_and_optional_mnemo() ->
     modules_with_mnemo = {item.module for item in with_mnemo}
 
     assert "pneumo_solver_ui.tools.desktop_input_editor" in modules_without_mnemo
+    assert "pneumo_solver_ui.tools.desktop_geometry_reference_center" in modules_without_mnemo
     assert "pneumo_solver_ui.tools.desktop_ring_scenario_editor" in modules_without_mnemo
     assert "pneumo_solver_ui.tools.test_center_gui" in modules_without_mnemo
     assert "pneumo_solver_ui.tools.run_autotest_gui" in modules_without_mnemo
-    assert "pneumo_solver_ui.tools.run_full_diagnostics_gui" in modules_without_mnemo
-    assert "pneumo_solver_ui.tools.send_results_gui" in modules_without_mnemo
+    assert "pneumo_solver_ui.tools.desktop_diagnostics_center" in modules_without_mnemo
     assert "pneumo_solver_ui.qt_compare_viewer" in modules_without_mnemo
     assert "pneumo_solver_ui.desktop_animator.app" in modules_without_mnemo
     assert "pneumo_solver_ui.desktop_mnemo.app" not in modules_without_mnemo
@@ -66,4 +66,5 @@ def test_root_desktop_control_center_wrappers_delegate_to_launcher() -> None:
     assert "wscript.shell" in vbs
     assert "start_desktop_control_center.pyw" in vbs
     assert 'Path(__file__).with_name("START_DESKTOP_CONTROL_CENTER.py")' in pyw
+    assert "ensure_root_launcher_runtime" in py
     assert 'MODULE = "pneumo_solver_ui.tools.desktop_control_center"' in py

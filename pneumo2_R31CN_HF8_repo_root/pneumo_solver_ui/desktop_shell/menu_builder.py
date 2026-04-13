@@ -28,6 +28,42 @@ def _workflow_shortcut_label(index: int) -> str:
     return f"Ctrl+Alt+{index}"
 
 
+def _sorted_specs(specs: tuple[DesktopShellToolSpec, ...]) -> tuple[DesktopShellToolSpec, ...]:
+    return tuple(
+        sorted(
+            specs,
+            key=lambda spec: (
+                int(spec.menu_order),
+                int(spec.nav_order),
+                str(spec.title or "").lower(),
+            ),
+        )
+    )
+
+
+def _menu_sections(
+    hosted_specs: tuple[DesktopShellToolSpec, ...],
+    external_specs: tuple[DesktopShellToolSpec, ...],
+) -> tuple[tuple[str, tuple[DesktopShellToolSpec, ...]], ...]:
+    all_specs = _sorted_specs(hosted_specs + external_specs)
+    section_order = (
+        "Данные",
+        "Сценарии",
+        "Расчёт",
+        "Оптимизация",
+        "Результаты",
+        "Анализ",
+        "Визуализация",
+        "Инструменты",
+    )
+    section_specs: list[tuple[str, tuple[DesktopShellToolSpec, ...]]] = []
+    for label in section_order:
+        section_specs.append(
+            (label, tuple(spec for spec in all_specs if spec.menu_section == label))
+        )
+    return tuple(section_specs)
+
+
 @dataclass
 class ShellWorkspaceContextMenuController:
     notebook: tk.Misc
@@ -76,19 +112,12 @@ class ShellWorkspaceContextMenuController:
         has_active_hosted_session = bool(current_key and current_key != HOME_WORKSPACE_KEY)
         has_recently_closed = self.has_recently_closed_sessions()
 
-        if current_key == HOME_WORKSPACE_KEY:
-            current_label = "Главная"
-        elif has_active_hosted_session:
+        current_label = "Обзор"
+        if current_key and current_key != HOME_WORKSPACE_KEY:
             current_label = next(
-                (
-                    session.spec.title
-                    for session in open_sessions
-                    if session.key == current_key
-                ),
+                (session.spec.title for session in open_sessions if session.key == current_key),
                 "Неизвестная вкладка",
             )
-        else:
-            current_label = "Неизвестная вкладка"
 
         self.menu.add_command(label=f"Текущая вкладка: {current_label}", state="disabled")
         self.menu.add_command(
@@ -102,50 +131,51 @@ class ShellWorkspaceContextMenuController:
             state="normal" if self.workflow_specs else "disabled",
         )
         self.menu.add_command(
-            label="Предыдущий открытый этап маршрута\tCtrl+Alt+Left",
+            label="Предыдущий этап\tCtrl+Alt+Left",
             command=self.select_previous_workflow,
             state="normal" if has_workflow_sessions else "disabled",
         )
         self.menu.add_command(
-            label="Следующий открытый этап маршрута\tCtrl+Alt+Right",
+            label="Следующий этап\tCtrl+Alt+Right",
             command=self.select_next_workflow,
             state="normal" if has_workflow_sessions else "disabled",
         )
-        self.menu.add_command(label="Перейти на главную", command=self.select_home)
+        self.menu.add_separator()
+        self.menu.add_command(label="Перейти к обзору", command=self.select_home)
         self.menu.add_command(
-            label="Следующее встроенное окно",
+            label="Следующее окно\tCtrl+Tab",
             command=self.select_next_hosted,
             state="normal" if has_sessions else "disabled",
         )
         self.menu.add_command(
-            label="Предыдущее встроенное окно",
+            label="Предыдущее окно\tCtrl+Shift+Tab",
             command=self.select_previous_hosted,
             state="normal" if has_sessions else "disabled",
         )
         self.menu.add_separator()
         self.menu.add_command(
-            label="Перезагрузить текущее окно",
+            label="Перезагрузить текущее окно\tF5",
             command=self.reload_current,
             state="normal" if has_active_hosted_session else "disabled",
         )
         self.menu.add_command(
-            label="Закрыть текущее окно",
+            label="Закрыть текущее окно\tCtrl+W",
             command=self.close_current,
             state="normal" if has_active_hosted_session else "disabled",
         )
         self.menu.add_command(
-            label="Закрыть остальные встроенные окна",
+            label="Закрыть остальные окна",
             command=self.close_other_hosted,
             state="normal" if has_active_hosted_session and len(open_sessions) > 1 else "disabled",
         )
         self.menu.add_command(
-            label="Закрыть все встроенные окна",
+            label="Закрыть все окна",
             command=self.close_all_hosted,
             state="normal" if has_sessions else "disabled",
         )
         self.menu.add_separator()
         self.menu.add_command(
-            label="Повторно открыть последнее окно",
+            label="Вернуть последнее закрытое окно",
             command=self.reopen_last_closed,
             state="normal" if has_recently_closed else "disabled",
         )
@@ -228,105 +258,53 @@ def build_shell_menubar(
     quit_app: Callable[[], None],
 ) -> Menu:
     menubar = Menu(root)
+    selected_window_var = tk.StringVar(master=root, value=HOME_WORKSPACE_KEY)
 
     file_menu = Menu(menubar, tearoff=False)
-    file_menu.add_command(label="Главная", command=select_home)
+    file_menu.add_command(label="Обзор", command=select_home)
     file_menu.add_separator()
     file_menu.add_command(label="Выход", command=quit_app)
     menubar.add_cascade(label="Файл", menu=file_menu)
 
-    hosted_menu = Menu(menubar, tearoff=False)
-    for spec in hosted_specs:
-        hosted_menu.add_command(label=spec.title, command=lambda key=spec.key: open_tool(key))
-    menubar.add_cascade(label="Встроенные окна", menu=hosted_menu)
+    for section_label, section_specs in _menu_sections(hosted_specs, external_specs):
+        section_menu = Menu(menubar, tearoff=False)
+        if section_label == "Расчёт" and workflow_specs:
+            section_menu.add_command(
+                label="Продолжить основной маршрут\tCtrl+Shift+N",
+                command=continue_workflow,
+            )
+            section_menu.add_command(
+                label="Предыдущий этап маршрута\tCtrl+Alt+Left",
+                command=select_previous_workflow,
+                state="normal" if has_open_workflow_sessions() else "disabled",
+            )
+            section_menu.add_command(
+                label="Следующий этап маршрута\tCtrl+Alt+Right",
+                command=select_next_workflow,
+                state="normal" if has_open_workflow_sessions() else "disabled",
+            )
+            if section_specs:
+                section_menu.add_separator()
+        if not section_specs:
+            section_menu.add_command(label="Раздел пока пуст", state="disabled")
+        else:
+            for spec in section_specs:
+                section_menu.add_command(
+                    label=spec.title,
+                    command=lambda key=spec.key: open_tool(key),
+                )
+        menubar.add_cascade(label=section_label, menu=section_menu)
 
-    external_menu = Menu(menubar, tearoff=False)
-    for spec in external_specs:
-        external_menu.add_command(label=spec.title, command=lambda key=spec.key: open_tool(key))
-    menubar.add_cascade(label="Внешние окна", menu=external_menu)
-
-    workflow_menu = Menu(menubar, tearoff=False)
-    navigation_menu = Menu(menubar, tearoff=False)
     window_menu = Menu(menubar, tearoff=False)
-    selected_window_var = tk.StringVar(master=root, value=HOME_WORKSPACE_KEY)
 
     def _current_workspace_title(open_sessions: tuple[HostedToolSession, ...]) -> str:
         current_key = selected_workspace_key()
         if current_key == HOME_WORKSPACE_KEY or not current_key:
-            return "Главная"
+            return "Обзор"
         for session in open_sessions:
             if session.key == current_key:
                 return session.spec.title
         return "Неизвестная вкладка"
-
-    def _rebuild_navigation_menu() -> None:
-        navigation_menu.delete(0, "end")
-        open_sessions = list_open_sessions()
-        has_sessions = bool(open_sessions)
-        navigation_menu.add_command(label="Главная", command=select_home)
-        navigation_menu.add_separator()
-        navigation_menu.add_command(
-            label=f"Текущий контекст: {_current_workspace_title(open_sessions)}",
-            state="disabled",
-        )
-        navigation_menu.add_separator()
-        navigation_menu.add_command(
-            label="Следующее встроенное окно\tCtrl+Tab",
-            command=select_next_hosted,
-            state="normal" if has_sessions else "disabled",
-        )
-        navigation_menu.add_command(
-            label="Предыдущее встроенное окно\tCtrl+Shift+Tab",
-            command=select_previous_hosted,
-            state="normal" if has_sessions else "disabled",
-        )
-        navigation_menu.add_separator()
-        if not open_sessions:
-            navigation_menu.add_command(label="Нет открытых встроенных окон", state="disabled")
-            return
-        for index, session in enumerate(open_sessions, start=1):
-            accelerator = f"\tCtrl+{index}" if index <= MAX_DIRECT_SESSION_SHORTCUT else ""
-            navigation_menu.add_command(
-                label=f"{numbered_session_label(session, index)}{accelerator}",
-                command=lambda key=session.key: select_hosted_session(key),
-            )
-
-    def _rebuild_workflow_menu() -> None:
-        workflow_menu.delete(0, "end")
-        open_sessions = list_open_sessions()
-        open_keys = {session.key for session in open_sessions}
-        has_workflow_sessions = has_open_workflow_sessions()
-        if not workflow_specs:
-            workflow_menu.add_command(label="Основной маршрут недоступен", state="disabled")
-            return
-
-        workflow_menu.add_command(
-            label=describe_workflow_progress(workflow_specs, open_keys),
-            state="disabled",
-        )
-        workflow_menu.add_separator()
-        workflow_menu.add_command(
-            label="Продолжить основной маршрут\tCtrl+Shift+N",
-            command=continue_workflow,
-        )
-        workflow_menu.add_command(
-            label="Предыдущий открытый этап маршрута\tCtrl+Alt+Left",
-            command=select_previous_workflow,
-            state="normal" if has_workflow_sessions else "disabled",
-        )
-        workflow_menu.add_command(
-            label="Следующий открытый этап маршрута\tCtrl+Alt+Right",
-            command=select_next_workflow,
-            state="normal" if has_workflow_sessions else "disabled",
-        )
-        workflow_menu.add_separator()
-        for index, spec in enumerate(workflow_specs, start=1):
-            suffix = " (открыт)" if spec.key in open_keys else ""
-            accelerator = f"\t{_workflow_shortcut_label(index)}"
-            workflow_menu.add_command(
-                label=f"Шаг {index}. {spec.title}{suffix}{accelerator}",
-                command=lambda key=spec.key: open_tool(key),
-            )
 
     def _rebuild_window_menu() -> None:
         window_menu.delete(0, "end")
@@ -334,7 +312,7 @@ def build_shell_menubar(
         current_key = selected_workspace_key() or ""
         has_active_hosted_session = bool(current_key and current_key != HOME_WORKSPACE_KEY)
         has_recently_closed = has_recently_closed_sessions()
-        selected_window_var.set(current_key)
+        selected_window_var.set(current_key or HOME_WORKSPACE_KEY)
 
         window_menu.add_command(
             label="Перезагрузить текущее окно\tF5",
@@ -347,41 +325,39 @@ def build_shell_menubar(
             state="normal" if has_active_hosted_session else "disabled",
         )
         window_menu.add_command(
-            label="Закрыть остальные встроенные окна",
+            label="Закрыть остальные окна",
             command=close_other_hosted,
             state="normal" if has_active_hosted_session and len(open_sessions) > 1 else "disabled",
         )
         window_menu.add_command(
-            label="Закрыть все встроенные окна",
+            label="Закрыть все окна",
             command=close_all_hosted,
             state="normal" if open_sessions else "disabled",
         )
         window_menu.add_command(
-            label="Повторно открыть последнее окно\tCtrl+Shift+T",
+            label="Вернуть последнее закрытое окно\tCtrl+Shift+T",
             command=reopen_last_closed,
             state="normal" if has_recently_closed else "disabled",
         )
         window_menu.add_separator()
-
-        window_menu.add_command(
-            label=f"Открыто встроенных окон: {len(open_sessions)}",
-            state="disabled",
-        )
         window_menu.add_command(
             label=f"Текущее окно: {_current_workspace_title(open_sessions)}",
             state="disabled",
         )
+        window_menu.add_command(
+            label=f"Открыто окон: {len(open_sessions)}",
+            state="disabled",
+        )
+        window_menu.add_separator()
         window_menu.add_radiobutton(
-            label="Главная",
+            label="Обзор",
             value=HOME_WORKSPACE_KEY,
             variable=selected_window_var,
             command=select_home,
         )
         if not open_sessions:
-            window_menu.add_command(label="Нет открытых встроенных окон", state="disabled")
+            window_menu.add_command(label="Открытых встроенных окон пока нет", state="disabled")
             return
-
-        window_menu.add_separator()
         for index, session in enumerate(open_sessions, start=1):
             window_menu.add_radiobutton(
                 label=numbered_session_label(session, index),
@@ -389,12 +365,6 @@ def build_shell_menubar(
                 variable=selected_window_var,
                 command=lambda key=session.key: select_hosted_session(key),
             )
-
-    workflow_menu.configure(postcommand=_rebuild_workflow_menu)
-    menubar.add_cascade(label="Маршрут", menu=workflow_menu)
-
-    navigation_menu.configure(postcommand=_rebuild_navigation_menu)
-    menubar.add_cascade(label="Навигация", menu=navigation_menu)
 
     window_menu.configure(postcommand=_rebuild_window_menu)
     menubar.add_cascade(label="Окно", menu=window_menu)

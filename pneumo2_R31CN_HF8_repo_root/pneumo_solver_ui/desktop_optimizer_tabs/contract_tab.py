@@ -21,7 +21,7 @@ class DesktopOptimizerContractTab(ttk.Frame):
 
         ttk.Label(
             body,
-            text="Optimization contract",
+            text="Контракт оптимизации",
             font=("Segoe UI", 14, "bold"),
         ).grid(row=0, column=0, sticky="w")
         ttk.Label(
@@ -34,35 +34,35 @@ class DesktopOptimizerContractTab(ttk.Frame):
             justify="left",
         ).grid(row=1, column=0, sticky="ew", pady=(6, 10))
 
-        self.summary_panel = KeyValueGridPanel(body, text="Scope / search-space snapshot")
+        self.summary_panel = KeyValueGridPanel(body, text="Снимок области и пространства поиска")
         self.summary_panel.grid(row=2, column=0, sticky="ew")
 
-        self.paths_panel = KeyValueGridPanel(body, text="Resolved artifacts")
+        self.paths_panel = KeyValueGridPanel(body, text="Подготовленные артефакты")
         self.paths_panel.grid(row=3, column=0, sticky="ew", pady=(10, 0))
 
-        objective_frame = ttk.LabelFrame(body, text="Objective contract", padding=10)
+        objective_frame = ttk.LabelFrame(body, text="Контракт целей", padding=10)
         objective_frame.grid(row=4, column=0, sticky="ew", pady=(10, 0))
         objective_frame.columnconfigure(1, weight=1)
         objective_frame.columnconfigure(3, weight=1)
 
-        ttk.Label(objective_frame, text="Objective keys").grid(row=0, column=0, sticky="nw", padx=(0, 8))
+        ttk.Label(objective_frame, text="Цели оптимизации").grid(row=0, column=0, sticky="nw", padx=(0, 8))
         self.objective_text = tk.Text(objective_frame, height=5, wrap="word")
         self.objective_text.grid(row=0, column=1, columnspan=3, sticky="ew")
 
-        ttk.Label(objective_frame, text="Penalty key").grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(objective_frame, text="Ключ штрафа").grid(row=1, column=0, sticky="w", pady=(8, 0))
         ttk.Entry(
             objective_frame,
             textvariable=controller.var("opt_penalty_key"),
         ).grid(row=1, column=1, sticky="ew", pady=(8, 0))
 
-        ttk.Label(objective_frame, text="Penalty tol").grid(row=1, column=2, sticky="w", padx=(12, 8), pady=(8, 0))
+        ttk.Label(objective_frame, text="Допуск штрафа").grid(row=1, column=2, sticky="w", padx=(12, 8), pady=(8, 0))
         ttk.Entry(
             objective_frame,
             textvariable=controller.var("opt_penalty_tol"),
             width=14,
         ).grid(row=1, column=3, sticky="w", pady=(8, 0))
 
-        ttk.Label(objective_frame, text="Problem hash mode").grid(row=2, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(objective_frame, text="Режим хэша задачи").grid(row=2, column=0, sticky="w", pady=(8, 0))
         ttk.Combobox(
             objective_frame,
             textvariable=controller.var("settings_opt_problem_hash_mode"),
@@ -81,42 +81,42 @@ class DesktopOptimizerContractTab(ttk.Frame):
 
         self.stage_policy_panel = TextReportPanel(
             body,
-            text="Planned stage policy",
+            text="План стадий",
             height=8,
         )
         self.stage_policy_panel.grid(row=5, column=0, sticky="ew", pady=(10, 0))
 
         self.drift_panel = TextReportPanel(
             body,
-            text="Selected run drift vs current launch",
+            text="Расхождение выбранного прогона с текущим запуском",
             height=10,
         )
         self.drift_panel.grid(row=6, column=0, sticky="ew", pady=(10, 0))
 
-        selection_frame = ttk.LabelFrame(body, text="Selected run actions", padding=10)
+        selection_frame = ttk.LabelFrame(body, text="Действия по выбранному прогону", padding=10)
         selection_frame.grid(row=7, column=0, sticky="ew", pady=(10, 0))
         ttk.Button(
             selection_frame,
-            text="Apply selected contract",
+            text="Применить контракт",
             command=controller.apply_selected_run_contract,
         ).pack(side="left")
         ttk.Button(
             selection_frame,
-            text="Open selected objective contract",
+            text="Открыть контракт целей",
             command=controller.open_selected_objective_contract,
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
             selection_frame,
-            text="History",
+            text="История",
             command=controller.show_history_tab,
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
             selection_frame,
-            text="Dashboard",
+            text="Обзор",
             command=controller.show_dashboard_tab,
         ).pack(side="left", padx=(8, 0))
 
-        open_frame = ttk.LabelFrame(body, text="Quick actions", padding=10)
+        open_frame = ttk.LabelFrame(body, text="Быстрые действия", padding=10)
         open_frame.grid(row=8, column=0, sticky="ew", pady=(10, 0))
         ttk.Button(
             open_frame,
@@ -135,7 +135,7 @@ class DesktopOptimizerContractTab(ttk.Frame):
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
             open_frame,
-            text="Открыть workspace",
+            text="Открыть рабочую область",
             command=lambda: controller.open_current_artifact("workspace_dir"),
         ).pack(side="left", padx=(8, 0))
 

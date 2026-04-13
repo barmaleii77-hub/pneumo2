@@ -280,10 +280,11 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
 
     assert "class DesktopGeometryReferenceCenter" in tool_src
     assert "ttk.Notebook" in tool_src
-    assert 'self.notebook.add(self.geometry_tab, text="Подвеска")' in tool_src
-    assert 'self.notebook.add(self.cylinder_tab, text="Цилиндры")' in tool_src
-    assert 'self.notebook.add(self.spring_tab, text="Пружины")' in tool_src
-    assert 'self.notebook.add(self.guide_tab, text="Параметры")' in tool_src
+    assert "create_scrollable_tab(self.notebook" in tool_src
+    assert 'self.notebook.add(geometry_tab_host, text="Подвеска")' in tool_src
+    assert 'self.notebook.add(cylinder_tab_host, text="Цилиндры")' in tool_src
+    assert 'self.notebook.add(spring_tab_host, text="Пружины")' in tool_src
+    assert 'self.notebook.add(guide_tab_host, text="Параметры")' in tool_src
     assert "DesktopGeometryReferenceRuntime()" in tool_src
     assert "def _refresh_geometry_tab(self) -> None:" in tool_src
     assert "def _refresh_cylinder_tab(self) -> None:" in tool_src

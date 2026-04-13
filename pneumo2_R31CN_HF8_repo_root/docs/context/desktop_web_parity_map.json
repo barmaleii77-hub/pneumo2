@@ -1,0 +1,169 @@
+[
+  {
+    "capability_id": "input.project_entry_and_setup",
+    "status": "сведён",
+    "desktop_route_kind": "main+tool",
+    "desktop_tool_keys": ["desktop_input_editor", "test_center", "desktop_diagnostics_center"],
+    "web_targets": [
+      "pneumo_ui_app.py",
+      "00_Setup.py",
+      "00_Preflight.py",
+      "97_Settings.py",
+      "01_SchemeIntegrity.py",
+      "nonascii_4bd55fba.py"
+    ],
+    "notes": "Старт, базовая настройка, preflight и контроль целостности теперь собраны вокруг ввода данных, расчётного центра и единой диагностики."
+  },
+  {
+    "capability_id": "reference.geometry_and_guides",
+    "status": "контекстный",
+    "desktop_route_kind": "contextual+tool+external",
+    "desktop_tool_keys": [
+      "desktop_input_editor",
+      "desktop_geometry_reference_center",
+      "desktop_animator",
+      "desktop_mnemo"
+    ],
+    "web_targets": [
+      "10_SuspensionGeometry.py",
+      "13_CamozziCylindersCatalog.py",
+      "14_SpringsGeometry_CoilBind.py",
+      "15_PneumoScheme_Mnemo.py",
+      "16_PneumoScheme_Graph.py",
+      "20_ParamsGuide.py",
+      "nonascii_c56f9319.py"
+    ],
+    "notes": "Справочные и геометрические страницы не дублируются как отдельные web-полотна: они сведены в справочный центр, графику рядом с вводом и специализированные окна."
+  },
+  {
+    "capability_id": "calculation.validation_and_prechecks",
+    "status": "перенесён",
+    "desktop_route_kind": "main",
+    "desktop_tool_keys": ["test_center", "desktop_results_center"],
+    "web_targets": [
+      "09_Validation_Web.py",
+      "08_ValidationCockpit_Web.py",
+      "98_SelfCheck.py",
+      "nonascii_780954e8.py"
+    ],
+    "notes": "Проверки перед расчётом и валидация после расчёта переходят через расчётный центр и единый центр результатов."
+  },
+  {
+    "capability_id": "results.compare_and_review",
+    "status": "перенесён",
+    "desktop_route_kind": "main+external",
+    "desktop_tool_keys": ["desktop_results_center", "compare_viewer"],
+    "web_targets": [
+      "12_ResultsViewer.py",
+      "20_CompareRuns.py",
+      "21_CompareRuns_Quick.py",
+      "06_CompareNPZ_Web.py",
+      "06_CompareViewer_QT.py",
+      "07_CompareNPZ_QT.py",
+      "nonascii_7286e9eb.py",
+      "nonascii_6621d6f3.py",
+      "nonascii_073afeaa.py"
+    ],
+    "notes": "Просмотр результатов и сравнение прогонов сведены в единый центр результатов с выходом во внешний Compare Viewer."
+  },
+  {
+    "capability_id": "visualization.animator_and_mnemo",
+    "status": "перенесён",
+    "desktop_route_kind": "main+external",
+    "desktop_tool_keys": ["desktop_results_center", "desktop_animator", "desktop_mnemo"],
+    "web_targets": [
+      "07_DesktopAnimator.py",
+      "08_DesktopAnimator.py",
+      "08_DesktopMnemo.py",
+      "11_AnimationCockpit_Web.py",
+      "40_DesktopAnimator.py",
+      "nonascii_1dddf109.py"
+    ],
+    "notes": "Визуализация не живёт отдельными дублями в shell: результатный центр открывает Animator и мнемосхему в нужном контексте."
+  },
+  {
+    "capability_id": "tools.diagnostics_and_bundle",
+    "status": "сведён",
+    "desktop_route_kind": "tool",
+    "desktop_tool_keys": ["desktop_diagnostics_center", "desktop_results_center"],
+    "web_targets": [
+      "98_BuildBundle_ZIP.py",
+      "98_SendBundle.py",
+      "99_Diagnostics.py",
+      "99_EnvDiagnostics.py",
+      "nonascii_0ee421da.py",
+      "nonascii_18680cfb.py",
+      "nonascii_f5ca7911.py"
+    ],
+    "notes": "Диагностика, сбор ZIP и подготовка отправки собраны в один desktop-центр и остаются доступны из результатов."
+  },
+  {
+    "capability_id": "optimization.orchestration_and_databases",
+    "status": "сведён",
+    "desktop_route_kind": "main",
+    "desktop_tool_keys": ["desktop_optimizer_center", "desktop_results_center"],
+    "web_targets": [
+      "30_Optimization.py",
+      "31_OptDatabase.py",
+      "04_DistributedOptimization.py",
+      "20_DistributedOptimization.py",
+      "04_DistributedOptimization_R58.py",
+      "03_DistributedOptimizationDB.py",
+      "04_ExperimentDB_Distributed.py",
+      "21_ExperimentDB.py",
+      "nonascii_92b4a0a4.py",
+      "nonascii_16841a54.py",
+      "nonascii_7ccd4c23.py"
+    ],
+    "notes": "Оптимизация, распределённые прогоны и рабочие базы сведены в центр автоматизированной оптимизации и связанные итоговые сводки."
+  },
+  {
+    "capability_id": "analysis.influence_and_exploration",
+    "status": "сведён",
+    "desktop_route_kind": "main+tool",
+    "desktop_tool_keys": [
+      "desktop_results_center",
+      "desktop_optimizer_center",
+      "desktop_geometry_reference_center"
+    ],
+    "web_targets": [
+      "03_Design_Advisor.py",
+      "03_DesignAdvisor.py",
+      "03_SystemInfluence.py",
+      "04_SubsystemsInfluence.py",
+      "04_Uncertainty.py",
+      "05_ParamsInfluence.py",
+      "05_ParamInfluence.py",
+      "02_Calibration_NPZ.py",
+      "nonascii_122b787f.py",
+      "nonascii_056e13a2.py",
+      "nonascii_46129abd.py",
+      "nonascii_de9dc1dc.py",
+      "nonascii_43e273a2.py"
+    ],
+    "notes": "Исследовательские страницы анализа не тянутся в GUI по одной; их полезное поведение сводится в результаты, оптимизацию и справочный анализ."
+  },
+  {
+    "capability_id": "legacy.archived_web_surfaces",
+    "status": "архивный legacy",
+    "desktop_route_kind": "legacy",
+    "desktop_tool_keys": [],
+    "web_targets": [
+      "nonascii_03df0dac.py",
+      "nonascii_7efe5ac9.py",
+      "04_DistributedOptimization_R58__dup.py",
+      "97_DistributedOptimizationDB_LEGACY_R53.py",
+      "97_DistributedOptimizationDB_LEGACY_R53__dup.py",
+      "nonascii_d456c983.py",
+      "nonascii_6444bcf3.py",
+      "nonascii_fa2d2dca.py",
+      "nonascii_e3499901.py",
+      "nonascii_50c61554.py",
+      "nonascii_a3d25616.py",
+      "nonascii_5f83ad91.py",
+      "nonascii_1b5f5920.py",
+      "nonascii_d5be598e.py"
+    ],
+    "notes": "Исторические дубли и донорские поверхности сохраняются только как архив поведения и регрессионная опора."
+  }
+]

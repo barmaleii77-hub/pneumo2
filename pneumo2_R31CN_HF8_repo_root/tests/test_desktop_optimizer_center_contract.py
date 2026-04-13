@@ -54,6 +54,7 @@ def test_root_desktop_optimizer_center_wrappers_delegate_to_launcher() -> None:
     assert "wscript.shell" in vbs
     assert "start_desktop_optimizer_center.pyw" in vbs
     assert 'Path(__file__).with_name("START_DESKTOP_OPTIMIZER_CENTER.py")' in pyw
+    assert "ensure_root_launcher_runtime" in py
     assert 'MODULE = "pneumo_solver_ui.tools.desktop_optimizer_center"' in py
 
 
@@ -188,7 +189,7 @@ def test_desktop_optimizer_runtime_can_apply_operator_launch_profile() -> None:
     assert runtime.session_state["opt_backend"] == "Dask"
     assert runtime.session_state["opt_budget"] == 300
     assert runtime.session_state["dask_workers"] >= 1
-    assert summary["profile_label"] == "Coordinator / Dask Explore"
+    assert summary["profile_label"] == "Координатор / Dask-исследование"
     assert summary["launch_pipeline"] == "coordinator"
 
     runtime.update_state({"opt_budget": 111})
@@ -718,35 +719,35 @@ def test_desktop_optimizer_center_keeps_tabbed_modular_architecture() -> None:
     assert "class DesktopOptimizerFinishedTab" in finished_tab_src
     assert "class DesktopOptimizerHandoffTab" in handoff_tab_src
     assert "class DesktopOptimizerPackagingTab" in packaging_tab_src
-    assert 'text="Selected run drift vs current launch"' in contract_tab_src
-    assert 'text="Apply selected contract"' in contract_tab_src
-    assert 'text="Quick navigation"' in dashboard_tab_src
-    assert 'text="Workspace operator snapshot"' in dashboard_tab_src
-    assert 'text="Launch readiness / operator checklist"' in dashboard_tab_src
-    assert 'text="Latest optimization pointer"' in dashboard_tab_src
-    assert 'text="Selected run next step"' in dashboard_tab_src
-    assert 'text="Latest pointer JSON"' in dashboard_tab_src
-    assert 'text="Next selected-run step"' in dashboard_tab_src
-    assert 'text="Best packaging run"' in dashboard_tab_src
+    assert 'text="Расхождение выбранного прогона с текущим запуском"' in contract_tab_src
+    assert 'text="Применить контракт"' in contract_tab_src
+    assert 'text="Быстрые переходы"' in dashboard_tab_src
+    assert 'text="Состояние рабочей области"' in dashboard_tab_src
+    assert 'text="Готовность к запуску и checklist"' in dashboard_tab_src
+    assert 'text="Последний указатель оптимизации"' in dashboard_tab_src
+    assert 'text="Следующий шаг по выбранному прогону"' in dashboard_tab_src
+    assert 'text="Последний указатель"' in dashboard_tab_src
+    assert 'text="Следующий шаг выбранного прогона"' in dashboard_tab_src
+    assert 'text="Лучший прогон для выпуска"' in dashboard_tab_src
     assert 'values=("stable", "legacy")' in contract_tab_src
-    assert 'text="Launch profiles"' in runtime_tab_src
-    assert 'text="Apply profile"' in runtime_tab_src
-    assert 'text="Launch readiness"' in runtime_tab_src
-    assert 'text="Next recommended surface"' in runtime_tab_src
-    assert 'text="Resume target"' in runtime_tab_src
+    assert 'text="Профили запуска"' in runtime_tab_src
+    assert 'text="Применить профиль"' in runtime_tab_src
+    assert 'text="Готовность к запуску"' in runtime_tab_src
+    assert 'text="Следующий рекомендуемый шаг"' in runtime_tab_src
+    assert 'text="Источник продолжения"' in runtime_tab_src
     assert "HANDOFF_SORT_OPTIONS" in history_tab_src
-    assert 'text="Handoff overview"' in history_tab_src
-    assert 'text="Открыть results"' in history_tab_src
-    assert 'text="Objective contract"' in history_tab_src
-    assert 'text="Apply contract"' in history_tab_src
-    assert 'text="Make latest pointer"' in history_tab_src
-    assert 'text="Handoff plan"' in history_tab_src
-    assert 'text="Finished jobs filters"' in finished_tab_src
-    assert 'text="Make latest pointer"' in finished_tab_src
-    assert 'text="Packaging ranking"' in finished_tab_src
-    assert 'text="Handoff candidate filters"' in handoff_tab_src
-    assert 'text="Make latest pointer"' in handoff_tab_src
-    assert 'text="Continuation ranking"' in handoff_tab_src
-    assert 'text="Packaging filters"' in packaging_tab_src
-    assert 'text="Make latest pointer"' in packaging_tab_src
-    assert 'text="Readiness ranking"' in packaging_tab_src
+    assert 'text="Сводка по передаче"' in history_tab_src
+    assert 'text="Открыть результаты"' in history_tab_src
+    assert 'text="Контракт целей"' in history_tab_src
+    assert 'text="Применить контракт"' in history_tab_src
+    assert 'text="Сделать текущим указателем"' in history_tab_src
+    assert 'text="План передачи"' in history_tab_src
+    assert 'text="Фильтры готовых прогонов"' in finished_tab_src
+    assert 'text="Сделать текущим указателем"' in finished_tab_src
+    assert 'text="Ранжирование для выпуска"' in finished_tab_src
+    assert 'text="Фильтры кандидатов на передачу"' in handoff_tab_src
+    assert 'text="Сделать текущим указателем"' in handoff_tab_src
+    assert 'text="Ранжирование продолжения"' in handoff_tab_src
+    assert 'text="Фильтры выпуска"' in packaging_tab_src
+    assert 'text="Сделать текущим указателем"' in packaging_tab_src
+    assert 'text="Ранжирование по готовности"' in packaging_tab_src

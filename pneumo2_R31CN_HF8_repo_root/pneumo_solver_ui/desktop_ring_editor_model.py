@@ -22,8 +22,18 @@ EVENT_KINDS = ("яма", "препятствие")
 EVENT_SIDES = ("left", "right", "both")
 CLOSURE_POLICIES = ("closed_c1_periodic", "strict_exact")
 
-RING_PRESET_DEFAULT = "Demo: mixed ISO+SINE"
-SEGMENT_PRESET_DEFAULT = "Straight ISO cruise"
+RING_PRESET_DEFAULT_KEY = "Demo: mixed ISO+SINE"
+SEGMENT_PRESET_DEFAULT_KEY = "Straight ISO cruise"
+
+
+@dataclass(frozen=True)
+class PresetPresentation:
+    title_ru: str
+    hint_ru: str = ""
+
+
+RING_PRESET_DEFAULT = "Демо: смешанное ISO 8608 и синусоида"
+SEGMENT_PRESET_DEFAULT = "Прямой участок ISO 8608"
 
 
 def new_uid() -> str:
@@ -42,6 +52,21 @@ def safe_int(value: Any, default: int = 0) -> int:
         return int(value)
     except Exception:
         return int(default)
+
+
+def _turn_label(value: object) -> str:
+    return {
+        "STRAIGHT": "Прямо",
+        "LEFT": "Влево",
+        "RIGHT": "Вправо",
+    }.get(str(value or "").upper(), str(value or ""))
+
+
+def _road_mode_label(value: object) -> str:
+    return {
+        "ISO8608": "ISO 8608",
+        "SINE": "Синусоида",
+    }.get(str(value or "").upper(), str(value or ""))
 
 
 def build_default_iso_road(*, seed: int = 12345) -> dict[str, Any]:
@@ -260,7 +285,7 @@ def build_default_ring_spec() -> dict[str, Any]:
 def _segment_preset_straight_iso(*, seed: int) -> dict[str, Any]:
     return {
         "uid": new_uid(),
-        "name": "Preset straight ISO",
+        "name": "Прямой участок ISO",
         "duration_s": 4.0,
         "turn_direction": "STRAIGHT",
         "speed_end_kph": 45.0,
@@ -277,7 +302,7 @@ def _segment_preset_left_sine(*, seed: int) -> dict[str, Any]:
     _ = seed
     return {
         "uid": new_uid(),
-        "name": "Preset left sine",
+        "name": "Левый поворот, синусоида",
         "duration_s": 4.0,
         "turn_direction": "LEFT",
         "speed_end_kph": 38.0,
@@ -298,7 +323,7 @@ def _segment_preset_left_sine(*, seed: int) -> dict[str, Any]:
 def _segment_preset_brake_rough(*, seed: int) -> dict[str, Any]:
     return {
         "uid": new_uid(),
-        "name": "Preset brake rough ISO",
+        "name": "Торможение на грубом ISO",
         "duration_s": 3.5,
         "turn_direction": "STRAIGHT",
         "speed_end_kph": 20.0,
@@ -325,7 +350,7 @@ def _segment_preset_brake_rough(*, seed: int) -> dict[str, Any]:
 def _segment_preset_obstacle_both(*, seed: int) -> dict[str, Any]:
     return {
         "uid": new_uid(),
-        "name": "Preset obstacle stress",
+        "name": "Участок с препятствиями",
         "duration_s": 3.0,
         "turn_direction": "STRAIGHT",
         "speed_end_kph": 30.0,
@@ -362,6 +387,25 @@ SEGMENT_PRESET_BUILDERS: dict[str, Any] = {
     "Obstacle stress": _segment_preset_obstacle_both,
 }
 
+SEGMENT_PRESET_PRESENTATIONS: dict[str, PresetPresentation] = {
+    "Straight ISO cruise": PresetPresentation(
+        title_ru="Прямой участок ISO 8608",
+        hint_ru="Ровный прямой участок с профилем ISO 8608 и постоянной скоростью.",
+    ),
+    "Left turn sine": PresetPresentation(
+        title_ru="Левый поворот с синусоидой",
+        hint_ru="Поворот влево с синусоидальным дорожным профилем.",
+    ),
+    "Brake rough ISO": PresetPresentation(
+        title_ru="Торможение на грубом ISO",
+        hint_ru="Замедление на шероховатом участке ISO 8608.",
+    ),
+    "Obstacle stress": PresetPresentation(
+        title_ru="Препятствия и ямы",
+        hint_ru="Стрессовый участок с препятствиями и ямой.",
+    ),
+}
+
 
 def _ring_preset_iso_endurance(*, seed: int) -> dict[str, Any]:
     return {
@@ -376,7 +420,7 @@ def _ring_preset_iso_endurance(*, seed: int) -> dict[str, Any]:
         "track_m": 1.0,
         "segments": [
             {
-                "name": "Endurance straight",
+                "name": "Ресурсный прямой участок",
                 "duration_s": 6.0,
                 "turn_direction": "STRAIGHT",
                 "speed_end_kph": 36.0,
@@ -384,7 +428,7 @@ def _ring_preset_iso_endurance(*, seed: int) -> dict[str, Any]:
                 "events": [],
             },
             {
-                "name": "Endurance left",
+                "name": "Ресурсный левый поворот",
                 "duration_s": 4.5,
                 "turn_direction": "LEFT",
                 "speed_end_kph": 36.0,
@@ -393,7 +437,7 @@ def _ring_preset_iso_endurance(*, seed: int) -> dict[str, Any]:
                 "events": [],
             },
             {
-                "name": "Endurance straight fast",
+                "name": "Ресурсный прямой быстрый",
                 "duration_s": 5.0,
                 "turn_direction": "STRAIGHT",
                 "speed_end_kph": 42.0,
@@ -401,7 +445,7 @@ def _ring_preset_iso_endurance(*, seed: int) -> dict[str, Any]:
                 "events": [],
             },
             {
-                "name": "Endurance close",
+                "name": "Ресурсное замыкание",
                 "duration_s": 4.0,
                 "turn_direction": "RIGHT",
                 "speed_end_kph": 36.0,
@@ -426,7 +470,7 @@ def _ring_preset_sine_handling(*, seed: int) -> dict[str, Any]:
         "track_m": 1.0,
         "segments": [
             {
-                "name": "Approach sine",
+                "name": "Подход к синусоиде",
                 "duration_s": 4.5,
                 "turn_direction": "STRAIGHT",
                 "speed_end_kph": 34.0,
@@ -434,7 +478,7 @@ def _ring_preset_sine_handling(*, seed: int) -> dict[str, Any]:
                 "events": [],
             },
             {
-                "name": "Left handling",
+                "name": "Левый манёвр",
                 "duration_s": 4.0,
                 "turn_direction": "LEFT",
                 "speed_end_kph": 32.0,
@@ -443,7 +487,7 @@ def _ring_preset_sine_handling(*, seed: int) -> dict[str, Any]:
                 "events": [],
             },
             {
-                "name": "Right handling",
+                "name": "Правый манёвр",
                 "duration_s": 4.0,
                 "turn_direction": "RIGHT",
                 "speed_end_kph": 32.0,
@@ -452,7 +496,7 @@ def _ring_preset_sine_handling(*, seed: int) -> dict[str, Any]:
                 "events": [],
             },
             {
-                "name": "Recovery close",
+                "name": "Выход и замыкание",
                 "duration_s": 3.0,
                 "turn_direction": "STRAIGHT",
                 "speed_end_kph": 32.0,
@@ -476,7 +520,7 @@ def _ring_preset_events_stress(*, seed: int) -> dict[str, Any]:
         "track_m": 1.0,
         "segments": [
             {
-                "name": "Event warmup",
+                "name": "Разогрев перед событиями",
                 "duration_s": 4.0,
                 "turn_direction": "STRAIGHT",
                 "speed_end_kph": 28.0,
@@ -486,7 +530,7 @@ def _ring_preset_events_stress(*, seed: int) -> dict[str, Any]:
                 ],
             },
             {
-                "name": "Obstacle pair",
+                "name": "Пара препятствий",
                 "duration_s": 3.5,
                 "turn_direction": "STRAIGHT",
                 "speed_end_kph": 24.0,
@@ -497,7 +541,7 @@ def _ring_preset_events_stress(*, seed: int) -> dict[str, Any]:
                 ],
             },
             {
-                "name": "Event close",
+                "name": "Замыкающий участок событий",
                 "duration_s": 4.0,
                 "turn_direction": "LEFT",
                 "speed_end_kph": 28.0,
@@ -516,26 +560,61 @@ RING_PRESET_BUILDERS: dict[str, Any] = {
     "Events stress": _ring_preset_events_stress,
 }
 
+RING_PRESET_PRESENTATIONS: dict[str, PresetPresentation] = {
+    "Demo: mixed ISO+SINE": PresetPresentation(
+        title_ru="Демо: смешанное ISO 8608 и синусоида",
+        hint_ru="Базовое демонстрационное кольцо с прямыми участками, поворотом и смешанным профилем.",
+    ),
+    "ISO endurance": PresetPresentation(
+        title_ru="Ресурсный круг ISO 8608",
+        hint_ru="Длинный кольцевой сценарий для ресурсной проверки на профиле ISO 8608.",
+    ),
+    "SINE handling": PresetPresentation(
+        title_ru="Управляемость на синусоиде",
+        hint_ru="Кольцо с синусоидальными участками и манёврами влево/вправо.",
+    ),
+    "Events stress": PresetPresentation(
+        title_ru="События и препятствия",
+        hint_ru="Кольцо с ямами, препятствиями и стрессовыми дорожными участками.",
+    ),
+}
+
+
+def _resolve_preset_key(
+    name: str,
+    *,
+    builders: dict[str, Any],
+    presentations: dict[str, PresetPresentation],
+    label: str,
+) -> str:
+    value = str(name or "").strip()
+    if value in builders:
+        return value
+    for key, presentation in presentations.items():
+        if value == presentation.title_ru:
+            return key
+    raise KeyError(f"Unknown {label} preset: {name}")
+
 
 def list_ring_preset_names() -> tuple[str, ...]:
-    return tuple(RING_PRESET_BUILDERS.keys())
+    return tuple(RING_PRESET_PRESENTATIONS[key].title_ru for key in RING_PRESET_BUILDERS.keys())
 
 
 def list_segment_preset_names() -> tuple[str, ...]:
-    return tuple(SEGMENT_PRESET_BUILDERS.keys())
+    return tuple(SEGMENT_PRESET_PRESENTATIONS[key].title_ru for key in SEGMENT_PRESET_BUILDERS.keys())
 
 
 def build_ring_preset(name: str, *, seed: int) -> dict[str, Any]:
-    builder = RING_PRESET_BUILDERS.get(str(name))
-    if builder is None:
-        raise KeyError(f"Unknown ring preset: {name}")
+    builder = RING_PRESET_BUILDERS.get(
+        _resolve_preset_key(name, builders=RING_PRESET_BUILDERS, presentations=RING_PRESET_PRESENTATIONS, label="ring")
+    )
     return normalize_spec(builder(seed=int(seed)))
 
 
 def build_segment_preset(name: str, *, seed: int) -> dict[str, Any]:
-    builder = SEGMENT_PRESET_BUILDERS.get(str(name))
-    if builder is None:
-        raise KeyError(f"Unknown segment preset: {name}")
+    builder = SEGMENT_PRESET_BUILDERS.get(
+        _resolve_preset_key(name, builders=SEGMENT_PRESET_BUILDERS, presentations=SEGMENT_PRESET_PRESENTATIONS, label="segment")
+    )
     segment = copy.deepcopy(builder(seed=int(seed)))
     segment["uid"] = new_uid()
     ensure_road_defaults(segment)
@@ -801,14 +880,13 @@ def build_segment_flow_rows(spec: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def build_segment_label(row: dict[str, Any]) -> str:
-    turn_map = {"STRAIGHT": "=", "LEFT": "L", "RIGHT": "R"}
-    turn = turn_map.get(str(row.get("turn_direction") or "").upper(), "?")
-    road = str(row.get("road_mode") or "ISO").upper()
+    turn = _turn_label(row.get("turn_direction") or "")
+    road = _road_mode_label(row.get("road_mode") or "ISO8608")
     return (
         f"{int(row.get('index', 0)) + 1:02d}. "
         f"{str(row.get('name') or 'Сегмент')} | "
         f"{turn} | "
         f"{float(row.get('speed_start_kph', 0.0)):.0f}->{float(row.get('speed_end_kph', 0.0)):.0f} км/ч | "
         f"{float(row.get('length_m', 0.0)):.1f} м | "
-        f"{road} | ev:{int(row.get('event_count', 0) or 0)}"
+        f"{road} | событий: {int(row.get('event_count', 0) or 0)}"
     )

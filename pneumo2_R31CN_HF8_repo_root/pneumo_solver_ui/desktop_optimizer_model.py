@@ -81,23 +81,23 @@ RAY_LOCAL_MODE = "Локальный кластер (создать автома
 DESKTOP_OPTIMIZER_PROFILE_OPTIONS: tuple[tuple[str, str, str], ...] = (
     (
         "stage_triage",
-        "StageRunner / Triage",
-        "Быстрый staged triage для первичного физического фильтра и baseline sanity-check.",
+        "Поэтапный запуск / Черновой отбор",
+        "Быстрый поэтапный прогон для первичного физического фильтра и грубой проверки базового решения.",
     ),
     (
         "stage_validation",
-        "StageRunner / Validation",
-        "Более длинный staged path для проверки suite и stage policy перед handoff.",
+        "Поэтапный запуск / Проверка",
+        "Более длинный поэтапный маршрут для проверки набора сценариев и стадий перед передачей дальше.",
     ),
     (
         "coord_dask_explore",
-        "Coordinator / Dask Explore",
-        "Локальный distributed перебор через Dask, когда search-space уже стабилизирован.",
+        "Координатор / Dask-исследование",
+        "Локальный распределённый перебор через Dask, когда область поиска уже стабилизирована.",
     ),
     (
         "coord_ray_handoff",
-        "Coordinator / Ray Handoff",
-        "Ray-oriented профиль для continuation после staged handoff и short full-ring exploration.",
+        "Координатор / Ray-передача",
+        "Профиль на базе Ray для продолжения после поэтапной передачи и короткой проверки полного кольца.",
     ),
 )
 
@@ -256,7 +256,7 @@ def build_optimizer_session_defaults(
 
 def launch_profile_label(profile_key: str) -> str:
     key = str(profile_key or "").strip()
-    return launch_profile_label_map().get(key, key or "StageRunner / Triage")
+    return launch_profile_label_map().get(key, key or "Поэтапный запуск / Черновой отбор")
 
 
 def launch_profile_description(profile_key: str) -> str:

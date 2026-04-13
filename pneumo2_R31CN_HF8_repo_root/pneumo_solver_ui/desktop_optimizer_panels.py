@@ -84,7 +84,7 @@ class TextReportPanel(ttk.LabelFrame):
 
 class HistoryTreePanel(ttk.LabelFrame):
     def __init__(self, master: tk.Misc, *, on_select: callable) -> None:
-        super().__init__(master, text="Workspace history", padding=8)
+        super().__init__(master, text="История рабочей области", padding=8)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
         self.tree = ttk.Treeview(
@@ -93,10 +93,10 @@ class HistoryTreePanel(ttk.LabelFrame):
             show="tree headings",
             height=18,
         )
-        self.tree.heading("#0", text="Run")
+        self.tree.heading("#0", text="Прогон")
         self.tree.heading("status", text="Статус")
-        self.tree.heading("pipeline", text="Pipeline")
-        self.tree.heading("backend", text="Backend")
+        self.tree.heading("pipeline", text="Контур")
+        self.tree.heading("backend", text="Исполнитель")
         self.tree.column("#0", width=260, stretch=True)
         self.tree.column("status", width=90, stretch=False, anchor="center")
         self.tree.column("pipeline", width=90, stretch=False, anchor="center")
@@ -139,7 +139,7 @@ class HistoryTreePanel(ttk.LabelFrame):
 
 class FinishedJobsTreePanel(ttk.LabelFrame):
     def __init__(self, master: tk.Misc, *, on_select: callable) -> None:
-        super().__init__(master, text="Finished jobs", padding=8)
+        super().__init__(master, text="Готовые прогоны", padding=8)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
         self.tree = ttk.Treeview(
@@ -148,12 +148,12 @@ class FinishedJobsTreePanel(ttk.LabelFrame):
             show="tree headings",
             height=18,
         )
-        self.tree.heading("#0", text="Run")
+        self.tree.heading("#0", text="Прогон")
         self.tree.heading("status", text="Статус")
-        self.tree.heading("pipeline", text="Pipeline")
-        self.tree.heading("truth", text="Truth-ready")
-        self.tree.heading("verify", text="Verify")
-        self.tree.heading("risk", text="Risk")
+        self.tree.heading("pipeline", text="Контур")
+        self.tree.heading("truth", text="Готовность")
+        self.tree.heading("verify", text="Проверка")
+        self.tree.heading("risk", text="Риск")
         self.tree.column("#0", width=250, stretch=True)
         self.tree.column("status", width=90, stretch=False, anchor="center")
         self.tree.column("pipeline", width=100, stretch=False, anchor="center")
@@ -195,7 +195,7 @@ class FinishedJobsTreePanel(ttk.LabelFrame):
 
 class HandoffTreePanel(ttk.LabelFrame):
     def __init__(self, master: tk.Misc, *, on_select: callable) -> None:
-        super().__init__(master, text="Handoff candidates", padding=8)
+        super().__init__(master, text="Кандидаты на передачу", padding=8)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
         self.tree = ttk.Treeview(
@@ -204,12 +204,12 @@ class HandoffTreePanel(ttk.LabelFrame):
             show="tree headings",
             height=18,
         )
-        self.tree.heading("#0", text="Run")
-        self.tree.heading("live", text="Live")
-        self.tree.heading("preset", text="Preset")
-        self.tree.heading("score", text="Score")
-        self.tree.heading("budget", text="Budget")
-        self.tree.heading("seeds", text="Seeds")
+        self.tree.heading("#0", text="Прогон")
+        self.tree.heading("live", text="Активен")
+        self.tree.heading("preset", text="Профиль")
+        self.tree.heading("score", text="Оценка")
+        self.tree.heading("budget", text="Бюджет")
+        self.tree.heading("seeds", text="Зёрна")
         self.tree.column("#0", width=220, stretch=True)
         self.tree.column("live", width=60, stretch=False, anchor="center")
         self.tree.column("preset", width=180, stretch=True)
@@ -251,7 +251,7 @@ class HandoffTreePanel(ttk.LabelFrame):
 
 class PackagingTreePanel(ttk.LabelFrame):
     def __init__(self, master: tk.Misc, *, on_select: callable) -> None:
-        super().__init__(master, text="Packaging runs", padding=8)
+        super().__init__(master, text="Прогоны выпуска", padding=8)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
         self.tree = ttk.Treeview(
@@ -260,12 +260,12 @@ class PackagingTreePanel(ttk.LabelFrame):
             show="tree headings",
             height=18,
         )
-        self.tree.heading("#0", text="Run")
+        self.tree.heading("#0", text="Прогон")
         self.tree.heading("status", text="Статус")
-        self.tree.heading("truth", text="Truth-ready")
-        self.tree.heading("verify", text="Verify")
-        self.tree.heading("risk", text="Risk")
-        self.tree.heading("fallback", text="Fallback")
+        self.tree.heading("truth", text="Готовность")
+        self.tree.heading("verify", text="Проверка")
+        self.tree.heading("risk", text="Риск")
+        self.tree.heading("fallback", text="Откат")
         self.tree.column("#0", width=230, stretch=True)
         self.tree.column("status", width=90, stretch=False, anchor="center")
         self.tree.column("truth", width=90, stretch=False, anchor="center")

@@ -5,6 +5,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog, ttk
 
+from pneumo_solver_ui.desktop_ui_core import build_status_strip, create_scrollable_tab
 from pneumo_solver_ui.desktop_geometry_reference_model import (
     CylinderCatalogRow,
     CylinderFamilyReferenceRow,
@@ -37,7 +38,7 @@ class DesktopGeometryReferenceCenter:
         self._hosted = bool(hosted or not self._owns_root)
         self.root = host if host is not None else tk.Tk()
         if self._owns_root:
-            self.root.title(f"Geometry Catalogs Reference Center ({RELEASE})")
+            self.root.title(f"Справочный центр геометрии и компонентов ({RELEASE})")
             self.root.geometry("1540x980")
             self.root.minsize(1260, 820)
 
@@ -49,7 +50,7 @@ class DesktopGeometryReferenceCenter:
         self.base_path_var = tk.StringVar(master=self.root, value=str(self.runtime.base_path))
         self.status_var = tk.StringVar(
             master=self.root,
-            value="Reference center готов: geometry, cylinders, springs и guides в desktop workspace.",
+            value="Справочный центр готов: геометрия, цилиндры, пружины и инженерные подсказки собраны в одном окне.",
         )
         self.geometry_summary_var = tk.StringVar(master=self.root)
         self.component_fit_summary_var = tk.StringVar(master=self.root)
@@ -97,50 +98,49 @@ class DesktopGeometryReferenceCenter:
 
         ttk.Label(
             outer,
-            text="Geometry Catalogs Reference Center",
+            text="Справочный центр геометрии и компонентов",
             font=("Segoe UI", 16, "bold"),
         ).pack(anchor="w")
         ttk.Label(
             outer,
             text=(
-                "Отдельный справочно-инженерный desktop workspace для анализа геометрии подвески, "
-                "подбора цилиндров, расчёта геометрии пружин и быстрого доступа к parameter guides. "
-                "Центр не редактирует input editor и не копирует WEB-layout; он помогает принимать инженерные решения."
+                "Отдельный справочно-инженерный рабочий центр для анализа геометрии подвески, "
+                "подбора цилиндров, расчёта геометрии пружин и быстрого доступа к параметрам. "
+                "Центр не редактирует исходные данные напрямую и не повторяет web-компоновку; он помогает принимать инженерные решения."
             ),
             wraplength=1420,
             justify="left",
         ).pack(anchor="w", pady=(6, 10))
 
-        source = ttk.LabelFrame(outer, text="Источник reference context", padding=10)
+        source = ttk.LabelFrame(outer, text="Источник опорных данных", padding=10)
         source.pack(fill="x", expand=False)
         source.columnconfigure(1, weight=1)
-        ttk.Label(source, text="Base JSON overlay:").grid(row=0, column=0, sticky="w")
+        ttk.Label(source, text="Базовый JSON:").grid(row=0, column=0, sticky="w")
         ttk.Entry(source, textvariable=self.base_path_var).grid(row=0, column=1, sticky="ew", padx=8)
-        ttk.Button(source, text="Browse", command=self._browse_base_path).grid(row=0, column=2, padx=(0, 6))
-        ttk.Button(source, text="Use default", command=self._use_default_base).grid(row=0, column=3, padx=(0, 6))
-        ttk.Button(source, text="Reload all", command=self.refresh_all).grid(row=0, column=4)
+        ttk.Button(source, text="Выбрать...", command=self._browse_base_path).grid(row=0, column=2, padx=(0, 6))
+        ttk.Button(source, text="По умолчанию", command=self._use_default_base).grid(row=0, column=3, padx=(0, 6))
+        ttk.Button(source, text="Обновить всё", command=self.refresh_all).grid(row=0, column=4)
 
         self.notebook = ttk.Notebook(outer)
         self.notebook.pack(fill="both", expand=True, pady=(10, 0))
 
-        self.geometry_tab = ttk.Frame(self.notebook, padding=10)
-        self.cylinder_tab = ttk.Frame(self.notebook, padding=10)
-        self.spring_tab = ttk.Frame(self.notebook, padding=10)
-        self.guide_tab = ttk.Frame(self.notebook, padding=10)
-        self.notebook.add(self.geometry_tab, text="Подвеска")
-        self.notebook.add(self.cylinder_tab, text="Цилиндры")
-        self.notebook.add(self.spring_tab, text="Пружины")
-        self.notebook.add(self.guide_tab, text="Параметры")
+        geometry_tab_host, self.geometry_tab = create_scrollable_tab(self.notebook, padding=10)
+        cylinder_tab_host, self.cylinder_tab = create_scrollable_tab(self.notebook, padding=10)
+        spring_tab_host, self.spring_tab = create_scrollable_tab(self.notebook, padding=10)
+        guide_tab_host, self.guide_tab = create_scrollable_tab(self.notebook, padding=10)
+        self.notebook.add(geometry_tab_host, text="Подвеска")
+        self.notebook.add(cylinder_tab_host, text="Цилиндры")
+        self.notebook.add(spring_tab_host, text="Пружины")
+        self.notebook.add(guide_tab_host, text="Параметры")
 
         self._build_geometry_tab()
         self._build_cylinder_tab(family_names=family_names)
         self._build_spring_tab(family_names=family_names)
         self._build_guide_tab()
 
-        footer = ttk.Frame(outer)
+        footer = build_status_strip(outer, primary_var=self.status_var, reserve_columns=1)
         footer.pack(fill="x", pady=(10, 0))
-        ttk.Label(footer, textvariable=self.status_var).pack(side="left", anchor="w")
-        ttk.Button(footer, text="Refresh active tab", command=self._refresh_active_tab).pack(side="right")
+        ttk.Button(footer, text="Обновить активную вкладку", command=self._refresh_active_tab).grid(row=0, column=1, sticky="e", padx=(12, 0))
 
         if self._owns_root:
             self.root.protocol("WM_DELETE_WINDOW", self._request_close)
@@ -543,7 +543,7 @@ class DesktopGeometryReferenceCenter:
         current_path = self.runtime.resolve_base_path(self.base_path_var.get())
         initial_dir = current_path.parent if current_path.parent.exists() else current_path
         path = filedialog.askopenfilename(
-            title="Выбрать base JSON для reference center",
+            title="Выбрать базовый JSON для справочного центра",
             initialdir=str(initial_dir),
             filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
         )
@@ -572,7 +572,7 @@ class DesktopGeometryReferenceCenter:
         self._refresh_spring_tab()
         self._refresh_parameter_guide()
         self.status_var.set(
-            "Reference center обновлён. Источник: " + self.runtime.describe_base_source(self._base_path())
+            "Справочный центр обновлён. Источник: " + self.runtime.describe_base_source(self._base_path())
         )
 
     def _refresh_active_tab(self) -> None:
@@ -1103,11 +1103,11 @@ class DesktopGeometryReferenceCenter:
         if str(self.guide_query_var.get() or "").strip():
             self.guide_summary_var.set(
                 f"Найдено {len(rows)} параметров по запросу «{self.guide_query_var.get().strip()}». "
-                "Guide строится из canonical desktop field specs и family-contract keys, а не из WEB page layout."
+                "Справочник строится по каноническим спецификациям desktop-полей и семейным контрактам, а не по web-разметке."
             )
         else:
             self.guide_summary_var.set(
-                f"Показано {len(rows)} reference-параметров из общих desktop sections и family-contract keys с текущими значениями из base."
+                f"Показано {len(rows)} справочных параметров из общих разделов desktop-интерфейса и семейных контрактов с текущими значениями из базового файла."
             )
 
     def _clear_guide_query(self) -> None:

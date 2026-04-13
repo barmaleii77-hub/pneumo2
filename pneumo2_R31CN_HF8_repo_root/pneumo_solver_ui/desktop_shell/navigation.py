@@ -11,10 +11,10 @@ HOME_WORKSPACE_KEY = "__home__"
 MAX_DIRECT_SESSION_SHORTCUT = 9
 PRIMARY_WORKFLOW_KEYS = (
     "desktop_input_editor",
+    "desktop_ring_editor",
     "test_center",
-    "autotest_gui",
-    "full_diagnostics_gui",
-    "send_results_gui",
+    "desktop_optimizer_center",
+    "desktop_results_center",
 )
 
 

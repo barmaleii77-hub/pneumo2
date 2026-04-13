@@ -23,19 +23,19 @@ class DesktopOptimizerHistoryTab(ttk.Frame):
 
         actions = ttk.Frame(right)
         actions.grid(row=0, column=0, sticky="ew")
-        ttk.Button(actions, text="Обновить history", command=controller.refresh_history).pack(side="left")
-        ttk.Button(actions, text="Открыть run dir", command=controller.open_selected_run_dir).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Обновить историю", command=controller.refresh_history).pack(side="left")
+        ttk.Button(actions, text="Открыть каталог прогона", command=controller.open_selected_run_dir).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Открыть лог", command=controller.open_selected_log).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Открыть results", command=controller.open_selected_results).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Objective contract", command=controller.open_selected_objective_contract).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Apply contract", command=controller.apply_selected_run_contract).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Make latest pointer", command=controller.make_selected_run_latest_pointer).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Handoff plan", command=controller.open_selected_handoff_plan).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Start handoff", command=controller.start_selected_handoff).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Открыть результаты", command=controller.open_selected_results).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Контракт целей", command=controller.open_selected_objective_contract).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Применить контракт", command=controller.apply_selected_run_contract).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Сделать текущим указателем", command=controller.make_selected_run_latest_pointer).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="План передачи", command=controller.open_selected_handoff_plan).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Начать передачу", command=controller.start_selected_handoff).pack(side="left", padx=(8, 0))
 
-        handoff_filters = ttk.LabelFrame(right, text="Handoff overview filters", padding=8)
+        handoff_filters = ttk.LabelFrame(right, text="Фильтры передачи", padding=8)
         handoff_filters.grid(row=1, column=0, sticky="ew", pady=(10, 0))
-        ttk.Label(handoff_filters, text="Ranking").grid(row=0, column=0, sticky="w")
+        ttk.Label(handoff_filters, text="Ранжирование").grid(row=0, column=0, sticky="w")
         ttk.Combobox(
             handoff_filters,
             textvariable=controller.var("opt_handoff_sort_mode"),
@@ -43,7 +43,7 @@ class DesktopOptimizerHistoryTab(ttk.Frame):
             state="readonly",
             width=28,
         ).grid(row=0, column=1, sticky="w", padx=(8, 12))
-        ttk.Label(handoff_filters, text="Min seeds").grid(row=0, column=2, sticky="w")
+        ttk.Label(handoff_filters, text="Минимум зёрен").grid(row=0, column=2, sticky="w")
         ttk.Entry(
             handoff_filters,
             textvariable=controller.var("opt_handoff_min_seeds"),
@@ -51,33 +51,33 @@ class DesktopOptimizerHistoryTab(ttk.Frame):
         ).grid(row=0, column=3, sticky="w", padx=(8, 12))
         ttk.Checkbutton(
             handoff_filters,
-            text="Full ring only",
+            text="Только полное кольцо",
             variable=controller.var("opt_handoff_full_ring_only"),
             command=controller.refresh_history,
         ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(8, 0))
         ttk.Checkbutton(
             handoff_filters,
-            text="DONE only",
+            text="Только завершённые",
             variable=controller.var("opt_handoff_done_only"),
             command=controller.refresh_history,
         ).grid(row=1, column=2, columnspan=2, sticky="w", pady=(8, 0))
         ttk.Button(
             handoff_filters,
-            text="Apply handoff filters",
+            text="Применить фильтры",
             command=controller.refresh_history,
         ).grid(row=0, column=4, rowspan=2, sticky="e")
 
-        self.handoff_panel = TextReportPanel(right, text="Handoff overview", height=8)
+        self.handoff_panel = TextReportPanel(right, text="Сводка по передаче", height=8)
         self.handoff_panel.grid(row=2, column=0, sticky="ew", pady=(10, 0))
-        self.summary_panel = TextReportPanel(right, text="Selected run summary", height=8)
+        self.summary_panel = TextReportPanel(right, text="Сводка по выбранному прогону", height=8)
         self.summary_panel.grid(row=3, column=0, sticky="ew", pady=(10, 0))
-        self.contract_panel = TextReportPanel(right, text="Objective / scope contract", height=8)
+        self.contract_panel = TextReportPanel(right, text="Контракт целей и области", height=8)
         self.contract_panel.grid(row=4, column=0, sticky="ew", pady=(10, 0))
-        self.packaging_panel = TextReportPanel(right, text="Packaging / finished job", height=7)
+        self.packaging_panel = TextReportPanel(right, text="Выпуск и готовность", height=7)
         self.packaging_panel.grid(row=5, column=0, sticky="ew", pady=(10, 0))
-        self.stage_policy_panel = TextReportPanel(right, text="Stage policy / handoff", height=10)
+        self.stage_policy_panel = TextReportPanel(right, text="Стадии и передача", height=10)
         self.stage_policy_panel.grid(row=6, column=0, sticky="ew", pady=(10, 0))
-        self.log_panel = TextReportPanel(right, text="Selected log tail", height=12, wrap="none")
+        self.log_panel = TextReportPanel(right, text="Последние строки журнала", height=12, wrap="none")
         self.log_panel.grid(row=7, column=0, sticky="ew", pady=(10, 0))
 
     def set_history_rows(self, rows: list[dict[str, str]], *, selected_key: str = "") -> None:

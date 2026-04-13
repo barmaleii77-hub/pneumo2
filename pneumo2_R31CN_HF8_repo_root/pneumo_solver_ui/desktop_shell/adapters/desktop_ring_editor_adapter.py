@@ -14,10 +14,24 @@ def create_hosted_ring_editor(parent: tk.Misc) -> DesktopRingScenarioEditor:
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="desktop_ring_editor",
-        title="Редактор кольцевых сценариев",
-        description="Сегменты, road/motion/events, diagnostics, preview и генерация spec/road/axay.",
+        title="Сценарии",
+        description="Редактор дорожных и кольцевых сценариев с разметкой участков, событий и проверкой сценарного покрытия.",
         group="Встроенные окна",
         mode="hosted",
+        workflow_stage="scenarios",
+        entry_kind="main",
+        capability_ids=(
+            "scenarios.ring_editor",
+            "scenarios.coverage_review",
+            "optimization.source_ring",
+        ),
+        launch_contexts=("home", "data", "optimization"),
+        menu_section="Сценарии",
+        nav_section="Сценарии",
+        details="Кольцевой сценарий остаётся главным пользовательским входом для расчёта и автоматической оптимизации.",
+        menu_order=20,
+        nav_order=20,
+        primary=True,
         standalone_module="pneumo_solver_ui.tools.desktop_ring_scenario_editor",
         create_hosted=create_hosted_ring_editor,
     )

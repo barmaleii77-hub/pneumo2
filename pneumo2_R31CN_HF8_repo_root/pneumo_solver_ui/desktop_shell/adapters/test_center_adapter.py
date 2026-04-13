@@ -14,10 +14,24 @@ def create_hosted_test_center(parent: tk.Misc) -> App:
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="test_center",
-        title="Центр проверок",
-        description="Автотесты, диагностика и переход к отправке результатов.",
+        title="Расчёт и проверка",
+        description="Запуск расчётов, проверок и основных прогонов из одного понятного места.",
         group="Встроенные окна",
         mode="hosted",
+        workflow_stage="calculation",
+        entry_kind="main",
+        capability_ids=(
+            "calculation.runs",
+            "calculation.preflight",
+            "calculation.validation",
+        ),
+        launch_contexts=("home", "data", "scenarios", "results"),
+        menu_section="Расчёт",
+        nav_section="Расчёт",
+        details="Раздел для запуска контрольных, рабочих и подробных прогонов, а также для первичной проверки готовности конфигурации.",
+        menu_order=30,
+        nav_order=30,
+        primary=True,
         standalone_module="pneumo_solver_ui.tools.test_center_gui",
         create_hosted=create_hosted_test_center,
     )

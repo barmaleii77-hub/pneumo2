@@ -13,6 +13,14 @@ REQUIRED_ROOT_FILES = [
     "START_DESKTOP_CONTROL_CENTER.py",
     "START_DESKTOP_CONTROL_CENTER.pyw",
     "START_DESKTOP_CONTROL_CENTER.vbs",
+    "START_DESKTOP_MAIN_SHELL.cmd",
+    "START_DESKTOP_MAIN_SHELL.py",
+    "START_DESKTOP_MAIN_SHELL.pyw",
+    "START_DESKTOP_MAIN_SHELL.vbs",
+    "START_DESKTOP_OPTIMIZER_CENTER.cmd",
+    "START_DESKTOP_OPTIMIZER_CENTER.py",
+    "START_DESKTOP_OPTIMIZER_CENTER.pyw",
+    "START_DESKTOP_OPTIMIZER_CENTER.vbs",
     "START_DESKTOP_RING_EDITOR.cmd",
     "START_DESKTOP_RING_EDITOR.py",
     "START_DESKTOP_RING_EDITOR.pyw",
@@ -78,6 +86,14 @@ def test_build_portable_release_zip_excludes_runtime_noise_and_long_doc_sources(
     assert "START_DESKTOP_CONTROL_CENTER.py" in names
     assert "START_DESKTOP_CONTROL_CENTER.pyw" in names
     assert "START_DESKTOP_CONTROL_CENTER.vbs" in names
+    assert "START_DESKTOP_MAIN_SHELL.cmd" in names
+    assert "START_DESKTOP_MAIN_SHELL.py" in names
+    assert "START_DESKTOP_MAIN_SHELL.pyw" in names
+    assert "START_DESKTOP_MAIN_SHELL.vbs" in names
+    assert "START_DESKTOP_OPTIMIZER_CENTER.cmd" in names
+    assert "START_DESKTOP_OPTIMIZER_CENTER.py" in names
+    assert "START_DESKTOP_OPTIMIZER_CENTER.pyw" in names
+    assert "START_DESKTOP_OPTIMIZER_CENTER.vbs" in names
     assert "START_DESKTOP_RING_EDITOR.cmd" in names
     assert "START_DESKTOP_RING_EDITOR.py" in names
     assert "START_DESKTOP_RING_EDITOR.pyw" in names
@@ -132,6 +148,14 @@ def test_build_portable_release_tree_excludes_runtime_noise_and_writes_manifest(
     saved = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert saved["member_count"] == manifest["member_count"]
     assert (out_dir / "app.py").exists()
+    assert (out_dir / "START_DESKTOP_MAIN_SHELL.cmd").exists()
+    assert (out_dir / "START_DESKTOP_MAIN_SHELL.py").exists()
+    assert (out_dir / "START_DESKTOP_MAIN_SHELL.pyw").exists()
+    assert (out_dir / "START_DESKTOP_MAIN_SHELL.vbs").exists()
+    assert (out_dir / "START_DESKTOP_OPTIMIZER_CENTER.cmd").exists()
+    assert (out_dir / "START_DESKTOP_OPTIMIZER_CENTER.py").exists()
+    assert (out_dir / "START_DESKTOP_OPTIMIZER_CENTER.pyw").exists()
+    assert (out_dir / "START_DESKTOP_OPTIMIZER_CENTER.vbs").exists()
     assert (out_dir / "START_DESKTOP_RING_EDITOR.cmd").exists()
     assert (out_dir / "START_DESKTOP_RING_EDITOR.py").exists()
     assert (out_dir / "START_DESKTOP_RING_EDITOR.pyw").exists()

@@ -41,6 +41,7 @@ from pneumo_solver_ui.desktop_input_model import (
     default_suite_json_path,
     default_working_copy_path,
     evaluate_desktop_section_readiness,
+    field_spec_map,
     find_desktop_field_matches,
     load_base_defaults,
     list_desktop_profile_paths,
@@ -60,6 +61,9 @@ from pneumo_solver_ui.desktop_input_model import (
     save_desktop_snapshot,
     save_base_payload,
 )
+from pneumo_solver_ui.desktop_input_graphics import DesktopInputGraphicPanel
+from pneumo_solver_ui.desktop_ui_core import ScrollableFrame, build_scrolled_text
+from pneumo_solver_ui.desktop_ui_help import attach_tooltip, show_help_dialog
 from pneumo_solver_ui.desktop_run_setup_model import (
     DESKTOP_RUN_CACHE_POLICY_OPTIONS,
     DESKTOP_RUN_PROFILE_OPTIONS,
@@ -99,24 +103,8 @@ except Exception:
     RELEASE = os.environ.get("PNEUMO_RELEASE", "UNIFIED_v6_67") or "UNIFIED_v6_67"
 
 
-class ScrollableSection(ttk.Frame):
-    def __init__(self, master: tk.Misc) -> None:
-        super().__init__(master)
-        self.canvas = tk.Canvas(self, highlightthickness=0)
-        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
-        self.body = ttk.Frame(self.canvas)
-        self.body.bind(
-            "<Configure>",
-            lambda _e: self.canvas.configure(scrollregion=self.canvas.bbox("all")),
-        )
-        self.window = self.canvas.create_window((0, 0), window=self.body, anchor="nw")
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-        self.canvas.bind(
-            "<Configure>",
-            lambda e: self.canvas.itemconfigure(self.window, width=e.width),
-        )
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
+class ScrollableSection(ScrollableFrame):
+    pass
 
 
 class DesktopInputEditor:
@@ -125,7 +113,7 @@ class DesktopInputEditor:
         self._hosted = bool(hosted or not self._owns_root)
         self.root = host if host is not None else tk.Tk()
         if self._owns_root:
-            self.root.title(f"Pneumo Input Editor — {RELEASE}")
+            self.root.title(f"Данные машины ({RELEASE})")
             self.root.geometry("1160x860")
             self.root.minsize(1020, 760)
         self.ui_style = ttk.Style(self.root)
@@ -137,6 +125,7 @@ class DesktopInputEditor:
         self.vars: dict[str, tk.Variable] = {}
         self._widget_handles: dict[str, tuple[DesktopInputFieldSpec, ttk.Label]] = {}
         self._field_frames: dict[str, ttk.LabelFrame] = {}
+        self._field_row_by_key: dict[str, int] = {}
         self._field_tabs_by_key: dict[str, ScrollableSection] = {}
         self._section_title_by_key = {
             spec.key: section.title
@@ -209,6 +198,15 @@ class DesktopInputEditor:
         self.field_restore_buttons: dict[str, ttk.Button] = {}
         self._safe_action_history: list[dict[str, object]] = []
         self.route_buttons: dict[str, ttk.Button] = {}
+        self.section_graphics_panels: dict[str, DesktopInputGraphicPanel] = {}
+        self.show_advanced_var = tk.BooleanVar(value=False)
+        self.inspector_title_var = tk.StringVar(value="Параметр не выбран")
+        self.inspector_section_var = tk.StringVar(value="Раздел: —")
+        self.inspector_unit_var = tk.StringVar(value="Единица: —")
+        self.inspector_range_var = tk.StringVar(value="Диапазон: —")
+        self.inspector_help_var = tk.StringVar(value="Выберите параметр слева или в форме, чтобы увидеть пояснение.")
+        self._selected_field_key = ""
+        self._selected_field_spec: DesktopInputFieldSpec | None = None
         self.field_search_var = tk.StringVar()
         self.field_search_choice_var = tk.StringVar(value="—")
         self.field_search_summary_var = tk.StringVar(
@@ -263,6 +261,12 @@ class DesktopInputEditor:
         self.run_primary_spin: ttk.Spinbox | None = None
         self.run_secondary_spin: ttk.Spinbox | None = None
         self._run_setup_center = None
+        self._geometry_reference_center = None
+        self._diagnostics_center = None
+        self._service_container: ttk.Frame | None = None
+        self._service_toggle_anchor: ttk.Frame | None = None
+        self._service_panels_visible = False
+        self.service_toggle_text_var = tk.StringVar(value="Показать файлы и сервис")
         self.status_var = tk.StringVar()
         self.path_var = tk.StringVar()
         self._task_running = False
@@ -291,6 +295,28 @@ class DesktopInputEditor:
 
     def _set_status(self, text: str) -> None:
         self.status_var.set(text)
+
+    def _set_service_panels_visible(self, visible: bool) -> None:
+        container = self._service_container
+        if container is None:
+            return
+        self._service_panels_visible = bool(visible)
+        if self._service_panels_visible:
+            pack_kwargs: dict[str, object] = {"fill": "x"}
+            anchor = self._service_toggle_anchor
+            if anchor is not None:
+                pack_kwargs["after"] = anchor
+            if not container.winfo_manager():
+                container.pack(**pack_kwargs)
+            self.service_toggle_text_var.set("Скрыть файлы и сервис")
+            self._set_status("Открыт сервисный слой: файлы, профили, история и запуск.")
+            return
+        if container.winfo_manager():
+            container.pack_forget()
+        self.service_toggle_text_var.set("Показать файлы и сервис")
+
+    def _toggle_service_panels(self) -> None:
+        self._set_service_panels_visible(not self._service_panels_visible)
 
     def _configure_launch_summary_styles(self) -> None:
         self.ui_style.configure("DesktopLaunchFast.TLabel", foreground="#4f6b7a")
@@ -399,9 +425,14 @@ class DesktopInputEditor:
             return
         safe_index = max(0, min(int(index), len(self.section_titles) - 1))
         self.section_notebook.select(safe_index)
+        if hasattr(self, "section_listbox"):
+            self.section_listbox.selection_clear(0, "end")
+            self.section_listbox.selection_set(safe_index)
+            self.section_listbox.activate(safe_index)
         self._refresh_section_route_summary()
         if self._field_search_tracks_current_section():
             self._refresh_active_field_search_view()
+        self._refresh_selected_section_graphics()
 
     def _select_section_by_title(self, section_title: str) -> None:
         target_index = self.section_title_to_index.get(str(section_title or "").strip())
@@ -413,6 +444,50 @@ class DesktopInputEditor:
         self._refresh_section_route_summary()
         if self._field_search_tracks_current_section():
             self._refresh_active_field_search_view()
+        self._refresh_selected_section_graphics()
+
+    def _on_section_listbox_selected(self, _event: object | None = None) -> None:
+        if not hasattr(self, "section_listbox"):
+            return
+        selected = self.section_listbox.curselection()
+        if not selected:
+            return
+        self._select_section_index(int(selected[0]))
+
+    def _refresh_selected_section_graphics(self) -> None:
+        section_title = self._current_section_title()
+        payload = self._gather_payload()
+        selected_spec = self._selected_field_spec
+        if selected_spec is not None and self._section_title_by_key.get(selected_spec.key) != section_title:
+            selected_spec = None
+        self._refresh_graphics_for_section(
+            section_title=section_title,
+            payload=payload,
+            spec=selected_spec,
+        )
+        self.inspector_section_var.set(f"Раздел: {section_title}")
+
+    def _refresh_graphics_for_section(
+        self,
+        *,
+        section_title: str,
+        payload: dict[str, object],
+        spec: DesktopInputFieldSpec | None = None,
+    ) -> None:
+        refresh_kwargs = {
+            "section_title": section_title,
+            "payload": payload,
+            "field_label": spec.label if spec is not None else "",
+            "unit_label": spec.unit_label if spec is not None else "",
+            "field_key": spec.key if spec is not None else "",
+            "graphic_context": spec.effective_graphic_context if spec is not None else "",
+        }
+        graphics_by_title = getattr(self, "section_graphics_panels", {})
+        graphic_panel = graphics_by_title.get(section_title)
+        if graphic_panel is not None:
+            graphic_panel.refresh(**refresh_kwargs)
+        if hasattr(self, "graphics_panel"):
+            self.graphics_panel.refresh(**refresh_kwargs)
 
     def _go_prev_section(self) -> None:
         self._select_section_index(self._current_section_index() - 1)
@@ -1301,22 +1376,86 @@ class DesktopInputEditor:
 
         ttk.Label(
             outer,
-            text="Ввод исходных данных",
+            text="Данные машины",
             font=("Segoe UI", 16, "bold"),
         ).pack(anchor="w")
         ttk.Label(
             outer,
             text=(
-                "Desktop-редактор для исходных параметров модели. "
-                "Здесь исходные данные собраны по инженерным кластерам: геометрия, пневматика, "
-                "механика, статическая настройка, компоненты и справочные данные "
-                "без WEB UI и без изменения Desktop Mnemo."
+                "Классическая настольная форма ввода исходных данных. "
+                "Сначала вводятся и проверяются инженерные параметры машины, затем задаются сценарии "
+                "и только после этого запускаются расчёт и оптимизация. "
+                "Для каждого параметра остаются единицы измерения, подсказка и развернутое пояснение."
             ),
             wraplength=1080,
             justify="left",
         ).pack(anchor="w", pady=(6, 12))
 
-        toolbar = ttk.LabelFrame(outer, text="Файл параметров", padding=10)
+        quick_actions = ttk.Frame(outer)
+        quick_actions.pack(fill="x", pady=(0, 12))
+        ttk.Button(quick_actions, text="Загрузить данные...", command=self._load_json).pack(side="left")
+        ttk.Button(quick_actions, text="Сохранить рабочую копию", command=self._save_working_copy).pack(side="left", padx=(8, 0))
+        ttk.Button(
+            quick_actions,
+            textvariable=self.service_toggle_text_var,
+            command=self._toggle_service_panels,
+        ).pack(side="left", padx=(8, 0))
+        ttk.Button(quick_actions, text="Настроить расчёт", command=self._open_run_setup_center).pack(side="left", padx=(8, 0))
+        ttk.Button(quick_actions, text="Справочники и геометрия", command=self._open_geometry_reference_center).pack(
+            side="left",
+            padx=(8, 0),
+        )
+        ttk.Button(quick_actions, text="Диагностика и отправка", command=self._open_diagnostics_center).pack(
+            side="left",
+            padx=(8, 0),
+        )
+        ttk.Checkbutton(
+            quick_actions,
+            text="Показать дополнительные параметры",
+            variable=self.show_advanced_var,
+            command=self._refresh_field_visibility,
+        ).pack(side="right")
+        self._service_toggle_anchor = quick_actions
+        self._service_container = ttk.Frame(outer)
+        self._service_container.pack(fill="x")
+
+        overview_frame = ttk.LabelFrame(outer, text="Главное сейчас", padding=10)
+        overview_frame.pack(fill="x", pady=(0, 12))
+        overview_frame.columnconfigure(1, weight=1)
+        ttk.Label(overview_frame, text="Источник данных:").grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            overview_frame,
+            textvariable=self.path_var,
+            foreground="#2f4f4f",
+            wraplength=920,
+            justify="left",
+        ).grid(row=0, column=1, sticky="w", padx=(8, 0))
+        ttk.Label(
+            overview_frame,
+            textvariable=self.config_summary_var,
+            wraplength=1040,
+            justify="left",
+            foreground="#334455",
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(10, 0))
+        ttk.Label(
+            overview_frame,
+            textvariable=self.run_launch_summary_var,
+            wraplength=1040,
+            justify="left",
+            foreground="#355c7d",
+        ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        ttk.Label(
+            overview_frame,
+            text=(
+                "Здесь остаются только параметры машины, навигация, поиск и графическое сопровождение. "
+                "Файлы, профили, история, пресеты, проверка, запуск и артефакты открываются по кнопке слева."
+            ),
+            wraplength=1040,
+            justify="left",
+            foreground="#555555",
+        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
+
+        toolbar = ttk.LabelFrame(self._service_container, text="Файл параметров", padding=10)
         toolbar.pack(fill="x")
 
         ttk.Label(toolbar, text="Текущий источник:").grid(row=0, column=0, sticky="w")
@@ -1334,7 +1473,7 @@ class DesktopInputEditor:
         ttk.Button(toolbar, text="Сохранить как...", command=self._save_as).grid(row=1, column=3, pady=(10, 0), sticky="w", padx=(8, 0))
         ttk.Button(toolbar, text="Открыть папку проекта", command=self._open_repo_root).grid(row=1, column=4, pady=(10, 0), sticky="e", padx=(8, 0))
 
-        profiles = ttk.LabelFrame(outer, text="Рабочие профили", padding=10)
+        profiles = ttk.LabelFrame(self._service_container, text="Рабочие профили", padding=10)
         profiles.pack(fill="x", pady=(12, 0))
         profiles.columnconfigure(5, weight=1)
 
@@ -1511,7 +1650,7 @@ class DesktopInputEditor:
         compare_scroll.grid(row=0, column=1, sticky="ns")
         self.compare_tree.configure(yscrollcommand=compare_scroll.set)
 
-        config_frame = ttk.LabelFrame(outer, text="Сводка конфигурации перед запуском", padding=10)
+        config_frame = ttk.LabelFrame(self._service_container, text="Сводка конфигурации перед запуском", padding=10)
         config_frame.pack(fill="x", pady=(12, 0))
         ttk.Label(
             config_frame,
@@ -1521,7 +1660,7 @@ class DesktopInputEditor:
             foreground="#334455",
         ).pack(anchor="w")
 
-        preset_frame = ttk.LabelFrame(outer, text="Быстрые пресеты", padding=10)
+        preset_frame = ttk.LabelFrame(self._service_container, text="Быстрые пресеты", padding=10)
         preset_frame.pack(fill="x", pady=(12, 0))
         for col in range(3):
             preset_frame.columnconfigure(col, weight=1)
@@ -1552,7 +1691,7 @@ class DesktopInputEditor:
             justify="left",
         ).grid(row=3, column=0, columnspan=3, sticky="w", pady=(10, 0))
 
-        history_frame = ttk.LabelFrame(outer, text="История последних действий", padding=10)
+        history_frame = ttk.LabelFrame(self._service_container, text="История последних действий", padding=10)
         history_frame.pack(fill="x", pady=(12, 0))
         history_frame.columnconfigure(0, weight=1)
         history_frame.columnconfigure(1, weight=0)
@@ -1580,7 +1719,7 @@ class DesktopInputEditor:
             justify="left",
         ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(10, 0))
 
-        actions = ttk.LabelFrame(outer, text="Проверка и расчёт", padding=10)
+        actions = ttk.LabelFrame(self._service_container, text="Проверка и расчёт", padding=10)
         actions.pack(fill="x", pady=(12, 0))
         ttk.Label(
             actions,
@@ -1794,7 +1933,7 @@ class DesktopInputEditor:
             foreground="#555555",
         ).grid(row=8, column=0, columnspan=6, sticky="w", pady=(12, 0))
 
-        route_frame = ttk.LabelFrame(outer, text="Пошаговый маршрут настройки", padding=10)
+        route_frame = ttk.LabelFrame(self._service_container, text="Пошаговый маршрут настройки", padding=10)
         route_frame.pack(fill="x", pady=(12, 0))
         route_col_count = max(4, len(self.section_titles))
         for col in range(route_col_count):
@@ -1853,7 +1992,7 @@ class DesktopInputEditor:
             pady=(10, 0),
         )
 
-        search_frame = ttk.LabelFrame(outer, text="Быстрый поиск по параметрам", padding=10)
+        search_frame = ttk.LabelFrame(self._service_container, text="Быстрый поиск по параметрам", padding=10)
         search_frame.pack(fill="x", pady=(12, 0))
         search_frame.columnconfigure(1, weight=1)
         search_frame.columnconfigure(3, weight=1)
@@ -1928,8 +2067,122 @@ class DesktopInputEditor:
         search_entry.bind("<Return>", lambda _event: self._jump_to_selected_field())
         self.field_search_combo.bind("<<ComboboxSelected>>", lambda _event: self._jump_to_selected_field())
 
-        notebook = ttk.Notebook(outer)
-        notebook.pack(fill="both", expand=True, pady=(12, 0))
+        work_area = ttk.Panedwindow(outer, orient="horizontal")
+        work_area.pack(fill="both", expand=True, pady=(12, 0))
+
+        section_nav = ttk.LabelFrame(work_area, text="Разделы данных", padding=10)
+        section_nav.columnconfigure(0, weight=1)
+        section_nav.rowconfigure(1, weight=1)
+        ttk.Label(
+            section_nav,
+            text=(
+                "Слева собраны инженерные разделы ввода. "
+                "Выберите раздел, чтобы быстро перейти к его параметрам, замечаниям и графической подсказке."
+            ),
+            wraplength=220,
+            justify="left",
+        ).grid(row=0, column=0, columnspan=2, sticky="ew")
+        self.section_listbox = tk.Listbox(
+            section_nav,
+            height=max(len(self.section_titles), 8),
+            activestyle="none",
+            exportselection=False,
+        )
+        self.section_listbox.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
+        section_scroll = ttk.Scrollbar(
+            section_nav,
+            orient="vertical",
+            command=self.section_listbox.yview,
+        )
+        section_scroll.grid(row=1, column=1, sticky="ns", pady=(10, 0))
+        self.section_listbox.configure(yscrollcommand=section_scroll.set)
+        for title in self.section_titles:
+            self.section_listbox.insert("end", title)
+        if self.section_titles:
+            self.section_listbox.selection_set(0)
+            self.section_listbox.activate(0)
+        self.section_listbox.bind("<<ListboxSelect>>", self._on_section_listbox_selected)
+        ttk.Button(
+            section_nav,
+            text="Показать поля раздела",
+            command=self._show_current_section_fields_in_search,
+        ).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        ttk.Button(
+            section_nav,
+            text="К замечанию раздела",
+            command=self._show_current_section_attention_fields_in_search,
+        ).grid(row=3, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        ttk.Button(
+            section_nav,
+            text="К изменению раздела",
+            command=self._show_current_section_changed_fields_in_search,
+        ).grid(row=4, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        ttk.Label(
+            section_nav,
+            textvariable=self.route_summary_var,
+            wraplength=220,
+            justify="left",
+            foreground="#555555",
+        ).grid(row=5, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        work_area.add(section_nav, weight=0)
+
+        center_panel = ttk.Frame(work_area)
+        center_panel.columnconfigure(0, weight=1)
+        center_panel.rowconfigure(0, weight=1)
+        work_area.add(center_panel, weight=1)
+
+        inspector_panel = ttk.LabelFrame(work_area, text="Свойства и пояснение", padding=10)
+        inspector_panel.columnconfigure(0, weight=1)
+        inspector_panel.rowconfigure(5, weight=1)
+        ttk.Label(
+            inspector_panel,
+            textvariable=self.inspector_title_var,
+            font=("Segoe UI", 11, "bold"),
+            wraplength=280,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
+        ttk.Button(
+            inspector_panel,
+            text="?",
+            width=3,
+            command=self._show_selected_field_help,
+        ).grid(row=0, column=1, sticky="ne", padx=(8, 0))
+        ttk.Label(
+            inspector_panel,
+            textvariable=self.inspector_section_var,
+            foreground="#355c7d",
+            wraplength=280,
+            justify="left",
+        ).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        ttk.Label(
+            inspector_panel,
+            textvariable=self.inspector_unit_var,
+            wraplength=280,
+            justify="left",
+        ).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        ttk.Label(
+            inspector_panel,
+            textvariable=self.inspector_range_var,
+            wraplength=280,
+            justify="left",
+        ).grid(row=3, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        ttk.Label(
+            inspector_panel,
+            textvariable=self.inspector_help_var,
+            wraplength=280,
+            justify="left",
+        ).grid(row=4, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        self.graphics_panel = DesktopInputGraphicPanel(inspector_panel)
+        self.graphics_panel.grid(row=5, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
+        ttk.Button(
+            inspector_panel,
+            text="Показать поля текущего раздела",
+            command=self._show_current_section_fields_in_search,
+        ).grid(row=6, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        work_area.add(inspector_panel, weight=0)
+
+        notebook = ttk.Notebook(center_panel)
+        notebook.pack(fill="both", expand=True)
         self.section_notebook = notebook
         self.section_notebook.bind("<<NotebookTabChanged>>", self._on_section_tab_changed)
 
@@ -2001,27 +2254,45 @@ class DesktopInputEditor:
             self.section_issue_buttons[section.title] = issue_button
             self.section_restore_buttons[section.title] = restore_button
             self.section_search_buttons[section.title] = search_button
+            graphic_panel = DesktopInputGraphicPanel(tab.body)
+            graphic_panel.grid(
+                row=2,
+                column=0,
+                columnspan=2,
+                sticky="ew",
+                padx=12,
+                pady=(0, 10),
+            )
+            if not hasattr(self, "section_graphics_panels"):
+                self.section_graphics_panels = {}
+            self.section_graphics_panels[section.title] = graphic_panel
 
-            for idx, spec in enumerate(section.fields, start=2):
+            for idx, spec in enumerate(section.fields, start=3):
                 frame = ttk.LabelFrame(tab.body, text=spec.label, padding=10)
                 frame.grid(row=idx, column=0, sticky="ew", padx=12, pady=8)
                 frame.columnconfigure(1, weight=1)
                 self._field_frames[spec.key] = frame
+                self._field_row_by_key[spec.key] = idx
                 self._field_tabs_by_key[spec.key] = tab
                 ttk.Label(
                     frame,
                     text=spec.description,
                     wraplength=980,
                     justify="left",
-                ).grid(row=0, column=0, columnspan=4, sticky="w")
+                ).grid(row=0, column=0, columnspan=5, sticky="w")
                 self._build_field_controls(frame, spec)
+                self._decorate_field_frame(frame, spec)
 
-        log_frame = ttk.LabelFrame(outer, text="Журнал проверки и расчёта", padding=8)
+        self._refresh_field_visibility()
+        self._refresh_selected_section_graphics()
+
+        log_frame = ttk.LabelFrame(self._service_container, text="Журнал проверки и расчёта", padding=8)
         log_frame.pack(fill="both", expand=False, pady=(12, 0))
-        self.run_log = tk.Text(log_frame, height=12, wrap="word")
-        self.run_log.pack(fill="both", expand=True)
+        log_body, self.run_log = build_scrolled_text(log_frame, height=12, wrap="word")
+        log_body.pack(fill="both", expand=True)
         self.run_log.configure(state="disabled")
         self._append_run_log("Editor готов. Можно менять исходные данные и сразу запускать проверку или preview-расчёт.")
+        self._set_service_panels_visible(False)
 
         footer = ttk.Frame(outer)
         footer.pack(fill="x", pady=(10, 0))
@@ -2031,6 +2302,7 @@ class DesktopInputEditor:
             text="Подсказка: default_base.json не перезаписывается автоматически.",
             foreground="#555555",
         ).pack(side="right", anchor="e")
+        ttk.Sizegrip(footer).pack(side="right", anchor="se", padx=(12, 0))
 
     def _build_field_restore_button(
         self,
@@ -2059,8 +2331,14 @@ class DesktopInputEditor:
             return
 
         if spec.control == "choice":
-            var = tk.StringVar(value=spec.choices[0] if spec.choices else "")
-            combo = ttk.Combobox(frame, textvariable=var, values=list(spec.choices), state="readonly", width=28)
+            var = tk.StringVar(value=spec.to_ui(spec.choices[0] if spec.choices else ""))
+            combo = ttk.Combobox(
+                frame,
+                textvariable=var,
+                values=list(spec.display_choices or spec.choices),
+                state="readonly",
+                width=28,
+            )
             combo.grid(row=1, column=0, sticky="w", pady=(8, 0))
             value_label = ttk.Label(frame, text="")
             value_label.grid(row=1, column=3, sticky="e", pady=(8, 0))
@@ -2127,6 +2405,77 @@ class DesktopInputEditor:
         self._build_field_restore_button(frame, spec)
         var.trace_add("write", lambda *_args, key=spec.key: self._on_field_var_changed(key))
 
+    def _decorate_field_frame(self, frame: ttk.LabelFrame, spec: DesktopInputFieldSpec) -> None:
+        frame.columnconfigure(0, weight=1)
+        attach_tooltip(frame, spec.effective_tooltip_text)
+        unit_text = f"Единица: {spec.unit_label or 'безразмерно'}"
+        ttk.Label(
+            frame,
+            text=unit_text,
+            foreground="#355c7d",
+        ).grid(row=2, column=0, sticky="w", pady=(8, 0))
+        help_button = ttk.Button(
+            frame,
+            text="?",
+            width=3,
+            command=lambda current_spec=spec: self._show_field_help(current_spec),
+        )
+        help_button.grid(row=2, column=3, sticky="e", pady=(8, 0))
+        attach_tooltip(help_button, spec.effective_tooltip_text)
+        for child in frame.winfo_children():
+            attach_tooltip(child, spec.effective_tooltip_text)
+            try:
+                child.bind("<Button-1>", lambda _event, key=spec.key: self._select_field(key), add="+")
+                child.bind("<FocusIn>", lambda _event, key=spec.key: self._select_field(key), add="+")
+            except Exception:
+                continue
+
+    def _show_field_help(self, spec: DesktopInputFieldSpec) -> None:
+        show_help_dialog(
+            self.root,
+            title=spec.effective_help_title or spec.label,
+            headline=f"{spec.label} ({spec.unit_label or 'безразмерно'})",
+            body=spec.effective_help_body,
+        )
+
+    def _show_selected_field_help(self) -> None:
+        if self._selected_field_spec is None:
+            return
+        self._show_field_help(self._selected_field_spec)
+
+    def _select_field(self, key: str) -> None:
+        handle = self._widget_handles.get(str(key))
+        if handle is None:
+            return
+        spec, _label = handle
+        self._selected_field_key = spec.key
+        self._selected_field_spec = spec
+        section_title = self._section_title_by_key.get(spec.key, "—")
+        self.inspector_title_var.set(spec.label)
+        self.inspector_section_var.set(f"Раздел: {section_title}")
+        self.inspector_unit_var.set(f"Единица: {spec.unit_label or 'безразмерно'}")
+        self.inspector_range_var.set(f"Диапазон: {spec.range_text}")
+        self.inspector_help_var.set(spec.effective_tooltip_text or spec.description)
+        payload = self._gather_payload()
+        self._refresh_graphics_for_section(
+            section_title=section_title,
+            payload=payload,
+            spec=spec,
+        )
+
+    def _refresh_field_visibility(self) -> None:
+        show_advanced = bool(self.show_advanced_var.get())
+        for spec in field_spec_map().values():
+            frame = self._field_frames.get(spec.key)
+            row = self._field_row_by_key.get(spec.key)
+            if frame is None or row is None:
+                continue
+            should_show = show_advanced or spec.effective_user_level != "advanced"
+            if should_show:
+                frame.grid()
+            else:
+                frame.grid_remove()
+
     def _refresh_source_reference_diff_state(self) -> None:
         diffs = build_desktop_profile_diff(
             self._gather_payload(),
@@ -2142,6 +2491,7 @@ class DesktopInputEditor:
         self._refresh_config_summary()
         self._refresh_section_route_summary()
         self._refresh_section_header_summaries()
+        self._select_field(key)
         if self.compare_target_path is not None:
             self._refresh_profile_comparison()
         else:
@@ -2570,6 +2920,50 @@ class DesktopInputEditor:
         from pneumo_solver_ui.tools.desktop_run_setup_center import DesktopRunSetupCenter
 
         self._run_setup_center = DesktopRunSetupCenter(self)
+
+    def _focus_toplevel_controller(self, controller: object) -> bool:
+        root = getattr(controller, "root", None)
+        if root is None:
+            return False
+        try:
+            root.deiconify()
+            root.lift()
+            root.focus_force()
+            return True
+        except Exception:
+            return False
+
+    def _open_geometry_reference_center(self) -> None:
+        existing = self._geometry_reference_center
+        try:
+            if existing is not None and self._focus_toplevel_controller(existing):
+                self._set_status("Открыт справочный центр геометрии и каталогов.")
+                return
+        except Exception:
+            pass
+        self._geometry_reference_center = None
+        from pneumo_solver_ui.tools.desktop_geometry_reference_center import (
+            DesktopGeometryReferenceCenter,
+        )
+
+        window = tk.Toplevel(self.root)
+        self._geometry_reference_center = DesktopGeometryReferenceCenter(window, hosted=True)
+        self._set_status("Открыт справочный центр геометрии и каталогов.")
+
+    def _open_diagnostics_center(self) -> None:
+        existing = self._diagnostics_center
+        try:
+            if existing is not None and self._focus_toplevel_controller(existing):
+                self._set_status("Открыт центр диагностики и отправки.")
+                return
+        except Exception:
+            pass
+        self._diagnostics_center = None
+        from pneumo_solver_ui.tools.desktop_diagnostics_center import DesktopDiagnosticsCenter
+
+        window = tk.Toplevel(self.root)
+        self._diagnostics_center = DesktopDiagnosticsCenter(window, hosted=True, initial_tab="restore")
+        self._set_status("Открыт центр диагностики и отправки.")
 
     def _notify_run_setup_center_closed(self) -> None:
         self._run_setup_center = None
@@ -4724,6 +5118,10 @@ class DesktopInputEditor:
         try:
             if self._run_setup_center is not None:
                 self._run_setup_center.on_host_close()
+            if self._geometry_reference_center is not None:
+                self._geometry_reference_center.on_host_close()
+            if self._diagnostics_center is not None:
+                self._diagnostics_center.on_host_close()
         except Exception:
             return
 

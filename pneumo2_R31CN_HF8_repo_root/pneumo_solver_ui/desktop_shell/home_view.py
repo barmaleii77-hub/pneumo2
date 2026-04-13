@@ -181,7 +181,9 @@ def build_shell_home_view(
     summary.columnconfigure(1, weight=1)
     summary.columnconfigure(2, weight=1)
 
-    workflow_specs = ordered_workflow_specs(hosted_specs)
+    main_specs = tuple(spec for spec in hosted_specs if spec.entry_kind == "main")
+    tool_specs = tuple(spec for spec in hosted_specs if spec.entry_kind != "main")
+    workflow_specs = ordered_workflow_specs(main_specs)
     (
         workflow_summary_var,
         continue_workflow_button,
@@ -245,8 +247,8 @@ def build_shell_home_view(
     cards.columnconfigure(0, weight=1)
     cards.columnconfigure(1, weight=1)
 
-    _build_group_box(cards, 0, "Встроенные окна", hosted_specs, open_tool)
-    _build_group_box(cards, 1, "Внешние окна", external_specs, open_tool)
+    _build_group_box(cards, 0, "Справочники и служебные центры", tool_specs, open_tool)
+    _build_group_box(cards, 1, "Анализ и визуализация", external_specs, open_tool)
     controller.refresh()
     return controller
 
@@ -386,6 +388,15 @@ def _build_group_box(
 ) -> None:
     box = ttk.LabelFrame(parent, text=title, padding=12)
     box.grid(row=0, column=column, sticky="nsew", padx=6, pady=6)
+
+    if not specs:
+        ttk.Label(
+            box,
+            text="Пока нет отдельных разделов в этой группе.",
+            wraplength=460,
+            justify="left",
+        ).pack(anchor="w")
+        return
 
     for spec in specs:
         card = ttk.Frame(box, padding=(0, 0, 0, 8))

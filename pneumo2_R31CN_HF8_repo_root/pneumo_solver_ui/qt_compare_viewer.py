@@ -427,6 +427,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.setObjectName("compareViewerWindow")
         self._window_title_base = "Pneumo: NPZ Compare Viewer (DiagrammyV680R05)"
         self.setWindowTitle(self._window_title_base)
+        self.setMinimumSize(1220, 820)
         try:
             self.setDockOptions(
                 QtWidgets.QMainWindow.AllowTabbedDocks

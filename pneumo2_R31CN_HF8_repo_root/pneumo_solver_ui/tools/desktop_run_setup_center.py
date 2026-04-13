@@ -8,6 +8,7 @@ from pneumo_solver_ui.desktop_input_model import (
     DESKTOP_PREVIEW_SURFACE_OPTIONS,
     DESKTOP_RUN_PRESET_OPTIONS,
 )
+from pneumo_solver_ui.desktop_ui_core import ScrollableFrame, build_status_strip
 from pneumo_solver_ui.desktop_run_setup_model import (
     DESKTOP_RUN_CACHE_POLICY_OPTIONS,
     DESKTOP_RUN_PROFILE_OPTIONS,
@@ -18,24 +19,8 @@ from pneumo_solver_ui.desktop_run_setup_model import (
 )
 
 
-class _ScrollableBody(ttk.Frame):
-    def __init__(self, master: tk.Misc) -> None:
-        super().__init__(master)
-        self.canvas = tk.Canvas(self, highlightthickness=0)
-        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
-        self.body = ttk.Frame(self.canvas)
-        self.body.bind(
-            "<Configure>",
-            lambda _event: self.canvas.configure(scrollregion=self.canvas.bbox("all")),
-        )
-        self.window = self.canvas.create_window((0, 0), window=self.body, anchor="nw")
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-        self.canvas.bind(
-            "<Configure>",
-            lambda event: self.canvas.itemconfigure(self.window, width=event.width),
-        )
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
+class _ScrollableBody(ScrollableFrame):
+    pass
 
 
 class DesktopRunSetupCenter:
@@ -657,6 +642,12 @@ class DesktopRunSetupCenter:
             text="Обновить все сводки",
             command=self._refresh_runtime_summaries,
         ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
+
+        footer = build_status_strip(
+            outer,
+            primary_var=self.launch_action_hint_var,
+        )
+        footer.pack(fill="x", pady=(10, 0))
 
         self.editor._refresh_run_policy_hints()
         self._refresh_runtime_summaries()

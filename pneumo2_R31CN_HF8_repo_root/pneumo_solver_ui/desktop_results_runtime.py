@@ -195,7 +195,7 @@ def _suggested_next_step(
     if validation_status == "FAIL":
         detail = validation_errors[0] if validation_errors else gate_reason or "Validation reported blocking errors."
         return (
-            "Inspect validation report before branching further.",
+            "Сначала разберите отчёт проверки, потом переходите дальше.",
             detail,
             "open_artifact",
             "validation_json",
@@ -220,7 +220,7 @@ def _suggested_next_step(
 
     if gate and gate not in {"PASS", "OK", "READY"}:
         return (
-            "Review optimizer scope gate before send/export.",
+            "Перед отправкой проверьте шлюз оптимизации.",
             gate_reason or f"release_gate={gate}",
             "open_artifact",
             "validation_json",
@@ -229,7 +229,7 @@ def _suggested_next_step(
     if validation_status == "WARN":
         detail = validation_warnings[0] if validation_warnings else "Validation emitted warnings that need operator review."
         return (
-            "Review validation warnings, then branch into Compare Viewer or Animator.",
+            "Сначала проверьте предупреждения, затем переходите к сравнению или визуализации.",
             detail,
             "open_artifact",
             "validation_json",
@@ -256,27 +256,27 @@ def _suggested_next_step(
         if latest_pointer_json_path is not None:
             return (
                 anim_recommendations[0],
-                "Anim diagnostics suggest this as the next operator check.",
+                "Диагностика визуализации рекомендует именно этот следующий шаг.",
                 "open_animator_follow",
                 "latest_pointer",
             )
         if latest_npz_path is not None:
             return (
                 anim_recommendations[0],
-                "Anim diagnostics suggest this as the next operator check.",
+                "Диагностика визуализации рекомендует именно этот следующий шаг.",
                 "open_compare_viewer",
                 "latest_npz",
             )
         return (
             anim_recommendations[0],
-            "Anim diagnostics suggest this as the next operator check.",
+            "Диагностика визуализации рекомендует именно этот следующий шаг.",
             "open_artifact",
             "anim_diag_json",
         )
 
     if latest_npz_path is not None:
         return (
-            "Open Compare Viewer on the latest NPZ.",
+            "Откройте сравнение по последнему NPZ.",
             latest_npz_path.name,
             "open_compare_viewer",
             "latest_npz",
@@ -284,7 +284,7 @@ def _suggested_next_step(
 
     if latest_pointer_json_path is not None:
         return (
-            "Open Desktop Animator in follow mode.",
+            "Откройте аниматор в режиме сопровождения.",
             latest_pointer_json_path.name,
             "open_animator_follow",
             "latest_pointer",
@@ -292,15 +292,15 @@ def _suggested_next_step(
 
     if latest_zip_path is not None:
         return (
-            "Open Send Center and inspect the latest bundle sidecars.",
+            "Откройте центр отправки и проверьте свежие материалы пакета.",
             latest_zip_path.name,
             "open_send_center",
             "send_bundle_zip",
         )
 
     return (
-        "Run diagnostics / create a send bundle first.",
-        "Latest validation and results artifacts are not available yet.",
+        "Сначала запустите диагностику или соберите пакет отправки.",
+        "Свежие артефакты проверки и результатов пока не появились.",
         "open_diagnostics_gui",
         "",
     )
@@ -357,18 +357,18 @@ class DesktopResultsRuntime:
         latest_diagnostics_run_dir = _latest_child_dir(self.diagnostics_runs_dir)
 
         items: list[DesktopResultsArtifact] = []
-        _append_artifact(items, key="send_bundle_zip", title="Latest send bundle ZIP", category="bundle", path=latest_zip_path)
-        _append_artifact(items, key="validation_json", title="Validation JSON", category="validation", path=validation_json_path)
-        _append_artifact(items, key="validation_md", title="Validation Markdown", category="validation", path=validation_md_path)
-        _append_artifact(items, key="triage_json", title="Triage JSON", category="triage", path=triage_json_path)
-        _append_artifact(items, key="triage_md", title="Triage Markdown", category="triage", path=triage_md_path)
-        _append_artifact(items, key="dashboard_html", title="Dashboard HTML", category="results", path=dashboard_html_path)
-        _append_artifact(items, key="anim_diag_json", title="Anim diagnostics JSON", category="anim_latest", path=anim_diag_json_path)
-        _append_artifact(items, key="latest_npz", title="Latest anim NPZ", category="results", path=latest_npz_path)
-        _append_artifact(items, key="latest_pointer", title="Latest anim pointer", category="results", path=latest_pointer_json_path)
-        _append_artifact(items, key="mnemo_event_log", title="Desktop Mnemo event log", category="results", path=latest_mnemo_event_log_path)
-        _append_artifact(items, key="autotest_run", title="Latest autotest run dir", category="runs", path=latest_autotest_run_dir)
-        _append_artifact(items, key="diagnostics_run", title="Latest diagnostics run dir", category="runs", path=latest_diagnostics_run_dir)
+        _append_artifact(items, key="send_bundle_zip", title="Последний ZIP пакета отправки", category="bundle", path=latest_zip_path)
+        _append_artifact(items, key="validation_json", title="Проверка в JSON", category="validation", path=validation_json_path)
+        _append_artifact(items, key="validation_md", title="Проверка в Markdown", category="validation", path=validation_md_path)
+        _append_artifact(items, key="triage_json", title="Разбор замечаний в JSON", category="triage", path=triage_json_path)
+        _append_artifact(items, key="triage_md", title="Разбор замечаний в Markdown", category="triage", path=triage_md_path)
+        _append_artifact(items, key="dashboard_html", title="Сводная HTML-страница", category="results", path=dashboard_html_path)
+        _append_artifact(items, key="anim_diag_json", title="Диагностика визуализации в JSON", category="anim_latest", path=anim_diag_json_path)
+        _append_artifact(items, key="latest_npz", title="Последний NPZ анимации", category="results", path=latest_npz_path)
+        _append_artifact(items, key="latest_pointer", title="Последний указатель анимации", category="results", path=latest_pointer_json_path)
+        _append_artifact(items, key="mnemo_event_log", title="Журнал событий мнемосхемы", category="results", path=latest_mnemo_event_log_path)
+        _append_artifact(items, key="autotest_run", title="Последний каталог автотеста", category="runs", path=latest_autotest_run_dir)
+        _append_artifact(items, key="diagnostics_run", title="Последний каталог диагностики", category="runs", path=latest_diagnostics_run_dir)
 
         validation_status = _validation_status(
             ok=validation_payload.get("ok")
@@ -426,20 +426,20 @@ class DesktopResultsRuntime:
         overview_rows: list[DesktopResultsOverviewRow] = [
             DesktopResultsOverviewRow(
                 key="send_bundle_validation",
-                title="Send bundle validation",
+                title="Проверка пакета отправки",
                 status=validation_status,
                 detail=(
                     f"errors={len(validation_payload.get('errors') or [])} | "
                     f"warnings={len(validation_payload.get('warnings') or [])}"
                 ),
-                next_action="Inspect validation report" if validation_json_path is not None else "Run diagnostics / bundle first",
+                next_action="Открыть отчёт проверки" if validation_json_path is not None else "Сначала запустить диагностику",
                 evidence_path=validation_json_path or validation_md_path,
                 action_key="open_artifact",
                 artifact_key="validation_json" if validation_json_path is not None else "validation_md",
             ),
             DesktopResultsOverviewRow(
                 key="triage_report",
-                title="Triage report",
+                title="Разбор замечаний",
                 status=triage_status,
                 detail=(
                     f"critical={triage_critical_count} | "
@@ -464,55 +464,55 @@ class DesktopResultsRuntime:
             ),
             DesktopResultsOverviewRow(
                 key="optimizer_scope_gate",
-                title="Optimizer scope gate",
+                title="Шлюз области оптимизации",
                 status=str(optimizer_scope_gate.get("release_gate") or "n/a"),
                 detail=str(optimizer_scope_gate.get("release_gate_reason") or "No optimizer scope gate in latest validation."),
-                next_action="Inspect validation warnings" if validation_json_path is not None else "",
+                next_action="Проверить предупреждения" if validation_json_path is not None else "",
                 evidence_path=validation_json_path,
                 action_key="open_artifact",
                 artifact_key="validation_json" if validation_json_path is not None else "validation_md",
             ),
             DesktopResultsOverviewRow(
                 key="anim_latest_results",
-                title="Latest anim result",
+                title="Последний результат анимации",
                 status="READY" if latest_npz_path is not None else "MISSING",
                 detail=str(latest_npz_path.name if latest_npz_path is not None else "anim_latest NPZ is not available."),
-                next_action="Open Compare Viewer" if latest_npz_path is not None else "Run autotest / diagnostics",
+                next_action="Открыть сравнение" if latest_npz_path is not None else "Запустить автотест или диагностику",
                 evidence_path=latest_npz_path,
                 action_key="open_compare_viewer" if latest_npz_path is not None else "open_diagnostics_gui",
                 artifact_key="latest_npz",
             ),
             DesktopResultsOverviewRow(
                 key="animator_pointer",
-                title="Animator pointer",
+                title="Указатель аниматора",
                 status="READY" if latest_pointer_json_path is not None else "MISSING",
                 detail=str(
                     latest_pointer_json_path.name
                     if latest_pointer_json_path is not None
                     else "anim_latest pointer is not available."
                 ),
-                next_action="Open Desktop Animator follow" if latest_pointer_json_path is not None else "Export anim_latest pointer",
+                next_action="Открыть аниматор" if latest_pointer_json_path is not None else "Сформировать указатель anim_latest",
                 evidence_path=latest_pointer_json_path,
                 action_key="open_animator_follow" if latest_pointer_json_path is not None else "open_diagnostics_gui",
                 artifact_key="latest_pointer",
             ),
             DesktopResultsOverviewRow(
                 key="mnemo_event_log",
-                title="Desktop Mnemo event log",
+                title="Журнал событий мнемосхемы",
                 status="READY" if latest_mnemo_event_log_path is not None else "MISSING",
                 detail=str(
                     latest_mnemo_event_log_path.name
                     if latest_mnemo_event_log_path is not None
                     else "Event log not found for latest result."
                 ),
-                next_action="Inspect recent events" if latest_mnemo_event_log_path is not None else "Open Desktop Mnemo and export event log",
+                next_action="Посмотреть свежие события" if latest_mnemo_event_log_path is not None else "Открыть мнемосхему и выгрузить журнал",
                 evidence_path=latest_mnemo_event_log_path,
                 action_key="open_artifact" if latest_mnemo_event_log_path is not None else "open_diagnostics_gui",
                 artifact_key="mnemo_event_log",
             ),
             DesktopResultsOverviewRow(
                 key="bundle_sidecars",
-                title="Bundle sidecars",
+                title="Материалы пакета",
                 status=(
                     "READY"
                     if latest_zip_path is not None and triage_md_path is not None and dashboard_html_path is not None
@@ -523,7 +523,7 @@ class DesktopResultsRuntime:
                     f"triage={'yes' if triage_md_path is not None else 'no'} | "
                     f"dashboard={'yes' if dashboard_html_path is not None else 'no'}"
                 ),
-                next_action="Open Send Center" if latest_zip_path is not None else "Create send bundle",
+                next_action="Открыть центр отправки" if latest_zip_path is not None else "Собрать пакет отправки",
                 evidence_path=latest_zip_path or triage_md_path or dashboard_html_path,
                 action_key="open_send_center" if latest_zip_path is not None else "open_send_bundles",
                 artifact_key=(
@@ -716,7 +716,7 @@ class DesktopResultsRuntime:
             path: Path | None,
             *,
             category: str,
-            detail: str = "Pinned from latest local run handoff.",
+            detail: str = "Закреплено из последней локальной точки передачи.",
         ) -> None:
             _append_artifact(
                 items,
@@ -729,33 +729,33 @@ class DesktopResultsRuntime:
 
         append_current(
             "session_send_bundle_zip",
-            "Current run ZIP",
+            "ZIP текущего прогона",
             handoff.zip_path,
             category="bundle",
         )
         append_current(
             "session_autotest_run",
-            "Current run autotest dir",
+            "Каталог автотеста текущего прогона",
             handoff.autotest_run_dir,
             category="runs",
         )
         append_current(
             "session_diagnostics_run",
-            "Current run diagnostics dir",
+            "Каталог диагностики текущего прогона",
             handoff.diagnostics_run_dir,
             category="runs",
         )
 
         pinned_map = (
-            ("validation_json", "Current run validation JSON"),
-            ("validation_md", "Current run validation Markdown"),
-            ("triage_json", "Current run triage JSON"),
-            ("triage_md", "Current run triage Markdown"),
-            ("dashboard_html", "Current run dashboard HTML"),
-            ("anim_diag_json", "Current run anim diagnostics JSON"),
-            ("latest_npz", "Current run anim NPZ"),
-            ("latest_pointer", "Current run animator pointer"),
-            ("mnemo_event_log", "Current run Mnemo event log"),
+            ("validation_json", "Проверка текущего прогона в JSON"),
+            ("validation_md", "Проверка текущего прогона в Markdown"),
+            ("triage_json", "Разбор замечаний текущего прогона в JSON"),
+            ("triage_md", "Разбор замечаний текущего прогона в Markdown"),
+            ("dashboard_html", "HTML-сводка текущего прогона"),
+            ("anim_diag_json", "Диагностика анимации текущего прогона"),
+            ("latest_npz", "NPZ текущего прогона"),
+            ("latest_pointer", "Указатель аниматора текущего прогона"),
+            ("mnemo_event_log", "Журнал мнемосхемы текущего прогона"),
         )
         for artifact_key, title in pinned_map:
             artifact = self.artifact_by_key(snapshot, artifact_key)
@@ -892,7 +892,7 @@ class DesktopResultsRuntime:
     def artifact_preview_lines(self, artifact: DesktopResultsArtifact) -> tuple[str, ...]:
         path = artifact.path
         if not path.exists():
-            return ("Artifact is missing on disk.",)
+            return ("Артефакт отсутствует на диске.",)
 
         if path.is_dir():
             children = sorted(path.iterdir(), key=lambda item: item.name.lower())
@@ -992,15 +992,15 @@ class DesktopResultsRuntime:
 
                 keys = sorted(str(key) for key in obj.keys())[:8]
                 return ("json_keys=" + ", ".join(keys),)
-            return ("JSON preview unavailable.",)
+            return ("Предпросмотр JSON недоступен.",)
 
         if suffix in {".md", ".txt", ".html"}:
             try:
                 raw_lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
             except Exception:
-                return ("Text preview unavailable.",)
+                return ("Текстовый предпросмотр недоступен.",)
             lines = [_short_text(line) for line in raw_lines if str(line).strip()]
-            return tuple(lines[:8] or ["Text file is empty."])
+            return tuple(lines[:8] or ["Текстовый файл пуст."])
 
         if suffix == ".npz":
             try:
@@ -1008,9 +1008,9 @@ class DesktopResultsRuntime:
             except Exception:
                 size_bytes = 0
             return (
-                f"NPZ bundle: {path.name}",
+                f"NPZ-пакет: {path.name}",
                 f"size_bytes={size_bytes}",
-                "Use Compare Viewer or Desktop Animator for deep inspection.",
+                "Для подробного разбора откройте сравнение или аниматор.",
             )
 
         try:
@@ -1018,7 +1018,7 @@ class DesktopResultsRuntime:
         except Exception:
             size_bytes = 0
         return (
-            f"File: {path.name}",
+            f"Файл: {path.name}",
             f"size_bytes={size_bytes}",
         )
 

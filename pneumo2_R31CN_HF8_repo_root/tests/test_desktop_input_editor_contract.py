@@ -65,9 +65,34 @@ def test_desktop_input_model_exposes_main_operator_sections() -> None:
     assert specs["corner_loads_mode"].control == "choice"
     assert "adiabatic" in specs["термодинамика"].choices
     assert "table" in specs["механика_кинематика"].choices
+    assert dict(specs["corner_loads_mode"].choice_labels)["cg"] == "Через центр тяжести"
+    assert dict(specs["механика_кинематика"].choice_labels)["table"] == "По табличной характеристике"
     assert specs["использовать_паспорт_компонентов"].control == "bool"
     assert specs["газ_модель_теплоемкости"].control == "choice"
     assert specs["static_trim_enable"].control == "bool"
+
+
+def test_desktop_input_model_requires_units_tooltips_and_help_for_user_fields() -> None:
+    for key, spec in field_spec_map().items():
+        assert str(spec.effective_tooltip_text or "").strip(), key
+        assert str(spec.effective_help_title or "").strip(), key
+        assert str(spec.effective_help_body or "").strip(), key
+        if spec.control not in {"bool", "choice"}:
+            assert str(spec.unit_label or "").strip(), key
+
+
+def test_desktop_input_model_exposes_graphic_context_for_core_fields() -> None:
+    specs = field_spec_map()
+
+    assert specs["база"].effective_graphic_context == "frame_dimensions"
+    assert specs["колея"].effective_graphic_context == "track"
+    assert specs["ход_штока"].effective_graphic_context == "stroke"
+    assert specs["начальное_давление_Ресивер1"].effective_graphic_context == "pressure"
+    assert specs["объём_ресивера_1"].effective_graphic_context == "volume"
+    assert specs["масса_рамы"].effective_graphic_context == "mass_sprung"
+    assert specs["zero_pose_target_stroke_frac"].effective_graphic_context == "trim_target"
+    assert specs["механика_кинематика"].effective_graphic_context == "kinematics"
+    assert specs["температура_окр_К"].effective_graphic_context == "temperature"
 
 
 def test_desktop_input_model_uses_safe_paths_inside_repo_workspace() -> None:
@@ -616,7 +641,7 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
 
     assert "build_desktop_launch_catalog(include_mnemo=False)" in src
     assert "pneumo_solver_ui.tools.desktop_input_editor" in launcher_modules
-    assert "Исходные данные и расчет" in launcher_titles or "Исходные данные и расчёт" in launcher_titles
+    assert "Данные машины" in launcher_titles
     assert "default_base.json" in editor_src
     assert "Сохранить рабочую копию" in editor_src
     assert "Рабочие профили" in editor_src
@@ -758,6 +783,45 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "Показать отличия с профилем" in editor_src
     assert "field_search_var" in editor_src
     assert "field_search_choice_var" in editor_src
+
+
+def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation_and_inspector() -> None:
+    src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_control_center.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    editor_src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_input_editor.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    run_setup_src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_run_setup_center.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    run_setup_model_src = (ROOT / "pneumo_solver_ui" / "desktop_run_setup_model.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    run_setup_runtime_src = (ROOT / "pneumo_solver_ui" / "desktop_run_setup_runtime.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    single_run_src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_single_run.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert 'text="Данные машины"' in editor_src
+    assert 'ttk.Panedwindow(outer, orient="horizontal")' in editor_src
+    assert 'text="Разделы данных"' in editor_src
+    assert "self.section_listbox = tk.Listbox(" in editor_src
+    assert 'self.section_listbox.bind("<<ListboxSelect>>", self._on_section_listbox_selected)' in editor_src
+    assert 'text="Свойства и пояснение"' in editor_src
+    assert "self.graphics_panel = DesktopInputGraphicPanel(inspector_panel)" in editor_src
+    assert "textvariable=self.inspector_unit_var" in editor_src
+    assert 'text="?"' in editor_src
+    assert "spec.display_choices or spec.choices" in editor_src
+    assert "show_help_dialog(" in editor_src
     assert "field_search_summary_var" in editor_src
     assert "field_search_mode" in editor_src
     assert "_current_section_title" in editor_src
@@ -1010,3 +1074,27 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "full_log_bundle.npz" in single_run_src
     assert "Desktop Mnemo" in src
     assert "desktop_mnemo" not in editor_src.lower()
+
+
+def test_desktop_input_editor_hides_service_layers_behind_explicit_toggle() -> None:
+    editor_src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_input_editor.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert "service_toggle_text_var" in editor_src
+    assert "_toggle_service_panels" in editor_src
+    assert "_set_service_panels_visible" in editor_src
+    assert 'textvariable=self.service_toggle_text_var' in editor_src
+    assert 'overview_frame = ttk.LabelFrame(outer, text="Главное сейчас", padding=10)' in editor_src
+    assert 'self._service_container = ttk.Frame(outer)' in editor_src
+    assert 'ttk.LabelFrame(self._service_container, text="Файл параметров", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(self._service_container, text="Рабочие профили", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(self._service_container, text="Быстрые пресеты", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(self._service_container, text="История последних действий", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(self._service_container, text="Проверка и расчёт", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(self._service_container, text="Пошаговый маршрут настройки", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(self._service_container, text="Быстрый поиск по параметрам", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(self._service_container, text="Журнал проверки и расчёта", padding=8)' in editor_src
+    assert "_set_service_panels_visible(False)" in editor_src
+    assert "before=toolbar" not in editor_src

@@ -33,15 +33,15 @@ def test_desktop_results_session_handoff_model_defaults() -> None:
 def test_desktop_results_center_browse_filter_matches_category_and_query() -> None:
     artifact = DesktopResultsArtifact(
         key="validation_json",
-        title="Current run validation JSON",
+        title="Проверка текущего прогона в JSON",
         category="validation",
         path=Path("C:/tmp/latest_send_bundle_validation.json"),
-        detail="Pinned from latest local run handoff.",
+        detail="Закреплено из последней локальной точки передачи.",
     )
 
     assert _artifact_matches_filters(artifact, category="all", query="")
     assert _artifact_matches_filters(artifact, category="validation", query="send_bundle")
-    assert _artifact_matches_filters(artifact, category="validation", query="current run")
+    assert _artifact_matches_filters(artifact, category="validation", query="текущего прогона")
     assert not _artifact_matches_filters(artifact, category="triage", query="")
     assert not _artifact_matches_filters(artifact, category="validation", query="animator")
 
@@ -174,10 +174,10 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert snapshot.suggested_next_artifact_key == "latest_pointer"
 
     titles = {item.title for item in snapshot.recent_artifacts}
-    assert "Latest send bundle ZIP" in titles
-    assert "Validation Markdown" in titles
-    assert "Latest anim NPZ" in titles
-    assert "Desktop Mnemo event log" in titles
+    assert "Последний ZIP пакета отправки" in titles
+    assert "Проверка в Markdown" in titles
+    assert "Последний NPZ анимации" in titles
+    assert "Журнал событий мнемосхемы" in titles
 
     validation_artifact = next(
         item for item in snapshot.recent_artifacts if item.key == "validation_json"
@@ -203,10 +203,10 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     session_titles = {item.title for item in session_artifacts}
     session_keys = {item.key for item in session_artifacts}
     session_categories = {item.key: item.category for item in session_artifacts}
-    assert "Current run ZIP" in session_titles
-    assert "Current run validation JSON" in session_titles
-    assert "Current run triage JSON" in session_titles
-    assert "Current run animator pointer" in session_titles
+    assert "ZIP текущего прогона" in session_titles
+    assert "Проверка текущего прогона в JSON" in session_titles
+    assert "Разбор замечаний текущего прогона в JSON" in session_titles
+    assert "Указатель аниматора текущего прогона" in session_titles
     assert "session_send_bundle_zip" in session_keys
     assert "session_validation_json" in session_keys
     assert session_categories["session_send_bundle_zip"] == "bundle"
@@ -277,9 +277,9 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     )
     assert "warning: warn-a" in preview
 
-    assert format_validation_summary(snapshot).startswith("Validation: PASS")
+    assert format_validation_summary(snapshot).startswith("Проверка: Норма")
     assert "FAIL" in format_optimizer_gate_summary(snapshot)
-    assert "critical=1" in format_triage_summary(snapshot)
+    assert "критичных=1" in format_triage_summary(snapshot)
     assert "anim_latest.npz" in format_npz_summary(snapshot)
 
 
@@ -458,54 +458,55 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "DesktopResultsSessionHandoff" in tool_src
     assert "DesktopResultsCenter" in tool_src
     assert "ttk.Notebook" in tool_src
-    assert 'self.notebook.add(self.results_center, text="Validation & Results")' in tool_src
+    assert 'self.notebook.add(self.results_center, text="Результаты и анализ")' in tool_src
     assert "self.results_center.refresh()" in tool_src
     assert "self.results_center.set_session_handoff(" in tool_src
     assert "self.notebook.select(self.results_center)" in tool_src
 
     assert "class DesktopResultsCenter" in center_src
-    assert "ttk.Treeview" in center_src
+    assert "build_scrolled_treeview" in center_src
+    assert "build_scrolled_text" in center_src
     assert "def refresh(self) -> None:" in center_src
-    assert "Validation overview" in center_src
-    assert "Suggested next step" in center_src
-    assert "Latest run handoff" in center_src
+    assert "Обзор проверок" in center_src
+    assert "Следующий шаг:" in center_src
+    assert "Передача последнего прогона" in center_src
     assert "def set_session_handoff(" in center_src
-    assert "Focus suggested branch" in center_src
-    assert "Open latest ZIP" in center_src
-    assert "Open current validation" in center_src
-    assert "Open current triage" in center_src
-    assert "Branch current compare" in center_src
-    assert "Branch current animator" in center_src
+    assert "Перейти к рекомендованной ветви" in center_src
+    assert "Открыть последний ZIP" in center_src
+    assert "Открыть текущую проверку" in center_src
+    assert "Открыть текущий разбор замечаний" in center_src
+    assert "Открыть текущее сравнение" in center_src
+    assert "Открыть текущую визуализацию" in center_src
     assert "def _preferred_handoff_artifact(" in center_src
-    assert "Current run only" in center_src
-    assert "Category:" in center_src
-    assert "values=[\"all\", \"validation\", \"triage\", \"results\", \"anim_latest\", \"runs\", \"bundle\"]" in center_src
-    assert "Search:" in center_src
+    assert "Только текущий прогон" in center_src
+    assert "Раздел:" in center_src
+    assert "Все материалы" in center_src
+    assert "Поиск:" in center_src
     assert "def _clear_browse_query(" in center_src
     assert "query=" in center_src
     assert "def _on_browse_scope_changed(" in center_src
     assert "def _artifact_matches_browse_filter(" in center_src
     assert "def _artifact_matches_filters(" in center_src
     assert "def _browse_scope_summary(" in center_src
-    assert "Browse scope:" in center_src
+    assert "Область просмотра:" in center_src
     assert "session_artifacts(" in center_src
-    assert "Current run (pinned)" in center_src
-    assert "Latest workspace artifacts" in center_src
+    assert "Текущий прогон (закреплён)" in center_src
+    assert "Последние материалы рабочей области" in center_src
     assert "preferred_artifact_by_key(" in center_src
     assert "preferred_overview_evidence_artifact(" in center_src
-    assert "self.overview_tree = ttk.Treeview" in center_src
+    assert "overview_tree_frame, self.overview_tree = build_scrolled_treeview(" in center_src
     assert "self.overview_tree.bind(\"<<TreeviewSelect>>\", self._on_overview_select)" in center_src
     assert "self.overview_tree.bind(\"<Double-1>\", self._on_overview_open)" in center_src
     assert "self.tree.bind(\"<Double-1>\", self._on_open_selected)" in center_src
-    assert "Run suggested next step" in center_src
-    assert "Run selected overview action" in center_src
+    assert "Выполнить следующий шаг" in center_src
+    assert "Выполнить действие по проверке" in center_src
     assert "artifact_preview_lines" in center_src
-    assert "Preview:" in center_src
-    assert "Triage red flags:" in center_src
+    assert "Предпросмотр:" in center_src
+    assert "Красные флаги разбора замечаний:" in center_src
     assert "launch_compare_viewer" in center_src
     assert "launch_animator" in center_src
-    assert "Validation warnings:" in center_src
-    assert "Compare target NPZ:" in center_src
+    assert "Предупреждения проверки:" in center_src
+    assert "NPZ для сравнения:" in center_src
     assert "artifact=self._selected_artifact()" in center_src
 
     assert "class DesktopResultsSnapshot" in model_src
@@ -534,7 +535,7 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "def session_artifacts(" in runtime_src
     assert "def preferred_artifact_by_key(" in runtime_src
     assert "def preferred_overview_evidence_artifact(" in runtime_src
-    assert "Current run validation JSON" in runtime_src
+    assert "Проверка текущего прогона в JSON" in runtime_src
     assert "def compare_viewer_path(" in runtime_src
     assert "def animator_target_paths(" in runtime_src
     assert "def compare_viewer_args(" in runtime_src

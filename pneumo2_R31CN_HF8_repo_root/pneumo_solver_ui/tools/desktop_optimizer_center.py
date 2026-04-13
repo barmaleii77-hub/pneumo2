@@ -61,7 +61,7 @@ class DesktopOptimizerCenter:
         self._hosted = bool(hosted or not self._owns_root)
         self.root = host if host is not None else tk.Tk()
         if self._owns_root:
-            self.root.title(f"Desktop Optimizer Center ({RELEASE})")
+            self.root.title(f"Центр автоматизированной оптимизации ({RELEASE})")
             self.root.geometry("1480x980")
             self.root.minsize(1220, 820)
         self.repo_root = Path(__file__).resolve().parents[2]
@@ -72,7 +72,7 @@ class DesktopOptimizerCenter:
             platform_name=sys.platform,
         )
         self.status_var = tk.StringVar(
-            value="Готово. Optimization workflow вынесен в desktop center."
+            value="Готово. Автоматизированная оптимизация доступна в отдельном инженерном центре."
         )
         self._poll_after_id: str | None = None
         self._host_closed = False
@@ -103,18 +103,32 @@ class DesktopOptimizerCenter:
         outer.pack(fill="both", expand=True)
         ttk.Label(
             outer,
-            text="Desktop Optimizer Center",
+            text="Центр автоматизированной оптимизации",
             font=("Segoe UI", 16, "bold"),
         ).pack(anchor="w")
         ttk.Label(
             outer,
             text=(
-                "Operator-oriented центр оптимизации: scope/search-space contract, stage policy, "
-                "distributed runtime, history, finished jobs и handoff без WEB."
+                "Инженерный центр автоматизированной оптимизации: подготовка кольцевых сценариев, "
+                "поэтапный запуск оптимизаторов, распределённые вычисления, история прогонов и выпуск результатов "
+                "без web-оболочки."
             ),
             wraplength=1320,
             justify="left",
         ).pack(anchor="w", pady=(6, 10))
+
+        auto_frame = ttk.LabelFrame(outer, text="Режим работы", padding=10)
+        auto_frame.pack(fill="x", pady=(0, 10))
+        ttk.Label(
+            auto_frame,
+            text=(
+                "Автоматически: пользователь задаёт кольцевой сценарий и цель, а система сама собирает стадии и запускает оптимизаторы.\n"
+                "Настраиваемо: можно менять состав сценариев, стадии, веса и ограничения.\n"
+                "Экспертно: доступны все внутренние параметры библиотек и распределённого запуска."
+            ),
+            wraplength=1320,
+            justify="left",
+        ).pack(anchor="w")
 
         self.notebook = ttk.Notebook(outer)
         self.notebook.pack(fill="both", expand=True)
@@ -126,13 +140,13 @@ class DesktopOptimizerCenter:
         self.finished_tab = DesktopOptimizerFinishedTab(self.notebook, self)
         self.handoff_tab = DesktopOptimizerHandoffTab(self.notebook, self)
         self.packaging_tab = DesktopOptimizerPackagingTab(self.notebook, self)
-        self.notebook.add(self.dashboard_tab, text="Dashboard")
-        self.notebook.add(self.contract_tab, text="Contract")
-        self.notebook.add(self.runtime_tab, text="Runtime")
-        self.notebook.add(self.history_tab, text="History")
-        self.notebook.add(self.finished_tab, text="Finished Jobs")
-        self.notebook.add(self.handoff_tab, text="Handoff")
-        self.notebook.add(self.packaging_tab, text="Packaging")
+        self.notebook.add(self.dashboard_tab, text="Автоматический маршрут")
+        self.notebook.add(self.contract_tab, text="Контракт и цели")
+        self.notebook.add(self.runtime_tab, text="Стадии и вычисления")
+        self.notebook.add(self.history_tab, text="История")
+        self.notebook.add(self.finished_tab, text="Готовые прогоны")
+        self.notebook.add(self.handoff_tab, text="Передача стадий")
+        self.notebook.add(self.packaging_tab, text="Упаковка и выпуск")
 
         footer = ttk.Frame(outer)
         footer.pack(fill="x", pady=(10, 0))
@@ -248,7 +262,7 @@ class DesktopOptimizerCenter:
             f"backend: {getattr(job, 'backend', '')}",
             f"budget: {int(getattr(job, 'budget', 0) or 0)}",
         ]
-        lines.append("status: RUNNING" if rc is None else f"status: FINISHED rc={int(rc)}")
+        lines.append("состояние: выполняется" if rc is None else f"состояние: завершено rc={int(rc)}")
         if surface.get("soft_stop_requested"):
             lines.append("soft-stop: requested")
         if runtime_summary:
@@ -265,23 +279,23 @@ class DesktopOptimizerCenter:
                 "Выберите staged/coordinator run во вкладке History, чтобы использовать его как resume target."
             )
         lines = [
-            f"selected run: {payload.get('selected_run_name') or '—'}",
-            f"selected pipeline: {payload.get('selected_pipeline') or '—'}",
-            f"selected path: {selected_run_dir}",
-            f"current launch pipeline: {payload.get('launch_pipeline') or '—'}",
+            f"выбранный прогон: {payload.get('selected_run_name') or '—'}",
+            f"контур выбранного прогона: {payload.get('selected_pipeline') or '—'}",
+            f"путь к выбранному прогону: {selected_run_dir}",
+            f"контур текущего запуска: {payload.get('launch_pipeline') or '—'}",
         ]
         if payload.get("selected_run_id"):
-            lines.append(f"selected coordinator run_id: {payload.get('selected_run_id')}")
+            lines.append(f"идентификатор координатора: {payload.get('selected_run_id')}")
         if bool(payload.get("stage_resume_enabled")):
-            lines.append("stage resume: enabled")
+            lines.append("продолжение стадий: включено")
         else:
-            lines.append("stage resume: disabled")
+            lines.append("продолжение стадий: выключено")
         if bool(payload.get("coord_resume_enabled")):
             lines.append(
-                f"coordinator resume: enabled (run_id={payload.get('coord_run_id') or 'auto/problem-hash'})"
+                f"продолжение координатора: включено (run_id={payload.get('coord_run_id') or 'auto/problem-hash'})"
             )
         else:
-            lines.append("coordinator resume: disabled")
+            lines.append("продолжение координатора: выключено")
         return "\n".join(lines)
 
     def _format_dashboard_workspace_text(self) -> str:
@@ -295,23 +309,23 @@ class DesktopOptimizerCenter:
         ) or "—"
         return "\n".join(
             [
-                f"workspace: {getattr(snapshot, 'workspace_dir', '')}",
-                f"problem hash: {getattr(snapshot, 'problem_hash', '') or '—'}",
-                f"hash mode: {getattr(snapshot, 'problem_hash_mode', '') or '—'}",
-                f"objective keys: {objective_keys}",
+                f"рабочая область: {getattr(snapshot, 'workspace_dir', '')}",
+                f"хэш задачи: {getattr(snapshot, 'problem_hash', '') or '—'}",
+                f"режим хэша: {getattr(snapshot, 'problem_hash_mode', '') or '—'}",
+                f"цели оптимизации: {objective_keys}",
                 (
-                    "search-space: "
-                    f"base={int(getattr(snapshot, 'base_param_count', 0) or 0)}, "
-                    f"design={int(getattr(snapshot, 'search_param_count', 0) or 0)}, "
-                    f"widened={int(getattr(snapshot, 'widened_range_count', 0) or 0)}"
+                    "пространство поиска: "
+                    f"базовых={int(getattr(snapshot, 'base_param_count', 0) or 0)}, "
+                    f"проектных={int(getattr(snapshot, 'search_param_count', 0) or 0)}, "
+                    f"расширенных={int(getattr(snapshot, 'widened_range_count', 0) or 0)}"
                 ),
                 (
-                    "suite coverage: "
-                    f"rows={int(getattr(snapshot, 'suite_row_count', 0) or 0)}, "
-                    f"enabled={int(getattr(snapshot, 'enabled_suite_total', 0) or 0)}, "
-                    f"stages={stage_counts}"
+                    "покрытие сценариев: "
+                    f"строк={int(getattr(snapshot, 'suite_row_count', 0) or 0)}, "
+                    f"включено={int(getattr(snapshot, 'enabled_suite_total', 0) or 0)}, "
+                    f"стадии={stage_counts}"
                 ),
-                f"baseline source: {getattr(snapshot, 'baseline_source_label', '') or getattr(snapshot, 'baseline_source_kind', '') or '—'}",
+                f"источник базового решения: {getattr(snapshot, 'baseline_source_label', '') or getattr(snapshot, 'baseline_source_kind', '') or '—'}",
             ]
         )
 
@@ -320,9 +334,9 @@ class DesktopOptimizerCenter:
         resume_target = dict(dashboard.get("resume_target") or {})
         active_surface = dict(dashboard.get("active_surface") or {})
         lines = [
-            f"launch profile: {launch_profile.get('profile_label') or '—'}",
+            f"профиль запуска: {launch_profile.get('profile_label') or '—'}",
             (
-                "launch mode: "
+                "режим запуска: "
                 f"{launch_profile.get('launch_pipeline') or '—'} / "
                 f"{launch_profile.get('backend') or '—'}"
             ),
