@@ -1,0 +1,56 @@
+{
+  "schema_version": "pneumo_opt_auto_ring_suite_v1",
+  "source_ring": {
+    "road_csv": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\anim_latest_road_csv.csv",
+    "axay_csv": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\anim_latest_axay_csv.csv",
+    "scenario_json": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\anim_latest_scenario_json.json"
+  },
+  "fragment": {
+    "id": "ringfrag_diag",
+    "label": "диагональ",
+    "kind": "diag",
+    "peak_value": 0.019159544510944156,
+    "center_s": 13.01,
+    "t_start": 11.0,
+    "t_end": 15.0,
+    "duration_s": 4.0,
+    "segments": [
+      {
+        "segment_index": 2,
+        "name": "S3_прямо_55",
+        "start_s": 9.0,
+        "end_s": 12.0,
+        "duration_s": 3.0,
+        "turn_direction": "STRAIGHT",
+        "road_mode": "ISO8608",
+        "event_count": 0
+      },
+      {
+        "segment_index": 3,
+        "name": "S4_замыкание",
+        "start_s": 12.0,
+        "end_s": 15.0,
+        "duration_s": 3.0,
+        "turn_direction": "STRAIGHT",
+        "road_mode": "ISO8608",
+        "event_count": 0
+      }
+    ]
+  },
+  "road_clip": {
+    "src": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\anim_latest_road_csv.csv",
+    "dst": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\opt_auto_suite_workspace\\ui_state\\optimization_auto_ring_suite\\fragments\\ringfrag_diag_road.csv",
+    "rows": 401,
+    "t_start_source_s": 11.0,
+    "t_end_source_s": 15.0,
+    "duration_s": 4.0
+  },
+  "axay_clip": {
+    "src": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\anim_latest_axay_csv.csv",
+    "dst": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\opt_auto_suite_workspace\\ui_state\\optimization_auto_ring_suite\\fragments\\ringfrag_diag_axay.csv",
+    "rows": 401,
+    "t_start_source_s": 11.0,
+    "t_end_source_s": 15.0,
+    "duration_s": 4.0
+  }
+}

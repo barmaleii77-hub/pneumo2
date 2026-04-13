@@ -13,6 +13,10 @@ REQUIRED_ROOT_FILES = [
     "START_DESKTOP_CONTROL_CENTER.py",
     "START_DESKTOP_CONTROL_CENTER.pyw",
     "START_DESKTOP_CONTROL_CENTER.vbs",
+    "START_DESKTOP_RING_EDITOR.cmd",
+    "START_DESKTOP_RING_EDITOR.py",
+    "START_DESKTOP_RING_EDITOR.pyw",
+    "START_DESKTOP_RING_EDITOR.vbs",
     "START_PNEUMO_APP.pyw",
     "VERSION.txt",
     "release_tag.json",
@@ -74,6 +78,10 @@ def test_build_portable_release_zip_excludes_runtime_noise_and_long_doc_sources(
     assert "START_DESKTOP_CONTROL_CENTER.py" in names
     assert "START_DESKTOP_CONTROL_CENTER.pyw" in names
     assert "START_DESKTOP_CONTROL_CENTER.vbs" in names
+    assert "START_DESKTOP_RING_EDITOR.cmd" in names
+    assert "START_DESKTOP_RING_EDITOR.py" in names
+    assert "START_DESKTOP_RING_EDITOR.pyw" in names
+    assert "START_DESKTOP_RING_EDITOR.vbs" in names
     assert "START_PNEUMO_APP.pyw" in names
     assert "pneumo_solver_ui/core.py" in names
     assert "docs/11_TODO.md" in names
@@ -124,6 +132,10 @@ def test_build_portable_release_tree_excludes_runtime_noise_and_writes_manifest(
     saved = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert saved["member_count"] == manifest["member_count"]
     assert (out_dir / "app.py").exists()
+    assert (out_dir / "START_DESKTOP_RING_EDITOR.cmd").exists()
+    assert (out_dir / "START_DESKTOP_RING_EDITOR.py").exists()
+    assert (out_dir / "START_DESKTOP_RING_EDITOR.pyw").exists()
+    assert (out_dir / "START_DESKTOP_RING_EDITOR.vbs").exists()
     assert (out_dir / "START_PNEUMO_APP.pyw").exists()
     assert (out_dir / "pneumo_solver_ui" / "core.py").exists()
     assert (out_dir / "docs" / "11_TODO.md").exists()

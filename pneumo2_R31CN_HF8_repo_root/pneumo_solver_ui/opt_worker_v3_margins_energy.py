@@ -359,9 +359,69 @@ def load_model(py_path: str):
 
 _GLOBAL_MODEL = None
 _GLOBAL_CFG = None
+_GLOBAL_TESTS = None
+_TS_COMPILED_INPUT_CACHE: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
+
+
+def _prepare_runtime_tests(cfg: Dict[str, Any]) -> List[Tuple[str, Dict[str, Any], float, float, Dict[str, Any]]]:
+    tests = build_test_suite(cfg)
+    try:
+        if bool(cfg.get("sort_tests_by_cost", False)):
+            tests = sorted(tests, key=lambda t: float(t[2]) * float(t[3]))
+    except Exception:
+        pass
+    return list(tests)
+
+
+def _timeseries_path_signature(raw_path: Any) -> Tuple[str, float | None, int | None]:
+    text = str(raw_path or "").strip()
+    if not text:
+        return ("", None, None)
+    p = os.path.abspath(text)
+    try:
+        st = os.stat(p)
+        return (p, float(st.st_mtime), int(st.st_size))
+    except Exception:
+        return (p, None, None)
+
+
+def _timeseries_compile_cache_key(test: Dict[str, Any]) -> Tuple[Any, ...] | None:
+    road_csv = str(test.get("road_csv") or "").strip()
+    axay_csv = str(test.get("axay_csv") or "").strip()
+    if (not road_csv) and (not axay_csv):
+        return None
+    return (
+        _timeseries_path_signature(road_csv),
+        _timeseries_path_signature(axay_csv),
+    )
+
+
+def _compile_timeseries_inputs_cached(test: Dict[str, Any]) -> Dict[str, Any]:
+    if callable(test.get("road_func")) and callable(test.get("ax_func")) and callable(test.get("ay_func")):
+        return test
+
+    cache_key = _timeseries_compile_cache_key(test)
+    if cache_key is None:
+        return _compile_timeseries_inputs(test)
+
+    cached = _TS_COMPILED_INPUT_CACHE.get(cache_key)
+    if isinstance(cached, dict):
+        merged = dict(test)
+        for key in ("road_func", "ax_func", "ay_func"):
+            if callable(cached.get(key)) and not callable(merged.get(key)):
+                merged[key] = cached[key]
+        return merged
+
+    compiled = _compile_timeseries_inputs(dict(test))
+    _TS_COMPILED_INPUT_CACHE[cache_key] = {
+        key: compiled.get(key)
+        for key in ("road_func", "ax_func", "ay_func")
+        if callable(compiled.get(key))
+    }
+    return compiled
 
 def _init_pool_worker(model_path: str, cfg: Dict[str, Any]):
-    global _GLOBAL_MODEL, _GLOBAL_CFG
+    global _GLOBAL_MODEL, _GLOBAL_CFG, _GLOBAL_TESTS, _TS_COMPILED_INPUT_CACHE
 
     # В воркерах multiprocessing принудительно ограничиваем OpenMP/BLAS threadpools до 1,
     # чтобы N процессов не пытались каждый использовать все ядра (оверсабскрипция).
@@ -370,6 +430,8 @@ def _init_pool_worker(model_path: str, cfg: Dict[str, Any]):
 
     _GLOBAL_MODEL = load_model(model_path)
     _GLOBAL_CFG = cfg
+    _TS_COMPILED_INPUT_CACHE = {}
+    _GLOBAL_TESTS = _prepare_runtime_tests(cfg)
 
 def _pool_worker(payload: Tuple[int, Dict[str, Any]]):
     """Оценка одного кандидата в отдельном процессе.
@@ -378,7 +440,7 @@ def _pool_worker(payload: Tuple[int, Dict[str, Any]]):
     """
     idx, p = payload
     try:
-        return eval_candidate(_GLOBAL_MODEL, idx, p, _GLOBAL_CFG)
+        return eval_candidate(_GLOBAL_MODEL, idx, p, _GLOBAL_CFG, tests=_GLOBAL_TESTS)
     except Exception as e:
         return make_error_row(idx, p, e)
 
@@ -803,6 +865,12 @@ def rod_margin_and_speed(df: pd.DataFrame, params: Dict[str, Any], stroke_m_defa
     per_cyl_margins = {"Ц1": [], "Ц2": []}
     per_cyl_speeds = {"Ц1": [], "Ц2": []}
 
+    def _safe_nanreduce(values: Any, reducer) -> float:
+        arr = np.asarray(values, dtype=float).reshape(-1)
+        if arr.size == 0 or not np.any(np.isfinite(arr)):
+            return float("nan")
+        return float(reducer(arr))
+
     for c in corners:
         corner_margins = []
         corner_speeds = []
@@ -819,10 +887,10 @@ def rod_margin_and_speed(df: pd.DataFrame, params: Dict[str, Any], stroke_m_defa
             v = v_c1.to_numpy(dtype=float)
             L = stroke_for("Ц1", c)
             if L > 0:
-                m = float(np.min(np.minimum(s, L - s)))
+                m = _safe_nanreduce(np.minimum(s, L - s), np.nanmin)
             else:
                 m = float("nan")
-            sp = float(np.max(np.abs(v)))
+            sp = _safe_nanreduce(np.abs(v), np.nanmax)
             out[f"мин_запас_до_упора_штока_Ц1_{c}_м"] = m
             out[f"макс_скорость_штока_Ц1_{c}_м_с"] = sp
             corner_margins.append(m)
@@ -841,10 +909,10 @@ def rod_margin_and_speed(df: pd.DataFrame, params: Dict[str, Any], stroke_m_defa
             v = v_c2.to_numpy(dtype=float)
             L = stroke_for("Ц2", c)
             if L > 0:
-                m = float(np.min(np.minimum(s, L - s)))
+                m = _safe_nanreduce(np.minimum(s, L - s), np.nanmin)
             else:
                 m = float("nan")
-            sp = float(np.max(np.abs(v)))
+            sp = _safe_nanreduce(np.abs(v), np.nanmax)
             out[f"мин_запас_до_упора_штока_Ц2_{c}_м"] = m
             out[f"макс_скорость_штока_Ц2_{c}_м_с"] = sp
             corner_margins.append(m)
@@ -856,20 +924,20 @@ def rod_margin_and_speed(df: pd.DataFrame, params: Dict[str, Any], stroke_m_defa
             out[f"макс_скорость_штока_Ц2_{c}_м_с"] = float("nan")
 
         # --- Worst-case по углу (совместимость со старым форматом) ---
-        cm = float(np.nanmin(np.array(corner_margins, dtype=float))) if corner_margins else float("nan")
-        cs = float(np.nanmax(np.array(corner_speeds, dtype=float))) if corner_speeds else float("nan")
+        cm = _safe_nanreduce(corner_margins, np.nanmin)
+        cs = _safe_nanreduce(corner_speeds, np.nanmax)
         out[f"мин_запас_до_упора_штока_{c}_м"] = cm
         out[f"макс_скорость_штока_{c}_м_с"] = cs
         per_corner_margin[c] = cm
         per_corner_speed[c] = cs
 
     # Агрегаты
-    out["мин_запас_до_упора_штока_все_м"] = float(np.nanmin(np.array(list(per_corner_margin.values()), dtype=float)))
-    out["макс_скорость_штока_все_м_с"] = float(np.nanmax(np.array(list(per_corner_speed.values()), dtype=float)))
+    out["мин_запас_до_упора_штока_все_м"] = _safe_nanreduce(list(per_corner_margin.values()), np.nanmin)
+    out["макс_скорость_штока_все_м_с"] = _safe_nanreduce(list(per_corner_speed.values()), np.nanmax)
 
     for cyl in cyls:
-        mm = float(np.nanmin(np.array(per_cyl_margins[cyl], dtype=float))) if per_cyl_margins[cyl] else float("nan")
-        ss = float(np.nanmax(np.array(per_cyl_speeds[cyl], dtype=float))) if per_cyl_speeds[cyl] else float("nan")
+        mm = _safe_nanreduce(per_cyl_margins[cyl], np.nanmin)
+        ss = _safe_nanreduce(per_cyl_speeds[cyl], np.nanmax)
         out[f"мин_запас_до_упора_штока_{cyl}_все_м"] = mm
         out[f"макс_скорость_штока_{cyl}_все_м_с"] = ss
 
@@ -1164,7 +1232,7 @@ def eval_candidate_once(model, params: Dict[str, Any], test: Dict[str, Any], dt:
     ts_compile_ok = 1
     ts_compile_error = ""
     try:
-        test_local = _compile_timeseries_inputs(test_local)
+        test_local = _compile_timeseries_inputs_cached(test_local)
     except Exception as e:
         ts_compile_ok = 0
         ts_compile_error = (f"{type(e).__name__}: {e}")[:300]
@@ -2516,15 +2584,15 @@ def synthesize_aggregate_objectives_from_available_tests(row: Dict[str, Any]) ->
     return row
 
 
-def eval_candidate(model, idx: int, params: Dict[str, Any], cfg: Dict[str, float]) -> Dict[str, Any]:
+def eval_candidate(
+    model,
+    idx: int,
+    params: Dict[str, Any],
+    cfg: Dict[str, float],
+    tests: Optional[List[Tuple[str, Dict[str, Any], float, float, Dict[str, Any]]]] = None,
+) -> Dict[str, Any]:
     """Оценка кандидата на всём тест‑наборе."""
-    tests = build_test_suite(cfg)
-    # Дешёвые тесты сначала (помогает early-stop на длинных наборах)
-    try:
-        if bool(cfg.get("sort_tests_by_cost", False)):
-            tests = sorted(tests, key=lambda t: float(t[2]) * float(t[3]))
-    except Exception:
-        pass
+    tests = list(tests) if tests is not None else _prepare_runtime_tests(cfg)
 
     stop_if_pen_gt = float(cfg.get("stop_if_pen_gt", float("inf")))
 
@@ -3625,9 +3693,11 @@ def main():
 
         return items
 
+    runtime_tests = _prepare_runtime_tests(cfg)
+
     def eval_one(idx: int, p: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            row = eval_candidate(model, idx, p, cfg)
+            row = eval_candidate(model, idx, p, cfg, tests=runtime_tests)
         except Exception as e:
             row = make_error_row(idx, p, e)
         return _mark_candidate_role(row, "search")

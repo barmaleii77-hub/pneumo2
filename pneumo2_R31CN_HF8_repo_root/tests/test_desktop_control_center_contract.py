@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pneumo_solver_ui.desktop_shell.launcher_catalog import build_desktop_launch_catalog
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -12,18 +14,34 @@ def test_desktop_control_center_targets_core_desktop_tools_without_mnemo() -> No
         errors="replace",
     )
 
-    assert "pneumo_solver_ui.tools.test_center_gui" in src
-    assert "pneumo_solver_ui.tools.desktop_input_editor" in src
-    assert "pneumo_solver_ui.tools.run_full_diagnostics_gui" in src
-    assert "pneumo_solver_ui.tools.send_results_gui" in src
-    assert "pneumo_solver_ui.qt_compare_viewer" in src
-    assert "pneumo_solver_ui.desktop_animator.app" in src
     assert "DesktopControlCenter" in src
+    assert "build_desktop_launch_catalog(include_mnemo=False)" in src
+    assert "DesktopLaunchCatalogItem" in src
+    assert "spawn_module(module)" in src
 
     src_lower = src.lower()
     assert "desktop mnemo" in src_lower
     assert "desktop_mnemo" not in src_lower
     assert "pneumo_solver_ui.desktop_mnemo" not in src
+
+
+def test_launcher_catalog_keeps_shared_desktop_tool_list_and_optional_mnemo() -> None:
+    without_mnemo = build_desktop_launch_catalog(include_mnemo=False)
+    with_mnemo = build_desktop_launch_catalog(include_mnemo=True)
+
+    modules_without_mnemo = {item.module for item in without_mnemo}
+    modules_with_mnemo = {item.module for item in with_mnemo}
+
+    assert "pneumo_solver_ui.tools.desktop_input_editor" in modules_without_mnemo
+    assert "pneumo_solver_ui.tools.desktop_ring_scenario_editor" in modules_without_mnemo
+    assert "pneumo_solver_ui.tools.test_center_gui" in modules_without_mnemo
+    assert "pneumo_solver_ui.tools.run_autotest_gui" in modules_without_mnemo
+    assert "pneumo_solver_ui.tools.run_full_diagnostics_gui" in modules_without_mnemo
+    assert "pneumo_solver_ui.tools.send_results_gui" in modules_without_mnemo
+    assert "pneumo_solver_ui.qt_compare_viewer" in modules_without_mnemo
+    assert "pneumo_solver_ui.desktop_animator.app" in modules_without_mnemo
+    assert "pneumo_solver_ui.desktop_mnemo.app" not in modules_without_mnemo
+    assert "pneumo_solver_ui.desktop_mnemo.app" in modules_with_mnemo
 
 
 def test_root_desktop_control_center_wrappers_delegate_to_launcher() -> None:

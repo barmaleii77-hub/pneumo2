@@ -3,6 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
+from pneumo_solver_ui.optimization_active_runtime_summary import (
+    active_handoff_provenance_caption,
+    active_runtime_penalty_gate_caption,
+    active_runtime_progress_caption,
+    active_runtime_recent_errors_caption,
+    active_runtime_trial_health_caption,
+)
 from pneumo_solver_ui.optimization_page_readonly_ui import (
     current_objective_keys,
 )
@@ -25,6 +32,7 @@ HANDOFF_SORT_OPTIONS = (
     "Минимальный budget",
 )
 _HISTORY_SELECTED_RUN_DIR_KEY = "__opt_history_selected_run_dir"
+_ACTIVE_LAUNCH_CONTEXT_KEY = "__opt_active_launch_context"
 
 
 def _run_dir_key(raw: Any) -> str:
@@ -68,19 +76,47 @@ def with_active_job_placeholder(summaries: Sequence[Any], *, active_job: Any) ->
     return [placeholder, *items]
 
 
-def build_handoff_overview_rows(summaries: Sequence[Any]) -> list[dict[str, Any]]:
+def _active_launch_context_map(session_state: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(session_state, Mapping):
+        return {}
+    raw = session_state.get(_ACTIVE_LAUNCH_CONTEXT_KEY)
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _active_handoff_target_run_dir(*, active_job: Any, active_launch_context: Mapping[str, Any] | None) -> str:
+    context = dict(active_launch_context or {})
+    if str(context.get("kind") or "").strip() != "handoff":
+        return ""
+    target_run_dir = _run_dir_key(context.get("run_dir"))
+    if target_run_dir:
+        return target_run_dir
+    return _run_dir_key(getattr(active_job, "run_dir", None))
+
+
+def build_handoff_overview_rows(
+    summaries: Sequence[Any],
+    *,
+    active_job: Any = None,
+    active_launch_context: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    active_target_run_dir = _active_handoff_target_run_dir(
+        active_job=active_job,
+        active_launch_context=active_launch_context,
+    )
     for summary in list(summaries or ()):
         if str(getattr(summary, "pipeline_mode", "") or "") != "staged":
             continue
         if not bool(getattr(summary, "handoff_available", False)):
             continue
+        target_run_dir = _run_dir_key(getattr(summary, "handoff_target_run_dir", "") or "")
         rows.append(
             {
                 "__run_dir": _run_dir_key(getattr(summary, "run_dir", "") or ""),
-                "__target_run_dir": _run_dir_key(getattr(summary, "handoff_target_run_dir", "") or ""),
+                "__target_run_dir": target_run_dir,
                 "run": str(getattr(getattr(summary, "run_dir", None), "name", "") or ""),
                 "status": str(getattr(summary, "status_label", "") or ""),
+                "live_now": "LIVE" if active_target_run_dir and target_run_dir == active_target_run_dir else "—",
                 "preset": str(getattr(summary, "handoff_preset_tag", "") or ""),
                 "budget": int(getattr(summary, "handoff_budget", 0) or 0),
                 "seeds": int(getattr(summary, "handoff_seed_count", 0) or 0),
@@ -156,6 +192,7 @@ def sort_handoff_overview_rows(
         return sorted(
             items,
             key=lambda row: (
+                0 if str(row.get("live_now") or "") == "LIVE" else 1,
                 int(row.get("budget", 0) or 0),
                 -float(row.get("quality_score", 0.0) or 0.0),
                 -int(row.get("seeds", 0) or 0),
@@ -166,6 +203,7 @@ def sort_handoff_overview_rows(
         return sorted(
             items,
             key=lambda row: (
+                0 if str(row.get("live_now") or "") == "LIVE" else 1,
                 -float(row.get("quality_score", 0.0) or 0.0),
                 -int(row.get("promotable", 0) or 0),
                 -int(row.get("unique", 0) or 0),
@@ -176,6 +214,7 @@ def sort_handoff_overview_rows(
     return sorted(
         items,
         key=lambda row: (
+            0 if str(row.get("live_now") or "") == "LIVE" else 1,
             0 if str(row.get("full_ring") or "").strip().lower() == "yes" else 1,
             0 if str(row.get("status") or "").strip().upper() == "DONE" else 1,
             -float(row.get("quality_score", 0.0) or 0.0),
@@ -190,9 +229,18 @@ def render_workspace_handoff_overview(
     st: Any,
     summaries: Sequence[Any],
     *,
+    active_job: Any = None,
+    active_launch_context: Mapping[str, Any] | None = None,
+    active_runtime_summary: Mapping[str, Any] | None = None,
     start_handoff_fn: Callable[[Path], bool] | None = None,
 ) -> bool:
-    rows = enrich_handoff_overview_rows(build_handoff_overview_rows(summaries))
+    rows = enrich_handoff_overview_rows(
+        build_handoff_overview_rows(
+            summaries,
+            active_job=active_job,
+            active_launch_context=active_launch_context,
+        )
+    )
     if not rows:
         return False
     import pandas as pd
@@ -249,6 +297,43 @@ def render_workspace_handoff_overview(
         return False
     rows_ranked = sort_handoff_overview_rows(rows_filtered, sort_mode=sort_mode)
     best = rows_ranked[0]
+    live_rows = [row for row in rows_ranked if str(row.get("live_now") or "") == "LIVE"]
+    if live_rows:
+        live_row = live_rows[0]
+        st.info(
+            "LIVE NOW: сейчас full-ring coordinator уже выполняется для "
+            f"staged run `{live_row['run']}` с preset `{live_row['preset']}`."
+        )
+        progress_caption = active_runtime_progress_caption(
+            active_runtime_summary,
+            prefix="Active handoff progress",
+        )
+        if progress_caption:
+            st.caption(progress_caption)
+        trial_health_caption = active_runtime_trial_health_caption(
+            active_runtime_summary,
+            prefix="Active handoff trial health",
+        )
+        if trial_health_caption:
+            st.caption(trial_health_caption)
+        penalty_gate_caption = active_runtime_penalty_gate_caption(
+            active_runtime_summary,
+            prefix="Active handoff penalty gate",
+        )
+        if penalty_gate_caption:
+            st.caption(penalty_gate_caption)
+        recent_errors_caption = active_runtime_recent_errors_caption(
+            active_runtime_summary,
+            prefix="Recent handoff errors",
+        )
+        if recent_errors_caption:
+            st.caption(recent_errors_caption)
+        provenance_caption = active_handoff_provenance_caption(
+            active_runtime_summary,
+            prefix="Handoff provenance",
+        )
+        if provenance_caption:
+            st.caption(provenance_caption)
     st.caption(
         "Quick best handoff сейчас: "
         f"run={best['run']}, preset={best['preset']}, score={best['quality_score']}, "
@@ -302,8 +387,10 @@ def render_workspace_run_history_block(
     render_details_fn: Callable[..., Any] = render_selected_optimization_run_details,
     render_pointer_actions_fn: Callable[..., Any] = render_optimization_run_pointer_actions,
     render_handoff_overview_fn: Callable[..., Any] | None = render_workspace_handoff_overview,
+    active_runtime_summary: Mapping[str, Any] | None = None,
 ) -> None:
     active_run_dir = getattr(active_job, "run_dir", None) if active_job is not None else None
+    active_launch_context = _active_launch_context_map(session_state)
     summaries = with_active_job_placeholder(
         discover_runs_fn(workspace_dir, active_run_dir=active_run_dir),
         active_job=active_job,
@@ -318,7 +405,14 @@ def render_workspace_run_history_block(
         "не затирал понимание первого."
     )
     if render_handoff_overview_fn is not None:
-        render_handoff_overview_fn(st, summaries, start_handoff_fn=start_handoff_fn)
+        render_handoff_overview_fn(
+            st,
+            summaries,
+            active_job=active_job,
+            active_launch_context=active_launch_context,
+            active_runtime_summary=active_runtime_summary,
+            start_handoff_fn=start_handoff_fn,
+        )
 
     option_map = {_run_dir_key(item.run_dir): item for item in summaries}
     option_keys = list(option_map.keys())
@@ -375,12 +469,18 @@ def render_workspace_run_history_block(
         current_problem_hash=current_problem_hash,
         current_problem_hash_mode=current_problem_hash_mode,
         start_handoff_fn=start_handoff_fn,
+        active_run_dir=active_run_dir,
+        active_launch_context=active_launch_context,
+        active_runtime_summary=dict(active_runtime_summary or {}),
     )
 
     render_pointer_actions_fn(
         st,
         summary,
         key_prefix="opt_history",
+        active_run_dir=active_run_dir,
+        active_launch_context=active_launch_context,
+        active_runtime_summary=dict(active_runtime_summary or {}),
         rerun_fn=rerun_fn,
         selected_from="optimization_history",
         make_latest_label="Сделать текущей «последней оптимизацией»",

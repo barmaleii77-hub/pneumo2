@@ -5,6 +5,89 @@ from pathlib import Path
 from typing import Any, Callable
 
 from pneumo_solver_ui import run_artifacts
+from pneumo_solver_ui.optimization_active_runtime_summary import (
+    active_handoff_provenance_caption,
+    active_runtime_penalty_gate_caption,
+    active_runtime_progress_caption,
+    active_runtime_recent_errors_caption,
+    active_runtime_trial_health_caption,
+)
+
+
+def _run_dir_key(raw: Any) -> str:
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    try:
+        return str(Path(text).resolve())
+    except Exception:
+        return text
+
+
+def _render_live_now_pointer_marker(
+    st: Any,
+    summary: Any,
+    *,
+    active_run_dir: Any = None,
+    active_launch_context: dict[str, Any] | None = None,
+    active_runtime_summary: dict[str, Any] | None = None,
+) -> bool:
+    selected_run_dir = _run_dir_key(getattr(summary, "run_dir", None))
+    current_active_run_dir = _run_dir_key(active_run_dir)
+    if not selected_run_dir or not current_active_run_dir or selected_run_dir != current_active_run_dir:
+        return False
+    context = dict(active_launch_context or {})
+    is_handoff = str(context.get("kind") or "").strip() == "handoff"
+    progress_caption = active_runtime_progress_caption(
+        active_runtime_summary,
+        prefix="Active handoff progress" if is_handoff else "Active run progress",
+    )
+    trial_health_caption = active_runtime_trial_health_caption(
+        active_runtime_summary,
+        prefix="Active handoff trial health" if is_handoff else "Active run trial health",
+    )
+    penalty_gate_caption = active_runtime_penalty_gate_caption(
+        active_runtime_summary,
+        prefix="Active handoff penalty gate" if is_handoff else "Active run penalty gate",
+    )
+    recent_errors_caption = active_runtime_recent_errors_caption(
+        active_runtime_summary,
+        prefix="Recent handoff errors" if is_handoff else "Recent run errors",
+    )
+    provenance_caption = active_handoff_provenance_caption(
+        active_runtime_summary,
+        prefix="Handoff provenance" if is_handoff else "Run provenance",
+    )
+    if str(context.get("kind") or "").strip() == "handoff":
+        source_run_dir = _run_dir_key(context.get("source_run_dir"))
+        source_name = Path(source_run_dir).name if source_run_dir else "staged run"
+        st.info(
+            "LIVE NOW: выбранный run сейчас выполняется как seeded full-ring coordinator handoff "
+            f"из staged run `{source_name}`."
+        )
+        if progress_caption:
+            st.caption(progress_caption)
+        if trial_health_caption:
+            st.caption(trial_health_caption)
+        if penalty_gate_caption:
+            st.caption(penalty_gate_caption)
+        if recent_errors_caption:
+            st.caption(recent_errors_caption)
+        if provenance_caption:
+            st.caption(provenance_caption)
+        return True
+    st.info("LIVE NOW: выбранный run сейчас выполняется в текущей сессии.")
+    if progress_caption:
+        st.caption(progress_caption)
+    if trial_health_caption:
+        st.caption(trial_health_caption)
+    if penalty_gate_caption:
+        st.caption(penalty_gate_caption)
+    if recent_errors_caption:
+        st.caption(recent_errors_caption)
+    if provenance_caption:
+        st.caption(provenance_caption)
+    return True
 
 
 def build_run_pointer_meta_from_summary(
@@ -84,6 +167,9 @@ def render_optimization_run_pointer_actions(
     summary: Any,
     *,
     key_prefix: str,
+    active_run_dir: Any = None,
+    active_launch_context: dict[str, Any] | None = None,
+    active_runtime_summary: dict[str, Any] | None = None,
     rerun_fn: Callable[[Any], None] | None = None,
     selected_from: str = "optimization_history",
     make_latest_label: str = "Сделать текущей «последней оптимизацией»",
@@ -95,6 +181,14 @@ def render_optimization_run_pointer_actions(
     meta = build_run_pointer_meta_from_summary(summary, selected_from=selected_from)
     run_dir = Path(getattr(summary, "run_dir"))
     log_path = getattr(summary, "log_path", None)
+
+    _render_live_now_pointer_marker(
+        st,
+        summary,
+        active_run_dir=active_run_dir,
+        active_launch_context=active_launch_context,
+        active_runtime_summary=active_runtime_summary,
+    )
 
     b1, b2, b3 = st.columns([1, 1, 2])
     with b1:

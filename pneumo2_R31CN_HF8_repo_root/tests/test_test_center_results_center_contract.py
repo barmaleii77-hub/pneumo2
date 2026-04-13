@@ -1,0 +1,541 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from pneumo_solver_ui.desktop_results_model import (
+    DesktopResultsArtifact,
+    DesktopResultsSessionHandoff,
+    DesktopResultsSnapshot,
+    format_npz_summary,
+    format_optimizer_gate_summary,
+    format_triage_summary,
+    format_validation_summary,
+)
+from pneumo_solver_ui.desktop_results_runtime import DesktopResultsRuntime
+from pneumo_solver_ui.tools.desktop_results_center import _artifact_matches_filters
+from pneumo_solver_ui.tools.send_bundle_contract import ANIM_DIAG_SIDECAR_JSON
+
+
+ROOT = Path(__file__).resolve().parents[1]
+UI_ROOT = ROOT / "pneumo_solver_ui"
+
+
+def test_desktop_results_session_handoff_model_defaults() -> None:
+    handoff = DesktopResultsSessionHandoff(summary="rc=0")
+
+    assert handoff.summary == "rc=0"
+    assert handoff.detail == ""
+    assert handoff.step_lines == ()
+    assert handoff.zip_path is None
+
+
+def test_desktop_results_center_browse_filter_matches_category_and_query() -> None:
+    artifact = DesktopResultsArtifact(
+        key="validation_json",
+        title="Current run validation JSON",
+        category="validation",
+        path=Path("C:/tmp/latest_send_bundle_validation.json"),
+        detail="Pinned from latest local run handoff.",
+    )
+
+    assert _artifact_matches_filters(artifact, category="all", query="")
+    assert _artifact_matches_filters(artifact, category="validation", query="send_bundle")
+    assert _artifact_matches_filters(artifact, category="validation", query="current run")
+    assert not _artifact_matches_filters(artifact, category="triage", query="")
+    assert not _artifact_matches_filters(artifact, category="validation", query="animator")
+
+
+def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_path: Path, monkeypatch) -> None:
+    repo_root = tmp_path / "repo"
+    send_bundles = repo_root / "send_bundles"
+    send_bundles.mkdir(parents=True, exist_ok=True)
+    autotest_run = repo_root / "pneumo_solver_ui" / "autotest_runs" / "AT_001"
+    diagnostics_run = repo_root / "diagnostics_runs" / "DG_001"
+    autotest_run.mkdir(parents=True, exist_ok=True)
+    diagnostics_run.mkdir(parents=True, exist_ok=True)
+
+    zip_path = send_bundles / "bundle_001.zip"
+    zip_path.write_bytes(b"zip")
+    (send_bundles / "latest_send_bundle_path.txt").write_text(str(zip_path), encoding="utf-8")
+    (send_bundles / "latest_send_bundle_validation.md").write_text("# validation\n", encoding="utf-8")
+    (send_bundles / "latest_triage_report.json").write_text(
+        json.dumps(
+            {
+                "severity_counts": {
+                    "critical": 1,
+                    "warn": 2,
+                    "info": 3,
+                },
+                "red_flags": [
+                    "Desktop Mnemo recent: Большой перепад давлений",
+                ],
+                "operator_recommendations": [
+                    "Open Desktop Animator first and inspect Mnemo red flags before send.",
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (send_bundles / "latest_triage_report.md").write_text("# triage\n", encoding="utf-8")
+    (send_bundles / "latest_dashboard.html").write_text("<html></html>", encoding="utf-8")
+    (send_bundles / ANIM_DIAG_SIDECAR_JSON).write_text("{}", encoding="utf-8")
+    (send_bundles / "latest_send_bundle_validation.json").write_text(
+        json.dumps(
+            {
+                "ok": True,
+                "errors": [],
+                "warnings": ["warn-a", "warn-b"],
+                "optimizer_scope_gate": {
+                    "release_gate": "FAIL",
+                    "release_risk": True,
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    latest_npz = repo_root / "workspace" / "exports" / "anim_latest.npz"
+    latest_pointer = repo_root / "workspace" / "exports" / "anim_latest.json"
+    latest_event_log = repo_root / "workspace" / "exports" / "anim_latest.desktop_mnemo_events.json"
+    latest_npz.parent.mkdir(parents=True, exist_ok=True)
+    latest_npz.write_bytes(b"npz")
+    latest_pointer.write_text("{}", encoding="utf-8")
+    latest_event_log.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.collect_anim_latest_diagnostics_summary",
+        lambda include_meta=True: {
+            "anim_latest_npz_path": str(latest_npz),
+            "anim_latest_pointer_json": str(latest_pointer),
+            "anim_latest_mnemo_event_log_path": str(latest_event_log),
+            "anim_latest_mnemo_event_log_current_mode": "Регуляторный коридор",
+            "anim_latest_mnemo_event_log_recent_titles": ["Большой перепад давлений"],
+        },
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.load_latest_send_bundle_anim_dashboard",
+        lambda out_dir: {"visual_cache_token": "tok-123"},
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.format_anim_dashboard_brief_lines",
+        lambda anim: [f"token={anim.get('visual_cache_token')}"],
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.build_anim_operator_recommendations",
+        lambda anim: ["Open Desktop Animator first", "Then inspect Compare Viewer"],
+    )
+
+    runtime = DesktopResultsRuntime(repo_root=repo_root, python_executable="python")
+    snapshot = runtime.snapshot()
+
+    assert snapshot.latest_zip_path == zip_path.resolve()
+    assert snapshot.validation_ok is True
+    assert snapshot.validation_error_count == 0
+    assert snapshot.validation_warning_count == 2
+    assert snapshot.triage_critical_count == 1
+    assert snapshot.triage_warn_count == 2
+    assert snapshot.triage_info_count == 3
+    assert snapshot.validation_errors == ()
+    assert snapshot.validation_warnings == ("warn-a", "warn-b")
+    assert snapshot.triage_red_flags == ("Desktop Mnemo recent: Большой перепад давлений",)
+    assert snapshot.optimizer_scope_gate == "FAIL"
+    assert snapshot.optimizer_scope_gate_reason == ""
+    assert snapshot.optimizer_scope_release_risk is True
+    overview = {row.key: row for row in snapshot.validation_overview_rows}
+    assert overview["send_bundle_validation"].status == "WARN"
+    assert "warnings=2" in overview["send_bundle_validation"].detail
+    assert overview["send_bundle_validation"].action_key == "open_artifact"
+    assert overview["triage_report"].status == "CRITICAL"
+    assert "critical=1" in overview["triage_report"].detail
+    assert overview["triage_report"].action_key == "open_artifact"
+    assert overview["anim_latest_results"].status == "READY"
+    assert overview["anim_latest_results"].action_key == "open_compare_viewer"
+    assert overview["animator_pointer"].status == "READY"
+    assert overview["animator_pointer"].action_key == "open_animator_follow"
+    assert overview["bundle_sidecars"].status == "READY"
+    assert overview["bundle_sidecars"].action_key == "open_send_center"
+    assert snapshot.latest_npz_path == latest_npz.resolve()
+    assert snapshot.latest_pointer_json_path == latest_pointer.resolve()
+    assert snapshot.latest_mnemo_event_log_path == latest_event_log.resolve()
+    assert snapshot.latest_autotest_run_dir == autotest_run.resolve()
+    assert snapshot.latest_diagnostics_run_dir == diagnostics_run.resolve()
+    assert snapshot.anim_summary_lines == ("token=tok-123",)
+    assert snapshot.operator_recommendations[0] == "Open Desktop Animator first and inspect Mnemo red flags before send."
+    assert snapshot.mnemo_current_mode == "Регуляторный коридор"
+    assert snapshot.mnemo_recent_titles == ("Большой перепад давлений",)
+    assert snapshot.suggested_next_step == "Open Desktop Animator first and inspect Mnemo red flags before send."
+    assert snapshot.suggested_next_detail == "Desktop Mnemo recent: Большой перепад давлений"
+    assert snapshot.suggested_next_action_key == "open_animator_follow"
+    assert snapshot.suggested_next_artifact_key == "latest_pointer"
+
+    titles = {item.title for item in snapshot.recent_artifacts}
+    assert "Latest send bundle ZIP" in titles
+    assert "Validation Markdown" in titles
+    assert "Latest anim NPZ" in titles
+    assert "Desktop Mnemo event log" in titles
+
+    validation_artifact = next(
+        item for item in snapshot.recent_artifacts if item.key == "validation_json"
+    )
+    preview = runtime.artifact_preview_lines(validation_artifact)
+    triage_artifact = runtime.artifact_by_key(snapshot, "triage_json")
+    assert triage_artifact is not None
+    assert triage_artifact.key == "triage_json"
+    overview_artifact = runtime.overview_evidence_artifact(snapshot, overview["animator_pointer"])
+    assert overview_artifact is not None
+    assert overview_artifact.key == "latest_pointer"
+    session_artifacts = runtime.session_artifacts(
+        snapshot,
+        DesktopResultsSessionHandoff(
+            summary="rc=0 | duration=1.0s",
+            detail="Pinned current run.",
+            step_lines=("Autotest: rc=0", "Diagnostics: rc=0"),
+            zip_path=zip_path.resolve(),
+            autotest_run_dir=autotest_run.resolve(),
+            diagnostics_run_dir=diagnostics_run.resolve(),
+        ),
+    )
+    session_titles = {item.title for item in session_artifacts}
+    session_keys = {item.key for item in session_artifacts}
+    session_categories = {item.key: item.category for item in session_artifacts}
+    assert "Current run ZIP" in session_titles
+    assert "Current run validation JSON" in session_titles
+    assert "Current run triage JSON" in session_titles
+    assert "Current run animator pointer" in session_titles
+    assert "session_send_bundle_zip" in session_keys
+    assert "session_validation_json" in session_keys
+    assert session_categories["session_send_bundle_zip"] == "bundle"
+    assert session_categories["session_validation_json"] == "validation"
+    assert session_categories["session_triage_json"] == "triage"
+    assert session_categories["session_latest_pointer"] == "results"
+    preferred_validation = runtime.preferred_artifact_by_key(
+        snapshot,
+        "validation_json",
+        handoff=DesktopResultsSessionHandoff(
+            summary="rc=0 | duration=1.0s",
+            detail="Pinned current run.",
+            step_lines=("Autotest: rc=0",),
+            zip_path=zip_path.resolve(),
+            autotest_run_dir=autotest_run.resolve(),
+            diagnostics_run_dir=diagnostics_run.resolve(),
+        ),
+    )
+    assert preferred_validation is not None
+    assert preferred_validation.key == "session_validation_json"
+    preferred_triage = runtime.preferred_artifact_by_key(
+        snapshot,
+        "triage_json",
+        handoff=DesktopResultsSessionHandoff(
+            summary="rc=0 | duration=1.0s",
+            detail="Pinned current run.",
+            step_lines=("Autotest: rc=0",),
+            zip_path=zip_path.resolve(),
+            autotest_run_dir=autotest_run.resolve(),
+            diagnostics_run_dir=diagnostics_run.resolve(),
+        ),
+    )
+    assert preferred_triage is not None
+    assert preferred_triage.key == "session_triage_json"
+    preferred_pointer = runtime.preferred_artifact_by_key(
+        snapshot,
+        "latest_pointer",
+        handoff=DesktopResultsSessionHandoff(
+            summary="rc=0 | duration=1.0s",
+            detail="Pinned current run.",
+            step_lines=("Autotest: rc=0",),
+            zip_path=zip_path.resolve(),
+            autotest_run_dir=autotest_run.resolve(),
+            diagnostics_run_dir=diagnostics_run.resolve(),
+        ),
+    )
+    assert preferred_pointer is not None
+    assert preferred_pointer.key == "session_latest_pointer"
+    preferred_overview_artifact = runtime.preferred_overview_evidence_artifact(
+        snapshot,
+        overview["animator_pointer"],
+        handoff=DesktopResultsSessionHandoff(
+            summary="rc=0 | duration=1.0s",
+            detail="Pinned current run.",
+            step_lines=("Autotest: rc=0",),
+            zip_path=zip_path.resolve(),
+            autotest_run_dir=autotest_run.resolve(),
+            diagnostics_run_dir=diagnostics_run.resolve(),
+        ),
+    )
+    assert preferred_overview_artifact is not None
+    assert preferred_overview_artifact.key == "session_latest_pointer"
+    assert preview[:4] == (
+        "ok=True",
+        "errors=0",
+        "warnings=2",
+        "optimizer_gate=FAIL",
+    )
+    assert "warning: warn-a" in preview
+
+    assert format_validation_summary(snapshot).startswith("Validation: PASS")
+    assert "FAIL" in format_optimizer_gate_summary(snapshot)
+    assert "critical=1" in format_triage_summary(snapshot)
+    assert "anim_latest.npz" in format_npz_summary(snapshot)
+
+
+def test_desktop_results_runtime_builds_branch_args() -> None:
+    npz_path = Path("C:/tmp/anim_latest.npz")
+    pointer_path = Path("C:/tmp/anim_latest.json")
+    pointer_artifact = type("Artifact", (), {"path": pointer_path, "category": "results"})()
+    npz_artifact = type("Artifact", (), {"path": npz_path, "category": "results"})()
+    mnemo_log_path = Path("C:/tmp/anim_latest.desktop_mnemo_events.json")
+    mnemo_artifact = type("Artifact", (), {"path": mnemo_log_path, "category": "results"})()
+    snapshot = DesktopResultsSnapshot(
+        latest_zip_path=None,
+        latest_validation_json_path=None,
+        latest_validation_md_path=None,
+        latest_triage_json_path=None,
+        latest_triage_md_path=None,
+        latest_dashboard_html_path=None,
+        latest_anim_diag_json_path=None,
+        latest_npz_path=npz_path,
+        latest_pointer_json_path=pointer_path,
+        latest_mnemo_event_log_path=None,
+        latest_autotest_run_dir=None,
+        latest_diagnostics_run_dir=None,
+        validation_ok=None,
+        validation_error_count=0,
+        validation_warning_count=0,
+        triage_critical_count=0,
+        triage_warn_count=0,
+        triage_info_count=0,
+        validation_errors=(),
+        validation_warnings=(),
+        triage_red_flags=(),
+        optimizer_scope_gate="",
+        optimizer_scope_gate_reason="",
+        optimizer_scope_release_risk=None,
+        anim_summary_lines=(),
+        operator_recommendations=(),
+        mnemo_current_mode="",
+        mnemo_recent_titles=(),
+        suggested_next_step="",
+        suggested_next_detail="",
+        validation_overview_rows=(),
+        recent_artifacts=(),
+    )
+    runtime = DesktopResultsRuntime(repo_root=Path.cwd(), python_executable="python")
+
+    assert runtime.compare_viewer_args(snapshot) == [str(npz_path)]
+    assert runtime.animator_args(snapshot, follow=False) == [
+        "--npz",
+        str(npz_path),
+        "--pointer",
+        str(pointer_path),
+        "--no-follow",
+    ]
+    assert runtime.animator_args(snapshot, follow=True) == [
+        "--pointer",
+        str(pointer_path),
+    ]
+    assert runtime.compare_viewer_args(snapshot, artifact=npz_artifact) == [str(npz_path)]
+    assert runtime.compare_viewer_args(snapshot, artifact=pointer_artifact) == [str(npz_path)]
+    assert runtime.animator_args(snapshot, follow=False, artifact=pointer_artifact) == [
+        "--npz",
+        str(npz_path),
+        "--pointer",
+        str(pointer_path),
+        "--no-follow",
+    ]
+    assert runtime.animator_args(snapshot, follow=True, artifact=mnemo_artifact) == [
+        "--pointer",
+        str(pointer_path),
+    ]
+
+
+def test_desktop_results_runtime_previews_selected_result_artifacts(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    pointer_path = repo_root / "workspace" / "exports" / "anim_latest.json"
+    mnemo_log_path = repo_root / "workspace" / "exports" / "anim_latest.desktop_mnemo_events.json"
+    pointer_path.parent.mkdir(parents=True, exist_ok=True)
+    pointer_path.write_text(
+        json.dumps(
+            {
+                "updated_utc": "2026-04-13T10:00:00Z",
+                "npz_path": str(pointer_path.with_suffix(".npz")),
+                "visual_cache_token": "tok-preview",
+                "visual_reload_inputs": ["npz", "road_csv"],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    mnemo_log_path.write_text(
+        json.dumps(
+            {
+                "current_mode": "Регуляторный коридор",
+                "event_count": 4,
+                "active_latch_count": 1,
+                "acknowledged_latch_count": 2,
+                "recent_events": [
+                    {"title": "Большой перепад давлений"},
+                    {"title": "Смена режима"},
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    runtime = DesktopResultsRuntime(repo_root=repo_root, python_executable="python")
+
+    pointer_artifact = type(
+        "Artifact",
+        (),
+        {"key": "latest_pointer", "path": pointer_path, "category": "results"},
+    )()
+    mnemo_artifact = type(
+        "Artifact",
+        (),
+        {"key": "mnemo_event_log", "path": mnemo_log_path, "category": "results"},
+    )()
+
+    pointer_preview = runtime.artifact_preview_lines(pointer_artifact)
+    mnemo_preview = runtime.artifact_preview_lines(mnemo_artifact)
+
+    assert "token=tok-preview" in pointer_preview
+    assert "reload_inputs=['npz', 'road_csv']" in pointer_preview
+    assert "mode=Регуляторный коридор" in mnemo_preview
+    assert "recent: Большой перепад давлений" in mnemo_preview
+
+    triage_path = repo_root / "send_bundles" / "latest_triage_report.json"
+    triage_path.parent.mkdir(parents=True, exist_ok=True)
+    triage_path.write_text(
+        json.dumps(
+            {
+                "severity_counts": {"critical": 0, "warn": 1, "info": 0},
+                "red_flags": ["Pointer drift"],
+                "operator_recommendations": ["Open Compare Viewer next"],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    triage_artifact = type(
+        "Artifact",
+        (),
+        {"key": "triage_json", "path": triage_path, "category": "triage"},
+    )()
+    triage_preview = runtime.artifact_preview_lines(triage_artifact)
+
+    assert "severity_counts={'critical': 0, 'warn': 1, 'info': 0}" in triage_preview
+    assert "red_flag: Pointer drift" in triage_preview
+    assert "next: Open Compare Viewer next" in triage_preview
+
+
+def test_test_center_gui_embeds_validation_results_center_modules() -> None:
+    tool_src = (UI_ROOT / "tools" / "test_center_gui.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    center_src = (UI_ROOT / "tools" / "desktop_results_center.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    model_src = (UI_ROOT / "desktop_results_model.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    runtime_src = (UI_ROOT / "desktop_results_runtime.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert "DesktopResultsRuntime" in tool_src
+    assert "DesktopResultsSessionHandoff" in tool_src
+    assert "DesktopResultsCenter" in tool_src
+    assert "ttk.Notebook" in tool_src
+    assert 'self.notebook.add(self.results_center, text="Validation & Results")' in tool_src
+    assert "self.results_center.refresh()" in tool_src
+    assert "self.results_center.set_session_handoff(" in tool_src
+    assert "self.notebook.select(self.results_center)" in tool_src
+
+    assert "class DesktopResultsCenter" in center_src
+    assert "ttk.Treeview" in center_src
+    assert "def refresh(self) -> None:" in center_src
+    assert "Validation overview" in center_src
+    assert "Suggested next step" in center_src
+    assert "Latest run handoff" in center_src
+    assert "def set_session_handoff(" in center_src
+    assert "Focus suggested branch" in center_src
+    assert "Open latest ZIP" in center_src
+    assert "Open current validation" in center_src
+    assert "Open current triage" in center_src
+    assert "Branch current compare" in center_src
+    assert "Branch current animator" in center_src
+    assert "def _preferred_handoff_artifact(" in center_src
+    assert "Current run only" in center_src
+    assert "Category:" in center_src
+    assert "values=[\"all\", \"validation\", \"triage\", \"results\", \"anim_latest\", \"runs\", \"bundle\"]" in center_src
+    assert "Search:" in center_src
+    assert "def _clear_browse_query(" in center_src
+    assert "query=" in center_src
+    assert "def _on_browse_scope_changed(" in center_src
+    assert "def _artifact_matches_browse_filter(" in center_src
+    assert "def _artifact_matches_filters(" in center_src
+    assert "def _browse_scope_summary(" in center_src
+    assert "Browse scope:" in center_src
+    assert "session_artifacts(" in center_src
+    assert "Current run (pinned)" in center_src
+    assert "Latest workspace artifacts" in center_src
+    assert "preferred_artifact_by_key(" in center_src
+    assert "preferred_overview_evidence_artifact(" in center_src
+    assert "self.overview_tree = ttk.Treeview" in center_src
+    assert "self.overview_tree.bind(\"<<TreeviewSelect>>\", self._on_overview_select)" in center_src
+    assert "self.overview_tree.bind(\"<Double-1>\", self._on_overview_open)" in center_src
+    assert "self.tree.bind(\"<Double-1>\", self._on_open_selected)" in center_src
+    assert "Run suggested next step" in center_src
+    assert "Run selected overview action" in center_src
+    assert "artifact_preview_lines" in center_src
+    assert "Preview:" in center_src
+    assert "Triage red flags:" in center_src
+    assert "launch_compare_viewer" in center_src
+    assert "launch_animator" in center_src
+    assert "Validation warnings:" in center_src
+    assert "Compare target NPZ:" in center_src
+    assert "artifact=self._selected_artifact()" in center_src
+
+    assert "class DesktopResultsSnapshot" in model_src
+    assert "class DesktopResultsOverviewRow" in model_src
+    assert "class DesktopResultsSessionHandoff" in model_src
+    assert "def format_validation_summary(" in model_src
+    assert "def format_optimizer_gate_summary(" in model_src
+    assert "def format_triage_summary(" in model_src
+    assert "action_key: str = \"\"" in model_src
+    assert "artifact_key: str = \"\"" in model_src
+    assert "validation_errors: tuple[str, ...]" in model_src
+    assert "triage_red_flags: tuple[str, ...]" in model_src
+    assert "validation_overview_rows: tuple[DesktopResultsOverviewRow, ...]" in model_src
+    assert "optimizer_scope_gate_reason: str" in model_src
+    assert "suggested_next_step: str" in model_src
+    assert "suggested_next_action_key: str = \"\"" in model_src
+
+    assert "class DesktopResultsRuntime" in runtime_src
+    assert "def snapshot(self) -> DesktopResultsSnapshot:" in runtime_src
+    assert "def artifact_preview_lines(" in runtime_src
+    assert "DesktopResultsOverviewRow(" in runtime_src
+    assert "key=\"triage_report\"" in runtime_src
+    assert "_suggested_next_step" in runtime_src
+    assert "def artifact_by_key(" in runtime_src
+    assert "def overview_evidence_artifact(" in runtime_src
+    assert "def session_artifacts(" in runtime_src
+    assert "def preferred_artifact_by_key(" in runtime_src
+    assert "def preferred_overview_evidence_artifact(" in runtime_src
+    assert "Current run validation JSON" in runtime_src
+    assert "def compare_viewer_path(" in runtime_src
+    assert "def animator_target_paths(" in runtime_src
+    assert "def compare_viewer_args(" in runtime_src
+    assert "def animator_args(" in runtime_src

@@ -8,6 +8,8 @@ import numpy as np
 from pneumo_solver_ui.desktop_animator.geom3d_helpers import (
     car_frame_rotate_xy,
     center_and_orient_cylinder_vertices_to_y,
+    derive_wheel_pose_from_hardpoints,
+    localize_world_point_to_car_frame,
     localize_world_points_to_car_frame,
     orient_centered_cylinder_vertices_to_y,
     orthonormal_frame_from_corners,
@@ -39,6 +41,15 @@ def test_localize_world_points_to_car_frame_preserves_canonical_xyz_semantics() 
 
     restored = localize_world_points_to_car_frame(world, x0=x0, y0=y0, yaw_rad=yaw)
     assert np.allclose(restored, local, atol=1e-9)
+
+
+def test_localize_world_point_to_car_frame_matches_vectorized_helper() -> None:
+    yaw = math.radians(-17.0)
+    x0, y0 = 3.5, 8.0
+    point = np.array([4.2, 7.1, 0.37], dtype=float)
+    single = localize_world_point_to_car_frame(point, x0=x0, y0=y0, yaw_rad=yaw)
+    vectorized = localize_world_points_to_car_frame(point, x0=x0, y0=y0, yaw_rad=yaw)[0]
+    assert np.allclose(single, vectorized, atol=1e-9)
 
 
 def test_car_frame_rotate_xy_matches_expected_left_right_sign() -> None:
@@ -113,3 +124,25 @@ def test_app_source_uses_solver_points_and_no_runtime_wheel_rotate_in_update_fra
     assert 'frame_corner_xyz' in src
     assert 'center_and_orient_cylinder_vertices_to_y' in src
     assert 'w.rotate(90.0, 1, 0, 0)' not in src
+
+
+def test_derive_wheel_pose_from_hardpoints_recovers_center_axis_and_angles() -> None:
+    center, axle, fwd, up, toe_rad, camber_rad = derive_wheel_pose_from_hardpoints(
+        fallback_center_xyz=np.asarray([0.0, 0.0, 0.42], dtype=float),
+        lower_front_xyz=np.asarray([0.12, 0.21, 0.30], dtype=float),
+        lower_rear_xyz=np.asarray([-0.08, 0.19, 0.28], dtype=float),
+        upper_front_xyz=np.asarray([0.10, 0.23, 0.56], dtype=float),
+        upper_rear_xyz=np.asarray([-0.10, 0.21, 0.54], dtype=float),
+    )
+    assert center.shape == (3,)
+    assert np.isclose(center[0], 0.01, atol=1e-9)
+    assert np.isclose(center[1], 0.21, atol=1e-9)
+    assert np.isclose(center[2], 0.42, atol=1e-12)
+    assert np.allclose(axle @ fwd, 0.0, atol=1e-9)
+    assert np.allclose(axle @ up, 0.0, atol=1e-9)
+    assert np.allclose(fwd @ up, 0.0, atol=1e-9)
+    assert np.allclose(np.linalg.norm(axle), 1.0, atol=1e-9)
+    assert np.allclose(np.linalg.norm(fwd), 1.0, atol=1e-9)
+    assert np.allclose(np.linalg.norm(up), 1.0, atol=1e-9)
+    assert np.isfinite(toe_rad)
+    assert np.isfinite(camber_rad)

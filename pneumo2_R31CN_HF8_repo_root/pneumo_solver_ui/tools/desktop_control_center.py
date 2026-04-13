@@ -27,11 +27,16 @@ import os
 import subprocess
 import sys
 import traceback
-from dataclasses import dataclass
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from pneumo_solver_ui.desktop_shell.external_launch import repo_root as shell_repo_root
+from pneumo_solver_ui.desktop_shell.external_launch import spawn_module
+from pneumo_solver_ui.desktop_shell.launcher_catalog import (
+    DesktopLaunchCatalogItem,
+    build_desktop_launch_catalog,
+)
 
 try:
     from pneumo_solver_ui.release_info import get_release
@@ -41,74 +46,12 @@ except Exception:
     RELEASE = os.environ.get("PNEUMO_RELEASE", "UNIFIED_v6_67") or "UNIFIED_v6_67"
 
 
-@dataclass(frozen=True)
-class LaunchTarget:
-    title: str
-    module: str
-    description: str
-
-
-LAUNCH_TARGETS: tuple[LaunchTarget, ...] = (
-    LaunchTarget(
-        title="Исходные данные и расчёт",
-        module="pneumo_solver_ui.tools.desktop_input_editor",
-        description="Редактор исходных параметров модели: геометрия, пневматика, механика и настройки расчёта.",
-    ),
-    LaunchTarget(
-        title="Центр проверок",
-        module="pneumo_solver_ui.tools.test_center_gui",
-        description="Автотесты, полная диагностика и быстрый переход к отправке результатов.",
-    ),
-    LaunchTarget(
-        title="Полная диагностика",
-        module="pneumo_solver_ui.tools.run_full_diagnostics_gui",
-        description="Собрать полный диагностический архив и проверить состояние окружения.",
-    ),
-    LaunchTarget(
-        title="Отправка результатов",
-        module="pneumo_solver_ui.tools.send_results_gui",
-        description="Собрать SEND bundle и открыть окно копирования архива без WEB UI.",
-    ),
-    LaunchTarget(
-        title="Сравнение NPZ (Qt)",
-        module="pneumo_solver_ui.qt_compare_viewer",
-        description="Desktop viewer для сравнения прогонов, графиков и NPZ-трасс.",
-    ),
-    LaunchTarget(
-        title="Desktop Animator",
-        module="pneumo_solver_ui.desktop_animator.app",
-        description="Открыть PySide6-аниматор для последней выгрузки или локального сценария.",
-    ),
-)
-
-
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
-def _python_gui_exe() -> str:
-    if os.name != "nt":
-        return sys.executable
-
-    try:
-        exe = Path(sys.executable)
-        if exe.name.lower() == "python.exe":
-            pyw = exe.with_name("pythonw.exe")
-            if pyw.exists():
-                return str(pyw)
-    except Exception:
-        pass
-    return sys.executable
+    return shell_repo_root()
 
 
 def _spawn_module(module: str) -> subprocess.Popen:
-    cmd = [_python_gui_exe(), "-m", module]
-    kwargs: dict[str, object] = {
-        "cwd": str(_repo_root()),
-    }
-    if os.name == "nt":
-        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    return subprocess.Popen(cmd, **kwargs)
+    return spawn_module(module)
 
 
 class DesktopControlCenter:
@@ -117,6 +60,7 @@ class DesktopControlCenter:
         self.root.title(f"Pneumo Desktop Control Center — {RELEASE}")
         self.root.geometry("860x540")
         self.root.minsize(820, 500)
+        self.launch_targets = build_desktop_launch_catalog(include_mnemo=False)
 
         self.status_var = tk.StringVar(value="Готово. Выберите desktop-инструмент.")
         self._build_ui()
@@ -146,7 +90,7 @@ class DesktopControlCenter:
         cards.columnconfigure(0, weight=1)
         cards.columnconfigure(1, weight=1)
 
-        for idx, target in enumerate(LAUNCH_TARGETS):
+        for idx, target in enumerate(self.launch_targets):
             row = idx // 2
             col = idx % 2
             box = ttk.LabelFrame(cards, text=target.title, padding=12)
@@ -206,7 +150,7 @@ class DesktopControlCenter:
             messagebox.showerror("Desktop Control Center", f"Не удалось открыть папку проекта:\n{exc}")
             self._append_log("[error] open repo\n" + traceback.format_exc())
 
-    def _launch(self, target: LaunchTarget) -> None:
+    def _launch(self, target: DesktopLaunchCatalogItem) -> None:
         try:
             proc = _spawn_module(target.module)
             self.status_var.set(f"Запущено: {target.title}")

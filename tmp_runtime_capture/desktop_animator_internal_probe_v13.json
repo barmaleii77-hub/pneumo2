@@ -1,0 +1,17 @@
+{
+  "elapsed_s": 7.632819099999324,
+  "display_hz_hint": 119.999,
+  "interval_ms_runtime": 1,
+  "tick_count": 176,
+  "tick_hz": 23.058321924597372,
+  "tick_mean_ms": 16.121855113583067,
+  "update_frame_count": 171,
+  "update_frame_hz": 22.403255960830403,
+  "update_frame_mean_ms": 16.52115964905491,
+  "car3d_update_count": 173,
+  "car3d_update_hz": 22.66528234633719,
+  "car3d_update_mean_ms": 16.187044508693216,
+  "paint_count": 169,
+  "paint_hz": 22.141229575323614,
+  "paint_mean_ms": 13.229073964541287
+}

@@ -1,0 +1,565 @@
+{
+  "elapsed_s": 7.636389399998734,
+  "top": [
+    {
+      "func": "~:0:<built-in method exec>",
+      "cc": 1,
+      "nc": 1,
+      "tt": 2.2932481,
+      "ct": 7.636340000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:24917:_tick",
+      "cc": 146,
+      "nc": 146,
+      "tt": 0.0055319,
+      "ct": 3.0706672000000004
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:25033:_update_frame",
+      "cc": 137,
+      "nc": 137,
+      "tt": 0.0043355,
+      "ct": 3.0297519000000004
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:23733:update_frame",
+      "cc": 137,
+      "nc": 137,
+      "tt": 0.0086155,
+      "ct": 3.0134928000000003
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:12157:update_frame",
+      "cc": 137,
+      "nc": 137,
+      "tt": 0.22297,
+      "ct": 2.9880962
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:845:paintGL",
+      "cc": 138,
+      "nc": 138,
+      "tt": 0.0016491000000000001,
+      "ct": 2.2579051000000003
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\GLViewWidget.py:213:paintGL",
+      "cc": 138,
+      "nc": 138,
+      "tt": 0.0009886,
+      "ct": 2.2542572
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\GLViewWidget.py:219:paint",
+      "cc": 138,
+      "nc": 138,
+      "tt": 0.0150218,
+      "ct": 2.2524493000000003
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:857:drawItemTree",
+      "cc": 138,
+      "nc": 8914,
+      "tt": 0.10764770000000001,
+      "ct": 2.2319861000000003
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\items\\GLMeshItem.py:233:paint",
+      "cc": 7452,
+      "nc": 7452,
+      "tt": 0.8027971,
+      "ct": 1.7961166000000002
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:12524:_set_mesh_from_segment",
+      "cc": 4384,
+      "nc": 4384,
+      "tt": 0.0084201,
+      "ct": 0.31253790000000004
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\items\\GLLinePlotItem.py:145:paint",
+      "cc": 1324,
+      "nc": 1324,
+      "tt": 0.1477579,
+      "ct": 0.2808549
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:7635:_wheel_tire_face_colors_local",
+      "cc": 548,
+      "nc": 548,
+      "tt": 0.1874809,
+      "ct": 0.26251420000000003
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\OpenGL\\GL\\VERSION\\GL_2_0.py:483:glVertexAttribPointer",
+      "cc": 20864,
+      "nc": 20864,
+      "tt": 0.2084408,
+      "ct": 0.2602117
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\GLGraphicsItem.py:254:setupGLState",
+      "cc": 8776,
+      "nc": 8776,
+      "tt": 0.22639450000000003,
+      "ct": 0.2330045
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:12462:_segment_transform_y",
+      "cc": 4384,
+      "nc": 4384,
+      "tt": 0.0426269,
+      "ct": 0.18326900000000002
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:6997:_scene_grade_color_array",
+      "cc": 411,
+      "nc": 411,
+      "tt": 0.1111091,
+      "ct": 0.1540049
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\fromnumeric.py:89:_wrapreduction_any_all",
+      "cc": 71876,
+      "nc": 71876,
+      "tt": 0.0584131,
+      "ct": 0.1479356
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:12355:_solver_local_point",
+      "cc": 8768,
+      "nc": 8768,
+      "tt": 0.0079777,
+      "ct": 0.1462778
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:471:_set_gl_mesh_item_static_transform",
+      "cc": 5480,
+      "nc": 5480,
+      "tt": 0.0473456,
+      "ct": 0.1459057
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\numeric.py:1556:cross",
+      "cc": 4232,
+      "nc": 4232,
+      "tt": 0.0479196,
+      "ct": 0.1449226
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\fromnumeric.py:2589:all",
+      "cc": 56258,
+      "nc": 56258,
+      "tt": 0.026487300000000002,
+      "ct": 0.14275790000000002
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:1851:_sample_point_local",
+      "cc": 10412,
+      "nc": 10412,
+      "tt": 0.006296400000000001,
+      "ct": 0.1365474
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:13178:_wishbone_payloads_from_quads",
+      "cc": 274,
+      "nc": 274,
+      "tt": 0.0029022,
+      "ct": 0.13220110000000002
+    },
+    {
+      "func": "~:0:<built-in method numpy.asarray>",
+      "cc": 314515,
+      "nc": 314515,
+      "tt": 0.1294046,
+      "ct": 0.1294046
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\playback_sampling.py:128:lerp_point_row",
+      "cc": 10412,
+      "nc": 10412,
+      "tt": 0.06578160000000001,
+      "ct": 0.1289959
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:5965:_wishbone_plate_mesh",
+      "cc": 1096,
+      "nc": 1096,
+      "tt": 0.02092,
+      "ct": 0.1287887
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\geom3d_helpers.py:204:derive_wheel_pose_from_hardpoints",
+      "cc": 548,
+      "nc": 548,
+      "tt": 0.011751600000000001,
+      "ct": 0.127286
+    },
+    {
+      "func": "~:0:<method 'reduce' of 'numpy.ufunc' objects>",
+      "cc": 85342,
+      "nc": 85342,
+      "tt": 0.1261581,
+      "ct": 0.1261581
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:5782:_road_face_colors",
+      "cc": 137,
+      "nc": 137,
+      "tt": 0.057468500000000006,
+      "ct": 0.11906000000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:12556:_set_poly_mesh",
+      "cc": 1918,
+      "nc": 1918,
+      "tt": 0.00333,
+      "ct": 0.11633750000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:401:_update_gl_mesh_item_fast",
+      "cc": 1918,
+      "nc": 1918,
+      "tt": 0.0400212,
+      "ct": 0.11218460000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\geom3d_helpers.py:764:road_grid_line_segments",
+      "cc": 137,
+      "nc": 137,
+      "tt": 0.05803440000000001,
+      "ct": 0.1068767
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\items\\GLMeshItem.py:144:upload_vertex_buffers",
+      "cc": 1972,
+      "nc": 1972,
+      "tt": 0.006220600000000001,
+      "ct": 0.1009073
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:10072:_contact_bounce_material_rgba",
+      "cc": 1644,
+      "nc": 1644,
+      "tt": 0.0155887,
+      "ct": 0.09313980000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\items\\GLMeshItem.py:146:upload_vbo",
+      "cc": 8270,
+      "nc": 8270,
+      "tt": 0.0138002,
+      "ct": 0.0909245
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\linalg\\_linalg.py:2623:norm",
+      "cc": 25975,
+      "nc": 25975,
+      "tt": 0.050334300000000005,
+      "ct": 0.09069490000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\fromnumeric.py:2241:clip",
+      "cc": 17425,
+      "nc": 17425,
+      "tt": 0.013532500000000001,
+      "ct": 0.0879665
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\numeric.py:1482:moveaxis",
+      "cc": 12696,
+      "nc": 12696,
+      "tt": 0.0236454,
+      "ct": 0.08739250000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:6790:_smooth_rgba",
+      "cc": 11508,
+      "nc": 11508,
+      "tt": 0.041333800000000004,
+      "ct": 0.0865002
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\geom3d_helpers.py:829:road_crossbar_line_segments_from_profiles",
+      "cc": 137,
+      "nc": 137,
+      "tt": 0.0444432,
+      "ct": 0.08500440000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\fromnumeric.py:51:_wrapfunc",
+      "cc": 20030,
+      "nc": 20030,
+      "tt": 0.012632500000000001,
+      "ct": 0.0836173
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:7124:_cylinder_gas_glass_rgba",
+      "cc": 4384,
+      "nc": 4384,
+      "tt": 0.021653500000000003,
+      "ct": 0.07990140000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:6022:_deformed_wheel_vertices",
+      "cc": 548,
+      "nc": 548,
+      "tt": 0.054908500000000006,
+      "ct": 0.0750459
+    },
+    {
+      "func": "~:0:<method 'size' of 'PySide6.QtOpenGL.QOpenGLBuffer' objects>",
+      "cc": 10366,
+      "nc": 10366,
+      "tt": 0.07328380000000001,
+      "ct": 0.07328380000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:1662:_sample_series_local",
+      "cc": 10960,
+      "nc": 10960,
+      "tt": 0.022049000000000003,
+      "ct": 0.0702904
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:10103:_apply_mesh_material",
+      "cc": 4384,
+      "nc": 4384,
+      "tt": 0.023734500000000002,
+      "ct": 0.0690135
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:5824:_rotation_from_y_to_vec",
+      "cc": 6028,
+      "nc": 6028,
+      "tt": 0.035005100000000004,
+      "ct": 0.0685047
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:12540:_set_disc_mesh",
+      "cc": 1096,
+      "nc": 1096,
+      "tt": 0.0023953,
+      "ct": 0.0684078
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\shaders.py:360:__enter__",
+      "cc": 7452,
+      "nc": 7452,
+      "tt": 0.0633117,
+      "ct": 0.0674527
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:7094:_scene_graded_rgba",
+      "cc": 5754,
+      "nc": 5754,
+      "tt": 0.016023100000000002,
+      "ct": 0.0666423
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\items\\GLMeshItem.py:173:parseMeshData",
+      "cc": 7452,
+      "nc": 7452,
+      "tt": 0.0178536,
+      "ct": 0.0616509
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:12587:_set_line_item_data",
+      "cc": 14933,
+      "nc": 14933,
+      "tt": 0.0131523,
+      "ct": 0.059447700000000006
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\shaders.py:405:__exit__",
+      "cc": 7452,
+      "nc": 7452,
+      "tt": 0.055992,
+      "ct": 0.0570412
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\numeric.py:1420:normalize_axis_tuple",
+      "cc": 25392,
+      "nc": 25392,
+      "tt": 0.0337535,
+      "ct": 0.0532371
+    },
+    {
+      "func": "~:0:<method 'clip' of 'numpy.ndarray' objects>",
+      "cc": 17425,
+      "nc": 17425,
+      "tt": 0.007570800000000001,
+      "ct": 0.052671100000000005
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\OpenGL\\GL\\shaders.py:92:__enter__",
+      "cc": 6430,
+      "nc": 6430,
+      "tt": 0.0500752,
+      "ct": 0.051633700000000005
+    },
+    {
+      "func": "~:0:<method 'append' of 'list' objects>",
+      "cc": 512332,
+      "nc": 512332,
+      "tt": 0.0508981,
+      "ct": 0.0508981
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\OpenGL\\GL\\shaders.py:95:__exit__",
+      "cc": 6430,
+      "nc": 6430,
+      "tt": 0.049042,
+      "ct": 0.0502017
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\geom3d_helpers.py:1200:cylinder_visual_state_from_packaging",
+      "cc": 1096,
+      "nc": 1096,
+      "tt": 0.0094823,
+      "ct": 0.049867800000000004
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:510:_scaled_basis_transform3d",
+      "cc": 5480,
+      "nc": 5480,
+      "tt": 0.022532200000000002,
+      "ct": 0.049589900000000006
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\OpenGL\\contextdata.py:44:setValue",
+      "cc": 20864,
+      "nc": 20864,
+      "tt": 0.0266159,
+      "ct": 0.047682800000000004
+    },
+    {
+      "func": "~:0:<method 'reshape' of 'numpy.ndarray' objects>",
+      "cc": 162745,
+      "nc": 162745,
+      "tt": 0.0461646,
+      "ct": 0.0461646
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\_methods.py:98:_clip",
+      "cc": 17425,
+      "nc": 17425,
+      "tt": 0.0451003,
+      "ct": 0.0451003
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:2152:_palette_rgb",
+      "cc": 7672,
+      "nc": 7672,
+      "tt": 0.014024300000000002,
+      "ct": 0.045011
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\fromnumeric.py:69:_wrapreduction",
+      "cc": 8260,
+      "nc": 8260,
+      "tt": 0.0131491,
+      "ct": 0.0435322
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:6610:_wheel_tire_material_rgba",
+      "cc": 548,
+      "nc": 548,
+      "tt": 0.0079221,
+      "ct": 0.0433621
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:2136:_lerp_rgb",
+      "cc": 10893,
+      "nc": 10893,
+      "tt": 0.0195483,
+      "ct": 0.0421466
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:2144:_boost_rgb",
+      "cc": 9864,
+      "nc": 9864,
+      "tt": 0.011910700000000001,
+      "ct": 0.041855
+    },
+    {
+      "func": "~:0:<built-in method builtins.getattr>",
+      "cc": 213624,
+      "nc": 213654,
+      "tt": 0.0408921,
+      "ct": 0.040903600000000005
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\playback_sampling.py:60:lerp_series_value",
+      "cc": 10880,
+      "nc": 10880,
+      "tt": 0.0287406,
+      "ct": 0.040826600000000005
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\fromnumeric.py:3328:prod",
+      "cc": 5520,
+      "nc": 5520,
+      "tt": 0.005029700000000001,
+      "ct": 0.0399247
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\fromnumeric.py:2477:any",
+      "cc": 15618,
+      "nc": 15618,
+      "tt": 0.0071422000000000005,
+      "ct": 0.0388072
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:12494:_disc_transform_y",
+      "cc": 1096,
+      "nc": 1096,
+      "tt": 0.008075800000000001,
+      "ct": 0.0387022
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:7937:_spring_geometry_m",
+      "cc": 5480,
+      "nc": 5480,
+      "tt": 0.014940700000000001,
+      "ct": 0.0376458
+    },
+    {
+      "func": "~:0:<built-in method numpy.array>",
+      "cc": 48232,
+      "nc": 48232,
+      "tt": 0.0367351,
+      "ct": 0.0367351
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\Transform3D.py:12:__init__",
+      "cc": 10960,
+      "nc": 10960,
+      "tt": 0.0291876,
+      "ct": 0.0363526
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:2169:_heat_rgb",
+      "cc": 2740,
+      "nc": 2740,
+      "tt": 0.0106181,
+      "ct": 0.0354364
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\GLGraphicsItem.py:141:setTransform",
+      "cc": 5480,
+      "nc": 5480,
+      "tt": 0.0106865,
+      "ct": 0.0353523
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\lib\\_nanfunctions_impl.py:1227:nanpercentile",
+      "cc": 274,
+      "nc": 274,
+      "tt": 0.0011734,
+      "ct": 0.0346488
+    }
+  ]
+}

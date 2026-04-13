@@ -1,0 +1,16 @@
+{
+  "roi_bbox_absolute": [
+    560,
+    260,
+    1180,
+    860
+  ],
+  "roi_shape": [
+    600,
+    620,
+    3
+  ],
+  "identical_adjacent_ratio_roi": 0.5930232558139535,
+  "mean_changed_px_ratio_roi": 0.09841391597899474,
+  "mean_changed_px_ratio_roi_thr8": 0.049850900225056255
+}

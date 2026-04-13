@@ -1,0 +1,752 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from pneumo_solver_ui.desktop_optimizer_model import (
+    build_contract_snapshot,
+    build_optimizer_session_defaults,
+)
+from pneumo_solver_ui.desktop_optimizer_runtime import DesktopOptimizerRuntime
+from pneumo_solver_ui.optimization_run_history import OptimizationRunSummary
+from pneumo_solver_ui.desktop_shell.launcher_catalog import build_desktop_launch_catalog
+from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
+
+
+ROOT = Path(__file__).resolve().parents[1]
+UI_ROOT = ROOT / "pneumo_solver_ui"
+
+
+def test_desktop_optimizer_center_is_registered_as_hosted_shell_tool() -> None:
+    specs = build_desktop_shell_specs()
+    by_key = {spec.key: spec for spec in specs}
+
+    assert "desktop_optimizer_center" in by_key
+    spec = by_key["desktop_optimizer_center"]
+    assert spec.mode == "hosted"
+    assert spec.group == "Встроенные окна"
+    assert spec.standalone_module == "pneumo_solver_ui.tools.desktop_optimizer_center"
+    assert spec.create_hosted is not None
+
+    catalog_modules = {item.module for item in build_desktop_launch_catalog(include_mnemo=False)}
+    assert "pneumo_solver_ui.tools.desktop_optimizer_center" in catalog_modules
+
+
+def test_root_desktop_optimizer_center_wrappers_delegate_to_launcher() -> None:
+    cmd = (ROOT / "START_DESKTOP_OPTIMIZER_CENTER.cmd").read_text(
+        encoding="utf-8",
+        errors="replace",
+    ).lower()
+    vbs = (ROOT / "START_DESKTOP_OPTIMIZER_CENTER.vbs").read_text(
+        encoding="utf-8",
+        errors="replace",
+    ).lower()
+    pyw = (ROOT / "START_DESKTOP_OPTIMIZER_CENTER.pyw").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    py = (ROOT / "START_DESKTOP_OPTIMIZER_CENTER.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert "start_desktop_optimizer_center.vbs" in cmd or "start_desktop_optimizer_center.pyw" in cmd
+    assert "wscript.shell" in vbs
+    assert "start_desktop_optimizer_center.pyw" in vbs
+    assert 'Path(__file__).with_name("START_DESKTOP_OPTIMIZER_CENTER.py")' in pyw
+    assert 'MODULE = "pneumo_solver_ui.tools.desktop_optimizer_center"' in py
+
+
+def test_desktop_optimizer_defaults_seed_stage_and_distributed_knobs() -> None:
+    defaults = build_optimizer_session_defaults(cpu_count=8, platform_name="win32")
+
+    assert defaults["opt_use_staged"] is True
+    assert defaults["opt_launch_profile"] == "stage_triage"
+    assert defaults["opt_backend"] == "Dask"
+    assert defaults["opt_budget"] > 0
+    assert defaults["ui_seed_candidates"] > 0
+    assert defaults["stage_policy_mode"]
+    assert defaults["dask_mode"]
+    assert defaults["ray_mode"]
+    assert "opt_botorch_n_init" in defaults
+    assert defaults["opt_handoff_sort_mode"]
+    assert defaults["opt_finished_sort_mode"]
+    assert defaults["opt_packaging_sort_mode"]
+
+
+def test_desktop_optimizer_contract_snapshot_reads_default_contract() -> None:
+    session_state = build_optimizer_session_defaults(cpu_count=8, platform_name="win32")
+    snapshot = build_contract_snapshot(session_state, ui_root=UI_ROOT)
+
+    assert snapshot.workspace_dir.name == "workspace"
+    assert snapshot.model_path.exists()
+    assert snapshot.worker_path.exists()
+    assert snapshot.base_json_path.exists()
+    assert snapshot.ranges_json_path.exists()
+    assert snapshot.suite_json_path.exists()
+    assert snapshot.search_param_count > 0
+    assert snapshot.enabled_suite_total > 0
+    assert snapshot.objective_keys
+    assert snapshot.penalty_key
+    assert snapshot.problem_hash_mode
+
+
+def test_desktop_optimizer_runtime_builds_stage_and_coordinator_previews() -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+
+    runtime.update_state({"opt_use_staged": True, "use_staged_opt": True})
+    stage_preview = runtime.command_preview_text()
+    assert "opt_stage_runner_v1.py" in stage_preview
+    assert "--stage_policy_mode" in stage_preview
+
+    runtime.update_state({"opt_use_staged": False, "use_staged_opt": False, "opt_backend": "Ray"})
+    coord_preview = runtime.command_preview_text()
+    assert "dist_opt_coordinator.py" in coord_preview
+    assert "--backend ray" in coord_preview
+    assert "--budget" in coord_preview
+    assert runtime.handoff_overview_rows() == []
+
+
+def test_desktop_optimizer_runtime_binds_selected_history_run_as_resume_target(tmp_path: Path) -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+
+    staged_run = tmp_path / "opt_runs" / "staged" / "p_stage_resume"
+    staged_run.mkdir(parents=True)
+    runtime.bind_selected_run_dir(staged_run)
+    staged_summary = runtime.resume_target_summary()
+
+    assert runtime.session_state["__opt_history_selected_run_dir"] == str(staged_run.resolve())
+    assert runtime.session_state["opt_dist_run_id"] == ""
+    assert staged_summary["selected_pipeline"] == "staged"
+    assert staged_summary["selected_run_name"] == "p_stage_resume"
+
+    coord_run = tmp_path / "opt_runs" / "coord" / "p_coord_resume"
+    coord_run.mkdir(parents=True)
+    (coord_run / "run_id.txt").write_text("run_target_42", encoding="utf-8")
+    runtime.bind_selected_run_dir(coord_run)
+    coord_summary = runtime.resume_target_summary()
+
+    assert runtime.session_state["__opt_history_selected_run_dir"] == str(coord_run.resolve())
+    assert runtime.session_state["opt_dist_run_id"] == "run_target_42"
+    assert coord_summary["selected_pipeline"] == "coordinator"
+    assert coord_summary["selected_run_id"] == "run_target_42"
+
+
+def test_desktop_optimizer_runtime_can_apply_selected_run_contract_to_launch_state(tmp_path: Path) -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+    summary = OptimizationRunSummary(
+        run_dir=tmp_path / "coord_run",
+        pipeline_mode="coordinator",
+        backend="Ray",
+        status="done",
+        status_label="DONE",
+        started_at="",
+        updated_ts=0.0,
+        objective_keys=("comfort", "roll", "energy"),
+        penalty_key="penalty_total",
+        penalty_tol=0.25,
+        problem_hash_mode="legacy",
+    )
+
+    updates = runtime.apply_run_contract(summary)
+
+    assert updates["opt_objectives"] == "comfort\nroll\nenergy"
+    assert updates["opt_penalty_key"] == "penalty_total"
+    assert updates["opt_penalty_tol"] == 0.25
+    assert updates["settings_opt_problem_hash_mode"] == "legacy"
+    assert runtime.session_state["opt_objectives"] == "comfort\nroll\nenergy"
+    assert runtime.session_state["opt_penalty_key"] == "penalty_total"
+    assert runtime.session_state["opt_penalty_tol"] == 0.25
+    assert runtime.session_state["settings_opt_problem_hash_mode"] == "legacy"
+
+
+def test_desktop_optimizer_runtime_can_apply_operator_launch_profile() -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+
+    updates = runtime.apply_launch_profile("coord_dask_explore")
+    summary = runtime.launch_profile_summary()
+
+    assert updates["opt_launch_profile"] == "coord_dask_explore"
+    assert runtime.session_state["opt_use_staged"] is False
+    assert runtime.session_state["use_staged_opt"] is False
+    assert runtime.session_state["opt_backend"] == "Dask"
+    assert runtime.session_state["opt_budget"] == 300
+    assert runtime.session_state["dask_workers"] >= 1
+    assert summary["profile_label"] == "Coordinator / Dask Explore"
+    assert summary["launch_pipeline"] == "coordinator"
+
+    runtime.update_state({"opt_budget": 111})
+    drifted_summary = runtime.launch_profile_summary()
+    assert "opt_budget" in drifted_summary["drift_keys"]
+
+
+def test_desktop_optimizer_runtime_builds_contract_drift_summary(tmp_path: Path) -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+    current_snapshot = runtime.contract_snapshot()
+    summary = OptimizationRunSummary(
+        run_dir=tmp_path / "coord_drift",
+        pipeline_mode="coordinator",
+        backend="Distributed coordinator",
+        status="done",
+        status_label="DONE",
+        started_at="",
+        updated_ts=0.0,
+        objective_keys=("comfort", "roll"),
+        penalty_key="penalty_other",
+        penalty_tol=float(current_snapshot.penalty_tol) + 1.0,
+        problem_hash="DIFFERENT_SCOPE_HASH",
+        problem_hash_mode="legacy" if str(current_snapshot.problem_hash_mode) == "stable" else "stable",
+        baseline_source_kind="artifact",
+        baseline_source_label="different_baseline",
+    )
+
+    drift = runtime.contract_drift_summary(summary)
+
+    assert "objective stack" in drift["diff_bits"]
+    assert "penalty key" in drift["diff_bits"]
+    assert "penalty tol" in drift["diff_bits"]
+    assert drift["scope_payload"]["compatibility"] == "different"
+    assert drift["scope_payload"]["mode_compatibility"] == "different"
+    assert drift["baseline_compatibility"] == "different"
+
+
+def test_desktop_optimizer_runtime_builds_launch_readiness_summary(tmp_path: Path) -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+    runtime.workspace_dir = tmp_path
+
+    coord_run = tmp_path / "opt_runs" / "coord" / "p_readiness_partial"
+    (coord_run / "export").mkdir(parents=True)
+    (coord_run / "coordinator.log").write_text("coord readiness log", encoding="utf-8")
+    (coord_run / "export" / "trials.csv").write_text(
+        (
+            "status,anim_export_packaging_status,anim_export_packaging_truth_ready,"
+            "верификация_флаги,число_runtime_fallback_пружины,"
+            "число_пересечений_пружина_цилиндр,число_пересечений_пружина_пружина\n"
+            "DONE,partial,0,spring_host_clearance,1,1,0\n"
+        ),
+        encoding="utf-8",
+    )
+
+    readiness = runtime.launch_readiness_summary()
+    by_title = {
+        str(row.get("title") or ""): dict(row)
+        for row in tuple(readiness.get("rows") or ())
+    }
+
+    assert readiness["warn_count"] >= 1
+    assert readiness["headline"] == "Review blockers before launch."
+    assert readiness["next_action"] == "Packaging"
+    assert by_title["Packaging evidence"]["status"] == "warn"
+    assert by_title["Selected run alignment"]["status"] == "info"
+    assert by_title["Runtime state"]["status"] == "ok"
+
+
+def test_desktop_optimizer_runtime_tracks_latest_pointer_flow(tmp_path: Path) -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+    runtime.workspace_dir = tmp_path
+
+    coord_run = tmp_path / "opt_runs" / "coord" / "p_pointer_ready"
+    (coord_run / "export").mkdir(parents=True)
+    (coord_run / "coordinator.log").write_text("coord pointer log", encoding="utf-8")
+    (coord_run / "export" / "trials.csv").write_text(
+        (
+            "status,anim_export_packaging_status,anim_export_packaging_truth_ready,"
+            "верификация_флаги,число_runtime_fallback_пружины,"
+            "число_пересечений_пружина_цилиндр,число_пересечений_пружина_пружина\n"
+            "DONE,complete,1,,0,0,0\n"
+        ),
+        encoding="utf-8",
+    )
+    runtime.bind_selected_run_dir(coord_run)
+
+    summary = OptimizationRunSummary(
+        run_dir=coord_run,
+        pipeline_mode="coordinator",
+        backend="Ray",
+        status="done",
+        status_label="DONE",
+        started_at="",
+        updated_ts=0.0,
+        objective_keys=("comfort", "energy"),
+        penalty_key="penalty_total",
+        penalty_tol=0.1,
+        problem_hash_mode="stable",
+    )
+
+    pointer = runtime.save_run_pointer(summary)
+    latest = runtime.latest_pointer_summary()
+
+    assert Path(pointer["pointer_path"]).exists()
+    assert pointer["run_name"] == "p_pointer_ready"
+    assert pointer["selected_from"] == "desktop_optimizer_center"
+    assert pointer["selected_matches_pointer"] is True
+    assert pointer["pointer_in_history"] is True
+    assert latest["run_dir"] == str(coord_run.resolve())
+    assert latest["pipeline_mode"] == "coordinator"
+    assert latest["backend"] == "Ray"
+
+
+def test_desktop_optimizer_runtime_builds_selected_run_next_step_summary(tmp_path: Path) -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+    runtime.workspace_dir = tmp_path
+
+    staged_run = tmp_path / "opt_runs" / "staged" / "p_next_step"
+    staged_run.mkdir(parents=True)
+    (staged_run / "sp.json").write_text(
+        json.dumps({"status": "done", "ts": "2026-04-13T13:00:00"}),
+        encoding="utf-8",
+    )
+    (staged_run / "results_all.csv").write_text(
+        (
+            "status,anim_export_packaging_status,anim_export_packaging_truth_ready,"
+            "верификация_флаги,число_runtime_fallback_пружины,"
+            "число_пересечений_пружина_цилиндр,число_пересечений_пружина_пружина\n"
+            "DONE,complete,1,,0,0,0\n"
+        ),
+        encoding="utf-8",
+    )
+    handoff_dir = staged_run / "coordinator_handoff"
+    handoff_dir.mkdir()
+    (handoff_dir / "coordinator_handoff_plan.json").write_text(
+        json.dumps(
+            {
+                "recommended_backend": "ray",
+                "recommended_budget": 32,
+                "recommended_q": 1,
+                "recommended_proposer": "botorch",
+                "seed_count": 4,
+                "suite_analysis": {"family": "full_ring"},
+                "requires_full_ring_validation": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    runtime.bind_selected_run_dir(staged_run)
+
+    summary = runtime.selected_run_next_step_summary(staged_run)
+    by_title = {
+        str(row.get("title") or ""): dict(row)
+        for row in tuple(summary.get("rows") or ())
+    }
+
+    assert summary["headline"] == "Selected staged run is ready for coordinator continuation."
+    assert summary["next_action"] == "Handoff"
+    assert summary["next_action_kind"] == "show_handoff_tab"
+    assert by_title["Packaging route"]["status"] == "ok"
+    assert by_title["Continuation route"]["status"] == "ok"
+    assert by_title["Latest pointer"]["action_kind"] == "make_latest_pointer"
+
+
+def test_desktop_optimizer_runtime_builds_finished_jobs_packaging_view(tmp_path: Path) -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+    runtime.workspace_dir = tmp_path
+
+    staged_run = tmp_path / "opt_runs" / "staged" / "p_stage_done"
+    staged_run.mkdir(parents=True)
+    (staged_run / "sp.json").write_text(
+        json.dumps({"status": "done", "ts": "2026-04-13T10:00:00"}),
+        encoding="utf-8",
+    )
+    (staged_run / "results_all.csv").write_text(
+        (
+            "status,anim_export_packaging_status,anim_export_packaging_truth_ready,"
+            "верификация_флаги,число_runtime_fallback_пружины,"
+            "число_пересечений_пружина_цилиндр,число_пересечений_пружина_пружина\n"
+            "DONE,complete,1,,0,0,0\n"
+        ),
+        encoding="utf-8",
+    )
+
+    coord_run = tmp_path / "opt_runs" / "coord" / "p_coord_partial"
+    (coord_run / "export").mkdir(parents=True)
+    (coord_run / "coordinator.log").write_text("coord log", encoding="utf-8")
+    (coord_run / "export" / "trials.csv").write_text(
+        (
+            "status,anim_export_packaging_status,anim_export_packaging_truth_ready,"
+            "верификация_флаги,число_runtime_fallback_пружины,"
+            "число_пересечений_пружина_цилиндр,число_пересечений_пружина_пружина\n"
+            "DONE,partial,0,spring_host_clearance,1,1,0\n"
+            "ERROR,,,,,,\n"
+        ),
+        encoding="utf-8",
+    )
+
+    rows = runtime.finished_job_rows()
+    overview = runtime.finished_job_overview()
+
+    assert len(rows) == 2
+    assert rows[0]["run_dir"] == str(staged_run)
+    assert rows[0]["ready_state"] == "truth-ready"
+    assert overview["total_jobs"] == 2
+    assert overview["truth_ready_jobs"] == 1
+    assert overview["verification_pass_jobs"] == 1
+    assert overview["interference_jobs"] == 1
+
+    runtime.update_state({"opt_finished_truth_ready_only": True})
+    filtered_rows = runtime.finished_job_rows()
+    assert len(filtered_rows) == 1
+    assert filtered_rows[0]["run_dir"] == str(staged_run)
+
+    packaging_rows = runtime.packaging_rows()
+    packaging_overview = runtime.packaging_overview()
+    assert len(packaging_rows) == 2
+    assert packaging_rows[0]["run_dir"] == str(staged_run)
+    assert packaging_rows[0]["ready_state"] == "truth-ready"
+    assert packaging_overview["best_run"] == "p_stage_done"
+    assert packaging_overview["zero_interference_runs"] == 1
+    selected_packaging = runtime.selected_packaging_row(staged_run)
+    assert selected_packaging is not None
+    assert selected_packaging["runtime_fallback_rows"] == 0
+
+    runtime.update_state({"opt_packaging_zero_interference_only": True})
+    zero_risk_rows = runtime.packaging_rows()
+    assert len(zero_risk_rows) == 1
+    assert zero_risk_rows[0]["run_dir"] == str(staged_run)
+
+
+def test_desktop_optimizer_runtime_builds_handoff_candidate_view(tmp_path: Path) -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+    runtime.workspace_dir = tmp_path
+
+    staged_run = tmp_path / "opt_runs" / "staged" / "p_stage_handoff"
+    staged_run.mkdir(parents=True)
+    (staged_run / "sp.json").write_text(
+        json.dumps({"status": "done", "ts": "2026-04-13T11:00:00"}),
+        encoding="utf-8",
+    )
+    handoff_dir = staged_run / "coordinator_handoff"
+    handoff_dir.mkdir()
+    (handoff_dir / "coordinator_handoff_plan.json").write_text(
+        json.dumps(
+            {
+                "recommended_backend": "ray",
+                "recommended_budget": 64,
+                "recommended_q": 2,
+                "recommended_proposer": "botorch",
+                "seed_count": 5,
+                "suite_analysis": {"family": "full_ring"},
+                "requires_full_ring_validation": True,
+                "recommendation_reason": {
+                    "fragment_count": 2,
+                    "has_full_ring": True,
+                    "pipeline_hint": "staged_then_full_ring",
+                    "seed_bridge": {
+                        "staged_rows_ok": 9,
+                        "promotable_rows": 7,
+                        "unique_param_candidates": 6,
+                        "selection_pool": "pareto",
+                        "seed_count": 5,
+                    },
+                },
+                "cmd_args": [
+                    "--backend",
+                    "ray",
+                    "--proposer",
+                    "botorch",
+                    "--run-dir",
+                    str((tmp_path / "opt_runs" / "coord" / "p_coord_handoff").resolve()),
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    rows = runtime.handoff_overview_rows()
+    summary = runtime.handoff_overview_summary()
+    selected = runtime.selected_handoff_row(staged_run)
+
+    assert len(rows) == 1
+    assert rows[0]["run"] == "p_stage_handoff"
+    assert rows[0]["preset"] == "ray/botorch/q2"
+    assert rows[0]["full_ring"] == "yes"
+    assert rows[0]["seeds"] == 5
+    assert summary["total_candidates"] == 1
+    assert summary["best_run"] == "p_stage_handoff"
+    assert selected is not None
+    assert selected["budget"] == 64
+    assert selected["pool"] == "pareto"
+
+
+def test_desktop_optimizer_runtime_builds_operator_dashboard_snapshot(tmp_path: Path) -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+    runtime.workspace_dir = tmp_path
+
+    staged_run = tmp_path / "opt_runs" / "staged" / "p_dashboard"
+    staged_run.mkdir(parents=True)
+    (staged_run / "sp.json").write_text(
+        json.dumps({"status": "done", "ts": "2026-04-13T12:00:00"}),
+        encoding="utf-8",
+    )
+    (staged_run / "results_all.csv").write_text(
+        (
+            "status,anim_export_packaging_status,anim_export_packaging_truth_ready,"
+            "верификация_флаги,число_runtime_fallback_пружины,"
+            "число_пересечений_пружина_цилиндр,число_пересечений_пружина_пружина\n"
+            "DONE,complete,1,,0,0,0\n"
+        ),
+        encoding="utf-8",
+    )
+    handoff_dir = staged_run / "coordinator_handoff"
+    handoff_dir.mkdir()
+    (handoff_dir / "coordinator_handoff_plan.json").write_text(
+        json.dumps(
+            {
+                "recommended_backend": "ray",
+                "recommended_budget": 48,
+                "recommended_q": 1,
+                "recommended_proposer": "botorch",
+                "seed_count": 3,
+                "suite_analysis": {"family": "full_ring"},
+                "requires_full_ring_validation": True,
+                "recommendation_reason": {
+                    "fragment_count": 1,
+                    "has_full_ring": True,
+                    "pipeline_hint": "dashboard_test",
+                    "seed_bridge": {
+                        "staged_rows_ok": 4,
+                        "promotable_rows": 3,
+                        "unique_param_candidates": 3,
+                        "selection_pool": "pareto",
+                        "seed_count": 3,
+                    },
+                },
+                "cmd_args": [
+                    "--backend",
+                    "ray",
+                    "--run-dir",
+                    str((tmp_path / "opt_runs" / "coord" / "p_dashboard_handoff").resolve()),
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    snapshot = runtime.dashboard_snapshot()
+
+    assert snapshot["launch_profile"]["profile_label"]
+    assert snapshot["launch_readiness"]["headline"]
+    assert "latest_pointer" in snapshot
+    assert snapshot["selected_run_next_step"]["headline"]
+    assert snapshot["resume_target"]["launch_pipeline"] == "staged"
+    assert snapshot["best_finished_row"] is not None
+    assert snapshot["best_finished_row"]["name"] == "p_dashboard"
+    assert snapshot["best_handoff_row"] is not None
+    assert snapshot["best_handoff_row"]["run"] == "p_dashboard"
+    assert snapshot["best_packaging_row"] is not None
+    assert snapshot["best_packaging_row"]["name"] == "p_dashboard"
+
+
+def test_desktop_optimizer_center_keeps_tabbed_modular_architecture() -> None:
+    tool_src = (UI_ROOT / "tools" / "desktop_optimizer_center.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    model_src = (UI_ROOT / "desktop_optimizer_model.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    panels_src = (UI_ROOT / "desktop_optimizer_panels.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    runtime_src = (UI_ROOT / "desktop_optimizer_runtime.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    contract_tab_src = (UI_ROOT / "desktop_optimizer_tabs" / "contract_tab.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    dashboard_tab_src = (UI_ROOT / "desktop_optimizer_tabs" / "dashboard_tab.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    history_tab_src = (UI_ROOT / "desktop_optimizer_tabs" / "history_tab.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    finished_tab_src = (UI_ROOT / "desktop_optimizer_tabs" / "finished_tab.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    handoff_tab_src = (UI_ROOT / "desktop_optimizer_tabs" / "handoff_tab.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    packaging_tab_src = (UI_ROOT / "desktop_optimizer_tabs" / "packaging_tab.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    runtime_tab_src = (UI_ROOT / "desktop_optimizer_tabs" / "runtime_tab.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert "class DesktopOptimizerCenter" in tool_src
+    assert "ttk.Notebook" in tool_src
+    assert "DesktopOptimizerDashboardTab" in tool_src
+    assert "DesktopOptimizerContractTab" in tool_src
+    assert "DesktopOptimizerRuntimeTab" in tool_src
+    assert "DesktopOptimizerHistoryTab" in tool_src
+    assert "DesktopOptimizerFinishedTab" in tool_src
+    assert "DesktopOptimizerHandoffTab" in tool_src
+    assert "DesktopOptimizerPackagingTab" in tool_src
+    assert "DesktopOptimizerRuntime(" in tool_src
+    assert "def refresh_all(self) -> None:" in tool_src
+    assert "def refresh_contract(self) -> None:" in tool_src
+    assert "def refresh_history(self) -> None:" in tool_src
+    assert "def refresh_finished_jobs(self) -> None:" in tool_src
+    assert "def refresh_handoff(self) -> None:" in tool_src
+    assert "def refresh_packaging(self) -> None:" in tool_src
+    assert "def refresh_dashboard(self) -> None:" in tool_src
+    assert "self._sync_widget_state()" in tool_src
+    assert "def show_dashboard_tab(self) -> None:" in tool_src
+    assert "def show_contract_tab(self) -> None:" in tool_src
+    assert "def show_runtime_tab(self) -> None:" in tool_src
+    assert "def show_history_tab(self) -> None:" in tool_src
+    assert "def show_finished_tab(self) -> None:" in tool_src
+    assert "def show_handoff_tab(self) -> None:" in tool_src
+    assert "def show_packaging_tab(self) -> None:" in tool_src
+    assert "def _format_launch_profile_text(self) -> str:" in tool_src
+    assert "def _format_launch_readiness_text(self, readiness: dict[str, Any]) -> str:" in tool_src
+    assert "def _format_dashboard_pointer_text(self, dashboard: dict[str, Any]) -> str:" in tool_src
+    assert "def _format_selected_run_next_step_text(self, payload: dict[str, Any]) -> str:" in tool_src
+    assert "def _format_selected_contract_drift_text(self) -> str:" in tool_src
+    assert "def _format_dashboard_workspace_text(self) -> str:" in tool_src
+    assert "def _format_dashboard_runtime_text(self, dashboard: dict[str, Any]) -> str:" in tool_src
+    assert "def _format_handoff_summary_text(self) -> str:" in tool_src
+    assert "def _format_finished_overview_text(self) -> str:" in tool_src
+    assert "def _format_packaging_overview_text(self) -> str:" in tool_src
+    assert "def _format_resume_target_text(self) -> str:" in tool_src
+    assert "def follow_launch_readiness_next_action(self) -> None:" in tool_src
+    assert "def follow_selected_run_next_step(self) -> None:" in tool_src
+    assert "def open_latest_optimization_pointer(self) -> None:" in tool_src
+    assert "def make_selected_run_latest_pointer(self) -> None:" in tool_src
+    assert "self.runtime.bind_selected_run_dir(self._selected_run_dir)" in tool_src
+    assert "def open_selected_results(self) -> None:" in tool_src
+    assert "def open_selected_objective_contract(self) -> None:" in tool_src
+    assert "def apply_selected_run_contract(self) -> None:" in tool_src
+    assert "def apply_launch_profile_label(self, label: str) -> None:" in tool_src
+    assert "def on_finished_selection_changed(self) -> None:" in tool_src
+    assert "def on_handoff_selection_changed(self) -> None:" in tool_src
+    assert "def on_packaging_selection_changed(self) -> None:" in tool_src
+    assert "def open_selected_handoff_plan(self) -> None:" in tool_src
+    assert "def _schedule_poll(self) -> None:" in tool_src
+    assert "def on_host_close(self) -> None:" in tool_src
+
+    assert "class DesktopOptimizerContractSnapshot" in model_src
+    assert "DESKTOP_OPTIMIZER_PROFILE_OPTIONS" in model_src
+    assert "FINISHED_JOB_SORT_OPTIONS" in model_src
+    assert "PACKAGING_SORT_OPTIONS" in model_src
+    assert "def apply_launch_profile(" in model_src
+    assert "def build_contract_snapshot(" in model_src
+    assert "def build_stage_policy_blueprint_rows(" in model_src
+
+    assert "class DesktopOptimizerRuntime" in runtime_src
+    assert "def apply_launch_profile(self, profile_key: str) -> dict[str, Any]:" in runtime_src
+    assert "def launch_profile_summary(self) -> dict[str, Any]:" in runtime_src
+    assert "def launch_readiness_summary(self) -> dict[str, Any]:" in runtime_src
+    assert "def save_run_pointer(" in runtime_src
+    assert "def latest_pointer_summary(self) -> dict[str, Any]:" in runtime_src
+    assert "def selected_run_next_step_summary(" in runtime_src
+    assert "def contract_drift_summary(self, summary: OptimizationRunSummary | None) -> dict[str, Any]:" in runtime_src
+    assert "def finished_job_rows(self) -> list[dict[str, Any]]:" in runtime_src
+    assert "def finished_job_overview(self) -> dict[str, Any]:" in runtime_src
+    assert "def packaging_rows(self) -> list[dict[str, Any]]:" in runtime_src
+    assert "def packaging_overview(self) -> dict[str, Any]:" in runtime_src
+    assert "def selected_packaging_row(" in runtime_src
+    assert "def dashboard_snapshot(self) -> dict[str, Any]:" in runtime_src
+    assert "def handoff_overview_summary(self) -> dict[str, Any]:" in runtime_src
+    assert "def selected_handoff_row(" in runtime_src
+    assert "def command_preview_text(self) -> str:" in runtime_src
+    assert "def active_job_surface(self) -> dict[str, Any]:" in runtime_src
+    assert "def bind_selected_run_dir(self, run_dir: Path | str | None) -> None:" in runtime_src
+    assert "def resume_target_summary(self) -> dict[str, Any]:" in runtime_src
+    assert "def apply_run_contract(self, summary: OptimizationRunSummary) -> dict[str, Any]:" in runtime_src
+    assert "def selected_run_details(" in runtime_src
+
+    assert "class HandoffTreePanel" in panels_src
+    assert "class PackagingTreePanel" in panels_src
+    assert "class DesktopOptimizerDashboardTab" in dashboard_tab_src
+    assert "class DesktopOptimizerContractTab" in contract_tab_src
+    assert "class DesktopOptimizerRuntimeTab" in runtime_tab_src
+    assert "class DesktopOptimizerHistoryTab" in history_tab_src
+    assert "class DesktopOptimizerFinishedTab" in finished_tab_src
+    assert "class DesktopOptimizerHandoffTab" in handoff_tab_src
+    assert "class DesktopOptimizerPackagingTab" in packaging_tab_src
+    assert 'text="Selected run drift vs current launch"' in contract_tab_src
+    assert 'text="Apply selected contract"' in contract_tab_src
+    assert 'text="Quick navigation"' in dashboard_tab_src
+    assert 'text="Workspace operator snapshot"' in dashboard_tab_src
+    assert 'text="Launch readiness / operator checklist"' in dashboard_tab_src
+    assert 'text="Latest optimization pointer"' in dashboard_tab_src
+    assert 'text="Selected run next step"' in dashboard_tab_src
+    assert 'text="Latest pointer JSON"' in dashboard_tab_src
+    assert 'text="Next selected-run step"' in dashboard_tab_src
+    assert 'text="Best packaging run"' in dashboard_tab_src
+    assert 'values=("stable", "legacy")' in contract_tab_src
+    assert 'text="Launch profiles"' in runtime_tab_src
+    assert 'text="Apply profile"' in runtime_tab_src
+    assert 'text="Launch readiness"' in runtime_tab_src
+    assert 'text="Next recommended surface"' in runtime_tab_src
+    assert 'text="Resume target"' in runtime_tab_src
+    assert "HANDOFF_SORT_OPTIONS" in history_tab_src
+    assert 'text="Handoff overview"' in history_tab_src
+    assert 'text="Открыть results"' in history_tab_src
+    assert 'text="Objective contract"' in history_tab_src
+    assert 'text="Apply contract"' in history_tab_src
+    assert 'text="Make latest pointer"' in history_tab_src
+    assert 'text="Handoff plan"' in history_tab_src
+    assert 'text="Finished jobs filters"' in finished_tab_src
+    assert 'text="Make latest pointer"' in finished_tab_src
+    assert 'text="Packaging ranking"' in finished_tab_src
+    assert 'text="Handoff candidate filters"' in handoff_tab_src
+    assert 'text="Make latest pointer"' in handoff_tab_src
+    assert 'text="Continuation ranking"' in handoff_tab_src
+    assert 'text="Packaging filters"' in packaging_tab_src
+    assert 'text="Make latest pointer"' in packaging_tab_src
+    assert 'text="Readiness ranking"' in packaging_tab_src

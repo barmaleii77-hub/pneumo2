@@ -27,6 +27,8 @@ from typing import Dict, Tuple
 
 import streamlit as st
 
+from .spring_table import build_spring_geometry_reference
+
 from .suspension_family_contract import (
     FAMILY_ORDER,
     SPRING_STATIC_MODE_AUTO_MIDSTROKE,
@@ -208,42 +210,59 @@ def run() -> None:
     pitch_m = float(pitch_mm) / 1000.0
     G_Pa = float(G_GPa) * 1e9
 
-    k_N_m = _spring_rate_N_per_m(G_Pa, d_wire_m, D_mean_m, N_active)
-    k_N_mm = k_N_m / 1000.0 if math.isfinite(k_N_m) else float("nan")
-
-    L_solid = _solid_length_m(N_total, d_wire_m)
-    L_free_from_pitch = _free_length_from_pitch_m(N_total, pitch_m, d_wire_m)
-
-    tau_max = _max_shear_stress_Pa(F_max, D_mean_m, d_wire_m)
+    geometry = build_spring_geometry_reference(
+        d_wire_m=d_wire_m,
+        D_mean_m=D_mean_m,
+        N_active=float(N_active),
+        N_total=float(N_total),
+        pitch_m=pitch_m,
+        G_Pa=G_Pa,
+        F_max_N=float(F_max),
+    )
 
     st.subheader("Расчёт")
 
     cA, cB, cC = st.columns([1, 1, 1])
     with cA:
-        st.metric("k (N/mm)", f"{k_N_mm:.3g}" if math.isfinite(k_N_mm) else "—")
-        st.metric("k (N/m)", f"{k_N_m:.3g}" if math.isfinite(k_N_m) else "—")
+        st.metric(
+            "k (N/mm)",
+            f"{geometry.rate_N_per_mm:.3g}" if math.isfinite(geometry.rate_N_per_mm) else "—",
+        )
+        st.metric(
+            "k (N/m)",
+            f"{geometry.rate_N_per_m:.3g}" if math.isfinite(geometry.rate_N_per_m) else "—",
+        )
 
     with cB:
-        st.metric("L_solid (mm)", f"{L_solid*1000.0:.2f}" if math.isfinite(L_solid) else "—")
+        st.metric(
+            "L_solid (mm)",
+            f"{geometry.solid_length_m * 1000.0:.2f}"
+            if math.isfinite(geometry.solid_length_m)
+            else "—",
+        )
         st.metric(
             "L_free из pitch (mm)",
-            f"{L_free_from_pitch*1000.0:.2f}" if math.isfinite(L_free_from_pitch) else "—",
+            f"{geometry.free_length_from_pitch_m * 1000.0:.2f}"
+            if math.isfinite(geometry.free_length_from_pitch_m)
+            else "—",
         )
 
     with cC:
         st.metric(
             "τ_max (МПа)",
-            f"{tau_max/1e6:.1f}" if math.isfinite(tau_max) else "—",
+            f"{geometry.max_shear_stress_Pa / 1e6:.1f}"
+            if math.isfinite(geometry.max_shear_stress_Pa)
+            else "—",
         )
-        if math.isfinite(d_wire_m) and d_wire_m > 0:
-            C = D_mean_m / d_wire_m
-            st.metric("Spring index C=D/d", f"{C:.2f}" if math.isfinite(C) else "—")
+        st.metric(
+            "Spring index C=D/d",
+            f"{geometry.spring_index:.2f}" if math.isfinite(geometry.spring_index) else "—",
+        )
 
-    if math.isfinite(L_solid) and math.isfinite(L_free_from_pitch):
-        delta_bind = L_free_from_pitch - L_solid
+    if math.isfinite(geometry.solid_length_m) and math.isfinite(geometry.free_length_from_pitch_m):
         st.write(
             {
-                "delta_to_bind_mm": float(delta_bind * 1000.0),
+                "delta_to_bind_mm": float(geometry.bind_travel_margin_m * 1000.0),
                 "note": "Если delta_to_bind отрицательная — витки уже 'в солиде' при свободной длине (невозможно).",
             }
         )
@@ -261,7 +280,7 @@ def run() -> None:
         N_total=float(N_total),
         pitch_m=pitch_m,
         G_Pa=float(G_Pa),
-        L_solid_m=float(L_solid) if math.isfinite(L_solid) else 0.0,
+        L_solid_m=float(geometry.solid_length_m) if math.isfinite(geometry.solid_length_m) else 0.0,
         margin_bind_m=float(margin_bind_mm) / 1000.0,
     )
 

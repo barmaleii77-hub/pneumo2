@@ -69,6 +69,43 @@ def test_default_ranges_exclude_non_design_keys_and_cover_current_base() -> None
     ]:
         lo, hi = ranges[key]
         assert float(lo) <= float(base[key]) <= float(hi)
+    for key in [
+        "верх_Ц1_зад_z_относительно_рамы_м",
+        "верх_Ц1_перед_z_относительно_рамы_м",
+        "верх_Ц2_зад_z_относительно_рамы_м",
+        "верх_Ц2_перед_z_относительно_рамы_м",
+    ]:
+        assert float(ranges[key][1]) > float(base["высота_рамы"]), key
+
+
+def test_sanitize_ranges_strips_integrator_runtime_knobs_from_optimizer_space() -> None:
+    base = {
+        "макс_шаг_интегрирования_с": 3.0e-4,
+        "интегратор_rtol": 1e-3,
+        "интегратор_atol": 1e-7,
+        "интегратор_mass_rtol_scale_factor": 2.0,
+        "интегратор_err_group_weight_mass": 0.92,
+        "пружина_масштаб": 0.18,
+    }
+    ranges = {
+        "макс_шаг_интегрирования_с": [1e-4, 5e-4],
+        "интегратор_rtol": [1e-4, 1e-2],
+        "интегратор_atol": [1e-8, 1e-6],
+        "интегратор_mass_rtol_scale_factor": [1.0, 3.0],
+        "интегратор_err_group_weight_mass": [0.8, 1.0],
+        "пружина_масштаб": [0.1, 0.3],
+    }
+
+    sanitized, audit = sanitize_ranges_for_optimization(base, ranges)
+
+    assert sanitized == {"пружина_масштаб": [0.1, 0.3]}
+    assert set(audit["removed_non_design_keys"]) >= {
+        "макс_шаг_интегрирования_с",
+        "интегратор_rtol",
+        "интегратор_atol",
+        "интегратор_mass_rtol_scale_factor",
+        "интегратор_err_group_weight_mass",
+    }
 
 
 def test_explicit_stage_numbers_do_not_push_disabled_stage0_to_minus_one() -> None:

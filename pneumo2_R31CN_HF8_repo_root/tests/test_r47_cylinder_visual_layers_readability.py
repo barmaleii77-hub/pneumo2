@@ -22,4 +22,12 @@ def test_outer_housing_shell_is_weakened_while_internal_layers_stay_readable() -
     assert 'body.setGLOptions("translucent")' in APP
     assert 'drawEdges=False' in APP
     assert 'color=(0.20, 0.74, 0.98, 0.08)' in APP
-    assert 'color=(1.00, 0.88, 0.22, 0.88)' in APP
+    assert 'color=(0.90, 0.96, 1.00, 0.78)' in APP
+    assert 'color=(0.34, 0.90, 1.00, 0.74)' in APP
+    assert 'color=(1.00, 0.80, 0.34, 0.74)' in APP
+    assert 'color=(1.00, 0.88, 0.22, 0.96)' in APP
+    assert 'rod_display_seg = self._rod_display_segment_from_packaging_state(packaging_state)' in APP
+    assert 'packaging_state.get("piston_center")' in APP
+    assert 'show_cylinder_internal_detail_lines = True' in APP
+    assert 'if rod_display_seg is not None:' in APP
+    assert 'rod_inner_seg = _rod_internal_centerline_vertices_from_packaging_state(packaging_state)' in APP

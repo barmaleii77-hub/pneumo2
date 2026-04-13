@@ -21,6 +21,10 @@ from pneumo_solver_ui.desktop_input_model import (
     DesktopInputFieldSpec,
     apply_desktop_quick_preset,
     apply_desktop_run_preset,
+    build_desktop_section_change_cards,
+    build_desktop_section_field_search_items,
+    build_desktop_section_issue_cards,
+    build_desktop_section_summary_cards,
     build_desktop_preview_surface,
     build_desktop_profile_diff,
     delete_desktop_profile,
@@ -28,6 +32,8 @@ from pneumo_solver_ui.desktop_input_model import (
     desktop_section_status_label,
     desktop_profile_dir_path,
     desktop_profile_display_name,
+    desktop_run_summary_path,
+    desktop_runs_dir_path,
     desktop_snapshot_dir_path,
     desktop_snapshot_display_name,
     default_base_json_path,
@@ -38,9 +44,11 @@ from pneumo_solver_ui.desktop_input_model import (
     find_desktop_field_matches,
     load_base_defaults,
     list_desktop_profile_paths,
+    list_desktop_run_dirs,
     list_desktop_snapshot_paths,
     load_base_with_defaults,
     load_desktop_profile,
+    load_desktop_run_summary,
     load_desktop_snapshot,
     preview_surface_label,
     quick_preset_description,
@@ -51,6 +59,35 @@ from pneumo_solver_ui.desktop_input_model import (
     save_desktop_profile,
     save_desktop_snapshot,
     save_base_payload,
+)
+from pneumo_solver_ui.desktop_run_setup_model import (
+    DESKTOP_RUN_CACHE_POLICY_OPTIONS,
+    DESKTOP_RUN_PROFILE_OPTIONS,
+    DESKTOP_RUN_RUNTIME_POLICY_OPTIONS,
+    describe_latest_preview_summary,
+    describe_run_launch_outlook,
+    describe_run_launch_recommendation,
+    describe_run_launch_route,
+    describe_selfcheck_gate_status,
+    describe_latest_selfcheck_summary,
+    apply_run_setup_profile,
+    cache_policy_description,
+    cache_policy_label,
+    describe_latest_run_summary,
+    describe_run_setup_snapshot,
+    run_profile_description,
+    run_profile_label,
+    runtime_policy_description,
+    runtime_policy_label,
+)
+from pneumo_solver_ui.desktop_run_setup_runtime import (
+    append_subprocess_log,
+    build_selfcheck_subject_signature,
+    build_run_log_path,
+    desktop_run_setup_cache_root,
+    desktop_run_setup_log_root,
+    desktop_single_run_cache_dir,
+    write_json_report_from_stdout,
 )
 
 
@@ -83,15 +120,19 @@ class ScrollableSection(ttk.Frame):
 
 
 class DesktopInputEditor:
-    def __init__(self) -> None:
-        self.root = tk.Tk()
-        self.root.title(f"Pneumo Input Editor — {RELEASE}")
-        self.root.geometry("1160x860")
-        self.root.minsize(1020, 760)
+    def __init__(self, host: tk.Misc | None = None, *, hosted: bool = False) -> None:
+        self._owns_root = host is None
+        self._hosted = bool(hosted or not self._owns_root)
+        self.root = host if host is not None else tk.Tk()
+        if self._owns_root:
+            self.root.title(f"Pneumo Input Editor — {RELEASE}")
+            self.root.geometry("1160x860")
+            self.root.minsize(1020, 760)
         self.ui_style = ttk.Style(self.root)
 
         self.current_source_path: Path = default_base_json_path()
         self.current_payload = load_base_with_defaults()
+        self.source_reference_payload = load_base_with_defaults()
         self.default_payload = load_base_defaults()
         self.vars: dict[str, tk.Variable] = {}
         self._widget_handles: dict[str, tuple[DesktopInputFieldSpec, ttk.Label]] = {}
@@ -133,9 +174,22 @@ class DesktopInputEditor:
         self.snapshot_name_var = tk.StringVar(value="перед_запуском")
         self.snapshot_hint_var = tk.StringVar()
         self.active_snapshot_path: Path | None = None
+        self.latest_preview_summary_var = tk.StringVar()
+        self.active_preview_report_path: Path | None = None
+        self.active_preview_log_path: Path | None = None
+        self.latest_selfcheck_summary_var = tk.StringVar()
+        self.active_selfcheck_report_path: Path | None = None
+        self.active_selfcheck_log_path: Path | None = None
+        self.latest_run_summary_var = tk.StringVar()
+        self.active_run_dir: Path | None = None
+        self.active_run_summary_path: Path | None = None
+        self.active_run_log_path: Path | None = None
+        self.active_run_cache_dir: Path | None = None
+        self.active_run_saved_files: dict[str, str] = {}
         self.compare_summary_var = tk.StringVar()
         self.compare_target_path: Path | None = None
         self.compare_diffs_by_key: dict[str, dict[str, object]] = {}
+        self.source_reference_diffs_by_key: dict[str, dict[str, object]] = {}
         self.config_summary_var = tk.StringVar()
         self.run_context_var = tk.StringVar()
         self.quick_preset_hint_var = tk.StringVar(
@@ -145,6 +199,14 @@ class DesktopInputEditor:
             value="История безопасных действий пока пуста."
         )
         self.route_summary_var = tk.StringVar()
+        self.section_summary_vars: dict[str, tk.StringVar] = {}
+        self.section_summary_labels: dict[str, ttk.Label] = {}
+        self.section_issue_buttons: dict[str, ttk.Button] = {}
+        self.section_restore_buttons: dict[str, ttk.Button] = {}
+        self.section_search_buttons: dict[str, ttk.Button] = {}
+        self.section_issue_focus_by_title: dict[str, str] = {}
+        self.section_change_focus_by_title: dict[str, str] = {}
+        self.field_restore_buttons: dict[str, ttk.Button] = {}
         self._safe_action_history: list[dict[str, object]] = []
         self.route_buttons: dict[str, ttk.Button] = {}
         self.field_search_var = tk.StringVar()
@@ -152,6 +214,7 @@ class DesktopInputEditor:
         self.field_search_summary_var = tk.StringVar(
             value="Введите часть названия, единицы измерения или описания параметра."
         )
+        self.field_search_mode = "idle"
         self._field_search_display_to_key: dict[str, str] = {}
         self.run_scenario_key_to_label = {
             "worldroad": "Дорога: текущий профиль preview",
@@ -165,14 +228,24 @@ class DesktopInputEditor:
         self.run_scenario_var = tk.StringVar(
             value=self.run_scenario_key_to_label["worldroad"]
         )
+        self.run_profile_var = tk.StringVar(value="detail")
         self.run_dt_var = tk.DoubleVar(value=0.003)
         self.run_t_end_var = tk.DoubleVar(value=1.6)
-        self.run_record_full_var = tk.BooleanVar(value=True)
+        self.run_record_full_var = tk.BooleanVar(value=False)
         self.run_primary_value_var = tk.DoubleVar(value=3.0)
         self.run_secondary_value_var = tk.DoubleVar(value=0.4)
+        self.run_cache_policy_var = tk.StringVar(value="reuse")
+        self.run_export_csv_var = tk.BooleanVar(value=True)
+        self.run_export_npz_var = tk.BooleanVar(value=False)
+        self.run_auto_check_var = tk.BooleanVar(value=True)
+        self.run_log_to_file_var = tk.BooleanVar(value=True)
+        self.run_runtime_policy_var = tk.StringVar(value="balanced")
         self.run_primary_label_var = tk.StringVar()
         self.run_secondary_label_var = tk.StringVar()
         self.run_summary_var = tk.StringVar()
+        self.run_profile_hint_var = tk.StringVar()
+        self.run_cache_hint_var = tk.StringVar()
+        self.run_runtime_policy_hint_var = tk.StringVar()
         self.run_mode_summary_var = tk.StringVar()
         self.run_mode_cost_var = tk.StringVar()
         self.run_mode_advice_var = tk.StringVar()
@@ -182,20 +255,39 @@ class DesktopInputEditor:
             value="Пресеты запуска меняют только режим расчёта: шаг, длительность и расширенный лог."
         )
         self.run_launch_label: ttk.Label | None = None
+        self.preview_surface_primary_spin: ttk.Spinbox | None = None
+        self.preview_surface_secondary_spin: ttk.Spinbox | None = None
+        self.preview_surface_start_spin: ttk.Spinbox | None = None
+        self.preview_surface_angle_spin: ttk.Spinbox | None = None
+        self.preview_surface_shape_spin: ttk.Spinbox | None = None
+        self.run_primary_spin: ttk.Spinbox | None = None
+        self.run_secondary_spin: ttk.Spinbox | None = None
+        self._run_setup_center = None
         self.status_var = tk.StringVar()
         self.path_var = tk.StringVar()
         self._task_running = False
+        self._host_closed = False
         self._set_status("Готово. Открыт черновик на основе default_base.json.")
         self._configure_launch_summary_styles()
+        self._configure_route_button_styles()
         self._build_ui()
         self._bind_summary_var_traces()
         self._refresh_safe_action_history_view()
         self._refresh_section_route_summary()
         self._refresh_preview_surface_controls()
         self._refresh_run_scenario_controls()
+        self._refresh_run_profile_hint()
+        self._refresh_run_policy_hints()
         self._refresh_profile_list()
         self._refresh_snapshot_list()
-        self._load_into_vars(self.current_payload, self.current_source_path)
+        self._load_into_vars(
+            self.current_payload,
+            self.current_source_path,
+            refresh_source_reference=True,
+        )
+        self._refresh_latest_preview_summary()
+        self._refresh_latest_selfcheck_summary()
+        self._refresh_latest_run_summary()
 
     def _set_status(self, text: str) -> None:
         self.status_var.set(text)
@@ -204,6 +296,69 @@ class DesktopInputEditor:
         self.ui_style.configure("DesktopLaunchFast.TLabel", foreground="#4f6b7a")
         self.ui_style.configure("DesktopLaunchBalanced.TLabel", foreground="#334455")
         self.ui_style.configure("DesktopLaunchDetailed.TLabel", foreground="#7a4f01")
+
+    def _configure_route_button_styles(self) -> None:
+        self.ui_style.configure("DesktopRoute.TButton", padding=(8, 4))
+        self.ui_style.configure(
+            "DesktopRouteCurrent.TButton",
+            padding=(8, 4),
+            foreground="#113355",
+        )
+        self.ui_style.configure(
+            "DesktopRouteWarn.TButton",
+            padding=(8, 4),
+            foreground="#8a4b00",
+        )
+        self.ui_style.configure(
+            "DesktopRouteChanged.TButton",
+            padding=(8, 4),
+            foreground="#16507a",
+        )
+        self.ui_style.configure(
+            "DesktopRouteWarnChanged.TButton",
+            padding=(8, 4),
+            foreground="#7a3f00",
+        )
+        self.ui_style.configure(
+            "DesktopRouteCurrentWarn.TButton",
+            padding=(8, 4),
+            foreground="#8a3b00",
+        )
+        self.ui_style.configure(
+            "DesktopRouteCurrentChanged.TButton",
+            padding=(8, 4),
+            foreground="#0f426a",
+        )
+        self.ui_style.configure(
+            "DesktopRouteCurrentWarnChanged.TButton",
+            padding=(8, 4),
+            foreground="#733100",
+        )
+
+    def _route_button_style_for_state(
+        self,
+        *,
+        is_current: bool,
+        status_key: str,
+        changed_count: int,
+    ) -> str:
+        has_warn = str(status_key or "").strip().lower() == "warn"
+        has_changes = int(changed_count) > 0
+        if is_current and has_warn and has_changes:
+            return "DesktopRouteCurrentWarnChanged.TButton"
+        if is_current and has_warn:
+            return "DesktopRouteCurrentWarn.TButton"
+        if is_current and has_changes:
+            return "DesktopRouteCurrentChanged.TButton"
+        if is_current:
+            return "DesktopRouteCurrent.TButton"
+        if has_warn and has_changes:
+            return "DesktopRouteWarnChanged.TButton"
+        if has_warn:
+            return "DesktopRouteWarn.TButton"
+        if has_changes:
+            return "DesktopRouteChanged.TButton"
+        return "DesktopRoute.TButton"
 
     def _launch_summary_style_for_mode(self, mode_key: str) -> str:
         key = str(mode_key or "").strip().lower()
@@ -224,12 +379,29 @@ class DesktopInputEditor:
         except Exception:
             return 0
 
+    def _current_section_title(self) -> str:
+        if not self.section_titles:
+            return ""
+        index = self._current_section_index()
+        if 0 <= index < len(self.section_titles):
+            return self.section_titles[index]
+        return self.section_titles[0]
+
+    def _field_search_tracks_current_section(self) -> bool:
+        return str(self.field_search_mode or "idle").strip().lower() in {
+            "current_section",
+            "current_section_attention",
+            "current_section_changed",
+        }
+
     def _select_section_index(self, index: int) -> None:
         if not self.section_titles:
             return
         safe_index = max(0, min(int(index), len(self.section_titles) - 1))
         self.section_notebook.select(safe_index)
         self._refresh_section_route_summary()
+        if self._field_search_tracks_current_section():
+            self._refresh_active_field_search_view()
 
     def _select_section_by_title(self, section_title: str) -> None:
         target_index = self.section_title_to_index.get(str(section_title or "").strip())
@@ -237,38 +409,368 @@ class DesktopInputEditor:
             return
         self._select_section_index(target_index)
 
+    def _on_section_tab_changed(self, _event: object | None = None) -> None:
+        self._refresh_section_route_summary()
+        if self._field_search_tracks_current_section():
+            self._refresh_active_field_search_view()
+
     def _go_prev_section(self) -> None:
         self._select_section_index(self._current_section_index() - 1)
 
     def _go_next_section(self) -> None:
         self._select_section_index(self._current_section_index() + 1)
 
+    def _build_section_route_state(
+        self,
+    ) -> tuple[
+        list[dict[str, object]],
+        dict[str, dict[str, object]],
+        list[dict[str, object]],
+        dict[str, dict[str, object]],
+    ]:
+        current_payload = self._gather_payload()
+        readiness_rows = evaluate_desktop_section_readiness(current_payload)
+        change_cards = build_desktop_section_change_cards(
+            current_payload,
+            self.source_reference_payload,
+        )
+        readiness_by_title = {
+            str(row.get("title") or ""): row for row in readiness_rows
+        }
+        change_by_title = {
+            str(card.get("title") or ""): card for card in change_cards
+        }
+        return readiness_rows, readiness_by_title, change_cards, change_by_title
+
+    def _find_next_section_title(
+        self,
+        predicate: object,
+    ) -> str | None:
+        if not self.section_titles:
+            return None
+        checker = predicate if callable(predicate) else None
+        if checker is None:
+            return None
+        start_index = self._current_section_index()
+        for offset in range(1, len(self.section_titles)):
+            title = self.section_titles[(start_index + offset) % len(self.section_titles)]
+            try:
+                if bool(checker(title)):
+                    return title
+            except Exception:
+                continue
+        return None
+
+    def _go_next_attention_section(self) -> None:
+        _rows, readiness_by_title, _change_cards, _change_by_title = self._build_section_route_state()
+        title = self._find_next_section_title(
+            lambda section_title: str(
+                readiness_by_title.get(section_title, {}).get("status") or ""
+            ).strip().lower() == "warn"
+        )
+        if not title:
+            self._set_status("Следующих шагов с замечаниями сейчас нет.")
+            return
+        self._select_section_by_title(title)
+        self._set_status(f"Открыт следующий шаг с замечанием: {title}")
+
+    def _go_next_changed_section(self) -> None:
+        _rows, _readiness_by_title, _change_cards, change_by_title = self._build_section_route_state()
+        title = self._find_next_section_title(
+            lambda section_title: int(
+                change_by_title.get(section_title, {}).get("changed_count") or 0
+            ) > 0
+        )
+        if not title:
+            self._set_status("Следующих изменённых шагов сейчас нет.")
+            return
+        self._select_section_by_title(title)
+        self._set_status(f"Открыт следующий изменённый шаг: {title}")
+
     def _refresh_section_route_summary(self) -> None:
         if not self.section_titles:
             self.route_summary_var.set("Шаги настройки пока недоступны.")
             return
-        readiness_rows = evaluate_desktop_section_readiness(self._gather_payload())
-        readiness_by_title = {str(row.get("title") or ""): row for row in readiness_rows}
+        readiness_rows, readiness_by_title, change_cards, change_by_title = (
+            self._build_section_route_state()
+        )
+        issue_cards = build_desktop_section_issue_cards(self._gather_payload())
+        issue_by_title = {
+            str(card.get("title") or "").strip(): card for card in issue_cards
+        }
+        current_index = self._current_section_index()
         for idx, title in enumerate(self.section_titles):
             button = self.route_buttons.get(title)
             if button is None:
                 continue
             row = readiness_by_title.get(title, {})
-            status_text = desktop_section_status_label(str(row.get("status") or ""))
-            button.configure(text=f"{idx + 1}. {title} · {status_text}")
-        index = self._current_section_index()
+            issue_card = issue_by_title.get(title, {})
+            change_card = change_by_title.get(title, {})
+            status_key = str(row.get("status") or "")
+            status_text = desktop_section_status_label(status_key)
+            issue_count = int(issue_card.get("issue_count") or 0)
+            changed_count = int(change_card.get("changed_count") or 0)
+            issue_badge = f" · {issue_count} зам." if issue_count > 0 else ""
+            change_badge = f" · {changed_count} изм." if changed_count > 0 else ""
+            button.configure(
+                text=f"{idx + 1}. {title} · {status_text}{issue_badge}{change_badge}",
+                style=self._route_button_style_for_state(
+                    is_current=idx == current_index,
+                    status_key=status_key,
+                    changed_count=changed_count,
+                ),
+            )
+        index = current_index
         current_title = self.section_titles[index]
         previous_title = self.section_titles[index - 1] if index > 0 else "—"
         next_title = self.section_titles[index + 1] if index + 1 < len(self.section_titles) else "Готово к запуску"
         current_row = readiness_by_title.get(current_title, {})
+        current_issue_card = issue_by_title.get(current_title, {})
+        current_change_card = change_by_title.get(current_title, {})
         ok_count = sum(1 for row in readiness_rows if str(row.get("status") or "") == "ok")
         warn_count = sum(1 for row in readiness_rows if str(row.get("status") or "") == "warn")
+        changed_sections = sum(
+            1 for card in change_cards if int(card.get("changed_count") or 0) > 0
+        )
+        issue_sections = sum(
+            1 for card in issue_cards if int(card.get("issue_count") or 0) > 0
+        )
+        current_issue_count = int(current_issue_card.get("issue_count") or 0)
+        next_attention_title = self._find_next_section_title(
+            lambda title: str(readiness_by_title.get(title, {}).get("status") or "").strip().lower() == "warn"
+        )
+        next_changed_title = self._find_next_section_title(
+            lambda title: int(change_by_title.get(title, {}).get("changed_count") or 0) > 0
+        )
         self.route_summary_var.set(
             f"Сейчас шаг {index + 1} из {len(self.section_titles)}: {current_title}. "
             f"Предыдущий: {previous_title}. Следующий: {next_title}. "
             f"Готово шагов: {ok_count}; требуют внимания: {warn_count}. "
+            f"Шагов с замечаниями: {issue_sections}. "
+            f"Изменено шагов: {changed_sections}. "
+            f"Следующий шаг с замечанием: {next_attention_title or 'не найден'}. "
+            f"Следующий изменённый шаг: {next_changed_title or 'не найден'}. "
             f"Статус шага: {desktop_section_status_label(str(current_row.get('status') or ''))}. "
-            f"{str(current_row.get('summary') or '').strip()}"
+            f"Замечаний шага: {current_issue_count}. "
+            f"Замечания шага: {str(current_issue_card.get('summary') or 'замечаний нет').strip()}. "
+            f"{str(current_row.get('summary') or '').strip()} "
+            f"Изменения шага: {str(current_change_card.get('summary') or 'без изменений').strip()}."
+        )
+
+    def _refresh_section_header_summaries(self) -> None:
+        current_payload = self._gather_payload()
+        cards = build_desktop_section_summary_cards(current_payload)
+        issue_cards = build_desktop_section_issue_cards(current_payload)
+        change_cards = build_desktop_section_change_cards(
+            current_payload,
+            self.source_reference_payload,
+        )
+        issue_by_title = {
+            str(card.get("title") or "").strip(): card for card in issue_cards
+        }
+        change_by_title = {
+            str(card.get("title") or "").strip(): card for card in change_cards
+        }
+        for card in cards:
+            title = str(card.get("title") or "").strip()
+            if not title:
+                continue
+            var = self.section_summary_vars.get(title)
+            label = self.section_summary_labels.get(title)
+            issue_button = self.section_issue_buttons.get(title)
+            restore_button = self.section_restore_buttons.get(title)
+            search_button = self.section_search_buttons.get(title)
+            issue_card = issue_by_title.get(title, {})
+            change_card = change_by_title.get(title, {})
+            if var is None:
+                continue
+            status_key = str(card.get("status") or "").strip().lower()
+            status_text = desktop_section_status_label(status_key)
+            headline = str(card.get("headline") or "").strip()
+            details = str(card.get("details") or "").strip()
+            focus_key = str(card.get("focus_key") or "").strip()
+            focus_label = str(card.get("focus_label") or "").strip()
+            focus_reason = str(card.get("focus_reason") or "").strip()
+            change_summary = (
+                str(change_card.get("summary") or "").strip() or "без изменений"
+            )
+            changed_count = int(change_card.get("changed_count") or 0)
+            issue_count = int(issue_card.get("issue_count") or 0)
+            change_focus_key = str(change_card.get("focus_key") or "").strip()
+            change_focus_label = str(change_card.get("focus_label") or "").strip()
+            text = headline
+            if details:
+                text = f"{headline}\nСтатус кластера: {status_text}. {details}"
+            elif headline:
+                text = f"{headline}\nСтатус кластера: {status_text}."
+            else:
+                text = f"Статус кластера: {status_text}."
+            text = f"{text}\nИзменено от рабочей точки: {change_summary}."
+            if focus_reason:
+                text = f"{text}\nПервое замечание: {focus_reason}"
+            elif change_focus_label:
+                text = f"{text}\nПервое изменение: {change_focus_label}."
+            var.set(text)
+            if label is not None:
+                if status_key == "ok":
+                    label.configure(foreground="#1f5d50")
+                elif status_key == "warn":
+                    label.configure(foreground="#7a4f01")
+                else:
+                    label.configure(foreground="#555555")
+            if focus_key:
+                self.section_issue_focus_by_title[title] = focus_key
+            else:
+                self.section_issue_focus_by_title.pop(title, None)
+            if change_focus_key:
+                self.section_change_focus_by_title[title] = change_focus_key
+            else:
+                self.section_change_focus_by_title.pop(title, None)
+            if issue_button is not None:
+                if focus_key:
+                    button_label = focus_label or "замечанию"
+                    issue_button.configure(
+                        text=f"Перейти к замечанию: {button_label}",
+                        state="normal",
+                    )
+                elif change_focus_key:
+                    button_label = change_focus_label or "изменению"
+                    issue_button.configure(
+                        text=f"Перейти к изменению: {button_label}",
+                        state="normal",
+                    )
+                else:
+                    issue_button.configure(
+                        text="Кластер в норме",
+                        state="disabled",
+                    )
+            if restore_button is not None:
+                if changed_count > 0:
+                    restore_button.configure(
+                        text="Вернуть к рабочей точке",
+                        state="normal",
+                    )
+                else:
+                    restore_button.configure(
+                        text="Совпадает с рабочей точкой",
+                        state="disabled",
+                    )
+            if search_button is not None:
+                if issue_count > 0:
+                    search_button.configure(
+                        text=f"Показать замечания кластера: {issue_count}",
+                        state="normal",
+                    )
+                elif changed_count > 0:
+                    search_button.configure(
+                        text=f"Показать изменения кластера: {changed_count}",
+                        state="normal",
+                    )
+                else:
+                    search_button.configure(
+                        text="Показать параметры кластера",
+                        state="normal",
+                    )
+            tab_index = self.section_title_to_index.get(title)
+            if tab_index is not None:
+                tab_caption = title if changed_count <= 0 else f"{title} · {changed_count} изм."
+                self.section_notebook.tab(tab_index, text=tab_caption)
+
+    def _jump_to_section_issue(self, section_title: str) -> None:
+        title = str(section_title or "").strip()
+        if not title:
+            return
+        self._select_section_by_title(title)
+        focus_key = str(self.section_issue_focus_by_title.get(title) or "").strip()
+        if not focus_key:
+            focus_key = str(self.section_change_focus_by_title.get(title) or "").strip()
+        if not focus_key:
+            self._set_status(f"Кластер «{title}» выглядит согласованным.")
+            return
+        self._jump_to_field(focus_key)
+
+    def _reset_section_to_source_reference(self, section: object) -> None:
+        title = getattr(section, "title", "Раздел")
+        fields = tuple(getattr(section, "fields", ()) or ())
+        if not fields:
+            return
+        before_payload = self._gather_payload()
+        change_cards = build_desktop_section_change_cards(
+            before_payload,
+            self.source_reference_payload,
+        )
+        change_by_title = {
+            str(card.get("title") or "").strip(): card for card in change_cards
+        }
+        change_card = change_by_title.get(str(title or "").strip(), {})
+        changed_keys = {
+            str(key or "").strip()
+            for key in (change_card.get("changed_keys") or ())
+            if str(key or "").strip()
+        }
+        if not changed_keys:
+            self._set_status(f"Раздел «{title}» уже совпадает с рабочей точкой.")
+            return
+        if not messagebox.askyesno(
+            "Desktop Input Editor",
+            f"Вернуть раздел «{title}» к рабочей точке?",
+        ):
+            return
+        restored_count = 0
+        for spec in fields:
+            if not isinstance(spec, DesktopInputFieldSpec) or spec.key not in changed_keys:
+                continue
+            var = self.vars.get(spec.key)
+            if var is None:
+                continue
+            reference_value = self.source_reference_payload.get(spec.key)
+            try:
+                var.set(spec.to_ui(reference_value))
+                restored_count += 1
+            except Exception:
+                continue
+            self._refresh_value_label(spec.key)
+        self._remember_safe_action(
+            f"Возврат раздела к рабочей точке: {title}",
+            before_payload,
+            changed_count=restored_count,
+        )
+        self._refresh_config_summary()
+        self._refresh_profile_comparison()
+        self._refresh_section_header_summaries()
+        self._set_status(f"Раздел «{title}» возвращён к рабочей точке.")
+        self._append_run_log(
+            f"[section-restore] Раздел «{title}» возвращён к рабочей точке; полей: {restored_count}"
+        )
+
+    def _restore_field_to_source_reference(self, key: str) -> None:
+        clean_key = str(key or "").strip()
+        handle = self._widget_handles.get(clean_key)
+        var = self.vars.get(clean_key)
+        if handle is None or var is None:
+            return
+        spec, _label = handle
+        if clean_key not in self.source_reference_diffs_by_key:
+            self._set_status(f"Параметр «{spec.label}» уже совпадает с рабочей точкой.")
+            return
+        before_payload = self._gather_payload()
+        reference_value = self.source_reference_payload.get(clean_key)
+        try:
+            var.set(spec.to_ui(reference_value))
+        except Exception as exc:
+            messagebox.showerror(
+                "Desktop Input Editor",
+                f"Не удалось вернуть параметр «{spec.label}» к рабочей точке:\n{exc}",
+            )
+            return
+        self._remember_safe_action(
+            f"Возврат параметра к рабочей точке: {spec.label}",
+            before_payload,
+            changed_count=1,
+        )
+        self._set_status(f"Параметр «{spec.label}» возвращён к рабочей точке.")
+        self._append_run_log(
+            f"[field-restore] Параметр «{spec.label}» возвращён к рабочей точке."
         )
 
     def _selected_field_search_key(self) -> str | None:
@@ -277,9 +779,108 @@ class DesktopInputEditor:
             return None
         return self._field_search_display_to_key.get(selected)
 
+    def _apply_field_search_items(
+        self,
+        items: list[dict[str, str]],
+        *,
+        summary_text: str,
+        empty_text: str,
+    ) -> None:
+        display_values: list[str] = []
+        display_to_key: dict[str, str] = {}
+        for item in items:
+            display = str(item.get("display") or "").strip()
+            key = str(item.get("key") or "").strip()
+            if not display or not key or display in display_to_key:
+                continue
+            display_values.append(display)
+            display_to_key[display] = key
+        self._field_search_display_to_key = display_to_key
+        self.field_search_combo.configure(values=display_values)
+        if display_values:
+            self.field_search_choice_var.set(display_values[0])
+            self.field_search_summary_var.set(summary_text)
+            return
+        self.field_search_choice_var.set("—")
+        self.field_search_summary_var.set(empty_text)
+
+    def _field_search_badges_for_key(
+        self,
+        key: str,
+        *,
+        extra_badges: tuple[str, ...] = (),
+    ) -> list[str]:
+        clean_key = str(key or "").strip()
+        section_title = self._section_title_by_key.get(clean_key, "")
+        badges: list[str] = []
+        if clean_key in self.source_reference_diffs_by_key:
+            badges.append("изм. от рабочей точки")
+        if clean_key in self.compare_diffs_by_key:
+            badges.append("отличается от профиля")
+        if str(self.section_issue_focus_by_title.get(section_title) or "").strip() == clean_key:
+            badges.append("первое замечание секции")
+        for badge in extra_badges:
+            badge_text = str(badge or "").strip()
+            if badge_text and badge_text not in badges:
+                badges.append(badge_text)
+        return badges
+
+    def _build_field_search_item(
+        self,
+        *,
+        key: str,
+        label: str,
+        section_title: str,
+        extra_badges: tuple[str, ...] = (),
+    ) -> dict[str, str]:
+        clean_key = str(key or "").strip()
+        clean_label = str(label or clean_key).strip() or clean_key
+        clean_section_title = str(section_title or "").strip()
+        display = f"{clean_label} — {clean_section_title or '—'}"
+        badges = self._field_search_badges_for_key(
+            clean_key,
+            extra_badges=extra_badges,
+        )
+        if badges:
+            display = f"{display} · {' · '.join(badges)}"
+        return {
+            "key": clean_key,
+            "label": clean_label,
+            "section_title": clean_section_title,
+            "display": display,
+        }
+
+    def _refresh_active_field_search_view(self) -> None:
+        mode = str(self.field_search_mode or "idle").strip().lower()
+        if mode == "text":
+            if str(self.field_search_var.get() or "").strip():
+                self._refresh_field_search_results()
+                return
+            self.field_search_mode = "idle"
+            return
+        if mode == "changed":
+            self._show_changed_fields_in_search()
+            return
+        if mode == "attention":
+            self._show_attention_fields_in_search()
+            return
+        if mode == "current_section":
+            self._show_current_section_fields_in_search(announce=False)
+            return
+        if mode == "current_section_attention":
+            self._show_current_section_attention_fields_in_search(announce=False)
+            return
+        if mode == "current_section_changed":
+            self._show_current_section_changed_fields_in_search(announce=False)
+            return
+        if mode == "profile_diff":
+            self._show_profile_diff_fields_in_search()
+            return
+
     def _refresh_field_search_results(self) -> None:
         query = str(self.field_search_var.get() or "").strip()
         if not query:
+            self.field_search_mode = "idle"
             self._field_search_display_to_key = {}
             self.field_search_combo.configure(values=[])
             self.field_search_choice_var.set("—")
@@ -287,29 +888,52 @@ class DesktopInputEditor:
                 "Введите часть названия, единицы измерения или описания параметра."
             )
             return
+        self.field_search_mode = "text"
         matches = find_desktop_field_matches(query, limit=12)
-        display_values = [str(item.get("display") or "").strip() for item in matches if str(item.get("display") or "").strip()]
-        self._field_search_display_to_key = {
-            str(item.get("display") or "").strip(): str(item.get("key") or "").strip()
-            for item in matches
-            if str(item.get("display") or "").strip() and str(item.get("key") or "").strip()
-        }
-        self.field_search_combo.configure(values=display_values)
-        if display_values:
-            self.field_search_choice_var.set(display_values[0])
-            first_match = matches[0]
-            self.field_search_summary_var.set(
-                f"Найдено параметров: {len(matches)}. "
+        items = [
+            self._build_field_search_item(
+                key=str(match.get("key") or "").strip(),
+                label=str(match.get("label") or "").strip(),
+                section_title=str(match.get("section_title") or "").strip(),
+            )
+            for match in matches
+            if str(match.get("key") or "").strip()
+        ]
+        first_match = items[0] if items else {}
+        changed_count = sum(
+            1 for item in items if str(item.get("key") or "").strip() in self.source_reference_diffs_by_key
+        )
+        profile_diff_count = sum(
+            1 for item in items if str(item.get("key") or "").strip() in self.compare_diffs_by_key
+        )
+        attention_count = sum(
+            1
+            for item in items
+            if str(
+                self.section_issue_focus_by_title.get(
+                    str(item.get("section_title") or "").strip(),
+                )
+                or ""
+            ).strip()
+            == str(item.get("key") or "").strip()
+        )
+        self._apply_field_search_items(
+            items,
+            summary_text=(
+                f"Найдено параметров: {len(items)}. "
+                f"Из них: {changed_count} изменено от рабочей точки; "
+                f"{profile_diff_count} отличается от профиля; "
+                f"{attention_count} совпадает с первыми замечаниями. "
                 f"Первый результат: {str(first_match.get('label') or '').strip()} "
                 f"в секции «{str(first_match.get('section_title') or '').strip()}»."
-            )
-            return
-        self.field_search_choice_var.set("—")
-        self.field_search_summary_var.set(
-            f"По запросу «{query}» ничего не найдено. Попробуйте часть названия или описание параметра."
+            ),
+            empty_text=(
+                f"По запросу «{query}» ничего не найдено. Попробуйте часть названия или описание параметра."
+            ),
         )
 
     def _clear_field_search(self) -> None:
+        self.field_search_mode = "idle"
         self.field_search_var.set("")
         self.field_search_choice_var.set("—")
         self._field_search_display_to_key = {}
@@ -318,6 +942,310 @@ class DesktopInputEditor:
             "Введите часть названия, единицы измерения или описания параметра."
         )
         self._set_status("Поиск параметров очищен.")
+
+    def _show_changed_fields_in_search(self) -> None:
+        self.field_search_mode = "changed"
+        items: list[dict[str, str]] = []
+        for section in DESKTOP_INPUT_SECTIONS:
+            for spec in section.fields:
+                if spec.key not in self.source_reference_diffs_by_key:
+                    continue
+                items.append(
+                    self._build_field_search_item(
+                        key=spec.key,
+                        label=spec.label,
+                        section_title=section.title,
+                    )
+                )
+        first_item = items[0] if items else {}
+        self._apply_field_search_items(
+            items,
+            summary_text=(
+                f"Изменено от рабочей точки: {len(items)} параметров. "
+                f"Первый: {str(first_item.get('label') or '').strip()} "
+                f"в секции «{str(first_item.get('section_title') or '').strip()}»."
+            ),
+            empty_text="Отличий от рабочей точки по полям сейчас нет.",
+        )
+        if items:
+            self._set_status("Показаны параметры, изменённые от рабочей точки.")
+        else:
+            self._set_status("Изменённых от рабочей точки параметров сейчас нет.")
+
+    def _show_attention_fields_in_search(self) -> None:
+        self.field_search_mode = "attention"
+        items: list[dict[str, str]] = []
+        cards = build_desktop_section_summary_cards(self._gather_payload())
+        for card in cards:
+            if str(card.get("status") or "").strip().lower() != "warn":
+                continue
+            key = str(card.get("focus_key") or "").strip()
+            if not key:
+                continue
+            section_title = str(card.get("title") or "").strip()
+            handle = self._widget_handles.get(key)
+            spec = handle[0] if handle is not None else None
+            label = (
+                str(getattr(spec, "label", "") or "").strip()
+                or str(card.get("focus_label") or "").strip()
+                or key
+            )
+            items.append(
+                self._build_field_search_item(
+                    key=key,
+                    label=label,
+                    section_title=section_title,
+                )
+            )
+        first_item = items[0] if items else {}
+        self._apply_field_search_items(
+            items,
+            summary_text=(
+                f"Шагов с замечаниями: {len(items)}. "
+                f"Первое замечание: {str(first_item.get('label') or '').strip()} "
+                f"в секции «{str(first_item.get('section_title') or '').strip()}»."
+            ),
+            empty_text="Секций с замечаниями сейчас нет.",
+        )
+        if items:
+            self._set_status("Показаны первые замечания по кластерам.")
+        else:
+            self._set_status("Секций с замечаниями сейчас нет.")
+
+    def _show_current_section_attention_fields_in_search(self, *, announce: bool = True) -> None:
+        self.field_search_mode = "current_section_attention"
+        section_title = self._current_section_title()
+        if not section_title:
+            self._apply_field_search_items(
+                [],
+                summary_text="Текущий кластер пока недоступен.",
+                empty_text="Текущий кластер пока недоступен.",
+            )
+            if announce:
+                self._set_status("Текущий кластер пока недоступен.")
+            return
+        issue_cards = build_desktop_section_issue_cards(self._gather_payload())
+        issue_by_title = {
+            str(card.get("title") or "").strip(): card for card in issue_cards
+        }
+        issue_card = issue_by_title.get(section_title, {})
+        issue_keys = [
+            str(key or "").strip()
+            for key in (issue_card.get("issue_keys") or ())
+            if str(key or "").strip()
+        ]
+        issue_labels = [
+            str(label or "").strip()
+            for label in (issue_card.get("issue_labels") or ())
+            if str(label or "").strip()
+        ]
+        items = [
+            self._build_field_search_item(
+                key=key,
+                label=issue_labels[idx] if idx < len(issue_labels) else key,
+                section_title=section_title,
+            )
+            for idx, key in enumerate(issue_keys)
+        ]
+        first_item = items[0] if items else {}
+        changed_count = sum(
+            1 for item in items if str(item.get("key") or "").strip() in self.source_reference_diffs_by_key
+        )
+        profile_diff_count = sum(
+            1 for item in items if str(item.get("key") or "").strip() in self.compare_diffs_by_key
+        )
+        self._apply_field_search_items(
+            items,
+            summary_text=(
+                f"Замечания текущего кластера «{section_title}»: {len(items)}. "
+                f"Из них: {changed_count} изменено от рабочей точки; "
+                f"{profile_diff_count} отличается от профиля. "
+                f"Первое замечание: {str(first_item.get('label') or '').strip()} "
+                f"в секции «{str(first_item.get('section_title') or section_title).strip()}»."
+            ),
+            empty_text=f"В текущем кластере «{section_title}» замечаний сейчас нет.",
+        )
+        if not announce:
+            return
+        if items:
+            self._set_status(f"Показаны замечания текущего кластера: {section_title}")
+        else:
+            self._set_status(f"В текущем кластере «{section_title}» замечаний сейчас нет.")
+
+    def _show_current_section_fields_in_search(self, *, announce: bool = True) -> None:
+        self.field_search_mode = "current_section"
+        section_title = self._current_section_title()
+        if not section_title:
+            self._apply_field_search_items(
+                [],
+                summary_text="Текущий кластер пока недоступен.",
+                empty_text="Текущий кластер пока недоступен.",
+            )
+            if announce:
+                self._set_status("Текущий кластер пока недоступен.")
+            return
+        items = [
+            self._build_field_search_item(
+                key=str(item.get("key") or "").strip(),
+                label=str(item.get("label") or "").strip(),
+                section_title=str(item.get("section_title") or "").strip(),
+            )
+            for item in build_desktop_section_field_search_items(section_title)
+            if str(item.get("key") or "").strip()
+        ]
+        first_item = items[0] if items else {}
+        changed_count = sum(
+            1 for item in items if str(item.get("key") or "").strip() in self.source_reference_diffs_by_key
+        )
+        profile_diff_count = sum(
+            1 for item in items if str(item.get("key") or "").strip() in self.compare_diffs_by_key
+        )
+        attention_count = sum(
+            1
+            for item in items
+            if str(
+                self.section_issue_focus_by_title.get(
+                    str(item.get("section_title") or "").strip(),
+                )
+                or ""
+            ).strip()
+            == str(item.get("key") or "").strip()
+        )
+        self._apply_field_search_items(
+            items,
+            summary_text=(
+                f"Текущий кластер «{section_title}»: {len(items)} параметров. "
+                f"Из них: {changed_count} изменено от рабочей точки; "
+                f"{profile_diff_count} отличается от профиля; "
+                f"{attention_count} совпадает с первым замечанием кластера. "
+                f"Первый: {str(first_item.get('label') or '').strip()} "
+                f"в секции «{str(first_item.get('section_title') or section_title).strip()}»."
+            ),
+            empty_text=f"В кластере «{section_title}» доступных параметров сейчас нет.",
+        )
+        if not announce:
+            return
+        if items:
+            self._set_status(f"Показаны параметры текущего кластера: {section_title}")
+        else:
+            self._set_status(f"В кластере «{section_title}» доступных параметров сейчас нет.")
+
+    def _show_current_section_changed_fields_in_search(self, *, announce: bool = True) -> None:
+        self.field_search_mode = "current_section_changed"
+        section_title = self._current_section_title()
+        if not section_title:
+            self._apply_field_search_items(
+                [],
+                summary_text="Текущий кластер пока недоступен.",
+                empty_text="Текущий кластер пока недоступен.",
+            )
+            if announce:
+                self._set_status("Текущий кластер пока недоступен.")
+            return
+        items = [
+            self._build_field_search_item(
+                key=str(item.get("key") or "").strip(),
+                label=str(item.get("label") or "").strip(),
+                section_title=str(item.get("section_title") or "").strip(),
+            )
+            for item in build_desktop_section_field_search_items(section_title)
+            if str(item.get("key") or "").strip() in self.source_reference_diffs_by_key
+        ]
+        first_item = items[0] if items else {}
+        profile_diff_count = sum(
+            1 for item in items if str(item.get("key") or "").strip() in self.compare_diffs_by_key
+        )
+        attention_count = sum(
+            1
+            for item in items
+            if str(
+                self.section_issue_focus_by_title.get(
+                    str(item.get("section_title") or "").strip(),
+                )
+                or ""
+            ).strip()
+            == str(item.get("key") or "").strip()
+        )
+        self._apply_field_search_items(
+            items,
+            summary_text=(
+                f"Изменения текущего кластера «{section_title}»: {len(items)} параметров. "
+                f"Из них: {profile_diff_count} отличается от профиля; "
+                f"{attention_count} совпадает с первым замечанием кластера. "
+                f"Первое изменение: {str(first_item.get('label') or '').strip()} "
+                f"в секции «{str(first_item.get('section_title') or section_title).strip()}»."
+            ),
+            empty_text=f"В текущем кластере «{section_title}» изменений от рабочей точки нет.",
+        )
+        if not announce:
+            return
+        if items:
+            self._set_status(f"Показаны изменения текущего кластера: {section_title}")
+        else:
+            self._set_status(f"В текущем кластере «{section_title}» изменений от рабочей точки нет.")
+
+    def _show_section_search_from_summary(self, section_title: str) -> None:
+        title = str(section_title or "").strip()
+        if not title:
+            return
+        self._select_section_by_title(title)
+        issue_cards = build_desktop_section_issue_cards(self._gather_payload())
+        issue_by_title = {
+            str(card.get("title") or "").strip(): card for card in issue_cards
+        }
+        change_cards = build_desktop_section_change_cards(
+            self._gather_payload(),
+            self.source_reference_payload,
+        )
+        change_by_title = {
+            str(card.get("title") or "").strip(): card for card in change_cards
+        }
+        if int(issue_by_title.get(title, {}).get("issue_count") or 0) > 0:
+            self._show_current_section_attention_fields_in_search()
+            return
+        if int(change_by_title.get(title, {}).get("changed_count") or 0) > 0:
+            self._show_current_section_changed_fields_in_search()
+            return
+        self._show_current_section_fields_in_search()
+
+    def _show_profile_diff_fields_in_search(self) -> None:
+        self.field_search_mode = "profile_diff"
+        target = self.compare_target_path
+        if target is None:
+            self._apply_field_search_items(
+                [],
+                summary_text="Сравнение с профилем выключено.",
+                empty_text="Сравнение с профилем выключено.",
+            )
+            self._set_status("Сравнение с профилем выключено.")
+            return
+        profile_name = desktop_profile_display_name(target)
+        items: list[dict[str, str]] = []
+        for section in DESKTOP_INPUT_SECTIONS:
+            for spec in section.fields:
+                if spec.key not in self.compare_diffs_by_key:
+                    continue
+                items.append(
+                    self._build_field_search_item(
+                        key=spec.key,
+                        label=spec.label,
+                        section_title=section.title,
+                    )
+                )
+        first_item = items[0] if items else {}
+        self._apply_field_search_items(
+            items,
+            summary_text=(
+                f"Отличия с профилем «{profile_name}»: {len(items)} параметров. "
+                f"Первый: {str(first_item.get('label') or '').strip()} "
+                f"в секции «{str(first_item.get('section_title') or '').strip()}»."
+            ),
+            empty_text=f"Отличий с профилем «{profile_name}» сейчас нет.",
+        )
+        if items:
+            self._set_status(f"Показаны отличия с профилем: {profile_name}")
+        else:
+            self._set_status(f"Отличий с профилем «{profile_name}» сейчас нет.")
 
     def _scroll_to_field(self, key: str) -> None:
         frame = self._field_frames.get(key)
@@ -380,7 +1308,8 @@ class DesktopInputEditor:
             outer,
             text=(
                 "Desktop-редактор для исходных параметров модели. "
-                "Здесь редактируются основные размеры, пневматика, механика и настройки расчёта "
+                "Здесь исходные данные собраны по инженерным кластерам: геометрия, пневматика, "
+                "механика, статическая настройка, компоненты и справочные данные "
                 "без WEB UI и без изменения Desktop Mnemo."
             ),
             wraplength=1080,
@@ -656,274 +1585,62 @@ class DesktopInputEditor:
         ttk.Label(
             actions,
             text=(
-                "Здесь можно сразу проверить конфигурацию и сделать короткий preview-расчёт "
-                "по текущим исходным данным, не переходя в WEB UI. "
-                "Профиль preview-дороги выбирается прямо здесь."
+                "Здесь остаются только сводка и кнопки запуска. "
+                "Профиль preview-дороги, Настройки запуска расчёта и Пресеты запуска "
+                "вынесены в отдельный desktop run setup."
             ),
             wraplength=1040,
             justify="left",
         ).grid(row=0, column=0, columnspan=6, sticky="w")
-        ttk.Label(actions, text="Шаг preview dt, с").grid(row=1, column=0, sticky="w", pady=(10, 0))
-        ttk.Spinbox(actions, from_=0.001, to=0.1, increment=0.001, textvariable=self.preview_dt_var, width=10, format="%.3f").grid(row=1, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
-        ttk.Label(actions, text="Длительность preview, с").grid(row=1, column=2, sticky="w", padx=(16, 0), pady=(10, 0))
-        ttk.Spinbox(actions, from_=0.2, to=60.0, increment=0.1, textvariable=self.preview_t_end_var, width=10, format="%.1f").grid(row=1, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
-        ttk.Label(actions, text="Длина участка, м").grid(row=1, column=4, sticky="w", padx=(16, 0), pady=(10, 0))
-        ttk.Spinbox(actions, from_=5.0, to=5000.0, increment=1.0, textvariable=self.preview_road_len_var, width=10, format="%.1f").grid(row=1, column=5, sticky="w", padx=(8, 0), pady=(10, 0))
 
-        surface_frame = ttk.LabelFrame(actions, text="Профиль preview-дороги", padding=10)
-        surface_frame.grid(row=2, column=0, columnspan=6, sticky="ew", pady=(12, 0))
-        surface_frame.columnconfigure(5, weight=1)
-
-        ttk.Label(surface_frame, text="Тип профиля").grid(row=0, column=0, sticky="w")
-        preview_combo = ttk.Combobox(
-            surface_frame,
-            textvariable=self.preview_surface_var,
-            values=[label for _key, label in DESKTOP_PREVIEW_SURFACE_OPTIONS],
-            state="readonly",
-            width=28,
-        )
-        preview_combo.grid(row=0, column=1, sticky="w", padx=(8, 0))
-        self.preview_surface_var.trace_add(
-            "write",
-            lambda *_args: self._refresh_preview_surface_controls(),
-        )
+        run_setup_frame = ttk.LabelFrame(actions, text="Отдельный run setup", padding=10)
+        run_setup_frame.grid(row=1, column=0, columnspan=6, sticky="ew", pady=(12, 0))
         ttk.Label(
-            surface_frame,
-            textvariable=self.preview_surface_summary_var,
-            foreground="#555555",
-            wraplength=760,
+            run_setup_frame,
+            text=(
+                "Откройте отдельное окно настройки расчёта, чтобы менять baseline/detail/full, "
+                "cache, export, auto-check, запись логов, Профиль preview-дороги и Настройки запуска расчёта "
+                "без смешения runtime и физических параметров."
+            ),
+            wraplength=1040,
             justify="left",
-        ).grid(row=0, column=2, columnspan=4, sticky="w", padx=(16, 0))
-
-        ttk.Label(surface_frame, textvariable=self.preview_surface_primary_label_var).grid(
-            row=1,
-            column=0,
-            sticky="w",
-            pady=(10, 0),
-        )
-        self.preview_surface_primary_spin = ttk.Spinbox(
-            surface_frame,
-            from_=0.0,
-            to=2.0,
-            increment=0.005,
-            textvariable=self.preview_surface_primary_value_var,
-            width=10,
-            format="%.3f",
-        )
-        self.preview_surface_primary_spin.grid(row=1, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
-
-        ttk.Label(surface_frame, textvariable=self.preview_surface_secondary_label_var).grid(
-            row=1,
-            column=2,
-            sticky="w",
-            padx=(16, 0),
-            pady=(10, 0),
-        )
-        self.preview_surface_secondary_spin = ttk.Spinbox(
-            surface_frame,
-            from_=0.01,
-            to=50.0,
-            increment=0.05,
-            textvariable=self.preview_surface_secondary_value_var,
-            width=10,
-            format="%.3f",
-        )
-        self.preview_surface_secondary_spin.grid(row=1, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
-
-        ttk.Label(surface_frame, text="Начало профиля, м").grid(
-            row=1,
-            column=4,
-            sticky="w",
-            padx=(16, 0),
-            pady=(10, 0),
-        )
-        self.preview_surface_start_spin = ttk.Spinbox(
-            surface_frame,
-            from_=0.0,
-            to=500.0,
-            increment=0.1,
-            textvariable=self.preview_surface_start_var,
-            width=10,
-            format="%.2f",
-        )
-        self.preview_surface_start_spin.grid(row=1, column=5, sticky="w", padx=(8, 0), pady=(10, 0))
-
-        ttk.Label(surface_frame, text="Угол гребня, град").grid(
-            row=2,
-            column=0,
-            sticky="w",
-            pady=(10, 0),
-        )
-        self.preview_surface_angle_spin = ttk.Spinbox(
-            surface_frame,
-            from_=-90.0,
-            to=90.0,
-            increment=1.0,
-            textvariable=self.preview_surface_angle_var,
-            width=10,
-            format="%.1f",
-        )
-        self.preview_surface_angle_spin.grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
-
-        ttk.Label(surface_frame, text="Коэффициент формы").grid(
-            row=2,
-            column=2,
-            sticky="w",
-            padx=(16, 0),
-            pady=(10, 0),
-        )
-        self.preview_surface_shape_spin = ttk.Spinbox(
-            surface_frame,
-            from_=0.1,
-            to=10.0,
-            increment=0.1,
-            textvariable=self.preview_surface_shape_var,
-            width=10,
-            format="%.2f",
-        )
-        self.preview_surface_shape_spin.grid(row=2, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
-
-        run_frame = ttk.LabelFrame(actions, text="Настройки запуска расчёта", padding=10)
-        run_frame.grid(row=3, column=0, columnspan=6, sticky="ew", pady=(12, 0))
-        run_frame.columnconfigure(5, weight=1)
-
-        ttk.Label(run_frame, text="Сценарий").grid(row=0, column=0, sticky="w")
-        run_combo = ttk.Combobox(
-            run_frame,
-            textvariable=self.run_scenario_var,
-            values=list(self.run_scenario_key_to_label.values()),
-            state="readonly",
-            width=30,
-        )
-        run_combo.grid(row=0, column=1, sticky="w", padx=(8, 0))
-        self.run_scenario_var.trace_add(
-            "write",
-            lambda *_args: self._refresh_run_scenario_controls(),
-        )
+        ).grid(row=0, column=0, columnspan=3, sticky="w")
         ttk.Label(
-            run_frame,
-            textvariable=self.run_summary_var,
+            run_setup_frame,
+            textvariable=self.run_profile_hint_var,
             foreground="#555555",
-            wraplength=740,
-            justify="left",
-        ).grid(row=0, column=2, columnspan=4, sticky="w", padx=(16, 0))
-
-        ttk.Label(run_frame, text="Шаг dt, с").grid(row=1, column=0, sticky="w", pady=(10, 0))
-        ttk.Spinbox(
-            run_frame,
-            from_=0.001,
-            to=0.1,
-            increment=0.001,
-            textvariable=self.run_dt_var,
-            width=10,
-            format="%.3f",
-        ).grid(row=1, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
-
-        ttk.Label(run_frame, text="Длительность, с").grid(row=1, column=2, sticky="w", padx=(16, 0), pady=(10, 0))
-        ttk.Spinbox(
-            run_frame,
-            from_=0.2,
-            to=60.0,
-            increment=0.1,
-            textvariable=self.run_t_end_var,
-            width=10,
-            format="%.1f",
-        ).grid(row=1, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
-
-        ttk.Checkbutton(
-            run_frame,
-            text="Сохранять расширенный лог (давления и потоки)",
-            variable=self.run_record_full_var,
-        ).grid(row=1, column=4, columnspan=2, sticky="w", padx=(16, 0), pady=(10, 0))
-
-        ttk.Label(run_frame, textvariable=self.run_primary_label_var).grid(
-            row=2,
-            column=0,
-            sticky="w",
-            pady=(10, 0),
-        )
-        self.run_primary_spin = ttk.Spinbox(
-            run_frame,
-            from_=0.0,
-            to=50.0,
-            increment=0.1,
-            textvariable=self.run_primary_value_var,
-            width=10,
-            format="%.3f",
-        )
-        self.run_primary_spin.grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
-
-        ttk.Label(run_frame, textvariable=self.run_secondary_label_var).grid(
-            row=2,
-            column=2,
-            sticky="w",
-            padx=(16, 0),
-            pady=(10, 0),
-        )
-        self.run_secondary_spin = ttk.Spinbox(
-            run_frame,
-            from_=0.0,
-            to=50.0,
-            increment=0.1,
-            textvariable=self.run_secondary_value_var,
-            width=10,
-            format="%.3f",
-        )
-        self.run_secondary_spin.grid(row=2, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
-
-        run_preset_frame = ttk.LabelFrame(run_frame, text="Пресеты запуска", padding=10)
-        run_preset_frame.grid(row=3, column=0, columnspan=6, sticky="ew", pady=(12, 0))
-        for col in range(3):
-            run_preset_frame.columnconfigure(col, weight=1)
-        for idx, (preset_key, preset_label_text, _preset_desc) in enumerate(DESKTOP_RUN_PRESET_OPTIONS):
-            ttk.Button(
-                run_preset_frame,
-                text=preset_label_text,
-                command=lambda key=preset_key: self._apply_run_preset(key),
-            ).grid(
-                row=0,
-                column=idx,
-                sticky="ew",
-                padx=(0 if idx == 0 else 8, 0),
-            )
-        ttk.Label(
-            run_preset_frame,
-            textvariable=self.run_mode_summary_var,
-            foreground="#334455",
             wraplength=1040,
             justify="left",
         ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(10, 0))
         ttk.Label(
-            run_preset_frame,
-            textvariable=self.run_mode_cost_var,
-            foreground="#6b4d00",
+            run_setup_frame,
+            textvariable=self.run_mode_summary_var,
+            foreground="#334455",
             wraplength=1040,
             justify="left",
         ).grid(row=2, column=0, columnspan=3, sticky="w", pady=(8, 0))
         ttk.Label(
-            run_preset_frame,
-            textvariable=self.run_mode_advice_var,
-            foreground="#1f5d50",
+            run_setup_frame,
+            textvariable=self.run_cache_hint_var,
+            foreground="#6b4d00",
             wraplength=1040,
             justify="left",
         ).grid(row=3, column=0, columnspan=3, sticky="w", pady=(8, 0))
         ttk.Label(
-            run_preset_frame,
-            textvariable=self.run_mode_usage_var,
+            run_setup_frame,
+            textvariable=self.run_runtime_policy_hint_var,
             foreground="#355c7d",
             wraplength=1040,
             justify="left",
         ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 0))
-        ttk.Label(
-            run_preset_frame,
-            textvariable=self.run_preset_hint_var,
-            foreground="#555555",
-            wraplength=1040,
-            justify="left",
-        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        ttk.Button(
+            run_setup_frame,
+            text="Открыть отдельное окно настройки расчёта",
+            command=self._open_run_setup_center,
+        ).grid(row=5, column=0, sticky="w", pady=(10, 0))
 
         context_frame = ttk.LabelFrame(actions, text="Текущая рабочая точка", padding=10)
-        context_frame.grid(row=4, column=0, columnspan=6, sticky="ew", pady=(12, 0))
+        context_frame.grid(row=2, column=0, columnspan=6, sticky="ew", pady=(12, 0))
         ttk.Label(
             context_frame,
             textvariable=self.run_context_var,
@@ -951,7 +1668,7 @@ class DesktopInputEditor:
         ).grid(row=0, column=2, sticky="w", padx=(12, 0))
 
         launch_frame = ttk.LabelFrame(actions, text="Будет запущено сейчас", padding=10)
-        launch_frame.grid(row=5, column=0, columnspan=6, sticky="ew", pady=(12, 0))
+        launch_frame.grid(row=3, column=0, columnspan=6, sticky="ew", pady=(12, 0))
         self.run_launch_label = ttk.Label(
             launch_frame,
             textvariable=self.run_launch_summary_var,
@@ -961,29 +1678,138 @@ class DesktopInputEditor:
         )
         self.run_launch_label.pack(anchor="w")
 
-        ttk.Button(actions, text="Проверить конфигурацию", command=self._run_config_check).grid(row=6, column=0, columnspan=2, sticky="w", pady=(12, 0))
-        ttk.Button(actions, text="Быстрый расчёт", command=self._run_quick_preview).grid(row=6, column=2, columnspan=2, sticky="w", padx=(12, 0), pady=(12, 0))
-        ttk.Button(actions, text="Запустить подробный расчёт", command=self._run_single_desktop_run).grid(row=6, column=4, columnspan=2, sticky="w", padx=(12, 0), pady=(12, 0))
+        ttk.Button(actions, text="Проверить конфигурацию", command=self._run_config_check).grid(row=4, column=0, columnspan=2, sticky="w", pady=(12, 0))
+        ttk.Button(actions, text="Быстрый расчёт", command=self._run_quick_preview).grid(row=4, column=2, columnspan=2, sticky="w", padx=(12, 0), pady=(12, 0))
+        ttk.Button(actions, text="Запустить подробный расчёт", command=self._run_single_desktop_run).grid(row=4, column=4, columnspan=2, sticky="w", padx=(12, 0), pady=(12, 0))
+
+        latest_preview_frame = ttk.LabelFrame(actions, text="Последний baseline / preview", padding=10)
+        latest_preview_frame.grid(row=5, column=0, columnspan=6, sticky="ew", pady=(12, 0))
+        latest_preview_frame.columnconfigure(0, weight=1)
+        ttk.Label(
+            latest_preview_frame,
+            textvariable=self.latest_preview_summary_var,
+            wraplength=1040,
+            justify="left",
+            foreground="#334455",
+        ).grid(row=0, column=0, columnspan=3, sticky="w")
+        ttk.Button(
+            latest_preview_frame,
+            text="Обновить preview-сводку",
+            command=self._refresh_latest_preview_summary,
+        ).grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(
+            latest_preview_frame,
+            text="Открыть preview_report.json",
+            command=self._open_latest_preview_report_json,
+        ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            latest_preview_frame,
+            text="Открыть preview-лог",
+            command=self._open_latest_preview_log,
+        ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
+
+        latest_selfcheck_frame = ttk.LabelFrame(actions, text="Последний auto-check / selfcheck", padding=10)
+        latest_selfcheck_frame.grid(row=6, column=0, columnspan=6, sticky="ew", pady=(12, 0))
+        latest_selfcheck_frame.columnconfigure(0, weight=1)
+        ttk.Label(
+            latest_selfcheck_frame,
+            textvariable=self.latest_selfcheck_summary_var,
+            wraplength=1040,
+            justify="left",
+            foreground="#334455",
+        ).grid(row=0, column=0, columnspan=3, sticky="w")
+        ttk.Button(
+            latest_selfcheck_frame,
+            text="Обновить selfcheck-сводку",
+            command=self._refresh_latest_selfcheck_summary,
+        ).grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(
+            latest_selfcheck_frame,
+            text="Открыть selfcheck_report.json",
+            command=self._open_latest_selfcheck_report_json,
+        ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            latest_selfcheck_frame,
+            text="Открыть selfcheck-лог",
+            command=self._open_latest_selfcheck_log,
+        ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
+
+        latest_run_frame = ttk.LabelFrame(actions, text="Последний подробный расчёт", padding=10)
+        latest_run_frame.grid(row=7, column=0, columnspan=6, sticky="ew", pady=(12, 0))
+        latest_run_frame.columnconfigure(0, weight=1)
+        ttk.Label(
+            latest_run_frame,
+            textvariable=self.latest_run_summary_var,
+            wraplength=1040,
+            justify="left",
+            foreground="#334455",
+        ).grid(row=0, column=0, columnspan=5, sticky="w")
+        ttk.Button(
+            latest_run_frame,
+            text="Обновить сводку",
+            command=self._refresh_latest_run_summary,
+        ).grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(
+            latest_run_frame,
+            text="Открыть папку запуска",
+            command=self._open_latest_run_dir,
+        ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            latest_run_frame,
+            text="Открыть run_summary.json",
+            command=self._open_latest_run_summary_json,
+        ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            latest_run_frame,
+            text="Открыть run-лог",
+            command=self._open_latest_run_log,
+        ).grid(row=1, column=3, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            latest_run_frame,
+            text="Открыть папку всех запусков",
+            command=self._open_desktop_runs_dir,
+        ).grid(row=1, column=4, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            latest_run_frame,
+            text="Открыть df_main.csv",
+            command=self._open_latest_df_main_csv,
+        ).grid(row=2, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(
+            latest_run_frame,
+            text="Открыть NPZ bundle",
+            command=self._open_latest_npz_bundle,
+        ).grid(row=2, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
+        ttk.Button(
+            latest_run_frame,
+            text="Открыть cache entry",
+            command=self._open_latest_run_cache_dir,
+        ).grid(row=2, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
+
         ttk.Label(
             actions,
-            text="Preview использует временный worldroad-сценарий с текущей скоростью из раздела «Настройки расчёта».",
+            text=(
+                "Preview использует временный worldroad-сценарий с текущей скоростью из раздела «Статическая настройка». "
+                "Если нужен полный pre-run workflow с cache/export/logging, используйте отдельное окно настройки расчёта."
+            ),
             foreground="#555555",
-        ).grid(row=7, column=0, columnspan=6, sticky="w", pady=(12, 0))
+        ).grid(row=8, column=0, columnspan=6, sticky="w", pady=(12, 0))
 
         route_frame = ttk.LabelFrame(outer, text="Пошаговый маршрут настройки", padding=10)
         route_frame.pack(fill="x", pady=(12, 0))
-        for col in range(4):
+        route_col_count = max(4, len(self.section_titles))
+        for col in range(route_col_count):
             route_frame.columnconfigure(col, weight=1)
         ttk.Label(
             route_frame,
             text=(
-                "Быстрый маршрут помогает идти по шагам: сначала геометрия, затем пневматика, "
-                "механика и в конце настройки расчёта. Это только навигация по текущему editor "
+                "Быстрый маршрут помогает идти по кластерам: сначала геометрия, затем пневматика, "
+                "механика, статическая настройка, компоненты и справочные данные. "
+                "Это только навигация по текущему editor "
                 "и не дублирует отдельные окна Animator, Compare Viewer или Mnemo."
             ),
             wraplength=1040,
             justify="left",
-        ).grid(row=0, column=0, columnspan=4, sticky="w")
+        ).grid(row=0, column=0, columnspan=route_col_count, sticky="w")
         for idx, title in enumerate(self.section_titles):
             button = ttk.Button(
                 route_frame,
@@ -1002,13 +1828,30 @@ class DesktopInputEditor:
             text="Далее",
             command=self._go_next_section,
         ).grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
+        ttk.Button(
+            route_frame,
+            text="К следующему замечанию",
+            command=self._go_next_attention_section,
+        ).grid(row=2, column=2, sticky="w", padx=(8, 0), pady=(10, 0))
+        ttk.Button(
+            route_frame,
+            text="К следующему изменению",
+            command=self._go_next_changed_section,
+        ).grid(row=2, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
         ttk.Label(
             route_frame,
             textvariable=self.route_summary_var,
             foreground="#555555",
             wraplength=840,
             justify="left",
-        ).grid(row=2, column=2, columnspan=2, sticky="w", padx=(16, 0), pady=(10, 0))
+        ).grid(
+            row=3,
+            column=0,
+            columnspan=route_col_count,
+            sticky="w",
+            padx=(0, 0),
+            pady=(10, 0),
+        )
 
         search_frame = ttk.LabelFrame(outer, text="Быстрый поиск по параметрам", padding=10)
         search_frame.pack(fill="x", pady=(12, 0))
@@ -1055,20 +1898,40 @@ class DesktopInputEditor:
             text="Очистить поиск",
             command=self._clear_field_search,
         ).grid(row=2, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(
+            search_frame,
+            text="Показать изменённые",
+            command=self._show_changed_fields_in_search,
+        ).grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
+        ttk.Button(
+            search_frame,
+            text="Показать замечания",
+            command=self._show_attention_fields_in_search,
+        ).grid(row=2, column=2, sticky="w", padx=(8, 0), pady=(10, 0))
+        ttk.Button(
+            search_frame,
+            text="Показать текущий кластер",
+            command=self._show_current_section_fields_in_search,
+        ).grid(row=2, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
+        ttk.Button(
+            search_frame,
+            text="Показать отличия с профилем",
+            command=self._show_profile_diff_fields_in_search,
+        ).grid(row=2, column=4, sticky="w", padx=(8, 0), pady=(10, 0))
         ttk.Label(
             search_frame,
             textvariable=self.field_search_summary_var,
             foreground="#555555",
             wraplength=940,
             justify="left",
-        ).grid(row=2, column=1, columnspan=4, sticky="w", padx=(8, 0), pady=(10, 0))
+        ).grid(row=3, column=0, columnspan=5, sticky="w", pady=(10, 0))
         search_entry.bind("<Return>", lambda _event: self._jump_to_selected_field())
         self.field_search_combo.bind("<<ComboboxSelected>>", lambda _event: self._jump_to_selected_field())
 
         notebook = ttk.Notebook(outer)
         notebook.pack(fill="both", expand=True, pady=(12, 0))
         self.section_notebook = notebook
-        self.section_notebook.bind("<<NotebookTabChanged>>", lambda _event: self._refresh_section_route_summary())
+        self.section_notebook.bind("<<NotebookTabChanged>>", self._on_section_tab_changed)
 
         for section in DESKTOP_INPUT_SECTIONS:
             tab = ScrollableSection(notebook)
@@ -1080,13 +1943,66 @@ class DesktopInputEditor:
                 wraplength=1000,
                 justify="left",
             ).grid(row=0, column=0, sticky="w", padx=12, pady=(12, 10))
+            section_actions = ttk.Frame(tab.body)
+            section_actions.grid(row=0, column=1, sticky="e", padx=12, pady=(12, 10))
+            restore_button = ttk.Button(
+                section_actions,
+                text="Вернуть к рабочей точке",
+                state="disabled",
+                command=lambda sec=section: self._reset_section_to_source_reference(sec),
+            )
+            restore_button.grid(row=0, column=0, sticky="e")
             ttk.Button(
-                tab.body,
+                section_actions,
                 text="Вернуть раздел к значениям по умолчанию",
                 command=lambda sec=section: self._reset_section_to_defaults(sec),
-            ).grid(row=0, column=1, sticky="e", padx=12, pady=(12, 10))
+            ).grid(row=0, column=1, sticky="e", padx=(8, 0))
 
-            for idx, spec in enumerate(section.fields, start=1):
+            summary_frame = ttk.LabelFrame(
+                tab.body,
+                text="Сводка по текущему кластеру",
+                padding=8,
+            )
+            summary_frame.grid(
+                row=1,
+                column=0,
+                columnspan=2,
+                sticky="ew",
+                padx=12,
+                pady=(0, 10),
+            )
+            summary_frame.columnconfigure(0, weight=1)
+            summary_var = tk.StringVar(
+                value="Сводка кластера обновляется по текущим значениям."
+            )
+            summary_label = ttk.Label(
+                summary_frame,
+                textvariable=summary_var,
+                wraplength=980,
+                justify="left",
+                foreground="#355c7d",
+            )
+            summary_label.grid(row=0, column=0, sticky="w")
+            issue_button = ttk.Button(
+                summary_frame,
+                text="Перейти к замечанию",
+                state="disabled",
+                command=lambda section_title=section.title: self._jump_to_section_issue(section_title),
+            )
+            issue_button.grid(row=0, column=1, sticky="ne", padx=(12, 0))
+            search_button = ttk.Button(
+                summary_frame,
+                text="Показать параметры кластера",
+                command=lambda section_title=section.title: self._show_section_search_from_summary(section_title),
+            )
+            search_button.grid(row=0, column=2, sticky="ne", padx=(8, 0))
+            self.section_summary_vars[section.title] = summary_var
+            self.section_summary_labels[section.title] = summary_label
+            self.section_issue_buttons[section.title] = issue_button
+            self.section_restore_buttons[section.title] = restore_button
+            self.section_search_buttons[section.title] = search_button
+
+            for idx, spec in enumerate(section.fields, start=2):
                 frame = ttk.LabelFrame(tab.body, text=spec.label, padding=10)
                 frame.grid(row=idx, column=0, sticky="ew", padx=12, pady=8)
                 frame.columnconfigure(1, weight=1)
@@ -1116,6 +2032,20 @@ class DesktopInputEditor:
             foreground="#555555",
         ).pack(side="right", anchor="e")
 
+    def _build_field_restore_button(
+        self,
+        frame: ttk.LabelFrame,
+        spec: DesktopInputFieldSpec,
+    ) -> None:
+        button = ttk.Button(
+            frame,
+            text="Совпадает",
+            state="disabled",
+            command=lambda key=spec.key: self._restore_field_to_source_reference(key),
+        )
+        button.grid(row=1, column=4, sticky="e", padx=(10, 0), pady=(8, 0))
+        self.field_restore_buttons[spec.key] = button
+
     def _build_field_controls(self, frame: ttk.LabelFrame, spec: DesktopInputFieldSpec) -> None:
         if spec.control == "bool":
             var = tk.BooleanVar(value=False)
@@ -1124,6 +2054,7 @@ class DesktopInputEditor:
             value_label.grid(row=1, column=3, sticky="e", pady=(8, 0))
             self.vars[spec.key] = var
             self._widget_handles[spec.key] = (spec, value_label)
+            self._build_field_restore_button(frame, spec)
             var.trace_add("write", lambda *_args, key=spec.key: self._on_field_var_changed(key))
             return
 
@@ -1135,7 +2066,8 @@ class DesktopInputEditor:
             value_label.grid(row=1, column=3, sticky="e", pady=(8, 0))
             self.vars[spec.key] = var
             self._widget_handles[spec.key] = (spec, value_label)
-            var.trace_add("write", lambda *_args, key=spec.key: self._refresh_value_label(key))
+            self._build_field_restore_button(frame, spec)
+            var.trace_add("write", lambda *_args, key=spec.key: self._on_field_var_changed(key))
             return
 
         if spec.control == "int":
@@ -1163,7 +2095,8 @@ class DesktopInputEditor:
             value_label.grid(row=1, column=3, sticky="e", pady=(8, 0))
             self.vars[spec.key] = var
             self._widget_handles[spec.key] = (spec, value_label)
-            var.trace_add("write", lambda *_args, key=spec.key: self._refresh_value_label(key))
+            self._build_field_restore_button(frame, spec)
+            var.trace_add("write", lambda *_args, key=spec.key: self._on_field_var_changed(key))
             return
 
         var = tk.DoubleVar(value=float(spec.min_value or 0.0))
@@ -1191,14 +2124,28 @@ class DesktopInputEditor:
         value_label.grid(row=1, column=3, sticky="e", pady=(8, 0))
         self.vars[spec.key] = var
         self._widget_handles[spec.key] = (spec, value_label)
+        self._build_field_restore_button(frame, spec)
         var.trace_add("write", lambda *_args, key=spec.key: self._on_field_var_changed(key))
 
+    def _refresh_source_reference_diff_state(self) -> None:
+        diffs = build_desktop_profile_diff(
+            self._gather_payload(),
+            self.source_reference_payload,
+        )
+        self.source_reference_diffs_by_key = {
+            str(item.get("key") or ""): item for item in diffs
+        }
+
     def _on_field_var_changed(self, key: str) -> None:
+        self._refresh_source_reference_diff_state()
         self._refresh_value_label(key)
         self._refresh_config_summary()
         self._refresh_section_route_summary()
+        self._refresh_section_header_summaries()
         if self.compare_target_path is not None:
             self._refresh_profile_comparison()
+        else:
+            self._refresh_active_field_search_view()
 
     def _display_source_name(self) -> str:
         path = self.current_source_path
@@ -1228,6 +2175,7 @@ class DesktopInputEditor:
             if bool(self.snapshot_before_run_var.get())
             else "выключен"
         )
+        run_profile_key = self._selected_run_profile_key()
         self.run_context_var.set(
             "\n".join(
                 (
@@ -1236,6 +2184,7 @@ class DesktopInputEditor:
                     f"Последний снимок: {active_snapshot}",
                     f"Сравнение с профилем: {compare_profile}",
                     f"Автоснимок перед запуском: {snapshot_policy}",
+                    f"Run setup: {run_profile_label(run_profile_key)}; cache {cache_policy_label(str(self.run_cache_policy_var.get() or 'reuse'))}; runtime policy {runtime_policy_label(str(self.run_runtime_policy_var.get() or 'balanced'))}.",
                 )
             )
         )
@@ -1248,31 +2197,211 @@ class DesktopInputEditor:
         self.run_mode_usage_var.set(str(mode_info.get("usage_summary") or "").strip())
 
     def _refresh_run_launch_summary(self) -> None:
-        snapshot_enabled = bool(self.snapshot_before_run_var.get())
-        snapshot_base_name = str(self.snapshot_name_var.get() or "").strip() or "перед_запуском"
-        snapshot_summary = (
-            f"автоснимок включён ({snapshot_base_name})"
-            if snapshot_enabled
-            else "автоснимок выключен"
+        info = describe_run_setup_snapshot(
+            self._gather_run_settings_snapshot(),
+            scenario_label=self._selected_run_scenario_label(),
+            preview_surface_label=preview_surface_label(self._selected_preview_surface_key()),
+            snapshot_enabled=bool(self.snapshot_before_run_var.get()),
+            snapshot_name=str(self.snapshot_name_var.get() or "").strip() or "перед_запуском",
         )
-        quick_surface = preview_surface_label(self._selected_preview_surface_key())
-        quick_summary = (
-            f"Быстрый расчёт: дорожный preview «{quick_surface}», "
-            f"dt={float(self.preview_dt_var.get()):.3f} с, "
-            f"длительность={float(self.preview_t_end_var.get()):.1f} с, "
-            f"участок={float(self.preview_road_len_var.get()):.1f} м, {snapshot_summary}."
+        selfcheck_report_path = self._runtime_selfcheck_report_path()
+        selfcheck_report_exists = selfcheck_report_path.exists()
+        selfcheck_report = self._load_selfcheck_report(selfcheck_report_path)
+        selfcheck_modified_at = ""
+        if selfcheck_report_exists:
+            try:
+                selfcheck_modified_at = datetime.fromtimestamp(
+                    selfcheck_report_path.stat().st_mtime
+                ).strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                selfcheck_modified_at = ""
+        selfcheck_has_signature, selfcheck_is_stale = self._selfcheck_freshness_state(
+            selfcheck_report
         )
-        run_mode = describe_desktop_run_mode(self._gather_run_settings_snapshot())
-        scenario_label = self._selected_run_scenario_label()
-        road_part = ""
-        if self._selected_run_scenario_key() == "worldroad":
-            road_part = f", профиль дороги «{quick_surface}»"
-        detail_summary = (
-            f"Подробный расчёт: {scenario_label}{road_part}, "
-            f"режим {str(run_mode.get('mode_label') or '').strip()}, "
-            f"{str(run_mode.get('cost_label') or '').strip()}, {snapshot_summary}."
+        selfcheck_line = describe_selfcheck_gate_status(
+            selfcheck_report,
+            report_exists=selfcheck_report_exists,
+            modified_at=selfcheck_modified_at,
+            has_signature=selfcheck_has_signature,
+            is_stale=selfcheck_is_stale,
         )
-        self.run_launch_summary_var.set(f"{quick_summary}\n{detail_summary}")
+        launch_route_line = describe_run_launch_route(
+            auto_check_enabled=bool(self.run_auto_check_var.get()),
+            runtime_policy_key=str(self.run_runtime_policy_var.get() or "balanced"),
+            summary=selfcheck_report,
+            report_exists=selfcheck_report_exists,
+            has_signature=selfcheck_has_signature,
+            is_stale=selfcheck_is_stale,
+        )
+        launch_outlook_line = describe_run_launch_outlook(
+            auto_check_enabled=bool(self.run_auto_check_var.get()),
+            runtime_policy_key=str(self.run_runtime_policy_var.get() or "balanced"),
+            summary=selfcheck_report,
+            report_exists=selfcheck_report_exists,
+            has_signature=selfcheck_has_signature,
+            is_stale=selfcheck_is_stale,
+        )
+        launch_recommendation_line = describe_run_launch_recommendation(
+            auto_check_enabled=bool(self.run_auto_check_var.get()),
+            runtime_policy_key=str(self.run_runtime_policy_var.get() or "balanced"),
+            summary=selfcheck_report,
+            report_exists=selfcheck_report_exists,
+            has_signature=selfcheck_has_signature,
+            is_stale=selfcheck_is_stale,
+        )
+        self.run_launch_summary_var.set(
+            "\n".join(
+                (
+                    str(info.get("headline") or "").strip(),
+                    str(info.get("preview_line") or "").strip(),
+                    str(info.get("detail_line") or "").strip(),
+                    str(info.get("runtime_line") or "").strip(),
+                    selfcheck_line,
+                    launch_route_line,
+                    launch_outlook_line,
+                    launch_recommendation_line,
+                )
+            ).strip()
+        )
+
+    def _current_latest_run_dir(self) -> Path | None:
+        if self.active_run_dir is not None and self.active_run_dir.exists():
+            return self.active_run_dir.resolve()
+        run_dirs = list_desktop_run_dirs()
+        if not run_dirs:
+            self.active_run_dir = None
+            self.active_run_summary_path = None
+            self.active_run_log_path = None
+            self.active_run_cache_dir = None
+            self.active_run_saved_files = {}
+            return None
+        latest = run_dirs[0].resolve()
+        self.active_run_dir = latest
+        self.active_run_summary_path = desktop_run_summary_path(latest)
+        return latest
+
+    def _latest_run_log_path_from_summary(self, summary: dict[str, object] | None) -> Path | None:
+        raw = str(dict(summary or {}).get("ui_subprocess_log") or "").strip()
+        if not raw:
+            return None
+        try:
+            return Path(raw).resolve()
+        except Exception:
+            return None
+
+    def _latest_run_cache_dir_from_summary(self, summary: dict[str, object] | None) -> Path | None:
+        current = dict(summary or {})
+        raw = str(current.get("cache_dir") or "").strip()
+        if not raw:
+            cache_policy = str(current.get("cache_policy") or "off").strip().lower() or "off"
+            cache_key = str(current.get("cache_key") or "").strip()
+            if cache_policy != "off" and cache_key:
+                try:
+                    return desktop_single_run_cache_dir(cache_key)
+                except Exception:
+                    return None
+            return None
+        try:
+            return Path(raw).resolve()
+        except Exception:
+            return None
+
+    def _latest_run_saved_files_from_summary(self, summary: dict[str, object] | None) -> dict[str, str]:
+        raw = dict(summary or {}).get("saved_files")
+        if not isinstance(raw, dict):
+            return {}
+        saved: dict[str, str] = {}
+        for key, value in raw.items():
+            text = str(value or "").strip()
+            if not text:
+                continue
+            try:
+                saved[str(key)] = str(Path(text).resolve())
+            except Exception:
+                saved[str(key)] = text
+        return saved
+
+    def _latest_saved_file_path(self, key: str) -> Path | None:
+        raw = str(self.active_run_saved_files.get(str(key), "")).strip()
+        if not raw:
+            return None
+        try:
+            return Path(raw).resolve()
+        except Exception:
+            return None
+
+    def _refresh_latest_run_summary(self) -> None:
+        latest_dir = self._current_latest_run_dir()
+        if latest_dir is None:
+            self.active_run_log_path = None
+            self.active_run_cache_dir = None
+            self.active_run_saved_files = {}
+            self.latest_run_summary_var.set(
+                f"Подробные расчёты ещё не запускались.\nПапка запусков: {desktop_runs_dir_path()}"
+            )
+            return
+
+        summary_path = desktop_run_summary_path(latest_dir)
+        self.active_run_dir = latest_dir
+        self.active_run_summary_path = summary_path
+        if not summary_path.exists():
+            self.active_run_log_path = None
+            self.active_run_cache_dir = None
+            self.active_run_saved_files = {}
+            self.latest_run_summary_var.set(
+                "\n".join(
+                    (
+                        f"Последний запуск: {latest_dir.name}",
+                        "run_summary.json пока не найден.",
+                        f"Папка запуска: {latest_dir}",
+                    )
+                )
+            )
+            return
+
+        try:
+            summary = load_desktop_run_summary(summary_path)
+        except Exception as exc:
+            self.active_run_log_path = None
+            self.active_run_cache_dir = None
+            self.active_run_saved_files = {}
+            self.latest_run_summary_var.set(
+                "\n".join(
+                    (
+                        f"Последний запуск: {latest_dir.name}",
+                        f"Не удалось прочитать run_summary.json: {exc}",
+                        f"Путь к summary: {summary_path}",
+                    )
+                )
+            )
+            return
+
+        self.active_run_log_path = self._latest_run_log_path_from_summary(summary)
+        self.active_run_cache_dir = self._latest_run_cache_dir_from_summary(summary)
+        self.active_run_saved_files = self._latest_run_saved_files_from_summary(summary)
+        info = describe_latest_run_summary(
+            summary,
+            latest_run_name=latest_dir.name,
+            latest_run_dir=str(latest_dir),
+        )
+        artifact_line = str(info.get("artifact_line") or "").strip()
+        if not artifact_line:
+            artifact_line = f"Папка артефактов: {summary.get('outdir') or latest_dir}"
+        self.latest_run_summary_var.set(
+            "\n".join(
+                (
+                    str(info.get("headline") or "").strip(),
+                    str(info.get("scenario_line") or "").strip(),
+                    str(info.get("runtime_line") or "").strip(),
+                    str(info.get("mode_line") or "").strip(),
+                    str(info.get("health_line") or "").strip(),
+                    str(info.get("artifact_state_line") or "").strip(),
+                    str(info.get("cache_line") or "").strip(),
+                    str(info.get("log_line") or "").strip(),
+                    artifact_line,
+                )
+            )
+        )
 
     def _refresh_value_label(self, key: str) -> None:
         handle = self._widget_handles.get(key)
@@ -1280,6 +2409,7 @@ class DesktopInputEditor:
         if handle is None or var is None:
             return
         spec, label = handle
+        restore_button = self.field_restore_buttons.get(key)
         try:
             value = var.get()
         except Exception:
@@ -1292,13 +2422,31 @@ class DesktopInputEditor:
             text = f"{int(value)} {spec.unit_label}".strip()
         else:
             text = f"{float(value):.{int(spec.digits)}f} {spec.unit_label}".strip()
-        if key in self.compare_diffs_by_key:
+        compare_diff = key in self.compare_diffs_by_key
+        source_diff = key in self.source_reference_diffs_by_key
+        if compare_diff and source_diff:
+            label.configure(
+                text=f"{text} · изменено и от рабочей точки",
+                foreground="#8a4b00",
+            )
+        elif compare_diff:
             label.configure(text=f"{text} · изменено", foreground="#a05a00")
+        elif source_diff:
+            label.configure(
+                text=f"{text} · изменено от рабочей точки",
+                foreground="#16507a",
+            )
         else:
             label.configure(text=text, foreground="#2f4f4f")
+        if restore_button is not None:
+            if source_diff:
+                restore_button.configure(text="К рабочей точке", state="normal")
+            else:
+                restore_button.configure(text="Совпадает", state="disabled")
 
     def _bind_summary_var_traces(self) -> None:
         tracked_vars = (
+            self.preview_surface_var,
             self.preview_dt_var,
             self.preview_t_end_var,
             self.preview_road_len_var,
@@ -1309,17 +2457,35 @@ class DesktopInputEditor:
             self.preview_surface_start_var,
             self.preview_surface_angle_var,
             self.preview_surface_shape_var,
+            self.run_profile_var,
+            self.run_scenario_var,
             self.run_dt_var,
             self.run_t_end_var,
             self.run_record_full_var,
             self.run_primary_value_var,
             self.run_secondary_value_var,
+            self.run_cache_policy_var,
+            self.run_export_csv_var,
+            self.run_export_npz_var,
+            self.run_auto_check_var,
+            self.run_log_to_file_var,
+            self.run_runtime_policy_var,
         )
         for var in tracked_vars:
             var.trace_add("write", lambda *_args: self._refresh_config_summary())
             var.trace_add("write", lambda *_args: self._refresh_run_context_summary())
             var.trace_add("write", lambda *_args: self._refresh_run_mode_summary())
             var.trace_add("write", lambda *_args: self._refresh_run_launch_summary())
+            var.trace_add("write", lambda *_args: self._refresh_run_profile_hint())
+            var.trace_add("write", lambda *_args: self._refresh_run_policy_hints())
+        self.preview_surface_var.trace_add(
+            "write",
+            lambda *_args: self._refresh_preview_surface_controls(),
+        )
+        self.run_scenario_var.trace_add(
+            "write",
+            lambda *_args: self._refresh_run_scenario_controls(),
+        )
 
     def _safe_current_base_float(self, key: str, default: float = 0.0) -> float:
         spec_var = self.vars.get(key)
@@ -1337,6 +2503,76 @@ class DesktopInputEditor:
             self._selected_run_scenario_key(),
             self._selected_run_scenario_key(),
         )
+
+    def _selected_run_profile_key(self) -> str:
+        key = str(self.run_profile_var.get() or "").strip().lower()
+        known = {name for name, _label, _desc in DESKTOP_RUN_PROFILE_OPTIONS}
+        return key if key in known else "detail"
+
+    def _refresh_run_profile_hint(self) -> None:
+        profile_key = self._selected_run_profile_key()
+        label = run_profile_label(profile_key)
+        description = run_profile_description(profile_key)
+        self.run_profile_hint_var.set(
+            f"Профиль запуска: {label}. {description}"
+        )
+
+    def _refresh_run_policy_hints(self) -> None:
+        cache_key = str(self.run_cache_policy_var.get() or "").strip().lower() or "reuse"
+        runtime_policy_key = str(self.run_runtime_policy_var.get() or "").strip().lower() or "balanced"
+        self.run_cache_hint_var.set(
+            f"Cache: {cache_policy_label(cache_key)}. {cache_policy_description(cache_key)}"
+        )
+        self.run_runtime_policy_hint_var.set(
+            f"Runtime policy: {runtime_policy_label(runtime_policy_key)}. {runtime_policy_description(runtime_policy_key)}"
+        )
+
+    def _apply_run_setup_profile(self, profile_key: str) -> None:
+        before_payload = self._gather_payload()
+        before_run = self._gather_run_settings_snapshot()
+        updated, changed_keys = apply_run_setup_profile(
+            before_run,
+            profile_key,
+            scenario_key=self._selected_run_scenario_key(),
+        )
+        label = run_profile_label(profile_key)
+        description = run_profile_description(profile_key)
+        if not changed_keys:
+            self.run_profile_var.set(str(updated.get("launch_profile") or profile_key))
+            self.run_preset_hint_var.set(
+                f"Профиль запуска «{label}» уже активен."
+            )
+            self._set_status(f"Профиль запуска «{label}» уже применён.")
+            return
+        self._remember_safe_action(
+            f"Профиль запуска: {label}",
+            before_payload,
+            changed_count=len(changed_keys),
+            run_settings_snapshot=before_run,
+        )
+        self._restore_run_settings_snapshot(updated)
+        self.run_preset_hint_var.set(
+            f"Профиль запуска «{label}» применён. {description} Изменено runtime-настроек: {len(changed_keys)}."
+        )
+        self._set_status(f"Применён профиль запуска: {label}")
+        self._append_run_log(
+            f"[run-profile] {label}: изменено runtime-настроек {len(changed_keys)}"
+        )
+
+    def _open_run_setup_center(self) -> None:
+        existing = self._run_setup_center
+        try:
+            if existing is not None:
+                existing.focus()
+                return
+        except Exception:
+            self._run_setup_center = None
+        from pneumo_solver_ui.tools.desktop_run_setup_center import DesktopRunSetupCenter
+
+        self._run_setup_center = DesktopRunSetupCenter(self)
+
+    def _notify_run_setup_center_closed(self) -> None:
+        self._run_setup_center = None
 
     def _refresh_config_summary(self) -> None:
         mass_frame = self._safe_current_base_float("масса_рамы")
@@ -1382,6 +2618,12 @@ class DesktopInputEditor:
                 f"длительность={float(self.run_t_end_var.get()):.1f} с; "
                 f"расширенный лог={'включён' if bool(self.run_record_full_var.get()) else 'выключен'}."
             ),
+            (
+                f"Run setup: {run_profile_label(self._selected_run_profile_key())}; "
+                f"cache={cache_policy_label(str(self.run_cache_policy_var.get() or 'reuse'))}; "
+                f"NPZ={'да' if bool(self.run_export_npz_var.get()) else 'нет'}; "
+                f"auto-check={'да' if bool(self.run_auto_check_var.get()) else 'нет'}."
+            ),
         ]
         self.config_summary_var.set("\n".join(lines))
 
@@ -1409,20 +2651,76 @@ class DesktopInputEditor:
 
     def _gather_run_settings_snapshot(self) -> dict[str, object]:
         return {
+            "launch_profile": self._selected_run_profile_key(),
             "scenario_key": self._selected_run_scenario_key(),
+            "preview_dt": float(self.preview_dt_var.get()),
+            "preview_t_end": float(self.preview_t_end_var.get()),
+            "preview_road_len_m": float(self.preview_road_len_var.get()),
+            "preview_surface_key": self._selected_preview_surface_key(),
+            "preview_primary_value": float(self.preview_surface_primary_value_var.get()),
+            "preview_secondary_value": float(self.preview_surface_secondary_value_var.get()),
+            "preview_start_value": float(self.preview_surface_start_var.get()),
+            "preview_angle_value": float(self.preview_surface_angle_var.get()),
+            "preview_shape_value": float(self.preview_surface_shape_var.get()),
             "dt": float(self.run_dt_var.get()),
             "t_end": float(self.run_t_end_var.get()),
             "record_full": bool(self.run_record_full_var.get()),
             "primary_value": float(self.run_primary_value_var.get()),
             "secondary_value": float(self.run_secondary_value_var.get()),
+            "cache_policy": str(self.run_cache_policy_var.get() or "reuse"),
+            "export_csv": bool(self.run_export_csv_var.get()),
+            "export_npz": bool(self.run_export_npz_var.get()),
+            "auto_check": bool(self.run_auto_check_var.get()),
+            "write_log_file": bool(self.run_log_to_file_var.get()),
+            "runtime_policy": str(self.run_runtime_policy_var.get() or "balanced"),
         }
 
     def _restore_run_settings_snapshot(self, snapshot: dict[str, object] | None) -> None:
         if not snapshot:
             return
+        profile_key = str(snapshot.get("launch_profile") or "").strip().lower()
+        if profile_key:
+            self.run_profile_var.set(profile_key)
         scenario_key = str(snapshot.get("scenario_key") or "").strip()
         if scenario_key and scenario_key in self.run_scenario_key_to_label:
             self.run_scenario_var.set(self.run_scenario_key_to_label[scenario_key])
+        preview_surface_key = str(snapshot.get("preview_surface_key") or "").strip()
+        if preview_surface_key and preview_surface_key in self.preview_surface_key_to_label:
+            self.preview_surface_var.set(self.preview_surface_key_to_label[preview_surface_key])
+        elif preview_surface_key and preview_surface_key in self.preview_surface_label_to_key:
+            self.preview_surface_var.set(preview_surface_key)
+        try:
+            self.preview_dt_var.set(float(snapshot.get("preview_dt", self.preview_dt_var.get())))
+        except Exception:
+            pass
+        try:
+            self.preview_t_end_var.set(float(snapshot.get("preview_t_end", self.preview_t_end_var.get())))
+        except Exception:
+            pass
+        try:
+            self.preview_road_len_var.set(float(snapshot.get("preview_road_len_m", self.preview_road_len_var.get())))
+        except Exception:
+            pass
+        try:
+            self.preview_surface_primary_value_var.set(float(snapshot.get("preview_primary_value", self.preview_surface_primary_value_var.get())))
+        except Exception:
+            pass
+        try:
+            self.preview_surface_secondary_value_var.set(float(snapshot.get("preview_secondary_value", self.preview_surface_secondary_value_var.get())))
+        except Exception:
+            pass
+        try:
+            self.preview_surface_start_var.set(float(snapshot.get("preview_start_value", self.preview_surface_start_var.get())))
+        except Exception:
+            pass
+        try:
+            self.preview_surface_angle_var.set(float(snapshot.get("preview_angle_value", self.preview_surface_angle_var.get())))
+        except Exception:
+            pass
+        try:
+            self.preview_surface_shape_var.set(float(snapshot.get("preview_shape_value", self.preview_surface_shape_var.get())))
+        except Exception:
+            pass
         try:
             self.run_dt_var.set(float(snapshot.get("dt", self.run_dt_var.get())))
         except Exception:
@@ -1443,6 +2741,31 @@ class DesktopInputEditor:
             self.run_secondary_value_var.set(float(snapshot.get("secondary_value", self.run_secondary_value_var.get())))
         except Exception:
             pass
+        try:
+            self.run_cache_policy_var.set(str(snapshot.get("cache_policy", self.run_cache_policy_var.get()) or "reuse"))
+        except Exception:
+            pass
+        try:
+            self.run_export_csv_var.set(bool(snapshot.get("export_csv", self.run_export_csv_var.get())))
+        except Exception:
+            pass
+        try:
+            self.run_export_npz_var.set(bool(snapshot.get("export_npz", self.run_export_npz_var.get())))
+        except Exception:
+            pass
+        try:
+            self.run_auto_check_var.set(bool(snapshot.get("auto_check", self.run_auto_check_var.get())))
+        except Exception:
+            pass
+        try:
+            self.run_log_to_file_var.set(bool(snapshot.get("write_log_file", self.run_log_to_file_var.get())))
+        except Exception:
+            pass
+        try:
+            self.run_runtime_policy_var.set(str(snapshot.get("runtime_policy", self.run_runtime_policy_var.get()) or "balanced"))
+        except Exception:
+            pass
+        self._refresh_preview_surface_controls()
         self._refresh_run_scenario_controls()
 
     def _remember_safe_action(
@@ -1689,7 +3012,11 @@ class DesktopInputEditor:
             merged = load_base_with_defaults()
             merged.update(payload)
             self.active_snapshot_path = target.resolve()
-            self._load_into_vars(merged, self.current_source_path)
+            self._load_into_vars(
+                merged,
+                self.current_source_path,
+                refresh_source_reference=True,
+            )
             self.snapshot_name_var.set(target.stem.split("__", 1)[-1])
             self._set_status(f"Загружен снимок: {target.name}")
             self._append_run_log(f"[snapshot] Загружен снимок: {target}")
@@ -1710,6 +3037,226 @@ class DesktopInputEditor:
             self._set_status(f"Открыта папка снимков: {root}")
         except Exception as exc:
             messagebox.showerror("Desktop Input Editor", f"Не удалось открыть папку снимков:\n{exc}")
+
+    def _open_path(self, target: Path, *, success_text: str, error_title: str) -> bool:
+        try:
+            if os.name == "nt":
+                os.startfile(str(target))  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(target)])
+            else:
+                subprocess.Popen(["xdg-open", str(target)])
+            self._set_status(success_text)
+            return True
+        except Exception as exc:
+            messagebox.showerror("Desktop Input Editor", f"{error_title}:\n{exc}")
+            return False
+
+    def _open_latest_run_dir(self) -> None:
+        latest_dir = self._current_latest_run_dir()
+        if latest_dir is None:
+            messagebox.showinfo("Desktop Input Editor", "Папка последнего запуска пока не найдена.")
+            return
+        self._open_path(
+            latest_dir,
+            success_text=f"Открыта папка запуска: {latest_dir}",
+            error_title="Не удалось открыть папку запуска",
+        )
+
+    def _open_latest_preview_report_json(self) -> None:
+        report_path = self._runtime_preview_report_path()
+        self.active_preview_report_path = report_path
+        if not report_path.exists():
+            messagebox.showinfo("Desktop Input Editor", "preview_report.json пока не найден.")
+            return
+        self._open_path(
+            report_path,
+            success_text=f"Открыт preview_report.json: {report_path}",
+            error_title="Не удалось открыть preview_report.json",
+        )
+
+    def _open_latest_selfcheck_report_json(self) -> None:
+        report_path = self._runtime_selfcheck_report_path()
+        self.active_selfcheck_report_path = report_path
+        if not report_path.exists():
+            messagebox.showinfo("Desktop Input Editor", "selfcheck_report.json пока не найден.")
+            return
+        self._open_path(
+            report_path,
+            success_text=f"Открыт selfcheck_report.json: {report_path}",
+            error_title="Не удалось открыть selfcheck_report.json",
+        )
+
+    def _open_latest_selfcheck_log(self) -> None:
+        report_path = self._runtime_selfcheck_report_path()
+        if report_path.exists():
+            try:
+                report = json.loads(report_path.read_text(encoding="utf-8"))
+                if isinstance(report, dict):
+                    self.active_selfcheck_log_path = self._selfcheck_log_path_from_report(report)
+            except Exception:
+                pass
+        log_path = self.active_selfcheck_log_path
+        if log_path is None:
+            messagebox.showinfo("Desktop Input Editor", "Лог последнего selfcheck пока не найден.")
+            return
+        if not log_path.exists():
+            messagebox.showinfo(
+                "Desktop Input Editor",
+                f"Файл лога последнего selfcheck не найден:\n{log_path}",
+            )
+            return
+        self._open_path(
+            log_path,
+            success_text=f"Открыт selfcheck-лог: {log_path}",
+            error_title="Не удалось открыть selfcheck-лог",
+        )
+
+    def _open_latest_preview_log(self) -> None:
+        report_path = self._runtime_preview_report_path()
+        if report_path.exists():
+            try:
+                report = json.loads(report_path.read_text(encoding="utf-8"))
+                if isinstance(report, dict):
+                    self.active_preview_log_path = self._preview_log_path_from_report(report)
+            except Exception:
+                pass
+        log_path = self.active_preview_log_path
+        if log_path is None:
+            messagebox.showinfo("Desktop Input Editor", "Лог последнего preview пока не найден.")
+            return
+        if not log_path.exists():
+            messagebox.showinfo(
+                "Desktop Input Editor",
+                f"Файл лога последнего preview не найден:\n{log_path}",
+            )
+            return
+        self._open_path(
+            log_path,
+            success_text=f"Открыт preview-лог: {log_path}",
+            error_title="Не удалось открыть preview-лог",
+        )
+
+    def _open_run_setup_cache_root(self) -> None:
+        root = desktop_run_setup_cache_root()
+        root.mkdir(parents=True, exist_ok=True)
+        self._open_path(
+            root,
+            success_text=f"Открыта папка runtime-cache: {root}",
+            error_title="Не удалось открыть папку runtime-cache",
+        )
+
+    def _open_run_setup_log_root(self) -> None:
+        root = desktop_run_setup_log_root()
+        root.mkdir(parents=True, exist_ok=True)
+        self._open_path(
+            root,
+            success_text=f"Открыта папка runtime-логов: {root}",
+            error_title="Не удалось открыть папку runtime-логов",
+        )
+
+    def _open_latest_run_summary_json(self) -> None:
+        latest_dir = self._current_latest_run_dir()
+        if latest_dir is None:
+            messagebox.showinfo("Desktop Input Editor", "run_summary.json пока не найден.")
+            return
+        summary_path = desktop_run_summary_path(latest_dir)
+        if not summary_path.exists():
+            messagebox.showinfo("Desktop Input Editor", "run_summary.json пока не найден.")
+            return
+        self._open_path(
+            summary_path,
+            success_text=f"Открыт run_summary.json: {summary_path}",
+            error_title="Не удалось открыть run_summary.json",
+        )
+
+    def _open_latest_run_log(self) -> None:
+        if self.active_run_summary_path is not None and self.active_run_summary_path.exists():
+            try:
+                summary = load_desktop_run_summary(self.active_run_summary_path)
+                self.active_run_log_path = self._latest_run_log_path_from_summary(summary)
+                self.active_run_cache_dir = self._latest_run_cache_dir_from_summary(summary)
+                self.active_run_saved_files = self._latest_run_saved_files_from_summary(summary)
+            except Exception:
+                pass
+        log_path = self.active_run_log_path
+        if log_path is None:
+            messagebox.showinfo("Desktop Input Editor", "Лог последнего запуска пока не найден.")
+            return
+        if not log_path.exists():
+            messagebox.showinfo(
+                "Desktop Input Editor",
+                f"Файл лога последнего запуска не найден:\n{log_path}",
+            )
+            return
+        self._open_path(
+            log_path,
+            success_text=f"Открыт run-лог: {log_path}",
+            error_title="Не удалось открыть run-лог",
+        )
+
+    def _open_latest_run_cache_dir(self) -> None:
+        if self.active_run_summary_path is not None and self.active_run_summary_path.exists():
+            try:
+                summary = load_desktop_run_summary(self.active_run_summary_path)
+                self.active_run_cache_dir = self._latest_run_cache_dir_from_summary(summary)
+                self.active_run_saved_files = self._latest_run_saved_files_from_summary(summary)
+            except Exception:
+                pass
+        cache_dir = self.active_run_cache_dir
+        if cache_dir is None:
+            messagebox.showinfo("Desktop Input Editor", "Cache entry последнего запуска пока не найден.")
+            return
+        if not cache_dir.exists():
+            messagebox.showinfo(
+                "Desktop Input Editor",
+                f"Папка cache entry последнего запуска не найдена:\n{cache_dir}",
+            )
+            return
+        self._open_path(
+            cache_dir,
+            success_text=f"Открыта папка cache entry: {cache_dir}",
+            error_title="Не удалось открыть папку cache entry",
+        )
+
+    def _open_latest_saved_file(self, key: str, *, label: str) -> None:
+        if self.active_run_summary_path is not None and self.active_run_summary_path.exists():
+            try:
+                summary = load_desktop_run_summary(self.active_run_summary_path)
+                self.active_run_cache_dir = self._latest_run_cache_dir_from_summary(summary)
+                self.active_run_saved_files = self._latest_run_saved_files_from_summary(summary)
+            except Exception:
+                pass
+        target = self._latest_saved_file_path(key)
+        if target is None:
+            messagebox.showinfo("Desktop Input Editor", f"{label} последнего запуска пока не найден.")
+            return
+        if not target.exists():
+            messagebox.showinfo(
+                "Desktop Input Editor",
+                f"Файл {label} последнего запуска не найден:\n{target}",
+            )
+            return
+        self._open_path(
+            target,
+            success_text=f"Открыт {label}: {target}",
+            error_title=f"Не удалось открыть {label}",
+        )
+
+    def _open_latest_df_main_csv(self) -> None:
+        self._open_latest_saved_file("df_main", label="df_main.csv")
+
+    def _open_latest_npz_bundle(self) -> None:
+        self._open_latest_saved_file("npz_bundle", label="NPZ bundle")
+
+    def _open_desktop_runs_dir(self) -> None:
+        root = desktop_runs_dir_path()
+        root.mkdir(parents=True, exist_ok=True)
+        self._open_path(
+            root,
+            success_text=f"Открыта папка запусков: {root}",
+            error_title="Не удалось открыть папку запусков",
+        )
 
     def _autosave_snapshot_before_run(self, run_label: str) -> None:
         if not bool(self.snapshot_before_run_var.get()):
@@ -1795,6 +3342,7 @@ class DesktopInputEditor:
             for key in self._widget_handles:
                 self._refresh_value_label(key)
             self._refresh_run_context_summary()
+            self._refresh_active_field_search_view()
             return
         try:
             reference_payload = self._profile_payload_with_defaults(target)
@@ -1805,6 +3353,7 @@ class DesktopInputEditor:
             for key in self._widget_handles:
                 self._refresh_value_label(key)
             self._refresh_run_context_summary()
+            self._refresh_active_field_search_view()
             return
 
         diffs = build_desktop_profile_diff(self._gather_payload(), reference_payload)
@@ -1825,6 +3374,7 @@ class DesktopInputEditor:
         for key in self._widget_handles:
             self._refresh_value_label(key)
         self._refresh_run_context_summary()
+        self._refresh_active_field_search_view()
 
     def _compare_selected_profile(self) -> None:
         target = self._selected_profile_path()
@@ -1848,7 +3398,9 @@ class DesktopInputEditor:
             return raw_value
         return "flat"
 
-    def _set_spinbox_state(self, widget: ttk.Spinbox, enabled: bool) -> None:
+    def _set_spinbox_state(self, widget: ttk.Spinbox | None, enabled: bool) -> None:
+        if widget is None:
+            return
         widget.configure(state="normal" if enabled else "disabled")
 
     def _refresh_preview_surface_controls(self) -> None:
@@ -1957,9 +3509,17 @@ class DesktopInputEditor:
         self._refresh_run_mode_summary()
         self._refresh_config_summary()
 
-    def _load_into_vars(self, payload: dict[str, object], source_path: Path) -> None:
+    def _load_into_vars(
+        self,
+        payload: dict[str, object],
+        source_path: Path,
+        *,
+        refresh_source_reference: bool = False,
+    ) -> None:
         self.current_payload = dict(payload)
         self.current_source_path = source_path.resolve()
+        if refresh_source_reference:
+            self.source_reference_payload = dict(payload)
         self.path_var.set(str(self.current_source_path))
         if source_path.name.endswith(".json"):
             self.profile_name_var.set(source_path.stem)
@@ -1974,11 +3534,15 @@ class DesktopInputEditor:
                 except Exception:
                     pass
                 self._refresh_value_label(spec.key)
+        self._refresh_source_reference_diff_state()
+        for key in self._widget_handles:
+            self._refresh_value_label(key)
         self._refresh_config_summary()
         self._refresh_run_context_summary()
         self._refresh_run_mode_summary()
         self._refresh_run_launch_summary()
         self._refresh_section_route_summary()
+        self._refresh_section_header_summaries()
         self._refresh_profile_comparison()
 
     def _reset_section_to_defaults(self, section: object) -> None:
@@ -2042,7 +3606,7 @@ class DesktopInputEditor:
             payload = load_base_with_defaults(target)
             self.active_profile_path = None
             self.active_snapshot_path = None
-            self._load_into_vars(payload, target)
+            self._load_into_vars(payload, target, refresh_source_reference=True)
             self._set_status(f"Загружен файл параметров: {target.name}")
         except Exception as exc:
             messagebox.showerror("Desktop Input Editor", f"Не удалось открыть JSON:\n{exc}")
@@ -2084,7 +3648,7 @@ class DesktopInputEditor:
             merged = load_base_with_defaults()
             merged.update(payload)
             self.active_profile_path = target.resolve()
-            self._load_into_vars(merged, target)
+            self._load_into_vars(merged, target, refresh_source_reference=True)
             self._set_status(f"Загружен профиль: {target.name}")
             self._append_run_log(f"[profile] Загружен профиль: {target}")
         except Exception as exc:
@@ -2116,7 +3680,11 @@ class DesktopInputEditor:
             payload = load_base_with_defaults()
             self.active_profile_path = None
             self.active_snapshot_path = None
-            self._load_into_vars(payload, default_base_json_path())
+            self._load_into_vars(
+                payload,
+                default_base_json_path(),
+                refresh_source_reference=True,
+            )
             self._set_status("Загружены значения по умолчанию из default_base.json.")
         except Exception as exc:
             messagebox.showerror("Desktop Input Editor", f"Не удалось загрузить default_base.json:\n{exc}")
@@ -2126,9 +3694,16 @@ class DesktopInputEditor:
         try:
             payload = self._gather_payload()
             save_base_payload(target, payload)
+            self.source_reference_payload = dict(payload)
+            self.current_payload = dict(payload)
+            self._refresh_source_reference_diff_state()
             self.current_source_path = target
             self.path_var.set(str(target))
             self._refresh_run_context_summary()
+            for key in self._widget_handles:
+                self._refresh_value_label(key)
+            self._refresh_section_header_summaries()
+            self._refresh_active_field_search_view()
             self._set_status(f"Рабочая копия сохранена: {target}")
             messagebox.showinfo("Desktop Input Editor", f"Рабочая копия сохранена:\n{target}")
         except Exception as exc:
@@ -2147,7 +3722,7 @@ class DesktopInputEditor:
         return (repo_root() / "workspace" / "ui_state" / "desktop_input_preview_report.json").resolve()
 
     def _runtime_single_run_root(self) -> Path:
-        return (repo_root() / "workspace" / "desktop_runs").resolve()
+        return desktop_runs_dir_path()
 
     def _new_runtime_single_run_dir(self) -> Path:
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -2284,6 +3859,8 @@ class DesktopInputEditor:
         *,
         result_path: Path | None = None,
         on_success: callable | None = None,
+        log_file_path: Path | None = None,
+        persist_stdout_json: bool = False,
     ) -> None:
         if self._task_running:
             messagebox.showinfo("Desktop Input Editor", "Дождитесь завершения текущей проверки или расчёта.")
@@ -2309,6 +3886,9 @@ class DesktopInputEditor:
                 stderr = proc.stderr or ""
 
                 def _finish() -> None:
+                    if self._host_closed:
+                        self._task_running = False
+                        return
                     self._task_running = False
                     if stdout.strip():
                         self._append_run_log("[stdout]")
@@ -2316,7 +3896,24 @@ class DesktopInputEditor:
                     if stderr.strip():
                         self._append_run_log("[stderr]")
                         self._append_run_log(stderr.strip())
+                    if log_file_path is not None:
+                        try:
+                            append_subprocess_log(
+                                log_file_path,
+                                title=title,
+                                cmd=cmd,
+                                returncode=int(proc.returncode),
+                                stdout=stdout,
+                                stderr=stderr,
+                            )
+                            self._append_run_log(f"[log] subprocess-лог сохранён: {log_file_path}")
+                        except Exception as exc:
+                            self._append_run_log(f"[warn] Не удалось записать subprocess-лог: {exc}")
                     if proc.returncode == 0:
+                        if persist_stdout_json and result_path is not None:
+                            saved = write_json_report_from_stdout(stdout, result_path)
+                            if saved is None:
+                                self._append_run_log("[warn] Не удалось выделить JSON из stdout команды.")
                         self._set_status(f"Готово: {title}")
                         if callable(on_success):
                             try:
@@ -2333,6 +3930,9 @@ class DesktopInputEditor:
                 self.root.after(0, _finish)
             except Exception as exc:
                 def _fail() -> None:
+                    if self._host_closed:
+                        self._task_running = False
+                        return
                     self._task_running = False
                     self._set_status(f"Ошибка запуска: {title}")
                     self._append_run_log(f"[error] {exc}")
@@ -2342,12 +3942,28 @@ class DesktopInputEditor:
 
         threading.Thread(target=_worker, daemon=True).start()
 
-    def _summarize_selfcheck_report(self, report_path: Path | None) -> None:
+    def _summarize_selfcheck_report(
+        self,
+        report_path: Path | None,
+        *,
+        log_file_path: Path | None = None,
+    ) -> None:
         if report_path is None or not report_path.exists():
             self._append_run_log("[warn] report_json не найден после проверки конфигурации.")
             return
         try:
             report = json.loads(report_path.read_text(encoding="utf-8"))
+            if not isinstance(report, dict):
+                raise ValueError("selfcheck_report.json должен содержать JSON object")
+            report["ui_subject_signature"] = self._current_selfcheck_subject_signature()
+            if log_file_path is not None:
+                report["ui_subprocess_log"] = str(log_file_path.resolve())
+            report_path.write_text(
+                json.dumps(report, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            self.active_selfcheck_report_path = report_path.resolve()
+            self.active_selfcheck_log_path = self._selfcheck_log_path_from_report(report)
             ok = bool(report.get("ok", False))
             errors = list(report.get("errors") or [])
             warnings = list(report.get("warnings") or [])
@@ -2360,14 +3976,149 @@ class DesktopInputEditor:
             for msg in warnings[:5]:
                 self._append_run_log(f"  warn: {msg}")
         except Exception as exc:
+            self.active_selfcheck_log_path = None
             self._append_run_log(f"[warn] Не удалось разобрать report_json: {exc}")
+        self._refresh_latest_selfcheck_summary()
 
-    def _summarize_preview_report(self, report_path: Path | None) -> None:
+    def _preview_log_path_from_report(self, report: dict[str, object] | None) -> Path | None:
+        raw = str(dict(report or {}).get("ui_subprocess_log") or "").strip()
+        if not raw:
+            return None
+        try:
+            return Path(raw).resolve()
+        except Exception:
+            return None
+
+    def _selfcheck_log_path_from_report(self, report: dict[str, object] | None) -> Path | None:
+        raw = str(dict(report or {}).get("ui_subprocess_log") or "").strip()
+        if not raw:
+            return None
+        try:
+            return Path(raw).resolve()
+        except Exception:
+            return None
+
+    def _refresh_latest_selfcheck_summary(self) -> None:
+        report_path = self._runtime_selfcheck_report_path()
+        self.active_selfcheck_report_path = report_path
+        if not report_path.exists():
+            self.active_selfcheck_log_path = None
+            self.latest_selfcheck_summary_var.set(
+                "\n".join(
+                    (
+                        "Auto-check / selfcheck ещё не запускался.",
+                        f"Ожидаемый JSON отчёт: {report_path}",
+                    )
+                )
+            )
+            self._refresh_run_launch_summary()
+            return
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            if not isinstance(report, dict):
+                raise ValueError("selfcheck_report.json должен содержать JSON object")
+        except Exception as exc:
+            self.active_selfcheck_log_path = None
+            self.latest_selfcheck_summary_var.set(
+                "\n".join(
+                    (
+                        "Последний auto-check найден, но отчёт не читается.",
+                        f"Не удалось прочитать selfcheck_report.json: {exc}",
+                        f"Путь к отчёту: {report_path}",
+                    )
+                )
+            )
+            self._refresh_run_launch_summary()
+            return
+        self.active_selfcheck_log_path = self._selfcheck_log_path_from_report(report)
+        has_signature, is_stale = self._selfcheck_freshness_state(report)
+        info = describe_latest_selfcheck_summary(
+            report,
+            report_path=str(report_path),
+            has_signature=has_signature,
+            is_stale=is_stale,
+        )
+        lines = [
+            str(info.get("headline") or "").strip(),
+            str(info.get("status_line") or "").strip(),
+            str(info.get("freshness_line") or "").strip(),
+            str(info.get("checks_line") or "").strip(),
+            str(info.get("log_line") or "").strip(),
+            str(info.get("report_line") or "").strip(),
+            str(info.get("note_line") or "").strip(),
+        ]
+        self.latest_selfcheck_summary_var.set("\n".join(line for line in lines if line))
+        self._refresh_run_launch_summary()
+
+    def _refresh_latest_preview_summary(self) -> None:
+        report_path = self._runtime_preview_report_path()
+        self.active_preview_report_path = report_path
+        if not report_path.exists():
+            self.active_preview_log_path = None
+            self.latest_preview_summary_var.set(
+                "\n".join(
+                    (
+                        "Preview ещё не запускался.",
+                        f"Ожидаемый JSON отчёт: {report_path}",
+                    )
+                )
+            )
+            return
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            if not isinstance(report, dict):
+                raise ValueError("preview_report.json должен содержать JSON object")
+        except Exception as exc:
+            self.active_preview_log_path = None
+            self.latest_preview_summary_var.set(
+                "\n".join(
+                    (
+                        "Последний preview найден, но отчёт не читается.",
+                        f"Не удалось прочитать preview_report.json: {exc}",
+                        f"Путь к отчёту: {report_path}",
+                    )
+                )
+            )
+            return
+        self.active_preview_log_path = self._preview_log_path_from_report(report)
+        info = describe_latest_preview_summary(report, report_path=str(report_path))
+        lines = [
+            str(info.get("headline") or "").strip(),
+            str(info.get("surface_line") or "").strip(),
+            str(info.get("metrics_line") or "").strip(),
+            str(info.get("pressure_line") or "").strip(),
+            str(info.get("log_line") or "").strip(),
+            str(info.get("report_line") or "").strip(),
+        ]
+        note_line = str(info.get("note_line") or "").strip()
+        if note_line:
+            lines.append(note_line)
+        self.latest_preview_summary_var.set("\n".join(line for line in lines if line))
+
+    def _summarize_preview_report(
+        self,
+        report_path: Path | None,
+        *,
+        log_file_path: Path | None = None,
+    ) -> None:
         if report_path is None or not report_path.exists():
             self._append_run_log("[warn] JSON preview-расчёта не найден.")
             return
         try:
             report = json.loads(report_path.read_text(encoding="utf-8"))
+            if not isinstance(report, dict):
+                raise ValueError("preview_report.json должен содержать JSON object")
+            report["preview_surface_key"] = self._selected_preview_surface_key()
+            report["preview_surface_label"] = preview_surface_label(self._selected_preview_surface_key())
+            report["preview_road_len_m"] = float(self.preview_road_len_var.get())
+            if log_file_path is not None:
+                report["ui_subprocess_log"] = str(log_file_path.resolve())
+            report_path.write_text(
+                json.dumps(report, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            self.active_preview_report_path = report_path.resolve()
+            self.active_preview_log_path = self._preview_log_path_from_report(report)
             self._append_run_log(
                 "[summary] "
                 f"roll_max={float(report.get('max_abs_phi_deg', 0.0)):.2f} deg; "
@@ -2375,15 +4126,43 @@ class DesktopInputEditor:
                 f"min_tire_Fz={float(report.get('min_tire_Fz_N', 0.0)):.1f} N; "
                 f"max_tire_pen={float(report.get('max_tire_pen_m', 0.0)):.4f} m"
             )
+            self._append_run_log(
+                "[summary] "
+                f"preview={report.get('preview_surface_label') or '—'}; "
+                f"dt={float(report.get('dt_s', 0.0) or 0.0):.3f} с; "
+                f"t_end={float(report.get('t_end_s', 0.0) or 0.0):.1f} с; "
+                f"steps={int(report.get('n_steps', 0) or 0)}"
+            )
+            if self.active_preview_log_path is not None:
+                self._append_run_log(f"[summary] UI preview-лог: {self.active_preview_log_path}")
         except Exception as exc:
+            self.active_preview_log_path = None
             self._append_run_log(f"[warn] Не удалось разобрать JSON preview-расчёта: {exc}")
+        self._refresh_latest_preview_summary()
 
-    def _summarize_single_run_report(self, report_path: Path | None) -> None:
+    def _summarize_single_run_report(
+        self,
+        report_path: Path | None,
+        *,
+        log_file_path: Path | None = None,
+    ) -> None:
         if report_path is None or not report_path.exists():
             self._append_run_log("[warn] JSON подробного расчёта не найден.")
             return
+        self.active_run_summary_path = report_path.resolve()
+        self.active_run_dir = report_path.resolve().parent
         try:
             report = json.loads(report_path.read_text(encoding="utf-8"))
+            if not isinstance(report, dict):
+                raise ValueError("run_summary.json должен содержать JSON object")
+            if log_file_path is not None:
+                report["ui_subprocess_log"] = str(log_file_path.resolve())
+                report_path.write_text(
+                    json.dumps(report, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+            self.active_run_log_path = self._latest_run_log_path_from_summary(report)
+            self.active_run_cache_dir = self._latest_run_cache_dir_from_summary(report)
             self._append_run_log(
                 "[summary] "
                 f"сценарий={report.get('scenario_name') or '—'}; "
@@ -2391,6 +4170,14 @@ class DesktopInputEditor:
                 f"строк df_main={int(report.get('df_main_rows') or 0)}; "
                 f"крен_peak={float(report.get('roll_peak_deg') or 0.0):.2f} град; "
                 f"тангаж_peak={float(report.get('pitch_peak_deg') or 0.0):.2f} град"
+            )
+            self._append_run_log(
+                "[summary] "
+                f"профиль={run_profile_label(str(report.get('run_profile') or 'detail'))}; "
+                f"cache={cache_policy_label(str(report.get('cache_policy') or 'off'))}; "
+                f"cache-hit={'да' if bool(report.get('cache_hit')) else 'нет'}; "
+                f"CSV={'да' if bool(report.get('export_csv', True)) else 'нет'}; "
+                f"NPZ={'да' if bool(report.get('export_npz', False)) else 'нет'}"
             )
             mech_ok = report.get("mech_selfcheck_ok")
             mech_msg = str(report.get("mech_selfcheck_msg") or "").strip()
@@ -2400,13 +4187,265 @@ class DesktopInputEditor:
                 )
             if mech_msg:
                 self._append_run_log(f"[summary] Сообщение: {mech_msg}")
+            if self.active_run_log_path is not None:
+                self._append_run_log(f"[summary] UI subprocess-лог: {self.active_run_log_path}")
+            if self.active_run_cache_dir is not None:
+                self._append_run_log(f"[summary] Cache entry: {self.active_run_cache_dir}")
             outdir = str(report.get("outdir") or "").strip()
             if outdir:
                 self._append_run_log(f"[summary] Артефакты расчёта: {outdir}")
         except Exception as exc:
+            self.active_run_log_path = None
+            self.active_run_cache_dir = None
             self._append_run_log(f"[warn] Не удалось разобрать JSON подробного расчёта: {exc}")
+        self._refresh_latest_run_summary()
 
-    def _soft_preflight_before_run(self, run_label: str) -> bool:
+    def _build_action_log_path(self, action_label: str) -> Path | None:
+        if not bool(self.run_log_to_file_var.get()):
+            return None
+        try:
+            return build_run_log_path(action_label)
+        except Exception as exc:
+            self._append_run_log(f"[warn] Не удалось подготовить путь для subprocess-лога: {exc}")
+            return None
+
+    def _current_selfcheck_subject_signature(self) -> str:
+        return build_selfcheck_subject_signature(
+            payload=self._gather_payload(),
+            run_settings=self._gather_run_settings_snapshot(),
+        )
+
+    def _selfcheck_signature_from_report(self, report: dict[str, object] | None) -> str:
+        return str(dict(report or {}).get("ui_subject_signature") or "").strip()
+
+    def _selfcheck_freshness_state(self, report: dict[str, object] | None) -> tuple[bool, bool]:
+        signature = self._selfcheck_signature_from_report(report)
+        if not signature:
+            return False, True
+        return True, signature != self._current_selfcheck_subject_signature()
+
+    def _load_selfcheck_report(self, report_path: Path | None) -> dict[str, object] | None:
+        if report_path is None or not report_path.exists():
+            return None
+        try:
+            raw = json.loads(report_path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+        return raw if isinstance(raw, dict) else None
+
+    def _stored_selfcheck_allows_launch(self, run_label: str) -> bool:
+        runtime_policy = str(self.run_runtime_policy_var.get() or "balanced").strip().lower() or "balanced"
+        report_path = self._runtime_selfcheck_report_path()
+        report = self._load_selfcheck_report(report_path)
+        if report is None:
+            issue_text = "последний сохранённый auto-check не найден"
+            if runtime_policy == "force":
+                self._append_run_log(
+                    f"[auto-check] {run_label}: {issue_text}, продолжаем без повторной проверки по policy=force."
+                )
+                return True
+            if runtime_policy == "strict":
+                self._append_run_log(
+                    f"[auto-check] {run_label}: {issue_text}, запуск остановлен по policy=strict."
+                )
+                self._set_status(f"Запуск остановлен: {run_label}")
+                messagebox.showwarning(
+                    "Desktop Input Editor",
+                    (
+                        f"Автоматический auto-check перед «{run_label}» выключен.\n\n"
+                        "Последний сохранённый auto-check не найден.\n\n"
+                        "Режим strict блокирует запуск без актуальной проверки. "
+                        "Сначала выполните «Проверить конфигурацию»."
+                    ),
+                )
+                return False
+            if messagebox.askyesno(
+                "Desktop Input Editor",
+                (
+                    f"Автоматический auto-check перед «{run_label}» выключен.\n\n"
+                    "Последний сохранённый auto-check не найден.\n\n"
+                    "Продолжить запуск без повторной проверки?"
+                ),
+            ):
+                self._append_run_log(
+                    f"[auto-check] {run_label}: запуск подтверждён без сохранённого auto-check."
+                )
+                return True
+            self._append_run_log(
+                f"[auto-check] {run_label}: запуск отменён пользователем без сохранённого auto-check."
+            )
+            self._set_status(f"Запуск отменён: {run_label}")
+            return False
+
+        has_signature, is_stale = self._selfcheck_freshness_state(report)
+        if not has_signature or is_stale:
+            issue_text = (
+                "последний сохранённый auto-check устарел для текущих настроек"
+                if is_stale
+                else "последний сохранённый auto-check не привязан к текущей конфигурации"
+            )
+            if runtime_policy == "force":
+                self._append_run_log(
+                    f"[auto-check] {run_label}: {issue_text}, продолжаем без повторной проверки по policy=force."
+                )
+                return True
+            if runtime_policy == "strict":
+                self._append_run_log(
+                    f"[auto-check] {run_label}: {issue_text}, запуск остановлен по policy=strict."
+                )
+                self._set_status(f"Запуск остановлен: {run_label}")
+                messagebox.showwarning(
+                    "Desktop Input Editor",
+                    (
+                        f"Автоматический auto-check перед «{run_label}» выключен.\n\n"
+                        f"{issue_text.capitalize()}.\n\n"
+                        "Режим strict блокирует запуск без актуальной проверки. "
+                        "Сначала выполните «Проверить конфигурацию»."
+                    ),
+                )
+                return False
+            if messagebox.askyesno(
+                "Desktop Input Editor",
+                (
+                    f"Автоматический auto-check перед «{run_label}» выключен.\n\n"
+                    f"{issue_text.capitalize()}.\n\n"
+                    "Продолжить запуск без повторной проверки?"
+                ),
+            ):
+                self._append_run_log(
+                    f"[auto-check] {run_label}: запуск подтверждён несмотря на то, что {issue_text}."
+                )
+                return True
+            self._append_run_log(
+                f"[auto-check] {run_label}: запуск отменён пользователем, потому что {issue_text}."
+            )
+            self._set_status(f"Запуск отменён: {run_label}")
+            return False
+
+        ok = bool(report.get("ok", False))
+        errors = list(report.get("errors") or [])
+        warnings = list(report.get("warnings") or [])
+        if ok:
+            self._append_run_log(
+                f"[auto-check] {run_label}: используем актуальный сохранённый selfcheck; warnings={len(warnings)}."
+            )
+            return True
+
+        if runtime_policy == "force":
+            self._append_run_log(
+                f"[auto-check] {run_label}: актуальный сохранённый selfcheck содержит ошибки, продолжаем по policy=force."
+            )
+            return True
+        if runtime_policy == "strict":
+            self._append_run_log(
+                f"[auto-check] {run_label}: актуальный сохранённый selfcheck содержит ошибки, запуск остановлен по policy=strict."
+            )
+            self._set_status(f"Запуск остановлен: {run_label}")
+            preview_errors = "\n".join(f"- {msg}" for msg in errors[:4]) or "- Без деталей"
+            messagebox.showwarning(
+                "Desktop Input Editor",
+                (
+                    f"Автоматический auto-check перед «{run_label}» выключен, но есть актуальный selfcheck с ошибками.\n\n"
+                    + preview_errors
+                    + "\n\nРежим strict блокирует запуск, пока проблемы не будут исправлены."
+                ),
+            )
+            return False
+
+        preview_errors = "\n".join(f"- {msg}" for msg in errors[:4]) or "- Без деталей"
+        if messagebox.askyesno(
+            "Desktop Input Editor",
+            (
+                f"Автоматический auto-check перед «{run_label}» выключен, "
+                "но актуальный сохранённый selfcheck нашёл проблемы:\n\n"
+                f"{preview_errors}\n\n"
+                "Продолжить запуск без повторной проверки?"
+            ),
+        ):
+            self._append_run_log(
+                f"[auto-check] {run_label}: запуск подтверждён несмотря на ошибки в актуальном сохранённом selfcheck."
+            )
+            return True
+        self._append_run_log(
+            f"[auto-check] {run_label}: запуск отменён пользователем после чтения актуального сохранённого selfcheck."
+        )
+        self._set_status(f"Запуск отменён: {run_label}")
+        return False
+
+    def _auto_check_allows_launch(self, report_path: Path | None, run_label: str) -> bool:
+        runtime_policy = str(self.run_runtime_policy_var.get() or "balanced").strip().lower() or "balanced"
+        report = self._load_selfcheck_report(report_path)
+        if report is None:
+            if runtime_policy == "force":
+                self._append_run_log(f"[auto-check] {run_label}: отчёт недоступен, продолжаем по policy=force.")
+                return True
+            if runtime_policy == "strict":
+                self._append_run_log(f"[auto-check] {run_label}: отчёт недоступен, запуск остановлен по policy=strict.")
+                self._set_status(f"Запуск остановлен: {run_label}")
+                return False
+            return messagebox.askyesno(
+                "Desktop Input Editor",
+                f"Отчёт auto-check для «{run_label}» не найден.\n\nПродолжить запуск?",
+            )
+
+        ok = bool(report.get("ok", False))
+        errors = list(report.get("errors") or [])
+        warnings = list(report.get("warnings") or [])
+        if ok:
+            self._append_run_log(
+                f"[auto-check] {run_label}: отчёт OK; warnings={len(warnings)}."
+            )
+            return True
+
+        if runtime_policy == "force":
+            self._append_run_log(
+                f"[auto-check] {run_label}: продолжаем несмотря на ошибки по policy=force."
+            )
+            return True
+        if runtime_policy == "strict":
+            self._append_run_log(
+                f"[auto-check] {run_label}: запуск остановлен по policy=strict; errors={len(errors)}."
+            )
+            self._set_status(f"Запуск остановлен: {run_label}")
+            return False
+
+        preview_errors = "\n".join(f"- {msg}" for msg in errors[:4]) or "- Без деталей"
+        return messagebox.askyesno(
+            "Desktop Input Editor",
+            (
+                f"Auto-check перед «{run_label}» нашёл проблемы:\n\n"
+                f"{preview_errors}\n\n"
+                "Продолжить запуск?"
+            ),
+        )
+
+    def _launch_with_optional_auto_check(
+        self,
+        run_label: str,
+        launch_callback: callable,
+        *,
+        log_file_path: Path | None = None,
+    ) -> None:
+        if not self._soft_preflight_before_run(run_label):
+            return
+        if not bool(self.run_auto_check_var.get()):
+            if self._stored_selfcheck_allows_launch(run_label):
+                launch_callback(log_file_path)
+            return
+
+        def _after_check(report_path: Path | None) -> None:
+            if self._auto_check_allows_launch(report_path, run_label):
+                launch_callback(log_file_path)
+            else:
+                self._append_run_log(f"[auto-check] {run_label}: запуск отменён после auto-check.")
+
+        self._run_config_check(
+            title=f"Auto-check перед «{run_label}»",
+            on_success=_after_check,
+            log_file_path=log_file_path,
+        )
+
+    def _soft_preflight_before_run(self, run_label: str, *, runtime_policy: str | None = None) -> bool:
         readiness_rows = evaluate_desktop_section_readiness(self._gather_payload())
         warn_rows = [
             row for row in readiness_rows if str(row.get("status") or "").strip().lower() == "warn"
@@ -2415,12 +4454,34 @@ class DesktopInputEditor:
             self._append_run_log(f"[preflight] {run_label}: проблемных шагов не найдено.")
             return True
 
+        policy_key = str(runtime_policy or self.run_runtime_policy_var.get() or "balanced").strip().lower() or "balanced"
+
         detail_lines = [
             f"- {str(row.get('title') or 'Раздел')}: {str(row.get('summary') or '').strip()}"
             for row in warn_rows[:4]
         ]
         if len(warn_rows) > 4:
             detail_lines.append(f"- И ещё разделов с замечаниями: {len(warn_rows) - 4}")
+        if policy_key == "force":
+            self._append_run_log(
+                f"[preflight] {run_label}: найдены предупреждения, но policy=force разрешает запуск."
+            )
+            return True
+        if policy_key == "strict":
+            self._append_run_log(
+                f"[preflight] {run_label}: запуск остановлен по policy=strict."
+            )
+            self._set_status(f"Запуск остановлен: {run_label}")
+            messagebox.showwarning(
+                "Desktop Input Editor",
+                (
+                    f"Перед запуском «{run_label}» есть шаги, требующие внимания:\n\n"
+                    + "\n".join(detail_lines)
+                    + "\n\nРежим strict блокирует запуск, пока проблемы не будут исправлены."
+                ),
+            )
+            return False
+
         prompt = (
             f"Перед запуском «{run_label}» есть шаги, требующие внимания:\n\n"
             + "\n".join(detail_lines)
@@ -2438,7 +4499,15 @@ class DesktopInputEditor:
         self._set_status(f"Запуск отменён: {run_label}")
         return False
 
-    def _run_config_check(self) -> None:
+    def _run_config_check(
+        self,
+        *,
+        title: str = "Проверить конфигурацию",
+        on_success: callable | None = None,
+        log_file_path: Path | None = None,
+    ) -> None:
+        if log_file_path is None:
+            log_file_path = self._build_action_log_path("config_check")
         base_path = self._save_runtime_base_snapshot()
         report_path = self._runtime_selfcheck_report_path()
         cmd = [
@@ -2460,86 +4529,130 @@ class DesktopInputEditor:
             "--mode",
             "fast",
         ]
+
+        def _finish_selfcheck(path: Path | None) -> None:
+            self._summarize_selfcheck_report(path, log_file_path=log_file_path)
+            if callable(on_success):
+                on_success(path)
+
         self._run_command_async(
-            "Проверить конфигурацию",
+            title,
             cmd,
             result_path=report_path,
-            on_success=self._summarize_selfcheck_report,
+            on_success=_finish_selfcheck,
+            log_file_path=log_file_path,
         )
 
-    def _run_quick_preview(self) -> None:
-        if not self._soft_preflight_before_run("Быстрый расчёт"):
+    def _run_quick_preview(self, *, prechecked: bool = False) -> None:
+        log_file_path = self._build_action_log_path("quick_preview")
+
+        def _launch(log_path: Path | None) -> None:
+            self._autosave_snapshot_before_run("quick_preview")
+            base_path = self._save_runtime_base_snapshot()
+            suite_path = self._runtime_preview_suite_path()
+            report_path = self._runtime_preview_report_path()
+            save_base_payload(suite_path, self._build_preview_suite())
+            self._append_run_log(
+                f"[preview] Профиль дороги: {preview_surface_label(self._selected_preview_surface_key())}"
+            )
+            cmd = [
+                self._python_cli_exe(),
+                "-m",
+                "pneumo_solver_ui.tools.worldroad_compile_only_demo",
+                "--params",
+                str(base_path),
+                "--test",
+                str(suite_path),
+                "--test_index",
+                "0",
+                "--dt",
+                str(float(self.preview_dt_var.get())),
+                "--t_end",
+                str(float(self.preview_t_end_var.get())),
+            ]
+            self._run_command_async(
+                "Быстрый расчёт",
+                cmd,
+                result_path=report_path,
+                on_success=lambda path, current_log_path=log_path: self._summarize_preview_report(
+                    path,
+                    log_file_path=current_log_path,
+                ),
+                log_file_path=log_path,
+                persist_stdout_json=True,
+            )
+
+        if prechecked:
+            _launch(log_file_path)
             return
-        self._autosave_snapshot_before_run("quick_preview")
-        base_path = self._save_runtime_base_snapshot()
-        suite_path = self._runtime_preview_suite_path()
-        report_path = self._runtime_preview_report_path()
-        save_base_payload(suite_path, self._build_preview_suite())
-        self._append_run_log(
-            f"[preview] Профиль дороги: {preview_surface_label(self._selected_preview_surface_key())}"
-        )
-        cmd = [
-            self._python_cli_exe(),
-            "-m",
-            "pneumo_solver_ui.tools.worldroad_compile_only_demo",
-            "--params",
-            str(base_path),
-            "--test",
-            str(suite_path),
-            "--test_index",
-            "0",
-            "--dt",
-            str(float(self.preview_dt_var.get())),
-            "--t_end",
-            str(float(self.preview_t_end_var.get())),
-            "--json-out",
-            str(report_path),
-        ]
-        self._run_command_async(
+
+        self._launch_with_optional_auto_check(
             "Быстрый расчёт",
-            cmd,
-            result_path=report_path,
-            on_success=self._summarize_preview_report,
+            _launch,
+            log_file_path=log_file_path,
         )
 
-    def _run_single_desktop_run(self) -> None:
-        if not self._soft_preflight_before_run("Запустить подробный расчёт"):
+    def _run_single_desktop_run(self, *, prechecked: bool = False) -> None:
+        log_file_path = self._build_action_log_path("detail_run")
+
+        def _launch(log_path: Path | None) -> None:
+            self._autosave_snapshot_before_run("detail_run")
+            base_path = self._save_runtime_base_snapshot()
+            suite_path = self._runtime_preview_suite_path().with_name("desktop_input_single_run_suite.json")
+            save_base_payload(suite_path, self._build_single_run_suite())
+            run_dir = self._new_runtime_single_run_dir()
+            report_path = run_dir / "run_summary.json"
+            scenario_label = self.run_scenario_key_to_label.get(
+                self._selected_run_scenario_key(),
+                self._selected_run_scenario_key(),
+            )
+            self._append_run_log(f"[run] Сценарий расчёта: {scenario_label}")
+            cmd = [
+                self._python_cli_exe(),
+                "-m",
+                "pneumo_solver_ui.tools.desktop_single_run",
+                "--params",
+                str(base_path),
+                "--test",
+                str(suite_path),
+                "--test_index",
+                "0",
+                "--dt",
+                str(float(self.run_dt_var.get())),
+                "--t_end",
+                str(float(self.run_t_end_var.get())),
+                "--outdir",
+                str(run_dir),
+                "--cache_policy",
+                str(self.run_cache_policy_var.get() or "reuse"),
+                "--run_profile",
+                self._selected_run_profile_key(),
+            ]
+            if bool(self.run_record_full_var.get()):
+                cmd.append("--record_full")
+            if bool(self.run_export_npz_var.get()):
+                cmd.append("--export_npz")
+            if not bool(self.run_export_csv_var.get()):
+                cmd.append("--no_export_csv")
+            self._run_command_async(
+                "Запустить подробный расчёт",
+                cmd,
+                result_path=report_path,
+                on_success=lambda path, current_log_path=log_path: self._summarize_single_run_report(
+                    path,
+                    log_file_path=current_log_path,
+                ),
+                log_file_path=log_path,
+            )
+
+        if prechecked:
+            _launch(log_file_path)
             return
-        self._autosave_snapshot_before_run("detail_run")
-        base_path = self._save_runtime_base_snapshot()
-        suite_path = self._runtime_preview_suite_path().with_name("desktop_input_single_run_suite.json")
-        save_base_payload(suite_path, self._build_single_run_suite())
-        run_dir = self._new_runtime_single_run_dir()
-        report_path = run_dir / "run_summary.json"
-        scenario_label = self.run_scenario_key_to_label.get(
-            self._selected_run_scenario_key(),
-            self._selected_run_scenario_key(),
-        )
-        self._append_run_log(f"[run] Сценарий расчёта: {scenario_label}")
-        cmd = [
-            self._python_cli_exe(),
-            "-m",
-            "pneumo_solver_ui.tools.desktop_single_run",
-            "--params",
-            str(base_path),
-            "--test",
-            str(suite_path),
-            "--test_index",
-            "0",
-            "--dt",
-            str(float(self.run_dt_var.get())),
-            "--t_end",
-            str(float(self.run_t_end_var.get())),
-            "--outdir",
-            str(run_dir),
-        ]
-        if bool(self.run_record_full_var.get()):
-            cmd.append("--record_full")
-        self._run_command_async(
+
+        self._launch_with_optional_auto_check(
             "Запустить подробный расчёт",
-            cmd,
-            result_path=report_path,
-            on_success=self._summarize_single_run_report,
+            _launch,
+            log_file_path=log_file_path,
         )
 
     def _save_as(self) -> None:
@@ -2556,9 +4669,16 @@ class DesktopInputEditor:
         try:
             payload = self._gather_payload()
             save_base_payload(target, payload)
+            self.source_reference_payload = dict(payload)
+            self.current_payload = dict(payload)
+            self._refresh_source_reference_diff_state()
             self.current_source_path = target
             self.path_var.set(str(target))
             self._refresh_run_context_summary()
+            for key in self._widget_handles:
+                self._refresh_value_label(key)
+            self._refresh_section_header_summaries()
+            self._refresh_active_field_search_view()
             self._set_status(f"Параметры сохранены: {target}")
             messagebox.showinfo("Desktop Input Editor", f"Параметры сохранены:\n{target}")
         except Exception as exc:
@@ -2596,7 +4716,16 @@ class DesktopInputEditor:
             messagebox.showerror("Desktop Input Editor", f"Не удалось открыть папку профилей:\n{exc}")
 
     def run(self) -> None:
-        self.root.mainloop()
+        if self._owns_root:
+            self.root.mainloop()
+
+    def on_host_close(self) -> None:
+        self._host_closed = True
+        try:
+            if self._run_setup_center is not None:
+                self._run_setup_center.on_host_close()
+        except Exception:
+            return
 
 
 def main() -> int:

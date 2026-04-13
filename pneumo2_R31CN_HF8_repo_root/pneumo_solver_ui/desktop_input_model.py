@@ -74,7 +74,7 @@ class DesktopInputSection:
 DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
     DesktopInputSection(
         title="Геометрия",
-        description="Базовые размеры машины и посадка кузова.",
+        description="Базовые размеры кузова, колёс и ходов, которые задают общую посадку и рабочую геометрию.",
         fields=(
             DesktopInputFieldSpec("база", "Колёсная база", "м", "Расстояние между передней и задней осями.", min_value=0.8, max_value=4.0, step=0.01, digits=3),
             DesktopInputFieldSpec("колея", "Колея", "м", "Расстояние между левым и правым колесом на оси.", min_value=0.6, max_value=3.0, step=0.01, digits=3),
@@ -89,7 +89,7 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
     ),
     DesktopInputSection(
         title="Пневматика",
-        description="Исходные давления, объёмы и размеры пневмоцилиндров.",
+        description="Стартовые давления, полезные объёмы и габариты пневмоцилиндров.",
         fields=(
             DesktopInputFieldSpec("начальное_давление_Ресивер1", "Начальное давление ресивера 1", "кПа (абс.)", "Стартовое абсолютное давление в ресивере 1.", min_value=100.0, max_value=1200.0, step=5.0, ui_scale=0.001, digits=1),
             DesktopInputFieldSpec("начальное_давление_Ресивер2", "Начальное давление ресивера 2", "кПа (абс.)", "Стартовое абсолютное давление в ресивере 2.", min_value=100.0, max_value=1200.0, step=5.0, ui_scale=0.001, digits=1),
@@ -107,12 +107,13 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
     ),
     DesktopInputSection(
         title="Механика",
-        description="Массы, шины, пружина и стабилизаторы.",
+        description="Массы, шины, пружина и стабилизаторы, которые формируют механический отклик подвески.",
         fields=(
             DesktopInputFieldSpec("масса_рамы", "Масса рамы", "кг", "Подрессоренная масса кузова/рамы.", min_value=50.0, max_value=5000.0, step=10.0, digits=1),
             DesktopInputFieldSpec("масса_неподрессоренная_на_угол", "Неподрессоренная масса на угол", "кг", "Масса колеса, ступицы и рычагов на один угол.", min_value=1.0, max_value=250.0, step=1.0, digits=1),
             DesktopInputFieldSpec("жёсткость_шины", "Жёсткость шины", "Н/м", "Вертикальная жёсткость шины.", min_value=10000.0, max_value=1000000.0, step=1000.0, digits=0),
             DesktopInputFieldSpec("демпфирование_шины", "Демпфирование шины", "Н·с/м", "Вертикальное демпфирование шины.", min_value=100.0, max_value=50000.0, step=100.0, digits=0),
+            DesktopInputFieldSpec("пружина_длина_свободная_м", "Свободная длина пружины", "мм", "Исходная свободная длина пружины до сжатия.", min_value=100.0, max_value=1500.0, step=1.0, ui_scale=1000.0, digits=0),
             DesktopInputFieldSpec("пружина_масштаб", "Масштаб пружины", "коэф.", "Масштабирует табличную характеристику пружины.", min_value=0.05, max_value=3.0, step=0.01, digits=2),
             DesktopInputFieldSpec("стабилизатор_вкл", "Стабилизатор включён", "", "Включает учёт стабилизатора в модели.", control="bool"),
             DesktopInputFieldSpec("стабилизатор_перед_жесткость_Н_м", "Жёсткость переднего стабилизатора", "Н/м", "Эквивалентная жёсткость переднего стабилизатора.", min_value=0.0, max_value=500000.0, step=1000.0, digits=0),
@@ -120,18 +121,47 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
         ),
     ),
     DesktopInputSection(
-        title="Настройки расчёта",
-        description="Скорость, интегрирование и служебные режимы модели.",
+        title="Статическая настройка",
+        description="Стартовое состояние, распределение веса и режим поиска статической посадки.",
         fields=(
             DesktopInputFieldSpec("vx0_м_с", "Начальная скорость", "м/с", "Начальная продольная скорость модели.", min_value=0.0, max_value=80.0, step=0.1, digits=2),
-            DesktopInputFieldSpec("макс_шаг_интегрирования_с", "Максимальный шаг интегрирования", "мс", "Ограничение шага интегратора.", min_value=0.01, max_value=10.0, step=0.01, ui_scale=1000.0, digits=2),
-            DesktopInputFieldSpec("макс_число_внутренних_шагов_на_dt", "Макс. внутренних шагов на dt", "", "Защита от зависания интегратора на одном шаге dt.", control="int", min_value=1000, max_value=1000000, step=1000, digits=0),
+            DesktopInputFieldSpec("cg_x_м", "Смещение ЦТ по базе", "м", "Продольное смещение центра тяжести относительно середины базы.", min_value=-1.5, max_value=1.5, step=0.005, digits=3),
+            DesktopInputFieldSpec("cg_y_м", "Смещение ЦТ по колее", "м", "Поперечное смещение центра тяжести относительно продольной оси.", min_value=-1.0, max_value=1.0, step=0.005, digits=3),
+            DesktopInputFieldSpec("corner_loads_mode", "Режим распределения веса по углам", "", "Как распределять вес по углам при инициализации: через ЦТ или через эффективные жёсткости.", control="choice", choices=("cg", "stiffness")),
             DesktopInputFieldSpec("static_trim_enable", "Искать статическую посадку", "", "Перед основным расчётом подобрать статическое равновесие.", control="bool"),
             DesktopInputFieldSpec("static_trim_force", "Форсировать статическую посадку", "", "Принудительно выполнять static trim даже при существующем состоянии.", control="bool"),
+            DesktopInputFieldSpec("static_trim_pneumo_mode", "Режим static trim по пневматике", "", "Как корректировать пневматику при поиске посадки: давлением, массой или политропой.", control="choice", choices=("pressure", "mass", "polytropic")),
+            DesktopInputFieldSpec("zero_pose_target_stroke_frac", "Целевая доля хода в нуле", "доля", "Желаемое положение штока в статике как доля полного хода.", min_value=0.0, max_value=1.0, step=0.01, digits=2),
+            DesktopInputFieldSpec("zero_pose_tol_stroke_frac", "Допуск по доле хода", "доля", "Разрешённое отклонение от целевого положения штока в статике.", min_value=0.0, max_value=0.5, step=0.01, digits=2),
+        ),
+    ),
+    DesktopInputSection(
+        title="Компоненты",
+        description="Выбор активной кинематики, привязки пружины и правил работы с паспортом компонентов.",
+        fields=(
+            DesktopInputFieldSpec("механика_кинематика", "Кинематика подвески", "", "Активный вариант кинематики в модели.", control="choice", choices=("dw2d", "dw2d_mounts", "mr", "table")),
+            DesktopInputFieldSpec("колесо_координата", "Режим колесо_координата", "", "Как интерпретируется координата колеса: центр колеса или пятно контакта.", control="choice", choices=("center", "contact")),
+            DesktopInputFieldSpec("использовать_паспорт_компонентов", "Использовать паспорт компонентов", "", "Подтягивать параметры компонентов из component passport.", control="bool"),
+            DesktopInputFieldSpec("enforce_camozzi_only", "Только Camozzi-коды", "", "Контролировать, что схема использует только Camozzi-коды из паспорта компонентов.", control="bool"),
+            DesktopInputFieldSpec("enforce_scheme_integrity", "Контроль целостности схемы", "", "Следить за fingerprint схемы и не терять инженерную целостность конфигурации.", control="bool"),
+            DesktopInputFieldSpec("пружина_по_цилиндру", "Опорный цилиндр для пружины", "", "К какому цилиндру привязывать пружину в механической модели.", control="choice", choices=("C1", "C2", "DELTA")),
+            DesktopInputFieldSpec("пружина_геометрия_согласовать_с_цилиндром", "Согласовывать геометрию пружины с цилиндром", "", "Поддерживать совместимость геометрии пружины с выбранным цилиндром.", control="bool"),
+        ),
+    ),
+    DesktopInputSection(
+        title="Справочные данные",
+        description="Режимы газа, температурные reference-параметры и служебные инженерные проверки.",
+        fields=(
+            DesktopInputFieldSpec("термодинамика", "Режим термодинамики", "", "Модель газа: изотерма, адиабата или тепловой режим со стенкой.", control="choice", choices=("thermal", "isothermal", "adiabatic")),
+            DesktopInputFieldSpec("газ_модель_теплоемкости", "Модель теплоёмкости воздуха", "", "Постоянные теплоёмкости или T-зависимая reference-модель nist_air.", control="choice", choices=("constant", "nist_air")),
+            DesktopInputFieldSpec("температура_окр_К", "Температура окружающей среды", "К", "Температура среды, в которой работает система.", min_value=200.0, max_value=400.0, step=1.0, digits=1),
+            DesktopInputFieldSpec("T_AIR_К", "Начальная температура воздуха", "К", "Базовая температура воздуха для начального состояния газа.", min_value=200.0, max_value=400.0, step=1.0, digits=1),
+            DesktopInputFieldSpec("макс_шаг_интегрирования_с", "Максимальный шаг интегрирования", "мс", "Ограничение шага интегратора.", min_value=0.01, max_value=10.0, step=0.01, ui_scale=1000.0, digits=2),
+            DesktopInputFieldSpec("макс_число_внутренних_шагов_на_dt", "Макс. внутренних шагов на dt", "", "Защита от зависания интегратора на одном шаге dt.", control="int", min_value=1000, max_value=1000000, step=1000, digits=0),
             DesktopInputFieldSpec("autoverif_enable", "Включить автопроверку", "", "Проверять физические и численные ограничения после расчёта.", control="bool"),
             DesktopInputFieldSpec("mechanics_selfcheck", "Включить самопроверку механики", "", "Проверять кинематику и механические ограничения.", control="bool"),
-            DesktopInputFieldSpec("термодинамика", "Режим термодинамики", "", "Модель газа: упрощённая или тепловая.", control="choice", choices=("thermal", "isothermal")),
-            DesktopInputFieldSpec("механика_кинематика", "Кинематика подвески", "", "Активный вариант кинематики в модели.", control="choice", choices=("dw2d", "mr")),
+            DesktopInputFieldSpec("пружина_длина_солид_м", "Solid length пружины", "мм", "Справочная длина пружины в сомкнутом состоянии.", min_value=0.0, max_value=400.0, step=1.0, ui_scale=1000.0, digits=0),
+            DesktopInputFieldSpec("пружина_запас_до_coil_bind_минимум_м", "Минимальный запас до coil bind", "мм", "Допустимый минимальный запас до coil bind для reference-проверок.", min_value=0.0, max_value=120.0, step=1.0, ui_scale=1000.0, digits=0),
         ),
     ),
 )
@@ -216,6 +246,10 @@ def desktop_snapshot_dir_path() -> Path:
     return (repo_root() / "workspace" / "ui_state" / "desktop_input_snapshots").resolve()
 
 
+def desktop_runs_dir_path() -> Path:
+    return (repo_root() / "workspace" / "desktop_runs").resolve()
+
+
 def default_ranges_json_path() -> Path:
     return (Path(__file__).resolve().parent / "default_ranges.json").resolve()
 
@@ -251,6 +285,27 @@ def desktop_field_search_display_name(
     return f"{spec.label}{unit_suffix} — {section_title}"
 
 
+def build_desktop_section_field_search_items(section_title: str) -> list[dict[str, str]]:
+    clean_section_title = str(section_title or "").strip()
+    if not clean_section_title:
+        return []
+    for section in DESKTOP_INPUT_SECTIONS:
+        if str(section.title or "").strip() != clean_section_title:
+            continue
+        return [
+            {
+                "key": spec.key,
+                "label": spec.label,
+                "section_title": section.title,
+                "description": spec.description,
+                "display": desktop_field_search_display_name(spec, section.title),
+            }
+            for spec in section.fields
+            if str(spec.key or "").strip()
+        ]
+    return []
+
+
 def _normalize_search_text(value: Any) -> str:
     raw = str(value or "").strip().lower()
     raw = raw.replace("ё", "е").replace("_", " ")
@@ -263,6 +318,8 @@ def _desktop_field_search_aliases(spec: DesktopInputFieldSpec) -> tuple[str, ...
     aliases: list[str] = []
     if key.startswith("static_trim"):
         aliases.extend(("статическая посадка", "static trim"))
+    if key == "corner_loads_mode":
+        aliases.extend(("распределение веса", "corner loads"))
     if key == "макс_число_внутренних_шагов_на_dt":
         aliases.append("лимит внутренних шагов")
     if key == "макс_шаг_интегрирования_с":
@@ -273,6 +330,14 @@ def _desktop_field_search_aliases(spec: DesktopInputFieldSpec) -> tuple[str, ...
         aliases.append("самопроверка механики")
     if key == "механика_кинематика":
         aliases.append("кинематика подвески")
+    if key == "использовать_паспорт_компонентов":
+        aliases.extend(("component passport", "паспорт camozzi"))
+    if key == "колесо_координата":
+        aliases.extend(("режим колеса", "wheel coord"))
+    if key == "газ_модель_теплоемкости":
+        aliases.extend(("теплоемкость воздуха", "nist air"))
+    if key == "пружина_по_цилиндру":
+        aliases.extend(("опорный цилиндр", "spring cylinder"))
     return tuple(aliases)
 
 
@@ -471,8 +536,16 @@ def evaluate_desktop_section_readiness(
         geometry_issues.append("колея")
     if _safe_float(current, "радиус_колеса_м") <= 0.0:
         geometry_issues.append("радиус колеса")
+    if _safe_float(current, "wheel_width_m") <= 0.0:
+        geometry_issues.append("ширина колеса")
     if _safe_float(current, "ход_штока") <= 0.0:
         geometry_issues.append("ход штока")
+    if min(
+        _safe_float(current, "длина_рамы"),
+        _safe_float(current, "ширина_рамы"),
+        _safe_float(current, "высота_рамы"),
+    ) <= 0.0:
+        geometry_issues.append("габариты рамы")
     rows.append(
         {
             "title": "Геометрия",
@@ -480,7 +553,7 @@ def evaluate_desktop_section_readiness(
             "summary": (
                 "Проверьте: " + ", ".join(geometry_issues) + "."
                 if geometry_issues
-                else "Основные размеры и ход заданы."
+                else "Базовые размеры кузова, колёс и ходов заданы."
             ),
             "issues": geometry_issues,
         }
@@ -524,6 +597,10 @@ def evaluate_desktop_section_readiness(
         mechanics_issues.append("жёсткость шины")
     if _safe_float(current, "демпфирование_шины") <= 0.0:
         mechanics_issues.append("демпфирование шины")
+    if _safe_float(current, "пружина_длина_свободная_м") <= 0.0:
+        mechanics_issues.append("свободная длина пружины")
+    if _safe_float(current, "пружина_масштаб") <= 0.0:
+        mechanics_issues.append("масштаб пружины")
     if _safe_bool(current, "стабилизатор_вкл") and (
         _safe_float(current, "стабилизатор_перед_жесткость_Н_м") <= 0.0
         and _safe_float(current, "стабилизатор_зад_жесткость_Н_м") <= 0.0
@@ -536,37 +613,547 @@ def evaluate_desktop_section_readiness(
             "summary": (
                 "Проверьте: " + ", ".join(mechanics_issues) + "."
                 if mechanics_issues
-                else "Массы, шины и стабилизаторы выглядят готовыми к запуску."
+                else "Массы, шины, пружина и стабилизаторы выглядят готовыми к запуску."
             ),
             "issues": mechanics_issues,
         }
     )
 
-    calc_issues: list[str] = []
-    if _safe_float(current, "макс_шаг_интегрирования_с") <= 0.0:
-        calc_issues.append("максимальный шаг интегрирования")
-    if _safe_float(current, "макс_число_внутренних_шагов_на_dt") < 1000.0:
-        calc_issues.append("лимит внутренних шагов")
+    static_issues: list[str] = []
+    if _safe_float(current, "vx0_м_с") < 0.0:
+        static_issues.append("начальная скорость")
+    if _safe_choice(current, "corner_loads_mode") not in {"cg", "stiffness"}:
+        static_issues.append("режим распределения веса")
     if _safe_bool(current, "static_trim_force") and not _safe_bool(current, "static_trim_enable"):
-        calc_issues.append("форсированный static trim без включённого поиска посадки")
-    if not _safe_choice(current, "термодинамика"):
-        calc_issues.append("режим термодинамики")
-    if not _safe_choice(current, "механика_кинематика"):
-        calc_issues.append("кинематика подвески")
+        static_issues.append("форсированный static trim без включённого поиска посадки")
+    if _safe_choice(current, "static_trim_pneumo_mode") not in {"pressure", "mass", "polytropic"}:
+        static_issues.append("режим static trim по пневматике")
+    target_stroke = _safe_float(current, "zero_pose_target_stroke_frac", 0.5)
+    if not (0.0 <= target_stroke <= 1.0):
+        static_issues.append("целевая доля хода")
+    tol_stroke = _safe_float(current, "zero_pose_tol_stroke_frac", 0.2)
+    if not (0.0 <= tol_stroke <= 1.0):
+        static_issues.append("допуск по доле хода")
     rows.append(
         {
-            "title": "Настройки расчёта",
-            "status": "warn" if calc_issues else "ok",
+            "title": "Статическая настройка",
+            "status": "warn" if static_issues else "ok",
             "summary": (
-                "Проверьте: " + ", ".join(calc_issues) + "."
-                if calc_issues
-                else "Интегрирование и служебные режимы выглядят согласованно."
+                "Проверьте: " + ", ".join(static_issues) + "."
+                if static_issues
+                else "Стартовое состояние и статическая посадка выглядят согласованно."
             ),
-            "issues": calc_issues,
+            "issues": static_issues,
+        }
+    )
+
+    component_issues: list[str] = []
+    if _safe_choice(current, "механика_кинематика") not in {"dw2d", "dw2d_mounts", "mr", "table"}:
+        component_issues.append("кинематика подвески")
+    if _safe_choice(current, "колесо_координата") not in {"center", "contact"}:
+        component_issues.append("режим колесо_координата")
+    if _safe_choice(current, "пружина_по_цилиндру").upper() not in {"C1", "C2", "DELTA"}:
+        component_issues.append("опорный цилиндр пружины")
+    if _safe_bool(current, "enforce_camozzi_only") and not _safe_bool(current, "использовать_паспорт_компонентов"):
+        component_issues.append("Camozzi-only контроль без паспорта компонентов")
+    rows.append(
+        {
+            "title": "Компоненты",
+            "status": "warn" if component_issues else "ok",
+            "summary": (
+                "Проверьте: " + ", ".join(component_issues) + "."
+                if component_issues
+                else "Кинематика, привязка пружины и паспорт компонентов согласованы."
+            ),
+            "issues": component_issues,
+        }
+    )
+
+    reference_issues: list[str] = []
+    if _safe_choice(current, "термодинамика") not in {"thermal", "isothermal", "adiabatic"}:
+        reference_issues.append("режим термодинамики")
+    if _safe_choice(current, "газ_модель_теплоемкости") not in {"constant", "nist_air"}:
+        reference_issues.append("модель теплоёмкости воздуха")
+    if min(
+        _safe_float(current, "температура_окр_К"),
+        _safe_float(current, "T_AIR_К"),
+    ) <= 0.0:
+        reference_issues.append("температурные reference-данные")
+    if _safe_float(current, "макс_шаг_интегрирования_с") <= 0.0:
+        reference_issues.append("максимальный шаг интегрирования")
+    if _safe_float(current, "макс_число_внутренних_шагов_на_dt") < 1000.0:
+        reference_issues.append("лимит внутренних шагов")
+    if _safe_float(current, "пружина_длина_солид_м") < 0.0:
+        reference_issues.append("solid length пружины")
+    if _safe_float(current, "пружина_запас_до_coil_bind_минимум_м") < 0.0:
+        reference_issues.append("запас до coil bind")
+    if (not _safe_bool(current, "autoverif_enable")) and (not _safe_bool(current, "mechanics_selfcheck")):
+        reference_issues.append("выключены все инженерные проверки")
+    rows.append(
+        {
+            "title": "Справочные данные",
+            "status": "warn" if reference_issues else "ok",
+            "summary": (
+                "Проверьте: " + ", ".join(reference_issues) + "."
+                if reference_issues
+                else "Reference-режимы, температуры и инженерные проверки выглядят согласованно."
+            ),
+            "issues": reference_issues,
         }
     )
 
     return rows
+
+
+def _fmt_mm_from_m(value_m: Any) -> str:
+    try:
+        return f"{float(value_m) * 1000.0:.0f} мм"
+    except Exception:
+        return "—"
+
+
+def _fmt_m(value_m: Any, digits: int = 2) -> str:
+    try:
+        return f"{float(value_m):.{int(digits)}f} м"
+    except Exception:
+        return "—"
+
+
+def _fmt_signed_m(value_m: Any, digits: int = 3) -> str:
+    try:
+        return f"{float(value_m):+.{int(digits)}f} м"
+    except Exception:
+        return "—"
+
+
+def _fmt_liters(value_m3: Any) -> str:
+    try:
+        return f"{float(value_m3) * 1000.0:.1f} л"
+    except Exception:
+        return "—"
+
+
+def _fmt_kpa(value_pa: Any) -> str:
+    try:
+        return f"{float(value_pa) * 0.001:.0f} кПа"
+    except Exception:
+        return "—"
+
+
+def _fmt_temperature_k(value_k: Any) -> str:
+    try:
+        return f"{float(value_k):.0f} К"
+    except Exception:
+        return "—"
+
+
+def _fmt_ms(value_s: Any) -> str:
+    try:
+        return f"{float(value_s) * 1000.0:.2f} мс"
+    except Exception:
+        return "—"
+
+
+def _fmt_bool_flag(value: Any, true_label: str = "да", false_label: str = "нет") -> str:
+    return true_label if bool(value) else false_label
+
+
+def _issue_focus_entry(key: str, label: str, reason: str) -> dict[str, str]:
+    return {
+        "focus_key": str(key or "").strip(),
+        "focus_label": str(label or "").strip(),
+        "focus_reason": str(reason or "").strip(),
+    }
+
+
+_SECTION_DEFAULT_FOCUS_KEY = {
+    section.title: (section.fields[0].key if section.fields else "")
+    for section in DESKTOP_INPUT_SECTIONS
+}
+
+
+_SECTION_ISSUE_FOCUS_MAP = {
+    "Геометрия": {
+        "база": _issue_focus_entry(
+            "база",
+            "База",
+            "База не задана или меньше нуля.",
+        ),
+        "колея": _issue_focus_entry(
+            "колея",
+            "Колея",
+            "Колея не задана или меньше нуля.",
+        ),
+        "радиус колеса": _issue_focus_entry(
+            "радиус_колеса_м",
+            "Радиус колеса",
+            "Радиус колеса должен быть положительным.",
+        ),
+        "ширина колеса": _issue_focus_entry(
+            "wheel_width_m",
+            "Ширина колеса",
+            "Ширина колеса должна быть положительной.",
+        ),
+        "ход штока": _issue_focus_entry(
+            "ход_штока",
+            "Ход штока",
+            "Ход штока должен быть положительным.",
+        ),
+        "габариты рамы": _issue_focus_entry(
+            "длина_рамы",
+            "Габариты рамы",
+            "Хотя бы один из габаритов рамы не заполнен.",
+        ),
+    },
+    "Пневматика": {
+        "объёмы ресиверов": _issue_focus_entry(
+            "объём_ресивера_1",
+            "Объёмы ресиверов",
+            "Хотя бы один ресивер имеет нулевой или отрицательный объём.",
+        ),
+        "объём аккумулятора": _issue_focus_entry(
+            "объём_аккумулятора",
+            "Объём аккумулятора",
+            "Объём аккумулятора должен быть положительным.",
+        ),
+        "стартовые давления": _issue_focus_entry(
+            "начальное_давление_Ресивер1",
+            "Стартовые давления",
+            "Хотя бы одно стартовое давление не задано.",
+        ),
+        "Ц1: шток не должен быть больше поршня": _issue_focus_entry(
+            "диаметр_штока_Ц1",
+            "Геометрия цилиндра Ц1",
+            "Диаметр штока Ц1 не должен быть больше или равен диаметру поршня.",
+        ),
+        "Ц2: шток не должен быть больше поршня": _issue_focus_entry(
+            "диаметр_штока_Ц2",
+            "Геометрия цилиндра Ц2",
+            "Диаметр штока Ц2 не должен быть больше или равен диаметру поршня.",
+        ),
+    },
+    "Механика": {
+        "масса рамы": _issue_focus_entry(
+            "масса_рамы",
+            "Масса рамы",
+            "Масса рамы должна быть положительной.",
+        ),
+        "неподрессоренная масса": _issue_focus_entry(
+            "масса_неподрессоренная_на_угол",
+            "Неподрессоренная масса",
+            "Неподрессоренная масса на угол должна быть положительной.",
+        ),
+        "жёсткость шины": _issue_focus_entry(
+            "жёсткость_шины",
+            "Жёсткость шины",
+            "Жёсткость шины должна быть положительной.",
+        ),
+        "демпфирование шины": _issue_focus_entry(
+            "демпфирование_шины",
+            "Демпфирование шины",
+            "Демпфирование шины должно быть положительным.",
+        ),
+        "свободная длина пружины": _issue_focus_entry(
+            "пружина_длина_свободная_м",
+            "Свободная длина пружины",
+            "Свободная длина пружины должна быть положительной.",
+        ),
+        "масштаб пружины": _issue_focus_entry(
+            "пружина_масштаб",
+            "Масштаб пружины",
+            "Масштаб пружины должен быть больше нуля.",
+        ),
+        "включён стабилизатор без жёсткости": _issue_focus_entry(
+            "стабилизатор_перед_жесткость_Н_м",
+            "Жёсткость стабилизатора",
+            "Стабилизатор включён, но жёсткость не задана ни спереди, ни сзади.",
+        ),
+    },
+    "Статическая настройка": {
+        "начальная скорость": _issue_focus_entry(
+            "vx0_м_с",
+            "Начальная скорость",
+            "Начальная скорость не может быть отрицательной.",
+        ),
+        "режим распределения веса": _issue_focus_entry(
+            "corner_loads_mode",
+            "Распределение веса по углам",
+            "Нужно выбрать допустимый режим распределения веса.",
+        ),
+        "форсированный static trim без включённого поиска посадки": _issue_focus_entry(
+            "static_trim_enable",
+            "Static trim",
+            "Форсирование static trim включено без основного режима поиска посадки.",
+        ),
+        "режим static trim по пневматике": _issue_focus_entry(
+            "static_trim_pneumo_mode",
+            "Режим static trim",
+            "Нужно выбрать допустимый режим коррекции пневматики.",
+        ),
+        "целевая доля хода": _issue_focus_entry(
+            "zero_pose_target_stroke_frac",
+            "Целевая доля хода",
+            "Целевая доля хода должна быть в диапазоне от 0 до 1.",
+        ),
+        "допуск по доле хода": _issue_focus_entry(
+            "zero_pose_tol_stroke_frac",
+            "Допуск по доле хода",
+            "Допуск по доле хода должен быть в диапазоне от 0 до 1.",
+        ),
+    },
+    "Компоненты": {
+        "кинематика подвески": _issue_focus_entry(
+            "механика_кинематика",
+            "Кинематика подвески",
+            "Нужно выбрать поддерживаемый режим кинематики.",
+        ),
+        "режим колесо_координата": _issue_focus_entry(
+            "колесо_координата",
+            "Режим колесо_координата",
+            "Нужно выбрать допустимую интерпретацию координаты колеса.",
+        ),
+        "опорный цилиндр пружины": _issue_focus_entry(
+            "пружина_по_цилиндру",
+            "Опорный цилиндр пружины",
+            "Пружина должна быть привязана к допустимому цилиндру.",
+        ),
+        "Camozzi-only контроль без паспорта компонентов": _issue_focus_entry(
+            "использовать_паспорт_компонентов",
+            "Паспорт компонентов",
+            "Camozzi-only контроль требует включённого паспорта компонентов.",
+        ),
+    },
+    "Справочные данные": {
+        "режим термодинамики": _issue_focus_entry(
+            "термодинамика",
+            "Режим термодинамики",
+            "Нужно выбрать поддерживаемый режим термодинамики.",
+        ),
+        "модель теплоёмкости воздуха": _issue_focus_entry(
+            "газ_модель_теплоемкости",
+            "Модель теплоёмкости",
+            "Нужно выбрать поддерживаемую модель теплоёмкости воздуха.",
+        ),
+        "температурные reference-данные": _issue_focus_entry(
+            "температура_окр_К",
+            "Температуры reference-данных",
+            "Температуры воздуха и окружения должны быть положительными.",
+        ),
+        "максимальный шаг интегрирования": _issue_focus_entry(
+            "макс_шаг_интегрирования_с",
+            "Максимальный шаг интегрирования",
+            "Максимальный шаг интегрирования должен быть положительным.",
+        ),
+        "лимит внутренних шагов": _issue_focus_entry(
+            "макс_число_внутренних_шагов_на_dt",
+            "Лимит внутренних шагов",
+            "Лимит внутренних шагов слишком мал для устойчивого расчёта.",
+        ),
+        "solid length пружины": _issue_focus_entry(
+            "пружина_длина_солид_м",
+            "Solid length пружины",
+            "Solid length пружины не может быть отрицательной.",
+        ),
+        "запас до coil bind": _issue_focus_entry(
+            "пружина_запас_до_coil_bind_минимум_м",
+            "Запас до coil bind",
+            "Запас до coil bind не может быть отрицательным.",
+        ),
+        "выключены все инженерные проверки": _issue_focus_entry(
+            "autoverif_enable",
+            "Инженерные проверки",
+            "Хотя бы одна инженерная проверка должна оставаться включённой.",
+        ),
+    },
+}
+
+
+def _desktop_section_issue_focus(
+    title: str,
+    issues: Any,
+) -> dict[str, str]:
+    section_title = str(title or "").strip()
+    section_map = _SECTION_ISSUE_FOCUS_MAP.get(section_title, {})
+    default_focus_key = str(_SECTION_DEFAULT_FOCUS_KEY.get(section_title) or "").strip()
+    issue_list = [
+        str(item or "").strip()
+        for item in (issues if isinstance(issues, (list, tuple)) else ())
+        if str(item or "").strip()
+    ]
+    for issue in issue_list:
+        focus = section_map.get(issue)
+        if focus:
+            return dict(focus)
+    if issue_list:
+        first_issue = issue_list[0]
+        return _issue_focus_entry(
+            default_focus_key,
+            first_issue,
+            f"Проверьте пункт: {first_issue}.",
+        )
+    return _issue_focus_entry("", "", "")
+
+
+def _desktop_section_issue_entries(
+    title: str,
+    issues: Any,
+) -> list[dict[str, str]]:
+    section_title = str(title or "").strip()
+    section_map = _SECTION_ISSUE_FOCUS_MAP.get(section_title, {})
+    default_focus_key = str(_SECTION_DEFAULT_FOCUS_KEY.get(section_title) or "").strip()
+    issue_list = [
+        str(item or "").strip()
+        for item in (issues if isinstance(issues, (list, tuple)) else ())
+        if str(item or "").strip()
+    ]
+    entries: list[dict[str, str]] = []
+    for issue in issue_list:
+        focus = section_map.get(issue)
+        if focus:
+            entries.append(dict(focus))
+            continue
+        entries.append(
+            _issue_focus_entry(
+                default_focus_key,
+                issue,
+                f"Проверьте пункт: {issue}.",
+            )
+        )
+    return entries
+
+
+def build_desktop_section_summary_cards(
+    payload: dict[str, Any],
+) -> list[dict[str, object]]:
+    current = load_base_defaults()
+    current.update(dict(payload or {}))
+    readiness_rows = evaluate_desktop_section_readiness(current)
+    readiness_by_title = {
+        str(row.get("title") or ""): row for row in readiness_rows
+    }
+
+    def _status_and_detail(title: str) -> tuple[str, str]:
+        row = readiness_by_title.get(title, {})
+        return (
+            str(row.get("status") or ""),
+            str(row.get("summary") or "").strip(),
+        )
+
+    def _focus(title: str) -> dict[str, str]:
+        row = readiness_by_title.get(title, {})
+        return _desktop_section_issue_focus(title, row.get("issues"))
+
+    geometry_status, geometry_detail = _status_and_detail("Геометрия")
+    pneumatic_status, pneumatic_detail = _status_and_detail("Пневматика")
+    mechanics_status, mechanics_detail = _status_and_detail("Механика")
+    static_status, static_detail = _status_and_detail("Статическая настройка")
+    components_status, components_detail = _status_and_detail("Компоненты")
+    reference_status, reference_detail = _status_and_detail("Справочные данные")
+    geometry_focus = _focus("Геометрия")
+    pneumatic_focus = _focus("Пневматика")
+    mechanics_focus = _focus("Механика")
+    static_focus = _focus("Статическая настройка")
+    components_focus = _focus("Компоненты")
+    reference_focus = _focus("Справочные данные")
+
+    return [
+        {
+            "title": "Геометрия",
+            "status": geometry_status,
+            "headline": (
+                f"База {_fmt_m(current.get('база'))}; колея {_fmt_m(current.get('колея'))}; "
+                f"ход {_fmt_mm_from_m(current.get('ход_штока'))}; "
+                f"колесо R{_fmt_mm_from_m(current.get('радиус_колеса_м'))} / {_fmt_mm_from_m(current.get('wheel_width_m'))}."
+            ),
+            "details": geometry_detail,
+            **geometry_focus,
+        },
+        {
+            "title": "Пневматика",
+            "status": pneumatic_status,
+            "headline": (
+                f"Р1 {_fmt_kpa(current.get('начальное_давление_Ресивер1'))}; "
+                f"Р2 {_fmt_kpa(current.get('начальное_давление_Ресивер2'))}; "
+                f"Р3 {_fmt_kpa(current.get('начальное_давление_Ресивер3'))}; "
+                f"аккум {_fmt_kpa(current.get('начальное_давление_аккумулятора'))}."
+            ),
+            "details": (
+                f"Объёмы: {_fmt_liters(current.get('объём_ресивера_1'))}, "
+                f"{_fmt_liters(current.get('объём_ресивера_2'))}, "
+                f"{_fmt_liters(current.get('объём_ресивера_3'))}, "
+                f"{_fmt_liters(current.get('объём_аккумулятора'))}. {pneumatic_detail}"
+            ),
+            **pneumatic_focus,
+        },
+        {
+            "title": "Механика",
+            "status": mechanics_status,
+            "headline": (
+                f"Рама {_safe_float(current, 'масса_рамы'):.0f} кг; "
+                f"угол {_safe_float(current, 'масса_неподрессоренная_на_угол'):.0f} кг; "
+                f"шина {_safe_float(current, 'жёсткость_шины'):.0f} Н/м; "
+                f"пружина {_fmt_mm_from_m(current.get('пружина_длина_свободная_м'))}."
+            ),
+            "details": (
+                f"Стабилизатор {_fmt_bool_flag(current.get('стабилизатор_вкл'), 'включён', 'выключен')}; "
+                f"масштаб пружины {_safe_float(current, 'пружина_масштаб', 0.0):.2f}. "
+                f"{mechanics_detail}"
+            ),
+            **mechanics_focus,
+        },
+        {
+            "title": "Статическая настройка",
+            "status": static_status,
+            "headline": (
+                f"vx0 {_safe_float(current, 'vx0_м_с', 0.0):.2f} м/с; "
+                f"CG X {_fmt_signed_m(current.get('cg_x_м'))}; "
+                f"CG Y {_fmt_signed_m(current.get('cg_y_м'))}; "
+                f"corner loads {str(current.get('corner_loads_mode') or '—')}."
+            ),
+            "details": (
+                f"Static trim {_fmt_bool_flag(current.get('static_trim_enable'), 'включён', 'выключен')}; "
+                f"pneumo mode {str(current.get('static_trim_pneumo_mode') or '—')}; "
+                f"цель {float(_safe_float(current, 'zero_pose_target_stroke_frac', 0.0)):.2f} "
+                f"+/- {float(_safe_float(current, 'zero_pose_tol_stroke_frac', 0.0)):.2f}. "
+                f"{static_detail}"
+            ),
+            **static_focus,
+        },
+        {
+            "title": "Компоненты",
+            "status": components_status,
+            "headline": (
+                f"Кинематика {str(current.get('механика_кинематика') or '—')}; "
+                f"колесо_координата {str(current.get('колесо_координата') or '—')}; "
+                f"паспорт {_fmt_bool_flag(current.get('использовать_паспорт_компонентов'))}; "
+                f"Camozzi-only {_fmt_bool_flag(current.get('enforce_camozzi_only'))}."
+            ),
+            "details": (
+                f"Пружина привязана к {str(current.get('пружина_по_цилиндру') or '—')}; "
+                f"согласование с цилиндром {_fmt_bool_flag(current.get('пружина_геометрия_согласовать_с_цилиндром'))}. "
+                f"{components_detail}"
+            ),
+            **components_focus,
+        },
+        {
+            "title": "Справочные данные",
+            "status": reference_status,
+            "headline": (
+                f"Термо {str(current.get('термодинамика') or '—')} / "
+                f"{str(current.get('газ_модель_теплоемкости') or '—')}; "
+                f"T_air {_fmt_temperature_k(current.get('T_AIR_К'))}; "
+                f"T_окр {_fmt_temperature_k(current.get('температура_окр_К'))}; "
+                f"dt_max {_fmt_ms(current.get('макс_шаг_интегрирования_с'))}."
+            ),
+            "details": (
+                f"Autoverif {_fmt_bool_flag(current.get('autoverif_enable'))}; "
+                f"mech selfcheck {_fmt_bool_flag(current.get('mechanics_selfcheck'))}; "
+                f"coil bind {_fmt_mm_from_m(current.get('пружина_запас_до_coil_bind_минимум_м'))}. "
+                f"{reference_detail}"
+            ),
+            **reference_focus,
+        },
+    ]
 
 
 def _coerce_spec_base_value(spec: DesktopInputFieldSpec, base_value: Any) -> Any:
@@ -793,6 +1380,132 @@ def build_desktop_profile_diff(
     return diffs
 
 
+def _format_issue_count(count: int) -> str:
+    value = max(0, int(count))
+    tail10 = value % 10
+    tail100 = value % 100
+    if tail10 == 1 and tail100 != 11:
+        return f"{value} замечание"
+    if tail10 in {2, 3, 4} and tail100 not in {12, 13, 14}:
+        return f"{value} замечания"
+    return f"{value} замечаний"
+
+
+def build_desktop_section_issue_cards(
+    payload: dict[str, Any],
+) -> list[dict[str, object]]:
+    current = load_base_defaults()
+    current.update(dict(payload or {}))
+    readiness_rows = evaluate_desktop_section_readiness(current)
+    readiness_by_title = {
+        str(row.get("title") or "").strip(): row for row in readiness_rows
+    }
+
+    cards: list[dict[str, object]] = []
+    for section in DESKTOP_INPUT_SECTIONS:
+        row = readiness_by_title.get(section.title, {})
+        entries = _desktop_section_issue_entries(section.title, row.get("issues"))
+        issue_labels: list[str] = []
+        issue_keys: list[str] = []
+        issue_reasons: list[str] = []
+        for entry in entries:
+            label = str(entry.get("focus_label") or "").strip()
+            key = str(entry.get("focus_key") or "").strip()
+            reason = str(entry.get("focus_reason") or "").strip()
+            if label and label not in issue_labels:
+                issue_labels.append(label)
+            if key and key not in issue_keys:
+                issue_keys.append(key)
+            if reason and reason not in issue_reasons:
+                issue_reasons.append(reason)
+        issue_count = len(entries)
+        if issue_count <= 0:
+            summary = "замечаний нет"
+        else:
+            preview = ", ".join(issue_labels[:2]).strip(", ")
+            suffix = f" и ещё {issue_count - 2}" if issue_count > 2 else ""
+            summary = f"{_format_issue_count(issue_count)}: {preview}{suffix}".strip(": ")
+        cards.append(
+            {
+                "title": section.title,
+                "issue_count": issue_count,
+                "issue_keys": issue_keys,
+                "issue_labels": issue_labels,
+                "issue_reasons": issue_reasons,
+                "focus_key": issue_keys[0] if issue_keys else "",
+                "focus_label": issue_labels[0] if issue_labels else "",
+                "focus_reason": issue_reasons[0] if issue_reasons else "",
+                "summary": summary,
+                "status": "warn" if issue_count > 0 else "ok",
+            }
+        )
+    return cards
+
+
+def _format_changed_params_count(count: int) -> str:
+    value = max(0, int(count))
+    tail10 = value % 10
+    tail100 = value % 100
+    if tail10 == 1 and tail100 != 11:
+        return f"{value} параметр"
+    if tail10 in {2, 3, 4} and tail100 not in {12, 13, 14}:
+        return f"{value} параметра"
+    return f"{value} параметров"
+
+
+def build_desktop_section_change_cards(
+    current_payload: dict[str, Any],
+    reference_payload: dict[str, Any],
+) -> list[dict[str, object]]:
+    current_obj = load_base_defaults()
+    current_obj.update(dict(current_payload or {}))
+    reference_obj = load_base_defaults()
+    reference_obj.update(dict(reference_payload or {}))
+
+    section_map = desktop_field_section_map()
+    grouped: dict[str, list[dict[str, Any]]] = {
+        section.title: [] for section in DESKTOP_INPUT_SECTIONS
+    }
+    for diff in build_desktop_profile_diff(current_obj, reference_obj):
+        section_title = section_map.get(str(diff.get("key") or "").strip())
+        if not section_title:
+            continue
+        grouped.setdefault(section_title, []).append(diff)
+
+    cards: list[dict[str, object]] = []
+    for section in DESKTOP_INPUT_SECTIONS:
+        items = grouped.get(section.title, [])
+        labels: list[str] = []
+        keys: list[str] = []
+        for item in items:
+            label = str(item.get("label") or item.get("key") or "").strip()
+            key = str(item.get("key") or "").strip()
+            if label and label not in labels:
+                labels.append(label)
+            if key and key not in keys:
+                keys.append(key)
+        changed_count = len(keys)
+        if changed_count <= 0:
+            summary = "без изменений"
+        else:
+            preview = ", ".join(labels[:2]).strip(", ")
+            suffix = f" и ещё {changed_count - 2}" if changed_count > 2 else ""
+            summary = f"{_format_changed_params_count(changed_count)}: {preview}{suffix}".strip(": ")
+        cards.append(
+            {
+                "title": section.title,
+                "changed_count": changed_count,
+                "changed_keys": keys,
+                "changed_labels": labels,
+                "focus_key": keys[0] if keys else "",
+                "focus_label": labels[0] if labels else "",
+                "summary": summary,
+                "status": "changed" if changed_count > 0 else "clean",
+            }
+        )
+    return cards
+
+
 def sanitize_desktop_profile_name(name: str) -> str:
     raw = str(name or "").strip()
     if not raw:
@@ -860,6 +1573,32 @@ def save_desktop_snapshot(name: str, payload: dict[str, Any]) -> Path:
     return save_base_payload(target, payload)
 
 
+def desktop_run_summary_path(path: Path | str) -> Path:
+    target = Path(path).resolve()
+    if target.suffix.lower() == ".json":
+        return target
+    return (target / "run_summary.json").resolve()
+
+
+def list_desktop_run_dirs() -> list[Path]:
+    root = desktop_runs_dir_path()
+    if not root.exists():
+        return []
+    return sorted(
+        [path.resolve() for path in root.iterdir() if path.is_dir()],
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+
+
+def load_desktop_run_summary(path: Path | str) -> dict[str, Any]:
+    target = desktop_run_summary_path(path)
+    raw = json.loads(target.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"Desktop run summary must contain a JSON object: {target}")
+    return raw
+
+
 def load_desktop_profile(path: Path | str) -> dict[str, Any]:
     target = Path(path).resolve()
     raw = json.loads(target.read_text(encoding="utf-8"))
@@ -918,8 +1657,12 @@ __all__ = [
     "apply_desktop_run_preset",
     "build_desktop_preview_surface",
     "build_desktop_profile_diff",
+    "build_desktop_section_issue_cards",
+    "build_desktop_section_field_search_items",
+    "build_desktop_section_change_cards",
     "delete_desktop_profile",
     "desktop_section_status_label",
+    "build_desktop_section_summary_cards",
     "desktop_field_values_match",
     "desktop_profile_dir_path",
     "desktop_profile_display_name",

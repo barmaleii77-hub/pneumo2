@@ -1,0 +1,20 @@
+[
+  {
+    "name": "_wheel_tire_face_colors",
+    "count": 4,
+    "total_ms": 2.086000000417698,
+    "mean_ms": 0.5215000001044245
+  },
+  {
+    "name": "_scene_graded_rgba",
+    "count": 4,
+    "total_ms": 0.05459999920276459,
+    "mean_ms": 0.013649999800691148
+  },
+  {
+    "name": "_scene_grade_color_array",
+    "count": 8,
+    "total_ms": 0.037300002077245153,
+    "mean_ms": 0.004662500259655644
+  }
+]

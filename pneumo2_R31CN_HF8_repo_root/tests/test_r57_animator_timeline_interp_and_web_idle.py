@@ -134,6 +134,19 @@ def test_event_timeline_click_to_seek_carries_exact_sample_time() -> None:
     assert "self._apply_seek_request(idx, sample_t=float(sample_t))" in APP
 
 
+def test_event_timeline_promotes_authored_ring_segment_ranges_into_desktop_band() -> None:
+    assert "def _timeline_ring_segment_ranges_for_bundle(bundle: object) -> List[dict]:" in HMI
+    assert 'cached = getattr(bundle, "_desktop_ring_segment_ranges_cache", _RING_SEGMENT_CACHE_MISS)' in HMI
+    assert "build_nominal_ring_progress_from_spec" in HMI
+    assert "build_segment_ranges_from_progress" in HMI
+    assert "self._segment_ranges: List[dict] = []" in HMI
+    assert "ring_ranges = _timeline_ring_segment_ranges_for_bundle(b)" in HMI
+    assert "self._segment_ranges = [dict(rr) for rr in ring_ranges if isinstance(rr, dict)]" in HMI
+    assert "segment_band_h = 8 if segment_ranges else 0" in HMI
+    assert 'p.drawText(' in HMI
+    assert '"RING"' in HMI
+
+
 def test_desktop_animator_world_progress_falls_back_to_xy_arclength_for_truthful_motion() -> None:
     assert 'key = "svc__world_progress_series"' in APP
     assert 'key = "svc__body_longitudinal_progress_series"' in APP
@@ -201,7 +214,7 @@ def test_desktop_animator_world_progress_falls_back_to_xy_arclength_for_truthful
     assert 'y0 = float(' in APP
     assert 'default=float(_g("путь_x_м", 0.0)),' in APP
     assert 'default=float(_g("путь_y_м", 0.0)),' in APP
-    assert "deriving world XY from скорость_vx_м_с + скорость_vy_м_с + yaw_рад as SERVICE/DERIVED." in DATA_BUNDLE
+    assert "animator falls back to derived world XY from solver скорости + yaw." in DATA_BUNDLE
     assert "def _align_series_length(arr: Any, n: int, *, fill: float = 0.0) -> np.ndarray:" in DATA_BUNDLE
     assert "without cyclic wraparound" in DATA_BUNDLE
     assert "pad_value = float(vec[-1]) if np.isfinite(float(vec[-1])) else float(fill)" in DATA_BUNDLE
@@ -231,7 +244,13 @@ def test_desktop_animator_world_progress_falls_back_to_xy_arclength_for_truthful
     assert 'yaw_rate = _align_series_length(self.get("yaw_rate_рад_с", default=0.0), n, fill=0.0)' in DATA_BUNDLE
     assert 'yaw = np.asarray(np.unwrap(np.asarray(yaw, dtype=float)), dtype=float)' in DATA_BUNDLE
     assert 'yaw_rate = np.asarray(np.gradient(yaw, t, edge_order=1), dtype=float)' in DATA_BUNDLE
-    assert "1) derivative of world-frame velocity from ``ensure_world_velocity_xy()``;" in DATA_BUNDLE
+    assert "1) rotate canonical body-frame ``ax/ay`` into world frame;" in DATA_BUNDLE
+    assert 'if self.main.has("скорость_vx_м_с") and self.main.has("скорость_vy_м_с"):' in DATA_BUNDLE
+    assert 'if self.main.has("ускорение_продольное_ax_м_с2") and self.main.has("ускорение_поперечное_ay_м_с2"):' in DATA_BUNDLE
+    assert 'vxw = vx * np.cos(yaw) - vy * np.sin(yaw)' in DATA_BUNDLE
+    assert 'vyw = vx * np.sin(yaw) + vy * np.cos(yaw)' in DATA_BUNDLE
+    assert 'axw = c * axb - s * ayb' in DATA_BUNDLE
+    assert 'ayw = s * axb + c * ayb' in DATA_BUNDLE
     assert 'vxw, vyw = self.ensure_world_velocity_xy()' in DATA_BUNDLE
     assert 'axw = np.asarray(np.gradient(vxw, t, edge_order=1), dtype=float)' in DATA_BUNDLE
     assert 'ayw = np.asarray(np.gradient(vyw, t, edge_order=1), dtype=float)' in DATA_BUNDLE
@@ -318,10 +337,23 @@ def test_desktop_animator_subframe_yaw_uses_shortest_arc_sampling() -> None:
 
 
 def test_playback_service_interval_is_tightened_for_high_speed_without_restoring_busy_loop() -> None:
-    assert 'base_ms = 8.0  # ~125 Hz stable display cadence across playback speeds.' in APP
+    assert 'base_ms = 8.0  # Fallback service cadence when no live present rate is known yet.' in APP
     assert 'changing playback speed' in APP
-    assert 'target_ms = 1000.0 * 1.5 * dense_dt_s' in APP
+    assert 'target_ms = 500.0 * dense_dt_s' in APP
+    assert 'def _playback_rearm_delay_ms(target_interval_ms: int, *, spent_s: float = 0.0) -> int:' in APP
     assert '4 ms' in APP
+    assert 'two visual samples per solver step' in APP
+
+
+def test_bundle_load_surfaces_validation_fallbacks_explicitly() -> None:
+    assert 'def service_fallback_messages(self) -> List[str]:' in DATA_BUNDLE
+    assert 'fallback_msgs = list(getattr(b, "service_fallback_messages", lambda: [])())' in APP
+    assert 'check_report = run_self_checks(b)' in APP
+    assert 'status_msg = (' in APP
+    assert '"VALIDATION WARN: "' in APP
+    assert 'f"fallback={len(fallback_msgs)} "' in APP
+    assert 'code="bundle_validation_fallback"' in APP
+    assert 'code="bundle_self_check"' in APP
 
 
 def test_playhead_publishers_do_not_force_storage_churn_on_every_render() -> None:

@@ -358,6 +358,49 @@ def resolve_overrides(base_params: Dict[str, Any], scenario: Scenario) -> Dict[s
     return out
 
 
+def build_stage_runtime_base_params(base_params: Mapping[str, Any] | None, stage_name: str) -> Dict[str, Any]:
+    """Return effective base params for one stage runtime.
+
+    Contract:
+    - stage0_relevance stays on the cheaper integrator path;
+    - long/final stages enable local error control automatically;
+    - integrator knobs remain runtime policy, not design-space parameters.
+    """
+    out: Dict[str, Any] = dict(base_params or {})
+    stage_name_s = str(stage_name or "").strip()
+    use_err_control = stage_name_s in {"stage1_long", "stage2_final"}
+
+    out["интегратор_контроль_локальной_ошибки"] = bool(use_err_control)
+    if use_err_control:
+        out.setdefault("интегратор_rtol", 1e-3)
+        out.setdefault("интегратор_atol", 1e-7)
+        out.setdefault("интегратор_mass_rtol_scale_factor", 2.0)
+        out.setdefault("интегратор_err_group_weight_mass", 0.92)
+    return out
+
+
+def materialize_stage_runtime_base_json(
+    stage_dir: Path,
+    *,
+    base_params: Mapping[str, Any] | None,
+    stage_name: str,
+) -> tuple[Path, Dict[str, Any]]:
+    effective = build_stage_runtime_base_params(base_params, stage_name)
+    stage_name_s = str(stage_name or "").strip()
+    runtime_info = {
+        "stage_name": stage_name_s,
+        "интегратор_контроль_локальной_ошибки": bool(effective.get("интегратор_контроль_локальной_ошибки", False)),
+        "интегратор_rtol": float(effective.get("интегратор_rtol", 1e-3)),
+        "интегратор_atol": float(effective.get("интегратор_atol", 1e-7)),
+        "интегратор_mass_rtol_scale_factor": float(effective.get("интегратор_mass_rtol_scale_factor", 2.0)),
+        "интегратор_err_group_weight_mass": float(effective.get("интегратор_err_group_weight_mass", 0.92)),
+    }
+    out_path = Path(stage_dir) / "base_effective.json"
+    save_json(effective, out_path)
+    save_json(runtime_info, Path(stage_dir) / "integrator_runtime_policy.json")
+    return out_path, runtime_info
+
+
 def filter_and_scale_suite(
     suite: List[Dict[str, Any]],
     *,
@@ -2256,6 +2299,7 @@ def main() -> int:
         stage_out_csv = stage_dir / stage_out_csv_name(i)
         stage_suite_json = stage_dir / "suite.json"
         stage_ranges_json = stage_dir / "ranges.json"
+        stage_base_json = stage_dir / "base_effective.json"
         stage_done_flag = stage_dir / "DONE.txt"
 
         stage_csvs.append((stage_name, stage_out_csv))
@@ -2285,6 +2329,12 @@ def main() -> int:
             })
             continue
         save_json(suite_exp, stage_suite_json)
+
+        stage_base_json, stage_integrator_runtime = materialize_stage_runtime_base_json(
+            stage_dir,
+            base_params=base_params,
+            stage_name=stage_name,
+        )
 
         # Ranges for this stage
         try:
@@ -2496,7 +2546,7 @@ def main() -> int:
             "--progress_every_sec",
             str(float(args.progress_every_sec)),
             "--base_json",
-            str(base_json),
+            str(stage_base_json),
             "--ranges_json",
             str(stage_ranges_json),
             "--stop_if_pen_gt",
@@ -2534,6 +2584,8 @@ def main() -> int:
             "stage_seed_focus_budget": int(stage_seed_plan.get("focus_budget", 0) or 0),
             "stage_policy_name": str(stage_seed_plan.get("policy_name") or ""),
             "stage_priority_params": list(stage_influence_summary.get("top_params") or []),
+            "stage_base_json": str(stage_base_json),
+            "stage_integrator_runtime": dict(stage_integrator_runtime),
             "stage_tuner_profile_name": str(stage_tuner_cfg.get("profile_name") or ""),
             "stage_tuner_warmstart_mode": str(stage_tuner_cfg.get("warmstart_mode") or ""),
             "stage_tuner_guided_mode": str(stage_tuner_cfg.get("guided_mode") or ""),

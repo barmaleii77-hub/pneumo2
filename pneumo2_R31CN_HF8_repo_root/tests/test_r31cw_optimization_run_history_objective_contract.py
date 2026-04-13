@@ -28,10 +28,17 @@ def test_r31cw_run_history_reads_objective_contract_for_coordinator_run(tmp_path
         encoding='utf-8',
     )
     with (export_dir / 'trials.csv').open('w', encoding='utf-8', newline='') as fh:
-        writer = csv.DictWriter(fh, fieldnames=['status', 'error_text'])
+        writer = csv.DictWriter(fh, fieldnames=['trial_id', 'status', 'error_text', 'g_json', 'y_json', 'metrics_json'])
         writer.writeheader()
-        writer.writerow({'status': 'DONE', 'error_text': ''})
-        writer.writerow({'status': 'ERROR', 'error_text': 'boom'})
+        writer.writerow({
+            'trial_id': '1',
+            'status': 'DONE',
+            'error_text': '',
+            'g_json': '[0.0]',
+            'y_json': '[1.0, 2.0, 3.0]',
+            'metrics_json': '{"comfort": 1.0, "roll": 2.0, "energy": 3.0, "penalty_total": 0.0}',
+        })
+        writer.writerow({'trial_id': '2', 'status': 'ERROR', 'error_text': 'boom', 'g_json': '', 'y_json': '', 'metrics_json': ''})
 
     summary = summarize_optimization_run(run_dir)
     assert summary is not None
@@ -40,6 +47,10 @@ def test_r31cw_run_history_reads_objective_contract_for_coordinator_run(tmp_path
     assert summary.penalty_key == 'penalty_total'
     assert summary.penalty_tol == 1.25
     assert summary.objective_contract_path == run_dir / 'objective_contract.json'
+    assert summary.runtime_summary is not None
+    assert summary.runtime_summary['trial_health'] == {'done': 1, 'running': 0, 'error': 1}
+    assert summary.runtime_summary['penalty_gate'] == {}
+    assert summary.runtime_summary['recent_errors'] == ['boom']
 
 
 def test_r31cw_run_history_falls_back_to_problem_spec_cfg_when_explicit_contract_missing(tmp_path: Path) -> None:

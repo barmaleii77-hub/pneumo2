@@ -56,6 +56,140 @@ def test_data_bundle_road_profile_refuses_missing_road_columns() -> None:
         raise AssertionError('ensure_road_profile must not invent flat road when road traces are missing')
 
 
+def test_data_bundle_body_velocity_prefers_canonical_solver_channels_over_path_reconstruction() -> None:
+    t = np.array([0.0, 0.5, 1.0], dtype=float)
+    vx = np.array([1.0, 2.0, 3.0], dtype=float)
+    vy = np.array([0.25, 0.5, 0.75], dtype=float)
+    cols = ['время_с', 'скорость_vx_м_с', 'скорость_vy_м_с', 'yaw_рад', 'путь_x_м', 'путь_y_м']
+    values = np.column_stack([
+        t,
+        vx,
+        vy,
+        np.zeros_like(t),
+        np.array([0.0, 100.0, 200.0], dtype=float),
+        np.zeros_like(t),
+    ])
+    b = _bundle(cols, values)
+
+    vxb, vyb = b.ensure_body_velocity_xy()
+
+    assert np.allclose(vxb, vx)
+    assert np.allclose(vyb, vy)
+
+
+def test_data_bundle_world_velocity_prefers_rotated_solver_body_velocity_over_path_gradient() -> None:
+    t = np.array([0.0, 0.5, 1.0], dtype=float)
+    vx = np.array([2.0, 2.0, 2.0], dtype=float)
+    vy = np.array([1.0, 1.0, 1.0], dtype=float)
+    cols = ['время_с', 'скорость_vx_м_с', 'скорость_vy_м_с', 'yaw_рад', 'путь_x_м', 'путь_y_м']
+    values = np.column_stack([
+        t,
+        vx,
+        vy,
+        np.zeros_like(t),
+        np.array([0.0, 0.0, 0.0], dtype=float),
+        np.array([0.0, 0.0, 0.0], dtype=float),
+    ])
+    b = _bundle(cols, values)
+
+    vxw, vyw = b.ensure_world_velocity_xy()
+
+    assert np.allclose(vxw, vx)
+    assert np.allclose(vyw, vy)
+
+
+def test_data_bundle_world_acceleration_prefers_rotated_solver_body_acceleration_over_velocity_derivative() -> None:
+    t = np.array([0.0, 0.5, 1.0], dtype=float)
+    ax = np.array([5.0, 5.0, 5.0], dtype=float)
+    ay = np.array([1.5, 1.5, 1.5], dtype=float)
+    cols = [
+        'время_с',
+        'скорость_vx_м_с',
+        'скорость_vy_м_с',
+        'ускорение_продольное_ax_м_с2',
+        'ускорение_поперечное_ay_м_с2',
+        'yaw_рад',
+        'путь_x_м',
+        'путь_y_м',
+    ]
+    values = np.column_stack([
+        t,
+        np.array([3.0, 3.0, 3.0], dtype=float),
+        np.array([0.0, 0.0, 0.0], dtype=float),
+        ax,
+        ay,
+        np.zeros_like(t),
+        np.array([0.0, 1.5, 3.0], dtype=float),
+        np.zeros_like(t),
+    ])
+    b = _bundle(cols, values)
+
+    axw, ayw = b.ensure_world_acceleration_xy()
+
+    assert np.allclose(axw, ax)
+    assert np.allclose(ayw, ay)
+
+
+def test_data_bundle_service_fallback_messages_report_validation_degradation() -> None:
+    t = np.array([0.0, 0.5, 1.0], dtype=float)
+    cols = ['время_с', 'скорость_vx_м_с', 'скорость_vy_м_с', 'yaw_рад']
+    values = np.column_stack([
+        t,
+        np.array([1.0, 1.0, 1.0], dtype=float),
+        np.array([0.1, 0.1, 0.1], dtype=float),
+        np.array([0.0, 0.1, 0.2], dtype=float),
+    ])
+    b = _bundle(cols, values)
+
+    b.ensure_world_xy()
+    b.ensure_yaw_rate_rad_s()
+    b.ensure_world_acceleration_xy()
+    b.ensure_body_acceleration_xy()
+
+    msgs = b.service_fallback_messages()
+
+    assert any("falls back to derived world XY" in msg for msg in msgs)
+    assert any("falls back to derivative of yaw" in msg for msg in msgs)
+    assert any("falls back to derivative of world velocity" in msg for msg in msgs)
+    assert any("falls back to rotated world acceleration" in msg for msg in msgs)
+
+
+def test_data_bundle_service_fallback_messages_stay_empty_when_canonical_motion_channels_exist() -> None:
+    t = np.array([0.0, 0.5, 1.0], dtype=float)
+    cols = [
+        'время_с',
+        'скорость_vx_м_с',
+        'скорость_vy_м_с',
+        'ускорение_продольное_ax_м_с2',
+        'ускорение_поперечное_ay_м_с2',
+        'yaw_рад',
+        'yaw_rate_рад_с',
+        'путь_x_м',
+        'путь_y_м',
+    ]
+    values = np.column_stack([
+        t,
+        np.array([2.0, 2.0, 2.0], dtype=float),
+        np.array([0.5, 0.5, 0.5], dtype=float),
+        np.array([0.1, 0.1, 0.1], dtype=float),
+        np.array([0.2, 0.2, 0.2], dtype=float),
+        np.zeros_like(t),
+        np.array([0.01, 0.01, 0.01], dtype=float),
+        np.array([0.0, 1.0, 2.0], dtype=float),
+        np.zeros_like(t),
+    ])
+    b = _bundle(cols, values)
+
+    b.ensure_world_xy()
+    b.ensure_world_velocity_xy()
+    b.ensure_body_velocity_xy()
+    b.ensure_yaw_rate_rad_s()
+    b.ensure_world_acceleration_xy()
+    b.ensure_body_acceleration_xy()
+
+    assert b.service_fallback_messages() == []
+
+
 def test_collect_visual_contract_status_reports_no_data_messages() -> None:
     import pandas as pd
 

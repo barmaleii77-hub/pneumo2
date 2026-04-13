@@ -8,7 +8,7 @@ Goal
 Provide a *single* standalone GUI to run the most important autonomous checks:
 - Autotest Harness (`tools/run_autotest.py`)
 - Full Diagnostics (`tools/run_full_diagnostics.py`)
-- Optional Send Bundle creation + open 1-button copy window
+- Optional Send Bundle creation + open the shared diagnostics/send desktop center
 
 This GUI intentionally runs underlying tools as subprocesses so that:
 - stdout/stderr is captured exactly as in CLI
@@ -31,6 +31,7 @@ import subprocess
 import sys
 import threading
 import time
+import tkinter as tk
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -76,6 +77,9 @@ from tkinter import Tk, Text, StringVar, BooleanVar, IntVar, END
 from tkinter import messagebox
 from tkinter import ttk
 
+from pneumo_solver_ui.desktop_results_runtime import DesktopResultsRuntime
+from pneumo_solver_ui.desktop_results_model import DesktopResultsSessionHandoff
+from pneumo_solver_ui.tools.desktop_results_center import DesktopResultsCenter
 from pneumo_solver_ui.tools.send_bundle_contract import (
     ANIM_DIAG_SIDECAR_JSON,
     format_anim_dashboard_brief_lines,
@@ -88,6 +92,13 @@ class RunState:
     proc: subprocess.Popen[str] | None = None
     start_time: float = 0.0
     last_zip: str | None = None
+    requested_autotest: bool = False
+    requested_diagnostics: bool = False
+    requested_send_bundle: bool = False
+    autotest_rc: int | None = None
+    diagnostics_rc: int | None = None
+    send_bundle_ok: bool | None = None
+    send_bundle_error: str = ""
 
 
 def _repo_root() -> Path:
@@ -121,13 +132,20 @@ def _open_in_file_manager(path: str) -> None:
 
 
 class App:
-    def __init__(self) -> None:
+    def __init__(self, host: tk.Misc | None = None, *, hosted: bool = False) -> None:
         self.repo = _repo_root()
         self.py = _guess_python()
+        self.results_runtime = DesktopResultsRuntime(
+            repo_root=self.repo,
+            python_executable=self.py,
+        )
 
-        self.root = Tk()
-        self.root.title(f"Autonomous Testing Center ({RELEASE})")
-        self.root.geometry("980x700")
+        self._owns_root = host is None
+        self._hosted = bool(hosted or not self._owns_root)
+        self.root = host if host is not None else Tk()
+        if self._owns_root:
+            self.root.title(f"Test Validation Results Center ({RELEASE})")
+            self.root.geometry("1180x760")
 
         # What to run
         self.do_autotest = BooleanVar(value=True)
@@ -144,12 +162,13 @@ class App:
 
         # After run
         self.make_send_bundle = BooleanVar(value=True)
-        self.open_send_gui = BooleanVar(value=True)
+        self.open_send_gui = BooleanVar(value=False)
         self.auto_open_folder = BooleanVar(value=False)
         self.continue_on_failure = BooleanVar(value=True)
 
         self.q: "queue.Queue[str]" = queue.Queue()
         self.state = RunState()
+        self._host_closed = False
 
         self._build_ui()
         self.root.after(100, self._tick)
@@ -157,7 +176,18 @@ class App:
     def _build_ui(self) -> None:
         pad = 10
 
-        top = ttk.Frame(self.root, padding=pad)
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill="both", expand=True)
+
+        run_tab = ttk.Frame(self.notebook)
+        self.results_center = DesktopResultsCenter(
+            self.notebook,
+            runtime=self.results_runtime,
+        )
+        self.notebook.add(run_tab, text="Run Tests")
+        self.notebook.add(self.results_center, text="Validation & Results")
+
+        top = ttk.Frame(run_tab, padding=pad)
         top.pack(fill="x")
 
         ttk.Label(top, text="Что запускать:").grid(row=0, column=0, sticky="w")
@@ -165,7 +195,7 @@ class App:
         ttk.Checkbutton(top, text="Full Diagnostics", variable=self.do_diagnostics).grid(row=0, column=2, sticky="w", padx=(8, 0))
 
         # Levels
-        lvl = ttk.Frame(self.root, padding=(pad, 0, pad, pad))
+        lvl = ttk.Frame(run_tab, padding=(pad, 0, pad, pad))
         lvl.pack(fill="x")
 
         ttk.Label(lvl, text="Autotest уровень:").grid(row=0, column=0, sticky="w")
@@ -178,7 +208,7 @@ class App:
         lvl.columnconfigure(5, weight=1)
 
         # Diagnostics options
-        diag = ttk.LabelFrame(self.root, text="Опции Full Diagnostics", padding=pad)
+        diag = ttk.LabelFrame(run_tab, text="Опции Full Diagnostics", padding=pad)
         diag.pack(fill="x", padx=pad, pady=(0, pad))
 
         ttk.Checkbutton(diag, text="Пропустить UI smoke-test (не запускать Streamlit)", variable=self.skip_ui_smoke).grid(row=0, column=0, sticky="w")
@@ -194,15 +224,15 @@ class App:
         diag.columnconfigure(2, weight=1)
 
         # After run
-        aft = ttk.LabelFrame(self.root, text="После завершения", padding=pad)
+        aft = ttk.LabelFrame(run_tab, text="После завершения", padding=pad)
         aft.pack(fill="x", padx=pad, pady=(0, pad))
         ttk.Checkbutton(aft, text="Создать Send Bundle (ZIP для чата)", variable=self.make_send_bundle).grid(row=0, column=0, sticky="w")
-        ttk.Checkbutton(aft, text="Открыть окно Copy ZIP (1 кнопка)", variable=self.open_send_gui).grid(row=0, column=1, sticky="w", padx=(16, 0))
+        ttk.Checkbutton(aft, text="Сразу открыть Diagnostics / Send Center", variable=self.open_send_gui).grid(row=0, column=1, sticky="w", padx=(16, 0))
         ttk.Checkbutton(aft, text="Открыть папку send_bundles", variable=self.auto_open_folder).grid(row=0, column=2, sticky="w", padx=(16, 0))
         aft.columnconfigure(3, weight=1)
 
         # Buttons
-        btns = ttk.Frame(self.root, padding=(pad, 0, pad, pad))
+        btns = ttk.Frame(run_tab, padding=(pad, 0, pad, pad))
         btns.pack(fill="x")
         self.btn_run = ttk.Button(btns, text="▶ Запустить автономное тестирование", command=self._on_run)
         self.btn_run.pack(side="left")
@@ -213,14 +243,19 @@ class App:
         ttk.Button(btns, text="📂 Открыть send_bundles", command=self._open_send_bundles).pack(side="left", padx=(8, 0))
         ttk.Button(btns, text="📂 Открыть autotest_runs", command=self._open_autotest_runs).pack(side="left", padx=(8, 0))
         ttk.Button(btns, text="📂 Открыть diagnostics_runs", command=self._open_diagnostics_runs).pack(side="left", padx=(8, 0))
+        ttk.Button(
+            btns,
+            text="Validation & Results",
+            command=lambda: self.notebook.select(self.results_center),
+        ).pack(side="left", padx=(8, 0))
 
         self.status = StringVar(value="Готов.")
         ttk.Label(btns, textvariable=self.status).pack(side="right")
 
         # Output
-        self.text = Text(self.root, wrap="word")
+        self.text = Text(run_tab, wrap="word")
         self.text.pack(fill="both", expand=True, padx=pad, pady=(0, pad))
-        self._append("Autonomous Testing Center ready.\n")
+        self._append("Test Validation Results Center ready.\n")
 
     def _append(self, s: str) -> None:
         self.text.insert(END, s)
@@ -254,7 +289,14 @@ class App:
         self.btn_stop.config(state="normal")
         self.status.set("Запуск...")
 
-        self.state = RunState(proc=None, start_time=time.time(), last_zip=None)
+        self.state = RunState(
+            proc=None,
+            start_time=time.time(),
+            last_zip=None,
+            requested_autotest=bool(self.do_autotest.get()),
+            requested_diagnostics=bool(self.do_diagnostics.get()),
+            requested_send_bundle=bool(self.make_send_bundle.get()),
+        )
 
         t = threading.Thread(target=self._worker, daemon=True)
         t.start()
@@ -316,6 +358,7 @@ class App:
             if self.do_autotest.get():
                 cmd = [self.py, "-u", str(self.repo / "pneumo_solver_ui" / "tools" / "run_autotest.py"), "--level", self.autotest_level.get().strip()]
                 rc = self._run_cmd(cmd, f"Autotest ({self.autotest_level.get()})")
+                self.state.autotest_rc = rc
                 if rc != 0:
                     final_rc = rc
                     if not self.continue_on_failure.get():
@@ -330,6 +373,7 @@ class App:
                 if self.run_opt_smoke.get():
                     cmd += ["--run_opt_smoke", "--opt_minutes", str(int(self.opt_minutes.get())), "--opt_jobs", str(int(self.opt_jobs.get()))]
                 rc = self._run_cmd(cmd, f"Full Diagnostics ({self.diagnostics_level.get()})")
+                self.state.diagnostics_rc = rc
                 if rc != 0:
                     final_rc = rc
                     if not self.continue_on_failure.get():
@@ -349,9 +393,13 @@ class App:
                     out_dir.mkdir(parents=True, exist_ok=True)
                     zip_path = make_send_bundle(self.repo, out_dir=out_dir, keep_last_n=3, max_file_mb=80, include_workspace_osc=False)
                     self.state.last_zip = str(zip_path)
+                    self.state.send_bundle_ok = True
+                    self.state.send_bundle_error = ""
                     self.q.put(f"ZIP: {zip_path}\n")
                     _rr("send_bundle_done", zip_path=str(zip_path))
                 except Exception as e:
+                    self.state.send_bundle_ok = False
+                    self.state.send_bundle_error = str(e)
                     _rr("send_bundle_failed", error=repr(e))
                     self.q.put(f"[Send Bundle failed] {e}\n")
                     if final_rc == 0:
@@ -361,6 +409,8 @@ class App:
             self.q.put("__ALL_DONE__" + str(final_rc))
 
     def _tick(self) -> None:
+        if self._host_closed:
+            return
         try:
             while True:
                 msg = self.q.get_nowait()
@@ -377,18 +427,67 @@ class App:
             pass
         self.root.after(100, self._tick)
 
+    def on_host_close(self) -> None:
+        self._host_closed = True
+        self._on_stop()
+
     def _on_finished(self, rc: int) -> None:
         self.btn_run.config(state="normal")
         self.btn_stop.config(state="disabled")
         self.status.set(f"Готово. RC={rc}.")
-
+        self.results_center.refresh()
         dur = 0.0
         try:
             dur = time.time() - float(self.state.start_time)
         except Exception:
             pass
+        snapshot = self.results_center.snapshot_state
+        step_lines: list[str] = []
+        if self.state.requested_autotest:
+            step_lines.append(
+                f"Autotest ({self.autotest_level.get()}): rc={self.state.autotest_rc}"
+            )
+        if self.state.requested_diagnostics:
+            step_lines.append(
+                f"Full Diagnostics ({self.diagnostics_level.get()}): rc={self.state.diagnostics_rc}"
+            )
+        if self.state.requested_send_bundle:
+            if self.state.send_bundle_ok:
+                step_lines.append("Send bundle: ready")
+            elif self.state.send_bundle_ok is False:
+                step_lines.append("Send bundle: failed")
+        if self.open_send_gui.get():
+            step_lines.append("Auto-open Send Center: on")
+        if self.auto_open_folder.get():
+            step_lines.append("Auto-open send_bundles folder: on")
+        handoff_detail = (
+            f"Run finished with rc={rc} in {dur:.1f} s. "
+            "Use the suggested branch below to continue validation/inspection."
+        )
+        if self.state.send_bundle_error:
+            handoff_detail = handoff_detail + f" Send bundle error: {self.state.send_bundle_error}"
+        self.results_center.set_session_handoff(
+            DesktopResultsSessionHandoff(
+                summary=f"rc={rc} | duration={dur:.1f}s",
+                detail=handoff_detail,
+                step_lines=tuple(step_lines),
+                zip_path=Path(self.state.last_zip).expanduser().resolve()
+                if self.state.last_zip
+                else None,
+                autotest_run_dir=(
+                    snapshot.latest_autotest_run_dir if snapshot is not None else None
+                ),
+                diagnostics_run_dir=(
+                    snapshot.latest_diagnostics_run_dir if snapshot is not None else None
+                ),
+            )
+        )
+        self.notebook.select(self.results_center)
 
-        msg_lines = [f"Автономное тестирование завершено (rc={rc}, {dur:.1f} s)."]
+        msg_lines = [
+            f"Автономное тестирование завершено (rc={rc}, {dur:.1f} s).",
+            "Validation & Results overview обновлён во второй вкладке.",
+        ]
         if self.state.last_zip:
             msg_lines.append(f"ZIP: {self.state.last_zip}")
             out_dir = Path(self.state.last_zip).expanduser().resolve().parent
@@ -408,13 +507,16 @@ class App:
 
         if self.open_send_gui.get():
             try:
-                send_gui = self.repo / "pneumo_solver_ui" / "tools" / "send_results_gui.py"
-                subprocess.Popen([self.py, str(send_gui)], cwd=str(self.repo))
+                env = os.environ.copy()
+                if self.make_send_bundle.get() and self.state.last_zip:
+                    env["PNEUMO_SEND_RESULTS_REUSE_LATEST"] = "1"
+                self.results_runtime.launch_send_results_gui(env=env)
             except Exception:
                 pass
 
     def run(self) -> None:
-        self.root.mainloop()
+        if self._owns_root:
+            self.root.mainloop()
 
 
 def main() -> int:

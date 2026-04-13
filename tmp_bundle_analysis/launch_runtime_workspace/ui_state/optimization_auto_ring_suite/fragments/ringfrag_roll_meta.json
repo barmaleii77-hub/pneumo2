@@ -1,0 +1,56 @@
+{
+  "schema_version": "pneumo_opt_auto_ring_suite_v1",
+  "source_ring": {
+    "road_csv": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\launch_runtime_workspace\\exports\\anim_latest_road_csv.csv",
+    "axay_csv": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\launch_runtime_workspace\\exports\\anim_latest_axay_csv.csv",
+    "scenario_json": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\launch_runtime_workspace\\exports\\anim_latest_scenario_json.json"
+  },
+  "fragment": {
+    "id": "ringfrag_roll",
+    "label": "крен",
+    "kind": "roll",
+    "peak_value": 2.0576131687242794,
+    "center_s": 7.01,
+    "t_start": 5.01,
+    "t_end": 9.01,
+    "duration_s": 4.0,
+    "segments": [
+      {
+        "segment_index": 1,
+        "name": "S2_поворот",
+        "start_s": 5.0,
+        "end_s": 9.0,
+        "duration_s": 4.0,
+        "turn_direction": "LEFT",
+        "road_mode": "SINE",
+        "event_count": 0
+      },
+      {
+        "segment_index": 2,
+        "name": "S3_прямо_55",
+        "start_s": 9.0,
+        "end_s": 12.0,
+        "duration_s": 3.0,
+        "turn_direction": "STRAIGHT",
+        "road_mode": "ISO8608",
+        "event_count": 0
+      }
+    ]
+  },
+  "road_clip": {
+    "src": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\launch_runtime_workspace\\exports\\anim_latest_road_csv.csv",
+    "dst": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\launch_runtime_workspace\\ui_state\\optimization_auto_ring_suite\\fragments\\ringfrag_roll_road.csv",
+    "rows": 401,
+    "t_start_source_s": 5.01,
+    "t_end_source_s": 9.01,
+    "duration_s": 4.0
+  },
+  "axay_clip": {
+    "src": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\launch_runtime_workspace\\exports\\anim_latest_axay_csv.csv",
+    "dst": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\launch_runtime_workspace\\ui_state\\optimization_auto_ring_suite\\fragments\\ringfrag_roll_axay.csv",
+    "rows": 401,
+    "t_start_source_s": 5.01,
+    "t_end_source_s": 9.01,
+    "duration_s": 4.0
+  }
+}

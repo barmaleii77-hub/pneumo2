@@ -1,0 +1,95 @@
+{
+  "elapsed_s": 6.631269900000007,
+  "items": [
+    {
+      "name": "_road_patch_mesh_inside_wheel_cylinder",
+      "count": 344,
+      "total_ms": 612.8530999894792,
+      "mean_ms": 1.7815497092717418
+    },
+    {
+      "name": "_scene_grade_color_array",
+      "count": 4595,
+      "total_ms": 177.64659995191323,
+      "mean_ms": 0.038660848738174804
+    },
+    {
+      "name": "_scene_graded_rgba",
+      "count": 3864,
+      "total_ms": 159.25170000446087,
+      "mean_ms": 0.04121420807568863
+    },
+    {
+      "name": "_wheel_tire_face_colors",
+      "count": 344,
+      "total_ms": 100.13479999997799,
+      "mean_ms": 0.2910895348836569
+    },
+    {
+      "name": "_road_face_colors",
+      "count": 86,
+      "total_ms": 25.314500000604312,
+      "mean_ms": 0.29435465116981757
+    },
+    {
+      "name": "_apply_mesh_material",
+      "count": 2863,
+      "total_ms": 23.935299982440483,
+      "mean_ms": 0.00836021654992682
+    },
+    {
+      "name": "_contact_bounce_material_rgba",
+      "count": 1044,
+      "total_ms": 22.326700037410774,
+      "mean_ms": 0.021385728005182736
+    },
+    {
+      "name": "_road_crossbar_line_segments_from_profiles",
+      "count": 86,
+      "total_ms": 14.243499998883635,
+      "mean_ms": 0.16562209301027483
+    },
+    {
+      "name": "_road_grid_line_segments",
+      "count": 86,
+      "total_ms": 10.477699996044976,
+      "mean_ms": 0.12183372088424389
+    },
+    {
+      "name": "_wheel_tire_material_rgba",
+      "count": 344,
+      "total_ms": 10.000799996305432,
+      "mean_ms": 0.02907209301251579
+    },
+    {
+      "name": "_road_native_support_s_values_from_axis",
+      "count": 172,
+      "total_ms": 8.233699989432353,
+      "mean_ms": 0.04787034877576949
+    },
+    {
+      "name": "_ellipse_mesh_on_plane",
+      "count": 51,
+      "total_ms": 4.9870000020746375,
+      "mean_ms": 0.09778431376616936
+    },
+    {
+      "name": "_sampled_road_preview_window_m",
+      "count": 86,
+      "total_ms": 0.6181000017022598,
+      "mean_ms": 0.0071872093221193
+    },
+    {
+      "name": "_stable_road_grid_cross_spacing",
+      "count": 86,
+      "total_ms": 0.20640000366256572,
+      "mean_ms": 0.0024000000425879737
+    },
+    {
+      "name": "_stable_road_surface_spacing",
+      "count": 86,
+      "total_ms": 0.1883999939309433,
+      "mean_ms": 0.002190697603848178
+    }
+  ]
+}

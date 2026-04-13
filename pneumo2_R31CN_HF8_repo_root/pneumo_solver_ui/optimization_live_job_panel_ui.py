@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from pneumo_solver_ui.optimization_active_runtime_summary import (
+    active_handoff_provenance_caption,
+    active_runtime_penalty_gate_caption,
+    active_runtime_progress_caption,
+    active_runtime_recent_errors_caption,
+    active_runtime_trial_health_caption,
+)
 from pneumo_solver_ui.optimization_baseline_source_ui import (
     render_baseline_source_summary,
 )
@@ -42,6 +49,7 @@ def render_live_optimization_job_panel(
     auto_refresh_default: bool,
     current_problem_hash: str = "",
     current_problem_hash_mode: str = "",
+    active_runtime_summary: dict[str, Any] | None = None,
     auto_refresh_key: str = "__opt_autorefresh_enabled",
     log_tail_chars: int = 8000,
 ) -> bool:
@@ -57,6 +65,43 @@ def render_live_optimization_job_panel(
         budget = int(getattr(job, "budget", 0) or 0)
         st.progress(min(1.0, max(0.0, done / float(budget))))
         st.caption(f"Выполнено: {done} из {budget}")
+
+    is_handoff = str(getattr(job, "backend", "") or "").startswith("Handoff/")
+    progress_caption = active_runtime_progress_caption(
+        active_runtime_summary,
+        prefix="Active handoff progress" if is_handoff else "Active run progress",
+    )
+    trial_health_caption = active_runtime_trial_health_caption(
+        active_runtime_summary,
+        prefix="Active handoff trial health" if is_handoff else "Active run trial health",
+    )
+    penalty_gate_caption = active_runtime_penalty_gate_caption(
+        active_runtime_summary,
+        prefix="Active handoff penalty gate" if is_handoff else "Active run penalty gate",
+    )
+    recent_errors_caption = active_runtime_recent_errors_caption(
+        active_runtime_summary,
+        prefix="Recent handoff errors" if is_handoff else "Recent run errors",
+    )
+    provenance_caption = active_handoff_provenance_caption(
+        active_runtime_summary,
+        prefix="Handoff provenance" if is_handoff else "Run provenance",
+    )
+    runtime_diagnostics = [
+        text
+        for text in (
+            progress_caption,
+            trial_health_caption,
+            penalty_gate_caption,
+            recent_errors_caption,
+            provenance_caption,
+        )
+        if str(text or "").strip()
+    ]
+    if runtime_diagnostics:
+        st.markdown("**Runtime diagnostics**")
+        for line in runtime_diagnostics:
+            st.caption(str(line))
 
     render_baseline_source_summary(
         st,

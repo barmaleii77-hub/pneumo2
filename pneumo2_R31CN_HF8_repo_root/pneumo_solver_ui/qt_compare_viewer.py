@@ -117,10 +117,13 @@ except Exception:
 
 try:
     try:
-        from geometry_acceptance_contract import format_geometry_acceptance_summary_lines  # type: ignore
+        from geometry_acceptance_contract import build_geometry_acceptance_rows, format_geometry_acceptance_summary_lines  # type: ignore
     except Exception:
-        from pneumo_solver_ui.geometry_acceptance_contract import format_geometry_acceptance_summary_lines  # type: ignore
+        from pneumo_solver_ui.geometry_acceptance_contract import build_geometry_acceptance_rows, format_geometry_acceptance_summary_lines  # type: ignore
 except Exception:
+    def build_geometry_acceptance_rows(summary):  # type: ignore
+        return []
+
     def format_geometry_acceptance_summary_lines(summary, *, label=""):
         return []
 
@@ -470,6 +473,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.available_signals: List[str] = []
         self.signals_selected: List[str] = []
         self._signals_selection_explicit: bool = False
+        self.dist_signal_selected: str = ""
         self.navigator_signal_selected: str = ""
         self.events_selected: List[str] = []
         self._events_selection_explicit: bool = False
@@ -514,14 +518,39 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._mv_updating: bool = False
         self._mv_restoring_settings: bool = False
         self._workspace_focus_mode: str = "all"
+        self._workspace_focus_dock_attr: str = ""
+        self._workspace_app_focus_connected: bool = False
         self._workspace_analysis_mode: str = "all_to_all"
         self._insight_heat: Dict[str, object] = {}
+        self._insight_peak_heat: Dict[str, object] = {}
         self._insight_infl: Dict[str, object] = {}
         self._insight_qa: Dict[str, object] = {}
         self._insight_events: Dict[str, object] = {}
+        self._events_timeline_cache: Optional[Dict[str, object]] = None
+        self._events_runs_cache: Optional[Dict[str, object]] = None
+        self._peak_cache: Optional[Dict[str, object]] = None
+        self._open_timeline_cache: Optional[Dict[str, object]] = None
+        self._static_stroke_cache: Optional[Dict[str, object]] = None
+        self._geometry_acceptance_cache: Optional[Dict[str, object]] = None
+        self._dist_cache: Optional[Dict[str, object]] = None
         self._mv_timer = QtCore.QTimer(self)
         self._mv_timer.setSingleShot(True)
         self._mv_timer.timeout.connect(self._update_multivar_views)
+        self._dist_timer = QtCore.QTimer(self)
+        self._dist_timer.setSingleShot(True)
+        self._dist_timer.timeout.connect(self._rebuild_run_metrics)
+        self._peak_timer = QtCore.QTimer(self)
+        self._peak_timer.setSingleShot(True)
+        self._peak_timer.timeout.connect(self._rebuild_peak_heatmap)
+        self._open_timeline_timer = QtCore.QTimer(self)
+        self._open_timeline_timer.setSingleShot(True)
+        self._open_timeline_timer.timeout.connect(self._rebuild_open_timeline_view)
+        self._static_timer = QtCore.QTimer(self)
+        self._static_timer.setSingleShot(True)
+        self._static_timer.timeout.connect(self._rebuild_static_stroke_view)
+        self._geometry_timer = QtCore.QTimer(self)
+        self._geometry_timer.setSingleShot(True)
+        self._geometry_timer.timeout.connect(self._rebuild_geometry_acceptance_view)
 
         self._build_dock()
         self._build_menu()
@@ -533,11 +562,16 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._restore_after_load = {}
         self._load_settings()
         self._build_heatmap_dock()
+        self._build_peak_heatmap_dock()
+        self._build_open_timeline_dock()
         self._build_influence_dock()
+        self._build_run_metrics_dock()
+        self._build_static_stroke_dock()
         self._build_infl_heatmap_dock()
         self._build_multivar_dock()
         self._build_qa_dock()
         self._build_events_dock()
+        self._build_geometry_acceptance_dock()
         self._build_view_menu()
         self._apply_default_workspace_layout()
 
@@ -561,6 +595,13 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         # crosshair
         self.proxy = pg.SignalProxy(self.glw.scene().sigMouseMoved, rateLimit=60, slot=self._on_mouse_moved)
+        try:
+            app = QtWidgets.QApplication.instance()
+            if app is not None:
+                app.focusChanged.connect(self._on_app_focus_changed)
+                self._workspace_app_focus_connected = True
+        except Exception:
+            self._workspace_app_focus_connected = False
 
     # ---------------- UI ----------------
     def _build_dock(self):
@@ -608,7 +649,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.btn_workspace_focus_all.setToolTip("Show the full workspace with all docks.")
         self.btn_workspace_focus_all.setCheckable(True)
         self.btn_workspace_focus_all.setChecked(True)
-        self.btn_workspace_focus_all.clicked.connect(lambda _=False: self._focus_workspace_preset("all"))
+        self.btn_workspace_focus_all.clicked.connect(lambda _=False: self._activate_workspace_focus_mode("all"))
         self._workspace_focus_buttons.addButton(self.btn_workspace_focus_all)
         row_focus.addWidget(self.btn_workspace_focus_all)
 
@@ -616,7 +657,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.btn_workspace_focus_heatmaps.setObjectName("workspaceFocusHeatmapsButton")
         self.btn_workspace_focus_heatmaps.setToolTip("Focus Delta and Influence heatmaps.")
         self.btn_workspace_focus_heatmaps.setCheckable(True)
-        self.btn_workspace_focus_heatmaps.clicked.connect(lambda _=False: self._focus_workspace_preset("heatmaps"))
+        self.btn_workspace_focus_heatmaps.clicked.connect(lambda _=False: self._activate_workspace_focus_mode("heatmaps"))
         self._workspace_focus_buttons.addButton(self.btn_workspace_focus_heatmaps)
         row_focus.addWidget(self.btn_workspace_focus_heatmaps)
 
@@ -624,7 +665,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.btn_workspace_focus_multivar.setObjectName("workspaceFocusMultivarButton")
         self.btn_workspace_focus_multivar.setToolTip("Focus SPLOM, Parallel and 3D melting-cloud / pebbles views.")
         self.btn_workspace_focus_multivar.setCheckable(True)
-        self.btn_workspace_focus_multivar.clicked.connect(lambda _=False: self._focus_workspace_preset("multivariate"))
+        self.btn_workspace_focus_multivar.clicked.connect(lambda _=False: self._activate_workspace_focus_mode("multivariate"))
         self._workspace_focus_buttons.addButton(self.btn_workspace_focus_multivar)
         row_focus.addWidget(self.btn_workspace_focus_multivar)
 
@@ -632,7 +673,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.btn_workspace_focus_qa.setObjectName("workspaceFocusQaButton")
         self.btn_workspace_focus_qa.setToolTip("Focus QA and event drill-down tools.")
         self.btn_workspace_focus_qa.setCheckable(True)
-        self.btn_workspace_focus_qa.clicked.connect(lambda _=False: self._focus_workspace_preset("qa"))
+        self.btn_workspace_focus_qa.clicked.connect(lambda _=False: self._activate_workspace_focus_mode("qa"))
         self._workspace_focus_buttons.addButton(self.btn_workspace_focus_qa)
         row_focus.addWidget(self.btn_workspace_focus_qa)
 
@@ -904,6 +945,15 @@ class CompareViewer(QtWidgets.QMainWindow):
 
     def closeEvent(self, event):  # noqa: N802
         try:
+            if bool(getattr(self, '_workspace_app_focus_connected', False)):
+                app = QtWidgets.QApplication.instance()
+                if app is not None:
+                    app.focusChanged.disconnect(self._on_app_focus_changed)
+        except Exception:
+            pass
+        finally:
+            self._workspace_app_focus_connected = False
+        try:
             self._save_settings()
         except Exception:
             pass
@@ -999,6 +1049,12 @@ class CompareViewer(QtWidgets.QMainWindow):
                 s.value('workspace_analysis_mode', getattr(self, '_workspace_analysis_mode', 'all_to_all'))
                 or getattr(self, '_workspace_analysis_mode', 'all_to_all')
             )
+            raw_focus_mode = s.value('workspace_focus_mode')
+            if raw_focus_mode is not None:
+                self._restore_after_load['workspace_focus_mode'] = str(raw_focus_mode or 'all')
+            raw_focus_dock = s.value('workspace_focus_dock')
+            if raw_focus_dock is not None:
+                self._restore_after_load['workspace_focus_dock'] = str(raw_focus_dock or '')
             if hasattr(self, 'spin_rows'):
                 self.spin_rows.setValue(self._qs_int(s.value('plot_rows', self.spin_rows.value()), self.spin_rows.value()))
             if hasattr(self, 'spin_fps'):
@@ -1053,6 +1109,12 @@ class CompareViewer(QtWidgets.QMainWindow):
             raw = s.value('signal_filter')
             if raw is not None:
                 self._restore_after_load['signal_filter'] = str(raw or '')
+        except Exception:
+            pass
+        try:
+            raw = s.value('dist_signal')
+            if raw is not None:
+                self._restore_after_load['dist_signal'] = str(raw or '')
         except Exception:
             pass
         try:
@@ -1153,12 +1215,24 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._restore_after_load = {}
         if not stt:
             return
+        valid_focus_modes = {"all", "heatmaps", "multivariate", "qa"}
+        saved_focus_mode = str(stt.get('workspace_focus_mode') or '').strip()
+        if saved_focus_mode not in valid_focus_modes:
+            saved_focus_mode = ""
+        saved_focus_dock = str(stt.get('workspace_focus_dock') or '').strip()
+        if saved_focus_dock and not isinstance(self._workspace_dock_by_attr(saved_focus_dock), QtWidgets.QDockWidget):
+            saved_focus_dock = ""
+        had_window_state = stt.get('window_state') is not None
         try:
             win_state = stt.get('window_state')
             if win_state is not None:
                 self.restoreState(win_state)
         except Exception:
             pass
+        if saved_focus_mode:
+            self._workspace_focus_mode = saved_focus_mode
+        if saved_focus_dock:
+            self._workspace_focus_dock_attr = saved_focus_dock
         # Influence(t) heatmap dock
         try:
             if hasattr(self, 'chk_inflheat'):
@@ -1191,6 +1265,14 @@ class CompareViewer(QtWidgets.QMainWindow):
                 pass
 
         if not getattr(self, 'runs', None):
+            try:
+                if saved_focus_mode and not had_window_state:
+                    self._focus_workspace_preset(saved_focus_mode)
+                    self._restore_workspace_focus_dock(saved_focus_mode=saved_focus_mode, dock_attr=saved_focus_dock)
+                elif saved_focus_mode:
+                    self._update_workspace_status()
+            except Exception:
+                pass
             keep_keys = (
                 'dataset_paths',
                 'runs',
@@ -1200,6 +1282,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 'reference_run_path',
                 'table',
                 'signal_filter',
+                'dist_signal',
                 'nav_signal',
                 'nav_region',
                 'play_time',
@@ -1338,6 +1421,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 'table',
                 'signals',
                 'signals_selection_explicit',
+                'dist_signal',
                 'events_selected',
                 'events_selection_explicit',
             ):
@@ -1398,6 +1482,12 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 pass
 
+        try:
+            want_dist_signal = str(stt.get('dist_signal') or '').strip()
+            if want_dist_signal:
+                self.dist_signal_selected = want_dist_signal
+        except Exception:
+            pass
         try:
             want_nav_signal = str(stt.get('nav_signal') or '').strip()
             if want_nav_signal:
@@ -1579,6 +1669,14 @@ class CompareViewer(QtWidgets.QMainWindow):
                 self._ensure_playhead_visible_in_view()
         except Exception:
             pass
+        try:
+            if saved_focus_mode and not had_window_state:
+                self._focus_workspace_preset(saved_focus_mode)
+                self._restore_workspace_focus_dock(saved_focus_mode=saved_focus_mode, dock_attr=saved_focus_dock)
+            elif saved_focus_mode:
+                self._update_workspace_status()
+        except Exception:
+            pass
 
     def _save_settings(self) -> None:
         s = getattr(self, '_settings', None)
@@ -1603,8 +1701,14 @@ class CompareViewer(QtWidgets.QMainWindow):
             s.setValue('nav_enabled', int(self.chk_nav.isChecked()))
             s.setValue('mode_delta', int(self.chk_delta.isChecked()))
             s.setValue('workspace_analysis_mode', str(getattr(self, '_workspace_analysis_mode', 'all_to_all') or 'all_to_all'))
+            s.setValue('workspace_focus_mode', str(getattr(self, '_workspace_focus_mode', 'all') or 'all'))
+            s.setValue('workspace_focus_dock', str(getattr(self, '_workspace_focus_dock_attr', '') or ''))
             s.setValue('plot_rows', int(self.spin_rows.value()))
             s.setValue('play_fps', int(self.spin_fps.value()))
+            if hasattr(self, 'combo_dist_mode'):
+                s.setValue('dist_mode', self._run_metrics_mode_key())
+            if hasattr(self, 'chk_dist_use_view'):
+                s.setValue('dist_use_view', int(self.chk_dist_use_view.isChecked()))
             s.setValue('zero_baseline', int(self.chk_zero_baseline.isChecked()))
             s.setValue('lock_y_signal', int(self.chk_lock_y.isChecked()))
             s.setValue('lock_y_unit', int(self.chk_lock_y_unit.isChecked()))
@@ -1656,6 +1760,14 @@ class CompareViewer(QtWidgets.QMainWindow):
             try:
                 if hasattr(self, 'edit_filter'):
                     s.setValue('signal_filter', str(self.edit_filter.text() or ''))
+            except Exception:
+                pass
+            try:
+                dist_signal_value = str(
+                    getattr(self, 'dist_signal_selected', '') or
+                    (self.combo_dist_signal.currentText() if hasattr(self, 'combo_dist_signal') else '') or ''
+                ).strip()
+                s.setValue('dist_signal', dist_signal_value)
             except Exception:
                 pass
             try:
@@ -1848,7 +1960,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.lbl_status_quality.setObjectName("statusChipQuality")
         sb.addPermanentWidget(self.lbl_status_quality)
 
-        self.lbl_status_layout = QtWidgets.QLabel("Focus all | Docks 0/0 | Ref —")
+        self.lbl_status_layout = QtWidgets.QLabel("Focus Overview | Docks 0/0 | Ref —")
         self.lbl_status_layout.setObjectName("statusChipLayout")
         sb.addPermanentWidget(self.lbl_status_layout)
 
@@ -2053,7 +2165,44 @@ class CompareViewer(QtWidgets.QMainWindow):
                 except Exception:
                     pass
 
-    def _update_workspace_focus_button_hints(
+    def _workspace_focus_mode_display_text(
+        self,
+        *,
+        focus_mode: str,
+        follow_target: Optional[Dict[str, object]] = None,
+        for_action: bool = False,
+    ) -> str:
+        mode = str(focus_mode or "all")
+        base_labels = {
+            "all": "Show All Docks" if for_action else "Overview",
+            "heatmaps": "Focus Heatmaps" if for_action else "Heatmaps",
+            "multivariate": "Focus Multivariate" if for_action else "Multivar",
+            "qa": "Focus QA / Events" if for_action else "QA / Events",
+        }
+        label = base_labels.get(mode, base_labels["all"])
+        target = dict(follow_target or {})
+        target_focus = str(target.get("focus") or "").strip()
+        target_dock = str(target.get("dock_label") or "").strip()
+        if target_dock == "Influence(t) Heatmap":
+            target_short = "Influence(t)"
+        else:
+            target_short = target_dock
+        current_short = self._workspace_current_dock_label(short=True)
+        if mode == "all" and target_short:
+            if current_short and current_short != target_short:
+                return f"{label} ({current_short}) -> Next {target_short}"
+            return f"{label} -> Next {target_short}"
+        if mode == "all" and current_short:
+            return f"{label} ({current_short})"
+        if mode != target_focus or not target_dock:
+            return label
+        if mode == "heatmaps":
+            return f"{label} -> {target_short}"
+        if mode == "qa":
+            return f"{label} -> {target_dock}"
+        return label
+
+    def _update_workspace_focus_labels(
         self,
         *,
         analysis_mode: Optional[str] = None,
@@ -2061,20 +2210,68 @@ class CompareViewer(QtWidgets.QMainWindow):
         qa_issues: Optional[int] = None,
     ) -> None:
         mode = str(analysis_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
-        trust_flag = bool(trust_visible if trust_visible is not None else (getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible()))
-        qa_count = int(qa_issues if qa_issues is not None else 0)
-        recommended = self._workspace_contextual_focus_recommendation(
+        trust_flag = bool(
+            trust_visible if trust_visible is not None else (
+                getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible()
+            )
+        )
+        qa_count = int(
+            qa_issues if qa_issues is not None else int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
+        )
+        events = dict(getattr(self, "_insight_events", {}) or {})
+        events_rows = int(events.get("rows", 0) or 0)
+        causal_story = self._workspace_causal_story_summary(
             analysis_mode=mode,
+            heat=dict(getattr(self, "_insight_heat", {}) or {}),
+            infl=dict(getattr(self, "_insight_infl", {}) or {}),
+            infl_lens=self._workspace_influence_lens_summary(),
+            events=events,
             trust_visible=trust_flag,
             qa_issues=qa_count,
         )
-        reason = self._workspace_contextual_focus_reason(
+        follow_target = self._workspace_follow_target_summary(
             analysis_mode=mode,
             trust_visible=trust_flag,
             qa_issues=qa_count,
+            events_rows=events_rows,
+            events_insight=events,
+            causal_story=causal_story,
         )
-        current_anchor = self._workspace_analysis_anchor_label(analysis_mode=mode)
 
+        button_mapping = {
+            "all": getattr(self, "btn_workspace_focus_all", None),
+            "heatmaps": getattr(self, "btn_workspace_focus_heatmaps", None),
+            "multivariate": getattr(self, "btn_workspace_focus_multivar", None),
+            "qa": getattr(self, "btn_workspace_focus_qa", None),
+        }
+        action_mapping = {
+            "all": getattr(self, "act_view_show_all_docks", None),
+            "heatmaps": getattr(self, "act_view_focus_heatmaps", None),
+            "multivariate": getattr(self, "act_view_focus_multivar", None),
+            "qa": getattr(self, "act_view_focus_qa", None),
+        }
+        for key, button in button_mapping.items():
+            if button is None:
+                continue
+            try:
+                button.setText(self._workspace_focus_mode_display_text(focus_mode=key, follow_target=follow_target, for_action=False))
+            except Exception:
+                pass
+        for key, action in action_mapping.items():
+            if action is None:
+                continue
+            try:
+                action.setText(self._workspace_focus_mode_display_text(focus_mode=key, follow_target=follow_target, for_action=True))
+            except Exception:
+                pass
+
+    def _update_workspace_focus_button_hints(
+        self,
+        *,
+        analysis_mode: Optional[str] = None,
+        trust_visible: Optional[bool] = None,
+        qa_issues: Optional[int] = None,
+    ) -> None:
         mapping = {
             "all": (
                 getattr(self, "btn_workspace_focus_all", None),
@@ -2097,17 +2294,57 @@ class CompareViewer(QtWidgets.QMainWindow):
             button, base = spec
             if button is None:
                 continue
-            hint = base
-            if key == recommended:
-                hint = f"{hint} Recommended right now because {reason}."
-            if key == "heatmaps" and mode in {"one_to_all", "all_to_one"}:
-                hint = f"{hint} Current anchor: {current_anchor}."
-            elif key == "multivariate" and mode == "all_to_all":
-                hint = f"{hint} Current anchor: {current_anchor}."
-            elif key == "qa" and (trust_flag or qa_count > 0):
-                hint = f"{hint} Recommended when trust warnings or QA issues need confirmation."
+            hint = self._workspace_focus_mode_hint_text(
+                focus_mode=key,
+                base=base,
+                analysis_mode=analysis_mode,
+                trust_visible=trust_visible,
+                qa_issues=qa_issues,
+            )
             try:
                 button.setToolTip(hint)
+            except Exception:
+                pass
+
+    def _update_workspace_focus_action_hints(
+        self,
+        *,
+        analysis_mode: Optional[str] = None,
+        trust_visible: Optional[bool] = None,
+        qa_issues: Optional[int] = None,
+    ) -> None:
+        mapping = {
+            "all": (
+                getattr(self, "act_view_show_all_docks", None),
+                "Show the full workspace with all docks."
+            ),
+            "heatmaps": (
+                getattr(self, "act_view_focus_heatmaps", None),
+                "Focus Delta and Influence heatmaps."
+            ),
+            "multivariate": (
+                getattr(self, "act_view_focus_multivar", None),
+                "Focus SPLOM, Parallel and 3D melting-cloud / pebbles views."
+            ),
+            "qa": (
+                getattr(self, "act_view_focus_qa", None),
+                "Focus QA and event drill-down tools."
+            ),
+        }
+        for key, spec in mapping.items():
+            action, base = spec
+            if action is None:
+                continue
+            hint = self._workspace_focus_mode_hint_text(
+                focus_mode=key,
+                base=base,
+                analysis_mode=analysis_mode,
+                trust_visible=trust_visible,
+                qa_issues=qa_issues,
+            )
+            try:
+                action.setToolTip(hint)
+                action.setStatusTip(hint)
             except Exception:
                 pass
 
@@ -2144,6 +2381,250 @@ class CompareViewer(QtWidgets.QMainWindow):
                 except Exception:
                     pass
 
+    def _workspace_follow_target_label(
+        self,
+        follow_target: Optional[Dict[str, object]] = None,
+        *,
+        separator: str = " -> ",
+        fallback: str = "Overview",
+    ) -> str:
+        target = dict(follow_target or {})
+        focus_label = str(target.get("focus_label") or "").strip()
+        dock_label = str(target.get("dock_label") or "").strip()
+        if focus_label and dock_label:
+            return f"{focus_label}{separator}{dock_label}"
+        if dock_label:
+            return dock_label
+        if focus_label:
+            return focus_label
+        return fallback
+
+    def _workspace_current_focus_target(self) -> Dict[str, str]:
+        mode = str(getattr(self, "_workspace_focus_mode", "all") or "all")
+        attr = str(getattr(self, "_workspace_focus_dock_attr", "") or "").strip()
+        if mode == "all" or not attr:
+            return {}
+        if attr == "dock_controls":
+            return {}
+        if attr not in self._workspace_allowed_dock_attrs(mode):
+            return {}
+        dock = self._workspace_dock_by_attr(attr)
+        if dock is None:
+            return {}
+        focus_label_map = {
+            "heatmaps": "Heatmaps",
+            "multivariate": "Multivar",
+            "qa": "QA / Events",
+        }
+        dock_label_map = {
+            "dock_controls": "Controls",
+            "dock_heatmap": "Δ(t)",
+            "dock_peak_heatmap": "Peak |Δ|",
+            "dock_open_timeline": "Valves (open)",
+            "dock_influence": "Influence(t)",
+            "dock_run_metrics": "Run metrics",
+            "dock_static_stroke": "Static (t0)",
+            "dock_inflheat": "Influence(t) Heatmap",
+            "dock_multivar": "Multivariate",
+            "dock_qa": "QA",
+            "dock_events": "Events",
+            "dock_geometry_acceptance": "Geometry acceptance",
+        }
+        if attr == "dock_events":
+            return {
+                "focus": mode,
+                "focus_label": str(focus_label_map.get(mode, mode) or mode),
+                "dock_attr": attr,
+                "dock_label": self._events_dock_route_label(self._events_dock_current_subtarget()),
+            }
+        return {
+            "focus": mode,
+            "focus_label": str(focus_label_map.get(mode, mode) or mode),
+            "dock_attr": attr,
+            "dock_label": str(dock_label_map.get(attr, dock.windowTitle() or attr) or attr),
+        }
+
+    def _workspace_current_dock_label(self, *, short: bool = False) -> str:
+        attr = str(getattr(self, "_workspace_focus_dock_attr", "") or "").strip()
+        if not attr or attr == "dock_controls":
+            return ""
+        label_map = {
+            "dock_heatmap": "Δ(t)",
+            "dock_peak_heatmap": "Peak |Δ|",
+            "dock_open_timeline": "Valves (open)",
+            "dock_influence": "Influence(t)",
+            "dock_run_metrics": "Run metrics",
+            "dock_static_stroke": "Static (t0)",
+            "dock_inflheat": "Influence(t) Heatmap",
+            "dock_multivar": "Multivariate",
+            "dock_qa": "QA",
+            "dock_events": "Events",
+            "dock_geometry_acceptance": "Geometry acceptance",
+        }
+        if attr == "dock_events":
+            return self._events_dock_route_label(self._events_dock_current_subtarget(), short=short)
+        label = str(label_map.get(attr, "") or "")
+        if short and label == "Influence(t) Heatmap":
+            return "Influence(t)"
+        return label
+
+    def _workspace_route_label(
+        self,
+        follow_target: Optional[Dict[str, object]] = None,
+        *,
+        separator: str = ": ",
+        fallback: str = "Overview",
+        include_current: bool = True,
+    ) -> str:
+        target = dict(follow_target or {})
+        target_label = self._workspace_follow_target_label(target, separator=separator, fallback=fallback)
+        target_dock = str(target.get("dock_label") or "").strip()
+        current_dock = self._workspace_current_dock_label()
+        if include_current and current_dock and current_dock != target_dock:
+            return f"{current_dock} -> {target_label}"
+        return target_label
+
+    def _workspace_focus_mode_hint_text(
+        self,
+        *,
+        focus_mode: str,
+        base: str,
+        analysis_mode: Optional[str] = None,
+        trust_visible: Optional[bool] = None,
+        qa_issues: Optional[int] = None,
+        events_insight: Optional[Dict[str, object]] = None,
+        infl_lens: Optional[Dict[str, object]] = None,
+        mv_lens: Optional[Dict[str, object]] = None,
+    ) -> str:
+        mode = str(analysis_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        trust_flag = bool(
+            trust_visible if trust_visible is not None else (
+                getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible()
+            )
+        )
+        qa_count = int(
+            qa_issues if qa_issues is not None else int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
+        )
+        events = dict(events_insight if events_insight is not None else (getattr(self, "_insight_events", {}) or {}))
+        infl_summary = dict(infl_lens if infl_lens is not None else self._workspace_influence_lens_summary())
+        mv_summary = dict(mv_lens if mv_lens is not None else self._workspace_multivar_lens_summary())
+        events_rows = int(events.get("rows", 0) or 0)
+        current_anchor = self._workspace_analysis_anchor_label(
+            analysis_mode=mode,
+            infl_lens=infl_summary,
+            mv_lens=mv_summary,
+        )
+        causal_story = self._workspace_causal_story_summary(
+            analysis_mode=mode,
+            heat=dict(getattr(self, "_insight_heat", {}) or {}),
+            infl=dict(getattr(self, "_insight_infl", {}) or {}),
+            infl_lens=infl_summary,
+            events=events,
+            trust_visible=trust_flag,
+            qa_issues=qa_count,
+        )
+        follow_target = self._workspace_follow_target_summary(
+            analysis_mode=mode,
+            trust_visible=trust_flag,
+            qa_issues=qa_count,
+            events_rows=events_rows,
+            events_insight=events,
+            causal_story=causal_story,
+        )
+        target_focus = str(follow_target.get("focus") or "").strip()
+        target_dock = str(follow_target.get("dock_label") or "").strip()
+        target_label = self._workspace_follow_target_label(follow_target)
+        reason = self._workspace_contextual_focus_reason(
+            analysis_mode=mode,
+            trust_visible=trust_flag,
+            qa_issues=qa_count,
+            events_rows=events_rows,
+            events_insight=events,
+            causal_story=causal_story,
+        )
+
+        hint = base
+        if focus_mode == "all":
+            hint = f"{hint} Current anchor: {current_anchor}."
+            current_dock = self._workspace_current_dock_label()
+            if current_dock:
+                hint = f"{hint} Current overview dock: {current_dock}."
+            if target_label:
+                hint = f"{hint} Exact target right now: {target_label}."
+            if target_label and target_focus:
+                hint = f"{hint} Use this when you want context before jumping to {target_label}. If you are already in Overview, clicking it again follows that target."
+            return hint
+
+        if focus_mode == "heatmaps" and mode in {"one_to_all", "all_to_one"}:
+            hint = f"{hint} Current anchor: {current_anchor}."
+        elif focus_mode == "multivariate" and mode == "all_to_all":
+            hint = f"{hint} Current anchor: {current_anchor}."
+        elif focus_mode == "qa" and (trust_flag or qa_count > 0 or target_focus == "qa"):
+            hint = f"{hint} Current anchor: {current_anchor}."
+
+        if focus_mode == target_focus and target_dock:
+            hint = f"{hint} Best dock inside this focus: {target_dock}."
+            hint = f"{hint} Recommended right now because {reason}."
+        elif focus_mode == "qa" and (trust_flag or qa_count > 0):
+            hint = f"{hint} Recommended when trust warnings or QA issues need confirmation."
+        return hint
+
+    def _workspace_analysis_mode_hint_text(
+        self,
+        *,
+        analysis_mode: str,
+        base: str,
+        infl_lens: Optional[Dict[str, object]] = None,
+        mv_lens: Optional[Dict[str, object]] = None,
+        trust_visible: Optional[bool] = None,
+        qa_issues: Optional[int] = None,
+        events_insight: Optional[Dict[str, object]] = None,
+    ) -> str:
+        infl_summary = dict(infl_lens if infl_lens is not None else self._workspace_influence_lens_summary())
+        mv_summary = dict(mv_lens if mv_lens is not None else self._workspace_multivar_lens_summary())
+        events = dict(events_insight if events_insight is not None else (getattr(self, "_insight_events", {}) or {}))
+        trust_flag = bool(
+            trust_visible if trust_visible is not None else (
+                getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible()
+            )
+        )
+        qa_count = int(
+            qa_issues if qa_issues is not None else int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
+        )
+        events_rows = int(events.get("rows", 0) or 0)
+        anchor = self._workspace_analysis_anchor_label(
+            analysis_mode=analysis_mode,
+            infl_lens=infl_summary,
+            mv_lens=mv_summary,
+        )
+        causal_story = self._workspace_causal_story_summary(
+            analysis_mode=analysis_mode,
+            heat=dict(getattr(self, "_insight_heat", {}) or {}),
+            infl=dict(getattr(self, "_insight_infl", {}) or {}),
+            infl_lens=infl_summary,
+            events=events,
+            trust_visible=trust_flag,
+            qa_issues=qa_count,
+        )
+        follow_target = self._workspace_follow_target_summary(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_flag,
+            qa_issues=qa_count,
+            events_rows=events_rows,
+            events_insight=events,
+            causal_story=causal_story,
+        )
+        reason = self._workspace_contextual_focus_reason(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_flag,
+            qa_issues=qa_count,
+            events_rows=events_rows,
+            events_insight=events,
+            causal_story=causal_story,
+        )
+        target_label = self._workspace_follow_target_label(follow_target)
+        return f"{base} Anchor: {anchor}. Recommended target: {target_label} because {reason}."
+
     def _update_workspace_analysis_button_hints(self, *, current_mode: Optional[str] = None) -> None:
         mode = str(current_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
         infl_lens = self._workspace_influence_lens_summary()
@@ -2155,72 +2636,29 @@ class CompareViewer(QtWidgets.QMainWindow):
             "one_to_all": (
                 getattr(self, "btn_workspace_analysis_one_to_all", None),
                 "One driver to many responses.",
-                self._workspace_analysis_anchor_label(
-                    analysis_mode="one_to_all",
-                    infl_lens=infl_lens,
-                    mv_lens=mv_lens,
-                ),
-                self._workspace_contextual_focus_recommendation(
-                    analysis_mode="one_to_all",
-                    trust_visible=trust_visible,
-                    qa_issues=qa_issues,
-                    events_insight=events_insight,
-                ),
-                self._workspace_contextual_focus_reason(
-                    analysis_mode="one_to_all",
-                    trust_visible=trust_visible,
-                    qa_issues=qa_issues,
-                    events_insight=events_insight,
-                ),
             ),
             "all_to_one": (
                 getattr(self, "btn_workspace_analysis_all_to_one", None),
                 "Many drivers to one target response.",
-                self._workspace_analysis_anchor_label(
-                    analysis_mode="all_to_one",
-                    infl_lens=infl_lens,
-                    mv_lens=mv_lens,
-                ),
-                self._workspace_contextual_focus_recommendation(
-                    analysis_mode="all_to_one",
-                    trust_visible=trust_visible,
-                    qa_issues=qa_issues,
-                    events_insight=events_insight,
-                ),
-                self._workspace_contextual_focus_reason(
-                    analysis_mode="all_to_one",
-                    trust_visible=trust_visible,
-                    qa_issues=qa_issues,
-                    events_insight=events_insight,
-                ),
             ),
             "all_to_all": (
                 getattr(self, "btn_workspace_analysis_all_to_all", None),
                 "Cross-coupled field scouting with clouds and pebbles.",
-                self._workspace_analysis_anchor_label(
-                    analysis_mode="all_to_all",
-                    infl_lens=infl_lens,
-                    mv_lens=mv_lens,
-                ),
-                self._workspace_contextual_focus_recommendation(
-                    analysis_mode="all_to_all",
-                    trust_visible=trust_visible,
-                    qa_issues=qa_issues,
-                    events_insight=events_insight,
-                ),
-                self._workspace_contextual_focus_reason(
-                    analysis_mode="all_to_all",
-                    trust_visible=trust_visible,
-                    qa_issues=qa_issues,
-                    events_insight=events_insight,
-                ),
             ),
         }
         for key, spec in hints.items():
-            button, base, anchor, focus, reason = spec
+            button, base = spec
             if button is None:
                 continue
-            hint = f"{base} Anchor: {anchor}. Recommended focus: {focus} because {reason}."
+            hint = self._workspace_analysis_mode_hint_text(
+                analysis_mode=key,
+                base=base,
+                infl_lens=infl_lens,
+                mv_lens=mv_lens,
+                trust_visible=trust_visible,
+                qa_issues=qa_issues,
+                events_insight=events_insight,
+            )
             if key == mode:
                 hint = f"{hint} Current lens."
             try:
@@ -2277,24 +2715,15 @@ class CompareViewer(QtWidgets.QMainWindow):
             action, base = spec
             if action is None:
                 continue
-            anchor = self._workspace_analysis_anchor_label(
+            hint = self._workspace_analysis_mode_hint_text(
                 analysis_mode=key,
+                base=base,
                 infl_lens=infl_lens,
                 mv_lens=mv_lens,
-            )
-            focus = self._workspace_contextual_focus_recommendation(
-                analysis_mode=key,
                 trust_visible=trust_visible,
                 qa_issues=qa_issues,
                 events_insight=events_insight,
             )
-            reason = self._workspace_contextual_focus_reason(
-                analysis_mode=key,
-                trust_visible=trust_visible,
-                qa_issues=qa_issues,
-                events_insight=events_insight,
-            )
-            hint = f"{base} Anchor: {anchor}. Recommended focus: {focus} because {reason}."
             if key == mode:
                 hint = f"{hint} Current lens."
             try:
@@ -2390,12 +2819,6 @@ class CompareViewer(QtWidgets.QMainWindow):
         rows = int(events_rows if events_rows is not None else int(events.get("rows", 0) or 0))
         source_rows = int(events.get("source_rows", rows) or rows)
         no_signals_selected = bool(events.get("no_signals_selected", False))
-        if trust_flag:
-            return "trust banner is active, so evidence should be checked before pattern hunting"
-        if qa_count > 0:
-            return f"QA found {qa_count} issue(s), so suspicious regions should be validated first"
-        if no_signals_selected and source_rows > 0 and mode in {"one_to_all", "all_to_one"}:
-            return "event channels are muted, so causal timing support is missing"
         story = dict(
             causal_story
             if causal_story is not None
@@ -2409,40 +2832,64 @@ class CompareViewer(QtWidgets.QMainWindow):
                 qa_issues=qa_count,
             )
         )
+        follow_target = dict(
+            self._workspace_follow_target_summary(
+                analysis_mode=mode,
+                trust_visible=trust_flag,
+                qa_issues=qa_count,
+                events_rows=rows,
+                events_insight=events,
+                causal_story=story,
+            )
+            or {}
+        )
+        target_dock = str(follow_target.get("dock_label") or "").strip()
+        target_label = self._workspace_route_label(follow_target, separator=": ", fallback="the suggested dock")
+        current_dock = self._workspace_current_dock_label()
+        if current_dock and target_dock and current_dock != target_dock:
+            target_ref = f"the route {target_label}"
+        else:
+            target_ref = target_label or "the suggested dock"
+        if trust_flag:
+            return f"trust banner is active, so {target_ref} should check the evidence before pattern hunting"
+        if qa_count > 0:
+            return f"QA found {qa_count} issue(s), so {target_ref} should validate suspicious regions first"
+        if no_signals_selected and source_rows > 0 and mode in {"one_to_all", "all_to_one"}:
+            return f"event channels are muted, so {target_ref} should restore causal timing support"
         story_conf = str(story.get("confidence") or "").strip()
         repair_lane = str(story.get("repair_lane") or "").strip()
         repair_hint = str(story.get("repair_hint") or "").strip()
         if repair_lane == "qa":
             return (
-                f"the weakest link is event / evidence support, so QA / Events should repair it"
+                f"the weakest link is event / evidence support, so {target_ref} should repair it"
                 f"{': ' + repair_hint if repair_hint else ''}"
             )
         if repair_lane == "heatmaps":
             return (
-                f"the weakest link is time-local alignment, so Heatmaps should repair it"
+                f"the weakest link is time-local alignment, so {target_ref} should repair it"
                 f"{': ' + repair_hint if repair_hint else ''}"
             )
         if repair_lane == "multivariate":
             return (
-                f"the weakest link is field structure, so Multivariate should repair it"
+                f"the weakest link is field structure, so {target_ref} should repair it"
                 f"{': ' + repair_hint if repair_hint else ''}"
             )
         if story_conf == "partial":
             if mode in {"one_to_all", "all_to_one"}:
-                return "the causal story is only partially aligned, so QA / Events should repair the missing link"
+                return f"the causal story is only partially aligned, so {target_ref} should repair the missing link"
             if mode == "all_to_all":
-                return "the corridor is only partially aligned, so Heatmaps should localize the missing link in time"
+                return f"the corridor is only partially aligned, so {target_ref} should localize the missing link in time"
         if story_conf == "tentative":
             if mode in {"one_to_all", "all_to_one"}:
-                return "the causal story is still tentative, so Heatmaps should stabilize the time-local explanation"
+                return f"the causal story is still tentative, so {target_ref} should stabilize the time-local explanation"
             if mode == "all_to_all":
-                return "the field story is still tentative, so Multivariate should strengthen the structure before drill-down"
+                return f"the field story is still tentative, so {target_ref} should strengthen the structure before drill-down"
         if mode == "one_to_all":
-            return "heatmaps are the fastest way to trace one driver fanning out across many responses"
+            return f"{target_ref} is the fastest way to trace one driver fanning out across many responses"
         if mode == "all_to_one":
-            return "heatmaps keep one target waveform aligned with many competing drivers"
+            return f"{target_ref} keeps one target waveform aligned with many competing drivers"
         if mode == "all_to_all":
-            return "multivariate views are best for melting-cloud and pebbles-on-sand structure scouting"
+            return f"{target_ref} is best for melting-cloud and pebbles-on-sand structure scouting"
         return "full workspace gives the broadest context"
 
     def _workspace_should_follow_analysis_focus(self, previous_analysis_mode: str, current_focus_mode: str) -> bool:
@@ -2452,6 +2899,66 @@ class CompareViewer(QtWidgets.QMainWindow):
         prev_recommended = self._workspace_contextual_focus_recommendation(analysis_mode=previous_analysis_mode)
         return current_focus == prev_recommended
 
+    def _workspace_live_follow_target(self, *, analysis_mode: Optional[str] = None) -> Dict[str, object]:
+        mode = str(analysis_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        events_rows = 0
+        try:
+            if getattr(self, "tbl_events", None) is not None:
+                events_rows = int(self.tbl_events.rowCount())
+        except Exception:
+            events_rows = 0
+        qa_issues = int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
+        trust_visible = bool(getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible())
+        events = dict(getattr(self, "_insight_events", {}) or {})
+        causal_story = self._workspace_causal_story_summary(
+            analysis_mode=mode,
+            heat=dict(getattr(self, "_insight_heat", {}) or {}),
+            infl=dict(getattr(self, "_insight_infl", {}) or {}),
+            infl_lens=self._workspace_influence_lens_summary(),
+            events=events,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+        )
+        return dict(
+            self._workspace_follow_target_summary(
+                analysis_mode=mode,
+                trust_visible=trust_visible,
+                qa_issues=qa_issues,
+                events_rows=events_rows,
+                events_insight=events,
+                causal_story=causal_story,
+            )
+            or {}
+        )
+
+    def _apply_workspace_follow_target(self, follow_target: Optional[Dict[str, object]] = None) -> None:
+        target = dict(follow_target or {})
+        focus = str(target.get("focus") or "all")
+        self._focus_workspace_preset(focus)
+        dock = getattr(self, str(target.get("dock_attr") or ""), None)
+        if isinstance(dock, QtWidgets.QDockWidget):
+            self._raise_dock(dock)
+            if dock is getattr(self, "dock_events", None):
+                try:
+                    self._set_events_dock_tab(str(target.get("dock_subtarget") or ""))
+                except Exception:
+                    pass
+        self._update_workspace_status()
+
+    def _activate_workspace_focus_mode(self, mode: str) -> None:
+        focus = str(mode or "all")
+        follow_target = self._workspace_live_follow_target()
+        if focus == "all":
+            if str(getattr(self, "_workspace_focus_mode", "all") or "all") == "all" and str(follow_target.get("focus") or "").strip():
+                self._apply_workspace_follow_target(follow_target)
+                return
+            self._focus_workspace_preset("all")
+            return
+        if str(follow_target.get("focus") or "").strip() == focus:
+            self._apply_workspace_follow_target(follow_target)
+            return
+        self._focus_workspace_preset(focus)
+
     def _set_workspace_analysis_mode(self, mode: str) -> None:
         valid = {"one_to_all", "all_to_one", "all_to_all"}
         previous_analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
@@ -2460,9 +2967,29 @@ class CompareViewer(QtWidgets.QMainWindow):
         if self._workspace_analysis_mode not in valid:
             self._workspace_analysis_mode = "all_to_all"
         if self._workspace_should_follow_analysis_focus(previous_analysis_mode, current_focus_mode):
-            recommended_focus = self._workspace_contextual_focus_recommendation(analysis_mode=self._workspace_analysis_mode)
-            if recommended_focus and (recommended_focus != current_focus_mode):
-                self._focus_workspace_preset(recommended_focus)
+            qa_issues = int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
+            trust_visible = bool(getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible())
+            events = dict(getattr(self, "_insight_events", {}) or {})
+            events_rows = int(events.get("rows", 0) or 0)
+            causal_story = self._workspace_causal_story_summary(
+                analysis_mode=self._workspace_analysis_mode,
+                heat=dict(getattr(self, "_insight_heat", {}) or {}),
+                infl=dict(getattr(self, "_insight_infl", {}) or {}),
+                infl_lens=self._workspace_influence_lens_summary(),
+                events=events,
+                trust_visible=trust_visible,
+                qa_issues=qa_issues,
+            )
+            follow_target = self._workspace_follow_target_summary(
+                analysis_mode=self._workspace_analysis_mode,
+                trust_visible=trust_visible,
+                qa_issues=qa_issues,
+                events_rows=events_rows,
+                events_insight=events,
+                causal_story=causal_story,
+            )
+            if str(follow_target.get("focus") or ""):
+                self._apply_workspace_follow_target(follow_target)
                 return
         self._update_workspace_status()
 
@@ -2526,6 +3053,7 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         infl_lens = self._workspace_influence_lens_summary()
         mv_lens = self._workspace_multivar_lens_summary()
+        dist_lens = self._workspace_run_metrics_lens_summary()
         causal_story = self._workspace_causal_story_summary(
             analysis_mode=analysis_mode,
             heat=dict(getattr(self, "_insight_heat", {}) or {}),
@@ -2534,6 +3062,19 @@ class CompareViewer(QtWidgets.QMainWindow):
             events=events,
             trust_visible=trust_visible,
             qa_issues=qa_issues,
+        )
+        peak_bridge = self._workspace_peak_heat_bridge_summary(
+            analysis_mode=analysis_mode,
+            sigs=sigs,
+            infl_lens=infl_lens,
+            causal_story=causal_story,
+        )
+        dist_bridge = self._workspace_run_metrics_bridge_summary(
+            analysis_mode=analysis_mode,
+            sigs=sigs,
+            infl_lens=infl_lens,
+            dist_lens=dist_lens,
+            causal_story=causal_story,
         )
         recommended_focus = self._workspace_contextual_focus_recommendation(
             analysis_mode=analysis_mode,
@@ -2573,34 +3114,42 @@ class CompareViewer(QtWidgets.QMainWindow):
             events_insight=events,
             causal_story=causal_story,
         )
+        current_dock_label = str(self._workspace_current_dock_label() or "").strip()
+        target_focus_label = str(follow_target.get('focus_label') or recommended_focus_label or "").strip()
+        target_dock_label = str(follow_target.get('dock_label') or 'dock').strip()
+        follow_route_label = f"{target_focus_label}: {target_dock_label}" if target_focus_label else target_dock_label
+        if current_dock_label and current_dock_label != target_dock_label:
+            follow_route_label = f"from {current_dock_label} -> {follow_route_label}"
         follow_button = getattr(self, "btn_workspace_follow_hint", None)
         if isinstance(follow_button, QtWidgets.QPushButton):
             follow_headline = str(repair_summary.get("headline") or "Weakest link")
             follow_detail = str(repair_summary.get("detail") or focus_reason)
             try:
-                follow_button.setText(
-                    f"Follow weakest link -> {str(follow_target.get('focus_label') or recommended_focus_label)}: "
-                    f"{str(follow_target.get('dock_label') or 'dock')}"
-                )
+                follow_button.setText(f"Follow weakest link -> {follow_route_label}")
                 follow_button.setEnabled(bool(runs))
-                follow_button.setToolTip(f"{follow_headline}. {follow_detail}")
+                extra = f" Current dock: {current_dock_label}." if current_dock_label else ""
+                follow_button.setToolTip(f"{follow_headline}. {follow_detail}{extra}")
             except Exception:
                 pass
         follow_action = getattr(self, "act_view_focus_hint", None)
         if isinstance(follow_action, QtGui.QAction):
             try:
-                follow_action.setText(
-                    f"Follow Weakest Link ({str(follow_target.get('focus_label') or recommended_focus_label)}: "
-                    f"{str(follow_target.get('dock_label') or 'dock')})"
-                )
-                follow_action.setStatusTip(f"{str(repair_summary.get('headline') or 'Weakest link')}. {str(repair_summary.get('detail') or focus_reason)}")
-                follow_action.setToolTip(f"{str(repair_summary.get('headline') or 'Weakest link')}. {str(repair_summary.get('detail') or focus_reason)}")
+                follow_action.setText(f"Follow Weakest Link ({follow_route_label})")
+                extra = f" Current dock: {current_dock_label}." if current_dock_label else ""
+                follow_action.setStatusTip(f"{str(repair_summary.get('headline') or 'Weakest link')}. {str(repair_summary.get('detail') or focus_reason)}{extra}")
+                follow_action.setToolTip(f"{str(repair_summary.get('headline') or 'Weakest link')}. {str(repair_summary.get('detail') or focus_reason)}{extra}")
                 follow_action.setEnabled(bool(runs))
             except Exception:
                 pass
-        follow_target_label = (
-            f"{str(follow_target.get('focus_label') or recommended_focus_label)}: "
-            f"{str(follow_target.get('dock_label') or 'dock')}"
+        follow_target_label = self._workspace_follow_target_label(
+            follow_target,
+            separator=": ",
+            fallback=str(recommended_focus_label or "Overview"),
+        )
+        follow_route_label = self._workspace_route_label(
+            follow_target,
+            separator=": ",
+            fallback=str(recommended_focus_label or "Overview"),
         )
 
         title = "Compare overview"
@@ -2816,6 +3365,8 @@ class CompareViewer(QtWidgets.QMainWindow):
                     f"{body} Setup for all -> all: aim for 3+ runs and 3+ signals so melting clouds, sparse outliers and "
                     "pebbles-on-sand overlays become visually informative."
                 )
+            if follow_route_label:
+                body = f"{body} First working route after setup: {follow_route_label}."
 
         if runs:
             if bool(events.get("no_signals_selected", False)):
@@ -2838,7 +3389,17 @@ class CompareViewer(QtWidgets.QMainWindow):
                     body = f"{body} Main gap: {str(causal_story.get('repair_hint') or '').strip()}"
                 if str(repair_summary.get("headline") or "").strip():
                     body = f"{body} {str(repair_summary.get('headline') or '').strip()}."
-            body = f"{body} Recommended follow target: {follow_target_label}. Recommended focus: {recommended_focus_label} because {focus_reason}."
+            if peak_bridge:
+                body = (
+                    f"{body} Peak bridge: {str(peak_bridge.get('headline') or '').strip()}. "
+                    f"{str(peak_bridge.get('detail') or '').strip()}"
+                )
+            if dist_bridge:
+                body = (
+                    f"{body} Run-metrics bridge: {str(dist_bridge.get('headline') or '').strip()}. "
+                    f"{str(dist_bridge.get('detail') or '').strip()}"
+                )
+            body = f"{body} Recommended route: {follow_route_label} because {focus_reason}."
 
         if notes:
             body = f"{body} Status: {', '.join(notes)}."
@@ -3111,6 +3672,364 @@ class CompareViewer(QtWidgets.QMainWindow):
             "color3d": c3,
         }
 
+    def _workspace_run_metrics_lens_summary(self) -> Dict[str, object]:
+        cache = getattr(self, "_dist_cache", None)
+        if not isinstance(cache, dict):
+            return {}
+        rows_raw = list(cache.get("rows") or [])
+        parsed: List[Dict[str, object]] = []
+        for rec in rows_raw:
+            if not isinstance(rec, dict):
+                continue
+            run_label = str(rec.get("run") or "").strip()
+            if not run_label:
+                continue
+            try:
+                value = float(rec.get("value", np.nan))
+            except Exception:
+                value = float("nan")
+            if not np.isfinite(value):
+                continue
+            parsed.append(
+                {
+                    "run": run_label,
+                    "value": float(value),
+                    "is_ref": bool(rec.get("is_ref", False)),
+                }
+            )
+        if not parsed:
+            return {}
+
+        values = np.asarray([float(rec["value"]) for rec in parsed], dtype=float)
+        if values.size <= 0 or not np.isfinite(values).any():
+            return {}
+
+        mean_value = float(np.nanmean(values))
+        median_value = float(np.nanmedian(values))
+        std_value = float(np.nanstd(values))
+        min_value = float(np.nanmin(values))
+        max_value = float(np.nanmax(values))
+        spread_value = float(max_value - min_value)
+        abs_scale = max(
+            abs(median_value),
+            abs(mean_value),
+            float(np.nanmedian(np.abs(values))) if values.size else 0.0,
+            1.0,
+        )
+        robust_scale = float(np.nanmedian(np.abs(values - median_value)) * 1.4826) if values.size else 0.0
+        outlier_rec = max(parsed, key=lambda rec: abs(float(rec["value"]) - median_value))
+        top_rec = max(parsed, key=lambda rec: float(rec["value"]))
+        bottom_rec = min(parsed, key=lambda rec: float(rec["value"]))
+        ref_rec = next((dict(rec) for rec in parsed if bool(rec.get("is_ref", False))), None)
+        outlier_gap = abs(float(outlier_rec["value"]) - median_value)
+        mixed_sign = bool(min_value < 0.0 < max_value)
+        outlier_driven = bool(
+            len(parsed) >= 3 and outlier_gap >= max(std_value * 1.25, robust_scale * 1.5, max(abs_scale, 1.0) * 0.35)
+        )
+        wide_spread = bool(
+            len(parsed) >= 3 and spread_value >= max(std_value * 1.6, max(abs_scale, 1.0) * 0.75)
+        )
+        metric_key = str(cache.get("metric_key") or "").strip()
+        return {
+            "signal": str(cache.get("signal") or "").strip(),
+            "metric_key": metric_key,
+            "metric_label": str(cache.get("metric_label") or "").strip(),
+            "time_desc": str(cache.get("time_desc") or "").strip(),
+            "table_name": str(cache.get("table_name") or "").strip(),
+            "ref_label": str(cache.get("ref_label") or (ref_rec or {}).get("run") or "").strip(),
+            "unit": str(cache.get("unit") or "").strip(),
+            "runs": int(len(parsed)),
+            "mean": float(mean_value),
+            "median": float(median_value),
+            "std": float(std_value),
+            "min": float(min_value),
+            "max": float(max_value),
+            "spread": float(spread_value),
+            "mixed_sign": bool(mixed_sign),
+            "outlier_driven": bool(outlier_driven),
+            "wide_spread": bool(wide_spread),
+            "bridge_ready": bool(len(parsed) >= 3 and (mixed_sign or outlier_driven or wide_spread)),
+            "top_run": str(top_rec.get("run") or ""),
+            "top_value": float(top_rec.get("value", np.nan)),
+            "bottom_run": str(bottom_rec.get("run") or ""),
+            "bottom_value": float(bottom_rec.get("value", np.nan)),
+            "outlier_run": str(outlier_rec.get("run") or ""),
+            "outlier_value": float(outlier_rec.get("value", np.nan)),
+            "outlier_gap": float(outlier_gap),
+            "ref_run": str((ref_rec or {}).get("run") or ""),
+            "ref_value": float((ref_rec or {}).get("value", np.nan)) if ref_rec is not None else float("nan"),
+        }
+
+    def _workspace_peak_heat_lens_summary(self) -> Dict[str, object]:
+        cache = getattr(self, "_peak_cache", None)
+        if not isinstance(cache, dict):
+            return {}
+        run_labels = [str(x) for x in (cache.get("runs") or []) if str(x).strip()]
+        sig_labels = [str(x) for x in (cache.get("signals") or []) if str(x).strip()]
+        values = np.asarray(cache.get("values", np.asarray([])), dtype=float)
+        times = np.asarray(cache.get("times", np.asarray([])), dtype=float)
+        if values.ndim != 2 or values.shape[0] != len(sig_labels) or values.shape[1] != len(run_labels):
+            return {}
+        if len(run_labels) < 2 or len(sig_labels) < 1:
+            return {}
+        nonref = np.asarray(values[:, 1:], dtype=float) if values.shape[1] > 1 else np.asarray([], dtype=float)
+        if nonref.size <= 0 or not np.isfinite(nonref).any():
+            return {}
+        hotspot = dict(getattr(self, "_insight_peak_heat", {}) or {})
+        abs_nonref = np.where(np.isfinite(nonref), nonref, np.nan)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            row_max = np.nanmax(abs_nonref, axis=1) if abs_nonref.ndim == 2 else np.asarray([], dtype=float)
+            col_max = np.nanmax(abs_nonref, axis=0) if abs_nonref.ndim == 2 else np.asarray([], dtype=float)
+        hotspot_peak = float(hotspot.get("peak", np.nan))
+        if not np.isfinite(hotspot_peak) or hotspot_peak <= 0.0:
+            hotspot_peak = float(np.nanmax(abs_nonref))
+        dominant_signal = ""
+        dominant_run = ""
+        if row_max.size:
+            try:
+                dominant_signal = str(sig_labels[int(np.nanargmax(row_max))])
+            except Exception:
+                dominant_signal = ""
+        if col_max.size:
+            try:
+                dominant_run = str(run_labels[int(np.nanargmax(col_max)) + 1])
+            except Exception:
+                dominant_run = ""
+        signal_competition = 0
+        run_competition = 0
+        threshold = float(hotspot_peak * 0.7) if np.isfinite(hotspot_peak) and hotspot_peak > 0.0 else float("nan")
+        if np.isfinite(threshold):
+            try:
+                signal_competition = int(np.sum(np.isfinite(row_max) & (row_max >= threshold)))
+            except Exception:
+                signal_competition = 0
+            try:
+                run_competition = int(np.sum(np.isfinite(col_max) & (col_max >= threshold)))
+            except Exception:
+                run_competition = 0
+        hotspot_signal = str(hotspot.get("signal") or dominant_signal or "").strip()
+        hotspot_run = str(hotspot.get("run") or dominant_run or "").strip()
+        hotspot_time = float(hotspot.get("time_s", np.nan))
+        if (not np.isfinite(hotspot_time)) and hotspot_signal and hotspot_run:
+            try:
+                row = sig_labels.index(hotspot_signal)
+                col = run_labels.index(hotspot_run)
+                hotspot_time = float(times[row, col])
+            except Exception:
+                hotspot_time = float("nan")
+        return {
+            "signal_count": int(len(sig_labels)),
+            "run_count": int(len(run_labels)),
+            "ref_label": str(cache.get("ref_label") or (run_labels[0] if run_labels else "")).strip(),
+            "table_name": str(cache.get("table_name") or "").strip(),
+            "hotspot_signal": hotspot_signal,
+            "hotspot_run": hotspot_run,
+            "hotspot_time": float(hotspot_time) if np.isfinite(hotspot_time) else float("nan"),
+            "hotspot_peak": float(hotspot_peak) if np.isfinite(hotspot_peak) else float("nan"),
+            "hotspot_unit": str(hotspot.get("unit") or "").strip(),
+            "dominant_signal": dominant_signal,
+            "dominant_run": dominant_run,
+            "signal_competition": int(signal_competition),
+            "run_competition": int(run_competition),
+            "bridge_ready": bool(len(sig_labels) >= 2 and len(run_labels) >= 3),
+        }
+
+    def _workspace_peak_heat_bridge_summary(
+        self,
+        *,
+        analysis_mode: Optional[str] = None,
+        sigs: Optional[List[str]] = None,
+        infl_lens: Optional[Dict[str, object]] = None,
+        peak_lens: Optional[Dict[str, object]] = None,
+        causal_story: Optional[Dict[str, object]] = None,
+    ) -> Dict[str, object]:
+        mode = str(analysis_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        if mode not in {"one_to_all", "all_to_one"}:
+            return {}
+        peak = dict(peak_lens if peak_lens is not None else self._workspace_peak_heat_lens_summary())
+        if not peak or not bool(peak.get("bridge_ready", False)):
+            return {}
+        if sigs is None:
+            try:
+                sig_list = [str(x) for x in self._selected_signals() if str(x).strip()]
+            except Exception:
+                sig_list = []
+        else:
+            sig_list = [str(x) for x in (sigs or []) if str(x).strip()]
+        if len(sig_list) < 2:
+            return {}
+        infl = dict(infl_lens if infl_lens is not None else self._workspace_influence_lens_summary())
+        story = dict(causal_story or {})
+        story_conf = str(story.get("confidence") or "").strip()
+        repair_lane = str(story.get("repair_lane") or "").strip()
+        repair_surface = str(story.get("repair_surface") or "").strip()
+        if story_conf == "aligned":
+            return {}
+        if repair_lane == "qa":
+            return {}
+        hotspot_signal = str(peak.get("hotspot_signal") or "").strip()
+        hotspot_run = str(peak.get("hotspot_run") or "").strip()
+        hotspot_peak = float(peak.get("hotspot_peak", np.nan))
+        hotspot_time = float(peak.get("hotspot_time", np.nan))
+        signal_competition = int(peak.get("signal_competition", 0) or 0)
+        run_competition = int(peak.get("run_competition", 0) or 0)
+        target_signal = str(
+            infl.get("target_signal")
+            or self._workspace_analysis_target_signal(sig_list)
+            or ""
+        ).strip()
+        headline = ""
+        detail = ""
+        tone = "accent"
+        if mode == "one_to_all":
+            if str(infl.get("fanout_feature") or "").strip() and signal_competition < 2 and story_conf == "partial" and repair_surface in {"delta", "influence_heatmap"}:
+                return {}
+            headline = "Coarse-gate the fan-out first"
+            detail = (
+                f"Peak |Δ| is dominated by {hotspot_signal or 'one response'} in {hotspot_run or 'one run'}"
+                f"{f' @ {hotspot_time:.3f}s' if np.isfinite(hotspot_time) else ''}"
+                f"{f' (|Δ|={hotspot_peak:.6g})' if np.isfinite(hotspot_peak) else ''}. "
+                "Use the aggregate surface to decide which response lane deserves the next time-local heatmap pass."
+            )
+            if signal_competition >= 2:
+                detail = f"{detail} Around {signal_competition} responses stay within the same peak band, so the fan-out is still crowded."
+                tone = "warn"
+        else:
+            if not target_signal or (hotspot_signal and hotspot_signal == target_signal):
+                return {}
+            headline = "Check whether another response steals the global peak"
+            detail = (
+                f"The target is {target_signal}, but Peak |Δ| is currently led by {hotspot_signal or 'another response'}"
+                f"{f' in {hotspot_run}' if hotspot_run else ''}"
+                f"{f' @ {hotspot_time:.3f}s' if np.isfinite(hotspot_time) else ''}. "
+                "Use the aggregate surface to see whether the target is truly primary or just one member of a broader split."
+            )
+            if run_competition >= 2:
+                detail = f"{detail} The peak also spans multiple runs, so this is not just a single-run outlier."
+            tone = "warn"
+        return {
+            "focus": "heatmaps",
+            "focus_label": "Heatmaps",
+            "dock_attr": "dock_peak_heatmap",
+            "dock_label": "Peak |Δ|",
+            "headline": headline,
+            "detail": detail,
+            "tone": tone,
+            "signal": hotspot_signal,
+            "run": hotspot_run,
+        }
+
+    def _workspace_run_metrics_bridge_summary(
+        self,
+        *,
+        analysis_mode: Optional[str] = None,
+        sigs: Optional[List[str]] = None,
+        infl_lens: Optional[Dict[str, object]] = None,
+        dist_lens: Optional[Dict[str, object]] = None,
+        causal_story: Optional[Dict[str, object]] = None,
+    ) -> Dict[str, object]:
+        mode = str(analysis_mode or getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        if mode not in {"one_to_all", "all_to_one"}:
+            return {}
+        dist = dict(dist_lens if dist_lens is not None else self._workspace_run_metrics_lens_summary())
+        if not dist or int(dist.get("runs", 0) or 0) < 3:
+            return {}
+
+        if sigs is None:
+            try:
+                sig_list = [str(x) for x in self._selected_signals() if str(x).strip()]
+            except Exception:
+                sig_list = []
+        else:
+            sig_list = [str(x) for x in (sigs or []) if str(x).strip()]
+        infl = dict(infl_lens if infl_lens is not None else self._workspace_influence_lens_summary())
+        story = dict(causal_story or {})
+        story_conf = str(story.get("confidence") or "").strip()
+        repair_lane = str(story.get("repair_lane") or "").strip()
+        repair_surface = str(story.get("repair_surface") or "").strip()
+        if story_conf in {"aligned", "validate first"}:
+            return {}
+        if repair_lane in {"qa", "multivariate"}:
+            return {}
+        if story_conf == "partial" and repair_surface in {"delta", "influence_heatmap"}:
+            return {}
+
+        signal_name = str(dist.get("signal") or (sig_list[0] if sig_list else "")).strip()
+        metric_label = str(dist.get("metric_label") or "run metric").strip()
+        time_desc = str(dist.get("time_desc") or "").strip()
+        outlier_run = str(dist.get("outlier_run") or "").strip()
+        top_run = str(dist.get("top_run") or "").strip()
+        outlier_value = float(dist.get("outlier_value", np.nan))
+        median_value = float(dist.get("median", np.nan))
+        ref_label = str(dist.get("ref_label") or dist.get("ref_run") or "").strip()
+        mixed_sign = bool(dist.get("mixed_sign", False))
+        outlier_driven = bool(dist.get("outlier_driven", False))
+        wide_spread = bool(dist.get("wide_spread", False))
+        metric_key = str(dist.get("metric_key") or "").strip()
+
+        headline = ""
+        detail = ""
+        tone = "accent"
+
+        if mode == "all_to_one":
+            if len(sig_list) > 2:
+                return {}
+            if outlier_driven:
+                headline = "Check whether the target is outlier-driven"
+                detail = (
+                    f"{outlier_run or top_run or 'One run'} is pulling {signal_name or 'the target'} "
+                    f"to {outlier_value:.6g} while the median stays near {median_value:.6g} in {metric_label}. "
+                    f"Use this ranking before trusting a single lead driver."
+                )
+                tone = "warn"
+            elif mixed_sign and "delta" in metric_key:
+                headline = "Check whether the target splits around the reference"
+                detail = (
+                    f"{signal_name or 'The target'} crosses both sides of the reference"
+                    f"{f' {ref_label}' if ref_label else ''} in {metric_label}. "
+                    "Use the scalar ranking to see whether this is a clean cohort split or just a noisy frame."
+                )
+            elif wide_spread or not list(infl.get("target_examples") or []):
+                headline = "Quantify target spread first"
+                detail = (
+                    f"Use {metric_label} for {signal_name or 'the target'} to see whether the response is broad, skewed or ref-biased"
+                    f"{f' ({time_desc})' if time_desc else ''} before ranking many drivers."
+                )
+            else:
+                return {}
+        else:
+            if len(sig_list) > 2 and list(infl.get("fanout_examples") or []) and not (outlier_driven or wide_spread):
+                return {}
+            if outlier_driven:
+                headline = "Check whether one response is run-dominated"
+                detail = (
+                    f"{signal_name or 'This response'} is being amplified mainly by {outlier_run or top_run or 'one run'} "
+                    f"({outlier_value:.6g} in {metric_label}). Use Run metrics to see whether the fan-out is broad enough"
+                    " across runs to justify a one-driver sweep."
+                )
+                tone = "warn"
+            elif wide_spread or not str(infl.get("fanout_feature") or "").strip():
+                headline = "Quantify response spread first"
+                detail = (
+                    f"Use {metric_label} for {signal_name or 'the current response'} to check whether the run spread is broad, split or reference-biased"
+                    f"{f' ({time_desc})' if time_desc else ''} before sweeping one driver across many outputs."
+                )
+            else:
+                return {}
+
+        return {
+            "focus": "heatmaps",
+            "focus_label": "Heatmaps",
+            "dock_attr": "dock_run_metrics",
+            "dock_label": "Run metrics",
+            "signal": signal_name,
+            "metric_label": metric_label,
+            "headline": headline,
+            "detail": detail,
+            "tone": tone,
+        }
+
     def _workspace_next_move_summary(
         self,
         *,
@@ -3138,52 +4057,126 @@ class CompareViewer(QtWidgets.QMainWindow):
         story_conf = str(story.get("confidence") or "").strip()
         story_label = str(story.get("headline") or "").strip()
         repair_lane = str(story.get("repair_lane") or "").strip()
+        repair_surface = str(story.get("repair_surface") or "").strip()
         repair_hint = str(story.get("repair_hint") or "").strip()
+        surface_label = {
+            "delta": "Δ(t)",
+            "influence_heatmap": "Influence(t) Heatmap",
+            "events": "Events",
+            "qa": "QA",
+            "multivariate": "Multivariate",
+        }.get(repair_surface, "")
+        current_dock_label = str(self._workspace_current_dock_label() or "").strip()
+
+        def _route_surface_detail(detail: str, target_label: str) -> str:
+            target = str(target_label or "").strip()
+            if not target:
+                return detail
+            route = f"Open {target}"
+            if current_dock_label and current_dock_label != target:
+                route = f"From {current_dock_label}, open {target}"
+            clean_detail = str(detail or "").strip()
+            if not clean_detail:
+                return route
+            return f"{route} and {clean_detail[0].lower()}{clean_detail[1:]}"
+
+        peak_bridge = self._workspace_peak_heat_bridge_summary(
+            analysis_mode=analysis_mode,
+            sigs=sigs,
+            infl_lens=infl_lens,
+            causal_story=story,
+        )
+        if peak_bridge:
+            detail = _route_surface_detail(
+                str(peak_bridge.get("detail") or "").strip(),
+                str(peak_bridge.get("dock_label") or "Peak |Δ|"),
+            )
+            return {
+                "headline": str(peak_bridge.get("headline") or "Coarse-gate the response field first"),
+                "detail": detail,
+                "tone": str(peak_bridge.get("tone") or "accent"),
+            }
+
+        dist_bridge = self._workspace_run_metrics_bridge_summary(
+            analysis_mode=analysis_mode,
+            sigs=sigs,
+            infl_lens=infl_lens,
+            causal_story=story,
+        )
+        if dist_bridge:
+            detail = _route_surface_detail(
+                str(dist_bridge.get("detail") or "").strip(),
+                str(dist_bridge.get("dock_label") or "Run metrics"),
+            )
+            return {
+                "headline": str(dist_bridge.get("headline") or "Quantify run spread first"),
+                "detail": detail,
+                "tone": str(dist_bridge.get("tone") or "accent"),
+            }
+
         if story_conf == "aligned":
             if analysis_mode == "one_to_all":
+                detail = f"The current chain {story_label or 'driver -> responses'} is aligned. Sweep nearby times and confirm that the same fan-out survives outside the hotspot window."
+                if surface_label:
+                    detail = _route_surface_detail(detail, surface_label)
                 return {
                     "headline": "Stress-test the aligned fan-out",
-                    "detail": f"The current chain {story_label or 'driver -> responses'} is aligned. Sweep nearby times and confirm that the same fan-out survives outside the hotspot window.",
+                    "detail": detail,
                     "tone": "ok",
                 }
             if analysis_mode == "all_to_one":
+                detail = f"The chain {story_label or 'driver -> target'} is aligned. Keep the target fixed and check whether it survives adjacent frames and event windows."
+                if surface_label:
+                    detail = _route_surface_detail(detail, surface_label)
                 return {
                     "headline": "Stress-test the aligned target chain",
-                    "detail": f"The chain {story_label or 'driver -> target'} is aligned. Keep the target fixed and check whether it survives adjacent frames and event windows.",
+                    "detail": detail,
                     "tone": "ok",
                 }
             if analysis_mode == "all_to_all":
+                detail = f"The field chain {story_label or 'corridor'} is aligned. Now test whether it stays dominant inside each visual cluster instead of only globally."
+                if surface_label:
+                    detail = _route_surface_detail(detail, surface_label)
                 return {
                     "headline": "Stress-test the aligned corridor",
-                    "detail": f"The field chain {story_label or 'corridor'} is aligned. Now test whether it stays dominant inside each visual cluster instead of only globally.",
+                    "detail": detail,
                     "tone": "ok",
                 }
         if story_conf == "partial":
             if repair_lane == "qa":
+                detail = (
+                    f"The chain {story_label or 'story'} is only partially aligned because its evidence link is weak. "
+                    f"{repair_hint or 'Use QA / Events to restore the missing local trigger support.'}"
+                )
+                if surface_label:
+                    detail = _route_surface_detail(detail, surface_label)
                 return {
                     "headline": "Repair the event anchor",
-                    "detail": (
-                        f"The chain {story_label or 'story'} is only partially aligned because its evidence link is weak. "
-                        f"{repair_hint or 'Use QA / Events to restore the missing local trigger support.'}"
-                    ),
+                    "detail": detail,
                     "tone": "warn",
                 }
             if repair_lane == "heatmaps":
+                detail = (
+                    f"The chain {story_label or 'story'} is only partially aligned in time. "
+                    f"{repair_hint or 'Use Heatmaps to lock the hotspot onto the active response or target.'}"
+                )
+                if surface_label:
+                    detail = _route_surface_detail(detail, surface_label)
                 return {
                     "headline": "Repair the time-local link",
-                    "detail": (
-                        f"The chain {story_label or 'story'} is only partially aligned in time. "
-                        f"{repair_hint or 'Use Heatmaps to lock the hotspot onto the active response or target.'}"
-                    ),
+                    "detail": detail,
                     "tone": "warn",
                 }
             if repair_lane == "multivariate":
+                detail = (
+                    f"The field story {story_label or 'corridor'} is only partially aligned structurally. "
+                    f"{repair_hint or 'Use Multivariate to test whether the corridor survives inside the cloud clusters.'}"
+                )
+                if surface_label:
+                    detail = _route_surface_detail(detail, surface_label)
                 return {
                     "headline": "Repair the field structure",
-                    "detail": (
-                        f"The field story {story_label or 'corridor'} is only partially aligned structurally. "
-                        f"{repair_hint or 'Use Multivariate to test whether the corridor survives inside the cloud clusters.'}"
-                    ),
+                    "detail": detail,
                     "tone": "warn",
                 }
             if analysis_mode in {"one_to_all", "all_to_one"}:
@@ -3200,30 +4193,39 @@ class CompareViewer(QtWidgets.QMainWindow):
                 }
         if story_conf == "tentative":
             if repair_lane == "qa":
+                detail = (
+                    f"The current chain {story_label or 'story'} is still tentative because its trigger evidence is thin. "
+                    f"{repair_hint or 'Use QA / Events to anchor the candidate chain before drilling deeper.'}"
+                )
+                if surface_label:
+                    detail = _route_surface_detail(detail, surface_label)
                 return {
                     "headline": "Rebuild evidence support",
-                    "detail": (
-                        f"The current chain {story_label or 'story'} is still tentative because its trigger evidence is thin. "
-                        f"{repair_hint or 'Use QA / Events to anchor the candidate chain before drilling deeper.'}"
-                    ),
+                    "detail": detail,
                     "tone": "accent",
                 }
             if repair_lane == "heatmaps":
+                detail = (
+                    f"The current chain {story_label or 'story'} is still tentative in time. "
+                    f"{repair_hint or 'Use Heatmaps to find a stable hotspot before trusting the driver ranking.'}"
+                )
+                if surface_label:
+                    detail = _route_surface_detail(detail, surface_label)
                 return {
                     "headline": "Stabilize the time gate",
-                    "detail": (
-                        f"The current chain {story_label or 'story'} is still tentative in time. "
-                        f"{repair_hint or 'Use Heatmaps to find a stable hotspot before trusting the driver ranking.'}"
-                    ),
+                    "detail": detail,
                     "tone": "accent",
                 }
             if repair_lane == "multivariate":
+                detail = (
+                    f"The current field story {story_label or 'corridor'} is still tentative structurally. "
+                    f"{repair_hint or 'Use Multivariate to build a stronger cloud separation before trusting the corridor.'}"
+                )
+                if surface_label:
+                    detail = _route_surface_detail(detail, surface_label)
                 return {
                     "headline": "Strengthen the field structure",
-                    "detail": (
-                        f"The current field story {story_label or 'corridor'} is still tentative structurally. "
-                        f"{repair_hint or 'Use Multivariate to build a stronger cloud separation before trusting the corridor.'}"
-                    ),
+                    "detail": detail,
                     "tone": "accent",
                 }
             if analysis_mode in {"one_to_all", "all_to_one"}:
@@ -3368,6 +4370,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 "confidence_detail": "The data-quality layer is warning before the influence story is fully trusted.",
                 "repair_hint": "Resolve the trust / QA warnings first, then rebuild the causal story on the cleaned evidence.",
                 "repair_lane": "qa",
+                "repair_surface": "qa",
             }
 
         heat_sig = str(heat.get("signal") or "").strip()
@@ -3425,19 +4428,24 @@ class CompareViewer(QtWidgets.QMainWindow):
                 if confidence == "aligned":
                     repair_hint = "Sweep a few nearby frames and confirm that the same response set stays inside the fan-out."
                     repair_lane = "heatmaps"
+                    repair_surface = "influence_heatmap"
                 elif confidence == "partial":
                     if not response_in_fanout:
                         repair_hint = "The hotspot response is outside the top fan-out set, so re-check the local frame or response selection."
                         repair_lane = "heatmaps"
+                        repair_surface = "delta"
                     elif event_sig and not event_aligned:
                         repair_hint = "The fan-out is visible, but event timing is not yet locking the spread; inspect nearby Events and Delta frames."
                         repair_lane = "qa"
+                        repair_surface = "events"
                     else:
                         repair_hint = "One link in the spread is still weak, so keep the driver fixed and verify the local gate."
                         repair_lane = "heatmaps"
+                        repair_surface = "delta"
                 else:
                     repair_hint = "Hold one driver steady and step through time until the hotspot response and event gate begin to agree."
                     repair_lane = "heatmaps"
+                    repair_surface = "delta"
                 return {
                     "headline": chain,
                     "detail": detail,
@@ -3446,6 +4454,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                     "confidence_detail": confidence_detail,
                     "repair_hint": repair_hint,
                     "repair_lane": repair_lane,
+                    "repair_surface": repair_surface,
                 }
 
         if analysis_mode == "all_to_one":
@@ -3491,19 +4500,24 @@ class CompareViewer(QtWidgets.QMainWindow):
                 if confidence == "aligned":
                     repair_hint = "Move a few frames around the target and confirm that the same lead driver keeps winning."
                     repair_lane = "heatmaps"
+                    repair_surface = "influence_heatmap"
                 elif confidence == "partial":
                     if not target_match and heat_sig:
                         repair_hint = "The heat hotspot is still off-target, so move Delta onto the target waveform before trusting the chain."
                         repair_lane = "heatmaps"
+                        repair_surface = "delta"
                     elif event_sig and not event_aligned:
                         repair_hint = "Driver and target agree, but event timing is still drifting; inspect Events around the current frame."
                         repair_lane = "qa"
+                        repair_surface = "events"
                     else:
                         repair_hint = "The target chain is close, but one local confirmation is still missing."
                         repair_lane = "heatmaps"
+                        repair_surface = "delta"
                 else:
                     repair_hint = "Narrow the target, hold the playhead steady and wait until hotspot, driver and event timing start to lock together."
                     repair_lane = "heatmaps"
+                    repair_surface = "delta"
                 return {
                     "headline": chain,
                     "detail": detail,
@@ -3512,6 +4526,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                     "confidence_detail": confidence_detail,
                     "repair_hint": repair_hint,
                     "repair_lane": repair_lane,
+                    "repair_surface": repair_surface,
                 }
 
         corridor_feat = str(infl_lens.get("top_pair_feature") or infl.get("feature") or "").strip()
@@ -3549,19 +4564,24 @@ class CompareViewer(QtWidgets.QMainWindow):
             if confidence == "aligned":
                 repair_hint = "Probe each cloud cluster and confirm that the same corridor survives inside the local structure."
                 repair_lane = "multivariate"
+                repair_surface = "multivariate"
             elif confidence == "partial":
                 if not corridor_matches_hotspot and heat_sig:
                     repair_hint = "The dominant corridor and Delta hotspot disagree on the active response, so localize the split in Heatmaps."
                     repair_lane = "heatmaps"
+                    repair_surface = "delta"
                 elif event_sig and not event_aligned:
                     repair_hint = "The corridor is visible, but event timing is not anchoring it yet; compare against pebbles or nearby Events."
                     repair_lane = "multivariate"
+                    repair_surface = "multivariate"
                 else:
                     repair_hint = "One field anchor is still weaker than the others, so keep cross-checking time-local heatmaps against the cloud."
                     repair_lane = "heatmaps"
+                    repair_surface = "delta"
             else:
                 repair_hint = "Add stronger time or event anchoring before trusting the cloud corridor as a real field pattern."
                 repair_lane = "multivariate"
+                repair_surface = "multivariate"
             return {
                 "headline": chain,
                 "detail": detail,
@@ -3570,6 +4590,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 "confidence_detail": confidence_detail,
                 "repair_hint": repair_hint,
                 "repair_lane": repair_lane,
+                "repair_surface": repair_surface,
             }
 
         return {
@@ -3580,6 +4601,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             "confidence_detail": "There is not enough agreement yet between the available evidence layers.",
             "repair_hint": "Stabilize one frame and one target or corridor before asking the window for a stronger causal story.",
             "repair_lane": "multivariate" if analysis_mode == "all_to_all" else "heatmaps",
+            "repair_surface": "multivariate" if analysis_mode == "all_to_all" else "delta",
         }
 
     def _workspace_causal_story_label(self, causal_story: Optional[Dict[str, object]] = None) -> str:
@@ -3679,15 +4701,14 @@ class CompareViewer(QtWidgets.QMainWindow):
         }
         focus_label = focus_label_map.get(focus, focus)
         repair_lane = str(story.get("repair_lane") or "").strip()
-        repair_hint = str(story.get("repair_hint") or "").strip().lower()
+        repair_surface = str(story.get("repair_surface") or "").strip()
         dock_attr = "dock_controls"
         dock_label = "Controls"
+        dock_subtarget = ""
         if focus == "heatmaps":
             dock_attr = "dock_heatmap"
             dock_label = "Δ(t)"
-            if mode in {"one_to_all", "all_to_one"} and any(
-                token in repair_hint for token in ("driver", "fan-out", "lead driver", "keeps winning")
-            ):
+            if repair_surface == "influence_heatmap":
                 dock_attr = "dock_inflheat"
                 dock_label = "Influence(t) Heatmap"
         elif focus == "multivariate":
@@ -3699,16 +4720,45 @@ class CompareViewer(QtWidgets.QMainWindow):
             if trust_flag or qa_count > 0:
                 dock_attr = "dock_qa"
                 dock_label = "QA"
-            elif repair_lane == "qa" and (
-                "event" in repair_hint or "trigger" in repair_hint or int(rows or 0) > 0
-            ):
+            elif repair_surface == "events":
                 dock_attr = "dock_events"
-                dock_label = "Events"
+                if len(list(self._selected_runs())) > 1 and int(rows or 0) > 0:
+                    dock_label = self._events_dock_route_label("Runs raster")
+                    dock_subtarget = "Runs raster"
+                else:
+                    dock_label = "Events"
+            elif repair_lane == "qa" and int(rows or 0) > 0:
+                dock_attr = "dock_events"
+                if len(list(self._selected_runs())) > 1:
+                    dock_label = self._events_dock_route_label("Runs raster")
+                    dock_subtarget = "Runs raster"
+                else:
+                    dock_label = "Events"
+        if focus == "heatmaps":
+            peak_bridge = self._workspace_peak_heat_bridge_summary(
+                analysis_mode=mode,
+                sigs=[str(x) for x in self._selected_signals() if str(x).strip()],
+                infl_lens=self._workspace_influence_lens_summary(),
+                causal_story=story,
+            )
+            if peak_bridge:
+                dock_attr = str(peak_bridge.get("dock_attr") or dock_attr)
+                dock_label = str(peak_bridge.get("dock_label") or dock_label)
+            if not peak_bridge:
+                dist_bridge = self._workspace_run_metrics_bridge_summary(
+                    analysis_mode=mode,
+                    infl_lens=self._workspace_influence_lens_summary(),
+                    causal_story=story,
+                )
+                if dist_bridge:
+                    dock_attr = str(dist_bridge.get("dock_attr") or dock_attr)
+                    dock_label = str(dist_bridge.get("dock_label") or dock_label)
         return {
             "focus": focus,
             "focus_label": focus_label,
             "dock_attr": dock_attr,
             "dock_label": dock_label,
+            "dock_subtarget": dock_subtarget,
         }
 
     def _update_workspace_insights(self) -> None:
@@ -3730,11 +4780,14 @@ class CompareViewer(QtWidgets.QMainWindow):
             events_rows = 0
 
         heat = dict(getattr(self, "_insight_heat", {}) or {})
+        peak_heat = dict(getattr(self, "_insight_peak_heat", {}) or {})
         infl = dict(getattr(self, "_insight_infl", {}) or {})
         qa = dict(getattr(self, "_insight_qa", {}) or {})
         events = dict(getattr(self, "_insight_events", {}) or {})
         infl_lens = self._workspace_influence_lens_summary()
         mv_lens = self._workspace_multivar_lens_summary()
+        dist_lens = self._workspace_run_metrics_lens_summary()
+        peak_lens = self._workspace_peak_heat_lens_summary()
 
         qa_issues = int(qa.get("issues", 0) or 0)
         qa_err = int(qa.get("err", 0) or 0)
@@ -3769,6 +4822,20 @@ class CompareViewer(QtWidgets.QMainWindow):
             events=events,
             trust_visible=trust_visible,
             qa_issues=qa_issues,
+        )
+        dist_bridge = self._workspace_run_metrics_bridge_summary(
+            analysis_mode=analysis_mode,
+            sigs=sigs,
+            infl_lens=infl_lens,
+            dist_lens=dist_lens,
+            causal_story=causal_story,
+        )
+        peak_bridge = self._workspace_peak_heat_bridge_summary(
+            analysis_mode=analysis_mode,
+            sigs=sigs,
+            infl_lens=infl_lens,
+            peak_lens=peak_lens,
+            causal_story=causal_story,
         )
         next_move = self._workspace_next_move_summary(
             analysis_mode=analysis_mode,
@@ -3819,6 +4886,8 @@ class CompareViewer(QtWidgets.QMainWindow):
             events_insight=events,
             causal_story=causal_story,
         )
+        follow_target_label = self._workspace_follow_target_label(follow_target, separator=": ", fallback="Overview")
+        follow_route_label = self._workspace_route_label(follow_target, separator=": ", fallback="Overview")
 
         cards: List[str] = []
 
@@ -3853,8 +4922,8 @@ class CompareViewer(QtWidgets.QMainWindow):
         cards.append(
             self._workspace_insight_card_html(
                 "Recommended focus",
-                f"{str(follow_target.get('focus_label') or recommended_focus_label)} -> {str(follow_target.get('dock_label') or 'dock')}",
-                f"Open {str(follow_target.get('dock_label') or 'the suggested dock')} now. Why now: {focus_reason}.",
+                follow_route_label,
+                f"Take this route now. Why now: {focus_reason}.",
                 tone="warn" if recommended_focus == "qa" else ("ok" if recommended_focus == "multivariate" else "accent"),
             )
         )
@@ -3992,8 +5061,66 @@ class CompareViewer(QtWidgets.QMainWindow):
                         "Build multivariate field",
                         "Select 2+ runs and 1+ signals so the window can derive run-level fields for SPLOM, 3D melting cloud and pebbles-on-sand overlays.",
                         tone="neutral",
-                    )
                 )
+            )
+
+        if analysis_mode in {"one_to_all", "all_to_one"} and dist_lens:
+            dist_headline = str(dist_bridge.get("headline") or "Run spread ready").strip()
+            dist_tone = str(dist_bridge.get("tone") or ("ok" if not dist_lens.get("bridge_ready", False) else "accent")).strip()
+            dist_signal = str(dist_lens.get("signal") or "signal").strip()
+            dist_metric = str(dist_lens.get("metric_label") or "run metric").strip()
+            dist_time = str(dist_lens.get("time_desc") or "").strip()
+            dist_detail = (
+                f"{dist_signal} via {dist_metric}: top={str(dist_lens.get('top_run') or '—')} "
+                f"({float(dist_lens.get('top_value', 0.0) or 0.0):.6g}), median={float(dist_lens.get('median', 0.0) or 0.0):.6g}, "
+                f"ref={str(dist_lens.get('ref_label') or dist_lens.get('ref_run') or '—')} "
+                f"({float(dist_lens.get('ref_value', 0.0) or 0.0):.6g})."
+            )
+            if dist_time:
+                dist_detail = f"{dist_detail} Window: {dist_time}."
+            if dist_bridge:
+                dist_detail = f"{dist_detail} {str(dist_bridge.get('detail') or '').strip()}"
+            elif bool(dist_lens.get("mixed_sign", False)) and "delta" in str(dist_lens.get("metric_key") or ""):
+                dist_detail = f"{dist_detail} Values cross both sides of the reference, so the run spread is currently split."
+            elif bool(dist_lens.get("outlier_driven", False)):
+                dist_detail = (
+                    f"{dist_detail} {str(dist_lens.get('outlier_run') or 'One run')} is currently pulling the scalar ranking away from the median."
+                )
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Run spread",
+                    dist_headline,
+                    dist_detail,
+                    tone=dist_tone,
+                )
+            )
+
+        if analysis_mode in {"one_to_all", "all_to_one"} and peak_lens:
+            peak_headline = str(peak_bridge.get("headline") or "Peak |Δ| field ready").strip()
+            peak_tone = str(peak_bridge.get("tone") or ("ok" if not peak_lens.get("bridge_ready", False) else "accent")).strip()
+            peak_signal = str(peak_lens.get("hotspot_signal") or peak_lens.get("dominant_signal") or "signal").strip()
+            peak_run = str(peak_lens.get("hotspot_run") or peak_lens.get("dominant_run") or "run").strip()
+            peak_value = float(peak_lens.get("hotspot_peak", 0.0) or 0.0)
+            peak_time = float(peak_lens.get("hotspot_time", float("nan")) or float("nan"))
+            peak_unit = str(peak_lens.get("hotspot_unit") or "").strip()
+            peak_unit_txt = f" [{peak_unit}]" if peak_unit else ""
+            peak_detail = (
+                f"Hotspot {peak_signal} in {peak_run}"
+                f"{f' @ {peak_time:.3f}s' if np.isfinite(peak_time) else ''}"
+                f" = {peak_value:.6g}{peak_unit_txt}. "
+                f"Signal competition={int(peak_lens.get('signal_competition', 0) or 0)}, "
+                f"run competition={int(peak_lens.get('run_competition', 0) or 0)}."
+            )
+            if peak_bridge:
+                peak_detail = f"{peak_detail} {str(peak_bridge.get('detail') or '').strip()}"
+            cards.append(
+                self._workspace_insight_card_html(
+                    "Peak |Δ| field",
+                    peak_headline,
+                    peak_detail,
+                    tone=peak_tone,
+                )
+            )
 
         if heat.get("signal"):
             cards.append(
@@ -4112,7 +5239,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             quality_headline = "Trust attention required"
             quality_detail = (
                 f"Trust banner is active. QA issues={qa_issues} (err={qa_err}, warn={qa_warn}), events rows={events_rows}. "
-                "Next: QA / Events."
+                f"Next: {follow_route_label}."
             )
             if qa_focus:
                 quality_detail = f"{quality_detail} {qa_focus}"
@@ -4123,26 +5250,51 @@ class CompareViewer(QtWidgets.QMainWindow):
             quality_headline = f"QA flagged {qa_issues} issue(s)"
             quality_detail = (
                 f"err={qa_err}, warn={qa_warn}, events rows={events_rows}. "
-                "Next: inspect QA / Events, then return to Heatmaps for root-cause localization."
+                f"Next: inspect {follow_route_label}, then return to Heatmaps for root-cause localization."
             )
             if qa_focus:
                 quality_detail = f"{quality_detail} {qa_focus}"
             if events_focus:
                 quality_detail = f"{quality_detail} Event anchor: {events_focus}."
             quality_tone = "warn" if qa_err == 0 else "alert"
-        elif len(runs) >= 3 and len(sigs) >= 3:
+        elif analysis_mode == "all_to_all" and len(runs) >= 3 and len(sigs) >= 3:
             quality_headline = "Ready for all-to-all scouting"
             quality_detail = (
                 f"Table {table}, runs={len(runs)}, signals={len(sigs)}, events rows={events_rows}. "
-                "Next: Multivar for clusters and sparse outliers, then Heatmaps for time localization."
+                f"Next: {follow_route_label} for clusters and sparse outliers, then Heatmaps for time localization."
+            )
+            quality_tone = "ok"
+        elif analysis_mode == "all_to_one" and len(runs) >= 3 and 1 <= len(sigs) <= 2:
+            quality_headline = "Ready for target explanation"
+            quality_detail = (
+                f"Table {table}, runs={len(runs)}, target signals={len(sigs)}, events rows={events_rows}. "
+                f"Next: {follow_route_label} to rank many drivers against the current target, then cross-check Delta / Events around the active frame."
+            )
+            quality_tone = "ok"
+        elif analysis_mode == "one_to_all" and len(runs) >= 3 and len(sigs) >= 2:
+            quality_headline = "Ready for driver sweep"
+            quality_detail = (
+                f"Table {table}, runs={len(runs)}, response signals={len(sigs)}, events rows={events_rows}. "
+                f"Next: {follow_route_label} to trace one candidate driver across many responses, then use QA / Events for local trigger checks."
             )
             quality_tone = "ok"
         else:
             quality_headline = "Build comparison density"
-            quality_detail = (
-                f"Table {table}, runs={len(runs)}, signals={len(sigs)}, events rows={events_rows}. "
-                "Add a few more signals to strengthen multivariate separation."
-            )
+            if analysis_mode == "all_to_one":
+                quality_detail = (
+                    f"Table {table}, runs={len(runs)}, signals={len(sigs)}, events rows={events_rows}. "
+                    "Keep 3+ runs and narrow the target to 1-2 signals so one waveform can be explained cleanly."
+                )
+            elif analysis_mode == "one_to_all":
+                quality_detail = (
+                    f"Table {table}, runs={len(runs)}, signals={len(sigs)}, events rows={events_rows}. "
+                    "Keep 3+ runs and at least 2 response signals so one driver can fan out across visible responses."
+                )
+            else:
+                quality_detail = (
+                    f"Table {table}, runs={len(runs)}, signals={len(sigs)}, events rows={events_rows}. "
+                    "Add a few more signals to strengthen multivariate separation."
+                )
             quality_tone = "accent"
 
         cards.append(
@@ -4175,15 +5327,14 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 pass
 
-    def _workspace_focus_label(self) -> str:
+    def _workspace_focus_label(self, *, follow_target: Optional[Dict[str, object]] = None) -> str:
         mode = str(getattr(self, "_workspace_focus_mode", "all") or "all")
-        labels = {
-            "all": "all",
-            "heatmaps": "heatmaps",
-            "multivariate": "multivar",
-            "qa": "qa/events",
-        }
-        return labels.get(mode, mode)
+        current_target = self._workspace_current_focus_target()
+        return self._workspace_focus_mode_display_text(
+            focus_mode=mode,
+            follow_target=(current_target or follow_target),
+            for_action=False,
+        )
 
     def _set_workspace_dock_title(self, attr: str, title: str) -> None:
         dock = getattr(self, attr, None)
@@ -4198,6 +5349,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self,
         *,
         analysis_mode: str,
+        follow_target: Optional[Dict[str, object]] = None,
         anchor_label: str,
         ref: str,
         runs_count: int,
@@ -4206,6 +5358,14 @@ class CompareViewer(QtWidgets.QMainWindow):
     ) -> None:
         base = str(getattr(self, "_window_title_base", "") or "Pneumo: NPZ Compare Viewer")
         parts: List[str] = []
+        focus_mode = str(getattr(self, "_workspace_focus_mode", "all") or "all")
+        focus_label = str(self._workspace_focus_label(follow_target=follow_target) or "").strip()
+        if focus_label:
+            parts.append(f"Focus {focus_label}")
+        if focus_mode == "all":
+            next_label = self._workspace_follow_target_label(follow_target, separator=": ", fallback="")
+            if next_label:
+                parts.append(f"Next {next_label}")
         lens_label = self._workspace_analysis_label()
         if lens_label:
             parts.append(f"Lens {lens_label}")
@@ -4237,9 +5397,13 @@ class CompareViewer(QtWidgets.QMainWindow):
 
     def _workspace_export_context_slug(self) -> str:
         analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        focus_mode = str(getattr(self, "_workspace_focus_mode", "all") or "all")
         runs = list(self._selected_runs()) if hasattr(self, "list_runs") else []
         ref = str(self._reference_run_label(runs) or "").strip()
         table = str(getattr(self, "current_table", "") or "").strip()
+        follow_target = self._workspace_live_follow_target(analysis_mode=analysis_mode)
+        current_target = self._workspace_current_focus_target()
+        focus_label = self._workspace_focus_label(follow_target=follow_target)
         infl_lens = self._workspace_influence_lens_summary()
         mv_lens = self._workspace_multivar_lens_summary()
         anchor = self._workspace_analysis_anchor_label(
@@ -4249,6 +5413,21 @@ class CompareViewer(QtWidgets.QMainWindow):
         )
 
         parts: List[str] = []
+        if focus_mode == "all":
+            current_label = self._workspace_current_dock_label()
+            current_slug = self._workspace_export_slugify(current_label)
+            if current_slug:
+                parts.append(f"current_{current_slug[:24]}")
+            next_label = self._workspace_follow_target_label(follow_target, separator=" ", fallback="")
+            next_slug = self._workspace_export_slugify(next_label)
+            if next_slug:
+                parts.append(f"next_{next_slug[:32]}")
+        else:
+            focus_slug = self._workspace_export_slugify(
+                self._workspace_follow_target_label(current_target or follow_target, separator=" ", fallback=focus_label)
+            )
+            if focus_slug and focus_slug not in {"overview", "show_all_docks"}:
+                parts.append(f"focus_{focus_slug[:32]}")
         lens_slug = self._workspace_export_slugify(analysis_mode, fallback="all_to_all")
         if lens_slug:
             parts.append(f"lens_{lens_slug}")
@@ -4313,9 +5492,9 @@ class CompareViewer(QtWidgets.QMainWindow):
         target_badge = ""
         if target_attr:
             target_badge = (
-                " | Validation target"
+                f" | Validate {str(follow_target.get('dock_label') or 'target')}"
                 if str(causal_story.get("confidence") or "").strip() == "aligned"
-                else " | Follow target"
+                else f" | Follow {str(follow_target.get('dock_label') or 'target')}"
             )
 
         self._set_workspace_dock_title("dock_controls", "Controls")
@@ -4325,10 +5504,18 @@ class CompareViewer(QtWidgets.QMainWindow):
             heat_suffix = f" | {anchor}"
         heat_lane_suffix = repair_badge if repair_lane == "heatmaps" else ""
         heat_follow_suffix = target_badge if target_attr == "dock_heatmap" else ""
+        peak_follow_suffix = target_badge if target_attr == "dock_peak_heatmap" else ""
+        open_follow_suffix = target_badge if target_attr == "dock_open_timeline" else ""
         infl_follow_suffix = target_badge if target_attr == "dock_influence" else ""
+        dist_follow_suffix = target_badge if target_attr == "dock_run_metrics" else ""
+        static_follow_suffix = target_badge if target_attr == "dock_static_stroke" else ""
         inflheat_follow_suffix = target_badge if target_attr == "dock_inflheat" else ""
         self._set_workspace_dock_title("dock_heatmap", f"Δ(t) Heatmap{heat_suffix}{heat_lane_suffix}{heat_follow_suffix}")
+        self._set_workspace_dock_title("dock_open_timeline", f"Valves (open) timeline{heat_suffix}{heat_lane_suffix}{open_follow_suffix}")
         self._set_workspace_dock_title("dock_influence", f"Influence(t): meta → signals{heat_suffix}{heat_lane_suffix}{infl_follow_suffix}")
+        self._set_workspace_dock_title("dock_peak_heatmap", f"Peak |Δ| heatmap{heat_suffix}{heat_lane_suffix}{peak_follow_suffix}")
+        self._set_workspace_dock_title("dock_run_metrics", f"Run metrics / distributions{heat_suffix}{heat_lane_suffix}{dist_follow_suffix}")
+        self._set_workspace_dock_title("dock_static_stroke", f"Static (t0) / stroke check{heat_suffix}{heat_lane_suffix}{static_follow_suffix}")
         self._set_workspace_dock_title("dock_inflheat", f"Influence(t) Heatmap{heat_suffix}{heat_lane_suffix}{inflheat_follow_suffix}")
 
         multivar_title = "Multivariate: SPLOM / Parallel / 3D"
@@ -4357,6 +5544,21 @@ class CompareViewer(QtWidgets.QMainWindow):
         if target_attr == "dock_events":
             events_title = f"{events_title}{target_badge}"
         self._set_workspace_dock_title("dock_events", events_title)
+
+        ga_title = "Geometry acceptance"
+        ga_cache = dict(getattr(self, "_geometry_acceptance_cache", {}) or {})
+        gate_counts = dict(ga_cache.get("gate_counts") or {})
+        fail_n = int(gate_counts.get("FAIL", 0) or 0)
+        warn_n = int(gate_counts.get("WARN", 0) or 0)
+        if fail_n > 0:
+            ga_title = f"{ga_title} | FAIL {fail_n}"
+        elif warn_n > 0:
+            ga_title = f"{ga_title} | WARN {warn_n}"
+        if repair_lane == "qa":
+            ga_title = f"{ga_title}{repair_badge}"
+        if target_attr == "dock_geometry_acceptance":
+            ga_title = f"{ga_title}{target_badge}"
+        self._set_workspace_dock_title("dock_geometry_acceptance", ga_title)
 
     def _update_workspace_status(self) -> None:
         runs = list(self._selected_runs()) if hasattr(self, "list_runs") else []
@@ -4447,7 +5649,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         if weakest_status:
             quality_text = f"{quality_text} | Weakest {weakest_status}"
         layout_text = (
-            f"Focus {self._workspace_focus_label()} | Lens {self._workspace_analysis_label()} | "
+            f"Focus {self._workspace_focus_label(follow_target=follow_target)} | Lens {self._workspace_analysis_label()} | "
             f"{anchor_label} | Docks {visible_docks}/{total_docks} | Ref {ref}"
         )
         if story_label:
@@ -4475,6 +5677,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         )
         self._update_workspace_window_title(
             analysis_mode=analysis_mode,
+            follow_target=follow_target,
             anchor_label=anchor_label,
             ref=ref,
             runs_count=len(runs),
@@ -4490,7 +5693,17 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._sync_workspace_focus_buttons()
         self._sync_workspace_analysis_buttons()
         self._sync_workspace_analysis_actions(current_mode=analysis_mode)
+        self._update_workspace_focus_labels(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+        )
         self._update_workspace_focus_button_hints(
+            analysis_mode=analysis_mode,
+            trust_visible=trust_visible,
+            qa_issues=qa_issues,
+        )
+        self._update_workspace_focus_action_hints(
             analysis_mode=analysis_mode,
             trust_visible=trust_visible,
             qa_issues=qa_issues,
@@ -4505,16 +5718,135 @@ class CompareViewer(QtWidgets.QMainWindow):
         for attr in (
             "dock_controls",
             "dock_heatmap",
+            "dock_peak_heatmap",
+            "dock_open_timeline",
             "dock_influence",
+            "dock_run_metrics",
+            "dock_static_stroke",
             "dock_inflheat",
             "dock_multivar",
             "dock_qa",
             "dock_events",
+            "dock_geometry_acceptance",
         ):
             dock = getattr(self, attr, None)
             if isinstance(dock, QtWidgets.QDockWidget):
                 docks.append(dock)
         return docks
+
+    def _workspace_dock_by_attr(self, attr: str) -> Optional[QtWidgets.QDockWidget]:
+        key = str(attr or "").strip()
+        if key not in {
+            "dock_controls",
+            "dock_heatmap",
+            "dock_peak_heatmap",
+            "dock_open_timeline",
+            "dock_influence",
+            "dock_run_metrics",
+            "dock_static_stroke",
+            "dock_inflheat",
+            "dock_multivar",
+            "dock_qa",
+            "dock_events",
+            "dock_geometry_acceptance",
+        }:
+            return None
+        dock = getattr(self, key, None)
+        return dock if isinstance(dock, QtWidgets.QDockWidget) else None
+
+    def _workspace_dock_attr_for(self, dock: Optional[QtWidgets.QDockWidget]) -> str:
+        if dock is None:
+            return ""
+        for attr in (
+            "dock_controls",
+            "dock_heatmap",
+            "dock_peak_heatmap",
+            "dock_open_timeline",
+            "dock_influence",
+            "dock_run_metrics",
+            "dock_static_stroke",
+            "dock_inflheat",
+            "dock_multivar",
+            "dock_qa",
+            "dock_events",
+            "dock_geometry_acceptance",
+        ):
+            if getattr(self, attr, None) is dock:
+                return attr
+        return ""
+
+    def _workspace_dock_for_widget(self, widget: Optional[QtWidgets.QWidget]) -> Optional[QtWidgets.QDockWidget]:
+        cur = widget
+        while cur is not None:
+            if isinstance(cur, QtWidgets.QDockWidget):
+                return cur
+            try:
+                cur = cur.parentWidget()
+            except Exception:
+                return None
+        return None
+
+    def _workspace_allowed_dock_attrs(self, focus_mode: str) -> Set[str]:
+        mode = str(focus_mode or "all")
+        allowed = {"dock_controls"}
+        if mode == "heatmaps":
+            allowed.update({"dock_heatmap", "dock_peak_heatmap", "dock_open_timeline", "dock_influence", "dock_run_metrics", "dock_static_stroke", "dock_inflheat"})
+        elif mode == "multivariate":
+            allowed.add("dock_multivar")
+        elif mode == "qa":
+            allowed.update({"dock_qa", "dock_events", "dock_geometry_acceptance"})
+        else:
+            allowed.update(
+                {
+                    "dock_heatmap",
+                    "dock_peak_heatmap",
+                    "dock_open_timeline",
+                    "dock_influence",
+                    "dock_run_metrics",
+                    "dock_static_stroke",
+                    "dock_inflheat",
+                    "dock_multivar",
+                    "dock_qa",
+                    "dock_events",
+                    "dock_geometry_acceptance",
+                }
+            )
+        return allowed
+
+    def _restore_workspace_focus_dock(self, *, saved_focus_mode: str, dock_attr: str) -> bool:
+        attr = str(dock_attr or "").strip()
+        if not attr:
+            return False
+        if attr not in self._workspace_allowed_dock_attrs(saved_focus_mode):
+            return False
+        dock = self._workspace_dock_by_attr(attr)
+        if dock is None:
+            return False
+        self._raise_dock(dock)
+        return True
+
+    def _remember_workspace_focus_widget(self, widget: Optional[QtWidgets.QWidget]) -> bool:
+        dock = self._workspace_dock_for_widget(widget)
+        attr = self._workspace_dock_attr_for(dock)
+        if not attr or attr == "dock_controls":
+            return False
+        mode = str(getattr(self, "_workspace_focus_mode", "all") or "all")
+        if mode != "all" and attr not in self._workspace_allowed_dock_attrs(mode):
+            return False
+        if str(getattr(self, "_workspace_focus_dock_attr", "") or "") == attr:
+            return False
+        self._workspace_focus_dock_attr = attr
+        try:
+            self._update_workspace_status()
+        except Exception:
+            pass
+        return True
+
+    def _on_app_focus_changed(self, _old: Optional[QtWidgets.QWidget], new: Optional[QtWidgets.QWidget]) -> None:
+        try:
+            self._remember_workspace_focus_widget(new)
+        except Exception:
+            pass
 
     def _show_dock(self, dock: Optional[QtWidgets.QDockWidget]) -> None:
         if dock is None:
@@ -4532,6 +5864,12 @@ class CompareViewer(QtWidgets.QMainWindow):
         if dock is None:
             return
         try:
+            attr = self._workspace_dock_attr_for(dock)
+            if attr:
+                self._workspace_focus_dock_attr = attr
+        except Exception:
+            pass
+        try:
             dock.raise_()
         except Exception:
             pass
@@ -4540,11 +5878,16 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._workspace_focus_mode = "all"
         controls = getattr(self, "dock_controls", None)
         heatmap = getattr(self, "dock_heatmap", None)
+        peak_heatmap = getattr(self, "dock_peak_heatmap", None)
+        open_timeline = getattr(self, "dock_open_timeline", None)
         influence = getattr(self, "dock_influence", None)
+        run_metrics = getattr(self, "dock_run_metrics", None)
+        static_stroke = getattr(self, "dock_static_stroke", None)
         inflheat = getattr(self, "dock_inflheat", None)
         multivar = getattr(self, "dock_multivar", None)
         qa = getattr(self, "dock_qa", None)
         events = getattr(self, "dock_events", None)
+        geometry_acceptance = getattr(self, "dock_geometry_acceptance", None)
 
         for dock in self._iter_workspace_docks():
             self._show_dock(dock)
@@ -4556,7 +5899,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         if controls is not None:
             self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, controls)
 
-        analysis_anchor = heatmap or influence or inflheat or multivar
+        analysis_anchor = heatmap or peak_heatmap or open_timeline or influence or run_metrics or static_stroke or inflheat or multivar
         if analysis_anchor is not None:
             self.addDockWidget(QtCore.Qt.RightDockWidgetArea, analysis_anchor)
 
@@ -4577,7 +5920,21 @@ class CompareViewer(QtWidgets.QMainWindow):
             else:
                 self.addDockWidget(QtCore.Qt.RightDockWidgetArea, events)
 
-        for dock in (heatmap, influence, inflheat, multivar):
+        if geometry_acceptance is not None:
+            if qa is not None:
+                try:
+                    self.tabifyDockWidget(qa, geometry_acceptance)
+                except Exception:
+                    pass
+            elif events is not None:
+                try:
+                    self.tabifyDockWidget(events, geometry_acceptance)
+                except Exception:
+                    pass
+            else:
+                self.addDockWidget(QtCore.Qt.RightDockWidgetArea, geometry_acceptance)
+
+        for dock in (heatmap, peak_heatmap, open_timeline, influence, run_metrics, static_stroke, inflheat, multivar):
             if dock is None or dock is analysis_anchor:
                 continue
             self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
@@ -4611,32 +5968,42 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         controls = getattr(self, "dock_controls", None)
         heatmap = getattr(self, "dock_heatmap", None)
+        peak_heatmap = getattr(self, "dock_peak_heatmap", None)
+        open_timeline = getattr(self, "dock_open_timeline", None)
         influence = getattr(self, "dock_influence", None)
+        run_metrics = getattr(self, "dock_run_metrics", None)
+        static_stroke = getattr(self, "dock_static_stroke", None)
         inflheat = getattr(self, "dock_inflheat", None)
         multivar = getattr(self, "dock_multivar", None)
         qa = getattr(self, "dock_qa", None)
         events = getattr(self, "dock_events", None)
+        geometry_acceptance = getattr(self, "dock_geometry_acceptance", None)
 
         show_attrs = {"dock_controls"}
         active_dock = controls
         if mode == "heatmaps":
-            show_attrs.update({"dock_heatmap", "dock_influence", "dock_inflheat"})
-            active_dock = heatmap or influence or inflheat or controls
+            show_attrs.update({"dock_heatmap", "dock_peak_heatmap", "dock_open_timeline", "dock_influence", "dock_run_metrics", "dock_static_stroke", "dock_inflheat"})
+            active_dock = heatmap or peak_heatmap or open_timeline or influence or run_metrics or static_stroke or inflheat or controls
         elif mode == "multivariate":
             show_attrs.add("dock_multivar")
             active_dock = multivar or controls
         elif mode == "qa":
-            show_attrs.update({"dock_qa", "dock_events"})
-            active_dock = qa or events or controls
+            show_attrs.update({"dock_qa", "dock_events", "dock_geometry_acceptance"})
+            active_dock = qa or events or geometry_acceptance or controls
         else:
             show_attrs.update(
                 {
                     "dock_heatmap",
+                    "dock_peak_heatmap",
+                    "dock_open_timeline",
                     "dock_influence",
+                    "dock_run_metrics",
+                    "dock_static_stroke",
                     "dock_inflheat",
                     "dock_multivar",
                     "dock_qa",
                     "dock_events",
+                    "dock_geometry_acceptance",
                 }
             )
             active_dock = heatmap or multivar or qa or controls
@@ -4644,11 +6011,16 @@ class CompareViewer(QtWidgets.QMainWindow):
         for attr in (
             "dock_controls",
             "dock_heatmap",
+            "dock_peak_heatmap",
+            "dock_open_timeline",
             "dock_influence",
+            "dock_run_metrics",
+            "dock_static_stroke",
             "dock_inflheat",
             "dock_multivar",
             "dock_qa",
             "dock_events",
+            "dock_geometry_acceptance",
         ):
             dock = getattr(self, attr, None)
             if not isinstance(dock, QtWidgets.QDockWidget):
@@ -4665,38 +6037,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._update_workspace_status()
 
     def _follow_workspace_heuristic_focus(self) -> None:
-        analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
-        events_rows = 0
-        try:
-            if getattr(self, "tbl_events", None) is not None:
-                events_rows = int(self.tbl_events.rowCount())
-        except Exception:
-            events_rows = 0
-        qa_issues = int((getattr(self, "_insight_qa", {}) or {}).get("issues", 0) or 0)
-        trust_visible = bool(getattr(self, "lbl_trust", None) is not None and self.lbl_trust.isVisible())
-        events = dict(getattr(self, "_insight_events", {}) or {})
-        causal_story = self._workspace_causal_story_summary(
-            analysis_mode=analysis_mode,
-            heat=dict(getattr(self, "_insight_heat", {}) or {}),
-            infl=dict(getattr(self, "_insight_infl", {}) or {}),
-            infl_lens=self._workspace_influence_lens_summary(),
-            events=events,
-            trust_visible=trust_visible,
-            qa_issues=qa_issues,
-        )
-        follow_target = self._workspace_follow_target_summary(
-            analysis_mode=analysis_mode,
-            trust_visible=trust_visible,
-            qa_issues=qa_issues,
-            events_rows=events_rows,
-            events_insight=events,
-            causal_story=causal_story,
-        )
-        focus = str(follow_target.get("focus") or "all")
-        self._focus_workspace_preset(focus)
-        dock = getattr(self, str(follow_target.get("dock_attr") or ""), None)
-        if isinstance(dock, QtWidgets.QDockWidget):
-            self._raise_dock(dock)
+        self._apply_workspace_follow_target(self._workspace_live_follow_target())
 
     def _build_view_menu(self) -> None:
         m = self.menuBar()
@@ -4714,7 +6055,7 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         self.act_view_show_all_docks = QtGui.QAction("Show All Docks", self)
         self.act_view_show_all_docks.setObjectName("act_view_show_all_docks")
-        self.act_view_show_all_docks.triggered.connect(lambda: self._focus_workspace_preset("all"))
+        self.act_view_show_all_docks.triggered.connect(lambda: self._activate_workspace_focus_mode("all"))
         layout_menu.addAction(self.act_view_show_all_docks)
 
         layout_menu.addSeparator()
@@ -4722,19 +6063,19 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.act_view_focus_heatmaps = QtGui.QAction("Focus Heatmaps", self)
         self.act_view_focus_heatmaps.setObjectName("act_view_focus_heatmaps")
         self.act_view_focus_heatmaps.setShortcut("Ctrl+Shift+1")
-        self.act_view_focus_heatmaps.triggered.connect(lambda: self._focus_workspace_preset("heatmaps"))
+        self.act_view_focus_heatmaps.triggered.connect(lambda: self._activate_workspace_focus_mode("heatmaps"))
         layout_menu.addAction(self.act_view_focus_heatmaps)
 
         self.act_view_focus_multivar = QtGui.QAction("Focus Multivariate", self)
         self.act_view_focus_multivar.setObjectName("act_view_focus_multivar")
         self.act_view_focus_multivar.setShortcut("Ctrl+Shift+2")
-        self.act_view_focus_multivar.triggered.connect(lambda: self._focus_workspace_preset("multivariate"))
+        self.act_view_focus_multivar.triggered.connect(lambda: self._activate_workspace_focus_mode("multivariate"))
         layout_menu.addAction(self.act_view_focus_multivar)
 
         self.act_view_focus_qa = QtGui.QAction("Focus QA / Events", self)
         self.act_view_focus_qa.setObjectName("act_view_focus_qa")
         self.act_view_focus_qa.setShortcut("Ctrl+Shift+3")
-        self.act_view_focus_qa.triggered.connect(lambda: self._focus_workspace_preset("qa"))
+        self.act_view_focus_qa.triggered.connect(lambda: self._activate_workspace_focus_mode("qa"))
         layout_menu.addAction(self.act_view_focus_qa)
 
         self.act_view_focus_hint = QtGui.QAction("Follow Weakest Link", self)
@@ -4777,11 +6118,16 @@ class CompareViewer(QtWidgets.QMainWindow):
         dock_specs = (
             ("Controls", getattr(self, "dock_controls", None)),
             ("Δ(t) Heatmap", getattr(self, "dock_heatmap", None)),
+            ("Peak |Δ| Heatmap", getattr(self, "dock_peak_heatmap", None)),
+            ("Valves (open) timeline", getattr(self, "dock_open_timeline", None)),
             ("Influence(t)", getattr(self, "dock_influence", None)),
+            ("Run metrics", getattr(self, "dock_run_metrics", None)),
+            ("Static (t0) / stroke check", getattr(self, "dock_static_stroke", None)),
             ("Influence(t) Heatmap", getattr(self, "dock_inflheat", None)),
             ("Multivariate", getattr(self, "dock_multivar", None)),
             ("QA", getattr(self, "dock_qa", None)),
             ("Events", getattr(self, "dock_events", None)),
+            ("Geometry acceptance", getattr(self, "dock_geometry_acceptance", None)),
         )
         for text, dock in dock_specs:
             if not isinstance(dock, QtWidgets.QDockWidget):
@@ -5292,9 +6638,1066 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             return
 
+    def _peak_heat_default_note(self) -> str:
+        return (
+            "Peak |Δ| heatmap: rows = Signals, cols = Runs. "
+            "Each cell stores the strongest absolute deviation from the reference run over time. "
+            "Click a cell to focus run/signal and jump to the peak time."
+        )
+
+    def _peak_heat_color(self, value: float, vmax: float, *, is_ref: bool = False) -> QtGui.QColor:
+        if is_ref:
+            return QtGui.QColor(255, 240, 214)
+        if not np.isfinite(value):
+            return QtGui.QColor(245, 245, 245)
+        scale = float(vmax) if np.isfinite(vmax) and float(vmax) > 0.0 else 1.0
+        alpha = float(np.clip(abs(float(value)) / scale, 0.0, 1.0))
+        warm = int(170 * alpha)
+        return QtGui.QColor(255, 252 - warm, 236 - int(80 * alpha))
+
+    def _peak_heat_status_text(
+        self,
+        *,
+        ref_label: str,
+        table_name: str,
+        runs_count: int,
+        sigs_count: int,
+        hotspot_signal: str,
+        hotspot_run: str,
+        hotspot_time: float,
+        hotspot_value: float,
+        hotspot_unit: str,
+    ) -> Tuple[str, str]:
+        unit_txt = f" [{hotspot_unit}]" if str(hotspot_unit or "").strip() else ""
+        line1 = (
+            f"Peak |Δ| vs ref={ref_label or '—'} | table={table_name or '—'} | "
+            f"runs={int(runs_count)} | signals={int(sigs_count)}"
+        )
+        if hotspot_signal and hotspot_run and np.isfinite(float(hotspot_value)):
+            line2 = (
+                f"Hotspot: {hotspot_signal} in {hotspot_run} @ {float(hotspot_time):.3f}s = "
+                f"{float(hotspot_value):.6g}{unit_txt}"
+            )
+        else:
+            line2 = "No finite peak cells in the current compare context."
+        mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        if mode == "one_to_all":
+            hint = "Use this surface to spot which response lights up hardest before opening Δ(t) or Influence(t)."
+        elif mode == "all_to_one":
+            hint = "Use this surface to check whether the target split is broad or concentrated in a few extreme runs."
+        else:
+            hint = "Use this surface as a coarse gate before time-local Δ(t) slices and all-to-all cloud structure."
+        return line1, f"{line2}\nHeuristic: {hint}"
+
+    def _build_peak_heatmap_dock(self) -> None:
+        dock = QtWidgets.QDockWidget("Peak |Δ| heatmap", self)
+        dock.setObjectName("dock_peak_heatmap")
+        dock.setAllowedAreas(
+            QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea | QtCore.Qt.BottomDockWidgetArea
+        )
+
+        root = QtWidgets.QWidget()
+        lay = QtWidgets.QVBoxLayout(root)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(6)
+
+        self.lbl_peak_heat_note = QtWidgets.QLabel(self._peak_heat_default_note())
+        self.lbl_peak_heat_note.setWordWrap(True)
+        lay.addWidget(self.lbl_peak_heat_note)
+
+        self.lbl_peak_heat_stats = QtWidgets.QLabel("")
+        self.lbl_peak_heat_stats.setWordWrap(True)
+        self.lbl_peak_heat_stats.setStyleSheet("color:#666;")
+        lay.addWidget(self.lbl_peak_heat_stats)
+
+        self.tbl_peak_heat = QtWidgets.QTableWidget()
+        self.tbl_peak_heat.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectItems)
+        self.tbl_peak_heat.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.tbl_peak_heat.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.tbl_peak_heat.setAlternatingRowColors(True)
+        self.tbl_peak_heat.setEnabled(False)
+        try:
+            self.tbl_peak_heat.cellClicked.connect(self._on_peak_heat_cell_clicked)
+        except Exception:
+            pass
+        lay.addWidget(self.tbl_peak_heat, 1)
+
+        dock.setWidget(root)
+        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+        try:
+            if hasattr(self, "dock_heatmap") and self.dock_heatmap is not None:
+                self.tabifyDockWidget(self.dock_heatmap, dock)
+        except Exception:
+            pass
+        self.dock_peak_heatmap = dock
+        self._clear_peak_heatmap_view()
+
+    def _clear_peak_heatmap_view(self, note: str = "") -> None:
+        self._peak_cache = None
+        self._insight_peak_heat = {}
+        try:
+            if getattr(self, "tbl_peak_heat", None) is not None:
+                self.tbl_peak_heat.clear()
+                self.tbl_peak_heat.setRowCount(0)
+                self.tbl_peak_heat.setColumnCount(0)
+                self.tbl_peak_heat.setEnabled(False)
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "lbl_peak_heat_note"):
+                self.lbl_peak_heat_note.setText(str(note or self._peak_heat_default_note()))
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "lbl_peak_heat_stats"):
+                self.lbl_peak_heat_stats.setText("")
+        except Exception:
+            pass
+        self._update_workspace_status()
+
+    def _schedule_peak_heatmap_rebuild(self, *_args, delay_ms: int = 120) -> None:
+        timer = getattr(self, "_peak_timer", None)
+        if timer is None:
+            return
+        try:
+            timer.stop()
+        except Exception:
+            pass
+        try:
+            timer.start(int(delay_ms))
+        except Exception:
+            pass
+
+    def _rebuild_peak_heatmap(self) -> None:
+        tbl = getattr(self, "tbl_peak_heat", None)
+        if tbl is None:
+            return
+        runs = self._ordered_runs_for_reference(self._selected_runs())
+        if len(runs) < 2:
+            self._clear_peak_heatmap_view("Peak |Δ| heatmap: выберите минимум два прогона.")
+            return
+        sigs = list(self._selected_signals())
+        if not sigs:
+            self._clear_peak_heatmap_view("Peak |Δ| heatmap: выберите хотя бы один сигнал.")
+            return
+        table_name = str(getattr(self, "current_table", "") or "").strip()
+        if not table_name:
+            self._clear_peak_heatmap_view("Peak |Δ| heatmap: выберите общую таблицу.")
+            return
+
+        ref_run = runs[0]
+        run_labels = [str(getattr(run, "label", "") or "") for run in runs]
+        sig_labels = [str(sig) for sig in sigs]
+        values = np.full((len(sig_labels), len(run_labels)), np.nan, dtype=float)
+        peak_times = np.full((len(sig_labels), len(run_labels)), np.nan, dtype=float)
+        signed_peaks = np.full((len(sig_labels), len(run_labels)), np.nan, dtype=float)
+        unit_map: Dict[str, str] = {}
+
+        for i_sig, sig in enumerate(sig_labels):
+            x_ref, y_ref, unit = self._get_xy(ref_run, sig)
+            unit_map[str(sig)] = str(unit or "")
+            if x_ref.size == 0 or y_ref.size == 0:
+                continue
+            x_ref = np.asarray(x_ref, dtype=float)
+            y_ref = np.asarray(y_ref, dtype=float)
+            ref_mask = np.isfinite(x_ref) & np.isfinite(y_ref)
+            if not np.any(ref_mask):
+                continue
+            x_use = x_ref[ref_mask]
+            y_ref_use = y_ref[ref_mask]
+            if x_use.size <= 0:
+                continue
+            values[i_sig, 0] = 0.0
+            signed_peaks[i_sig, 0] = 0.0
+            peak_times[i_sig, 0] = float(x_use[0])
+            for j_run, run in enumerate(runs[1:], start=1):
+                x, y, _u = self._get_xy(run, sig)
+                if x.size == 0 or y.size == 0:
+                    continue
+                try:
+                    y_interp = np.interp(x_use, np.asarray(x, dtype=float), np.asarray(y, dtype=float), left=np.nan, right=np.nan)
+                except Exception:
+                    continue
+                delta = np.asarray(y_interp, dtype=float) - y_ref_use
+                mask = np.isfinite(delta)
+                if not np.any(mask):
+                    continue
+                idxs = np.flatnonzero(mask)
+                abs_delta = np.abs(delta[idxs])
+                if abs_delta.size <= 0:
+                    continue
+                best_rel = int(np.argmax(abs_delta))
+                best_idx = int(idxs[best_rel])
+                values[i_sig, j_run] = float(abs_delta[best_rel])
+                signed_peaks[i_sig, j_run] = float(delta[best_idx])
+                peak_times[i_sig, j_run] = float(x_use[best_idx])
+
+        finite_vals = values[np.isfinite(values)]
+        non_ref_vals = values[:, 1:] if values.shape[1] > 1 else np.asarray([], dtype=float)
+        finite_non_ref = non_ref_vals[np.isfinite(non_ref_vals)]
+        if finite_non_ref.size <= 0:
+            self._clear_peak_heatmap_view("Peak |Δ| heatmap: нет конечных отклонений относительно reference.")
+            return
+
+        vmax = float(np.nanpercentile(finite_non_ref, 98))
+        if not np.isfinite(vmax) or vmax <= 0.0:
+            vmax = float(np.nanmax(finite_non_ref)) if finite_non_ref.size else 1.0
+        if not np.isfinite(vmax) or vmax <= 0.0:
+            vmax = 1.0
+
+        try:
+            tbl.setSortingEnabled(False)
+            tbl.clear()
+            tbl.setRowCount(len(sig_labels))
+            tbl.setColumnCount(len(run_labels))
+            tbl.setHorizontalHeaderLabels([_trim_label(label, 18) for label in run_labels])
+            tbl.setVerticalHeaderLabels([_trim_label(label, 24) for label in sig_labels])
+            for col, run_label in enumerate(run_labels):
+                item = tbl.horizontalHeaderItem(col)
+                if item is not None:
+                    item.setToolTip(str(run_label))
+            for row, sig in enumerate(sig_labels):
+                item = tbl.verticalHeaderItem(row)
+                if item is not None:
+                    item.setToolTip(str(sig))
+            for row, sig in enumerate(sig_labels):
+                unit = str(unit_map.get(sig, "") or "")
+                unit_txt = f" [{unit}]" if unit else ""
+                for col, run_label in enumerate(run_labels):
+                    value = float(values[row, col])
+                    time_s = float(peak_times[row, col])
+                    signed_delta = float(signed_peaks[row, col])
+                    text = "" if not np.isfinite(value) else f"{value:.4g}"
+                    item = QtWidgets.QTableWidgetItem(text)
+                    item.setTextAlignment(QtCore.Qt.AlignCenter)
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+                    item.setBackground(self._peak_heat_color(value, vmax, is_ref=(col == 0)))
+                    if np.isfinite(value):
+                        tooltip = (
+                            f"sig: {sig}\n"
+                            f"run: {run_label}\n"
+                            f"ref: {ref_run.label}\n"
+                            f"peak |Δ|: {value:.6g}{unit_txt}\n"
+                            f"signed Δ @ peak: {signed_delta:.6g}{unit_txt}\n"
+                            f"t_peak: {time_s:.6f} s\n"
+                            f"table: {table_name}"
+                        )
+                    else:
+                        tooltip = (
+                            f"sig: {sig}\nrun: {run_label}\nref: {ref_run.label}\n"
+                            f"No finite peak |Δ| in table {table_name}."
+                        )
+                    item.setToolTip(tooltip)
+                    item.setData(
+                        QtCore.Qt.UserRole,
+                        {
+                            "run": run_label,
+                            "signal": sig,
+                            "time_s": time_s,
+                            "peak": value,
+                            "signed_delta": signed_delta,
+                            "unit": unit,
+                            "is_ref": bool(col == 0),
+                        },
+                    )
+                    tbl.setItem(row, col, item)
+            try:
+                hdr = tbl.horizontalHeader()
+                hdr.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+                tbl.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+            except Exception:
+                pass
+            tbl.setEnabled(True)
+        except Exception:
+            self._clear_peak_heatmap_view("Peak |Δ| heatmap: не удалось собрать таблицу.")
+            return
+
+        hotspot_vals = np.asarray(values[:, 1:], dtype=float)
+        hotspot_times = np.asarray(peak_times[:, 1:], dtype=float)
+        hotspot_signed = np.asarray(signed_peaks[:, 1:], dtype=float)
+        hotspot_vals = np.where(np.isfinite(hotspot_vals), hotspot_vals, np.nan)
+        flat_idx = int(np.nanargmax(hotspot_vals))
+        hot_row, hot_col_rel = np.unravel_index(flat_idx, hotspot_vals.shape)
+        hot_col = int(hot_col_rel + 1)
+        hotspot_signal = sig_labels[hot_row] if 0 <= hot_row < len(sig_labels) else ""
+        hotspot_run = run_labels[hot_col] if 0 <= hot_col < len(run_labels) else ""
+        hotspot_time = float(hotspot_times[hot_row, hot_col_rel]) if hotspot_times.size else float("nan")
+        hotspot_peak = float(hotspot_vals[hot_row, hot_col_rel]) if hotspot_vals.size else float("nan")
+        hotspot_signed = float(hotspot_signed[hot_row, hot_col_rel]) if hotspot_signed.size else float("nan")
+        hotspot_unit = str(unit_map.get(hotspot_signal, "") or "")
+
+        self._peak_cache = {
+            "ref_label": str(ref_run.label),
+            "table_name": table_name,
+            "runs": list(run_labels),
+            "signals": list(sig_labels),
+            "values": values,
+            "times": peak_times,
+            "signed": signed_peaks,
+            "units": dict(unit_map),
+        }
+        self._insight_peak_heat = {
+            "signal": hotspot_signal,
+            "run": hotspot_run,
+            "time_s": hotspot_time,
+            "peak": hotspot_peak,
+            "signed_delta": hotspot_signed,
+            "unit": hotspot_unit,
+            "ref_label": str(ref_run.label),
+            "table_name": table_name,
+        }
+
+        line1, line2 = self._peak_heat_status_text(
+            ref_label=str(ref_run.label),
+            table_name=table_name,
+            runs_count=len(run_labels),
+            sigs_count=len(sig_labels),
+            hotspot_signal=hotspot_signal,
+            hotspot_run=hotspot_run,
+            hotspot_time=hotspot_time,
+            hotspot_value=hotspot_peak,
+            hotspot_unit=hotspot_unit,
+        )
+        try:
+            self.lbl_peak_heat_note.setText(line1)
+        except Exception:
+            pass
+        try:
+            self.lbl_peak_heat_stats.setText(line2)
+        except Exception:
+            pass
+        self._update_workspace_status()
+
+    def _on_peak_heat_cell_clicked(self, row: int, col: int) -> None:
+        tbl = getattr(self, "tbl_peak_heat", None)
+        if tbl is None:
+            return
+        try:
+            item = tbl.item(int(row), int(col))
+        except Exception:
+            item = None
+        if item is None:
+            return
+        try:
+            payload = item.data(QtCore.Qt.UserRole) or {}
+        except Exception:
+            payload = {}
+        if not isinstance(payload, dict):
+            return
+        run_label = str(payload.get("run") or "").strip()
+        sig = str(payload.get("signal") or "").strip()
+        if not run_label or not sig:
+            return
+        target_run_row = -1
+        if hasattr(self, "list_runs"):
+            for i in range(self.list_runs.count()):
+                it = self.list_runs.item(i)
+                if it is not None and str(it.text()) == run_label:
+                    target_run_row = i
+                    break
+        if (not self._signal_exists_in_current_context(sig)) or target_run_row < 0:
+            return
+        if not self._select_signal_by_name(sig, exclusive=False):
+            return
+        run_added = False
+        if hasattr(self, "list_runs"):
+            try:
+                self.list_runs.blockSignals(True)
+                it = self.list_runs.item(target_run_row)
+                if it is not None:
+                    if not it.isSelected():
+                        it.setSelected(True)
+                        run_added = True
+                    self._set_current_list_row(self.list_runs, target_run_row)
+                self._runs_selection_explicit = True
+                self.runs_selected_paths = [
+                    self._normalized_run_path(getattr(run, "path", Path("")))
+                    for run in self._selected_runs()
+                ]
+            finally:
+                try:
+                    self.list_runs.blockSignals(False)
+                except Exception:
+                    pass
+        if run_added:
+            self._on_run_selection_changed()
+        else:
+            self._rebuild_plots()
+        try:
+            t_peak = float(payload.get("time_s", np.nan))
+            if np.isfinite(t_peak):
+                self._set_playhead_time(t_peak)
+        except Exception:
+            pass
+
+    def _open_timeline_default_note(self) -> str:
+        return (
+            "Valves (open): quick discrete timeline for the current reference run. "
+            "Rows come from the `open` table; click to move the playhead."
+        )
+
+    def _open_timeline_status_text(
+        self,
+        *,
+        ref_label: str,
+        valves_count: int,
+        changed_count: int,
+        t_min: float,
+        t_max: float,
+        truncated: bool,
+    ) -> Tuple[str, str]:
+        line1 = (
+            f"Valves (open) timeline | ref={ref_label or '—'} | valves={int(valves_count)}"
+            f" | changed={int(changed_count)}"
+        )
+        if np.isfinite(float(t_min)) and np.isfinite(float(t_max)):
+            line1 = f"{line1} | t=[{float(t_min):.3f}, {float(t_max):.3f}] s"
+        line2 = "Click a stripe to move the playhead."
+        if truncated:
+            line2 = f"{line2} The list is truncated to the current max-valves limit."
+        return line1, line2
+
+    def _open_timeline_mismatch_color(self, mismatch_ratio: float, *, is_ref: bool = False) -> QtGui.QColor:
+        if is_ref:
+            return QtGui.QColor(232, 236, 245)
+        try:
+            v = float(mismatch_ratio)
+        except Exception:
+            return QtGui.QColor(242, 242, 242)
+        if not np.isfinite(v):
+            return QtGui.QColor(242, 242, 242)
+        a = max(0.0, min(1.0, v))
+        red = int(230 + 25 * a)
+        green = int(245 - 105 * a)
+        blue = int(220 - 60 * a)
+        return QtGui.QColor(red, green, blue)
+
+    def _build_open_timeline_dock(self) -> None:
+        dock = QtWidgets.QDockWidget("Valves (open) timeline", self)
+        dock.setObjectName("dock_open_timeline")
+        dock.setAllowedAreas(
+            QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea | QtCore.Qt.BottomDockWidgetArea
+        )
+        dock.setFeatures(QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
+
+        root = QtWidgets.QWidget()
+        lay = QtWidgets.QVBoxLayout(root)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(6)
+
+        row = QtWidgets.QHBoxLayout()
+        row.setSpacing(8)
+        row.addWidget(QtWidgets.QLabel("Max valves:"))
+        self.spin_open_timeline_valves = QtWidgets.QSpinBox()
+        self.spin_open_timeline_valves.setRange(1, 80)
+        self.spin_open_timeline_valves.setSingleStep(1)
+        self.spin_open_timeline_valves.setValue(40)
+        self.spin_open_timeline_valves.setToolTip(
+            "Upper bound for rows in the open timeline. Changed valves are prioritized first."
+        )
+        self.spin_open_timeline_valves.valueChanged.connect(
+            lambda _=None: self._schedule_open_timeline_rebuild(delay_ms=40)
+        )
+        row.addWidget(self.spin_open_timeline_valves, 0)
+        row.addStretch(1)
+        lay.addLayout(row)
+
+        self.lbl_open_timeline_note = QtWidgets.QLabel(self._open_timeline_default_note())
+        self.lbl_open_timeline_note.setWordWrap(True)
+        lay.addWidget(self.lbl_open_timeline_note)
+
+        self.lbl_open_timeline_stats = QtWidgets.QLabel("")
+        self.lbl_open_timeline_stats.setWordWrap(True)
+        self.lbl_open_timeline_stats.setStyleSheet("color:#666;")
+        lay.addWidget(self.lbl_open_timeline_stats)
+
+        tabs = QtWidgets.QTabWidget()
+
+        self.plot_open_timeline = None
+        self.img_open_timeline = None
+        self.line_open_timeline = None
+        self._open_timeline_proxy = None
+        self.lbl_open_timeline_readout = QtWidgets.QLabel("")
+        self.lbl_open_timeline_readout.setWordWrap(True)
+        tab_timeline = QtWidgets.QWidget()
+        tl_lay = QtWidgets.QVBoxLayout(tab_timeline)
+        tl_lay.setContentsMargins(6, 6, 6, 6)
+        tl_lay.setSpacing(6)
+
+        if pg is None:
+            tl_lay.addWidget(QtWidgets.QLabel("Valves timeline unavailable: pyqtgraph not found"))
+        else:
+            try:
+                self.plot_open_timeline = pg.PlotWidget()
+                self.plot_open_timeline.setMinimumHeight(260)
+                self.plot_open_timeline.setBackground(None)
+                self.plot_open_timeline.showGrid(x=True, y=False, alpha=0.20)
+                self.plot_open_timeline.setMouseEnabled(x=True, y=False)
+                self.plot_open_timeline.invertY(True)
+                try:
+                    self.plot_open_timeline.setLabel("bottom", "t, s")
+                except Exception:
+                    pass
+                self.plot_open_timeline.setEnabled(False)
+                self.img_open_timeline = pg.ImageItem(axisOrder='row-major')
+                self.plot_open_timeline.addItem(self.img_open_timeline)
+                self.line_open_timeline = pg.InfiniteLine(
+                    angle=90, movable=False, pen=pg.mkPen((255, 140, 0, 190), width=2)
+                )
+                self.plot_open_timeline.addItem(self.line_open_timeline)
+                try:
+                    self.line_open_timeline.hide()
+                except Exception:
+                    pass
+                tl_lay.addWidget(self.plot_open_timeline, 1)
+                tl_lay.addWidget(self.lbl_open_timeline_readout)
+                try:
+                    self._open_timeline_proxy = pg.SignalProxy(
+                        self.plot_open_timeline.scene().sigMouseMoved,
+                        rateLimit=60,
+                        slot=self._on_open_timeline_mouse_moved,
+                    )
+                except Exception:
+                    self._open_timeline_proxy = None
+                try:
+                    self.plot_open_timeline.scene().sigMouseClicked.connect(self._on_open_timeline_mouse_clicked)
+                except Exception:
+                    pass
+            except Exception as e:
+                self.plot_open_timeline = None
+                tl_lay.addWidget(QtWidgets.QLabel(f"Valves timeline init failed: {e}"))
+
+        tabs.addTab(tab_timeline, "Reference timeline")
+
+        tab_mismatch = QtWidgets.QWidget()
+        mm_lay = QtWidgets.QVBoxLayout(tab_mismatch)
+        mm_lay.setContentsMargins(6, 6, 6, 6)
+        mm_lay.setSpacing(6)
+        self.lbl_open_timeline_mismatch = QtWidgets.QLabel(
+            "Mismatch vs ref: rows are common valves, columns are selected runs."
+        )
+        self.lbl_open_timeline_mismatch.setWordWrap(True)
+        self.lbl_open_timeline_mismatch.setStyleSheet("color:#666;")
+        mm_lay.addWidget(self.lbl_open_timeline_mismatch)
+        self.tbl_open_timeline_mismatch = QtWidgets.QTableWidget()
+        self.tbl_open_timeline_mismatch.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectItems)
+        self.tbl_open_timeline_mismatch.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.tbl_open_timeline_mismatch.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.tbl_open_timeline_mismatch.setAlternatingRowColors(True)
+        self.tbl_open_timeline_mismatch.setEnabled(False)
+        try:
+            self.tbl_open_timeline_mismatch.cellClicked.connect(self._on_open_timeline_mismatch_clicked)
+            self.tbl_open_timeline_mismatch.cellDoubleClicked.connect(self._on_open_timeline_mismatch_clicked)
+        except Exception:
+            pass
+        mm_lay.addWidget(self.tbl_open_timeline_mismatch, 1)
+        tabs.addTab(tab_mismatch, "Mismatch vs ref")
+
+        lay.addWidget(tabs, 1)
+
+        dock.setWidget(root)
+        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+        try:
+            if hasattr(self, "dock_heatmap") and self.dock_heatmap is not None:
+                self.tabifyDockWidget(self.dock_heatmap, dock)
+        except Exception:
+            pass
+        self.dock_open_timeline = dock
+        self._clear_open_timeline_view()
+
+    def _clear_open_timeline_view(self, note: str = "") -> None:
+        self._open_timeline_cache = None
+        try:
+            if getattr(self, "img_open_timeline", None) is not None:
+                self.img_open_timeline.setImage(np.zeros((1, 1), dtype=float))
+        except Exception:
+            pass
+        try:
+            if getattr(self, "plot_open_timeline", None) is not None:
+                self.plot_open_timeline.setEnabled(False)
+                self.plot_open_timeline.getAxis("left").setTicks([[]])
+        except Exception:
+            pass
+        try:
+            if getattr(self, "line_open_timeline", None) is not None:
+                self.line_open_timeline.hide()
+        except Exception:
+            pass
+        try:
+            if getattr(self, "tbl_open_timeline_mismatch", None) is not None:
+                self.tbl_open_timeline_mismatch.clear()
+                self.tbl_open_timeline_mismatch.setRowCount(0)
+                self.tbl_open_timeline_mismatch.setColumnCount(0)
+                self.tbl_open_timeline_mismatch.setEnabled(False)
+        except Exception:
+            pass
+        try:
+            self.lbl_open_timeline_note.setText(str(note or self._open_timeline_default_note()))
+        except Exception:
+            pass
+        try:
+            self.lbl_open_timeline_stats.setText("")
+        except Exception:
+            pass
+        try:
+            self.lbl_open_timeline_readout.setText("")
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "lbl_open_timeline_mismatch"):
+                self.lbl_open_timeline_mismatch.setText(
+                    "Mismatch vs ref: rows are common valves, columns are selected runs."
+                )
+        except Exception:
+            pass
+        self._update_workspace_status()
+
+    def _schedule_open_timeline_rebuild(self, *_args, delay_ms: int = 120) -> None:
+        timer = getattr(self, "_open_timeline_timer", None)
+        if timer is None:
+            return
+        try:
+            timer.stop()
+        except Exception:
+            pass
+        try:
+            timer.start(int(delay_ms))
+        except Exception:
+            pass
+
+    def _rebuild_open_timeline_view(self) -> None:
+        plot = getattr(self, "plot_open_timeline", None)
+        img = getattr(self, "img_open_timeline", None)
+        if plot is None or img is None:
+            return
+        runs = self._ordered_runs_for_reference(self._selected_runs())
+        if not runs:
+            self._clear_open_timeline_view("Valves (open): выберите хотя бы один run.")
+            return
+        ref = self._reference_run(runs)
+        if ref is None:
+            self._clear_open_timeline_view("Valves (open): reference run is unavailable.")
+            return
+        try:
+            df_open = getattr(ref, "tables", {}).get("open")
+        except Exception:
+            df_open = None
+        if not isinstance(df_open, pd.DataFrame) or df_open.empty:
+            self._clear_open_timeline_view(
+                f"Valves (open): run {getattr(ref, 'label', '—')} has no non-empty `open` table."
+            )
+            return
+
+        try:
+            tcol = detect_time_col(df_open) or df_open.columns[0]
+        except Exception:
+            tcol = df_open.columns[0]
+        try:
+            tt = np.asarray(extract_time_vector(df_open, tcol), dtype=float)
+        except Exception:
+            tt = np.asarray([], dtype=float)
+        if tt.size <= 0:
+            tt = np.arange(len(df_open), dtype=float)
+        valve_cols = [str(c) for c in df_open.columns if str(c) != str(tcol)]
+        if not valve_cols:
+            self._clear_open_timeline_view("Valves (open): open table exists, but no valve columns were found.")
+            return
+
+        max_valves = int(self.spin_open_timeline_valves.value()) if hasattr(self, "spin_open_timeline_valves") else 40
+        rows_meta: List[Tuple[int, int, str, np.ndarray]] = []
+        for col in valve_cols:
+            try:
+                arr_raw = np.asarray(df_open[col].values, dtype=float)
+            except Exception:
+                continue
+            n = min(int(tt.size), int(arr_raw.size))
+            if n <= 0:
+                continue
+            arr_raw = np.asarray(arr_raw[:n], dtype=float)
+            mask = np.isfinite(arr_raw)
+            if not np.any(mask):
+                continue
+            arr01 = np.zeros(n, dtype=float)
+            arr01[mask] = (arr_raw[mask] > 0.5).astype(float)
+            changed = int(np.nanmax(arr01[mask]) - np.nanmin(arr01[mask]) > 0.0)
+            active = int(np.nanmax(arr01[mask]) > 0.5)
+            rows_meta.append((changed, active, str(col), arr01))
+        if not rows_meta:
+            self._clear_open_timeline_view("Valves (open): no finite valve state columns were found.")
+            return
+
+        rows_meta.sort(key=lambda item: (-int(item[0]), -int(item[1]), str(item[2]).lower()))
+        truncated = len(rows_meta) > max_valves
+        rows_use = rows_meta[:max_valves]
+        labels = [str(item[2]) for item in rows_use]
+        Z = np.vstack([np.asarray(item[3], dtype=float) for item in rows_use])
+        tt_use = np.asarray(tt[: Z.shape[1]], dtype=float)
+        changed_count = int(sum(int(item[0]) for item in rows_use))
+        if tt_use.size <= 0 or Z.size <= 0:
+            self._clear_open_timeline_view("Valves (open): no aligned timeline points were found.")
+            return
+
+        try:
+            img.setImage(Z, autoLevels=False)
+            x0 = float(tt_use[0])
+            x1 = float(tt_use[-1]) if tt_use.size > 1 else float(tt_use[0] + 1e-6)
+            img.setRect(QtCore.QRectF(float(x0), -0.5, max(1e-6, float(x1 - x0)), float(len(labels))))
+            img.setLevels((0.0, 1.0))
+            img.setLookupTable(
+                np.asarray(
+                    [
+                        [242, 242, 242, 255],
+                        [210, 232, 214, 255],
+                        [68, 150, 92, 255],
+                    ],
+                    dtype=np.ubyte,
+                )
+            )
+            tick_step = max(1, int(np.ceil(len(labels) / 16.0)))
+            ticks = [(float(i), _trim_label(labels[i], 28)) for i in range(0, len(labels), tick_step)]
+            plot.getAxis("left").setTicks([ticks])
+            plot.setEnabled(True)
+            plot.setYRange(-0.5, float(len(labels) - 0.5), padding=0.02)
+            plot.setXRange(float(tt_use[0]), float(tt_use[-1]), padding=0.01)
+        except Exception:
+            self._clear_open_timeline_view("Valves (open): failed to build the timeline heatmap.")
+            return
+
+        mismatch_rows_count = 0
+        mismatch_cols_count = 0
+        mismatch_common = 0
+        mismatch_tbl = getattr(self, "tbl_open_timeline_mismatch", None)
+        if mismatch_tbl is not None:
+            try:
+                ref_series_by_valve = {str(item[2]): np.asarray(item[3], dtype=float) for item in rows_meta}
+                common_valves = set(labels)
+                run_open_cache: Dict[str, Tuple[np.ndarray, Dict[str, np.ndarray]]] = {}
+                for run in runs:
+                    try:
+                        df_run_open = getattr(run, "tables", {}).get("open")
+                    except Exception:
+                        df_run_open = None
+                    if not isinstance(df_run_open, pd.DataFrame) or df_run_open.empty:
+                        common_valves = set()
+                        break
+                    try:
+                        tcol_run = detect_time_col(df_run_open) or df_run_open.columns[0]
+                    except Exception:
+                        tcol_run = df_run_open.columns[0]
+                    try:
+                        tt_run = np.asarray(extract_time_vector(df_run_open, tcol_run), dtype=float)
+                    except Exception:
+                        tt_run = np.asarray([], dtype=float)
+                    if tt_run.size <= 0:
+                        tt_run = np.arange(len(df_run_open), dtype=float)
+                    cols_map: Dict[str, np.ndarray] = {}
+                    for col in df_run_open.columns:
+                        if str(col) == str(tcol_run):
+                            continue
+                        try:
+                            arr_raw = np.asarray(df_run_open[col].values, dtype=float)
+                        except Exception:
+                            continue
+                        n = min(int(tt_run.size), int(arr_raw.size))
+                        if n <= 0:
+                            continue
+                        arr_raw = np.asarray(arr_raw[:n], dtype=float)
+                        mask = np.isfinite(arr_raw)
+                        if not np.any(mask):
+                            continue
+                        arr01 = np.zeros(n, dtype=float)
+                        arr01[mask] = (arr_raw[mask] > 0.5).astype(float)
+                        cols_map[str(col)] = arr01
+                    common_valves &= set(cols_map.keys())
+                    run_open_cache[str(getattr(run, "label", "") or "")] = (np.asarray(tt_run, dtype=float), cols_map)
+
+                mismatch_labels = [lab for lab in labels if lab in common_valves]
+                mismatch_common = int(len(mismatch_labels))
+                mismatch_tbl.clear()
+                if mismatch_labels and len(runs) >= 2:
+                    run_labels = [str(getattr(run, "label", "") or "") for run in runs]
+                    mismatch_tbl.setRowCount(len(mismatch_labels))
+                    mismatch_tbl.setColumnCount(len(run_labels))
+                    mismatch_tbl.setHorizontalHeaderLabels([_trim_label(lbl, 18) for lbl in run_labels])
+                    mismatch_tbl.setVerticalHeaderLabels([_trim_label(lbl, 28) for lbl in mismatch_labels])
+                    for c, run_label in enumerate(run_labels):
+                        hitem = mismatch_tbl.horizontalHeaderItem(c)
+                        if hitem is not None:
+                            hitem.setToolTip(run_label)
+                    for r, valve in enumerate(mismatch_labels):
+                        vitem = mismatch_tbl.verticalHeaderItem(r)
+                        if vitem is not None:
+                            vitem.setToolTip(valve)
+                        ref_arr = np.asarray(ref_series_by_valve.get(valve, np.asarray([], dtype=float)), dtype=float)
+                        ref_t = np.asarray(tt_use[: ref_arr.size], dtype=float)
+                        for c, run_label in enumerate(run_labels):
+                            is_ref = (c == 0)
+                            mismatch = float("nan")
+                            duty_ref = float("nan")
+                            duty_run = float("nan")
+                            first_time = float("nan")
+                            if is_ref:
+                                mismatch = 0.0
+                                if ref_arr.size > 0:
+                                    duty_ref = float(np.mean(ref_arr > 0.5))
+                                    duty_run = duty_ref
+                            else:
+                                run_tt, run_cols = run_open_cache.get(run_label, (np.asarray([], dtype=float), {}))
+                                run_arr = np.asarray(run_cols.get(valve, np.asarray([], dtype=float)), dtype=float)
+                                run_tt = np.asarray(run_tt[: run_arr.size], dtype=float)
+                                if ref_arr.size > 0 and run_arr.size > 0 and run_tt.size > 0 and ref_t.size > 0:
+                                    order = np.argsort(run_tt)
+                                    x_src = np.asarray(run_tt[order], dtype=float)
+                                    y_src = np.asarray(run_arr[order], dtype=float)
+                                    idx = np.searchsorted(x_src, ref_t)
+                                    idx = np.clip(idx, 1, max(1, len(x_src) - 1))
+                                    left = idx - 1
+                                    choose = np.where(np.abs(x_src[left] - ref_t) <= np.abs(x_src[idx] - ref_t), left, idx)
+                                    sampled = np.asarray(y_src[choose], dtype=float)
+                                    mask = np.isfinite(ref_arr) & np.isfinite(sampled)
+                                    if np.any(mask):
+                                        ref_masked = np.asarray(ref_arr[mask], dtype=float)
+                                        sampled = np.asarray(sampled[mask], dtype=float)
+                                        diff = ref_masked != sampled
+                                        mismatch = float(np.mean(diff)) if diff.size else float("nan")
+                                        duty_ref = float(np.mean(ref_masked > 0.5))
+                                        duty_run = float(np.mean(sampled > 0.5))
+                                        diff_idx = np.flatnonzero(diff)
+                                        if diff_idx.size > 0:
+                                            first_time = float(np.asarray(ref_t[mask], dtype=float)[int(diff_idx[0])])
+                            text = "" if not np.isfinite(mismatch) else f"{100.0 * mismatch:.0f}%"
+                            item = QtWidgets.QTableWidgetItem(text)
+                            item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+                            item.setTextAlignment(QtCore.Qt.AlignCenter)
+                            item.setBackground(self._open_timeline_mismatch_color(mismatch, is_ref=is_ref))
+                            tooltip = (
+                                f"valve: {valve}\nrun: {run_label}\nref: {getattr(ref, 'label', '')}\n"
+                                f"mismatch: {'' if not np.isfinite(mismatch) else f'{100.0 * mismatch:.2f}%'}\n"
+                                f"ref duty: {'' if not np.isfinite(duty_ref) else f'{100.0 * duty_ref:.1f}%'}\n"
+                                f"run duty: {'' if not np.isfinite(duty_run) else f'{100.0 * duty_run:.1f}%'}"
+                            )
+                            if np.isfinite(first_time):
+                                tooltip = f"{tooltip}\nfirst mismatch: {first_time:.6f} s"
+                            item.setToolTip(tooltip)
+                            item.setData(
+                                QtCore.Qt.UserRole,
+                                {
+                                    "run": run_label,
+                                    "signal": valve,
+                                    "time_s": first_time,
+                                    "mismatch": mismatch,
+                                    "is_ref": bool(is_ref),
+                                },
+                            )
+                            if np.isfinite(mismatch) and mismatch > 0.0:
+                                font = item.font()
+                                font.setBold(True)
+                                item.setFont(font)
+                            mismatch_tbl.setItem(r, c, item)
+                    try:
+                        hdr = mismatch_tbl.horizontalHeader()
+                        for c in range(len(run_labels)):
+                            hdr.setSectionResizeMode(c, QtWidgets.QHeaderView.ResizeToContents)
+                        mismatch_tbl.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+                    except Exception:
+                        pass
+                    mismatch_tbl.setEnabled(True)
+                    mismatch_rows_count = int(len(mismatch_labels))
+                    mismatch_cols_count = int(len(run_labels))
+                    try:
+                        self.lbl_open_timeline_mismatch.setText(
+                            f"Mismatch vs ref: {len(mismatch_labels)} common valve(s) across {len(run_labels)} run(s). "
+                            "Click a cell to focus run / valve and jump to the first mismatch."
+                        )
+                    except Exception:
+                        pass
+                else:
+                    mismatch_tbl.setRowCount(0)
+                    mismatch_tbl.setColumnCount(0)
+                    mismatch_tbl.setEnabled(False)
+                    try:
+                        self.lbl_open_timeline_mismatch.setText(
+                            "Mismatch vs ref: need at least 2 runs with common `open` valve columns."
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                try:
+                    mismatch_tbl.clear()
+                    mismatch_tbl.setRowCount(0)
+                    mismatch_tbl.setColumnCount(0)
+                    mismatch_tbl.setEnabled(False)
+                except Exception:
+                    pass
+                try:
+                    self.lbl_open_timeline_mismatch.setText(
+                        "Mismatch vs ref is temporarily unavailable; the reference timeline above remains valid."
+                    )
+                except Exception:
+                    pass
+
+        self._open_timeline_cache = {
+            "run": str(getattr(ref, "label", "") or ""),
+            "time": tt_use,
+            "valves": list(labels),
+            "data": Z,
+            "changed_count": changed_count,
+            "truncated": bool(truncated),
+            "mismatch_rows": mismatch_rows_count,
+            "mismatch_cols": mismatch_cols_count,
+            "common_valves": mismatch_common,
+        }
+        line1, line2 = self._open_timeline_status_text(
+            ref_label=str(getattr(ref, "label", "") or ""),
+            valves_count=len(labels),
+            changed_count=changed_count,
+            t_min=float(tt_use[0]),
+            t_max=float(tt_use[-1]),
+            truncated=bool(truncated),
+        )
+        try:
+            self.lbl_open_timeline_note.setText(line1)
+            self.lbl_open_timeline_readout.setText("")
+            self.lbl_open_timeline_stats.setText(line2)
+        except Exception:
+            pass
+        try:
+            if getattr(self, "line_open_timeline", None) is not None:
+                self.line_open_timeline.show()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "_t_ref") and np.asarray(getattr(self, "_t_ref", np.asarray([])), dtype=float).size > 0:
+                idx = int(self.slider_time.value()) if hasattr(self, "slider_time") else 0
+                idx = max(0, min(idx, int(len(self._t_ref) - 1)))
+                self._sync_open_timeline_to_time(float(self._t_ref[idx]))
+        except Exception:
+            pass
+        self._update_workspace_status()
+
+    def _sync_open_timeline_to_time(self, t: float) -> None:
+        cache = dict(getattr(self, "_open_timeline_cache", {}) or {})
+        tt = np.asarray(cache.get("time", np.asarray([])), dtype=float)
+        Z = np.asarray(cache.get("data", np.asarray([[]], dtype=float)), dtype=float)
+        labels = list(cache.get("valves") or [])
+        if tt.size <= 0 or Z.size <= 0 or not labels:
+            return
+        try:
+            idx = int(np.argmin(np.abs(tt - float(t))))
+        except Exception:
+            return
+        idx = max(0, min(idx, int(tt.size - 1)))
+        x = float(tt[idx])
+        active_now = int(np.sum(np.asarray(Z[:, idx], dtype=float) > 0.5))
+        try:
+            if getattr(self, "line_open_timeline", None) is not None:
+                self.line_open_timeline.setPos(x)
+        except Exception:
+            pass
+        try:
+            self.lbl_open_timeline_stats.setText(
+                f"ref={str(cache.get('run') or '—')} | t={x:.3f}s | active now={active_now}/{len(labels)}"
+            )
+        except Exception:
+            pass
+
+    def _open_timeline_sample(self, scene_pos) -> Dict[str, object]:
+        cache = dict(getattr(self, "_open_timeline_cache", {}) or {})
+        plot = getattr(self, "plot_open_timeline", None)
+        if plot is None or not cache:
+            return {}
+        tt = np.asarray(cache.get("time", np.asarray([])), dtype=float)
+        Z = np.asarray(cache.get("data", np.asarray([[]], dtype=float)), dtype=float)
+        labels = list(cache.get("valves") or [])
+        if tt.size <= 0 or Z.size <= 0 or not labels:
+            return {}
+        try:
+            mp = plot.getViewBox().mapSceneToView(scene_pos)
+            x = float(mp.x())
+            y = float(mp.y())
+        except Exception:
+            return {}
+        if not np.isfinite(x) or not np.isfinite(y):
+            return {}
+        row = int(np.round(y))
+        if row < 0 or row >= len(labels):
+            return {}
+        idx = int(np.argmin(np.abs(tt - x)))
+        idx = max(0, min(idx, int(tt.size - 1)))
+        state = float(Z[row, idx]) if 0 <= row < Z.shape[0] and 0 <= idx < Z.shape[1] else float("nan")
+        return {
+            "row": row,
+            "idx": idx,
+            "time_s": float(tt[idx]),
+            "valve": str(labels[row]),
+            "state": state,
+            "run": str(cache.get("run") or ""),
+        }
+
+    def _on_open_timeline_mouse_moved(self, evt) -> None:
+        pos = evt[0] if isinstance(evt, tuple) else evt
+        sample = self._open_timeline_sample(pos)
+        if not sample:
+            return
+        state_txt = "open" if float(sample.get("state", 0.0) or 0.0) > 0.5 else "closed"
+        try:
+            self.lbl_open_timeline_readout.setText(
+                f"run={sample.get('run') or '—'} | valve={sample.get('valve') or '—'} | "
+                f"t={float(sample.get('time_s', float('nan'))):.3f}s | state={state_txt}"
+            )
+        except Exception:
+            pass
+
+    def _on_open_timeline_mouse_clicked(self, event) -> None:
+        try:
+            if event.button() != QtCore.Qt.LeftButton:
+                return
+        except Exception:
+            return
+        sample = self._open_timeline_sample(event.scenePos())
+        if not sample:
+            return
+        try:
+            self._set_playhead_time(float(sample.get("time_s", float("nan"))))
+        except Exception:
+            pass
+
+    def _on_open_timeline_mismatch_clicked(self, row: int, col: int) -> None:
+        tbl = getattr(self, "tbl_open_timeline_mismatch", None)
+        if tbl is None:
+            return
+        try:
+            item = tbl.item(int(row), int(col))
+        except Exception:
+            item = None
+        if item is None:
+            return
+        try:
+            payload = dict(item.data(QtCore.Qt.UserRole) or {})
+        except Exception:
+            payload = {}
+        run_label = str(payload.get("run") or "").strip()
+        sig = str(payload.get("signal") or "").strip()
+        t0 = float(payload.get("time_s", np.nan))
+        focused = False
+        if run_label and sig:
+            try:
+                focused = bool(self._focus_run_signal(run_label, sig))
+            except Exception:
+                focused = False
+        if (not focused) and run_label:
+            try:
+                focused = bool(self._focus_run_label_preserving_context(run_label))
+            except Exception:
+                focused = False
+        if focused and np.isfinite(t0):
+            try:
+                self._set_playhead_time(t0)
+            except Exception:
+                pass
 
 
-    
+
 
     # ---------------- Influence(t) Heatmap (time-player): meta → signals over time ----------------
 
@@ -5368,6 +7771,8 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._inflheat_proxy = None
         self.lbl_inflheat_readout = QtWidgets.QLabel("")
         self.lbl_inflheat_readout.setWordWrap(True)
+        self.plot_inflheat_pair = None
+        self._inflheat_pair_click_connected = False
 
         if pg is None or build_influence_t_cube is None:
             lay.addWidget(QtWidgets.QLabel("Influence(t) heatmap unavailable: pyqtgraph / build_influence_t_cube not found"))
@@ -5394,6 +7799,28 @@ class CompareViewer(QtWidgets.QMainWindow):
                     )
                 except Exception:
                     self._inflheat_proxy = None
+                try:
+                    self.imv_inflheat.getView().scene().sigMouseClicked.connect(self._on_inflheat_mouse_clicked)
+                except Exception:
+                    pass
+
+                self.plot_inflheat_pair = pg.PlotWidget()
+                self.plot_inflheat_pair.setMinimumHeight(180)
+                self.plot_inflheat_pair.setBackground(None)
+                self.plot_inflheat_pair.showGrid(x=True, y=True, alpha=0.25)
+                self.plot_inflheat_pair.setLabel("bottom", "t, s")
+                self.plot_inflheat_pair.setLabel("left", "corr")
+                self.plot_inflheat_pair.setEnabled(False)
+                self.plot_inflheat_pair.setToolTip(
+                    "corr(t) for the current meta -> signal pair. "
+                    "Click inside the plot to move the playhead."
+                )
+                try:
+                    self.plot_inflheat_pair.scene().sigMouseClicked.connect(self._on_inflheat_pair_mouse_clicked)
+                    self._inflheat_pair_click_connected = True
+                except Exception:
+                    self._inflheat_pair_click_connected = False
+                lay.addWidget(self.plot_inflheat_pair)
             except Exception as e:
                 self.imv_inflheat = None
                 lay.addWidget(QtWidgets.QLabel(f"Influence(t) heatmap init failed: {e}"))
@@ -5425,8 +7852,143 @@ class CompareViewer(QtWidgets.QMainWindow):
         return (
             "Axes: X = Signals, Y = Meta features.\n"
             "Наведи мышь на ячейку: покажу полные подписи.\n"
-            "Совет: включите Δ-mode, чтобы видеть влияние на Δ(signal) относительно reference run."
+            "Совет: включите Δ-mode, чтобы видеть влияние на Δ(signal) относительно reference run.\n"
+            "Текущая focused pair получает corr(t) trace ниже."
         )
+
+    def _clear_inflheat_pair_trace(self, title: str = "") -> None:
+        plot = getattr(self, "plot_inflheat_pair", None)
+        if plot is None:
+            return
+        try:
+            plot.clear()
+            plot.setEnabled(False)
+            plot.setLabel("bottom", "t, s")
+            plot.setLabel("left", "corr")
+            plot.setTitle(str(title or "corr(t): focus a meta -> signal pair"))
+        except Exception:
+            pass
+
+    def _resolve_inflheat_focus_pair(self) -> Optional[Tuple[str, str, int, int]]:
+        sigs = list(getattr(self, "_inflheat_sig_labels", []) or [])
+        feats = list(getattr(self, "_inflheat_feat_labels", []) or [])
+        cube_obj = getattr(self, "_inflheat", None)
+        if cube_obj is None or not sigs or not feats:
+            return None
+
+        def _try_pair(feat_name: str, sig_name: str) -> Optional[Tuple[str, str, int, int]]:
+            feat_name = str(feat_name or "").strip()
+            sig_name = str(sig_name or "").strip()
+            if feat_name in feats and sig_name in sigs:
+                return feat_name, sig_name, feats.index(feat_name), sigs.index(sig_name)
+            return None
+
+        pair = _try_pair(
+            str(getattr(self, "_infl_focus_feat", "") or ""),
+            str(getattr(self, "_infl_focus_sig", "") or ""),
+        )
+        if pair is None:
+            insight = dict(getattr(self, "_insight_infl", {}) or {})
+            pair = _try_pair(
+                str(insight.get("feature") or ""),
+                str(insight.get("signal") or ""),
+            )
+        if pair is not None:
+            feat_name, sig_name, _fi, _si = pair
+            self._infl_focus_feat = feat_name
+            self._infl_focus_sig = sig_name
+            return pair
+
+        try:
+            tH = np.asarray(getattr(self, "_inflheat_t", np.asarray([])), dtype=float)
+            cube = np.asarray(getattr(cube_obj, "cube", np.asarray([])), dtype=float)
+            if cube.ndim != 3 or cube.size == 0 or tH.size <= 0:
+                return None
+            idx = 0
+            if hasattr(self, "slider_time") and getattr(self, "_t_ref", np.asarray([])).size:
+                try:
+                    idx = int(max(0, min(int(self.slider_time.value()), int(len(self._t_ref) - 1))))
+                    t_now = float(self._t_ref[idx])
+                    idx = int(np.argmin(np.abs(tH - t_now)))
+                except Exception:
+                    idx = 0
+            idx = max(0, min(int(idx), int(cube.shape[0] - 1)))
+            frame = np.asarray(cube[idx], dtype=float)
+            if frame.ndim != 2 or frame.size == 0 or not np.isfinite(frame).any():
+                return None
+            A = np.abs(frame)
+            A = np.nan_to_num(A, nan=-1.0, posinf=-1.0, neginf=-1.0)
+            k = int(np.argmax(A))
+            fi = int(k // len(sigs))
+            si = int(k % len(sigs))
+            if not (0 <= fi < len(feats) and 0 <= si < len(sigs)):
+                return None
+            feat_name = str(feats[fi])
+            sig_name = str(sigs[si])
+            self._infl_focus_feat = feat_name
+            self._infl_focus_sig = sig_name
+            return feat_name, sig_name, fi, si
+        except Exception:
+            return None
+
+    def _update_inflheat_pair_trace(self) -> None:
+        plot = getattr(self, "plot_inflheat_pair", None)
+        if plot is None:
+            return
+        pair = self._resolve_inflheat_focus_pair()
+        cube_obj = getattr(self, "_inflheat", None)
+        tH = np.asarray(getattr(self, "_inflheat_t", np.asarray([])), dtype=float)
+        cube = np.asarray(getattr(cube_obj, "cube", np.asarray([])), dtype=float) if cube_obj is not None else np.asarray([])
+        if pair is None or cube.ndim != 3 or cube.size == 0 or tH.size == 0:
+            self._clear_inflheat_pair_trace("corr(t): build Influence(t) Heatmap to inspect one pair over time")
+            return
+
+        feat_name, sig_name, fi, si = pair
+        try:
+            c_t = np.asarray(cube[:, fi, si], dtype=float)
+        except Exception:
+            c_t = np.asarray([], dtype=float)
+        finite = np.isfinite(tH) & np.isfinite(c_t)
+        if c_t.size == 0 or not finite.any():
+            self._clear_inflheat_pair_trace(f"corr(t): {feat_name} -> {sig_name} has no finite frames")
+            return
+
+        try:
+            plot.clear()
+            plot.setEnabled(True)
+            plot.showGrid(x=True, y=True, alpha=0.25)
+            plot.setLabel("bottom", "t, s")
+            plot.setLabel("left", "corr")
+            plot.plot(
+                tH[finite],
+                c_t[finite],
+                pen=pg.mkPen((60, 110, 190, 220), width=2),
+                antialias=True,
+            )
+            plot.addItem(pg.InfiniteLine(pos=0.0, angle=0, pen=pg.mkPen((120, 120, 120, 160), width=1, style=QtCore.Qt.DotLine)))
+
+            idx_now = 0
+            if hasattr(self, "slider_time") and getattr(self, "_t_ref", np.asarray([])).size:
+                try:
+                    idx_now = int(max(0, min(int(self.slider_time.value()), int(len(self._t_ref) - 1))))
+                    t_now = float(self._t_ref[idx_now])
+                except Exception:
+                    t_now = float(tH[0])
+            else:
+                t_now = float(tH[0])
+            try:
+                idx_now = int(np.argmin(np.abs(tH - float(t_now))))
+            except Exception:
+                idx_now = 0
+            idx_now = max(0, min(int(idx_now), int(len(tH) - 1)))
+            t_now = float(tH[idx_now])
+            c_now = float(c_t[idx_now]) if idx_now < len(c_t) else float("nan")
+            plot.addItem(pg.InfiniteLine(pos=t_now, angle=90, pen=pg.mkPen((230, 120, 40, 220), width=2)))
+            plot.setYRange(-1.05, 1.05, padding=0.0)
+            current_txt = f" | current={c_now:+.3f} @ {t_now:.3f}s" if np.isfinite(c_now) else ""
+            plot.setTitle(f"corr(t): {feat_name} -> {sig_name}{current_txt} | click to move playhead")
+        except Exception:
+            self._clear_inflheat_pair_trace(f"corr(t): failed for {feat_name} -> {sig_name}")
 
     def _update_inflheat_note_for_index(self, idx: int) -> None:
         cube_obj = getattr(self, "_inflheat", None)
@@ -5673,6 +8235,8 @@ class CompareViewer(QtWidgets.QMainWindow):
                 idx = int(self.slider_time.value()) if hasattr(self, "slider_time") else 0
                 idx = max(0, min(idx, int(len(self._t_ref) - 1)))
                 self._sync_inflheat_to_time(float(self._t_ref[idx]))
+            else:
+                self._update_inflheat_pair_trace()
         except Exception:
             pass
 
@@ -5697,6 +8261,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                     pass
         except Exception:
             pass
+        self._clear_inflheat_pair_trace(note or "")
         try:
             self.lbl_inflheat_note.setText(str(note or self._inflheat_default_note()))
         except Exception:
@@ -5717,6 +8282,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             if hasattr(self.imv_inflheat, "setCurrentIndex"):
                 self.imv_inflheat.setCurrentIndex(idx)
             self._update_inflheat_note_for_index(idx)
+            self._update_inflheat_pair_trace()
         except Exception:
             return
 
@@ -5725,7 +8291,8 @@ class CompareViewer(QtWidgets.QMainWindow):
             return
         try:
             pos = evt[0] if isinstance(evt, (tuple, list)) else evt
-            vb = self.imv_inflheat.getView()
+            plot_item = self.imv_inflheat.getView()
+            vb = plot_item.vb if hasattr(plot_item, "vb") else plot_item
             p = vb.mapSceneToView(pos)
             x = float(p.x())
             y = float(p.y())
@@ -5750,6 +8317,66 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.lbl_inflheat_readout.setText(
                 f"{t_txt}   sig[{ix}]={sig_lab}   meta[{iy}]={feat_lab}"
             )
+        except Exception:
+            return
+
+    def _on_inflheat_mouse_clicked(self, event):
+        if self.imv_inflheat is None or not self._inflheat_sig_labels or not self._inflheat_feat_labels:
+            return
+        try:
+            pos = event.scenePos() if hasattr(event, "scenePos") else None
+            if pos is None:
+                return
+            plot_item = self.imv_inflheat.getView()
+            vb = plot_item.vb if hasattr(plot_item, "vb") else plot_item
+            try:
+                if not vb.sceneBoundingRect().contains(pos):
+                    return
+            except Exception:
+                pass
+            p = vb.mapSceneToView(pos)
+            ix = int(round(float(p.x())))
+            iy = int(round(float(p.y())))
+            if iy < 0 or iy >= len(self._inflheat_feat_labels):
+                return
+            if ix < 0 or ix >= len(self._inflheat_sig_labels):
+                return
+            feat_name = str(self._inflheat_feat_labels[iy])
+            sig_name = str(self._inflheat_sig_labels[ix])
+            self._infl_focus_feat = feat_name
+            self._infl_focus_sig = sig_name
+            try:
+                cache = dict(getattr(self, "_infl_cache", {}) or {})
+                feat_sel = [str(x) for x in (cache.get("feat_sel") or []) if str(x).strip()]
+                sigs = [str(x) for x in (cache.get("sigs") or []) if str(x).strip()]
+                if feat_name in feat_sel and sig_name in sigs and getattr(self, "tbl_infl", None) is not None:
+                    self.tbl_infl.setCurrentCell(feat_sel.index(feat_name), sigs.index(sig_name))
+            except Exception:
+                pass
+            try:
+                self._update_influence_scatter_from_cache()
+            except Exception:
+                pass
+            self._update_inflheat_pair_trace()
+        except Exception:
+            return
+
+    def _on_inflheat_pair_mouse_clicked(self, event):
+        plot = getattr(self, "plot_inflheat_pair", None)
+        if plot is None or self._inflheat_t is None or np.asarray(self._inflheat_t).size == 0:
+            return
+        try:
+            pos = event.scenePos() if hasattr(event, "scenePos") else None
+            if pos is None:
+                return
+            vb = plot.plotItem.vb
+            try:
+                if not vb.sceneBoundingRect().contains(pos):
+                    return
+            except Exception:
+                pass
+            p = vb.mapSceneToView(pos)
+            self._set_playhead_time(float(p.x()))
         except Exception:
             return
 
@@ -5832,6 +8459,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.plot_infl.setLabel('bottom', 'meta value')
         self.plot_infl.setLabel('left', 'signal value')
         self.plot_infl.setEnabled(False)
+        self.plot_infl.setToolTip("Клик по точке → сфокусировать соответствующий run в текущей паре meta → signal.")
         splitter.addWidget(self.plot_infl)
 
         splitter.setStretchFactor(0, 3)
@@ -5871,6 +8499,1887 @@ class CompareViewer(QtWidgets.QMainWindow):
             pass
 
         self.dock_influence = dock
+
+
+    # ---------------- Run-level metrics / distributions ----------------
+
+    def _build_run_metrics_dock(self) -> None:
+        dock = QtWidgets.QDockWidget("Run metrics / distributions", self)
+        dock.setObjectName("dock_run_metrics")
+        dock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+        dock.setFeatures(QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
+
+        root = QtWidgets.QWidget()
+        v = QtWidgets.QVBoxLayout(root)
+        v.setContentsMargins(8, 8, 8, 8)
+        v.setSpacing(6)
+
+        row = QtWidgets.QHBoxLayout()
+        row.setSpacing(8)
+        row.addWidget(QtWidgets.QLabel("Signal:"))
+        self.combo_dist_signal = QtWidgets.QComboBox()
+        self.combo_dist_signal.setToolTip(
+            "Один сигнал на все выбранные runs. Метрика превращает его в одно число на run, "
+            "чтобы быстро увидеть ranking и распределение."
+        )
+        self.combo_dist_signal.currentIndexChanged.connect(self._on_run_metrics_signal_changed)
+        row.addWidget(self.combo_dist_signal, 1)
+
+        row.addWidget(QtWidgets.QLabel("Metric:"))
+        self.combo_dist_mode = QtWidgets.QComboBox()
+        self.combo_dist_mode.addItem("Значение @ playhead", "value_at_playhead")
+        self.combo_dist_mode.addItem("Δ @ playhead (vs reference)", "delta_at_playhead")
+        self.combo_dist_mode.addItem("RMS по окну", "rms_window")
+        self.combo_dist_mode.addItem("RMS(Δ) по окну (vs reference)", "rms_delta_window")
+        self.combo_dist_mode.addItem("max|Δ| по окну (vs reference)", "maxabs_delta_window")
+        self.combo_dist_mode.setToolTip(
+            "Как свернуть выбранный сигнал в одно число на каждый run: значение в playhead "
+            "или оконная метрика по текущему виду."
+        )
+        self.combo_dist_mode.currentIndexChanged.connect(self._on_run_metrics_mode_changed)
+        row.addWidget(self.combo_dist_mode, 1)
+
+        self.chk_dist_use_view = QtWidgets.QCheckBox("По видимому окну")
+        self.chk_dist_use_view.setChecked(True)
+        self.chk_dist_use_view.setToolTip(
+            "Для оконных метрик использовать текущий видимый X-интервал первого графика. "
+            "Если окно недоступно, будет использован весь сигнал."
+        )
+        self.chk_dist_use_view.stateChanged.connect(lambda _=None: self._schedule_run_metrics_rebuild(delay_ms=80))
+        row.addWidget(self.chk_dist_use_view, 0)
+        v.addLayout(row)
+
+        self.lbl_dist_note = QtWidgets.QLabel("Run metrics: choose a signal to rank runs.")
+        self.lbl_dist_note.setWordWrap(True)
+        v.addWidget(self.lbl_dist_note)
+
+        self.lbl_dist_stats = QtWidgets.QLabel("")
+        self.lbl_dist_stats.setWordWrap(True)
+        self.lbl_dist_stats.setStyleSheet("color:#666;")
+        v.addWidget(self.lbl_dist_stats)
+
+        tabs = QtWidgets.QTabWidget()
+
+        tab_rank = QtWidgets.QWidget()
+        rank_lay = QtWidgets.QVBoxLayout(tab_rank)
+        rank_lay.setContentsMargins(6, 6, 6, 6)
+        rank_lay.setSpacing(6)
+
+        self.plot_dist_bar = pg.PlotWidget()
+        self.plot_dist_bar.setMinimumHeight(220)
+        self.plot_dist_bar.setBackground(None)
+        self.plot_dist_bar.showGrid(x=False, y=True, alpha=0.25)
+        self.plot_dist_bar.setMouseEnabled(x=False, y=False)
+        self.plot_dist_bar.setEnabled(False)
+        rank_lay.addWidget(self.plot_dist_bar, 1)
+
+        self.tbl_dist = QtWidgets.QTableWidget()
+        self.tbl_dist.setColumnCount(4)
+        self.tbl_dist.setHorizontalHeaderLabels(["#", "run", "value", "ref"])
+        self.tbl_dist.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.tbl_dist.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.tbl_dist.setAlternatingRowColors(True)
+        self.tbl_dist.setMinimumHeight(170)
+        try:
+            hdr = self.tbl_dist.horizontalHeader()
+            hdr.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
+            hdr.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+            hdr.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)
+            hdr.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)
+        except Exception:
+            pass
+        try:
+            self.tbl_dist.cellDoubleClicked.connect(self._on_run_metrics_table_double_clicked)
+        except Exception:
+            pass
+        rank_lay.addWidget(self.tbl_dist, 0)
+        tabs.addTab(tab_rank, "Ranking")
+
+        tab_hist = QtWidgets.QWidget()
+        hist_lay = QtWidgets.QVBoxLayout(tab_hist)
+        hist_lay.setContentsMargins(6, 6, 6, 6)
+        hist_lay.setSpacing(6)
+        self.plot_dist_hist = pg.PlotWidget()
+        self.plot_dist_hist.setMinimumHeight(280)
+        self.plot_dist_hist.setBackground(None)
+        self.plot_dist_hist.showGrid(x=True, y=True, alpha=0.25)
+        self.plot_dist_hist.setMouseEnabled(x=False, y=False)
+        self.plot_dist_hist.setEnabled(False)
+        hist_lay.addWidget(self.plot_dist_hist, 1)
+        tabs.addTab(tab_hist, "Distribution")
+
+        tab_kde = QtWidgets.QWidget()
+        kde_lay = QtWidgets.QVBoxLayout(tab_kde)
+        kde_lay.setContentsMargins(6, 6, 6, 6)
+        kde_lay.setSpacing(6)
+        self.plot_dist_kde = pg.PlotWidget()
+        self.plot_dist_kde.setMinimumHeight(280)
+        self.plot_dist_kde.setBackground(None)
+        self.plot_dist_kde.showGrid(x=True, y=True, alpha=0.25)
+        self.plot_dist_kde.setMouseEnabled(x=False, y=False)
+        self.plot_dist_kde.setEnabled(False)
+        kde_lay.addWidget(self.plot_dist_kde, 1)
+        tabs.addTab(tab_kde, "Density / KDE")
+
+        tab_box = QtWidgets.QWidget()
+        box_lay = QtWidgets.QVBoxLayout(tab_box)
+        box_lay.setContentsMargins(6, 6, 6, 6)
+        box_lay.setSpacing(6)
+        self.plot_dist_box = pg.PlotWidget()
+        self.plot_dist_box.setMinimumHeight(280)
+        self.plot_dist_box.setBackground(None)
+        self.plot_dist_box.showGrid(x=False, y=True, alpha=0.25)
+        self.plot_dist_box.setMouseEnabled(x=False, y=False)
+        self.plot_dist_box.setEnabled(False)
+        try:
+            self.plot_dist_box.getAxis("bottom").setTicks([[]])
+        except Exception:
+            pass
+        box_lay.addWidget(self.plot_dist_box, 1)
+        tabs.addTab(tab_box, "Box / strip")
+
+        v.addWidget(tabs, 1)
+
+        dock.setWidget(root)
+        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+        try:
+            if hasattr(self, "dock_influence") and self.dock_influence is not None:
+                self.tabifyDockWidget(self.dock_influence, dock)
+        except Exception:
+            pass
+        self.dock_run_metrics = dock
+
+        try:
+            self.plot_dist_bar.scene().sigMouseClicked.connect(self._on_run_metrics_bar_clicked)
+        except Exception:
+            pass
+
+        try:
+            s = self._settings
+            want_mode = str(s.value("dist_mode", "value_at_playhead") or "value_at_playhead")
+            idx_mode = self.combo_dist_mode.findData(want_mode)
+            if idx_mode >= 0:
+                self.combo_dist_mode.setCurrentIndex(idx_mode)
+            self.chk_dist_use_view.setChecked(
+                self._qs_bool(s.value("dist_use_view", self.chk_dist_use_view.isChecked()), self.chk_dist_use_view.isChecked())
+            )
+        except Exception:
+            pass
+
+        self._refresh_run_metrics_signal_combo()
+        self._clear_run_metrics_view("Выберите runs и signal context для per-run compare.")
+
+    def _run_metrics_mode_key(self) -> str:
+        combo = getattr(self, "combo_dist_mode", None)
+        if combo is None:
+            return "value_at_playhead"
+        try:
+            data = combo.currentData()
+            if data is not None and str(data).strip():
+                return str(data).strip()
+        except Exception:
+            pass
+        return "value_at_playhead"
+
+    def _run_metrics_signal_options(self) -> List[str]:
+        try:
+            return self._current_context_signal_names(apply_filter=False)
+        except Exception:
+            return []
+
+    def _refresh_run_metrics_signal_combo(self) -> None:
+        combo = getattr(self, "combo_dist_signal", None)
+        if combo is None:
+            return
+        options = self._run_metrics_signal_options()
+        try:
+            current = str(combo.currentText() or "").strip()
+        except Exception:
+            current = ""
+        remembered = str(getattr(self, "dist_signal_selected", "") or "").strip()
+        selected = []
+        try:
+            selected = [str(x) for x in (self._selected_signals() or []) if str(x).strip()]
+        except Exception:
+            selected = []
+        target = ""
+        for candidate in [remembered, current] + list(selected) + list(options[:1]):
+            cand = str(candidate or "").strip()
+            if cand and cand in options:
+                target = cand
+                break
+        try:
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItems(options)
+            if target:
+                combo.setCurrentText(target)
+        finally:
+            try:
+                combo.blockSignals(False)
+            except Exception:
+                pass
+        try:
+            combo.setEnabled(bool(options))
+        except Exception:
+            pass
+        try:
+            current_sig = str(combo.currentText() or "").strip()
+            if current_sig and ((not remembered) or (remembered in options) or current_sig == remembered):
+                self.dist_signal_selected = current_sig
+        except Exception:
+            pass
+
+    def _current_metrics_time_window(self) -> Tuple[Optional[float], Optional[float], str]:
+        use_view = bool(getattr(self, "chk_dist_use_view", None) and self.chk_dist_use_view.isChecked())
+        if not use_view:
+            return None, None, "whole-run"
+        if not getattr(self, "plots", None):
+            return None, None, "whole-run (view unavailable)"
+        try:
+            xr = self.plots[0].getViewBox().viewRange()[0]
+            if not isinstance(xr, (list, tuple)) or len(xr) < 2:
+                return None, None, "whole-run (view unavailable)"
+            t0 = float(xr[0])
+            t1 = float(xr[1])
+            if not (np.isfinite(t0) and np.isfinite(t1)):
+                return None, None, "whole-run (view unavailable)"
+            lo = min(t0, t1)
+            hi = max(t0, t1)
+            if hi <= lo:
+                return None, None, "whole-run (view unavailable)"
+            return lo, hi, f"view {lo:.3f}..{hi:.3f}s"
+        except Exception:
+            return None, None, "whole-run (view unavailable)"
+
+    def _run_metrics_status_text(
+        self,
+        *,
+        signal_name: str,
+        metric_label: str,
+        table_name: str,
+        ref_label: str,
+        rows_count: int,
+        unit: str,
+        top_run: str,
+        top_value: float,
+        mean_value: float,
+        median_value: float,
+        std_value: float,
+        time_desc: str,
+    ) -> Tuple[str, str]:
+        unit_txt = f" [{unit}]" if str(unit or "").strip() else ""
+        line1 = (
+            f"Signal={signal_name or '—'} | metric={metric_label}{unit_txt} | "
+            f"table={table_name or '—'} | ref={ref_label or '—'} | runs={int(rows_count)}"
+        )
+        if top_run and np.isfinite(float(top_value)):
+            line2 = (
+                f"Top run: {top_run} = {float(top_value):.6g}{unit_txt} | "
+                f"{time_desc} | mean={float(mean_value):.6g} | median={float(median_value):.6g} | std={float(std_value):.6g}"
+            )
+        else:
+            line2 = f"{time_desc} | no finite values"
+
+        analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
+        if analysis_mode == "one_to_all":
+            hint = "Use this ranking to see which runs amplify the chosen response most before sweeping one driver across many outputs."
+        elif analysis_mode == "all_to_one":
+            hint = "Use this spread check to see whether the target response is stable, split or outlier-driven before trusting one lead driver."
+        else:
+            hint = "Use this scalar slice as a fast bridge between waveform detail and all-to-all cloud structure."
+        return line1, f"{line2}\nHeuristic: {hint}"
+
+    def _clear_run_metrics_view(self, note: str = "") -> None:
+        self._dist_cache = None
+        try:
+            if getattr(self, "plot_dist_bar", None) is not None:
+                self.plot_dist_bar.clear()
+                self.plot_dist_bar.setEnabled(False)
+        except Exception:
+            pass
+        try:
+            if getattr(self, "plot_dist_hist", None) is not None:
+                self.plot_dist_hist.clear()
+                self.plot_dist_hist.setEnabled(False)
+        except Exception:
+            pass
+        try:
+            if getattr(self, "plot_dist_kde", None) is not None:
+                self.plot_dist_kde.clear()
+                self.plot_dist_kde.setEnabled(False)
+        except Exception:
+            pass
+        try:
+            self._dist_box_scatter = None
+            if getattr(self, "plot_dist_box", None) is not None:
+                self.plot_dist_box.clear()
+                self.plot_dist_box.setEnabled(False)
+        except Exception:
+            pass
+        try:
+            if getattr(self, "tbl_dist", None) is not None:
+                self.tbl_dist.setRowCount(0)
+                self.tbl_dist.setEnabled(False)
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "lbl_dist_note"):
+                self.lbl_dist_note.setText(str(note or "Run metrics: —"))
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "lbl_dist_stats"):
+                self.lbl_dist_stats.setText("")
+        except Exception:
+            pass
+        self._update_workspace_status()
+
+    def _schedule_run_metrics_rebuild(self, *_args, delay_ms: int = 160) -> None:
+        timer = getattr(self, "_dist_timer", None)
+        if timer is None:
+            return
+        try:
+            timer.stop()
+        except Exception:
+            pass
+        try:
+            timer.start(int(delay_ms))
+        except Exception:
+            pass
+
+    def _on_run_metrics_signal_changed(self, _index: int) -> None:
+        try:
+            self.dist_signal_selected = str(self.combo_dist_signal.currentText() or "").strip()
+        except Exception:
+            self.dist_signal_selected = ""
+        self._schedule_run_metrics_rebuild(delay_ms=40)
+
+    def _on_run_metrics_mode_changed(self, _index: int) -> None:
+        try:
+            s = getattr(self, "_settings", None)
+            if s is not None:
+                s.setValue("dist_mode", self._run_metrics_mode_key())
+        except Exception:
+            pass
+        self._schedule_run_metrics_rebuild(delay_ms=40)
+
+    def _on_run_metrics_table_double_clicked(self, row: int, _col: int) -> None:
+        try:
+            item = self.tbl_dist.item(int(row), 1)
+            if item is None:
+                return
+            run_label = str(item.data(QtCore.Qt.UserRole) or item.text() or "").strip()
+        except Exception:
+            return
+        sig = str(getattr(self, "dist_signal_selected", "") or "").strip()
+        if run_label and sig:
+            self._focus_run_signal(run_label, sig)
+
+    def _on_run_metrics_bar_clicked(self, event) -> None:
+        cache = dict(getattr(self, "_dist_cache", {}) or {})
+        if not cache:
+            return
+        try:
+            pos = event.scenePos() if hasattr(event, "scenePos") else None
+            if pos is None:
+                return
+            vb = self.plot_dist_bar.getViewBox()
+            p = vb.mapSceneToView(pos)
+            idx = int(round(float(p.x())))
+        except Exception:
+            return
+        rows = list(cache.get("rows", []) or [])
+        if idx < 0 or idx >= len(rows):
+            return
+        row = dict(rows[idx] or {})
+        run_label = str(row.get("run") or "").strip()
+        sig = str(cache.get("signal") or "").strip()
+        if not run_label or not sig:
+            return
+        try:
+            self.tbl_dist.selectRow(idx)
+        except Exception:
+            pass
+        self._focus_run_signal(run_label, sig)
+
+    def _on_run_metrics_box_clicked(self, _item, points, *_args) -> None:
+        if points is None:
+            return
+        try:
+            if len(points) <= 0:
+                return
+        except Exception:
+            return
+        try:
+            point = points[0]
+            data = point.data()
+            if isinstance(data, np.ndarray):
+                data = data.tolist()
+            if isinstance(data, (list, tuple)):
+                data = data[0] if data else ""
+            run_label = str(data or "").strip()
+        except Exception:
+            return
+        cache = dict(getattr(self, "_dist_cache", {}) or {})
+        sig = str(cache.get("signal") or "").strip()
+        if not run_label or not sig:
+            return
+        try:
+            rows = list(cache.get("rows", []) or [])
+            for idx, row in enumerate(rows):
+                if str((row or {}).get("run") or "").strip() == run_label:
+                    self.tbl_dist.selectRow(int(idx))
+                    break
+        except Exception:
+            pass
+        self._focus_run_signal(run_label, sig)
+
+    def _run_metrics_density_curve(
+        self,
+        values: np.ndarray,
+        *,
+        points: int = 160,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        vals = np.asarray(values, dtype=float)
+        vals = vals[np.isfinite(vals)]
+        if vals.size <= 0:
+            return np.zeros(0, dtype=float), np.zeros(0, dtype=float)
+        if vals.size == 1:
+            center = float(vals[0])
+            span = max(1.0, abs(center) * 0.2, 1e-6)
+            xs = np.linspace(center - span, center + span, max(32, int(points)))
+            sigma = max(span / 5.0, 1e-6)
+            z = (xs - center) / sigma
+            ys = np.exp(-0.5 * z * z) / (sigma * np.sqrt(2.0 * np.pi))
+            return np.asarray(xs, dtype=float), np.asarray(ys, dtype=float)
+
+        vmin = float(np.nanmin(vals))
+        vmax = float(np.nanmax(vals))
+        spread = float(vmax - vmin)
+        std = float(np.nanstd(vals))
+        if not np.isfinite(std):
+            std = 0.0
+        if spread <= 1e-12:
+            center = float(np.nanmean(vals))
+            span = max(1.0, abs(center) * 0.2, 1e-6)
+            xs = np.linspace(center - span, center + span, max(32, int(points)))
+            sigma = max(span / 5.0, 1e-6)
+            z = (xs - center) / sigma
+            ys = np.exp(-0.5 * z * z) / (sigma * np.sqrt(2.0 * np.pi))
+            return np.asarray(xs, dtype=float), np.asarray(ys, dtype=float)
+
+        sigma = max(std, spread / 6.0, 1e-6)
+        n = float(len(vals))
+        bw = 1.06 * sigma * (n ** (-1.0 / 5.0))
+        if not np.isfinite(bw) or bw <= 0.0:
+            bw = max(spread / 12.0, sigma * 0.25, 1e-3)
+        lo = vmin - 3.0 * bw
+        hi = vmax + 3.0 * bw
+        xs = np.linspace(lo, hi, max(48, int(points)))
+        diffs = (xs[:, None] - vals[None, :]) / bw
+        kern = np.exp(-0.5 * diffs * diffs)
+        ys = np.sum(kern, axis=1) / (n * bw * np.sqrt(2.0 * np.pi))
+        return np.asarray(xs, dtype=float), np.asarray(ys, dtype=float)
+
+    def _rebuild_run_metrics(self) -> None:
+        combo_sig = getattr(self, "combo_dist_signal", None)
+        combo_mode = getattr(self, "combo_dist_mode", None)
+        if combo_sig is None or combo_mode is None:
+            return
+        runs = list(self._selected_runs())
+        if not runs:
+            self._clear_run_metrics_view("Выберите хотя бы один прогон (Runs).")
+            return
+        if combo_sig.count() <= 0:
+            self._refresh_run_metrics_signal_combo()
+        sig = str(combo_sig.currentText() or getattr(self, "dist_signal_selected", "") or "").strip()
+        if not sig:
+            self._clear_run_metrics_view("Выберите signal context для per-run compare.")
+            return
+
+        ref_run = self._reference_run(runs) or runs[0]
+        mode_key = self._run_metrics_mode_key()
+        metric_label = str(combo_mode.currentText() or "").strip() or "Run metric"
+
+        x_ref, y_ref, unit = self._get_xy(ref_run, sig)
+        if x_ref.size == 0 or y_ref.size == 0:
+            self._clear_run_metrics_view(f"{sig}: нет данных в текущей таблице для reference run.")
+            return
+
+        t_play = float("nan")
+        try:
+            remembered_t = getattr(self, "playhead_time_selected", None)
+            if remembered_t is not None and np.isfinite(float(remembered_t)):
+                t_play = float(remembered_t)
+        except Exception:
+            t_play = float("nan")
+        if not np.isfinite(t_play):
+            try:
+                if getattr(self, "_t_ref", np.asarray([])).size:
+                    idx = int(max(0, min(self.slider_time.value(), int(len(self._t_ref) - 1))))
+                    t_play = float(self._t_ref[idx])
+            except Exception:
+                t_play = float("nan")
+        if not np.isfinite(t_play) and x_ref.size:
+            try:
+                t_play = float(x_ref[0])
+            except Exception:
+                t_play = float("nan")
+
+        t0, t1, window_desc = self._current_metrics_time_window()
+        is_playhead_mode = mode_key in {"value_at_playhead", "delta_at_playhead"}
+        time_desc = f"playhead {t_play:.3f}s" if is_playhead_mode and np.isfinite(t_play) else window_desc
+
+        values: List[Dict[str, object]] = []
+        ref_interp = float(np.interp(float(t_play), x_ref, y_ref, left=np.nan, right=np.nan)) if np.isfinite(t_play) else float("nan")
+        lo = min(float(t0), float(t1)) if (t0 is not None and t1 is not None and np.isfinite(t0) and np.isfinite(t1)) else None
+        hi = max(float(t0), float(t1)) if (t0 is not None and t1 is not None and np.isfinite(t0) and np.isfinite(t1)) else None
+
+        ref_x_use = np.asarray(x_ref, dtype=float)
+        ref_y_use = np.asarray(y_ref, dtype=float)
+        if lo is not None and hi is not None and ref_x_use.size:
+            mask_ref = (ref_x_use >= lo) & (ref_x_use <= hi)
+            if bool(np.any(mask_ref)):
+                ref_x_use = ref_x_use[mask_ref]
+                ref_y_use = ref_y_use[mask_ref]
+
+        for run in runs:
+            x, y, _u = self._get_xy(run, sig)
+            if x.size == 0 or y.size == 0:
+                values.append({"run": str(run.label), "value": float("nan"), "is_ref": bool(run is ref_run)})
+                continue
+            v = float("nan")
+            if mode_key == "value_at_playhead":
+                if np.isfinite(t_play):
+                    try:
+                        v = float(np.interp(float(t_play), x, y, left=np.nan, right=np.nan))
+                    except Exception:
+                        v = float("nan")
+            elif mode_key == "delta_at_playhead":
+                if np.isfinite(t_play):
+                    try:
+                        y0 = float(np.interp(float(t_play), x, y, left=np.nan, right=np.nan))
+                    except Exception:
+                        y0 = float("nan")
+                    v = float(y0 - ref_interp) if np.isfinite(y0) and np.isfinite(ref_interp) else float("nan")
+            elif mode_key == "rms_window":
+                y_use = np.asarray(y, dtype=float)
+                if lo is not None and hi is not None and x.size:
+                    mask = (x >= lo) & (x <= hi)
+                    if bool(np.any(mask)):
+                        y_use = y_use[mask]
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    v = float(np.sqrt(np.nanmean(y_use * y_use))) if y_use.size else float("nan")
+            elif mode_key in {"rms_delta_window", "maxabs_delta_window"}:
+                if ref_x_use.size and ref_y_use.size:
+                    try:
+                        y_itp = np.interp(ref_x_use, x, y, left=np.nan, right=np.nan)
+                    except Exception:
+                        y_itp = np.asarray([], dtype=float)
+                    if y_itp.size:
+                        d = np.asarray(y_itp, dtype=float) - np.asarray(ref_y_use, dtype=float)
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore", RuntimeWarning)
+                            if mode_key == "rms_delta_window":
+                                v = float(np.sqrt(np.nanmean(d * d))) if d.size else float("nan")
+                            else:
+                                v = float(np.nanmax(np.abs(d))) if d.size else float("nan")
+            values.append({"run": str(run.label), "value": float(v), "is_ref": bool(run is ref_run)})
+
+        df = pd.DataFrame(values)
+        if df.empty or "value" not in df.columns:
+            self._clear_run_metrics_view("Недостаточно данных для per-run distributions.")
+            return
+        try:
+            df = df[np.isfinite(df["value"].values)].copy()
+        except Exception:
+            df = pd.DataFrame(columns=["run", "value", "is_ref"])
+        if df.empty:
+            self._clear_run_metrics_view("Недостаточно конечных значений для выбранной метрики.")
+            return
+
+        df.sort_values("value", ascending=False, inplace=True, kind="mergesort")
+        df.reset_index(drop=True, inplace=True)
+        df["rank"] = np.arange(1, len(df) + 1, dtype=int)
+
+        vals = np.asarray(df["value"].values, dtype=float)
+        mean_value = float(np.nanmean(vals)) if vals.size else float("nan")
+        median_value = float(np.nanmedian(vals)) if vals.size else float("nan")
+        std_value = float(np.nanstd(vals)) if vals.size else float("nan")
+        top_run = str(df.iloc[0]["run"]) if len(df) else ""
+        top_value = float(df.iloc[0]["value"]) if len(df) else float("nan")
+
+        line1, line2 = self._run_metrics_status_text(
+            signal_name=sig,
+            metric_label=metric_label,
+            table_name=str(getattr(self, "current_table", "") or ""),
+            ref_label=str(getattr(ref_run, "label", "") or ""),
+            rows_count=len(df),
+            unit=str(unit or ""),
+            top_run=top_run,
+            top_value=top_value,
+            mean_value=mean_value,
+            median_value=median_value,
+            std_value=std_value,
+            time_desc=time_desc,
+        )
+        try:
+            self.lbl_dist_note.setText(line1)
+        except Exception:
+            pass
+        try:
+            self.lbl_dist_stats.setText(line2)
+        except Exception:
+            pass
+
+        try:
+            self.tbl_dist.setSortingEnabled(False)
+            self.tbl_dist.clearContents()
+            self.tbl_dist.setRowCount(int(len(df)))
+            self.tbl_dist.setEnabled(True)
+            for i, rec in enumerate(df.itertuples(index=False)):
+                rank_item = QtWidgets.QTableWidgetItem(str(int(rec.rank)))
+                run_item = QtWidgets.QTableWidgetItem(_trim_label(str(rec.run), 26))
+                run_item.setToolTip(str(rec.run))
+                run_item.setData(QtCore.Qt.UserRole, str(rec.run))
+                val_item = QtWidgets.QTableWidgetItem(f"{float(rec.value):.6g}")
+                ref_item = QtWidgets.QTableWidgetItem("ref" if bool(rec.is_ref) else "")
+                for item in (rank_item, run_item, val_item, ref_item):
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+                if bool(rec.is_ref):
+                    for item in (rank_item, run_item, val_item, ref_item):
+                        item.setBackground(QtGui.QColor(255, 240, 214))
+                self.tbl_dist.setItem(i, 0, rank_item)
+                self.tbl_dist.setItem(i, 1, run_item)
+                self.tbl_dist.setItem(i, 2, val_item)
+                self.tbl_dist.setItem(i, 3, ref_item)
+            self.tbl_dist.setSortingEnabled(False)
+        except Exception:
+            pass
+
+        try:
+            self.plot_dist_bar.clear()
+            self.plot_dist_bar.setEnabled(True)
+            xs = np.arange(len(df), dtype=float)
+            ys = np.asarray(df["value"].values, dtype=float)
+            ref_mask = np.asarray(df["is_ref"].values, dtype=bool)
+            if np.any(~ref_mask):
+                bar = pg.BarGraphItem(
+                    x=xs[~ref_mask],
+                    height=ys[~ref_mask],
+                    width=0.75,
+                    brush=pg.mkBrush(90, 150, 230, 180),
+                    pen=pg.mkPen(50, 90, 150, 220),
+                )
+                self.plot_dist_bar.addItem(bar)
+            if np.any(ref_mask):
+                bar_ref = pg.BarGraphItem(
+                    x=xs[ref_mask],
+                    height=ys[ref_mask],
+                    width=0.75,
+                    brush=pg.mkBrush(235, 165, 40, 210),
+                    pen=pg.mkPen(150, 90, 20, 220),
+                )
+                self.plot_dist_bar.addItem(bar_ref)
+            self.plot_dist_bar.addItem(pg.InfiniteLine(pos=0.0, angle=0, pen=pg.mkPen((0, 0, 0, 70), width=1)))
+            ticks: List[Tuple[float, str]] = []
+            step = max(1, int(np.ceil(len(df) / 12.0)))
+            for i, rec in enumerate(df.itertuples(index=False)):
+                if (i % step) == 0 or i == int(len(df) - 1):
+                    ticks.append((float(i), _trim_label(str(rec.run), 14)))
+            try:
+                self.plot_dist_bar.getAxis("bottom").setTicks([ticks])
+            except Exception:
+                pass
+            self.plot_dist_bar.setXRange(-0.8, max(0.8, float(len(df) - 0.2)), padding=0)
+            self.plot_dist_bar.setLabel("left", f"{metric_label}{' [' + str(unit) + ']' if str(unit or '').strip() else ''}")
+            self.plot_dist_bar.setLabel("bottom", "runs (ranked)")
+        except Exception:
+            pass
+
+        try:
+            self.plot_dist_hist.clear()
+            self.plot_dist_hist.setEnabled(True)
+            if vals.size <= 1 or float(np.nanmin(vals)) == float(np.nanmax(vals)):
+                center = float(vals[0])
+                width = max(1e-6, abs(center) * 0.1, 1.0)
+                centers = np.asarray([center], dtype=float)
+                counts = np.asarray([1.0], dtype=float)
+            else:
+                nbins = min(40, max(8, int(np.sqrt(len(vals)) * 2)))
+                counts, edges = np.histogram(vals, bins=nbins)
+                centers = 0.5 * (edges[:-1] + edges[1:])
+                width = float(edges[1] - edges[0]) * 0.92 if len(edges) >= 2 else 1.0
+            hist_bar = pg.BarGraphItem(
+                x=np.asarray(centers, dtype=float),
+                height=np.asarray(counts, dtype=float),
+                width=float(width),
+                brush=pg.mkBrush(120, 120, 120, 170),
+                pen=pg.mkPen(90, 90, 90, 220),
+            )
+            self.plot_dist_hist.addItem(hist_bar)
+            if np.isfinite(mean_value):
+                ln_mean = pg.InfiniteLine(pos=float(mean_value), angle=90, pen=pg.mkPen((50, 120, 210, 210), width=2))
+                ln_mean.setToolTip("mean")
+                self.plot_dist_hist.addItem(ln_mean)
+            if np.isfinite(median_value):
+                ln_med = pg.InfiniteLine(pos=float(median_value), angle=90, pen=pg.mkPen((220, 140, 30, 210), width=2, style=QtCore.Qt.DashLine))
+                ln_med.setToolTip("median")
+                self.plot_dist_hist.addItem(ln_med)
+            ref_vals = df[df["is_ref"]]["value"].values
+            if len(ref_vals):
+                ref_v = float(ref_vals[0])
+                if np.isfinite(ref_v):
+                    ln_ref = pg.InfiniteLine(pos=ref_v, angle=90, pen=pg.mkPen((170, 40, 40, 210), width=1))
+                    ln_ref.setToolTip("reference")
+                    self.plot_dist_hist.addItem(ln_ref)
+            self.plot_dist_hist.setLabel("bottom", f"{metric_label}{' [' + str(unit) + ']' if str(unit or '').strip() else ''}")
+            self.plot_dist_hist.setLabel("left", "count")
+        except Exception:
+            pass
+
+        try:
+            self.plot_dist_kde.clear()
+            self.plot_dist_kde.setEnabled(True)
+            xs_kde, ys_kde = self._run_metrics_density_curve(vals)
+            if xs_kde.size and ys_kde.size and np.isfinite(ys_kde).any():
+                curve = pg.PlotDataItem(
+                    xs_kde,
+                    ys_kde,
+                    pen=pg.mkPen(70, 110, 190, 230, width=2),
+                    antialias=True,
+                )
+                self.plot_dist_kde.addItem(curve)
+                fill = pg.FillBetweenItem(
+                    curve,
+                    pg.PlotDataItem(xs_kde, np.zeros_like(xs_kde), pen=pg.mkPen(None)),
+                    brush=pg.mkBrush(120, 170, 230, 70),
+                )
+                self.plot_dist_kde.addItem(fill)
+            if np.isfinite(mean_value):
+                ln_mean_kde = pg.InfiniteLine(pos=float(mean_value), angle=90, pen=pg.mkPen((50, 120, 210, 210), width=2))
+                ln_mean_kde.setToolTip("mean")
+                self.plot_dist_kde.addItem(ln_mean_kde)
+            if np.isfinite(median_value):
+                ln_med_kde = pg.InfiniteLine(pos=float(median_value), angle=90, pen=pg.mkPen((220, 140, 30, 210), width=2, style=QtCore.Qt.DashLine))
+                ln_med_kde.setToolTip("median")
+                self.plot_dist_kde.addItem(ln_med_kde)
+            ref_vals = df[df["is_ref"]]["value"].values
+            if len(ref_vals):
+                ref_v = float(ref_vals[0])
+                if np.isfinite(ref_v):
+                    ln_ref_kde = pg.InfiniteLine(pos=ref_v, angle=90, pen=pg.mkPen((170, 40, 40, 210), width=1))
+                    ln_ref_kde.setToolTip("reference")
+                    self.plot_dist_kde.addItem(ln_ref_kde)
+            self.plot_dist_kde.setLabel("bottom", f"{metric_label}{' [' + str(unit) + ']' if str(unit or '').strip() else ''}")
+            self.plot_dist_kde.setLabel("left", "density")
+        except Exception:
+            pass
+
+        try:
+            self._dist_box_scatter = None
+            self.plot_dist_box.clear()
+            self.plot_dist_box.setEnabled(True)
+            self.plot_dist_box.setLabel("left", f"{metric_label}{' [' + str(unit) + ']' if str(unit or '').strip() else ''}")
+            self.plot_dist_box.setLabel("bottom", "")
+            self.plot_dist_box.setXRange(-0.7, 0.7, padding=0)
+            try:
+                self.plot_dist_box.getAxis("bottom").setTicks([[]])
+            except Exception:
+                pass
+
+            q1 = float(np.nanpercentile(vals, 25))
+            q2 = float(np.nanpercentile(vals, 50))
+            q3 = float(np.nanpercentile(vals, 75))
+            iqr = float(q3 - q1)
+            low_bound = float(q1 - 1.5 * iqr)
+            high_bound = float(q3 + 1.5 * iqr)
+            inlier_vals = vals[np.isfinite(vals) & (vals >= low_bound) & (vals <= high_bound)]
+            whisk_lo = float(np.nanmin(inlier_vals)) if inlier_vals.size else float(np.nanmin(vals))
+            whisk_hi = float(np.nanmax(inlier_vals)) if inlier_vals.size else float(np.nanmax(vals))
+
+            box_item = pg.BarGraphItem(
+                x=np.asarray([0.0], dtype=float),
+                y0=np.asarray([q1], dtype=float),
+                height=np.asarray([max(1e-12, q3 - q1)], dtype=float),
+                width=0.34,
+                brush=pg.mkBrush(150, 150, 150, 80),
+                pen=pg.mkPen(100, 100, 100, 220),
+            )
+            self.plot_dist_box.addItem(box_item)
+            for x0, x1, y0, y1, pen in [
+                (0.0, 0.0, whisk_lo, q1, pg.mkPen(90, 90, 90, 220, width=1)),
+                (0.0, 0.0, q3, whisk_hi, pg.mkPen(90, 90, 90, 220, width=1)),
+                (-0.18, 0.18, q2, q2, pg.mkPen(220, 140, 30, 230, width=2)),
+                (-0.11, 0.11, whisk_lo, whisk_lo, pg.mkPen(90, 90, 90, 220, width=1)),
+                (-0.11, 0.11, whisk_hi, whisk_hi, pg.mkPen(90, 90, 90, 220, width=1)),
+            ]:
+                self.plot_dist_box.addItem(pg.PlotDataItem([x0, x1], [y0, y1], pen=pen))
+
+            ref_vals = df[df["is_ref"]]["value"].values
+            if len(ref_vals):
+                ref_v = float(ref_vals[0])
+                if np.isfinite(ref_v):
+                    ln_ref_box = pg.InfiniteLine(pos=ref_v, angle=0, pen=pg.mkPen((170, 40, 40, 210), width=1, style=QtCore.Qt.DashLine))
+                    ln_ref_box.setToolTip("reference")
+                    self.plot_dist_box.addItem(ln_ref_box)
+
+            count_vals = int(len(vals))
+            if count_vals <= 1:
+                jit = np.asarray([0.0], dtype=float)
+            else:
+                order = np.arange(count_vals, dtype=float)
+                span = min(0.24, 0.04 * max(1.0, np.ceil(np.sqrt(count_vals))))
+                centered = order - float((count_vals - 1) / 2.0)
+                scale = max(1.0, float(np.max(np.abs(centered))))
+                jit = (centered / scale) * span
+
+            spots = []
+            for j, rec in enumerate(df.itertuples(index=False)):
+                is_ref = bool(rec.is_ref)
+                spots.append(
+                    {
+                        "pos": (float(jit[j]), float(rec.value)),
+                        "data": str(rec.run),
+                        "size": 12 if is_ref else 10,
+                        "brush": pg.mkBrush(235, 165, 40, 220) if is_ref else pg.mkBrush(90, 150, 230, 185),
+                        "pen": pg.mkPen(150, 90, 20, 220) if is_ref else pg.mkPen(50, 90, 150, 210),
+                        "symbol": "o",
+                    }
+                )
+            scatter = pg.ScatterPlotItem(pxMode=True)
+            scatter.addPoints(spots)
+            try:
+                scatter.sigClicked.connect(self._on_run_metrics_box_clicked)
+            except Exception:
+                pass
+            self.plot_dist_box.addItem(scatter)
+            self._dist_box_scatter = scatter
+        except Exception:
+            pass
+
+        self._dist_cache = {
+            "signal": sig,
+            "metric_key": mode_key,
+            "metric_label": metric_label,
+            "time_desc": time_desc,
+            "table_name": str(getattr(self, "current_table", "") or ""),
+            "ref_label": str(getattr(ref_run, "label", "") or ""),
+            "unit": str(unit or ""),
+            "rows": df[["run", "value", "is_ref"]].to_dict("records"),
+        }
+        self._update_workspace_status()
+
+
+    # ---------------- Static (t0) / stroke check ----------------
+
+    def _stroke_signal_names(self, columns: Sequence[object]) -> List[str]:
+        out: List[str] = []
+        seen: Set[str] = set()
+        for col in columns or []:
+            name = str(col or "").strip()
+            if not name:
+                continue
+            low = name.lower()
+            if ("шток" not in low) and ("stroke" not in low):
+                continue
+            if name in seen:
+                continue
+            out.append(name)
+            seen.add(name)
+        return out
+
+    def _run_stroke_length_m(self, run: Run) -> Optional[float]:
+        meta = getattr(run, "meta", None)
+        if not isinstance(meta, dict):
+            meta = {}
+        for key in ("L_stroke_m", "ход_штока_м"):
+            try:
+                value = meta.get(key)
+                if value is None:
+                    continue
+                value_f = float(value)
+                if np.isfinite(value_f) and value_f > 0.0:
+                    return float(value_f)
+            except Exception:
+                pass
+        try:
+            flat = infl_flatten_meta_numeric(meta) if callable(infl_flatten_meta_numeric) else {}
+        except Exception:
+            flat = {}
+        if isinstance(flat, dict):
+            for key, value in flat.items():
+                low = str(key or "").strip().lower()
+                if not low:
+                    continue
+                if not (low.endswith("l_stroke_m") or low.endswith("ход_штока_м")):
+                    continue
+                try:
+                    value_f = float(value)
+                except Exception:
+                    continue
+                if np.isfinite(value_f) and value_f > 0.0:
+                    return float(value_f)
+        return None
+
+    def _static_stroke_signal_table_map(self, run: Run) -> Dict[str, str]:
+        table_map: Dict[str, str] = {}
+        candidates: List[str] = []
+        for candidate in [str(getattr(self, "current_table", "") or "").strip(), "main", "full"]:
+            if candidate and candidate in getattr(run, "tables", {}) and candidate not in candidates:
+                candidates.append(candidate)
+        for candidate in sorted([str(x) for x in getattr(run, "tables", {}).keys() if str(x).strip()]):
+            if candidate not in candidates:
+                candidates.append(candidate)
+        for table_name in candidates:
+            df = run.tables.get(table_name)
+            if df is None or df.empty:
+                continue
+            for sig in self._stroke_signal_names(list(df.columns)):
+                table_map.setdefault(sig, str(table_name))
+        return table_map
+
+    def _static_stroke_default_note(self) -> str:
+        return (
+            "Static (t0) / stroke check: look for rods sitting far from ~50% stroke at startup. "
+            "Cells show stroke % when L_stroke_m is available, otherwise raw transformed t0."
+        )
+
+    def _static_stroke_color(
+        self,
+        dev_from_50_pct: float,
+        max_abs_dev_pct: float,
+        *,
+        is_ref: bool = False,
+        has_pct: bool = True,
+    ) -> QtGui.QColor:
+        try:
+            if is_ref:
+                return QtGui.QColor(255, 240, 214)
+            if not has_pct or not np.isfinite(float(dev_from_50_pct)):
+                return QtGui.QColor(244, 244, 244)
+            vmax = float(max(max_abs_dev_pct, 5.0))
+            a = min(1.0, abs(float(dev_from_50_pct)) / vmax)
+            k = int(130 * a)
+            if float(dev_from_50_pct) >= 0.0:
+                return QtGui.QColor(255, 255 - k, 255 - k)
+            return QtGui.QColor(255 - k, 255 - k, 255)
+        except Exception:
+            return QtGui.QColor(244, 244, 244)
+
+    def _static_stroke_status_text(
+        self,
+        *,
+        ref_label: str,
+        runs_count: int,
+        signals_count: int,
+        worst_run: str,
+        worst_signal: str,
+        worst_pct: float,
+        worst_dev_pct: float,
+        have_pct: bool,
+        missing_pct_count: int,
+    ) -> Tuple[str, str]:
+        line1 = (
+            f"Static (t0) / stroke check | ref={ref_label or '—'} | runs={int(runs_count)} | "
+            f"stroke signals={int(signals_count)} | goal≈50% stroke"
+        )
+        if have_pct and worst_run and worst_signal and np.isfinite(float(worst_pct)):
+            line2 = (
+                f"Worst startup offset: {worst_signal} in {worst_run} = {float(worst_pct):.1f}% "
+                f"({float(worst_dev_pct):+.1f} pp from 50%). Click a cell to inspect the waveform."
+            )
+        else:
+            line2 = "L_stroke_m metadata is missing, so cells show raw transformed t0 values only."
+        if int(missing_pct_count) > 0 and have_pct:
+            line2 = f"{line2} {int(missing_pct_count)} cell(s) still have no stroke %."
+        return line1, line2
+
+    def _build_static_stroke_dock(self) -> None:
+        dock = QtWidgets.QDockWidget("Static (t0) / stroke check", self)
+        dock.setObjectName("dock_static_stroke")
+        dock.setAllowedAreas(
+            QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea | QtCore.Qt.BottomDockWidgetArea
+        )
+
+        root = QtWidgets.QWidget()
+        lay = QtWidgets.QVBoxLayout(root)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(6)
+
+        self.lbl_static_stroke_note = QtWidgets.QLabel(self._static_stroke_default_note())
+        self.lbl_static_stroke_note.setWordWrap(True)
+        lay.addWidget(self.lbl_static_stroke_note)
+
+        self.lbl_static_stroke_stats = QtWidgets.QLabel("")
+        self.lbl_static_stroke_stats.setWordWrap(True)
+        self.lbl_static_stroke_stats.setStyleSheet("color:#666;")
+        lay.addWidget(self.lbl_static_stroke_stats)
+
+        self.tbl_static_stroke = QtWidgets.QTableWidget()
+        self.tbl_static_stroke.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectItems)
+        self.tbl_static_stroke.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.tbl_static_stroke.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.tbl_static_stroke.setAlternatingRowColors(True)
+        self.tbl_static_stroke.setEnabled(False)
+        try:
+            self.tbl_static_stroke.cellClicked.connect(self._on_static_stroke_cell_clicked)
+        except Exception:
+            pass
+        lay.addWidget(self.tbl_static_stroke, 1)
+
+        dock.setWidget(root)
+        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+        try:
+            anchor = getattr(self, "dock_run_metrics", None) or getattr(self, "dock_heatmap", None)
+            if anchor is not None:
+                self.tabifyDockWidget(anchor, dock)
+        except Exception:
+            pass
+        self.dock_static_stroke = dock
+        self._clear_static_stroke_view()
+
+    def _clear_static_stroke_view(self, note: str = "") -> None:
+        self._static_stroke_cache = None
+        try:
+            if getattr(self, "tbl_static_stroke", None) is not None:
+                self.tbl_static_stroke.clear()
+                self.tbl_static_stroke.setRowCount(0)
+                self.tbl_static_stroke.setColumnCount(0)
+                self.tbl_static_stroke.setEnabled(False)
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "lbl_static_stroke_note"):
+                self.lbl_static_stroke_note.setText(str(note or self._static_stroke_default_note()))
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "lbl_static_stroke_stats"):
+                self.lbl_static_stroke_stats.setText("")
+        except Exception:
+            pass
+        self._update_workspace_status()
+
+    def _schedule_static_stroke_rebuild(self, *_args, delay_ms: int = 120) -> None:
+        timer = getattr(self, "_static_timer", None)
+        if timer is None:
+            return
+        try:
+            timer.stop()
+        except Exception:
+            pass
+        try:
+            timer.start(int(delay_ms))
+        except Exception:
+            pass
+
+    def _rebuild_static_stroke_view(self) -> None:
+        tbl = getattr(self, "tbl_static_stroke", None)
+        if tbl is None:
+            return
+        runs = self._ordered_runs_for_reference(self._selected_runs())
+        if not runs:
+            self._clear_static_stroke_view("Static (t0) / stroke check: выберите хотя бы один run.")
+            return
+
+        run_labels = [str(getattr(run, "label", "") or "") for run in runs]
+        run_tables = [self._static_stroke_signal_table_map(run) for run in runs]
+        sig_labels = sorted({sig for mapping in run_tables for sig in mapping.keys()})
+        if not sig_labels:
+            self._clear_static_stroke_view(
+                "Static (t0) / stroke check: не найдено сигналов штока в current/main/full таблицах."
+            )
+            return
+
+        raw_t0 = np.full((len(sig_labels), len(run_labels)), np.nan, dtype=float)
+        time_s = np.full((len(sig_labels), len(run_labels)), np.nan, dtype=float)
+        stroke_pct = np.full((len(sig_labels), len(run_labels)), np.nan, dtype=float)
+        dev_pct = np.full((len(sig_labels), len(run_labels)), np.nan, dtype=float)
+        unit_map: Dict[str, str] = {}
+        payload_map: Dict[Tuple[int, int], Dict[str, object]] = {}
+
+        for j_run, run in enumerate(runs):
+            stroke_len_m = self._run_stroke_length_m(run)
+            for i_sig, sig in enumerate(sig_labels):
+                table_name = str(run_tables[j_run].get(sig, "") or "").strip()
+                if not table_name:
+                    continue
+                x, y, unit = self._get_xy_from_table(
+                    run,
+                    sig,
+                    table_name=table_name,
+                    apply_zero_baseline=False,
+                )
+                if x.size == 0 or y.size == 0:
+                    continue
+                x = np.asarray(x, dtype=float)
+                y = np.asarray(y, dtype=float)
+                mask = np.isfinite(x) & np.isfinite(y)
+                if not np.any(mask):
+                    continue
+                idx0 = int(np.flatnonzero(mask)[0])
+                t0 = float(x[idx0])
+                v0 = float(y[idx0])
+                raw_t0[i_sig, j_run] = v0
+                time_s[i_sig, j_run] = t0
+                unit_map.setdefault(sig, str(unit or ""))
+                if stroke_len_m is not None and stroke_len_m > 1e-9 and str(unit or "").lower() in {"mm", "m"}:
+                    denom = float(stroke_len_m) * (1000.0 if str(unit).lower() == "mm" else 1.0)
+                    if np.isfinite(denom) and denom > 0.0:
+                        pct = float(v0 / denom * 100.0)
+                        stroke_pct[i_sig, j_run] = pct
+                        dev_pct[i_sig, j_run] = float(pct - 50.0)
+                payload_map[(i_sig, j_run)] = {
+                    "run": str(getattr(run, "label", "") or ""),
+                    "signal": str(sig),
+                    "time_s": float(t0),
+                    "raw_t0": float(v0),
+                    "unit": str(unit or ""),
+                    "table": str(table_name),
+                    "stroke_length_m": None if stroke_len_m is None else float(stroke_len_m),
+                    "stroke_pct": float(stroke_pct[i_sig, j_run]) if np.isfinite(stroke_pct[i_sig, j_run]) else float("nan"),
+                    "dev_from_50_pct": float(dev_pct[i_sig, j_run]) if np.isfinite(dev_pct[i_sig, j_run]) else float("nan"),
+                    "is_ref": bool(j_run == 0),
+                }
+
+        finite_pct = stroke_pct[np.isfinite(stroke_pct)]
+        finite_dev = dev_pct[np.isfinite(dev_pct)]
+        have_pct = finite_pct.size > 0
+        max_abs_dev = float(np.nanmax(np.abs(finite_dev))) if finite_dev.size else 5.0
+        missing_pct_count = int(np.count_nonzero(np.isfinite(raw_t0) & ~np.isfinite(stroke_pct)))
+
+        try:
+            tbl.setSortingEnabled(False)
+            tbl.clear()
+            tbl.setRowCount(len(sig_labels))
+            tbl.setColumnCount(len(run_labels))
+            tbl.setHorizontalHeaderLabels([_trim_label(label, 18) for label in run_labels])
+            tbl.setVerticalHeaderLabels([_trim_label(label, 28) for label in sig_labels])
+            for col, run_label in enumerate(run_labels):
+                item = tbl.horizontalHeaderItem(col)
+                if item is not None:
+                    item.setToolTip(str(run_label))
+            for row, sig in enumerate(sig_labels):
+                item = tbl.verticalHeaderItem(row)
+                if item is not None:
+                    item.setToolTip(str(sig))
+            for row, sig in enumerate(sig_labels):
+                for col, run_label in enumerate(run_labels):
+                    payload = dict(payload_map.get((row, col), {}) or {})
+                    pct = float(payload.get("stroke_pct", np.nan))
+                    raw = float(payload.get("raw_t0", np.nan))
+                    dev = float(payload.get("dev_from_50_pct", np.nan))
+                    unit = str(payload.get("unit") or "")
+                    unit_txt = f" [{unit}]" if unit else ""
+                    if np.isfinite(pct):
+                        text = f"{pct:.1f}%"
+                    elif np.isfinite(raw):
+                        text = f"{raw:.4g}"
+                    else:
+                        text = ""
+                    item = QtWidgets.QTableWidgetItem(text)
+                    item.setTextAlignment(QtCore.Qt.AlignCenter)
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+                    item.setBackground(
+                        self._static_stroke_color(
+                            dev,
+                            max_abs_dev,
+                            is_ref=bool(payload.get("is_ref", False)),
+                            has_pct=bool(np.isfinite(pct)),
+                        )
+                    )
+                    if payload:
+                        tooltip = [
+                            f"sig: {sig}",
+                            f"run: {run_label}",
+                            f"table: {str(payload.get('table') or '—')}",
+                            f"t0: {float(payload.get('time_s', np.nan)):.6f} s" if np.isfinite(float(payload.get("time_s", np.nan))) else "t0: —",
+                            f"value @ t0: {raw:.6g}{unit_txt}" if np.isfinite(raw) else "value @ t0: —",
+                        ]
+                        stroke_len_m = payload.get("stroke_length_m")
+                        if stroke_len_m is not None and np.isfinite(float(stroke_len_m)):
+                            tooltip.append(f"L_stroke: {float(stroke_len_m):.6g} m")
+                        if np.isfinite(pct):
+                            tooltip.append(f"stroke %: {pct:.3f}%")
+                        if np.isfinite(dev):
+                            tooltip.append(f"dev from 50%: {dev:+.3f} pp")
+                        item.setToolTip("\n".join(tooltip))
+                    else:
+                        item.setToolTip(f"sig: {sig}\nrun: {run_label}\nNo static stroke value available.")
+                    item.setData(QtCore.Qt.UserRole, payload)
+                    tbl.setItem(row, col, item)
+            try:
+                hdr = tbl.horizontalHeader()
+                hdr.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+                tbl.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+            except Exception:
+                pass
+            tbl.setEnabled(True)
+        except Exception:
+            self._clear_static_stroke_view("Static (t0) / stroke check: не удалось собрать таблицу.")
+            return
+
+        worst_run = ""
+        worst_signal = ""
+        worst_pct = float("nan")
+        worst_dev = float("nan")
+        if finite_dev.size > 0:
+            idx_flat = int(np.nanargmax(np.abs(dev_pct)))
+            row_w, col_w = np.unravel_index(idx_flat, dev_pct.shape)
+            worst_signal = str(sig_labels[int(row_w)] or "")
+            worst_run = str(run_labels[int(col_w)] or "")
+            worst_pct = float(stroke_pct[int(row_w), int(col_w)])
+            worst_dev = float(dev_pct[int(row_w), int(col_w)])
+
+        line1, line2 = self._static_stroke_status_text(
+            ref_label=str(run_labels[0] if run_labels else ""),
+            runs_count=len(run_labels),
+            signals_count=len(sig_labels),
+            worst_run=worst_run,
+            worst_signal=worst_signal,
+            worst_pct=worst_pct,
+            worst_dev_pct=worst_dev,
+            have_pct=bool(have_pct),
+            missing_pct_count=missing_pct_count,
+        )
+        try:
+            self.lbl_static_stroke_note.setText(line1)
+        except Exception:
+            pass
+        try:
+            self.lbl_static_stroke_stats.setText(line2)
+        except Exception:
+            pass
+
+        self._static_stroke_cache = {
+            "runs": list(run_labels),
+            "signals": list(sig_labels),
+            "raw_t0": raw_t0,
+            "time_s": time_s,
+            "stroke_pct": stroke_pct,
+            "dev_pct": dev_pct,
+        }
+        self._update_workspace_status()
+
+    def _on_static_stroke_cell_clicked(self, row: int, col: int) -> None:
+        tbl = getattr(self, "tbl_static_stroke", None)
+        if tbl is None:
+            return
+        try:
+            item = tbl.item(int(row), int(col))
+        except Exception:
+            item = None
+        if item is None:
+            return
+        try:
+            payload = dict(item.data(QtCore.Qt.UserRole) or {})
+        except Exception:
+            payload = {}
+        run_label = str(payload.get("run") or "").strip()
+        sig = str(payload.get("signal") or "").strip()
+        if not run_label or not sig:
+            return
+        if not self._focus_run_signal(run_label, sig):
+            return
+        try:
+            t0 = float(payload.get("time_s", np.nan))
+            if np.isfinite(t0):
+                self._set_playhead_time(t0)
+        except Exception:
+            pass
+
+
+    # ---------------- Geometry acceptance (frame / wheel / road) ----------------
+
+    def _geometry_gate_color(self, gate: str) -> QtGui.QColor:
+        gate_txt = str(gate or "MISSING").strip().upper()
+        if gate_txt == "FAIL":
+            return QtGui.QColor(255, 219, 219)
+        if gate_txt == "WARN":
+            return QtGui.QColor(255, 243, 208)
+        if gate_txt == "PASS":
+            return QtGui.QColor(220, 247, 220)
+        return QtGui.QColor(242, 242, 242)
+
+    def _focus_run_label_preserving_context(self, run_label: str) -> bool:
+        label_txt = str(run_label or "").strip()
+        if not label_txt or not hasattr(self, "list_runs"):
+            return False
+        target_row = -1
+        for i in range(self.list_runs.count()):
+            it = self.list_runs.item(i)
+            if it is not None and str(it.text()) == label_txt:
+                target_row = i
+                break
+        if target_row < 0:
+            return False
+        run_added = False
+        try:
+            self.list_runs.blockSignals(True)
+            it = self.list_runs.item(target_row)
+            if it is not None:
+                if not it.isSelected():
+                    it.setSelected(True)
+                    run_added = True
+                self._set_current_list_row(self.list_runs, target_row)
+            self._runs_selection_explicit = True
+            self.runs_selected_paths = [
+                self._normalized_run_path(getattr(run, "path", Path("")))
+                for run in self._selected_runs()
+            ]
+        finally:
+            try:
+                self.list_runs.blockSignals(False)
+            except Exception:
+                pass
+        if run_added:
+            self._on_run_selection_changed()
+        else:
+            self._update_workspace_status()
+        return True
+
+    def _geometry_acceptance_status_text(
+        self,
+        *,
+        runs_count: int,
+        gate_counts: Dict[str, int],
+        worst_run: str,
+        worst_gate: str,
+        worst_reason: str,
+    ) -> Tuple[str, str]:
+        parts = []
+        for gate in ("FAIL", "WARN", "PASS", "MISSING"):
+            n = int(gate_counts.get(gate, 0) or 0)
+            if n > 0:
+                parts.append(f"{gate}={n}")
+        counts_txt = " | ".join(parts) if parts else "no gates"
+        line1 = f"Geometry acceptance | runs={int(runs_count)} | {counts_txt}"
+        if worst_run and worst_gate:
+            line2 = f"Worst run: {worst_run} [{worst_gate}]"
+            if str(worst_reason or "").strip():
+                line2 = f"{line2} | {str(worst_reason).strip()}"
+        else:
+            line2 = "No geometry acceptance payloads are available for the current selection."
+        return line1, line2
+
+    def _build_geometry_acceptance_dock(self) -> None:
+        dock = QtWidgets.QDockWidget("Geometry acceptance", self)
+        dock.setObjectName("dock_geometry_acceptance")
+        dock.setAllowedAreas(
+            QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea | QtCore.Qt.BottomDockWidgetArea
+        )
+
+        root = QtWidgets.QWidget()
+        lay = QtWidgets.QVBoxLayout(root)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(6)
+
+        self.lbl_geometry_note = QtWidgets.QLabel(
+            "Geometry acceptance checks the frame / wheel / road solver-point contract across selected runs."
+        )
+        self.lbl_geometry_note.setWordWrap(True)
+        lay.addWidget(self.lbl_geometry_note)
+
+        self.lbl_geometry_stats = QtWidgets.QLabel("")
+        self.lbl_geometry_stats.setWordWrap(True)
+        self.lbl_geometry_stats.setStyleSheet("color:#666;")
+        lay.addWidget(self.lbl_geometry_stats)
+
+        tabs = QtWidgets.QTabWidget()
+
+        tab_matrix = QtWidgets.QWidget()
+        mv = QtWidgets.QVBoxLayout(tab_matrix)
+        mv.setContentsMargins(6, 6, 6, 6)
+        mv.setSpacing(6)
+        self.lbl_geometry_matrix = QtWidgets.QLabel(
+            "Gate matrix: rows are corners, columns are runs. Click a cell to focus the corresponding run."
+        )
+        self.lbl_geometry_matrix.setWordWrap(True)
+        self.lbl_geometry_matrix.setStyleSheet("color:#666;")
+        mv.addWidget(self.lbl_geometry_matrix)
+        self.tbl_geometry_gate_matrix = QtWidgets.QTableWidget()
+        self.tbl_geometry_gate_matrix.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectItems)
+        self.tbl_geometry_gate_matrix.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.tbl_geometry_gate_matrix.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.tbl_geometry_gate_matrix.setAlternatingRowColors(False)
+        self.tbl_geometry_gate_matrix.setEnabled(False)
+        try:
+            self.tbl_geometry_gate_matrix.cellClicked.connect(self._on_geometry_acceptance_matrix_clicked)
+            self.tbl_geometry_gate_matrix.cellDoubleClicked.connect(self._on_geometry_acceptance_matrix_clicked)
+        except Exception:
+            pass
+        mv.addWidget(self.tbl_geometry_gate_matrix, 1)
+        tabs.addTab(tab_matrix, "Gate matrix")
+
+        tab_summary = QtWidgets.QWidget()
+        sv = QtWidgets.QVBoxLayout(tab_summary)
+        sv.setContentsMargins(6, 6, 6, 6)
+        sv.setSpacing(6)
+        self.tbl_geometry_summary = QtWidgets.QTableWidget()
+        self.tbl_geometry_summary.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.tbl_geometry_summary.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.tbl_geometry_summary.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.tbl_geometry_summary.setAlternatingRowColors(True)
+        self.tbl_geometry_summary.setEnabled(False)
+        try:
+            self.tbl_geometry_summary.cellDoubleClicked.connect(self._on_geometry_acceptance_summary_clicked)
+        except Exception:
+            pass
+        sv.addWidget(self.tbl_geometry_summary, 1)
+        tabs.addTab(tab_summary, "Runs")
+
+        tab_corner = QtWidgets.QWidget()
+        cv = QtWidgets.QVBoxLayout(tab_corner)
+        cv.setContentsMargins(6, 6, 6, 6)
+        cv.setSpacing(6)
+        self.tbl_geometry_corners = QtWidgets.QTableWidget()
+        self.tbl_geometry_corners.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.tbl_geometry_corners.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.tbl_geometry_corners.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.tbl_geometry_corners.setAlternatingRowColors(True)
+        self.tbl_geometry_corners.setEnabled(False)
+        try:
+            self.tbl_geometry_corners.cellDoubleClicked.connect(self._on_geometry_acceptance_corner_clicked)
+        except Exception:
+            pass
+        cv.addWidget(self.tbl_geometry_corners, 1)
+        tabs.addTab(tab_corner, "Per-corner")
+
+        tab_detail = QtWidgets.QWidget()
+        dv = QtWidgets.QVBoxLayout(tab_detail)
+        dv.setContentsMargins(6, 6, 6, 6)
+        dv.setSpacing(6)
+        self.txt_geometry_details = QtWidgets.QPlainTextEdit()
+        self.txt_geometry_details.setReadOnly(True)
+        self.txt_geometry_details.setPlaceholderText("Detailed geometry acceptance summary will appear here.")
+        dv.addWidget(self.txt_geometry_details, 1)
+        tabs.addTab(tab_detail, "Details")
+
+        lay.addWidget(tabs, 1)
+
+        dock.setWidget(root)
+        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+        try:
+            qa = getattr(self, "dock_qa", None)
+            events = getattr(self, "dock_events", None)
+            if qa is not None:
+                self.tabifyDockWidget(qa, dock)
+            elif events is not None:
+                self.tabifyDockWidget(events, dock)
+        except Exception:
+            pass
+        self.dock_geometry_acceptance = dock
+        self._clear_geometry_acceptance_view()
+
+    def _clear_geometry_acceptance_view(self, note: str = "") -> None:
+        self._geometry_acceptance_cache = None
+        for attr in ("tbl_geometry_gate_matrix", "tbl_geometry_summary", "tbl_geometry_corners"):
+            tbl = getattr(self, attr, None)
+            if tbl is None:
+                continue
+            try:
+                tbl.clear()
+                tbl.setRowCount(0)
+                tbl.setColumnCount(0)
+                tbl.setEnabled(False)
+            except Exception:
+                pass
+        try:
+            if getattr(self, "txt_geometry_details", None) is not None:
+                self.txt_geometry_details.setPlainText("")
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "lbl_geometry_note"):
+                self.lbl_geometry_note.setText(
+                    str(note or "Geometry acceptance: select runs to inspect frame / wheel / road contract health.")
+                )
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "lbl_geometry_stats"):
+                self.lbl_geometry_stats.setText("")
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "lbl_geometry_matrix"):
+                self.lbl_geometry_matrix.setText(
+                    "Gate matrix: rows are corners, columns are runs. Click a cell to focus the corresponding run."
+                )
+        except Exception:
+            pass
+        self._update_workspace_status()
+
+    def _schedule_geometry_acceptance_rebuild(self, *_args, delay_ms: int = 120) -> None:
+        timer = getattr(self, "_geometry_timer", None)
+        if timer is None:
+            return
+        try:
+            timer.stop()
+        except Exception:
+            pass
+        try:
+            timer.start(int(delay_ms))
+        except Exception:
+            pass
+
+    def _rebuild_geometry_acceptance_view(self) -> None:
+        tbl_matrix = getattr(self, "tbl_geometry_gate_matrix", None)
+        tbl_summary = getattr(self, "tbl_geometry_summary", None)
+        tbl_corners = getattr(self, "tbl_geometry_corners", None)
+        txt_details = getattr(self, "txt_geometry_details", None)
+        if tbl_matrix is None or tbl_summary is None or tbl_corners is None or txt_details is None:
+            return
+
+        runs = list(self._selected_runs())
+        if not runs:
+            self._clear_geometry_acceptance_view("Geometry acceptance: выберите хотя бы один run.")
+            return
+
+        gate_rank = {"FAIL": 3, "WARN": 2, "PASS": 1, "MISSING": 0}
+        summary_rows: List[Dict[str, object]] = []
+        corner_rows: List[Dict[str, object]] = []
+        detail_lines: List[str] = []
+        gate_counts = {"FAIL": 0, "WARN": 0, "PASS": 0, "MISSING": 0}
+        worst_run = ""
+        worst_gate = ""
+        worst_reason = ""
+        worst_rank = -1
+
+        for run in runs:
+            run_label = str(getattr(run, "label", "") or "").strip()
+            acc = dict(getattr(run, "geometry_acceptance", {}) or {})
+            gate = str(acc.get("release_gate") or ("MISSING" if not acc else "PASS")).strip().upper()
+            if gate not in gate_counts:
+                gate = "MISSING"
+            reason = str(acc.get("release_gate_reason") or ("geometry acceptance data missing" if not acc else "")).strip()
+            fr_min = acc.get("frame_road_min_m")
+            wr_min = acc.get("wheel_road_min_m")
+            worst_corner = str(acc.get("worst_corner") or "").strip()
+            worst_metric = str(acc.get("worst_metric") or "").strip()
+            worst_value_m = acc.get("worst_value_m")
+            try:
+                worst_value_mm = float(worst_value_m) * 1000.0 if worst_value_m is not None else None
+            except Exception:
+                worst_value_mm = None
+            summary_rows.append(
+                {
+                    "run": run_label,
+                    "gate": gate,
+                    "reason": reason,
+                    "frame_road_min_m": fr_min,
+                    "wheel_road_min_m": wr_min,
+                    "worst_corner": worst_corner,
+                    "worst_metric": worst_metric,
+                    "worst_value_mm": worst_value_mm,
+                }
+            )
+            gate_counts[gate] = int(gate_counts.get(gate, 0) or 0) + 1
+            rank = int(gate_rank.get(gate, 0))
+            if rank > worst_rank:
+                worst_rank = rank
+                worst_run = run_label
+                worst_gate = gate
+                worst_reason = reason
+            try:
+                detail_lines.extend(format_geometry_acceptance_summary_lines(acc, label=run_label))
+            except Exception:
+                pass
+            try:
+                rows = build_geometry_acceptance_rows(acc) if acc else []
+            except Exception:
+                rows = []
+            for row in rows:
+                row_out = dict(row or {})
+                row_out["run"] = run_label
+                corner_rows.append(row_out)
+
+        if not summary_rows:
+            self._clear_geometry_acceptance_view("Geometry acceptance: нет данных для текущего выбора.")
+            return
+
+        line1, line2 = self._geometry_acceptance_status_text(
+            runs_count=len(summary_rows),
+            gate_counts=gate_counts,
+            worst_run=worst_run,
+            worst_gate=worst_gate,
+            worst_reason=worst_reason,
+        )
+        try:
+            self.lbl_geometry_note.setText(line1)
+            self.lbl_geometry_stats.setText(line2)
+        except Exception:
+            pass
+
+        matrix_ok = False
+        matrix_rows_count = 0
+        matrix_cols_count = 0
+        try:
+            run_labels = [str(row.get("run") or "").strip() for row in summary_rows]
+            corners_order: List[str] = []
+            matrix_by_corner: Dict[str, Dict[str, Dict[str, object]]] = {}
+            for row in corner_rows:
+                corner = str(row.get("угол") or row.get("corner") or "").strip()
+                run_label = str(row.get("run") or "").strip()
+                if not corner or not run_label:
+                    continue
+                if corner not in corners_order:
+                    corners_order.append(corner)
+                matrix_by_corner.setdefault(corner, {})[run_label] = dict(row or {})
+
+            tbl_matrix.clear()
+            tbl_matrix.setRowCount(len(corners_order))
+            tbl_matrix.setColumnCount(len(run_labels))
+            tbl_matrix.setVerticalHeaderLabels(corners_order)
+            tbl_matrix.setHorizontalHeaderLabels(run_labels)
+
+            gate_short = {"FAIL": "F", "WARN": "W", "PASS": "P", "MISSING": "M"}
+            for i, corner in enumerate(corners_order):
+                by_run = dict(matrix_by_corner.get(corner) or {})
+                for j, run_label in enumerate(run_labels):
+                    row = dict(by_run.get(run_label) or {})
+                    gate = str(row.get("gate") or "MISSING").upper()
+                    text = gate_short.get(gate, "M")
+                    item = QtWidgets.QTableWidgetItem(text)
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+                    item.setBackground(self._geometry_gate_color(gate))
+                    item.setTextAlignment(int(QtCore.Qt.AlignCenter))
+                    item.setData(
+                        QtCore.Qt.UserRole,
+                        {
+                            "run": run_label,
+                            "corner": corner,
+                            "gate": gate,
+                            "reason": str(row.get("reason") or "").strip(),
+                        },
+                    )
+                    tooltip_lines = [f"run: {run_label}", f"corner: {corner}", f"gate: {gate}"]
+                    reason = str(row.get("reason") or "").strip()
+                    if reason:
+                        tooltip_lines.append(reason)
+                    for src_key, title in (
+                        ("рама‑дорога min, м", "frame-road min"),
+                        ("колесо‑дорога min, м", "wheel-road min"),
+                        ("Σ err, мм", "sum err"),
+                        ("XY wheel-road err, мм", "XY wheel-road"),
+                        ("WF err, мм", "WF"),
+                        ("WR err, мм", "WR"),
+                        ("FR err, мм", "FR"),
+                    ):
+                        value = row.get(src_key)
+                        try:
+                            num = float(value)
+                        except Exception:
+                            continue
+                        if np.isfinite(num):
+                            tooltip_lines.append(f"{title}: {num:.6g}")
+                    missing = str(row.get("missing") or "").strip()
+                    if missing:
+                        tooltip_lines.append(f"missing: {missing}")
+                    item.setToolTip("\n".join(tooltip_lines))
+                    if gate in {"FAIL", "WARN"}:
+                        font = item.font()
+                        font.setBold(True)
+                        item.setFont(font)
+                    tbl_matrix.setItem(i, j, item)
+            try:
+                hdr = tbl_matrix.horizontalHeader()
+                for col in range(len(run_labels)):
+                    hdr.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+                v_hdr = tbl_matrix.verticalHeader()
+                v_hdr.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+            except Exception:
+                pass
+            matrix_ok = bool(corners_order and run_labels)
+            matrix_rows_count = int(len(corners_order))
+            matrix_cols_count = int(len(run_labels))
+            tbl_matrix.setEnabled(matrix_ok)
+            try:
+                if hasattr(self, "lbl_geometry_matrix"):
+                    self.lbl_geometry_matrix.setText(
+                        "Gate matrix: F fail, W warn, P pass, M missing. Click a cell to focus the run."
+                    )
+            except Exception:
+                pass
+        except Exception:
+            try:
+                tbl_matrix.clear()
+                tbl_matrix.setRowCount(0)
+                tbl_matrix.setColumnCount(0)
+                tbl_matrix.setEnabled(False)
+            except Exception:
+                pass
+            try:
+                if hasattr(self, "lbl_geometry_matrix"):
+                    self.lbl_geometry_matrix.setText(
+                        "Gate matrix is temporarily unavailable; summary tables below remain valid."
+                    )
+            except Exception:
+                pass
+
+        try:
+            cols = [
+                ("run", "run"),
+                ("gate", "gate"),
+                ("reason", "reason"),
+                ("frame_road_min_m", "frame-road min, m"),
+                ("wheel_road_min_m", "wheel-road min, m"),
+                ("worst_corner", "worst corner"),
+                ("worst_metric", "worst metric"),
+                ("worst_value_mm", "worst value, mm"),
+            ]
+            tbl_summary.clear()
+            tbl_summary.setRowCount(len(summary_rows))
+            tbl_summary.setColumnCount(len(cols))
+            tbl_summary.setHorizontalHeaderLabels([c[1] for c in cols])
+            for i, row in enumerate(summary_rows):
+                gate = str(row.get("gate") or "MISSING").upper()
+                bg = self._geometry_gate_color(gate)
+                for j, (key, _title) in enumerate(cols):
+                    value = row.get(key)
+                    if isinstance(value, float):
+                        text = "" if not np.isfinite(value) else f"{value:.6g}"
+                    elif value is None:
+                        text = ""
+                    else:
+                        text = str(value)
+                    item = QtWidgets.QTableWidgetItem(text)
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+                    item.setBackground(bg)
+                    if key == "run":
+                        item.setData(QtCore.Qt.UserRole, str(row.get("run") or ""))
+                    tbl_summary.setItem(i, j, item)
+            try:
+                hdr = tbl_summary.horizontalHeader()
+                hdr.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
+                hdr.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
+                hdr.setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)
+                for col in range(3, len(cols)):
+                    hdr.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+            except Exception:
+                pass
+            tbl_summary.setEnabled(True)
+        except Exception:
+            self._clear_geometry_acceptance_view("Geometry acceptance: не удалось собрать summary table.")
+            return
+
+        try:
+            corner_cols = [
+                ("run", "run"),
+                ("угол", "corner"),
+                ("gate", "gate"),
+                ("reason", "reason"),
+                ("рама‑дорога min, м", "frame-road min, m"),
+                ("колесо‑дорога min, м", "wheel-road min, m"),
+                ("Σ err, мм", "Σ err, mm"),
+                ("XY wheel-road err, мм", "XY wheel-road, mm"),
+                ("WF err, мм", "WF err, mm"),
+                ("WR err, мм", "WR err, mm"),
+                ("FR err, мм", "FR err, mm"),
+                ("missing", "missing"),
+            ]
+            tbl_corners.clear()
+            tbl_corners.setRowCount(len(corner_rows))
+            tbl_corners.setColumnCount(len(corner_cols))
+            tbl_corners.setHorizontalHeaderLabels([c[1] for c in corner_cols])
+            for i, row in enumerate(corner_rows):
+                gate = str(row.get("gate") or "MISSING").upper()
+                bg = self._geometry_gate_color(gate)
+                for j, (key, _title) in enumerate(corner_cols):
+                    value = row.get(key)
+                    if isinstance(value, float):
+                        text = "" if not np.isfinite(value) else f"{value:.6g}"
+                    elif value is None:
+                        text = ""
+                    else:
+                        text = str(value)
+                    item = QtWidgets.QTableWidgetItem(text)
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+                    item.setBackground(bg)
+                    if key == "run":
+                        item.setData(QtCore.Qt.UserRole, str(row.get("run") or ""))
+                    tbl_corners.setItem(i, j, item)
+            try:
+                hdr = tbl_corners.horizontalHeader()
+                hdr.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
+                hdr.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
+                hdr.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)
+                hdr.setSectionResizeMode(3, QtWidgets.QHeaderView.Stretch)
+                for col in range(4, len(corner_cols)):
+                    hdr.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+            except Exception:
+                pass
+            tbl_corners.setEnabled(bool(corner_rows))
+        except Exception:
+            self._clear_geometry_acceptance_view("Geometry acceptance: не удалось собрать per-corner table.")
+            return
+
+        try:
+            txt_details.setPlainText("\n".join(detail_lines[:96]))
+        except Exception:
+            pass
+
+        self._geometry_acceptance_cache = {
+            "matrix_rows": matrix_rows_count,
+            "matrix_cols": matrix_cols_count,
+            "matrix_enabled": bool(matrix_ok),
+            "summary_rows": summary_rows,
+            "corner_rows": corner_rows,
+            "gate_counts": gate_counts,
+            "worst_run": worst_run,
+            "worst_gate": worst_gate,
+            "worst_reason": worst_reason,
+        }
+        self._update_workspace_status()
+
+    def _on_geometry_acceptance_summary_clicked(self, row: int, _col: int) -> None:
+        tbl = getattr(self, "tbl_geometry_summary", None)
+        if tbl is None:
+            return
+        try:
+            item = tbl.item(int(row), 0)
+        except Exception:
+            item = None
+        if item is None:
+            return
+        run_label = str(item.data(QtCore.Qt.UserRole) or item.text() or "").strip()
+        if run_label:
+            self._focus_run_label_preserving_context(run_label)
+
+    def _on_geometry_acceptance_corner_clicked(self, row: int, _col: int) -> None:
+        tbl = getattr(self, "tbl_geometry_corners", None)
+        if tbl is None:
+            return
+        try:
+            item = tbl.item(int(row), 0)
+        except Exception:
+            item = None
+        if item is None:
+            return
+        run_label = str(item.data(QtCore.Qt.UserRole) or item.text() or "").strip()
+        if run_label:
+            self._focus_run_label_preserving_context(run_label)
+
+    def _on_geometry_acceptance_matrix_clicked(self, row: int, col: int) -> None:
+        tbl = getattr(self, "tbl_geometry_gate_matrix", None)
+        if tbl is None:
+            return
+        try:
+            item = tbl.item(int(row), int(col))
+        except Exception:
+            item = None
+        if item is None:
+            return
+        try:
+            payload = dict(item.data(QtCore.Qt.UserRole) or {})
+        except Exception:
+            payload = {}
+        run_label = str(payload.get("run") or "").strip()
+        if run_label:
+            self._focus_run_label_preserving_context(run_label)
 
 
     # ---------------- Multivariate Explorer (SPLOM / Parallel / 3D) ----------------
@@ -6134,7 +10643,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         if (px is None) or (go is None) or (not HAVE_QTWEBENGINE):
             warn = QtWidgets.QLabel(
                 "⚠ Multivariate требует Plotly + QtWebEngine (PySide6-Addons). "
-                "Если вкладки пустые — установите зависимости и перезапустите." 
+                "Если вкладки пустые — установите зависимости и перезапустите."
             )
             warn.setWordWrap(True)
             warn.setStyleSheet("color:#6a4b00;background:#fff7d6;border:1px solid #e6d18b;border-radius:6px;padding:6px;")
@@ -7161,6 +11670,41 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.qa_plot.addItem(self.qa_img)
         lay.addWidget(self.qa_plot, 1)
 
+        filters_row = QtWidgets.QHBoxLayout()
+        filters_row.setSpacing(8)
+        filters_row.addWidget(QtWidgets.QLabel("Фильтр таблицы: severity ≥"))
+        self.combo_qa_min_sev = QtWidgets.QComboBox()
+        self.combo_qa_min_sev.addItem("1 (любая проблема)", 1)
+        self.combo_qa_min_sev.addItem("2 (warn+)", 2)
+        self.combo_qa_min_sev.addItem("3 (error only)", 3)
+        self.combo_qa_min_sev.setCurrentIndex(0)
+        self.combo_qa_min_sev.setToolTip("Фильтрует нижнюю таблицу issues. Heatmap сверху остаётся полной картой QA-проблем.")
+        filters_row.addWidget(self.combo_qa_min_sev)
+        filters_row.addWidget(QtWidgets.QLabel("Codes:"))
+        self.btn_qa_codes_all = QtWidgets.QPushButton("All")
+        self.btn_qa_codes_all.setToolTip("Включить все коды проблем в таблице ниже.")
+        filters_row.addWidget(self.btn_qa_codes_all)
+        self.btn_qa_codes_none = QtWidgets.QPushButton("None")
+        self.btn_qa_codes_none.setToolTip("Временно скрыть все коды проблем в таблице ниже.")
+        filters_row.addWidget(self.btn_qa_codes_none)
+        filters_row.addStretch(1)
+        lay.addLayout(filters_row)
+
+        self.list_qa_codes = QtWidgets.QListWidget()
+        self.list_qa_codes.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
+        self.list_qa_codes.setAlternatingRowColors(True)
+        self.list_qa_codes.setMaximumHeight(88)
+        self.list_qa_codes.setEnabled(False)
+        self.list_qa_codes.setToolTip(
+            "Чекбоксы фильтруют только issues-table. Heatmap и QA summary сверху всегда строятся по полному scan-результату."
+        )
+        lay.addWidget(self.list_qa_codes, 0)
+
+        self.lbl_qa_table_filters = QtWidgets.QLabel("")
+        self.lbl_qa_table_filters.setWordWrap(True)
+        self.lbl_qa_table_filters.setStyleSheet("color:#666;")
+        lay.addWidget(self.lbl_qa_table_filters)
+
         # Issues table
         self.tbl_qa = QtWidgets.QTableWidget()
         self.tbl_qa.setColumnCount(6)
@@ -7193,6 +11737,9 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._qa_sig_labels = []
         self._qa_first_t = {}
         self._qa_cell_codes = {}
+        self._qa_df = pd.DataFrame()
+        self._qa_code_filter_initialized = False
+        self._qa_checked_codes_selected: List[str] = []
 
         # Restore persisted QA settings (loaded earlier)
         try:
@@ -7215,6 +11762,13 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.combo_qa_sens.currentIndexChanged.connect(self._rebuild_qa)
         self.chk_qa_all.stateChanged.connect(self._rebuild_qa)
         self.btn_qa_rescan.clicked.connect(lambda: self._rebuild_qa(force=True))
+        self.combo_qa_min_sev.currentIndexChanged.connect(self._refresh_qa_table_view)
+        self.btn_qa_codes_all.clicked.connect(lambda: self._set_all_qa_code_filters(True))
+        self.btn_qa_codes_none.clicked.connect(lambda: self._set_all_qa_code_filters(False))
+        try:
+            self.list_qa_codes.itemChanged.connect(self._on_qa_code_filter_changed)
+        except Exception:
+            pass
 
         try:
             self.qa_plot.scene().sigMouseMoved.connect(self._on_qa_mouse_move)
@@ -7228,6 +11782,166 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         # First paint
         self._rebuild_qa(force=True)
+
+    def _qa_min_severity(self) -> int:
+        try:
+            return int(self.combo_qa_min_sev.currentData() or 1)
+        except Exception:
+            return 1
+
+    def _qa_checked_code_filters(self) -> List[str]:
+        lst = getattr(self, "list_qa_codes", None)
+        if lst is None:
+            return []
+        out: List[str] = []
+        try:
+            for i in range(lst.count()):
+                it = lst.item(i)
+                if it is None:
+                    continue
+                code = str(it.data(QtCore.Qt.UserRole) or it.text() or "").strip()
+                if code and it.checkState() == QtCore.Qt.Checked:
+                    out.append(code)
+        except Exception:
+            return []
+        return out
+
+    def _sync_qa_code_filters(self, df: Optional[pd.DataFrame]) -> None:
+        lst = getattr(self, "list_qa_codes", None)
+        if lst is None:
+            return
+        if not isinstance(df, pd.DataFrame) or df.empty or "code" not in df.columns:
+            try:
+                prev = lst.blockSignals(True)
+                lst.clear()
+                lst.setEnabled(False)
+            except Exception:
+                prev = False
+            finally:
+                try:
+                    lst.blockSignals(prev)
+                except Exception:
+                    pass
+            self._qa_checked_codes_selected = []
+            self._qa_code_filter_initialized = False
+            return
+
+        codes = sorted({str(x).strip() for x in df["code"].tolist() if pd.notna(x) and str(x).strip()})
+        prev_checked = {str(x).strip() for x in getattr(self, "_qa_checked_codes_selected", []) if str(x).strip()}
+        if not getattr(self, "_qa_code_filter_initialized", False):
+            checked = set(codes)
+        elif prev_checked:
+            checked = {code for code in codes if code in prev_checked}
+            if not checked:
+                checked = set(codes)
+        else:
+            checked = set()
+
+        prev = False
+        try:
+            prev = lst.blockSignals(True)
+            lst.clear()
+            for code in codes:
+                it = QtWidgets.QListWidgetItem(code)
+                it.setFlags(it.flags() | QtCore.Qt.ItemIsUserCheckable)
+                it.setData(QtCore.Qt.UserRole, code)
+                it.setCheckState(QtCore.Qt.Checked if code in checked else QtCore.Qt.Unchecked)
+                lst.addItem(it)
+            lst.setEnabled(bool(codes))
+        except Exception:
+            pass
+        finally:
+            try:
+                lst.blockSignals(prev)
+            except Exception:
+                pass
+
+        self._qa_checked_codes_selected = [code for code in codes if code in checked]
+        self._qa_code_filter_initialized = True
+
+    def _set_all_qa_code_filters(self, checked: bool) -> None:
+        lst = getattr(self, "list_qa_codes", None)
+        if lst is None:
+            return
+        prev = False
+        try:
+            prev = lst.blockSignals(True)
+            for i in range(lst.count()):
+                it = lst.item(i)
+                if it is not None:
+                    it.setCheckState(QtCore.Qt.Checked if checked else QtCore.Qt.Unchecked)
+        except Exception:
+            pass
+        finally:
+            try:
+                lst.blockSignals(prev)
+            except Exception:
+                pass
+        self._qa_checked_codes_selected = self._qa_checked_code_filters()
+        self._qa_code_filter_initialized = True
+        self._refresh_qa_table_view()
+
+    def _on_qa_code_filter_changed(self, _item: Optional[QtWidgets.QListWidgetItem] = None) -> None:
+        self._qa_checked_codes_selected = self._qa_checked_code_filters()
+        self._qa_code_filter_initialized = True
+        self._refresh_qa_table_view()
+
+    def _qa_filtered_table_frame(self) -> pd.DataFrame:
+        df = getattr(self, "_qa_df", None)
+        if not isinstance(df, pd.DataFrame) or df.empty:
+            return pd.DataFrame()
+        view = df.copy()
+        try:
+            view = view[pd.to_numeric(view["severity"], errors="coerce").fillna(0) >= float(self._qa_min_severity())]
+        except Exception:
+            pass
+        if "code" in view.columns:
+            checked_codes = self._qa_checked_code_filters()
+            if getattr(self, "list_qa_codes", None) is not None and self.list_qa_codes.count() > 0:
+                if checked_codes:
+                    view = view[view["code"].astype(str).isin([str(x) for x in checked_codes])]
+                else:
+                    view = view.iloc[0:0].copy()
+        return view
+
+    def _refresh_qa_table_view(self) -> None:
+        tbl = getattr(self, "tbl_qa", None)
+        if tbl is None:
+            return
+        df = self._qa_filtered_table_frame()
+        total_df = getattr(self, "_qa_df", None)
+        total_count = int(len(total_df)) if isinstance(total_df, pd.DataFrame) else 0
+        visible_count = int(len(df))
+        try:
+            checked_codes = self._qa_checked_code_filters()
+            if total_count <= 0:
+                self.lbl_qa_table_filters.setText("")
+            else:
+                code_txt = (
+                    f"codes={len(checked_codes)}"
+                    if getattr(self, "list_qa_codes", None) is not None and self.list_qa_codes.count() > 0
+                    else "codes=0"
+                )
+                self.lbl_qa_table_filters.setText(
+                    f"Issues table: {visible_count}/{total_count} row(s) after severity ≥ {self._qa_min_severity()} and {code_txt}."
+                )
+        except Exception:
+            pass
+        try:
+            tbl.setRowCount(0)
+            if df is None or df.empty:
+                tbl.setEnabled(False)
+                return
+            rows = df[["severity", "run_label", "signal", "code", "t0", "message"]].values.tolist()
+            rows = rows[:500]
+            tbl.setRowCount(len(rows))
+            for i, row in enumerate(rows):
+                for j, val in enumerate(row):
+                    it = QtWidgets.QTableWidgetItem("" if val is None else str(val))
+                    tbl.setItem(i, j, it)
+            tbl.setEnabled(bool(rows))
+        except Exception:
+            pass
 
     def _qa_status_text(
         self,
@@ -7330,6 +12044,18 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.lbl_events_info.setWordWrap(True)
         lay.addWidget(self.lbl_events_info)
 
+        tabs = QtWidgets.QTabWidget()
+        self.tabs_events_panel = tabs
+        try:
+            tabs.currentChanged.connect(self._on_events_dock_tab_changed)
+        except Exception:
+            pass
+
+        tab_table = QtWidgets.QWidget()
+        table_lay = QtWidgets.QVBoxLayout(tab_table)
+        table_lay.setContentsMargins(6, 6, 6, 6)
+        table_lay.setSpacing(6)
+
         self.tbl_events = QtWidgets.QTableWidget(0, 5)
         self.tbl_events.setHorizontalHeaderLabels(["t, s", "signal", "from", "to", "table"])
         try:
@@ -7343,7 +12069,165 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.tbl_events.cellDoubleClicked.connect(self._on_event_row_double_clicked)
         except Exception:
             pass
-        lay.addWidget(self.tbl_events, 1)
+        table_lay.addWidget(self.tbl_events, 1)
+        tabs.addTab(tab_table, "Table")
+
+        tab_timeline = QtWidgets.QWidget()
+        timeline_lay = QtWidgets.QVBoxLayout(tab_timeline)
+        timeline_lay.setContentsMargins(6, 6, 6, 6)
+        timeline_lay.setSpacing(6)
+
+        self.lbl_events_timeline_note = QtWidgets.QLabel(
+            "Timeline: visible baseline events as a raster-like layer. Click a point to focus signal and move playhead."
+        )
+        self.lbl_events_timeline_note.setWordWrap(True)
+        timeline_lay.addWidget(self.lbl_events_timeline_note)
+
+        self.plot_events_timeline = None
+        self.scatter_events_timeline = None
+        self.line_events_timeline = None
+        self._events_timeline_proxy = None
+        self.lbl_events_timeline_readout = QtWidgets.QLabel("")
+        self.lbl_events_timeline_readout.setWordWrap(True)
+
+        if pg is None:
+            timeline_lay.addWidget(QtWidgets.QLabel("Events timeline unavailable: pyqtgraph not found"))
+        else:
+            try:
+                self.plot_events_timeline = pg.PlotWidget()
+                self.plot_events_timeline.setMinimumHeight(240)
+                self.plot_events_timeline.setBackground(None)
+                self.plot_events_timeline.showGrid(x=True, y=False, alpha=0.20)
+                self.plot_events_timeline.setMouseEnabled(x=True, y=False)
+                self.plot_events_timeline.invertY(True)
+                try:
+                    self.plot_events_timeline.setLabel("bottom", "t, s")
+                except Exception:
+                    pass
+                self.plot_events_timeline.setEnabled(False)
+                self.scatter_events_timeline = pg.ScatterPlotItem(pxMode=True)
+                self.plot_events_timeline.addItem(self.scatter_events_timeline)
+                self.line_events_timeline = pg.InfiniteLine(
+                    angle=90, movable=False, pen=pg.mkPen((255, 140, 0, 190), width=2)
+                )
+                self.plot_events_timeline.addItem(self.line_events_timeline)
+                try:
+                    self.line_events_timeline.hide()
+                except Exception:
+                    pass
+                try:
+                    self.scatter_events_timeline.sigClicked.connect(self._on_events_timeline_points_clicked)
+                except Exception:
+                    pass
+                try:
+                    self._events_timeline_proxy = pg.SignalProxy(
+                        self.plot_events_timeline.scene().sigMouseMoved,
+                        rateLimit=60,
+                        slot=self._on_events_timeline_mouse_moved,
+                    )
+                except Exception:
+                    self._events_timeline_proxy = None
+                timeline_lay.addWidget(self.plot_events_timeline, 1)
+                timeline_lay.addWidget(self.lbl_events_timeline_readout)
+            except Exception as e:
+                self.plot_events_timeline = None
+                timeline_lay.addWidget(QtWidgets.QLabel(f"Events timeline init failed: {e}"))
+
+        tabs.addTab(tab_timeline, "Timeline")
+
+        tab_compare = QtWidgets.QWidget()
+        compare_lay = QtWidgets.QVBoxLayout(tab_compare)
+        compare_lay.setContentsMargins(6, 6, 6, 6)
+        compare_lay.setSpacing(6)
+
+        self.lbl_events_compare = QtWidgets.QLabel(
+            "Mismatch vs ref: rows are visible baseline event signals, columns are selected runs."
+        )
+        self.lbl_events_compare.setWordWrap(True)
+        self.lbl_events_compare.setStyleSheet("color:#666;")
+        compare_lay.addWidget(self.lbl_events_compare)
+
+        self.tbl_events_compare = QtWidgets.QTableWidget()
+        self.tbl_events_compare.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectItems)
+        self.tbl_events_compare.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.tbl_events_compare.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        try:
+            self.tbl_events_compare.horizontalHeader().setStretchLastSection(False)
+            self.tbl_events_compare.verticalHeader().setVisible(True)
+        except Exception:
+            pass
+        try:
+            self.tbl_events_compare.cellClicked.connect(self._on_events_compare_cell_clicked)
+            self.tbl_events_compare.cellDoubleClicked.connect(self._on_events_compare_cell_clicked)
+        except Exception:
+            pass
+        compare_lay.addWidget(self.tbl_events_compare, 1)
+
+        tabs.addTab(tab_compare, "Mismatch vs ref")
+
+        tab_runs = QtWidgets.QWidget()
+        runs_lay = QtWidgets.QVBoxLayout(tab_runs)
+        runs_lay.setContentsMargins(6, 6, 6, 6)
+        runs_lay.setSpacing(6)
+
+        self.lbl_events_runs_note = QtWidgets.QLabel(
+            "Runs raster: visible event signals across all selected runs. Click a point to focus run / signal and move playhead."
+        )
+        self.lbl_events_runs_note.setWordWrap(True)
+        runs_lay.addWidget(self.lbl_events_runs_note)
+
+        self.plot_events_runs = None
+        self.scatter_events_runs = None
+        self.line_events_runs = None
+        self._events_runs_proxy = None
+        self.lbl_events_runs_readout = QtWidgets.QLabel("")
+        self.lbl_events_runs_readout.setWordWrap(True)
+
+        if pg is None:
+            runs_lay.addWidget(QtWidgets.QLabel("Runs raster unavailable: pyqtgraph not found"))
+        else:
+            try:
+                self.plot_events_runs = pg.PlotWidget()
+                self.plot_events_runs.setMinimumHeight(240)
+                self.plot_events_runs.setBackground(None)
+                self.plot_events_runs.showGrid(x=True, y=False, alpha=0.20)
+                self.plot_events_runs.setMouseEnabled(x=True, y=False)
+                self.plot_events_runs.invertY(True)
+                try:
+                    self.plot_events_runs.setLabel("bottom", "t, s")
+                except Exception:
+                    pass
+                self.plot_events_runs.setEnabled(False)
+                self.scatter_events_runs = pg.ScatterPlotItem(pxMode=True)
+                self.plot_events_runs.addItem(self.scatter_events_runs)
+                self.line_events_runs = pg.InfiniteLine(
+                    angle=90, movable=False, pen=pg.mkPen((255, 140, 0, 190), width=2)
+                )
+                self.plot_events_runs.addItem(self.line_events_runs)
+                try:
+                    self.line_events_runs.hide()
+                except Exception:
+                    pass
+                try:
+                    self.scatter_events_runs.sigClicked.connect(self._on_events_runs_points_clicked)
+                except Exception:
+                    pass
+                try:
+                    self._events_runs_proxy = pg.SignalProxy(
+                        self.plot_events_runs.scene().sigMouseMoved,
+                        rateLimit=60,
+                        slot=self._on_events_runs_mouse_moved,
+                    )
+                except Exception:
+                    self._events_runs_proxy = None
+                runs_lay.addWidget(self.plot_events_runs, 1)
+                runs_lay.addWidget(self.lbl_events_runs_readout)
+            except Exception as e:
+                self.plot_events_runs = None
+                runs_lay.addWidget(QtWidgets.QLabel(f"Runs raster init failed: {e}"))
+
+        tabs.addTab(tab_runs, "Runs raster")
+        lay.addWidget(tabs, 1)
 
         self.dock_events.setWidget(w)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_events)
@@ -7529,6 +12413,933 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             return
 
+    def _events_dock_current_subtarget(self) -> str:
+        tabs = getattr(self, "tabs_events_panel", None)
+        if not isinstance(tabs, QtWidgets.QTabWidget):
+            return ""
+        try:
+            idx = int(tabs.currentIndex())
+        except Exception:
+            return ""
+        if idx < 0:
+            return ""
+        try:
+            return str(tabs.tabText(idx) or "").strip()
+        except Exception:
+            return ""
+
+    def _events_dock_route_label(self, subtarget: str, *, short: bool = False) -> str:
+        key = str(subtarget or "").strip()
+        mapping = {
+            "Table": "Events",
+            "Timeline": "Events timeline" if not short else "Timeline",
+            "Mismatch vs ref": "Event mismatch" if not short else "Mismatch",
+            "Runs raster": "Runs raster",
+        }
+        return str(mapping.get(key, "Events") or "Events")
+
+    def _set_events_dock_tab(self, subtarget: str) -> bool:
+        tabs = getattr(self, "tabs_events_panel", None)
+        if not isinstance(tabs, QtWidgets.QTabWidget):
+            return False
+        want = str(subtarget or "").strip().lower()
+        aliases = {
+            "events": "table",
+            "events table": "table",
+            "table": "table",
+            "events timeline": "timeline",
+            "timeline": "timeline",
+            "event mismatch": "mismatch vs ref",
+            "mismatch": "mismatch vs ref",
+            "mismatch vs ref": "mismatch vs ref",
+            "runs raster": "runs raster",
+        }
+        want_norm = aliases.get(want, want)
+        for i in range(tabs.count()):
+            try:
+                tab_text = str(tabs.tabText(i) or "").strip()
+            except Exception:
+                tab_text = ""
+            if aliases.get(tab_text.lower(), tab_text.lower()) == want_norm:
+                try:
+                    tabs.setCurrentIndex(i)
+                except Exception:
+                    return False
+                return True
+        return False
+
+    def _on_events_dock_tab_changed(self, _index: int) -> None:
+        try:
+            self._update_workspace_status()
+        except Exception:
+            pass
+
+    def _clear_events_timeline_view(self, note: str) -> None:
+        self._events_timeline_cache = None
+        try:
+            if getattr(self, "scatter_events_timeline", None) is not None:
+                self.scatter_events_timeline.setData([])
+        except Exception:
+            pass
+        try:
+            plot = getattr(self, "plot_events_timeline", None)
+            if plot is not None:
+                plot.clear()
+                if getattr(self, "scatter_events_timeline", None) is not None:
+                    plot.addItem(self.scatter_events_timeline)
+                if getattr(self, "line_events_timeline", None) is not None:
+                    plot.addItem(self.line_events_timeline)
+                    self.line_events_timeline.hide()
+                plot.setEnabled(False)
+                plot.setTitle("")
+                ax = plot.getAxis("left")
+                if ax is not None:
+                    ax.setTicks([])
+        except Exception:
+            pass
+        try:
+            self.lbl_events_timeline_note.setText(str(note or "Timeline: none"))
+            self.lbl_events_timeline_readout.setText("")
+        except Exception:
+            pass
+
+    def _event_timeline_color(self, row: int, total: int) -> object:
+        try:
+            return pg.intColor(int(row), hues=max(6, int(total)), values=1, maxValue=220, minValue=140)
+        except Exception:
+            return pg.mkBrush(60, 90, 180, 210)
+
+    def _rebuild_events_timeline_view(
+        self,
+        baseline_label: str,
+        df_events: pd.DataFrame,
+        selected_signals: Sequence[str],
+        *,
+        no_signals_selected: bool,
+    ) -> None:
+        plot = getattr(self, "plot_events_timeline", None)
+        scatter = getattr(self, "scatter_events_timeline", None)
+        if plot is None or scatter is None:
+            return
+
+        if no_signals_selected:
+            self._clear_events_timeline_view(
+                "Timeline: no event signals selected. Check one or more event rows to turn the timeline into a visual gate."
+            )
+            return
+        if not isinstance(df_events, pd.DataFrame) or df_events.empty:
+            self._clear_events_timeline_view(
+                "Timeline: no visible events in the current baseline / filter context."
+            )
+            return
+
+        try:
+            df_use = df_events.copy()
+            df_use["signal"] = df_use["signal"].astype(str)
+            df_use["table"] = df_use["table"].astype(str)
+            df_use["t"] = pd.to_numeric(df_use["t"], errors="coerce")
+            df_use = df_use[np.isfinite(df_use["t"].values)].copy()
+        except Exception:
+            df_use = pd.DataFrame()
+        if df_use.empty:
+            self._clear_events_timeline_view("Timeline: all visible rows have invalid event time.")
+            return
+
+        available_names = set(df_use["signal"].tolist())
+        ordered_signals: List[str] = []
+        for sig in selected_signals:
+            sig_name = str(sig or "").strip()
+            if sig_name and sig_name in available_names and sig_name not in ordered_signals:
+                ordered_signals.append(sig_name)
+        if not ordered_signals:
+            try:
+                ordered_signals = [str(x) for x in df_use["signal"].drop_duplicates().tolist()]
+            except Exception:
+                ordered_signals = []
+        if not ordered_signals:
+            self._clear_events_timeline_view("Timeline: no visible event rows after ordering.")
+            return
+
+        row_map = {str(sig): idx for idx, sig in enumerate(ordered_signals)}
+        try:
+            df_use["row_y"] = df_use["signal"].map(row_map)
+            df_use = df_use[pd.notna(df_use["row_y"])].copy()
+            df_use["row_y"] = df_use["row_y"].astype(int)
+        except Exception:
+            pass
+        if df_use.empty:
+            self._clear_events_timeline_view("Timeline: current events do not map to visible signal rows.")
+            return
+
+        df_use.sort_values(["row_y", "t", "signal"], inplace=True, kind="mergesort")
+        df_use.reset_index(drop=True, inplace=True)
+
+        spots = []
+        records: List[Dict[str, object]] = []
+        total_rows = max(1, len(ordered_signals))
+        for row in df_use.itertuples(index=False):
+            try:
+                t = float(getattr(row, "t", np.nan))
+            except Exception:
+                t = np.nan
+            signal_name = str(getattr(row, "signal", "") or "")
+            table_name = str(getattr(row, "table", "") or "")
+            try:
+                row_y = int(getattr(row, "row_y", -1))
+            except Exception:
+                row_y = -1
+            if not np.isfinite(t) or row_y < 0:
+                continue
+            payload = {
+                "baseline": str(baseline_label or ""),
+                "time_s": float(t),
+                "signal": signal_name,
+                "from": getattr(row, "from", ""),
+                "to": getattr(row, "to", ""),
+                "table": table_name,
+                "row_y": int(row_y),
+            }
+            records.append(payload)
+            spots.append(
+                {
+                    "pos": (float(t), float(row_y)),
+                    "data": payload,
+                    "size": 9,
+                    "symbol": "o",
+                    "brush": self._event_timeline_color(row_y, total_rows),
+                    "pen": pg.mkPen(40, 40, 40, 200),
+                }
+            )
+
+        if not records:
+            self._clear_events_timeline_view("Timeline: no finite event points available for plotting.")
+            return
+
+        try:
+            scatter.setData(spots)
+        except Exception:
+            self._clear_events_timeline_view("Timeline: failed to populate event scatter.")
+            return
+        try:
+            ax = plot.getAxis("left")
+            if ax is not None:
+                ax.setTicks([[(float(i), str(sig)) for i, sig in enumerate(ordered_signals)]])
+        except Exception:
+            pass
+        try:
+            plot.setTitle(f"Baseline {baseline_label or '—'} | {len(records)} visible event(s)")
+            plot.setEnabled(True)
+            plot.setYRange(-0.5, float(len(ordered_signals) - 0.5), padding=0.02)
+            t_min = float(df_use["t"].min())
+            t_max = float(df_use["t"].max())
+            if np.isfinite(t_min) and np.isfinite(t_max):
+                if t_max <= t_min:
+                    span = max(0.1, abs(t_min) * 0.1, 1.0)
+                    plot.setXRange(t_min - span, t_max + span, padding=0.02)
+                else:
+                    plot.setXRange(t_min, t_max, padding=0.03)
+            if getattr(self, "line_events_timeline", None) is not None:
+                self.line_events_timeline.show()
+        except Exception:
+            pass
+
+        self._events_timeline_cache = {
+            "baseline": str(baseline_label or ""),
+            "signals": list(ordered_signals),
+            "records": list(records),
+            "times": np.asarray([float(rec.get("time_s", np.nan)) for rec in records], dtype=float),
+            "rows": np.asarray([int(rec.get("row_y", -1)) for rec in records], dtype=float),
+        }
+        try:
+            self.lbl_events_timeline_note.setText(
+                f"Timeline: {len(records)} visible event(s) across {len(ordered_signals)} signal row(s). "
+                "Click a point to focus the baseline signal and jump playhead."
+            )
+            self.lbl_events_timeline_readout.setText("")
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "_t_ref") and np.asarray(getattr(self, "_t_ref", np.asarray([])), dtype=float).size > 0:
+                idx = int(self.slider_time.value()) if hasattr(self, "slider_time") else 0
+                idx = max(0, min(idx, int(len(self._t_ref) - 1)))
+                self._sync_events_timeline_to_time(float(self._t_ref[idx]))
+        except Exception:
+            pass
+
+    def _sync_events_timeline_to_time(self, t: float) -> None:
+        cache = dict(getattr(self, "_events_timeline_cache", {}) or {})
+        tt = np.asarray(cache.get("times", np.asarray([])), dtype=float)
+        if tt.size <= 0:
+            return
+        try:
+            idx = int(np.argmin(np.abs(tt - float(t))))
+        except Exception:
+            return
+        idx = max(0, min(idx, int(tt.size - 1)))
+        x = float(tt[idx])
+        try:
+            if getattr(self, "line_events_timeline", None) is not None:
+                self.line_events_timeline.setPos(x)
+        except Exception:
+            pass
+        try:
+            records = list(cache.get("records") or [])
+            if 0 <= idx < len(records):
+                rec = dict(records[idx] or {})
+                self.lbl_events_timeline_readout.setText(
+                    f"baseline={str(cache.get('baseline') or '—')} | near={str(rec.get('signal') or '—')} | "
+                    f"event t={float(rec.get('time_s', float('nan'))):.3f}s | playhead={float(t):.3f}s"
+                )
+        except Exception:
+            pass
+
+    def _events_timeline_sample(self, scene_pos) -> Dict[str, object]:
+        cache = dict(getattr(self, "_events_timeline_cache", {}) or {})
+        plot = getattr(self, "plot_events_timeline", None)
+        if plot is None or not cache:
+            return {}
+        tt = np.asarray(cache.get("times", np.asarray([])), dtype=float)
+        yy = np.asarray(cache.get("rows", np.asarray([])), dtype=float)
+        records = list(cache.get("records") or [])
+        if tt.size <= 0 or yy.size <= 0 or not records:
+            return {}
+        try:
+            mp = plot.getViewBox().mapSceneToView(scene_pos)
+            x = float(mp.x())
+            y = float(mp.y())
+        except Exception:
+            return {}
+        if not np.isfinite(x) or not np.isfinite(y):
+            return {}
+        try:
+            xr = plot.getViewBox().viewRange()[0]
+            x_tol = max(0.05, 0.03 * abs(float(xr[1]) - float(xr[0])))
+        except Exception:
+            x_tol = 0.2
+        cand = np.flatnonzero(np.abs(yy - y) <= 0.45)
+        if cand.size <= 0:
+            return {}
+        dx = np.abs(tt[cand] - x)
+        best_local = int(np.argmin(dx))
+        if not np.isfinite(dx[best_local]) or float(dx[best_local]) > float(x_tol):
+            return {}
+        idx = int(cand[best_local])
+        if idx < 0 or idx >= len(records):
+            return {}
+        return dict(records[idx] or {})
+
+    def _on_events_timeline_mouse_moved(self, evt) -> None:
+        pos = evt[0] if isinstance(evt, tuple) else evt
+        sample = self._events_timeline_sample(pos)
+        if not sample:
+            return
+        try:
+            self.lbl_events_timeline_readout.setText(
+                f"baseline={str(sample.get('baseline') or '—')} | signal={str(sample.get('signal') or '—')} | "
+                f"t={float(sample.get('time_s', float('nan'))):.3f}s | "
+                f"{sample.get('from')}→{sample.get('to')} | table={str(sample.get('table') or '—')}"
+            )
+        except Exception:
+            pass
+
+    def _on_events_timeline_points_clicked(self, _item, points, *_args) -> None:
+        if points is None:
+            return
+        try:
+            if len(points) <= 0:
+                return
+        except Exception:
+            return
+        try:
+            data = points[0].data()
+            if isinstance(data, np.ndarray):
+                data = data.tolist()
+            if isinstance(data, (list, tuple)):
+                data = data[0] if data else {}
+            payload = dict(data or {})
+        except Exception:
+            return
+        baseline = str(payload.get("baseline") or "").strip()
+        signal_name = str(payload.get("signal") or "").strip()
+        try:
+            t = float(payload.get("time_s", np.nan))
+        except Exception:
+            t = float("nan")
+        if not baseline or not signal_name or not np.isfinite(t):
+            return
+        try:
+            focused = bool(self._focus_run_signal(baseline, signal_name))
+        except Exception:
+            focused = False
+        if not focused:
+            return
+        try:
+            self._set_playhead_time(float(t))
+        except Exception:
+            pass
+
+    def _clear_events_compare_view(self, note: str) -> None:
+        tbl = getattr(self, "tbl_events_compare", None)
+        if tbl is not None:
+            try:
+                tbl.clear()
+                tbl.setRowCount(0)
+                tbl.setColumnCount(0)
+                tbl.setEnabled(False)
+            except Exception:
+                pass
+        try:
+            self.lbl_events_compare.setText(str(note or "Mismatch vs ref: none"))
+        except Exception:
+            pass
+
+    def _events_compare_color(
+        self,
+        *,
+        count_delta: int,
+        first_lag_s: float,
+        is_ref: bool,
+        has_ref: bool,
+        has_run: bool,
+    ) -> QtGui.QColor:
+        if is_ref:
+            return QtGui.QColor(232, 232, 232)
+        if not has_ref and not has_run:
+            return QtGui.QColor(242, 242, 242)
+        if has_ref and not has_run:
+            return QtGui.QColor(242, 199, 199)
+        if has_run and not has_ref:
+            return QtGui.QColor(250, 220, 180)
+        abs_delta = abs(int(count_delta))
+        lag_abs = abs(float(first_lag_s)) if np.isfinite(first_lag_s) else float("nan")
+        if abs_delta == 0 and np.isfinite(lag_abs) and lag_abs <= 1e-6:
+            return QtGui.QColor(205, 238, 210)
+        if abs_delta >= 2 or (np.isfinite(lag_abs) and lag_abs >= 0.5):
+            return QtGui.QColor(244, 191, 191)
+        if abs_delta >= 1 or (np.isfinite(lag_abs) and lag_abs >= 0.05):
+            return QtGui.QColor(250, 227, 182)
+        return QtGui.QColor(221, 239, 222)
+
+    def _rebuild_events_compare_view(
+        self,
+        baseline_label: str,
+        baseline_events: pd.DataFrame,
+        selected_signals: Sequence[str],
+        *,
+        no_signals_selected: bool,
+    ) -> None:
+        tbl = getattr(self, "tbl_events_compare", None)
+        if tbl is None:
+            return
+        runs = list(self._selected_runs())
+        if no_signals_selected:
+            self._clear_events_compare_view(
+                "Mismatch vs ref: no event signals selected. Check one or more event signals to compare runs."
+            )
+            return
+        ref_run = self._reference_run(runs)
+        if ref_run is None or not isinstance(baseline_events, pd.DataFrame) or baseline_events.empty:
+            self._clear_events_compare_view(
+                "Mismatch vs ref: no baseline events available for the current reference run."
+            )
+            return
+
+        run_list = list(runs)
+        if all(str(getattr(run, "label", "") or "").strip() != str(baseline_label or "").strip() for run in run_list):
+            run_list.insert(0, ref_run)
+        if len(run_list) < 2:
+            self._clear_events_compare_view(
+                "Mismatch vs ref: select at least two runs to compare event drift against the reference."
+            )
+            return
+
+        try:
+            ref_df = baseline_events.copy()
+            ref_df["signal"] = ref_df["signal"].astype(str)
+            ref_df["t"] = pd.to_numeric(ref_df["t"], errors="coerce")
+            ref_df = ref_df[np.isfinite(ref_df["t"].values)].copy()
+        except Exception:
+            ref_df = pd.DataFrame()
+        if ref_df.empty:
+            self._clear_events_compare_view(
+                "Mismatch vs ref: baseline events exist, but no finite event timestamps are available."
+            )
+            return
+
+        ref_counts = ref_df["signal"].astype(str).value_counts()
+        ref_available = set(ref_counts.index.tolist())
+        row_labels: List[str] = []
+        for sig in selected_signals:
+            sig_name = str(sig or "").strip()
+            if sig_name and sig_name in ref_available and sig_name not in row_labels:
+                row_labels.append(sig_name)
+        if not row_labels:
+            row_labels = [str(x) for x in ref_counts.index.tolist()]
+        if not row_labels:
+            self._clear_events_compare_view("Mismatch vs ref: no visible baseline event signals remain after filtering.")
+            return
+
+        tbl.clear()
+        tbl.setRowCount(int(len(row_labels)))
+        tbl.setColumnCount(int(len(run_list)))
+        tbl.setVerticalHeaderLabels([str(x) for x in row_labels])
+        tbl.setHorizontalHeaderLabels([str(getattr(run, "label", "") or "") for run in run_list])
+
+        mismatch_cells = 0
+        for c, run in enumerate(run_list):
+            run_label = str(getattr(run, "label", "") or "").strip()
+            is_ref = bool(ref_run is not None and run is ref_run) or (run_label == str(baseline_label or "").strip())
+            try:
+                run_df = getattr(run, "events", None)
+                if isinstance(run_df, pd.DataFrame) and not run_df.empty:
+                    run_df = run_df.copy()
+                    run_df["signal"] = run_df["signal"].astype(str)
+                    run_df["t"] = pd.to_numeric(run_df["t"], errors="coerce")
+                    run_df = run_df[np.isfinite(run_df["t"].values)].copy()
+                    run_df = run_df[run_df["signal"].isin(row_labels)].copy()
+                else:
+                    run_df = pd.DataFrame()
+            except Exception:
+                run_df = pd.DataFrame()
+
+            run_groups = {}
+            if isinstance(run_df, pd.DataFrame) and not run_df.empty:
+                try:
+                    run_groups = {str(sig): grp.copy() for sig, grp in run_df.groupby("signal", sort=False)}
+                except Exception:
+                    run_groups = {}
+
+            for r, sig_name in enumerate(row_labels):
+                ref_sig = ref_df[ref_df["signal"].astype(str) == str(sig_name)].copy()
+                run_sig = run_groups.get(str(sig_name), pd.DataFrame())
+                ref_count = int(len(ref_sig)) if isinstance(ref_sig, pd.DataFrame) else 0
+                run_count = int(len(run_sig)) if isinstance(run_sig, pd.DataFrame) else 0
+                try:
+                    ref_first = float(ref_sig["t"].min()) if ref_count > 0 else float("nan")
+                except Exception:
+                    ref_first = float("nan")
+                try:
+                    run_first = float(run_sig["t"].min()) if run_count > 0 else float("nan")
+                except Exception:
+                    run_first = float("nan")
+                count_delta = int(run_count - ref_count)
+                first_lag_s = float(run_first - ref_first) if np.isfinite(run_first) and np.isfinite(ref_first) else float("nan")
+                has_ref = bool(ref_count > 0)
+                has_run = bool(run_count > 0)
+
+                if is_ref:
+                    text = "ref"
+                elif not has_ref and not has_run:
+                    text = "—"
+                elif has_ref and not has_run:
+                    text = "miss"
+                elif has_run and not has_ref:
+                    text = "extra"
+                else:
+                    pieces: List[str] = []
+                    if count_delta != 0:
+                        pieces.append(f"{count_delta:+d}")
+                    if np.isfinite(first_lag_s) and abs(first_lag_s) > 1e-6:
+                        pieces.append(f"{first_lag_s:+.2f}s")
+                    text = "ok" if not pieces else " | ".join(pieces)
+
+                item = QtWidgets.QTableWidgetItem(text)
+                item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+                item.setTextAlignment(QtCore.Qt.AlignCenter)
+                item.setBackground(
+                    self._events_compare_color(
+                        count_delta=count_delta,
+                        first_lag_s=first_lag_s,
+                        is_ref=is_ref,
+                        has_ref=has_ref,
+                        has_run=has_run,
+                    )
+                )
+                tooltip = (
+                    f"signal: {sig_name}\nrun: {run_label}\nref: {baseline_label or '—'}\n"
+                    f"ref events: {ref_count}\nrun events: {run_count}"
+                )
+                if np.isfinite(ref_first):
+                    tooltip = f"{tooltip}\nref first: {ref_first:.6f} s"
+                if np.isfinite(run_first):
+                    tooltip = f"{tooltip}\nrun first: {run_first:.6f} s"
+                if np.isfinite(first_lag_s):
+                    tooltip = f"{tooltip}\nfirst-event lag: {first_lag_s:+.6f} s"
+                item.setToolTip(tooltip)
+                item.setData(
+                    QtCore.Qt.UserRole,
+                    {
+                        "run": run_label,
+                        "signal": sig_name,
+                        "time_s": run_first if np.isfinite(run_first) else ref_first,
+                        "is_ref": bool(is_ref),
+                        "count_delta": int(count_delta),
+                        "first_lag_s": first_lag_s,
+                    },
+                )
+                if (not is_ref) and ((count_delta != 0) or (np.isfinite(first_lag_s) and abs(first_lag_s) > 1e-6)):
+                    mismatch_cells += 1
+                    font = item.font()
+                    font.setBold(True)
+                    item.setFont(font)
+                tbl.setItem(r, c, item)
+
+        try:
+            hdr = tbl.horizontalHeader()
+            for c in range(tbl.columnCount()):
+                hdr.setSectionResizeMode(c, QtWidgets.QHeaderView.ResizeToContents)
+            tbl.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+            tbl.setEnabled(True)
+        except Exception:
+            pass
+        try:
+            self.lbl_events_compare.setText(
+                f"Mismatch vs ref: {len(row_labels)} signal row(s) across {len(run_list)} run(s). "
+                f"Highlighted drift cells: {int(mismatch_cells)}. Click a cell to focus run / signal and jump to the first local event."
+            )
+        except Exception:
+            pass
+
+    def _on_events_compare_cell_clicked(self, row: int, col: int) -> None:
+        tbl = getattr(self, "tbl_events_compare", None)
+        if tbl is None:
+            return
+        try:
+            item = tbl.item(int(row), int(col))
+        except Exception:
+            item = None
+        if item is None:
+            return
+        try:
+            payload = dict(item.data(QtCore.Qt.UserRole) or {})
+        except Exception:
+            payload = {}
+        run_label = str(payload.get("run") or "").strip()
+        sig = str(payload.get("signal") or "").strip()
+        try:
+            t = float(payload.get("time_s", np.nan))
+        except Exception:
+            t = float("nan")
+        if not run_label or not sig:
+            return
+        try:
+            focused = bool(self._focus_run_signal(run_label, sig))
+        except Exception:
+            focused = False
+        if (not focused) and run_label:
+            try:
+                focused = bool(self._focus_run_label_preserving_context(run_label))
+            except Exception:
+                focused = False
+        if focused and np.isfinite(t):
+            try:
+                self._set_playhead_time(float(t))
+            except Exception:
+                pass
+
+    def _clear_events_runs_view(self, note: str) -> None:
+        self._events_runs_cache = None
+        try:
+            if getattr(self, "scatter_events_runs", None) is not None:
+                self.scatter_events_runs.setData([])
+        except Exception:
+            pass
+        try:
+            plot = getattr(self, "plot_events_runs", None)
+            if plot is not None:
+                plot.clear()
+                if getattr(self, "scatter_events_runs", None) is not None:
+                    plot.addItem(self.scatter_events_runs)
+                if getattr(self, "line_events_runs", None) is not None:
+                    plot.addItem(self.line_events_runs)
+                    self.line_events_runs.hide()
+                plot.setEnabled(False)
+                plot.setTitle("")
+                ax = plot.getAxis("left")
+                if ax is not None:
+                    ax.setTicks([])
+        except Exception:
+            pass
+        try:
+            self.lbl_events_runs_note.setText(str(note or "Runs raster: none"))
+            self.lbl_events_runs_readout.setText("")
+        except Exception:
+            pass
+
+    def _rebuild_events_runs_view(
+        self,
+        selected_signals: Sequence[str],
+        *,
+        no_signals_selected: bool,
+    ) -> None:
+        plot = getattr(self, "plot_events_runs", None)
+        scatter = getattr(self, "scatter_events_runs", None)
+        if plot is None or scatter is None:
+            return
+        runs = list(self._selected_runs())
+        if not runs:
+            self._clear_events_runs_view("Runs raster: select one or more runs to compare event timing.")
+            return
+        if no_signals_selected:
+            self._clear_events_runs_view(
+                "Runs raster: no event signals selected. Check one or more event signals to compare timing across runs."
+            )
+            return
+
+        run_labels = [str(getattr(run, "label", "") or "").strip() for run in runs]
+        ref_label = str(self._reference_run_label(runs) or "").strip()
+        run_rows = {lab: idx for idx, lab in enumerate(run_labels)}
+
+        signal_order: List[str] = []
+        seen_signals = set()
+        visible_by_run: Dict[str, pd.DataFrame] = {}
+        for run in runs:
+            run_label = str(getattr(run, "label", "") or "").strip()
+            df_run = getattr(run, "events", None)
+            if not isinstance(df_run, pd.DataFrame) or df_run.empty:
+                visible_by_run[run_label] = pd.DataFrame()
+                continue
+            try:
+                df_use = df_run.copy()
+                df_use["signal"] = df_use["signal"].astype(str)
+                df_use["table"] = df_use["table"].astype(str)
+                df_use["t"] = pd.to_numeric(df_use["t"], errors="coerce")
+                df_use = df_use[np.isfinite(df_use["t"].values)].copy()
+            except Exception:
+                df_use = pd.DataFrame()
+            if df_use.empty:
+                visible_by_run[run_label] = pd.DataFrame()
+                continue
+            try:
+                df_use = df_use[df_use["signal"].isin([str(x) for x in selected_signals])].copy()
+            except Exception:
+                pass
+            visible_by_run[run_label] = df_use
+            try:
+                for sig_name in df_use["signal"].drop_duplicates().tolist():
+                    sig_text = str(sig_name or "").strip()
+                    if sig_text and sig_text not in seen_signals:
+                        seen_signals.add(sig_text)
+                        signal_order.append(sig_text)
+            except Exception:
+                pass
+
+        if not signal_order:
+            self._clear_events_runs_view("Runs raster: no visible events remain for the current run / signal context.")
+            return
+
+        offsets = {signal_order[0]: 0.0} if len(signal_order) == 1 else {
+            sig: float(off) for sig, off in zip(signal_order, np.linspace(-0.28, 0.28, len(signal_order)))
+        }
+        color_map = {sig: self._event_timeline_color(idx, len(signal_order)) for idx, sig in enumerate(signal_order)}
+
+        spots = []
+        records: List[Dict[str, object]] = []
+        for run_label in run_labels:
+            df_use = visible_by_run.get(run_label)
+            if not isinstance(df_use, pd.DataFrame) or df_use.empty:
+                continue
+            base_y = float(run_rows.get(run_label, 0))
+            for row in df_use.itertuples(index=False):
+                try:
+                    t = float(getattr(row, "t", np.nan))
+                except Exception:
+                    t = np.nan
+                sig_name = str(getattr(row, "signal", "") or "")
+                if not np.isfinite(t) or sig_name not in offsets:
+                    continue
+                payload = {
+                    "run": run_label,
+                    "signal": sig_name,
+                    "time_s": float(t),
+                    "from": getattr(row, "from", ""),
+                    "to": getattr(row, "to", ""),
+                    "table": str(getattr(row, "table", "") or ""),
+                    "y": float(base_y + offsets.get(sig_name, 0.0)),
+                }
+                records.append(payload)
+                is_ref = bool(ref_label and run_label == ref_label)
+                spots.append(
+                    {
+                        "pos": (float(t), float(payload["y"])),
+                        "data": payload,
+                        "size": 11 if is_ref else 8,
+                        "symbol": "o",
+                        "brush": color_map.get(sig_name, pg.mkBrush(60, 90, 180, 210)),
+                        "pen": pg.mkPen(45, 45, 45, 220) if not is_ref else pg.mkPen(170, 110, 25, 230, width=2),
+                    }
+                )
+
+        if not records:
+            self._clear_events_runs_view("Runs raster: no finite event points are available across the selected runs.")
+            return
+
+        try:
+            scatter.setData(spots)
+        except Exception:
+            self._clear_events_runs_view("Runs raster: failed to populate cross-run event scatter.")
+            return
+
+        try:
+            ax = plot.getAxis("left")
+            if ax is not None:
+                ax.setTicks([[(float(i), str(label)) for i, label in enumerate(run_labels)]])
+        except Exception:
+            pass
+        try:
+            plot.setEnabled(True)
+            plot.setTitle(
+                f"Runs raster | {len(records)} visible event(s) across {len(run_labels)} run(s) and {len(signal_order)} signal(s)"
+            )
+            plot.setYRange(-0.5, float(len(run_labels) - 0.5), padding=0.02)
+            times = np.asarray([float(rec.get("time_s", np.nan)) for rec in records], dtype=float)
+            t_min = float(np.nanmin(times))
+            t_max = float(np.nanmax(times))
+            if np.isfinite(t_min) and np.isfinite(t_max):
+                if t_max <= t_min:
+                    span = max(0.1, abs(t_min) * 0.1, 1.0)
+                    plot.setXRange(t_min - span, t_max + span, padding=0.02)
+                else:
+                    plot.setXRange(t_min, t_max, padding=0.03)
+            if getattr(self, "line_events_runs", None) is not None:
+                self.line_events_runs.show()
+        except Exception:
+            pass
+
+        self._events_runs_cache = {
+            "run_labels": list(run_labels),
+            "signal_order": list(signal_order),
+            "ref_label": ref_label,
+            "records": list(records),
+            "times": np.asarray([float(rec.get("time_s", np.nan)) for rec in records], dtype=float),
+            "ys": np.asarray([float(rec.get("y", np.nan)) for rec in records], dtype=float),
+        }
+        try:
+            self.lbl_events_runs_note.setText(
+                f"Runs raster: compare {len(signal_order)} visible event signal(s) across {len(run_labels)} selected run(s). "
+                "Colors identify event signals; click a point to jump into that run / signal."
+            )
+            self.lbl_events_runs_readout.setText("")
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "_t_ref") and np.asarray(getattr(self, "_t_ref", np.asarray([])), dtype=float).size > 0:
+                idx = int(self.slider_time.value()) if hasattr(self, "slider_time") else 0
+                idx = max(0, min(idx, int(len(self._t_ref) - 1)))
+                self._sync_events_runs_to_time(float(self._t_ref[idx]))
+        except Exception:
+            pass
+
+    def _sync_events_runs_to_time(self, t: float) -> None:
+        cache = dict(getattr(self, "_events_runs_cache", {}) or {})
+        tt = np.asarray(cache.get("times", np.asarray([])), dtype=float)
+        if tt.size <= 0:
+            return
+        try:
+            idx = int(np.argmin(np.abs(tt - float(t))))
+        except Exception:
+            return
+        idx = max(0, min(idx, int(tt.size - 1)))
+        try:
+            if getattr(self, "line_events_runs", None) is not None:
+                self.line_events_runs.setPos(float(t))
+        except Exception:
+            pass
+        try:
+            records = list(cache.get("records") or [])
+            if 0 <= idx < len(records):
+                rec = dict(records[idx] or {})
+                self.lbl_events_runs_readout.setText(
+                    f"ref={str(cache.get('ref_label') or '—')} | near={str(rec.get('run') or '—')} / {str(rec.get('signal') or '—')} | "
+                    f"event t={float(rec.get('time_s', float('nan'))):.3f}s | playhead={float(t):.3f}s"
+                )
+        except Exception:
+            pass
+
+    def _events_runs_sample(self, scene_pos) -> Dict[str, object]:
+        cache = dict(getattr(self, "_events_runs_cache", {}) or {})
+        plot = getattr(self, "plot_events_runs", None)
+        if plot is None or not cache:
+            return {}
+        tt = np.asarray(cache.get("times", np.asarray([])), dtype=float)
+        yy = np.asarray(cache.get("ys", np.asarray([])), dtype=float)
+        records = list(cache.get("records") or [])
+        if tt.size <= 0 or yy.size <= 0 or not records:
+            return {}
+        try:
+            mp = plot.getViewBox().mapSceneToView(scene_pos)
+            x = float(mp.x())
+            y = float(mp.y())
+        except Exception:
+            return {}
+        if not np.isfinite(x) or not np.isfinite(y):
+            return {}
+        try:
+            xr = plot.getViewBox().viewRange()[0]
+            x_tol = max(0.05, 0.03 * abs(float(xr[1]) - float(xr[0])))
+        except Exception:
+            x_tol = 0.2
+        cand = np.flatnonzero(np.abs(yy - y) <= 0.35)
+        if cand.size <= 0:
+            return {}
+        dx = np.abs(tt[cand] - x)
+        best_local = int(np.argmin(dx))
+        if not np.isfinite(dx[best_local]) or float(dx[best_local]) > float(x_tol):
+            return {}
+        idx = int(cand[best_local])
+        if idx < 0 or idx >= len(records):
+            return {}
+        return dict(records[idx] or {})
+
+    def _on_events_runs_mouse_moved(self, evt) -> None:
+        pos = evt[0] if isinstance(evt, tuple) else evt
+        sample = self._events_runs_sample(pos)
+        if not sample:
+            return
+        try:
+            self.lbl_events_runs_readout.setText(
+                f"run={str(sample.get('run') or '—')} | signal={str(sample.get('signal') or '—')} | "
+                f"t={float(sample.get('time_s', float('nan'))):.3f}s | "
+                f"{sample.get('from')}→{sample.get('to')} | table={str(sample.get('table') or '—')}"
+            )
+        except Exception:
+            pass
+
+    def _on_events_runs_points_clicked(self, _item, points, *_args) -> None:
+        if points is None:
+            return
+        try:
+            if len(points) <= 0:
+                return
+        except Exception:
+            return
+        try:
+            data = points[0].data()
+            if isinstance(data, np.ndarray):
+                data = data.tolist()
+            if isinstance(data, (list, tuple)):
+                data = data[0] if data else {}
+            payload = dict(data or {})
+        except Exception:
+            return
+        run_label = str(payload.get("run") or "").strip()
+        sig = str(payload.get("signal") or "").strip()
+        try:
+            t = float(payload.get("time_s", np.nan))
+        except Exception:
+            t = float("nan")
+        if not run_label or not sig:
+            return
+        try:
+            focused = bool(self._focus_run_signal(run_label, sig))
+        except Exception:
+            focused = False
+        if focused and np.isfinite(t):
+            try:
+                self._set_playhead_time(float(t))
+            except Exception:
+                pass
+
 
     def _qa_sensitivity_code(self) -> str:
         try:
@@ -7598,6 +13409,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 pass
 
         df = qa_issues_to_frame(issues)
+        self._qa_df = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
         summ = qa_summarize(df) if qa_summarize is not None else {"n": int(len(df))}
         n = int(summ.get('n', 0) or 0)
         n_err = int(summ.get('n_err', 0) or 0)
@@ -7689,18 +13501,8 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         # fill table
         try:
-            self.tbl_qa.setRowCount(0)
-            if df is None or df.empty:
-                self.tbl_qa.setEnabled(False)
-                return
-            # columns: severity, run, signal, code, t0, message
-            rows = df[["severity", "run_label", "signal", "code", "t0", "message"]].values.tolist()
-            self.tbl_qa.setRowCount(len(rows))
-            for i, row in enumerate(rows[:500]):
-                for j, val in enumerate(row):
-                    it = QtWidgets.QTableWidgetItem("" if val is None else str(val))
-                    self.tbl_qa.setItem(i, j, it)
-            self.tbl_qa.setEnabled(bool(rows))
+            self._sync_qa_code_filters(df)
+            self._refresh_qa_table_view()
         except Exception:
             pass
 
@@ -7712,12 +13514,28 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._qa_first_t = {}
         self._qa_cell_codes = {}
         self._insight_qa = {}
+        self._qa_df = pd.DataFrame()
+        self._qa_checked_codes_selected = []
+        self._qa_code_filter_initialized = False
         try:
             self.lbl_qa_summary.setText(str(summary or "QA: —"))
         except Exception:
             pass
         try:
             self.lbl_qa_readout.setText("")
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "lbl_qa_table_filters"):
+                self.lbl_qa_table_filters.setText("")
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "list_qa_codes"):
+                prev = self.list_qa_codes.blockSignals(True)
+                self.list_qa_codes.clear()
+                self.list_qa_codes.setEnabled(False)
+                self.list_qa_codes.blockSignals(prev)
         except Exception:
             pass
         try:
@@ -8259,6 +14077,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             pass
         try:
+            self._infl_scatter_item = None
             self.plot_infl.clear()
             self.plot_infl.setEnabled(False)
         except Exception:
@@ -8502,8 +14321,32 @@ class CompareViewer(QtWidgets.QMainWindow):
                 self._infl_focus_feat = str(feat_sel[int(row)])
                 self._infl_focus_sig = str(sigs[int(col)])
                 self._update_influence_scatter_from_cache()
+                self._update_inflheat_pair_trace()
         except Exception:
             pass
+
+    def _on_influence_scatter_clicked(self, _item, points, *_args) -> None:
+        if points is None:
+            return
+        try:
+            if len(points) <= 0:
+                return
+        except Exception:
+            return
+        try:
+            point = points[0]
+            data = point.data()
+            if isinstance(data, np.ndarray):
+                data = data.tolist()
+            if isinstance(data, (list, tuple)):
+                data = data[0] if data else ""
+            run_label = str(data or "").strip()
+        except Exception:
+            return
+        sig = str(getattr(self, "_infl_focus_sig", "") or "").strip()
+        if not run_label or not sig:
+            return
+        self._focus_run_signal(run_label, sig)
 
     def _update_influence_scatter_from_cache(self) -> None:
         try:
@@ -8530,10 +14373,38 @@ class CompareViewer(QtWidgets.QMainWindow):
 
             self.plot_infl.clear()
             self.plot_infl.showGrid(x=True, y=True, alpha=0.25)
+            self._infl_scatter_item = None
 
             # points
             try:
-                self.plot_infl.plot(x, y, pen=None, symbol="o", symbolSize=7, symbolBrush=(80, 80, 80, 180))
+                ref_label = str(self._infl_cache.get("ref_label") or "")
+                spots = []
+                for idx, run in enumerate(runs):
+                    xv = float(x[idx]) if idx < len(x) else float("nan")
+                    yv = float(y[idx]) if idx < len(y) else float("nan")
+                    if not (np.isfinite(xv) and np.isfinite(yv)):
+                        continue
+                    run_label = str(getattr(run, "label", "") or "")
+                    is_ref = bool(ref_label and run_label == ref_label)
+                    spots.append(
+                        {
+                            "pos": (xv, yv),
+                            "data": run_label,
+                            "size": 12 if is_ref else 9,
+                            "brush": pg.mkBrush(235, 165, 40, 220) if is_ref else pg.mkBrush(80, 80, 80, 185),
+                            "pen": pg.mkPen(150, 90, 20, 220) if is_ref else pg.mkPen(45, 45, 45, 200),
+                            "symbol": "o",
+                        }
+                    )
+                scatter = pg.ScatterPlotItem(pxMode=True)
+                if spots:
+                    scatter.addPoints(spots)
+                    try:
+                        scatter.sigClicked.connect(self._on_influence_scatter_clicked)
+                    except Exception:
+                        pass
+                    self.plot_infl.addItem(scatter)
+                    self._infl_scatter_item = scatter
             except Exception:
                 pass
 
@@ -8552,8 +14423,12 @@ class CompareViewer(QtWidgets.QMainWindow):
 
             # title / info
             try:
-                title = f"t={t0:.4f}s | corr={c:.3f} | n={int(m.sum())}"
+                title = f"t={t0:.4f}s | corr={c:.3f} | n={int(m.sum())} | click a point to focus run"
                 self.plot_infl.setTitle(title)
+            except Exception:
+                pass
+            try:
+                self._update_inflheat_pair_trace()
             except Exception:
                 pass
 
@@ -8915,6 +14790,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             'reference_run',
             'reference_run_path',
             'table',
+            'dist_signal',
             'nav_signal',
             'nav_region',
             'play_time',
@@ -8942,6 +14818,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 'runs_selection_explicit',
                 'reference_run',
                 'table',
+                'dist_signal',
                 'play_time',
                 'play_index',
                 'signals',
@@ -8984,6 +14861,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._runs_selection_explicit = False
         self.current_table = ""
         self.table_selected = ""
+        self.dist_signal_selected = ""
         edit_filter = getattr(self, "edit_filter", None)
         if edit_filter is not None:
             try:
@@ -9000,6 +14878,12 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.playhead_index_selected = None
         self.reference_run_selected = ""
         self.reference_run_selected_path = ""
+        self._events_runs_cache = None
+        self._peak_cache = None
+        self._open_timeline_cache = None
+        self._static_stroke_cache = None
+        self._geometry_acceptance_cache = None
+        self._insight_peak_heat = {}
         self._insight_events = {}
         self._mv_checked_dims_selected = None
         self._infl_focus_feat = None
@@ -9028,6 +14912,9 @@ class CompareViewer(QtWidgets.QMainWindow):
     def _invalidate_run_dependent_caches(self) -> None:
         self._invalidate_multivar_cache()
         self._infl_cache = None
+        self._peak_cache = None
+        self._insight_peak_heat = {}
+        self._dist_cache = None
         self._qa_cache_key = None
         self._qa_mat = None
         self._qa_run_labels = []
@@ -9080,6 +14967,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             kept_selected = self._refresh_signal_list(prev_signals)
             if (not kept_selected) and self.available_signals and not bool(getattr(self, '_signals_selection_explicit', False)):
                 self._select_default_signals()
+            self._schedule_static_stroke_rebuild(delay_ms=10)
             self._rebuild_plots()
         self._update_workspace_status()
 
@@ -9148,6 +15036,8 @@ class CompareViewer(QtWidgets.QMainWindow):
             # never crash on UI glue
             pass
         self._rebuild_plots()
+        self._schedule_run_metrics_rebuild(delay_ms=80)
+        self._schedule_static_stroke_rebuild(delay_ms=80)
 
     def _refresh_signal_list(self, preferred_selected: Optional[Sequence[str]] = None) -> List[str]:
         try:
@@ -9194,6 +15084,10 @@ class CompareViewer(QtWidgets.QMainWindow):
                     pass
             try:
                 self.combo_nav_signal.setEnabled(False)
+            except Exception:
+                pass
+            try:
+                self._refresh_run_metrics_signal_combo()
             except Exception:
                 pass
             return []
@@ -9255,6 +15149,10 @@ class CompareViewer(QtWidgets.QMainWindow):
             current_nav = str(self.combo_nav_signal.currentText() or '').strip()
             if current_nav and (not remembered_nav or remembered_nav_available or current_nav == remembered_nav):
                 self.navigator_signal_selected = current_nav
+        except Exception:
+            pass
+        try:
+            self._refresh_run_metrics_signal_combo()
         except Exception:
             pass
         try:
@@ -9338,6 +15236,10 @@ class CompareViewer(QtWidgets.QMainWindow):
             self._refresh_anim_diag_panel()
         except Exception:
             pass
+        try:
+            self._schedule_static_stroke_rebuild(delay_ms=10)
+        except Exception:
+            pass
         self._rebuild_plots()
         self._update_workspace_status()
 
@@ -9352,6 +15254,10 @@ class CompareViewer(QtWidgets.QMainWindow):
             pass
         try:
             self._refresh_events_table()
+        except Exception:
+            pass
+        try:
+            self._schedule_static_stroke_rebuild(delay_ms=10)
         except Exception:
             pass
         self._rebuild_plots()
@@ -9469,7 +15375,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         ref_run = self._reference_run(sel)
 
         df = getattr(ref_run, 'events', None) if ref_run is not None else None
-        pick = self._get_selected_event_signals()
+        pick_names = self._get_selected_event_signals()
         have_filter_items = bool(getattr(self, 'list_events', None) is not None and self.list_events.count() > 0)
         baseline_label = str(ref_run.label) if ref_run is not None else ""
         if not isinstance(df, pd.DataFrame) or df.empty:
@@ -9477,9 +15383,9 @@ class CompareViewer(QtWidgets.QMainWindow):
                 "baseline": baseline_label,
                 "rows": 0,
                 "source_rows": 0,
-                "selected_signals": list(pick),
+                "selected_signals": list(pick_names),
                 "filter_items": int(self.list_events.count()) if have_filter_items and getattr(self, "list_events", None) is not None else 0,
-                "no_signals_selected": bool(have_filter_items and not pick),
+                "no_signals_selected": bool(have_filter_items and not pick_names),
                 "top_signal": "",
                 "top_count": 0,
                 "sample_signal": "",
@@ -9495,13 +15401,31 @@ class CompareViewer(QtWidgets.QMainWindow):
             except Exception:
                 pass
             try:
+                self._clear_events_timeline_view(
+                    "Timeline: no baseline events available in the current reference run."
+                )
+            except Exception:
+                pass
+            try:
+                self._clear_events_compare_view(
+                    "Mismatch vs ref: no baseline events available in the current reference run."
+                )
+            except Exception:
+                pass
+            try:
+                self._clear_events_runs_view(
+                    "Runs raster: no baseline events available in the current reference run."
+                )
+            except Exception:
+                pass
+            try:
                 self.lbl_events_info.setText(
                     self._events_status_text(
                         baseline_label=str(ref_run.label) if ref_run is not None else "",
                         rows_count=0,
-                        selected_signals=list(pick),
+                        selected_signals=list(pick_names),
                         have_filter_items=have_filter_items,
-                        no_signals_selected=bool(have_filter_items and not pick),
+                        no_signals_selected=bool(have_filter_items and not pick_names),
                     )
                 )
             except Exception:
@@ -9517,7 +15441,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             source_table_count = int(pd.Series(df.get('table', pd.Series([], dtype=object))).astype(str).nunique())
         except Exception:
             source_table_count = 0
-        pick = set(pick)
+        pick = set(pick_names)
         if have_filter_items:
             if pick:
                 try:
@@ -9526,6 +15450,11 @@ class CompareViewer(QtWidgets.QMainWindow):
                     pass
             else:
                 df = df.iloc[0:0].copy()
+
+        try:
+            df_compare = df.copy()
+        except Exception:
+            df_compare = pd.DataFrame()
 
         max_rows = 500
         if len(df) > max_rows:
@@ -9566,9 +15495,9 @@ class CompareViewer(QtWidgets.QMainWindow):
             "baseline": baseline_label,
             "rows": int(len(df)),
             "source_rows": int(source_rows),
-            "selected_signals": [str(x) for x in pick],
+            "selected_signals": [str(x) for x in pick_names],
             "filter_items": int(self.list_events.count()) if have_filter_items and getattr(self, "list_events", None) is not None else 0,
-            "no_signals_selected": bool(have_filter_items and not pick),
+            "no_signals_selected": bool(have_filter_items and not pick_names),
             "top_signal": top_signal,
             "top_count": int(top_count),
             "sample_signal": sample_signal,
@@ -9612,15 +15541,46 @@ class CompareViewer(QtWidgets.QMainWindow):
             tbl.setEnabled(bool(len(df)))
         except Exception:
             pass
+        try:
+            self._rebuild_events_timeline_view(
+                baseline_label=baseline_label,
+                df_events=df,
+                selected_signals=list(pick_names),
+                no_signals_selected=bool(have_filter_items and not pick_names),
+            )
+        except Exception:
+            self._clear_events_timeline_view(
+                "Timeline: temporarily unavailable, but the Events table above remains valid."
+            )
+        try:
+            self._rebuild_events_compare_view(
+                baseline_label=baseline_label,
+                baseline_events=df_compare,
+                selected_signals=list(pick_names),
+                no_signals_selected=bool(have_filter_items and not pick_names),
+            )
+        except Exception:
+            self._clear_events_compare_view(
+                "Mismatch vs ref is temporarily unavailable, but the baseline Events table remains valid."
+            )
+        try:
+            self._rebuild_events_runs_view(
+                selected_signals=list(pick_names),
+                no_signals_selected=bool(have_filter_items and not pick_names),
+            )
+        except Exception:
+            self._clear_events_runs_view(
+                "Runs raster is temporarily unavailable, but the baseline Events views remain valid."
+            )
 
         try:
             self.lbl_events_info.setText(
                 self._events_status_text(
                     baseline_label=baseline_label,
                     rows_count=len(df),
-                    selected_signals=list(pick),
+                    selected_signals=list(pick_names),
                     have_filter_items=have_filter_items,
-                    no_signals_selected=bool(have_filter_items and not pick),
+                    no_signals_selected=bool(have_filter_items and not pick_names),
                     sample_signal=sample_signal,
                     sample_time_s=sample_time_s,
                 )
@@ -9712,8 +15672,18 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             pass
 
-    def _get_xy(self, run: Run, sig: str) -> Tuple[np.ndarray, np.ndarray, str]:
-        df = run.tables.get(self.current_table)
+    def _get_xy_from_table(
+        self,
+        run: Run,
+        sig: str,
+        *,
+        table_name: Optional[str] = None,
+        apply_zero_baseline: bool = True,
+    ) -> Tuple[np.ndarray, np.ndarray, str]:
+        table_key = str(table_name or getattr(self, "current_table", "") or "").strip()
+        if not table_key:
+            return np.asarray([]), np.asarray([]), ""
+        df = run.tables.get(table_key)
         if df is None or df.empty or sig not in df.columns:
             return np.asarray([]), np.asarray([]), ""
         tcol = detect_time_col(df)
@@ -9756,7 +15726,7 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         # Zero-baseline (display-only) for displacement/angle-like units
         try:
-            if bool(getattr(self, "zero_baseline", False)):
+            if apply_zero_baseline and bool(getattr(self, "zero_baseline", False)):
                 u0 = (unit or "").lower()
                 is_pos_like = u0 in ("m", "mm", "deg", "rad")
                 if is_pos_like and y.size:
@@ -9778,6 +15748,9 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         return x, y, unit
 
+    def _get_xy(self, run: Run, sig: str) -> Tuple[np.ndarray, np.ndarray, str]:
+        return self._get_xy_from_table(run, sig, table_name=str(getattr(self, "current_table", "") or ""), apply_zero_baseline=True)
+
 
     def _on_region_changed(self):
         if getattr(self, "_updating_region", False):
@@ -9793,6 +15766,11 @@ class CompareViewer(QtWidgets.QMainWindow):
                 p.setXRange(r0, r1, padding=0)
         finally:
             self._updating_region = False
+        try:
+            if hasattr(self, "chk_dist_use_view") and self.chk_dist_use_view.isChecked():
+                self._schedule_run_metrics_rebuild(delay_ms=120)
+        except Exception:
+            pass
 
     def _on_main_xrange_changed(self, *args, **kwargs):
         """Keep region in sync with user zoom/pan on the main plot.
@@ -9807,8 +15785,6 @@ class CompareViewer(QtWidgets.QMainWindow):
         the actual ViewBox.viewRange().
         """
         if getattr(self, "_updating_region", False):
-            return
-        if not getattr(self, "_region", None):
             return
 
         # Try to locate a ViewBox from the signal args.
@@ -9826,22 +15802,28 @@ class CompareViewer(QtWidgets.QMainWindow):
         if vb is None:
             return
 
-        self._updating_region = True
+        if getattr(self, "_region", None):
+            self._updating_region = True
+            try:
+                vr = vb.viewRange()
+                # viewRange() -> [[xmin, xmax], [ymin, ymax]]
+                if not (isinstance(vr, (list, tuple)) and len(vr) >= 1):
+                    return
+                xr = vr[0]
+                if not (isinstance(xr, (list, tuple)) and len(xr) >= 2):
+                    return
+                r0, r1 = float(xr[0]), float(xr[1])
+                if not (np.isfinite(r0) and np.isfinite(r1)):
+                    return
+                self.navigator_region_selected = (r0, r1)
+                self._region.setRegion((r0, r1))
+            finally:
+                self._updating_region = False
         try:
-            vr = vb.viewRange()
-            # viewRange() -> [[xmin, xmax], [ymin, ymax]]
-            if not (isinstance(vr, (list, tuple)) and len(vr) >= 1):
-                return
-            xr = vr[0]
-            if not (isinstance(xr, (list, tuple)) and len(xr) >= 2):
-                return
-            r0, r1 = float(xr[0]), float(xr[1])
-            if not (np.isfinite(r0) and np.isfinite(r1)):
-                return
-            self.navigator_region_selected = (r0, r1)
-            self._region.setRegion((r0, r1))
-        finally:
-            self._updating_region = False
+            if hasattr(self, "chk_dist_use_view") and self.chk_dist_use_view.isChecked():
+                self._schedule_run_metrics_rebuild(delay_ms=120)
+        except Exception:
+            pass
 
     def _rebuild_plots(self):
         """Build small-multiples plots for selected signals and runs.
@@ -9902,6 +15884,22 @@ class CompareViewer(QtWidgets.QMainWindow):
                 pass
             try:
                 self._rebuild_qa(force=True)
+            except Exception:
+                pass
+            try:
+                self._schedule_run_metrics_rebuild(delay_ms=10)
+            except Exception:
+                pass
+            try:
+                self._schedule_open_timeline_rebuild(delay_ms=10)
+            except Exception:
+                pass
+            try:
+                self._schedule_static_stroke_rebuild(delay_ms=10)
+            except Exception:
+                pass
+            try:
+                self._schedule_geometry_acceptance_rebuild(delay_ms=10)
             except Exception:
                 pass
             return
@@ -10112,12 +16110,16 @@ class CompareViewer(QtWidgets.QMainWindow):
                 sig_ranges[str(sig)] = (str(unit or ""), float('nan'), float('nan'))
 
         # keep region synced with main x-range (first plot)
-        if use_nav and getattr(self, "_region", None) and first_plot is not None:
+        if first_plot is not None:
             try:
                 first_plot.getViewBox().sigXRangeChanged.connect(self._on_main_xrange_changed)
-                self._on_region_changed()
             except Exception:
                 pass
+            if use_nav and getattr(self, "_region", None):
+                try:
+                    self._on_region_changed()
+                except Exception:
+                    pass
 
         # add legend to first plot only
         try:
@@ -10180,6 +16182,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         # update Δ(t) heatmap
         try:
             self._rebuild_heatmap()
+            self._schedule_peak_heatmap_rebuild(delay_ms=10)
             self._schedule_influence_rebuild()
             self._schedule_inflheat_rebuild()
             # QA (cached): should not add noticeable cost
@@ -10201,6 +16204,22 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         try:
             self._sync_playhead_visuals()
+        except Exception:
+            pass
+        try:
+            self._schedule_run_metrics_rebuild(delay_ms=10)
+        except Exception:
+            pass
+        try:
+            self._schedule_open_timeline_rebuild(delay_ms=10)
+        except Exception:
+            pass
+        try:
+            self._schedule_static_stroke_rebuild(delay_ms=10)
+        except Exception:
+            pass
+        try:
+            self._schedule_geometry_acceptance_rebuild(delay_ms=10)
         except Exception:
             pass
 
@@ -10272,6 +16291,21 @@ class CompareViewer(QtWidgets.QMainWindow):
         try:
             if getattr(self, '_heat_enabled', False):
                 self._sync_heatmap_to_time(float(x))
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_open_timeline_cache", None):
+                self._sync_open_timeline_to_time(float(x))
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_events_timeline_cache", None):
+                self._sync_events_timeline_to_time(float(x))
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_events_runs_cache", None):
+                self._sync_events_runs_to_time(float(x))
         except Exception:
             pass
         try:
@@ -10351,6 +16385,10 @@ class CompareViewer(QtWidgets.QMainWindow):
         # sync Influence(t) to playhead (debounced)
         try:
             self._schedule_influence_rebuild()
+        except Exception:
+            pass
+        try:
+            self._schedule_run_metrics_rebuild(delay_ms=80)
         except Exception:
             pass
 
@@ -10572,6 +16610,7 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         saved_state = None
         saved_geometry = None
+        saved_focus_mode = str(getattr(self, "_workspace_focus_mode", "all") or "all")
         try:
             saved_state = self.saveState()
             saved_geometry = self.saveGeometry()
@@ -10587,7 +16626,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 ("compare_workspace_qa", "qa"),
             )
             for stem, mode in preset_specs:
-                self._focus_workspace_preset(mode)
+                self._activate_workspace_focus_mode(mode)
                 if mode == "multivariate":
                     try:
                         self._update_multivar_views()
@@ -10613,6 +16652,12 @@ class CompareViewer(QtWidgets.QMainWindow):
                     self._apply_default_workspace_layout()
                 except Exception:
                     pass
+            else:
+                self._workspace_focus_mode = saved_focus_mode
+            try:
+                self._update_workspace_status()
+            except Exception:
+                pass
             try:
                 QtWidgets.QApplication.processEvents()
             except Exception:

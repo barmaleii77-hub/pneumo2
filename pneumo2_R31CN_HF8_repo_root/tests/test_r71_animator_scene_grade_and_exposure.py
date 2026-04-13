@@ -12,11 +12,12 @@ def test_animator_source_adds_scene_grade_helpers_and_runtime_profile() -> None:
         "def _smooth_scalar(",
         "def _scene_grade_profile(",
         "def _scene_grade_color_array(",
+        "def _scene_grade_rgba_scalar(",
         "def _scene_graded_rgba(",
         "scene_glass_energy_us: list[float] = []",
         "scene_glass_energy_u = float(",
-        'key_prefix="scene-grade-main"',
-        "scene_grade = self._scene_grade_profile(",
+        'key_prefix="scene-grade-base"',
+        "scene_grade_base = self._effective_scene_grade_profile(",
         'key="scene-background"',
     ):
         assert needle in APP

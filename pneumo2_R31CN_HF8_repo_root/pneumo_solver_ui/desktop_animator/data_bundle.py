@@ -200,12 +200,25 @@ class DataBundle:
     # Derived caches (computed lazily)
     _derived: Dict[str, np.ndarray] = field(default_factory=dict, init=False, repr=False)
     _warned_codes: Set[str] = field(default_factory=set, init=False, repr=False)
+    _service_fallbacks: Dict[str, str] = field(default_factory=dict, init=False, repr=False)
+    _point_xyz_cache: Dict[tuple[str, str], Optional[np.ndarray]] = field(default_factory=dict, init=False, repr=False)
 
     def _warn_once(self, code: str, msg: str, *args: Any) -> None:
         if code in self._warned_codes:
             return
         self._warned_codes.add(code)
         logger.warning(msg, *args)
+
+    def _record_service_fallback(self, code: str, msg: str, *args: Any) -> None:
+        try:
+            rendered = str(msg) % args if args else str(msg)
+        except Exception:
+            rendered = str(msg)
+        self._service_fallbacks.setdefault(str(code), rendered)
+        self._warn_once(code, msg, *args)
+
+    def service_fallback_messages(self) -> List[str]:
+        return [str(self._service_fallbacks[k]) for k in sorted(self._service_fallbacks)]
 
     @property
     def geometry_contract_ok(self) -> bool:
@@ -425,6 +438,9 @@ class DataBundle:
         No aliases and no synthetic reconstruction are allowed here. If a triplet is
         only partially present, we warn and return None.
         """
+        cache_key = (str(kind), str(corner))
+        if cache_key in self._point_xyz_cache:
+            return self._point_xyz_cache[cache_key]
         try:
             cx, cy, cz = solver_point_cols(kind, corner)
         except Exception as e:
@@ -434,6 +450,7 @@ class DataBundle:
                 corner,
                 e,
             )
+            self._point_xyz_cache[cache_key] = None
             return None
         ax = self.main.column(cx, default=None)
         ay = self.main.column(cy, default=None)
@@ -441,6 +458,7 @@ class DataBundle:
 
         present = [ax is not None, ay is not None, az is not None]
         if not any(present):
+            self._point_xyz_cache[cache_key] = None
             return None
         if not all(present):
             logger.warning(
@@ -451,13 +469,16 @@ class DataBundle:
                 cy,
                 cz,
             )
+            self._point_xyz_cache[cache_key] = None
             return None
 
-        return np.column_stack([
+        out = np.column_stack([
             np.asarray(ax, dtype=float),
             np.asarray(ay, dtype=float),
             np.asarray(az, dtype=float),
         ])
+        self._point_xyz_cache[cache_key] = out
+        return out
 
     def has_solver_points(self) -> bool:
         """Whether the full canonical solver-point contract is present."""
@@ -581,9 +602,9 @@ class DataBundle:
         except Exception:
             pass
 
-        self._warn_once(
+        self._record_service_fallback(
             "ensure_world_xy::integrated_fallback",
-            "[Animator] Missing canonical path columns 'путь_x_м'/'путь_y_м'; deriving world XY from скорость_vx_м_с + скорость_vy_м_с + yaw_рад as SERVICE/DERIVED.",
+            "[Animator][VALIDATION] Missing canonical path columns 'путь_x_м'/'путь_y_м'; animator falls back to derived world XY from solver скорости + yaw.",
         )
         vx = _align_series_length(self.get("скорость_vx_м_с", default=0.0), n, fill=0.0)
         vy = _align_series_length(self.get("скорость_vy_м_с", default=0.0), n, fill=0.0)
@@ -605,7 +626,12 @@ class DataBundle:
         return xw, yw
 
     def ensure_world_velocity_xy(self) -> Tuple[np.ndarray, np.ndarray]:
-        """World-frame XY velocity from explicit path if available, else from body vx/vy/yaw."""
+        """World-frame XY velocity with solver-body channels preferred.
+
+        Source priority:
+          1) rotate canonical body-frame ``скорость_vx_м_с`` / ``скорость_vy_м_с`` by yaw;
+          2) derivative of canonical world path ``путь_x_м`` / ``путь_y_м``.
+        """
         key_x = "svc__vx_world_м_с"
         key_y = "svc__vy_world_м_с"
         if key_x in self._derived and key_y in self._derived:
@@ -618,6 +644,23 @@ class DataBundle:
             self._derived[key_y] = np.zeros((0,), dtype=float)
             return self._derived[key_x], self._derived[key_y]
 
+        try:
+            if self.main.has("скорость_vx_м_с") and self.main.has("скорость_vy_м_с"):
+                yaw = _align_series_length(self.get("yaw_рад", default=0.0), n, fill=0.0)
+                vx = _align_series_length(self.get("скорость_vx_м_с", default=0.0), n, fill=0.0)
+                vy = _align_series_length(self.get("скорость_vy_м_с", default=0.0), n, fill=0.0)
+                vxw = vx * np.cos(yaw) - vy * np.sin(yaw)
+                vyw = vx * np.sin(yaw) + vy * np.cos(yaw)
+                self._derived[key_x] = np.asarray(vxw, dtype=float)
+                self._derived[key_y] = np.asarray(vyw, dtype=float)
+                return self._derived[key_x], self._derived[key_y]
+        except Exception:
+            pass
+
+        self._record_service_fallback(
+            "ensure_world_velocity_xy::path_gradient_fallback",
+            "[Animator][VALIDATION] Missing canonical solver velocity channels for world XY; animator falls back to derivative of world path.",
+        )
         xw, yw = self.ensure_world_xy()
         try:
             if n >= 2:
@@ -627,21 +670,32 @@ class DataBundle:
                 vxw = np.zeros((n,), dtype=float)
                 vyw = np.zeros((n,), dtype=float)
         except Exception:
-            yaw = _align_series_length(self.get("yaw_рад", default=0.0), n, fill=0.0)
-            vx = _align_series_length(self.get("скорость_vx_м_с", default=0.0), n, fill=0.0)
-            vy = _align_series_length(self.get("скорость_vy_м_с", default=0.0), n, fill=0.0)
-            vxw = vx * np.cos(yaw) - vy * np.sin(yaw)
-            vyw = vx * np.sin(yaw) + vy * np.cos(yaw)
+            vxw = np.zeros((n,), dtype=float)
+            vyw = np.zeros((n,), dtype=float)
         self._derived[key_x] = vxw
         self._derived[key_y] = vyw
         return vxw, vyw
 
     def ensure_body_velocity_xy(self) -> Tuple[np.ndarray, np.ndarray]:
-        """Body-frame XY velocity reconstructed from world path + yaw."""
+        """Canonical body-frame XY velocity when present, else rotate from world."""
         key_x = "svc__vx_body_м_с"
         key_y = "svc__vy_body_м_с"
         if key_x in self._derived and key_y in self._derived:
             return self._derived[key_x], self._derived[key_y]
+        n = int(len(self.t))
+        try:
+            if self.main.has("скорость_vx_м_с") and self.main.has("скорость_vy_м_с"):
+                vxb = _align_series_length(self.get("скорость_vx_м_с", default=0.0), n, fill=0.0)
+                vyb = _align_series_length(self.get("скорость_vy_м_с", default=0.0), n, fill=0.0)
+                self._derived[key_x] = np.asarray(vxb, dtype=float)
+                self._derived[key_y] = np.asarray(vyb, dtype=float)
+                return self._derived[key_x], self._derived[key_y]
+        except Exception:
+            pass
+        self._record_service_fallback(
+            "ensure_body_velocity_xy::rotate_world_fallback",
+            "[Animator][VALIDATION] Missing canonical body velocity channels 'скорость_vx_м_с'/'скорость_vy_м_с'; animator falls back to rotated world velocity.",
+        )
         vxw, vyw = self.ensure_world_velocity_xy()
         yaw = _align_series_length(self.get("yaw_рад", default=0.0), int(len(vxw)), fill=0.0)
         c = np.cos(yaw)
@@ -672,6 +726,10 @@ class DataBundle:
         except Exception:
             pass
 
+        self._record_service_fallback(
+            "ensure_yaw_rate_rad_s::yaw_gradient_fallback",
+            "[Animator][VALIDATION] Missing canonical yaw-rate channel 'yaw_rate_рад_с'; animator falls back to derivative of yaw.",
+        )
         yaw = _align_series_length(self.get("yaw_рад", default=0.0), n, fill=0.0)
         yaw = np.asarray(np.unwrap(np.asarray(yaw, dtype=float)), dtype=float)
         try:
@@ -688,8 +746,8 @@ class DataBundle:
         """World-frame XY acceleration.
 
         Priority:
-          1) derivative of world-frame velocity from ``ensure_world_velocity_xy()``;
-          2) rotation of canonical body-frame ``ax/ay`` into world frame.
+          1) rotate canonical body-frame ``ax/ay`` into world frame;
+          2) derivative of world-frame velocity from ``ensure_world_velocity_xy()``.
         """
         key_x = "svc__ax_world_м_с2"
         key_y = "svc__ay_world_м_с2"
@@ -704,6 +762,25 @@ class DataBundle:
             return self._derived[key_x], self._derived[key_y]
 
         try:
+            if self.main.has("ускорение_продольное_ax_м_с2") and self.main.has("ускорение_поперечное_ay_м_с2"):
+                yaw = _align_series_length(self.get("yaw_рад", default=0.0), n, fill=0.0)
+                axb = _align_series_length(self.get("ускорение_продольное_ax_м_с2", default=0.0), n, fill=0.0)
+                ayb = _align_series_length(self.get("ускорение_поперечное_ay_м_с2", default=0.0), n, fill=0.0)
+                c = np.cos(yaw)
+                s = np.sin(yaw)
+                axw = c * axb - s * ayb
+                ayw = s * axb + c * ayb
+                self._derived[key_x] = np.asarray(axw, dtype=float)
+                self._derived[key_y] = np.asarray(ayw, dtype=float)
+                return self._derived[key_x], self._derived[key_y]
+        except Exception:
+            pass
+
+        self._record_service_fallback(
+            "ensure_world_acceleration_xy::velocity_gradient_fallback",
+            "[Animator][VALIDATION] Missing canonical solver acceleration channels; animator falls back to derivative of world velocity.",
+        )
+        try:
             if n >= 2:
                 vxw, vyw = self.ensure_world_velocity_xy()
                 axw = np.asarray(np.gradient(vxw, t, edge_order=1), dtype=float)
@@ -714,15 +791,8 @@ class DataBundle:
         except Exception:
             pass
 
-        yaw = _align_series_length(self.get("yaw_рад", default=0.0), n, fill=0.0)
-        axb = _align_series_length(self.get("ускорение_продольное_ax_м_с2", default=0.0), n, fill=0.0)
-        ayb = _align_series_length(self.get("ускорение_поперечное_ay_м_с2", default=0.0), n, fill=0.0)
-        c = np.cos(yaw)
-        s = np.sin(yaw)
-        axw = c * axb - s * ayb
-        ayw = s * axb + c * ayb
-        self._derived[key_x] = np.asarray(axw, dtype=float)
-        self._derived[key_y] = np.asarray(ayw, dtype=float)
+        self._derived[key_x] = np.zeros((n,), dtype=float)
+        self._derived[key_y] = np.zeros((n,), dtype=float)
         return self._derived[key_x], self._derived[key_y]
 
     def ensure_body_acceleration_xy(self) -> Tuple[np.ndarray, np.ndarray]:
@@ -743,6 +813,10 @@ class DataBundle:
         except Exception:
             pass
 
+        self._record_service_fallback(
+            "ensure_body_acceleration_xy::rotate_world_fallback",
+            "[Animator][VALIDATION] Missing canonical body acceleration channels 'ускорение_продольное_ax_м_с2'/'ускорение_поперечное_ay_м_с2'; animator falls back to rotated world acceleration.",
+        )
         axw, ayw = self.ensure_world_acceleration_xy()
         yaw = _align_series_length(self.get("yaw_рад", default=0.0), int(len(axw)), fill=0.0)
         c = np.cos(yaw)

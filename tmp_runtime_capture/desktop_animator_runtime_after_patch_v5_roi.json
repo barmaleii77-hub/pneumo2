@@ -1,0 +1,17 @@
+{
+  "video": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_runtime_capture\\desktop_animator_runtime_after_patch_v5.mp4",
+  "frame_count": 70,
+  "pairs": 69,
+  "identical_pairs_roi": 0,
+  "identical_ratio_roi": 0.0,
+  "mean_abs_diff_roi": 0.4696902475420753,
+  "median_abs_diff_roi": 0.014629535446386713,
+  "mean_changed_px_ratio_roi": 0.016823277019943916,
+  "median_changed_px_ratio_roi": 0.00033984453486035767,
+  "roi_rel": {
+    "x0": 0.03,
+    "x1": 0.5,
+    "y0": 0.08,
+    "y1": 0.88
+  }
+}

@@ -256,10 +256,24 @@ def test_key_ui_files_keep_clean_visible_russian_labels() -> None:
     assert "Не удалось экспортировать последнюю анимационную выгрузку:" in heavy_text
     assert "Последняя анимационная выгрузка сохранена:" in heavy_text
     assert "Файл NPZ:" in heavy_text
+    assert "Готовность anim_latest:" in heavy_text
     assert "Без OpenGL (режим совместимости)" in heavy_text
     assert "Запустить Desktop Animator" in heavy_text
     assert "Desktop Animator запущен (если система позволяет GUI)." in heavy_text
     assert "Не удалось запустить Desktop Animator (см. логи)." in heavy_text
+    assert "Другие отдельные GUI-окна проекта" in heavy_text
+    assert "Открыть центр desktop-инструментов" in heavy_text
+    assert "Открыть редактор исходных данных" in heavy_text
+    assert "Открыть центр тестов" in heavy_text
+    assert "Открыть GUI автотестов" in heavy_text
+    assert "Открыть GUI диагностики" in heavy_text
+    assert "Открыть GUI отправки результатов" in heavy_text
+    assert "Открыть Compare Viewer" in heavy_text
+    assert "Окно «{_window_label}» запущено (если система позволяет GUI)." in heavy_text
+    assert "Не удалось запустить окно «{_window_label}» (см. логи)." in heavy_text
+    assert "Что делать дальше сейчас" not in heavy_text
+    assert "Последние артефакты" not in heavy_text
+    assert "Рабочие папки desktop-контура" not in heavy_text
     assert "Подвеска: кинематика и перемещения, плюс проверка DW2D" in heavy_text
     assert "Кинематика и перемещения: в норме" in heavy_text
     assert "Кинематика и перемещения: требуют внимания" in heavy_text

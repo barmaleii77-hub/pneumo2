@@ -1,0 +1,18 @@
+{
+  "bundle": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_send_analysis_20260412\\workspace\\exports\\anim_latest.npz",
+  "video": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_runtime_capture\\desktop_animator_runtime_after_patch_v4.mp4",
+  "bbox": [
+    747,
+    309,
+    3094,
+    1745
+  ],
+  "captured_frames": 59,
+  "captured_pairs": 58,
+  "identical_adjacent_pairs": 6,
+  "identical_adjacent_ratio": 0.10344827586206896,
+  "unique_frame_count": 53,
+  "effective_unique_fps": 26.896551724137932,
+  "capture_fps_target": 30.0,
+  "capture_duration_s": 6.0
+}

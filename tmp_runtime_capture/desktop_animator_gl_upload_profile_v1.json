@@ -1,0 +1,26 @@
+[
+  {
+    "name": "GLLinePlotItem.setData",
+    "count": 4589,
+    "total_ms": 30.4497000270203,
+    "mean_ms": 0.006635367188280736
+  },
+  {
+    "name": "GLMeshItem.setMeshData",
+    "count": 5919,
+    "total_ms": 30.015099993761396,
+    "mean_ms": 0.00507097482577486
+  },
+  {
+    "name": "GLMeshItem.update",
+    "count": 23502,
+    "total_ms": 16.04569994378835,
+    "mean_ms": 0.000682737636958061
+  },
+  {
+    "name": "GLLinePlotItem.update",
+    "count": 9424,
+    "total_ms": 7.132299873774173,
+    "mean_ms": 0.0007568229916992968
+  }
+]

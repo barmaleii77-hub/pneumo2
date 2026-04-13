@@ -8,6 +8,18 @@ NON_DESIGN_RANGE_KEYS: tuple[str, ...] = (
     "vx0_м_с",
     "world_road_vmin_м_с",
     "world_road_yaw_rate_limit_рад_с",
+    "лимит_относит_изменения_объёма_за_шаг",
+    "макс_число_внутренних_шагов_на_dt",
+    "макс_шаг_интегрирования_с",
+    "интегратор_контроль_локальной_ошибки",
+    "интегратор_rtol",
+    "интегратор_atol",
+    "интегратор_safety",
+    "интегратор_fac_min",
+    "интегратор_fac_max",
+    "интегратор_h_min_с",
+    "интегратор_mass_rtol_scale_factor",
+    "интегратор_err_group_weight_mass",
 )
 
 STAGE_RUNTIME_ROLE_DESCRIPTIONS: dict[str, str] = {

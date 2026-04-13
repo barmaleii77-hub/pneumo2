@@ -6,8 +6,17 @@ from types import SimpleNamespace
 from pneumo_solver_ui.optimization_run_pointer_actions_ui import (
     build_run_pointer_meta_from_summary,
     open_results_via_run_pointer,
+    render_optimization_run_pointer_actions,
     save_run_pointer_to_latest,
 )
+
+
+class _FakeColumn:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
 
 
 class _FakeStreamlit:
@@ -26,6 +35,17 @@ class _FakeStreamlit:
 
     def switch_page(self, text: str) -> None:
         self.calls.append(("switch_page", text))
+
+    def columns(self, spec):
+        count = int(spec) if isinstance(spec, int) else len(spec)
+        return [_FakeColumn() for _ in range(count)]
+
+    def button(self, label: str, **kwargs) -> bool:
+        self.calls.append(("button", label))
+        return False
+
+    def caption(self, text: str) -> None:
+        self.calls.append(("caption", text))
 
 
 def test_build_run_pointer_meta_from_summary_keeps_history_contract_fields() -> None:
@@ -96,3 +116,101 @@ def test_save_and_open_run_pointer_actions_use_injected_side_effects() -> None:
     assert ("success", "latest_optimization pointer перепривязан к выбранному run_dir.") in st.calls
     assert ("switch_page", "pages/20_DistributedOptimization.py") in st.calls
     assert [event[0] for event in events] == ["save", "autoload", "rerun", "save", "autoload"]
+
+
+def test_render_run_pointer_actions_marks_live_handoff_run() -> None:
+    st = _FakeStreamlit()
+    summary = SimpleNamespace(
+        run_dir=Path("C:/tmp/coord_live_now"),
+        backend="Handoff/ray/portfolio/q2",
+        pipeline_mode="coordinator",
+        status="running",
+        row_count=0,
+        done_count=0,
+        running_count=1,
+        error_count=0,
+        objective_keys=("comfort",),
+        penalty_key="penalty_total",
+        penalty_tol=0.0,
+        handoff_preset_tag="ray/portfolio/q2",
+        handoff_budget=84,
+        handoff_seed_count=6,
+        log_path=Path("C:/tmp/coord_live_now/coordinator.log"),
+    )
+
+    render_optimization_run_pointer_actions(
+        st,
+        summary,
+        key_prefix="opt_history",
+        active_run_dir=Path("C:/tmp/coord_live_now"),
+        active_launch_context={
+            "kind": "handoff",
+            "run_dir": str(Path("C:/tmp/coord_live_now").resolve()),
+            "source_run_dir": str(Path("C:/tmp/staged_seed_source").resolve()),
+        },
+        active_runtime_summary={
+            "done": 5,
+            "budget": 84,
+            "tail_state": "trial=5 status=RUNNING",
+            "trial_health": {"done": 5, "running": 2, "error": 1},
+            "penalty_gate": {
+                "infeasible_done": 1,
+                "penalty_key": "penalty_total",
+                "penalty_tol": 0.25,
+                "last_penalty": 0.6,
+                "objective_drift": {"comfort": 0.7, "energy": 3.5},
+            },
+            "recent_errors": ["bad physics", "solver diverged badly on wheel hop"],
+            "handoff_provenance": {
+                "source_run_name": "staged_seed_source",
+                "selection_pool": "promotable",
+                "seed_count": 6,
+                "unique_param_candidates": 6,
+                "promotable_rows": 7,
+                "staged_rows_ok": 9,
+                "pipeline_hint": "staged_then_coordinator",
+                "fragment_count": 4,
+                "has_full_ring": True,
+            },
+        },
+        rerun_fn=None,
+    )
+
+    assert any(
+        kind == "info"
+        and "LIVE NOW" in text
+        and "seeded full-ring coordinator handoff" in text
+        and "staged_seed_source" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "done=5 / 84" in text
+        and "trial=5 status=RUNNING" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "DONE=5, RUNNING=2, ERROR=1" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "Active handoff penalty gate:" in text
+        and "infeasible DONE=1" in text
+        and "`penalty_total`=0.6 > 0.25" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "Recent handoff errors:" in text
+        and "bad physics" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "Handoff provenance:" in text
+        and "source=staged_seed_source" in text
+        for kind, text in st.calls
+    )
+    assert any(kind == "caption" and "coordinator.log" in text for kind, text in st.calls)

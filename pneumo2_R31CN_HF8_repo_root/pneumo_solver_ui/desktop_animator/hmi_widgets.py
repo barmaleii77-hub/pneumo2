@@ -17,17 +17,99 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from pneumo_solver_ui.data_contract import read_visual_geometry_meta
+from pneumo_solver_ui.ring_visuals import (
+    build_nominal_ring_progress_from_spec,
+    build_ring_visual_payload_from_spec,
+    build_segment_ranges_from_progress,
+    load_ring_spec_from_npz,
+)
+
 from .data_bundle import _align_series_length
 
 
 def _clamp(x: float, a: float, b: float) -> float:
     return float(max(a, min(b, x)))
+
+
+def _safe_float(x: object, default: float) -> float:
+    try:
+        v = float(x)
+        if not np.isfinite(v):
+            return float(default)
+        return v
+    except Exception:
+        return float(default)
+
+
+_RING_SEGMENT_CACHE_MISS = object()
+
+
+def _timeline_ring_segment_ranges_for_bundle(bundle: object) -> List[dict]:
+    cached = getattr(bundle, "_desktop_ring_segment_ranges_cache", _RING_SEGMENT_CACHE_MISS)
+    if cached is not _RING_SEGMENT_CACHE_MISS:
+        return [dict(row) for row in list(cached or []) if isinstance(row, dict)]
+
+    local_cached = getattr(bundle, "_desktop_timeline_ring_segment_ranges_cache", _RING_SEGMENT_CACHE_MISS)
+    if local_cached is not _RING_SEGMENT_CACHE_MISS:
+        return [dict(row) for row in list(local_cached or []) if isinstance(row, dict)]
+
+    ranges: List[dict] = []
+    npz_path = getattr(bundle, "npz_path", None)
+    if npz_path is not None:
+        try:
+            ring_spec = load_ring_spec_from_npz(Path(npz_path))
+        except Exception:
+            ring_spec = None
+        if isinstance(ring_spec, dict) and isinstance(ring_spec.get("segments"), list):
+            meta = getattr(bundle, "meta", None)
+            if not isinstance(meta, dict):
+                meta = {}
+            try:
+                vis_geom = read_visual_geometry_meta(
+                    meta,
+                    context="Desktop Animator timeline ring ranges",
+                    log=lambda _m: None,
+                )
+            except Exception:
+                vis_geom = {}
+            track_m = _safe_float(vis_geom.get("track_m"), 0.0)
+            wheel_width_m = _safe_float(vis_geom.get("wheel_width_m"), 0.0)
+            try:
+                ring_visual = build_ring_visual_payload_from_spec(
+                    ring_spec,
+                    track_m=float(max(0.0, track_m)),
+                    wheel_width_m=float(max(0.0, wheel_width_m)),
+                    seed=int(ring_spec.get("seed", 0) or 0),
+                )
+            except Exception:
+                ring_visual = None
+            if isinstance(ring_visual, dict):
+                try:
+                    nominal_progress = build_nominal_ring_progress_from_spec(
+                        ring_spec,
+                        getattr(bundle, "t", []),
+                    )
+                    built = build_segment_ranges_from_progress(
+                        ring_visual,
+                        list(nominal_progress.get("distance_m") or []),
+                    )
+                    if isinstance(built, list):
+                        ranges = [dict(row) for row in built if isinstance(row, dict)]
+                except Exception:
+                    ranges = []
+    try:
+        setattr(bundle, "_desktop_timeline_ring_segment_ranges_cache", tuple(ranges))
+    except Exception:
+        pass
+    return list(ranges)
 
 
 def _robust_minmax(y: np.ndarray, *, p_lo: float = 1.0, p_hi: float = 99.0) -> Tuple[float, float]:
@@ -734,6 +816,7 @@ class EventTimelineWidget(QtWidgets.QWidget):
 
         self._t: Optional[np.ndarray] = None
         self._lanes: List[_Lane] = []
+        self._segment_ranges: List[dict] = []
         self._markers: List[int] = []  # segment transitions etc
         self._idx: int = 0
         self._playhead_t_s: Optional[float] = None
@@ -769,6 +852,7 @@ class EventTimelineWidget(QtWidgets.QWidget):
         self._playhead_t_s = float(t[0]) if t.size else None
         self._playhead_px_key = None
         self._lanes = []
+        self._segment_ranges = []
         self._markers = []
         self._static_data_key = None
         self._invalidate_static_cache()
@@ -872,20 +956,39 @@ class EventTimelineWidget(QtWidgets.QWidget):
             except Exception:
                 pass
 
-        # Segment transitions marker (if present)
-        try:
-            sid = _align_series_length(b.get("сегмент_id", 0.0), n, fill=0.0)
-            sid = np.rint(np.where(np.isfinite(sid), sid, 0.0)).astype(np.int32, copy=False)
-            if sid.size >= n and n > 1:
-                ch = np.where(sid[1:] != sid[:-1])[0]
-                self._markers = [int(x + 1) for x in ch.tolist()]
-        except Exception:
+        ring_ranges = _timeline_ring_segment_ranges_for_bundle(b)
+        if ring_ranges:
+            self._segment_ranges = [dict(rr) for rr in ring_ranges if isinstance(rr, dict)]
             self._markers = []
+            for rr in self._segment_ranges[1:]:
+                try:
+                    self._markers.append(int(rr.get("idx0", 0)))
+                except Exception:
+                    pass
+        else:
+            # Segment transitions marker (if present)
+            try:
+                sid = _align_series_length(b.get("сегмент_id", 0.0), n, fill=0.0)
+                sid = np.rint(np.where(np.isfinite(sid), sid, 0.0)).astype(np.int32, copy=False)
+                if sid.size >= n and n > 1:
+                    ch = np.where(sid[1:] != sid[:-1])[0]
+                    self._markers = [int(x + 1) for x in ch.tolist()]
+            except Exception:
+                self._markers = []
 
         self._static_data_key = (
             int(t.size),
             -1 if t.size == 0 else int(round(float(t[0]) * 1000.0)),
             -1 if t.size == 0 else int(round(float(t[-1]) * 1000.0)),
+            tuple(
+                (
+                    int(rr.get("idx0", 0)),
+                    int(rr.get("idx1", 0)),
+                    str(rr.get("name") or ""),
+                    str(rr.get("edge_color") or rr.get("color") or ""),
+                )
+                for rr in self._segment_ranges
+            ),
             tuple(
                 (
                     str(lane.name),
@@ -999,8 +1102,11 @@ class EventTimelineWidget(QtWidgets.QWidget):
         pad = self._pad
         label_w = int(self._label_w)
         lanes = self._lanes
-        lane_h = max(10, int((rect.height() - 2 * pad) / max(1, len(lanes))))
-        top = pad
+        segment_ranges = self._segment_ranges
+        segment_band_h = 8 if segment_ranges else 0
+        segment_gap_h = 4 if segment_ranges else 0
+        lane_h = max(10, int((rect.height() - 2 * pad - segment_band_h - segment_gap_h) / max(1, len(lanes))))
+        top = pad + segment_band_h + segment_gap_h
         x0 = label_w + pad
         x1 = rect.width() - pad
         w = max(1, x1 - x0)
@@ -1012,6 +1118,43 @@ class EventTimelineWidget(QtWidgets.QWidget):
         for frac in (0.0, 0.25, 0.5, 0.75, 1.0):
             xx = int(x0 + frac * w)
             p.drawLine(xx, top, xx, rect.height() - pad)
+
+        if segment_ranges:
+            band_y = pad
+            band_rect = QtCore.QRect(x0, band_y, w, segment_band_h)
+            p.setPen(QtCore.Qt.NoPen)
+            p.setBrush(QtGui.QColor(34, 40, 48, 220))
+            p.drawRect(band_rect)
+            p.setPen(self._muted)
+            p.drawText(
+                QtCore.QRect(pad, band_y, label_w - 2, segment_band_h),
+                int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter),
+                "RING",
+            )
+            for rr in segment_ranges:
+                try:
+                    ii0 = int(_clamp(int(rr.get("idx0", 0)), 0, n - 1))
+                    ii1 = int(_clamp(int(rr.get("idx1", 0)), 0, n - 1))
+                except Exception:
+                    continue
+                tt0 = float(t[ii0])
+                tt1 = float(t[ii1])
+                if ii1 == ii0:
+                    tt1 = min(t1, tt0 + 0.02)
+                u0 = (tt0 - t0) / dt
+                u1 = (tt1 - t0) / dt
+                xx0 = int(x0 + _clamp(u0, 0.0, 1.0) * w)
+                xx1 = int(x0 + _clamp(u1, 0.0, 1.0) * w)
+                if xx1 <= xx0:
+                    xx1 = xx0 + 1
+                col = QtGui.QColor(str(rr.get("edge_color") or rr.get("color") or ""))
+                if not col.isValid():
+                    col = QtGui.QColor(126, 144, 168, 210)
+                else:
+                    col.setAlpha(max(150, col.alpha()))
+                p.setPen(QtCore.Qt.NoPen)
+                p.setBrush(col)
+                p.drawRect(QtCore.QRect(xx0, band_y, xx1 - xx0, segment_band_h))
 
         for li, lane in enumerate(lanes):
             y = top + li * lane_h

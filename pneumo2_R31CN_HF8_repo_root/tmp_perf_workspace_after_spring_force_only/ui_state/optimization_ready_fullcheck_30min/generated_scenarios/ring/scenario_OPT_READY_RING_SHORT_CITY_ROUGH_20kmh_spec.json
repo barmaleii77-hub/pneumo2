@@ -1,0 +1,139 @@
+{
+  "schema_version": "ring_v2",
+  "closure_policy": "closed_c1_periodic",
+  "v0_kph": 20.0,
+  "seed": 123,
+  "dx_m": 0.02,
+  "dt_s": 0.01,
+  "n_laps": 1,
+  "wheelbase_m": 1.5,
+  "segments": [
+    {
+      "name": "S1_прямо_rough",
+      "duration_s": 4.0,
+      "turn_direction": "STRAIGHT",
+      "speed_end_kph": 20.0,
+      "road": {
+        "mode": "ISO8608",
+        "iso_class": "E",
+        "gd_pick": "mid",
+        "gd_n0_scale": 1.0,
+        "waviness_w": 2.0,
+        "left_right_coherence": 0.6,
+        "seed": 12345
+      },
+      "events": [
+        {
+          "kind": "яма",
+          "side": "left",
+          "start_m": 6.0,
+          "length_m": 0.45,
+          "depth_mm": -22.0,
+          "ramp_m": 0.08
+        },
+        {
+          "kind": "препятствие",
+          "side": "both",
+          "start_m": 12.0,
+          "length_m": 0.25,
+          "depth_mm": 16.0,
+          "ramp_m": 0.06
+        }
+      ],
+      "length_m": 22.22222222222222,
+      "speed_start_kph": 20.0
+    },
+    {
+      "name": "S2_поворот_влево",
+      "duration_s": 3.5,
+      "turn_direction": "LEFT",
+      "speed_end_kph": 20.0,
+      "turn_radius_m": 35.0,
+      "road": {
+        "mode": "SINE",
+        "aL_mm": 18.0,
+        "aR_mm": 18.0,
+        "lambdaL_m": 1.4,
+        "lambdaR_m": 1.4,
+        "phaseL_deg": 0.0,
+        "phaseR_deg": 180.0
+      },
+      "events": [],
+      "length_m": 19.444444444444443
+    },
+    {
+      "name": "S3_прямо_city",
+      "duration_s": 4.0,
+      "turn_direction": "STRAIGHT",
+      "speed_end_kph": 20.0,
+      "road": {
+        "mode": "ISO8608",
+        "iso_class": "D",
+        "gd_pick": "upper",
+        "gd_n0_scale": 1.0,
+        "waviness_w": 2.0,
+        "left_right_coherence": 0.55,
+        "seed": 23456
+      },
+      "events": [
+        {
+          "kind": "яма",
+          "side": "right",
+          "start_m": 4.0,
+          "length_m": 0.35,
+          "depth_mm": -18.0,
+          "ramp_m": 0.06
+        },
+        {
+          "kind": "препятствие",
+          "side": "left",
+          "start_m": 9.0,
+          "length_m": 0.3,
+          "depth_mm": 14.0,
+          "ramp_m": 0.07
+        }
+      ],
+      "length_m": 22.22222222222222
+    },
+    {
+      "name": "S4_поворот_вправо",
+      "duration_s": 3.5,
+      "turn_direction": "RIGHT",
+      "speed_end_kph": 20.0,
+      "turn_radius_m": 35.0,
+      "road": {
+        "mode": "SINE",
+        "aL_mm": 14.0,
+        "aR_mm": 14.0,
+        "lambdaL_m": 1.8,
+        "lambdaR_m": 1.8,
+        "phaseL_deg": 180.0,
+        "phaseR_deg": 0.0
+      },
+      "events": [],
+      "length_m": 19.444444444444443
+    }
+  ],
+  "track_m": 1.0,
+  "_generated_meta": {
+    "dt_s": 0.01,
+    "n_laps": 1,
+    "dx_m": 0.02,
+    "seed": 123,
+    "v0_kph": 20.0,
+    "wheelbase_m": 1.5,
+    "track_m": 1.0,
+    "ring_length_m": 83.32888888888888,
+    "lap_time_s": 15.0,
+    "n_samples": 1501,
+    "closure_policy": "closed_c1_periodic",
+    "seam_jump_left_m": 0.0,
+    "seam_jump_right_m": 0.0,
+    "seam_max_jump_m": 0.0,
+    "seam_open": false
+  },
+  "_generated_outputs": {
+    "road_csv": "scenario_OPT_READY_RING_SHORT_CITY_ROUGH_20kmh_road.csv",
+    "axay_csv": "scenario_OPT_READY_RING_SHORT_CITY_ROUGH_20kmh_axay.csv"
+  }
+}

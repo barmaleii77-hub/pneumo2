@@ -1,0 +1,18 @@
+{
+  "frame_count": 89,
+  "pairs": 88,
+  "identical_pairs_roi": 58,
+  "identical_ratio_roi": 0.6590909090909091,
+  "mean_abs_diff_roi": 5.140687432595969,
+  "median_abs_diff_roi": 0.0,
+  "mean_changed_px_ratio_roi": 0.07829314099824435,
+  "median_changed_px_ratio_roi": 0.0,
+  "mean_changed_px_ratio_roi_thr8": 0.044236853166231986,
+  "median_changed_px_ratio_roi_thr8": 0.0,
+  "roi_rel": {
+    "x0": 0.03,
+    "x1": 0.5,
+    "y0": 0.08,
+    "y1": 0.88
+  }
+}

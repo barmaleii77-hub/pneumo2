@@ -1971,15 +1971,15 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     dw_z_pivot_rear  = float(params.get('dw_z_пивота_нижнего_рычага_зад_м',   0.0))
 
     # Крепления цилиндров (12 ключевых размеров из контекста): отдельно для Ц1/Ц2 и перед/зад
-    span_C1_front = float(params.get('верх_Ц1_перед_между_ЛП_ПП_м', track))
-    span_C2_front = float(params.get('верх_Ц2_перед_между_ЛП_ПП_м', track))
-    span_C1_rear  = float(params.get('верх_Ц1_зад_между_ЛЗ_ПЗ_м', track))
-    span_C2_rear  = float(params.get('верх_Ц2_зад_между_ЛЗ_ПЗ_м', track))
+    span_C1_front = float(params.get('верх_Ц1_перед_между_ЛП_ПП_м', 0.30))
+    span_C2_front = float(params.get('верх_Ц2_перед_между_ЛП_ПП_м', 0.30))
+    span_C1_rear  = float(params.get('верх_Ц1_зад_между_ЛЗ_ПЗ_м', 0.30))
+    span_C2_rear  = float(params.get('верх_Ц2_зад_между_ЛЗ_ПЗ_м', 0.30))
 
-    topz_C1_front = float(params.get('верх_Ц1_перед_z_относительно_рамы_м', 0.25))
-    topz_C2_front = float(params.get('верх_Ц2_перед_z_относительно_рамы_м', 0.25))
-    topz_C1_rear  = float(params.get('верх_Ц1_зад_z_относительно_рамы_м',  0.25))
-    topz_C2_rear  = float(params.get('верх_Ц2_зад_z_относительно_рамы_м',  0.25))
+    topz_C1_front = float(params.get('верх_Ц1_перед_z_относительно_рамы_м', 0.52))
+    topz_C2_front = float(params.get('верх_Ц2_перед_z_относительно_рамы_м', 0.52))
+    topz_C1_rear  = float(params.get('верх_Ц1_зад_z_относительно_рамы_м',  0.52))
+    topz_C2_rear  = float(params.get('верх_Ц2_зад_z_относительно_рамы_м',  0.52))
 
     frac_C1_front = float(params.get('низ_Ц1_перед_доля_рычага', 0.60))
     frac_C2_front = float(params.get('низ_Ц2_перед_доля_рычага', 0.60))

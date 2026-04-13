@@ -97,12 +97,62 @@ def test_rod_centerline_overlay_uses_existing_rod_segment_without_inventing_geom
     assert np.allclose(vertices[1], np.asarray(state['rod_seg'][1], dtype=float), atol=1e-12)
 
 
+def test_segment_contour_line_vertices_build_two_rod_outline_rails_for_current_view() -> None:
+    from pneumo_solver_ui.desktop_animator.app import Car3DWidget
+
+    seg = np.asarray(
+        [
+            [0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ],
+        dtype=float,
+    )
+    vertices = Car3DWidget._segment_contour_line_vertices(
+        seg_xyz=seg,
+        radius_m=0.05,
+        view_dir_xyz=np.asarray([0.0, 0.0, 1.0], dtype=float),
+    )
+
+    assert vertices is not None
+    assert vertices.shape == (4, 3)
+    assert np.allclose(vertices[0], np.array([0.05, 0.0, 0.0], dtype=float), atol=1e-12)
+    assert np.allclose(vertices[1], np.array([0.05, 1.0, 0.0], dtype=float), atol=1e-12)
+    assert np.allclose(vertices[2], np.array([-0.05, 0.0, 0.0], dtype=float), atol=1e-12)
+    assert np.allclose(vertices[3], np.array([-0.05, 1.0, 0.0], dtype=float), atol=1e-12)
+
+
+def test_rod_display_segment_stretches_solid_rod_from_piston_to_outer_eye() -> None:
+    from pneumo_solver_ui.desktop_animator.app import Car3DWidget
+
+    state = cylinder_visual_state_from_packaging(
+        top_xyz=np.array([0.0, 0.0, 1.0], dtype=float),
+        bot_xyz=np.array([0.0, 0.0, 0.0], dtype=float),
+        stroke_pos_m=0.10,
+        stroke_len_m=0.25,
+        bore_d_m=0.032,
+        rod_d_m=0.016,
+        outer_d_m=0.038,
+        dead_cap_len_m=0.018,
+        dead_rod_len_m=0.025,
+        body_len_m=0.30,
+        dead_height_m=0.018,
+    )
+
+    seg = Car3DWidget._rod_display_segment_from_packaging_state(state)
+
+    assert seg is not None
+    np.testing.assert_allclose(np.asarray(seg[0], dtype=float), np.asarray(state["piston_center"], dtype=float), rtol=0.0, atol=1e-12)
+    np.testing.assert_allclose(np.asarray(seg[1], dtype=float), np.asarray(state["rod_seg"][1], dtype=float), rtol=0.0, atol=1e-12)
+
+
 def test_app_source_wires_playback_sampling_into_3d_renderer() -> None:
     src = APP.read_text(encoding='utf-8')
 
     assert 'set_playback_sample_t' in src
-    assert 'sample_t=self._playback_sample_t_s if bool(playing) else None' in src
+    assert 'sample_t=self._playback_sample_t_s' in src
     assert '_sample_time_bracket(' in src
     assert '_orient_centered_cylinder_vertices_to_y(v_unit)' in src
     assert '_rod_internal_centerline_vertices_from_packaging_state(packaging_state)' in src
+    assert 'self._segment_contour_line_vertices(' in src
     assert 'self._cyl_rod_core_lines' in src
+    assert 'self._rod_display_segment_from_packaging_state(packaging_state)' in src

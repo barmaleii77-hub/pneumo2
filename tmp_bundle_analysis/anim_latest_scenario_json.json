@@ -1,0 +1,159 @@
+{
+  "schema_version": "ring_v2",
+  "closure_policy": "closed_c1_periodic",
+  "v0_kph": 40.0,
+  "seed": 123,
+  "dx_m": 0.02,
+  "dt_s": 0.01,
+  "n_laps": 1,
+  "wheelbase_m": 1.5,
+  "track_m": 1.0,
+  "segments": [
+    {
+      "name": "S1_прямо",
+      "duration_s": 5.0,
+      "turn_direction": "STRAIGHT",
+      "speed_end_kph": 40.0,
+      "road": {
+        "center_height_start_mm": 0.0,
+        "center_height_end_mm": 0.0,
+        "cross_slope_start_pct": 0.0,
+        "cross_slope_end_pct": 0.0,
+        "mode": "ISO8608",
+        "iso_class": "E",
+        "gd_pick": "mid",
+        "gd_n0_scale": 1.0,
+        "waviness_w": 2.0,
+        "left_right_coherence": 0.5,
+        "seed": 12345
+      },
+      "events": [
+        {
+          "kind": "яма",
+          "side": "left",
+          "start_m": 8.0,
+          "length_m": 0.6,
+          "depth_mm": -35.0,
+          "ramp_m": 0.15
+        },
+        {
+          "kind": "препятствие",
+          "side": "both",
+          "start_m": 14.0,
+          "length_m": 0.35,
+          "depth_mm": 25.0,
+          "ramp_m": 0.08
+        }
+      ],
+      "uid": "83f03741",
+      "speed_start_kph": 40.0,
+      "length_m": 55.55555555555556
+    },
+    {
+      "name": "S2_поворот",
+      "duration_s": 4.0,
+      "turn_direction": "LEFT",
+      "speed_end_kph": 40.0,
+      "turn_radius_m": 60.0,
+      "road": {
+        "center_height_end_mm": 0.0,
+        "cross_slope_end_pct": 0.0,
+        "mode": "SINE",
+        "aL_mm": 50.0,
+        "aR_mm": 50.0,
+        "lambdaL_m": 1.5,
+        "lambdaR_m": 1.5,
+        "phaseL_deg": 0.0,
+        "phaseR_deg": 180.0,
+        "rand_aL": false,
+        "rand_aL_p": 0.5,
+        "rand_aL_lo_mm": 4.0,
+        "rand_aL_hi_mm": 4.0,
+        "rand_aR": false,
+        "rand_aR_p": 0.5,
+        "rand_aR_lo_mm": 4.0,
+        "rand_aR_hi_mm": 4.0,
+        "rand_lL": false,
+        "rand_lL_p": 0.5,
+        "rand_lL_lo_m": 2.5,
+        "rand_lL_hi_m": 2.5,
+        "rand_lR": false,
+        "rand_lR_p": 0.5,
+        "rand_lR_lo_m": 2.5,
+        "rand_lR_hi_m": 2.5,
+        "rand_pL": true,
+        "rand_pL_p": 0.5,
+        "rand_pL_lo_deg": 0.0,
+        "rand_pL_hi_deg": 360.0,
+        "rand_pR": true,
+        "rand_pR_p": 0.5,
+        "rand_pR_lo_deg": 0.0,
+        "rand_pR_hi_deg": 360.0
+      },
+      "events": [],
+      "uid": "2b3e9b44",
+      "length_m": 44.44444444444444
+    },
+    {
+      "name": "S3_прямо_55",
+      "duration_s": 3.0,
+      "turn_direction": "STRAIGHT",
+      "speed_end_kph": 55.0,
+      "road": {
+        "center_height_end_mm": 0.0,
+        "cross_slope_end_pct": 0.0,
+        "mode": "ISO8608",
+        "iso_class": "E",
+        "gd_pick": "mid",
+        "gd_n0_scale": 1.0,
+        "waviness_w": 2.0,
+        "left_right_coherence": 0.5,
+        "seed": 54321
+      },
+      "events": [],
+      "uid": "ff4cb66b",
+      "length_m": 39.58333333333333
+    },
+    {
+      "name": "S4_замыкание",
+      "duration_s": 3.0,
+      "turn_direction": "STRAIGHT",
+      "speed_end_kph": 40.0,
+      "road": {
+        "center_height_end_mm": 0.0,
+        "cross_slope_end_pct": 0.0,
+        "mode": "ISO8608",
+        "iso_class": "E",
+        "gd_pick": "mid",
+        "gd_n0_scale": 1.0,
+        "waviness_w": 2.0,
+        "left_right_coherence": 0.5,
+        "seed": 999
+      },
+      "events": [],
+      "uid": "7818d094",
+      "length_m": 39.58333333333333
+    }
+  ],
+  "_generated_meta": {
+    "dt_s": 0.01,
+    "n_laps": 1,
+    "dx_m": 0.02,
+    "seed": 123,
+    "v0_kph": 40.0,
+    "wheelbase_m": 1.5,
+    "track_m": 1.0,
+    "ring_length_m": 179.14444444444445,
+    "lap_time_s": 15.0,
+    "n_samples": 1501,
+    "closure_policy": "closed_c1_periodic",
+    "seam_jump_left_m": 0.0,
+    "seam_jump_right_m": 0.0,
+    "seam_max_jump_m": 0.0,
+    "seam_open": false
+  },
+  "_generated_outputs": {
+    "road_csv": "scenario_ring_test_01_road.csv",
+    "axay_csv": "scenario_ring_test_01_axay.csv"
+  }
+}

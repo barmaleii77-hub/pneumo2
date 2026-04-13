@@ -1,0 +1,17 @@
+{
+  "bundle": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_send_analysis_20260412\\workspace\\exports\\anim_latest.npz",
+  "bbox": [
+    80,
+    30,
+    1680,
+    1069
+  ],
+  "captured_frames": 74,
+  "captured_pairs": 73,
+  "identical_adjacent_pairs": 27,
+  "identical_adjacent_ratio": 0.3698630136986301,
+  "unique_frame_count": 47,
+  "effective_unique_fps": 7.833333333333333,
+  "capture_fps_target": 30.0,
+  "capture_duration_s": 6.0
+}

@@ -19,6 +19,9 @@ import csv
 import json
 from typing import Any, Dict, Optional
 
+from pneumo_solver_ui.optimization_active_runtime_summary import (
+    build_run_runtime_summary,
+)
 from pneumo_solver_ui.optimization_coordinator_handoff_runtime import (
     coordinator_handoff_plan_path,
 )
@@ -74,6 +77,7 @@ class OptimizationRunSummary:
     baseline_source_kind: str = ''
     baseline_source_label: str = ''
     baseline_source_path: Optional[Path] = None
+    runtime_summary: Optional[dict[str, Any]] = None
     handoff_available: bool = False
     handoff_plan_path: Optional[Path] = None
     handoff_target_run_dir: Optional[Path] = None
@@ -526,6 +530,12 @@ def _summarize_coordinator_run(run_dir: Path, *, active_run_dir: Optional[Path])
     contract = _objective_contract_fields(run_dir)
     problem_scope = _problem_scope_fields(run_dir)
     baseline_source = _baseline_source_fields(run_dir)
+    runtime_summary = build_run_runtime_summary(
+        run_dir,
+        pipeline_mode='coordinator',
+        backend='Distributed coordinator',
+        done=int(done_count),
+    )
     return OptimizationRunSummary(
         run_dir=run_dir,
         pipeline_mode='coordinator',
@@ -554,6 +564,7 @@ def _summarize_coordinator_run(run_dir: Path, *, active_run_dir: Optional[Path])
         baseline_source_kind=str(baseline_source['baseline_source_kind']),
         baseline_source_label=str(baseline_source['baseline_source_label']),
         baseline_source_path=baseline_source['baseline_source_path'],
+        runtime_summary=runtime_summary if runtime_summary else None,
     )
 
 

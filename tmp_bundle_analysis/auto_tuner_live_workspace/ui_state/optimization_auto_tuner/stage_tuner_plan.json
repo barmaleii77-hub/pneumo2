@@ -1,0 +1,81 @@
+{
+  "schema_version": "pneumo_opt_auto_tuner_plan_v1",
+  "suite_json": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\auto_tuner_live_workspace\\ui_state\\optimization_auto_ring_suite\\suite_auto_ring.json",
+  "suite_family": "auto_ring",
+  "suite_analysis": {
+    "family": "auto_ring",
+    "schema_version": "pneumo_opt_auto_ring_suite_v1",
+    "row_count": 13,
+    "stage_counts": {
+      "0": 5,
+      "1": 7,
+      "2": 1
+    },
+    "fragment_count": 4,
+    "fragment_names": [
+      "ringfrag_diag",
+      "ringfrag_pitch",
+      "ringfrag_roll",
+      "ringfrag_rough"
+    ],
+    "has_full_ring": true,
+    "meta_path": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\auto_tuner_live_workspace\\ui_state\\optimization_auto_ring_suite\\suite_auto_ring_meta.json"
+  },
+  "minutes_total": 10.0,
+  "jobs_hint": 8,
+  "heuristics": {
+    "minutes_scale": 1.0,
+    "jobs_scale": 1.0,
+    "complexity": 1.34
+  },
+  "stages": [
+    {
+      "stage_name": "stage0_relevance",
+      "profile_name": "ring_broad_archive",
+      "warmstart_mode": "archive",
+      "surrogate_samples": 0,
+      "surrogate_top_k": 0,
+      "sort_tests_by_cost": 1,
+      "guided_mode": "mutation",
+      "env_overrides": {
+        "PNEUMO_GUIDED_MODE": "mutation"
+      }
+    },
+    {
+      "stage_name": "stage1_long",
+      "profile_name": "ring_fragment_surrogate",
+      "warmstart_mode": "surrogate",
+      "surrogate_samples": 5489,
+      "surrogate_top_k": 43,
+      "sort_tests_by_cost": 1,
+      "guided_mode": "auto",
+      "env_overrides": {
+        "PNEUMO_GUIDED_MODE": "auto",
+        "PNEUMO_CEM_MIX": "0.55",
+        "PNEUMO_AUTO_PATIENCE": "20"
+      }
+    },
+    {
+      "stage_name": "stage2_final",
+      "profile_name": "ring_fullring_exploit",
+      "warmstart_mode": "surrogate",
+      "surrogate_samples": 17695,
+      "surrogate_top_k": 128,
+      "sort_tests_by_cost": 1,
+      "guided_mode": "auto",
+      "env_overrides": {
+        "PNEUMO_GUIDED_MODE": "auto",
+        "PNEUMO_CEM_ALPHA": "0.20",
+        "PNEUMO_CEM_MIX": "0.70",
+        "PNEUMO_AUTO_PATIENCE": "12",
+        "PNEUMO_AUTO_REHEAT_SIGMA": "0.25"
+      }
+    }
+  ],
+  "coordinator_handoff": {
+    "recommended_pipeline": "staged_then_coordinator",
+    "recommended_proposer": "portfolio",
+    "recommended_q": 2,
+    "requires_full_ring_validation": true
+  }
+}

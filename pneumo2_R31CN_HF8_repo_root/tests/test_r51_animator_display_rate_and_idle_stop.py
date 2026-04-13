@@ -26,12 +26,15 @@ def test_desktop_animator_uses_display_rate_playback_instead_of_4ms_frame_chasin
     assert 'self._play_cursor_t_s = 0.0' in APP
     assert 'Display cadence' in APP or 'display cadence' in APP
     assert 'def _nominal_positive_dt_s(t_axis: Any) -> float:' in APP
-    assert 'def _playback_interval_ms_for_speed(speed: float, *, source_dt_s: float | None = None) -> int:' in APP
-    assert 'base_ms = 8.0  # ~125 Hz stable display cadence across playback speeds.' in APP
+    assert 'def _playback_interval_ms_for_speed(' in APP
+    assert 'base_ms = 8.0  # Fallback ~125 Hz display cadence when source sampling is sparse.' in APP
+    assert 'refresh_hz = float(display_hz) if display_hz is not None else float("nan")' in APP
+    assert 'base_ms = float(np.clip(1000.0 / refresh_hz, 4.0, 20.0))' in APP
     assert 'changing playback speed' in APP
-    assert 'target_ms = 1000.0 * 1.5 * dense_dt_s' in APP
+    assert 'target_ms = 500.0 * dense_dt_s' in APP
     assert 'base_ms = min(float(base_ms), float(target_ms))' in APP
     assert 'def _advance_playback_cursor_limited(' in APP
+    assert 'def _playback_rearm_delay_ms(target_interval_ms: int, *, spent_s: float = 0.0) -> int:' in APP
     assert 'if wall_dt > max(0.18, 6.0 * interval_s):' in APP
     assert '_playback_source_index_for_time(t, float(self._play_cursor_t_s))' in APP
     assert 'base_ms = 4.0 if speed >= 1.0' not in APP

@@ -39,6 +39,15 @@ def test_data_bundle_point_xyz_reads_optional_kind_triplet() -> None:
     assert arr.shape == (1, 3)
 
 
+def test_data_bundle_point_xyz_caches_solver_triplets() -> None:
+    cols = list(point_cols('lower_arm_frame_front', 'ЛП'))
+    bundle = _bundle_with_columns(cols)
+    arr1 = bundle.point_xyz('lower_arm_frame_front', 'ЛП')
+    arr2 = bundle.point_xyz('lower_arm_frame_front', 'ЛП')
+    assert arr1 is not None
+    assert arr1 is arr2
+
+
 def test_data_bundle_point_xyz_returns_none_for_unknown_kind_without_crash() -> None:
     bundle = _bundle_with_columns(['время_с'])
     assert bundle.point_xyz('totally_unknown_kind', 'ЛП') is None

@@ -1081,6 +1081,154 @@ def launch_desktop_mnemo_follow(pointer_path: str | Path, *, theme: str = 'dark'
         return False
 
 
+def _desktop_gui_python_exe() -> str:
+    py_exe = sys.executable
+    if os.name == 'nt':
+        try:
+            cand = Path(str(sys.executable)).with_name('pythonw.exe')
+            if cand.exists():
+                py_exe = str(cand)
+        except Exception:
+            pass
+    return py_exe
+
+
+def _watch_desktop_gui_process(
+    proc: subprocess.Popen,
+    *,
+    gui_slug: str,
+    module_name: str,
+    cmd: list[str],
+) -> None:
+    def _worker() -> None:
+        try:
+            rc = int(proc.wait())
+        except Exception as e:
+            try:
+                log_event(
+                    'desktop_gui_wait_failed',
+                    gui=str(gui_slug),
+                    module=str(module_name),
+                    error=repr(e),
+                    cmd=' '.join(cmd),
+                )
+            except Exception:
+                pass
+            return
+        try:
+            log_event(
+                'desktop_gui_exit',
+                gui=str(gui_slug),
+                module=str(module_name),
+                returncode=rc,
+                cmd=' '.join(cmd),
+            )
+        except Exception:
+            pass
+
+    try:
+        threading.Thread(
+            target=_worker,
+            daemon=True,
+            name=f'desktop_gui_exit_watch_{gui_slug}',
+        ).start()
+    except Exception:
+        pass
+
+
+def launch_desktop_gui_module(
+    module_name: str,
+    *,
+    gui_slug: str,
+    gui_args: Optional[List[str]] = None,
+) -> bool:
+    """Best-effort launch for standalone desktop GUI modules from the heavy WEB home page."""
+    try:
+        cmd = [
+            _desktop_gui_python_exe(),
+            '-m',
+            str(module_name),
+        ]
+        if gui_args:
+            cmd.extend([str(arg) for arg in gui_args if str(arg or '').strip()])
+
+        log_dir = _desktop_animator_log_dir()
+        log_dir.mkdir(parents=True, exist_ok=True)
+        stdout_path = log_dir / f'{gui_slug}_stdout.log'
+        stderr_path = log_dir / f'{gui_slug}_stderr.log'
+        with open(stdout_path, 'ab') as f_out, open(stderr_path, 'ab') as f_err:
+            creationflags = 0
+            startupinfo = None
+            if os.name == 'nt':
+                creationflags = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
+                startupinfo = subprocess.STARTUPINFO()  # type: ignore[attr-defined]
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW  # type: ignore[attr-defined]
+            proc = subprocess.Popen(
+                cmd,
+                cwd=str(ROOT_DIR),
+                stdout=f_out,
+                stderr=f_err,
+                creationflags=creationflags,
+                startupinfo=startupinfo,
+            )
+
+        _watch_desktop_gui_process(
+            proc,
+            gui_slug=str(gui_slug),
+            module_name=str(module_name),
+            cmd=cmd,
+        )
+        try:
+            log_event(
+                'desktop_gui_spawned',
+                gui=str(gui_slug),
+                module=str(module_name),
+                cmd=' '.join(cmd),
+                pid=int(getattr(proc, 'pid', 0) or 0),
+                stdout_log=str(stdout_path),
+                stderr_log=str(stderr_path),
+            )
+        except Exception:
+            pass
+        return True
+    except Exception as e:
+        try:
+            log_event(
+                'desktop_gui_spawn_failed',
+                gui=str(gui_slug),
+                module=str(module_name),
+                error=repr(e),
+            )
+        except Exception:
+            pass
+        return False
+
+
+def open_desktop_path(path_value: str | Path) -> bool:
+    """Best-effort open of a desktop path from the heavy WEB home page."""
+    try:
+        target = Path(path_value).expanduser().resolve()
+        if target.suffix == '':
+            target.mkdir(parents=True, exist_ok=True)
+        if os.name == 'nt':
+            os.startfile(str(target))  # type: ignore[attr-defined]
+        elif sys.platform == 'darwin':
+            subprocess.Popen(['open', str(target)])
+        else:
+            subprocess.Popen(['xdg-open', str(target)])
+        try:
+            log_event('desktop_path_opened', path=str(target))
+        except Exception:
+            pass
+        return True
+    except Exception as e:
+        try:
+            log_event('desktop_path_open_failed', path=str(path_value), error=repr(e))
+        except Exception:
+            pass
+        return False
+
+
 
 consume_svg_pick_event = build_svg_pick_consumer(
     st.session_state,
@@ -6652,7 +6800,80 @@ else:
                                 st.warning('Не удалось запустить Desktop Mnemo (см. логи).')
                     with cols_da[2]:
                         st.caption(f'Файл NPZ: {npz_path}')
+                        st.caption(
+                            'Готовность anim_latest: '
+                            + (
+                                'NPZ готов, pointer готов.'
+                                if (npz_path.exists() and ptr_path.exists())
+                                else 'нужен свежий экспорт anim_latest.'
+                            )
+                        )
                         st.caption('Подсказка: включите **Авто-экспорт anim_latest** в настройках детального прогона. Animator даёт 3D/2D виды, Mnemo даёт отдельное HMI-окно с анимированной мнемохемой.')
+                    st.markdown('**Другие отдельные GUI-окна проекта**')
+                    _desktop_gui_items = [
+                        (
+                            'Открыть центр desktop-инструментов',
+                            'Центр desktop-инструментов',
+                            'pneumo_solver_ui.tools.desktop_control_center',
+                            'desktop_control_center',
+                            [],
+                        ),
+                        (
+                            'Открыть редактор исходных данных',
+                            'Редактор исходных данных',
+                            'pneumo_solver_ui.tools.desktop_input_editor',
+                            'desktop_input_editor',
+                            [],
+                        ),
+                        (
+                            'Открыть центр тестов',
+                            'Центр тестов',
+                            'pneumo_solver_ui.tools.test_center_gui',
+                            'test_center_gui',
+                            [],
+                        ),
+                        (
+                            'Открыть GUI автотестов',
+                            'GUI автотестов',
+                            'pneumo_solver_ui.tools.run_autotest_gui',
+                            'run_autotest_gui',
+                            [],
+                        ),
+                        (
+                            'Открыть GUI диагностики',
+                            'GUI диагностики',
+                            'pneumo_solver_ui.tools.run_full_diagnostics_gui',
+                            'run_full_diagnostics_gui',
+                            [],
+                        ),
+                        (
+                            'Открыть GUI отправки результатов',
+                            'GUI отправки результатов',
+                            'pneumo_solver_ui.tools.send_results_gui',
+                            'send_results_gui',
+                            [],
+                        ),
+                        (
+                            'Открыть Compare Viewer',
+                            'Compare Viewer',
+                            'pneumo_solver_ui.qt_compare_viewer',
+                            'qt_compare_viewer',
+                            [str(npz_path)] if npz_path.exists() else [],
+                        ),
+                    ]
+                    _desktop_gui_cols = st.columns(3)
+                    for _idx, (_button_label, _window_label, _module_name, _gui_slug, _gui_args) in enumerate(_desktop_gui_items):
+                        with _desktop_gui_cols[_idx % 3]:
+                            if st.button(_button_label, key=f'home_desktop_gui_{_gui_slug}_{cache_key}'):
+                                _ok_gui = launch_desktop_gui_module(
+                                    _module_name,
+                                    gui_slug=_gui_slug,
+                                    gui_args=_gui_args,
+                                )
+                                if _ok_gui:
+                                    st.success(f'Окно «{_window_label}» запущено (если система позволяет GUI).')
+                                else:
+                                    st.warning(f'Не удалось запустить окно «{_window_label}» (см. логи).')
 
                 # -----------------------------------
                 # Global timeline (shared playhead)

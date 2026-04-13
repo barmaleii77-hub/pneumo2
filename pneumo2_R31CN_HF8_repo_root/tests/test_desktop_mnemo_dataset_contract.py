@@ -13,8 +13,13 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     from pneumo_solver_ui.desktop_mnemo.app import (
         _build_active_diagonal_focus_meta,
         _build_route_pressure_strip_payloads,
+        _edge_actuation_active,
+        _node_label_presentation_meta,
         _route_pressure_strip_cause_effect_meta,
         _route_pressure_strip_flow_meta,
+        _route_node_label_opacity_profile,
+        _route_focus_opacity_profile,
+        _route_focus_visibility_meta,
         _route_pressure_strip_history_meta,
         _route_pressure_strip_intermediate_nodes_meta,
         _route_pressure_strip_terminal_meta,
@@ -208,6 +213,9 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     assert any(item["canonical_kind"] == "check" for item in diagnostics["components"])
     assert any(item["camozzi_code"] == "VNR-238-3/8" for item in diagnostics["components"])
     assert any(item["icon_key"] == "check" for item in diagnostics["components"])
+    assert any(item["anchor_node_name"] == "узел_после_ОК_Pmid" for item in diagnostics["components"])
+    assert any(item["anchor_node_source"] == "indicator" for item in diagnostics["components"])
+    assert any(bool(item["actuated"]) for item in diagnostics["components"])
     assert diagnostics["diagonal_focus"]["edges"] == []
     route_pressure_strips = _build_route_pressure_strip_payloads(
         dataset,
@@ -247,6 +255,7 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     assert any("Регуляторный узел" in str(item["summary_text"]) for item in regulator_intermediate)
     assert any("ведущего" in str(item["lead_hint_text"]).lower() for item in regulator_intermediate)
     assert any(str(item["lead_trend_text"]) for item in regulator_intermediate)
+    assert any("Q" in str(item["flow_hint_text"]) for item in regulator_intermediate)
     assert diagnostics["route_pressure_strips"]
     assert any(item["role"] == "regulator" for item in diagnostics["route_pressure_strips"])
 
@@ -326,8 +335,13 @@ def test_active_diagonal_focus_meta_surfaces_diagonal_nodes_and_alerts(tmp_path:
     from pneumo_solver_ui.desktop_mnemo.app import (
         _build_active_diagonal_focus_meta,
         _build_route_pressure_strip_payloads,
+        _edge_actuation_active,
+        _node_label_presentation_meta,
         _route_pressure_strip_cause_effect_meta,
         _route_pressure_strip_flow_meta,
+        _route_node_label_opacity_profile,
+        _route_focus_opacity_profile,
+        _route_focus_visibility_meta,
         _route_pressure_strip_history_meta,
         _route_pressure_strip_intermediate_nodes_meta,
         _route_pressure_strip_terminal_meta,
@@ -458,6 +472,7 @@ def test_active_diagonal_focus_meta_surfaces_diagonal_nodes_and_alerts(tmp_path:
     assert any("Камерный узел" in str(item["summary_text"]) for item in diagonal_intermediate)
     assert any("ведущего" in str(item["lead_hint_text"]).lower() for item in diagonal_intermediate)
     assert any(str(item["lead_trend_text"]) for item in diagonal_intermediate)
+    assert any("Q" in str(item["flow_hint_text"]) for item in diagonal_intermediate)
     route_pressure_strips = _build_route_pressure_strip_payloads(dataset, 1, selected_edge=selected_edge)
     assert route_pressure_strips
     assert any(item["role"] == "diagonal" for item in route_pressure_strips)
@@ -511,6 +526,105 @@ def test_active_diagonal_focus_meta_surfaces_diagonal_nodes_and_alerts(tmp_path:
     )
     assert tail_meta["cause_effect_status"] == "Q тянется после ΔP"
     assert tail_meta["cause_effect_badge"] == "ΔP→Q tail"
+    focused_visibility = _route_focus_visibility_meta(
+        {
+            "severity": "focus",
+            "selected": True,
+            "delta_p_bar": 1.45,
+            "trend_tone": "info",
+            "q_tone": "info",
+            "cause_effect_tone": "warn",
+        },
+        {"q_history_available": True, "equalized": False},
+        detail_mode="operator",
+    )
+    assert focused_visibility["show_leading_chip"] is True
+    assert focused_visibility["show_trailing_chip"] is True
+    assert focused_visibility["show_summary"] is True
+    assert focused_visibility["show_history_strip"] is True
+    calm_visibility = _route_focus_visibility_meta(
+        {
+            "severity": "focus",
+            "selected": True,
+            "delta_p_bar": 0.06,
+            "trend_tone": "neutral",
+            "q_tone": "neutral",
+            "cause_effect_tone": "ok",
+        },
+        {"q_history_available": False, "equalized": True},
+        detail_mode="operator",
+    )
+    assert calm_visibility["show_leading_chip"] is True
+    assert calm_visibility["show_trailing_chip"] is False
+    assert calm_visibility["show_summary"] is False
+    quiet_visibility = _route_focus_visibility_meta(
+        {
+            "severity": "attention",
+            "selected": False,
+            "hovered": False,
+            "delta_p_bar": 0.08,
+            "trend_tone": "neutral",
+            "q_tone": "neutral",
+            "cause_effect_tone": "neutral",
+        },
+        {"q_history_available": False, "equalized": False},
+        detail_mode="quiet",
+    )
+    assert quiet_visibility["show_trailing_chip"] is False
+    assert quiet_visibility["show_summary"] is False
+    quiet_opacity = _route_focus_opacity_profile(quiet_visibility, detail_mode="quiet")
+    focused_opacity = _route_focus_opacity_profile(focused_visibility, detail_mode="operator")
+    assert focused_opacity["strip_core_alpha"] > quiet_opacity["strip_core_alpha"]
+    assert focused_opacity["node_ring_alpha"] > quiet_opacity["node_ring_alpha"]
+    assert focused_opacity["node_label_bg_alpha"] > quiet_opacity["node_label_bg_alpha"]
+    assert focused_opacity["node_label_text_alpha"] > quiet_opacity["node_label_text_alpha"]
+    leading_label_opacity = _route_node_label_opacity_profile(
+        focused_opacity,
+        node_role="leading",
+        detail_mode="operator",
+    )
+    trailing_label_opacity = _route_node_label_opacity_profile(
+        quiet_opacity,
+        node_role="trailing",
+        detail_mode="quiet",
+    )
+    assert leading_label_opacity["label_bg_alpha"] > trailing_label_opacity["label_bg_alpha"]
+    assert leading_label_opacity["label_text_alpha"] > trailing_label_opacity["label_text_alpha"]
+    selected_presentation = _node_label_presentation_meta(
+        "Ресивер3",
+        detail_mode="operator",
+        route_label_role="leading",
+        is_selected=True,
+    )
+    quiet_chamber_presentation = _node_label_presentation_meta(
+        "Ц2_ЛП_БП",
+        detail_mode="quiet",
+    )
+    assert selected_presentation["layout_mode"] == "full"
+    assert quiet_chamber_presentation["layout_mode"] == "minimal"
+    assert selected_presentation["value_mode"] == "separate"
+    assert quiet_chamber_presentation["value_mode"] == "inline"
+    assert selected_presentation["alpha_scale"] > quiet_chamber_presentation["alpha_scale"]
+    assert selected_presentation["label_rect"][2] > quiet_chamber_presentation["label_rect"][2]
+    assert quiet_chamber_presentation["inline_value_rect"][2] < quiet_chamber_presentation["value_rect"][2]
+    quiet_regulator_presentation = _node_label_presentation_meta(
+        "узел_после_ОК_Pmid",
+        detail_mode="quiet",
+    )
+    assert quiet_regulator_presentation["layout_mode"] == "compact"
+    assert quiet_regulator_presentation["value_mode"] == "inline"
+    assert _edge_actuation_active(
+        component_kind="Регулятор",
+        canonical_kind="reg_after",
+        open_state=True,
+        flow_value=0.0,
+    ) is True
+    assert _edge_actuation_active(
+        component_kind="Линия",
+        canonical_kind="",
+        open_state=None,
+        flow_value=0.6,
+    ) is False
 
     alerts = _build_frame_alert_payload(
         dataset,

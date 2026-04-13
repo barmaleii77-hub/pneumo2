@@ -62,6 +62,14 @@ DETAIL_MODE_LABELS: dict[str, str] = {
     "operator": "Оператор",
     "full": "Полно",
 }
+FLOW_DISPLAY_MODE_LABELS: dict[str, str] = {
+    "nlpm": "Нл/мин",
+    "kg_s": "кг/с",
+}
+PRESSURE_DISPLAY_MODE_LABELS: dict[str, str] = {
+    "bar_g": "бар(g)",
+    "pa_abs": "Па(abs)",
+}
 
 PRESSURE_HEAT_STOPS: tuple[tuple[float, tuple[int, int, int]], ...] = (
     (0.00, (86, 198, 255)),
@@ -403,6 +411,7 @@ class CylinderSnapshot:
 class EdgeActivitySnapshot:
     edge_name: str
     component_kind: str
+    canonical_kind: str
     q_now: float
     direction_label: str
     state_label: str
@@ -1093,6 +1102,115 @@ def _flow_scale_and_unit(p_atm: float) -> tuple[float, str]:
 
 def _bar_g(pa_values: np.ndarray, p_atm: float) -> np.ndarray:
     return (np.asarray(pa_values, dtype=float) - float(p_atm)) / 1.0e5
+
+
+def _normalize_flow_display_mode(mode: str) -> str:
+    raw_mode = str(mode or "").strip().lower()
+    return raw_mode if raw_mode in FLOW_DISPLAY_MODE_LABELS else "nlpm"
+
+
+def _normalize_pressure_display_mode(mode: str) -> str:
+    raw_mode = str(mode or "").strip().lower()
+    return raw_mode if raw_mode in PRESSURE_DISPLAY_MODE_LABELS else "bar_g"
+
+
+def _flow_display_unit(dataset: MnemoDataset | None, mode: str) -> str:
+    normalized = _normalize_flow_display_mode(mode)
+    if normalized == "kg_s":
+        return "кг/с"
+    if dataset is not None and str(dataset.q_unit or "").strip():
+        return str(dataset.q_unit)
+    return FLOW_DISPLAY_MODE_LABELS["nlpm"]
+
+
+def _pressure_display_unit(mode: str) -> str:
+    normalized = _normalize_pressure_display_mode(mode)
+    return "Па" if normalized == "pa_abs" else "бар(g)"
+
+
+def _pressure_delta_display_unit(mode: str) -> str:
+    normalized = _normalize_pressure_display_mode(mode)
+    return "Па" if normalized == "pa_abs" else "бар"
+
+
+def _flow_value_from_dataset_units(value: Any, dataset: MnemoDataset | None, mode: str) -> float | None:
+    finite = _finite_or_none(value)
+    if finite is None:
+        return None
+    normalized = _normalize_flow_display_mode(mode)
+    if normalized == "kg_s" and dataset is not None:
+        scale = max(float(dataset.q_scale or 0.0), 1.0e-9)
+        return float(finite) / scale
+    return float(finite)
+
+
+def _flow_series_for_display(dataset: MnemoDataset | None, q_values: np.ndarray | list[float], mode: str) -> np.ndarray:
+    arr = np.asarray(q_values, dtype=float)
+    if dataset is None:
+        return arr
+    normalized = _normalize_flow_display_mode(mode)
+    if normalized == "kg_s":
+        return arr
+    return arr * float(dataset.q_scale)
+
+
+def _pressure_value_from_pa(value_pa: Any, dataset: MnemoDataset | None, mode: str) -> float | None:
+    finite = _finite_or_none(value_pa)
+    if finite is None or dataset is None:
+        return finite
+    normalized = _normalize_pressure_display_mode(mode)
+    if normalized == "pa_abs":
+        return float(finite)
+    return float((float(finite) - float(dataset.p_atm)) / 1.0e5)
+
+
+def _pressure_series_from_pa(dataset: MnemoDataset | None, p_values: np.ndarray | list[float], mode: str) -> np.ndarray:
+    arr = np.asarray(p_values, dtype=float)
+    if dataset is None:
+        return arr
+    normalized = _normalize_pressure_display_mode(mode)
+    if normalized == "pa_abs":
+        return arr
+    return _bar_g(arr, dataset.p_atm)
+
+
+def _pressure_value_from_bar_g(value_bar_g: Any, dataset: MnemoDataset | None, mode: str) -> float | None:
+    finite = _finite_or_none(value_bar_g)
+    if finite is None:
+        return None
+    normalized = _normalize_pressure_display_mode(mode)
+    if normalized == "pa_abs" and dataset is not None:
+        return float(finite) * 1.0e5 + float(dataset.p_atm)
+    return float(finite)
+
+
+def _pressure_delta_from_bar(value_bar: Any, mode: str) -> float | None:
+    finite = _finite_or_none(value_bar)
+    if finite is None:
+        return None
+    normalized = _normalize_pressure_display_mode(mode)
+    if normalized == "pa_abs":
+        return float(finite) * 1.0e5
+    return float(finite)
+
+
+def _flow_display_digits(mode: str) -> int:
+    return 4 if _normalize_flow_display_mode(mode) == "kg_s" else 1
+
+
+def _pressure_display_digits(mode: str) -> int:
+    return 0 if _normalize_pressure_display_mode(mode) == "pa_abs" else 2
+
+
+def _pressure_delta_display_digits(mode: str) -> int:
+    return 0 if _normalize_pressure_display_mode(mode) == "pa_abs" else 2
+
+
+def _fmt_display_value(value: Any, unit: str, *, digits: int) -> str:
+    finite = _finite_or_none(value)
+    if finite is None:
+        return f"— {unit}".strip()
+    return f"{finite:.{int(digits)}f} {unit}".strip()
 
 
 def _remove_duplicate_points(points: list[tuple[float, float]]) -> list[list[float]]:
@@ -1892,7 +2010,9 @@ def _route_pressure_strip_intermediate_nodes_meta(
     role = str(item.get("role") or "")
     start_node = str(item.get("start_node") or "")
     end_node = str(item.get("end_node") or "")
-    terminal_meta = _route_pressure_strip_terminal_meta(item)
+    q_status = str(item.get("q_status") or "")
+    cause_effect_status = str(item.get("cause_effect_status") or "")
+    terminal_meta = _route_pressure_strip_terminal_meta(item, dataset=dataset)
     leading_node_name = str(terminal_meta.get("leading_node") or "")
     leading_pressure_bar_g = _node_pressure_for_index(dataset, leading_node_name, idx) if leading_node_name else None
     endpoint_names = {name for name in [start_node, end_node] if name}
@@ -1983,6 +2103,41 @@ def _route_pressure_strip_intermediate_nodes_meta(
             return "Уходит от ведущего"
         return "Держит разброс к ведущему"
 
+    def _flow_hint_text(pressure_bar_g: float | None, lead_trend: str) -> str:
+        if not q_status or q_status == "Q без истории":
+            return "Q к узлу: —"
+        if q_status == "Q сменил знак":
+            return "Q меняет ход у узла"
+
+        delta_to_lead = None
+        if pressure_bar_g is not None and leading_pressure_bar_g is not None:
+            delta_to_lead = abs(float(pressure_bar_g) - float(leading_pressure_bar_g))
+        close_to_lead = delta_to_lead is not None and delta_to_lead <= 0.08
+        converging = lead_trend in {"Идёт к выравниванию", "Сближается с ведущим"}
+
+        if cause_effect_status == "Q запаздывает за ΔP":
+            return "Q ещё не дошёл до узла"
+        if cause_effect_status == "Q тянется после ΔP":
+            return "Q тянется через узел"
+        if cause_effect_status == "Q спорит с ΔP":
+            return "Q спорит с узлом"
+
+        if q_status in {"Q нарастает", "Q после переключения"}:
+            if close_to_lead:
+                return "Q уже поддержал узел"
+            if converging:
+                return "Q доходит до узла"
+            return "Q идёт, узел держит градиент"
+        if q_status == "Q удерживается":
+            if close_to_lead:
+                return "Q держится у узла"
+            return "Q проходит через узел"
+        if q_status in {"Q спадает", "Q затихает", "Q спокоен"}:
+            if converging or lead_trend == "Идёт к выравниванию":
+                return "Q гаснет у узла"
+            return "Q слабо поддерживает узел"
+        return f"Q у узла: {q_status}"
+
     def _add_node(node_name: str, source: str) -> None:
         name = str(node_name or "")
         if not name or name in seen or name not in dataset.node_names:
@@ -1994,6 +2149,7 @@ def _route_pressure_strip_intermediate_nodes_meta(
         pressure_label = f"{float(pressure_bar_g):0.2f} бар(g)" if pressure_bar_g is not None else "давление —"
         lead_hint = _lead_hint_text(pressure_bar_g)
         lead_trend = _lead_trend_text(name)
+        flow_hint = _flow_hint_text(pressure_bar_g, lead_trend)
         rows.append(
             {
                 "name": name,
@@ -2006,6 +2162,7 @@ def _route_pressure_strip_intermediate_nodes_meta(
                 "summary_text": f"{role_label} • {pressure_label}",
                 "lead_hint_text": lead_hint,
                 "lead_trend_text": lead_trend,
+                "flow_hint_text": flow_hint,
                 "source": source,
             }
         )
@@ -2060,6 +2217,8 @@ def _build_active_diagonal_focus_meta(
     idx: int,
     *,
     selected_edge: str | None,
+    flow_display_mode: str = "nlpm",
+    pressure_display_mode: str = "bar_g",
 ) -> dict[str, Any]:
     if dataset is None or dataset.time_s.size == 0:
         return {"edges": [], "nodes": [], "node_names": []}
@@ -2071,6 +2230,11 @@ def _build_active_diagonal_focus_meta(
     selected_edge_name = str(selected_edge or "") if selected_edge in dataset.edge_names else ""
     top_abs_flow = abs(float(edge_rows[0][1])) if edge_rows else 0.0
     activation_threshold = max(6.0, top_abs_flow * 0.24)
+    flow_unit = _flow_display_unit(dataset, flow_display_mode)
+    pressure_unit = _pressure_display_unit(pressure_display_mode)
+    pressure_delta_unit = _pressure_delta_display_unit(pressure_display_mode)
+    flow_digits = _flow_display_digits(flow_display_mode)
+    pressure_delta_digits = _pressure_delta_display_digits(pressure_display_mode)
 
     edge_items: list[dict[str, Any]] = []
     node_bucket: dict[str, dict[str, Any]] = {}
@@ -2088,6 +2252,8 @@ def _build_active_diagonal_focus_meta(
         pressure_pairs = [(name, _node_pressure_for_index(dataset, name, idx)) for name in focus_nodes]
         known_pressures = [float(value) for _, value in pressure_pairs if value is not None]
         pressure_span = max(known_pressures) - min(known_pressures) if len(known_pressures) >= 2 else None
+        q_now_display = _flow_value_from_dataset_units(q_now, dataset, flow_display_mode)
+        pressure_span_display = _pressure_delta_from_bar(pressure_span, pressure_display_mode)
         severity = "focus" if edge_name == selected_edge_name or rank == 1 else "attention"
         if severity != "focus" and pressure_span is not None and pressure_span >= 1.2:
             severity = "warn"
@@ -2101,9 +2267,11 @@ def _build_active_diagonal_focus_meta(
                 "pressure_span_bar": pressure_span,
                 "label": "Активная диагональ" if edge_name != selected_edge_name else "Выбранная диагональ",
                 "summary": (
-                    f"{edge_name}: |Q|={abs(float(q_now)):4.1f} {dataset.q_unit}"
+                    f"{edge_name}: |Q|="
+                    f"{_fmt_display_value(abs(q_now_display), flow_unit, digits=flow_digits)}"
                     + (
-                        f", ΔP по узлам {pressure_span:4.2f} бар(g)."
+                        f", ΔP по узлам "
+                        f"{_fmt_display_value(pressure_span_display, pressure_delta_unit, digits=pressure_delta_digits)}."
                         if pressure_span is not None
                         else "."
                     )
@@ -2124,6 +2292,11 @@ def _build_active_diagonal_focus_meta(
                     "edge_names": [],
                     "label": "Узел диагонали" if DIAGONAL_RE.match(node_name) else "Порт диагонали",
                     "summary": "Участвует в активной диагональной связи.",
+                    "pressure_label": _fmt_display_value(
+                        _pressure_value_from_bar_g(pressure, dataset, pressure_display_mode),
+                        pressure_unit,
+                        digits=_pressure_display_digits(pressure_display_mode),
+                    ),
                 },
             )
             if _severity_rank(severity) > _severity_rank(str(item.get("severity") or "")):
@@ -2158,6 +2331,8 @@ def _build_route_pressure_strip_payloads(
     idx: int,
     *,
     selected_edge: str | None,
+    flow_display_mode: str = "nlpm",
+    pressure_display_mode: str = "bar_g",
 ) -> list[dict[str, Any]]:
     if dataset is None or dataset.time_s.size == 0:
         return []
@@ -2170,6 +2345,12 @@ def _build_route_pressure_strip_payloads(
     selected_edge_name = str(selected_edge or "") if selected_edge in dataset.edge_names else ""
     top_abs_flow = abs(float(edge_rows[0][1])) if edge_rows else 0.0
     activation_threshold = max(6.0, top_abs_flow * 0.18)
+    flow_unit = _flow_display_unit(dataset, flow_display_mode)
+    pressure_unit = _pressure_display_unit(pressure_display_mode)
+    pressure_delta_unit = _pressure_delta_display_unit(pressure_display_mode)
+    flow_digits = _flow_display_digits(flow_display_mode)
+    pressure_digits = _pressure_display_digits(pressure_display_mode)
+    pressure_delta_digits = _pressure_delta_display_digits(pressure_display_mode)
 
     for rank, (edge_name, q_now) in enumerate(edge_rows[:18], start=1):
         edge_name = str(edge_name or "")
@@ -2194,6 +2375,7 @@ def _build_route_pressure_strip_payloads(
         p1_series_bar_g = _node_pressure_series_bar_g(dataset, node_1) if node_1 else None
         p2_series_bar_g = _node_pressure_series_bar_g(dataset, node_2) if node_2 else None
         q_series = _edge_flow_series_scaled(dataset, edge_name)
+        q_series_display = _flow_series_for_display(dataset, q_series, flow_display_mode) if q_series is not None else None
         open_series = _edge_open_series(dataset, edge_name)
 
         delta_p_bar = None
@@ -2207,22 +2389,26 @@ def _build_route_pressure_strip_payloads(
         )
         flow_meta = _route_pressure_strip_flow_meta(
             time_s=dataset.time_s,
-            q_values=q_series,
+            q_values=q_series_display,
             open_values=open_series,
             idx=idx,
-            q_unit=dataset.q_unit,
+            q_unit=flow_unit,
         )
         history_meta = _route_pressure_strip_history_meta(
             time_s=dataset.time_s,
-            q_values=q_series,
+            q_values=q_series_display,
             open_values=open_series,
             idx=idx,
-            q_unit=dataset.q_unit,
+            q_unit=flow_unit,
         )
         cause_effect_meta = _route_pressure_strip_cause_effect_meta(
             trend_meta=trend_meta,
             flow_meta=flow_meta,
         )
+        p1_display = _pressure_value_from_bar_g(p1_bar_g, dataset, pressure_display_mode)
+        p2_display = _pressure_value_from_bar_g(p2_bar_g, dataset, pressure_display_mode)
+        delta_p_display = _pressure_delta_from_bar(delta_p_bar, pressure_display_mode)
+        q_now_display = _flow_value_from_dataset_units(q_now, dataset, flow_display_mode)
 
         severity = "focus" if edge_name == selected_edge_name or rank == 1 else "attention"
         if severity != "focus" and delta_p_bar is not None and delta_p_bar >= (1.0 if role == "diagonal" else 1.4):
@@ -2248,22 +2434,32 @@ def _build_route_pressure_strip_payloads(
                 "p2_bar_g": _finite_or_none(p2_bar_g),
                 "delta_p_bar": _finite_or_none(delta_p_bar),
                 "flow": _finite_or_none(q_now),
+                "flow_display": q_now_display,
+                "flow_unit": flow_unit,
+                "pressure_unit": pressure_unit,
+                "pressure_delta_unit": pressure_delta_unit,
                 "label": f"ΔP фокус-{role_label}" if edge_name == selected_edge_name else f"ΔP {role_label}",
                 "pressure_label": (
-                    f"{float(p1_bar_g):0.2f} → {float(p2_bar_g):0.2f} бар(g)"
-                    if p1_bar_g is not None and p2_bar_g is not None
+                    f"{_fmt_display_value(p1_display, pressure_unit, digits=pressure_digits)}"
+                    f" → {_fmt_display_value(p2_display, pressure_unit, digits=pressure_digits)}"
+                    if p1_display is not None and p2_display is not None
                     else (
-                        f"{float(p1_bar_g):0.2f} бар(g)"
-                        if p1_bar_g is not None
-                        else f"{float(p2_bar_g):0.2f} бар(g)"
+                        _fmt_display_value(p1_display, pressure_unit, digits=pressure_digits)
+                        if p1_display is not None
+                        else _fmt_display_value(p2_display, pressure_unit, digits=pressure_digits)
                     )
                 ),
-                "delta_label": f"ΔP {float(delta_p_bar):0.2f}" if delta_p_bar is not None else "ΔP —",
+                "delta_label": (
+                    f"ΔP {_fmt_display_value(delta_p_display, pressure_delta_unit, digits=pressure_delta_digits)}"
+                    if delta_p_display is not None
+                    else "ΔP —"
+                ),
                 "summary": (
                     f"{_short_node_label(node_1)} → {_short_node_label(node_2)}"
                     + (
-                        f" • {float(p1_bar_g):0.2f} → {float(p2_bar_g):0.2f} бар(g)"
-                        if p1_bar_g is not None and p2_bar_g is not None
+                        f" • {_fmt_display_value(p1_display, pressure_unit, digits=pressure_digits)}"
+                        f" → {_fmt_display_value(p2_display, pressure_unit, digits=pressure_digits)}"
+                        if p1_display is not None and p2_display is not None
                         else ""
                     )
                 )
@@ -2301,7 +2497,12 @@ def _build_route_pressure_strip_payloads(
     return payloads[:6]
 
 
-def _route_pressure_strip_terminal_meta(payload: dict[str, Any] | None) -> dict[str, Any]:
+def _route_pressure_strip_terminal_meta(
+    payload: dict[str, Any] | None,
+    *,
+    dataset: MnemoDataset | None = None,
+    pressure_display_mode: str = "bar_g",
+) -> dict[str, Any]:
     item = dict(payload or {})
     start_node = str(item.get("start_node") or "")
     end_node = str(item.get("end_node") or "")
@@ -2356,6 +2557,11 @@ def _route_pressure_strip_terminal_meta(payload: dict[str, Any] | None) -> dict[
         end_badge = "P"
         leader_summary = f"Опорный конец: {end_label}"
 
+    pressure_unit = _pressure_display_unit(pressure_display_mode)
+    pressure_digits = _pressure_display_digits(pressure_display_mode)
+    p1_display = _pressure_value_from_bar_g(p1_bar_g, dataset, pressure_display_mode)
+    p2_display = _pressure_value_from_bar_g(p2_bar_g, dataset, pressure_display_mode)
+
     return {
         "edge_name": str(item.get("edge_name") or ""),
         "role": str(item.get("role") or ""),
@@ -2373,8 +2579,12 @@ def _route_pressure_strip_terminal_meta(payload: dict[str, Any] | None) -> dict[
         "end_label": end_label,
         "start_badge": start_badge,
         "end_badge": end_badge,
-        "start_pressure_label": f"{float(p1_bar_g):0.2f} бар(g)" if p1_bar_g is not None else "—",
-        "end_pressure_label": f"{float(p2_bar_g):0.2f} бар(g)" if p2_bar_g is not None else "—",
+        "start_pressure_label": _fmt_display_value(p1_display, pressure_unit, digits=pressure_digits)
+        if p1_display is not None
+        else "—",
+        "end_pressure_label": _fmt_display_value(p2_display, pressure_unit, digits=pressure_digits)
+        if p2_display is not None
+        else "—",
         "trend_status": str(item.get("trend_status") or ""),
         "trend_badge": str(item.get("trend_badge") or ""),
         "trend_tone": str(item.get("trend_tone") or "neutral"),
@@ -2394,6 +2604,303 @@ def _route_pressure_strip_terminal_meta(payload: dict[str, Any] | None) -> dict[
         "cause_effect_badge": str(item.get("cause_effect_badge") or ""),
         "cause_effect_tone": str(item.get("cause_effect_tone") or "neutral"),
         "cause_effect_summary": str(item.get("cause_effect_summary") or ""),
+    }
+
+
+def _route_focus_visibility_meta(
+    payload: dict[str, Any] | None,
+    terminal_meta: dict[str, Any] | None,
+    *,
+    detail_mode: str,
+) -> dict[str, Any]:
+    item = dict(payload or {})
+    terminal = dict(terminal_meta or {})
+    mode = str(detail_mode or "operator").strip().lower()
+    if mode not in DETAIL_MODE_LABELS:
+        mode = "operator"
+
+    severity = str(item.get("severity") or terminal.get("severity") or "info")
+    score = {
+        "focus": 2.2,
+        "warn": 1.8,
+        "attention": 1.1,
+        "info": 0.6,
+    }.get(severity, 0.4)
+    if bool(item.get("selected") or terminal.get("selected")):
+        score += 1.0
+    if bool(item.get("hovered")):
+        score += 1.2
+
+    for tone_name in (
+        str(item.get("trend_tone") or terminal.get("trend_tone") or "neutral"),
+        str(item.get("q_tone") or terminal.get("q_tone") or "neutral"),
+    ):
+        score += {
+            "warn": 0.7,
+            "info": 0.35,
+            "ok": 0.2,
+        }.get(tone_name, 0.0)
+
+    score += {
+        "warn": 1.0,
+        "info": 0.4,
+        "ok": 0.3,
+    }.get(str(item.get("cause_effect_tone") or terminal.get("cause_effect_tone") or "neutral"), 0.0)
+
+    delta_p_bar = _finite_or_none(item.get("delta_p_bar"))
+    delta_abs = abs(float(delta_p_bar)) if delta_p_bar is not None else 0.0
+    if delta_abs >= 1.2:
+        score += 1.0
+    elif delta_abs >= 0.5:
+        score += 0.5
+    elif delta_abs >= 0.15:
+        score += 0.2
+
+    if bool(terminal.get("q_history_available") or item.get("q_history_available")):
+        score += 0.2
+    if bool(terminal.get("equalized")):
+        score += 0.2
+
+    if mode == "full":
+        show_leading_chip = True
+        show_trailing_chip = True
+        show_summary = True
+        show_history_strip = True
+    elif mode == "quiet":
+        show_leading_chip = score >= 1.8
+        show_trailing_chip = score >= 5.4
+        show_summary = score >= 4.8 and (bool(item.get("hovered")) or severity in {"focus", "warn"})
+        show_history_strip = False
+    else:
+        show_leading_chip = score >= 1.2
+        show_trailing_chip = score >= 4.6
+        show_summary = score >= 4.0
+        show_history_strip = score >= 5.2
+
+    return {
+        "importance_score": float(score),
+        "show_leading_chip": bool(show_leading_chip),
+        "show_trailing_chip": bool(show_trailing_chip),
+        "show_summary": bool(show_summary),
+        "show_history_strip": bool(show_history_strip),
+    }
+
+
+def _route_focus_opacity_profile(
+    visibility_meta: dict[str, Any] | None,
+    *,
+    detail_mode: str,
+) -> dict[str, int]:
+    item = dict(visibility_meta or {})
+    mode = str(detail_mode or "operator").strip().lower()
+    if mode not in DETAIL_MODE_LABELS:
+        mode = "operator"
+
+    score = float(item.get("importance_score") or 0.0)
+    if mode == "full":
+        emphasis = 1.0
+    elif mode == "quiet":
+        emphasis = _clamp01((score - 1.0) / 4.6)
+    else:
+        emphasis = _clamp01((score - 0.8) / 4.0)
+
+    strip_glow_alpha = int(round(42 + emphasis * 88))
+    strip_core_alpha = int(round(126 + emphasis * 114))
+    node_ring_alpha = int(round(88 + emphasis * 148))
+    node_badge_alpha = int(round(108 + emphasis * 124))
+    node_label_bg_alpha = int(round(116 + emphasis * 112))
+    node_value_bg_alpha = int(round(104 + emphasis * 118))
+    node_label_text_alpha = int(round(154 + emphasis * 96))
+    node_value_text_alpha = int(round(148 + emphasis * 100))
+    node_badge_text_alpha = int(round(160 + emphasis * 88))
+
+    if not bool(item.get("show_trailing_chip")):
+        node_ring_alpha = int(round(node_ring_alpha * 0.78))
+        node_badge_alpha = int(round(node_badge_alpha * 0.76))
+        node_label_bg_alpha = int(round(node_label_bg_alpha * 0.88))
+        node_value_bg_alpha = int(round(node_value_bg_alpha * 0.90))
+        node_label_text_alpha = int(round(node_label_text_alpha * 0.90))
+        node_value_text_alpha = int(round(node_value_text_alpha * 0.90))
+        node_badge_text_alpha = int(round(node_badge_text_alpha * 0.88))
+    if not bool(item.get("show_summary")):
+        strip_glow_alpha = int(round(strip_glow_alpha * 0.84))
+        strip_core_alpha = int(round(strip_core_alpha * 0.88))
+        node_label_bg_alpha = int(round(node_label_bg_alpha * 0.92))
+        node_value_bg_alpha = int(round(node_value_bg_alpha * 0.94))
+        node_label_text_alpha = int(round(node_label_text_alpha * 0.94))
+        node_value_text_alpha = int(round(node_value_text_alpha * 0.95))
+        node_badge_text_alpha = int(round(node_badge_text_alpha * 0.94))
+
+    return {
+        "strip_glow_alpha": max(24, min(236, strip_glow_alpha)),
+        "strip_core_alpha": max(64, min(255, strip_core_alpha)),
+        "node_ring_alpha": max(54, min(255, node_ring_alpha)),
+        "node_badge_alpha": max(72, min(255, node_badge_alpha)),
+        "node_label_bg_alpha": max(72, min(246, node_label_bg_alpha)),
+        "node_value_bg_alpha": max(68, min(240, node_value_bg_alpha)),
+        "node_label_text_alpha": max(112, min(255, node_label_text_alpha)),
+        "node_value_text_alpha": max(112, min(255, node_value_text_alpha)),
+        "node_badge_text_alpha": max(120, min(255, node_badge_text_alpha)),
+    }
+
+
+def _route_node_label_opacity_profile(
+    opacity_meta: dict[str, Any] | None,
+    *,
+    node_role: str,
+    detail_mode: str,
+    is_selected: bool = False,
+    is_hovered: bool = False,
+) -> dict[str, int]:
+    item = dict(opacity_meta or {})
+    mode = str(detail_mode or "operator").strip().lower()
+    if mode not in DETAIL_MODE_LABELS:
+        mode = "operator"
+
+    role = str(node_role or "terminal").strip().lower()
+    role_scale = {
+        "leading": 1.00,
+        "terminal": 0.88 if mode != "full" else 0.94,
+        "intermediate": 0.78 if mode != "full" else 0.88,
+        "trailing": 0.64 if mode != "full" else 0.82,
+    }.get(role, 0.92 if mode == "full" else 0.86)
+    if is_hovered:
+        role_scale = max(role_scale, 0.94 if mode != "quiet" else 0.90)
+    if is_selected:
+        role_scale = max(role_scale, 0.98)
+
+    label_bg_alpha = int(round(float(item.get("node_label_bg_alpha") or 228) * role_scale))
+    value_bg_alpha = int(round(float(item.get("node_value_bg_alpha") or 212) * role_scale))
+    label_text_alpha = int(round(float(item.get("node_label_text_alpha") or 255) * role_scale))
+    value_text_alpha = int(round(float(item.get("node_value_text_alpha") or 255) * role_scale))
+    badge_text_alpha = int(round(float(item.get("node_badge_text_alpha") or 255) * role_scale))
+
+    return {
+        "label_bg_alpha": max(64, min(246, label_bg_alpha)),
+        "value_bg_alpha": max(60, min(240, value_bg_alpha)),
+        "label_text_alpha": max(96, min(255, label_text_alpha)),
+        "value_text_alpha": max(96, min(255, value_text_alpha)),
+        "badge_text_alpha": max(104, min(255, badge_text_alpha)),
+    }
+
+
+def _node_label_presentation_meta(
+    node_name: str,
+    *,
+    detail_mode: str,
+    route_label_role: str = "",
+    alert_severity: str = "",
+    diagonal_severity: str = "",
+    is_selected: bool = False,
+    is_hovered: bool = False,
+) -> dict[str, Any]:
+    mode = str(detail_mode or "operator").strip().lower()
+    if mode not in DETAIL_MODE_LABELS:
+        mode = "operator"
+
+    kind = _node_kind(node_name)
+    priority = {
+        "receiver": 1.1,
+        "accumulator": 1.1,
+        "regulator": 1.0,
+        "diagonal": 0.8,
+        "chamber": 0.25,
+        "mainline": 0.20,
+        "atm": 0.15,
+        "other": 0.10,
+    }.get(kind, 0.10)
+    priority += {
+        "leading": 2.4,
+        "terminal": 1.5,
+        "intermediate": 1.0,
+        "trailing": 0.65,
+    }.get(str(route_label_role or "").strip().lower(), 0.0)
+    priority += {
+        "warn": 1.8,
+        "focus": 1.3,
+        "attention": 0.9,
+        "info": 0.45,
+    }.get(str(alert_severity or "").strip().lower(), 0.0)
+    priority += {
+        "warn": 1.3,
+        "focus": 1.0,
+        "attention": 0.65,
+    }.get(str(diagonal_severity or "").strip().lower(), 0.0)
+    if is_hovered:
+        priority += 2.0
+    if is_selected:
+        priority += 2.4
+
+    if mode == "full" or priority >= 2.4:
+        layout_mode = "full"
+    elif priority >= 1.0 or kind in {"receiver", "accumulator", "regulator"}:
+        layout_mode = "compact"
+    else:
+        layout_mode = "minimal"
+
+    alpha_scale = {
+        "full": 1.00 if mode != "quiet" else 0.96,
+        "compact": 0.88 if mode != "quiet" else 0.76,
+        "minimal": 0.72 if mode != "quiet" else 0.56,
+    }[layout_mode]
+    if is_selected or is_hovered:
+        alpha_scale = max(alpha_scale, 0.96 if mode != "quiet" else 0.90)
+    elif str(alert_severity or "").strip().lower() in {"warn", "focus"}:
+        alpha_scale = max(alpha_scale, 0.90 if mode != "quiet" else 0.82)
+
+    if layout_mode == "full":
+        return {
+            "layout_mode": layout_mode,
+            "alpha_scale": float(alpha_scale),
+            "label_rect": (-82.0, -54.0, 164.0, 34.0),
+            "value_rect": (-72.0, -18.0, 144.0, 24.0),
+            "value_mode": "separate",
+            "label_radius": 12.0,
+            "value_radius": 9.0,
+            "label_font_size": 10.0,
+            "value_font_size": 8.5,
+            "badge_rect": (16.0, -38.0, 40.0, 18.0),
+            "badge_radius": 8.0,
+            "badge_font_size": 7.2,
+            "label_centered": False,
+        }
+    if layout_mode == "compact":
+        value_mode = "inline" if mode == "quiet" and not is_selected and not is_hovered else "separate"
+        return {
+            "layout_mode": layout_mode,
+            "alpha_scale": float(alpha_scale),
+            "label_rect": (-72.0, -50.0, 144.0, 30.0),
+            "value_rect": (-62.0, -18.0, 124.0, 21.0),
+            "value_mode": value_mode,
+            "inline_value_rect": (18.0, -12.0, 58.0, 17.0),
+            "label_radius": 10.0,
+            "value_radius": 8.0,
+            "inline_value_radius": 7.0,
+            "label_font_size": 8.7,
+            "value_font_size": 7.5,
+            "inline_value_font_size": 6.4,
+            "badge_rect": (14.0, -36.0, 36.0, 17.0),
+            "badge_radius": 7.0,
+            "badge_font_size": 6.6,
+            "label_centered": False,
+        }
+    return {
+        "layout_mode": layout_mode,
+        "alpha_scale": float(alpha_scale),
+        "label_rect": (-60.0, -46.0, 120.0, 24.0),
+        "value_rect": (-52.0, -18.0, 104.0, 18.0),
+        "value_mode": "inline",
+        "inline_value_rect": (16.0, -11.0, 52.0, 16.0),
+        "label_radius": 8.0,
+        "value_radius": 7.0,
+        "inline_value_radius": 6.0,
+        "label_font_size": 7.4,
+        "value_font_size": 6.6,
+        "inline_value_font_size": 6.0,
+        "badge_rect": (12.0, -34.0, 32.0, 15.0),
+        "badge_radius": 6.0,
+        "badge_font_size": 6.0,
+        "label_centered": True,
     }
 
 
@@ -2436,6 +2943,8 @@ def _build_frame_narrative(
     *,
     selected_edge: str | None,
     selected_node: str | None,
+    flow_display_mode: str = "nlpm",
+    pressure_display_mode: str = "bar_g",
 ) -> FrameNarrative:
     if dataset is None or dataset.time_s.size == 0:
         return FrameNarrative(
@@ -2458,11 +2967,18 @@ def _build_frame_narrative(
 
     edge_rows = _edge_rows_for_index(dataset, idx)
     node_rows = _node_rows_for_index(dataset, idx, overlay_only=True) or _node_rows_for_index(dataset, idx)
+    flow_unit = _flow_display_unit(dataset, flow_display_mode)
+    pressure_unit = _pressure_display_unit(pressure_display_mode)
+    pressure_delta_unit = _pressure_delta_display_unit(pressure_display_mode)
+    flow_digits = _flow_display_digits(flow_display_mode)
+    pressure_digits = _pressure_display_digits(pressure_display_mode)
+    pressure_delta_digits = _pressure_delta_display_digits(pressure_display_mode)
 
     top_edge_name, top_edge_value = edge_rows[0] if edge_rows else ("—", 0.0)
     top_node_name, top_node_value = node_rows[0] if node_rows else ("—", 0.0)
     min_pressure = node_rows[-1][1] if node_rows else top_node_value
     pressure_spread = float(top_node_value - min_pressure)
+    pressure_spread_display = _pressure_delta_from_bar(pressure_spread, pressure_display_mode)
 
     focus_edge = selected_edge if selected_edge in dataset.edge_names else top_edge_name
     focus_node = selected_node if selected_node in dataset.node_names else top_node_name
@@ -2523,7 +3039,9 @@ def _build_frame_narrative(
                 title="Большой перепад давлений",
                 severity="warn",
                 summary=(
-                    f"Среди ключевых узлов разброс составляет {pressure_spread:4.2f} бар(g). Это много для спокойного режима "
+                    f"Среди ключевых узлов разброс составляет "
+                    f"{_fmt_display_value(pressure_spread_display, pressure_delta_unit, digits=pressure_delta_digits)}. "
+                    "Это много для спокойного режима "
                     "и обычно означает активное перераспределение, подпитку или сброс."
                 ),
                 action=f"Сначала сравните {top_node_name} и самый слабый ключевой узел, затем проверьте ветви между ними.",
@@ -2535,7 +3053,8 @@ def _build_frame_narrative(
                 title="Контур близок к выравниванию",
                 severity="ok",
                 summary=(
-                    f"Разброс между ключевыми узлами сейчас около {pressure_spread:4.2f} бар(g). "
+                    f"Разброс между ключевыми узлами сейчас около "
+                    f"{_fmt_display_value(pressure_spread_display, pressure_delta_unit, digits=pressure_delta_digits)}. "
                     "Это похоже на устойчивое или почти выровненное состояние."
                 ),
                 action="Проверьте, не остались ли локальные импульсы только в одной ветви или на одном клапане.",
@@ -2555,7 +3074,9 @@ def _build_frame_narrative(
                 severity="attention",
                 summary=(
                     f"Помимо основного сценария заметен атмосферный канал {vent_name} "
-                    f"с расходом {vent_flow:6.1f} {dataset.q_unit}. Это может быть нормальным выпуском или признаком лишней утечки энергии."
+                    f"с расходом "
+                    f"{_fmt_display_value(_flow_value_from_dataset_units(vent_flow, dataset, flow_display_mode), flow_unit, digits=flow_digits)}. "
+                    "Это может быть нормальным выпуском или признаком лишней утечки энергии."
                 ),
                 action="Сравните этот канал с соседним регулятором или обратным клапаном: открытие должно быть объяснимо режимом.",
             )
@@ -2568,13 +3089,20 @@ def _build_frame_narrative(
             p_now = float(p_vals[max(0, min(int(idx), p_vals.size - 1))])
             p_min = float(np.min(p_vals)) if p_vals.size else p_now
             p_max = float(np.max(p_vals)) if p_vals.size else p_now
+            p_now_display = _pressure_value_from_bar_g(p_now, dataset, pressure_display_mode)
+            p_min_display = _pressure_value_from_bar_g(p_min, dataset, pressure_display_mode)
+            p_max_display = _pressure_value_from_bar_g(p_max, dataset, pressure_display_mode)
             modes.append(
                 DiagnosticMode(
                     title="Фокус узла",
                     severity="info",
                     summary=(
-                        f"Узел {focus_node} сейчас на уровне {p_now:4.2f} бар(g); его рабочий диапазон в загруженном bundle "
-                        f"составляет {p_min:4.2f} ... {p_max:4.2f} бар(g)."
+                        f"Узел {focus_node} сейчас на уровне "
+                        f"{_fmt_display_value(p_now_display, pressure_unit, digits=pressure_digits)}; "
+                        "его рабочий диапазон в загруженном bundle "
+                        f"составляет "
+                        f"{_fmt_display_value(p_min_display, pressure_unit, digits=pressure_digits)}"
+                        f" ... {_fmt_display_value(p_max_display, pressure_unit, digits=pressure_digits)}."
                     ),
                     action="Если это опорный узел режима, закрепите его в голове как эталон и сравнивайте остальные ветви относительно него.",
                 )
@@ -2610,8 +3138,17 @@ def _build_frame_alert_payload(
     *,
     selected_edge: str | None,
     selected_node: str | None,
+    flow_display_mode: str = "nlpm",
+    pressure_display_mode: str = "bar_g",
 ) -> dict[str, Any]:
-    narrative = _build_frame_narrative(dataset, idx, selected_edge=selected_edge, selected_node=selected_node)
+    narrative = _build_frame_narrative(
+        dataset,
+        idx,
+        selected_edge=selected_edge,
+        selected_node=selected_node,
+        flow_display_mode=flow_display_mode,
+        pressure_display_mode=pressure_display_mode,
+    )
     primary_mode = narrative.modes[0] if narrative.modes else DiagnosticMode(
         title=narrative.primary_title,
         severity="info",
@@ -2634,9 +3171,17 @@ def _build_frame_alert_payload(
 
     edge_rows = _edge_rows_for_index(dataset, idx)
     node_rows = _node_rows_for_index(dataset, idx, overlay_only=True) or _node_rows_for_index(dataset, idx)
+    flow_unit = _flow_display_unit(dataset, flow_display_mode)
+    pressure_unit = _pressure_display_unit(pressure_display_mode)
     focus_edge = selected_edge if selected_edge in dataset.edge_names else narrative.top_edge_name
     focus_node = selected_node if selected_node in dataset.node_names else narrative.top_node_name
-    diagonal_focus = _build_active_diagonal_focus_meta(dataset, idx, selected_edge=focus_edge)
+    diagonal_focus = _build_active_diagonal_focus_meta(
+        dataset,
+        idx,
+        selected_edge=focus_edge,
+        flow_display_mode=flow_display_mode,
+        pressure_display_mode=pressure_display_mode,
+    )
 
     edge_markers: dict[str, dict[str, Any]] = {}
     node_markers: dict[str, dict[str, Any]] = {}
@@ -2647,8 +3192,8 @@ def _build_frame_alert_payload(
         severity="focus",
         label="Ведущая ветка",
         summary="Максимальный |Q| на текущем кадре.",
-        value=narrative.top_edge_value,
-        unit=dataset.q_unit,
+        value=_flow_value_from_dataset_units(narrative.top_edge_value, dataset, flow_display_mode),
+        unit=flow_unit,
     )
     if focus_edge and focus_edge != narrative.top_edge_name:
         edge_role = _edge_role(focus_edge, dataset.edge_defs.get(focus_edge, {}))
@@ -2664,7 +3209,7 @@ def _build_frame_alert_payload(
             label=role_label,
             summary="Пользователь держит эту ветку в инженерном фокусе.",
             value=None,
-            unit=dataset.q_unit,
+            unit=flow_unit,
         )
 
     if edge_rows:
@@ -2678,8 +3223,8 @@ def _build_frame_alert_payload(
                     severity="attention",
                     label="Параллельный сброс",
                     summary="Атмосферная ветка заметно участвует в текущем режиме.",
-                    value=q_now,
-                    unit=dataset.q_unit,
+                    value=_flow_value_from_dataset_units(q_now, dataset, flow_display_mode),
+                    unit=flow_unit,
                 )
                 break
     diagonal_edges = list(diagonal_focus.get("edges") or [])
@@ -2691,8 +3236,8 @@ def _build_frame_alert_payload(
             severity=str(first_diagonal.get("severity") or "attention"),
             label=str(first_diagonal.get("label") or "Активная диагональ"),
             summary=str(first_diagonal.get("summary") or "Диагональная связь заметно участвует в текущем кадре."),
-            value=_finite_or_none(first_diagonal.get("flow")),
-            unit=dataset.q_unit,
+            value=_flow_value_from_dataset_units(first_diagonal.get("flow"), dataset, flow_display_mode),
+            unit=flow_unit,
         )
         for item in list(diagonal_focus.get("nodes") or [])[:3]:
             marker_name = str(item.get("name") or "")
@@ -2702,8 +3247,8 @@ def _build_frame_alert_payload(
                 severity=str(item.get("severity") or "attention"),
                 label=str(item.get("label") or "Узел диагонали"),
                 summary=str(item.get("summary") or "Участвует в активной диагональной связи."),
-                value=_finite_or_none(item.get("pressure_bar_g")),
-                unit="бар(g)",
+                value=_pressure_value_from_bar_g(item.get("pressure_bar_g"), dataset, pressure_display_mode),
+                unit=pressure_unit,
             )
 
     if node_rows:
@@ -2714,8 +3259,8 @@ def _build_frame_alert_payload(
             severity="focus" if narrative.pressure_spread < 2.0 else "warn",
             label="Максимум давления",
             summary="Верхний опорный узел на текущем кадре.",
-            value=top_node_value,
-            unit="бар(g)",
+            value=_pressure_value_from_bar_g(top_node_value, dataset, pressure_display_mode),
+            unit=pressure_unit,
         )
         low_node_name, low_node_value = node_rows[-1]
         if low_node_name != top_node_name:
@@ -2727,8 +3272,8 @@ def _build_frame_alert_payload(
                 severity=low_severity,
                 label=low_label,
                 summary="Нижняя опорная точка, с которой стоит сравнивать перепад.",
-                value=low_node_value,
-                unit="бар(g)",
+                value=_pressure_value_from_bar_g(low_node_value, dataset, pressure_display_mode),
+                unit=pressure_unit,
             )
 
     if focus_node and focus_node != narrative.top_node_name:
@@ -2739,7 +3284,7 @@ def _build_frame_alert_payload(
             label="Фокус пользователя",
             summary="Этот узел выбран для сопоставления со сценарием кадра.",
             value=None,
-            unit="бар(g)",
+            unit=pressure_unit,
         )
 
     edge_items = sorted(edge_markers.values(), key=lambda item: (-_severity_rank(str(item.get("severity") or "")), item["name"]))[:3]
@@ -3211,6 +3756,7 @@ def _build_edge_activity_snapshots_full(dataset: MnemoDataset | None, idx: int) 
     rows: list[EdgeActivitySnapshot] = []
     for edge_name, q_now in _edge_rows_for_index(dataset, idx):
         edge_def = dataset.edge_defs.get(edge_name, {})
+        canonical_kind = str(edge_def.get("kind") or "")
         n1 = str(edge_def.get("n1") or "")
         n2 = str(edge_def.get("n2") or "")
         if q_now >= 0.0:
@@ -3222,6 +3768,7 @@ def _build_edge_activity_snapshots_full(dataset: MnemoDataset | None, idx: int) 
             EdgeActivitySnapshot(
                 edge_name=edge_name,
                 component_kind=_edge_component_kind(edge_name, edge_def),
+                canonical_kind=canonical_kind,
                 q_now=float(q_now),
                 direction_label=direction_label,
                 state_label=_edge_open_state(dataset, edge_name, idx),
@@ -3405,11 +3952,14 @@ def _build_component_overlay_rows(
         ):
             continue
         flow_rgb = _flow_to_heat_rgb(item.q_now, max_abs_flow=max_abs_flow)
+        canonical_kind = str(item.canonical_kind or "")
         payload_rows.append(
             {
                 "edge_name": item.edge_name,
                 "component_kind": item.component_kind,
+                "canonical_kind": canonical_kind,
                 "component_short": _component_kind_short_label(item.component_kind),
+                "icon_key": _component_icon_key(item.component_kind, canonical_kind),
                 "q_now": _finite_or_none(item.q_now),
                 "flow_abs": _finite_or_none(abs(float(item.q_now))),
                 "direction_label": item.direction_label,
@@ -3422,6 +3972,12 @@ def _build_component_overlay_rows(
                 "is_selected": bool(item.edge_name == selected_name),
                 "is_active": bool(
                     abs(float(item.q_now)) >= max_abs_flow * 0.04 if max_abs_flow > 1.0e-9 else item.edge_name == selected_name
+                ),
+                "actuated": _edge_actuation_active(
+                    component_kind=item.component_kind,
+                    canonical_kind=canonical_kind,
+                    open_state=True if str(item.state_label or "").strip().lower() == "открыт" else (False if str(item.state_label or "").strip().lower() == "закрыт" else None),
+                    flow_value=float(item.q_now),
                 ),
                 "order": int(order),
             }
@@ -3443,12 +3999,26 @@ def _build_mnemo_diagnostics_payload(
     *,
     selected_edge: str | None,
     selected_node: str | None,
+    flow_display_mode: str = "nlpm",
+    pressure_display_mode: str = "bar_g",
 ) -> dict[str, Any]:
     cylinder_rows = _build_cylinder_snapshots(dataset, idx)
     component_rows = _build_component_overlay_rows(dataset, idx, selected_edge=selected_edge)
     focus_corner = _focus_corner_from_selection(dataset, edge_name=selected_edge, node_name=selected_node)
-    diagonal_focus = _build_active_diagonal_focus_meta(dataset, idx, selected_edge=selected_edge)
-    route_pressure_strips = _build_route_pressure_strip_payloads(dataset, idx, selected_edge=selected_edge)
+    diagonal_focus = _build_active_diagonal_focus_meta(
+        dataset,
+        idx,
+        selected_edge=selected_edge,
+        flow_display_mode=flow_display_mode,
+        pressure_display_mode=pressure_display_mode,
+    )
+    route_pressure_strips = _build_route_pressure_strip_payloads(
+        dataset,
+        idx,
+        selected_edge=selected_edge,
+        flow_display_mode=flow_display_mode,
+        pressure_display_mode=pressure_display_mode,
+    )
     diagonal_pressure_strips = _build_diagonal_pressure_strip_payloads(dataset, idx, selected_edge=selected_edge)
     return {
         "frame_idx": int(max(0, idx)),
@@ -3506,6 +4076,28 @@ def _component_kind_short_label(kind: str) -> str:
         "Р›РёРЅРёСЏ": "LINE",
     }
     return mapping.get(str(kind), "LINE")
+
+
+def _edge_actuation_active(
+    *,
+    component_kind: str,
+    canonical_kind: str,
+    open_state: bool | None,
+    flow_value: float,
+) -> bool:
+    component = str(component_kind or "").strip().lower()
+    canonical = str(canonical_kind or "").strip().lower()
+    if canonical in {"check", "orifice", "relief", "reg_after"}:
+        relevant = True
+    else:
+        relevant = any(token in component for token in ("клапан", "регулятор", "дроссель", "сброс"))
+    if not relevant:
+        return False
+    if open_state is True:
+        return True
+    if open_state is False and abs(float(flow_value)) <= 1.0e-6:
+        return False
+    return abs(float(flow_value)) > 1.0e-6
 
 
 def _canonical_kind_label(kind: str) -> str:
@@ -4099,6 +4691,29 @@ def _edge_recent_history_summary(history_meta: dict[str, Any], q_unit: str) -> s
     return summary
 
 
+def _edge_recent_history_summary_display(
+    history_meta: dict[str, Any],
+    dataset: MnemoDataset | None,
+    flow_display_mode: str,
+) -> str:
+    if not bool(history_meta.get("history_available")):
+        return "история ветви ещё не накоплена"
+
+    flow_unit = _flow_display_unit(dataset, flow_display_mode)
+    span_s = float(history_meta.get("history_span_s") or 0.0)
+    sample_count = int(history_meta.get("history_sample_count") or 0)
+    peak_abs = _flow_value_from_dataset_units(history_meta.get("history_peak_abs"), dataset, flow_display_mode)
+    summary = f"{span_s:0.2f} s • {sample_count} кадр."
+    if peak_abs is not None and abs(float(peak_abs)) > 0.0:
+        summary += f" • пик |Q| {float(peak_abs):0.2f} {flow_unit}"
+    else:
+        summary += " • без выраженного расхода"
+    open_ratio = history_meta.get("history_open_ratio")
+    if open_ratio is not None:
+        summary += f" • открыт {float(open_ratio) * 100.0:0.0f}% окна"
+    return summary
+
+
 def _edge_recent_pressure_meta(
     *,
     time_s: np.ndarray | list[float],
@@ -4202,6 +4817,29 @@ def _edge_recent_pressure_summary(pressure_meta: dict[str, Any]) -> str:
     last_delta = pressure_meta.get("pressure_history_last_delta")
     if last_delta is not None:
         summary += f" • текущее {float(last_delta):+0.2f} бар"
+    return summary
+
+
+def _edge_recent_pressure_summary_display(
+    pressure_meta: dict[str, Any],
+    pressure_display_mode: str,
+) -> str:
+    if not bool(pressure_meta.get("pressure_history_available")):
+        return "контур ΔP ещё не вычислен"
+
+    pressure_delta_unit = _pressure_delta_display_unit(pressure_display_mode)
+    span_s = float(pressure_meta.get("pressure_history_span_s") or 0.0)
+    sample_count = int(pressure_meta.get("pressure_history_sample_count") or 0)
+    peak_abs = _pressure_delta_from_bar(pressure_meta.get("pressure_history_peak_abs"), pressure_display_mode)
+    summary = (
+        f"{span_s:0.2f} s • {sample_count} кадр. • "
+        f"{str(pressure_meta.get('pressure_history_status') or 'ΔP без статуса')}"
+    )
+    if peak_abs is not None and abs(float(peak_abs)) > 0.0:
+        summary += f" • |ΔP|max {float(peak_abs):0.2f} {pressure_delta_unit}"
+    last_delta = _pressure_delta_from_bar(pressure_meta.get("pressure_history_last_delta"), pressure_display_mode)
+    if last_delta is not None:
+        summary += f" • текущее {float(last_delta):+0.2f} {pressure_delta_unit}"
     return summary
 
 
@@ -4893,11 +5531,34 @@ def _state_short_label(state_label: str) -> str:
     return "SIG?"
 
 
+def _component_anchor_node_name(edge_def: dict[str, Any], component_kind: str) -> tuple[str, str]:
+    n1 = str(edge_def.get("n1") or "")
+    n2 = str(edge_def.get("n2") or "")
+    endpoints = [name for name in (n1, n2) if name]
+    non_atm = [name for name in endpoints if name != "АТМ"]
+    indicator_nodes = [name for name in non_atm if name in REFERENCE_INDICATOR_NODE_ANCHORS_SVG]
+    component_nodes = [name for name in non_atm if name in REFERENCE_COMPONENT_NODE_ANCHORS_SVG]
+
+    if component_kind in {"Регулятор", "Обратный клапан", "Дроссель", "Сброс"} and indicator_nodes:
+        return indicator_nodes[0], "indicator"
+    if component_kind == "Питание" and component_nodes:
+        return component_nodes[0], "component"
+    if component_nodes:
+        return component_nodes[0], "component"
+    if indicator_nodes:
+        return indicator_nodes[0], "indicator"
+    if non_atm:
+        return non_atm[0], "endpoint"
+    return "", ""
+
+
 def _build_selected_edge_focus_meta(
     dataset: MnemoDataset | None,
     idx: int,
     *,
     edge_name: str | None,
+    flow_display_mode: str = "nlpm",
+    pressure_display_mode: str = "bar_g",
 ) -> dict[str, Any]:
     if dataset is None or dataset.time_s.size == 0:
         return {}
@@ -4937,6 +5598,11 @@ def _build_selected_edge_focus_meta(
     state_short = _state_short_label(state_label)
     zone_label = _edge_zone_label(selected_edge, edge_def)
     q_abs = abs(float(q_now))
+    q_abs_display = _flow_value_from_dataset_units(q_abs, dataset, flow_display_mode)
+    flow_unit = _flow_display_unit(dataset, flow_display_mode)
+    pressure_delta_unit = _pressure_delta_display_unit(pressure_display_mode)
+    flow_digits = _flow_display_digits(flow_display_mode)
+    pressure_delta_digits = _pressure_delta_display_digits(pressure_display_mode)
     flow_source = n1 if q_now >= 0.0 else n2
     flow_sink = n2 if q_now >= 0.0 else n1
     flow_label = (
@@ -5026,7 +5692,8 @@ def _build_selected_edge_focus_meta(
             "index_label": "02",
             "phase_label": "ΔP",
             "title": (
-                f"{pressure_label} • {delta_p_bar:+0.2f} бар"
+                f"{pressure_label} • "
+                f"{_fmt_display_value(_pressure_delta_from_bar(delta_p_bar, pressure_display_mode), pressure_delta_unit, digits=pressure_delta_digits)}"
                 if delta_p_bar is not None
                 else pressure_label
             ),
@@ -5038,7 +5705,8 @@ def _build_selected_edge_focus_meta(
             "index_label": "03",
             "phase_label": "Q",
             "title": (
-                f"{flow_label} • {q_abs:0.2f} {dataset.q_unit}"
+                f"{flow_label} • "
+                f"{_fmt_display_value(q_abs_display, flow_unit, digits=flow_digits)}"
                 if q_abs > 1.0e-9
                 else flow_label
             ),
@@ -5083,8 +5751,9 @@ def _build_selected_edge_focus_meta(
         "state_short": state_short,
         "zone_label": zone_label,
         "q_now": q_now,
-        "q_unit": dataset.q_unit,
+        "q_unit": flow_unit,
         "q_abs": q_abs,
+        "q_abs_display": q_abs_display,
         "flow_label": flow_label,
         "flow_source": flow_source,
         "flow_sink": flow_sink,
@@ -5133,6 +5802,10 @@ def _build_component_overlay_rows(
         flow_rgb = _flow_to_heat_rgb(item.q_now, max_abs_flow=max_abs_flow)
         edge_def = dataset.edge_defs.get(item.edge_name, {}) if dataset is not None else {}
         canonical_kind = str(edge_def.get("kind") or "")
+        n1 = str(edge_def.get("n1") or "")
+        n2 = str(edge_def.get("n2") or "")
+        anchor_node_name, anchor_node_source = _component_anchor_node_name(edge_def, item.component_kind)
+        open_state_label = str(item.state_label or "").strip().lower()
         payload_rows.append(
             {
                 "edge_name": item.edge_name,
@@ -5142,6 +5815,10 @@ def _build_component_overlay_rows(
                 "canonical_kind_label": _canonical_kind_label(canonical_kind),
                 "camozzi_code": str(edge_def.get("camozzi_code") or ""),
                 "icon_key": _component_icon_key(item.component_kind, canonical_kind),
+                "n1": n1,
+                "n2": n2,
+                "anchor_node_name": anchor_node_name,
+                "anchor_node_source": anchor_node_source,
                 "q_now": _finite_or_none(item.q_now),
                 "flow_abs": _finite_or_none(abs(float(item.q_now))),
                 "direction_label": item.direction_label,
@@ -5154,6 +5831,12 @@ def _build_component_overlay_rows(
                 "is_selected": bool(item.edge_name == selected_name),
                 "is_active": bool(
                     abs(float(item.q_now)) >= max_abs_flow * 0.04 if max_abs_flow > 1.0e-9 else item.edge_name == selected_name
+                ),
+                "actuated": _edge_actuation_active(
+                    component_kind=item.component_kind,
+                    canonical_kind=canonical_kind,
+                    open_state=True if open_state_label == "открыт" else (False if open_state_label == "закрыт" else None),
+                    flow_value=float(item.q_now),
                 ),
                 "order": int(order),
             }
@@ -5251,6 +5934,8 @@ class MnemoNativeView(QtWidgets.QWidget):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
         self._detail_mode = "operator"
+        self._flow_display_mode = "nlpm"
+        self._pressure_display_mode = "bar_g"
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(8)
@@ -5309,6 +5994,14 @@ class MnemoNativeView(QtWidgets.QWidget):
         self.hint_label.setText(
             "Колесо: zoom • drag: pan • click: выбрать ветвь или узел"
             + f" • слой: {self._detail_mode_label(self._detail_mode)}"
+        )
+
+    def set_display_modes(self, *, flow_display_mode: str, pressure_display_mode: str) -> None:
+        self._flow_display_mode = _normalize_flow_display_mode(flow_display_mode)
+        self._pressure_display_mode = _normalize_pressure_display_mode(pressure_display_mode)
+        self.native_canvas.set_display_modes(
+            flow_display_mode=self._flow_display_mode,
+            pressure_display_mode=self._pressure_display_mode,
         )
 
     def set_playhead(self, idx: int, playing: bool, dataset_id: str) -> None:
@@ -5370,11 +6063,18 @@ class CornerHeatmapWidget(QtWidgets.QWidget):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
         self._cards: dict[str, dict[str, Any]] = {}
+        self._pressure_display_mode = "bar_g"
+        self._pressure_dataset: MnemoDataset | None = None
         self.setMinimumHeight(220)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
 
     def set_cards(self, cards: dict[str, dict[str, Any]]) -> None:
         self._cards = dict(cards or {})
+        self.update()
+
+    def set_display_context(self, *, dataset: MnemoDataset | None, pressure_display_mode: str) -> None:
+        self._pressure_dataset = dataset
+        self._pressure_display_mode = _normalize_pressure_display_mode(pressure_display_mode)
         self.update()
 
     @staticmethod
@@ -5398,6 +6098,8 @@ class CornerHeatmapWidget(QtWidgets.QWidget):
             painter.drawText(full_rect, QtCore.Qt.AlignCenter, "Теплокарта углов ждёт данные bundle.")
             return
 
+        pressure_unit = _pressure_display_unit(self._pressure_display_mode)
+        pressure_delta_unit = _pressure_delta_display_unit(self._pressure_display_mode)
         gap = 10
         cell_width = max(40, int((full_rect.width() - gap) / 2))
         cell_height = max(60, int((full_rect.height() - gap) / 2))
@@ -5449,12 +6151,26 @@ class CornerHeatmapWidget(QtWidgets.QWidget):
             painter.drawText(
                 QtCore.QRectF(rect.left() + 12.0, rect.top() + 40.0, rect.width() - 24.0, 20.0),
                 QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-                f"Pmax {self._fmt(card.get('max_pressure_bar_g'), suffix='бар(g)', digits=2)}",
+                "Pmax "
+                + self._fmt(
+                    _pressure_value_from_bar_g(
+                        card.get("max_pressure_bar_g"),
+                        self._pressure_dataset,
+                        self._pressure_display_mode,
+                    ),
+                    suffix=pressure_unit,
+                    digits=2,
+                ),
             )
             painter.drawText(
                 QtCore.QRectF(rect.left() + 12.0, rect.top() + 62.0, rect.width() - 24.0, 20.0),
                 QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-                f"ΔPпик {self._fmt(card.get('delta_peak_bar'), suffix='бар', digits=2)}",
+                "ΔPпик "
+                + self._fmt(
+                    _pressure_delta_from_bar(card.get("delta_peak_bar"), self._pressure_display_mode),
+                    suffix=pressure_delta_unit,
+                    digits=2,
+                ),
             )
 
             stroke_ratio = card.get("stroke_ratio")
@@ -5567,8 +6283,13 @@ class PneumoSnapshotPanel(QtWidgets.QWidget):
             item.setForeground(QtGui.QBrush(QtGui.QColor(_text_color_for_rgb(background_rgb))))
         return item
 
-    def _fill_actuator_table(self, rows: list[CylinderSnapshot]) -> None:
+    def _fill_actuator_table(self, dataset: MnemoDataset, rows: list[CylinderSnapshot], *, pressure_display_mode: str) -> None:
         max_abs_dp = max((abs(float(item.delta_p_bar)) for item in rows if item.delta_p_bar is not None), default=0.0)
+        pressure_unit = _pressure_display_unit(pressure_display_mode)
+        pressure_delta_unit = _pressure_delta_display_unit(pressure_display_mode)
+        self.actuator_table.setHorizontalHeaderLabels(
+            ["Угол", "Цил", f"P БП [{pressure_unit}]", f"P ШП [{pressure_unit}]", f"ΔP [{pressure_delta_unit}]", "Ход", "vшт", "V БП", "V ШП"]
+        )
         self.actuator_table.setRowCount(len(rows))
         for row_idx, item in enumerate(rows):
             stroke_rgb = _mix_rgb((24, 40, 50), FLOW_FORWARD_RGB, 0.0 if item.stroke_ratio is None else float(item.stroke_ratio))
@@ -5598,7 +6319,10 @@ class PneumoSnapshotPanel(QtWidgets.QWidget):
                 row_idx,
                 2,
                 self._make_item(
-                    self._fmt(item.cap.pressure_bar_g, suffix="бар(g)"),
+                    self._fmt(
+                        _pressure_value_from_bar_g(item.cap.pressure_bar_g, dataset, pressure_display_mode),
+                        suffix=pressure_unit,
+                    ),
                     background_rgb=_pressure_to_heat_rgb(item.cap.pressure_bar_g),
                 ),
             )
@@ -5606,14 +6330,20 @@ class PneumoSnapshotPanel(QtWidgets.QWidget):
                 row_idx,
                 3,
                 self._make_item(
-                    self._fmt(item.rod.pressure_bar_g, suffix="бар(g)"),
+                    self._fmt(
+                        _pressure_value_from_bar_g(item.rod.pressure_bar_g, dataset, pressure_display_mode),
+                        suffix=pressure_unit,
+                    ),
                     background_rgb=_pressure_to_heat_rgb(item.rod.pressure_bar_g),
                 ),
             )
             self.actuator_table.setItem(
                 row_idx,
                 4,
-                self._make_item(self._fmt(item.delta_p_bar, suffix="бар"), background_rgb=delta_rgb),
+                self._make_item(
+                    self._fmt(_pressure_delta_from_bar(item.delta_p_bar, pressure_display_mode), suffix=pressure_delta_unit),
+                    background_rgb=delta_rgb,
+                ),
             )
             self.actuator_table.setItem(
                 row_idx,
@@ -5647,8 +6377,12 @@ class PneumoSnapshotPanel(QtWidgets.QWidget):
             )
             self.actuator_table.setVerticalHeaderItem(row_idx, QtWidgets.QTableWidgetItem(item.motion_label))
 
-    def _fill_components_table(self, dataset: MnemoDataset, rows: list[EdgeActivitySnapshot]) -> None:
+    def _fill_components_table(self, dataset: MnemoDataset, rows: list[EdgeActivitySnapshot], *, flow_display_mode: str) -> None:
         max_abs_flow = max((abs(float(item.q_now)) for item in rows), default=0.0)
+        flow_unit = _flow_display_unit(dataset, flow_display_mode)
+        self.components_table.setHorizontalHeaderLabels(
+            ["Элемент", "Тип", f"Q [{flow_unit}]", "Направление", "Состояние", "Зона"]
+        )
         self.components_table.setRowCount(len(rows))
         for row_idx, item in enumerate(rows):
             flow_rgb = _flow_to_heat_rgb(float(item.q_now), max_abs_flow=max_abs_flow)
@@ -5666,7 +6400,10 @@ class PneumoSnapshotPanel(QtWidgets.QWidget):
             self.components_table.setItem(
                 row_idx,
                 2,
-                self._make_item(f"{float(item.q_now):8.2f} {dataset.q_unit}", background_rgb=flow_rgb),
+                self._make_item(
+                    f"{float(_flow_value_from_dataset_units(item.q_now, dataset, flow_display_mode) or 0.0):8.2f} {flow_unit}",
+                    background_rgb=flow_rgb,
+                ),
             )
             self.components_table.setItem(
                 row_idx,
@@ -5684,7 +6421,14 @@ class PneumoSnapshotPanel(QtWidgets.QWidget):
                 self._make_item(item.zone_label, align=QtCore.Qt.AlignLeft),
             )
 
-    def update_frame(self, dataset: MnemoDataset | None, idx: int) -> None:
+    def update_frame(
+        self,
+        dataset: MnemoDataset | None,
+        idx: int,
+        *,
+        flow_display_mode: str,
+        pressure_display_mode: str,
+    ) -> None:
         if dataset is None or dataset.time_s.size == 0:
             self.summary.setHtml("<p>Snapshot ждёт NPZ bundle.</p>")
             self.heatmap.set_cards({})
@@ -5698,6 +6442,7 @@ class PneumoSnapshotPanel(QtWidgets.QWidget):
         cylinder_rows = _build_cylinder_snapshots(dataset, clamped_idx)
         edge_rows = _build_edge_activity_snapshots(dataset, clamped_idx)
         corner_cards = _build_corner_snapshot_cards(cylinder_rows, edge_rows)
+        flow_unit = _flow_display_unit(dataset, flow_display_mode)
         geometry_ready = sum(1 for item in cylinder_rows if item.geometry_ready)
         fastest = max(
             (item for item in cylinder_rows if item.stroke_speed_m_s is not None),
@@ -5724,11 +6469,13 @@ class PneumoSnapshotPanel(QtWidgets.QWidget):
             + f"<br/><b>t:</b> {time_s:0.3f} s"
             + f"<br/><b>Активная арматура:</b> {len(active_devices)} из {len(edge_rows)} верхних ветвей открыты."
             + f"<br/><b>{escape(fastest_text)}</b>"
+            + f"<br/><b>Q единицы:</b> {escape(flow_unit)}"
             + f"<br/><b>Geometry:</b> {escape(geometry_note)}"
         )
+        self.heatmap.set_display_context(dataset=dataset, pressure_display_mode=pressure_display_mode)
         self.heatmap.set_cards(corner_cards)
-        self._fill_actuator_table(cylinder_rows)
-        self._fill_components_table(dataset, edge_rows)
+        self._fill_actuator_table(dataset, cylinder_rows, pressure_display_mode=pressure_display_mode)
+        self._fill_components_table(dataset, edge_rows, flow_display_mode=flow_display_mode)
 
     def _actuator_clicked(self, row: int, _column: int) -> None:
         item = self.actuator_table.item(row, 0)
@@ -5830,7 +6577,16 @@ class OverviewPanel(QtWidgets.QWidget):
         if item is not None:
             self.node_activated.emit(str(item.data(QtCore.Qt.UserRole) or item.text()))
 
-    def update_frame(self, dataset: MnemoDataset | None, idx: int, *, playing: bool, follow_enabled: bool) -> None:
+    def update_frame(
+        self,
+        dataset: MnemoDataset | None,
+        idx: int,
+        *,
+        playing: bool,
+        follow_enabled: bool,
+        flow_display_mode: str,
+        pressure_display_mode: str,
+    ) -> None:
         if dataset is None or dataset.time_s.size == 0:
             self.dataset_meta.setHtml("<p>Нет загруженного NPZ.</p>")
             return
@@ -5841,17 +6597,37 @@ class OverviewPanel(QtWidgets.QWidget):
         narrative = _build_frame_narrative(dataset, idx, selected_edge=None, selected_node=None)
 
         top_edge_name = narrative.top_edge_name
-        top_edge_value = narrative.top_edge_value
-        max_pressure = narrative.top_node_value
+        top_edge_value = _flow_value_from_dataset_units(narrative.top_edge_value, dataset, flow_display_mode)
+        max_pressure = _pressure_value_from_bar_g(narrative.top_node_value, dataset, pressure_display_mode)
+        pressure_spread = _pressure_delta_from_bar(narrative.pressure_spread, pressure_display_mode)
+        flow_unit = _flow_display_unit(dataset, flow_display_mode)
+        pressure_unit = _pressure_display_unit(pressure_display_mode)
+        pressure_delta_unit = _pressure_delta_display_unit(pressure_display_mode)
 
-        self._fill_table(self.edge_table, edge_rows[:8], dataset.q_unit)
-        self._fill_table(self.node_table, node_rows[:8], "бар(g)")
+        self.edge_table.setHorizontalHeaderLabels(["Ветка", f"Q [{flow_unit}]"])
+        self.node_table.setHorizontalHeaderLabels(["Узел", f"P [{pressure_unit}]"])
+        self._fill_table(
+            self.edge_table,
+            [
+                (name, _flow_value_from_dataset_units(value, dataset, flow_display_mode) or 0.0)
+                for name, value in edge_rows[:8]
+            ],
+            flow_unit,
+        )
+        self._fill_table(
+            self.node_table,
+            [
+                (name, _pressure_value_from_bar_g(value, dataset, pressure_display_mode) or 0.0)
+                for name, value in node_rows[:8]
+            ],
+            pressure_unit,
+        )
 
         follow_text = "follow" if follow_enabled else "manual"
         state_text = "play" if playing else "pause"
         self._set_kpi(self.kpi_time, f"{time_s:5.2f} s")
-        self._set_kpi(self.kpi_flow, f"{top_edge_value:6.1f}")
-        self._set_kpi(self.kpi_pressure, f"{max_pressure:4.2f}")
+        self._set_kpi(self.kpi_flow, "—" if top_edge_value is None else f"{float(top_edge_value):6.1f} {flow_unit}")
+        self._set_kpi(self.kpi_pressure, "—" if max_pressure is None else f"{float(max_pressure):4.2f} {pressure_unit}")
         self._set_kpi(self.kpi_state, f"{follow_text} / {state_text}")
         self.dataset_meta.setHtml(
             "<b>Файл:</b> "
@@ -5862,12 +6638,12 @@ class OverviewPanel(QtWidgets.QWidget):
             + escape(narrative.primary_title)
             + "<br/><b>Самая активная ветка:</b> "
             + escape(top_edge_name)
-            + f" ({top_edge_value:6.1f} {dataset.q_unit})"
+            + (" (—)" if top_edge_value is None else f" ({float(top_edge_value):6.1f} {flow_unit})")
             + "<br/><b>Макс. узел:</b> "
             + escape(narrative.top_node_name)
-            + f" ({narrative.top_node_value:4.2f} бар(g))"
+            + (" (—)" if max_pressure is None else f" ({float(max_pressure):4.2f} {pressure_unit})")
             + "<br/><b>Перепад ключевых давлений:</b> "
-            + f"{narrative.pressure_spread:4.2f} бар(g)"
+            + ("—" if pressure_spread is None else f"{float(pressure_spread):4.2f} {pressure_delta_unit}")
             + "<br/><b>Подход:</b> semantic layout, отдельное окно, внешние docks, глобальный playhead."
         )
 
@@ -5933,19 +6709,33 @@ class SelectionPanel(QtWidgets.QWidget):
             idx = self.node_combo.findText(node_name or "")
             self.node_combo.setCurrentIndex(idx if idx >= 0 else 0)
 
-    def render_details(self, dataset: MnemoDataset | None, idx: int, *, edge_name: str | None, node_name: str | None) -> None:
+    def render_details(
+        self,
+        dataset: MnemoDataset | None,
+        idx: int,
+        *,
+        edge_name: str | None,
+        node_name: str | None,
+        flow_display_mode: str,
+        pressure_display_mode: str,
+    ) -> None:
         if dataset is None:
             self.details.setHtml("<p>Нет данных.</p>")
             return
 
         chunks: list[str] = ["<h3>Выбор</h3>"]
+        flow_unit = _flow_display_unit(dataset, flow_display_mode)
+        pressure_unit = _pressure_display_unit(pressure_display_mode)
+        pressure_delta_unit = _pressure_delta_display_unit(pressure_display_mode)
         if edge_name and dataset.bundle.q is not None:
             q_arr = dataset.bundle.q.column(edge_name, default=None)
             open_arr = dataset.bundle.open.column(edge_name, default=None) if dataset.bundle.open is not None else None
             if q_arr is not None:
                 q_vals = np.asarray(q_arr, dtype=float) * dataset.q_scale
+                q_vals_display = _flow_series_for_display(dataset, np.asarray(q_arr, dtype=float), flow_display_mode)
                 q_now = float(q_vals[idx])
-                q_peak = float(np.max(np.abs(q_vals))) if q_vals.size else 0.0
+                q_now_display = float(q_vals_display[idx])
+                q_peak_display = float(np.max(np.abs(q_vals_display))) if q_vals_display.size else 0.0
                 edge_def = dataset.edge_defs.get(edge_name, {})
                 edge_meta = dict(dataset.mapping.get("edges_meta", {}).get(edge_name) or {})
                 endpoint_1 = str(edge_def.get("n1") or "—")
@@ -5957,6 +6747,8 @@ class SelectionPanel(QtWidgets.QWidget):
                 direction_meta = _edge_direction_meta(edge_def, q_now)
                 p1_now, _, _ = _pressure_triplet(dataset, idx, endpoint_1)
                 p2_now, _, _ = _pressure_triplet(dataset, idx, endpoint_2)
+                p1_now_display = _pressure_value_from_bar_g(p1_now, dataset, pressure_display_mode)
+                p2_now_display = _pressure_value_from_bar_g(p2_now, dataset, pressure_display_mode)
                 element_meta = _edge_element_flow_contract_meta(
                     canonical_kind,
                     component_kind,
@@ -5970,6 +6762,8 @@ class SelectionPanel(QtWidgets.QWidget):
                     q_now=q_now,
                 )
                 camozzi_code = str(edge_def.get("camozzi_code") or "").strip() or "—"
+                delta_p_display = _pressure_delta_from_bar(pressure_meta.get("delta_p_bar"), pressure_display_mode)
+                dq_dt_display = _flow_value_from_dataset_units(temporal_meta.get("dq_dt"), dataset, flow_display_mode)
                 state = "открыт"
                 if open_arr is not None:
                     state = "открыт" if int(np.asarray(open_arr, dtype=int)[idx]) else "закрыт"
@@ -6042,9 +6836,9 @@ class SelectionPanel(QtWidgets.QWidget):
                     "<p><b>Ветка:</b> "
                     + escape(edge_name)
                     + "<br/><b>Текущее Q:</b> "
-                    + f"{q_now:8.2f} {dataset.q_unit}"
+                    + f"{q_now_display:8.2f} {flow_unit}"
                     + "<br/><b>Пик |Q|:</b> "
-                    + f"{q_peak:8.2f} {dataset.q_unit}"
+                    + f"{q_peak_display:8.2f} {flow_unit}"
                     + "<br/><b>Состояние:</b> "
                     + escape(state)
                     + "<br/><b>Элемент:</b> "
@@ -6076,13 +6870,13 @@ class SelectionPanel(QtWidgets.QWidget):
                     + "<br/><b>Концы ветви:</b> "
                     + escape(str(direction_meta.get("endpoint_1_short") or "—"))
                     + " "
-                    + ("—" if p1_now is None else f"{float(p1_now):0.2f} бар(g)")
+                    + ("—" if p1_now_display is None else f"{float(p1_now_display):0.2f} {pressure_unit}")
                     + " / "
                     + escape(str(direction_meta.get("endpoint_2_short") or "—"))
                     + " "
-                    + ("—" if p2_now is None else f"{float(p2_now):0.2f} бар(g)")
+                    + ("—" if p2_now_display is None else f"{float(p2_now_display):0.2f} {pressure_unit}")
                     + "<br/><b>ΔP ветви (n1-n2):</b> "
-                    + ("—" if pressure_meta.get("delta_p_bar") is None else f"{float(pressure_meta.get('delta_p_bar') or 0.0):+0.2f} бар")
+                    + ("—" if delta_p_display is None else f"{float(delta_p_display):+0.2f} {pressure_delta_unit}")
                     + "<br/><b>Ведущее давление:</b> "
                     + escape(str(pressure_meta.get("pressure_drive_label") or "—"))
                     + "<br/><b>Q vs ΔP:</b> "
@@ -6106,13 +6900,13 @@ class SelectionPanel(QtWidgets.QWidget):
                     + " / dQ/dt "
                     + (
                         "—"
-                        if temporal_meta.get("dq_dt") is None
-                        else f"{float(temporal_meta.get('dq_dt') or 0.0):+0.2f} {dataset.q_unit}/s"
+                        if dq_dt_display is None
+                        else f"{float(dq_dt_display):+0.2f} {flow_unit}/s"
                     )
                     + "<br/><b>Последнее окно:</b> "
-                    + escape(_edge_recent_history_summary(history_meta, dataset.q_unit))
+                    + escape(_edge_recent_history_summary_display(history_meta, dataset, flow_display_mode))
                     + "<br/><b>ΔP-контур:</b> "
-                    + escape(_edge_recent_pressure_summary(pressure_history_meta))
+                    + escape(_edge_recent_pressure_summary_display(pressure_history_meta, pressure_display_mode))
                     + "<br/><b>Причинная связка:</b> "
                     + escape(str(causality_meta.get("causality_status") or "—"))
                     + "<br/><b>Комментарий связки:</b> "
@@ -6158,7 +6952,13 @@ class SelectionPanel(QtWidgets.QWidget):
                     + escape(camozzi_code)
                     + "</p>"
                 )
-                focus_meta = _build_selected_edge_focus_meta(dataset, idx, edge_name=edge_name)
+                focus_meta = _build_selected_edge_focus_meta(
+                    dataset,
+                    idx,
+                    edge_name=edge_name,
+                    flow_display_mode=flow_display_mode,
+                    pressure_display_mode=pressure_display_mode,
+                )
                 if focus_meta:
                     steps_html = "".join(
                         "<li><b>"
@@ -6190,7 +6990,7 @@ class SelectionPanel(QtWidgets.QWidget):
         if node_name and dataset.bundle.p is not None:
             p_arr = dataset.bundle.p.column(node_name, default=None)
             if p_arr is not None:
-                p_vals = _bar_g(np.asarray(p_arr, dtype=float), dataset.p_atm)
+                p_vals = _pressure_series_from_pa(dataset, np.asarray(p_arr, dtype=float), pressure_display_mode)
                 p_now = float(p_vals[idx])
                 p_min = float(np.min(p_vals)) if p_vals.size else 0.0
                 p_max = float(np.max(p_vals)) if p_vals.size else 0.0
@@ -6198,15 +6998,21 @@ class SelectionPanel(QtWidgets.QWidget):
                     "<p><b>Узел:</b> "
                     + escape(node_name)
                     + "<br/><b>Текущее P:</b> "
-                    + f"{p_now:6.2f} бар(g)"
+                    + f"{p_now:6.2f} {pressure_unit}"
                     + "<br/><b>Диапазон:</b> "
-                    + f"{p_min:6.2f} ... {p_max:6.2f} бар(g)"
+                    + f"{p_min:6.2f} ... {p_max:6.2f} {pressure_unit}"
                     + "<br/><b>Тип отображения:</b> cognitive overlay / contextual details</p>"
                 )
                 chamber_context = _find_cylinder_snapshot_for_node(_build_cylinder_snapshots(dataset, idx), node_name)
                 if chamber_context is not None:
                     cylinder_snapshot, chamber_snapshot = chamber_context
                     sister_snapshot = cylinder_snapshot.rod if chamber_snapshot.chamber_key == "БП" else cylinder_snapshot.cap
+                    sister_pressure_display = _pressure_value_from_bar_g(
+                        sister_snapshot.pressure_bar_g,
+                        dataset,
+                        pressure_display_mode,
+                    )
+                    delta_p_display = _pressure_delta_from_bar(cylinder_snapshot.delta_p_bar, pressure_display_mode)
                     chunks.append(
                         "<p><b>Исполнительный контур:</b> "
                         + f"Ц{cylinder_snapshot.cyl_index} / {escape(cylinder_snapshot.corner)}"
@@ -6220,9 +7026,9 @@ class SelectionPanel(QtWidgets.QWidget):
                         + "<br/><b>Парная полость:</b> "
                         + escape(sister_snapshot.node_name)
                         + " / "
-                        + ("—" if sister_snapshot.pressure_bar_g is None else f"{sister_snapshot.pressure_bar_g:0.2f} бар(g)")
+                        + ("—" if sister_pressure_display is None else f"{sister_pressure_display:0.2f} {pressure_unit}")
                         + "<br/><b>ΔP БП-ШП:</b> "
-                        + ("—" if cylinder_snapshot.delta_p_bar is None else f"{cylinder_snapshot.delta_p_bar:+0.2f} бар")
+                        + ("—" if delta_p_display is None else f"{delta_p_display:+0.2f} {pressure_delta_unit}")
                         + "<br/><b>Объём текущей полости:</b> "
                         + ("—" if chamber_snapshot.volume_l is None else f"{chamber_snapshot.volume_l:0.2f} л")
                         + "<br/><b>Режим:</b> "
@@ -6251,6 +7057,8 @@ class GuidancePanel(QtWidgets.QTextBrowser):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
         self.setOpenExternalLinks(False)
+        self._flow_display_mode = "nlpm"
+        self._pressure_display_mode = "bar_g"
 
     @staticmethod
     def _severity_badge(severity: str) -> str:
@@ -6277,7 +7085,14 @@ class GuidancePanel(QtWidgets.QTextBrowser):
         playing: bool,
         follow_enabled: bool,
     ) -> None:
-        narrative = _build_frame_narrative(dataset, idx, selected_edge=selected_edge, selected_node=selected_node)
+        narrative = _build_frame_narrative(
+            dataset,
+            idx,
+            selected_edge=selected_edge,
+            selected_node=selected_node,
+            flow_display_mode=self._flow_display_mode,
+            pressure_display_mode=self._pressure_display_mode,
+        )
 
         if dataset is None or dataset.time_s.size == 0:
             self.setHtml(
@@ -6329,6 +7144,10 @@ class GuidancePanel(QtWidgets.QTextBrowser):
             + "</p>"
             + "".join(mode_cards)
         )
+
+    def set_display_modes(self, *, flow_display_mode: str, pressure_display_mode: str) -> None:
+        self._flow_display_mode = _normalize_flow_display_mode(flow_display_mode)
+        self._pressure_display_mode = _normalize_pressure_display_mode(pressure_display_mode)
 
 
 class SchemeFidelityPanel(QtWidgets.QTextBrowser):
@@ -6436,6 +7255,8 @@ class StartupBannerPanel(QtWidgets.QFrame):
         super().__init__(parent)
         self.setObjectName("startup_banner")
         self._focus_available = False
+        self._flow_display_mode = "nlpm"
+        self._pressure_display_mode = "bar_g"
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(16, 14, 16, 14)
@@ -6488,6 +7309,10 @@ class StartupBannerPanel(QtWidgets.QFrame):
             f'background:{bg}; color:{fg}; font-weight:700; font-size:11px;">{escape(text)}</span>'
         )
 
+    def set_display_modes(self, *, flow_display_mode: str, pressure_display_mode: str) -> None:
+        self._flow_display_mode = _normalize_flow_display_mode(flow_display_mode)
+        self._pressure_display_mode = _normalize_pressure_display_mode(pressure_display_mode)
+
     def render(
         self,
         context: LaunchOnboardingContext,
@@ -6501,7 +7326,14 @@ class StartupBannerPanel(QtWidgets.QFrame):
         prefer_selected_focus: bool = False,
     ) -> None:
         self.title_label.setText(context.title)
-        narrative = _build_frame_narrative(dataset, idx, selected_edge=None, selected_node=None)
+        narrative = _build_frame_narrative(
+            dataset,
+            idx,
+            selected_edge=None,
+            selected_node=None,
+            flow_display_mode=self._flow_display_mode,
+            pressure_display_mode=self._pressure_display_mode,
+        )
         focus_target = build_onboarding_focus_target(
             dataset,
             idx,
@@ -6816,6 +7648,8 @@ class TrendsPanel(QtWidgets.QWidget):
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(8, 8, 8, 8)
         lay.setSpacing(8)
+        self._flow_display_mode = "nlpm"
+        self._pressure_display_mode = "bar_g"
 
         self._has_pg = _HAS_PG
         if not self._has_pg:
@@ -6847,9 +7681,9 @@ class TrendsPanel(QtWidgets.QWidget):
             plot.addLegend(offset=(10, 10))
             lay.addWidget(plot, 1)
 
-        self.flow_plot.setLabel("left", "Q", units="")
+        self.flow_plot.setLabel("left", "Q", units=_flow_display_unit(None, self._flow_display_mode))
         self.flow_plot.setLabel("bottom", "t", units="s")
-        self.pressure_plot.setLabel("left", "P", units="бар(g)")
+        self.pressure_plot.setLabel("left", "P", units=_pressure_display_unit(self._pressure_display_mode))
         self.pressure_plot.setLabel("bottom", "t", units="s")
         self.stroke_plot.setLabel("left", "sшт", units="м")
         self.stroke_plot.setLabel("bottom", "t", units="s")
@@ -6864,6 +7698,16 @@ class TrendsPanel(QtWidgets.QWidget):
         self.pressure_plot.addItem(self.pressure_marker)
         self.stroke_plot.addItem(self.stroke_marker)
 
+    def set_display_modes(self, *, flow_display_mode: str, pressure_display_mode: str) -> None:
+        self._flow_display_mode = _normalize_flow_display_mode(flow_display_mode)
+        self._pressure_display_mode = _normalize_pressure_display_mode(pressure_display_mode)
+        if not self._has_pg:
+            return
+        assert self.flow_plot is not None
+        assert self.pressure_plot is not None
+        self.flow_plot.setLabel("left", "Q", units=_flow_display_unit(None, self._flow_display_mode))
+        self.pressure_plot.setLabel("left", "P", units=_pressure_display_unit(self._pressure_display_mode))
+
     def set_series(self, dataset: MnemoDataset | None, *, edge_name: str | None, node_name: str | None) -> None:
         if not self._has_pg or dataset is None:
             return
@@ -6877,7 +7721,7 @@ class TrendsPanel(QtWidgets.QWidget):
         if edge_name and dataset.bundle.q is not None:
             q_arr = dataset.bundle.q.column(edge_name, default=None)
             if q_arr is not None:
-                q_vals = np.asarray(q_arr, dtype=float) * dataset.q_scale
+                q_vals = _flow_series_for_display(dataset, np.asarray(q_arr, dtype=float), self._flow_display_mode)
                 self.flow_curve.setData(dataset.time_s, q_vals, name=edge_name)
                 self.flow_plot.setTitle(f"Q: {edge_name}", color="#d9e6ed")
         else:
@@ -6887,7 +7731,7 @@ class TrendsPanel(QtWidgets.QWidget):
         if node_name and dataset.bundle.p is not None:
             p_arr = dataset.bundle.p.column(node_name, default=None)
             if p_arr is not None:
-                p_vals = _bar_g(np.asarray(p_arr, dtype=float), dataset.p_atm)
+                p_vals = _pressure_series_from_pa(dataset, np.asarray(p_arr, dtype=float), self._pressure_display_mode)
                 self.pressure_curve.setData(dataset.time_s, p_vals, name=node_name)
                 self.pressure_plot.setTitle(f"P: {node_name}", color="#d9e6ed")
         else:
@@ -6939,6 +7783,8 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._dataset: MnemoDataset | None = None
         self._dataset_id = ""
         self._detail_mode = "operator"
+        self._flow_display_mode = "nlpm"
+        self._pressure_display_mode = "bar_g"
         self._frame_idx = 0
         self._playing = False
         self._selected_edge = ""
@@ -6955,6 +7801,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._edge_midpoints: dict[str, QtCore.QPointF] = {}
         self._node_points: dict[str, QtCore.QPointF] = {}
         self._node_hit_rects: dict[str, QtCore.QRectF] = {}
+        self._occupied_node_overlay_rects: list[QtCore.QRectF] = []
         self._overlay_targets: list[tuple[str, str, QtCore.QRectF]] = []
         self._svg_renderer: Any = None
         self._reference_svg_renderer: Any = None
@@ -6984,6 +7831,11 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._invalidate_background_cache()
         self.update()
         return self._detail_mode
+
+    def set_display_modes(self, *, flow_display_mode: str, pressure_display_mode: str) -> None:
+        self._flow_display_mode = _normalize_flow_display_mode(flow_display_mode)
+        self._pressure_display_mode = _normalize_pressure_display_mode(pressure_display_mode)
+        self.update()
 
     def set_reference_scheme_visible(self, visible: bool) -> bool:
         self._show_reference_scheme = bool(visible)
@@ -7649,6 +8501,14 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                 else QtGui.QPen(core_color, max(3.0, base_width * 0.55), QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin)
             )
             painter.drawPath(path)
+            self._draw_edge_flow_arrows(
+                painter,
+                edge_name=edge_name,
+                path=path,
+                flow_value=flow_value,
+                max_abs_flow=max_abs_flow,
+                open_state=open_state,
+            )
 
             if edge_name == self._selected_edge or (self._hover_kind == "edge" and edge_name == self._hover_name):
                 accent = QtGui.QColor("#fff4c7" if edge_name == self._selected_edge else "#d5f7ff")
@@ -7686,20 +8546,32 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                 continue
 
             severity = str(payload.get("severity") or "attention")
+            terminal_meta = _route_pressure_strip_terminal_meta(
+                payload,
+                dataset=self._dataset,
+                pressure_display_mode=self._pressure_display_mode,
+            )
+            visibility_meta = _route_focus_visibility_meta(payload, terminal_meta, detail_mode=self._detail_mode)
+            opacity_meta = _route_focus_opacity_profile(visibility_meta, detail_mode=self._detail_mode)
             p1_bar_g = _finite_or_none(payload.get("p1_bar_g"))
             p2_bar_g = _finite_or_none(payload.get("p2_bar_g"))
             order = int(payload.get("order") or 0)
             is_selected = bool(payload.get("selected"))
             severity_color = QtGui.QColor(self._severity_color_hex(severity))
-            severity_color.setAlpha(84 if not is_selected else 118)
+            severity_color.setAlpha(
+                max(
+                    56 if not is_selected else 86,
+                    int(opacity_meta.get("strip_glow_alpha") or 0),
+                )
+            )
             start_color = QtGui.QColor(
                 *(_pressure_to_heat_rgb(p1_bar_g) if p1_bar_g is not None else _flow_to_heat_rgb(0.0, max_abs_flow=1.0))
             )
             end_color = QtGui.QColor(
                 *(_pressure_to_heat_rgb(p2_bar_g) if p2_bar_g is not None else _flow_to_heat_rgb(0.0, max_abs_flow=1.0))
             )
-            start_color.setAlpha(232 if is_selected else 210)
-            end_color.setAlpha(232 if is_selected else 210)
+            start_color.setAlpha(int(opacity_meta.get("strip_core_alpha") or (232 if is_selected else 210)))
+            end_color.setAlpha(int(opacity_meta.get("strip_core_alpha") or (232 if is_selected else 210)))
             gradient = QtGui.QLinearGradient(path.pointAtPercent(0.0), path.pointAtPercent(1.0))
             gradient.setColorAt(0.0, start_color)
             gradient.setColorAt(1.0, end_color)
@@ -7708,7 +8580,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             painter.setPen(
                 QtGui.QPen(
                     severity_color,
-                    10.0 if is_selected else 8.0,
+                    10.0 if is_selected else 7.2,
                     QtCore.Qt.SolidLine,
                     QtCore.Qt.RoundCap,
                     QtCore.Qt.RoundJoin,
@@ -7718,7 +8590,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             painter.setPen(
                 QtGui.QPen(
                     QtGui.QBrush(gradient),
-                    5.6 if is_selected else 4.6,
+                    5.6 if is_selected else 4.2,
                     QtCore.Qt.SolidLine,
                     QtCore.Qt.RoundCap,
                     QtCore.Qt.RoundJoin,
@@ -7738,57 +8610,58 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             angle_deg = _path_angle_deg(path, anchor_percent)
             angle_rad = math.radians(angle_deg)
             side = -1.0 if order % 2 else 1.0
-            offset = 34.0 + 8.0 * float(order)
+            compact_mode = self._detail_mode != "full"
+            offset = (24.0 if compact_mode else 34.0) + (4.0 if compact_mode else 8.0) * float(order)
             anchor = QtCore.QPointF(
                 anchor.x() + (-math.sin(angle_rad) * offset * side),
                 anchor.y() + (math.cos(angle_rad) * offset * side),
             )
-            chip_rect = QtCore.QRectF(anchor.x() - 88.0, anchor.y() - 22.0, 176.0, 44.0)
-            if chip_rect.left() < safe_rect.left():
-                chip_rect.moveLeft(safe_rect.left())
-            if chip_rect.right() > safe_rect.right():
-                chip_rect.moveRight(safe_rect.right())
-            if chip_rect.top() < safe_rect.top():
-                chip_rect.moveTop(safe_rect.top())
-            if chip_rect.bottom() > safe_rect.bottom():
-                chip_rect.moveBottom(safe_rect.bottom())
+            chip_rect = self._route_pressure_chip_rect(anchor, safe_rect=safe_rect, compact=compact_mode)
+            if compact_mode:
+                self._draw_route_pressure_strip_compact_chip(
+                    painter,
+                    rect=chip_rect,
+                    payload=payload,
+                    border_color=severity_color,
+                    is_selected=is_selected,
+                )
+            else:
+                painter.setPen(QtGui.QPen(QtGui.QColor("#f7fbff" if is_selected else severity_color), 1.6))
+                painter.setBrush(QtGui.QColor(7, 17, 23, 222))
+                painter.drawRoundedRect(chip_rect, 12.0, 12.0)
 
-            painter.setPen(QtGui.QPen(QtGui.QColor("#f7fbff" if is_selected else severity_color), 1.6))
-            painter.setBrush(QtGui.QColor(7, 17, 23, 222))
-            painter.drawRoundedRect(chip_rect, 12.0, 12.0)
+                title_font = QtGui.QFont(self.font())
+                title_font.setPointSizeF(6.2)
+                title_font.setBold(True)
+                painter.setFont(title_font)
+                painter.setPen(QtGui.QColor("#eef7fa"))
+                painter.drawText(
+                    chip_rect.adjusted(10.0, 5.0, -10.0, -22.0),
+                    QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                    str(payload.get("label") or "ΔP диагонали"),
+                )
+                painter.setPen(QtGui.QColor("#9fc5d2"))
+                painter.drawText(
+                    chip_rect.adjusted(10.0, 5.0, -10.0, -22.0),
+                    QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+                    str(payload.get("delta_label") or "ΔP —"),
+                )
 
-            title_font = QtGui.QFont(self.font())
-            title_font.setPointSizeF(6.2)
-            title_font.setBold(True)
-            painter.setFont(title_font)
-            painter.setPen(QtGui.QColor("#eef7fa"))
-            painter.drawText(
-                chip_rect.adjusted(10.0, 5.0, -10.0, -22.0),
-                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-                str(payload.get("label") or "ΔP диагонали"),
-            )
-            painter.setPen(QtGui.QColor("#9fc5d2"))
-            painter.drawText(
-                chip_rect.adjusted(10.0, 5.0, -10.0, -22.0),
-                QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
-                str(payload.get("delta_label") or "ΔP —"),
-            )
-
-            body_font = QtGui.QFont(self.font())
-            body_font.setPointSizeF(5.9)
-            painter.setFont(body_font)
-            painter.setPen(QtGui.QColor("#d6e8ee"))
-            painter.drawText(
-                chip_rect.adjusted(10.0, 18.0, -10.0, -4.0),
-                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-                f"{payload.get('start_label') or '—'} → {payload.get('end_label') or '—'}",
-            )
-            painter.setPen(QtGui.QColor("#8be2f8"))
-            painter.drawText(
-                chip_rect.adjusted(10.0, 18.0, -10.0, -4.0),
-                QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
-                str(payload.get("pressure_label") or "—"),
-            )
+                body_font = QtGui.QFont(self.font())
+                body_font.setPointSizeF(5.9)
+                painter.setFont(body_font)
+                painter.setPen(QtGui.QColor("#d6e8ee"))
+                painter.drawText(
+                    chip_rect.adjusted(10.0, 18.0, -10.0, -4.0),
+                    QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                    f"{payload.get('start_label') or '—'} → {payload.get('end_label') or '—'}",
+                )
+                painter.setPen(QtGui.QColor("#8be2f8"))
+                painter.drawText(
+                    chip_rect.adjusted(10.0, 18.0, -10.0, -4.0),
+                    QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+                    str(payload.get("pressure_label") or "—"),
+                )
             self._overlay_targets.append(("edge", edge_name, chip_rect))
             painter.restore()
 
@@ -7847,6 +8720,101 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         )
         painter.restore()
 
+    def _route_pressure_chip_rect(
+        self,
+        anchor: QtCore.QPointF,
+        *,
+        safe_rect: QtCore.QRectF,
+        compact: bool,
+    ) -> QtCore.QRectF:
+        width = 150.0 if compact else 176.0
+        height = 30.0 if compact else 44.0
+        rect = QtCore.QRectF(anchor.x() - width * 0.5, anchor.y() - height * 0.5, width, height)
+        if rect.left() < safe_rect.left():
+            rect.moveLeft(safe_rect.left())
+        if rect.right() > safe_rect.right():
+            rect.moveRight(safe_rect.right())
+        if rect.top() < safe_rect.top():
+            rect.moveTop(safe_rect.top())
+        if rect.bottom() > safe_rect.bottom():
+            rect.moveBottom(safe_rect.bottom())
+        return rect
+
+    def _draw_route_pressure_strip_compact_chip(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+        border_color: QtGui.QColor,
+        is_selected: bool,
+    ) -> None:
+        painter.setPen(QtGui.QPen(QtGui.QColor("#f7fbff" if is_selected else border_color), 1.3))
+        painter.setBrush(QtGui.QColor(7, 17, 23, 226))
+        painter.drawRoundedRect(rect, 10.0, 10.0)
+
+        title_font = QtGui.QFont(self.font())
+        title_font.setPointSizeF(5.8)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.setPen(QtGui.QColor("#eef7fa"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 8.0, rect.top() + 2.0, rect.width() - 76.0, 11.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"{payload.get('start_label') or '—'} → {payload.get('end_label') or '—'}",
+        )
+        painter.setPen(QtGui.QColor("#9fc5d2"))
+        painter.drawText(
+            QtCore.QRectF(rect.right() - 68.0, rect.top() + 2.0, 60.0, 11.0),
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            str(payload.get("delta_label") or "ΔP —"),
+        )
+
+        body_font = QtGui.QFont(self.font())
+        body_font.setPointSizeF(5.2)
+        body_font.setBold(True)
+        painter.setFont(body_font)
+        painter.setPen(QtGui.QColor("#8be2f8"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 8.0, rect.top() + 14.0, rect.width() - 16.0, 10.0),
+            QtCore.Qt.AlignCenter,
+            f"{payload.get('trend_badge') or 'ΔP?'} • {payload.get('q_badge') or 'Q?'} • {payload.get('cause_effect_badge') or 'ΔP→Q ?'}",
+        )
+
+    def _draw_route_pressure_strip_terminal_compact_summary(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        terminal_meta: dict[str, Any],
+        highlight: QtGui.QColor,
+    ) -> None:
+        painter.setPen(QtGui.QPen(highlight, 1.2))
+        painter.setBrush(QtGui.QColor(8, 20, 28, 230))
+        painter.drawRoundedRect(rect, 8.0, 8.0)
+
+        title_font = QtGui.QFont(self.font())
+        title_font.setPointSizeF(5.5)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.setPen(QtGui.QColor("#eef7fa"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 8.0, rect.top() + 2.0, rect.width() - 16.0, 10.0),
+            QtCore.Qt.AlignCenter,
+            str(terminal_meta.get("leader_summary") or "Ведущий конец не определён"),
+        )
+
+        body_font = QtGui.QFont(self.font())
+        body_font.setPointSizeF(5.0)
+        body_font.setBold(True)
+        painter.setFont(body_font)
+        painter.setPen(QtGui.QColor("#bfdce6"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 8.0, rect.top() + 13.0, rect.width() - 16.0, 10.0),
+            QtCore.Qt.AlignCenter,
+            f"{terminal_meta.get('trend_badge') or 'ΔP?'} • {terminal_meta.get('q_badge') or 'Q?'} • {terminal_meta.get('cause_effect_badge') or 'ΔP→Q ?'}",
+        )
+
     def _active_route_pressure_strip_payload(self) -> dict[str, Any] | None:
         diagnostics = self._diagnostics if isinstance(self._diagnostics, dict) else {}
         strip_payloads = [dict(item or {}) for item in list(diagnostics.get("route_pressure_strips") or []) if isinstance(item, dict)]
@@ -7870,13 +8838,22 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         payload = self._active_route_pressure_strip_payload()
         if payload is None:
             return None
-        return _route_pressure_strip_terminal_meta(payload)
+        return _route_pressure_strip_terminal_meta(
+            payload,
+            dataset=self._dataset,
+            pressure_display_mode=self._pressure_display_mode,
+        )
 
     def _draw_route_pressure_strip_terminal_focus(self, painter: QtGui.QPainter) -> None:
         payload = self._active_route_pressure_strip_payload()
         if payload is None:
             return
-        terminal_meta = _route_pressure_strip_terminal_meta(payload)
+        terminal_meta = _route_pressure_strip_terminal_meta(
+            payload,
+            dataset=self._dataset,
+            pressure_display_mode=self._pressure_display_mode,
+        )
+        visibility_meta = _route_focus_visibility_meta(payload, terminal_meta, detail_mode=self._detail_mode)
         edge_name = str(terminal_meta.get("edge_name") or "")
         midpoint = self._edge_midpoints.get(edge_name)
         if midpoint is None:
@@ -7902,11 +8879,21 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         ]
 
         painter.save()
+        compact_mode = self._detail_mode != "full"
         for node_name, badge_text, pressure_text, label_text in endpoint_rows:
             point = self._node_points.get(node_name)
             if point is None:
                 continue
-            is_leading = node_name and node_name == str(terminal_meta.get("leading_node") or "")
+            equalized = bool(terminal_meta.get("equalized"))
+            is_leading = bool(node_name and node_name == str(terminal_meta.get("leading_node") or ""))
+            if equalized:
+                show_endpoint = bool(visibility_meta.get("show_leading_chip"))
+            else:
+                show_endpoint = bool(
+                    visibility_meta.get("show_leading_chip") if is_leading else visibility_meta.get("show_trailing_chip")
+                )
+            if not show_endpoint:
+                continue
             ring_color = QtGui.QColor(highlight)
             ring_color.setAlpha(255 if is_leading else 214)
             painter.setPen(QtGui.QPen(ring_color, 3.6 if is_leading else 2.4))
@@ -7915,28 +8902,28 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
 
             side = 1.0 if point.x() <= midpoint.x() else -1.0
             chip_rect = QtCore.QRectF(
-                point.x() + (18.0 if side > 0.0 else -106.0),
-                point.y() - 14.0,
-                88.0,
-                28.0,
+                point.x() + (16.0 if side > 0.0 else (-94.0 if compact_mode else -106.0)),
+                point.y() - (12.0 if compact_mode else 14.0),
+                72.0 if compact_mode else 88.0,
+                24.0 if compact_mode else 28.0,
             )
             painter.setPen(QtGui.QPen(ring_color, 1.8 if is_leading else 1.2))
             painter.setBrush(QtGui.QColor(7, 17, 23, 232))
             painter.drawRoundedRect(chip_rect, 9.0, 9.0)
 
             chip_font = QtGui.QFont(self.font())
-            chip_font.setPointSizeF(6.0 if is_leading else 5.8)
+            chip_font.setPointSizeF(5.4 if compact_mode else (6.0 if is_leading else 5.8))
             chip_font.setBold(True)
             painter.setFont(chip_font)
             painter.setPen(QtGui.QColor("#eef7fa"))
             painter.drawText(
-                chip_rect.adjusted(8.0, 2.0, -8.0, -12.0),
+                chip_rect.adjusted(7.0, 1.0, -7.0, -10.0 if compact_mode else -12.0),
                 QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
                 f"{badge_text} {pressure_text}",
             )
             painter.setPen(QtGui.QColor("#8be2f8" if is_leading else "#9fc5d2"))
             painter.drawText(
-                chip_rect.adjusted(8.0, 12.0, -8.0, -2.0),
+                chip_rect.adjusted(7.0, 10.0 if compact_mode else 12.0, -7.0, -2.0),
                 QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
                 label_text,
             )
@@ -7945,70 +8932,83 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         trend_fill, trend_border, trend_text = self._focus_tone_colors(str(terminal_meta.get("trend_tone") or "neutral"))
         q_fill, q_border, q_text = self._focus_tone_colors(str(terminal_meta.get("q_tone") or "neutral"))
         cause_fill, cause_border, cause_text = self._focus_tone_colors(str(terminal_meta.get("cause_effect_tone") or "neutral"))
-        summary_rect = QtCore.QRectF(midpoint.x() - 92.0, midpoint.y() - 98.0, 184.0, 102.0)
-        painter.setPen(QtGui.QPen(highlight, 1.4))
-        painter.setBrush(QtGui.QColor(8, 20, 28, 228))
-        painter.drawRoundedRect(summary_rect, 9.0, 9.0)
-        summary_font = QtGui.QFont(self.font())
-        summary_font.setPointSizeF(5.9)
-        summary_font.setBold(True)
-        painter.setFont(summary_font)
-        painter.setPen(QtGui.QColor("#eef7fa"))
-        painter.drawText(
-            summary_rect.adjusted(8.0, 1.0, -8.0, -73.0),
-            QtCore.Qt.AlignCenter | QtCore.Qt.AlignVCenter,
-            str(terminal_meta.get("leader_summary") or "Ведущий конец не определён"),
-        )
-        trend_rect = QtCore.QRectF(summary_rect.left() + 10.0, summary_rect.top() + 20.0, summary_rect.width() - 20.0, 13.0)
-        painter.setPen(QtGui.QPen(trend_border, 1.0))
-        painter.setBrush(trend_fill)
-        painter.drawRoundedRect(trend_rect, 7.0, 7.0)
-        trend_font = QtGui.QFont(self.font())
-        trend_font.setPointSizeF(5.5)
-        trend_font.setBold(True)
-        painter.setFont(trend_font)
-        painter.setPen(trend_text)
-        painter.drawText(
-            trend_rect.adjusted(6.0, 0.0, -6.0, 0.0),
-            QtCore.Qt.AlignCenter,
-            f"{terminal_meta.get('trend_badge') or 'ΔP?'} • {terminal_meta.get('trend_status') or 'ΔP без истории'}",
-        )
-        q_rect = QtCore.QRectF(summary_rect.left() + 10.0, summary_rect.top() + 36.0, summary_rect.width() - 20.0, 13.0)
-        painter.setPen(QtGui.QPen(q_border, 1.0))
-        painter.setBrush(q_fill)
-        painter.drawRoundedRect(q_rect, 7.0, 7.0)
-        q_font = QtGui.QFont(self.font())
-        q_font.setPointSizeF(5.5)
-        q_font.setBold(True)
-        painter.setFont(q_font)
-        painter.setPen(q_text)
-        painter.drawText(
-            q_rect.adjusted(6.0, 0.0, -6.0, 0.0),
-            QtCore.Qt.AlignCenter,
-            f"{terminal_meta.get('q_badge') or 'Q?'} • {terminal_meta.get('q_status') or 'Q без истории'}",
-        )
-        cause_rect = QtCore.QRectF(summary_rect.left() + 10.0, summary_rect.top() + 52.0, summary_rect.width() - 20.0, 10.0)
-        painter.setPen(QtGui.QPen(cause_border, 0.9))
-        painter.setBrush(cause_fill)
-        painter.drawRoundedRect(cause_rect, 5.0, 5.0)
-        cause_font = QtGui.QFont(self.font())
-        cause_font.setPointSizeF(4.7)
-        cause_font.setBold(True)
-        painter.setFont(cause_font)
-        painter.setPen(cause_text)
-        painter.drawText(
-            cause_rect.adjusted(4.0, 0.0, -4.0, 0.0),
-            QtCore.Qt.AlignCenter,
-            str(terminal_meta.get("cause_effect_badge") or "ΔP→Q ?"),
-        )
-        history_rect = QtCore.QRectF(summary_rect.left() + 10.0, summary_rect.top() + 66.0, summary_rect.width() - 20.0, 22.0)
-        self._draw_route_pressure_strip_flow_history(
-            painter,
-            rect=history_rect,
-            payload=terminal_meta,
-            accent=q_border,
-        )
-        self._overlay_targets.append(("edge", edge_name, summary_rect))
+        if compact_mode and bool(visibility_meta.get("show_summary")):
+            summary_rect = QtCore.QRectF(midpoint.x() - 80.0, midpoint.y() - 46.0, 160.0, 34.0)
+            self._draw_route_pressure_strip_terminal_compact_summary(
+                painter,
+                rect=summary_rect,
+                terminal_meta=terminal_meta,
+                highlight=highlight,
+            )
+        elif not compact_mode and bool(visibility_meta.get("show_summary")):
+            summary_rect = QtCore.QRectF(midpoint.x() - 92.0, midpoint.y() - 98.0, 184.0, 102.0)
+            painter.setPen(QtGui.QPen(highlight, 1.4))
+            painter.setBrush(QtGui.QColor(8, 20, 28, 228))
+            painter.drawRoundedRect(summary_rect, 9.0, 9.0)
+            summary_font = QtGui.QFont(self.font())
+            summary_font.setPointSizeF(5.9)
+            summary_font.setBold(True)
+            painter.setFont(summary_font)
+            painter.setPen(QtGui.QColor("#eef7fa"))
+            painter.drawText(
+                summary_rect.adjusted(8.0, 1.0, -8.0, -73.0),
+                QtCore.Qt.AlignCenter | QtCore.Qt.AlignVCenter,
+                str(terminal_meta.get("leader_summary") or "Ведущий конец не определён"),
+            )
+            trend_rect = QtCore.QRectF(summary_rect.left() + 10.0, summary_rect.top() + 20.0, summary_rect.width() - 20.0, 13.0)
+            painter.setPen(QtGui.QPen(trend_border, 1.0))
+            painter.setBrush(trend_fill)
+            painter.drawRoundedRect(trend_rect, 7.0, 7.0)
+            trend_font = QtGui.QFont(self.font())
+            trend_font.setPointSizeF(5.5)
+            trend_font.setBold(True)
+            painter.setFont(trend_font)
+            painter.setPen(trend_text)
+            painter.drawText(
+                trend_rect.adjusted(6.0, 0.0, -6.0, 0.0),
+                QtCore.Qt.AlignCenter,
+                f"{terminal_meta.get('trend_badge') or 'ΔP?'} • {terminal_meta.get('trend_status') or 'ΔP без истории'}",
+            )
+            q_rect = QtCore.QRectF(summary_rect.left() + 10.0, summary_rect.top() + 36.0, summary_rect.width() - 20.0, 13.0)
+            painter.setPen(QtGui.QPen(q_border, 1.0))
+            painter.setBrush(q_fill)
+            painter.drawRoundedRect(q_rect, 7.0, 7.0)
+            q_font = QtGui.QFont(self.font())
+            q_font.setPointSizeF(5.5)
+            q_font.setBold(True)
+            painter.setFont(q_font)
+            painter.setPen(q_text)
+            painter.drawText(
+                q_rect.adjusted(6.0, 0.0, -6.0, 0.0),
+                QtCore.Qt.AlignCenter,
+                f"{terminal_meta.get('q_badge') or 'Q?'} • {terminal_meta.get('q_status') or 'Q без истории'}",
+            )
+            cause_rect = QtCore.QRectF(summary_rect.left() + 10.0, summary_rect.top() + 52.0, summary_rect.width() - 20.0, 10.0)
+            painter.setPen(QtGui.QPen(cause_border, 0.9))
+            painter.setBrush(cause_fill)
+            painter.drawRoundedRect(cause_rect, 5.0, 5.0)
+            cause_font = QtGui.QFont(self.font())
+            cause_font.setPointSizeF(4.7)
+            cause_font.setBold(True)
+            painter.setFont(cause_font)
+            painter.setPen(cause_text)
+            painter.drawText(
+                cause_rect.adjusted(4.0, 0.0, -4.0, 0.0),
+                QtCore.Qt.AlignCenter,
+                str(terminal_meta.get("cause_effect_badge") or "ΔP→Q ?"),
+            )
+            if bool(visibility_meta.get("show_history_strip")):
+                history_rect = QtCore.QRectF(summary_rect.left() + 10.0, summary_rect.top() + 66.0, summary_rect.width() - 20.0, 22.0)
+                self._draw_route_pressure_strip_flow_history(
+                    painter,
+                    rect=history_rect,
+                    payload=terminal_meta,
+                    accent=q_border,
+                )
+        else:
+            summary_rect = QtCore.QRectF()
+        if summary_rect.isValid() and not summary_rect.isNull():
+            self._overlay_targets.append(("edge", edge_name, summary_rect))
         painter.restore()
 
     def _draw_route_pressure_strip_flow_history(
@@ -8101,6 +9101,8 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         diagnostics = self._diagnostics if isinstance(self._diagnostics, dict) else {}
         route_payload = self._active_route_pressure_strip_payload()
         route_terminal_meta = self._active_route_pressure_terminal_meta()
+        route_visibility_meta = _route_focus_visibility_meta(route_payload, route_terminal_meta, detail_mode=self._detail_mode)
+        route_opacity_meta = _route_focus_opacity_profile(route_visibility_meta, detail_mode=self._detail_mode)
         route_intermediate_items = _route_pressure_strip_intermediate_nodes_meta(
             self._dataset,
             diagnostics,
@@ -8110,6 +9112,11 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         route_intermediate_lookup = {
             str(item.get("name") or ""): dict(item or {})
             for item in route_intermediate_items
+            if str(dict(item or {}).get("name") or "").strip()
+        }
+        alert_node_lookup = {
+            str(item.get("name") or ""): dict(item or {})
+            for item in list(self._alerts.get("nodes") or [])
             if str(dict(item or {}).get("name") or "").strip()
         }
         diagonal_focus = dict(diagnostics.get("diagonal_focus") or {})
@@ -8151,7 +9158,10 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                 ]
                 if name
             )
-        spotlight_nodes.update(route_intermediate_lookup.keys())
+        if float(route_visibility_meta.get("importance_score") or 0.0) >= 1.4 or self._detail_mode == "full":
+            spotlight_nodes.update(route_intermediate_lookup.keys())
+        global_peak_flow_abs = self._global_peak_flow_abs()
+        self._occupied_node_overlay_rects = []
 
         for node_name, point in self._node_points.items():
             pressure = self._current_node_pressure(node_name)
@@ -8174,12 +9184,14 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             route_badge = ""
             route_ring_color: QtGui.QColor | None = None
             route_badge_fill: QtGui.QColor | None = None
+            route_label_role = ""
             if route_terminal_meta:
                 leading_node = str(route_terminal_meta.get("leading_node") or "")
                 trailing_node = str(route_terminal_meta.get("trailing_node") or "")
                 start_node = str(route_terminal_meta.get("start_node") or "")
                 end_node = str(route_terminal_meta.get("end_node") or "")
                 if node_name and node_name == leading_node:
+                    route_label_role = "leading"
                     route_badge = (
                         str(route_terminal_meta.get("start_badge") or "")
                         if node_name == start_node
@@ -8188,6 +9200,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                     route_ring_color = QtGui.QColor("#f6d98b")
                     route_badge_fill = QtGui.QColor(76, 56, 24, 228)
                 elif node_name and node_name == trailing_node:
+                    route_label_role = "trailing"
                     route_badge = (
                         str(route_terminal_meta.get("start_badge") or "")
                         if node_name == start_node
@@ -8196,6 +9209,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                     route_ring_color = QtGui.QColor("#8be2f8")
                     route_badge_fill = QtGui.QColor(16, 46, 58, 228)
                 elif node_name and node_name in {start_node, end_node}:
+                    route_label_role = "terminal"
                     route_badge = (
                         str(route_terminal_meta.get("start_badge") or "")
                         if node_name == start_node
@@ -8204,6 +9218,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                     route_ring_color = QtGui.QColor("#d6e8ee")
                     route_badge_fill = QtGui.QColor(22, 36, 45, 228)
             if not route_badge and node_name in route_intermediate_lookup:
+                route_label_role = "intermediate"
                 intermediate_item = route_intermediate_lookup.get(node_name) or {}
                 route_badge = str(intermediate_item.get("badge_text") or "")
                 kind = str(intermediate_item.get("kind") or "")
@@ -8221,6 +9236,15 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                     route_badge_fill = QtGui.QColor(24, 36, 45, 228)
             if route_ring_color is not None:
                 route_leading_node = str(route_terminal_meta.get("leading_node") or "") if route_terminal_meta else ""
+                ring_alpha = int(route_opacity_meta.get("node_ring_alpha") or 214)
+                badge_alpha = int(route_opacity_meta.get("node_badge_alpha") or 228)
+                is_secondary_route_node = bool(route_terminal_meta) and node_name == str(route_terminal_meta.get("trailing_node") or "")
+                if is_secondary_route_node:
+                    ring_alpha = max(48, int(round(ring_alpha * 0.78)))
+                    badge_alpha = max(64, int(round(badge_alpha * 0.76)))
+                route_ring_color.setAlpha(ring_alpha)
+                if route_badge_fill is not None:
+                    route_badge_fill.setAlpha(badge_alpha)
                 painter.setPen(
                     QtGui.QPen(
                         route_ring_color,
@@ -8235,59 +9259,189 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
 
             if node_name not in spotlight_nodes:
                 continue
-            label_rect = QtCore.QRectF(point.x() - 82.0, point.y() - 54.0, 164.0, 34.0)
+            alert_item = alert_node_lookup.get(node_name) or {}
+            presentation_meta = _node_label_presentation_meta(
+                node_name,
+                detail_mode=self._detail_mode,
+                route_label_role=route_label_role,
+                alert_severity=str(alert_item.get("severity") or ""),
+                diagonal_severity=str(diagonal_meta.get("severity") or "") if diagonal_meta else "",
+                is_selected=node_name == self._selected_node,
+                is_hovered=self._hover_kind == "node" and str(self._hover_name or "") == node_name,
+            )
+            indicator_rect = self._draw_node_indicator_bars(
+                painter,
+                point=point,
+                radius=radius,
+                payload=self._node_indicator_payload(node_name, global_peak_flow_abs=global_peak_flow_abs),
+                presentation_meta=presentation_meta,
+            )
+            route_label_opacity: dict[str, int] | None = None
+            if route_label_role:
+                route_label_opacity = _route_node_label_opacity_profile(
+                    route_opacity_meta,
+                    node_role=route_label_role,
+                    detail_mode=self._detail_mode,
+                    is_selected=node_name == self._selected_node,
+                    is_hovered=self._hover_kind == "node" and str(self._hover_name or "") == node_name,
+                )
+            alpha_scale = float(presentation_meta.get("alpha_scale") or 1.0)
+            label_bg_alpha = int(route_label_opacity.get("label_bg_alpha") or 228) if route_label_opacity else 228
+            value_bg_alpha = int(route_label_opacity.get("value_bg_alpha") or 212) if route_label_opacity else 212
+            label_text_alpha = int(route_label_opacity.get("label_text_alpha") or 255) if route_label_opacity else 255
+            value_text_alpha = int(route_label_opacity.get("value_text_alpha") or 255) if route_label_opacity else 255
+            badge_text_alpha = int(route_label_opacity.get("badge_text_alpha") or 255) if route_label_opacity else 255
+            label_bg_alpha = max(56, min(246, int(round(label_bg_alpha * alpha_scale))))
+            value_bg_alpha = max(56, min(240, int(round(value_bg_alpha * alpha_scale))))
+            label_text_alpha = max(88, min(255, int(round(label_text_alpha * alpha_scale))))
+            value_text_alpha = max(88, min(255, int(round(value_text_alpha * alpha_scale))))
+            badge_text_alpha = max(96, min(255, int(round(badge_text_alpha * alpha_scale))))
+
+            label_rect_meta = tuple(presentation_meta.get("label_rect") or (-82.0, -54.0, 164.0, 34.0))
+            value_rect_meta = tuple(presentation_meta.get("value_rect") or (-72.0, -18.0, 144.0, 24.0))
+            badge_rect_meta = tuple(presentation_meta.get("badge_rect") or (16.0, -38.0, 40.0, 18.0))
+            label_rect = QtCore.QRectF(
+                point.x() + float(label_rect_meta[0]),
+                point.y() + float(label_rect_meta[1]),
+                float(label_rect_meta[2]),
+                float(label_rect_meta[3]),
+            )
+            value_mode = str(presentation_meta.get("value_mode") or "separate")
+            if value_mode == "inline":
+                inline_value_meta = tuple(presentation_meta.get("inline_value_rect") or (16.0, -11.0, 52.0, 16.0))
+                value_rect = QtCore.QRectF(
+                    point.x() + float(inline_value_meta[0]),
+                    point.y() + float(inline_value_meta[1]),
+                    float(inline_value_meta[2]),
+                    float(inline_value_meta[3]),
+                )
+                value_padding = (5.0, 1.0, -5.0, -1.0)
+                value_radius = float(presentation_meta.get("inline_value_radius") or 6.0)
+                value_font_size = float(presentation_meta.get("inline_value_font_size") or 6.0)
+            else:
+                value_rect = QtCore.QRectF(
+                    point.x() + float(value_rect_meta[0]),
+                    point.y() + float(value_rect_meta[1]),
+                    float(value_rect_meta[2]),
+                    float(value_rect_meta[3]),
+                )
+                value_padding = (8.0, 3.0, -8.0, -3.0)
+                value_radius = float(presentation_meta.get("value_radius") or 9.0)
+                value_font_size = float(presentation_meta.get("value_font_size") or 8.5)
+            badge_rect = (
+                QtCore.QRectF(
+                    point.x() + float(badge_rect_meta[0]),
+                    point.y() + float(badge_rect_meta[1]),
+                    float(badge_rect_meta[2]),
+                    float(badge_rect_meta[3]),
+                )
+                if route_badge and route_badge_fill is not None and route_ring_color is not None
+                else None
+            )
+            layout_mode = str(presentation_meta.get("layout_mode") or "compact")
+            must_show_label = bool(
+                layout_mode == "full"
+                or node_name == self._selected_node
+                or (self._hover_kind == "node" and str(self._hover_name or "") == node_name)
+                or route_label_role in {"leading", "terminal"}
+                or alert_item
+                or diagonal_meta
+            )
+            overlay_union = label_rect.united(value_rect)
+            if badge_rect is not None:
+                overlay_union = overlay_union.united(badge_rect)
+            chosen_shift_y: float | None = None
+            for shift_y in (0.0, -38.0, 38.0, -76.0, 76.0, -114.0, 114.0):
+                shifted_union = overlay_union.translated(0.0, shift_y)
+                if shifted_union.top() < self._scene_rect.top() + 6.0 or shifted_union.bottom() > self._scene_rect.bottom() - 6.0:
+                    continue
+                if any(shifted_union.adjusted(-6.0, -4.0, 6.0, 4.0).intersects(existing) for existing in self._occupied_node_overlay_rects):
+                    continue
+                chosen_shift_y = shift_y
+                break
+            if chosen_shift_y is None and not must_show_label:
+                self._overlay_targets.append(("node", node_name, indicator_rect))
+                continue
+            if chosen_shift_y is None:
+                self._overlay_targets.append(("node", node_name, indicator_rect))
+                continue
+            if abs(chosen_shift_y) > 1.0e-6:
+                label_rect.translate(0.0, chosen_shift_y)
+                value_rect.translate(0.0, chosen_shift_y)
+                if badge_rect is not None:
+                    badge_rect.translate(0.0, chosen_shift_y)
+                overlay_union.translate(0.0, chosen_shift_y)
+
             label_bg = QtGui.QColor(fill)
-            label_bg.setAlpha(228)
+            label_bg.setAlpha(label_bg_alpha)
             painter.setPen(QtCore.Qt.NoPen)
             painter.setBrush(label_bg)
-            painter.drawRoundedRect(label_rect, 12.0, 12.0)
-            painter.setPen(QtGui.QColor(_text_color_for_rgb(rgb)))
+            painter.drawRoundedRect(
+                label_rect,
+                float(presentation_meta.get("label_radius") or 12.0),
+                float(presentation_meta.get("label_radius") or 12.0),
+            )
+            label_text_color = QtGui.QColor(_text_color_for_rgb(rgb))
+            label_text_color.setAlpha(label_text_alpha)
+            painter.setPen(label_text_color)
             label_font = QtGui.QFont(self.font())
-            label_font.setPointSizeF(10.0)
+            label_font.setPointSizeF(float(presentation_meta.get("label_font_size") or 10.0))
             label_font.setBold(True)
             painter.setFont(label_font)
             painter.drawText(
                 label_rect.adjusted(10.0, 6.0, -10.0, -6.0),
-                QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                (QtCore.Qt.AlignCenter if bool(presentation_meta.get("label_centered")) else (QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)),
                 _short_node_label(node_name),
             )
-
-            value_rect = QtCore.QRectF(point.x() - 72.0, point.y() - 18.0, 144.0, 24.0)
             painter.setPen(QtCore.Qt.NoPen)
-            painter.setBrush(QtGui.QColor(7, 17, 23, 212))
-            painter.drawRoundedRect(value_rect, 9.0, 9.0)
-            painter.setPen(QtGui.QColor("#d8eef2"))
+            value_fill = QtGui.QColor(7, 17, 23)
+            value_fill.setAlpha(value_bg_alpha)
+            painter.setBrush(value_fill)
+            painter.drawRoundedRect(
+                value_rect,
+                value_radius,
+                value_radius,
+            )
+            value_text_color = QtGui.QColor("#d8eef2")
+            value_text_color.setAlpha(value_text_alpha)
+            painter.setPen(value_text_color)
             value_font = QtGui.QFont(self.font())
-            value_font.setPointSizeF(8.5)
+            value_font.setPointSizeF(value_font_size)
             painter.setFont(value_font)
             painter.drawText(
-                value_rect.adjusted(8.0, 3.0, -8.0, -3.0),
+                value_rect.adjusted(*value_padding),
                 QtCore.Qt.AlignCenter,
-                self._fmt_value(pressure, "бар(g)", digits=2),
+                self._fmt_pressure_value(pressure, digits=2),
             )
-            if route_badge and route_badge_fill is not None and route_ring_color is not None:
-                badge_rect = QtCore.QRectF(point.x() + 16.0, point.y() - 38.0, 40.0, 18.0)
+            if badge_rect is not None and route_badge_fill is not None and route_ring_color is not None:
                 painter.setPen(QtGui.QPen(route_ring_color, 1.0))
                 painter.setBrush(route_badge_fill)
-                painter.drawRoundedRect(badge_rect, 8.0, 8.0)
+                painter.drawRoundedRect(
+                    badge_rect,
+                    float(presentation_meta.get("badge_radius") or 8.0),
+                    float(presentation_meta.get("badge_radius") or 8.0),
+                )
                 badge_font = QtGui.QFont(self.font())
-                badge_font.setPointSizeF(7.2)
+                badge_font.setPointSizeF(float(presentation_meta.get("badge_font_size") or 7.2))
                 badge_font.setBold(True)
                 painter.setFont(badge_font)
-                painter.setPen(QtGui.QColor("#f7fbff"))
+                badge_text_color = QtGui.QColor("#f7fbff")
+                badge_text_color.setAlpha(badge_text_alpha)
+                painter.setPen(badge_text_color)
                 painter.drawText(
                     badge_rect.adjusted(4.0, 0.0, -4.0, 0.0),
                     QtCore.Qt.AlignCenter,
                     route_badge,
                 )
                 self._overlay_targets.append(("node", node_name, badge_rect))
+            self._occupied_node_overlay_rects.append(QtCore.QRectF(overlay_union))
             intermediate_hover_item = route_intermediate_lookup.get(node_name) or {}
             if (
                 intermediate_hover_item
                 and self._hover_kind == "node"
                 and str(self._hover_name or "") == node_name
             ):
-                summary_rect = QtCore.QRectF(point.x() - 92.0, point.y() + 12.0, 184.0, 42.0)
+                summary_rect = QtCore.QRectF(point.x() - 94.0, point.y() + 12.0, 188.0, 56.0)
                 summary_fill, summary_border, summary_text = self._focus_tone_colors(
                     str(intermediate_hover_item.get("tone") or "neutral")
                 )
@@ -8300,7 +9454,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                 painter.setFont(summary_font)
                 painter.setPen(summary_text)
                 painter.drawText(
-                    summary_rect.adjusted(6.0, -16.0, -6.0, 0.0),
+                    QtCore.QRectF(summary_rect.left() + 6.0, summary_rect.top() + 4.0, summary_rect.width() - 12.0, 11.0),
                     QtCore.Qt.AlignCenter,
                     str(intermediate_hover_item.get("summary_text") or ""),
                 )
@@ -8309,7 +9463,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                 hint_font.setBold(True)
                 painter.setFont(hint_font)
                 painter.drawText(
-                    summary_rect.adjusted(6.0, -1.0, -6.0, 0.0),
+                    QtCore.QRectF(summary_rect.left() + 6.0, summary_rect.top() + 17.0, summary_rect.width() - 12.0, 10.0),
                     QtCore.Qt.AlignCenter,
                     str(intermediate_hover_item.get("lead_hint_text") or ""),
                 )
@@ -8318,11 +9472,20 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                 trend_font.setBold(True)
                 painter.setFont(trend_font)
                 painter.drawText(
-                    summary_rect.adjusted(6.0, 15.0, -6.0, 0.0),
+                    QtCore.QRectF(summary_rect.left() + 6.0, summary_rect.top() + 29.0, summary_rect.width() - 12.0, 10.0),
                     QtCore.Qt.AlignCenter,
                     str(intermediate_hover_item.get("lead_trend_text") or ""),
                 )
-            self._overlay_targets.append(("node", node_name, label_rect.united(value_rect)))
+                flow_font = QtGui.QFont(self.font())
+                flow_font.setPointSizeF(4.6)
+                flow_font.setBold(True)
+                painter.setFont(flow_font)
+                painter.drawText(
+                    QtCore.QRectF(summary_rect.left() + 6.0, summary_rect.top() + 41.0, summary_rect.width() - 12.0, 10.0),
+                    QtCore.Qt.AlignCenter,
+                    str(intermediate_hover_item.get("flow_hint_text") or ""),
+                )
+            self._overlay_targets.append(("node", node_name, overlay_union.united(indicator_rect)))
 
     def _selected_edge_direction_payload(self, *, max_abs_flow: float) -> dict[str, Any] | None:
         if self._dataset is None or not self._selected_edge:
@@ -8484,7 +9647,11 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             "temporal_tone": str(temporal_meta.get("temporal_tone") or "neutral"),
             "temporal_window_s": float(temporal_meta.get("window_s") or 0.0),
             "temporal_dq_dt": temporal_meta.get("dq_dt"),
-            "history_summary": _edge_recent_history_summary(history_meta, self._dataset.q_unit),
+            "history_summary": _edge_recent_history_summary_display(
+                history_meta,
+                self._dataset,
+                self._flow_display_mode,
+            ),
             "history_points": list(history_meta.get("history_points") or []),
             "history_open_blocks": list(history_meta.get("history_open_blocks") or []),
             "history_span_s": float(history_meta.get("history_span_s") or 0.0),
@@ -8492,7 +9659,10 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             "history_peak_abs": float(history_meta.get("history_peak_abs") or 0.0),
             "history_open_ratio": history_meta.get("history_open_ratio"),
             "history_zero_y": float(history_meta.get("history_zero_y") or 0.5),
-            "pressure_history_summary": _edge_recent_pressure_summary(pressure_history_meta),
+            "pressure_history_summary": _edge_recent_pressure_summary_display(
+                pressure_history_meta,
+                self._pressure_display_mode,
+            ),
             "pressure_history_points": list(pressure_history_meta.get("pressure_history_points") or []),
             "pressure_history_span_s": float(pressure_history_meta.get("pressure_history_span_s") or 0.0),
             "pressure_history_sample_count": int(pressure_history_meta.get("pressure_history_sample_count") or 0),
@@ -8670,17 +9840,11 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         normal = QtCore.QPointF(-math.sin(angle_rad), math.cos(angle_rad))
         if abs(normal.x()) <= 1.0e-6 and abs(normal.y()) <= 1.0e-6:
             normal = QtCore.QPointF(0.0, -1.0)
-        center = QtCore.QPointF(anchor.x() + normal.x() * 96.0, anchor.y() + normal.y() * 96.0)
-        card_rect = QtCore.QRectF(center.x() - 202.0, center.y() - 177.0, 404.0, 486.0)
-        safe_rect = self._scene_rect.adjusted(36.0, 36.0, -36.0, -36.0)
-        if card_rect.left() < safe_rect.left():
-            card_rect.moveLeft(safe_rect.left())
-        if card_rect.right() > safe_rect.right():
-            card_rect.moveRight(safe_rect.right())
-        if card_rect.top() < safe_rect.top():
-            card_rect.moveTop(safe_rect.top())
-        if card_rect.bottom() > safe_rect.bottom():
-            card_rect.moveBottom(safe_rect.bottom())
+        if self._detail_mode != "full":
+            compact_rect = self._selected_edge_direction_card_rect(anchor, normal, compact=True)
+            self._draw_selected_edge_direction_compact_card(painter, compact_rect, payload)
+            return
+        card_rect = self._selected_edge_direction_card_rect(anchor, normal, compact=False)
 
         flow_matches = payload.get("flow_matches_canonical")
         if flow_matches is True:
@@ -8835,7 +9999,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             f"Поток: {payload.get('flow_direction_label') or '—'}",
         )
         pressure_line = (
-            f"ΔP: {float(payload.get('delta_p_bar') or 0.0):+0.2f} бар • "
+            f"ΔP: {self._fmt_pressure_delta_value(payload.get('delta_p_bar'), digits=2)} • "
             f"{payload.get('pressure_drive_label') or '—'} • "
             f"{payload.get('flow_vs_pressure') or '—'}"
             if payload.get("delta_p_bar") is not None
@@ -8890,8 +10054,13 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             f"Динамика: {payload.get('temporal_status') or '—'}"
             f" • {float(payload.get('temporal_window_s') or 0.0):0.2f} s"
         )
-        if payload.get("temporal_dq_dt") is not None and self._dataset is not None:
-            temporal_line += f" • dQ/dt {float(payload.get('temporal_dq_dt') or 0.0):+0.2f} {self._dataset.q_unit}/s"
+        if payload.get("temporal_dq_dt") is not None:
+            dq_dt_value = self._display_flow_value(payload.get("temporal_dq_dt"))
+            temporal_line += (
+                f" • dQ/dt {float(dq_dt_value):+0.2f} {self._display_flow_unit()}/s"
+                if dq_dt_value is not None
+                else f" • dQ/dt — {self._display_flow_unit()}/s"
+            )
         painter.setPen(temporal_color)
         painter.drawText(
             card_rect.adjusted(14.0, 152.0, -12.0, 94.0),
@@ -8993,6 +10162,179 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             rect=pressure_history_strip_rect,
             payload=payload,
         )
+        painter.restore()
+
+    def _selected_edge_direction_card_rect(
+        self,
+        anchor: QtCore.QPointF,
+        normal: QtCore.QPointF,
+        *,
+        compact: bool,
+    ) -> QtCore.QRectF:
+        offset = 112.0 if compact else 96.0
+        center = QtCore.QPointF(anchor.x() + normal.x() * offset, anchor.y() + normal.y() * offset)
+        if compact:
+            rect = QtCore.QRectF(center.x() - 144.0, center.y() - 72.0, 288.0, 152.0)
+        else:
+            rect = QtCore.QRectF(center.x() - 202.0, center.y() - 177.0, 404.0, 486.0)
+        safe_rect = self._scene_rect.adjusted(36.0, 36.0, -36.0, -36.0)
+        if rect.left() < safe_rect.left():
+            rect.moveLeft(safe_rect.left())
+        if rect.right() > safe_rect.right():
+            rect.moveRight(safe_rect.right())
+        if rect.top() < safe_rect.top():
+            rect.moveTop(safe_rect.top())
+        if rect.bottom() > safe_rect.bottom():
+            rect.moveBottom(safe_rect.bottom())
+        return rect
+
+    def _draw_selected_edge_direction_compact_card(
+        self,
+        painter: QtGui.QPainter,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+    ) -> None:
+        flow_matches = payload.get("flow_matches_canonical")
+        border = QtGui.QColor("#f6d98b" if flow_matches is False else "#8fd5e8")
+        border.setAlpha(228 if flow_matches is False else 188)
+
+        def _tone_fill_text(tone: str) -> tuple[QtGui.QColor, QtGui.QColor]:
+            fill = QtGui.QColor(80, 96, 106, 224)
+            text = QtGui.QColor("#eef7fa")
+            if tone == "ok":
+                fill = QtGui.QColor(127, 228, 167, 220)
+                text = QtGui.QColor("#071117")
+            elif tone == "warn":
+                fill = QtGui.QColor(255, 156, 102, 236)
+                text = QtGui.QColor("#071117")
+            elif tone == "info":
+                fill = QtGui.QColor(138, 226, 248, 210)
+                text = QtGui.QColor("#071117")
+            return fill, text
+
+        painter.save()
+        painter.setPen(QtGui.QPen(border, 1.8))
+        painter.setBrush(QtGui.QColor(7, 17, 23, 220))
+        painter.drawRoundedRect(rect, 15.0, 15.0)
+
+        title_font = QtGui.QFont(self.font())
+        title_font.setPointSizeF(8.2)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.setPen(QtGui.QColor("#eef7fa"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 12.0, rect.top() + 6.0, rect.width() - 124.0, 16.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"{payload.get('endpoint_1_short') or '—'} → {payload.get('endpoint_2_short') or '—'}",
+        )
+
+        flow_fill = QtGui.QColor(91, 192, 231, 220) if flow_matches is True else QtGui.QColor(80, 96, 106, 224)
+        flow_text = QtGui.QColor("#071117") if flow_matches is True else QtGui.QColor("#eef7fa")
+        if flow_matches is False:
+            flow_fill = QtGui.QColor(248, 193, 92, 232)
+            flow_text = QtGui.QColor("#071117")
+        flow_badge_rect = QtCore.QRectF(rect.right() - 92.0, rect.top() + 8.0, 80.0, 18.0)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(flow_fill)
+        painter.drawRoundedRect(flow_badge_rect, 9.0, 9.0)
+        badge_font = QtGui.QFont(self.font())
+        badge_font.setPointSizeF(6.6)
+        badge_font.setBold(True)
+        painter.setFont(badge_font)
+        painter.setPen(flow_text)
+        painter.drawText(flow_badge_rect, QtCore.Qt.AlignCenter, str(payload.get("flow_status_label") or "—"))
+
+        pressure_badge = str(payload.get("pressure_drive_badge") or "")
+        if pressure_badge:
+            pressure_fill, pressure_text = _tone_fill_text("warn" if pressure_badge == "ΔP rev" else "info")
+            if pressure_badge == "ΔP ?":
+                pressure_fill, pressure_text = _tone_fill_text("neutral")
+            pressure_badge_rect = QtCore.QRectF(rect.left() + 12.0, rect.top() + 30.0, 62.0, 18.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(pressure_fill)
+            painter.drawRoundedRect(pressure_badge_rect, 9.0, 9.0)
+            painter.setPen(pressure_text)
+            painter.drawText(pressure_badge_rect, QtCore.Qt.AlignCenter, pressure_badge)
+
+        operability_badge = str(payload.get("operability_badge") or "")
+        if operability_badge:
+            operability_fill, operability_text = _tone_fill_text(str(payload.get("operability_tone") or "neutral"))
+            operability_badge_rect = QtCore.QRectF(rect.left() + 78.0, rect.top() + 30.0, 62.0, 18.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(operability_fill)
+            painter.drawRoundedRect(operability_badge_rect, 9.0, 9.0)
+            painter.setPen(operability_text)
+            painter.drawText(operability_badge_rect, QtCore.Qt.AlignCenter, operability_badge)
+
+        consistency_badge = str(payload.get("consistency_badge") or "")
+        if consistency_badge:
+            consistency_fill, consistency_text = _tone_fill_text(str(payload.get("consistency_tone") or "neutral"))
+            consistency_badge_rect = QtCore.QRectF(rect.left() + 144.0, rect.top() + 30.0, 62.0, 18.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(consistency_fill)
+            painter.drawRoundedRect(consistency_badge_rect, 9.0, 9.0)
+            painter.setPen(consistency_text)
+            painter.drawText(consistency_badge_rect, QtCore.Qt.AlignCenter, consistency_badge)
+
+        temporal_badge = str(payload.get("temporal_badge") or "")
+        if temporal_badge:
+            temporal_fill, temporal_text = _tone_fill_text(str(payload.get("temporal_tone") or "neutral"))
+            temporal_badge_rect = QtCore.QRectF(rect.left() + 210.0, rect.top() + 30.0, 66.0, 18.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(temporal_fill)
+            painter.drawRoundedRect(temporal_badge_rect, 9.0, 9.0)
+            painter.setPen(temporal_text)
+            painter.drawText(temporal_badge_rect, QtCore.Qt.AlignCenter, temporal_badge)
+
+        row_font = QtGui.QFont(self.font())
+        row_font.setPointSizeF(6.9)
+        row_font.setBold(True)
+        painter.setFont(row_font)
+        painter.setPen(QtGui.QColor("#f6d98b"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 12.0, rect.top() + 52.0, rect.width() - 24.0, 14.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Элемент: {payload.get('canonical_direction_label') or '—'}",
+        )
+        painter.setPen(QtGui.QColor(str(payload.get("flow_hex") or "#63d3f5")))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 12.0, rect.top() + 67.0, rect.width() - 24.0, 14.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Поток: {payload.get('flow_direction_label') or '—'}",
+        )
+
+        pressure_line = (
+            f"ΔP {self._fmt_pressure_delta_value(payload.get('delta_p_bar'), digits=2)} • {payload.get('flow_vs_pressure') or '—'}"
+            if payload.get("delta_p_bar") is not None
+            else "ΔP: нет данных по давлениям"
+        )
+        painter.setPen(QtGui.QColor("#a7d8e5"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 12.0, rect.top() + 82.0, rect.width() - 24.0, 14.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            pressure_line,
+        )
+
+        painter.setPen(QtGui.QColor("#bfdce6"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 12.0, rect.top() + 97.0, rect.width() - 24.0, 14.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Узкое место: {payload.get('phase_ribbon_bottleneck_label') or '—'}",
+        )
+        painter.setPen(QtGui.QColor("#a7f0c6" if str(payload.get("operator_hint_tone") or "neutral") == "ok" else "#bfdce6"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 12.0, rect.top() + 112.0, rect.width() - 24.0, 14.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"Сначала: {payload.get('operator_hint_title') or '—'}",
+        )
+
+        if self._detail_mode == "operator":
+            phase_rect = QtCore.QRectF(rect.left() + 12.0, rect.bottom() - 20.0, rect.width() - 24.0, 14.0)
+            self._draw_edge_phase_ribbon(
+                painter,
+                rect=phase_rect,
+                payload=payload,
+            )
         painter.restore()
 
     def _draw_edge_direction_marker(
@@ -9476,6 +10818,8 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         diagnostics = self._diagnostics if isinstance(self._diagnostics, dict) else {}
         cylinder_payloads = list(diagnostics.get("cylinders") or [])
         component_payloads = list(diagnostics.get("components") or [])
+        occupied_inline_rects: list[QtCore.QRectF] = [QtCore.QRectF(item) for item in self._occupied_node_overlay_rects]
+        safe_rect = self._scene_rect.adjusted(24.0, 24.0, -24.0, -24.0)
         if self._detail_mode == "quiet":
             focus_corner = str(diagnostics.get("focus_corner") or "")
             selected_node = str(diagnostics.get("selected_node") or "")
@@ -9485,24 +10829,124 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                 if str(payload.get("corner") or "") == focus_corner or str(payload.get("focus_node") or "") == selected_node
             ]
             cylinder_payloads = filtered[:2] if filtered else cylinder_payloads[:1]
-            component_payloads = []
+            component_payloads = [
+                payload
+                for payload in component_payloads
+                if isinstance(payload, dict) and (bool(payload.get("is_selected")) or bool(payload.get("actuated")))
+            ][:4]
         elif self._detail_mode == "operator":
             component_payloads = component_payloads[:8]
         for payload in cylinder_payloads:
             if not isinstance(payload, dict):
                 continue
-            rect = self._cylinder_card_rect(payload)
-            self._draw_cylinder_card(painter, rect, payload)
+            if self._detail_mode != "full":
+                is_focus_payload = self._payload_is_focus_cylinder(payload)
+                self._draw_cylinder_bridge_indicator(
+                    painter,
+                    payload,
+                    safe_rect=safe_rect,
+                    occupied_rects=occupied_inline_rects,
+                )
+                if self._detail_mode in {"operator", "quiet"}:
+                    if not is_focus_payload:
+                        continue
+                    rect = self._cylinder_inline_indicator_rect(payload)
+                    if rect is not None:
+                        resolved_rect = self._resolve_overlay_rect(
+                            rect,
+                            safe_rect=safe_rect,
+                            occupied_rects=occupied_inline_rects,
+                        )
+                        if resolved_rect is not None:
+                            self._draw_cylinder_inline_indicator(painter, resolved_rect, payload)
+                            continue
+                else:
+                    rect = self._cylinder_compact_rect(payload)
+                    self._draw_cylinder_compact_card(painter, rect, payload)
+            else:
+                rect = self._cylinder_card_rect(payload)
+                self._draw_cylinder_card(painter, rect, payload)
         for payload in component_payloads:
             if not isinstance(payload, dict):
+                continue
+            presentation_meta = self._component_anchor_presentation_meta(payload)
+            if self._detail_mode != "full":
+                if not bool(presentation_meta.get("show_marker")):
+                    continue
+                marker_rect = self._component_anchor_marker_rect(payload)
+                if marker_rect is not None:
+                    resolved_marker_rect = self._resolve_overlay_rect(
+                        marker_rect,
+                        safe_rect=safe_rect,
+                        occupied_rects=occupied_inline_rects,
+                        candidate_offsets=[
+                            (0.0, 0.0),
+                            (0.0, -10.0),
+                            (0.0, 10.0),
+                            (-10.0, 0.0),
+                            (10.0, 0.0),
+                            (-12.0, -10.0),
+                            (12.0, -10.0),
+                            (-12.0, 10.0),
+                            (12.0, 10.0),
+                        ],
+                    )
+                    if resolved_marker_rect is not None:
+                        self._draw_component_anchor_marker(painter, resolved_marker_rect, payload)
+                if self._detail_mode == "quiet" and not bool(payload.get("is_selected")) and not bool(presentation_meta.get("show_badge")):
+                    continue
+                if not bool(presentation_meta.get("show_badge")):
+                    continue
+                anchor_rect = self._component_anchor_badge_rect(payload)
+                if anchor_rect is not None:
+                    resolved_rect = self._resolve_overlay_rect(
+                        anchor_rect,
+                        safe_rect=safe_rect,
+                        occupied_rects=occupied_inline_rects,
+                        candidate_offsets=[
+                            (0.0, 0.0),
+                            (0.0, -16.0),
+                            (0.0, 16.0),
+                            (-18.0, 0.0),
+                            (18.0, 0.0),
+                            (-18.0, -14.0),
+                            (18.0, -14.0),
+                            (-18.0, 14.0),
+                            (18.0, 14.0),
+                        ],
+                    )
+                    if resolved_rect is not None:
+                        self._draw_component_anchor_badge(painter, resolved_rect, payload)
+                        continue
+                rect = self._component_inline_badge_rect(payload)
+                if rect is None:
+                    continue
+                resolved_rect = self._resolve_overlay_rect(
+                    rect,
+                    safe_rect=safe_rect,
+                    occupied_rects=occupied_inline_rects,
+                )
+                if resolved_rect is None:
+                    continue
+                self._draw_component_inline_badge(painter, resolved_rect, payload)
                 continue
             rect = self._component_badge_rect(payload)
             if rect is None:
                 continue
             self._draw_component_badge(painter, rect, payload)
 
+    def _payload_is_focus_cylinder(self, payload: dict[str, Any]) -> bool:
+        focus_corner = str(self._diagnostics.get("focus_corner") or "")
+        return str(payload.get("corner") or "") == focus_corner or str(payload.get("focus_node") or "") == self._selected_node
+
     def _selected_edge_focus_payload(self) -> dict[str, Any] | None:
-        payload = _build_selected_edge_focus_meta(self._dataset, self._frame_idx, edge_name=self._selected_edge)
+        payload = _build_selected_edge_focus_meta(
+            self._dataset,
+            self._frame_idx,
+            edge_name=self._selected_edge,
+            flow_display_mode=self._flow_display_mode,
+            pressure_display_mode=self._pressure_display_mode,
+        )
         if not payload:
             return None
         active_step = str(self._selected_focus_step or "")
@@ -9880,6 +11324,36 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             170.0,
         )
 
+    def _cylinder_compact_rect(self, payload: dict[str, Any]) -> QtCore.QRectF:
+        cap_name = str(dict(payload.get("cap") or {}).get("node_name") or "")
+        rod_name = str(dict(payload.get("rod") or {}).get("node_name") or "")
+        cap_point = self._node_points.get(cap_name)
+        rod_point = self._node_points.get(rod_name)
+        corner = str(payload.get("corner") or "")
+        safe_rect = self._scene_rect.adjusted(28.0, 28.0, -28.0, -28.0)
+
+        if cap_point is not None and rod_point is not None:
+            center = QtCore.QPointF(
+                (cap_point.x() + rod_point.x()) * 0.5,
+                (cap_point.y() + rod_point.y()) * 0.5,
+            )
+            side_shift = -104.0 if corner.startswith("Л") else 104.0
+            vertical_shift = -10.0 if corner.endswith("П") else 10.0
+            rect = QtCore.QRectF(center.x() + side_shift - 76.0, center.y() + vertical_shift - 44.0, 152.0, 88.0)
+        else:
+            fallback = self._cylinder_card_rect(payload)
+            rect = QtCore.QRectF(fallback.left() + 14.0, fallback.top() + 22.0, fallback.width() - 28.0, 92.0)
+
+        if rect.left() < safe_rect.left():
+            rect.moveLeft(safe_rect.left())
+        if rect.right() > safe_rect.right():
+            rect.moveRight(safe_rect.right())
+        if rect.top() < safe_rect.top():
+            rect.moveTop(safe_rect.top())
+        if rect.bottom() > safe_rect.bottom():
+            rect.moveBottom(safe_rect.bottom())
+        return rect
+
     def _component_badge_rect(self, payload: dict[str, Any]) -> QtCore.QRectF | None:
         edge_name = str(payload.get("edge_name") or "")
         midpoint = self._edge_midpoints.get(edge_name)
@@ -9889,6 +11363,597 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         shift_x = -48.0 if order % 2 else 48.0
         shift_y = -46.0 - float(order % 3) * 36.0
         return QtCore.QRectF(midpoint.x() + shift_x - 86.0, midpoint.y() + shift_y - 26.0, 172.0, 52.0)
+
+    def _resolve_overlay_rect(
+        self,
+        rect: QtCore.QRectF,
+        *,
+        safe_rect: QtCore.QRectF,
+        occupied_rects: list[QtCore.QRectF],
+        candidate_offsets: list[tuple[float, float]] | None = None,
+    ) -> QtCore.QRectF | None:
+        offsets = list(candidate_offsets or [])
+        if not offsets:
+            offsets = [
+                (0.0, 0.0),
+                (0.0, -20.0),
+                (0.0, 20.0),
+                (-28.0, 0.0),
+                (28.0, 0.0),
+                (-32.0, -18.0),
+                (32.0, -18.0),
+                (-32.0, 18.0),
+                (32.0, 18.0),
+                (0.0, -40.0),
+                (0.0, 40.0),
+            ]
+        for dx, dy in offsets:
+            candidate = QtCore.QRectF(rect)
+            candidate.translate(float(dx), float(dy))
+            if candidate.left() < safe_rect.left():
+                candidate.moveLeft(safe_rect.left())
+            if candidate.right() > safe_rect.right():
+                candidate.moveRight(safe_rect.right())
+            if candidate.top() < safe_rect.top():
+                candidate.moveTop(safe_rect.top())
+            if candidate.bottom() > safe_rect.bottom():
+                candidate.moveBottom(safe_rect.bottom())
+            expanded = candidate.adjusted(-6.0, -4.0, 6.0, 4.0)
+            if any(expanded.intersects(existing) for existing in occupied_rects):
+                continue
+            occupied_rects.append(QtCore.QRectF(expanded))
+            return candidate
+        return None
+
+    def _cylinder_inline_indicator_rect(self, payload: dict[str, Any]) -> QtCore.QRectF | None:
+        cap_name = str(dict(payload.get("cap") or {}).get("node_name") or "")
+        rod_name = str(dict(payload.get("rod") or {}).get("node_name") or "")
+        cap_point = self._node_points.get(cap_name)
+        rod_point = self._node_points.get(rod_name)
+        corner = str(payload.get("corner") or "")
+        if cap_point is not None and rod_point is not None:
+            center = QtCore.QPointF(
+                (cap_point.x() + rod_point.x()) * 0.5,
+                (cap_point.y() + rod_point.y()) * 0.5,
+            )
+            side_shift = -74.0 if corner.startswith("Л") else 74.0
+            vertical_shift = -6.0 if corner.endswith("П") else 6.0
+            return QtCore.QRectF(center.x() + side_shift - 58.0, center.y() + vertical_shift - 18.0, 116.0, 36.0)
+        fallback = self._cylinder_compact_rect(payload)
+        if fallback.isNull():
+            return None
+        return QtCore.QRectF(fallback.center().x() - 58.0, fallback.center().y() - 18.0, 116.0, 36.0)
+
+    def _component_inline_badge_rect(self, payload: dict[str, Any]) -> QtCore.QRectF | None:
+        edge_name = str(payload.get("edge_name") or "")
+        path = self._edge_paths.get(edge_name)
+        if path is None or path.isEmpty():
+            return None
+        order = int(payload.get("order") or 0)
+        t = 0.5 if not bool(payload.get("is_selected")) else 0.42
+        anchor = path.pointAtPercent(t)
+        angle_deg = self._path_angle_deg(path, t)
+        angle_rad = math.radians(angle_deg)
+        side = -1.0 if order % 2 else 1.0
+        offset = 22.0 + 6.0 * float(order % 3)
+        center = QtCore.QPointF(
+            anchor.x() + (-math.sin(angle_rad) * offset * side),
+            anchor.y() + (math.cos(angle_rad) * offset * side),
+        )
+        width = 76.0 if bool(payload.get("is_selected")) else 68.0
+        return QtCore.QRectF(center.x() - width * 0.5, center.y() - 10.0, width, 20.0)
+
+    def _component_anchor_badge_rect(self, payload: dict[str, Any]) -> QtCore.QRectF | None:
+        anchor_node_name = str(payload.get("anchor_node_name") or "")
+        point = self._node_points.get(anchor_node_name)
+        if point is None:
+            return None
+        source = str(payload.get("anchor_node_source") or "")
+        presentation_meta = self._component_anchor_presentation_meta(payload)
+        badge_mode = str(presentation_meta.get("badge_mode") or "text")
+        width = 82.0 if bool(payload.get("is_selected")) else 72.0
+        if badge_mode == "graphic":
+            width = 42.0 if bool(payload.get("is_selected")) else 38.0
+        elif badge_mode == "compact":
+            width = 66.0 if bool(payload.get("is_selected")) else 58.0
+        elif str(presentation_meta.get("marker_mode") or "") == "minimal":
+            width = max(64.0, width - 10.0)
+        elif str(presentation_meta.get("marker_mode") or "") == "compact":
+            width = max(68.0, width - 4.0)
+        height = 16.0 if badge_mode == "graphic" else 18.0
+        scene_center = self._scene_rect.center()
+        dx = 28.0 if point.x() <= scene_center.x() else -28.0
+        dy = 18.0 if point.y() <= scene_center.y() else -18.0
+        if source == "indicator":
+            dy = -18.0 if point.y() >= scene_center.y() else 18.0
+        elif source == "component":
+            dy = 14.0 if abs(point.y() - scene_center.y()) < 120.0 else (-18.0 if point.y() > scene_center.y() else 18.0)
+        return QtCore.QRectF(point.x() + dx - width * 0.5, point.y() + dy - height * 0.5, width, height)
+
+    def _component_anchor_marker_rect(self, payload: dict[str, Any]) -> QtCore.QRectF | None:
+        anchor_node_name = str(payload.get("anchor_node_name") or "")
+        point = self._node_points.get(anchor_node_name)
+        if point is None:
+            return None
+        source = str(payload.get("anchor_node_source") or "")
+        presentation_meta = self._component_anchor_presentation_meta(payload)
+        marker_mode = str(presentation_meta.get("marker_mode") or "full")
+        if bool(payload.get("is_selected")):
+            size = 24.0
+        elif marker_mode == "minimal":
+            size = 16.0
+        elif marker_mode == "compact":
+            size = 19.0
+        else:
+            size = 22.0
+        scene_center = self._scene_rect.center()
+        dx = 14.0 if point.x() <= scene_center.x() else -14.0
+        dy = -14.0 if point.y() >= scene_center.y() else 14.0
+        if source == "component":
+            dy = 12.0 if point.y() <= scene_center.y() else -12.0
+        elif source == "endpoint":
+            dx = 12.0 if point.x() <= scene_center.x() else -12.0
+        return QtCore.QRectF(point.x() + dx - size * 0.5, point.y() + dy - size * 0.5, size, size)
+
+    @staticmethod
+    def _rect_connection_point(rect: QtCore.QRectF, target: QtCore.QPointF) -> QtCore.QPointF:
+        clamped_x = min(max(float(target.x()), rect.left()), rect.right())
+        clamped_y = min(max(float(target.y()), rect.top()), rect.bottom())
+        distances = {
+            "left": abs(clamped_x - rect.left()),
+            "right": abs(clamped_x - rect.right()),
+            "top": abs(clamped_y - rect.top()),
+            "bottom": abs(clamped_y - rect.bottom()),
+        }
+        side = min(distances, key=distances.get)
+        if side == "left":
+            return QtCore.QPointF(rect.left(), clamped_y)
+        if side == "right":
+            return QtCore.QPointF(rect.right(), clamped_y)
+        if side == "top":
+            return QtCore.QPointF(clamped_x, rect.top())
+        return QtCore.QPointF(clamped_x, rect.bottom())
+
+    def _draw_overlay_tether(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        anchor: QtCore.QPointF,
+        color: QtGui.QColor,
+        emphasized: bool,
+    ) -> None:
+        if rect.contains(anchor):
+            return
+        start = self._rect_connection_point(rect, anchor)
+        color_line = QtGui.QColor(color)
+        color_line.setAlpha(210 if emphasized else 138)
+        painter.save()
+        painter.setPen(QtGui.QPen(color_line, 1.2 if emphasized else 0.9, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
+        painter.drawLine(start, anchor)
+        ring_pen = QtGui.QPen(QtGui.QColor(color), 1.2 if emphasized else 0.9)
+        ring_pen.setColor(QtGui.QColor(color.red(), color.green(), color.blue(), 228 if emphasized else 164))
+        painter.setPen(ring_pen)
+        painter.setBrush(QtGui.QColor(7, 17, 23, 0))
+        painter.drawEllipse(anchor, 4.2 if emphasized else 3.6, 4.2 if emphasized else 3.6)
+        painter.restore()
+
+    def _canvas_zoom_scale(self) -> float:
+        content_rect = self._content_rect()
+        if content_rect.width() <= 1.0 or content_rect.height() <= 1.0:
+            return 1.0
+        sx = content_rect.width() / max(1.0, self._camera_rect.width())
+        sy = content_rect.height() / max(1.0, self._camera_rect.height())
+        return float(min(sx, sy))
+
+    def _component_anchor_presentation_meta(self, payload: dict[str, Any]) -> dict[str, Any]:
+        zoom_scale = self._canvas_zoom_scale()
+        is_selected = bool(payload.get("is_selected"))
+        actuated = bool(payload.get("actuated"))
+        is_active = bool(payload.get("is_active"))
+        importance_score = 0.0
+        if is_selected:
+            importance_score += 1.8
+        if actuated:
+            importance_score += 1.35
+        if is_active:
+            importance_score += 0.75
+        if str(payload.get("anchor_node_source") or "") == "indicator":
+            importance_score += 0.18
+
+        marker_mode = "full"
+        if not is_selected and not actuated:
+            if zoom_scale < 0.38 and importance_score < 1.1:
+                marker_mode = "minimal"
+            elif zoom_scale < 0.60 or importance_score < 1.4:
+                marker_mode = "compact"
+        elif zoom_scale < 0.46 and not is_selected:
+            marker_mode = "compact"
+
+        show_marker = True
+        if self._detail_mode == "quiet":
+            show_marker = is_selected or actuated or is_active
+        elif self._detail_mode == "operator":
+            show_marker = is_selected or actuated or is_active or zoom_scale >= 0.48
+
+        show_indicator_bars = marker_mode != "minimal" and (
+            is_selected or actuated or is_active or zoom_scale >= (0.82 if self._detail_mode == "quiet" else 0.68)
+        )
+        show_badge = bool(is_selected)
+        if self._detail_mode == "full":
+            show_badge = True
+        elif actuated and zoom_scale >= 0.56:
+            show_badge = True
+        elif is_active and zoom_scale >= 0.96 and self._detail_mode == "operator":
+            show_badge = True
+
+        badge_mode = "text"
+        if show_badge:
+            if zoom_scale < 0.46 and (self._detail_mode == "quiet" or not is_selected):
+                badge_mode = "graphic"
+            elif zoom_scale < 0.72:
+                badge_mode = "compact"
+
+        return {
+            "zoom_scale": float(zoom_scale),
+            "importance_score": float(importance_score),
+            "marker_mode": marker_mode,
+            "show_marker": bool(show_marker),
+            "show_indicator_bars": bool(show_indicator_bars),
+            "show_badge": bool(show_badge),
+            "badge_mode": badge_mode,
+        }
+
+    def _draw_cylinder_inline_indicator(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:
+        cap = dict(payload.get("cap") or {})
+        rod = dict(payload.get("rod") or {})
+        focus_corner = str(self._diagnostics.get("focus_corner") or "")
+        is_focus = str(payload.get("corner") or "") == focus_corner or str(payload.get("focus_node") or "") == self._selected_node
+        border = QtGui.QColor("#f8c15c" if is_focus else "#63d3f5")
+        border.setAlpha(232 if is_focus else 156)
+        painter.save()
+        painter.setPen(QtGui.QPen(border, 1.8 if is_focus else 1.25))
+        painter.setBrush(QtGui.QColor(8, 20, 28, 226))
+        painter.drawRoundedRect(rect, 11.0, 11.0)
+
+        title_font = QtGui.QFont(self.font())
+        title_font.setPointSizeF(6.7)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.setPen(QtGui.QColor("#eff9fb"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 8.0, rect.top() + 2.0, rect.width() - 46.0, 12.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"{payload.get('corner')} • Ц{int(payload.get('cyl_index') or 1)}",
+        )
+
+        motion_rect = QtCore.QRectF(rect.right() - 34.0, rect.top() + 4.0, 26.0, 10.0)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(str(payload.get("delta_hex") or "#304754")))
+        painter.drawRoundedRect(motion_rect, 5.0, 5.0)
+        motion_font = QtGui.QFont(self.font())
+        motion_font.setPointSizeF(5.6)
+        motion_font.setBold(True)
+        painter.setFont(motion_font)
+        painter.setPen(QtGui.QColor(str(payload.get("delta_text_hex") or "#eff9fb")))
+        painter.drawText(motion_rect, QtCore.Qt.AlignCenter, str(payload.get("motion_short") or "SIG?"))
+
+        body_font = QtGui.QFont(self.font())
+        body_font.setPointSizeF(5.7)
+        body_font.setBold(True)
+        painter.setFont(body_font)
+        painter.setPen(QtGui.QColor("#bfe2ea"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 8.0, rect.top() + 14.0, rect.width() - 16.0, 10.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"БП {self._fmt_pressure_value(cap.get('pressure_bar_g'), digits=2)} • ШП {self._fmt_pressure_value(rod.get('pressure_bar_g'), digits=2)}",
+        )
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 8.0, rect.top() + 24.0, rect.width() - 16.0, 10.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"x {self._fmt_value(payload.get('stroke_m'), 'м', digits=3)} • ΔP {self._fmt_pressure_delta_value(payload.get('delta_p_bar'), digits=2)}",
+        )
+
+        stroke_ratio = _finite_or_none(payload.get("stroke_ratio"))
+        if stroke_ratio is not None:
+            bar_rect = QtCore.QRectF(rect.left() + 8.0, rect.bottom() - 6.0, rect.width() - 16.0, 3.0)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(QtGui.QColor(19, 35, 46, 168))
+            painter.drawRoundedRect(bar_rect, 1.5, 1.5)
+            fill_rect = QtCore.QRectF(bar_rect.left(), bar_rect.top(), bar_rect.width() * _clamp01(float(stroke_ratio)), bar_rect.height())
+            painter.setBrush(QtGui.QColor("#4fe5c0" if is_focus else "#62c7ff"))
+            painter.drawRoundedRect(fill_rect, 1.5, 1.5)
+        self._overlay_targets.append(("node", str(payload.get("focus_node") or ""), rect))
+        painter.restore()
+
+    def _draw_cylinder_bridge_indicator(
+        self,
+        painter: QtGui.QPainter,
+        payload: dict[str, Any],
+        *,
+        safe_rect: QtCore.QRectF,
+        occupied_rects: list[QtCore.QRectF],
+    ) -> bool:
+        cap = dict(payload.get("cap") or {})
+        rod = dict(payload.get("rod") or {})
+        cap_name = str(cap.get("node_name") or "")
+        rod_name = str(rod.get("node_name") or "")
+        cap_point = self._node_points.get(cap_name)
+        rod_point = self._node_points.get(rod_name)
+        if cap_point is None or rod_point is None:
+            return False
+
+        is_focus = self._payload_is_focus_cylinder(payload)
+        bridge_line = QtCore.QLineF(cap_point, rod_point)
+        if bridge_line.length() <= 1.0:
+            return False
+        tangent = QtCore.QPointF(bridge_line.dx() / bridge_line.length(), bridge_line.dy() / bridge_line.length())
+        normal = QtCore.QPointF(-tangent.y(), tangent.x())
+        corner = str(payload.get("corner") or "")
+        side = -1.0 if corner.startswith("Л") else 1.0
+        offset = 16.0 if self._detail_mode == "quiet" else 20.0
+        start = QtCore.QPointF(cap_point.x() + normal.x() * offset * side, cap_point.y() + normal.y() * offset * side)
+        end = QtCore.QPointF(rod_point.x() + normal.x() * offset * side, rod_point.y() + normal.y() * offset * side)
+
+        painter.save()
+        painter.setPen(QtGui.QPen(QtGui.QColor(11, 22, 30, 214), 8.0 if is_focus else 6.0, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
+        painter.drawLine(start, end)
+
+        cap_rgb = _hex_to_rgb(str(cap.get("heat_hex") or "#2f4a59"))
+        rod_rgb = _hex_to_rgb(str(rod.get("heat_hex") or "#2f4a59"))
+        gradient = QtGui.QLinearGradient(start, end)
+        gradient.setColorAt(0.0, QtGui.QColor(*cap_rgb))
+        gradient.setColorAt(1.0, QtGui.QColor(*rod_rgb))
+        painter.setPen(QtGui.QPen(QtGui.QBrush(gradient), 4.0 if is_focus else 3.2, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin))
+        painter.drawLine(start, end)
+
+        end_radius = 7.0 if is_focus else 6.0
+        painter.setPen(QtGui.QPen(QtGui.QColor("#071117"), 1.0))
+        painter.setBrush(QtGui.QColor(*cap_rgb))
+        painter.drawEllipse(start, end_radius, end_radius)
+        painter.setBrush(QtGui.QColor(*rod_rgb))
+        painter.drawEllipse(end, end_radius, end_radius)
+
+        stroke_ratio = _finite_or_none(payload.get("stroke_ratio"))
+        marker_t = _clamp01(float(stroke_ratio)) if stroke_ratio is not None else 0.5
+        marker_center = QtCore.QPointF(
+            start.x() + (end.x() - start.x()) * marker_t,
+            start.y() + (end.y() - start.y()) * marker_t,
+        )
+        painter.setPen(QtGui.QPen(QtGui.QColor("#f7fbff"), 1.0))
+        painter.setBrush(QtGui.QColor(str(payload.get("delta_hex") or "#35505f")))
+        painter.drawEllipse(marker_center, 4.5 if is_focus else 4.0, 4.5 if is_focus else 4.0)
+
+        chip_center = QtCore.QPointF(
+            marker_center.x() + normal.x() * 18.0 * side,
+            marker_center.y() + normal.y() * 18.0 * side,
+        )
+        chip_rect = QtCore.QRectF(chip_center.x() - 38.0, chip_center.y() - 9.0, 76.0, 18.0)
+        chip_rect = self._resolve_overlay_rect(
+            chip_rect,
+            safe_rect=safe_rect,
+            occupied_rects=occupied_rects,
+            candidate_offsets=[
+                (0.0, 0.0),
+                (normal.x() * 10.0 * side, normal.y() * 10.0 * side),
+                (-normal.x() * 10.0 * side, -normal.y() * 10.0 * side),
+                (0.0, -18.0),
+                (0.0, 18.0),
+            ],
+        )
+        if chip_rect is not None:
+            painter.setPen(QtGui.QPen(QtGui.QColor("#f8c15c" if is_focus else "#4f90a7"), 1.2))
+            painter.setBrush(QtGui.QColor(8, 20, 28, 232))
+            painter.drawRoundedRect(chip_rect, 8.0, 8.0)
+            chip_font = QtGui.QFont(self.font())
+            chip_font.setPointSizeF(5.8)
+            chip_font.setBold(True)
+            painter.setFont(chip_font)
+            painter.setPen(QtGui.QColor("#eef7fa"))
+            painter.drawText(
+                QtCore.QRectF(chip_rect.left() + 6.0, chip_rect.top(), chip_rect.width() - 12.0, chip_rect.height()),
+                QtCore.Qt.AlignCenter,
+                f"{payload.get('motion_short') or 'SIG?'} • ΔP {self._fmt_pressure_delta_value(payload.get('delta_p_bar'), digits=1)}",
+            )
+            self._overlay_targets.append(("node", str(payload.get("focus_node") or ""), chip_rect))
+        painter.restore()
+        return True
+
+    def _draw_component_inline_badge(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:
+        is_selected = bool(payload.get("is_selected"))
+        border = QtGui.QColor("#fff4c7" if is_selected else self._severity_color_hex("info"))
+        painter.save()
+        painter.setPen(QtGui.QPen(border, 1.2 if is_selected else 1.0))
+        painter.setBrush(QtGui.QColor(8, 20, 28, 232))
+        painter.drawRoundedRect(rect, 8.0, 8.0)
+
+        icon_rect = QtCore.QRectF(rect.left() + 3.0, rect.top() + 3.0, 14.0, rect.height() - 6.0)
+        self._draw_component_icon(
+            painter,
+            icon_rect,
+            payload,
+            text_hex="#eef7fa",
+            draw_backplate=False,
+            stroke_width=1.2,
+        )
+        font = QtGui.QFont(self.font())
+        font.setPointSizeF(5.8 if is_selected else 5.6)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor("#eef7fa"))
+        painter.drawText(
+            QtCore.QRectF(icon_rect.right() + 4.0, rect.top(), rect.width() - 30.0, rect.height()),
+            QtCore.Qt.AlignCenter,
+            str(payload.get("state_short") or payload.get("component_short") or "SIG?"),
+        )
+        self._draw_actuation_led(
+            painter,
+            rect=rect,
+            active=bool(payload.get("actuated")),
+            compact=True,
+        )
+        self._overlay_targets.append(("edge", str(payload.get("edge_name") or ""), rect))
+        painter.restore()
+
+    def _draw_component_anchor_badge(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:
+        is_selected = bool(payload.get("is_selected"))
+        border = QtGui.QColor("#fff4c7" if is_selected else "#3e7282")
+        anchor_node_name = str(payload.get("anchor_node_name") or "")
+        anchor_point = self._node_points.get(anchor_node_name)
+        presentation_meta = self._component_anchor_presentation_meta(payload)
+        badge_mode = str(presentation_meta.get("badge_mode") or "text")
+        indicator_payload = self._component_indicator_payload(payload, global_peak_flow_abs=self._global_peak_flow_abs())
+        painter.save()
+        painter.setPen(QtGui.QPen(border, 1.0))
+        painter.setBrush(QtGui.QColor(8, 20, 28, 236))
+        painter.drawRoundedRect(rect, 7.0, 7.0)
+
+        if anchor_point is not None:
+            self._draw_overlay_tether(
+                painter,
+                rect=rect,
+                anchor=anchor_point,
+                color=border,
+                emphasized=is_selected or bool(payload.get("actuated")),
+            )
+
+        icon_rect = QtCore.QRectF(rect.left() + 3.0, rect.top() + 2.0, 14.0, rect.height() - 4.0)
+        if badge_mode != "graphic":
+            self._draw_component_icon(
+                painter,
+                icon_rect,
+                payload,
+                text_hex="#eef7fa",
+                draw_backplate=False,
+                stroke_width=1.15,
+            )
+        indicator_rect = QtCore.QRectF(icon_rect)
+        if bool(presentation_meta.get("show_indicator_bars")):
+            indicator_rect = self._draw_component_indicator_bars(
+                painter,
+                rect=rect,
+                payload=indicator_payload,
+                compact=badge_mode == "graphic",
+            )
+        if badge_mode == "graphic":
+            led_diameter = 5.2
+            led_padding = 2.2
+            icon_left = indicator_rect.right() + 1.6
+            icon_right = rect.right() - led_diameter - led_padding - 1.4
+            icon_rect = QtCore.QRectF(icon_left, rect.top() + 3.4, max(7.0, icon_right - icon_left), max(6.0, rect.height() - 6.8))
+            self._draw_component_icon(
+                painter,
+                icon_rect,
+                payload,
+                text_hex="#eef7fa",
+                draw_backplate=False,
+                stroke_width=1.05,
+            )
+        else:
+            text_left = max(icon_rect.right(), indicator_rect.right()) + 4.0
+            text_right = rect.right() - 14.0
+            text_rect = QtCore.QRectF(text_left, rect.top(), max(12.0, text_right - text_left), rect.height())
+            font = QtGui.QFont(self.font())
+            font.setPointSizeF(5.4 if badge_mode == "compact" else (5.7 if is_selected else 5.5))
+            font.setBold(True)
+            painter.setFont(font)
+            painter.setPen(QtGui.QColor("#eef7fa"))
+            painter.drawText(
+                text_rect,
+                QtCore.Qt.AlignCenter,
+                (
+                    str(payload.get("state_short") or "SIG?")
+                    if badge_mode == "compact"
+                    else (
+                        f"{payload.get('component_short') or 'LINE'} {payload.get('state_short') or 'SIG?'}"
+                        if is_selected
+                        else str(payload.get("state_short") or "SIG?")
+                    )
+                ),
+            )
+        flow_strip_rect = QtCore.QRectF(rect.left() + 4.0, rect.bottom() - 3.0, rect.width() - 8.0, 2.0)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(str(payload.get("flow_hex") or "#304754")))
+        painter.drawRoundedRect(flow_strip_rect, 1.0, 1.0)
+        self._draw_actuation_led(
+            painter,
+            rect=rect,
+            active=bool(payload.get("actuated")),
+            compact=True,
+            led_diameter=5.2 if badge_mode == "graphic" else 6.0,
+            padding=2.2 if badge_mode == "graphic" else 3.0,
+            top_padding=2.2 if badge_mode == "graphic" else 3.0,
+        )
+        self._overlay_targets.append(("edge", str(payload.get("edge_name") or ""), rect))
+        painter.restore()
+
+    def _draw_component_anchor_marker(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:
+        is_selected = bool(payload.get("is_selected"))
+        anchor_node_name = str(payload.get("anchor_node_name") or "")
+        anchor_point = self._node_points.get(anchor_node_name)
+        border = QtGui.QColor("#fff4c7" if is_selected else str(payload.get("flow_hex") or "#3e7282"))
+        fill = QtGui.QColor(8, 20, 28, 238 if is_selected else 228)
+        presentation_meta = self._component_anchor_presentation_meta(payload)
+        marker_mode = str(presentation_meta.get("marker_mode") or "full")
+        indicator_payload = self._component_indicator_payload(payload, global_peak_flow_abs=self._global_peak_flow_abs())
+        painter.save()
+        painter.setPen(QtGui.QPen(border, 1.1 if is_selected else 0.9))
+        painter.setBrush(fill)
+        painter.drawRoundedRect(rect, 6.0, 6.0)
+
+        if anchor_point is not None:
+            self._draw_overlay_tether(
+                painter,
+                rect=rect,
+                anchor=anchor_point,
+                color=border,
+                emphasized=is_selected or bool(payload.get("actuated")),
+            )
+
+        indicator_rect = QtCore.QRectF(rect.left() + 1.6, rect.top() + 2.0, 0.0, 0.0)
+        if bool(presentation_meta.get("show_indicator_bars")):
+            indicator_rect = self._draw_component_indicator_bars(
+                painter,
+                rect=rect,
+                payload=indicator_payload,
+                compact=True,
+            )
+        led_diameter = 4.2 if marker_mode == "minimal" else 5.0
+        led_padding = 1.8 if marker_mode == "minimal" else 2.2
+        icon_left = indicator_rect.right() + (1.0 if marker_mode == "minimal" else 1.8)
+        icon_right = rect.right() - led_diameter - led_padding - 1.4
+        icon_width = max(5.2, icon_right - icon_left)
+        icon_top = rect.top() + (4.7 if marker_mode == "minimal" else 4.1)
+        icon_height = max(5.2 if marker_mode == "minimal" else 6.6, rect.height() - (10.8 if marker_mode == "minimal" else 9.0))
+        icon_rect = QtCore.QRectF(icon_left, icon_top, icon_width, icon_height)
+        self._draw_component_icon(
+            painter,
+            icon_rect,
+            payload,
+            text_hex="#eef7fa",
+            draw_backplate=False,
+            stroke_width=1.0,
+        )
+        flow_strip_rect = QtCore.QRectF(
+            icon_rect.left(),
+            rect.bottom() - (2.1 if marker_mode == "minimal" else 2.5),
+            max(3.2 if marker_mode == "minimal" else 4.0, rect.right() - icon_rect.left() - 2.4),
+            1.2 if marker_mode == "minimal" else 1.5,
+        )
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(str(payload.get("flow_hex") or "#304754")))
+        painter.drawRoundedRect(flow_strip_rect, 0.8, 0.8)
+        self._draw_actuation_led(
+            painter,
+            rect=rect,
+            active=bool(payload.get("actuated")),
+            compact=True,
+            led_diameter=led_diameter,
+            padding=1.8,
+            top_padding=1.8,
+        )
+        self._overlay_targets.append(("edge", str(payload.get("edge_name") or ""), rect))
+        painter.restore()
 
     def _draw_cylinder_card(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:
         cap = dict(payload.get("cap") or {})
@@ -9928,12 +11993,111 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.drawText(
             footer_rect,
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-            f"ΔP {self._fmt_value(payload.get('delta_p_bar'), 'бар', digits=2)}",
+            f"ΔP {self._fmt_pressure_delta_value(payload.get('delta_p_bar'), digits=2)}",
         )
         painter.drawText(
             footer_rect,
             QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
             f"x {self._fmt_value(payload.get('stroke_m'), 'м', digits=3)} / v {self._fmt_value(payload.get('stroke_speed_m_s'), 'м/с', digits=3)}",
+        )
+
+    def _draw_cylinder_compact_card(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:
+        cap = dict(payload.get("cap") or {})
+        rod = dict(payload.get("rod") or {})
+        focus_corner = str(self._diagnostics.get("focus_corner") or "")
+        is_focus = str(payload.get("corner") or "") == focus_corner or str(payload.get("focus_node") or "") == self._selected_node
+        border = QtGui.QColor("#f8c15c" if is_focus else "#63d3f5")
+        border.setAlpha(234 if is_focus else 154)
+        painter.setPen(QtGui.QPen(border, 2.4 if is_focus else 1.8))
+        painter.setBrush(QtGui.QColor(8, 20, 28, 224))
+        painter.drawRoundedRect(rect, 16.0, 16.0)
+
+        title_font = QtGui.QFont(self.font())
+        title_font.setPointSizeF(7.8)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.setPen(QtGui.QColor("#eff9fb"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 10.0, rect.top() + 6.0, rect.width() - 68.0, 16.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"{payload.get('corner')} • Ц{int(payload.get('cyl_index') or 1)}",
+        )
+
+        motion_rect = QtCore.QRectF(rect.right() - 56.0, rect.top() + 6.0, 46.0, 16.0)
+        motion_fill = QtGui.QColor(str(payload.get("delta_hex") or "#304754"))
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(motion_fill)
+        painter.drawRoundedRect(motion_rect, 8.0, 8.0)
+        motion_font = QtGui.QFont(self.font())
+        motion_font.setPointSizeF(6.8)
+        motion_font.setBold(True)
+        painter.setFont(motion_font)
+        painter.setPen(QtGui.QColor(str(payload.get("delta_text_hex") or "#eff9fb")))
+        painter.drawText(motion_rect, QtCore.Qt.AlignCenter, str(payload.get("motion_short") or "SIG?"))
+
+        cap_rect = QtCore.QRectF(rect.left() + 10.0, rect.top() + 26.0, rect.width() - 20.0, 18.0)
+        rod_rect = QtCore.QRectF(rect.left() + 10.0, rect.top() + 47.0, rect.width() - 20.0, 18.0)
+        self._draw_cylinder_compact_row(painter, cap_rect, cap, caption="БП")
+        self._draw_cylinder_compact_row(painter, rod_rect, rod, caption="ШП")
+        self._overlay_targets.append(("node", str(cap.get("node_name") or ""), cap_rect))
+        self._overlay_targets.append(("node", str(rod.get("node_name") or ""), rod_rect))
+
+        footer_font = QtGui.QFont(self.font())
+        footer_font.setPointSizeF(6.5)
+        footer_font.setBold(True)
+        painter.setFont(footer_font)
+        painter.setPen(QtGui.QColor("#c8dce2"))
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 10.0, rect.bottom() - 24.0, rect.width() - 20.0, 10.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            f"ΔP {self._fmt_pressure_delta_value(payload.get('delta_p_bar'), digits=2)}",
+        )
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 10.0, rect.bottom() - 24.0, rect.width() - 20.0, 10.0),
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            f"x {self._fmt_value(payload.get('stroke_m'), 'м', digits=3)}",
+        )
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 10.0, rect.bottom() - 12.0, rect.width() - 20.0, 10.0),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            str(payload.get("motion_label") or "Ход не определён"),
+        )
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 10.0, rect.bottom() - 12.0, rect.width() - 20.0, 10.0),
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            f"v {self._fmt_value(payload.get('stroke_speed_m_s'), 'м/с', digits=3)}",
+        )
+
+    def _draw_cylinder_compact_row(
+        self,
+        painter: QtGui.QPainter,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+        *,
+        caption: str,
+    ) -> None:
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(str(payload.get("heat_hex") or "#22303a")))
+        painter.drawRoundedRect(rect, 9.0, 9.0)
+        painter.setPen(QtGui.QColor(str(payload.get("text_hex") or "#eef7fa")))
+        font = QtGui.QFont(self.font())
+        font.setPointSizeF(6.8)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 8.0, rect.top(), 28.0, rect.height()),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            caption,
+        )
+        painter.drawText(
+            QtCore.QRectF(rect.left() + 28.0, rect.top(), rect.width() - 74.0, rect.height()),
+            QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            self._fmt_pressure_value(payload.get("pressure_bar_g"), digits=2),
+        )
+        painter.drawText(
+            QtCore.QRectF(rect.left() + rect.width() - 50.0, rect.top(), 42.0, rect.height()),
+            QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            self._fmt_value(payload.get("volume_l"), "л", digits=2),
         )
 
     def _draw_chamber_panel(
@@ -9963,7 +12127,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.drawText(
             rect.adjusted(10.0, 20.0, -10.0, -8.0),
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-            f"P {self._fmt_value(payload.get('pressure_bar_g'), 'бар(g)', digits=2)}",
+            f"P {self._fmt_pressure_value(payload.get('pressure_bar_g'), digits=2)}",
         )
         painter.drawText(
             rect.adjusted(10.0, 20.0, -10.0, -8.0),
@@ -9996,12 +12160,18 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.drawText(
             rect.adjusted(46.0, 18.0, -10.0, -4.0),
             QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-            self._fmt_value(payload.get("q_now"), self._dataset.q_unit if self._dataset is not None else "", digits=2),
+            self._fmt_flow_value(payload.get("q_now"), digits=2),
         )
         painter.drawText(
             rect.adjusted(46.0, 18.0, -10.0, -4.0),
             QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
             str(payload.get("zone_label") or ""),
+        )
+        self._draw_actuation_led(
+            painter,
+            rect=rect,
+            active=bool(payload.get("actuated")),
+            compact=False,
         )
         self._overlay_targets.append(("edge", str(payload.get("edge_name") or ""), rect))
 
@@ -10053,6 +12223,12 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                     "is_selected": is_selected,
                     "is_alert": is_alert,
                     "severity": str(alert_meta.get("severity") or ("focus" if is_selected else "info")),
+                    "actuated": _edge_actuation_active(
+                        component_kind=component_kind,
+                        canonical_kind=canonical_kind,
+                        open_state=self._current_edge_open(edge_name),
+                        flow_value=flow_value,
+                    ),
                     "symbol_t": 0.42 if is_selected else 0.5,
                 }
             )
@@ -10106,6 +12282,12 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             text_rect,
             QtCore.Qt.AlignCenter,
             str(payload.get("component_short") or "LINE"),
+        )
+        self._draw_actuation_led(
+            painter,
+            rect=plate,
+            active=bool(payload.get("actuated")),
+            compact=True,
         )
         painter.restore()
 
@@ -10232,6 +12414,313 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         idx = max(0, min(int(self._frame_idx), len(values) - 1))
         return _finite_or_none(values[idx])
 
+    def _edge_peak_flow_abs(self, edge_name: str) -> float:
+        series = self._edge_series_map.get(edge_name)
+        if not isinstance(series, dict):
+            return 0.0
+        values = list(series.get("q") or [])
+        peak = 0.0
+        for value in values:
+            finite = _finite_or_none(value)
+            if finite is None:
+                continue
+            peak = max(peak, abs(float(finite)))
+        return peak
+
+    def _global_peak_flow_abs(self) -> float:
+        peak = 0.0
+        for edge_name in self._edge_series_map:
+            peak = max(peak, self._edge_peak_flow_abs(str(edge_name)))
+        return peak
+
+    def _edge_pressure_rgb(self, edge_name: str) -> tuple[int, int, int]:
+        if self._dataset is None:
+            return FLOW_IDLE_RGB
+        edge_def = dict(self._dataset.edge_defs.get(edge_name) or {})
+        pressures = [
+            self._current_node_pressure(str(edge_def.get("n1") or "")),
+            self._current_node_pressure(str(edge_def.get("n2") or "")),
+        ]
+        finite_pressures = [float(value) for value in pressures if value is not None]
+        pressure_bar_g = sum(finite_pressures) / len(finite_pressures) if finite_pressures else None
+        return _pressure_to_heat_rgb(pressure_bar_g)
+
+    def _node_indicator_payload(self, node_name: str, *, global_peak_flow_abs: float) -> dict[str, Any]:
+        pressure_series = self._node_series_map.get(node_name) if isinstance(self._node_series_map, dict) else None
+        pressure_values = list(dict(pressure_series or {}).get("p") or [])
+        pressure_now = self._current_node_pressure(node_name)
+        pressure_peak = None
+        for value in pressure_values:
+            finite = _finite_or_none(value)
+            if finite is None:
+                continue
+            pressure_peak = float(finite) if pressure_peak is None else max(float(pressure_peak), float(finite))
+
+        dominant_flow = 0.0
+        local_peak_flow_abs = 0.0
+        if self._dataset is not None:
+            for edge_name, edge_def in self._dataset.edge_defs.items():
+                endpoints = {str(edge_def.get("n1") or ""), str(edge_def.get("n2") or "")}
+                if node_name not in endpoints:
+                    continue
+                flow_now = self._current_edge_flow(edge_name)
+                if abs(float(flow_now)) >= abs(float(dominant_flow)):
+                    dominant_flow = float(flow_now)
+                local_peak_flow_abs = max(local_peak_flow_abs, self._edge_peak_flow_abs(edge_name))
+
+        flow_denominator = max(1.0e-6, float(global_peak_flow_abs or 0.0), float(local_peak_flow_abs or 0.0))
+        pressure_norm = _clamp01((float(pressure_now or -0.35) + 0.35) / 10.35)
+        pressure_peak_norm = _clamp01((float(pressure_peak or pressure_now or -0.35) + 0.35) / 10.35)
+        flow_norm = _clamp01(abs(float(dominant_flow)) / flow_denominator)
+        flow_peak_norm = _clamp01(float(local_peak_flow_abs) / flow_denominator)
+        return {
+            "pressure_norm": float(pressure_norm),
+            "pressure_peak_norm": float(pressure_peak_norm),
+            "flow_norm": float(flow_norm),
+            "flow_peak_norm": float(flow_peak_norm),
+            "pressure_rgb": _pressure_to_heat_rgb(pressure_now),
+            "flow_rgb": _flow_to_heat_rgb(dominant_flow, max_abs_flow=flow_denominator),
+        }
+
+    def _component_indicator_payload(self, payload: dict[str, Any], *, global_peak_flow_abs: float) -> dict[str, Any]:
+        anchor_node_name = str(payload.get("anchor_node_name") or "")
+        edge_name = str(payload.get("edge_name") or "")
+        pressure_now = self._current_node_pressure(anchor_node_name) if anchor_node_name else None
+        pressure_peak = None
+        seen_nodes: set[str] = set()
+        pressure_node_names = [
+            anchor_node_name,
+            str(payload.get("n1") or ""),
+            str(payload.get("n2") or ""),
+        ]
+        for node_name in pressure_node_names:
+            if not node_name or node_name in seen_nodes:
+                continue
+            seen_nodes.add(node_name)
+            if pressure_now is None:
+                pressure_now = self._current_node_pressure(node_name)
+            pressure_series = self._node_series_map.get(node_name) if isinstance(self._node_series_map, dict) else None
+            pressure_values = list(dict(pressure_series or {}).get("p") or [])
+            for value in pressure_values:
+                finite = _finite_or_none(value)
+                if finite is None:
+                    continue
+                pressure_peak = float(finite) if pressure_peak is None else max(float(pressure_peak), float(finite))
+
+        if pressure_now is None:
+            finite_pressures = [
+                value
+                for value in (
+                    self._current_node_pressure(str(payload.get("n1") or "")),
+                    self._current_node_pressure(str(payload.get("n2") or "")),
+                )
+                if value is not None
+            ]
+            if finite_pressures:
+                pressure_now = sum(float(value) for value in finite_pressures) / len(finite_pressures)
+
+        flow_now = self._current_edge_flow(edge_name) if edge_name else float(payload.get("q_now") or 0.0)
+        local_peak_flow_abs = self._edge_peak_flow_abs(edge_name) if edge_name else abs(float(flow_now))
+        flow_denominator = max(1.0e-6, float(global_peak_flow_abs or 0.0), float(local_peak_flow_abs or 0.0), abs(float(flow_now)))
+        pressure_norm = _clamp01((float(pressure_now or -0.35) + 0.35) / 10.35)
+        pressure_peak_norm = _clamp01((float(pressure_peak or pressure_now or -0.35) + 0.35) / 10.35)
+        flow_norm = _clamp01(abs(float(flow_now)) / flow_denominator)
+        flow_peak_norm = _clamp01(float(local_peak_flow_abs) / flow_denominator)
+        return {
+            "pressure_norm": float(pressure_norm),
+            "pressure_peak_norm": float(pressure_peak_norm),
+            "flow_norm": float(flow_norm),
+            "flow_peak_norm": float(flow_peak_norm),
+            "pressure_rgb": _pressure_to_heat_rgb(pressure_now),
+            "flow_rgb": _flow_to_heat_rgb(flow_now, max_abs_flow=flow_denominator),
+            "pressure_bar_g": pressure_now,
+            "flow_value": float(flow_now),
+        }
+
+    def _draw_component_indicator_bars(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        payload: dict[str, Any],
+        compact: bool,
+    ) -> QtCore.QRectF:
+        if compact:
+            group_rect = QtCore.QRectF(rect.left() + 2.0, rect.top() + 3.0, 5.2, max(8.0, rect.height() - 6.8))
+            bar_width = 2.0
+            bar_gap = 1.2
+            back_alpha = 120
+            marker_height = 1.6
+            corner_radius = 1.1
+        else:
+            group_rect = QtCore.QRectF(rect.left() + 20.5, rect.top() + 2.5, 8.0, max(10.0, rect.height() - 5.0))
+            bar_width = 3.0
+            bar_gap = 2.0
+            back_alpha = 148
+            marker_height = 1.9
+            corner_radius = 1.6
+        if group_rect.height() <= 6.0:
+            return QtCore.QRectF()
+
+        painter.save()
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(8, 20, 28, back_alpha))
+        painter.drawRoundedRect(group_rect.adjusted(-1.0, -1.0, 1.0, 1.0), 3.2, 3.2)
+        bar_specs = [
+            (
+                QtCore.QRectF(group_rect.left(), group_rect.top(), bar_width, group_rect.height()),
+                payload.get("pressure_norm"),
+                payload.get("pressure_peak_norm"),
+                QtGui.QColor(*tuple(payload.get("pressure_rgb") or (34, 48, 58))),
+            ),
+            (
+                QtCore.QRectF(group_rect.left() + bar_width + bar_gap, group_rect.top(), bar_width, group_rect.height()),
+                payload.get("flow_norm"),
+                payload.get("flow_peak_norm"),
+                QtGui.QColor(*tuple(payload.get("flow_rgb") or FLOW_IDLE_RGB)),
+            ),
+        ]
+        for bar_rect, current_norm, peak_norm, color in bar_specs:
+            painter.setBrush(QtGui.QColor(19, 32, 39, 178))
+            painter.drawRoundedRect(bar_rect, corner_radius, corner_radius)
+            fill_height = max(1.5, float(bar_rect.height()) * _clamp01(float(current_norm or 0.0)))
+            fill_rect = QtCore.QRectF(bar_rect.left(), bar_rect.bottom() - fill_height, bar_rect.width(), fill_height)
+            painter.setBrush(color)
+            painter.drawRoundedRect(fill_rect, max(0.9, corner_radius - 0.2), max(0.9, corner_radius - 0.2))
+            peak_y = bar_rect.bottom() - float(bar_rect.height()) * _clamp01(float(peak_norm or 0.0))
+            marker_rect = QtCore.QRectF(bar_rect.left() - 0.6, peak_y - marker_height * 0.5, bar_rect.width() + 1.2, marker_height)
+            peak_color = QtGui.QColor("#f7fbff")
+            peak_color.setAlpha(226)
+            painter.setBrush(peak_color)
+            painter.drawRoundedRect(marker_rect, marker_height * 0.5, marker_height * 0.5)
+        painter.restore()
+        return group_rect.adjusted(-1.0, -1.0, 1.0, 1.0)
+
+    def _draw_node_indicator_bars(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        point: QtCore.QPointF,
+        radius: float,
+        payload: dict[str, Any],
+        presentation_meta: dict[str, Any],
+    ) -> QtCore.QRectF:
+        layout_mode = str(presentation_meta.get("layout_mode") or "compact")
+        bar_height = {"full": 34.0, "compact": 28.0, "minimal": 22.0}.get(layout_mode, 28.0)
+        group_width = 16.0
+        side = -1.0 if point.x() > self._scene_rect.center().x() else 1.0
+        left = point.x() + side * (radius + 10.0)
+        if side < 0.0:
+            left -= group_width
+        group_rect = QtCore.QRectF(left, point.y() - bar_height * 0.5, group_width, bar_height)
+        painter.save()
+        painter.setPen(QtCore.Qt.NoPen)
+        backplate = QtGui.QColor(7, 17, 23, 178)
+        painter.setBrush(backplate)
+        painter.drawRoundedRect(group_rect.adjusted(-2.0, -2.0, 2.0, 2.0), 6.0, 6.0)
+
+        bar_specs = [
+            (QtCore.QRectF(group_rect.left(), group_rect.top(), 6.0, group_rect.height()), payload.get("pressure_norm"), payload.get("pressure_peak_norm"), QtGui.QColor(*tuple(payload.get("pressure_rgb") or (34, 48, 58)))),
+            (QtCore.QRectF(group_rect.right() - 6.0, group_rect.top(), 6.0, group_rect.height()), payload.get("flow_norm"), payload.get("flow_peak_norm"), QtGui.QColor(*tuple(payload.get("flow_rgb") or FLOW_IDLE_RGB))),
+        ]
+        for bar_rect, current_norm, peak_norm, color in bar_specs:
+            painter.setBrush(QtGui.QColor(20, 34, 42, 170))
+            painter.drawRoundedRect(bar_rect, 3.0, 3.0)
+            fill_height = max(2.0, float(bar_rect.height()) * _clamp01(float(current_norm or 0.0)))
+            fill_rect = QtCore.QRectF(bar_rect.left(), bar_rect.bottom() - fill_height, bar_rect.width(), fill_height)
+            painter.setBrush(color)
+            painter.drawRoundedRect(fill_rect, 2.6, 2.6)
+            peak_y = bar_rect.bottom() - float(bar_rect.height()) * _clamp01(float(peak_norm or 0.0))
+            marker = QtCore.QRectF(bar_rect.left() - 1.0, peak_y - 1.2, bar_rect.width() + 2.0, 2.4)
+            marker_color = QtGui.QColor("#f7fbff")
+            marker_color.setAlpha(228)
+            painter.setBrush(marker_color)
+            painter.drawRoundedRect(marker, 1.2, 1.2)
+        painter.restore()
+        return group_rect.adjusted(-2.0, -2.0, 2.0, 2.0)
+
+    def _draw_actuation_led(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        rect: QtCore.QRectF,
+        active: bool,
+        compact: bool = False,
+        led_diameter: float | None = None,
+        padding: float | None = None,
+        top_padding: float | None = None,
+    ) -> None:
+        led_diameter = float(led_diameter) if led_diameter is not None else (8.0 if compact else 10.0)
+        pad_x = float(padding) if padding is not None else 5.0
+        pad_y = float(top_padding) if top_padding is not None else 4.0
+        led_rect = QtCore.QRectF(rect.right() - led_diameter - pad_x, rect.top() + pad_y, led_diameter, led_diameter)
+        border = QtGui.QColor("#d7f5dd" if active else "#36505a")
+        fill = QtGui.QColor("#45e28f" if active else "#20323a")
+        fill.setAlpha(242 if active else 210)
+        painter.save()
+        painter.setPen(QtGui.QPen(border, 1.1))
+        painter.setBrush(fill)
+        painter.drawEllipse(led_rect)
+        painter.restore()
+
+    def _draw_edge_flow_arrows(
+        self,
+        painter: QtGui.QPainter,
+        *,
+        edge_name: str,
+        path: QtGui.QPainterPath,
+        flow_value: float,
+        max_abs_flow: float,
+        open_state: bool | None,
+    ) -> None:
+        if abs(float(flow_value)) <= 1.0e-9:
+            return
+        try:
+            path_length = float(path.length())
+        except Exception:
+            path_length = 0.0
+        if path_length <= 48.0:
+            return
+        magnitude = 0.0 if max_abs_flow <= 1.0e-9 else _clamp01(abs(float(flow_value)) / float(max_abs_flow))
+        spacing = max(46.0, 112.0 - 54.0 * math.sqrt(max(0.0, magnitude)))
+        travel_px = (self._flow_phase * (0.22 + 1.55 * magnitude)) % spacing
+        arrow_w = 10.0 + 24.0 * math.sqrt(max(0.0, magnitude))
+        arrow_h = 5.0 + 9.0 * math.sqrt(max(0.0, magnitude))
+        tip_w = max(3.5, arrow_w * 0.28)
+        pressure_color = QtGui.QColor(*self._edge_pressure_rgb(edge_name))
+        pressure_color.setAlpha(140 if open_state is False else 228)
+        border_color = QtGui.QColor("#071117")
+        border_color.setAlpha(120 if open_state is False else 176)
+        positions: list[float] = []
+        if float(flow_value) >= 0.0:
+            cursor = float(travel_px)
+            while cursor < path_length:
+                positions.append(cursor)
+                cursor += spacing
+        else:
+            cursor = max(0.0, path_length - float(travel_px))
+            while cursor > 0.0:
+                positions.append(cursor)
+                cursor -= spacing
+        for distance in positions:
+            percent = _clamp01(distance / max(path_length, 1.0))
+            center = path.pointAtPercent(percent)
+            angle = self._path_angle_deg(path, percent) + (180.0 if float(flow_value) < 0.0 else 0.0)
+            painter.save()
+            painter.translate(center)
+            painter.rotate(angle)
+            arrow = QtGui.QPainterPath()
+            arrow.moveTo(-arrow_w * 0.5, -arrow_h * 0.5)
+            arrow.lineTo(arrow_w * 0.5 - tip_w, -arrow_h * 0.5)
+            arrow.lineTo(arrow_w * 0.5, 0.0)
+            arrow.lineTo(arrow_w * 0.5 - tip_w, arrow_h * 0.5)
+            arrow.lineTo(-arrow_w * 0.5, arrow_h * 0.5)
+            arrow.closeSubpath()
+            painter.setPen(QtGui.QPen(border_color, 1.0))
+            painter.setBrush(pressure_color)
+            painter.drawPath(arrow)
+            painter.restore()
+
     @staticmethod
     def _polyline_midpoint(points: list[QtCore.QPointF]) -> QtCore.QPointF | None:
         if not points:
@@ -10264,6 +12753,33 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         if finite is None:
             return f"— {unit}".strip()
         return f"{finite:.{int(digits)}f} {unit}".strip()
+
+    def _display_flow_unit(self) -> str:
+        return _flow_display_unit(self._dataset, self._flow_display_mode)
+
+    def _display_pressure_unit(self) -> str:
+        return _pressure_display_unit(self._pressure_display_mode)
+
+    def _display_pressure_delta_unit(self) -> str:
+        return _pressure_delta_display_unit(self._pressure_display_mode)
+
+    def _display_flow_value(self, value: Any) -> float | None:
+        return _flow_value_from_dataset_units(value, self._dataset, self._flow_display_mode)
+
+    def _display_pressure_value(self, value_bar_g: Any) -> float | None:
+        return _pressure_value_from_bar_g(value_bar_g, self._dataset, self._pressure_display_mode)
+
+    def _display_pressure_delta_value(self, value_bar: Any) -> float | None:
+        return _pressure_delta_from_bar(value_bar, self._pressure_display_mode)
+
+    def _fmt_flow_value(self, value: Any, *, digits: int) -> str:
+        return self._fmt_value(self._display_flow_value(value), self._display_flow_unit(), digits=digits)
+
+    def _fmt_pressure_value(self, value_bar_g: Any, *, digits: int) -> str:
+        return self._fmt_value(self._display_pressure_value(value_bar_g), self._display_pressure_unit(), digits=digits)
+
+    def _fmt_pressure_delta_value(self, value_bar: Any, *, digits: int) -> str:
+        return self._fmt_value(self._display_pressure_delta_value(value_bar), self._display_pressure_delta_unit(), digits=digits)
 
     @staticmethod
     def _severity_color_hex(severity: str) -> str:
@@ -10348,6 +12864,8 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._view_mode_override_active = bool(self._startup_view_mode_override)
         self.view_mode = self._startup_view_mode_override or self._persisted_view_mode
         self.detail_mode = self._normalize_detail_mode(self.ui_state.get_str("detail_mode", "operator"))
+        self.flow_display_mode = _normalize_flow_display_mode(self.ui_state.get_str("flow_display_mode", "nlpm"))
+        self.pressure_display_mode = _normalize_pressure_display_mode(self.ui_state.get_str("pressure_display_mode", "bar_g"))
         self.reference_scheme_visible = bool(self.ui_state.get_bool("reference_scheme_visible", True))
         self.setStyleSheet(APP_STYLESHEET_DARK if self.theme == "dark" else APP_STYLESHEET_LIGHT)
 
@@ -10360,6 +12878,10 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.mnemo_view.status.connect(self._set_status)
         self.mnemo_view.focus_step_jump_requested.connect(self._jump_to_focus_step)
         self.startup_banner = StartupBannerPanel(self)
+        self.startup_banner.set_display_modes(
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
         self.startup_banner.hide_requested.connect(lambda: self._set_startup_banner_visible(False))
         self.startup_banner.focus_requested.connect(self._apply_onboarding_focus)
         self.startup_banner.render(
@@ -10391,7 +12913,19 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.selection_panel.edge_selected.connect(self._select_edge)
         self.selection_panel.node_selected.connect(self._select_node)
         self.trends_panel = TrendsPanel(self)
+        self.trends_panel.set_display_modes(
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
+        self.mnemo_view.set_display_modes(
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
         self.guide_panel = GuidancePanel(self)
+        self.guide_panel.set_display_modes(
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
         self.fidelity_panel = SchemeFidelityPanel(self)
         self.event_panel = EventMemoryPanel(self)
         self.legend_panel = QtWidgets.QTextBrowser(self)
@@ -10545,6 +13079,24 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.detail_combo.setCurrentIndex(detail_idx)
         self.detail_combo.currentIndexChanged.connect(self._detail_mode_changed)
         tb.addWidget(self.detail_combo)
+
+        self.flow_unit_combo = QtWidgets.QComboBox()
+        self.flow_unit_combo.setObjectName("mnemo_flow_unit_combo")
+        self.flow_unit_combo.addItem("Q: Нл/мин", "nlpm")
+        self.flow_unit_combo.addItem("Q: кг/с", "kg_s")
+        flow_idx = max(0, self.flow_unit_combo.findData(self.flow_display_mode))
+        self.flow_unit_combo.setCurrentIndex(flow_idx)
+        self.flow_unit_combo.currentIndexChanged.connect(self._flow_unit_changed)
+        tb.addWidget(self.flow_unit_combo)
+
+        self.pressure_unit_combo = QtWidgets.QComboBox()
+        self.pressure_unit_combo.setObjectName("mnemo_pressure_unit_combo")
+        self.pressure_unit_combo.addItem("P: бар(g)", "bar_g")
+        self.pressure_unit_combo.addItem("P: Па(abs)", "pa_abs")
+        pressure_idx = max(0, self.pressure_unit_combo.findData(self.pressure_display_mode))
+        self.pressure_unit_combo.setCurrentIndex(pressure_idx)
+        self.pressure_unit_combo.currentIndexChanged.connect(self._pressure_unit_changed)
+        tb.addWidget(self.pressure_unit_combo)
 
         self.scrubber = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.scrubber.setMinimum(0)
@@ -10828,6 +13380,8 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.current_idx,
             edge_name=self.selected_edge,
             node_name=self.selected_node,
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
         )
         self.trends_panel.set_series(self.dataset, edge_name=self.selected_edge, node_name=self.selected_node)
         self.guide_panel.render(
@@ -10932,8 +13486,20 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         else:
             self.pointer_watcher.stop()
         self._set_status(f"Follow {'ON' if self.follow_enabled else 'OFF'}")
-        self.overview_panel.update_frame(self.dataset, self.current_idx, playing=self.playing, follow_enabled=self.follow_enabled)
-        self.snapshot_panel.update_frame(self.dataset, self.current_idx)
+        self.overview_panel.update_frame(
+            self.dataset,
+            self.current_idx,
+            playing=self.playing,
+            follow_enabled=self.follow_enabled,
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
+        self.snapshot_panel.update_frame(
+            self.dataset,
+            self.current_idx,
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
         self.guide_panel.render(
             self.dataset,
             self.current_idx,
@@ -10954,8 +13520,20 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         else:
             self.play_timer.stop()
         self._push_playhead()
-        self.overview_panel.update_frame(self.dataset, self.current_idx, playing=self.playing, follow_enabled=self.follow_enabled)
-        self.snapshot_panel.update_frame(self.dataset, self.current_idx)
+        self.overview_panel.update_frame(
+            self.dataset,
+            self.current_idx,
+            playing=self.playing,
+            follow_enabled=self.follow_enabled,
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
+        self.snapshot_panel.update_frame(
+            self.dataset,
+            self.current_idx,
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
         self.guide_panel.render(
             self.dataset,
             self.current_idx,
@@ -11012,6 +13590,74 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self._play_speed = float(speed)
         except Exception:
             self._play_speed = 1.0
+
+    def _set_flow_display_mode(self, mode: str, *, announce: bool) -> str:
+        self.flow_display_mode = _normalize_flow_display_mode(mode)
+        if hasattr(self, "flow_unit_combo"):
+            with QtCore.QSignalBlocker(self.flow_unit_combo):
+                idx = max(0, self.flow_unit_combo.findData(self.flow_display_mode))
+                self.flow_unit_combo.setCurrentIndex(idx)
+        self.ui_state.set_value("flow_display_mode", self.flow_display_mode)
+        self.trends_panel.set_display_modes(
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
+        self.guide_panel.set_display_modes(
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
+        self.startup_banner.set_display_modes(
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
+        self.mnemo_view.set_display_modes(
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
+        if self.dataset is not None:
+            self.trends_panel.set_series(self.dataset, edge_name=self.selected_edge, node_name=self.selected_node)
+            self._refresh_frame(push_to_view=False)
+        if announce:
+            self._set_status(f"Единицы расхода: {FLOW_DISPLAY_MODE_LABELS[self.flow_display_mode]}")
+        return self.flow_display_mode
+
+    def _set_pressure_display_mode(self, mode: str, *, announce: bool) -> str:
+        self.pressure_display_mode = _normalize_pressure_display_mode(mode)
+        if hasattr(self, "pressure_unit_combo"):
+            with QtCore.QSignalBlocker(self.pressure_unit_combo):
+                idx = max(0, self.pressure_unit_combo.findData(self.pressure_display_mode))
+                self.pressure_unit_combo.setCurrentIndex(idx)
+        self.ui_state.set_value("pressure_display_mode", self.pressure_display_mode)
+        self.trends_panel.set_display_modes(
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
+        self.guide_panel.set_display_modes(
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
+        self.startup_banner.set_display_modes(
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
+        self.mnemo_view.set_display_modes(
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
+        if self.dataset is not None:
+            self.trends_panel.set_series(self.dataset, edge_name=self.selected_edge, node_name=self.selected_node)
+            self._refresh_frame(push_to_view=False)
+        if announce:
+            self._set_status(f"Единицы давления: {PRESSURE_DISPLAY_MODE_LABELS[self.pressure_display_mode]}")
+        return self.pressure_display_mode
+
+    def _flow_unit_changed(self, index: int) -> None:
+        mode = str(self.flow_unit_combo.itemData(index) or "nlpm")
+        self._set_flow_display_mode(mode, announce=True)
+
+    def _pressure_unit_changed(self, index: int) -> None:
+        mode = str(self.pressure_unit_combo.itemData(index) or "bar_g")
+        self._set_pressure_display_mode(mode, announce=True)
 
     def _on_scrubbed(self, value: int) -> None:
         if self.dataset is None:
@@ -11103,9 +13749,28 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         with QtCore.QSignalBlocker(self.scrubber):
             self.scrubber.setValue(self.current_idx)
         self.time_label.setText(f"t = {float(self.dataset.time_s[self.current_idx]):6.3f} s")
-        self.overview_panel.update_frame(self.dataset, self.current_idx, playing=self.playing, follow_enabled=self.follow_enabled)
-        self.snapshot_panel.update_frame(self.dataset, self.current_idx)
-        self.selection_panel.render_details(self.dataset, self.current_idx, edge_name=self.selected_edge, node_name=self.selected_node)
+        self.overview_panel.update_frame(
+            self.dataset,
+            self.current_idx,
+            playing=self.playing,
+            follow_enabled=self.follow_enabled,
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
+        self.snapshot_panel.update_frame(
+            self.dataset,
+            self.current_idx,
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
+        self.selection_panel.render_details(
+            self.dataset,
+            self.current_idx,
+            edge_name=self.selected_edge,
+            node_name=self.selected_node,
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
+        )
         self.trends_panel.set_index(self.dataset, self.current_idx)
         self.guide_panel.render(
             self.dataset,
@@ -11136,6 +13801,8 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.current_idx,
             selected_edge=self.selected_edge,
             selected_node=self.selected_node,
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
         )
         self.mnemo_view.set_alerts(alerts)
 
@@ -11145,6 +13812,8 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.current_idx,
             selected_edge=self.selected_edge,
             selected_node=self.selected_node,
+            flow_display_mode=self.flow_display_mode,
+            pressure_display_mode=self.pressure_display_mode,
         )
         self.mnemo_view.set_diagnostics(diagnostics)
 

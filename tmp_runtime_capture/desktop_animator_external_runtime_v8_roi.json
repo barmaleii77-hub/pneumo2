@@ -1,0 +1,14 @@
+{
+  "roi_bbox_rel": [
+    0.03,
+    0.08,
+    0.5,
+    0.88
+  ],
+  "captured_frames": 70,
+  "captured_pairs": 69,
+  "identical_adjacent_pairs": 38,
+  "identical_adjacent_ratio": 0.5507246376811594,
+  "unique_frame_count": 32,
+  "effective_unique_fps": 5.333333333333333
+}

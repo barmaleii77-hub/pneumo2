@@ -74,9 +74,9 @@ except Exception:
 
 # Табличная пружина: линейная или PCHIP (монотонный кубик)
 try:
-    from .spring_table import spring_force, spring_inverse_force
+    from .spring_table import SpringTable
 except Exception:
-    from spring_table import spring_force, spring_inverse_force
+    from spring_table import SpringTable
 
 try:
     from .precharge_policy import (
@@ -93,7 +93,10 @@ except Exception:
 
 try:
     from .suspension_family_runtime import (
-        build_spring_family_runtime_snapshot,
+        CORNER_AXLE_BY_NAME,
+        CORNER_NAMES,
+        FAMILY_ORDER,
+        SPRING_RUNTIME_METRICS,
         normalize_spring_attachment_mode,
         resolve_cylinder_corner_geometry,
         resolve_cylinder_precharge_policy,
@@ -104,7 +107,10 @@ try:
     )
 except Exception:
     from suspension_family_runtime import (
-        build_spring_family_runtime_snapshot,
+        CORNER_AXLE_BY_NAME,
+        CORNER_NAMES,
+        FAMILY_ORDER,
+        SPRING_RUNTIME_METRICS,
         normalize_spring_attachment_mode,
         resolve_cylinder_corner_geometry,
         resolve_cylinder_precharge_policy,
@@ -265,6 +271,12 @@ P_ATM = 101325.0
 P_N_DEFAULT = 101325.0
 T_N_DEFAULT = 273.15
 
+_ORIFICE_PR_CRIT = (2.0 / (GAMMA + 1.0)) ** (GAMMA / (GAMMA - 1.0))
+_ORIFICE_CHOKED_FACTOR = math.sqrt(GAMMA / (R_AIR * T_AIR)) * (2.0 / (GAMMA + 1.0)) ** (
+    (GAMMA + 1.0) / (2.0 * (GAMMA - 1.0))
+)
+_ORIFICE_SUB_FACTOR = 2.0 * GAMMA / (R_AIR * T_AIR * (GAMMA - 1.0))
+
 
 # -------------------------
 # Гладкие аппроксимации (для дифференцируемой динамики)
@@ -313,15 +325,47 @@ def mdot_orifice(p_up: float, p_dn: float, A: float, Cd: float = 0.8) -> float:
         return 0.0
 
     pr = p_dn / p_up
-    pr_crit = (2.0 / (GAMMA + 1.0)) ** (GAMMA / (GAMMA - 1.0))
 
-    if pr <= pr_crit:
+    if pr <= _ORIFICE_PR_CRIT:
         # захлопывание (choked)
-        return Cd * A * p_up * math.sqrt(GAMMA / (R_AIR * T_AIR)) * (2.0 / (GAMMA + 1.0)) ** ((GAMMA + 1.0) / (2.0 * (GAMMA - 1.0)))
+        return Cd * A * p_up * _ORIFICE_CHOKED_FACTOR
     else:
         term = pr ** (2.0 / GAMMA) - pr ** ((GAMMA + 1.0) / GAMMA)
         term = max(term, 0.0)
-        return Cd * A * p_up * math.sqrt(2.0 * GAMMA / (R_AIR * T_AIR * (GAMMA - 1.0)) * term)
+        return Cd * A * p_up * math.sqrt(_ORIFICE_SUB_FACTOR * term)
+
+
+def mdot_orifice_vec(p_up: Any, p_dn: Any, A: Any, Cd: Any = 0.8) -> np.ndarray:
+    """Векторный аналог mdot_orifice для массивов одинаковой broadcast-формы."""
+    p_up_arr, p_dn_arr, area_arr, cd_arr = np.broadcast_arrays(
+        np.asarray(p_up, dtype=float),
+        np.asarray(p_dn, dtype=float),
+        np.asarray(A, dtype=float),
+        np.asarray(Cd, dtype=float),
+    )
+    out = np.zeros_like(p_up_arr, dtype=float)
+    valid = (area_arr > 0.0) & (p_up_arr > 0.0) & (p_dn_arr > 0.0) & (p_up_arr > p_dn_arr)
+    if not np.any(valid):
+        return out
+
+    pu = p_up_arr[valid]
+    pd = p_dn_arr[valid]
+    area = area_arr[valid]
+    cd = cd_arr[valid]
+    pr = pd / pu
+    choked = pr <= _ORIFICE_PR_CRIT
+
+    md_valid = np.empty_like(pu, dtype=float)
+    if np.any(choked):
+        md_valid[choked] = cd[choked] * area[choked] * pu[choked] * _ORIFICE_CHOKED_FACTOR
+    if np.any(~choked):
+        pr_sub = pr[~choked]
+        term = pr_sub ** (2.0 / GAMMA) - pr_sub ** ((GAMMA + 1.0) / GAMMA)
+        term = np.maximum(term, 0.0)
+        md_valid[~choked] = cd[~choked] * area[~choked] * pu[~choked] * np.sqrt(_ORIFICE_SUB_FACTOR * term)
+
+    out[valid] = md_valid
+    return out
 
 def mdot_orifice_signed(p1: float, p2: float, A: float, Cd: float = 0.8) -> float:
     """Двусторонний дроссель: знак расхода зависит от перепада."""
@@ -331,6 +375,18 @@ def mdot_orifice_signed(p1: float, p2: float, A: float, Cd: float = 0.8) -> floa
         return -mdot_orifice(p2, p1, A, Cd)
     else:
         return 0.0
+
+
+def mdot_orifice_signed_vec(p1: Any, p2: Any, A: Any, Cd: Any = 0.8) -> np.ndarray:
+    """Векторный аналог двустороннего дросселя."""
+    p1_arr, p2_arr, area_arr, cd_arr = np.broadcast_arrays(
+        np.asarray(p1, dtype=float),
+        np.asarray(p2, dtype=float),
+        np.asarray(A, dtype=float),
+        np.asarray(Cd, dtype=float),
+    )
+    sign = np.sign(p1_arr - p2_arr)
+    return sign * mdot_orifice_vec(np.maximum(p1_arr, p2_arr), np.minimum(p1_arr, p2_arr), area_arr, cd_arr)
 
 
 # --------------------------------------------
@@ -356,6 +412,10 @@ def _gate01_tanh(x: float, k: float) -> float:
     except Exception:
         # fallback (на всякий случай)
         return 1.0 if x > 0 else 0.0
+
+
+def _gate01_tanh_vec(x: Any, k: float) -> np.ndarray:
+    return 0.5 * (1.0 + np.tanh(0.5 * float(k) * np.asarray(x, dtype=float)))
 
 
 def mdot_orifice_smooth(
@@ -384,26 +444,58 @@ def mdot_orifice_smooth(
         return 0.0
 
     pr = float(p_dn) / float(p_up)
-    pr_crit = (2.0 / (GAMMA + 1.0)) ** (GAMMA / (GAMMA - 1.0))
 
     # choked branch (как в mdot_orifice)
     md_choked = (
         Cd
         * A
         * p_up
-        * math.sqrt(GAMMA / (R_AIR * T_AIR))
-        * (2.0 / (GAMMA + 1.0)) ** ((GAMMA + 1.0) / (2.0 * (GAMMA - 1.0)))
+        * _ORIFICE_CHOKED_FACTOR
     )
 
     # subsonic branch (как в mdot_orifice, но term берём гладко >=0)
     term_raw = pr ** (2.0 / GAMMA) - pr ** ((GAMMA + 1.0) / GAMMA)
     # eps_term выбираем очень маленьким: он нужен только для численной устойчивости
     term = smooth_pos(float(term_raw), 1e-12)
-    md_sub = Cd * A * p_up * math.sqrt(2.0 * GAMMA / (R_AIR * T_AIR * (GAMMA - 1.0)) * term)
+    md_sub = Cd * A * p_up * math.sqrt(_ORIFICE_SUB_FACTOR * term)
 
     # smooth switch around pr_crit
-    w = _gate01_tanh(pr - pr_crit, float(k_pr))
+    w = _gate01_tanh(pr - _ORIFICE_PR_CRIT, float(k_pr))
     return (1.0 - w) * md_choked + w * md_sub
+
+
+def mdot_orifice_smooth_vec(
+    p_up: Any,
+    p_dn: Any,
+    A: Any,
+    Cd: Any = 0.8,
+    *,
+    k_pr: float = 120.0,
+) -> np.ndarray:
+    p_up_arr, p_dn_arr, area_arr, cd_arr = np.broadcast_arrays(
+        np.asarray(p_up, dtype=float),
+        np.asarray(p_dn, dtype=float),
+        np.asarray(A, dtype=float),
+        np.asarray(Cd, dtype=float),
+    )
+    out = np.zeros_like(p_up_arr, dtype=float)
+    valid = (area_arr > 0.0) & (p_up_arr > 0.0) & (p_dn_arr > 0.0) & (p_up_arr > p_dn_arr)
+    if not np.any(valid):
+        return out
+
+    pu = p_up_arr[valid]
+    pd = p_dn_arr[valid]
+    area = area_arr[valid]
+    cd = cd_arr[valid]
+    pr = pd / pu
+
+    md_choked = cd * area * pu * _ORIFICE_CHOKED_FACTOR
+    term_raw = pr ** (2.0 / GAMMA) - pr ** ((GAMMA + 1.0) / GAMMA)
+    term = smooth_pos(term_raw, 1e-12)
+    md_sub = cd * area * pu * np.sqrt(_ORIFICE_SUB_FACTOR * term)
+    w = _gate01_tanh_vec(pr - _ORIFICE_PR_CRIT, float(k_pr))
+    out[valid] = (1.0 - w) * md_choked + w * md_sub
+    return out
 
 
 def mdot_orifice_signed_smooth(
@@ -442,6 +534,41 @@ def mdot_orifice_signed_smooth(
 
     md_mag = mdot_orifice_smooth(p_up, p_dn, A, Cd, k_pr=float(k_pr))
     return s * md_mag
+
+
+def mdot_orifice_signed_smooth_vec(
+    p1: Any,
+    p2: Any,
+    A: Any,
+    Cd: Any = 0.8,
+    *,
+    k_pr: float = 120.0,
+    k_sign: float = 1e-4,
+    eps_dp_Pa: float = 1.0,
+) -> np.ndarray:
+    p1_arr, p2_arr, area_arr, cd_arr = np.broadcast_arrays(
+        np.asarray(p1, dtype=float),
+        np.asarray(p2, dtype=float),
+        np.asarray(A, dtype=float),
+        np.asarray(Cd, dtype=float),
+    )
+    out = np.zeros_like(p1_arr, dtype=float)
+    valid = (area_arr > 0.0) & (p1_arr > 0.0) & (p2_arr > 0.0)
+    if not np.any(valid):
+        return out
+
+    p1v = p1_arr[valid]
+    p2v = p2_arr[valid]
+    area = area_arr[valid]
+    cd = cd_arr[valid]
+    eps = max(1e-12, float(eps_dp_Pa))
+    dp = p1v - p2v
+    adp = smooth_abs(dp, eps)
+    p_up = 0.5 * (p1v + p2v + adp)
+    p_dn = 0.5 * (p1v + p2v - adp)
+    sign = np.tanh(float(k_sign) * dp)
+    out[valid] = sign * mdot_orifice_smooth_vec(p_up, p_dn, area, cd, k_pr=float(k_pr))
+    return out
 
 def area_from_Qn(Qn_Nl_min: float,
                  p_up_abs: float = None,
@@ -1070,6 +1197,38 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
 
     N = len(nodes)
     E = len(edges)
+    edge_specs = tuple(
+        (
+            e.n1,
+            e.n2,
+            e.kind,
+            float(e.A),
+            float(e.Cd),
+            float(getattr(e, 'dp_crack', 0.0) or 0.0),
+            float(getattr(e, 'p_set', 0.0) or 0.0),
+        )
+        for e in edges
+    )
+    edge_specs_orifice = tuple(
+        (ei, n1, n2, area, cd)
+        for ei, (n1, n2, kind, area, cd, _dp_crack, _p_set) in enumerate(edge_specs)
+        if kind == 'orifice'
+    )
+    edge_specs_check = tuple(
+        (ei, n1, n2, area, cd, dp_crack)
+        for ei, (n1, n2, kind, area, cd, dp_crack, _p_set) in enumerate(edge_specs)
+        if kind == 'check'
+    )
+    edge_specs_reg_after = tuple(
+        (ei, n1, n2, area, cd, dp_crack, p_set)
+        for ei, (n1, n2, kind, area, cd, dp_crack, p_set) in enumerate(edge_specs)
+        if kind == 'reg_after'
+    )
+    edge_specs_reg_before = tuple(
+        (ei, n1, n2, area, cd, p_set)
+        for ei, (n1, n2, kind, area, cd, _dp_crack, p_set) in enumerate(edge_specs)
+        if kind in ('reg_before', 'relief')
+    )
 
     # -------------------------------------------------------------
     # Режим сглаживания (для дифференцируемости/градиентной оптимизации)
@@ -1248,10 +1407,10 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 dw_pivot_z = np.where(is_front_corner, dw_pivot_z_front, dw_pivot_z_rear).astype(float)
 
                 # --- C1 geometry (same as main model) ---
-                top_span_C1_front = float(params.get('верх_Ц1_перед_между_ЛП_ПП_м', float(W)))
-                top_span_C1_rear  = float(params.get('верх_Ц1_зад_между_ЛЗ_ПЗ_м',   float(W)))
-                top_z_C1_front = float(params.get('верх_Ц1_перед_z_относительно_рамы_м', float(H)))
-                top_z_C1_rear  = float(params.get('верх_Ц1_зад_z_относительно_рамы_м',   float(H)))
+                top_span_C1_front = float(params.get('верх_Ц1_перед_между_ЛП_ПП_м', 0.30))
+                top_span_C1_rear  = float(params.get('верх_Ц1_зад_между_ЛЗ_ПЗ_м',   0.30))
+                top_z_C1_front = float(params.get('верх_Ц1_перед_z_относительно_рамы_м', 0.52))
+                top_z_C1_rear  = float(params.get('верх_Ц1_зад_z_относительно_рамы_м',   0.52))
                 frac_C1_front = _clip_frac_auto('низ_Ц1_перед_доля_рычага', 0.70)
                 frac_C1_rear  = _clip_frac_auto('низ_Ц1_зад_доля_рычага',   0.70)
 
@@ -1269,10 +1428,10 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 ds1_ddelta0_auto = -(dw_frac_C1 * dw_z_diff0_C1) / L0_1
 
                 # --- C2 geometry (same as main model) ---
-                top_span_C2_front = float(params.get('верх_Ц2_перед_между_ЛП_ПП_м', float(W)))
-                top_span_C2_rear  = float(params.get('верх_Ц2_зад_между_ЛЗ_ПЗ_м',   float(W)))
-                top_z_C2_front = float(params.get('верх_Ц2_перед_z_относительно_рамы_м', float(H)))
-                top_z_C2_rear  = float(params.get('верх_Ц2_зад_z_относительно_рамы_м',   float(H)))
+                top_span_C2_front = float(params.get('верх_Ц2_перед_между_ЛП_ПП_м', 0.30))
+                top_span_C2_rear  = float(params.get('верх_Ц2_зад_между_ЛЗ_ПЗ_м',   0.30))
+                top_z_C2_front = float(params.get('верх_Ц2_перед_z_относительно_рамы_м', 0.52))
+                top_z_C2_rear  = float(params.get('верх_Ц2_зад_z_относительно_рамы_м',   0.52))
                 frac_C2_front = _clip_frac_auto('низ_Ц2_перед_доля_рычага', 0.55)
                 frac_C2_rear  = _clip_frac_auto('низ_Ц2_зад_доля_рычага',   0.55)
 
@@ -1844,10 +2003,10 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     dw_pivot_z = np.where(is_front_corner, dw_pivot_z_front, dw_pivot_z_rear).astype(float)
 
     # --- Ц1 (насосные)
-    top_span_C1_front = float(params.get('верх_Ц1_перед_между_ЛП_ПП_м', float(W)))
-    top_span_C1_rear  = float(params.get('верх_Ц1_зад_между_ЛЗ_ПЗ_м',   float(W)))
-    top_z_C1_front = float(params.get('верх_Ц1_перед_z_относительно_рамы_м', float(H)))
-    top_z_C1_rear  = float(params.get('верх_Ц1_зад_z_относительно_рамы_м',   float(H)))
+    top_span_C1_front = float(params.get('верх_Ц1_перед_между_ЛП_ПП_м', 0.30))
+    top_span_C1_rear  = float(params.get('верх_Ц1_зад_между_ЛЗ_ПЗ_м',   0.30))
+    top_z_C1_front = float(params.get('верх_Ц1_перед_z_относительно_рамы_м', 0.52))
+    top_z_C1_rear  = float(params.get('верх_Ц1_зад_z_относительно_рамы_м',   0.52))
     frac_C1_front = _clip_frac('низ_Ц1_перед_доля_рычага', 0.70)
     frac_C1_rear  = _clip_frac('низ_Ц1_зад_доля_рычага',   0.70)
 
@@ -1860,12 +2019,14 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     dw_y_diff_C1 = dw_y_top_C1 - dw_y_bot_C1
     # z_diff0 = z_top_offset - (1-frac)*pivot_z_offset
     dw_z_diff0_C1 = dw_top_z_C1 - (1.0 - dw_frac_C1) * dw_pivot_z
+    dw_y_diff_sq_C1 = dw_y_diff_C1 * dw_y_diff_C1
+    dw_L0_C1 = np.maximum(np.sqrt(dw_y_diff_sq_C1 + dw_z_diff0_C1 * dw_z_diff0_C1), 1e-9)
 
     # --- Ц2 (противокреновые)
-    top_span_C2_front = float(params.get('верх_Ц2_перед_между_ЛП_ПП_м', float(W)))
-    top_span_C2_rear  = float(params.get('верх_Ц2_зад_между_ЛЗ_ПЗ_м',   float(W)))
-    top_z_C2_front = float(params.get('верх_Ц2_перед_z_относительно_рамы_м', float(H)))
-    top_z_C2_rear  = float(params.get('верх_Ц2_зад_z_относительно_рамы_м',   float(H)))
+    top_span_C2_front = float(params.get('верх_Ц2_перед_между_ЛП_ПП_м', 0.30))
+    top_span_C2_rear  = float(params.get('верх_Ц2_зад_между_ЛЗ_ПЗ_м',   0.30))
+    top_z_C2_front = float(params.get('верх_Ц2_перед_z_относительно_рамы_м', 0.52))
+    top_z_C2_rear  = float(params.get('верх_Ц2_зад_z_относительно_рамы_м',   0.52))
     frac_C2_front = _clip_frac('низ_Ц2_перед_доля_рычага', 0.55)
     frac_C2_rear  = _clip_frac('низ_Ц2_зад_доля_рычага',   0.55)
 
@@ -1880,7 +2041,38 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     dw_y_bot_C2 = dw_frac_C2 * y_pos
     dw_y_diff_C2 = dw_y_top_C2 - dw_y_bot_C2
     dw_z_diff0_C2 = dw_top_z_C2 - (1.0 - dw_frac_C2) * dw_upper_pivot_z_C2
+    dw_y_diff_sq_C2 = dw_y_diff_C2 * dw_y_diff_C2
+    dw_L0_C2 = np.maximum(np.sqrt(dw_y_diff_sq_C2 + dw_z_diff0_C2 * dw_z_diff0_C2), 1e-9)
 
+    use_dw2d = bool(params.get('механика_dw2d', True))
+    wheel_coord_is_contact = wheel_coord_mode == "contact"
+    chamber_is_cap = chamber_sign > 0.0
+    rt_air = R_AIR * T_AIR
+    atm_index = node_index['АТМ']
+    atm_mass = P_ATM * V0_vec[atm_index] / rt_air
+    p_abs_min = float(params.get('минимальное_абсолютное_давление_Па', 1000.0))
+    p_mass_floor_scale = p_abs_min / rt_air
+    wheel_z_offset = wheel_radius if wheel_coord_is_contact else 0.0
+    y_pos0 = float(y_pos[0])
+    y_pos1 = float(y_pos[1])
+    y_pos2 = float(y_pos[2])
+    y_pos3 = float(y_pos[3])
+    x_pos0 = float(x_pos[0])
+    x_pos1 = float(x_pos[1])
+    x_pos2 = float(x_pos[2])
+    x_pos3 = float(x_pos[3])
+    idx_C1_cap = np.array([node_index[f'Ц1_{c}_БП'] for c in corner_order], dtype=int)
+    idx_C1_rod = np.array([node_index[f'Ц1_{c}_ШП'] for c in corner_order], dtype=int)
+    idx_C2_cap = np.array([node_index[f'Ц2_{c}_БП'] for c in corner_order], dtype=int)
+    idx_C2_rod = np.array([node_index[f'Ц2_{c}_ШП'] for c in corner_order], dtype=int)
+    idx_C1_cap0 = int(idx_C1_cap[0]); idx_C1_cap1 = int(idx_C1_cap[1]); idx_C1_cap2 = int(idx_C1_cap[2]); idx_C1_cap3 = int(idx_C1_cap[3])
+    idx_C1_rod0 = int(idx_C1_rod[0]); idx_C1_rod1 = int(idx_C1_rod[1]); idx_C1_rod2 = int(idx_C1_rod[2]); idx_C1_rod3 = int(idx_C1_rod[3])
+    idx_C2_cap0 = int(idx_C2_cap[0]); idx_C2_cap1 = int(idx_C2_cap[1]); idx_C2_cap2 = int(idx_C2_cap[2]); idx_C2_cap3 = int(idx_C2_cap[3])
+    idx_C2_rod0 = int(idx_C2_rod[0]); idx_C2_rod1 = int(idx_C2_rod[1]); idx_C2_rod2 = int(idx_C2_rod[2]); idx_C2_rod3 = int(idx_C2_rod[3])
+    A1_cap0 = float(A1_cap[0]); A1_cap1 = float(A1_cap[1]); A1_cap2 = float(A1_cap[2]); A1_cap3 = float(A1_cap[3])
+    A1_rod0 = float(A1_rod[0]); A1_rod1 = float(A1_rod[1]); A1_rod2 = float(A1_rod[2]); A1_rod3 = float(A1_rod[3])
+    A2_cap0 = float(A2_cap[0]); A2_cap1 = float(A2_cap[1]); A2_cap2 = float(A2_cap[2]); A2_cap3 = float(A2_cap[3])
+    A2_rod0 = float(A2_rod[0]); A2_rod1 = float(A2_rod[1]); A2_rod2 = float(A2_rod[2]); A2_rod3 = float(A2_rod[3])
     # -------------------------------------------------------------
     # ПРУЖИНА: предсжатие x0 для статики в середине хода
     # -------------------------------------------------------------
@@ -1888,17 +2080,10 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     # поэтому вертикальное усилие от пружины получается из осевого через геом. коэффициент ds/dδ.
     def F_cyl_axial_at_p(p_vec: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Осевые силы цилиндров в каждом углу при заданных давлениях."""
-        F1_list, F2_list = [], []
-        for i_c, cname in enumerate(corner_order):
-            p1c = p_vec[node_index[f'Ц1_{cname}_БП']]
-            p1r = p_vec[node_index[f'Ц1_{cname}_ШП']]
-            p2c = p_vec[node_index[f'Ц2_{cname}_БП']]
-            p2r = p_vec[node_index[f'Ц2_{cname}_ШП']]
-            F1 = (p1c - P_ATM) * A1_cap[i_c] - (p1r - P_ATM) * A1_rod[i_c]
-            F2 = (p2c - P_ATM) * A2_cap[i_c] - (p2r - P_ATM) * A2_rod[i_c]
-            F1_list.append(F1)
-            F2_list.append(F2)
-        return np.array(F1_list, dtype=float), np.array(F2_list, dtype=float)
+        p_vec = np.asarray(p_vec, dtype=float)
+        F1 = (p_vec[idx_C1_cap] - P_ATM) * A1_cap - (p_vec[idx_C1_rod] - P_ATM) * A1_rod
+        F2 = (p_vec[idx_C2_cap] - P_ATM) * A2_cap - (p_vec[idx_C2_rod] - P_ATM) * A2_rod
+        return np.asarray(F1, dtype=float), np.asarray(F2, dtype=float)
 
     # Геом. коэффициенты ds/dδ в точке delta=0 (используем для грубой оценки статики)
     def _ds_ddelta0(y_diff: np.ndarray, z_diff0: np.ndarray, frac: np.ndarray) -> np.ndarray:
@@ -1935,10 +2120,13 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     L_free = float(np.mean(L_free_vec))
     L_free = max(0.0, L_free)
 
-    x_tab_max = float(табл_пруж_ход_м[-1]) if len(табл_пруж_ход_м) else 0.30
+    spring_table_runtime = SpringTable(табл_пруж_ход_м, табл_пруж_сила_Н, mode=spring_interp_mode)
+    x_tab_max = float(spring_table_runtime.x_max) if spring_table_runtime.x_tab_m.size else 0.30
     x_tab_max = max(0.0, x_tab_max)
     # alias: используется в rhs (для читабельности)
     spring_x_max = x_tab_max
+    spring_table_has_curve = spring_table_runtime.x_tab_m.size >= 2
+    spring_force_eval = spring_table_runtime.force if spring_table_has_curve else None
 
     preload_min_vec_C1 = np.asarray(spring_family_c1['rebound_preload_min_m'], dtype=float)
     preload_min_vec_C2 = np.asarray(spring_family_c2['rebound_preload_min_m'], dtype=float)
@@ -1999,14 +2187,14 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     F_tab_target = float(np.mean(F_tab_target_corner))
 
     def _x0_from_scalar(F_vert_target_scalar: float, mr_scalar: float, scale_scalar: float, *, is_delta_mode: bool) -> float:
-        if len(табл_пруж_ход_м) < 2:
+        if not spring_table_has_curve:
             return 0.0
         if is_delta_mode:
             F_ax = float(F_vert_target_scalar)
         else:
             F_ax = float(F_vert_target_scalar) / max(1e-6, float(mr_scalar))
         F_tab = F_ax / max(1e-9, float(scale_scalar))
-        x0_s = spring_inverse_force(F_tab, табл_пруж_ход_м, табл_пруж_сила_Н, mode=spring_interp_mode)
+        x0_s = spring_table_runtime.inverse(F_tab)
         x0_s = float(np.asarray(x0_s))
         return float(np.clip(x0_s, 0.0, x_tab_max))
 
@@ -2062,7 +2250,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             )
             return np.array([x0_f, x0_f, x0_r, x0_r], dtype=float)
         if spring_x0_mode_eff == 'per_corner':
-            x0_corner = spring_inverse_force(f_tab_target_corner_vec, табл_пруж_ход_м, табл_пруж_сила_Н, mode=spring_interp_mode)
+            x0_corner = spring_table_runtime.inverse(f_tab_target_corner_vec)
             return np.clip(np.asarray(x0_corner, dtype=float), 0.0, x_tab_max)
         x0_s = _x0_from_scalar(
             float(np.mean(target_corner_vec)),
@@ -2161,41 +2349,119 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
 
     solid_length_vec_C1 = np.asarray(spring_family_c1['solid_length_m'], dtype=float)
     solid_length_vec_C2 = np.asarray(spring_family_c2['solid_length_m'], dtype=float)
+    solid_length_vec = np.asarray(spring_family['solid_length_m'], dtype=float)
     coil_bind_margin_min_vec_C1 = np.asarray(spring_family_c1['coil_bind_margin_min_m'], dtype=float)
     coil_bind_margin_min_vec_C2 = np.asarray(spring_family_c2['coil_bind_margin_min_m'], dtype=float)
+    coil_bind_margin_min_vec = np.asarray(spring_family['coil_bind_margin_min_m'], dtype=float)
+    coil_bind_stop_vec_C1 = solid_length_vec_C1 + coil_bind_margin_min_vec_C1
+    coil_bind_stop_vec_C2 = solid_length_vec_C2 + coil_bind_margin_min_vec_C2
+    coil_bind_stop_vec = solid_length_vec + coil_bind_margin_min_vec
+    solid_length_has_any_C1 = bool(np.any(np.isfinite(solid_length_vec_C1)))
+    solid_length_has_any_C2 = bool(np.any(np.isfinite(solid_length_vec_C2)))
+    solid_length_has_any = bool(np.any(np.isfinite(solid_length_vec)))
+    spring_nan4 = np.full(4, np.nan, dtype=float)
+    spring_zero4 = np.zeros(4, dtype=float)
 
-    def _build_spring_runtime_state(
+    def _compute_single_spring_force_component(
+        s_cyl: np.ndarray,
+        s0_vec_local: np.ndarray,
+        x0_vec_local: np.ndarray,
+        scale_vec_local: np.ndarray,
+        ds_ddelta_vec: np.ndarray,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        x_comp = np.clip(x0_vec_local + (s0_vec_local - s_cyl), 0.0, x_tab_max)
+        force_wheel = spring_zero4
+        if spring_force_eval is not None:
+            f_inc = np.asarray(spring_force_eval(x_comp), dtype=float)
+            force_wheel = -(scale_vec_local * f_inc) * ds_ddelta_vec
+        return x_comp, force_wheel
+
+    def _compute_single_spring_force_only(
+        s_cyl: np.ndarray,
+        s0_vec_local: np.ndarray,
+        x0_vec_local: np.ndarray,
+        scale_vec_local: np.ndarray,
+        ds_ddelta_vec: np.ndarray,
+    ) -> np.ndarray:
+        if spring_force_eval is None:
+            return spring_zero4
+        x_query = x0_vec_local + (s0_vec_local - s_cyl)
+        f_inc = np.asarray(spring_force_eval(x_query), dtype=float)
+        return -(scale_vec_local * f_inc) * ds_ddelta_vec
+
+    def _compute_spring_force_components(
+        s_c1: np.ndarray,
+        s_c2: np.ndarray,
+        ds1_ddelta_vec: np.ndarray,
+        ds2_ddelta_vec: np.ndarray,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        x_comp_c1, force_wheel_c1 = _compute_single_spring_force_component(
+            s_c1,
+            s0_C1,
+            x0_vec_C1,
+            масштаб_пружины_vec_C1,
+            ds1_ddelta_vec,
+        )
+        x_comp_c2, force_wheel_c2 = _compute_single_spring_force_component(
+            s_c2,
+            s0_C2,
+            x0_vec_C2,
+            масштаб_пружины_vec_C2,
+            ds2_ddelta_vec,
+        )
+        return x_comp_c1, x_comp_c2, force_wheel_c1, force_wheel_c2
+
+    def _compute_spring_runtime_components(
         delta_vec: np.ndarray,
         s_c1: np.ndarray,
         s_c2: np.ndarray,
         ds1_ddelta_vec: np.ndarray,
         ds2_ddelta_vec: np.ndarray,
-    ) -> Dict[str, Any]:
-        delta_vec = np.asarray(delta_vec, dtype=float)
-        s_c1 = np.asarray(s_c1, dtype=float)
-        s_c2 = np.asarray(s_c2, dtype=float)
-        ds1_ddelta_vec = np.asarray(ds1_ddelta_vec, dtype=float)
-        ds2_ddelta_vec = np.asarray(ds2_ddelta_vec, dtype=float)
-
-        x_comp_c1 = np.clip(x0_vec_C1 + (s0_C1 - s_c1), 0.0, x_tab_max)
-        x_comp_c2 = np.clip(x0_vec_C2 + (s0_C2 - s_c2), 0.0, x_tab_max)
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        x_comp_c1, x_comp_c2, force_wheel_c1, force_wheel_c2 = _compute_spring_force_components(
+            s_c1,
+            s_c2,
+            ds1_ddelta_vec,
+            ds2_ddelta_vec,
+        )
         len_c1 = np.maximum(0.0, L_free_vec_C1 - x_comp_c1)
         len_c2 = np.maximum(0.0, L_free_vec_C2 - x_comp_c2)
 
-        force_wheel_c1 = np.zeros(4, dtype=float)
-        force_wheel_c2 = np.zeros(4, dtype=float)
-        if len(табл_пруж_ход_м) >= 2:
-            f_inc_c1 = spring_force(x_comp_c1, табл_пруж_ход_м, табл_пруж_сила_Н, mode=spring_interp_mode)
-            f_inc_c2 = spring_force(x_comp_c2, табл_пруж_ход_м, табл_пруж_сила_Н, mode=spring_interp_mode)
-            force_wheel_c1 = -(масштаб_пружины_vec_C1 * np.asarray(f_inc_c1, dtype=float)) * ds1_ddelta_vec
-            force_wheel_c2 = -(масштаб_пружины_vec_C2 * np.asarray(f_inc_c2, dtype=float)) * ds2_ddelta_vec
-
         coil_margin_c1 = np.full(4, np.nan, dtype=float)
         coil_margin_c2 = np.full(4, np.nan, dtype=float)
-        if np.any(np.isfinite(solid_length_vec_C1)):
-            coil_margin_c1 = len_c1 - (solid_length_vec_C1 + coil_bind_margin_min_vec_C1)
-        if np.any(np.isfinite(solid_length_vec_C2)):
-            coil_margin_c2 = len_c2 - (solid_length_vec_C2 + coil_bind_margin_min_vec_C2)
+        if solid_length_has_any_C1:
+            coil_margin_c1 = len_c1 - coil_bind_stop_vec_C1
+        if solid_length_has_any_C2:
+            coil_margin_c2 = len_c2 - coil_bind_stop_vec_C2
+
+        return (
+            x_comp_c1,
+            x_comp_c2,
+            len_c1,
+            len_c2,
+            force_wheel_c1,
+            force_wheel_c2,
+            coil_margin_c1,
+            coil_margin_c2,
+        )
+
+    def _compute_spring_runtime_export_pack(
+        delta_vec: np.ndarray,
+        s_c1: np.ndarray,
+        s_c2: np.ndarray,
+        ds1_ddelta_vec: np.ndarray,
+        ds2_ddelta_vec: np.ndarray,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        (
+            x_comp_c1,
+            x_comp_c2,
+            len_c1,
+            len_c2,
+            force_wheel_c1,
+            force_wheel_c2,
+            coil_margin_c1,
+            coil_margin_c2,
+        ) = _compute_spring_runtime_components(delta_vec, s_c1, s_c2, ds1_ddelta_vec, ds2_ddelta_vec)
 
         if dual_spring_mode:
             compression = np.maximum(x_comp_c1, x_comp_c2)
@@ -2210,14 +2476,11 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         elif spring_mode == 'delta':
             compression = np.clip(x0_vec + delta_vec, 0.0, x_tab_max)
             length = np.maximum(0.0, L_free_vec - compression)
-            coil_margin = np.full(4, np.nan, dtype=float)
-            if np.any(np.isfinite(np.asarray(spring_family['solid_length_m'], dtype=float))):
-                coil_margin = length - (
-                    np.asarray(spring_family['solid_length_m'], dtype=float)
-                    + np.asarray(spring_family['coil_bind_margin_min_m'], dtype=float)
-                )
+            coil_margin = spring_nan4
+            if solid_length_has_any:
+                coil_margin = length - coil_bind_stop_vec
             force_wheel = np.asarray(
-                масштаб_пружины_vec * spring_force(compression, табл_пруж_ход_м, табл_пруж_сила_Н, mode=spring_interp_mode),
+                масштаб_пружины_vec * spring_table_runtime.force(compression),
                 dtype=float,
             )
         else:
@@ -2225,6 +2488,84 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             length = len_c1
             coil_margin = coil_margin_c1
             force_wheel = force_wheel_c1
+
+        return (
+            compression,
+            length,
+            coil_margin,
+            force_wheel,
+            x_comp_c1,
+            len_c1,
+            coil_margin_c1,
+            x_comp_c2,
+            len_c2,
+            coil_margin_c2,
+        )
+
+    def _spring_force_wheel_only(
+        delta_vec: np.ndarray,
+        s_c1: np.ndarray,
+        s_c2: np.ndarray,
+        ds1_ddelta_vec: np.ndarray,
+        ds2_ddelta_vec: np.ndarray,
+    ) -> np.ndarray:
+        if spring_force_eval is None:
+            return np.zeros(4, dtype=float)
+        if spring_mode == 'delta':
+            compression = x0_vec + np.asarray(delta_vec, dtype=float)
+            return np.asarray(
+                масштаб_пружины_vec * spring_force_eval(compression),
+                dtype=float,
+            )
+        if dual_spring_mode:
+            return _compute_single_spring_force_only(
+                s_c1,
+                s0_C1,
+                x0_vec_C1,
+                масштаб_пружины_vec_C1,
+                ds1_ddelta_vec,
+            ) + _compute_single_spring_force_only(
+                s_c2,
+                s0_C2,
+                x0_vec_C2,
+                масштаб_пружины_vec_C2,
+                ds2_ddelta_vec,
+            )
+        if spring_mode == 'c2':
+            return _compute_single_spring_force_only(
+                s_c2,
+                s0_C2,
+                x0_vec_C2,
+                масштаб_пружины_vec_C2,
+                ds2_ddelta_vec,
+            )
+        return _compute_single_spring_force_only(
+            s_c1,
+            s0_C1,
+            x0_vec_C1,
+            масштаб_пружины_vec_C1,
+            ds1_ddelta_vec,
+        )
+
+    def _build_spring_runtime_state(
+        delta_vec: np.ndarray,
+        s_c1: np.ndarray,
+        s_c2: np.ndarray,
+        ds1_ddelta_vec: np.ndarray,
+        ds2_ddelta_vec: np.ndarray,
+    ) -> Dict[str, Any]:
+        (
+            compression,
+            length,
+            coil_margin,
+            force_wheel,
+            x_comp_c1,
+            len_c1,
+            coil_margin_c1,
+            x_comp_c2,
+            len_c2,
+            coil_margin_c2,
+        ) = _compute_spring_runtime_export_pack(delta_vec, s_c1, s_c2, ds1_ddelta_vec, ds2_ddelta_vec)
 
         return {
             "compression_m": compression,
@@ -2240,96 +2581,112 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 "Ц1": {
                     "компрессия_м": x_comp_c1,
                     "длина_м": len_c1,
-                    "зазор_до_крышки_м": np.full(4, np.nan, dtype=float),
+                    "зазор_до_крышки_м": spring_nan4,
                     "запас_до_coil_bind_м": coil_margin_c1,
                     "длина_установленная_м": len_c1,
                 },
                 "Ц2": {
                     "компрессия_м": x_comp_c2,
                     "длина_м": len_c2,
-                    "зазор_до_крышки_м": np.full(4, np.nan, dtype=float),
+                    "зазор_до_крышки_м": spring_nan4,
                     "запас_до_coil_bind_м": coil_margin_c2,
                     "длина_установленная_м": len_c2,
                 },
             },
         }
 
-    # Функция объёмов (дифференциальная)
-    def volumes(z, phi, theta, zw, z_dot, phi_dot, theta_dot, zw_dot):
-        """Объёмы камер и их производные.
+    def _dw_kin_precomputed(
+        delta_local: np.ndarray,
+        delta_dot_local: np.ndarray,
+        y_diff_sq: np.ndarray,
+        z_diff0: np.ndarray,
+        frac: np.ndarray,
+        stroke: np.ndarray,
+        s0: np.ndarray,
+        L0: np.ndarray,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        z_diff = z_diff0 - frac * delta_local
+        L = np.sqrt(y_diff_sq + z_diff * z_diff)
+        s_raw = s0 + (L - L0)
 
-        В v9 объём каждой камеры зависит от хода соответствующего цилиндра (Ц1/Ц2) и угла подвески.
-        Вариант механики выбирается параметром 'механика_dw2d' (по умолчанию True).
-        """
+        L_safe = np.maximum(L, 1e-9)
+        ds_ddelta = -(frac * z_diff) / L_safe
+        s_raw_dot = ds_ddelta * delta_dot_local
 
-        V = V0_vec.copy()
-        dV = np.zeros_like(V)
-
-        # Положение кузова в углах
-        z_body = z + math.sin(phi)*y_pos*math.cos(theta) - math.sin(theta)*x_pos
-
-        # Для механики используем координату центра колеса.
-        if wheel_coord_mode == "contact":
-            zw_eff = zw + wheel_radius
-            zw_dot_eff = zw_dot
+        if smooth_stroke:
+            s, ds_dsraw = smooth_clip_with_grad(s_raw, 0.0, stroke, smooth_eps_pos_m)
+            s_dot = ds_dsraw * s_raw_dot
         else:
-            zw_eff = zw
-            zw_dot_eff = zw_dot
+            s = np.clip(s_raw, 0.0, stroke)
+            if consistent_stroke_kinematics:
+                gate = ((s_raw > 0.0) & (s_raw < stroke)).astype(float)
+                s_dot = s_raw_dot * gate
+            else:
+                s_dot = s_raw_dot
+        return s, s_dot, s_raw, ds_ddelta
 
-        delta = zw_eff - z_body
+    def _mechanics_state(z, phi, theta, zw, z_dot, phi_dot, theta_dot, zw_dot):
+        sin_phi = math.sin(phi)
+        cos_phi = math.cos(phi)
+        sin_theta = math.sin(theta)
+        cos_theta = math.cos(theta)
+        sin_phi_cos_theta = sin_phi * cos_theta
+        y_vel_term = (cos_phi * phi_dot * cos_theta) - (sin_phi * sin_theta * theta_dot)
+        x_vel_term = cos_theta * theta_dot
+        # Положение кузова в углах
+        z_body = np.empty(4, dtype=float)
+        z_body[0] = z + sin_phi_cos_theta * y_pos0 - sin_theta * x_pos0
+        z_body[1] = z + sin_phi_cos_theta * y_pos1 - sin_theta * x_pos1
+        z_body[2] = z + sin_phi_cos_theta * y_pos2 - sin_theta * x_pos2
+        z_body[3] = z + sin_phi_cos_theta * y_pos3 - sin_theta * x_pos3
+        delta = np.empty(4, dtype=float)
+        delta[0] = zw[0] - z_body[0] + wheel_z_offset
+        delta[1] = zw[1] - z_body[1] + wheel_z_offset
+        delta[2] = zw[2] - z_body[2] + wheel_z_offset
+        delta[3] = zw[3] - z_body[3] + wheel_z_offset
 
         # Скорости
-        z_body_dot = (z_dot
-                     + (math.cos(phi)*y_pos*math.cos(theta))*phi_dot
-                     + (math.sin(phi)*y_pos*(-math.sin(theta)))*theta_dot
-                     - (x_pos*math.cos(theta))*theta_dot)
-        delta_dot = zw_dot_eff - z_body_dot
-
-        use_dw2d = bool(params.get('механика_dw2d', True))
+        z_body_dot = np.empty(4, dtype=float)
+        z_body_dot[0] = z_dot + y_vel_term * y_pos0 - x_vel_term * x_pos0
+        z_body_dot[1] = z_dot + y_vel_term * y_pos1 - x_vel_term * x_pos1
+        z_body_dot[2] = z_dot + y_vel_term * y_pos2 - x_vel_term * x_pos2
+        z_body_dot[3] = z_dot + y_vel_term * y_pos3 - x_vel_term * x_pos3
+        delta_dot = np.empty(4, dtype=float)
+        delta_dot[0] = zw_dot[0] - z_body_dot[0]
+        delta_dot[1] = zw_dot[1] - z_body_dot[1]
+        delta_dot[2] = zw_dot[2] - z_body_dot[2]
+        delta_dot[3] = zw_dot[3] - z_body_dot[3]
 
         # -------------------------
         # Кинематика хода штока
         # -------------------------
         if use_dw2d:
-            # Двойные A-рычаги (приближение в плоскости y-z):
-            # s_raw = s0 + (L(delta) - L0)
-            # ds/dδ = dL/dδ
-
-            def _dw_kin(delta_local: np.ndarray, delta_dot_local: np.ndarray,
-                         y_diff: np.ndarray, z_diff0: np.ndarray, frac: np.ndarray,
-                         stroke: np.ndarray, s0: np.ndarray):
-                # Геометрия: z_diff = z_diff0 - frac*delta
-                z_diff = z_diff0 - frac * delta_local
-                L = np.sqrt(y_diff*y_diff + z_diff*z_diff)
-                # L0 соответствует delta=0
-                L0 = np.sqrt(y_diff*y_diff + z_diff0*z_diff0)
-                s_raw = s0 + (L - L0)
-
-                # dL/dδ = (z_diff/L)*(-frac)
-                L_safe = np.maximum(L, 1e-9)
-                ds_ddelta = -(frac * z_diff) / L_safe
-                s_raw_dot = ds_ddelta * delta_dot_local
-
-                if smooth_stroke:
-                    s, ds_dsraw = smooth_clip_with_grad(s_raw, 0.0, stroke, smooth_eps_pos_m)
-                    s_dot = ds_dsraw * s_raw_dot
-                else:
-                    s = np.clip(s_raw, 0.0, stroke)
-                    if consistent_stroke_kinematics:
-                        gate = ((s_raw > 0.0) & (s_raw < stroke)).astype(float)
-                        s_dot = s_raw_dot * gate
-                    else:
-                        s_dot = s_raw_dot
-                return s, s_dot, s_raw, ds_ddelta
-
-            s1, s1_dot, s1_raw, ds1_ddelta = _dw_kin(delta, delta_dot, dw_y_diff_C1, dw_z_diff0_C1, dw_frac_C1, stroke_C1, s0_C1)
-            s2, s2_dot, s2_raw, ds2_ddelta = _dw_kin(delta, delta_dot, dw_y_diff_C2, dw_z_diff0_C2, dw_frac_C2, stroke_C2, s0_C2)
+            s1, s1_dot, s1_raw, ds1_ddelta = _dw_kin_precomputed(
+                delta,
+                delta_dot,
+                dw_y_diff_sq_C1,
+                dw_z_diff0_C1,
+                dw_frac_C1,
+                stroke_C1,
+                s0_C1,
+                dw_L0_C1,
+            )
+            s2, s2_dot, s2_raw, ds2_ddelta = _dw_kin_precomputed(
+                delta,
+                delta_dot,
+                dw_y_diff_sq_C2,
+                dw_z_diff0_C2,
+                dw_frac_C2,
+                stroke_C2,
+                s0_C2,
+                dw_L0_C2,
+            )
         else:
             # Legacy (как v8): s_raw = s0 - delta
             s1_raw = s0_C1 - delta
             s2_raw = s0_C2 - delta
-            ds1_ddelta = -np.ones(4)
-            ds2_ddelta = -np.ones(4)
+            ds1_ddelta = -np.ones_like(delta)
+            ds2_ddelta = -np.ones_like(delta)
             if smooth_stroke:
                 s1, ds1_dx = smooth_clip_with_grad(s1_raw, 0.0, stroke_C1, smooth_eps_pos_m)
                 s2, ds2_dx = smooth_clip_with_grad(s2_raw, 0.0, stroke_C2, smooth_eps_pos_m)
@@ -2347,24 +2704,195 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                     s1_dot = -delta_dot
                     s2_dot = -delta_dot
 
+        return z_body, z_body_dot, delta, delta_dot, s1, s2, s1_dot, s2_dot, s1_raw, s2_raw, ds1_ddelta, ds2_ddelta
+
+    def _mechanics_state_compact(z, phi, theta, zw, z_dot, phi_dot, theta_dot, zw_dot):
+        sin_phi = math.sin(phi)
+        cos_phi = math.cos(phi)
+        sin_theta = math.sin(theta)
+        cos_theta = math.cos(theta)
+        sin_phi_cos_theta = sin_phi * cos_theta
+        y_vel_term = (cos_phi * phi_dot * cos_theta) - (sin_phi * sin_theta * theta_dot)
+        x_vel_term = cos_theta * theta_dot
+
+        delta = np.empty(4, dtype=float)
+        delta[0] = zw[0] - (z + sin_phi_cos_theta * y_pos0 - sin_theta * x_pos0) + wheel_z_offset
+        delta[1] = zw[1] - (z + sin_phi_cos_theta * y_pos1 - sin_theta * x_pos1) + wheel_z_offset
+        delta[2] = zw[2] - (z + sin_phi_cos_theta * y_pos2 - sin_theta * x_pos2) + wheel_z_offset
+        delta[3] = zw[3] - (z + sin_phi_cos_theta * y_pos3 - sin_theta * x_pos3) + wheel_z_offset
+
+        delta_dot = np.empty(4, dtype=float)
+        delta_dot[0] = zw_dot[0] - (z_dot + y_vel_term * y_pos0 - x_vel_term * x_pos0)
+        delta_dot[1] = zw_dot[1] - (z_dot + y_vel_term * y_pos1 - x_vel_term * x_pos1)
+        delta_dot[2] = zw_dot[2] - (z_dot + y_vel_term * y_pos2 - x_vel_term * x_pos2)
+        delta_dot[3] = zw_dot[3] - (z_dot + y_vel_term * y_pos3 - x_vel_term * x_pos3)
+
+        if use_dw2d:
+            s1, s1_dot, s1_raw, ds1_ddelta = _dw_kin_precomputed(
+                delta,
+                delta_dot,
+                dw_y_diff_sq_C1,
+                dw_z_diff0_C1,
+                dw_frac_C1,
+                stroke_C1,
+                s0_C1,
+                dw_L0_C1,
+            )
+            s2, s2_dot, s2_raw, ds2_ddelta = _dw_kin_precomputed(
+                delta,
+                delta_dot,
+                dw_y_diff_sq_C2,
+                dw_z_diff0_C2,
+                dw_frac_C2,
+                stroke_C2,
+                s0_C2,
+                dw_L0_C2,
+            )
+        else:
+            s1_raw = s0_C1 - delta
+            s2_raw = s0_C2 - delta
+            ds1_ddelta = -np.ones_like(delta)
+            ds2_ddelta = -np.ones_like(delta)
+            if smooth_stroke:
+                s1, ds1_dx = smooth_clip_with_grad(s1_raw, 0.0, stroke_C1, smooth_eps_pos_m)
+                s2, ds2_dx = smooth_clip_with_grad(s2_raw, 0.0, stroke_C2, smooth_eps_pos_m)
+                s1_dot = ds1_dx * (-delta_dot)
+                s2_dot = ds2_dx * (-delta_dot)
+            else:
+                s1 = np.clip(s1_raw, 0.0, stroke_C1)
+                s2 = np.clip(s2_raw, 0.0, stroke_C2)
+                if consistent_stroke_kinematics:
+                    g1 = ((s1_raw > 0.0) & (s1_raw < stroke_C1)).astype(float)
+                    g2 = ((s2_raw > 0.0) & (s2_raw < stroke_C2)).astype(float)
+                    s1_dot = (-delta_dot) * g1
+                    s2_dot = (-delta_dot) * g2
+                else:
+                    s1_dot = -delta_dot
+                    s2_dot = -delta_dot
+
+        return delta, delta_dot, s1, s2, s1_dot, s2_dot, s1_raw, s2_raw, ds1_ddelta, ds2_ddelta
+
+    def _body_state_from_state(state: np.ndarray):
+        z = float(state[0])
+        phi = float(state[1])
+        theta = float(state[2])
+        z_dot = float(state[7])
+        phi_dot = float(state[8])
+        theta_dot = float(state[9])
+
+        sin_phi = math.sin(phi)
+        cos_phi = math.cos(phi)
+        sin_theta = math.sin(theta)
+        cos_theta = math.cos(theta)
+        sin_phi_cos_theta = sin_phi * cos_theta
+        y_vel_term = (cos_phi * phi_dot * cos_theta) - (sin_phi * sin_theta * theta_dot)
+        x_vel_term = cos_theta * theta_dot
+
+        z_body = np.empty(4, dtype=float)
+        z_body[0] = z + sin_phi_cos_theta * y_pos0 - sin_theta * x_pos0
+        z_body[1] = z + sin_phi_cos_theta * y_pos1 - sin_theta * x_pos1
+        z_body[2] = z + sin_phi_cos_theta * y_pos2 - sin_theta * x_pos2
+        z_body[3] = z + sin_phi_cos_theta * y_pos3 - sin_theta * x_pos3
+
+        z_body_dot = np.empty(4, dtype=float)
+        z_body_dot[0] = z_dot + y_vel_term * y_pos0 - x_vel_term * x_pos0
+        z_body_dot[1] = z_dot + y_vel_term * y_pos1 - x_vel_term * x_pos1
+        z_body_dot[2] = z_dot + y_vel_term * y_pos2 - x_vel_term * x_pos2
+        z_body_dot[3] = z_dot + y_vel_term * y_pos3 - x_vel_term * x_pos3
+        return z_body, z_body_dot
+
+    def _pack_pressure_state_cfl(
+        p: np.ndarray,
+        V: np.ndarray,
+        dV: np.ndarray,
+        delta: np.ndarray,
+        delta_dot: np.ndarray,
+        s_C1: np.ndarray,
+        s_C2: np.ndarray,
+        s_dot_C1: np.ndarray,
+        s_dot_C2: np.ndarray,
+        s_raw_C1: np.ndarray,
+        s_raw_C2: np.ndarray,
+        ds1_ddelta: np.ndarray,
+        ds2_ddelta: np.ndarray,
+        mdots: np.ndarray | None = None,
+        dm_dt: np.ndarray | None = None,
+    ):
+        return (
+            p,
+            V,
+            dV,
+            delta,
+            delta_dot,
+            s_C1,
+            s_C2,
+            s_dot_C1,
+            s_dot_C2,
+            s_raw_C1,
+            s_raw_C2,
+            ds1_ddelta,
+            ds2_ddelta,
+            mdots,
+            dm_dt,
+        )
+
+    def _build_pressure_vectors(
+        s1: np.ndarray,
+        s2: np.ndarray,
+        s1_dot: np.ndarray,
+        s2_dot: np.ndarray,
+        *,
+        include_dv: bool,
+    ):
+        V = V0_vec.copy()
         # -------------------------
         # Объёмы камер
         # -------------------------
-        # Под каждый узел камеры берём ход соответствующего цилиндра и угла
         s_node = np.where(chamber_is_C1 == 1, s1[chamber_corner], s2[chamber_corner])
-        sdot_node = np.where(chamber_is_C1 == 1, s1_dot[chamber_corner], s2_dot[chamber_corner])
-        is_cap = (chamber_sign > 0.0)
-        V_ch = np.where(is_cap,
-                        chamber_V0dead + chamber_area * s_node,
-                        chamber_V0dead + chamber_area * (chamber_stroke - s_node))
+        V_ch = np.where(
+            chamber_is_cap,
+            chamber_V0dead + chamber_area * s_node,
+            chamber_V0dead + chamber_area * (chamber_stroke - s_node),
+        )
         V[chamber_indices] = V_ch
+        if not include_dv:
+            return V
+
+        dV = np.zeros_like(V)
+        sdot_node = np.where(chamber_is_C1 == 1, s1_dot[chamber_corner], s2_dot[chamber_corner])
         dV[chamber_indices] = chamber_sign * chamber_area * sdot_node
+        return V, dV
+
+    # Функция объёмов (дифференциальная)
+    def volumes(z, phi, theta, zw, z_dot, phi_dot, theta_dot, zw_dot):
+        """Объёмы камер и их производные.
+
+        В v9 объём каждой камеры зависит от хода соответствующего цилиндра (Ц1/Ц2) и угла подвески.
+        Вариант механики выбирается параметром 'механика_dw2d' (по умолчанию True).
+        """
+
+        (
+            z_body,
+            z_body_dot,
+            delta,
+            delta_dot,
+            s1,
+            s2,
+            s1_dot,
+            s2_dot,
+            s1_raw,
+            s2_raw,
+            ds1_ddelta,
+            ds2_ddelta,
+        ) = _mechanics_state(z, phi, theta, zw, z_dot, phi_dot, theta_dot, zw_dot)
+
+        V, dV = _build_pressure_vectors(s1, s2, s1_dot, s2_dot, include_dv=True)
 
         return V, dV, delta, z_body, z_body_dot, delta_dot, s1, s2, s1_dot, s2_dot, s1_raw, s2_raw, ds1_ddelta, ds2_ddelta
 
     V_init, *_ = volumes(z0, phi0, th0, zw0, z_dot0, phi_dot0, th_dot0, zw_dot0)
-    m0 = p0 * V_init / (R_AIR * T_AIR)
-    m0[node_index['АТМ']] = P_ATM * V0_vec[node_index['АТМ']] / (R_AIR * T_AIR)
+    m0 = p0 * V_init / rt_air
+    m0[atm_index] = atm_mass
 
     # Состояние
     state0 = np.concatenate([
@@ -2519,6 +3047,8 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     except Exception:
         road_offset0_m = 0.0
 
+    road_dfunc_is_default_zero = isinstance(test, dict) and ('road_dfunc' not in test) and (world_cache is None)
+
     label_func = test.get('label_func', lambda t: 0)
 
     def compute_pressures(state):
@@ -2526,7 +3056,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         zw = state[3:7]
         z_dot, phi_dot, theta_dot = state[7], state[8], state[9]
         zw_dot = state[10:14]
-        m = state[14:].copy()
+        m = state[14:]
 
         (V, dV,
          delta, z_body, z_body_dot, delta_dot,
@@ -2535,25 +3065,20 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
          ds1_ddelta, ds2_ddelta) = volumes(z, phi, theta, zw, z_dot, phi_dot, theta_dot, zw_dot)
 
         # атмосфера как граничное условие + допускаем вакуум (p_abs может быть ниже P_ATM, но не ниже p_abs_min)
-        p_abs_min = float(params.get('минимальное_абсолютное_давление_Па', 1000.0))
-
-        # атмосфера (граничное условие)
-        m[node_index['АТМ']] = P_ATM * V0_vec[node_index['АТМ']] / (R_AIR * T_AIR)
-
         if smooth_pressure_floor:
             V_safe = smooth_max(V, 1e-9, smooth_eps_vol_m3)
         else:
             V_safe = np.maximum(1e-9, V)
 
         # Жёстко обеспечиваем физичность: m >= p_abs_min*V/(R*T)  ⇔  p_abs >= p_abs_min
-        m_floor = (p_abs_min * V_safe) / (R_AIR * T_AIR)
+        m_floor = (p_abs_min * V_safe) / rt_air
         if smooth_pressure_floor:
-            m = m_floor + smooth_pos(m - m_floor, smooth_eps_mass_kg)
+            m_safe = m_floor + smooth_pos(m - m_floor, smooth_eps_mass_kg)
         else:
-            m = np.maximum(m, m_floor)
+            m_safe = np.maximum(m, m_floor)
 
-        p = m * R_AIR * T_AIR / V_safe
-        p[node_index['АТМ']] = P_ATM
+        p = m_safe * rt_air / V_safe
+        p[atm_index] = P_ATM
 
         return (p, V, dV,
                 delta, delta_dot,
@@ -2562,6 +3087,112 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 s_dot_C1, s_dot_C2,
                 s_raw_C1, s_raw_C2,
                 ds1_ddelta, ds2_ddelta)
+
+    def compute_pressures_fast(state):
+        z, phi, theta = state[0], state[1], state[2]
+        zw = state[3:7]
+        z_dot, phi_dot, theta_dot = state[7], state[8], state[9]
+        zw_dot = state[10:14]
+        m = state[14:]
+
+        (
+            delta,
+            delta_dot,
+            s_C1,
+            s_C2,
+            s_dot_C1,
+            s_dot_C2,
+            s_raw_C1,
+            s_raw_C2,
+            ds1_ddelta,
+            ds2_ddelta,
+        ) = _mechanics_state_compact(z, phi, theta, zw, z_dot, phi_dot, theta_dot, zw_dot)
+        V = _build_pressure_vectors(s_C1, s_C2, s_dot_C1, s_dot_C2, include_dv=False)
+
+        if smooth_pressure_floor:
+            V_safe = smooth_max(V, 1e-9, smooth_eps_vol_m3)
+        else:
+            V_safe = V if np.all(V >= 1e-9) else np.maximum(1e-9, V)
+
+        m_floor = (p_abs_min * V_safe) / rt_air
+        if smooth_pressure_floor:
+            m_safe = m_floor + smooth_pos(m - m_floor, smooth_eps_mass_kg)
+        else:
+            m_safe = m if np.all(m >= m_floor) else np.maximum(m, m_floor)
+
+        p = np.empty_like(V_safe)
+        np.divide(m_safe, V_safe, out=p)
+        p *= rt_air
+        p[atm_index] = P_ATM
+
+        return (
+            p,
+            delta,
+            delta_dot,
+            s_C1,
+            s_C2,
+            s_dot_C1,
+            s_dot_C2,
+            s_raw_C1,
+            s_raw_C2,
+            ds1_ddelta,
+            ds2_ddelta,
+        )
+
+    def _compute_pressure_state_cfl(state):
+        z, phi, theta = state[0], state[1], state[2]
+        zw = state[3:7]
+        z_dot, phi_dot, theta_dot = state[7], state[8], state[9]
+        zw_dot = state[10:14]
+        m = state[14:]
+
+        (
+            delta,
+            delta_dot,
+            s_C1,
+            s_C2,
+            s_dot_C1,
+            s_dot_C2,
+            s_raw_C1,
+            s_raw_C2,
+            ds1_ddelta,
+            ds2_ddelta,
+        ) = _mechanics_state_compact(z, phi, theta, zw, z_dot, phi_dot, theta_dot, zw_dot)
+        V, dV = _build_pressure_vectors(s_C1, s_C2, s_dot_C1, s_dot_C2, include_dv=True)
+
+        if smooth_pressure_floor:
+            V_safe = smooth_max(V, 1e-9, smooth_eps_vol_m3)
+        else:
+            V_safe = V if np.all(V >= 1e-9) else np.maximum(1e-9, V)
+
+        m_floor = (p_abs_min * V_safe) / rt_air
+        if smooth_pressure_floor:
+            m_safe = m_floor + smooth_pos(m - m_floor, smooth_eps_mass_kg)
+        else:
+            m_safe = m if np.all(m >= m_floor) else np.maximum(m, m_floor)
+
+        p = np.empty_like(V_safe)
+        np.divide(m_safe, V_safe, out=p)
+        p *= rt_air
+        p[atm_index] = P_ATM
+
+        return (
+            p,
+            V,
+            dV,
+            delta,
+            delta_dot,
+            s_C1,
+            s_C2,
+            s_dot_C1,
+            s_dot_C2,
+            s_raw_C1,
+            s_raw_C2,
+            ds1_ddelta,
+            ds2_ddelta,
+            None,
+            None,
+        )
 
     # Параметры сглаживания логики клапанов (для дифференцируемости)
     # Если smooth_valves=False — поведение полностью как раньше (жёсткие if).
@@ -2593,169 +3224,258 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             return mdot_orifice_smooth(pu, pdn, A, Cd, k_pr=pneumo_flow_smooth_k_pr)
         return mdot_orifice(pu, pdn, A, Cd)
 
-    def compute_flows(p):
-        mdots = np.zeros(E)
-        for ei, e in enumerate(edges):
-            pu = p[e.n1]
-            pdn = p[e.n2]
+    if pneumo_flow_smooth_mode:
+        _mdot_orifice_signed_active = lambda pu, pdn, area, cd: mdot_orifice_signed_smooth(
+            pu,
+            pdn,
+            area,
+            cd,
+            k_pr=pneumo_flow_smooth_k_pr,
+            k_sign=pneumo_flow_smooth_k_sign,
+            eps_dp_Pa=pneumo_flow_smooth_eps_dp_Pa,
+        )
+    else:
+        _mdot_orifice_signed_active = mdot_orifice_signed
 
-            if e.kind == 'orifice':
-                # Двусторонний дроссель (может менять направление)
-                if pneumo_flow_smooth_mode:
-                    mdots[ei] = mdot_orifice_signed_smooth(
-                        pu,
-                        pdn,
-                        e.A,
-                        e.Cd,
-                        k_pr=pneumo_flow_smooth_k_pr,
-                        k_sign=pneumo_flow_smooth_k_sign,
-                        eps_dp_Pa=pneumo_flow_smooth_eps_dp_Pa,
-                    )
+    if smooth_valves:
+        def _fill_flows(mdots, p):
+            p_local = p
+            mdot_orifice_signed_active = _mdot_orifice_signed_active
+            mdot_forward = _mdot_forward
+            gate01 = _gate01
+            for ei, n1, n2, area, cd in edge_specs_orifice:
+                mdots[ei] = mdot_orifice_signed_active(p_local[n1], p_local[n2], area, cd)
+            for ei, n1, n2, area, cd, dp_crack in edge_specs_check:
+                pu = p_local[n1]
+                pdn = p_local[n2]
+                g = gate01(pu - pdn - dp_crack)
+                mdots[ei] = g * mdot_forward(pu, pdn, area, cd)
+            for ei, n1, n2, area, cd, dp_crack, p_set in edge_specs_reg_after:
+                pu = p_local[n1]
+                pdn = p_local[n2]
+                g1 = gate01(p_set - pdn)
+                g2 = gate01(pu - pdn - dp_crack)
+                mdots[ei] = (g1 * g2) * mdot_forward(pu, pdn, area, cd)
+            for ei, n1, n2, area, cd, p_set in edge_specs_reg_before:
+                pu = p_local[n1]
+                pdn = p_local[n2]
+                g1 = gate01(pu - p_set)
+                g2 = gate01(pu - pdn)
+                mdots[ei] = (g1 * g2) * mdot_forward(pu, pdn, area, cd)
+            return mdots
+        def compute_flows(p):
+            mdots = np.empty(E, dtype=float)
+            return _fill_flows(mdots, p)
+    else:
+        def _fill_flows(mdots, p):
+            p_local = p
+            mdot_orifice_signed_active = _mdot_orifice_signed_active
+            mdot_forward = _mdot_forward
+            for ei, n1, n2, area, cd in edge_specs_orifice:
+                mdots[ei] = mdot_orifice_signed_active(p_local[n1], p_local[n2], area, cd)
+            for ei, n1, n2, area, cd, dp_crack in edge_specs_check:
+                pu = p_local[n1]
+                pdn = p_local[n2]
+                mdots[ei] = mdot_forward(pu, pdn, area, cd) if pu > pdn + dp_crack else 0.0
+            for ei, n1, n2, area, cd, dp_crack, p_set in edge_specs_reg_after:
+                pu = p_local[n1]
+                pdn = p_local[n2]
+                if (pdn < p_set) and (pu > pdn + dp_crack):
+                    mdots[ei] = mdot_forward(pu, pdn, area, cd)
                 else:
-                    mdots[ei] = mdot_orifice_signed(pu, pdn, e.A, e.Cd)
-
-            elif e.kind == 'check':
-                if smooth_valves:
-                    g = _gate01(pu - pdn - e.dp_crack)
-                    mdots[ei] = g * _mdot_forward(pu, pdn, e.A, e.Cd)
+                    mdots[ei] = 0.0
+            for ei, n1, n2, area, cd, p_set in edge_specs_reg_before:
+                pu = p_local[n1]
+                pdn = p_local[n2]
+                if (pu > p_set) and (pu > pdn):
+                    mdots[ei] = mdot_forward(pu, pdn, area, cd)
                 else:
-                    mdots[ei] = _mdot_forward(pu, pdn, e.A, e.Cd) if pu > pdn + e.dp_crack else 0.0
+                    mdots[ei] = 0.0
+            return mdots
+        def compute_flows(p):
+            mdots = np.empty(E, dtype=float)
+            return _fill_flows(mdots, p)
 
-            elif e.kind == 'reg_after':
-                if smooth_valves:
-                    # Открываем, если downstream ниже уставки, и есть перепад на открытие
-                    g1 = _gate01(e.p_set - pdn)              # p_dn < p_set
-                    g2 = _gate01(pu - pdn - e.dp_crack)      # pu > pdn + dp_crack
-                    mdots[ei] = (g1 * g2) * _mdot_forward(pu, pdn, e.A, e.Cd)
-                else:
-                    if (p[e.n2] < e.p_set) and (pu > pdn + e.dp_crack):
-                        mdots[ei] = _mdot_forward(pu, pdn, e.A, e.Cd)
-                    else:
-                        mdots[ei] = 0.0
+    k_stop = float(params.get('жёсткость_отбойника', 1.0e6))
+    c_stop = float(params.get('демпфирование_отбойника', 5.0e3))
+    zero4 = np.zeros(4, dtype=float)
+    wheel_weight_N = float(m_w * g)
+    inv_m_w = 1.0 / float(m_w)
 
-            elif e.kind == 'relief':
-                if smooth_valves:
-                    # Открываем, если upstream выше уставки, и поток вообще возможен (pu>pdn)
-                    g1 = _gate01(pu - e.p_set)
-                    g2 = _gate01(pu - pdn)
-                    mdots[ei] = (g1 * g2) * _mdot_forward(pu, pdn, e.A, e.Cd)
-                else:
-                    if (pu > e.p_set) and (pu > pdn):
-                        mdots[ei] = _mdot_forward(pu, pdn, e.A, e.Cd)
-                    else:
-                        mdots[ei] = 0.0
-        return mdots
+    arb_enabled = bool(params.get('стабилизатор_вкл', False))
+    if arb_enabled:
+        k_arb_f = float(params.get('стабилизатор_перед_жесткость_Н_м', 0.0) or 0.0)
+        c_arb_f = float(params.get('стабилизатор_перед_демпфирование_Н_с_м', 0.0) or 0.0)
+        k_arb_r = float(params.get('стабилизатор_зад_жесткость_Н_м', 0.0) or 0.0)
+        c_arb_r = float(params.get('стабилизатор_зад_демпфирование_Н_с_м', 0.0) or 0.0)
+    else:
+        k_arb_f = 0.0
+        c_arb_f = 0.0
+        k_arb_r = 0.0
+        c_arb_r = 0.0
+    inv_m_body = 1.0 / float(m_body)
+    inv_I_roll = 1.0 / float(I_roll)
+    inv_I_pitch = 1.0 / float(I_pitch)
+    body_inertial_moment_coeff = float(m_body * h_cg)
+    def _stroke_outside_range(s_raw: np.ndarray, stroke: np.ndarray) -> bool:
+        return (
+            float(s_raw[0]) < 0.0 or float(s_raw[0]) > float(stroke[0])
+            or float(s_raw[1]) < 0.0 or float(s_raw[1]) > float(stroke[1])
+            or float(s_raw[2]) < 0.0 or float(s_raw[2]) > float(stroke[2])
+            or float(s_raw[3]) < 0.0 or float(s_raw[3]) > float(stroke[3])
+        )
 
-    def rhs(state, t):
-        """Правая часть ОДУ (без логирования!). Логирование делается снаружи,
-        иначе при RK2 второй вызов rhs(mid, t+dt) перетирает значения в out[k]."""
-        z, phi, theta = state[0], state[1], state[2]
-        zw = state[3:7]
-        z_dot, phi_dot, theta_dot = state[7], state[8], state[9]
-        zw_dot = state[10:14]
+    def _stop_force_axial(s_raw: np.ndarray, s_raw_dot: np.ndarray, stroke: np.ndarray) -> np.ndarray:
+        """Осевое усилие ограничителей хода (bump/rebound)."""
+        if smooth_stops:
+            bump_x = -s_raw
+            g_b = smooth_pos_grad(bump_x, smooth_eps_stop_m)
+            bump_pen = bump_x * g_b
 
-        (p, V, dV,
-         delta, delta_dot,
-         z_body, z_body_dot,
-         s_C1, s_C2,
-         s_dot_C1, s_dot_C2,
-         s_raw_C1, s_raw_C2,
-         ds1_ddelta, ds2_ddelta) = compute_pressures(state)
-        mdots = compute_flows(p)
+            reb_x = s_raw - stroke
+            g_r = smooth_pos_grad(reb_x, smooth_eps_stop_m)
+            reb_pen = reb_x * g_r
 
-        dm_dt = B @ mdots
-        dm_dt[node_index['АТМ']] = 0.0
+            bump_v = -s_raw_dot
+            g_bv = smooth_pos_grad(bump_v, smooth_eps_stop_vel_mps)
+            bump_pen_dot_in = bump_v * g_bv * g_b
 
-        # ---------------------------------------------------------
-        # СИЛЫ ПОДВЕСКИ v9
-        # ---------------------------------------------------------
-        # Цилиндры: осевые силы -> вертикальные через виртуальную работу:
-        #   F_vert = -F_axial * (ds/dδ)
-        # где δ = z_w - z_body(в углу), s — выдвижение штока.
-        F1_ax = np.zeros(4)
-        F2_ax = np.zeros(4)
-        for i_c, cname in enumerate(corner_order):
-            p1c = p[node_index[f'Ц1_{cname}_БП']]
-            p1r = p[node_index[f'Ц1_{cname}_ШП']]
-            p2c = p[node_index[f'Ц2_{cname}_БП']]
-            p2r = p[node_index[f'Ц2_{cname}_ШП']]
-            F1_ax[i_c] = (p1c - P_ATM) * A1_cap[i_c] - (p1r - P_ATM) * A1_rod[i_c]
-            F2_ax[i_c] = (p2c - P_ATM) * A2_cap[i_c] - (p2r - P_ATM) * A2_rod[i_c]
+            reb_v = s_raw_dot
+            g_rv = smooth_pos_grad(reb_v, smooth_eps_stop_vel_mps)
+            reb_pen_dot_in = reb_v * g_rv * g_r
+        else:
+            if not _stroke_outside_range(s_raw, stroke):
+                return zero4
+            out = np.empty(4, dtype=float)
+            for i in range(4):
+                s_val = float(s_raw[i])
+                s_dot_val = float(s_raw_dot[i])
+                stroke_val = float(stroke[i])
+                bump_pen = -s_val if s_val < 0.0 else 0.0
+                reb_pen = (s_val - stroke_val) if s_val > stroke_val else 0.0
+                bump_pen_dot_in = (-s_dot_val) if (s_val < 0.0 and s_dot_val < 0.0) else 0.0
+                reb_pen_dot_in = s_dot_val if (s_val > stroke_val and s_dot_val > 0.0) else 0.0
+                out[i] = (k_stop * bump_pen + c_stop * bump_pen_dot_in) - (k_stop * reb_pen + c_stop * reb_pen_dot_in)
+            return out
 
-        F_cyl1 = -F1_ax * ds1_ddelta
-        F_cyl2 = -F2_ax * ds2_ddelta
-        F_cyl = F_cyl1 + F_cyl2
+        return (k_stop * bump_pen + c_stop * bump_pen_dot_in) - (k_stop * reb_pen + c_stop * reb_pen_dot_in)
 
-        # Пружина: по умолчанию привязана к ходу Ц1 (coilover), но можно
-        # переключить в "legacy" режим (по δ) параметром механика_пружина_режим.
-        spring_state_now = _build_spring_runtime_state(delta, s_C1, s_C2, ds1_ddelta, ds2_ddelta)
-        F_spr = np.asarray(spring_state_now["force_wheel_N"], dtype=float)
+    if smooth_contacts:
+        def _compute_tire_force_rhs_scalars(t: float, zw: np.ndarray, zw_dot: np.ndarray) -> Tuple[float, float, float, float]:
+            z_road = road_func(t)
+            pen = z_road - zw + wheel_z_offset
+            pen_dot = -zw_dot if road_dfunc_is_default_zero else (road_dfunc(t) - zw_dot)
+            g_contact = smooth_pos_grad(pen, smooth_eps_pos_m)
+            pen_in = pen * g_contact
+            g_v = smooth_pos_grad(pen_dot, smooth_eps_vel_mps)
+            pen_dot_in = (pen_dot * g_v) * g_contact
+            F_tire = k_tire * pen_in + c_tire * pen_dot_in
+            return float(F_tire[0]), float(F_tire[1]), float(F_tire[2]), float(F_tire[3])
 
-        F_susp = F_spr + F_cyl
+        def _compute_tire_force_rhs_from_state_scalars(t: float, state: np.ndarray) -> Tuple[float, float, float, float]:
+            return _compute_tire_force_rhs_scalars(t, state[3:7], state[10:14])
 
-        # Ограничители хода по каждому цилиндру отдельно (шток 0..stroke)
-        k_stop = float(params.get('жёсткость_отбойника', 1.0e6))
-        c_stop = float(params.get('демпфирование_отбойника', 5.0e3))
-        # Скорость "в геометрии" (для демпфирования в упоре)
-        s1_raw_dot = ds1_ddelta * delta_dot
-        s2_raw_dot = ds2_ddelta * delta_dot
-
-        def stop_force_axial(s_raw: np.ndarray, s_raw_dot: np.ndarray, stroke: np.ndarray) -> np.ndarray:
-            """Осевое усилие ограничителей хода (bump/rebound).
-
-            При smooth_stops=True используется гладкая (без оффсета в нуле) аппроксимация
-            односторонних penetration и одностороннего демпфирования (только «вдавливание»).
-            """
-            # bump: s_raw < 0  (пересжатие)
-            # rebound: s_raw > stroke (переразжатие)
-            if smooth_stops:
-                bump_x = -s_raw
-                g_b = smooth_pos_grad(bump_x, smooth_eps_stop_m)
-                bump_pen = bump_x * g_b
-
-                reb_x = (s_raw - stroke)
-                g_r = smooth_pos_grad(reb_x, smooth_eps_stop_m)
-                reb_pen = reb_x * g_r
-
-                bump_v = -s_raw_dot
-                g_bv = smooth_pos_grad(bump_v, smooth_eps_stop_vel_mps)
-                bump_pen_dot_in = bump_v * g_bv * g_b
-
-                reb_v = s_raw_dot
-                g_rv = smooth_pos_grad(reb_v, smooth_eps_stop_vel_mps)
-                reb_pen_dot_in = reb_v * g_rv * g_r
+        def _compute_tire_force_rhs(t: float, zw: np.ndarray, zw_dot: np.ndarray) -> np.ndarray:
+            F0, F1, F2, F3 = _compute_tire_force_rhs_scalars(t, zw, zw_dot)
+            return np.array([F0, F1, F2, F3], dtype=float)
+    else:
+        def _compute_tire_force_rhs_scalars(t: float, zw: np.ndarray, zw_dot: np.ndarray) -> Tuple[float, float, float, float]:
+            z_road = road_func(t)
+            pen0 = z_road[0] - zw[0] + wheel_z_offset
+            pen1 = z_road[1] - zw[1] + wheel_z_offset
+            pen2 = z_road[2] - zw[2] + wheel_z_offset
+            pen3 = z_road[3] - zw[3] + wheel_z_offset
+            if road_dfunc_is_default_zero:
+                pen_dot0 = -zw_dot[0]
+                pen_dot1 = -zw_dot[1]
+                pen_dot2 = -zw_dot[2]
+                pen_dot3 = -zw_dot[3]
             else:
-                bump_pen = np.maximum(0.0, -s_raw)
-                reb_pen = np.maximum(0.0, s_raw - stroke)
-                bump_pen_dot_in = np.where(s_raw < 0.0, np.maximum(0.0, -s_raw_dot), 0.0)
-                reb_pen_dot_in = np.where(s_raw > stroke, np.maximum(0.0, s_raw_dot), 0.0)
+                z_road_dot = road_dfunc(t)
+                pen_dot0 = z_road_dot[0] - zw_dot[0]
+                pen_dot1 = z_road_dot[1] - zw_dot[1]
+                pen_dot2 = z_road_dot[2] - zw_dot[2]
+                pen_dot3 = z_road_dot[3] - zw_dot[3]
+            F0 = (k_tire * pen0 + c_tire * max(pen_dot0, 0.0)) if pen0 > 0.0 else 0.0
+            F1 = (k_tire * pen1 + c_tire * max(pen_dot1, 0.0)) if pen1 > 0.0 else 0.0
+            F2 = (k_tire * pen2 + c_tire * max(pen_dot2, 0.0)) if pen2 > 0.0 else 0.0
+            F3 = (k_tire * pen3 + c_tire * max(pen_dot3, 0.0)) if pen3 > 0.0 else 0.0
+            return F0, F1, F2, F3
 
-            return (k_stop*bump_pen + c_stop*bump_pen_dot_in) - (k_stop*reb_pen + c_stop*reb_pen_dot_in)
+        def _compute_tire_force_rhs_from_state_scalars(t: float, state: np.ndarray) -> Tuple[float, float, float, float]:
+            z_road = road_func(t)
+            zw0 = float(state[3]); zw1 = float(state[4]); zw2 = float(state[5]); zw3 = float(state[6])
+            pen0 = z_road[0] - zw0 + wheel_z_offset
+            pen1 = z_road[1] - zw1 + wheel_z_offset
+            pen2 = z_road[2] - zw2 + wheel_z_offset
+            pen3 = z_road[3] - zw3 + wheel_z_offset
+            if road_dfunc_is_default_zero:
+                pen_dot0 = -float(state[10])
+                pen_dot1 = -float(state[11])
+                pen_dot2 = -float(state[12])
+                pen_dot3 = -float(state[13])
+            else:
+                z_road_dot = road_dfunc(t)
+                pen_dot0 = z_road_dot[0] - float(state[10])
+                pen_dot1 = z_road_dot[1] - float(state[11])
+                pen_dot2 = z_road_dot[2] - float(state[12])
+                pen_dot3 = z_road_dot[3] - float(state[13])
+            F0 = (k_tire * pen0 + c_tire * max(pen_dot0, 0.0)) if pen0 > 0.0 else 0.0
+            F1 = (k_tire * pen1 + c_tire * max(pen_dot1, 0.0)) if pen1 > 0.0 else 0.0
+            F2 = (k_tire * pen2 + c_tire * max(pen_dot2, 0.0)) if pen2 > 0.0 else 0.0
+            F3 = (k_tire * pen3 + c_tire * max(pen_dot3, 0.0)) if pen3 > 0.0 else 0.0
+            return F0, F1, F2, F3
 
-        F_stop_ax_C1 = stop_force_axial(s_raw_C1, s1_raw_dot, stroke_C1)
-        F_stop_ax_C2 = stop_force_axial(s_raw_C2, s2_raw_dot, stroke_C2)
-        F_stop = (-F_stop_ax_C1 * ds1_ddelta) + (-F_stop_ax_C2 * ds2_ddelta)
-        F_susp = F_susp + F_stop
-        F_susp_no_arb = F_susp.copy()
-        # ------------------------------------------------------------
-        # Стабилизатор поперечной устойчивости (опционально)
-        # ------------------------------------------------------------
-        # Модель: эквивалентные вертикальные силы, пропорциональные разности ходов слева/справа.
-        # diff = delta_L - delta_R (по оси), F = k*diff + c*diff_dot.
-        # На левом колесе +F, на правом -F.
+        def _compute_tire_force_rhs(t: float, zw: np.ndarray, zw_dot: np.ndarray) -> np.ndarray:
+            F0, F1, F2, F3 = _compute_tire_force_rhs_scalars(t, zw, zw_dot)
+            return np.array([F0, F1, F2, F3], dtype=float)
+
+    def _compute_suspension_force_state(
+        p: np.ndarray,
+        delta: np.ndarray,
+        delta_dot: np.ndarray,
+        s_C1: np.ndarray,
+        s_C2: np.ndarray,
+        s_raw_C1: np.ndarray,
+        s_raw_C2: np.ndarray,
+        ds1_ddelta: np.ndarray,
+        ds2_ddelta: np.ndarray,
+        *,
+        ax_t: float,
+        ay_t: float,
+        spring_force: np.ndarray | None = None,
+        full_output: bool = True,
+    ) -> Any:
+        F1_ax = (p[idx_C1_cap] - P_ATM) * A1_cap - (p[idx_C1_rod] - P_ATM) * A1_rod
+        F2_ax = (p[idx_C2_cap] - P_ATM) * A2_cap - (p[idx_C2_rod] - P_ATM) * A2_rod
+
+        if full_output:
+            F_cyl1 = -F1_ax * ds1_ddelta
+            F_cyl2 = -F2_ax * ds2_ddelta
+            F_cyl = F_cyl1 + F_cyl2
+        else:
+            F_cyl = -(F1_ax * ds1_ddelta + F2_ax * ds2_ddelta)
+        if spring_force is None:
+            F_spr = np.asarray(_spring_force_wheel_only(delta, s_C1, s_C2, ds1_ddelta, ds2_ddelta), dtype=float)
+        else:
+            F_spr = np.asarray(spring_force, dtype=float)
+        F_susp = F_spr + F_cyl
+        if _stroke_outside_range(s_raw_C1, stroke_C1) or _stroke_outside_range(s_raw_C2, stroke_C2):
+            s1_raw_dot = ds1_ddelta * delta_dot
+            s2_raw_dot = ds2_ddelta * delta_dot
+            F_stop_ax_C1 = _stop_force_axial(s_raw_C1, s1_raw_dot, stroke_C1)
+            F_stop_ax_C2 = _stop_force_axial(s_raw_C2, s2_raw_dot, stroke_C2)
+            F_stop = (-F_stop_ax_C1 * ds1_ddelta) + (-F_stop_ax_C2 * ds2_ddelta)
+            F_susp = F_susp + F_stop
+        else:
+            F_stop = zero4
+
         F_arb_f = 0.0
         F_arb_r = 0.0
-        if bool(params.get('стабилизатор_вкл', False)):
-            k_arb_f = float(params.get('стабилизатор_перед_жесткость_Н_м', 0.0) or 0.0)
-            c_arb_f = float(params.get('стабилизатор_перед_демпфирование_Н_с_м', 0.0) or 0.0)
-            k_arb_r = float(params.get('стабилизатор_зад_жесткость_Н_м', 0.0) or 0.0)
-            c_arb_r = float(params.get('стабилизатор_зад_демпфирование_Н_с_м', 0.0) or 0.0)
-
-            # перед: ЛП(0) - ПП(1)
+        if arb_enabled:
             diff_f = float(delta[0] - delta[1])
             diffdot_f = float(delta_dot[0] - delta_dot[1])
             F_arb_f = k_arb_f * diff_f + c_arb_f * diffdot_f
-            # зад: ЛЗ(2) - ПЗ(3)
             diff_r = float(delta[2] - delta[3])
             diffdot_r = float(delta_dot[2] - delta_dot[3])
             F_arb_r = k_arb_r * diff_r + c_arb_r * diffdot_r
@@ -2765,72 +3485,52 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             F_susp[2] += F_arb_r
             F_susp[3] -= F_arb_r
 
+        M_roll_inert = float(body_inertial_moment_coeff * ay_t)
+        M_pitch_inert = float(body_inertial_moment_coeff * ax_t)
+        F_sum = F_susp[0] + F_susp[1] + F_susp[2] + F_susp[3]
+        M_roll = float(
+            F_susp[0] * y_pos0 + F_susp[1] * y_pos1 + F_susp[2] * y_pos2 + F_susp[3] * y_pos3
+        ) + M_roll_inert
+        M_pitch = float(
+            -(F_susp[0] * x_pos0 + F_susp[1] * x_pos1 + F_susp[2] * x_pos2 + F_susp[3] * x_pos3)
+        ) + M_pitch_inert
+        z_ddot = float((float(F_sum) - m_body * g) * inv_m_body)
+        phi_ddot = float(M_roll * inv_I_roll)
+        theta_ddot = float(M_pitch * inv_I_pitch)
+
+        if not full_output:
+            return F_susp, z_ddot, phi_ddot, theta_ddot
+
+        if arb_enabled:
+            F_susp_no_arb0 = F_susp[0] - F_arb_f
+            F_susp_no_arb1 = F_susp[1] + F_arb_f
+            F_susp_no_arb2 = F_susp[2] - F_arb_r
+            F_susp_no_arb3 = F_susp[3] + F_arb_r
+        else:
+            F_susp_no_arb0 = F_susp[0]
+            F_susp_no_arb1 = F_susp[1]
+            F_susp_no_arb2 = F_susp[2]
+            F_susp_no_arb3 = F_susp[3]
         F_arb_vec = np.array([F_arb_f, -F_arb_f, F_arb_r, -F_arb_r], dtype=float)
+        M_roll_susp = float(
+            F_susp_no_arb0 * y_pos0
+            + F_susp_no_arb1 * y_pos1
+            + F_susp_no_arb2 * y_pos2
+            + F_susp_no_arb3 * y_pos3
+        )
+        M_pitch_susp = float(
+            -(F_susp_no_arb0 * x_pos0 + F_susp_no_arb1 * x_pos1 + F_susp_no_arb2 * x_pos2 + F_susp_no_arb3 * x_pos3)
+        )
+        M_roll_arb = float(F_arb_vec[0] * y_pos0 + F_arb_vec[1] * y_pos1 + F_arb_vec[2] * y_pos2 + F_arb_vec[3] * y_pos3)
 
-        # Моменты от сил и инерции (инерц. моменты через высоту ЦМ)
-        ax_t = ax_func(t)
-        ay_t = ay_func(t)
-        M_roll = np.sum(F_susp * y_pos) + m_body*ay_t*h_cg
-        M_pitch = -np.sum(F_susp * x_pos) + m_body*ax_t*h_cg
-        M_roll_susp = float(np.sum(F_susp_no_arb * y_pos))
-        M_pitch_susp = float(-np.sum(F_susp_no_arb * x_pos))
-        M_roll_arb = float(np.sum(F_arb_vec * y_pos))
-        M_roll_inert = float(m_body * ay_t * h_cg)
-        M_pitch_inert = float(m_body * ax_t * h_cg)
-
-        z_ddot = (np.sum(F_susp) - m_body*g) / m_body
-        phi_ddot = M_roll / I_roll
-        theta_ddot = M_pitch / I_pitch
-
-        # Колёса и контакт (односторонний)
-        z_road = road_func(t)
-        # Корректная скорость профиля: pen_dot = z_road_dot - z_w_dot
-        try:
-            z_road_dot = road_dfunc(t)
-        except Exception:
-            z_road_dot = np.zeros(4)
-
-        if wheel_coord_mode == 'contact':
-            # zw интерпретируется как координата точки контакта
-            pen = (z_road - zw)
-        else:
-            # zw интерпретируется как координата центра колеса
-            pen = (z_road - zw + wheel_radius)
-
-        pen_dot = (z_road_dot - zw_dot)
-        if smooth_contacts:
-            # Гладкая односторонняя контактная модель БЕЗ паразитного оффсета в нуле.
-            # Вместо smooth_pos(pen) (который даёт eps/2 при pen=0) используем pen*gate.
-            g_contact = smooth_pos_grad(pen, smooth_eps_pos_m)
-            pen_in = pen * g_contact
-
-            # Демпфирование только при «вдавливании» (pen_dot>0) и только в контакте.
-            g_v = smooth_pos_grad(pen_dot, smooth_eps_vel_mps)
-            pen_dot_in = (pen_dot * g_v) * g_contact
-            F_tire = k_tire*pen_in + c_tire*pen_dot_in
-        else:
-            F_tire = np.where(pen > 0.0, k_tire*pen + c_tire*np.maximum(pen_dot, 0.0), 0.0)
-        zw_ddot = (F_tire - F_susp - m_w*g) / m_w
-
-        dst = np.zeros_like(state)
-        dst[0] = z_dot
-        dst[1] = phi_dot
-        dst[2] = theta_dot
-        dst[3:7] = zw_dot
-        dst[7] = z_ddot
-        dst[8] = phi_ddot
-        dst[9] = theta_ddot
-        dst[10:14] = zw_ddot
-        dst[14:] = dm_dt
-        last_mech.clear()
-        last_mech.update({
-            'F_susp': np.asarray(F_susp, dtype=float).copy(),
-            'F_spr': np.asarray(F_spr, dtype=float).copy(),
-            'F_cyl': np.asarray(F_cyl, dtype=float).copy(),
-            'F_cyl1': np.asarray(F_cyl1, dtype=float).copy(),
-            'F_cyl2': np.asarray(F_cyl2, dtype=float).copy(),
-            'F_stop': np.asarray(F_stop, dtype=float).copy(),
-            'F_arb': np.asarray(F_arb_vec, dtype=float).copy(),
+        return {
+            'F_susp': F_susp,
+            'F_spr': F_spr,
+            'F_cyl': F_cyl,
+            'F_cyl1': F_cyl1,
+            'F_cyl2': F_cyl2,
+            'F_stop': F_stop,
+            'F_arb': F_arb_vec,
             'F_arb_front': float(F_arb_f),
             'F_arb_rear': float(F_arb_r),
             'M_roll_susp': float(M_roll_susp),
@@ -2840,8 +3540,232 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             'M_pitch_susp': float(M_pitch_susp),
             'M_pitch_inert': float(M_pitch_inert),
             'M_pitch_total': float(M_pitch),
-        })
+            'z_ddot': z_ddot,
+            'phi_ddot': phi_ddot,
+            'theta_ddot': theta_ddot,
+        }
+
+    def _compute_suspension_force_rhs_scalars(
+        p: np.ndarray,
+        delta: np.ndarray,
+        delta_dot: np.ndarray,
+        s_C1: np.ndarray,
+        s_C2: np.ndarray,
+        s_raw_C1: np.ndarray,
+        s_raw_C2: np.ndarray,
+        ds1_ddelta: np.ndarray,
+        ds2_ddelta: np.ndarray,
+        *,
+        ax_t: float,
+        ay_t: float,
+    ) -> Tuple[float, float, float, float, float, float, float]:
+        F_spr = _spring_force_wheel_only(delta, s_C1, s_C2, ds1_ddelta, ds2_ddelta)
+        ds10 = float(ds1_ddelta[0]); ds11 = float(ds1_ddelta[1]); ds12 = float(ds1_ddelta[2]); ds13 = float(ds1_ddelta[3])
+        ds20 = float(ds2_ddelta[0]); ds21 = float(ds2_ddelta[1]); ds22 = float(ds2_ddelta[2]); ds23 = float(ds2_ddelta[3])
+        F_susp0 = float(F_spr[0]) - (
+            ((float(p[idx_C1_cap0]) - P_ATM) * A1_cap0 - (float(p[idx_C1_rod0]) - P_ATM) * A1_rod0) * ds10
+            + ((float(p[idx_C2_cap0]) - P_ATM) * A2_cap0 - (float(p[idx_C2_rod0]) - P_ATM) * A2_rod0) * ds20
+        )
+        F_susp1 = float(F_spr[1]) - (
+            ((float(p[idx_C1_cap1]) - P_ATM) * A1_cap1 - (float(p[idx_C1_rod1]) - P_ATM) * A1_rod1) * ds11
+            + ((float(p[idx_C2_cap1]) - P_ATM) * A2_cap1 - (float(p[idx_C2_rod1]) - P_ATM) * A2_rod1) * ds21
+        )
+        F_susp2 = float(F_spr[2]) - (
+            ((float(p[idx_C1_cap2]) - P_ATM) * A1_cap2 - (float(p[idx_C1_rod2]) - P_ATM) * A1_rod2) * ds12
+            + ((float(p[idx_C2_cap2]) - P_ATM) * A2_cap2 - (float(p[idx_C2_rod2]) - P_ATM) * A2_rod2) * ds22
+        )
+        F_susp3 = float(F_spr[3]) - (
+            ((float(p[idx_C1_cap3]) - P_ATM) * A1_cap3 - (float(p[idx_C1_rod3]) - P_ATM) * A1_rod3) * ds13
+            + ((float(p[idx_C2_cap3]) - P_ATM) * A2_cap3 - (float(p[idx_C2_rod3]) - P_ATM) * A2_rod3) * ds23
+        )
+        if _stroke_outside_range(s_raw_C1, stroke_C1) or _stroke_outside_range(s_raw_C2, stroke_C2):
+            s1_raw_dot = ds1_ddelta * delta_dot
+            s2_raw_dot = ds2_ddelta * delta_dot
+            F_stop_ax_C1 = _stop_force_axial(s_raw_C1, s1_raw_dot, stroke_C1)
+            F_stop_ax_C2 = _stop_force_axial(s_raw_C2, s2_raw_dot, stroke_C2)
+            F_susp0 += -(float(F_stop_ax_C1[0]) * ds10 + float(F_stop_ax_C2[0]) * ds20)
+            F_susp1 += -(float(F_stop_ax_C1[1]) * ds11 + float(F_stop_ax_C2[1]) * ds21)
+            F_susp2 += -(float(F_stop_ax_C1[2]) * ds12 + float(F_stop_ax_C2[2]) * ds22)
+            F_susp3 += -(float(F_stop_ax_C1[3]) * ds13 + float(F_stop_ax_C2[3]) * ds23)
+
+        if arb_enabled:
+            diff_f = float(delta[0] - delta[1])
+            diffdot_f = float(delta_dot[0] - delta_dot[1])
+            F_arb_f = k_arb_f * diff_f + c_arb_f * diffdot_f
+            diff_r = float(delta[2] - delta[3])
+            diffdot_r = float(delta_dot[2] - delta_dot[3])
+            F_arb_r = k_arb_r * diff_r + c_arb_r * diffdot_r
+            F_susp0 += F_arb_f
+            F_susp1 -= F_arb_f
+            F_susp2 += F_arb_r
+            F_susp3 -= F_arb_r
+
+        M_roll = float(
+            F_susp0 * y_pos0 + F_susp1 * y_pos1 + F_susp2 * y_pos2 + F_susp3 * y_pos3
+        ) + float(body_inertial_moment_coeff * ay_t)
+        M_pitch = float(
+            -(F_susp0 * x_pos0 + F_susp1 * x_pos1 + F_susp2 * x_pos2 + F_susp3 * x_pos3)
+        ) + float(body_inertial_moment_coeff * ax_t)
+        z_ddot = float(((F_susp0 + F_susp1 + F_susp2 + F_susp3) - m_body * g) * inv_m_body)
+        phi_ddot = float(M_roll * inv_I_roll)
+        theta_ddot = float(M_pitch * inv_I_pitch)
+        return F_susp0, F_susp1, F_susp2, F_susp3, z_ddot, phi_ddot, theta_ddot
+
+    def _compute_suspension_force_rhs(
+        p: np.ndarray,
+        delta: np.ndarray,
+        delta_dot: np.ndarray,
+        s_C1: np.ndarray,
+        s_C2: np.ndarray,
+        s_raw_C1: np.ndarray,
+        s_raw_C2: np.ndarray,
+        ds1_ddelta: np.ndarray,
+        ds2_ddelta: np.ndarray,
+        *,
+        ax_t: float,
+        ay_t: float,
+    ) -> Tuple[np.ndarray, float, float, float]:
+        F_susp0, F_susp1, F_susp2, F_susp3, z_ddot, phi_ddot, theta_ddot = _compute_suspension_force_rhs_scalars(
+            p,
+            delta,
+            delta_dot,
+            s_C1,
+            s_C2,
+            s_raw_C1,
+            s_raw_C2,
+            ds1_ddelta,
+            ds2_ddelta,
+            ax_t=ax_t,
+            ay_t=ay_t,
+        )
+        return np.array([F_susp0, F_susp1, F_susp2, F_susp3], dtype=float), z_ddot, phi_ddot, theta_ddot
+
+    def _fill_rhs_from_pressure_state(
+        dst: np.ndarray,
+        state: np.ndarray,
+        t: float,
+        p: np.ndarray,
+        delta: np.ndarray,
+        delta_dot: np.ndarray,
+        s_C1: np.ndarray,
+        s_C2: np.ndarray,
+        s_dot_C1: np.ndarray,
+        s_dot_C2: np.ndarray,
+        s_raw_C1: np.ndarray,
+        s_raw_C2: np.ndarray,
+        ds1_ddelta: np.ndarray,
+        ds2_ddelta: np.ndarray,
+        mdots: np.ndarray,
+        dm_dt: np.ndarray | None = None,
+    ) -> np.ndarray:
+        z_dot, phi_dot, theta_dot = state[7], state[8], state[9]
+
+        if dm_dt is None:
+            dm_dt = B @ mdots
+            dm_dt[node_index['АТМ']] = 0.0
+
+        ax_t = ax_func(t)
+        ay_t = ay_func(t)
+        F_susp0, F_susp1, F_susp2, F_susp3, z_ddot, phi_ddot, theta_ddot = _compute_suspension_force_rhs_scalars(
+            p,
+            delta,
+            delta_dot,
+            s_C1,
+            s_C2,
+            s_raw_C1,
+            s_raw_C2,
+            ds1_ddelta,
+            ds2_ddelta,
+            ax_t=ax_t,
+            ay_t=ay_t,
+        )
+
+        F_tire0, F_tire1, F_tire2, F_tire3 = _compute_tire_force_rhs_from_state_scalars(t, state)
+
+        dst[0] = z_dot
+        dst[1] = phi_dot
+        dst[2] = theta_dot
+        dst[3:7] = state[10:14]
+        dst[7] = z_ddot
+        dst[8] = phi_ddot
+        dst[9] = theta_ddot
+        dst[10] = (F_tire0 - F_susp0 - wheel_weight_N) * inv_m_w
+        dst[11] = (F_tire1 - F_susp1 - wheel_weight_N) * inv_m_w
+        dst[12] = (F_tire2 - F_susp2 - wheel_weight_N) * inv_m_w
+        dst[13] = (F_tire3 - F_susp3 - wheel_weight_N) * inv_m_w
+        dst[14:] = dm_dt
         return dst
+
+    def _rhs_from_pressure_state(
+        state: np.ndarray,
+        t: float,
+        p: np.ndarray,
+        delta: np.ndarray,
+        delta_dot: np.ndarray,
+        s_C1: np.ndarray,
+        s_C2: np.ndarray,
+        s_dot_C1: np.ndarray,
+        s_dot_C2: np.ndarray,
+        s_raw_C1: np.ndarray,
+        s_raw_C2: np.ndarray,
+        ds1_ddelta: np.ndarray,
+        ds2_ddelta: np.ndarray,
+        mdots: np.ndarray,
+        dm_dt: np.ndarray | None = None,
+    ) -> np.ndarray:
+        dst = np.empty_like(state)
+        return _fill_rhs_from_pressure_state(
+            dst,
+            state,
+            t,
+            p,
+            delta,
+            delta_dot,
+            s_C1,
+            s_C2,
+            s_dot_C1,
+            s_dot_C2,
+            s_raw_C1,
+            s_raw_C2,
+            ds1_ddelta,
+            ds2_ddelta,
+            mdots,
+            dm_dt=dm_dt,
+        )
+
+    def rhs(state, t):
+        """Правая часть ОДУ (без логирования!). Логирование делается снаружи,
+        иначе при RK2 второй вызов rhs(mid, t+dt) перетирает значения в out[k]."""
+        (
+            p,
+            delta,
+            delta_dot,
+            s_C1,
+            s_C2,
+            s_dot_C1,
+            s_dot_C2,
+            s_raw_C1,
+            s_raw_C2,
+            ds1_ddelta,
+            ds2_ddelta,
+        ) = compute_pressures_fast(state)
+        mdots = compute_flows(p)
+        return _rhs_from_pressure_state(
+            state,
+            t,
+            p,
+            delta,
+            delta_dot,
+            s_C1,
+            s_C2,
+            s_dot_C1,
+            s_dot_C2,
+            s_raw_C1,
+            s_raw_C2,
+            ds1_ddelta,
+            ds2_ddelta,
+            mdots,
+        )
 
     # ---------------------------------------------------------
     # compile_only: вернуть "ядро" интегратора без прогонки симуляции.
@@ -3121,9 +4045,20 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             elif z_road.size != 4:
                 z_road = np.full(4, float('nan'), dtype=float)
             body_height = z_body - z_road
-            spring_state = _build_spring_runtime_state(delta, s_c1, s_c2, ds1_ddelta, ds2_ddelta)
+            (
+                _compression_trim,
+                _length_trim,
+                coil_trim,
+                _force_trim,
+                _x_comp_c1_trim,
+                _len_c1_trim,
+                _coil_margin_c1_trim,
+                _x_comp_c2_trim,
+                _len_c2_trim,
+                _coil_margin_c2_trim,
+            ) = _compute_spring_runtime_export_pack(delta, s_c1, s_c2, ds1_ddelta, ds2_ddelta)
             gap = np.full(4, np.nan, dtype=float)
-            coil = np.asarray(spring_state.get('coil_bind_margin_m', np.full(4, np.nan, dtype=float)), dtype=float)
+            coil = np.asarray(coil_trim, dtype=float)
             mid_err_c1 = s_c1 - np.asarray(s0_C1, dtype=float)
             mid_err_c2 = s_c2 - np.asarray(s0_C2, dtype=float)
             body_height_err = np.where(body_height_target_finite, body_height - body_height_target_m, np.nan)
@@ -3708,11 +4643,11 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     # Включение: params['интегратор_контроль_локальной_ошибки']=True
     integ_err_control = bool(params.get('интегратор_контроль_локальной_ошибки', False))
 
-    integ_rtol = float(params.get('интегратор_rtol', 1e-4))
+    integ_rtol = float(params.get('интегратор_rtol', 1e-3))
     if (not np.isfinite(integ_rtol)) or integ_rtol <= 0.0:
         integ_rtol = 1e-4
 
-    integ_atol = float(params.get('интегратор_atol', 1e-8))
+    integ_atol = float(params.get('интегратор_atol', 1e-7))
     if (not np.isfinite(integ_atol)) or integ_atol <= 0.0:
         integ_atol = 1e-8
 
@@ -3732,36 +4667,163 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     if (not np.isfinite(integ_h_min)) or (integ_h_min <= 0.0):
         integ_h_min = 1e-7
 
-    last_mech: Dict[str, Any] = {}
+    integ_mass_rtol_scale_factor = float(params.get('интегратор_mass_rtol_scale_factor', 2.0))
+    if (not np.isfinite(integ_mass_rtol_scale_factor)) or (integ_mass_rtol_scale_factor < 1.0):
+        integ_mass_rtol_scale_factor = 2.0
+    integ_err_group_weight_mass = float(params.get('интегратор_err_group_weight_mass', 0.92))
+    if (not np.isfinite(integ_err_group_weight_mass)) or (integ_err_group_weight_mass <= 0.0):
+        integ_err_group_weight_mass = 0.92
+    integ_mass_scale_floor_vec = p_mass_floor_scale * V0_vec
 
-    def _project_masses(_state: np.ndarray) -> None:
+    integ_err_group_labels = ('body_pos', 'wheel_pos', 'body_vel', 'wheel_vel', 'mass')
+    integ_err_group_weight_vec = np.array(
+        [1.0, 1.0, 1.0, 1.0, float(integ_err_group_weight_mass)],
+        dtype=float,
+    )
+
+    def _finite_group_max(arr: np.ndarray) -> float:
+        mask = np.isfinite(arr)
+        if not np.any(mask):
+            return float('inf')
+        return float(np.max(arr[mask]))
+
+    def _project_masses(_state: np.ndarray, *, return_prepared: bool = False, include_dv: bool = False):
         # Удерживаем массы не ниже floor (p_abs_min) и не даём отрицательных масс.
         z_, phi_, theta_ = _state[0], _state[1], _state[2]
         zw_ = _state[3:7]
         z_dot_, phi_dot_, theta_dot_ = _state[7], _state[8], _state[9]
         zw_dot_ = _state[10:14]
-        V_tmp = volumes(z_, phi_, theta_, zw_, z_dot_, phi_dot_, theta_dot_, zw_dot_)[0]
+        (
+            _delta,
+            _delta_dot,
+            s_C1,
+            s_C2,
+            s_dot_C1,
+            s_dot_C2,
+            _s_raw_C1,
+            _s_raw_C2,
+            _ds1_ddelta,
+            _ds2_ddelta,
+        ) = _mechanics_state_compact(z_, phi_, theta_, zw_, z_dot_, phi_dot_, theta_dot_, zw_dot_)
+        if include_dv:
+            V_tmp, dV_tmp = _build_pressure_vectors(s_C1, s_C2, s_dot_C1, s_dot_C2, include_dv=True)
+        else:
+            V_tmp = _build_pressure_vectors(s_C1, s_C2, s_dot_C1, s_dot_C2, include_dv=False)
+            dV_tmp = None
         if smooth_pressure_floor:
             V_safe = smooth_max(V_tmp, 1e-9, smooth_eps_vol_m3)
         else:
-            V_safe = np.maximum(1e-9, V_tmp)
-        m_floor = (p_abs_min * V_safe) / (R_AIR * T_AIR)
+            V_safe = V_tmp if np.all(V_tmp >= 1e-9) else np.maximum(1e-9, V_tmp)
+        m_floor = p_mass_floor_scale * V_safe
 
         m_state = _state[14:]
         if smooth_pressure_floor:
             m_state = m_floor + smooth_pos(m_state - m_floor, smooth_eps_mass_kg)
+            m_state[atm_index] = atm_mass
+            _state[14:] = m_state
         else:
-            m_state = np.maximum(m_state, m_floor)
+            np.maximum(m_state, m_floor, out=m_state)
+            m_state[atm_index] = atm_mass
 
-        # атмосфера фиксирована
-        m_state[node_index['АТМ']] = P_ATM * V0_vec[node_index['АТМ']] / (R_AIR * T_AIR)
-        _state[14:] = m_state
+        if not return_prepared:
+            return None
+        p_state = np.empty_like(V_safe)
+        np.divide(m_state, V_safe, out=p_state)
+        p_state *= rt_air
+        p_state[atm_index] = P_ATM
+        return (
+            p_state,
+            V_tmp,
+            dV_tmp,
+            _delta,
+            _delta_dot,
+            s_C1,
+            s_C2,
+            s_dot_C1,
+            s_dot_C2,
+            _s_raw_C1,
+            _s_raw_C2,
+            _ds1_ddelta,
+            _ds2_ddelta,
+            None,
+            None,
+        )
 
-    def _advance_with_substeps(_state: np.ndarray, t0: float, dt_total: float):
+    rhs_k1_buf = np.empty_like(state0)
+    rhs_k2_buf = np.empty_like(state0)
+    rhs_tmp_buf = np.empty_like(state0)
+    state_mid_buf = np.empty_like(state0)
+    mdots_k1_buf = np.empty(E, dtype=float)
+    mdots_k2_buf = np.empty(E, dtype=float)
+    dm_dt_k1_buf = np.empty(N, dtype=float)
+    dm_dt_log_buf = np.empty(N, dtype=float)
+    p_state_mid_buf = np.empty_like(V0_vec)
+
+    def _project_masses_mid(_state: np.ndarray):
+        z_, phi_, theta_ = _state[0], _state[1], _state[2]
+        zw_ = _state[3:7]
+        z_dot_, phi_dot_, theta_dot_ = _state[7], _state[8], _state[9]
+        zw_dot_ = _state[10:14]
+        (
+            _delta,
+            _delta_dot,
+            s_C1,
+            s_C2,
+            s_dot_C1,
+            s_dot_C2,
+            _s_raw_C1,
+            _s_raw_C2,
+            _ds1_ddelta,
+            _ds2_ddelta,
+        ) = _mechanics_state_compact(z_, phi_, theta_, zw_, z_dot_, phi_dot_, theta_dot_, zw_dot_)
+        V_tmp = _build_pressure_vectors(s_C1, s_C2, s_dot_C1, s_dot_C2, include_dv=False)
+        if smooth_pressure_floor:
+            V_safe = smooth_max(V_tmp, 1e-9, smooth_eps_vol_m3)
+        else:
+            V_safe = V_tmp if np.all(V_tmp >= 1e-9) else np.maximum(1e-9, V_tmp)
+        m_floor = p_mass_floor_scale * V_safe
+
+        m_state = _state[14:]
+        if smooth_pressure_floor:
+            m_state = m_floor + smooth_pos(m_state - m_floor, smooth_eps_mass_kg)
+            m_state[atm_index] = atm_mass
+            _state[14:] = m_state
+        else:
+            np.maximum(m_state, m_floor, out=m_state)
+            m_state[atm_index] = atm_mass
+
+        np.divide(m_state, V_safe, out=p_state_mid_buf)
+        np.multiply(p_state_mid_buf, rt_air, out=p_state_mid_buf)
+        p_state_mid_buf[atm_index] = P_ATM
+        return (
+            p_state_mid_buf,
+            V_tmp,
+            None,
+            _delta,
+            _delta_dot,
+            s_C1,
+            s_C2,
+            s_dot_C1,
+            s_dot_C2,
+            _s_raw_C1,
+            _s_raw_C2,
+            _ds1_ddelta,
+            _ds2_ddelta,
+            None,
+            None,
+        )
+
+    def _advance_with_substeps(
+        _state: np.ndarray,
+        t0: float,
+        dt_total: float,
+        *,
+        prepared_cfl0=None,
+    ):
         """Интегрирует состояние на интервале dt_total с внутренними подшагами.
 
         Возвращает:
-            (state, stats_dict)
+            (state, stats_dict, prepared_cfl)
         где stats_dict содержит диагностику подшагов:
             n_sub, h_min, h_max, h_mean, n_reject, err_max
         """
@@ -3774,6 +4836,9 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         h_sum = 0.0
         n_reject = 0
         err_max = 0.0
+        err_group_max_local = np.zeros(5, dtype=float)
+        err_group_reject_dominant_local = np.zeros(5, dtype=int)
+        err_group_reject_weighted_dominant_local = np.zeros(5, dtype=int)
 
         max_h = min(float(max_h_default), float(dt_total))
         h_hint = float(max_h)
@@ -3781,15 +4846,98 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         # Абсолютный нижний порог шага (только чтобы гарантировать прогресс времени)
         h_floor = 1e-12
 
-        def _heun_step(y: np.ndarray, tt: float, hh: float) -> np.ndarray:
+        prepared_cfl = prepared_cfl0
+
+        def _heun_step(
+            y: np.ndarray,
+            tt: float,
+            hh: float,
+            k1: np.ndarray | None = None,
+            *,
+            return_prepared: bool = False,
+        ):
             # RK2 / Heun (trapezoidal explicit): predictor + corrector.
-            k1 = rhs(y, tt)
-            mid = y + hh * k1
-            _project_masses(mid)
-            k2 = rhs(mid, tt + hh)
-            y_new = y + 0.5 * hh * (k1 + k2)
-            _project_masses(y_new)
-            return y_new
+            if k1 is None:
+                k1 = rhs_tmp_buf
+                (
+                    p_k1,
+                    delta_k1,
+                    delta_dot_k1,
+                    s_C1_k1,
+                    s_C2_k1,
+                    s_dot_C1_k1,
+                    s_dot_C2_k1,
+                    s_raw_C1_k1,
+                    s_raw_C2_k1,
+                    ds1_ddelta_k1,
+                    ds2_ddelta_k1,
+                ) = compute_pressures_fast(y)
+                mdots_k1 = _fill_flows(mdots_k1_buf, p_k1)
+                _fill_rhs_from_pressure_state(
+                    k1,
+                    y,
+                    tt,
+                    p_k1,
+                    delta_k1,
+                    delta_dot_k1,
+                    s_C1_k1,
+                    s_C2_k1,
+                    s_dot_C1_k1,
+                    s_dot_C2_k1,
+                    s_raw_C1_k1,
+                    s_raw_C2_k1,
+                    ds1_ddelta_k1,
+                    ds2_ddelta_k1,
+                    mdots_k1,
+                )
+            np.multiply(k1, hh, out=state_mid_buf)
+            np.add(state_mid_buf, y, out=state_mid_buf)
+            mid = state_mid_buf
+            prepared_mid = _project_masses_mid(mid)
+            assert prepared_mid is not None
+            (
+                p_mid,
+                _V_mid,
+                _dV_mid,
+                delta_mid,
+                delta_dot_mid,
+                s_C1_mid,
+                s_C2_mid,
+                s_dot_C1_mid,
+                s_dot_C2_mid,
+                s_raw_C1_mid,
+                s_raw_C2_mid,
+                ds1_ddelta_mid,
+                ds2_ddelta_mid,
+                _mdots_mid_cached,
+                _dm_dt_mid_cached,
+            ) = prepared_mid
+            mdots_mid = _fill_flows(mdots_k2_buf, p_mid) if _mdots_mid_cached is None else _mdots_mid_cached
+            k2 = _fill_rhs_from_pressure_state(
+                rhs_k2_buf,
+                mid,
+                tt + hh,
+                p_mid,
+                delta_mid,
+                delta_dot_mid,
+                s_C1_mid,
+                s_C2_mid,
+                s_dot_C1_mid,
+                s_dot_C2_mid,
+                s_raw_C1_mid,
+                s_raw_C2_mid,
+                ds1_ddelta_mid,
+                ds2_ddelta_mid,
+                mdots_mid,
+                dm_dt=_dm_dt_mid_cached,
+            )
+            np.add(k1, k2, out=state_mid_buf)
+            np.multiply(state_mid_buf, 0.5 * hh, out=state_mid_buf)
+            y_new = y + state_mid_buf
+            prepared_next = _project_masses(y_new, return_prepared=return_prepared, include_dv=return_prepared)
+            if not return_prepared:
+                return y_new
+            return y_new, prepared_next
 
         while dt_rem > 0.0:
             n_sub += 1
@@ -3804,17 +4952,75 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             h = min(float(h_hint), float(max_h), float(dt_rem))
 
             # --- ограничения по массе/объёму (CFL‑подобные) ---
-            p_, V_, dV_, *_rest = compute_pressures(_state)
-            mdots_ = compute_flows(p_)
+            if prepared_cfl is None:
+                (
+                    p_,
+                    V_,
+                    dV_,
+                    delta_cfl,
+                    delta_dot_cfl,
+                    s_C1_cfl,
+                    s_C2_cfl,
+                    s_dot_C1_cfl,
+                    s_dot_C2_cfl,
+                    s_raw_C1_cfl,
+                    s_raw_C2_cfl,
+                    ds1_ddelta_cfl,
+                    ds2_ddelta_cfl,
+                    mdots_cached,
+                    dm_dt_cached,
+                ) = _compute_pressure_state_cfl(_state)
+            else:
+                (
+                    p_,
+                    V_,
+                    dV_,
+                    delta_cfl,
+                    delta_dot_cfl,
+                    s_C1_cfl,
+                    s_C2_cfl,
+                    s_dot_C1_cfl,
+                    s_dot_C2_cfl,
+                    s_raw_C1_cfl,
+                    s_raw_C2_cfl,
+                    ds1_ddelta_cfl,
+                    ds2_ddelta_cfl,
+                    mdots_cached,
+                    dm_dt_cached,
+                ) = prepared_cfl
+                prepared_cfl = None
+            mdots_ = _fill_flows(mdots_k1_buf, p_) if mdots_cached is None else mdots_cached
+            if dm_dt_cached is None:
+                np.dot(B, mdots_, out=dm_dt_k1_buf)
+                dm_dt_k1_buf[idx_atm] = 0.0
+                dm_dt_ = dm_dt_k1_buf
+            else:
+                dm_dt_ = dm_dt_cached
+            k1_state = _fill_rhs_from_pressure_state(
+                rhs_k1_buf,
+                _state,
+                t_loc,
+                p_,
+                delta_cfl,
+                delta_dot_cfl,
+                s_C1_cfl,
+                s_C2_cfl,
+                s_dot_C1_cfl,
+                s_dot_C2_cfl,
+                s_raw_C1_cfl,
+                s_raw_C2_cfl,
+                ds1_ddelta_cfl,
+                ds2_ddelta_cfl,
+                mdots_,
+                dm_dt=dm_dt_,
+            )
 
             # CFL по массе: не даём «высосать» массу за один подшаг
-            dm_dt = B @ mdots_
-            dm_dt[idx_atm] = 0.0
             m_state = _state[14:14+N]
-            mask = (dm_dt < 0.0)
+            mask = (dm_dt_ < 0.0)
             mask[idx_atm] = False
             if np.any(mask):
-                dt_mass = 0.5 * float(np.min(m_state[mask] / (-dm_dt[mask] + 1e-12)))
+                dt_mass = 0.5 * float(np.min(m_state[mask] / (-dm_dt_[mask] + 1e-12)))
                 h = min(h, dt_mass)
 
             # Ограничение по относительному изменению объёма за шаг
@@ -3828,7 +5034,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
 
             if not integ_err_control:
                 # --- обычный шаг RK2/Heun ---
-                _state = _heun_step(_state, t_loc, h)
+                _state, prepared_cfl = _heun_step(_state, t_loc, h, k1=k1_state, return_prepared=True)
                 # статистика
                 h_min = min(h_min, h)
                 h_max = max(h_max, h)
@@ -3849,19 +5055,36 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
 
             while True:
                 # один шаг h
-                y1 = _heun_step(_state, t_loc, h)
+                y1 = _heun_step(_state, t_loc, h, k1=k1_state)
 
                 # два полу‑шага
                 hh = 0.5 * h
-                y_half = _heun_step(_state, t_loc, hh)
-                y2 = _heun_step(y_half, t_loc + hh, hh)
+                y_half = _heun_step(_state, t_loc, hh, k1=k1_state)
+                y2, prepared_y2 = _heun_step(y_half, t_loc + hh, hh, return_prepared=True)
 
                 err_est = (y2 - y1) / 3.0
                 scale = integ_atol + integ_rtol * np.maximum(np.abs(y1), np.abs(y2))
+                if scale.shape[0] > 14:
+                    mass_scale_base = integ_mass_rtol_scale_factor * np.maximum(
+                        np.maximum(np.abs(y1[14:]), np.abs(y2[14:])),
+                        integ_mass_scale_floor_vec,
+                    )
+                    scale[14:] = integ_atol + integ_rtol * mass_scale_base
                 # защита от нулевых масштабов
                 scale = np.maximum(scale, 1e-30)
                 err_vec = np.abs(err_est) / scale
-                err_norm = float(np.nanmax(err_vec)) if err_vec.size else 0.0
+                err_body_pos = _finite_group_max(err_vec[0:3])
+                err_wheel_pos = _finite_group_max(err_vec[3:7])
+                err_body_vel = _finite_group_max(err_vec[7:10])
+                err_wheel_vel = _finite_group_max(err_vec[10:14])
+                err_mass = _finite_group_max(err_vec[14:]) if err_vec.shape[0] > 14 else 0.0
+                err_group_vals = np.array(
+                    [err_body_pos, err_wheel_pos, err_body_vel, err_wheel_vel, err_mass],
+                    dtype=float,
+                )
+                err_group_vals_weighted = err_group_vals * integ_err_group_weight_vec
+                np.maximum(err_group_max_local, err_group_vals, out=err_group_max_local)
+                err_norm = float(np.nanmax(err_group_vals_weighted)) if err_group_vals_weighted.size else 0.0
                 if not np.isfinite(err_norm):
                     err_norm = float('inf')
 
@@ -3871,14 +5094,18 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 if (err_norm <= 1.0) or (h <= max(float(integ_h_min), float(h_floor))):
                     # принимаем более точный y2
                     _state = y2
+                    prepared_cfl = prepared_y2
                     break
 
                 # отклоняем шаг, уменьшаем h
+                err_group_reject_dominant_local[int(np.argmax(err_group_vals))] += 1
+                err_group_reject_weighted_dominant_local[int(np.argmax(err_group_vals_weighted))] += 1
                 tries += 1
                 n_reject += 1
                 if tries >= 25:
                     # fail‑safe: чтобы не «виснуть» на неустойчивом режиме, принимаем y2
                     _state = y2
+                    prepared_cfl = prepared_y2
                     break
 
                 fac = float(integ_safety) * float((1.0 / err_norm) ** (1.0 / 3.0))
@@ -3912,10 +5139,42 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             'h_mean': float(h_sum / max(1, int(n_sub))),
             'n_reject': int(n_reject),
             'err_max': float(err_max),
+            'err_group_max': err_group_max_local.copy(),
+            'err_group_reject_dominant_N': err_group_reject_dominant_local.copy(),
+            'err_group_reject_weighted_dominant_N': err_group_reject_weighted_dominant_local.copy(),
         }
-        return _state, stats
+        return _state, stats, prepared_cfl
     out.update(spring_family_runtime_series_template(n_steps))
     out['пружина_режим_семейства_id'] = np.full(n_steps, float(spring_family_mode_id(spring_mode)), dtype=float)
+    integ_err_group_max_global = np.zeros(5, dtype=float)
+    integ_err_group_reject_dominant_total = np.zeros(5, dtype=int)
+    integ_err_group_reject_weighted_dominant_total = np.zeros(5, dtype=int)
+    if dual_spring_mode:
+        spring_family_active_cyls = {'Ц1', 'Ц2'}
+    elif spring_mode == 'c2':
+        spring_family_active_cyls = {'Ц2'}
+    else:
+        spring_family_active_cyls = {'Ц1'}
+    spring_runtime_fill_plan = []
+    for _cyl_name, _axle_name in FAMILY_ORDER:
+        _cyl_key = str(_cyl_name).strip().upper()
+        _active_flag = 1.0 if _cyl_key in spring_family_active_cyls else 0.0
+        for _corner_index, _corner_name in enumerate(CORNER_NAMES):
+            if CORNER_AXLE_BY_NAME.get(_corner_name) != _axle_name:
+                continue
+            spring_runtime_fill_plan.append(
+                (
+                    f"пружина_{_cyl_key}_{_corner_name}_активна",
+                    _active_flag,
+                    _cyl_key,
+                    _corner_index,
+                        tuple(
+                            (metric_index, f"пружина_{_cyl_key}_{_corner_name}_{metric}")
+                            for metric_index, metric in enumerate(SPRING_RUNTIME_METRICS)
+                        ),
+                    )
+                )
+    prepared_log_state = None
     for k, t in enumerate(time):
         out['перемещение_рамы_z_м'][k] = state[0]
         out['крен_phi_рад'][k] = state[1]
@@ -3926,28 +5185,11 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         out['скорость_крен_phi_рад_с'][k] = state[8]
         out['скорость_тангаж_theta_рад_с'][k] = state[9]
 
-        # Рама в точках колёс (геометрия на основе x_pos/y_pos)
-        z, phi, theta = state[0], state[1], state[2]
-        z_dot, phi_dot, theta_dot = state[7], state[8], state[9]
-        z_body = z + math.sin(phi)*y_pos*math.cos(theta) - math.sin(theta)*x_pos
-        z_body_dot = (z_dot
-                      + (math.cos(phi)*y_pos*math.cos(theta))*phi_dot
-                      + (math.sin(phi)*y_pos*(-math.sin(theta)))*theta_dot
-                      - (x_pos*math.cos(theta))*theta_dot)
-
-        out['рама_угол_ЛП_z_м'][k] = float(z_body[0])
-        out['рама_угол_ПП_z_м'][k] = float(z_body[1])
-        out['рама_угол_ЛЗ_z_м'][k] = float(z_body[2])
-        out['рама_угол_ПЗ_z_м'][k] = float(z_body[3])
-
-        out['рама_угол_ЛП_v_м_с'][k] = float(z_body_dot[0])
-        out['рама_угол_ПП_v_м_с'][k] = float(z_body_dot[1])
-        out['рама_угол_ЛЗ_v_м_с'][k] = float(z_body_dot[2])
-        out['рама_угол_ПЗ_v_м_с'][k] = float(z_body_dot[3])
-
         # Логируем внешние воздействия (для разделения инерции и дороги)
-        out['ускорение_продольное_ax_м_с2'][k] = float(ax_func(t))
-        out['ускорение_поперечное_ay_м_с2'][k] = float(ay_func(t))
+        ax_t = float(ax_func(t))
+        ay_t = float(ay_func(t))
+        out['ускорение_продольное_ax_м_с2'][k] = ax_t
+        out['ускорение_поперечное_ay_м_с2'][k] = ay_t
         out['сегмент_id'][k] = int(label_func(t))
 
         # Опрокидывание: аварийная остановка (только если совсем вышли за разумные углы)
@@ -3976,44 +5218,97 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         out['скорость_колеса_ЛЗ_м_с'][k] = float(zw_dot_state[2])
         out['скорость_колеса_ПЗ_м_с'][k] = float(zw_dot_state[3])
 
+        if prepared_log_state is None:
+            (p, V, dV,
+             delta, delta_dot,
+             z_body, z_body_dot,
+             s_C1, s_C2,
+             s_dot_C1, s_dot_C2,
+             s_raw_C1, s_raw_C2,
+             ds1_ddelta, ds2_ddelta) = compute_pressures(state)
+            prepared_log_state = _pack_pressure_state_cfl(
+                p,
+                V,
+                dV,
+                delta,
+                delta_dot,
+                s_C1,
+                s_C2,
+                s_dot_C1,
+                s_dot_C2,
+                s_raw_C1,
+                s_raw_C2,
+                ds1_ddelta,
+                ds2_ddelta,
+            )
+        else:
+            (
+                p,
+                V,
+                dV,
+                delta,
+                delta_dot,
+                s_C1,
+                s_C2,
+                s_dot_C1,
+                s_dot_C2,
+                s_raw_C1,
+                s_raw_C2,
+                ds1_ddelta,
+                ds2_ddelta,
+                _mdots_cached_log,
+                _dm_dt_cached_log,
+            ) = prepared_log_state
+            z_body, z_body_dot = _body_state_from_state(state)
+        out['рама_угол_ЛП_z_м'][k] = float(z_body[0])
+        out['рама_угол_ПП_z_м'][k] = float(z_body[1])
+        out['рама_угол_ЛЗ_z_м'][k] = float(z_body[2])
+        out['рама_угол_ПЗ_z_м'][k] = float(z_body[3])
+
+        out['рама_угол_ЛП_v_м_с'][k] = float(z_body_dot[0])
+        out['рама_угол_ПП_v_м_с'][k] = float(z_body_dot[1])
+        out['рама_угол_ЛЗ_v_м_с'][k] = float(z_body_dot[2])
+        out['рама_угол_ПЗ_v_м_с'][k] = float(z_body_dot[3])
+
+        (
+            x_dyn_comp,
+            L_inst_dyn,
+            coil_margin,
+            spring_force_wheel_now,
+            x_comp_c1_now,
+            len_c1_now,
+            coil_margin_c1_now,
+            x_comp_c2_now,
+            len_c2_now,
+            coil_margin_c2_now,
+        ) = _compute_spring_runtime_export_pack(delta, s_C1, s_C2, ds1_ddelta, ds2_ddelta)
         # Колёса относительно рамы (P0): z_center - z_body
         out['колесо_относительно_рамы_ЛП_м'][k] = float(zw_center[0] - z_body[0])
         out['колесо_относительно_рамы_ПП_м'][k] = float(zw_center[1] - z_body[1])
         out['колесо_относительно_рамы_ЛЗ_м'][k] = float(zw_center[2] - z_body[2])
         out['колесо_относительно_рамы_ПЗ_м'][k] = float(zw_center[3] - z_body[3])
-
-        (p, V, dV,
-         delta, delta_dot,
-         z_body, z_body_dot,
-         s_C1, s_C2,
-         s_dot_C1, s_dot_C2,
-         s_raw_C1, s_raw_C2,
-         ds1_ddelta, ds2_ddelta) = compute_pressures(state)
-        # --- Стабилизатор (лог) ---
-        # В динамике стабилизатор учитывается в rhs(); здесь повторяем расчёт один раз на шаг
-        # для удобного логирования/графиков (без влияния на интегратор).
-        F_arb_f = 0.0
-        F_arb_r = 0.0
-        if bool(params.get('стабилизатор_вкл', False)):
-            k_arb_f = float(params.get('стабилизатор_перед_жесткость_Н_м', 0.0) or 0.0)
-            c_arb_f = float(params.get('стабилизатор_перед_демпфирование_Н_с_м', 0.0) or 0.0)
-            k_arb_r = float(params.get('стабилизатор_зад_жесткость_Н_м', 0.0) or 0.0)
-            c_arb_r = float(params.get('стабилизатор_зад_демпфирование_Н_с_м', 0.0) or 0.0)
-            d_front = float(delta[0] - delta[1])
-            d_front_dot = float(delta_dot[0] - delta_dot[1])
-            F_arb_f = k_arb_f * d_front + c_arb_f * d_front_dot
-            d_rear = float(delta[2] - delta[3])
-            d_rear_dot = float(delta_dot[2] - delta_dot[3])
-            F_arb_r = k_arb_r * d_rear + c_arb_r * d_rear_dot
-
-        F_arb_vec = np.array([F_arb_f, -F_arb_f, F_arb_r, -F_arb_r], dtype=float)
+        mech_state_now = _compute_suspension_force_state(
+            p,
+            delta,
+            delta_dot,
+            s_C1,
+            s_C2,
+            s_raw_C1,
+            s_raw_C2,
+            ds1_ddelta,
+            ds2_ddelta,
+            ax_t=ax_t,
+            ay_t=ay_t,
+            spring_force=np.asarray(spring_force_wheel_now, dtype=float),
+        )
+        F_arb_vec = np.asarray(mech_state_now['F_arb'], dtype=float)
         out['сила_стабилизатора_ЛП_Н'][k] = float(F_arb_vec[0])
         out['сила_стабилизатора_ПП_Н'][k] = float(F_arb_vec[1])
         out['сила_стабилизатора_ЛЗ_Н'][k] = float(F_arb_vec[2])
         out['сила_стабилизатора_ПЗ_Н'][k] = float(F_arb_vec[3])
-        out['сила_стабилизатора_перед_Н'][k] = float(F_arb_f)
-        out['сила_стабилизатора_зад_Н'][k] = float(F_arb_r)
-        out['момент_крен_стабилизатор_Нм'][k] = float(np.sum(F_arb_vec * y_pos))
+        out['сила_стабилизатора_перед_Н'][k] = float(mech_state_now['F_arb_front'])
+        out['сила_стабилизатора_зад_Н'][k] = float(mech_state_now['F_arb_rear'])
+        out['момент_крен_стабилизатор_Нм'][k] = float(mech_state_now['M_roll_arb'])
 
 
         # Лог штоков (положение/скорость) — нужны для KPI по упорам/скоростям
@@ -4053,25 +5348,37 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         out['доля_хода_Ц2_ЛЗ'][k] = float(s_C2[2] / max(stroke_C2[2], 1e-9))
         out['доля_хода_Ц2_ПЗ'][k] = float(s_C2[3] / max(stroke_C2[3], 1e-9))
 
-        spring_state_now = _build_spring_runtime_state(delta, s_C1, s_C2, ds1_ddelta, ds2_ddelta)
-        x_dyn_comp = np.asarray(spring_state_now["compression_m"], dtype=float)
-        L_inst_dyn = np.asarray(spring_state_now["installed_length_m"], dtype=float)
-        coil_margin = np.asarray(spring_state_now["coil_bind_margin_m"], dtype=float)
-        spring_family_runtime_now = build_spring_family_runtime_snapshot(
-            spring_mode=spring_mode,
-            metrics_by_cyl=spring_state_now["runtime_metrics_by_cyl"],
+        c1_metric_arrays = (
+            x_comp_c1_now,
+            len_c1_now,
+            spring_nan4,
+            coil_margin_c1_now,
+            len_c1_now,
         )
-        for _name, _value in spring_family_runtime_now.items():
-            out[_name][k] = float(_value)
+        c2_metric_arrays = (
+            x_comp_c2_now,
+            len_c2_now,
+            spring_nan4,
+            coil_margin_c2_now,
+            len_c2_now,
+        )
+        for _active_col, _active_flag, _cyl_key, _corner_index, _metric_cols in spring_runtime_fill_plan:
+            out[_active_col][k] = _active_flag
+            _metric_arrays = c1_metric_arrays if _cyl_key == 'Ц1' else c2_metric_arrays
+            for _metric_name, _metric_col in _metric_cols:
+                _value = float('nan')
+                if _active_flag > 0.5:
+                    _vec = _metric_arrays[_metric_name]
+                    if (_corner_index < _vec.size) and np.isfinite(_vec[_corner_index]):
+                        _value = float(_vec[_corner_index])
+                out[_metric_col][k] = _value
 
-        # Force breakdown синхронизируем с теми же формулами, что и rhs().
-        _ = rhs(state, float(t))
-        F_susp_dbg = np.asarray(last_mech.get("F_susp", np.zeros(4, dtype=float)), dtype=float)
-        F_spr_dbg = np.asarray(last_mech.get("F_spr", np.zeros(4, dtype=float)), dtype=float)
-        F_cyl_dbg = np.asarray(last_mech.get("F_cyl", np.zeros(4, dtype=float)), dtype=float)
-        F_cyl1_dbg = np.asarray(last_mech.get("F_cyl1", np.zeros(4, dtype=float)), dtype=float)
-        F_cyl2_dbg = np.asarray(last_mech.get("F_cyl2", np.zeros(4, dtype=float)), dtype=float)
-        F_stop_dbg = np.asarray(last_mech.get("F_stop", np.zeros(4, dtype=float)), dtype=float)
+        F_susp_dbg = np.asarray(mech_state_now["F_susp"], dtype=float)
+        F_spr_dbg = np.asarray(mech_state_now["F_spr"], dtype=float)
+        F_cyl_dbg = np.asarray(mech_state_now["F_cyl"], dtype=float)
+        F_cyl1_dbg = np.asarray(mech_state_now["F_cyl1"], dtype=float)
+        F_cyl2_dbg = np.asarray(mech_state_now["F_cyl2"], dtype=float)
+        F_stop_dbg = np.asarray(mech_state_now["F_stop"], dtype=float)
 
         out['сила_подвески_ЛП_Н'][k] = float(F_susp_dbg[0])
         out['сила_подвески_ПП_Н'][k] = float(F_susp_dbg[1])
@@ -4105,19 +5412,16 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         out['сила_отбойника_ПЗ_Н'][k] = float(F_stop_dbg[3])
         out['сила_отбойника_итого_Н'][k] = float(np.sum(F_stop_dbg))
 
-        out['момент_крен_подвеска_Нм'][k] = float(last_mech.get("M_roll_susp", 0.0))
-        out['момент_крен_инерция_Нм'][k] = float(last_mech.get("M_roll_inert", 0.0))
-        out['момент_крен_итого_Нм'][k] = float(last_mech.get("M_roll_total", 0.0))
-        out['момент_тангаж_подвеска_Нм'][k] = float(last_mech.get("M_pitch_susp", 0.0))
-        out['момент_тангаж_инерция_Нм'][k] = float(last_mech.get("M_pitch_inert", 0.0))
-        out['момент_тангаж_итого_Нм'][k] = float(last_mech.get("M_pitch_total", 0.0))
+        out['момент_крен_подвеска_Нм'][k] = float(mech_state_now["M_roll_susp"])
+        out['момент_крен_инерция_Нм'][k] = float(mech_state_now["M_roll_inert"])
+        out['момент_крен_итого_Нм'][k] = float(mech_state_now["M_roll_total"])
+        out['момент_тангаж_подвеска_Нм'][k] = float(mech_state_now["M_pitch_susp"])
+        out['момент_тангаж_инерция_Нм'][k] = float(mech_state_now["M_pitch_inert"])
+        out['момент_тангаж_итого_Нм'][k] = float(mech_state_now["M_pitch_total"])
 
         # Дорога и контактные реакции шин (для контроля отрыва)
         z_road = road_func(t)
         z_road_dot = road_dfunc(t) if road_dfunc is not None else np.zeros(4)
-
-        zw_state = np.asarray(state[3:7], dtype=float)
-        zw_dot_state = np.asarray(state[10:14], dtype=float)
         if wheel_coord_mode == "contact":
             zw_contact = zw_state
             zw_center = zw_state + wheel_radius
@@ -4181,6 +5485,26 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         out['давление_аккумулятор_Па'][k] = p[node_index['Аккумулятор']]
 
         mdots = compute_flows(p)
+        np.dot(B, mdots, out=dm_dt_log_buf)
+        dm_dt_log_buf[idx_atm] = 0.0
+        dm_dt = dm_dt_log_buf
+        prepared_log_state = _pack_pressure_state_cfl(
+            p,
+            V,
+            dV,
+            delta,
+            delta_dot,
+            s_C1,
+            s_C2,
+            s_dot_C1,
+            s_dot_C2,
+            s_raw_C1,
+            s_raw_C2,
+            ds1_ddelta,
+            ds2_ddelta,
+            mdots,
+            dm_dt,
+        )
 
         if record_full:
             p_full[k, :] = p
@@ -4243,7 +5567,12 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
 
         if k < n_steps - 1:
             dt_outer = float(time[k+1] - time[k])
-            state, _istat = _advance_with_substeps(state, float(t), dt_outer)
+            state, _istat, prepared_log_state = _advance_with_substeps(
+                state,
+                float(t),
+                dt_outer,
+                prepared_cfl0=prepared_log_state,
+            )
             try:
                 out['интегратор_подшаги_N'][k] = int(_istat.get('n_sub', 0))
                 out['интегратор_подшаг_мин_с'][k] = float(_istat.get('h_min', 0.0))
@@ -4251,6 +5580,18 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 out['интегратор_подшаг_средн_с'][k] = float(_istat.get('h_mean', 0.0))
                 out['интегратор_отклонения_N'][k] = int(_istat.get('n_reject', 0))
                 out['интегратор_ошибка_max'][k] = float(_istat.get('err_max', 0.0))
+                err_group_max_step = np.asarray(_istat.get('err_group_max', np.zeros(5, dtype=float)), dtype=float)
+                err_group_reject_step = np.asarray(
+                    _istat.get('err_group_reject_dominant_N', np.zeros(5, dtype=int)),
+                    dtype=int,
+                )
+                err_group_reject_weighted_step = np.asarray(
+                    _istat.get('err_group_reject_weighted_dominant_N', np.zeros(5, dtype=int)),
+                    dtype=int,
+                )
+                np.maximum(integ_err_group_max_global, err_group_max_step, out=integ_err_group_max_global)
+                integ_err_group_reject_dominant_total += err_group_reject_step
+                integ_err_group_reject_weighted_dominant_total += err_group_reject_weighted_step
             except Exception:
                 pass
 
@@ -4687,6 +6028,28 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         df_atm.loc[0, 'интегратор_h_min_param_с'] = float(integ_h_min)
         df_atm.loc[0, 'интегратор_dt_int_max_с'] = float(max_h_default)
         df_atm.loc[0, 'интегратор_lim_rel_V'] = float(lim_rel_V)
+        df_atm.loc[0, 'интегратор_mass_rtol_scale_factor'] = float(integ_mass_rtol_scale_factor)
+        df_atm.loc[0, 'интегратор_err_group_weight_mass'] = float(integ_err_group_weight_mass)
+        for _idx, _label in enumerate(integ_err_group_labels):
+            df_atm.loc[0, f'интегратор_err_group_max_{_label}'] = float(integ_err_group_max_global[_idx])
+            df_atm.loc[0, f'интегратор_err_reject_dominant_{_label}_N'] = int(
+                integ_err_group_reject_dominant_total[_idx]
+            )
+            df_atm.loc[0, f'интегратор_err_reject_weighted_dominant_{_label}_N'] = int(
+                integ_err_group_reject_weighted_dominant_total[_idx]
+            )
+        if np.sum(integ_err_group_reject_dominant_total) > 0:
+            df_atm.loc[0, 'интегратор_err_reject_dominant_group'] = str(
+                integ_err_group_labels[int(np.argmax(integ_err_group_reject_dominant_total))]
+            )
+        else:
+            df_atm.loc[0, 'интегратор_err_reject_dominant_group'] = 'none'
+        if np.sum(integ_err_group_reject_weighted_dominant_total) > 0:
+            df_atm.loc[0, 'интегратор_err_reject_weighted_dominant_group'] = str(
+                integ_err_group_labels[int(np.argmax(integ_err_group_reject_weighted_dominant_total))]
+            )
+        else:
+            df_atm.loc[0, 'интегратор_err_reject_weighted_dominant_group'] = 'none'
     except Exception:
         pass
 

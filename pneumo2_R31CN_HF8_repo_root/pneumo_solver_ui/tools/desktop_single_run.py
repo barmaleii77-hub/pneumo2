@@ -22,6 +22,18 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ""):
 
 from pneumo_solver_ui.module_loading import load_python_module_from_path
 from pneumo_solver_ui.ui_simulation_helpers import call_simulate, parse_sim_output
+from pneumo_solver_ui.desktop_run_setup_runtime import (
+    desktop_single_run_cache_dir,
+    desktop_single_run_cache_key,
+    mirror_tree,
+    remap_saved_files_to_dir,
+)
+
+
+try:
+    from pneumo_solver_ui.npz_bundle import export_full_log_to_npz
+except Exception:
+    export_full_log_to_npz = None  # type: ignore[assignment]
 
 
 def _load_json(path: Path) -> Any:
@@ -98,6 +110,12 @@ def build_desktop_run_summary(
     t_end: float,
     record_full: bool,
     outdir: Path,
+    cache_dir: Path | None = None,
+    cache_policy: str = "off",
+    cache_hit: bool = False,
+    export_csv: bool = True,
+    export_npz: bool = False,
+    run_profile: str = "detail",
 ) -> dict[str, Any]:
     df_main = parsed.get("df_main")
     df_atm = parsed.get("df_atm")
@@ -127,7 +145,13 @@ def build_desktop_run_summary(
         "dt_s": float(dt),
         "t_end_s": float(t_end),
         "record_full": bool(record_full),
+        "run_profile": str(run_profile or "").strip() or "detail",
+        "cache_policy": str(cache_policy or "").strip() or "off",
+        "cache_hit": bool(cache_hit),
+        "export_csv": bool(export_csv),
+        "export_npz": bool(export_npz),
         "outdir": str(outdir),
+        "cache_dir": str(cache_dir) if cache_dir is not None else None,
         "df_main_rows": int(len(df_main)) if isinstance(df_main, pd.DataFrame) else 0,
         "df_atm_rows": int(len(df_atm)) if isinstance(df_atm, pd.DataFrame) else 0,
         "df_p_rows": int(len(df_p)) if isinstance(df_p, pd.DataFrame) else 0,
@@ -149,9 +173,16 @@ def build_desktop_run_summary(
     return summary
 
 
-def _write_run_artifacts(parsed: dict[str, Any], outdir: Path) -> dict[str, str]:
+def _write_run_artifacts(
+    parsed: dict[str, Any],
+    outdir: Path,
+    *,
+    export_csv: bool = True,
+) -> dict[str, str]:
     outdir.mkdir(parents=True, exist_ok=True)
     saved: dict[str, str] = {}
+    if not bool(export_csv):
+        return saved
     file_map = {
         "df_main": outdir / "df_main.csv",
         "df_drossel": outdir / "df_drossel.csv",
@@ -169,6 +200,29 @@ def _write_run_artifacts(parsed: dict[str, Any], outdir: Path) -> dict[str, str]
     return saved
 
 
+def _export_npz_bundle(parsed: dict[str, Any], outdir: Path, summary: dict[str, Any]) -> str | None:
+    if export_full_log_to_npz is None:
+        return None
+    df_main = parsed.get("df_main")
+    if not isinstance(df_main, pd.DataFrame) or df_main.empty:
+        return None
+    target = outdir / "full_log_bundle.npz"
+    export_full_log_to_npz(
+        target,
+        df_main,
+        df_p=parsed.get("df_p"),
+        df_q=parsed.get("df_mdot"),
+        df_open=parsed.get("df_open"),
+        meta={
+            "scenario_name": summary.get("scenario_name"),
+            "scenario_type": summary.get("scenario_type"),
+            "run_profile": summary.get("run_profile"),
+            "cache_hit": summary.get("cache_hit"),
+        },
+    )
+    return str(target)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Run one desktop scenario without WEB UI")
     ap.add_argument("--params", required=True, help="Path to base params JSON")
@@ -178,6 +232,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dt", type=float, default=None)
     ap.add_argument("--t_end", type=float, default=None)
     ap.add_argument("--record_full", action="store_true")
+    ap.add_argument("--cache_policy", choices=["reuse", "refresh", "off"], default="off")
+    ap.add_argument("--run_profile", default="detail")
+    ap.add_argument("--export_npz", action="store_true")
+    ap.add_argument("--no_export_csv", action="store_true")
     ap.add_argument("--outdir", required=True, help="Output folder for CSV and JSON artifacts")
     args = ap.parse_args(argv)
 
@@ -205,6 +263,45 @@ def main(argv: list[str] | None = None) -> int:
         test_row.get("t_end", test_row.get("t_end_s")),
         1.0,
     )
+    export_csv = not bool(args.no_export_csv)
+    cache_policy = str(args.cache_policy or "off").strip().lower() or "off"
+    run_profile = str(args.run_profile or "detail").strip().lower() or "detail"
+    cache_key = desktop_single_run_cache_key(
+        params=params,
+        test_row=test_row,
+        dt=dt,
+        t_end=t_end,
+        record_full=bool(args.record_full),
+        export_csv=bool(export_csv),
+        export_npz=bool(args.export_npz),
+        run_profile=run_profile,
+    )
+    cache_dir = desktop_single_run_cache_dir(cache_key)
+    cache_summary_path = cache_dir / "run_summary.json"
+    summary_path = outdir / "run_summary.json"
+
+    if cache_policy == "reuse" and cache_summary_path.exists():
+        mirror_tree(cache_dir, outdir)
+        cached_summary = _load_json(summary_path)
+        if isinstance(cached_summary, dict):
+            cached_summary["outdir"] = str(outdir)
+            cached_summary["cache_hit"] = True
+            cached_summary["cache_policy"] = cache_policy
+            cached_summary["run_profile"] = run_profile
+            cached_summary["export_csv"] = bool(export_csv)
+            cached_summary["export_npz"] = bool(args.export_npz)
+            cached_summary["saved_files"] = remap_saved_files_to_dir(
+                cached_summary.get("saved_files"),
+                outdir,
+            )
+            cached_summary["cache_key"] = cache_key
+            cached_summary["cache_dir"] = str(cache_dir)
+            summary_path.write_text(
+                json.dumps(cached_summary, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            print(json.dumps(cached_summary, ensure_ascii=False, indent=2))
+            return 0 if bool(cached_summary.get("ok", True)) else 2
 
     model_mod = load_python_module_from_path(model_path, "desktop_single_run_model")
     raw = call_simulate(
@@ -217,7 +314,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parsed = parse_sim_output(raw, want_full=bool(args.record_full))
 
-    saved = _write_run_artifacts(parsed, outdir)
+    saved = _write_run_artifacts(parsed, outdir, export_csv=export_csv)
     summary = build_desktop_run_summary(
         parsed,
         test_row,
@@ -225,11 +322,22 @@ def main(argv: list[str] | None = None) -> int:
         t_end=t_end,
         record_full=bool(args.record_full),
         outdir=outdir,
+        cache_dir=cache_dir if cache_policy in {"reuse", "refresh"} else None,
+        cache_policy=cache_policy,
+        cache_hit=False,
+        export_csv=bool(export_csv),
+        export_npz=bool(args.export_npz),
+        run_profile=run_profile,
     )
+    if bool(args.export_npz):
+        npz_path = _export_npz_bundle(parsed, outdir, summary)
+        if npz_path:
+            saved["npz_bundle"] = npz_path
     summary["saved_files"] = saved
-
-    summary_path = outdir / "run_summary.json"
+    summary["cache_key"] = cache_key
     summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    if cache_policy in {"reuse", "refresh"}:
+        mirror_tree(outdir, cache_dir)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0 if bool(summary.get("ok", True)) else 2
 

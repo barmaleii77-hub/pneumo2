@@ -1,0 +1,564 @@
+{
+  "top": [
+    {
+      "func": "~:0:<built-in method builtins.exec>",
+      "cc": 1,
+      "nc": 872,
+      "tt": 0.007422300000000001,
+      "ct": 12.3083238
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:24770:load_npz",
+      "cc": 1,
+      "nc": 1,
+      "tt": 0.00016260000000000002,
+      "ct": 5.433292300000001
+    },
+    {
+      "func": "~:0:<built-in method exec>",
+      "cc": 1,
+      "nc": 1,
+      "tt": 1.4535825,
+      "ct": 5.3094364
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\self_checks.py:76:run_self_checks",
+      "cc": 1,
+      "nc": 1,
+      "tt": 0.002426,
+      "ct": 5.306691600000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\suspension_geometry_diagnostics.py:132:collect_suspension_geometry_status",
+      "cc": 1,
+      "nc": 1,
+      "tt": 0.0013781000000000002,
+      "ct": 5.2980299
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\suspension_geometry_diagnostics.py:75:_world_to_body_local",
+      "cc": 32,
+      "nc": 32,
+      "tt": 0.2176356,
+      "ct": 5.2784598
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\geom3d_helpers.py:45:orthonormal_frame_from_corners",
+      "cc": 88477,
+      "nc": 88477,
+      "tt": 1.2727823,
+      "ct": 5.0624677
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\numeric.py:1556:cross",
+      "cc": 93453,
+      "nc": 93453,
+      "tt": 0.8722866,
+      "ct": 2.7699638
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:726:paintGL",
+      "cc": 29,
+      "nc": 29,
+      "tt": 0.00036550000000000005,
+      "ct": 2.7060104000000003
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\GLViewWidget.py:213:paintGL",
+      "cc": 29,
+      "nc": 29,
+      "tt": 0.00025800000000000004,
+      "ct": 2.7051872
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\GLViewWidget.py:219:paint",
+      "cc": 29,
+      "nc": 29,
+      "tt": 0.004279000000000001,
+      "ct": 2.7047582
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:738:drawItemTree",
+      "cc": 29,
+      "nc": 2801,
+      "tt": 0.030858000000000003,
+      "ct": 2.698488
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\items\\GLMeshItem.py:233:paint",
+      "cc": 1566,
+      "nc": 1566,
+      "tt": 0.17274060000000002,
+      "ct": 2.398638
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\items\\GLMeshItem.py:173:parseMeshData",
+      "cc": 1566,
+      "nc": 1566,
+      "tt": 0.010685100000000001,
+      "ct": 1.8136995
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\numeric.py:1482:moveaxis",
+      "cc": 280359,
+      "nc": 280359,
+      "tt": 0.4426628,
+      "ct": 1.7109734
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\MeshData.py:200:vertexNormals",
+      "cc": 406,
+      "nc": 406,
+      "tt": 0.6995649,
+      "ct": 1.703403
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:24716:_update_frame",
+      "cc": 30,
+      "nc": 30,
+      "tt": 0.0009528000000000001,
+      "ct": 1.1362516
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:23416:update_frame",
+      "cc": 32,
+      "nc": 32,
+      "tt": 0.0023297,
+      "ct": 1.1327624
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:11926:update_frame",
+      "cc": 32,
+      "nc": 32,
+      "tt": 0.0607158,
+      "ct": 1.1266945000000002
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:24600:_tick",
+      "cc": 28,
+      "nc": 28,
+      "tt": 0.0012018,
+      "ct": 1.1038423000000002
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\numeric.py:1420:normalize_axis_tuple",
+      "cc": 560720,
+      "nc": 560720,
+      "tt": 0.6640600000000001,
+      "ct": 1.0661939
+    },
+    {
+      "func": "<frozen importlib._bootstrap>:1349:_find_and_load",
+      "cc": 9,
+      "nc": 994,
+      "tt": 0.0035634000000000004,
+      "ct": 0.8863858
+    },
+    {
+      "func": "<frozen importlib._bootstrap>:1304:_find_and_load_unlocked",
+      "cc": 9,
+      "nc": 983,
+      "tt": 0.0028181,
+      "ct": 0.886125
+    },
+    {
+      "func": "<frozen importlib._bootstrap>:911:_load_unlocked",
+      "cc": 11,
+      "nc": 967,
+      "tt": 0.0021819,
+      "ct": 0.8837261000000001
+    },
+    {
+      "func": "<frozen importlib._bootstrap>:480:_call_with_frames_removed",
+      "cc": 17,
+      "nc": 2211,
+      "tt": 0.0010372,
+      "ct": 0.8797002
+    },
+    {
+      "func": "<frozen importlib._bootstrap_external>:1017:exec_module",
+      "cc": 9,
+      "nc": 844,
+      "tt": 0.0014550000000000001,
+      "ct": 0.8580219
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:1:<module>",
+      "cc": 1,
+      "nc": 1,
+      "tt": 0.0002564,
+      "ct": 0.7779333
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\linalg\\_linalg.py:2623:norm",
+      "cc": 274291,
+      "nc": 274291,
+      "tt": 0.39881170000000005,
+      "ct": 0.7414010000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\diag\\bootstrap.py:133:_wrapped_import",
+      "cc": 38,
+      "nc": 9086,
+      "tt": 0.0021897,
+      "ct": 0.6979982
+    },
+    {
+      "func": "~:0:<__lazy_import__>",
+      "cc": 357,
+      "nc": 9397,
+      "tt": 0.012261600000000001,
+      "ct": 0.6978928000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:23743:__init__",
+      "cc": 1,
+      "nc": 1,
+      "tt": 0.0002433,
+      "ct": 0.6227359
+    },
+    {
+      "func": "~:0:<method 'sum' of 'numpy.ndarray' objects>",
+      "cc": 495515,
+      "nc": 495515,
+      "tt": 0.1403446,
+      "ct": 0.6134034
+    },
+    {
+      "func": "~:0:<built-in method builtins.__import__>",
+      "cc": 72,
+      "nc": 209,
+      "tt": 0.0003929,
+      "ct": 0.5693811000000001
+    },
+    {
+      "func": "<frozen importlib._bootstrap>:1390:_handle_fromlist",
+      "cc": 770,
+      "nc": 3174,
+      "tt": 0.002079,
+      "ct": 0.5372025
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\_methods.py:49:_sum",
+      "cc": 495515,
+      "nc": 495515,
+      "tt": 0.0709879,
+      "ct": 0.47305270000000005
+    },
+    {
+      "func": "~:0:<method 'reduce' of 'numpy.ufunc' objects>",
+      "cc": 517281,
+      "nc": 517281,
+      "tt": 0.43910920000000003,
+      "ct": 0.43910920000000003
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\lib\\_shape_base_impl.py:628:column_stack",
+      "cc": 91882,
+      "nc": 91882,
+      "tt": 0.26365510000000003,
+      "ct": 0.38250920000000005
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\MeshData.py:356:vertexFaces",
+      "cc": 406,
+      "nc": 406,
+      "tt": 0.25465940000000004,
+      "ct": 0.32616510000000004
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:24083:_restore_persisted_state",
+      "cc": 1,
+      "nc": 1,
+      "tt": 4.32e-05,
+      "ct": 0.3163406
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\visual_contract.py:1:<module>",
+      "cc": 1,
+      "nc": 1,
+      "tt": 1.7e-05,
+      "ct": 0.31599510000000003
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pandas\\__init__.py:1:<module>",
+      "cc": 1,
+      "nc": 1,
+      "tt": 3.5900000000000005e-05,
+      "ct": 0.3125469
+    },
+    {
+      "func": "~:0:<method 'restoreGeometry' of 'PySide6.QtWidgets.QWidget' objects>",
+      "cc": 2,
+      "nc": 2,
+      "tt": 0.310967,
+      "ct": 0.310967
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:21787:__init__",
+      "cc": 1,
+      "nc": 1,
+      "tt": 0.0003155,
+      "ct": 0.2870206
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\items\\GLLinePlotItem.py:145:paint",
+      "cc": 1206,
+      "nc": 1206,
+      "tt": 0.1242179,
+      "ct": 0.2564036
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:20563:__init__",
+      "cc": 1,
+      "nc": 1,
+      "tt": 0.000192,
+      "ct": 0.24386110000000003
+    },
+    {
+      "func": "~:0:<method 'prepare' of 'PySide6.QtGui.QStaticText' objects>",
+      "cc": 28,
+      "nc": 28,
+      "tt": 0.24326240000000002,
+      "ct": 0.24326240000000002
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:20369:__init__",
+      "cc": 4,
+      "nc": 4,
+      "tt": 0.0004441,
+      "ct": 0.24316500000000002
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:20410:_prepare_static_text",
+      "cc": 8,
+      "nc": 8,
+      "tt": 5.8200000000000005e-05,
+      "ct": 0.24265430000000002
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\__init__.py:1:<module>",
+      "cc": 1,
+      "nc": 1,
+      "tt": 9.67e-05,
+      "ct": 0.23591640000000003
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pandas\\core\\api.py:1:<module>",
+      "cc": 1,
+      "nc": 1,
+      "tt": 2.36e-05,
+      "ct": 0.21695520000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\numpy\\_core\\numeric.py:1469:<genexpr>",
+      "cc": 1121440,
+      "nc": 1121440,
+      "tt": 0.1419398,
+      "ct": 0.2033165
+    },
+    {
+      "func": "<frozen importlib._bootstrap_external>:1090:get_code",
+      "cc": 844,
+      "nc": 844,
+      "tt": 0.0045793000000000006,
+      "ct": 0.1719409
+    },
+    {
+      "func": "~:0:<built-in method builtins.len>",
+      "cc": 2133105,
+      "nc": 2135012,
+      "tt": 0.16341440000000002,
+      "ct": 0.16377070000000002
+    },
+    {
+      "func": "~:0:<built-in method builtins.getattr>",
+      "cc": 72720,
+      "nc": 86167,
+      "tt": 0.0375852,
+      "ct": 0.1596197
+    },
+    {
+      "func": "~:0:<built-in method numpy.asarray>",
+      "cc": 910165,
+      "nc": 910165,
+      "tt": 0.15421500000000002,
+      "ct": 0.15421500000000002
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\colors\\palette.py:1:<module>",
+      "cc": 1,
+      "nc": 1,
+      "tt": 2.1000000000000002e-06,
+      "ct": 0.153313
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\Qt\\__init__.py:1:<module>",
+      "cc": 1,
+      "nc": 1,
+      "tt": 9.27e-05,
+      "ct": 0.1529192
+    },
+    {
+      "func": "C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\\Lib\\enum.py:696:__call__",
+      "cc": 17954,
+      "nc": 17954,
+      "tt": 0.007729000000000001,
+      "ct": 0.1508787
+    },
+    {
+      "func": "~:0:<method 'dot' of 'numpy.ndarray' objects>",
+      "cc": 274120,
+      "nc": 274120,
+      "tt": 0.1477803,
+      "ct": 0.1477803
+    },
+    {
+      "func": "~:0:<method 'append' of 'list' objects>",
+      "cc": 1566464,
+      "nc": 1566464,
+      "tt": 0.1436649,
+      "ct": 0.1436649
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\Qt\\__init__.py:148:_copy_attrs",
+      "cc": 3,
+      "nc": 3,
+      "tt": 0.0004353,
+      "ct": 0.14306950000000002
+    },
+    {
+      "func": "<frozen importlib._bootstrap_external>:1323:exec_module",
+      "cc": 53,
+      "nc": 86,
+      "tt": 9.230000000000001e-05,
+      "ct": 0.13885530000000001
+    },
+    {
+      "func": "~:0:<built-in method _imp.exec_dynamic>",
+      "cc": 53,
+      "nc": 86,
+      "tt": 0.0213447,
+      "ct": 0.1386487
+    },
+    {
+      "func": "C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\\Lib\\enum.py:843:_create_",
+      "cc": 647,
+      "nc": 647,
+      "tt": 0.0058316,
+      "ct": 0.1384498
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\geom3d_helpers.py:271:grid_faces_rect",
+      "cc": 22,
+      "nc": 22,
+      "tt": 0.0732744,
+      "ct": 0.1295253
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\__init__.py:1:<module>",
+      "cc": 1,
+      "nc": 1,
+      "tt": 1.58e-05,
+      "ct": 0.1261558
+    },
+    {
+      "func": "<frozen importlib._bootstrap>:1240:_find_spec",
+      "cc": 977,
+      "nc": 977,
+      "tt": 0.0040197,
+      "ct": 0.1259303
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\shaders.py:1:<module>",
+      "cc": 1,
+      "nc": 1,
+      "tt": 1.5700000000000002e-05,
+      "ct": 0.11844030000000001
+    },
+    {
+      "func": "<frozen importlib._bootstrap_external>:1548:find_spec",
+      "cc": 942,
+      "nc": 942,
+      "tt": 0.0005365000000000001,
+      "ct": 0.11749970000000001
+    },
+    {
+      "func": "<frozen importlib._bootstrap_external>:1519:_get_spec",
+      "cc": 942,
+      "nc": 942,
+      "tt": 0.0015794000000000001,
+      "ct": 0.11695760000000001
+    },
+    {
+      "func": "<frozen importlib._bootstrap_external>:1621:find_spec",
+      "cc": 1154,
+      "nc": 1154,
+      "tt": 0.0060904,
+      "ct": 0.10840730000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\OpenGL\\GL\\__init__.py:1:<module>",
+      "cc": 1,
+      "nc": 1,
+      "tt": 0.0005075,
+      "ct": 0.10715240000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pyqtgraph\\opengl\\MeshData.py:178:faceNormals",
+      "cc": 1566,
+      "nc": 1566,
+      "tt": 0.0233392,
+      "ct": 0.1058196
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\OpenGL\\GL\\VERSION\\GL_2_0.py:471:glGetAttribLocation",
+      "cc": 6844,
+      "nc": 6844,
+      "tt": 0.0850394,
+      "ct": 0.10563040000000001
+    },
+    {
+      "func": "~:0:<built-in method numpy.lib.array_utils.normalize_axis_index>",
+      "cc": 841810,
+      "nc": 841810,
+      "tt": 0.0938124,
+      "ct": 0.0938124
+    },
+    {
+      "func": "C:\\Users\\Admin\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\site-packages\\pandas\\core\\arrays\\__init__.py:1:<module>",
+      "cc": 1,
+      "nc": 1,
+      "tt": 1.11e-05,
+      "ct": 0.09304130000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:12230:_set_mesh_from_segment",
+      "cc": 928,
+      "nc": 928,
+      "tt": 0.004174300000000001,
+      "ct": 0.09196950000000001
+    },
+    {
+      "func": "C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\\Lib\\enum.py:499:__new__",
+      "cc": 672,
+      "nc": 672,
+      "tt": 0.0121311,
+      "ct": 0.0916405
+    },
+    {
+      "func": "~:0:<built-in method builtins.isinstance>",
+      "cc": 806534,
+      "nc": 806788,
+      "tt": 0.0874225,
+      "ct": 0.08782100000000001
+    },
+    {
+      "func": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\desktop_animator\\app.py:12123:_solver_local_point",
+      "cc": 1856,
+      "nc": 1856,
+      "tt": 0.0023119,
+      "ct": 0.0874362
+    }
+  ]
+}

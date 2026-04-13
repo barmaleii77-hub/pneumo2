@@ -18,6 +18,7 @@ import subprocess
 import sys
 import threading
 import time
+import tkinter as tk
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -73,10 +74,13 @@ def _open_in_file_manager(path: str) -> None:
 
 
 class App:
-    def __init__(self) -> None:
-        self.root = Tk()
-        self.root.title("Autotest Harness GUI ({RELEASE})")
-        self.root.geometry("920x620")
+    def __init__(self, host: tk.Misc | None = None, *, hosted: bool = False) -> None:
+        self._owns_root = host is None
+        self._hosted = bool(hosted or not self._owns_root)
+        self.root = host if host is not None else Tk()
+        if self._owns_root:
+            self.root.title(f"Autotest Harness GUI ({RELEASE})")
+            self.root.geometry("920x620")
 
         self.level = StringVar(value="standard")
         self.no_zip = BooleanVar(value=False)
@@ -85,6 +89,7 @@ class App:
 
         self.q: "queue.Queue[str]" = queue.Queue()
         self.state = RunState()
+        self._host_closed = False
 
         self._build_ui()
         self.root.after(100, self._tick)
@@ -207,6 +212,8 @@ class App:
             return
 
     def _tick(self) -> None:
+        if self._host_closed:
+            return
         try:
             while True:
                 msg = self.q.get_nowait()
@@ -222,6 +229,10 @@ class App:
         except queue.Empty:
             pass
         self.root.after(100, self._tick)
+
+    def on_host_close(self) -> None:
+        self._host_closed = True
+        self._on_stop()
 
     def _on_finished(self, rc: int) -> None:
         self.status.set(f"Готово. RC={rc}.")
@@ -262,7 +273,8 @@ class App:
                 messagebox.showwarning("Send bundle", f"Не удалось открыть send_results_gui: {e}")
 
     def run(self) -> None:
-        self.root.mainloop()
+        if self._owns_root:
+            self.root.mainloop()
 
 
 def main() -> int:

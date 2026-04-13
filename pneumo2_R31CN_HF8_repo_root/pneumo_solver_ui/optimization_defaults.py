@@ -23,7 +23,10 @@ from typing import Any, Iterable, Sequence
 
 # Diagnostics-archive aligned UI defaults
 DIAGNOSTIC_OPT_MINUTES_DEFAULT: float = 10.0
-DIAGNOSTIC_OPT_JOBS_HINT: int = 24
+# Do not underutilize larger Windows workstations: the runtime already clamps to
+# the ProcessPoolExecutor hard limit (61 on Windows), so the default hint should
+# reach that platform cap instead of stopping at a stale archive-era value 24.
+DIAGNOSTIC_OPT_JOBS_HINT: int = 61
 DIAGNOSTIC_USE_STAGED_OPT: bool = True
 DIAGNOSTIC_WARMSTART_MODE: str = "surrogate"
 DIAGNOSTIC_SURROGATE_SAMPLES: int = 8000

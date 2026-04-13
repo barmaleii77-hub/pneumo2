@@ -1,0 +1,18 @@
+{
+  "pid": 10564,
+  "title": "Анимация — Desktop Animator (UNIFIED_v6_80)",
+  "bbox": [
+    73,
+    60,
+    1687,
+    1076
+  ],
+  "captured_frames": 83,
+  "captured_pairs": 82,
+  "identical_adjacent_pairs": 48,
+  "identical_adjacent_ratio": 0.5853658536585366,
+  "unique_frame_count": 35,
+  "effective_unique_fps": 5.833333333333333,
+  "capture_fps_target": 30.0,
+  "capture_duration_s": 6.0
+}

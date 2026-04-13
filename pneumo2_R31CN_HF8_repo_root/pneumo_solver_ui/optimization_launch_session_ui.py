@@ -3,6 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
+from pneumo_solver_ui.optimization_active_runtime_summary import (
+    active_handoff_provenance_caption,
+    active_runtime_penalty_gate_caption,
+    active_runtime_progress_caption,
+    active_runtime_recent_errors_caption,
+    active_runtime_trial_health_caption,
+)
 from pneumo_solver_ui.optimization_finished_job_ui import (
     render_finished_optimization_job_panel,
 )
@@ -40,7 +47,13 @@ def _active_launch_context_for_job(st: Any, job: Any) -> dict[str, Any]:
     return dict(raw)
 
 
-def _render_active_launch_context_banner(st: Any, context: dict[str, Any], *, job: Any) -> None:
+def _render_active_launch_context_banner(
+    st: Any,
+    context: dict[str, Any],
+    *,
+    job: Any,
+    active_runtime_summary: dict[str, Any] | None = None,
+) -> None:
     if str(context.get("kind") or "").strip() != "handoff":
         return
     source_run_dir = _resolved_path_text(context.get("source_run_dir"))
@@ -49,6 +62,36 @@ def _render_active_launch_context_banner(st: Any, context: dict[str, Any], *, jo
         "Сейчас активен seeded full-ring coordinator handoff из staged run "
         f"`{source_name}`. Ниже показаны live progress и лог нового запуска `{getattr(job, 'run_dir').name}`."
     )
+    progress_caption = active_runtime_progress_caption(
+        active_runtime_summary,
+        prefix="Active handoff progress",
+    )
+    trial_health_caption = active_runtime_trial_health_caption(
+        active_runtime_summary,
+        prefix="Active handoff trial health",
+    )
+    penalty_gate_caption = active_runtime_penalty_gate_caption(
+        active_runtime_summary,
+        prefix="Active handoff penalty gate",
+    )
+    recent_errors_caption = active_runtime_recent_errors_caption(
+        active_runtime_summary,
+        prefix="Recent handoff errors",
+    )
+    provenance_caption = active_handoff_provenance_caption(
+        active_runtime_summary,
+        prefix="Handoff provenance",
+    )
+    if progress_caption:
+        st.caption(progress_caption)
+    if trial_health_caption:
+        st.caption(trial_health_caption)
+    if penalty_gate_caption:
+        st.caption(penalty_gate_caption)
+    if recent_errors_caption:
+        st.caption(recent_errors_caption)
+    if provenance_caption:
+        st.caption(provenance_caption)
 
 
 def render_optimization_launch_session_block(
@@ -70,6 +113,7 @@ def render_optimization_launch_session_block(
     start_handoff_job_fn: Callable[[Path], bool] | None = None,
     current_problem_hash: str = "",
     current_problem_hash_mode: str = "",
+    active_runtime_summary: dict[str, Any] | None = None,
     render_live_panel_fn: Callable[..., Any] = render_live_optimization_job_panel,
     render_finished_panel_fn: Callable[..., Any] = render_finished_optimization_job_panel,
     render_launch_panel_fn: Callable[..., bool] = render_optimization_launch_panel,
@@ -92,7 +136,12 @@ def render_optimization_launch_session_block(
         if job is not None and job_rc is None:
             launch_context = _active_launch_context_for_job(st, job)
             if launch_context:
-                _render_active_launch_context_banner(st, launch_context, job=job)
+                _render_active_launch_context_banner(
+                    st,
+                    launch_context,
+                    job=job,
+                    active_runtime_summary=active_runtime_summary,
+                )
             log_text = tail_file_text_fn(getattr(job, "log_path"))
             render_live_panel_fn(
                 st,
@@ -100,6 +149,7 @@ def render_optimization_launch_session_block(
                 log_text=log_text,
                 soft_stop_requested=soft_stop_requested_fn(job),
                 coordinator_done=parse_done_from_log_fn(log_text),
+                active_runtime_summary=dict(active_runtime_summary or {}),
                 render_stage_runtime=(
                     (lambda: render_stage_runtime_fn(job))
                     if render_stage_runtime_fn is not None
@@ -138,6 +188,7 @@ def render_optimization_launch_session_block(
             )
 
         elif job is not None and job_rc is not None:
+            launch_context = _active_launch_context_for_job(st, job)
             render_finished_panel_fn(
                 st,
                 job,
@@ -145,6 +196,7 @@ def render_optimization_launch_session_block(
                 soft_stop_requested=soft_stop_requested_fn(job),
                 clear_job_fn=clear_job_fn,
                 rerun_fn=rerun_fn,
+                active_launch_context=launch_context,
                 start_handoff_fn=(
                     (lambda run_dir=getattr(job, "run_dir", None): start_handoff_job_fn(Path(run_dir)) if run_dir is not None else False)
                     if start_handoff_job_fn is not None

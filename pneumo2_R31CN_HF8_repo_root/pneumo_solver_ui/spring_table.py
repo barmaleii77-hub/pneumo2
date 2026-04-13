@@ -22,7 +22,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, field
 from typing import Any, Literal, Optional, Tuple, Union
 
 import numpy as np
@@ -34,6 +35,24 @@ except Exception:  # pragma: no cover
 
 
 SpringInterpMode = Literal['linear', 'pchip']
+
+
+@dataclass(frozen=True)
+class SpringGeometryReference:
+    d_wire_m: float
+    D_mean_m: float
+    N_active: float
+    N_total: float
+    pitch_m: float
+    G_Pa: float
+    F_max_N: float
+    spring_index: float
+    rate_N_per_m: float
+    rate_N_per_mm: float
+    solid_length_m: float
+    free_length_from_pitch_m: float
+    bind_travel_margin_m: float
+    max_shear_stress_Pa: float
 
 
 def _prepare_table(x_tab: Any, f_tab: Any) -> Tuple[np.ndarray, np.ndarray]:
@@ -62,6 +81,122 @@ def _prepare_table(x_tab: Any, f_tab: Any) -> Tuple[np.ndarray, np.ndarray]:
     return x, f
 
 
+def _build_pchip_interpolator(x_tab: np.ndarray, y_tab: np.ndarray):
+    """Построить PCHIP один раз для уже подготовленной таблицы."""
+    if (PchipInterpolator is None) or (x_tab.size < 2):
+        return None
+    try:
+        return PchipInterpolator(x_tab, y_tab, extrapolate=True)
+    except Exception:
+        return None
+
+
+def spring_rate_from_geometry(
+    G_Pa: float,
+    d_wire_m: float,
+    D_mean_m: float,
+    N_active: float,
+) -> float:
+    """k = G d^4 / (8 D^3 N)."""
+    if G_Pa <= 0 or d_wire_m <= 0 or D_mean_m <= 0 or N_active <= 0:
+        return float("nan")
+    return float(G_Pa) * float(d_wire_m) ** 4 / (8.0 * float(D_mean_m) ** 3 * float(N_active))
+
+
+def spring_wahl_factor(C: float) -> float:
+    if C <= 1.0:
+        return float("nan")
+    return (4.0 * C - 1.0) / (4.0 * C - 4.0) + 0.615 / C
+
+
+def spring_max_shear_stress(
+    F_N: float,
+    D_mean_m: float,
+    d_wire_m: float,
+) -> float:
+    """tau_max ≈ (8 F D / (pi d^3)) * K_w."""
+    if F_N <= 0 or D_mean_m <= 0 or d_wire_m <= 0:
+        return float("nan")
+    spring_index = float(D_mean_m) / float(d_wire_m)
+    Kw = spring_wahl_factor(spring_index)
+    if not math.isfinite(Kw):
+        return float("nan")
+    return (8.0 * float(F_N) * float(D_mean_m) / (math.pi * float(d_wire_m) ** 3)) * float(Kw)
+
+
+def spring_solid_length(N_total: float, d_wire_m: float) -> float:
+    if d_wire_m <= 0 or N_total <= 0:
+        return float("nan")
+    return float(max(1, int(round(N_total)))) * float(d_wire_m)
+
+
+def spring_free_length_from_pitch(
+    N_total: float,
+    pitch_m: float,
+    d_wire_m: float,
+) -> float:
+    if d_wire_m <= 0 or pitch_m <= 0 or N_total < 2:
+        return float("nan")
+    turns = max(2, int(round(N_total)))
+    return float(turns - 1) * float(pitch_m) + float(d_wire_m)
+
+
+def build_spring_geometry_reference(
+    *,
+    d_wire_m: float,
+    D_mean_m: float,
+    N_active: float,
+    N_total: float,
+    pitch_m: float,
+    G_Pa: float,
+    F_max_N: float = 0.0,
+) -> SpringGeometryReference:
+    spring_index = (
+        float(D_mean_m) / float(d_wire_m)
+        if d_wire_m > 0
+        else float("nan")
+    )
+    rate_N_per_m = spring_rate_from_geometry(
+        G_Pa,
+        d_wire_m,
+        D_mean_m,
+        N_active,
+    )
+    solid_length_m = spring_solid_length(N_total, d_wire_m)
+    free_length_from_pitch_m = spring_free_length_from_pitch(
+        N_total,
+        pitch_m,
+        d_wire_m,
+    )
+    bind_travel_margin_m = (
+        float(free_length_from_pitch_m) - float(solid_length_m)
+        if math.isfinite(free_length_from_pitch_m) and math.isfinite(solid_length_m)
+        else float("nan")
+    )
+    return SpringGeometryReference(
+        d_wire_m=float(d_wire_m),
+        D_mean_m=float(D_mean_m),
+        N_active=float(N_active),
+        N_total=float(N_total),
+        pitch_m=float(pitch_m),
+        G_Pa=float(G_Pa),
+        F_max_N=float(F_max_N),
+        spring_index=float(spring_index),
+        rate_N_per_m=float(rate_N_per_m),
+        rate_N_per_mm=(float(rate_N_per_m) / 1000.0) if math.isfinite(rate_N_per_m) else float("nan"),
+        solid_length_m=float(solid_length_m),
+        free_length_from_pitch_m=float(free_length_from_pitch_m),
+        bind_travel_margin_m=float(bind_travel_margin_m),
+        max_shear_stress_Pa=float(
+            spring_max_shear_stress(
+                F_max_N,
+                D_mean_m,
+                d_wire_m,
+            )
+        ),
+    )
+
+
 def _unique_monotone(x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Сжать повторы x (или y) в строго монотонный аргумент.
 
@@ -84,6 +219,90 @@ def _unique_monotone(x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarr
     return y_unique, x_for_y
 
 
+def _spring_force_prepared(
+    x_query: Any,
+    x_tab: np.ndarray,
+    f_tab: np.ndarray,
+    *,
+    mode: SpringInterpMode = 'linear',
+    interpolator: Any = None,
+):
+    xq = np.asarray(x_query, dtype=float)
+    if x_tab.size == 0:
+        return np.zeros_like(xq, dtype=float)
+
+    xqc = np.clip(xq, float(x_tab[0]), float(x_tab[-1]))
+
+    if (mode == 'pchip') and (interpolator is not None):
+        try:
+            return np.asarray(interpolator(xqc), dtype=float)
+        except Exception:
+            pass
+
+    return np.asarray(np.interp(xqc, x_tab, f_tab), dtype=float)
+
+
+def _spring_inverse_prepared(
+    f_query: Any,
+    x_tab: np.ndarray,
+    f_tab: np.ndarray,
+    *,
+    mode: SpringInterpMode = 'linear',
+    f_unique: Optional[np.ndarray] = None,
+    x_for_f_unique: Optional[np.ndarray] = None,
+    interpolator: Any = None,
+):
+    fq = np.asarray(f_query, dtype=float)
+    if x_tab.size == 0:
+        return np.zeros_like(fq, dtype=float)
+
+    fqc = np.clip(fq, float(f_tab[0]), float(f_tab[-1]))
+    if f_unique is None or x_for_f_unique is None:
+        f_unique, x_for_f_unique = _unique_monotone(x_tab, f_tab)
+
+    if f_unique.size < 2:
+        if x_for_f_unique.size == 0:
+            return np.zeros_like(fqc, dtype=float)
+        return np.zeros_like(fqc, dtype=float) + float(x_for_f_unique[0])
+
+    if (mode == 'pchip') and (interpolator is not None):
+        try:
+            return np.asarray(interpolator(fqc), dtype=float)
+        except Exception:
+            pass
+
+    return np.asarray(np.interp(fqc, f_unique, x_for_f_unique), dtype=float)
+
+
+def _spring_stiffness_prepared(
+    x_query: Any,
+    x_tab: np.ndarray,
+    f_tab: np.ndarray,
+    *,
+    mode: SpringInterpMode = 'linear',
+    derivative: Any = None,
+):
+    xq = np.asarray(x_query, dtype=float)
+    if x_tab.size < 2:
+        return np.zeros_like(xq, dtype=float)
+
+    xqc = np.clip(xq, float(x_tab[0]), float(x_tab[-1]))
+
+    if (mode == 'pchip') and (derivative is not None):
+        try:
+            k = derivative(xqc)
+            return np.asarray(np.where(np.isfinite(k), k, 0.0), dtype=float)
+        except Exception:
+            pass
+
+    dx = np.diff(x_tab)
+    df = np.diff(f_tab)
+    slopes = np.where(np.abs(dx) > 0.0, df / dx, 0.0)
+    idx = np.searchsorted(x_tab, xqc, side='right') - 1
+    idx = np.clip(idx, 0, len(slopes) - 1)
+    return slopes[idx].astype(float)
+
+
 def spring_force(x_query: Any, x_tab: Any, f_tab: Any, mode: SpringInterpMode = 'linear'):
     """F(x) по табличной кривой.
 
@@ -93,21 +312,13 @@ def spring_force(x_query: Any, x_tab: Any, f_tab: Any, mode: SpringInterpMode = 
     x, f = _prepare_table(x_tab, f_tab)
     if x.size == 0:
         return np.zeros_like(xq, dtype=float)
-
-    x_min = float(x[0])
-    x_max = float(x[-1])
-    xqc = np.clip(xq, x_min, x_max)
-
-    if (mode == 'pchip') and (PchipInterpolator is not None) and (x.size >= 2):
-        try:
-            itp = PchipInterpolator(x, f, extrapolate=True)
-            y = itp(xqc)
-            return np.asarray(y, dtype=float)
-        except Exception:
-            # fallback
-            pass
-
-    return np.interp(xqc, x, f)
+    return _spring_force_prepared(
+        xq,
+        x,
+        f,
+        mode=mode,
+        interpolator=_build_pchip_interpolator(x, f) if mode == 'pchip' else None,
+    )
 
 
 def spring_inverse_force(f_query: Any, x_tab: Any, f_tab: Any, mode: SpringInterpMode = 'linear'):
@@ -121,25 +332,16 @@ def spring_inverse_force(f_query: Any, x_tab: Any, f_tab: Any, mode: SpringInter
     x, f = _prepare_table(x_tab, f_tab)
     if x.size == 0:
         return np.zeros_like(fq, dtype=float)
-
-    f_min = float(f[0])
-    f_max = float(f[-1])
-    fqc = np.clip(fq, f_min, f_max)
-
-    # Для обратной функции нужен строго возрастающий аргумент.
     f_u, x_u = _unique_monotone(x, f)
-    if f_u.size < 2:
-        return np.zeros_like(fqc, dtype=float) + float(x_u[0])
-
-    if (mode == 'pchip') and (PchipInterpolator is not None) and (f_u.size >= 2):
-        try:
-            itp = PchipInterpolator(f_u, x_u, extrapolate=True)
-            y = itp(fqc)
-            return np.asarray(y, dtype=float)
-        except Exception:
-            pass
-
-    return np.interp(fqc, f_u, x_u)
+    return _spring_inverse_prepared(
+        fq,
+        x,
+        f,
+        mode=mode,
+        f_unique=f_u,
+        x_for_f_unique=x_u,
+        interpolator=_build_pchip_interpolator(f_u, x_u) if mode == 'pchip' else None,
+    )
 
 
 def spring_stiffness(x_query: Any, x_tab: Any, f_tab: Any, mode: SpringInterpMode = 'linear'):
@@ -158,32 +360,14 @@ def spring_stiffness(x_query: Any, x_tab: Any, f_tab: Any, mode: SpringInterpMod
     x, f = _prepare_table(x_tab, f_tab)
     if x.size < 2:
         return np.zeros_like(xq, dtype=float)
-
-    x_min = float(x[0])
-    x_max = float(x[-1])
-    xqc = np.clip(xq, x_min, x_max)
-
-    if (mode == 'pchip') and (PchipInterpolator is not None):
-        try:
-            itp = PchipInterpolator(x, f, extrapolate=True)
-            ditp = itp.derivative()
-            k = ditp(xqc)
-            k = np.where(np.isfinite(k), k, 0.0)
-            return np.asarray(k, dtype=float)
-        except Exception:
-            # fallback to linear slopes
-            pass
-
-    # piecewise-linear slope
-    dx = np.diff(x)
-    df = np.diff(f)
-    # avoid div0
-    slopes = np.where(np.abs(dx) > 0.0, df / dx, 0.0)
-
-    # for each xqc choose the corresponding segment
-    idx = np.searchsorted(x, xqc, side='right') - 1
-    idx = np.clip(idx, 0, len(slopes) - 1)
-    return slopes[idx].astype(float)
+    force_interpolator = _build_pchip_interpolator(x, f) if mode == 'pchip' else None
+    return _spring_stiffness_prepared(
+        xq,
+        x,
+        f,
+        mode=mode,
+        derivative=force_interpolator.derivative() if force_interpolator is not None else None,
+    )
 
 
 @dataclass
@@ -193,9 +377,22 @@ class SpringTable:
     x_tab_m: np.ndarray
     f_tab_N: np.ndarray
     mode: SpringInterpMode = 'linear'
+    _force_interpolator: Any = field(init=False, repr=False, default=None)
+    _force_derivative: Any = field(init=False, repr=False, default=None)
+    _inverse_interpolator: Any = field(init=False, repr=False, default=None)
+    _f_unique_N: np.ndarray = field(init=False, repr=False)
+    _x_for_f_unique_m: np.ndarray = field(init=False, repr=False)
 
     def __post_init__(self):
         self.x_tab_m, self.f_tab_N = _prepare_table(self.x_tab_m, self.f_tab_N)
+        self._f_unique_N, self._x_for_f_unique_m = _unique_monotone(self.x_tab_m, self.f_tab_N)
+        self._force_interpolator = _build_pchip_interpolator(self.x_tab_m, self.f_tab_N) if self.mode == 'pchip' else None
+        self._force_derivative = self._force_interpolator.derivative() if self._force_interpolator is not None else None
+        self._inverse_interpolator = (
+            _build_pchip_interpolator(self._f_unique_N, self._x_for_f_unique_m)
+            if self.mode == 'pchip'
+            else None
+        )
 
     @property
     def x_max(self) -> float:
@@ -206,10 +403,30 @@ class SpringTable:
         return float(self.f_tab_N[-1]) if self.f_tab_N.size else 0.0
 
     def force(self, x_m: Any):
-        return spring_force(x_m, self.x_tab_m, self.f_tab_N, mode=self.mode)
+        return _spring_force_prepared(
+            x_m,
+            self.x_tab_m,
+            self.f_tab_N,
+            mode=self.mode,
+            interpolator=self._force_interpolator,
+        )
 
     def inverse(self, f_N: Any):
-        return spring_inverse_force(f_N, self.x_tab_m, self.f_tab_N, mode=self.mode)
+        return _spring_inverse_prepared(
+            f_N,
+            self.x_tab_m,
+            self.f_tab_N,
+            mode=self.mode,
+            f_unique=self._f_unique_N,
+            x_for_f_unique=self._x_for_f_unique_m,
+            interpolator=self._inverse_interpolator,
+        )
 
     def stiffness(self, x_m: Any):
-        return spring_stiffness(x_m, self.x_tab_m, self.f_tab_N, mode=self.mode)
+        return _spring_stiffness_prepared(
+            x_m,
+            self.x_tab_m,
+            self.f_tab_N,
+            mode=self.mode,
+            derivative=self._force_derivative,
+        )

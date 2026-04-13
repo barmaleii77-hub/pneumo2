@@ -62,6 +62,9 @@ from pneumo_solver_ui.optimization_job_start_ui import (
     start_coordinator_handoff_job_with_feedback,
     start_optimization_job_with_feedback,
 )
+from pneumo_solver_ui.optimization_active_runtime_summary import (
+    build_active_runtime_summary,
+)
 from pneumo_solver_ui.optimization_page_readonly_ui import (
     render_last_optimization_overview_block,
     render_physical_workflow_block,
@@ -111,6 +114,14 @@ try:
     )
 except Exception:
     _CURRENT_PROBLEM_HASH = ""
+_ACTIVE_JOB = load_job_from_session(st.session_state)
+_ACTIVE_LAUNCH_CONTEXT = dict(st.session_state.get("__opt_active_launch_context") or {})
+_ACTIVE_RUNTIME_SUMMARY = build_active_runtime_summary(
+    _ACTIVE_JOB,
+    tail_file_text_fn=tail_file_text,
+    parse_done_from_log_fn=parse_done_from_log,
+    active_launch_context=_ACTIVE_LAUNCH_CONTEXT,
+)
 
 # ---------------------------
 # UI
@@ -151,6 +162,9 @@ render_optimization_readonly_expanders(
         results_page="pages/20_DistributedOptimization.py",
         current_problem_hash=_CURRENT_PROBLEM_HASH,
         current_problem_hash_mode=_CURRENT_PROBLEM_HASH_MODE,
+        active_run_dir=getattr(_ACTIVE_JOB, "run_dir", None),
+        active_launch_context=_ACTIVE_LAUNCH_CONTEXT,
+        active_runtime_summary=_ACTIVE_RUNTIME_SUMMARY,
     ),
     physical_label="Физический смысл путей запуска",
     render_physical=lambda: render_physical_workflow_block(
@@ -165,7 +179,7 @@ render_optimization_readonly_expanders(
     render_history=lambda: render_workspace_run_history_block(
         st,
         workspace_dir=_WORKSPACE_DIR,
-        active_job=load_job_from_session(st.session_state),
+        active_job=_ACTIVE_JOB,
         session_state=st.session_state,
         current_problem_hash=_CURRENT_PROBLEM_HASH,
         default_objectives=DEFAULT_OPTIMIZATION_OBJECTIVES,
@@ -174,6 +188,7 @@ render_optimization_readonly_expanders(
         current_penalty_tol=st.session_state.get("opt_penalty_tol", DIST_OPT_PENALTY_TOL_DEFAULT),
         load_log_text=tail_file_text,
         rerun_fn=request_rerun,
+        active_runtime_summary=_ACTIVE_RUNTIME_SUMMARY,
         start_handoff_fn=lambda source_run_dir: start_coordinator_handoff_job_with_feedback(
             st,
             session_state=st.session_state,
@@ -246,13 +261,13 @@ if opt_use_staged:
     render_stage_runner_configuration_controls(st, ui_jobs_default=_UI_JOBS_DEFAULT)
 
 
-job = load_job_from_session(st.session_state)
 render_optimization_launch_session_block(
     st,
-    job=job,
+    job=_ACTIVE_JOB,
     is_staged=bool(st.session_state.get("opt_use_staged", DIAGNOSTIC_USE_STAGED_OPT)),
     current_problem_hash=_CURRENT_PROBLEM_HASH,
     current_problem_hash_mode=_CURRENT_PROBLEM_HASH_MODE,
+    active_runtime_summary=_ACTIVE_RUNTIME_SUMMARY,
     tail_file_text_fn=tail_file_text,
     soft_stop_requested_fn=soft_stop_requested,
     parse_done_from_log_fn=parse_done_from_log,

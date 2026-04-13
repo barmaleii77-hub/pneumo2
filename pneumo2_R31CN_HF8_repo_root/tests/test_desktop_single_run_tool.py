@@ -8,6 +8,7 @@ from pneumo_solver_ui.tools.desktop_single_run import build_desktop_run_summary
 
 
 def test_build_desktop_run_summary_extracts_operator_metrics() -> None:
+    cache_dir = Path("workspace/cache/desktop_run_setup/single_run/demo")
     parsed = {
         "df_main": pd.DataFrame(
             {
@@ -34,11 +35,15 @@ def test_build_desktop_run_summary_extracts_operator_metrics() -> None:
         t_end=1.0,
         record_full=True,
         outdir=Path("workspace/desktop_runs/demo"),
+        cache_dir=cache_dir,
+        cache_policy="reuse",
     )
 
     assert summary["ok"] is True
     assert summary["scenario_name"] == "desktop_run_roll"
     assert summary["scenario_type"] == "инерция_крен"
+    assert summary["cache_policy"] == "reuse"
+    assert summary["cache_dir"] == str(cache_dir)
     assert summary["df_main_rows"] == 3
     assert summary["df_p_rows"] == 2
     assert summary["df_mdot_rows"] == 2

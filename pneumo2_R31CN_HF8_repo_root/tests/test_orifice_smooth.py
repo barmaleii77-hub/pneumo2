@@ -42,6 +42,46 @@ def test_orifice_signed_smooth_is_approximately_antisymmetric():
     assert abs(z) < 1e-9
 
 
+def test_orifice_vectorized_helpers_match_scalar_variants():
+    from pneumo_solver_ui import model_pneumo_v9_mech_doublewishbone_worldroad as m
+
+    p1 = np.array([300_000.0, 260_000.0, 200_000.0, 180_000.0], dtype=float)
+    p2 = np.array([10_000.0, 250_000.0, 220_000.0, 180_000.0], dtype=float)
+    A = np.array([1e-5, 2e-5, 1.5e-5, 1e-5], dtype=float)
+    Cd = np.array([0.8, 0.75, 0.85, 0.8], dtype=float)
+
+    expected_signed = np.array([m.mdot_orifice_signed(a, b, area, cd) for a, b, area, cd in zip(p1, p2, A, Cd)], dtype=float)
+    got_signed = m.mdot_orifice_signed_vec(p1, p2, A, Cd)
+    assert np.allclose(got_signed, expected_signed, rtol=1e-12, atol=1e-12)
+
+    p_up = np.maximum(p1, p2)
+    p_dn = np.minimum(p1, p2)
+    expected_smooth = np.array(
+        [m.mdot_orifice_smooth(a, b, area, cd, k_pr=120.0) for a, b, area, cd in zip(p_up, p_dn, A, Cd)],
+        dtype=float,
+    )
+    got_smooth = m.mdot_orifice_smooth_vec(p_up, p_dn, A, Cd, k_pr=120.0)
+    assert np.allclose(got_smooth, expected_smooth, rtol=1e-12, atol=1e-12)
+
+    expected_signed_smooth = np.array(
+        [
+            m.mdot_orifice_signed_smooth(a, b, area, cd, k_pr=120.0, k_sign=1e-4, eps_dp_Pa=1.0)
+            for a, b, area, cd in zip(p1, p2, A, Cd)
+        ],
+        dtype=float,
+    )
+    got_signed_smooth = m.mdot_orifice_signed_smooth_vec(
+        p1,
+        p2,
+        A,
+        Cd,
+        k_pr=120.0,
+        k_sign=1e-4,
+        eps_dp_Pa=1.0,
+    )
+    assert np.allclose(got_signed_smooth, expected_signed_smooth, rtol=1e-12, atol=1e-12)
+
+
 def test_worldroad_smoke_with_smooth_flow_mode():
     """Smoke: симуляция не должна падать при включённом smooth-flow."""
     from pneumo_solver_ui import model_pneumo_v9_mech_doublewishbone_worldroad as m

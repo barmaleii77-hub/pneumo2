@@ -55,6 +55,7 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert "self.native_canvas.set_diagnostics(diagnostics)" in src
     assert "self.native_canvas.set_focus_region(focus_region)" in src
     assert "self.native_canvas.show_overview(overview_meta)" in src
+    assert "self.native_canvas.set_display_modes(" in src
     assert 'self.fidelity_panel.render(self.dataset)' in src
     assert 'self._central_layout.addWidget(self.mnemo_view, 1)' in src
     assert "self.mnemo_view.focus_step_jump_requested.connect(self._jump_to_focus_step)" in src
@@ -123,8 +124,13 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert "startup_time_ref_npz: str," in src
     assert 'self._persisted_view_mode = self._normalize_view_mode(self.ui_state.get_str("view_mode", "focus"))' in src
     assert 'self.detail_mode = self._normalize_detail_mode(self.ui_state.get_str("detail_mode", "operator"))' in src
+    assert "FLOW_DISPLAY_MODE_LABELS" in src
+    assert "PRESSURE_DISPLAY_MODE_LABELS" in src
+    assert 'self.flow_display_mode = _normalize_flow_display_mode(self.ui_state.get_str("flow_display_mode", "nlpm"))' in src
+    assert 'self.pressure_display_mode = _normalize_pressure_display_mode(self.ui_state.get_str("pressure_display_mode", "bar_g"))' in src
     assert "DETAIL_MODE_LABELS" in src
     assert 'self.mnemo_view.set_detail_mode(self.detail_mode)' in src
+    assert "self.trends_panel.set_display_modes(" in src
     assert "self._startup_view_mode_override = self._parse_startup_view_mode_override(startup_view_mode)" in src
     assert "self._view_mode_override_active = bool(self._startup_view_mode_override)" in src
     assert "self._startup_time_s = float(startup_time_s) if startup_time_s is not None else None" in src
@@ -198,10 +204,24 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert "_build_frame_alert_payload" in src
     assert "self._draw_alert_markers(painter)" in src
     assert 'self.detail_combo = QtWidgets.QComboBox()' in src
+    assert 'self.flow_unit_combo = QtWidgets.QComboBox()' in src
+    assert 'self.flow_unit_combo.setObjectName("mnemo_flow_unit_combo")' in src
+    assert 'self.flow_unit_combo.addItem("Q: Нл/мин", "nlpm")' in src
+    assert 'self.flow_unit_combo.addItem("Q: кг/с", "kg_s")' in src
+    assert 'self.pressure_unit_combo = QtWidgets.QComboBox()' in src
+    assert 'self.pressure_unit_combo.setObjectName("mnemo_pressure_unit_combo")' in src
+    assert 'self.pressure_unit_combo.addItem("P: бар(g)", "bar_g")' in src
+    assert 'self.pressure_unit_combo.addItem("P: Па(abs)", "pa_abs")' in src
     assert 'self.detail_combo.addItem("Тихо", "quiet")' in src
     assert 'self.detail_combo.addItem("Оператор", "operator")' in src
     assert 'self.detail_combo.addItem("Полно", "full")' in src
     assert 'detail_menu = view_menu.addMenu("Плотность overlays")' in src
+    assert "def _set_flow_display_mode(self, mode: str, *, announce: bool) -> str:" in src
+    assert "def _set_pressure_display_mode(self, mode: str, *, announce: bool) -> str:" in src
+    assert "def _flow_unit_changed(self, index: int) -> None:" in src
+    assert "def _pressure_unit_changed(self, index: int) -> None:" in src
+    assert 'self.ui_state.set_value("flow_display_mode", self.flow_display_mode)' in src
+    assert 'self.ui_state.set_value("pressure_display_mode", self.pressure_display_mode)' in src
     assert 'PLAYHEAD_STORAGE_KEY = "pneumo_desktop_mnemo_playhead"' in src
     assert "BOOTSTRAP_JS" not in src
     assert "MnemoWebView" not in src
@@ -315,6 +335,7 @@ def test_desktop_mnemo_native_canvas_has_overlay_contract() -> None:
     assert "def _route_pressure_strip_history_meta(" in src
     assert "def _route_pressure_strip_cause_effect_meta(" in src
     assert "def _route_pressure_strip_intermediate_nodes_meta(" in src
+    assert "def _edge_actuation_active(" in src
     assert "Регуляторный узел" in src
     assert "Камерный узел" in src
     assert "Почти как ведущий конец" in src
@@ -324,6 +345,10 @@ def test_desktop_mnemo_native_canvas_has_overlay_contract() -> None:
     assert "Сближается с ведущим" in src
     assert "Уходит от ведущего" in src
     assert "Держит разброс к ведущему" in src
+    assert "Q доходит до узла" in src
+    assert "Q ещё не дошёл до узла" in src
+    assert "Q тянется через узел" in src
+    assert "Q гаснет у узла" in src
     assert "Q↑" in src
     assert "Q↓" in src
     assert "Q=" in src
@@ -332,6 +357,33 @@ def test_desktop_mnemo_native_canvas_has_overlay_contract() -> None:
     assert "ΔP→Q ok" in src
     assert "ΔP→Q lag" in src
     assert "ΔP→Q tail" in src
+    assert "def _route_focus_visibility_meta(" in src
+    assert "def _route_focus_opacity_profile(" in src
+    assert '"show_leading_chip"' in src
+    assert '"show_trailing_chip"' in src
+    assert '"show_summary"' in src
+    assert '"show_history_strip"' in src
+    assert '"strip_glow_alpha"' in src
+    assert '"strip_core_alpha"' in src
+    assert '"node_ring_alpha"' in src
+    assert '"node_badge_alpha"' in src
+    assert '"node_label_bg_alpha"' in src
+    assert '"node_value_bg_alpha"' in src
+    assert '"node_label_text_alpha"' in src
+    assert '"node_value_text_alpha"' in src
+    assert '"node_badge_text_alpha"' in src
+    assert "def _node_label_presentation_meta(" in src
+    assert '"layout_mode": layout_mode' in src
+    assert '"minimal": 0.72 if mode != "quiet" else 0.56' in src
+    assert '"value_mode": "inline"' in src
+    assert '"inline_value_rect": (16.0, -11.0, 52.0, 16.0)' in src
+    assert "def _draw_node_indicator_bars(" in src
+    assert "def _draw_edge_flow_arrows(" in src
+    assert "def _draw_actuation_led(" in src
+    assert "def _route_node_label_opacity_profile(" in src
+    assert "def _route_pressure_chip_rect(" in src
+    assert "def _draw_route_pressure_strip_compact_chip(" in src
+    assert "def _draw_route_pressure_strip_terminal_compact_summary(" in src
     assert "def _draw_route_pressure_strip_cause_effect_accent(" in src
     assert "Ведёт:" in src
     assert "Ведущий конец не определён" in src
@@ -339,16 +391,136 @@ def test_desktop_mnemo_native_canvas_has_overlay_contract() -> None:
     assert "self._draw_route_pressure_strip_terminal_focus(painter)" in src
     assert "self._draw_route_pressure_strip_cause_effect_accent(" in src
     assert "def _draw_route_pressure_strip_flow_history(" in src
+    assert "self._draw_route_pressure_strip_compact_chip(" in src
+    assert "self._draw_route_pressure_strip_terminal_compact_summary(" in src
+    assert "visibility_meta = _route_focus_visibility_meta(payload, terminal_meta, detail_mode=self._detail_mode)" in src
+    assert "opacity_meta = _route_focus_opacity_profile(visibility_meta, detail_mode=self._detail_mode)" in src
     assert "self._update_hover_route_pressure_focus()" in src
     assert "route_terminal_meta = self._active_route_pressure_terminal_meta()" in src
     assert "route_intermediate_items = _route_pressure_strip_intermediate_nodes_meta(" in src
+    assert "route_label_role = \"\"" in src
+    assert "presentation_meta = _node_label_presentation_meta(" in src
+    assert "indicator_rect = self._draw_node_indicator_bars(" in src
+    assert "alpha_scale = float(presentation_meta.get(\"alpha_scale\") or 1.0)" in src
+    assert "value_mode = str(presentation_meta.get(\"value_mode\") or \"separate\")" in src
+    assert "if value_mode == \"inline\":" in src
+    assert "value_padding = (5.0, 1.0, -5.0, -1.0)" in src
+    assert "self._occupied_node_overlay_rects: list[QtCore.QRectF] = []" in src
+    assert "chosen_shift_y" in src
+    assert "route_label_opacity = _route_node_label_opacity_profile(" in src
+    assert "label_text_color.setAlpha(label_text_alpha)" in src
+    assert "value_text_color.setAlpha(value_text_alpha)" in src
+    assert "badge_text_color.setAlpha(badge_text_alpha)" in src
+    assert "self._draw_edge_flow_arrows(" in src
+    assert '"actuated": _edge_actuation_active(' in src
+    assert "self._draw_actuation_led(" in src
+    assert "occupied_inline_rects: list[QtCore.QRectF] = [QtCore.QRectF(item) for item in self._occupied_node_overlay_rects]" in src
+    assert "def _resolve_overlay_rect(" in src
+    assert "def _payload_is_focus_cylinder(self, payload: dict[str, Any]) -> bool:" in src
+    assert "def _cylinder_inline_indicator_rect(self, payload: dict[str, Any]) -> QtCore.QRectF | None:" in src
+    assert "def _component_anchor_marker_rect(self, payload: dict[str, Any]) -> QtCore.QRectF | None:" in src
+    assert "def _component_anchor_badge_rect(self, payload: dict[str, Any]) -> QtCore.QRectF | None:" in src
+    assert "def _component_inline_badge_rect(self, payload: dict[str, Any]) -> QtCore.QRectF | None:" in src
+    assert "def _canvas_zoom_scale(self) -> float:" in src
+    assert "def _component_anchor_presentation_meta(self, payload: dict[str, Any]) -> dict[str, Any]:" in src
+    assert "def _component_indicator_payload(self, payload: dict[str, Any], *, global_peak_flow_abs: float) -> dict[str, Any]:" in src
+    assert "def _draw_component_indicator_bars(" in src
+    assert "def _normalize_flow_display_mode(mode: str) -> str:" in src
+    assert "def _normalize_pressure_display_mode(mode: str) -> str:" in src
+    assert "def _flow_display_unit(dataset: MnemoDataset | None, mode: str) -> str:" in src
+    assert "def _pressure_display_unit(mode: str) -> str:" in src
+    assert "def _flow_series_for_display(dataset: MnemoDataset | None, q_values: np.ndarray | list[float], mode: str) -> np.ndarray:" in src
+    assert "def _pressure_series_from_pa(dataset: MnemoDataset | None, p_values: np.ndarray | list[float], mode: str) -> np.ndarray:" in src
+    assert "def _edge_recent_history_summary_display(" in src
+    assert "def _edge_recent_pressure_summary_display(" in src
+    assert "def set_display_context(self, *, dataset: MnemoDataset | None, pressure_display_mode: str) -> None:" in src
+    assert "def set_display_modes(self, *, flow_display_mode: str, pressure_display_mode: str) -> None:" in src
+    assert "def _display_flow_unit(self) -> str:" in src
+    assert "def _display_pressure_unit(self) -> str:" in src
+    assert "def _display_pressure_delta_unit(self) -> str:" in src
+    assert "def _fmt_flow_value(self, value: Any, *, digits: int) -> str:" in src
+    assert "def _fmt_pressure_value(self, value_bar_g: Any, *, digits: int) -> str:" in src
+    assert "def _fmt_pressure_delta_value(self, value_bar: Any, *, digits: int) -> str:" in src
+    assert "def render_details(" in src
+    assert "flow_display_mode: str," in src
+    assert "pressure_display_mode: str," in src
+    assert "q_vals_display = _flow_series_for_display(dataset, np.asarray(q_arr, dtype=float), flow_display_mode)" in src
+    assert "p_vals = _pressure_series_from_pa(dataset, np.asarray(p_arr, dtype=float), pressure_display_mode)" in src
+    assert "_edge_recent_history_summary_display(history_meta, dataset, flow_display_mode)" in src
+    assert "_edge_recent_pressure_summary_display(pressure_history_meta, pressure_display_mode)" in src
+    assert "self.heatmap.set_display_context(dataset=dataset, pressure_display_mode=pressure_display_mode)" in src
+    assert "_pressure_value_from_bar_g(" in src
+    assert "_pressure_delta_from_bar(card.get(\"delta_peak_bar\"), self._pressure_display_mode)" in src
+    assert "pressure_spread_display = _pressure_delta_from_bar(pressure_spread, pressure_display_mode)" in src
+    assert "self.guide_panel.set_display_modes(" in src
+    assert "self.startup_banner.set_display_modes(" in src
+    assert "flow_display_mode=self._flow_display_mode," in src
+    assert "pressure_display_mode=self._pressure_display_mode," in src
+    assert "flow_display_mode=self.flow_display_mode," in src
+    assert "pressure_display_mode=self.flow_display_mode," not in src
+    assert "unit=flow_unit," in src
+    assert "unit=pressure_unit," in src
+    assert "def _build_active_diagonal_focus_meta(" in src
+    assert "flow_display_mode: str = \"nlpm\"" in src
+    assert "pressure_display_mode: str = \"bar_g\"" in src
+    assert "q_values=q_series_display," in src
+    assert "q_unit=flow_unit," in src
+    assert "\"flow_unit\": flow_unit," in src
+    assert "\"pressure_unit\": pressure_unit," in src
+    assert "\"pressure_delta_unit\": pressure_delta_unit," in src
+    assert "pressure_display_mode=self._pressure_display_mode," in src
+    assert "flow_display_mode=self.flow_display_mode," in src
+    assert "pressure_display_mode=self.pressure_display_mode," in src
+    assert "self._push_diagnostics()" in src
+    assert "self._fmt_pressure_value(pressure, digits=2)" in src
+    assert "self._fmt_pressure_delta_value(payload.get('delta_p_bar'), digits=2)" in src
+    assert "self._fmt_flow_value(payload.get(\"q_now\"), digits=2)" in src
+    assert "self.mnemo_view.set_display_modes(" in src
+    assert "flow_display_mode=self.flow_display_mode," in src
+    assert "pressure_display_mode=self.pressure_display_mode," in src
+    assert "def _rect_connection_point(rect: QtCore.QRectF, target: QtCore.QPointF) -> QtCore.QPointF:" in src
+    assert "def _draw_overlay_tether(" in src
+    assert "def _draw_cylinder_bridge_indicator(" in src
+    assert "def _draw_cylinder_inline_indicator(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:" in src
+    assert "def _draw_component_anchor_marker(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:" in src
+    assert "def _draw_component_anchor_badge(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:" in src
+    assert "def _draw_component_inline_badge(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:" in src
+    assert "self._draw_cylinder_bridge_indicator(" in src
+    assert 'component_payloads = [' in src
+    assert 'if self._detail_mode == "quiet" and not bool(payload.get("is_selected")) and not bool(presentation_meta.get("show_badge")):' in src
+    assert "if not is_focus_payload:" in src
+    assert 'if self._detail_mode in {"operator", "quiet"}:' in src
+    assert "self._draw_cylinder_inline_indicator(painter, resolved_rect, payload)" in src
+    assert "self._draw_component_anchor_marker(painter, resolved_marker_rect, payload)" in src
+    assert "self._draw_component_anchor_badge(painter, resolved_rect, payload)" in src
+    assert "indicator_payload = self._component_indicator_payload(payload, global_peak_flow_abs=self._global_peak_flow_abs())" in src
+    assert "presentation_meta = self._component_anchor_presentation_meta(payload)" in src
+    assert 'badge_mode = str(presentation_meta.get("badge_mode") or "text")' in src
+    assert '"badge_mode": badge_mode' in src
+    assert 'if not bool(presentation_meta.get("show_marker")):' in src
+    assert 'if not bool(presentation_meta.get("show_badge")):' in src
+    assert 'if bool(presentation_meta.get("show_indicator_bars")):' in src
+    assert 'if badge_mode != "graphic":' in src
+    assert 'if badge_mode == "graphic":' in src
+    assert "self._draw_component_indicator_bars(" in src
+    assert "self._draw_overlay_tether(" in src
+    assert "self._draw_component_inline_badge(painter, resolved_rect, payload)" in src
     assert 'intermediate_hover_item = route_intermediate_lookup.get(node_name) or {}' in src
     assert 'str(intermediate_hover_item.get("lead_hint_text") or "")' in src
     assert 'str(intermediate_hover_item.get("lead_trend_text") or "")' in src
+    assert 'str(intermediate_hover_item.get("flow_hint_text") or "")' in src
     assert 'and self._hover_kind == "node"' in src
     assert "self._draw_selected_edge_terminal_overlay(painter)" in src
     assert "self._draw_diagonal_focus_pressure_strips(painter)" in src
     assert "spotlight_nodes.update(diagonal_focus_nodes)" in src
+    assert "def _cylinder_compact_rect(self, payload: dict[str, Any]) -> QtCore.QRectF:" in src
+    assert "def _draw_cylinder_compact_card(self, painter: QtGui.QPainter, rect: QtCore.QRectF, payload: dict[str, Any]) -> None:" in src
+    assert "def _draw_cylinder_compact_row(" in src
+    assert 'if self._detail_mode != "full":' in src
+    assert "self._draw_cylinder_compact_card(painter, rect, payload)" in src
+    assert "def _selected_edge_direction_card_rect(" in src
+    assert "def _draw_selected_edge_direction_compact_card(" in src
+    assert "self._draw_selected_edge_direction_compact_card(painter, compact_rect, payload)" in src
     assert "Направление выбранной ветви" in src
     assert "Вердикт:" in src
     assert "Сигналы:" in src

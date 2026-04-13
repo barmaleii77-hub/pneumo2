@@ -24,6 +24,7 @@ def test_r31av_default_objectives_vertical_lateral_energy_order() -> None:
 def test_r31av_jobs_default_follows_diagnostics_hint() -> None:
     assert diagnostics_jobs_default(64, platform_name="win32") == DIAGNOSTIC_OPT_JOBS_HINT
     assert diagnostics_jobs_default(8, platform_name="win32") == 8
+    assert diagnostics_jobs_default(128, platform_name="win32") == 61
 
 
 def test_r31cm_jobs_default_without_explicit_cpu_count_is_safe() -> None:

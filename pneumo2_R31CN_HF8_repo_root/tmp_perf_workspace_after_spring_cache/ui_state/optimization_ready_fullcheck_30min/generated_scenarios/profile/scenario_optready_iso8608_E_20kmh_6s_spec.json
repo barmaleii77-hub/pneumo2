@@ -1,0 +1,39 @@
+{
+  "schema_version": "pneumo_opt_ready_preset_v1",
+  "preset_name": "fullcheck_30min",
+  "scenario_type": "road_profile_csv",
+  "name": "road_profile_iso8608_E_20кмч_6s",
+  "road_csv": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\tmp_perf_workspace_after_spring_cache\\ui_state\\optimization_ready_fullcheck_30min\\generated_scenarios\\profile\\scenario_optready_iso8608_E_20kmh_6s_road.csv",
+  "meta": {
+    "t_end": 6.0,
+    "dt": 0.01,
+    "vx0_м_с": 5.555555555555555,
+    "wheelbase_m": 1.5,
+    "left_right_coherence": 0.55,
+    "L_n_pts": 1992.0,
+    "L_dx_m": 0.02,
+    "L_length_m": 39.82,
+    "L_gd_n0_target_m3": 0.004096,
+    "L_gd_n0_est_m3": 0.002518154525506541,
+    "L_scale_applied": 1.2753776015258769,
+    "L_seed": 43532.0,
+    "R_n_pts": 1992.0,
+    "R_dx_m": 0.02,
+    "R_length_m": 39.82,
+    "R_gd_n0_target_m3": 0.004096,
+    "R_gd_n0_est_m3": 0.0021932226544903416,
+    "R_scale_applied": 1.3665911766376273,
+    "R_seed": 43533.0
+  },
+  "generator": {
+    "road_class": "E",
+    "gd_pick": "mid",
+    "gd_n0_scale": 1.0,
+    "waviness_w": 2.0,
+    "speed_mps": 5.555555555555555,
+    "dt": 0.01,
+    "t_end": 6.0,
+    "left_right_coherence": 0.55,
+    "seed": 431
+  }
+}

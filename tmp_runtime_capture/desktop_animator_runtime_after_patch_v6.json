@@ -1,0 +1,19 @@
+{
+  "bundle": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_send_analysis_20260412\\workspace\\exports\\anim_latest.npz",
+  "video": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_runtime_capture\\desktop_animator_runtime_after_patch_v6.mp4",
+  "bbox": [
+    80,
+    60,
+    1679,
+    1069
+  ],
+  "captured_frames": 49,
+  "captured_pairs": 48,
+  "identical_adjacent_pairs": 17,
+  "identical_adjacent_ratio": 0.3541666666666667,
+  "unique_frame_count": 32,
+  "effective_unique_fps": 5.333333333333333,
+  "capture_fps_target": 30.0,
+  "capture_duration_s": 6.0,
+  "video_write_error": "OSError('[Errno 32] Broken pipe\\n\\nFFMPEG COMMAND:\\nC:\\\\Users\\\\Admin\\\\AppData\\\\Local\\\\Packages\\\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\\\LocalCache\\\\local-packages\\\\Python313\\\\site-packages\\\\imageio_ffmpeg\\\\binaries\\\\ffmpeg-win-x86_64-v7.1.exe -y -f rawvideo -vcodec rawvideo -s 1599x1009 -pix_fmt rgb24 -r 30.00 -i - -an -vcodec libx264 -pix_fmt yuv420p -v warning C:\\\\Users\\\\Admin\\\\Documents\\\\GitHub\\\\pneumo2\\\\tmp_runtime_capture\\\\desktop_animator_runtime_after_patch_v6.mp4\\n\\nFFMPEG STDERR OUTPUT:\\n')"
+}

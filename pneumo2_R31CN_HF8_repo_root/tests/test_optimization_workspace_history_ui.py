@@ -76,6 +76,7 @@ def test_workspace_history_handoff_quality_helpers_rank_and_filter_rows() -> Non
         {
             "run": "run-a",
             "status": "DONE",
+            "live_now": "—",
             "preset": "ray/portfolio/q2",
             "budget": 84,
             "seeds": 6,
@@ -90,6 +91,7 @@ def test_workspace_history_handoff_quality_helpers_rank_and_filter_rows() -> Non
         {
             "run": "run-b",
             "status": "PARTIAL",
+            "live_now": "—",
             "preset": "ray/q1",
             "budget": 60,
             "seeds": 2,
@@ -214,6 +216,7 @@ def test_workspace_history_ui_surfaces_handoff_comparison_rows() -> None:
             "__target_run_dir": "C:\\tmp\\run-coord",
             "run": "run-stage",
             "status": "DONE",
+            "live_now": "—",
             "preset": "ray/portfolio/q2",
             "budget": 84,
             "seeds": 6,
@@ -493,3 +496,155 @@ def test_workspace_history_ui_prefers_active_pending_job_placeholder_when_select
     assert ("metric", ("Статус", "RUNNING")) in st.calls
     assert ("metric", ("DONE", 0)) in st.calls
     assert ("metric", ("RUNNING", 1)) in st.calls
+
+
+def test_workspace_history_ui_marks_live_handoff_in_comparison_and_details() -> None:
+    pending_run = Path("C:/tmp/run-coord-live").resolve()
+    st = _FakeStreamlit(
+        select_values={"Выберите run для разбора": str(pending_run)},
+    )
+    st.session_state["__opt_history_selected_run_dir"] = str(pending_run)
+    events: list[tuple[str, object]] = []
+    staged = SimpleNamespace(
+        run_dir=Path("C:/tmp/run-stage-live"),
+        status_label="DONE",
+        pipeline_mode="staged",
+        row_count=14,
+        done_count=0,
+        backend="StageRunner",
+        error_count=0,
+        running_count=0,
+        handoff_available=True,
+        handoff_target_run_dir=pending_run,
+        handoff_preset_tag="ray/portfolio/q2",
+        handoff_budget=84,
+        handoff_seed_count=6,
+        handoff_staged_rows_ok=9,
+        handoff_promotable_rows=7,
+        handoff_unique_param_candidates=6,
+        handoff_selection_pool="promotable",
+        handoff_fragment_count=4,
+        handoff_has_full_ring=True,
+        handoff_suite_family="auto_ring",
+    )
+    active_job = SimpleNamespace(
+        run_dir=pending_run,
+        started_ts=123.0,
+        log_path=pending_run / "coordinator.log",
+        backend="Handoff/ray/portfolio/q2",
+        pipeline_mode="coordinator",
+    )
+    session_state = {
+        "opt_objectives": "comfort\nroll",
+        "opt_penalty_key": "penalty_total",
+        "__opt_active_launch_context": {
+            "kind": "handoff",
+            "run_dir": str(pending_run),
+            "pipeline_mode": "coordinator",
+            "backend": "Handoff/ray/portfolio/q2",
+            "source_run_dir": str(Path("C:/tmp/run-stage-live").resolve()),
+        },
+    }
+
+    render_workspace_run_history_block(
+        st,
+        workspace_dir=Path("C:/tmp/workspace"),
+        active_job=active_job,
+        session_state=session_state,
+        active_runtime_summary={
+            "done": 5,
+            "budget": 84,
+            "tail_state": "trial=5 status=RUNNING",
+            "trial_health": {"done": 5, "running": 2, "error": 1},
+            "penalty_gate": {
+                "infeasible_done": 1,
+                "penalty_key": "penalty_total",
+                "penalty_tol": 0.25,
+                "last_penalty": 0.6,
+                "objective_drift": {"comfort": 0.7, "energy": 3.5},
+            },
+            "recent_errors": ["bad physics", "solver diverged badly on wheel hop"],
+            "handoff_provenance": {
+                "source_run_name": "run-stage-live",
+                "selection_pool": "promotable",
+                "seed_count": 6,
+                "unique_param_candidates": 6,
+                "promotable_rows": 7,
+                "staged_rows_ok": 9,
+                "pipeline_hint": "staged_then_coordinator",
+                "fragment_count": 4,
+                "has_full_ring": True,
+            },
+        },
+        start_handoff_fn=None,
+        current_problem_hash="ph_current_ui_scope",
+        current_problem_hash_mode="legacy",
+        default_objectives=("comfort", "roll", "energy"),
+        objectives_text_fn=lambda values: "\n".join(values),
+        penalty_key_default="penalty_total",
+        current_penalty_tol=0.0,
+        load_log_text=lambda _path: "",
+        rerun_fn=lambda _st: None,
+        discover_runs_fn=lambda *_args, **_kwargs: [staged],
+        format_run_choice_fn=lambda item: item.run_dir.name,
+        render_details_fn=lambda _st, item, **kwargs: events.append(
+            (
+                "details",
+                item.run_dir.name,
+                str(kwargs.get("active_run_dir") or ""),
+                dict(kwargs.get("active_launch_context") or {}),
+            )
+        ),
+        render_pointer_actions_fn=lambda _st, item, **kwargs: events.append(("actions", item.run_dir.name)),
+    )
+
+    df_calls = [payload for kind, payload in st.calls if kind == "dataframe"]
+    assert len(df_calls) == 1
+    frame, _kwargs = df_calls[0]
+    assert list(frame["live_now"]) == ["LIVE"]
+    assert any(
+        kind == "info"
+        and "LIVE NOW" in text
+        and "run-stage-live" in text
+        and "ray/portfolio/q2" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "done=5 / 84" in text
+        and "trial=5 status=RUNNING" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "DONE=5, RUNNING=2, ERROR=1" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "Active handoff penalty gate:" in text
+        and "infeasible DONE=1" in text
+        and "`penalty_total`=0.6 > 0.25" in text
+        and "comfort +0.7" in text
+        and "energy +3.5" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "Recent handoff errors:" in text
+        and "bad physics" in text
+        and "solver diverged badly on wheel hop" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "Handoff provenance:" in text
+        and "source=run-stage-live" in text
+        and "pool=promotable" in text
+        and "full-ring=yes" in text
+        for kind, text in st.calls
+    )
+    assert events[0][0] == "details"
+    assert events[0][1] == "run-coord-live"
+    assert events[0][2] == str(pending_run)
+    assert events[0][3]["kind"] == "handoff"

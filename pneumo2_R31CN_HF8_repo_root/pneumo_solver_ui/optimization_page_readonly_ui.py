@@ -32,6 +32,9 @@ def render_last_optimization_overview_block(
     results_page: str,
     current_problem_hash: str = "",
     current_problem_hash_mode: str = "",
+    active_run_dir: Any = None,
+    active_launch_context: Mapping[str, Any] | None = None,
+    active_runtime_summary: Mapping[str, Any] | None = None,
     render_summary_fn: Callable[..., bool] = render_last_optimization_pointer_summary,
 ) -> None:
     if not render_summary_fn(
@@ -40,6 +43,9 @@ def render_last_optimization_overview_block(
         compact=False,
         current_problem_hash=current_problem_hash,
         current_problem_hash_mode=current_problem_hash_mode,
+        active_run_dir=active_run_dir,
+        active_launch_context=dict(active_launch_context or {}),
+        active_runtime_summary=dict(active_runtime_summary or {}),
         missing_message="Последняя оптимизация пока не запускалась (или артефакты не найдены).",
         success_message="Найдены результаты последней оптимизации.",
         packaging_heading="Сводка по геометрии узлов (последний run)",

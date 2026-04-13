@@ -1,0 +1,74 @@
+{
+  "schema_version": "pneumo_opt_coordinator_handoff_v1",
+  "run_dir": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\coordinator_handoff_live_run",
+  "staged_results_csv": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\coordinator_handoff_live_run\\results_all.csv",
+  "suite_json": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\auto_tuner_live_workspace\\ui_state\\optimization_auto_ring_suite\\suite_auto_ring.json",
+  "suite_analysis": {
+    "family": "auto_ring",
+    "schema_version": "pneumo_opt_auto_ring_suite_v1",
+    "row_count": 13,
+    "stage_counts": {
+      "0": 5,
+      "1": 7,
+      "2": 1
+    },
+    "fragment_count": 4,
+    "fragment_names": [
+      "ringfrag_diag",
+      "ringfrag_pitch",
+      "ringfrag_roll",
+      "ringfrag_rough"
+    ],
+    "has_full_ring": true,
+    "meta_path": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\auto_tuner_live_workspace\\ui_state\\optimization_auto_ring_suite\\suite_auto_ring_meta.json"
+  },
+  "seed_json": "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\coordinator_handoff_live_run\\coordinator_handoff\\coordinator_seed_points.json",
+  "seed_count": 2,
+  "seed_limit": 16,
+  "objective_keys": [
+    "метрика_комфорт__RMS_ускор_рамы_микро_м_с2",
+    "метрика_крен_ay3_град",
+    "метрика_энергия_дроссели_микро_Дж"
+  ],
+  "penalty_key": "штраф_физичности_сумма",
+  "coordinator_handoff": {
+    "recommended_pipeline": "staged_then_coordinator",
+    "recommended_proposer": "portfolio",
+    "recommended_q": 2,
+    "requires_full_ring_validation": true
+  },
+  "recommended_backend": "ray",
+  "recommended_budget": 84,
+  "cmd_args": [
+    "--backend",
+    "ray",
+    "--run-dir",
+    "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\coordinator_handoff_live_run\\coordinator_handoff\\run",
+    "--model",
+    "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\model_pneumo_v9_doublewishbone_camozzi.py",
+    "--worker",
+    "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\opt_worker_v3_margins_energy.py",
+    "--base-json",
+    "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\default_base.json",
+    "--ranges-json",
+    "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\pneumo2_R31CN_HF8_repo_root\\pneumo_solver_ui\\default_ranges.json",
+    "--suite-json",
+    "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\auto_tuner_live_workspace\\ui_state\\optimization_auto_ring_suite\\suite_auto_ring.json",
+    "--budget",
+    "84",
+    "--proposer",
+    "portfolio",
+    "--q",
+    "2",
+    "--seed-json",
+    "C:\\Users\\Admin\\Documents\\GitHub\\pneumo2\\tmp_bundle_analysis\\coordinator_handoff_live_run\\coordinator_handoff\\coordinator_seed_points.json",
+    "--penalty-key",
+    "штраф_физичности_сумма",
+    "--objective",
+    "метрика_комфорт__RMS_ускор_рамы_микро_м_с2",
+    "--objective",
+    "метрика_крен_ay3_град",
+    "--objective",
+    "метрика_энергия_дроссели_микро_Дж"
+  ]
+}

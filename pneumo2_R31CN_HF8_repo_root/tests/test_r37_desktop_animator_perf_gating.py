@@ -118,15 +118,15 @@ def test_desktop_animator_status_line_uses_aligned_summary_speed_truth() -> None
     src = APP.read_text(encoding="utf-8")
     anchor = 'self._status(f"t={t:.3f}s, v={v:.2f}m/s, file={b.npz_path.name}")'
     assert anchor in src
-    tail = src.split(anchor)[0][-1400:]
+    status_block = src[src.index('summary = _ensure_telemetry_summary_cache(b)'):src.index(anchor)]
 
-    assert 'summary = _ensure_telemetry_summary_cache(b)' in tail
-    assert 't_status = _sample_series_local(summary["t"], i0=sample_i0, i1=sample_i1, alpha=alpha, default=t)' in tail
-    assert 'vx_status = _sample_series_local(summary["vx"], i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in tail
-    assert 'vy_status = _sample_series_local(summary["vy"], i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in tail
-    assert 'if np.isfinite(float(t_status)):' in tail
-    assert "vxb_status = b.get(" not in tail
-    assert "vyb_status = b.get(" not in tail
+    assert 'summary = _ensure_telemetry_summary_cache(b)' in status_block
+    assert 't_status = _sample_series_local(summary["t"], i0=sample_i0, i1=sample_i1, alpha=alpha, default=t)' in status_block
+    assert 'vx_status = _sample_series_local(summary["vx"], i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in status_block
+    assert 'vy_status = _sample_series_local(summary["vy"], i0=sample_i0, i1=sample_i1, alpha=alpha, default=0.0)' in status_block
+    assert 'if np.isfinite(float(t_status)):' in status_block
+    assert "vxb_status = b.get(" not in status_block
+    assert "vyb_status = b.get(" not in status_block
 
 
 def test_desktop_animator_geometry_overlays_use_live_viewgeometry_fields() -> None:
@@ -200,8 +200,14 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._corner_cache = _ensure_corner_signal_cache(b)" in app_src
     assert '"Fподв (Н)"' in app_src
     assert '"Fпруж (Н)"' in app_src
-    assert '"Fпневм (Н)"' in app_src
-    assert '"Шток Δ (м)"' in app_src
+    assert '"Fпневм Σ (Н)"' in app_src
+    assert '"Fпневм Ц1 (Н)"' in app_src
+    assert '"Fпневм Ц2 (Н)"' in app_src
+    assert '"Шток Ц1 Δ (м)"' in app_src
+    assert '"Шток Ц2 Δ (м)"' in app_src
+    assert '"pneumoF1": np.asarray(b.get(f"сила_пневматики_Ц1_{c}_Н", 0.0), dtype=float),' in app_src
+    assert '"stroke2": np.asarray(b.get(f"сжатие_подвески_шток_Ц2_{c}_м", 0.0), dtype=float),' in app_src
+    assert '"pneumoF2": np.asarray(b.get(f"сила_пневматики_Ц2_{c}_Н", 0.0), dtype=float),' in app_src
     assert '"Шина сжатие (м)"' in app_src
     assert 'title="3D: Кузов/дорога/контакт"' in app_src
     assert 'action_text="3D: Кузов/дорога/контакт (отдельное окно)"' in app_src
@@ -270,6 +276,9 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self._pressure_series_map: Dict[str, np.ndarray] = {}" in app_src
     assert "self._main_pressure_series_map: Dict[str, np.ndarray] = {}" in app_src
     assert "self._patm_arr, self._patm_default_pa = _infer_patm_source(b)" in app_src
+    assert "n_t = int(np.asarray(b.t, dtype=float).reshape(-1).size)" in app_src
+    assert "self._main_pressure_series_map[str(node)] = _align_series_length(" in app_src
+    assert "self._pressure_series_map[str(node)] = _align_series_length(" in app_src
     assert "P = sample(arr, patm)" in app_src
     assert 's = "—" if not np.isfinite(bar_g) else f"{bar_g:.2f}"' in app_src
     assert 'key = "svc__world_progress_series"' in app_src
@@ -629,7 +638,12 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "self.flow_panel.update_frame(b, i, sample_t=sample_t)" in app_src
     assert "self.valve_panel.update_frame(b, i, sample_t=sample_t)" in app_src
     assert "vals0 = np.asarray(b.open.values[i0, self._idxs], dtype=float)" in app_src
+    assert "n_rows = int(np.asarray(b.open.values).shape[0])" in app_src
+    assert 'raise ValueError("empty open table")' in app_src
+    assert "i0 = int(_clamp(int(sample_i0), 0, n_rows - 1))" in app_src
     assert "q0 = np.asarray(b.q.values[i0, self._idxs], dtype=float)" in app_src
+    assert "n_rows = int(np.asarray(b.q.values).shape[0])" in app_src
+    assert 'raise ValueError("empty flow table")' in app_src
     assert "self._compact_visual_expanded = False" in app_src
     assert "class _CompactTelemetrySummaryCanvas(QtWidgets.QWidget):" in app_src
     assert "self._value_static_texts: list[QtGui.QStaticText] = []" in app_src
@@ -727,13 +741,15 @@ def test_desktop_animator_source_routes_hot_3d_draw_paths_through_safe_helpers()
         "def _set_line_item_data(",
         "or np.any(faces < 0)",
         "or np.any(faces >= verts.shape[0])",
-        "_set_poly_mesh(self._chassis_mesh, v_box, self._box_faces)",
+        "_set_poly_mesh(",
+        "self._chassis_mesh,",
         "face_colors_rgba_u8=wheel_face_colors",
         "_set_line_item_data(self._contact_pts, marker_pos, colors_rgba=marker_cols)",
         "_set_line_item_data(self._contact_links, link_pos, colors_rgba=link_cols)",
         "face_colors_rgba_u8=road_face_colors",
-        "_set_line_item_data(self._road_edges, edge, colors_rgba=edge_colors)",
-        "_set_line_item_data(self._road_stripes, grid_lines, colors_rgba=stripe_colors)",
+        "show_road_wire = bool(show_road and bool(self._visual.get(\"show_road_wire\", False)))",
+        "_set_line_item_pos(self._road_edges, None)",
+        "_set_line_item_pos(self._road_stripes, None)",
     ):
         assert needle in app_src
 

@@ -31,6 +31,9 @@ class _FakeStreamlit:
     def success(self, text: str) -> None:
         self.calls.append(("success", text))
 
+    def caption(self, text: str) -> None:
+        self.calls.append(("caption", text))
+
 
 class _FakeProc:
     def __init__(self, poll_result):
@@ -104,6 +107,31 @@ def test_launch_session_ui_routes_running_job_into_live_panel() -> None:
         is_staged=False,
         current_problem_hash="ph_launch_ui_scope",
         current_problem_hash_mode="legacy",
+        active_runtime_summary={
+            "done": 5,
+            "budget": 84,
+            "tail_state": "trial=5 status=RUNNING",
+            "trial_health": {"done": 5, "running": 2, "error": 1},
+            "penalty_gate": {
+                "infeasible_done": 1,
+                "penalty_key": "penalty_total",
+                "penalty_tol": 0.25,
+                "last_penalty": 0.6,
+                "objective_drift": {"comfort": 0.7, "energy": 3.5},
+            },
+            "recent_errors": ["bad physics", "solver diverged badly on wheel hop"],
+            "handoff_provenance": {
+                "source_run_name": "staged-run",
+                "selection_pool": "promotable",
+                "seed_count": 6,
+                "unique_param_candidates": 6,
+                "promotable_rows": 7,
+                "staged_rows_ok": 9,
+                "pipeline_hint": "staged_then_coordinator",
+                "fragment_count": 4,
+                "has_full_ring": True,
+            },
+        },
         tail_file_text_fn=lambda _: "done=5",
         soft_stop_requested_fn=lambda _: True,
         parse_done_from_log_fn=lambda text: 5 if "5" in text else None,
@@ -127,6 +155,37 @@ def test_launch_session_ui_routes_running_job_into_live_panel() -> None:
         and "run-1" in text
         for kind, text in st.calls
     )
+    assert any(
+        kind == "caption"
+        and "done=5 / 84" in text
+        and "trial=5 status=RUNNING" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "DONE=5, RUNNING=2, ERROR=1" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "Active handoff penalty gate:" in text
+        and "infeasible DONE=1" in text
+        and "`penalty_total`=0.6 > 0.25" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "Recent handoff errors:" in text
+        and "bad physics" in text
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "Handoff provenance:" in text
+        and "source=staged-run" in text
+        and "pool=promotable" in text
+        for kind, text in st.calls
+    )
     assert events == [("live", 5, True, "ph_launch_ui_scope", "legacy")]
 
 
@@ -143,9 +202,17 @@ def test_launch_session_ui_routes_finished_job_into_finished_panel() -> None:
 
     def _render_finished(_st, _job, **kwargs):
         started = bool(kwargs["start_handoff_fn"] and kwargs["start_handoff_fn"]())
-        events.append(("finished", kwargs["rc"], kwargs["soft_stop_requested"], started))
+        context = dict(kwargs.get("active_launch_context") or {})
+        events.append(("finished", kwargs["rc"], kwargs["soft_stop_requested"], started, context))
         return True
 
+    st.session_state["__opt_active_launch_context"] = {
+        "kind": "handoff",
+        "run_dir": str(Path("C:/tmp/run-2").resolve()),
+        "pipeline_mode": "staged",
+        "backend": "stage",
+        "source_run_dir": str(Path("C:/tmp/staged-source").resolve()),
+    }
     render_optimization_launch_session_block(
         st,
         job=job,
@@ -168,6 +235,18 @@ def test_launch_session_ui_routes_finished_job_into_finished_panel() -> None:
 
     assert events == [
         ("handoff_start", Path("C:/tmp/run-2")),
-        ("finished", 0, False, True),
+        (
+            "finished",
+            0,
+            False,
+            True,
+            {
+                "kind": "handoff",
+                "run_dir": str(Path("C:/tmp/run-2").resolve()),
+                "pipeline_mode": "staged",
+                "backend": "stage",
+                "source_run_dir": str(Path("C:/tmp/staged-source").resolve()),
+            },
+        ),
         ("launch_panel", "Запустить StageRunner"),
     ]

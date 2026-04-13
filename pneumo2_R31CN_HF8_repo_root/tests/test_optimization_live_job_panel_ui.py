@@ -37,6 +37,9 @@ class _FakeStreamlit:
     def caption(self, text: str) -> None:
         self.calls.append(("caption", text))
 
+    def markdown(self, text: str) -> None:
+        self.calls.append(("markdown", text))
+
     def write(self, text: str) -> None:
         self.calls.append(("write", text))
 
@@ -140,6 +143,31 @@ def test_live_job_panel_handles_coordinator_progress_and_hard_stop(tmp_path: Pat
         log_text="coordinator log",
         soft_stop_requested=False,
         coordinator_done=5,
+        active_runtime_summary={
+            "done": 5,
+            "budget": 20,
+            "tail_state": "trial=5 status=RUNNING",
+            "trial_health": {"done": 5, "running": 2, "error": 1},
+            "penalty_gate": {
+                "infeasible_done": 1,
+                "penalty_key": "penalty_total",
+                "penalty_tol": 0.25,
+                "last_penalty": 0.6,
+                "objective_drift": {"comfort": 0.7, "energy": 3.5},
+            },
+            "recent_errors": ["bad physics", "solver diverged badly on wheel hop"],
+            "handoff_provenance": {
+                "source_run_name": "staged-run",
+                "selection_pool": "promotable",
+                "seed_count": 6,
+                "unique_param_candidates": 6,
+                "promotable_rows": 7,
+                "staged_rows_ok": 9,
+                "pipeline_hint": "staged_then_coordinator",
+                "fragment_count": 4,
+                "has_full_ring": True,
+            },
+        },
         render_stage_runtime=None,
         write_soft_stop_file_fn=lambda _: True,
         terminate_process_fn=lambda _: events.append("terminate"),
@@ -171,6 +199,31 @@ def test_live_job_panel_handles_coordinator_progress_and_hard_stop(tmp_path: Pat
     assert ("progress", 0.25) in st.calls
     assert any(
         kind == "caption" and "5" in str(text) and "20" in str(text)
+        for kind, text in st.calls
+    )
+    assert ("markdown", "**Runtime diagnostics**") in st.calls
+    assert any(
+        kind == "caption"
+        and "DONE=5, RUNNING=2, ERROR=1" in str(text)
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "Active run penalty gate:" in str(text)
+        and "infeasible DONE=1" in str(text)
+        and "`penalty_total`=0.6 > 0.25" in str(text)
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "Recent run errors:" in str(text)
+        and "bad physics" in str(text)
+        for kind, text in st.calls
+    )
+    assert any(
+        kind == "caption"
+        and "Run provenance:" in str(text)
+        and "source=staged-run" in str(text)
         for kind, text in st.calls
     )
     assert ("write", "**Baseline source:** scoped baseline") in st.calls

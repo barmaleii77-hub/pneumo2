@@ -59,7 +59,8 @@ def _stats_from_df(df):
     col_n = 'интегратор_подшаги_N'
     col_hmin = 'интегратор_подшаг_мин_с'
     col_hmax = 'интегратор_подшаг_макс_с'
-    col_hmean = 'интегратор_подшаг_средний_с'
+    col_hmean = 'интегратор_подшаг_средн_с'
+    col_hmean_legacy = 'интегратор_подшаг_средний_с'
     if col_n not in df.columns:
         return None
     try:
@@ -67,18 +68,22 @@ def _stats_from_df(df):
         mask_n = (n > 0) & np.isfinite(n)
         n_mean = float(np.mean(n[mask_n])) if np.any(mask_n) else float('nan')
 
-        def _nan_stats(col: str, fn):
-            if col not in df.columns:
-                return float('nan')
-            a = df[col].to_numpy(dtype=float)
-            m = np.isfinite(a)
-            if not np.any(m):
-                return float('nan')
-            return float(fn(a[m]))
+        def _nan_stats(cols, fn):
+            if isinstance(cols, str):
+                cols = (cols,)
+            for col in cols:
+                if col not in df.columns:
+                    continue
+                a = df[col].to_numpy(dtype=float)
+                m = np.isfinite(a)
+                if not np.any(m):
+                    return float('nan')
+                return float(fn(a[m]))
+            return float('nan')
 
         h_min = _nan_stats(col_hmin, np.min)
         h_max = _nan_stats(col_hmax, np.max)
-        h_mean = _nan_stats(col_hmean, np.mean)
+        h_mean = _nan_stats((col_hmean, col_hmean_legacy), np.mean)
 
         return {'n_mean': n_mean, 'h_min': h_min, 'h_max': h_max, 'h_mean': h_mean}
     except Exception:
@@ -96,6 +101,10 @@ def run_check(
     ratio_min: float = 2.0,
     check_err_control: bool = False,
     ratio_err_min: float = 1.8,
+    err_rtol: float | None = None,
+    err_atol: float | None = None,
+    err_mass_rtol_scale_factor: float | None = None,
+    err_group_weight_mass: float | None = None,
 ) -> Dict[str, Any]:
     """Выполняет проверку и возвращает dict (ok, metrics...)."""
     from pneumo_solver_ui import model_pneumo_v9_mech_doublewishbone_worldroad as m
@@ -120,16 +129,21 @@ def run_check(
         if bool(err_control):
             # step-doubling контроль локальной ошибки (Matematika6455)
             params["интегратор_контроль_локальной_ошибки"] = True
-            # оставляем дефолты, но задаём явно, чтобы чек не зависел от default_base.json
-            params["интегратор_rtol"] = 1e-4
-            params["интегратор_atol"] = 1e-8
-        df_main, *_ = m.simulate(params, scenario, dt=float(dt), t_end=float(t_end), record_full=False)
-        return df_main
+            if err_rtol is not None:
+                params["интегратор_rtol"] = float(err_rtol)
+            if err_atol is not None:
+                params["интегратор_atol"] = float(err_atol)
+            if err_mass_rtol_scale_factor is not None:
+                params["интегратор_mass_rtol_scale_factor"] = float(err_mass_rtol_scale_factor)
+            if err_group_weight_mass is not None:
+                params["интегратор_err_group_weight_mass"] = float(err_group_weight_mass)
+        df_main, *_, df_atm = m.simulate(params, scenario, dt=float(dt), t_end=float(t_end), record_full=False)
+        return df_main, df_atm
 
-    df_fine = _run(float(fine))
-    df_mid = _run(float(mid))
-    df_coarse = _run(float(coarse))
-    df_coarse_err = _run(float(coarse), err_control=True) if bool(check_err_control) else None
+    df_fine, _ = _run(float(fine))
+    df_mid, _ = _run(float(mid))
+    df_coarse, _ = _run(float(coarse))
+    df_coarse_err, df_coarse_err_atm = _run(float(coarse), err_control=True) if bool(check_err_control) else (None, None)
 
     # одинаковая сетка логирования
     if not (len(df_fine) == len(df_mid) == len(df_coarse) and (df_coarse_err is None or len(df_coarse_err) == len(df_fine))):
@@ -195,6 +209,21 @@ def run_check(
     ok = (e_mid < e_coarse) and (ratio > float(ratio_min))
     if df_coarse_err is not None:
         ok = bool(ok) and (e_coarse_err < e_coarse) and (ratio_err > float(ratio_err_min))
+
+    err_diag: Dict[str, Any] | None = None
+    if df_coarse_err_atm is not None and len(df_coarse_err_atm) > 0:
+        row = df_coarse_err_atm.iloc[0]
+        err_diag = {
+            "err_control_total_rejects": int(row.get("интегратор_total_rejects", 0)),
+            "err_control_total_substeps": int(row.get("интегратор_total_substeps", 0)),
+            "err_control_dominant_group": str(row.get("интегратор_err_reject_dominant_group", "none")),
+            "err_control_weighted_dominant_group": str(row.get("интегратор_err_reject_weighted_dominant_group", "none")),
+            "err_control_mass_rtol_scale_factor": float(row.get("интегратор_mass_rtol_scale_factor", float("nan"))),
+            "err_control_err_group_weight_mass": float(row.get("интегратор_err_group_weight_mass", float("nan"))),
+            "err_control_rtol": float(row.get("интегратор_rtol", float("nan"))),
+            "err_control_atol": float(row.get("интегратор_atol", float("nan"))),
+        }
+
     return {
         "ok": bool(ok),
         "col": col,
@@ -211,6 +240,11 @@ def run_check(
         "integrator_stats": diag,
         "ratio_min": float(ratio_min),
         "ratio_err_min": float(ratio_err_min),
+        "err_rtol_override": None if err_rtol is None else float(err_rtol),
+        "err_atol_override": None if err_atol is None else float(err_atol),
+        "err_mass_rtol_scale_factor_override": None if err_mass_rtol_scale_factor is None else float(err_mass_rtol_scale_factor),
+        "err_group_weight_mass_override": None if err_group_weight_mass is None else float(err_group_weight_mass),
+        **(err_diag or {}),
     }
 
 
@@ -229,6 +263,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Также проверить режим контроля локальной ошибки (step-doubling, Matematika6455).",
     )
     ap.add_argument("--ratio_err_min", type=float, default=1.8)
+    ap.add_argument("--err_rtol", type=float, default=None)
+    ap.add_argument("--err_atol", type=float, default=None)
+    ap.add_argument("--err_mass_rtol_scale_factor", type=float, default=None)
+    ap.add_argument("--err_group_weight_mass", type=float, default=None)
 
     ns = ap.parse_args(argv)
     res = run_check(
@@ -241,6 +279,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         ratio_min=ns.ratio_min,
         check_err_control=bool(ns.check_err_control),
         ratio_err_min=ns.ratio_err_min,
+        err_rtol=ns.err_rtol,
+        err_atol=ns.err_atol,
+        err_mass_rtol_scale_factor=ns.err_mass_rtol_scale_factor,
+        err_group_weight_mass=ns.err_group_weight_mass,
     )
 
     if bool(res.get("ok")):

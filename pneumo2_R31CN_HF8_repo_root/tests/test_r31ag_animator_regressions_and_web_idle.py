@@ -9,10 +9,14 @@ MECH_ANIM = (ROOT / "pneumo_solver_ui" / "components" / "mech_anim" / "index.htm
 PLAYHEAD = (ROOT / "pneumo_solver_ui" / "components" / "playhead_ctrl" / "index.html").read_text(encoding="utf-8")
 
 
-def test_road_items_become_visible_after_valid_geometry_update() -> None:
-    assert 'self._road_mesh.setVisible(True)' in APP
-    assert 'self._road_edges.setVisible(True)' in APP
-    assert 'self._road_stripes.setVisible(True)' in APP
+def test_road_preview_defaults_to_mesh_without_wire_overlay() -> None:
+    assert "_set_poly_mesh(" in APP
+    assert "self._road_mesh," in APP
+    assert "drawEdges=True," in APP
+    assert "edgeColor=(0.22, 0.30, 0.38, 0.40)," in APP
+    assert 'show_road_wire = bool(show_road and bool(self._visual.get("show_road_wire", False)))' in APP
+    assert '_set_line_item_pos(self._road_edges, None)' in APP
+    assert '_set_line_item_pos(self._road_stripes, None)' in APP
 
 
 def test_playback_perf_mode_applies_consistent_perf_hints_to_all_aux_panels() -> None:

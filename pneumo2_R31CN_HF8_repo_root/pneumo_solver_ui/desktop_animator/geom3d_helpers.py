@@ -9,8 +9,21 @@ ABSOLUTE LAW
 """
 from __future__ import annotations
 
+from functools import lru_cache
 import math
 import numpy as np
+
+
+def _quantize_display_count(count: int, *, quantum: int, min_count: int, max_count: int) -> int:
+    """Keep presentation topology in stable buckets to avoid frame-to-frame churn."""
+    q = int(max(1, quantum))
+    lo = int(max(1, min_count))
+    hi = int(max(lo, max_count))
+    value = int(max(lo, min(hi, count)))
+    if value <= lo or value >= hi:
+        return value
+    bucket = int(q * round(float(value) / float(q)))
+    return int(max(lo, min(hi, bucket)))
 
 
 def car_frame_rotate_xy(x: np.ndarray | float, y: np.ndarray | float, yaw_rad: float) -> tuple[np.ndarray, np.ndarray]:
@@ -40,6 +53,23 @@ def localize_world_points_to_car_frame(points_xyz: np.ndarray, *, x0: float, y0:
     out[:, 0] = lx
     out[:, 1] = ly
     return out
+
+
+def localize_world_point_to_car_frame(point_xyz: np.ndarray, *, x0: float, y0: float, yaw_rad: float) -> np.ndarray:
+    """Fast path for a single world-space point -> local car frame."""
+    pt = np.asarray(point_xyz, dtype=float).reshape(3)
+    c = math.cos(-float(yaw_rad))
+    s = math.sin(-float(yaw_rad))
+    dx = float(pt[0]) - float(x0)
+    dy = float(pt[1]) - float(y0)
+    return np.asarray(
+        [
+            (c * dx) - (s * dy),
+            (s * dx) + (c * dy),
+            float(pt[2]),
+        ],
+        dtype=float,
+    )
 
 
 def orthonormal_frame_from_corners(lp: np.ndarray, pp: np.ndarray, lz: np.ndarray, pz: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -163,6 +193,66 @@ def _safe_normalize(vec_xyz: np.ndarray, *, fallback_xyz: np.ndarray) -> np.ndar
     return np.array([0.0, 1.0, 0.0], dtype=float)
 
 
+def _normalize_xyz_or(
+    x: float,
+    y: float,
+    z: float,
+    *,
+    fallback_xyz: np.ndarray,
+) -> tuple[float, float, float]:
+    n = math.sqrt((float(x) * float(x)) + (float(y) * float(y)) + (float(z) * float(z)))
+    if math.isfinite(n) and n > 1e-12:
+        inv = 1.0 / n
+        return float(x) * inv, float(y) * inv, float(z) * inv
+    fb = np.asarray(fallback_xyz, dtype=float).reshape(3)
+    fx = float(fb[0])
+    fy = float(fb[1])
+    fz = float(fb[2])
+    fn = math.sqrt((fx * fx) + (fy * fy) + (fz * fz))
+    if math.isfinite(fn) and fn > 1e-12:
+        inv = 1.0 / fn
+        return fx * inv, fy * inv, fz * inv
+    return 0.0, 1.0, 0.0
+
+
+def _cross_xyz(
+    ax: float,
+    ay: float,
+    az: float,
+    bx: float,
+    by: float,
+    bz: float,
+) -> tuple[float, float, float]:
+    return (
+        (float(ay) * float(bz)) - (float(az) * float(by)),
+        (float(az) * float(bx)) - (float(ax) * float(bz)),
+        (float(ax) * float(by)) - (float(ay) * float(bx)),
+    )
+
+
+def _project_xyz_to_plane_normalized(
+    vx: float,
+    vy: float,
+    vz: float,
+    *,
+    plane_normal_xyz: np.ndarray,
+    fallback_xyz: np.ndarray,
+) -> tuple[float, float, float]:
+    nx, ny, nz = _normalize_xyz_or(
+        float(np.asarray(plane_normal_xyz, dtype=float).reshape(3)[0]),
+        float(np.asarray(plane_normal_xyz, dtype=float).reshape(3)[1]),
+        float(np.asarray(plane_normal_xyz, dtype=float).reshape(3)[2]),
+        fallback_xyz=np.array([0.0, 0.0, 1.0], dtype=float),
+    )
+    dot = (float(vx) * nx) + (float(vy) * ny) + (float(vz) * nz)
+    return _normalize_xyz_or(
+        float(vx) - (nx * dot),
+        float(vy) - (ny * dot),
+        float(vz) - (nz * dot),
+        fallback_xyz=fallback_xyz,
+    )
+
+
 def project_vector_to_plane(vec_xyz: np.ndarray, *, plane_normal_xyz: np.ndarray, fallback_xyz: np.ndarray) -> np.ndarray:
     """Project a vector to a plane and normalize the result."""
     v = np.asarray(vec_xyz, dtype=float).reshape(3)
@@ -205,32 +295,89 @@ def derive_wheel_pose_from_hardpoints(
     lr = _opt(lower_rear_xyz)
     uf = _opt(upper_front_xyz)
     ur = _opt(upper_rear_xyz)
-    hardpoints = [p for p in (lf, lr, uf, ur) if p is not None]
-    if hardpoints:
-        hub_mean = np.mean(np.vstack(hardpoints), axis=0)
-        center[0] = float(hub_mean[0])
-        center[1] = float(hub_mean[1])
+    sum_x = 0.0
+    sum_y = 0.0
+    hardpoint_count = 0
+    for p in (lf, lr, uf, ur):
+        if p is None:
+            continue
+        sum_x += float(p[0])
+        sum_y += float(p[1])
+        hardpoint_count += 1
+    if hardpoint_count > 0:
+        center[0] = sum_x / float(hardpoint_count)
+        center[1] = sum_y / float(hardpoint_count)
 
     lower_mid = None if (lf is None or lr is None) else 0.5 * (lf + lr)
     upper_mid = None if (uf is None or ur is None) else 0.5 * (uf + ur)
-    front_pts = [p for p in (lf, uf) if p is not None]
-    rear_pts = [p for p in (lr, ur) if p is not None]
-    front_mid = np.mean(np.vstack(front_pts), axis=0) if front_pts else None
-    rear_mid = np.mean(np.vstack(rear_pts), axis=0) if rear_pts else None
 
-    up = _safe_normalize(
-        (upper_mid - lower_mid) if (upper_mid is not None and lower_mid is not None) else np.array([0.0, 0.0, 1.0], dtype=float),
-        fallback_xyz=np.array([0.0, 0.0, 1.0], dtype=float),
-    )
-    fwd_guess = np.array([1.0, 0.0, 0.0], dtype=float)
+    front_mid = None
+    front_count = 0
+    front_x = 0.0
+    front_y = 0.0
+    front_z = 0.0
+    for p in (lf, uf):
+        if p is None:
+            continue
+        front_x += float(p[0])
+        front_y += float(p[1])
+        front_z += float(p[2])
+        front_count += 1
+    if front_count > 0:
+        front_mid = np.asarray([front_x / front_count, front_y / front_count, front_z / front_count], dtype=float)
+
+    rear_mid = None
+    rear_count = 0
+    rear_x = 0.0
+    rear_y = 0.0
+    rear_z = 0.0
+    for p in (lr, ur):
+        if p is None:
+            continue
+        rear_x += float(p[0])
+        rear_y += float(p[1])
+        rear_z += float(p[2])
+        rear_count += 1
+    if rear_count > 0:
+        rear_mid = np.asarray([rear_x / rear_count, rear_y / rear_count, rear_z / rear_count], dtype=float)
+
+    if upper_mid is not None and lower_mid is not None:
+        upx = float(upper_mid[0] - lower_mid[0])
+        upy = float(upper_mid[1] - lower_mid[1])
+        upz = float(upper_mid[2] - lower_mid[2])
+    else:
+        upx, upy, upz = 0.0, 0.0, 1.0
+    upx, upy, upz = _normalize_xyz_or(upx, upy, upz, fallback_xyz=np.array([0.0, 0.0, 1.0], dtype=float))
+
     if front_mid is not None and rear_mid is not None:
-        fwd_guess = front_mid - rear_mid
-    fwd = project_vector_to_plane(fwd_guess, plane_normal_xyz=up, fallback_xyz=np.array([1.0, 0.0, 0.0], dtype=float))
-    axle = _safe_normalize(np.cross(up, fwd), fallback_xyz=np.array([0.0, 1.0 if center[1] >= 0.0 else -1.0, 0.0], dtype=float))
-    # Re-orthogonalize after axle fallback.
-    fwd = _safe_normalize(np.cross(axle, up), fallback_xyz=fwd)
-    up = _safe_normalize(np.cross(fwd, axle), fallback_xyz=up)
+        fgx = float(front_mid[0] - rear_mid[0])
+        fgy = float(front_mid[1] - rear_mid[1])
+        fgz = float(front_mid[2] - rear_mid[2])
+    else:
+        fgx, fgy, fgz = 1.0, 0.0, 0.0
+    fwdx, fwdy, fwdz = _project_xyz_to_plane_normalized(
+        fgx,
+        fgy,
+        fgz,
+        plane_normal_xyz=np.asarray([upx, upy, upz], dtype=float),
+        fallback_xyz=np.array([1.0, 0.0, 0.0], dtype=float),
+    )
 
+    axx, axy, axz = _cross_xyz(upx, upy, upz, fwdx, fwdy, fwdz)
+    axx, axy, axz = _normalize_xyz_or(
+        axx,
+        axy,
+        axz,
+        fallback_xyz=np.array([0.0, 1.0 if center[1] >= 0.0 else -1.0, 0.0], dtype=float),
+    )
+    fwdx, fwdy, fwdz = _cross_xyz(axx, axy, axz, upx, upy, upz)
+    fwdx, fwdy, fwdz = _normalize_xyz_or(fwdx, fwdy, fwdz, fallback_xyz=np.asarray([fwdx, fwdy, fwdz], dtype=float))
+    upx, upy, upz = _cross_xyz(fwdx, fwdy, fwdz, axx, axy, axz)
+    upx, upy, upz = _normalize_xyz_or(upx, upy, upz, fallback_xyz=np.asarray([upx, upy, upz], dtype=float))
+
+    axle = np.asarray([axx, axy, axz], dtype=float)
+    fwd = np.asarray([fwdx, fwdy, fwdz], dtype=float)
+    up = np.asarray([upx, upy, upz], dtype=float)
     toe_rad = math.atan2(float(axle[0]), max(1e-12, abs(float(axle[1]))))
     camber_rad = math.atan2(float(axle[2]), max(1e-12, abs(float(axle[1]))))
     return center, axle, fwd, up, float(toe_rad), float(camber_rad)
@@ -268,23 +415,92 @@ def ellipse_mesh_on_plane(
 
 
 
+@lru_cache(maxsize=64)
+def _grid_faces_rect_cached(n_s: int, n_l: int) -> np.ndarray:
+    row_idx = np.arange(n_s - 1, dtype=np.int32).reshape(-1, 1)
+    col_idx = np.arange(n_l - 1, dtype=np.int32).reshape(1, -1)
+    row0 = row_idx * int(n_l)
+    row1 = (row_idx + 1) * int(n_l)
+    a = row0 + col_idx
+    b = a + 1
+    d = row1 + col_idx
+    c = d + 1
+    faces = np.stack(
+        [
+            np.stack([a, b, c], axis=-1),
+            np.stack([a, c, d], axis=-1),
+        ],
+        axis=-2,
+    ).reshape(-1, 3)
+    faces = np.ascontiguousarray(faces, dtype=np.int32)
+    try:
+        faces.setflags(write=False)
+    except Exception:
+        pass
+    return faces
+
+
 def grid_faces_rect(n_long: int, n_lat: int) -> np.ndarray:
     """Return triangle faces for a regular (longitudinal x lateral) road grid."""
     n_s = int(max(2, n_long))
     n_l = int(max(2, n_lat))
-    faces: list[list[int]] = []
-    for i in range(n_s - 1):
-        row0 = i * n_l
-        row1 = (i + 1) * n_l
-        for j in range(n_l - 1):
-            a = row0 + j
-            b = row0 + j + 1
-            c = row1 + j + 1
-            d = row1 + j
-            faces.append([a, b, c])
-            faces.append([a, c, d])
-    return np.asarray(faces, dtype=np.int32)
+    return _grid_faces_rect_cached(n_s, n_l)
 
+
+@lru_cache(maxsize=128)
+def _road_longitudinal_line_pairs(
+    n_long: int,
+    n_lat: int,
+    lateral_stride: int,
+    include_outer_edges: bool = True,
+) -> np.ndarray:
+    n_s = int(max(2, n_long))
+    n_l = int(max(2, n_lat))
+    lat_stride = int(max(1, lateral_stride))
+    rails = set(range(0, n_l, lat_stride))
+    if bool(include_outer_edges):
+        rails |= {0, n_l - 1}
+    else:
+        rails = set(int(i) for i in rails if 0 < int(i) < (n_l - 1))
+        if not rails and n_l > 2:
+            rails = {int(n_l // 2)}
+    rails = sorted(rails)
+    if n_s <= 1 or not rails:
+        return np.zeros((0, 2), dtype=np.int32)
+    row_base = (np.arange(n_s - 1, dtype=np.int32) * n_l).reshape(-1, 1)
+    rail_cols = np.asarray(rails, dtype=np.int32).reshape(1, -1)
+    start = row_base + rail_cols
+    pairs = np.empty((start.size, 2), dtype=np.int32)
+    pairs[:, 0] = start.reshape(-1)
+    pairs[:, 1] = (start + n_l).reshape(-1)
+    try:
+        pairs.setflags(write=False)
+    except Exception:
+        pass
+    return pairs
+
+
+@lru_cache(maxsize=256)
+def _road_crossbar_line_pairs(
+    n_long: int,
+    n_lat: int,
+    rows_key: tuple[int, ...],
+) -> np.ndarray:
+    n_s = int(max(2, n_long))
+    n_l = int(max(2, n_lat))
+    rows = np.asarray(sorted(set(int(i) for i in rows_key if 0 <= int(i) < n_s)), dtype=np.int32)
+    if rows.size == 0 or n_l <= 1:
+        return np.zeros((0, 2), dtype=np.int32)
+    col_offsets = np.arange(n_l - 1, dtype=np.int32).reshape(1, -1)
+    start = (rows.reshape(-1, 1) * n_l) + col_offsets
+    pairs = np.empty((start.size, 2), dtype=np.int32)
+    pairs[:, 0] = start.reshape(-1)
+    pairs[:, 1] = (start + 1).reshape(-1)
+    try:
+        pairs.setflags(write=False)
+    except Exception:
+        pass
+    return pairs
 
 
 def regular_grid_submesh(
@@ -357,6 +573,7 @@ def road_display_counts_from_view(
         n_long = int(max(min_long, min(target_long, raw_n)))
     else:
         n_long = target_long
+    n_long = _quantize_display_count(n_long, quantum=32, min_count=min_long, max_count=max_long)
 
     target_lat = int(round(vp_h / 42.0))
     n_lat = int(max(min_lat, min(max_lat, target_lat)))
@@ -727,6 +944,7 @@ def road_grid_line_segments(
     include_longitudinal: bool = True,
     include_crossbars: bool = True,
     force_last_crossbar: bool = True,
+    include_outer_longitudinal: bool = True,
 ) -> np.ndarray:
     """Build visible grid lines for the road mesh.
 
@@ -742,19 +960,16 @@ def road_grid_line_segments(
     n_l = int(max(2, n_lat))
     if verts.shape[0] != n_s * n_l:
         raise ValueError('road_grid_line_segments: vertex count does not match grid shape')
-    segs: list[np.ndarray] = []
+    pair_blocks: list[np.ndarray] = []
     if include_longitudinal:
-        # Longitudinal lines: decimated lateral rails plus both borders.
-        lat_stride = int(max(1, lateral_stride))
-        rails = set(range(0, n_l, lat_stride))
-        rails.add(0)
-        rails.add(n_l - 1)
-        for j in sorted(rails):
-            for i in range(n_s - 1):
-                a = verts[i * n_l + j]
-                b = verts[(i + 1) * n_l + j]
-                segs.append(a)
-                segs.append(b)
+        pair_blocks.append(
+            _road_longitudinal_line_pairs(
+                n_s,
+                n_l,
+                int(max(1, lateral_stride)),
+                bool(include_outer_longitudinal),
+            )
+        )
     if include_crossbars:
         # Cross-bars: prefer explicitly supplied rows; otherwise fall back to every N-th
         # local longitudinal row. ``force_last_crossbar`` keeps the old behaviour, but
@@ -769,16 +984,42 @@ def road_grid_line_segments(
             rows = set(range(0, n_s, stride))
             if force_last_crossbar:
                 rows.add(n_s - 1)
-        for i in sorted(rows):
-            base = i * n_l
-            for j in range(n_l - 1):
-                a = verts[base + j]
-                b = verts[base + j + 1]
-                segs.append(a)
-                segs.append(b)
-    if not segs:
+        pair_blocks.append(_road_crossbar_line_pairs(n_s, n_l, tuple(sorted(rows))))
+    if not pair_blocks:
         return np.zeros((0, 3), dtype=float)
-    return np.asarray(segs, dtype=float)
+    if len(pair_blocks) == 1:
+        pairs = pair_blocks[0]
+    else:
+        pairs = np.concatenate(pair_blocks, axis=0)
+    if pairs.size == 0:
+        return np.zeros((0, 3), dtype=float)
+    return np.ascontiguousarray(verts[pairs.reshape(-1)], dtype=float)
+
+
+def polyline_line_segments(points_xyz: np.ndarray) -> np.ndarray:
+    """Return independent line segments for a polyline without closing joins."""
+    pts = np.asarray(points_xyz, dtype=float).reshape(-1, 3)
+    if pts.shape[0] <= 1:
+        return np.zeros((0, 3), dtype=float)
+    segs = np.empty(((pts.shape[0] - 1) * 2, 3), dtype=float)
+    segs[0::2] = pts[:-1]
+    segs[1::2] = pts[1:]
+    return np.ascontiguousarray(segs, dtype=float)
+
+
+def road_edge_line_segments(left_edge_xyz: np.ndarray, right_edge_xyz: np.ndarray) -> np.ndarray:
+    """Return independent left/right road edge segments without a closing cross-connection."""
+    left = np.asarray(left_edge_xyz, dtype=float).reshape(-1, 3)
+    right = np.asarray(right_edge_xyz, dtype=float).reshape(-1, 3)
+    if left.shape[0] <= 1 and right.shape[0] <= 1:
+        return np.zeros((0, 3), dtype=float)
+    left_segs = polyline_line_segments(left)
+    right_segs = polyline_line_segments(right)
+    if left_segs.size == 0:
+        return right_segs
+    if right_segs.size == 0:
+        return left_segs
+    return np.ascontiguousarray(np.vstack([left_segs, right_segs]), dtype=float)
 
 
 def road_crossbar_line_segments_from_profiles(
@@ -856,14 +1097,12 @@ def road_crossbar_line_segments_from_profiles(
     x_grid = x_t[:, None] + nx_t[:, None] * off[None, :]
     y_grid = y_t[:, None] + ny_t[:, None] * off[None, :]
     verts = np.stack([x_grid, y_grid, z_grid], axis=2)
-    segs: list[np.ndarray] = []
-    for row in verts:
-        for j in range(n_lat - 1):
-            segs.append(row[j])
-            segs.append(row[j + 1])
-    if not segs:
+    if verts.shape[0] == 0 or n_lat <= 1:
         return np.zeros((0, 3), dtype=float)
-    return np.asarray(segs, dtype=float)
+    segs = np.empty((verts.shape[0], n_lat - 1, 2, 3), dtype=float)
+    segs[:, :, 0, :] = verts[:, :-1, :]
+    segs[:, :, 1, :] = verts[:, 1:, :]
+    return np.ascontiguousarray(segs.reshape(-1, 3), dtype=float)
 
 
 def _points_inside_wheel_cylinder_mask(

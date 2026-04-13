@@ -3,6 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from pneumo_solver_ui.optimization_active_runtime_summary import (
+    active_handoff_provenance_caption,
+    active_runtime_penalty_gate_caption,
+    active_runtime_progress_caption,
+    active_runtime_recent_errors_caption,
+    active_runtime_trial_health_caption,
+)
 from pneumo_solver_ui.optimization_coordinator_handoff_ui import (
     render_coordinator_handoff_action,
 )
@@ -20,6 +27,84 @@ from pneumo_solver_ui.optimization_problem_scope_ui import (
 from pneumo_solver_ui.optimization_run_history import (
     summarize_run_packaging_snapshot,
 )
+
+
+def _run_dir_key(raw: Any) -> str:
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    try:
+        return str(Path(text).resolve())
+    except Exception:
+        return text
+
+
+def _render_active_run_marker(
+    st: Any,
+    summary: Any,
+    *,
+    active_run_dir: Any = None,
+    active_launch_context: dict[str, Any] | None = None,
+    active_runtime_summary: dict[str, Any] | None = None,
+) -> bool:
+    selected_run_dir = _run_dir_key(getattr(summary, "run_dir", None))
+    current_active_run_dir = _run_dir_key(active_run_dir)
+    if not selected_run_dir or not current_active_run_dir or selected_run_dir != current_active_run_dir:
+        return False
+
+    context = dict(active_launch_context or {})
+    is_handoff = str(context.get("kind") or "").strip() == "handoff"
+    progress_caption = active_runtime_progress_caption(
+        active_runtime_summary,
+        prefix="Active handoff progress" if is_handoff else "Active run progress",
+    )
+    trial_health_caption = active_runtime_trial_health_caption(
+        active_runtime_summary,
+        prefix="Active handoff trial health" if is_handoff else "Active run trial health",
+    )
+    penalty_gate_caption = active_runtime_penalty_gate_caption(
+        active_runtime_summary,
+        prefix="Active handoff penalty gate" if is_handoff else "Active run penalty gate",
+    )
+    recent_errors_caption = active_runtime_recent_errors_caption(
+        active_runtime_summary,
+        prefix="Recent handoff errors" if is_handoff else "Recent run errors",
+    )
+    provenance_caption = active_handoff_provenance_caption(
+        active_runtime_summary,
+        prefix="Handoff provenance" if is_handoff else "Run provenance",
+    )
+    if str(context.get("kind") or "").strip() == "handoff":
+        source_run_dir = _run_dir_key(context.get("source_run_dir"))
+        source_name = Path(source_run_dir).name if source_run_dir else "staged run"
+        st.info(
+            "LIVE NOW: сейчас это активный seeded full-ring coordinator handoff "
+            f"из staged run `{source_name}`."
+        )
+        if progress_caption:
+            st.caption(progress_caption)
+        if trial_health_caption:
+            st.caption(trial_health_caption)
+        if penalty_gate_caption:
+            st.caption(penalty_gate_caption)
+        if recent_errors_caption:
+            st.caption(recent_errors_caption)
+        if provenance_caption:
+            st.caption(provenance_caption)
+        return True
+
+    st.info("LIVE NOW: этот optimization run сейчас выполняется в текущей сессии.")
+    if progress_caption:
+        st.caption(progress_caption)
+    if trial_health_caption:
+        st.caption(trial_health_caption)
+    if penalty_gate_caption:
+        st.caption(penalty_gate_caption)
+    if recent_errors_caption:
+        st.caption(recent_errors_caption)
+    if provenance_caption:
+        st.caption(provenance_caption)
+    return True
 
 
 def render_optimization_run_log_tail(
@@ -82,6 +167,59 @@ def render_optimization_run_packaging_details(
     return False
 
 
+def _render_final_runtime_summary(
+    st: Any,
+    summary: Any,
+    *,
+    active_run_dir: Any = None,
+) -> bool:
+    selected_run_dir = _run_dir_key(getattr(summary, "run_dir", None))
+    current_active_run_dir = _run_dir_key(active_run_dir)
+    if selected_run_dir and current_active_run_dir and selected_run_dir == current_active_run_dir:
+        return False
+    runtime_summary = dict(getattr(summary, "runtime_summary", None) or {})
+    if not runtime_summary:
+        return False
+    is_handoff = str(getattr(summary, "backend", "") or "").startswith("Handoff/")
+    progress_caption = active_runtime_progress_caption(
+        runtime_summary,
+        prefix="Final handoff progress" if is_handoff else "Final run progress",
+    )
+    trial_health_caption = active_runtime_trial_health_caption(
+        runtime_summary,
+        prefix="Final handoff trial health" if is_handoff else "Final run trial health",
+    )
+    penalty_gate_caption = active_runtime_penalty_gate_caption(
+        runtime_summary,
+        prefix="Final handoff penalty gate" if is_handoff else "Final run penalty gate",
+    )
+    recent_errors_caption = active_runtime_recent_errors_caption(
+        runtime_summary,
+        prefix="Recent handoff errors" if is_handoff else "Recent run errors",
+    )
+    provenance_caption = active_handoff_provenance_caption(
+        runtime_summary,
+        prefix="Handoff provenance" if is_handoff else "Run provenance",
+    )
+    diagnostic_lines = [
+        text
+        for text in (
+            progress_caption,
+            trial_health_caption,
+            penalty_gate_caption,
+            recent_errors_caption,
+            provenance_caption,
+        )
+        if str(text or "").strip()
+    ]
+    if not diagnostic_lines:
+        return False
+    st.write("**Final runtime diagnostics**")
+    for line in diagnostic_lines:
+        st.caption(str(line))
+    return True
+
+
 def render_selected_optimization_run_details(
     st: Any,
     summary: Any,
@@ -93,8 +231,18 @@ def render_selected_optimization_run_details(
     current_problem_hash: str = "",
     current_problem_hash_mode: str = "",
     start_handoff_fn: Callable[[Path], bool] | None = None,
+    active_run_dir: Any = None,
+    active_launch_context: dict[str, Any] | None = None,
+    active_runtime_summary: dict[str, Any] | None = None,
     render_handoff_action_fn: Callable[..., bool] = render_coordinator_handoff_action,
 ) -> None:
+    _render_active_run_marker(
+        st,
+        summary,
+        active_run_dir=active_run_dir,
+        active_launch_context=active_launch_context,
+        active_runtime_summary=active_runtime_summary,
+    )
     st.write(f"**Pipeline:** {summary.backend}")
     st.write(f"**run_dir:** `{summary.run_dir}`")
     if summary.result_path is not None:
@@ -157,6 +305,11 @@ def render_selected_optimization_run_details(
     )
     render_objective_contract_drift_warning(st, contract_diff_bits)
 
+    _render_final_runtime_summary(
+        st,
+        summary,
+        active_run_dir=active_run_dir,
+    )
     render_optimization_run_packaging_details(st, summary.result_path)
     render_optimization_run_log_tail(st, summary.log_path, load_log_text=load_log_text)
     if str(getattr(summary, "pipeline_mode", "") or "") == "staged" and render_handoff_action_fn is not None:
