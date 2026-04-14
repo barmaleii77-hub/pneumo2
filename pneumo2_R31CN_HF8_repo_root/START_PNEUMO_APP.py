@@ -402,8 +402,8 @@ DEFAULT_PORT = 8505
 def _ts_compact() -> str:
     return time.strftime("%Y%m%d_%H%M%S", time.localtime())
 
-def _new_run_id() -> str:
-    return f"UI_{_ts_compact()}"
+def _new_run_id(prefix: str = "UI") -> str:
+    return f"{prefix}_{_ts_compact()}"
 
 def _new_session_dir(run_id: str) -> Path:
     base = (ROOT / "runs" / "ui_sessions").resolve()
@@ -682,6 +682,7 @@ class LauncherGUI:
         self._pbar_mode = "determinate"
 
         self.proc: subprocess.Popen | None = None
+        self.proc_kind: str | None = None
         self.session_dir: Path | None = None
         self.run_id: str | None = None
         self.trace_id: str | None = None
@@ -693,6 +694,7 @@ class LauncherGUI:
         self._launcher_stop_source: str | None = None
         self._child_env: dict | None = None
         self.stream_log_fh = None
+        self.active_log_path: Path | None = None
         self._lock = threading.Lock()
         self.launch_http_ready: bool = False
         self.launch_ready_source: str | None = None
@@ -721,6 +723,7 @@ class LauncherGUI:
         ttk.Button(top, text="Запустить (с авто-установкой зависимостей)", command=self.start_app).pack(
             side="right", padx=6
         )
+        ttk.Button(top, text="Запустить Desktop GUI-spec", command=self.start_desktop_shell).pack(side="right", padx=6)
         ttk.Button(top, text="Остановить", command=lambda: self.stop_app(reason="button_stop")).pack(side="right", padx=6)
         ttk.Button(top, text="Только установить зависимости", command=self.install_deps).pack(side="right", padx=6)
 
@@ -744,6 +747,7 @@ class LauncherGUI:
         ttk.Button(bottom, text="Открыть папку логов", command=self.open_logs_dir).pack(side="left")
         ttk.Button(bottom, text="Открыть deps_install.log", command=self.open_deps_log).pack(side="left", padx=6)
         ttk.Button(bottom, text="Открыть streamlit_stdout.log", command=self.open_streamlit_log).pack(side="left", padx=6)
+        ttk.Button(bottom, text="Открыть desktop_gui_spec_shell.log", command=self.open_desktop_log).pack(side="left", padx=6)
         ttk.Button(bottom, text="Выход", command=self.on_close).pack(side="right")
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -788,6 +792,109 @@ class LauncherGUI:
                 pass
 
         self.root.after(0, _set)
+
+    def _reset_launch_state(self) -> None:
+        self._exit_handled = False
+        self._close_requested = False
+        self._launcher_stop_requested = False
+        self._launcher_stop_source = None
+        self.launch_http_ready = False
+        self.launch_ready_source = None
+        self.launch_http_notes = []
+        self.launch_readiness_diag = None
+        self.proc_kind = None
+        self.rr_token = None
+
+    def _prepare_child_session_env(
+        self,
+        *,
+        run_prefix: str = "UI",
+        extra_env: dict[str, str] | None = None,
+    ) -> tuple[str, Path, Path, Path, str, dict[str, str]]:
+        self._reset_launch_state()
+        run_id = _new_run_id(run_prefix)
+        session_dir = _new_session_dir(run_id)
+        trace_id = uuid.uuid4().hex[:12]
+        self.run_id = run_id
+        self.session_dir = session_dir
+        self.trace_id = trace_id
+
+        log_dir = session_dir / "logs"
+        workspace_dir = session_dir / "workspace"
+
+        env = os.environ.copy()
+        env.update(
+            {
+                "PNEUMO_RELEASE": RELEASE,
+                "PNEUMO_RUN_ID": run_id,
+                "PNEUMO_TRACE_ID": trace_id,
+                "PNEUMO_SESSION_DIR": str(session_dir),
+                "PNEUMO_LOG_DIR": str(log_dir),
+                "PNEUMO_WORKSPACE_DIR": str(workspace_dir),
+                "PYTHONUTF8": "1",
+                "PYTHONIOENCODING": "utf-8",
+                "PYTHONWARNINGS": "default",
+                "PNEUMO_SHARED_VENV_PYTHON": str(_venv_python(prefer_gui=False)),
+                "PYTHONPATH": str(ROOT)
+                + (os.pathsep + env.get("PYTHONPATH", "") if env.get("PYTHONPATH") else ""),
+            }
+        )
+        normalized_extra_env = {str(k): str(v) for k, v in (extra_env or {}).items()}
+        transient_keys = {
+            "PNEUMO_UI_PORT",
+            "PNEUMO_AUTO_SEND_BUNDLE",
+            "PNEUMO_DESKTOP_GUI_SPEC_SHELL",
+            "PNEUMO_LAUNCH_SURFACE",
+        }
+        for key in transient_keys:
+            if key not in normalized_extra_env:
+                env.pop(key, None)
+                os.environ.pop(key, None)
+        env.update(normalized_extra_env)
+
+        os.environ.update({k: v for k, v in env.items() if k.startswith("PNEUMO_")})
+        self._child_env = env
+        return run_id, session_dir, log_dir, workspace_dir, trace_id, env
+
+    def _close_active_log_handle(self) -> None:
+        try:
+            if self.stream_log_fh:
+                self.stream_log_fh.close()
+        except Exception:
+            pass
+        self.stream_log_fh = None
+
+    def _attach_process_log(self, log_path: Path, cmd: list[str]) -> None:
+        self._close_active_log_handle()
+        self.active_log_path = log_path
+        try:
+            self.stream_log_fh = open(log_path, "a", encoding="utf-8", errors="replace")
+            self.stream_log_fh.write(f"\n===== {time.strftime('%Y-%m-%d %H:%M:%S')} =====\n")
+            self.stream_log_fh.write(" ".join(cmd) + "\n")
+        except Exception:
+            self.stream_log_fh = None
+
+    def _launch_logged_process(
+        self,
+        *,
+        cmd: list[str],
+        env: dict[str, str],
+        log_path: Path,
+        show_console: bool,
+    ) -> subprocess.Popen:
+        self._attach_process_log(log_path, cmd)
+        creationflags = subprocess.CREATE_NEW_CONSOLE if show_console else _creationflags_no_window()
+        popen_kwargs = {}
+        if not show_console:
+            popen_kwargs["stdout"] = self.stream_log_fh or subprocess.DEVNULL
+            popen_kwargs["stderr"] = self.stream_log_fh or subprocess.DEVNULL
+        return subprocess.Popen(
+            cmd,
+            cwd=str(ROOT),
+            creationflags=creationflags,
+            env=env,
+            **popen_kwargs,
+        )
 
     # ---------------- logging ----------------
     def _log(self, msg: str) -> None:
@@ -1570,56 +1677,14 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
                         return
 
                     # --- Testy R56: UI session isolation (logs/workspace) ---
-                    self._exit_handled = False
-                    self._close_requested = False
-                    self._launcher_stop_requested = False
-                    self._launcher_stop_source = None
-                    self.launch_http_ready = False
-                    self.launch_ready_source = None
-                    self.launch_http_notes = []
-                    self.launch_readiness_diag = None
-                    run_id = _new_run_id()
-                    session_dir = _new_session_dir(run_id)
-                    trace_id = uuid.uuid4().hex[:12]
-                    self.run_id = run_id
-                    self.session_dir = session_dir
-                    self.trace_id = trace_id
-
-                    log_dir = session_dir / "logs"
-                    workspace_dir = session_dir / "workspace"
+                    run_id, session_dir, log_dir, workspace_dir, trace_id, env = self._prepare_child_session_env(
+                        extra_env={
+                            "PNEUMO_UI_PORT": str(port),
+                            "PNEUMO_AUTO_SEND_BUNDLE": "1",
+                            "PNEUMO_LAUNCH_SURFACE": "web_streamlit",
+                        }
+                    )
                     streamlit_log_path = log_dir / "streamlit_stdout.log"
-
-                    # child env (also update current process env for downstream tools)
-                    env = os.environ.copy()
-                    env["PNEUMO_RELEASE"] = RELEASE
-                    env["PNEUMO_RUN_ID"] = run_id
-                    env["PNEUMO_TRACE_ID"] = trace_id
-                    env["PNEUMO_SESSION_DIR"] = str(session_dir)
-                    env["PNEUMO_LOG_DIR"] = str(log_dir)
-                    env["PNEUMO_WORKSPACE_DIR"] = str(workspace_dir)
-                    env["PNEUMO_UI_PORT"] = str(port)
-                    env["PNEUMO_AUTO_SEND_BUNDLE"] = "1"
-                    env["PYTHONUTF8"] = "1"
-                    env["PYTHONIOENCODING"] = "utf-8"
-                    env["PYTHONWARNINGS"] = "default"
-                    env["PNEUMO_SHARED_VENV_PYTHON"] = str(_venv_python(prefer_gui=False))
-                    # Гарантируем импорт локальных модулей из корня проекта
-                    env["PYTHONPATH"] = str(ROOT) + (os.pathsep + env.get("PYTHONPATH", "") if env.get("PYTHONPATH") else "")
-
-                    # продублируем ключевые PNEUMO_* в текущий процесс,
-                    # чтобы send_results_gui (если запускать без env) всё равно видел сессию
-                    os.environ.update({
-                        "PNEUMO_RELEASE": env["PNEUMO_RELEASE"],
-                        "PNEUMO_RUN_ID": env["PNEUMO_RUN_ID"],
-                        "PNEUMO_TRACE_ID": env["PNEUMO_TRACE_ID"],
-                        "PNEUMO_SESSION_DIR": env["PNEUMO_SESSION_DIR"],
-                        "PNEUMO_LOG_DIR": env["PNEUMO_LOG_DIR"],
-                        "PNEUMO_WORKSPACE_DIR": env["PNEUMO_WORKSPACE_DIR"],
-                        "PNEUMO_UI_PORT": env["PNEUMO_UI_PORT"],
-                        "PNEUMO_AUTO_SEND_BUNDLE": env["PNEUMO_AUTO_SEND_BUNDLE"],
-                        "PNEUMO_SHARED_VENV_PYTHON": env["PNEUMO_SHARED_VENV_PYTHON"],
-                    })
-                    self._child_env = env
 
                     # Run Registry: фиксируем старт UI-сессии (best-effort)
                     if start_run is not None:
@@ -1658,35 +1723,19 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
                         "warning",
                     ]
 
-                    # Лог Streamlit (чтобы ошибки/варнинги не терялись)
-                    try:
-                        self.stream_log_fh = open(streamlit_log_path, "a", encoding="utf-8", errors="replace")
-                        self.stream_log_fh.write(f"\n===== {time.strftime('%Y-%m-%d %H:%M:%S')} =====\n")
-                        self.stream_log_fh.write(" ".join(cmd) + "\n")
-                    except Exception:
-                        self.stream_log_fh = None
-
-                    # env уже подготовлен выше (Testy R56)
-
                     self._ui_status("Запускаю Streamlit сервер …")
                     self._pbar_start_indeterminate()
-                    show_console = bool(self.show_console_var.get())
-                    creationflags = (subprocess.CREATE_NEW_CONSOLE if show_console else _creationflags_no_window())
-                    popen_kwargs = {}
-                    if not show_console:
-                        popen_kwargs['stdout'] = self.stream_log_fh or subprocess.DEVNULL
-                        popen_kwargs['stderr'] = self.stream_log_fh or subprocess.DEVNULL
-                    self.proc = subprocess.Popen(
-                        cmd,
-                        cwd=str(ROOT),
-                        creationflags=creationflags,
+                    self.proc_kind = "web"
+                    self.proc = self._launch_logged_process(
+                        cmd=cmd,
                         env=env,
-                        **popen_kwargs,
+                        log_path=streamlit_log_path,
+                        show_console=show_console,
                     )
 
                     # Мониторим завершение процесса, чтобы *всегда* собрать ZIP после закрытия UI
                     try:
-                        self._start_proc_monitor(self.proc)
+                        self._start_proc_monitor(self.proc, kind="web")
                     except Exception:
                         pass
 
@@ -1780,6 +1829,84 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def start_desktop_shell(self) -> None:
+        with self._lock:
+            if self.proc and self.proc.poll() is None:
+                messagebox.showinfo("Уже запущено", "Сначала остановите текущий процесс запуска.")
+                return
+
+        def worker() -> None:
+            with self._lock:
+                try:
+                    self._ui_status("Готовлю окружение для desktop GUI-spec …")
+                    self._pbar_set(0)
+                    ok = self._install_deps_sync()
+                    if not ok:
+                        return
+
+                    py = _venv_python(prefer_gui=False)
+                    show_console = bool(self.show_console_var.get())
+                    _, _, log_dir, _, _, env = self._prepare_child_session_env(
+                        run_prefix="DESKTOP",
+                        extra_env={
+                            "PNEUMO_LAUNCH_SURFACE": "desktop_gui_spec_shell",
+                            "PNEUMO_DESKTOP_GUI_SPEC_SHELL": "1",
+                        },
+                    )
+                    desktop_log_path = log_dir / "desktop_gui_spec_shell.log"
+                    cmd = [
+                        str(py),
+                        "-m",
+                        "pneumo_solver_ui.tools.desktop_gui_spec_shell",
+                    ]
+
+                    self._ui_status("Запускаю Desktop GUI-spec …")
+                    self._pbar_start_indeterminate()
+                    self.proc_kind = "desktop"
+                    self.proc = self._launch_logged_process(
+                        cmd=cmd,
+                        env=env,
+                        log_path=desktop_log_path,
+                        show_console=show_console,
+                    )
+                    self._start_proc_monitor(self.proc, kind="desktop")
+
+                    deadline = time.time() + 2.0
+                    exited_early = False
+                    while time.time() < deadline:
+                        if self.proc and (self.proc.poll() is not None):
+                            exited_early = True
+                            break
+                        time.sleep(0.1)
+
+                    self._pbar_stop()
+                    self._pbar_set(100)
+
+                    if exited_early:
+                        self._ui_status("❌ Desktop GUI-spec завершился сразу (см. desktop log)")
+                        self._log(f"❌ Desktop GUI-spec завершился сразу — проверь лог: {desktop_log_path}")
+                        _safe_messagebox_error(
+                            "Не удалось запустить",
+                            "Desktop GUI-spec завершился сразу после старта.\n\n"
+                            f"Проверь лог: {desktop_log_path}",
+                        )
+                        return
+
+                    self._ui_status("✅ Desktop GUI-spec запущен (через тот же bootstrap и venv).")
+                    self._log(f"✅ Desktop GUI-spec запущен. Лог: {desktop_log_path}")
+                except Exception as e:
+                    tb = traceback.format_exc()
+                    self._pbar_stop()
+                    self._log("❌ start_desktop_shell crashed: " + repr(e))
+                    try:
+                        with open(LAUNCHER_LOG, "a", encoding="utf-8", errors="replace") as f:
+                            f.write("\nCRASH:\n" + tb + "\n")
+                    except Exception:
+                        pass
+                    _safe_messagebox_error("Ошибка", f"Сбой запуска desktop GUI-spec. См. логи в {LOG_DIR}")
+
+        threading.Thread(target=worker, daemon=True).start()
+
     def _stop_watchdog_proc(self) -> None:
         with self._lock:
             wp = self.watchdog_proc
@@ -1799,9 +1926,10 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
         with self._lock:
             p = self.proc
             self.proc = None
+            proc_kind = self.proc_kind
         self._launcher_stop_requested = True
         self._launcher_stop_source = str(reason or "launcher_stop_app")
-        self._log(f"[stop_app request] source={self._launcher_stop_source}")
+        self._log(f"[stop_app request] source={self._launcher_stop_source} kind={proc_kind or 'unknown'}")
         if p is not None:
             try:
                 if terminate_process_tree is not None:
@@ -1818,19 +1946,14 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
                         p.wait(timeout=1.2)
                     except Exception:
                         p.kill()
-                self._log("Остановил процесс Streamlit и его дочернее дерево.")
+                self._log("Остановил активный дочерний процесс и его дерево.")
                 self._ui_status("Остановлено.")
             except Exception as e:
                 self._log(f"Не удалось остановить: {e}")
         self._stop_watchdog_proc()
-        try:
-            if self.stream_log_fh:
-                self.stream_log_fh.close()
-        except Exception:
-            pass
-        self.stream_log_fh = None
+        self._close_active_log_handle()
 
-    def _start_proc_monitor(self, proc: subprocess.Popen) -> None:
+    def _start_proc_monitor(self, proc: subprocess.Popen, *, kind: str) -> None:
         """Ждём завершения streamlit процесса и запускаем postmortem сборку (UI-thread safe)."""
 
         def _waiter():
@@ -1841,15 +1964,21 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
                 rc = None
             try:
                 # schedule on Tk main thread
-                self.root.after(0, lambda: self._handle_streamlit_exit(rc))
+                self.root.after(0, lambda: self._handle_child_exit(kind, rc))
             except Exception:
                 # last resort
                 try:
-                    self._handle_streamlit_exit(rc)
+                    self._handle_child_exit(kind, rc)
                 except Exception:
                     pass
 
         threading.Thread(target=_waiter, daemon=True).start()
+
+    def _handle_child_exit(self, kind: str, rc: int | None) -> None:
+        if kind == "desktop":
+            self._handle_desktop_exit(rc)
+            return
+        self._handle_streamlit_exit(rc)
 
     def _spawn_watchdog(self, *, target_pid: int, session_dir: Path, env: dict) -> None:
         """Запускаем watchdog, который вмешается, если launcher умрёт раньше streamlit."""
@@ -1891,12 +2020,8 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
             self._stop_watchdog_proc()
         except Exception:
             pass
-        try:
-            if self.stream_log_fh:
-                self.stream_log_fh.close()
-        except Exception:
-            pass
-        self.stream_log_fh = None
+        self.proc_kind = None
+        self._close_active_log_handle()
 
         # Run Registry: фиксируем завершение
         try:
@@ -1964,6 +2089,37 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
         if self._close_requested:
             try:
                 self.root.after(250, self.root.destroy)
+            except Exception:
+                pass
+
+    def _handle_desktop_exit(self, rc: int | None) -> None:
+        if self._exit_handled:
+            return
+        self._exit_handled = True
+
+        log_path = self.active_log_path
+        self.proc_kind = None
+        self._close_active_log_handle()
+
+        stop_src = self._launcher_stop_source or ""
+        self._log(
+            f"[DESKTOP EXIT] rc={rc} stop_requested={self._launcher_stop_requested} stop_source={stop_src or 'none'}\n"
+        )
+        if self._launcher_stop_requested:
+            self._ui_status("Остановлено.")
+        elif rc in (0, None):
+            self._ui_status("Desktop GUI-spec завершён.")
+        else:
+            self._ui_status("❌ Desktop GUI-spec завершился с ошибкой (см. desktop log)")
+            if log_path is not None:
+                _safe_messagebox_error(
+                    "Desktop GUI-spec",
+                    "Desktop GUI-spec завершился с ошибкой.\n\n"
+                    f"Проверь лог: {log_path}",
+                )
+        if self._close_requested:
+            try:
+                self.root.destroy()
             except Exception:
                 pass
 
@@ -2043,6 +2199,42 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
                 subprocess.Popen(["xdg-open", str(STREAMLIT_LOG)])  # noqa: S603,S607
         except Exception as e:
             self._log(f"open_streamlit_log failed: {e}")
+
+    def open_desktop_log(self) -> None:
+        candidates: list[Path] = []
+        try:
+            if self.active_log_path is not None and self.active_log_path.name == "desktop_gui_spec_shell.log":
+                candidates.append(self.active_log_path)
+        except Exception:
+            pass
+        try:
+            if self.session_dir is not None:
+                candidates.append(self.session_dir / "logs" / "desktop_gui_spec_shell.log")
+        except Exception:
+            pass
+
+        target: Path | None = None
+        for p in candidates:
+            try:
+                if p.exists():
+                    target = p
+                    break
+            except Exception:
+                continue
+
+        if target is None:
+            messagebox.showinfo("Нет файла", "desktop_gui_spec_shell.log пока не создан.")
+            return
+
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(str(target))  # noqa: S606
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(target)])  # noqa: S603,S607
+            else:
+                subprocess.Popen(["xdg-open", str(target)])  # noqa: S603,S607
+        except Exception as e:
+            self._log(f"open_desktop_log failed: {e}")
 
     def on_close(self) -> None:
         # Testy R56: если UI запущен — корректно останавливаем и после этого собираем ZIP.
