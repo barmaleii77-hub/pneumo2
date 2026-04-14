@@ -4,6 +4,13 @@
 
 Мы мигрируем проект в классическое Windows GUI-приложение. WEB больше не целевая платформа развития. Это окно должно стать главным desktop-shell приложения.
 
+## Наследование desktop-канона
+
+- Перед локальными решениями сначала следуй [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md), затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
+- Для shell baseline command surface: `menu bar + toolbar + dockable/floating/auto-hide panes + command search + status/progress strip`.
+- Левая hierarchy/navigation pane допустима только для реальной структуры разделов и workflow, правая pane должна оставаться context-sensitive и пригодной для inspector/details сценариев.
+- `Ribbon` не использовать как базовый шаблон shell. Он допустим только как отдельно обоснованное исключение для конкретного workspace.
+
 ## Цель
 
 Развивать главное классическое Windows GUI-приложение как основной вход в систему. Нужен понятный shell с верхним меню, toolbar, home screen, рабочей областью со встроенными окнами и единым пользовательским маршрутом без WEB.
@@ -40,11 +47,15 @@
 - Shell должен быть центром приложения, а не свалкой feature-кода.
 - Сохраняй классический desktop UX под Windows.
 - Если нужно подключить новое окно, меняй adapter/spec/catalog, а не тащи его логику в shell.
+- Не прячь core-команды за web-style navigation, hamburger или нестабильные contextual-only паттерны.
+- Поддерживай явные scrollbars, resize affordances, keyboard-first переходы по major regions и `command search`.
 
 ## Готовый промт
 
 ```text
 Работай только в lane "Главное Окно Приложения".
+
+Сначала прочитай docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md, затем docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md и соблюдай их как project-wide baseline и augmented A–M project-specific contract.
 
 Контекст: проект уходит из WEB в desktop-first архитектуру. Это окно должно стать главным Windows-приложением с классическим многооконным интерфейсом.
 
@@ -77,6 +88,8 @@
 - выноси новые seams в отдельные shell-модули
 - shell должен быть центром приложения, а не свалкой feature-кода
 - сохраняй классический desktop UX под Windows
+- держи baseline command surface: menu bar + toolbar + dockable panes + command search + status/progress strip
+- не используй ribbon как shell-default без отдельного обоснования
 
 Сделай следующий логичный шаг по shell core, реализуй его до конца и прогони shell-targeted tests.
 ```

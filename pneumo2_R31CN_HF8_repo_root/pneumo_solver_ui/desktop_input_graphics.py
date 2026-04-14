@@ -15,8 +15,16 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
     and CG-related inputs.
     """
 
-    CANVAS_WIDTH = 300
+    CANVAS_WIDTH = 560
     CANVAS_HEIGHT = 330
+    SCHEME_X0 = 16
+    SCHEME_Y0 = 54
+    SCHEME_X1 = 250
+    SCHEME_Y1 = 210
+    METRICS_X0 = 272
+    METRICS_Y0 = 54
+    METRICS_X1 = CANVAS_WIDTH - 16
+    METRICS_Y1 = CANVAS_HEIGHT - 24
     _MECH_SCHEME_PATH = Path(__file__).resolve().parent / "assets" / "mech_scheme.png"
     _PNEUMO_SCHEME_PATH = Path(__file__).resolve().parents[1] / "tmp_pneumo_scheme_render.png"
 
@@ -59,7 +67,7 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
         ttk.Label(
             self,
             textvariable=self.summary_var,
-            wraplength=400,
+            wraplength=520,
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
         self.canvas = tk.Canvas(
@@ -72,8 +80,8 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
         )
         self.canvas.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
         self._scheme_images: dict[str, tk.PhotoImage | None] = {
-            "mech": self._load_scheme_image(self._MECH_SCHEME_PATH, max_width=272, max_height=146),
-            "pneumo": self._load_scheme_image(self._PNEUMO_SCHEME_PATH, max_width=272, max_height=146),
+            "mech": self._load_scheme_image(self._MECH_SCHEME_PATH, max_width=220, max_height=130),
+            "pneumo": self._load_scheme_image(self._PNEUMO_SCHEME_PATH, max_width=220, max_height=130),
         }
 
     def refresh(
@@ -134,11 +142,17 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
         context_title = self._context_title(active_context) or str(field_label or "").strip() or str(section_title or "").strip()
         self.canvas.create_text(18, 38, anchor="w", text=f"Контекст: {context_title}", font=("Segoe UI", 8), fill="#355070")
 
-        scheme_x0 = 16
-        scheme_y0 = 54
-        scheme_x1 = self.CANVAS_WIDTH - 16
-        scheme_y1 = 210
+        scheme_x0 = self.SCHEME_X0
+        scheme_y0 = self.SCHEME_Y0
+        scheme_x1 = self.SCHEME_X1
+        scheme_y1 = self.SCHEME_Y1
+        metrics_x0 = self.METRICS_X0
+        metrics_y0 = self.METRICS_Y0
+        metrics_x1 = self.METRICS_X1
+        metrics_y1 = self.METRICS_Y1
         self.canvas.create_rectangle(scheme_x0, scheme_y0, scheme_x1, scheme_y1, outline="#d6dbe1", fill="#ffffff")
+        self.canvas.create_rectangle(metrics_x0, metrics_y0, metrics_x1, metrics_y1, outline="#d6dbe1", fill="#fbfcfd")
+        self.canvas.create_line(metrics_x0 - 10, scheme_y0, metrics_x0 - 10, metrics_y1, fill="#eef2f6")
         image = self._scheme_image_for_section(section_title)
         if image is not None:
             self.canvas.create_image(
@@ -155,17 +169,17 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
                 fill="#6c757d",
             )
 
-        self.canvas.create_line(28, 222, self.CANVAS_WIDTH - 28, 222, fill="#718096", arrow=tk.BOTH)
+        self.canvas.create_line(scheme_x0 + 12, 222, scheme_x1 - 12, 222, fill="#718096", arrow=tk.BOTH)
         self.canvas.create_text(
-            self.CANVAS_WIDTH / 2,
+            (scheme_x0 + scheme_x1) / 2,
             234,
             text=f"База {geom['wheelbase']:.2f} м",
             font=("Segoe UI", 8),
             fill="#264653",
         )
-        self.canvas.create_line(self.CANVAS_WIDTH - 34, 74, self.CANVAS_WIDTH - 34, 190, fill="#718096", arrow=tk.BOTH)
+        self.canvas.create_line(scheme_x1 - 18, 74, scheme_x1 - 18, 190, fill="#718096", arrow=tk.BOTH)
         self.canvas.create_text(
-            self.CANVAS_WIDTH - 48,
+            scheme_x1 - 32,
             132,
             text=f"Колея {geom['track']:.2f} м",
             angle=90,
@@ -373,8 +387,9 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
         active_context: str,
         unit_label: str,
     ) -> None:
-        x = 256
-        y = 44
+        x = self.METRICS_X0 + 12
+        y = self.METRICS_Y0 + 12
+        metrics_width = self.METRICS_X1 - self.METRICS_X0 - 24
         lines = self._metric_lines(section_title, payload, geom)
         if unit_label:
             lines.insert(0, f"Единица: {unit_label}")
@@ -384,7 +399,8 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
             self.canvas.create_text(
                 x,
                 y + idx * 18,
-                anchor="w",
+                anchor="nw",
+                width=metrics_width,
                 text=text,
                 font=("Segoe UI", 8),
                 fill="#264653" if idx == 0 else "#495057",

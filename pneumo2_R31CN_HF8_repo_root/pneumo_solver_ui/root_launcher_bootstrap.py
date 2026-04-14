@@ -9,6 +9,7 @@ reuse that bootstrap and then re-exec themselves inside the shared runtime.
 
 from __future__ import annotations
 
+import importlib
 import os
 import subprocess
 import sys
@@ -41,6 +42,14 @@ def _infer_prefer_gui(prefer_gui: bool | None = None) -> bool:
         return bool(prefer_gui)
     exe_name = Path(sys.executable).name.casefold()
     return exe_name == "pythonw.exe"
+
+
+def _current_runtime_can_import(module: str) -> bool:
+    try:
+        importlib.import_module(module)
+    except Exception:
+        return False
+    return True
 
 
 def _fallback_log(root: Path, message: str) -> None:
@@ -186,6 +195,13 @@ def ensure_root_launcher_runtime(
 
     desired_python = Path(launcher_module._venv_python(prefer_gui=use_gui_python))
     if _same_python(active_python, desired_python):
+        return None
+
+    if _current_runtime_can_import(module):
+        _fallback_log(
+            root,
+            f"[desktop-root] bootstrap skipped for {module}: current runtime already imports target module",
+        )
         return None
 
     runner = _HeadlessBootstrapRunner(launcher_module, root=root)

@@ -12,6 +12,12 @@ class DesktopLaunchCatalogItem:
     module: str
     description: str
     group: str
+    runtime_kind: str
+    workspace_role: str
+    source_of_truth_role: str
+    migration_status: str
+    search_aliases: tuple[str, ...]
+    context_handoff_keys: tuple[str, ...]
 
 
 def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[DesktopLaunchCatalogItem, ...]:
@@ -28,6 +34,12 @@ def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[Desktop
                 module=spec.standalone_module,
                 description=spec.description,
                 group=spec.group,
+                runtime_kind=spec.effective_runtime_kind,
+                workspace_role=spec.effective_workspace_role,
+                source_of_truth_role=spec.effective_source_of_truth_role,
+                migration_status=spec.effective_migration_status,
+                search_aliases=spec.effective_search_aliases,
+                context_handoff_keys=spec.effective_context_handoff_keys,
             )
         )
     return tuple(items)

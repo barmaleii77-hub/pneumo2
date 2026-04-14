@@ -68,10 +68,17 @@ def build_shell_command_search_entries(
                     spec.title,
                     spec.description,
                     spec.details,
+                    spec.effective_help_topic,
+                    spec.effective_tooltip,
                     spec.menu_section,
                     spec.nav_section,
+                    spec.effective_workspace_role,
+                    spec.effective_source_of_truth_role,
+                    spec.effective_runtime_kind,
+                    spec.effective_migration_status,
                     *spec.capability_ids,
                     *spec.launch_contexts,
+                    *spec.effective_search_aliases,
                 }
             )
         )

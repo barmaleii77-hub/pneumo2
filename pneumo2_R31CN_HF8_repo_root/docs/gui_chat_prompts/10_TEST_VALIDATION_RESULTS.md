@@ -4,6 +4,12 @@
 
 После запуска расчётов пользователь должен работать в desktop-центре тестов и результатов, а не разрываться между WEB validation/results страницами.
 
+## Наследование desktop-канона
+
+- Перед локальными решениями сначала следуй [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md), затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
+- Results center может быть orchestration-oriented, но должен наследовать command discipline, keyboard-first, accessibility, High-DPI и performance policy.
+- Если появляются previews, inspectors или result surfaces, располагай их как устойчивые panes, а не как web-style бесконечные страницы. `Ribbon` не использовать как default.
+
 ## Цель
 
 Развивать desktop test/results center как главный маршрут после запуска расчётов. Нужны: тестовые прогоны, validation overview, results browsing, переходы в compare viewer, animator и diagnostics/send center.
@@ -43,6 +49,8 @@
 
 ```text
 Работай только в lane "Test Validation Results Center".
+
+Сначала прочитай docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md, затем docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md и соблюдай их как project-wide baseline и augmented A–M project-specific contract.
 
 Контекст: после запуска расчётов пользователь должен оставаться в desktop test/results center, а не уходить в WEB validation/results pages.
 

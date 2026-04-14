@@ -37,6 +37,20 @@ def _canvas_item_types(panel: DesktopInputGraphicPanel) -> list[str]:
     return [panel.canvas.type(item) for item in panel.canvas.find_all()]
 
 
+def _text_coords_by_value(panel: DesktopInputGraphicPanel, needle: str) -> list[tuple[float, float]]:
+    coords: list[tuple[float, float]] = []
+    for item in panel.canvas.find_all():
+        if panel.canvas.type(item) != "text":
+            continue
+        text = str(panel.canvas.itemcget(item, "text") or "").strip()
+        if needle not in text:
+            continue
+        xy = panel.canvas.coords(item)
+        if len(xy) >= 2:
+            coords.append((float(xy[0]), float(xy[1])))
+    return coords
+
+
 def test_desktop_input_graphic_panel_renders_engineering_workspace_for_all_main_sections() -> None:
     payload = load_base_with_defaults()
     _root, panel = _make_panel()
@@ -92,6 +106,13 @@ def test_desktop_input_graphic_panel_shows_pneumatic_scheme_and_metrics() -> Non
     assert "Аккумулятор" in joined
     assert "Суммарный объём" in joined
     assert "кПа" in joined
+
+    title_coords = _text_coords_by_value(panel, "Пневмосхема проекта")
+    metric_coords = _text_coords_by_value(panel, "Ресивер 1")
+    assert title_coords
+    assert metric_coords
+    assert title_coords[0][0] < panel.SCHEME_X1
+    assert metric_coords[0][0] >= panel.METRICS_X0
 
 
 def test_desktop_input_graphic_panel_shows_static_trim_metrics_and_context() -> None:

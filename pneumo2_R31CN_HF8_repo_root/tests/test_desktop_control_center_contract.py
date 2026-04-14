@@ -40,8 +40,8 @@ def test_launcher_catalog_keeps_shared_desktop_tool_list_and_optional_mnemo() ->
     assert "pneumo_solver_ui.tools.desktop_diagnostics_center" in modules_without_mnemo
     assert "pneumo_solver_ui.qt_compare_viewer" in modules_without_mnemo
     assert "pneumo_solver_ui.desktop_animator.app" in modules_without_mnemo
-    assert "pneumo_solver_ui.desktop_mnemo.app" not in modules_without_mnemo
-    assert "pneumo_solver_ui.desktop_mnemo.app" in modules_with_mnemo
+    assert "pneumo_solver_ui.desktop_mnemo.main" not in modules_without_mnemo
+    assert "pneumo_solver_ui.desktop_mnemo.main" in modules_with_mnemo
 
 
 def test_root_desktop_control_center_wrappers_delegate_to_launcher() -> None:

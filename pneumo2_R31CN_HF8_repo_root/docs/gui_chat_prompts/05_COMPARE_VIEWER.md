@@ -4,6 +4,12 @@
 
 `qt_compare_viewer` должен стать главным специализированным окном сравнения и постепенно забрать compare/results/validation use-cases из WEB.
 
+## Наследование desktop-канона
+
+- Перед локальными решениями сначала следуй [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md), затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
+- Если compare window использует document/viewport surface, держи её в центре и выстраивай вспомогательные panes вокруг неё.
+- Даже как specialized window `qt_compare_viewer` обязан сохранять keyboard-first, accessibility, High-DPI и performance policy. `Ribbon` не использовать как default.
+
 ## Цель
 
 Сделать `qt_compare_viewer` основным специализированным GUI сравнения и постепенно поглотить compare/results/validation сценарии, которые раньше жили в WEB.
@@ -43,6 +49,8 @@
 
 ```text
 Работай только в lane "Compare Viewer".
+
+Сначала прочитай docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md, затем docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md и соблюдай их как project-wide baseline и augmented A–M project-specific contract.
 
 Контекст: qt_compare_viewer должен стать главным специализированным окном сравнения. WEB compare/results/validation surfaces используются только как источник поведения.
 

@@ -4,6 +4,13 @@
 
 Это отдельный GUI-контур для настройки режимов запуска. Пользователь должен видеть не только физические параметры, но и понятную конфигурацию самого расчёта.
 
+## Наследование desktop-канона
+
+- Перед локальными решениями сначала следуй [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md), затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
+- Baseline command surface для этого lane: `menu bar` или host toolbar, рабочие panes, `command search`, status/progress strip. `Ribbon` по умолчанию не использовать.
+- Частые настройки должны жить в modeless sections и panes, а редкие и risk-bearing решения в модальных сценариях с delayed commit.
+- Scrollable dialogs не использовать как норму. Длинные настройки делить на sections, cards, tabs или panes.
+
 ## Цель
 
 Выделить и развить понятный desktop GUI для настройки расчёта: режим запуска, dt, длительность, baseline/detail/full, cache, export, auto-check, запись логов, runtime policy.
@@ -39,11 +46,14 @@
 - Не смешивай физические параметры и runtime-настройки в один бесформенный экран.
 - Если логика растёт, вынеси её в отдельный run setup module.
 - Не дублируй `test_center_gui`, а выделяй понятный pre-run configuration workflow.
+- Прогресс, ошибки и solver status не должны жить только в status bar без явного объяснения в основном рабочем регионе.
 
 ## Готовый промт
 
 ```text
 Работай только в lane "Настройка Расчёта".
+
+Сначала прочитай docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md, затем docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md и соблюдай их как project-wide baseline и augmented A–M project-specific contract.
 
 Контекст: пользователь должен настраивать не только физические параметры, но и сам режим расчёта в отдельном desktop GUI.
 
@@ -74,6 +84,8 @@
 - не смешивай физические параметры и runtime-настройки в один бесформенный экран
 - если логика растёт, вынеси её в отдельный run setup module
 - не дублируй test center, а выделяй понятный pre-run configuration workflow
+- для частых настроек используй modeless flow, а не каскад scrollable dialogs
+- не прячь критичные run warnings и progress только в status bar
 
 Сделай следующий шаг по desktop run setup и доведи его до рабочего состояния.
 ```

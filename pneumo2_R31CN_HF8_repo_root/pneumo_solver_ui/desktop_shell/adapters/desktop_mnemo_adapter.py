@@ -5,7 +5,7 @@ from ..external_launch import spawn_module
 
 
 def _launch_desktop_mnemo() -> object:
-    return spawn_module("pneumo_solver_ui.desktop_mnemo.app")
+    return spawn_module("pneumo_solver_ui.desktop_mnemo.main")
 
 
 def build_spec() -> DesktopShellToolSpec:
@@ -24,6 +24,6 @@ def build_spec() -> DesktopShellToolSpec:
         details="Наглядное состояние системы и связей компонентов в отдельном окне мнемосхемы.",
         menu_order=80,
         nav_order=80,
-        standalone_module="pneumo_solver_ui.desktop_mnemo.app",
+        standalone_module="pneumo_solver_ui.desktop_mnemo.main",
         launch_external=_launch_desktop_mnemo,
     )

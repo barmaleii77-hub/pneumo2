@@ -595,7 +595,7 @@ def test_root_desktop_main_shell_wrappers_delegate_to_shell_launcher() -> None:
     assert "start_desktop_main_shell.pyw" in vbs
     assert 'Path(__file__).with_name("START_DESKTOP_MAIN_SHELL.py")' in pyw
     assert "ensure_root_launcher_runtime" in py
-    assert 'MODULE = "pneumo_solver_ui.tools.desktop_main_shell"' in py
+    assert 'MODULE = "pneumo_solver_ui.tools.desktop_main_shell_qt"' in py
 
 
 def test_desktop_main_shell_launcher_exposes_cli_for_startup_route() -> None:
