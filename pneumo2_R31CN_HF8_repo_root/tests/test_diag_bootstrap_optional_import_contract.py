@@ -10,7 +10,20 @@ def test_diag_bootstrap_treats_known_optional_desktop_imports_as_low_noise() -> 
         errors="replace",
     )
 
-    assert '"qdarktheme"' in text
-    assert '"bottleneck"' in text
-    assert '"cuda"' in text
+    for name in (
+        "qdarktheme",
+        "bottleneck",
+        "cuda",
+        "fqdn",
+        "rfc3987",
+        "rfc3986_validator",
+        "rfc3987_syntax",
+        "rfc3339_validator",
+        "webcolors",
+        "jsonpointer",
+        "uri_template",
+        "isoduration",
+        "anywidget",
+    ):
+        assert f'"{name}"' in text
     assert "_OPTIONAL_MISSING_GENERIC" in text

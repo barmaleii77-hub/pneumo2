@@ -54,5 +54,22 @@ def test_r31ax_root_app_defines_string_key_registry() -> None:
 def test_r31ax_bootstrap_demotes_optional_missing_modules_from_error_spam() -> None:
     src = (_repo_root() / 'pneumo_solver_ui' / 'diag' / 'bootstrap.py').read_text(encoding='utf-8')
     assert 'OptionalModuleMissing' in src
-    for name in ['CoolProp', 'cython', 'scikits', 'sksparse', 'uarray', 'xarray']:
+    for name in [
+        'CoolProp',
+        'cython',
+        'scikits',
+        'sksparse',
+        'uarray',
+        'xarray',
+        'fqdn',
+        'rfc3987',
+        'rfc3986_validator',
+        'rfc3987_syntax',
+        'rfc3339_validator',
+        'webcolors',
+        'jsonpointer',
+        'uri_template',
+        'isoduration',
+        'anywidget',
+    ]:
         assert f'"{name}"' in src

@@ -882,6 +882,7 @@ def _make_send_bundle_inner(
             if os.environ.get(k)
         },
     }
+    meta.update(_runtime_python_truth_override())
 
     # R49: Ensure the *current* UI session is included in the bundle.
     # If the caller did not pass primary_session_dir explicitly, we try env PNEUMO_SESSION_DIR.
@@ -933,7 +934,7 @@ def _make_send_bundle_inner(
     res_total = AddResult()
 
     try:
-        anim_diag_event, anim_diag_md = _collect_anim_latest_bundle_diagnostics(out_dir)
+        anim_diag_event, anim_diag_md = _collect_anim_latest_bundle_diagnostics(out_dir, repo_root=repo_root)
     except Exception:
         anim_diag_event = {"anim_latest_available": False, "error": traceback.format_exc()}
         anim_diag_md = "# Anim Latest Pointer Diagnostics\n\nerror collecting diagnostics\n"
@@ -2170,6 +2171,294 @@ def _make_send_bundle_inner(
         pass
 
     return zip_path
+
+
+def _repo_root_from_here_override() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _normalized_executable_path_override(raw: str | Path | None) -> str:
+    try:
+        return str(Path(raw or "").expanduser().resolve()).casefold()
+    except Exception:
+        return str(raw or "").casefold()
+
+
+def _venv_truth_from_executable_override(executable: str | Path | None) -> Dict[str, Any]:
+    exe_str = str(executable or "").strip()
+    if not exe_str:
+        return {
+            "python_executable": "",
+            "python_prefix": "",
+            "python_base_prefix": "",
+            "venv_active": False,
+        }
+    try:
+        exe = Path(exe_str).expanduser().resolve()
+    except Exception:
+        exe = Path(exe_str)
+    try:
+        parent_name = exe.parent.name.lower()
+    except Exception:
+        parent_name = ""
+    prefix_path = exe.parent.parent if parent_name in {"scripts", "bin"} else exe.parent
+    prefix = str(prefix_path)
+    base_prefix = prefix
+    venv_active = False
+    try:
+        pyvenv_cfg = prefix_path / "pyvenv.cfg"
+        if pyvenv_cfg.exists():
+            venv_active = True
+            for line in pyvenv_cfg.read_text(encoding="utf-8", errors="replace").splitlines():
+                stripped = line.strip()
+                if stripped.lower().startswith("home ="):
+                    base_prefix = stripped.split("=", 1)[1].strip() or base_prefix
+                    break
+    except Exception:
+        pass
+    return {
+        "python_executable": str(exe),
+        "python_prefix": prefix,
+        "python_base_prefix": base_prefix,
+        "venv_active": bool(venv_active),
+    }
+
+
+def _runtime_python_truth_override() -> Dict[str, Any]:
+    current_executable = str(sys.executable)
+    current_prefix = str(getattr(sys, "prefix", ""))
+    current_base_prefix = str(getattr(sys, "base_prefix", current_prefix))
+    current_venv_active = bool(current_prefix != current_base_prefix or os.environ.get("VIRTUAL_ENV"))
+    preferred_cli_python = _resolve_cli_python_executable()
+    effective_executable = preferred_cli_python or current_executable
+    effective_truth = _venv_truth_from_executable_override(effective_executable)
+    return {
+        "python_executable": str(effective_truth.get("python_executable") or current_executable),
+        "python_prefix": str(effective_truth.get("python_prefix") or current_prefix),
+        "python_base_prefix": str(effective_truth.get("python_base_prefix") or current_base_prefix),
+        "venv_active": bool(effective_truth.get("venv_active") or current_venv_active),
+        "preferred_cli_python": preferred_cli_python,
+        "python_executable_current": current_executable,
+        "python_prefix_current": current_prefix,
+        "python_base_prefix_current": current_base_prefix,
+        "venv_active_current": current_venv_active,
+        "python_runtime_source": (
+            "preferred_cli_python"
+            if _normalized_executable_path_override(effective_executable)
+            != _normalized_executable_path_override(current_executable)
+            else "current_process"
+        ),
+    }
+
+
+def _collect_anim_latest_diagnostics_via_cli_python_override(repo_root: Path, python_exe: str) -> Dict[str, Any]:
+    code = (
+        "import json\n"
+        "from pneumo_solver_ui.run_artifacts import collect_anim_latest_diagnostics_summary\n"
+        "diag = dict(collect_anim_latest_diagnostics_summary(include_meta=True) or {})\n"
+        "print(json.dumps(diag, ensure_ascii=False))\n"
+    )
+    rc, out, err = _run([str(python_exe), "-c", code], cwd=repo_root, timeout_s=90.0)
+    if int(rc) != 0:
+        raise RuntimeError((err or out or f"anim_latest diagnostics subprocess failed rc={rc}").strip())
+    raw = str(out or "").strip()
+    if not raw:
+        raise RuntimeError("anim_latest diagnostics subprocess returned empty stdout")
+    try:
+        parsed = json.loads(raw)
+    except Exception as exc:
+        raise RuntimeError(
+            f"anim_latest diagnostics subprocess returned invalid json: {exc!r}; raw={raw[:400]!r}"
+        ) from exc
+    return dict(parsed) if isinstance(parsed, dict) else {}
+
+
+def _format_anim_diag_error(exc: BaseException) -> str:
+    if isinstance(exc, ModuleNotFoundError):
+        missing = str(getattr(exc, "name", "") or "").strip() or "unknown"
+        return f"Отсутствует необязательная зависимость: {missing}"
+    try:
+        match = re.search(r"No module named ['\"]([^'\"]+)['\"]", str(exc))
+        if match:
+            return f"Отсутствует необязательная зависимость: {match.group(1)}"
+    except Exception:
+        pass
+    return repr(exc)
+
+
+def _collect_anim_latest_bundle_diagnostics(out_dir: Path, *, repo_root: Optional[Path] = None) -> Tuple[Dict[str, Any], str]:
+    repo_root = (repo_root or _repo_root_from_here_override()).resolve()
+    diag: Dict[str, Any]
+    try:
+        preferred_cli_python = str(_runtime_python_truth_override().get("preferred_cli_python") or "").strip()
+        if preferred_cli_python and (
+            _normalized_executable_path_override(preferred_cli_python)
+            != _normalized_executable_path_override(sys.executable)
+        ):
+            diag = _collect_anim_latest_diagnostics_via_cli_python_override(repo_root, preferred_cli_python)
+        else:
+            from pneumo_solver_ui.run_artifacts import collect_anim_latest_diagnostics_summary
+
+            diag = dict(collect_anim_latest_diagnostics_summary(include_meta=True) or {})
+    except Exception as exc:
+        friendly_error = _format_anim_diag_error(exc)
+        diag = {
+            "anim_latest_available": False,
+            "error": friendly_error,
+            "anim_latest_issues": [
+                f"Не удалось собрать anim_latest diagnostics: {friendly_error}.",
+            ],
+        }
+
+    deps = dict(diag.get("anim_latest_visual_cache_dependencies") or {})
+    meta = dict(diag.get("anim_latest_meta") or {})
+    try:
+        from pneumo_solver_ui.anim_export_contract import summarize_anim_export_contract, summarize_anim_export_validation
+
+        contract_summary = dict(summarize_anim_export_contract(meta) or {})
+        validation_summary = dict(summarize_anim_export_validation(meta) or {})
+    except Exception:
+        contract_summary = {}
+        validation_summary = {}
+
+    def _resolve_sidecar(ref: Any, *, pointer_json: Any, fallback_path: Any = None) -> tuple[str, str, bool | None]:
+        ref_s = str(ref or "").strip()
+        if not ref_s and fallback_path not in (None, ""):
+            ref_s = str(fallback_path or "").strip()
+        if not ref_s:
+            return "", "", None
+        p = Path(ref_s)
+        if not p.is_absolute():
+            try:
+                ptr = Path(str(pointer_json or "")).expanduser()
+                if str(ptr):
+                    p = (ptr.parent / p).resolve()
+            except Exception:
+                p = Path(ref_s)
+        try:
+            exists = bool(p.exists())
+        except Exception:
+            exists = None
+        return str(ref_s), str(p), exists
+
+    pointer_json = diag.get("anim_latest_pointer_json") or ""
+    road_ref, road_path, road_exists = _resolve_sidecar(
+        meta.get("road_csv"),
+        pointer_json=pointer_json,
+        fallback_path=(deps.get("road_csv") or {}).get("path") or deps.get("road_csv_path"),
+    )
+    axay_ref, axay_path, axay_exists = _resolve_sidecar(meta.get("axay_csv"), pointer_json=pointer_json)
+    scenario_ref, scenario_path, scenario_exists = _resolve_sidecar(meta.get("scenario_json"), pointer_json=pointer_json)
+    diag["anim_latest_road_csv_ref"] = road_ref
+    diag["anim_latest_road_csv_path"] = road_path
+    diag["anim_latest_road_csv_exists"] = road_exists
+    diag["anim_latest_axay_csv_ref"] = axay_ref
+    diag["anim_latest_axay_csv_path"] = axay_path
+    diag["anim_latest_axay_csv_exists"] = axay_exists
+    diag["anim_latest_scenario_json_ref"] = scenario_ref
+    diag["anim_latest_scenario_json_path"] = scenario_path
+    diag["anim_latest_scenario_json_exists"] = scenario_exists
+    if contract_summary:
+        diag.update({f"anim_latest_{k}": v for k, v in contract_summary.items()})
+    if validation_summary:
+        diag.update({f"anim_latest_{k}": v for k, v in validation_summary.items()})
+
+    issues = [str(x) for x in (diag.get("anim_latest_issues") or []) if str(x).strip()]
+    lines = ["# Anim Latest Pointer Diagnostics", ""]
+    lines.append(f"- anim_latest_available: {bool(diag.get('anim_latest_available'))}")
+    lines.append(f"- anim_latest_usable: {diag.get('anim_latest_usable')}")
+    lines.append(f"- anim_latest_pointer_json_exists: {diag.get('anim_latest_pointer_json_exists')}")
+    lines.append(f"- anim_latest_npz_exists: {diag.get('anim_latest_npz_exists')}")
+    lines.append(f"- anim_latest_global_pointer_json: {diag.get('anim_latest_global_pointer_json') or '—'}")
+    lines.append(f"- anim_latest_pointer_json: {diag.get('anim_latest_pointer_json') or '—'}")
+    lines.append(f"- anim_latest_npz_path: {diag.get('anim_latest_npz_path') or '—'}")
+    lines.append(f"- anim_latest_road_csv: {diag.get('anim_latest_road_csv_ref') or '—'} -> {diag.get('anim_latest_road_csv_path') or '—'} (exists={diag.get('anim_latest_road_csv_exists')})")
+    lines.append(f"- anim_latest_axay_csv: {diag.get('anim_latest_axay_csv_ref') or '—'} -> {diag.get('anim_latest_axay_csv_path') or '—'} (exists={diag.get('anim_latest_axay_csv_exists')})")
+    lines.append(f"- anim_latest_scenario_json: {diag.get('anim_latest_scenario_json_ref') or '—'} -> {diag.get('anim_latest_scenario_json_path') or '—'} (exists={diag.get('anim_latest_scenario_json_exists')})")
+    lines.append(f"- anim_latest_contract_sidecar: {diag.get('anim_latest_contract_sidecar_ref') or '—'} -> {diag.get('anim_latest_contract_sidecar_path') or '—'} (exists={diag.get('anim_latest_contract_sidecar_exists')})")
+    lines.append(f"- anim_latest_hardpoints_source_of_truth: {diag.get('anim_latest_hardpoints_source_of_truth_ref') or '—'} -> {diag.get('anim_latest_hardpoints_source_of_truth_path') or '—'} (exists={diag.get('anim_latest_hardpoints_source_of_truth_exists')})")
+    lines.append(f"- anim_latest_cylinder_packaging_passport: {diag.get('anim_latest_cylinder_packaging_passport_ref') or '—'} -> {diag.get('anim_latest_cylinder_packaging_passport_path') or '—'} (exists={diag.get('anim_latest_cylinder_packaging_passport_exists')})")
+    lines.append(f"- anim_latest_road_contract_web: {diag.get('anim_latest_road_contract_web_ref') or '—'} -> {diag.get('anim_latest_road_contract_web_path') or '—'} (exists={diag.get('anim_latest_road_contract_web_exists')})")
+    lines.append(f"- anim_latest_road_contract_desktop: {diag.get('anim_latest_road_contract_desktop_ref') or '—'} -> {diag.get('anim_latest_road_contract_desktop_path') or '—'} (exists={diag.get('anim_latest_road_contract_desktop_exists')})")
+    lines.append(
+        f"- anim_latest_mnemo_event_log: {diag.get('anim_latest_mnemo_event_log_ref') or '—'} -> {diag.get('anim_latest_mnemo_event_log_path') or '—'} "
+        f"(exists={diag.get('anim_latest_mnemo_event_log_exists')}, schema={diag.get('anim_latest_mnemo_event_log_schema_version') or '—'}, updated_utc={diag.get('anim_latest_mnemo_event_log_updated_utc') or '—'})"
+    )
+    lines.append(
+        f"- anim_latest_mnemo_event_log_state: mode={diag.get('anim_latest_mnemo_event_log_current_mode') or '—'} / total={diag.get('anim_latest_mnemo_event_log_event_count')} / active={diag.get('anim_latest_mnemo_event_log_active_latch_count')} / acked={diag.get('anim_latest_mnemo_event_log_acknowledged_latch_count')}"
+    )
+    recent_titles = [str(x) for x in (diag.get("anim_latest_mnemo_event_log_recent_titles") or []) if str(x).strip()]
+    if recent_titles:
+        lines.append(f"- anim_latest_mnemo_event_log_recent: {' | '.join(recent_titles[:3])}")
+    lines.append(f"- browser_perf_registry_snapshot: {diag.get('browser_perf_registry_snapshot_ref') or '—'} -> {diag.get('browser_perf_registry_snapshot_path') or '—'} (exists={diag.get('browser_perf_registry_snapshot_exists')}, in_bundle={diag.get('browser_perf_registry_snapshot_in_bundle')})")
+    lines.append(f"- browser_perf_previous_snapshot: {diag.get('browser_perf_previous_snapshot_ref') or '—'} -> {diag.get('browser_perf_previous_snapshot_path') or '—'} (exists={diag.get('browser_perf_previous_snapshot_exists')}, in_bundle={diag.get('browser_perf_previous_snapshot_in_bundle')})")
+    lines.append(f"- browser_perf_contract: {diag.get('browser_perf_contract_ref') or '—'} -> {diag.get('browser_perf_contract_path') or '—'} (exists={diag.get('browser_perf_contract_exists')}, in_bundle={diag.get('browser_perf_contract_in_bundle')})")
+    lines.append(f"- browser_perf_evidence_report: {diag.get('browser_perf_evidence_report_ref') or '—'} -> {diag.get('browser_perf_evidence_report_path') or '—'} (exists={diag.get('browser_perf_evidence_report_exists')}, in_bundle={diag.get('browser_perf_evidence_report_in_bundle')})")
+    lines.append(f"- browser_perf_comparison_report: {diag.get('browser_perf_comparison_report_ref') or '—'} -> {diag.get('browser_perf_comparison_report_path') or '—'} (exists={diag.get('browser_perf_comparison_report_exists')}, in_bundle={diag.get('browser_perf_comparison_report_in_bundle')})")
+    lines.append(f"- browser_perf_trace: {diag.get('browser_perf_trace_ref') or '—'} -> {diag.get('browser_perf_trace_path') or '—'} (exists={diag.get('browser_perf_trace_exists')}, in_bundle={diag.get('browser_perf_trace_in_bundle')})")
+    lines.append(f"- browser_perf_status: {diag.get('browser_perf_status') or '—'} / level={diag.get('browser_perf_level') or '—'}")
+    lines.append(f"- browser_perf_evidence_status: {diag.get('browser_perf_evidence_status') or '—'} / level={diag.get('browser_perf_evidence_level') or '—'} / bundle_ready={diag.get('browser_perf_bundle_ready')} / snapshot_contract_match={diag.get('browser_perf_snapshot_contract_match')}")
+    lines.append(f"- browser_perf_comparison_status: {diag.get('browser_perf_comparison_status') or '—'} / level={diag.get('browser_perf_comparison_level') or '—'} / ready={diag.get('browser_perf_comparison_ready')} / changed={diag.get('browser_perf_comparison_changed')}")
+    lines.append(f"- browser_perf_comparison_delta: wakeups={diag.get('browser_perf_comparison_delta_total_wakeups')} / dup={diag.get('browser_perf_comparison_delta_total_duplicate_guard_hits')} / render={diag.get('browser_perf_comparison_delta_total_render_count')} / max_idle_poll_ms={diag.get('browser_perf_comparison_delta_max_idle_poll_ms')}")
+    lines.append(f"- browser_perf_component_count: {diag.get('browser_perf_component_count')} / total_wakeups={diag.get('browser_perf_total_wakeups')} / total_duplicate_guard_hits={diag.get('browser_perf_total_duplicate_guard_hits')} / max_idle_poll_ms={diag.get('browser_perf_max_idle_poll_ms')}")
+    lines.append(f"- anim_latest_visual_cache_token: {diag.get('anim_latest_visual_cache_token') or '—'}")
+    reload_inputs = list(diag.get("anim_latest_visual_reload_inputs") or [])
+    lines.append(f"- anim_latest_visual_reload_inputs: {', '.join(str(x) for x in reload_inputs) if reload_inputs else '—'}")
+    lines.append(f"- anim_latest_updated_utc: {diag.get('anim_latest_updated_utc') or '—'}")
+    if contract_summary:
+        lines.append(f"- anim_latest_has_solver_points_block: {diag.get('anim_latest_has_solver_points_block')}")
+        lines.append(f"- anim_latest_has_hardpoints_block: {diag.get('anim_latest_has_hardpoints_block')}")
+        lines.append(f"- anim_latest_has_packaging_block: {diag.get('anim_latest_has_packaging_block')}")
+        lines.append(f"- anim_latest_packaging_status: {diag.get('anim_latest_packaging_status') or '—'}")
+        lines.append(f"- anim_latest_packaging_truth_ready: {diag.get('anim_latest_packaging_truth_ready')}")
+    if validation_summary:
+        lines.append(f"- anim_latest_validation_level: {diag.get('anim_latest_validation_level') or '—'}")
+        lines.append(f"- anim_latest_validation_visible_present_family_count: {diag.get('anim_latest_validation_visible_present_family_count')} / {diag.get('anim_latest_validation_visible_required_family_count')}")
+        lines.append(f"- anim_latest_validation_packaging_status: {diag.get('anim_latest_validation_packaging_status') or '—'}")
+        lines.append(f"- anim_latest_validation_packaging_truth_ready: {diag.get('anim_latest_validation_packaging_truth_ready')}")
+    if issues:
+        lines.extend(["", "## anim_latest_issues", *[f"- {x}" for x in issues]])
+    if deps:
+        lines.extend(["", "## visual_cache_dependencies", "```json", json.dumps(deps, ensure_ascii=False, indent=2), "```"])
+    if diag.get("anim_latest_meta"):
+        lines.extend(["", "## anim_latest_meta", "```json", json.dumps(diag.get("anim_latest_meta"), ensure_ascii=False, indent=2), "```"])
+    if diag.get("error"):
+        lines.extend(["", f"error: {diag.get('error')}"])
+    md = "\n".join(lines).rstrip() + "\n"
+
+    try:
+        _safe_write_text(out_dir / ANIM_DIAG_SIDECAR_JSON, json.dumps(diag, ensure_ascii=False, indent=2))
+        _safe_write_text(out_dir / ANIM_DIAG_SIDECAR_MD, md)
+    except Exception:
+        pass
+    return diag, md
+
+
+def _health_report_failure_payload(zip_path: Path, error_text: str) -> Dict[str, Any]:
+    python_truth = _runtime_python_truth_override()
+    return {
+        "schema": "health_report",
+        "schema_version": "1.3.0",
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "zip_path": str(zip_path),
+        "ok": False,
+        "signals": {
+            "health_report_error": {
+                "error": str(error_text),
+                "python_executable": python_truth["python_executable"],
+                "python_prefix": python_truth["python_prefix"],
+                "python_base_prefix": python_truth["python_base_prefix"],
+                "venv_active": python_truth["venv_active"],
+                "preferred_cli_python": python_truth["preferred_cli_python"],
+                "python_executable_current": python_truth["python_executable_current"],
+                "python_runtime_source": python_truth["python_runtime_source"],
+            }
+        },
+        "notes": [
+            "health report generation failed; embedded fallback stub instead of dropping artifact",
+            str(error_text),
+        ],
+    }
 
 
 def make_send_bundle(
