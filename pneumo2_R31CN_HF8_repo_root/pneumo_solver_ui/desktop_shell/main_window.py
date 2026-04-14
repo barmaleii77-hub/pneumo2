@@ -7,6 +7,10 @@ from tkinter import messagebox, ttk
 from pneumo_solver_ui.desktop_ui_core import ScrollableFrame
 from pneumo_solver_ui.release_info import get_release
 
+from .command_search import (
+    build_shell_command_search_entries,
+    rank_shell_command_search_entries,
+)
 from .contracts import DesktopShellToolSpec
 from .home_view import ShellHomeViewController, build_shell_home_view
 from .menu_builder import (
@@ -32,11 +36,19 @@ class DesktopMainShell:
 
         self.specs = build_desktop_shell_specs()
         self.spec_by_key = {spec.key: spec for spec in self.specs}
+        self.command_search_entries = build_shell_command_search_entries(self.specs)
         self.status_var = tk.StringVar(
             value="Готово. Выберите раздел слева, верхнее меню или обзорную страницу."
         )
+        self.runtime_var = tk.StringVar(
+            value="Runtime: нет активной инженерной операции."
+        )
         self.workflow_var = tk.StringVar(value="Маршрут: недоступен")
         self.workspace_var = tk.StringVar(value="Обзор | Открытых окон: 0")
+        self.command_search_var = tk.StringVar(value="")
+        self.command_search_hint_var = tk.StringVar(
+            value="Поиск команд: начните вводить название экрана, команды или артефакта."
+        )
         self.details_title_var = tk.StringVar(value="Обзор")
         self.details_meta_var = tk.StringVar(value="Основное рабочее место")
         self.details_body_var = tk.StringVar(
@@ -51,6 +63,9 @@ class DesktopMainShell:
         self._startup_tool_keys = startup_tool_keys
         self._startup_route_applied = False
         self._nav_item_to_key: dict[str, str] = {}
+        self._runtime_trace_var: tk.Variable | None = None
+        self._runtime_trace_id: str | None = None
+        self._f6_region_widgets: tuple[tk.Widget, ...] = ()
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -132,6 +147,7 @@ class DesktopMainShell:
             open_tool=self.open_tool,
         )
         self.toolbar.frame.pack(fill="x", before=body)
+        self._build_command_strip(outer, before=body)
 
         self.notebook = ttk.Notebook(center_panel)
         self.notebook.pack(fill="both", expand=True)
@@ -183,6 +199,9 @@ class DesktopMainShell:
         )
         self.root.protocol("WM_DELETE_WINDOW", self.quit_app)
         self._refresh_shell_state()
+        self._bind_runtime_trace()
+        self._configure_region_navigation()
+        self._bind_shell_shortcuts()
         self.root.after_idle(self._open_startup_route)
 
         status = ttk.Frame(self.root, padding=(10, 6))
@@ -190,10 +209,24 @@ class DesktopMainShell:
         status.columnconfigure(0, weight=1)
         status.columnconfigure(1, weight=0)
         status.columnconfigure(2, weight=0)
-        ttk.Label(status, textvariable=self.status_var).grid(row=0, column=0, sticky="w")
+        self.status_primary_label = ttk.Label(status, textvariable=self.status_var)
+        self.status_primary_label.grid(row=0, column=0, sticky="w")
+        self.status_runtime_label = ttk.Label(
+            status,
+            textvariable=self.runtime_var,
+            takefocus=True,
+        )
+        self.status_runtime_label.grid(row=1, column=0, sticky="w", pady=(4, 0))
         ttk.Label(status, textvariable=self.workflow_var).grid(row=0, column=1, sticky="e", padx=(12, 0))
-        ttk.Label(status, textvariable=self.workspace_var).grid(row=0, column=2, sticky="e", padx=(12, 0))
-        ttk.Sizegrip(status).grid(row=0, column=3, sticky="se", padx=(12, 0))
+        ttk.Label(status, textvariable=self.workspace_var).grid(row=1, column=1, sticky="e", padx=(12, 0), pady=(4, 0))
+        ttk.Sizegrip(status).grid(row=1, column=3, sticky="se", padx=(12, 0))
+        self._f6_region_widgets = (
+            self.command_search_combo,
+            self.nav_tree,
+            self.notebook,
+            self.details_open_button,
+            self.status_runtime_label,
+        )
 
     def _build_navigation_panel(self, parent: ttk.Frame) -> None:
         panel = ttk.LabelFrame(parent, text="Разделы", padding=8)
@@ -251,7 +284,12 @@ class DesktopMainShell:
             wraplength=280,
             justify="left",
         ).pack(anchor="w", pady=(8, 0))
-        ttk.Button(body, text="Открыть текущий раздел", command=self._open_current_detail_target).pack(
+        self.details_open_button = ttk.Button(
+            body,
+            text="Открыть текущий раздел",
+            command=self._open_current_detail_target,
+        )
+        self.details_open_button.pack(
             fill="x",
             pady=(12, 0),
         )
@@ -259,6 +297,71 @@ class DesktopMainShell:
             fill="x",
             pady=(6, 0),
         )
+
+    def _build_command_strip(self, parent: ttk.Frame, *, before: tk.Widget) -> None:
+        command_strip = ttk.LabelFrame(parent, text="Командная зона", padding=8)
+        command_strip.pack(fill="x", before=before, pady=(0, 8))
+        command_strip.columnconfigure(1, weight=1)
+
+        actions = ttk.Frame(command_strip)
+        actions.grid(row=0, column=0, sticky="w")
+        ttk.Button(
+            actions,
+            text="Собрать диагностику",
+            command=self._open_global_diagnostics,
+        ).pack(side="left")
+        ttk.Button(
+            actions,
+            text="Открыть сравнение",
+            command=self._open_compare_viewer,
+        ).pack(side="left", padx=(8, 0))
+        ttk.Button(
+            actions,
+            text="Открыть в аниматоре",
+            command=self._open_animator,
+        ).pack(side="left", padx=(8, 0))
+        ttk.Button(
+            actions,
+            text="Остановить",
+            command=self._request_stop_active_work,
+        ).pack(side="left", padx=(8, 0))
+
+        search = ttk.Frame(command_strip)
+        search.grid(row=0, column=1, sticky="ew", padx=(16, 0))
+        search.columnconfigure(1, weight=1)
+        ttk.Label(search, text="Поиск команд").grid(row=0, column=0, sticky="w")
+        self.command_search_combo = ttk.Combobox(
+            search,
+            textvariable=self.command_search_var,
+            values=tuple(entry.label for entry in self.command_search_entries),
+            width=42,
+        )
+        self.command_search_combo.grid(row=0, column=1, sticky="ew", padx=(8, 8))
+        self.command_search_combo.bind(
+            "<<ComboboxSelected>>",
+            lambda _event: self._refresh_command_search_hint(),
+        )
+        self.command_search_combo.bind(
+            "<KeyRelease>",
+            lambda _event: self._refresh_command_search_hint(),
+        )
+        self.command_search_combo.bind(
+            "<Return>",
+            lambda _event: self._execute_command_search(),
+        )
+        ttk.Button(
+            search,
+            text="Открыть",
+            command=self._execute_command_search,
+        ).grid(row=0, column=2, sticky="e")
+        ttk.Label(
+            search,
+            textvariable=self.command_search_hint_var,
+            wraplength=620,
+            justify="left",
+            foreground="#4f5961",
+        ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(6, 0))
+        self._refresh_command_search_hint()
 
     def _rebuild_navigation_tree(self) -> None:
         self.nav_tree.delete(*self.nav_tree.get_children())
@@ -322,6 +425,8 @@ class DesktopMainShell:
         self.workspace_var.set(self.workspace.describe_workspace())
         self._sync_navigation_selection()
         self._refresh_details_panel()
+        self._bind_runtime_trace()
+        self._refresh_runtime_from_active_tool()
 
     def _sync_navigation_selection(self) -> None:
         current_key = self.workspace.selected_workspace_key()
@@ -437,9 +542,9 @@ class DesktopMainShell:
         messagebox.showinfo(
             "PneumoApp",
             "PneumoApp\n\n"
-            "Классическое настольное рабочее место инженера.\n"
-            "Основной маршрут: данные машины, сценарии, расчёт, оптимизация и результаты.\n"
-            "Специализированные окна визуализации и анализа открываются из единого shell.",
+            "Нативное Windows desktop-рабочее место инженера.\n"
+            "Основной маршрут: исходные данные, сценарии, baseline и optimization, анализ, аниматор и диагностика.\n"
+            "Главное shell-окно держит command surface, contextual browser, inspector и быстрые переходы к специализированным окнам.",
         )
 
     def _on_tab_changed(self, _event: object | None = None) -> None:
@@ -477,6 +582,172 @@ class DesktopMainShell:
                 return True
         self.status_var.set(f"Не найден маршрут для возможности: {capability}")
         return False
+
+    def _open_global_diagnostics(self) -> None:
+        self.open_tool("desktop_diagnostics_center")
+
+    def _open_compare_viewer(self) -> None:
+        self.open_tool("compare_viewer")
+
+    def _open_animator(self) -> None:
+        self.open_tool("desktop_animator")
+
+    def _request_stop_active_work(self) -> None:
+        session = self.workspace.current_session()
+        if session is None:
+            self.status_var.set("Останавливать пока нечего: активное рабочее окно не выбрано.")
+            return
+        controller = getattr(session, "controller", None)
+        for method_name, caption in (
+            ("soft_stop_job", "Запрошена мягкая остановка оптимизации."),
+            ("_stop", "Запрошена остановка активной операции."),
+            ("_on_stop", "Запрошена остановка активной операции."),
+        ):
+            method = getattr(controller, method_name, None)
+            if callable(method):
+                method()
+                self.status_var.set(caption)
+                return
+        self.status_var.set(f"В окне «{session.spec.title}» нет поддерживаемой команды остановки.")
+
+    def _refresh_command_search_hint(self) -> None:
+        query = str(self.command_search_var.get() or "").strip()
+        ranked = rank_shell_command_search_entries(query, self.command_search_entries)
+        if not ranked:
+            if query:
+                self.command_search_hint_var.set(
+                    f"Совпадений по запросу «{query}» нет. Попробуйте название раздела, bundle, animator или diagnostics."
+                )
+            else:
+                self.command_search_hint_var.set(
+                    "Поиск команд: начните вводить название экрана, команды или артефакта."
+                )
+            return
+        best = ranked[0]
+        self.command_search_hint_var.set(
+            f"{best.label} -> {best.location}. {best.summary}"
+        )
+
+    def _execute_command_search(self) -> None:
+        query = str(self.command_search_var.get() or "").strip()
+        ranked = rank_shell_command_search_entries(query, self.command_search_entries)
+        if not ranked:
+            self.status_var.set(f"Команда по запросу «{query or '—'}» не найдена.")
+            self._refresh_command_search_hint()
+            return
+        best = ranked[0]
+        if best.action_kind == "tool":
+            self.open_tool(best.action_value)
+        elif best.action_value == "home":
+            self._select_home_tab()
+        else:
+            self.status_var.set(f"Команда «{best.label}» пока не поддерживается.")
+            return
+        self.status_var.set(f"Выполнена команда: {best.label}")
+        self.command_search_var.set(best.label)
+        self._refresh_command_search_hint()
+
+    def _compact_runtime_text(self, raw_text: str) -> str:
+        text = " | ".join(part.strip() for part in str(raw_text or "").splitlines() if part.strip())
+        if not text:
+            return "Runtime: нет активной инженерной операции."
+        if len(text) > 220:
+            text = text[:217].rstrip() + "..."
+        return f"Runtime: {text}"
+
+    def _runtime_source_var(self, controller: object | None) -> tk.Variable | None:
+        if controller is None:
+            return None
+        for attr_name in (
+            "status_var",
+            "machine_state_var",
+            "workspace_summary_var",
+            "mode_summary_var",
+            "context_summary_var",
+            "run_launch_summary_var",
+        ):
+            candidate = getattr(controller, attr_name, None)
+            if isinstance(candidate, tk.Variable):
+                return candidate
+        return None
+
+    def _unbind_runtime_trace(self) -> None:
+        if self._runtime_trace_var is None or self._runtime_trace_id is None:
+            self._runtime_trace_var = None
+            self._runtime_trace_id = None
+            return
+        try:
+            self._runtime_trace_var.trace_remove("write", self._runtime_trace_id)
+        except Exception:
+            pass
+        self._runtime_trace_var = None
+        self._runtime_trace_id = None
+
+    def _bind_runtime_trace(self) -> None:
+        self._unbind_runtime_trace()
+        session = self.workspace.current_session()
+        controller = getattr(session, "controller", None) if session is not None else None
+        runtime_source = self._runtime_source_var(controller)
+        if runtime_source is None:
+            return
+        self._runtime_trace_var = runtime_source
+        self._runtime_trace_id = runtime_source.trace_add(
+            "write",
+            lambda *_args: self._refresh_runtime_from_active_tool(),
+        )
+
+    def _refresh_runtime_from_active_tool(self) -> None:
+        session = self.workspace.current_session()
+        if session is None:
+            self.runtime_var.set("Runtime: shell ждёт открытия рабочего раздела.")
+            return
+        controller = getattr(session, "controller", None)
+        runtime_source = self._runtime_source_var(controller)
+        if runtime_source is not None:
+            try:
+                self.runtime_var.set(self._compact_runtime_text(str(runtime_source.get() or "")))
+                return
+            except Exception:
+                pass
+        self.runtime_var.set(self._compact_runtime_text(f"Активно окно: {session.spec.title}"))
+
+    def _focus_next_region(self, *, step: int) -> str:
+        widgets = tuple(
+            widget
+            for widget in self._f6_region_widgets
+            if widget is not None and int(widget.winfo_exists())
+        )
+        if not widgets:
+            return "break"
+        focused = self.root.focus_get()
+        try:
+            current_index = widgets.index(focused)  # type: ignore[arg-type]
+        except ValueError:
+            current_index = -1 if step > 0 else 0
+        target = widgets[(current_index + step) % len(widgets)]
+        target.focus_set()
+        return "break"
+
+    def _configure_region_navigation(self) -> None:
+        self.root.bind_all("<F6>", lambda _event: self._focus_next_region(step=1))
+        self.root.bind_all("<Shift-F6>", lambda _event: self._focus_next_region(step=-1))
+
+    def _bind_shell_shortcuts(self) -> None:
+        self.root.bind_all("<Control-k>", lambda _event: self._focus_command_search())
+        self.root.bind_all("<F7>", lambda _event: self._run_bound_action(self._open_global_diagnostics))
+        self.root.bind_all("<F8>", lambda _event: self._run_bound_action(self._open_animator))
+        self.root.bind_all("<Shift-F5>", lambda _event: self._run_bound_action(self._request_stop_active_work))
+
+    def _focus_command_search(self) -> str:
+        self.command_search_combo.focus_set()
+        self.command_search_combo.selection_range(0, "end")
+        return "break"
+
+    def _run_bound_action(self, action: object) -> str:
+        handler = action if callable(action) else None
+        if handler is not None:
+            handler()
+        return "break"
 
     def _open_startup_route(self) -> None:
         if self._startup_route_applied:

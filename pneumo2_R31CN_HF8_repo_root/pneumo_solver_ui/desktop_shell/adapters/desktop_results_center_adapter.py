@@ -21,8 +21,8 @@ def create_hosted_results_center(parent: tk.Misc) -> DesktopResultsCenter:
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="desktop_results_center",
-        title="Результаты",
-        description="Единый центр результатов, замечаний и переходов к сравнению, визуализации и диагностике.",
+        title="Analysis и результаты",
+        description="Единый центр результатов, validation summary и переходов к сравнению, визуализации и диагностике.",
         group="Встроенные окна",
         mode="hosted",
         workflow_stage="results",
@@ -38,7 +38,7 @@ def build_spec() -> DesktopShellToolSpec:
         launch_contexts=("home", "calculation", "optimization", "analysis"),
         menu_section="Результаты",
         nav_section="Результаты",
-        details="Здесь пользователь видит, что именно считалось, какие замечания нашлись и куда идти дальше для анализа.",
+        details="Здесь пользователь видит, что именно считалось, какие замечания нашлись, какой следующий шаг рекомендован и как перейти к сравнению, аниматору и диагностике.",
         menu_order=50,
         nav_order=50,
         primary=True,

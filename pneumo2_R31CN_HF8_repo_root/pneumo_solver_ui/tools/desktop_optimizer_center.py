@@ -19,6 +19,7 @@ from pneumo_solver_ui.desktop_optimizer_tabs import (
     DesktopOptimizerPackagingTab,
     DesktopOptimizerRuntimeTab,
 )
+from pneumo_solver_ui.optimization_contract_summary_ui import format_hard_gate
 
 try:
     from pneumo_solver_ui.release_info import get_release
@@ -75,11 +76,18 @@ class DesktopOptimizerCenter:
             value="Готово. Автоматизированная оптимизация доступна в отдельном инженерном центре."
         )
         self.mode_summary_var = tk.StringVar(
-            value="Режим: автоматический подбор и ручная настройка доступны во вкладках."
+            value="Режим: active optimization mode, baseline и runtime contract будут показаны после первого обновления."
         )
         self.workspace_summary_var = tk.StringVar(
             value="Контекст: контракт, история прогонов и готовые выпуски будут показаны после первого обновления."
         )
+        self.baseline_summary_var = tk.StringVar(
+            value="Baseline: источник и политика автообновления будут показаны после первого обновления."
+        )
+        self.contract_summary_var = tk.StringVar(
+            value="Runtime contract: objective stack и hard gate будут показаны после первого обновления."
+        )
+        self.launch_button_text_var = tk.StringVar(value="Запустить оптимизацию")
         self._poll_after_id: str | None = None
         self._host_closed = False
         self._selected_run_dir = ""
@@ -113,7 +121,7 @@ class DesktopOptimizerCenter:
         title_box.pack(side="left", fill="x", expand=True)
         ttk.Label(
             title_box,
-            text="Центр автоматизированной оптимизации",
+            text="Baseline и optimization",
             font=("Segoe UI", 16, "bold"),
         ).pack(anchor="w")
         ttk.Label(
@@ -160,9 +168,28 @@ class DesktopOptimizerCenter:
             wraplength=300,
         ).pack(anchor="w")
 
+        baseline_frame = ttk.LabelFrame(sidebar, text="Baseline", padding=8)
+        baseline_frame.pack(fill="x", pady=(8, 0))
+        ttk.Label(
+            baseline_frame,
+            textvariable=self.baseline_summary_var,
+            justify="left",
+            wraplength=300,
+        ).pack(anchor="w")
+
+        contract_frame = ttk.LabelFrame(sidebar, text="Runtime contract", padding=8)
+        contract_frame.pack(fill="x", pady=(8, 0))
+        ttk.Label(
+            contract_frame,
+            textvariable=self.contract_summary_var,
+            justify="left",
+            wraplength=300,
+        ).pack(anchor="w")
+
         nav_frame = ttk.LabelFrame(sidebar, text="Переходы", padding=8)
         nav_frame.pack(fill="x", pady=(8, 0))
-        ttk.Button(nav_frame, text="Контракт", command=self.show_contract_tab).pack(fill="x")
+        ttk.Button(nav_frame, text="Baseline и контракт", command=self.show_contract_tab).pack(fill="x")
+        ttk.Button(nav_frame, text="Optimization runtime", command=self.show_runtime_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="История", command=self.show_history_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="Готовые прогоны", command=self.show_finished_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="Передача стадий", command=self.show_handoff_tab).pack(fill="x", pady=(6, 0))
@@ -177,9 +204,9 @@ class DesktopOptimizerCenter:
         self.finished_tab = DesktopOptimizerFinishedTab(self.notebook, self)
         self.handoff_tab = DesktopOptimizerHandoffTab(self.notebook, self)
         self.packaging_tab = DesktopOptimizerPackagingTab(self.notebook, self)
-        self.notebook.add(self.dashboard_tab, text="Автоматический маршрут")
-        self.notebook.add(self.contract_tab, text="Контракт и цели")
-        self.notebook.add(self.runtime_tab, text="Стадии и вычисления")
+        self.notebook.add(self.dashboard_tab, text="Baseline и запуск")
+        self.notebook.add(self.contract_tab, text="Baseline и контракт")
+        self.notebook.add(self.runtime_tab, text="Optimization runtime")
         self.notebook.add(self.history_tab, text="История")
         self.notebook.add(self.finished_tab, text="Готовые прогоны")
         self.notebook.add(self.handoff_tab, text="Передача стадий")
@@ -511,7 +538,76 @@ class DesktopOptimizerCenter:
                     "Параметры поиска: "
                     f"{int(getattr(snapshot, 'search_param_count', 0) or 0)}"
                 ),
-                "Рабочая зона: история, handoff и выпуск открываются справа во вкладках.",
+                "Рабочая зона: baseline, runtime, history, handoff и выпуск открываются справа во вкладках.",
+            ]
+        )
+
+    def _active_mode_key(self) -> str:
+        if bool(self.var("opt_use_staged").get()):
+            return "staged"
+        return "distributed"
+
+    def profile_labels_for_active_mode(self) -> tuple[str, ...]:
+        mode_key = self._active_mode_key()
+        labels: list[str] = []
+        for option_key, option_label, _desc in self.runtime.launch_profile_options():
+            if mode_key == "staged" and option_key.startswith("stage_"):
+                labels.append(option_label)
+            if mode_key == "distributed" and option_key.startswith("coord_"):
+                labels.append(option_label)
+        return tuple(labels)
+
+    def set_active_mode(self, mode_key: str) -> None:
+        is_staged = str(mode_key or "").strip().lower() != "distributed"
+        self.var("opt_use_staged").set(is_staged)
+        self.runtime.session_state["use_staged_opt"] = bool(is_staged)
+        current_profile_key = str(self.runtime.session_state.get("opt_launch_profile", "") or "")
+        if is_staged and not current_profile_key.startswith("stage_"):
+            self.runtime.apply_launch_profile("stage_triage")
+            self._load_state_into_widgets()
+        if not is_staged and not current_profile_key.startswith("coord_"):
+            self.runtime.apply_launch_profile("coord_dask_explore")
+            self._load_state_into_widgets()
+        self.refresh_all()
+
+    def _primary_launch_button_text(self) -> str:
+        if self._active_mode_key() == "staged":
+            return "Запустить поэтапный запуск"
+        return "Запустить распределённую координацию"
+
+    def _format_baseline_summary_text(self) -> str:
+        snapshot = self._contract_snapshot
+        if snapshot is None:
+            snapshot = self.runtime.contract_snapshot()
+        auto_update = bool(self.runtime.session_state.get("opt_autoupdate_baseline", False))
+        source_label = str(getattr(snapshot, "baseline_source_label", "") or getattr(snapshot, "baseline_source_kind", "") or "—")
+        baseline_path = str(getattr(snapshot, "baseline_path", "") or "не найден")
+        return "\n".join(
+            [
+                f"Активный baseline: {source_label}",
+                f"Путь: {baseline_path}",
+                f"Автообновление baseline: {'включено' if auto_update else 'выключено'}",
+            ]
+        )
+
+    def _format_runtime_contract_summary_text(self) -> str:
+        snapshot = self._contract_snapshot
+        if snapshot is None:
+            snapshot = self.runtime.contract_snapshot()
+        objective_stack = ", ".join(tuple(getattr(snapshot, "objective_keys", ()) or ())) or "—"
+        hard_gate = format_hard_gate(
+            getattr(snapshot, "penalty_key", ""),
+            getattr(snapshot, "penalty_tol", None),
+        ) or "—"
+        if self._active_mode_key() == "staged":
+            mode_label = "Рекомендуемый: Поэтапный запуск"
+        else:
+            mode_label = "Расширенный: Распределённая координация"
+        return "\n".join(
+            [
+                f"Активный режим: {mode_label}",
+                f"Objective stack: {objective_stack}",
+                f"Hard gate: {hard_gate}",
             ]
         )
 
@@ -1284,12 +1380,16 @@ class DesktopOptimizerCenter:
         self.refresh_contract()
         self.mode_summary_var.set(self._format_compact_mode_summary())
         self.workspace_summary_var.set(self._format_compact_workspace_summary())
+        self.baseline_summary_var.set(self._format_baseline_summary_text())
+        self.contract_summary_var.set(self._format_runtime_contract_summary_text())
+        self.launch_button_text_var.set(self._primary_launch_button_text())
         surface = self.runtime.active_job_surface()
         readiness = self.runtime.launch_readiness_summary()
         self.runtime_tab.render(
             profile_key=str(self.runtime.session_state.get("opt_launch_profile", "") or ""),
             profile_text=self._format_launch_profile_text(),
             readiness_text=self._format_launch_readiness_text(readiness),
+            contract_text=self._format_runtime_contract_summary_text(),
             preview_text=self.runtime.command_preview_text(),
             resume_text=self._format_resume_target_text(),
             status_text=self._format_runtime_status_text(surface),

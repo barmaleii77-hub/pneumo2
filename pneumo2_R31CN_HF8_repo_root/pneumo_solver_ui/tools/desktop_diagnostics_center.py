@@ -269,7 +269,7 @@ class DesktopDiagnosticsCenter:
         quick_box.pack(fill="x", pady=(8, 0))
         ttk.Button(
             quick_box,
-            text="Запустить диагностику",
+            text="Собрать диагностику",
             command=self._start_run,
         ).pack(fill="x")
         ttk.Button(

@@ -1,4 +1,4 @@
-﻿# Windows Desktop CAD GUI Canon
+# Windows Desktop CAD GUI Canon
 
 Этот документ задаёт project-wide baseline для desktop GUI в `pneumo2`. Он трактует классический Microsoft Win32 UX Guide как источник legacy-принципов, которые нужно сверять с current Windows guidance по accessibility, navigation, controls, input и DPI, а не копировать буквально. Канон обязателен для shell, editor-окон, viewport/workspace-поверхностей и analysis-модулей. Утилитарные окна могут отходить от CAD-layout, если у них нет document/viewport surface, но обязаны сохранять keyboard-first, accessibility, DPI и performance discipline.
 
@@ -26,7 +26,6 @@
 - Вокруг document area допускаются дополнительные panes: selection filters, layers, diagnostics, job queue, results summary, reference snippets, если они не съедают рабочую площадь без пользы.
 - Везде, где уместно, должны быть явные scrollbars и resize affordances. Плавающие и docked panes должны визуально показывать, что их можно менять по размеру и положению.
 - Раскладки docked, floating и auto-hide panes должны сохраняться и восстанавливаться между сеансами как baseline desktop behavior.
-- Docking policy допускается описывать machine-readable matrix-слоем: какие pane можно dock/float/auto-hide/выносить на второй монитор, а какие являются document-centered surface и не должны терять основной anchor.
 - Для 3D surfaces обязателен orientation widget уровня `ViewCube`: стандартные виды, возврат к orientation presets, настраиваемые размер и положение, без засорения viewport.
 
 ## 3. Command model: menu, toolbar, palettes, context menu, search
@@ -69,7 +68,6 @@
 - Keyboard-first работа обязательна: логичный tab order, `F6` и `Shift+F6` между major regions, `Arrow keys` внутри composite controls, `Esc` для понятного выхода из режимов и `Enter` там, где он ожидаем.
 - Сохранять стандартные Windows shortcuts и vocabulary: `Ctrl+Z`, `Ctrl+Y`, `Ctrl+C`, `Ctrl+V`, `Ctrl+F`, `F1`, `Ctrl+P` и другие общеожидаемые сочетания.
 - Частые команды должны иметь shortcuts; важные controls должны иметь access keys; tooltip и help metadata должны раскрывать shortcut hints.
-- Keyboard map может быть отдельным contract artifact, если он явно фиксирует `F6`-порядок регионов, search shortcut, primary action shortcut и access-key discipline.
 - Screen reader support и `UI Automation` exposure обязательны для всех важных элементов, включая custom controls.
 - Для элементов должны быть корректные accessible names, roles, values, states и focus indicators.
 - Контраст текста не ниже `4.5:1`. Критичный смысл нельзя передавать только цветом, особенно только красным и зелёным.
@@ -100,24 +98,3 @@
 - Компромисс допустим между единым baseline и спецификой отдельных окон: specialized tools могут отходить от общего CAD-layout, если они сохраняют project-wide command discipline, accessibility, DPI и performance policy.
 - Любое отклонение от этого канона должно быть локально обосновано в prompt, spec или design note для конкретного workspace.
 - Сжатая формула: большой центральный viewport или document area, вокруг него dockable workflow panes, сверху понятная command surface, справа context-sensitive properties, слева иерархия только по делу, снизу status/progress strip, везде keyboard-first accessibility, честный High-DPI и измеримая отзывчивость.
-
-## 9. Explainability, help-pane и provenance contract
-
-- Каждый значимый control обязан иметь короткий tooltip и отдельную modeless-affordance `?`, открывающую расширенную помощь в inspector/help pane, а не в новом модальном окне, если нет жёсткой причины для modal flow.
-- `Command search` индексирует не только названия команд, но и help-tags, tooltip-теги, проектные сущности, артефакты и миграционные синонимы из старых web-маршрутов.
-- Результат `command search` показывает не только имя команды, но и путь к ней: workspace, docked pane, отдельное окно или специализированный инструмент.
-- Любой расчётный preview, overlay, график и анимационная поверхность обязаны показывать `источник представления` и `время построения`; для cached/exported artifacts дополнительно показываются run id, путь к артефакту или эквивалентный provenance marker.
-- Help metadata, provenance markers и warning states должны быть доступны не только мышью, но и с клавиатуры, через inspector pane, accessible names, adjacent descriptive text и другие UI Automation-friendly surfaces.
-- Idle-поведение является частью GUI contract: hidden panes, detached windows и неактивные surfaces обязаны останавливать timers, polling и ненужные redraw loops, а instrumentation уровня ETW-style or equivalent telemetry должно уметь отличать visible work, hidden work и idle wakeups.
-
-## 10. Element Registries And Verification Hooks
-
-- Для desktop GUI допустим machine-readable contract layer с координатами, прямоугольниками и ownership регионов окна, если он не подменяет human-readable canon и используется как reference artifact.
-- Каждый интерактивный элемент обязан иметь стабильный `automation_id`, пригодный для UI Automation, smoke tests, acceptance checks и replayable diagnostics.
-- Для каждого meaningful interactive element обязательны `tooltip + help` linkage, а для keyboard-first сценариев также access key, hotkey и понятный tab order.
-- Layout и shell-regions могут описываться машиночитаемо на базовом окне наподобие `1920x1080`, но реализация обязана оставаться DPI-aware и не трактовать pixel coordinates как жёсткую отрисовочную геометрию на любом мониторе.
-- Source-of-truth matrix допустима как contract artifact: она должна явно разводить master-copy данных и производные представления, а также запрещённые дублирующие места редактирования.
-- UI state matrix допустима как verification-layer для `default/hover/focus/dirty/valid/warning/error`, если она не подменяет accessibility semantics и не сводит смысл состояния только к цвету.
-- Observability hooks для GUI pipeline допустимо хранить как machine-readable event catalog с обязательными полями payload, если этот слой поддерживает acceptance/performance и regression verification, а не заменяет UX-канон.
-- Acceptance, performance и pipeline verification допустимо хранить отдельными machine-readable suites, если human-readable docs явно говорят, что это verification layer, а не самостоятельный канон.
-- `Command search` должен быть индексируемой surface не только для команд, но и для help topics, field registries, migration aliases, test entities и artifact routes.

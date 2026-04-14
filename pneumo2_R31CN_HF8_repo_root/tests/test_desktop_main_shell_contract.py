@@ -70,7 +70,7 @@ def test_desktop_main_shell_registry_exposes_shared_standalone_launch_catalog() 
     assert "pneumo_solver_ui.tools.desktop_diagnostics_center" in modules
     assert "pneumo_solver_ui.qt_compare_viewer" in modules
     assert "pneumo_solver_ui.desktop_animator.app" in modules
-    assert "pneumo_solver_ui.desktop_mnemo.app" in modules
+    assert "pneumo_solver_ui.desktop_mnemo.main" in modules
 
 
 def test_desktop_main_shell_keeps_classic_menu_and_workspace_shell() -> None:
@@ -595,7 +595,7 @@ def test_root_desktop_main_shell_wrappers_delegate_to_shell_launcher() -> None:
     assert "start_desktop_main_shell.pyw" in vbs
     assert 'Path(__file__).with_name("START_DESKTOP_MAIN_SHELL.py")' in pyw
     assert "ensure_root_launcher_runtime" in py
-    assert 'MODULE = "pneumo_solver_ui.tools.desktop_main_shell"' in py
+    assert 'MODULE = "pneumo_solver_ui.tools.desktop_main_shell_qt"' in py
 
 
 def test_desktop_main_shell_launcher_exposes_cli_for_startup_route() -> None:

@@ -14,8 +14,8 @@ def create_hosted_test_center(parent: tk.Misc) -> App:
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="test_center",
-        title="Расчёт и проверка",
-        description="Запуск расчётов, проверок и основных прогонов из одного понятного места.",
+        title="Baseline и проверки",
+        description="Baseline-прогоны, контрольные тесты и первичная проверка результатов из одного понятного места.",
         group="Встроенные окна",
         mode="hosted",
         workflow_stage="calculation",
@@ -28,7 +28,7 @@ def build_spec() -> DesktopShellToolSpec:
         launch_contexts=("home", "data", "scenarios", "results"),
         menu_section="Расчёт",
         nav_section="Расчёт",
-        details="Раздел для запуска контрольных, рабочих и подробных прогонов, а также для первичной проверки готовности конфигурации.",
+        details="Раздел держит baseline-прогон, контрольные тесты, проверку готовности и прямой переход к анализу результатов без скрытых маршрутов.",
         menu_order=30,
         nav_order=30,
         primary=True,

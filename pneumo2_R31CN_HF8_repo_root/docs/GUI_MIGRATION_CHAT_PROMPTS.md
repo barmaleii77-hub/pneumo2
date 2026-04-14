@@ -12,6 +12,16 @@
 - Не дублировать `desktop_animator`, `qt_compare_viewer` и `desktop_mnemo` внутри других окон.
 - Не строить новый монолит: делить окна на `*_model.py`, `*_runtime.py`, `*_panel.py`, `*_bridge.py`, если модуль растёт.
 
+## Обязательное наследование desktop-канона
+
+- Перед любым GUI lane сначала читать [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md), затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
+- `17_WINDOWS_DESKTOP_CAD_GUI_CANON.md` задаёт общий Windows desktop baseline.
+- `18_PNEUMOAPP_WINDOWS_GUI_SPEC.md` задаёт augmented v2 A–О contract для `Пневмоподвески`: matrix of web-to-desktop feature preservation, workflow-first IA, language and units policy, mandatory tooltip and question-mark help, graphical representation of inputs, source markers and build-time labels for graphical views, ring-editor source-of-truth, один optimization-mode selector, first-class diagnostics, truthful animator states, native Windows title-bar/system-menu behavior и stricter DPI/windowing/accessibility/performance acceptance.
+- Этот документ задаёт project-wide baseline для desktop UX и имеет приоритет над локальными prompt-формулировками, если они не задают явно обоснованное исключение.
+- Базовая command surface проекта: `menu bar + toolbar + dockable/floating/auto-hide panes + command search + status/progress strip`.
+- `Ribbon` не является режимом по умолчанию. Его можно использовать только как локально обоснованное исключение для конкретного workspace.
+- Specialized windows могут отходить от полного CAD-layout, если у них нет document/viewport-first surface, но обязаны сохранять keyboard-first, accessibility, High-DPI и performance policy.
+
 ## Общие правила для всех чатов
 
 - Один чат = один модульный lane.
@@ -20,6 +30,10 @@
 - Если нужен shared seam, выносить его рядом с целевым GUI-модулем, а не в случайный общий файл.
 - `pneumo_ui_app.py` и `pages/*` читать можно, развивать в них новые возможности нельзя.
 - Для shell-интеграции менять только `adapter/spec/catalog`, а не тащить feature-логику в shell.
+- Не проектировать GUI как web-first layout с hamburger в роли главного доступа к core-командам.
+- Для document/viewport workflows держать в центре рабочую поверхность, а не набор форм и второстепенных панелей.
+- Для scenario workflow считать `Ring Editor` единственным source-of-truth; derived views не должны становиться параллельным editor-path.
+- Для значимых controls, warnings, графиков и overlays соблюдать contract `tooltip + ? help + source marker`, но не использовать эти элементы как замену понятной layout-архитектуре.
 
 ## Shared Danger Zone
 

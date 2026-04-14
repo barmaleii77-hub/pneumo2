@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Root launcher for the classic desktop shell."""
+"""Root launcher for the Qt-first desktop shell."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from pneumo_solver_ui.root_launcher_bootstrap import ensure_root_launcher_runtim
 
 
 ROOT = Path(__file__).resolve().parent
-MODULE = "pneumo_solver_ui.tools.desktop_main_shell"
+MODULE = "pneumo_solver_ui.tools.desktop_main_shell_qt"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
