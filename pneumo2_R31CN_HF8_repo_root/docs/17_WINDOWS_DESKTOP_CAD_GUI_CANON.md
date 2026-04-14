@@ -5,6 +5,7 @@
 ## 1. Информационная архитектура
 
 - Проект проектируется как native Windows desktop engineering software, а не как web-страница в окне.
+- Главное окно должно сохранять нативные ожидания Windows: стандартную строку заголовка, system menu, перетаскивание окна, двойной щелчок для разворачивания, правый щелчок по заголовку и совместимость с Snap Layouts.
 - Базовая топология desktop suite: shell, специализированные рабочие центры, отдельные специализированные окна и вспомогательные утилиты.
 - Главный смысл интерфейса там, где это уместно, должен строиться вокруг document/viewport-first surface.
 - Служебные элементы, диагностика, редкие команды и технические детали уводятся на второй и третий план, а не конкурируют с рабочей областью.
@@ -16,6 +17,7 @@
 ## 2. Layout главного окна с перечнем panes
 
 - Верх окна: `menu bar`, под ним `toolbar` или command strip с самыми частыми действиями.
+- Если title bar кастомизируется, нельзя ломать стандартные Windows-affordances: drag, maximize, system menu, snap и resize behavior.
 - Под командной поверхностью должен быть доступен единый `command search`, который не прячет core-команды за hamburger или web-style navigation.
 - Центральная область: document well, modeling or analysis viewport, drawing canvas, preview surface или другая главная рабочая поверхность.
 - Левая панель: browser/tree, project navigator или scenario list только при наличии реальной иерархии; панель должна быть dockable, resizable и при необходимости auto-hide.
@@ -23,6 +25,7 @@
 - Нижняя полоса: status/progress strip для состояния режима, координат, выделения, background task progress, solver state и других полезных, но не критичных сигналов.
 - Вокруг document area допускаются дополнительные panes: selection filters, layers, diagnostics, job queue, results summary, reference snippets, если они не съедают рабочую площадь без пользы.
 - Везде, где уместно, должны быть явные scrollbars и resize affordances. Плавающие и docked panes должны визуально показывать, что их можно менять по размеру и положению.
+- Раскладки docked, floating и auto-hide panes должны сохраняться и восстанавливаться между сеансами как baseline desktop behavior.
 - Для 3D surfaces обязателен orientation widget уровня `ViewCube`: стандартные виды, возврат к orientation presets, настраиваемые размер и положение, без засорения viewport.
 
 ## 3. Command model: menu, toolbar, palettes, context menu, search
@@ -35,6 +38,7 @@
 - `Command search` обязателен. Он должен искать по partial match, запускать команду сразу, показывать путь до команды в UI, терпеть частичные и неточные вводы, ранжировать по частоте и по возможности поддерживать synonyms из других CAD-систем.
 - Palette windows и tool windows допустимы как first-class command surfaces для repeated workflows, особенно когда важны кастомизация, второй монитор и сохранение layout.
 - Для объектов и режимов использовать contextual commands, но не превращать интерфейс в нестабильный набор внезапно исчезающих controls.
+- Tooltip, краткая встроенная help и shortcut hints должны дополнять command architecture, но не заменять понятную информационную архитектуру и видимые core-команды.
 
 ## 4. Сценарии работы: selection, editing, view navigation, analysis, export
 
@@ -72,7 +76,7 @@
 
 ## 7. High-DPI, theming и performance checklist
 
-- Проектировать как `Per-Monitor DPI aware`, предпочтительно `PMv2`.
+- Проектировать как `Per-Monitor DPI aware`, предпочтительно `PMv2 (Per-Monitor V2)`.
 - Blur и bitmap stretch не считаются нормальным режимом. При смене DPI нужно пересчитывать размеры controls, шрифты и bitmap assets.
 - Для Win32 path использовать suggested rectangle из `WM_DPICHANGED`; mixed-DPI и multi-monitor сценарии обязательны в тестах.
 - Плавающие secondary windows, detached panes и tool windows не должны ломаться при переносе между мониторами с разным DPI.
@@ -80,12 +84,14 @@
 - Accent color использовать сдержанно: для важного interactive state, focus, selection и progress, а не для тотальной заливки интерфейса.
 - Performance policy должна быть измеримой: launch responsiveness, key interactions, background work, idle CPU, memory usage, power use, state restore и UI latency должны иметь измеряемые сценарии.
 - Для длительных операций показывать progress. Determinate progress использовать whenever possible, плюс `Cancel` или `Stop`, когда это безопасно.
+- In-window progress обязателен; taskbar progress в Windows допустим только как отражение более подробного индикатора внутри окна, а не как его замена.
 - Background work не должен держать UI постоянно “живым” без пользы. Wakeups, polling и лишние redraws нужно минимизировать. Для замеров использовать instrumentation и telemetry уровня ETW-style measurements, где это уместно.
 
 ## 8. Anti-patterns, компромиссы и сжатая формула
 
 - Запрещено делать `Ribbon` только “потому что солидно”. Если он уменьшает полезную площадь viewport или заставляет пользователя бесконечно переключать tabs, это неверное решение.
 - Запрещено прятать критичную информацию только в status bar.
+- Запрещено ломать нативное Windows-поведение окна ради кастомной chrome или декоративного title bar.
 - Запрещены noisy notifications, dialog sprawl, mouse-only core flows, скрытые advanced options без явной disclosure affordance и scrollable dialogs.
 - Запрещён web-app minimalism, который режет discoverability профессиональных команд, рабочих panes и keyboard-first сценариев.
 - Компромисс допустим между плотностью команд и площадью viewport, но по умолчанию выигрывает рабочая эффективность инженера, а не декоративная чистота экрана.

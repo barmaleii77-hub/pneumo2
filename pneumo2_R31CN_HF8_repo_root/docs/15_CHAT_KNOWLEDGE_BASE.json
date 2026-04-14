@@ -1,0 +1,291 @@
+{
+  "schema": "pneumo.chat_knowledge_base.v1",
+  "updated_at": "2026-04-14T04:27:25+00:00",
+  "requirements": [
+    {
+      "id": "REQ-0001",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "Проект должен мигрировать из WEB в понятный классический desktop GUI под Windows без потери функциональности.",
+      "details": "Статус: активно.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0002",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "WEB больше не является целевой платформой развития пользовательских сценариев.",
+      "details": "В WEB допустимы только минимальные мосты, launch-кнопки и reference-поведение до полного переноса в GUI.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0003",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "Главные операторские сценарии должны жить в GUI.",
+      "details": "Состав: главное окно приложения; ввод исходных данных; настройка расчёта; редактор и генератор сценариев колец; compare viewer; desktop mnemo; desktop animator; optimizer center; diagnostics/send bundle; validation/results/test center; geometry/reference center; engineering analysis/calibration/influence.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0004",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "Архитектура GUI должна быть модульной и пригодной для параллельной разработки разными чатами без пересечения по тем же файлам.",
+      "details": "Статус: активно.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0005",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "Нельзя дублировать домены Desktop Animator, Compare Viewer и Desktop Mnemo в других окнах без отдельной необходимости.",
+      "details": "Статус: активно.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0006",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "Главное desktop-приложение должно быть классическим Windows GUI с верхним меню и многооконным интерфейсом внутри приложения.",
+      "details": "Статус: активно.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0007",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "Ввод исходных данных должен быть удобным, секционным и понятным для пользователя.",
+      "details": "Минимальные кластеры: геометрия; пневматика; механика; настройки расчёта.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0008",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "Все пользовательские хотелки из чатов этого проекта должны записываться в базу знаний.",
+      "details": "Статус: активно.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0009",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "Все планы работ, prompt-пакеты и decomposition, которые генерируют чаты этого проекта, должны записываться в базу знаний.",
+      "details": "Статус: активно.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0010",
+      "created_at": "2026-04-13T17:06:27+00:00",
+      "source": "chat",
+      "title": "База знаний должна автоматически обновляться и сохраняться локально и в удалённом репозитории.",
+      "details": "Для chat-capture используется knowledge_base_sync: запись в JSON store, перегенерация markdown-журналов и по умолчанию stage/commit/push в текущую ветку.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0011",
+      "created_at": "2026-04-13T18:11:38+00:00",
+      "source": "chat",
+      "title": "Проект должен использовать отдельный Windows desktop CAD/CAM/CAE GUI canon как главный baseline для всего desktop suite.",
+      "details": "Baseline: menu bar + toolbar + dockable/floating/auto-hide panes + command search + status/progress strip; ribbon допустим только как отдельно обоснованное исключение для конкретного workspace.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0012",
+      "created_at": "2026-04-13T19:03:25+00:00",
+      "source": "chat",
+      "title": "Проект должен использовать project-specific Windows desktop GUI-spec для PneumoApp поверх общего CAD GUI canon.",
+      "details": "Spec фиксирует 4 workspace-группы, global diagnostics action, один selector optimization-mode, first-class Test Suite/Scenario generation, honest animator truth states и source-of-truth map для setup, suite, baseline, optimization и analysis.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0013",
+      "created_at": "2026-04-13T19:36:42+00:00",
+      "source": "chat",
+      "title": "Проект должен использовать augmented A–M Windows desktop GUI contract для PneumoApp поверх общего CAD GUI canon.",
+      "details": "Contract фиксирует workflow-first IA, ring editor как единственный source-of-truth сценариев, один active optimization mode, first-class diagnostics, honest animator truth states, taskbar/status/progress policy и snap/DPI/performance discipline.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0014",
+      "created_at": "2026-04-14T04:27:25+00:00",
+      "source": "chat",
+      "title": "Refined GUI-spec для desktop migration должен опираться на deep research по Windows windowing, tooltip/help, truthful graphics и измеримому DPI/performance behavior.",
+      "details": "Уточнённый GUI-spec обязан явно фиксировать native Windows title-bar/system-menu/snap behavior, tooltip и question-mark help contract, source markers и время построения для графических представлений, а также проверяемые требования по Per-Monitor V2, WM_DPICHANGED, UI Automation, idle CPU, hidden panes, taskbar progress и ETW-style instrumentation.",
+      "status": "активно"
+    }
+  ],
+  "plans": [
+    {
+      "id": "PLAN-0001",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "GUI_MIGRATION_CHAT_PROMPTS.md",
+      "details": "GUI-only пакет миграции из WEB в desktop GUI по отдельным направлениям.",
+      "artifact_path": "GUI_MIGRATION_CHAT_PROMPTS.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0002",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "PARALLEL_CHAT_PROMPTS_GUI_AND_WEB_2026-04-12.md",
+      "details": "Исторический пакет параллельной разработки GUI и WEB. После решения о GUI-first WEB-часть использовать только как reference.",
+      "artifact_path": "PARALLEL_CHAT_PROMPTS_GUI_AND_WEB_2026-04-12.md",
+      "status": "частично актуален"
+    },
+    {
+      "id": "PLAN-0003",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "gui_chat_prompts/00_INDEX.md",
+      "details": "Индекс prompt-файлов для параллельных GUI-чатов.",
+      "artifact_path": "gui_chat_prompts/00_INDEX.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0004",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "gui_chat_prompts/01_MAIN_WINDOW.md",
+      "details": "Главное окно приложения.",
+      "artifact_path": "gui_chat_prompts/01_MAIN_WINDOW.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0005",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "gui_chat_prompts/02_INPUT_DATA.md",
+      "details": "Ввод исходных данных.",
+      "artifact_path": "gui_chat_prompts/02_INPUT_DATA.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0006",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "gui_chat_prompts/03_RUN_SETUP.md",
+      "details": "Настройка расчёта.",
+      "artifact_path": "gui_chat_prompts/03_RUN_SETUP.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0007",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "gui_chat_prompts/04_RING_EDITOR.md",
+      "details": "Редактор и генератор сценариев колец.",
+      "artifact_path": "gui_chat_prompts/04_RING_EDITOR.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0008",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "gui_chat_prompts/05_COMPARE_VIEWER.md",
+      "details": "Compare viewer.",
+      "artifact_path": "gui_chat_prompts/05_COMPARE_VIEWER.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0009",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "gui_chat_prompts/06_DESKTOP_MNEMO.md",
+      "details": "Desktop mnemo.",
+      "artifact_path": "gui_chat_prompts/06_DESKTOP_MNEMO.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0010",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "gui_chat_prompts/07_DESKTOP_ANIMATOR.md",
+      "details": "Desktop animator.",
+      "artifact_path": "gui_chat_prompts/07_DESKTOP_ANIMATOR.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0011",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "gui_chat_prompts/08_OPTIMIZER_CENTER.md",
+      "details": "Optimizer center со всеми настройками.",
+      "artifact_path": "gui_chat_prompts/08_OPTIMIZER_CENTER.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0012",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "gui_chat_prompts/09_DIAGNOSTICS_SEND_BUNDLE.md",
+      "details": "Diagnostics и send bundle.",
+      "artifact_path": "gui_chat_prompts/09_DIAGNOSTICS_SEND_BUNDLE.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0013",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "gui_chat_prompts/10_TEST_VALIDATION_RESULTS.md",
+      "details": "Test, validation, results center.",
+      "artifact_path": "gui_chat_prompts/10_TEST_VALIDATION_RESULTS.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0014",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "gui_chat_prompts/11_GEOMETRY_REFERENCE.md",
+      "details": "Geometry, catalogs, reference.",
+      "artifact_path": "gui_chat_prompts/11_GEOMETRY_REFERENCE.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0015",
+      "created_at": "2026-04-13T00:00:00+00:00",
+      "source": "chat",
+      "title": "gui_chat_prompts/12_ENGINEERING_ANALYSIS.md",
+      "details": "Engineering analysis, calibration, influence.",
+      "artifact_path": "gui_chat_prompts/12_ENGINEERING_ANALYSIS.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0016",
+      "created_at": "2026-04-13T18:11:56+00:00",
+      "source": "chat",
+      "title": "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md",
+      "details": "Project-wide Windows desktop CAD/CAM/CAE GUI canon для shell, editor-окон, viewport/workspace-поверхностей и analysis-модулей.",
+      "artifact_path": "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0017",
+      "created_at": "2026-04-13T19:03:25+00:00",
+      "source": "chat",
+      "title": "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md",
+      "details": "Decision-complete GUI-spec для shell, workspaces, command model, workflows, diagnostics, animator truth policy и acceptance criteria проекта Пневмоподвеска.",
+      "artifact_path": "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0018",
+      "created_at": "2026-04-13T19:36:42+00:00",
+      "source": "chat",
+      "title": "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md (augmented A–M revision)",
+      "details": "Revision existing project-specific GUI spec to augmented A–M contract with optimization transparency, ring-editor source-of-truth, diagnostics operational surface, truthful animator policy, status/taskbar policy and DPI/windowing/performance rules.",
+      "artifact_path": "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0019",
+      "created_at": "2026-04-14T04:26:39+00:00",
+      "source": "chat",
+      "title": "Refined GUI-spec synchronization from deep research",
+      "details": "Уточнить 17-й canon, 18-й project-specific GUI-spec, prompt-layer и knowledge-base summary по deep-research-report.md без изменения runtime GUI и без потери web-to-desktop functional parity.",
+      "artifact_path": "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md",
+      "status": "актуален"
+    }
+  ]
+}
