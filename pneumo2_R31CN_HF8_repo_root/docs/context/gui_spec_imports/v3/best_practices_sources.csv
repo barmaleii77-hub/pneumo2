@@ -1,0 +1,24 @@
+id,источник,url,роль
+WIN-BEST-PRACTICES,Microsoft Learn,https://learn.microsoft.com/en-us/windows/apps/get-started/best-practices,"нативное поведение Windows, resize, scrolling, input, accessibility, performance"
+WIN-HIDPI,Microsoft Learn,https://learn.microsoft.com/en-us/windows/win32/hidpi/high-dpi-desktop-application-development-on-windows,"Per-Monitor V2, WM_DPICHANGED, mixed-DPI, crisp rendering"
+WIN-ACCESSIBILITY,Microsoft Learn,https://learn.microsoft.com/en-us/windows/win32/winauto/accessibility-best-practices,"keyboard parity, focus, high contrast, programmatic access"
+WIN-ACCESS-KEYS,Microsoft Learn,https://learn.microsoft.com/en-us/windows/apps/design/input/access-keys,"access keys, keytips, Alt navigation"
+WIN-RIBBON,Microsoft Learn,https://learn.microsoft.com/en-us/windows/win32/windowsribbon/windowsribbon-introduction,когда оправдана лента команд и как она соотносится с меню/панелями
+WIN-DIALOGS,Microsoft Learn,https://learn.microsoft.com/en-us/windows/win32/uxguide/win-dialog-box,"modal/modeless policy, progress dialogs, no scrollable dialogs"
+AUTODESK-PROPERTIES,Autodesk Help,https://help.autodesk.com/view/ACD/2025/ENU/?guid=GUID-94C065AB-FF9E-4752-B778-23D2FBB87E18,"properties palette, dock/resize/second monitor/persistence"
+AUTODESK-COMMAND-SEARCH,Autodesk Help,https://help.autodesk.com/cloudhelp/2016/ENU/AutoCAD-LT/files/GUID-D89B73C9-E124-4D22-AC72-0D0C53734C72.htm,"command search, mid-string search, misspelling tolerance, frequency ranking"
+AUTODESK-INPUTSEARCH,Autodesk Help,https://help.autodesk.com/cloudhelp/2020/ENU/AutoCAD-Core/files/GUID-3B84DB63-C960-45CF-A8E1-3BB405CF3A46.htm,"search settings, mid-string, autocorrect, delay"
+AUTODESK-VIEWCUBE,Autodesk Help,https://help.autodesk.com/cloudhelp/2019/ENU/InventorLT-Help/files/GUID-B266056E-5E88-42A0-B29C-7BB25C377BD3.htm,"persistent ViewCube, preset views, Home view, orientation feedback"
+AUTODESK-VIEWCUBE-HOME,Autodesk Help,https://help.autodesk.com/cloudhelp/2021/ENU/AutoCAD-Core/files/GUID-6EC30815-871F-4E2A-B95E-78C239B83370.htm,Home view semantics for 3D orientation
+WIN-TITLEBAR-DESIGN,Microsoft Learn,https://learn.microsoft.com/en-us/windows/apps/design/basics/titlebar-design,"стандартная строка заголовка, drag regions, system menu, caption buttons, размеры 32 px/16 px, text scaling"
+WIN-TITLEBAR-CUSTOMIZATION,Microsoft Learn,https://learn.microsoft.com/en-us/windows/apps/develop/title-bar,правильная кастомизация title bar без потери системного поведения и caption buttons
+WIN-SNAP-LAYOUTS,Microsoft Learn,https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/ui/apply-snap-layout-menu,"snap layouts, требования к caption buttons, минимальная ширина до 500 effective pixels и целевая до 330 effective pixels"
+WIN-KEYBOARD-INTERACTIONS,Microsoft Learn,https://learn.microsoft.com/en-us/windows/apps/develop/input/keyboard-interactions,"keyboard-first interaction, focus visuals, power-user and accessibility keyboard model"
+WIN-TREEVIEW,Microsoft Learn,https://learn.microsoft.com/en-us/windows/apps/design/controls/tree-view,"single/multi selection tree behavior, checkboxes, parent-child semantics"
+WIN-PROGRESS,Microsoft Learn,https://learn.microsoft.com/en-us/windows/win32/uxguide/progress-bars,"modeless progress in status bar, cancel/stop semantics, progress feedback policy"
+WIN-PERFORMANCE-RESPONSIVE,Microsoft Learn,https://learn.microsoft.com/en-us/windows/apps/performance/responsive,"interaction classes, start/stop telemetry, responsiveness goals, ETW instrumentation"
+WIN-PERFORMANCE-OVERVIEW,Microsoft Learn,https://learn.microsoft.com/en-us/windows/apps/performance/,"performance as workflow discipline, CPU/memory/power metrics, regression measurement"
+ETW-ABOUT,Microsoft Learn,https://learn.microsoft.com/en-us/windows/win32/etw/about-event-tracing,Event Tracing for Windows as low-overhead tracing backbone for production-grade diagnostics
+AUTODESK-PALETTES,Autodesk Help,https://help.autodesk.com/cloudhelp/2018/ENU/AutoCAD-LT-MAC/files/GUID-9EFE8CE8-0E26-4700-B5A4-C1A5B30B2804.htm,dock/float/auto-hide palette behavior and tabbed palettes as stable CAD pattern
+SOLIDWORKS-MANAGER-PANE,SOLIDWORKS Help,https://help.solidworks.com/2021/English/SolidWorks/sldworks/c_management_panel.htm,manager pane and left-side design tree pattern for part/assembly/drawing workflows
+SOLIDWORKS-PROPERTYMANAGER,SOLIDWORKS Help,https://help.solidworks.com/2022/english/SolidWorks/sldworks/r_pm_overview.htm?id=1acbcdae6f584f5ba06fffeff494857b,context-sensitive PropertyManager pattern with preview and keep-visible behavior

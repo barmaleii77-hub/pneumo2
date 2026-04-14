@@ -1,0 +1,127 @@
+id,название,тип,обязательное,help_id,короткая_подсказка,каталог,варианты,единица_измерения
+RG-FLD-SCENARIO-NAME,Название сценария,text_editor,False,HELP-RG-SCENARIO-NAME,Имя сценария для пользователя и истории.,поля_редактора_кольца,,
+RG-FLD-CLOSURE-POLICY,Политика замыкания кольца,combo_box,True,HELP-RG-CLOSURE-POLICY,Как последний сегмент замыкается на первый.,поля_редактора_кольца,"['closed_c1_periodic', 'closed_exact', 'preview_open_only']",
+RG-FLD-V0,"Начальная скорость, километры в час",numeric_editor,False,HELP-RG-V0,Начальная скорость прохождения сценария.,поля_редактора_кольца,,км/ч
+RG-FLD-DX,"Шаг дискретизации дороги, метры",numeric_editor,False,HELP-RG-DX,Пространственный шаг генерации дорожного профиля.,поля_редактора_кольца,,м
+RG-FLD-LAPS,"Количество кругов, штуки",integer_editor,False,HELP-RG-LAPS,Сколько кругов формирует сценарий.,поля_редактора_кольца,,шт.
+RG-FLD-SEED,Код генератора случайности,integer_editor,False,HELP-RG-SEED,Код повторяемости генератора.,поля_редактора_кольца,,код
+RG-FLD-SEGMENT-ID,"Номер сегмента, штуки",read_only_integer,False,HELP-RG-SEGMENT-ID,Порядковый номер сегмента.,поля_редактора_кольца,,шт.
+RG-FLD-SEGMENT-LABEL,Имя сегмента,text_editor,False,HELP-RG-SEGMENT-LABEL,Короткое имя сегмента.,поля_редактора_кольца,,
+RG-FLD-SEGMENT-LENGTH,"Длина сегмента, метры",numeric_editor,False,HELP-RG-SEGMENT-LENGTH,Длина участка по оси траектории.,поля_редактора_кольца,,м
+RG-FLD-TURN-TYPE,Поворот,combo_box,True,HELP-RG-TURN-TYPE,"Структурный тип сегмента: прямо, влево, вправо.",поля_редактора_кольца,"['прямо', 'влево', 'вправо']",
+RG-FLD-RADIUS,"Радиус центральной линии, метры",numeric_editor,False,HELP-RG-RADIUS,Радиус сегмента поворота.,поля_редактора_кольца,,м
+RG-FLD-ARC-ANGLE,"Угол дуги, градусы",numeric_editor,False,HELP-RG-ARC-ANGLE,Угол поворота сегмента.,поля_редактора_кольца,,градусы
+RG-FLD-END-HEIGHT,"Высота дороги в конце сегмента, миллиметры",numeric_editor,False,HELP-RG-END-HEIGHT,Высота центральной линии дороги в конце сегмента.,поля_редактора_кольца,,мм
+RG-FLD-CROSSFALL,"Поперечный уклон, градусы",numeric_editor,False,HELP-RG-CROSSFALL,Поперечный уклон сегмента.,поля_редактора_кольца,,градусы
+RG-FLD-SURFACE-TYPE,Тип покрытия,combo_box,True,HELP-RG-SURFACE-TYPE,Генератор и класс покрытия.,поля_редактора_кольца,"['ISO8608', 'SINE', 'CSV', 'ручной профиль']",
+RG-FLD-SURFACE-CLASS,Класс шероховатости или профиль,text_editor,False,HELP-RG-SURFACE-CLASS,"Класс ISO8608, имя CSV или описание ручного профиля.",поля_редактора_кольца,,
+RG-FLD-SINE-AMPLITUDE,"Амплитуда синусоиды, миллиметры",numeric_editor,False,HELP-RG-SINE-AMPLITUDE,Амплитуда синусоидального профиля.,поля_редактора_кольца,,мм
+RG-FLD-SINE-WAVELENGTH,"Длина волны синусоиды, метры",numeric_editor,False,HELP-RG-SINE-WAVELENGTH,Пространственная длина волны.,поля_редактора_кольца,,м
+RG-FLD-PHASE-RIGHT,"Фаза правой колеи, градусы",numeric_editor,False,HELP-RG-PHASE-RIGHT,Фазовый сдвиг правой колеи относительно левой.,поля_редактора_кольца,,градусы
+RG-FLD-RANDOM-PHASES,Случайные фазы,checkbox,False,HELP-RG-RANDOM-PHASES,Разрешить случайную фазу микропрофиля.,поля_редактора_кольца,,
+RG-FLD-TARGET-SPEED,"Целевая скорость прохождения, километры в час",numeric_editor,False,HELP-RG-TARGET-SPEED,"Режим прохождения сегмента, не тип геометрии.",поля_редактора_кольца,,км/ч
+RG-FLD-NOTE,Комментарий режима прохождения,multiline_text,False,HELP-RG-NOTE,Дополнительное пояснение по сегменту.,поля_редактора_кольца,,
+TS-FLD-ENABLED,Включено,checkbox,False,HELP-TS-ENABLED,Будет ли испытание участвовать в расчёте.,поля_матрицы_испытаний,,
+TS-FLD-NAME,Имя испытания,text_editor,False,HELP-TS-NAME,Уникальное имя строки испытания.,поля_матрицы_испытаний,,
+TS-FLD-TYPE,Тип испытания,combo_box,True,HELP-TS-TYPE,Тип испытания.,поля_матрицы_испытаний,"['inertia', 'bump', 'road_profile', 'ring', 'axay', 'custom']",
+TS-FLD-STAGE,"Стадия первого входа, уровень",integer_editor,False,HELP-TS-STAGE,"Первый runtime-tier, в который входит испытание.",поля_матрицы_испытаний,,уровень
+TS-FLD-DT,"Шаг интегрирования, секунды",numeric_editor,False,HELP-TS-DT,Шаг интегрирования для этого испытания.,поля_матрицы_испытаний,,с
+TS-FLD-T-END,"Время моделирования, секунды",numeric_editor,False,HELP-TS-T-END,Продолжительность испытания.,поля_матрицы_испытаний,,с
+TS-FLD-SCENARIO-LINK,Сценарий,entity_link,False,HELP-TS-SCENARIO-LINK,Связанный сценарий из редактора кольца.,поля_матрицы_испытаний,,
+TS-FLD-ROAD-CSV,Файл road_csv,path_picker,False,HELP-TS-ROAD-CSV,Путь к файлу профиля дороги.,поля_матрицы_испытаний,,
+TS-FLD-AXAY-CSV,Файл axay_csv,path_picker,False,HELP-TS-AXAY-CSV,Путь к файлу управляющих ускорений.,поля_матрицы_испытаний,,
+TS-FLD-SCENARIO-JSON,Файл scenario_json,path_picker,False,HELP-TS-SCENARIO-JSON,Путь к JSON сценария.,поля_матрицы_испытаний,,
+TS-FLD-MAX-CONTACT-LOSS,"Максимальная потеря контакта, доля единицы",numeric_editor,False,HELP-TS-MAX-CONTACT-LOSS,Ограничение на допустимую потерю контакта.,поля_матрицы_испытаний,,доля единицы
+TS-FLD-PARAMS-OVERRIDE,Переопределения параметров,json_editor,False,HELP-TS-PARAMS-OVERRIDE,Локальные overrides параметров для испытания.,поля_матрицы_испытаний,,
+TS-FLD-NOTE,Комментарий,multiline_text,False,HELP-TS-NOTE,Комментарий к испытанию.,поля_матрицы_испытаний,,
+BL-FLD-RUN-NAME,Имя базового прогона,text_editor,False,HELP-BL-RUN-NAME,Имя запуска базового прогона.,поля_базового_прогона,,
+BL-FLD-BASELINE-SOURCE,Источник baseline,read_only_text,False,HELP-BL-BASELINE-SOURCE,Откуда взят текущий baseline.,поля_базового_прогона,,
+BL-FLD-AUTO-UPDATE,Автообновление baseline_best.json,checkbox,False,HELP-BL-AUTO-UPDATE,Разрешить накопительное обновление baseline после принятия результата.,поля_базового_прогона,,
+BL-FLD-SUITE-SUMMARY,Сводка набора испытаний,read_only_text,False,HELP-BL-SUITE-SUMMARY,Какие испытания войдут в базовый прогон.,поля_базового_прогона,,
+BL-FLD-OUTPUT-DIR,Каталог результатов,path_display,False,HELP-BL-OUTPUT-DIR,Куда будут записаны результаты прогона.,поля_базового_прогона,,
+OP-FLD-MODE,Режим запуска,combo_box,True,HELP-OP-MODE,Активный режим запуска.,поля_оптимизации_stage_runner,"['StageRunner', 'distributed coordinator']",
+OP-FLD-MINUTES,"Лимит времени оптимизации, минуты",numeric_editor,False,HELP-OP-MINUTES,Общий бюджет времени оптимизации.,поля_оптимизации_stage_runner,,мин
+OP-FLD-JOBS,"Количество параллельных процессов, штуки",integer_editor,False,HELP-OP-JOBS,Количество рабочих процессов.,поля_оптимизации_stage_runner,,шт.
+OP-FLD-USE-STAGED,Использовать staged pipeline,checkbox,False,HELP-OP-USE-STAGED,Включить StageRunner.,поля_оптимизации_stage_runner,,
+OP-FLD-AUTO-UPDATE-BASELINE,Автообновлять baseline_best.json,checkbox,False,HELP-OP-AUTO-UPDATE-BASELINE,"Если включено, лучший результат можно принять как новый baseline.",поля_оптимизации_stage_runner,,
+OP-FLD-WARMSTART,Режим warm-start,combo_box,True,HELP-OP-WARMSTART,Источник стартовых кандидатов.,поля_оптимизации_stage_runner,"['surrogate', 'archive', 'none']",
+OP-FLD-SURROGATE-SAMPLES,"Число surrogate samples, штуки",integer_editor,False,HELP-OP-SURROGATE-SAMPLES,Число выборок для surrogate warm-start.,поля_оптимизации_stage_runner,,шт.
+OP-FLD-SURROGATE-TOPK,"Размер surrogate top-k, штуки",integer_editor,False,HELP-OP-SURROGATE-TOPK,Размер элитного множества surrogate.,поля_оптимизации_stage_runner,,шт.
+OP-FLD-SEED-CANDIDATES,"Seed кандидатов, штуки",integer_editor,False,HELP-OP-SEED-CANDIDATES,Число seed-кандидатов.,поля_оптимизации_stage_runner,,шт.
+OP-FLD-SEED-CONDITIONS,"Seed условий, штуки",integer_editor,False,HELP-OP-SEED-CONDITIONS,Число seed-условий.,поля_оптимизации_stage_runner,,шт.
+OP-FLD-FLUSH-EVERY,"Частота записи строк, строк",integer_editor,False,HELP-OP-FLUSH-EVERY,Через сколько строк worker записывает данные.,поля_оптимизации_stage_runner,,строк
+OP-FLD-PROGRESS-EVERY,"Период записи progress, секунды",numeric_editor,False,HELP-OP-PROGRESS-EVERY,Как часто обновляется progress-файл.,поля_оптимизации_stage_runner,,с
+OP-FLD-AUTO-REFRESH,Автообновление монитора,checkbox,False,HELP-OP-AUTO-REFRESH,Обновлять монитор выполнения автоматически.,поля_оптимизации_stage_runner,,
+OP-FLD-REFRESH-SEC,"Период автообновления монитора, секунды",numeric_editor,False,HELP-OP-REFRESH-SEC,Период обновления UI монитора.,поля_оптимизации_stage_runner,,с
+OP-FLD-STOP-PEN-S1,"Порог досрочного отсечения стадии 1, условные единицы штрафа",numeric_editor,False,HELP-OP-STOP-PEN-S1,Ранний stop для первой длинной стадии.,поля_оптимизации_stage_runner,,усл. ед.
+OP-FLD-STOP-PEN-S2,"Порог досрочного отсечения стадии 2, условные единицы штрафа",numeric_editor,False,HELP-OP-STOP-PEN-S2,Ранний stop для финальной стадии.,поля_оптимизации_stage_runner,,усл. ед.
+OP-FLD-SORT-BY-COST,Сортировать тесты по стоимости,checkbox,False,HELP-OP-SORT-BY-COST,Сначала считать более дешёвые тесты.,поля_оптимизации_stage_runner,,
+OP-FLD-INFLUENCE-EPS,"Относительный шаг influence eps_rel, доля единицы",numeric_editor,False,HELP-OP-INFLUENCE-EPS,Относительный шаг для system influence.,поля_оптимизации_stage_runner,,доля единицы
+OP-FLD-ADAPTIVE-EPS,Адаптивный eps_rel,checkbox,False,HELP-OP-ADAPTIVE-EPS,Разрешить адаптивный eps_rel.,поля_оптимизации_stage_runner,,
+OP-FLD-STAGE-POLICY,Политика seed/promotion,combo_box,True,HELP-OP-STAGE-POLICY,Как распределять budget и продвигать кандидатов.,поля_оптимизации_stage_runner,"['influence_weighted', 'static']",
+OPD-FLD-BACKEND,Backend распределённого режима,combo_box,True,HELP-OPD-BACKEND,Распределённый backend.,поля_оптимизации_distributed,"['Dask', 'Ray']",
+OPD-FLD-PROPOSER,Метод предложения кандидатов,combo_box,True,HELP-OPD-PROPOSER,Алгоритм предложения кандидатов.,поля_оптимизации_distributed,"['random', 'mutation', 'cem', 'BoTorch qNEHVI']",
+OPD-FLD-BUDGET,"Бюджет кандидатов, штуки",integer_editor,False,HELP-OPD-BUDGET,Общее число кандидатов.,поля_оптимизации_distributed,,шт.
+OPD-FLD-MAX-INFLIGHT,"Максимум параллельных задач, штуки",integer_editor,False,HELP-OPD-MAX-INFLIGHT,Сколько задач может выполняться одновременно.,поля_оптимизации_distributed,,шт.
+OPD-FLD-SEED,Код генератора распределённого запуска,integer_editor,False,HELP-OPD-SEED,Повторяемость distributed coordinator.,поля_оптимизации_distributed,,код
+OPD-FLD-PENALTY-KEY,Ключ жёсткого ограничения,combo_box,False,HELP-OPD-PENALTY-KEY,Какой hard gate применить.,поля_оптимизации_distributed,,
+OPD-FLD-PENALTY-TOL,Допуск жёсткого ограничения,numeric_editor,False,HELP-OPD-PENALTY-TOL,Порог hard gate.,поля_оптимизации_distributed,,единица выбранного ограничения
+OPD-FLD-OBJECTIVES,Стек целевых метрик,multi_select,False,HELP-OPD-OBJECTIVES,Список objective keys.,поля_оптимизации_distributed,,
+OPD-FLD-HASH-MODE,Режим problem hash,combo_box,True,HELP-OPD-HASH-MODE,Как формируется problem hash.,поля_оптимизации_distributed,"['stable', 'loose']",
+OPD-FLD-Q,"Размер batch q, штуки",integer_editor,False,HELP-OPD-Q,Размер batch для proposer-а.,поля_оптимизации_distributed,,шт.
+OPD-FLD-DEVICE,Устройство вычислений,combo_box,True,HELP-OPD-DEVICE,Где считать proposer и модели.,поля_оптимизации_distributed,"['CPU', 'CUDA']",
+OPD-FLD-DASK-MODE,Режим Dask,combo_box,True,HELP-OPD-DASK-MODE,Local или scheduler.,поля_оптимизации_distributed,"['local', 'scheduler']",
+OPD-FLD-DASK-SCHEDULER,Адрес Dask scheduler,text_editor,False,HELP-OPD-DASK-SCHEDULER,Адрес scheduler.,поля_оптимизации_distributed,,
+OPD-FLD-DASK-WORKERS,"Dask workers, штуки",integer_editor,False,HELP-OPD-DASK-WORKERS,Количество Dask workers.,поля_оптимизации_distributed,,шт.
+OPD-FLD-DASK-THREADS,"Потоки на worker, штуки",integer_editor,False,HELP-OPD-DASK-THREADS,Число потоков на worker.,поля_оптимизации_distributed,,шт.
+OPD-FLD-DASK-MEM,"Память на worker, гигабайты",numeric_editor,False,HELP-OPD-DASK-MEM,Лимит памяти на worker.,поля_оптимизации_distributed,,ГиБ
+OPD-FLD-DASK-DASHBOARD,Адрес Dask dashboard,text_editor,False,HELP-OPD-DASK-DASHBOARD,Адрес dashboard.,поля_оптимизации_distributed,,
+OPD-FLD-RAY-MODE,Режим Ray,combo_box,True,HELP-OPD-RAY-MODE,Local или cluster.,поля_оптимизации_distributed,"['local', 'cluster']",
+OPD-FLD-RAY-ADDRESS,Адрес Ray cluster,text_editor,False,HELP-OPD-RAY-ADDRESS,Адрес Ray.,поля_оптимизации_distributed,,
+OPD-FLD-RAY-CPUS,"Локальные CPU Ray, штуки",integer_editor,False,HELP-OPD-RAY-CPUS,Сколько CPU взять локально.,поля_оптимизации_distributed,,шт.
+OPD-FLD-RAY-DASHBOARD,Показывать Ray dashboard,checkbox,False,HELP-OPD-RAY-DASHBOARD,Включить dashboard.,поля_оптимизации_distributed,,
+OPD-FLD-RAY-DASHBOARD-PORT,Порт Ray dashboard,integer_editor,False,HELP-OPD-RAY-DASHBOARD-PORT,Порт dashboard.,поля_оптимизации_distributed,,порт
+OPD-FLD-RUNTIME-ENV-MODE,Режим runtime_env,combo_box,True,HELP-OPD-RUNTIME-ENV-MODE,Как формировать runtime_env.,поля_оптимизации_distributed,"['none', 'json', 'auto']",
+OPD-FLD-RUNTIME-ENV-JSON,JSON runtime_env,json_editor,False,HELP-OPD-RUNTIME-ENV-JSON,Точный runtime_env.,поля_оптимизации_distributed,,
+OPD-FLD-RUNTIME-EXCLUDE,Исключения runtime_env,text_editor,False,HELP-OPD-RUNTIME-EXCLUDE,Что исключить из runtime_env.,поля_оптимизации_distributed,,
+OPD-FLD-EVALUATORS,"Оценщиков, штуки",integer_editor,False,HELP-OPD-EVALUATORS,Число evaluator-процессов.,поля_оптимизации_distributed,,шт.
+OPD-FLD-CPUS-PER-EVAL,"CPU на оценщик, штуки",integer_editor,False,HELP-OPD-CPUS-PER-EVAL,Число CPU на evaluator.,поля_оптимизации_distributed,,шт.
+OPD-FLD-PROPOSERS,"Proposer-ов, штуки",integer_editor,False,HELP-OPD-PROPOSERS,Число proposer-процессов.,поля_оптимизации_distributed,,шт.
+OPD-FLD-GPUS-PER-PROPOSER,"GPU на proposer, штуки",numeric_editor,False,HELP-OPD-GPUS-PER-PROPOSER,Число GPU на proposer.,поля_оптимизации_distributed,,шт.
+OPD-FLD-PROPOSER-BUFFER,"Буфер proposer, штуки",integer_editor,False,HELP-OPD-PROPOSER-BUFFER,Число заранее подготовленных предложений.,поля_оптимизации_distributed,,шт.
+OPD-FLD-DB-PATH,Путь к базе запуска,path_picker,False,HELP-OPD-DB-PATH,Путь к ExperimentDB.,поля_оптимизации_distributed,,
+OPD-FLD-DB-ENGINE,Движок базы,combo_box,True,HELP-OPD-DB-ENGINE,Тип базы данных.,поля_оптимизации_distributed,"['sqlite', 'duckdb', 'postgres']",
+OPD-FLD-RESUME,Продолжить существующий запуск,checkbox,False,HELP-OPD-RESUME,Разрешить resume.,поля_оптимизации_distributed,,
+OPD-FLD-RUN-ID,Идентификатор запуска,text_editor,False,HELP-OPD-RUN-ID,Явный run id.,поля_оптимизации_distributed,,
+OPD-FLD-STALE-TTL,"TTL устаревших записей, секунды",numeric_editor,False,HELP-OPD-STALE-TTL,Через сколько секунд считать запись устаревшей.,поля_оптимизации_distributed,,с
+OPD-FLD-HV-LOG,Вести hypervolume log,checkbox,False,HELP-OPD-HV-LOG,Включить историю hypervolume.,поля_оптимизации_distributed,,
+OPD-FLD-EXPORT-EVERY,Экспортировать каждые N итераций,integer_editor,False,HELP-OPD-EXPORT-EVERY,Частота экспортов промежуточных результатов.,поля_оптимизации_distributed,,итераций
+OPD-FLD-N-INIT,"BoTorch n-init, штуки",integer_editor,False,HELP-OPD-N-INIT,Число стартовых точек.,поля_оптимизации_distributed,,шт.
+OPD-FLD-MIN-FEASIBLE,"Минимум feasible точек, штуки",integer_editor,False,HELP-OPD-MIN-FEASIBLE,Минимум feasible точек до включения qNEHVI.,поля_оптимизации_distributed,,шт.
+OPD-FLD-NUM-RESTARTS,"BoTorch num_restarts, штуки",integer_editor,False,HELP-OPD-NUM-RESTARTS,Число перезапусков оптимизации acquisition function.,поля_оптимизации_distributed,,шт.
+OPD-FLD-RAW-SAMPLES,"BoTorch raw_samples, штуки",integer_editor,False,HELP-OPD-RAW-SAMPLES,Число сырых sample-точек.,поля_оптимизации_distributed,,шт.
+OPD-FLD-MAXITER,"BoTorch maxiter, итерации",integer_editor,False,HELP-OPD-MAXITER,Максимум итераций внутреннего оптимизатора.,поля_оптимизации_distributed,,итераций
+OPD-FLD-REF-MARGIN,"BoTorch ref_margin, доля единицы",numeric_editor,False,HELP-OPD-REF-MARGIN,Margin для reference point.,поля_оптимизации_distributed,,доля единицы
+OPD-FLD-NORMALIZE,Нормализовать objective,checkbox,False,HELP-OPD-NORMALIZE,Нормализовать objectives.,поля_оптимизации_distributed,,
+MN-FLD-CURRENT-STAGE,Текущая стадия,read_only_text,False,HELP-MN-CURRENT-STAGE,Текущая стадия расчёта.,поля_монитора_выполнения,,
+MN-FLD-STAGE-BUDGET,"Бюджет стадии, минуты",read_only_numeric,False,HELP-MN-STAGE-BUDGET,Бюджет времени текущей стадии.,поля_монитора_выполнения,,мин
+MN-FLD-ELAPSED,"Прошло времени, минуты",read_only_numeric,False,HELP-MN-ELAPSED,Прошедшее время.,поля_монитора_выполнения,,мин
+MN-FLD-LIVE-ROWS,"Строк в текущей стадии, штуки",read_only_integer,False,HELP-MN-LIVE-ROWS,Сколько строк уже записано.,поля_монитора_выполнения,,шт.
+MN-FLD-CANDIDATE-COUNTS,Счётчики кандидатов,read_only_json,False,HELP-MN-CANDIDATE-COUNTS,Счётчики кандидатов по состояниям.,поля_монитора_выполнения,,
+MN-FLD-UNDERFILL,"Недобор budget, штуки",read_only_integer,False,HELP-MN-UNDERFILL,Недобор seed budget.,поля_монитора_выполнения,,шт.
+MN-FLD-GATE-PREVIEW,Причины gate,read_only_list,False,HELP-MN-GATE-PREVIEW,Почему кандидаты не прошли.,поля_монитора_выполнения,,
+MN-FLD-RUN-DIR,Каталог запуска,path_display,False,HELP-MN-RUN-DIR,Где лежат артефакты.,поля_монитора_выполнения,,
+DG-FLD-INCLUDE-WORKSPACE,Включать рабочий каталог,checkbox,False,HELP-DG-INCLUDE-WORKSPACE,Добавлять ли workspace.,поля_диагностики,,
+DG-FLD-INCLUDE-ROADS,Включать дороги и манёвры,checkbox,False,HELP-DG-INCLUDE-ROADS,Добавлять ли профили дорог и манёвров.,поля_диагностики,,
+DG-FLD-INCLUDE-OPT-RUNS,Включать opt_runs,checkbox,False,HELP-DG-INCLUDE-OPT-RUNS,Добавлять ли каталоги оптимизации.,поля_диагностики,,
+DG-FLD-INCLUDE-EXPORTS,Включать exports,checkbox,False,HELP-DG-INCLUDE-EXPORTS,Добавлять ли exports.,поля_диагностики,,
+DG-FLD-INCLUDE-PERF,Включать trace производительности,checkbox,False,HELP-DG-INCLUDE-PERF,Добавлять ли trace производительности.,поля_диагностики,,
+DG-FLD-RETENTION-DAYS,"Хранить архивы, сутки",integer_editor,False,HELP-DG-RETENTION-DAYS,Сколько суток хранить старые архивы.,поля_диагностики,,сут.
+DG-FLD-MAX-SIZE,"Максимальный размер архива, мегабайты",numeric_editor,False,HELP-DG-MAX-SIZE,Лимит размера архива.,поля_диагностики,,МиБ
+DG-FLD-NAMING,Формат имени архива,text_editor,False,HELP-DG-NAMING,Шаблон имени архива.,поля_диагностики,,
+DG-FLD-LAST-PATH,Последний архив,path_display,False,HELP-DG-LAST-PATH,Путь к последнему архиву.,поля_диагностики,,
+DG-FLD-LAST-TIME,Время последней сборки,read_only_datetime,False,HELP-DG-LAST-TIME,Когда последний раз успешно собран архив.,поля_диагностики,,
+DG-FLD-FRESHNESS,"Свежесть архива, минуты",read_only_numeric,False,HELP-DG-FRESHNESS,Возраст последнего архива.,поля_диагностики,,мин
+DG-FLD-HEALTH,Состояние self-check,read_only_json,False,HELP-DG-HEALTH,Результат самопроверки.,поля_диагностики,,
+DG-FLD-AUTOSAVE-EXIT,Автосохранение при выходе,checkbox,False,HELP-DG-AUTOSAVE-EXIT,Сохранять пакет при штатном выходе.,поля_диагностики,,
+DG-FLD-AUTOSAVE-CRASH,Автосохранение при аварии,checkbox,False,HELP-DG-AUTOSAVE-CRASH,Сохранять пакет при аварии.,поля_диагностики,,

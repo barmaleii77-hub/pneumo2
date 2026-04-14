@@ -1,82 +1,72 @@
-# Chat Prompt: Главное Окно Приложения
+# Chat Prompt: Главное окно приложения
 
-## Контекст
+## Канонический слой
 
-Мы мигрируем проект в классическое Windows GUI-приложение. WEB больше не целевая платформа развития. Это окно должно стать главным desktop-shell приложения.
+- `docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md`
+- `docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md`
+- `docs/context/gui_spec_imports/v3/current_macro.dot`
+- `docs/context/gui_spec_imports/v3/optimized_macro.dot`
+- `docs/context/gui_spec_imports/v3/ui_element_catalog.csv`
+- `docs/context/gui_spec_imports/v3/help_catalog.csv`
+- `docs/context/gui_spec_imports/v3/tooltip_catalog.csv`
+- `docs/context/gui_spec_imports/v3/keyboard_matrix.csv`
+- `docs/context/gui_spec_imports/v3/docking_matrix.csv`
+- `docs/context/gui_spec_imports/v3/ui_state_matrix.csv`
 
-## Цель
+## Цель lane
 
-Развивать главное классическое Windows GUI-приложение как основной вход в систему. Нужен понятный shell с верхним меню, toolbar, home screen, рабочей областью со встроенными окнами и единым пользовательским маршрутом без WEB.
+Развивать главное окно как native Windows shell для инженерного desktop-приложения:
+
+- сверху command surface и command search;
+- слева навигация и browser только там, где реально есть иерархия;
+- по центру document/viewport-first рабочая поверхность;
+- справа context-sensitive properties/help pane;
+- снизу status/progress strip.
 
 ## Можно менять
 
-- [main_window.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/desktop_shell/main_window.py)
-- [workspace.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/desktop_shell/workspace.py)
-- [menu_builder.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/desktop_shell/menu_builder.py)
-- [toolbar.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/desktop_shell/toolbar.py)
-- [home_view.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/desktop_shell/home_view.py)
-- [navigation.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/desktop_shell/navigation.py)
-- [lifecycle.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/desktop_shell/lifecycle.py)
-- [desktop_main_shell.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/tools/desktop_main_shell.py)
-- [test_desktop_main_shell_contract.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/tests/test_desktop_main_shell_contract.py)
+- `pneumo_solver_ui/desktop_shell/main_window.py`
+- `pneumo_solver_ui/desktop_shell/workspace.py`
+- `pneumo_solver_ui/desktop_shell/menu_builder.py`
+- `pneumo_solver_ui/desktop_shell/toolbar.py`
+- `pneumo_solver_ui/desktop_shell/home_view.py`
+- `pneumo_solver_ui/desktop_shell/navigation.py`
+- `pneumo_solver_ui/desktop_shell/lifecycle.py`
+- `pneumo_solver_ui/tools/desktop_main_shell.py`
+- `tests/test_desktop_main_shell_contract.py`
 
 ## Можно читать как источник поведения
 
-- [pneumo_ui_app.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/pneumo_ui_app.py)
-- [page_registry.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/page_registry.py)
+- `pneumo_solver_ui/pneumo_ui_app.py`
+- `pneumo_solver_ui/page_registry.py`
+- parity map и imported workflow graphs
 
 ## Нельзя менять
 
-- feature-логику отдельных окон
-- [qt_compare_viewer.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/qt_compare_viewer.py)
-- [app.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/desktop_animator/app.py)
-- [app.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/desktop_mnemo/app.py)
-- WEB pages
+- feature-логику отдельных окон;
+- `qt_compare_viewer.py`;
+- `desktop_animator/*`;
+- `desktop_mnemo/*`;
+- web pages как target implementation surface.
 
 ## Правила
 
-- Не превращай `main_window.py` в новый монолит.
-- Выноси новые seams в отдельные shell-модули.
-- Shell должен быть центром приложения, а не свалкой feature-кода.
-- Сохраняй классический desktop UX под Windows.
-- Если нужно подключить новое окно, меняй adapter/spec/catalog, а не тащи его логику в shell.
+- Shell не превращать в новый монолит.
+- Новые seams выносить в отдельные shell-модули.
+- Логика hosted и external tools не дублируется внутри shell.
+- `Command search`, diagnostics entrypoint и user route обязаны соответствовать `17/18`.
 
-## Готовый промт
+## Готовый prompt
 
 ```text
-Работай только в lane "Главное Окно Приложения".
+Работай только в lane "Главное окно приложения".
 
-Контекст: проект уходит из WEB в desktop-first архитектуру. Это окно должно стать главным Windows-приложением с классическим многооконным интерфейсом.
+Сначала прочитай:
+- docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md
+- docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md
+- docs/context/desktop_web_parity_map.json
 
-Цель: развивать shell с верхним меню, toolbar, home screen, рабочей областью со встроенными окнами, навигацией, lifecycle hosted tabs и понятным пользовательским маршрутом без WEB.
+Цель: развивать native Windows shell как основной document-first вход в систему без потери desktop affordances, command search, diagnostics visibility и workflow route.
 
-Можно менять только:
-- pneumo_solver_ui/desktop_shell/main_window.py
-- pneumo_solver_ui/desktop_shell/workspace.py
-- pneumo_solver_ui/desktop_shell/menu_builder.py
-- pneumo_solver_ui/desktop_shell/toolbar.py
-- pneumo_solver_ui/desktop_shell/home_view.py
-- pneumo_solver_ui/desktop_shell/navigation.py
-- pneumo_solver_ui/desktop_shell/lifecycle.py
-- pneumo_solver_ui/tools/desktop_main_shell.py
-- tests/test_desktop_main_shell_contract.py
-
-Можно читать как источник поведения:
-- pneumo_solver_ui/pneumo_ui_app.py
-- pneumo_solver_ui/page_registry.py
-
-Нельзя менять:
-- feature-логику отдельных окон
-- qt_compare_viewer.py
-- desktop_animator/app.py
-- desktop_mnemo/app.py
-- WEB pages
-
-Правила:
-- не превращай main_window.py в новый монолит
-- выноси новые seams в отдельные shell-модули
-- shell должен быть центром приложения, а не свалкой feature-кода
-- сохраняй классический desktop UX под Windows
-
-Сделай следующий логичный шаг по shell core, реализуй его до конца и прогони shell-targeted tests.
+Можно менять только shell-файлы и targeted tests. Не переноси feature-логику отдельных окон внутрь shell и не строй новый монолит.
 ```

@@ -1,81 +1,53 @@
-# Chat Prompt: Ввод Исходных Данных
+# Chat Prompt: Ввод исходных данных
 
-## Контекст
+## Канонический слой
 
-Это основной GUI ввода параметров вместо WEB-форм. Пользователь должен настраивать систему по понятным кластерам, а не через длинный Streamlit-экран.
+- `docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md`
+- `docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md`
+- `docs/context/gui_spec_imports/v3/field_catalog.csv`
+- `docs/context/gui_spec_imports/v3/help_catalog.csv`
+- `docs/context/gui_spec_imports/v3/source_of_truth_matrix.csv`
+- `docs/context/desktop_web_parity_map.json`
 
-## Цель
+## Цель lane
 
-Сделать основное окно ввода исходных данных понятным для инженера и пользователя. Оно должно быть cluster-based: Геометрия, Пневматика, Механика, Статическая настройка, Компоненты, Справочные данные.
+Сделать `Исходные данные` главным master-copy параметров машины, геометрии,
+пневматики, механики, масс и базовых solver settings.
+
+Обязательные свойства surface:
+
+- cluster-based структура;
+- units и help у каждого meaningful control;
+- парность `число/таблица + графика/схема`;
+- явный readiness-summary;
+- связка с command search и inspector/help pane.
 
 ## Можно менять
 
-- [desktop_input_editor.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/tools/desktop_input_editor.py)
-- [desktop_input_model.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/desktop_input_model.py)
-- [test_desktop_input_editor_contract.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/tests/test_desktop_input_editor_contract.py)
+- `pneumo_solver_ui/tools/desktop_input_editor.py`
+- `pneumo_solver_ui/desktop_input_model.py`
+- `tests/test_desktop_input_editor_contract.py`
+- `tests/test_desktop_input_graphics_contract.py`
 
 ## Можно читать как источник поведения
 
-- [pneumo_ui_app.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/pneumo_ui_app.py)
-- [10_SuspensionGeometry.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/pages/10_SuspensionGeometry.py)
-- [13_CamozziCylindersCatalog.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/pages/13_CamozziCylindersCatalog.py)
-- [14_SpringsGeometry_CoilBind.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/pages/14_SpringsGeometry_CoilBind.py)
-- [spring_geometry_ui.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/spring_geometry_ui.py)
-- [spring_table.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/spring_table.py)
-- [01_PARAMETER_REGISTRY.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/01_PARAMETER_REGISTRY.md)
+- `pneumo_solver_ui/pneumo_ui_app.py`
+- `pneumo_solver_ui/pages/10_SuspensionGeometry.py`
+- `pneumo_solver_ui/pages/13_CamozziCylindersCatalog.py`
+- `pneumo_solver_ui/pages/14_SpringsGeometry_CoilBind.py`
+- `01_PARAMETER_REGISTRY.md`
 
 ## Нельзя менять
 
-- shell core
-- optimizer GUI
-- compare viewer
-- desktop animator
-- desktop mnemo
-- WEB pages
+- shell core;
+- optimizer GUI;
+- compare viewer;
+- animator и mnemo;
+- web pages как target implementation surface.
 
 ## Правила
 
-- Не дублируй compare/animator/mnemo.
-- Не складывай всё в один огромный Tk-класс.
-- Если нужны новые blocks, выноси их в отдельные panel/model helpers.
-- Сохраняй понятный desktop UX: секции, пресеты, профили, snapshots, быстрый поиск.
-
-## Готовый промт
-
-```text
-Работай только в lane "Ввод Исходных Данных".
-
-Контекст: это основной GUI ввода параметров вместо WEB. Пользователь должен настраивать систему по понятным кластерам, а не через длинный WEB-экран.
-
-Цель: сделать desktop input editor удобным и инженерно понятным. Нужны секции: Геометрия, Пневматика, Механика, Статическая настройка, Компоненты, Справочные данные.
-
-Можно менять только:
-- pneumo_solver_ui/tools/desktop_input_editor.py
-- pneumo_solver_ui/desktop_input_model.py
-- tests/test_desktop_input_editor_contract.py
-
-Можно читать как источник поведения:
-- pneumo_solver_ui/pneumo_ui_app.py
-- pneumo_solver_ui/pages/10_SuspensionGeometry.py
-- pneumo_solver_ui/pages/13_CamozziCylindersCatalog.py
-- pneumo_solver_ui/pages/14_SpringsGeometry_CoilBind.py
-- pneumo_solver_ui/spring_geometry_ui.py
-- pneumo_solver_ui/spring_table.py
-- 01_PARAMETER_REGISTRY.md
-
-Нельзя менять:
-- shell core
-- optimizer GUI
-- compare viewer
-- desktop animator
-- desktop mnemo
-- WEB pages
-
-Правила:
-- не дублируй compare/animator/mnemo
-- не складывай всё в один огромный Tk-класс
-- если нужны новые blocks, выноси их в отдельные panel/model helpers
-- сохраняй понятный desktop UX: секции, пресеты, профили, snapshots, быстрый поиск
-
-Сделай следующий полезный шаг именно по окну ввода исходных данных и прогони его targeted tests.
-```
+- Ввод данных не расползается по случайным secondary routes.
+- Обозначения без названия и единицы измерения запрещены.
+- Графика рядом с вводом обязана быть честной: `расчетно подтверждено / по исходным данным / условно`.
+- Для справочников и reference-data использовать contextual/tool routes, а не новые top-level pages.

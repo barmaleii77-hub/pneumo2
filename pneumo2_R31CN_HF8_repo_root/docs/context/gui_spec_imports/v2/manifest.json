@@ -1,0 +1,72 @@
+[
+  {
+    "file": "README.md",
+    "bytes": 2580,
+    "sha256": "330f2afea028fb385c835fb97b925d635c5f577c98dc86571c586b93615f3f43"
+  },
+  {
+    "file": "acceptance_criteria.csv",
+    "bytes": 5589,
+    "sha256": "ca54c5909a765f2bc5cd24d3c21a3f3e6a6328af392c397613855bd51b4ba4ef"
+  },
+  {
+    "file": "current_element_graph.dot",
+    "bytes": 3203,
+    "sha256": "786c24c2db0d7b8d0ad512928d50d7f741f4588e401f9affa220034046cc73c4"
+  },
+  {
+    "file": "current_macro.dot",
+    "bytes": 2708,
+    "sha256": "c76f4c4b08c467d745e904f47c4e6c53e6143a18e9326260fefe1446c4fcd24f"
+  },
+  {
+    "file": "field_catalog.csv",
+    "bytes": 26270,
+    "sha256": "28bc25d63adcdbafd079183a6318302a13f527591c72e051b69cc01e89279ce1"
+  },
+  {
+    "file": "help_catalog.csv",
+    "bytes": 251581,
+    "sha256": "21e42e62ca784dab8d0180dc2f4de61120b8b4e395a8639aa87f9185addd6024"
+  },
+  {
+    "file": "migration_matrix.csv",
+    "bytes": 9191,
+    "sha256": "679e60a61d3e37681cf571cbfcf725d926455a33023bc92035dcd0a10344d452"
+  },
+  {
+    "file": "optimized_element_graph.dot",
+    "bytes": 9939,
+    "sha256": "38fbc3a49aefcb21fb88b38b8a153b45becfe203955314c701a7b68661cbf67a"
+  },
+  {
+    "file": "optimized_macro.dot",
+    "bytes": 2998,
+    "sha256": "503bc4ed71e7d73dc4f59aad19e7a99bb5ab446b143da26d9c166e9b706658eb"
+  },
+  {
+    "file": "pipeline_verification.csv",
+    "bytes": 10018,
+    "sha256": "2e078d6b6c84494ea9588a933ec57d0e281b76cd489130845182bc3ead0e58a1"
+  },
+  {
+    "file": "pneumo_gui_codex_spec_v2_detailed.json",
+    "bytes": 1041568,
+    "sha256": "f3fcf6c755d0ea1ce02aabb084e6d3e133a44c2eb251e2479ec5e3002e23c1d3"
+  },
+  {
+    "file": "test_suite.csv",
+    "bytes": 11620,
+    "sha256": "b539b9a301a84bb06a76e2946f272f67b10a98b83b9462d78c6808404c0e8d42"
+  },
+  {
+    "file": "tooltip_catalog.csv",
+    "bytes": 58533,
+    "sha256": "55eed4ab58a1d68703c77f996e91209f285a0cb0d7589ed0ede43149ae03b48b"
+  },
+  {
+    "file": "ui_element_catalog.csv",
+    "bytes": 70924,
+    "sha256": "771ba162d0b778bd4504ae70c4a588d47618545df9aa7f8ab3eff0f8f6d2f867"
+  }
+]

@@ -1,0 +1,135 @@
+{
+  "package_id": "pneumo_gui_codex_package_v3",
+  "version": "3.0.0",
+  "created": "2026-04-14",
+  "main_file": "pneumo_gui_codex_spec_v3_refined.json",
+  "counts": {
+    "ui_elements": 157,
+    "fields": 139,
+    "help": 302,
+    "tooltips": 282,
+    "optimized_macro_nodes": 24,
+    "optimized_macro_edges": 40,
+    "optimized_element_nodes": 50,
+    "optimized_element_edges": 44,
+    "tests": 61,
+    "acceptance_criteria": 29
+  },
+  "files": [
+    {
+      "name": "CHANGELOG_v3.md",
+      "size_bytes": 1736,
+      "sha256": "90cc37cd05ab1ca4a6de1955fc9a536eb6b7ffdd875bc04df7902ade7c86a97f"
+    },
+    {
+      "name": "README.md",
+      "size_bytes": 2049,
+      "sha256": "deb6814257f4fd2934db628abee39d72046a9882dfa7ee919c849fb3e2312fc6"
+    },
+    {
+      "name": "acceptance_criteria.csv",
+      "size_bytes": 7214,
+      "sha256": "af4eb3ad7ce3dbd6a260317a934a32ca4f7022177c9195008a43c110ecf23caa"
+    },
+    {
+      "name": "best_practices_sources.csv",
+      "size_bytes": 4797,
+      "sha256": "3293e949041e8aadc7520afc04d8222c598f66ef2670a2944755c4cf88f55409"
+    },
+    {
+      "name": "current_element_graph.dot",
+      "size_bytes": 3152,
+      "sha256": "270449451be7d72bb27e537eb91109e4e7d34dac128a1751d5903145f7a29210"
+    },
+    {
+      "name": "current_macro.dot",
+      "size_bytes": 3342,
+      "sha256": "8bd02064889fe95f872f07268e25399b87259f80893b007dbad9b91778521c27"
+    },
+    {
+      "name": "docking_matrix.csv",
+      "size_bytes": 1078,
+      "sha256": "7b8f673cd3049a59361541942e07e305cafa80c8cbefac642f24c9c31a9f379b"
+    },
+    {
+      "name": "field_catalog.csv",
+      "size_bytes": 30119,
+      "sha256": "61b6b8de25dbb87d8d6ef283e6b3ba43a82902e9776085b51b5b0eff02303343"
+    },
+    {
+      "name": "graph_delta_v3.csv",
+      "size_bytes": 463,
+      "sha256": "74b3476ab271755e31bf7b552fc8b2bc4aea3148942c7c45ac593a456151aca4"
+    },
+    {
+      "name": "help_catalog.csv",
+      "size_bytes": 344984,
+      "sha256": "9b04a5a197113a537b1435bdfc0211292bf6196fd19accba58344b20ed70e35f"
+    },
+    {
+      "name": "keyboard_matrix.csv",
+      "size_bytes": 1132,
+      "sha256": "acd3b2b564515ff6abcc0aaa83fe79e5b53b1c3a35a76f37cfab75d9d7a7ab26"
+    },
+    {
+      "name": "manifest.json",
+      "size_bytes": 4000,
+      "sha256": "e5835b35f7d5a6161dc3727fff3b9c9939b8696467b45dfa38ab9b058efec4c9"
+    },
+    {
+      "name": "migration_matrix.csv",
+      "size_bytes": 9210,
+      "sha256": "ed00a70f893a1dc3e34f757cc721fe43f3976ff7d14e9ab8be112b4d3451d5f5"
+    },
+    {
+      "name": "optimized_element_graph.dot",
+      "size_bytes": 6520,
+      "sha256": "7dfe8f5a76ac01e97ec46011c72dab38ca8f5da8e0a7dc79a40b581759eb003b"
+    },
+    {
+      "name": "optimized_macro.dot",
+      "size_bytes": 4888,
+      "sha256": "01b496213229f2cb7b3c1deff8b0bc32a7e123b96df5091300ce1c249ab7c24d"
+    },
+    {
+      "name": "pipeline_observability.csv",
+      "size_bytes": 1702,
+      "sha256": "ced870abf9f8435a9ebf42a89e48aa05be4b3943071a550d81854b23a030945b"
+    },
+    {
+      "name": "pipeline_verification.csv",
+      "size_bytes": 14095,
+      "sha256": "c33b07975d3224cafce97f787eaf359f10184ffe2a70cb2f7f3a865c0aaa485a"
+    },
+    {
+      "name": "pneumo_gui_codex_spec_v3_refined.json",
+      "size_bytes": 1202373,
+      "sha256": "3d162bd50347fbb60592cf2354ff7168d444279ac9cb9a8548ff6d6f161515ce"
+    },
+    {
+      "name": "source_of_truth_matrix.csv",
+      "size_bytes": 4618,
+      "sha256": "3006f3456f5390af5a87e6b5b4a150973fdbb445c7ed6987eca01c294002ed3b"
+    },
+    {
+      "name": "test_suite.csv",
+      "size_bytes": 15042,
+      "sha256": "e7eb76cb34af4d8cc04aec75caebbe06ac0d638abc7bafbfb2fff26ca7413673"
+    },
+    {
+      "name": "tooltip_catalog.csv",
+      "size_bytes": 64509,
+      "sha256": "59993748748a17167431483e81dcddb12abb9bb0e33c5fb39e1fbf53cf5f48da"
+    },
+    {
+      "name": "ui_element_catalog.csv",
+      "size_bytes": 92480,
+      "sha256": "7bd5f7c461219b7eaab6c2b4545fbdde95f165b8e2dbd5f4e37b117a2fef0120"
+    },
+    {
+      "name": "ui_state_matrix.csv",
+      "size_bytes": 1558,
+      "sha256": "584d1b37edcd4b6c78cd64673edd7553743ff0dbcccc32990ca3084b453577a9"
+    }
+  ]
+}

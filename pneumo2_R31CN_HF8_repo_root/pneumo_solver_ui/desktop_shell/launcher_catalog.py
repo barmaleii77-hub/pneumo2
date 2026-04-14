@@ -15,7 +15,18 @@ class DesktopLaunchCatalogItem:
 
 
 def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[DesktopLaunchCatalogItem, ...]:
-    items: list[DesktopLaunchCatalogItem] = []
+    items: list[DesktopLaunchCatalogItem] = [
+        DesktopLaunchCatalogItem(
+            key="desktop_gui_spec_shell",
+            title="PneumoApp Desktop Shell (GUI-spec)",
+            module="pneumo_solver_ui.tools.desktop_gui_spec_shell",
+            description=(
+                "Канонический PySide6 shell по GUI-spec (17/18): workspace-first маршрут, "
+                "global command search, overview dashboard и always-visible diagnostics."
+            ),
+            group="Главное окно",
+        )
+    ]
     for spec in build_desktop_shell_specs():
         if not include_mnemo and spec.key == "desktop_mnemo":
             continue

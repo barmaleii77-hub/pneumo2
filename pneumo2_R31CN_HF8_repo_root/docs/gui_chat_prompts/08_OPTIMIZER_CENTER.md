@@ -1,86 +1,61 @@
-# Chat Prompt: Оптимизатор Со Всеми Настройками
+# Chat Prompt: Центр оптимизации
 
-## Контекст
+## Канонический слой
 
-Optimization workflow больше не должен быть завязан на WEB. Нужен полноценный desktop optimizer center для operator workflow и всех инженерных настроек.
+- `docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md`
+- `docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md`, раздел `К. Базовый прогон, оптимизация и анализ`
+- `docs/context/gui_spec_imports/v3/pneumo_gui_codex_spec_v3_refined.json`
+- `docs/context/gui_spec_imports/v3/help_catalog.csv`
+- `docs/context/gui_spec_imports/v3/pipeline_verification.csv`
+- `docs/context/gui_spec_imports/v3/source_of_truth_matrix.csv`
+- `docs/context/gui_spec_imports/v3/pipeline_observability.csv`
+- `docs/context/desktop_web_parity_map.json`
 
-## Цель
+## Цель lane
 
-Перенести optimization workflow из WEB в полноценный desktop GUI center. Нужны: scope, search space, objectives, stage policy, distributed settings, runtime launch, live progress, history, finished jobs, handoff, packaging, objective contract.
+Собрать единый solve-center для operator workflow и инженерных настроек
+оптимизации.
+
+На активном экране всегда видны:
+
+- active mode;
+- objective contract;
+- hard gate;
+- baseline source;
+- auto-update baseline;
+- current stage и stage budget;
+- candidate counts, underfill и gate reasons;
+- run directory и latest results file.
 
 ## Можно менять
 
-- новые GUI файлы:
-  - `pneumo_solver_ui/tools/desktop_optimizer_center.py`
-  - `pneumo_solver_ui/desktop_optimizer_model.py`
-  - `pneumo_solver_ui/desktop_optimizer_runtime.py`
-  - `pneumo_solver_ui/desktop_optimizer_panels.py`
-  - `pneumo_solver_ui/desktop_optimizer_tabs/*`
-- optimization-specific desktop tests
-- shell adapter/catalog only if adding new optimizer window
+- `pneumo_solver_ui/tools/desktop_optimizer_center.py`
+- `pneumo_solver_ui/desktop_optimizer_model.py`
+- `pneumo_solver_ui/desktop_optimizer_runtime.py`
+- `pneumo_solver_ui/desktop_optimizer_panels.py`
+- `pneumo_solver_ui/desktop_optimizer_tabs/*`
+- optimizer-specific desktop tests
 
 ## Можно читать как источник поведения
 
-- [03_Optimization.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/pages/03_Optimization.py)
-- [04_DistributedOptimization.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/pages/04_DistributedOptimization.py)
-- [04_DistributedOptimization_R58.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/pages/04_DistributedOptimization_R58.py)
-- [30_Optimization.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/pages/30_Optimization.py)
-- все `optimization_*.py`
-- [opt_stage_runner_v1.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/opt_stage_runner_v1.py)
-- [opt_worker_v3_margins_energy.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/opt_worker_v3_margins_energy.py)
-- [ui_optimization_page_shell_helpers.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/ui_optimization_page_shell_helpers.py)
+- `pneumo_solver_ui/pages/03_Optimization.py`
+- `pneumo_solver_ui/pages/04_DistributedOptimization.py`
+- `pneumo_solver_ui/pages/30_Optimization.py`
+- `pneumo_solver_ui/opt_stage_runner_v1.py`
+- `pneumo_solver_ui/opt_worker_v3_margins_energy.py`
 
 ## Нельзя менять
 
-- [pneumo_ui_app.py](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/pneumo_solver_ui/pneumo_ui_app.py)
-- desktop input editor
-- compare viewer
-- desktop animator
-- desktop mnemo
-- WEB pages как target
+- `pneumo_solver_ui/pneumo_ui_app.py` как target surface;
+- desktop input editor;
+- compare viewer;
+- animator;
+- mnemo;
+- web pages как target.
 
 ## Правила
 
-- Optimization GUI дели по панелям и вкладкам.
-- Не тащи сюда WEB view code напрямую, переносить нужно поведение и shared runtime logic.
-- Избегай нового гигантского single-file optimizer window.
-
-## Готовый промт
-
-```text
-Работай только в lane "Оптимизатор Со Всеми Настройками".
-
-Контекст: optimization workflow уходит из WEB. Нужен полноценный desktop optimizer center для operator workflow и всех инженерных настроек.
-
-Цель: перенести optimization workflow из WEB в полноценный desktop GUI center. Нужны: scope, search space, objectives, stage policy, distributed settings, runtime launch, live progress, history, finished jobs, handoff, packaging, objective contract и operator-oriented UX.
-
-Можно менять только:
-- новые desktop_optimizer_* модули
-- optimization-specific desktop tests
-- shell adapter/catalog only if adding new optimizer window
-
-Можно читать как источник поведения:
-- pneumo_solver_ui/pages/03_Optimization.py
-- pneumo_solver_ui/pages/04_DistributedOptimization.py
-- pneumo_solver_ui/pages/04_DistributedOptimization_R58.py
-- pneumo_solver_ui/pages/30_Optimization.py
-- все optimization_*.py
-- pneumo_solver_ui/opt_stage_runner_v1.py
-- pneumo_solver_ui/opt_worker_v3_margins_energy.py
-- pneumo_solver_ui/ui_optimization_page_shell_helpers.py
-
-Нельзя менять:
-- pneumo_ui_app.py
-- desktop_input_editor.py
-- compare viewer
-- desktop animator
-- desktop mnemo
-- WEB pages как target
-
-Правила:
-- optimization GUI дели по панелям и вкладкам
-- не тащи сюда WEB view code напрямую, переносить нужно поведение и shared runtime logic
-- избегай нового гигантского single-file optimizer window
-
-Сделай первый или следующий логичный шаг по desktop optimizer center и сохрани модульность.
-```
+- На экране одновременно не существует двух главных кнопок запуска.
+- `StageRunner` — рекомендуемый режим, distributed coordinator — advanced.
+- Advanced distributed/cluster-настройки живут внутри того же solve-center, а не на параллельной странице.
+- Optimization GUI делится на панели и табы, а не врастает в single-file window.
