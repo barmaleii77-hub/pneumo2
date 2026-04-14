@@ -58,7 +58,10 @@ _OPTIONAL_MISSING_ON_WINDOWS = {"fcntl", "pwd", "grp", "termios", "resource"}
 # event, but no longer spam the generic ModuleNotFoundError channel.
 _OPTIONAL_MISSING_GENERIC = {
     "CoolProp",
+    "bottleneck",
+    "cuda",
     "cython",
+    "qdarktheme",
     "scikits",
     "sksparse",
     "uarray",

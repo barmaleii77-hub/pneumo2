@@ -871,6 +871,7 @@ class LauncherGUI:
             self.stream_log_fh = open(log_path, "a", encoding="utf-8", errors="replace")
             self.stream_log_fh.write(f"\n===== {time.strftime('%Y-%m-%d %H:%M:%S')} =====\n")
             self.stream_log_fh.write(" ".join(cmd) + "\n")
+            self.stream_log_fh.flush()
         except Exception:
             self.stream_log_fh = None
 

@@ -66,6 +66,74 @@ def _write_external_pointer_bundle(tmp_path: Path) -> Path:
     return zip_path
 
 
+def _write_no_anim_bundle(tmp_path: Path) -> Path:
+    zip_path = tmp_path / "bundle_no_anim.zip"
+    diag = {
+        "anim_latest_available": False,
+        "anim_latest_global_pointer_json": "C:/external/workspace/_pointers/anim_latest.json",
+        "anim_latest_pointer_json": "",
+        "anim_latest_npz_path": "",
+        "anim_latest_visual_cache_token": "",
+        "anim_latest_visual_reload_inputs": [],
+        "anim_latest_visual_cache_dependencies": {},
+        "anim_latest_updated_utc": "",
+        "anim_latest_usable": False,
+        "anim_latest_issues": [],
+    }
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("bundle/meta.json", json.dumps({"release": "pytest", "created_at": "2026-03-13T00:31:22"}, ensure_ascii=False, indent=2))
+        zf.writestr("bundle/manifest.json", json.dumps({}, ensure_ascii=False, indent=2))
+        zf.writestr("bundle/summary.json", json.dumps({"added_files": 1}, ensure_ascii=False, indent=2))
+        zf.writestr("bundle/skips.json", json.dumps([], ensure_ascii=False, indent=2))
+        zf.writestr("bundle/README_SEND_BUNDLE.txt", "README")
+        zf.writestr("MANIFEST.json", json.dumps({}, ensure_ascii=False, indent=2))
+        zf.writestr("triage/triage_report.md", "# triage\n")
+        zf.writestr("triage/latest_anim_pointer_diagnostics.json", json.dumps(diag, ensure_ascii=False, indent=2))
+        zf.writestr("triage/latest_anim_pointer_diagnostics.md", "# Anim latest diagnostics\n")
+        zf.writestr("workspace/exports/.gitkeep", "")
+        zf.writestr("workspace/uploads/placeholder.txt", "u")
+        zf.writestr("workspace/road_profiles/placeholder.txt", "r")
+        zf.writestr("workspace/maneuvers/placeholder.txt", "m")
+        zf.writestr("workspace/opt_runs/placeholder.txt", "o")
+        zf.writestr("workspace/ui_state/state.json", json.dumps({"ok": True}, ensure_ascii=False))
+        zf.writestr("ui_logs/app.log", "ok\n")
+    return zip_path
+
+
+def _write_expected_anim_bundle_without_pointers(tmp_path: Path) -> Path:
+    zip_path = tmp_path / "bundle_expected_anim.zip"
+    diag = {
+        "anim_latest_available": True,
+        "anim_latest_global_pointer_json": "C:/external/workspace/_pointers/anim_latest.json",
+        "anim_latest_pointer_json": "C:/external/workspace/exports/anim_latest.json",
+        "anim_latest_npz_path": "C:/external/workspace/exports/anim_latest.npz",
+        "anim_latest_visual_cache_token": "tok-expected",
+        "anim_latest_visual_reload_inputs": ["npz"],
+        "anim_latest_visual_cache_dependencies": {},
+        "anim_latest_updated_utc": "2026-03-12T15:23:43.684336+00:00",
+        "anim_latest_usable": False,
+        "anim_latest_issues": [],
+    }
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("bundle/meta.json", json.dumps({"release": "pytest", "created_at": "2026-03-13T00:31:22"}, ensure_ascii=False, indent=2))
+        zf.writestr("bundle/manifest.json", json.dumps({}, ensure_ascii=False, indent=2))
+        zf.writestr("bundle/summary.json", json.dumps({"added_files": 1}, ensure_ascii=False, indent=2))
+        zf.writestr("bundle/skips.json", json.dumps([], ensure_ascii=False, indent=2))
+        zf.writestr("bundle/README_SEND_BUNDLE.txt", "README")
+        zf.writestr("MANIFEST.json", json.dumps({}, ensure_ascii=False, indent=2))
+        zf.writestr("triage/triage_report.md", "# triage\n")
+        zf.writestr("triage/latest_anim_pointer_diagnostics.json", json.dumps(diag, ensure_ascii=False, indent=2))
+        zf.writestr("triage/latest_anim_pointer_diagnostics.md", "# Anim latest diagnostics\n")
+        zf.writestr("workspace/exports/.gitkeep", "")
+        zf.writestr("workspace/uploads/placeholder.txt", "u")
+        zf.writestr("workspace/road_profiles/placeholder.txt", "r")
+        zf.writestr("workspace/maneuvers/placeholder.txt", "m")
+        zf.writestr("workspace/opt_runs/placeholder.txt", "o")
+        zf.writestr("workspace/ui_state/state.json", json.dumps({"ok": True}, ensure_ascii=False))
+        zf.writestr("ui_logs/app.log", "ok\n")
+    return zip_path
+
+
 def test_collect_anim_latest_diagnostics_summary_marks_external_missing_paths_unusable(tmp_path: Path, monkeypatch) -> None:
     workspace = tmp_path / "workspace"
     monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(workspace))
@@ -148,3 +216,31 @@ def test_sources_wire_bundle_usability_diagnostics_everywhere() -> None:
     assert "optimizer.scope_sync" in dashboard_text
     assert "optimizer.gate" in dashboard_text
     assert "anim_latest_usable" in triage_text
+
+
+def test_validate_send_bundle_skips_missing_anim_pointer_warnings_when_no_anim_export_happened(tmp_path: Path) -> None:
+    zip_path = _write_no_anim_bundle(tmp_path)
+
+    res = validate_send_bundle(zip_path)
+    warnings = [str(x) for x in (res.report_json.get("warnings") or [])]
+    anim = dict(res.report_json.get("anim_latest") or {})
+
+    assert res.ok is True
+    assert anim["available"] is False
+    assert anim["contract_expected"] is False
+    assert not any("global anim_latest pointer" in msg for msg in warnings)
+    assert not any("local anim_latest pointer" in msg for msg in warnings)
+
+
+def test_validate_send_bundle_keeps_missing_pointer_warnings_when_anim_contract_is_expected(tmp_path: Path) -> None:
+    zip_path = _write_expected_anim_bundle_without_pointers(tmp_path)
+
+    res = validate_send_bundle(zip_path)
+    warnings = [str(x) for x in (res.report_json.get("warnings") or [])]
+    anim = dict(res.report_json.get("anim_latest") or {})
+
+    assert res.ok is True
+    assert anim["available"] is True
+    assert anim["contract_expected"] is True
+    assert any("global anim_latest pointer" in msg for msg in warnings)
+    assert any("local anim_latest pointer" in msg for msg in warnings)

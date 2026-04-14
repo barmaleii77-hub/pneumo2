@@ -16,3 +16,4 @@ def test_web_launcher_can_start_desktop_gui_spec_through_shared_bootstrap() -> N
     assert 'pneumo_solver_ui.tools.desktop_gui_spec_shell' in text
     assert 'desktop_gui_spec_shell.log' in text
     assert 'self._launch_logged_process(' in text
+    assert 'self.stream_log_fh.flush()' in text

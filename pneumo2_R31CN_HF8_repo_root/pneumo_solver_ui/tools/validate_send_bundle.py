@@ -149,6 +149,18 @@ def _ref_present_in_bundle(ref: Any, bundle_basenames: set[str]) -> Optional[boo
     return Path(ref_text).name in bundle_basenames
 
 
+def _anim_snapshot_requires_bundle_contract(snapshot: dict[str, Any] | None) -> bool:
+    if not isinstance(snapshot, dict):
+        return False
+    return bool(
+        snapshot.get("available")
+        or snapshot.get("visual_cache_token")
+        or snapshot.get("pointer_json")
+        or snapshot.get("npz_path")
+        or snapshot.get("visual_reload_inputs")
+    )
+
+
 def _md_list(items: List[str]) -> str:
     if not items:
         return "- (нет)"
@@ -400,15 +412,6 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
             anim_latest["local_pointer_present"] = ANIM_LOCAL_POINTER in name_set
             anim_latest["global_pointer_present"] = ANIM_GLOBAL_POINTER in name_set
 
-            if not anim_latest["diagnostics_json_present"]:
-                warnings.append(f"Missing {ANIM_DIAG_JSON} (anim_latest diagnostics sidecar)")
-            if not anim_latest["diagnostics_md_present"]:
-                warnings.append(f"Missing {ANIM_DIAG_MD} (anim_latest diagnostics sidecar)")
-            if not anim_latest["global_pointer_present"]:
-                warnings.append(f"Missing {ANIM_GLOBAL_POINTER} (global anim_latest pointer)")
-            if not anim_latest["local_pointer_present"]:
-                warnings.append(f"Missing {ANIM_LOCAL_POINTER} (local anim_latest pointer)")
-
             diag_obj = _read_json(ANIM_DIAG_JSON) if anim_latest["diagnostics_json_present"] else None
             local_obj = _read_json(ANIM_LOCAL_POINTER) if anim_latest["local_pointer_present"] else None
             global_obj = _read_json(ANIM_GLOBAL_POINTER) if anim_latest["global_pointer_present"] else None
@@ -439,6 +442,21 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                 ),
             }
             anim_latest["sources"] = {k: v for k, v in source_states.items() if isinstance(v, dict)}
+            anim_latest_expected = any(
+                _anim_snapshot_requires_bundle_contract(state)
+                for state in source_states.values()
+                if isinstance(state, dict)
+            )
+            anim_latest["contract_expected"] = anim_latest_expected
+
+            if not anim_latest["diagnostics_json_present"] and anim_latest_expected:
+                warnings.append(f"Missing {ANIM_DIAG_JSON} (anim_latest diagnostics sidecar)")
+            if not anim_latest["diagnostics_md_present"] and anim_latest_expected:
+                warnings.append(f"Missing {ANIM_DIAG_MD} (anim_latest diagnostics sidecar)")
+            if not anim_latest["global_pointer_present"] and anim_latest_expected:
+                warnings.append(f"Missing {ANIM_GLOBAL_POINTER} (global anim_latest pointer)")
+            if not anim_latest["local_pointer_present"] and anim_latest_expected:
+                warnings.append(f"Missing {ANIM_LOCAL_POINTER} (local anim_latest pointer)")
 
             canonical = choose_anim_snapshot(
                 {k: v for k, v in source_states.items() if isinstance(v, dict)},

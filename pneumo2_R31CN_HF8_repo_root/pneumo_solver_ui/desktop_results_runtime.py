@@ -12,7 +12,11 @@ from pneumo_solver_ui.desktop_results_model import (
     DesktopResultsSessionHandoff,
     DesktopResultsSnapshot,
 )
-from pneumo_solver_ui.desktop_shell.external_launch import python_gui_exe, spawn_module
+from pneumo_solver_ui.desktop_shell.external_launch import (
+    python_gui_exe,
+    spawn_module,
+    track_spawned_process,
+)
 from pneumo_solver_ui.run_artifacts import collect_anim_latest_diagnostics_summary
 from pneumo_solver_ui.tools.send_bundle_contract import (
     ANIM_DIAG_SIDECAR_JSON,
@@ -887,7 +891,8 @@ class DesktopResultsRuntime:
         }
         if os.name == "nt":
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        return subprocess.Popen(cmd, **kwargs)
+        proc = subprocess.Popen(cmd, **kwargs)
+        return track_spawned_process(proc)
 
     def artifact_preview_lines(self, artifact: DesktopResultsArtifact) -> tuple[str, ...]:
         path = artifact.path
