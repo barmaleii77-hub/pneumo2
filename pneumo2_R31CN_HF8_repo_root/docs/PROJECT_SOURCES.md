@@ -50,6 +50,14 @@
 - `docs/context/gui_spec_imports/v13_ring_editor_migration/web_to_desktop_migration_matrix_v13.csv` — специализированная ring-level migration matrix `web -> desktop`.
 - `docs/context/gui_spec_imports/v13_ring_editor_migration/ring_editor_acceptance_gates_v13.csv` — acceptance gates для `WS-RING`.
 - `docs/context/gui_spec_imports/v13_ring_editor_migration/ring_to_suite_link_contract_v13.json` — handoff contract `WS-RING -> WS-SUITE`.
+- `docs/context/gui_spec_imports/v12_design_recovery/README.md` — historical design-recovery layer из `v12`.
+- `docs/context/gui_spec_imports/v12_design_recovery/pneumo_gui_codex_spec_v12_design_recovery.json` — design-recovery delta после implementation-веток.
+- `docs/context/gui_spec_imports/v12_design_recovery/ring_editor_canonical_contract_v12.json` — precursor ring contract перед `v13`.
+- `docs/context/gui_spec_imports/v12_design_recovery/optimization_control_plane_contract_v12.json` — precursor optimization control-plane contract.
+- `docs/context/gui_spec_imports/v12_design_recovery/truthful_graphics_contract_v12.json` — precursor truthful-graphics contract.
+- `docs/context/gui_spec_imports/v12_design_recovery/workspace_delta_v12.json` — workspace-level recovery delta.
+- `docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md` — human-readable lineage `v1…v13`.
+- `docs/context/gui_spec_archive_lineage.json` — machine-readable lineage inventory `v1…v13`.
 
 ### Historical import
 
@@ -75,8 +83,10 @@
 2. `18_PNEUMOAPP_WINDOWS_GUI_SPEC.md`
 3. `docs/context/gui_spec_imports/v3/*`
 4. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING` и handoff `WS-RING -> WS-SUITE`
-5. older versions в `docs/context/gui_spec_imports/*`
-6. `docs/gui_chat_prompts/*`
+5. `docs/context/gui_spec_imports/v12_design_recovery/*` как historical design-recovery layer
+6. `docs/context/gui_spec_archive_lineage.json` и `docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md`
+7. older versions в `docs/context/gui_spec_imports/*`
+8. `docs/gui_chat_prompts/*`
 
 ## Зафиксированные внешние AI snapshots
 

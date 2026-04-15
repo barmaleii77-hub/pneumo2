@@ -1,15 +1,26 @@
 # Chat Prompt: Оптимизатор Со Всеми Настройками
 
+## Канонический слой
+
+- Сначала читать [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](../17_WINDOWS_DESKTOP_CAD_GUI_CANON.md),
+  затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](../18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
+- Общий detailed layer для shell, migration и observability:
+  [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md).
+- Historical design-recovery precursor для optimization contract:
+  [optimization_control_plane_contract_v12.json](../context/gui_spec_imports/v12_design_recovery/optimization_control_plane_contract_v12.json),
+  [pneumo_gui_codex_spec_v12_design_recovery.json](../context/gui_spec_imports/v12_design_recovery/pneumo_gui_codex_spec_v12_design_recovery.json).
+
 ## Контекст
 
 Optimization workflow больше не должен быть завязан на WEB. Нужен полноценный desktop optimizer center для operator workflow и всех инженерных настроек.
 
 ## Наследование desktop-канона
 
-- Перед локальными решениями сначала следуй [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md), затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
+- Перед локальными решениями сначала следуй [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](../17_WINDOWS_DESKTOP_CAD_GUI_CANON.md), затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](../18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
 - Optimizer center должен наследовать baseline `menu/toolbar/panes/search/status`, а не web-first layout.
 - Даже если optimizer workspace не выглядит как классический CAD viewport, он обязан сохранять keyboard-first, accessibility, High-DPI и performance policy. `Ribbon` не использовать как default.
 - В optimizer UI должен быть один active mode selector, видимые `objective stack` и `hard gate`, явный baseline source и без двух конкурирующих launch-кнопок.
+- `v12` считается важным precursor-слоем для optimization control plane: он фиксирует design-first требования до любых implementation-pass слоёв.
 
 ## Цель
 

@@ -17,6 +17,8 @@
 
 - `v3/` — active detailed machine-readable reference layer из
   `pneumo_gui_codex_package_v3.zip`;
+- `v12_design_recovery/` — historical design-recovery layer из
+  `pneumo_gui_codex_preservation_and_design_recovery_v12.zip`;
 - `v13_ring_editor_migration/` — специализированный ring-editor migration
   addendum из `pneumo_gui_codex_design_v13_ring_editor_migration.zip`;
 - `v2/` — historical detailed import-layer из
@@ -24,6 +26,9 @@
 - корневые `pneumo_gui_codex_spec_v1.json`, `current_pipeline.dot`,
   `optimized_pipeline.dot` — historical import-layer из
   `pneumo_gui_codex_package_v1.zip`.
+- Эволюция `v1…v13` в виде knowledge-base summary зафиксирована в
+  `docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md` и
+  `docs/context/gui_spec_archive_lineage.json`.
 
 ## Что использовать в работе
 
@@ -32,11 +37,16 @@
    layout, UI elements, field/help/tooltip catalogs, migration matrix,
    acceptance criteria, pipeline verification, source-of-truth, docking,
    keyboard, UI state и observability contracts.
-3. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
+3. Если нужно понять, как текущий канон вырос из старых архивов, читать
+   `GUI_SPEC_ARCHIVE_LINEAGE.md` и `gui_spec_archive_lineage.json`.
+4. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
    `v13_ring_editor_migration/*` как специализированный addendum поверх `v3`:
    schema contract, screen blueprints, state machine, ring-level migration
    matrix, acceptance gates и suite-link contract.
-4. `v2` и `v1` использовать только как historical imports и источник для
+5. `v12_design_recovery/*` использовать как historical design-recovery layer:
+   он фиксирует возврат в design-first ветку, канон ring editor, optimization
+   control plane и truthful graphics перед `v13`.
+6. `v2` и `v1` использовать только как historical imports и источник для
    сравнения эволюции GUI-spec.
 
 ## Политика обновления
@@ -47,4 +57,5 @@
 - при конфликте между imported sources и текущим каноном приоритет у `17/18`,
   затем у active detailed layer `v3`, затем у специализированного addendum
   `v13_ring_editor_migration` в пределах `WS-RING` и ring-to-suite handoff,
-  затем у historical imports.
+  затем у `v12_design_recovery` как historical design-recovery layer, затем у
+  остальных historical imports.

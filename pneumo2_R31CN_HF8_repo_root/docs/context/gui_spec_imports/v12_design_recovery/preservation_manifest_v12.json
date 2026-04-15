@@ -1,0 +1,136 @@
+{
+  "package": "pneumo_gui_codex_preservation_and_design_recovery_v12",
+  "created_at": "2026-04-15",
+  "entries": [
+    {
+      "path": "artifact_lineage_v12.csv",
+      "size_bytes": 6081,
+      "sha256": "4a19e1ac16f41e27b835ef70f41c44897512ec2d6e19bdc9909cae9c001738c2"
+    },
+    {
+      "path": "artifact_lineage_v12.json",
+      "size_bytes": 8954,
+      "sha256": "78b5d7cecc2395fa533dd3437b5dc6711efa6d96976d20bf85f40b9ff224f747"
+    },
+    {
+      "path": "continuation_decision_v12.md",
+      "size_bytes": 2948,
+      "sha256": "cef0893a03520817e9b3b1955f23c617d3309ed7e253c7981aed2a842951c3e2"
+    },
+    {
+      "path": "pneumo_gui_codex_spec_v12_design_recovery.json",
+      "size_bytes": 6346,
+      "sha256": "2d1d982736fed7f2a4dae95625c4d734cd63f41703d2f136531315673d763a4e"
+    },
+    {
+      "path": "ring_editor_canonical_contract_v12.json",
+      "size_bytes": 4993,
+      "sha256": "1f9ff18d3b9b0122c3e2e121fa539bbc1a9f4456cc333436fc1621277742ac49"
+    },
+    {
+      "path": "optimization_control_plane_contract_v12.json",
+      "size_bytes": 2927,
+      "sha256": "df4e648ee0dd78ac49bdee3204666ff6e10d180a17dfaf3218fe13c620ed12f4"
+    },
+    {
+      "path": "truthful_graphics_contract_v12.json",
+      "size_bytes": 2296,
+      "sha256": "4ce057c56b08b8d64295d3f67ddb5d34701106b1fb651eece3267ccc0ed19739"
+    },
+    {
+      "path": "workspace_delta_v12.json",
+      "size_bytes": 3031,
+      "sha256": "245f045ac98201a54ca41a020eb76dbc8ed0473dab43b9cd53445921d06bc7a2"
+    },
+    {
+      "path": "README.md",
+      "size_bytes": 1787,
+      "sha256": "9781e837868cd956cd49413a2807dfa1b89097b716b91b23fd14c3af779e5568"
+    },
+    {
+      "path": "preserved_outputs/pneumo_gui_codex_package_v1.zip",
+      "size_bytes": 21418,
+      "sha256": "8be9f48b2935f07a6957c1698a58364369c6412ea16a262deeabf3e5884c7283"
+    },
+    {
+      "path": "preserved_outputs/pneumo_gui_codex_package_v2.zip",
+      "size_bytes": 169875,
+      "sha256": "db6bbc9253b491fca96f3470238ca7d60c3c67d8606bccfd5341121841ca66de"
+    },
+    {
+      "path": "preserved_outputs/pneumo_gui_codex_package_v3.zip",
+      "size_bytes": 213673,
+      "sha256": "877acc791198a3ae0a6f34873504e3db15580e8d39f2aea345dff4abcfcf384e"
+    },
+    {
+      "path": "preserved_outputs/pneumo_gui_codex_package_v4.zip",
+      "size_bytes": 324919,
+      "sha256": "034670b2ca83fd0fe80c8c0ca3e2be7204de8a7b49890cdf3a5513ae728b45c4"
+    },
+    {
+      "path": "preserved_outputs/pneumo_gui_codex_package_v5.zip",
+      "size_bytes": 674812,
+      "sha256": "a1a4e65e5621288e99a4b80d4ee7d8550beb13caac20481a4a399072536fbf98"
+    },
+    {
+      "path": "preserved_outputs/pneumo_gui_codex_package_v6_impl.zip",
+      "size_bytes": 49249,
+      "sha256": "d1d05e31a28aa75d3e6d1aebc1ec9226cb581fd2a2e5664e0b1645df6bdbec12"
+    },
+    {
+      "path": "preserved_outputs/pneumo_gui_codex_package_v7_bootstrap.zip",
+      "size_bytes": 57681,
+      "sha256": "ea3e8528dfa455cd66e61e74b52e71668d3e062e5c6f7cc2cc1b1a389d7a2f97"
+    },
+    {
+      "path": "preserved_outputs/pneumo_gui_codex_package_v8_fillin.zip",
+      "size_bytes": 101899,
+      "sha256": "2c98afaf74d3ed2a00e9b6bf1b8f596e2c7ffc7827846a2d2a16b1d1f361a1c7"
+    },
+    {
+      "path": "preserved_outputs/pneumo_gui_codex_package_v9_interactions.zip",
+      "size_bytes": 300883,
+      "sha256": "8fef4a74ba87ee640d2470abe6733fbec38aecb72bc050d04de9ec2107c353e5"
+    },
+    {
+      "path": "preserved_outputs/pneumo_gui_codex_package_v10_backend_adapters.zip",
+      "size_bytes": 113153,
+      "sha256": "7b0fc9834a9fc813a3db98aedc1e8d57ad6f6ac4902f7cbcdfa78476bba60799"
+    },
+    {
+      "path": "preserved_outputs/pneumo_gui_codex_package_v11_execution_wiring.zip",
+      "size_bytes": 402203,
+      "sha256": "dcb7cd38f7e31e291716dfd0474944432b7e7da09932a3259ae7b65923cfaefe"
+    },
+    {
+      "path": "preserved_outputs/prompt_gui_windows_cad_pneumo_augmented_2026-04-13.md",
+      "size_bytes": 28839,
+      "sha256": "79761f344d37aabf302c98fcdbe7f1444a4d6d894d2016f8ac3b337161269b7e"
+    },
+    {
+      "path": "preserved_outputs/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md",
+      "size_bytes": 55098,
+      "sha256": "a5c4abad92c82ee125438d78f42a77036d58ef4472de11bdf04fd1d674e5e3bb"
+    },
+    {
+      "path": "reference_inputs/Прогрев контекста проекта.txt",
+      "size_bytes": 6799,
+      "sha256": "b2614c9531ed62810e254541459d4951580f64d20539cbaefe86946cf97dfdb5"
+    },
+    {
+      "path": "reference_inputs/Проектный релиз.txt",
+      "size_bytes": 6061,
+      "sha256": "56c4801c96760af6f1a0291a42af6b30ace6e0f81c68cc2632b7caf0bf8b832b"
+    },
+    {
+      "path": "reference_inputs/Разработка софта для подвески.txt",
+      "size_bytes": 4528,
+      "sha256": "bcb9579bbc447d8d936e565089a98f3b5cfcb6672d8375ccaa0f53c59e9a56c1"
+    },
+    {
+      "path": "reference_inputs/deep-research-report (5).md",
+      "size_bytes": 61507,
+      "sha256": "9cc1f35d3c19631c28a2cdd2d07f8c25949ee8fc72f293a1a2679ce6ea501dd7"
+    }
+  ]
+}

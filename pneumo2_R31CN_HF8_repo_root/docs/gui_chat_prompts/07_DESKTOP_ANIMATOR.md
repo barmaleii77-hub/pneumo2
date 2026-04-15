@@ -1,15 +1,26 @@
 # Chat Prompt: Desktop Animator
 
+## Канонический слой
+
+- Сначала читать [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](../17_WINDOWS_DESKTOP_CAD_GUI_CANON.md),
+  затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](../18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
+- Общий detailed layer для shell, truth markers и observability:
+  [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md).
+- Historical design-recovery precursor для honest graphics:
+  [truthful_graphics_contract_v12.json](../context/gui_spec_imports/v12_design_recovery/truthful_graphics_contract_v12.json),
+  [pneumo_gui_codex_spec_v12_design_recovery.json](../context/gui_spec_imports/v12_design_recovery/pneumo_gui_codex_spec_v12_design_recovery.json).
+
 ## Контекст
 
 Desktop Animator должен стать основным окном анимации и инженерного просмотра результатов. WEB animation cockpit используется только как источник поведения.
 
 ## Наследование desktop-канона
 
-- Перед локальными решениями сначала следуй [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md), затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
+- Перед локальными решениями сначала следуй [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](../17_WINDOWS_DESKTOP_CAD_GUI_CANON.md), затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](../18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
 - Для animator-поверхностей держи viewport-first layout, а overlays, timelines, properties и diagnostics выноси в управляемые panes.
 - Если есть 3D viewport, orientation widget уровня `ViewCube` обязателен. `Ribbon` не использовать как default.
 - Соблюдай honest visualization contract: `truth complete / truth partial / truth absent`; не рисуй fake geometry, pin-to-pin cylinder body или декоративный fallback без warning.
+- `v12` считается важным precursor-слоем для truthful graphics и честной границы между расчётной, исходной и условной графикой.
 
 ## Цель
 

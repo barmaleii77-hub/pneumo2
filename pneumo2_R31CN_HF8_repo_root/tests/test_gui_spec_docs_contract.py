@@ -10,14 +10,19 @@ DOCS = ROOT / "docs"
 CONTEXT = DOCS / "context"
 IMPORTS = CONTEXT / "gui_spec_imports"
 IMPORTS_V3 = IMPORTS / "v3"
+IMPORTS_V12 = IMPORTS / "v12_design_recovery"
 IMPORTS_V13 = IMPORTS / "v13_ring_editor_migration"
 
 CANON_17 = DOCS / "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md"
 CANON_18 = DOCS / "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md"
 PROJECT_SOURCES = DOCS / "PROJECT_SOURCES.md"
 GUI_INDEX = DOCS / "gui_chat_prompts" / "00_INDEX.md"
+ANIMATOR_LANE = DOCS / "gui_chat_prompts" / "07_DESKTOP_ANIMATOR.md"
+OPTIMIZER_LANE = DOCS / "gui_chat_prompts" / "08_OPTIMIZER_CENTER.md"
 RING_LANE = DOCS / "gui_chat_prompts" / "04_RING_EDITOR.md"
 RESULTS_LANE = DOCS / "gui_chat_prompts" / "10_TEST_VALIDATION_RESULTS.md"
+LINEAGE_MD = CONTEXT / "GUI_SPEC_ARCHIVE_LINEAGE.md"
+LINEAGE_JSON = CONTEXT / "gui_spec_archive_lineage.json"
 PARITY_SUMMARY = CONTEXT / "DESKTOP_WEB_PARITY_SUMMARY.md"
 PARITY_JSON = CONTEXT / "desktop_web_parity_map.json"
 IMPORTS_README = IMPORTS / "README.md"
@@ -166,16 +171,25 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     project_sources_text = PROJECT_SOURCES.read_text(encoding="utf-8")
     index_text = GUI_INDEX.read_text(encoding="utf-8")
 
+    assert "v12_design_recovery/" in imports_readme
     assert "v13_ring_editor_migration/" in imports_readme
     assert "специализированный ring-editor migration" in imports_readme
     assert "WS-RING -> WS-SUITE" in imports_readme
+    assert "GUI_SPEC_ARCHIVE_LINEAGE.md" in imports_readme
 
+    assert "v12_design_recovery/README.md" in project_sources_text
+    assert "optimization_control_plane_contract_v12.json" in project_sources_text
+    assert "truthful_graphics_contract_v12.json" in project_sources_text
+    assert "GUI_SPEC_ARCHIVE_LINEAGE.md" in project_sources_text
+    assert "gui_spec_archive_lineage.json" in project_sources_text
     assert "v13_ring_editor_migration/README.md" in project_sources_text
     assert "ring_editor_schema_contract_v13.json" in project_sources_text
     assert "ring_editor_screen_blueprints_v13.csv" in project_sources_text
     assert "ring_editor_acceptance_gates_v13.csv" in project_sources_text
     assert "ring_to_suite_link_contract_v13.json" in project_sources_text
 
+    assert "gui_spec_imports/v12_design_recovery/README.md" in index_text
+    assert "GUI_SPEC_ARCHIVE_LINEAGE.md" in index_text
     assert "gui_spec_imports/v13_ring_editor_migration/README.md" in index_text
     assert "специализированный addendum для `WS-RING`" in index_text
     assert "WS-RING -> WS-SUITE" in index_text
@@ -191,6 +205,10 @@ def test_canon_and_parity_summary_reference_v13_ring_editor_layer() -> None:
     assert "## П. Специализированный addendum `v13` для `WS-RING`" in canon_18
     assert "## Р. Контракт handoff `WS-RING -> WS-SUITE`" in canon_18
     assert "## С. Ring-level migration gates" in canon_18
+    assert "## Т. Историческая линия `v1…v13` и политика продолжения" in canon_18
+    assert "./context/GUI_SPEC_ARCHIVE_LINEAGE.md" in canon_18
+    assert "./context/gui_spec_archive_lineage.json" in canon_18
+    assert "./context/gui_spec_imports/v12_design_recovery/README.md" in canon_18
     assert "./context/gui_spec_imports/v13_ring_editor_migration/pneumo_gui_codex_spec_v13_ring_editor_migration.json" in canon_18
     assert "./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_schema_contract_v13.json" in canon_18
     assert "./context/gui_spec_imports/v13_ring_editor_migration/ring_to_suite_link_contract_v13.json" in canon_18
@@ -205,9 +223,38 @@ def test_canon_and_parity_summary_reference_v13_ring_editor_layer() -> None:
     assert "further refined by v13 ring_to_suite link contract" in parity_json
 
 
+def test_v12_design_recovery_layer_and_lineage_inventory_are_registered() -> None:
+    assert IMPORTS_V12.exists()
+    assert LINEAGE_MD.exists()
+    assert LINEAGE_JSON.exists()
+
+    v12_readme = (IMPORTS_V12 / "README.md").read_text(encoding="utf-8-sig")
+    lineage_md = LINEAGE_MD.read_text(encoding="utf-8")
+    lineage_json = json.loads(LINEAGE_JSON.read_text(encoding="utf-8"))
+
+    assert "Preservation and Design Recovery v12" in v12_readme
+    assert (IMPORTS_V12 / "pneumo_gui_codex_spec_v12_design_recovery.json").exists()
+    assert (IMPORTS_V12 / "ring_editor_canonical_contract_v12.json").exists()
+    assert (IMPORTS_V12 / "optimization_control_plane_contract_v12.json").exists()
+    assert (IMPORTS_V12 / "truthful_graphics_contract_v12.json").exists()
+
+    assert "v1–v13" in lineage_md
+    assert "v12" in lineage_md
+    assert "v13" in lineage_md
+    assert "implementation-oriented passes" in lineage_md
+    assert "design-recovery" in lineage_md
+
+    versions = [item["version"] for item in lineage_json]
+    assert versions == ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13"]
+    assert any(item["version"] == "v12" and item["repo_layer"] == "docs/context/gui_spec_imports/v12_design_recovery/" for item in lineage_json)
+    assert any(item["version"] == "v13" and item["repo_layer"] == "docs/context/gui_spec_imports/v13_ring_editor_migration/" for item in lineage_json)
+
+
 def test_ring_related_lane_docs_reference_v13_contracts() -> None:
     ring_lane_text = RING_LANE.read_text(encoding="utf-8")
     results_lane_text = RESULTS_LANE.read_text(encoding="utf-8")
+    optimizer_lane_text = OPTIMIZER_LANE.read_text(encoding="utf-8")
+    animator_lane_text = ANIMATOR_LANE.read_text(encoding="utf-8")
 
     assert "## Канонический слой" in ring_lane_text
     assert "../17_WINDOWS_DESKTOP_CAD_GUI_CANON.md" in ring_lane_text
@@ -224,6 +271,16 @@ def test_ring_related_lane_docs_reference_v13_contracts() -> None:
     assert "web_to_desktop_migration_matrix_v13.csv" in results_lane_text
     assert "stale link" in results_lane_text
 
+    assert "## Канонический слой" in optimizer_lane_text
+    assert "optimization_control_plane_contract_v12.json" in optimizer_lane_text
+    assert "../17_WINDOWS_DESKTOP_CAD_GUI_CANON.md" in optimizer_lane_text
+    assert "../18_PNEUMOAPP_WINDOWS_GUI_SPEC.md" in optimizer_lane_text
+
+    assert "## Канонический слой" in animator_lane_text
+    assert "truthful_graphics_contract_v12.json" in animator_lane_text
+    assert "../17_WINDOWS_DESKTOP_CAD_GUI_CANON.md" in animator_lane_text
+    assert "../18_PNEUMOAPP_WINDOWS_GUI_SPEC.md" in animator_lane_text
+
 
 def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
     offenders: list[str] = []
@@ -232,10 +289,14 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         PROJECT_SOURCES,
         GUI_INDEX,
         CANON_18,
+        LINEAGE_MD,
         PARITY_SUMMARY,
         PARITY_JSON,
+        ANIMATOR_LANE,
+        OPTIMIZER_LANE,
         RING_LANE,
         RESULTS_LANE,
+        IMPORTS_V12 / "README.md",
         IMPORTS_V13 / "README.md",
     )
 

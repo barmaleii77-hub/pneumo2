@@ -1,0 +1,183 @@
+[
+  {
+    "version": "v1",
+    "archive_name": "pneumo_gui_codex_package_v1.zip",
+    "phase": "design",
+    "status": "historical_import",
+    "role": "стартовый machine-readable GUI-spec",
+    "main_artifacts": [
+      "pneumo_gui_codex_spec_v1.json",
+      "current_pipeline.dot",
+      "optimized_pipeline.dot"
+    ],
+    "repo_layer": "docs/context/gui_spec_imports/"
+  },
+  {
+    "version": "v2",
+    "archive_name": "pneumo_gui_codex_package_v2.zip",
+    "phase": "design",
+    "status": "historical_detailed_import",
+    "role": "первый detailed reference layer",
+    "main_artifacts": [
+      "pneumo_gui_codex_spec_v2_detailed.json",
+      "migration_matrix.csv",
+      "acceptance_criteria.csv",
+      "pipeline_verification.csv"
+    ],
+    "repo_layer": "docs/context/gui_spec_imports/v2/"
+  },
+  {
+    "version": "v3",
+    "archive_name": "pneumo_gui_codex_package_v3.zip",
+    "phase": "design",
+    "status": "active_detailed_layer",
+    "role": "active detailed machine-readable GUI-spec",
+    "main_artifacts": [
+      "pneumo_gui_codex_spec_v3_refined.json",
+      "source_of_truth_matrix.csv",
+      "keyboard_matrix.csv",
+      "docking_matrix.csv",
+      "ui_state_matrix.csv",
+      "pipeline_observability.csv"
+    ],
+    "repo_layer": "docs/context/gui_spec_imports/v3/"
+  },
+  {
+    "version": "v4",
+    "archive_name": "pneumo_gui_codex_package_v4.zip",
+    "phase": "design",
+    "status": "historical_archive",
+    "role": "ultra-design expansion со сценариями, dialog catalog и richer shell contract",
+    "main_artifacts": [
+      "pneumo_gui_codex_spec_v4_ultra.json",
+      "current_user_step_graph.dot",
+      "dialog_catalog.csv",
+      "element_state_machine.csv"
+    ],
+    "repo_layer": "lineage_only"
+  },
+  {
+    "version": "v5",
+    "archive_name": "pneumo_gui_codex_package_v5.zip",
+    "phase": "design",
+    "status": "historical_archive",
+    "role": "master design layer с archive evidence, microcopy, command synonyms и truth matrices",
+    "main_artifacts": [
+      "pneumo_gui_codex_spec_v5_master.json",
+      "archive_evidence_index.csv",
+      "command_search_synonyms.csv",
+      "graphics_truth_matrix.csv",
+      "cognitive_ergonomics_matrix.csv"
+    ],
+    "repo_layer": "lineage_only"
+  },
+  {
+    "version": "v6",
+    "archive_name": "pneumo_gui_codex_package_v6_impl.zip",
+    "phase": "implementation",
+    "status": "historical_archive",
+    "role": "implementation pass с workspace packets, component library и work orders",
+    "main_artifacts": [
+      "pneumo_gui_codex_spec_v6_implementation.json",
+      "workspace_implementation_packets.csv",
+      "component_library.csv",
+      "codex_work_orders.csv"
+    ],
+    "repo_layer": "lineage_only"
+  },
+  {
+    "version": "v7",
+    "archive_name": "pneumo_gui_codex_package_v7_bootstrap.zip",
+    "phase": "implementation",
+    "status": "historical_archive",
+    "role": "bootstrap source skeleton для PySide6/Qt6 shell",
+    "main_artifacts": [
+      "pneumo_gui_codex_spec_v7_bootstrap.json",
+      "bootstrap_tree.csv",
+      "workspace_registry.csv",
+      "degraded_truth_registry.json"
+    ],
+    "repo_layer": "lineage_only"
+  },
+  {
+    "version": "v8",
+    "archive_name": "pneumo_gui_codex_package_v8_fillin.zip",
+    "phase": "implementation",
+    "status": "historical_archive",
+    "role": "fill-in pass с seeded workspaces, command/service registries и local tests",
+    "main_artifacts": [
+      "pneumo_gui_codex_spec_v8_fillin.json",
+      "workspace_fillin_registry.csv",
+      "command_registry.csv",
+      "service_registry.csv",
+      "local_test_matrix.csv"
+    ],
+    "repo_layer": "lineage_only"
+  },
+  {
+    "version": "v9",
+    "archive_name": "pneumo_gui_codex_package_v9_interactions.zip",
+    "phase": "implementation",
+    "status": "historical_archive",
+    "role": "interaction pass; архив содержит шумный pytest cache и не используется как clean import layer",
+    "main_artifacts": [
+      "source_tree/"
+    ],
+    "repo_layer": "lineage_only"
+  },
+  {
+    "version": "v10",
+    "archive_name": "pneumo_gui_codex_package_v10_backend_adapters.zip",
+    "phase": "implementation",
+    "status": "historical_archive",
+    "role": "backend adapter pass для baseline, optimization, diagnostics и ring source-of-truth",
+    "main_artifacts": [
+      "pneumo_gui_codex_spec_v10_backend_adapters.json",
+      "backend_adapter_contracts.json",
+      "backend_adapter_registry.csv",
+      "binding_persistence_matrix.csv"
+    ],
+    "repo_layer": "lineage_only"
+  },
+  {
+    "version": "v11",
+    "archive_name": "pneumo_gui_codex_package_v11_execution_wiring.zip",
+    "phase": "implementation",
+    "status": "historical_archive",
+    "role": "execution wiring pass; присланные копии не являются clean import layer из-за шумных cache-файлов",
+    "main_artifacts": [
+      "source_tree/"
+    ],
+    "repo_layer": "lineage_only"
+  },
+  {
+    "version": "v12",
+    "archive_name": "pneumo_gui_codex_preservation_and_design_recovery_v12.zip",
+    "phase": "design_recovery",
+    "status": "historical_design_recovery_layer",
+    "role": "preservation and design recovery, возвращающий проект в design-first ветку",
+    "main_artifacts": [
+      "pneumo_gui_codex_spec_v12_design_recovery.json",
+      "ring_editor_canonical_contract_v12.json",
+      "optimization_control_plane_contract_v12.json",
+      "truthful_graphics_contract_v12.json",
+      "workspace_delta_v12.json"
+    ],
+    "repo_layer": "docs/context/gui_spec_imports/v12_design_recovery/"
+  },
+  {
+    "version": "v13",
+    "archive_name": "pneumo_gui_codex_design_v13_ring_editor_migration.zip",
+    "phase": "design_addendum",
+    "status": "specialized_addendum",
+    "role": "ring-editor migration layer и handoff contract WS-RING -> WS-SUITE",
+    "main_artifacts": [
+      "pneumo_gui_codex_spec_v13_ring_editor_migration.json",
+      "ring_editor_schema_contract_v13.json",
+      "web_to_desktop_migration_matrix_v13.csv",
+      "ring_editor_acceptance_gates_v13.csv",
+      "ring_to_suite_link_contract_v13.json"
+    ],
+    "repo_layer": "docs/context/gui_spec_imports/v13_ring_editor_migration/"
+  }
+]

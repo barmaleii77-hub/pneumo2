@@ -15,7 +15,12 @@
 4. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
    и related `v13_ring_editor_migration/*`
    — специализированный addendum для `WS-RING` и handoff `WS-RING -> WS-SUITE`.
-5. `docs/gui_chat_prompts/*`
+5. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
+   — historical design-recovery layer, который возвращает проект из implementation-веток в design-first.
+6. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
+   и [gui_spec_archive_lineage.json](../context/gui_spec_archive_lineage.json)
+   — lineage `v1…v13`, чтобы понимать роль каждого архива.
+7. `docs/gui_chat_prompts/*`
    — implementation prompts, которые должны наследовать канон, а не заменять его.
 
 ## Что считается reference layer
@@ -27,6 +32,9 @@
   schema contract, screen blueprints, element/field catalogs, state machine,
   user pipeline, ring-level migration matrix, acceptance gates и suite-link
   contract.
+- `v12_design_recovery` задаёт historical recovery layer:
+  ring-editor precursor contract, optimization control plane, truthful graphics
+  и workspace recovery delta.
 
 ## Lane docs
 
@@ -49,5 +57,9 @@
 - если lane касается ring editor, handoff сценария или suite consumer
   сценарного контракта, обязательно дополнительно смотреть
   `v13_ring_editor_migration/*`;
+- если lane касается происхождения текущего канона, recovery decisions или
+  границы между design и implementation-pass, смотреть `v12_design_recovery/*`
+  и lineage `v1…v13`;
 - при конфликте приоритет у `17/18`, затем у `v3`, затем у специализированного
-  `v13_ring_editor_migration`, затем у historical imports.
+  `v13_ring_editor_migration`, затем у `v12_design_recovery`, затем у
+  historical imports.

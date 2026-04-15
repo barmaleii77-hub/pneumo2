@@ -906,3 +906,34 @@ release-gate contract и задаётся в
 Acceptance gates для этого контура задаются в
 [ring_editor_acceptance_gates_v13.csv](./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_acceptance_gates_v13.csv)
 и считаются обязательными для `WS-RING` и связанных consumer-workspaces.
+
+## Т. Историческая линия `v1…v13` и политика продолжения
+
+Текущий канон не вырос из одного архива. Он собирается из последовательности
+слоёв, где разные версии имели разный статус:
+
+- `v1` — стартовый machine-readable GUI-spec;
+- `v2` — первый detailed reference layer;
+- `v3` — текущий active detailed layer;
+- `v4` и `v5` — усиленные design-first layers с richer shell, microcopy,
+  state, validation и archive-evidence contracts;
+- `v6…v11` — implementation-oriented passes: implementation planning,
+  bootstrap shell, fill-in, interactions, backend adapters и execution wiring;
+- `v12` — preservation and design recovery: возврат проекта из implementation
+  ветки обратно в design-first continuation;
+- `v13` — специализированный addendum для `WS-RING` и handoff
+  `WS-RING -> WS-SUITE`.
+
+Читать lineage нужно через:
+
+- [GUI_SPEC_ARCHIVE_LINEAGE.md](./context/GUI_SPEC_ARCHIVE_LINEAGE.md)
+- [gui_spec_archive_lineage.json](./context/gui_spec_archive_lineage.json)
+- [v12_design_recovery/README.md](./context/gui_spec_imports/v12_design_recovery/README.md)
+
+Практическое правило:
+
+- implementation-архивы `v6…v11` не переопределяют текущий GUI canon;
+- design-recovery `v12` объясняет, почему проект продолжает work не из
+  bootstrap/source-tree ветки, а из design-first ветки;
+- specialized addendum `v13` продолжает именно эту восстановленную ветку в
+  области ring editor и ring-to-suite handoff.

@@ -1,0 +1,172 @@
+[
+  {
+    "artifact_id": "V1",
+    "file_name": "pneumo_gui_codex_package_v1.zip",
+    "branch_kind": "дизайн",
+    "preservation_status": "исторический",
+    "copied_to": "preserved_outputs/pneumo_gui_codex_package_v1.zip",
+    "size_bytes": 21418,
+    "sha256": "8be9f48b2935f07a6957c1698a58364369c6412ea16a262deeabf3e5884c7283",
+    "comment": "Начальный машиночитаемый граф и базовая спецификация GUI. Полезен как стартовая точка lineage, но не как текущая каноническая база."
+  },
+  {
+    "artifact_id": "V2",
+    "file_name": "pneumo_gui_codex_package_v2.zip",
+    "branch_kind": "дизайн",
+    "preservation_status": "исторический",
+    "copied_to": "preserved_outputs/pneumo_gui_codex_package_v2.zip",
+    "size_bytes": 169875,
+    "sha256": "db6bbc9253b491fca96f3470238ca7d60c3c67d8606bccfd5341121841ca66de",
+    "comment": "Сильное расширение детализации GUI. Полезен для истории наращивания структуры экранов."
+  },
+  {
+    "artifact_id": "V3",
+    "file_name": "pneumo_gui_codex_package_v3.zip",
+    "branch_kind": "дизайн",
+    "preservation_status": "исторический",
+    "copied_to": "preserved_outputs/pneumo_gui_codex_package_v3.zip",
+    "size_bytes": 213673,
+    "sha256": "877acc791198a3ae0a6f34873504e3db15580e8d39f2aea345dff4abcfcf384e",
+    "comment": "Уточнение каталогов состояний, keyboard/docking/observability."
+  },
+  {
+    "artifact_id": "V4",
+    "file_name": "pneumo_gui_codex_package_v4.zip",
+    "branch_kind": "дизайн",
+    "preservation_status": "исторический",
+    "copied_to": "preserved_outputs/pneumo_gui_codex_package_v4.zip",
+    "size_bytes": 324919,
+    "sha256": "034670b2ca83fd0fe80c8c0ca3e2be7204de8a7b49890cdf3a5513ae728b45c4",
+    "comment": "Ультра-детализация экранов, графов, сценариев и тестов."
+  },
+  {
+    "artifact_id": "V5",
+    "file_name": "pneumo_gui_codex_package_v5.zip",
+    "branch_kind": "дизайн",
+    "preservation_status": "канонический",
+    "copied_to": "preserved_outputs/pneumo_gui_codex_package_v5.zip",
+    "size_bytes": 674812,
+    "sha256": "a1a4e65e5621288e99a4b80d4ee7d8550beb13caac20481a4a399072536fbf98",
+    "comment": "Последний чистый design-first master package до ухода в implementation-ветку. Текущая базовая каноническая опора для продолжения проектирования."
+  },
+  {
+    "artifact_id": "V6",
+    "file_name": "pneumo_gui_codex_package_v6_impl.zip",
+    "branch_kind": "implementation",
+    "preservation_status": "архивированный",
+    "copied_to": "preserved_outputs/pneumo_gui_codex_package_v6_impl.zip",
+    "size_bytes": 49249,
+    "sha256": "d1d05e31a28aa75d3e6d1aebc1ec9226cb581fd2a2e5664e0b1645df6bdbec12",
+    "comment": "Переход в implementation planning. Полезен как downstream scaffold для Codex после freeze дизайна, но не как основной ответ на исходную задачу."
+  },
+  {
+    "artifact_id": "V7",
+    "file_name": "pneumo_gui_codex_package_v7_bootstrap.zip",
+    "branch_kind": "implementation",
+    "preservation_status": "архивированный",
+    "copied_to": "preserved_outputs/pneumo_gui_codex_package_v7_bootstrap.zip",
+    "size_bytes": 57681,
+    "sha256": "ea3e8528dfa455cd66e61e74b52e71668d3e062e5c6f7cc2cc1b1a389d7a2f97",
+    "comment": "Bootstrap source skeleton. Сохраняется как побочная кодовая ветка."
+  },
+  {
+    "artifact_id": "V8",
+    "file_name": "pneumo_gui_codex_package_v8_fillin.zip",
+    "branch_kind": "implementation",
+    "preservation_status": "архивированный",
+    "copied_to": "preserved_outputs/pneumo_gui_codex_package_v8_fillin.zip",
+    "size_bytes": 101899,
+    "sha256": "2c98afaf74d3ed2a00e9b6bf1b8f596e2c7ffc7827846a2d2a16b1d1f361a1c7",
+    "comment": "Workspace fill-in scaffold. Использовать только после явного решения перейти к коду."
+  },
+  {
+    "artifact_id": "V9",
+    "file_name": "pneumo_gui_codex_package_v9_interactions.zip",
+    "branch_kind": "implementation",
+    "preservation_status": "архивированный",
+    "copied_to": "preserved_outputs/pneumo_gui_codex_package_v9_interactions.zip",
+    "size_bytes": 300883,
+    "sha256": "8fef4a74ba87ee640d2470abe6733fbec38aecb72bc050d04de9ec2107c353e5",
+    "comment": "Interaction scaffold. Не считать каноном GUI-проектирования."
+  },
+  {
+    "artifact_id": "V10",
+    "file_name": "pneumo_gui_codex_package_v10_backend_adapters.zip",
+    "branch_kind": "implementation",
+    "preservation_status": "архивированный",
+    "copied_to": "preserved_outputs/pneumo_gui_codex_package_v10_backend_adapters.zip",
+    "size_bytes": 113153,
+    "sha256": "7b0fc9834a9fc813a3db98aedc1e8d57ad6f6ac4902f7cbcdfa78476bba60799",
+    "comment": "Backend adapter pass. Сохраняется как reference для позднего implementation-phase."
+  },
+  {
+    "artifact_id": "V11",
+    "file_name": "pneumo_gui_codex_package_v11_execution_wiring.zip",
+    "branch_kind": "implementation",
+    "preservation_status": "архивированный",
+    "copied_to": "preserved_outputs/pneumo_gui_codex_package_v11_execution_wiring.zip",
+    "size_bytes": 402203,
+    "sha256": "dcb7cd38f7e31e291716dfd0474944432b7e7da09932a3259ae7b65923cfaefe",
+    "comment": "Execution wiring pass. Полезен как reference при будущей wiring-реализации, но не как первичный дизайн-артефакт."
+  },
+  {
+    "artifact_id": "PROMPT_V1",
+    "file_name": "prompt_gui_windows_cad_pneumo_augmented_2026-04-13.md",
+    "branch_kind": "дизайн_prompt",
+    "preservation_status": "опорный",
+    "copied_to": "preserved_outputs/prompt_gui_windows_cad_pneumo_augmented_2026-04-13.md",
+    "size_bytes": 28839,
+    "sha256": "79761f344d37aabf302c98fcdbe7f1444a4d6d894d2016f8ac3b337161269b7e",
+    "comment": "Ранняя цельная формулировка требований к desktop GUI проекта."
+  },
+  {
+    "artifact_id": "PROMPT_V2",
+    "file_name": "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md",
+    "branch_kind": "дизайн_prompt",
+    "preservation_status": "канонический",
+    "copied_to": "preserved_outputs/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md",
+    "size_bytes": 55098,
+    "sha256": "a5c4abad92c82ee125438d78f42a77036d58ef4472de11bdf04fd1d674e5e3bb",
+    "comment": "Усиленный промт под проект; вместе с V5 образует основную design-first пару для продолжения работ."
+  },
+  {
+    "artifact_id": "PROJECT_CONTEXT",
+    "file_name": "Прогрев контекста проекта.txt",
+    "branch_kind": "reference_input",
+    "preservation_status": "опорный",
+    "copied_to": "reference_inputs/Прогрев контекста проекта.txt",
+    "size_bytes": 6799,
+    "sha256": "b2614c9531ed62810e254541459d4951580f64d20539cbaefe86946cf97dfdb5",
+    "comment": "Краткий проектный контекст."
+  },
+  {
+    "artifact_id": "PROJECT_RELEASE",
+    "file_name": "Проектный релиз.txt",
+    "branch_kind": "reference_input",
+    "preservation_status": "опорный",
+    "copied_to": "reference_inputs/Проектный релиз.txt",
+    "size_bytes": 6061,
+    "sha256": "56c4801c96760af6f1a0291a42af6b30ace6e0f81c68cc2632b7caf0bf8b832b",
+    "comment": "Срез по релизной и runtime-ветке проекта."
+  },
+  {
+    "artifact_id": "PROJECT_DEV",
+    "file_name": "Разработка софта для подвески.txt",
+    "branch_kind": "reference_input",
+    "preservation_status": "опорный",
+    "copied_to": "reference_inputs/Разработка софта для подвески.txt",
+    "size_bytes": 4528,
+    "sha256": "bcb9579bbc447d8d936e565089a98f3b5cfcb6672d8375ccaa0f53c59e9a56c1",
+    "comment": "Сводка по разработческой ветке и следующим техническим шагам."
+  },
+  {
+    "artifact_id": "DEEP_RESEARCH",
+    "file_name": "deep-research-report (5).md",
+    "branch_kind": "reference_input",
+    "preservation_status": "опорный",
+    "copied_to": "reference_inputs/deep-research-report (5).md",
+    "size_bytes": 61507,
+    "sha256": "9cc1f35d3c19631c28a2cdd2d07f8c25949ee8fc72f293a1a2679ce6ea501dd7",
+    "comment": "Исследование по Windows desktop/CAD best practices и проектным ограничениям."
+  }
+]
