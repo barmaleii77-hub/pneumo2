@@ -19,6 +19,8 @@
 ### Imported detailed reference
 
 - `docs/context/gui_spec_imports/README.md` — верхний source note для imported GUI-spec layers.
+- `docs/context/gui_spec_imports/foundations/README.md` — upstream prompt layer, предшествующий серии архивов `v1…v13`.
+- `docs/context/gui_spec_imports/foundations/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md` — foundational prompt source (`PROMPT_V2`).
 - `docs/context/gui_spec_imports/v3/README.md` — active detailed reference layer из `pneumo_gui_codex_package_v3.zip`.
 - `docs/context/gui_spec_imports/v3/pneumo_gui_codex_spec_v3_refined.json` — главный machine-readable GUI-spec.
 - `docs/context/gui_spec_imports/v3/current_macro.dot` — текущий macro workflow graph.
@@ -81,12 +83,13 @@
 
 1. `17_WINDOWS_DESKTOP_CAD_GUI_CANON.md`
 2. `18_PNEUMOAPP_WINDOWS_GUI_SPEC.md`
-3. `docs/context/gui_spec_imports/v3/*`
-4. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING` и handoff `WS-RING -> WS-SUITE`
-5. `docs/context/gui_spec_imports/v12_design_recovery/*` как historical design-recovery layer
-6. `docs/context/gui_spec_archive_lineage.json` и `docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md`
-7. older versions в `docs/context/gui_spec_imports/*`
-8. `docs/gui_chat_prompts/*`
+3. `docs/context/gui_spec_imports/foundations/*` как upstream intent/provenance layer
+4. `docs/context/gui_spec_imports/v3/*`
+5. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING` и handoff `WS-RING -> WS-SUITE`
+6. `docs/context/gui_spec_imports/v12_design_recovery/*` как historical design-recovery layer
+7. `docs/context/gui_spec_archive_lineage.json` и `docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md`
+8. older versions в `docs/context/gui_spec_imports/*`
+9. `docs/gui_chat_prompts/*`
 
 ## Зафиксированные внешние AI snapshots
 

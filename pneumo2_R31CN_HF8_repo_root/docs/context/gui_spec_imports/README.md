@@ -15,6 +15,8 @@
 
 ## Текущая иерархия версий
 
+- `foundations/` — upstream prompt sources, предшествующие серии архивов
+  `v1…v13`;
 - `v3/` — active detailed machine-readable reference layer из
   `pneumo_gui_codex_package_v3.zip`;
 - `v12_design_recovery/` — historical design-recovery layer из
@@ -33,28 +35,33 @@
 ## Что использовать в работе
 
 1. Сначала читать `17` и `18` как канон для людей.
-2. Затем использовать `v3/*` как active detailed machine-readable reference для:
+2. Если нужен upstream provenance исходного design-intent, читать
+   `foundations/*` как pre-`v1` prompt layer.
+3. Затем использовать `v3/*` как active detailed machine-readable reference для:
    layout, UI elements, field/help/tooltip catalogs, migration matrix,
    acceptance criteria, pipeline verification, source-of-truth, docking,
    keyboard, UI state и observability contracts.
-3. Если нужно понять, как текущий канон вырос из старых архивов, читать
+4. Если нужно понять, как текущий канон вырос из старых архивов, читать
    `GUI_SPEC_ARCHIVE_LINEAGE.md` и `gui_spec_archive_lineage.json`.
-4. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
+5. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
    `v13_ring_editor_migration/*` как специализированный addendum поверх `v3`:
    schema contract, screen blueprints, state machine, ring-level migration
    matrix, acceptance gates и suite-link contract.
-5. `v12_design_recovery/*` использовать как historical design-recovery layer:
+6. `v12_design_recovery/*` использовать как historical design-recovery layer:
    он фиксирует возврат в design-first ветку, канон ring editor, optimization
    control plane и truthful graphics перед `v13`.
-6. `v2` и `v1` использовать только как historical imports и источник для
+7. `v2` и `v1` использовать только как historical imports и источник для
    сравнения эволюции GUI-spec.
 
 ## Политика обновления
 
 - CSV, DOT и JSON сохраняются максимально близко к архивному источнику;
+- markdown prompt sources в `foundations/` сохраняются максимально близко к
+  внешнему upstream-источнику;
 - нормализация допускается только в производных docs/tests, а не в imported
   source artifacts;
 - при конфликте между imported sources и текущим каноном приоритет у `17/18`,
+  затем у `foundations/*` как upstream intent layer только для provenance,
   затем у active detailed layer `v3`, затем у специализированного addendum
   `v13_ring_editor_migration` в пределах `WS-RING` и ring-to-suite handoff,
   затем у `v12_design_recovery` как historical design-recovery layer, затем у

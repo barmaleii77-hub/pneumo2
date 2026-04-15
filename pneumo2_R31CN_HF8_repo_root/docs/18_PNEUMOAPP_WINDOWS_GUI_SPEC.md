@@ -907,11 +907,12 @@ Acceptance gates для этого контура задаются в
 [ring_editor_acceptance_gates_v13.csv](./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_acceptance_gates_v13.csv)
 и считаются обязательными для `WS-RING` и связанных consumer-workspaces.
 
-## Т. Историческая линия `v1…v13` и политика продолжения
+## Т. Историческая линия `PROMPT_V2 + v1…v13` и политика продолжения
 
 Текущий канон не вырос из одного архива. Он собирается из последовательности
 слоёв, где разные версии имели разный статус:
 
+- `PROMPT_V2` — upstream prompt source до появления машинных архивов;
 - `v1` — стартовый machine-readable GUI-spec;
 - `v2` — первый detailed reference layer;
 - `v3` — текущий active detailed layer;
@@ -926,12 +927,16 @@ Acceptance gates для этого контура задаются в
 
 Читать lineage нужно через:
 
+- [foundations/README.md](./context/gui_spec_imports/foundations/README.md)
+- [prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md](./context/gui_spec_imports/foundations/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md)
 - [GUI_SPEC_ARCHIVE_LINEAGE.md](./context/GUI_SPEC_ARCHIVE_LINEAGE.md)
 - [gui_spec_archive_lineage.json](./context/gui_spec_archive_lineage.json)
 - [v12_design_recovery/README.md](./context/gui_spec_imports/v12_design_recovery/README.md)
 
 Практическое правило:
 
+- `PROMPT_V2` фиксирует исходный native Windows / no-web-first /
+  no-feature-loss intent и используется как foundational provenance layer;
 - implementation-архивы `v6…v11` не переопределяют текущий GUI canon;
 - design-recovery `v12` объясняет, почему проект продолжает work не из
   bootstrap/source-tree ветки, а из design-first ветки;

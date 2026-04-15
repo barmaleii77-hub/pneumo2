@@ -9,22 +9,30 @@
    — project-wide desktop baseline.
 2. [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](../18_PNEUMOAPP_WINDOWS_GUI_SPEC.md)
    — project-specific GUI contract для `Пневмоподвески`.
-3. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
+3. [gui_spec_imports/foundations/README.md](../context/gui_spec_imports/foundations/README.md)
+   и
+   [prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md](../context/gui_spec_imports/foundations/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md)
+   — foundational upstream prompt source (`PROMPT_V2`).
+4. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
    и related `v3/*`
    — active detailed machine-readable reference layer.
-4. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
+5. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
    и related `v13_ring_editor_migration/*`
    — специализированный addendum для `WS-RING` и handoff `WS-RING -> WS-SUITE`.
-5. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
+6. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
    — historical design-recovery layer, который возвращает проект из implementation-веток в design-first.
-6. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
+7. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
    и [gui_spec_archive_lineage.json](../context/gui_spec_archive_lineage.json)
    — lineage `v1…v13`, чтобы понимать роль каждого архива.
-7. `docs/gui_chat_prompts/*`
+8. `docs/gui_chat_prompts/*`
    — implementation prompts, которые должны наследовать канон, а не заменять его.
 
 ## Что считается reference layer
 
+- `foundations` задаёт upstream intent layer:
+  native Windows desktop, no web-first, no feature-loss migration, diagnostics
+  as first-class surface, ring editor as single source of truth и honest
+  graphics baseline.
 - `v3` задаёт общий detailed layer:
   shell, layout, UI elements, help/tooltip catalogs, migration matrix,
   acceptance, verification, keyboard/docking/state/observability contracts.
@@ -54,6 +62,8 @@
 ## Правило использования
 
 - если lane касается shell, сначала смотреть `17`, `18` и `v3`;
+- если нужно понять исходный жёсткий intent ещё до `v1`, дополнительно читать
+  `foundations/*`;
 - если lane касается ring editor, handoff сценария или suite consumer
   сценарного контракта, обязательно дополнительно смотреть
   `v13_ring_editor_migration/*`;

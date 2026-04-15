@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 CONTEXT = DOCS / "context"
 IMPORTS = CONTEXT / "gui_spec_imports"
+FOUNDATIONS = IMPORTS / "foundations"
 IMPORTS_V3 = IMPORTS / "v3"
 IMPORTS_V12 = IMPORTS / "v12_design_recovery"
 IMPORTS_V13 = IMPORTS / "v13_ring_editor_migration"
@@ -171,12 +172,16 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     project_sources_text = PROJECT_SOURCES.read_text(encoding="utf-8")
     index_text = GUI_INDEX.read_text(encoding="utf-8")
 
+    assert "foundations/" in imports_readme
+    assert "upstream prompt sources" in imports_readme
     assert "v12_design_recovery/" in imports_readme
     assert "v13_ring_editor_migration/" in imports_readme
     assert "специализированный ring-editor migration" in imports_readme
     assert "WS-RING -> WS-SUITE" in imports_readme
     assert "GUI_SPEC_ARCHIVE_LINEAGE.md" in imports_readme
 
+    assert "gui_spec_imports/foundations/README.md" in project_sources_text
+    assert "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md" in project_sources_text
     assert "v12_design_recovery/README.md" in project_sources_text
     assert "optimization_control_plane_contract_v12.json" in project_sources_text
     assert "truthful_graphics_contract_v12.json" in project_sources_text
@@ -188,6 +193,8 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "ring_editor_acceptance_gates_v13.csv" in project_sources_text
     assert "ring_to_suite_link_contract_v13.json" in project_sources_text
 
+    assert "gui_spec_imports/foundations/README.md" in index_text
+    assert "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md" in index_text
     assert "gui_spec_imports/v12_design_recovery/README.md" in index_text
     assert "GUI_SPEC_ARCHIVE_LINEAGE.md" in index_text
     assert "gui_spec_imports/v13_ring_editor_migration/README.md" in index_text
@@ -205,7 +212,9 @@ def test_canon_and_parity_summary_reference_v13_ring_editor_layer() -> None:
     assert "## П. Специализированный addendum `v13` для `WS-RING`" in canon_18
     assert "## Р. Контракт handoff `WS-RING -> WS-SUITE`" in canon_18
     assert "## С. Ring-level migration gates" in canon_18
-    assert "## Т. Историческая линия `v1…v13` и политика продолжения" in canon_18
+    assert "## Т. Историческая линия `PROMPT_V2 + v1…v13` и политика продолжения" in canon_18
+    assert "./context/gui_spec_imports/foundations/README.md" in canon_18
+    assert "./context/gui_spec_imports/foundations/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md" in canon_18
     assert "./context/GUI_SPEC_ARCHIVE_LINEAGE.md" in canon_18
     assert "./context/gui_spec_archive_lineage.json" in canon_18
     assert "./context/gui_spec_imports/v12_design_recovery/README.md" in canon_18
@@ -224,28 +233,40 @@ def test_canon_and_parity_summary_reference_v13_ring_editor_layer() -> None:
 
 
 def test_v12_design_recovery_layer_and_lineage_inventory_are_registered() -> None:
+    assert FOUNDATIONS.exists()
     assert IMPORTS_V12.exists()
     assert LINEAGE_MD.exists()
     assert LINEAGE_JSON.exists()
 
+    foundations_readme = (FOUNDATIONS / "README.md").read_text(encoding="utf-8")
+    prompt_text = (
+        FOUNDATIONS / "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md"
+    ).read_text(encoding="utf-8")
     v12_readme = (IMPORTS_V12 / "README.md").read_text(encoding="utf-8-sig")
     lineage_md = LINEAGE_MD.read_text(encoding="utf-8")
     lineage_json = json.loads(LINEAGE_JSON.read_text(encoding="utf-8"))
 
+    assert "Foundational GUI Prompt Sources" in foundations_readme
+    assert "PROMPT_V2" in foundations_readme
+    assert "Ты — ведущий архитектор пользовательского интерфейса" in prompt_text
+    assert "Не предлагай веб‑интерфейс как основу." in prompt_text
+    assert "Потеря существующей функциональности при миграции из веб‑версии" in prompt_text
     assert "Preservation and Design Recovery v12" in v12_readme
     assert (IMPORTS_V12 / "pneumo_gui_codex_spec_v12_design_recovery.json").exists()
     assert (IMPORTS_V12 / "ring_editor_canonical_contract_v12.json").exists()
     assert (IMPORTS_V12 / "optimization_control_plane_contract_v12.json").exists()
     assert (IMPORTS_V12 / "truthful_graphics_contract_v12.json").exists()
 
-    assert "v1–v13" in lineage_md
+    assert "PROMPT_V2 + v1–v13" in lineage_md
+    assert "PROMPT_V2" in lineage_md
     assert "v12" in lineage_md
     assert "v13" in lineage_md
     assert "implementation-oriented passes" in lineage_md
     assert "design-recovery" in lineage_md
 
     versions = [item["version"] for item in lineage_json]
-    assert versions == ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13"]
+    assert versions == ["PROMPT_V2", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13"]
+    assert any(item["version"] == "PROMPT_V2" and item["repo_layer"] == "docs/context/gui_spec_imports/foundations/" for item in lineage_json)
     assert any(item["version"] == "v12" and item["repo_layer"] == "docs/context/gui_spec_imports/v12_design_recovery/" for item in lineage_json)
     assert any(item["version"] == "v13" and item["repo_layer"] == "docs/context/gui_spec_imports/v13_ring_editor_migration/" for item in lineage_json)
 
@@ -296,6 +317,8 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         OPTIMIZER_LANE,
         RING_LANE,
         RESULTS_LANE,
+        FOUNDATIONS / "README.md",
+        FOUNDATIONS / "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md",
         IMPORTS_V12 / "README.md",
         IMPORTS_V13 / "README.md",
     )

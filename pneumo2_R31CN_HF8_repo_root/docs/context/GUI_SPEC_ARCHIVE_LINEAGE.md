@@ -1,11 +1,14 @@
-# GUI-Spec Archive Lineage v1–v13
+# GUI-Spec Archive Lineage PROMPT_V2 + v1–v13
 
-Этот документ фиксирует, как серия архивов `v1…v13` влияет на текущий
+Этот документ фиксирует, как upstream prompt source `PROMPT_V2` и серия
+архивов `v1…v13` влияют на текущий
 GUI-spec проекта и какие из них считаются active, historical или recovery
 слоями.
 
 ## Как читать lineage
 
+- `PROMPT_V2` — pre-`v1` upstream prompt source, который задаёт исходный
+  native Windows, no-web-first и no-feature-loss intent.
 - `v1–v5` — design-first эволюция машиночитаемого GUI-spec.
 - `v6–v11` — implementation-oriented passes: от экранного implementation
   planning до bootstrap, fill-in, interaction pass, backend adapters и
@@ -16,6 +19,20 @@ GUI-spec проекта и какие из них считаются active, his
   `WS-RING -> WS-SUITE`.
 
 ## Версии
+
+### PROMPT_V2
+
+- Роль: upstream foundational prompt source до серии архивов `v1…v13`.
+- Ключевой артефакт:
+  `prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md`.
+- Что фиксирует:
+  native Windows desktop как целевую архитектуру,
+  запрет web-first и feature-loss migration,
+  diagnostics как first-class surface,
+  ring editor как single source of truth,
+  honest graphics и обязательные help/tooltip/unit rules.
+- Статус: foundational provenance layer в
+  `docs/context/gui_spec_imports/foundations/`.
 
 ### v1
 
@@ -123,16 +140,18 @@ GUI-spec проекта и какие из них считаются active, his
 
 1. `docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md`
 2. `docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md`
-3. `docs/context/gui_spec_imports/v3/*`
-4. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING`
+3. `docs/context/gui_spec_imports/foundations/*`
+4. `docs/context/gui_spec_imports/v3/*`
+5. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING`
    и ring-to-suite handoff
-5. `docs/context/gui_spec_imports/v12_design_recovery/*`
-6. lineage `v1…v13`
-7. прочие historical imports и implementation archives
+6. `docs/context/gui_spec_imports/v12_design_recovery/*`
+7. lineage `PROMPT_V2 + v1…v13`
+8. прочие historical imports и implementation archives
 
 ## Практическое правило
 
-- Для текущих GUI-задач сначала опираемся на `17`, `18` и `v3`.
+- Для текущих GUI-задач сначала опираемся на `17`, `18`, `foundations` и `v3`.
 - Для ring editor и suite handoff обязательно добавляем `v13`.
 - Для спорных вопросов о происхождении канона, design/recovery decisions и
-  границе между design и implementation-pass читаем `v12` и lineage `v1…v13`.
+  границе между design и implementation-pass читаем `v12` и lineage
+  `PROMPT_V2 + v1…v13`.
