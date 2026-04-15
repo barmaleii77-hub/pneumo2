@@ -1,0 +1,204 @@
+{
+  "contract_id": "RING-EDITOR-SCHEMA-CONTRACT-V13",
+  "root_object": "ring_scenario",
+  "version": "v13",
+  "single_source_of_truth": "ring_editor_workspace",
+  "root_fields": {
+    "scenario_id": {
+      "type": "uuid",
+      "required": true
+    },
+    "scenario_name": {
+      "type": "string",
+      "required": false
+    },
+    "closure_policy": {
+      "type": "enum",
+      "values": [
+        "closed_c1_periodic",
+        "closed_exact",
+        "preview_open_only"
+      ],
+      "required": true
+    },
+    "v0_kph": {
+      "type": "number",
+      "unit": "км/ч",
+      "required": false
+    },
+    "dx_m": {
+      "type": "number",
+      "unit": "м",
+      "required": false
+    },
+    "n_laps": {
+      "type": "integer",
+      "unit": "шт.",
+      "required": false
+    },
+    "seed": {
+      "type": "integer",
+      "required": false
+    },
+    "road_width_m": {
+      "type": "number",
+      "unit": "м",
+      "required": true
+    },
+    "start_height_mm": {
+      "type": "number",
+      "unit": "мм",
+      "required": true
+    },
+    "seam_tolerance_mm": {
+      "type": "number",
+      "unit": "мм",
+      "required": false
+    },
+    "segments": {
+      "type": "array<ring_segment>",
+      "min_items": 1,
+      "required": true
+    }
+  },
+  "segment_object": {
+    "segment_id": {
+      "type": "integer",
+      "unit": "шт.",
+      "required": true
+    },
+    "label": {
+      "type": "string",
+      "required": false
+    },
+    "enabled": {
+      "type": "boolean",
+      "required": false,
+      "default": true
+    },
+    "length_m": {
+      "type": "number",
+      "unit": "м",
+      "required": true
+    },
+    "turn_direction": {
+      "type": "enum",
+      "values": [
+        "прямо",
+        "влево",
+        "вправо"
+      ],
+      "required": true
+    },
+    "turn_radius_m": {
+      "type": "number",
+      "unit": "м",
+      "required_if": "turn_direction != 'прямо'"
+    },
+    "arc_angle_deg": {
+      "type": "number",
+      "unit": "градусы",
+      "required_if": "turn_direction != 'прямо'"
+    },
+    "end_height_mm": {
+      "type": "number",
+      "unit": "мм",
+      "required": true
+    },
+    "crossfall_deg": {
+      "type": "number",
+      "unit": "градусы",
+      "required": true
+    },
+    "surface_type": {
+      "type": "enum",
+      "values": [
+        "ISO8608",
+        "SINE",
+        "CSV",
+        "ручной профиль"
+      ],
+      "required": true
+    },
+    "surface_profile_ref": {
+      "type": "string",
+      "required_if": "surface_type in ['CSV','ручной профиль']"
+    },
+    "surface_class": {
+      "type": "string",
+      "required_if": "surface_type == 'ISO8608'"
+    },
+    "sine_amplitude_mm": {
+      "type": "number",
+      "unit": "мм",
+      "required_if": "surface_type == 'SINE'"
+    },
+    "sine_wavelength_m": {
+      "type": "number",
+      "unit": "м",
+      "required_if": "surface_type == 'SINE'"
+    },
+    "phase_right_deg": {
+      "type": "number",
+      "unit": "градусы",
+      "required_if": "surface_type == 'SINE'"
+    },
+    "random_phases": {
+      "type": "boolean",
+      "required": false
+    },
+    "target_speed_kph": {
+      "type": "number",
+      "unit": "км/ч",
+      "required": false
+    },
+    "passage_mode": {
+      "type": "enum",
+      "values": [
+        "steady",
+        "accel",
+        "brake",
+        "custom"
+      ],
+      "required": false
+    },
+    "note": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "derived_fields": {
+    "start_state_of_segment_i": "for i==0 берётся из root.start_height_mm и стартового направления; для i>0 равен концу сегмента i-1",
+    "last_segment_auto_close": "конец последнего сегмента визуально и логически привязан к началу сегмента 0",
+    "left_rut_height_mm": "derived from road_width_m and crossfall_deg",
+    "right_rut_height_mm": "derived from road_width_m and crossfall_deg",
+    "seam_delta_mm": "расхождение конца последнего сегмента и начала сегмента 0"
+  },
+  "exports": {
+    "road_csv": {
+      "required": true,
+      "producer": "ring_editor_export"
+    },
+    "scenario_json": {
+      "required": true,
+      "producer": "ring_editor_export"
+    },
+    "meta_json.road.segments": {
+      "required": true,
+      "producer": "ring_editor_export"
+    },
+    "segment_id_series": {
+      "required": true,
+      "producer": "ring_editor_export"
+    },
+    "suite_link_metadata": {
+      "required": false,
+      "producer": "suite_handoff"
+    }
+  },
+  "forbidden": {
+    "manual_left_right_rut_input": true,
+    "accel_brake_as_geometric_segment_type": true,
+    "secondary_user_source_of_truth_outside_ring_editor": true
+  }
+}

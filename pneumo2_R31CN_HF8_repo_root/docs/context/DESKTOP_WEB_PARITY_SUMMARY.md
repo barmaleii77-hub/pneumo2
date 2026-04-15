@@ -30,8 +30,8 @@ contract из `gui_spec_imports/v3`.
 |---|---|---|---|---|
 | `WEB-001` Редактирование параметров подвески и диапазонов оптимизации | Главная страница и таблица параметров web-приложения | Рабочее пространство «Исходные данные» | `поиск: параметры подвески / диапазоны оптимизации / жёсткость / цилиндр` | Одновременный числовой и графический вид, правый инспектор, явная help-панель. |
 | `WEB-002` Режимы и флаги | Отдельный блок флагов в web UI | Левое дерево → раздел «Режимы и флаги» внутри «Исходные данные» | `поиск: режимы / флаги / асимметрия / degraded` | Явное разделение числовых и логических параметров, объяснимость через help. |
-| `WEB-003` Редактор кольца и генератор дорожного сценария | Генератор сценария и связанная форма web UI | Рабочее пространство «Редактор кольца и сценариев» | `поиск: редактор кольца / сценарий / профиль дороги / сегмент` | Единый канон сегментов, план кольца, продольный профиль, поперечный уклон, seam diagnostics. |
-| `WEB-004` Матрица испытаний | Suite editor и таблица тестов | Рабочее пространство «Матрица испытаний» | `поиск: испытания / suite / матрица испытаний` | Связь с кольцом, валидация sidecar-файлов, preview и добавление в pipeline без скрытых маршрутов. |
+| `WEB-003` Редактор кольца и генератор дорожного сценария | Генератор сценария и связанная форма web UI | Рабочее пространство «Редактор кольца и сценариев» | `поиск: редактор кольца / сценарий / профиль дороги / сегмент` | Единый канон сегментов, план кольца, продольный профиль, поперечный уклон, seam diagnostics и правый инспектор как единственное место детального редактирования сегмента. |
+| `WEB-004` Матрица испытаний | Suite editor и таблица тестов | Рабочее пространство «Матрица испытаний» | `поиск: испытания / suite / матрица испытаний` | Связь с кольцом, валидация sidecar-файлов, preview и добавление в pipeline без скрытых маршрутов; `WS-SUITE` потребляет ring contract и не дублирует геометрию сценария. |
 | `WEB-005` Baseline | Baseline controls в главной оптимизационной поверхности | Рабочее пространство «Базовый прогон» | `поиск: baseline / базовый прогон / принять baseline` | Явный baseline source, сравнение кандидата с baseline, политика auto-update на отдельной панели. |
 | `WEB-006` StageRunner | Главная страница и/или Optimization page web UI | Рабочее пространство «Центр оптимизации» | `поиск: StageRunner / режим по стадиям / запустить StageRunner` | Один активный режим запуска, stage policy, visible objective contract, run preview. |
 | `WEB-007` Distributed coordinator / Dask / Ray / BoTorch | Optimization page / coordinator blocks / CLI-related forms | Рабочее пространство «Центр оптимизации», режим distributed | `поиск: distributed coordinator / Dask / Ray / BoTorch` | Честное переключение режимов, без одновременных conflicting launch-кнопок. |
@@ -57,6 +57,25 @@ contract из `gui_spec_imports/v3`.
   обязательными уточняющими слоями поверх migration/parity contract.
 - Hosted desktop shell должен постепенно убрать legacy bridges там, где уже
   существуют spec-compliant native workspaces.
+
+## Специализированное уточнение для `WS-RING`
+
+Общий parity-layer остаётся привязан к `v3`, но для ring editor действует
+дополнительный специализированный addendum:
+
+- [pneumo_gui_codex_spec_v13_ring_editor_migration.json](/Users/User/Desktop/pneumo2_R31CN_HF8_github_push_package/pneumo2_R31CN_HF8_repo_root/docs/context/gui_spec_imports/v13_ring_editor_migration/pneumo_gui_codex_spec_v13_ring_editor_migration.json)
+- [web_to_desktop_migration_matrix_v13.csv](/Users/User/Desktop/pneumo2_R31CN_HF8_github_push_package/pneumo2_R31CN_HF8_repo_root/docs/context/gui_spec_imports/v13_ring_editor_migration/web_to_desktop_migration_matrix_v13.csv)
+- [ring_editor_schema_contract_v13.json](/Users/User/Desktop/pneumo2_R31CN_HF8_github_push_package/pneumo2_R31CN_HF8_repo_root/docs/context/gui_spec_imports/v13_ring_editor_migration/ring_editor_schema_contract_v13.json)
+- [ring_to_suite_link_contract_v13.json](/Users/User/Desktop/pneumo2_R31CN_HF8_github_push_package/pneumo2_R31CN_HF8_repo_root/docs/context/gui_spec_imports/v13_ring_editor_migration/ring_to_suite_link_contract_v13.json)
+- [ring_editor_acceptance_gates_v13.csv](/Users/User/Desktop/pneumo2_R31CN_HF8_github_push_package/pneumo2_R31CN_HF8_repo_root/docs/context/gui_spec_imports/v13_ring_editor_migration/ring_editor_acceptance_gates_v13.csv)
+
+Этот слой уточняет, что:
+
+- `WS-RING` — единственный пользовательский источник истины для `ring_scenario`;
+- поля сегмента редактируются через глобальный правый инспектор, а не через
+  локальные скрытые формы;
+- `WS-SUITE` хранит только ссылку на канонический экспорт и test-level overrides;
+- stale link между экспортом кольца и тестом должен быть видимым предупреждением.
 
 ## Как использовать этот summary
 

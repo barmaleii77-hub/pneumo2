@@ -808,3 +808,101 @@
 - [ ] Центральная рабочая область всегда получает максимум площади.
 - [ ] Основные ежедневные команды доступны из command bar, поиска команд и контекстного действия или shortcut.
 - [ ] Диагностика, анализ, анимация и compare работают как first-class flows, а не как служебные приложения второго сорта.
+
+## П. Специализированный addendum `v13` для `WS-RING`
+
+Общий active detailed layer для проекта остаётся в `v3`, но для рабочего
+пространства `WS-RING` и handoff `WS-RING -> WS-SUITE` действует
+специализированный imported addendum из
+`pneumo_gui_codex_design_v13_ring_editor_migration.zip`.
+
+Machine-readable source set:
+
+- [README.md](./context/gui_spec_imports/v13_ring_editor_migration/README.md)
+- [pneumo_gui_codex_spec_v13_ring_editor_migration.json](./context/gui_spec_imports/v13_ring_editor_migration/pneumo_gui_codex_spec_v13_ring_editor_migration.json)
+- [ring_editor_schema_contract_v13.json](./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_schema_contract_v13.json)
+- [ring_editor_screen_blueprints_v13.csv](./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_screen_blueprints_v13.csv)
+- [ring_editor_element_catalog_v13.csv](./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_element_catalog_v13.csv)
+- [ring_editor_field_catalog_v13.csv](./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_field_catalog_v13.csv)
+- [ring_editor_state_machine_v13.json](./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_state_machine_v13.json)
+- [ring_editor_user_pipeline_v13.dot](./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_user_pipeline_v13.dot)
+- [ring_editor_user_steps_v13.csv](./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_user_steps_v13.csv)
+- [web_to_desktop_migration_matrix_v13.csv](./context/gui_spec_imports/v13_ring_editor_migration/web_to_desktop_migration_matrix_v13.csv)
+- [ring_editor_acceptance_gates_v13.csv](./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_acceptance_gates_v13.csv)
+- [ring_to_suite_link_contract_v13.json](./context/gui_spec_imports/v13_ring_editor_migration/ring_to_suite_link_contract_v13.json)
+
+### Что уточняет `v13`
+
+- `WS-RING` является единственным пользовательским источником истины для
+  `ring_scenario`.
+- `WS-SUITE`, `WS-ANIMATOR` и `WS-OPTIMIZATION` только потребляют кольцевой
+  контракт и не создают альтернативных мест редактирования геометрии.
+- Режимы `accel` и `brake` относятся к прохождению сегмента, а не к типу
+  геометрии.
+- Поперечный уклон задаётся одним явным параметром сегмента, а высоты колеи
+  остаются derived-полями.
+- Последний сегмент обязан честно показывать auto-close и seam diagnostics,
+  а не маскировать их под независимый ввод.
+
+### Пространственный контракт `WS-RING`
+
+Базовый layout рабочего пространства фиксируется через регионы:
+
+- `RG-HEADER` — глобальные поля сценария;
+- `RG-LEFT` — список сегментов и действия;
+- `RG-PLAN` — план кольца как primary visual source;
+- `RG-LONG` — продольный профиль;
+- `RG-CROSSFALL` — поперечный уклон и seam preview;
+- `RG-FOOTER` — валидация, экспорт и handoff в испытания.
+
+Детальные поля сегмента не дублируются локальными модалками рабочего
+пространства. Они редактируются через глобальный правый инспектор shell в
+режимах `segment_detail`, `seam_and_export` и `field_help`.
+
+### Данные, состояния и экспорт
+
+- Каноническая схема данных определяется в
+  `ring_editor_schema_contract_v13.json`.
+- Состояния редактора и переходы задаются в
+  `ring_editor_state_machine_v13.json`.
+- Пользовательский поток и экранные режимы задаются в
+  `ring_editor_user_pipeline_v13.dot`,
+  `ring_editor_user_steps_v13.csv` и
+  `ring_editor_screen_blueprints_v13.csv`.
+- Обязательные экспортируемые артефакты:
+  `road_csv`, `scenario_json`, `meta_json.road.segments`,
+  `segment_id_series` и optional `suite_link_metadata`.
+
+## Р. Контракт handoff `WS-RING -> WS-SUITE`
+
+Связь между редактором кольца и матрицей испытаний считается отдельным
+release-gate contract и задаётся в
+[ring_to_suite_link_contract_v13.json](./context/gui_spec_imports/v13_ring_editor_migration/ring_to_suite_link_contract_v13.json).
+
+Основные правила:
+
+- `WS-SUITE` не копирует геометрию сценария в произвольные локальные поля;
+- в тест передаются только ссылка на сценарий, пути к экспортам, stage/type,
+  runtime overrides и test-level параметры;
+- пользователь должен уметь открыть исходный сценарий обратно в `WS-RING`;
+- если версия export изменилась, stale test link обязан быть явно помечен
+  предупреждением;
+- редактирование сценария внутри `WS-SUITE` запрещено.
+
+## С. Ring-level migration gates
+
+Общая migration matrix проекта остаётся в `v3`, но для ring workflow действует
+специализированная ring-level matrix:
+[web_to_desktop_migration_matrix_v13.csv](./context/gui_spec_imports/v13_ring_editor_migration/web_to_desktop_migration_matrix_v13.csv).
+
+Она уточняет, что без потери должны сохраняться как минимум:
+
+- глобальные поля кольца;
+- список сегментов и reorder-поведение;
+- карточка сегмента через глобальный инспектор;
+- особая логика сегмента `0`;
+- auto-close последнего сегмента и seam diagnostics.
+
+Acceptance gates для этого контура задаются в
+[ring_editor_acceptance_gates_v13.csv](./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_acceptance_gates_v13.csv)
+и считаются обязательными для `WS-RING` и связанных consumer-workspaces.

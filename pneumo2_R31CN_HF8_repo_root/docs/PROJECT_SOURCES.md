@@ -39,6 +39,17 @@
 - `docs/context/gui_spec_imports/v3/acceptance_criteria.csv` — acceptance layer.
 - `docs/context/gui_spec_imports/v3/pipeline_verification.csv` — pipeline verification layer.
 - `docs/context/gui_spec_imports/v3/test_suite.csv` — catalog GUI-spec tests.
+- `docs/context/gui_spec_imports/v13_ring_editor_migration/README.md` — специализированный imported addendum для `WS-RING` и ring migration.
+- `docs/context/gui_spec_imports/v13_ring_editor_migration/pneumo_gui_codex_spec_v13_ring_editor_migration.json` — главный machine-readable ring-editor migration spec.
+- `docs/context/gui_spec_imports/v13_ring_editor_migration/ring_editor_schema_contract_v13.json` — каноническая схема данных кольцевого сценария.
+- `docs/context/gui_spec_imports/v13_ring_editor_migration/ring_editor_screen_blueprints_v13.csv` — screen/mode blueprints рабочего пространства `WS-RING`.
+- `docs/context/gui_spec_imports/v13_ring_editor_migration/ring_editor_element_catalog_v13.csv` — catalog элементов интерфейса ring editor.
+- `docs/context/gui_spec_imports/v13_ring_editor_migration/ring_editor_field_catalog_v13.csv` — catalog полей ring editor.
+- `docs/context/gui_spec_imports/v13_ring_editor_migration/ring_editor_state_machine_v13.json` — state machine сценарного контура.
+- `docs/context/gui_spec_imports/v13_ring_editor_migration/ring_editor_user_pipeline_v13.dot` — ring-level user pipeline graph.
+- `docs/context/gui_spec_imports/v13_ring_editor_migration/web_to_desktop_migration_matrix_v13.csv` — специализированная ring-level migration matrix `web -> desktop`.
+- `docs/context/gui_spec_imports/v13_ring_editor_migration/ring_editor_acceptance_gates_v13.csv` — acceptance gates для `WS-RING`.
+- `docs/context/gui_spec_imports/v13_ring_editor_migration/ring_to_suite_link_contract_v13.json` — handoff contract `WS-RING -> WS-SUITE`.
 
 ### Historical import
 
@@ -63,8 +74,9 @@
 1. `17_WINDOWS_DESKTOP_CAD_GUI_CANON.md`
 2. `18_PNEUMOAPP_WINDOWS_GUI_SPEC.md`
 3. `docs/context/gui_spec_imports/v3/*`
-4. older versions в `docs/context/gui_spec_imports/*`
-5. `docs/gui_chat_prompts/*`
+4. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING` и handoff `WS-RING -> WS-SUITE`
+5. older versions в `docs/context/gui_spec_imports/*`
+6. `docs/gui_chat_prompts/*`
 
 ## Зафиксированные внешние AI snapshots
 

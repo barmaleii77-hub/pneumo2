@@ -1,0 +1,63 @@
+element_id,name,type,region_id,x_local_px,y_local_px,width_px,height_px,source_binding,visible_when,enabled_when,tooltip_required,help_required,scroll_behavior
+RG-FLD-SCENARIO-NAME,Название сценария,text_editor,RG-HEADER,0,4,220,32,scenario.root.name,Всегда,Всегда,Да,Да,Нет
+RG-FLD-CLOSURE-POLICY,Политика замыкания кольца,combo_box,RG-HEADER,232,4,180,32,scenario.root.closure_policy,Всегда,Всегда,Да,Да,Нет
+RG-FLD-V0,Начальная скорость,numeric_editor,RG-HEADER,424,4,132,32,scenario.root.v0_kph,Всегда,Всегда,Да,Да,Нет
+RG-FLD-DX,Шаг дискретизации,numeric_editor,RG-HEADER,568,4,132,32,scenario.root.dx_m,Всегда,Всегда,Да,Да,Нет
+RG-FLD-LAPS,Количество кругов,integer_editor,RG-HEADER,712,4,124,32,scenario.root.n_laps,Всегда,Всегда,Да,Да,Нет
+RG-FLD-SEED,Код генератора,integer_editor,RG-HEADER,848,4,120,32,scenario.root.seed,Всегда,Всегда,Да,Да,Нет
+RG-FLD-ROAD-WIDTH,Ширина дороги,numeric_editor,RG-HEADER,980,4,116,32,scenario.root.road_width_m,Всегда,Всегда,Да,Да,Нет
+RG-BTN-GENERATE-PREVIEW,Сгенерировать предварительный просмотр,secondary_button,RG-HEADER,1108,4,96,32,preview.generate,Всегда,Всегда,Да,Да,Нет
+RG-SEGMENT-LIST,Список сегментов,list_view,RG-LEFT,0,0,304,720,scenario.segments[],Всегда,Всегда,Да,Да,Вертикальный внутренний скролл
+RG-BTN-ADD-SEGMENT,Добавить сегмент,small_button,RG-LEFT,0,736,144,36,scenario.segments.add,Всегда,Всегда,Да,Да,Нет
+RG-BTN-DUP-SEGMENT,Дублировать сегмент,small_button,RG-LEFT,160,736,144,36,scenario.segments.duplicate,Есть выделение,Есть выделение,Да,Да,Нет
+RG-BTN-DELETE-SEGMENT,Удалить сегмент,small_button,RG-LEFT,0,780,144,36,scenario.segments.delete,Есть выделение,Есть выделение,Да,Да,Нет
+RG-BTN-INSERT-BEFORE,Вставить перед,small_button,RG-LEFT,160,780,144,36,scenario.segments.insert_before,Есть выделение,Есть выделение,Да,Да,Нет
+RG-BTN-INSERT-AFTER,Вставить после,small_button,RG-LEFT,0,824,144,36,scenario.segments.insert_after,Есть выделение,Есть выделение,Да,Да,Нет
+RG-BTN-MOVE-UP,Поднять сегмент,small_button,RG-LEFT,160,824,144,36,scenario.segments.move_up,Есть выделение и сегмент не первый,Есть выделение,Да,Да,Нет
+RG-BTN-MOVE-DOWN,Опустить сегмент,small_button,RG-LEFT,0,868,144,36,scenario.segments.move_down,Есть выделение и сегмент не последний,Есть выделение,Да,Да,Нет
+RG-SEAM-BADGE,Индикатор шва,state_badge,RG-LEFT,160,868,144,36,scenario.validation.seam_status,Всегда,Всегда,Да,Да,Нет
+RING-MESSAGE-BAR,Локальная строка сообщений,message_bar,RG-LEFT,0,916,304,44,scenario.messages,Всегда,Всегда,Да,Да,Нет
+RG-PLAN-VIEW,План кольца,canvas,RG-PLAN,0,0,884,500,scenario.preview.plan,Всегда,Всегда,Да,Да,Внутренний pan/zoom
+RG-PLAN-LEGEND,Легенда плана кольца,legend_panel,RG-PLAN,688,8,188,72,scenario.preview.plan.legend,Всегда,Всегда,Да,Да,Нет
+RG-LONG-PROFILE-VIEW,Продольный профиль,chart,RG-LONG,0,0,574,184,scenario.preview.long_profile,Всегда,Всегда,Да,Да,Внутренний pan/zoom
+RG-LONG-STATUS,Статус продольного профиля,state_badge,RG-LONG,426,192,148,28,scenario.preview.long_profile.status,Всегда,Всегда,Да,Да,Нет
+RG-CROSSFALL-VIEW,Поперечный уклон,chart_panel,RG-CROSSFALL,0,0,294,148,scenario.preview.crossfall,Всегда,Всегда,Да,Да,Внутренний pan/zoom
+RG-SEAM-DIAGNOSTICS,Диагностика замыкания,message_list,RG-CROSSFALL,0,156,294,72,scenario.validation.seam_messages,Всегда,Всегда,Да,Да,Внутренний вертикальный скролл
+RG-BTN-CHECK-SEAM,Проверить шов кольца,secondary_button,RG-FOOTER,0,0,168,36,scenario.validation.run,Всегда,Всегда,Да,Да,Нет
+RG-BTN-EXPORT-SCENARIO,Экспортировать сценарий,secondary_button,RG-FOOTER,180,0,168,36,scenario.export,Preview generated,Всегда,Да,Да,Нет
+RG-BTN-ADD-TO-SUITE,Добавить в испытания,primary_button,RG-FOOTER,360,0,176,36,scenario.to_suite,Export ready,Всегда,Да,Да,Нет
+RG-SUITE-LINK-SUMMARY,Сводка передачи в испытания,summary_card,RG-FOOTER,0,48,332,72,suite_handoff.summary,Export ready,Всегда,Да,Да,Нет
+RG-EXPORT-ARTIFACTS,Сводка экспортированных файлов,summary_card,RG-FOOTER,344,48,260,72,scenario.export.summary,Export ready,Всегда,Да,Да,Нет
+RG-VALIDATION-SUMMARY,Сводка проверок,summary_card,RG-FOOTER,616,48,268,72,scenario.validation.summary,Всегда,Всегда,Да,Да,Нет
+RG-HELP-ANCHOR,Локальный знак вопроса,help_anchor,RG-FOOTER,896,48,24,24,help.open_context,Всегда,Всегда,Да,Да,Нет
+RING-VALIDATION-STRIP,Полоса валидации,validation_strip,RG-FOOTER,932,48,296,24,scenario.validation.strip,Всегда,Всегда,Да,Да,Нет
+RING-UNITS-LEGEND,Легенда единиц измерения,units_legend,RG-FOOTER,896,80,332,40,scenario.units.legend,Всегда,Всегда,Да,Да,Нет
+RG-INS-SEGMENT-CARD,Карточка выбранного сегмента,inspector_card,GLOBAL-RIGHT-INSPECTOR,0,0,298,840,scenario.segment.selected,Есть выделение,Есть выделение,Да,Да,Вертикальный внутренний скролл
+RG-INS-SEAM-CARD,Карточка шва и экспорта,inspector_card,GLOBAL-RIGHT-INSPECTOR,0,0,298,840,scenario.validation.export,Mode seam_export,Всегда,Да,Да,Вертикальный внутренний скролл
+RG-INS-HELP-CARD,Контекстная помощь по элементу,inspector_card,GLOBAL-RIGHT-INSPECTOR,0,0,298,840,help.context,Всегда,Всегда,Да,Да,Вертикальный внутренний скролл
+UI-RG-FLD-SCENARIO-NAME,Название сценария,field_row,GLOBAL-RIGHT-INSPECTOR,16,16,266,32,RG-FLD-SCENARIO-NAME,Mode segment_detail или seam_export,Всегда,Да,Да,Нет
+UI-RG-FLD-CLOSURE-POLICY,Политика замыкания кольца,field_row,GLOBAL-RIGHT-INSPECTOR,16,56,266,32,RG-FLD-CLOSURE-POLICY,Mode segment_detail или seam_export,Всегда,Да,Да,Нет
+UI-RG-FLD-V0,Начальная скорость прохождения,field_row,GLOBAL-RIGHT-INSPECTOR,16,96,266,32,RG-FLD-V0,Mode segment_detail или seam_export,Всегда,Да,Да,Нет
+UI-RG-FLD-DX,Шаг дискретизации дороги,field_row,GLOBAL-RIGHT-INSPECTOR,16,136,266,32,RG-FLD-DX,Mode segment_detail или seam_export,Всегда,Да,Да,Нет
+UI-RG-FLD-LAPS,Количество кругов,field_row,GLOBAL-RIGHT-INSPECTOR,16,176,266,32,RG-FLD-LAPS,Mode segment_detail или seam_export,Всегда,Да,Да,Нет
+UI-RG-FLD-SEED,Код генератора случайности,field_row,GLOBAL-RIGHT-INSPECTOR,16,216,266,32,RG-FLD-SEED,Mode segment_detail или seam_export,Всегда,Да,Да,Нет
+UI-RG-FLD-ROAD-WIDTH,Ширина дороги,field_row,GLOBAL-RIGHT-INSPECTOR,16,256,266,32,RG-FLD-ROAD-WIDTH,Mode segment_detail или seam_export,Всегда,Да,Да,Нет
+UI-RG-FLD-START-HEIGHT,Высота дороги в начале кольца,field_row,GLOBAL-RIGHT-INSPECTOR,16,296,266,32,RG-FLD-START-HEIGHT,Выбран сегмент 0,Всегда,Да,Да,Нет
+UI-RG-FLD-SHOV-THRESHOLD,Порог допуска шва кольца,field_row,GLOBAL-RIGHT-INSPECTOR,16,336,266,32,RG-FLD-SHOV-THRESHOLD,Mode segment_detail или seam_export,Всегда,Да,Да,Нет
+UI-RG-FLD-SEGMENT-ID,Номер сегмента,field_row,GLOBAL-RIGHT-INSPECTOR,16,376,266,32,RG-FLD-SEGMENT-ID,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-SEGMENT-LABEL,Имя сегмента,field_row,GLOBAL-RIGHT-INSPECTOR,16,416,266,32,RG-FLD-SEGMENT-LABEL,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-SEGMENT-ENABLED,Сегмент включён,field_row,GLOBAL-RIGHT-INSPECTOR,16,456,266,32,RG-FLD-SEGMENT-ENABLED,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-SEGMENT-LENGTH,Длина сегмента,field_row,GLOBAL-RIGHT-INSPECTOR,16,496,266,32,RG-FLD-SEGMENT-LENGTH,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-TURN-DIRECTION,Направление поворота,field_row,GLOBAL-RIGHT-INSPECTOR,16,536,266,32,RG-FLD-TURN-DIRECTION,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-TURN-RADIUS,Радиус поворота,field_row,GLOBAL-RIGHT-INSPECTOR,16,576,266,32,RG-FLD-TURN-RADIUS,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-ARC-ANGLE,Угол дуги,field_row,GLOBAL-RIGHT-INSPECTOR,16,616,266,32,RG-FLD-ARC-ANGLE,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-END-HEIGHT,Высота дороги в конце сегмента,field_row,GLOBAL-RIGHT-INSPECTOR,16,656,266,32,RG-FLD-END-HEIGHT,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-CROSSFALL,Поперечный уклон,field_row,GLOBAL-RIGHT-INSPECTOR,16,696,266,32,RG-FLD-CROSSFALL,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-SURFACE-TYPE,Тип покрытия,field_row,GLOBAL-RIGHT-INSPECTOR,16,736,266,32,RG-FLD-SURFACE-TYPE,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-SURFACE-CLASS,Класс шероховатости или профиль,field_row,GLOBAL-RIGHT-INSPECTOR,16,776,266,32,RG-FLD-SURFACE-CLASS,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-SINE-AMPLITUDE,Амплитуда синусоиды,field_row,GLOBAL-RIGHT-INSPECTOR,16,816,266,32,RG-FLD-SINE-AMPLITUDE,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-SINE-WAVELENGTH,Длина волны синусоиды,field_row,GLOBAL-RIGHT-INSPECTOR,16,856,266,32,RG-FLD-SINE-WAVELENGTH,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-PHASE-RIGHT,Фаза правой колеи,field_row,GLOBAL-RIGHT-INSPECTOR,16,896,266,32,RG-FLD-PHASE-RIGHT,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-RANDOM-PHASES,Случайные фазы,field_row,GLOBAL-RIGHT-INSPECTOR,16,936,266,32,RG-FLD-RANDOM-PHASES,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-TARGET-SPEED,Целевая скорость прохождения,field_row,GLOBAL-RIGHT-INSPECTOR,16,976,266,32,RG-FLD-TARGET-SPEED,Есть выделение,Всегда,Да,Да,Нет
+UI-RG-FLD-PASSAGE-MODE,Режим прохождения сегмента,field_row,GLOBAL-RIGHT-INSPECTOR,16,1016,266,32,RG-FLD-PASSAGE-MODE,Есть выделение,Всегда,Да,Да,Нет

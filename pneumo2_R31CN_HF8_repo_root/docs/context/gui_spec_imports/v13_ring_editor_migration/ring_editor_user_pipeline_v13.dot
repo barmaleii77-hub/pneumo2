@@ -1,0 +1,26 @@
+digraph RING_EDITOR_PIPELINE_V13 {
+  rankdir=LR;
+  node [shape=box, style=rounded];
+  open_ws_ring [label="Открыть WS-RING"];
+  create_or_import [label="Создать или импортировать сценарий"];
+  edit_globals [label="Заполнить глобальные поля кольца"];
+  manage_segments [label="Добавить / упорядочить сегменты"];
+  edit_segment0 [label="Редактировать сегмент 0"];
+  edit_segmentN [label="Редактировать сегмент N"];
+  generate_preview [label="Сгенерировать предварительный просмотр"];
+  check_seam [label="Проверить шов"];
+  seam_warning [label="Есть предупреждение по шву"];
+  export_ready [label="Готово к экспорту"];
+  export_scenario [label="Экспортировать road_csv + scenario_json"];
+  suite_handoff [label="Передать в WS-SUITE"];
+  verify_suite [label="Проверить связь в матрице испытаний"];
+  run_baseline [label="Запустить baseline / optimization"];
+  open_ws_ring -> create_or_import -> edit_globals -> manage_segments;
+  manage_segments -> edit_segment0 -> generate_preview;
+  manage_segments -> edit_segmentN -> generate_preview;
+  generate_preview -> check_seam;
+  check_seam -> seam_warning [label="warning/error"];
+  seam_warning -> manage_segments [label="исправить"];
+  check_seam -> export_ready [label="ok"];
+  export_ready -> export_scenario -> suite_handoff -> verify_suite -> run_baseline;
+}

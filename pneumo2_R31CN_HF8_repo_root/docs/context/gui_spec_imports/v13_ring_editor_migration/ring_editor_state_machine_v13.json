@@ -1,0 +1,182 @@
+{
+  "machine_id": "RING-EDITOR-STATE-MACHINE-V13",
+  "initial_state": "empty_workspace",
+  "states": [
+    {
+      "id": "empty_workspace",
+      "description": "Нет созданного сценария или список сценариев пуст.",
+      "visible_cards": [
+        "RING-EMPTY-STATE"
+      ],
+      "allowed_actions": [
+        "create_scenario",
+        "import_scenario"
+      ]
+    },
+    {
+      "id": "draft_created",
+      "description": "Создан новый черновик сценария, но сегменты ещё не валидированы.",
+      "visible_cards": [
+        "RG-SEGMENT-LIST",
+        "RG-PLAN-VIEW"
+      ],
+      "allowed_actions": [
+        "edit_global_fields",
+        "add_segment",
+        "generate_preview"
+      ]
+    },
+    {
+      "id": "segment_selected",
+      "description": "Выбран сегмент, открыт правый инспектор сегмента.",
+      "visible_cards": [
+        "RG-INS-SEGMENT-CARD"
+      ],
+      "allowed_actions": [
+        "edit_segment",
+        "move_segment",
+        "duplicate_segment",
+        "delete_segment"
+      ]
+    },
+    {
+      "id": "segment0_selected",
+      "description": "Выбран нулевой сегмент; начало кольца редактируется явно.",
+      "parent": "segment_selected",
+      "allowed_actions": [
+        "edit_start_height",
+        "edit_end_height",
+        "edit_turn",
+        "edit_surface"
+      ]
+    },
+    {
+      "id": "last_segment_autoclose_locked",
+      "description": "Выбран последний сегмент; часть полей замыкания locked и derived.",
+      "parent": "segment_selected",
+      "allowed_actions": [
+        "edit_non_closure_fields",
+        "review_seam"
+      ]
+    },
+    {
+      "id": "preview_generated",
+      "description": "План кольца, профили и derived поля пересчитаны.",
+      "allowed_actions": [
+        "inspect_plan",
+        "inspect_profile",
+        "check_seam",
+        "export_scenario",
+        "link_to_suite"
+      ]
+    },
+    {
+      "id": "seam_warning",
+      "description": "Шов не проходит допуск и требует явного исправления или подтверждения preview-open режима.",
+      "allowed_actions": [
+        "return_to_segment_edit",
+        "open_seam_report",
+        "change_closure_policy"
+      ]
+    },
+    {
+      "id": "export_ready",
+      "description": "Preview и seam check пройдены, артефакты готовы к экспорту или передаче в испытания.",
+      "allowed_actions": [
+        "export_scenario",
+        "add_to_suite"
+      ]
+    },
+    {
+      "id": "suite_handoff",
+      "description": "Открыт режим передачи сценария в матрицу испытаний.",
+      "allowed_actions": [
+        "create_test",
+        "update_test",
+        "open_suite_workspace"
+      ]
+    },
+    {
+      "id": "linked_to_suite",
+      "description": "Сценарий связан хотя бы с одним испытанием.",
+      "allowed_actions": [
+        "open_suite_workspace",
+        "run_baseline",
+        "return_to_ring"
+      ]
+    }
+  ],
+  "transitions": [
+    {
+      "event": "create_scenario",
+      "from": "empty_workspace",
+      "to": "draft_created"
+    },
+    {
+      "event": "import_scenario",
+      "from": "empty_workspace",
+      "to": "preview_generated"
+    },
+    {
+      "event": "select_segment",
+      "from": "draft_created",
+      "to": "segment_selected"
+    },
+    {
+      "event": "select_segment0",
+      "from": "segment_selected",
+      "to": "segment0_selected"
+    },
+    {
+      "event": "select_last_segment",
+      "from": "segment_selected",
+      "to": "last_segment_autoclose_locked"
+    },
+    {
+      "event": "generate_preview",
+      "from": "draft_created",
+      "to": "preview_generated"
+    },
+    {
+      "event": "generate_preview",
+      "from": "segment_selected",
+      "to": "preview_generated"
+    },
+    {
+      "event": "seam_check_failed",
+      "from": "preview_generated",
+      "to": "seam_warning"
+    },
+    {
+      "event": "seam_check_passed",
+      "from": "preview_generated",
+      "to": "export_ready"
+    },
+    {
+      "event": "open_suite_handoff",
+      "from": "export_ready",
+      "to": "suite_handoff"
+    },
+    {
+      "event": "suite_link_created",
+      "from": "suite_handoff",
+      "to": "linked_to_suite"
+    },
+    {
+      "event": "return_to_edit",
+      "from": "seam_warning",
+      "to": "segment_selected"
+    },
+    {
+      "event": "reopen_preview",
+      "from": "linked_to_suite",
+      "to": "preview_generated"
+    }
+  ],
+  "guards": [
+    "Сегмент 0 имеет явный блок начального состояния.",
+    "Последний сегмент не может редактировать derived auto-close поля напрямую.",
+    "Экспорт и передача в испытания запрещены, пока не построен preview и не пройдена валидация обязательных полей.",
+    "При closure_policy = preview_open_only сценарий можно экспортировать только с явным предупреждением о незамкнутом кольце."
+  ]
+}

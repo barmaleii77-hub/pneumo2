@@ -16,7 +16,7 @@
     "desktop_tool_keys": [
       "desktop_input_editor"
     ],
-    "notes": "Derived from gui_spec_imports/v3/migration_matrix.csv and aligned with the 17/18 canon."
+    "notes": "Derived from gui_spec_imports/v3/migration_matrix.csv, further refined by v13 ring_editor migration artifacts, and aligned with the 17/18 canon."
   },
   {
     "capability_id": "WEB-002",
@@ -35,7 +35,7 @@
     "desktop_tool_keys": [
       "desktop_input_editor"
     ],
-    "notes": "Derived from gui_spec_imports/v3/migration_matrix.csv and aligned with the 17/18 canon."
+    "notes": "Derived from gui_spec_imports/v3/migration_matrix.csv, further refined by v13 ring_to_suite link contract, and aligned with the 17/18 canon."
   },
   {
     "capability_id": "WEB-003",

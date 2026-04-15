@@ -1,0 +1,45 @@
+field_id,name,data_type,scope,required,tooltip_required,allowed_values,unit,description,display_unit
+RG-FLD-SCENARIO-NAME,Название сценария,text,global,Нет,Да,,,Имя сценария для пользователя и истории.,
+RG-FLD-CLOSURE-POLICY,Политика замыкания кольца,enum,global,Да,Да,closed_c1_periodic|closed_exact|preview_open_only,,Как замыкается последний сегмент на первый.,
+RG-FLD-V0,Начальная скорость прохождения,number,global,Нет,Да,,км/ч,Начальная скорость сценария.,км/ч
+RG-FLD-DX,Шаг дискретизации дороги,number,global,Нет,Да,,м,Пространственный шаг генерации дорожного профиля.,м
+RG-FLD-LAPS,Количество кругов,integer,global,Нет,Да,,шт.,Сколько кругов формирует сценарий.,шт.
+RG-FLD-SEED,Код генератора случайности,integer,global,Нет,Да,,код,Повторяемость генератора.,код
+RG-FLD-ROAD-WIDTH,Ширина дороги,number,global,Да,Да,,м,"Используется для поперечного профиля, полос и preview ширины дороги.",м
+RG-FLD-START-HEIGHT,Высота дороги в начале кольца,number,segment0,Да,Да,,мм,Начальная высота центральной линии дороги для сегмента 0.,мм
+RG-FLD-SHOV-THRESHOLD,Порог допуска шва кольца,number,global,Нет,Да,,мм,"Порог, выше которого шов считается проблемным и требует явного решения.",мм
+RG-FLD-SEGMENT-ID,Номер сегмента,readonly_integer,segment,Да,Да,,шт.,Порядковый номер сегмента.,шт.
+RG-FLD-SEGMENT-LABEL,Имя сегмента,text,segment,Нет,Да,,,Короткое имя сегмента.,
+RG-FLD-SEGMENT-ENABLED,Сегмент включён,checkbox,segment,Нет,Да,,,Позволяет временно исключить сегмент из кольца без удаления.,
+RG-FLD-SEGMENT-LENGTH,Длина сегмента,number,segment,Да,Да,,м,Длина участка по оси траектории.,м
+RG-FLD-TURN-DIRECTION,Направление поворота,enum,segment,Да,Да,прямо|влево|вправо,,Структурный тип сегмента.,
+RG-FLD-TURN-RADIUS,Радиус поворота,number,segment,Условно,Да,,м,Радиус центральной линии поворота.,м
+RG-FLD-ARC-ANGLE,Угол дуги,number,segment,Условно,Да,,градусы,Угол поворота сегмента.,градусы
+RG-FLD-END-HEIGHT,Высота дороги в конце сегмента,number,segment,Да,Да,,мм,Конечная высота центральной линии текущего сегмента.,мм
+RG-FLD-CROSSFALL,Поперечный уклон,number,segment,Да,Да,,градусы,Наклон дороги поперёк машины.,градусы
+RG-FLD-SURFACE-TYPE,Тип покрытия,enum,segment,Да,Да,ISO8608|SINE|CSV|ручной профиль,,Генератор и класс покрытия.,
+RG-FLD-SURFACE-CLASS,Класс шероховатости или профиль,text,segment,Условно,Да,,,"Класс ISO8608, имя CSV или описание ручного профиля.",
+RG-FLD-SINE-AMPLITUDE,Амплитуда синусоиды,number,segment,Условно,Да,,мм,Амплитуда синусоидального профиля.,мм
+RG-FLD-SINE-WAVELENGTH,Длина волны синусоиды,number,segment,Условно,Да,,м,Пространственная длина волны.,м
+RG-FLD-PHASE-RIGHT,Фаза правой колеи,number,segment,Условно,Да,,градусы,Фазовый сдвиг правой колеи относительно левой.,градусы
+RG-FLD-RANDOM-PHASES,Случайные фазы,checkbox,segment,Нет,Да,,,Разрешить случайную фазу микропрофиля.,
+RG-FLD-TARGET-SPEED,Целевая скорость прохождения,number,segment,Нет,Да,,км/ч,"Режим прохождения сегмента, а не тип геометрии.",км/ч
+RG-FLD-PASSAGE-MODE,Режим прохождения сегмента,enum,segment,Нет,Да,steady|accel|brake|custom,,Телеметрический режим прохождения. Не геометрия.,
+RG-FLD-NOTE,Комментарий сегмента,multiline_text,segment,Нет,Да,,,Дополнительное пояснение по сегменту.,
+RG-FLD-AUTO-CLOSE,Автозамыкание последнего сегмента,readonly_checkbox,last_segment,Да,Да,включено|выключено,,Locked state последнего сегмента.,
+RG-FLD-START-STATE-DERIVED,Начало текущего сегмента,derived_readonly,segment,Да,Да,,,"Для сегмента 0 берётся из глобального начала кольца, для остальных — из конца предыдущего сегмента.",
+RG-FLD-LEFT-RUT-HEIGHT,Высота левой колеи,derived_readonly,segment,Да,Да,,мм,Derived от ширины дороги и поперечного уклона. Не основной пользовательский ввод.,мм
+RG-FLD-RIGHT-RUT-HEIGHT,Высота правой колеи,derived_readonly,segment,Да,Да,,мм,Derived от ширины дороги и поперечного уклона. Не основной пользовательский ввод.,мм
+RG-FLD-SEAM-DELTA,Расхождение шва,derived_readonly,global,Да,Да,,мм,Показывает разницу между концом последнего и началом первого сегмента.,мм
+RG-FLD-SEAM-STATUS,Статус шва,derived_readonly,global,Да,Да,ok|warning|error,,Итог диагностики автозамыкания.,
+RG-FLD-EXPORT-ROAD-CSV,Путь road_csv,readonly_path,export,Нет,Да,,,Путь к экспортированному профилю дороги.,
+RG-FLD-EXPORT-SCENARIO-JSON,Путь scenario_json,readonly_path,export,Нет,Да,,,Путь к экспортированному JSON сценария.,
+RG-FLD-EXPORT-META-ROAD,Сводка meta road segments,readonly_text,export,Нет,Да,,,Короткая сводка по segment_id и метаданным дорожных сегментов.,
+RG-FLD-SUITE-LINK-MODE,Режим связи с матрицей испытаний,enum,suite_handoff,Да,Да,создать новое испытание|обновить выбранное испытание|только экспорт,,"Определяет, как сценарий попадёт в WS-SUITE.",
+RG-FLD-SUITE-TARGET-TEST-ID,Целевое испытание,entity_link,suite_handoff,Условно,Да,,,Связанное испытание для обновления.,
+RG-FLD-SUITE-STAGE,Стадия испытания,integer,suite_handoff,Нет,Да,,шт.,Первая стадия входа испытания в StageRunner.,шт.
+RG-FLD-SUITE-DT,Шаг интегрирования испытания,number,suite_handoff,Да,Да,,с,Шаг интегрирования для создаваемого испытания.,с
+RG-FLD-SUITE-T-END,Время моделирования испытания,number,suite_handoff,Да,Да,,с,Время моделирования для создаваемого испытания.,с
+RG-FLD-SUITE-TYPE,Тип испытания,enum,suite_handoff,Да,Да,ring,,Тип испытания для ссылки на кольцевой сценарий.,
+RG-FLD-VALIDATION-LEVEL,Уровень проверки перед экспортом,enum,export,Да,Да,быстрый|полный,,"Определяет глубину проверки шва, единиц и sidecar-файлов.",
+RG-FLD-DIAGNOSTIC-REPORT,Диагностический отчёт кольца,readonly_text,export,Нет,Да,,,"Сводка ошибок, предупреждений и рекомендаций по кольцу.",

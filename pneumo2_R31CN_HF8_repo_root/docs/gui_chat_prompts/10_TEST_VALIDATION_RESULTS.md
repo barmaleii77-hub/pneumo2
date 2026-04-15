@@ -1,14 +1,29 @@
 # Chat Prompt: Test Validation Results Center
 
+## Канонический слой
+
+- Сначала читать [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](../17_WINDOWS_DESKTOP_CAD_GUI_CANON.md),
+  затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](../18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
+- Общий detailed layer для shell, migration и acceptance:
+  [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md),
+  [migration_matrix.csv](../context/gui_spec_imports/v3/migration_matrix.csv),
+  [pipeline_verification.csv](../context/gui_spec_imports/v3/pipeline_verification.csv),
+  [acceptance_criteria.csv](../context/gui_spec_imports/v3/acceptance_criteria.csv).
+- Специализированный addendum для сценарного handoff:
+  [ring_to_suite_link_contract_v13.json](../context/gui_spec_imports/v13_ring_editor_migration/ring_to_suite_link_contract_v13.json),
+  [web_to_desktop_migration_matrix_v13.csv](../context/gui_spec_imports/v13_ring_editor_migration/web_to_desktop_migration_matrix_v13.csv),
+  [ring_editor_acceptance_gates_v13.csv](../context/gui_spec_imports/v13_ring_editor_migration/ring_editor_acceptance_gates_v13.csv).
+
 ## Контекст
 
 После запуска расчётов пользователь должен работать в desktop-центре тестов и результатов, а не разрываться между WEB validation/results страницами.
 
 ## Наследование desktop-канона
 
-- Перед локальными решениями сначала следуй [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md), затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](C:/Users/Admin/Documents/GitHub/pneumo2/pneumo2_R31CN_HF8_repo_root/docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
+- Перед локальными решениями сначала следуй [17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](../17_WINDOWS_DESKTOP_CAD_GUI_CANON.md), затем [18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](../18_PNEUMOAPP_WINDOWS_GUI_SPEC.md).
 - Results center может быть orchestration-oriented, но должен наследовать command discipline, keyboard-first, accessibility, High-DPI и performance policy.
 - Если появляются previews, inspectors или result surfaces, располагай их как устойчивые panes, а не как web-style бесконечные страницы. `Ribbon` не использовать как default.
+- Если workflow касается сценария кольца, `WS-SUITE` работает только как consumer канонического экспорта из `WS-RING`: геометрия сегментов не копируется в локальные editable поля.
 
 ## Цель
 
@@ -44,6 +59,7 @@
 - `test_center_gui` должен быть orchestration window, а не копией compare viewer или animator.
 - Глубокую графику оставляй compare viewer и animator.
 - Удерживай понятный operator flow: run -> validate -> inspect -> branch into specialized tool.
+- Для тестов типа `ring` показывай ссылку назад к каноническому сценарию и версию ring export; stale link обязан быть видимым warning, а не скрытым расхождением данных.
 
 ## Готовый промт
 

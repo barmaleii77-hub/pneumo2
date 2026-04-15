@@ -1,0 +1,23 @@
+{
+  "artifact_id": "V13-RING-EDITOR-MIGRATION",
+  "continues_from": [
+    "PROMPT_V2",
+    "V5",
+    "V12"
+  ],
+  "branch": "design",
+  "status": "canonical_continuation",
+  "what_it_adds": [
+    "детальная схема экранов редактора кольца",
+    "канонический schema-contract кольцевого сценария",
+    "детальная ring-level матрица миграции web → desktop",
+    "state machine и user→GUI→user pipeline вокруг редактора кольца",
+    "ring-specific acceptance gates"
+  ],
+  "what_it_does_not_do": [
+    "не пишет исходный код GUI",
+    "не меняет shell-архитектуру",
+    "не объявляет implementation-ветку новой канонической базой"
+  ],
+  "next_after_v13": "детализировать WS-SUITE как consumer кольцевого контракта и связать acceptance-gates между WS-RING, WS-SUITE, WS-BASELINE и WS-ANIMATOR."
+}

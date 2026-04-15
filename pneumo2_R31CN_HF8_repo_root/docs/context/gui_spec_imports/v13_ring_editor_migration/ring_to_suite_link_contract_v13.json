@@ -1,0 +1,28 @@
+{
+  "contract_id": "RING-TO-SUITE-LINK-CONTRACT-V13",
+  "source_of_truth": "ring_editor_workspace",
+  "rule": "WS-SUITE не копирует геометрию сценария в произвольные локальные поля. Он ссылается на канонический экспорт ring editor и хранит только stage/type/dt/t_end/target overrides, которые нужны испытанию.",
+  "copied_fields_to_test": [
+    "scenario_ref_id",
+    "scenario_json_path",
+    "road_csv_path",
+    "segment_meta_ref",
+    "test_stage",
+    "test_type='ring'",
+    "dt_s",
+    "t_end_s",
+    "target_overrides",
+    "params_override"
+  ],
+  "must_not_duplicate": [
+    "segment geometry",
+    "manual segment heights",
+    "left/right rut independent heights",
+    "secondary closure policy"
+  ],
+  "acceptance": [
+    "Из WS-SUITE можно открыть исходный сценарий обратно в WS-RING",
+    "Редактирование сценария в WS-SUITE невозможно, только переход к источнику истины",
+    "Изменение scenario export version инвалидирует stale test link и показывает предупреждение"
+  ]
+}

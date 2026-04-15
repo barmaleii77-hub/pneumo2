@@ -17,6 +17,8 @@
 
 - `v3/` — active detailed machine-readable reference layer из
   `pneumo_gui_codex_package_v3.zip`;
+- `v13_ring_editor_migration/` — специализированный ring-editor migration
+  addendum из `pneumo_gui_codex_design_v13_ring_editor_migration.zip`;
 - `v2/` — historical detailed import-layer из
   `pneumo_gui_codex_package_v2.zip`;
 - корневые `pneumo_gui_codex_spec_v1.json`, `current_pipeline.dot`,
@@ -30,7 +32,11 @@
    layout, UI elements, field/help/tooltip catalogs, migration matrix,
    acceptance criteria, pipeline verification, source-of-truth, docking,
    keyboard, UI state и observability contracts.
-3. `v2` и `v1` использовать только как historical imports и источник для
+3. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
+   `v13_ring_editor_migration/*` как специализированный addendum поверх `v3`:
+   schema contract, screen blueprints, state machine, ring-level migration
+   matrix, acceptance gates и suite-link contract.
+4. `v2` и `v1` использовать только как historical imports и источник для
    сравнения эволюции GUI-spec.
 
 ## Политика обновления
@@ -39,4 +45,6 @@
 - нормализация допускается только в производных docs/tests, а не в imported
   source artifacts;
 - при конфликте между imported sources и текущим каноном приоритет у `17/18`,
-  затем у active detailed layer `v3`, затем у historical imports.
+  затем у active detailed layer `v3`, затем у специализированного addendum
+  `v13_ring_editor_migration` в пределах `WS-RING` и ring-to-suite handoff,
+  затем у historical imports.

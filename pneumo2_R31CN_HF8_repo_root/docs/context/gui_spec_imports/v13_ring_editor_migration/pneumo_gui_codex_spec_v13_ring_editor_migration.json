@@ -1,0 +1,172 @@
+{
+  "artifact_id": "PNEUMO-GUI-CODEX-V13-RING-EDITOR-MIGRATION",
+  "branch": "design",
+  "version": "v13",
+  "goal": "Следующий слой после V12: детализировать канон экранов редактора кольца и матрицу миграции web → desktop без потери функций.",
+  "parents": [
+    "PROMPT_V2",
+    "V5",
+    "V12"
+  ],
+  "sources_checked": [
+    {
+      "id": "PROMPT_V2",
+      "path": "/mnt/data/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md",
+      "role": "базовый канон GUI проекта"
+    },
+    {
+      "id": "V12-DESIGN-RECOVERY",
+      "path": "/mnt/data/pneumo_gui_codex_preservation_and_design_recovery_v12/pneumo_gui_codex_spec_v12_design_recovery.json",
+      "role": "корректирующий слой продолжения"
+    },
+    {
+      "id": "V12-RING-CONTRACT",
+      "path": "/mnt/data/pneumo_gui_codex_preservation_and_design_recovery_v12/ring_editor_canonical_contract_v12.json",
+      "role": "канон редактора кольца"
+    },
+    {
+      "id": "V12-WORKSPACE-DELTA",
+      "path": "/mnt/data/pneumo_gui_codex_preservation_and_design_recovery_v12/workspace_delta_v12.json",
+      "role": "дельта по рабочим пространствам"
+    },
+    {
+      "id": "V12-OPT-CONTROL",
+      "path": "/mnt/data/pneumo_gui_codex_preservation_and_design_recovery_v12/optimization_control_plane_contract_v12.json",
+      "role": "канон control plane оптимизации"
+    },
+    {
+      "id": "V12-TRUTH-GRAPHICS",
+      "path": "/mnt/data/pneumo_gui_codex_preservation_and_design_recovery_v12/truthful_graphics_contract_v12.json",
+      "role": "канон честной графики"
+    },
+    {
+      "id": "DEEP-RESEARCH-REPORT-5",
+      "path": "/mnt/data/deep-research-report (5).md",
+      "role": "сводный внешний и проектный канон, включая web→desktop матрицу"
+    },
+    {
+      "id": "V5-PACKAGE",
+      "path": "/mnt/data/pneumo_gui_codex_preservation_and_design_recovery_v12/preserved_outputs/pneumo_gui_codex_package_v5.zip",
+      "role": "предыдущая детальная машиночитаемая GUI база"
+    }
+  ],
+  "canonical_decisions": [
+    "Редактор кольца является единственным пользовательским источником дорожных сценариев.",
+    "WS-SUITE, WS-ANIMATOR и WS-OPTIMIZATION только потребляют кольцевой контракт и не создают альтернативных источников истины.",
+    "Разгон/торможение — это режим прохождения, а не тип геометрического сегмента.",
+    "Поперечный уклон задаётся одним явным параметром сегмента; высоты левой и правой колеи являются derived-полями.",
+    "Последний сегмент auto-close locked и не маскируется под независимый пользовательский ввод.",
+    "Миграция из web в desktop запрещает потерю функций и дубли источников истины."
+  ],
+  "workspace": {
+    "workspace_id": "WS-RING",
+    "name": "Редактор кольца и сценариев",
+    "container_px": {
+      "x": 310,
+      "y": 64,
+      "width": 1252,
+      "height": 984
+    },
+    "regions": [
+      {
+        "region_id": "RG-HEADER",
+        "name": "Глобальные поля сценария",
+        "x": 24,
+        "y": 16,
+        "width": 1204,
+        "height": 40,
+        "role": "global_ring_metadata"
+      },
+      {
+        "region_id": "RG-LEFT",
+        "name": "Список сегментов и действия",
+        "x": 24,
+        "y": 72,
+        "width": 304,
+        "height": 888,
+        "role": "segment_order_and_actions"
+      },
+      {
+        "region_id": "RG-PLAN",
+        "name": "План кольца",
+        "x": 344,
+        "y": 72,
+        "width": 884,
+        "height": 500,
+        "role": "primary_visual_source"
+      },
+      {
+        "region_id": "RG-LONG",
+        "name": "Продольный профиль",
+        "x": 344,
+        "y": 588,
+        "width": 574,
+        "height": 228,
+        "role": "elevation_preview"
+      },
+      {
+        "region_id": "RG-CROSSFALL",
+        "name": "Поперечный уклон и шов",
+        "x": 934,
+        "y": 588,
+        "width": 294,
+        "height": 228,
+        "role": "crossfall_and_seam_preview"
+      },
+      {
+        "region_id": "RG-FOOTER",
+        "name": "Шов, экспорт и передача в испытания",
+        "x": 344,
+        "y": 832,
+        "width": 884,
+        "height": 128,
+        "role": "validation_export_handoff"
+      }
+    ],
+    "global_right_inspector_dependency": {
+      "region_id": "GLOBAL-RIGHT-INSPECTOR",
+      "modes": [
+        "segment_detail",
+        "seam_and_export",
+        "field_help"
+      ],
+      "note": "Детальные поля сегмента редактируются в правом глобальном инспекторе shell. Рабочее пространство не дублирует источник истины локальными модальными диалогами."
+    }
+  },
+  "screen_blueprints_ref": "ring_editor_screen_blueprints_v13.csv",
+  "element_catalog_ref": "ring_editor_element_catalog_v13.csv",
+  "field_catalog_ref": "ring_editor_field_catalog_v13.csv",
+  "schema_contract_ref": "ring_editor_schema_contract_v13.json",
+  "state_machine_ref": "ring_editor_state_machine_v13.json",
+  "user_pipeline_graph_ref": "ring_editor_user_pipeline_v13.dot",
+  "migration_matrix_ref": "web_to_desktop_migration_matrix_v13.csv",
+  "acceptance_gates_ref": "ring_editor_acceptance_gates_v13.csv",
+  "suite_link_contract_ref": "ring_to_suite_link_contract_v13.json",
+  "ring_editor_pipeline_summary": {
+    "primary_flow": [
+      "open_ws_ring",
+      "create_or_import_scenario",
+      "edit_global_ring_fields",
+      "build_segment_list",
+      "edit_segment0_and_segmentN",
+      "generate_preview",
+      "check_seam",
+      "export",
+      "link_to_suite",
+      "consume_in_baseline_and_optimization"
+    ],
+    "forbidden_detours": [
+      "manual scenario editing outside WS-RING",
+      "editing segment geometry in WS-SUITE",
+      "animator-side scenario invention",
+      "legacy hidden scenario forms"
+    ]
+  },
+  "v13_specific_additions_vs_v12": [
+    "конкретные screen/mode blueprints вместо только высокоуровневого контракта",
+    "конкретная ring-level migration matrix вместо общей web → desktop матрицы",
+    "конкретная state machine для сценарного контура",
+    "явный handoff-контракт WS-RING → WS-SUITE"
+  ],
+  "next_step_after_v13": "V14: детализировать рабочее пространство «Матрица испытаний» как consumer кольцевого контракта, включая test-type=ring, stage semantics, validation sidecars и baseline handoff."
+}

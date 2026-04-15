@@ -1,0 +1,71 @@
+{
+  "artifact_id": "PNEUMO-GUI-CODEX-V13-RING-EDITOR-MIGRATION",
+  "file_count": 13,
+  "counts": {
+    "screen_blueprints": 4,
+    "elements": 62,
+    "fields": 44,
+    "migration_rows": 18,
+    "user_steps": 14,
+    "acceptance_gates": 17
+  },
+  "parents": [
+    "PROMPT_V2",
+    "V5",
+    "V12"
+  ],
+  "files": [
+    {
+      "name": "README.md",
+      "size_bytes": 2220
+    },
+    {
+      "name": "artifact_lineage_v13.json",
+      "size_bytes": 1035
+    },
+    {
+      "name": "pneumo_gui_codex_spec_v13_ring_editor_migration.json",
+      "size_bytes": 7356
+    },
+    {
+      "name": "ring_editor_acceptance_gates_v13.csv",
+      "size_bytes": 4349
+    },
+    {
+      "name": "ring_editor_element_catalog_v13.csv",
+      "size_bytes": 11546
+    },
+    {
+      "name": "ring_editor_field_catalog_v13.csv",
+      "size_bytes": 8517
+    },
+    {
+      "name": "ring_editor_schema_contract_v13.json",
+      "size_bytes": 4883
+    },
+    {
+      "name": "ring_editor_screen_blueprints_v13.csv",
+      "size_bytes": 3554
+    },
+    {
+      "name": "ring_editor_state_machine_v13.json",
+      "size_bytes": 5448
+    },
+    {
+      "name": "ring_editor_user_pipeline_v13.dot",
+      "size_bytes": 1602
+    },
+    {
+      "name": "ring_editor_user_steps_v13.csv",
+      "size_bytes": 2573
+    },
+    {
+      "name": "ring_to_suite_link_contract_v13.json",
+      "size_bytes": 1255
+    },
+    {
+      "name": "web_to_desktop_migration_matrix_v13.csv",
+      "size_bytes": 7375
+    }
+  ]
+}

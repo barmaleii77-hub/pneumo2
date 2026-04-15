@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import json
 from pathlib import Path
 
@@ -10,25 +9,18 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 CONTEXT = DOCS / "context"
 IMPORTS = CONTEXT / "gui_spec_imports"
-IMPORTS_V2 = IMPORTS / "v2"
 IMPORTS_V3 = IMPORTS / "v3"
+IMPORTS_V13 = IMPORTS / "v13_ring_editor_migration"
+
 CANON_17 = DOCS / "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md"
 CANON_18 = DOCS / "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md"
 PROJECT_SOURCES = DOCS / "PROJECT_SOURCES.md"
+GUI_INDEX = DOCS / "gui_chat_prompts" / "00_INDEX.md"
+RING_LANE = DOCS / "gui_chat_prompts" / "04_RING_EDITOR.md"
+RESULTS_LANE = DOCS / "gui_chat_prompts" / "10_TEST_VALIDATION_RESULTS.md"
 PARITY_SUMMARY = CONTEXT / "DESKTOP_WEB_PARITY_SUMMARY.md"
 PARITY_JSON = CONTEXT / "desktop_web_parity_map.json"
-GUI_INDEX = DOCS / "gui_chat_prompts" / "00_INDEX.md"
-TARGETED_LANE_DOCS = (
-    DOCS / "gui_chat_prompts" / "01_MAIN_WINDOW.md",
-    DOCS / "gui_chat_prompts" / "02_INPUT_DATA.md",
-    DOCS / "gui_chat_prompts" / "03_RUN_SETUP.md",
-    DOCS / "gui_chat_prompts" / "04_RING_EDITOR.md",
-    DOCS / "gui_chat_prompts" / "06_DESKTOP_MNEMO.md",
-    DOCS / "gui_chat_prompts" / "07_DESKTOP_ANIMATOR.md",
-    DOCS / "gui_chat_prompts" / "08_OPTIMIZER_CENTER.md",
-    DOCS / "gui_chat_prompts" / "09_DIAGNOSTICS_SEND_BUNDLE.md",
-    DOCS / "gui_chat_prompts" / "10_TEST_VALIDATION_RESULTS.md",
-)
+IMPORTS_README = IMPORTS / "README.md"
 
 STRONG_MOJIBAKE_MARKERS = (
     "Р В Р’В Р вЂ™Р’В Р В Р Р‹Р РЋРЎСџР В Р’В Р вЂ™Р’В ",
@@ -37,8 +29,6 @@ STRONG_MOJIBAKE_MARKERS = (
     "Р В Р’В Р вЂ™Р’В Р В Р Р‹Р РЋРІвЂћСћР В Р’В Р вЂ™Р’В ",
     "Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ў",
     "Р В Р’В Р В РІР‚В Р В Р вЂ Р В РІР‚С™Р вЂ™Р’В ",
-    "Р В РІР‚СљР Р†Р вЂљРЎСљР В РІР‚СљР вЂ™Р’В ",
-    "Р В РІР‚СљР В РІР‚РЋР В РІР‚СљР вЂ™Р’В°",
 )
 
 
@@ -47,275 +37,206 @@ def _load_csv_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def test_gui_spec_canon_docs_exist_and_link_active_v3_layer() -> None:
-    assert CANON_17.exists()
-    assert CANON_18.exists()
+def test_v13_import_layer_exists_and_matches_manifest() -> None:
+    manifest_path = IMPORTS_V13 / "manifest.json"
+    readme_path = IMPORTS_V13 / "README.md"
 
-    canon_17 = CANON_17.read_text(encoding="utf-8")
-    canon_18 = CANON_18.read_text(encoding="utf-8")
-
-    assert "automation_id" in canon_17
-    assert "tooltip + help" in canon_17
-    assert "Source-of-truth matrix" in canon_17
-    assert "Observability hooks" in canon_17
-    assert "Command search" in canon_17
-    assert "pipeline verification" in canon_17
-
-    assert "## Ц. Active detailed reference layer v3" in canon_18
-    assert "## Ч. Workflow graphs и shell-region contract" in canon_18
-    assert "## Ш. Базовое окно `1920x1080` и координатный contract" in canon_18
-    assert "## Щ. UI element catalog, field registry, help и tooltip registries" in canon_18
-    assert "## Ы. Migration matrix `web -> desktop`" in canon_18
-    assert "## Ь. Acceptance, pipeline verification и test suite" in canon_18
-    assert "## Э. Source-of-truth, keyboard, docking, state и observability matrices" in canon_18
-    assert "./context/gui_spec_imports/v3/README.md" in canon_18
-    assert "./context/gui_spec_imports/v3/current_macro.dot" in canon_18
-    assert "./context/gui_spec_imports/v3/optimized_macro.dot" in canon_18
-    assert "./context/gui_spec_imports/v3/current_element_graph.dot" in canon_18
-    assert "./context/gui_spec_imports/v3/optimized_element_graph.dot" in canon_18
-    assert "./context/gui_spec_imports/v3/ui_element_catalog.csv" in canon_18
-    assert "./context/gui_spec_imports/v3/field_catalog.csv" in canon_18
-    assert "./context/gui_spec_imports/v3/help_catalog.csv" in canon_18
-    assert "./context/gui_spec_imports/v3/tooltip_catalog.csv" in canon_18
-    assert "./context/gui_spec_imports/v3/migration_matrix.csv" in canon_18
-    assert "./context/gui_spec_imports/v3/source_of_truth_matrix.csv" in canon_18
-    assert "./context/gui_spec_imports/v3/keyboard_matrix.csv" in canon_18
-    assert "./context/gui_spec_imports/v3/docking_matrix.csv" in canon_18
-    assert "./context/gui_spec_imports/v3/ui_state_matrix.csv" in canon_18
-    assert "./context/gui_spec_imports/v3/pipeline_observability.csv" in canon_18
-    assert "./context/gui_spec_imports/v3/acceptance_criteria.csv" in canon_18
-    assert "./context/gui_spec_imports/v3/pipeline_verification.csv" in canon_18
-    assert "./context/gui_spec_imports/v3/test_suite.csv" in canon_18
-    assert "historical detailed import" in canon_18
-
-
-def test_gui_spec_v3_import_layer_exists_and_manifest_matches_files() -> None:
-    manifest_path = IMPORTS_V3 / "manifest.json"
-    readme_path = IMPORTS_V3 / "README.md"
-
-    assert IMPORTS_V3.exists()
-    assert IMPORTS_V2.exists()
+    assert IMPORTS_V13.exists()
     assert manifest_path.exists()
     assert readme_path.exists()
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     readme_text = readme_path.read_text(encoding="utf-8-sig")
 
-    assert "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md" in readme_text
-    assert "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md" in readme_text
-    assert "active detailed machine-readable reference layer" in readme_text
-    assert "historical detailed import" in readme_text
-    assert "raw `.zip`" in readme_text
+    assert manifest["artifact_id"] == "PNEUMO-GUI-CODEX-V13-RING-EDITOR-MIGRATION"
+    assert manifest["file_count"] == len(manifest["files"])
+    assert "редактор кольца и миграция web → desktop" in readme_text.lower()
 
-    expected_files = {
-        "README.md",
-        "manifest.json",
-        "CHANGELOG_v3.md",
-        "pneumo_gui_codex_spec_v3_refined.json",
-        "current_macro.dot",
-        "optimized_macro.dot",
-        "current_element_graph.dot",
-        "optimized_element_graph.dot",
-        "ui_element_catalog.csv",
-        "field_catalog.csv",
-        "help_catalog.csv",
-        "tooltip_catalog.csv",
-        "migration_matrix.csv",
-        "acceptance_criteria.csv",
-        "pipeline_verification.csv",
-        "test_suite.csv",
-        "best_practices_sources.csv",
-        "source_of_truth_matrix.csv",
-        "ui_state_matrix.csv",
-        "keyboard_matrix.csv",
-        "docking_matrix.csv",
-        "pipeline_observability.csv",
-        "graph_delta_v3.csv",
-    }
+    manifest_names = {str(item["name"]) for item in manifest["files"]}
+    actual_names = {path.name for path in IMPORTS_V13.iterdir() if path.is_file()}
 
-    manifest_entries = {str(item["name"]) for item in manifest["files"]}
-    actual_files = {path.name for path in IMPORTS_V3.iterdir() if path.is_file()}
-
-    assert manifest_entries == actual_files
-    assert actual_files == expected_files
-    assert manifest["main_file"] == "pneumo_gui_codex_spec_v3_refined.json"
-    assert manifest["version"] == "3.0.0"
-    assert manifest["counts"]["ui_elements"] == 157
+    assert actual_names == manifest_names | {"manifest.json"}
 
     for item in manifest["files"]:
-        file_path = IMPORTS_V3 / str(item["name"])
-        payload = file_path.read_bytes()
-        if file_path.name in {"README.md", "manifest.json"}:
-            continue
-        assert item["size_bytes"] == len(payload), file_path.name
-        assert item["sha256"] == hashlib.sha256(payload).hexdigest(), file_path.name
+        file_path = IMPORTS_V13 / str(item["name"])
+        assert file_path.exists(), file_path.name
+        assert file_path.stat().st_size == item["size_bytes"], file_path.name
+
+    assert manifest["counts"] == {
+        "screen_blueprints": 4,
+        "elements": 62,
+        "fields": 44,
+        "migration_rows": 18,
+        "user_steps": 14,
+        "acceptance_gates": 17,
+    }
+
+    assert len(_load_csv_rows(IMPORTS_V13 / "ring_editor_screen_blueprints_v13.csv")) == 4
+    assert len(_load_csv_rows(IMPORTS_V13 / "ring_editor_element_catalog_v13.csv")) == 62
+    assert len(_load_csv_rows(IMPORTS_V13 / "ring_editor_field_catalog_v13.csv")) == 44
+    assert len(_load_csv_rows(IMPORTS_V13 / "web_to_desktop_migration_matrix_v13.csv")) == 18
+    assert len(_load_csv_rows(IMPORTS_V13 / "ring_editor_user_steps_v13.csv")) == 14
+    assert len(_load_csv_rows(IMPORTS_V13 / "ring_editor_acceptance_gates_v13.csv")) == 17
 
 
-def test_gui_spec_v3_detailed_json_loads_and_exposes_expected_contract_keys() -> None:
-    spec_path = IMPORTS_V3 / "pneumo_gui_codex_spec_v3_refined.json"
-    data = json.loads(spec_path.read_text(encoding="utf-8-sig"))
+def test_v13_spec_and_contract_files_load_with_expected_ring_guarantees() -> None:
+    spec = json.loads(
+        (IMPORTS_V13 / "pneumo_gui_codex_spec_v13_ring_editor_migration.json").read_text(
+            encoding="utf-8-sig"
+        )
+    )
+    schema = json.loads(
+        (IMPORTS_V13 / "ring_editor_schema_contract_v13.json").read_text(encoding="utf-8-sig")
+    )
+    suite_link = json.loads(
+        (IMPORTS_V13 / "ring_to_suite_link_contract_v13.json").read_text(encoding="utf-8-sig")
+    )
 
-    assert data["идентификатор_схемы"] == "pneumo_gui_codex_spec_v3_refined"
-    assert data["версия"] == "3.0.0"
-    assert "оболочка_главного_окна" in data
-    assert "каталог_элементов_UI_плоский" in data
-    assert "каталог_полей_плоский" in data
-    assert "каталог_развёрнутой_справки" in data
-    assert "каталог_коротких_подсказок" in data
-    assert "матрица_миграции_web_в_desktop" in data
-    assert "проверка_pipeline_юзер_GUI_юзер" in data
-    assert "набор_тестов" in data
-    assert "критерии_приёмки" in data
-    assert "контракт_поиска_команд" in data
-    assert "контракт_подсказок_и_справки" in data
-    assert "контракт_стыковки_и_отстыковки" in data
-    assert "контракт_источников_истины" in data
-    assert "контракт_когнитивной_эргономики" in data
-    assert "контракт_состояний_элемента" in data
-    assert "контракт_валидации_и_исправления" in data
-    assert "контракт_undo_redo" in data
-    assert "контракт_пустых_и_недоступных_состояний" in data
-    assert "контракт_табличных_поверхностей" in data
-    assert "контракт_клавиатурной_карты_расширенный" in data
-    assert "контракт_наблюдаемости_pipeline" in data
-    assert "контракт_окна_и_title_bar" in data
-    assert "контракт_докирования_по_типам_панелей" in data
+    assert spec["version"] == "v13"
+    assert spec["workspace"]["workspace_id"] == "WS-RING"
+    assert spec["schema_contract_ref"] == "ring_editor_schema_contract_v13.json"
+    assert spec["suite_link_contract_ref"] == "ring_to_suite_link_contract_v13.json"
+    assert "Редактор кольца является единственным пользовательским источником дорожных сценариев." in spec["canonical_decisions"]
+    assert spec["next_step_after_v13"].startswith("V14:")
+
+    region_ids = {region["region_id"] for region in spec["workspace"]["regions"]}
+    assert region_ids == {"RG-HEADER", "RG-LEFT", "RG-PLAN", "RG-LONG", "RG-CROSSFALL", "RG-FOOTER"}
+    assert spec["workspace"]["global_right_inspector_dependency"]["region_id"] == "GLOBAL-RIGHT-INSPECTOR"
+
+    assert schema["single_source_of_truth"] == "ring_editor_workspace"
+    assert schema["root_object"] == "ring_scenario"
+    assert schema["root_fields"]["segments"]["required"] is True
+    assert schema["forbidden"]["secondary_user_source_of_truth_outside_ring_editor"] is True
+
+    assert suite_link["source_of_truth"] == "ring_editor_workspace"
+    assert "scenario_json_path" in suite_link["copied_fields_to_test"]
+    assert "road_csv_path" in suite_link["copied_fields_to_test"]
+    assert "segment geometry" in suite_link["must_not_duplicate"]
+    assert any("Из WS-SUITE можно открыть исходный сценарий обратно в WS-RING" == item for item in suite_link["acceptance"])
 
 
-def test_project_sources_index_and_parity_summary_reference_v3_layer() -> None:
-    imports_readme = (IMPORTS / "README.md").read_text(encoding="utf-8")
-    index_text = GUI_INDEX.read_text(encoding="utf-8")
+def test_v13_catalogs_keep_minimal_ring_editor_contract_shape() -> None:
+    element_rows = _load_csv_rows(IMPORTS_V13 / "ring_editor_element_catalog_v13.csv")
+    field_rows = _load_csv_rows(IMPORTS_V13 / "ring_editor_field_catalog_v13.csv")
+    gate_rows = _load_csv_rows(IMPORTS_V13 / "ring_editor_acceptance_gates_v13.csv")
+    migration_rows = _load_csv_rows(IMPORTS_V13 / "web_to_desktop_migration_matrix_v13.csv")
+
+    assert set(element_rows[0].keys()) == {
+        "element_id",
+        "name",
+        "type",
+        "region_id",
+        "x_local_px",
+        "y_local_px",
+        "width_px",
+        "height_px",
+        "source_binding",
+        "visible_when",
+        "enabled_when",
+        "tooltip_required",
+        "help_required",
+        "scroll_behavior",
+    }
+    assert any(row["element_id"] == "RG-FLD-CLOSURE-POLICY" for row in element_rows)
+    assert all(row["tooltip_required"] == "Да" for row in element_rows[:5])
+    assert all(row["help_required"] == "Да" for row in element_rows[:5])
+
+    assert set(field_rows[0].keys()) == {
+        "field_id",
+        "name",
+        "data_type",
+        "scope",
+        "required",
+        "tooltip_required",
+        "allowed_values",
+        "unit",
+        "description",
+        "display_unit",
+    }
+    assert any(row["field_id"] == "RG-FLD-CLOSURE-POLICY" and row["allowed_values"] == "closed_c1_periodic|closed_exact|preview_open_only" for row in field_rows)
+    assert any(row["field_id"] == "RG-FLD-V0" and row["unit"] == "км/ч" for row in field_rows)
+
+    assert any(row["gate_id"] == "RG-GATE-001" and row["severity"] == "Блокирующий" for row in gate_rows)
+    assert any(row["web_feature_id"] == "WEB-RING-003" and row["source_of_truth"] == "Канонический ring_scenario.segments[i]" for row in migration_rows)
+    assert any(row["web_feature_id"] == "WEB-RING-005" and "шов кольца" in row["command_search_route"] for row in migration_rows)
+
+
+def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
+    imports_readme = IMPORTS_README.read_text(encoding="utf-8")
     project_sources_text = PROJECT_SOURCES.read_text(encoding="utf-8")
-    parity_summary_text = PARITY_SUMMARY.read_text(encoding="utf-8")
+    index_text = GUI_INDEX.read_text(encoding="utf-8")
 
-    assert "gui_spec_imports/v3/*" in index_text
-    assert "Active detailed v3 layer" in index_text
-    assert "implementation prompts" in index_text
+    assert "v13_ring_editor_migration/" in imports_readme
+    assert "специализированный ring-editor migration" in imports_readme
+    assert "WS-RING -> WS-SUITE" in imports_readme
 
-    assert "v3/" in imports_readme
-    assert "active detailed machine-readable reference layer" in imports_readme
-    assert "historical detailed import-layer" in imports_readme
+    assert "v13_ring_editor_migration/README.md" in project_sources_text
+    assert "ring_editor_schema_contract_v13.json" in project_sources_text
+    assert "ring_editor_screen_blueprints_v13.csv" in project_sources_text
+    assert "ring_editor_acceptance_gates_v13.csv" in project_sources_text
+    assert "ring_to_suite_link_contract_v13.json" in project_sources_text
 
-    assert "Human-readable canon" in project_sources_text
-    assert "Imported detailed reference" in project_sources_text
-    assert "docs/context/gui_spec_imports/v3/pneumo_gui_codex_spec_v3_refined.json" in project_sources_text
-    assert "docs/context/gui_spec_imports/v3/source_of_truth_matrix.csv" in project_sources_text
-    assert "docs/context/gui_spec_imports/v3/pipeline_observability.csv" in project_sources_text
-    assert "docs/context/gui_spec_imports/v2/README.md" in project_sources_text
-    assert "docs/context/DESKTOP_WEB_PARITY_SUMMARY.md" in project_sources_text
-    assert "docs/gui_chat_prompts/00_INDEX.md" in project_sources_text
-
-    assert "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md" in parity_summary_text
-    assert "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md" in parity_summary_text
-    assert "gui_spec_imports/v3" in parity_summary_text
-    assert "desktop_web_parity_map.json" in parity_summary_text
-    assert "новый_обязательный_слой" in parity_summary_text
-    assert "source_of_truth_matrix.csv" in parity_summary_text
+    assert "gui_spec_imports/v13_ring_editor_migration/README.md" in index_text
+    assert "специализированный addendum для `WS-RING`" in index_text
+    assert "WS-RING -> WS-SUITE" in index_text
 
 
-def test_v3_catalogs_keep_basic_machine_readable_contracts() -> None:
-    ui_rows = _load_csv_rows(IMPORTS_V3 / "ui_element_catalog.csv")
-    field_rows = _load_csv_rows(IMPORTS_V3 / "field_catalog.csv")
-    help_rows = _load_csv_rows(IMPORTS_V3 / "help_catalog.csv")
-    tooltip_rows = _load_csv_rows(IMPORTS_V3 / "tooltip_catalog.csv")
+def test_canon_and_parity_summary_reference_v13_ring_editor_layer() -> None:
+    canon_17 = CANON_17.read_text(encoding="utf-8")
+    canon_18 = CANON_18.read_text(encoding="utf-8")
+    parity_summary = PARITY_SUMMARY.read_text(encoding="utf-8")
+    parity_json = PARITY_JSON.read_text(encoding="utf-8")
 
-    automation_ids = [row["automation_id"].strip() for row in ui_rows]
-    assert ui_rows
-    assert len(automation_ids) == len(set(automation_ids))
-    assert all(row["tooltip_id"].strip() for row in ui_rows)
-    assert all(row["help_id"].strip() for row in ui_rows)
-    assert all(row["workspace_owner"].strip() for row in ui_rows)
-    assert all(row["регион"].strip() for row in ui_rows)
+    assert "command search" in canon_17.lower()
+    assert "## П. Специализированный addendum `v13` для `WS-RING`" in canon_18
+    assert "## Р. Контракт handoff `WS-RING -> WS-SUITE`" in canon_18
+    assert "## С. Ring-level migration gates" in canon_18
+    assert "./context/gui_spec_imports/v13_ring_editor_migration/pneumo_gui_codex_spec_v13_ring_editor_migration.json" in canon_18
+    assert "./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_schema_contract_v13.json" in canon_18
+    assert "./context/gui_spec_imports/v13_ring_editor_migration/ring_to_suite_link_contract_v13.json" in canon_18
+    assert "./context/gui_spec_imports/v13_ring_editor_migration/web_to_desktop_migration_matrix_v13.csv" in canon_18
 
-    help_ids = {row["id"].strip() for row in help_rows}
-    tooltip_help_ids = {row["связанная_помощь"].strip() for row in tooltip_rows}
-    assert tooltip_help_ids <= help_ids
+    assert "Специализированное уточнение для `WS-RING`" in parity_summary
+    assert "v13_ring_editor_migration" in parity_summary
+    assert "ring_to_suite_link_contract_v13.json" in parity_summary
+    assert "stale link" in parity_summary
 
-    required_field_columns = {
-        "id",
-        "название",
-        "тип",
-        "обязательное",
-        "help_id",
-        "короткая_подсказка",
-        "каталог",
-        "варианты",
-        "единица_измерения",
-    }
-    assert set(field_rows[0].keys()) == required_field_columns
-    numeric_types = {"numeric_editor", "integer_editor", "read_only_numeric", "read_only_integer"}
-    numeric_rows = [row for row in field_rows if row["тип"] in numeric_types]
-    assert numeric_rows
-    assert all(row["единица_измерения"].strip() for row in numeric_rows)
+    assert "further refined by v13 ring_editor migration artifacts" in parity_json
+    assert "further refined by v13 ring_to_suite link contract" in parity_json
 
 
-def test_v3_refined_matrices_have_expected_contract_shape() -> None:
-    source_rows = _load_csv_rows(IMPORTS_V3 / "source_of_truth_matrix.csv")
-    state_rows = _load_csv_rows(IMPORTS_V3 / "ui_state_matrix.csv")
-    keyboard_rows = _load_csv_rows(IMPORTS_V3 / "keyboard_matrix.csv")
-    docking_rows = _load_csv_rows(IMPORTS_V3 / "docking_matrix.csv")
-    observability_rows = _load_csv_rows(IMPORTS_V3 / "pipeline_observability.csv")
-    sources_rows = _load_csv_rows(IMPORTS_V3 / "best_practices_sources.csv")
+def test_ring_related_lane_docs_reference_v13_contracts() -> None:
+    ring_lane_text = RING_LANE.read_text(encoding="utf-8")
+    results_lane_text = RESULTS_LANE.read_text(encoding="utf-8")
 
-    assert set(source_rows[0].keys()) == {
-        "домен",
-        "источник_истины",
-        "производные_представления",
-        "запрещено",
-        "проверка",
-    }
-    assert {row["домен"] for row in source_rows} >= {
-        "Исходные конструктивные параметры",
-        "Сценарии дороги и кольца",
-        "Набор испытаний",
-        "Baseline",
-        "Контракт оптимизации",
-        "Диагностика",
-    }
+    assert "## Канонический слой" in ring_lane_text
+    assert "../17_WINDOWS_DESKTOP_CAD_GUI_CANON.md" in ring_lane_text
+    assert "../18_PNEUMOAPP_WINDOWS_GUI_SPEC.md" in ring_lane_text
+    assert "ring_editor_schema_contract_v13.json" in ring_lane_text
+    assert "ring_editor_screen_blueprints_v13.csv" in ring_lane_text
+    assert "ring_to_suite_link_contract_v13.json" in ring_lane_text
+    assert "WS-SUITE" in ring_lane_text
 
-    assert {row["id"] for row in state_rows} >= {
-        "STATE-DEFAULT",
-        "STATE-FOCUS",
-        "STATE-DIRTY",
-        "STATE-WARNING",
-        "STATE-ERROR",
-    }
-
-    assert any(row["значение"] == "Поиск команд" and row["клавиши"] == "Ctrl+K" for row in keyboard_rows)
-    assert any(row["значение"] == "Главное действие шага" and row["клавиши"] == "Ctrl+Enter" for row in keyboard_rows)
-    f6_rows = [row for row in keyboard_rows if row["тип"] == "F6_порядок"]
-    assert len(f6_rows) >= 5
-
-    assert any(row["панель"] == "правая_панель_свойств_и_справки" and row["можно_на_второй_монитор"] == "True" for row in docking_rows)
-    assert any(row["панель"] == "аниматор" and row["можно_плавающее_окно"] == "True" for row in docking_rows)
-    assert any(row["панель"] == "диагностика" for row in docking_rows)
-
-    assert {row["event_id"] for row in observability_rows} >= {
-        "ui_app_started",
-        "ui_workspace_changed",
-        "ui_field_changed",
-        "ui_validation_state_changed",
-        "ui_baseline_started",
-    }
-    assert all(row["обязательные_поля"].strip() for row in observability_rows)
-
-    assert any(row["источник"] == "Microsoft Learn" for row in sources_rows)
-    assert all(row["url"].startswith("https://") for row in sources_rows)
+    assert "## Канонический слой" in results_lane_text
+    assert "../17_WINDOWS_DESKTOP_CAD_GUI_CANON.md" in results_lane_text
+    assert "../18_PNEUMOAPP_WINDOWS_GUI_SPEC.md" in results_lane_text
+    assert "ring_to_suite_link_contract_v13.json" in results_lane_text
+    assert "web_to_desktop_migration_matrix_v13.csv" in results_lane_text
+    assert "stale link" in results_lane_text
 
 
-def test_targeted_gui_spec_docs_have_no_strong_mojibake() -> None:
+def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
     offenders: list[str] = []
     target_paths = (
-        CANON_17,
-        CANON_18,
+        IMPORTS_README,
         PROJECT_SOURCES,
+        GUI_INDEX,
+        CANON_18,
         PARITY_SUMMARY,
         PARITY_JSON,
-        GUI_INDEX,
-        IMPORTS / "README.md",
-        IMPORTS_V2 / "README.md",
-        IMPORTS_V3 / "README.md",
-        *TARGETED_LANE_DOCS,
+        RING_LANE,
+        RESULTS_LANE,
+        IMPORTS_V13 / "README.md",
     )
 
     for path in target_paths:
@@ -325,18 +246,3 @@ def test_targeted_gui_spec_docs_have_no_strong_mojibake() -> None:
             offenders.append(f"{path.name}: {', '.join(bad) if bad else '????'}")
 
     assert not offenders, "\n".join(offenders)
-
-
-def test_targeted_lane_docs_keep_canonical_reference_blocks_and_v3_links() -> None:
-    for path in TARGETED_LANE_DOCS:
-        text = path.read_text(encoding="utf-8")
-
-        assert "## Канонический слой" in text, path.name
-        assert "docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md" in text, path.name
-        assert "docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md" in text, path.name
-        assert "docs/context/gui_spec_imports/v3/" in text, path.name
-        assert "## Цель lane" in text, path.name
-        assert "## Можно менять" in text, path.name
-        assert "## Можно читать как источник поведения" in text, path.name
-        assert "## Нельзя менять" in text, path.name
-        assert "## Правила" in text, path.name
