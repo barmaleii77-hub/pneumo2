@@ -17,6 +17,10 @@
 
 - `foundations/` — upstream prompt sources, предшествующие серии архивов
   `v1…v13`;
+- `v32_connector_reconciled/` — active connector-reconciled knowledge digest из
+  `pneumo_codex_tz_spec_connector_reconciled_v32.zip`; использовать как карту
+  чтения V32 и как новый source-priority/requirements/acceptance слой поверх
+  `v3`, `v12` и `v13`, не заменяя `17/18`;
 - `v3/` — active detailed machine-readable reference layer из
   `pneumo_gui_codex_package_v3.zip`;
 - `v12_design_recovery/` — historical design-recovery layer из
@@ -37,20 +41,23 @@
 1. Сначала читать `17` и `18` как канон для людей.
 2. Если нужен upstream provenance исходного design-intent, читать
    `foundations/*` как pre-`v1` prompt layer.
-3. Затем использовать `v3/*` как active detailed machine-readable reference для:
+3. Затем читать `v32_connector_reconciled/README.md` как active
+   connector-reconciled digest для V32: source authority, requirements,
+   acceptance, workspace contracts, playbooks, release gates и open gaps.
+4. Затем использовать `v3/*` как checked-in detailed machine-readable reference для:
    layout, UI elements, field/help/tooltip catalogs, migration matrix,
    acceptance criteria, pipeline verification, source-of-truth, docking,
    keyboard, UI state и observability contracts.
-4. Если нужно понять, как текущий канон вырос из старых архивов, читать
+5. Если нужно понять, как текущий канон вырос из старых архивов, читать
    `GUI_SPEC_ARCHIVE_LINEAGE.md` и `gui_spec_archive_lineage.json`.
-5. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
+6. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
    `v13_ring_editor_migration/*` как специализированный addendum поверх `v3`:
    schema contract, screen blueprints, state machine, ring-level migration
    matrix, acceptance gates и suite-link contract.
-6. `v12_design_recovery/*` использовать как historical design-recovery layer:
+7. `v12_design_recovery/*` использовать как historical design-recovery layer:
    он фиксирует возврат в design-first ветку, канон ring editor, optimization
    control plane и truthful graphics перед `v13`.
-7. `v2` и `v1` использовать только как historical imports и источник для
+8. `v2` и `v1` использовать только как historical imports и источник для
    сравнения эволюции GUI-spec.
 
 ## Политика обновления
@@ -61,8 +68,9 @@
 - нормализация допускается только в производных docs/tests, а не в imported
   source artifacts;
 - при конфликте между imported sources и текущим каноном приоритет у `17/18`,
+  затем у `v32_connector_reconciled/README.md` как connector-reconciled digest,
   затем у `foundations/*` как upstream intent layer только для provenance,
-  затем у active detailed layer `v3`, затем у специализированного addendum
+  затем у checked-in detailed layer `v3`, затем у специализированного addendum
   `v13_ring_editor_migration` в пределах `WS-RING` и ring-to-suite handoff,
   затем у `v12_design_recovery` как historical design-recovery layer, затем у
   остальных historical imports.

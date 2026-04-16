@@ -13,18 +13,21 @@
    и
    [prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md](../context/gui_spec_imports/foundations/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md)
    — foundational upstream prompt source (`PROMPT_V2`).
-4. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
+4. [gui_spec_imports/v32_connector_reconciled/README.md](../context/gui_spec_imports/v32_connector_reconciled/README.md)
+   — active connector-reconciled GUI/TZ digest для source authority,
+   workspace contracts, v32 playbooks, release gates и open gaps.
+5. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
    и related `v3/*`
-   — active detailed machine-readable reference layer.
-5. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
+   — checked-in detailed machine-readable reference layer.
+6. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
    и related `v13_ring_editor_migration/*`
    — специализированный addendum для `WS-RING` и handoff `WS-RING -> WS-SUITE`.
-6. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
+7. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
    — historical design-recovery layer, который возвращает проект из implementation-веток в design-first.
-7. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
+8. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
    и [gui_spec_archive_lineage.json](../context/gui_spec_archive_lineage.json)
    — lineage `v1…v13`, чтобы понимать роль каждого архива.
-8. `docs/gui_chat_prompts/*`
+9. `docs/gui_chat_prompts/*`
    — implementation prompts, которые должны наследовать канон, а не заменять его.
 
 ## Что считается reference layer
@@ -33,6 +36,9 @@
   native Windows desktop, no web-first, no feature-loss migration, diagnostics
   as first-class surface, ring editor as single source of truth и honest
   graphics baseline.
+- `v32_connector_reconciled` задаёт новый connector-reconciled GUI/TZ digest:
+  source authority, 12 workspace contracts, acceptance playbooks, release gates,
+  runtime artifact schema, evidence policy и open gaps.
 - `v3` задаёт общий detailed layer:
   shell, layout, UI elements, help/tooltip catalogs, migration matrix,
   acceptance, verification, keyboard/docking/state/observability contracts.
@@ -62,6 +68,9 @@
 ## Правило использования
 
 - если lane касается shell, сначала смотреть `17`, `18` и `v3`;
+- если lane касается cross-workspace architecture, release gates, acceptance
+  evidence, runtime artifacts или open gaps, обязательно смотреть
+  `v32_connector_reconciled/README.md`;
 - если нужно понять исходный жёсткий intent ещё до `v1`, дополнительно читать
   `foundations/*`;
 - если lane касается ring editor, handoff сценария или suite consumer
@@ -70,6 +79,6 @@
 - если lane касается происхождения текущего канона, recovery decisions или
   границы между design и implementation-pass, смотреть `v12_design_recovery/*`
   и lineage `v1…v13`;
-- при конфликте приоритет у `17/18`, затем у `v3`, затем у специализированного
-  `v13_ring_editor_migration`, затем у `v12_design_recovery`, затем у
-  historical imports.
+- при конфликте приоритет у `17/18`, затем у `v32_connector_reconciled`, затем
+  у `v3`, затем у специализированного `v13_ring_editor_migration`, затем у
+  `v12_design_recovery`, затем у historical imports.

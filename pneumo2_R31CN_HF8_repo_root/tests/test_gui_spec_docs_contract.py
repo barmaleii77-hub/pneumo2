@@ -13,6 +13,7 @@ FOUNDATIONS = IMPORTS / "foundations"
 IMPORTS_V3 = IMPORTS / "v3"
 IMPORTS_V12 = IMPORTS / "v12_design_recovery"
 IMPORTS_V13 = IMPORTS / "v13_ring_editor_migration"
+IMPORTS_V32 = IMPORTS / "v32_connector_reconciled"
 
 CANON_17 = DOCS / "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md"
 CANON_18 = DOCS / "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md"
@@ -43,6 +44,10 @@ def _load_csv_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
+def _normalized_text_size(path: Path) -> int:
+    return len(path.read_bytes().replace(b"\r\n", b"\n"))
+
+
 def test_v13_import_layer_exists_and_matches_manifest() -> None:
     manifest_path = IMPORTS_V13 / "manifest.json"
     readme_path = IMPORTS_V13 / "README.md"
@@ -66,7 +71,7 @@ def test_v13_import_layer_exists_and_matches_manifest() -> None:
     for item in manifest["files"]:
         file_path = IMPORTS_V13 / str(item["name"])
         assert file_path.exists(), file_path.name
-        assert file_path.stat().st_size == item["size_bytes"], file_path.name
+        assert _normalized_text_size(file_path) == item["size_bytes"], file_path.name
 
     assert manifest["counts"] == {
         "screen_blueprints": 4,
@@ -176,6 +181,8 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "upstream prompt sources" in imports_readme
     assert "v12_design_recovery/" in imports_readme
     assert "v13_ring_editor_migration/" in imports_readme
+    assert "v32_connector_reconciled/" in imports_readme
+    assert "connector-reconciled" in imports_readme
     assert "специализированный ring-editor migration" in imports_readme
     assert "WS-RING -> WS-SUITE" in imports_readme
     assert "GUI_SPEC_ARCHIVE_LINEAGE.md" in imports_readme
@@ -192,12 +199,15 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "ring_editor_screen_blueprints_v13.csv" in project_sources_text
     assert "ring_editor_acceptance_gates_v13.csv" in project_sources_text
     assert "ring_to_suite_link_contract_v13.json" in project_sources_text
+    assert "v32_connector_reconciled/README.md" in project_sources_text
+    assert "pneumo_codex_tz_spec_connector_reconciled_v32.zip" in project_sources_text
 
     assert "gui_spec_imports/foundations/README.md" in index_text
     assert "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md" in index_text
     assert "gui_spec_imports/v12_design_recovery/README.md" in index_text
     assert "GUI_SPEC_ARCHIVE_LINEAGE.md" in index_text
     assert "gui_spec_imports/v13_ring_editor_migration/README.md" in index_text
+    assert "gui_spec_imports/v32_connector_reconciled/README.md" in index_text
     assert "специализированный addendum для `WS-RING`" in index_text
     assert "WS-RING -> WS-SUITE" in index_text
 
@@ -269,6 +279,23 @@ def test_v12_design_recovery_layer_and_lineage_inventory_are_registered() -> Non
     assert any(item["version"] == "PROMPT_V2" and item["repo_layer"] == "docs/context/gui_spec_imports/foundations/" for item in lineage_json)
     assert any(item["version"] == "v12" and item["repo_layer"] == "docs/context/gui_spec_imports/v12_design_recovery/" for item in lineage_json)
     assert any(item["version"] == "v13" and item["repo_layer"] == "docs/context/gui_spec_imports/v13_ring_editor_migration/" for item in lineage_json)
+
+
+def test_v32_connector_reconciled_digest_is_registered() -> None:
+    readme_path = IMPORTS_V32 / "README.md"
+    assert readme_path.exists()
+
+    text = readme_path.read_text(encoding="utf-8")
+    assert "PNEUMO-CODEX-TZ-SPEC-CONNECTOR-RECONCILED-V32" in text
+    assert "pneumo_codex_tz_spec_connector_reconciled_v32.zip" in text
+    assert "12 workspaces" in text
+    assert "`WS-INPUTS`" in text
+    assert "`WS-RING`" in text
+    assert "PLAYBOOK_PRODUCER_TRUTH.md" in text
+    assert "RELEASE_GATE_HARDENING_MATRIX.csv" in text
+    assert "RUNTIME_ARTIFACT_SCHEMA.yaml" in text
+    assert "`GAP-001`" in text
+    assert "00_READ_FIRST__ABSOLUTE_LAW.md" in text
 
 
 def test_ring_related_lane_docs_reference_v13_contracts() -> None:

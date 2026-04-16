@@ -63,30 +63,31 @@ Operational note:
 4. [README.md](../README.md)
 5. [docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](./17_WINDOWS_DESKTOP_CAD_GUI_CANON.md)
 6. [docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](./18_PNEUMOAPP_WINDOWS_GUI_SPEC.md)
-7. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
-8. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
+7. [docs/context/gui_spec_imports/v32_connector_reconciled/README.md](./context/gui_spec_imports/v32_connector_reconciled/README.md)
+8. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
+9. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
 
 ### 3. Активные требования и рабочий backlog
 
-9. [docs/01_RequirementsFromContext.md](./01_RequirementsFromContext.md)
-10. [docs/10_NextStepsPlan.md](./10_NextStepsPlan.md)
-11. [docs/11_TODO.md](./11_TODO.md)
-12. [docs/12_Wishlist.md](./12_Wishlist.md)
-13. [docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.md](./12_AI_Wishlist_Canonical_Omnibus_2026-04-08.md)
+10. [docs/01_RequirementsFromContext.md](./01_RequirementsFromContext.md)
+11. [docs/10_NextStepsPlan.md](./10_NextStepsPlan.md)
+12. [docs/11_TODO.md](./11_TODO.md)
+13. [docs/12_Wishlist.md](./12_Wishlist.md)
+14. [docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.md](./12_AI_Wishlist_Canonical_Omnibus_2026-04-08.md)
 
 ### 4. Исполняемые контракты и registries
 
-14. `pneumo_solver_ui/contracts/*`
-15. `pneumo_solver_ui/*contract*.py`
-16. `tests/test_*contract*`
+15. `pneumo_solver_ui/contracts/*`
+16. `pneumo_solver_ui/*contract*.py`
+17. `tests/test_*contract*`
 
 ### 5. История и архив
 
-17. `TODO_MASTER_*`, `WISHLIST_MASTER_*`
-18. `TODO_WISHLIST_R31*_ADDENDUM_*.md`
-19. `docs/consolidated/*`
-20. `docs/context/WISHLIST*`
-21. `docs/_legacy_DOCS_upper/*`
+18. `TODO_MASTER_*`, `WISHLIST_MASTER_*`
+19. `TODO_WISHLIST_R31*_ADDENDUM_*.md`
+20. `docs/consolidated/*`
+21. `docs/context/WISHLIST*`
+22. `docs/_legacy_DOCS_upper/*`
 
 ## Непереговорные правила проекта
 
@@ -136,6 +137,7 @@ Operational note:
 
 - локальный канон в репозитории;
 - локальные digests и snapshots AI-контекста;
+- active connector-reconciled GUI/TZ digest v32;
 - внешние архивы и Google Drive как контекст и история;
 - исполняемые contracts и tests как проверяемое поведение.
 
@@ -198,6 +200,7 @@ Operational note:
 
 - [docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](./17_WINDOWS_DESKTOP_CAD_GUI_CANON.md)
 - [docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](./18_PNEUMOAPP_WINDOWS_GUI_SPEC.md)
+- [docs/context/gui_spec_imports/v32_connector_reconciled/README.md](./context/gui_spec_imports/v32_connector_reconciled/README.md)
 
 Что задаёт общий canon:
 
@@ -221,6 +224,15 @@ Operational note:
 - обязательные tooltip и question-mark help, которые дополняют layout, но не заменяют его;
 - обязательные графические input surfaces, source markers и время построения для расчётных previews и графиков;
 - refined Windows title-bar/system-menu/Snap Layout behavior, `UI Automation`, `WM_DPICHANGED`, idle CPU, hidden-pane budget и ETW-style instrumentation policy для desktop GUI.
+
+Что добавляет connector-reconciled v32 layer:
+
+- source authority, reading order и conflict policy для архива `pneumo_codex_tz_spec_connector_reconciled_v32.zip`;
+- 12 workspace contracts: `WS-SHELL`, `WS-PROJECT`, `WS-INPUTS`, `WS-RING`, `WS-SUITE`, `WS-BASELINE`, `WS-OPTIMIZATION`, `WS-ANALYSIS`, `WS-ANIMATOR`, `WS-DIAGNOSTICS`, `WS-SETTINGS`, `WS-TOOLS`;
+- machine-readable scope: 45 requirements, 45 acceptance rows, 61 screen rows, 704 UI element rows и 488 parameter rows;
+- acceptance playbooks для producer truth, diagnostics bundle, parity/migration, scenario canon, Windows runtime, performance trace и objective contract;
+- release-gate hardening, runtime artifact schema, evidence-required-by-gate и open-gap-to-evidence map;
+- explicit open gaps: producer-side hardpoints/solver_points truth, cylinder packaging passport, measured perf trace, viewport gating, ring seam, geometry runtime proof, `default_base.json` cleanup, `road_width_m` canonicalization и Windows visual acceptance.
 
 Связанные, но вспомогательные UX-источники:
 

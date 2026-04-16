@@ -29,15 +29,15 @@
     },
     {
       "name": "ring_editor_acceptance_gates_v13.csv",
-      "size_bytes": 4349
+      "size_bytes": 4331
     },
     {
       "name": "ring_editor_element_catalog_v13.csv",
-      "size_bytes": 11546
+      "size_bytes": 11483
     },
     {
       "name": "ring_editor_field_catalog_v13.csv",
-      "size_bytes": 8517
+      "size_bytes": 8472
     },
     {
       "name": "ring_editor_schema_contract_v13.json",
@@ -45,7 +45,7 @@
     },
     {
       "name": "ring_editor_screen_blueprints_v13.csv",
-      "size_bytes": 3554
+      "size_bytes": 3549
     },
     {
       "name": "ring_editor_state_machine_v13.json",
@@ -57,7 +57,7 @@
     },
     {
       "name": "ring_editor_user_steps_v13.csv",
-      "size_bytes": 2573
+      "size_bytes": 2558
     },
     {
       "name": "ring_to_suite_link_contract_v13.json",
@@ -65,7 +65,7 @@
     },
     {
       "name": "web_to_desktop_migration_matrix_v13.csv",
-      "size_bytes": 7375
+      "size_bytes": 7356
     }
   ]
 }

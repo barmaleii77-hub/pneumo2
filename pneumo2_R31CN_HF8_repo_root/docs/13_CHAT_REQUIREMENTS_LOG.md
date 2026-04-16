@@ -95,6 +95,12 @@ ID: `REQ-0013`.
 Источник: chat.
 ID: `REQ-0014`.
 
+15. Connector-reconciled GUI/TZ spec v32 is an active knowledge-base reference
+Archive C:/Users/Admin/Downloads/pneumo_codex_tz_spec_connector_reconciled_v32.zip refines the GUI-first migration knowledge base with source authority, reading order, 12 workspace contracts, 45 requirements, 45 acceptance rows, acceptance playbooks, release gates, runtime artifact schema, evidence policy and open gaps. It informs future GUI/TZ work but does not override 00 law, parameter registry, unified data contract or human-readable canon docs 17/18.
+Статус: активно.
+Источник: chat + archive:pneumo_codex_tz_spec_connector_reconciled_v32.
+ID: `REQ-0015`.
+
 ## Как ссылаться из будущих задач
 
 Если новая задача опирается на решение из чата, но не отражена в старом каноне, сначала проверить этот файл, а затем соответствующие plan-файлы из [docs/14_CHAT_PLANS_LOG.md](./14_CHAT_PLANS_LOG.md).

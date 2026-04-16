@@ -1,5 +1,6 @@
 * text=auto
 
+.gitattributes text eol=lf
 *.py text eol=lf
 *.pyw text eol=lf
 *.md text eol=lf
@@ -11,6 +12,7 @@
 *.toml text eol=lf
 *.ini text eol=lf
 *.csv text eol=lf
+*.dot text eol=lf
 *.svg text eol=lf
 *.log text eol=lf
 

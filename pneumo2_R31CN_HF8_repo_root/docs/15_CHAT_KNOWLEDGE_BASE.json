@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-14T04:27:25+00:00",
+  "updated_at": "2026-04-16T18:59:26+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -112,6 +112,14 @@
       "source": "chat",
       "title": "Refined GUI-spec для desktop migration должен опираться на deep research по Windows windowing, tooltip/help, truthful graphics и измеримому DPI/performance behavior.",
       "details": "Уточнённый GUI-spec обязан явно фиксировать native Windows title-bar/system-menu/snap behavior, tooltip и question-mark help contract, source markers и время построения для графических представлений, а также проверяемые требования по Per-Monitor V2, WM_DPICHANGED, UI Automation, idle CPU, hidden panes, taskbar progress и ETW-style instrumentation.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0015",
+      "created_at": "2026-04-16T18:59:26+00:00",
+      "source": "chat + archive:pneumo_codex_tz_spec_connector_reconciled_v32",
+      "title": "Connector-reconciled GUI/TZ spec v32 is an active knowledge-base reference",
+      "details": "Archive C:/Users/Admin/Downloads/pneumo_codex_tz_spec_connector_reconciled_v32.zip refines the GUI-first migration knowledge base with source authority, reading order, 12 workspace contracts, 45 requirements, 45 acceptance rows, acceptance playbooks, release gates, runtime artifact schema, evidence policy and open gaps. It informs future GUI/TZ work but does not override 00 law, parameter registry, unified data contract or human-readable canon docs 17/18.",
       "status": "активно"
     }
   ],
@@ -285,6 +293,15 @@
       "title": "Refined GUI-spec synchronization from deep research",
       "details": "Уточнить 17-й canon, 18-й project-specific GUI-spec, prompt-layer и knowledge-base summary по deep-research-report.md без изменения runtime GUI и без потери web-to-desktop functional parity.",
       "artifact_path": "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0020",
+      "created_at": "2026-04-16T18:59:26+00:00",
+      "source": "chat + archive:pneumo_codex_tz_spec_connector_reconciled_v32",
+      "title": "Digest connector-reconciled v32 GUI/TZ archive into knowledge base",
+      "details": "Add a repository knowledge-base entrypoint for the v32 archive, update source-priority docs and prompt index so future chats can use v32 without rereading 325 archive files blindly.",
+      "artifact_path": "context/gui_spec_imports/v32_connector_reconciled/README.md",
       "status": "актуален"
     }
   ]

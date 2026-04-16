@@ -148,6 +148,13 @@ ID: `PLAN-0018`.
 Источник: chat.
 ID: `PLAN-0019`.
 
+20. Digest connector-reconciled v32 GUI/TZ archive into knowledge base
+Назначение: Add a repository knowledge-base entrypoint for the v32 archive, update source-priority docs and prompt index so future chats can use v32 without rereading 325 archive files blindly.
+Артефакт: [context/gui_spec_imports/v32_connector_reconciled/README.md](./context/gui_spec_imports/v32_connector_reconciled/README.md)
+Статус: актуален.
+Источник: chat + archive:pneumo_codex_tz_spec_connector_reconciled_v32.
+ID: `PLAN-0020`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

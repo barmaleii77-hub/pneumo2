@@ -155,3 +155,16 @@ GUI-spec проекта и какие из них считаются active, his
 - Для спорных вопросов о происхождении канона, design/recovery decisions и
   границе между design и implementation-pass читаем `v12` и lineage
   `PROMPT_V2 + v1…v13`.
+
+## Связанный connector-reconciled слой V32
+
+После этой lineage-цепочки добавлен отдельный knowledge-base слой
+`docs/context/gui_spec_imports/v32_connector_reconciled/README.md` из архива
+`pneumo_codex_tz_spec_connector_reconciled_v32.zip`.
+
+V32 не является очередным imported implementation pass в линии `v1…v13`.
+Его роль другая: собрать connector-reconciled GUI/TZ package с source authority,
+workspace contracts, acceptance playbooks, release gates, runtime artifact
+schema, evidence policy и open gaps. Поэтому для новых задач V32 читается после
+`17/18` как актуальный digest, а этот lineage-документ остается картой
+происхождения старых слоев.
