@@ -13,12 +13,14 @@
    и
    [prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md](../context/gui_spec_imports/foundations/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md)
    — foundational upstream prompt source (`PROMPT_V2`).
-4. [gui_spec_imports/v32_connector_reconciled/README.md](../context/gui_spec_imports/v32_connector_reconciled/README.md)
-   — active connector-reconciled GUI/TZ digest для source authority,
-   workspace contracts, v32 playbooks, release gates и open gaps.
-5. [COMPLETENESS_ASSESSMENT.md](../context/gui_spec_imports/v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
+4. [gui_spec_imports/v33_connector_reconciled/README.md](../context/gui_spec_imports/v33_connector_reconciled/README.md)
+   и [COMPLETENESS_ASSESSMENT.md](../context/gui_spec_imports/v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
+   — active connector-reconciled GUI/TZ digest для v33 integrity policy,
+   selfcheck/remediation, repo-canon read order, gate mapping и PB-008.
+5. [gui_spec_imports/v32_connector_reconciled/README.md](../context/gui_spec_imports/v32_connector_reconciled/README.md),
+   [COMPLETENESS_ASSESSMENT.md](../context/gui_spec_imports/v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
    и [PARALLEL_CHAT_WORKSTREAMS.md](../context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md)
-   — проверка достаточности v32 и разбиение работы на независимые чаты.
+   — previous connector-reconciled digest и разбиение работы на независимые чаты.
 6. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
    и related `v3/*`
    — checked-in detailed machine-readable reference layer.
@@ -42,6 +44,9 @@
 - `v32_connector_reconciled` задаёт новый connector-reconciled GUI/TZ digest:
   source authority, 12 workspace contracts, acceptance playbooks, release gates,
   runtime artifact schema, evidence policy и open gaps.
+- `v33_connector_reconciled` уточняет v32:
+  package integrity policy, selfcheck/remediation, repo-canon read-order/gate
+  mapping, prompt audits и dedicated PB-008 provenance playbook.
 - `COMPLETENESS_ASSESSMENT` фиксирует, что v32 достаточно как contract/planning
   layer, но не является runtime closure proof.
 - `PARALLEL_CHAT_WORKSTREAMS` задаёт 16 независимых workstreams с owned scope,
@@ -77,7 +82,7 @@
 - если lane касается shell, сначала смотреть `17`, `18` и `v3`;
 - если lane касается cross-workspace architecture, release gates, acceptance
   evidence, runtime artifacts или open gaps, обязательно смотреть
-  `v32_connector_reconciled/README.md`;
+  `v33_connector_reconciled/README.md`, затем `v32_connector_reconciled/README.md`;
 - если нужно понять исходный жёсткий intent ещё до `v1`, дополнительно читать
   `foundations/*`;
 - если lane касается ring editor, handoff сценария или suite consumer

@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-16T19:15:18+00:00",
+  "updated_at": "2026-04-16T20:12:43+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -128,6 +128,14 @@
       "source": "chat + v32 completeness assessment",
       "title": "Before using v32 as an implementation guide, check completeness and runtime limits",
       "details": "The connector-reconciled v32 package is sufficient as a planning, contract, source-authority, workspace/handoff and acceptance/evidence layer, but it is not runtime closure proof. Future chats must consult COMPLETENESS_ASSESSMENT.md and must not claim producer truth, cylinder packaging, measured performance, Windows visual acceptance or imported-layer runtime closure without fresh tests/artifacts/SEND bundle evidence.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0017",
+      "created_at": "2026-04-16T20:12:43+00:00",
+      "source": "chat + archive:pneumo_codex_tz_spec_connector_reconciled_v33",
+      "title": "Connector-reconciled GUI/TZ spec v33 supersedes v32 for active package-integrity and repo-conformance reference",
+      "details": "Archive C:/Users/Admin/Downloads/pneumo_codex_tz_spec_connector_reconciled_v33.zip is the active connector-reconciled GUI/TZ reference layer after v32. It fixes v32 manifest self-hash policy, adds package selfcheck/remediation, repo-canon read-order and gate mapping, prompt mandatory/enum audits, and dedicated PB-008 current/historical/stale provenance playbook. It still does not prove runtime closure for producer truth, cylinder packaging, measured performance, Windows visual acceptance or imported-layer runtime proof.",
       "status": "активно"
     }
   ],
@@ -319,6 +327,15 @@
       "title": "Use v32 parallel chat workstreams for independent project acceleration",
       "details": "Split future project work into independent Russian-named workstreams with owned scopes, handoff IDs, forbidden overlap zones and short startup prompts so multiple chats can implement in parallel without confusion.",
       "artifact_path": "context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0022",
+      "created_at": "2026-04-16T20:12:43+00:00",
+      "source": "chat + archive:pneumo_codex_tz_spec_connector_reconciled_v33",
+      "title": "Digest connector-reconciled v33 archive into knowledge base",
+      "details": "Add v33 README and completeness assessment, update source priority docs and prompt index so future chats read v33 before v32 while still using v32 parallel workstreams.",
+      "artifact_path": "context/gui_spec_imports/v33_connector_reconciled/README.md",
       "status": "актуален"
     }
   ]

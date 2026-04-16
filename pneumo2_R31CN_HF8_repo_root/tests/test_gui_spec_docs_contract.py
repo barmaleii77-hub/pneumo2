@@ -14,8 +14,10 @@ IMPORTS_V3 = IMPORTS / "v3"
 IMPORTS_V12 = IMPORTS / "v12_design_recovery"
 IMPORTS_V13 = IMPORTS / "v13_ring_editor_migration"
 IMPORTS_V32 = IMPORTS / "v32_connector_reconciled"
+IMPORTS_V33 = IMPORTS / "v33_connector_reconciled"
 V32_COMPLETENESS = IMPORTS_V32 / "COMPLETENESS_ASSESSMENT.md"
 V32_WORKSTREAMS = IMPORTS_V32 / "PARALLEL_CHAT_WORKSTREAMS.md"
+V33_COMPLETENESS = IMPORTS_V33 / "COMPLETENESS_ASSESSMENT.md"
 
 CANON_17 = DOCS / "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md"
 CANON_18 = DOCS / "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md"
@@ -184,6 +186,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "v12_design_recovery/" in imports_readme
     assert "v13_ring_editor_migration/" in imports_readme
     assert "v32_connector_reconciled/" in imports_readme
+    assert "v33_connector_reconciled/" in imports_readme
     assert "connector-reconciled" in imports_readme
     assert "COMPLETENESS_ASSESSMENT.md" in imports_readme
     assert "PARALLEL_CHAT_WORKSTREAMS.md" in imports_readme
@@ -206,7 +209,10 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "v32_connector_reconciled/README.md" in project_sources_text
     assert "v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md" in project_sources_text
     assert "v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md" in project_sources_text
+    assert "v33_connector_reconciled/README.md" in project_sources_text
+    assert "v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md" in project_sources_text
     assert "pneumo_codex_tz_spec_connector_reconciled_v32.zip" in project_sources_text
+    assert "pneumo_codex_tz_spec_connector_reconciled_v33.zip" in project_sources_text
 
     assert "gui_spec_imports/foundations/README.md" in index_text
     assert "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md" in index_text
@@ -214,6 +220,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "GUI_SPEC_ARCHIVE_LINEAGE.md" in index_text
     assert "gui_spec_imports/v13_ring_editor_migration/README.md" in index_text
     assert "gui_spec_imports/v32_connector_reconciled/README.md" in index_text
+    assert "gui_spec_imports/v33_connector_reconciled/README.md" in index_text
     assert "COMPLETENESS_ASSESSMENT.md" in index_text
     assert "PARALLEL_CHAT_WORKSTREAMS.md" in index_text
     assert "специализированный addendum для `WS-RING`" in index_text
@@ -322,6 +329,28 @@ def test_v32_connector_reconciled_digest_is_registered() -> None:
     assert "knowledge_base_sync" in workstreams
 
 
+def test_v33_connector_reconciled_digest_is_registered() -> None:
+    readme_path = IMPORTS_V33 / "README.md"
+    assert readme_path.exists()
+    assert V33_COMPLETENESS.exists()
+
+    text = readme_path.read_text(encoding="utf-8")
+    assert "pneumo_codex_tz_spec_connector_reconciled_v33.zip" in text
+    assert "PACKAGE_INTEGRITY_POLICY.md" in text
+    assert "PLAYBOOK_CURRENT_HISTORICAL_STALE_CONTEXT.md" in text
+    assert "REPO_CANON_READ_ORDER.csv" in text
+    assert "REPO_CANON_GATE_MAPPING.csv" in text
+    assert "337" in text
+    assert "не объявляет runtime closure" in text
+
+    completeness = V33_COMPLETENESS.read_text(encoding="utf-8")
+    assert "Все `336` hashed files совпали с manifest" in completeness
+    assert "ISSUE-V33-001" in completeness
+    assert "ISSUE-V33-002" in completeness
+    assert "SOURCE_CONTEXT/PROMPT_CANONICAL_EXTRACTS_V33.md" in completeness
+    assert "active_label_drift_absent: false" in completeness
+
+
 def test_ring_related_lane_docs_reference_v13_contracts() -> None:
     ring_lane_text = RING_LANE.read_text(encoding="utf-8")
     results_lane_text = RESULTS_LANE.read_text(encoding="utf-8")
@@ -373,7 +402,9 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         IMPORTS_V12 / "README.md",
         IMPORTS_V13 / "README.md",
         IMPORTS_V32 / "README.md",
+        IMPORTS_V33 / "README.md",
         V32_COMPLETENESS,
+        V33_COMPLETENESS,
         V32_WORKSTREAMS,
     )
 

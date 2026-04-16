@@ -63,31 +63,34 @@ Operational note:
 4. [README.md](../README.md)
 5. [docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](./17_WINDOWS_DESKTOP_CAD_GUI_CANON.md)
 6. [docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](./18_PNEUMOAPP_WINDOWS_GUI_SPEC.md)
-7. [docs/context/gui_spec_imports/v32_connector_reconciled/README.md](./context/gui_spec_imports/v32_connector_reconciled/README.md)
-8. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
-9. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
+7. [docs/context/gui_spec_imports/v33_connector_reconciled/README.md](./context/gui_spec_imports/v33_connector_reconciled/README.md)
+8. [docs/context/gui_spec_imports/v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md](./context/gui_spec_imports/v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
+9. [docs/context/gui_spec_imports/v32_connector_reconciled/README.md](./context/gui_spec_imports/v32_connector_reconciled/README.md)
+10. [docs/context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md](./context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md)
+11. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
+12. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
 
 ### 3. Активные требования и рабочий backlog
 
-10. [docs/01_RequirementsFromContext.md](./01_RequirementsFromContext.md)
-11. [docs/10_NextStepsPlan.md](./10_NextStepsPlan.md)
-12. [docs/11_TODO.md](./11_TODO.md)
-13. [docs/12_Wishlist.md](./12_Wishlist.md)
-14. [docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.md](./12_AI_Wishlist_Canonical_Omnibus_2026-04-08.md)
+13. [docs/01_RequirementsFromContext.md](./01_RequirementsFromContext.md)
+14. [docs/10_NextStepsPlan.md](./10_NextStepsPlan.md)
+15. [docs/11_TODO.md](./11_TODO.md)
+16. [docs/12_Wishlist.md](./12_Wishlist.md)
+17. [docs/12_AI_Wishlist_Canonical_Omnibus_2026-04-08.md](./12_AI_Wishlist_Canonical_Omnibus_2026-04-08.md)
 
 ### 4. Исполняемые контракты и registries
 
-15. `pneumo_solver_ui/contracts/*`
-16. `pneumo_solver_ui/*contract*.py`
-17. `tests/test_*contract*`
+18. `pneumo_solver_ui/contracts/*`
+19. `pneumo_solver_ui/*contract*.py`
+20. `tests/test_*contract*`
 
 ### 5. История и архив
 
-18. `TODO_MASTER_*`, `WISHLIST_MASTER_*`
-19. `TODO_WISHLIST_R31*_ADDENDUM_*.md`
-20. `docs/consolidated/*`
-21. `docs/context/WISHLIST*`
-22. `docs/_legacy_DOCS_upper/*`
+21. `TODO_MASTER_*`, `WISHLIST_MASTER_*`
+22. `TODO_WISHLIST_R31*_ADDENDUM_*.md`
+23. `docs/consolidated/*`
+24. `docs/context/WISHLIST*`
+25. `docs/_legacy_DOCS_upper/*`
 
 ## Непереговорные правила проекта
 
@@ -200,6 +203,8 @@ Operational note:
 
 - [docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](./17_WINDOWS_DESKTOP_CAD_GUI_CANON.md)
 - [docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](./18_PNEUMOAPP_WINDOWS_GUI_SPEC.md)
+- [docs/context/gui_spec_imports/v33_connector_reconciled/README.md](./context/gui_spec_imports/v33_connector_reconciled/README.md)
+- [docs/context/gui_spec_imports/v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md](./context/gui_spec_imports/v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
 - [docs/context/gui_spec_imports/v32_connector_reconciled/README.md](./context/gui_spec_imports/v32_connector_reconciled/README.md)
 - [docs/context/gui_spec_imports/v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md](./context/gui_spec_imports/v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
 - [docs/context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md](./context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md)
@@ -240,6 +245,19 @@ Operational note:
   и V30 label в `CODEx_CONSUMPTION_ORDER.md` зафиксированы как caveats.
 - parallel chat workstreams: дальнейшая работа разбита на 16 independent lanes
   с русскими названиями, owned scope, handoff boundaries и стартовыми промтами.
+
+Что добавляет connector-reconciled v33 layer:
+
+- active replacement/уточнение v32 для package integrity и repo-canon conformance;
+- `PACKAGE_MANIFEST.json` больше не хэширует сам себя, integrity policy вынесен
+  в `PACKAGE_INTEGRITY_POLICY.md` и `PACKAGE_SELFCHECK_REPORT.json`;
+- dedicated `PLAYBOOK_CURRENT_HISTORICAL_STALE_CONTEXT.md` закрывает v32 caveat
+  по `PB-008`;
+- `REPO_CANON_READ_ORDER.csv` и `REPO_CANON_GATE_MAPPING.csv` фиксируют связь
+  `PROJECT_SOURCES -> 17 -> 18 -> parity/TODO` с package release gates;
+- v33 completeness assessment сохраняет runtime limits: producer truth,
+  cylinder packaging, measured performance, Windows visual acceptance и
+  imported-layer runtime proof не считаются закрытыми без живых artifacts.
 
 Связанные, но вспомогательные UX-источники:
 

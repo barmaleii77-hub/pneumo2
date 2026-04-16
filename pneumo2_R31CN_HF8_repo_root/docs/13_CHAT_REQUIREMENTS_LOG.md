@@ -107,6 +107,12 @@ The connector-reconciled v32 package is sufficient as a planning, contract, sour
 Источник: chat + v32 completeness assessment.
 ID: `REQ-0016`.
 
+17. Connector-reconciled GUI/TZ spec v33 supersedes v32 for active package-integrity and repo-conformance reference
+Archive C:/Users/Admin/Downloads/pneumo_codex_tz_spec_connector_reconciled_v33.zip is the active connector-reconciled GUI/TZ reference layer after v32. It fixes v32 manifest self-hash policy, adds package selfcheck/remediation, repo-canon read-order and gate mapping, prompt mandatory/enum audits, and dedicated PB-008 current/historical/stale provenance playbook. It still does not prove runtime closure for producer truth, cylinder packaging, measured performance, Windows visual acceptance or imported-layer runtime proof.
+Статус: активно.
+Источник: chat + archive:pneumo_codex_tz_spec_connector_reconciled_v33.
+ID: `REQ-0017`.
+
 ## Как ссылаться из будущих задач
 
 Если новая задача опирается на решение из чата, но не отражена в старом каноне, сначала проверить этот файл, а затем соответствующие plan-файлы из [docs/14_CHAT_PLANS_LOG.md](./14_CHAT_PLANS_LOG.md).

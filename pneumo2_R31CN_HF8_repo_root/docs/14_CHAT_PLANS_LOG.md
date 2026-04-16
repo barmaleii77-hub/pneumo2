@@ -162,6 +162,13 @@ ID: `PLAN-0020`.
 Источник: chat + v32 parallel workstreams.
 ID: `PLAN-0021`.
 
+22. Digest connector-reconciled v33 archive into knowledge base
+Назначение: Add v33 README and completeness assessment, update source priority docs and prompt index so future chats read v33 before v32 while still using v32 parallel workstreams.
+Артефакт: [context/gui_spec_imports/v33_connector_reconciled/README.md](./context/gui_spec_imports/v33_connector_reconciled/README.md)
+Статус: актуален.
+Источник: chat + archive:pneumo_codex_tz_spec_connector_reconciled_v33.
+ID: `PLAN-0022`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

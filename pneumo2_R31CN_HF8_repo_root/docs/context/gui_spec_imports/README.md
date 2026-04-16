@@ -17,9 +17,14 @@
 
 - `foundations/` — upstream prompt sources, предшествующие серии архивов
   `v1…v13`;
+- `v33_connector_reconciled/` — active connector-reconciled knowledge digest из
+  `pneumo_codex_tz_spec_connector_reconciled_v33.zip`; использовать как
+  текущий v33 source-priority, integrity/selfcheck/remediation и repo-canon
+  gate-mapping слой поверх v32;
 - `v32_connector_reconciled/` — active connector-reconciled knowledge digest из
-  `pneumo_codex_tz_spec_connector_reconciled_v32.zip`; использовать как карту
-  чтения V32 и как новый source-priority/requirements/acceptance слой поверх
+  `pneumo_codex_tz_spec_connector_reconciled_v32.zip`; использовать как
+  предыдущий connector-reconciled слой и как workstream-decomposition layer
+  через `PARALLEL_CHAT_WORKSTREAMS.md`, поверх
   `v3`, `v12` и `v13`, не заменяя `17/18`; внутри также лежат
   `COMPLETENESS_ASSESSMENT.md` и `PARALLEL_CHAT_WORKSTREAMS.md`;
 - `v3/` — active detailed machine-readable reference layer из
@@ -42,10 +47,12 @@
 1. Сначала читать `17` и `18` как канон для людей.
 2. Если нужен upstream provenance исходного design-intent, читать
    `foundations/*` как pre-`v1` prompt layer.
-3. Затем читать `v32_connector_reconciled/README.md` как active
-   connector-reconciled digest для V32: source authority, requirements,
-   acceptance, workspace contracts, playbooks, release gates и open gaps.
-4. Если нужно стартовать параллельную разработку, читать
+3. Затем читать `v33_connector_reconciled/README.md` как active
+   connector-reconciled digest для V33: integrity policy, selfcheck,
+   remediation, repo-canon read order, gate mapping и PB-008 provenance
+   playbook.
+4. Для контекста V32 и параллельной разработки читать
+   `v32_connector_reconciled/README.md` и
    `v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md`; если нужно понять
    достаточность архива, читать `v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md`.
 5. Затем использовать `v3/*` как checked-in detailed machine-readable reference для:
@@ -72,7 +79,9 @@
 - нормализация допускается только в производных docs/tests, а не в imported
   source artifacts;
 - при конфликте между imported sources и текущим каноном приоритет у `17/18`,
-  затем у `v32_connector_reconciled/README.md` как connector-reconciled digest,
+  затем у `v33_connector_reconciled/README.md` как active connector-reconciled
+  digest, затем у `v32_connector_reconciled/README.md` как previous
+  connector-reconciled digest/workstream layer,
   затем у `foundations/*` как upstream intent layer только для provenance,
   затем у checked-in detailed layer `v3`, затем у специализированного addendum
   `v13_ring_editor_migration` в пределах `WS-RING` и ring-to-suite handoff,
