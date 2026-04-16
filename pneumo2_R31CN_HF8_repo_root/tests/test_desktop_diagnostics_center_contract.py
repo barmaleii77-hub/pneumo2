@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import zipfile
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from pneumo_solver_ui.desktop_diagnostics_model import (
 )
 from pneumo_solver_ui.desktop_diagnostics_runtime import (
     append_desktop_diagnostics_run_log,
+    load_desktop_diagnostics_bundle_record,
     load_last_desktop_diagnostics_center_state,
     load_last_desktop_diagnostics_run_record,
     load_last_desktop_diagnostics_run_log_text,
@@ -26,6 +28,30 @@ from pneumo_solver_ui.desktop_diagnostics_runtime import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _analysis_manifest(
+    *,
+    run_id: str = "run-001",
+    manifest_hash: str = "hash-001",
+    state: str = "CURRENT",
+    mismatches: list[dict[str, str]] | None = None,
+) -> dict:
+    return {
+        "schema": "desktop_results_evidence_manifest",
+        "schema_version": "1.0.0",
+        "handoff_id": "HO-009",
+        "evidence_manifest_hash": manifest_hash,
+        "run_id": run_id,
+        "run_contract_hash": f"contract-{run_id}",
+        "compare_contract_id": f"compare-{run_id}",
+        "selected_artifact_list": [
+            {"key": "validation_json", "path": "validation.json"},
+            {"key": "latest_npz", "path": "anim_latest.npz"},
+        ],
+        "result_context": {"state": state, "selected": {"run_id": run_id}},
+        "mismatch_summary": {"state": state, "mismatches": list(mismatches or [])},
+    }
 
 
 def test_desktop_diagnostics_model_builds_headless_command_and_parses_paths() -> None:
@@ -64,6 +90,85 @@ def test_desktop_diagnostics_model_builds_headless_command_and_parses_paths() ->
     assert parse_run_full_diagnostics_output_line("noop") == {}
 
 
+def test_desktop_diagnostics_reads_analysis_evidence_from_send_bundles_first(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    out_dir = repo_root / "send_bundles"
+    workspace_exports = repo_root / "pneumo_solver_ui" / "workspace" / "exports"
+    out_dir.mkdir(parents=True)
+    workspace_exports.mkdir(parents=True)
+    (out_dir / "latest_analysis_evidence_manifest.json").write_text(
+        json.dumps(_analysis_manifest(run_id="run-sidecar", manifest_hash="hash-sidecar"), ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (workspace_exports / "analysis_evidence_manifest.json").write_text(
+        json.dumps(_analysis_manifest(run_id="run-workspace", manifest_hash="hash-workspace"), ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    bundle = load_desktop_diagnostics_bundle_record(repo_root, out_dir=out_dir)
+
+    assert bundle.latest_analysis_evidence_manifest_path == str(
+        (out_dir / "latest_analysis_evidence_manifest.json").resolve()
+    )
+    assert bundle.analysis_evidence_status == "READY"
+    assert bundle.analysis_evidence_context_state == "CURRENT"
+    assert bundle.analysis_evidence_manifest_hash == "hash-sidecar"
+    assert bundle.analysis_evidence_run_id == "run-sidecar"
+    assert bundle.analysis_evidence_artifact_count == 2
+    assert bundle.analysis_evidence_mismatch_count == 0
+
+
+def test_desktop_diagnostics_reads_analysis_evidence_workspace_fallback_and_warns(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    out_dir = repo_root / "send_bundles"
+    workspace = tmp_path / "effective_workspace"
+    out_dir.mkdir(parents=True)
+    (workspace / "exports").mkdir(parents=True)
+    monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(workspace))
+    (workspace / "exports" / "analysis_evidence_manifest.json").write_text(
+        json.dumps(
+            _analysis_manifest(
+                run_id="run-stale",
+                manifest_hash="hash-stale",
+                state="STALE",
+                mismatches=[{"key": "run_contract_hash", "current": "new", "selected": "old"}],
+            ),
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    bundle = load_desktop_diagnostics_bundle_record(repo_root, out_dir=out_dir)
+
+    assert bundle.latest_analysis_evidence_manifest_path == str(
+        (workspace / "exports" / "analysis_evidence_manifest.json").resolve()
+    )
+    assert bundle.analysis_evidence_status == "WARN"
+    assert bundle.analysis_evidence_context_state == "STALE"
+    assert bundle.analysis_evidence_manifest_hash == "hash-stale"
+    assert bundle.analysis_evidence_run_id == "run-stale"
+    assert bundle.analysis_evidence_mismatch_count == 1
+    assert any("context is STALE" in msg for msg in bundle.analysis_evidence_warnings)
+    assert any("context mismatch" in msg for msg in bundle.analysis_evidence_warnings)
+
+
+def test_desktop_diagnostics_marks_missing_analysis_evidence_with_results_action(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    out_dir = repo_root / "send_bundles"
+    out_dir.mkdir(parents=True)
+
+    bundle = load_desktop_diagnostics_bundle_record(repo_root, out_dir=out_dir)
+
+    assert bundle.analysis_evidence_status == "MISSING"
+    assert bundle.analysis_evidence_context_state == "MISSING"
+    assert bundle.latest_analysis_evidence_manifest_path == ""
+    assert "Results Center" in bundle.analysis_evidence_action
+    assert any("Analysis evidence / HO-009 missing" in msg for msg in bundle.analysis_evidence_warnings)
+
+
 def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_state(tmp_path: Path) -> None:
     out_dir = tmp_path / "send_bundles"
     out_dir.mkdir()
@@ -74,6 +179,11 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
             "bundle/meta.json",
             json.dumps({"release": "TEST", "run_id": "R1", "created_at": "2026-04-13 00:00:00"}),
         )
+    (out_dir / "latest_send_bundle_path.txt").write_text(str(zip_path.resolve()), encoding="utf-8")
+    (out_dir / "latest_send_bundle.sha256").write_text(
+        hashlib.sha256(zip_path.read_bytes()).hexdigest() + "  latest_send_bundle.zip\n",
+        encoding="utf-8",
+    )
 
     (out_dir / "last_bundle_meta.json").write_text(
         json.dumps(
@@ -155,7 +265,12 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert summary_md.name == LATEST_DESKTOP_DIAGNOSTICS_SUMMARY_MD
     assert payload["machine_paths"]["latest_summary_md"].endswith(LATEST_DESKTOP_DIAGNOSTICS_SUMMARY_MD)
     assert payload["machine_paths"]["latest_bundle_inspection_json"].endswith(LATEST_SEND_BUNDLE_INSPECTION_JSON)
+    assert payload["machine_paths"]["latest_bundle_path_txt"].endswith("latest_send_bundle_path.txt")
+    assert payload["machine_paths"]["latest_bundle_sha256"].endswith("latest_send_bundle.sha256")
+    assert "latest_analysis_evidence_manifest_json" in payload["machine_paths"]
     assert payload["machine_paths"]["latest_run_state_json"].endswith(LATEST_DESKTOP_DIAGNOSTICS_RUN_JSON)
+    assert payload["analysis_evidence"]["status"] == bundle.analysis_evidence_status
+    assert payload["analysis_evidence"]["context_state"] == bundle.analysis_evidence_context_state
     assert payload["bundle"]["latest_clipboard_status_path"].endswith("latest_send_bundle_clipboard_status.json")
     assert payload["ui"]["selected_tab"] == "bundle"
     assert payload["ui"]["active_bundle_out_dir"].endswith("send_bundles")
@@ -189,6 +304,8 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "ttk.Notebook" in center_src
     assert "write_desktop_diagnostics_center_state" in center_src
     assert "Машиночитаемые пути" in center_src
+    assert "Analysis evidence / HO-009" in center_src
+    assert "latest_analysis_evidence_manifest.json" in center_src
     assert "copy_latest_bundle_to_clipboard(" in center_src
     assert "out_dir=self._active_bundle_out_dir()" in center_src
     assert "def _schedule_poll(self) -> None:" in center_src
