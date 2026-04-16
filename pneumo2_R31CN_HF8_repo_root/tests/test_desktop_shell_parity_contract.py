@@ -121,6 +121,7 @@ def test_desktop_web_parity_registry_routes_keep_shell_and_tool_coverage() -> No
     assert "workspace.baseline_run.open" in commands
     assert "workspace.optimization.open" in commands
     assert "workspace.results_analysis.open" in commands
+    assert "analysis.engineering.open" in commands
     assert "workspace.animation.open" in commands
 
     for entry in entries:

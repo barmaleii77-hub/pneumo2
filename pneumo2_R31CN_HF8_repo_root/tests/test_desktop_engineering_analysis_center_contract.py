@@ -1,0 +1,77 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _read(rel: str) -> str:
+    return (ROOT / rel).read_text(encoding="utf-8", errors="replace")
+
+
+def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log() -> None:
+    src = _read("pneumo_solver_ui/tools/desktop_engineering_analysis_center.py")
+
+    assert "class DesktopEngineeringAnalysisCenter" in src
+    assert "DesktopEngineeringAnalysisRuntime" in src
+    assert 'workspace = ttk.Panedwindow(self, orient="horizontal")' in src
+    for label in (
+        "Обновить",
+        "Открыть выбранное",
+        "Экспорт evidence",
+        "System Influence",
+        "Full Report",
+        "Influence Staging",
+        "Собрать диагностику",
+    ):
+        assert label in src
+    assert "threading.Thread" in src
+    assert "ttk.Progressbar" in src
+    assert "status_var" in src
+    assert "log_text" in src
+    assert "def _run_system_influence" in src
+    assert "def _run_full_report" in src
+    assert "def _run_param_staging" in src
+
+
+def test_engineering_analysis_shell_discovery_is_wired_to_module_and_aliases() -> None:
+    spec_registry = _read("pneumo_solver_ui/desktop_spec_shell/registry.py")
+    legacy_registry = _read("pneumo_solver_ui/desktop_shell/registry.py")
+    legacy_contracts = _read("pneumo_solver_ui/desktop_shell/contracts.py")
+    adapter = _read("pneumo_solver_ui/desktop_shell/adapters/desktop_engineering_analysis_center_adapter.py")
+
+    assert "analysis.engineering.open" in spec_registry
+    assert "pneumo_solver_ui.tools.desktop_engineering_analysis_center" in spec_registry
+    assert "analysis.influence_and_exploration" in spec_registry
+    for alias in (
+        "engineering analysis",
+        "calibration",
+        "influence",
+        "sensitivity",
+        "system influence",
+        "калибровка",
+        "влияние",
+        "чувствительность",
+    ):
+        assert alias in spec_registry
+        assert alias in legacy_contracts
+
+    assert "build_desktop_engineering_analysis_center_spec" in legacy_registry
+    assert "desktop_engineering_analysis_center" in adapter
+    assert "DesktopEngineeringAnalysisRuntime" in adapter
+
+
+def test_engineering_analysis_send_bundle_sources_reference_expected_artifacts() -> None:
+    make_bundle = _read("pneumo_solver_ui/tools/make_send_bundle.py")
+    evidence = _read("pneumo_solver_ui/tools/send_bundle_evidence.py")
+    validate = _read("pneumo_solver_ui/tools/validate_send_bundle.py")
+    inspect = _read("pneumo_solver_ui/tools/inspect_send_bundle.py")
+
+    assert "ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME" in make_bundle
+    assert "ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME" in make_bundle
+    assert "BND-021" in evidence
+    assert "if engineering analysis used" in evidence
+    assert "release_blocking_if_missing\": False" in evidence
+    assert "engineering_analysis_evidence" in validate
+    assert "has_engineering_analysis_evidence" in inspect

@@ -6,6 +6,9 @@ from .adapters.desktop_animator_adapter import build_spec as build_desktop_anima
 from .adapters.desktop_diagnostics_center_adapter import (
     build_spec as build_desktop_diagnostics_center_spec,
 )
+from .adapters.desktop_engineering_analysis_center_adapter import (
+    build_spec as build_desktop_engineering_analysis_center_spec,
+)
 from .adapters.desktop_geometry_reference_adapter import (
     build_spec as build_desktop_geometry_reference_spec,
 )
@@ -30,6 +33,7 @@ def build_desktop_shell_specs() -> tuple[DesktopShellToolSpec, ...]:
         build_test_center_spec(),
         build_desktop_optimizer_center_spec(),
         build_desktop_results_center_spec(),
+        build_desktop_engineering_analysis_center_spec(),
         build_autotest_spec(),
         build_desktop_diagnostics_center_spec(),
         build_compare_viewer_spec(),
