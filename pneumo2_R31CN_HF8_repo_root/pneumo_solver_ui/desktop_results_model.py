@@ -26,6 +26,16 @@ class DesktopResultsOverviewRow:
 
 
 @dataclass(frozen=True)
+class DesktopResultsContextField:
+    key: str
+    title: str
+    current_value: str = ""
+    selected_value: str = ""
+    status: str = "UNKNOWN"
+    detail: str = ""
+
+
+@dataclass(frozen=True)
 class DesktopResultsSessionHandoff:
     summary: str = ""
     detail: str = ""
@@ -71,6 +81,14 @@ class DesktopResultsSnapshot:
     recent_artifacts: tuple[DesktopResultsArtifact, ...]
     suggested_next_action_key: str = ""
     suggested_next_artifact_key: str = ""
+    result_context_state: str = "UNKNOWN"
+    result_context_banner: str = "Контекст результата: выбранный результат пока не определён."
+    result_context_detail: str = ""
+    result_context_action: str = ""
+    result_context_fields: tuple[DesktopResultsContextField, ...] = ()
+    diagnostics_evidence_manifest_path: Path | None = None
+    diagnostics_evidence_manifest_hash: str = ""
+    diagnostics_evidence_manifest_status: str = "MISSING"
 
 
 def format_validation_summary(snapshot: DesktopResultsSnapshot) -> str:
@@ -114,14 +132,28 @@ def format_recent_runs_summary(snapshot: DesktopResultsSnapshot) -> str:
     return f"Последние прогоны: автотест={autotest} | диагностика={diagnostics}"
 
 
+def format_result_context_summary(snapshot: DesktopResultsSnapshot) -> str:
+    state = str(snapshot.result_context_state or "UNKNOWN").upper()
+    labels = {
+        "CURRENT": "текущий",
+        "HISTORICAL": "исторический",
+        "STALE": "устарел",
+        "MISSING": "нет данных",
+        "UNKNOWN": "не определён",
+    }
+    return f"Контекст результата: {labels.get(state, state.lower())}"
+
+
 __all__ = [
     "DesktopResultsArtifact",
+    "DesktopResultsContextField",
     "DesktopResultsOverviewRow",
     "DesktopResultsSessionHandoff",
     "DesktopResultsSnapshot",
     "format_npz_summary",
     "format_optimizer_gate_summary",
     "format_recent_runs_summary",
+    "format_result_context_summary",
     "format_triage_summary",
     "format_validation_summary",
 ]

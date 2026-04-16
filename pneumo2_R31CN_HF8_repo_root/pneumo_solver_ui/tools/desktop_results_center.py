@@ -15,6 +15,7 @@ from pneumo_solver_ui.desktop_results_model import (
     format_npz_summary,
     format_optimizer_gate_summary,
     format_recent_runs_summary,
+    format_result_context_summary,
     format_triage_summary,
     format_validation_summary,
 )
@@ -74,6 +75,7 @@ _BROWSE_CATEGORY_OPTIONS: tuple[tuple[str, str], ...] = (
     ("triage", "Разбор замечаний"),
     ("results", "Результаты"),
     ("anim_latest", "Визуализация"),
+    ("evidence", "Evidence"),
     ("runs", "Прогоны"),
     ("bundle", "Пакет"),
 )
@@ -87,6 +89,10 @@ _STATUS_LABELS: dict[str, str] = {
     "CRITICAL": "Критично",
     "PARTIAL": "Частично",
     "INFO": "Справка",
+    "CURRENT": "Текущий",
+    "HISTORICAL": "Исторический",
+    "STALE": "Устарел",
+    "UNKNOWN": "Не определён",
 }
 
 
@@ -133,6 +139,9 @@ class DesktopResultsCenter(ttk.Frame):
         self.triage_var = tk.StringVar(master=self, value="Разбор замечаний: критично=0 | предупреждений=0 | информации=0 | красных флагов=0")
         self.npz_var = tk.StringVar(master=self, value="Последний NPZ: пока недоступен.")
         self.runs_var = tk.StringVar(master=self, value="Последние прогоны: автотест=— | диагностика=—")
+        self.context_var = tk.StringVar(master=self, value="Контекст результата: не определён")
+        self.context_banner_var = tk.StringVar(master=self, value="Контекст результата: выбранный результат пока не определён.")
+        self.evidence_manifest_var = tk.StringVar(master=self, value="Evidence manifest: пока не экспортирован.")
         self.next_step_var = tk.StringVar(master=self, value="Следующий шаг: дождитесь первого снимка проверки и результатов.")
         self.next_detail_var = tk.StringVar(master=self, value="Пояснение: свежие артефакты проверки и результатов пока не появились.")
         self.handoff_summary_var = tk.StringVar(master=self, value="Передача последнего прогона: локальная точка передачи пока не сформирована.")
@@ -170,6 +179,8 @@ class DesktopResultsCenter(ttk.Frame):
         self.btn_open_selected.pack(side="left", padx=(8, 0))
         self.btn_diagnostics = ttk.Button(actions, text="Собрать диагностику", command=self._launch_full_diagnostics_gui)
         self.btn_diagnostics.pack(side="left", padx=(8, 0))
+        self.btn_export_evidence = ttk.Button(actions, text="Экспорт evidence", command=self._export_diagnostics_evidence)
+        self.btn_export_evidence.pack(side="left", padx=(8, 0))
         self.btn_compare = ttk.Button(actions, text="Сравнение", command=self._launch_compare_viewer)
         self.btn_compare.pack(side="left", padx=(8, 0))
         self.btn_animator = ttk.Button(actions, text="Аниматор", command=self._launch_animator)
@@ -200,6 +211,9 @@ class DesktopResultsCenter(ttk.Frame):
         ttk.Label(summary, textvariable=self.triage_var, wraplength=420, justify="left").pack(anchor="w", pady=(4, 0))
         ttk.Label(summary, textvariable=self.npz_var, wraplength=420, justify="left").pack(anchor="w", pady=(4, 0))
         ttk.Label(summary, textvariable=self.runs_var, wraplength=420, justify="left").pack(anchor="w", pady=(4, 0))
+        ttk.Label(summary, textvariable=self.context_var, wraplength=420, justify="left").pack(anchor="w", pady=(4, 0))
+        ttk.Label(summary, textvariable=self.context_banner_var, wraplength=420, justify="left").pack(anchor="w", pady=(4, 0))
+        ttk.Label(summary, textvariable=self.evidence_manifest_var, wraplength=420, justify="left").pack(anchor="w", pady=(4, 0))
 
         handoff = ttk.LabelFrame(summary_body, text="Следующий шаг", padding=10)
         handoff.pack(fill="x", pady=(10, 0))
@@ -303,6 +317,7 @@ class DesktopResultsCenter(ttk.Frame):
         tools.pack(fill="x", pady=(10, 0))
         ttk.Button(tools, text="Открыть send_bundles", command=self._open_send_bundles).pack(fill="x")
         ttk.Button(tools, text="Собрать диагностику", command=self._launch_full_diagnostics_gui).pack(fill="x", pady=(6, 0))
+        ttk.Button(tools, text="Экспорт evidence manifest", command=self._export_diagnostics_evidence).pack(fill="x", pady=(6, 0))
         ttk.Button(tools, text="Открыть центр отправки", command=self._launch_send_results_gui).pack(fill="x", pady=(6, 0))
 
         overview = ttk.LabelFrame(left_pane, text="Обзор проверок", padding=8)
@@ -416,6 +431,16 @@ class DesktopResultsCenter(ttk.Frame):
         self.triage_var.set(format_triage_summary(snapshot))
         self.npz_var.set(format_npz_summary(snapshot))
         self.runs_var.set(format_recent_runs_summary(snapshot))
+        self.context_var.set(format_result_context_summary(snapshot))
+        self.context_banner_var.set(snapshot.result_context_banner)
+        manifest_label = (
+            str(snapshot.diagnostics_evidence_manifest_path)
+            if snapshot.diagnostics_evidence_manifest_path is not None
+            else "пока не экспортирован"
+        )
+        self.evidence_manifest_var.set(
+            f"Evidence manifest: {snapshot.diagnostics_evidence_manifest_status} | {manifest_label}"
+        )
         self.next_step_var.set("Следующий шаг: " + snapshot.suggested_next_step)
         self.next_detail_var.set("Почему сейчас: " + snapshot.suggested_next_detail)
         self._render_overview(snapshot)
@@ -465,6 +490,7 @@ class DesktopResultsCenter(ttk.Frame):
             if (animator_pointer is not None or animator_npz is not None)
             else "disabled"
         )
+        self.btn_export_evidence.configure(state="normal")
         self.btn_run_next_step.configure(
             text=_button_text("Выполнить следующий шаг", snapshot.suggested_next_step),
             state=(
@@ -795,6 +821,7 @@ class DesktopResultsCenter(ttk.Frame):
             "open_diagnostics_gui",
             "open_send_center",
             "open_send_bundles",
+            "export_diagnostics_evidence",
         }:
             return True
         return False
@@ -812,12 +839,27 @@ class DesktopResultsCenter(ttk.Frame):
             format_triage_summary(snapshot),
             format_npz_summary(snapshot),
             format_recent_runs_summary(snapshot),
+            format_result_context_summary(snapshot),
+            snapshot.result_context_banner,
+            f"Evidence manifest: {snapshot.diagnostics_evidence_manifest_path or '—'}",
             "Область просмотра: " + self._browse_scope_summary(),
             "",
             "Рекомендуемый следующий шаг:",
             snapshot.suggested_next_step,
             f"Почему сейчас: {snapshot.suggested_next_detail}",
         ]
+        if snapshot.result_context_detail:
+            lines.append("Детали контекста: " + snapshot.result_context_detail)
+        if snapshot.result_context_action:
+            lines.append("Действие по контексту: " + snapshot.result_context_action)
+        if snapshot.result_context_fields:
+            lines.extend(["", "Поля контекста результата:"])
+            for field in snapshot.result_context_fields[:12]:
+                lines.append(
+                    "- "
+                    + f"{field.title}: {_status_label(field.status)} | "
+                    + f"current={field.current_value or '—'} | selected={field.selected_value or '—'}"
+                )
         if handoff is not None:
             lines.extend(
                 [
@@ -966,10 +1008,27 @@ class DesktopResultsCenter(ttk.Frame):
             elif action == "open_diagnostics_gui":
                 self.runtime.launch_full_diagnostics_gui()
             elif action == "open_send_center":
+                self.runtime.write_diagnostics_evidence_manifest(
+                    snapshot,
+                    handoff=self.session_handoff_state,
+                )
                 self.runtime.launch_send_results_gui()
             elif action == "open_send_bundles":
                 self.runtime.send_bundles_dir.mkdir(parents=True, exist_ok=True)
                 _open_path(self.runtime.send_bundles_dir)
+            elif action == "export_diagnostics_evidence":
+                manifest_path = self.runtime.write_diagnostics_evidence_manifest(
+                    snapshot,
+                    handoff=self.session_handoff_state,
+                )
+                self.refresh()
+                artifact = self.runtime.artifact_by_key(
+                    self.snapshot_state or snapshot,
+                    "diagnostics_evidence_manifest",
+                )
+                self._select_artifact(artifact)
+                self.status_var.set(f"Evidence manifest exported: {manifest_path}")
+                return
             else:
                 return
             self.status_var.set(success_message or f"Action completed: {action}")
@@ -1095,6 +1154,12 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_send_bundles",
             success_message=f"Opened: {self.runtime.send_bundles_dir}",
+        )
+
+    def _export_diagnostics_evidence(self) -> None:
+        self._run_action(
+            "export_diagnostics_evidence",
+            success_message="Evidence manifest exported for diagnostics.",
         )
 
     def _launch_compare_viewer(self) -> None:

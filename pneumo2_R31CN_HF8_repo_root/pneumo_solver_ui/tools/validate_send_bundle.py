@@ -65,6 +65,17 @@ from .send_bundle_contract import (
     choose_anim_snapshot,
     extract_anim_snapshot,
 )
+from .send_bundle_evidence import (
+    ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME,
+    ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME,
+    EVIDENCE_MANIFEST_ARCNAME,
+    GEOMETRY_REFERENCE_EVIDENCE_ARCNAME,
+    GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME,
+    evidence_manifest_release_errors,
+    evidence_manifest_warnings,
+    load_evidence_manifest_from_zip,
+    summarize_geometry_reference_evidence,
+)
 
 
 try:
@@ -214,6 +225,9 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
         "release_risks": [],
         "stats": {},
         "anim_latest": {},
+        "evidence_manifest": {},
+        "engineering_analysis_evidence": {},
+        "geometry_reference_evidence": {},
         "optimizer_scope": {},
         "optimizer_scope_gate": {},
     }
@@ -361,6 +375,61 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
             if not isinstance(manifest_obj, dict):
                 errors.append("bundle/manifest.json is not a JSON object")
                 manifest_obj = {}
+
+            evidence_obj = load_evidence_manifest_from_zip(z)
+            if evidence_obj:
+                rep["evidence_manifest"] = dict(evidence_obj)
+                for msg in evidence_manifest_warnings(evidence_obj):
+                    if msg not in warnings:
+                        warnings.append(msg)
+                for msg in evidence_manifest_release_errors(evidence_obj):
+                    if msg not in errors:
+                        errors.append(msg)
+            else:
+                warnings.append(f"Missing {EVIDENCE_MANIFEST_ARCNAME} (merged diagnostics evidence manifest)")
+
+            engineering_name = ""
+            if ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME in name_set:
+                engineering_name = ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME
+            elif ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME in name_set:
+                engineering_name = ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME
+            if engineering_name:
+                engineering_obj = _read_json(engineering_name)
+                if isinstance(engineering_obj, dict):
+                    validation_obj = dict(engineering_obj.get("validation") or {})
+                    rep["engineering_analysis_evidence"] = {
+                        "status": "READY" if engineering_obj.get("evidence_manifest_hash") else "WARN",
+                        "source_path": engineering_name,
+                        "schema": str(engineering_obj.get("schema") or ""),
+                        "evidence_manifest_hash": str(engineering_obj.get("evidence_manifest_hash") or ""),
+                        "run_dir": str(engineering_obj.get("run_dir") or ""),
+                        "analysis_status": str(validation_obj.get("status") or ""),
+                        "influence_status": str(validation_obj.get("influence_status") or ""),
+                        "calibration_status": str(validation_obj.get("calibration_status") or ""),
+                        "sensitivity_row_count": len(engineering_obj.get("sensitivity_summary") or []),
+                    }
+                else:
+                    warnings.append(f"{engineering_name} is not valid JSON")
+
+            geometry_reference_name = ""
+            if GEOMETRY_REFERENCE_EVIDENCE_ARCNAME in name_set:
+                geometry_reference_name = GEOMETRY_REFERENCE_EVIDENCE_ARCNAME
+            elif GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME in name_set:
+                geometry_reference_name = GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME
+            if geometry_reference_name:
+                geometry_reference_obj = _read_json(geometry_reference_name)
+                if isinstance(geometry_reference_obj, dict):
+                    geometry_summary = summarize_geometry_reference_evidence(
+                        geometry_reference_obj,
+                        source_path=geometry_reference_name,
+                    )
+                    rep["geometry_reference_evidence"] = geometry_summary
+                    for item in geometry_summary.get("warnings") or []:
+                        msg = str(item).strip()
+                        if msg and msg not in warnings:
+                            warnings.append(msg)
+                else:
+                    warnings.append(f"{geometry_reference_name} is not valid JSON")
 
             optimizer_scope_sources: Dict[str, Dict[str, Any]] = {}
             triage_scope = extract_optimizer_scope_from_triage(_read_json("triage/triage_report.json"))
@@ -692,6 +761,9 @@ def _render_md(rep: Dict[str, Any]) -> str:
     warnings = rep.get("warnings") or []
     release_risks = rep.get("release_risks") or []
     anim = rep.get("anim_latest") or {}
+    evidence = rep.get("evidence_manifest") or {}
+    engineering = rep.get("engineering_analysis_evidence") or {}
+    analysis_handoff = evidence.get("analysis_handoff") or {}
     optimizer_scope = rep.get("optimizer_scope") or {}
     optimizer_scope_gate = rep.get("optimizer_scope_gate") or {}
     ui_autosave = rep.get("ui_autosave") or {}
@@ -705,11 +777,37 @@ def _render_md(rep: Dict[str, Any]) -> str:
         f"- zip_path: `{rep.get('zip_path')}`",
         f"- release: `{rep.get('release')}`",
         "",
+        "## Evidence manifest",
+        "",
+        f"- present: `{bool(evidence)}`",
+        f"- collection_mode: `{evidence.get('collection_mode') or 'n/a'}`",
+        f"- finalization_stage: `{evidence.get('finalization_stage') or 'n/a'}`",
+        f"- zip_sha256: `{evidence.get('zip_sha256') or 'n/a'}`",
+        f"- pb002_missing_required_count: `{evidence.get('pb002_missing_required_count')}`",
+        f"- missing_required_count: `{evidence.get('missing_required_count')}`",
+        f"- missing_optional_count: `{evidence.get('missing_optional_count')}`",
+        f"- analysis_handoff: `{analysis_handoff.get('status') or 'MISSING'}` / context=`{analysis_handoff.get('result_context_state') or 'MISSING'}` / run=`{analysis_handoff.get('run_id') or '-'}`",
+        f"- analysis_handoff_mismatches: `{analysis_handoff.get('mismatch_count') or 0}`",
+        "",
+        "### Missing evidence warnings",
+        "",
+        _md_list([str(x) for x in (evidence.get('missing_warnings') or [])]),
+        "",
         "## Stats",
         "",
         "```json",
         json.dumps(stats, ensure_ascii=False, indent=2),
         "```",
+        "",
+        "## Engineering analysis evidence",
+        "",
+        f"- present: `{bool(engineering)}`",
+        f"- status: `{engineering.get('status') or 'MISSING'}`",
+        f"- source_path: `{engineering.get('source_path') or '-'}`",
+        f"- evidence_manifest_hash: `{engineering.get('evidence_manifest_hash') or '-'}`",
+        f"- influence_status: `{engineering.get('influence_status') or '-'}`",
+        f"- calibration_status: `{engineering.get('calibration_status') or '-'}`",
+        f"- sensitivity_row_count: `{engineering.get('sensitivity_row_count')}`",
         "",
         "## Optimizer scope",
         "",
@@ -717,12 +815,12 @@ def _render_md(rep: Dict[str, Any]) -> str:
         f"- release_gate: `{optimizer_scope_gate.get('release_gate') or 'n/a'}`",
         f"- release_gate_reason: `{optimizer_scope_gate.get('release_gate_reason') or 'n/a'}`",
         f"- release_risk: `{optimizer_scope_gate.get('release_risk')}`",
-        f"- canonical_source: `{optimizer_scope.get('canonical_source') or 'вЂ”'}`",
+        f"- canonical_source: `{optimizer_scope.get('canonical_source') or '-'}`",
         f"- scope_sync_ok: `{optimizer_scope.get('scope_sync_ok')}`",
-        f"- Problem scope: `{optimizer_scope.get('problem_hash_short') or optimizer_scope.get('problem_hash') or 'вЂ”'}`",
-        f"- Hash mode: `{optimizer_scope.get('problem_hash_mode') or 'вЂ”'}`",
-        f"- objective_keys: `{', '.join(str(x) for x in (optimizer_scope.get('objective_keys') or [])) or 'вЂ”'}`",
-        f"- penalty_key: `{optimizer_scope.get('penalty_key') or 'вЂ”'}`",
+        f"- Problem scope: `{optimizer_scope.get('problem_hash_short') or optimizer_scope.get('problem_hash') or '-'}`",
+        f"- Hash mode: `{optimizer_scope.get('problem_hash_mode') or '-'}`",
+        f"- objective_keys: `{', '.join(str(x) for x in (optimizer_scope.get('objective_keys') or [])) or '-'}`",
+        f"- penalty_key: `{optimizer_scope.get('penalty_key') or '-'}`",
         f"- penalty_tol: `{optimizer_scope.get('penalty_tol')}`",
         "",
         "### Optimizer scope issues",

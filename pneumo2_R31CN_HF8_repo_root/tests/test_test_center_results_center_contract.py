@@ -9,6 +9,7 @@ from pneumo_solver_ui.desktop_results_model import (
     DesktopResultsSnapshot,
     format_npz_summary,
     format_optimizer_gate_summary,
+    format_result_context_summary,
     format_triage_summary,
     format_validation_summary,
 )
@@ -57,6 +58,20 @@ def test_desktop_results_center_uses_split_workspace_and_scrollable_summary_pane
     assert 'right_pane = ttk.Panedwindow(right_column, orient="vertical")' in src
     assert "summary_host = ScrollableFrame(right_pane)" in src
     assert 'ttk.Sizegrip(footer).pack(side="right")' in src
+
+
+def test_desktop_results_center_refreshes_analysis_evidence_before_opening_send_center() -> None:
+    src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_results_center.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    block = src.split('elif action == "open_send_center":', 1)[1].split(
+        'elif action == "open_send_bundles":',
+        1,
+    )[0]
+
+    assert "write_diagnostics_evidence_manifest(" in block
+    assert block.index("write_diagnostics_evidence_manifest(") < block.index("launch_send_results_gui()")
 
 
 def test_test_center_gui_uses_left_controls_and_right_log_workspace() -> None:
@@ -175,6 +190,7 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert overview["send_bundle_validation"].status == "WARN"
     assert "warnings=2" in overview["send_bundle_validation"].detail
     assert overview["send_bundle_validation"].action_key == "open_artifact"
+    assert overview["selected_result_context"].action_key == "export_diagnostics_evidence"
     assert overview["triage_report"].status == "CRITICAL"
     assert "critical=1" in overview["triage_report"].detail
     assert overview["triage_report"].action_key == "open_artifact"
@@ -306,6 +322,212 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert "FAIL" in format_optimizer_gate_summary(snapshot)
     assert "критичных=1" in format_triage_summary(snapshot)
     assert "anim_latest.npz" in format_npz_summary(snapshot)
+    assert format_result_context_summary(snapshot).startswith("Контекст результата:")
+
+
+def test_desktop_results_runtime_surfaces_stale_selected_result_context(tmp_path: Path, monkeypatch) -> None:
+    repo_root = tmp_path / "repo"
+    send_bundles = repo_root / "send_bundles"
+    send_bundles.mkdir(parents=True, exist_ok=True)
+    validation_path = send_bundles / "latest_send_bundle_validation.json"
+    validation_path.write_text(
+        json.dumps(
+            {
+                "ok": True,
+                "errors": [],
+                "warnings": [],
+                "result_context": {
+                    "current": {
+                        "run_id": "run-current",
+                        "run_contract_hash": "run-hash-current",
+                        "objective_contract_hash": "objective-current",
+                        "scenario_lineage_hash": "ring-current",
+                    },
+                    "selected": {
+                        "run_id": "run-historical",
+                        "run_contract_hash": "run-hash-historical",
+                        "objective_contract_hash": "objective-current",
+                        "scenario_lineage_hash": "ring-historical",
+                        "compare_contract_hash": "compare-001",
+                    },
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (send_bundles / "latest_send_bundle_validation.md").write_text(
+        "# validation\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.collect_anim_latest_diagnostics_summary",
+        lambda include_meta=True: {},
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.load_latest_send_bundle_anim_dashboard",
+        lambda out_dir: {},
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.format_anim_dashboard_brief_lines",
+        lambda anim: [],
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.build_anim_operator_recommendations",
+        lambda anim: [],
+    )
+
+    runtime = DesktopResultsRuntime(repo_root=repo_root, python_executable="python")
+    snapshot = runtime.snapshot()
+    overview = {row.key: row for row in snapshot.validation_overview_rows}
+    context_fields = {field.key: field for field in snapshot.result_context_fields}
+
+    assert snapshot.result_context_state == "STALE"
+    assert "Текущая постановка отличается" in snapshot.result_context_banner
+    assert "run_contract_hash" in snapshot.result_context_detail
+    assert "scenario_lineage_hash" in snapshot.result_context_detail
+    assert overview["selected_result_context"].status == "STALE"
+    assert overview["selected_result_context"].action_key == "export_diagnostics_evidence"
+    assert context_fields["objective_contract_hash"].status == "CURRENT"
+    assert context_fields["run_contract_hash"].status == "STALE"
+    assert context_fields["run_contract_hash"].selected_value == "run-hash-historical"
+    assert context_fields["scenario_lineage_hash"].current_value == "ring-current"
+    assert format_result_context_summary(snapshot) == "Контекст результата: устарел"
+
+
+def test_desktop_results_runtime_keeps_validation_report_visible_without_json(tmp_path: Path, monkeypatch) -> None:
+    repo_root = tmp_path / "repo"
+    send_bundles = repo_root / "send_bundles"
+    send_bundles.mkdir(parents=True, exist_ok=True)
+    validation_md = send_bundles / "latest_send_bundle_validation.md"
+    validation_md.write_text("# validation\noperator report\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.collect_anim_latest_diagnostics_summary",
+        lambda include_meta=True: {},
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.load_latest_send_bundle_anim_dashboard",
+        lambda out_dir: {},
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.format_anim_dashboard_brief_lines",
+        lambda anim: [],
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.build_anim_operator_recommendations",
+        lambda anim: [],
+    )
+
+    runtime = DesktopResultsRuntime(repo_root=repo_root, python_executable="python")
+    snapshot = runtime.snapshot()
+    overview = {row.key: row for row in snapshot.validation_overview_rows}
+    validation_artifact = runtime.artifact_by_key(snapshot, "validation_json")
+
+    assert snapshot.latest_validation_json_path is None
+    assert snapshot.latest_validation_md_path == validation_md.resolve()
+    assert overview["send_bundle_validation"].evidence_path == validation_md.resolve()
+    assert overview["send_bundle_validation"].artifact_key == "validation_md"
+    assert validation_artifact is not None
+    assert validation_artifact.key == "validation_md"
+    assert "Проверка в Markdown" in {item.title for item in snapshot.recent_artifacts}
+
+
+def test_desktop_results_runtime_exports_diagnostics_evidence_manifest_input(tmp_path: Path, monkeypatch) -> None:
+    repo_root = tmp_path / "repo"
+    send_bundles = repo_root / "send_bundles"
+    send_bundles.mkdir(parents=True, exist_ok=True)
+    (send_bundles / "latest_send_bundle_validation.json").write_text(
+        json.dumps(
+            {
+                "ok": True,
+                "errors": [],
+                "warnings": [],
+                "result_context": {
+                    "current": {
+                        "run_id": "run-777",
+                        "run_contract_hash": "run-hash-777",
+                        "analysis_context_hash": "analysis-777",
+                        "compare_contract_hash": "compare-777",
+                    },
+                    "selected": {
+                        "run_id": "run-777",
+                        "run_contract_hash": "run-hash-777",
+                        "analysis_context_hash": "analysis-777",
+                        "compare_contract_hash": "compare-777",
+                    },
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (send_bundles / "latest_send_bundle_validation.md").write_text("# validation\n", encoding="utf-8")
+    latest_npz = repo_root / "pneumo_solver_ui" / "workspace" / "exports" / "anim_latest.npz"
+    latest_pointer = latest_npz.with_suffix(".json")
+    latest_npz.parent.mkdir(parents=True, exist_ok=True)
+    latest_npz.write_bytes(b"npz")
+    latest_pointer.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.collect_anim_latest_diagnostics_summary",
+        lambda include_meta=True: {
+            "anim_latest_npz_path": str(latest_npz),
+            "anim_latest_pointer_json": str(latest_pointer),
+            "anim_latest_visual_cache_token": "tok-777",
+        },
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.load_latest_send_bundle_anim_dashboard",
+        lambda out_dir: {},
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.format_anim_dashboard_brief_lines",
+        lambda anim: [],
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.build_anim_operator_recommendations",
+        lambda anim: [],
+    )
+
+    runtime = DesktopResultsRuntime(repo_root=repo_root, python_executable="python")
+    snapshot = runtime.snapshot()
+    manifest_path = runtime.write_diagnostics_evidence_manifest(
+        snapshot,
+        handoff=DesktopResultsSessionHandoff(
+            summary="rc=0",
+            detail="Pinned run.",
+            step_lines=("Autotest: rc=0",),
+        ),
+    )
+    workspace_manifest = (
+        repo_root / "pneumo_solver_ui" / "workspace" / "exports" / "analysis_evidence_manifest.json"
+    )
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    refreshed = runtime.snapshot()
+    artifact_keys = {item["key"] for item in payload["selected_artifact_list"]}
+
+    assert manifest_path == (send_bundles / "latest_analysis_evidence_manifest.json").resolve()
+    assert workspace_manifest.exists()
+    assert payload["schema"] == "desktop_results_evidence_manifest"
+    assert payload["handoff_id"] == "HO-009"
+    assert payload["produced_by"] == "WS-ANALYSIS"
+    assert payload["consumed_by"] == "WS-DIAGNOSTICS"
+    assert payload["run_id"] == "run-777"
+    assert payload["run_contract_hash"] == "run-hash-777"
+    assert payload["compare_contract_id"] == "compare-777"
+    assert payload["result_context"]["state"] == "CURRENT"
+    assert payload["mismatch_summary"]["state"] == "CURRENT"
+    assert payload["evidence_manifest_hash"]
+    assert "validation_json" in artifact_keys
+    assert "latest_npz" in artifact_keys
+    assert payload["selected_filters"]["handoff_present"] is True
+    assert refreshed.diagnostics_evidence_manifest_path == manifest_path
+    assert refreshed.diagnostics_evidence_manifest_status == "READY"
+    assert refreshed.diagnostics_evidence_manifest_hash == payload["evidence_manifest_hash"]
 
 
 def test_desktop_results_runtime_builds_branch_args() -> None:

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from pneumo_solver_ui.desktop_results_model import (
     DesktopResultsArtifact,
+    DesktopResultsContextField,
     DesktopResultsOverviewRow,
     DesktopResultsSessionHandoff,
     DesktopResultsSnapshot,
@@ -176,6 +179,231 @@ def _dedupe_text_items(items: list[str] | tuple[str, ...]) -> tuple[str, ...]:
             out.append(text)
             seen.add(text)
     return tuple(out)
+
+
+_CONTEXT_FIELD_TITLES: dict[str, str] = {
+    "run_id": "Run ID",
+    "run_contract_hash": "Run contract hash",
+    "selected_run_hash": "Selected run hash",
+    "analysis_context_hash": "Analysis context hash",
+    "compare_contract_hash": "Compare contract hash",
+    "evidence_manifest_hash": "Evidence manifest hash",
+    "objective_contract_hash": "Objective contract hash",
+    "hard_gate_key": "Hard gate key",
+    "hard_gate_tolerance": "Hard gate tolerance",
+    "active_baseline_hash": "Active baseline hash",
+    "suite_snapshot_hash": "Suite snapshot hash",
+    "scenario_lineage_hash": "Scenario lineage hash",
+    "problem_hash": "Problem hash",
+    "problem_hash_mode": "Problem hash mode",
+    "objective_keys": "Objective keys",
+    "penalty_key": "Penalty key",
+    "penalty_tol": "Penalty tolerance",
+    "visual_cache_token": "Anim visual cache token",
+}
+
+_CONTEXT_FIELD_KEYS: tuple[str, ...] = tuple(_CONTEXT_FIELD_TITLES)
+
+_CONTEXT_KEY_ALIASES: dict[str, tuple[str, ...]] = {
+    "visual_cache_token": ("visual_cache_token", "anim_latest_visual_cache_token"),
+    "run_contract_hash": ("run_contract_hash", "selected_run_hash"),
+    "compare_contract_hash": ("compare_contract_hash", "compare_contract_id"),
+}
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _json_dumps_canonical(obj: Any) -> str:
+    return json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(dict(payload), ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(str(tmp), str(path))
+
+
+def _effective_workspace_dir(repo_root: Path) -> Path:
+    raw = os.environ.get("PNEUMO_WORKSPACE_DIR", "").strip()
+    if raw:
+        try:
+            return Path(raw).expanduser().resolve()
+        except Exception:
+            return Path(raw).expanduser()
+    return (Path(repo_root) / "pneumo_solver_ui" / "workspace").resolve()
+
+
+def _as_mapping(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _nested_mapping(root: Mapping[str, Any], *path: str) -> dict[str, Any]:
+    current: Any = root
+    for key in path:
+        if not isinstance(current, Mapping):
+            return {}
+        current = current.get(key)
+    return _as_mapping(current)
+
+
+def _stringify_context_value(value: Any) -> str:
+    if value in (None, "", [], {}):
+        return ""
+    if isinstance(value, (Mapping, list, tuple)):
+        try:
+            return json.dumps(value, ensure_ascii=False, sort_keys=True)
+        except Exception:
+            return str(value)
+    return str(value)
+
+
+def _context_value(mapping: Mapping[str, Any], key: str) -> str:
+    aliases = _CONTEXT_KEY_ALIASES.get(key, (key,))
+    for alias in aliases:
+        if alias in mapping:
+            value = _stringify_context_value(mapping.get(alias))
+            if value:
+                return value
+    return ""
+
+
+def _merge_context(dst: dict[str, Any], src: Mapping[str, Any]) -> None:
+    for key in _CONTEXT_FIELD_KEYS:
+        if _context_value(dst, key):
+            continue
+        value = _context_value(src, key)
+        if value:
+            dst[key] = value
+
+
+def _extract_result_context(
+    *,
+    validation_payload: Mapping[str, Any],
+    triage_payload: Mapping[str, Any],
+    anim_diag: Mapping[str, Any],
+) -> dict[str, Any]:
+    result_context = _nested_mapping(validation_payload, "result_context")
+    current: dict[str, Any] = {}
+    selected: dict[str, Any] = {}
+
+    for src in (
+        _nested_mapping(result_context, "current"),
+        _nested_mapping(result_context, "current_context"),
+        _nested_mapping(validation_payload, "current_context"),
+        _nested_mapping(validation_payload, "optimizer_scope", "current"),
+    ):
+        _merge_context(current, src)
+
+    for src in (
+        _nested_mapping(result_context, "selected"),
+        _nested_mapping(result_context, "selected_context"),
+        _nested_mapping(validation_payload, "selected_context"),
+        _nested_mapping(validation_payload, "analysis_context"),
+        _nested_mapping(validation_payload, "optimizer_scope", "selected"),
+    ):
+        _merge_context(selected, src)
+
+    _merge_context(selected, result_context)
+    _merge_context(selected, _as_mapping(validation_payload.get("optimizer_scope")))
+    _merge_context(selected, _as_mapping(triage_payload.get("dist_progress")))
+    _merge_context(selected, anim_diag)
+
+    fields: list[DesktopResultsContextField] = []
+    mismatches: list[str] = []
+    comparable_count = 0
+    for key in _CONTEXT_FIELD_KEYS:
+        current_value = _context_value(current, key)
+        selected_value = _context_value(selected, key)
+        if not current_value and not selected_value:
+            continue
+        status = "HISTORICAL" if selected_value else "MISSING"
+        detail = ""
+        if current_value and selected_value:
+            comparable_count += 1
+            if current_value == selected_value:
+                status = "CURRENT"
+            else:
+                status = "STALE"
+                detail = f"{key}: current={current_value} | selected={selected_value}"
+                mismatches.append(key)
+        elif current_value and not selected_value:
+            status = "MISSING"
+            detail = f"{key}: current context exists, selected result did not publish it"
+        fields.append(
+            DesktopResultsContextField(
+                key=key,
+                title=_CONTEXT_FIELD_TITLES.get(key, key),
+                current_value=current_value,
+                selected_value=selected_value,
+                status=status,
+                detail=detail,
+            )
+        )
+
+    explicit_state = str(
+        result_context.get("state")
+        or result_context.get("context_state")
+        or validation_payload.get("result_context_state")
+        or ""
+    ).strip().upper()
+    selected_has_signal = any(_context_value(selected, key) for key in _CONTEXT_FIELD_KEYS)
+    current_has_signal = any(_context_value(current, key) for key in _CONTEXT_FIELD_KEYS)
+
+    if mismatches:
+        state = "STALE"
+        banner = "Текущая постановка отличается от выбранного результата."
+        detail = "Различаются поля: " + ", ".join(mismatches)
+        action = "Откройте compare contract или переключите контекст; diagnostics export сохранит оба контекста."
+    elif explicit_state in {"CURRENT", "HISTORICAL", "STALE"}:
+        state = explicit_state
+        banner = {
+            "CURRENT": "Выбранный результат соответствует текущему контексту.",
+            "HISTORICAL": "Открыт исторический результат с frozen context.",
+            "STALE": "Текущий контекст помечен как stale для выбранного результата.",
+        }[state]
+        detail = str(result_context.get("detail") or result_context.get("banner_detail") or "")
+        action = str(result_context.get("action") or result_context.get("required_action") or "")
+    elif selected_has_signal and current_has_signal and comparable_count > 0:
+        state = "CURRENT"
+        banner = "Выбранный результат соответствует текущему контексту."
+        detail = "Совпали опубликованные context/hash поля."
+        action = "Можно переходить к compare, animator или diagnostics evidence export."
+    elif selected_has_signal:
+        state = "HISTORICAL"
+        banner = "Открыт исторический результат с frozen context."
+        detail = "Текущий контекст не опубликован для полной сверки; результат остаётся historical, не silently current."
+        action = "Для актуализации откройте текущий run или экспортируйте evidence как historical."
+    else:
+        state = "MISSING"
+        banner = "Контекст результата отсутствует."
+        detail = "Validation report/run summary не опубликовали run/context hashes."
+        action = "Запустите диагностику или соберите пакет отправки со свежими result context fields."
+
+    return {
+        "state": state,
+        "banner": banner,
+        "detail": detail,
+        "action": action,
+        "fields": tuple(fields),
+        "current": dict(current),
+        "selected": dict(selected),
+        "mismatches": tuple(mismatches),
+    }
 
 
 def _suggested_next_step(
@@ -359,6 +587,21 @@ class DesktopResultsRuntime:
 
         latest_autotest_run_dir = _latest_child_dir(self.autotest_runs_dir)
         latest_diagnostics_run_dir = _latest_child_dir(self.diagnostics_runs_dir)
+        context = _extract_result_context(
+            validation_payload=validation_payload,
+            triage_payload=triage_payload,
+            anim_diag=anim_diag,
+        )
+        workspace_manifest_path = (
+            _effective_workspace_dir(self.repo_root) / "exports" / "analysis_evidence_manifest.json"
+        )
+        diagnostics_evidence_manifest_path = _existing_path(
+            out_dir / "latest_analysis_evidence_manifest.json"
+        ) or _existing_path(workspace_manifest_path)
+        evidence_manifest_payload = _safe_read_json_dict(diagnostics_evidence_manifest_path)
+        diagnostics_evidence_manifest_hash = str(
+            evidence_manifest_payload.get("evidence_manifest_hash") or ""
+        )
 
         items: list[DesktopResultsArtifact] = []
         _append_artifact(items, key="send_bundle_zip", title="Последний ZIP пакета отправки", category="bundle", path=latest_zip_path)
@@ -373,6 +616,14 @@ class DesktopResultsRuntime:
         _append_artifact(items, key="mnemo_event_log", title="Журнал событий мнемосхемы", category="results", path=latest_mnemo_event_log_path)
         _append_artifact(items, key="autotest_run", title="Последний каталог автотеста", category="runs", path=latest_autotest_run_dir)
         _append_artifact(items, key="diagnostics_run", title="Последний каталог диагностики", category="runs", path=latest_diagnostics_run_dir)
+        _append_artifact(
+            items,
+            key="diagnostics_evidence_manifest",
+            title="Evidence manifest для диагностики",
+            category="evidence",
+            path=diagnostics_evidence_manifest_path,
+            detail="HO-009 WS-ANALYSIS -> WS-DIAGNOSTICS",
+        )
 
         validation_status = _validation_status(
             ok=validation_payload.get("ok")
@@ -475,6 +726,16 @@ class DesktopResultsRuntime:
                 evidence_path=validation_json_path,
                 action_key="open_artifact",
                 artifact_key="validation_json" if validation_json_path is not None else "validation_md",
+            ),
+            DesktopResultsOverviewRow(
+                key="selected_result_context",
+                title="Контекст выбранного результата",
+                status=str(context.get("state") or "MISSING"),
+                detail=str(context.get("banner") or ""),
+                next_action=str(context.get("action") or "Экспортировать evidence manifest"),
+                evidence_path=diagnostics_evidence_manifest_path,
+                action_key="export_diagnostics_evidence",
+                artifact_key="diagnostics_evidence_manifest",
             ),
             DesktopResultsOverviewRow(
                 key="anim_latest_results",
@@ -585,6 +846,16 @@ class DesktopResultsRuntime:
             suggested_next_artifact_key=suggested_next_artifact_key,
             validation_overview_rows=tuple(overview_rows),
             recent_artifacts=tuple(items),
+            result_context_state=str(context.get("state") or "MISSING"),
+            result_context_banner=str(context.get("banner") or ""),
+            result_context_detail=str(context.get("detail") or ""),
+            result_context_action=str(context.get("action") or ""),
+            result_context_fields=tuple(context.get("fields") or ()),
+            diagnostics_evidence_manifest_path=diagnostics_evidence_manifest_path,
+            diagnostics_evidence_manifest_hash=diagnostics_evidence_manifest_hash,
+            diagnostics_evidence_manifest_status=(
+                "READY" if diagnostics_evidence_manifest_path is not None else "MISSING"
+            ),
         )
 
     def artifact_by_key(
@@ -776,6 +1047,148 @@ class DesktopResultsRuntime:
             )
         return tuple(items)
 
+    def _evidence_artifact_record(self, artifact: DesktopResultsArtifact) -> dict[str, Any]:
+        path = artifact.path
+        record: dict[str, Any] = {
+            "key": artifact.key,
+            "title": artifact.title,
+            "category": artifact.category,
+            "path": str(path),
+            "exists": bool(path.exists()),
+            "is_dir": bool(path.is_dir()) if path.exists() else None,
+            "detail": artifact.detail,
+        }
+        try:
+            if path.exists() and path.is_file():
+                stat = path.stat()
+                record["size_bytes"] = int(stat.st_size)
+                record["mtime_epoch"] = float(stat.st_mtime)
+                record["sha256"] = _sha256_file(path)
+            elif path.exists() and path.is_dir():
+                record["child_count"] = sum(1 for _item in path.iterdir())
+        except Exception as exc:
+            record["sha256_error"] = str(exc)
+        return record
+
+    def build_diagnostics_evidence_manifest(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        *,
+        handoff: DesktopResultsSessionHandoff | None = None,
+    ) -> dict[str, Any]:
+        artifacts = list(self.session_artifacts(snapshot, handoff)) + list(snapshot.recent_artifacts)
+        selected_artifacts: list[dict[str, Any]] = []
+        seen: set[tuple[str, str]] = set()
+        for artifact in artifacts:
+            identity = (artifact.key, str(artifact.path))
+            if identity in seen:
+                continue
+            seen.add(identity)
+            selected_artifacts.append(self._evidence_artifact_record(artifact))
+
+        selected_context = {
+            field.key: field.selected_value
+            for field in snapshot.result_context_fields
+            if field.selected_value
+        }
+        current_context = {
+            field.key: field.current_value
+            for field in snapshot.result_context_fields
+            if field.current_value
+        }
+        mismatches = [
+            {
+                "key": field.key,
+                "title": field.title,
+                "current": field.current_value,
+                "selected": field.selected_value,
+                "detail": field.detail,
+            }
+            for field in snapshot.result_context_fields
+            if str(field.status or "").upper() == "STALE"
+        ]
+        payload: dict[str, Any] = {
+            "schema": "desktop_results_evidence_manifest",
+            "schema_version": "1.0.0",
+            "handoff_id": "HO-009",
+            "produced_by": "WS-ANALYSIS",
+            "consumed_by": "WS-DIAGNOSTICS",
+            "created_at": _utc_now(),
+            "project_id": self.repo_root.name,
+            "project_path": str(self.repo_root),
+            "run_id": selected_context.get("run_id") or os.environ.get("PNEUMO_RUN_ID", ""),
+            "run_contract_hash": selected_context.get("run_contract_hash", ""),
+            "compare_contract_id": selected_context.get("compare_contract_hash", ""),
+            "context_hash": selected_context.get("analysis_context_hash")
+            or selected_context.get("run_contract_hash")
+            or "",
+            "selected_artifact_list": selected_artifacts,
+            "selected_tables": [],
+            "selected_charts": [],
+            "selected_filters": {
+                "source": "desktop_results_center",
+                "artifact_scope": "session_handoff_plus_latest",
+                "handoff_present": handoff is not None,
+                "categories": sorted({str(item.get("category") or "") for item in selected_artifacts if item.get("category")}),
+            },
+            "mismatch_summary": {
+                "state": snapshot.result_context_state,
+                "banner": snapshot.result_context_banner,
+                "detail": snapshot.result_context_detail,
+                "required_action": snapshot.result_context_action,
+                "mismatches": mismatches,
+            },
+            "result_context": {
+                "state": snapshot.result_context_state,
+                "current": current_context,
+                "selected": selected_context,
+                "fields": [
+                    {
+                        "key": field.key,
+                        "title": field.title,
+                        "current": field.current_value,
+                        "selected": field.selected_value,
+                        "status": field.status,
+                        "detail": field.detail,
+                    }
+                    for field in snapshot.result_context_fields
+                ],
+            },
+            "validation_reports": {
+                "json": str(snapshot.latest_validation_json_path or ""),
+                "markdown": str(snapshot.latest_validation_md_path or ""),
+                "ok": snapshot.validation_ok,
+                "errors": list(snapshot.validation_errors),
+                "warnings": list(snapshot.validation_warnings),
+            },
+            "run_summaries": {
+                "autotest_run_dir": str(snapshot.latest_autotest_run_dir or ""),
+                "diagnostics_run_dir": str(snapshot.latest_diagnostics_run_dir or ""),
+                "session_handoff": {
+                    "summary": handoff.summary if handoff is not None else "",
+                    "detail": handoff.detail if handoff is not None else "",
+                    "step_lines": list(handoff.step_lines) if handoff is not None else [],
+                },
+            },
+        }
+        payload["evidence_manifest_hash"] = _sha256_text(_json_dumps_canonical(payload))
+        return payload
+
+    def write_diagnostics_evidence_manifest(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        *,
+        handoff: DesktopResultsSessionHandoff | None = None,
+    ) -> Path:
+        payload = self.build_diagnostics_evidence_manifest(snapshot, handoff=handoff)
+        workspace_path = (
+            _effective_workspace_dir(self.repo_root) / "exports" / "analysis_evidence_manifest.json"
+        )
+        sidecar_path = self.send_bundles_dir / "latest_analysis_evidence_manifest.json"
+        _atomic_write_json(workspace_path, payload)
+        _atomic_write_json(sidecar_path, payload)
+        return sidecar_path.resolve()
+
     def compare_viewer_path(
         self,
         snapshot: DesktopResultsSnapshot,
@@ -911,6 +1324,24 @@ class DesktopResultsRuntime:
         if suffix == ".json":
             obj = _safe_read_json_any(path)
             if isinstance(obj, dict):
+                if artifact.key == "diagnostics_evidence_manifest":
+                    selected = obj.get("selected_artifact_list") or []
+                    mismatch = dict(obj.get("mismatch_summary") or {})
+                    lines = [
+                        f"schema={obj.get('schema')}",
+                        f"handoff_id={obj.get('handoff_id')}",
+                        f"context_state={mismatch.get('state') or '—'}",
+                        f"artifacts={len(selected) if isinstance(selected, list) else 0}",
+                    ]
+                    if obj.get("evidence_manifest_hash"):
+                        lines.append(
+                            "manifest_hash="
+                            + _short_text(obj.get("evidence_manifest_hash"), limit=36)
+                        )
+                    if mismatch.get("banner"):
+                        lines.append("banner=" + _short_text(mismatch.get("banner")))
+                    return tuple(lines)
+
                 if artifact.key == "validation_json":
                     errors = [str(item) for item in (obj.get("errors") or []) if str(item).strip()]
                     warnings = [str(item) for item in (obj.get("warnings") or []) if str(item).strip()]

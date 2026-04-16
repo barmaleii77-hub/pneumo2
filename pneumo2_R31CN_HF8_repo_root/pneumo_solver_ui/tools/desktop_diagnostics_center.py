@@ -191,6 +191,8 @@ class DesktopDiagnosticsCenter:
             bundle_out_dir / "latest_send_bundle_clipboard_status.json",
             bundle_out_dir / "latest_send_bundle_validation.json",
             bundle_out_dir / "latest_send_bundle_validation.md",
+            bundle_out_dir / "latest_evidence_manifest.json",
+            bundle_out_dir / "latest_analysis_evidence_manifest.json",
             bundle_out_dir / "latest_health_report.json",
             bundle_out_dir / "latest_health_report.md",
             bundle_out_dir / "latest_triage_report.md",
@@ -199,9 +201,19 @@ class DesktopDiagnosticsCenter:
             bundle_out_dir / "latest_desktop_diagnostics_summary.md",
             bundle_out_dir / "latest_desktop_diagnostics_center_state.json",
             bundle_out_dir / "latest_send_bundle.zip",
+            bundle_out_dir / "latest_send_bundle_path.txt",
+            bundle_out_dir / "latest_send_bundle.sha256",
             run_out_root / "latest_desktop_diagnostics_run.json",
             run_out_root / "latest_desktop_diagnostics_run.log",
         ]
+        raw_workspace = os.environ.get("PNEUMO_WORKSPACE_DIR", "").strip()
+        try:
+            workspace = Path(raw_workspace).expanduser().resolve() if raw_workspace else (
+                self.repo_root / "pneumo_solver_ui" / "workspace"
+            ).resolve()
+            tracked_paths.append(workspace / "exports" / "analysis_evidence_manifest.json")
+        except Exception:
+            pass
         if self.zip_path is not None:
             tracked_paths.append(Path(self.zip_path).expanduser())
         return tuple(self._state_signature_for_path(path) for path in tracked_paths)
@@ -905,6 +917,35 @@ class DesktopDiagnosticsCenter:
             return
         _open_in_explorer(Path(bundle.latest_zip_path).expanduser().resolve().parent)
 
+    def _analysis_evidence_summary_lines(self, bundle) -> list[str]:
+        status = str(getattr(bundle, "analysis_evidence_status", "") or "MISSING").strip().upper()
+        context_state = str(getattr(bundle, "analysis_evidence_context_state", "") or "MISSING")
+        warnings = [
+            str(item).strip()
+            for item in (getattr(bundle, "analysis_evidence_warnings", None) or [])
+            if str(item).strip()
+        ]
+        lines = [
+            "## Analysis evidence / HO-009",
+            f"- Status: {status}",
+            f"- Context state: {context_state}",
+            f"- Run ID: {getattr(bundle, 'analysis_evidence_run_id', '') or '—'}",
+            f"- Run contract hash: {getattr(bundle, 'analysis_evidence_run_contract_hash', '') or '—'}",
+            f"- Compare contract: {getattr(bundle, 'analysis_evidence_compare_contract_id', '') or '—'}",
+            f"- Artifacts: {getattr(bundle, 'analysis_evidence_artifact_count', 0)}",
+            f"- Mismatches: {getattr(bundle, 'analysis_evidence_mismatch_count', 0)}",
+            f"- Manifest: {getattr(bundle, 'latest_analysis_evidence_manifest_path', '') or '—'}",
+        ]
+        manifest_hash = str(getattr(bundle, "analysis_evidence_manifest_hash", "") or "")
+        if manifest_hash:
+            lines.append(f"- Manifest hash: {manifest_hash}")
+        action = str(getattr(bundle, "analysis_evidence_action", "") or "")
+        if action:
+            lines.append(f"- Action: {action}")
+        for warning in warnings[:5]:
+            lines.append(f"- Warning: {warning}")
+        return lines
+
     def _render_summary_text(self, bundle, *, bundle_out_dir: Path | None = None) -> str:
         bundle_out_dir = bundle_out_dir or self._active_bundle_out_dir()
         center_state_path = bundle_out_dir / LATEST_DESKTOP_DIAGNOSTICS_CENTER_JSON
@@ -934,12 +975,17 @@ class DesktopDiagnosticsCenter:
         if bundle.summary_lines:
             lines.extend(["", "## Общая сводка"])
             lines.extend(f"- {line}" for line in bundle.summary_lines)
+        lines.append("")
+        lines.extend(self._analysis_evidence_summary_lines(bundle))
         lines.extend(
             [
                 "",
                 "## Машиночитаемые пути",
                 f"- Снимок состояния центра: {path_str(center_state_path)}",
                 f"- Последняя сводка Markdown: {path_str(summary_md_path)}",
+                f"- Последний ZIP: {bundle.latest_zip_path or '—'}",
+                f"- Указатель latest ZIP TXT: {bundle.latest_path_pointer_path or '—'}",
+                f"- SHA256 latest ZIP: {bundle.latest_sha_path or '—'}",
                 f"- Метаданные пакета JSON: {bundle.latest_bundle_meta_path or '—'}",
                 f"- Проверка пакета JSON: {bundle.latest_inspection_json_path or '—'}",
                 f"- Проверка пакета Markdown: {bundle.latest_inspection_md_path or '—'}",
@@ -948,6 +994,8 @@ class DesktopDiagnosticsCenter:
                 f"- Проверка содержимого JSON: {bundle.latest_validation_json_path or '—'}",
                 f"- Проверка содержимого Markdown: {bundle.latest_validation_md_path or '—'}",
                 f"- Разбор замечаний Markdown: {bundle.latest_triage_md_path or '—'}",
+                f"- Evidence manifest JSON: {bundle.latest_evidence_manifest_path or '—'}",
+                f"- Analysis evidence / HO-009 JSON: {bundle.latest_analysis_evidence_manifest_path or '—'}",
                 f"- Статус буфера обмена JSON: {bundle.latest_clipboard_status_path or '—'}",
                 f"- Диагностика указателя анимации JSON: {bundle.anim_pointer_diagnostics_path or '—'}",
                 f"- Последний файл состояния прогона JSON: {self._last_run_record.state_path if self._last_run_record else '—'}",
@@ -1010,6 +1058,15 @@ class DesktopDiagnosticsCenter:
 
         if bundle.summary_lines:
             meta_bits.extend(bundle.summary_lines)
+        meta_bits.append(
+            "Analysis evidence / HO-009: "
+            f"{bundle.analysis_evidence_status} / context={bundle.analysis_evidence_context_state} / "
+            f"run={bundle.analysis_evidence_run_id or '—'} / "
+            f"artifacts={bundle.analysis_evidence_artifact_count} / "
+            f"mismatches={bundle.analysis_evidence_mismatch_count}"
+        )
+        if bundle.analysis_evidence_action and bundle.analysis_evidence_status != "READY":
+            meta_bits.append(bundle.analysis_evidence_action)
         if bundle.anim_pointer_diagnostics_path:
             meta_bits.append(f"Диагностика указателя анимации: {bundle.anim_pointer_diagnostics_path}")
         if bundle.clipboard_ok is not None:
@@ -1061,8 +1118,9 @@ class DesktopDiagnosticsCenter:
         self.status_var.set("Сборка пакета отправки...")
 
         def worker() -> None:
+            trigger = str(os.environ.get("PNEUMO_SEND_BUNDLE_TRIGGER") or "desktop_diagnostics_center")
             result = build_full_diagnostics_bundle(
-                trigger="desktop_diagnostics_center",
+                trigger=trigger,
                 repo_root=self.repo_root,
                 open_folder=False,
             )
