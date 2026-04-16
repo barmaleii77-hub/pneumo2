@@ -49,7 +49,9 @@ def _road_mode_label(value: object) -> str:
 def _closure_policy_label(value: object) -> str:
     mapping = {
         "closed_c1_periodic": "гладкое замыкание",
+        "closed_exact": "точное замыкание без коррекции",
         "strict_exact": "строгое совпадение",
+        "preview_open_only": "открытый preview",
     }
     return mapping.get(str(value or "").strip(), str(value or ""))
 
@@ -229,7 +231,7 @@ class SegmentListPanel(ttk.LabelFrame):
 
 class PreviewPanel(ttk.LabelFrame):
     def __init__(self, parent: tk.Misc) -> None:
-        super().__init__(parent, text="Предпросмотр кольца", padding=8)
+        super().__init__(parent, text="Развёрнутый циклический preview", padding=8)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
 
@@ -340,61 +342,85 @@ class PreviewPanel(ttk.LabelFrame):
             return
         width = max(80, int(self.canvas.winfo_width()))
         height = max(80, int(self.canvas.winfo_height()))
-        cx = width / 2.0
-        cy = height / 2.0
-        radius = max(40.0, min(width, height) * 0.32)
-        lane_w = max(14.0, radius * 0.12)
-
-        self.canvas.create_oval(cx - radius, cy - radius, cx + radius, cy + radius, outline="#334155", width=lane_w)
-        self.canvas.create_oval(cx - radius, cy - radius, cx + radius, cy + radius, outline="#1e293b", width=2)
-        self.canvas.create_oval(cx - radius + lane_w, cy - radius + lane_w, cx + radius - lane_w, cy + radius - lane_w, outline="#1e293b", width=2)
 
         segments = diagnostics.preview_segments or []
         if not segments:
-            self.canvas.create_text(cx, cy, text="Нет данных\nдля кольца", fill="#e2e8f0", font=("Segoe UI", 14, "bold"))
+            self.canvas.create_text(
+                width / 2.0,
+                height / 2.0,
+                text="Нет данных для развёрнутого preview",
+                fill="#e2e8f0",
+                font=("Segoe UI", 14, "bold"),
+            )
             return
 
-        for segment in segments:
-            self._draw_segment_arc(segment, cx=cx, cy=cy, radius=radius, width=lane_w)
-
+        left_pad = 56.0
+        right_pad = 42.0
+        top = 74.0
+        bar_h = 54.0
+        axis_y = top + bar_h + 36.0
+        usable_w = max(40.0, width - left_pad - right_pad)
         self.canvas.create_text(
-            cx,
-            cy,
-            text="КОЛЬЦО\nСЦЕНАРИЙ",
+            left_pad,
+            24,
+            text="Один круг показан как развёрнутая дистанция 0 → L. Повтор справа — только seam-preview, не геометрическое кольцо.",
             fill="#e2e8f0",
-            font=("Segoe UI", 14, "bold"),
-            justify="center",
+            anchor="w",
+            font=("Segoe UI", 10, "bold"),
         )
+        self.canvas.create_line(left_pad, axis_y, left_pad + usable_w, axis_y, fill="#475569", width=2)
+        for tick in range(5):
+            x = left_pad + usable_w * tick / 4.0
+            self.canvas.create_line(x, axis_y - 7, x, axis_y + 7, fill="#64748b", width=1)
+            self.canvas.create_text(x, axis_y + 20, text=f"{tick * 25}%", fill="#cbd5e1", font=("Segoe UI", 9))
 
-    def _draw_segment_arc(
+        for segment in segments:
+            self._draw_segment_bar(segment, left_pad=left_pad, top=top, usable_w=usable_w, height=bar_h)
+
+        seam_x = left_pad + usable_w
+        self.canvas.create_line(seam_x, top - 16, seam_x, axis_y + 12, fill="#f97316", width=2, dash=(4, 3))
+        self.canvas.create_text(seam_x, top - 24, text="шов L→0", fill="#fed7aa", font=("Segoe UI", 9, "bold"))
+
+        ghost_w = min(140.0, usable_w * 0.18)
+        ghost_left = min(width - right_pad - ghost_w, seam_x + 12.0)
+        if ghost_left > seam_x + 2.0:
+            self.canvas.create_rectangle(ghost_left, top, ghost_left + ghost_w, top + bar_h, outline="#334155", fill="#111827", width=1)
+            self.canvas.create_text(
+                ghost_left + ghost_w / 2.0,
+                top + bar_h / 2.0,
+                text="начало\nслед. круга",
+                fill="#94a3b8",
+                font=("Segoe UI", 9),
+                justify="center",
+            )
+
+    def _draw_segment_bar(
         self,
         segment: RingPreviewSegment,
         *,
-        cx: float,
-        cy: float,
-        radius: float,
-        width: float,
+        left_pad: float,
+        top: float,
+        usable_w: float,
+        height: float,
     ) -> None:
-        bbox = (cx - radius, cy - radius, cx + radius, cy + radius)
-        start_deg = 90.0 - 360.0 * float(segment.start_fraction)
-        extent_deg = -360.0 * max(0.002, float(segment.end_fraction - segment.start_fraction))
-        line_w = width + (8.0 if segment.index == self._selected_index else 0.0)
-        self.canvas.create_arc(*bbox, start=start_deg, extent=extent_deg, style="arc", outline=segment.color, width=line_w)
-
-        mid_fraction = (float(segment.start_fraction) + float(segment.end_fraction)) * 0.5
-        theta = math.radians(90.0 - 360.0 * mid_fraction)
-        label_radius = radius + width * 0.9
-        x = cx + label_radius * math.cos(theta)
-        y = cy - label_radius * math.sin(theta)
+        x0 = left_pad + usable_w * max(0.0, min(1.0, float(segment.start_fraction)))
+        x1 = left_pad + usable_w * max(0.0, min(1.0, float(segment.end_fraction)))
+        if x1 <= x0:
+            x1 = x0 + 2.0
+        outline = "#ffffff" if segment.index == self._selected_index else "#1e293b"
+        line_w = 3 if segment.index == self._selected_index else 1
+        self.canvas.create_rectangle(x0, top, x1, top + height, fill=segment.color, outline=outline, width=line_w)
+        mid_x = 0.5 * (x0 + x1)
         turn_text = _short_turn_label(segment.turn_direction)
         road_text = _short_road_mode_label(segment.road_mode)
         event_suffix = f" • {segment.event_count} соб." if int(segment.event_count) > 0 else ""
         self.canvas.create_text(
-            x,
-            y,
+            mid_x,
+            top + height / 2.0,
             text=f"{segment.index + 1}: {turn_text} / {road_text}{event_suffix}",
             fill="#cbd5e1" if segment.index != self._selected_index else "#ffffff",
             font=("Segoe UI", 9, "bold" if segment.index == self._selected_index else "normal"),
+            width=max(40, int(x1 - x0 - 6)),
         )
 
 
@@ -430,7 +456,7 @@ class MotionPanel(ttk.Frame):
         self.closure_combo = ttk.Combobox(
             general,
             textvariable=self.closure_policy_var,
-            values=("Гладкое замыкание", "Строгое совпадение"),
+            values=("Гладкое замыкание", "Строгое совпадение", "Открытый preview"),
             state="readonly",
             width=20,
         )
@@ -445,6 +471,7 @@ class MotionPanel(ttk.Frame):
         self.segment_name_var = tk.StringVar()
         self.duration_var = tk.StringVar()
         self.turn_direction_var = tk.StringVar(value="Прямо")
+        self.passage_mode_var = tk.StringVar(value="Постоянный")
         self.speed_end_var = tk.StringVar()
         self.turn_radius_var = tk.StringVar()
         self.start_speed_var = tk.StringVar(value="Стартовая скорость: 0.0 км/ч")
@@ -455,7 +482,7 @@ class MotionPanel(ttk.Frame):
             _add_entry(segment, row=0, column=0, label="Имя", variable=self.segment_name_var, width=20),
             _add_entry(segment, row=0, column=2, label="Длительность, с", variable=self.duration_var),
             _add_entry(segment, row=1, column=2, label="Скорость в конце, км/ч", variable=self.speed_end_var),
-            _add_entry(segment, row=1, column=4, label="Радиус поворота, м", variable=self.turn_radius_var),
+            _add_entry(segment, row=2, column=2, label="Радиус поворота, м", variable=self.turn_radius_var),
         ]
         ttk.Label(segment, text="Направление").grid(row=1, column=0, sticky="w", padx=(0, 6), pady=3)
         self.turn_combo = ttk.Combobox(
@@ -467,9 +494,19 @@ class MotionPanel(ttk.Frame):
         )
         self.turn_combo.grid(row=1, column=1, sticky="ew", padx=(0, 12), pady=3)
         self.segment_widgets.append(self.turn_combo)
+        ttk.Label(segment, text="Режим прохождения").grid(row=2, column=0, sticky="w", padx=(0, 6), pady=3)
+        self.passage_combo = ttk.Combobox(
+            segment,
+            textvariable=self.passage_mode_var,
+            values=("Постоянный", "Разгон", "Торможение", "Пользовательский"),
+            state="readonly",
+            width=18,
+        )
+        self.passage_combo.grid(row=2, column=1, sticky="ew", padx=(0, 12), pady=3)
+        self.segment_widgets.append(self.passage_combo)
 
         status = ttk.Frame(segment)
-        status.grid(row=2, column=0, columnspan=6, sticky="ew", pady=(8, 0))
+        status.grid(row=3, column=0, columnspan=6, sticky="ew", pady=(8, 0))
         status.columnconfigure((0, 1, 2), weight=1)
         ttk.Label(status, textvariable=self.start_speed_var).grid(row=0, column=0, sticky="w")
         ttk.Label(status, textvariable=self.length_var).grid(row=0, column=1, sticky="w")
@@ -479,6 +516,7 @@ class MotionPanel(ttk.Frame):
         _set_many_states(self.segment_widgets, "normal" if enabled else "disabled")
         if enabled:
             _set_widget_state(self.turn_combo, "readonly")
+            _set_widget_state(self.passage_combo, "readonly")
 
 
 class RoadPanel(ttk.Frame):
@@ -509,12 +547,16 @@ class RoadPanel(ttk.Frame):
         )
         self.mode_combo.grid(row=0, column=1, sticky="ew", padx=(0, 12), pady=3)
         self.state_widgets: list[tk.Misc] = [self.mode_combo]
+        self.center_start_entry = _add_entry(state_box, row=0, column=2, label="Центр в начале, мм", variable=self.center_start_var)
+        self.center_end_entry = _add_entry(state_box, row=0, column=4, label="Центр в конце, мм", variable=self.center_end_var)
+        self.cross_start_entry = _add_entry(state_box, row=1, column=0, label="Поперечный уклон в начале, %", variable=self.cross_start_var)
+        self.cross_end_entry = _add_entry(state_box, row=1, column=2, label="Поперечный уклон в конце, %", variable=self.cross_end_var)
         self.state_widgets.extend(
             [
-                _add_entry(state_box, row=0, column=2, label="Центр в начале, мм", variable=self.center_start_var),
-                _add_entry(state_box, row=0, column=4, label="Центр в конце, мм", variable=self.center_end_var),
-                _add_entry(state_box, row=1, column=0, label="Поперечный уклон в начале, %", variable=self.cross_start_var),
-                _add_entry(state_box, row=1, column=2, label="Поперечный уклон в конце, %", variable=self.cross_end_var),
+                self.center_start_entry,
+                self.center_end_entry,
+                self.cross_start_entry,
+                self.cross_end_entry,
             ]
         )
 
@@ -696,6 +738,12 @@ class RoadPanel(ttk.Frame):
         self._selected_index = 0
 
         self.update_mode_visibility("ISO8608")
+
+    def set_boundary_editability(self, *, start_editable: bool, end_editable: bool) -> None:
+        _set_widget_state(self.center_start_entry, "normal" if start_editable else "disabled")
+        _set_widget_state(self.cross_start_entry, "normal" if start_editable else "disabled")
+        _set_widget_state(self.center_end_entry, "normal" if end_editable else "disabled")
+        _set_widget_state(self.cross_end_entry, "normal" if end_editable else "disabled")
 
     def update_mode_visibility(self, mode: str) -> None:
         normalized = str(mode or "ISO8608").upper().replace(" ", "")
@@ -1222,6 +1270,8 @@ class ExportPanel(ttk.Frame):
         on_open_last_spec: callable,
         on_open_last_road: callable,
         on_open_last_axay: callable,
+        on_open_last_meta: callable,
+        on_open_ring_source: callable,
         on_open_anim_latest: callable,
     ) -> None:
         super().__init__(parent, padding=8)
@@ -1243,11 +1293,28 @@ class ExportPanel(ttk.Frame):
         ttk.Entry(top, textvariable=self.tag_var, width=20).grid(row=1, column=1, sticky="w", pady=3)
 
         opt_box = ttk.LabelFrame(self, text="Передача в оптимизацию", padding=8)
-        opt_box.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        opt_box.grid(row=2, column=0, sticky="ew", pady=(8, 0))
         opt_box.columnconfigure(1, weight=1)
 
         self.opt_workspace_var = tk.StringVar()
         self.opt_window_var = tk.StringVar(value="4.0")
+        self.inputs_handoff_var = tk.StringVar(
+            value=(
+                "HO-002 inputs_snapshot ещё не проверен. "
+                "WS-RING читает только frozen ref/hash из WS-INPUTS."
+            )
+        )
+
+        inputs_box = ttk.LabelFrame(self, text="Inputs handoff / HO-002", padding=8)
+        inputs_box.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        inputs_box.columnconfigure(0, weight=1)
+        ttk.Label(
+            inputs_box,
+            textvariable=self.inputs_handoff_var,
+            wraplength=880,
+            justify="left",
+            foreground="#334455",
+        ).grid(row=0, column=0, sticky="w")
 
         ttk.Label(opt_box, text="Каталог оптимизации").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=3)
         ttk.Entry(opt_box, textvariable=self.opt_workspace_var).grid(row=0, column=1, sticky="ew", pady=3)
@@ -1261,15 +1328,17 @@ class ExportPanel(ttk.Frame):
         ttk.Button(opt_actions, text="Открыть последний набор", command=on_open_opt_suite).grid(row=0, column=1, sticky="ew")
 
         artifact_box = ttk.LabelFrame(self, text="Последние артефакты", padding=8)
-        artifact_box.grid(row=2, column=0, sticky="ew", pady=(8, 0))
-        artifact_box.columnconfigure((0, 1, 2, 3), weight=1)
+        artifact_box.grid(row=3, column=0, sticky="ew", pady=(8, 0))
+        artifact_box.columnconfigure((0, 1, 2, 3, 4, 5), weight=1)
         ttk.Button(artifact_box, text="Открыть последний сценарий", command=on_open_last_spec).grid(row=0, column=0, sticky="ew", padx=(0, 4))
         ttk.Button(artifact_box, text="Открыть последнюю дорогу", command=on_open_last_road).grid(row=0, column=1, sticky="ew", padx=(0, 4))
         ttk.Button(artifact_box, text="Открыть последний файл ускорений", command=on_open_last_axay).grid(row=0, column=2, sticky="ew", padx=(0, 4))
-        ttk.Button(artifact_box, text="Открыть папку для анимации", command=on_open_anim_latest).grid(row=0, column=3, sticky="ew")
+        ttk.Button(artifact_box, text="Открыть meta HO-004", command=on_open_last_meta).grid(row=0, column=3, sticky="ew", padx=(0, 4))
+        ttk.Button(artifact_box, text="Открыть source WS-RING", command=on_open_ring_source).grid(row=0, column=4, sticky="ew", padx=(0, 4))
+        ttk.Button(artifact_box, text="Открыть папку для анимации", command=on_open_anim_latest).grid(row=0, column=5, sticky="ew")
 
         buttons = ttk.Frame(self)
-        buttons.grid(row=3, column=0, sticky="ew", pady=(8, 0))
+        buttons.grid(row=4, column=0, sticky="ew", pady=(8, 0))
         buttons.columnconfigure((0, 1, 2, 3, 4), weight=1)
         ttk.Button(buttons, text="Загрузить сценарий", command=on_load_spec).grid(row=0, column=0, sticky="ew", padx=(0, 4))
         ttk.Button(buttons, text="Сохранить сценарий", command=on_save_spec).grid(row=0, column=1, sticky="ew", padx=(0, 4))
@@ -1277,4 +1346,4 @@ class ExportPanel(ttk.Frame):
         ttk.Button(buttons, text="Построить набор оптимизации", command=on_build_auto_suite).grid(row=0, column=3, sticky="ew", padx=(0, 4))
         ttk.Button(buttons, text="Открыть каталог выгрузки", command=on_open_output).grid(row=0, column=4, sticky="ew")
 
-        ttk.Label(self, textvariable=self.last_export_var, wraplength=880, justify="left").grid(row=4, column=0, sticky="ew", pady=(10, 0))
+        ttk.Label(self, textvariable=self.last_export_var, wraplength=880, justify="left").grid(row=5, column=0, sticky="ew", pady=(10, 0))

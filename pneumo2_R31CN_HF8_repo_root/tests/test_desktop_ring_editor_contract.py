@@ -14,6 +14,13 @@ from pneumo_solver_ui.desktop_ring_editor_model import (
     insert_segment_preset_after_selection,
     list_ring_preset_names,
     list_segment_preset_names,
+    resolve_ring_inputs_handoff,
+)
+from pneumo_solver_ui.desktop_input_model import (
+    desktop_input_payload_hash,
+    desktop_inputs_snapshot_handoff_path,
+    load_base_defaults,
+    save_desktop_inputs_snapshot,
 )
 from pneumo_solver_ui.desktop_ring_editor_runtime import (
     build_ring_bundle_optimization_preview,
@@ -92,6 +99,16 @@ def _make_stub_editor(tmp_path: Path) -> DesktopRingScenarioEditor:
     return editor
 
 
+def _write_inputs_snapshot_for_workspace(tmp_path: Path) -> tuple[dict[str, object], Path]:
+    workspace = tmp_path / "workspace"
+    payload = load_base_defaults()
+    payload["база"] = 1.72
+    payload["колея"] = 1.42
+    target = desktop_inputs_snapshot_handoff_path(workspace_dir=workspace)
+    saved = save_desktop_inputs_snapshot(payload, target_path=target)
+    return payload, saved
+
+
 def test_desktop_ring_editor_is_registered_as_standalone_hosted_tool() -> None:
     from pneumo_solver_ui.desktop_shell.launcher_catalog import build_desktop_launch_catalog
     from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
@@ -108,6 +125,42 @@ def test_desktop_ring_editor_is_registered_as_standalone_hosted_tool() -> None:
 
     catalog_modules = {item.module for item in build_desktop_launch_catalog(include_mnemo=False)}
     assert "pneumo_solver_ui.tools.desktop_ring_scenario_editor" in catalog_modules
+
+
+def test_ring_resolves_missing_inputs_snapshot_without_surrogate_inputs(tmp_path: Path) -> None:
+    resolved = resolve_ring_inputs_handoff(workspace_dir=tmp_path / "workspace")
+
+    assert resolved["handoff_id"] == "HO-002"
+    assert resolved["target_workspace"] == "WS-RING"
+    assert resolved["state"] == "missing"
+    assert resolved["can_consume"] is False
+    assert "surrogate inputs" in resolved["banner"]
+    assert "inputs" not in resolved
+
+
+def test_ring_consumes_only_frozen_inputs_snapshot_ref_and_detects_stale_hash(tmp_path: Path) -> None:
+    payload, target = _write_inputs_snapshot_for_workspace(tmp_path)
+    current_hash = desktop_input_payload_hash(payload)
+
+    current = resolve_ring_inputs_handoff(
+        workspace_dir=tmp_path / "workspace",
+        current_inputs_snapshot_hash=current_hash,
+    )
+    stale = resolve_ring_inputs_handoff(
+        workspace_dir=tmp_path / "workspace",
+        current_inputs_snapshot_hash="different-inputs-hash",
+    )
+
+    assert current["state"] == "current"
+    assert current["can_consume"] is True
+    assert current["snapshot_path"] == str(target)
+    assert current["payload_hash"] == current_hash
+    assert current["ref"]["snapshot_ref"] == str(target)
+    assert "inputs" not in current
+    assert "inputs" not in current["ref"]
+    assert stale["state"] == "stale"
+    assert stale["can_consume"] is False
+    assert "inputs_snapshot_hash_changed" in stale["stale_reasons"]
 
 
 def test_root_desktop_ring_editor_wrappers_delegate_to_launcher() -> None:
@@ -170,6 +223,10 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert '"<F5>"' in tool_src
     assert "mirror_ring_bundle_to_anim_latest_exports" in tool_src
     assert "materialize_ring_bundle_optimization_suite" in tool_src
+    assert "resolve_ring_inputs_handoff" in tool_src
+    assert "_refresh_inputs_handoff_state" in tool_src
+    assert "HO-002 inputs_snapshot" in tool_src
+    assert "inputs_handoff_var" in tool_src
     assert "opt_workspace_var" in tool_src
     assert "opt_window_var" in tool_src
     assert "def _choose_opt_workspace_dir" in tool_src
@@ -178,13 +235,15 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "def _open_last_generated_spec" in tool_src
     assert "def _open_last_generated_road" in tool_src
     assert "def _open_last_generated_axay" in tool_src
+    assert "def _open_last_generated_meta" in tool_src
+    assert "def _open_ring_source_of_truth" in tool_src
     assert "def _open_anim_latest_exports" in tool_src
     assert "artifacts_stale" in tool_src
     assert "opt_suite_stale" in tool_src
     assert "Состояние файлов сценария:" in tool_src
     assert "Состояние набора оптимизации:" in tool_src
     assert "Длина кольца:" in tool_src
-    assert "Максимальный шов замыкания:" in tool_src
+    assert "Максимальный шов после export-policy:" in tool_src
     assert "build_ring_bundle_optimization_preview" in tool_src
     assert "build_ring_bundle_optimization_suite_preview" in tool_src
     assert "Фрагментов оптимизации:" in tool_src
@@ -207,18 +266,24 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "class DiagnosticsPanel" in panels_src
     assert "class ExportPanel" in panels_src
     assert "Сегменты" in panels_src
-    assert "Предпросмотр кольца" in panels_src
+    assert "Развёрнутый циклический preview" in panels_src
     assert "Параметры дороги" in panels_src
     assert "Передача в оптимизацию" in panels_src
+    assert "Inputs handoff / HO-002" in panels_src
+    assert "WS-RING читает только frozen ref/hash из WS-INPUTS." in panels_src
+    assert "inputs_handoff_var" in panels_src
     assert "Окна оптимизации" in panels_src
     assert "Строки набора оптимизации" in panels_src
     assert "Открыть каталог оптимизации" in panels_src
     assert "Открыть последний набор" in panels_src
     assert "Последние артефакты" in panels_src
+    assert "Открыть meta HO-004" in panels_src
+    assert "Открыть source WS-RING" in panels_src
     assert "Загрузить сценарий" in panels_src
     assert "Сохранить сценарий" in panels_src
     assert "Построить набор оптимизации" in panels_src
     assert "Начальная скорость, км/ч" in panels_src
+    assert "Режим прохождения" in panels_src
     assert "Зерно генерации" in panels_src
     assert "Шаг профиля, м" in panels_src
     assert "Шаг времени, с" in panels_src
@@ -235,7 +300,9 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "Профиль всего кольца: амплитуда (A) левого/правого следа, мм" in panels_src
     assert "Профиль всего кольца: полный размах левого/правого следа, мм" in panels_src
     assert "Шов замыкания слева/справа" in panels_src
-    assert "КОЛЬЦО\\nСЦЕНАРИЙ" in panels_src
+    assert "не геометрическое кольцо" in panels_src
+    assert "create_arc" not in panels_src
+    assert "create_oval" not in panels_src
     assert "scroll_to_top" in panels_src
     assert 'label="v0, км/ч"' not in panels_src
     assert 'label="seed"' not in panels_src
@@ -268,6 +335,8 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "def _build_road_profile_preview" in runtime_src
     assert "def build_ring_editor_diagnostics" in runtime_src
     assert "def export_ring_scenario_bundle" in runtime_src
+    assert "meta_json" in runtime_src
+    assert "ring_source_of_truth_json" in runtime_src
     assert "def mirror_ring_bundle_to_anim_latest_exports" in runtime_src
     assert "def materialize_ring_bundle_optimization_suite" in runtime_src
     assert "def build_ring_bundle_optimization_preview" in runtime_src
@@ -326,15 +395,35 @@ def test_desktop_ring_editor_default_spec_builds_preview_and_bundle(tmp_path: Pa
     spec_path = Path(str(bundle["scenario_json"]))
     road_path = Path(str(bundle["road_csv"]))
     axay_path = Path(str(bundle["axay_csv"]))
+    meta_path = Path(str(bundle["meta_json"]))
+    source_path = Path(str(bundle["ring_source_of_truth_json"]))
 
     assert spec_path.exists()
     assert road_path.exists()
     assert axay_path.exists()
+    assert meta_path.exists()
+    assert source_path.exists()
+    assert "segment_id" in road_path.read_text(encoding="utf-8").splitlines()[0].split(",")
 
     exported = json.loads(spec_path.read_text(encoding="utf-8"))
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    source = json.loads(source_path.read_text(encoding="utf-8"))
     assert exported["schema_version"] == "ring_v2"
     assert exported["_generated_outputs"]["road_csv"] == road_path.name
     assert exported["_generated_outputs"]["axay_csv"] == axay_path.name
+    assert exported["_generated_outputs"]["meta_json"] == meta_path.name
+    assert exported["_generated_outputs"]["ring_source_of_truth_json"] == source_path.name
+    assert exported["_lineage"]["handoff_id"] == "HO-004"
+    assert meta["handoff_id"] == "HO-004"
+    assert meta["source_workspace"] == "WS-RING"
+    assert meta["consumer_workspace"] == "WS-SUITE"
+    assert meta["downstream_geometry_editing_allowed"] is False
+    assert meta["road"]["segments"]
+    assert meta["road"]["segment_id_series"]["csv_column"] == "segment_id"
+    assert meta["lineage"]["ring_source_hash_sha256"]
+    assert meta["lineage"]["ring_export_set_hash_sha256"]
+    assert source["_source_contract"]["editable_owner"] == "WS-RING"
+    assert source["_source_contract"]["downstream_geometry_editing_allowed"] is False
 
 
 def test_desktop_ring_editor_can_mirror_bundle_into_workspace_anim_latest_exports(tmp_path: Path) -> None:
@@ -386,6 +475,13 @@ def test_desktop_ring_editor_can_materialize_optimization_auto_ring_suite(tmp_pa
     assert float(suite_info["window_s"]) == 6.5
     assert Path(str(suite_info["workspace_dir"])).resolve() == workspace_dir.resolve()
     assert meta["input_ring"]["scenario_json"].endswith("anim_latest_scenario_json.json")
+    assert meta["handoff"]["handoff_id"] == "HO-004"
+    assert meta["handoff"]["source_workspace"] == "WS-RING"
+    assert meta["handoff"]["ring_geometry_editable"] is False
+    full_row = next(row for row in rows if isinstance(row, dict) and str(row.get("имя") or "") == "ring_auto_full")
+    assert full_row["test_type"] == "ring"
+    assert full_row["handoff_id"] == "HO-004"
+    assert full_row["ring_geometry_editable"] is False
 
 
 def test_desktop_ring_road_panel_renders_whole_and_local_profile() -> None:
@@ -444,6 +540,13 @@ def test_desktop_ring_editor_quick_save_reuses_known_spec_path(tmp_path: Path) -
     editor._refresh_from_state = lambda: refresh_calls.append("refresh")
     editor.state.spec_path = str(tmp_path / "saved_ring_spec.json")
     editor.state.dirty = True
+    editor.state.spec["segments"][0]["road"]["center_height_start_mm"] = 7.0
+    editor.state.spec["segments"][0]["road"]["cross_slope_start_pct"] = 2.0
+    editor.state.spec["segments"][1]["speed_start_kph"] = 99.0
+    editor.state.spec["segments"][1]["road"]["center_height_start_mm"] = 123.0
+    editor.state.spec["segments"][1]["road"]["cross_slope_start_pct"] = 4.0
+    editor.state.spec["segments"][-1]["speed_end_kph"] = 99.0
+    editor.state.spec["segments"][-1]["road"]["center_height_end_mm"] = 999.0
 
     saved_path = DesktopRingScenarioEditor._save_spec(editor)
 
@@ -451,6 +554,13 @@ def test_desktop_ring_editor_quick_save_reuses_known_spec_path(tmp_path: Path) -
     assert Path(saved_path or "").exists()
     exported = json.loads(Path(saved_path or "").read_text(encoding="utf-8"))
     assert exported["schema_version"] == "ring_v2"
+    assert exported["_source_contract"]["editable_owner"] == "WS-RING"
+    assert "speed_start_kph" not in exported["segments"][1]
+    assert "center_height_start_mm" not in exported["segments"][1]["road"]
+    assert "cross_slope_start_pct" not in exported["segments"][1]["road"]
+    assert float(exported["segments"][-1]["speed_end_kph"]) == float(exported["v0_kph"])
+    assert float(exported["segments"][-1]["road"]["center_height_end_mm"]) == 7.0
+    assert float(exported["segments"][-1]["road"]["cross_slope_end_pct"]) == 2.0
     assert editor.state.dirty is False
     assert refresh_calls == ["refresh"]
 
