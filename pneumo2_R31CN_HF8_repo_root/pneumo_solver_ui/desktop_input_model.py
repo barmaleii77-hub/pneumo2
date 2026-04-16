@@ -554,6 +554,69 @@ def default_suite_json_path() -> Path:
     return (Path(__file__).resolve().parent / "default_suite.json").resolve()
 
 
+def describe_desktop_inputs_handoff_for_workspace(
+    target_workspace: str,
+    *,
+    workspace_dir: Path | str | None = None,
+    snapshot_path: Path | str | None = None,
+    snapshot: dict[str, Any] | None = None,
+    current_payload_hash: str = "",
+) -> dict[str, Any]:
+    workspace = Path(workspace_dir).resolve() if workspace_dir is not None else (repo_root() / "workspace").resolve()
+    target = Path(snapshot_path) if snapshot_path is not None else workspace / "handoffs" / "WS-INPUTS" / "inputs_snapshot.json"
+    loaded = dict(snapshot or {}) if isinstance(snapshot, dict) else {}
+    if not loaded and target.exists():
+        try:
+            obj = json.loads(target.read_text(encoding="utf-8"))
+            loaded = dict(obj) if isinstance(obj, dict) else {}
+        except Exception:
+            loaded = {}
+    if not loaded:
+        return {
+            "state": "missing",
+            "is_stale": True,
+            "path": str(target),
+            "current_payload_hash": str(current_payload_hash or ""),
+            "snapshot_payload_hash": "",
+            "banner": "Frozen inputs_snapshot не найден для downstream handoff.",
+        }
+    target_workspaces = tuple(str(item) for item in loaded.get("target_workspaces") or ())
+    handoff_ids = dict(loaded.get("handoff_ids") or {})
+    clean_target = str(target_workspace or "").strip()
+    snapshot_hash = str(loaded.get("payload_hash") or loaded.get("snapshot_hash") or "").strip()
+    if clean_target and target_workspaces and clean_target not in target_workspaces:
+        return {
+            "state": "invalid",
+            "is_stale": True,
+            "path": str(target),
+            "current_payload_hash": str(current_payload_hash or ""),
+            "snapshot_payload_hash": snapshot_hash,
+            "banner": f"Frozen inputs_snapshot is not addressed to {clean_target}.",
+        }
+    if clean_target and handoff_ids and clean_target not in handoff_ids:
+        return {
+            "state": "invalid",
+            "is_stale": True,
+            "path": str(target),
+            "current_payload_hash": str(current_payload_hash or ""),
+            "snapshot_payload_hash": snapshot_hash,
+            "banner": f"Frozen inputs_snapshot missing handoff_id for {clean_target}.",
+        }
+    is_stale = bool(current_payload_hash and snapshot_hash and snapshot_hash != str(current_payload_hash))
+    return {
+        "state": "stale" if is_stale else "current",
+        "is_stale": is_stale,
+        "path": str(target),
+        "current_payload_hash": str(current_payload_hash or ""),
+        "snapshot_payload_hash": snapshot_hash,
+        "banner": (
+            "Frozen inputs_snapshot устарел относительно текущего inputs hash."
+            if is_stale
+            else "Frozen inputs_snapshot доступен для downstream handoff."
+        ),
+    }
+
+
 def flatten_field_specs() -> tuple[DesktopInputFieldSpec, ...]:
     fields: list[DesktopInputFieldSpec] = []
     for section in DESKTOP_INPUT_SECTIONS:
@@ -1966,6 +2029,7 @@ __all__ = [
     "desktop_snapshot_dir_path",
     "desktop_snapshot_display_name",
     "desktop_snapshot_path",
+    "describe_desktop_inputs_handoff_for_workspace",
     "evaluate_desktop_section_readiness",
     "default_base_json_path",
     "default_ranges_json_path",

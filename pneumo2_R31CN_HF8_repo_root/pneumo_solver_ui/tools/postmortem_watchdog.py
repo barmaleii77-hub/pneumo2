@@ -300,7 +300,10 @@ def main() -> int:
             if os.name == "nt":
                 py_for_gui = _pyw_for_windows(sys.executable)
             send_gui = repo / "pneumo_solver_ui" / "tools" / "send_results_gui.py"
-            subprocess.Popen([str(py_for_gui), str(send_gui)], cwd=str(repo), env=os.environ.copy())
+            send_env = os.environ.copy()
+            send_env["PNEUMO_SEND_RESULTS_REUSE_LATEST"] = "1"
+            send_env["PNEUMO_SEND_BUNDLE_TRIGGER"] = "watchdog"
+            subprocess.Popen([str(py_for_gui), str(send_gui)], cwd=str(repo), env=send_env)
             _log(log_path, "[watchdog] opened send_results_gui")
         except Exception:
             _log(log_path, "[watchdog] failed to open send_results_gui:\n" + traceback.format_exc())
