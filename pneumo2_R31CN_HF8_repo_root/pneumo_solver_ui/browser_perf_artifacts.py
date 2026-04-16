@@ -15,6 +15,7 @@ Current phase goals:
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
+import hashlib
 import json
 
 BROWSER_PERF_REGISTRY_SNAPSHOT_JSON_NAME = "browser_perf_registry_snapshot.json"
@@ -24,15 +25,23 @@ BROWSER_PERF_EVIDENCE_REPORT_JSON_NAME = "browser_perf_evidence_report.json"
 BROWSER_PERF_EVIDENCE_REPORT_MD_NAME = "browser_perf_evidence_report.md"
 BROWSER_PERF_COMPARISON_REPORT_JSON_NAME = "browser_perf_comparison_report.json"
 BROWSER_PERF_COMPARISON_REPORT_MD_NAME = "browser_perf_comparison_report.md"
+BROWSER_PERF_TRACE_JSON_NAME = "browser_perf_trace.json"
+VIEWPORT_GATING_REPORT_JSON_NAME = "viewport_gating_report.json"
+VIEWPORT_GATING_REPORT_MD_NAME = "viewport_gating_report.md"
 BROWSER_PERF_TRACE_CANDIDATE_NAMES: tuple[str, ...] = (
     "browser_perf_trace.trace",
-    "browser_perf_trace.json",
+    BROWSER_PERF_TRACE_JSON_NAME,
+    "browser_perf_trace.jsonl",
+    "browser_perf_trace.csv",
+    "browser_perf_trace.etl",
     "browser_perf_trace.cpuprofile",
     "browser_performance_trace.trace",
     "browser_performance_trace.json",
+    "browser_performance_trace.etl",
     "perf_trace.trace",
     "perf_trace.json",
 )
+_HIDDEN_VIEWPORT_STATES: frozenset[str] = frozenset({"hidden", "offscreen", "zero_size", "css_hidden"})
 _SUMMARY_COMPARE_KEYS: tuple[str, ...] = (
     "component_count",
     "visible_count",
@@ -76,9 +85,23 @@ def _safe_str(value: Any) -> str:
 def _copy_json_value(value: Any) -> Any:
     if isinstance(value, Mapping):
         return {str(k): _copy_json_value(v) for k, v in value.items()}
-    if isinstance(value, list):
+    if isinstance(value, (list, tuple, set)):
         return [_copy_json_value(v) for v in value]
-    return value
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return _safe_str(value)
+
+
+def _stable_hash(payload: Any) -> str:
+    blob = json.dumps(_copy_json_value(payload), ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()
+
+
+def _component_counter(info: Mapping[str, Any], *keys: str) -> int:
+    total = 0
+    for key in keys:
+        total += _safe_int(info.get(key), 0)
+    return total
 
 
 def _normalize_snapshot_summary(components: Mapping[str, Any], summary: Mapping[str, Any]) -> dict[str, Any]:
@@ -143,6 +166,169 @@ def _trace_candidate_path(exports_dir: Path) -> tuple[str, str, bool]:
         except Exception:
             continue
     return "", "", False
+
+
+def write_browser_perf_trace_artifact(
+    exports_dir: Path,
+    trace: Any,
+    *,
+    trace_session_id: str = "",
+    captured_at: str = "",
+    surfaces: Any = None,
+    idle_cpu_summary: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    exports_dir = Path(exports_dir)
+    exports_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema": "browser_perf_trace.v1",
+        "captured_at": _safe_str(captured_at or _utc_iso()),
+        "trace_session_id": _safe_str(trace_session_id),
+        "surfaces": _copy_json_value(surfaces or []),
+        "idle_cpu_summary": _copy_json_value(_as_dict(idle_cpu_summary)),
+        "trace": _copy_json_value(trace),
+    }
+    if not payload["trace_session_id"]:
+        payload["trace_session_id"] = _stable_hash({"trace": payload["trace"], "surfaces": payload["surfaces"]})[:16]
+    payload["evidence_hash"] = _stable_hash(payload)
+    path = exports_dir / BROWSER_PERF_TRACE_JSON_NAME
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "ref": BROWSER_PERF_TRACE_JSON_NAME,
+        "path": str(path.resolve()),
+        "exists": True,
+        "trace_session_id": _safe_str(payload.get("trace_session_id")),
+        "evidence_hash": _safe_str(payload.get("evidence_hash")),
+    }
+
+
+def _viewport_state_for_component(info: Mapping[str, Any]) -> str:
+    state = _safe_str(info.get("viewport_state") or info.get("state")).strip().lower()
+    if state:
+        return state
+    if "visible" in info:
+        return "visible" if bool(info.get("visible")) else "hidden"
+    return "unknown"
+
+
+def _viewport_surface_row(name: str, info: Mapping[str, Any]) -> dict[str, Any]:
+    state = _viewport_state_for_component(info)
+    wakeups = _component_counter(info, "wakeups", "wake_up_count", "timer_wakeups")
+    render_count = _component_counter(info, "render_count", "renders")
+    schedule_raf = _component_counter(info, "schedule_raf_count", "raf_count", "request_animation_frame_count")
+    schedule_timeout = _component_counter(info, "schedule_timeout_count", "timeout_count")
+    idle_poll_ms = _safe_int(info.get("idle_poll_ms"), 0)
+    duplicate_guard_hits = _component_counter(info, "duplicate_guard_hits")
+    activity_count = int(wakeups + render_count + schedule_raf + schedule_timeout)
+    hidden = state in _HIDDEN_VIEWPORT_STATES
+    return {
+        "component": _safe_str(info.get("component") or name),
+        "viewport_state": state,
+        "visible": bool(state == "visible" or info.get("visible") is True),
+        "hidden_surface": bool(hidden),
+        "wakeups": wakeups,
+        "render_count": render_count,
+        "schedule_raf_count": schedule_raf,
+        "schedule_timeout_count": schedule_timeout,
+        "duplicate_guard_hits": duplicate_guard_hits,
+        "idle_poll_ms": idle_poll_ms,
+        "activity_count": activity_count,
+        "gated": bool((not hidden) or activity_count == 0),
+    }
+
+
+def _build_viewport_gating_report(
+    *,
+    updated_utc: str,
+    snapshot_ref: str,
+    snapshot_path: str,
+    snapshot_payload: Mapping[str, Any] | None,
+    trace_ref: str,
+    trace_path: str,
+    trace_exists: bool,
+) -> dict[str, Any]:
+    snap = normalize_browser_perf_snapshot(snapshot_payload)
+    components = _as_dict(snap.get("components"))
+    surfaces = [
+        _viewport_surface_row(name, _as_dict(info))
+        for name, info in sorted(components.items(), key=lambda item: str(item[0]))
+    ]
+    hidden_surfaces = [row for row in surfaces if bool(row.get("hidden_surface"))]
+    hidden_surface_updates = [row for row in hidden_surfaces if _safe_int(row.get("activity_count"), 0) > 0]
+    if hidden_surface_updates:
+        level = "FAIL"
+        status = "hidden_surface_updates"
+        release_gate = "FAIL"
+        hard_fail = True
+        message = "Hidden/offscreen browser surfaces are still consuming frame budget."
+    elif hidden_surfaces:
+        level = "PASS"
+        status = "hidden_surfaces_gated"
+        release_gate = "PASS"
+        hard_fail = False
+        message = "Hidden/offscreen browser surfaces are present and gated to zero frame-budget activity."
+    elif surfaces:
+        level = "WARN"
+        status = "no_hidden_surfaces"
+        release_gate = "WARN"
+        hard_fail = False
+        message = "Viewport snapshot has components but no hidden/offscreen surfaces to prove gating against."
+    else:
+        level = "WARN"
+        status = "missing_components"
+        release_gate = "WARN"
+        hard_fail = False
+        message = "Viewport gating snapshot does not contain component data."
+    report = {
+        "schema": "viewport_gating_report.v1",
+        "playbook_id": "PB-006",
+        "open_gap_id": "OG-004",
+        "release_gates": ["RGH-012"],
+        "updated_utc": _safe_str(updated_utc or snap.get("updated_utc") or _utc_iso()),
+        "snapshot_ref": _safe_str(snapshot_ref),
+        "snapshot_path": _safe_str(snapshot_path),
+        "trace_ref": _safe_str(trace_ref),
+        "trace_path": _safe_str(trace_path),
+        "trace_exists": bool(trace_exists),
+        "component_count": int(len(surfaces)),
+        "hidden_surface_count": int(len(hidden_surfaces)),
+        "hidden_surface_update_count": int(len(hidden_surface_updates)),
+        "hidden_surfaces_gated": bool(hidden_surfaces and not hidden_surface_updates),
+        "hidden_surface_updates": hidden_surface_updates,
+        "surfaces": surfaces,
+        "level": level,
+        "status": status,
+        "release_gate": release_gate,
+        "hard_fail": bool(hard_fail),
+        "message": message,
+    }
+    report["evidence_hash"] = _stable_hash(report)
+    return report
+
+
+def _render_viewport_gating_report_md(report: Mapping[str, Any]) -> str:
+    rep = _as_dict(report)
+    updates = rep.get("hidden_surface_updates") if isinstance(rep.get("hidden_surface_updates"), list) else []
+    update_names = [
+        _safe_str(_as_dict(row).get("component"))
+        for row in updates
+        if _safe_str(_as_dict(row).get("component")).strip()
+    ]
+    lines = [
+        "# Viewport Gating Report",
+        "",
+        f"- status: {rep.get('status') or '-'} / level={rep.get('level') or '-'} / release_gate={rep.get('release_gate') or '-'}",
+        f"- playbook_id: {rep.get('playbook_id') or 'PB-006'}",
+        f"- release_gates: {', '.join(str(x) for x in (rep.get('release_gates') or [])) or 'RGH-012'}",
+        f"- trace_ref: {rep.get('trace_ref') or '-'}",
+        f"- trace_exists: {rep.get('trace_exists')}",
+        f"- component_count: {rep.get('component_count') or 0}",
+        f"- hidden_surface_count: {rep.get('hidden_surface_count') or 0}",
+        f"- hidden_surface_update_count: {rep.get('hidden_surface_update_count') or 0}",
+        f"- hidden_surfaces_gated: {rep.get('hidden_surfaces_gated')}",
+        f"- hidden_surface_updates: {', '.join(update_names) if update_names else '-'}",
+        f"- message: {rep.get('message') or '-'}",
+    ]
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _contract_level(snapshot_exists: bool, trace_exists: bool, component_count: int) -> tuple[str, str, str]:
@@ -391,6 +577,8 @@ def write_browser_perf_artifacts(
     evidence_report_md_path = exports_dir / BROWSER_PERF_EVIDENCE_REPORT_MD_NAME
     comparison_report_path = exports_dir / BROWSER_PERF_COMPARISON_REPORT_JSON_NAME
     comparison_report_md_path = exports_dir / BROWSER_PERF_COMPARISON_REPORT_MD_NAME
+    viewport_report_path = exports_dir / VIEWPORT_GATING_REPORT_JSON_NAME
+    viewport_report_md_path = exports_dir / VIEWPORT_GATING_REPORT_MD_NAME
 
     previous_snapshot_payload: dict[str, Any] = {}
     previous_trace_exists: bool | None = None
@@ -450,6 +638,18 @@ def write_browser_perf_artifacts(
     )
     evidence_report_path.write_text(json.dumps(evidence_report, ensure_ascii=False, indent=2), encoding="utf-8")
     evidence_report_md_path.write_text(_render_browser_perf_evidence_report_md(evidence_report), encoding="utf-8")
+
+    viewport_report = _build_viewport_gating_report(
+        updated_utc=_safe_str(updated_utc or snap_norm.get("updated_utc") or _utc_iso()),
+        snapshot_ref=BROWSER_PERF_REGISTRY_SNAPSHOT_JSON_NAME,
+        snapshot_path=str(snapshot_path.resolve()),
+        snapshot_payload=snap_norm,
+        trace_ref=trace_ref,
+        trace_path=trace_path,
+        trace_exists=bool(trace_exists),
+    )
+    viewport_report_path.write_text(json.dumps(viewport_report, ensure_ascii=False, indent=2), encoding="utf-8")
+    viewport_report_md_path.write_text(_render_viewport_gating_report_md(viewport_report), encoding="utf-8")
 
     if previous_snapshot_payload:
         previous_snapshot_path.write_text(
@@ -516,6 +716,18 @@ def write_browser_perf_artifacts(
             "comparison_ready": bool(comparison_report.get("comparison_ready")),
             "comparison_changed": comparison_report.get("comparison_changed"),
         },
+        "viewport_gating_report": {
+            "ref": VIEWPORT_GATING_REPORT_JSON_NAME,
+            "path": str(viewport_report_path.resolve()),
+            "exists": True,
+            "level": _safe_str(viewport_report.get("level")),
+            "status": _safe_str(viewport_report.get("status")),
+            "release_gate": _safe_str(viewport_report.get("release_gate")),
+            "hard_fail": bool(viewport_report.get("hard_fail")),
+            "hidden_surface_count": _safe_int(viewport_report.get("hidden_surface_count"), 0),
+            "hidden_surface_update_count": _safe_int(viewport_report.get("hidden_surface_update_count"), 0),
+            "hidden_surfaces_gated": bool(viewport_report.get("hidden_surfaces_gated")),
+        },
         "browser_perf_trace": {
             "ref": trace_ref,
             "path": trace_path,
@@ -531,6 +743,7 @@ def collect_browser_perf_artifacts_summary(exports_dir: Path) -> dict[str, Any]:
     contract_path = exports_dir / BROWSER_PERF_CONTRACT_JSON_NAME
     evidence_report_path = exports_dir / BROWSER_PERF_EVIDENCE_REPORT_JSON_NAME
     comparison_report_path = exports_dir / BROWSER_PERF_COMPARISON_REPORT_JSON_NAME
+    viewport_report_path = exports_dir / VIEWPORT_GATING_REPORT_JSON_NAME
     trace_ref, trace_path, trace_exists = _trace_candidate_path(exports_dir)
 
     snapshot_exists = False
@@ -702,6 +915,57 @@ def collect_browser_perf_artifacts_summary(exports_dir: Path) -> dict[str, Any]:
         comparison_delta_total_render_count = int(delta_summary.get("total_render_count", 0))
         comparison_delta_max_idle_poll_ms = int(delta_summary.get("max_idle_poll_ms", 0))
 
+    viewport_exists = False
+    viewport_level = ""
+    viewport_status = ""
+    viewport_message = ""
+    viewport_release_gate = ""
+    viewport_hard_fail = False
+    viewport_hidden_surface_count = 0
+    viewport_hidden_surface_update_count = 0
+    viewport_hidden_surfaces_gated = False
+    viewport_trace_exists = bool(trace_exists)
+    if viewport_report_path.exists():
+        try:
+            payload = json.loads(viewport_report_path.read_text(encoding="utf-8"))
+            if isinstance(payload, Mapping):
+                viewport_exists = True
+                viewport_level = _safe_str(payload.get("level"))
+                viewport_status = _safe_str(payload.get("status"))
+                viewport_message = _safe_str(payload.get("message"))
+                viewport_release_gate = _safe_str(payload.get("release_gate"))
+                viewport_hard_fail = bool(payload.get("hard_fail"))
+                viewport_hidden_surface_count = _safe_int(payload.get("hidden_surface_count"), 0)
+                viewport_hidden_surface_update_count = _safe_int(payload.get("hidden_surface_update_count"), 0)
+                viewport_hidden_surfaces_gated = bool(payload.get("hidden_surfaces_gated"))
+                viewport_trace_exists = bool(payload.get("trace_exists"))
+        except Exception:
+            viewport_exists = True
+
+    if not viewport_level and snapshot_exists:
+        viewport_payload = _build_viewport_gating_report(
+            updated_utc=_safe_str(
+                (snapshot_payload or {}).get("updated_utc")
+                or (contract_payload or {}).get("updated_utc")
+                or _utc_iso()
+            ),
+            snapshot_ref=BROWSER_PERF_REGISTRY_SNAPSHOT_JSON_NAME,
+            snapshot_path=str(snapshot_path.resolve()) if snapshot_path.exists() else "",
+            snapshot_payload=snapshot_payload,
+            trace_ref=trace_ref,
+            trace_path=trace_path,
+            trace_exists=bool(trace_exists),
+        )
+        viewport_level = _safe_str(viewport_payload.get("level"))
+        viewport_status = _safe_str(viewport_payload.get("status"))
+        viewport_message = _safe_str(viewport_payload.get("message"))
+        viewport_release_gate = _safe_str(viewport_payload.get("release_gate"))
+        viewport_hard_fail = bool(viewport_payload.get("hard_fail"))
+        viewport_hidden_surface_count = _safe_int(viewport_payload.get("hidden_surface_count"), 0)
+        viewport_hidden_surface_update_count = _safe_int(viewport_payload.get("hidden_surface_update_count"), 0)
+        viewport_hidden_surfaces_gated = bool(viewport_payload.get("hidden_surfaces_gated"))
+        viewport_trace_exists = bool(viewport_payload.get("trace_exists"))
+
     return {
         "browser_perf_registry_snapshot_ref": BROWSER_PERF_REGISTRY_SNAPSHOT_JSON_NAME if snapshot_exists else "",
         "browser_perf_registry_snapshot_path": str(snapshot_path.resolve()) if snapshot_path.exists() else "",
@@ -718,6 +982,9 @@ def collect_browser_perf_artifacts_summary(exports_dir: Path) -> dict[str, Any]:
         "browser_perf_comparison_report_ref": BROWSER_PERF_COMPARISON_REPORT_JSON_NAME if comparison_report_path.exists() else "",
         "browser_perf_comparison_report_path": str(comparison_report_path.resolve()) if comparison_report_path.exists() else "",
         "browser_perf_comparison_report_exists": comparison_exists,
+        "viewport_gating_report_ref": VIEWPORT_GATING_REPORT_JSON_NAME if viewport_report_path.exists() else "",
+        "viewport_gating_report_path": str(viewport_report_path.resolve()) if viewport_report_path.exists() else "",
+        "viewport_gating_report_exists": viewport_exists,
         "browser_perf_trace_ref": trace_ref,
         "browser_perf_trace_path": trace_path,
         "browser_perf_trace_exists": bool(trace_exists),
@@ -742,6 +1009,15 @@ def collect_browser_perf_artifacts_summary(exports_dir: Path) -> dict[str, Any]:
         "browser_perf_comparison_delta_total_duplicate_guard_hits": comparison_delta_total_duplicate_guard_hits,
         "browser_perf_comparison_delta_total_render_count": comparison_delta_total_render_count,
         "browser_perf_comparison_delta_max_idle_poll_ms": comparison_delta_max_idle_poll_ms,
+        "viewport_gating_level": viewport_level,
+        "viewport_gating_status": viewport_status,
+        "viewport_gating_message": viewport_message,
+        "viewport_gating_release_gate": viewport_release_gate,
+        "viewport_gating_hard_fail": bool(viewport_hard_fail),
+        "viewport_gating_hidden_surface_count": viewport_hidden_surface_count,
+        "viewport_gating_hidden_surface_update_count": viewport_hidden_surface_update_count,
+        "viewport_gating_hidden_surfaces_gated": bool(viewport_hidden_surfaces_gated),
+        "viewport_gating_trace_exists": bool(viewport_trace_exists),
         "browser_perf_dataset_id": snapshot_dataset_id,
         "browser_perf_source_component": snapshot_source_component,
         "browser_perf_summary": snapshot_summary,
@@ -766,5 +1042,19 @@ def persist_browser_perf_snapshot_event(
     src = dict(snapshot)
     src.setdefault("dataset_id", _safe_str(evt_dict.get("dataset_id")))
     src.setdefault("source_component", _safe_str(evt_dict.get("source_component") or "playhead_ctrl"))
+    trace_payload = None
+    for key in ("browser_perf_trace", "trace_payload", "trace"):
+        if key in evt_dict:
+            trace_payload = evt_dict.get(key)
+            break
+    if trace_payload not in (None, "", [], {}):
+        write_browser_perf_trace_artifact(
+            exports_dir=exports_dir,
+            trace=trace_payload,
+            trace_session_id=_safe_str(evt_dict.get("trace_session_id") or evt_dict.get("session_id")),
+            captured_at=updated_utc,
+            surfaces=evt_dict.get("surfaces") or list(_as_dict(src.get("components")).keys()),
+            idle_cpu_summary=_as_dict(evt_dict.get("idle_cpu_summary")),
+        )
     write_browser_perf_artifacts(exports_dir=exports_dir, snapshot=src, updated_utc=updated_utc)
     return collect_browser_perf_artifacts_summary(exports_dir)

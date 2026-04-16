@@ -8,10 +8,11 @@ sections and sliders, without forcing them through the large WEB UI.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,14 @@ DESKTOP_ADVANCED_FIELD_KEYS: frozenset[str] = frozenset(
         "пружина_запас_до_coil_bind_минимум_м",
     }
 )
+
+
+DESKTOP_INPUT_SNAPSHOT_SCHEMA_VERSION = "desktop_inputs_snapshot_v1"
+DESKTOP_INPUT_SNAPSHOT_FILENAME = "inputs_snapshot.json"
+DESKTOP_INPUT_HANDOFF_IDS: dict[str, str] = {
+    "WS-RING": "HO-002",
+    "WS-SUITE": "HO-003",
+}
 
 
 DESKTOP_HELP_OVERRIDES: dict[str, dict[str, str]] = {
@@ -377,7 +386,6 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
             DesktopInputFieldSpec("длина_рамы", "Длина рамы", "м", "Габаритная длина кузова/рамы для модели и визуализации.", min_value=1.0, max_value=6.0, step=0.01, digits=3),
             DesktopInputFieldSpec("ширина_рамы", "Ширина рамы", "м", "Габаритная ширина кузова/рамы.", min_value=0.2, max_value=3.0, step=0.01, digits=3),
             DesktopInputFieldSpec("высота_рамы", "Высота рамы", "м", "Габаритная высота кузова/рамы.", min_value=0.1, max_value=2.5, step=0.01, digits=3),
-            DesktopInputFieldSpec("высота_центра_масс", "Высота центра масс", "м", "Высота центра масс относительно дорожного уровня.", min_value=0.05, max_value=1.5, step=0.005, digits=3),
             DesktopInputFieldSpec("радиус_колеса_м", "Радиус колеса", "м", "Радиус колеса для кинематики и контакта с дорогой.", min_value=0.15, max_value=0.8, step=0.005, digits=3),
             DesktopInputFieldSpec("wheel_width_m", "Ширина колеса", "мм", "Физическая ширина колеса/шины.", min_value=120.0, max_value=420.0, step=1.0, ui_scale=1000.0, digits=0),
             DesktopInputFieldSpec("ход_штока", "Полный ход штока", "мм", "Полный рабочий ход цилиндра.", min_value=50.0, max_value=500.0, step=1.0, ui_scale=1000.0, digits=0),
@@ -402,11 +410,21 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
         ),
     ),
     DesktopInputSection(
-        title="Механика",
-        description="Массы, шины, пружина и стабилизаторы, которые формируют механический отклик подвески.",
+        title="Массы",
+        description="Подрессоренная и неподрессоренная масса, положение центра масс и правило распределения веса по углам.",
         fields=(
             DesktopInputFieldSpec("масса_рамы", "Масса рамы", "кг", "Подрессоренная масса кузова/рамы.", min_value=50.0, max_value=5000.0, step=10.0, digits=1),
             DesktopInputFieldSpec("масса_неподрессоренная_на_угол", "Неподрессоренная масса на угол", "кг", "Масса колеса, ступицы и рычагов на один угол.", min_value=1.0, max_value=250.0, step=1.0, digits=1),
+            DesktopInputFieldSpec("высота_центра_масс", "Высота центра масс", "м", "Высота центра масс относительно дорожного уровня.", min_value=0.05, max_value=1.5, step=0.005, digits=3),
+            DesktopInputFieldSpec("cg_x_м", "Смещение ЦТ по базе", "м", "Продольное смещение центра тяжести относительно середины базы.", min_value=-1.5, max_value=1.5, step=0.005, digits=3),
+            DesktopInputFieldSpec("cg_y_м", "Смещение ЦТ по колее", "м", "Поперечное смещение центра тяжести относительно продольной оси.", min_value=-1.0, max_value=1.0, step=0.005, digits=3),
+            DesktopInputFieldSpec("corner_loads_mode", "Режим распределения веса по углам", "", "Как распределять вес по углам при инициализации: через ЦТ или через эффективные жёсткости.", control="choice", choices=("cg", "stiffness"), choice_labels=(("cg", "Через центр тяжести"), ("stiffness", "Через жёсткости"))),
+        ),
+    ),
+    DesktopInputSection(
+        title="Механика",
+        description="Шины, пружина и стабилизаторы, которые формируют механический отклик подвески.",
+        fields=(
             DesktopInputFieldSpec("жёсткость_шины", "Жёсткость шины", "Н/м", "Вертикальная жёсткость шины.", min_value=10000.0, max_value=1000000.0, step=1000.0, digits=0),
             DesktopInputFieldSpec("демпфирование_шины", "Демпфирование шины", "Н·с/м", "Вертикальное демпфирование шины.", min_value=100.0, max_value=50000.0, step=100.0, digits=0),
             DesktopInputFieldSpec("пружина_длина_свободная_м", "Свободная длина пружины", "мм", "Исходная свободная длина пружины до сжатия.", min_value=100.0, max_value=1500.0, step=1.0, ui_scale=1000.0, digits=0),
@@ -418,12 +436,9 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
     ),
     DesktopInputSection(
         title="Статическая настройка",
-        description="Стартовое состояние, распределение веса и режим поиска статической посадки.",
+        description="Стартовое состояние и режим поиска статической посадки.",
         fields=(
             DesktopInputFieldSpec("vx0_м_с", "Начальная скорость", "м/с", "Начальная продольная скорость модели.", min_value=0.0, max_value=80.0, step=0.1, digits=2),
-            DesktopInputFieldSpec("cg_x_м", "Смещение ЦТ по базе", "м", "Продольное смещение центра тяжести относительно середины базы.", min_value=-1.5, max_value=1.5, step=0.005, digits=3),
-            DesktopInputFieldSpec("cg_y_м", "Смещение ЦТ по колее", "м", "Поперечное смещение центра тяжести относительно продольной оси.", min_value=-1.0, max_value=1.0, step=0.005, digits=3),
-            DesktopInputFieldSpec("corner_loads_mode", "Режим распределения веса по углам", "", "Как распределять вес по углам при инициализации: через ЦТ или через эффективные жёсткости.", control="choice", choices=("cg", "stiffness"), choice_labels=(("cg", "Через центр тяжести"), ("stiffness", "Через жёсткости"))),
             DesktopInputFieldSpec("static_trim_enable", "Искать статическую посадку", "", "Перед основным расчётом подобрать статическое равновесие.", control="bool"),
             DesktopInputFieldSpec("static_trim_force", "Форсировать статическую посадку", "", "Принудительно выполнять static trim даже при существующем состоянии.", control="bool"),
             DesktopInputFieldSpec("static_trim_pneumo_mode", "Режим static trim по пневматике", "", "Как корректировать пневматику при поиске посадки: давлением, массой или политропой.", control="choice", choices=("pressure", "mass", "polytropic"), choice_labels=(("pressure", "Коррекция давлением"), ("mass", "Коррекция массой"), ("polytropic", "Политропная коррекция"))),
@@ -446,18 +461,24 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
     ),
     DesktopInputSection(
         title="Справочные данные",
-        description="Режимы газа, температурные reference-параметры и служебные инженерные проверки.",
+        description="Режимы газа, температурные reference-параметры и справочные лимиты пружины.",
         fields=(
             DesktopInputFieldSpec("термодинамика", "Режим термодинамики", "", "Модель газа: изотерма, адиабата или тепловой режим со стенкой.", control="choice", choices=("thermal", "isothermal", "adiabatic"), choice_labels=(("thermal", "Теплообмен со стенкой"), ("isothermal", "Изотермический"), ("adiabatic", "Адиабатический"))),
             DesktopInputFieldSpec("газ_модель_теплоемкости", "Модель теплоёмкости воздуха", "", "Постоянные теплоёмкости или T-зависимая reference-модель nist_air.", control="choice", choices=("constant", "nist_air"), choice_labels=(("constant", "Постоянные теплоёмкости"), ("nist_air", "Справочная модель воздуха NIST"))),
             DesktopInputFieldSpec("температура_окр_К", "Температура окружающей среды", "К", "Температура среды, в которой работает система.", min_value=200.0, max_value=400.0, step=1.0, digits=1),
             DesktopInputFieldSpec("T_AIR_К", "Начальная температура воздуха", "К", "Базовая температура воздуха для начального состояния газа.", min_value=200.0, max_value=400.0, step=1.0, digits=1),
+            DesktopInputFieldSpec("пружина_длина_солид_м", "Сомкнутая длина пружины", "мм", "Справочная длина пружины в полностью сомкнутом состоянии.", min_value=0.0, max_value=400.0, step=1.0, ui_scale=1000.0, digits=0),
+            DesktopInputFieldSpec("пружина_запас_до_coil_bind_минимум_м", "Минимальный запас до смыкания витков", "мм", "Допустимый минимальный запас до смыкания витков для справочных проверок.", min_value=0.0, max_value=120.0, step=1.0, ui_scale=1000.0, digits=0),
+        ),
+    ),
+    DesktopInputSection(
+        title="Численные настройки",
+        description="Ограничения интегратора и инженерные проверки, которые влияют на устойчивость расчёта.",
+        fields=(
             DesktopInputFieldSpec("макс_шаг_интегрирования_с", "Максимальный шаг интегрирования", "мс", "Ограничение шага интегратора.", min_value=0.01, max_value=10.0, step=0.01, ui_scale=1000.0, digits=2),
             DesktopInputFieldSpec("макс_число_внутренних_шагов_на_dt", "Макс. внутренних шагов на dt", "шагов", "Защита от зависания интегратора на одном шаге dt.", control="int", min_value=1000, max_value=1000000, step=1000, digits=0),
             DesktopInputFieldSpec("autoverif_enable", "Включить автопроверку", "", "Проверять физические и численные ограничения после расчёта.", control="bool"),
             DesktopInputFieldSpec("mechanics_selfcheck", "Включить самопроверку механики", "", "Проверять кинематику и механические ограничения.", control="bool"),
-            DesktopInputFieldSpec("пружина_длина_солид_м", "Сомкнутая длина пружины", "мм", "Справочная длина пружины в полностью сомкнутом состоянии.", min_value=0.0, max_value=400.0, step=1.0, ui_scale=1000.0, digits=0),
-            DesktopInputFieldSpec("пружина_запас_до_coil_bind_минимум_м", "Минимальный запас до смыкания витков", "мм", "Допустимый минимальный запас до смыкания витков для справочных проверок.", min_value=0.0, max_value=120.0, step=1.0, ui_scale=1000.0, digits=0),
         ),
     ),
 )
@@ -542,6 +563,21 @@ def desktop_snapshot_dir_path() -> Path:
     return (repo_root() / "workspace" / "ui_state" / "desktop_input_snapshots").resolve()
 
 
+def desktop_inputs_handoff_dir_path(
+    *,
+    workspace_dir: Path | str | None = None,
+) -> Path:
+    workspace = Path(workspace_dir).resolve() if workspace_dir is not None else (repo_root() / "workspace").resolve()
+    return (workspace / "handoffs" / "WS-INPUTS").resolve()
+
+
+def desktop_inputs_snapshot_handoff_path(
+    *,
+    workspace_dir: Path | str | None = None,
+) -> Path:
+    return (desktop_inputs_handoff_dir_path(workspace_dir=workspace_dir) / DESKTOP_INPUT_SNAPSHOT_FILENAME).resolve()
+
+
 def desktop_runs_dir_path() -> Path:
     return (repo_root() / "workspace" / "desktop_runs").resolve()
 
@@ -552,6 +588,394 @@ def default_ranges_json_path() -> Path:
 
 def default_suite_json_path() -> Path:
     return (Path(__file__).resolve().parent / "default_suite.json").resolve()
+
+
+def _canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def canonical_base_input_keys() -> frozenset[str]:
+    return frozenset(str(key) for key in load_base_defaults().keys())
+
+
+def desktop_input_field_keys() -> frozenset[str]:
+    return frozenset(spec.key for spec in flatten_field_specs())
+
+
+def find_desktop_invented_input_keys(
+    payload: dict[str, Any],
+    *,
+    allowed_keys: frozenset[str] | None = None,
+) -> tuple[str, ...]:
+    allowed = allowed_keys if allowed_keys is not None else canonical_base_input_keys()
+    return tuple(
+        sorted(
+            str(key)
+            for key in dict(payload or {}).keys()
+            if str(key) not in allowed
+        )
+    )
+
+
+def validate_desktop_input_payload_keys(payload: dict[str, Any]) -> None:
+    invented_keys = find_desktop_invented_input_keys(payload)
+    if invented_keys:
+        preview = ", ".join(invented_keys[:8])
+        suffix = "" if len(invented_keys) <= 8 else f" и ещё {len(invented_keys) - 8}"
+        raise ValueError(
+            "WS-INPUTS snapshot contains keys outside default_base.json: "
+            f"{preview}{suffix}"
+        )
+
+
+def canonicalize_desktop_input_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    current = load_base_defaults()
+    current.update(dict(payload or {}))
+    validate_desktop_input_payload_keys(current)
+    return current
+
+
+def desktop_input_payload_hash(payload: dict[str, Any]) -> str:
+    return hashlib.sha256(_canonical_json_bytes(canonicalize_desktop_input_payload(payload))).hexdigest()
+
+
+def build_desktop_inputs_snapshot(
+    payload: dict[str, Any],
+    *,
+    source_path: Path | str | None = None,
+    created_at_utc: str | None = None,
+) -> dict[str, Any]:
+    frozen_inputs = canonicalize_desktop_input_payload(payload)
+    payload_hash = desktop_input_payload_hash(frozen_inputs)
+    section_keys = {
+        section.title: [spec.key for spec in section.fields]
+        for section in DESKTOP_INPUT_SECTIONS
+    }
+    created = str(
+        created_at_utc
+        or datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+    source = str(Path(source_path).resolve()) if source_path else ""
+    snapshot_core = {
+        "schema_version": DESKTOP_INPUT_SNAPSHOT_SCHEMA_VERSION,
+        "source_workspace": "WS-INPUTS",
+        "target_workspaces": list(DESKTOP_INPUT_HANDOFF_IDS.keys()),
+        "handoff_ids": dict(DESKTOP_INPUT_HANDOFF_IDS),
+        "frozen": True,
+        "created_at_utc": created,
+        "source_path": source,
+        "payload_hash": payload_hash,
+        "payload_key_count": len(frozen_inputs),
+        "field_key_count": len(desktop_input_field_keys()),
+        "invented_keys": [],
+        "section_keys": section_keys,
+        "readiness": evaluate_desktop_section_readiness(frozen_inputs),
+        "inputs": frozen_inputs,
+    }
+    snapshot_core["snapshot_hash"] = hashlib.sha256(
+        _canonical_json_bytes(snapshot_core)
+    ).hexdigest()
+    return snapshot_core
+
+
+def validate_desktop_inputs_snapshot_contract(
+    snapshot: dict[str, Any],
+    *,
+    target_workspace: str | None = None,
+) -> None:
+    if not isinstance(snapshot, dict):
+        raise ValueError("inputs_snapshot must contain a JSON object")
+    if str(snapshot.get("schema_version") or "") != DESKTOP_INPUT_SNAPSHOT_SCHEMA_VERSION:
+        raise ValueError("inputs_snapshot has unsupported schema_version")
+    if str(snapshot.get("source_workspace") or "") != "WS-INPUTS":
+        raise ValueError("inputs_snapshot source_workspace must be WS-INPUTS")
+    if bool(snapshot.get("frozen", False)) is not True:
+        raise ValueError("inputs_snapshot must be frozen before handoff")
+
+    target_workspaces = tuple(str(item) for item in list(snapshot.get("target_workspaces") or []))
+    handoff_ids = dict(snapshot.get("handoff_ids") or {})
+    for workspace, handoff_id in DESKTOP_INPUT_HANDOFF_IDS.items():
+        if workspace not in target_workspaces:
+            raise ValueError(f"inputs_snapshot missing target workspace {workspace}")
+        if str(handoff_ids.get(workspace) or "") != handoff_id:
+            raise ValueError(f"inputs_snapshot has wrong handoff_id for {workspace}")
+    clean_target = str(target_workspace or "").strip()
+    if clean_target:
+        expected_handoff = DESKTOP_INPUT_HANDOFF_IDS.get(clean_target)
+        if expected_handoff is None:
+            raise ValueError(f"unsupported inputs_snapshot target workspace: {clean_target}")
+        if clean_target not in target_workspaces:
+            raise ValueError(f"inputs_snapshot is not addressed to {clean_target}")
+
+    inputs = snapshot.get("inputs")
+    if not isinstance(inputs, dict):
+        raise ValueError("inputs_snapshot inputs must contain a JSON object")
+    invented_keys = find_desktop_invented_input_keys(inputs)
+    if invented_keys:
+        preview = ", ".join(invented_keys[:8])
+        raise ValueError(f"inputs_snapshot inputs contain invented keys: {preview}")
+    if list(snapshot.get("invented_keys") or []) != []:
+        raise ValueError("inputs_snapshot invented_keys must be empty")
+    missing_keys = sorted(canonical_base_input_keys() - set(str(key) for key in inputs.keys()))
+    if missing_keys:
+        preview = ", ".join(missing_keys[:8])
+        raise ValueError(f"inputs_snapshot inputs missing canonical keys: {preview}")
+
+    expected_payload_hash = desktop_input_payload_hash(inputs)
+    if str(snapshot.get("payload_hash") or "") != expected_payload_hash:
+        raise ValueError("inputs_snapshot payload_hash does not match canonical inputs")
+    if int(snapshot.get("payload_key_count") or 0) != len(inputs):
+        raise ValueError("inputs_snapshot payload_key_count does not match inputs")
+    if int(snapshot.get("field_key_count") or 0) != len(desktop_input_field_keys()):
+        raise ValueError("inputs_snapshot field_key_count does not match desktop field registry")
+    expected_section_keys = {
+        section.title: [spec.key for spec in section.fields]
+        for section in DESKTOP_INPUT_SECTIONS
+    }
+    if dict(snapshot.get("section_keys") or {}) != expected_section_keys:
+        raise ValueError("inputs_snapshot section_keys do not match desktop input sections")
+
+    expected_snapshot_hash = hashlib.sha256(
+        _canonical_json_bytes({key: value for key, value in snapshot.items() if key != "snapshot_hash"})
+    ).hexdigest()
+    if str(snapshot.get("snapshot_hash") or "") != expected_snapshot_hash:
+        raise ValueError("inputs_snapshot snapshot_hash does not match frozen snapshot")
+
+
+def build_desktop_inputs_snapshot_ref(
+    snapshot: dict[str, Any],
+    *,
+    target_workspace: str,
+    snapshot_path: Path | str | None = None,
+) -> dict[str, Any]:
+    clean_target = str(target_workspace or "").strip()
+    validate_desktop_inputs_snapshot_contract(snapshot, target_workspace=clean_target)
+    return {
+        "workspace": "WS-INPUTS",
+        "target_workspace": clean_target,
+        "handoff_id": DESKTOP_INPUT_HANDOFF_IDS[clean_target],
+        "schema_version": DESKTOP_INPUT_SNAPSHOT_SCHEMA_VERSION,
+        "frozen": True,
+        "snapshot_ref": str(Path(snapshot_path).resolve()) if snapshot_path is not None else "",
+        "payload_hash": str(snapshot.get("payload_hash") or ""),
+        "snapshot_hash": str(snapshot.get("snapshot_hash") or ""),
+    }
+
+
+def save_desktop_inputs_snapshot(
+    payload: dict[str, Any],
+    *,
+    source_path: Path | str | None = None,
+    target_path: Path | str | None = None,
+) -> Path:
+    target = Path(target_path).resolve() if target_path else desktop_inputs_snapshot_handoff_path()
+    snapshot = build_desktop_inputs_snapshot(payload, source_path=source_path)
+    save_base_payload(target, snapshot)
+    return target
+
+
+def load_desktop_inputs_snapshot(path: Path | str | None = None) -> dict[str, Any]:
+    target = Path(path).resolve() if path else desktop_inputs_snapshot_handoff_path()
+    raw = json.loads(target.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"Desktop inputs snapshot must contain a JSON object: {target}")
+    validate_desktop_inputs_snapshot_contract(raw)
+    return raw
+
+
+def describe_desktop_inputs_handoff_for_workspace(
+    target_workspace: str,
+    *,
+    current_payload_hash: str = "",
+    snapshot: dict[str, Any] | None = None,
+    snapshot_path: Path | str | None = None,
+    workspace_dir: Path | str | None = None,
+) -> dict[str, Any]:
+    clean_target = str(target_workspace or "").strip()
+    handoff_id = DESKTOP_INPUT_HANDOFF_IDS.get(clean_target, "")
+    target = (
+        Path(snapshot_path).resolve()
+        if snapshot_path is not None
+        else desktop_inputs_snapshot_handoff_path(workspace_dir=workspace_dir)
+    )
+    base = {
+        "version": "desktop_inputs_handoff_ref_v1",
+        "target_workspace": clean_target,
+        "handoff_id": handoff_id,
+        "snapshot_path": str(target),
+        "payload_hash": "",
+        "snapshot_hash": "",
+        "can_consume": False,
+    }
+    if not handoff_id:
+        return {
+            **base,
+            "state": "invalid",
+            "is_stale": True,
+            "stale_reasons": ["unsupported_inputs_handoff_target"],
+            "banner": f"inputs_snapshot не поддерживает target workspace: {clean_target}.",
+        }
+
+    loaded_snapshot = snapshot
+    if loaded_snapshot is None:
+        if not target.exists():
+            return {
+                **base,
+                "state": "missing",
+                "is_stale": True,
+                "stale_reasons": ["missing_inputs_snapshot"],
+                "banner": (
+                    f"{handoff_id}: frozen inputs_snapshot.json не найден. "
+                    f"{clean_target} не должен создавать surrogate inputs."
+                ),
+            }
+        try:
+            loaded_snapshot = load_desktop_inputs_snapshot(target)
+        except Exception as exc:
+            return {
+                **base,
+                "state": "invalid",
+                "is_stale": True,
+                "stale_reasons": ["invalid_inputs_snapshot"],
+                "banner": f"{handoff_id} inputs_snapshot не читается или невалиден: {exc}",
+            }
+
+    try:
+        validate_desktop_inputs_snapshot_contract(loaded_snapshot, target_workspace=clean_target)
+    except Exception as exc:
+        return {
+            **base,
+            "state": "invalid",
+            "is_stale": True,
+            "stale_reasons": ["invalid_inputs_snapshot"],
+            "banner": f"{handoff_id} inputs_snapshot невалиден для {clean_target}: {exc}",
+        }
+
+    ref = build_desktop_inputs_snapshot_ref(
+        loaded_snapshot,
+        target_workspace=clean_target,
+        snapshot_path=target,
+    )
+    payload_hash = str(ref.get("payload_hash") or "")
+    snapshot_hash = str(ref.get("snapshot_hash") or "")
+    if current_payload_hash and payload_hash != str(current_payload_hash):
+        return {
+            **base,
+            "payload_hash": payload_hash,
+            "snapshot_hash": snapshot_hash,
+            "ref": ref,
+            "state": "stale",
+            "is_stale": True,
+            "stale_reasons": ["inputs_snapshot_hash_changed"],
+            "banner": (
+                f"{handoff_id} inputs_snapshot устарел для {clean_target}: "
+                "payload_hash отличается от текущего frozen WS-INPUTS context."
+            ),
+        }
+
+    return {
+        **base,
+        "payload_hash": payload_hash,
+        "snapshot_hash": snapshot_hash,
+        "ref": ref,
+        "state": "current",
+        "is_stale": False,
+        "stale_reasons": [],
+        "can_consume": True,
+        "banner": (
+            f"{handoff_id} inputs_snapshot актуален для {clean_target}; "
+            "downstream хранит ref/hash и не редактирует WS-INPUTS."
+        ),
+    }
+
+
+def describe_desktop_inputs_snapshot_state(
+    current_payload: dict[str, Any],
+    *,
+    snapshot: dict[str, Any] | None = None,
+    snapshot_path: Path | str | None = None,
+) -> dict[str, Any]:
+    target = Path(snapshot_path).resolve() if snapshot_path else desktop_inputs_snapshot_handoff_path()
+    try:
+        current_hash = desktop_input_payload_hash(current_payload)
+    except Exception as exc:
+        return {
+            "state": "invalid",
+            "is_stale": True,
+            "path": str(target),
+            "current_payload_hash": "",
+            "snapshot_payload_hash": "",
+            "banner": f"Нельзя заморозить inputs_snapshot: {exc}",
+        }
+
+    loaded_snapshot = snapshot
+    if loaded_snapshot is None:
+        if not target.exists():
+            return {
+                "state": "missing",
+                "is_stale": True,
+                "path": str(target),
+                "current_payload_hash": current_hash,
+                "snapshot_payload_hash": "",
+                "banner": (
+                    "Frozen inputs_snapshot ещё не создан. WS-RING (HO-002) и "
+                    "WS-SUITE (HO-003) должны получить замороженный снимок перед handoff."
+                ),
+            }
+        try:
+            loaded_snapshot = load_desktop_inputs_snapshot(target)
+        except Exception as exc:
+            return {
+                "state": "invalid",
+                "is_stale": True,
+                "path": str(target),
+                "current_payload_hash": current_hash,
+                "snapshot_payload_hash": "",
+                "banner": f"Frozen inputs_snapshot повреждён или не читается: {exc}",
+            }
+
+    snapshot_hash = str(loaded_snapshot.get("payload_hash") or "")
+    try:
+        validate_desktop_inputs_snapshot_contract(loaded_snapshot)
+    except Exception as exc:
+        return {
+            "state": "invalid",
+            "is_stale": True,
+            "path": str(target),
+            "current_payload_hash": current_hash,
+            "snapshot_payload_hash": snapshot_hash,
+            "banner": f"Frozen inputs_snapshot невалиден: {exc}",
+        }
+    is_stale = current_hash != snapshot_hash
+    if is_stale:
+        return {
+            "state": "stale",
+            "is_stale": True,
+            "path": str(target),
+            "current_payload_hash": current_hash,
+            "snapshot_payload_hash": snapshot_hash,
+            "banner": (
+                "Frozen inputs_snapshot устарел: текущие исходные данные изменились "
+                "после handoff. Обновите snapshot перед WS-RING (HO-002) или "
+                "WS-SUITE (HO-003)."
+            ),
+        }
+    return {
+        "state": "current",
+        "is_stale": False,
+        "path": str(target),
+        "current_payload_hash": current_hash,
+        "snapshot_payload_hash": snapshot_hash,
+        "banner": (
+            "Frozen inputs_snapshot актуален для WS-RING (HO-002) и "
+            "WS-SUITE (HO-003). Downstream должен читать snapshot, а не редактировать WS-INPUTS."
+        ),
+    }
 
 
 def flatten_field_specs() -> tuple[DesktopInputFieldSpec, ...]:
@@ -884,11 +1308,29 @@ def evaluate_desktop_section_readiness(
         }
     )
 
-    mechanics_issues: list[str] = []
+    mass_issues: list[str] = []
     if _safe_float(current, "масса_рамы") <= 0.0:
-        mechanics_issues.append("масса рамы")
+        mass_issues.append("масса рамы")
     if _safe_float(current, "масса_неподрессоренная_на_угол") <= 0.0:
-        mechanics_issues.append("неподрессоренная масса")
+        mass_issues.append("неподрессоренная масса")
+    if _safe_float(current, "высота_центра_масс") <= 0.0:
+        mass_issues.append("высота центра масс")
+    if _safe_choice(current, "corner_loads_mode") not in {"cg", "stiffness"}:
+        mass_issues.append("режим распределения веса")
+    rows.append(
+        {
+            "title": "Массы",
+            "status": "warn" if mass_issues else "ok",
+            "summary": (
+                "Проверьте: " + ", ".join(mass_issues) + "."
+                if mass_issues
+                else "Массы, центр тяжести и распределение веса выглядят готовыми к запуску."
+            ),
+            "issues": mass_issues,
+        }
+    )
+
+    mechanics_issues: list[str] = []
     if _safe_float(current, "жёсткость_шины") <= 0.0:
         mechanics_issues.append("жёсткость шины")
     if _safe_float(current, "демпфирование_шины") <= 0.0:
@@ -909,7 +1351,7 @@ def evaluate_desktop_section_readiness(
             "summary": (
                 "Проверьте: " + ", ".join(mechanics_issues) + "."
                 if mechanics_issues
-                else "Массы, шины, пружина и стабилизаторы выглядят готовыми к запуску."
+                else "Шины, пружина и стабилизаторы выглядят готовыми к запуску."
             ),
             "issues": mechanics_issues,
         }
@@ -918,8 +1360,6 @@ def evaluate_desktop_section_readiness(
     static_issues: list[str] = []
     if _safe_float(current, "vx0_м_с") < 0.0:
         static_issues.append("начальная скорость")
-    if _safe_choice(current, "corner_loads_mode") not in {"cg", "stiffness"}:
-        static_issues.append("режим распределения веса")
     if _safe_bool(current, "static_trim_force") and not _safe_bool(current, "static_trim_enable"):
         static_issues.append("форсированный static trim без включённого поиска посадки")
     if _safe_choice(current, "static_trim_pneumo_mode") not in {"pressure", "mass", "polytropic"}:
@@ -975,16 +1415,10 @@ def evaluate_desktop_section_readiness(
         _safe_float(current, "T_AIR_К"),
     ) <= 0.0:
         reference_issues.append("температурные reference-данные")
-    if _safe_float(current, "макс_шаг_интегрирования_с") <= 0.0:
-        reference_issues.append("максимальный шаг интегрирования")
-    if _safe_float(current, "макс_число_внутренних_шагов_на_dt") < 1000.0:
-        reference_issues.append("лимит внутренних шагов")
     if _safe_float(current, "пружина_длина_солид_м") < 0.0:
         reference_issues.append("сомкнутая длина пружины")
     if _safe_float(current, "пружина_запас_до_coil_bind_минимум_м") < 0.0:
         reference_issues.append("запас до смыкания витков")
-    if (not _safe_bool(current, "autoverif_enable")) and (not _safe_bool(current, "mechanics_selfcheck")):
-        reference_issues.append("выключены все инженерные проверки")
     rows.append(
         {
             "title": "Справочные данные",
@@ -992,9 +1426,29 @@ def evaluate_desktop_section_readiness(
             "summary": (
                 "Проверьте: " + ", ".join(reference_issues) + "."
                 if reference_issues
-                else "Reference-режимы, температуры и инженерные проверки выглядят согласованно."
+                else "Reference-режимы, температуры и справочные лимиты выглядят согласованно."
             ),
             "issues": reference_issues,
+        }
+    )
+
+    numerical_issues: list[str] = []
+    if _safe_float(current, "макс_шаг_интегрирования_с") <= 0.0:
+        numerical_issues.append("максимальный шаг интегрирования")
+    if _safe_float(current, "макс_число_внутренних_шагов_на_dt") < 1000.0:
+        numerical_issues.append("лимит внутренних шагов")
+    if (not _safe_bool(current, "autoverif_enable")) and (not _safe_bool(current, "mechanics_selfcheck")):
+        numerical_issues.append("выключены все инженерные проверки")
+    rows.append(
+        {
+            "title": "Численные настройки",
+            "status": "warn" if numerical_issues else "ok",
+            "summary": (
+                "Проверьте: " + ", ".join(numerical_issues) + "."
+                if numerical_issues
+                else "Ограничения интегратора и инженерные проверки заданы."
+            ),
+            "issues": numerical_issues,
         }
     )
 
@@ -1128,7 +1582,7 @@ _SECTION_ISSUE_FOCUS_MAP = {
             "Диаметр штока Ц2 не должен быть больше или равен диаметру поршня.",
         ),
     },
-    "Механика": {
+    "Массы": {
         "масса рамы": _issue_focus_entry(
             "масса_рамы",
             "Масса рамы",
@@ -1139,6 +1593,18 @@ _SECTION_ISSUE_FOCUS_MAP = {
             "Неподрессоренная масса",
             "Неподрессоренная масса на угол должна быть положительной.",
         ),
+        "высота центра масс": _issue_focus_entry(
+            "высота_центра_масс",
+            "Высота центра масс",
+            "Высота центра масс должна быть положительной.",
+        ),
+        "режим распределения веса": _issue_focus_entry(
+            "corner_loads_mode",
+            "Распределение веса по углам",
+            "Нужно выбрать допустимый режим распределения веса.",
+        ),
+    },
+    "Механика": {
         "жёсткость шины": _issue_focus_entry(
             "жёсткость_шины",
             "Жёсткость шины",
@@ -1170,11 +1636,6 @@ _SECTION_ISSUE_FOCUS_MAP = {
             "vx0_м_с",
             "Начальная скорость",
             "Начальная скорость не может быть отрицательной.",
-        ),
-        "режим распределения веса": _issue_focus_entry(
-            "corner_loads_mode",
-            "Распределение веса по углам",
-            "Нужно выбрать допустимый режим распределения веса.",
         ),
         "форсированный static trim без включённого поиска посадки": _issue_focus_entry(
             "static_trim_enable",
@@ -1235,16 +1696,6 @@ _SECTION_ISSUE_FOCUS_MAP = {
             "Температуры reference-данных",
             "Температуры воздуха и окружения должны быть положительными.",
         ),
-        "максимальный шаг интегрирования": _issue_focus_entry(
-            "макс_шаг_интегрирования_с",
-            "Максимальный шаг интегрирования",
-            "Максимальный шаг интегрирования должен быть положительным.",
-        ),
-        "лимит внутренних шагов": _issue_focus_entry(
-            "макс_число_внутренних_шагов_на_dt",
-            "Лимит внутренних шагов",
-            "Лимит внутренних шагов слишком мал для устойчивого расчёта.",
-        ),
         "сомкнутая длина пружины": _issue_focus_entry(
             "пружина_длина_солид_м",
             "Сомкнутая длина пружины",
@@ -1254,6 +1705,18 @@ _SECTION_ISSUE_FOCUS_MAP = {
             "пружина_запас_до_coil_bind_минимум_м",
             "Запас до смыкания витков",
             "Запас до смыкания витков не может быть отрицательным.",
+        ),
+    },
+    "Численные настройки": {
+        "максимальный шаг интегрирования": _issue_focus_entry(
+            "макс_шаг_интегрирования_с",
+            "Максимальный шаг интегрирования",
+            "Максимальный шаг интегрирования должен быть положительным.",
+        ),
+        "лимит внутренних шагов": _issue_focus_entry(
+            "макс_число_внутренних_шагов_на_dt",
+            "Лимит внутренних шагов",
+            "Лимит внутренних шагов слишком мал для устойчивого расчёта.",
         ),
         "выключены все инженерные проверки": _issue_focus_entry(
             "autoverif_enable",
@@ -1341,16 +1804,20 @@ def build_desktop_section_summary_cards(
 
     geometry_status, geometry_detail = _status_and_detail("Геометрия")
     pneumatic_status, pneumatic_detail = _status_and_detail("Пневматика")
+    mass_status, mass_detail = _status_and_detail("Массы")
     mechanics_status, mechanics_detail = _status_and_detail("Механика")
     static_status, static_detail = _status_and_detail("Статическая настройка")
     components_status, components_detail = _status_and_detail("Компоненты")
     reference_status, reference_detail = _status_and_detail("Справочные данные")
+    numerical_status, numerical_detail = _status_and_detail("Численные настройки")
     geometry_focus = _focus("Геометрия")
     pneumatic_focus = _focus("Пневматика")
+    mass_focus = _focus("Массы")
     mechanics_focus = _focus("Механика")
     static_focus = _focus("Статическая настройка")
     components_focus = _focus("Компоненты")
     reference_focus = _focus("Справочные данные")
+    numerical_focus = _focus("Численные настройки")
 
     return [
         {
@@ -1382,12 +1849,27 @@ def build_desktop_section_summary_cards(
             **pneumatic_focus,
         },
         {
-            "title": "Механика",
-            "status": mechanics_status,
+            "title": "Массы",
+            "status": mass_status,
             "headline": (
                 f"Рама {_safe_float(current, 'масса_рамы'):.0f} кг; "
                 f"угол {_safe_float(current, 'масса_неподрессоренная_на_угол'):.0f} кг; "
+                f"ЦМ H {_fmt_m(current.get('высота_центра_масс'))}; "
+                f"corner loads {str(current.get('corner_loads_mode') or '—')}."
+            ),
+            "details": (
+                f"CG X {_fmt_signed_m(current.get('cg_x_м'))}; "
+                f"CG Y {_fmt_signed_m(current.get('cg_y_м'))}. "
+                f"{mass_detail}"
+            ),
+            **mass_focus,
+        },
+        {
+            "title": "Механика",
+            "status": mechanics_status,
+            "headline": (
                 f"шина {_safe_float(current, 'жёсткость_шины'):.0f} Н/м; "
+                f"демпфер {_safe_float(current, 'демпфирование_шины'):.0f} Н·с/м; "
                 f"пружина {_fmt_mm_from_m(current.get('пружина_длина_свободная_м'))}."
             ),
             "details": (
@@ -1402,13 +1884,10 @@ def build_desktop_section_summary_cards(
             "status": static_status,
             "headline": (
                 f"vx0 {_safe_float(current, 'vx0_м_с', 0.0):.2f} м/с; "
-                f"CG X {_fmt_signed_m(current.get('cg_x_м'))}; "
-                f"CG Y {_fmt_signed_m(current.get('cg_y_м'))}; "
-                f"corner loads {str(current.get('corner_loads_mode') or '—')}."
+                f"static trim {_fmt_bool_flag(current.get('static_trim_enable'), 'включён', 'выключен')}; "
+                f"pneumo mode {str(current.get('static_trim_pneumo_mode') or '—')}."
             ),
             "details": (
-                f"Static trim {_fmt_bool_flag(current.get('static_trim_enable'), 'включён', 'выключен')}; "
-                f"pneumo mode {str(current.get('static_trim_pneumo_mode') or '—')}; "
                 f"цель {float(_safe_float(current, 'zero_pose_target_stroke_frac', 0.0)):.2f} "
                 f"+/- {float(_safe_float(current, 'zero_pose_tol_stroke_frac', 0.0)):.2f}. "
                 f"{static_detail}"
@@ -1438,16 +1917,28 @@ def build_desktop_section_summary_cards(
                 f"Термо {str(current.get('термодинамика') or '—')} / "
                 f"{str(current.get('газ_модель_теплоемкости') or '—')}; "
                 f"T_air {_fmt_temperature_k(current.get('T_AIR_К'))}; "
-                f"T_окр {_fmt_temperature_k(current.get('температура_окр_К'))}; "
-                f"dt_max {_fmt_ms(current.get('макс_шаг_интегрирования_с'))}."
+                f"T_окр {_fmt_temperature_k(current.get('температура_окр_К'))}."
             ),
             "details": (
-                f"Autoverif {_fmt_bool_flag(current.get('autoverif_enable'))}; "
-                f"mech selfcheck {_fmt_bool_flag(current.get('mechanics_selfcheck'))}; "
+                f"Сомкнутая длина {_fmt_mm_from_m(current.get('пружина_длина_солид_м'))}; "
                 f"запас до смыкания {_fmt_mm_from_m(current.get('пружина_запас_до_coil_bind_минимум_м'))}. "
                 f"{reference_detail}"
             ),
             **reference_focus,
+        },
+        {
+            "title": "Численные настройки",
+            "status": numerical_status,
+            "headline": (
+                f"dt_max {_fmt_ms(current.get('макс_шаг_интегрирования_с'))}; "
+                f"внутренних шагов {_safe_float(current, 'макс_число_внутренних_шагов_на_dt', 0.0):.0f}."
+            ),
+            "details": (
+                f"Autoverif {_fmt_bool_flag(current.get('autoverif_enable'))}; "
+                f"mech selfcheck {_fmt_bool_flag(current.get('mechanics_selfcheck'))}. "
+                f"{numerical_detail}"
+            ),
+            **numerical_focus,
         },
     ]
 
@@ -1943,7 +2434,10 @@ def save_base_payload(path: Path, payload: dict[str, Any]) -> Path:
 
 
 __all__ = [
+    "DESKTOP_INPUT_HANDOFF_IDS",
+    "DESKTOP_INPUT_SNAPSHOT_FILENAME",
     "DESKTOP_INPUT_SECTIONS",
+    "DESKTOP_INPUT_SNAPSHOT_SCHEMA_VERSION",
     "DesktopInputFieldSpec",
     "DesktopInputSection",
     "DESKTOP_PREVIEW_SURFACE_OPTIONS",
@@ -1952,11 +2446,17 @@ __all__ = [
     "apply_desktop_quick_preset",
     "apply_desktop_run_preset",
     "build_desktop_preview_surface",
+    "build_desktop_inputs_snapshot",
+    "build_desktop_inputs_snapshot_ref",
     "build_desktop_profile_diff",
     "build_desktop_section_issue_cards",
     "build_desktop_section_field_search_items",
     "build_desktop_section_change_cards",
+    "canonical_base_input_keys",
+    "canonicalize_desktop_input_payload",
     "delete_desktop_profile",
+    "describe_desktop_inputs_handoff_for_workspace",
+    "describe_desktop_inputs_snapshot_state",
     "desktop_section_status_label",
     "build_desktop_section_summary_cards",
     "desktop_field_values_match",
@@ -1966,6 +2466,10 @@ __all__ = [
     "desktop_snapshot_dir_path",
     "desktop_snapshot_display_name",
     "desktop_snapshot_path",
+    "desktop_input_field_keys",
+    "desktop_input_payload_hash",
+    "desktop_inputs_handoff_dir_path",
+    "desktop_inputs_snapshot_handoff_path",
     "evaluate_desktop_section_readiness",
     "default_base_json_path",
     "default_ranges_json_path",
@@ -1976,11 +2480,13 @@ __all__ = [
     "describe_desktop_run_mode",
     "field_spec_map",
     "find_desktop_field_matches",
+    "find_desktop_invented_input_keys",
     "flatten_field_specs",
     "list_desktop_profile_paths",
     "list_desktop_snapshot_paths",
     "load_base_defaults",
     "load_desktop_profile",
+    "load_desktop_inputs_snapshot",
     "load_desktop_snapshot",
     "load_base_with_defaults",
     "preview_surface_label",
@@ -1996,6 +2502,9 @@ __all__ = [
     "repo_root",
     "sanitize_desktop_profile_name",
     "save_desktop_profile",
+    "save_desktop_inputs_snapshot",
     "save_desktop_snapshot",
+    "validate_desktop_inputs_snapshot_contract",
+    "validate_desktop_input_payload_keys",
     "save_base_payload",
 ]

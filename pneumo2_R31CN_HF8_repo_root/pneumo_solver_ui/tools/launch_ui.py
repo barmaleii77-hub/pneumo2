@@ -246,7 +246,9 @@ def main() -> int:
         py_for_gui = sys.executable
         if os.name == "nt":
             py_for_gui = _pyw_for_windows(sys.executable)
-        subprocess.Popen([str(py_for_gui), str(send_gui)], cwd=str(repo), env=env, creationflags=_creationflags_no_window())
+        send_env = dict(env)
+        send_env["PNEUMO_SEND_BUNDLE_TRIGGER"] = "auto-exit" if int(rc) == 0 else f"auto-crash-rc-{int(rc)}"
+        subprocess.Popen([str(py_for_gui), str(send_gui)], cwd=str(repo), env=send_env, creationflags=_creationflags_no_window())
     except Exception as e:
         print(f"WARN: failed to open send_results_gui: {e}")
 
