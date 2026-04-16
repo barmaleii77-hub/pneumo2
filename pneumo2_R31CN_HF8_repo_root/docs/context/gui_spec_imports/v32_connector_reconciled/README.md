@@ -19,6 +19,13 @@ entrypoint и картой чтения для будущих задач.
 digest v32, затем при необходимости открывать конкретные файлы из локального
 архива v32.
 
+Связанные рабочие документы:
+
+- [COMPLETENESS_ASSESSMENT.md](./COMPLETENESS_ASSESSMENT.md) - проверка
+  полноты и достаточности архива v32;
+- [PARALLEL_CHAT_WORKSTREAMS.md](./PARALLEL_CHAT_WORKSTREAMS.md) - разбиение
+  дальнейшей работы на независимые параллельные чаты.
+
 ## Primary Reading Order из архива
 
 1. `README_PROVENANCE.md`

@@ -20,7 +20,8 @@
 - `v32_connector_reconciled/` — active connector-reconciled knowledge digest из
   `pneumo_codex_tz_spec_connector_reconciled_v32.zip`; использовать как карту
   чтения V32 и как новый source-priority/requirements/acceptance слой поверх
-  `v3`, `v12` и `v13`, не заменяя `17/18`;
+  `v3`, `v12` и `v13`, не заменяя `17/18`; внутри также лежат
+  `COMPLETENESS_ASSESSMENT.md` и `PARALLEL_CHAT_WORKSTREAMS.md`;
 - `v3/` — active detailed machine-readable reference layer из
   `pneumo_gui_codex_package_v3.zip`;
 - `v12_design_recovery/` — historical design-recovery layer из
@@ -44,20 +45,23 @@
 3. Затем читать `v32_connector_reconciled/README.md` как active
    connector-reconciled digest для V32: source authority, requirements,
    acceptance, workspace contracts, playbooks, release gates и open gaps.
-4. Затем использовать `v3/*` как checked-in detailed machine-readable reference для:
+4. Если нужно стартовать параллельную разработку, читать
+   `v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md`; если нужно понять
+   достаточность архива, читать `v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md`.
+5. Затем использовать `v3/*` как checked-in detailed machine-readable reference для:
    layout, UI elements, field/help/tooltip catalogs, migration matrix,
    acceptance criteria, pipeline verification, source-of-truth, docking,
    keyboard, UI state и observability contracts.
-5. Если нужно понять, как текущий канон вырос из старых архивов, читать
+6. Если нужно понять, как текущий канон вырос из старых архивов, читать
    `GUI_SPEC_ARCHIVE_LINEAGE.md` и `gui_spec_archive_lineage.json`.
-6. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
+7. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
    `v13_ring_editor_migration/*` как специализированный addendum поверх `v3`:
    schema contract, screen blueprints, state machine, ring-level migration
    matrix, acceptance gates и suite-link contract.
-7. `v12_design_recovery/*` использовать как historical design-recovery layer:
+8. `v12_design_recovery/*` использовать как historical design-recovery layer:
    он фиксирует возврат в design-first ветку, канон ring editor, optimization
    control plane и truthful graphics перед `v13`.
-8. `v2` и `v1` использовать только как historical imports и источник для
+9. `v2` и `v1` использовать только как historical imports и источник для
    сравнения эволюции GUI-spec.
 
 ## Политика обновления

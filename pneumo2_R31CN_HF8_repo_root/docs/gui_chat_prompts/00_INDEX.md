@@ -16,18 +16,21 @@
 4. [gui_spec_imports/v32_connector_reconciled/README.md](../context/gui_spec_imports/v32_connector_reconciled/README.md)
    — active connector-reconciled GUI/TZ digest для source authority,
    workspace contracts, v32 playbooks, release gates и open gaps.
-5. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
+5. [COMPLETENESS_ASSESSMENT.md](../context/gui_spec_imports/v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
+   и [PARALLEL_CHAT_WORKSTREAMS.md](../context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md)
+   — проверка достаточности v32 и разбиение работы на независимые чаты.
+6. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
    и related `v3/*`
    — checked-in detailed machine-readable reference layer.
-6. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
+7. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
    и related `v13_ring_editor_migration/*`
    — специализированный addendum для `WS-RING` и handoff `WS-RING -> WS-SUITE`.
-7. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
+8. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
    — historical design-recovery layer, который возвращает проект из implementation-веток в design-first.
-8. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
+9. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
    и [gui_spec_archive_lineage.json](../context/gui_spec_archive_lineage.json)
    — lineage `v1…v13`, чтобы понимать роль каждого архива.
-9. `docs/gui_chat_prompts/*`
+10. `docs/gui_chat_prompts/*`
    — implementation prompts, которые должны наследовать канон, а не заменять его.
 
 ## Что считается reference layer
@@ -39,6 +42,10 @@
 - `v32_connector_reconciled` задаёт новый connector-reconciled GUI/TZ digest:
   source authority, 12 workspace contracts, acceptance playbooks, release gates,
   runtime artifact schema, evidence policy и open gaps.
+- `COMPLETENESS_ASSESSMENT` фиксирует, что v32 достаточно как contract/planning
+  layer, но не является runtime closure proof.
+- `PARALLEL_CHAT_WORKSTREAMS` задаёт 16 независимых workstreams с owned scope,
+  handoff boundaries и короткими стартовыми промтами.
 - `v3` задаёт общий detailed layer:
   shell, layout, UI elements, help/tooltip catalogs, migration matrix,
   acceptance, verification, keyboard/docking/state/observability contracts.

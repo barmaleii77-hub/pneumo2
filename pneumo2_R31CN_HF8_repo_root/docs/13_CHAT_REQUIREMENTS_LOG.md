@@ -101,6 +101,12 @@ Archive C:/Users/Admin/Downloads/pneumo_codex_tz_spec_connector_reconciled_v32.z
 Источник: chat + archive:pneumo_codex_tz_spec_connector_reconciled_v32.
 ID: `REQ-0015`.
 
+16. Before using v32 as an implementation guide, check completeness and runtime limits
+The connector-reconciled v32 package is sufficient as a planning, contract, source-authority, workspace/handoff and acceptance/evidence layer, but it is not runtime closure proof. Future chats must consult COMPLETENESS_ASSESSMENT.md and must not claim producer truth, cylinder packaging, measured performance, Windows visual acceptance or imported-layer runtime closure without fresh tests/artifacts/SEND bundle evidence.
+Статус: активно.
+Источник: chat + v32 completeness assessment.
+ID: `REQ-0016`.
+
 ## Как ссылаться из будущих задач
 
 Если новая задача опирается на решение из чата, но не отражена в старом каноне, сначала проверить этот файл, а затем соответствующие plan-файлы из [docs/14_CHAT_PLANS_LOG.md](./14_CHAT_PLANS_LOG.md).

@@ -155,6 +155,13 @@ ID: `PLAN-0019`.
 Источник: chat + archive:pneumo_codex_tz_spec_connector_reconciled_v32.
 ID: `PLAN-0020`.
 
+21. Use v32 parallel chat workstreams for independent project acceleration
+Назначение: Split future project work into independent Russian-named workstreams with owned scopes, handoff IDs, forbidden overlap zones and short startup prompts so multiple chats can implement in parallel without confusion.
+Артефакт: [context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md](./context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md)
+Статус: актуален.
+Источник: chat + v32 parallel workstreams.
+ID: `PLAN-0021`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

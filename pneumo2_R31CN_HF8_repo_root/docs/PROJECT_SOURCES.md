@@ -22,6 +22,8 @@
 - `docs/context/gui_spec_imports/foundations/README.md` — upstream prompt layer, предшествующий серии архивов `v1…v13`.
 - `docs/context/gui_spec_imports/foundations/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md` — foundational prompt source (`PROMPT_V2`).
 - `docs/context/gui_spec_imports/v32_connector_reconciled/README.md` — active connector-reconciled GUI/TZ digest из `pneumo_codex_tz_spec_connector_reconciled_v32.zip`; фиксирует source authority, reading order, 12 workspaces, v32 playbooks, release gates, open gaps и runtime-evidence policy.
+- `docs/context/gui_spec_imports/v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md` — оценка полноты и достаточности v32: structural checks, coverage checks, caveats и границы применимости.
+- `docs/context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md` — матрица независимых параллельных workstreams и стартовые промты для чатов.
 - `docs/context/gui_spec_imports/v3/README.md` — active detailed reference layer из `pneumo_gui_codex_package_v3.zip`.
 - `docs/context/gui_spec_imports/v3/pneumo_gui_codex_spec_v3_refined.json` — главный machine-readable GUI-spec.
 - `docs/context/gui_spec_imports/v3/current_macro.dot` — текущий macro workflow graph.
@@ -110,6 +112,6 @@
 ## Правило использования
 
 - Внешние ссылки не заменяют локальный канон.
-- Для GUI-first задач сначала читать `17`, затем `18`, затем `gui_spec_imports/v32_connector_reconciled/README.md`, затем `gui_spec_imports/v3/*`, parity docs и только потом lane-level prompts.
+- Для GUI-first задач сначала читать `17`, затем `18`, затем `gui_spec_imports/v32_connector_reconciled/README.md`, `COMPLETENESS_ASSESSMENT.md` и `PARALLEL_CHAT_WORKSTREAMS.md`, затем `gui_spec_imports/v3/*`, parity docs и только потом lane-level prompts.
 - Imported JSON/DOT/CSV используются как reference artifacts, а не как единственный источник правды.
 - При конфликте между imported sources и текущим каноном приоритет у `17/18`.

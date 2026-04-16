@@ -201,6 +201,8 @@ Operational note:
 - [docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](./17_WINDOWS_DESKTOP_CAD_GUI_CANON.md)
 - [docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](./18_PNEUMOAPP_WINDOWS_GUI_SPEC.md)
 - [docs/context/gui_spec_imports/v32_connector_reconciled/README.md](./context/gui_spec_imports/v32_connector_reconciled/README.md)
+- [docs/context/gui_spec_imports/v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md](./context/gui_spec_imports/v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
+- [docs/context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md](./context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md)
 
 Что задаёт общий canon:
 
@@ -233,6 +235,11 @@ Operational note:
 - acceptance playbooks для producer truth, diagnostics bundle, parity/migration, scenario canon, Windows runtime, performance trace и objective contract;
 - release-gate hardening, runtime artifact schema, evidence-required-by-gate и open-gap-to-evidence map;
 - explicit open gaps: producer-side hardpoints/solver_points truth, cylinder packaging passport, measured perf trace, viewport gating, ring seam, geometry runtime proof, `default_base.json` cleanup, `road_width_m` canonicalization и Windows visual acceptance.
+- completeness assessment: v32 достаточен как contract/planning/reference layer,
+  но не является runtime closure proof; self-checksum `PACKAGE_MANIFEST.json`
+  и V30 label в `CODEx_CONSUMPTION_ORDER.md` зафиксированы как caveats.
+- parallel chat workstreams: дальнейшая работа разбита на 16 independent lanes
+  с русскими названиями, owned scope, handoff boundaries и стартовыми промтами.
 
 Связанные, но вспомогательные UX-источники:
 

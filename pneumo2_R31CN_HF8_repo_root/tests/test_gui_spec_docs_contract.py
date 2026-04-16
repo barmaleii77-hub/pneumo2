@@ -14,6 +14,8 @@ IMPORTS_V3 = IMPORTS / "v3"
 IMPORTS_V12 = IMPORTS / "v12_design_recovery"
 IMPORTS_V13 = IMPORTS / "v13_ring_editor_migration"
 IMPORTS_V32 = IMPORTS / "v32_connector_reconciled"
+V32_COMPLETENESS = IMPORTS_V32 / "COMPLETENESS_ASSESSMENT.md"
+V32_WORKSTREAMS = IMPORTS_V32 / "PARALLEL_CHAT_WORKSTREAMS.md"
 
 CANON_17 = DOCS / "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md"
 CANON_18 = DOCS / "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md"
@@ -183,6 +185,8 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "v13_ring_editor_migration/" in imports_readme
     assert "v32_connector_reconciled/" in imports_readme
     assert "connector-reconciled" in imports_readme
+    assert "COMPLETENESS_ASSESSMENT.md" in imports_readme
+    assert "PARALLEL_CHAT_WORKSTREAMS.md" in imports_readme
     assert "специализированный ring-editor migration" in imports_readme
     assert "WS-RING -> WS-SUITE" in imports_readme
     assert "GUI_SPEC_ARCHIVE_LINEAGE.md" in imports_readme
@@ -200,6 +204,8 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "ring_editor_acceptance_gates_v13.csv" in project_sources_text
     assert "ring_to_suite_link_contract_v13.json" in project_sources_text
     assert "v32_connector_reconciled/README.md" in project_sources_text
+    assert "v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md" in project_sources_text
+    assert "v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md" in project_sources_text
     assert "pneumo_codex_tz_spec_connector_reconciled_v32.zip" in project_sources_text
 
     assert "gui_spec_imports/foundations/README.md" in index_text
@@ -208,6 +214,8 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "GUI_SPEC_ARCHIVE_LINEAGE.md" in index_text
     assert "gui_spec_imports/v13_ring_editor_migration/README.md" in index_text
     assert "gui_spec_imports/v32_connector_reconciled/README.md" in index_text
+    assert "COMPLETENESS_ASSESSMENT.md" in index_text
+    assert "PARALLEL_CHAT_WORKSTREAMS.md" in index_text
     assert "специализированный addendum для `WS-RING`" in index_text
     assert "WS-RING -> WS-SUITE" in index_text
 
@@ -284,6 +292,8 @@ def test_v12_design_recovery_layer_and_lineage_inventory_are_registered() -> Non
 def test_v32_connector_reconciled_digest_is_registered() -> None:
     readme_path = IMPORTS_V32 / "README.md"
     assert readme_path.exists()
+    assert V32_COMPLETENESS.exists()
+    assert V32_WORKSTREAMS.exists()
 
     text = readme_path.read_text(encoding="utf-8")
     assert "PNEUMO-CODEX-TZ-SPEC-CONNECTOR-RECONCILED-V32" in text
@@ -296,6 +306,20 @@ def test_v32_connector_reconciled_digest_is_registered() -> None:
     assert "RUNTIME_ARTIFACT_SCHEMA.yaml" in text
     assert "`GAP-001`" in text
     assert "00_READ_FIRST__ABSOLUTE_LAW.md" in text
+    assert "COMPLETENESS_ASSESSMENT.md" in text
+    assert "PARALLEL_CHAT_WORKSTREAMS.md" in text
+
+    completeness = V32_COMPLETENESS.read_text(encoding="utf-8")
+    assert "v32 хорош как карта, контракт и acceptance план" in completeness
+    assert "self-checksum manifest mismatch" in completeness
+    assert "CODEX CONSUMPTION ORDER V30" in completeness
+    assert "PB-008 indexed without dedicated markdown playbook" in completeness
+
+    workstreams = V32_WORKSTREAMS.read_text(encoding="utf-8")
+    assert "V32-01. Кабина проекта и главное окно" in workstreams
+    assert "V32-16. Release Gates, KB и acceptance map" in workstreams
+    assert "HO-001" in workstreams
+    assert "knowledge_base_sync" in workstreams
 
 
 def test_ring_related_lane_docs_reference_v13_contracts() -> None:
@@ -348,6 +372,9 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         FOUNDATIONS / "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md",
         IMPORTS_V12 / "README.md",
         IMPORTS_V13 / "README.md",
+        IMPORTS_V32 / "README.md",
+        V32_COMPLETENESS,
+        V32_WORKSTREAMS,
     )
 
     for path in target_paths:
