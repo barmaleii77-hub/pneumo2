@@ -231,6 +231,30 @@ class ParameterGuideRow:
     current_value_text: str
 
 
+@dataclass(frozen=True)
+class PackagingPassportEvidenceRow:
+    cylinder: str
+    contract_complete: bool
+    full_mesh_allowed: bool
+    consumer_geometry_fabrication_allowed: bool
+    export_truth_mode: str
+    missing_advanced_fields: tuple[str, ...]
+    missing_geometry_fields: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PackagingPassportEvidenceSnapshot:
+    schema: str
+    packaging_contract_hash: str
+    packaging_status: str
+    axis_only_cylinders: tuple[str, ...]
+    complete_cylinders: tuple[str, ...]
+    missing_advanced_fields: tuple[str, ...]
+    consumer_geometry_fabrication_allowed: bool
+    rows: tuple[PackagingPassportEvidenceRow, ...]
+    warnings: tuple[str, ...] = ()
+
+
 def _safe_float(value: Any, default: float = float("nan")) -> float:
     try:
         return float(value)
@@ -259,6 +283,116 @@ def _format_current_value(value: Any, *, unit_label: str = "", digits: int = 3) 
     if not math.isfinite(out):
         return "—"
     return f"{out:.{digits}f}" + (f" {unit_label}" if unit_label else "")
+
+
+def _safe_string_tuple(value: Any) -> tuple[str, ...]:
+    if isinstance(value, (list, tuple, set)):
+        return tuple(str(item) for item in value if str(item).strip())
+    if value in (None, ""):
+        return ()
+    return (str(value),)
+
+
+def _read_json_mapping(path: Path | str | None) -> dict[str, Any]:
+    if not path:
+        return {}
+    try:
+        p = Path(path).expanduser().resolve(strict=False)
+    except Exception:
+        return {}
+    try:
+        if not p.exists():
+            return {}
+        raw = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return dict(raw) if isinstance(raw, Mapping) else {}
+
+
+def _packaging_passport_from_meta(meta: Mapping[str, Any] | None) -> dict[str, Any]:
+    data = dict(meta or {})
+    packaging = data.get("packaging")
+    if not isinstance(packaging, Mapping):
+        return {}
+    cylinders = packaging.get("cylinders")
+    if not isinstance(cylinders, Mapping):
+        return {}
+    policy = packaging.get("consumer_policy") or packaging.get("policy") or {}
+    return {
+        "schema": str(packaging.get("schema") or "cylinder_packaging.contract.v1"),
+        "packaging_contract_hash": str(packaging.get("packaging_contract_hash") or ""),
+        "status": str(packaging.get("status") or ""),
+        "axis_only_cylinders": list(packaging.get("axis_only_cylinders") or []),
+        "complete_cylinders": list(packaging.get("complete_cylinders") or []),
+        "missing_advanced_fields": list(packaging.get("missing_advanced_fields") or []),
+        "consumer_policy": dict(policy) if isinstance(policy, Mapping) else {},
+        "cylinders": dict(cylinders),
+    }
+
+
+def build_packaging_passport_evidence(
+    base_rows: tuple[CylinderPackageReferenceRow, ...],
+    *,
+    artifact_meta: Mapping[str, Any] | None = None,
+    passport_path: Path | str | None = None,
+) -> PackagingPassportEvidenceSnapshot:
+    passport = _read_json_mapping(passport_path)
+    warnings: list[str] = []
+    if not passport:
+        passport = _packaging_passport_from_meta(artifact_meta)
+        if not passport:
+            warnings.append("Missing cylinder packaging passport evidence.")
+
+    cylinders = dict(passport.get("cylinders") or {}) if isinstance(passport.get("cylinders"), Mapping) else {}
+    base_cylinders = tuple(
+        dict.fromkeys(
+            cyl
+            for row in base_rows
+            for cyl in (
+                "cyl1" if "Ц1" in row.family or "cyl1" in row.family.lower() else "",
+                "cyl2" if "Ц2" in row.family or "cyl2" in row.family.lower() else "",
+            )
+            if cyl
+        )
+    )
+    cylinder_names = tuple(dict.fromkeys((*base_cylinders, "cyl1", "cyl2", *[str(k) for k in cylinders.keys()])))
+    policy = passport.get("consumer_policy") or passport.get("policy") or {}
+    consumer_policy = dict(policy) if isinstance(policy, Mapping) else {}
+    consumer_fabrication_allowed = bool(consumer_policy.get("consumer_geometry_fabrication_allowed", False))
+    rows: list[PackagingPassportEvidenceRow] = []
+    for cyl in cylinder_names:
+        block = dict(cylinders.get(cyl) or {}) if isinstance(cylinders.get(cyl), Mapping) else {}
+        contract_complete = bool(block.get("contract_complete"))
+        rows.append(
+            PackagingPassportEvidenceRow(
+                cylinder=cyl,
+                contract_complete=contract_complete,
+                full_mesh_allowed=bool(block.get("full_mesh_allowed", contract_complete)),
+                consumer_geometry_fabrication_allowed=bool(
+                    block.get("consumer_geometry_fabrication_allowed", consumer_fabrication_allowed)
+                ),
+                export_truth_mode=str(
+                    block.get("truth_mode")
+                    or ("full_mesh_allowed" if contract_complete else "axis_only_honesty_mode")
+                ),
+                missing_advanced_fields=_safe_string_tuple(
+                    block.get("advanced_fields_missing") or passport.get("missing_advanced_fields")
+                ),
+                missing_geometry_fields=_safe_string_tuple(block.get("missing_geometry_fields")),
+            )
+        )
+
+    return PackagingPassportEvidenceSnapshot(
+        schema=str(passport.get("schema") or ""),
+        packaging_contract_hash=str(passport.get("packaging_contract_hash") or ""),
+        packaging_status=str(passport.get("packaging_status") or passport.get("status") or ""),
+        axis_only_cylinders=_safe_string_tuple(passport.get("axis_only_cylinders")),
+        complete_cylinders=_safe_string_tuple(passport.get("complete_cylinders")),
+        missing_advanced_fields=_safe_string_tuple(passport.get("missing_advanced_fields")),
+        consumer_geometry_fabrication_allowed=consumer_fabrication_allowed,
+        rows=tuple(rows),
+        warnings=tuple(warnings),
+    )
 
 
 def _format_family_current_value(value: Any, meta: Mapping[str, Any]) -> str:
@@ -1267,6 +1401,8 @@ __all__ = [
     "ComponentFitReferenceRow",
     "GeometryFamilyReferenceRow",
     "GeometryReferenceSnapshot",
+    "PackagingPassportEvidenceRow",
+    "PackagingPassportEvidenceSnapshot",
     "ParameterGuideRow",
     "SpringFamilyReferenceRow",
     "SpringReferenceSnapshot",
@@ -1279,6 +1415,7 @@ __all__ = [
     "build_cylinder_pressure_estimate",
     "build_component_fit_reference_rows",
     "build_geometry_reference_snapshot",
+    "build_packaging_passport_evidence",
     "build_parameter_guide_rows",
     "load_camozzi_catalog_rows",
     "load_camozzi_stroke_options_mm",
