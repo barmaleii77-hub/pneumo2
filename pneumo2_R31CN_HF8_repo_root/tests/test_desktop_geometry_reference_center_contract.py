@@ -1,15 +1,27 @@
 from __future__ import annotations
 
 import math
+import json
 from pathlib import Path
 
+import numpy as np
+
 from pneumo_solver_ui.desktop_geometry_reference_model import (
+    CYLINDER_PACKAGING_ADVANCED_FIELDS,
+    TRUTH_STATE_APPROXIMATE,
+    TRUTH_STATE_SOURCE_DATA_CONFIRMED,
     CylinderFamilyReferenceRow,
     build_cylinder_match_recommendations,
     build_cylinder_force_bias_estimate,
     build_current_cylinder_package_rows,
     build_current_cylinder_precharge_rows,
     build_current_spring_reference_snapshot,
+    build_artifact_reference_context,
+    build_geometry_acceptance_evidence,
+    build_packaging_passport_evidence,
+    build_road_width_evidence,
+    build_road_width_reference,
+    cylinder_packaging_passport_key,
     load_camozzi_catalog_rows,
 )
 from pneumo_solver_ui.desktop_geometry_reference_runtime import DesktopGeometryReferenceRuntime
@@ -25,6 +37,148 @@ ROOT = Path(__file__).resolve().parents[1]
 UI_ROOT = ROOT / "pneumo_solver_ui"
 
 
+def _geometry_acceptance_mapping() -> dict[str, np.ndarray]:
+    time = np.array([0.0, 0.1], dtype=float)
+    data: dict[str, np.ndarray] = {"время_с": time}
+    corners = {
+        "ЛП": (0.75, 0.50),
+        "ПП": (0.75, -0.50),
+        "ЛЗ": (-0.75, 0.50),
+        "ПЗ": (-0.75, -0.50),
+    }
+    frame_z = np.array([0.50, 0.51], dtype=float)
+    wheel_z = np.array([0.30, 0.31], dtype=float)
+    road_z = np.array([0.00, 0.00], dtype=float)
+    for corner, (x, y) in corners.items():
+        data[f"рама_относительно_дороги_{corner}_м"] = frame_z - road_z
+        data[f"колесо_относительно_дороги_{corner}_м"] = wheel_z - road_z
+        data[f"колесо_относительно_рамы_{corner}_м"] = wheel_z - frame_z
+        data[f"frame_corner_{corner}_x_м"] = np.full_like(time, x)
+        data[f"frame_corner_{corner}_y_м"] = np.full_like(time, y)
+        data[f"frame_corner_{corner}_z_м"] = frame_z
+        data[f"wheel_center_{corner}_x_м"] = np.full_like(time, x)
+        data[f"wheel_center_{corner}_y_м"] = np.full_like(time, y)
+        data[f"wheel_center_{corner}_z_м"] = wheel_z
+        data[f"road_contact_{corner}_x_м"] = np.full_like(time, x)
+        data[f"road_contact_{corner}_y_м"] = np.full_like(time, y)
+        data[f"road_contact_{corner}_z_м"] = road_z
+    return data
+
+
+def _write_reference_artifact(tmp_path: Path) -> dict[str, object]:
+    mapping = _geometry_acceptance_mapping()
+    cols = list(mapping.keys())
+    values = np.column_stack([mapping[col] for col in cols])
+    packaging = {
+        "schema": "cylinder_packaging.contract.v1",
+        "status": "partial",
+        "packaging_contract_hash": "pkg-hash-123",
+        "required_advanced_fields": ["gland_or_sleeve_position_m"],
+        "missing_advanced_fields": ["gland_or_sleeve_position_m"],
+        "complete_cylinders": ["cyl1"],
+        "axis_only_cylinders": ["cyl2"],
+        "cylinders": {
+            "cyl1": {
+                "contract_complete": True,
+                "truth_mode": "full_mesh_allowed",
+                "full_mesh_allowed": True,
+                "consumer_geometry_fabrication_allowed": False,
+                "advanced_fields_missing": [],
+                "missing_geometry_fields": [],
+                "length_status_by_corner": {
+                    "ЛП": "already_finite",
+                    "ПП": "already_finite",
+                    "ЛЗ": "already_finite",
+                    "ПЗ": "already_finite",
+                },
+            },
+            "cyl2": {
+                "contract_complete": False,
+                "truth_mode": "axis_only_honesty_mode",
+                "full_mesh_allowed": False,
+                "consumer_geometry_fabrication_allowed": False,
+                "advanced_fields_missing": ["gland_or_sleeve_position_m"],
+                "missing_geometry_fields": ["explicit_body_axis_world_m"],
+                "length_status_by_corner": {
+                    "ЛП": "missing",
+                    "ПП": "missing",
+                    "ЛЗ": "missing",
+                    "ПЗ": "missing",
+                },
+            },
+        },
+        "policy": {
+            "consumer_geometry_fabrication_allowed": False,
+            "full_body_rod_piston_requires_complete_passport": True,
+            "axis_only_honesty_mode_when_incomplete": True,
+        },
+    }
+    meta = {
+        "geometry": {
+            "road_width_m": 1.5,
+            "track_m": 1.0,
+            "wheel_width_m": 0.22,
+        },
+        "packaging": packaging,
+        "anim_export_contract_artifacts": {
+            "cylinder_packaging_passport": "CYLINDER_PACKAGING_PASSPORT.json",
+            "geometry_acceptance_json": "geometry_acceptance_report.json",
+        },
+    }
+    npz_path = tmp_path / "anim_latest.npz"
+    pointer_path = tmp_path / "anim_latest.json"
+    passport_path = tmp_path / "CYLINDER_PACKAGING_PASSPORT.json"
+    np.savez_compressed(
+        npz_path,
+        main_cols=np.array(cols, dtype=str),
+        main_values=values,
+        meta_json=np.array(json.dumps(meta, ensure_ascii=False), dtype=str),
+    )
+    pointer_path.write_text(
+        json.dumps(
+            {
+                "npz_path": str(npz_path),
+                "updated_utc": "2026-04-17T00:00:00+00:00",
+                "meta": meta,
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    passport = {
+        "schema": "cylinder_packaging_passport.v1",
+        "updated_utc": "2026-04-17T00:00:00+00:00",
+        "npz_path": str(npz_path),
+        "pointer_path": str(pointer_path),
+        "packaging_status": "partial",
+        "packaging_contract_hash": "pkg-hash-123",
+        "required_advanced_fields": ["gland_or_sleeve_position_m"],
+        "missing_advanced_fields": ["gland_or_sleeve_position_m"],
+        "complete_cylinders": ["cyl1"],
+        "axis_only_cylinders": ["cyl2"],
+        "cylinders": packaging["cylinders"],
+        "consumer_policy": {
+            "consumer_geometry_fabrication_allowed": False,
+            "full_body_rod_piston_requires_complete_passport": True,
+        },
+    }
+    passport_path.write_text(json.dumps(passport, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "anim_latest_usable": True,
+        "anim_latest_pointer_json": str(pointer_path),
+        "anim_latest_npz_path": str(npz_path),
+        "anim_latest_pointer_json_exists": True,
+        "anim_latest_npz_exists": True,
+        "anim_latest_pointer_json_in_workspace": True,
+        "anim_latest_npz_in_workspace": True,
+        "anim_latest_updated_utc": "2026-04-17T00:00:00+00:00",
+        "anim_latest_visual_cache_token": "token-123",
+        "anim_latest_meta": meta,
+        "anim_latest_cylinder_packaging_passport_path": str(passport_path),
+        "anim_latest_cylinder_packaging_passport_exists": True,
+    }
+
+
 def test_desktop_geometry_reference_runtime_builds_reference_snapshots() -> None:
     runtime = DesktopGeometryReferenceRuntime(ui_root=UI_ROOT)
 
@@ -36,6 +190,9 @@ def test_desktop_geometry_reference_runtime_builds_reference_snapshots() -> None
     springs = runtime.current_spring_snapshot()
     catalog = runtime.cylinder_catalog_rows()
     guide = runtime.parameter_guide_rows("давление", limit=8)
+    component_passport = runtime.component_passport_rows()
+    road_width = runtime.road_width_reference()
+    acceptance = runtime.geometry_acceptance_evidence()
 
     assert geometry.base_path.name.endswith(".json")
     assert len(geometry.families) == 4
@@ -60,6 +217,14 @@ def test_desktop_geometry_reference_runtime_builds_reference_snapshots() -> None
     assert all(row.cap_area_cm2 > 0.0 for row in catalog[:5])
     assert len(guide) > 0
     assert any("давление" in row.label.lower() or "давление" in row.description.lower() for row in guide)
+    assert component_passport
+    assert any("component_passport.json" in row.help_text for row in component_passport)
+    assert road_width.parameter_key == "road_width_m"
+    assert road_width.unit_label == "м"
+    assert road_width.status in {"explicit", "derived_from_track_and_wheel_width", "missing"}
+    assert "GAP-008" in road_width.explanation
+    assert acceptance.gate == "MISSING"
+    assert "solver-point" in acceptance.evidence_required
 
 
 def test_desktop_geometry_reference_center_uses_split_workspace_with_sidebar() -> None:
@@ -228,6 +393,152 @@ def test_cylinder_package_reference_rows_report_body_vs_dead_lengths() -> None:
     assert math.isclose(row.body_length_mm, 178.0, rel_tol=0.0, abs_tol=1e-9)
     assert math.isclose(row.body_length_gap_mm, 3.0, rel_tol=0.0, abs_tol=1e-9)
     assert any("body" in note for note in row.notes)
+    assert row.status == "axis_only"
+    assert row.truth_state == TRUTH_STATE_APPROXIMATE
+    assert 0.0 < row.completeness_pct < 100.0
+    assert "gland_length_m" in row.missing_fields
+    assert "body" in row.hidden_elements
+    assert "axis-only" in row.explanation
+
+    for field in CYLINDER_PACKAGING_ADVANCED_FIELDS:
+        base[cylinder_packaging_passport_key(field, "Ц1", "перед")] = 0.010
+
+    complete = {item.family: item for item in build_current_cylinder_package_rows(base)}["Ц1 перед"]
+
+    assert complete.status == "complete"
+    assert complete.truth_state == TRUTH_STATE_SOURCE_DATA_CONFIRMED
+    assert math.isclose(complete.completeness_pct, 100.0, rel_tol=0.0, abs_tol=1e-9)
+    assert complete.missing_fields == ()
+    assert complete.hidden_elements == ()
+    assert "complete" in complete.explanation.lower()
+
+
+def test_geometry_reference_exposes_road_width_contract_and_help_label() -> None:
+    runtime = DesktopGeometryReferenceRuntime(ui_root=UI_ROOT)
+
+    derived = build_road_width_reference({"колея": 1.0, "wheel_width_m": 0.22})
+    explicit = build_road_width_reference({"road_width_m": 1.5, "колея": 1.0, "wheel_width_m": 0.22})
+    guide_rows = runtime.parameter_guide_rows("road_width_m", limit=5)
+
+    assert derived.status == "derived_from_track_and_wheel_width"
+    assert math.isclose(derived.effective_road_width_m, 1.22, rel_tol=0.0, abs_tol=1e-9)
+    assert "declared supplement" in derived.explanation
+    assert explicit.status == "explicit"
+    assert math.isclose(explicit.effective_road_width_m, 1.5, rel_tol=0.0, abs_tol=1e-9)
+    assert guide_rows
+    assert any(row.key == "road_width_m" and row.unit_label == "м" and "GAP-008" in row.description for row in guide_rows)
+
+
+def test_geometry_acceptance_evidence_reports_missing_and_pass_runtime_contract() -> None:
+    missing = build_geometry_acceptance_evidence()
+    passed = build_geometry_acceptance_evidence(_geometry_acceptance_mapping(), source_label="unit geometry frame")
+
+    assert missing.gate == "MISSING"
+    assert missing.available is False
+    assert "solver-point" in missing.evidence_required
+    assert passed.gate == "PASS"
+    assert passed.available is True
+    assert len(passed.rows) == 4
+    assert all(row.gate == "PASS" for row in passed.rows)
+    assert any("gate=PASS" in line for line in passed.summary_lines)
+
+
+def test_artifact_backed_runtime_reports_missing_without_latest_artifact() -> None:
+    runtime = DesktopGeometryReferenceRuntime(ui_root=UI_ROOT)
+    artifact = runtime.artifact_context({})
+    acceptance = runtime.artifact_geometry_acceptance_evidence(artifact)
+    handoff = runtime.diagnostics_handoff_evidence(artifact_context=artifact)
+
+    assert artifact.status == "missing"
+    assert artifact.source_label == "anim_latest missing"
+    assert acceptance.gate == "MISSING"
+    assert acceptance.artifact_status == "missing"
+    assert any("No latest anim artifact" in item for item in acceptance.warnings)
+    assert handoff["schema"] == "geometry_reference_evidence.v1"
+    assert handoff["does_not_render_animator_meshes"] is True
+    assert "artifact_context" in handoff["evidence_missing"]
+
+
+def test_artifact_backed_runtime_reads_npz_acceptance_and_packaging_passport(tmp_path: Path) -> None:
+    runtime = DesktopGeometryReferenceRuntime(ui_root=UI_ROOT)
+    summary = _write_reference_artifact(tmp_path)
+    artifact = runtime.artifact_context(summary)  # type: ignore[arg-type]
+    acceptance = runtime.artifact_geometry_acceptance_evidence(artifact)
+    packaging = runtime.packaging_passport_evidence(artifact_context=artifact)
+    handoff = runtime.diagnostics_handoff_evidence(artifact_context=artifact)
+
+    assert artifact.status == "current"
+    assert artifact.packaging_passport_exists is True
+    assert acceptance.gate == "PASS"
+    assert acceptance.artifact_status == "current"
+    assert acceptance.source_path.endswith("anim_latest.npz")
+    assert len(acceptance.rows) == 4
+    assert all(row.gate == "PASS" for row in acceptance.rows)
+    assert packaging.schema == "cylinder_packaging_passport.v1"
+    assert packaging.packaging_status == "partial"
+    assert packaging.packaging_contract_hash == "pkg-hash-123"
+    assert packaging.complete_cylinders == ("cyl1",)
+    assert packaging.axis_only_cylinders == ("cyl2",)
+    assert packaging.consumer_geometry_fabrication_allowed is False
+    assert any(row.cylinder == "cyl2" and row.export_status == "axis_only" for row in packaging.rows)
+    assert handoff["packaging_contract_hash"] == "pkg-hash-123"
+    assert handoff["geometry_acceptance_gate"] == "PASS"
+
+
+def test_runtime_can_use_selected_pointer_and_npz_artifact_without_rebinding_latest(tmp_path: Path) -> None:
+    runtime = DesktopGeometryReferenceRuntime(ui_root=UI_ROOT)
+    summary = _write_reference_artifact(tmp_path)
+    pointer_path = str(summary["anim_latest_pointer_json"])
+    npz_path = str(summary["anim_latest_npz_path"])
+
+    pointer_artifact = runtime.artifact_context(artifact_path=pointer_path)
+    npz_artifact = runtime.artifact_context(artifact_path=npz_path)
+    missing_artifact = runtime.artifact_context(artifact_path=tmp_path / "missing_anim_latest.json")
+
+    assert pointer_artifact.status == "historical"
+    assert pointer_artifact.source_label.startswith("selected artifact pointer:")
+    assert pointer_artifact.pointer_path == pointer_path
+    assert pointer_artifact.npz_path == npz_path
+    assert pointer_artifact.packaging_passport_exists is True
+    assert runtime.artifact_geometry_acceptance_evidence(pointer_artifact).gate == "PASS"
+    assert npz_artifact.status == "historical"
+    assert npz_artifact.source_label.startswith("selected artifact:")
+    assert npz_artifact.pointer_path == ""
+    assert npz_artifact.npz_path == npz_path
+    assert npz_artifact.meta["geometry"]["road_width_m"] == 1.5
+    assert runtime.artifact_geometry_acceptance_evidence(npz_artifact).gate == "PASS"
+    assert missing_artifact.status == "stale"
+    assert any("stale" in issue for issue in missing_artifact.issues)
+
+
+def test_road_width_evidence_prefers_explicit_meta_and_keeps_missing_gap_warning() -> None:
+    explicit = build_road_width_evidence(
+        {"колея": 1.0, "wheel_width_m": 0.22},
+        artifact_meta={"geometry": {"road_width_m": 1.5}},
+    )
+    missing = build_road_width_evidence({}, artifact_meta={})
+
+    assert explicit.status == "explicit_meta"
+    assert explicit.preferred_source == "meta.geometry.road_width_m"
+    assert math.isclose(explicit.effective_road_width_m, 1.5, rel_tol=0.0, abs_tol=1e-9)
+    assert math.isclose(explicit.base_effective_m, 1.22, rel_tol=0.0, abs_tol=1e-9)
+    assert math.isclose(explicit.mismatch_mm, 280.0, rel_tol=0.0, abs_tol=1e-9)
+    assert "Animator must not derive it silently" in explicit.explanation
+    assert missing.status == "missing"
+    assert "GAP-008" in missing.explanation
+
+
+def test_packaging_passport_reader_surfaces_base_export_mismatch_and_truth_policy(tmp_path: Path) -> None:
+    summary = _write_reference_artifact(tmp_path)
+    artifact = build_artifact_reference_context(summary)  # type: ignore[arg-type]
+    base_rows = build_current_cylinder_package_rows({})
+    packaging = build_packaging_passport_evidence(base_rows, artifact_context=artifact)
+
+    assert packaging.source_label == "CYLINDER_PACKAGING_PASSPORT.json"
+    assert packaging.mismatch_status == "mismatch"
+    assert packaging.consumer_geometry_fabrication_allowed is False
+    assert any(row.mismatch_status == "base_missing" for row in packaging.rows)
+    assert any("Base/reference packaging differs" in warning for warning in packaging.warnings)
 
 
 def test_spring_reference_snapshot_keeps_missing_diameter_data_unknown() -> None:
@@ -298,12 +609,38 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert 'self.notebook.add(cylinder_tab_host, text="Цилиндры")' in tool_src
     assert 'self.notebook.add(spring_tab_host, text="Пружины")' in tool_src
     assert 'self.notebook.add(guide_tab_host, text="Параметры")' in tool_src
+    assert 'self.notebook.add(passport_tab_host, text="Паспорта")' in tool_src
+    assert "self.artifact_path_var" in tool_src
+    assert 'text="Artifact JSON/NPZ:"' in tool_src
+    assert "def _browse_artifact_path(self) -> None:" in tool_src
+    assert "def _use_latest_artifact(self) -> None:" in tool_src
+    assert "def _artifact_context(self):" in tool_src
+    assert "artifact_path=self._artifact_path()" in tool_src
+    assert '("Animator artifacts", "*.json *.npz")' in tool_src
     assert "DesktopGeometryReferenceRuntime()" in tool_src
     assert "def _refresh_geometry_tab(self) -> None:" in tool_src
     assert "def _refresh_cylinder_tab(self) -> None:" in tool_src
     assert "def _on_recommendation_selected(self, _event: object) -> None:" in tool_src
     assert "def _refresh_spring_tab(self) -> None:" in tool_src
     assert "def _refresh_parameter_guide(self) -> None:" in tool_src
+    assert "def _refresh_passport_tab(self) -> None:" in tool_src
+    assert "attach_tooltip" in tool_src
+    assert "show_help_dialog" in tool_src
+    assert "self.artifact_summary_var" in tool_src
+    assert 'text="road_width_m reference / GAP-008"' in tool_src
+    assert 'text="Geometry acceptance evidence / GAP-006"' in tool_src
+    assert "self.road_width_tree = self._build_tree(" in tool_src
+    assert "self.geometry_acceptance_tree = self._build_tree(" in tool_src
+    assert "self.component_passport_tree = self._build_tree(" in tool_src
+    assert "self.packaging_passport_tree = self._build_tree(" in tool_src
+    assert "self.packaging_artifact_tree = self._build_tree(" in tool_src
+    assert 'text="export/runtime packaging passport evidence"' in tool_src
+    assert '("unit", "Ед. изм.", 80, "w")' in tool_src
+    assert '("layer", "Layer", 120, "w")' in tool_src
+    assert '("source", "Source", 220, "w")' in tool_src
+    assert "artifact_geometry_acceptance_evidence" in tool_src
+    assert "road_width_evidence" in tool_src
+    assert "diagnostics_handoff_evidence" in tool_src
     assert 'text="Сквозная совместимость компонентов по семействам"' in tool_src
     assert "self.component_fit_summary_var" in tool_src
     assert "self.component_fit_tree = self._build_tree(" in tool_src
@@ -314,6 +651,9 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert '("body", "Body, мм", 90, "e")' in tool_src
     assert '("body_need", "Stroke+dead, мм", 110, "e")' in tool_src
     assert '("body_gap", "Δbody, мм", 90, "e")' in tool_src
+    assert '("pkg_status", "Pkg status", 100, "w")' in tool_src
+    assert '("pkg_complete", "Pkg, %", 80, "e")' in tool_src
+    assert '("truth", "Truth state", 170, "w")' in tool_src
     assert '("dnet", "ΔFnet rec, Н", 110, "e")' in tool_src
     assert '("bias", "Bias rec", 90, "w")' in tool_src
     assert '("B", "B, мм", 80, "e")' in tool_src
@@ -346,9 +686,20 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "class CylinderMatchRecommendation" in model_src
     assert "class CylinderPackageReferenceRow" in model_src
     assert "class CylinderPrechargeReferenceRow" in model_src
+    assert "class ComponentPassportCatalogRow" in model_src
     assert "class ComponentFitReferenceRow" in model_src
+    assert "class ArtifactReferenceContext" in model_src
+    assert "class PackagingPassportEvidenceSnapshot" in model_src
+    assert "class RoadWidthEvidence" in model_src
+    assert "class RoadWidthReference" in model_src
+    assert "class GeometryAcceptanceEvidenceSnapshot" in model_src
     assert "class SpringReferenceSnapshot" in model_src
     assert "def build_geometry_reference_snapshot(" in model_src
+    assert "def build_geometry_acceptance_evidence(" in model_src
+    assert "def build_artifact_reference_context(" in model_src
+    assert "def build_geometry_acceptance_evidence_from_artifact(" in model_src
+    assert "def build_packaging_passport_evidence(" in model_src
+    assert "def build_geometry_reference_diagnostics_handoff(" in model_src
     assert "def build_cylinder_force_bias_estimate(" in model_src
     assert "def build_current_cylinder_package_rows(" in model_src
     assert "def build_current_cylinder_precharge_rows(" in model_src
@@ -358,9 +709,13 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "def build_component_fit_reference_rows(" in model_src
     assert "def build_current_spring_reference_snapshot(" in model_src
     assert "def build_parameter_guide_rows(" in model_src
+    assert "def build_road_width_reference(" in model_src
+    assert "def load_component_passport_catalog_rows(" in model_src
+    assert "def cylinder_packaging_passport_key(" in model_src
     assert "def _build_family_parameter_guide_rows(" in model_src
 
     assert "class DesktopGeometryReferenceRuntime" in runtime_src
+    assert "def _artifact_summary_from_path(" in runtime_src
     assert "def geometry_snapshot(" in runtime_src
     assert "def current_cylinder_package_rows(" in runtime_src
     assert "def current_cylinder_rows(" in runtime_src
@@ -370,3 +725,12 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "def cylinder_catalog_rows(" in runtime_src
     assert "def cylinder_match_recommendations(" in runtime_src
     assert "def parameter_guide_rows(" in runtime_src
+    assert "def component_passport_rows(" in runtime_src
+    assert "def road_width_reference(" in runtime_src
+    assert "def geometry_acceptance_evidence(" in runtime_src
+    assert "def artifact_context(" in runtime_src
+    assert "artifact_path: str | Path | None = None" in runtime_src
+    assert "def artifact_geometry_acceptance_evidence(" in runtime_src
+    assert "def road_width_evidence(" in runtime_src
+    assert "def packaging_passport_evidence(" in runtime_src
+    assert "def diagnostics_handoff_evidence(" in runtime_src

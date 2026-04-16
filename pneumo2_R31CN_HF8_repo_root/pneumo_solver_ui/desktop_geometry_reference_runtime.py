@@ -1,18 +1,28 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
 from pneumo_solver_ui.desktop_geometry_reference_model import (
+    ArtifactReferenceContext,
+    ComponentPassportCatalogRow,
     CylinderCatalogRow,
     CylinderFamilyReferenceRow,
     CylinderMatchRecommendation,
     CylinderPackageReferenceRow,
     CylinderPrechargeReferenceRow,
     ComponentFitReferenceRow,
+    GeometryAcceptanceEvidenceSnapshot,
     GeometryReferenceSnapshot,
+    PackagingPassportEvidenceSnapshot,
     ParameterGuideRow,
+    RoadWidthEvidence,
+    RoadWidthReference,
     SpringReferenceSnapshot,
+    build_artifact_reference_context,
+    build_geometry_acceptance_evidence,
+    build_geometry_acceptance_evidence_from_artifact,
     build_component_fit_reference_rows,
     build_cylinder_match_recommendations,
     build_current_cylinder_package_rows,
@@ -20,14 +30,22 @@ from pneumo_solver_ui.desktop_geometry_reference_model import (
     build_current_cylinder_reference_rows,
     build_current_spring_reference_snapshot,
     build_cylinder_pressure_estimate,
+    build_geometry_reference_diagnostics_handoff,
     build_geometry_reference_snapshot,
+    build_packaging_passport_evidence,
     build_parameter_guide_rows,
+    build_road_width_evidence,
+    build_road_width_reference,
+    load_component_passport_catalog_rows,
     load_camozzi_catalog_rows,
 )
 from pneumo_solver_ui.desktop_input_model import (
     default_base_json_path,
     load_base_with_defaults,
 )
+from pneumo_solver_ui.anim_export_contract import CYLINDER_PACKAGING_PASSPORT_JSON_NAME
+from pneumo_solver_ui.geometry_acceptance_contract import GEOMETRY_ACCEPTANCE_JSON_NAME
+from pneumo_solver_ui.run_artifacts import collect_anim_latest_diagnostics_summary
 
 
 def _normalize_search_text(value: Any) -> str:
@@ -38,6 +56,7 @@ class DesktopGeometryReferenceRuntime:
     def __init__(self, *, ui_root: Path | None = None) -> None:
         self.ui_root = Path(ui_root or Path(__file__).resolve().parent).resolve()
         self.base_path = default_base_json_path()
+        self.component_passport_path = self.ui_root / "component_passport.json"
         self._catalog_rows = load_camozzi_catalog_rows()
 
     def resolve_base_path(self, raw_path: str | Path | None = None) -> Path:
@@ -114,6 +133,172 @@ class DesktopGeometryReferenceRuntime:
             base_path=path,
             dw_min_mm=dw_min_mm,
             dw_max_mm=dw_max_mm,
+        )
+
+    def component_passport_rows(
+        self,
+        passport_path: str | Path | None = None,
+    ) -> tuple[ComponentPassportCatalogRow, ...]:
+        return load_component_passport_catalog_rows(passport_path or self.component_passport_path)
+
+    def road_width_reference(
+        self,
+        raw_path: str | Path | None = None,
+    ) -> RoadWidthReference:
+        return build_road_width_reference(self.load_base_payload(raw_path))
+
+    def geometry_acceptance_evidence(
+        self,
+        frame_or_mapping: Any | None = None,
+        *,
+        source_label: str = "",
+        tol_m: float = 1e-6,
+    ) -> GeometryAcceptanceEvidenceSnapshot:
+        return build_geometry_acceptance_evidence(
+            frame_or_mapping,
+            source_label=source_label,
+            tol_m=tol_m,
+        )
+
+    def _artifact_summary_from_path(self, raw_path: str | Path | None) -> dict[str, Any]:
+        text = str(raw_path or "").strip()
+        if not text:
+            return {}
+        try:
+            path = Path(text).expanduser().resolve(strict=False)
+        except Exception:
+            path = Path(text)
+        exists = False
+        try:
+            exists = bool(path.exists())
+        except Exception:
+            exists = False
+        suffix = path.suffix.lower()
+        if suffix == ".npz":
+            return {
+                "source_label": f"selected artifact: {path}",
+                "anim_latest_usable": bool(exists),
+                "anim_latest_npz_path": str(path),
+                "anim_latest_npz_exists": bool(exists),
+                "anim_latest_npz_in_workspace": False,
+                "anim_latest_cylinder_packaging_passport_path": str(path.parent / CYLINDER_PACKAGING_PASSPORT_JSON_NAME),
+                "anim_latest_cylinder_packaging_passport_exists": bool((path.parent / CYLINDER_PACKAGING_PASSPORT_JSON_NAME).exists()),
+                "anim_latest_geometry_acceptance_json_path": str(path.parent / GEOMETRY_ACCEPTANCE_JSON_NAME),
+                "anim_latest_geometry_acceptance_json_exists": bool((path.parent / GEOMETRY_ACCEPTANCE_JSON_NAME).exists()),
+                "anim_latest_issues": [] if exists else [f"selected NPZ artifact is missing on disk: {path}"],
+            }
+
+        pointer_obj: dict[str, Any] = {}
+        if exists:
+            try:
+                loaded = json.loads(path.read_text(encoding="utf-8"))
+                pointer_obj = dict(loaded) if isinstance(loaded, dict) else {}
+            except Exception:
+                pointer_obj = {}
+        raw_npz = (
+            pointer_obj.get("npz_path")
+            or pointer_obj.get("anim_latest_npz")
+            or pointer_obj.get("anim_latest_npz_path")
+            or ""
+        )
+        npz_path = ""
+        if str(raw_npz or "").strip():
+            try:
+                npz_candidate = Path(str(raw_npz)).expanduser()
+                if not npz_candidate.is_absolute():
+                    npz_candidate = path.parent / npz_candidate
+                npz_path = str(npz_candidate.resolve(strict=False))
+            except Exception:
+                npz_path = str(raw_npz)
+        npz_exists = bool(Path(npz_path).exists()) if npz_path else False
+        meta = pointer_obj.get("meta") if isinstance(pointer_obj.get("meta"), dict) else pointer_obj.get("anim_latest_meta")
+        artifact_dir = Path(npz_path).parent if npz_path else path.parent
+        return {
+            "source_label": f"selected artifact pointer: {path}",
+            "anim_latest_usable": bool(exists and npz_exists),
+            "anim_latest_pointer_json": str(path),
+            "anim_latest_pointer_json_exists": bool(exists),
+            "anim_latest_pointer_json_in_workspace": False,
+            "anim_latest_npz_path": npz_path,
+            "anim_latest_npz_exists": bool(npz_exists) if npz_path else None,
+            "anim_latest_npz_in_workspace": False if npz_path else None,
+            "anim_latest_updated_utc": str(pointer_obj.get("updated_utc") or pointer_obj.get("updated_at") or ""),
+            "anim_latest_visual_cache_token": str(pointer_obj.get("visual_cache_token") or ""),
+            "anim_latest_meta": dict(meta or {}) if isinstance(meta, dict) else {},
+            "anim_latest_cylinder_packaging_passport_path": str(artifact_dir / CYLINDER_PACKAGING_PASSPORT_JSON_NAME),
+            "anim_latest_cylinder_packaging_passport_exists": bool((artifact_dir / CYLINDER_PACKAGING_PASSPORT_JSON_NAME).exists()),
+            "anim_latest_geometry_acceptance_json_path": str(artifact_dir / GEOMETRY_ACCEPTANCE_JSON_NAME),
+            "anim_latest_geometry_acceptance_json_exists": bool((artifact_dir / GEOMETRY_ACCEPTANCE_JSON_NAME).exists()),
+            "anim_latest_issues": [] if exists and (not npz_path or npz_exists) else [
+                f"selected artifact pointer/NPZ is stale: {path}"
+            ],
+        }
+
+    def artifact_context(
+        self,
+        summary: dict[str, Any] | None = None,
+        *,
+        artifact_path: str | Path | None = None,
+    ) -> ArtifactReferenceContext:
+        if artifact_path not in (None, ""):
+            summary = self._artifact_summary_from_path(artifact_path)
+        elif summary is None:
+            try:
+                summary = collect_anim_latest_diagnostics_summary(include_meta=True)
+            except Exception:
+                summary = {}
+        return build_artifact_reference_context(summary)
+
+    def artifact_geometry_acceptance_evidence(
+        self,
+        artifact_context: ArtifactReferenceContext | None = None,
+        *,
+        summary: dict[str, Any] | None = None,
+        tol_m: float = 1e-6,
+    ) -> GeometryAcceptanceEvidenceSnapshot:
+        artifact = artifact_context or self.artifact_context(summary)
+        return build_geometry_acceptance_evidence_from_artifact(artifact, tol_m=tol_m)
+
+    def road_width_evidence(
+        self,
+        raw_path: str | Path | None = None,
+        *,
+        artifact_context: ArtifactReferenceContext | None = None,
+        summary: dict[str, Any] | None = None,
+    ) -> RoadWidthEvidence:
+        artifact = artifact_context or self.artifact_context(summary)
+        return build_road_width_evidence(
+            self.load_base_payload(raw_path),
+            artifact_meta=artifact.meta,
+        )
+
+    def packaging_passport_evidence(
+        self,
+        raw_path: str | Path | None = None,
+        *,
+        artifact_context: ArtifactReferenceContext | None = None,
+        summary: dict[str, Any] | None = None,
+    ) -> PackagingPassportEvidenceSnapshot:
+        artifact = artifact_context or self.artifact_context(summary)
+        return build_packaging_passport_evidence(
+            self.current_cylinder_package_rows(raw_path),
+            artifact_context=artifact,
+        )
+
+    def diagnostics_handoff_evidence(
+        self,
+        raw_path: str | Path | None = None,
+        *,
+        artifact_context: ArtifactReferenceContext | None = None,
+        summary: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        artifact = artifact_context or self.artifact_context(summary)
+        return build_geometry_reference_diagnostics_handoff(
+            artifact_context=artifact,
+            component_rows=self.component_passport_rows(),
+            road_width=self.road_width_evidence(raw_path, artifact_context=artifact),
+            packaging=self.packaging_passport_evidence(raw_path, artifact_context=artifact),
+            acceptance=self.artifact_geometry_acceptance_evidence(artifact),
         )
 
     def catalog_variant_labels(self) -> tuple[str, ...]:

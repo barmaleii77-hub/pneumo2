@@ -278,6 +278,13 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
         "unit_catalog": {"Kphi": "N*m/rad", "eps_rel_used": "dimensionless"},
         "sensitivity_summary": [{"param": "база", "score": 1.0, "status": "ok"}],
         "selected_artifact_list": [{"key": "system_influence_json", "sha256": "abc"}],
+        "handoff_requirements": {
+            "handoff_id": "HO-007",
+            "contract_status": "READY",
+            "required_contract_path": "C:/workspace/handoffs/WS-OPTIMIZATION/selected_run_contract.json",
+            "missing_fields": [],
+            "can_run_engineering_analysis": True,
+        },
         "evidence_manifest_hash": "engineering-hash-001",
     }
     (out_dir / ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME).write_text(
@@ -311,6 +318,7 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
     assert validation_engineering["status"] == "READY"
     assert validation_engineering["evidence_manifest_hash"] == "engineering-hash-001"
     assert validation_engineering["influence_status"] == "PASS"
+    assert validation_engineering["handoff_requirements"]["contract_status"] == "READY"
 
     inspection = inspect_send_bundle(zip_path)
     inspection_md = render_inspection_md(inspection)
@@ -318,6 +326,7 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
     assert dict(inspection["engineering_analysis_evidence"])["evidence_manifest_hash"] == "engineering-hash-001"
     assert "Engineering analysis evidence" in inspection_md
     assert "engineering-hash-001" in inspection_md
+    assert "handoff_contract_status" in inspection_md
 
 
 def test_send_bundle_evidence_analysis_handoff_prefers_latest_sidecar(tmp_path: Path) -> None:
