@@ -67,8 +67,11 @@ Operational note:
 8. [docs/context/gui_spec_imports/v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md](./context/gui_spec_imports/v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
 9. [docs/context/gui_spec_imports/v32_connector_reconciled/README.md](./context/gui_spec_imports/v32_connector_reconciled/README.md)
 10. [docs/context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md](./context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md)
-11. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
-12. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
+11. [docs/context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md](./context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md)
+12. [docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md](./context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
+13. [docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](./context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
+14. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
+15. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
 
 ### 3. Активные требования и рабочий backlog
 
@@ -140,7 +143,8 @@ Operational note:
 
 - локальный канон в репозитории;
 - локальные digests и snapshots AI-контекста;
-- active connector-reconciled GUI/TZ digest v32;
+- active connector-reconciled GUI/TZ digest v33, with v32 retained as previous
+  workstream/release-gate reference layer;
 - внешние архивы и Google Drive как контекст и история;
 - исполняемые contracts и tests как проверяемое поведение.
 
@@ -208,6 +212,11 @@ Operational note:
 - [docs/context/gui_spec_imports/v32_connector_reconciled/README.md](./context/gui_spec_imports/v32_connector_reconciled/README.md)
 - [docs/context/gui_spec_imports/v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md](./context/gui_spec_imports/v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
 - [docs/context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md](./context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md)
+- [docs/context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md](./context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md)
+- [docs/context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_HARDENING_MATRIX.csv](./context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_HARDENING_MATRIX.csv)
+- [docs/context/gui_spec_imports/v32_connector_reconciled/GAP_TO_EVIDENCE_ACTION_MAP.csv](./context/gui_spec_imports/v32_connector_reconciled/GAP_TO_EVIDENCE_ACTION_MAP.csv)
+- [docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md](./context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
+- [docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](./context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
 
 Что задаёт общий canon:
 
@@ -239,6 +248,9 @@ Operational note:
 - machine-readable scope: 45 requirements, 45 acceptance rows, 61 screen rows, 704 UI element rows и 488 parameter rows;
 - acceptance playbooks для producer truth, diagnostics bundle, parity/migration, scenario canon, Windows runtime, performance trace и objective contract;
 - release-gate hardening, runtime artifact schema, evidence-required-by-gate и open-gap-to-evidence map;
+- checked-in release-gate extracts: `RELEASE_GATE_HARDENING_MATRIX.csv`,
+  `GAP_TO_EVIDENCE_ACTION_MAP.csv` и
+  `RELEASE_GATE_ACCEPTANCE_MAP.md` для локальных docs/tests/helpers;
 - explicit open gaps: producer-side hardpoints/solver_points truth, cylinder packaging passport, measured perf trace, viewport gating, ring seam, geometry runtime proof, `default_base.json` cleanup, `road_width_m` canonicalization и Windows visual acceptance.
 - completeness assessment: v32 достаточен как contract/planning/reference layer,
   но не является runtime closure proof; self-checksum `PACKAGE_MANIFEST.json`
@@ -258,6 +270,16 @@ Operational note:
 - v33 completeness assessment сохраняет runtime limits: producer truth,
   cylinder packaging, measured performance, Windows visual acceptance и
   imported-layer runtime proof не считаются закрытыми без живых artifacts.
+
+Что добавляет release-readiness triage:
+
+- текущий mixed dirty tree разложен по V32 lanes, gate/open-gap links,
+  required evidence и targeted tests;
+- V32-16-owned files отделены от runtime/domain draft work;
+- triage не является runtime closure proof и не разрешает staging без
+  owner-approved lane-пакета.
+- V32-16 acceptance note фиксирует docs/helper scope, focused validation и
+  дальнейший порядок интеграции lane-пакетов.
 
 Связанные, но вспомогательные UX-источники:
 

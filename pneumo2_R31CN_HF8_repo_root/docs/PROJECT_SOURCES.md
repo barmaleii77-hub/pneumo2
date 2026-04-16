@@ -29,6 +29,8 @@
 - `docs/context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md` — local release-gate/acceptance/evidence map для `V32-16`.
 - `docs/context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_HARDENING_MATRIX.csv` — checked-in v32 extract: 20 release hardening rows.
 - `docs/context/gui_spec_imports/v32_connector_reconciled/GAP_TO_EVIDENCE_ACTION_MAP.csv` — checked-in v32 extract: 6 open gap -> evidence action rows.
+- `docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md` — release-readiness triage текущего dirty tree по V32 lane, gate/gap, evidence и targeted tests; не является runtime closure proof.
+- `docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md` — V32-16 integration note: accepted docs/helper scope, validation status and no-runtime-closure rule.
 - `docs/context/gui_spec_imports/v3/README.md` — active detailed reference layer из `pneumo_gui_codex_package_v3.zip`.
 - `docs/context/gui_spec_imports/v3/pneumo_gui_codex_spec_v3_refined.json` — главный machine-readable GUI-spec.
 - `docs/context/gui_spec_imports/v3/current_macro.dot` — текущий macro workflow graph.
@@ -120,5 +122,6 @@
 
 - Внешние ссылки не заменяют локальный канон.
 - Для GUI-first задач сначала читать `17`, затем `18`, затем `gui_spec_imports/v33_connector_reconciled/README.md` и `COMPLETENESS_ASSESSMENT.md`, затем `gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md`, `gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md`, `gui_spec_imports/v3/*`, parity docs и только потом lane-level prompts.
+- Для release-readiness merge сначала сверять `docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md` и `docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md`, затем принимать V32-16 docs/helper patch и только после этого разбирать lane-пакеты с их evidence.
 - Imported JSON/DOT/CSV используются как reference artifacts, а не как единственный источник правды.
 - При конфликте между imported sources и текущим каноном приоритет у `17/18`.

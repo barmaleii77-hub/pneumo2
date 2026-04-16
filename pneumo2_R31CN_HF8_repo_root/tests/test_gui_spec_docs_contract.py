@@ -2,7 +2,23 @@ from __future__ import annotations
 
 import csv
 import json
+import subprocess
 from pathlib import Path
+
+from pneumo_solver_ui.release_gate import (
+    load_v32_gap_to_evidence_action_map,
+    load_v32_release_gate_hardening_matrix,
+    release_gate_reference_metadata,
+    v32_release_gate_reference_metadata,
+    v32_release_gate_reference_paths,
+    v33_release_gate_reference_metadata,
+    v33_release_gate_reference_paths,
+)
+from pneumo_solver_ui.workspace_contract import (
+    v32_handoff_ids,
+    v32_workspace_ids,
+    v32_workspace_reference_paths,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,15 +34,23 @@ IMPORTS_V33 = IMPORTS / "v33_connector_reconciled"
 V32_COMPLETENESS = IMPORTS_V32 / "COMPLETENESS_ASSESSMENT.md"
 V32_WORKSTREAMS = IMPORTS_V32 / "PARALLEL_CHAT_WORKSTREAMS.md"
 V33_COMPLETENESS = IMPORTS_V33 / "COMPLETENESS_ASSESSMENT.md"
+V32_RELEASE_ACCEPTANCE_MAP = IMPORTS_V32 / "RELEASE_GATE_ACCEPTANCE_MAP.md"
+V32_GATE_HARDENING = IMPORTS_V32 / "RELEASE_GATE_HARDENING_MATRIX.csv"
+V32_GAP_MAP = IMPORTS_V32 / "GAP_TO_EVIDENCE_ACTION_MAP.csv"
+V32_INPUTS_HANDOFF_EVIDENCE = IMPORTS_V32 / "WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md"
+RELEASE_TRIAGE = CONTEXT / "release_readiness" / "WORKTREE_TRIAGE_2026-04-17.md"
+V32_16_ACCEPTANCE_NOTE = CONTEXT / "release_readiness" / "V32_16_ACCEPTANCE_NOTE_2026-04-17.md"
 
 CANON_17 = DOCS / "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md"
 CANON_18 = DOCS / "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md"
 PROJECT_SOURCES = DOCS / "PROJECT_SOURCES.md"
+PROJECT_KNOWLEDGE_BASE = DOCS / "00_PROJECT_KNOWLEDGE_BASE.md"
 GUI_INDEX = DOCS / "gui_chat_prompts" / "00_INDEX.md"
 ANIMATOR_LANE = DOCS / "gui_chat_prompts" / "07_DESKTOP_ANIMATOR.md"
 OPTIMIZER_LANE = DOCS / "gui_chat_prompts" / "08_OPTIMIZER_CENTER.md"
 RING_LANE = DOCS / "gui_chat_prompts" / "04_RING_EDITOR.md"
 RESULTS_LANE = DOCS / "gui_chat_prompts" / "10_TEST_VALIDATION_RESULTS.md"
+RELEASE_LANE = DOCS / "gui_chat_prompts" / "13_RELEASE_GATES_KB_ACCEPTANCE.md"
 LINEAGE_MD = CONTEXT / "GUI_SPEC_ARCHIVE_LINEAGE.md"
 LINEAGE_JSON = CONTEXT / "gui_spec_archive_lineage.json"
 PARITY_SUMMARY = CONTEXT / "DESKTOP_WEB_PARITY_SUMMARY.md"
@@ -50,6 +74,52 @@ def _load_csv_rows(path: Path) -> list[dict[str, str]]:
 
 def _normalized_text_size(path: Path) -> int:
     return len(path.read_bytes().replace(b"\r\n", b"\n"))
+
+
+def _parse_markdown_table(path: Path) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    headers: list[str] | None = None
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line.startswith("|") or line.startswith("| ---"):
+            continue
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        if cells == ["path", "status", "owner_lane", "gate_or_gap", "evidence_required", "tests", "decision"]:
+            headers = cells
+            continue
+        if headers is None:
+            continue
+        rows.append(dict(zip(headers, cells, strict=True)))
+    return rows
+
+
+def _dirty_repo_paths_from_git_status() -> set[str]:
+    result = subprocess.run(
+        ["git", "-C", str(ROOT.parent), "status", "--short"],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    repo_prefix = f"{ROOT.name}/"
+    dirty_paths: set[str] = set()
+    for raw_line in result.stdout.splitlines():
+        if not raw_line:
+            continue
+        raw_path = raw_line[3:].strip()
+        if " -> " in raw_path:
+            raw_path = raw_path.split(" -> ", 1)[1].strip()
+        if not raw_path.startswith(repo_prefix):
+            continue
+        rel_path = raw_path.removeprefix(repo_prefix)
+        absolute_path = ROOT / rel_path
+        if rel_path.endswith("/"):
+            for child in absolute_path.rglob("*"):
+                if child.is_file():
+                    dirty_paths.add(child.relative_to(ROOT).as_posix())
+        else:
+            dirty_paths.add(rel_path.replace("\\", "/").strip('"'))
+    return dirty_paths
 
 
 def test_v13_import_layer_exists_and_matches_manifest() -> None:
@@ -190,6 +260,9 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "connector-reconciled" in imports_readme
     assert "COMPLETENESS_ASSESSMENT.md" in imports_readme
     assert "PARALLEL_CHAT_WORKSTREAMS.md" in imports_readme
+    assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in imports_readme
+    assert "RELEASE_GATE_HARDENING_MATRIX.csv" in imports_readme
+    assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in imports_readme
     assert "специализированный ring-editor migration" in imports_readme
     assert "WS-RING -> WS-SUITE" in imports_readme
     assert "GUI_SPEC_ARCHIVE_LINEAGE.md" in imports_readme
@@ -209,8 +282,14 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "v32_connector_reconciled/README.md" in project_sources_text
     assert "v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md" in project_sources_text
     assert "v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md" in project_sources_text
+    assert "v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md" in project_sources_text
+    assert "v32_connector_reconciled/RELEASE_GATE_HARDENING_MATRIX.csv" in project_sources_text
+    assert "v32_connector_reconciled/GAP_TO_EVIDENCE_ACTION_MAP.csv" in project_sources_text
     assert "v33_connector_reconciled/README.md" in project_sources_text
     assert "v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md" in project_sources_text
+    assert "gui_chat_prompts/13_RELEASE_GATES_KB_ACCEPTANCE.md" in project_sources_text
+    assert "context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md" in project_sources_text
+    assert "context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md" in project_sources_text
     assert "pneumo_codex_tz_spec_connector_reconciled_v32.zip" in project_sources_text
     assert "pneumo_codex_tz_spec_connector_reconciled_v33.zip" in project_sources_text
 
@@ -223,6 +302,12 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "gui_spec_imports/v33_connector_reconciled/README.md" in index_text
     assert "COMPLETENESS_ASSESSMENT.md" in index_text
     assert "PARALLEL_CHAT_WORKSTREAMS.md" in index_text
+    assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in index_text
+    assert "RELEASE_GATE_HARDENING_MATRIX.csv" in index_text
+    assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in index_text
+    assert "WORKTREE_TRIAGE_2026-04-17.md" in index_text
+    assert "V32_16_ACCEPTANCE_NOTE_2026-04-17.md" in index_text
+    assert "13_RELEASE_GATES_KB_ACCEPTANCE.md" in index_text
     assert "специализированный addendum для `WS-RING`" in index_text
     assert "WS-RING -> WS-SUITE" in index_text
 
@@ -301,10 +386,15 @@ def test_v32_connector_reconciled_digest_is_registered() -> None:
     assert readme_path.exists()
     assert V32_COMPLETENESS.exists()
     assert V32_WORKSTREAMS.exists()
+    assert V32_RELEASE_ACCEPTANCE_MAP.exists()
+    assert V32_GATE_HARDENING.exists()
+    assert V32_GAP_MAP.exists()
+    assert V32_INPUTS_HANDOFF_EVIDENCE.exists()
 
     text = readme_path.read_text(encoding="utf-8")
     assert "PNEUMO-CODEX-TZ-SPEC-CONNECTOR-RECONCILED-V32" in text
     assert "pneumo_codex_tz_spec_connector_reconciled_v32.zip" in text
+    assert "v33_connector_reconciled" in text
     assert "12 workspaces" in text
     assert "`WS-INPUTS`" in text
     assert "`WS-RING`" in text
@@ -315,18 +405,169 @@ def test_v32_connector_reconciled_digest_is_registered() -> None:
     assert "00_READ_FIRST__ABSOLUTE_LAW.md" in text
     assert "COMPLETENESS_ASSESSMENT.md" in text
     assert "PARALLEL_CHAT_WORKSTREAMS.md" in text
+    assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in text
+    assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in text
+    assert "WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md" in text
 
     completeness = V32_COMPLETENESS.read_text(encoding="utf-8")
     assert "v32 хорош как карта, контракт и acceptance план" in completeness
     assert "self-checksum manifest mismatch" in completeness
     assert "CODEX CONSUMPTION ORDER V30" in completeness
     assert "PB-008 indexed without dedicated markdown playbook" in completeness
+    assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in completeness
 
     workstreams = V32_WORKSTREAMS.read_text(encoding="utf-8")
     assert "V32-01. Кабина проекта и главное окно" in workstreams
     assert "V32-16. Release Gates, KB и acceptance map" in workstreams
+    assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in workstreams
     assert "HO-001" in workstreams
     assert "knowledge_base_sync" in workstreams
+
+    handoff_evidence = V32_INPUTS_HANDOFF_EVIDENCE.read_text(encoding="utf-8")
+    assert "test_full_handoff_chain_preserves_refs_and_hashes_without_solver_run" in handoff_evidence
+    assert "`HO-002`, `HO-003`, `HO-004`, `HO-005`" in handoff_evidence
+    assert "does not claim solver correctness" in handoff_evidence
+
+
+def test_v32_release_gate_acceptance_map_is_executable_docs_contract() -> None:
+    hardening_rows = _load_csv_rows(V32_GATE_HARDENING)
+    gap_rows = _load_csv_rows(V32_GAP_MAP)
+    helper_hardening_rows = load_v32_release_gate_hardening_matrix(ROOT)
+    helper_gap_rows = load_v32_gap_to_evidence_action_map(ROOT)
+    map_text = V32_RELEASE_ACCEPTANCE_MAP.read_text(encoding="utf-8")
+    release_lane_text = RELEASE_LANE.read_text(encoding="utf-8")
+
+    assert len(hardening_rows) == 20
+    assert len(gap_rows) == 6
+    assert helper_hardening_rows == hardening_rows
+    assert helper_gap_rows == gap_rows
+
+    assert {row["HARDENING_ID"] for row in hardening_rows} == {f"RGH-{i:03d}" for i in range(1, 21)}
+    assert {row["OPEN_GAP_ID"] for row in gap_rows} == {f"OG-{i:03d}" for i in range(1, 7)}
+    assert any(
+        row["HARDENING_ID"] == "RGH-011"
+        and row["PLAYBOOK_ID"] == "PB-006"
+        and row["OPEN_GAP_LINK"] == "OG-003"
+        for row in hardening_rows
+    )
+    assert any(
+        row["OPEN_GAP_ID"] == "OG-001"
+        and row["PRIORITY"] == "P0"
+        and "anim_latest contract" in row["REQUIRED_EVIDENCE"]
+        for row in gap_rows
+    )
+
+    paths = v32_release_gate_reference_paths(ROOT)
+    metadata = v32_release_gate_reference_metadata(ROOT)
+    combined_metadata = release_gate_reference_metadata(ROOT)
+    assert Path(paths["release_gate_acceptance_map"]) == V32_RELEASE_ACCEPTANCE_MAP
+    assert metadata["hardening_rows"] == 20
+    assert metadata["open_gap_rows"] == 6
+    assert metadata["runtime_closure_claim"] is False
+    assert combined_metadata["active_connector"]["source_layer"] == (
+        "docs/context/gui_spec_imports/v33_connector_reconciled"
+    )
+    assert combined_metadata["active_connector"]["runtime_closure_claim"] is False
+    assert combined_metadata["workstream_gate_extract"]["source_layer"] == (
+        "docs/context/gui_spec_imports/v32_connector_reconciled"
+    )
+    assert combined_metadata["workstream_gate_extract"]["hardening_rows"] == 20
+    assert combined_metadata["workstream_gate_extract"]["open_gap_rows"] == 6
+    assert combined_metadata["workstream_gate_extract"]["runtime_closure_claim"] is False
+
+    assert v32_workspace_ids() == (
+        "WS-SHELL",
+        "WS-PROJECT",
+        "WS-INPUTS",
+        "WS-RING",
+        "WS-SUITE",
+        "WS-BASELINE",
+        "WS-OPTIMIZATION",
+        "WS-ANALYSIS",
+        "WS-ANIMATOR",
+        "WS-DIAGNOSTICS",
+        "WS-SETTINGS",
+        "WS-TOOLS",
+    )
+    assert v32_handoff_ids() == tuple(f"HO-{i:03d}" for i in range(1, 11))
+    workspace_paths = v32_workspace_reference_paths(ROOT)
+    assert Path(workspace_paths["release_gate_acceptance_map"]) == V32_RELEASE_ACCEPTANCE_MAP
+
+    assert "не объявляет runtime closure" in map_text
+    assert "RGH-001" in map_text
+    assert "OG-006" in map_text
+    assert "WS-RING / HO-004 Live Evidence" in map_text
+    assert "RG-GATE-012" in map_text
+    assert "RG-GATE-013" in map_text
+    assert "RG-GATE-016" in map_text
+    assert "release_gate.py" in map_text
+    assert "workspace_contract.py" in map_text
+
+    assert "V32-16" in release_lane_text
+    assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in release_lane_text
+    assert "Do not implement domain runtime features here." in release_lane_text
+    assert "WORKTREE_TRIAGE_2026-04-17.md" in release_lane_text
+    assert "V32_16_ACCEPTANCE_NOTE_2026-04-17.md" in release_lane_text
+
+
+def test_release_readiness_triage_covers_dirty_worktree_with_lane_ownership() -> None:
+    assert RELEASE_TRIAGE.exists()
+
+    rows = _parse_markdown_table(RELEASE_TRIAGE)
+    assert rows
+    assert set(rows[0].keys()) == {
+        "path",
+        "status",
+        "owner_lane",
+        "gate_or_gap",
+        "evidence_required",
+        "tests",
+        "decision",
+    }
+
+    allowed_statuses = {"keep", "rework", "defer", "needs-review"}
+    triage_paths: set[str] = set()
+    for row in rows:
+        normalized_path = row["path"].strip("`")
+        triage_paths.add(normalized_path)
+        assert row["status"].strip("`") in allowed_statuses, normalized_path
+        assert row["gate_or_gap"].strip("`"), normalized_path
+        assert row["evidence_required"].strip("`"), normalized_path
+        assert row["tests"].strip("`"), normalized_path
+        assert row["decision"].strip("`"), normalized_path
+        assert row["owner_lane"].startswith("V32-") or row["status"].strip("`") == "defer", (
+            normalized_path
+        )
+
+    dirty_paths = _dirty_repo_paths_from_git_status()
+    missing_paths = sorted(dirty_paths - triage_paths)
+    assert not missing_paths, "\n".join(missing_paths)
+
+    text = RELEASE_TRIAGE.read_text(encoding="utf-8")
+    assert "This is not a runtime closure claim." in text
+    assert "docs/context/gui_spec_imports/v33_connector_reconciled/README.md" in text
+    assert "docs/context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md" in text
+    assert text.index("v33_connector_reconciled/README.md") < text.index(
+        "v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md"
+    )
+
+
+def test_v32_16_acceptance_note_records_docs_helper_boundary() -> None:
+    assert V32_16_ACCEPTANCE_NOTE.exists()
+
+    text = V32_16_ACCEPTANCE_NOTE.read_text(encoding="utf-8")
+    assert "not a runtime closure claim" in text
+    assert "docs/context/gui_spec_imports/v33_connector_reconciled" in text
+    assert "docs/context/gui_spec_imports/v32_connector_reconciled" in text
+    assert "20 hardening rows" in text
+    assert "6 open-gap rows" in text
+    assert "pneumo_solver_ui/release_gate.py" in text
+    assert "pneumo_solver_ui/workspace_contract.py" in text
+    assert "tests/test_gui_spec_docs_contract.py" in text
+    assert "23 passed" in text
+    assert "Diagnostics evidence" in text
+    assert "Runtime evidence" in text
+    assert "Producer truth" in text
 
 
 def test_v33_connector_reconciled_digest_is_registered() -> None:
@@ -349,6 +590,14 @@ def test_v33_connector_reconciled_digest_is_registered() -> None:
     assert "ISSUE-V33-002" in completeness
     assert "SOURCE_CONTEXT/PROMPT_CANONICAL_EXTRACTS_V33.md" in completeness
     assert "active_label_drift_absent: false" in completeness
+
+    paths = v33_release_gate_reference_paths(ROOT)
+    metadata = v33_release_gate_reference_metadata(ROOT)
+    assert Path(paths["readme"]) == readme_path
+    assert Path(paths["completeness_assessment"]) == V33_COMPLETENESS
+    assert metadata["source_layer"] == "docs/context/gui_spec_imports/v33_connector_reconciled"
+    assert metadata["active_connector_layer"] is True
+    assert metadata["runtime_closure_claim"] is False
 
 
 def test_ring_related_lane_docs_reference_v13_contracts() -> None:
@@ -387,6 +636,7 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
     offenders: list[str] = []
     target_paths = (
         IMPORTS_README,
+        PROJECT_KNOWLEDGE_BASE,
         PROJECT_SOURCES,
         GUI_INDEX,
         CANON_18,
@@ -397,6 +647,7 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         OPTIMIZER_LANE,
         RING_LANE,
         RESULTS_LANE,
+        RELEASE_LANE,
         FOUNDATIONS / "README.md",
         FOUNDATIONS / "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md",
         IMPORTS_V12 / "README.md",
@@ -406,6 +657,11 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         V32_COMPLETENESS,
         V33_COMPLETENESS,
         V32_WORKSTREAMS,
+        V32_RELEASE_ACCEPTANCE_MAP,
+        V32_GATE_HARDENING,
+        V32_GAP_MAP,
+        RELEASE_TRIAGE,
+        V32_16_ACCEPTANCE_NOTE,
     )
 
     for path in target_paths:

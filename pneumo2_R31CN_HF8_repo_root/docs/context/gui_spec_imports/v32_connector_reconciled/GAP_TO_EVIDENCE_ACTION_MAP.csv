@@ -1,0 +1,7 @@
+OPEN_GAP_ID,TITLE,PRIORITY,PLAYBOOK_ID,NEXT_ACTION,REQUIRED_EVIDENCE,NEXT_OWNER_ROLE,STATUS
+OG-001,hardpoints_solver_points_truth,P0,PB-001,Поднять полный hardpoints/solver_points contract в export и validator,anim_latest contract + geometry acceptance report,solver/model/export owners,gap
+OG-002,cylinder_packaging_passport,P0,PB-001,Добить cylinder packaging passport и оставить axis-only до complete truth,meta.packaging complete per cylinder + truth gate report,solver/export/animator owners,gap
+OG-003,browser_perf_trace_acceptance,P0,PB-006,Добавить browser perf trace exporter и bundle evidence,browser_perf_trace artifact in SEND bundle,web/runtime owners,gap
+OG-004,viewport_gating_acceptance,P1,PB-006,Доказать viewport gating тяжёлых скрытых surface,viewport gating report + trace,web/runtime owners,gap
+OG-005,windows_visual_acceptance,P1,PB-002;PB-005,Собрать свежий Windows runtime evidence set,Windows SEND bundle + shell runtime proof + latest pointer proof,runtime QA owners,gap
+OG-006,imported_layers_runtime_proof,P2,PB-008,Уточнить границу imported layers и runtime proof,explicit assumption/gap evidence,architecture owners,open_question

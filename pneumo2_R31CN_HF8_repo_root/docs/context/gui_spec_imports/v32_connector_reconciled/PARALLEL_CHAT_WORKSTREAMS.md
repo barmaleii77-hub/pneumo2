@@ -168,7 +168,7 @@ workstreams для параллельной разработки разными 
 ### V32-16. Release Gates, KB и acceptance map
 
 ```text
-Работай над knowledge base, release gates и acceptance map. Прочитай 00_PROJECT_KNOWLEDGE_BASE, PROJECT_SOURCES, v32 README, этот workstreams-документ, RELEASE_GATE_HARDENING_MATRIX и GAP_TO_EVIDENCE_ACTION_MAP. Твой scope: docs, KB logs, release_gate/workspace_contract helpers, source authority, acceptance docs/tests and prompt indexes. Не реализуй runtime features вместо domain-чатов. Обновляй knowledge_base_sync entries, tests/test_gui_spec_docs_contract.py, no-mojibake checks и ссылки на active reference layers.
+Работай над knowledge base, release gates и acceptance map. Прочитай 00_PROJECT_KNOWLEDGE_BASE, PROJECT_SOURCES, v32 README, этот workstreams-документ, RELEASE_GATE_ACCEPTANCE_MAP.md, RELEASE_GATE_HARDENING_MATRIX.csv и GAP_TO_EVIDENCE_ACTION_MAP.csv. Твой scope: docs, KB logs, release_gate/workspace_contract helpers, source authority, acceptance docs/tests and prompt indexes. Не реализуй runtime features вместо domain-чатов. Обновляй knowledge_base_sync entries, tests/test_gui_spec_docs_contract.py, no-mojibake checks и ссылки на active reference layers.
 ```
 
 ## Минимальный Definition Of Done для любого чата

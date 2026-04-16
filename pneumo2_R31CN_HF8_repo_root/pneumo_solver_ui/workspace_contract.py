@@ -28,6 +28,36 @@ OPTIONAL_WORKSPACE_DIRS: tuple[str, ...] = (
     'osc',
 )
 
+V32_WORKSPACE_IDS: tuple[str, ...] = (
+    'WS-SHELL',
+    'WS-PROJECT',
+    'WS-INPUTS',
+    'WS-RING',
+    'WS-SUITE',
+    'WS-BASELINE',
+    'WS-OPTIMIZATION',
+    'WS-ANALYSIS',
+    'WS-ANIMATOR',
+    'WS-DIAGNOSTICS',
+    'WS-SETTINGS',
+    'WS-TOOLS',
+)
+
+V32_HANDOFF_IDS: tuple[str, ...] = (
+    'HO-001',
+    'HO-002',
+    'HO-003',
+    'HO-004',
+    'HO-005',
+    'HO-006',
+    'HO-007',
+    'HO-008',
+    'HO-009',
+    'HO-010',
+)
+
+V32_WORKSPACE_REFERENCE_DIR = Path('docs') / 'context' / 'gui_spec_imports' / 'v32_connector_reconciled'
+
 
 def repo_local_workspace_dir(repo_root: Path | str) -> Path:
     repo_root = Path(repo_root)
@@ -51,6 +81,24 @@ def required_workspace_dirs() -> tuple[str, ...]:
 
 def optional_workspace_dirs() -> tuple[str, ...]:
     return OPTIONAL_WORKSPACE_DIRS
+
+
+def v32_workspace_ids() -> tuple[str, ...]:
+    return V32_WORKSPACE_IDS
+
+
+def v32_handoff_ids() -> tuple[str, ...]:
+    return V32_HANDOFF_IDS
+
+
+def v32_workspace_reference_paths(repo_root: Path | str) -> dict[str, str]:
+    root = Path(repo_root)
+    base = root / V32_WORKSPACE_REFERENCE_DIR
+    return {
+        'readme': str(base / 'README.md'),
+        'workstreams': str(base / 'PARALLEL_CHAT_WORKSTREAMS.md'),
+        'release_gate_acceptance_map': str(base / 'RELEASE_GATE_ACCEPTANCE_MAP.md'),
+    }
 
 
 def iter_workspace_contract_dirs(*, include_optional: bool = True) -> Iterable[str]:

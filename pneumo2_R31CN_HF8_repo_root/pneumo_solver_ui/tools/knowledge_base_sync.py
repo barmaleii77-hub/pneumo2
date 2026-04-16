@@ -343,6 +343,10 @@ def seed_default_chat_knowledge_base() -> dict[str, Any]:
             "Все планы работ, prompt-пакеты и decomposition, которые генерируют чаты этого проекта, должны записываться в базу знаний.",
             "Статус: активно.",
         ),
+        (
+            "Release-gate closure must stay evidence-mapped before runtime closure claims.",
+            "V32-16 uses RELEASE_GATE_ACCEPTANCE_MAP.md, RELEASE_GATE_HARDENING_MATRIX.csv and GAP_TO_EVIDENCE_ACTION_MAP.csv to require artifact/test/bundle evidence before any gate or open gap can be treated as closed.",
+        ),
     ]
     for title, details in seed_requirements:
         add_chat_requirement(store, title=title, details=details)
@@ -363,6 +367,8 @@ def seed_default_chat_knowledge_base() -> dict[str, Any]:
         ("gui_chat_prompts/10_TEST_VALIDATION_RESULTS.md", "Test, validation, results center.", "gui_chat_prompts/10_TEST_VALIDATION_RESULTS.md", "актуален"),
         ("gui_chat_prompts/11_GEOMETRY_REFERENCE.md", "Geometry, catalogs, reference.", "gui_chat_prompts/11_GEOMETRY_REFERENCE.md", "актуален"),
         ("gui_chat_prompts/12_ENGINEERING_ANALYSIS.md", "Engineering analysis, calibration, influence.", "gui_chat_prompts/12_ENGINEERING_ANALYSIS.md", "актуален"),
+        ("gui_chat_prompts/13_RELEASE_GATES_KB_ACCEPTANCE.md", "Release gates, KB, source authority and acceptance map for V32-16.", "gui_chat_prompts/13_RELEASE_GATES_KB_ACCEPTANCE.md", "актуален"),
+        ("context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md", "Repo-side map from v32 release hardening and open gaps to required evidence.", "context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md", "актуален"),
     ]
     for title, details, artifact_path, status in seed_plans:
         add_chat_plan(store, title=title, details=details, artifact_path=artifact_path, status=status)

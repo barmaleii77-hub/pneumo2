@@ -1,0 +1,21 @@
+HARDENING_ID,PLAYBOOK_ID,GATE_SCOPE,REQUIRED_ARTIFACT_CLASS,REQUIRED_SIGNAL,CURRENT_STATUS,HARD_FAIL_IF,SOFT_FAIL_IF,PACKAGE_STATUS,OPEN_GAP_LINK
+RGH-001,PB-001,hardpoints producer truth,anim_latest / export contract,meta.solver_points + meta.hardpoints present,covered_partially,missing or incomplete hardpoints exported,historical/imported evidence only,covered_partially,OG-001
+RGH-002,PB-001,cylinder packaging passport,anim_latest / export contract,meta.packaging complete per cylinder,gap,full body/rod/piston enabled without complete passport,axis-only honesty mode active,gap,OG-002
+RGH-003,PB-001,graphics truth states,surface-level graphics policy,truth-state explicitly marked,covered,surface claims solver truth without evidence,approximate mode with major warning,covered,
+RGH-004,PB-003,ring editor sole source,ring export set,ring_source_of_truth + generator_manifest,covered,downstream editable geometry copy exists,historical imported reference only,covered,
+RGH-005,PB-003,downstream scenario read-only lineage,validated suite snapshot + downstream lineage,scenario_lineage_hash chain complete,covered,suite/baseline/optimization owns geometry,stale banner on mismatch only,covered,
+RGH-006,PB-002,diagnostics one-click bundle,SEND bundle,bundle contents + health + triage + sha,covered_partially,latest pointer stale or health missing,optional evidence missing but explained,covered_partially,OG-005
+RGH-007,PB-002,health after final triage,health report timing,health built after final triage rewrite,covered_partially,health/triage order inverted,historical bundle lacked proof,covered_partially,OG-005
+RGH-008,PB-004,web desktop parity,parity map + migration matrix,no silent function loss,covered,feature missing without desktop location,feature marked in development with search alias,covered,
+RGH-009,PB-005,windows shell baseline,shell runtime proof,snap/docking/F6/DPI/resize proven,covered_partially,shell breaks Windows titlebar/snap/resize contract,contract documented but runtime proof absent,covered_partially,OG-005
+RGH-010,PB-005,accessibility and keyboard,keyboard/accessibility checklist,"F6, focus, UIA, contrast verified",covered,pointer-only critical action,partial manual verification only,covered,
+RGH-011,PB-006,browser perf trace,perf artifact,trace exporter present in bundle,gap,fix claimed without measured trace,manual observation only,gap,OG-003
+RGH-012,PB-006,viewport gating,runtime trace/report,hidden heavy surfaces gated,gap,hidden panes/webviews keep consuming frame budget,narrative-only mitigation,gap,OG-004
+RGH-013,PB-007,objective contract persistence,run dir objective contract,problem hash includes hard gate/objective stack,covered,resume mixes different contracts,history warns about mismatch,covered,
+RGH-014,PB-007,compare mismatch surfacing,compare contract,mismatch banner and explicit compare mode,covered,compare without explicit contract,inspect-only historical mode,covered,
+RGH-015,PB-008,current/historical/stale banners,banner policy + provenance fields,user sees stale/current/historical state,covered,silent rebinding to current context,banner exists but proof incomplete,covered,
+RGH-016,PB-002,helper runtime provenance,bundle meta,python/workspace/helper runtime explicit,covered_partially,helper runtime unknown in bundle,provenance incomplete but bundle builds,covered_partially,OG-005
+RGH-017,PB-005,portable archive path budget,release package,portable unzip/path budget safe on Windows,covered_partially,archive path budget exceeds safe range,"portable proven, some historical source zips long",covered_partially,
+RGH-018,PB-001,geometry acceptance report,diagnostics/runtime artifact,geometry acceptance included and explainable,covered_partially,no geometry acceptance artifact for graphics truth,report exists but not all producer fields complete,covered_partially,OG-001
+RGH-019,PB-006,animator frame-budget evidence,perf/runtime trace,dt-aware playback evidence,gap,animator perf claimed closed without trace,manual/bundle audit only,gap,OG-003
+RGH-020,PB-004,command search discoverability,parity + shell search aliases,new desktop entry points searchable,covered,function moved but not discoverable,search aliases incomplete,covered,

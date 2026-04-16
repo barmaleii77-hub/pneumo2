@@ -113,6 +113,18 @@ Archive C:/Users/Admin/Downloads/pneumo_codex_tz_spec_connector_reconciled_v33.z
 Источник: chat + archive:pneumo_codex_tz_spec_connector_reconciled_v33.
 ID: `REQ-0017`.
 
+18. Release-gate closure must stay evidence-mapped before runtime closure claims.
+V32-16 uses RELEASE_GATE_ACCEPTANCE_MAP.md, RELEASE_GATE_HARDENING_MATRIX.csv and GAP_TO_EVIDENCE_ACTION_MAP.csv to require artifact/test/bundle evidence before any gate or open gap can be treated as closed.
+Статус: активно.
+Источник: chat + v32 release-gate acceptance map.
+ID: `REQ-0018`.
+
+19. Dirty release-readiness worktree must be partitioned by V32 lane before staging.
+The mixed V32/V33 dirty tree is treated as draft work across lanes; each changed or untracked file needs owner lane, gate/gap link, required evidence and targeted tests before release integration.
+Статус: активно.
+Источник: chat + release-readiness triage.
+ID: `REQ-0019`.
+
 ## Как ссылаться из будущих задач
 
 Если новая задача опирается на решение из чата, но не отражена в старом каноне, сначала проверить этот файл, а затем соответствующие plan-файлы из [docs/14_CHAT_PLANS_LOG.md](./14_CHAT_PLANS_LOG.md).

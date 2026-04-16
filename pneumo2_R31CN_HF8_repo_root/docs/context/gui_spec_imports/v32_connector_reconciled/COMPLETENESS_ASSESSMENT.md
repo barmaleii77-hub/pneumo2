@@ -169,6 +169,15 @@ Windows visual acceptance и runtime P0 closure.
 
 - Для ускорения разработки использовать
   [PARALLEL_CHAT_WORKSTREAMS.md](./PARALLEL_CHAT_WORKSTREAMS.md).
+- Для V32-16 и release-gate/docs работ использовать
+  [RELEASE_GATE_ACCEPTANCE_MAP.md](./RELEASE_GATE_ACCEPTANCE_MAP.md),
+  [RELEASE_GATE_HARDENING_MATRIX.csv](./RELEASE_GATE_HARDENING_MATRIX.csv) и
+  [GAP_TO_EVIDENCE_ACTION_MAP.csv](./GAP_TO_EVIDENCE_ACTION_MAP.csv) как
+  checked-in extracts, сохраняя полный ZIP как archive-only source.
 - Для runtime closure запускать отдельные workstreams по `OG-001...OG-006`.
 - После появления живых artifacts обновить KB не новым summary, а evidence note:
   какой artifact, какой gate, какой test, какой bundle proof.
+- Для `WS-RING -> WS-SUITE` evidence note уже ведётся в
+  [RELEASE_GATE_ACCEPTANCE_MAP.md](./RELEASE_GATE_ACCEPTANCE_MAP.md): он
+  связывает `RG-GATE-012`, `RG-GATE-013` и `RG-GATE-016` с Ring/Suite tests,
+  lineage hashes, stale detection и no-hidden-closure behavior.

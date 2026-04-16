@@ -26,7 +26,10 @@
   предыдущий connector-reconciled слой и как workstream-decomposition layer
   через `PARALLEL_CHAT_WORKSTREAMS.md`, поверх
   `v3`, `v12` и `v13`, не заменяя `17/18`; внутри также лежат
-  `COMPLETENESS_ASSESSMENT.md` и `PARALLEL_CHAT_WORKSTREAMS.md`;
+  `COMPLETENESS_ASSESSMENT.md`, `PARALLEL_CHAT_WORKSTREAMS.md`,
+  `RELEASE_GATE_ACCEPTANCE_MAP.md`, checked-in
+  `RELEASE_GATE_HARDENING_MATRIX.csv` и
+  `GAP_TO_EVIDENCE_ACTION_MAP.csv`;
 - `v3/` — active detailed machine-readable reference layer из
   `pneumo_gui_codex_package_v3.zip`;
 - `v12_design_recovery/` — historical design-recovery layer из
@@ -55,20 +58,24 @@
    `v32_connector_reconciled/README.md` и
    `v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md`; если нужно понять
    достаточность архива, читать `v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md`.
-5. Затем использовать `v3/*` как checked-in detailed machine-readable reference для:
+5. Если задача касается release gates, acceptance evidence или open gaps, читать
+   `v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md` и local checked-in
+   extracts `RELEASE_GATE_HARDENING_MATRIX.csv`,
+   `GAP_TO_EVIDENCE_ACTION_MAP.csv`.
+6. Затем использовать `v3/*` как checked-in detailed machine-readable reference для:
    layout, UI elements, field/help/tooltip catalogs, migration matrix,
    acceptance criteria, pipeline verification, source-of-truth, docking,
    keyboard, UI state и observability contracts.
-6. Если нужно понять, как текущий канон вырос из старых архивов, читать
+7. Если нужно понять, как текущий канон вырос из старых архивов, читать
    `GUI_SPEC_ARCHIVE_LINEAGE.md` и `gui_spec_archive_lineage.json`.
-7. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
+8. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
    `v13_ring_editor_migration/*` как специализированный addendum поверх `v3`:
    schema contract, screen blueprints, state machine, ring-level migration
    matrix, acceptance gates и suite-link contract.
-8. `v12_design_recovery/*` использовать как historical design-recovery layer:
+9. `v12_design_recovery/*` использовать как historical design-recovery layer:
    он фиксирует возврат в design-first ветку, канон ring editor, optimization
    control plane и truthful graphics перед `v13`.
-9. `v2` и `v1` использовать только как historical imports и источник для
+10. `v2` и `v1` использовать только как historical imports и источник для
    сравнения эволюции GUI-spec.
 
 ## Политика обновления
@@ -81,7 +88,7 @@
 - при конфликте между imported sources и текущим каноном приоритет у `17/18`,
   затем у `v33_connector_reconciled/README.md` как active connector-reconciled
   digest, затем у `v32_connector_reconciled/README.md` как previous
-  connector-reconciled digest/workstream layer,
+  connector-reconciled digest/workstream layer и его release/evidence extracts,
   затем у `foundations/*` как upstream intent layer только для provenance,
   затем у checked-in detailed layer `v3`, затем у специализированного addendum
   `v13_ring_editor_migration` в пределах `WS-RING` и ring-to-suite handoff,

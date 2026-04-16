@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-16T20:12:43+00:00",
+  "updated_at": "2026-04-16T20:33:56+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -136,6 +136,22 @@
       "source": "chat + archive:pneumo_codex_tz_spec_connector_reconciled_v33",
       "title": "Connector-reconciled GUI/TZ spec v33 supersedes v32 for active package-integrity and repo-conformance reference",
       "details": "Archive C:/Users/Admin/Downloads/pneumo_codex_tz_spec_connector_reconciled_v33.zip is the active connector-reconciled GUI/TZ reference layer after v32. It fixes v32 manifest self-hash policy, adds package selfcheck/remediation, repo-canon read-order and gate mapping, prompt mandatory/enum audits, and dedicated PB-008 current/historical/stale provenance playbook. It still does not prove runtime closure for producer truth, cylinder packaging, measured performance, Windows visual acceptance or imported-layer runtime proof.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0018",
+      "created_at": "2026-04-16T20:16:18+00:00",
+      "source": "chat + v32 release-gate acceptance map",
+      "title": "Release-gate closure must stay evidence-mapped before runtime closure claims.",
+      "details": "V32-16 uses RELEASE_GATE_ACCEPTANCE_MAP.md, RELEASE_GATE_HARDENING_MATRIX.csv and GAP_TO_EVIDENCE_ACTION_MAP.csv to require artifact/test/bundle evidence before any gate or open gap can be treated as closed.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0019",
+      "created_at": "2026-04-16T20:28:07+00:00",
+      "source": "chat + release-readiness triage",
+      "title": "Dirty release-readiness worktree must be partitioned by V32 lane before staging.",
+      "details": "The mixed V32/V33 dirty tree is treated as draft work across lanes; each changed or untracked file needs owner lane, gate/gap link, required evidence and targeted tests before release integration.",
       "status": "активно"
     }
   ],
@@ -336,6 +352,33 @@
       "title": "Digest connector-reconciled v33 archive into knowledge base",
       "details": "Add v33 README and completeness assessment, update source priority docs and prompt index so future chats read v33 before v32 while still using v32 parallel workstreams.",
       "artifact_path": "context/gui_spec_imports/v33_connector_reconciled/README.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0023",
+      "created_at": "2026-04-16T20:16:18+00:00",
+      "source": "chat + v32 release-gate acceptance map",
+      "title": "V32-16 Release Gates KB acceptance map",
+      "details": "Maintain the repo-side release-gate hardening, gap-to-evidence map, source-authority links, helper metadata, prompt index and docs-contract tests without implementing domain runtime features.",
+      "artifact_path": "context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0024",
+      "created_at": "2026-04-16T20:28:01+00:00",
+      "source": "chat + release-readiness triage",
+      "title": "Release-readiness dirty worktree triage",
+      "details": "Inventory the current mixed dirty tree by V32 lane, gate/gap, required evidence and targeted tests before integrating runtime/domain draft changes.",
+      "artifact_path": "context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0025",
+      "created_at": "2026-04-16T20:33:56+00:00",
+      "source": "chat + release-readiness acceptance",
+      "title": "V32-16 docs helper acceptance pass",
+      "details": "Accept the V32-16 docs/helper release-readiness scope with active v33/v32 reference metadata, triage coverage and focused docs/KB/mojibake tests before runtime lane packages are integrated.",
+      "artifact_path": "context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md",
       "status": "актуален"
     }
   ]

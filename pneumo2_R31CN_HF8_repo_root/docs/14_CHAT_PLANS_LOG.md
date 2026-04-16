@@ -169,6 +169,27 @@ ID: `PLAN-0021`.
 Источник: chat + archive:pneumo_codex_tz_spec_connector_reconciled_v33.
 ID: `PLAN-0022`.
 
+23. V32-16 Release Gates KB acceptance map
+Назначение: Maintain the repo-side release-gate hardening, gap-to-evidence map, source-authority links, helper metadata, prompt index and docs-contract tests without implementing domain runtime features.
+Артефакт: [context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md](./context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md)
+Статус: актуален.
+Источник: chat + v32 release-gate acceptance map.
+ID: `PLAN-0023`.
+
+24. Release-readiness dirty worktree triage
+Назначение: Inventory the current mixed dirty tree by V32 lane, gate/gap, required evidence and targeted tests before integrating runtime/domain draft changes.
+Артефакт: [context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md](./context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
+Статус: актуален.
+Источник: chat + release-readiness triage.
+ID: `PLAN-0024`.
+
+25. V32-16 docs helper acceptance pass
+Назначение: Accept the V32-16 docs/helper release-readiness scope with active v33/v32 reference metadata, triage coverage and focused docs/KB/mojibake tests before runtime lane packages are integrated.
+Артефакт: [context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](./context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
+Статус: актуален.
+Источник: chat + release-readiness acceptance.
+ID: `PLAN-0025`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

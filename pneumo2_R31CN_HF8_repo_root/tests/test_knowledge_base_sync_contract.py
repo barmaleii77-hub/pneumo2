@@ -26,6 +26,27 @@ def test_chat_knowledge_base_store_exists_and_is_seeded() -> None:
     assert len(data["plans"]) >= 15
     assert any("GUI" in item["title"] or "desktop" in item["details"].lower() for item in data["requirements"])
     assert any(item["artifact_path"] == "gui_chat_prompts/08_OPTIMIZER_CENTER.md" for item in data["plans"])
+    assert any(
+        item["title"] == "Release-gate closure must stay evidence-mapped before runtime closure claims."
+        for item in data["requirements"]
+    )
+    assert any(
+        item["title"] == "Dirty release-readiness worktree must be partitioned by V32 lane before staging."
+        for item in data["requirements"]
+    )
+    assert any(
+        item["artifact_path"]
+        == "context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md"
+        for item in data["plans"]
+    )
+    assert any(
+        item["artifact_path"] == "context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md"
+        for item in data["plans"]
+    )
+    assert any(
+        item["artifact_path"] == "context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md"
+        for item in data["plans"]
+    )
 
 
 def test_chat_knowledge_base_adders_dedupe_same_entry() -> None:
