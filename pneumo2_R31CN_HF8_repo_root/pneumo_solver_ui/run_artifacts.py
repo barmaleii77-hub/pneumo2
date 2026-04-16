@@ -522,6 +522,63 @@ def collect_anim_latest_diagnostics_summary(
         artifact_refs.get("road_contract_desktop"),
         default_name="road_contract_desktop.json",
     )
+    capture_manifest_ref, capture_manifest_path, capture_manifest_exists = _resolve_pointer_relative(
+        artifact_refs.get("capture_export_manifest"),
+        default_name="capture_export_manifest.json",
+    )
+    frame_budget_ref, frame_budget_path, frame_budget_exists = _resolve_pointer_relative(
+        artifact_refs.get("frame_budget_evidence"),
+        default_name="animator_frame_budget_evidence.json",
+    )
+    capture_manifest_obj = _read_json(Path(capture_manifest_path)) if capture_manifest_path and capture_manifest_exists else None
+    frame_budget_obj = _read_json(Path(frame_budget_path)) if frame_budget_path and frame_budget_exists else None
+    if capture_manifest_exists and capture_manifest_obj is None:
+        issues.append(f"anim_latest capture export manifest exists but is unreadable: {capture_manifest_path}")
+    if frame_budget_exists and frame_budget_obj is None:
+        issues.append(f"anim_latest frame budget evidence exists but is unreadable: {frame_budget_path}")
+
+    capture_manifest_handoff_id = ""
+    capture_manifest_capture_hash = ""
+    capture_manifest_analysis_context_hash = ""
+    capture_manifest_truth_mode_hash = ""
+    capture_manifest_blocking_states: list[str] = []
+    capture_manifest_truth_state = ""
+    capture_manifest_analysis_refs_present: Any = None
+    capture_manifest_optimizer_refs_present: Any = None
+    if isinstance(capture_manifest_obj, dict):
+        capture_manifest_handoff_id = str(capture_manifest_obj.get("handoff_id") or "")
+        capture_manifest_capture_hash = str(capture_manifest_obj.get("capture_hash") or "")
+        capture_manifest_analysis_context_hash = str(capture_manifest_obj.get("analysis_context_hash") or "")
+        capture_manifest_truth_mode_hash = str(capture_manifest_obj.get("truth_mode_hash") or "")
+        capture_manifest_blocking_states = [
+            str(x) for x in list(capture_manifest_obj.get("blocking_states") or []) if str(x).strip()
+        ]
+        truth_summary_obj = capture_manifest_obj.get("truth_summary")
+        if isinstance(truth_summary_obj, dict):
+            capture_manifest_truth_state = str(truth_summary_obj.get("overall_truth_state") or "")
+        capture_manifest_analysis_refs_present = bool(capture_manifest_obj.get("analysis_artifact_refs"))
+        capture_manifest_optimizer_refs_present = bool(capture_manifest_obj.get("optimizer_artifact_refs"))
+
+    frame_budget_handoff_id = ""
+    frame_budget_evidence_state = ""
+    frame_budget_evidence_hash = ""
+    frame_budget_hidden_gated: Any = None
+    frame_budget_hidden_aux_docks: Any = None
+    frame_budget_visible_aux: Any = None
+    frame_budget_active: Any = None
+    if isinstance(frame_budget_obj, dict):
+        frame_budget_handoff_id = str(frame_budget_obj.get("handoff_id") or "")
+        frame_budget_evidence_state = str(frame_budget_obj.get("evidence_state") or "")
+        frame_budget_evidence_hash = str(frame_budget_obj.get("evidence_hash") or "")
+        hidden_gating = frame_budget_obj.get("hidden_dock_gating")
+        if isinstance(hidden_gating, dict):
+            frame_budget_hidden_gated = hidden_gating.get("gated")
+            frame_budget_hidden_aux_docks = hidden_gating.get("hidden_aux_docks")
+            frame_budget_visible_aux = hidden_gating.get("visible_aux")
+        frame_budget = frame_budget_obj.get("frame_budget")
+        if isinstance(frame_budget, dict):
+            frame_budget_active = frame_budget.get("frame_budget_active")
+
     mnemo_event_ref, mnemo_event_path, mnemo_event_exists = _infer_mnemo_event_log_path(npz_path, pointer_json)
     mnemo_event_obj = _read_json(Path(mnemo_event_path)) if mnemo_event_path and mnemo_event_exists else None
     if mnemo_event_exists and mnemo_event_obj is None:
@@ -582,6 +639,27 @@ def collect_anim_latest_diagnostics_summary(
         "anim_latest_road_contract_desktop_ref": road_desktop_ref,
         "anim_latest_road_contract_desktop_path": road_desktop_path,
         "anim_latest_road_contract_desktop_exists": road_desktop_exists,
+        "anim_latest_capture_export_manifest_ref": capture_manifest_ref,
+        "anim_latest_capture_export_manifest_path": capture_manifest_path,
+        "anim_latest_capture_export_manifest_exists": capture_manifest_exists,
+        "anim_latest_capture_export_manifest_handoff_id": capture_manifest_handoff_id,
+        "anim_latest_capture_hash": capture_manifest_capture_hash,
+        "anim_latest_analysis_context_hash": capture_manifest_analysis_context_hash,
+        "anim_latest_truth_mode_hash": capture_manifest_truth_mode_hash,
+        "anim_latest_capture_export_manifest_blocking_states": capture_manifest_blocking_states,
+        "anim_latest_capture_export_manifest_truth_state": capture_manifest_truth_state,
+        "anim_latest_analysis_artifact_refs_present": capture_manifest_analysis_refs_present,
+        "anim_latest_optimizer_artifact_refs_present": capture_manifest_optimizer_refs_present,
+        "anim_latest_frame_budget_evidence_ref": frame_budget_ref,
+        "anim_latest_frame_budget_evidence_path": frame_budget_path,
+        "anim_latest_frame_budget_evidence_exists": frame_budget_exists,
+        "anim_latest_frame_budget_evidence_handoff_id": frame_budget_handoff_id,
+        "anim_latest_frame_budget_evidence_state": frame_budget_evidence_state,
+        "anim_latest_frame_budget_evidence_hash": frame_budget_evidence_hash,
+        "anim_latest_frame_budget_hidden_dock_gating": frame_budget_hidden_gated,
+        "anim_latest_frame_budget_hidden_aux_docks": frame_budget_hidden_aux_docks,
+        "anim_latest_frame_budget_visible_aux": frame_budget_visible_aux,
+        "anim_latest_frame_budget_active": frame_budget_active,
         "anim_latest_mnemo_event_log_ref": mnemo_event_ref,
         "anim_latest_mnemo_event_log_path": mnemo_event_path,
         "anim_latest_mnemo_event_log_exists": mnemo_event_exists,

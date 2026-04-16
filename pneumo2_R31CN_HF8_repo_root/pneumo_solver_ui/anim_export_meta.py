@@ -225,6 +225,30 @@ def extract_anim_sidecar_meta(
         if k in inner and inner.get(k) is not None:
             m[k] = inner.get(k)
 
+    # Preserve downstream provenance pointers.  The manifest writer treats these
+    # as references only; it does not infer missing analysis or optimizer outputs.
+    for k in (
+        "analysis_context",
+        "analysis_context_hash",
+        "analysis_context_path",
+        "analysis_report_path",
+        "analysis_artifacts",
+        "compare_contract_hash",
+        "compare_contract_path",
+        "compare_session_id",
+        "optimizer_artifact_refs",
+        "optimizer_run_dir",
+        "optimization_run_dir",
+        "optimization_artifacts",
+        "optimization_summary_path",
+        "selected_run_contract",
+        "objective_contract_hash",
+        "optimizer_scope",
+        "problem_hash",
+    ):
+        if k in inner and inner.get(k) is not None:
+            m[k] = inner.get(k)
+
     spec = _json_load(resolved_scenario) if resolved_scenario is not None else None
     if isinstance(spec, dict) and isinstance(spec.get("segments"), list):
         m["scenario_kind"] = "ring"
