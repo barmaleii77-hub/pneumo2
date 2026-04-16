@@ -1,0 +1,578 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from pneumo_solver_ui.desktop_engineering_analysis_model import (
+    ANALYSIS_TO_ANIMATOR_HANDOFF_ID,
+    SELECTED_RUN_HANDOFF_ID,
+    SELECTED_RUN_PRODUCED_BY,
+    SelectedRunContext,
+    build_analysis_compare_contract,
+    build_analysis_to_animator_link_contract,
+    build_compare_influence_surface,
+    build_sensitivity_summary,
+    infer_engineering_unit,
+)
+from pneumo_solver_ui.desktop_engineering_analysis_runtime import (
+    LATEST_ENGINEERING_ANALYSIS_EVIDENCE_MANIFEST,
+    DesktopEngineeringAnalysisRuntime,
+    load_selected_run_contract,
+)
+
+
+def _write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def _write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _build_system_influence_payload() -> dict:
+    return {
+        "version": "system_influence_report_v1",
+        "config": {
+            "requested_eps_rel": 0.01,
+            "adaptive_eps": True,
+            "stage_name": "stage1_long",
+        },
+        "baseline": {
+            "pneumo": {
+                "min_bottleneck_mdot": 0.032,
+                "avg_bottleneck_mdot": 0.051,
+            },
+            "mech": {
+                "Kphi": 12000.0,
+                "f_roll": 1.45,
+            },
+        },
+        "params": [
+            {
+                "param": "база",
+                "group": "kinematics",
+                "score": 1.4,
+                "status": "ok",
+                "eps_rel_used": 0.001,
+                "elas_Kphi": 1.2,
+                "elas_min_bottleneck_mdot": 0.1,
+            },
+            {
+                "param": "клапан_dp_переход_Па",
+                "group": "pneumatics",
+                "score": 0.8,
+                "status": "ok",
+                "eps_rel_used": 0.003,
+                "elas_Kphi": 0.0,
+                "elas_min_bottleneck_mdot": -0.8,
+            },
+            {
+                "param": "колея",
+                "group": "kinematics",
+                "score": 0.2,
+                "status": "ok",
+                "eps_rel_used": 0.001,
+                "elas_Kphi": 0.2,
+                "elas_f_roll": 0.1,
+            },
+        ],
+    }
+
+
+def _build_run_dir(tmp_path: Path) -> Path:
+    run_dir = tmp_path / "RUN_engineering_analysis"
+    payload = _build_system_influence_payload()
+    _write_json(run_dir / "system_influence.json", payload)
+    _write_text(run_dir / "SYSTEM_INFLUENCE.md", "# System Influence\n")
+    _write_text(
+        run_dir / "system_influence_params.csv",
+        "param,group,score,eps_rel_used\nбаза,kinematics,1.4,0.001\n",
+    )
+    _write_text(run_dir / "system_influence_edges.csv", "edge,mdot_ref\nE1,0.032\n")
+    _write_text(run_dir / "system_influence_paths.csv", "chamber,path_bottleneck_mdot\nC1,0.032\n")
+    _write_text(run_dir / "REPORT_FULL.md", "# REPORT_FULL\n")
+    _write_json(run_dir / "fit_report_final.json", {"best_rmse": 0.12, "success": True})
+    _write_json(run_dir / "fit_details_final.json", {"tests": [], "signals": []})
+    _write_json(run_dir / "compare_influence.json", {"schema": "compare_influence_fixture"})
+    return run_dir
+
+
+def _selected_run_contract_payload(run_dir: Path, **overrides) -> dict:
+    result_path = run_dir / "compare_influence.json"
+    payload = {
+        "schema_version": "selected_run_contract_v1",
+        "handoff_id": SELECTED_RUN_HANDOFF_ID,
+        "source_workspace": SELECTED_RUN_PRODUCED_BY,
+        "target_workspace": "WS-ANALYSIS",
+        "run_id": "run-analysis-001",
+        "run_name": run_dir.name,
+        "run_dir": str(run_dir),
+        "mode": "distributed_coordinator",
+        "status": "done",
+        "started_at_utc": "2026-04-17T00:00:00Z",
+        "finished_at_utc": "2026-04-17T00:05:00Z",
+        "objective_contract_hash": "objective-hash-001",
+        "objective_stack": ["min_rms", "min_pressure"],
+        "hard_gate_key": "max_pressure_pa",
+        "hard_gate_tolerance": 250000.0,
+        "active_baseline_hash": "baseline-hash-001",
+        "suite_snapshot_hash": "suite-hash-001",
+        "problem_hash": "problem-hash-001",
+        "results_csv_path": str(result_path),
+        "artifact_dir": str(run_dir),
+        "analysis_handoff_ready_state": "ready",
+        "diagnostics_handoff_ready_state": "not_finalized_by_optimizer",
+        "results_artifact_index": {
+            "run_dir": str(run_dir),
+            "results_csv_path": str(result_path),
+            "objective_contract_path": str(run_dir / "objective_contract.json"),
+        },
+    }
+    for key, value in overrides.items():
+        if value is None:
+            payload.pop(key, None)
+        else:
+            payload[key] = value
+    return payload
+
+
+def _write_selected_run_contract(path: Path, run_dir: Path, **overrides) -> Path:
+    _write_json(path, _selected_run_contract_payload(run_dir, **overrides))
+    return path
+
+
+def test_compare_influence_surface_preserves_units_and_diagnostics() -> None:
+    corr = np.asarray(
+        [
+            [0.10, -0.82],
+            [0.96, 0.25],
+        ],
+        dtype=float,
+    )
+    surface = build_compare_influence_surface(
+        corr,
+        ["база", "колея"],
+        ["RMS(положение_штока_ЛП_м)", "MAXABS(давление_ресивер1_Па)"],
+        feature_units={"база": "m", "колея": "m"},
+        target_units={
+            "RMS(положение_штока_ЛП_м)": "m",
+            "MAXABS(давление_ресивер1_Па)": "Pa",
+        },
+        top_k=3,
+    )
+
+    assert surface["surface_type"] == "compare_influence"
+    assert surface["diagnostics"]["shape_matches_axes"] is True
+    assert surface["diagnostics"]["finite_cell_count"] == 4
+    assert surface["diagnostics"]["max_abs_corr"] == 0.96
+    assert surface["ranked_features"][0] == "колея"
+    assert surface["top_cells"][0]["feature"] == "колея"
+    assert surface["top_cells"][0]["target_unit"] == "m"
+    assert surface["axes"]["features"][0]["unit"] == "m"
+
+
+def test_sensitivity_summary_ranks_influence_rows_and_units_are_explicit() -> None:
+    summary = build_sensitivity_summary(_build_system_influence_payload(), top_k=2)
+
+    assert [row.param for row in summary] == ["база", "клапан_dp_переход_Па"]
+    assert summary[0].strongest_metric == "elas_Kphi"
+    assert summary[1].strongest_metric == "elas_min_bottleneck_mdot"
+    assert infer_engineering_unit("elas_Kphi") == "dimensionless"
+    assert infer_engineering_unit("min_bottleneck_mdot") == "kg/s"
+    assert infer_engineering_unit("Kphi") == "N*m/rad"
+
+
+def test_engineering_analysis_runtime_validates_artifacts_and_exports_evidence(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path)
+    contract_path = _write_selected_run_contract(tmp_path / "selected_run_contract.json", run_dir)
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="python")
+    snapshot = runtime.snapshot(selected_contract_path=contract_path)
+
+    assert snapshot.status == "PASS"
+    assert snapshot.contract_status == "READY"
+    assert snapshot.selected_run_context is not None
+    assert snapshot.selected_run_context.run_id == "run-analysis-001"
+    assert snapshot.selected_run_context.objective_contract_hash == "objective-hash-001"
+    assert snapshot.selected_run_context.hard_gate_key == "max_pressure_pa"
+    assert snapshot.selected_run_context.active_baseline_hash == "baseline-hash-001"
+    assert snapshot.selected_run_context.suite_snapshot_hash == "suite-hash-001"
+    assert snapshot.influence_status == "PASS"
+    assert snapshot.calibration_status == "PASS"
+    assert snapshot.compare_status == "PASS"
+    assert snapshot.artifact_by_key("system_influence_json") is not None
+    assert snapshot.artifact_by_key("report_full_md") is not None
+    assert snapshot.sensitivity_rows[0].param == "база"
+    assert snapshot.unit_catalog["eps_rel_used"] == "dimensionless"
+    assert snapshot.unit_catalog["min_bottleneck_mdot"] == "kg/s"
+
+    surface = build_compare_influence_surface(
+        np.asarray([[1.0], [-1.0]], dtype=float),
+        ["база", "колея"],
+        ["RMS(положение_штока_ЛП_м)"],
+        feature_units={"база": "m", "колея": "m"},
+        target_units={"RMS(положение_штока_ЛП_м)": "m"},
+    )
+    sidecar = runtime.write_diagnostics_evidence_manifest(
+        snapshot,
+        compare_surfaces=[surface],
+    )
+
+    workspace_manifest = tmp_path / "pneumo_solver_ui" / "workspace" / "exports" / "engineering_analysis_evidence_manifest.json"
+    assert sidecar == (tmp_path / "send_bundles" / LATEST_ENGINEERING_ANALYSIS_EVIDENCE_MANIFEST).resolve()
+    assert sidecar.exists()
+    assert workspace_manifest.exists()
+
+    payload = json.loads(sidecar.read_text(encoding="utf-8"))
+    assert payload["schema"] == "desktop_engineering_analysis_evidence_manifest"
+    assert payload["handoff_id"] == "HO-009"
+    assert payload["produced_by"] == "WS-ANALYSIS"
+    assert payload["consumed_by"] == "WS-DIAGNOSTICS"
+    assert payload["upstream_handoff"]["handoff_id"] == "HO-007"
+    assert payload["upstream_handoff"]["selected_run_contract_path"] == str(contract_path.resolve())
+    assert payload["upstream_handoff"]["run_id"] == "run-analysis-001"
+    assert payload["upstream_handoff"]["objective_contract_hash"] == "objective-hash-001"
+    assert payload["upstream_handoff"]["hard_gate_key"] == "max_pressure_pa"
+    assert payload["upstream_handoff"]["active_baseline_hash"] == "baseline-hash-001"
+    assert payload["upstream_handoff"]["suite_snapshot_hash"] == "suite-hash-001"
+    assert payload["handoff_requirements"]["handoff_id"] == "HO-007"
+    assert payload["handoff_requirements"]["can_run_engineering_analysis"] is True
+    assert payload["handoff_requirements"]["missing_fields"] == []
+    assert payload["diagnostics_bundle_finalized"] is False
+    assert payload["validation"]["influence_status"] == "PASS"
+    assert payload["validation"]["selected_run_contract_status"] == "READY"
+    assert payload["unit_catalog"]["Kphi"] == "N*m/rad"
+    assert payload["sensitivity_summary"][0]["param"] == "база"
+    assert payload["compare_influence_surfaces"][0]["diagnostics"]["finite_cell_count"] == 2
+    assert payload["evidence_manifest_hash"]
+
+    records = {item["key"]: item for item in payload["selected_artifact_list"]}
+    assert records["system_influence_json"]["sha256"]
+    assert records["system_influence_json"]["size_bytes"] > 0
+    assert records["report_full_md"]["sha256"]
+    assert any(item["key"] == "report_full_md" for item in payload["report_provenance"])
+
+    refreshed = runtime.snapshot(selected_contract_path=contract_path)
+    assert refreshed.diagnostics_evidence_manifest_path == sidecar
+    assert refreshed.diagnostics_evidence_manifest_status == "READY"
+    assert refreshed.diagnostics_evidence_manifest_hash == payload["evidence_manifest_hash"]
+
+
+def test_selected_run_contract_loads_ho007_context_as_analysis_master_source(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path)
+    contract_path = _write_selected_run_contract(
+        tmp_path / "workspace" / "handoffs" / "WS-OPTIMIZATION" / "selected_run_contract.json",
+        run_dir,
+    )
+
+    snapshot = load_selected_run_contract(contract_path)
+
+    assert snapshot.exists is True
+    assert snapshot.status == "READY"
+    assert snapshot.selected_run_context is not None
+    assert snapshot.selected_run_context.run_id == "run-analysis-001"
+    assert snapshot.selected_run_context.mode == "distributed_coordinator"
+    assert snapshot.selected_run_context.results_artifact_index["run_dir"] == str(run_dir)
+    assert snapshot.selected_run_contract_hash
+    assert snapshot.blocking_states == ()
+
+
+def test_missing_selected_contract_blocks_analysis_without_live_runtime(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path)
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="python")
+    snapshot = runtime.snapshot(selected_contract_path=tmp_path / "missing" / "selected_run_contract.json")
+
+    assert snapshot.status == "BLOCKED"
+    assert snapshot.contract_status == "MISSING"
+    assert snapshot.artifacts == ()
+    assert "missing selected run contract" in snapshot.blocking_states
+    assert snapshot.mismatch_summary["handoff_id"] == "HO-007"
+
+    requirements = runtime.selected_run_handoff_requirements(snapshot)
+    assert requirements["handoff_id"] == "HO-007"
+    assert requirements["producer_workspace"] == "WS-OPTIMIZATION"
+    assert requirements["consumer_workspace"] == "WS-ANALYSIS"
+    assert requirements["contract_status"] == "MISSING"
+    assert requirements["can_run_engineering_analysis"] is False
+    assert "run_id" in requirements["missing_fields"]
+    assert "results_artifact_index" in requirements["missing_fields"]
+    assert requirements["required_contract_path"] == str((tmp_path / "missing" / "selected_run_contract.json").resolve())
+
+    explicit_run_snapshot = runtime.snapshot(
+        run_dir,
+        selected_contract_path=tmp_path / "missing" / "selected_run_contract.json",
+    )
+    assert explicit_run_snapshot.status == "BLOCKED"
+    assert explicit_run_snapshot.artifacts == ()
+
+
+def test_incomplete_selected_contract_degrades_but_keeps_available_artifacts(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path)
+    contract_path = _write_selected_run_contract(
+        tmp_path / "selected_run_contract.json",
+        run_dir,
+        suite_snapshot_hash=None,
+        results_artifact_index={},
+    )
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="python")
+
+    snapshot = runtime.snapshot(selected_contract_path=contract_path)
+
+    assert snapshot.status == "DEGRADED"
+    assert snapshot.contract_status == "DEGRADED"
+    assert snapshot.artifact_by_key("system_influence_json") is not None
+    assert set(snapshot.mismatch_summary["missing_fields"]) >= {
+        "suite_snapshot_hash",
+        "results_artifact_index",
+    }
+
+
+def test_analysis_compare_contract_blocks_objective_mismatch_before_charts() -> None:
+    left = SelectedRunContext(
+        run_id="left",
+        mode="distributed_coordinator",
+        status="done",
+        run_dir="C:/runs/left",
+        objective_contract_hash="objective-a",
+        hard_gate_key="max_pressure_pa",
+        hard_gate_tolerance=250000.0,
+        active_baseline_hash="baseline-a",
+        suite_snapshot_hash="suite-a",
+        problem_hash="problem-a",
+    )
+    right_payload = left.to_payload()
+    right_payload["run_id"] = "right"
+    right_payload["objective_contract_hash"] = "objective-b"
+
+    contract = build_analysis_compare_contract(
+        left,
+        right_payload,
+        compare_mode="selected_vs_history_run",
+        selected_metrics=["score"],
+        unit_profile={"score": "dimensionless"},
+    )
+
+    assert contract["analysis_compare_ready_state"] == "blocked"
+    assert "objective_contract_hash" in contract["blocking_states"]
+    assert contract["results_source_kind"] == "selected_run_contract"
+    assert contract["metric_units"]["score"] == "dimensionless"
+    assert contract["mismatch_banner"]["banner_id"] == "BANNER-HIST-002"
+
+
+def test_analysis_compare_contract_requires_explicit_refs() -> None:
+    contract = build_analysis_compare_contract(None, None)
+
+    assert contract["analysis_compare_ready_state"] == "blocked"
+    assert contract["blocking_states"] == ("missing explicit compare refs",)
+    assert contract["mismatch_banner"]["scope"] == "missing_compare_contract"
+
+
+def test_analysis_to_animator_link_blocks_without_explicit_artifact_pointer() -> None:
+    context = SelectedRunContext(
+        run_id="run-analysis-001",
+        mode="distributed_coordinator",
+        status="done",
+        run_dir="C:/runs/run-analysis-001",
+        objective_contract_hash="objective-hash-001",
+        hard_gate_key="max_pressure_pa",
+        hard_gate_tolerance=250000.0,
+        active_baseline_hash="baseline-hash-001",
+        suite_snapshot_hash="suite-hash-001",
+        problem_hash="problem-hash-001",
+        run_contract_hash="selected-run-contract-hash-001",
+    )
+
+    contract = build_analysis_to_animator_link_contract(
+        context,
+        selected_result_artifact_pointer=None,
+        selected_best_candidate_ref="candidate-001",
+    )
+
+    assert contract["handoff_id"] == ANALYSIS_TO_ANIMATOR_HANDOFF_ID
+    assert contract["producer_workspace"] == "WS-ANALYSIS"
+    assert contract["consumer_workspace"] == "WS-ANIMATOR"
+    assert contract["ready_state"] == "blocked"
+    assert "missing selected result artifact pointer" in contract["blocking_states"]
+    assert "missing selected_test_id" in contract["blocking_states"]
+    assert contract["rules"][0].startswith("WS-ANIMATOR receives only explicit artifact pointers")
+
+
+def test_runtime_exports_analysis_to_animator_context_from_selected_contract(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path)
+    contract_path = _write_selected_run_contract(tmp_path / "selected_run_contract.json", run_dir)
+    pointer_path = run_dir / "compare_influence.json"
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="python")
+    snapshot = runtime.snapshot(selected_contract_path=contract_path)
+
+    payload = runtime.export_analysis_to_animator_link_contract(
+        snapshot,
+        selected_result_artifact_pointer=pointer_path,
+        selected_test_id="T01",
+        selected_segment_id="segment-1",
+        selected_time_window={"mode": "time_s", "start_s": 0.0, "end_s": 1.0},
+        selected_best_candidate_ref="candidate-001",
+        now_text="2026-04-17T00:00:00Z",
+    )
+
+    context_path = tmp_path / "pneumo_solver_ui" / "workspace" / "handoffs" / "WS-ANALYSIS" / "analysis_context.json"
+    link_path = tmp_path / "pneumo_solver_ui" / "workspace" / "handoffs" / "WS-ANALYSIS" / "animator_link_contract.json"
+    assert context_path.exists()
+    assert link_path.exists()
+
+    link = json.loads(link_path.read_text(encoding="utf-8"))
+    context = json.loads(context_path.read_text(encoding="utf-8"))
+    assert payload["analysis_context_path"] == str(context_path.resolve())
+    assert payload["animator_link_contract_path"] == str(link_path.resolve())
+    assert link["schema"] == "analysis_to_animator_link_contract.v1"
+    assert link["handoff_id"] == ANALYSIS_TO_ANIMATOR_HANDOFF_ID
+    assert link["producer_workspace"] == "WS-ANALYSIS"
+    assert link["consumer_workspace"] == "WS-ANIMATOR"
+    assert link["run_id"] == "run-analysis-001"
+    assert link["run_contract_hash"] == snapshot.selected_run_contract_hash
+    assert link["selected_test_id"] == "T01"
+    assert link["selected_segment_id"] == "segment-1"
+    assert link["selected_time_window"]["start_s"] == 0.0
+    assert link["selected_result_artifact_pointer"]["path"] == str(pointer_path.resolve())
+    assert link["selected_result_artifact_pointer"]["exists"] is True
+    assert link["selected_result_artifact_pointer"]["sha256"]
+    assert link["objective_contract_hash"] == "objective-hash-001"
+    assert link["suite_snapshot_hash"] == "suite-hash-001"
+    assert link["problem_hash"] == "problem-hash-001"
+    assert link["ready_state"] == "ready"
+    assert link["animator_link_contract_hash"]
+
+    assert context["schema"] == "analysis_context.v1"
+    assert context["handoff_id"] == ANALYSIS_TO_ANIMATOR_HANDOFF_ID
+    assert context["analysis_context_path"] == str(context_path.resolve())
+    assert context["selected_run_contract_hash"] == snapshot.selected_run_contract_hash
+    assert context["selected_run_context"]["run_id"] == "run-analysis-001"
+    assert context["selected_result_artifact_pointer"]["sha256"] == link["selected_result_artifact_pointer"]["sha256"]
+    assert context["animator_link_contract_hash"] == link["animator_link_contract_hash"]
+    assert context["animator_link_contract"]["run_id"] == "run-analysis-001"
+    assert context["diagnostics_bundle_finalized"] is False
+    assert context["analysis_context_hash"]
+
+
+def test_runtime_blocks_analysis_to_animator_export_for_missing_pointer(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path)
+    contract_path = _write_selected_run_contract(tmp_path / "selected_run_contract.json", run_dir)
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="python")
+    snapshot = runtime.snapshot(selected_contract_path=contract_path)
+
+    with pytest.raises(RuntimeError, match="selected result artifact pointer"):
+        runtime.export_analysis_to_animator_link_contract(
+            snapshot,
+            selected_result_artifact_pointer=run_dir / "missing.npz",
+            selected_test_id="T01",
+            selected_segment_id="segment-1",
+            selected_best_candidate_ref="candidate-001",
+        )
+
+    assert not runtime.analysis_context_path().exists()
+    assert not runtime.animator_link_contract_path().exists()
+
+
+def test_runtime_system_influence_command_helper_is_subprocess_free_under_patch(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path)
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="PYTHON")
+    captured: list[tuple[tuple[str, ...], Path]] = []
+
+    def _fake_run(command, *, cwd):
+        captured.append((tuple(command), Path(cwd)))
+        return 0, "system influence ok", ""
+
+    runtime._run_command = _fake_run  # type: ignore[method-assign]
+
+    result = runtime.run_system_influence(
+        run_dir,
+        fit_ranges_json=run_dir / "fit_ranges.json",
+        adaptive_eps=True,
+        stage_name="stage1_long",
+        max_params=17,
+    )
+
+    assert result.ok is True
+    assert result.status == "FINISHED"
+    assert result.returncode == 0
+    command = captured[0][0]
+    assert command[:3] == ("PYTHON", "-m", "pneumo_solver_ui.calibration.system_influence_report_v1")
+    assert "--run_dir" in command
+    assert str(run_dir.resolve()) in command
+    assert "--adaptive_eps" in command
+    assert command[command.index("--stage_name") + 1] == "stage1_long"
+    assert command[command.index("--max_params") + 1] == "17"
+    assert captured[0][1] == tmp_path.resolve()
+
+
+def test_runtime_full_report_command_helper_builds_report_argv(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path)
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="PYTHON")
+    captured: list[tuple[str, ...]] = []
+
+    def _fake_run(command, *, cwd):
+        captured.append(tuple(command))
+        return 0, "full report ok", ""
+
+    runtime._run_command = _fake_run  # type: ignore[method-assign]
+
+    result = runtime.run_full_report(run_dir, max_plots=5)
+
+    assert result.ok is True
+    command = captured[0]
+    assert command[:3] == ("PYTHON", "-m", "pneumo_solver_ui.calibration.report_full_from_run_v1")
+    assert command[command.index("--run_dir") + 1] == str(run_dir.resolve())
+    assert command[command.index("--max_plots") + 1] == "5"
+
+
+def test_runtime_param_staging_reports_missing_inputs_without_subprocess(tmp_path: Path) -> None:
+    run_dir = tmp_path / "RUN_missing_staging"
+    run_dir.mkdir()
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="PYTHON")
+
+    result = runtime.run_param_staging(run_dir)
+
+    assert result.ok is False
+    assert result.status == "MISSING_INPUTS"
+    assert result.returncode is None
+    assert "fit_ranges_json" in result.error
+    assert "system_influence_json" in result.error
+
+
+def test_runtime_param_staging_command_helper_requires_fit_ranges_and_influence(tmp_path: Path) -> None:
+    run_dir = tmp_path / "RUN_staging"
+    _write_json(run_dir / "system_influence.json", _build_system_influence_payload())
+    _write_json(run_dir / "fit_ranges_final.json", {"база": [2.0, 4.0]})
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="PYTHON")
+    captured: list[tuple[str, ...]] = []
+
+    def _fake_run(command, *, cwd):
+        captured.append(tuple(command))
+        return 0, "staging ok", ""
+
+    runtime._run_command = _fake_run  # type: ignore[method-assign]
+
+    result = runtime.run_param_staging(run_dir)
+
+    assert result.ok is True
+    command = captured[0]
+    assert command[:3] == ("PYTHON", "-m", "pneumo_solver_ui.calibration.param_staging_v3_influence")
+    assert command[command.index("--fit_ranges_json") + 1] == str((run_dir / "fit_ranges_final.json").resolve())
+    assert command[command.index("--system_influence_json") + 1] == str((run_dir / "system_influence.json").resolve())
+    assert command[command.index("--out_dir") + 1] == str(run_dir.resolve())
+
+
+def test_desktop_engineering_analysis_center_shell_is_materialized() -> None:
+    from pneumo_solver_ui.tools.desktop_engineering_analysis_center import (
+        DesktopEngineeringAnalysisCenter,
+        format_contract_banner,
+        format_selected_run_summary,
+    )
+
+    assert DesktopEngineeringAnalysisCenter.__name__ == "DesktopEngineeringAnalysisCenter"
+    assert callable(format_contract_banner)
+    assert callable(format_selected_run_summary)
+    assert hasattr(DesktopEngineeringAnalysisCenter, "_export_animator_link")

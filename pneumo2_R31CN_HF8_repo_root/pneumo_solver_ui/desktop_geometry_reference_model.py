@@ -15,6 +15,12 @@ from pneumo_solver_ui.desktop_input_model import (
     field_spec_map,
     find_desktop_field_matches,
 )
+from pneumo_solver_ui.geometry_acceptance_contract import (
+    GEOMETRY_ACCEPTANCE_JSON_NAME,
+    build_geometry_acceptance_rows,
+    collect_geometry_acceptance_from_frame,
+    format_geometry_acceptance_summary_lines,
+)
 from pneumo_solver_ui.dw2d_kinematics import (
     build_dw2d_mounts_params_from_base,
     dw2d_mounts_delta_rod_and_drod,
@@ -29,6 +35,8 @@ from pneumo_solver_ui.suspension_family_contract import (
     FAMILY_ORDER,
     SPRING_GEOMETRY_FIELDS,
     SPRING_STATIC_MODE_KEY,
+    canonical_axle_slug,
+    canonical_cylinder_slug,
     cylinder_axle_geometry_key,
     cylinder_family_key,
     cylinder_precharge_key,
@@ -41,6 +49,7 @@ from pneumo_solver_ui.suspension_family_contract import (
 
 
 CATALOG_JSON = Path(__file__).resolve().parent / "catalogs" / "camozzi_catalog.json"
+COMPONENT_PASSPORT_JSON = Path(__file__).resolve().parent / "component_passport.json"
 REFERENCE_GUIDE_SECTION_TITLES: tuple[str, ...] = (
     "Геометрия",
     "Пневматика",
@@ -48,6 +57,31 @@ REFERENCE_GUIDE_SECTION_TITLES: tuple[str, ...] = (
     "Справочные данные",
 )
 ATM_PA = 101325.0
+TRUTH_STATE_SOURCE_DATA_CONFIRMED = "source_data_confirmed"
+TRUTH_STATE_APPROXIMATE = "approximate_inferred_with_warning"
+TRUTH_STATE_UNAVAILABLE = "unavailable"
+
+CYLINDER_PACKAGING_BASIC_FIELDS: tuple[str, ...] = (
+    "bore_diameter_m",
+    "rod_diameter_m",
+    "stroke_m",
+    "outer_diameter_m",
+    "dead_cap_length_m",
+    "dead_rod_length_m",
+    "dead_height_m",
+    "body_length_m",
+)
+CYLINDER_PACKAGING_ADVANCED_FIELDS: tuple[str, ...] = (
+    "gland_length_m",
+    "rod_eye_length_m",
+    "retracted_pin_to_pin_m",
+    "extended_pin_to_pin_m",
+    "piston_length_m",
+)
+CYLINDER_PACKAGING_REQUIRED_FIELDS: tuple[str, ...] = (
+    *CYLINDER_PACKAGING_BASIC_FIELDS,
+    *CYLINDER_PACKAGING_ADVANCED_FIELDS,
+)
 
 
 @dataclass(frozen=True)
@@ -90,6 +124,19 @@ class CylinderCatalogRow:
     annulus_area_m2: float
     cap_area_cm2: float
     annulus_area_cm2: float
+
+
+@dataclass(frozen=True)
+class ComponentPassportCatalogRow:
+    component_id: str
+    manufacturer: str
+    family: str
+    category: str
+    ports: str
+    status: str
+    missing_data_count: int
+    iso6358_status: str
+    help_text: str
 
 
 @dataclass(frozen=True)
@@ -149,6 +196,13 @@ class CylinderPackageReferenceRow:
     expected_body_length_mm: float
     body_length_gap_mm: float
     notes: tuple[str, ...]
+    status: str = "unknown"
+    truth_state: str = TRUTH_STATE_UNAVAILABLE
+    completeness_pct: float = 0.0
+    missing_fields: tuple[str, ...] = ()
+    hidden_elements: tuple[str, ...] = ()
+    passport_id: str = ""
+    explanation: str = ""
 
 
 @dataclass(frozen=True)
@@ -231,6 +285,112 @@ class ParameterGuideRow:
     current_value_text: str
 
 
+@dataclass(frozen=True)
+class RoadWidthReference:
+    parameter_key: str
+    label: str
+    unit_label: str
+    explicit_road_width_m: float
+    effective_road_width_m: float
+    track_m: float
+    wheel_width_m: float
+    status: str
+    source: str
+    explanation: str
+
+
+@dataclass(frozen=True)
+class GeometryAcceptanceEvidenceRow:
+    corner: str
+    gate: str
+    reason: str
+    sigma_err_mm: float
+    xy_wheel_road_err_mm: float
+    wf_err_mm: float
+    wr_err_mm: float
+    fr_err_mm: float
+    missing: str
+
+
+@dataclass(frozen=True)
+class GeometryAcceptanceEvidenceSnapshot:
+    gate: str
+    reason: str
+    available: bool
+    source_label: str
+    evidence_required: str
+    summary_lines: tuple[str, ...]
+    rows: tuple[GeometryAcceptanceEvidenceRow, ...]
+    artifact_status: str = "missing"
+    source_path: str = ""
+    updated_utc: str = ""
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ArtifactReferenceContext:
+    status: str
+    source_label: str
+    pointer_path: str
+    npz_path: str
+    exports_dir: str
+    updated_utc: str
+    visual_cache_token: str
+    meta: Mapping[str, Any]
+    issues: tuple[str, ...]
+    packaging_passport_path: str
+    packaging_passport_exists: bool
+    geometry_acceptance_path: str
+    geometry_acceptance_exists: bool
+
+
+@dataclass(frozen=True)
+class RoadWidthEvidence:
+    parameter_key: str
+    unit_label: str
+    status: str
+    preferred_source: str
+    base_status: str
+    base_effective_m: float
+    meta_road_width_m: float
+    effective_road_width_m: float
+    mismatch_mm: float
+    explanation: str
+
+
+@dataclass(frozen=True)
+class PackagingPassportEvidenceRow:
+    cylinder: str
+    base_status: str
+    export_status: str
+    export_truth_mode: str
+    base_completeness_pct: float
+    contract_complete: bool
+    full_mesh_allowed: bool
+    consumer_geometry_fabrication_allowed: bool
+    mismatch_status: str
+    missing_advanced_fields: tuple[str, ...]
+    missing_geometry_fields: tuple[str, ...]
+    length_status_summary: str
+
+
+@dataclass(frozen=True)
+class PackagingPassportEvidenceSnapshot:
+    artifact_status: str
+    source_label: str
+    passport_path: str
+    schema: str
+    packaging_status: str
+    packaging_contract_hash: str
+    mismatch_status: str
+    complete_cylinders: tuple[str, ...]
+    axis_only_cylinders: tuple[str, ...]
+    missing_advanced_fields: tuple[str, ...]
+    consumer_geometry_fabrication_allowed: bool
+    warnings: tuple[str, ...]
+    rows: tuple[PackagingPassportEvidenceRow, ...]
+
+
 def _safe_float(value: Any, default: float = float("nan")) -> float:
     try:
         return float(value)
@@ -300,6 +460,38 @@ def _catalog_area_bundle(bore_mm: float, rod_mm: float) -> tuple[float, float, f
     return cap_area_m2, annulus_area_m2, _area_to_cm2(cap_area_m2), _area_to_cm2(annulus_area_m2)
 
 
+def _is_positive_finite(value: Any) -> bool:
+    try:
+        out = float(value)
+    except Exception:
+        return False
+    return math.isfinite(out) and out > 0.0
+
+
+def cylinder_packaging_passport_key(field: str, cyl: str, axle: str) -> str:
+    field_name = str(field or "").strip()
+    if field_name in CYLINDER_AXLE_GEOMETRY_FIELDS:
+        return cylinder_axle_geometry_key(field_name, cyl, axle)
+    stem = field_name[:-2] if field_name.endswith("_m") else field_name
+    return f"{canonical_cylinder_slug(cyl)}_{stem}_{canonical_axle_slug(axle)}_m"
+
+
+def _component_passport_status(component: Mapping[str, Any]) -> tuple[str, str]:
+    missing_data = component.get("missing_data") if isinstance(component, Mapping) else ()
+    missing_count = len(missing_data) if isinstance(missing_data, (list, tuple)) else 0
+    iso = component.get("iso6358") if isinstance(component.get("iso6358"), Mapping) else {}
+    status_map = dict(iso.get("_status") or {}) if isinstance(iso, Mapping) else {}
+    status_text = "; ".join(f"{key}={value}" for key, value in sorted(status_map.items())) or "not_declared"
+    lowered = status_text.lower()
+    if missing_count:
+        status = "needs_datasheet"
+    elif "assumed" in lowered or "estimated" in lowered:
+        status = "estimated"
+    else:
+        status = "ok"
+    return status, status_text
+
+
 @lru_cache(maxsize=1)
 def load_camozzi_catalog_rows() -> tuple[CylinderCatalogRow, ...]:
     if not CATALOG_JSON.exists():
@@ -345,6 +537,627 @@ def load_camozzi_stroke_options_mm() -> tuple[int, ...]:
     options = cylinders.get("stroke_options_mm") or ()
     cleaned = sorted({int(option) for option in options if _safe_float(option, default=float("nan")) > 0.0})
     return tuple(cleaned)
+
+
+def load_component_passport_catalog_rows(
+    passport_path: Path | str | None = None,
+) -> tuple[ComponentPassportCatalogRow, ...]:
+    path = Path(passport_path or COMPONENT_PASSPORT_JSON)
+    if not path.exists():
+        return ()
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return ()
+    components = raw.get("components") if isinstance(raw, Mapping) else ()
+    if not isinstance(components, (list, tuple)):
+        return ()
+    rows: list[ComponentPassportCatalogRow] = []
+    for component in components:
+        if not isinstance(component, Mapping):
+            continue
+        status, iso_status = _component_passport_status(component)
+        missing_data = component.get("missing_data")
+        missing_count = len(missing_data) if isinstance(missing_data, (list, tuple)) else 0
+        component_id = str(component.get("id") or "").strip()
+        family = str(component.get("family") or "").strip()
+        category = str(component.get("category") or "").strip()
+        rows.append(
+            ComponentPassportCatalogRow(
+                component_id=component_id,
+                manufacturer=str(component.get("manufacturer") or "").strip(),
+                family=family,
+                category=category,
+                ports=str(component.get("ports") or "").strip(),
+                status=status,
+                missing_data_count=int(missing_count),
+                iso6358_status=iso_status,
+                help_text=(
+                    "component_passport.json is the pneumatic component data passport "
+                    "for catalog values and ISO 6358 estimates. It is separate from the "
+                    "cylinder packaging passport used for body/rod/piston geometry truth."
+                ),
+            )
+        )
+    return tuple(rows)
+
+
+def build_road_width_reference(base_payload: Mapping[str, Any]) -> RoadWidthReference:
+    explicit = _safe_float(base_payload.get("road_width_m"), default=float("nan"))
+    track = _safe_float(base_payload.get("колея", base_payload.get("track_m")), default=float("nan"))
+    wheel_width = _safe_float(base_payload.get("wheel_width_m"), default=0.0)
+    if not math.isfinite(wheel_width) or wheel_width < 0.0:
+        wheel_width = 0.0
+
+    if math.isfinite(explicit) and explicit > 0.0:
+        effective = float(explicit)
+        status = "explicit"
+        source = "base.road_width_m"
+    elif math.isfinite(track) and track > 0.0:
+        effective = float(max(track, track + max(0.0, wheel_width)))
+        status = "derived_from_track_and_wheel_width"
+        source = "derived: колея + wheel_width_m"
+    else:
+        effective = float("nan")
+        status = "missing"
+        source = "missing: need road_width_m or колея"
+
+    if status == "explicit":
+        explanation = (
+            "GAP-008 visibility: road_width_m is explicit and can be passed to nested "
+            "meta.geometry without a consumer-side derived fallback."
+        )
+    elif status == "derived_from_track_and_wheel_width":
+        explanation = (
+            "GAP-008 visibility: road_width_m is not explicit here, so the reference "
+            "center shows the exporter-side derivation from track/колея plus wheel_width_m. "
+            "This is a declared supplement, not hidden animator behavior."
+        )
+    else:
+        explanation = (
+            "GAP-008 visibility: road_width_m cannot be confirmed or derived. WS-RING "
+            "should own scenario.root.road_width_m, and exports should surface it in "
+            "meta.geometry before visual consumers read the run."
+        )
+
+    return RoadWidthReference(
+        parameter_key="road_width_m",
+        label="Ширина дороги",
+        unit_label="м",
+        explicit_road_width_m=float(explicit),
+        effective_road_width_m=float(effective),
+        track_m=float(track),
+        wheel_width_m=float(wheel_width),
+        status=status,
+        source=source,
+        explanation=explanation,
+    )
+
+
+def build_geometry_acceptance_evidence(
+    frame_or_mapping: Any | None = None,
+    *,
+    source_label: str = "",
+    tol_m: float = 1e-6,
+) -> GeometryAcceptanceEvidenceSnapshot:
+    summary = collect_geometry_acceptance_from_frame(
+        {} if frame_or_mapping is None else frame_or_mapping,
+        tol_m=tol_m,
+    )
+    rows: list[GeometryAcceptanceEvidenceRow] = []
+    for row in build_geometry_acceptance_rows(summary):
+        rows.append(
+            GeometryAcceptanceEvidenceRow(
+                corner=str(row.get("угол") or ""),
+                gate=str(row.get("gate") or "MISSING"),
+                reason=str(row.get("reason") or ""),
+                sigma_err_mm=_safe_float(row.get("Σ err, мм")),
+                xy_wheel_road_err_mm=_safe_float(row.get("XY wheel-road err, мм")),
+                wf_err_mm=_safe_float(row.get("WF err, мм")),
+                wr_err_mm=_safe_float(row.get("WR err, мм")),
+                fr_err_mm=_safe_float(row.get("FR err, мм")),
+                missing=str(row.get("missing") or ""),
+            )
+        )
+    available = bool(summary.get("available", False))
+    label = str(source_label or ("runtime frame" if frame_or_mapping is not None else "no runtime frame selected"))
+    return GeometryAcceptanceEvidenceSnapshot(
+        gate=str(summary.get("release_gate") or "MISSING"),
+        reason=str(summary.get("release_gate_reason") or ""),
+        available=available,
+        source_label=label,
+        evidence_required=(
+            "geometry_acceptance_report requires solver-point triplets "
+            "frame_corner/wheel_center/road_contact plus scalar FR/WR/WF columns."
+        ),
+        summary_lines=tuple(format_geometry_acceptance_summary_lines(summary, label=label)),
+        rows=tuple(rows),
+    )
+
+
+def _read_json_mapping(path: Path | str | None) -> dict[str, Any]:
+    if not path:
+        return {}
+    try:
+        p = Path(path).expanduser().resolve(strict=False)
+    except Exception:
+        return {}
+    try:
+        if not p.exists():
+            return {}
+        raw = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return dict(raw) if isinstance(raw, Mapping) else {}
+
+
+def _safe_strings(value: Any) -> tuple[str, ...]:
+    if isinstance(value, (list, tuple, set)):
+        return tuple(str(item) for item in value if str(item).strip())
+    if value in (None, ""):
+        return ()
+    return (str(value),)
+
+
+def _path_exists(path_text: str) -> bool:
+    if not str(path_text or "").strip():
+        return False
+    try:
+        return Path(path_text).expanduser().resolve(strict=False).exists()
+    except Exception:
+        return False
+
+
+def _npz_main_mapping(npz_path: Path | str | None) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
+    if not npz_path:
+        return {}, {}
+    try:
+        path = Path(npz_path).expanduser().resolve(strict=False)
+    except Exception:
+        return {}, {}
+    if not path.exists():
+        return {}, {}
+    try:
+        with np.load(path, allow_pickle=True) as data:
+            if "main_cols" not in data or "main_values" not in data:
+                return {}, {}
+            cols = [str(col) for col in np.asarray(data["main_cols"]).tolist()]
+            values = np.asarray(data["main_values"], dtype=float)
+            if values.ndim == 1 and len(cols) == 1:
+                values = values.reshape((-1, 1))
+            if values.ndim != 2:
+                return {}, {}
+            mapping = {
+                str(col): np.asarray(values[:, idx], dtype=float)
+                for idx, col in enumerate(cols[: values.shape[1]])
+            }
+            meta: dict[str, Any] = {}
+            if "meta_json" in data:
+                raw = data["meta_json"].tolist()
+                if isinstance(raw, (bytes, bytearray)):
+                    raw = raw.decode("utf-8", errors="replace")
+                if isinstance(raw, str):
+                    loaded = json.loads(raw)
+                    meta = dict(loaded) if isinstance(loaded, Mapping) else {}
+                elif isinstance(raw, Mapping):
+                    meta = dict(raw)
+            return mapping, meta
+    except Exception:
+        return {}, {}
+
+
+def build_artifact_reference_context(summary: Mapping[str, Any] | None = None) -> ArtifactReferenceContext:
+    data = dict(summary or {})
+    pointer_path = str(data.get("anim_latest_pointer_json") or data.get("pointer_json") or "")
+    npz_path = str(data.get("anim_latest_npz_path") or data.get("npz_path") or "")
+    pointer_exists = data.get("anim_latest_pointer_json_exists")
+    npz_exists = data.get("anim_latest_npz_exists")
+    if pointer_exists is None and pointer_path:
+        pointer_exists = _path_exists(pointer_path)
+    if npz_exists is None and npz_path:
+        npz_exists = _path_exists(npz_path)
+    pointer_in_workspace = data.get("anim_latest_pointer_json_in_workspace")
+    npz_in_workspace = data.get("anim_latest_npz_in_workspace")
+    usable = bool(data.get("anim_latest_usable"))
+    if not pointer_path and not npz_path:
+        status = "missing"
+    elif pointer_exists is False or npz_exists is False:
+        status = "stale"
+    elif usable and (pointer_in_workspace is False or npz_in_workspace is False):
+        status = "historical"
+    elif usable or (npz_path and npz_exists is True):
+        status = "current"
+    else:
+        status = "stale"
+
+    meta = data.get("anim_latest_meta")
+    if not isinstance(meta, Mapping):
+        meta = data.get("meta") if isinstance(data.get("meta"), Mapping) else {}
+    if not meta and npz_path and npz_exists is True:
+        _mapping, npz_meta = _npz_main_mapping(npz_path)
+        meta = npz_meta
+
+    exports_dir = ""
+    for candidate in (pointer_path, npz_path):
+        if candidate:
+            try:
+                exports_dir = str(Path(candidate).expanduser().resolve(strict=False).parent)
+                break
+            except Exception:
+                pass
+
+    artifact_refs = dict(meta.get("anim_export_contract_artifacts") or {}) if isinstance(meta, Mapping) and isinstance(meta.get("anim_export_contract_artifacts"), Mapping) else {}
+
+    def _resolve_ref(explicit_key: str, ref_key: str, default_name: str) -> tuple[str, bool]:
+        explicit = str(data.get(explicit_key) or "").strip()
+        raw = explicit or str(artifact_refs.get(ref_key) or default_name or "").strip()
+        if not raw:
+            return "", False
+        try:
+            path = Path(raw)
+            if not path.is_absolute() and exports_dir:
+                path = Path(exports_dir) / path
+            resolved = str(path.expanduser().resolve(strict=False))
+        except Exception:
+            resolved = raw
+        exists_value = data.get(explicit_key.replace("_path", "_exists"))
+        exists = bool(exists_value) if isinstance(exists_value, bool) else _path_exists(resolved)
+        return resolved, exists
+
+    packaging_path, packaging_exists = _resolve_ref(
+        "anim_latest_cylinder_packaging_passport_path",
+        "cylinder_packaging_passport",
+        "CYLINDER_PACKAGING_PASSPORT.json",
+    )
+    acceptance_path, acceptance_exists = _resolve_ref(
+        "anim_latest_geometry_acceptance_json_path",
+        "geometry_acceptance_json",
+        GEOMETRY_ACCEPTANCE_JSON_NAME,
+    )
+    issues = _safe_strings(data.get("anim_latest_issues"))
+    source_label_override = str(data.get("source_label") or data.get("artifact_source_label") or "").strip()
+    source_label = source_label_override or (
+        f"anim_latest {status}: {npz_path or pointer_path or 'no artifact'}"
+        if status != "missing"
+        else "anim_latest missing"
+    )
+    return ArtifactReferenceContext(
+        status=status,
+        source_label=source_label,
+        pointer_path=pointer_path,
+        npz_path=npz_path,
+        exports_dir=exports_dir,
+        updated_utc=str(data.get("anim_latest_updated_utc") or data.get("updated_utc") or data.get("updated_at") or ""),
+        visual_cache_token=str(data.get("anim_latest_visual_cache_token") or data.get("visual_cache_token") or ""),
+        meta=dict(meta or {}) if isinstance(meta, Mapping) else {},
+        issues=issues,
+        packaging_passport_path=packaging_path,
+        packaging_passport_exists=bool(packaging_exists),
+        geometry_acceptance_path=acceptance_path,
+        geometry_acceptance_exists=bool(acceptance_exists),
+    )
+
+
+def build_geometry_acceptance_evidence_from_artifact(
+    artifact: ArtifactReferenceContext,
+    *,
+    tol_m: float = 1e-6,
+) -> GeometryAcceptanceEvidenceSnapshot:
+    warnings: list[str] = []
+    mapping: dict[str, np.ndarray] = {}
+    meta_from_npz: dict[str, Any] = {}
+    if artifact.npz_path and _path_exists(artifact.npz_path):
+        mapping, meta_from_npz = _npz_main_mapping(artifact.npz_path)
+    if not mapping:
+        if artifact.status == "missing":
+            warnings.append("No latest anim artifact is registered; geometry acceptance remains MISSING.")
+        elif artifact.npz_path:
+            warnings.append(f"NPZ artifact is unavailable or unreadable: {artifact.npz_path}")
+        evidence = build_geometry_acceptance_evidence(
+            None,
+            source_label=artifact.source_label,
+            tol_m=tol_m,
+        )
+    else:
+        evidence = build_geometry_acceptance_evidence(
+            mapping,
+            source_label=artifact.source_label,
+            tol_m=tol_m,
+        )
+
+    missing = sorted({part for row in evidence.rows for part in _safe_strings(row.missing)})
+    if missing:
+        warnings.append("Missing solver-point triplets: " + ", ".join(missing[:8]))
+    scalar_mismatch = any(
+        max(
+            abs(value)
+            for value in (row.wf_err_mm, row.wr_err_mm, row.fr_err_mm)
+            if math.isfinite(value)
+        )
+        > 0.001
+        for row in evidence.rows
+        if any(math.isfinite(value) for value in (row.wf_err_mm, row.wr_err_mm, row.fr_err_mm))
+    )
+    if scalar_mismatch:
+        warnings.append("Scalar FR/WR/WF columns diverge from exported XYZ solver-point evidence.")
+    if meta_from_npz and artifact.status == "current":
+        # Keep this as a cheap confidence marker for diagnostics consumers.
+        pass
+    return GeometryAcceptanceEvidenceSnapshot(
+        gate=evidence.gate,
+        reason=evidence.reason,
+        available=evidence.available,
+        source_label=evidence.source_label,
+        evidence_required=evidence.evidence_required,
+        summary_lines=evidence.summary_lines,
+        rows=evidence.rows,
+        artifact_status=artifact.status,
+        source_path=artifact.npz_path,
+        updated_utc=artifact.updated_utc,
+        warnings=tuple(dict.fromkeys((*artifact.issues, *warnings))),
+    )
+
+
+def build_road_width_evidence(
+    base_payload: Mapping[str, Any],
+    *,
+    artifact_meta: Mapping[str, Any] | None = None,
+) -> RoadWidthEvidence:
+    base = build_road_width_reference(base_payload)
+    meta = dict(artifact_meta or {})
+    geometry = dict(meta.get("geometry") or {}) if isinstance(meta.get("geometry"), Mapping) else {}
+    meta_width = _safe_float(geometry.get("road_width_m"), default=float("nan"))
+    if math.isfinite(meta_width) and meta_width > 0.0:
+        mismatch = (
+            (float(meta_width) - float(base.effective_road_width_m)) * 1000.0
+            if math.isfinite(base.effective_road_width_m)
+            else float("nan")
+        )
+        mismatch_text = (
+            f" Base/reference differs by {mismatch:+.1f} mm."
+            if math.isfinite(mismatch) and abs(mismatch) > 1e-6
+            else ""
+        )
+        return RoadWidthEvidence(
+            parameter_key="road_width_m",
+            unit_label="м",
+            status="explicit_meta",
+            preferred_source="meta.geometry.road_width_m",
+            base_status=base.status,
+            base_effective_m=base.effective_road_width_m,
+            meta_road_width_m=float(meta_width),
+            effective_road_width_m=float(meta_width),
+            mismatch_mm=float(mismatch),
+            explanation=(
+                "Exporter evidence wins for visual consumers: road_width_m is explicit in "
+                "meta.geometry. WS-RING should own scenario.root.road_width_m; Animator must not "
+                "derive it silently."
+                + mismatch_text
+            ),
+        )
+    if base.status != "missing":
+        return RoadWidthEvidence(
+            parameter_key="road_width_m",
+            unit_label=base.unit_label,
+            status=base.status,
+            preferred_source=base.source,
+            base_status=base.status,
+            base_effective_m=base.effective_road_width_m,
+            meta_road_width_m=float("nan"),
+            effective_road_width_m=base.effective_road_width_m,
+            mismatch_mm=float("nan"),
+            explanation=base.explanation + " Export meta did not provide explicit meta.geometry.road_width_m.",
+        )
+    return RoadWidthEvidence(
+        parameter_key="road_width_m",
+        unit_label=base.unit_label,
+        status="missing",
+        preferred_source="missing",
+        base_status=base.status,
+        base_effective_m=base.effective_road_width_m,
+        meta_road_width_m=float("nan"),
+        effective_road_width_m=float("nan"),
+        mismatch_mm=float("nan"),
+        explanation=base.explanation + " No export meta.geometry.road_width_m evidence is available.",
+    )
+
+
+def _base_packaging_by_cylinder(
+    base_rows: tuple[CylinderPackageReferenceRow, ...],
+) -> dict[str, dict[str, Any]]:
+    grouped: dict[str, list[CylinderPackageReferenceRow]] = {"cyl1": [], "cyl2": []}
+    for row in base_rows:
+        family = str(row.family)
+        if "Ц1" in family or "cyl1" in family.lower():
+            grouped["cyl1"].append(row)
+        elif "Ц2" in family or "cyl2" in family.lower():
+            grouped["cyl2"].append(row)
+    out: dict[str, dict[str, Any]] = {}
+    for cyl, rows in grouped.items():
+        if not rows:
+            out[cyl] = {
+                "status": "missing",
+                "completeness_pct": 0.0,
+                "axis_only_families": (),
+                "missing_fields": (),
+            }
+            continue
+        complete = all(row.status == "complete" for row in rows)
+        out[cyl] = {
+            "status": "complete" if complete else "axis_only",
+            "completeness_pct": float(sum(float(row.completeness_pct) for row in rows) / max(1, len(rows))),
+            "axis_only_families": tuple(row.family for row in rows if row.status != "complete"),
+            "missing_fields": tuple(
+                dict.fromkeys(field for row in rows for field in row.missing_fields)
+            ),
+        }
+    return out
+
+
+def _passport_from_meta_packaging(meta: Mapping[str, Any] | None) -> dict[str, Any]:
+    meta_dict = dict(meta or {})
+    packaging = dict(meta_dict.get("packaging") or {}) if isinstance(meta_dict.get("packaging"), Mapping) else {}
+    if not packaging:
+        return {}
+    cylinders = dict(packaging.get("cylinders") or {}) if isinstance(packaging.get("cylinders"), Mapping) else {}
+    out_cylinders: dict[str, Any] = {}
+    for cyl_name, block in cylinders.items():
+        cyl = dict(block or {}) if isinstance(block, Mapping) else {}
+        out_cylinders[str(cyl_name)] = {
+            "contract_complete": bool(cyl.get("contract_complete")),
+            "length_status_by_corner": dict(cyl.get("length_status_by_corner") or {}) if isinstance(cyl.get("length_status_by_corner"), Mapping) else {},
+            "missing_geometry_fields": list(cyl.get("missing_geometry_fields") or []),
+            "advanced_fields_present": list(cyl.get("advanced_fields_present") or []),
+            "advanced_fields_missing": list(cyl.get("advanced_fields_missing") or []),
+            "truth_mode": str(cyl.get("truth_mode") or ""),
+            "graphics_truth_state": str(cyl.get("graphics_truth_state") or ""),
+            "axis_only_honesty_mode": bool(cyl.get("axis_only_honesty_mode", not bool(cyl.get("contract_complete")))),
+            "full_mesh_allowed": bool(cyl.get("full_mesh_allowed", bool(cyl.get("contract_complete")))),
+            "consumer_geometry_fabrication_allowed": bool(cyl.get("consumer_geometry_fabrication_allowed", False)),
+        }
+    return {
+        "schema": "meta.packaging.inline",
+        "packaging_status": str(packaging.get("status") or ""),
+        "packaging_contract_hash": str(packaging.get("packaging_contract_hash") or ""),
+        "required_advanced_fields": list(packaging.get("required_advanced_fields") or []),
+        "missing_advanced_fields": list(packaging.get("missing_advanced_fields") or []),
+        "complete_cylinders": list(packaging.get("complete_cylinders") or []),
+        "axis_only_cylinders": list(packaging.get("axis_only_cylinders") or []),
+        "cylinders": out_cylinders,
+        "consumer_policy": dict(packaging.get("policy") or {}) if isinstance(packaging.get("policy"), Mapping) else {},
+    }
+
+
+def build_packaging_passport_evidence(
+    base_rows: tuple[CylinderPackageReferenceRow, ...],
+    *,
+    artifact_context: ArtifactReferenceContext | None = None,
+    artifact_meta: Mapping[str, Any] | None = None,
+    passport_path: Path | str | None = None,
+) -> PackagingPassportEvidenceSnapshot:
+    context = artifact_context
+    meta = dict(artifact_meta or (context.meta if context is not None else {}) or {})
+    raw_path = str(passport_path or (context.packaging_passport_path if context is not None else "") or "")
+    passport = _read_json_mapping(raw_path)
+    source_label = "CYLINDER_PACKAGING_PASSPORT.json"
+    if not passport:
+        passport = _passport_from_meta_packaging(meta)
+        source_label = "meta.packaging inline" if passport else "missing packaging passport"
+    artifact_status = context.status if context is not None else ("current" if passport else "missing")
+    base_by_cyl = _base_packaging_by_cylinder(base_rows)
+    warnings: list[str] = []
+    if not passport:
+        warnings.append("Missing CYLINDER_PACKAGING_PASSPORT.json and meta.packaging; packaging truth remains evidence-missing.")
+
+    cylinders = dict(passport.get("cylinders") or {}) if isinstance(passport.get("cylinders"), Mapping) else {}
+    cyl_names = tuple(dict.fromkeys(("cyl1", "cyl2", *[str(name) for name in cylinders.keys()])))
+    rows: list[PackagingPassportEvidenceRow] = []
+    for cyl_name in cyl_names:
+        base = dict(base_by_cyl.get(cyl_name) or {})
+        cyl = dict(cylinders.get(cyl_name) or {}) if isinstance(cylinders.get(cyl_name), Mapping) else {}
+        contract_complete = bool(cyl.get("contract_complete"))
+        full_mesh_allowed = bool(cyl.get("full_mesh_allowed", contract_complete))
+        fabrication = bool(cyl.get("consumer_geometry_fabrication_allowed", False))
+        base_complete = str(base.get("status") or "") == "complete"
+        if not passport:
+            mismatch = "missing_artifact"
+        elif fabrication:
+            mismatch = "fabrication_violation"
+        elif base_complete and not contract_complete:
+            mismatch = "export_missing"
+        elif (not base_complete) and contract_complete:
+            mismatch = "base_missing"
+        else:
+            mismatch = "match"
+        length_status = dict(cyl.get("length_status_by_corner") or {}) if isinstance(cyl.get("length_status_by_corner"), Mapping) else {}
+        if length_status:
+            status_counts: dict[str, int] = {}
+            for value in length_status.values():
+                key = str(value or "missing")
+                status_counts[key] = status_counts.get(key, 0) + 1
+            length_summary = ", ".join(f"{key}:{count}" for key, count in sorted(status_counts.items()))
+        else:
+            length_summary = "—"
+        rows.append(
+            PackagingPassportEvidenceRow(
+                cylinder=cyl_name,
+                base_status=str(base.get("status") or "missing"),
+                export_status="complete" if contract_complete else ("axis_only" if cyl else "missing"),
+                export_truth_mode=str(cyl.get("truth_mode") or ("full_mesh_allowed" if contract_complete else "axis_only_honesty_mode")),
+                base_completeness_pct=float(base.get("completeness_pct") or 0.0),
+                contract_complete=contract_complete,
+                full_mesh_allowed=full_mesh_allowed,
+                consumer_geometry_fabrication_allowed=fabrication,
+                mismatch_status=mismatch,
+                missing_advanced_fields=_safe_strings(cyl.get("advanced_fields_missing") or passport.get("missing_advanced_fields")),
+                missing_geometry_fields=_safe_strings(cyl.get("missing_geometry_fields")),
+                length_status_summary=length_summary,
+            )
+        )
+    consumer_policy = dict(passport.get("consumer_policy") or passport.get("policy") or {}) if isinstance(passport.get("consumer_policy") or passport.get("policy"), Mapping) else {}
+    fabrication_allowed = bool(consumer_policy.get("consumer_geometry_fabrication_allowed", False))
+    if fabrication_allowed:
+        warnings.append("Packaging consumer policy allows geometry fabrication; this violates Reference Center truth policy.")
+    mismatch_rows = [row for row in rows if row.mismatch_status != "match"]
+    if mismatch_rows:
+        warnings.append("Base/reference packaging differs from export/runtime passport for: " + ", ".join(row.cylinder for row in mismatch_rows))
+    return PackagingPassportEvidenceSnapshot(
+        artifact_status=artifact_status,
+        source_label=source_label,
+        passport_path=raw_path,
+        schema=str(passport.get("schema") or ""),
+        packaging_status=str(passport.get("packaging_status") or passport.get("status") or ""),
+        packaging_contract_hash=str(passport.get("packaging_contract_hash") or ""),
+        mismatch_status="mismatch" if mismatch_rows else ("missing" if not passport else "match"),
+        complete_cylinders=_safe_strings(passport.get("complete_cylinders")),
+        axis_only_cylinders=_safe_strings(passport.get("axis_only_cylinders")),
+        missing_advanced_fields=_safe_strings(passport.get("missing_advanced_fields")),
+        consumer_geometry_fabrication_allowed=fabrication_allowed,
+        warnings=tuple(dict.fromkeys(warnings)),
+        rows=tuple(rows),
+    )
+
+
+def build_geometry_reference_diagnostics_handoff(
+    *,
+    artifact_context: ArtifactReferenceContext,
+    component_rows: tuple[ComponentPassportCatalogRow, ...],
+    road_width: RoadWidthEvidence,
+    packaging: PackagingPassportEvidenceSnapshot,
+    acceptance: GeometryAcceptanceEvidenceSnapshot,
+) -> dict[str, Any]:
+    missing: list[str] = []
+    if artifact_context.status in {"missing", "stale"}:
+        missing.append("artifact_context")
+    if road_width.status == "missing":
+        missing.append("road_width_m")
+    if packaging.mismatch_status == "missing":
+        missing.append("cylinder_packaging_passport")
+    if acceptance.gate == "MISSING":
+        missing.append("geometry_acceptance")
+    return {
+        "schema": "geometry_reference_evidence.v1",
+        "producer_owned": False,
+        "reference_center_role": "reader_and_evidence_surface",
+        "does_not_render_animator_meshes": True,
+        "artifact_status": artifact_context.status,
+        "artifact_source_label": artifact_context.source_label,
+        "artifact_npz_path": artifact_context.npz_path,
+        "artifact_pointer_path": artifact_context.pointer_path,
+        "updated_utc": artifact_context.updated_utc,
+        "road_width_status": road_width.status,
+        "road_width_source": road_width.preferred_source,
+        "road_width_effective_m": road_width.effective_road_width_m,
+        "packaging_status": packaging.packaging_status,
+        "packaging_contract_hash": packaging.packaging_contract_hash,
+        "packaging_mismatch_status": packaging.mismatch_status,
+        "packaging_axis_only_cylinders": list(packaging.axis_only_cylinders),
+        "geometry_acceptance_gate": acceptance.gate,
+        "geometry_acceptance_available": acceptance.available,
+        "component_passport_components": len(component_rows),
+        "component_passport_needs_data": sum(1 for row in component_rows if row.status != "ok"),
+        "evidence_missing": list(dict.fromkeys(missing)),
+    }
 
 
 def build_cylinder_pressure_estimate(
@@ -603,6 +1416,26 @@ def build_current_cylinder_package_rows(
     for cyl, axle in FAMILY_ORDER:
         family = family_name(cyl, axle)
         cylinder = cylinder_rows.get(family)
+        raw_values: dict[str, Any] = {
+            "bore_diameter_m": normalized_base.get(cylinder_family_key("bore", cyl, axle)),
+            "rod_diameter_m": normalized_base.get(cylinder_family_key("rod", cyl, axle)),
+            "stroke_m": normalized_base.get(cylinder_family_key("stroke", cyl, axle)),
+        }
+        for field in (
+            "outer_diameter_m",
+            "dead_cap_length_m",
+            "dead_rod_length_m",
+            "dead_height_m",
+            "body_length_m",
+            *CYLINDER_PACKAGING_ADVANCED_FIELDS,
+        ):
+            raw_values[field] = normalized_base.get(cylinder_packaging_passport_key(field, cyl, axle))
+        present_fields = tuple(
+            field for field in CYLINDER_PACKAGING_REQUIRED_FIELDS if _is_positive_finite(raw_values.get(field))
+        )
+        missing_fields = tuple(
+            field for field in CYLINDER_PACKAGING_REQUIRED_FIELDS if field not in present_fields
+        )
         outer_diameter_m = _safe_float(
             normalized_base.get(cylinder_axle_geometry_key("outer_diameter_m", cyl, axle)),
             default=float("nan"),
@@ -654,6 +1487,8 @@ def build_current_cylinder_package_rows(
             notes.append("body derived from stroke+dead")
         if not math.isfinite(dead_cap_length_m) or not math.isfinite(dead_rod_length_m):
             notes.append("неполный dead-length contract")
+        if missing_fields:
+            notes.append("packaging passport incomplete")
         if math.isfinite(body_length_gap_mm):
             if body_length_gap_mm < -0.5:
                 notes.append("body меньше stroke+dead")
@@ -661,6 +1496,36 @@ def build_current_cylinder_package_rows(
                 notes.append("body с запасом к stroke+dead")
             else:
                 notes.append("body ~= stroke+dead")
+
+        completeness_pct = (
+            float(len(present_fields)) / float(len(CYLINDER_PACKAGING_REQUIRED_FIELDS)) * 100.0
+            if CYLINDER_PACKAGING_REQUIRED_FIELDS
+            else 0.0
+        )
+        body_conflict = math.isfinite(body_length_gap_mm) and body_length_gap_mm < -0.5
+        if not present_fields:
+            status = "unavailable"
+            truth_state = TRUTH_STATE_UNAVAILABLE
+        elif not missing_fields and not body_conflict:
+            status = "complete"
+            truth_state = TRUTH_STATE_SOURCE_DATA_CONFIRMED
+        elif body_conflict:
+            status = "inconsistent"
+            truth_state = TRUTH_STATE_APPROXIMATE
+        else:
+            status = "axis_only"
+            truth_state = TRUTH_STATE_APPROXIMATE
+        hidden_elements = () if status == "complete" else ("body", "rod", "piston", "gland")
+        explanation = (
+            "Packaging passport complete: source-data body/rod/piston/gland dimensions are present."
+            if status == "complete"
+            else (
+                "Packaging passport is incomplete or inconsistent, so visual consumers must stay in "
+                "axis-only honesty mode. Missing fields: "
+                + (", ".join(missing_fields) if missing_fields else "none")
+                + "."
+            )
+        )
 
         rows.append(
             CylinderPackageReferenceRow(
@@ -673,6 +1538,13 @@ def build_current_cylinder_package_rows(
                 expected_body_length_mm=_meters_to_mm(expected_body_length_m),
                 body_length_gap_mm=body_length_gap_mm,
                 notes=tuple(notes),
+                status=status,
+                truth_state=truth_state,
+                completeness_pct=float(completeness_pct),
+                missing_fields=missing_fields,
+                hidden_elements=hidden_elements,
+                passport_id=f"cylinder_packaging::{canonical_cylinder_slug(cyl)}::{canonical_axle_slug(axle)}",
+                explanation=explanation,
             )
         )
     return tuple(rows)
@@ -1131,6 +2003,7 @@ def build_parameter_guide_rows(
     normalized_base = dict(base_payload or {})
     query_text = str(query or "").strip()
     rows: list[ParameterGuideRow] = []
+    road_width_row = _build_road_width_parameter_guide_row(normalized_base)
     if query_text:
         for match in find_desktop_field_matches(query_text, limit=limit):
             key = str(match.get("key") or "").strip()
@@ -1152,7 +2025,7 @@ def build_parameter_guide_rows(
                     ),
                 )
             )
-        family_rows = _build_family_parameter_guide_rows(normalized_base)
+        family_rows = (*_build_family_parameter_guide_rows(normalized_base), road_width_row)
         tokens = tuple(part for part in query_text.lower().replace("ё", "е").split() if part)
         matched_keys = {row.key for row in rows}
         for row in family_rows:
@@ -1193,7 +2066,28 @@ def build_parameter_guide_rows(
                 )
             )
     rows.extend(_build_family_parameter_guide_rows(normalized_base))
+    rows.append(road_width_row)
     return tuple(rows[: max(1, int(limit))])
+
+
+def _build_road_width_parameter_guide_row(
+    base_payload: Mapping[str, Any],
+) -> ParameterGuideRow:
+    reference = build_road_width_reference(base_payload)
+    current = (
+        f"{reference.effective_road_width_m:.3f} {reference.unit_label} ({reference.status})"
+        if math.isfinite(reference.effective_road_width_m)
+        else f"— ({reference.status})"
+    )
+    return ParameterGuideRow(
+        key=reference.parameter_key,
+        label=reference.label,
+        unit_label=reference.unit_label,
+        section_title="Справочные данные",
+        description=reference.explanation,
+        display=f"{reference.label} — GAP-008 road_width_m",
+        current_value_text=current,
+    )
 
 
 def _build_family_parameter_guide_rows(
@@ -1255,8 +2149,16 @@ def _build_family_parameter_guide_rows(
 
 __all__ = [
     "CATALOG_JSON",
+    "COMPONENT_PASSPORT_JSON",
+    "CYLINDER_PACKAGING_ADVANCED_FIELDS",
+    "CYLINDER_PACKAGING_BASIC_FIELDS",
+    "CYLINDER_PACKAGING_REQUIRED_FIELDS",
     "REFERENCE_GUIDE_SECTION_TITLES",
     "ATM_PA",
+    "TRUTH_STATE_APPROXIMATE",
+    "TRUTH_STATE_SOURCE_DATA_CONFIRMED",
+    "TRUTH_STATE_UNAVAILABLE",
+    "ArtifactReferenceContext",
     "CylinderCatalogRow",
     "CylinderForceBiasEstimate",
     "CylinderFamilyReferenceRow",
@@ -1264,12 +2166,22 @@ __all__ = [
     "CylinderPackageReferenceRow",
     "CylinderPrechargeReferenceRow",
     "CylinderPressureEstimate",
+    "ComponentPassportCatalogRow",
     "ComponentFitReferenceRow",
+    "GeometryAcceptanceEvidenceRow",
+    "GeometryAcceptanceEvidenceSnapshot",
     "GeometryFamilyReferenceRow",
     "GeometryReferenceSnapshot",
+    "PackagingPassportEvidenceRow",
+    "PackagingPassportEvidenceSnapshot",
     "ParameterGuideRow",
+    "RoadWidthEvidence",
+    "RoadWidthReference",
     "SpringFamilyReferenceRow",
     "SpringReferenceSnapshot",
+    "build_artifact_reference_context",
+    "build_geometry_acceptance_evidence_from_artifact",
+    "build_geometry_acceptance_evidence",
     "build_current_cylinder_package_rows",
     "build_current_cylinder_precharge_rows",
     "build_current_cylinder_reference_rows",
@@ -1278,8 +2190,14 @@ __all__ = [
     "build_cylinder_match_recommendations",
     "build_cylinder_pressure_estimate",
     "build_component_fit_reference_rows",
+    "build_geometry_reference_diagnostics_handoff",
     "build_geometry_reference_snapshot",
+    "build_packaging_passport_evidence",
     "build_parameter_guide_rows",
+    "build_road_width_evidence",
+    "build_road_width_reference",
+    "cylinder_packaging_passport_key",
     "load_camozzi_catalog_rows",
     "load_camozzi_stroke_options_mm",
+    "load_component_passport_catalog_rows",
 ]
