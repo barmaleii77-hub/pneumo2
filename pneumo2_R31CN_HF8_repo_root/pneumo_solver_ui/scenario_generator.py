@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Dict, Iterable, Mapping, Optional, Tuple
 
 import math
 import numpy as np
@@ -384,7 +384,13 @@ def generate_maneuver_time_series(
 # -----------------------------
 
 
-def write_road_csv(path: Path, t: np.ndarray, z4: np.ndarray) -> Path:
+def write_road_csv(
+    path: Path,
+    t: np.ndarray,
+    z4: np.ndarray,
+    *,
+    extra_columns: Optional[Mapping[str, Iterable[object]]] = None,
+) -> Path:
     """Записать road_csv.
 
     Формат:
@@ -400,6 +406,9 @@ def write_road_csv(path: Path, t: np.ndarray, z4: np.ndarray) -> Path:
         "z2": np.asarray(z4[:, 2], dtype=float),
         "z3": np.asarray(z4[:, 3], dtype=float),
     })
+    if extra_columns:
+        for key, values in dict(extra_columns).items():
+            df[str(key)] = list(values)
     df.to_csv(path, index=False)
     return path
 

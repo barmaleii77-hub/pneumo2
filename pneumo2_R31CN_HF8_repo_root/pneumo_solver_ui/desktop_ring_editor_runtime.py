@@ -173,6 +173,13 @@ def _build_summary_text(errors: list[str], warnings: list[str], metrics: dict[st
         f"{float(metrics.get('seam_right_mm', 0.0) or 0.0):.2f} / "
         f"{float(metrics.get('seam_max_mm', 0.0) or 0.0):.2f} мм."
     )
+    if float(metrics.get("raw_seam_max_mm", 0.0) or 0.0) > 1e-9:
+        lines.append(
+            "Raw seam до export-замыкания L/R/max: "
+            f"{float(metrics.get('raw_seam_left_mm', 0.0) or 0.0):.2f} / "
+            f"{float(metrics.get('raw_seam_right_mm', 0.0) or 0.0):.2f} / "
+            f"{float(metrics.get('raw_seam_max_mm', 0.0) or 0.0):.2f} мм."
+        )
     lines.append(
         "Whole-ring amplitude A L/R: "
         f"{float(metrics.get('ring_amp_left_mm', 0.0) or 0.0):.2f} / "
@@ -210,6 +217,9 @@ def build_ring_editor_diagnostics(spec: dict[str, Any]) -> RingEditorDiagnostics
     seam_left_mm = 0.0
     seam_right_mm = 0.0
     seam_max_mm = 0.0
+    raw_seam_left_mm = 0.0
+    raw_seam_right_mm = 0.0
+    raw_seam_max_mm = 0.0
     ring_amp_left_mm = 0.0
     ring_amp_right_mm = 0.0
     ring_p2p_left_mm = 0.0
@@ -226,6 +236,7 @@ def build_ring_editor_diagnostics(spec: dict[str, Any]) -> RingEditorDiagnostics
                 seed=safe_int(spec.get("seed", 123), 123),
             )
             ring_length_m = float((tracks.get("meta", {}) or {}).get("L_total_m", ring_length_m) or ring_length_m)
+            track_meta = dict(tracks.get("meta", {}) or {})
             z_left = np.asarray(tracks.get("zL_m", []), dtype=float).reshape(-1)
             z_right = np.asarray(tracks.get("zR_m", []), dtype=float).reshape(-1)
             road_profile = _build_road_profile_preview(tracks)
@@ -233,13 +244,25 @@ def build_ring_editor_diagnostics(spec: dict[str, Any]) -> RingEditorDiagnostics
                 seam_left_mm = float(abs(z_left[-1] - z_left[0]) * 1000.0)
                 seam_right_mm = float(abs(z_right[-1] - z_right[0]) * 1000.0)
                 seam_max_mm = float(max(seam_left_mm, seam_right_mm))
+                raw_seam_left_mm = float(abs(float(track_meta.get("raw_seam_jump_left_m", z_left[-1] - z_left[0]) or 0.0)) * 1000.0)
+                raw_seam_right_mm = float(abs(float(track_meta.get("raw_seam_jump_right_m", z_right[-1] - z_right[0]) or 0.0)) * 1000.0)
+                raw_seam_max_mm = float(max(raw_seam_left_mm, raw_seam_right_mm))
                 z_left_median = float(np.nanmedian(z_left))
                 z_right_median = float(np.nanmedian(z_right))
                 ring_amp_left_mm = float(np.nanmax(np.abs(z_left - z_left_median)) * 1000.0)
                 ring_amp_right_mm = float(np.nanmax(np.abs(z_right - z_right_median)) * 1000.0)
                 ring_p2p_left_mm = float((np.nanmax(z_left) - np.nanmin(z_left)) * 1000.0)
                 ring_p2p_right_mm = float((np.nanmax(z_right) - np.nanmin(z_right)) * 1000.0)
-            closure_policy = str((tracks.get("meta", {}) or {}).get("closure_policy", closure_policy) or closure_policy)
+            closure_policy = str(track_meta.get("closure_policy", closure_policy) or closure_policy)
+            if bool(track_meta.get("closure_applied", False)) and raw_seam_max_mm > 1e-9:
+                warnings.append(
+                    "Гладкое C1-замыкание применено только как export spline; raw seam остаётся видимым в диагностике "
+                    f"({raw_seam_max_mm:.2f} мм)."
+                )
+            if closure_policy == "preview_open_only":
+                warnings.append(
+                    "preview_open_only: сценарий экспортируется как открытый preview с явным seam-warning; downstream не должен считать его замкнутым."
+                )
             summarized_rows = summarize_ring_track_segments(spec, tracks)
             for index, row in enumerate(summarized_rows):
                 flow_row = flow_rows[index] if 0 <= index < len(flow_rows) else {}
@@ -277,6 +300,9 @@ def build_ring_editor_diagnostics(spec: dict[str, Any]) -> RingEditorDiagnostics
         "seam_left_mm": float(seam_left_mm),
         "seam_right_mm": float(seam_right_mm),
         "seam_max_mm": float(seam_max_mm),
+        "raw_seam_left_mm": float(raw_seam_left_mm),
+        "raw_seam_right_mm": float(raw_seam_right_mm),
+        "raw_seam_max_mm": float(raw_seam_max_mm),
         "ring_amp_left_mm": float(ring_amp_left_mm),
         "ring_amp_right_mm": float(ring_amp_right_mm),
         "ring_p2p_left_mm": float(ring_p2p_left_mm),
@@ -298,6 +324,7 @@ def build_ring_editor_diagnostics(spec: dict[str, Any]) -> RingEditorDiagnostics
 def export_ring_scenario_bundle(spec: dict[str, Any], *, output_dir: str | Path, tag: str) -> dict[str, Any]:
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    # Returned bundle includes meta_json and ring_source_of_truth_json for HO-004.
     return generate_ring_scenario_bundle(
         spec,
         out_dir=out_dir,

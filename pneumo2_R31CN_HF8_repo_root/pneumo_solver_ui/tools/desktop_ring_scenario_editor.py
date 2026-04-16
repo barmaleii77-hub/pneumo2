@@ -31,6 +31,7 @@ from pneumo_solver_ui.desktop_ring_editor_model import (
     replace_selected_event,
     RING_PRESET_DEFAULT,
     SEGMENT_PRESET_DEFAULT,
+    resolve_ring_inputs_handoff,
     safe_float,
     safe_int,
     save_spec_to_path,
@@ -95,9 +96,23 @@ SIDE_FROM_UI = {value: key for key, value in SIDE_TO_UI.items()}
 
 CLOSURE_POLICY_TO_UI = {
     "closed_c1_periodic": "Гладкое замыкание",
+    "closed_exact": "Строгое совпадение",
     "strict_exact": "Строгое совпадение",
+    "preview_open_only": "Открытый preview",
 }
-CLOSURE_POLICY_FROM_UI = {value: key for key, value in CLOSURE_POLICY_TO_UI.items()}
+CLOSURE_POLICY_FROM_UI = {
+    "Гладкое замыкание": "closed_c1_periodic",
+    "Строгое совпадение": "closed_exact",
+    "Открытый preview": "preview_open_only",
+}
+
+PASSAGE_MODE_TO_UI = {
+    "steady": "Постоянный",
+    "accel": "Разгон",
+    "brake": "Торможение",
+    "custom": "Пользовательский",
+}
+PASSAGE_MODE_FROM_UI = {value: key for key, value in PASSAGE_MODE_TO_UI.items()}
 
 
 def _open_path(path: str | Path) -> None:
@@ -140,6 +155,7 @@ class DesktopRingScenarioEditor:
         self.ring_preset_var = tk.StringVar(value=RING_PRESET_DEFAULT)
         self.segment_preset_var = tk.StringVar(value=SEGMENT_PRESET_DEFAULT)
         self.status_var = tk.StringVar(value="Готово. Можно редактировать кольцевой сценарий.")
+        self._latest_inputs_handoff_state: dict[str, object] = {}
 
         self._build_ui()
         self._install_window_bindings()
@@ -331,6 +347,8 @@ class DesktopRingScenarioEditor:
             on_open_last_spec=self._open_last_generated_spec,
             on_open_last_road=self._open_last_generated_road,
             on_open_last_axay=self._open_last_generated_axay,
+            on_open_last_meta=self._open_last_generated_meta,
+            on_open_ring_source=self._open_ring_source_of_truth,
             on_open_anim_latest=self._open_anim_latest_exports,
         )
         self.export_panel.grid(row=0, column=0, sticky="ew")
@@ -359,6 +377,7 @@ class DesktopRingScenarioEditor:
             self.motion_panel.segment_name_var,
             self.motion_panel.duration_var,
             self.motion_panel.turn_direction_var,
+            self.motion_panel.passage_mode_var,
             self.motion_panel.speed_end_var,
             self.motion_panel.turn_radius_var,
             self.road_panel.mode_var,
@@ -469,6 +488,7 @@ class DesktopRingScenarioEditor:
         diagnostics = build_ring_editor_diagnostics(self.state.spec)
         self._last_diagnostics = diagnostics
         self._apply_diagnostics(diagnostics)
+        self._refresh_inputs_handoff_state()
         dirty_label = "есть несохранённые изменения" if self.state.dirty else "сохранено"
         scenario_label = Path(self.state.spec_path).name if self.state.spec_path else "в памяти"
         artifacts_label = "требуется пересборка" if self.state.export.artifacts_stale else "актуально"
@@ -481,6 +501,26 @@ class DesktopRingScenarioEditor:
             + (f" | {self.state.status_message}" if self.state.status_message else "")
         )
         self._update_window_title()
+
+    def _refresh_inputs_handoff_state(self) -> dict[str, object]:
+        try:
+            state = resolve_ring_inputs_handoff()
+            self._latest_inputs_handoff_state = dict(state)
+            banner = str(state.get("banner") or "").strip()
+            path = str(state.get("snapshot_path") or "").strip()
+            payload_hash = str(state.get("payload_hash") or "").strip()
+            lines = [
+                f"HO-002 inputs_snapshot: {state.get('state') or 'missing'}",
+                f"payload_hash={payload_hash[:12] or '—'} | can_consume={bool(state.get('can_consume', False))}",
+                banner,
+                f"inputs_snapshot.json: {path}",
+            ]
+            self.export_panel.inputs_handoff_var.set("\n".join(line for line in lines if line).strip())
+            return state
+        except Exception as exc:
+            self._latest_inputs_handoff_state = {}
+            self.export_panel.inputs_handoff_var.set(f"Не удалось проверить HO-002 inputs_snapshot: {exc}")
+            return {}
 
     def _load_state_to_form(self) -> None:
         spec = self.state.spec
@@ -507,9 +547,11 @@ class DesktopRingScenarioEditor:
             self.motion_panel.segment_name_var.set("")
             self.motion_panel.duration_var.set("")
             self.motion_panel.turn_direction_var.set("Прямо")
+            self.motion_panel.passage_mode_var.set("Постоянный")
             self.motion_panel.speed_end_var.set("")
             self.motion_panel.turn_radius_var.set("")
             self.events_panel.set_events([])
+            self.road_panel.set_boundary_editability(start_editable=False, end_editable=False)
             return
 
         self.motion_panel.segment_name_var.set(str(segment.get("name", "")))
@@ -517,14 +559,27 @@ class DesktopRingScenarioEditor:
         self.motion_panel.turn_direction_var.set(
             TURN_DIRECTION_TO_UI.get(str(segment.get("turn_direction", "STRAIGHT")).upper(), "Прямо")
         )
+        self.motion_panel.passage_mode_var.set(
+            PASSAGE_MODE_TO_UI.get(str(segment.get("passage_mode", "steady")).lower(), "Постоянный")
+        )
         self.motion_panel.speed_end_var.set(str(segment.get("speed_end_kph", 0.0)))
         self.motion_panel.turn_radius_var.set(str(segment.get("turn_radius_m", 0.0)))
 
+        selected_index = find_selected_segment_index(self.state)
+        segments = list(self.state.spec.get("segments", []) or [])
+        selected_row = None
+        if self._last_diagnostics is not None and 0 <= selected_index < len(self._last_diagnostics.segment_rows):
+            candidate = self._last_diagnostics.segment_rows[selected_index]
+            selected_row = candidate if isinstance(candidate, dict) else None
         self.road_panel.mode_var.set(ROAD_MODE_TO_UI.get(str(road.get("mode", "ISO8608")).upper(), "ISO 8608"))
-        self.road_panel.center_start_var.set(str(road.get("center_height_start_mm", 0.0)))
-        self.road_panel.center_end_var.set(str(road.get("center_height_end_mm", 0.0)))
-        self.road_panel.cross_start_var.set(str(road.get("cross_slope_start_pct", 0.0)))
-        self.road_panel.cross_end_var.set(str(road.get("cross_slope_end_pct", 0.0)))
+        self.road_panel.center_start_var.set(str((selected_row or {}).get("center_height_start_mm", road.get("center_height_start_mm", 0.0))))
+        self.road_panel.center_end_var.set(str((selected_row or {}).get("center_height_end_mm", road.get("center_height_end_mm", 0.0))))
+        self.road_panel.cross_start_var.set(str((selected_row or {}).get("cross_slope_start_pct", road.get("cross_slope_start_pct", 0.0))))
+        self.road_panel.cross_end_var.set(str((selected_row or {}).get("cross_slope_end_pct", road.get("cross_slope_end_pct", 0.0))))
+        self.road_panel.set_boundary_editability(
+            start_editable=selected_index == 0,
+            end_editable=not bool(segments and selected_index >= len(segments) - 1),
+        )
         self.road_panel.iso_class_var.set(str(road.get("iso_class", "E")).upper())
         self.road_panel.gd_pick_var.set(GD_PICK_TO_UI.get(str(road.get("gd_pick", "mid")).lower(), "средний"))
         self.road_panel.gd_scale_var.set(str(road.get("gd_n0_scale", 1.0)))
@@ -585,21 +640,39 @@ class DesktopRingScenarioEditor:
         segment = get_selected_segment(self.state)
         if segment is None:
             return
+        selected_index = find_selected_segment_index(self.state)
+        segments = list(spec.get("segments", []) or [])
+        is_last_segment = bool(segments and selected_index >= len(segments) - 1)
         segment["name"] = str(self.motion_panel.segment_name_var.get() or "Сегмент")
         segment["duration_s"] = safe_float(self.motion_panel.duration_var.get(), segment.get("duration_s", 3.0))
         segment["turn_direction"] = TURN_DIRECTION_FROM_UI.get(
             str(self.motion_panel.turn_direction_var.get() or "Прямо"),
             "STRAIGHT",
         )
-        segment["speed_end_kph"] = safe_float(self.motion_panel.speed_end_var.get(), segment.get("speed_end_kph", 40.0))
+        segment["passage_mode"] = PASSAGE_MODE_FROM_UI.get(
+            str(self.motion_panel.passage_mode_var.get() or "Постоянный"),
+            "steady",
+        )
+        if is_last_segment:
+            segment["speed_end_kph"] = safe_float(spec.get("v0_kph", 40.0), 40.0)
+        else:
+            segment["speed_end_kph"] = safe_float(self.motion_panel.speed_end_var.get(), segment.get("speed_end_kph", 40.0))
         segment["turn_radius_m"] = safe_float(self.motion_panel.turn_radius_var.get(), segment.get("turn_radius_m", 0.0))
 
         road = ensure_road_defaults(segment)
         road["mode"] = ROAD_MODE_FROM_UI.get(str(self.road_panel.mode_var.get() or "ISO 8608"), "ISO8608")
-        road["center_height_start_mm"] = safe_float(self.road_panel.center_start_var.get(), road.get("center_height_start_mm", 0.0))
+        if selected_index == 0:
+            road["center_height_start_mm"] = safe_float(self.road_panel.center_start_var.get(), road.get("center_height_start_mm", 0.0))
+            road["cross_slope_start_pct"] = safe_float(self.road_panel.cross_start_var.get(), road.get("cross_slope_start_pct", 0.0))
+        else:
+            road.pop("center_height_start_mm", None)
+            road.pop("cross_slope_start_pct", None)
         road["center_height_end_mm"] = safe_float(self.road_panel.center_end_var.get(), road.get("center_height_end_mm", 0.0))
-        road["cross_slope_start_pct"] = safe_float(self.road_panel.cross_start_var.get(), road.get("cross_slope_start_pct", 0.0))
         road["cross_slope_end_pct"] = safe_float(self.road_panel.cross_end_var.get(), road.get("cross_slope_end_pct", 0.0))
+        if is_last_segment and segments:
+            first_road = dict((segments[0] or {}).get("road", {}) or {})
+            road["center_height_end_mm"] = safe_float(first_road.get("center_height_start_mm", 0.0), 0.0)
+            road["cross_slope_end_pct"] = safe_float(first_road.get("cross_slope_start_pct", 0.0), 0.0)
         road["iso_class"] = str(self.road_panel.iso_class_var.get() or "E").upper()
         road["gd_pick"] = GD_PICK_FROM_UI.get(str(self.road_panel.gd_pick_var.get() or "средний"), "mid")
         road["gd_n0_scale"] = safe_float(self.road_panel.gd_scale_var.get(), road.get("gd_n0_scale", 1.0))
@@ -695,8 +768,15 @@ class DesktopRingScenarioEditor:
                     f"\nДлительность круга: {float(meta.get('lap_time_s', 0.0) or 0.0):.2f} с"
                     f"\nЧисло отсчётов: {int(meta.get('n_samples', 0) or 0)}"
                     f"\nРежим замыкания: {CLOSURE_POLICY_TO_UI.get(str(meta.get('closure_policy', '')), 'не задан')}"
-                    f"\nМаксимальный шов замыкания: {1000.0 * float(meta.get('seam_max_jump_m', 0.0) or 0.0):.1f} мм"
+                    f"\nRaw seam до export-замыкания: {1000.0 * float(meta.get('raw_seam_max_jump_m', 0.0) or 0.0):.1f} мм"
+                    f"\nМаксимальный шов после export-policy: {1000.0 * float(meta.get('seam_max_jump_m', 0.0) or 0.0):.1f} мм"
                 )
+                lineage = meta.get("lineage") if isinstance(meta.get("lineage"), dict) else {}
+                if lineage:
+                    meta_lines += (
+                        f"\nRing source hash: {str(lineage.get('ring_source_hash_sha256', ''))[:16]}"
+                        f"\nExport set hash: {str(lineage.get('ring_export_set_hash_sha256', ''))[:16]}"
+                    )
             anim_latest_lines = ""
             if bundle.get("anim_latest_scenario_json"):
                 anim_dir = str(Path(str(bundle.get("anim_latest_scenario_json", ""))).expanduser().parent)
@@ -720,6 +800,8 @@ class DesktopRingScenarioEditor:
                 f"Сценарий: {bundle.get('scenario_json', '')}\n"
                 f"Профиль дороги: {bundle.get('road_csv', '')}\n"
                 f"Файл ускорений: {bundle.get('axay_csv', '')}"
+                f"\nMeta HO-004: {bundle.get('meta_json', '')}"
+                f"\nSource-of-truth WS-RING: {bundle.get('ring_source_of_truth_json', '')}"
                 f"{artifacts_line}"
                 f"{opt_suite_line}"
                 f"{meta_lines}"
@@ -927,6 +1009,12 @@ class DesktopRingScenarioEditor:
     def _open_last_generated_axay(self) -> None:
         self._open_last_generated_file("axay_csv", "Файл ускорений")
 
+    def _open_last_generated_meta(self) -> None:
+        self._open_last_generated_file("meta_json", "Meta HO-004")
+
+    def _open_ring_source_of_truth(self) -> None:
+        self._open_last_generated_file("ring_source_of_truth_json", "Source-of-truth WS-RING")
+
     def _open_anim_latest_exports(self) -> None:
         bundle = self.state.export.last_bundle or {}
         anim_latest_path = str(bundle.get("anim_latest_scenario_json") or "").strip()
@@ -1025,7 +1113,9 @@ class DesktopRingScenarioEditor:
                     "Файлы сценария подготовлены.\n\n"
                     f"Сценарий: {bundle.get('scenario_json', '')}\n"
                     f"Профиль дороги: {bundle.get('road_csv', '')}\n"
-                    f"Файл ускорений: {bundle.get('axay_csv', '')}\n\n"
+                    f"Файл ускорений: {bundle.get('axay_csv', '')}\n"
+                    f"Meta HO-004: {bundle.get('meta_json', '')}\n"
+                    f"Source-of-truth WS-RING: {bundle.get('ring_source_of_truth_json', '')}\n\n"
                     "Копия для анимации:\n"
                     f"Сценарий: {mirrored.get('scenario_json', '')}\n"
                     f"Профиль дороги: {mirrored.get('road_csv', '')}\n"

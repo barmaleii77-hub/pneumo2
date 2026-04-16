@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import math
 import logging
+import hashlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -33,6 +34,22 @@ from scipy.interpolate import CubicSpline
 from .scenario_generator import ISO8608Spec, generate_iso8608_profile, write_axay_csv, write_road_csv
 
 log = logging.getLogger(__name__)
+
+
+def _stable_json_dumps(obj: Any) -> str:
+    return json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _sha256_file(path: str | Path) -> str:
+    h = hashlib.sha256()
+    with Path(path).open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def _ring_mod_with_endpoint_preserved(values: np.ndarray, ring_length_m: float) -> np.ndarray:
@@ -88,6 +105,9 @@ def _segment_motion_contract(
     legacy_mode = str(seg.get("drive_mode", "STRAIGHT") or "STRAIGHT").strip().upper()
     turn_direction = _segment_turn_direction(seg)
     explicit_motion = _segment_has_explicit_motion_fields(seg)
+    raw_passage_mode = str(seg.get("passage_mode", "") or "").strip().lower()
+    if raw_passage_mode not in {"steady", "accel", "brake", "custom"}:
+        raw_passage_mode = ""
 
     if explicit_motion:
         speed_start_kph = float(v_start_kph)
@@ -139,10 +159,13 @@ def _segment_motion_contract(
     if turn_direction == "STRAIGHT":
         if abs(speed_end_kph - speed_start_kph) <= 1e-9:
             derived_legacy_mode = "STRAIGHT"
+            derived_passage_mode = "steady"
         else:
             derived_legacy_mode = "ACCEL" if speed_end_kph > speed_start_kph else "BRAKE"
+            derived_passage_mode = "accel" if speed_end_kph > speed_start_kph else "brake"
     else:
         derived_legacy_mode = "TURN_LEFT" if turn_direction == "LEFT" else "TURN_RIGHT"
+        derived_passage_mode = "steady"
 
     try:
         turn_radius_m = float(seg.get("turn_radius_m", 0.0) or 0.0)
@@ -158,6 +181,7 @@ def _segment_motion_contract(
         "turn_radius_m": max(0.0, turn_radius_m),
         "legacy_mode": derived_legacy_mode if explicit_motion else legacy_mode,
         "display_mode": derived_legacy_mode,
+        "passage_mode": raw_passage_mode or derived_passage_mode,
     }
 
 
@@ -361,12 +385,16 @@ def _resolve_closure_policy(spec: Dict[str, Any]) -> str:
     Supported canonical policies:
     - ``closed_c1_periodic``: the generated ring is smoothly closed in value and
       first derivative across the seam; export/preview use a periodic spline.
-    - ``strict_exact``: keep the authored profile exactly as-is and expose the seam.
+    - ``closed_exact`` / ``strict_exact``: keep the authored profile exactly as-is
+      and expose the seam. ``strict_exact`` is kept as a legacy spelling.
+    - ``preview_open_only``: keep the authored profile open and mark the export as
+      preview-only so downstream cannot mistake it for a closed road.
     """
     raw = str(spec.get("closure_policy", "closed_c1_periodic") or "closed_c1_periodic").strip().lower()
-    if raw not in {"closed_c1_periodic", "strict_exact"}:
+    if raw not in {"closed_c1_periodic", "closed_exact", "strict_exact", "preview_open_only"}:
         raise ValueError(
-            f"Unsupported closure_policy={raw!r}. Allowed: 'closed_c1_periodic', 'strict_exact'."
+            "Unsupported closure_policy="
+            f"{raw!r}. Allowed: 'closed_c1_periodic', 'closed_exact', 'strict_exact', 'preview_open_only'."
         )
     return raw
 
@@ -1122,7 +1150,7 @@ def generate_ring_tracks(
     seam_max = float(max(abs(seam_jump_L), abs(seam_jump_R)))
     raw_seam_max = float(max(abs(raw_jump_L), abs(raw_jump_R)))
     seam_open = bool(seam_max > seam_thr)
-    if closure_policy == "strict_exact" and raw_seam_max > seam_thr:
+    if closure_policy in {"strict_exact", "closed_exact", "preview_open_only"} and raw_seam_max > seam_thr:
         log.warning(
             "scenario_ring: closure_policy=%s, road seam is not closed (left=%.1f mm, right=%.1f mm). "
             "No hidden closure correction is applied.",
@@ -1142,6 +1170,11 @@ def generate_ring_tracks(
 
     x = _ensure_increasing_x(x)
     spline_bc = "periodic" if closure_policy == "closed_c1_periodic" else "natural"
+    closure_export_state = (
+        "closed_c1_corrected"
+        if closure_applied
+        else ("open_preview_only" if closure_policy == "preview_open_only" else "authored_exact")
+    )
     left_spline = CubicSpline(x, zL_closed, bc_type=spline_bc)
     right_spline = CubicSpline(x, zR_closed, bc_type=spline_bc)
 
@@ -1161,6 +1194,8 @@ def generate_ring_tracks(
             "n_pts": int(len(x)),
             "closure_policy": closure_policy,
             "closure_applied": bool(closure_applied),
+            "closure_export_state": closure_export_state,
+            "no_hidden_closure": True,
             "closure_bc_type": spline_bc,
             "raw_seam_jump_left_m": raw_jump_L,
             "raw_seam_jump_right_m": raw_jump_R,
@@ -1302,6 +1337,7 @@ def summarize_ring_track_segments(spec: Dict[str, Any], tracks: Dict[str, Any]) 
             "name": str(seg.get("name", f"S{i+1}")),
             "drive_mode": str(motion["legacy_mode"]).upper(),
             "turn_direction": str(motion["turn_direction"]).upper(),
+            "passage_mode": str(motion.get("passage_mode", "steady") or "steady"),
             "speed_start_kph": float(motion["speed_start_kph"]),
             "speed_end_kph": float(motion["speed_end_kph"]),
             "turn_radius_m": float(motion["turn_radius_m"]),
@@ -1322,6 +1358,58 @@ def summarize_ring_track_segments(spec: Dict[str, Any], tracks: Dict[str, Any]) 
             **{f"R_{k}": v for k, v in st_r.items()},
         })
         x_cursor = x1
+    return out
+
+
+def _segment_ids_for_ring_positions(
+    x_ring_m: np.ndarray,
+    segment_rows: List[Dict[str, Any]],
+    *,
+    ring_length_m: float,
+) -> np.ndarray:
+    x = np.asarray(x_ring_m, dtype=float).reshape(-1)
+    ids = np.ones(int(x.size), dtype=int)
+    if x.size == 0 or not segment_rows:
+        return ids
+    ring_length_m = float(max(1e-9, ring_length_m))
+    for idx, row in enumerate(segment_rows):
+        seg_id = int(row.get("segment_id", row.get("seg_idx", idx + 1)) or (idx + 1))
+        x0 = float(row.get("x_start_m", 0.0) or 0.0)
+        x1 = float(row.get("x_end_m", x0) or x0)
+        if idx >= len(segment_rows) - 1:
+            mask = (x >= x0 - 1e-9) & (x <= ring_length_m + 1e-9)
+        else:
+            mask = (x >= x0 - 1e-9) & (x < x1 - 1e-9)
+        ids[mask] = seg_id
+    return ids
+
+
+def _road_segment_export_meta(
+    spec: Dict[str, Any],
+    tracks: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    rows = summarize_ring_track_segments(spec, tracks)
+    source_segments = list(spec.get("segments", []) or [])
+    out: List[Dict[str, Any]] = []
+    for idx, row in enumerate(rows):
+        src = dict(source_segments[idx] or {}) if idx < len(source_segments) and isinstance(source_segments[idx], dict) else {}
+        out.append(
+            {
+                "id": int(row.get("seg_idx", idx + 1) or (idx + 1)),
+                "segment_id": int(row.get("seg_idx", idx + 1) or (idx + 1)),
+                "uid": str(src.get("uid") or ""),
+                "name": str(row.get("name") or src.get("name") or f"S{idx + 1}"),
+                "x_start_m": float(row.get("x_start_m", 0.0) or 0.0),
+                "x_end_m": float(row.get("x_end_m", 0.0) or 0.0),
+                "length_m": float(row.get("length_m", 0.0) or 0.0),
+                "turn_direction": str(row.get("turn_direction") or "STRAIGHT"),
+                "passage_mode": str(row.get("passage_mode") or src.get("passage_mode") or "steady"),
+                "road_mode": str(row.get("road_mode") or ""),
+                "event_count": int(src.get("event_count", len(list(src.get("events", []) or []))) or 0),
+                "source_workspace": "WS-RING",
+                "geometry_editable_owner": "WS-RING",
+            }
+        )
     return out
 
 
@@ -1360,14 +1448,17 @@ def generate_ring_scenario_bundle(
 
     drive = generate_ring_drive_profile(spec, dt_s=dt_s, n_laps=n_laps)
     tracks = generate_ring_tracks(spec, dx_m=dx_m, seed=seed)
-    L_total = float(tracks["meta"]["L_total_m"])
+    track_meta = dict(tracks.get("meta", {}) or {})
+    L_total = float(track_meta["L_total_m"])
     left_spline: CubicSpline = tracks["left_spline"]
     right_spline: CubicSpline = tracks["right_spline"]
+    segment_export_rows = _road_segment_export_meta(spec, tracks)
 
     t = drive["t_s"]
     dist_front = drive["distance_m"]
     xF = _ring_mod_with_endpoint_preserved(dist_front, L_total)
     xR = _ring_mod_with_endpoint_preserved(dist_front - wheelbase_m, L_total)
+    segment_id_series = _segment_ids_for_ring_positions(xF, segment_export_rows, ring_length_m=L_total)
 
     z_fl = left_spline(xF)
     z_fr = right_spline(xF)
@@ -1378,9 +1469,11 @@ def generate_ring_scenario_bundle(
     road_csv = out_dir / f"{stem}_road.csv"
     axay_csv = out_dir / f"{stem}_axay.csv"
     scenario_json = out_dir / f"{stem}_spec.json"
+    ring_source_of_truth_json = out_dir / f"{stem}_ring_source_of_truth.json"
+    meta_json = out_dir / f"{stem}_meta.json"
 
     z4 = np.column_stack([z_fl, z_fr, z_rl, z_rr])
-    write_road_csv(road_csv, t, z4)
+    write_road_csv(road_csv, t, z4, extra_columns={"segment_id": [int(v) for v in segment_id_series]})
     write_axay_csv(axay_csv, t, drive["ax_mps2"], drive["ay_mps2"])
 
     meta = {
@@ -1394,11 +1487,20 @@ def generate_ring_scenario_bundle(
         "ring_length_m": L_total,
         "lap_time_s": float(drive["t_s"][-1]) / float(n_laps) if n_laps > 0 else float(drive["t_s"][-1]),
         "n_samples": int(len(t)),
-        "closure_policy": str(tracks.get("meta", {}).get("closure_policy", "strict_exact") or "strict_exact"),
-        "seam_jump_left_m": float(tracks.get("meta", {}).get("seam_jump_left_m", 0.0) or 0.0),
-        "seam_jump_right_m": float(tracks.get("meta", {}).get("seam_jump_right_m", 0.0) or 0.0),
-        "seam_max_jump_m": float(tracks.get("meta", {}).get("seam_max_jump_m", 0.0) or 0.0),
-        "seam_open": bool(tracks.get("meta", {}).get("seam_open", False)),
+        "closure_policy": str(track_meta.get("closure_policy", "strict_exact") or "strict_exact"),
+        "closure_export_state": str(track_meta.get("closure_export_state", "") or ""),
+        "closure_applied": bool(track_meta.get("closure_applied", False)),
+        "closure_bc_type": str(track_meta.get("closure_bc_type", "") or ""),
+        "raw_seam_jump_left_m": float(track_meta.get("raw_seam_jump_left_m", 0.0) or 0.0),
+        "raw_seam_jump_right_m": float(track_meta.get("raw_seam_jump_right_m", 0.0) or 0.0),
+        "raw_seam_max_jump_m": float(track_meta.get("raw_seam_max_jump_m", 0.0) or 0.0),
+        "seam_jump_left_m": float(track_meta.get("seam_jump_left_m", 0.0) or 0.0),
+        "seam_jump_right_m": float(track_meta.get("seam_jump_right_m", 0.0) or 0.0),
+        "seam_max_jump_m": float(track_meta.get("seam_max_jump_m", 0.0) or 0.0),
+        "seam_threshold_m": float(track_meta.get("seam_threshold_m", 0.0) or 0.0),
+        "seam_open": bool(track_meta.get("seam_open", False)),
+        "closure_correction_left_max_m": float(track_meta.get("closure_correction_left_max_m", 0.0) or 0.0),
+        "closure_correction_right_max_m": float(track_meta.get("closure_correction_right_max_m", 0.0) or 0.0),
     }
 
     spec_to_save = dict(spec)
@@ -1422,6 +1524,8 @@ def generate_ring_scenario_bundle(
             forced_end_kph=forced_end_kph,
         )
         seg_saved["turn_direction"] = str(motion_saved["turn_direction"]).upper()
+        seg_saved["segment_id"] = int(idx + 1)
+        seg_saved["passage_mode"] = str(motion_saved.get("passage_mode", "steady") or "steady")
         if idx == 0:
             seg_saved["speed_start_kph"] = float(motion_saved["speed_start_kph"])
         else:
@@ -1445,19 +1549,111 @@ def generate_ring_scenario_bundle(
     spec_to_save["dx_m"] = float(dx_m)
     if seed is not None:
         spec_to_save["seed"] = int(seed)
+    source_of_truth_payload = dict(spec_to_save)
+    source_of_truth_payload["_source_contract"] = {
+        "workspace": "WS-RING",
+        "source_of_truth": True,
+        "editable_owner": "WS-RING",
+        "handoff_id": "HO-004",
+        "downstream_geometry_editing_allowed": False,
+    }
+    ring_source_hash = _sha256_text(_stable_json_dumps(source_of_truth_payload))
+    source_of_truth_payload["_lineage"] = {
+        "ring_source_hash_sha256": ring_source_hash,
+        "hash_scope": "canonical WS-RING source payload before generated artifacts",
+    }
+    ring_source_of_truth_json.write_text(
+        json.dumps(source_of_truth_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    meta["road_segments_count"] = int(len(segment_export_rows))
+    meta["segment_id_series_column"] = "segment_id"
     spec_to_save["_generated_meta"] = meta
-    spec_to_save["_generated_outputs"] = {"road_csv": road_csv.name, "axay_csv": axay_csv.name}
+    spec_to_save["_generated_outputs"] = {
+        "road_csv": road_csv.name,
+        "axay_csv": axay_csv.name,
+        "meta_json": meta_json.name,
+        "ring_source_of_truth_json": ring_source_of_truth_json.name,
+    }
+    spec_to_save["_lineage"] = {
+        "ring_source_hash_sha256": ring_source_hash,
+        "handoff_id": "HO-004",
+        "source_workspace": "WS-RING",
+    }
 
     scenario_json.write_text(
         json.dumps(spec_to_save, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
+    export_hashes = {
+        "road_csv_sha256": _sha256_file(road_csv),
+        "axay_csv_sha256": _sha256_file(axay_csv),
+        "scenario_json_sha256": _sha256_file(scenario_json),
+        "ring_source_of_truth_json_sha256": _sha256_file(ring_source_of_truth_json),
+    }
+    export_set_hash = _sha256_text(
+        _stable_json_dumps(
+            {
+                "source_hash": ring_source_hash,
+                "files": export_hashes,
+                "schema_version": "ring_export_set_v1",
+            }
+        )
+    )
+    meta["lineage"] = {
+        "ring_source_hash_sha256": ring_source_hash,
+        "ring_export_set_hash_sha256": export_set_hash,
+        **export_hashes,
+    }
+    meta_json_payload = {
+        "schema_version": "ring_export_meta_v1",
+        "handoff_id": "HO-004",
+        "source_workspace": "WS-RING",
+        "consumer_workspace": "WS-SUITE",
+        "source_of_truth": {
+            "path": str(ring_source_of_truth_json),
+            "sha256": ring_source_hash,
+            "editable_owner": "WS-RING",
+        },
+        "downstream_geometry_editing_allowed": False,
+        "export_set": {
+            "road_csv": str(road_csv),
+            "axay_csv": str(axay_csv),
+            "scenario_json": str(scenario_json),
+            "meta_json": str(meta_json),
+            "ring_source_of_truth_json": str(ring_source_of_truth_json),
+        },
+        "lineage": dict(meta["lineage"]),
+        "closure": {
+            "policy": str(meta.get("closure_policy") or ""),
+            "export_state": str(meta.get("closure_export_state") or ""),
+            "applied": bool(meta.get("closure_applied", False)),
+            "raw_seam_max_jump_m": float(meta.get("raw_seam_max_jump_m", 0.0) or 0.0),
+            "seam_max_jump_m": float(meta.get("seam_max_jump_m", 0.0) or 0.0),
+            "seam_open": bool(meta.get("seam_open", False)),
+            "no_hidden_closure_behavior": True,
+        },
+        "road": {
+            "segments": segment_export_rows,
+            "segment_id_series": {
+                "csv_column": "segment_id",
+                "sample_count": int(len(segment_id_series)),
+                "unique_segment_ids": [int(v) for v in sorted(set(int(x) for x in segment_id_series))],
+            },
+        },
+    }
+    meta_json.write_text(json.dumps(meta_json_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
     return {
         "road_csv": str(road_csv),
         "axay_csv": str(axay_csv),
         "scenario_json": str(scenario_json),
+        "meta_json": str(meta_json),
+        "ring_source_of_truth_json": str(ring_source_of_truth_json),
         "meta": meta,
+        "lineage": dict(meta["lineage"]),
     }
 
 
@@ -1486,8 +1682,14 @@ def validate_ring_spec(spec: Dict[str, Any]) -> Dict[str, List[str]]:
         return {"errors": errors, "warnings": warns}
 
     closure_policy = str(spec.get("closure_policy", "closed_c1_periodic") or "closed_c1_periodic").strip().lower()
-    if closure_policy not in ("closed_c1_periodic", "strict_exact"):
-        errors.append("closure_policy должен быть одним из 'closed_c1_periodic' или 'strict_exact'.")
+    if closure_policy not in ("closed_c1_periodic", "closed_exact", "strict_exact", "preview_open_only"):
+        errors.append(
+            "closure_policy должен быть одним из 'closed_c1_periodic', 'closed_exact', 'strict_exact' или 'preview_open_only'."
+        )
+    if closure_policy == "preview_open_only":
+        warns.append(
+            "closure_policy=preview_open_only: экспорт разрешён только как открытый preview с явным seam_warning; downstream не должен считать дорогу замкнутой."
+        )
     if "track_m" in spec:
         track_m = _coerce_float(spec.get("track_m", 1.0) or 1.0, "track_m должен быть числом.")
         if track_m is not None and track_m <= 0.0:
