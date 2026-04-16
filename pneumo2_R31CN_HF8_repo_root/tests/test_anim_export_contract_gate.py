@@ -6,12 +6,17 @@ import json
 import pandas as pd
 
 from pneumo_solver_ui.anim_export_contract import (
+    build_packaging_block,
     CYLINDER_PACKAGING_PASSPORT_JSON_NAME,
     HARDPOINTS_SOURCE_OF_TRUTH_JSON_NAME,
     augment_anim_latest_meta,
     ensure_cylinder_length_columns,
     validate_anim_export_contract_meta,
     write_anim_export_contract_artifacts,
+)
+from pneumo_solver_ui.desktop_geometry_reference_model import (
+    build_current_cylinder_package_rows,
+    build_packaging_passport_evidence,
 )
 from pneumo_solver_ui.solver_points_contract import CORNERS
 
@@ -117,6 +122,7 @@ def test_validate_anim_export_contract_warns_on_partial_packaging() -> None:
     df = _build_df()
     df_fixed, length_repair = ensure_cylinder_length_columns(df)
     meta = augment_anim_latest_meta(_build_meta(), df_main=df_fixed, length_repair=length_repair)
+    packaging_again = build_packaging_block(meta, df_fixed, length_repair=length_repair)
     report = validate_anim_export_contract_meta(meta)
     assert report["level"] == "WARN"
     assert report["summary"]["visible_present_family_count"] == len(VISIBLE_FAMILIES)
@@ -124,7 +130,19 @@ def test_validate_anim_export_contract_warns_on_partial_packaging() -> None:
     assert report["summary"]["has_hardpoints_block"] is True
     assert report["summary"]["has_packaging_block"] is True
     assert report["summary"]["packaging_truth_ready"] is False
+    assert report["summary"]["axis_only_cylinders"] == ["cyl1", "cyl2"]
+    assert report["summary"]["contract_drift_failures"] == []
+    assert report["summary"]["fake_geometry_failures"] == []
+    assert meta["packaging"]["packaging_contract_hash"] == packaging_again["packaging_contract_hash"]
     assert any("shared axle fallback" in msg for msg in report["warnings"])
+
+
+def test_validate_anim_export_contract_fails_on_missing_truth_blocks() -> None:
+    report = validate_anim_export_contract_meta({})
+
+    assert report["level"] == "FAIL"
+    assert any("missing meta.solver_points" in msg for msg in report["messages"])
+    assert any("missing meta.hardpoints" in msg for msg in report["messages"])
 
 
 def test_write_anim_export_contract_artifacts_writes_files(tmp_path: Path) -> None:
@@ -151,9 +169,26 @@ def test_write_anim_export_contract_artifacts_writes_files(tmp_path: Path) -> No
     packaging = json.loads(Path(out["cylinder_packaging_passport_path"]).read_text(encoding="utf-8"))
     assert hardpoints["schema"] == "hardpoints.source_of_truth.v1"
     assert hardpoints["visible_missing_families"] == []
+    assert hardpoints["hardpoints_contract_hash"]
+    assert hardpoints["families"]["cyl1_top"]["family_contract_hash"]
+    assert hardpoints["policy"]["consumer_geometry_fabrication_allowed"] is False
     assert packaging["schema"] == "cylinder_packaging_passport.v1"
+    assert packaging["packaging_contract_hash"]
+    assert packaging["axis_only_cylinders"] == ["cyl1", "cyl2"]
     assert packaging["cylinders"]["cyl1"]["mount_families"]["top"] == "cyl1_top"
     assert packaging["cylinders"]["cyl1"]["truth_mode"] == "axis_only_honesty_mode"
+    assert packaging["cylinders"]["cyl1"]["full_mesh_allowed"] is False
+    assert packaging["consumer_policy"]["consumer_geometry_fabrication_allowed"] is False
+    reference_evidence = build_packaging_passport_evidence(
+        build_current_cylinder_package_rows({}),
+        artifact_meta=meta,
+        passport_path=out["cylinder_packaging_passport_path"],
+    )
+    assert reference_evidence.schema == "cylinder_packaging_passport.v1"
+    assert reference_evidence.packaging_contract_hash == packaging["packaging_contract_hash"]
+    assert reference_evidence.axis_only_cylinders == ("cyl1", "cyl2")
+    assert reference_evidence.consumer_geometry_fabrication_allowed is False
+    assert all(not row.consumer_geometry_fabrication_allowed for row in reference_evidence.rows)
     md = Path(out["validation_md_path"]).read_text(encoding="utf-8")
     assert "packaging_truth_ready" in md
     assert "visible_present_family_count" in md
@@ -184,3 +219,80 @@ def test_validate_anim_export_contract_fails_on_spring_spring_interference() -> 
     report = validate_anim_export_contract_meta(meta)
     assert report["level"] == "FAIL"
     assert any("spring/spring interference" in msg for msg in report["messages"])
+
+
+def test_validate_anim_export_contract_fails_on_contract_drift() -> None:
+    df = _build_df()
+    df_fixed, length_repair = ensure_cylinder_length_columns(df)
+    meta = augment_anim_latest_meta(_build_meta(), df_main=df_fixed, length_repair=length_repair)
+    meta["hardpoints"]["families"].pop("lower_arm_frame_front")
+
+    report = validate_anim_export_contract_meta(meta)
+
+    assert report["level"] == "FAIL"
+    assert any("contract drift" in msg for msg in report["messages"])
+
+
+def test_validate_anim_export_contract_fails_on_partial_visible_hardpoint_triplet() -> None:
+    df = _build_df().drop(columns=["lower_arm_frame_front_ЛП_z_м"])
+    df_fixed, length_repair = ensure_cylinder_length_columns(df)
+    meta = augment_anim_latest_meta(_build_meta(), df_main=df_fixed, length_repair=length_repair)
+
+    report = validate_anim_export_contract_meta(meta)
+
+    assert report["level"] == "FAIL"
+    assert "lower_arm_frame_front" in report["summary"]["visible_partial_families"]
+    assert any("partial visible hardpoint families" in msg for msg in report["messages"])
+
+
+def test_validate_anim_export_contract_fails_on_missing_family_hash() -> None:
+    df = _build_df()
+    df_fixed, length_repair = ensure_cylinder_length_columns(df)
+    meta = augment_anim_latest_meta(_build_meta(), df_main=df_fixed, length_repair=length_repair)
+    meta["hardpoints"]["families"]["cyl1_top"].pop("family_contract_hash")
+
+    report = validate_anim_export_contract_meta(meta)
+
+    assert report["level"] == "FAIL"
+    assert any("missing hardpoint family_contract_hash" in msg for msg in report["messages"])
+
+
+def test_validate_anim_export_contract_fails_on_stale_validation_summary() -> None:
+    df = _build_df()
+    df_fixed, length_repair = ensure_cylinder_length_columns(df)
+    meta = augment_anim_latest_meta(_build_meta(), df_main=df_fixed, length_repair=length_repair)
+    meta["anim_export_validation"] = {
+        "visible_present_family_count": 0,
+        "visible_missing_families": ["stale_fake_family"],
+        "packaging_status": "complete",
+        "packaging_truth_ready": True,
+    }
+
+    report = validate_anim_export_contract_meta(meta)
+
+    assert report["level"] == "FAIL"
+    assert any("anim_export_validation" in msg and "current" in msg for msg in report["messages"])
+
+
+def test_validate_anim_export_contract_fails_on_fake_geometry_source() -> None:
+    df = _build_df()
+    df_fixed, length_repair = ensure_cylinder_length_columns(df)
+    meta = augment_anim_latest_meta(_build_meta(), df_main=df_fixed, length_repair=length_repair)
+    meta["hardpoints"]["families"]["cyl1_top"]["source_kind"] = "fabricated"
+
+    report = validate_anim_export_contract_meta(meta)
+
+    assert report["level"] == "FAIL"
+    assert any("fake/invented geometry" in msg for msg in report["messages"])
+
+
+def test_validate_anim_export_contract_rejects_full_mesh_without_packaging_passport() -> None:
+    df = _build_df()
+    df_fixed, length_repair = ensure_cylinder_length_columns(df)
+    meta = augment_anim_latest_meta(_build_meta(), df_main=df_fixed, length_repair=length_repair)
+    meta["packaging"]["cylinders"]["cyl1"]["full_mesh_allowed"] = True
+
+    report = validate_anim_export_contract_meta(meta)
+
+    assert report["level"] == "FAIL"
+    assert any("full mesh allowed without complete passport" in msg for msg in report["messages"])
