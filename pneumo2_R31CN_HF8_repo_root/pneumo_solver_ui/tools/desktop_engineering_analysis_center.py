@@ -7,7 +7,7 @@ import sys
 import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 from typing import Callable
 
 from pneumo_solver_ui.desktop_engineering_analysis_model import (
@@ -83,6 +83,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.snapshot_state: EngineeringAnalysisSnapshot | None = None
         self._artifact_by_iid: dict[str, EngineeringAnalysisArtifact] = {}
         self._path_by_iid: dict[str, Path] = {}
+        self._candidate_by_iid: dict[str, dict] = {}
         self._sensitivity_by_iid: dict[str, EngineeringSensitivityRow] = {}
         self._worker_thread: threading.Thread | None = None
 
@@ -115,6 +116,8 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.btn_refresh.pack(side="left")
         self.btn_open_selected = ttk.Button(actions, text="Открыть выбранное", command=self._open_selected)
         self.btn_open_selected.pack(side="left", padx=(8, 0))
+        self.btn_export_ho007 = ttk.Button(actions, text="Экспорт HO-007", command=self._export_selected_run_contract_bridge)
+        self.btn_export_ho007.pack(side="left", padx=(8, 0))
         self.btn_export_evidence = ttk.Button(actions, text="Экспорт evidence", command=self._export_diagnostics_evidence)
         self.btn_export_evidence.pack(side="left", padx=(8, 0))
         self.btn_animator_link = ttk.Button(actions, text="Animator link", command=self._export_animator_link)
@@ -244,6 +247,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
     def _populate_snapshot(self, snapshot: EngineeringAnalysisSnapshot) -> None:
         self._artifact_by_iid.clear()
         self._path_by_iid.clear()
+        self._candidate_by_iid.clear()
         self._sensitivity_by_iid.clear()
         self.artifact_tree.delete(*self.artifact_tree.get_children())
         self.sensitivity_tree.delete(*self.sensitivity_tree.get_children())
@@ -315,6 +319,46 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             self._artifact_by_iid[iid] = artifact
             self._path_by_iid[iid] = artifact.path
 
+        candidate_root = self.artifact_tree.insert(
+            "",
+            "end",
+            text="Optimization runs for HO-007",
+            values=("", "ho007_candidates", ""),
+            open=not bool(snapshot.run_dir),
+        )
+        try:
+            candidates = self.runtime.discover_selected_run_candidates(limit=25)
+        except Exception as exc:
+            self.artifact_tree.insert(
+                candidate_root,
+                "end",
+                text="Candidate discovery failed",
+                values=("FAILED", "optimization_run", f"{type(exc).__name__}: {exc!s}"),
+            )
+            candidates = ()
+        if not candidates:
+            self.artifact_tree.insert(
+                candidate_root,
+                "end",
+                text="No optimization runs found",
+                values=("MISSING", "optimization_run", ""),
+            )
+        for candidate in candidates:
+            run_dir_text = str(candidate.get("run_dir") or "")
+            bridge_status = str(candidate.get("bridge_status") or "UNKNOWN")
+            status_label = str(candidate.get("status_label") or candidate.get("status") or "").strip()
+            run_id = str(candidate.get("run_id") or candidate.get("run_name") or "optimization run")
+            label = f"{run_id} [{status_label or bridge_status}]"
+            iid = self.artifact_tree.insert(
+                candidate_root,
+                "end",
+                text=label,
+                values=(bridge_status, "optimization_run", run_dir_text),
+            )
+            if run_dir_text:
+                self._path_by_iid[iid] = Path(run_dir_text)
+            self._candidate_by_iid[iid] = dict(candidate)
+
         for idx, row in enumerate(snapshot.sensitivity_rows, start=1):
             iid = f"sens_{idx}"
             self.sensitivity_tree.insert(
@@ -350,14 +394,30 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         }
         return json.dumps(payload, ensure_ascii=False, indent=2)
 
+    def _selected_tree_iid(self) -> str:
+        selected = self.artifact_tree.selection()
+        return str(selected[0]) if selected else ""
+
     def _selected_tree_path(self) -> Path | None:
-        for tree in (self.artifact_tree,):
-            selected = tree.selection()
-            if selected:
-                path = self._path_by_iid.get(selected[0])
-                if path is not None:
-                    return path
+        iid = self._selected_tree_iid()
+        if iid:
+            path = self._path_by_iid.get(iid)
+            if path is not None:
+                return path
         return None
+
+    def _selected_candidate_run_dir(self) -> Path | None:
+        iid = self._selected_tree_iid()
+        if not iid:
+            return None
+        candidate = self._candidate_by_iid.get(iid)
+        if not candidate:
+            return None
+        raw = str(candidate.get("run_dir") or "").strip()
+        if not raw:
+            return None
+        path = Path(raw)
+        return path if path.exists() and path.is_dir() else None
 
     def _open_selected(self) -> None:
         path = self._selected_tree_path()
@@ -383,6 +443,10 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             payload["size_bytes"] = path.stat().st_size if path.exists() and path.is_file() else None
             self._set_text(self.detail_text, json.dumps(payload, ensure_ascii=False, indent=2))
             return
+        candidate = self._candidate_by_iid.get(iid)
+        if candidate is not None:
+            self._set_text(self.detail_text, json.dumps(candidate, ensure_ascii=False, indent=2))
+            return
         path = self._path_by_iid.get(iid)
         if path is not None:
             self._set_text(self.detail_text, json.dumps({"path": str(path), "exists": path.exists()}, ensure_ascii=False, indent=2))
@@ -403,6 +467,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
     def _set_busy(self, busy: bool, label: str = "") -> None:
         buttons = (
             self.btn_refresh,
+            self.btn_export_ho007,
             self.btn_export_evidence,
             self.btn_animator_link,
             self.btn_system_influence,
@@ -483,6 +548,55 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
 
     def _run_param_staging(self) -> None:
         self._run_job("Influence Staging", lambda run_dir: self.runtime.run_param_staging(run_dir))
+
+    def _export_selected_run_contract_bridge(self) -> None:
+        existing = self._worker_thread
+        if existing is not None and existing.is_alive():
+            messagebox.showinfo("Engineering Analysis", "Дождитесь завершения текущей команды.")
+            return
+        snapshot = self.snapshot_state or self.runtime.snapshot()
+        run_dir = self._selected_candidate_run_dir()
+        if run_dir is None:
+            selected = self._selected_tree_path()
+            initial_dir = selected if selected is not None and selected.is_dir() else snapshot.run_dir
+            if initial_dir is None:
+                initial_dir = self.runtime.repo_root
+            chosen = filedialog.askdirectory(
+                parent=self,
+                title="Выберите completed optimization run directory для HO-007",
+                initialdir=str(initial_dir),
+            )
+            if not chosen:
+                return
+            run_dir = Path(chosen)
+        self._set_busy(True, "Export HO-007")
+        self._append_log(f"$ Export HO-007\nrun_dir={run_dir}")
+
+        def _target() -> None:
+            try:
+                result = self.runtime.export_selected_run_contract_from_run_dir(
+                    run_dir,
+                    selected_from="desktop_engineering_analysis_center",
+                )
+            except Exception as exc:
+                result = EngineeringAnalysisJobResult(
+                    ok=False,
+                    status="FAILED",
+                    command=(),
+                    returncode=None,
+                    run_dir=run_dir,
+                    artifacts=(),
+                    log_text="",
+                    error=f"{type(exc).__name__}: {exc!s}",
+                )
+            self.after(0, lambda: self._finish_job("Export HO-007", result))
+
+        self._worker_thread = threading.Thread(
+            target=_target,
+            name="engineering-analysis-export-ho007",
+            daemon=True,
+        )
+        self._worker_thread.start()
 
     def _export_diagnostics_evidence(self) -> None:
         snapshot = self.snapshot_state or self.runtime.snapshot()

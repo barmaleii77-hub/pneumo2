@@ -617,6 +617,220 @@ class DesktopEngineeringAnalysisRuntime:
         )
         return self._execute_job(run_dir=resolved, command=command)
 
+    def _selected_run_contract_missing_inputs(
+        self,
+        payload: Mapping[str, Any],
+    ) -> tuple[str, ...]:
+        missing: list[str] = []
+        for field in REQUIRED_SELECTED_RUN_CONTRACT_FIELDS:
+            if _value_missing(payload.get(field)):
+                missing.append(field)
+
+        results_index = dict(payload.get("results_artifact_index") or {})
+        for field in ("run_dir", "results_csv_path", "objective_contract_path"):
+            raw = payload.get(field) or results_index.get(field)
+            if field == "run_dir":
+                if _resolve_existing_dir(raw) is None:
+                    missing.append(field)
+            elif _resolve_existing_file(raw) is None:
+                missing.append(field)
+
+        if str(payload.get("analysis_handoff_ready_state") or "").strip().lower() == "blocked":
+            for item in payload.get("blocking_states") or ():
+                text = str(item or "").strip()
+                if text:
+                    missing.append(f"blocking_state:{text}")
+            if not payload.get("blocking_states"):
+                missing.append("analysis_handoff_ready_state")
+        return tuple(dict.fromkeys(missing))
+
+    def build_selected_run_contract_from_run_dir(
+        self,
+        run_dir: Path | str,
+        *,
+        selected_from: str = "desktop_engineering_analysis_center",
+        now_text: str | None = None,
+    ) -> dict[str, Any]:
+        """Build the HO-007 payload with the optimizer's canonical producer helper."""
+
+        resolved = self.resolve_run_dir(run_dir)
+        if resolved is None:
+            raise FileNotFoundError(f"run_dir not found: {run_dir}")
+
+        from pneumo_solver_ui.desktop_optimizer_runtime import DesktopOptimizerRuntime
+
+        ui_root = self.repo_root / "pneumo_solver_ui"
+        if not ui_root.exists():
+            ui_root = self.repo_root
+        optimizer_runtime = DesktopOptimizerRuntime(
+            ui_root=ui_root,
+            python_executable=self._python(),
+        )
+        optimizer_runtime.workspace_dir = _effective_workspace_dir(self.repo_root)
+        details = optimizer_runtime.selected_run_details(resolved)
+        if details is None:
+            raise ValueError(f"not an optimization run directory: {resolved}")
+        payload = optimizer_runtime.build_selected_run_contract(
+            details.summary,
+            selected_from=selected_from,
+            now_text=now_text,
+        )
+        return dict(payload)
+
+    def discover_selected_run_candidates(
+        self,
+        *,
+        limit: int = 25,
+    ) -> tuple[dict[str, Any], ...]:
+        from pneumo_solver_ui.desktop_optimizer_runtime import DesktopOptimizerRuntime
+        from pneumo_solver_ui.optimization_run_history import discover_workspace_optimization_runs
+
+        workspace = _effective_workspace_dir(self.repo_root)
+        ui_root = self.repo_root / "pneumo_solver_ui"
+        if not ui_root.exists():
+            ui_root = self.repo_root
+        optimizer_runtime = DesktopOptimizerRuntime(
+            ui_root=ui_root,
+            python_executable=self._python(),
+        )
+        optimizer_runtime.workspace_dir = workspace
+
+        rows: list[dict[str, Any]] = []
+        summaries = discover_workspace_optimization_runs(workspace)
+        for summary in summaries[: max(0, int(limit or 0))]:
+            payload: dict[str, Any] = {}
+            missing_inputs: tuple[str, ...] = ()
+            bridge_status = "UNKNOWN"
+            error = ""
+            try:
+                payload = optimizer_runtime.build_selected_run_contract(
+                    summary,
+                    selected_from="desktop_engineering_analysis_center_preview",
+                )
+                missing_inputs = self._selected_run_contract_missing_inputs(payload)
+                bridge_status = "READY" if not missing_inputs else "MISSING_INPUTS"
+            except Exception as exc:
+                bridge_status = "FAILED"
+                error = f"{type(exc).__name__}: {exc!s}"
+
+            rows.append(
+                {
+                    "run_id": str(payload.get("run_id") or summary.run_id or summary.run_dir.name),
+                    "run_name": str(payload.get("run_name") or summary.run_dir.name),
+                    "run_dir": str(Path(summary.run_dir).resolve()),
+                    "pipeline_mode": str(summary.pipeline_mode or ""),
+                    "mode": str(payload.get("mode") or ""),
+                    "backend": str(summary.backend or payload.get("backend") or ""),
+                    "status": str(summary.status or payload.get("status") or ""),
+                    "status_label": str(summary.status_label or "").strip(),
+                    "updated_ts": float(summary.updated_ts or 0.0),
+                    "row_count": int(summary.row_count or 0),
+                    "done_count": int(summary.done_count or 0),
+                    "result_path": str(Path(summary.result_path).resolve())
+                    if summary.result_path is not None
+                    else "",
+                    "objective_contract_hash": str(payload.get("objective_contract_hash") or ""),
+                    "hard_gate_key": str(payload.get("hard_gate_key") or ""),
+                    "hard_gate_tolerance": payload.get("hard_gate_tolerance"),
+                    "active_baseline_hash": str(payload.get("active_baseline_hash") or ""),
+                    "suite_snapshot_hash": str(payload.get("suite_snapshot_hash") or ""),
+                    "analysis_handoff_ready_state": str(
+                        payload.get("analysis_handoff_ready_state") or ""
+                    ),
+                    "bridge_status": bridge_status,
+                    "missing_inputs": list(missing_inputs),
+                    "blocking_states": list(payload.get("blocking_states") or ()),
+                    "warnings": list(payload.get("warnings") or ()),
+                    "selected_run_contract_hash": str(
+                        payload.get("selected_run_contract_hash") or ""
+                    ),
+                    "error": error,
+                }
+            )
+        return tuple(rows)
+
+    def export_selected_run_contract_from_run_dir(
+        self,
+        run_dir: Path | str | None = None,
+        *,
+        target_path: Path | str | None = None,
+        selected_from: str = "desktop_engineering_analysis_center",
+        now_text: str | None = None,
+    ) -> EngineeringAnalysisJobResult:
+        resolved = self.resolve_run_dir(run_dir)
+        command = (
+            "export_selected_run_contract_from_run_dir",
+            str(run_dir or ""),
+            str(target_path or self.selected_run_contract_path()),
+        )
+        if resolved is None:
+            return self._missing_inputs_result(
+                run_dir=None,
+                command=command,
+                error="run_dir not found",
+            )
+
+        try:
+            payload = self.build_selected_run_contract_from_run_dir(
+                resolved,
+                selected_from=selected_from,
+                now_text=now_text,
+            )
+        except Exception as exc:
+            return self._missing_inputs_result(
+                run_dir=resolved,
+                command=command,
+                error=f"{type(exc).__name__}: {exc!s}",
+            )
+
+        missing = self._selected_run_contract_missing_inputs(payload)
+        if missing:
+            return self._missing_inputs_result(
+                run_dir=resolved,
+                command=command,
+                error="missing inputs: " + ", ".join(missing),
+            )
+
+        target = Path(target_path).expanduser() if target_path is not None else self.selected_run_contract_path()
+        try:
+            target = target.resolve()
+        except Exception:
+            pass
+        try:
+            _atomic_write_json(target, payload)
+        except Exception as exc:
+            artifacts = self.collect_artifacts(resolved)
+            return EngineeringAnalysisJobResult(
+                ok=False,
+                status="FAILED",
+                command=command,
+                returncode=None,
+                run_dir=resolved,
+                artifacts=artifacts,
+                log_text="",
+                error=f"{type(exc).__name__}: {exc!s}",
+            )
+
+        artifact = EngineeringAnalysisArtifact(
+            key="selected_run_contract_json",
+            title="Selected run contract",
+            category="handoff",
+            path=target,
+            required=True,
+            detail="HO-007 selected run contract exported from an explicit optimization run directory.",
+        )
+        contract_hash = str(payload.get("selected_run_contract_hash") or "")
+        return EngineeringAnalysisJobResult(
+            ok=True,
+            status="FINISHED",
+            command=command,
+            returncode=0,
+            run_dir=resolved,
+            artifacts=(artifact, *self.collect_artifacts(resolved)),
+            log_text=f"selected_run_contract_path={target}\nselected_run_contract_hash={contract_hash}",
+            error="",
+        )
+
     def _artifact(
         self,
         run_dir: Path,
