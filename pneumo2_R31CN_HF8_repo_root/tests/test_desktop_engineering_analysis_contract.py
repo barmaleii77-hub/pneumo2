@@ -22,6 +22,10 @@ from pneumo_solver_ui.desktop_engineering_analysis_runtime import (
     DesktopEngineeringAnalysisRuntime,
     load_selected_run_contract,
 )
+from pneumo_solver_ui.optimization_objective_contract import (
+    objective_contract_hash,
+    objective_contract_payload,
+)
 
 
 def _write_text(path: Path, text: str) -> None:
@@ -144,6 +148,27 @@ def _selected_run_contract_payload(run_dir: Path, **overrides) -> dict:
 def _write_selected_run_contract(path: Path, run_dir: Path, **overrides) -> Path:
     _write_json(path, _selected_run_contract_payload(run_dir, **overrides))
     return path
+
+
+def _build_optimizer_ready_run_dir(tmp_path: Path) -> Path:
+    run_dir = tmp_path / "pneumo_solver_ui" / "workspace" / "opt_runs" / "coord" / "p_ho007_bridge_ready"
+    _write_text(run_dir / "export" / "trials.csv", "status,metrics_json\nDONE,\"{}\"\n")
+    _write_text(run_dir / "coordinator.log", "done=1/1\n")
+    _write_text(run_dir / "run_id.txt", "run_ho007_bridge_ready")
+    _write_json(
+        run_dir / "baseline_source.json",
+        {
+            "active_baseline_hash": "active-baseline-hash-bridge",
+            "suite_snapshot_hash": "suite-snapshot-hash-bridge",
+        },
+    )
+    _write_json(
+        run_dir / "objective_contract.json",
+        objective_contract_payload(
+            source="engineering_analysis_bridge_test",
+        ),
+    )
+    return run_dir
 
 
 def test_compare_influence_surface_preserves_units_and_diagnostics() -> None:
@@ -279,6 +304,106 @@ def test_selected_run_contract_loads_ho007_context_as_analysis_master_source(tmp
     assert snapshot.selected_run_context.results_artifact_index["run_dir"] == str(run_dir)
     assert snapshot.selected_run_contract_hash
     assert snapshot.blocking_states == ()
+
+
+def test_runtime_exports_ho007_selected_run_contract_from_explicit_optimizer_run_dir(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("PNEUMO_WORKSPACE_DIR", raising=False)
+    monkeypatch.delenv("PNEUMO_SELECTED_RUN_CONTRACT_PATH", raising=False)
+    run_dir = _build_optimizer_ready_run_dir(tmp_path)
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="PYTHON")
+
+    result = runtime.export_selected_run_contract_from_run_dir(
+        run_dir,
+        now_text="2026-04-17T00:00:00Z",
+    )
+
+    contract_path = tmp_path / "pneumo_solver_ui" / "workspace" / "handoffs" / "WS-OPTIMIZATION" / "selected_run_contract.json"
+    assert result.ok is True
+    assert result.status == "FINISHED"
+    assert result.returncode == 0
+    assert result.command[0] == "export_selected_run_contract_from_run_dir"
+    assert contract_path.exists()
+    assert result.artifacts[0].key == "selected_run_contract_json"
+
+    payload = json.loads(contract_path.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == "selected_run_contract_v1"
+    assert payload["handoff_id"] == SELECTED_RUN_HANDOFF_ID
+    assert payload["source_workspace"] == SELECTED_RUN_PRODUCED_BY
+    assert payload["target_workspace"] == "WS-ANALYSIS"
+    assert payload["selected_from"] == "desktop_engineering_analysis_center"
+    assert payload["run_id"] == "run_ho007_bridge_ready"
+    assert payload["mode"] == "distributed_coordinator"
+    assert payload["status"] == "done"
+    assert payload["objective_contract_hash"] == objective_contract_hash()
+    assert payload["hard_gate_key"]
+    assert payload["hard_gate_tolerance"] == 0.0
+    assert payload["active_baseline_hash"] == "active-baseline-hash-bridge"
+    assert payload["suite_snapshot_hash"] == "suite-snapshot-hash-bridge"
+    results_csv_path = payload["results_artifact_index"]["results_csv_path"]
+    assert results_csv_path.endswith("export\\trials.csv") or results_csv_path.endswith("export/trials.csv")
+    assert payload["results_artifact_index"]["objective_contract_path"].endswith("objective_contract.json")
+    assert payload["analysis_handoff_ready_state"] == "ready"
+    assert payload["selected_run_contract_hash"]
+
+    contract_snapshot = load_selected_run_contract(contract_path)
+    assert contract_snapshot.status == "READY"
+    assert contract_snapshot.selected_run_context is not None
+    assert contract_snapshot.selected_run_context.run_id == "run_ho007_bridge_ready"
+    assert contract_snapshot.blocking_states == ()
+
+
+def test_runtime_discovers_ho007_bridge_candidates_with_preflight_status(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("PNEUMO_WORKSPACE_DIR", raising=False)
+    monkeypatch.delenv("PNEUMO_SELECTED_RUN_CONTRACT_PATH", raising=False)
+    ready_run_dir = _build_optimizer_ready_run_dir(tmp_path)
+    missing_run_dir = tmp_path / "pneumo_solver_ui" / "workspace" / "opt_runs" / "coord" / "p_ho007_missing"
+    _write_text(missing_run_dir / "coordinator.log", "started but no completed artifacts\n")
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="PYTHON")
+
+    rows = runtime.discover_selected_run_candidates(limit=10)
+
+    by_dir = {Path(row["run_dir"]): row for row in rows}
+    assert ready_run_dir.resolve() in by_dir
+    assert missing_run_dir.resolve() in by_dir
+    ready = by_dir[ready_run_dir.resolve()]
+    missing = by_dir[missing_run_dir.resolve()]
+    assert ready["bridge_status"] == "READY"
+    assert ready["analysis_handoff_ready_state"] == "ready"
+    assert ready["run_id"] == "run_ho007_bridge_ready"
+    assert ready["selected_run_contract_hash"]
+    assert missing["bridge_status"] == "MISSING_INPUTS"
+    assert "results_csv_path" in missing["missing_inputs"]
+    assert "blocking_state:missing results artifact" in missing["missing_inputs"]
+
+
+def test_runtime_refuses_ho007_export_when_optimizer_run_inputs_are_incomplete(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("PNEUMO_WORKSPACE_DIR", raising=False)
+    monkeypatch.delenv("PNEUMO_SELECTED_RUN_CONTRACT_PATH", raising=False)
+    run_dir = tmp_path / "pneumo_solver_ui" / "workspace" / "opt_runs" / "coord" / "p_ho007_missing"
+    _write_text(run_dir / "coordinator.log", "started but no completed artifacts\n")
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="PYTHON")
+
+    result = runtime.export_selected_run_contract_from_run_dir(run_dir)
+
+    contract_path = tmp_path / "pneumo_solver_ui" / "workspace" / "handoffs" / "WS-OPTIMIZATION" / "selected_run_contract.json"
+    assert result.ok is False
+    assert result.status == "MISSING_INPUTS"
+    assert "active_baseline_hash" in result.error
+    assert "suite_snapshot_hash" in result.error
+    assert "results_csv_path" in result.error
+    assert "objective_contract_path" in result.error
+    assert "blocking_state:run unknown" in result.error
+    assert "blocking_state:missing results artifact" in result.error
+    assert not contract_path.exists()
 
 
 def test_missing_selected_contract_blocks_analysis_without_live_runtime(tmp_path: Path) -> None:

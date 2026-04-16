@@ -19,6 +19,7 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     for label in (
         "Обновить",
         "Открыть выбранное",
+        "Экспорт HO-007",
         "Экспорт evidence",
         "System Influence",
         "Full Report",
@@ -33,6 +34,13 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "def _run_system_influence" in src
     assert "def _run_full_report" in src
     assert "def _run_param_staging" in src
+    assert "def _export_selected_run_contract_bridge" in src
+    assert "discover_selected_run_candidates" in src
+    assert "_candidate_by_iid" in src
+    assert "Optimization runs for HO-007" in src
+    assert "def _selected_candidate_run_dir" in src
+    assert "bridge_status" in src
+    assert "filedialog.askdirectory" in src
 
 
 def test_engineering_analysis_shell_discovery_is_wired_to_module_and_aliases() -> None:
