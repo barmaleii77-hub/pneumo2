@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from pneumo_solver_ui.geometry_acceptance_contract import (
+    build_geometry_acceptance_report,
     build_geometry_acceptance_rows,
     collect_geometry_acceptance_from_frame,
     format_geometry_acceptance_summary_lines,
@@ -55,6 +56,12 @@ def test_release_gate_pass_and_rows_are_enriched() -> None:
     lines = format_geometry_acceptance_summary_lines(summary)
     assert any("gate=PASS" in x for x in lines)
     assert any("worst:" in x for x in lines)
+    report = build_geometry_acceptance_report(summary, updated_utc="2026-04-17T00:00:00+00:00")
+    assert report["inspection_status"] == "ok"
+    assert report["truth_state_summary"]["graphics_truth_state"] == "solver_confirmed"
+    assert report["truth_state_summary"]["producer_owned"] is True
+    assert report["truth_state_summary"]["no_synthetic_geometry"] is True
+    assert report["missing_fields"] == []
 
 
 def test_release_gate_fail_identifies_corner_metric_and_reason() -> None:
@@ -93,3 +100,25 @@ def test_release_gate_ignores_structural_frame_xy_offsets_when_wheel_road_xy_is_
     assert float(row_pz["XY frame-wheel offset, мм"] or 0.0) >= 31.0
     lines = format_geometry_acceptance_summary_lines(summary)
     assert any("XYwr 0.000 мм" in x for x in lines)
+
+
+def test_report_warns_on_partial_geometry_truth() -> None:
+    df = _base_df().drop(columns=["road_contact_ЛП_z_м"])
+    summary = collect_geometry_acceptance_from_frame(df)
+    report = build_geometry_acceptance_report(summary)
+
+    assert summary["release_gate"] == "WARN"
+    assert report["inspection_status"] == "warning"
+    assert report["truth_state_summary"]["graphics_truth_state"] == "approximate_inferred_with_warning"
+    assert "road_contact_ЛП_z_м" in report["missing_fields"]
+    assert report["warnings"]
+
+
+def test_report_marks_missing_geometry_truth_unavailable() -> None:
+    summary = collect_geometry_acceptance_from_frame(pd.DataFrame({"время_с": [0.0]}))
+    report = build_geometry_acceptance_report(summary)
+
+    assert summary["release_gate"] == "MISSING"
+    assert report["inspection_status"] == "missing"
+    assert report["truth_state_summary"]["graphics_truth_state"] == "unavailable"
+    assert report["truth_state_summary"]["available"] is False

@@ -9,7 +9,10 @@ This module keeps the exporter honest and machine-checkable:
   distances without inventing synthetic geometry inside Animator.
 """
 
+import hashlib
+import json
 from copy import deepcopy
+from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Mapping, Sequence
 
 import numpy as np
@@ -27,6 +30,20 @@ from .suspension_family_runtime import spring_family_active_flag_column, spring_
 
 LogFn = Callable[[str], None]
 AXES: tuple[str, str, str] = ("x", "y", "z")
+
+
+def _contract_hash(value: Any) -> str:
+    try:
+        blob = json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+    except Exception:
+        blob = repr(value).encode("utf-8", errors="replace")
+    return hashlib.sha256(blob).hexdigest()
 
 VISIBLE_SUSPENSION_FAMILIES: tuple[str, ...] = (
     "frame_corner",
@@ -347,7 +364,7 @@ def build_solver_points_block(df_or_columns: Any) -> dict[str, Any]:
                 visible_partial.append(family)
             if family in LEGACY_ALIAS_FAMILIES:
                 legacy_partial.append(family)
-    return {
+    block = {
         "schema": "solver_points.contract.v1",
         "representation": "explicit_world_xyz_columns_in_npz",
         "space": "world_m",
@@ -359,11 +376,33 @@ def build_solver_points_block(df_or_columns: Any) -> dict[str, Any]:
         "legacy_alias_families": legacy_full,
         "partial_legacy_alias_families": legacy_partial,
         "hardpoints_block_ref": "meta.hardpoints",
+        "lineage": {
+            "source": "producer_export.main_cols",
+            "hash_algorithm": "sha256",
+        },
+        "policy": {
+            "consumer_geometry_fabrication_allowed": False,
+            "missing_truth_state": "unavailable",
+        },
         "notes": [
             "Animator should prefer explicit family refs from meta.hardpoints when present.",
             "This block intentionally references NPZ columns and does not duplicate time-series payload.",
         ],
     }
+    block["solver_points_contract_hash"] = _contract_hash({
+        "schema": block["schema"],
+        "representation": block["representation"],
+        "space": block["space"],
+        "source_ref": block["source_ref"],
+        "families_present": full_families,
+        "families_partial": partial_families,
+        "visible_suspension_skeleton_families": visible_full,
+        "partial_visible_suspension_skeleton_families": visible_partial,
+        "legacy_alias_families": legacy_full,
+        "partial_legacy_alias_families": legacy_partial,
+        "policy": block["policy"],
+    })
+    return block
 
 
 def build_hardpoints_block(df_or_columns: Any) -> dict[str, Any]:
@@ -404,19 +443,49 @@ def build_hardpoints_block(df_or_columns: Any) -> dict[str, Any]:
         else:
             fam_block["coverage"] = "missing"
         if fam_block["coverage"] != "missing":
+            fam_block["family_contract_hash"] = _contract_hash({
+                "family": family,
+                "role": fam_block.get("role"),
+                "kind": fam_block.get("kind"),
+                "space": "world_m",
+                "corner_order": list(CORNERS),
+                "coverage": fam_block.get("coverage"),
+                "corners": fam_block.get("corners"),
+                "missing_corners": fam_block.get("missing_corners"),
+                "partial_corners": fam_block.get("partial_corners"),
+            })
             families[family] = fam_block
-    return {
+    block = {
         "schema": "hardpoints.export.v1",
         "space": "world_m",
         "corner_order": list(CORNERS),
         "canonical_families": canonical_full,
         "partial_families": partial_families,
         "families": families,
+        "lineage": {
+            "source": "producer_export.main_cols",
+            "hash_algorithm": "sha256",
+        },
+        "policy": {
+            "consumer_geometry_fabrication_allowed": False,
+            "missing_truth_state": "unavailable",
+            "legacy_alias_reconstruction_allowed": False,
+        },
         "notes": [
             "Each family points back to canonical NPZ columns; no geometry is reconstructed here.",
             "Family coverage may be partial on older bundles that do not export optional wishbone hardpoints.",
         ],
     }
+    block["hardpoints_contract_hash"] = _contract_hash({
+        "schema": block["schema"],
+        "space": block["space"],
+        "corner_order": block["corner_order"],
+        "canonical_families": canonical_full,
+        "partial_families": partial_families,
+        "families": families,
+        "policy": block["policy"],
+    })
+    return block
 
 
 def _geometry_value_map(geometry: Mapping[str, Any], key_map: Mapping[str, str]) -> tuple[dict[str, float], list[str]]:
@@ -832,6 +901,8 @@ def build_packaging_block(
         contract_complete = bool(length_ok and geometry_ok and advanced_ok)
         complete_flags.append(contract_complete)
         cylinder_geometry_by_name[cyl_name] = resolved_geometry_by_axle
+        truth_mode = "full_mesh_allowed" if contract_complete else "axis_only_honesty_mode"
+        graphics_truth_state = "solver_confirmed" if contract_complete else "approximate_inferred_with_warning"
 
         cyl_block: dict[str, Any] = {
             "mount_families": {
@@ -874,6 +945,11 @@ def build_packaging_block(
             "advanced_fields_present": advanced_present,
             "advanced_fields_missing": advanced_missing,
             "contract_complete": contract_complete,
+            "truth_mode": truth_mode,
+            "graphics_truth_state": graphics_truth_state,
+            "axis_only_honesty_mode": bool(not contract_complete),
+            "full_mesh_allowed": bool(contract_complete),
+            "consumer_geometry_fabrication_allowed": False,
             "notes": [
                 "Animator must not invent missing absolute packaging geometry.",
                 "When advanced fields are absent, consumers should stay in simplified body/rod truth mode and warn explicitly.",
@@ -947,18 +1023,27 @@ def build_packaging_block(
     )
 
     status = "complete" if complete_flags and all(complete_flags) else "partial"
-    return {
+    complete_cylinders = [name for name, block in cylinders_out.items() if bool(dict(block or {}).get("contract_complete"))]
+    axis_only_cylinders = [name for name in cylinders_out if name not in complete_cylinders]
+    block = {
         "schema": "cylinder_packaging.contract.v1",
         "status": status,
         "representation": "geometry_scalars_plus_mount_refs",
         "required_advanced_fields": list(CYLINDER_ADVANCED_FIELDS),
         "missing_advanced_fields": all_missing_advanced,
+        "complete_cylinders": complete_cylinders,
+        "axis_only_cylinders": axis_only_cylinders,
         "cylinders": cylinders_out,
         "spring_families": spring_families_out,
         "shared_spring_runtime_by_axle": shared_spring_runtime,
         "spring_host_interference_families": spring_host_interference_families,
         "spring_pair_clearance_by_corner": spring_pair_clearance_by_corner,
         "spring_pair_interference_corners": spring_pair_interference_corners,
+        "policy": {
+            "consumer_geometry_fabrication_allowed": False,
+            "full_body_rod_piston_requires_complete_passport": True,
+            "axis_only_honesty_mode_when_incomplete": True,
+        },
         "notes": [
             "Scalar geometry lives in meta.geometry and is referenced here explicitly.",
             "Mount points are referenced through meta.hardpoints families and main_values/main_cols NPZ refs.",
@@ -966,6 +1051,22 @@ def build_packaging_block(
             "Spring runtime prefers explicit family columns and falls back to shared axle diagnostics only when older bundles do not export the family owner yet.",
         ],
     }
+    block["packaging_contract_hash"] = _contract_hash({
+        "schema": block["schema"],
+        "status": block["status"],
+        "representation": block["representation"],
+        "required_advanced_fields": block["required_advanced_fields"],
+        "missing_advanced_fields": block["missing_advanced_fields"],
+        "complete_cylinders": complete_cylinders,
+        "axis_only_cylinders": axis_only_cylinders,
+        "cylinders": cylinders_out,
+        "spring_families": spring_families_out,
+        "shared_spring_runtime_by_axle": shared_spring_runtime,
+        "spring_host_interference_families": spring_host_interference_families,
+        "spring_pair_interference_corners": spring_pair_interference_corners,
+        "policy": block["policy"],
+    })
+    return block
 
 
 def augment_anim_latest_meta(
@@ -993,6 +1094,7 @@ def summarize_anim_export_contract(meta: Mapping[str, Any] | None) -> dict[str, 
     truth_ready = bool(packaging.get("status") == "complete")
     missing_advanced = [str(x) for x in list(packaging.get("missing_advanced_fields") or []) if str(x).strip()]
     complete_cylinders = [name for name, block in cylinders.items() if bool(dict(block or {}).get("contract_complete"))]
+    axis_only_cylinders = [name for name in cylinders if name not in complete_cylinders]
     spring_host_interference_families = [
         str(name)
         for name, block in spring_families.items()
@@ -1035,6 +1137,8 @@ def summarize_anim_export_contract(meta: Mapping[str, Any] | None) -> dict[str, 
         "hardpoints_family_count": int(len(list((hardpoints.get("families") or {}).keys()))),
         "complete_cylinders": complete_cylinders,
         "complete_cylinder_count": int(len(complete_cylinders)),
+        "axis_only_cylinders": axis_only_cylinders,
+        "axis_only_cylinder_count": int(len(axis_only_cylinders)),
         "spring_family_count": int(len(spring_families)),
         "spring_host_interference_families": spring_host_interference_families,
         "spring_pair_interference_corners": spring_pair_interference_corners,
@@ -1113,9 +1217,6 @@ def summarize_anim_export_objective_metrics(meta: Mapping[str, Any] | None) -> d
     }
 
 
-from pathlib import Path
-import json
-
 ANIM_EXPORT_CONTRACT_SIDECAR_NAME = "anim_latest.contract.sidecar.json"
 ANIM_EXPORT_CONTRACT_VALIDATION_JSON_NAME = "anim_latest.contract.validation.json"
 ANIM_EXPORT_CONTRACT_VALIDATION_MD_NAME = "anim_latest.contract.validation.md"
@@ -1158,6 +1259,9 @@ def build_hardpoints_source_of_truth(
         "space": str(hardpoints.get("space") or "world_m"),
         "representation": "explicit_npz_column_refs_only",
         "complete": complete,
+        "hardpoints_contract_hash": str(hardpoints.get("hardpoints_contract_hash") or ""),
+        "lineage": _jsonable(hardpoints.get("lineage") or {}),
+        "policy": _jsonable(hardpoints.get("policy") or {}),
         "visible_required_families": list(VISIBLE_SUSPENSION_FAMILIES),
         "visible_present_families": visible_present,
         "visible_partial_families": visible_partial,
@@ -1204,7 +1308,11 @@ def build_cylinder_packaging_passport(
             "missing_geometry_fields": list(cyl_block.get("missing_geometry_fields") or []),
             "advanced_fields_present": list(cyl_block.get("advanced_fields_present") or []),
             "advanced_fields_missing": list(cyl_block.get("advanced_fields_missing") or []),
-            "truth_mode": "full_mesh_allowed" if contract_complete else "axis_only_honesty_mode",
+            "truth_mode": str(cyl_block.get("truth_mode") or ("full_mesh_allowed" if contract_complete else "axis_only_honesty_mode")),
+            "graphics_truth_state": str(cyl_block.get("graphics_truth_state") or ("solver_confirmed" if contract_complete else "approximate_inferred_with_warning")),
+            "axis_only_honesty_mode": bool(cyl_block.get("axis_only_honesty_mode", not contract_complete)),
+            "full_mesh_allowed": bool(cyl_block.get("full_mesh_allowed", contract_complete)),
+            "consumer_geometry_fabrication_allowed": bool(cyl_block.get("consumer_geometry_fabrication_allowed", False)),
         }
     return {
         "schema": "cylinder_packaging_passport.v1",
@@ -1212,6 +1320,7 @@ def build_cylinder_packaging_passport(
         "npz_path": str(npz_path or ""),
         "pointer_path": str(pointer_path or ""),
         "packaging_status": str(packaging.get("status") or ""),
+        "packaging_contract_hash": str(packaging.get("packaging_contract_hash") or ""),
         "required_advanced_fields": list(packaging.get("required_advanced_fields") or list(CYLINDER_ADVANCED_FIELDS)),
         "missing_advanced_fields": list(packaging.get("missing_advanced_fields") or []),
         "complete_cylinders": complete_cylinders,
@@ -1225,6 +1334,8 @@ def build_cylinder_packaging_passport(
         "consumer_policy": {
             "complete_contract": "Desktop Animator may render body/rod/piston meshes.",
             "partial_contract": "Desktop Animator must stay in axis-only honesty mode and warn explicitly.",
+            "consumer_geometry_fabrication_allowed": False,
+            "full_body_rod_piston_requires_complete_passport": True,
         },
         "notes": [
             "This passport is exporter-owned truth and must be preferred over renderer heuristics.",
@@ -1277,6 +1388,182 @@ def build_anim_export_contract_sidecar(
     }
 
 
+def _list_strings(value: Any) -> list[str]:
+    if isinstance(value, (list, tuple, set)):
+        return [str(x) for x in value if str(x).strip()]
+    return []
+
+
+def _same_string_list(a: Any, b: Any) -> bool:
+    return list(_list_strings(a)) == list(_list_strings(b))
+
+
+def _fake_marker_truthy(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return bool(value)
+    if isinstance(value, (int, float)):
+        try:
+            return bool(float(value))
+        except Exception:
+            return bool(value)
+    if isinstance(value, str):
+        txt = value.strip().lower()
+        return txt not in {"", "0", "false", "no", "none", "null", "n/a", "allowed=false"}
+    if isinstance(value, (list, tuple, set, dict)):
+        return bool(value)
+    return bool(value)
+
+
+def _collect_fake_geometry_failures(meta_dict: Mapping[str, Any]) -> list[str]:
+    bad_value_tokens = ("fake", "fabricated", "invented", "synthetic", "dummy", "mock")
+    bad_key_tokens = ("fake", "fabricated", "invented", "synthetic", "dummy", "mock")
+    source_keys = {"source", "source_kind", "source_type", "truth_source", "provenance", "origin"}
+    failures: list[str] = []
+    roots = {
+        "solver_points": meta_dict.get("solver_points"),
+        "hardpoints": meta_dict.get("hardpoints"),
+        "packaging": meta_dict.get("packaging"),
+    }
+
+    def walk(value: Any, path: str) -> None:
+        if isinstance(value, Mapping):
+            for key, child in value.items():
+                key_s = str(key)
+                key_l = key_s.lower()
+                child_path = f"{path}.{key_s}" if path else key_s
+                if "no_synthetic" not in key_l and not key_l.startswith(("no_", "not_")):
+                    if any(tok in key_l for tok in bad_key_tokens) and _fake_marker_truthy(child):
+                        failures.append(f"fake/invented geometry marker at {child_path}")
+                if key_l in source_keys and isinstance(child, str):
+                    child_l = child.strip().lower()
+                    if any(tok in child_l for tok in bad_value_tokens):
+                        failures.append(f"fake/invented geometry source at {child_path}: {child}")
+                walk(child, child_path)
+        elif isinstance(value, (list, tuple)):
+            for idx, child in enumerate(value):
+                walk(child, f"{path}[{idx}]")
+
+    for root_name, root_value in roots.items():
+        walk(root_value, root_name)
+    return list(dict.fromkeys(failures))
+
+
+def _collect_contract_drift_failures(
+    meta_dict: Mapping[str, Any],
+    *,
+    visible_present: Sequence[str],
+    visible_partial: Sequence[str],
+    visible_missing: Sequence[str],
+) -> list[str]:
+    failures: list[str] = []
+    solver_points = dict(meta_dict.get("solver_points") or {}) if isinstance(meta_dict.get("solver_points"), Mapping) else {}
+    hardpoints = dict(meta_dict.get("hardpoints") or {}) if isinstance(meta_dict.get("hardpoints"), Mapping) else {}
+    packaging = dict(meta_dict.get("packaging") or {}) if isinstance(meta_dict.get("packaging"), Mapping) else {}
+    validation = dict(meta_dict.get("anim_export_validation") or {}) if isinstance(meta_dict.get("anim_export_validation"), Mapping) else {}
+    hardpoint_families = dict(hardpoints.get("families") or {}) if isinstance(hardpoints.get("families"), Mapping) else {}
+    cylinders = dict(packaging.get("cylinders") or {}) if isinstance(packaging.get("cylinders"), Mapping) else {}
+
+    if solver_points and not str(solver_points.get("solver_points_contract_hash") or "").strip():
+        failures.append("contract drift: missing solver_points_contract_hash")
+    if hardpoints and not str(hardpoints.get("hardpoints_contract_hash") or "").strip():
+        failures.append("contract drift: missing hardpoints_contract_hash")
+    if packaging and not str(packaging.get("packaging_contract_hash") or "").strip():
+        failures.append("contract drift: missing packaging_contract_hash")
+
+    if solver_points and hardpoints:
+        solver_visible = _list_strings(solver_points.get("visible_suspension_skeleton_families"))
+        solver_partial = _list_strings(solver_points.get("partial_visible_suspension_skeleton_families"))
+        if set(solver_visible) != set(visible_present):
+            failures.append(
+                "contract drift: solver_points.visible_suspension_skeleton_families "
+                f"{solver_visible} != hardpoints.full {list(visible_present)}"
+            )
+        if set(solver_partial) != set(visible_partial):
+            failures.append(
+                "contract drift: solver_points.partial_visible_suspension_skeleton_families "
+                f"{solver_partial} != hardpoints.partial {list(visible_partial)}"
+            )
+
+    for family in list(visible_present) + list(visible_partial):
+        fam_block = dict(hardpoint_families.get(family) or {}) if isinstance(hardpoint_families.get(family), Mapping) else {}
+        if not str(fam_block.get("family_contract_hash") or "").strip():
+            failures.append(f"contract drift: missing hardpoint family_contract_hash for {family}")
+
+    if packaging:
+        complete_cylinders = [str(name) for name, block in cylinders.items() if bool(dict(block or {}).get("contract_complete"))]
+        axis_only_cylinders = [str(name) for name in cylinders if str(name) not in complete_cylinders]
+        expected_status = "complete" if cylinders and len(complete_cylinders) == len(cylinders) else "partial"
+        if str(packaging.get("status") or "") != expected_status:
+            failures.append(
+                "contract drift: packaging.status "
+                f"{packaging.get('status')!r} != derived {expected_status!r}"
+            )
+        if "complete_cylinders" in packaging and not _same_string_list(packaging.get("complete_cylinders"), complete_cylinders):
+            failures.append(
+                "contract drift: packaging.complete_cylinders "
+                f"{_list_strings(packaging.get('complete_cylinders'))} != derived {complete_cylinders}"
+            )
+        if "axis_only_cylinders" in packaging and not _same_string_list(packaging.get("axis_only_cylinders"), axis_only_cylinders):
+            failures.append(
+                "contract drift: packaging.axis_only_cylinders "
+                f"{_list_strings(packaging.get('axis_only_cylinders'))} != derived {axis_only_cylinders}"
+            )
+        for cyl_name, block in cylinders.items():
+            cyl_block = dict(block or {}) if isinstance(block, Mapping) else {}
+            complete = bool(cyl_block.get("contract_complete"))
+            expected_mode = "full_mesh_allowed" if complete else "axis_only_honesty_mode"
+            if str(cyl_block.get("truth_mode") or "") != expected_mode:
+                failures.append(
+                    f"contract drift: packaging.cylinders.{cyl_name}.truth_mode "
+                    f"{cyl_block.get('truth_mode')!r} != {expected_mode!r}"
+                )
+            if complete:
+                if cyl_block.get("full_mesh_allowed") is not True:
+                    failures.append(f"contract drift: {cyl_name} complete passport does not allow full mesh")
+            else:
+                if cyl_block.get("axis_only_honesty_mode") is not True:
+                    failures.append(f"contract drift: {cyl_name} incomplete passport lacks axis-only honesty mode")
+                if bool(cyl_block.get("full_mesh_allowed")):
+                    failures.append(f"fake/invented geometry risk: {cyl_name} full mesh allowed without complete passport")
+            if bool(cyl_block.get("consumer_geometry_fabrication_allowed")):
+                failures.append(f"fake/invented geometry risk: {cyl_name} allows consumer fabrication")
+        policy = dict(packaging.get("policy") or {}) if isinstance(packaging.get("policy"), Mapping) else {}
+        if bool(policy.get("consumer_geometry_fabrication_allowed")):
+            failures.append("fake/invented geometry risk: packaging policy allows consumer fabrication")
+
+    if validation:
+        expected_values = {
+            "visible_present_family_count": int(len(visible_present)),
+            "visible_required_family_count": int(len(VISIBLE_SUSPENSION_FAMILIES)),
+            "visible_present_families": list(visible_present),
+            "visible_partial_families": list(visible_partial),
+            "visible_missing_families": list(visible_missing),
+            "packaging_status": str(packaging.get("status") or ""),
+            "packaging_truth_ready": bool(packaging.get("status") == "complete"),
+        }
+        for key, expected in expected_values.items():
+            if key not in validation:
+                continue
+            got = validation.get(key)
+            if isinstance(expected, list):
+                ok = _same_string_list(got, expected)
+            elif isinstance(expected, bool):
+                ok = bool(got) is expected
+            elif isinstance(expected, int):
+                try:
+                    ok = int(got) == expected
+                except Exception:
+                    ok = False
+            else:
+                ok = str(got) == str(expected)
+            if not ok:
+                failures.append(f"contract drift: anim_export_validation.{key}={got!r} != current {expected!r}")
+
+    return failures
+
+
 def validate_anim_export_contract_meta(meta: Mapping[str, Any] | None) -> dict[str, Any]:
     meta_dict = dict(meta or {})
     solver_summary = summarize_anim_export_contract(meta_dict)
@@ -1292,6 +1579,13 @@ def validate_anim_export_contract_meta(meta: Mapping[str, Any] | None) -> dict[s
     messages: list[str] = []
     failures: list[str] = []
     warnings: list[str] = []
+    contract_drift_failures = _collect_contract_drift_failures(
+        meta_dict,
+        visible_present=visible_present,
+        visible_partial=visible_partial,
+        visible_missing=visible_missing,
+    )
+    fake_geometry_failures = _collect_fake_geometry_failures(meta_dict)
 
     if not solver_summary.get("has_solver_points_block"):
         failures.append("missing meta.solver_points")
@@ -1308,6 +1602,10 @@ def validate_anim_export_contract_meta(meta: Mapping[str, Any] | None) -> dict[s
             "packaging truth-contract is partial: "
             + (", ".join(str(x) for x in (packaging.get("missing_advanced_fields") or [])) or "advanced packaging fields missing")
         )
+    if contract_drift_failures:
+        failures.extend(contract_drift_failures)
+    if fake_geometry_failures:
+        failures.extend(fake_geometry_failures)
 
     spring_host_interference = [
         str(name)
@@ -1383,6 +1681,13 @@ def validate_anim_export_contract_meta(meta: Mapping[str, Any] | None) -> dict[s
             "visible_present_families": visible_present,
             "visible_partial_families": visible_partial,
             "visible_missing_families": visible_missing,
+            "contract_drift_failures": contract_drift_failures,
+            "fake_geometry_failures": fake_geometry_failures,
+            "producer_truth_policy": {
+                "consumer_geometry_fabrication_allowed": False,
+                "full_body_rod_piston_requires_complete_passport": True,
+                "axis_only_honesty_mode_when_incomplete": True,
+            },
             "validation_level": level,
         },
         "messages": messages,
@@ -1418,6 +1723,12 @@ def render_anim_export_contract_validation_md(report: Mapping[str, Any] | None) 
     partial_vis = [str(x) for x in (summary.get("visible_partial_families") or []) if str(x).strip()]
     if partial_vis:
         lines.extend(["", "## visible_partial_families", *[f"- {x}" for x in partial_vis]])
+    drift = [str(x) for x in (summary.get("contract_drift_failures") or []) if str(x).strip()]
+    if drift:
+        lines.extend(["", "## contract_drift_failures", *[f"- {x}" for x in drift]])
+    fake = [str(x) for x in (summary.get("fake_geometry_failures") or []) if str(x).strip()]
+    if fake:
+        lines.extend(["", "## fake_geometry_failures", *[f"- {x}" for x in fake]])
     spring_interference = [str(x) for x in (summary.get("spring_host_interference_families") or []) if str(x).strip()]
     if spring_interference:
         lines.extend(["", "## spring_host_interference_families", *[f"- {x}" for x in spring_interference]])
