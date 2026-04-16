@@ -407,6 +407,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                         "influence_status": str(validation_obj.get("influence_status") or ""),
                         "calibration_status": str(validation_obj.get("calibration_status") or ""),
                         "sensitivity_row_count": len(engineering_obj.get("sensitivity_summary") or []),
+                        "handoff_requirements": dict(engineering_obj.get("handoff_requirements") or {}),
                     }
                 else:
                     warnings.append(f"{engineering_name} is not valid JSON")
@@ -808,6 +809,8 @@ def _render_md(rep: Dict[str, Any]) -> str:
         f"- influence_status: `{engineering.get('influence_status') or '-'}`",
         f"- calibration_status: `{engineering.get('calibration_status') or '-'}`",
         f"- sensitivity_row_count: `{engineering.get('sensitivity_row_count')}`",
+        f"- handoff_contract_status: `{dict(engineering.get('handoff_requirements') or {}).get('contract_status') or '-'}`",
+        f"- handoff_required_path: `{dict(engineering.get('handoff_requirements') or {}).get('required_contract_path') or '-'}`",
         "",
         "## Optimizer scope",
         "",

@@ -31,6 +31,7 @@ def make_send_bundle(
     project_root: Optional[PathLike] = None,
     tag: Optional[str] = None,
     operator_note: Optional[str] = None,
+    trigger: Optional[str] = None,
 ) -> Path:
     """Собрать полный диагностический ZIP.
 
@@ -64,6 +65,7 @@ def make_send_bundle(
         project_root=root,
         tag=tag,
         operator_note=operator_note,
+        trigger=trigger,
     )
 
 
@@ -77,6 +79,7 @@ def make_send_bundle_bytes(
     project_root: Optional[PathLike] = None,
     tag: Optional[str] = None,
     operator_note: Optional[str] = None,
+    trigger: Optional[str] = None,
 ) -> Tuple[bytes, str]:
     """Собрать полный диагностический ZIP и вернуть (bytes, filename)."""
     p = make_send_bundle(
@@ -89,5 +92,6 @@ def make_send_bundle_bytes(
         include_workspace_osc=include_workspace_osc,
         primary_session_dir=primary_session_dir,
         project_root=project_root,
+        trigger=trigger,
     )
     return p.read_bytes(), p.name

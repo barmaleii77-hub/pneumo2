@@ -392,6 +392,7 @@ def build_full_diagnostics_bundle(
             primary_session_dir=primary_session_dir,
             tag=tag or None,
             operator_note=str(cfg.reason or "").strip() or None,
+            trigger=str(trigger or "manual"),
         )
         zip_path = Path(zp).resolve()
 

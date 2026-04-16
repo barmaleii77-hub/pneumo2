@@ -195,11 +195,13 @@ def load_desktop_diagnostics_bundle_record(
     meta = read_last_meta_from_out_dir(resolved_out_dir)
     summary = summarize_last_bundle_meta(meta)
 
-    latest_zip = Path(summary["zip_path"]).expanduser() if summary.get("zip_path") else None
-    if latest_zip and latest_zip.exists():
-        latest_zip = latest_zip.resolve()
-    else:
-        latest_zip = _pick_latest_bundle_candidate(resolved_out_dir)
+    latest_zip = _pick_latest_bundle_candidate(resolved_out_dir)
+    if latest_zip is None and summary.get("zip_path"):
+        latest_zip = Path(summary["zip_path"]).expanduser()
+        if latest_zip.exists():
+            latest_zip = latest_zip.resolve()
+        else:
+            latest_zip = None
 
     dashboard = load_latest_send_bundle_anim_dashboard(resolved_out_dir)
     summary_lines = [str(x) for x in (summary.get("summary_lines") or []) if str(x).strip()]

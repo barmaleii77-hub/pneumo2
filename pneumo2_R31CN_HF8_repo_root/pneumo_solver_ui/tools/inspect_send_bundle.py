@@ -40,6 +40,8 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
         if str(x).strip()
     ]
     artifacts = dict(signals.get("artifacts") or {})
+    evidence_manifest = dict(signals.get("evidence_manifest") or {})
+    engineering_analysis_evidence = dict(signals.get("engineering_analysis_evidence") or {})
     geometry_acceptance = dict(rep.signals.get("geometry_acceptance") or {})
     summary: Dict[str, Any] = {
         "schema": "send_bundle_inspection",
@@ -49,6 +51,8 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
         "ok": bool(rep.ok),
         "release": meta.get("release") or "",
         "artifacts": artifacts,
+        "evidence_manifest": evidence_manifest,
+        "engineering_analysis_evidence": engineering_analysis_evidence,
         "anim_latest": anim,
         "mnemo_event_log": mnemo,
         "ring_closure": ring_closure,
@@ -65,6 +69,8 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
         "has_dashboard_report": bool(artifacts.get("dashboard_report")),
         "has_triage_report": bool(artifacts.get("triage_report")),
         "has_anim_diagnostics": bool(artifacts.get("anim_diagnostics")),
+        "has_evidence_manifest": bool(artifacts.get("evidence_manifest")),
+        "has_engineering_analysis_evidence": bool(artifacts.get("engineering_analysis_evidence")),
         "has_browser_perf_registry_snapshot": bool(artifacts.get("browser_perf_registry_snapshot")),
         "has_browser_perf_previous_snapshot": bool(artifacts.get("browser_perf_previous_snapshot")),
         "has_browser_perf_contract": bool(artifacts.get("browser_perf_contract")),
@@ -83,6 +89,8 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
     rep_obj = summary.get("health_report") or {}
     rep_signals = dict(rep_obj.get("signals") or {})
     anim = dict(summary.get("anim_latest") or {})
+    evidence = dict(summary.get("evidence_manifest") or {})
+    engineering = dict(summary.get("engineering_analysis_evidence") or {})
     mnemo = dict(summary.get("mnemo_event_log") or {})
     ring_closure = dict(summary.get("ring_closure") or {})
     optimizer_scope = dict(summary.get("optimizer_scope") or {})
@@ -100,6 +108,8 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
         f"- Dashboard report: {summary.get('has_dashboard_report')}",
         f"- Triage report: {summary.get('has_triage_report')}",
         f"- Anim diagnostics: {summary.get('has_anim_diagnostics')}",
+        f"- Evidence manifest: {summary.get('has_evidence_manifest')}",
+        f"- Engineering analysis evidence: {summary.get('has_engineering_analysis_evidence')}",
         f"- Browser perf snapshot: {summary.get('has_browser_perf_registry_snapshot')}",
         f"- Browser perf previous snapshot: {summary.get('has_browser_perf_previous_snapshot')}",
         f"- Browser perf contract: {summary.get('has_browser_perf_contract')}",
@@ -132,6 +142,38 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
         lines.append(f"- scope_sync_ok: `{optimizer_scope.get('scope_sync_ok')}`")
         for issue in list(optimizer_scope.get("issues") or [])[:5]:
             lines.append(f"- scope_issue: {issue}")
+    if evidence:
+        lines += [
+            "",
+            "## Evidence manifest",
+            f"- collection_mode: `{evidence.get('collection_mode') or '—'}`",
+            f"- trigger: `{evidence.get('trigger') or '—'}`",
+            f"- finalization_stage: `{evidence.get('finalization_stage') or '—'}`",
+            f"- zip_sha256: `{evidence.get('zip_sha256') or '—'}`",
+            f"- pb002_missing_required_count: `{evidence.get('pb002_missing_required_count')}`",
+            f"- missing_required_count: `{evidence.get('missing_required_count')}`",
+            f"- missing_optional_count: `{evidence.get('missing_optional_count')}`",
+        ]
+        for warning in list(evidence.get("missing_warnings") or [])[:8]:
+            lines.append(f"- missing_evidence: {warning}")
+    if engineering:
+        lines += [
+            "",
+            "## Engineering analysis evidence",
+            f"- status: `{engineering.get('status') or 'MISSING'}`",
+            f"- source_path: `{engineering.get('source_path') or '—'}`",
+            f"- evidence_manifest_hash: `{engineering.get('evidence_manifest_hash') or '—'}`",
+            f"- influence_status: `{engineering.get('influence_status') or '—'}`",
+            f"- calibration_status: `{engineering.get('calibration_status') or '—'}`",
+            f"- sensitivity_row_count: `{engineering.get('sensitivity_row_count')}`",
+        ]
+        requirements = dict(engineering.get("handoff_requirements") or {})
+        if requirements:
+            lines += [
+                f"- handoff_contract_status: `{requirements.get('contract_status') or '—'}`",
+                f"- handoff_required_path: `{requirements.get('required_contract_path') or '—'}`",
+                f"- handoff_missing_fields: `{', '.join(str(x) for x in (requirements.get('missing_fields') or [])) or '—'}`",
+            ]
     lines += [
         "",
         "## Anim latest",

@@ -55,6 +55,15 @@ from .send_bundle_contract import (
     summarize_ring_closure,
     summarize_mnemo_event_log,
 )
+from .send_bundle_evidence import (
+    ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME,
+    ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME,
+    EVIDENCE_MANIFEST_ARCNAME,
+    build_evidence_manifest,
+    evidence_manifest_warnings,
+    load_evidence_manifest_from_zip,
+    read_manifest_inputs_from_zip,
+)
 
 
 @dataclass
@@ -146,6 +155,8 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 "dashboard_report": "dashboard/dashboard.json" in name_set,
                 "triage_report": "triage/triage_report.json" in name_set or "triage/triage_report.md" in name_set,
                 "anim_diagnostics": ANIM_DIAG_JSON in name_set,
+                "evidence_manifest": EVIDENCE_MANIFEST_ARCNAME in name_set,
+                "engineering_analysis_evidence": ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME in name_set,
                 "health_report_embedded": "health/health_report.json" in name_set or "health/health_report.md" in name_set,
                 "browser_perf_registry_snapshot": f"workspace/exports/{BROWSER_PERF_REGISTRY_SNAPSHOT_JSON_NAME}" in name_set,
                 "browser_perf_previous_snapshot": f"workspace/exports/{BROWSER_PERF_PREVIOUS_SNAPSHOT_JSON_NAME}" in name_set,
@@ -161,6 +172,48 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     "release": meta.get("release"),
                     "run_id": meta.get("run_id"),
                     "created_at": meta.get("created_at"),
+                    "trigger": meta.get("trigger"),
+                    "collection_mode": meta.get("collection_mode"),
+                }
+
+            try:
+                evidence_obj = load_evidence_manifest_from_zip(z)
+                if not evidence_obj:
+                    evidence_meta, evidence_json_by_name = read_manifest_inputs_from_zip(z)
+                    evidence_obj = build_evidence_manifest(
+                        zip_path=zip_path,
+                        names=names,
+                        meta=evidence_meta or meta or {},
+                        json_by_name=evidence_json_by_name,
+                        planned_paths=(EVIDENCE_MANIFEST_ARCNAME, "health/health_report.json", "health/health_report.md"),
+                        stage="health_report_collection",
+                    )
+                signals["evidence_manifest"] = dict(evidence_obj)
+                for msg in evidence_manifest_warnings(evidence_obj):
+                    if msg not in notes:
+                        notes.append(msg)
+            except Exception as exc:
+                notes.append(f"failed to inspect evidence manifest: {type(exc).__name__}: {exc!s}")
+
+            engineering_name = ""
+            if ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME in name_set:
+                engineering_name = ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME
+            elif ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME in name_set:
+                engineering_name = ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME
+            if engineering_name:
+                engineering_obj = _read_json_from_zip(z, engineering_name)
+                validation_obj = dict((engineering_obj or {}).get("validation") or {}) if isinstance(engineering_obj, dict) else {}
+                signals["engineering_analysis_evidence"] = {
+                    "status": "READY" if isinstance(engineering_obj, dict) and engineering_obj.get("evidence_manifest_hash") else "WARN",
+                    "source_path": engineering_name,
+                    "schema": str((engineering_obj or {}).get("schema") or "") if isinstance(engineering_obj, dict) else "",
+                    "evidence_manifest_hash": str((engineering_obj or {}).get("evidence_manifest_hash") or "") if isinstance(engineering_obj, dict) else "",
+                    "run_dir": str((engineering_obj or {}).get("run_dir") or "") if isinstance(engineering_obj, dict) else "",
+                    "analysis_status": str(validation_obj.get("status") or ""),
+                    "influence_status": str(validation_obj.get("influence_status") or ""),
+                    "calibration_status": str(validation_obj.get("calibration_status") or ""),
+                    "sensitivity_row_count": len((engineering_obj or {}).get("sensitivity_summary") or []) if isinstance(engineering_obj, dict) else 0,
+                    "handoff_requirements": dict((engineering_obj or {}).get("handoff_requirements") or {}) if isinstance(engineering_obj, dict) else {},
                 }
 
             anim_sources: Dict[str, Dict[str, Any]] = {}
@@ -434,6 +487,8 @@ def render_health_report_md(rep: HealthReport) -> str:
     ring_closure = dict(rep.signals.get("ring_closure") or anim.get("ring_closure_summary") or {})
     operator_recommendations = [str(x) for x in (rep.signals.get("operator_recommendations") or []) if str(x).strip()]
     artifacts = dict(rep.signals.get("artifacts") or {})
+    evidence = dict(rep.signals.get("evidence_manifest") or {})
+    engineering = dict(rep.signals.get("engineering_analysis_evidence") or {})
     optimizer_scope = dict(rep.signals.get("optimizer_scope") or {})
     optimizer_scope_gate = dict(rep.signals.get("optimizer_scope_gate") or {})
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
@@ -449,6 +504,8 @@ def render_health_report_md(rep: HealthReport) -> str:
         f"- dashboard_report: {artifacts.get('dashboard_report')}",
         f"- triage_report: {artifacts.get('triage_report')}",
         f"- anim_diagnostics: {artifacts.get('anim_diagnostics')}",
+        f"- evidence_manifest: {artifacts.get('evidence_manifest')}",
+        f"- engineering_analysis_evidence: {artifacts.get('engineering_analysis_evidence')}",
         f"- health_report_embedded: {artifacts.get('health_report_embedded')}",
         f"- browser_perf_registry_snapshot: {artifacts.get('browser_perf_registry_snapshot')}",
         f"- browser_perf_previous_snapshot: {artifacts.get('browser_perf_previous_snapshot')}",
@@ -466,6 +523,41 @@ def render_health_report_md(rep: HealthReport) -> str:
             f"- errors_count: {val.get('errors_count')}",
             f"- warnings_count: {val.get('warnings_count')}",
         ]
+
+    if evidence:
+        lines += [
+            "",
+            "## Evidence manifest",
+            f"- collection_mode: {evidence.get('collection_mode') or '—'}",
+            f"- trigger: {evidence.get('trigger') or '—'}",
+            f"- finalization_stage: {evidence.get('finalization_stage') or '—'}",
+            f"- zip_sha256: {evidence.get('zip_sha256') or '—'}",
+            f"- pb002_missing_required_count: {evidence.get('pb002_missing_required_count')}",
+            f"- missing_required_count: {evidence.get('missing_required_count')}",
+            f"- missing_optional_count: {evidence.get('missing_optional_count')}",
+        ]
+        for warning in list(evidence.get("missing_warnings") or [])[:8]:
+            lines.append(f"- missing_evidence: {warning}")
+
+    if engineering:
+        lines += [
+            "",
+            "## Engineering analysis evidence",
+            f"- status: {engineering.get('status') or 'MISSING'}",
+            f"- source_path: {engineering.get('source_path') or '—'}",
+            f"- evidence_manifest_hash: {engineering.get('evidence_manifest_hash') or '—'}",
+            f"- analysis_status: {engineering.get('analysis_status') or '—'}",
+            f"- influence_status: {engineering.get('influence_status') or '—'}",
+            f"- calibration_status: {engineering.get('calibration_status') or '—'}",
+            f"- sensitivity_row_count: {engineering.get('sensitivity_row_count')}",
+        ]
+        requirements = dict(engineering.get("handoff_requirements") or {})
+        if requirements:
+            lines += [
+                f"- handoff_contract_status: {requirements.get('contract_status') or '—'}",
+                f"- handoff_required_path: `{requirements.get('required_contract_path') or '—'}`",
+                f"- handoff_missing_fields: {', '.join(str(x) for x in (requirements.get('missing_fields') or [])) or '—'}",
+            ]
 
     if optimizer_scope:
         lines += [

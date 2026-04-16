@@ -279,6 +279,37 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert loaded_center_state["ui"]["selected_tab"] == "bundle"
 
 
+def test_desktop_diagnostics_prefers_latest_bundle_pointer_over_stale_meta(tmp_path: Path) -> None:
+    out_dir = tmp_path / "send_bundles"
+    out_dir.mkdir()
+
+    stale_zip = out_dir / "SEND_stale_bundle.zip"
+    latest_zip = out_dir / "latest_send_bundle.zip"
+    for path, release in ((stale_zip, "STALE"), (latest_zip, "LATEST")):
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("bundle/meta.json", json.dumps({"release": release}))
+
+    (out_dir / "last_bundle_meta.json").write_text(
+        json.dumps(
+            {"ok": True, "zip": {"path": str(stale_zip.resolve()), "name": stale_zip.name}},
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (out_dir / "latest_send_bundle_path.txt").write_text(str(latest_zip.resolve()), encoding="utf-8")
+    (out_dir / "latest_send_bundle.sha256").write_text(
+        hashlib.sha256(latest_zip.read_bytes()).hexdigest() + "  latest_send_bundle.zip\n",
+        encoding="utf-8",
+    )
+
+    bundle = load_desktop_diagnostics_bundle_record(tmp_path, out_dir=out_dir)
+
+    assert bundle.latest_zip_path == str(latest_zip.resolve())
+    assert bundle.latest_path_pointer_path.endswith("latest_send_bundle_path.txt")
+    assert bundle.latest_sha_path.endswith("latest_send_bundle.sha256")
+
+
 def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> None:
     diag_src = (ROOT / "pneumo_solver_ui" / "tools" / "run_full_diagnostics_gui.py").read_text(
         encoding="utf-8",
