@@ -55,6 +55,11 @@ from .visual_contract import (
     ROAD_CONTRACT_WEB_JSON_NAME,
     write_road_contract_artifacts,
 )
+from .geometry_acceptance_contract import (
+    GEOMETRY_ACCEPTANCE_JSON_NAME,
+    GEOMETRY_ACCEPTANCE_MD_NAME,
+    write_geometry_acceptance_artifacts,
+)
 from .anim_export_contract import (
     ANIM_EXPORT_CONTRACT_SIDECAR_NAME,
     ANIM_EXPORT_CONTRACT_VALIDATION_JSON_NAME,
@@ -66,6 +71,69 @@ from .anim_export_contract import (
     validate_anim_export_contract_meta,
     write_anim_export_contract_artifacts,
 )
+try:
+    from .desktop_animator.truth_contract import (
+        ANIMATOR_FRAME_BUDGET_EVIDENCE_JSON_NAME,
+        CAPTURE_EXPORT_MANIFEST_JSON_NAME,
+        build_animator_truth_summary,
+        build_capture_export_manifest,
+        write_json_artifact,
+    )
+except Exception:  # pragma: no cover - fallback for branches without animator truth helpers yet
+    CAPTURE_EXPORT_MANIFEST_JSON_NAME = "capture_export_manifest.json"
+    ANIMATOR_FRAME_BUDGET_EVIDENCE_JSON_NAME = "animator_frame_budget_evidence.json"
+
+    def build_animator_truth_summary(meta: Any, *, updated_utc: str = "", **_kwargs: Any) -> dict[str, Any]:
+        meta_dict = dict(meta or {}) if isinstance(meta, dict) else {}
+        validation = dict(meta_dict.get("anim_export_validation") or {}) if isinstance(meta_dict.get("anim_export_validation"), dict) else {}
+        level = str(validation.get("validation_level") or validation.get("level") or "")
+        overall = "solver_confirmed" if level == "PASS" else "approximate_inferred_with_warning"
+        warnings = [] if level == "PASS" else ["Truth incomplete: show approximate/unavailable warning and do not fabricate geometry."]
+        return {
+            "schema": "desktop_animator.truth_summary.v1",
+            "updated_utc": str(updated_utc or meta_dict.get("updated_utc") or ""),
+            "overall_truth_state": overall,
+            "validation_level": level,
+            "warnings": warnings,
+            "artifact_refs": dict(meta_dict.get("anim_export_contract_artifacts") or {}),
+        }
+
+    def build_capture_export_manifest(
+        *,
+        meta: Any,
+        updated_utc: str = "",
+        npz_path: str | Path | None = None,
+        pointer_path: str | Path | None = None,
+        artifact_refs: Any = None,
+        truth_summary: Any = None,
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        refs = dict(artifact_refs or {})
+        refs.setdefault("frame_budget_evidence", ANIMATOR_FRAME_BUDGET_EVIDENCE_JSON_NAME)
+        truth = dict(truth_summary or build_animator_truth_summary(meta, updated_utc=updated_utc))
+        return {
+            "schema": "capture_export_manifest.v1",
+            "updated_utc": str(updated_utc or ""),
+            "capture_refs": {
+                "anim_latest_npz": {"path": str(npz_path or "")},
+                "anim_latest_pointer": {"path": str(pointer_path or "")},
+            },
+            "artifact_refs": refs,
+            "truth_summary": truth,
+            "blocking_states": [] if str(truth.get("overall_truth_state") or "") == "solver_confirmed" else ["truth_warning_required"],
+            "provenance": {
+                "producer": "anim_latest export",
+                "truth_warning_required": bool(str(truth.get("overall_truth_state") or "") != "solver_confirmed"),
+            },
+        }
+
+    def write_json_artifact(path: str | Path, payload: Any) -> Path:
+        out = Path(path).expanduser().resolve(strict=False)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        tmp = out.with_suffix(out.suffix + ".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(out)
+        return out
 from .run_artifacts import local_anim_latest_export_paths, write_anim_latest_pointer_json
 
 
@@ -589,8 +657,13 @@ def export_anim_latest_bundle(
             "cylinder_packaging_passport": CYLINDER_PACKAGING_PASSPORT_JSON_NAME,
             "road_contract_web": ROAD_CONTRACT_WEB_JSON_NAME,
             "road_contract_desktop": ROAD_CONTRACT_DESKTOP_JSON_NAME,
+            "geometry_acceptance_json": GEOMETRY_ACCEPTANCE_JSON_NAME,
+            "geometry_acceptance_md": GEOMETRY_ACCEPTANCE_MD_NAME,
+            "capture_export_manifest": CAPTURE_EXPORT_MANIFEST_JSON_NAME,
+            "frame_budget_evidence": ANIMATOR_FRAME_BUDGET_EVIDENCE_JSON_NAME,
         }
         meta_norm["anim_export_truth_ready"] = bool(str(contract_validation.get("level") or "") == "PASS")
+        meta_norm["desktop_animator_truth_summary"] = build_animator_truth_summary(meta_norm)
     except Exception:
         pass
 
@@ -653,6 +726,40 @@ def export_anim_latest_bundle(
     except Exception as exc:
         logging.warning("[anim_latest] failed to write road contract artifacts for %s: %s", exports_dir, exc)
 
+    geometry_acceptance_artifacts = {}
+    try:
+        geometry_acceptance_artifacts = write_geometry_acceptance_artifacts(
+            exports_dir,
+            frame_or_mapping=df_main_anim,
+            updated_utc=updated_utc,
+            npz_path=npz_path,
+            pointer_path=pointer_path,
+            source_label="anim_latest export",
+        )
+    except Exception as exc:
+        logging.warning("[anim_latest] failed to write geometry acceptance artifacts for %s: %s", exports_dir, exc)
+
+    capture_manifest_artifacts = {}
+    try:
+        truth_summary = dict(meta_norm.get("desktop_animator_truth_summary") or {})
+        if not truth_summary:
+            truth_summary = build_animator_truth_summary(meta_norm, updated_utc=updated_utc)
+        capture_manifest = build_capture_export_manifest(
+            meta=meta_norm,
+            updated_utc=updated_utc,
+            npz_path=npz_path,
+            pointer_path=pointer_path,
+            artifact_refs=dict(meta_norm.get("anim_export_contract_artifacts") or {}),
+            truth_summary=truth_summary,
+        )
+        capture_manifest_path = write_json_artifact(exports_dir / CAPTURE_EXPORT_MANIFEST_JSON_NAME, capture_manifest)
+        capture_manifest_artifacts = {
+            "capture_export_manifest_path": str(capture_manifest_path),
+            "capture_export_manifest": capture_manifest,
+        }
+    except Exception as exc:
+        logging.warning("[anim_latest] failed to write capture export manifest for %s: %s", exports_dir, exc)
+
     # Debug trace (helps diagnose “ничего не передалось в аниматор”)
     try:
         trace = {
@@ -677,6 +784,15 @@ def export_anim_latest_bundle(
                 "web": dict((road_contract_artifacts or {}).get("road_contract_web") or {}),
                 "desktop": dict((road_contract_artifacts or {}).get("road_contract_desktop") or {}),
             },
+            "geometry_acceptance": {
+                "artifacts": {
+                    k: v
+                    for k, v in dict(geometry_acceptance_artifacts or {}).items()
+                    if k != "geometry_acceptance_report"
+                },
+                "report": dict((geometry_acceptance_artifacts or {}).get("geometry_acceptance_report") or {}),
+            },
+            "capture_export_manifest": dict(capture_manifest_artifacts or {}),
             "mirrored_global_pointer": mirrored_global_pointer,
         }
         (exports_dir / "anim_latest_trace.json").write_text(

@@ -80,13 +80,28 @@ def test_collect_anim_latest_bundle_diagnostics_surfaces_sidecar_paths(tmp_path:
     assert diag["anim_latest_road_contract_web_exists"] is True
     assert diag["anim_latest_road_contract_desktop_ref"] == "road_contract_desktop.json"
     assert diag["anim_latest_road_contract_desktop_exists"] is True
+    assert diag["anim_latest_capture_export_manifest_ref"] == "capture_export_manifest.json"
+    assert diag["anim_latest_capture_export_manifest_exists"] is True
+    assert diag["anim_latest_capture_export_manifest_handoff_id"] == "HO-010"
+    assert diag["anim_latest_capture_hash"]
+    assert diag["anim_latest_truth_mode_hash"]
+    assert diag["anim_latest_capture_export_manifest_truth_state"] in {
+        "solver_confirmed",
+        "approximate_inferred_with_warning",
+        "unavailable",
+    }
+    assert diag["anim_latest_frame_budget_evidence_ref"] == "animator_frame_budget_evidence.json"
+    assert diag["anim_latest_frame_budget_evidence_exists"] is False
 
     web_contract = json.loads((exports_dir / "road_contract_web.json").read_text(encoding="utf-8"))
     desktop_contract = json.loads((exports_dir / "road_contract_desktop.json").read_text(encoding="utf-8"))
+    capture_manifest = json.loads((exports_dir / "capture_export_manifest.json").read_text(encoding="utf-8"))
     assert web_contract["level"] == "PASS"
     assert desktop_contract["level"] == "PASS"
     assert web_contract["road_width_status"] == "explicit"
     assert desktop_contract["road_width_status"] == "explicit"
+    assert capture_manifest["handoff_id"] == "HO-010"
+    assert capture_manifest["artifact_refs"]["validation_json"] == "anim_latest.contract.validation.json"
 
 
 def test_generate_triage_report_prefers_latest_send_bundle_path_over_stale_registry_event(tmp_path: Path) -> None:

@@ -1031,6 +1031,13 @@ from .cylinder_truth_gate import (
     evaluate_all_cylinder_truth_gates as _evaluate_all_cylinder_truth_gates,
     render_cylinder_truth_gate_message as _render_cylinder_truth_gate_message,
 )
+from .truth_contract import (
+    ANIMATOR_FRAME_BUDGET_EVIDENCE_JSON_NAME as _ANIMATOR_FRAME_BUDGET_EVIDENCE_JSON_NAME,
+    TRUTH_STATE_SOLVER_CONFIRMED as _TRUTH_STATE_SOLVER_CONFIRMED,
+    build_animator_truth_summary as _build_animator_truth_summary,
+    build_frame_budget_evidence as _build_frame_budget_evidence,
+    write_json_artifact as _write_animator_json_artifact,
+)
 from .playback_sampling import (
     lerp_wrapped_angle_value as _lerp_wrapped_angle_value,
     lerp_point_row as _lerp_point_row,
@@ -2854,8 +2861,9 @@ def _prepare_loaded_bundle(path: Path | str) -> _PreparedBundleLoad:
     except Exception:
         pass
     fallback_msgs = list(getattr(bundle, "service_fallback_messages", lambda: [])())
-    spring_todo_msgs = _mandatory_spring_geometry_todo_messages(bundle)
-    ring_info_msgs = _ring_overlay_info_messages(bundle)
+    b = bundle
+    spring_todo_msgs = _mandatory_spring_geometry_todo_messages(b)
+    ring_info_msgs = _ring_overlay_info_messages(b)
     try:
         check_report = run_self_checks(bundle)
         check_msgs = list(getattr(check_report, "messages", []) or [])
@@ -6116,6 +6124,7 @@ class Car3DWidget(QtWidgets.QWidget):
         self._show_piston_markers_debug = False
         self._layout_transition_active = False
         self._cylinder_truth_gates: Dict[str, Dict[str, Any]] = _evaluate_all_cylinder_truth_gates(None)
+        self._animator_truth_summary: Dict[str, Any] = _build_animator_truth_summary(None, cylinder_gates=self._cylinder_truth_gates)
         self._glass_ior = 1.52
         self._glass_f0 = self._schlick_f0_from_ior(self._glass_ior)
         self._shadow_hover_m = 0.006
@@ -8924,6 +8933,21 @@ class Car3DWidget(QtWidgets.QWidget):
         rgb += np.asarray((164.0, 180.0, 208.0), dtype=float).reshape(1, 3) * (0.26 + 0.34 * speed_u) * rotation_mark.reshape(-1, 1)
         rgb += np.asarray((244.0, 248.0, 255.0), dtype=float).reshape(1, 3) * (0.62 + 1.10 * speed_u) * rotation_band.reshape(-1, 1)
         rgb += np.asarray((194.0, 214.0, 255.0), dtype=float).reshape(1, 3) * (0.22 + 0.54 * speed_u) * rotation_ridge.reshape(-1, 1)
+        spin_face_wave = np.asarray(0.5 + 0.5 * np.sin((3.0 * theta) + (0.6 * axial_u)), dtype=float)
+        spin_face_contrast = np.asarray(shell_u * (0.28 + 0.72 * tread_u) * (0.55 + 0.45 * speed_u), dtype=float)
+        rgb += (
+            np.asarray((132.0, 158.0, 202.0), dtype=float).reshape(1, 3)
+            * (0.16 + 0.30 * spin_face_wave).reshape(-1, 1)
+            * spin_face_contrast.reshape(-1, 1)
+        )
+        rgb *= (
+            1.0
+            - (
+                (0.14 + 0.12 * contact_u)
+                * (1.0 - spin_face_wave)
+                * spin_face_contrast
+            ).reshape(-1, 1)
+        )
         groove_dark = 0.10 + 0.24 * tread_groove + 0.22 * marker_shadow + 0.14 * major_block_shadow + 0.08 * contact_u
         rgb *= (1.0 - groove_dark.reshape(-1, 1))
         rgb *= (1.0 - (0.08 + 0.06 * speed_u) * rotation_mark.reshape(-1, 1))
@@ -8935,13 +8959,14 @@ class Car3DWidget(QtWidgets.QWidget):
             * branding_light.reshape(-1, 1)
         )
         alpha = (
-            0.24
+            0.31
             + 0.10 * shell_u
             + 0.08 * marker_highlight
             + 0.06 * major_block_highlight
             + 0.22 * rotation_band
             + 0.12 * rotation_mark
             + 0.06 * rotation_ridge
+            + 0.10 * spin_face_contrast
             - 0.04 * tread_groove
         )
         if in_air:
@@ -12264,7 +12289,7 @@ class Car3DWidget(QtWidgets.QWidget):
             md_raw = gl.MeshData.cylinder(rows=24, cols=72, radius=[wheel_r, wheel_r], length=wheel_w)
             v_cyl = np.asarray(md_raw.vertexes(), dtype=float)
             f_cyl = np.asarray(md_raw.faces(), dtype=np.int32)
-            md_perf = gl.MeshData.cylinder(rows=18, cols=56, radius=[wheel_r, wheel_r], length=wheel_w)
+            md_perf = gl.MeshData.cylinder(rows=8, cols=16, radius=[wheel_r, wheel_r], length=wheel_w)
             v_cyl_perf = np.asarray(md_perf.vertexes(), dtype=float)
             f_cyl_perf = np.asarray(md_perf.faces(), dtype=np.int32)
         else:
@@ -12644,6 +12669,7 @@ class Car3DWidget(QtWidgets.QWidget):
                 shader="balloon",
             )
             _set_gl_item_readable_translucent(spring)
+            spring.setGLOptions("translucent")
             _set_gl_item_depth_value(spring, _SPRING_DEPTH_MESH)
             _set_gl_mesh_compute_normals(spring, False)
             spring.setVisible(False)
@@ -12671,6 +12697,7 @@ class Car3DWidget(QtWidgets.QWidget):
                 shader=_animator_shader_name(_ANIMATOR_SOLID_SHADER, "edgeHilight"),
             )
             _set_gl_item_readable_translucent(spring_seat)
+            spring_seat.setGLOptions("opaque")
             _set_gl_item_depth_value(spring_seat, _SPRING_DEPTH_SEAT)
             _set_gl_mesh_compute_normals(spring_seat, False)
             spring_seat.setVisible(False)
@@ -12823,6 +12850,16 @@ class Car3DWidget(QtWidgets.QWidget):
             if extra > 0:
                 preview = f"{preview}, +{extra}"
             lines.append(f"TODO: incomplete spring geometry from solver/export ({preview})")
+        try:
+            truth_summary = dict(getattr(self, "_animator_truth_summary", {}) or {})
+            truth_state = str(truth_summary.get("overall_truth_state") or "").strip()
+            truth_warnings = list(truth_summary.get("warnings") or [])
+        except Exception:
+            truth_state = ""
+            truth_warnings = []
+        if truth_state and truth_state != _TRUTH_STATE_SOLVER_CONFIRMED:
+            suffix = f"; warnings={len(truth_warnings)}" if truth_warnings else ""
+            lines.append(f"TRUTH BADGE: {truth_state} (approximate/unavailable graphics{suffix})")
         try:
             limited_cylinders = [
                 self._compact_canvas_warning_line(_render_cylinder_truth_gate_message(dict(gate)), max_chars=108)
@@ -13082,7 +13119,18 @@ class Car3DWidget(QtWidgets.QWidget):
             self._spring_force_visual_max_n = 4500.0
             self._pneumo_force_visual_max_n = 2500.0
         try:
-            self._cylinder_truth_gates = _evaluate_all_cylinder_truth_gates(getattr(bundle, "meta", None) if bundle is not None else None)
+            bundle_meta = getattr(bundle, "meta", None) if bundle is not None else None
+            self._cylinder_truth_gates = _evaluate_all_cylinder_truth_gates(bundle_meta)
+            self._animator_truth_summary = _build_animator_truth_summary(
+                bundle_meta,
+                cylinder_gates=self._cylinder_truth_gates,
+            )
+            if str(self._animator_truth_summary.get("overall_truth_state") or "") != _TRUTH_STATE_SOLVER_CONFIRMED:
+                _emit_animator_warning(
+                    "[Animator] Truth badge requires approximate/unavailable graphics warning.",
+                    code="graphics_truth_badge_warning",
+                    truth_summary=dict(self._animator_truth_summary),
+                )
             for _gate in self._cylinder_truth_gates.values():
                 if not bool(dict(_gate).get("enabled")):
                     _emit_animator_warning(
@@ -13092,6 +13140,7 @@ class Car3DWidget(QtWidgets.QWidget):
                     )
         except Exception:
             self._cylinder_truth_gates = _evaluate_all_cylinder_truth_gates(None)
+            self._animator_truth_summary = _build_animator_truth_summary(None, cylinder_gates=self._cylinder_truth_gates)
         try:
             if bundle is None:
                 raise ValueError('missing bundle')
@@ -14018,7 +14067,7 @@ class Car3DWidget(QtWidgets.QWidget):
         )
         validation_perf_mode = bool(self._playback_active) and bool(self._playback_perf_mode)
         rich_suspension_fx = not bool(validation_perf_mode)
-        rich_wheel_fx = bool(getattr(self, "_show_wheel_hardware", False))
+        rich_wheel_fx = bool(getattr(self, "_show_wheel_hardware", False)) and not bool(validation_perf_mode)
         rich_cylinder_fx = bool(getattr(self, "_show_cylinder_chrome", False)) and rich_suspension_fx
         show_scene_line_fx = self._scene_line_fx_enabled()
         show_cylinder_detail_lines = bool(getattr(self, "_show_cylinder_chrome", False))
@@ -14455,6 +14504,7 @@ class Car3DWidget(QtWidgets.QWidget):
                 self._box_faces,
                 topology_key=("chassis-box", int(self._box_faces.shape[0]), int(self._box_faces[-1, -1])),
             )
+        self._set_camera_center_if_needed(np.asarray(center_draw, dtype=float).reshape(3))
         camera_view_dir = self._camera_view_direction_local_xyz(target_xyz=np.asarray(center_draw, dtype=float).reshape(3))
         base_mean_load_u = float(
             _clamp(
@@ -14568,8 +14618,12 @@ class Car3DWidget(QtWidgets.QWidget):
                     rolling_progress_m=spin_progress_m,
                     wheel_radius_m=float(self.geom.wheel_radius),
                 )
-                wheel_base_vertices = self._wheel_base_vertices
-                wheel_faces = self._wheel_faces
+                if bool(validation_perf_mode) and self._wheel_perf_base_vertices is not None and self._wheel_perf_faces is not None:
+                    wheel_base_vertices = self._wheel_perf_base_vertices
+                    wheel_faces = self._wheel_perf_faces
+                else:
+                    wheel_base_vertices = self._wheel_base_vertices
+                    wheel_faces = self._wheel_faces
                 deformed_wheel = self._deformed_wheel_vertices(
                     tire_force_n=float(tire_forces_n[idx]) if idx < len(tire_forces_n) else 0.0,
                     tire_compression_m=float(tire_compressions_m[idx]) if idx < len(tire_compressions_m) else 0.0,
@@ -16058,8 +16112,8 @@ class Car3DWidget(QtWidgets.QWidget):
                                 ),
                                 "wheel_gap_m": float(corner_wheel_gap_m[idx]) if idx < len(corner_wheel_gap_m) else 0.0,
                                 "in_air": bool(wheel_air[idx] > 0.5) if idx < len(wheel_air) else False,
-                                "samples_per_turn": 16,
-                                "tube_sides": 10,
+                                "samples_per_turn": 6 if bool(validation_perf_mode) else 16,
+                                "tube_sides": 5 if bool(validation_perf_mode) else 10,
                                 "end_trim_m": float(max(0.007, 1.35 * wire_radius_m)),
                             }
                 spring_visual_states.append(spring_state)
@@ -16170,12 +16224,9 @@ class Car3DWidget(QtWidgets.QWidget):
                 face_rgba=bot_seat_face_rgba,
                 edge_rgba=bot_seat_edge_rgba,
             )
-            if spring_glow is not None:
+            if rich_suspension_fx and spring_glow is not None and spring_path is not None:
                 try:
                     glow_rgba = np.asarray(spring_glow_rgba, dtype=float).reshape(4)
-                    if not bool(rich_suspension_fx):
-                        glow_rgba = glow_rgba.copy()
-                        glow_rgba[3] = float(_clamp(0.80 * float(glow_rgba[3]), 0.04, 0.14))
                     glow_cols = np.repeat(glow_rgba.reshape(1, 4), np.asarray(spring_path, dtype=float).shape[0], axis=0)
                     _set_line_item_data(spring_glow, np.asarray(spring_path, dtype=float), colors_rgba=glow_cols)
                 except Exception:
@@ -16493,12 +16544,10 @@ class Car3DWidget(QtWidgets.QWidget):
                     vp_w, vp_h = 1280, 720
 
                 if bool(validation_perf_mode):
-                    # Keep the road visually stable during fast playback: coarse tessellation
-                    # saved little time in practice, but made motion read as frame skipping.
-                    min_long = int(max(220, self._road_pts))
-                    max_long = 720
-                    min_lat = 8
-                    max_lat = int(max(12, min(self._road_lat_pts, 15)))
+                    min_long = int(max(72, min(self._road_pts, 96)))
+                    max_long = 140
+                    min_lat = 4
+                    max_lat = 5
                 elif bool(self._playback_active):
                     min_long = int(max(240, self._road_pts))
                     max_long = 1200
@@ -24118,6 +24167,7 @@ class CockpitWidget(QtWidgets.QWidget):
         self._aux_cadence_window_started_ts: float = 0.0
         self._aux_cadence_emit_period_s: float = 1.5
         self._aux_cadence_tracking_active: bool = False
+        self._latest_frame_budget_evidence: Dict[str, Any] = {}
         self._bundle_source_dt_s: float = float("nan")
         self._runtime_validation_budget_active: bool = False
         self._external_windows: Dict[str, ExternalPanelWindow] = {}
@@ -25233,6 +25283,77 @@ class CockpitWidget(QtWidgets.QWidget):
                 "visible": bool(self._dock_is_exposed(str(name))),
             }
         if payload:
+            visible_aux_count = int(self._visible_aux_dock_count())
+            total_aux_docks = 0
+            try:
+                total_aux_docks = sum(1 for name in dict(getattr(self, "_docks", {}) or {}).keys() if str(name) != "dock_3d")
+            except Exception:
+                total_aux_docks = int(visible_aux_count)
+            source_dt_s: Optional[float]
+            try:
+                raw_source_dt = float(getattr(self, "_bundle_source_dt_s", float("nan")))
+                source_dt_s = raw_source_dt if np.isfinite(raw_source_dt) else None
+            except Exception:
+                source_dt_s = None
+            frame_cadence: Dict[str, Any] = {}
+            try:
+                owner = self.window()
+            except Exception:
+                owner = None
+            try:
+                interval_fn = getattr(owner, "_playback_interval_ms_for_index", None)
+                idx = int(getattr(owner, "_idx", 0))
+                if callable(interval_fn):
+                    target_interval_ms = int(max(1, interval_fn(idx)))
+                    frame_cadence["target_interval_ms"] = target_interval_ms
+                    frame_cadence["target_hz"] = round(1000.0 / float(target_interval_ms), 3)
+            except Exception:
+                target_interval_ms = 0
+            try:
+                measured_hz = float(getattr(owner, "_present_hz_ema", float("nan")))
+                if np.isfinite(measured_hz):
+                    frame_cadence["measured_present_hz"] = round(measured_hz, 3)
+                    frame_cadence["sample_count"] = 1
+            except Exception:
+                measured_hz = float("nan")
+            try:
+                present_dt_s = float(getattr(owner, "_present_dt_ema_s", float("nan")))
+                if np.isfinite(present_dt_s):
+                    frame_cadence["present_dt_ema_ms"] = round(present_dt_s * 1000.0, 3)
+            except Exception:
+                pass
+            try:
+                pending_fn = getattr(owner, "_car3d_present_pending", None)
+                if callable(pending_fn):
+                    interval_arg = int(frame_cadence.get("target_interval_ms") or 0) or None
+                    frame_cadence["pending_present"] = bool(pending_fn(interval_ms=interval_arg))
+            except Exception:
+                pass
+            if frame_cadence:
+                frame_cadence["display_hz_source"] = "measured_present" if np.isfinite(float(measured_hz)) else "screen_hint"
+            evidence = _build_frame_budget_evidence(
+                panels=payload,
+                visible_aux=visible_aux_count,
+                total_aux_docks=int(total_aux_docks),
+                playing=bool(playing),
+                many_visible_budget=bool(many_visible_budget),
+                frame_budget_active=bool(many_visible_budget) or bool(getattr(self, "_runtime_validation_budget_active", False)),
+                window_s=float(window_s),
+                source_dt_s=source_dt_s,
+                frame_cadence=frame_cadence,
+                provenance={
+                    "producer": "Desktop Animator",
+                    "event": "AnimatorAuxCadence",
+                    "hidden_dock_gate": "_dock_is_exposed",
+                },
+            )
+            self._latest_frame_budget_evidence = dict(evidence)
+            try:
+                workspace_raw = str(os.environ.get("PNEUMO_WORKSPACE_DIR") or "").strip()
+                exports_dir = (Path(workspace_raw).expanduser().resolve(strict=False) / "exports") if workspace_raw else (PROJECT_ROOT / "exports")
+                _write_animator_json_artifact(exports_dir / _ANIMATOR_FRAME_BUDGET_EVIDENCE_JSON_NAME, evidence)
+            except Exception:
+                pass
             try:
                 from pneumo_solver_ui.diag.eventlog import get_global_logger
                 get_global_logger(PROJECT_ROOT).emit(
@@ -25240,9 +25361,10 @@ class CockpitWidget(QtWidgets.QWidget):
                     "aux pane cadence window",
                     playing=bool(playing),
                     many_visible_budget=bool(many_visible_budget),
-                    visible_aux=int(self._visible_aux_dock_count()),
+                    visible_aux=int(visible_aux_count),
                     window_s=round(window_s, 3),
                     panels=payload,
+                    frame_budget_evidence=dict(evidence),
                 )
             except Exception:
                 pass
@@ -26853,7 +26975,7 @@ class MainWindow(QtWidgets.QMainWindow):
         target_interval_ms = int(self._playback_interval_ms_for_index(int(getattr(self, "_idx", 0))))
         if target_interval_ms <= 0:
             return
-        if self._car3d_present_pending(interval_ms=int(target_interval_ms)):
+        if self._car3d_present_pending_compat(interval_ms=int(target_interval_ms)):
             return
         # Keep service cadence in phase with measured present cadence, but avoid jittery
         # rearming for sub-millisecond EMA noise.
@@ -26939,6 +27061,20 @@ class MainWindow(QtWidgets.QMainWindow):
                     pass
                 return False
         return True
+
+    def _car3d_present_pending_compat(self, *, interval_ms: int | None = None, now_ts: float | None = None) -> bool:
+        fn = getattr(self, "_car3d_present_pending", None)
+        if not callable(fn):
+            return False
+        try:
+            return bool(fn(interval_ms=interval_ms, now_ts=now_ts))
+        except TypeError:
+            try:
+                return bool(fn())
+            except Exception:
+                return False
+        except Exception:
+            return False
 
     def _playback_interval_ms_for_index(self, idx: int) -> int:
         return int(
@@ -27083,7 +27219,7 @@ class MainWindow(QtWidgets.QMainWindow):
         now = float(time.perf_counter())
         last = float(self._play_wall_ts) if self._play_wall_ts else now
         raw_wall_dt = max(0.0, now - last)
-        if self._car3d_present_pending(interval_ms=int(interval_ms), now_ts=now):
+        if self._car3d_present_pending_compat(interval_ms=int(interval_ms), now_ts=now):
             # Validation-first policy: if the previous GL frame has not been presented yet,
             # do not accumulate wall-time debt and then jump over solver states on the next
             # successful tick. We intentionally slow effective playback instead of skipping
