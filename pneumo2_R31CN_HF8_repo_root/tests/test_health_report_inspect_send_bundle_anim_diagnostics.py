@@ -322,7 +322,8 @@ def test_sources_wire_health_report_and_offline_inspector_into_send_bundle_flow(
     inspect_text = (ROOT / "pneumo_solver_ui" / "tools" / "inspect_send_bundle.py").read_text(encoding="utf-8")
 
     assert 'build_health_report(zip_path, out_dir=out_dir)' in bundle_text
-    assert 'add_health_report_to_zip(zip_path, _health_json, _health_md)' in bundle_text
+    assert 'def _run_health_pass' in bundle_text
+    assert '_replace_zip_entries(_entries)' in bundle_text
     assert 'health/health_report.json' in bundle_text
     assert 'health/health_report.md' in bundle_text
     assert '_atomic_copy_file(zip_path, latest_zip)' in bundle_text

@@ -79,6 +79,8 @@ class DesktopDiagnosticsBundleRecord:
     out_dir: str
     latest_zip_path: str = ""
     latest_zip_name: str = ""
+    latest_path_pointer_path: str = ""
+    latest_sha_path: str = ""
     latest_bundle_meta_path: str = ""
     latest_inspection_json_path: str = ""
     latest_inspection_md_path: str = ""
@@ -87,6 +89,32 @@ class DesktopDiagnosticsBundleRecord:
     latest_validation_json_path: str = ""
     latest_validation_md_path: str = ""
     latest_triage_md_path: str = ""
+    latest_evidence_manifest_path: str = ""
+    latest_analysis_evidence_manifest_path: str = ""
+    analysis_evidence_manifest_hash: str = ""
+    analysis_evidence_status: str = "MISSING"
+    analysis_evidence_handoff_id: str = ""
+    analysis_evidence_context_state: str = "MISSING"
+    analysis_evidence_run_id: str = ""
+    analysis_evidence_run_contract_hash: str = ""
+    analysis_evidence_compare_contract_id: str = ""
+    analysis_evidence_artifact_count: int = 0
+    analysis_evidence_mismatch_count: int = 0
+    analysis_evidence_warnings: list[str] = field(default_factory=list)
+    analysis_evidence_action: str = ""
+    latest_geometry_reference_evidence_path: str = ""
+    geometry_reference_status: str = "MISSING"
+    geometry_reference_artifact_status: str = "missing"
+    geometry_reference_road_width_status: str = "missing"
+    geometry_reference_road_width_source: str = ""
+    geometry_reference_packaging_status: str = "missing"
+    geometry_reference_packaging_mismatch_status: str = "missing"
+    geometry_reference_packaging_contract_hash: str = ""
+    geometry_reference_acceptance_gate: str = "MISSING"
+    geometry_reference_component_passport_needs_data: int = 0
+    geometry_reference_evidence_missing: list[str] = field(default_factory=list)
+    geometry_reference_warnings: list[str] = field(default_factory=list)
+    geometry_reference_action: str = ""
     latest_clipboard_status_path: str = ""
     anim_pointer_diagnostics_path: str = ""
     summary_lines: list[str] = field(default_factory=list)

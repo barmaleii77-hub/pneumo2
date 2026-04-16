@@ -48,7 +48,7 @@ import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from .send_bundle_contract import (
     ANIM_DIAG_JSON,
@@ -57,6 +57,20 @@ from .send_bundle_contract import (
     ANIM_DIAG_SIDECAR_MD,
     build_anim_operator_recommendations,
     extract_anim_snapshot,
+)
+from .send_bundle_evidence import (
+    ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME,
+    ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME,
+    ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME,
+    EVIDENCE_MANIFEST_ARCNAME,
+    EVIDENCE_MANIFEST_SIDECAR_NAME,
+    GEOMETRY_REFERENCE_EVIDENCE_ARCNAME,
+    GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME,
+    GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME,
+    build_evidence_manifest,
+    classify_collection_mode,
+    helper_runtime_provenance,
+    read_manifest_inputs_from_zip,
 )
 
 
@@ -456,6 +470,7 @@ def _build_send_bundle_readme(anim_diag: Optional[Dict[str, Any]] = None) -> str
         "Содержимое (best-effort):\n"
         "- triage/: короткий triage-отчёт (md+json) по последним запускам\n"
         "- health/: сводный health-report по bundle (json+md)\n"
+        "- diagnostics/evidence_manifest.json: manifest of expected SEND evidence classes\n"
         "- ui_logs/: логи UI (jsonl + .log)\n- root_logs/: логи запуска Streamlit/скриптов (repo_root/logs, напр. streamlit.log)\n- reports/: отчёты качества логов (loglint/logstats, автогенерация)\n"
         "- autotest/: последние прогоны run_autotest (если запускались)\n"
         "- diagnostics_runs/: последние прогоны run_full_diagnostics (если запускались)\n- ui_sessions/: последние UI-сессии (runs/ui_sessions)\n- runs/: run_registry.jsonl и index.json (если есть)\n- workspace/: exports/uploads/road_profiles/maneuvers/opt_runs/ui_state (+ marker если пусто)\n"
@@ -838,6 +853,7 @@ def _make_send_bundle_inner(
     primary_session_dir: Optional[Path] = None,
     tag: Optional[str] = None,
     operator_note: Optional[str] = None,
+    trigger: Optional[str] = None,
 ) -> Path:
     out_dir = out_dir.expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -850,11 +866,15 @@ def _make_send_bundle_inner(
 
     max_file_bytes = int(max_file_mb) * 1024 * 1024
 
+    raw_trigger = str(trigger or tag_s or os.environ.get("PNEUMO_SEND_BUNDLE_TRIGGER") or "manual").strip() or "manual"
+
     meta: Dict[str, Any] = {
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "release": RELEASE,
         "repo_root": str(repo_root),
         "pneumo_dir": str(pneumo_dir),
+        "trigger": raw_trigger,
+        "collection_mode": classify_collection_mode(raw_trigger),
         "platform": platform.platform(),
         "python": sys.version,
         "python_executable": str(sys.executable),
@@ -932,6 +952,8 @@ def _make_send_bundle_inner(
     skips: List[Dict[str, Any]] = []
 
     res_total = AddResult()
+    engineering_analysis_evidence_added = False
+    geometry_reference_evidence_added = False
 
     try:
         anim_diag_event, anim_diag_md = _collect_anim_latest_bundle_diagnostics(out_dir, repo_root=repo_root)
@@ -999,9 +1021,6 @@ def _make_send_bundle_inner(
             pass
 
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as z:
-        # --- meta & docs inside bundle ---
-        z.writestr("bundle/meta.json", json.dumps(meta, ensure_ascii=False, indent=2))
-
         readme = _build_send_bundle_readme(anim_diag_event)
         z.writestr("bundle/README_SEND_BUNDLE.txt", readme)
 
@@ -1335,6 +1354,7 @@ def _make_send_bundle_inner(
             # optional but useful
             ("_pointers", False),
             ("baselines", False),
+            ("handoffs", False),
             ("opt_archive", False),
         ]
 
@@ -1400,12 +1420,123 @@ def _make_send_bundle_inner(
 
         meta["effective_workspace_source"] = effective_ws_source
         meta["effective_workspace_path"] = str(effective_ws)
+        meta["effective_workspace"] = str(effective_ws)
         if p_env_ws is not None and str(p_env_ws) != str(effective_ws):
             meta["env_workspace_path"] = str(p_env_ws)
         meta["repo_local_workspace_path"] = str(default_ws)
+        meta["helper_runtime_provenance"] = helper_runtime_provenance(meta)
 
         # Canonical bundle workspace must always mirror the effective runtime workspace.
         _add_workspace_dir(effective_ws, "workspace")
+
+        def _add_engineering_analysis_evidence_sidecar() -> None:
+            nonlocal engineering_analysis_evidence_added, res_total
+            candidates = (
+                out_dir / ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME,
+                effective_ws / "exports" / Path(ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME).name,
+                default_ws / "exports" / Path(ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME).name,
+            )
+            seen: set[str] = set()
+            for src in candidates:
+                try:
+                    key = str(Path(src).expanduser().resolve())
+                except Exception:
+                    key = str(src)
+                if key in seen:
+                    continue
+                seen.add(key)
+                if not Path(src).exists() or not Path(src).is_file():
+                    continue
+                rr = _add_file(
+                    z,
+                    Path(src),
+                    ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME,
+                    manifest=manifest,
+                    skips=skips,
+                    max_file_bytes=max_file_bytes,
+                )
+                res_total.added_files += rr.added_files
+                res_total.added_bytes += rr.added_bytes
+                res_total.skipped_files += rr.skipped_files
+                res_total.skipped_bytes += rr.skipped_bytes
+                engineering_analysis_evidence_added = rr.added_files > 0
+                return
+
+        def _add_geometry_reference_evidence_sidecar() -> None:
+            nonlocal geometry_reference_evidence_added, res_total
+            sidecar_path = out_dir / GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME
+            candidates = (
+                sidecar_path,
+                effective_ws / "exports" / Path(GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME).name,
+                default_ws / "exports" / Path(GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME).name,
+            )
+            seen: set[str] = set()
+            for src in candidates:
+                try:
+                    key = str(Path(src).expanduser().resolve())
+                except Exception:
+                    key = str(src)
+                if key in seen:
+                    continue
+                seen.add(key)
+                if not Path(src).exists() or not Path(src).is_file():
+                    continue
+                rr = _add_file(
+                    z,
+                    Path(src),
+                    GEOMETRY_REFERENCE_EVIDENCE_ARCNAME,
+                    manifest=manifest,
+                    skips=skips,
+                    max_file_bytes=max_file_bytes,
+                )
+                res_total.added_files += rr.added_files
+                res_total.added_bytes += rr.added_bytes
+                res_total.skipped_files += rr.skipped_files
+                res_total.skipped_bytes += rr.skipped_bytes
+                geometry_reference_evidence_added = rr.added_files > 0
+                if geometry_reference_evidence_added and Path(src) != sidecar_path:
+                    try:
+                        _safe_write_text(sidecar_path, Path(src).read_text(encoding="utf-8", errors="replace"))
+                    except Exception:
+                        pass
+                return
+
+            try:
+                from pneumo_solver_ui.desktop_geometry_reference_runtime import DesktopGeometryReferenceRuntime
+
+                payload = DesktopGeometryReferenceRuntime().diagnostics_handoff_evidence()
+            except Exception as exc:
+                payload = {
+                    "schema": "geometry_reference_evidence.v1",
+                    "producer_owned": False,
+                    "reference_center_role": "reader_and_evidence_surface",
+                    "does_not_render_animator_meshes": True,
+                    "artifact_status": "missing",
+                    "road_width_status": "missing",
+                    "packaging_mismatch_status": "missing",
+                    "geometry_acceptance_gate": "MISSING",
+                    "component_passport_components": 0,
+                    "component_passport_needs_data": 0,
+                    "evidence_missing": ["geometry_reference_runtime"],
+                    "adapter_error": f"{type(exc).__name__}: {exc!s}",
+                }
+            text = json.dumps(payload, ensure_ascii=False, indent=2)
+            try:
+                _safe_write_text(sidecar_path, text)
+            except Exception:
+                pass
+            rr = _add_generated_text(
+                z,
+                GEOMETRY_REFERENCE_EVIDENCE_ARCNAME,
+                text,
+                manifest=manifest,
+            )
+            res_total.added_files += rr.added_files
+            res_total.added_bytes += rr.added_bytes
+            geometry_reference_evidence_added = rr.added_files > 0
+
+        _add_engineering_analysis_evidence_sidecar()
+        _add_geometry_reference_evidence_sidecar()
 
         # Preserve visibility of a distinct env override tree only when it is NOT the
         # effective workspace mirrored into `workspace/`.
@@ -1665,6 +1796,8 @@ def _make_send_bundle_inner(
             pass
 
         # --- final manifests ---
+        z.writestr("bundle/meta.json", json.dumps(meta, ensure_ascii=False, indent=2))
+
         # R59 contract: MANIFEST.json must exist (keep also legacy bundle/manifest.json).
         _mjson = json.dumps(manifest, ensure_ascii=False, indent=2)
         z.writestr("bundle/manifest.json", _mjson)
@@ -1784,18 +1917,51 @@ def _make_send_bundle_inner(
         )
 
     def _embed_triage_sidecars(paths: Iterable[Path]) -> None:
-        with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as _zt:
-            for _p in paths:
-                if _p.exists():
-                    _zt.write(_p, arcname=f"triage/{_p.name}")
+        entries: Dict[str, bytes] = {}
+        for _p in paths:
+            if _p.exists():
+                entries[f"triage/{_p.name}"] = _p.read_bytes()
+        if entries:
+            _replace_zip_entries(entries)
+
+    def _replace_zip_entries(entries: Mapping[str, str | bytes]) -> None:
+        if not entries:
+            return
+        tmp_zip = zip_path.with_name(zip_path.name + ".rewrite.tmp")
+        normalized: Dict[str, bytes] = {}
+        for arcname, payload in entries.items():
+            arc = str(arcname).replace("\\", "/")
+            if isinstance(payload, bytes):
+                normalized[arc] = payload
+            else:
+                normalized[arc] = str(payload).encode("utf-8", errors="replace")
+
+        try:
+            if tmp_zip.exists():
+                tmp_zip.unlink()
+        except Exception:
+            pass
+
+        seen_arcnames: set[str] = set()
+        with zipfile.ZipFile(zip_path, "r") as _zin, zipfile.ZipFile(tmp_zip, "w", compression=zipfile.ZIP_DEFLATED) as _zout:
+            for _info in _zin.infolist():
+                if _info.filename in normalized or _info.filename in seen_arcnames:
+                    continue
+                seen_arcnames.add(_info.filename)
+                with _zin.open(_info, "r") as _src_fh:
+                    _zout.writestr(_info, _src_fh.read())
+            for _arcname, _payload in normalized.items():
+                seen_arcnames.add(_arcname)
+                _zout.writestr(_arcname, _payload)
+        os.replace(str(tmp_zip), str(zip_path))
 
     def _embed_validation_report(report_md: str, report_json: Dict[str, Any]) -> None:
-        with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as _zv:
-            _zv.writestr("validation/validation_report.md", report_md)
-            _zv.writestr(
-                "validation/validation_report.json",
-                json.dumps(report_json, ensure_ascii=False, indent=2),
-            )
+        _replace_zip_entries(
+            {
+                "validation/validation_report.md": report_md,
+                "validation/validation_report.json": json.dumps(report_json, ensure_ascii=False, indent=2),
+            }
+        )
 
     def _embed_validation_sidecars_into_triage() -> None:
         _embed_triage_sidecars((latest_validation_md, latest_validation_json))
@@ -1873,12 +2039,16 @@ def _make_send_bundle_inner(
         try:
             if dashboard_created and dashboard_html_cache:
                 if embed_in_zip:
-                    with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as _zd:
-                        _zd.writestr("dashboard/index.html", dashboard_html_cache)
-                        _zd.writestr(
-                            "dashboard/dashboard.json",
-                            json.dumps(dashboard_json_cache, ensure_ascii=False, indent=2),
-                        )
+                    _replace_zip_entries(
+                        {
+                            "dashboard/index.html": dashboard_html_cache,
+                            "dashboard/dashboard.json": json.dumps(
+                                dashboard_json_cache,
+                                ensure_ascii=False,
+                                indent=2,
+                            ),
+                        }
+                    )
                 if _write_dashboard_sidecars is not None:
                     _write_dashboard_sidecars(out_dir, dashboard_html_cache, dashboard_json_cache, stamp=stamp)
             elif embed_in_zip and (_dashboard_refresh_error or dashboard_error_trace):
@@ -1898,6 +2068,8 @@ def _make_send_bundle_inner(
         rec: Dict[str, Any] = {
             'created_at': meta.get('created_at'),
             'release': meta.get('release'),
+            'trigger': meta.get('trigger'),
+            'collection_mode': meta.get('collection_mode'),
             'zip_name': zip_path.name,
             'zip_path': str(zip_path.resolve()),
             'latest_zip_path': str(latest_zip.resolve()),
@@ -2047,6 +2219,109 @@ def _make_send_bundle_inner(
         except Exception:
             pass
 
+    latest_evidence_json = out_dir / EVIDENCE_MANIFEST_SIDECAR_NAME
+
+    def _append_evidence_manifest(*, stage: str, planned_paths: Iterable[str] = ()) -> None:
+        try:
+            with zipfile.ZipFile(zip_path, "r") as _zr:
+                _names = list(_zr.namelist())
+                _meta_from_zip, _json_by_name = read_manifest_inputs_from_zip(_zr)
+            _manifest_meta = dict(meta)
+            for _k, _v in dict(_meta_from_zip or {}).items():
+                if _manifest_meta.get(_k) in (None, "", [], {}):
+                    _manifest_meta[_k] = _v
+            _payload = build_evidence_manifest(
+                zip_path=zip_path,
+                names=_names,
+                meta=_manifest_meta,
+                json_by_name=_json_by_name,
+                planned_paths=planned_paths,
+                stage=stage,
+                finalization_stage=stage,
+            )
+            _text = json.dumps(_payload, ensure_ascii=False, indent=2)
+            _safe_write_text(latest_evidence_json, _text)
+            _replace_zip_entries({EVIDENCE_MANIFEST_ARCNAME: _text})
+        except Exception:
+            try:
+                with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as _ze:
+                    _ze.writestr("diagnostics/evidence_manifest_failed.txt", traceback.format_exc())
+            except Exception:
+                pass
+
+    def _write_final_evidence_sidecar_proof() -> None:
+        try:
+            payload = json.loads(latest_evidence_json.read_text(encoding="utf-8", errors="replace"))
+            if not isinstance(payload, dict):
+                return
+        except Exception:
+            return
+        try:
+            latest_sha_text = latest_sha.read_text(encoding="utf-8", errors="replace").strip()
+        except Exception:
+            latest_sha_text = ""
+        latest_sha_value = latest_sha_text.split()[0] if latest_sha_text else ""
+        try:
+            payload["final_latest_zip_sha256"] = _sha256_file(latest_zip) if latest_zip.exists() else ""
+            payload["final_original_zip_sha256"] = _sha256_file(zip_path) if zip_path.exists() else ""
+            payload["final_latest_sha256_sidecar"] = latest_sha_value
+            payload["latest_zip_matches_original"] = bool(
+                payload.get("final_latest_zip_sha256")
+                and payload.get("final_latest_zip_sha256") == payload.get("final_original_zip_sha256")
+            )
+            payload["latest_sha_sidecar_matches"] = bool(
+                latest_sha_value and latest_sha_value == payload.get("final_latest_zip_sha256")
+            )
+            payload["latest_pointer_path"] = str(latest_txt.resolve())
+            payload["latest_pointer_target"] = latest_txt.read_text(encoding="utf-8", errors="replace").strip() if latest_txt.exists() else ""
+            payload["latest_pointer_matches_original"] = bool(
+                payload.get("latest_pointer_target") == str(zip_path.resolve())
+            )
+            payload["finalized_at"] = datetime.now().isoformat(timespec="seconds")
+            payload["finalization_stage"] = "latest_zip_sha_inspection_proof"
+            payload["zip_sha256"] = payload.get("final_latest_zip_sha256") or payload.get("zip_sha256") or ""
+            payload["zip_sha256_scope"] = "latest_send_bundle.zip final bytes"
+            _safe_write_text(latest_evidence_json, json.dumps(payload, ensure_ascii=False, indent=2))
+        except Exception:
+            pass
+
+    def _run_health_pass(*, failure_name: str = "health/health_report_failed.txt") -> None:
+        try:
+            from pneumo_solver_ui.tools.health_report import build_health_report
+
+            _health_json, _health_md = build_health_report(zip_path, out_dir=out_dir)
+            _entries: Dict[str, bytes] = {}
+            if _health_json and Path(_health_json).exists():
+                _entries["health/health_report.json"] = Path(_health_json).read_bytes()
+            if _health_md and Path(_health_md).exists():
+                _entries["health/health_report.md"] = Path(_health_md).read_bytes()
+            if _entries:
+                _replace_zip_entries(_entries)
+        except Exception:
+            _health_err = traceback.format_exc()
+            try:
+                _fallback_json, _fallback_md = _write_health_report_failure_stub(zip_path, out_dir, _health_err)
+                _entries = {}
+                if _fallback_json.exists():
+                    _entries["health/health_report.json"] = _fallback_json.read_bytes()
+                if _fallback_md.exists():
+                    _entries["health/health_report.md"] = _fallback_md.read_bytes()
+                _entries[failure_name] = _health_err.encode("utf-8", errors="replace")
+                _replace_zip_entries(_entries)
+            except Exception:
+                try:
+                    _replace_zip_entries({failure_name: _health_err})
+                except Exception:
+                    pass
+
+    def _planned_evidence_paths(*paths: str) -> tuple[str, ...]:
+        planned = [str(path) for path in paths if str(path or "").strip()]
+        if engineering_analysis_evidence_added:
+            planned.append(ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME)
+        if geometry_reference_evidence_added:
+            planned.append(GEOMETRY_REFERENCE_EVIDENCE_ARCNAME)
+        return tuple(dict.fromkeys(planned))
+
     _refresh_latest_bundle(
         write_path=True,
         write_sha=True,
@@ -2123,6 +2398,23 @@ def _make_send_bundle_inner(
         failure_name="validation/validation_failed_final.txt",
     )
 
+    _append_evidence_manifest(
+        stage="after_final_validation_before_health",
+        planned_paths=_planned_evidence_paths(
+            EVIDENCE_MANIFEST_ARCNAME,
+            "health/health_report.json",
+            "health/health_report.md",
+        ),
+    )
+
+    # Re-run validation after evidence is embedded so both the latest sidecar
+    # and in-bundle validation report see diagnostics/evidence_manifest.json.
+    _run_validation_pass(
+        embed_report=True,
+        embed_triage_sidecars=True,
+        failure_name="validation/validation_failed_after_evidence.txt",
+    )
+
     # Refresh dashboard after final triage/validation so the embedded dashboard
     # and latest_dashboard sidecars reflect the finalized bundle state.
     _refresh_dashboard(embed_in_zip=True)
@@ -2130,31 +2422,33 @@ def _make_send_bundle_inner(
     # R69c: now that the run-registry event and final triage files are in place,
     # rebuild the health report against the final ZIP contents and refresh the
     # latest bundle copy/sha to match the post-triage archive.
-    try:
-        from pneumo_solver_ui.tools.health_report import build_health_report, add_health_report_to_zip
+    _run_health_pass()
 
-        _health_json, _health_md = build_health_report(zip_path, out_dir=out_dir)
-        add_health_report_to_zip(zip_path, _health_json, _health_md)
-    except Exception:
-        _health_err = traceback.format_exc()
-        try:
-            _fallback_json, _fallback_md = _write_health_report_failure_stub(zip_path, out_dir, _health_err)
-            with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as _z2:
-                _z2.write(_fallback_json, arcname="health/health_report.json")
-                _z2.write(_fallback_md, arcname="health/health_report.md")
-                _z2.writestr("health/health_report_failed.txt", _health_err)
-        except Exception:
-            try:
-                with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as _z2:
-                    _z2.writestr("health/health_report_failed.txt", _health_err)
-            except Exception:
-                pass
+    _append_evidence_manifest(
+        stage="after_final_health_before_latest",
+        planned_paths=_planned_evidence_paths(EVIDENCE_MANIFEST_ARCNAME),
+    )
+
+    # One final pass lets health/validation/dashboard report on the final
+    # manifest without changing any domain calculations.
+    _run_health_pass(failure_name="health/health_report_failed_after_evidence.txt")
+    _run_validation_pass(
+        embed_report=True,
+        embed_triage_sidecars=True,
+        failure_name="validation/validation_failed_release_ready.txt",
+    )
+    _refresh_dashboard(embed_in_zip=True)
+    _append_evidence_manifest(
+        stage="final_after_validation_dashboard",
+        planned_paths=_planned_evidence_paths(EVIDENCE_MANIFEST_ARCNAME),
+    )
 
     _refresh_latest_bundle(
         write_path=True,
         write_sha=True,
         update_index=True,
     )
+    _write_final_evidence_sidecar_proof()
 
     # ------------------------------------------------------------
     # R53: write session marker (for watchdog + idempotency).
@@ -2472,6 +2766,7 @@ def make_send_bundle(
     project_root: Optional[Path] = None,
     tag: Optional[str] = None,
     operator_note: Optional[str] = None,
+    trigger: Optional[str] = None,
 ) -> Path:
     """Thread/process-safe wrapper around the actual bundle builder.
 
@@ -2531,6 +2826,7 @@ def make_send_bundle(
                 primary_session_dir=primary_session_dir,
                 tag=tag,
                 operator_note=operator_note,
+                trigger=trigger,
             )
     except Exception:
         # If lock fails for any reason, still attempt to build bundle (best-effort).
@@ -2545,6 +2841,7 @@ def make_send_bundle(
             primary_session_dir=primary_session_dir,
             tag=tag,
             operator_note=operator_note,
+            trigger=trigger,
         )
 
 
@@ -2556,6 +2853,7 @@ def main() -> int:
     ap.add_argument("--max_file_mb", type=int, default=80, help="Пропускать файлы больше этого размера (МБ)")
     ap.add_argument("--include_workspace_osc", action="store_true", help="Включать workspace/osc (может быть большим)")
     ap.add_argument("--primary_session_dir", default=None, help="Явно указать UI session dir (приоритетнее env PNEUMO_SESSION_DIR)")
+    ap.add_argument("--trigger", default="manual", help="Machine-readable bundle trigger/mode provenance")
     ap.add_argument("--print_path", action="store_true", help="Напечатать путь к созданному zip")
     args = ap.parse_args()
 
@@ -2569,6 +2867,7 @@ def main() -> int:
         max_file_mb=int(args.max_file_mb),
         include_workspace_osc=bool(args.include_workspace_osc),
         primary_session_dir=Path(args.primary_session_dir) if args.primary_session_dir else None,
+        trigger=str(args.trigger or "manual"),
     )
 
     if args.print_path:

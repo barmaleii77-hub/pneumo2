@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import replace
 from pathlib import Path
 from typing import Optional
@@ -18,6 +19,14 @@ from pneumo_solver_ui.tools.send_bundle_contract import (
     ANIM_DIAG_SIDECAR_JSON,
     format_anim_dashboard_brief_lines,
     load_latest_send_bundle_anim_dashboard,
+)
+from pneumo_solver_ui.tools.send_bundle_evidence import (
+    ANALYSIS_EVIDENCE_SIDECAR_NAME,
+    EVIDENCE_MANIFEST_SIDECAR_NAME,
+    GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME,
+    GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME,
+    summarize_analysis_evidence_manifest,
+    summarize_geometry_reference_evidence,
 )
 
 from .desktop_diagnostics_model import (
@@ -60,6 +69,80 @@ def _resolve_bundle_out_dir(repo_root: Path, out_dir: Optional[Path | str] = Non
         return cfg.resolved_out_dir(repo_root)
     except Exception:
         return (repo_root / "send_bundles").resolve()
+
+
+def _effective_workspace_dir(repo_root: Path) -> Path:
+    raw = os.environ.get("PNEUMO_WORKSPACE_DIR", "").strip()
+    if raw:
+        try:
+            return Path(raw).expanduser().resolve()
+        except Exception:
+            return Path(raw).expanduser()
+    return (Path(repo_root) / "pneumo_solver_ui" / "workspace").resolve()
+
+
+def _load_analysis_evidence_summary(repo_root: Path, out_dir: Path) -> dict:
+    candidates = [
+        out_dir / ANALYSIS_EVIDENCE_SIDECAR_NAME,
+        _effective_workspace_dir(repo_root) / "exports" / "analysis_evidence_manifest.json",
+    ]
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        payload = _safe_read_json_dict(candidate)
+        read_warnings = []
+        if not payload:
+            read_warnings.append("Analysis evidence / HO-009 manifest is empty or unreadable.")
+        summary = summarize_analysis_evidence_manifest(
+            payload,
+            source_path=path_str(candidate),
+            read_warnings=read_warnings,
+        )
+        break
+    else:
+        summary = summarize_analysis_evidence_manifest({}, source_path="")
+
+    status = str(summary.get("status") or "MISSING").strip().upper()
+    if status == "MISSING":
+        action = "Откройте Results Center и выполните экспорт evidence manifest перед SEND."
+    elif status == "WARN":
+        action = "Проверьте HO-009 context state и mismatches перед отправкой."
+    else:
+        action = "HO-009 evidence готов к включению в diagnostics/SEND."
+    summary["action"] = action
+    return summary
+
+
+def _load_geometry_reference_evidence_summary(repo_root: Path, out_dir: Path) -> dict:
+    candidates = [
+        out_dir / GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME,
+        _effective_workspace_dir(repo_root) / "exports" / Path(GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME).name,
+    ]
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        payload = _safe_read_json_dict(candidate)
+        read_warnings = []
+        if not payload:
+            read_warnings.append("Geometry reference evidence is empty or unreadable.")
+        summary = summarize_geometry_reference_evidence(
+            payload,
+            source_path=path_str(candidate),
+            read_warnings=read_warnings,
+        )
+        break
+    else:
+        summary = summarize_geometry_reference_evidence({}, source_path="")
+
+    status = str(summary.get("status") or "MISSING").strip().upper()
+    if status == "MISSING":
+        action = "Откройте Reference Center или соберите SEND bundle, чтобы создать geometry reference evidence."
+    elif status == "WARN":
+        action = "Проверьте packaging/road_width/geometry acceptance warnings перед отправкой."
+    else:
+        action = "Geometry Reference evidence готов к включению в diagnostics/SEND."
+    summary["action"] = action
+    return summary
 
 
 def _pick_latest_bundle_candidate(out_dir: Path) -> Optional[Path]:
@@ -125,11 +208,23 @@ def load_desktop_diagnostics_bundle_record(
 
     clipboard_path = resolved_out_dir / "latest_send_bundle_clipboard_status.json"
     clipboard_status = _safe_read_json_dict(clipboard_path) if clipboard_path.exists() else {}
+    analysis = _load_analysis_evidence_summary(repo_root, resolved_out_dir)
+    geometry_reference = _load_geometry_reference_evidence_summary(repo_root, resolved_out_dir)
 
     return DesktopDiagnosticsBundleRecord(
         out_dir=path_str(resolved_out_dir),
         latest_zip_path=path_str(latest_zip),
         latest_zip_name=latest_zip.name if latest_zip else "",
+        latest_path_pointer_path=path_str(
+            (resolved_out_dir / "latest_send_bundle_path.txt")
+            if (resolved_out_dir / "latest_send_bundle_path.txt").exists()
+            else ""
+        ),
+        latest_sha_path=path_str(
+            (resolved_out_dir / "latest_send_bundle.sha256")
+            if (resolved_out_dir / "latest_send_bundle.sha256").exists()
+            else ""
+        ),
         latest_bundle_meta_path=path_str(meta_path if meta_path.exists() else ""),
         latest_inspection_json_path=path_str(
             (resolved_out_dir / LATEST_SEND_BUNDLE_INSPECTION_JSON)
@@ -166,6 +261,44 @@ def load_desktop_diagnostics_bundle_record(
             if (resolved_out_dir / "latest_triage_report.md").exists()
             else ""
         ),
+        latest_evidence_manifest_path=path_str(
+            (resolved_out_dir / EVIDENCE_MANIFEST_SIDECAR_NAME)
+            if (resolved_out_dir / EVIDENCE_MANIFEST_SIDECAR_NAME).exists()
+            else ""
+        ),
+        latest_analysis_evidence_manifest_path=str(analysis.get("source_path") or ""),
+        analysis_evidence_manifest_hash=str(analysis.get("evidence_manifest_hash") or ""),
+        analysis_evidence_status=str(analysis.get("status") or "MISSING"),
+        analysis_evidence_handoff_id=str(analysis.get("handoff_id") or ""),
+        analysis_evidence_context_state=str(analysis.get("result_context_state") or "MISSING"),
+        analysis_evidence_run_id=str(analysis.get("run_id") or ""),
+        analysis_evidence_run_contract_hash=str(analysis.get("run_contract_hash") or ""),
+        analysis_evidence_compare_contract_id=str(analysis.get("compare_contract_id") or ""),
+        analysis_evidence_artifact_count=int(analysis.get("artifact_count") or 0),
+        analysis_evidence_mismatch_count=int(analysis.get("mismatch_count") or 0),
+        analysis_evidence_warnings=[str(item) for item in (analysis.get("warnings") or []) if str(item).strip()],
+        analysis_evidence_action=str(analysis.get("action") or ""),
+        latest_geometry_reference_evidence_path=str(geometry_reference.get("source_path") or ""),
+        geometry_reference_status=str(geometry_reference.get("status") or "MISSING"),
+        geometry_reference_artifact_status=str(geometry_reference.get("artifact_status") or "missing"),
+        geometry_reference_road_width_status=str(geometry_reference.get("road_width_status") or "missing"),
+        geometry_reference_road_width_source=str(geometry_reference.get("road_width_source") or ""),
+        geometry_reference_packaging_status=str(geometry_reference.get("packaging_status") or "missing"),
+        geometry_reference_packaging_mismatch_status=str(
+            geometry_reference.get("packaging_mismatch_status") or "missing"
+        ),
+        geometry_reference_packaging_contract_hash=str(geometry_reference.get("packaging_contract_hash") or ""),
+        geometry_reference_acceptance_gate=str(geometry_reference.get("geometry_acceptance_gate") or "MISSING"),
+        geometry_reference_component_passport_needs_data=int(
+            geometry_reference.get("component_passport_needs_data") or 0
+        ),
+        geometry_reference_evidence_missing=[
+            str(item) for item in (geometry_reference.get("evidence_missing") or []) if str(item).strip()
+        ],
+        geometry_reference_warnings=[
+            str(item) for item in (geometry_reference.get("warnings") or []) if str(item).strip()
+        ],
+        geometry_reference_action=str(geometry_reference.get("action") or ""),
         latest_clipboard_status_path=path_str(clipboard_path if clipboard_path.exists() else ""),
         anim_pointer_diagnostics_path=path_str(
             (resolved_out_dir / ANIM_DIAG_SIDECAR_JSON)
@@ -327,6 +460,8 @@ def write_desktop_diagnostics_center_state(
             "center_state_json": path_str(path),
             "latest_summary_md": resolved_summary_md_path,
             "latest_bundle_zip": bundle_record.latest_zip_path,
+            "latest_bundle_path_txt": bundle_record.latest_path_pointer_path,
+            "latest_bundle_sha256": bundle_record.latest_sha_path,
             "latest_bundle_meta_json": bundle_record.latest_bundle_meta_path,
             "latest_bundle_inspection_json": bundle_record.latest_inspection_json_path,
             "latest_bundle_inspection_md": bundle_record.latest_inspection_md_path,
@@ -335,10 +470,40 @@ def write_desktop_diagnostics_center_state(
             "latest_validation_json": bundle_record.latest_validation_json_path,
             "latest_validation_md": bundle_record.latest_validation_md_path,
             "latest_triage_md": bundle_record.latest_triage_md_path,
+            "latest_evidence_manifest_json": bundle_record.latest_evidence_manifest_path,
+            "latest_analysis_evidence_manifest_json": bundle_record.latest_analysis_evidence_manifest_path,
+            "latest_geometry_reference_evidence_json": bundle_record.latest_geometry_reference_evidence_path,
             "latest_clipboard_status_json": bundle_record.latest_clipboard_status_path,
             "anim_pointer_diagnostics_json": bundle_record.anim_pointer_diagnostics_path,
             "latest_run_state_json": run_record.state_path if run_record is not None else "",
             "latest_run_log": run_record.log_path if run_record is not None else "",
+        },
+        "analysis_evidence": {
+            "status": bundle_record.analysis_evidence_status,
+            "context_state": bundle_record.analysis_evidence_context_state,
+            "manifest_hash": bundle_record.analysis_evidence_manifest_hash,
+            "handoff_id": bundle_record.analysis_evidence_handoff_id,
+            "run_id": bundle_record.analysis_evidence_run_id,
+            "run_contract_hash": bundle_record.analysis_evidence_run_contract_hash,
+            "compare_contract_id": bundle_record.analysis_evidence_compare_contract_id,
+            "artifact_count": bundle_record.analysis_evidence_artifact_count,
+            "mismatch_count": bundle_record.analysis_evidence_mismatch_count,
+            "warnings": list(bundle_record.analysis_evidence_warnings),
+            "action": bundle_record.analysis_evidence_action,
+        },
+        "geometry_reference_evidence": {
+            "status": bundle_record.geometry_reference_status,
+            "artifact_status": bundle_record.geometry_reference_artifact_status,
+            "road_width_status": bundle_record.geometry_reference_road_width_status,
+            "road_width_source": bundle_record.geometry_reference_road_width_source,
+            "packaging_status": bundle_record.geometry_reference_packaging_status,
+            "packaging_mismatch_status": bundle_record.geometry_reference_packaging_mismatch_status,
+            "packaging_contract_hash": bundle_record.geometry_reference_packaging_contract_hash,
+            "geometry_acceptance_gate": bundle_record.geometry_reference_acceptance_gate,
+            "component_passport_needs_data": bundle_record.geometry_reference_component_passport_needs_data,
+            "evidence_missing": list(bundle_record.geometry_reference_evidence_missing),
+            "warnings": list(bundle_record.geometry_reference_warnings),
+            "action": bundle_record.geometry_reference_action,
         },
     }
     _safe_write_json(path, payload)
