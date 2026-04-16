@@ -15,6 +15,7 @@ Desktop Animator runtime classes.
 
 from __future__ import annotations
 
+import json
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Mapping
@@ -23,6 +24,8 @@ import numpy as np
 import pandas as pd
 
 CORNERS: tuple[str, ...] = ("ЛП", "ПП", "ЛЗ", "ПЗ")
+GEOMETRY_ACCEPTANCE_JSON_NAME = "geometry_acceptance_report.json"
+GEOMETRY_ACCEPTANCE_MD_NAME = "geometry_acceptance_report.md"
 _FAIL_METRICS: tuple[tuple[str, str], ...] = (
     ("max_invariant_err_m", "Σ"),
     ("max_scalar_err_wheel_frame_m", "WF"),
@@ -283,6 +286,123 @@ def build_geometry_acceptance_rows(summary: Mapping[str, Any]) -> List[Dict[str,
     return rows
 
 
+def build_geometry_acceptance_report(
+    summary: Mapping[str, Any],
+    *,
+    updated_utc: str = "",
+    npz_path: str | Path | None = None,
+    pointer_path: str | Path | None = None,
+    source_label: str = "anim_latest export",
+) -> Dict[str, Any]:
+    """Build the producer-side evidence object required by PB-001/GAP-006.
+
+    The report is intentionally derived only from exported solver-point columns:
+    no hardpoints, road traces, or scalar clearances are reconstructed here.
+    """
+    enriched = _enrich_gate_fields(summary)
+    gate = str(enriched.get("release_gate") or "MISSING")
+    available = bool(enriched.get("available", False))
+    missing_fields = list(dict.fromkeys(str(x) for x in (enriched.get("missing_triplets") or []) if str(x).strip()))
+    warnings: list[str] = []
+    if gate in {"WARN", "FAIL", "MISSING"}:
+        reason = str(enriched.get("release_gate_reason") or "geometry acceptance is incomplete")
+        warnings.append(reason)
+    if missing_fields:
+        warnings.append("missing producer-side fields: " + _missing_preview(missing_fields, limit=8))
+
+    if gate == "PASS":
+        graphics_truth_state = "solver_confirmed"
+        inspection_status = "ok"
+    elif available:
+        graphics_truth_state = "approximate_inferred_with_warning"
+        inspection_status = "warning" if gate == "WARN" else "fail"
+    else:
+        graphics_truth_state = "unavailable"
+        inspection_status = "missing"
+
+    report: Dict[str, Any] = {
+        "schema": "geometry_acceptance_report.v1",
+        "updated_utc": str(updated_utc or ""),
+        "source_label": str(source_label or ""),
+        "npz_path": str(npz_path or ""),
+        "pointer_path": str(pointer_path or ""),
+        "inspection_status": inspection_status,
+        "truth_state_summary": {
+            "graphics_truth_state": graphics_truth_state,
+            "release_gate": gate,
+            "release_gate_reason": str(enriched.get("release_gate_reason") or ""),
+            "available": available,
+            "ok": bool(enriched.get("ok", False)),
+            "producer_owned": True,
+            "no_synthetic_geometry": True,
+        },
+        "missing_fields": missing_fields,
+        "warnings": list(dict.fromkeys(str(x) for x in warnings if str(x).strip())),
+        "summary": dict(enriched),
+        "rows": build_geometry_acceptance_rows(enriched),
+        "summary_lines": format_geometry_acceptance_summary_lines(enriched, label=source_label),
+    }
+    return report
+
+
+def render_geometry_acceptance_report_md(report: Mapping[str, Any] | None) -> str:
+    rep = dict(report or {})
+    truth = dict(rep.get("truth_state_summary") or {}) if isinstance(rep.get("truth_state_summary"), Mapping) else {}
+    lines = [
+        "# geometry acceptance report",
+        "",
+        f"- inspection_status: **{rep.get('inspection_status') or 'missing'}**",
+        f"- graphics_truth_state: {truth.get('graphics_truth_state') or 'unavailable'}",
+        f"- release_gate: {truth.get('release_gate') or 'MISSING'}",
+        f"- producer_owned: {truth.get('producer_owned')}",
+        f"- no_synthetic_geometry: {truth.get('no_synthetic_geometry')}",
+    ]
+    reason = str(truth.get("release_gate_reason") or "").strip()
+    if reason:
+        lines.append(f"- release_gate_reason: {reason}")
+    missing = [str(x) for x in (rep.get("missing_fields") or []) if str(x).strip()]
+    if missing:
+        lines.extend(["", "## missing producer-side fields", *[f"- {x}" for x in missing]])
+    warnings = [str(x) for x in (rep.get("warnings") or []) if str(x).strip()]
+    if warnings:
+        lines.extend(["", "## warnings", *[f"- {x}" for x in warnings]])
+    summary_lines = [str(x) for x in (rep.get("summary_lines") or []) if str(x).strip()]
+    if summary_lines:
+        lines.extend(["", "## summary", *[f"- {x}" for x in summary_lines]])
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def write_geometry_acceptance_artifacts(
+    exports_dir: str | Path,
+    *,
+    frame_or_mapping: Any,
+    updated_utc: str = "",
+    npz_path: str | Path | None = None,
+    pointer_path: str | Path | None = None,
+    source_label: str = "anim_latest export",
+    tol_m: float = 1e-6,
+) -> Dict[str, Any]:
+    exports = Path(exports_dir)
+    exports.mkdir(parents=True, exist_ok=True)
+    summary = collect_geometry_acceptance_from_frame(frame_or_mapping, tol_m=tol_m)
+    report = build_geometry_acceptance_report(
+        summary,
+        updated_utc=updated_utc,
+        npz_path=npz_path,
+        pointer_path=pointer_path,
+        source_label=source_label,
+    )
+    json_path = exports / GEOMETRY_ACCEPTANCE_JSON_NAME
+    md_path = exports / GEOMETRY_ACCEPTANCE_MD_NAME
+    json_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    md_path.write_text(render_geometry_acceptance_report_md(report), encoding="utf-8")
+    return {
+        "geometry_acceptance_json_path": str(json_path),
+        "geometry_acceptance_md_path": str(md_path),
+        "geometry_acceptance_report": report,
+    }
+
+
 def collect_geometry_acceptance_from_frame(frame_or_mapping: Any, *, tol_m: float = 1e-6) -> Dict[str, Any]:
     """Return serializable acceptance summary from a main dataframe/mapping."""
     df = _ensure_df(frame_or_mapping)
@@ -456,7 +576,6 @@ def _main_df_from_npz(npz_source: Any) -> pd.DataFrame:
     closer = None
     try:
         if isinstance(npz_source, (str, Path)):
-            npz = np.load(Path(npz_source).expanduser().resolve(), allow_pickle=True)
             npz = np.load(Path(npz_source).expanduser().resolve(), allow_pickle=True)
         elif isinstance(npz_source, (bytes, bytearray)):
             npz = np.load(BytesIO(npz_source), allow_pickle=True)

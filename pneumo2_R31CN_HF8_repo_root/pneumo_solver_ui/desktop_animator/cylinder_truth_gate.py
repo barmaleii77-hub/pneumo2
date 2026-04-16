@@ -5,11 +5,10 @@ from __future__ import annotations
 Project intent for the current phase:
 - if explicit packaging truth is missing, Animator must stay honest and render only
   the solver-derived cylinder axis;
-- if the exporter provides an explicit axis + resolved basic geometry
-  (bore/rod/outer/body lengths), Animator may render honest axis-derived
-  body/rod/piston volumes even when advanced packaging fields are still missing;
-- the full contract still unlocks the richer explicit packaging mode exported in
-  ``meta.packaging.cylinders``.
+- body/rod/piston volumes are allowed only when the exporter marks the cylinder
+  packaging passport complete and all required resolved fields are present;
+- partial packaging is useful provenance, but it stays axis-only and carries an
+  approximate/unavailable warning instead of invented geometry.
 """
 
 import math
@@ -20,6 +19,17 @@ _ALLOWED_LENGTH_STATUSES = {
     "filled_from_endpoint_distance",
     "patched_nonfinite_from_endpoint_distance",
 }
+
+TRUTH_STATE_SOLVER_CONFIRMED = "solver_confirmed"
+TRUTH_STATE_SOURCE_DATA_CONFIRMED = "source_data_confirmed"
+TRUTH_STATE_APPROXIMATE = "approximate_inferred_with_warning"
+TRUTH_STATE_UNAVAILABLE = "unavailable"
+ALLOWED_GRAPHICS_TRUTH_STATES: tuple[str, ...] = (
+    TRUTH_STATE_SOLVER_CONFIRMED,
+    TRUTH_STATE_SOURCE_DATA_CONFIRMED,
+    TRUTH_STATE_APPROXIMATE,
+    TRUTH_STATE_UNAVAILABLE,
+)
 
 
 def _as_mapping(value: Any) -> dict[str, Any]:
@@ -76,16 +86,33 @@ def evaluate_cylinder_truth_gate(meta: Mapping[str, Any] | None, cyl_name: str) 
     )
     has_packaging_block = bool(packaging)
     has_cylinder_block = bool(cyl_block)
-    enabled = bool(has_packaging_block and has_cylinder_block and length_ok and basic_geometry_ready)
+    advanced_geometry_ready = not advanced_missing
+    enabled = bool(
+        has_packaging_block
+        and has_cylinder_block
+        and contract_complete
+        and length_ok
+        and basic_geometry_ready
+        and advanced_geometry_ready
+    )
+    partial_truth_signal = bool(
+        packaging_status
+        or length_status_by_corner
+        or resolved_geometry
+        or advanced_missing
+        or _as_mapping(cyl_block.get("mount_families"))
+    )
 
     if not has_packaging_block:
         reason = "missing_meta_packaging"
     elif not has_cylinder_block:
         reason = f"missing_{cyl_key}_packaging_block"
-    elif contract_complete:
-        reason = f"{cyl_key}_packaging_complete"
     elif enabled:
-        reason = f"{cyl_key}_axis_derived_packaging_ready"
+        reason = f"{cyl_key}_packaging_complete"
+    elif contract_complete and advanced_missing:
+        reason = f"{cyl_key}_contract_marked_complete_but_missing_advanced_fields"
+    elif not contract_complete:
+        reason = f"{cyl_key}_packaging_incomplete_axis_only"
     elif advanced_missing:
         reason = f"{cyl_key}_advanced_packaging_missing"
     elif not length_ok:
@@ -95,15 +122,21 @@ def evaluate_cylinder_truth_gate(meta: Mapping[str, Any] | None, cyl_name: str) 
     else:
         reason = f"{cyl_key}_packaging_partial"
 
+    truth_state = (
+        TRUTH_STATE_SOLVER_CONFIRMED
+        if enabled
+        else (TRUTH_STATE_APPROXIMATE if partial_truth_signal and has_cylinder_block else TRUTH_STATE_UNAVAILABLE)
+    )
+
     return {
         "cyl_name": cyl_key,
         "enabled": enabled,
-        "mode": (
-            "body_rod_piston"
-            if bool(enabled and contract_complete)
-            else ("axis_derived_packaging" if enabled else "axis_only")
-        ),
+        "mode": "body_rod_piston" if bool(enabled) else "axis_only",
         "reason": reason,
+        "truth_state": truth_state,
+        "truth_badge": truth_state,
+        "warning_required": not bool(enabled),
+        "hidden_elements": [] if bool(enabled) else ["body", "rod", "piston"],
         "has_packaging_block": has_packaging_block,
         "has_cylinder_block": has_cylinder_block,
         "packaging_status": packaging_status,
@@ -111,6 +144,7 @@ def evaluate_cylinder_truth_gate(meta: Mapping[str, Any] | None, cyl_name: str) 
         "length_status_by_corner": length_status_by_corner,
         "length_contract_ready": length_ok,
         "basic_geometry_ready": basic_geometry_ready,
+        "advanced_geometry_ready": advanced_geometry_ready,
         "resolved_geometry": resolved_geometry,
         "advanced_fields_missing": advanced_missing,
         "mount_families": _as_mapping(cyl_block.get("mount_families")),
@@ -129,12 +163,6 @@ def render_cylinder_truth_gate_message(gate: Mapping[str, Any] | None) -> str:
     cyl = str(info.get("cyl_name") or "cyl?").upper()
     if bool(info.get("enabled")) and str(info.get("mode") or "") == "body_rod_piston":
         return f"{cyl} packaging contract complete -> body/rod/piston truth mode enabled."
-    if bool(info.get("enabled")) and str(info.get("mode") or "") == "axis_derived_packaging":
-        missing_adv = _as_str_list(info.get("advanced_fields_missing"))
-        tail = "explicit axis + resolved basic geometry are present"
-        if missing_adv:
-            tail += "; advanced packaging fields still missing: " + ", ".join(missing_adv)
-        return f"{cyl} -> axis-derived packaging mode enabled: {tail}."
 
     reason = str(info.get("reason") or "axis_only")
     missing_adv = _as_str_list(info.get("advanced_fields_missing"))
@@ -148,12 +176,23 @@ def render_cylinder_truth_gate_message(gate: Mapping[str, Any] | None) -> str:
         tail = "length columns are not explicit/finite for all corners"
     elif reason.endswith("basic_geometry_missing"):
         tail = "resolved basic bore/rod/outer/body geometry is incomplete"
+    elif reason.endswith("packaging_incomplete_axis_only") and missing_adv:
+        tail = "approximate packaging only; missing advanced fields: " + ", ".join(missing_adv)
+    elif reason.endswith("packaging_incomplete_axis_only"):
+        tail = "packaging passport is not complete"
+    elif "contract_marked_complete_but_missing_advanced_fields" in reason and missing_adv:
+        tail = "contract is inconsistent; missing advanced fields: " + ", ".join(missing_adv)
     else:
         tail = "explicit packaging truth is partial"
     return f"{cyl} -> axis-only honesty mode (body/rod/piston meshes disabled): {tail}."
 
 
 __all__ = [
+    "ALLOWED_GRAPHICS_TRUTH_STATES",
+    "TRUTH_STATE_SOLVER_CONFIRMED",
+    "TRUTH_STATE_SOURCE_DATA_CONFIRMED",
+    "TRUTH_STATE_APPROXIMATE",
+    "TRUTH_STATE_UNAVAILABLE",
     "evaluate_cylinder_truth_gate",
     "evaluate_all_cylinder_truth_gates",
     "render_cylinder_truth_gate_message",

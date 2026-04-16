@@ -1,13 +1,25 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from pneumo_solver_ui.anim_export_contract import summarize_anim_export_contract, summarize_anim_export_objective_metrics
+from pneumo_solver_ui.anim_export_contract import (
+    CYLINDER_ADVANCED_FIELDS,
+    augment_anim_latest_meta,
+    ensure_cylinder_length_columns,
+    summarize_anim_export_contract,
+    summarize_anim_export_objective_metrics,
+)
 from pneumo_solver_ui.data_contract import build_geometry_meta_from_base
+from pneumo_solver_ui.geometry_acceptance_contract import (
+    GEOMETRY_ACCEPTANCE_JSON_NAME,
+    GEOMETRY_ACCEPTANCE_MD_NAME,
+)
 from pneumo_solver_ui.npz_bundle import export_anim_latest_bundle
 from pneumo_solver_ui.solver_points_contract import CORNERS, KNOWN_POINT_KINDS, point_cols
 from pneumo_solver_ui.suspension_family_runtime import spring_family_active_flag_column, spring_family_runtime_column
@@ -139,8 +151,11 @@ def test_export_anim_latest_bundle_writes_contract_blocks_and_repairs_nan_cylind
     meta, cols, values = _read_npz_meta(npz_path)
 
     assert meta["solver_points"]["schema"] == "solver_points.contract.v1"
+    assert meta["solver_points"]["solver_points_contract_hash"]
     assert meta["hardpoints"]["schema"] == "hardpoints.export.v1"
+    assert meta["hardpoints"]["hardpoints_contract_hash"]
     assert meta["packaging"]["schema"] == "cylinder_packaging.contract.v1"
+    assert meta["packaging"]["packaging_contract_hash"]
     assert "frame_corner" in meta["solver_points"]["visible_suspension_skeleton_families"]
     assert "lower_arm_frame_front" in meta["solver_points"]["visible_suspension_skeleton_families"]
     assert set(meta["solver_points"]["legacy_alias_families"]) >= {"arm_pivot", "arm_joint", "arm2_pivot", "arm2_joint"}
@@ -151,8 +166,11 @@ def test_export_anim_latest_bundle_writes_contract_blocks_and_repairs_nan_cylind
 
     packaging = meta["packaging"]
     assert packaging["status"] == "partial"
+    assert packaging["axis_only_cylinders"] == ["cyl1", "cyl2"]
     assert "gland_or_sleeve_position_m" in packaging["missing_advanced_fields"]
     assert packaging["cylinders"]["cyl1"]["mount_families"]["top"] == "cyl1_top"
+    assert packaging["cylinders"]["cyl1"]["truth_mode"] == "axis_only_honesty_mode"
+    assert packaging["cylinders"]["cyl1"]["full_mesh_allowed"] is False
     assert packaging["cylinders"]["cyl1"]["length_status_by_corner"]["ЛП"] == "filled_from_endpoint_distance"
     assert packaging["cylinders"]["cyl2"]["length_status_by_corner"]["ПЗ"] == "filled_from_endpoint_distance"
     assert packaging["cylinders"]["cyl1"]["resolved_geometry_by_axle"]["front"]["stroke_m"] == 0.25
@@ -193,6 +211,79 @@ def test_export_anim_latest_bundle_writes_contract_blocks_and_repairs_nan_cylind
     assert objective_metrics["мин_зазор_пружина_пружина_м"] > 9.9
     assert objective_metrics["макс_ошибка_midstroke_t0_м"] == 0.075
     assert objective_metrics["мин_запас_до_coil_bind_пружины_м"] == 0.018
+
+    artifact_refs = dict(meta["anim_export_contract_artifacts"])
+    assert artifact_refs["geometry_acceptance_json"] == GEOMETRY_ACCEPTANCE_JSON_NAME
+    assert artifact_refs["geometry_acceptance_md"] == GEOMETRY_ACCEPTANCE_MD_NAME
+    assert artifact_refs["capture_export_manifest"] == "capture_export_manifest.json"
+    assert artifact_refs["frame_budget_evidence"] == "animator_frame_budget_evidence.json"
+    geom_report_path = tmp_path / GEOMETRY_ACCEPTANCE_JSON_NAME
+    geom_report_md_path = tmp_path / GEOMETRY_ACCEPTANCE_MD_NAME
+    assert geom_report_path.exists()
+    assert geom_report_md_path.exists()
+    capture_manifest_path = tmp_path / "capture_export_manifest.json"
+    assert capture_manifest_path.exists()
+    capture_manifest = json.loads(capture_manifest_path.read_text(encoding="utf-8"))
+    assert capture_manifest["artifact_refs"]["frame_budget_evidence"] == "animator_frame_budget_evidence.json"
+    geom_report = json.loads(geom_report_path.read_text(encoding="utf-8"))
+    assert geom_report["schema"] == "geometry_acceptance_report.v1"
+    assert geom_report["truth_state_summary"]["producer_owned"] is True
+    assert geom_report["truth_state_summary"]["no_synthetic_geometry"] is True
+    assert geom_report["missing_fields"] == []
+    assert geom_report["inspection_status"] in {"ok", "warning"}
+
+
+def test_validate_anim_export_contract_cli_exits_zero_only_for_pass(tmp_path: Path) -> None:
+    df_fixed, length_repair = ensure_cylinder_length_columns(_solver_df_with_optional_hardpoints_and_nan_lengths())
+    meta = _geometry_meta()
+    meta["packaging"] = {
+        "cylinders": {
+            cyl: {field: {"source": "pytest"} for field in CYLINDER_ADVANCED_FIELDS}
+            for cyl in ("cyl1", "cyl2")
+        }
+    }
+    meta = augment_anim_latest_meta(meta, df_main=df_fixed, length_repair=length_repair)
+    pass_json = tmp_path / "pass_anim_latest.json"
+    pass_json.write_text(json.dumps({"meta": meta}, ensure_ascii=False), encoding="utf-8")
+
+    root = Path(__file__).resolve().parents[1]
+    pass_result = subprocess.run(
+        [sys.executable, "-m", "pneumo_solver_ui.tools.validate_anim_export_contract", str(pass_json)],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert pass_result.returncode == 0, pass_result.stdout + pass_result.stderr
+    assert json.loads(pass_result.stdout)["level"] == "PASS"
+
+    fail_meta = json.loads(json.dumps(meta, ensure_ascii=False))
+    fail_meta["hardpoints"]["families"].pop("cyl1_top")
+    fail_json = tmp_path / "fail_anim_latest.json"
+    fail_report_json = tmp_path / "fail_report.json"
+    fail_report_md = tmp_path / "fail_report.md"
+    fail_json.write_text(json.dumps({"meta": fail_meta}, ensure_ascii=False), encoding="utf-8")
+
+    fail_result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pneumo_solver_ui.tools.validate_anim_export_contract",
+            str(fail_json),
+            "--report-json",
+            str(fail_report_json),
+            "--report-md",
+            str(fail_report_md),
+        ],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert fail_result.returncode == 1
+    assert fail_report_json.exists()
+    assert fail_report_md.exists()
+    assert json.loads(fail_report_json.read_text(encoding="utf-8"))["level"] == "FAIL"
 
 
 def test_collect_anim_latest_bundle_diagnostics_surfaces_contract_summary(tmp_path: Path, monkeypatch) -> None:
