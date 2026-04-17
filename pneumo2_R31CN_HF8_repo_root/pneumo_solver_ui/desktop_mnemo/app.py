@@ -1728,7 +1728,7 @@ def _build_frame_alert_payload(
 
 
 def prepare_dataset(npz_path: Path) -> MnemoDataset:
-    bundle = load_npz(npz_path)
+    bundle = load_npz(npz_path, include_visual_contract=False)
     if bundle.q is None:
         raise ValueError("NPZ bundle has no q_values table for pneumatic mnemonic.")
 

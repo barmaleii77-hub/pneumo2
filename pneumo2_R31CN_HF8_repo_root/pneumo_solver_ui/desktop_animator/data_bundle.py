@@ -21,6 +21,7 @@ Design goals:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -29,19 +30,12 @@ import logging
 import math
 
 import numpy as np
-import pandas as pd
 
 from pneumo_solver_ui.data_contract import (
     audit_main_columns,
     collect_geometry_contract_issues,
     normalize_npz_meta,
     read_visual_geometry_meta,
-)
-from pneumo_solver_ui.visual_contract import (
-    collect_visual_cache_dependencies,
-    collect_visual_contract_status,
-    load_visual_road_sidecar,
-    visual_cache_dependencies_token,
 )
 from pneumo_solver_ui.solver_points_contract import (
     POINT_KINDS as SOLVER_POINT_KINDS,
@@ -53,6 +47,30 @@ logger = logging.getLogger(__name__)
 
 
 CORNERS: Tuple[str, str, str, str] = ("ЛП", "ПП", "ЛЗ", "ПЗ")
+
+
+@lru_cache(maxsize=1)
+def _import_pandas() -> Any:
+    import pandas as pd  # type: ignore
+
+    return pd
+
+
+@lru_cache(maxsize=1)
+def _import_visual_contract_helpers() -> tuple[Any, Any, Any, Any]:
+    from pneumo_solver_ui.visual_contract import (
+        collect_visual_cache_dependencies,
+        collect_visual_contract_status,
+        load_visual_road_sidecar,
+        visual_cache_dependencies_token,
+    )
+
+    return (
+        collect_visual_cache_dependencies,
+        collect_visual_contract_status,
+        load_visual_road_sidecar,
+        visual_cache_dependencies_token,
+    )
 
 
 def _coerce_str(x: Any) -> str:
@@ -165,11 +183,13 @@ class NpzTable:
             return np.asarray(col, dtype=float)
         except Exception:
             try:
+                pd = _import_pandas()
                 s = pd.to_numeric(pd.Series(col), errors='coerce')
                 return np.asarray(s.to_numpy(copy=True), dtype=float)
             except Exception:
                 return np.full((self.values.shape[0],), np.nan, dtype=float)
     def to_dataframe(self) -> pd.DataFrame:
+        pd = _import_pandas()
         return pd.DataFrame(self.values, columns=self.cols)
 
 
@@ -504,6 +524,7 @@ class DataBundle:
                 self._derived[key] = None  # type: ignore[assignment]
                 return None
 
+            pd = _import_pandas()
             df = pd.read_csv(csv_path)
             if "t" not in df.columns:
                 self._derived[key] = None  # type: ignore[assignment]
@@ -1015,7 +1036,7 @@ def _load_table(npz: np.lib.npyio.NpzFile, prefix: str) -> Optional[NpzTable]:
     return NpzTable(cols=cols, values=values)
 
 
-def load_npz(path: str | Path) -> DataBundle:
+def load_npz(path: str | Path, *, include_visual_contract: bool = True) -> DataBundle:
     """Load an NPZ export produced by the UI."""
     pth = Path(path).expanduser().resolve()
     with np.load(pth, allow_pickle=True) as z:
@@ -1056,31 +1077,42 @@ def load_npz(path: str | Path) -> DataBundle:
             meta["_geometry_contract_issues"] = []
             meta["_geometry_contract_ok"] = True
 
-        t_main = main.column("время_с", default=None) if main.has("время_с") else None
-        road_sidecar = load_visual_road_sidecar(
-            pth,
-            meta,
-            time_vector=t_main,
-            context="Desktop Animator NPZ",
-            log=lambda m: logger.warning("[Animator] %s", m),
-        )
-        cache_deps = collect_visual_cache_dependencies(
-            pth,
-            meta=meta,
-            context="Desktop Animator NPZ cache",
-            log=lambda m: logger.warning("[Animator] %s", m),
-        )
-        meta["_visual_cache_dependencies"] = dict(cache_deps)
-        meta["_visual_cache_token"] = visual_cache_dependencies_token(cache_deps)
-        meta["_visual_contract"] = collect_visual_contract_status(
-            main.cols,
-            meta=meta,
-            npz_path=pth,
-            time_vector=t_main,
-            road_sidecar=road_sidecar,
-            context="Desktop Animator NPZ",
-            log=lambda m: logger.warning("[Animator] %s", m),
-        )
+        meta["_visual_cache_dependencies"] = {}
+        meta["_visual_cache_token"] = ""
+        meta["_visual_contract"] = {}
+
+        if include_visual_contract:
+            (
+                collect_visual_cache_dependencies,
+                collect_visual_contract_status,
+                load_visual_road_sidecar,
+                visual_cache_dependencies_token,
+            ) = _import_visual_contract_helpers()
+            t_main = main.column("время_с", default=None) if main.has("время_с") else None
+            road_sidecar = load_visual_road_sidecar(
+                pth,
+                meta,
+                time_vector=t_main,
+                context="Desktop Animator NPZ",
+                log=lambda m: logger.warning("[Animator] %s", m),
+            )
+            cache_deps = collect_visual_cache_dependencies(
+                pth,
+                meta=meta,
+                context="Desktop Animator NPZ cache",
+                log=lambda m: logger.warning("[Animator] %s", m),
+            )
+            meta["_visual_cache_dependencies"] = dict(cache_deps)
+            meta["_visual_cache_token"] = visual_cache_dependencies_token(cache_deps) or ""
+            meta["_visual_contract"] = collect_visual_contract_status(
+                main.cols,
+                meta=meta,
+                npz_path=pth,
+                time_vector=t_main,
+                road_sidecar=road_sidecar,
+                context="Desktop Animator NPZ",
+                log=lambda m: logger.warning("[Animator] %s", m),
+            )
 
         # === CONTRACT CHECK ===
         # Minimum required channel for any animation is the time axis.
