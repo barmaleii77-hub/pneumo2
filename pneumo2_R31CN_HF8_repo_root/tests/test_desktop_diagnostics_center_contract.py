@@ -485,6 +485,9 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "def _engineering_analysis_evidence_summary_lines(self, bundle) -> list[str]:" in center_src
     assert "def _engineering_analysis_status_text(self, bundle) -> str:" in center_src
     assert "Evidence handoff status" in center_src
+    assert "HO-008 analysis context" in center_src
+    assert "analysis_context_status" in runtime_src
+    assert "analysis_context_action" in runtime_src
     assert "Geometry Reference evidence" in center_src
     assert "Artifact freshness" in center_src
     assert "geometry_reference_artifact_freshness_relation" in center_src
