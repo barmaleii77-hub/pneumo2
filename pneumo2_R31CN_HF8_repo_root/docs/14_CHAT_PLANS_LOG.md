@@ -295,6 +295,13 @@ ID: `PLAN-0039`.
 Источник: chat: visible startup proof 2026-04-17.
 ID: `PLAN-0040`.
 
+41. Branch cleanup and safe parallel work plan
+Назначение: Consolidate temporary Codex branches into codex/work, delete obsolete branch refs, and continue future GUI migration through bounded parallel lanes with disjoint file ownership from codex/work only.
+Артефакт: [context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md](./context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md)
+Статус: active.
+Источник: chat: branch cleanup 2026-04-18.
+ID: `PLAN-0041`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

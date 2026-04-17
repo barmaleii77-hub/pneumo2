@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-17T18:14:00+00:00",
+  "updated_at": "2026-04-17T19:16:41+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -514,6 +514,15 @@
       "title": "Qt shell and Desktop Mnemo visible startup proof",
       "details": "Record controlled real-Windows visible startup proof for Qt main shell and Desktop Mnemo: automated startup PASS, while manual visual, Snap Layouts, mixed-DPI, second-monitor and long-running stability acceptance remain pending.",
       "artifact_path": "context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md",
+      "status": "active"
+    },
+    {
+      "id": "PLAN-0041",
+      "created_at": "2026-04-17T19:16:41+00:00",
+      "source": "chat: branch cleanup 2026-04-18",
+      "title": "Branch cleanup and safe parallel work plan",
+      "details": "Consolidate temporary Codex branches into codex/work, delete obsolete branch refs, and continue future GUI migration through bounded parallel lanes with disjoint file ownership from codex/work only.",
+      "artifact_path": "context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md",
       "status": "active"
     }
   ]

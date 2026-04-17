@@ -82,8 +82,9 @@ Operational note:
 23. [docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](./context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
 24. [docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](./context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
 25. [docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md](./context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md)
-26. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
-27. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
+26. [docs/context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md](./context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md)
+27. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
+28. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
 
 ### 3. Активные требования и рабочий backlog
 
@@ -241,6 +242,7 @@ Operational note:
 - [docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](./context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
 - [docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](./context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
 - [docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md](./context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md)
+- [docs/context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md](./context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md)
 
 Что задаёт общий canon:
 
@@ -345,6 +347,9 @@ Operational note:
   для Qt main shell и Desktop Mnemo (`PASS` automated visible startup), но
   оставляет manual visual, Snap Layouts, second-monitor, mixed-DPI и
   long-running stability acceptance pending.
+- Branch cleanup and next-work plan фиксирует, что временные Codex branches
+  собраны в `codex/work`, лишние ветки удалены, а следующая параллельная
+  работа должна стартовать только от `codex/work` с disjoint file ownership.
 
 Связанные, но вспомогательные UX-источники:
 
