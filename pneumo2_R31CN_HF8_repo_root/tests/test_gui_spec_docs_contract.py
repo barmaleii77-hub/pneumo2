@@ -801,6 +801,7 @@ def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_releas
     assert "producer_artifact_status=missing" in text
     assert "producer_readiness_reasons" in text
     assert "packaging_mismatch_not_match" in text
+    assert "artifact_freshness_missing" in text
     assert "producer_evidence_owner=producer_export" in text
     assert "producer_next_action" in text
     assert "consumer_may_fabricate_geometry=false" in text
@@ -827,7 +828,7 @@ def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_releas
     assert "tests/test_desktop_diagnostics_center_contract.py" in text
     assert "33 passed" in text
     assert "45 passed" in text
-    assert "87 passed" in text
+    assert "77 passed" in text
     assert "Runtime validation result: `validation ok`" in text
     assert "Final standalone audit result" in text
     assert "OK errors=0 warnings=9 zip_entries=310 manifest_checked=286" in text

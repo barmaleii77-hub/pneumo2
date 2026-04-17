@@ -52,18 +52,19 @@ python -m pytest tests/test_v32_diagnostics_send_bundle_evidence.py tests/test_h
 Result: `33 passed`. Focused Geometry/Diagnostics producer-handoff
 regression set: `45 passed`.
 
-Focused Geometry/Diagnostics regression result: `87 passed`.
+Focused Geometry/Diagnostics regression result: `77 passed`.
 
 Runtime proof captured:
 
-- ZIP: `send_bundles/SEND_20260417_083946_bundle.zip`
-- Final latest SHA256: `67694d0c3e01ef7f30c4b1780729e4e74baf8d80b74419dddcd139fc0ec7c72a`
-- Trigger / mode: `desktop_diagnostics_center` / `manual`
+- ZIP: `send_bundles/SEND_20260417_085523_bundle.zip`
+- Final latest SHA256: `d9edac34ac1769160c5aefc2668fb69440bf27a9fb8fc8eb25ead0d2c2b3adf2`
+- Trigger / mode: `desktop_geometry_reference_center` / `manual`
 - Validation: `ok=True`, `errors=0`, `warnings=7`
 - Health after final triage: `ok=False`, `notes=9`, preserving adjacent-workstream warnings.
 - PB-002 required evidence: `pb002_missing_required_count=0`
 - Latest pointer/SHA proof: `latest_zip_matches_original=True`, `latest_sha_sidecar_matches=True`, `latest_pointer_matches_original=True`
-- Post-regression latest proof: after the `87 passed` focused Diagnostics run,
+- Post-regression latest proof: after the `77 passed` focused
+  Geometry/Diagnostics/docs run,
   `latest_send_bundle.zip`, `latest_send_bundle_path.txt`,
   `latest_send_bundle.sha256`, `latest_evidence_manifest.json` and
   `latest_send_bundle_inspection.json` still point to the same final manual ZIP
@@ -79,7 +80,9 @@ Runtime proof captured:
   `producer_artifact_status=missing`, `producer_evidence_owner=producer_export`,
   the required producer artifact list for `anim_latest`, packaging passport and
   geometry acceptance, `producer_next_action` for re-exporting producer evidence,
-  producer readiness reasons such as `packaging_mismatch_not_match`,
+  `producer_readiness_reasons=[artifact_context_missing,
+  packaging_status_not_complete, packaging_mismatch_not_match,
+  geometry_acceptance_not_pass, artifact_freshness_missing]`,
   `consumer_may_fabricate_geometry=false`,
   `artifact_freshness_status=missing`, `artifact_freshness_relation=latest`,
   `road_width_status=derived_from_track_and_wheel_width`,
