@@ -254,6 +254,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 "browser_perf_evidence_report": f"workspace/exports/{BROWSER_PERF_EVIDENCE_REPORT_JSON_NAME}" in name_set,
                 "browser_perf_comparison_report": f"workspace/exports/{BROWSER_PERF_COMPARISON_REPORT_JSON_NAME}" in name_set,
                 "browser_perf_trace": any(f"workspace/exports/{name}" in name_set for name in BROWSER_PERF_TRACE_CANDIDATE_NAMES),
+                "evidence_manifest": EVIDENCE_MANIFEST_ARCNAME in name_set,
             }
 
             meta = _read_json_from_zip(z, "bundle/meta.json")
@@ -613,6 +614,7 @@ def render_health_report_md(rep: HealthReport) -> str:
     engineering = dict(rep.signals.get("engineering_analysis_evidence") or {})
     optimizer_scope = dict(rep.signals.get("optimizer_scope") or {})
     optimizer_scope_gate = dict(rep.signals.get("optimizer_scope_gate") or {})
+    evidence_manifest = dict(rep.signals.get("evidence_manifest") or {})
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
     lines = [
         "# Health report",
@@ -635,7 +637,23 @@ def render_health_report_md(rep: HealthReport) -> str:
         f"- browser_perf_evidence_report: {artifacts.get('browser_perf_evidence_report')}",
         f"- browser_perf_comparison_report: {artifacts.get('browser_perf_comparison_report')}",
         f"- browser_perf_trace: {artifacts.get('browser_perf_trace')}",
+        f"- evidence_manifest: {artifacts.get('evidence_manifest')}",
     ]
+
+    if evidence_manifest:
+        analysis_handoff = dict(evidence_manifest.get("analysis_handoff") or {})
+        missing_warnings = [str(x) for x in (evidence_manifest.get("missing_warnings") or []) if str(x).strip()]
+        lines += [
+            "",
+            "## Evidence manifest",
+            f"- evidence_manifest_hash: `{evidence_manifest.get('evidence_manifest_hash') or '—'}`",
+            f"- stage: `{evidence_manifest.get('finalization_stage') or evidence_manifest.get('stage') or '—'}`",
+            f"- missing_required_count: `{evidence_manifest.get('missing_required_count')}`",
+            f"- missing_optional_count: `{evidence_manifest.get('missing_optional_count')}`",
+            f"- analysis_handoff: `{analysis_handoff.get('status') or 'MISSING'}` / context=`{analysis_handoff.get('result_context_state') or 'MISSING'}`",
+        ]
+        for msg in missing_warnings[:10]:
+            lines.append(f"- missing_evidence: {msg}")
 
     if val:
         lines += [

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import sys
 import hashlib
@@ -31,6 +33,7 @@ from pneumo_solver_ui.optimization_active_runtime_summary import (
     build_active_runtime_summary,
     build_run_runtime_summary,
 )
+from pneumo_solver_ui.optimization_baseline_source import read_baseline_source_artifact
 from pneumo_solver_ui.optimization_contract_summary_ui import (
     compare_objective_contract_to_current,
 )
@@ -123,6 +126,54 @@ def _int_value(raw: Any) -> int:
             return int(float(raw or 0.0))
         except Exception:
             return 0
+
+
+def _canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+
+
+def _sha256_payload(value: Any) -> str:
+    return hashlib.sha256(_canonical_json_bytes(value)).hexdigest()
+
+
+def _file_sha256(path: Path | str | None) -> str:
+    if path is None:
+        return ""
+    try:
+        candidate = Path(path)
+        if not candidate.exists() or not candidate.is_file():
+            return ""
+        digest = hashlib.sha256()
+        with candidate.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except Exception:
+        return ""
+
+
+def _utc_now_label() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _utc_from_timestamp(value: float | int | None) -> str:
+    try:
+        ts = float(value or 0.0)
+    except Exception:
+        return ""
+    if ts <= 0.0:
+        return ""
+    return datetime.fromtimestamp(ts, UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _optimization_active_mode(summary: OptimizationRunSummary) -> str:
+    return "stage_runner" if str(summary.pipeline_mode or "") == "staged" else "distributed_coordinator"
 
 
 def _compatibility_text(selected: str, current: str) -> str:

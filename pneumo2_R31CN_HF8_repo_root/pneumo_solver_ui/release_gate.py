@@ -368,7 +368,34 @@ def main(argv: Optional[List[str]] = None) -> int:
         (out_dir / "gate_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         return 2
 
-    # 3) pytest (optional)
+    # 3) runtime evidence hard gates (optional)
+    if require_browser_trace or require_viewport_gating or require_animator_frame_budget or require_windows_runtime:
+        r = _runtime_evidence_step(
+            project_root=project_root,
+            logs_dir=logs_dir,
+            evidence_dir=runtime_evidence_dir,
+            require_browser_trace=require_browser_trace,
+            require_viewport_gating=require_viewport_gating,
+            require_animator_frame_budget=require_animator_frame_budget,
+            require_windows_runtime=require_windows_runtime,
+        )
+        steps.append(r)
+
+    if args.fail_fast and not steps[-1].ok:
+        verdict = "FAIL"
+        report = {
+            "utc": _utc_now_iso(),
+            "level": args.level,
+            "project_root": str(project_root),
+            "out_dir": str(out_dir),
+            "runtime_evidence_dir": str(runtime_evidence_dir),
+            "steps": [asdict(s) for s in steps],
+            "verdict": verdict,
+        }
+        (out_dir / "gate_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        return 2
+
+    # 4) pytest (optional)
     if args.run_pytest:
         pytest_log = logs_dir / "pytest.txt"
         cmd = ["pytest"] + args.pytest_args.split()
