@@ -15,15 +15,42 @@ from pneumo_solver_ui.geometry_acceptance_contract import format_geometry_accept
 
 from .health_report import collect_health_report
 from .send_bundle_contract import build_anim_operator_recommendations, summarize_ring_closure
+from .send_bundle_evidence import (
+    ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME,
+    ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME,
+)
+
+
+def _read_json_from_zip(zf: zipfile.ZipFile, name: str) -> Optional[Dict[str, Any]]:
+    try:
+        with zf.open(name, "r") as f:
+            raw = f.read()
+        obj = json.loads(raw.decode("utf-8", errors="replace"))
+        return dict(obj) if isinstance(obj, dict) else None
+    except Exception:
+        return None
 
 
 def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
     zp = Path(zip_path).expanduser().resolve()
     rep = collect_health_report(zp)
     name_set = set()
+    engineering_analysis_evidence: Dict[str, Any] = {}
+    engineering_analysis_evidence_source = ""
     try:
         with zipfile.ZipFile(zp, "r") as zf:
             name_set = set(zf.namelist())
+            for arcname in (
+                ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME,
+                ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME,
+            ):
+                if arcname not in name_set:
+                    continue
+                obj = _read_json_from_zip(zf, arcname)
+                if obj is not None:
+                    engineering_analysis_evidence = obj
+                    engineering_analysis_evidence_source = arcname
+                    break
     except Exception:
         name_set = set()
 
@@ -58,6 +85,9 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
         "geometry_acceptance": geometry_acceptance,
         "geometry_acceptance_gate": str(geometry_acceptance.get("release_gate") or "MISSING") if geometry_acceptance else "MISSING",
         "geometry_acceptance_reason": str(geometry_acceptance.get("release_gate_reason") or "") if geometry_acceptance else "",
+        "engineering_analysis_evidence": engineering_analysis_evidence,
+        "engineering_analysis_evidence_source": engineering_analysis_evidence_source,
+        "engineering_analysis_evidence_hash": str(engineering_analysis_evidence.get("evidence_manifest_hash") or ""),
         "notes": list(rep.notes or []),
         "health_report": asdict(rep),
         "has_embedded_health_report": bool(artifacts.get("health_report_embedded")),
@@ -72,6 +102,7 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
         "has_browser_perf_comparison_report": bool(artifacts.get("browser_perf_comparison_report")),
         "has_browser_perf_trace": bool(artifacts.get("browser_perf_trace")),
         "has_geometry_acceptance": bool(geometry_acceptance),
+        "has_engineering_analysis_evidence": bool(engineering_analysis_evidence),
         "zip_entries": len(name_set),
     }
     if not bool(artifacts.get("health_report_embedded")):
@@ -87,6 +118,7 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
     ring_closure = dict(summary.get("ring_closure") or {})
     optimizer_scope = dict(summary.get("optimizer_scope") or {})
     optimizer_scope_gate = dict(summary.get("optimizer_scope_gate") or {})
+    engineering = dict(summary.get("engineering_analysis_evidence") or {})
     operator_recommendations = [str(x) for x in (summary.get("operator_recommendations") or []) if str(x).strip()]
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
     lines = [
@@ -132,6 +164,17 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
         lines.append(f"- scope_sync_ok: `{optimizer_scope.get('scope_sync_ok')}`")
         for issue in list(optimizer_scope.get("issues") or [])[:5]:
             lines.append(f"- scope_issue: {issue}")
+    if engineering:
+        validation = dict(engineering.get("validation") or {})
+        lines += [
+            "",
+            "## Engineering analysis evidence",
+            f"- source_path: `{summary.get('engineering_analysis_evidence_source') or '—'}`",
+            f"- evidence_manifest_hash: `{engineering.get('evidence_manifest_hash') or '—'}`",
+            f"- analysis_status: `{validation.get('status') or '—'}`",
+            f"- influence_status: `{validation.get('influence_status') or '—'}`",
+            f"- calibration_status: `{validation.get('calibration_status') or '—'}`",
+        ]
     lines += [
         "",
         "## Anim latest",
