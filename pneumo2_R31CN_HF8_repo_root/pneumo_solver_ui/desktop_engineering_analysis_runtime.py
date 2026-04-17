@@ -1359,12 +1359,40 @@ class DesktopEngineeringAnalysisRuntime:
             for item in selected_artifacts
             if str(item.get("category") or "") in {"report", "calibration", "influence", "compare_influence"}
         ]
+        compare_artifacts = [
+            artifact
+            for artifact in snapshot.artifacts
+            if (
+                artifact.path.suffix.lower() == ".json"
+                and (artifact.category == "compare_influence" or "compare_influence" in artifact.key)
+            )
+        ]
         surface_sources = (
             compare_surfaces
             if compare_surfaces is not None
             else self.compare_influence_surfaces(snapshot)
         )
         surfaces = [dict(surface) for surface in surface_sources]
+        surface_source_paths = {
+            str(surface.get("source") or "").strip()
+            for surface in surfaces
+            if str(surface.get("source") or "").strip()
+        }
+        unparsed_compare_artifacts = [
+            str(artifact.path)
+            for artifact in compare_artifacts
+            if str(artifact.path) not in surface_source_paths
+        ] if compare_surfaces is None else []
+        validation_warnings: list[str] = []
+        if compare_surfaces is None and compare_artifacts and not surfaces:
+            validation_warnings.append(
+                "compare_influence artifact(s) found but no parseable compare_influence surface was exported; "
+                "expected a prebuilt surface payload or corr/matrix plus feature and target axes."
+            )
+        elif unparsed_compare_artifacts:
+            validation_warnings.append(
+                f"{len(unparsed_compare_artifacts)} compare_influence artifact(s) were not parseable as surfaces."
+            )
         payload: dict[str, Any] = {
             "schema": ENGINEERING_ANALYSIS_EVIDENCE_SCHEMA,
             "schema_version": ENGINEERING_ANALYSIS_EVIDENCE_SCHEMA_VERSION,
@@ -1426,6 +1454,7 @@ class DesktopEngineeringAnalysisRuntime:
                 "compare_status": snapshot.compare_status,
                 "selected_run_contract_status": snapshot.contract_status,
                 "blocking_states": list(snapshot.blocking_states),
+                "warnings": validation_warnings,
             },
             "selected_artifact_list": selected_artifacts,
             "selected_tables": [
@@ -1453,6 +1482,12 @@ class DesktopEngineeringAnalysisRuntime:
                 row.to_payload()
                 for row in snapshot.sensitivity_rows
             ],
+            "compare_influence_diagnostics": {
+                "artifact_count": len(compare_artifacts),
+                "surface_count": len(surfaces),
+                "unparsed_artifacts": unparsed_compare_artifacts,
+                "source": "explicit" if compare_surfaces is not None else "artifact_auto_discovery",
+            },
             "compare_influence_surfaces": surfaces,
             "report_provenance": report_provenance,
         }

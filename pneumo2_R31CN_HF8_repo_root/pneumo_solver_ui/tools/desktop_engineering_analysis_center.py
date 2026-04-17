@@ -21,6 +21,16 @@ from pneumo_solver_ui.desktop_ui_core import build_scrolled_text, build_scrolled
 from pneumo_solver_ui.release_info import get_release
 
 
+ANALYSIS_COMMAND_OPEN_TARGETS: tuple[tuple[str, str], ...] = (
+    ("selected_contract", "Открыть HO-007 selected_run_contract.json"),
+    ("run_dir", "Открыть selected run_dir"),
+    ("selected_artifact", "Открыть selected artifact"),
+    ("evidence_manifest", "Открыть HO-009 evidence manifest"),
+    ("analysis_context", "Открыть HO-008 analysis_context.json"),
+    ("animator_link", "Открыть HO-008 animator_link_contract.json"),
+)
+
+
 def _open_path(path: Path) -> None:
     if os.name == "nt":
         os.startfile(str(path))  # type: ignore[attr-defined]
@@ -95,6 +105,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.status_var = tk.StringVar(master=self, value="Engineering Analysis Center ready.")
         self.candidate_ready_only_var = tk.BooleanVar(master=self, value=False)
         self.candidate_filter_summary_var = tk.StringVar(master=self, value="HO-007 candidates: not loaded.")
+        self.command_var = tk.StringVar(master=self, value=ANALYSIS_COMMAND_OPEN_TARGETS[0][1])
 
         self._build_ui()
         self.refresh()
@@ -142,9 +153,27 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         artifact_box = ttk.LabelFrame(left_column, text="Study / artifacts", padding=8)
         artifact_box.grid(row=0, column=0, sticky="nsew")
         artifact_box.columnconfigure(0, weight=1)
-        artifact_box.rowconfigure(1, weight=1)
+        artifact_box.rowconfigure(2, weight=1)
+        command_bar = ttk.Frame(artifact_box)
+        command_bar.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        command_bar.columnconfigure(1, weight=1)
+        ttk.Label(command_bar, text="Command").grid(row=0, column=0, sticky="w")
+        self.command_combo = ttk.Combobox(
+            command_bar,
+            textvariable=self.command_var,
+            values=[label for _key, label in ANALYSIS_COMMAND_OPEN_TARGETS],
+            state="readonly",
+            width=44,
+        )
+        self.command_combo.grid(row=0, column=1, sticky="ew", padx=(8, 8))
+        self.btn_open_command = ttk.Button(
+            command_bar,
+            text="Открыть",
+            command=self._run_command_surface_action,
+        )
+        self.btn_open_command.grid(row=0, column=2, sticky="e")
         candidate_filter_bar = ttk.Frame(artifact_box)
-        candidate_filter_bar.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        candidate_filter_bar.grid(row=1, column=0, sticky="ew", pady=(0, 6))
         ttk.Checkbutton(
             candidate_filter_bar,
             text="READY only",
@@ -169,7 +198,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.artifact_tree.column("status", width=110, anchor="w")
         self.artifact_tree.column("category", width=130, anchor="w")
         self.artifact_tree.column("path", width=380, anchor="w")
-        artifact_frame.grid(row=1, column=0, sticky="nsew")
+        artifact_frame.grid(row=2, column=0, sticky="nsew")
         self.artifact_tree.bind("<<TreeviewSelect>>", self._on_artifact_select)
         self.artifact_tree.bind("<Double-1>", lambda _event: self._open_selected())
 
