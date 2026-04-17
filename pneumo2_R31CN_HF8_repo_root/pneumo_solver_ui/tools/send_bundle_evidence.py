@@ -736,6 +736,7 @@ def summarize_geometry_reference_evidence(
     freshness_status = str(obj.get("artifact_freshness_status") or "").strip().lower() or artifact_status
     freshness_relation = str(obj.get("artifact_freshness_relation") or "").strip().lower() or "unknown"
     road_width_status = str(obj.get("road_width_status") or "").strip().lower() or "missing"
+    packaging_status = str(obj.get("packaging_status") or "").strip().lower() or "missing"
     packaging_mismatch = str(obj.get("packaging_mismatch_status") or "").strip().lower() or "missing"
     acceptance_gate = str(obj.get("geometry_acceptance_gate") or "").strip().upper() or "MISSING"
     producer_evidence_owner = (
@@ -755,6 +756,7 @@ def summarize_geometry_reference_evidence(
         artifact_status not in {"missing", "stale"}
         and freshness_status not in {"missing", "stale"}
         and road_width_status != "missing"
+        and packaging_status == "complete"
         and packaging_mismatch not in {"missing", "mismatch"}
         and acceptance_gate == "PASS"
     ):
@@ -778,6 +780,8 @@ def summarize_geometry_reference_evidence(
             producer_readiness_reasons.append(f"artifact_relation_{freshness_relation}")
         if road_width_status == "missing":
             producer_readiness_reasons.append("road_width_m_missing")
+        if packaging_status != "complete":
+            producer_readiness_reasons.append("packaging_status_not_complete")
         if packaging_mismatch == "missing":
             producer_readiness_reasons.append("packaging_mismatch_missing")
         elif packaging_mismatch == "mismatch":
@@ -848,8 +852,10 @@ def summarize_geometry_reference_evidence(
         warnings.append(f"Geometry reference selected/latest relation is {freshness_relation}.")
     if road_width_status == "missing":
         warnings.append("Geometry reference road_width_m evidence is missing; GAP-008 remains open.")
-    if packaging_mismatch in {"missing", "mismatch"}:
-        warnings.append(f"Geometry reference packaging passport state is {packaging_mismatch}.")
+    if packaging_status != "complete" or packaging_mismatch in {"missing", "mismatch"}:
+        warnings.append(
+            f"Geometry reference packaging passport state is status={packaging_status}, mismatch={packaging_mismatch}."
+        )
     if acceptance_gate != "PASS":
         warnings.append(f"Geometry acceptance gate is {acceptance_gate}.")
 
@@ -865,7 +871,7 @@ def summarize_geometry_reference_evidence(
         "artifact_source_label": str(obj.get("artifact_source_label") or ""),
         "road_width_status": road_width_status,
         "road_width_source": str(obj.get("road_width_source") or ""),
-        "packaging_status": str(obj.get("packaging_status") or ""),
+        "packaging_status": packaging_status,
         "packaging_mismatch_status": packaging_mismatch,
         "packaging_contract_hash": str(obj.get("packaging_contract_hash") or ""),
         "geometry_acceptance_gate": acceptance_gate,

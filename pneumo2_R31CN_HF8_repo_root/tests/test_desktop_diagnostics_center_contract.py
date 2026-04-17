@@ -78,6 +78,7 @@ def _geometry_reference_evidence() -> dict:
         "geometry_acceptance_gate": "PASS",
         "geometry_acceptance_available": True,
         "producer_artifact_status": "ready",
+        "producer_readiness_reasons": [],
         "producer_evidence_owner": "producer_export",
         "producer_required_artifacts": [
             "workspace/_pointers/anim_latest.json or workspace/exports/anim_latest.json",
@@ -353,6 +354,7 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert bundle.geometry_reference_packaging_contract_hash == "packaging-hash"
     assert bundle.geometry_reference_acceptance_gate == "PASS"
     assert bundle.geometry_reference_producer_artifact_status == "ready"
+    assert bundle.geometry_reference_producer_readiness_reasons == []
     assert bundle.geometry_reference_consumer_may_fabricate_geometry is False
 
     run = DesktopDiagnosticsRunRecord(
@@ -423,6 +425,7 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert payload["geometry_reference_evidence"]["packaging_contract_hash"] == "packaging-hash"
     assert payload["geometry_reference_evidence"]["geometry_acceptance_gate"] == "PASS"
     assert payload["geometry_reference_evidence"]["producer_artifact_status"] == "ready"
+    assert payload["geometry_reference_evidence"]["producer_readiness_reasons"] == []
     assert payload["geometry_reference_evidence"]["consumer_may_fabricate_geometry"] is False
     assert "workspace/exports/anim_latest.npz" in payload["geometry_reference_evidence"]["producer_required_artifacts"]
     assert payload["bundle"]["latest_clipboard_status_path"].endswith("latest_send_bundle_clipboard_status.json")
@@ -549,9 +552,11 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "Geometry Reference evidence" in center_src
     assert "Artifact freshness" in center_src
     assert "Producer artifact status" in center_src
+    assert "Producer readiness reasons" in center_src
     assert "Consumer fabrication allowed" in center_src
     assert "geometry_reference_artifact_freshness_relation" in center_src
     assert "geometry_reference_producer_artifact_status" in runtime_src
+    assert "geometry_reference_producer_readiness_reasons" in runtime_src
     assert "consumer_may_fabricate_geometry" in runtime_src
     assert 'text="Открыть Geometry JSON"' in center_src
     assert "self.btn_open_geometry_reference_evidence" in center_src
