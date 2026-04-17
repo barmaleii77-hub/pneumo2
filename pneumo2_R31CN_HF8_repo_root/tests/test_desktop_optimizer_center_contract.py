@@ -57,6 +57,46 @@ def _optimizer_suite_snapshot(
     )
 
 
+def _write_stale_optimizer_baseline_context(
+    *,
+    workspace_dir: Path,
+    tmp_path: Path,
+) -> dict[str, object]:
+    old_suite = _optimizer_suite_snapshot(
+        inputs_hash="inputs-hash-before",
+        ring_hash="ring-hash-before",
+    )
+    current_suite = _optimizer_suite_snapshot(
+        inputs_hash="inputs-hash-current",
+        ring_hash="ring-hash-current",
+    )
+    suite_path = baseline_suite_handoff_snapshot_path(
+        workspace_dir=workspace_dir,
+        repo_root=ROOT,
+    )
+    suite_path.parent.mkdir(parents=True, exist_ok=True)
+    suite_path.write_text(json.dumps(current_suite, ensure_ascii=False), encoding="utf-8")
+    active = build_active_baseline_contract(
+        suite_snapshot=old_suite,
+        baseline_path=tmp_path / "baseline_stale.json",
+        baseline_payload={"param_a": 1.0},
+        baseline_meta={"problem_hash": "optimizer-stale-baseline"},
+        source_run_dir=tmp_path / "runs" / "baseline_old",
+        created_at_utc="2026-04-17T00:20:00Z",
+    )
+    contract_path = write_active_baseline_contract(
+        active,
+        workspace_dir=workspace_dir,
+        repo_root=ROOT,
+    )
+    return {
+        "active": active,
+        "contract_path": contract_path,
+        "current_suite": current_suite,
+        "old_suite": old_suite,
+    }
+
+
 def test_desktop_optimizer_center_is_registered_as_hosted_shell_tool() -> None:
     specs = build_desktop_shell_specs()
     by_key = {spec.key: spec for spec in specs}
@@ -189,33 +229,14 @@ def test_desktop_optimizer_contract_snapshot_blocks_stale_active_baseline_withou
 ) -> None:
     workspace_dir = tmp_path / "workspace"
     monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(workspace_dir))
-    old_suite = _optimizer_suite_snapshot(
-        inputs_hash="inputs-hash-before",
-        ring_hash="ring-hash-before",
-    )
-    current_suite = _optimizer_suite_snapshot(
-        inputs_hash="inputs-hash-current",
-        ring_hash="ring-hash-current",
-    )
-    suite_path = baseline_suite_handoff_snapshot_path(
+    context = _write_stale_optimizer_baseline_context(
         workspace_dir=workspace_dir,
-        repo_root=ROOT,
+        tmp_path=tmp_path,
     )
-    suite_path.parent.mkdir(parents=True, exist_ok=True)
-    suite_path.write_text(json.dumps(current_suite, ensure_ascii=False), encoding="utf-8")
-    active = build_active_baseline_contract(
-        suite_snapshot=old_suite,
-        baseline_path=tmp_path / "baseline_stale.json",
-        baseline_payload={"param_a": 1.0},
-        baseline_meta={"problem_hash": "optimizer-stale-baseline"},
-        source_run_dir=tmp_path / "runs" / "baseline_old",
-        created_at_utc="2026-04-17T00:20:00Z",
-    )
-    contract_path = write_active_baseline_contract(
-        active,
-        workspace_dir=workspace_dir,
-        repo_root=ROOT,
-    )
+    active = dict(context["active"])
+    contract_path = Path(context["contract_path"])
+    old_suite = dict(context["old_suite"])
+    current_suite = dict(context["current_suite"])
     before = contract_path.read_text(encoding="utf-8")
 
     assert old_suite["suite_snapshot_hash"] != current_suite["suite_snapshot_hash"]
@@ -406,6 +427,40 @@ def test_desktop_optimizer_runtime_builds_launch_readiness_summary(tmp_path: Pat
     assert by_title["Packaging evidence"]["status"] == "warn"
     assert by_title["Selected run alignment"]["status"] == "info"
     assert by_title["Runtime state"]["status"] == "ok"
+
+
+def test_desktop_optimizer_runtime_launch_readiness_blocks_stale_ho006(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(workspace_dir))
+    context = _write_stale_optimizer_baseline_context(
+        workspace_dir=workspace_dir,
+        tmp_path=tmp_path,
+    )
+    contract_path = Path(context["contract_path"])
+    before = contract_path.read_text(encoding="utf-8")
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+
+    readiness = runtime.launch_readiness_summary()
+    by_title = {
+        str(row.get("title") or ""): dict(row)
+        for row in tuple(readiness.get("rows") or ())
+    }
+    ho006_row = by_title["Active baseline HO-006"]
+
+    assert readiness["headline"] == "Review blockers before launch."
+    assert readiness["next_action"] == "Baseline Center"
+    assert ho006_row["status"] == "warn"
+    assert ho006_row["state"] == "stale"
+    assert ho006_row["optimizer_baseline_can_consume"] is False
+    assert "suite_snapshot_hash_changed" in ho006_row["summary"]
+    assert contract_path.read_text(encoding="utf-8") == before
 
 
 def test_desktop_optimizer_runtime_tracks_latest_pointer_flow(tmp_path: Path) -> None:

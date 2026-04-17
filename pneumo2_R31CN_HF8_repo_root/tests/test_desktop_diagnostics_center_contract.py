@@ -213,6 +213,8 @@ def test_desktop_diagnostics_reads_analysis_evidence_workspace_fallback_and_warn
 
 
 def test_desktop_diagnostics_surfaces_ho008_analysis_context_warning(tmp_path: Path) -> None:
+    from pneumo_solver_ui.tools.desktop_diagnostics_center import DesktopDiagnosticsCenter
+
     repo_root = tmp_path / "repo"
     out_dir = repo_root / "send_bundles"
     out_dir.mkdir(parents=True)
@@ -246,6 +248,8 @@ def test_desktop_diagnostics_surfaces_ho008_analysis_context_warning(tmp_path: P
     assert bundle.analysis_truth_mode_hash == "truth-ho008"
     assert "Engineering Analysis Center" in bundle.analysis_context_action
     assert any("HO-008 analysis context is BLOCKED" in msg for msg in bundle.analysis_evidence_warnings)
+    summary_lines = DesktopDiagnosticsCenter._analysis_evidence_summary_lines(object(), bundle)
+    assert "- HO-010 capture/export: READY | handoff=HO-010 | capture_hash=capture-ho008" in summary_lines
 
     center_state = write_desktop_diagnostics_center_state(out_dir, bundle_record=bundle)
     payload = json.loads(center_state.read_text(encoding="utf-8"))
@@ -535,6 +539,7 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "def _engineering_analysis_status_text(self, bundle) -> str:" in center_src
     assert "Evidence handoff status" in center_src
     assert "HO-008 analysis context" in center_src
+    assert "HO-010 capture/export" in center_src
     assert "analysis_context_status" in runtime_src
     assert "analysis_context_action" in runtime_src
     assert "Geometry Reference evidence" in center_src

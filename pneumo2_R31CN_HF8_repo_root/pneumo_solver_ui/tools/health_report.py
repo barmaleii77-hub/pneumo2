@@ -63,6 +63,7 @@ from .send_bundle_evidence import (
     evidence_manifest_warnings,
     load_evidence_manifest_from_zip,
     read_manifest_inputs_from_zip,
+    summarize_engineering_analysis_evidence,
 )
 
 
@@ -202,30 +203,22 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 engineering_name = ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME
             if engineering_name:
                 engineering_obj = _read_json_from_zip(z, engineering_name)
-                validation_obj = dict((engineering_obj or {}).get("validation") or {}) if isinstance(engineering_obj, dict) else {}
-                readiness_obj = (
-                    dict((engineering_obj or {}).get("selected_run_candidate_readiness") or {})
-                    if isinstance(engineering_obj, dict)
-                    else {}
-                )
-                signals["engineering_analysis_evidence"] = {
-                    "status": "READY" if isinstance(engineering_obj, dict) and engineering_obj.get("evidence_manifest_hash") else "WARN",
-                    "source_path": engineering_name,
-                    "schema": str((engineering_obj or {}).get("schema") or "") if isinstance(engineering_obj, dict) else "",
-                    "evidence_manifest_hash": str((engineering_obj or {}).get("evidence_manifest_hash") or "") if isinstance(engineering_obj, dict) else "",
-                    "run_dir": str((engineering_obj or {}).get("run_dir") or "") if isinstance(engineering_obj, dict) else "",
-                    "analysis_status": str(validation_obj.get("status") or ""),
-                    "influence_status": str(validation_obj.get("influence_status") or ""),
-                    "calibration_status": str(validation_obj.get("calibration_status") or ""),
-                    "sensitivity_row_count": len((engineering_obj or {}).get("sensitivity_summary") or []) if isinstance(engineering_obj, dict) else 0,
-                    "handoff_requirements": dict((engineering_obj or {}).get("handoff_requirements") or {}) if isinstance(engineering_obj, dict) else {},
-                    "selected_run_candidate_readiness": readiness_obj,
-                    "selected_run_candidate_count": int(readiness_obj.get("candidate_count") or 0),
-                    "selected_run_ready_candidate_count": int(readiness_obj.get("ready_candidate_count") or 0),
-                    "selected_run_missing_inputs_candidate_count": int(
-                        readiness_obj.get("missing_inputs_candidate_count") or 0
-                    ),
-                }
+                if isinstance(engineering_obj, dict):
+                    engineering_summary = summarize_engineering_analysis_evidence(
+                        engineering_obj,
+                        source_path=engineering_name,
+                    )
+                else:
+                    engineering_summary = summarize_engineering_analysis_evidence(
+                        {},
+                        source_path=engineering_name,
+                        read_warnings=(f"{engineering_name} is not valid JSON",),
+                    )
+                signals["engineering_analysis_evidence"] = engineering_summary
+                for item in engineering_summary.get("warnings") or []:
+                    msg = str(item).strip()
+                    if msg and msg not in notes:
+                        notes.append(msg)
 
             anim_sources: Dict[str, Dict[str, Any]] = {}
             optimizer_scope_sources: Dict[str, Dict[str, Any]] = {}

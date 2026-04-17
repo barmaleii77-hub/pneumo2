@@ -37,20 +37,22 @@
    — lane evidence notes для V32-02/V32-04/V32-06/V32-08/V32-10/V32-13/V32-14/V32-09/V32-11/V32-15; не объявляют full gap closure без named runtime artifacts.
 8. [WORKTREE_TRIAGE_2026-04-17.md](../context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
    — release-readiness ownership map текущего dirty tree; не runtime closure proof.
-9. [V32_16_ACCEPTANCE_NOTE_2026-04-17.md](../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
+9. [SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md](../context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md)
+   — reviewed clean self-check warnings snapshot; не diagnostics/SEND closure proof.
+10. [V32_16_ACCEPTANCE_NOTE_2026-04-17.md](../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
    — accepted V32-16 docs/helper scope and validation note.
-10. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
+11. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
    и related `v3/*`
    — checked-in detailed machine-readable reference layer.
-11. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
+12. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
    и related `v13_ring_editor_migration/*`
    — специализированный addendum для `WS-RING` и handoff `WS-RING -> WS-SUITE`.
-12. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
+13. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
    — historical design-recovery layer, который возвращает проект из implementation-веток в design-first.
-13. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
+14. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
    и [gui_spec_archive_lineage.json](../context/gui_spec_archive_lineage.json)
    — lineage `v1…v13`, чтобы понимать роль каждого архива.
-14. `docs/gui_chat_prompts/*`
+15. `docs/gui_chat_prompts/*`
    — implementation prompts, которые должны наследовать канон, а не заменять его.
 
 ## Что считается reference layer
@@ -84,6 +86,9 @@
   которым нужны живые artifacts.
 - `WORKTREE_TRIAGE_2026-04-17` фиксирует owner lane, gate/gap, required evidence
   и targeted tests для текущего dirty tree перед release-readiness merge.
+- `SELF_CHECK_WARNINGS_REVIEW_2026-04-17` фиксирует clean generated
+  self-check snapshot для `REPORTS/SELF_CHECK_SILENT_WARNINGS.*` без
+  diagnostics/SEND closure claim.
 - `V32_16_ACCEPTANCE_NOTE_2026-04-17` фиксирует accepted V32-16 docs/helper
   scope, focused validation and next lane order.
 - `v3` задаёт общий detailed layer:

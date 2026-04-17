@@ -1153,6 +1153,7 @@ def build_geometry_reference_diagnostics_handoff(
         producer_artifact_status = "missing"
     elif (
         acceptance.gate != "PASS"
+        or road_width.status == "missing"
         or packaging.packaging_status != "complete"
         or packaging.mismatch_status != "match"
     ):

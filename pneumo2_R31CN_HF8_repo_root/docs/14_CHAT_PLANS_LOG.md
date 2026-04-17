@@ -260,6 +260,13 @@ ID: `PLAN-0034`.
 Источник: chat + V32-13 Engineering Analysis.
 ID: `PLAN-0035`.
 
+36. Self-check silent warnings review
+Назначение: Review generated REPORTS/SELF_CHECK_SILENT_WARNINGS.json and .md as clean self-check snapshots with rc=0, fail_count=0 and warn_count=0; keep them as release-readiness report provenance only, not diagnostics/SEND runtime closure and not a replacement for V32-11 producer-owned warning handoffs.
+Артефакт: [context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md](./context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md)
+Статус: актуален.
+Источник: chat + V32-11/V32-16 self-check review.
+ID: `PLAN-0036`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

@@ -74,6 +74,7 @@ from .send_bundle_evidence import (
     evidence_manifest_release_errors,
     evidence_manifest_warnings,
     load_evidence_manifest_from_zip,
+    summarize_engineering_analysis_evidence,
     summarize_geometry_reference_evidence,
 )
 
@@ -396,30 +397,21 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
             if engineering_name:
                 engineering_obj = _read_json(engineering_name)
                 if isinstance(engineering_obj, dict):
-                    validation_obj = dict(engineering_obj.get("validation") or {})
-                    readiness_obj = dict(engineering_obj.get("selected_run_candidate_readiness") or {})
-                    rep["engineering_analysis_evidence"] = {
-                        "status": "READY" if engineering_obj.get("evidence_manifest_hash") else "WARN",
-                        "source_path": engineering_name,
-                        "schema": str(engineering_obj.get("schema") or ""),
-                        "evidence_manifest_hash": str(engineering_obj.get("evidence_manifest_hash") or ""),
-                        "run_dir": str(engineering_obj.get("run_dir") or ""),
-                        "analysis_status": str(validation_obj.get("status") or ""),
-                        "influence_status": str(validation_obj.get("influence_status") or ""),
-                        "calibration_status": str(validation_obj.get("calibration_status") or ""),
-                        "sensitivity_row_count": len(engineering_obj.get("sensitivity_summary") or []),
-                        "handoff_requirements": dict(engineering_obj.get("handoff_requirements") or {}),
-                        "selected_run_candidate_readiness": readiness_obj,
-                        "selected_run_candidate_count": int(readiness_obj.get("candidate_count") or 0),
-                        "selected_run_ready_candidate_count": int(
-                            readiness_obj.get("ready_candidate_count") or 0
-                        ),
-                        "selected_run_missing_inputs_candidate_count": int(
-                            readiness_obj.get("missing_inputs_candidate_count") or 0
-                        ),
-                    }
+                    engineering_summary = summarize_engineering_analysis_evidence(
+                        engineering_obj,
+                        source_path=engineering_name,
+                    )
                 else:
-                    warnings.append(f"{engineering_name} is not valid JSON")
+                    engineering_summary = summarize_engineering_analysis_evidence(
+                        {},
+                        source_path=engineering_name,
+                        read_warnings=(f"{engineering_name} is not valid JSON",),
+                    )
+                rep["engineering_analysis_evidence"] = engineering_summary
+                for item in engineering_summary.get("warnings") or []:
+                    msg = str(item).strip()
+                    if msg and msg not in warnings:
+                        warnings.append(msg)
 
             geometry_reference_name = ""
             if GEOMETRY_REFERENCE_EVIDENCE_ARCNAME in name_set:
@@ -818,6 +810,11 @@ def _render_md(rep: Dict[str, Any]) -> str:
         f"- influence_status: `{engineering.get('influence_status') or '-'}`",
         f"- calibration_status: `{engineering.get('calibration_status') or '-'}`",
         f"- sensitivity_row_count: `{engineering.get('sensitivity_row_count')}`",
+        f"- validated_artifacts_status: `{engineering.get('validated_artifacts_status') or '-'}`",
+        f"- required_artifact_count: `{engineering.get('required_artifact_count')}`",
+        f"- ready_required_artifact_count: `{engineering.get('ready_required_artifact_count')}`",
+        f"- missing_required_artifact_count: `{engineering.get('missing_required_artifact_count')}`",
+        f"- missing_required_artifacts: `{', '.join(str(x) for x in (engineering.get('missing_required_artifact_keys') or [])) or '-'}`",
         f"- handoff_contract_status: `{dict(engineering.get('handoff_requirements') or {}).get('contract_status') or '-'}`",
         f"- handoff_required_path: `{dict(engineering.get('handoff_requirements') or {}).get('required_contract_path') or '-'}`",
         f"- selected_run_candidate_count: `{engineering.get('selected_run_candidate_count')}`",

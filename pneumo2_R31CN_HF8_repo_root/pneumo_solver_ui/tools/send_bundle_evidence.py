@@ -198,7 +198,13 @@ EXPECTED_EVIDENCE: tuple[dict[str, Any], ...] = (
         "required_when": "if engineering analysis used",
         "release_blocking_if_missing": False,
         "hash_required": "optional",
-        "expected_provenance_fields": ("evidence_manifest_hash", "sensitivity_summary", "unit_catalog"),
+        "expected_provenance_fields": (
+            "evidence_manifest_hash",
+            "sensitivity_summary",
+            "unit_catalog",
+            "validated_artifacts",
+            "report_provenance",
+        ),
         "notes": "Engineering analysis, calibration, influence and sensitivity evidence manifest.",
     },
     {
@@ -524,6 +530,127 @@ def analysis_handoff_for_evidence_manifest(
         source_path=source_path,
         read_warnings=read_warnings,
     )
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except Exception:
+        return 0
+
+
+def _engineering_missing_artifact_records(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in value:
+        if isinstance(item, Mapping):
+            record = {
+                "key": str(item.get("key") or item.get("path") or "").strip(),
+                "title": str(item.get("title") or "").strip(),
+                "category": str(item.get("category") or "").strip(),
+                "path": str(item.get("path") or "").strip(),
+                "validation_status": str(item.get("validation_status") or "").strip(),
+            }
+        else:
+            record = {
+                "key": str(item or "").strip(),
+                "title": "",
+                "category": "",
+                "path": "",
+                "validation_status": "",
+            }
+        if record["key"] or record["path"]:
+            out.append(record)
+    return out
+
+
+def summarize_engineering_analysis_evidence(
+    payload: Mapping[str, Any] | None,
+    *,
+    source_path: str = "",
+    read_warnings: Iterable[str] = (),
+) -> Dict[str, Any]:
+    obj = dict(payload or {})
+    source = str(source_path or "").strip()
+    warnings = [str(item).strip() for item in read_warnings if str(item).strip()]
+    schema = str(obj.get("schema") or "").strip()
+    evidence_hash = str(obj.get("evidence_manifest_hash") or "").strip()
+    validation = _mapping(obj.get("validation"))
+    readiness = _mapping(obj.get("selected_run_candidate_readiness"))
+    validated = _mapping(obj.get("validated_artifacts"))
+    validated_status = str(validated.get("status") or "").strip().upper()
+    missing_required_artifacts = _engineering_missing_artifact_records(
+        validated.get("missing_required_artifacts")
+    )
+    missing_required_keys = [
+        str(item.get("key") or item.get("path") or "").strip()
+        for item in missing_required_artifacts
+        if str(item.get("key") or item.get("path") or "").strip()
+    ]
+    validation_warnings = [
+        str(item).strip()
+        for item in (validation.get("warnings") or [])
+        if str(item).strip()
+    ]
+
+    if not source:
+        status = "MISSING"
+        warnings.append(
+            "Engineering Analysis evidence / HO-009 missing; export evidence manifest from "
+            "Engineering Analysis Center before SEND."
+        )
+    else:
+        status = "READY" if evidence_hash else "WARN"
+        if not obj:
+            warnings.append("Engineering Analysis evidence / HO-009 manifest is empty or unreadable.")
+        if schema and schema != "desktop_engineering_analysis_evidence_manifest":
+            warnings.append(f"Engineering Analysis evidence / HO-009 has unexpected schema: {schema}.")
+        if not evidence_hash:
+            warnings.append("Engineering Analysis evidence / HO-009 manifest has no evidence_manifest_hash.")
+        if validated and validated_status and validated_status != "READY":
+            warnings.append(
+                "Engineering Analysis validated artifacts require attention: "
+                f"{validated_status}."
+            )
+        if missing_required_keys:
+            warnings.append(
+                "Engineering Analysis missing required artifact(s): "
+                + ", ".join(missing_required_keys)
+            )
+        for item in validation_warnings:
+            warnings.append(f"Engineering Analysis validation warning: {item}")
+        if warnings:
+            status = "WARN"
+
+    return {
+        "status": status,
+        "source_path": source,
+        "schema": schema,
+        "evidence_manifest_hash": evidence_hash,
+        "run_dir": str(obj.get("run_dir") or ""),
+        "analysis_status": str(validation.get("status") or ""),
+        "influence_status": str(validation.get("influence_status") or ""),
+        "calibration_status": str(validation.get("calibration_status") or ""),
+        "compare_status": str(validation.get("compare_status") or ""),
+        "sensitivity_row_count": len(obj.get("sensitivity_summary") or []) if isinstance(obj, dict) else 0,
+        "validated_artifacts": dict(validated),
+        "validated_artifacts_status": validated_status,
+        "required_artifact_count": _safe_int(validated.get("required_artifact_count")),
+        "ready_required_artifact_count": _safe_int(validated.get("ready_required_artifact_count")),
+        "missing_required_artifact_count": _safe_int(validated.get("missing_required_artifact_count")),
+        "hash_ready_artifact_count": _safe_int(validated.get("hash_ready_artifact_count")),
+        "missing_required_artifacts": missing_required_artifacts,
+        "missing_required_artifact_keys": list(dict.fromkeys(missing_required_keys)),
+        "handoff_requirements": dict(obj.get("handoff_requirements") or {}),
+        "selected_run_candidate_readiness": readiness,
+        "selected_run_candidate_count": _safe_int(readiness.get("candidate_count")),
+        "selected_run_ready_candidate_count": _safe_int(readiness.get("ready_candidate_count")),
+        "selected_run_missing_inputs_candidate_count": _safe_int(
+            readiness.get("missing_inputs_candidate_count")
+        ),
+        "warnings": list(dict.fromkeys(warnings)),
+    }
 
 
 def _load_geometry_reference_json_from_file(path: Path) -> tuple[Dict[str, Any], str]:

@@ -44,6 +44,10 @@ def test_chat_knowledge_base_store_exists_and_is_seeded() -> None:
         for item in data["plans"]
     )
     assert any(
+        item["artifact_path"] == "context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md"
+        for item in data["plans"]
+    )
+    assert any(
         item["artifact_path"] == "context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md"
         for item in data["plans"]
     )

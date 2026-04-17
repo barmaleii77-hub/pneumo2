@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-17T03:37:08+00:00",
+  "updated_at": "2026-04-17T03:40:31+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -469,6 +469,15 @@
       "title": "V32-13 Engineering Analysis evidence acceptance",
       "details": "Accept Engineering Analysis/Calibration/Influence evidence contracts for WS-ANALYSIS, HO-007, HO-008 and HO-009 with selected_run_contract, compare influence surfaces, unit catalog, report provenance, engineering_analysis_evidence_manifest and analysis-to-animator link tests; this is contract/provenance acceptance, not diagnostics/SEND runtime closure.",
       "artifact_path": "context/gui_spec_imports/v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0036",
+      "created_at": "2026-04-17T03:40:31+00:00",
+      "source": "chat + V32-11/V32-16 self-check review",
+      "title": "Self-check silent warnings review",
+      "details": "Review generated REPORTS/SELF_CHECK_SILENT_WARNINGS.json and .md as clean self-check snapshots with rc=0, fail_count=0 and warn_count=0; keep them as release-readiness report provenance only, not diagnostics/SEND runtime closure and not a replacement for V32-11 producer-owned warning handoffs.",
+      "artifact_path": "context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md",
       "status": "актуален"
     }
   ]

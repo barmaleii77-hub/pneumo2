@@ -10,8 +10,8 @@ does not close `OG-001`, `OG-002`, `OG-003`, `OG-004`, `OG-005`, or `OG-006`.
 
 Current proof snapshot:
 
-- ZIP: `send_bundles/SEND_20260417_083330_bundle.zip`
-- SHA256: `2dc744bf767e6bf073a66de91577ee47dd0875cd8fb920e6b51dd6b11c5156d9`
+- ZIP: `send_bundles/SEND_20260417_083946_bundle.zip`
+- SHA256: `67694d0c3e01ef7f30c4b1780729e4e74baf8d80b74419dddcd139fc0ec7c72a`
 - Trigger / mode: `desktop_diagnostics_center` / `manual`
 - PB-002 required evidence: `pb002_missing_required_count=0`
 - Validation: `ok=True`, `errors=0`, `warnings=7`

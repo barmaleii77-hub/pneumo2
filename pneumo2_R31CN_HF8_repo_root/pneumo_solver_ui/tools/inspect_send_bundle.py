@@ -184,6 +184,11 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
             f"- influence_status: `{engineering.get('influence_status') or '—'}`",
             f"- calibration_status: `{engineering.get('calibration_status') or '—'}`",
             f"- sensitivity_row_count: `{engineering.get('sensitivity_row_count')}`",
+            f"- validated_artifacts_status: `{engineering.get('validated_artifacts_status') or '—'}`",
+            f"- required_artifact_count: `{engineering.get('required_artifact_count')}`",
+            f"- ready_required_artifact_count: `{engineering.get('ready_required_artifact_count')}`",
+            f"- missing_required_artifact_count: `{engineering.get('missing_required_artifact_count')}`",
+            f"- missing_required_artifacts: `{', '.join(str(x) for x in (engineering.get('missing_required_artifact_keys') or [])) or '—'}`",
         ]
         requirements = dict(engineering.get("handoff_requirements") or {})
         if requirements:

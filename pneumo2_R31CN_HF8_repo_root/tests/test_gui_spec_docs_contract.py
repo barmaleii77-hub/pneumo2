@@ -47,7 +47,10 @@ V32_DIAGNOSTICS_EVIDENCE_NOTE = IMPORTS_V32 / "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE
 V32_DIAGNOSTICS_PRODUCER_GAPS_HANDOFF = IMPORTS_V32 / "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md"
 V32_RUNTIME_EVIDENCE_NOTE = IMPORTS_V32 / "RUNTIME_RELEASE_EVIDENCE_NOTE.md"
 RELEASE_TRIAGE = CONTEXT / "release_readiness" / "WORKTREE_TRIAGE_2026-04-17.md"
+SELF_CHECK_WARNINGS_REVIEW = CONTEXT / "release_readiness" / "SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md"
 V32_16_ACCEPTANCE_NOTE = CONTEXT / "release_readiness" / "V32_16_ACCEPTANCE_NOTE_2026-04-17.md"
+SELF_CHECK_WARNINGS_JSON = ROOT / "REPORTS" / "SELF_CHECK_SILENT_WARNINGS.json"
+SELF_CHECK_WARNINGS_MD = ROOT / "REPORTS" / "SELF_CHECK_SILENT_WARNINGS.md"
 
 CANON_17 = DOCS / "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md"
 CANON_18 = DOCS / "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md"
@@ -316,6 +319,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md" in project_sources_text
     assert "gui_chat_prompts/13_RELEASE_GATES_KB_ACCEPTANCE.md" in project_sources_text
     assert "context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md" in project_sources_text
+    assert "context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md" in project_sources_text
     assert "context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md" in project_sources_text
     assert "pneumo_codex_tz_spec_connector_reconciled_v32.zip" in project_sources_text
     assert "pneumo_codex_tz_spec_connector_reconciled_v33.zip" in project_sources_text
@@ -342,6 +346,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md" in index_text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in index_text
     assert "WORKTREE_TRIAGE_2026-04-17.md" in index_text
+    assert "SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md" in index_text
     assert "V32_16_ACCEPTANCE_NOTE_2026-04-17.md" in index_text
     assert "13_RELEASE_GATES_KB_ACCEPTANCE.md" in index_text
     assert "специализированный addendum для `WS-RING`" in index_text
@@ -566,6 +571,7 @@ def test_v32_release_gate_acceptance_map_is_executable_docs_contract() -> None:
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in release_lane_text
     assert "Do not implement domain runtime features here." in release_lane_text
     assert "WORKTREE_TRIAGE_2026-04-17.md" in release_lane_text
+    assert "SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md" in release_lane_text
     assert "V32_16_ACCEPTANCE_NOTE_2026-04-17.md" in release_lane_text
 
 
@@ -609,6 +615,45 @@ def test_release_readiness_triage_covers_dirty_worktree_with_lane_ownership() ->
     assert text.index("v33_connector_reconciled/README.md") < text.index(
         "v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md"
     )
+
+
+def test_self_check_warnings_review_records_clean_snapshot_without_diagnostics_closure() -> None:
+    assert SELF_CHECK_WARNINGS_JSON.exists()
+    assert SELF_CHECK_WARNINGS_MD.exists()
+    assert SELF_CHECK_WARNINGS_REVIEW.exists()
+
+    payload = json.loads(SELF_CHECK_WARNINGS_JSON.read_text(encoding="utf-8"))
+    assert payload["rc"] == 0
+    assert payload["summary"]["fail_count"] == 0
+    assert payload["summary"]["warn_count"] == 0
+    assert payload["fails"] == []
+    assert payload["warnings"] == []
+
+    report_md = SELF_CHECK_WARNINGS_MD.read_text(encoding="utf-8")
+    assert "# SELF_CHECK" in report_md
+    assert "- fail_count: 0" in report_md
+    assert "- warn_count: 0" in report_md
+
+    note = SELF_CHECK_WARNINGS_REVIEW.read_text(encoding="utf-8")
+    assert "SELF_CHECK_SILENT_WARNINGS.json" in note
+    assert "SELF_CHECK_SILENT_WARNINGS.md" in note
+    assert "fail_count=0" in note
+    assert "warn_count=0" in note
+    assert "does not close `OG-005`" in note
+    assert "does not supersede the V32-11 diagnostics/SEND bundle warning state" in note
+    assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in note
+    assert "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md" in note
+
+    rows_by_path = {row["path"].strip("`"): row for row in _parse_markdown_table(RELEASE_TRIAGE)}
+    for report_path in (
+        "REPORTS/SELF_CHECK_SILENT_WARNINGS.json",
+        "REPORTS/SELF_CHECK_SILENT_WARNINGS.md",
+    ):
+        row = rows_by_path[report_path]
+        assert row["status"] == "keep"
+        assert "fail_count=0" in row["evidence_required"]
+        assert "warn_count=0" in row["evidence_required"]
+        assert "not SEND/runtime closure" in row["decision"]
 
 
 def test_v32_14_v32_09_producer_animator_truth_note_records_contract_acceptance_without_gap_closure() -> None:
@@ -985,6 +1030,9 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         V32_DIAGNOSTICS_PRODUCER_GAPS_HANDOFF,
         V32_RUNTIME_EVIDENCE_NOTE,
         RELEASE_TRIAGE,
+        SELF_CHECK_WARNINGS_REVIEW,
+        SELF_CHECK_WARNINGS_JSON,
+        SELF_CHECK_WARNINGS_MD,
         V32_16_ACCEPTANCE_NOTE,
     )
 

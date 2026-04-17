@@ -39,6 +39,7 @@
 - `docs/context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md` — producer-owned diagnostics warning handoff после SEND-bundle hardening; фиксирует missing producer artifacts без runtime closure claim.
 - `docs/context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md` — V32-15 runtime evidence hard-gate note для `PB-006`, `RGH-011`, `RGH-012`, `RGH-019`, `OG-003`, `OG-004`.
 - `docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md` — release-readiness triage текущего dirty tree по V32 lane, gate/gap, evidence и targeted tests; не является runtime closure proof.
+- `docs/context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md` — review note для `REPORTS/SELF_CHECK_SILENT_WARNINGS.*`: clean self-check snapshot (`fail_count=0`, `warn_count=0`) без diagnostics/SEND closure claim.
 - `docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md` — V32-16 integration note: accepted docs/helper scope, validation status and no-runtime-closure rule.
 - `docs/context/gui_spec_imports/v3/README.md` — active detailed reference layer из `pneumo_gui_codex_package_v3.zip`.
 - `docs/context/gui_spec_imports/v3/pneumo_gui_codex_spec_v3_refined.json` — главный machine-readable GUI-spec.

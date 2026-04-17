@@ -25,7 +25,8 @@
 19. [../context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md](../context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md)
 20. [../context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md)
 21. [../context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md](../context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
-22. [../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
+22. [../context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md](../context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md)
+23. [../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
 
 ## Scope
 
@@ -34,6 +35,7 @@ Owned scope:
 - docs and source-authority references;
 - KB logs and `knowledge_base_sync` entries;
 - release-readiness triage docs for dirty-tree ownership;
+- self-check warnings review docs for generated report provenance;
 - lane evidence notes and producer-warning handoffs for inputs/suite handoff,
   producer, compare, geometry, mnemo, engineering analysis, diagnostics and
   runtime/perf hard gates;

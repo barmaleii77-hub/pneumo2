@@ -55,9 +55,9 @@ Focused Geometry/Diagnostics regression result: `85 passed`.
 
 Runtime proof captured:
 
-- ZIP: `send_bundles/SEND_20260417_083527_auto-exit_bundle.zip`
-- Final latest SHA256: `526fc0c91513c7b1d9e44e3d1b2c49c45b09f4cc79e557ef0f2bb3421cc77d75`
-- Trigger / mode: `auto-exit` / `exit`
+- ZIP: `send_bundles/SEND_20260417_083946_bundle.zip`
+- Final latest SHA256: `67694d0c3e01ef7f30c4b1780729e4e74baf8d80b74419dddcd139fc0ec7c72a`
+- Trigger / mode: `desktop_diagnostics_center` / `manual`
 - Validation: `ok=True`, `errors=0`, `warnings=7`
 - Health after final triage: `ok=False`, `notes=9`, preserving adjacent-workstream warnings.
 - PB-002 required evidence: `pb002_missing_required_count=0`

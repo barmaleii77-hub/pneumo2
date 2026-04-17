@@ -7,10 +7,13 @@ from pathlib import Path
 import numpy as np
 
 from pneumo_solver_ui.desktop_geometry_reference_model import (
+    ArtifactReferenceContext,
     CYLINDER_PACKAGING_ADVANCED_FIELDS,
+    PackagingPassportEvidenceSnapshot,
     TRUTH_STATE_APPROXIMATE,
     TRUTH_STATE_SOURCE_DATA_CONFIRMED,
     CylinderFamilyReferenceRow,
+    build_geometry_reference_diagnostics_handoff,
     build_cylinder_match_recommendations,
     build_cylinder_force_bias_estimate,
     build_current_cylinder_package_rows,
@@ -632,6 +635,56 @@ def test_road_width_evidence_prefers_explicit_meta_and_keeps_missing_gap_warning
     assert "Animator must not derive it silently" in explicit.explanation
     assert missing.status == "missing"
     assert "GAP-008" in missing.explanation
+
+
+def test_producer_handoff_stays_partial_when_road_width_evidence_is_missing() -> None:
+    artifact = ArtifactReferenceContext(
+        status="current",
+        source_label="synthetic complete artifact without road_width_m",
+        pointer_path="C:/workspace/exports/anim_latest.json",
+        npz_path="C:/workspace/exports/anim_latest.npz",
+        exports_dir="C:/workspace/exports",
+        updated_utc="2026-04-17T00:00:00+00:00",
+        visual_cache_token="token",
+        meta={},
+        issues=(),
+        packaging_passport_path="C:/workspace/exports/CYLINDER_PACKAGING_PASSPORT.json",
+        packaging_passport_exists=True,
+        geometry_acceptance_path="C:/workspace/exports/geometry_acceptance_report.json",
+        geometry_acceptance_exists=True,
+    )
+    road_width = build_road_width_evidence({}, artifact_meta={})
+    packaging = PackagingPassportEvidenceSnapshot(
+        artifact_status="current",
+        source_label="synthetic complete passport",
+        passport_path="C:/workspace/exports/CYLINDER_PACKAGING_PASSPORT.json",
+        schema="cylinder_packaging_passport.v1",
+        packaging_status="complete",
+        packaging_contract_hash="pkg-complete",
+        mismatch_status="match",
+        complete_cylinders=("cyl1", "cyl2"),
+        axis_only_cylinders=(),
+        missing_advanced_fields=(),
+        consumer_geometry_fabrication_allowed=False,
+        warnings=(),
+        rows=(),
+    )
+    handoff = build_geometry_reference_diagnostics_handoff(
+        artifact_context=artifact,
+        component_rows=(),
+        road_width=road_width,
+        packaging=packaging,
+        acceptance=build_geometry_acceptance_evidence(
+            _geometry_acceptance_mapping(),
+            source_label="synthetic PASS frame",
+        ),
+    )
+
+    assert handoff["geometry_acceptance_gate"] == "PASS"
+    assert handoff["packaging_mismatch_status"] == "match"
+    assert handoff["road_width_status"] == "missing"
+    assert handoff["producer_artifact_status"] == "partial"
+    assert "road_width_m" in handoff["evidence_missing"]
 
 
 def test_packaging_passport_reader_surfaces_base_export_mismatch_and_truth_policy(tmp_path: Path) -> None:

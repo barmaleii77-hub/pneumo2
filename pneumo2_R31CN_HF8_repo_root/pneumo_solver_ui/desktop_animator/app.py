@@ -16362,21 +16362,12 @@ class Car3DWidget(QtWidgets.QWidget):
             [0.0, 0.0, float(z_vec_offset)],
             dtype=float,
         )
-        vel_vec = np.asarray(
-            [
-                float(vel_body_x * self._vel_scale),
-                float(vel_body_y * self._vel_scale),
-                0.0,
-            ],
-            dtype=float,
+        vel_vec = (
+            np.asarray(R_local[:, 0], dtype=float) * float(speed_along_road * self._vel_scale)
         )
-        acc_vec = np.asarray(
-            [
-                float(external_ax * self._accel_scale),
-                float(external_ay * self._accel_scale),
-                0.0,
-            ],
-            dtype=float,
+        acc_vec = (
+            np.asarray(R_local[:, 0], dtype=float) * float(external_ax * self._accel_scale)
+            + np.asarray(R_local[:, 1], dtype=float) * float(external_ay * self._accel_scale)
         )
         vel_pos, vel_colors = _arrow_lines_3d(
             vec_origin,

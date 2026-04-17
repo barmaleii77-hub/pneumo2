@@ -33,6 +33,7 @@ from pneumo_solver_ui.tools.send_bundle_evidence import (
     build_evidence_manifest,
     classify_collection_mode,
     evidence_manifest_warnings,
+    summarize_engineering_analysis_evidence,
     summarize_geometry_reference_evidence,
 )
 from pneumo_solver_ui.tools.validate_send_bundle import validate_send_bundle
@@ -386,6 +387,15 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
         "unit_catalog": {"Kphi": "N*m/rad", "eps_rel_used": "dimensionless"},
         "sensitivity_summary": [{"param": "база", "score": 1.0, "status": "ok"}],
         "selected_artifact_list": [{"key": "system_influence_json", "sha256": "abc"}],
+        "validated_artifacts": {
+            "schema": "engineering_analysis_validated_artifacts.v1",
+            "status": "READY",
+            "required_artifact_count": 3,
+            "ready_required_artifact_count": 3,
+            "missing_required_artifact_count": 0,
+            "missing_required_artifacts": [],
+            "hash_ready_artifact_count": 1,
+        },
         "handoff_requirements": {
             "handoff_id": "HO-007",
             "contract_status": "READY",
@@ -446,6 +456,12 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
     assert validation_engineering["evidence_manifest_hash"] == "engineering-hash-001"
     assert validation_engineering["influence_status"] == "PASS"
     assert validation_engineering["handoff_requirements"]["contract_status"] == "READY"
+    assert validation_engineering["validated_artifacts_status"] == "READY"
+    assert validation_engineering["ready_required_artifact_count"] == 3
+    assert validation_engineering["missing_required_artifact_count"] == 0
+    assert validation_engineering["missing_required_artifact_keys"] == []
+    assert "validated_artifacts_status" in validation.report_md
+    assert "ready_required_artifact_count" in validation.report_md
     assert validation_engineering["selected_run_candidate_count"] == 2
     assert validation_engineering["selected_run_ready_candidate_count"] == 1
     assert validation_engineering["selected_run_missing_inputs_candidate_count"] == 1
@@ -456,10 +472,49 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
     inspection_engineering = dict(inspection["engineering_analysis_evidence"])
     assert inspection_engineering["evidence_manifest_hash"] == "engineering-hash-001"
     assert inspection_engineering["selected_run_ready_candidate_count"] == 1
+    assert inspection_engineering["validated_artifacts_status"] == "READY"
+    assert inspection_engineering["ready_required_artifact_count"] == 3
     assert "Engineering analysis evidence" in inspection_md
     assert "engineering-hash-001" in inspection_md
+    assert "validated_artifacts_status" in inspection_md
+    assert "ready_required_artifact_count" in inspection_md
     assert "handoff_contract_status" in inspection_md
     assert "selected_run_ready_candidate_count" in inspection_md
+
+
+def test_engineering_analysis_evidence_summary_surfaces_missing_validated_artifacts() -> None:
+    summary = summarize_engineering_analysis_evidence(
+        {
+            "schema": "desktop_engineering_analysis_evidence_manifest",
+            "evidence_manifest_hash": "engineering-hash-warn",
+            "validation": {"status": "PARTIAL", "influence_status": "PASS", "calibration_status": "MISSING"},
+            "validated_artifacts": {
+                "schema": "engineering_analysis_validated_artifacts.v1",
+                "status": "MISSING",
+                "required_artifact_count": 3,
+                "ready_required_artifact_count": 1,
+                "missing_required_artifact_count": 2,
+                "missing_required_artifacts": [
+                    {"key": "system_influence_md", "validation_status": "MISSING"},
+                    {"key": "system_influence_params_csv", "validation_status": "MISSING"},
+                ],
+                "hash_ready_artifact_count": 1,
+            },
+            "sensitivity_summary": [{"param": "база", "score": 1.0}],
+        },
+        source_path=ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME,
+    )
+
+    assert summary["status"] == "WARN"
+    assert summary["validated_artifacts_status"] == "MISSING"
+    assert summary["required_artifact_count"] == 3
+    assert summary["ready_required_artifact_count"] == 1
+    assert summary["missing_required_artifact_count"] == 2
+    assert summary["missing_required_artifact_keys"] == [
+        "system_influence_md",
+        "system_influence_params_csv",
+    ]
+    assert any("missing required artifact" in warning for warning in summary["warnings"])
 
 
 def test_send_bundle_evidence_analysis_handoff_prefers_latest_sidecar(tmp_path: Path) -> None:

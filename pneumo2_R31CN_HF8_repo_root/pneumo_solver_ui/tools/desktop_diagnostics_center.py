@@ -1003,8 +1003,18 @@ class DesktopDiagnosticsCenter:
             lines.append(f"- Selected test: {bundle.analysis_selected_test_id}")
         if getattr(bundle, "analysis_selected_npz_path", ""):
             lines.append(f"- Selected NPZ: {bundle.analysis_selected_npz_path}")
-        if getattr(bundle, "analysis_capture_export_manifest_handoff_id", ""):
-            lines.append(f"- Capture handoff: {bundle.analysis_capture_export_manifest_handoff_id}")
+        capture_handoff = str(getattr(bundle, "analysis_capture_export_manifest_handoff_id", "") or "")
+        capture_hash = str(getattr(bundle, "analysis_capture_hash", "") or "")
+        if capture_handoff == "HO-010" and capture_hash:
+            capture_status = "READY"
+        elif capture_handoff or capture_hash:
+            capture_status = "DEGRADED"
+        else:
+            capture_status = "MISSING"
+        lines.append(
+            "- HO-010 capture/export: "
+            f"{capture_status} | handoff={capture_handoff or '—'} | capture_hash={capture_hash or '—'}"
+        )
         manifest_hash = str(getattr(bundle, "analysis_evidence_manifest_hash", "") or "")
         if manifest_hash:
             lines.append(f"- Manifest hash: {manifest_hash}")
