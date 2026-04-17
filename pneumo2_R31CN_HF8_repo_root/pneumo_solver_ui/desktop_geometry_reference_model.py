@@ -1140,24 +1140,29 @@ def build_geometry_reference_diagnostics_handoff(
     acceptance: GeometryAcceptanceEvidenceSnapshot,
 ) -> dict[str, Any]:
     missing: list[str] = []
+    producer_readiness_reasons: list[str] = []
     if artifact_context.status in {"missing", "stale"}:
         missing.append("artifact_context")
+        producer_readiness_reasons.append(f"artifact_context_{artifact_context.status}")
     if road_width.status == "missing":
         missing.append("road_width_m")
+        producer_readiness_reasons.append("road_width_m_missing")
     if packaging.mismatch_status == "missing":
         missing.append("cylinder_packaging_passport")
+    if packaging.packaging_status != "complete":
+        producer_readiness_reasons.append("packaging_status_not_complete")
+    if packaging.mismatch_status != "match":
+        producer_readiness_reasons.append("packaging_mismatch_not_match")
     if acceptance.gate == "MISSING":
         missing.append("geometry_acceptance")
+    if acceptance.gate != "PASS":
+        producer_readiness_reasons.append("geometry_acceptance_not_pass")
     producer_artifact_status = "ready"
     if artifact_context.status in {"missing", "stale"}:
         producer_artifact_status = "missing"
-    elif (
-        acceptance.gate != "PASS"
-        or road_width.status == "missing"
-        or packaging.packaging_status != "complete"
-        or packaging.mismatch_status != "match"
-    ):
+    elif producer_readiness_reasons:
         producer_artifact_status = "partial"
+    producer_readiness_reasons = list(dict.fromkeys(producer_readiness_reasons))
     return {
         "schema": "geometry_reference_evidence.v1",
         "producer_owned": False,
@@ -1165,6 +1170,7 @@ def build_geometry_reference_diagnostics_handoff(
         "does_not_render_animator_meshes": True,
         "producer_evidence_owner": GEOMETRY_REFERENCE_PRODUCER_EVIDENCE_OWNER,
         "producer_artifact_status": producer_artifact_status,
+        "producer_readiness_reasons": producer_readiness_reasons,
         "producer_required_artifacts": list(GEOMETRY_REFERENCE_REQUIRED_PRODUCER_ARTIFACTS),
         "producer_next_action": GEOMETRY_REFERENCE_PRODUCER_NEXT_ACTION,
         "reference_center_can_close_producer_gaps": False,

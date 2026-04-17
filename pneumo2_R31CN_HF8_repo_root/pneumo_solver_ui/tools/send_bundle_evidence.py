@@ -261,6 +261,7 @@ EXPECTED_EVIDENCE: tuple[dict[str, Any], ...] = (
             "road_width_status",
             "packaging_contract_hash",
             "producer_artifact_status",
+            "producer_readiness_reasons",
             "component_passport",
         ),
         "notes": "Geometry acceptance and Reference Center handoff evidence.",
@@ -726,6 +727,11 @@ def summarize_geometry_reference_evidence(
         for item in (obj.get("evidence_missing") or [])
         if str(item).strip()
     ]
+    producer_readiness_reasons = [
+        str(item).strip()
+        for item in (obj.get("producer_readiness_reasons") or [])
+        if str(item).strip()
+    ]
     artifact_status = str(obj.get("artifact_status") or "").strip().lower() or "missing"
     freshness_status = str(obj.get("artifact_freshness_status") or "").strip().lower() or artifact_status
     freshness_relation = str(obj.get("artifact_freshness_relation") or "").strip().lower() or "unknown"
@@ -759,6 +765,26 @@ def summarize_geometry_reference_evidence(
         producer_artifact_status = "missing"
     else:
         producer_artifact_status = "partial"
+    if not producer_readiness_reasons:
+        if artifact_status == "missing":
+            producer_readiness_reasons.append("artifact_context_missing")
+        elif artifact_status == "stale":
+            producer_readiness_reasons.append("artifact_context_stale")
+        if freshness_status == "missing":
+            producer_readiness_reasons.append("artifact_freshness_missing")
+        elif freshness_status == "stale":
+            producer_readiness_reasons.append("artifact_freshness_stale")
+        if freshness_relation in {"differs_from_latest", "selected_without_latest", "selected_unavailable"}:
+            producer_readiness_reasons.append(f"artifact_relation_{freshness_relation}")
+        if road_width_status == "missing":
+            producer_readiness_reasons.append("road_width_m_missing")
+        if packaging_mismatch == "missing":
+            producer_readiness_reasons.append("packaging_mismatch_missing")
+        elif packaging_mismatch == "mismatch":
+            producer_readiness_reasons.append("packaging_mismatch_not_match")
+        if acceptance_gate != "PASS":
+            producer_readiness_reasons.append("geometry_acceptance_not_pass")
+    producer_readiness_reasons = list(dict.fromkeys(producer_readiness_reasons))
 
     def _safe_int_field(key: str) -> int:
         try:
@@ -783,6 +809,7 @@ def summarize_geometry_reference_evidence(
             "packaging_contract_hash": "",
             "geometry_acceptance_gate": "MISSING",
             "producer_artifact_status": "missing",
+            "producer_readiness_reasons": ["geometry_reference_evidence_missing"],
             "producer_evidence_owner": GEOMETRY_REFERENCE_PRODUCER_EVIDENCE_OWNER,
             "producer_required_artifacts": list(GEOMETRY_REFERENCE_REQUIRED_PRODUCER_ARTIFACTS),
             "producer_next_action": GEOMETRY_REFERENCE_PRODUCER_NEXT_ACTION,
@@ -802,8 +829,14 @@ def summarize_geometry_reference_evidence(
     if consumer_may_fabricate_geometry:
         warnings.append("Geometry reference evidence allows consumer geometry fabrication; producer export must own it.")
     if producer_artifact_status in {"missing", "partial", "stale"}:
+        reason_suffix = (
+            f" Reasons: {', '.join(producer_readiness_reasons)}."
+            if producer_readiness_reasons
+            else ""
+        )
         warnings.append(
-            f"Geometry reference producer artifact handoff is {producer_artifact_status}: {producer_next_action}"
+            f"Geometry reference producer artifact handoff is {producer_artifact_status}: "
+            f"{producer_next_action}{reason_suffix}"
         )
     if evidence_missing:
         warnings.append(f"Geometry reference evidence reports missing item(s): {', '.join(evidence_missing)}.")
@@ -837,6 +870,7 @@ def summarize_geometry_reference_evidence(
         "packaging_contract_hash": str(obj.get("packaging_contract_hash") or ""),
         "geometry_acceptance_gate": acceptance_gate,
         "producer_artifact_status": producer_artifact_status,
+        "producer_readiness_reasons": producer_readiness_reasons,
         "producer_evidence_owner": producer_evidence_owner,
         "producer_required_artifacts": list(dict.fromkeys(producer_required_artifacts)),
         "producer_next_action": producer_next_action,

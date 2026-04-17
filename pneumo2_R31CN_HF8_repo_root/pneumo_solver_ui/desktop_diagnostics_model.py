@@ -139,6 +139,7 @@ class DesktopDiagnosticsBundleRecord:
     geometry_reference_packaging_contract_hash: str = ""
     geometry_reference_acceptance_gate: str = "MISSING"
     geometry_reference_producer_artifact_status: str = "missing"
+    geometry_reference_producer_readiness_reasons: list[str] = field(default_factory=list)
     geometry_reference_producer_evidence_owner: str = "producer_export"
     geometry_reference_producer_required_artifacts: list[str] = field(default_factory=list)
     geometry_reference_producer_next_action: str = ""

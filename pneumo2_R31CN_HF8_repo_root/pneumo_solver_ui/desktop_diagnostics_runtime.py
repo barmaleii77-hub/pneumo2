@@ -478,6 +478,9 @@ def load_desktop_diagnostics_bundle_record(
         geometry_reference_producer_artifact_status=str(
             geometry_reference.get("producer_artifact_status") or "missing"
         ),
+        geometry_reference_producer_readiness_reasons=_clean_string_list(
+            geometry_reference.get("producer_readiness_reasons")
+        ),
         geometry_reference_producer_evidence_owner=str(
             geometry_reference.get("producer_evidence_owner") or "producer_export"
         ),

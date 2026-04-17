@@ -822,7 +822,7 @@ def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_releas
     assert "tests/test_desktop_diagnostics_center_contract.py" in text
     assert "26 passed" in text
     assert "45 passed" in text
-    assert "85 passed" in text
+    assert "87 passed" in text
     assert "Runtime validation result: `validation ok`" in text
     assert "does not alter solver, optimizer, animator, geometry, or domain calculations" in text
 
