@@ -10,8 +10,8 @@ does not close `OG-001`, `OG-002`, `OG-003`, `OG-004`, `OG-005`, or `OG-006`.
 
 Current proof snapshot:
 
-- ZIP: `send_bundles/SEND_20260417_082546_bundle.zip`
-- SHA256: `8aa8b64347793c9023691de7d6edb5b987447a7bd516e074a774c03650112130`
+- ZIP: `send_bundles/SEND_20260417_082931_bundle.zip`
+- SHA256: `20aafc2808aea2e93fd46826144d0c057ffb270b73092de62adda918a0eacfa1`
 - Trigger / mode: `desktop_diagnostics_center` / `manual`
 - PB-002 required evidence: `pb002_missing_required_count=0`
 - Validation: `ok=True`, `errors=0`, `warnings=6`
@@ -24,7 +24,7 @@ Producer-owned warnings still present:
 
 | warning | owner lane | expected producer artifact | diagnostics behavior |
 | --- | --- | --- | --- |
-| `Analysis evidence / HO-009 missing` | `V32-07` / Results Center | `latest_analysis_evidence_manifest.json` or `workspace/exports/analysis_evidence_manifest.json` | Warn only; do not block PB-002 bundle construction. |
+| `Analysis evidence / HO-009 context state is missing` | `V32-07` / Results Center | `latest_analysis_evidence_manifest.json` is present, but producer must populate current result context, selected run/test/NPZ refs and hashes | Warn only; do not block PB-002 bundle construction. |
 | `Geometry reference evidence reports missing item(s): artifact_context, geometry_acceptance` | `V32-12` / Geometry Reference | `latest_geometry_reference_evidence.json` with `artifact_context` and `geometry_acceptance` evidence | Warn only; keep explicit missing-evidence text in validation, health and inspect. |
 | `Geometry reference artifact context is missing` | `V32-12` / Geometry Reference | Current selected artifact context, including latest/selected relation | Warn only. |
 | `Geometry reference artifact freshness is missing` | `V32-12` / Geometry Reference | `artifact_freshness_status`, `artifact_freshness_relation`, `latest_artifact_status` | Warn only. |
@@ -42,6 +42,16 @@ Diagnostics next action after producer artifacts arrive:
 4. Run `inspect_send_bundle --zip send_bundles\latest_send_bundle.zip`.
 5. Update `DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md` with the new ZIP/SHA and
    remaining warning count.
+
+Current HO-009 state:
+
+- `latest_analysis_evidence_manifest.json` exists and is embedded in the SEND
+  bundle.
+- `analysis_handoff.status=WARN`.
+- `analysis_handoff.result_context_state=MISSING`.
+- `analysis_handoff.artifact_count=15`.
+- Diagnostics must keep this as a warning until Results Center exports a
+  current context with selected run/test/NPZ refs and provenance hashes.
 
 Boundary:
 

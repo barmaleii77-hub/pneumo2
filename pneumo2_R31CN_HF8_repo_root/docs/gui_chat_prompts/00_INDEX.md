@@ -30,7 +30,8 @@
    [COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md),
    [GEOMETRY_REFERENCE_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md),
    [MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md),
-   [DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md)
+   [DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md),
+   [DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md](../context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md)
    и [RUNTIME_RELEASE_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md)
    — lane evidence notes для V32-02/V32-04/V32-06/V32-08/V32-10/V32-14/V32-09/V32-11/V32-15; не объявляют full gap closure без named runtime artifacts.
 8. [WORKTREE_TRIAGE_2026-04-17.md](../context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
@@ -74,7 +75,8 @@
   `COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE`,
   `GEOMETRY_REFERENCE_EVIDENCE_NOTE`,
   `MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE`,
-  `DIAGNOSTICS_RELEASE_EVIDENCE_NOTE` и `RUNTIME_RELEASE_EVIDENCE_NOTE`
+  `DIAGNOSTICS_RELEASE_EVIDENCE_NOTE`,
+  `DIAGNOSTICS_PRODUCER_GAPS_HANDOFF` и `RUNTIME_RELEASE_EVIDENCE_NOTE`
   фиксируют accepted lane evidence contracts для
   V32-02/V32-04/V32-06/V32-08/V32-10/V32-14/V32-09/V32-11/V32-15 и explicit non-closure для gaps,
   которым нужны живые artifacts.

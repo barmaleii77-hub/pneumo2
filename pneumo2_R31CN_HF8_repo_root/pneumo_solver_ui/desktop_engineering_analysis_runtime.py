@@ -1253,6 +1253,14 @@ class DesktopEngineeringAnalysisRuntime:
                 surfaces.append(surface)
         return tuple(surfaces)
 
+    def compare_influence_surface_for_artifact(
+        self,
+        artifact: EngineeringAnalysisArtifact,
+        *,
+        top_k: int = 20,
+    ) -> dict[str, Any] | None:
+        return self._compare_influence_surface_from_artifact(artifact, top_k=top_k)
+
     def build_analysis_to_animator_link_contract(
         self,
         snapshot: EngineeringAnalysisSnapshot,

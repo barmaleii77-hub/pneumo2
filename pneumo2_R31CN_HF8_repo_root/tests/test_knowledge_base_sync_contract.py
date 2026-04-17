@@ -54,6 +54,16 @@ def test_chat_knowledge_base_store_exists_and_is_seeded() -> None:
     )
     assert any(
         item["artifact_path"]
+        == "context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md"
+        for item in data["plans"]
+    )
+    assert any(
+        item["artifact_path"]
+        == "context/gui_spec_imports/v32_connector_reconciled/WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md"
+        for item in data["plans"]
+    )
+    assert any(
+        item["artifact_path"]
         == "context/gui_spec_imports/v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md"
         for item in data["plans"]
     )

@@ -443,6 +443,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self._set_text(self.detail_text, self._snapshot_detail(snapshot))
 
     def _snapshot_detail(self, snapshot: EngineeringAnalysisSnapshot) -> str:
+        compare_surfaces = self._compare_surface_details(snapshot)
         payload = {
             "status": snapshot.status,
             "run_dir": str(snapshot.run_dir or ""),
@@ -453,10 +454,56 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             "blocking_states": list(snapshot.blocking_states),
             "artifact_count": len(snapshot.artifacts),
             "sensitivity_row_count": len(snapshot.sensitivity_rows),
+            "compare_influence_surface_count": len(compare_surfaces),
+            "compare_influence_surfaces": compare_surfaces,
             "unit_catalog": dict(snapshot.unit_catalog),
             "handoff_requirements": self.runtime.selected_run_handoff_requirements(snapshot),
         }
         return json.dumps(payload, ensure_ascii=False, indent=2)
+
+    def _compare_surface_details(self, snapshot: EngineeringAnalysisSnapshot) -> list[dict]:
+        try:
+            surfaces = self.runtime.compare_influence_surfaces(snapshot, top_k=5)
+        except Exception as exc:
+            return [
+                {
+                    "status": "FAILED",
+                    "error": f"{type(exc).__name__}: {exc!s}",
+                }
+            ]
+        return [
+            {
+                "title": str(surface.get("title") or "compare_influence"),
+                "source": str(surface.get("source") or ""),
+                "diagnostics": dict(surface.get("diagnostics") or {}),
+                "top_cells": list(surface.get("top_cells") or [])[:5],
+            }
+            for surface in surfaces
+        ]
+
+    def _compare_surface_preview_for_artifact(self, artifact: EngineeringAnalysisArtifact) -> dict:
+        try:
+            surface = self.runtime.compare_influence_surface_for_artifact(artifact, top_k=5)
+        except Exception as exc:
+            return {
+                "status": "FAILED",
+                "error": f"{type(exc).__name__}: {exc!s}",
+            }
+        if surface is None:
+            return {
+                "status": "UNPARSEABLE",
+                "warning": (
+                    "compare_influence artifact exists, but no surface could be built; "
+                    "expected prebuilt surface payload or corr/matrix plus feature and target axes."
+                ),
+            }
+        return {
+            "status": "READY",
+            "title": str(surface.get("title") or "compare_influence"),
+            "source": str(surface.get("source") or ""),
+            "diagnostics": dict(surface.get("diagnostics") or {}),
+            "top_cells": list(surface.get("top_cells") or [])[:5],
+        }
 
     def _refresh_candidate_filter(self) -> None:
         snapshot = self.snapshot_state
@@ -559,6 +606,8 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             path = artifact.path
             payload["exists"] = path.exists()
             payload["size_bytes"] = path.stat().st_size if path.exists() and path.is_file() else None
+            if artifact.category == "compare_influence" and path.suffix.lower() == ".json":
+                payload["compare_influence_surface_preview"] = self._compare_surface_preview_for_artifact(artifact)
             self._set_text(self.detail_text, json.dumps(payload, ensure_ascii=False, indent=2))
             return
         candidate = self._candidate_by_iid.get(iid)

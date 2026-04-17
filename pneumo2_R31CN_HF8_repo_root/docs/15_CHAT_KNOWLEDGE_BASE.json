@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-17T03:26:37+00:00",
+  "updated_at": "2026-04-17T03:30:59+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -433,6 +433,24 @@
       "title": "V32-10 Desktop Mnemo truth graphics acceptance",
       "details": "Accept the Desktop Mnemo dataset/provenance truth-graphics contract for V32-10 and RGH-003 with source markers, scheme fidelity, unavailable-state policy, snapshot, settings bridge, launcher and window tests; this is specialized Mnemo acceptance, not runtime gap closure.",
       "artifact_path": "context/gui_spec_imports/v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0032",
+      "created_at": "2026-04-17T03:30:21+00:00",
+      "source": "chat + V32-02/V32-04 inputs suite handoff",
+      "title": "V32-02/V32-04 inputs suite handoff acceptance",
+      "details": "Accept the frozen inputs and suite handoff evidence for WS-INPUTS, WS-RING, WS-SUITE, WS-BASELINE, HO-002, HO-003, HO-004 and HO-005 with inputs_snapshot, validated_suite_snapshot, stale/current banners, command discoverability and baseline gate tests; this is handoff acceptance, not solver/runtime closure.",
+      "artifact_path": "context/gui_spec_imports/v32_connector_reconciled/WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0033",
+      "created_at": "2026-04-17T03:30:59+00:00",
+      "source": "chat",
+      "title": "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md",
+      "details": "Diagnostics producer-owned warning handoff after SEND-bundle hardening; keeps missing producer evidence visible without runtime closure claims.",
+      "artifact_path": "context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md",
       "status": "актуален"
     }
   ]

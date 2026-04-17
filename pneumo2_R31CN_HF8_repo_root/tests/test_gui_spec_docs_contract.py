@@ -43,6 +43,7 @@ V32_COMPARE_OBJECTIVE_INTEGRITY_NOTE = IMPORTS_V32 / "COMPARE_OBJECTIVE_INTEGRIT
 V32_GEOMETRY_REFERENCE_EVIDENCE_NOTE = IMPORTS_V32 / "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md"
 V32_MNEMO_TRUTH_GRAPHICS_NOTE = IMPORTS_V32 / "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md"
 V32_DIAGNOSTICS_EVIDENCE_NOTE = IMPORTS_V32 / "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md"
+V32_DIAGNOSTICS_PRODUCER_GAPS_HANDOFF = IMPORTS_V32 / "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md"
 V32_RUNTIME_EVIDENCE_NOTE = IMPORTS_V32 / "RUNTIME_RELEASE_EVIDENCE_NOTE.md"
 RELEASE_TRIAGE = CONTEXT / "release_readiness" / "WORKTREE_TRIAGE_2026-04-17.md"
 V32_16_ACCEPTANCE_NOTE = CONTEXT / "release_readiness" / "V32_16_ACCEPTANCE_NOTE_2026-04-17.md"
@@ -269,11 +270,13 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in imports_readme
     assert "RELEASE_GATE_HARDENING_MATRIX.csv" in imports_readme
     assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in imports_readme
+    assert "WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md" in imports_readme
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in imports_readme
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in imports_readme
     assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in imports_readme
     assert "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in imports_readme
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in imports_readme
+    assert "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md" in imports_readme
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in imports_readme
     assert "специализированный ring-editor migration" in imports_readme
     assert "WS-RING -> WS-SUITE" in imports_readme
@@ -297,11 +300,13 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md" in project_sources_text
     assert "v32_connector_reconciled/RELEASE_GATE_HARDENING_MATRIX.csv" in project_sources_text
     assert "v32_connector_reconciled/GAP_TO_EVIDENCE_ACTION_MAP.csv" in project_sources_text
+    assert "v32_connector_reconciled/WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in project_sources_text
+    assert "v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md" in project_sources_text
     assert "v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md" in project_sources_text
     assert "v33_connector_reconciled/README.md" in project_sources_text
     assert "v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md" in project_sources_text
@@ -323,11 +328,13 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in index_text
     assert "RELEASE_GATE_HARDENING_MATRIX.csv" in index_text
     assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in index_text
+    assert "WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md" in index_text
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in index_text
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in index_text
     assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in index_text
     assert "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in index_text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in index_text
+    assert "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md" in index_text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in index_text
     assert "WORKTREE_TRIAGE_2026-04-17.md" in index_text
     assert "V32_16_ACCEPTANCE_NOTE_2026-04-17.md" in index_text
@@ -436,6 +443,7 @@ def test_v32_connector_reconciled_digest_is_registered() -> None:
     assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in text
     assert "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in text
+    assert "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md" in text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in text
     assert "WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md" in text
 
@@ -456,6 +464,9 @@ def test_v32_connector_reconciled_digest_is_registered() -> None:
     handoff_evidence = V32_INPUTS_HANDOFF_EVIDENCE.read_text(encoding="utf-8")
     assert "test_full_handoff_chain_preserves_refs_and_hashes_without_solver_run" in handoff_evidence
     assert "`HO-002`, `HO-003`, `HO-004`, `HO-005`" in handoff_evidence
+    assert "validated_suite_snapshot.json" in handoff_evidence
+    assert "Current V32-02/V32-04 handoff recheck" in handoff_evidence
+    assert "79 passed" in handoff_evidence
     assert "does not claim solver correctness" in handoff_evidence
 
 
@@ -535,11 +546,13 @@ def test_v32_release_gate_acceptance_map_is_executable_docs_contract() -> None:
 
     assert "V32-16" in release_lane_text
     assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in release_lane_text
+    assert "WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md" in release_lane_text
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in release_lane_text
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in release_lane_text
     assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in release_lane_text
     assert "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in release_lane_text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in release_lane_text
+    assert "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md" in release_lane_text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in release_lane_text
     assert "Do not implement domain runtime features here." in release_lane_text
     assert "WORKTREE_TRIAGE_2026-04-17.md" in release_lane_text
@@ -727,6 +740,23 @@ def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_releas
     assert "does not alter solver, optimizer, animator, geometry, or domain calculations" in text
 
 
+def test_v32_11_diagnostics_producer_gaps_handoff_tracks_warning_only_boundaries() -> None:
+    assert V32_DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.exists()
+
+    text = V32_DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.read_text(encoding="utf-8")
+    assert "Diagnostics Producer Gaps Handoff" in text
+    assert "producer-owned evidence" in text
+    assert "does not close `OG-001`, `OG-002`, `OG-003`, `OG-004`, `OG-005`, or `OG-006`" in text
+    assert "pb002_missing_required_count=0" in text
+    assert "latest_send_bundle.zip" in text
+    assert "Analysis evidence / HO-009 context state is missing" in text
+    assert "Geometry acceptance gate is MISSING" in text
+    assert "browser perf evidence is not trace_bundle_ready: missing" in text
+    assert "Warn only" in text
+    assert "Do not compute or reinterpret solver, optimizer, animator, geometry or" in text
+    assert "performance domain values in this lane" in text
+
+
 def test_v32_15_runtime_evidence_note_records_hard_gate_acceptance_without_gap_closure() -> None:
     assert V32_RUNTIME_EVIDENCE_NOTE.exists()
 
@@ -858,11 +888,13 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         V32_RELEASE_ACCEPTANCE_MAP,
         V32_GATE_HARDENING,
         V32_GAP_MAP,
+        V32_INPUTS_HANDOFF_EVIDENCE,
         V32_PRODUCER_ANIMATOR_TRUTH_NOTE,
         V32_COMPARE_OBJECTIVE_INTEGRITY_NOTE,
         V32_GEOMETRY_REFERENCE_EVIDENCE_NOTE,
         V32_MNEMO_TRUTH_GRAPHICS_NOTE,
         V32_DIAGNOSTICS_EVIDENCE_NOTE,
+        V32_DIAGNOSTICS_PRODUCER_GAPS_HANDOFF,
         V32_RUNTIME_EVIDENCE_NOTE,
         RELEASE_TRIAGE,
         V32_16_ACCEPTANCE_NOTE,

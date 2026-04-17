@@ -232,6 +232,20 @@ ID: `PLAN-0030`.
 Источник: chat + V32-10 Desktop Mnemo truth graphics.
 ID: `PLAN-0031`.
 
+32. V32-02/V32-04 inputs suite handoff acceptance
+Назначение: Accept the frozen inputs and suite handoff evidence for WS-INPUTS, WS-RING, WS-SUITE, WS-BASELINE, HO-002, HO-003, HO-004 and HO-005 with inputs_snapshot, validated_suite_snapshot, stale/current banners, command discoverability and baseline gate tests; this is handoff acceptance, not solver/runtime closure.
+Артефакт: [context/gui_spec_imports/v32_connector_reconciled/WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md)
+Статус: актуален.
+Источник: chat + V32-02/V32-04 inputs suite handoff.
+ID: `PLAN-0032`.
+
+33. DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md
+Назначение: Diagnostics producer-owned warning handoff after SEND-bundle hardening; keeps missing producer evidence visible without runtime closure claims.
+Артефакт: [context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md](./context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md)
+Статус: актуален.
+Источник: chat.
+ID: `PLAN-0033`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

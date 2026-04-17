@@ -49,6 +49,11 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "def _auto_export_evidence_after_ho007" in src
     assert "write_diagnostics_evidence_manifest" in src
     assert "evidence auto-exported after HO-007" in src
+    assert "compare_influence_surface_count" in src
+    assert "def _compare_surface_details" in src
+    assert "def _compare_surface_preview_for_artifact" in src
+    assert "compare_influence_surface_preview" in src
+    assert "compare_influence_surface_for_artifact" in src
     assert "filedialog.askdirectory" in src
 
 

@@ -35,7 +35,8 @@
   `COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md`,
   `GEOMETRY_REFERENCE_EVIDENCE_NOTE.md`,
   `MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md`,
-  `DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md` and
+  `DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md`,
+  `DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md` and
   `RUNTIME_RELEASE_EVIDENCE_NOTE.md`;
 - `v3/` — active detailed machine-readable reference layer из
   `pneumo_gui_codex_package_v3.zip`;
@@ -81,6 +82,8 @@
    `v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md`;
    for diagnostics/SEND-bundle acceptance,
    also read `v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md`;
+   for producer-owned diagnostics warning handoff, also read
+   `v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md`;
    for runtime/perf evidence gates, also read
    `v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md`.
 6. Затем использовать `v3/*` как checked-in detailed machine-readable reference для:

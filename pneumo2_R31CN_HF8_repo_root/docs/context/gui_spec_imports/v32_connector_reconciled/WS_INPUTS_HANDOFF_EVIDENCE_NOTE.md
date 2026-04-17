@@ -84,6 +84,14 @@ python -m pytest tests/test_desktop_shell_parity_contract.py tests/test_desktop_
 Observed results: `45 passed`, `52 passed`, `31 passed`, `23 passed`,
 `44 passed`.
 
+Current V32-02/V32-04 handoff recheck:
+
+```powershell
+python -m pytest tests/test_desktop_suite_snapshot.py tests/test_desktop_run_setup_center_contract.py tests/test_desktop_input_editor_contract.py tests/test_desktop_ring_editor_contract.py tests/test_optimization_auto_ring_suite.py tests/test_suite_contract_migration.py -q
+```
+
+Result: `79 passed`.
+
 Desktop-targeted follow-up:
 
 The monolithic `tests/test_*desktop*.py` run exceeded the local timeout when

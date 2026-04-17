@@ -54,8 +54,8 @@ Focused Geometry/Diagnostics regression result: `85 passed`.
 
 Runtime proof captured:
 
-- ZIP: `send_bundles/SEND_20260417_082546_bundle.zip`
-- Final latest SHA256: `8aa8b64347793c9023691de7d6edb5b987447a7bd516e074a774c03650112130`
+- ZIP: `send_bundles/SEND_20260417_082931_bundle.zip`
+- Final latest SHA256: `20aafc2808aea2e93fd46826144d0c057ffb270b73092de62adda918a0eacfa1`
 - Trigger / mode: `desktop_diagnostics_center` / `manual`
 - Validation: `ok=True`, `errors=0`, `warnings=6`
 - Health after final triage: `ok=False`, `notes=8`, preserving adjacent-workstream warnings.
@@ -63,6 +63,10 @@ Runtime proof captured:
 - Latest pointer/SHA proof: `latest_zip_matches_original=True`, `latest_sha_sidecar_matches=True`, `latest_pointer_matches_original=True`
 - Embedded evidence stage: `final_after_validation_dashboard`; latest sidecar proof stage: `latest_zip_sha_inspection_proof`.
 - Latest inspection sidecars: `latest_send_bundle_inspection.json` points at `latest_send_bundle.zip`, carries matching `zip_sha256`, and reports health, validation, triage and evidence manifest present.
+- HO-009 analysis sidecar proof: `latest_analysis_evidence_manifest.json` is
+  present and embedded; current state is `analysis_handoff.status=WARN` with
+  `result_context_state=MISSING`, so this is evidence presence, not analysis
+  closure.
 - BND-018 sidecar proof: `latest_geometry_reference_evidence.json` is embedded as
   `geometry/geometry_reference_evidence.json`; it carries
   `artifact_freshness_status=missing`, `artifact_freshness_relation=latest`,
