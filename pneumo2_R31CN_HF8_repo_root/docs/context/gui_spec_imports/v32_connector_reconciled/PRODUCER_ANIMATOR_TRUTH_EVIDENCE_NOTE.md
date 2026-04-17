@@ -84,6 +84,28 @@ python -m pytest tests\test_anim_latest_solver_points_contract_gate.py tests\tes
 
 Result: `111 passed`.
 
+Scoped PR / handoff inventory:
+
+- Producer-truth merge scope covers runtime/export contracts:
+  `pneumo_solver_ui/anim_export_contract.py`,
+  `pneumo_solver_ui/npz_bundle.py` and
+  `pneumo_solver_ui/geometry_acceptance_contract.py`.
+- Validator and evidence surfaces in scope are
+  `pneumo_solver_ui/tools/validate_anim_export_contract.py`,
+  `pneumo_solver_ui/tools/health_report.py`,
+  `pneumo_solver_ui/tools/inspect_send_bundle.py`,
+  `pneumo_solver_ui/tools/send_bundle_evidence.py` and
+  `pneumo_solver_ui/tools/make_send_bundle.py`.
+- Contract tests in scope are the combined verification tests listed above,
+  plus this documentation contract in `tests/test_gui_spec_docs_contract.py`.
+- Evidence notes in scope are this note and
+  `GEOMETRY_REFERENCE_EVIDENCE_NOTE.md`; Diagnostics remains an evidence
+  consumer and warning surface unless a producer artifact is actually present.
+- A neighboring GUI baseline workspace-page commit exists on `codex/work`, but
+  it is outside producer truth closure and should be reviewed under GUI
+  workspace-page scope, not as part of `solver_points` / `hardpoints` /
+  packaging / geometry acceptance truth.
+
 Non-claims:
 
 - `OG-001` stays open until a named release bundle contains full

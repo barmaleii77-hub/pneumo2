@@ -686,6 +686,11 @@ def test_v32_14_v32_09_producer_animator_truth_note_records_contract_acceptance_
     assert "diagnostics/health/inspect evidence surfaces" in text
     assert "GUI and diagnostics lanes remain consumers" in text
     assert "111 passed" in text
+    assert "Scoped PR / handoff inventory" in text
+    assert "Producer-truth merge scope covers runtime/export contracts" in text
+    assert "pneumo_solver_ui/tools/validate_anim_export_contract.py" in text
+    assert "tests/test_gui_spec_docs_contract.py" in text
+    assert "outside producer truth closure" in text
     assert "not a durable release SEND bundle" in text
     assert "complete cylinder packaging passport" in text
 
