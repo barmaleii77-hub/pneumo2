@@ -80,6 +80,12 @@ from tkinter import ttk
 from pneumo_solver_ui.desktop_ui_core import ScrollableFrame, build_scrolled_text, build_status_strip
 from pneumo_solver_ui.desktop_results_runtime import DesktopResultsRuntime
 from pneumo_solver_ui.desktop_results_model import DesktopResultsSessionHandoff
+from pneumo_solver_ui.desktop_suite_runtime import (
+    desktop_suite_handoff_dir,
+    desktop_suite_handoff_path,
+    read_desktop_suite_handoff_state,
+)
+
 from pneumo_solver_ui.tools.desktop_results_center import DesktopResultsCenter
 from pneumo_solver_ui.tools.send_bundle_contract import (
     ANIM_DIAG_SIDECAR_JSON,
@@ -170,6 +176,7 @@ class App:
         self.context_summary = StringVar(
             value="Слева контракт baseline и тестового прогона, справа журнал, результаты и быстрый переход к диагностике."
         )
+        self.suite_handoff_status = StringVar(value="HO-005 validated_suite_snapshot: состояние ещё не прочитано.")
         self.status = StringVar(value="Готов.")
 
         self.q: "queue.Queue[str]" = queue.Queue()
@@ -225,6 +232,32 @@ class App:
             wraplength=320,
             justify="left",
         ).pack(anchor="w")
+
+        suite_box = ttk.LabelFrame(config_body, text="Набор испытаний / HO-005", padding=pad)
+        suite_box.pack(fill="x", padx=pad, pady=(0, pad))
+        ttk.Label(
+            suite_box,
+            textvariable=self.suite_handoff_status,
+            wraplength=320,
+            justify="left",
+            foreground="#334455",
+        ).grid(row=0, column=0, columnspan=3, sticky="w")
+        ttk.Button(
+            suite_box,
+            text="Обновить HO-005",
+            command=self._refresh_suite_handoff_status,
+        ).grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(
+            suite_box,
+            text="Открыть validated_suite_snapshot.json",
+            command=self._open_suite_snapshot,
+        ).grid(row=1, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
+        ttk.Button(
+            suite_box,
+            text="Открыть папку handoff",
+            command=self._open_suite_handoff_dir,
+        ).grid(row=1, column=2, sticky="w", padx=(8, 0), pady=(10, 0))
+        suite_box.columnconfigure(0, weight=1)
 
         top = ttk.LabelFrame(config_body, text="Что запускать", padding=pad)
         top.pack(fill="x", padx=pad)
@@ -295,10 +328,40 @@ class App:
 
         footer = build_status_strip(self.root, primary_var=self.status)
         footer.pack(fill="x", padx=pad, pady=(0, pad))
+        self._refresh_suite_handoff_status()
 
     def _append(self, s: str) -> None:
         self.text.insert(END, s)
         self.text.see(END)
+
+    def _refresh_suite_handoff_status(self) -> None:
+        info = read_desktop_suite_handoff_state()
+        preview = dict(info.get("preview") or {})
+        validation = dict(info.get("validation") or {})
+        suite_hash = str(info.get("suite_snapshot_hash") or "")
+        lines = [
+            f"HO-005 validated_suite_snapshot: {info.get('state') or 'missing'}",
+            (
+                f"suite_snapshot_hash={suite_hash[:12] or '—'} | "
+                f"enabled={int(preview.get('enabled_count', 0) or 0)} | "
+                f"missing_refs={int(validation.get('blocking_missing_ref_count', 0) or 0)}"
+            ),
+            str(info.get("banner") or "").strip(),
+            f"path={info.get('path') or desktop_suite_handoff_path()}",
+        ]
+        self.suite_handoff_status.set("\n".join(line for line in lines if line).strip())
+
+    def _open_suite_snapshot(self) -> None:
+        path = desktop_suite_handoff_path()
+        if not path.exists():
+            messagebox.showinfo("Набор испытаний / HO-005", "validated_suite_snapshot.json пока не найден.")
+            return
+        _open_in_file_manager(str(path))
+
+    def _open_suite_handoff_dir(self) -> None:
+        path = desktop_suite_handoff_dir()
+        path.mkdir(parents=True, exist_ok=True)
+        _open_in_file_manager(str(path))
 
     def _open_send_bundles(self) -> None:
         p = self.repo / "send_bundles"

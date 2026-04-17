@@ -8,10 +8,11 @@ sections and sliders, without forcing them through the large WEB UI.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,15 @@ DESKTOP_ADVANCED_FIELD_KEYS: frozenset[str] = frozenset(
         "пружина_запас_до_coil_bind_минимум_м",
     }
 )
+
+
+DESKTOP_INPUT_SNAPSHOT_SCHEMA_VERSION = "desktop_inputs_snapshot_v1"
+DESKTOP_INPUT_SNAPSHOT_FILENAME = "inputs_snapshot.json"
+DESKTOP_INPUT_HANDOFF_IDS: dict[str, str] = {
+    "WS-RING": "HO-002",
+    "WS-SUITE": "HO-003",
+}
+
 
 
 DESKTOP_HELP_OVERRIDES: dict[str, dict[str, str]] = {
@@ -542,6 +552,22 @@ def desktop_snapshot_dir_path() -> Path:
     return (repo_root() / "workspace" / "ui_state" / "desktop_input_snapshots").resolve()
 
 
+def desktop_inputs_handoff_dir_path(
+    *,
+    workspace_dir: Path | str | None = None,
+) -> Path:
+    workspace = Path(workspace_dir).resolve() if workspace_dir is not None else (repo_root() / "workspace").resolve()
+    return (workspace / "handoffs" / "WS-INPUTS").resolve()
+
+
+def desktop_inputs_snapshot_handoff_path(
+    *,
+    workspace_dir: Path | str | None = None,
+) -> Path:
+    return (desktop_inputs_handoff_dir_path(workspace_dir=workspace_dir) / DESKTOP_INPUT_SNAPSHOT_FILENAME).resolve()
+
+
+
 def desktop_runs_dir_path() -> Path:
     return (repo_root() / "workspace" / "desktop_runs").resolve()
 
@@ -552,6 +578,395 @@ def default_ranges_json_path() -> Path:
 
 def default_suite_json_path() -> Path:
     return (Path(__file__).resolve().parent / "default_suite.json").resolve()
+
+
+def _canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def canonical_base_input_keys() -> frozenset[str]:
+    return frozenset(str(key) for key in load_base_defaults().keys())
+
+
+def desktop_input_field_keys() -> frozenset[str]:
+    return frozenset(spec.key for spec in flatten_field_specs())
+
+
+def find_desktop_invented_input_keys(
+    payload: dict[str, Any],
+    *,
+    allowed_keys: frozenset[str] | None = None,
+) -> tuple[str, ...]:
+    allowed = allowed_keys if allowed_keys is not None else canonical_base_input_keys()
+    return tuple(
+        sorted(
+            str(key)
+            for key in dict(payload or {}).keys()
+            if str(key) not in allowed
+        )
+    )
+
+
+def validate_desktop_input_payload_keys(payload: dict[str, Any]) -> None:
+    invented_keys = find_desktop_invented_input_keys(payload)
+    if invented_keys:
+        preview = ", ".join(invented_keys[:8])
+        suffix = "" if len(invented_keys) <= 8 else f" и ещё {len(invented_keys) - 8}"
+        raise ValueError(
+            "WS-INPUTS snapshot contains keys outside default_base.json: "
+            f"{preview}{suffix}"
+        )
+
+
+def canonicalize_desktop_input_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    current = load_base_defaults()
+    current.update(dict(payload or {}))
+    validate_desktop_input_payload_keys(current)
+    return current
+
+
+def desktop_input_payload_hash(payload: dict[str, Any]) -> str:
+    return hashlib.sha256(_canonical_json_bytes(canonicalize_desktop_input_payload(payload))).hexdigest()
+
+
+def build_desktop_inputs_snapshot(
+    payload: dict[str, Any],
+    *,
+    source_path: Path | str | None = None,
+    created_at_utc: str | None = None,
+) -> dict[str, Any]:
+    frozen_inputs = canonicalize_desktop_input_payload(payload)
+    payload_hash = desktop_input_payload_hash(frozen_inputs)
+    section_keys = {
+        section.title: [spec.key for spec in section.fields]
+        for section in DESKTOP_INPUT_SECTIONS
+    }
+    created = str(
+        created_at_utc
+        or datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+    source = str(Path(source_path).resolve()) if source_path else ""
+    snapshot_core = {
+        "schema_version": DESKTOP_INPUT_SNAPSHOT_SCHEMA_VERSION,
+        "source_workspace": "WS-INPUTS",
+        "target_workspaces": list(DESKTOP_INPUT_HANDOFF_IDS.keys()),
+        "handoff_ids": dict(DESKTOP_INPUT_HANDOFF_IDS),
+        "frozen": True,
+        "created_at_utc": created,
+        "source_path": source,
+        "payload_hash": payload_hash,
+        "payload_key_count": len(frozen_inputs),
+        "field_key_count": len(desktop_input_field_keys()),
+        "invented_keys": [],
+        "section_keys": section_keys,
+        "readiness": evaluate_desktop_section_readiness(frozen_inputs),
+        "inputs": frozen_inputs,
+    }
+    snapshot_core["snapshot_hash"] = hashlib.sha256(
+        _canonical_json_bytes(snapshot_core)
+    ).hexdigest()
+    return snapshot_core
+
+
+def validate_desktop_inputs_snapshot_contract(
+    snapshot: dict[str, Any],
+    *,
+    target_workspace: str | None = None,
+) -> None:
+    if not isinstance(snapshot, dict):
+        raise ValueError("inputs_snapshot must contain a JSON object")
+    if str(snapshot.get("schema_version") or "") != DESKTOP_INPUT_SNAPSHOT_SCHEMA_VERSION:
+        raise ValueError("inputs_snapshot has unsupported schema_version")
+    if str(snapshot.get("source_workspace") or "") != "WS-INPUTS":
+        raise ValueError("inputs_snapshot source_workspace must be WS-INPUTS")
+    if bool(snapshot.get("frozen", False)) is not True:
+        raise ValueError("inputs_snapshot must be frozen before handoff")
+
+    target_workspaces = tuple(str(item) for item in list(snapshot.get("target_workspaces") or []))
+    handoff_ids = dict(snapshot.get("handoff_ids") or {})
+    for workspace, handoff_id in DESKTOP_INPUT_HANDOFF_IDS.items():
+        if workspace not in target_workspaces:
+            raise ValueError(f"inputs_snapshot missing target workspace {workspace}")
+        if str(handoff_ids.get(workspace) or "") != handoff_id:
+            raise ValueError(f"inputs_snapshot has wrong handoff_id for {workspace}")
+    clean_target = str(target_workspace or "").strip()
+    if clean_target:
+        expected_handoff = DESKTOP_INPUT_HANDOFF_IDS.get(clean_target)
+        if expected_handoff is None:
+            raise ValueError(f"unsupported inputs_snapshot target workspace: {clean_target}")
+        if clean_target not in target_workspaces:
+            raise ValueError(f"inputs_snapshot is not addressed to {clean_target}")
+
+    inputs = snapshot.get("inputs")
+    if not isinstance(inputs, dict):
+        raise ValueError("inputs_snapshot inputs must contain a JSON object")
+    invented_keys = find_desktop_invented_input_keys(inputs)
+    if invented_keys:
+        preview = ", ".join(invented_keys[:8])
+        raise ValueError(f"inputs_snapshot inputs contain invented keys: {preview}")
+    if list(snapshot.get("invented_keys") or []) != []:
+        raise ValueError("inputs_snapshot invented_keys must be empty")
+    missing_keys = sorted(canonical_base_input_keys() - set(str(key) for key in inputs.keys()))
+    if missing_keys:
+        preview = ", ".join(missing_keys[:8])
+        raise ValueError(f"inputs_snapshot inputs missing canonical keys: {preview}")
+
+    expected_payload_hash = desktop_input_payload_hash(inputs)
+    if str(snapshot.get("payload_hash") or "") != expected_payload_hash:
+        raise ValueError("inputs_snapshot payload_hash does not match canonical inputs")
+    if int(snapshot.get("payload_key_count") or 0) != len(inputs):
+        raise ValueError("inputs_snapshot payload_key_count does not match inputs")
+    if int(snapshot.get("field_key_count") or 0) != len(desktop_input_field_keys()):
+        raise ValueError("inputs_snapshot field_key_count does not match desktop field registry")
+    expected_section_keys = {
+        section.title: [spec.key for spec in section.fields]
+        for section in DESKTOP_INPUT_SECTIONS
+    }
+    if dict(snapshot.get("section_keys") or {}) != expected_section_keys:
+        raise ValueError("inputs_snapshot section_keys do not match desktop input sections")
+
+    expected_snapshot_hash = hashlib.sha256(
+        _canonical_json_bytes({key: value for key, value in snapshot.items() if key != "snapshot_hash"})
+    ).hexdigest()
+    if str(snapshot.get("snapshot_hash") or "") != expected_snapshot_hash:
+        raise ValueError("inputs_snapshot snapshot_hash does not match frozen snapshot")
+
+
+def build_desktop_inputs_snapshot_ref(
+    snapshot: dict[str, Any],
+    *,
+    target_workspace: str,
+    snapshot_path: Path | str | None = None,
+) -> dict[str, Any]:
+    clean_target = str(target_workspace or "").strip()
+    validate_desktop_inputs_snapshot_contract(snapshot, target_workspace=clean_target)
+    return {
+        "workspace": "WS-INPUTS",
+        "target_workspace": clean_target,
+        "handoff_id": DESKTOP_INPUT_HANDOFF_IDS[clean_target],
+        "schema_version": DESKTOP_INPUT_SNAPSHOT_SCHEMA_VERSION,
+        "frozen": True,
+        "snapshot_ref": str(Path(snapshot_path).resolve()) if snapshot_path is not None else "",
+        "payload_hash": str(snapshot.get("payload_hash") or ""),
+        "snapshot_hash": str(snapshot.get("snapshot_hash") or ""),
+    }
+
+
+def save_desktop_inputs_snapshot(
+    payload: dict[str, Any],
+    *,
+    source_path: Path | str | None = None,
+    target_path: Path | str | None = None,
+) -> Path:
+    target = Path(target_path).resolve() if target_path else desktop_inputs_snapshot_handoff_path()
+    snapshot = build_desktop_inputs_snapshot(payload, source_path=source_path)
+    save_base_payload(target, snapshot)
+    return target
+
+
+def load_desktop_inputs_snapshot(path: Path | str | None = None) -> dict[str, Any]:
+    target = Path(path).resolve() if path else desktop_inputs_snapshot_handoff_path()
+    raw = json.loads(target.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"Desktop inputs snapshot must contain a JSON object: {target}")
+    validate_desktop_inputs_snapshot_contract(raw)
+    return raw
+
+
+def describe_desktop_inputs_handoff_for_workspace(
+    target_workspace: str,
+    *,
+    current_payload_hash: str = "",
+    snapshot: dict[str, Any] | None = None,
+    snapshot_path: Path | str | None = None,
+    workspace_dir: Path | str | None = None,
+) -> dict[str, Any]:
+    clean_target = str(target_workspace or "").strip()
+    handoff_id = DESKTOP_INPUT_HANDOFF_IDS.get(clean_target, "")
+    target = (
+        Path(snapshot_path).resolve()
+        if snapshot_path is not None
+        else desktop_inputs_snapshot_handoff_path(workspace_dir=workspace_dir)
+    )
+    base = {
+        "version": "desktop_inputs_handoff_ref_v1",
+        "target_workspace": clean_target,
+        "handoff_id": handoff_id,
+        "snapshot_path": str(target),
+        "payload_hash": "",
+        "snapshot_hash": "",
+        "can_consume": False,
+    }
+    if not handoff_id:
+        return {
+            **base,
+            "state": "invalid",
+            "is_stale": True,
+            "stale_reasons": ["unsupported_inputs_handoff_target"],
+            "banner": f"inputs_snapshot не поддерживает target workspace: {clean_target}.",
+        }
+
+    loaded_snapshot = snapshot
+    if loaded_snapshot is None:
+        if not target.exists():
+            return {
+                **base,
+                "state": "missing",
+                "is_stale": True,
+                "stale_reasons": ["missing_inputs_snapshot"],
+                "banner": (
+                    f"{handoff_id}: frozen inputs_snapshot.json не найден. "
+                    f"{clean_target} не должен создавать surrogate inputs."
+                ),
+            }
+        try:
+            loaded_snapshot = load_desktop_inputs_snapshot(target)
+        except Exception as exc:
+            return {
+                **base,
+                "state": "invalid",
+                "is_stale": True,
+                "stale_reasons": ["invalid_inputs_snapshot"],
+                "banner": f"{handoff_id} inputs_snapshot не читается или невалиден: {exc}",
+            }
+
+    try:
+        validate_desktop_inputs_snapshot_contract(loaded_snapshot, target_workspace=clean_target)
+    except Exception as exc:
+        return {
+            **base,
+            "state": "invalid",
+            "is_stale": True,
+            "stale_reasons": ["invalid_inputs_snapshot"],
+            "banner": f"{handoff_id} inputs_snapshot невалиден для {clean_target}: {exc}",
+        }
+
+    ref = build_desktop_inputs_snapshot_ref(
+        loaded_snapshot,
+        target_workspace=clean_target,
+        snapshot_path=target,
+    )
+    payload_hash = str(ref.get("payload_hash") or "")
+    snapshot_hash = str(ref.get("snapshot_hash") or "")
+    if current_payload_hash and payload_hash != str(current_payload_hash):
+        return {
+            **base,
+            "payload_hash": payload_hash,
+            "snapshot_hash": snapshot_hash,
+            "ref": ref,
+            "state": "stale",
+            "is_stale": True,
+            "stale_reasons": ["inputs_snapshot_hash_changed"],
+            "banner": (
+                f"{handoff_id} inputs_snapshot устарел для {clean_target}: "
+                "payload_hash отличается от текущего frozen WS-INPUTS context."
+            ),
+        }
+
+    return {
+        **base,
+        "payload_hash": payload_hash,
+        "snapshot_hash": snapshot_hash,
+        "ref": ref,
+        "state": "current",
+        "is_stale": False,
+        "stale_reasons": [],
+        "can_consume": True,
+        "banner": (
+            f"{handoff_id} inputs_snapshot актуален для {clean_target}; "
+            "downstream хранит ref/hash и не редактирует WS-INPUTS."
+        ),
+    }
+
+
+def describe_desktop_inputs_snapshot_state(
+    current_payload: dict[str, Any],
+    *,
+    snapshot: dict[str, Any] | None = None,
+    snapshot_path: Path | str | None = None,
+) -> dict[str, Any]:
+    target = Path(snapshot_path).resolve() if snapshot_path else desktop_inputs_snapshot_handoff_path()
+    try:
+        current_hash = desktop_input_payload_hash(current_payload)
+    except Exception as exc:
+        return {
+            "state": "invalid",
+            "is_stale": True,
+            "path": str(target),
+            "current_payload_hash": "",
+            "snapshot_payload_hash": "",
+            "banner": f"Нельзя заморозить inputs_snapshot: {exc}",
+        }
+
+    loaded_snapshot = snapshot
+    if loaded_snapshot is None:
+        if not target.exists():
+            return {
+                "state": "missing",
+                "is_stale": True,
+                "path": str(target),
+                "current_payload_hash": current_hash,
+                "snapshot_payload_hash": "",
+                "banner": (
+                    "Frozen inputs_snapshot ещё не создан. WS-RING (HO-002) и "
+                    "WS-SUITE (HO-003) должны получить замороженный снимок перед handoff."
+                ),
+            }
+        try:
+            loaded_snapshot = load_desktop_inputs_snapshot(target)
+        except Exception as exc:
+            return {
+                "state": "invalid",
+                "is_stale": True,
+                "path": str(target),
+                "current_payload_hash": current_hash,
+                "snapshot_payload_hash": "",
+                "banner": f"Frozen inputs_snapshot повреждён или не читается: {exc}",
+            }
+
+    snapshot_hash = str(loaded_snapshot.get("payload_hash") or "")
+    try:
+        validate_desktop_inputs_snapshot_contract(loaded_snapshot)
+    except Exception as exc:
+        return {
+            "state": "invalid",
+            "is_stale": True,
+            "path": str(target),
+            "current_payload_hash": current_hash,
+            "snapshot_payload_hash": snapshot_hash,
+            "banner": f"Frozen inputs_snapshot невалиден: {exc}",
+        }
+    is_stale = current_hash != snapshot_hash
+    if is_stale:
+        return {
+            "state": "stale",
+            "is_stale": True,
+            "path": str(target),
+            "current_payload_hash": current_hash,
+            "snapshot_payload_hash": snapshot_hash,
+            "banner": (
+                "Frozen inputs_snapshot устарел: текущие исходные данные изменились "
+                "после handoff. Обновите snapshot перед WS-RING (HO-002) или "
+                "WS-SUITE (HO-003)."
+            ),
+        }
+    return {
+        "state": "current",
+        "is_stale": False,
+        "path": str(target),
+        "current_payload_hash": current_hash,
+        "snapshot_payload_hash": snapshot_hash,
+        "banner": (
+            "Frozen inputs_snapshot актуален для WS-RING (HO-002) и "
+            "WS-SUITE (HO-003). Downstream должен читать snapshot, а не редактировать WS-INPUTS."
+        ),
+    }
+
 
 
 def flatten_field_specs() -> tuple[DesktopInputFieldSpec, ...]:
@@ -1952,11 +2367,17 @@ __all__ = [
     "apply_desktop_quick_preset",
     "apply_desktop_run_preset",
     "build_desktop_preview_surface",
+    "build_desktop_inputs_snapshot",
+    "build_desktop_inputs_snapshot_ref",
     "build_desktop_profile_diff",
     "build_desktop_section_issue_cards",
     "build_desktop_section_field_search_items",
     "build_desktop_section_change_cards",
+    "canonical_base_input_keys",
+    "canonicalize_desktop_input_payload",
     "delete_desktop_profile",
+    "describe_desktop_inputs_handoff_for_workspace",
+    "describe_desktop_inputs_snapshot_state",
     "desktop_section_status_label",
     "build_desktop_section_summary_cards",
     "desktop_field_values_match",
@@ -1966,6 +2387,10 @@ __all__ = [
     "desktop_snapshot_dir_path",
     "desktop_snapshot_display_name",
     "desktop_snapshot_path",
+    "desktop_input_field_keys",
+    "desktop_input_payload_hash",
+    "desktop_inputs_handoff_dir_path",
+    "desktop_inputs_snapshot_handoff_path",
     "evaluate_desktop_section_readiness",
     "default_base_json_path",
     "default_ranges_json_path",
@@ -1975,12 +2400,14 @@ __all__ = [
     "desktop_field_section_map",
     "describe_desktop_run_mode",
     "field_spec_map",
+    "find_desktop_invented_input_keys",
     "find_desktop_field_matches",
     "flatten_field_specs",
     "list_desktop_profile_paths",
     "list_desktop_snapshot_paths",
     "load_base_defaults",
     "load_desktop_profile",
+    "load_desktop_inputs_snapshot",
     "load_desktop_snapshot",
     "load_base_with_defaults",
     "preview_surface_label",
@@ -1996,6 +2423,9 @@ __all__ = [
     "repo_root",
     "sanitize_desktop_profile_name",
     "save_desktop_profile",
+    "save_desktop_inputs_snapshot",
     "save_desktop_snapshot",
+    "validate_desktop_inputs_snapshot_contract",
+    "validate_desktop_input_payload_keys",
     "save_base_payload",
 ]
