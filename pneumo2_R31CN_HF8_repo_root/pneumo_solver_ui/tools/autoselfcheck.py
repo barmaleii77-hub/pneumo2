@@ -29,9 +29,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 
@@ -51,6 +54,262 @@ class AutoSelfcheckResult:
 
 
 _LAST: Optional[AutoSelfcheckResult] = None
+_CACHE_SCHEMA_VERSION = 1
+
+
+def _env_flag(name: str) -> bool:
+    return str(os.environ.get(name, '0')).strip() == '1'
+
+
+def _autoselfcheck_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _cache_path(root: Path) -> Path:
+    return root / 'logs' / 'autoselfcheck_cache.json'
+
+
+def _cache_fingerprint(root: Path) -> Dict[str, Any]:
+    hasher = hashlib.sha1()
+    file_count = 0
+    paths = sorted(root.rglob("*.py"))
+    extra_paths = [
+        root / "default_base.json",
+        root / "default_suite.json",
+        root / "pneumo_ui_app.py",
+    ]
+    seen = {p.resolve() for p in paths if p.exists()}
+    for extra in extra_paths:
+        try:
+            resolved = extra.resolve()
+        except Exception:
+            resolved = extra
+        if extra.exists() and resolved not in seen:
+            paths.append(extra)
+            seen.add(resolved)
+
+    for path in sorted(paths):
+        parts_lower = {part.lower() for part in path.parts}
+        if "__pycache__" in parts_lower:
+            continue
+        try:
+            st = path.stat()
+            rel = path.relative_to(root)
+            hasher.update(str(rel).replace("\\", "/").encode("utf-8"))
+            hasher.update(b"|")
+            hasher.update(str(int(st.st_mtime_ns)).encode("ascii"))
+            hasher.update(b"|")
+            hasher.update(str(int(st.st_size)).encode("ascii"))
+            hasher.update(b"\n")
+            file_count += 1
+        except Exception:
+            continue
+
+    return {
+        "schema": _CACHE_SCHEMA_VERSION,
+        "digest": hasher.hexdigest(),
+        "files": int(file_count),
+        "no_compile": _env_flag("PNEUMO_AUTOCHECK_NO_COMPILE"),
+        "no_import": _env_flag("PNEUMO_AUTOCHECK_NO_IMPORT"),
+    }
+
+
+def _result_to_payload(res: AutoSelfcheckResult) -> Dict[str, Any]:
+    return {
+        "ok": bool(res.ok),
+        "elapsed_s": float(res.elapsed_s),
+        "results": dict(res.results or {}),
+        "failures": list(res.failures or []),
+        "summary": str(res.summary or ""),
+        "messages": list(res.messages or []),
+        "details": dict(res.details or {}),
+    }
+
+
+def _payload_to_result(payload: Dict[str, Any], *, cached: bool) -> Optional[AutoSelfcheckResult]:
+    try:
+        summary = str(payload.get("summary") or "")
+        if cached:
+            summary = f"{summary} [cached]" if summary else "autoselfcheck: cached"
+        details = dict(payload.get("details") or {})
+        if cached:
+            details["cache"] = {"hit": True}
+        results = dict(payload.get("results") or {})
+        if cached:
+            results["cache"] = {"hit": True}
+        return AutoSelfcheckResult(
+            ok=bool(payload.get("ok")),
+            elapsed_s=float(payload.get("elapsed_s") or 0.0),
+            results=results,
+            failures=list(payload.get("failures") or []),
+            summary=summary,
+            messages=list(payload.get("messages") or []),
+            details=details,
+        )
+    except Exception:
+        return None
+
+
+def _load_cached_result(root: Path, fingerprint: Dict[str, Any]) -> Optional[AutoSelfcheckResult]:
+    path = _cache_path(root)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if dict(payload.get("fingerprint") or {}) != dict(fingerprint):
+        return None
+    return _payload_to_result(dict(payload.get("result") or {}), cached=True)
+
+
+def _store_cached_result(root: Path, fingerprint: Dict[str, Any], res: AutoSelfcheckResult) -> None:
+    path = _cache_path(root)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(
+            json.dumps(
+                {
+                    "fingerprint": dict(fingerprint),
+                    "result": _result_to_payload(res),
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        os.replace(tmp, path)
+    except Exception:
+        pass
+
+
+def _run_autoselfcheck(root: Path) -> AutoSelfcheckResult:
+    t0 = time.time()
+    details: Dict[str, Any] = {}
+
+    # Импорты делаем лениво и через file-loading,
+    # чтобы работало и при запуске из zip/Windows.
+    import importlib.util
+    import sys
+
+    # Чтобы model_* импортировались как package, добавляем parent директорию в sys.path
+    if str(root.parent) not in sys.path:
+        sys.path.insert(0, str(root.parent))
+
+    def _load(name: str, path: Path):
+        spec = importlib.util.spec_from_file_location(name, str(path))
+        mod = importlib.util.module_from_spec(spec)
+        assert spec and spec.loader
+        spec.loader.exec_module(mod)  # type: ignore
+        return mod
+
+    param_contract_check = _load('param_contract_check', root / 'tools' / 'param_contract_check.py')
+    mech_energy_smoke_check = _load('mech_energy_smoke_check', root / 'tools' / 'mech_energy_smoke_check.py')
+
+    ok_all = True
+
+    ok, rc = _run_step('param_contract_check', param_contract_check.main)
+    details['param_contract_check'] = {'ok': ok, 'rc': rc}
+    ok_all = ok_all and ok
+
+    ok, rc = _run_step('mech_energy_smoke_check', lambda: mech_energy_smoke_check.main(argv=[]))
+    details['mech_energy_smoke_check'] = {'ok': ok, 'rc': rc}
+    ok_all = ok_all and ok
+
+    # 3) compileall (syntax safety)
+    if not _env_flag('PNEUMO_AUTOCHECK_NO_COMPILE'):
+        def _compileall():
+            import compileall
+            ok_ = bool(compileall.compile_dir(str(root), quiet=1))
+            return {'ok': ok_}
+
+        ok, rc = _run_step('compileall', _compileall)
+        details['compileall'] = {'ok': ok, 'rc': rc}
+        ok_all = ok_all and ok
+    else:
+        details['compileall'] = {'skipped': True}
+
+    # 3.5) UI layout guard (защита от отката к «широким таблицам»)
+    def _ui_layout_guard() -> Dict[str, Any]:
+        try:
+            ui_path = root / 'pneumo_ui_app.py'
+            txt = ui_path.read_text(encoding='utf-8', errors='ignore')
+            issues = []
+            if 'Новый редактор параметров: список + карточка' not in txt:
+                issues.append('missing params marker')
+            if 'Новый редактор тест-набора: список + карточка' not in txt:
+                issues.append('missing suite marker')
+            if 'df_params_edit = st.data_editor(' in txt:
+                issues.append('old params data_editor still present')
+            if 'df_suite_edit = st.data_editor(' in txt:
+                issues.append('old suite data_editor still present')
+            return {'ok': len(issues) == 0, 'issues': issues}
+        except Exception as e:
+            return {'ok': False, 'error': str(e)}
+
+    ok, rc = _run_step('ui_layout_guard', _ui_layout_guard)
+    details['ui_layout_guard'] = {'ok': ok, 'rc': rc}
+    ok_all = ok_all and ok
+
+    # 4) import smoke (минимальный)
+    if not _env_flag('PNEUMO_AUTOCHECK_NO_IMPORT'):
+        def _import_smoke():
+            import importlib
+
+            imported = []
+            for mod_name in [
+                'pneumo_solver_ui',
+                'pneumo_solver_ui.model_pneumo_v9_mech_doublewishbone_worldroad',
+            ]:
+                m = importlib.import_module(mod_name)
+                imported.append(mod_name)
+                if mod_name.endswith('worldroad'):
+                    missing = [
+                        a for a in (
+                            'mdot_orifice_smooth',
+                            'mdot_orifice_signed_smooth',
+                        ) if not hasattr(m, a)
+                    ]
+                    if missing:
+                        return {'ok': False, 'imported': imported, 'missing': missing}
+
+            return {'ok': True, 'imported': imported}
+
+        ok, rc = _run_step('import_smoke', _import_smoke)
+        details['import_smoke'] = {'ok': ok, 'rc': rc}
+        ok_all = ok_all and ok
+    else:
+        details['import_smoke'] = {'skipped': True}
+
+    elapsed = float(time.time() - t0)
+
+    failures = []
+    messages = []
+    try:
+        for _name, _info in (details or {}).items():
+            if isinstance(_info, dict) and (not bool(_info.get('ok', True))):
+                failures.append({'step': _name, 'rc': _info.get('rc')})
+                messages.append(f"{_name}: FAIL (rc={_info.get('rc')})")
+    except Exception:
+        failures = []
+        messages = []
+
+    if ok_all:
+        summary = f"autoselfcheck: PASS ({elapsed:.2f}s)"
+    else:
+        bad = ', '.join([f.get('step', '?') for f in failures]) if failures else 'unknown'
+        summary = f"autoselfcheck: FAIL ({len(failures)}) [{bad}] ({elapsed:.2f}s)"
+
+    return AutoSelfcheckResult(
+        ok=ok_all,
+        elapsed_s=elapsed,
+        results=details,
+        failures=failures,
+        summary=summary,
+        messages=messages,
+        details=details,
+    )
 
 
 def _run_step(name: str, fn) -> tuple[bool, Any]:
@@ -94,7 +353,7 @@ def ensure_autoselfcheck_once(strict: Optional[bool] = None) -> AutoSelfcheckRes
     if _LAST is not None:
         return _LAST
 
-    if str(os.environ.get('PNEUMO_AUTOCHECK_DISABLE', '0')).strip() == '1':
+    if _env_flag('PNEUMO_AUTOCHECK_DISABLE'):
         _LAST = AutoSelfcheckResult(
             ok=True,
             elapsed_s=0.0,
@@ -106,140 +365,22 @@ def ensure_autoselfcheck_once(strict: Optional[bool] = None) -> AutoSelfcheckRes
         return _LAST
 
     if strict is None:
-        strict = str(os.environ.get('PNEUMO_AUTOCHECK_STRICT', '0')).strip() == '1'
+        strict = _env_flag('PNEUMO_AUTOCHECK_STRICT')
 
-    t0 = time.time()
-    details: Dict[str, Any] = {}
+    root = _autoselfcheck_root()
+    fingerprint = _cache_fingerprint(root)
+    cached = _load_cached_result(root, fingerprint)
+    if cached is not None:
+        _LAST = cached
+        if strict and (not cached.ok):
+            raise RuntimeError(f'AutoSelfcheck FAIL: {cached.details}')
+        return cached
 
-    # Импорты делаем лениво и через file-loading,
-    # чтобы работало и при запуске из zip/Windows.
-    from pathlib import Path
-    import importlib.util
-    import sys
+    _LAST = _run_autoselfcheck(root)
+    _store_cached_result(root, fingerprint, _LAST)
 
-    root = Path(__file__).resolve().parents[1]  # .../pneumo_solver_ui
-    # Чтобы model_* импортировались как package, добавляем parent директорию в sys.path
-    if str(root.parent) not in sys.path:
-        sys.path.insert(0, str(root.parent))
-
-    def _load(name: str, path: Path):
-        spec = importlib.util.spec_from_file_location(name, str(path))
-        mod = importlib.util.module_from_spec(spec)
-        assert spec and spec.loader
-        spec.loader.exec_module(mod)  # type: ignore
-        return mod
-
-    param_contract_check = _load('param_contract_check', root / 'tools' / 'param_contract_check.py')
-    mech_energy_smoke_check = _load('mech_energy_smoke_check', root / 'tools' / 'mech_energy_smoke_check.py')
-
-    ok_all = True
-
-    ok, rc = _run_step('param_contract_check', param_contract_check.main)
-    details['param_contract_check'] = {'ok': ok, 'rc': rc}
-    ok_all = ok_all and ok
-
-    ok, rc = _run_step('mech_energy_smoke_check', lambda: mech_energy_smoke_check.main(argv=[]))
-    details['mech_energy_smoke_check'] = {'ok': ok, 'rc': rc}
-    ok_all = ok_all and ok
-
-    # 3) compileall (syntax safety)
-    if str(os.environ.get('PNEUMO_AUTOCHECK_NO_COMPILE', '0')).strip() != '1':
-        def _compileall():
-            import compileall
-            ok_ = bool(compileall.compile_dir(str(root), quiet=1))
-            return {'ok': ok_}
-
-        ok, rc = _run_step('compileall', _compileall)
-        details['compileall'] = {'ok': ok, 'rc': rc}
-        ok_all = ok_all and ok
-    else:
-        details['compileall'] = {'skipped': True}
-
-
-    # 3.5) UI layout guard (защита от отката к «широким таблицам»)
-    def _ui_layout_guard() -> Dict[str, Any]:
-        try:
-            ui_path = root / 'pneumo_ui_app.py'
-            txt = ui_path.read_text(encoding='utf-8', errors='ignore')
-            issues = []
-            if 'Новый редактор параметров: список + карточка' not in txt:
-                issues.append('missing params marker')
-            if 'Новый редактор тест-набора: список + карточка' not in txt:
-                issues.append('missing suite marker')
-            if 'df_params_edit = st.data_editor(' in txt:
-                issues.append('old params data_editor still present')
-            if 'df_suite_edit = st.data_editor(' in txt:
-                issues.append('old suite data_editor still present')
-            return {'ok': len(issues) == 0, 'issues': issues}
-        except Exception as e:
-            return {'ok': False, 'error': str(e)}
-
-    ok, rc = _run_step('ui_layout_guard', _ui_layout_guard)
-    details['ui_layout_guard'] = {'ok': ok, 'rc': rc}
-    ok_all = ok_all and ok
-
-    # 4) import smoke (минимальный)
-    if str(os.environ.get('PNEUMO_AUTOCHECK_NO_IMPORT', '0')).strip() != '1':
-        def _import_smoke():
-            import importlib
-
-            imported = []
-            for mod_name in [
-                'pneumo_solver_ui',
-                'pneumo_solver_ui.model_pneumo_v9_mech_doublewishbone_worldroad',
-            ]:
-                m = importlib.import_module(mod_name)
-                imported.append(mod_name)
-                if mod_name.endswith('worldroad'):
-                    missing = [
-                        a for a in (
-                            'mdot_orifice_smooth',
-                            'mdot_orifice_signed_smooth',
-                        ) if not hasattr(m, a)
-                    ]
-                    if missing:
-                        return {'ok': False, 'imported': imported, 'missing': missing}
-
-            return {'ok': True, 'imported': imported}
-
-        ok, rc = _run_step('import_smoke', _import_smoke)
-        details['import_smoke'] = {'ok': ok, 'rc': rc}
-        ok_all = ok_all and ok
-    else:
-        details['import_smoke'] = {'skipped': True}
-
-    elapsed = float(time.time() - t0)
-
-    # UI-friendly fields
-    failures = []
-    messages = []
-    try:
-        for _name, _info in (details or {}).items():
-            if isinstance(_info, dict) and (not bool(_info.get('ok', True))):
-                failures.append({'step': _name, 'rc': _info.get('rc')})
-                messages.append(f"{_name}: FAIL (rc={_info.get('rc')})")
-    except Exception:
-        failures = []
-        messages = []
-
-    if ok_all:
-        summary = f"autoselfcheck: PASS ({elapsed:.2f}s)"
-    else:
-        bad = ', '.join([f.get('step', '?') for f in failures]) if failures else 'unknown'
-        summary = f"autoselfcheck: FAIL ({len(failures)}) [{bad}] ({elapsed:.2f}s)"
-
-    _LAST = AutoSelfcheckResult(
-        ok=ok_all,
-        elapsed_s=elapsed,
-        results=details,
-        failures=failures,
-        summary=summary,
-        messages=messages,
-        details=details,
-    )
-
-    if strict and (not ok_all):
-        raise RuntimeError(f'AutoSelfcheck FAIL: {details}')
+    if strict and (not _LAST.ok):
+        raise RuntimeError(f'AutoSelfcheck FAIL: {_LAST.details}')
 
     return _LAST
 
