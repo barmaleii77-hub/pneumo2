@@ -30,6 +30,7 @@
   `RELEASE_GATE_ACCEPTANCE_MAP.md`, checked-in
   `RELEASE_GATE_HARDENING_MATRIX.csv` и
   `GAP_TO_EVIDENCE_ACTION_MAP.csv`, plus lane evidence notes such as
+  `WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md`,
   `PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md`,
   `COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md`,
   `GEOMETRY_REFERENCE_EVIDENCE_NOTE.md`,
@@ -67,7 +68,10 @@
 5. Если задача касается release gates, acceptance evidence или open gaps, читать
    `v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md` и local checked-in
    extracts `RELEASE_GATE_HARDENING_MATRIX.csv`,
-   `GAP_TO_EVIDENCE_ACTION_MAP.csv`; for producer/animator truth acceptance,
+   `GAP_TO_EVIDENCE_ACTION_MAP.csv`; for frozen inputs/suite handoff
+   acceptance, also read
+   `v32_connector_reconciled/WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md`;
+   for producer/animator truth acceptance,
    also read `v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md`;
    for compare/objective integrity, also read
    `v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md`;

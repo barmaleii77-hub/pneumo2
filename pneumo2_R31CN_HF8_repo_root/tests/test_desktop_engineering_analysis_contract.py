@@ -325,6 +325,33 @@ def test_evidence_export_builds_compare_influence_surfaces_from_artifacts(tmp_pa
     assert payload["selected_charts"] == ["Fixture compare influence"]
 
 
+def test_evidence_export_warns_when_compare_influence_artifact_is_unparseable(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path)
+    _write_json(run_dir / "compare_influence.json", {"schema": "compare_influence_fixture"})
+    contract_path = _write_selected_run_contract(tmp_path / "selected_run_contract.json", run_dir)
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="python")
+    snapshot = runtime.snapshot(selected_contract_path=contract_path)
+
+    payload = runtime.build_diagnostics_evidence_manifest(snapshot)
+
+    assert payload["compare_influence_surfaces"] == []
+    assert payload["selected_charts"] == []
+    diagnostics = payload["compare_influence_diagnostics"]
+    assert diagnostics["artifact_count"] == 1
+    assert diagnostics["surface_count"] == 0
+    assert diagnostics["source"] == "artifact_auto_discovery"
+    assert diagnostics["unparsed_artifacts"][0].endswith("compare_influence.json")
+    assert any(
+        "no parseable compare_influence surface" in warning
+        for warning in payload["validation"]["warnings"]
+    )
+
+    sidecar = runtime.write_diagnostics_evidence_manifest(snapshot)
+    exported = json.loads(sidecar.read_text(encoding="utf-8"))
+    assert exported["compare_influence_diagnostics"]["surface_count"] == 0
+    assert exported["validation"]["warnings"] == payload["validation"]["warnings"]
+
+
 def test_selected_run_contract_loads_ho007_context_as_analysis_master_source(tmp_path: Path) -> None:
     run_dir = _build_run_dir(tmp_path)
     contract_path = _write_selected_run_contract(
@@ -739,6 +766,7 @@ def test_runtime_param_staging_command_helper_requires_fit_ranges_and_influence(
 
 def test_desktop_engineering_analysis_center_shell_is_materialized() -> None:
     from pneumo_solver_ui.tools.desktop_engineering_analysis_center import (
+        ANALYSIS_COMMAND_OPEN_TARGETS,
         DesktopEngineeringAnalysisCenter,
         format_contract_banner,
         format_selected_run_summary,
@@ -748,3 +776,11 @@ def test_desktop_engineering_analysis_center_shell_is_materialized() -> None:
     assert callable(format_contract_banner)
     assert callable(format_selected_run_summary)
     assert hasattr(DesktopEngineeringAnalysisCenter, "_export_animator_link")
+    assert hasattr(DesktopEngineeringAnalysisCenter, "_run_command_surface_action")
+    command_labels = {label for _key, label in ANALYSIS_COMMAND_OPEN_TARGETS}
+    assert "Открыть HO-007 selected_run_contract.json" in command_labels
+    assert "Открыть selected run_dir" in command_labels
+    assert "Открыть selected artifact" in command_labels
+    assert "Открыть HO-009 evidence manifest" in command_labels
+    assert "Открыть HO-008 analysis_context.json" in command_labels
+    assert "Открыть HO-008 animator_link_contract.json" in command_labels

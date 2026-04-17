@@ -506,6 +506,48 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         except Exception as exc:
             messagebox.showerror("Engineering Analysis", f"Не удалось открыть:\n{path}\n\n{exc!s}")
 
+    def _command_key_from_label(self, label: str) -> str:
+        for key, item_label in ANALYSIS_COMMAND_OPEN_TARGETS:
+            if str(label or "") == item_label:
+                return key
+        return ANALYSIS_COMMAND_OPEN_TARGETS[0][0]
+
+    def _command_surface_target(
+        self,
+        action_key: str,
+        snapshot: EngineeringAnalysisSnapshot,
+    ) -> Path | None:
+        if action_key == "selected_contract":
+            return snapshot.selected_run_contract_path
+        if action_key == "run_dir":
+            return snapshot.run_dir
+        if action_key == "selected_artifact":
+            return self._selected_tree_path()
+        if action_key == "evidence_manifest":
+            return snapshot.diagnostics_evidence_manifest_path
+        if action_key == "analysis_context":
+            return self.runtime.analysis_context_path()
+        if action_key == "animator_link":
+            return self.runtime.animator_link_contract_path()
+        return None
+
+    def _run_command_surface_action(self) -> None:
+        snapshot = self.snapshot_state or self.runtime.snapshot()
+        action_key = self._command_key_from_label(self.command_var.get())
+        path = self._command_surface_target(action_key, snapshot)
+        if path is None:
+            messagebox.showinfo("Engineering Analysis", "Нет frozen artifact для выбранной команды.")
+            return
+        if not path.exists():
+            self.status_var.set(f"Command target missing: {path}")
+            messagebox.showwarning("Engineering Analysis", f"Artifact ещё не создан:\n{path}")
+            return
+        try:
+            _open_path(path)
+            self.status_var.set(f"Command opened: {path}")
+        except Exception as exc:
+            messagebox.showerror("Engineering Analysis", f"Не удалось открыть:\n{path}\n\n{exc!s}")
+
     def _on_artifact_select(self, _event: tk.Event | None = None) -> None:
         selected = self.artifact_tree.selection()
         if not selected:
@@ -543,6 +585,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
     def _set_busy(self, busy: bool, label: str = "") -> None:
         buttons = (
             self.btn_refresh,
+            self.btn_open_command,
             self.btn_export_ho007,
             self.btn_export_evidence,
             self.btn_animator_link,
