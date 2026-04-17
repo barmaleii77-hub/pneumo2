@@ -7,6 +7,17 @@ import numpy as np
 import pytest
 
 
+def test_prepare_dataset_uses_lightweight_npz_load_path() -> None:
+    src = (
+        Path(__file__).resolve().parents[1]
+        / "pneumo_solver_ui"
+        / "desktop_mnemo"
+        / "app.py"
+    ).read_text(encoding="utf-8")
+
+    assert "load_npz(npz_path, include_visual_contract=False)" in src
+
+
 def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) -> None:
     pytest.importorskip("PySide6")
 
