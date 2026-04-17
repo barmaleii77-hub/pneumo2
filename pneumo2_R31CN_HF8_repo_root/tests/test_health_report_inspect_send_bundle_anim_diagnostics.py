@@ -4,7 +4,12 @@ import json
 import zipfile
 from pathlib import Path
 
-from pneumo_solver_ui.tools.health_report import build_health_report, add_health_report_to_zip
+from pneumo_solver_ui.tools.health_report import (
+    add_health_report_to_zip,
+    build_health_report,
+    collect_health_report,
+    render_health_report_md,
+)
 from pneumo_solver_ui.tools.inspect_send_bundle import inspect_send_bundle, render_inspection_md
 
 
@@ -139,6 +144,7 @@ def _write_minimal_send_bundle(
     diag_token: str = "tok-sidecar",
     dist_progress: dict | None = None,
     export_scopes: list[tuple[str, dict]] | None = None,
+    geometry_acceptance_report: dict | None = None,
 ) -> Path:
     zip_path = tmp_path / "bundle.zip"
     diag = _make_anim_diag(diag_token, ["npz", "road_csv"])
@@ -186,12 +192,82 @@ def _write_minimal_send_bundle(
         zf.writestr("triage/triage_report.json", json.dumps(triage, ensure_ascii=False, indent=2))
         zf.writestr("triage/latest_anim_pointer_diagnostics.json", json.dumps(diag, ensure_ascii=False, indent=2))
         zf.writestr("triage/latest_anim_pointer_diagnostics.md", "# Anim latest diagnostics\n")
+        if geometry_acceptance_report is not None:
+            zf.writestr(
+                "workspace/exports/geometry_acceptance_report.json",
+                json.dumps(geometry_acceptance_report, ensure_ascii=False, indent=2),
+            )
         for run_name, run_scope in list(export_scopes or []):
             zf.writestr(
                 f"dist_runs/{run_name}/export/run_scope.json",
                 json.dumps(run_scope, ensure_ascii=False, indent=2),
             )
     return zip_path
+
+
+def _geometry_acceptance_report(gate: str, inspection_status: str) -> dict:
+    reason = f"pytest geometry acceptance {gate}"
+    return {
+        "schema": "geometry_acceptance_report.v1",
+        "inspection_status": inspection_status,
+        "truth_state_summary": {
+            "graphics_truth_state": "unavailable" if gate == "MISSING" else "approximate_inferred_with_warning",
+            "release_gate": gate,
+            "release_gate_reason": reason,
+            "available": gate != "MISSING",
+            "ok": gate == "PASS",
+            "producer_owned": True,
+            "no_synthetic_geometry": True,
+        },
+        "missing_fields": ["road_contact_ЛП_z_м"],
+        "warnings": [reason, "missing producer-side fields: road_contact_ЛП_z_м"],
+        "summary": {
+            "release_gate": gate,
+            "release_gate_reason": reason,
+            "available": gate != "MISSING",
+            "missing_triplets": ["road_contact_ЛП_z_м"],
+        },
+        "summary_lines": [f"Геом.acceptance gate={gate}: {reason}"],
+    }
+
+
+def test_health_and_inspect_preserve_geometry_acceptance_report_states(tmp_path: Path) -> None:
+    cases = (
+        ("MISSING", "missing", True),
+        ("WARN", "warning", True),
+        ("FAIL", "fail", False),
+    )
+    for gate, inspection_status, expected_ok in cases:
+        case_dir = tmp_path / gate.lower()
+        case_dir.mkdir(parents=True, exist_ok=True)
+        zip_path = _write_minimal_send_bundle(
+            case_dir,
+            geometry_acceptance_report=_geometry_acceptance_report(gate, inspection_status),
+        )
+
+        rep = collect_health_report(zip_path)
+        geom = dict(rep.signals.get("geometry_acceptance") or {})
+        health_md = render_health_report_md(rep)
+        summary = inspect_send_bundle(zip_path)
+        inspect_md = render_inspection_md(summary)
+
+        assert rep.ok is expected_ok
+        assert geom["source_kind"] == "geometry_acceptance_report"
+        assert geom["release_gate"] == gate
+        assert geom["inspection_status"] == inspection_status
+        assert geom["producer_owned"] is True
+        assert geom["no_synthetic_geometry"] is True
+        assert geom["missing_fields"] == ["road_contact_ЛП_z_м"]
+        assert any(f"geometry acceptance gate={gate}" in str(note) for note in rep.notes)
+        assert summary["geometry_acceptance_gate"] == gate
+        assert summary["geometry_acceptance_inspection_status"] == inspection_status
+        assert summary["geometry_acceptance_missing_fields"] == ["road_contact_ЛП_z_м"]
+        assert f"release_gate: {gate}" in health_md
+        assert f"inspection_status: {inspection_status}" in health_md
+        assert "missing_fields: road_contact_ЛП_z_м" in health_md
+        assert f"release_gate: {gate}" in inspect_md
+        assert f"inspection_status: {inspection_status}" in inspect_md
+        assert "missing_fields: road_contact_ЛП_z_м" in inspect_md
 
 
 

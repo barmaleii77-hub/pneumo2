@@ -18,6 +18,28 @@ from .health_report import collect_health_report
 from .send_bundle_contract import build_anim_operator_recommendations, summarize_ring_closure
 
 
+def _geometry_acceptance_lines(geom: Dict[str, Any]) -> list[str]:
+    lines = [
+        f"- inspection_status: {geom.get('inspection_status') or 'missing'}",
+        f"- release_gate: {geom.get('release_gate') or 'MISSING'}",
+        f"- release_gate_reason: {geom.get('release_gate_reason') or geom.get('error') or '—'}",
+        f"- producer_owned: {geom.get('producer_owned')}",
+        f"- no_synthetic_geometry: {geom.get('no_synthetic_geometry')}",
+    ]
+    missing = [str(x) for x in (geom.get("missing_fields") or []) if str(x).strip()]
+    if missing:
+        lines.append(f"- missing_fields: {', '.join(missing[:8])}")
+    warnings = [str(x) for x in (geom.get("warnings") or []) if str(x).strip()]
+    for warning in warnings[:5]:
+        lines.append(f"- warning: {warning}")
+    try:
+        formatted = [str(x) for x in format_geometry_acceptance_summary_lines(geom)]
+        lines.extend(x for x in formatted if x not in lines)
+    except Exception:
+        pass
+    return lines
+
+
 def _sha256_file(path: Path) -> str:
     try:
         if not path.exists() or not path.is_file():
@@ -79,6 +101,9 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
         "geometry_acceptance": geometry_acceptance,
         "geometry_acceptance_gate": str(geometry_acceptance.get("release_gate") or "MISSING") if geometry_acceptance else "MISSING",
         "geometry_acceptance_reason": str(geometry_acceptance.get("release_gate_reason") or "") if geometry_acceptance else "",
+        "geometry_acceptance_inspection_status": str(geometry_acceptance.get("inspection_status") or "missing") if geometry_acceptance else "missing",
+        "geometry_acceptance_missing_fields": list(geometry_acceptance.get("missing_fields") or []) if geometry_acceptance else [],
+        "geometry_acceptance_warnings": list(geometry_acceptance.get("warnings") or []) if geometry_acceptance else [],
         "notes": list(rep.notes or []),
         "health_report": asdict(rep),
         "has_embedded_health_report": bool(artifacts.get("health_report_embedded")),
@@ -254,7 +279,7 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
         lines += ["", "## Anim issues"] + [f"- {x}" for x in issues]
     geom = dict(summary.get("geometry_acceptance") or {})
     if geom:
-        lines += ["", "## Geometry acceptance"] + format_geometry_acceptance_summary_lines(geom)
+        lines += ["", "## Geometry acceptance"] + _geometry_acceptance_lines(geom)
     notes = list(summary.get("notes") or [])
     if notes:
         lines += ["", "## Notes"] + [f"- {x}" for x in notes]

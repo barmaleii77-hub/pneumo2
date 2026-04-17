@@ -127,16 +127,105 @@ def _collect_geometry_acceptance_best_effort(raw_npz: bytes) -> Tuple[Optional[D
         return None, f"failed to inspect anim_latest geometry acceptance: {type(e).__name__}: {e!s}"
 
 
+def _normalize_geometry_acceptance_payload(
+    payload: Dict[str, Any],
+    *,
+    source_path: str = "",
+    source_kind: str = "",
+) -> Dict[str, Any]:
+    """Normalize producer report or helper summary into one health surface."""
+    obj = dict(payload or {})
+    truth = dict(obj.get("truth_state_summary") or {}) if isinstance(obj.get("truth_state_summary"), dict) else {}
+    summary = dict(obj.get("summary") or {}) if isinstance(obj.get("summary"), dict) else {}
+    gate = str(
+        truth.get("release_gate")
+        or summary.get("release_gate")
+        or obj.get("release_gate")
+        or "MISSING"
+    ).upper()
+    reason = str(
+        truth.get("release_gate_reason")
+        or summary.get("release_gate_reason")
+        or obj.get("release_gate_reason")
+        or obj.get("error")
+        or ""
+    )
+    available = truth.get("available", summary.get("available", obj.get("available", False)))
+    ok_value = truth.get("ok", summary.get("ok", obj.get("ok", gate == "PASS")))
+    inspection_status = str(obj.get("inspection_status") or "").strip()
+    if not inspection_status:
+        if gate == "PASS":
+            inspection_status = "ok"
+        elif gate == "WARN":
+            inspection_status = "warning"
+        elif gate == "FAIL":
+            inspection_status = "fail"
+        else:
+            inspection_status = "missing"
+
+    warnings = [str(x) for x in (obj.get("warnings") or []) if str(x).strip()]
+    missing_fields = [str(x) for x in (obj.get("missing_fields") or summary.get("missing_triplets") or []) if str(x).strip()]
+    normalized = dict(summary)
+    normalized.update(obj)
+    normalized.update(
+        {
+            "release_gate": gate,
+            "release_gate_reason": reason,
+            "available": bool(available),
+            "ok": bool(ok_value),
+            "inspection_status": inspection_status,
+            "producer_owned": bool(truth.get("producer_owned", obj.get("producer_owned", False))),
+            "no_synthetic_geometry": bool(truth.get("no_synthetic_geometry", obj.get("no_synthetic_geometry", False))),
+            "graphics_truth_state": str(truth.get("graphics_truth_state") or obj.get("graphics_truth_state") or ""),
+            "missing_fields": missing_fields,
+            "warnings": warnings,
+            "source_path": str(source_path or obj.get("source_path") or ""),
+            "source_kind": str(source_kind or obj.get("source_kind") or ""),
+        }
+    )
+    if truth:
+        normalized["truth_state_summary"] = truth
+    if summary:
+        normalized["summary"] = summary
+    return normalized
+
+
+def _geometry_acceptance_note(geom: Dict[str, Any], *, source_label: str) -> tuple[bool, str]:
+    gate = str(geom.get("release_gate") or "MISSING").upper()
+    reason = str(geom.get("release_gate_reason") or "").strip()
+    suffix = f": {reason}" if reason else ""
+    if gate == "FAIL":
+        return False, f"geometry acceptance gate=FAIL for {source_label}{suffix}"
+    if gate == "WARN":
+        return True, f"geometry acceptance gate=WARN for {source_label}{suffix}"
+    if gate == "MISSING":
+        return True, f"geometry acceptance gate=MISSING for {source_label}{suffix}"
+    return True, ""
+
+
 def _format_geometry_acceptance_summary_lines_best_effort(geom: Dict[str, Any]) -> List[str]:
+    gate = str(geom.get("release_gate") or "MISSING")
+    reason = str(geom.get("release_gate_reason") or geom.get("error") or "—")
+    lines = [
+        f"- inspection_status: {geom.get('inspection_status') or 'missing'}",
+        f"- release_gate: {gate}",
+        f"- release_gate_reason: {reason}",
+        f"- producer_owned: {geom.get('producer_owned')}",
+        f"- no_synthetic_geometry: {geom.get('no_synthetic_geometry')}",
+    ]
+    missing = [str(x) for x in (geom.get("missing_fields") or []) if str(x).strip()]
+    if missing:
+        lines.append(f"- missing_fields: {', '.join(missing[:8])}")
+    warnings = [str(x) for x in (geom.get("warnings") or []) if str(x).strip()]
+    for warning in warnings[:5]:
+        lines.append(f"- warning: {warning}")
     try:
         mod = importlib.import_module("pneumo_solver_ui.geometry_acceptance_contract")
         fmt = getattr(mod, "format_geometry_acceptance_summary_lines")
-        lines = fmt(geom)
-        return [str(x) for x in lines]
+        formatted = [str(x) for x in fmt(geom)]
+        return lines + [x for x in formatted if x not in lines]
     except Exception:
-        gate = str(geom.get("release_gate") or geom.get("inspection_status") or "—")
-        reason = str(geom.get("release_gate_reason") or geom.get("error") or "—")
-        return [f"- gate: {gate}", f"- reason: {reason}"]
+        return lines
 
 
 def collect_health_report(zip_path: Path) -> HealthReport:
@@ -377,32 +466,61 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 optimizer_scope_sources,
                 preferred_order=("triage", "health", "validation", "dashboard", "export"),
             )
-            if ANIM_LOCAL_NPZ in name_set:
+            geometry_report_arc = "workspace/exports/geometry_acceptance_report.json"
+            explicit_geometry_report = _read_json_from_zip(z, geometry_report_arc) if geometry_report_arc in name_set else None
+            if explicit_geometry_report is not None:
+                geom_acc = _normalize_geometry_acceptance_payload(
+                    explicit_geometry_report,
+                    source_path=geometry_report_arc,
+                    source_kind="geometry_acceptance_report",
+                )
+                keep_ok, note = _geometry_acceptance_note(geom_acc, source_label=geometry_report_arc)
+                ok = ok and keep_ok
+                if note:
+                    notes.append(note)
+                signals["geometry_acceptance"] = geom_acc
+                anim_summary["geometry_acceptance"] = geom_acc
+            elif ANIM_LOCAL_NPZ in name_set:
                 try:
                     with z.open(ANIM_LOCAL_NPZ, "r") as f:
                         raw_npz = f.read()
                     geom_acc, geom_err = _collect_geometry_acceptance_best_effort(raw_npz)
                     if geom_acc is not None:
-                        geom_acc = dict(geom_acc)
-                        geom_acc["inspection_status"] = "ok"
-                        ga_gate = str(geom_acc.get("release_gate") or "MISSING")
-                        if ga_gate == "FAIL":
-                            ok = False
-                            notes.append(f"geometry acceptance gate=FAIL for anim_latest.npz: {geom_acc.get('release_gate_reason') or ''}")
-                        elif ga_gate == "WARN":
-                            notes.append(f"geometry acceptance gate=WARN for anim_latest.npz: {geom_acc.get('release_gate_reason') or ''}")
+                        geom_acc = _normalize_geometry_acceptance_payload(
+                            dict(geom_acc),
+                            source_path=ANIM_LOCAL_NPZ,
+                            source_kind="npz_recomputed",
+                        )
+                        keep_ok, note = _geometry_acceptance_note(geom_acc, source_label="anim_latest.npz")
+                        ok = ok and keep_ok
+                        if note:
+                            notes.append(note)
                     else:
                         geom_acc = {
-                            "inspection_status": "unavailable",
+                            "inspection_status": "missing",
+                            "release_gate": "MISSING",
+                            "release_gate_reason": str(geom_err or "geometry acceptance helper unavailable"),
+                            "available": False,
+                            "producer_owned": False,
+                            "no_synthetic_geometry": False,
                             "error": str(geom_err or "geometry acceptance helper unavailable"),
+                            "source_path": ANIM_LOCAL_NPZ,
+                            "source_kind": "npz_recomputed",
                         }
                         notes.append(str(geom_acc["error"]))
                     signals["geometry_acceptance"] = geom_acc
                     anim_summary["geometry_acceptance"] = geom_acc
                 except Exception as e:
                     geom_acc = {
-                        "inspection_status": "unavailable",
+                        "inspection_status": "missing",
+                        "release_gate": "MISSING",
+                        "release_gate_reason": f"failed to inspect anim_latest geometry acceptance: {type(e).__name__}: {e!s}",
+                        "available": False,
+                        "producer_owned": False,
+                        "no_synthetic_geometry": False,
                         "error": f"failed to inspect anim_latest geometry acceptance: {type(e).__name__}: {e!s}",
+                        "source_path": ANIM_LOCAL_NPZ,
+                        "source_kind": "npz_recomputed",
                     }
                     signals["geometry_acceptance"] = geom_acc
                     anim_summary["geometry_acceptance"] = geom_acc

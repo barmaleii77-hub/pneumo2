@@ -43,7 +43,8 @@ def test_collect_health_report_survives_missing_geometry_acceptance_helper(tmp_p
     geom = dict(rep.signals.get("geometry_acceptance") or {})
 
     assert rep.ok is True
-    assert geom.get("inspection_status") == "unavailable"
+    assert geom.get("inspection_status") == "missing"
+    assert geom.get("release_gate") == "MISSING"
     assert "No module named 'numpy'" in str(geom.get("error") or "")
     assert any("geometry acceptance helper unavailable" in str(x) for x in rep.notes)
 
