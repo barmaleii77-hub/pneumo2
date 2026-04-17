@@ -42,6 +42,8 @@ entrypoint и картой чтения для будущих задач.
 - [GEOMETRY_REFERENCE_EVIDENCE_NOTE.md](./GEOMETRY_REFERENCE_EVIDENCE_NOTE.md) -
   geometry reference evidence note для `PB-001 / PB-008 / RGH-018 /
   OG-001 / OG-002 / OG-006`.
+- [MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md](./MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md) -
+  Desktop Mnemo truth-graphics evidence note для `V32-10 / RGH-003`.
 - [DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md](./DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md) -
   runtime evidence note для `PB-002 / RGH-006 / RGH-007 / RGH-016`.
 - [RUNTIME_RELEASE_EVIDENCE_NOTE.md](./RUNTIME_RELEASE_EVIDENCE_NOTE.md) -

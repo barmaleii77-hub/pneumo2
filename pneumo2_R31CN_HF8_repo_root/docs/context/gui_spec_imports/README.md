@@ -33,6 +33,7 @@
   `PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md`,
   `COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md`,
   `GEOMETRY_REFERENCE_EVIDENCE_NOTE.md`,
+  `MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md`,
   `DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md` and
   `RUNTIME_RELEASE_EVIDENCE_NOTE.md`;
 - `v3/` — active detailed machine-readable reference layer из
@@ -72,6 +73,8 @@
    `v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md`;
    for geometry reference/imported-layer boundary proof, also read
    `v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md`;
+   for Desktop Mnemo truth graphics, also read
+   `v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md`;
    for diagnostics/SEND-bundle acceptance,
    also read `v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md`;
    for runtime/perf evidence gates, also read
