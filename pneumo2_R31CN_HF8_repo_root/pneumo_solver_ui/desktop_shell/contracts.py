@@ -106,6 +106,7 @@ class DesktopShellToolSpec:
             "test_center": "master",
             "desktop_optimizer_center": "master",
             "desktop_results_center": "derived",
+            "desktop_engineering_analysis_center": "derived",
             "compare_viewer": "derived",
             "desktop_animator": "derived",
             "desktop_mnemo": "derived",
@@ -123,6 +124,16 @@ class DesktopShellToolSpec:
             "test_center": ("набор испытаний", "tests", "validation"),
             "desktop_optimizer_center": ("baseline", "optimization", "stagerunner", "distributed"),
             "desktop_results_center": ("analysis", "results", "compare", "validation"),
+            "desktop_engineering_analysis_center": (
+                "engineering analysis",
+                "calibration",
+                "influence",
+                "sensitivity",
+                "system influence",
+                "калибровка",
+                "влияние",
+                "чувствительность",
+            ),
             "desktop_diagnostics_center": ("diagnostics", "bundle", "send bundle", "self-check"),
             "compare_viewer": ("compare viewer", "сравнение прогонов", "npz"),
             "desktop_animator": ("animator", "3d", "viewcube"),
@@ -152,6 +163,10 @@ class DesktopShellToolSpec:
             "selected_artifact",
             "selected_scenario",
             "source_of_truth_role",
+            "project_name",
+            "project_dir",
+            "workspace_dir",
+            "repo_root",
         )
 
     @property

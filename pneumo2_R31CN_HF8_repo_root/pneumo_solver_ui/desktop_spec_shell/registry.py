@@ -58,7 +58,7 @@ ROUTE_QUICK_ACTIONS_BY_WORKSPACE: dict[str, tuple[str, ...]] = {
     "test_matrix": ("test.center.open", "workspace.baseline_run.open", "workspace.ring_editor.open"),
     "baseline_run": ("baseline.center.open", "workspace.optimization.open", "workspace.results_analysis.open"),
     "optimization": ("optimization.center.open", "workspace.results_analysis.open", "workspace.diagnostics.open"),
-    "results_analysis": ("results.center.open", "results.compare.open", "workspace.animation.open", "workspace.diagnostics.open"),
+    "results_analysis": ("results.center.open", "analysis.engineering.open", "results.compare.open", "workspace.animation.open", "workspace.diagnostics.open"),
     "animation": ("animation.animator.open", "animation.mnemo.open", "workspace.results_analysis.open"),
     "diagnostics": ("diagnostics.collect_bundle", "diagnostics.verify_bundle", "diagnostics.send_results"),
 }
@@ -284,7 +284,7 @@ def build_shell_workspaces() -> tuple[DesktopWorkspaceSpec, ...]:
             graphics_policy="Compare и validation обязаны помечать источник данных и время построения.",
             capability_ids=("results.compare_and_review", "analysis.influence_and_exploration"),
             search_aliases=_aliases_for_capabilities(("results.compare_and_review", "analysis.influence_and_exploration"), "анализ", "результаты", "сравнение"),
-            quick_action_ids=("results.center.open", "results.compare.open"),
+            quick_action_ids=("results.center.open", "analysis.engineering.open", "results.compare.open"),
         ),
         DesktopWorkspaceSpec(
             workspace_id="animation",
@@ -378,6 +378,7 @@ def build_shell_commands() -> tuple[DesktopShellCommandSpec, ...]:
         DesktopShellCommandSpec("workspace.results_analysis.open", "Открыть workspace \"Анализ результатов\"", "Перейти к графикам, validation, compare и results artifacts.", "results_analysis", "open_workspace", "Рабочие пространства -> Анализ результатов", target_workspace_id="results_analysis", capability_ids=("results.compare_and_review", "analysis.influence_and_exploration"), help_topic_id="results_analysis"),
         DesktopShellCommandSpec("results.center.open", "Открыть центр анализа результатов", "Запустить existing results center как основную analysis surface.", "results_analysis", "launch_module", "Рабочие пространства -> Анализ результатов -> Центр результатов", module="pneumo_solver_ui.tools.desktop_results_center", capability_ids=("results.compare_and_review", "analysis.influence_and_exploration"), help_topic_id="results_analysis", search_aliases=("результаты", "анализ", "validation")),
         DesktopShellCommandSpec("results.compare.open", "Открыть compare viewer", "Запустить compare surface из analysis lane.", "results_analysis", "launch_module", "Рабочие пространства -> Анализ результатов -> Compare Viewer", module="pneumo_solver_ui.qt_compare_viewer", capability_ids=("results.compare_and_review",), launch_surface="external_window", help_topic_id="results_analysis", search_aliases=("compare", "сравнение", "npz")),
+        DesktopShellCommandSpec("analysis.engineering.open", "Открыть Engineering Analysis Center", "Запустить calibration, influence analysis, sensitivity summaries and engineering evidence export surface.", "results_analysis", "launch_module", "Рабочие пространства -> Анализ результатов -> Engineering Analysis Center", module="pneumo_solver_ui.tools.desktop_engineering_analysis_center", capability_ids=("analysis.influence_and_exploration",), launch_surface="tooling", help_topic_id="results_analysis", search_aliases=("engineering analysis", "calibration", "influence", "sensitivity", "system influence", "калибровка", "влияние", "чувствительность")),
         DesktopShellCommandSpec("workspace.animation.open", "Открыть workspace \"Анимация\"", "Перейти к animator/mnemo lane и честным визуальным режимам.", "animation", "open_workspace", "Рабочие пространства -> Анимация", target_workspace_id="animation", capability_ids=("visualization.animator_and_mnemo",), help_topic_id="animation"),
         DesktopShellCommandSpec("animation.animator.open", "Открыть Desktop Animator", "Запустить отдельное viewport-first окно анимации.", "animation", "launch_module", "Рабочие пространства -> Анимация -> Desktop Animator", module="pneumo_solver_ui.desktop_animator.app", capability_ids=("visualization.animator_and_mnemo",), launch_surface="external_window", help_topic_id="animation", search_aliases=("animator", "анимация", "трёхмерный вид")),
         DesktopShellCommandSpec("animation.mnemo.open", "Открыть Desktop Mnemo", "Запустить отдельное окно мнемосхемы из контекста результата.", "animation", "launch_module", "Рабочие пространства -> Анимация -> Desktop Mnemo", module="pneumo_solver_ui.desktop_mnemo.app", capability_ids=("visualization.animator_and_mnemo",), launch_surface="external_window", help_topic_id="animation", search_aliases=("mnemo", "мнемосхема", "пневмосхема")),
