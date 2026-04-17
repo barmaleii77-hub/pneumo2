@@ -166,6 +166,7 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
             lines.append(f"- scope_issue: {issue}")
     if engineering:
         validation = dict(engineering.get("validation") or {})
+        requirements = dict(engineering.get("handoff_requirements") or {})
         lines += [
             "",
             "## Engineering analysis evidence",
@@ -174,6 +175,8 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
             f"- analysis_status: `{validation.get('status') or '—'}`",
             f"- influence_status: `{validation.get('influence_status') or '—'}`",
             f"- calibration_status: `{validation.get('calibration_status') or '—'}`",
+            f"- handoff_contract_status: `{requirements.get('contract_status') or '—'}`",
+            f"- handoff_required_path: `{requirements.get('required_contract_path') or '—'}`",
         ]
     lines += [
         "",

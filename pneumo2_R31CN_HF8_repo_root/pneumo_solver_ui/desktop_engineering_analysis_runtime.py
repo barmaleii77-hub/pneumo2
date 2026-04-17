@@ -715,7 +715,9 @@ class DesktopEngineeringAnalysisRuntime:
 
             rows.append(
                 {
-                    "run_id": str(payload.get("run_id") or summary.run_id or summary.run_dir.name),
+                    "run_id": str(
+                        payload.get("run_id") or getattr(summary, "run_id", "") or summary.run_dir.name
+                    ),
                     "run_name": str(payload.get("run_name") or summary.run_dir.name),
                     "run_dir": str(Path(summary.run_dir).resolve()),
                     "pipeline_mode": str(summary.pipeline_mode or ""),
