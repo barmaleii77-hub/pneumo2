@@ -738,6 +738,7 @@ def write_desktop_diagnostics_center_state(
             "packaging_contract_hash": bundle_record.geometry_reference_packaging_contract_hash,
             "geometry_acceptance_gate": bundle_record.geometry_reference_acceptance_gate,
             "producer_artifact_status": bundle_record.geometry_reference_producer_artifact_status,
+            "producer_readiness_reasons": list(bundle_record.geometry_reference_producer_readiness_reasons),
             "producer_evidence_owner": bundle_record.geometry_reference_producer_evidence_owner,
             "producer_required_artifacts": list(bundle_record.geometry_reference_producer_required_artifacts),
             "producer_next_action": bundle_record.geometry_reference_producer_next_action,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from pneumo_solver_ui.desktop_optimizer_model import (
     build_contract_snapshot,
@@ -27,6 +28,7 @@ from pneumo_solver_ui.optimization_objective_contract import (
 from pneumo_solver_ui.optimization_run_history import OptimizationRunSummary
 from pneumo_solver_ui.desktop_shell.launcher_catalog import build_desktop_launch_catalog
 from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
+from pneumo_solver_ui.tools.desktop_optimizer_center import DesktopOptimizerCenter
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -461,6 +463,28 @@ def test_desktop_optimizer_runtime_launch_readiness_blocks_stale_ho006(
     assert ho006_row["optimizer_baseline_can_consume"] is False
     assert "suite_snapshot_hash_changed" in ho006_row["summary"]
     assert contract_path.read_text(encoding="utf-8") == before
+
+
+def test_desktop_optimizer_center_formats_stale_ho006_as_blocked_summary() -> None:
+    center = object.__new__(DesktopOptimizerCenter)
+    center._contract_snapshot = SimpleNamespace(
+        baseline_source_label="active_baseline_contract.json",
+        baseline_source_kind="active_contract",
+        baseline_path="C:/workspace/handoffs/WS-BASELINE/active_baseline_contract.json",
+        active_baseline_state="stale",
+        active_baseline_hash="abcdef1234567890",
+        optimizer_baseline_can_consume=False,
+    )
+    center.runtime = SimpleNamespace(
+        session_state={"opt_autoupdate_baseline": True},
+    )
+
+    text = center._format_baseline_summary_text()
+
+    assert "HO-006: stale (blocked)" in text
+    assert "HO-006: stale (current)" not in text
+    assert "active_baseline_hash: abcdef123456" in text
+    assert "Автообновление baseline: включено" in text
 
 
 def test_desktop_optimizer_runtime_tracks_latest_pointer_flow(tmp_path: Path) -> None:
