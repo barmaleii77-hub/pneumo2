@@ -155,6 +155,7 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
                 "artifact_freshness_reason": "legacy sidecar had freshness but no producer readiness reasons",
                 "latest_artifact_status": "missing",
                 "geometry_acceptance_gate": "MISSING",
+                "producer_readiness_reasons": ["artifact_context_missing"],
                 "legacy_without_producer_readiness": True,
             },
             ensure_ascii=False,
@@ -244,6 +245,8 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
     assert "producer_readiness_reasons" in latest_geometry_payload
     assert geometry_reference["producer_readiness_reasons"]
     assert latest_geometry_payload["producer_readiness_reasons"]
+    assert "artifact_freshness_missing" in geometry_reference["producer_readiness_reasons"]
+    assert "artifact_freshness_missing" in latest_geometry_payload["producer_readiness_reasons"]
     assert latest_geometry_payload["artifact_freshness_status"] == "missing"
     assert latest_geometry_payload["artifact_freshness_relation"] == "latest"
     assert evidence["runtime_provenance"]["effective_workspace"] == str(workspace.resolve())

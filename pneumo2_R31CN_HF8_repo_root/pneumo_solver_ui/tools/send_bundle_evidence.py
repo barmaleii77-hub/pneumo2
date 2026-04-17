@@ -767,25 +767,24 @@ def summarize_geometry_reference_evidence(
         producer_artifact_status = "missing"
     else:
         producer_artifact_status = "partial"
-    if not producer_readiness_reasons:
-        if artifact_status == "missing":
-            producer_readiness_reasons.append("artifact_context_missing")
-        elif artifact_status == "stale":
-            producer_readiness_reasons.append("artifact_context_stale")
-        if freshness_status == "missing":
-            producer_readiness_reasons.append("artifact_freshness_missing")
-        elif freshness_status == "stale":
-            producer_readiness_reasons.append("artifact_freshness_stale")
-        if freshness_relation in {"differs_from_latest", "selected_without_latest", "selected_unavailable"}:
-            producer_readiness_reasons.append(f"artifact_relation_{freshness_relation}")
-        if road_width_status == "missing":
-            producer_readiness_reasons.append("road_width_m_missing")
-        if packaging_status != "complete":
-            producer_readiness_reasons.append("packaging_status_not_complete")
-        if packaging_mismatch != "match":
-            producer_readiness_reasons.append("packaging_mismatch_not_match")
-        if acceptance_gate != "PASS":
-            producer_readiness_reasons.append("geometry_acceptance_not_pass")
+    if artifact_status == "missing":
+        producer_readiness_reasons.append("artifact_context_missing")
+    elif artifact_status == "stale":
+        producer_readiness_reasons.append("artifact_context_stale")
+    if freshness_status == "missing":
+        producer_readiness_reasons.append("artifact_freshness_missing")
+    elif freshness_status == "stale":
+        producer_readiness_reasons.append("artifact_freshness_stale")
+    if freshness_relation in {"differs_from_latest", "selected_without_latest", "selected_unavailable"}:
+        producer_readiness_reasons.append(f"artifact_relation_{freshness_relation}")
+    if road_width_status == "missing":
+        producer_readiness_reasons.append("road_width_m_missing")
+    if packaging_status != "complete":
+        producer_readiness_reasons.append("packaging_status_not_complete")
+    if packaging_mismatch != "match":
+        producer_readiness_reasons.append("packaging_mismatch_not_match")
+    if acceptance_gate != "PASS":
+        producer_readiness_reasons.append("geometry_acceptance_not_pass")
     producer_readiness_reasons = list(dict.fromkeys(producer_readiness_reasons))
 
     def _safe_int_field(key: str) -> int:

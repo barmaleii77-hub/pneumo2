@@ -1494,7 +1494,19 @@ def _make_send_bundle_inner(
                     "latest_artifact_status",
                     "producer_readiness_reasons",
                 )
-                return all(field in payload for field in required_fields)
+                if not all(field in payload for field in required_fields):
+                    return False
+                producer_reasons = {
+                    str(item).strip()
+                    for item in (payload.get("producer_readiness_reasons") or [])
+                    if str(item).strip()
+                }
+                freshness_status = str(payload.get("artifact_freshness_status") or "").strip().lower()
+                if freshness_status == "missing" and "artifact_freshness_missing" not in producer_reasons:
+                    return False
+                if freshness_status == "stale" and "artifact_freshness_stale" not in producer_reasons:
+                    return False
+                return True
 
             candidates = (
                 sidecar_path,
