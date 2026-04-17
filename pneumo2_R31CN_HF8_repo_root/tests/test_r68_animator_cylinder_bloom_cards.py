@@ -13,7 +13,7 @@ def test_animator_source_adds_camera_facing_bloom_cards_for_gas_chambers() -> No
         "def _cylinder_bloom_card_state(",
         "def _cylinder_bloom_card_face_colors(",
         "def _cylinder_bloom_card_rgba(",
-        "camera_view_dir = self._camera_view_direction_local_xyz()",
+        "camera_view_dir = self._camera_view_direction_local_xyz(target_xyz=np.asarray(center_draw, dtype=float)",
         "cap_bloom_state = self._cylinder_bloom_card_state(",
         "rod_bloom_state = self._cylinder_bloom_card_state(",
         "cap_bloom_face_colors = self._cylinder_bloom_card_face_colors(",

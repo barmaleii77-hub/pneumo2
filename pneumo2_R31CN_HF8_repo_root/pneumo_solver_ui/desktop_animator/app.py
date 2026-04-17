@@ -99,7 +99,6 @@ import numpy as np
 # opening_normal_xyz=-spring_axis_unit
 # _set_poly_mesh(top_seat_mesh, top_seat_verts, top_seat_faces)
 # _set_poly_mesh(bot_seat_mesh, bot_seat_verts, bot_seat_faces)
-# camera_view_dir = self._camera_view_direction_local_xyz()
 # cap_bloom_state = self._cylinder_bloom_card_state(
 # rod_bloom_state = self._cylinder_bloom_card_state(
 # cap_bloom_face_colors = self._cylinder_bloom_card_face_colors(
