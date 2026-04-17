@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from pneumo_solver_ui.desktop_input_model import repo_root
+from pneumo_solver_ui.desktop_suite_snapshot import (
+    VALIDATED_SUITE_SNAPSHOT_FILENAME,
+    VALIDATED_SUITE_SNAPSHOT_SCHEMA_VERSION,
+)
 
 
 def desktop_run_setup_cache_root() -> Path:
@@ -17,6 +21,21 @@ def desktop_run_setup_cache_root() -> Path:
 
 def desktop_run_setup_log_root() -> Path:
     return (repo_root() / "workspace" / "logs" / "desktop_run_setup").resolve()
+
+
+def validated_suite_snapshot_handoff_dir(
+    *,
+    workspace_dir: Path | str | None = None,
+) -> Path:
+    workspace = Path(workspace_dir).resolve() if workspace_dir is not None else (repo_root() / "workspace").resolve()
+    return (workspace / "handoffs" / "WS-SUITE").resolve()
+
+
+def validated_suite_snapshot_handoff_path(
+    *,
+    workspace_dir: Path | str | None = None,
+) -> Path:
+    return (validated_suite_snapshot_handoff_dir(workspace_dir=workspace_dir) / VALIDATED_SUITE_SNAPSHOT_FILENAME).resolve()
 
 
 def ensure_parent(path: Path) -> Path:
@@ -140,6 +159,34 @@ def write_json_report_from_stdout(stdout: str, report_path: Path) -> Path | None
     return target
 
 
+def write_validated_suite_snapshot(
+    snapshot: dict[str, Any],
+    *,
+    target_path: Path | str | None = None,
+    workspace_dir: Path | str | None = None,
+) -> Path:
+    if str(dict(snapshot or {}).get("schema_version") or "") != VALIDATED_SUITE_SNAPSHOT_SCHEMA_VERSION:
+        raise ValueError("validated_suite_snapshot has unsupported schema_version")
+    target = (
+        Path(target_path).resolve()
+        if target_path is not None
+        else validated_suite_snapshot_handoff_path(workspace_dir=workspace_dir)
+    )
+    ensure_parent(target)
+    target.write_text(json.dumps(dict(snapshot), ensure_ascii=False, indent=2), encoding="utf-8")
+    return target
+
+
+def read_validated_suite_snapshot(path: Path | str | None = None) -> dict[str, Any]:
+    target = Path(path).resolve() if path is not None else validated_suite_snapshot_handoff_path()
+    raw = json.loads(target.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"validated_suite_snapshot must contain a JSON object: {target}")
+    if str(raw.get("schema_version") or "") != VALIDATED_SUITE_SNAPSHOT_SCHEMA_VERSION:
+        raise ValueError(f"Unsupported validated_suite_snapshot schema: {target}")
+    return raw
+
+
 def mirror_tree(src: Path, dst: Path) -> Path:
     source = Path(src).resolve()
     target = Path(dst).resolve()
@@ -181,7 +228,11 @@ __all__ = [
     "desktop_single_run_cache_key",
     "extract_json_object",
     "mirror_tree",
+    "read_validated_suite_snapshot",
     "remap_saved_files_to_dir",
     "stable_run_hash",
+    "validated_suite_snapshot_handoff_dir",
+    "validated_suite_snapshot_handoff_path",
+    "write_validated_suite_snapshot",
     "write_json_report_from_stdout",
 ]
