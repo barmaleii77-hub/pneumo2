@@ -348,6 +348,42 @@ def test_validate_anim_export_contract_cli_exits_zero_only_for_pass(tmp_path: Pa
     assert stale_report["level"] == "FAIL"
     assert any("anim_export_validation" in msg and "current" in msg for msg in stale_report["messages"])
 
+    fake_sidecar = tmp_path / "fake_anim_latest.contract.sidecar.json"
+    fake_report_json = tmp_path / "fake_sidecar_report.json"
+    fake_hardpoints = json.loads(json.dumps(meta["hardpoints"], ensure_ascii=False))
+    fake_hardpoints["families"]["cyl1_top"]["source_kind"] = "fabricated"
+    fake_sidecar.write_text(
+        json.dumps(
+            {
+                "schema": "anim_export_contract.sidecar.v1",
+                "geometry": meta["geometry"],
+                "solver_points": meta["solver_points"],
+                "hardpoints": fake_hardpoints,
+                "packaging": meta["packaging"],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    fake_sidecar_result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pneumo_solver_ui.tools.validate_anim_export_contract",
+            str(fake_sidecar),
+            "--report-json",
+            str(fake_report_json),
+        ],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert fake_sidecar_result.returncode == 1
+    fake_report = json.loads(fake_report_json.read_text(encoding="utf-8"))
+    assert fake_report["level"] == "FAIL"
+    assert any("fake/invented geometry" in msg for msg in fake_report["messages"])
+
     fail_meta = json.loads(json.dumps(meta, ensure_ascii=False))
     fail_meta["hardpoints"]["families"].pop("cyl1_top")
     fail_json = tmp_path / "fail_anim_latest.json"
