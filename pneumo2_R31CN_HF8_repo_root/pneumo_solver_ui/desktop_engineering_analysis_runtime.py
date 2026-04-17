@@ -30,6 +30,7 @@ from pneumo_solver_ui.desktop_engineering_analysis_model import (
     EngineeringAnalysisSnapshot,
     SelectedRunContractSnapshot,
     build_analysis_to_animator_link_contract,
+    build_compare_influence_surface,
     build_sensitivity_summary,
     selected_run_context_from_payload,
 )
@@ -98,6 +99,40 @@ def _safe_read_json_dict(path: Path | None) -> dict[str, Any]:
     except Exception:
         return {}
     return dict(obj) if isinstance(obj, dict) else {}
+
+
+def _first_payload_value(payload: Mapping[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in payload and payload.get(key) not in (None, ""):
+            return payload.get(key)
+    return None
+
+
+def _axis_names(value: Any) -> list[str]:
+    if isinstance(value, Mapping):
+        return [str(key) for key in value.keys()]
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return []
+    names: list[str] = []
+    for item in value:
+        if isinstance(item, Mapping):
+            raw = (
+                item.get("key")
+                or item.get("name")
+                or item.get("label")
+                or item.get("param")
+                or item.get("metric")
+            )
+            names.append(str(raw or ""))
+        else:
+            names.append(str(item or ""))
+    return [name for name in names if name.strip()]
+
+
+def _unit_map(value: Any) -> dict[str, str]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(key): str(unit) for key, unit in value.items() if str(key).strip() and str(unit).strip()}
 
 
 def _resolve_existing_file(path: Path | str | None) -> Path | None:
