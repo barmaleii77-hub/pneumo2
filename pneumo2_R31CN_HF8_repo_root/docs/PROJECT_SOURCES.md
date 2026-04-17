@@ -29,6 +29,10 @@
 - `docs/context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md` — local release-gate/acceptance/evidence map для `V32-16`.
 - `docs/context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_HARDENING_MATRIX.csv` — checked-in v32 extract: 20 release hardening rows.
 - `docs/context/gui_spec_imports/v32_connector_reconciled/GAP_TO_EVIDENCE_ACTION_MAP.csv` — checked-in v32 extract: 6 open gap -> evidence action rows.
+- `docs/context/gui_spec_imports/v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md` — V32-14/V32-09 producer/animator truth evidence note для `PB-001`, `RGH-001`, `RGH-002`, `RGH-003`, `RGH-018`, `OG-001`, `OG-002`.
+- `docs/context/gui_spec_imports/v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md` — V32-06/V32-08 compare/objective integrity evidence note для `PB-007`, `PB-008`, `RGH-013`, `RGH-014`, `RGH-015`.
+- `docs/context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md` — V32-11 diagnostics/SEND-bundle evidence note для `PB-002`, `RGH-006`, `RGH-007`, `RGH-016`, `OG-005`.
+- `docs/context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md` — V32-15 runtime evidence hard-gate note для `PB-006`, `RGH-011`, `RGH-012`, `RGH-019`, `OG-003`, `OG-004`.
 - `docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md` — release-readiness triage текущего dirty tree по V32 lane, gate/gap, evidence и targeted tests; не является runtime closure proof.
 - `docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md` — V32-16 integration note: accepted docs/helper scope, validation status and no-runtime-closure rule.
 - `docs/context/gui_spec_imports/v3/README.md` — active detailed reference layer из `pneumo_gui_codex_package_v3.zip`.

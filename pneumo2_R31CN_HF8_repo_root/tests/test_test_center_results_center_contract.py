@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pneumo_solver_ui.desktop_results_model import (
     DesktopResultsArtifact,
+    DesktopResultsContextField,
     DesktopResultsSessionHandoff,
     DesktopResultsSnapshot,
     format_npz_summary,
@@ -13,7 +14,10 @@ from pneumo_solver_ui.desktop_results_model import (
     format_triage_summary,
     format_validation_summary,
 )
-from pneumo_solver_ui.desktop_results_runtime import DesktopResultsRuntime
+from pneumo_solver_ui.desktop_results_runtime import (
+    COMPARE_CURRENT_CONTEXT_SIDECAR_JSON,
+    DesktopResultsRuntime,
+)
 from pneumo_solver_ui.tools.desktop_results_center import _artifact_matches_filters
 from pneumo_solver_ui.tools.send_bundle_contract import ANIM_DIAG_SIDECAR_JSON
 
@@ -534,6 +538,32 @@ def test_desktop_results_runtime_exports_diagnostics_evidence_manifest_input(tmp
     assert refreshed.diagnostics_evidence_manifest_status == "READY"
     assert refreshed.diagnostics_evidence_manifest_hash == payload["evidence_manifest_hash"]
 
+    compare_sidecar_path = runtime.write_compare_current_context_sidecar(snapshot)
+    compare_sidecar = json.loads(compare_sidecar_path.read_text(encoding="utf-8"))
+
+    assert compare_sidecar_path.name == COMPARE_CURRENT_CONTEXT_SIDECAR_JSON
+    assert compare_sidecar["schema"] == "desktop_results_compare_current_context"
+    assert compare_sidecar["readonly"] is True
+    assert compare_sidecar["current_context_ref"]["run_id"] == "run-777"
+    assert compare_sidecar["selected_context_ref"]["compare_contract_hash"] == "compare-777"
+    assert compare_sidecar["mismatch_banner"]["banner_id"] == "BANNER-HIST-001"
+    assert compare_sidecar["current_context_ref_hash"]
+
+    refreshed_with_compare = runtime.snapshot()
+    compare_artifact = runtime.artifact_by_key(
+        refreshed_with_compare,
+        "compare_current_context_sidecar",
+    )
+    assert compare_artifact is not None
+    assert compare_artifact.path == compare_sidecar_path
+    assert compare_artifact.category == "evidence"
+    assert compare_artifact.detail == "HO-009 WS-ANALYSIS -> CompareViewer current_context_ref"
+    compare_preview = runtime.artifact_preview_lines(compare_artifact)
+    assert "schema=desktop_results_compare_current_context" in compare_preview
+    assert "handoff_id=HO-009" in compare_preview
+    assert "context_state=CURRENT" in compare_preview
+    assert "mismatch=BANNER-HIST-001" in compare_preview
+
 
 def test_desktop_results_runtime_builds_branch_args() -> None:
     npz_path = Path("C:/tmp/anim_latest.npz")
@@ -577,8 +607,17 @@ def test_desktop_results_runtime_builds_branch_args() -> None:
         recent_artifacts=(),
     )
     runtime = DesktopResultsRuntime(repo_root=Path.cwd(), python_executable="python")
+    context_path = Path("C:/tmp/latest_compare_current_context.json")
 
     assert runtime.compare_viewer_args(snapshot) == [str(npz_path)]
+    assert runtime.compare_viewer_args(
+        snapshot,
+        current_context_path=context_path,
+    ) == [
+        "--current-context",
+        str(context_path),
+        str(npz_path),
+    ]
     assert runtime.animator_args(snapshot, follow=False) == [
         "--npz",
         str(npz_path),
@@ -602,6 +641,99 @@ def test_desktop_results_runtime_builds_branch_args() -> None:
     assert runtime.animator_args(snapshot, follow=True, artifact=mnemo_artifact) == [
         "--pointer",
         str(pointer_path),
+    ]
+
+
+def test_desktop_results_runtime_launch_compare_viewer_writes_current_context_sidecar(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    latest_npz = repo_root / "workspace" / "exports" / "anim_latest.npz"
+    latest_npz.parent.mkdir(parents=True, exist_ok=True)
+    latest_npz.write_bytes(b"npz")
+    snapshot = DesktopResultsSnapshot(
+        latest_zip_path=None,
+        latest_validation_json_path=None,
+        latest_validation_md_path=None,
+        latest_triage_json_path=None,
+        latest_triage_md_path=None,
+        latest_dashboard_html_path=None,
+        latest_anim_diag_json_path=None,
+        latest_npz_path=latest_npz,
+        latest_pointer_json_path=None,
+        latest_mnemo_event_log_path=None,
+        latest_autotest_run_dir=None,
+        latest_diagnostics_run_dir=None,
+        validation_ok=True,
+        validation_error_count=0,
+        validation_warning_count=0,
+        triage_critical_count=0,
+        triage_warn_count=0,
+        triage_info_count=0,
+        validation_errors=(),
+        validation_warnings=(),
+        triage_red_flags=(),
+        optimizer_scope_gate="PASS",
+        optimizer_scope_gate_reason="",
+        optimizer_scope_release_risk=False,
+        anim_summary_lines=(),
+        operator_recommendations=(),
+        mnemo_current_mode="",
+        mnemo_recent_titles=(),
+        suggested_next_step="",
+        suggested_next_detail="",
+        validation_overview_rows=(),
+        recent_artifacts=(),
+        result_context_state="STALE",
+        result_context_banner="Текущая постановка отличается от выбранного результата.",
+        result_context_detail="objective_contract_hash",
+        result_context_action="Open Compare Viewer",
+        result_context_fields=(
+            DesktopResultsContextField(
+                key="run_id",
+                title="Run ID",
+                current_value="run-current",
+                selected_value="run-history",
+                status="STALE",
+                detail="run_id drift",
+            ),
+            DesktopResultsContextField(
+                key="objective_contract_hash",
+                title="Objective contract hash",
+                current_value="obj-current",
+                selected_value="obj-history",
+                status="STALE",
+                detail="objective drift",
+            ),
+        ),
+    )
+    captured: dict[str, object] = {}
+
+    def _fake_spawn_module(module: str, args=None):
+        captured["module"] = module
+        captured["args"] = list(args or [])
+        return {"module": module, "args": list(args or [])}
+
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.spawn_module",
+        _fake_spawn_module,
+    )
+
+    runtime = DesktopResultsRuntime(repo_root=repo_root, python_executable="python")
+    result = runtime.launch_compare_viewer(snapshot)
+    sidecar_path = runtime.compare_current_context_sidecar_path()
+    payload = json.loads(sidecar_path.read_text(encoding="utf-8"))
+
+    assert result == captured
+    assert captured["module"] == "pneumo_solver_ui.qt_compare_viewer"
+    assert captured["args"] == ["--current-context", str(sidecar_path), str(latest_npz)]
+    assert payload["current_context_ref"]["objective_contract_hash"] == "obj-current"
+    assert payload["selected_context_ref"]["objective_contract_hash"] == "obj-history"
+    assert payload["mismatch_banner"]["banner_id"] == "BANNER-HIST-002"
+    assert payload["mismatch_banner"]["mismatch_dimensions"] == [
+        "run_id",
+        "objective_contract_hash",
     ]
 
 
@@ -791,4 +923,8 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "def compare_viewer_path(" in runtime_src
     assert "def animator_target_paths(" in runtime_src
     assert "def compare_viewer_args(" in runtime_src
+    assert "write_compare_current_context_sidecar(" in runtime_src
+    assert "latest_compare_current_context.json" in runtime_src
+    assert "compare_current_context_sidecar" in runtime_src
+    assert "--current-context" in runtime_src
     assert "def animator_args(" in runtime_src

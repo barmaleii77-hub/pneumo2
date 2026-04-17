@@ -3,7 +3,10 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from pneumo_solver_ui.optimization_objective_contract import objective_contract_payload
+from pneumo_solver_ui.optimization_objective_contract import (
+    objective_contract_hash,
+    objective_contract_payload,
+)
 from pneumo_solver_ui.optimization_run_history import summarize_optimization_run
 
 
@@ -46,6 +49,13 @@ def test_r31cw_run_history_reads_objective_contract_for_coordinator_run(tmp_path
     assert summary.objective_keys == ('comfort', 'roll', 'energy')
     assert summary.penalty_key == 'penalty_total'
     assert summary.penalty_tol == 1.25
+    assert summary.hard_gate_key == 'penalty_total'
+    assert summary.hard_gate_tolerance == 1.25
+    assert summary.objective_contract_hash == objective_contract_hash(
+        objective_keys=['comfort', 'roll', 'energy'],
+        penalty_key='penalty_total',
+        penalty_tol=1.25,
+    )
     assert summary.objective_contract_path == run_dir / 'objective_contract.json'
     assert summary.runtime_summary is not None
     assert summary.runtime_summary['trial_health'] == {'done': 1, 'running': 0, 'error': 1}
@@ -73,6 +83,11 @@ def test_r31cw_run_history_falls_back_to_problem_spec_cfg_when_explicit_contract
     assert summary.objective_keys == ('comfort', 'roll')
     assert summary.penalty_key == 'penalty_total'
     assert summary.penalty_tol == 0.5
+    assert summary.objective_contract_hash == objective_contract_hash(
+        objective_keys=['comfort', 'roll'],
+        penalty_key='penalty_total',
+        penalty_tol=0.5,
+    )
     assert summary.objective_source == 'problem_spec_cfg_fallback'
     assert summary.objective_contract_path == run_dir / 'problem_spec.json'
 

@@ -49,10 +49,24 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
 
     assert commands["diagnostics.collect_bundle"].kind == "hosted_action"
     assert commands["diagnostics.collect_bundle"].automation_id == "DG-BTN-COLLECT"
+    assert commands["baseline.center.open"].kind == "open_workspace"
+    assert commands["baseline.center.open"].target_workspace_id == "baseline_run"
     assert commands["baseline.center.open"].automation_id == "BL-BTN-RUN"
+    assert commands["baseline.review"].kind == "hosted_action"
+    assert commands["baseline.review"].automation_id == "BL-BTN-REVIEW"
+    assert commands["baseline.adopt"].kind == "hosted_action"
+    assert commands["baseline.adopt"].automation_id == "BL-BTN-ADOPT"
+    assert commands["baseline.restore"].kind == "hosted_action"
+    assert commands["baseline.restore"].automation_id == "BL-BTN-RESTORE"
+    assert commands["baseline.legacy_launch.open"].module == "pneumo_solver_ui.tools.test_center_gui"
     assert commands["optimization.center.open"].automation_id == "OP-BTN-LAUNCH"
     assert commands["input.editor.open"].launch_surface == "legacy_bridge"
     assert commands["diagnostics.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_diagnostics_center"
+    assert "baseline.review" in workspaces["baseline_run"].quick_action_ids
+    assert "baseline.adopt" in workspaces["baseline_run"].quick_action_ids
+    assert "baseline.restore" in workspaces["baseline_run"].quick_action_ids
+    assert "baseline.legacy_launch.open" in workspaces["baseline_run"].quick_action_ids
+    assert "workspace.baseline_run.open" in workspaces["optimization"].quick_action_ids
 
 
 def test_gui_spec_shell_search_indexes_migration_aliases_and_visual_routes() -> None:
@@ -63,6 +77,8 @@ def test_gui_spec_shell_search_indexes_migration_aliases_and_visual_routes() -> 
     diagnostics_hits = search_command_palette(entries, "собрать диагностику")
     stiffness_hits = search_command_palette(entries, "жёсткость")
     mnemo_hits = search_command_palette(entries, "пневмосхема")
+    baseline_hits = search_command_palette(entries, "HO-006 active_baseline_contract")
+    baseline_review_hits = search_command_palette(entries, "HO-006 review baseline")
 
     assert diagnostics_hits
     assert diagnostics_hits[0].command_id == "diagnostics.collect_bundle"
@@ -70,6 +86,10 @@ def test_gui_spec_shell_search_indexes_migration_aliases_and_visual_routes() -> 
     assert stiffness_hits[0].command_id == "workspace.input_data.open"
     assert mnemo_hits
     assert any(hit.command_id == "animation.mnemo.open" for hit in mnemo_hits)
+    assert baseline_hits
+    assert baseline_hits[0].command_id in {"baseline.center.open", "workspace.baseline_run.open"}
+    assert baseline_review_hits
+    assert any(hit.command_id == "baseline.review" for hit in baseline_review_hits)
 
 
 def test_gui_spec_shell_help_registry_covers_every_workspace_with_catalog_text() -> None:
@@ -117,6 +137,7 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
     assert "OptimizationWorkspacePage" in src
     assert "ResultsWorkspacePage" in src
     assert "DiagnosticsWorkspacePage" in src
+    assert 'STARTUP_WORKSPACE_ENV = "PNEUMO_GUI_SPEC_SHELL_OPEN_WORKSPACE"' in src
     assert src.count("def open_workspace(") == 1
     assert src.count("def run_command(") == 1
 
@@ -124,5 +145,11 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
 def test_gui_spec_shell_is_available_in_shared_launch_catalog() -> None:
     catalog = build_desktop_launch_catalog(include_mnemo=True)
     modules = {item.module for item in catalog}
+    src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_gui_spec_shell.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
 
     assert "pneumo_solver_ui.tools.desktop_gui_spec_shell" in modules
+    assert '"--open"' in src
+    assert "PNEUMO_GUI_SPEC_SHELL_OPEN_WORKSPACE" in src

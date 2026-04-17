@@ -150,7 +150,11 @@ def test_qt_compare_viewer_sources_reference_anim_diagnostics_panel() -> None:
     assert "format_anim_diagnostics_lines" in text
     assert "self.txt_anim_diag" in text
     assert "anim_diagnostics: Dict" in text
+    assert "compare_ref: Dict" in text
+    assert "extract_compare_run_ref" in text
+    assert "compare_contract_path" in (ROOT / "pneumo_solver_ui" / "compare_contract.py").read_text(encoding="utf-8")
     assert "anim_diagnostics=dict(b.get('anim_diagnostics') or {})" in text
+    assert "compare_ref=dict(compare_ref or {})" in text
     assert "Road source:" in text
     assert "workspace_autoload_pointer_candidates" in text
     assert "nearest_anim_pointer_candidates" in diag_text

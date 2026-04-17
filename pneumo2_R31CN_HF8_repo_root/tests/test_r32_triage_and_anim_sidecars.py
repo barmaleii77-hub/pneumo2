@@ -49,6 +49,20 @@ def test_collect_anim_latest_bundle_diagnostics_surfaces_sidecar_paths(tmp_path:
     axay_csv.write_text("t,ax,ay\n0,0,0\n0.1,0.1,0.2\n", encoding="utf-8")
     scenario_json = tmp_path / "scenario.json"
     scenario_json.write_text(json.dumps({"schema": "ring_v2", "segments": []}, ensure_ascii=False), encoding="utf-8")
+    analysis_context_refs = {
+        "analysis_context_path": str(workspace / "handoffs" / "WS-ANALYSIS" / "analysis_context.json"),
+        "analysis_context_hash": "analysis-context-r32",
+        "analysis_context_status": "READY",
+        "animator_link_contract_hash": "animator-link-r32",
+        "selected_run_contract_hash": "selected-run-r32",
+        "selected_result_artifact_pointer": {"path": str(exports_dir / "anim_latest.json")},
+        "selected_npz_path": str(exports_dir / "anim_latest.npz"),
+        "run_id": "run-r32",
+        "objective_contract_hash": "objective-r32",
+        "suite_snapshot_hash": "suite-r32",
+        "problem_hash": "problem-r32",
+        "selected_test_id": "T01",
+    }
 
     export_anim_latest_bundle(
         exports_dir=exports_dir,
@@ -60,6 +74,7 @@ def test_collect_anim_latest_bundle_diagnostics_surfaces_sidecar_paths(tmp_path:
             "axay_csv": str(axay_csv),
             "scenario_json": str(scenario_json),
         },
+        analysis_context_refs=analysis_context_refs,
     )
 
     diag, _md = _collect_anim_latest_bundle_diagnostics(tmp_path)
@@ -84,6 +99,15 @@ def test_collect_anim_latest_bundle_diagnostics_surfaces_sidecar_paths(tmp_path:
     assert diag["anim_latest_capture_export_manifest_exists"] is True
     assert diag["anim_latest_capture_export_manifest_handoff_id"] == "HO-010"
     assert diag["anim_latest_capture_hash"]
+    assert diag["anim_latest_analysis_context_hash"] == "analysis-context-r32"
+    assert diag["anim_latest_analysis_context_status"] == "READY"
+    assert diag["anim_latest_animator_link_contract_hash"] == "animator-link-r32"
+    assert diag["anim_latest_selected_run_contract_hash"] == "selected-run-r32"
+    assert diag["anim_latest_selected_test_id"] == "T01"
+    assert diag["anim_latest_selected_npz_path"].endswith("anim_latest.npz")
+    assert diag["anim_latest_objective_contract_hash"] == "objective-r32"
+    assert diag["anim_latest_suite_snapshot_hash"] == "suite-r32"
+    assert diag["anim_latest_problem_hash"] == "problem-r32"
     assert diag["anim_latest_truth_mode_hash"]
     assert diag["anim_latest_capture_export_manifest_truth_state"] in {
         "solver_confirmed",
@@ -102,6 +126,11 @@ def test_collect_anim_latest_bundle_diagnostics_surfaces_sidecar_paths(tmp_path:
     assert desktop_contract["road_width_status"] == "explicit"
     assert capture_manifest["handoff_id"] == "HO-010"
     assert capture_manifest["artifact_refs"]["validation_json"] == "anim_latest.contract.validation.json"
+    assert capture_manifest["analysis_context_status"] == "READY"
+    assert capture_manifest["analysis_context_refs"]["selected_test_id"] == "T01"
+    assert capture_manifest["analysis_artifact_refs"]["analysis_context_hash"] == "analysis-context-r32"
+    assert capture_manifest["optimizer_artifact_refs"]["run_id"] == "run-r32"
+    assert capture_manifest["optimizer_artifact_refs"]["objective_contract_hash"] == "objective-r32"
 
 
 def test_generate_triage_report_prefers_latest_send_bundle_path_over_stale_registry_event(tmp_path: Path) -> None:

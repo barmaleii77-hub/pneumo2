@@ -29,7 +29,11 @@
   `COMPLETENESS_ASSESSMENT.md`, `PARALLEL_CHAT_WORKSTREAMS.md`,
   `RELEASE_GATE_ACCEPTANCE_MAP.md`, checked-in
   `RELEASE_GATE_HARDENING_MATRIX.csv` и
-  `GAP_TO_EVIDENCE_ACTION_MAP.csv`;
+  `GAP_TO_EVIDENCE_ACTION_MAP.csv`, plus lane evidence notes such as
+  `PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md`,
+  `COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md`,
+  `DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md` and
+  `RUNTIME_RELEASE_EVIDENCE_NOTE.md`;
 - `v3/` — active detailed machine-readable reference layer из
   `pneumo_gui_codex_package_v3.zip`;
 - `v12_design_recovery/` — historical design-recovery layer из
@@ -61,7 +65,14 @@
 5. Если задача касается release gates, acceptance evidence или open gaps, читать
    `v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md` и local checked-in
    extracts `RELEASE_GATE_HARDENING_MATRIX.csv`,
-   `GAP_TO_EVIDENCE_ACTION_MAP.csv`.
+   `GAP_TO_EVIDENCE_ACTION_MAP.csv`; for producer/animator truth acceptance,
+   also read `v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md`;
+   for compare/objective integrity, also read
+   `v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md`;
+   for diagnostics/SEND-bundle acceptance,
+   also read `v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md`;
+   for runtime/perf evidence gates, also read
+   `v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md`.
 6. Затем использовать `v3/*` как checked-in detailed machine-readable reference для:
    layout, UI elements, field/help/tooltip catalogs, migration matrix,
    acceptance criteria, pipeline verification, source-of-truth, docking,

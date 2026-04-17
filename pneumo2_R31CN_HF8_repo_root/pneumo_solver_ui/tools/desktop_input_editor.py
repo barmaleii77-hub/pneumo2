@@ -26,6 +26,7 @@ from pneumo_solver_ui.desktop_input_model import (
     build_desktop_section_issue_cards,
     build_desktop_section_summary_cards,
     build_desktop_preview_surface,
+    describe_desktop_inputs_snapshot_state,
     build_desktop_profile_diff,
     delete_desktop_profile,
     describe_desktop_run_mode,
@@ -58,6 +59,7 @@ from pneumo_solver_ui.desktop_input_model import (
     run_preset_description,
     run_preset_label,
     save_desktop_profile,
+    save_desktop_inputs_snapshot,
     save_desktop_snapshot,
     save_base_payload,
 )
@@ -93,6 +95,16 @@ from pneumo_solver_ui.desktop_run_setup_runtime import (
     desktop_single_run_cache_dir,
     write_json_report_from_stdout,
 )
+from pneumo_solver_ui.desktop_suite_runtime import (
+    build_desktop_suite_snapshot_context,
+    build_run_setup_suite_overrides,
+    desktop_suite_handoff_dir,
+    desktop_suite_handoff_path,
+    format_desktop_suite_status_lines,
+    reset_desktop_suite_overrides,
+    write_desktop_suite_handoff_snapshot,
+)
+from pneumo_solver_ui.optimization_baseline_source import baseline_suite_handoff_launch_gate
 
 
 try:
@@ -174,6 +186,19 @@ class DesktopInputEditor:
         self.snapshot_name_var = tk.StringVar(value="перед_запуском")
         self.snapshot_hint_var = tk.StringVar()
         self.active_snapshot_path: Path | None = None
+        self.handoff_snapshot_var = tk.StringVar(
+            value=(
+                "Frozen inputs_snapshot ещё не создан. WS-RING (HO-002) и "
+                "WS-SUITE (HO-003) должны получить замороженный снимок перед handoff."
+            )
+        )
+        self.suite_handoff_var = tk.StringVar(
+            value=(
+                "HO-005 validated_suite_snapshot ещё не проверен. "
+                "Откройте Run Setup -> Набор испытаний / HO-005."
+            )
+        )
+        self._latest_suite_handoff_context: dict[str, object] = {}
         self.latest_preview_summary_var = tk.StringVar()
         self.active_preview_report_path: Path | None = None
         self.active_preview_log_path: Path | None = None
@@ -328,6 +353,8 @@ class DesktopInputEditor:
         self._refresh_latest_preview_summary()
         self._refresh_latest_selfcheck_summary()
         self._refresh_latest_run_summary()
+        self._refresh_handoff_snapshot_state()
+        self._refresh_suite_handoff_state()
         self._initial_load_done = True
         self._set_status("Готово. Открыт черновик на основе default_base.json.")
 
@@ -1536,6 +1563,11 @@ class DesktopInputEditor:
         ttk.Button(quick_actions, text="Сохранить рабочую копию", command=self._save_working_copy).pack(side="left", padx=(8, 0))
         ttk.Button(
             quick_actions,
+            text="Заморозить inputs_snapshot",
+            command=self._save_inputs_handoff_snapshot,
+        ).pack(side="left", padx=(8, 0))
+        ttk.Button(
+            quick_actions,
             textvariable=self.service_toggle_text_var,
             command=self._toggle_service_panels,
         ).pack(side="left", padx=(8, 0))
@@ -1606,6 +1638,13 @@ class DesktopInputEditor:
         ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
         ttk.Label(
             overview_frame,
+            textvariable=self.handoff_snapshot_var,
+            wraplength=1040,
+            justify="left",
+            foreground="#7a4f01",
+        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        ttk.Label(
+            overview_frame,
             text=(
                 "Этот экран остаётся master copy для параметров машины и solver defaults. "
                 "Preview, профили, baseline, история и артефакты вынесены в сервисные панели, "
@@ -1614,7 +1653,7 @@ class DesktopInputEditor:
             wraplength=1040,
             justify="left",
             foreground="#555555",
-        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
 
         toolbar = ttk.LabelFrame(files_service_tab.body, text="Файл параметров", padding=10)
         toolbar.pack(fill="x")
@@ -1772,6 +1811,25 @@ class DesktopInputEditor:
             wraplength=1040,
             justify="left",
         ).grid(row=3, column=0, columnspan=6, sticky="w", pady=(10, 0))
+        handoff_box = ttk.LabelFrame(
+            snapshots,
+            text="Frozen handoff в WS-RING / WS-SUITE",
+            padding=8,
+        )
+        handoff_box.grid(row=4, column=0, columnspan=6, sticky="ew", pady=(12, 0))
+        handoff_box.columnconfigure(1, weight=1)
+        ttk.Button(
+            handoff_box,
+            text="Заморозить inputs_snapshot.json",
+            command=self._save_inputs_handoff_snapshot,
+        ).grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            handoff_box,
+            textvariable=self.handoff_snapshot_var,
+            foreground="#7a4f01",
+            wraplength=840,
+            justify="left",
+        ).grid(row=0, column=1, sticky="ew", padx=(12, 0))
 
         diff_frame = ttk.Frame(profile_details_notebook, padding=8)
         profile_details_notebook.add(diff_frame, text="Сравнение")
@@ -2069,7 +2127,8 @@ class DesktopInputEditor:
             route_frame,
             text=(
                 "Быстрый маршрут помогает идти по кластерам: сначала геометрия, затем пневматика, "
-                "механика, статическая настройка, компоненты и справочные данные. "
+                "массы, механика, статическая настройка, компоненты, справочные данные "
+                "и численные настройки. "
                 "Это только навигация по текущему editor "
                 "и не дублирует отдельные окна Animator, Compare Viewer или Mnemo."
             ),
@@ -2702,6 +2761,8 @@ class DesktopInputEditor:
         self._refresh_source_reference_diff_state()
         self._refresh_value_label(key)
         self._refresh_config_summary()
+        self._refresh_handoff_snapshot_state()
+        self._refresh_suite_handoff_state()
         self._refresh_section_route_summary()
         self._refresh_section_header_summaries()
         self._select_field(key)
@@ -2716,6 +2777,213 @@ class DesktopInputEditor:
             return path.name or str(path)
         except Exception:
             return str(path)
+
+    def _refresh_handoff_snapshot_state(self) -> None:
+        try:
+            info = describe_desktop_inputs_snapshot_state(self._gather_payload())
+            banner = str(info.get("banner") or "").strip()
+            path = str(info.get("path") or "").strip()
+            state = str(info.get("state") or "").strip()
+            if path:
+                banner = f"{banner}\ninputs_snapshot.json: {path}"
+            if state:
+                banner = f"{banner}\nСостояние handoff: {state}"
+            self.handoff_snapshot_var.set(banner.strip())
+        except Exception as exc:
+            self.handoff_snapshot_var.set(f"Не удалось проверить frozen inputs_snapshot: {exc}")
+
+    def _save_inputs_handoff_snapshot(self) -> None:
+        try:
+            payload = self._gather_payload()
+            target = save_desktop_inputs_snapshot(
+                payload,
+                source_path=self.current_source_path,
+            )
+            self._refresh_handoff_snapshot_state()
+            self._refresh_suite_handoff_state()
+            self._set_status(f"Frozen inputs_snapshot сохранён для WS-RING/WS-SUITE: {target.name}")
+            self._append_run_log(
+                f"[handoff] WS-INPUTS -> WS-RING/WS-SUITE: inputs_snapshot.json сохранён: {target}"
+            )
+            messagebox.showinfo(
+                "Desktop Input Editor",
+                (
+                    "Frozen inputs_snapshot.json сохранён для WS-RING (HO-002) "
+                    f"и WS-SUITE (HO-003):\n{target}"
+                ),
+            )
+        except Exception as exc:
+            self._refresh_handoff_snapshot_state()
+            messagebox.showerror(
+                "Desktop Input Editor",
+                f"Не удалось заморозить inputs_snapshot.json:\n{exc}",
+            )
+
+    def _current_suite_rows_for_handoff(self) -> tuple[list[dict[str, object]], Path, str]:
+        profile_key = self._selected_run_profile_key()
+        scenario_key = self._selected_run_scenario_key()
+        if profile_key == "baseline" and scenario_key == "worldroad":
+            return (
+                self._build_preview_suite(),
+                self._runtime_preview_suite_path(),
+                "baseline_preview",
+            )
+        return (
+            self._build_single_run_suite(),
+            self._runtime_preview_suite_path().with_name("desktop_input_single_run_suite.json"),
+            f"{profile_key}_{scenario_key}",
+        )
+
+    def _current_suite_overrides_for_handoff(self) -> dict[str, object]:
+        return build_run_setup_suite_overrides(
+            runtime_policy=str(self.run_runtime_policy_var.get() or "balanced"),
+            cache_policy=str(self.run_cache_policy_var.get() or "reuse"),
+            export_csv=bool(self.run_export_csv_var.get()),
+            export_npz=bool(self.run_export_npz_var.get()),
+            record_full=bool(self.run_record_full_var.get()),
+        )
+
+    def _current_suite_handoff_context(self) -> dict[str, object]:
+        rows, suite_source_path, context_label = self._current_suite_rows_for_handoff()
+        return build_desktop_suite_snapshot_context(
+            rows,
+            suite_source_path=suite_source_path,
+            overrides=self._current_suite_overrides_for_handoff(),
+            context_label=f"run_setup:{context_label}",
+            require_inputs_snapshot=True,
+            require_ring_hash_for_ring_refs=True,
+        )
+
+    def _refresh_suite_handoff_state(self) -> dict[str, object]:
+        try:
+            context = self._current_suite_handoff_context()
+            self._latest_suite_handoff_context = dict(context)
+            self.suite_handoff_var.set("\n".join(format_desktop_suite_status_lines(context)).strip())
+            return context
+        except Exception as exc:
+            self._latest_suite_handoff_context = {}
+            self.suite_handoff_var.set(f"Не удалось проверить HO-005 validated_suite_snapshot: {exc}")
+            return {}
+
+    def _suite_preview_rows(self, context: dict[str, object] | None = None) -> list[tuple[str, str, str, str, str, str, str]]:
+        current = context if context is not None else self._latest_suite_handoff_context
+        if not current:
+            current = self._refresh_suite_handoff_state()
+        snapshot = dict(current.get("snapshot") or {})
+        validation = dict(snapshot.get("validation") or {})
+        missing_by_row: dict[str, int] = {}
+        for item in list(validation.get("missing_refs") or []):
+            if isinstance(item, dict):
+                name = str(item.get("row") or "")
+                missing_by_row[name] = missing_by_row.get(name, 0) + 1
+        rows: list[tuple[str, str, str, str, str, str, str]] = []
+        for idx, row in enumerate(list(snapshot.get("suite_rows") or [])):
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get("имя") or row.get("name") or row.get("id") or f"row_{idx + 1}")
+            refs = ", ".join(
+                key for key in ("road_csv", "axay_csv", "scenario_json") if str(row.get(key) or "").strip()
+            )
+            rows.append(
+                (
+                    "yes" if bool(row.get("включен", row.get("enabled", True))) else "no",
+                    name,
+                    str(row.get("стадия", row.get("stage", 0)) or 0),
+                    str(row.get("тип", row.get("type", "")) or ""),
+                    str(row.get("dt", "")),
+                    str(row.get("t_end", row.get("t_end_s", ""))),
+                    refs or ("missing_refs" if missing_by_row.get(name) else "—"),
+                )
+            )
+        return rows
+
+    def _check_suite_handoff_snapshot(self) -> None:
+        context = self._refresh_suite_handoff_state()
+        banner = "\n".join(format_desktop_suite_status_lines(context)).strip() if context else self.suite_handoff_var.get()
+        self._append_run_log(f"[handoff] HO-005 check:\n{banner}")
+        messagebox.showinfo("Набор испытаний / HO-005", banner)
+
+    def _freeze_suite_handoff_snapshot(self) -> None:
+        try:
+            rows, suite_source_path, context_label = self._current_suite_rows_for_handoff()
+            context = write_desktop_suite_handoff_snapshot(
+                rows,
+                suite_source_path=suite_source_path,
+                overrides=self._current_suite_overrides_for_handoff(),
+                context_label=f"run_setup:{context_label}",
+                require_inputs_snapshot=True,
+                require_ring_hash_for_ring_refs=True,
+            )
+            self._latest_suite_handoff_context = dict(context)
+            self.suite_handoff_var.set("\n".join(format_desktop_suite_status_lines(context)).strip())
+            target = Path(str(context.get("written_path") or context.get("handoff_path") or ""))
+            self._append_run_log(f"[handoff] WS-SUITE -> WS-BASELINE HO-005 saved: {target}")
+            state = dict(context.get("state") or {})
+            if bool(state.get("handoff_ready", False)):
+                self._set_status(f"HO-005 validated_suite_snapshot сохранён: {target.name}")
+                messagebox.showinfo("Набор испытаний / HO-005", f"HO-005 сохранён:\n{target}")
+            else:
+                self._set_status("HO-005 сохранён, но validation не пройдена.")
+                messagebox.showwarning(
+                    "Набор испытаний / HO-005",
+                    "validated_suite_snapshot сохранён как evidence, но baseline будет заблокирован:\n\n"
+                    + str(state.get("banner") or ""),
+                )
+        except Exception as exc:
+            self._refresh_suite_handoff_state()
+            messagebox.showerror("Набор испытаний / HO-005", f"Не удалось заморозить HO-005:\n{exc}")
+
+    def _reset_suite_overrides(self) -> None:
+        try:
+            target = reset_desktop_suite_overrides()
+            self._refresh_suite_handoff_state()
+            self._set_status(f"WS-SUITE overrides сброшены: {target.name}")
+            self._append_run_log(f"[handoff] WS-SUITE overrides reset: {target}")
+        except Exception as exc:
+            messagebox.showerror("Набор испытаний / HO-005", f"Не удалось сбросить overrides:\n{exc}")
+
+    def _open_suite_handoff_snapshot(self) -> None:
+        target = desktop_suite_handoff_path()
+        if not target.exists():
+            messagebox.showinfo("Набор испытаний / HO-005", "validated_suite_snapshot.json пока не найден.")
+            return
+        self._open_path(
+            target,
+            success_text=f"Открыт validated_suite_snapshot.json: {target}",
+            error_title="Не удалось открыть validated_suite_snapshot.json",
+        )
+
+    def _open_suite_handoff_dir(self) -> None:
+        target = desktop_suite_handoff_dir()
+        target.mkdir(parents=True, exist_ok=True)
+        self._open_path(
+            target,
+            success_text=f"Открыта папка HO-005: {target}",
+            error_title="Не удалось открыть папку HO-005",
+        )
+
+    def _baseline_suite_gate_allows_launch(self, run_label: str) -> bool:
+        context = self._refresh_suite_handoff_state()
+        snapshot = dict(context.get("snapshot") or {})
+        gate = baseline_suite_handoff_launch_gate(
+            launch_profile="baseline",
+            runtime_policy=str(self.run_runtime_policy_var.get() or "balanced"),
+            current_suite_snapshot_hash=str(snapshot.get("suite_snapshot_hash") or ""),
+        )
+        state = str(gate.get("state") or "missing")
+        if bool(gate.get("baseline_launch_allowed", False)):
+            self._append_run_log(
+                f"[handoff] HO-005 OK for baseline: {gate.get('banner') or ''}"
+            )
+            return True
+        banner = str(gate.get("banner") or self.suite_handoff_var.get() or "").strip()
+        self._append_run_log(f"[handoff] {run_label}: baseline launch blocked by HO-005 state={state}. {banner}")
+        self._set_status("Baseline заблокирован: HO-005 не актуален.")
+        messagebox.showwarning(
+            "Набор испытаний / HO-005",
+            "Baseline не будет запущен без актуального validated_suite_snapshot.\n\n" + banner,
+        )
+        return False
 
     def _refresh_run_context_summary(self) -> None:
         active_profile = (
@@ -2826,6 +3094,7 @@ class DesktopInputEditor:
                 )
             ).strip()
         )
+        self._refresh_suite_handoff_state()
 
     def _current_latest_run_dir(self) -> Path | None:
         if self.active_run_dir is not None and self.active_run_dir.exists():
@@ -4150,6 +4419,7 @@ class DesktopInputEditor:
         self._refresh_run_launch_summary()
         self._refresh_section_route_summary()
         self._refresh_section_header_summaries()
+        self._refresh_handoff_snapshot_state()
         self._refresh_profile_comparison()
 
     def _reset_section_to_defaults(self, section: object) -> None:
@@ -4311,6 +4581,7 @@ class DesktopInputEditor:
                 self._refresh_value_label(key)
             self._refresh_section_header_summaries()
             self._refresh_active_field_search_view()
+            self._refresh_handoff_snapshot_state()
             self._set_status(f"Рабочая копия сохранена: {target}")
             messagebox.showinfo("Desktop Input Editor", f"Рабочая копия сохранена:\n{target}")
         except Exception as exc:
@@ -5151,6 +5422,8 @@ class DesktopInputEditor:
         )
 
     def _run_quick_preview(self, *, prechecked: bool = False) -> None:
+        if self._selected_run_profile_key() == "baseline" and not self._baseline_suite_gate_allows_launch("Baseline / preview"):
+            return
         log_file_path = self._build_action_log_path("quick_preview")
 
         def _launch(log_path: Path | None) -> None:
@@ -5286,6 +5559,7 @@ class DesktopInputEditor:
                 self._refresh_value_label(key)
             self._refresh_section_header_summaries()
             self._refresh_active_field_search_view()
+            self._refresh_handoff_snapshot_state()
             self._set_status(f"Параметры сохранены: {target}")
             messagebox.showinfo("Desktop Input Editor", f"Параметры сохранены:\n{target}")
         except Exception as exc:

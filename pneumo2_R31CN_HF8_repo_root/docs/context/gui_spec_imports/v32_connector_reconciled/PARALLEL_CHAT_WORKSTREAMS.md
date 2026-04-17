@@ -120,7 +120,7 @@ workstreams для параллельной разработки разными 
 ### V32-08. Compare Viewer и integrity mismatch
 
 ```text
-Работай над Compare Viewer. Прочитай 17/18, v32 README, compare contract matrix из v32 и docs/gui_chat_prompts/05_COMPARE_VIEWER.md. Твой scope: compare sessions, explicit compare contracts, mismatch banners, baseline/objective/run refs, offline NPZ/anim diagnostics loading и dock/layout behavior. Не мутируй optimizer history и не подменяй animator truth. Добавляй tests на compare_contract_hash, current vs historical mismatch, session autoload и Windows dock object names.
+Работай над Compare Viewer. Прочитай 17/18, v32 README, compare contract matrix из v32 и docs/gui_chat_prompts/05_COMPARE_VIEWER.md. Твой scope: compare sessions, explicit compare contracts, mismatch banners, baseline/objective/run refs, readonly current_context_ref sidecar provenance, offline NPZ/anim diagnostics loading и dock/layout behavior. Не мутируй optimizer history и не подменяй animator truth. Добавляй tests на compare_contract_hash, current vs historical mismatch, session autoload, missing sidecar status и Windows dock object names.
 ```
 
 ### V32-09. Desktop Animator и честная визуализация

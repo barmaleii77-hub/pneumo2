@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 
 
@@ -26,7 +27,11 @@ def _show_missing_pyside6_message(exc: Exception) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    _ = argv
+    args = list(sys.argv[1:] if argv is None else argv)
+    if "--open" in args:
+        index = args.index("--open")
+        if index + 1 < len(args):
+            os.environ["PNEUMO_GUI_SPEC_SHELL_OPEN_WORKSPACE"] = args[index + 1]
     try:
         from pneumo_solver_ui.desktop_spec_shell.main_window import main as run_shell
     except Exception as exc:

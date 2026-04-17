@@ -1947,7 +1947,7 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
                         p.wait(timeout=1.2)
                     except Exception:
                         p.kill()
-                self._log("Остановил активный дочерний процесс и его дерево.")
+                self._log("Остановил процесс Streamlit и его дочернее дерево.")
                 self._ui_status("Остановлено.")
             except Exception as e:
                 self._log(f"Не удалось остановить: {e}")

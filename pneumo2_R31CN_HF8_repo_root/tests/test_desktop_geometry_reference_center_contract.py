@@ -511,6 +511,84 @@ def test_runtime_can_use_selected_pointer_and_npz_artifact_without_rebinding_lat
     assert any("stale" in issue for issue in missing_artifact.issues)
 
 
+def test_runtime_reports_selected_artifact_freshness_against_latest(tmp_path: Path) -> None:
+    runtime = DesktopGeometryReferenceRuntime(ui_root=UI_ROOT)
+    selected_dir = tmp_path / "selected"
+    latest_dir = tmp_path / "latest"
+    selected_dir.mkdir()
+    latest_dir.mkdir()
+    selected_summary = _write_reference_artifact(selected_dir)
+    latest_summary = _write_reference_artifact(latest_dir)
+
+    selected_path = str(selected_summary["anim_latest_pointer_json"])
+    latest_path = str(latest_summary["anim_latest_pointer_json"])
+    selected_artifact = runtime.artifact_context(artifact_path=selected_path)
+    latest_artifact = runtime.artifact_context(latest_summary)  # type: ignore[arg-type]
+    matching_selected_artifact = runtime.artifact_context(artifact_path=latest_path)
+
+    historical = runtime.artifact_freshness_evidence(
+        selected_artifact,
+        artifact_path=selected_path,
+        latest_context=latest_artifact,
+    )
+    current = runtime.artifact_freshness_evidence(
+        matching_selected_artifact,
+        artifact_path=latest_path,
+        latest_context=latest_artifact,
+    )
+    latest_mode = runtime.artifact_freshness_evidence(
+        latest_artifact,
+        latest_context=latest_artifact,
+    )
+
+    assert historical["status"] == "historical"
+    assert historical["relation"] == "differs_from_latest"
+    assert historical["selected_pointer_path"] == selected_path
+    assert historical["latest_pointer_path"] == str(latest_summary["anim_latest_pointer_json"])
+    assert any("selected NPZ differs from latest NPZ" in issue for issue in historical["issues"])
+    assert current["status"] == "current"
+    assert current["relation"] == "matches_latest"
+    assert latest_mode["status"] == "current"
+    assert latest_mode["relation"] == "latest"
+
+
+def test_runtime_writes_geometry_reference_evidence_for_diagnostics_send(tmp_path: Path) -> None:
+    runtime = DesktopGeometryReferenceRuntime(ui_root=UI_ROOT)
+    summary = _write_reference_artifact(tmp_path)
+    pointer_path = str(summary["anim_latest_pointer_json"])
+    artifact = runtime.artifact_context(artifact_path=pointer_path)
+
+    result = runtime.write_diagnostics_handoff_evidence(
+        artifact_context=artifact,
+        artifact_path=pointer_path,
+        exports_dir=tmp_path / "workspace" / "exports",
+        send_bundles_dir=tmp_path / "send_bundles",
+    )
+    workspace_path = Path(result["workspace_path"])
+    sidecar_path = Path(result["sidecar_path"])
+    workspace_payload = json.loads(workspace_path.read_text(encoding="utf-8"))
+    sidecar_payload = json.loads(sidecar_path.read_text(encoding="utf-8"))
+
+    assert workspace_path.name == "geometry_reference_evidence.json"
+    assert sidecar_path.name == "latest_geometry_reference_evidence.json"
+    assert workspace_payload == sidecar_payload == result["payload"]
+    assert workspace_payload["schema"] == "geometry_reference_evidence.v1"
+    assert workspace_payload["artifact_status"] == "historical"
+    assert workspace_payload["artifact_freshness_status"] in {"historical", "current"}
+    assert workspace_payload["artifact_freshness_relation"] in {
+        "differs_from_latest",
+        "matches_latest",
+        "selected_without_latest",
+    }
+    assert workspace_payload["artifact_pointer_path"] == pointer_path
+    assert workspace_payload["geometry_acceptance_gate"] == "PASS"
+    assert workspace_payload["road_width_status"] == "explicit_meta"
+    assert workspace_payload["road_width_source"] == "meta.geometry.road_width_m"
+    assert workspace_payload["packaging_contract_hash"] == "pkg-hash-123"
+    assert workspace_payload["packaging_axis_only_cylinders"] == ["cyl2"]
+    assert workspace_payload["evidence_missing"] == []
+
+
 def test_road_width_evidence_prefers_explicit_meta_and_keeps_missing_gap_warning() -> None:
     explicit = build_road_width_evidence(
         {"колея": 1.0, "wheel_width_m": 0.22},
@@ -611,10 +689,15 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert 'self.notebook.add(guide_tab_host, text="Параметры")' in tool_src
     assert 'self.notebook.add(passport_tab_host, text="Паспорта")' in tool_src
     assert "self.artifact_path_var" in tool_src
+    assert "self.artifact_freshness_var" in tool_src
+    assert "self.evidence_export_summary_var" in tool_src
     assert 'text="Artifact JSON/NPZ:"' in tool_src
+    assert 'text="Artifact freshness:"' in tool_src
+    assert 'text="Export evidence for SEND"' in tool_src
     assert "def _browse_artifact_path(self) -> None:" in tool_src
     assert "def _use_latest_artifact(self) -> None:" in tool_src
     assert "def _artifact_context(self):" in tool_src
+    assert "def _export_evidence_for_send(self) -> None:" in tool_src
     assert "artifact_path=self._artifact_path()" in tool_src
     assert '("Animator artifacts", "*.json *.npz")' in tool_src
     assert "DesktopGeometryReferenceRuntime()" in tool_src
@@ -639,8 +722,10 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert '("layer", "Layer", 120, "w")' in tool_src
     assert '("source", "Source", 220, "w")' in tool_src
     assert "artifact_geometry_acceptance_evidence" in tool_src
+    assert "artifact_freshness_evidence" in tool_src
     assert "road_width_evidence" in tool_src
     assert "diagnostics_handoff_evidence" in tool_src
+    assert "write_diagnostics_handoff_evidence" in tool_src
     assert 'text="Сквозная совместимость компонентов по семействам"' in tool_src
     assert "self.component_fit_summary_var" in tool_src
     assert "self.component_fit_tree = self._build_tree(" in tool_src
@@ -731,6 +816,10 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "def artifact_context(" in runtime_src
     assert "artifact_path: str | Path | None = None" in runtime_src
     assert "def artifact_geometry_acceptance_evidence(" in runtime_src
+    assert "def artifact_freshness_evidence(" in runtime_src
     assert "def road_width_evidence(" in runtime_src
     assert "def packaging_passport_evidence(" in runtime_src
     assert "def diagnostics_handoff_evidence(" in runtime_src
+    assert "def write_diagnostics_handoff_evidence(" in runtime_src
+    assert '"geometry_reference_evidence.json"' in runtime_src
+    assert '"latest_geometry_reference_evidence.json"' in runtime_src

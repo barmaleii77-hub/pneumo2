@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from pneumo_solver_ui.optimization_launch_plan_runtime import (
     coordinator_problem_hash_for_launch,
     coordinator_resume_run_dir,
@@ -42,7 +44,7 @@ def test_resume_run_dir_reuses_existing_problem_hash_folder(tmp_path: Path) -> N
     assert chosen == existing
 
 
-def test_resume_run_dir_prefers_explicit_run_id_over_problem_hash(tmp_path: Path) -> None:
+def test_resume_run_dir_blocks_explicit_run_id_with_problem_hash_mismatch(tmp_path: Path) -> None:
     ui_root = _repo_ui_root()
     workspace = tmp_path / "workspace"
     session_state = {
@@ -70,13 +72,12 @@ def test_resume_run_dir_prefers_explicit_run_id_over_problem_hash(tmp_path: Path
     (explicit / "problem_hash.txt").write_text("different_problem", encoding="utf-8")
     (explicit / "run_id.txt").write_text("run_target", encoding="utf-8")
 
-    chosen = coordinator_resume_run_dir(
-        session_state,
-        workspace_dir=workspace,
-        ui_root=ui_root,
-    )
-
-    assert chosen == explicit
+    with pytest.raises(RuntimeError, match="Resume problem_hash mismatch"):
+        coordinator_resume_run_dir(
+            session_state,
+            workspace_dir=workspace,
+            ui_root=ui_root,
+        )
 
 
 def test_resume_run_dir_honors_legacy_problem_hash_mode(tmp_path: Path) -> None:

@@ -38,6 +38,11 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "discover_selected_run_candidates" in src
     assert "_candidate_by_iid" in src
     assert "Optimization runs for HO-007" in src
+    assert "candidate_ready_only_var" in src
+    assert "ttk.Checkbutton" in src
+    assert "READY only" in src
+    assert "def _refresh_candidate_filter" in src
+    assert "shown=" in src
     assert "def _selected_candidate_run_dir" in src
     assert "bridge_status" in src
     assert "filedialog.askdirectory" in src

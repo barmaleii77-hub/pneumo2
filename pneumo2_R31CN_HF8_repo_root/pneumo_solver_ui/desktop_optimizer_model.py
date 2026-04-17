@@ -6,7 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-from pneumo_solver_ui.optimization_baseline_source import resolve_workspace_baseline_source
+from pneumo_solver_ui.optimization_baseline_source import (
+    resolve_active_baseline_handoff,
+    resolve_baseline_suite_handoff,
+    resolve_workspace_baseline_source,
+)
 from pneumo_solver_ui.optimization_defaults import (
     DIAGNOSTIC_INFLUENCE_EPS_REL,
     DIAGNOSTIC_OPT_MINUTES_DEFAULT,
@@ -135,6 +139,13 @@ class DesktopOptimizerContractSnapshot:
     baseline_source_kind: str
     baseline_source_label: str
     baseline_path: str
+    baseline_handoff_id: str
+    active_baseline_hash: str
+    active_baseline_state: str
+    active_baseline_banner: str
+    active_baseline_contract_path: str
+    active_baseline_suite_snapshot_hash: str
+    optimizer_baseline_can_consume: bool
     base_param_count: int
     search_param_count: int
     suite_row_count: int
@@ -440,6 +451,15 @@ def build_contract_snapshot(
         problem_hash,
         workspace_dir=workspace_dir,
     )
+    suite_handoff = resolve_baseline_suite_handoff(
+        workspace_dir=workspace_dir,
+    )
+    active_baseline = resolve_active_baseline_handoff(
+        workspace_dir=workspace_dir,
+        current_suite_snapshot_hash=str(suite_handoff.get("suite_snapshot_hash") or ""),
+        current_inputs_snapshot_hash=str(suite_handoff.get("inputs_snapshot_hash") or ""),
+        current_ring_source_hash=str(suite_handoff.get("ring_source_hash") or ""),
+    )
     sample_search_params = tuple(sorted(str(key) for key in ranges_clean.keys())[:8])
     return DesktopOptimizerContractSnapshot(
         workspace_dir=workspace_dir,
@@ -459,6 +479,13 @@ def build_contract_snapshot(
         baseline_source_kind=str(baseline_source.get("source_kind") or ""),
         baseline_source_label=str(baseline_source.get("source_label") or ""),
         baseline_path=str(baseline_source.get("baseline_path") or ""),
+        baseline_handoff_id=str(active_baseline.get("handoff_id") or ""),
+        active_baseline_hash=str(active_baseline.get("active_baseline_hash") or ""),
+        active_baseline_state=str(active_baseline.get("state") or ""),
+        active_baseline_banner=str(active_baseline.get("banner") or ""),
+        active_baseline_contract_path=str(active_baseline.get("contract_path") or ""),
+        active_baseline_suite_snapshot_hash=str(active_baseline.get("suite_snapshot_hash") or ""),
+        optimizer_baseline_can_consume=bool(active_baseline.get("optimizer_can_consume", False)),
         base_param_count=len(base_clean),
         search_param_count=len(ranges_clean),
         suite_row_count=len(suite_clean),

@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Mapping, Optional, Tuple
 
 import json
 import shutil
@@ -510,6 +510,20 @@ def _should_mirror_global_anim_pointer(exports_dir: Path, *, explicit: Optional[
         return False
 
 
+def _merge_analysis_context_refs(
+    meta_norm: Dict[str, Any],
+    analysis_context_refs: Mapping[str, Any] | None,
+) -> None:
+    """Preserve explicit HO-008 analysis lineage in anim_latest metadata."""
+    if not isinstance(analysis_context_refs, Mapping):
+        return
+    for key, value in analysis_context_refs.items():
+        key_s = str(key)
+        if not key_s or value in (None, "", [], {}):
+            continue
+        meta_norm[key_s] = _coerce_jsonable(value)
+
+
 def export_full_log_to_npz(
     npz_path: str | Path,
     df_main: pd.DataFrame,
@@ -570,6 +584,7 @@ def export_anim_latest_bundle(
     df_q: Optional[pd.DataFrame] = None,
     df_open: Optional[pd.DataFrame] = None,
     meta: Optional[Dict[str, Any]] = None,
+    analysis_context_refs: Optional[Mapping[str, Any]] = None,
     mirror_global_pointer: Optional[bool] = None,
 ) -> Tuple[Path, Path]:
     """Export anim_latest bundle for Desktop Animator.
@@ -595,6 +610,7 @@ def export_anim_latest_bundle(
         raise
 
     meta_norm = _normalize_meta(meta)
+    _merge_analysis_context_refs(meta_norm, analysis_context_refs)
     meta_norm = assert_required_geometry_meta(
         meta_norm,
         context="anim_latest export meta_json",
@@ -750,6 +766,7 @@ def export_anim_latest_bundle(
             npz_path=npz_path,
             pointer_path=pointer_path,
             artifact_refs=dict(meta_norm.get("anim_export_contract_artifacts") or {}),
+            analysis_context_refs=dict(analysis_context_refs or {}),
             truth_summary=truth_summary,
         )
         capture_manifest_path = write_json_artifact(exports_dir / CAPTURE_EXPORT_MANIFEST_JSON_NAME, capture_manifest)

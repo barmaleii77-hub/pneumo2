@@ -2285,6 +2285,29 @@ def _make_send_bundle_inner(
         except Exception:
             pass
 
+    def _write_latest_inspection_sidecars() -> None:
+        try:
+            from pneumo_solver_ui.tools.inspect_send_bundle import inspect_send_bundle, render_inspection_md
+
+            inspected_zip = latest_zip if latest_zip.exists() else zip_path
+            inspection = inspect_send_bundle(inspected_zip)
+            _safe_write_text(
+                out_dir / "latest_send_bundle_inspection.json",
+                json.dumps(inspection, ensure_ascii=False, indent=2),
+            )
+            _safe_write_text(
+                out_dir / "latest_send_bundle_inspection.md",
+                render_inspection_md(inspection),
+            )
+        except Exception:
+            try:
+                _safe_write_text(
+                    out_dir / "latest_send_bundle_inspection_failed.txt",
+                    traceback.format_exc(),
+                )
+            except Exception:
+                pass
+
     def _run_health_pass(*, failure_name: str = "health/health_report_failed.txt") -> None:
         try:
             from pneumo_solver_ui.tools.health_report import build_health_report
@@ -2449,6 +2472,7 @@ def _make_send_bundle_inner(
         update_index=True,
     )
     _write_final_evidence_sidecar_proof()
+    _write_latest_inspection_sidecars()
 
     # ------------------------------------------------------------
     # R53: write session marker (for watchdog + idempotency).

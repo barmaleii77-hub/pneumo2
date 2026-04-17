@@ -397,6 +397,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                 engineering_obj = _read_json(engineering_name)
                 if isinstance(engineering_obj, dict):
                     validation_obj = dict(engineering_obj.get("validation") or {})
+                    readiness_obj = dict(engineering_obj.get("selected_run_candidate_readiness") or {})
                     rep["engineering_analysis_evidence"] = {
                         "status": "READY" if engineering_obj.get("evidence_manifest_hash") else "WARN",
                         "source_path": engineering_name,
@@ -408,6 +409,14 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                         "calibration_status": str(validation_obj.get("calibration_status") or ""),
                         "sensitivity_row_count": len(engineering_obj.get("sensitivity_summary") or []),
                         "handoff_requirements": dict(engineering_obj.get("handoff_requirements") or {}),
+                        "selected_run_candidate_readiness": readiness_obj,
+                        "selected_run_candidate_count": int(readiness_obj.get("candidate_count") or 0),
+                        "selected_run_ready_candidate_count": int(
+                            readiness_obj.get("ready_candidate_count") or 0
+                        ),
+                        "selected_run_missing_inputs_candidate_count": int(
+                            readiness_obj.get("missing_inputs_candidate_count") or 0
+                        ),
                     }
                 else:
                     warnings.append(f"{engineering_name} is not valid JSON")
@@ -811,6 +820,9 @@ def _render_md(rep: Dict[str, Any]) -> str:
         f"- sensitivity_row_count: `{engineering.get('sensitivity_row_count')}`",
         f"- handoff_contract_status: `{dict(engineering.get('handoff_requirements') or {}).get('contract_status') or '-'}`",
         f"- handoff_required_path: `{dict(engineering.get('handoff_requirements') or {}).get('required_contract_path') or '-'}`",
+        f"- selected_run_candidate_count: `{engineering.get('selected_run_candidate_count')}`",
+        f"- selected_run_ready_candidate_count: `{engineering.get('selected_run_ready_candidate_count')}`",
+        f"- selected_run_missing_inputs_candidate_count: `{engineering.get('selected_run_missing_inputs_candidate_count')}`",
         "",
         "## Optimizer scope",
         "",

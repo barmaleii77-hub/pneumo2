@@ -267,6 +267,8 @@ def test_engineering_analysis_runtime_validates_artifacts_and_exports_evidence(t
     assert payload["handoff_requirements"]["handoff_id"] == "HO-007"
     assert payload["handoff_requirements"]["can_run_engineering_analysis"] is True
     assert payload["handoff_requirements"]["missing_fields"] == []
+    assert payload["selected_run_candidate_readiness"]["schema"] == "selected_run_candidate_readiness.v1"
+    assert payload["selected_run_candidate_readiness"]["candidate_count"] == 0
     assert payload["diagnostics_bundle_finalized"] is False
     assert payload["validation"]["influence_status"] == "PASS"
     assert payload["validation"]["selected_run_contract_status"] == "READY"
@@ -380,6 +382,15 @@ def test_runtime_discovers_ho007_bridge_candidates_with_preflight_status(
     assert missing["bridge_status"] == "MISSING_INPUTS"
     assert "results_csv_path" in missing["missing_inputs"]
     assert "blocking_state:missing results artifact" in missing["missing_inputs"]
+
+    snapshot = runtime.snapshot(selected_contract_path=tmp_path / "missing" / "selected_run_contract.json")
+    manifest = runtime.build_diagnostics_evidence_manifest(snapshot)
+    readiness = manifest["selected_run_candidate_readiness"]
+    assert readiness["candidate_count"] == 2
+    assert readiness["ready_candidate_count"] == 1
+    assert readiness["missing_inputs_candidate_count"] == 1
+    assert str(ready_run_dir.resolve()) in readiness["ready_run_dirs"]
+    assert "blocking_state:missing results artifact" in readiness["unique_missing_inputs"]
 
 
 def test_runtime_refuses_ho007_export_when_optimizer_run_inputs_are_incomplete(

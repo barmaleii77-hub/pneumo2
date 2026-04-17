@@ -85,7 +85,6 @@ from pneumo_solver_ui.desktop_suite_runtime import (
     desktop_suite_handoff_path,
     read_desktop_suite_handoff_state,
 )
-
 from pneumo_solver_ui.tools.desktop_results_center import DesktopResultsCenter
 from pneumo_solver_ui.tools.send_bundle_contract import (
     ANIM_DIAG_SIDECAR_JSON,
@@ -596,7 +595,7 @@ class App:
             msg_lines.extend(format_anim_dashboard_brief_lines(load_latest_send_bundle_anim_dashboard(out_dir)))
             diag_json = out_dir / ANIM_DIAG_SIDECAR_JSON
             if diag_json.exists():
-                msg_lines.append(f"Диагностика указателя анимации: {diag_json}")
+                msg_lines.append(f"Anim pointer diagnostics: {diag_json}")
 
         messagebox.showinfo("Автономное тестирование", "\n".join(msg_lines))
 

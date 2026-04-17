@@ -8,7 +8,16 @@ from pneumo_solver_ui.desktop_input_model import (
     apply_desktop_quick_preset,
     apply_desktop_run_preset,
     DESKTOP_PREVIEW_SURFACE_OPTIONS,
+    build_desktop_inputs_snapshot,
+    build_desktop_inputs_snapshot_ref,
     build_desktop_preview_surface,
+    canonical_base_input_keys,
+    describe_desktop_inputs_handoff_for_workspace,
+    describe_desktop_inputs_snapshot_state,
+    desktop_field_section_map,
+    desktop_input_field_keys,
+    desktop_input_payload_hash,
+    desktop_inputs_snapshot_handoff_path,
     build_desktop_profile_diff,
     build_desktop_section_field_search_items,
     build_desktop_section_change_cards,
@@ -37,13 +46,18 @@ from pneumo_solver_ui.desktop_input_model import (
     list_desktop_run_dirs,
     list_desktop_snapshot_paths,
     load_desktop_run_summary,
+    load_base_defaults,
     preview_surface_label,
     quick_preset_description,
     quick_preset_label,
     run_preset_description,
     run_preset_label,
     sanitize_desktop_profile_name,
+    save_desktop_inputs_snapshot,
+    find_desktop_invented_input_keys,
+    validate_desktop_inputs_snapshot_contract,
 )
+from pneumo_solver_ui.desktop_input_graphics import DesktopInputGraphicPanel
 from pneumo_solver_ui.desktop_shell.launcher_catalog import build_desktop_launch_catalog
 
 
@@ -54,14 +68,20 @@ def test_desktop_input_model_exposes_main_operator_sections() -> None:
     titles = [section.title for section in DESKTOP_INPUT_SECTIONS]
     assert "Геометрия" in titles
     assert "Пневматика" in titles
+    assert "Массы" in titles
     assert "Механика" in titles
     assert "Статическая настройка" in titles
     assert "Компоненты" in titles
     assert "Справочные данные" in titles
+    assert "Численные настройки" in titles
 
     specs = field_spec_map()
+    section_map = desktop_field_section_map()
     assert specs["база"].unit_label == "м"
     assert specs["начальное_давление_Ресивер2"].unit_label == "кПа (абс.)"
+    assert section_map["масса_рамы"] == "Массы"
+    assert section_map["жёсткость_шины"] == "Механика"
+    assert section_map["макс_шаг_интегрирования_с"] == "Численные настройки"
     assert specs["corner_loads_mode"].control == "choice"
     assert "adiabatic" in specs["термодинамика"].choices
     assert "table" in specs["механика_кинематика"].choices
@@ -95,6 +115,32 @@ def test_desktop_input_model_exposes_graphic_context_for_core_fields() -> None:
     assert specs["температура_окр_К"].effective_graphic_context == "temperature"
 
 
+def test_desktop_input_graphic_contexts_are_registered_and_canonical() -> None:
+    contexts = {
+        spec.effective_graphic_context
+        for spec in field_spec_map().values()
+        if str(spec.effective_graphic_context or "").strip()
+    }
+
+    assert contexts <= set(DesktopInputGraphicPanel.CONTEXT_TITLES)
+    assert "mass_sprung" in contexts
+    assert "integration" in contexts
+    assert "invented_context" not in contexts
+
+
+def test_desktop_input_numeric_controls_have_units_and_physical_ranges() -> None:
+    for spec in field_spec_map().values():
+        if spec.control in {"bool", "choice"}:
+            continue
+        assert spec.control in {"slider", "int"}, spec.key
+        assert str(spec.unit_label or "").strip(), spec.key
+        assert spec.min_value is not None, spec.key
+        assert spec.max_value is not None, spec.key
+        assert spec.step is not None, spec.key
+        assert float(spec.max_value) > float(spec.min_value), spec.key
+        assert float(spec.step) > 0.0, spec.key
+
+
 def test_desktop_input_model_uses_safe_paths_inside_repo_workspace() -> None:
     default_base = default_base_json_path()
     default_ranges = default_ranges_json_path()
@@ -104,6 +150,7 @@ def test_desktop_input_model_uses_safe_paths_inside_repo_workspace() -> None:
     profile_path = desktop_profile_path("Мой профиль: demo/1")
     snapshot_dir = desktop_snapshot_dir_path()
     snapshot_path = desktop_snapshot_path("Перед запуском: rough/demo", stamp="20260412_101500")
+    handoff_snapshot = desktop_inputs_snapshot_handoff_path()
     runs_dir = desktop_runs_dir_path()
     run_summary = desktop_run_summary_path(runs_dir / "desktop_input_run_20260412_101500")
 
@@ -120,6 +167,9 @@ def test_desktop_input_model_uses_safe_paths_inside_repo_workspace() -> None:
     assert "workspace" in str(snapshot_dir)
     assert snapshot_dir.name == "desktop_input_snapshots"
     assert snapshot_path.name == "20260412_101500__Перед_запуском_rough_demo.json"
+    assert "handoffs" in str(handoff_snapshot)
+    assert "WS-INPUTS" in str(handoff_snapshot)
+    assert handoff_snapshot.name == "inputs_snapshot.json"
     assert "workspace" in str(runs_dir)
     assert runs_dir.name == "desktop_runs"
     assert run_summary.name == "run_summary.json"
@@ -133,6 +183,122 @@ def test_desktop_input_model_exposes_profile_helpers() -> None:
     assert isinstance(list_desktop_snapshot_paths(), list)
     assert isinstance(list_desktop_run_dirs(), list)
     assert desktop_run_summary_path(Path("workspace/desktop_runs/demo_run")).name == "run_summary.json"
+
+
+def test_desktop_inputs_snapshot_freezes_handoff_for_ring_and_suite(tmp_path: Path) -> None:
+    payload = load_base_defaults()
+    payload["база"] = 1.7
+    payload["масса_рамы"] = 650.0
+
+    snapshot = build_desktop_inputs_snapshot(
+        payload,
+        source_path=default_base_json_path(),
+        created_at_utc="2026-04-17T00:00:00Z",
+    )
+
+    assert snapshot["schema_version"] == "desktop_inputs_snapshot_v1"
+    assert snapshot["source_workspace"] == "WS-INPUTS"
+    assert snapshot["target_workspaces"] == ["WS-RING", "WS-SUITE"]
+    assert snapshot["handoff_ids"] == {"WS-RING": "HO-002", "WS-SUITE": "HO-003"}
+    assert snapshot["frozen"] is True
+    assert snapshot["inputs"]["база"] == 1.7
+    assert snapshot["inputs"]["масса_рамы"] == 650.0
+    assert snapshot["invented_keys"] == []
+    assert snapshot["payload_hash"] == desktop_input_payload_hash(payload)
+    assert "Массы" in snapshot["section_keys"]
+    assert "Численные настройки" in snapshot["section_keys"]
+
+    target = tmp_path / "inputs_snapshot.json"
+    saved = save_desktop_inputs_snapshot(payload, source_path=default_base_json_path(), target_path=target)
+    assert saved == target.resolve()
+    state = describe_desktop_inputs_snapshot_state(payload, snapshot=snapshot, snapshot_path=target)
+    assert state["state"] == "current"
+    assert state["is_stale"] is False
+    assert "HO-002" in state["banner"]
+    assert "HO-003" in state["banner"]
+
+
+def test_desktop_inputs_handoff_resolver_returns_refs_not_live_inputs(tmp_path: Path) -> None:
+    payload = load_base_defaults()
+    payload["база"] = 1.7
+    snapshot = build_desktop_inputs_snapshot(
+        payload,
+        source_path=default_base_json_path(),
+        created_at_utc="2026-04-17T00:00:00Z",
+    )
+    target = tmp_path / "workspace" / "handoffs" / "WS-INPUTS" / "inputs_snapshot.json"
+
+    validate_desktop_inputs_snapshot_contract(snapshot, target_workspace="WS-RING")
+    ring_ref = build_desktop_inputs_snapshot_ref(
+        snapshot,
+        target_workspace="WS-RING",
+        snapshot_path=target,
+    )
+    suite_state = describe_desktop_inputs_handoff_for_workspace(
+        "WS-SUITE",
+        snapshot=snapshot,
+        snapshot_path=target,
+        current_payload_hash=snapshot["payload_hash"],
+    )
+
+    assert ring_ref["handoff_id"] == "HO-002"
+    assert ring_ref["payload_hash"] == snapshot["payload_hash"]
+    assert ring_ref["snapshot_hash"] == snapshot["snapshot_hash"]
+    assert "inputs" not in ring_ref
+    assert suite_state["state"] == "current"
+    assert suite_state["handoff_id"] == "HO-003"
+    assert suite_state["can_consume"] is True
+    assert suite_state["ref"]["payload_hash"] == snapshot["payload_hash"]
+    assert "inputs" not in suite_state
+
+
+def test_desktop_inputs_handoff_resolver_reports_missing_stale_and_invalid(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    missing = describe_desktop_inputs_handoff_for_workspace("WS-RING", workspace_dir=workspace)
+    assert missing["state"] == "missing"
+    assert missing["can_consume"] is False
+    assert "surrogate inputs" in missing["banner"]
+
+    payload = load_base_defaults()
+    snapshot = build_desktop_inputs_snapshot(payload, created_at_utc="2026-04-17T00:00:00Z")
+    stale = describe_desktop_inputs_handoff_for_workspace(
+        "WS-RING",
+        snapshot=snapshot,
+        current_payload_hash="not-the-current-hash",
+    )
+    assert stale["state"] == "stale"
+    assert "inputs_snapshot_hash_changed" in stale["stale_reasons"]
+
+    invalid_snapshot = dict(snapshot)
+    invalid_snapshot["frozen"] = False
+    invalid = describe_desktop_inputs_handoff_for_workspace("WS-SUITE", snapshot=invalid_snapshot)
+    assert invalid["state"] == "invalid"
+    assert invalid["can_consume"] is False
+    assert "frozen" in invalid["banner"]
+
+
+def test_desktop_inputs_snapshot_marks_stale_and_blocks_invented_keys() -> None:
+    payload = load_base_defaults()
+    snapshot = build_desktop_inputs_snapshot(payload, created_at_utc="2026-04-17T00:00:00Z")
+    changed = dict(payload)
+    changed["база"] = float(changed["база"]) + 0.1
+
+    stale = describe_desktop_inputs_snapshot_state(changed, snapshot=snapshot)
+
+    assert stale["state"] == "stale"
+    assert stale["is_stale"] is True
+    assert "устарел" in stale["banner"]
+
+    with_invented = dict(payload)
+    with_invented["invented_shadow_key"] = 123
+    assert find_desktop_invented_input_keys(with_invented) == ("invented_shadow_key",)
+    invalid = describe_desktop_inputs_snapshot_state(with_invented, snapshot=snapshot)
+    assert invalid["state"] == "invalid"
+    assert "outside default_base.json" in invalid["banner"]
+
+
+def test_desktop_input_specs_do_not_invent_keys() -> None:
+    assert desktop_input_field_keys() <= canonical_base_input_keys()
 
 
 def test_desktop_run_summary_loader_reads_json_object() -> None:
@@ -366,7 +532,10 @@ def test_desktop_section_field_search_items_follow_cluster_structure() -> None:
     static_items = build_desktop_section_field_search_items("Статическая настройка")
     static_keys = {row["key"] for row in static_items}
     assert "static_trim_enable" in static_keys
-    assert "corner_loads_mode" in static_keys
+    mass_items = build_desktop_section_field_search_items("Массы")
+    mass_keys = {row["key"] for row in mass_items}
+    assert "corner_loads_mode" in mass_keys
+    assert "масса_рамы" in mass_keys
 
     assert build_desktop_section_field_search_items("Несуществующий кластер") == []
 
@@ -435,6 +604,7 @@ def test_desktop_section_readiness_flags_inconsistent_inputs() -> None:
     assert rows_by_title["Геометрия"]["status"] == "ok"
     assert rows_by_title["Пневматика"]["status"] == "warn"
     assert "Ц1: шток не должен быть больше поршня" in rows_by_title["Пневматика"]["issues"]
+    assert rows_by_title["Массы"]["status"] == "ok"
     assert rows_by_title["Механика"]["status"] == "warn"
     assert "включён стабилизатор без жёсткости" in rows_by_title["Механика"]["issues"]
     assert rows_by_title["Статическая настройка"]["status"] == "warn"
@@ -444,7 +614,8 @@ def test_desktop_section_readiness_flags_inconsistent_inputs() -> None:
     assert "режим колесо_координата" in rows_by_title["Компоненты"]["issues"]
     assert rows_by_title["Справочные данные"]["status"] == "warn"
     assert "режим термодинамики" in rows_by_title["Справочные данные"]["issues"]
-    assert "лимит внутренних шагов" in rows_by_title["Справочные данные"]["issues"]
+    assert rows_by_title["Численные настройки"]["status"] == "warn"
+    assert "лимит внутренних шагов" in rows_by_title["Численные настройки"]["issues"]
 
 
 def test_desktop_section_summary_cards_show_live_cluster_context() -> None:
@@ -492,17 +663,22 @@ def test_desktop_section_summary_cards_show_live_cluster_context() -> None:
     assert set(cards_by_title) >= {
         "Геометрия",
         "Пневматика",
+        "Массы",
         "Механика",
         "Статическая настройка",
         "Компоненты",
         "Справочные данные",
+        "Численные настройки",
     }
     assert "ход 320 мм" in cards_by_title["Геометрия"]["headline"]
     assert "Р1 101 кПа" in cards_by_title["Пневматика"]["headline"]
-    assert "рама 600 кг" in cards_by_title["Механика"]["headline"].lower()
-    assert "corner loads cg" in cards_by_title["Статическая настройка"]["headline"]
+    assert "рама 600 кг" in cards_by_title["Массы"]["headline"].lower()
+    assert "corner loads cg" in cards_by_title["Массы"]["headline"]
+    assert "шина 200000 Н/м" in cards_by_title["Механика"]["headline"]
+    assert "static trim включён" in cards_by_title["Статическая настройка"]["headline"]
     assert "Camozzi-only да" in cards_by_title["Компоненты"]["headline"]
     assert "Термо thermal / constant" in cards_by_title["Справочные данные"]["headline"]
+    assert "dt_max" in cards_by_title["Численные настройки"]["headline"]
     assert cards_by_title["Компоненты"]["status"] == "ok"
     assert cards_by_title["Компоненты"]["focus_key"] == ""
 
@@ -574,16 +750,18 @@ def test_desktop_section_issue_cards_group_live_issues_by_cluster() -> None:
     assert cards_by_title["Пневматика"]["issue_count"] == 1
     assert cards_by_title["Пневматика"]["focus_key"] == "диаметр_штока_Ц1"
     assert "Ц1" in str(cards_by_title["Пневматика"]["focus_label"])
+    assert cards_by_title["Массы"]["issue_count"] == 0
     assert cards_by_title["Механика"]["issue_count"] == 1
     assert cards_by_title["Статическая настройка"]["issue_count"] == 1
     assert cards_by_title["Компоненты"]["issue_count"] == 2
     assert "Кинематика подвески" in cards_by_title["Компоненты"]["issue_labels"]
     assert "Режим колесо_координата" in cards_by_title["Компоненты"]["issue_labels"]
-    assert cards_by_title["Справочные данные"]["issue_count"] == 3
+    assert cards_by_title["Справочные данные"]["issue_count"] == 2
     assert "Режим термодинамики" in cards_by_title["Справочные данные"]["issue_labels"]
     assert "Модель теплоёмкости" in cards_by_title["Справочные данные"]["issue_labels"]
-    assert "Лимит внутренних шагов" in cards_by_title["Справочные данные"]["issue_labels"]
-    assert "замечани" in str(cards_by_title["Справочные данные"]["summary"]).lower()
+    assert cards_by_title["Численные настройки"]["issue_count"] == 1
+    assert "Лимит внутренних шагов" in cards_by_title["Численные настройки"]["issue_labels"]
+    assert "замечани" in str(cards_by_title["Численные настройки"]["summary"]).lower()
 
 
 def test_desktop_section_summary_cards_expose_first_issue_focus_targets() -> None:
@@ -602,7 +780,7 @@ def test_desktop_section_summary_cards_expose_first_issue_focus_targets() -> Non
 
     assert cards_by_title["Геометрия"]["focus_key"] == "база"
     assert cards_by_title["Пневматика"]["focus_key"] == "начальное_давление_Ресивер1"
-    assert cards_by_title["Механика"]["focus_key"] == "масса_рамы"
+    assert cards_by_title["Массы"]["focus_key"] == "масса_рамы"
     assert cards_by_title["Статическая настройка"]["focus_key"] == "vx0_м_с"
     assert cards_by_title["Компоненты"]["focus_key"] == "использовать_паспорт_компонентов"
     assert cards_by_title["Справочные данные"]["focus_key"] == "термодинамика"
@@ -904,7 +1082,8 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "describe_selfcheck_gate_status" in editor_src
     assert "_current_selfcheck_subject_signature" in editor_src
     assert "_selfcheck_freshness_state" in editor_src
-    assert "статическая настройка, компоненты и справочные данные" in editor_src
+    assert "массы, механика, статическая настройка, компоненты, справочные данные" in editor_src
+    assert "и численные настройки" in editor_src
     assert "автоснимок включён" in run_setup_model_src
     assert 'artifacts_notebook = ttk.Notebook(actions)' in editor_src
     assert 'artifacts_notebook.add(latest_preview_frame, text="Preview")' in editor_src
@@ -1122,6 +1301,24 @@ def test_desktop_input_editor_hides_service_layers_behind_explicit_toggle() -> N
     assert 'ttk.LabelFrame(actions_service_tab.body, text="Журнал проверки и расчёта", padding=8)' in editor_src
     assert "_set_service_panels_visible(False)" in editor_src
     assert "before=toolbar" not in editor_src
+
+
+def test_desktop_input_editor_hard_gates_baseline_with_ho005_suite_handoff() -> None:
+    editor_src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_input_editor.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert "suite_handoff_var" in editor_src
+    assert "_freeze_suite_handoff_snapshot" in editor_src
+    assert "write_desktop_suite_handoff_snapshot" in editor_src
+    assert "baseline_suite_handoff_launch_gate" in editor_src
+    assert "_baseline_suite_gate_allows_launch" in editor_src
+    assert "runtime_policy не может обойти" in (
+        ROOT / "pneumo_solver_ui" / "optimization_baseline_source.py"
+    ).read_text(encoding="utf-8", errors="replace")
+    assert 'self._selected_run_profile_key() == "baseline"' in editor_src
+    assert 'Baseline / preview' in editor_src
 
 
 def test_desktop_input_editor_uses_dense_field_rows_instead_of_large_cards() -> None:

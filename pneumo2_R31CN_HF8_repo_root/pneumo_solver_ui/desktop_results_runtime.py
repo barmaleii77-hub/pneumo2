@@ -29,6 +29,9 @@ from pneumo_solver_ui.tools.send_bundle_contract import (
 )
 
 
+COMPARE_CURRENT_CONTEXT_SIDECAR_JSON = "latest_compare_current_context.json"
+
+
 def _safe_read_json_dict(path: Path | None) -> dict[str, Any]:
     if path is None or not path.exists() or not path.is_file():
         return {}
@@ -598,6 +601,9 @@ class DesktopResultsRuntime:
         diagnostics_evidence_manifest_path = _existing_path(
             out_dir / "latest_analysis_evidence_manifest.json"
         ) or _existing_path(workspace_manifest_path)
+        compare_current_context_sidecar_path = _existing_path(
+            out_dir / COMPARE_CURRENT_CONTEXT_SIDECAR_JSON
+        )
         evidence_manifest_payload = _safe_read_json_dict(diagnostics_evidence_manifest_path)
         diagnostics_evidence_manifest_hash = str(
             evidence_manifest_payload.get("evidence_manifest_hash") or ""
@@ -623,6 +629,14 @@ class DesktopResultsRuntime:
             category="evidence",
             path=diagnostics_evidence_manifest_path,
             detail="HO-009 WS-ANALYSIS -> WS-DIAGNOSTICS",
+        )
+        _append_artifact(
+            items,
+            key="compare_current_context_sidecar",
+            title="Compare current context handoff",
+            category="evidence",
+            path=compare_current_context_sidecar_path,
+            detail="HO-009 WS-ANALYSIS -> CompareViewer current_context_ref",
         )
 
         validation_status = _validation_status(
@@ -1031,6 +1045,7 @@ class DesktopResultsRuntime:
             ("latest_npz", "NPZ текущего прогона"),
             ("latest_pointer", "Указатель аниматора текущего прогона"),
             ("mnemo_event_log", "Журнал мнемосхемы текущего прогона"),
+            ("compare_current_context_sidecar", "Compare handoff текущего прогона"),
         )
         for artifact_key, title in pinned_map:
             artifact = self.artifact_by_key(snapshot, artifact_key)
@@ -1189,6 +1204,80 @@ class DesktopResultsRuntime:
         _atomic_write_json(sidecar_path, payload)
         return sidecar_path.resolve()
 
+    def compare_current_context_sidecar_path(self) -> Path:
+        return (self.send_bundles_dir / COMPARE_CURRENT_CONTEXT_SIDECAR_JSON).resolve()
+
+    def build_compare_current_context_sidecar(
+        self,
+        snapshot: DesktopResultsSnapshot,
+    ) -> dict[str, Any]:
+        selected_context = {
+            field.key: field.selected_value
+            for field in snapshot.result_context_fields
+            if field.selected_value
+        }
+        current_context = {
+            field.key: field.current_value
+            for field in snapshot.result_context_fields
+            if field.current_value
+        }
+        mismatches = [
+            {
+                "key": field.key,
+                "title": field.title,
+                "current": field.current_value,
+                "selected": field.selected_value,
+                "detail": field.detail,
+            }
+            for field in snapshot.result_context_fields
+            if str(field.status or "").upper() == "STALE"
+        ]
+        payload: dict[str, Any] = {
+            "schema": "desktop_results_compare_current_context",
+            "schema_version": "1.0.0",
+            "handoff_id": "HO-009",
+            "produced_by": "WS-ANALYSIS",
+            "consumed_by": "CompareViewer",
+            "created_at": _utc_now(),
+            "project_id": self.repo_root.name,
+            "project_path": str(self.repo_root),
+            "readonly": True,
+            "source": "desktop_results_runtime",
+            "current_context_ref": current_context,
+            "selected_context_ref": selected_context,
+            "result_context": {
+                "state": snapshot.result_context_state,
+                "banner": snapshot.result_context_banner,
+                "detail": snapshot.result_context_detail,
+                "required_action": snapshot.result_context_action,
+            },
+            "mismatch_banner": {
+                "banner_id": "BANNER-HIST-002" if mismatches else "BANNER-HIST-001",
+                "severity": "warning" if mismatches else "info",
+                "scope": "results_current_context_handoff",
+                "mismatch_dimensions": [str(item.get("key") or "") for item in mismatches],
+                "mismatches": mismatches,
+            },
+            "artifacts": {
+                "latest_npz_path": str(snapshot.latest_npz_path or ""),
+                "latest_validation_json_path": str(snapshot.latest_validation_json_path or ""),
+                "latest_validation_md_path": str(snapshot.latest_validation_md_path or ""),
+                "diagnostics_evidence_manifest_path": str(
+                    snapshot.diagnostics_evidence_manifest_path or ""
+                ),
+            },
+        }
+        payload["current_context_ref_hash"] = _sha256_text(
+            _json_dumps_canonical(payload["current_context_ref"])
+        )
+        payload["sidecar_hash"] = _sha256_text(_json_dumps_canonical(payload))
+        return payload
+
+    def write_compare_current_context_sidecar(self, snapshot: DesktopResultsSnapshot) -> Path:
+        path = self.compare_current_context_sidecar_path()
+        _atomic_write_json(path, self.build_compare_current_context_sidecar(snapshot))
+        return path.resolve()
+
     def compare_viewer_path(
         self,
         snapshot: DesktopResultsSnapshot,
@@ -1241,11 +1330,17 @@ class DesktopResultsRuntime:
         self,
         snapshot: DesktopResultsSnapshot,
         artifact: DesktopResultsArtifact | None = None,
+        *,
+        current_context_path: Path | None = None,
     ) -> list[str]:
         npz_path = self.compare_viewer_path(snapshot, artifact=artifact)
         if npz_path is None:
             return []
-        return [str(npz_path)]
+        args: list[str] = []
+        if current_context_path is not None:
+            args.extend(["--current-context", str(current_context_path)])
+        args.append(str(npz_path))
+        return args
 
     def animator_args(
         self,
@@ -1274,9 +1369,14 @@ class DesktopResultsRuntime:
         snapshot: DesktopResultsSnapshot,
         artifact: DesktopResultsArtifact | None = None,
     ):
+        current_context_path = self.write_compare_current_context_sidecar(snapshot)
         return spawn_module(
             "pneumo_solver_ui.qt_compare_viewer",
-            args=self.compare_viewer_args(snapshot, artifact=artifact),
+            args=self.compare_viewer_args(
+                snapshot,
+                artifact=artifact,
+                current_context_path=current_context_path,
+            ),
         )
 
     def launch_animator(
@@ -1340,6 +1440,26 @@ class DesktopResultsRuntime:
                         )
                     if mismatch.get("banner"):
                         lines.append("banner=" + _short_text(mismatch.get("banner")))
+                    return tuple(lines)
+
+                if artifact.key == "compare_current_context_sidecar":
+                    current = dict(obj.get("current_context_ref") or {})
+                    selected = dict(obj.get("selected_context_ref") or {})
+                    result_context = dict(obj.get("result_context") or {})
+                    mismatch = dict(obj.get("mismatch_banner") or {})
+                    lines = [
+                        f"schema={obj.get('schema')}",
+                        f"handoff_id={obj.get('handoff_id')}",
+                        f"context_state={result_context.get('state') or '—'}",
+                        f"current_refs={len(current)}",
+                        f"selected_refs={len(selected)}",
+                        f"mismatch={mismatch.get('banner_id') or '—'}",
+                    ]
+                    if obj.get("current_context_ref_hash"):
+                        lines.append(
+                            "current_context_ref_hash="
+                            + _short_text(obj.get("current_context_ref_hash"), limit=36)
+                        )
                     return tuple(lines)
 
                 if artifact.key == "validation_json":

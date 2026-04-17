@@ -15,8 +15,10 @@ def test_codex_handoff_snapshot_tracks_context_and_unsynced_references() -> None
     snapshot = collect_handoff_snapshot(ROOT)
 
     assert Path(snapshot["project_root"]) == ROOT
-    assert Path(snapshot["git_root"]).name == "pneumo2_R31CN_HF8_github_push_package"
+    git_root = Path(snapshot["git_root"])
+    assert git_root.exists()
     assert snapshot["project_root_from_git"] == "pneumo2_R31CN_HF8_repo_root"
+    assert (git_root / snapshot["project_root_from_git"]).resolve() == ROOT
     assert snapshot["branch"]
     assert len(snapshot["head_commit"]) == 40
     assert "pneumo2_R31CN_HF8_repo_root/docs/context/context_pn_main_chat.txt" in snapshot["synced_context_files"]

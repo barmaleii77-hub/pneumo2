@@ -244,10 +244,16 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
             return "spring"
         if str(section_title or "").strip() == "Пневматика":
             return "pressure"
-        if str(section_title or "").strip() == "Механика":
+        if str(section_title or "").strip() == "Массы":
             return "mass_sprung"
+        if str(section_title or "").strip() == "Механика":
+            return "spring"
         if str(section_title or "").strip() == "Статическая настройка":
             return "trim_target"
+        if str(section_title or "").strip() == "Справочные данные":
+            return "gas_model"
+        if str(section_title or "").strip() == "Численные настройки":
+            return "integration"
         return ""
 
     def _context_title(self, context_key: str) -> str:
@@ -427,12 +433,21 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
                 f"Диаметр поршня C1: {1000.0 * self._safe_float(payload, 'диаметр_поршня_Ц1', 0.0):.0f} мм",
                 f"Диаметр штока C1: {1000.0 * self._safe_float(payload, 'диаметр_штока_Ц1', 0.0):.0f} мм",
             ]
-        if section == "Механика":
+        if section == "Массы":
             return [
                 f"Масса рамы: {self._safe_float(payload, 'масса_рамы', 0.0):.0f} кг",
                 f"Неподрессоренная масса: {self._safe_float(payload, 'масса_неподрессоренная_на_угол', 0.0):.0f} кг",
+                f"Высота ЦМ: {self._safe_float(payload, 'высота_центра_масс', 0.0):.3f} м",
+                f"CG X: {self._safe_float(payload, 'cg_x_м', 0.0):.3f} м",
+                f"CG Y: {self._safe_float(payload, 'cg_y_м', 0.0):.3f} м",
+                f"Распределение: {str(payload.get('corner_loads_mode') or '—')}",
+            ]
+        if section == "Механика":
+            return [
                 f"Жёсткость шины: {self._safe_float(payload, 'жёсткость_шины', 0.0):.0f} Н/м",
                 f"Демпфирование шины: {self._safe_float(payload, 'демпфирование_шины', 0.0):.0f} Н·с/м",
+                f"Свободная длина пружины: {1000.0 * self._safe_float(payload, 'пружина_длина_свободная_м', 0.0):.0f} мм",
+                f"Масштаб пружины: {self._safe_float(payload, 'пружина_масштаб', 0.0):.2f}",
                 f"Стабилизатор перед: {self._safe_float(payload, 'стабилизатор_перед_жесткость_Н_м', 0.0):.0f} Н/м",
                 f"Стабилизатор зад: {self._safe_float(payload, 'стабилизатор_зад_жесткость_Н_м', 0.0):.0f} Н/м",
             ]
@@ -454,9 +469,18 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
         if section == "Справочные данные":
             return [
                 f"Температура воздуха: {self._safe_float(payload, 'температура_окр_К', 0.0):.1f} К",
+                f"Начальная T воздуха: {self._safe_float(payload, 'T_AIR_К', 0.0):.1f} К",
+                f"Термодинамика: {str(payload.get('термодинамика') or '—')}",
+                f"Теплоёмкость: {str(payload.get('газ_модель_теплоемкости') or '—')}",
+                f"Сомкнутая длина пружины: {1000.0 * self._safe_float(payload, 'пружина_длина_солид_м', 0.0):.0f} мм",
+                f"Запас до coil bind: {1000.0 * self._safe_float(payload, 'пружина_запас_до_coil_bind_минимум_м', 0.0):.0f} мм",
+            ]
+        if section == "Численные настройки":
+            return [
                 f"Шаг интегрирования: {self._safe_float(payload, 'макс_шаг_интегрирования_с', 0.0):.4f} с",
                 f"Внутренних шагов: {self._safe_float(payload, 'макс_число_внутренних_шагов_на_dt', 0.0):.0f}",
-                f"Проверки: {'включены' if bool(payload.get('autoverif_enable')) else 'выключены'}",
+                f"Autoverif: {'включён' if bool(payload.get('autoverif_enable')) else 'выключен'}",
+                f"Mechanics selfcheck: {'включён' if bool(payload.get('mechanics_selfcheck')) else 'выключен'}",
             ]
         return [
             f"База: {geom['wheelbase']:.2f} м",

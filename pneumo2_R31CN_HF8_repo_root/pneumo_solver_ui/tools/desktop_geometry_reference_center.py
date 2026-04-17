@@ -65,6 +65,14 @@ class DesktopGeometryReferenceCenter:
         self.road_width_summary_var = tk.StringVar(master=self.root)
         self.geometry_acceptance_summary_var = tk.StringVar(master=self.root)
         self.artifact_summary_var = tk.StringVar(master=self.root)
+        self.artifact_freshness_var = tk.StringVar(
+            master=self.root,
+            value="Artifact freshness: latest not checked yet.",
+        )
+        self.evidence_export_summary_var = tk.StringVar(
+            master=self.root,
+            value="Diagnostics evidence export: not written yet.",
+        )
         self.dw_min_var = tk.DoubleVar(master=self.root, value=-100.0)
         self.dw_max_var = tk.DoubleVar(master=self.root, value=100.0)
 
@@ -152,6 +160,26 @@ class DesktopGeometryReferenceCenter:
         ttk.Entry(source, textvariable=self.artifact_path_var).grid(row=1, column=1, sticky="ew", padx=8, pady=(8, 0))
         ttk.Button(source, text="Выбрать artifact...", command=self._browse_artifact_path).grid(row=1, column=2, padx=(0, 6), pady=(8, 0))
         ttk.Button(source, text="Latest", command=self._use_latest_artifact).grid(row=1, column=3, padx=(0, 6), pady=(8, 0))
+        ttk.Label(source, text="Artifact freshness:").grid(row=2, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(
+            source,
+            textvariable=self.artifact_freshness_var,
+            wraplength=980,
+            justify="left",
+        ).grid(row=2, column=1, columnspan=4, sticky="ew", padx=8, pady=(8, 0))
+        export_btn = ttk.Button(source, text="Export evidence for SEND", command=self._export_evidence_for_send)
+        export_btn.grid(row=3, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(
+            source,
+            textvariable=self.evidence_export_summary_var,
+            wraplength=980,
+            justify="left",
+        ).grid(row=3, column=1, columnspan=4, sticky="ew", padx=8, pady=(8, 0))
+        self._attach_tooltip(
+            export_btn,
+            "Записать geometry_reference_evidence.json для Diagnostics/Send Bundle. "
+            "Reference Center только передаёт evidence summary и не собирает SEND bundle.",
+        )
         source.pack(fill="x", expand=False)
 
         quick = ttk.LabelFrame(sidebar, text="Переходы", padding=8)
@@ -860,6 +888,40 @@ class DesktopGeometryReferenceCenter:
     def _artifact_context(self):
         return self.runtime.artifact_context(artifact_path=self._artifact_path())
 
+    def _export_evidence_for_send(self) -> None:
+        try:
+            artifact = self._artifact_context()
+            freshness = self.runtime.artifact_freshness_evidence(
+                artifact_context=artifact,
+                artifact_path=self._artifact_path(),
+            )
+            result = self.runtime.write_diagnostics_handoff_evidence(
+                self._base_path(),
+                artifact_context=artifact,
+                artifact_path=self._artifact_path(),
+            )
+            payload = result["payload"]
+            missing = tuple(str(item) for item in payload.get("evidence_missing") or ())
+            status = "READY" if not missing else "WARN"
+            workspace_path = Path(result["workspace_path"])
+            sidecar_path = Path(result["sidecar_path"])
+            missing_text = ", ".join(missing) if missing else "none"
+            self.evidence_export_summary_var.set(
+                "Diagnostics evidence export: "
+                f"{status}; gate={payload.get('geometry_acceptance_gate') or '—'}; "
+                f"freshness={freshness.get('status')}/{freshness.get('relation')}; "
+                f"road_width={payload.get('road_width_status') or '—'}; "
+                f"packaging={payload.get('packaging_status') or '—'}; "
+                f"workspace={workspace_path}; sidecar={sidecar_path}; missing={missing_text}."
+            )
+            self.status_var.set(
+                "Geometry Reference evidence exported for Diagnostics/SEND: "
+                f"{workspace_path.name} and {sidecar_path.name}."
+            )
+        except Exception as exc:
+            self.evidence_export_summary_var.set(f"Diagnostics evidence export: failed: {exc}")
+            self.status_var.set(f"Не удалось выгрузить Geometry Reference evidence: {exc}")
+
     def refresh_all(self) -> None:
         self._refresh_geometry_tab()
         self._refresh_cylinder_tab()
@@ -888,6 +950,10 @@ class DesktopGeometryReferenceCenter:
 
     def _refresh_geometry_tab(self) -> None:
         artifact = self._artifact_context()
+        freshness = self.runtime.artifact_freshness_evidence(
+            artifact_context=artifact,
+            artifact_path=self._artifact_path(),
+        )
         snapshot = self.runtime.geometry_snapshot(
             self._base_path(),
             dw_min_mm=float(self.dw_min_var.get()),
@@ -910,6 +976,15 @@ class DesktopGeometryReferenceCenter:
             f"npz={artifact.npz_path or '—'}; packaging_passport="
             f"{'yes' if artifact.packaging_passport_exists else 'missing'}; "
             f"geometry_acceptance_report={'yes' if artifact.geometry_acceptance_exists else 'missing'}."
+        )
+        freshness_issues = tuple(str(item) for item in freshness.get("issues") or ())
+        self.artifact_freshness_var.set(
+            "Artifact freshness: "
+            f"status={freshness.get('status')}; relation={freshness.get('relation')}; "
+            f"selected={freshness.get('selected_npz_path') or freshness.get('selected_pointer_path') or '—'}; "
+            f"latest={freshness.get('latest_npz_path') or freshness.get('latest_pointer_path') or '—'}; "
+            f"{freshness.get('reason') or ''}"
+            + (f" Issues: {'; '.join(freshness_issues[:2])}" if freshness_issues else "")
         )
         road_width = self.runtime.road_width_reference(self._base_path())
         road_evidence = self.runtime.road_width_evidence(self._base_path(), artifact_context=artifact)

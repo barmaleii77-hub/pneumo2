@@ -27,9 +27,10 @@ def test_desktop_animator_uses_display_rate_playback_instead_of_4ms_frame_chasin
     assert 'Display cadence' in APP or 'display cadence' in APP
     assert 'def _nominal_positive_dt_s(t_axis: Any) -> float:' in APP
     assert 'def _playback_interval_ms_for_speed(' in APP
-    assert 'base_ms = 8.0  # Fallback ~125 Hz display cadence when source sampling is sparse.' in APP
+    assert 'base_ms = 8.0  # Fallback service cadence when no live present rate is known yet.' in APP
     assert 'refresh_hz = float(display_hz) if display_hz is not None else float("nan")' in APP
-    assert 'base_ms = float(np.clip(1000.0 / refresh_hz, 4.0, 20.0))' in APP
+    assert 'base_ms = float(np.clip(1000.0 / refresh_hz, 4.0, 50.0))' in APP
+    assert 'display_hz=self._effective_display_refresh_hz_hint(),' in APP
     assert 'changing playback speed' in APP
     assert 'target_ms = 500.0 * dense_dt_s' in APP
     assert 'base_ms = min(float(base_ms), float(target_ms))' in APP

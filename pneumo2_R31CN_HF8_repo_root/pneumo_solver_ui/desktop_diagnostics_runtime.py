@@ -283,6 +283,16 @@ def load_desktop_diagnostics_bundle_record(
         latest_geometry_reference_evidence_path=str(geometry_reference.get("source_path") or ""),
         geometry_reference_status=str(geometry_reference.get("status") or "MISSING"),
         geometry_reference_artifact_status=str(geometry_reference.get("artifact_status") or "missing"),
+        geometry_reference_artifact_freshness_status=str(
+            geometry_reference.get("artifact_freshness_status") or "missing"
+        ),
+        geometry_reference_artifact_freshness_relation=str(
+            geometry_reference.get("artifact_freshness_relation") or "missing"
+        ),
+        geometry_reference_artifact_freshness_reason=str(
+            geometry_reference.get("artifact_freshness_reason") or ""
+        ),
+        geometry_reference_latest_artifact_status=str(geometry_reference.get("latest_artifact_status") or ""),
         geometry_reference_road_width_status=str(geometry_reference.get("road_width_status") or "missing"),
         geometry_reference_road_width_source=str(geometry_reference.get("road_width_source") or ""),
         geometry_reference_packaging_status=str(geometry_reference.get("packaging_status") or "missing"),
@@ -496,6 +506,10 @@ def write_desktop_diagnostics_center_state(
         "geometry_reference_evidence": {
             "status": bundle_record.geometry_reference_status,
             "artifact_status": bundle_record.geometry_reference_artifact_status,
+            "artifact_freshness_status": bundle_record.geometry_reference_artifact_freshness_status,
+            "artifact_freshness_relation": bundle_record.geometry_reference_artifact_freshness_relation,
+            "artifact_freshness_reason": bundle_record.geometry_reference_artifact_freshness_reason,
+            "latest_artifact_status": bundle_record.geometry_reference_latest_artifact_status,
             "road_width_status": bundle_record.geometry_reference_road_width_status,
             "road_width_source": bundle_record.geometry_reference_road_width_source,
             "packaging_status": bundle_record.geometry_reference_packaging_status,

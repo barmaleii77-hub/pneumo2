@@ -33,6 +33,7 @@ from pneumo_solver_ui.desktop_results_model import (
     format_validation_summary,
 )
 from pneumo_solver_ui.desktop_results_runtime import DesktopResultsRuntime
+from pneumo_solver_ui.optimization_baseline_source import build_baseline_center_surface
 
 
 @dataclass(frozen=True)
@@ -170,9 +171,35 @@ def build_baseline_workspace_summary(
     optimizer_runtime = _build_optimizer_runtime(repo_root, python_executable)
     contract = optimizer_runtime.contract_snapshot()
     results_snapshot = _safe_results_snapshot(repo_root, python_executable)
+    try:
+        baseline_surface = build_baseline_center_surface(workspace_dir=contract.workspace_dir)
+    except Exception:
+        baseline_surface = {}
 
-    baseline_label = _safe_text(contract.baseline_source_label, fallback="baseline provenance не найден")
-    baseline_path = _path_text(contract.baseline_path) or "Сначала выполните baseline-aware запуск и сохраните provenance."
+    active = dict(baseline_surface.get("active_baseline") or {})
+    suite_handoff = dict(baseline_surface.get("suite_handoff") or {})
+    banner_state = dict(baseline_surface.get("banner_state") or {})
+    mismatch_state = dict(baseline_surface.get("mismatch_state") or {})
+    history_rows = tuple(dict(row) for row in baseline_surface.get("history_rows") or ())
+    action_strip = dict(baseline_surface.get("action_strip") or {})
+
+    active_state = _safe_text(active.get("state"), fallback="missing")
+    ho005_state = _safe_text(suite_handoff.get("state"), fallback="missing")
+    active_hash = str(active.get("active_baseline_hash") or "")
+    suite_hash = str(active.get("suite_snapshot_hash") or suite_handoff.get("suite_snapshot_hash") or "")
+    inputs_hash = str(active.get("inputs_snapshot_hash") or suite_handoff.get("inputs_snapshot_hash") or "")
+    ring_hash = str(active.get("ring_source_hash") or suite_handoff.get("ring_source_hash") or "")
+    policy_mode = _safe_text(active.get("policy_mode"), fallback="policy n/a")
+    source_run = _path_text(active.get("source_run_dir")) or "source run не указан"
+    active_contract_path = _path_text(active.get("contract_path")) or "active_baseline_contract.json пока не найден"
+    history_path = _path_text(baseline_surface.get("history_path")) or "baseline_history.jsonl пока не найден"
+    optimizer_can_consume = bool(active.get("optimizer_baseline_can_consume", False))
+    baseline_label = (
+        f"HO-006 {active_state}"
+        if active_hash or active_state != "missing"
+        else "HO-006 active baseline не найден"
+    )
+    baseline_path = active_contract_path
     latest_result = (
         format_npz_summary(results_snapshot)
         if results_snapshot is not None
@@ -193,9 +220,46 @@ def build_baseline_workspace_summary(
         if results_snapshot is not None
         else "После baseline переходите в оптимизацию только из baseline-aware контекста."
     )
+    mismatch_fields = tuple(str(field) for field in mismatch_state.get("mismatch_fields") or ())
+    mismatch_text = (
+        ", ".join(mismatch_fields)
+        if mismatch_fields
+        else _safe_text(mismatch_state.get("state"), fallback="active/history mismatch не выбран")
+    )
+    allowed_actions = []
+    for action_name in ("review", "adopt", "restore"):
+        action = dict(action_strip.get(action_name) or {})
+        state = "enabled" if bool(action.get("enabled", False)) else "blocked"
+        if action_name == "review" and bool(action.get("read_only", False)):
+            state = "read-only"
+        allowed_actions.append(f"{action_name}={state}")
 
     facts = (
-        WorkspaceSummaryFact("Активный baseline", baseline_label, baseline_path),
+        WorkspaceSummaryFact(
+            "HO-005 -> active_baseline_contract -> HO-006",
+            f"HO-005={ho005_state} | HO-006={active_state}",
+            _safe_text(banner_state.get("banner"), fallback="Baseline Center ждёт явного review/adopt/restore."),
+        ),
+        WorkspaceSummaryFact(
+            "Активный baseline",
+            baseline_label,
+            f"active_baseline_hash={active_hash[:12] or '—'} | optimizer_can_consume={optimizer_can_consume}",
+        ),
+        WorkspaceSummaryFact(
+            "Frozen context",
+            f"suite={suite_hash[:12] or '—'} | inputs={inputs_hash[:12] or '—'} | ring={ring_hash[:12] or '—'}",
+            f"policy_mode={policy_mode}",
+        ),
+        WorkspaceSummaryFact(
+            "Baseline history",
+            f"rows={len(history_rows)} | selected={_safe_text(baseline_surface.get('selected_history_id'), fallback='нет')}",
+            f"mismatch={mismatch_text}",
+        ),
+        WorkspaceSummaryFact(
+            "Действия review/adopt/restore",
+            " | ".join(allowed_actions),
+            "Adopt/restore применяются только после explicit confirmation; silent rebinding запрещён.",
+        ),
         WorkspaceSummaryFact(
             "Контракт задачи",
             f"{_safe_text(contract.problem_hash_mode, fallback='mode n/a')} | {_safe_text(contract.problem_hash, fallback='hash n/a')}",
@@ -216,7 +280,10 @@ def build_baseline_workspace_summary(
     )
     evidence_lines = _dedupe_lines(
         (
-            f"Baseline path: {baseline_path}",
+            f"Active contract: {active_contract_path}",
+            f"Baseline history: {history_path}",
+            f"Banner: {_safe_text(banner_state.get('banner'), fallback='нет active banner')}",
+            f"Mismatch state: {mismatch_text}",
             f"Suite: {contract.suite_json_path}",
             f"Ranges: {contract.ranges_json_path}",
             f"Worker: {contract.worker_path}",
@@ -228,7 +295,7 @@ def build_baseline_workspace_summary(
     )
     return WorkspaceSummaryState(
         headline=baseline_label,
-        detail=baseline_path,
+        detail=_safe_text(banner_state.get("banner"), fallback=baseline_path),
         facts=facts,
         evidence_lines=evidence_lines,
     )
@@ -433,8 +500,11 @@ def build_optimization_workspace_summary(
         ),
         WorkspaceSummaryFact(
             "Baseline provenance",
-            _safe_text(contract.baseline_source_label, fallback="не найден"),
-            _path_text(contract.baseline_path) or "Нужен явный baseline provenance.",
+            f"HO-006={_safe_text(contract.active_baseline_state, fallback='missing')}",
+            (
+                f"active_baseline_hash={str(contract.active_baseline_hash or '')[:12] or '—'} | "
+                f"can_consume={bool(contract.optimizer_baseline_can_consume)}"
+            ),
         ),
         WorkspaceSummaryFact(
             "Suite / stages",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -46,10 +47,49 @@ from pneumo_solver_ui.desktop_input_model import (
 from pneumo_solver_ui.anim_export_contract import CYLINDER_PACKAGING_PASSPORT_JSON_NAME
 from pneumo_solver_ui.geometry_acceptance_contract import GEOMETRY_ACCEPTANCE_JSON_NAME
 from pneumo_solver_ui.run_artifacts import collect_anim_latest_diagnostics_summary
+from pneumo_solver_ui.workspace_contract import resolve_effective_workspace_dir
+
+
+GEOMETRY_REFERENCE_EVIDENCE_FILENAME = "geometry_reference_evidence.json"
+GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME = "latest_geometry_reference_evidence.json"
 
 
 def _normalize_search_text(value: Any) -> str:
     return " ".join(str(value or "").strip().lower().replace("ё", "е").replace("_", " ").split())
+
+
+def _path_identity(value: str | Path | None) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        return str(Path(text).expanduser().resolve(strict=False)).casefold()
+    except Exception:
+        return text.casefold()
+
+
+def _json_ready(value: Any) -> Any:
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): _json_ready(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_ready(item) for item in value]
+    return value
+
+
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> Path:
+    target = Path(path).expanduser().resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = target.with_name(f".{target.name}.tmp")
+    tmp_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
+    tmp_path.replace(target)
+    return target
 
 
 class DesktopGeometryReferenceRuntime:
@@ -256,7 +296,7 @@ class DesktopGeometryReferenceRuntime:
         summary: dict[str, Any] | None = None,
         tol_m: float = 1e-6,
     ) -> GeometryAcceptanceEvidenceSnapshot:
-        artifact = artifact_context or self.artifact_context(summary)
+        artifact = artifact_context or self.artifact_context(summary, artifact_path=artifact_path)
         return build_geometry_acceptance_evidence_from_artifact(artifact, tol_m=tol_m)
 
     def road_width_evidence(
@@ -290,16 +330,142 @@ class DesktopGeometryReferenceRuntime:
         raw_path: str | Path | None = None,
         *,
         artifact_context: ArtifactReferenceContext | None = None,
+        artifact_path: str | Path | None = None,
         summary: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         artifact = artifact_context or self.artifact_context(summary)
-        return build_geometry_reference_diagnostics_handoff(
+        payload = build_geometry_reference_diagnostics_handoff(
             artifact_context=artifact,
             component_rows=self.component_passport_rows(),
             road_width=self.road_width_evidence(raw_path, artifact_context=artifact),
             packaging=self.packaging_passport_evidence(raw_path, artifact_context=artifact),
             acceptance=self.artifact_geometry_acceptance_evidence(artifact),
         )
+        freshness = self.artifact_freshness_evidence(
+            artifact_context=artifact,
+            artifact_path=artifact_path,
+        )
+        payload.update(
+            {
+                "artifact_freshness_status": freshness["status"],
+                "artifact_freshness_relation": freshness["relation"],
+                "artifact_freshness_reason": freshness["reason"],
+                "latest_artifact_status": freshness["latest_status"],
+                "latest_artifact_npz_path": freshness["latest_npz_path"],
+                "latest_artifact_pointer_path": freshness["latest_pointer_path"],
+                "latest_artifact_updated_utc": freshness["latest_updated_utc"],
+                "selected_artifact_npz_path": freshness["selected_npz_path"],
+                "selected_artifact_pointer_path": freshness["selected_pointer_path"],
+            }
+        )
+        return payload
+
+    def artifact_freshness_evidence(
+        self,
+        artifact_context: ArtifactReferenceContext | None = None,
+        *,
+        artifact_path: str | Path | None = None,
+        latest_context: ArtifactReferenceContext | None = None,
+        latest_summary: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        selected_path = str(artifact_path or "").strip()
+        selected = artifact_context or self.artifact_context(artifact_path=selected_path)
+        latest = selected if not selected_path and latest_context is None else (
+            latest_context or self.artifact_context(latest_summary)
+        )
+        issues = list(selected.issues)
+
+        selected_npz_id = _path_identity(selected.npz_path)
+        latest_npz_id = _path_identity(latest.npz_path)
+        selected_pointer_id = _path_identity(selected.pointer_path)
+        latest_pointer_id = _path_identity(latest.pointer_path)
+        matches_npz = bool(selected_npz_id and latest_npz_id and selected_npz_id == latest_npz_id)
+        matches_pointer = bool(
+            selected_pointer_id and latest_pointer_id and selected_pointer_id == latest_pointer_id
+        )
+
+        if not selected_path:
+            status = selected.status
+            relation = "latest"
+            reason = "Using latest artifact helper; no selected artifact override."
+        elif selected.status in {"missing", "stale"}:
+            status = selected.status
+            relation = "selected_unavailable"
+            reason = "Selected artifact pointer/NPZ is unavailable or stale."
+        elif latest.status == "missing":
+            status = "historical"
+            relation = "selected_without_latest"
+            reason = "Selected artifact is readable, but latest artifact context is missing."
+        elif matches_npz or matches_pointer:
+            status = "current"
+            relation = "matches_latest"
+            reason = "Selected artifact matches latest by NPZ or pointer path."
+        else:
+            status = "historical"
+            relation = "differs_from_latest"
+            reason = "Selected artifact is readable, but differs from the current latest artifact."
+            issues.append(
+                "selected NPZ differs from latest NPZ: "
+                f"{selected.npz_path or '—'} vs {latest.npz_path or '—'}"
+            )
+
+        return {
+            "status": status,
+            "relation": relation,
+            "reason": reason,
+            "selected_status": selected.status,
+            "latest_status": latest.status,
+            "selected_source_label": selected.source_label,
+            "latest_source_label": latest.source_label,
+            "selected_pointer_path": selected.pointer_path,
+            "latest_pointer_path": latest.pointer_path,
+            "selected_npz_path": selected.npz_path,
+            "latest_npz_path": latest.npz_path,
+            "selected_updated_utc": selected.updated_utc,
+            "latest_updated_utc": latest.updated_utc,
+            "selected_visual_cache_token": selected.visual_cache_token,
+            "latest_visual_cache_token": latest.visual_cache_token,
+            "issues": list(dict.fromkeys(str(item) for item in issues if str(item or "").strip())),
+        }
+
+    def write_diagnostics_handoff_evidence(
+        self,
+        raw_path: str | Path | None = None,
+        *,
+        artifact_context: ArtifactReferenceContext | None = None,
+        artifact_path: str | Path | None = None,
+        summary: dict[str, Any] | None = None,
+        exports_dir: str | Path | None = None,
+        send_bundles_dir: str | Path | None = None,
+    ) -> dict[str, Any]:
+        payload = _json_ready(
+            self.diagnostics_handoff_evidence(
+                raw_path,
+                artifact_context=artifact_context,
+                artifact_path=artifact_path,
+                summary=summary,
+            )
+        )
+        repo_root = self.ui_root.parent.resolve()
+        if exports_dir is None:
+            workspace_dir = resolve_effective_workspace_dir(repo_root)
+            workspace_path = workspace_dir / "exports" / GEOMETRY_REFERENCE_EVIDENCE_FILENAME
+        else:
+            workspace_path = Path(exports_dir).expanduser().resolve() / GEOMETRY_REFERENCE_EVIDENCE_FILENAME
+        if send_bundles_dir is None:
+            sidecar_path = repo_root / "send_bundles" / GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME
+        else:
+            sidecar_path = Path(send_bundles_dir).expanduser().resolve() / GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME
+
+        written_workspace = _atomic_write_json(workspace_path, payload)
+        written_sidecar = _atomic_write_json(sidecar_path, payload)
+        return {
+            "payload": payload,
+            "workspace_path": written_workspace,
+            "sidecar_path": written_sidecar,
+            "workspace_arcname": f"workspace/exports/{GEOMETRY_REFERENCE_EVIDENCE_FILENAME}",
+            "sidecar_name": GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME,
+        }
 
     def catalog_variant_labels(self) -> tuple[str, ...]:
         labels = sorted({row.variant_label for row in self._catalog_rows})

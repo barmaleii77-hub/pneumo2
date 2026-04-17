@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import subprocess
 import sys
-from typing import Callable
+from typing import Any, Callable
 
 from PySide6 import QtCore, QtWidgets
 
@@ -30,6 +30,7 @@ from pneumo_solver_ui.desktop_diagnostics_runtime import (
     write_desktop_diagnostics_summary_md,
 )
 from pneumo_solver_ui.desktop_shell.external_launch import spawn_module
+from pneumo_solver_ui.optimization_baseline_source import baseline_center_evidence_payload
 
 from .catalogs import get_tooltip, get_ui_element
 from .contracts import DesktopWorkspaceSpec
@@ -80,6 +81,37 @@ def _bool_marker(value: bool | None) -> str:
     if value is None:
         return "unknown"
     return "yes" if value else "no"
+
+
+def _baseline_attention_required(evidence: dict[str, Any]) -> bool:
+    active = dict(evidence.get("active_baseline") or {})
+    active_state = str(active.get("state") or "").strip()
+    mismatch = dict(evidence.get("mismatch_state") or {})
+    return bool(
+        evidence.get("send_bundle_should_include", False)
+        or active_state != "current"
+        or str(mismatch.get("state") or "") == "historical_mismatch"
+    )
+
+
+def _baseline_status_text(evidence: dict[str, Any]) -> str:
+    if not evidence:
+        return "HO-006 baseline evidence недоступен."
+    active = dict(evidence.get("active_baseline") or {})
+    banner = dict(evidence.get("banner_state") or {})
+    mismatch = dict(evidence.get("mismatch_state") or {})
+    active_state = str(active.get("state") or banner.get("active_state") or "missing").strip() or "missing"
+    active_hash = str(active.get("active_baseline_hash") or "")
+    mismatch_state = str(mismatch.get("state") or banner.get("selected_compare_state") or "none")
+    banner_text = str(banner.get("banner") or active.get("banner") or "")
+    lines = [
+        f"HO-006 state={active_state}; active_baseline_hash={active_hash[:12] or '—'}",
+        f"mismatch={mismatch_state}; send_bundle_include={bool(evidence.get('send_bundle_should_include', False))}",
+        "silent_rebinding_allowed=False",
+    ]
+    if banner_text:
+        lines.append(f"banner={banner_text}")
+    return "\n".join(lines)
 
 
 def _restore_request_from_center_state(
@@ -151,6 +183,9 @@ class DiagnosticsWorkspaceSnapshot:
     center_state_path: str
     summary_md_path: str
     recommended_next_step: str
+    baseline_evidence: dict[str, Any]
+    baseline_attention_required: bool
+    baseline_status_text: str
     is_busy: bool
     status_text: str
 
@@ -202,6 +237,17 @@ class DiagnosticsShellController(QtCore.QObject):
         run_record = load_last_desktop_diagnostics_run_record(request.resolved_out_root(self.repo_root))
         run_log_text = load_last_desktop_diagnostics_run_log_text(request.resolved_out_root(self.repo_root))
         summary = build_diagnostics_workspace_summary(self.repo_root)
+        try:
+            baseline_evidence = baseline_center_evidence_payload(repo_root=self.repo_root)
+        except Exception as exc:
+            baseline_evidence = {
+                "schema": "baseline_center_evidence",
+                "error": str(exc),
+                "active_baseline": {"state": "invalid"},
+                "send_bundle_should_include": True,
+                "silent_rebinding_allowed": False,
+            }
+        baseline_attention = _baseline_attention_required(baseline_evidence)
 
         self._current_bundle = bundle
         self._current_request = request
@@ -220,10 +266,15 @@ class DiagnosticsShellController(QtCore.QObject):
             center_state_path=path_str(Path(bundle.out_dir) / "latest_desktop_diagnostics_center_state.json"),
             summary_md_path=path_str(Path(bundle.out_dir) / "latest_desktop_diagnostics_summary.md"),
             recommended_next_step=(
-                "Если bundle уже собран, проверьте inspection/health и затем переходите к отправке."
+                "Baseline HO-006 требует review в Baseline Center перед отправкой."
+                if baseline_attention
+                else "Если bundle уже собран, проверьте inspection/health и затем переходите к отправке."
                 if bundle.latest_zip_path
                 else "Сначала соберите диагностику, чтобы получить ZIP и свежие inspection/health артефакты."
             ),
+            baseline_evidence=baseline_evidence,
+            baseline_attention_required=baseline_attention,
+            baseline_status_text=_baseline_status_text(baseline_evidence),
             is_busy=self.is_busy(),
             status_text=self._status_text,
         )
@@ -426,6 +477,9 @@ class DiagnosticsShellController(QtCore.QObject):
                 "active_run_out_root": path_str(snapshot.request.resolved_out_root(self.repo_root)),
                 "clipboard_ok": snapshot.bundle.clipboard_ok,
                 "worker_error": "" if snapshot.run_record is None else snapshot.run_record.last_message,
+                "baseline_attention_required": snapshot.baseline_attention_required,
+                "baseline_status_text": snapshot.baseline_status_text,
+                "baseline_open_command": "baseline.center.open",
             },
         )
 
@@ -437,6 +491,7 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         *,
         repo_root: Path,
         on_shell_status: Callable[[str, bool], None] | None = None,
+        on_command: Callable[[str], None] | None = None,
         spawn_module_fn: Callable[[str], object] = spawn_module,
         open_path_fn: Callable[[Path], None] = _open_in_explorer,
         parent: QtWidgets.QWidget | None = None,
@@ -444,6 +499,7 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         super().__init__(parent)
         self.workspace = workspace
         self.on_shell_status = on_shell_status
+        self.on_command = on_command
         self.controller = DiagnosticsShellController(
             Path(repo_root).resolve(),
             spawn_module_fn=spawn_module_fn,
@@ -547,6 +603,18 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         check_layout.addRow("Рекомендуемый шаг", self.next_step_value)
         layout.addWidget(self.check_box)
 
+        self.baseline_box = QtWidgets.QGroupBox("Baseline HO-006")
+        baseline_layout = QtWidgets.QVBoxLayout(self.baseline_box)
+        self.baseline_status_value = QtWidgets.QLabel("")
+        self.baseline_status_value.setObjectName("DG-BASELINE-STATUS")
+        self.baseline_status_value.setWordWrap(True)
+        self.open_baseline_center_button = QtWidgets.QPushButton("Открыть Baseline Center")
+        self.open_baseline_center_button.setObjectName("DG-BTN-OPEN-BASELINE")
+        self.open_baseline_center_button.clicked.connect(self.open_baseline_center)
+        baseline_layout.addWidget(self.baseline_status_value)
+        baseline_layout.addWidget(self.open_baseline_center_button)
+        layout.addWidget(self.baseline_box)
+
         self.actions_box = QtWidgets.QGroupBox("Действия")
         actions_layout = QtWidgets.QGridLayout(self.actions_box)
         self.collect_button = QtWidgets.QPushButton("Собрать диагностику")
@@ -594,6 +662,13 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
 
     def handle_command(self, command_id: str) -> None:
         self.controller.handle_command(command_id)
+
+    def open_baseline_center(self) -> None:
+        if self.on_command is not None:
+            self.on_command("baseline.center.open")
+            self.status_label.setText("Открыт Baseline Center из diagnostics HO-006 banner.")
+            return
+        self.status_label.setText("Baseline Center доступен из основного shell route: WS-BASELINE / HO-006.")
 
     def _on_controller_status(self, text: str, busy: bool) -> None:
         self.status_label.setText(text)
@@ -645,6 +720,16 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.validation_value.setText(_safe_path_text(snapshot.bundle.latest_validation_md_path))
         self.triage_value.setText(_safe_path_text(snapshot.bundle.latest_triage_md_path))
         self.next_step_value.setText(snapshot.recommended_next_step)
+        self.baseline_status_value.setText(snapshot.baseline_status_text)
+        if snapshot.baseline_attention_required:
+            self.baseline_status_value.setStyleSheet(
+                "background: #fff4e5; color: #6f4e00; padding: 8px; border: 1px solid #d9822b;"
+            )
+        else:
+            self.baseline_status_value.setStyleSheet(
+                "background: #e8f7ee; color: #1f5f3a; padding: 8px; border: 1px solid #64b883;"
+            )
+        self.open_baseline_center_button.setEnabled(not snapshot.is_busy)
 
         self.log_view.setPlainText(snapshot.run_log_text or "\n".join(snapshot.summary_lines))
 

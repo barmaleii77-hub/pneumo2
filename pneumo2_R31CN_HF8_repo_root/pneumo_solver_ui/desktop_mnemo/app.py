@@ -56,6 +56,16 @@ REFERENCE_SCHEME_VIEWBOX_H = 1080.0
 REFERENCE_SCHEME_SCENE_INSET = (84.0, 150.0, 84.0, 140.0)
 PLAYHEAD_STORAGE_KEY = "pneumo_desktop_mnemo_playhead"
 EVENT_LOG_SCHEMA_VERSION = "desktop_mnemo_event_log_v1"
+DATASET_CONTRACT_SCHEMA_VERSION = "desktop_mnemo_dataset_contract_v1"
+DATASET_PROVENANCE_SCHEMA_VERSION = "desktop_mnemo_dataset_provenance_v1"
+DATASET_AVAILABILITY_SCHEMA_VERSION = "desktop_mnemo_availability_v1"
+WINDOW_LAYOUT_CONTRACT_SCHEMA_VERSION = "desktop_mnemo_window_layout_contract_v1"
+TRUTH_STATES: tuple[str, ...] = (
+    "solver_confirmed",
+    "source_data_confirmed",
+    "approximate_inferred_with_warning",
+    "unavailable",
+)
 CORNER_ORDER: tuple[str, str, str, str] = ("ЛП", "ПП", "ЛЗ", "ПЗ")
 DETAIL_MODE_LABELS: dict[str, str] = {
     "quiet": "Тихо",
@@ -325,6 +335,9 @@ class MnemoDataset:
     geometry_issues: list[str]
     geometry_warnings: list[str]
     scheme_fidelity: dict[str, Any]
+    availability: dict[str, Any]
+    provenance: dict[str, Any]
+    dataset_contract: dict[str, Any]
 
 
 @dataclass
@@ -866,6 +879,23 @@ def _friendly_error_text(exc: Exception) -> str:
     return f"{type(exc).__name__}: {exc}"
 
 
+def _qt_platform_name() -> str:
+    app = QtWidgets.QApplication.instance()
+    if app is not None:
+        try:
+            return str(app.platformName()).strip().lower()
+        except Exception:
+            return ""
+    try:
+        return str(QtGui.QGuiApplication.platformName()).strip().lower()
+    except Exception:
+        return ""
+
+
+def _desktop_mnemo_can_show_blocking_dialog() -> bool:
+    return _qt_platform_name() not in {"offscreen", "minimal", "minimalegl"}
+
+
 def _utc_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -898,13 +928,21 @@ def _build_event_log_payload(
     selected_node: str | None,
     follow_enabled: bool,
     pointer_path: Path | None,
+    window_layout_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    layout_contract = dict(window_layout_contract or _empty_window_layout_contract())
     if dataset is None or dataset.time_s.size == 0:
+        dataset_contract = _empty_dataset_contract()
         return {
             "schema_version": EVENT_LOG_SCHEMA_VERSION,
             "updated_utc": _utc_iso(),
             "source": "desktop_mnemo",
             "available": False,
+            "dataset_contract": dataset_contract,
+            "availability": dataset_contract["availability"],
+            "provenance": dataset_contract["provenance"],
+            "source_markers": list(dataset_contract["source_markers"]),
+            "window_layout_contract": layout_contract,
             "events": [],
         }
 
@@ -921,6 +959,13 @@ def _build_event_log_payload(
         "pointer_json": str(pointer_path.resolve()) if pointer_path is not None else "",
         "follow_enabled": bool(follow_enabled),
         "dataset_id": str(dataset.dataset_id),
+        "dataset_contract": dict(dataset.dataset_contract),
+        "availability": dict(dataset.availability),
+        "provenance": dict(dataset.provenance),
+        "source_markers": list(dataset.availability.get("source_markers") or []),
+        "unavailable_surfaces": list(dataset.availability.get("unavailable_surfaces") or []),
+        "overall_truth_state": str(dataset.availability.get("overall_truth_state") or "unavailable"),
+        "window_layout_contract": layout_contract,
         "current_idx": clamped_idx,
         "current_time_s": float(dataset.time_s[clamped_idx]),
         "selected_edge": str(selected_edge or ""),
@@ -960,6 +1005,7 @@ def _write_event_log_sidecar(
     selected_node: str | None,
     follow_enabled: bool,
     pointer_path: Path | None,
+    window_layout_contract: dict[str, Any] | None = None,
 ) -> Path | None:
     if dataset is None or dataset.time_s.size == 0:
         return None
@@ -972,12 +1018,572 @@ def _write_event_log_sidecar(
         selected_node=selected_node,
         follow_enabled=follow_enabled,
         pointer_path=pointer_path,
+        window_layout_contract=window_layout_contract,
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
     tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp_path.replace(out_path)
     return out_path
+
+
+def _table_columns(table: Any) -> list[str]:
+    cols = getattr(table, "cols", None)
+    if cols is None:
+        return []
+    try:
+        return [str(item) for item in list(cols)]
+    except Exception:
+        return []
+
+
+def _signal_columns(table: Any) -> list[str]:
+    return [name for name in _table_columns(table) if name != "время_с"]
+
+
+def _path_from_text(value: Any) -> Path | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return Path(text)
+    except Exception:
+        return None
+
+
+def _path_sha256(path: Path | None) -> str:
+    if path is None:
+        return ""
+    try:
+        path_obj = Path(path)
+        if not path_obj.exists() or not path_obj.is_file():
+            return ""
+        digest = hashlib.sha256()
+        with path_obj.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except Exception:
+        return ""
+
+
+def _source_file_payload(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return {"available": False, "path": "", "sha256": "", "mtime_ns": None, "size_bytes": None}
+    try:
+        resolved = Path(path).expanduser().resolve()
+    except Exception:
+        resolved = Path(path)
+    if not resolved.exists() or not resolved.is_file():
+        return {"available": False, "path": str(resolved), "sha256": "", "mtime_ns": None, "size_bytes": None}
+    stat = resolved.stat()
+    return {
+        "available": True,
+        "path": str(resolved),
+        "sha256": _path_sha256(resolved),
+        "mtime_ns": int(stat.st_mtime_ns),
+        "size_bytes": int(stat.st_size),
+    }
+
+
+def _finite_contract_value(value: Any) -> bool:
+    try:
+        return math.isfinite(float(value))
+    except Exception:
+        return False
+
+
+def _availability_marker(
+    *,
+    surface: str,
+    label: str,
+    state: str,
+    source: str,
+    reason: str,
+    missing: list[str] | tuple[str, ...] | None = None,
+    count: int | None = None,
+    total: int | None = None,
+) -> dict[str, Any]:
+    normalized_state = state if state in TRUTH_STATES else "unavailable"
+    payload: dict[str, Any] = {
+        "surface": str(surface),
+        "label": str(label),
+        "state": normalized_state,
+        "available": normalized_state != "unavailable",
+        "source": str(source),
+        "reason": str(reason),
+        "missing": [str(item) for item in (missing or []) if str(item).strip()],
+    }
+    if count is not None:
+        payload["count"] = int(count)
+    if total is not None:
+        payload["total"] = int(total)
+    return payload
+
+
+def _empty_availability_contract(reason: str = "Dataset is not loaded.") -> dict[str, Any]:
+    marker = _availability_marker(
+        surface="dataset",
+        label="Desktop Mnemo dataset",
+        state="unavailable",
+        source="none",
+        reason=reason,
+        missing=("npz_bundle",),
+    )
+    return {
+        "schema_version": DATASET_AVAILABILITY_SCHEMA_VERSION,
+        "overall_truth_state": "unavailable",
+        "source_markers": [marker],
+        "unavailable_surfaces": ["dataset"],
+        "warning_surfaces": [],
+        "summary": reason,
+    }
+
+
+def _empty_provenance_contract(reason: str = "Dataset is not loaded.") -> dict[str, Any]:
+    return {
+        "schema_version": DATASET_PROVENANCE_SCHEMA_VERSION,
+        "source": "desktop_mnemo",
+        "available": False,
+        "reason": reason,
+        "dataset_id": "",
+        "source_files": {},
+        "runtime_tables": {},
+    }
+
+
+def _empty_dataset_contract(reason: str = "Dataset is not loaded.") -> dict[str, Any]:
+    availability = _empty_availability_contract(reason)
+    provenance = _empty_provenance_contract(reason)
+    return {
+        "schema_version": DATASET_CONTRACT_SCHEMA_VERSION,
+        "source": "desktop_mnemo",
+        "truth_states": list(TRUTH_STATES),
+        "available": False,
+        "availability": availability,
+        "provenance": provenance,
+        "source_markers": list(availability["source_markers"]),
+    }
+
+
+def _truth_state_label(state: str) -> str:
+    mapping = {
+        "solver_confirmed": "solver confirmed",
+        "source_data_confirmed": "source data confirmed",
+        "approximate_inferred_with_warning": "approximate with warning",
+        "unavailable": "unavailable",
+    }
+    return mapping.get(str(state or "").strip(), "unavailable")
+
+
+def _truth_state_palette(state: str) -> tuple[str, str]:
+    mapping = {
+        "solver_confirmed": ("#81e7a3", "#0f2a1c"),
+        "source_data_confirmed": ("#9fe7f7", "#09212a"),
+        "approximate_inferred_with_warning": ("#f8c15c", "#2b1c09"),
+        "unavailable": ("#f0936b", "#30150f"),
+    }
+    return mapping.get(str(state or "").strip(), ("#f0936b", "#30150f"))
+
+
+def _availability_from_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return _empty_availability_contract()
+    if isinstance(payload.get("availability"), dict):
+        return dict(payload.get("availability") or {})
+    if "source_markers" in payload or "overall_truth_state" in payload:
+        return dict(payload)
+    return _empty_availability_contract()
+
+
+def _availability_source_markers(availability: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(availability, dict):
+        return []
+    return [dict(item or {}) for item in list(availability.get("source_markers") or []) if isinstance(item, dict)]
+
+
+def _availability_surface_state(availability: dict[str, Any] | None, surface: str) -> str:
+    target = str(surface or "")
+    for marker in _availability_source_markers(availability):
+        if str(marker.get("surface") or "") == target:
+            return str(marker.get("state") or "unavailable")
+    return "unavailable"
+
+
+def _truth_status_text(availability: dict[str, Any] | None) -> str:
+    availability = _availability_from_payload(availability)
+    overall_truth_state = str(availability.get("overall_truth_state") or "unavailable")
+    unavailable_surfaces = {str(item) for item in list(availability.get("unavailable_surfaces") or [])}
+    warning_surfaces = {str(item) for item in list(availability.get("warning_surfaces") or [])}
+    if overall_truth_state == "unavailable" or unavailable_surfaces.intersection({"pressure", "state"}):
+        return "Mnemo: unavailable pressure/state"
+    if overall_truth_state == "solver_confirmed" and not unavailable_surfaces and not warning_surfaces:
+        return "Mnemo: confirmed"
+    return "Mnemo: warnings"
+
+
+def _truth_summary_html(availability: dict[str, Any] | None) -> str:
+    availability = _availability_from_payload(availability)
+    overall_truth_state = str(availability.get("overall_truth_state") or "unavailable")
+    unavailable_surfaces = [str(item) for item in list(availability.get("unavailable_surfaces") or [])]
+    warning_surfaces = [str(item) for item in list(availability.get("warning_surfaces") or [])]
+    fg, bg = _truth_state_palette(overall_truth_state)
+    unavailable_text = ", ".join(unavailable_surfaces) if unavailable_surfaces else "none"
+    warning_text = ", ".join(warning_surfaces) if warning_surfaces else "none"
+    summary = str(availability.get("summary") or _truth_status_text(availability))
+    return (
+        '<div style="margin:0 0 10px 0; padding:9px 11px; border-radius:10px; '
+        'background:rgba(9,24,31,0.82); border:1px solid rgba(159,231,247,0.18);">'
+        f'<span style="display:inline-block; padding:2px 8px; border-radius:999px; '
+        f'background:{bg}; color:{fg}; font-weight:700; font-size:11px;">'
+        f'{escape(_truth_state_label(overall_truth_state))}</span>'
+        f'<div style="margin-top:7px;"><b>overall_truth_state:</b> {escape(overall_truth_state)}</div>'
+        f'<div><b>unavailable_surfaces:</b> {escape(unavailable_text)}</div>'
+        f'<div><b>warning_surfaces:</b> {escape(warning_text)}</div>'
+        f'<div style="color:#9fb8c2; margin-top:5px;">{escape(summary)}</div>'
+        "</div>"
+    )
+
+
+def _source_markers_table_html(availability: dict[str, Any] | None, *, limit: int = 16) -> str:
+    markers = _availability_source_markers(availability)
+    if not markers:
+        return "<p><b>source_markers:</b> none</p>"
+    rows: list[str] = []
+    for marker in markers[:limit]:
+        missing = [str(item) for item in list(marker.get("missing") or []) if str(item).strip()]
+        missing_or_reason = ", ".join(missing[:5])
+        if len(missing) > 5:
+            missing_or_reason += f", +{len(missing) - 5}"
+        if not missing_or_reason:
+            missing_or_reason = str(marker.get("reason") or "")
+        rows.append(
+            "<tr>"
+            f"<td>{escape(str(marker.get('surface') or ''))}</td>"
+            f"<td>{escape(str(marker.get('state') or 'unavailable'))}</td>"
+            f"<td>{escape(str(marker.get('source') or ''))}</td>"
+            f"<td>{escape(missing_or_reason)}</td>"
+            "</tr>"
+        )
+    tail = ""
+    if len(markers) > limit:
+        tail = f"<p style='color:#8fb0bc;'>source_markers: +{len(markers) - limit} hidden rows</p>"
+    return (
+        "<p><b>source_markers:</b></p>"
+        "<table cellspacing='0' cellpadding='4' style='width:100%; border-collapse:collapse;'>"
+        "<tr><th align='left'>surface</th><th align='left'>state</th><th align='left'>source</th>"
+        "<th align='left'>missing/reason</th></tr>"
+        + "".join(rows)
+        + "</table>"
+        + tail
+    )
+
+
+def _empty_window_layout_contract(reason: str = "Window layout is not available outside Mnemo runtime.") -> dict[str, Any]:
+    return {
+        "schema_version": WINDOW_LAYOUT_CONTRACT_SCHEMA_VERSION,
+        "source": "desktop_mnemo",
+        "available": False,
+        "reason": str(reason),
+        "docks": [],
+        "ui_state_keys": [
+            "window/geometry",
+            "window/state",
+            "view_mode",
+            "detail_mode",
+            "flow_display_mode",
+            "pressure_display_mode",
+            "reference_scheme_visible",
+        ],
+        "window_geometry_available": False,
+        "window_state_available": False,
+        "custom_titlebar_assumption": False,
+    }
+
+
+def _build_availability_contract(
+    *,
+    bundle: DataBundle,
+    edge_names: list[str],
+    node_names: list[str],
+    edge_series: list[dict[str, Any]],
+    node_series: list[dict[str, Any]],
+    scheme_fidelity: dict[str, Any],
+    reference_svg_inline: str,
+    visual_geometry: dict[str, Any],
+    geometry_issues: list[str],
+    geometry_warnings: list[str],
+) -> dict[str, Any]:
+    q_cols = _signal_columns(getattr(bundle, "q", None))
+    p_cols = _signal_columns(getattr(bundle, "p", None))
+    open_cols = _signal_columns(getattr(bundle, "open", None))
+    main_cols = _signal_columns(getattr(bundle, "main", None))
+    markers: list[dict[str, Any]] = []
+
+    markers.append(
+        _availability_marker(
+            surface="flow",
+            label="Pressure-line flow visualization",
+            state="solver_confirmed" if q_cols and edge_series else "unavailable",
+            source="NPZ:q_values",
+            reason=(
+                f"{len(edge_series)} flow series are available for Desktop Mnemo."
+                if q_cols and edge_series
+                else "q_values is required for pressure/flow mnemo visualization."
+            ),
+            missing=() if q_cols and edge_series else ("q_values",),
+            count=len(edge_series),
+            total=len(edge_names),
+        )
+    )
+
+    markers.append(
+        _availability_marker(
+            surface="pressure",
+            label="Node pressure visualization",
+            state="solver_confirmed" if p_cols and node_series else "unavailable",
+            source="NPZ:p_values",
+            reason=(
+                f"{len(node_series)} pressure series are available for Desktop Mnemo."
+                if p_cols and node_series
+                else "p_values is missing or has no pressure node columns; pressure colors and node labels stay unavailable."
+            ),
+            missing=() if p_cols and node_series else ("p_values",),
+            count=len(node_series),
+            total=len(node_names),
+        )
+    )
+
+    open_known = [name for name in edge_names if name in set(open_cols)]
+    if not edge_names:
+        state_surface = "unavailable"
+        state_reason = "No q_values edges are available, so component state cannot be matched."
+        state_missing: tuple[str, ...] = ("q_values",)
+    elif not open_cols:
+        state_surface = "unavailable"
+        state_reason = "open_values is missing; branch open/closed state is displayed as unavailable."
+        state_missing = ("open_values",)
+    elif len(open_known) < len(edge_names):
+        state_surface = "approximate_inferred_with_warning"
+        state_reason = f"open_values covers {len(open_known)}/{len(edge_names)} flow edges; missing states remain explicit."
+        state_missing = tuple(sorted(set(edge_names) - set(open_known)))
+    else:
+        state_surface = "solver_confirmed"
+        state_reason = "open_values covers all flow edges in the current bundle."
+        state_missing = ()
+    markers.append(
+        _availability_marker(
+            surface="state",
+            label="Open/closed component state",
+            state=state_surface,
+            source="NPZ:open_values",
+            reason=state_reason,
+            missing=state_missing,
+            count=len(open_known),
+            total=len(edge_names),
+        )
+    )
+
+    canonical_total = int(scheme_fidelity.get("canonical_edges_total") or 0)
+    canonical_routed = int(scheme_fidelity.get("canonical_edges_routed") or 0)
+    route_missing = [
+        *[str(item) for item in scheme_fidelity.get("canonical_route_issues", [])],
+        *[str(item) for item in scheme_fidelity.get("bundle_route_issues", [])],
+    ]
+    if canonical_total <= 0:
+        mapping_state = "unavailable"
+        mapping_reason = "Canonical PNEUMO_SCHEME.json did not provide routable edges."
+    elif route_missing or canonical_routed < canonical_total:
+        mapping_state = "approximate_inferred_with_warning"
+        mapping_reason = "Some canonical or bundle edges use fallback routing; mapping remains marked approximate."
+    else:
+        mapping_state = "source_data_confirmed"
+        mapping_reason = "Canonical PNEUMO_SCHEME.json edges are routed on the Desktop Mnemo scheme."
+    markers.append(
+        _availability_marker(
+            surface="scheme_mapping",
+            label="SVG/scheme mapping",
+            state=mapping_state,
+            source="PNEUMO_SCHEME.json",
+            reason=mapping_reason,
+            missing=route_missing,
+            count=canonical_routed,
+            total=canonical_total,
+        )
+    )
+
+    markers.append(
+        _availability_marker(
+            surface="reference_svg",
+            label="Reference pneumatic SVG underlay",
+            state="source_data_confirmed" if reference_svg_inline else "unavailable",
+            source="pneumo_scheme.svg",
+            reason=(
+                "Canonical pneumatic SVG is available as the native underlay."
+                if reference_svg_inline
+                else "Canonical pneumatic SVG underlay is missing; semantic fallback is used."
+            ),
+            missing=() if reference_svg_inline else ("pneumo_scheme.svg",),
+        )
+    )
+
+    cylinder_required = [
+        "cyl1_bore_diameter_m",
+        "cyl1_rod_diameter_m",
+        "cyl2_bore_diameter_m",
+        "cyl2_rod_diameter_m",
+        "cyl1_stroke_front_m",
+        "cyl1_stroke_rear_m",
+        "cyl2_stroke_front_m",
+        "cyl2_stroke_rear_m",
+        "cyl1_dead_cap_length_m",
+        "cyl1_dead_rod_length_m",
+        "cyl2_dead_cap_length_m",
+        "cyl2_dead_rod_length_m",
+    ]
+    missing_geometry = [name for name in cylinder_required if not _finite_contract_value(visual_geometry.get(name))]
+    stroke_columns = [name for name in main_cols if name.startswith("положение_штока_") and name.endswith("_м")]
+    if len(missing_geometry) == len(cylinder_required) and not stroke_columns:
+        cylinder_state = "unavailable"
+        cylinder_reason = "Cylinder geometry passport and stroke channels are absent; cylinder snapshot must not invent body/volume data."
+    elif missing_geometry:
+        cylinder_state = "approximate_inferred_with_warning"
+        cylinder_reason = "Cylinder snapshot uses available pressures/strokes, but complete packaging/volume geometry is incomplete."
+    else:
+        cylinder_state = "source_data_confirmed"
+        cylinder_reason = "Nested meta_json.geometry provides the cylinder fields needed for volume snapshot overlays."
+    markers.append(
+        _availability_marker(
+            surface="cylinder_snapshot",
+            label="Cylinder pressure/stroke snapshot",
+            state=cylinder_state,
+            source="meta_json.geometry + NPZ:main_values/p_values",
+            reason=cylinder_reason,
+            missing=[*missing_geometry, *(("stroke_channels",) if not stroke_columns else ())],
+            count=len(cylinder_required) - len(missing_geometry),
+            total=len(cylinder_required),
+        )
+    )
+
+    if geometry_issues or geometry_warnings:
+        markers.append(
+            _availability_marker(
+                surface="geometry_contract",
+                label="Visual geometry contract",
+                state="approximate_inferred_with_warning" if not geometry_issues else "unavailable",
+                source="meta_json.geometry",
+                reason="Visual geometry contract produced warnings/issues that must be shown with the scheme.",
+                missing=[*geometry_issues, *geometry_warnings],
+            )
+        )
+
+    unavailable = [str(item["surface"]) for item in markers if item["state"] == "unavailable"]
+    warning = [str(item["surface"]) for item in markers if item["state"] == "approximate_inferred_with_warning"]
+    if any(item["surface"] == "flow" and item["state"] == "unavailable" for item in markers):
+        overall = "unavailable"
+    elif unavailable or warning:
+        overall = "approximate_inferred_with_warning"
+    else:
+        overall = "solver_confirmed"
+    if unavailable:
+        summary = "Unavailable Desktop Mnemo surfaces: " + ", ".join(unavailable)
+    elif warning:
+        summary = "Desktop Mnemo has approximate surfaces with explicit warnings: " + ", ".join(warning)
+    else:
+        summary = "Desktop Mnemo flow, pressure, state and scheme mapping are available from confirmed sources."
+    return {
+        "schema_version": DATASET_AVAILABILITY_SCHEMA_VERSION,
+        "overall_truth_state": overall,
+        "source_markers": markers,
+        "unavailable_surfaces": unavailable,
+        "warning_surfaces": warning,
+        "summary": summary,
+    }
+
+
+def _build_dataset_provenance(
+    *,
+    npz_path: Path,
+    bundle: DataBundle,
+    dataset_id: str,
+    reference_scheme_source: str,
+    canonical_node_names: list[str],
+    edge_defs: dict[str, dict[str, Any]],
+    edge_names: list[str],
+    node_names: list[str],
+    time_s: np.ndarray,
+    q_unit: str,
+    p_atm: float,
+) -> dict[str, Any]:
+    reference_svg_path = _path_from_text(reference_scheme_source)
+    source_files = {
+        "npz": _source_file_payload(npz_path),
+        "scheme_json": _source_file_payload(SCHEME_JSON_PATH),
+        "reference_svg": _source_file_payload(reference_svg_path),
+        "source_of_truth_image": _source_file_payload(SOURCE_OF_TRUTH_PNEUMO_IMAGE_PATH),
+    }
+    return {
+        "schema_version": DATASET_PROVENANCE_SCHEMA_VERSION,
+        "source": "desktop_mnemo",
+        "available": True,
+        "dataset_id": str(dataset_id),
+        "source_files": source_files,
+        "runtime_tables": {
+            "main_values": {
+                "available": bool(_table_columns(getattr(bundle, "main", None))),
+                "columns": _table_columns(getattr(bundle, "main", None)),
+            },
+            "q_values": {
+                "available": bool(_table_columns(getattr(bundle, "q", None))),
+                "columns": _table_columns(getattr(bundle, "q", None)),
+            },
+            "p_values": {
+                "available": bool(_table_columns(getattr(bundle, "p", None))),
+                "columns": _table_columns(getattr(bundle, "p", None)),
+            },
+            "open_values": {
+                "available": bool(_table_columns(getattr(bundle, "open", None))),
+                "columns": _table_columns(getattr(bundle, "open", None)),
+            },
+        },
+        "canonical": {
+            "nodes_total": int(len(canonical_node_names)),
+            "edges_total": int(len(edge_defs)),
+            "bundle_edges_total": int(len(edge_names)),
+            "bundle_nodes_total": int(len(node_names)),
+        },
+        "time": {
+            "samples": int(time_s.size),
+            "start_s": float(time_s[0]) if time_s.size else None,
+            "end_s": float(time_s[-1]) if time_s.size else None,
+        },
+        "units": {
+            "flow": str(q_unit),
+            "pressure": "бар(g)",
+            "p_atm_pa": float(p_atm),
+        },
+    }
+
+
+def _build_dataset_contract(
+    *,
+    dataset_id: str,
+    availability: dict[str, Any],
+    provenance: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "schema_version": DATASET_CONTRACT_SCHEMA_VERSION,
+        "source": "desktop_mnemo",
+        "truth_states": list(TRUTH_STATES),
+        "available": bool(provenance.get("available")),
+        "dataset_id": str(dataset_id),
+        "overall_truth_state": str(availability.get("overall_truth_state") or "unavailable"),
+        "unavailable_surfaces": list(availability.get("unavailable_surfaces") or []),
+        "warning_surfaces": list(availability.get("warning_surfaces") or []),
+        "source_markers": list(availability.get("source_markers") or []),
+        "availability": availability,
+        "provenance": provenance,
+    }
 
 
 def _load_canonical_pneumo_scheme_svg() -> tuple[str, str]:
@@ -3156,6 +3762,7 @@ def _build_frame_alert_payload(
         action="",
     )
     if dataset is None or dataset.time_s.size == 0:
+        availability = _empty_availability_contract()
         return {
             "primary": {
                 "title": narrative.primary_title,
@@ -3164,6 +3771,10 @@ def _build_frame_alert_payload(
                 "severity": primary_mode.severity,
             },
             "scheme_fidelity": {},
+            "availability": availability,
+            "source_markers": list(availability.get("source_markers") or []),
+            "unavailable_surfaces": list(availability.get("unavailable_surfaces") or []),
+            "overall_truth_state": str(availability.get("overall_truth_state") or "unavailable"),
             "edges": [],
             "nodes": [],
             "mode_badges": [{"title": mode.title, "severity": mode.severity} for mode in narrative.modes[:3]],
@@ -3298,6 +3909,10 @@ def _build_frame_alert_payload(
             "severity": primary_mode.severity,
         },
         "scheme_fidelity": dict(dataset.scheme_fidelity),
+        "availability": dict(dataset.availability),
+        "source_markers": list(dataset.availability.get("source_markers") or []),
+        "unavailable_surfaces": list(dataset.availability.get("unavailable_surfaces") or []),
+        "overall_truth_state": str(dataset.availability.get("overall_truth_state") or "unavailable"),
         "edges": edge_items,
         "nodes": node_items,
         "mode_badges": [{"title": mode.title, "severity": mode.severity} for mode in narrative.modes[:3]],
@@ -3366,6 +3981,36 @@ def prepare_dataset(npz_path: Path) -> MnemoDataset:
     geometry_warnings = [str(item) for item in visual_geometry.get("warnings", []) if str(item).strip()]
     time_s = np.asarray(bundle.t, dtype=float)
     dataset_id = f"{npz_path.resolve()}::{npz_path.stat().st_mtime_ns}"
+    availability = _build_availability_contract(
+        bundle=bundle,
+        edge_names=edge_names,
+        node_names=node_names,
+        edge_series=edge_series,
+        node_series=node_series,
+        scheme_fidelity=scheme_fidelity,
+        reference_svg_inline=reference_svg_inline,
+        visual_geometry=visual_geometry,
+        geometry_issues=geometry_issues,
+        geometry_warnings=geometry_warnings,
+    )
+    provenance = _build_dataset_provenance(
+        npz_path=npz_path.resolve(),
+        bundle=bundle,
+        dataset_id=dataset_id,
+        reference_scheme_source=reference_scheme_source,
+        canonical_node_names=list(canonical_node_names),
+        edge_defs=edge_defs,
+        edge_names=edge_names,
+        node_names=node_names,
+        time_s=time_s,
+        q_unit=q_unit,
+        p_atm=p_atm,
+    )
+    dataset_contract = _build_dataset_contract(
+        dataset_id=dataset_id,
+        availability=availability,
+        provenance=provenance,
+    )
 
     return MnemoDataset(
         npz_path=npz_path.resolve(),
@@ -3392,6 +4037,9 @@ def prepare_dataset(npz_path: Path) -> MnemoDataset:
         geometry_issues=geometry_issues,
         geometry_warnings=geometry_warnings,
         scheme_fidelity=scheme_fidelity,
+        availability=availability,
+        provenance=provenance,
+        dataset_contract=dataset_contract,
     )
 
 
@@ -3433,6 +4081,24 @@ def _palette_rgb(stops: tuple[tuple[float, tuple[int, int, int]], ...], value: f
 
 def _rgb_hex(rgb: tuple[int, int, int]) -> str:
     return "#{:02x}{:02x}{:02x}".format(*tuple(int(max(0, min(255, c))) for c in rgb))
+
+
+def _hex_to_rgb(value: str, *, fallback: tuple[int, int, int] = (47, 74, 89)) -> tuple[int, int, int]:
+    text = str(value or "").strip()
+    if text.startswith("#"):
+        text = text[1:]
+    if len(text) == 3:
+        text = "".join(ch * 2 for ch in text)
+    if len(text) != 6:
+        return tuple(fallback)
+    try:
+        return (
+            int(text[0:2], 16),
+            int(text[2:4], 16),
+            int(text[4:6], 16),
+        )
+    except Exception:
+        return tuple(fallback)
 
 
 def _text_color_for_rgb(rgb: tuple[int, int, int]) -> str:
@@ -4003,6 +4669,7 @@ def _build_mnemo_diagnostics_payload(
     selected_node: str | None,
     flow_display_mode: str = "nlpm",
     pressure_display_mode: str = "bar_g",
+    window_layout_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     cylinder_rows = _build_cylinder_snapshots(dataset, idx)
     component_rows = _build_component_overlay_rows(dataset, idx, selected_edge=selected_edge)
@@ -4022,12 +4689,23 @@ def _build_mnemo_diagnostics_payload(
         pressure_display_mode=pressure_display_mode,
     )
     diagonal_pressure_strips = _build_diagonal_pressure_strip_payloads(dataset, idx, selected_edge=selected_edge)
+    dataset_contract = dict(dataset.dataset_contract) if dataset is not None else _empty_dataset_contract()
+    availability = dict(dataset.availability) if dataset is not None else dict(dataset_contract["availability"])
+    provenance = dict(dataset.provenance) if dataset is not None else dict(dataset_contract["provenance"])
+    layout_contract = dict(window_layout_contract or _empty_window_layout_contract())
     return {
         "frame_idx": int(max(0, idx)),
         "focus_corner": focus_corner,
         "selected_edge": str(selected_edge or ""),
         "selected_node": str(selected_node or ""),
         "scheme_fidelity": dict(dataset.scheme_fidelity) if dataset is not None else {},
+        "dataset_contract": dataset_contract,
+        "availability": availability,
+        "provenance": provenance,
+        "source_markers": list(availability.get("source_markers") or []),
+        "unavailable_surfaces": list(availability.get("unavailable_surfaces") or []),
+        "overall_truth_state": str(availability.get("overall_truth_state") or "unavailable"),
+        "window_layout_contract": layout_contract,
         "geometry_warnings": list(dataset.geometry_warnings) if dataset is not None else [],
         "geometry_issues": list(dataset.geometry_issues) if dataset is not None else [],
         "cylinders": [_serialize_cylinder_overlay(item) for item in cylinder_rows],
@@ -6306,7 +6984,7 @@ class PneumoSnapshotPanel(QtWidgets.QWidget):
                 0.0 if item.delta_p_bar is None else float(item.delta_p_bar),
                 max_abs_flow=max_abs_dp,
             )
-            mode_suffix = "abs" if item.geometry_ready else "P only"
+            mode_suffix = "abs" if item.geometry_ready else "P only (geometry unavailable)"
             self.actuator_table.setItem(
                 row_idx,
                 0,
@@ -6445,6 +7123,10 @@ class PneumoSnapshotPanel(QtWidgets.QWidget):
         edge_rows = _build_edge_activity_snapshots(dataset, clamped_idx)
         corner_cards = _build_corner_snapshot_cards(cylinder_rows, edge_rows)
         flow_unit = _flow_display_unit(dataset, flow_display_mode)
+        availability = _availability_from_payload(dataset.availability)
+        overall_truth_state = str(availability.get("overall_truth_state") or "unavailable")
+        unavailable_surfaces = [str(item) for item in list(availability.get("unavailable_surfaces") or [])]
+        cylinder_truth_state = _availability_surface_state(availability, "cylinder_snapshot")
         geometry_ready = sum(1 for item in cylinder_rows if item.geometry_ready)
         fastest = max(
             (item for item in cylinder_rows if item.stroke_speed_m_s is not None),
@@ -6456,6 +7138,11 @@ class PneumoSnapshotPanel(QtWidgets.QWidget):
             geometry_note += " Есть contract-issues в geometry."
         elif dataset.geometry_warnings:
             geometry_note += " Geometry читается с предупреждениями."
+        if cylinder_truth_state == "unavailable":
+            geometry_note += " Cylinder snapshot unavailable: отображается pressure-only без тихого volume fallback."
+        elif cylinder_truth_state == "approximate_inferred_with_warning":
+            geometry_note += " Cylinder snapshot approximate: неполная геометрия помечена явно."
+        unavailable_text = ", ".join(unavailable_surfaces) if unavailable_surfaces else "none"
 
         fastest_text = "Самый быстрый шток: нет сигнала."
         if fastest is not None and fastest.stroke_speed_m_s is not None:
@@ -6473,6 +7160,8 @@ class PneumoSnapshotPanel(QtWidgets.QWidget):
             + f"<br/><b>{escape(fastest_text)}</b>"
             + f"<br/><b>Q единицы:</b> {escape(flow_unit)}"
             + f"<br/><b>Geometry:</b> {escape(geometry_note)}"
+            + f"<br/><b>Truth:</b> {escape(overall_truth_state)}"
+            + f"<br/><b>Unavailable:</b> {escape(unavailable_text)}"
         )
         self.heatmap.set_display_context(dataset=dataset, pressure_display_mode=pressure_display_mode)
         self.heatmap.set_cards(corner_cards)
@@ -6765,7 +7454,6 @@ class SelectionPanel(QtWidgets.QWidget):
                 )
                 camozzi_code = str(edge_def.get("camozzi_code") or "").strip() or "—"
                 delta_p_display = _pressure_delta_from_bar(pressure_meta.get("delta_p_bar"), pressure_display_mode)
-                dq_dt_display = _flow_value_from_dataset_units(temporal_meta.get("dq_dt"), dataset, flow_display_mode)
                 state = "открыт"
                 if open_arr is not None:
                     state = "открыт" if int(np.asarray(open_arr, dtype=int)[idx]) else "закрыт"
@@ -6787,6 +7475,7 @@ class SelectionPanel(QtWidgets.QWidget):
                     open_values=None if open_arr is None else np.asarray(open_arr, dtype=int),
                     idx=idx,
                 )
+                dq_dt_display = _flow_value_from_dataset_units(temporal_meta.get("dq_dt"), dataset, flow_display_mode)
                 pressure_history_meta = _edge_recent_pressure_meta(
                     time_s=dataset.time_s,
                     p1_values=None if endpoint_1 == "" or dataset.bundle.p is None else _bar_g(np.asarray(dataset.bundle.p.column(endpoint_1, default=[]), dtype=float), dataset.p_atm),
@@ -7097,9 +7786,11 @@ class GuidancePanel(QtWidgets.QTextBrowser):
         )
 
         if dataset is None or dataset.time_s.size == 0:
+            availability = _empty_availability_contract()
             self.setHtml(
                 "<h3>Диагностические сценарии</h3>"
-                "<p>Это окно помогает читать мнемосхему как инженерную историю, а не как набор линий.</p>"
+                + _truth_summary_html(availability)
+                + "<p>Это окно помогает читать мнемосхему как инженерную историю, а не как набор линий.</p>"
                 "<p><b>Порядок чтения:</b><br/>"
                 "1. Найдите ведущую ветку.<br/>"
                 "2. Подтвердите один опорный узел давления.<br/>"
@@ -7122,6 +7813,9 @@ class GuidancePanel(QtWidgets.QTextBrowser):
 
         state_text = "follow" if follow_enabled else "manual"
         playback_text = "play" if playing else "pause"
+        availability = _availability_from_payload(dataset.availability)
+        overall_truth_state = str(availability.get("overall_truth_state") or "unavailable")
+        unavailable_surfaces = ", ".join(str(item) for item in list(availability.get("unavailable_surfaces") or [])) or "none"
         selected_block = (
             "<b>Фокус:</b> "
             + escape(selected_edge or "—")
@@ -7131,8 +7825,14 @@ class GuidancePanel(QtWidgets.QTextBrowser):
 
         self.setHtml(
             "<h3>Диагностические сценарии</h3>"
+            + _truth_summary_html(availability)
             + "<p><b>Текущий режим:</b> "
             + escape(narrative.primary_title)
+            + "<br/>"
+            + "<b>Honest state:</b> "
+            + escape(overall_truth_state)
+            + " / unavailable: "
+            + escape(unavailable_surfaces)
             + "<br/>"
             + "<b>Состояние окна:</b> "
             + escape(state_text)
@@ -7192,11 +7892,13 @@ class SchemeFidelityPanel(QtWidgets.QTextBrowser):
                 "<h3>Соответствие схеме</h3>"
                 "<p>Панель проверяет, насколько native-мнемосхема совпадает с canonical-пневмосхемой из "
                 "<code>PNEUMO_SCHEME.json</code>.</p>"
-                "<p>После загрузки bundle здесь появятся покрытие узлов, маршрутов и все отклонения без web-прослойки.</p>"
+                + _truth_summary_html(_empty_availability_contract())
+                + "<p>После загрузки bundle здесь появятся покрытие узлов, маршрутов и все отклонения без web-прослойки.</p>"
             )
             return
 
         fidelity = dict(dataset.scheme_fidelity or {})
+        availability = _availability_from_payload(dataset.availability)
         reference_scheme_source = str(fidelity.get("reference_scheme_source") or "—")
         reference_scheme_mode = str(fidelity.get("reference_scheme_mode") or "semantic_fallback")
         reference_scheme_image_source = str(fidelity.get("reference_scheme_image_source") or "—")
@@ -7222,6 +7924,8 @@ class SchemeFidelityPanel(QtWidgets.QTextBrowser):
             + f"<br/>critical indicator anchors = {reference_indicator_nodes_snapped}/{reference_indicator_nodes_total}"
             + f"<br/>chamber indicator anchors = {reference_chamber_nodes_snapped}/{reference_chamber_nodes_total}"
             + f"<br/>diagonal geometry from source scheme = {reference_diagonal_nodes_locked}/{reference_diagonal_nodes_total}</p>"
+            + _truth_summary_html(availability)
+            + _source_markers_table_html(availability)
             + "<p><b>Canonical layout:</b><br/>"
             + f"узлы {int(fidelity.get('canonical_nodes_positioned') or 0)}/{int(fidelity.get('canonical_nodes_total') or 0)}"
             + " • "
@@ -7893,6 +8597,13 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._diagnostics = dict(diagnostics or {})
         self.update()
 
+    def _diagnostic_availability(self) -> dict[str, Any]:
+        return _availability_from_payload(self._diagnostics)
+
+    def _surface_available(self, surface: str) -> bool:
+        state = _availability_surface_state(self._diagnostic_availability(), surface)
+        return state != "unavailable"
+
     def set_focus_region(self, focus_region: dict[str, Any] | None) -> None:
         self._dismiss_hover_route_pressure_focus(restore=False)
         self._focus_region = dict(focus_region) if isinstance(focus_region, dict) else None
@@ -8024,6 +8735,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.drawPixmap(0, 0, self._background_pixmap())
         if self._dataset is None:
             self._draw_empty_state(painter)
+            self._draw_truth_badge(painter)
             return
 
         painter.save()
@@ -8042,6 +8754,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         self._draw_selected_edge_focus_overlay(painter)
         painter.restore()
         self._draw_hud(painter)
+        self._draw_truth_badge(painter)
 
     def _advance_animations(self) -> None:
         dirty = False
@@ -8609,7 +9322,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
 
             anchor_percent = min(0.78, 0.34 + float(order) * 0.22)
             anchor = path.pointAtPercent(anchor_percent)
-            angle_deg = _path_angle_deg(path, anchor_percent)
+            angle_deg = self._path_angle_deg(path, anchor_percent)
             angle_rad = math.radians(angle_deg)
             side = -1.0 if order % 2 else 1.0
             compact_mode = self._detail_mode != "full"
@@ -8696,7 +9409,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.drawLine(start_point, end_point)
 
         anchor = path.pointAtPercent(accent_percent)
-        angle_deg = _path_angle_deg(path, accent_percent)
+        angle_deg = self._path_angle_deg(path, accent_percent)
         angle_rad = math.radians(angle_deg)
         side = -1.0 if order % 2 else 1.0
         offset = 18.0 if is_selected else 14.0
@@ -9164,11 +9877,14 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             spotlight_nodes.update(route_intermediate_lookup.keys())
         global_peak_flow_abs = self._global_peak_flow_abs()
         self._occupied_node_overlay_rects = []
+        pressure_available = self._surface_available("pressure")
 
         for node_name, point in self._node_points.items():
-            pressure = self._current_node_pressure(node_name)
+            pressure = self._current_node_pressure(node_name) if pressure_available else None
             rgb = _pressure_to_heat_rgb(pressure)
             fill = QtGui.QColor(*rgb)
+            if not pressure_available:
+                fill.setAlpha(186)
             radius = 12.0 if node_name in spotlight_nodes else 9.0
             if node_name == self._selected_node:
                 radius = 14.0
@@ -11197,6 +11913,32 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             )
         painter.restore()
 
+    def _draw_truth_badge(self, painter: QtGui.QPainter) -> None:
+        availability = self._diagnostic_availability()
+        overall_truth_state = str(availability.get("overall_truth_state") or "unavailable")
+        badge_text = _truth_status_text(availability)
+        fg_hex, bg_hex = _truth_state_palette(overall_truth_state)
+        content_rect = self._content_rect()
+        font = QtGui.QFont(self.font())
+        font.setPointSizeF(8.6)
+        font.setBold(True)
+        metrics = QtGui.QFontMetricsF(font)
+        badge_w = max(194.0, min(330.0, metrics.horizontalAdvance(badge_text) + 40.0))
+        rect = QtCore.QRectF(content_rect.left() + 16.0, content_rect.bottom() - 40.0, badge_w, 28.0)
+        painter.save()
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        back = QtGui.QColor(bg_hex)
+        back.setAlpha(232)
+        border = QtGui.QColor(fg_hex)
+        border.setAlpha(210)
+        painter.setPen(QtGui.QPen(border, 1.2))
+        painter.setBrush(back)
+        painter.drawRoundedRect(rect, 14.0, 14.0)
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor(fg_hex))
+        painter.drawText(rect.adjusted(13.0, 0.0, -13.0, 0.0), QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter, badge_text)
+        painter.restore()
+
     def _draw_hud(self, painter: QtGui.QPainter) -> None:
         content_rect = self._content_rect()
         left_hud = QtCore.QRectF(content_rect.left() + 16.0, content_rect.top() + 16.0, 360.0, 88.0)
@@ -12436,7 +13178,7 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         return peak
 
     def _edge_pressure_rgb(self, edge_name: str) -> tuple[int, int, int]:
-        if self._dataset is None:
+        if self._dataset is None or not self._surface_available("pressure"):
             return FLOW_IDLE_RGB
         edge_def = dict(self._dataset.edge_defs.get(edge_name) or {})
         pressures = [
@@ -12448,15 +13190,17 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         return _pressure_to_heat_rgb(pressure_bar_g)
 
     def _node_indicator_payload(self, node_name: str, *, global_peak_flow_abs: float) -> dict[str, Any]:
+        pressure_available = self._surface_available("pressure")
         pressure_series = self._node_series_map.get(node_name) if isinstance(self._node_series_map, dict) else None
         pressure_values = list(dict(pressure_series or {}).get("p") or [])
-        pressure_now = self._current_node_pressure(node_name)
+        pressure_now = self._current_node_pressure(node_name) if pressure_available else None
         pressure_peak = None
-        for value in pressure_values:
-            finite = _finite_or_none(value)
-            if finite is None:
-                continue
-            pressure_peak = float(finite) if pressure_peak is None else max(float(pressure_peak), float(finite))
+        if pressure_available:
+            for value in pressure_values:
+                finite = _finite_or_none(value)
+                if finite is None:
+                    continue
+                pressure_peak = float(finite) if pressure_peak is None else max(float(pressure_peak), float(finite))
 
         dominant_flow = 0.0
         local_peak_flow_abs = 0.0
@@ -12471,8 +13215,8 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                 local_peak_flow_abs = max(local_peak_flow_abs, self._edge_peak_flow_abs(edge_name))
 
         flow_denominator = max(1.0e-6, float(global_peak_flow_abs or 0.0), float(local_peak_flow_abs or 0.0))
-        pressure_norm = _clamp01((float(pressure_now or -0.35) + 0.35) / 10.35)
-        pressure_peak_norm = _clamp01((float(pressure_peak or pressure_now or -0.35) + 0.35) / 10.35)
+        pressure_norm = _clamp01((float(pressure_now or -0.35) + 0.35) / 10.35) if pressure_available else 0.0
+        pressure_peak_norm = _clamp01((float(pressure_peak or pressure_now or -0.35) + 0.35) / 10.35) if pressure_available else 0.0
         flow_norm = _clamp01(abs(float(dominant_flow)) / flow_denominator)
         flow_peak_norm = _clamp01(float(local_peak_flow_abs) / flow_denominator)
         return {
@@ -12482,12 +13226,15 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             "flow_peak_norm": float(flow_peak_norm),
             "pressure_rgb": _pressure_to_heat_rgb(pressure_now),
             "flow_rgb": _flow_to_heat_rgb(dominant_flow, max_abs_flow=flow_denominator),
+            "pressure_available": bool(pressure_available and pressure_now is not None),
+            "flow_available": True,
         }
 
     def _component_indicator_payload(self, payload: dict[str, Any], *, global_peak_flow_abs: float) -> dict[str, Any]:
+        pressure_available = self._surface_available("pressure")
         anchor_node_name = str(payload.get("anchor_node_name") or "")
         edge_name = str(payload.get("edge_name") or "")
-        pressure_now = self._current_node_pressure(anchor_node_name) if anchor_node_name else None
+        pressure_now = self._current_node_pressure(anchor_node_name) if pressure_available and anchor_node_name else None
         pressure_peak = None
         seen_nodes: set[str] = set()
         pressure_node_names = [
@@ -12499,17 +13246,18 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             if not node_name or node_name in seen_nodes:
                 continue
             seen_nodes.add(node_name)
-            if pressure_now is None:
+            if pressure_available and pressure_now is None:
                 pressure_now = self._current_node_pressure(node_name)
             pressure_series = self._node_series_map.get(node_name) if isinstance(self._node_series_map, dict) else None
             pressure_values = list(dict(pressure_series or {}).get("p") or [])
-            for value in pressure_values:
-                finite = _finite_or_none(value)
-                if finite is None:
-                    continue
-                pressure_peak = float(finite) if pressure_peak is None else max(float(pressure_peak), float(finite))
+            if pressure_available:
+                for value in pressure_values:
+                    finite = _finite_or_none(value)
+                    if finite is None:
+                        continue
+                    pressure_peak = float(finite) if pressure_peak is None else max(float(pressure_peak), float(finite))
 
-        if pressure_now is None:
+        if pressure_available and pressure_now is None:
             finite_pressures = [
                 value
                 for value in (
@@ -12524,8 +13272,8 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         flow_now = self._current_edge_flow(edge_name) if edge_name else float(payload.get("q_now") or 0.0)
         local_peak_flow_abs = self._edge_peak_flow_abs(edge_name) if edge_name else abs(float(flow_now))
         flow_denominator = max(1.0e-6, float(global_peak_flow_abs or 0.0), float(local_peak_flow_abs or 0.0), abs(float(flow_now)))
-        pressure_norm = _clamp01((float(pressure_now or -0.35) + 0.35) / 10.35)
-        pressure_peak_norm = _clamp01((float(pressure_peak or pressure_now or -0.35) + 0.35) / 10.35)
+        pressure_norm = _clamp01((float(pressure_now or -0.35) + 0.35) / 10.35) if pressure_available else 0.0
+        pressure_peak_norm = _clamp01((float(pressure_peak or pressure_now or -0.35) + 0.35) / 10.35) if pressure_available else 0.0
         flow_norm = _clamp01(abs(float(flow_now)) / flow_denominator)
         flow_peak_norm = _clamp01(float(local_peak_flow_abs) / flow_denominator)
         return {
@@ -12537,6 +13285,8 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
             "flow_rgb": _flow_to_heat_rgb(flow_now, max_abs_flow=flow_denominator),
             "pressure_bar_g": pressure_now,
             "flow_value": float(flow_now),
+            "pressure_available": bool(pressure_available and pressure_now is not None),
+            "flow_available": True,
         }
 
     def _draw_component_indicator_bars(
@@ -12574,17 +13324,25 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
                 payload.get("pressure_norm"),
                 payload.get("pressure_peak_norm"),
                 QtGui.QColor(*tuple(payload.get("pressure_rgb") or (34, 48, 58))),
+                bool(payload.get("pressure_available", True)),
             ),
             (
                 QtCore.QRectF(group_rect.left() + bar_width + bar_gap, group_rect.top(), bar_width, group_rect.height()),
                 payload.get("flow_norm"),
                 payload.get("flow_peak_norm"),
                 QtGui.QColor(*tuple(payload.get("flow_rgb") or FLOW_IDLE_RGB)),
+                bool(payload.get("flow_available", True)),
             ),
         ]
-        for bar_rect, current_norm, peak_norm, color in bar_specs:
+        for bar_rect, current_norm, peak_norm, color, available in bar_specs:
             painter.setBrush(QtGui.QColor(19, 32, 39, 178))
             painter.drawRoundedRect(bar_rect, corner_radius, corner_radius)
+            if not available:
+                painter.setPen(QtGui.QPen(QtGui.QColor(140, 164, 174, 128), 0.8))
+                painter.drawLine(bar_rect.topLeft(), bar_rect.bottomRight())
+                painter.drawLine(bar_rect.bottomLeft(), bar_rect.topRight())
+                painter.setPen(QtCore.Qt.NoPen)
+                continue
             fill_height = max(1.5, float(bar_rect.height()) * _clamp01(float(current_norm or 0.0)))
             fill_rect = QtCore.QRectF(bar_rect.left(), bar_rect.bottom() - fill_height, bar_rect.width(), fill_height)
             painter.setBrush(color)
@@ -12622,12 +13380,18 @@ class MnemoNativeCanvas(QtWidgets.QWidget):
         painter.drawRoundedRect(group_rect.adjusted(-2.0, -2.0, 2.0, 2.0), 6.0, 6.0)
 
         bar_specs = [
-            (QtCore.QRectF(group_rect.left(), group_rect.top(), 6.0, group_rect.height()), payload.get("pressure_norm"), payload.get("pressure_peak_norm"), QtGui.QColor(*tuple(payload.get("pressure_rgb") or (34, 48, 58)))),
-            (QtCore.QRectF(group_rect.right() - 6.0, group_rect.top(), 6.0, group_rect.height()), payload.get("flow_norm"), payload.get("flow_peak_norm"), QtGui.QColor(*tuple(payload.get("flow_rgb") or FLOW_IDLE_RGB))),
+            (QtCore.QRectF(group_rect.left(), group_rect.top(), 6.0, group_rect.height()), payload.get("pressure_norm"), payload.get("pressure_peak_norm"), QtGui.QColor(*tuple(payload.get("pressure_rgb") or (34, 48, 58))), bool(payload.get("pressure_available", True))),
+            (QtCore.QRectF(group_rect.right() - 6.0, group_rect.top(), 6.0, group_rect.height()), payload.get("flow_norm"), payload.get("flow_peak_norm"), QtGui.QColor(*tuple(payload.get("flow_rgb") or FLOW_IDLE_RGB)), bool(payload.get("flow_available", True))),
         ]
-        for bar_rect, current_norm, peak_norm, color in bar_specs:
+        for bar_rect, current_norm, peak_norm, color, available in bar_specs:
             painter.setBrush(QtGui.QColor(20, 34, 42, 170))
             painter.drawRoundedRect(bar_rect, 3.0, 3.0)
+            if not available:
+                painter.setPen(QtGui.QPen(QtGui.QColor(140, 164, 174, 128), 0.8))
+                painter.drawLine(bar_rect.topLeft(), bar_rect.bottomRight())
+                painter.drawLine(bar_rect.bottomLeft(), bar_rect.topRight())
+                painter.setPen(QtCore.Qt.NoPen)
+                continue
             fill_height = max(2.0, float(bar_rect.height()) * _clamp01(float(current_norm or 0.0)))
             fill_rect = QtCore.QRectF(bar_rect.left(), bar_rect.bottom() - fill_height, bar_rect.width(), fill_height)
             painter.setBrush(color)
@@ -12815,6 +13579,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         startup_checklist: list[str] | tuple[str, ...] | None,
     ):
         super().__init__()
+        self.setObjectName("desktop_mnemo_main_window")
         self.setWindowTitle("Мнемосхема пневмосистемы")
         self.setMinimumSize(1500, 980)
         self.setDockOptions(
@@ -13153,8 +13918,10 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
 
     def _build_statusbar(self) -> None:
         self.status_text = QtWidgets.QLabel("Готово.")
+        self.truth_text = QtWidgets.QLabel("Mnemo: unavailable pressure/state")
         self.path_text = QtWidgets.QLabel("")
         self.statusBar().addWidget(self.status_text, 1)
+        self.statusBar().addPermanentWidget(self.truth_text, 0)
         self.statusBar().addPermanentWidget(self.path_text, 1)
 
     @staticmethod
@@ -13429,6 +14196,97 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._apply_current_view_mode(source="toolbar_overview", auto_focus=False)
         self._set_status("Режим обзора: показана полная схема.")
 
+    def _layout_contract_docks(self) -> list[QtWidgets.QDockWidget]:
+        return [
+            self._overview_dock,
+            self._snapshot_dock,
+            self._selection_dock,
+            self._guide_dock,
+            self._fidelity_dock,
+            self._events_dock,
+            self._trends_dock,
+            self._legend_dock,
+        ]
+
+    @staticmethod
+    def _dock_area_contract_name(area: QtCore.Qt.DockWidgetArea) -> str:
+        mapping = {
+            QtCore.Qt.LeftDockWidgetArea: "left",
+            QtCore.Qt.RightDockWidgetArea: "right",
+            QtCore.Qt.TopDockWidgetArea: "top",
+            QtCore.Qt.BottomDockWidgetArea: "bottom",
+            QtCore.Qt.NoDockWidgetArea: "none",
+        }
+        return mapping.get(area, str(area))
+
+    def _dpi_ratio_for_layout_contract(self) -> float | None:
+        for getter in (
+            lambda: self.devicePixelRatioF(),
+            lambda: self.screen().devicePixelRatio() if self.screen() is not None else None,
+        ):
+            try:
+                value = getter()
+            except Exception:
+                value = None
+            if value is not None:
+                try:
+                    return float(value)
+                except Exception:
+                    continue
+        return None
+
+    def _build_window_layout_contract(self) -> dict[str, Any]:
+        ui_state_keys = [
+            "window/geometry",
+            "window/state",
+            "view_mode",
+            "detail_mode",
+            "flow_display_mode",
+            "pressure_display_mode",
+            "reference_scheme_visible",
+        ]
+        docks: list[dict[str, Any]] = []
+        for dock in self._layout_contract_docks():
+            area = self.dockWidgetArea(dock)
+            docks.append(
+                {
+                    "objectName": dock.objectName(),
+                    "title": dock.windowTitle(),
+                    "visible": bool(dock.isVisible()),
+                    "floating": bool(dock.isFloating()),
+                    "dock_area": self._dock_area_contract_name(area),
+                    "toggle_action_text": dock.toggleViewAction().text(),
+                }
+            )
+        geometry_state = self.saveGeometry()
+        window_state = self.saveState()
+        saved_geometry = self.ui_state.get_bytes("window/geometry")
+        saved_state = self.ui_state.get_bytes("window/state")
+        return {
+            "schema_version": WINDOW_LAYOUT_CONTRACT_SCHEMA_VERSION,
+            "source": "desktop_mnemo",
+            "available": True,
+            "window_objectName": self.objectName(),
+            "window_title": self.windowTitle(),
+            "docks": docks,
+            "ui_state_prefix": "desktop_mnemo",
+            "ui_state_keys": ui_state_keys,
+            "saved_ui_state_keys": [key for key in ui_state_keys if self.ui_state.value(key, None) is not None],
+            "window_geometry_available": bool(geometry_state and not geometry_state.isEmpty()),
+            "window_state_available": bool(window_state and not window_state.isEmpty()),
+            "saved_window_geometry_available": saved_geometry is not None,
+            "saved_window_state_available": saved_state is not None,
+            "current_theme": self.theme,
+            "view_mode": self.view_mode,
+            "detail_mode": self.detail_mode,
+            "flow_display_mode": self.flow_display_mode,
+            "pressure_display_mode": self.pressure_display_mode,
+            "reference_scheme_visible": bool(self.reference_scheme_visible),
+            "dpi_ratio": self._dpi_ratio_for_layout_contract(),
+            "window_chrome": "native_qt",
+            "custom_titlebar_assumption": False,
+        }
+
     def _restore_window_state(self) -> None:
         self.ui_state.bind_window_geometry(self, "window/geometry")
         state = self.ui_state.get_bytes("window/state")
@@ -13464,6 +14322,8 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             self.ui_state.set_value("window/state", self.saveState())
             self.ui_state.set_value("play_speed", float(self._play_speed))
             self.ui_state.set_value("detail_mode", str(self.detail_mode))
+            self.ui_state.set_value("flow_display_mode", str(self.flow_display_mode))
+            self.ui_state.set_value("pressure_display_mode", str(self.pressure_display_mode))
             if not self._view_mode_override_active:
                 self.ui_state.set_value("view_mode", str(self.view_mode))
             self.ui_state.sync()
@@ -13474,13 +14334,19 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
     def _set_status(self, text: str) -> None:
         self.status_text.setText(str(text))
 
+    def _set_truth_status(self, availability: dict[str, Any] | None) -> None:
+        if hasattr(self, "truth_text"):
+            self.truth_text.setText(_truth_status_text(availability))
+
     def _set_dataset_title(self) -> None:
         if self.dataset is None:
             self.setWindowTitle("Мнемосхема пневмосистемы")
             self.path_text.setText("")
+            self._set_truth_status(_empty_availability_contract())
             return
         self.setWindowTitle(f"Мнемосхема пневмосистемы • {self.dataset.npz_path.name}")
         self.path_text.setText(str(self.dataset.npz_path))
+        self._set_truth_status(self.dataset.availability)
 
     def _open_npz_dialog(self) -> None:
         base_dir = str(self.dataset.npz_path.parent if self.dataset is not None else PROJECT_ROOT)
@@ -13758,7 +14624,10 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
                 status += f" • фокус {self._last_startup_selection_applied_label}"
             self._set_status(status)
         except Exception as exc:
-            QtWidgets.QMessageBox.critical(self, "Desktop Mnemo", _friendly_error_text(exc))
+            if _desktop_mnemo_can_show_blocking_dialog():
+                QtWidgets.QMessageBox.critical(self, "Desktop Mnemo", _friendly_error_text(exc))
+            if self.dataset is None:
+                self._set_dataset_title()
             self._set_status(f"Ошибка загрузки: {exc}")
 
     def _refresh_frame(self, *, push_to_view: bool = False) -> None:
@@ -13827,6 +14696,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.mnemo_view.set_alerts(alerts)
 
     def _push_diagnostics(self) -> None:
+        window_layout_contract = self._build_window_layout_contract()
         diagnostics = _build_mnemo_diagnostics_payload(
             self.dataset,
             self.current_idx,
@@ -13834,8 +14704,10 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             selected_node=self.selected_node,
             flow_display_mode=self.flow_display_mode,
             pressure_display_mode=self.pressure_display_mode,
+            window_layout_contract=window_layout_contract,
         )
         self.mnemo_view.set_diagnostics(diagnostics)
+        self._set_truth_status(diagnostics.get("availability") if isinstance(diagnostics, dict) else None)
 
     def _persist_event_log(self, *, silent: bool) -> Path | None:
         path = _write_event_log_sidecar(
@@ -13846,6 +14718,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             selected_node=self.selected_node,
             follow_enabled=self.follow_enabled,
             pointer_path=self.pointer_path if self.pointer_path else None,
+            window_layout_contract=self._build_window_layout_contract(),
         )
         self._last_event_log_path = path
         if path is not None and not silent:

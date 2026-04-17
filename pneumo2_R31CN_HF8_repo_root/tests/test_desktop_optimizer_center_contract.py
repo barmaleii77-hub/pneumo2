@@ -8,6 +8,15 @@ from pneumo_solver_ui.desktop_optimizer_model import (
     build_optimizer_session_defaults,
 )
 from pneumo_solver_ui.desktop_optimizer_runtime import DesktopOptimizerRuntime
+from pneumo_solver_ui.optimization_job_session_runtime import (
+    DistOptJob,
+    load_job_from_session,
+    save_job_to_session,
+)
+from pneumo_solver_ui.optimization_objective_contract import (
+    objective_contract_hash,
+    objective_contract_payload,
+)
 from pneumo_solver_ui.optimization_run_history import OptimizationRunSummary
 from pneumo_solver_ui.desktop_shell.launcher_catalog import build_desktop_launch_catalog
 from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
@@ -41,6 +50,10 @@ def test_desktop_optimizer_center_uses_workspace_layout_instead_of_big_intro_pan
     assert 'workspace = ttk.Panedwindow(outer, orient="horizontal")' in src
     assert 'context_frame = ttk.LabelFrame(sidebar, text="Контекст", padding=8)' in src
     assert 'nav_frame = ttk.LabelFrame(sidebar, text="Переходы", padding=8)' in src
+    assert 'text="Открыть Baseline Center", command=self.open_baseline_center' in src
+    assert "PNEUMO_GUI_SPEC_SHELL_OPEN_WORKSPACE" in src
+    assert '"baseline_run"' in src
+    assert '"pneumo_solver_ui.tools.desktop_gui_spec_shell"' in src
     assert 'ttk.Sizegrip(footer).pack(side="right", padx=(10, 0))' in src
 
 
@@ -102,6 +115,12 @@ def test_desktop_optimizer_contract_snapshot_reads_default_contract() -> None:
     assert snapshot.objective_keys
     assert snapshot.penalty_key
     assert snapshot.problem_hash_mode
+    assert snapshot.baseline_handoff_id == "HO-006"
+    assert snapshot.active_baseline_state in {"missing", "current", "stale", "invalid"}
+    assert "active_baseline_contract.json" in snapshot.active_baseline_contract_path
+    assert snapshot.optimizer_baseline_can_consume is (
+        snapshot.active_baseline_state == "current"
+    )
 
 
 def test_desktop_optimizer_runtime_builds_stage_and_coordinator_previews() -> None:
@@ -272,7 +291,9 @@ def test_desktop_optimizer_runtime_builds_launch_readiness_summary(tmp_path: Pat
 
     assert readiness["warn_count"] >= 1
     assert readiness["headline"] == "Review blockers before launch."
-    assert readiness["next_action"] == "Packaging"
+    assert readiness["next_action"] == "Baseline Center"
+    assert by_title["Active baseline HO-006"]["status"] == "warn"
+    assert by_title["Active baseline HO-006"]["optimizer_baseline_can_consume"] is False
     assert by_title["Packaging evidence"]["status"] == "warn"
     assert by_title["Selected run alignment"]["status"] == "info"
     assert by_title["Runtime state"]["status"] == "ok"
@@ -325,6 +346,127 @@ def test_desktop_optimizer_runtime_tracks_latest_pointer_flow(tmp_path: Path) ->
     assert latest["run_dir"] == str(coord_run.resolve())
     assert latest["pipeline_mode"] == "coordinator"
     assert latest["backend"] == "Ray"
+
+
+def test_desktop_optimizer_runtime_exports_selected_run_contract_for_analysis(tmp_path: Path) -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+    runtime.workspace_dir = tmp_path
+    current = runtime.contract_snapshot()
+
+    run_dir = tmp_path / "opt_runs" / "coord" / "p_ho007_ready"
+    export_dir = run_dir / "export"
+    export_dir.mkdir(parents=True)
+    result_path = export_dir / "trials.csv"
+    result_path.write_text("status,metrics_json\nDONE,\"{}\"\n", encoding="utf-8")
+    (run_dir / "coordinator.log").write_text("done=1/1\n", encoding="utf-8")
+    (run_dir / "run_id.txt").write_text("run_ho007_ready", encoding="utf-8")
+    (run_dir / "problem_hash.txt").write_text(current.problem_hash, encoding="utf-8")
+    (run_dir / "problem_hash_mode.txt").write_text(current.problem_hash_mode, encoding="utf-8")
+    (run_dir / "baseline_source.json").write_text(
+        json.dumps(
+            {
+                "source_kind": current.baseline_source_kind,
+                "source_label": current.baseline_source_label,
+                "baseline_path": current.baseline_path,
+                "active_baseline_hash": "active_baseline_hash_001",
+                "suite_snapshot_hash": "suite_snapshot_hash_001",
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "objective_contract.json").write_text(
+        json.dumps(
+            objective_contract_payload(
+                objective_keys=current.objective_keys,
+                penalty_key=current.penalty_key,
+                penalty_tol=current.penalty_tol,
+                source="desktop_optimizer_center_test",
+            ),
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    details = runtime.selected_run_details(run_dir)
+    assert details is not None
+    summary = details.summary
+    payload = runtime.export_selected_run_contract(
+        summary,
+        selected_from="test_desktop_optimizer_center",
+        now_text="2026-04-17T00:00:00Z",
+    )
+    saved_path = Path(payload["selected_run_contract_path"])
+    saved = json.loads(saved_path.read_text(encoding="utf-8"))
+
+    assert saved_path == tmp_path / "handoffs" / "WS-OPTIMIZATION" / "selected_run_contract.json"
+    assert saved["handoff_id"] == "HO-007"
+    assert saved["source_workspace"] == "WS-OPTIMIZATION"
+    assert saved["target_workspace"] == "WS-ANALYSIS"
+    assert saved["run_id"] == "run_ho007_ready"
+    assert saved["mode"] == "distributed_coordinator"
+    assert saved["objective_contract_hash"] == objective_contract_hash(
+        objective_keys=current.objective_keys,
+        penalty_key=current.penalty_key,
+        penalty_tol=current.penalty_tol,
+    )
+    assert saved["hard_gate_key"] == current.penalty_key
+    assert saved["hard_gate_tolerance"] == current.penalty_tol
+    assert saved["problem_hash"] == current.problem_hash
+    assert saved["active_baseline_hash"] == "active_baseline_hash_001"
+    assert saved["suite_snapshot_hash"] == "suite_snapshot_hash_001"
+    assert saved["results_csv_path"] == str(result_path.resolve())
+    assert saved["results_artifact_index"]["objective_contract_path"].endswith("objective_contract.json")
+    assert saved["analysis_handoff_ready_state"] == "ready"
+    assert saved["diagnostics_handoff_ready_state"] == "not_finalized_by_optimizer"
+    assert saved["selected_run_contract_hash"]
+
+    pointer = runtime.save_run_pointer(summary, selected_from="test_desktop_optimizer_center")
+    assert pointer["handoff_id"] == "HO-007"
+    assert pointer["selected_run_contract_exists"] is True
+    assert pointer["analysis_handoff_ready_state"] == "ready"
+
+
+def test_desktop_optimizer_runtime_blocks_cleanup_while_job_is_active(tmp_path: Path) -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+
+    class _Proc:
+        returncode = None
+
+        def poll(self):
+            return self.returncode
+
+    proc = _Proc()
+    job = DistOptJob(
+        proc=proc,
+        run_dir=tmp_path,
+        log_path=tmp_path / "coordinator.log",
+        started_ts=1.0,
+        budget=4,
+        backend="Ray",
+        pipeline_mode="coordinator",
+        stop_file=tmp_path / "STOP_OPTIMIZATION.txt",
+    )
+    save_job_to_session(runtime.session_state, job)
+    runtime.session_state["__opt_active_launch_context"] = {"kind": "manual"}
+
+    assert runtime.clear_finished_job() is False
+    assert load_job_from_session(runtime.session_state) is not None
+    assert runtime.request_soft_stop() is True
+    assert (tmp_path / "STOP_OPTIMIZATION.txt").exists()
+
+    proc.returncode = 0
+    assert runtime.clear_finished_job() is True
+    assert load_job_from_session(runtime.session_state) is None
+    assert "__opt_active_launch_context" not in runtime.session_state
 
 
 def test_desktop_optimizer_runtime_builds_selected_run_next_step_summary(tmp_path: Path) -> None:

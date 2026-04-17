@@ -21,6 +21,8 @@ from pneumo_solver_ui.optimization_stage_policy import (
     stage_seed_policy_summary_text,
 )
 
+STAGE_RUNNER_CONTRACT_LABEL = "StageRunner: warm-start, influence и staged seed/promotion"
+
 
 def render_stage_runner_configuration_controls(
     st: Any,

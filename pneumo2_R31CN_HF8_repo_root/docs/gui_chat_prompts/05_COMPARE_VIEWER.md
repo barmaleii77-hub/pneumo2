@@ -45,6 +45,23 @@
 - Не распыляйся на shell и WEB.
 - Переносить именно рабочие compare/results функции, а не просто тексты.
 
+## Runtime Handoff Contract
+
+- Compare Viewer потребляет current-context только через
+  `CompareSession.current_context_ref` или явный sidecar JSON из
+  `--current-context`; optimizer runtime history не читается и не мутируется.
+- Если sidecar путь известен, session/export сохраняют `current_context_path`,
+  `current_context_ref_source_path` и `current_context_ref_source_status`
+  (`ready`, `missing` или `session`).
+- Если refs есть, но sidecar JSON отсутствует, dock `dock_compare_contract`
+  показывает `sidecar missing`, сохраняет contract refs и не подменяет их
+  текущим проектом.
+- `compare_contract.json` export должен включать выбранные signals/table/time
+  window, `run_refs`, `baseline_ref`, `objective_ref`, `mismatch_banner`,
+  `compare_contract_hash` и readonly provenance current-context source.
+- Offline NPZ diagnostics берутся из `anim_diagnostics` / `visual_contract`;
+  compare contract не заменяет animator truth.
+
 ## Готовый промт
 
 ```text

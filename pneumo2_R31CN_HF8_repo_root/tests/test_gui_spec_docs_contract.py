@@ -38,6 +38,9 @@ V32_RELEASE_ACCEPTANCE_MAP = IMPORTS_V32 / "RELEASE_GATE_ACCEPTANCE_MAP.md"
 V32_GATE_HARDENING = IMPORTS_V32 / "RELEASE_GATE_HARDENING_MATRIX.csv"
 V32_GAP_MAP = IMPORTS_V32 / "GAP_TO_EVIDENCE_ACTION_MAP.csv"
 V32_INPUTS_HANDOFF_EVIDENCE = IMPORTS_V32 / "WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md"
+V32_PRODUCER_ANIMATOR_TRUTH_NOTE = IMPORTS_V32 / "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md"
+V32_DIAGNOSTICS_EVIDENCE_NOTE = IMPORTS_V32 / "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md"
+V32_RUNTIME_EVIDENCE_NOTE = IMPORTS_V32 / "RUNTIME_RELEASE_EVIDENCE_NOTE.md"
 RELEASE_TRIAGE = CONTEXT / "release_readiness" / "WORKTREE_TRIAGE_2026-04-17.md"
 V32_16_ACCEPTANCE_NOTE = CONTEXT / "release_readiness" / "V32_16_ACCEPTANCE_NOTE_2026-04-17.md"
 
@@ -263,6 +266,9 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in imports_readme
     assert "RELEASE_GATE_HARDENING_MATRIX.csv" in imports_readme
     assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in imports_readme
+    assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in imports_readme
+    assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in imports_readme
+    assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in imports_readme
     assert "специализированный ring-editor migration" in imports_readme
     assert "WS-RING -> WS-SUITE" in imports_readme
     assert "GUI_SPEC_ARCHIVE_LINEAGE.md" in imports_readme
@@ -285,6 +291,9 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md" in project_sources_text
     assert "v32_connector_reconciled/RELEASE_GATE_HARDENING_MATRIX.csv" in project_sources_text
     assert "v32_connector_reconciled/GAP_TO_EVIDENCE_ACTION_MAP.csv" in project_sources_text
+    assert "v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in project_sources_text
+    assert "v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in project_sources_text
+    assert "v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md" in project_sources_text
     assert "v33_connector_reconciled/README.md" in project_sources_text
     assert "v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md" in project_sources_text
     assert "gui_chat_prompts/13_RELEASE_GATES_KB_ACCEPTANCE.md" in project_sources_text
@@ -305,6 +314,9 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in index_text
     assert "RELEASE_GATE_HARDENING_MATRIX.csv" in index_text
     assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in index_text
+    assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in index_text
+    assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in index_text
+    assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in index_text
     assert "WORKTREE_TRIAGE_2026-04-17.md" in index_text
     assert "V32_16_ACCEPTANCE_NOTE_2026-04-17.md" in index_text
     assert "13_RELEASE_GATES_KB_ACCEPTANCE.md" in index_text
@@ -407,6 +419,9 @@ def test_v32_connector_reconciled_digest_is_registered() -> None:
     assert "PARALLEL_CHAT_WORKSTREAMS.md" in text
     assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in text
     assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in text
+    assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in text
+    assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in text
+    assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in text
     assert "WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md" in text
 
     completeness = V32_COMPLETENESS.read_text(encoding="utf-8")
@@ -505,6 +520,9 @@ def test_v32_release_gate_acceptance_map_is_executable_docs_contract() -> None:
 
     assert "V32-16" in release_lane_text
     assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in release_lane_text
+    assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in release_lane_text
+    assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in release_lane_text
+    assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in release_lane_text
     assert "Do not implement domain runtime features here." in release_lane_text
     assert "WORKTREE_TRIAGE_2026-04-17.md" in release_lane_text
     assert "V32_16_ACCEPTANCE_NOTE_2026-04-17.md" in release_lane_text
@@ -550,6 +568,87 @@ def test_release_readiness_triage_covers_dirty_worktree_with_lane_ownership() ->
     assert text.index("v33_connector_reconciled/README.md") < text.index(
         "v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md"
     )
+
+
+def test_v32_14_v32_09_producer_animator_truth_note_records_contract_acceptance_without_gap_closure() -> None:
+    assert V32_PRODUCER_ANIMATOR_TRUTH_NOTE.exists()
+
+    text = V32_PRODUCER_ANIMATOR_TRUTH_NOTE.read_text(encoding="utf-8")
+    assert "V32-14/V32-09 producer and animator truth evidence contracts accepted" in text
+    assert "not a release closure claim" in text
+    assert "`OG-001`" in text
+    assert "`OG-002`" in text
+    assert "solver-points contract" in text
+    assert "`solver_points`, `hardpoints` and `packaging`" in text
+    assert "geometry-acceptance report" in text
+    assert "`no_synthetic_geometry`" in text
+    assert "`axis_only_honesty_mode`" in text
+    assert "tests/test_anim_latest_solver_points_contract_gate.py" in text
+    assert "tests/test_anim_export_contract_gate.py" in text
+    assert "tests/test_r52_anim_export_contract_blocks.py" in text
+    assert "tests/test_geometry_acceptance_release_gate.py" in text
+    assert "tests/test_r31bn_cylinder_truth_gate.py" in text
+    assert "tests/test_v32_desktop_animator_truth_contract.py" in text
+    assert "36 passed" in text
+    assert "not a durable release SEND bundle" in text
+    assert "complete cylinder packaging passport" in text
+
+
+def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_release_closure() -> None:
+    assert V32_DIAGNOSTICS_EVIDENCE_NOTE.exists()
+
+    text = V32_DIAGNOSTICS_EVIDENCE_NOTE.read_text(encoding="utf-8")
+    assert "V32-11 diagnostics evidence contract accepted" in text
+    assert "full `OG-005` closure claim" in text
+    assert "`OG-005`" in text
+    assert "diagnostics/evidence_manifest.json" in text
+    assert "latest_send_bundle.zip" in text
+    assert "latest_send_bundle.sha256" in text
+    assert "`BND-018`" in text
+    assert "geometry/geometry_reference_evidence.json" in text
+    assert "latest_geometry_reference_evidence.json" in text
+    assert "artifact_freshness_status" in text
+    assert "artifact_freshness_relation" in text
+    assert "`GAP-002`" in text
+    assert "`GAP-006`" in text
+    assert "`GAP-008`" in text
+    assert "reader_and_evidence_surface" in text
+    assert "does_not_render_animator_meshes" in text
+    assert "CYLINDER_PACKAGING_PASSPORT.json" in text
+    assert "meta.geometry.road_width_m" in text
+    assert "Geometry Reference Center does not close" in text
+    assert "Runtime proof captured" in text
+    assert "send_bundles/SEND_" in text
+    assert "pb002_missing_required_count=0" in text
+    assert "tests/test_v32_diagnostics_send_bundle_evidence.py" in text
+    assert "tests/test_health_report_inspect_send_bundle_anim_diagnostics.py" in text
+    assert "tests/test_desktop_diagnostics_center_contract.py" in text
+    assert "26 passed" in text
+    assert "Runtime validation result: `validation ok`" in text
+    assert "does not alter solver, optimizer, animator, geometry, or domain calculations" in text
+
+
+def test_v32_15_runtime_evidence_note_records_hard_gate_acceptance_without_gap_closure() -> None:
+    assert V32_RUNTIME_EVIDENCE_NOTE.exists()
+
+    text = V32_RUNTIME_EVIDENCE_NOTE.read_text(encoding="utf-8")
+    assert "V32-15 runtime evidence hard-gate contract accepted" in text
+    assert "not a release closure claim" in text
+    assert "`OG-003`" in text
+    assert "`OG-004`" in text
+    assert "browser_perf_trace" in text
+    assert "viewport_gating" in text
+    assert "animator_frame_budget" in text
+    assert "tests/test_v32_runtime_evidence_gates.py" in text
+    assert "tests/test_r31bu_browser_perf_artifacts.py" in text
+    assert "tests/test_r78_animator_playback_speed_stability.py" in text
+    assert "tests/test_r42_bundle_stable_road_grid_and_aux_cadence_metrics.py" in text
+    assert "47 passed" in text
+    assert "hard_fail_count=3" in text
+    assert "No measured `browser_perf_trace`" in text
+    assert "No current `viewport_gating_report.json`" in text
+    assert "No current `animator_frame_budget_evidence.json`" in text
+    assert "does not\n  alter solver, optimizer, geometry or domain calculations" in text
 
 
 def test_v32_16_acceptance_note_records_docs_helper_boundary() -> None:
@@ -660,6 +759,9 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         V32_RELEASE_ACCEPTANCE_MAP,
         V32_GATE_HARDENING,
         V32_GAP_MAP,
+        V32_PRODUCER_ANIMATOR_TRUTH_NOTE,
+        V32_DIAGNOSTICS_EVIDENCE_NOTE,
+        V32_RUNTIME_EVIDENCE_NOTE,
         RELEASE_TRIAGE,
         V32_16_ACCEPTANCE_NOTE,
     )

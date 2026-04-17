@@ -9,9 +9,12 @@ from pneumo_solver_ui.browser_perf_artifacts import (
     BROWSER_PERF_EVIDENCE_REPORT_JSON_NAME,
     BROWSER_PERF_PREVIOUS_SNAPSHOT_JSON_NAME,
     BROWSER_PERF_REGISTRY_SNAPSHOT_JSON_NAME,
+    BROWSER_PERF_TRACE_JSON_NAME,
+    VIEWPORT_GATING_REPORT_JSON_NAME,
     collect_browser_perf_artifacts_summary,
     persist_browser_perf_snapshot_event,
     write_browser_perf_artifacts,
+    write_browser_perf_trace_artifact,
 )
 from pneumo_solver_ui.run_artifacts import collect_anim_latest_diagnostics_summary
 from pneumo_solver_ui.tools.make_send_bundle import _collect_anim_latest_bundle_diagnostics
@@ -113,6 +116,58 @@ def test_write_browser_perf_artifacts_marks_bundle_ready_when_trace_exists(tmp_p
     assert report["bundle_ready"] is True
 
 
+def test_write_browser_perf_trace_artifact_and_viewport_report_pass_hidden_budget(tmp_path: Path) -> None:
+    snap = _snapshot()
+    hidden = snap["components"]["mech_anim"]
+    hidden.update(
+        {
+            "wakeups": 0,
+            "render_count": 0,
+            "schedule_raf_count": 0,
+            "schedule_timeout_count": 0,
+            "duplicate_guard_hits": 0,
+        }
+    )
+    trace = write_browser_perf_trace_artifact(
+        tmp_path,
+        {"traceEvents": [{"name": "frame", "ts": 1}]},
+        trace_session_id="pytest-trace",
+        surfaces=["playhead_ctrl", "mech_anim"],
+        idle_cpu_summary={"idle_cpu_pct": 1.5},
+    )
+    out = write_browser_perf_artifacts(tmp_path, snap, updated_utc="2026-03-31T00:00:01Z")
+    report = json.loads((tmp_path / VIEWPORT_GATING_REPORT_JSON_NAME).read_text(encoding="utf-8"))
+    trace_payload = json.loads((tmp_path / BROWSER_PERF_TRACE_JSON_NAME).read_text(encoding="utf-8"))
+
+    assert trace["exists"] is True
+    assert trace_payload["schema"] == "browser_perf_trace.v1"
+    assert trace_payload["trace_session_id"] == "pytest-trace"
+    assert out["viewport_gating_report"]["status"] == "hidden_surfaces_gated"
+    assert out["viewport_gating_report"]["release_gate"] == "PASS"
+    assert report["schema"] == "viewport_gating_report.v1"
+    assert report["hidden_surface_count"] == 1
+    assert report["hidden_surface_update_count"] == 0
+    assert report["hidden_surfaces_gated"] is True
+    summary = collect_browser_perf_artifacts_summary(tmp_path)
+    assert summary["browser_perf_trace_exists"] is True
+    assert summary["viewport_gating_report_exists"] is True
+    assert summary["viewport_gating_release_gate"] == "PASS"
+    assert summary["viewport_gating_hidden_surfaces_gated"] is True
+
+
+def test_viewport_report_hard_fails_hidden_surface_activity(tmp_path: Path) -> None:
+    write_browser_perf_artifacts(tmp_path, _snapshot(), updated_utc="2026-03-31T00:00:01Z")
+    report = json.loads((tmp_path / VIEWPORT_GATING_REPORT_JSON_NAME).read_text(encoding="utf-8"))
+    summary = collect_browser_perf_artifacts_summary(tmp_path)
+
+    assert report["status"] == "hidden_surface_updates"
+    assert report["release_gate"] == "FAIL"
+    assert report["hard_fail"] is True
+    assert report["hidden_surface_update_count"] == 1
+    assert summary["viewport_gating_hard_fail"] is True
+    assert summary["viewport_gating_hidden_surface_update_count"] == 1
+
+
 def test_write_browser_perf_artifacts_writes_previous_snapshot_and_comparison_on_second_run(tmp_path: Path) -> None:
     first = _snapshot()
     second = _snapshot()
@@ -171,6 +226,25 @@ def test_persist_browser_perf_snapshot_event_returns_summary(tmp_path: Path) -> 
     assert summary["browser_perf_comparison_report_exists"] is True
     assert summary["browser_perf_comparison_status"] == "no_reference"
     assert summary["browser_perf_comparison_ready"] is False
+
+
+def test_persist_browser_perf_snapshot_event_writes_trace_when_present(tmp_path: Path) -> None:
+    snap = _snapshot()
+    snap["components"]["mech_anim"].update({"wakeups": 0, "render_count": 0, "schedule_raf_count": 0, "schedule_timeout_count": 0})
+    evt = {
+        "kind": "browser_perf_snapshot",
+        "dataset_id": "pytest-dataset",
+        "source_component": "playhead_ctrl",
+        "snapshot": snap,
+        "browser_perf_trace": {"traceEvents": [{"name": "present", "ts": 123}]},
+        "trace_session_id": "evt-trace",
+        "updated_utc": "2026-03-31T00:00:02Z",
+    }
+    summary = persist_browser_perf_snapshot_event(evt, tmp_path)
+    assert summary is not None
+    assert (tmp_path / BROWSER_PERF_TRACE_JSON_NAME).exists()
+    assert summary["browser_perf_trace_exists"] is True
+    assert summary["browser_perf_evidence_status"] == "trace_bundle_ready"
 
 
 def test_collect_anim_latest_diagnostics_summary_surfaces_browser_perf_artifacts(tmp_path: Path, monkeypatch) -> None:
@@ -236,7 +310,9 @@ def test_generate_triage_report_surfaces_browser_perf_artifacts(tmp_path: Path, 
 def test_playhead_component_exports_browser_perf_snapshot_to_python() -> None:
     text = (ROOT / "pneumo_solver_ui" / "components" / "playhead_ctrl" / "index.html").read_text(encoding="utf-8")
     assert 'kind: "browser_perf_snapshot"' in text
-    assert 'sendPerfSnapshotToPython(true);' in text
+    assert "function collectBrowserPerfTracePayload(snapshot)" in text
+    assert "evt.browser_perf_trace = tracePayload.trace" in text
+    assert "sendPerfSnapshotToPython(true, {includeTrace: true});" in text
 
 
 def test_ui_sources_consume_browser_perf_snapshot_event() -> None:

@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import Any
 
 
+SETTINGS_BRIDGE_SCHEMA_VERSION = "desktop_mnemo_settings_bridge_v1"
+
+
 def desktop_mnemo_settings_path(project_root: Path) -> Path:
     return Path(project_root) / "pneumo_solver_ui" / "workspace" / "desktop_animator_settings.ini"
 
@@ -19,6 +22,19 @@ def normalize_desktop_mnemo_view_mode(mode: str) -> str:
     return "overview" if str(mode or "").strip().lower() == "overview" else "focus"
 
 
+def normalize_desktop_mnemo_flow_display_mode(mode: str) -> str:
+    return "kg_s" if str(mode or "").strip().lower() == "kg_s" else "nlpm"
+
+
+def normalize_desktop_mnemo_pressure_display_mode(mode: str) -> str:
+    return "pa_abs" if str(mode or "").strip().lower() == "pa_abs" else "bar_g"
+
+
+def normalize_desktop_mnemo_detail_mode(mode: str) -> str:
+    raw_mode = str(mode or "").strip().lower()
+    return raw_mode if raw_mode in {"quiet", "operator", "full"} else "operator"
+
+
 def desktop_mnemo_view_mode_label(mode: str) -> str:
     normalized = normalize_desktop_mnemo_view_mode(mode)
     if normalized == "overview":
@@ -26,37 +42,77 @@ def desktop_mnemo_view_mode_label(mode: str) -> str:
     return "Фокусный сценарий"
 
 
-def read_desktop_mnemo_view_mode(project_root: Path) -> str:
+def _read_desktop_mnemo_setting(project_root: Path, setting_key: str, default: str) -> str:
     ini_path = desktop_mnemo_settings_path(project_root)
     if not ini_path.exists():
-        return "focus"
+        return str(default)
 
     parser = ConfigParser()
     parser.optionxform = str
     try:
         parser.read(ini_path, encoding="utf-8")
     except Exception:
-        return "focus"
+        return str(default)
 
     candidates = [
-        ("desktop_mnemo", "view_mode"),
-        ("General", "desktop_mnemo/view_mode"),
-        ("General", "desktop_mnemo\\view_mode"),
+        ("desktop_mnemo", setting_key),
+        ("General", f"desktop_mnemo/{setting_key}"),
+        ("General", f"desktop_mnemo\\{setting_key}"),
     ]
-    for section, key in candidates:
-        if parser.has_section(section) and parser.has_option(section, key):
-            return normalize_desktop_mnemo_view_mode(parser.get(section, key, fallback="focus"))
+    for section, option_key in candidates:
+        if parser.has_section(section) and parser.has_option(section, option_key):
+            return str(parser.get(section, option_key, fallback=str(default))).strip()
 
     raw_text = ""
     try:
         raw_text = ini_path.read_text(encoding="utf-8")
     except Exception:
         raw_text = ""
-    for marker in ("desktop_mnemo/view_mode=", "desktop_mnemo\\view_mode="):
+    for marker in (f"desktop_mnemo/{setting_key}=", f"desktop_mnemo\\{setting_key}=", f"{setting_key}="):
         for line in raw_text.splitlines():
             if line.strip().startswith(marker):
-                return normalize_desktop_mnemo_view_mode(line.split("=", 1)[-1].strip())
-    return "focus"
+                return str(line.split("=", 1)[-1].strip())
+    return str(default)
+
+
+def read_desktop_mnemo_view_mode(project_root: Path) -> str:
+    return normalize_desktop_mnemo_view_mode(_read_desktop_mnemo_setting(project_root, "view_mode", "focus"))
+
+
+def read_desktop_mnemo_display_units(project_root: Path) -> dict[str, str]:
+    return {
+        "flow_display_mode": normalize_desktop_mnemo_flow_display_mode(
+            _read_desktop_mnemo_setting(project_root, "flow_display_mode", "nlpm")
+        ),
+        "pressure_display_mode": normalize_desktop_mnemo_pressure_display_mode(
+            _read_desktop_mnemo_setting(project_root, "pressure_display_mode", "bar_g")
+        ),
+        "detail_mode": normalize_desktop_mnemo_detail_mode(
+            _read_desktop_mnemo_setting(project_root, "detail_mode", "operator")
+        ),
+    }
+
+
+def build_desktop_mnemo_settings_contract(project_root: Path) -> dict[str, Any]:
+    ini_path = desktop_mnemo_settings_path(project_root)
+    view_mode = read_desktop_mnemo_view_mode(project_root)
+    display_units = read_desktop_mnemo_display_units(project_root)
+    settings_available = ini_path.exists()
+    return {
+        "schema_version": SETTINGS_BRIDGE_SCHEMA_VERSION,
+        "source": "desktop_mnemo.settings_bridge",
+        "settings_path": str(ini_path),
+        "settings_available": settings_available,
+        "view_mode": view_mode,
+        "view_mode_label": desktop_mnemo_view_mode_label(view_mode),
+        "flow_display_mode": display_units["flow_display_mode"],
+        "pressure_display_mode": display_units["pressure_display_mode"],
+        "detail_mode": display_units["detail_mode"],
+        "display_units": dict(display_units),
+        "display_units_truth_state": "source_data_confirmed" if settings_available else "unavailable",
+        "truth_state": "source_data_confirmed" if settings_available else "unavailable",
+        "unavailable_reason": "" if settings_available else "Desktop Mnemo settings bridge falls back to focus/default display modes until the shared settings file exists.",
+    }
 
 
 def _coerce_float(value: Any) -> float | None:

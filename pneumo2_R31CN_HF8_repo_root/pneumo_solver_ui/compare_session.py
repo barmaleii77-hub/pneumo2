@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, fields
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -60,11 +60,24 @@ class CompareSession:
     time_window: Optional[Tuple[float, float]] = None
     playhead_t: Optional[float] = None
 
+    # v32 explicit compare context (consumer refs, not optimizer history)
+    compare_contract: Optional[Dict[str, Any]] = None
+    compare_contract_hash: str = ""
+    baseline_ref: Optional[Dict[str, Any]] = None
+    objective_ref: Optional[Dict[str, Any]] = None
+    run_refs: Optional[List[Dict[str, Any]]] = None
+    current_context_ref: Optional[Dict[str, Any]] = None
+    current_context_path: str = ""
+    mismatch_banner: Optional[Dict[str, Any]] = None
+    session_source: str = ""
+
     def __post_init__(self):
         if self.npz_paths is None:
             self.npz_paths = []
         if self.signals is None:
             self.signals = []
+        if self.run_refs is None:
+            self.run_refs = []
 
 
 def to_json_dict(sess: CompareSession) -> Dict[str, Any]:
@@ -81,8 +94,10 @@ def loads(text: str) -> CompareSession:
     obj = json.loads(text)
     if not isinstance(obj, dict):
         raise ValueError("Session JSON must be an object")
-    # tolerate missing fields
-    return CompareSession(**obj)
+    # tolerate missing and future fields
+    allowed = {f.name for f in fields(CompareSession)}
+    clean = {k: v for k, v in obj.items() if k in allowed}
+    return CompareSession(**clean)
 
 
 def load_file(path: str | Path) -> CompareSession:

@@ -103,7 +103,7 @@ def test_qt_compare_viewer_real_bundle_runtime_smoke_syncs_live_analysis_docks(m
         assert "\u0421\u043e\u0431\u044b\u0442\u0438\u044f " in viewer.lbl_status_quality.text()
         assert "\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 " in viewer.lbl_status_quality.text()
         assert "\u0424\u043e\u043a\u0443\u0441 \u041e\u0431\u0437\u043e\u0440" in viewer.lbl_status_layout.text()
-        assert "\u041f\u0430\u043d\u0435\u043b\u0438 12/12" in viewer.lbl_status_layout.text()
+        assert "\u041f\u0430\u043d\u0435\u043b\u0438 13/13" in viewer.lbl_status_layout.text()
         assert viewer.lbl_workspace_assistant_title.text() != ""
         assert viewer.lbl_workspace_assistant.text() != ""
         assert viewer.btn_workspace_focus_all.isChecked() is True
@@ -115,7 +115,7 @@ def test_qt_compare_viewer_real_bundle_runtime_smoke_syncs_live_analysis_docks(m
         assert viewer.dock_inflheat.isVisible()
         assert not viewer.dock_multivar.isVisible()
         assert "\u0424\u043e\u043a\u0443\u0441 \u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u044b" in viewer.lbl_status_layout.text()
-        assert "\u041f\u0430\u043d\u0435\u043b\u0438 8/12" in viewer.lbl_status_layout.text()
+        assert "\u041f\u0430\u043d\u0435\u043b\u0438 9/13" in viewer.lbl_status_layout.text()
         assert viewer.btn_workspace_focus_heatmaps.isChecked() is True
 
         table_name = _select_table(viewer, app)
@@ -144,7 +144,7 @@ def test_qt_compare_viewer_real_bundle_runtime_smoke_syncs_live_analysis_docks(m
         assert viewer.dock_multivar.isVisible()
         assert not viewer.dock_heatmap.isVisible()
         assert "\u0424\u043e\u043a\u0443\u0441 \u041c\u043d\u043e\u0433\u043e\u043c\u0435\u0440\u043d\u044b\u0439" in viewer.lbl_status_layout.text()
-        assert "\u041f\u0430\u043d\u0435\u043b\u0438 2/12" in viewer.lbl_status_layout.text()
+        assert "\u041f\u0430\u043d\u0435\u043b\u0438 3/13" in viewer.lbl_status_layout.text()
         assert viewer.btn_workspace_focus_multivar.isChecked() is True
         assert viewer.lbl_workspace_assistant_title.text() != ""
 
@@ -229,6 +229,7 @@ def test_qt_compare_viewer_real_bundle_can_export_workspace_snapshot_set(monkeyp
         exports = viewer._export_workspace_snapshot_set(snapshot_dir)
         export_names = [path.name for path in exports]
         assert export_names == [
+            "compare_contract.json",
             "compare_workspace_overview.png",
             "compare_workspace_heatmaps.png",
             "compare_workspace_multivariate.png",
@@ -237,6 +238,9 @@ def test_qt_compare_viewer_real_bundle_can_export_workspace_snapshot_set(monkeyp
 
         for path in exports:
             assert path.exists()
+            if path.suffix.lower() == ".json":
+                assert path.stat().st_size > 100
+                continue
             assert path.stat().st_size > 10_000
             image = QtGui.QImage(str(path))
             assert not image.isNull()

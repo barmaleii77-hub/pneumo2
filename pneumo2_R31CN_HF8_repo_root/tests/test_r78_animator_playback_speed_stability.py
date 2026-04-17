@@ -279,6 +279,7 @@ def test_load_npz_accepts_str_path_and_normalizes_to_path_object(monkeypatch) ->
     win.btn_play = _DummyButton()
     win._timer = _DummyStopper()
     win._display_refresh_hz_hint = lambda: 60.0
+    win._speed = 1.0
     win._status_text = None
     win._update_frame_calls = []
     win._status = lambda text: setattr(win, "_status_text", text)
@@ -288,7 +289,7 @@ def test_load_npz_accepts_str_path_and_normalizes_to_path_object(monkeypatch) ->
     monkeypatch.setattr(appmod, "run_self_checks", lambda bundle: type("Report", (), {"messages": []})())
     monkeypatch.setattr(appmod, "_emit_animator_warning", lambda *args, **kwargs: None)
 
-    win.load_npz(r"C:\\tmp\\dense_validation_bundle.npz")
+    win.load_npz(r"C:\\tmp\\dense_validation_bundle.npz", background=False)
 
     assert isinstance(normalized["path"], Path)
     assert normalized["path"].name == "dense_validation_bundle.npz"

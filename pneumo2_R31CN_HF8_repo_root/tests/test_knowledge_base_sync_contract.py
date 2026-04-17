@@ -47,6 +47,21 @@ def test_chat_knowledge_base_store_exists_and_is_seeded() -> None:
         item["artifact_path"] == "context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md"
         for item in data["plans"]
     )
+    assert any(
+        item["artifact_path"]
+        == "context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md"
+        for item in data["plans"]
+    )
+    assert any(
+        item["artifact_path"]
+        == "context/gui_spec_imports/v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md"
+        for item in data["plans"]
+    )
+    assert any(
+        item["artifact_path"]
+        == "context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md"
+        for item in data["plans"]
+    )
 
 
 def test_chat_knowledge_base_adders_dedupe_same_entry() -> None:

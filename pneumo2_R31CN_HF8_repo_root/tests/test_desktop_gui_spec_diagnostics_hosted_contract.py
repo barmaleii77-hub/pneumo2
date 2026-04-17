@@ -33,6 +33,7 @@ def test_hosted_diagnostics_workspace_page_builds_offscreen_and_refreshes() -> N
         assert page.bundle_box.title() == "Текущее состояние bundle"
         assert page.run_box.title() == "Последний запуск диагностики"
         assert page.check_box.title() == "Проверка / inspection / health"
+        assert page.baseline_box.title() == "Baseline HO-006"
         assert page.actions_box.title() == "Действия"
         assert page.log_box.title() == "Журнал / последние сообщения"
         assert "desktop_diagnostics_runtime.py" in page.source_label.text()
@@ -63,6 +64,38 @@ def test_hosted_diagnostics_page_routes_send_and_legacy_actions_through_panel() 
 
         assert "pneumo_solver_ui.tools.send_results_gui" in spawns
         assert "pneumo_solver_ui.tools.desktop_diagnostics_center" in spawns
+    finally:
+        page.close()
+        page.deleteLater()
+        app.processEvents()
+
+
+def test_hosted_diagnostics_page_links_baseline_banner_to_baseline_center(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app = _app()
+    monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(tmp_path / "workspace"))
+    workspace = build_workspace_map()["diagnostics"]
+    commands: list[str] = []
+    page = DiagnosticsWorkspacePage(
+        workspace,
+        repo_root=ROOT,
+        on_command=lambda command_id: commands.append(command_id),
+    )
+    try:
+        page.refresh_view()
+        app.processEvents()
+
+        assert page.baseline_status_value.objectName() == "DG-BASELINE-STATUS"
+        assert page.open_baseline_center_button.objectName() == "DG-BTN-OPEN-BASELINE"
+        assert "HO-006 state=missing" in page.baseline_status_value.text()
+        assert "silent_rebinding_allowed=False" in page.baseline_status_value.text()
+
+        page.open_baseline_center()
+        app.processEvents()
+
+        assert commands == ["baseline.center.open"]
     finally:
         page.close()
         page.deleteLater()

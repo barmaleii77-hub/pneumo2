@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import zipfile
 from dataclasses import asdict
@@ -15,6 +16,21 @@ from pneumo_solver_ui.geometry_acceptance_contract import format_geometry_accept
 
 from .health_report import collect_health_report
 from .send_bundle_contract import build_anim_operator_recommendations, summarize_ring_closure
+
+
+def _sha256_file(path: Path) -> str:
+    try:
+        if not path.exists() or not path.is_file():
+            return ""
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                if not chunk:
+                    break
+                digest.update(chunk)
+        return digest.hexdigest()
+    except Exception:
+        return ""
 
 
 def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
@@ -48,6 +64,7 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
         "schema_version": "1.2.0",
         "zip_path": str(zp),
         "zip_name": zp.name,
+        "zip_sha256": _sha256_file(zp),
         "ok": bool(rep.ok),
         "release": meta.get("release") or "",
         "artifacts": artifacts,
@@ -101,6 +118,7 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
         "# Send bundle inspection",
         "",
         f"- ZIP: `{summary.get('zip_name') or ''}`",
+        f"- ZIP SHA256: `{summary.get('zip_sha256') or '—'}`",
         f"- OK: **{bool(summary.get('ok'))}**",
         f"- Release: {summary.get('release') or '—'}",
         f"- Embedded health report: {summary.get('has_embedded_health_report')}",
@@ -173,6 +191,13 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
                 f"- handoff_contract_status: `{requirements.get('contract_status') or '—'}`",
                 f"- handoff_required_path: `{requirements.get('required_contract_path') or '—'}`",
                 f"- handoff_missing_fields: `{', '.join(str(x) for x in (requirements.get('missing_fields') or [])) or '—'}`",
+            ]
+        readiness = dict(engineering.get("selected_run_candidate_readiness") or {})
+        if readiness:
+            lines += [
+                f"- selected_run_candidate_count: `{engineering.get('selected_run_candidate_count')}`",
+                f"- selected_run_ready_candidate_count: `{engineering.get('selected_run_ready_candidate_count')}`",
+                f"- selected_run_missing_inputs_candidate_count: `{engineering.get('selected_run_missing_inputs_candidate_count')}`",
             ]
     lines += [
         "",

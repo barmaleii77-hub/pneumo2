@@ -403,6 +403,13 @@ class DesktopDiagnosticsCenter:
         ttk.Button(top, text="Собрать пакет сейчас", command=lambda: self._start_bundle_build(auto_copy_on_ready=False)).pack(side="left", padx=(8, 0))
         self.btn_open_latest_zip = ttk.Button(top, text="📂 Открыть ZIP", command=self._open_latest_bundle, state="disabled")
         self.btn_open_latest_zip.pack(side="left", padx=(8, 0))
+        self.btn_open_geometry_reference_evidence = ttk.Button(
+            top,
+            text="Открыть Geometry JSON",
+            command=self._open_geometry_reference_evidence,
+            state="disabled",
+        )
+        self.btn_open_geometry_reference_evidence.pack(side="left", padx=(8, 0))
         ttk.Button(top, text="📂 Открыть папку пакетов", command=self._open_bundle_out_dir).pack(side="left", padx=(8, 0))
 
         summary_box = ttk.LabelFrame(self.bundle_body, text="Сводка и машинно-читаемые пути")
@@ -939,6 +946,14 @@ class DesktopDiagnosticsCenter:
             return
         _open_in_explorer(Path(bundle.latest_zip_path).expanduser().resolve().parent)
 
+    def _open_geometry_reference_evidence(self) -> None:
+        bundle = load_desktop_diagnostics_bundle_record(self.repo_root, out_dir=self._active_bundle_out_dir())
+        if not bundle.latest_geometry_reference_evidence_path:
+            return
+        path = Path(bundle.latest_geometry_reference_evidence_path).expanduser().resolve()
+        if path.exists():
+            _open_in_explorer(path)
+
     def _analysis_evidence_summary_lines(self, bundle) -> list[str]:
         status = str(getattr(bundle, "analysis_evidence_status", "") or "MISSING").strip().upper()
         context_state = str(getattr(bundle, "analysis_evidence_context_state", "") or "MISSING")
@@ -997,6 +1012,12 @@ class DesktopDiagnosticsCenter:
             f"- Status: {status}",
             f"- Artifact status: {getattr(bundle, 'geometry_reference_artifact_status', '') or 'missing'}",
             (
+                "- Artifact freshness: "
+                f"{getattr(bundle, 'geometry_reference_artifact_freshness_status', '') or 'missing'} / "
+                f"relation={getattr(bundle, 'geometry_reference_artifact_freshness_relation', '') or 'missing'} / "
+                f"latest={getattr(bundle, 'geometry_reference_latest_artifact_status', '') or '—'}"
+            ),
+            (
                 "- road_width_m: "
                 f"{getattr(bundle, 'geometry_reference_road_width_status', '') or 'missing'} / "
                 f"source={getattr(bundle, 'geometry_reference_road_width_source', '') or '—'}"
@@ -1026,6 +1047,8 @@ class DesktopDiagnosticsCenter:
     def _geometry_reference_status_text(self, bundle) -> str:
         status = str(getattr(bundle, "geometry_reference_status", "") or "MISSING").strip().upper()
         artifact = str(getattr(bundle, "geometry_reference_artifact_status", "") or "missing")
+        freshness = str(getattr(bundle, "geometry_reference_artifact_freshness_status", "") or "missing")
+        relation = str(getattr(bundle, "geometry_reference_artifact_freshness_relation", "") or "missing")
         road = str(getattr(bundle, "geometry_reference_road_width_status", "") or "missing")
         packaging = str(getattr(bundle, "geometry_reference_packaging_mismatch_status", "") or "missing")
         gate = str(getattr(bundle, "geometry_reference_acceptance_gate", "") or "MISSING")
@@ -1036,7 +1059,7 @@ class DesktopDiagnosticsCenter:
         ]
         action = str(getattr(bundle, "geometry_reference_action", "") or "")
         text = (
-            f"{status} / artifact={artifact} / road_width={road} / "
+            f"{status} / artifact={artifact} / freshness={freshness}:{relation} / road_width={road} / "
             f"packaging={packaging} / acceptance={gate}"
         )
         if missing:
@@ -1142,6 +1165,9 @@ class DesktopDiagnosticsCenter:
         self.zip_path = self._last_zip
         self.btn_open.configure(state="normal" if (self._last_zip or self._last_run_dir) else "disabled")
         self.btn_open_latest_zip.configure(state="normal" if bundle.latest_zip_path else "disabled")
+        self.btn_open_geometry_reference_evidence.configure(
+            state="normal" if bundle.latest_geometry_reference_evidence_path else "disabled"
+        )
         self.send_path_var.set(bundle.latest_zip_path or "(ещё не готово)")
         if bundle.latest_zip_path:
             zip_path = Path(bundle.latest_zip_path)

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from pneumo_solver_ui.optimization_launch_plan_runtime import (
     staged_problem_hash_for_launch,
     staged_resume_run_dir,
@@ -65,6 +67,28 @@ def test_staged_resume_run_dir_reuses_latest_compatible_run(tmp_path: Path) -> N
     )
 
     assert chosen == latest
+
+
+def test_staged_resume_run_dir_blocks_selected_history_run_with_problem_hash_mismatch(tmp_path: Path) -> None:
+    ui_root = _repo_ui_root()
+    workspace = tmp_path / "workspace"
+    selected = workspace / "opt_runs" / "staged" / "p_selected_mismatch"
+    selected.mkdir(parents=True)
+    (selected / "problem_hash.txt").write_text("different_problem", encoding="utf-8")
+    session_state = {
+        "opt_use_staged": True,
+        "opt_stage_resume": True,
+        "__opt_history_selected_run_dir": str(selected),
+        "opt_objectives": "comfort\nenergy",
+        "opt_penalty_key": "penalty_total",
+    }
+
+    with pytest.raises(RuntimeError, match="Resume problem_hash mismatch"):
+        staged_resume_run_dir(
+            session_state,
+            workspace_dir=workspace,
+            ui_root=ui_root,
+        )
 
 
 def test_staged_resume_run_dir_honors_legacy_problem_hash_mode(tmp_path: Path) -> None:

@@ -540,6 +540,14 @@ def collect_anim_latest_diagnostics_summary(
     capture_manifest_handoff_id = ""
     capture_manifest_capture_hash = ""
     capture_manifest_analysis_context_hash = ""
+    capture_manifest_analysis_context_status = ""
+    capture_manifest_animator_link_contract_hash = ""
+    capture_manifest_selected_run_contract_hash = ""
+    capture_manifest_selected_test_id = ""
+    capture_manifest_selected_npz_path = ""
+    capture_manifest_objective_contract_hash = ""
+    capture_manifest_suite_snapshot_hash = ""
+    capture_manifest_problem_hash = ""
     capture_manifest_truth_mode_hash = ""
     capture_manifest_blocking_states: list[str] = []
     capture_manifest_truth_state = ""
@@ -549,6 +557,64 @@ def collect_anim_latest_diagnostics_summary(
         capture_manifest_handoff_id = str(capture_manifest_obj.get("handoff_id") or "")
         capture_manifest_capture_hash = str(capture_manifest_obj.get("capture_hash") or "")
         capture_manifest_analysis_context_hash = str(capture_manifest_obj.get("analysis_context_hash") or "")
+        analysis_context_refs_obj = (
+            capture_manifest_obj.get("analysis_context_refs")
+            if isinstance(capture_manifest_obj.get("analysis_context_refs"), dict)
+            else {}
+        )
+        analysis_artifact_refs_obj = (
+            capture_manifest_obj.get("analysis_artifact_refs")
+            if isinstance(capture_manifest_obj.get("analysis_artifact_refs"), dict)
+            else {}
+        )
+        optimizer_artifact_refs_obj = (
+            capture_manifest_obj.get("optimizer_artifact_refs")
+            if isinstance(capture_manifest_obj.get("optimizer_artifact_refs"), dict)
+            else {}
+        )
+        capture_manifest_analysis_context_status = str(
+            capture_manifest_obj.get("analysis_context_status")
+            or analysis_context_refs_obj.get("analysis_context_status")
+            or analysis_artifact_refs_obj.get("analysis_context_status")
+            or ""
+        )
+        capture_manifest_animator_link_contract_hash = str(
+            capture_manifest_obj.get("animator_link_contract_hash")
+            or analysis_context_refs_obj.get("animator_link_contract_hash")
+            or analysis_artifact_refs_obj.get("animator_link_contract_hash")
+            or ""
+        )
+        capture_manifest_selected_run_contract_hash = str(
+            capture_manifest_obj.get("selected_run_contract_hash")
+            or analysis_context_refs_obj.get("selected_run_contract_hash")
+            or optimizer_artifact_refs_obj.get("selected_run_contract_hash")
+            or ""
+        )
+        capture_manifest_selected_test_id = str(
+            analysis_context_refs_obj.get("selected_test_id")
+            or analysis_artifact_refs_obj.get("selected_test_id")
+            or ""
+        )
+        capture_manifest_selected_npz_path = str(
+            analysis_context_refs_obj.get("selected_npz_path")
+            or analysis_artifact_refs_obj.get("selected_npz_path")
+            or ""
+        )
+        capture_manifest_objective_contract_hash = str(
+            optimizer_artifact_refs_obj.get("objective_contract_hash")
+            or analysis_context_refs_obj.get("objective_contract_hash")
+            or ""
+        )
+        capture_manifest_suite_snapshot_hash = str(
+            optimizer_artifact_refs_obj.get("suite_snapshot_hash")
+            or analysis_context_refs_obj.get("suite_snapshot_hash")
+            or ""
+        )
+        capture_manifest_problem_hash = str(
+            optimizer_artifact_refs_obj.get("problem_hash")
+            or analysis_context_refs_obj.get("problem_hash")
+            or ""
+        )
         capture_manifest_truth_mode_hash = str(capture_manifest_obj.get("truth_mode_hash") or "")
         capture_manifest_blocking_states = [
             str(x) for x in list(capture_manifest_obj.get("blocking_states") or []) if str(x).strip()
@@ -645,6 +711,14 @@ def collect_anim_latest_diagnostics_summary(
         "anim_latest_capture_export_manifest_handoff_id": capture_manifest_handoff_id,
         "anim_latest_capture_hash": capture_manifest_capture_hash,
         "anim_latest_analysis_context_hash": capture_manifest_analysis_context_hash,
+        "anim_latest_analysis_context_status": capture_manifest_analysis_context_status,
+        "anim_latest_animator_link_contract_hash": capture_manifest_animator_link_contract_hash,
+        "anim_latest_selected_run_contract_hash": capture_manifest_selected_run_contract_hash,
+        "anim_latest_selected_test_id": capture_manifest_selected_test_id,
+        "anim_latest_selected_npz_path": capture_manifest_selected_npz_path,
+        "anim_latest_objective_contract_hash": capture_manifest_objective_contract_hash,
+        "anim_latest_suite_snapshot_hash": capture_manifest_suite_snapshot_hash,
+        "anim_latest_problem_hash": capture_manifest_problem_hash,
         "anim_latest_truth_mode_hash": capture_manifest_truth_mode_hash,
         "anim_latest_capture_export_manifest_blocking_states": capture_manifest_blocking_states,
         "anim_latest_capture_export_manifest_truth_state": capture_manifest_truth_state,

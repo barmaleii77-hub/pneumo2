@@ -49,7 +49,7 @@ def _ensure_import_paths() -> None:
 _ensure_import_paths()
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 import json
 
 import numpy as np
@@ -87,6 +87,52 @@ try:
         )
 except Exception as e:
     raise SystemExit(f"Cannot import compare_ui helpers: {e}")
+
+
+try:
+    try:
+        from compare_contract import (  # type: ignore
+            build_compare_contract,
+            compare_contract_hash,
+            extract_compare_run_ref,
+            format_compare_contract_summary,
+            format_compare_mismatch_banner,
+            load_compare_contract,
+            save_compare_contract,
+        )
+    except Exception:
+        from pneumo_solver_ui.compare_contract import (  # type: ignore
+            build_compare_contract,
+            compare_contract_hash,
+            extract_compare_run_ref,
+            format_compare_contract_summary,
+            format_compare_mismatch_banner,
+            load_compare_contract,
+            save_compare_contract,
+        )
+except Exception:
+    build_compare_contract = None  # type: ignore
+    compare_contract_hash = None  # type: ignore
+    extract_compare_run_ref = None  # type: ignore
+    format_compare_contract_summary = None  # type: ignore
+    format_compare_mismatch_banner = None  # type: ignore
+    load_compare_contract = None  # type: ignore
+    save_compare_contract = None  # type: ignore
+
+
+try:
+    try:
+        from compare_session import CompareSession, load_file as load_compare_session_file, save_file as save_compare_session_file  # type: ignore
+    except Exception:
+        from pneumo_solver_ui.compare_session import (  # type: ignore
+            CompareSession,
+            load_file as load_compare_session_file,
+            save_file as save_compare_session_file,
+        )
+except Exception:
+    CompareSession = None  # type: ignore
+    load_compare_session_file = None  # type: ignore
+    save_compare_session_file = None  # type: ignore
 
 
 try:
@@ -289,6 +335,7 @@ class Run:
     visual_contract: Dict
     anim_diagnostics: Dict
     geometry_acceptance: Dict
+    compare_ref: Dict
     events: Optional[pd.DataFrame] = None
 
 
@@ -422,8 +469,13 @@ def _knn_density(points01: np.ndarray, k: int = 5) -> np.ndarray:
 
 
 class CompareViewer(QtWidgets.QMainWindow):
-    def __init__(self, paths: List[Path]):
+    def __init__(self, paths: List[Path], session: Optional['CompareSession'] = None):
         super().__init__()
+        if session is not None and not paths:
+            try:
+                paths = [Path(p) for p in (getattr(session, 'npz_paths', []) or []) if str(p).strip()]
+            except Exception:
+                paths = []
         self.setObjectName("compareViewerWindow")
         self._window_title_base = "PneumoApp: \u0446\u0435\u043d\u0442\u0440 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f NPZ"
         self.setWindowTitle(self._window_title_base)
@@ -479,6 +531,12 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.events_selected: List[str] = []
         self._events_selection_explicit: bool = False
         self._last_load_errors: List[str] = []
+        self._loaded_compare_session_path: str = ""
+        self._startup_compare_session = session
+        self._compare_current_context_ref: Dict[str, Any] = {}
+        self._compare_current_context_path: str = ""
+        self.compare_contract: Dict[str, Any] = {}
+        self.compare_contract_hash: str = ""
 
         # plots
         self.glw = pg.GraphicsLayoutWidget()
@@ -562,6 +620,8 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._settings = QtCore.QSettings('UnifiedPneumoApp', 'DiagrammyCompareViewer')
         self._restore_after_load = {}
         self._load_settings()
+        if session is not None:
+            self._prime_restore_from_compare_session(session)
         self._build_heatmap_dock()
         self._build_peak_heatmap_dock()
         self._build_open_timeline_dock()
@@ -573,6 +633,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._build_qa_dock()
         self._build_events_dock()
         self._build_geometry_acceptance_dock()
+        self._build_compare_contract_dock()
         self._build_view_menu()
         self._apply_default_workspace_layout()
 
@@ -592,6 +653,9 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._load_paths(paths)
         self._clear_pending_dataset_restore_if_mismatch([getattr(r, 'path', Path('')) for r in getattr(self, 'runs', [])])
         self._apply_restore_after_load()
+        if session is not None:
+            self._apply_compare_session_controls(session)
+        self._refresh_compare_contract_panel()
         self._update_workspace_status()
 
         # crosshair
@@ -627,6 +691,16 @@ class CompareViewer(QtWidgets.QMainWindow):
         )
         self.lbl_trust.setStyleSheet("QLabel{padding:6px;border-radius:6px;}")
         lay.addWidget(self.lbl_trust)
+
+        self.lbl_compare_mismatch = QtWidgets.QLabel("")
+        self.lbl_compare_mismatch.setObjectName("compareMismatchBanner")
+        self.lbl_compare_mismatch.setWordWrap(True)
+        self.lbl_compare_mismatch.setVisible(False)
+        self.lbl_compare_mismatch.setToolTip(
+            "Current/historical mismatch banner из explicit compare contract."
+        )
+        self.lbl_compare_mismatch.setStyleSheet("QLabel{padding:6px;border-radius:6px;}")
+        lay.addWidget(self.lbl_compare_mismatch)
 
         self.controls_top_tabs = QtWidgets.QTabWidget()
         self.controls_top_tabs.setObjectName("controlsTopTabs")
@@ -1653,6 +1727,104 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             pass
 
+    def _prime_restore_from_compare_session(self, sess: 'CompareSession') -> None:
+        stt = getattr(self, '_restore_after_load', None)
+        if not isinstance(stt, dict):
+            self._restore_after_load = {}
+            stt = self._restore_after_load
+        try:
+            paths = [str(p) for p in (getattr(sess, 'npz_paths', []) or []) if str(p).strip()]
+            if paths:
+                stt['dataset_paths'] = paths
+                stt['runs_paths'] = paths
+        except Exception:
+            pass
+        try:
+            labels = [str(x) for x in (getattr(sess, 'labels', None) or []) if str(x).strip()]
+            if labels:
+                stt['runs'] = labels
+        except Exception:
+            pass
+        try:
+            table = str(getattr(sess, 'table', '') or '').strip()
+            if table:
+                stt['table'] = table
+        except Exception:
+            pass
+        try:
+            signals = [str(x) for x in (getattr(sess, 'signals', []) or []) if str(x).strip()]
+            if signals:
+                stt['signals'] = signals
+                stt['signals_selection_explicit'] = True
+        except Exception:
+            pass
+        try:
+            ref_label = str(getattr(sess, 'reference_label', '') or '').strip()
+            if ref_label:
+                stt['reference_run'] = ref_label
+        except Exception:
+            pass
+        try:
+            if getattr(sess, 'time_window', None):
+                stt['nav_region'] = json.dumps(list(getattr(sess, 'time_window')))
+        except Exception:
+            pass
+        try:
+            if getattr(sess, 'playhead_t', None) is not None:
+                stt['play_time'] = float(getattr(sess, 'playhead_t'))
+        except Exception:
+            pass
+        try:
+            self._compare_current_context_ref = dict(getattr(sess, 'current_context_ref', None) or {})
+        except Exception:
+            self._compare_current_context_ref = {}
+        try:
+            self._compare_current_context_path = str(
+                getattr(sess, 'current_context_path', '')
+                or getattr(sess, 'current_context_sidecar_path', '')
+                or ''
+            ).strip()
+        except Exception:
+            self._compare_current_context_path = ""
+        try:
+            self.compare_contract = dict(getattr(sess, 'compare_contract', None) or {})
+            if not self.compare_contract and build_compare_contract is not None:
+                run_refs = [dict(x) for x in (getattr(sess, 'run_refs', None) or []) if isinstance(x, dict)]
+                if run_refs:
+                    self.compare_contract = build_compare_contract(
+                        run_refs,
+                        compare_mode='run_vs_run' if len(run_refs) >= 2 else 'selected_run_vs_current_context',
+                        selected_table=str(getattr(sess, 'table', '') or ''),
+                        selected_metrics=[str(x) for x in (getattr(sess, 'signals', []) or []) if str(x).strip()],
+                        selected_time_window=list(getattr(sess, 'time_window', None) or []),
+                        current_context_ref=self._compare_current_context_ref,
+                    )
+            self.compare_contract_hash = str(
+                getattr(sess, 'compare_contract_hash', '') or self.compare_contract.get('compare_contract_hash') or ''
+            )
+        except Exception:
+            self.compare_contract = {}
+            self.compare_contract_hash = ""
+
+    def _apply_compare_session_controls(self, sess: 'CompareSession') -> None:
+        try:
+            self.combo_dist_unit.setCurrentText(str(getattr(sess, 'dist_unit', self.dist_unit) or self.dist_unit))
+            self.combo_angle_unit.setCurrentText(str(getattr(sess, 'angle_unit', self.angle_unit) or self.angle_unit))
+            self.flow_unit = str(getattr(sess, 'flow_unit', self.flow_unit) or self.flow_unit)
+        except Exception:
+            pass
+        try:
+            self.chk_delta.setChecked(str(getattr(sess, 'mode', 'overlay') or 'overlay') == 'delta')
+        except Exception:
+            pass
+        try:
+            self.chk_zero_baseline.setChecked(bool(getattr(sess, 'zero_baseline', self.zero_baseline)))
+            self.baseline_mode = str(getattr(sess, 'baseline_mode', self.baseline_mode) or self.baseline_mode)
+            self.spin_baseline_s.setValue(float(getattr(sess, 'baseline_window_s', self.baseline_window_s) or 0.0))
+            self.baseline_first_n = int(getattr(sess, 'baseline_first_n', self.baseline_first_n) or 0)
+        except Exception:
+            pass
+
     def _apply_restore_after_load(self) -> None:
         stt = dict(getattr(self, '_restore_after_load', {}) or {})
         self._restore_after_load = {}
@@ -2146,6 +2318,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             s.setValue('workspace_analysis_mode', str(getattr(self, '_workspace_analysis_mode', 'all_to_all') or 'all_to_all'))
             s.setValue('workspace_focus_mode', str(getattr(self, '_workspace_focus_mode', 'all') or 'all'))
             s.setValue('workspace_focus_dock', str(getattr(self, '_workspace_focus_dock_attr', '') or ''))
+            s.setValue('last_compare_contract_hash', str(getattr(self, 'compare_contract_hash', '') or ''))
             s.setValue('plot_rows', int(self.spin_rows.value()))
             s.setValue('play_fps', int(self.spin_fps.value()))
             if hasattr(self, 'combo_dist_mode'):
@@ -2365,6 +2538,107 @@ class CompareViewer(QtWidgets.QMainWindow):
                 pass
 
 
+    def _build_compare_contract_dock(self) -> None:
+        dock = QtWidgets.QDockWidget("Compare contract", self)
+        dock.setObjectName("dock_compare_contract")
+        dock.setWindowTitle("Compare contract")
+        dock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+        dock.setMinimumWidth(280)
+
+        content = QtWidgets.QWidget()
+        lay = QtWidgets.QVBoxLayout(content)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(6)
+
+        source_row = QtWidgets.QHBoxLayout()
+        source_row.setContentsMargins(0, 0, 0, 0)
+        source_row.setSpacing(6)
+        self.lbl_compare_current_context_source = QtWidgets.QLabel("current_context_ref: -")
+        self.lbl_compare_current_context_source.setObjectName("compareCurrentContextSource")
+        self.lbl_compare_current_context_source.setWordWrap(True)
+        self.lbl_compare_current_context_source.setToolTip(
+            "Readonly current_context_ref source used for historical mismatch checks."
+        )
+        source_row.addWidget(self.lbl_compare_current_context_source, 1)
+        self.btn_open_compare_current_context_sidecar = QtWidgets.QToolButton()
+        self.btn_open_compare_current_context_sidecar.setObjectName(
+            "btnOpenCompareCurrentContextSidecar"
+        )
+        self.btn_open_compare_current_context_sidecar.setToolTip(
+            "Open current_context_ref sidecar JSON"
+        )
+        try:
+            icon = self.style().standardIcon(
+                QtWidgets.QStyle.StandardPixmap.SP_DialogOpenButton
+            )
+            self.btn_open_compare_current_context_sidecar.setIcon(icon)
+        except Exception:
+            self.btn_open_compare_current_context_sidecar.setText("Open")
+        self.btn_open_compare_current_context_sidecar.setEnabled(False)
+        self.btn_open_compare_current_context_sidecar.clicked.connect(
+            self._open_compare_current_context_sidecar
+        )
+        source_row.addWidget(self.btn_open_compare_current_context_sidecar, 0)
+        lay.addLayout(source_row)
+
+        self.txt_compare_contract = QtWidgets.QPlainTextEdit()
+        self.txt_compare_contract.setObjectName("compareContractSummary")
+        self.txt_compare_contract.setReadOnly(True)
+        self.txt_compare_contract.setPlainText("Compare contract: -")
+        self.txt_compare_contract.setToolTip("Explicit compare contract summary loaded from NPZ/session refs.")
+        lay.addWidget(self.txt_compare_contract, 1)
+
+        dock.setWidget(content)
+        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, dock)
+        self.dock_compare_contract = dock
+
+    def _refresh_compare_current_context_source(self) -> None:
+        label = getattr(self, 'lbl_compare_current_context_source', None)
+        button = getattr(self, 'btn_open_compare_current_context_sidecar', None)
+        ref_count = len(dict(getattr(self, '_compare_current_context_ref', {}) or {}))
+        raw_path = str(getattr(self, '_compare_current_context_path', '') or '').strip()
+        path_exists = False
+        display_path = raw_path
+        if raw_path:
+            try:
+                p = _absolute_fs_path(Path(raw_path))
+                display_path = str(p)
+                path_exists = p.exists() and p.is_file()
+            except Exception:
+                path_exists = False
+        if label is not None:
+            try:
+                if display_path:
+                    state = "sidecar" if path_exists else "sidecar missing"
+                    label.setText(f"current_context_ref {state}: {Path(display_path).name} | refs={ref_count}")
+                    label.setToolTip(display_path)
+                elif ref_count:
+                    label.setText(f"current_context_ref session refs={ref_count}")
+                    label.setToolTip("Readonly CompareSession.current_context_ref")
+                else:
+                    label.setText("current_context_ref: -")
+                    label.setToolTip("No readonly current_context_ref sidecar/session payload.")
+            except Exception:
+                pass
+        if button is not None:
+            try:
+                button.setEnabled(bool(path_exists))
+                button.setToolTip(display_path if path_exists else "No sidecar JSON path is available.")
+            except Exception:
+                pass
+
+    def _open_compare_current_context_sidecar(self) -> None:
+        raw_path = str(getattr(self, '_compare_current_context_path', '') or '').strip()
+        if not raw_path:
+            return
+        try:
+            p = _absolute_fs_path(Path(raw_path))
+            if p.exists() and p.is_file():
+                QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(p)))
+        except Exception:
+            pass
+
+
     def _build_menu(self):
         m = self.menuBar()
         file_menu = m.addMenu("\u0424\u0430\u0439\u043b")
@@ -2373,6 +2647,17 @@ class CompareViewer(QtWidgets.QMainWindow):
         act_open.setShortcut(QtGui.QKeySequence.Open)
         act_open.triggered.connect(self._open_dialog)
         file_menu.addAction(act_open)
+
+        act_open_session = QtGui.QAction("\u041e\u0442\u043a\u0440\u044b\u0442\u044c compare-\u0441\u0435\u0441\u0441\u0438\u044e...", self)
+        act_open_session.setObjectName("act_open_compare_session")
+        act_open_session.triggered.connect(self._open_session_dialog)
+        file_menu.addAction(act_open_session)
+
+        act_save_session = QtGui.QAction("\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c compare-\u0441\u0435\u0441\u0441\u0438\u044e...", self)
+        act_save_session.setObjectName("act_save_compare_session")
+        act_save_session.setShortcut("Ctrl+Shift+S")
+        act_save_session.triggered.connect(self._save_session_dialog)
+        file_menu.addAction(act_save_session)
 
         act_export = QtGui.QAction("\u042d\u043a\u0441\u043f\u043e\u0440\u0442 PNG...", self)
         act_export.setShortcut("Ctrl+E")
@@ -6068,6 +6353,10 @@ class CompareViewer(QtWidgets.QMainWindow):
     def _update_workspace_status(self) -> None:
         runs = list(self._selected_runs()) if hasattr(self, "list_runs") else []
         sigs = list(self._selected_signals()) if hasattr(self, "list_signals") else []
+        try:
+            self._refresh_compare_contract_panel()
+        except Exception:
+            pass
         table = str(getattr(self, "current_table", "") or "—")
         ref = str(self._reference_run_label(runs) or "—")
         analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
@@ -6158,6 +6447,9 @@ class CompareViewer(QtWidgets.QMainWindow):
         )
         if weakest_status:
             quality_text = f"{quality_text} | \u0421\u043b\u0430\u0431\u043e\u0435 \u043c\u0435\u0441\u0442\u043e {weakest_status}"
+        contract_hash = str(getattr(self, 'compare_contract_hash', '') or '')
+        if contract_hash:
+            quality_text = f"{quality_text} | Compare {contract_hash[:10]}"
         layout_text = (
             f"\u0424\u043e\u043a\u0443\u0441 {self._workspace_focus_label(follow_target=follow_target)} | "
             f"\u0410\u043d\u0430\u043b\u0438\u0437 {self._workspace_analysis_label()} | "
@@ -6229,6 +6521,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         docks: List[QtWidgets.QDockWidget] = []
         for attr in (
             "dock_controls",
+            "dock_compare_contract",
             "dock_heatmap",
             "dock_peak_heatmap",
             "dock_open_timeline",
@@ -6250,6 +6543,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         key = str(attr or "").strip()
         if key not in {
             "dock_controls",
+            "dock_compare_contract",
             "dock_heatmap",
             "dock_peak_heatmap",
             "dock_open_timeline",
@@ -6271,6 +6565,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             return ""
         for attr in (
             "dock_controls",
+            "dock_compare_contract",
             "dock_heatmap",
             "dock_peak_heatmap",
             "dock_open_timeline",
@@ -6300,7 +6595,7 @@ class CompareViewer(QtWidgets.QMainWindow):
 
     def _workspace_allowed_dock_attrs(self, focus_mode: str) -> Set[str]:
         mode = str(focus_mode or "all")
-        allowed = {"dock_controls"}
+        allowed = {"dock_controls", "dock_compare_contract"}
         if mode == "heatmaps":
             allowed.update({"dock_heatmap", "dock_peak_heatmap", "dock_open_timeline", "dock_influence", "dock_run_metrics", "dock_static_stroke", "dock_inflheat"})
         elif mode == "multivariate":
@@ -6389,6 +6684,7 @@ class CompareViewer(QtWidgets.QMainWindow):
     def _apply_default_workspace_layout(self) -> None:
         self._workspace_focus_mode = "all"
         controls = getattr(self, "dock_controls", None)
+        compare_contract = getattr(self, "dock_compare_contract", None)
         heatmap = getattr(self, "dock_heatmap", None)
         peak_heatmap = getattr(self, "dock_peak_heatmap", None)
         open_timeline = getattr(self, "dock_open_timeline", None)
@@ -6410,6 +6706,13 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         if controls is not None:
             self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, controls)
+        if compare_contract is not None:
+            self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, compare_contract)
+            if controls is not None:
+                try:
+                    self.tabifyDockWidget(controls, compare_contract)
+                except Exception:
+                    pass
 
         analysis_anchor = heatmap or peak_heatmap or open_timeline or influence or run_metrics or static_stroke or inflheat or multivar
         if analysis_anchor is not None:
@@ -6460,8 +6763,9 @@ class CompareViewer(QtWidgets.QMainWindow):
             self._show_dock(dock)
 
         try:
-            if controls is not None and analysis_anchor is not None:
-                self.resizeDocks([controls, analysis_anchor], [300, 1080], QtCore.Qt.Horizontal)
+            left_anchor = controls or compare_contract
+            if left_anchor is not None and analysis_anchor is not None:
+                self.resizeDocks([left_anchor, analysis_anchor], [300, 1080], QtCore.Qt.Horizontal)
         except Exception:
             pass
         try:
@@ -6472,6 +6776,11 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         self._raise_dock(heatmap or analysis_anchor)
         self._raise_dock(qa)
+        if controls is not None:
+            try:
+                controls.raise_()
+            except Exception:
+                pass
         self._update_workspace_status()
 
     def _focus_workspace_preset(self, mode: str) -> None:
@@ -6479,6 +6788,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._workspace_focus_mode = str(mode or "all")
 
         controls = getattr(self, "dock_controls", None)
+        compare_contract = getattr(self, "dock_compare_contract", None)
         heatmap = getattr(self, "dock_heatmap", None)
         peak_heatmap = getattr(self, "dock_peak_heatmap", None)
         open_timeline = getattr(self, "dock_open_timeline", None)
@@ -6491,17 +6801,17 @@ class CompareViewer(QtWidgets.QMainWindow):
         events = getattr(self, "dock_events", None)
         geometry_acceptance = getattr(self, "dock_geometry_acceptance", None)
 
-        show_attrs = {"dock_controls"}
-        active_dock = controls
+        show_attrs = {"dock_controls", "dock_compare_contract"}
+        active_dock = controls or compare_contract
         if mode == "heatmaps":
             show_attrs.update({"dock_heatmap", "dock_peak_heatmap", "dock_open_timeline", "dock_influence", "dock_run_metrics", "dock_static_stroke", "dock_inflheat"})
-            active_dock = heatmap or peak_heatmap or open_timeline or influence or run_metrics or static_stroke or inflheat or controls
+            active_dock = heatmap or peak_heatmap or open_timeline or influence or run_metrics or static_stroke or inflheat or controls or compare_contract
         elif mode == "multivariate":
             show_attrs.add("dock_multivar")
-            active_dock = multivar or controls
+            active_dock = multivar or controls or compare_contract
         elif mode == "qa":
             show_attrs.update({"dock_qa", "dock_events", "dock_geometry_acceptance"})
-            active_dock = qa or events or geometry_acceptance or controls
+            active_dock = qa or events or geometry_acceptance or controls or compare_contract
         else:
             show_attrs.update(
                 {
@@ -6518,10 +6828,11 @@ class CompareViewer(QtWidgets.QMainWindow):
                     "dock_geometry_acceptance",
                 }
             )
-            active_dock = heatmap or multivar or qa or controls
+            active_dock = heatmap or multivar or qa or controls or compare_contract
 
         for attr in (
             "dock_controls",
+            "dock_compare_contract",
             "dock_heatmap",
             "dock_peak_heatmap",
             "dock_open_timeline",
@@ -6647,6 +6958,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.menu_view_docks = docks_menu
         dock_specs = (
             ("\u041f\u0443\u043b\u044c\u0442", getattr(self, "dock_controls", None)),
+            ("Compare contract", getattr(self, "dock_compare_contract", None)),
             ("\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0394(t)", getattr(self, "dock_heatmap", None)),
             ("\u041f\u0438\u043a\u0438 |\u0394|", getattr(self, "dock_peak_heatmap", None)),
             ("\u0425\u043e\u0434 \u043a\u043b\u0430\u043f\u0430\u043d\u043e\u0432", getattr(self, "dock_open_timeline", None)),
@@ -10676,7 +10988,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                     item = QtWidgets.QTableWidgetItem(text)
                     item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
                     item.setBackground(self._geometry_gate_color(gate))
-                    item.setTextAlignment(int(QtCore.Qt.AlignCenter))
+                    item.setTextAlignment(QtCore.Qt.AlignCenter)
                     item.setData(
                         QtCore.Qt.UserRole,
                         {
@@ -14970,6 +15282,10 @@ class CompareViewer(QtWidgets.QMainWindow):
         tables = b.get("tables") or {}
         meta = b.get("meta") or {}
         label = _default_label(p, meta)
+        try:
+            compare_ref = extract_compare_run_ref(meta, npz_path=p, label=label) if extract_compare_run_ref is not None else {}
+        except Exception:
+            compare_ref = {}
         ev_df = None
         if ev_scan_run_tables is not None and ev_events_to_frame is not None:
             try:
@@ -14985,6 +15301,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             visual_contract=dict(b.get('visual_contract') or {}),
             anim_diagnostics=dict(b.get('anim_diagnostics') or {}),
             geometry_acceptance=dict(b.get('geometry_acceptance') or {}),
+            compare_ref=dict(compare_ref or {}),
             events=ev_df,
         )
 
@@ -15306,6 +15623,11 @@ class CompareViewer(QtWidgets.QMainWindow):
                         n += 1
 
             run.label = label
+            try:
+                if isinstance(getattr(run, 'compare_ref', None), dict):
+                    run.compare_ref['label'] = label
+            except Exception:
+                pass
             used.add(label)
 
     def _clear_pending_dataset_restore(self) -> None:
@@ -15457,6 +15779,128 @@ class CompareViewer(QtWidgets.QMainWindow):
 
     def _absolute_run_path(self, path: Path) -> Path:
         return _absolute_fs_path(path)
+
+    def _selected_compare_refs(self) -> List[Dict[str, Any]]:
+        refs: List[Dict[str, Any]] = []
+        for run in list(self._selected_runs()):
+            try:
+                ref = dict(getattr(run, 'compare_ref', {}) or {})
+                if ref:
+                    ref['label'] = str(getattr(run, 'label', '') or ref.get('label') or '')
+                    refs.append(ref)
+            except Exception:
+                pass
+        return refs
+
+    def _refresh_compare_contract_panel(self) -> None:
+        try:
+            self._refresh_compare_current_context_source()
+        except Exception:
+            pass
+        txtw = getattr(self, 'txt_compare_contract', None)
+        banner = getattr(self, 'lbl_compare_mismatch', None)
+        runs = list(self._selected_runs()) if hasattr(self, 'list_runs') else []
+        if not runs:
+            existing_contract = dict(getattr(self, 'compare_contract', {}) or {})
+            existing_refs = list(existing_contract.get('run_refs') or []) if existing_contract else []
+            if existing_refs:
+                self.compare_contract_hash = str(existing_contract.get('compare_contract_hash') or self.compare_contract_hash or '')
+                if txtw is not None:
+                    try:
+                        if format_compare_contract_summary is not None:
+                            txtw.setPlainText(format_compare_contract_summary(existing_contract))
+                        else:
+                            txtw.setPlainText(f"compare_contract_hash={self.compare_contract_hash[:16]}")
+                    except Exception:
+                        pass
+                if banner is not None:
+                    try:
+                        missing = {
+                            "banner_id": "BANNER-HIST-003",
+                            "severity": "error",
+                            "mismatch_dimensions": ["artifact_missing"],
+                        }
+                        existing_contract["mismatch_banner"] = missing
+                        self.compare_contract = existing_contract
+                        text = format_compare_mismatch_banner(missing) if format_compare_mismatch_banner is not None else ""
+                        banner.setStyleSheet(
+                            'QLabel{background:#ffd6d6;border:1px solid #cc0000;color:#330000;padding:6px;border-radius:6px;}'
+                        )
+                        banner.setText(text)
+                        banner.setVisible(bool(text))
+                    except Exception:
+                        pass
+                return
+            self.compare_contract = {}
+            self.compare_contract_hash = ""
+            if txtw is not None:
+                try:
+                    txtw.setPlainText("Compare contract: -")
+                except Exception:
+                    pass
+            if banner is not None:
+                try:
+                    banner.setVisible(False)
+                except Exception:
+                    pass
+            return
+        refs = self._selected_compare_refs()
+        current_ref = dict(getattr(self, '_compare_current_context_ref', {}) or {})
+        compare_mode = "run_vs_run" if len(refs) >= 2 else "selected_run_vs_current_context"
+        try:
+            if build_compare_contract is not None:
+                contract = build_compare_contract(
+                    refs,
+                    compare_mode=compare_mode,
+                    selected_table=str(getattr(self, 'current_table', '') or getattr(self, 'table_selected', '') or ''),
+                    selected_metrics=list(self._selected_signals()) if hasattr(self, 'list_signals') else [],
+                    selected_time_window=list(self._current_time_window() or []),
+                    unit_profile={
+                        "dist_unit": str(getattr(self, 'dist_unit', 'mm') or 'mm'),
+                        "angle_unit": str(getattr(self, 'angle_unit', 'deg') or 'deg'),
+                        "flow_unit": str(getattr(self, 'flow_unit', 'raw') or 'raw'),
+                        "p_atm_pa": float(getattr(self, 'p_atm', self.P_ATM)),
+                    },
+                    alignment_mode="time_s",
+                    current_context_ref=current_ref,
+                )
+            else:
+                contract = {}
+        except Exception:
+            contract = {}
+        self.compare_contract = dict(contract or {})
+        self.compare_contract_hash = str(self.compare_contract.get('compare_contract_hash') or '')
+        try:
+            if txtw is not None:
+                if format_compare_contract_summary is not None:
+                    txtw.setPlainText(format_compare_contract_summary(self.compare_contract))
+                else:
+                    txtw.setPlainText(f"compare_contract_hash={self.compare_contract_hash[:16]}")
+        except Exception:
+            pass
+        try:
+            summary = dict(self.compare_contract.get('mismatch_banner') or {})
+            text = format_compare_mismatch_banner(summary) if format_compare_mismatch_banner is not None else ""
+            banner_id = str(summary.get('banner_id') or '')
+            if banner is not None and text and banner_id in {"BANNER-HIST-002", "BANNER-HIST-003"}:
+                if str(summary.get('severity') or '').lower() == 'error':
+                    banner.setStyleSheet(
+                        'QLabel{background:#ffd6d6;border:1px solid #cc0000;color:#330000;padding:6px;border-radius:6px;}'
+                    )
+                else:
+                    banner.setStyleSheet(
+                        'QLabel{background:#fff1c2;border:1px solid #cc8a00;color:#332200;padding:6px;border-radius:6px;}'
+                    )
+                banner.setText(text)
+                banner.setVisible(True)
+            elif banner is not None:
+                banner.setVisible(False)
+        except Exception:
+            if banner is not None:
+                try:
+                    banner.setVisible(False)
+                except Exception:
+                    pass
 
     def _refresh_anim_diag_panel(self) -> None:
         txtw = getattr(self, 'txt_anim_diag', None)
@@ -17131,6 +17575,102 @@ class CompareViewer(QtWidgets.QMainWindow):
             raise RuntimeError("Qt failed to save PNG")
         return out
 
+    def _current_compare_contract_payload(self) -> Dict[str, Any]:
+        try:
+            self._refresh_compare_contract_panel()
+        except Exception:
+            pass
+        payload: Dict[str, Any] = dict(getattr(self, "compare_contract", {}) or {})
+
+        try:
+            selected_refs = self._selected_compare_refs()
+        except Exception:
+            selected_refs = []
+        if not selected_refs:
+            try:
+                selected_refs = [
+                    dict(getattr(run, "compare_ref", {}) or {})
+                    for run in list(getattr(self, "runs", []) or [])
+                    if dict(getattr(run, "compare_ref", {}) or {})
+                ]
+            except Exception:
+                selected_refs = []
+        if not selected_refs:
+            selected_refs = [
+                dict(item)
+                for item in list(payload.get("run_refs") or [])
+                if isinstance(item, dict)
+            ]
+
+        baseline_ref = dict(payload.get("baseline_ref") or {})
+        objective_ref = dict(payload.get("objective_ref") or {})
+        for ref in selected_refs:
+            if not baseline_ref and isinstance(ref.get("baseline_ref"), dict):
+                baseline_ref = dict(ref.get("baseline_ref") or {})
+            if not objective_ref and isinstance(ref.get("objective_ref"), dict):
+                objective_ref = dict(ref.get("objective_ref") or {})
+
+        try:
+            signals = [str(x) for x in self._selected_signals()]
+        except Exception:
+            signals = [str(x) for x in (getattr(self, "signals_selected", []) or []) if str(x).strip()]
+        table = str(getattr(self, "current_table", "") or getattr(self, "table_selected", "") or "")
+        time_window = self._current_time_window()
+
+        payload["run_refs"] = selected_refs
+        payload["baseline_ref"] = baseline_ref
+        payload["objective_ref"] = objective_ref
+        payload["current_context_ref"] = dict(getattr(self, "_compare_current_context_ref", {}) or {})
+        current_context_path = str(getattr(self, "_compare_current_context_path", "") or "").strip()
+        payload["current_context_ref_source"] = (
+            "sidecar" if current_context_path else ("session" if payload["current_context_ref"] else "")
+        )
+        if current_context_path:
+            payload["current_context_ref_source_path"] = current_context_path
+            try:
+                p = _absolute_fs_path(Path(current_context_path))
+                payload["current_context_ref_source_status"] = (
+                    "ready" if p.exists() and p.is_file() else "missing"
+                )
+            except Exception:
+                payload["current_context_ref_source_status"] = "missing"
+        elif payload["current_context_ref"]:
+            payload["current_context_ref_source_status"] = "session"
+        else:
+            payload["current_context_ref_source_status"] = "missing"
+        payload["mismatch_banner"] = dict(payload.get("mismatch_banner") or {})
+        payload["selected_table"] = table
+        payload["selected_signals"] = signals
+        payload["selected_metrics"] = list(payload.get("selected_metrics") or signals)
+        payload["selected_time_window"] = (
+            list(time_window) if time_window is not None else list(payload.get("selected_time_window") or [])
+        )
+        payload["session_source"] = "qt_compare_viewer"
+
+        existing_hash = str(getattr(self, "compare_contract_hash", "") or payload.get("compare_contract_hash") or "")
+        if existing_hash:
+            payload["compare_contract_hash"] = existing_hash
+        elif compare_contract_hash is not None:
+            try:
+                payload["compare_contract_hash"] = compare_contract_hash(payload)
+            except Exception:
+                payload["compare_contract_hash"] = ""
+        return payload
+
+    def _save_compare_contract_evidence(self, target) -> Optional[Path]:
+        out = _absolute_fs_path(target)
+        if out.suffix.lower() != ".json":
+            out = out / "compare_contract.json"
+        payload = self._current_compare_contract_payload()
+        if not payload:
+            return None
+        if save_compare_contract is not None:
+            save_compare_contract(out, payload)
+        else:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return out
+
     def _export_workspace_snapshot_set(self, out_dir) -> List[Path]:
         out_root = _absolute_fs_path(out_dir)
         try:
@@ -17149,6 +17689,9 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         exports: List[Path] = []
         try:
+            contract_path = self._save_compare_contract_evidence(out_root)
+            if contract_path is not None:
+                exports.append(contract_path)
             preset_specs = (
                 ("compare_workspace_overview", "all"),
                 ("compare_workspace_heatmaps", "heatmaps"),
@@ -17226,6 +17769,183 @@ class CompareViewer(QtWidgets.QMainWindow):
                 "Snapshot set exported",
                 f"Saved {len(exports)} workspace snapshots.\n\n{lines}",
             )
+
+    def _current_time_window(self) -> Optional[Tuple[float, float]]:
+        try:
+            reg = getattr(self, '_region', None)
+            if reg is not None:
+                rr = reg.getRegion()
+                if isinstance(rr, (list, tuple)) and len(rr) >= 2:
+                    return float(rr[0]), float(rr[1])
+        except Exception:
+            pass
+        try:
+            value = getattr(self, 'navigator_region_selected', None)
+            if value is not None and len(value) >= 2:
+                return float(value[0]), float(value[1])
+        except Exception:
+            pass
+        return None
+
+    def _current_compare_session(self) -> Optional['CompareSession']:
+        if CompareSession is None:
+            return None
+        try:
+            self._refresh_compare_contract_panel()
+        except Exception:
+            pass
+        runs = list(getattr(self, 'runs', []) or [])
+        session_hint = getattr(self, '_startup_compare_session', None)
+        selected = list(self._selected_runs()) if hasattr(self, 'list_runs') else []
+        ref_label = str(getattr(self, 'reference_run_selected', '') or self._reference_run_label(selected) or '')
+        run_refs = [dict(getattr(run, 'compare_ref', {}) or {}) for run in selected]
+        if not run_refs:
+            run_refs = [dict(getattr(run, 'compare_ref', {}) or {}) for run in runs]
+        if not run_refs:
+            contract = dict(getattr(self, 'compare_contract', {}) or {})
+            run_refs = [
+                dict(item)
+                for item in list(contract.get('run_refs') or [])
+                if isinstance(item, dict)
+            ]
+        baseline_ref = {}
+        objective_ref = {}
+        for ref in run_refs:
+            if not baseline_ref and isinstance(ref.get('baseline_ref'), dict):
+                baseline_ref = dict(ref.get('baseline_ref') or {})
+            if not objective_ref and isinstance(ref.get('objective_ref'), dict):
+                objective_ref = dict(ref.get('objective_ref') or {})
+        contract = dict(getattr(self, 'compare_contract', {}) or {})
+        if not baseline_ref and isinstance(contract.get('baseline_ref'), dict):
+            baseline_ref = dict(contract.get('baseline_ref') or {})
+        if not objective_ref and isinstance(contract.get('objective_ref'), dict):
+            objective_ref = dict(contract.get('objective_ref') or {})
+        time_window = self._current_time_window()
+        try:
+            play_t = getattr(self, 'playhead_time_selected', None)
+            play_t = float(play_t) if play_t is not None else None
+        except Exception:
+            play_t = None
+        try:
+            signals = [str(x) for x in self._selected_signals()]
+        except Exception:
+            signals = [str(x) for x in (getattr(self, 'signals_selected', []) or [])]
+        npz_paths = [str(self._absolute_run_path(getattr(run, 'path', Path('')))) for run in runs]
+        labels = [str(getattr(run, 'label', '') or '') for run in runs]
+        if not npz_paths and session_hint is not None:
+            try:
+                npz_paths = [str(p) for p in (getattr(session_hint, 'npz_paths', []) or []) if str(p).strip()]
+            except Exception:
+                npz_paths = []
+            try:
+                labels = [str(x) for x in (getattr(session_hint, 'labels', None) or []) if str(x).strip()]
+            except Exception:
+                labels = []
+        try:
+            return CompareSession(
+                npz_paths=npz_paths,
+                labels=labels,
+                table=str(getattr(self, 'current_table', '') or getattr(self, 'table_selected', '') or 'main'),
+                signals=signals,
+                mode='delta' if bool(getattr(self, 'chk_delta', None) and self.chk_delta.isChecked()) else 'overlay',
+                reference_label=ref_label or None,
+                dist_unit=str(getattr(self, 'dist_unit', 'mm') or 'mm'),
+                angle_unit=str(getattr(self, 'angle_unit', 'deg') or 'deg'),
+                flow_unit=str(getattr(self, 'flow_unit', 'raw') or 'raw'),
+                p_atm_pa=float(getattr(self, 'p_atm', self.P_ATM)),
+                zero_baseline=bool(getattr(self, 'zero_baseline', True)),
+                baseline_mode=str(getattr(self, 'baseline_mode', 't0') or 't0'),
+                baseline_window_s=float(getattr(self, 'baseline_window_s', 0.0) or 0.0),
+                baseline_first_n=int(getattr(self, 'baseline_first_n', 0) or 0),
+                lock_y_signal=bool(getattr(self, 'lock_y', True)),
+                lock_y_unit=bool(getattr(self, 'lock_y_by_unit', False)),
+                robust_y=bool(getattr(self, 'robust_y', True)),
+                sym_y=bool(getattr(self, 'sym_y', True)),
+                time_window=time_window,
+                playhead_t=play_t,
+                compare_contract=dict(getattr(self, 'compare_contract', {}) or {}),
+                compare_contract_hash=str(getattr(self, 'compare_contract_hash', '') or ''),
+                baseline_ref=baseline_ref or None,
+                objective_ref=objective_ref or None,
+                run_refs=run_refs,
+                current_context_ref=dict(getattr(self, '_compare_current_context_ref', {}) or {}),
+                current_context_path=str(getattr(self, '_compare_current_context_path', '') or ''),
+                mismatch_banner=dict((getattr(self, 'compare_contract', {}) or {}).get('mismatch_banner') or {}),
+                session_source='qt_compare_viewer',
+            )
+        except Exception:
+            return None
+
+    def _load_compare_session_path(self, path: str | Path) -> bool:
+        if load_compare_session_file is None:
+            QtWidgets.QMessageBox.warning(self, "Compare session", "compare_session helper is unavailable.")
+            return False
+        try:
+            sess = load_compare_session_file(path)
+        except Exception as exc:
+            QtWidgets.QMessageBox.warning(self, "Open compare session failed", str(exc))
+            return False
+        self._loaded_compare_session_path = str(_absolute_fs_path(Path(path)))
+        self._startup_compare_session = sess
+        self._prime_restore_from_compare_session(sess)
+        try:
+            paths = [Path(p) for p in (getattr(sess, 'npz_paths', []) or []) if str(p).strip()]
+        except Exception:
+            paths = []
+        loaded = self._load_paths(paths, replace=True) if paths else 0
+        if paths and loaded <= 0:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Open compare session",
+                "Session opened, but referenced NPZ files were not loaded.",
+            )
+        self._apply_restore_after_load()
+        self._apply_compare_session_controls(sess)
+        self._refresh_compare_contract_panel()
+        self._update_workspace_status()
+        try:
+            s = getattr(self, '_settings', None)
+            if s is not None:
+                s.setValue('last_session', self._loaded_compare_session_path)
+        except Exception:
+            pass
+        return True
+
+    def _open_session_dialog(self) -> None:
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Open Compare Session",
+            str(_absolute_fs_path(Path.cwd())),
+            "Compare sessions (*.json);;JSON files (*.json)",
+        )
+        if path:
+            self._load_compare_session_path(path)
+
+    def _save_session_dialog(self) -> None:
+        if save_compare_session_file is None:
+            QtWidgets.QMessageBox.warning(self, "Compare session", "compare_session helper is unavailable.")
+            return
+        default = str(_absolute_fs_path(Path.cwd() / "compare_session.json"))
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Save Compare Session",
+            default,
+            "Compare sessions (*.json);;JSON files (*.json)",
+        )
+        if not path:
+            return
+        sess = self._current_compare_session()
+        if sess is None:
+            QtWidgets.QMessageBox.warning(self, "Save Compare Session", "Could not build compare session.")
+            return
+        try:
+            save_compare_session_file(sess, path)
+            self._save_compare_contract_evidence(Path(path).with_name("compare_contract.json"))
+            self._loaded_compare_session_path = str(_absolute_fs_path(Path(path)))
+            if getattr(self, '_settings', None) is not None:
+                self._settings.setValue('last_session', self._loaded_compare_session_path)
+        except Exception as exc:
+            QtWidgets.QMessageBox.warning(self, "Save Compare Session failed", str(exc))
 
     def _open_dialog(self):
         dlg = QtWidgets.QFileDialog(self)
@@ -17351,21 +18071,131 @@ def _auto_find_npz(max_files: int = 6) -> List[Path]:
 
 
 
+def _load_compare_session_safely(path: str | Path | None) -> Optional['CompareSession']:
+    if load_compare_session_file is None or path is None:
+        return None
+    try:
+        p = _absolute_fs_path(Path(path))
+        if not p.exists() or not p.is_file():
+            return None
+        return load_compare_session_file(p)
+    except Exception:
+        return None
+
+
+def _load_current_context_ref_safely(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {}
+    try:
+        p = _absolute_fs_path(Path(path))
+        if not p.exists() or not p.is_file():
+            return {}
+        obj = json.loads(p.read_text(encoding="utf-8"))
+        if not isinstance(obj, dict):
+            return {}
+        for key in ("current_context_ref", "compare_ref", "run_ref"):
+            value = obj.get(key)
+            if isinstance(value, dict):
+                return dict(value)
+        return dict(obj)
+    except Exception:
+        return {}
+
+
+def _current_context_sidecar_path_safely(path: str | Path | None) -> str:
+    if path is None:
+        return ""
+    try:
+        p = _absolute_fs_path(Path(path))
+        return str(p) if p.exists() and p.is_file() else ""
+    except Exception:
+        return ""
+
+
+def _compare_session_npz_paths(sess: Optional['CompareSession']) -> List[Path]:
+    if sess is None:
+        return []
+    out: List[Path] = []
+    seen: set[str] = set()
+    for raw in (getattr(sess, 'npz_paths', []) or []):
+        try:
+            p = _absolute_fs_path(Path(str(raw)))
+        except Exception:
+            continue
+        key = _normalized_fs_path_key(p)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(p)
+    return out
+
+
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
-    ap.add_argument("npz", nargs="*", help="Paths to *.npz")
+    ap.add_argument("--session", help="Path to a saved CompareSession JSON")
+    ap.add_argument("--current-context", help="Path to readonly current context sidecar JSON")
+    ap.add_argument("npz", nargs="*", help="Paths to *.npz or a CompareSession *.json")
     return ap.parse_args(argv)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     argv = list(argv) if argv is not None else sys.argv[1:]
     args = parse_args(argv)
-    paths = [Path(p) for p in (args.npz or [])]
+    session = _load_compare_session_safely(args.session) if getattr(args, 'session', None) else None
+    current_context_arg = getattr(args, 'current_context', None)
+    current_context_ref = _load_current_context_ref_safely(current_context_arg)
+    current_context_path = _current_context_sidecar_path_safely(current_context_arg)
+    paths: List[Path] = []
+    for raw in (args.npz or []):
+        p = Path(raw)
+        if p.suffix.lower() == ".json" and session is None:
+            loaded_session = _load_compare_session_safely(p)
+            if loaded_session is not None:
+                session = loaded_session
+                continue
+        paths.append(p)
+    if current_context_ref:
+        if session is None and CompareSession is not None:
+            try:
+                session = CompareSession(
+                    current_context_ref=current_context_ref,
+                    current_context_path=current_context_path,
+                    session_source='current_context_sidecar',
+                )
+            except Exception:
+                session = None
+        elif session is not None:
+            try:
+                session.current_context_ref = current_context_ref
+                session.current_context_path = current_context_path
+            except Exception:
+                pass
+    if session is not None and not paths:
+        paths = _compare_session_npz_paths(session)
     startup_from_history = False
+    startup_from_session_refs = False
 
     # Auto-load latest runs if no files passed
-    if not paths:
+    if not paths and session is None:
+        try:
+            s = QtCore.QSettings('UnifiedPneumoApp', 'DiagrammyCompareViewer')
+            raw_session = s.value('last_session', None)
+            session = _load_compare_session_safely(raw_session) if raw_session else None
+            if session is not None:
+                if current_context_ref:
+                    try:
+                        session.current_context_ref = current_context_ref
+                        session.current_context_path = current_context_path
+                    except Exception:
+                        pass
+                paths = _compare_session_npz_paths(session)
+                if paths:
+                    startup_from_history = True
+                    startup_from_session_refs = True
+        except Exception:
+            session = None
+    if not paths and session is None:
         # Prefer the last opened files (persistent state)
         try:
             s = QtCore.QSettings('UnifiedPneumoApp', 'DiagrammyCompareViewer')
@@ -17395,8 +18225,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             paths = _auto_find_npz(max_files=6)
 
     app = QtWidgets.QApplication(sys.argv)
-    w = CompareViewer(paths)
-    if startup_from_history and (not getattr(w, 'runs', None)):
+    w = CompareViewer(paths, session=session)
+    if startup_from_history and (not startup_from_session_refs) and (not getattr(w, 'runs', None)):
         tried = {_normalized_fs_path_key(p) for p in paths}
         fallback = [p for p in _auto_find_npz(max_files=6) if _normalized_fs_path_key(p) not in tried]
         if fallback:

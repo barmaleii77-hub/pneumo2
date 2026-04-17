@@ -30,6 +30,7 @@ from pneumo_solver_ui.optimization_coordinator_handoff_summary import (
 )
 from pneumo_solver_ui.optimization_objective_contract import (
     normalize_objective_keys,
+    objective_contract_hash,
     objective_contract_payload,
 )
 from pneumo_solver_ui.optimization_baseline_source import (
@@ -57,6 +58,7 @@ class OptimizationRunSummary:
     status_label: str
     started_at: str
     updated_ts: float
+    run_id: str = ''
     log_path: Optional[Path] = None
     result_path: Optional[Path] = None
     row_count: int = 0
@@ -68,12 +70,17 @@ class OptimizationRunSummary:
     objective_keys: tuple[str, ...] = ()
     penalty_key: str = ''
     penalty_tol: Optional[float] = None
+    objective_contract_hash: str = ''
+    hard_gate_key: str = ''
+    hard_gate_tolerance: Optional[float] = None
     objective_source: str = ''
     objective_contract_path: Optional[Path] = None
     problem_hash: str = ''
     problem_hash_path: Optional[Path] = None
     problem_hash_mode: str = ''
     problem_hash_mode_path: Optional[Path] = None
+    active_baseline_hash: str = ''
+    suite_snapshot_hash: str = ''
     baseline_source_kind: str = ''
     baseline_source_label: str = ''
     baseline_source_path: Optional[Path] = None
@@ -281,10 +288,20 @@ def _objective_contract_fields(run_dir: Path) -> dict[str, Any]:
     objective_keys = normalize_objective_keys(payload.get('objective_keys'))
     penalty_key = str(payload.get('penalty_key') or '').strip()
     penalty_tol = _float_or_none(payload.get('penalty_tol')) if 'penalty_tol' in payload else None
+    contract_hash = str(payload.get('objective_contract_hash') or '').strip()
+    if not contract_hash:
+        contract_hash = objective_contract_hash(
+            objective_keys=objective_keys,
+            penalty_key=penalty_key,
+            penalty_tol=penalty_tol,
+        )
     return {
         'objective_keys': objective_keys,
         'penalty_key': penalty_key,
         'penalty_tol': penalty_tol,
+        'objective_contract_hash': contract_hash,
+        'hard_gate_key': penalty_key,
+        'hard_gate_tolerance': penalty_tol,
         'objective_source': str(payload.get('source') or ''),
         'objective_contract_path': payload_path,
     }
@@ -305,6 +322,14 @@ def _baseline_source_fields(run_dir: Path) -> dict[str, Any]:
         'baseline_source_kind': source_kind,
         'baseline_source_label': source_label,
         'baseline_source_path': baseline_path,
+        'active_baseline_hash': str(
+            payload.get('active_baseline_hash')
+            or payload.get('active_baseline_contract_hash')
+            or payload.get('baseline_contract_hash')
+            or payload.get('baseline_hash')
+            or ''
+        ).strip(),
+        'suite_snapshot_hash': str(payload.get('suite_snapshot_hash') or '').strip(),
     }
 
 
@@ -425,6 +450,7 @@ def _summarize_staged_run(run_dir: Path, *, active_run_dir: Optional[Path]) -> O
         status_label=_status_label(status),
         started_at=started_at,
         updated_ts=float(updated_ts),
+        run_id=str(payload.get('run_id') or run_dir.name),
         log_path=log_path if log_path.exists() else None,
         result_path=result_path if result_path.exists() else None,
         row_count=int(row_count),
@@ -432,12 +458,17 @@ def _summarize_staged_run(run_dir: Path, *, active_run_dir: Optional[Path]) -> O
         objective_keys=tuple(contract['objective_keys']),
         penalty_key=str(contract['penalty_key']),
         penalty_tol=contract['penalty_tol'],
+        objective_contract_hash=str(contract['objective_contract_hash']),
+        hard_gate_key=str(contract['hard_gate_key']),
+        hard_gate_tolerance=contract['hard_gate_tolerance'],
         objective_source=str(contract['objective_source']),
         objective_contract_path=contract['objective_contract_path'],
         problem_hash=str(problem_scope['problem_hash']),
         problem_hash_path=problem_scope['problem_hash_path'],
         problem_hash_mode=str(problem_scope['problem_hash_mode']),
         problem_hash_mode_path=problem_scope['problem_hash_mode_path'],
+        active_baseline_hash=str(baseline_source['active_baseline_hash']),
+        suite_snapshot_hash=str(baseline_source['suite_snapshot_hash']),
         baseline_source_kind=str(baseline_source['baseline_source_kind']),
         baseline_source_label=str(baseline_source['baseline_source_label']),
         baseline_source_path=baseline_source['baseline_source_path'],
@@ -513,10 +544,12 @@ def _summarize_coordinator_run(run_dir: Path, *, active_run_dir: Optional[Path])
         status = 'unknown'
         note = 'No coordinator completion markers found'
     started_at = ''
+    run_id = run_dir.name
     run_id_txt = run_dir / 'run_id.txt'
     if run_id_txt.exists():
         try:
-            started_at = run_id_txt.read_text(encoding='utf-8', errors='ignore').strip()
+            run_id = run_id_txt.read_text(encoding='utf-8', errors='ignore').strip()
+            started_at = run_id
         except Exception:
             started_at = ''
     try:
@@ -544,6 +577,7 @@ def _summarize_coordinator_run(run_dir: Path, *, active_run_dir: Optional[Path])
         status_label=_status_label(status),
         started_at=started_at,
         updated_ts=float(updated_ts),
+        run_id=str(run_id or run_dir.name),
         log_path=log_path if log_path.exists() else None,
         result_path=result_path,
         row_count=_csv_row_count(result_path),
@@ -555,12 +589,17 @@ def _summarize_coordinator_run(run_dir: Path, *, active_run_dir: Optional[Path])
         objective_keys=tuple(contract['objective_keys']),
         penalty_key=str(contract['penalty_key']),
         penalty_tol=contract['penalty_tol'],
+        objective_contract_hash=str(contract['objective_contract_hash']),
+        hard_gate_key=str(contract['hard_gate_key']),
+        hard_gate_tolerance=contract['hard_gate_tolerance'],
         objective_source=str(contract['objective_source']),
         objective_contract_path=contract['objective_contract_path'],
         problem_hash=str(problem_scope['problem_hash']),
         problem_hash_path=problem_scope['problem_hash_path'],
         problem_hash_mode=str(problem_scope['problem_hash_mode']),
         problem_hash_mode_path=problem_scope['problem_hash_mode_path'],
+        active_baseline_hash=str(baseline_source['active_baseline_hash']),
+        suite_snapshot_hash=str(baseline_source['suite_snapshot_hash']),
         baseline_source_kind=str(baseline_source['baseline_source_kind']),
         baseline_source_label=str(baseline_source['baseline_source_label']),
         baseline_source_path=baseline_source['baseline_source_path'],

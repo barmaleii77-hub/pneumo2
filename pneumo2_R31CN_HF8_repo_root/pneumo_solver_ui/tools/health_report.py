@@ -203,6 +203,11 @@ def collect_health_report(zip_path: Path) -> HealthReport:
             if engineering_name:
                 engineering_obj = _read_json_from_zip(z, engineering_name)
                 validation_obj = dict((engineering_obj or {}).get("validation") or {}) if isinstance(engineering_obj, dict) else {}
+                readiness_obj = (
+                    dict((engineering_obj or {}).get("selected_run_candidate_readiness") or {})
+                    if isinstance(engineering_obj, dict)
+                    else {}
+                )
                 signals["engineering_analysis_evidence"] = {
                     "status": "READY" if isinstance(engineering_obj, dict) and engineering_obj.get("evidence_manifest_hash") else "WARN",
                     "source_path": engineering_name,
@@ -214,6 +219,12 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     "calibration_status": str(validation_obj.get("calibration_status") or ""),
                     "sensitivity_row_count": len((engineering_obj or {}).get("sensitivity_summary") or []) if isinstance(engineering_obj, dict) else 0,
                     "handoff_requirements": dict((engineering_obj or {}).get("handoff_requirements") or {}) if isinstance(engineering_obj, dict) else {},
+                    "selected_run_candidate_readiness": readiness_obj,
+                    "selected_run_candidate_count": int(readiness_obj.get("candidate_count") or 0),
+                    "selected_run_ready_candidate_count": int(readiness_obj.get("ready_candidate_count") or 0),
+                    "selected_run_missing_inputs_candidate_count": int(
+                        readiness_obj.get("missing_inputs_candidate_count") or 0
+                    ),
                 }
 
             anim_sources: Dict[str, Dict[str, Any]] = {}
@@ -557,6 +568,13 @@ def render_health_report_md(rep: HealthReport) -> str:
                 f"- handoff_contract_status: {requirements.get('contract_status') or '—'}",
                 f"- handoff_required_path: `{requirements.get('required_contract_path') or '—'}`",
                 f"- handoff_missing_fields: {', '.join(str(x) for x in (requirements.get('missing_fields') or [])) or '—'}",
+            ]
+        readiness = dict(engineering.get("selected_run_candidate_readiness") or {})
+        if readiness:
+            lines += [
+                f"- selected_run_candidate_count: {engineering.get('selected_run_candidate_count')}",
+                f"- selected_run_ready_candidate_count: {engineering.get('selected_run_ready_candidate_count')}",
+                f"- selected_run_missing_inputs_candidate_count: {engineering.get('selected_run_missing_inputs_candidate_count')}",
             ]
 
     if optimizer_scope:

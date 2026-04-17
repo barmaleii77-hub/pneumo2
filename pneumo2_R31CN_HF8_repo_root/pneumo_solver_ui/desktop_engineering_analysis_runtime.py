@@ -749,6 +749,42 @@ class DesktopEngineeringAnalysisRuntime:
             )
         return tuple(rows)
 
+    def selected_run_candidate_readiness(self, *, limit: int = 25) -> dict[str, Any]:
+        candidates = list(self.discover_selected_run_candidates(limit=limit))
+        status_counts: dict[str, int] = {}
+        missing_inputs: list[str] = []
+        blocking_states: list[str] = []
+        ready_run_dirs: list[str] = []
+        for row in candidates:
+            status = str(row.get("bridge_status") or "UNKNOWN")
+            status_counts[status] = int(status_counts.get(status, 0)) + 1
+            if status == "READY":
+                run_dir = str(row.get("run_dir") or "").strip()
+                if run_dir:
+                    ready_run_dirs.append(run_dir)
+            for item in row.get("missing_inputs") or ():
+                text = str(item or "").strip()
+                if text:
+                    missing_inputs.append(text)
+            for item in row.get("blocking_states") or ():
+                text = str(item or "").strip()
+                if text:
+                    blocking_states.append(text)
+        return {
+            "schema": "selected_run_candidate_readiness.v1",
+            "source": "workspace/opt_runs",
+            "selected_run_contract_path": str(self.selected_run_contract_path()),
+            "candidate_count": len(candidates),
+            "ready_candidate_count": int(status_counts.get("READY", 0)),
+            "missing_inputs_candidate_count": int(status_counts.get("MISSING_INPUTS", 0)),
+            "failed_candidate_count": int(status_counts.get("FAILED", 0)),
+            "status_counts": dict(sorted(status_counts.items())),
+            "unique_missing_inputs": sorted(dict.fromkeys(missing_inputs)),
+            "unique_blocking_states": sorted(dict.fromkeys(blocking_states)),
+            "ready_run_dirs": ready_run_dirs[:10],
+            "candidates": candidates,
+        }
+
     def export_selected_run_contract_from_run_dir(
         self,
         run_dir: Path | str | None = None,
@@ -1264,6 +1300,7 @@ class DesktopEngineeringAnalysisRuntime:
                 "mismatch_summary": dict(snapshot.mismatch_summary or {}),
             },
             "handoff_requirements": self.selected_run_handoff_requirements(snapshot),
+            "selected_run_candidate_readiness": self.selected_run_candidate_readiness(limit=25),
             "diagnostics_bundle_finalized": False,
             "validation": {
                 "status": snapshot.status,

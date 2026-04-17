@@ -237,6 +237,8 @@ EXPECTED_EVIDENCE: tuple[dict[str, Any], ...] = (
         "release_blocking_if_missing": True,
         "hash_required": "optional",
         "expected_provenance_fields": (
+            "artifact_freshness_status",
+            "artifact_freshness_relation",
             "geometry_acceptance_gate",
             "road_width_status",
             "packaging_contract_hash",
@@ -553,6 +555,8 @@ def summarize_geometry_reference_evidence(
         if str(item).strip()
     ]
     artifact_status = str(obj.get("artifact_status") or "").strip().lower() or "missing"
+    freshness_status = str(obj.get("artifact_freshness_status") or "").strip().lower() or artifact_status
+    freshness_relation = str(obj.get("artifact_freshness_relation") or "").strip().lower() or "unknown"
     road_width_status = str(obj.get("road_width_status") or "").strip().lower() or "missing"
     packaging_mismatch = str(obj.get("packaging_mismatch_status") or "").strip().lower() or "missing"
     acceptance_gate = str(obj.get("geometry_acceptance_gate") or "").strip().upper() or "MISSING"
@@ -569,6 +573,9 @@ def summarize_geometry_reference_evidence(
             "source_path": "",
             "schema": schema,
             "artifact_status": "missing",
+            "artifact_freshness_status": "missing",
+            "artifact_freshness_relation": "missing",
+            "artifact_freshness_reason": "",
             "artifact_source_label": "",
             "road_width_status": "missing",
             "road_width_source": "",
@@ -592,6 +599,10 @@ def summarize_geometry_reference_evidence(
         warnings.append(f"Geometry reference evidence reports missing item(s): {', '.join(evidence_missing)}.")
     if artifact_status in {"missing", "stale"}:
         warnings.append(f"Geometry reference artifact context is {artifact_status}.")
+    if freshness_status in {"missing", "stale"}:
+        warnings.append(f"Geometry reference artifact freshness is {freshness_status}.")
+    if freshness_relation in {"differs_from_latest", "selected_without_latest", "selected_unavailable"}:
+        warnings.append(f"Geometry reference selected/latest relation is {freshness_relation}.")
     if road_width_status == "missing":
         warnings.append("Geometry reference road_width_m evidence is missing; GAP-008 remains open.")
     if packaging_mismatch in {"missing", "mismatch"}:
@@ -604,6 +615,10 @@ def summarize_geometry_reference_evidence(
         "source_path": source,
         "schema": schema,
         "artifact_status": artifact_status,
+        "artifact_freshness_status": freshness_status,
+        "artifact_freshness_relation": freshness_relation,
+        "artifact_freshness_reason": str(obj.get("artifact_freshness_reason") or ""),
+        "latest_artifact_status": str(obj.get("latest_artifact_status") or ""),
         "artifact_source_label": str(obj.get("artifact_source_label") or ""),
         "road_width_status": road_width_status,
         "road_width_source": str(obj.get("road_width_source") or ""),

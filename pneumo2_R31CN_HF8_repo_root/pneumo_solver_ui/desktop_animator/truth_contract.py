@@ -218,11 +218,19 @@ def extract_analysis_optimizer_artifact_refs(meta: Mapping[str, Any] | None) -> 
         "analysis_context",
         "analysis_context_hash",
         "analysis_context_path",
+        "analysis_context_status",
+        "animator_link_contract_hash",
+        "animator_link_contract_path",
         "analysis_report_path",
         "analysis_artifacts",
         "compare_contract_hash",
         "compare_contract_path",
         "compare_session_id",
+        "selected_result_artifact_pointer",
+        "selected_npz_path",
+        "selected_test_id",
+        "selected_segment_id",
+        "selected_time_window",
     )
     optimizer_keys = (
         "optimizer_artifact_refs",
@@ -230,8 +238,15 @@ def extract_analysis_optimizer_artifact_refs(meta: Mapping[str, Any] | None) -> 
         "optimization_run_dir",
         "optimization_artifacts",
         "optimization_summary_path",
+        "run_id",
         "selected_run_contract",
+        "selected_run_contract_hash",
+        "run_contract_hash",
         "objective_contract_hash",
+        "active_baseline_hash",
+        "suite_snapshot_hash",
+        "hard_gate_key",
+        "hard_gate_tolerance",
         "optimizer_scope",
         "problem_hash",
     )
@@ -367,6 +382,7 @@ def build_capture_export_manifest(
     npz_path: str | Path | None = None,
     pointer_path: str | Path | None = None,
     artifact_refs: Mapping[str, Any] | None = None,
+    analysis_context_refs: Mapping[str, Any] | None = None,
     frame_budget_evidence_ref: str = ANIMATOR_FRAME_BUDGET_EVIDENCE_JSON_NAME,
     truth_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -382,9 +398,33 @@ def build_capture_export_manifest(
         "anim_latest_pointer": {"path": str(pointer_path or ""), "sha256": pointer_sha},
     }
     artifact_groups = extract_analysis_optimizer_artifact_refs(meta_dict)
-    analysis_context_hash = str(meta_dict.get("analysis_context_hash") or "").strip()
+    explicit_analysis_context_refs = {
+        str(k): _jsonable(v)
+        for k, v in _as_mapping(analysis_context_refs).items()
+        if v not in (None, "", [], {})
+    }
+    if explicit_analysis_context_refs:
+        explicit_groups = extract_analysis_optimizer_artifact_refs(explicit_analysis_context_refs)
+        artifact_groups["analysis"] = {
+            **_as_mapping(artifact_groups.get("analysis")),
+            **_as_mapping(explicit_groups.get("analysis")),
+        }
+        artifact_groups["optimizer"] = {
+            **_as_mapping(artifact_groups.get("optimizer")),
+            **_as_mapping(explicit_groups.get("optimizer")),
+        }
+    analysis_context_hash = str(
+        explicit_analysis_context_refs.get("analysis_context_hash")
+        or meta_dict.get("analysis_context_hash")
+        or ""
+    ).strip()
     if not analysis_context_hash:
         analysis_context_hash = stable_contract_hash(artifact_groups.get("analysis") or {})
+    analysis_context_status = str(
+        explicit_analysis_context_refs.get("analysis_context_status")
+        or meta_dict.get("analysis_context_status")
+        or ""
+    ).strip()
     truth_mode_hash = str(truth.get("truth_mode_hash") or stable_contract_hash(truth))
     capture_hash = stable_contract_hash(capture_refs) if (npz_sha or pointer_sha) else ""
 
@@ -400,6 +440,10 @@ def build_capture_export_manifest(
         blocking_states.append("missing_hardpoints_truth")
     if states.get("cylinder_packaging") == TRUTH_STATE_UNAVAILABLE:
         blocking_states.append("missing_cylinder_packaging_truth")
+    if analysis_context_status in {"BLOCKED", "INVALID", "MISSING"}:
+        blocking_states.append("analysis_context_blocked")
+    elif analysis_context_status == "DEGRADED":
+        blocking_states.append("analysis_context_degraded")
 
     manifest = {
         "schema": "capture_export_manifest.v1",
@@ -409,9 +453,21 @@ def build_capture_export_manifest(
         "updated_utc": str(updated_utc or _utc_iso()),
         "capture_hash": capture_hash,
         "analysis_context_hash": analysis_context_hash,
+        "analysis_context_status": analysis_context_status,
+        "animator_link_contract_hash": str(
+            explicit_analysis_context_refs.get("animator_link_contract_hash")
+            or meta_dict.get("animator_link_contract_hash")
+            or ""
+        ),
+        "selected_run_contract_hash": str(
+            explicit_analysis_context_refs.get("selected_run_contract_hash")
+            or meta_dict.get("selected_run_contract_hash")
+            or ""
+        ),
         "truth_mode_hash": truth_mode_hash,
         "capture_refs": capture_refs,
         "artifact_refs": refs,
+        "analysis_context_refs": explicit_analysis_context_refs,
         "analysis_artifact_refs": _as_mapping(artifact_groups.get("analysis")),
         "optimizer_artifact_refs": _as_mapping(artifact_groups.get("optimizer")),
         "truth_summary": truth,

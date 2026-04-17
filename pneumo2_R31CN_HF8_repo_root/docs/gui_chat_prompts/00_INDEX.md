@@ -25,22 +25,27 @@
    [RELEASE_GATE_HARDENING_MATRIX.csv](../context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_HARDENING_MATRIX.csv)
    и [GAP_TO_EVIDENCE_ACTION_MAP.csv](../context/gui_spec_imports/v32_connector_reconciled/GAP_TO_EVIDENCE_ACTION_MAP.csv)
    — checked-in release/evidence extracts для V32-16 и docs-contract tests.
-7. [WORKTREE_TRIAGE_2026-04-17.md](../context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
+7. [PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md),
+   [COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md),
+   [DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md)
+   и [RUNTIME_RELEASE_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md)
+   — lane evidence notes для V32-06/V32-08/V32-14/V32-09/V32-11/V32-15; не объявляют full gap closure без named runtime artifacts.
+8. [WORKTREE_TRIAGE_2026-04-17.md](../context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
    — release-readiness ownership map текущего dirty tree; не runtime closure proof.
-8. [V32_16_ACCEPTANCE_NOTE_2026-04-17.md](../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
+9. [V32_16_ACCEPTANCE_NOTE_2026-04-17.md](../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
    — accepted V32-16 docs/helper scope and validation note.
-9. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
+10. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
    и related `v3/*`
    — checked-in detailed machine-readable reference layer.
-10. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
+11. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
    и related `v13_ring_editor_migration/*`
    — специализированный addendum для `WS-RING` и handoff `WS-RING -> WS-SUITE`.
-11. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
+12. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
    — historical design-recovery layer, который возвращает проект из implementation-веток в design-first.
-12. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
+13. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
    и [gui_spec_archive_lineage.json](../context/gui_spec_archive_lineage.json)
    — lineage `v1…v13`, чтобы понимать роль каждого архива.
-13. `docs/gui_chat_prompts/*`
+14. `docs/gui_chat_prompts/*`
    — implementation prompts, которые должны наследовать канон, а не заменять его.
 
 ## Что считается reference layer
@@ -61,6 +66,12 @@
   handoff boundaries и короткими стартовыми промтами.
 - `RELEASE_GATE_ACCEPTANCE_MAP` плюс checked-in gate/gap CSV задают локальную
   release/evidence карту для V32-16 без объявления runtime closure.
+- `PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE`,
+  `COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE`,
+  `DIAGNOSTICS_RELEASE_EVIDENCE_NOTE` и `RUNTIME_RELEASE_EVIDENCE_NOTE`
+  фиксируют accepted lane evidence contracts для
+  V32-06/V32-08/V32-14/V32-09/V32-11/V32-15 и explicit non-closure для gaps,
+  которым нужны живые artifacts.
 - `WORKTREE_TRIAGE_2026-04-17` фиксирует owner lane, gate/gap, required evidence
   и targeted tests для текущего dirty tree перед release-readiness merge.
 - `V32_16_ACCEPTANCE_NOTE_2026-04-17` фиксирует accepted V32-16 docs/helper
@@ -98,7 +109,10 @@
 - если lane касается cross-workspace architecture, release gates, acceptance
   evidence, runtime artifacts или open gaps, обязательно смотреть
   `v33_connector_reconciled/README.md`, затем `v32_connector_reconciled/README.md`
-  и `v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md`;
+  и `v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md`; для
+  producer/animator truth, compare/objective integrity, diagnostics или runtime/perf acceptance
+  дополнительно читать соответствующий
+  `*_RELEASE_EVIDENCE_NOTE.md`;
 - если lane касается текущего mixed dirty tree, дополнительно сверять
   `context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md` и
   `context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md`; не

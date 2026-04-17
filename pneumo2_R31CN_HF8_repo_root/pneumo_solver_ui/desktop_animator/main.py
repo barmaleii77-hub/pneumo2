@@ -16,6 +16,7 @@ The app is meant to be used together with the Streamlit UI:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 # Diagnostics/logging bootstrap (ABSOLUTE LAW: everything must be logged).
@@ -34,6 +35,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--npz", type=str, default="", help="Path to NPZ log file")
     ap.add_argument("--follow", action="store_true", help="Follow anim_latest.json pointer")
     ap.add_argument(
+        "--analysis-context",
+        type=str,
+        default=os.environ.get("PNEUMO_ANALYSIS_CONTEXT_PATH", ""),
+        help="Frozen HO-008 analysis_context.json path",
+    )
+    ap.add_argument(
         "--pointer",
         type=str,
         default="",
@@ -46,6 +53,11 @@ def main(argv: list[str] | None = None) -> int:
 
     pointer_path = Path(args.pointer).expanduser().resolve() if args.pointer else _default_pointer()
     npz_path = Path(args.npz).expanduser().resolve() if args.npz else None
+    analysis_context_path = (
+        Path(args.analysis_context).expanduser().resolve()
+        if str(args.analysis_context).strip()
+        else None
+    )
 
     try:
         from .app import run_app
@@ -55,7 +67,14 @@ def main(argv: list[str] | None = None) -> int:
         print(e)
         return 2
 
-    return int(run_app(npz_path=npz_path, follow=bool(args.follow), pointer_path=pointer_path, theme=str(args.theme), enable_gl=not bool(args.no_gl)))
+    return int(run_app(
+        npz_path=npz_path,
+        follow=bool(args.follow),
+        pointer_path=pointer_path,
+        analysis_context_path=analysis_context_path,
+        theme=str(args.theme),
+        enable_gl=not bool(args.no_gl),
+    ))
 
 
 if __name__ == "__main__":

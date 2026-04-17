@@ -59,6 +59,7 @@ DEFAULT_PINNED_COMMAND_IDS = (
 )
 
 DEFAULT_SHELL_STATE_RELATIVE_PATH = Path("pneumo_solver_ui") / "workspace" / "desktop_spec_shell_settings.ini"
+STARTUP_WORKSPACE_ENV = "PNEUMO_GUI_SPEC_SHELL_OPEN_WORKSPACE"
 
 _COLOR_BY_TOKEN = {
     "граница_контрола": "#d9e2ec",
@@ -112,6 +113,19 @@ def _default_shell_state_path(repo_root: Path) -> Path:
     if override:
         return Path(override)
     return Path(repo_root) / DEFAULT_SHELL_STATE_RELATIVE_PATH
+
+
+def _startup_workspace_id(
+    settings: QtCore.QSettings,
+    workspace_by_id: dict[str, DesktopWorkspaceSpec],
+) -> str:
+    requested_workspace_id = str(os.environ.get(STARTUP_WORKSPACE_ENV) or "").strip()
+    if requested_workspace_id in workspace_by_id:
+        return requested_workspace_id
+    restored_workspace_id = str(
+        settings.value("window/last_workspace", "overview") or "overview"
+    ).strip()
+    return restored_workspace_id if restored_workspace_id in workspace_by_id else "overview"
 
 
 class InspectorPanel(QtWidgets.QWidget):
@@ -299,12 +313,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         self._populate_pinned_actions()
         self._apply_shell_shortcuts()
         self._restore_window_state()
-        restored_workspace_id = str(
-            self._settings.value("window/last_workspace", "overview") or "overview"
-        ).strip()
-        self.open_workspace(
-            restored_workspace_id if restored_workspace_id in self.workspace_by_id else "overview"
-        )
+        self.open_workspace(_startup_workspace_id(self._settings, self.workspace_by_id))
 
     def _build_ui(self) -> None:
         self._build_menu()
@@ -731,6 +740,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 workspace,
                 repo_root=self.repo_root,
                 on_shell_status=self.set_shell_status,
+                on_command=self.run_command,
             )
         return ControlHubWorkspacePage(workspace, actions, self.run_command)
 

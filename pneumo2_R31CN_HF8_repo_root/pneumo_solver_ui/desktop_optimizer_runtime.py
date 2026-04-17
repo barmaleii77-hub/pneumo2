@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import os
 import sys
+import hashlib
+import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -63,6 +66,10 @@ from pneumo_solver_ui.optimization_run_history import (
 from pneumo_solver_ui.optimization_run_pointer_actions_ui import (
     build_run_pointer_meta_from_summary,
 )
+from pneumo_solver_ui.optimization_objective_contract import (
+    normalize_penalty_tol,
+    objective_contract_hash,
+)
 from pneumo_solver_ui.optimization_stage_policy_live import summarize_stage_policy_runtime
 from pneumo_solver_ui.optimization_workspace_history_ui import (
     HANDOFF_SORT_OPTIONS,
@@ -75,6 +82,10 @@ from pneumo_solver_ui.optimization_workspace_history_ui import (
 
 _ACTIVE_LAUNCH_CONTEXT_KEY = "__opt_active_launch_context"
 _HISTORY_SELECTED_RUN_DIR_KEY = "__opt_history_selected_run_dir"
+SELECTED_RUN_CONTRACT_FILENAME = "selected_run_contract.json"
+WS_OPTIMIZATION_HANDOFF_ID = "HO-007"
+WS_OPTIMIZATION_SOURCE_WORKSPACE = "WS-OPTIMIZATION"
+WS_OPTIMIZATION_ANALYSIS_TARGET_WORKSPACE = "WS-ANALYSIS"
 
 
 @dataclass(frozen=True)
@@ -122,6 +133,54 @@ def _compatibility_text(selected: str, current: str) -> str:
     if not current_text or not selected_text:
         return "unknown"
     return "match" if selected_text == current_text else "different"
+
+
+def _canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+
+
+def _sha256_payload(value: Any) -> str:
+    return hashlib.sha256(_canonical_json_bytes(value)).hexdigest()
+
+
+def _file_sha256(path: Path | str | None) -> str:
+    if path is None:
+        return ""
+    try:
+        candidate = Path(path)
+        if not candidate.exists() or not candidate.is_file():
+            return ""
+        digest = hashlib.sha256()
+        with candidate.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except Exception:
+        return ""
+
+
+def _utc_now_label() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _utc_from_timestamp(value: float | int | None) -> str:
+    try:
+        ts = float(value or 0.0)
+    except Exception:
+        return ""
+    if ts <= 0.0:
+        return ""
+    return datetime.fromtimestamp(ts, UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _optimization_active_mode(summary: OptimizationRunSummary) -> str:
+    return "stage_runner" if str(summary.pipeline_mode or "") == "staged" else "distributed_coordinator"
 
 
 class DesktopOptimizerRuntime:
@@ -220,6 +279,172 @@ class DesktopOptimizerRuntime:
         self.session_state.update(updates)
         return updates
 
+    def selected_run_contract_path(self) -> Path:
+        return (
+            self.workspace_dir
+            / "handoffs"
+            / WS_OPTIMIZATION_SOURCE_WORKSPACE
+            / SELECTED_RUN_CONTRACT_FILENAME
+        ).resolve()
+
+    def build_selected_run_contract(
+        self,
+        summary: OptimizationRunSummary,
+        *,
+        selected_from: str = "desktop_optimizer_center",
+        now_text: str | None = None,
+    ) -> dict[str, Any]:
+        drift = self.contract_drift_summary(summary)
+        scope_payload = dict(drift.get("scope_payload") or {})
+        diff_bits = tuple(str(bit) for bit in (drift.get("diff_bits") or ()) if str(bit).strip())
+        baseline_compatibility = str(drift.get("baseline_compatibility") or "")
+        status = str(summary.status or "").strip().lower()
+
+        blocking_states: list[str] = []
+        warnings: list[str] = []
+        if status in {"error", "unknown"}:
+            blocking_states.append(f"run {status or 'unknown'}")
+        elif status not in {"done", "partial", "stopped"}:
+            blocking_states.append("run incomplete")
+        elif status in {"partial", "stopped"}:
+            warnings.append(f"run status is {status}")
+
+        if summary.result_path is None:
+            blocking_states.append("missing results artifact")
+        if str(scope_payload.get("compatibility") or "") == "different" or str(
+            scope_payload.get("mode_compatibility") or ""
+        ) == "different":
+            blocking_states.append("problem scope mismatch")
+        if baseline_compatibility == "different":
+            blocking_states.append("active baseline mismatch")
+        if diff_bits:
+            warnings.append("objective contract drift: " + ", ".join(diff_bits))
+
+        active_baseline_hash = str(summary.active_baseline_hash or "").strip()
+        if not active_baseline_hash:
+            active_baseline_hash = _file_sha256(summary.baseline_source_path)
+        if not active_baseline_hash:
+            warnings.append("active baseline hash missing")
+
+        suite_snapshot_hash = str(summary.suite_snapshot_hash or "").strip()
+        if not suite_snapshot_hash:
+            warnings.append("suite snapshot hash missing")
+
+        hard_gate_tolerance = normalize_penalty_tol(
+            summary.hard_gate_tolerance
+            if summary.hard_gate_tolerance is not None
+            else summary.penalty_tol
+        )
+        objective_contract_hash_value = str(summary.objective_contract_hash or "").strip()
+        if not objective_contract_hash_value:
+            objective_contract_hash_value = objective_contract_hash(
+                objective_keys=summary.objective_keys,
+                penalty_key=summary.hard_gate_key or summary.penalty_key,
+                penalty_tol=hard_gate_tolerance,
+            )
+        active_mode = _optimization_active_mode(summary)
+        artifact_dir = (
+            Path(summary.result_path).parent
+            if summary.result_path is not None
+            else Path(summary.run_dir)
+        )
+        objective_contract_path = (
+            str(Path(summary.objective_contract_path).resolve())
+            if summary.objective_contract_path is not None
+            else ""
+        )
+        results_csv_path = (
+            str(Path(summary.result_path).resolve())
+            if summary.result_path is not None
+            else ""
+        )
+        log_path = (
+            str(Path(summary.log_path).resolve())
+            if summary.log_path is not None
+            else ""
+        )
+        handoff_plan_path = (
+            str(Path(summary.handoff_plan_path).resolve())
+            if summary.handoff_plan_path is not None
+            else ""
+        )
+        ready_state = "blocked" if blocking_states else ("warning" if warnings else "ready")
+
+        payload: dict[str, Any] = {
+            "schema_version": "selected_run_contract_v1",
+            "handoff_id": WS_OPTIMIZATION_HANDOFF_ID,
+            "source_workspace": WS_OPTIMIZATION_SOURCE_WORKSPACE,
+            "target_workspace": WS_OPTIMIZATION_ANALYSIS_TARGET_WORKSPACE,
+            "selected_from": str(selected_from or "desktop_optimizer_center"),
+            "created_at_utc": str(now_text or _utc_now_label()),
+            "run_id": str(summary.run_id or summary.run_dir.name),
+            "run_name": str(summary.run_dir.name),
+            "run_dir": str(Path(summary.run_dir).resolve()),
+            "mode": active_mode,
+            "active_mode": active_mode,
+            "pipeline_mode": str(summary.pipeline_mode or ""),
+            "backend": str(summary.backend or ""),
+            "status": str(summary.status or ""),
+            "status_label": str(summary.status_label or ""),
+            "started_at_utc": str(summary.started_at or ""),
+            "finished_at_utc": _utc_from_timestamp(summary.updated_ts)
+            if status in {"done", "partial", "stopped", "error"}
+            else "",
+            "objective_contract_hash": objective_contract_hash_value,
+            "objective_contract_path": objective_contract_path,
+            "objective_stack": list(summary.objective_keys or ()),
+            "hard_gate_key": str(summary.hard_gate_key or summary.penalty_key or ""),
+            "hard_gate_tolerance": hard_gate_tolerance,
+            "hard_gate_unit": "",
+            "problem_hash": str(summary.problem_hash or ""),
+            "problem_hash_mode": str(summary.problem_hash_mode or ""),
+            "active_baseline_hash": active_baseline_hash,
+            "active_baseline_ref": str(summary.baseline_source_path or ""),
+            "active_baseline_label": str(
+                summary.baseline_source_label or summary.baseline_source_kind or ""
+            ),
+            "suite_snapshot_hash": suite_snapshot_hash,
+            "results_csv_path": results_csv_path,
+            "best_candidate_ref": "",
+            "selected_best_candidate_ref": "",
+            "artifact_dir": str(Path(artifact_dir).resolve()),
+            "results_artifact_index": {
+                "results_csv_path": results_csv_path,
+                "log_path": log_path,
+                "objective_contract_path": objective_contract_path,
+                "handoff_plan_path": handoff_plan_path,
+                "run_dir": str(Path(summary.run_dir).resolve()),
+            },
+            "analysis_handoff_ready_state": ready_state,
+            "animator_handoff_ready_state": "warning",
+            "diagnostics_handoff_ready_state": "not_finalized_by_optimizer",
+            "blocking_states": tuple(blocking_states),
+            "warnings": tuple(warnings),
+            "current_context_drift": dict(drift),
+        }
+        payload["selected_run_contract_hash"] = _sha256_payload(payload)
+        return payload
+
+    def export_selected_run_contract(
+        self,
+        summary: OptimizationRunSummary,
+        *,
+        selected_from: str = "desktop_optimizer_center",
+        now_text: str | None = None,
+    ) -> dict[str, Any]:
+        payload = self.build_selected_run_contract(
+            summary,
+            selected_from=selected_from,
+            now_text=now_text,
+        )
+        path = self.selected_run_contract_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8",
+        )
+        return {**payload, "selected_run_contract_path": str(path)}
+
     def save_run_pointer(
         self,
         summary: OptimizationRunSummary,
@@ -232,6 +457,20 @@ class DesktopOptimizerRuntime:
         )
         meta["backend"] = str(summary.backend or meta.get("backend") or "")
         meta["run_dir"] = str(summary.run_dir)
+        selected_contract = self.export_selected_run_contract(
+            summary,
+            selected_from=selected_from,
+        )
+        meta["handoff_id"] = WS_OPTIMIZATION_HANDOFF_ID
+        meta["selected_run_contract_path"] = str(
+            selected_contract.get("selected_run_contract_path") or self.selected_run_contract_path()
+        )
+        meta["selected_run_contract_hash"] = str(
+            selected_contract.get("selected_run_contract_hash") or ""
+        )
+        meta["analysis_handoff_ready_state"] = str(
+            selected_contract.get("analysis_handoff_ready_state") or ""
+        )
         self._with_workspace_dir_env(
             run_artifacts.save_last_opt_ptr,
             Path(summary.run_dir),
@@ -291,6 +530,14 @@ class DesktopOptimizerRuntime:
                 or 0
             ),
             "result_path": str(result_path) if result_path is not None else "",
+            "handoff_id": str(meta.get("handoff_id") or ""),
+            "selected_run_contract_path": str(meta.get("selected_run_contract_path") or ""),
+            "selected_run_contract_hash": str(meta.get("selected_run_contract_hash") or ""),
+            "selected_run_contract_exists": bool(
+                str(meta.get("selected_run_contract_path") or "").strip()
+                and Path(str(meta.get("selected_run_contract_path"))).exists()
+            ),
+            "analysis_handoff_ready_state": str(meta.get("analysis_handoff_ready_state") or ""),
         }
 
     def selected_run_next_step_summary(
@@ -983,6 +1230,33 @@ class DesktopOptimizerRuntime:
             }
         )
 
+        baseline_state = str(snapshot.active_baseline_state or "missing")
+        baseline_banner = str(snapshot.active_baseline_banner or "").strip()
+        baseline_hash = str(snapshot.active_baseline_hash or "").strip()
+        if bool(snapshot.optimizer_baseline_can_consume):
+            baseline_status = "ok"
+            baseline_summary = (
+                f"HO-006 current: active_baseline_hash={baseline_hash[:12] or '—'}, "
+                f"suite_snapshot_hash={str(snapshot.active_baseline_suite_snapshot_hash or '')[:12] or '—'}."
+            )
+        else:
+            baseline_status = "warn"
+            baseline_summary = (
+                f"Blocking HO-006 state={baseline_state}: "
+                + (baseline_banner or "Open Baseline Center and explicitly review/adopt/restore active baseline.")
+            )
+        rows.append(
+            {
+                "title": "Active baseline HO-006",
+                "status": baseline_status,
+                "summary": baseline_summary,
+                "action": "Baseline Center",
+                "handoff_id": "HO-006",
+                "state": baseline_state,
+                "optimizer_baseline_can_consume": bool(snapshot.optimizer_baseline_can_consume),
+            }
+        )
+
         selected_scope = dict(drift.get("scope_payload") or {})
         diff_bits = tuple(str(bit) for bit in (drift.get("diff_bits") or ()) if str(bit).strip())
         baseline_compatibility = str(drift.get("baseline_compatibility") or "")
@@ -1176,9 +1450,19 @@ class DesktopOptimizerRuntime:
         )
         return job
 
-    def clear_finished_job(self) -> None:
+    def clear_finished_job(self) -> bool:
+        job = self.current_job()
+        if job is not None:
+            poll = getattr(getattr(job, "proc", None), "poll", None)
+            if callable(poll):
+                try:
+                    if poll() is None:
+                        return False
+                except Exception:
+                    return False
         clear_job_from_session(self.session_state)
         self.session_state.pop(_ACTIVE_LAUNCH_CONTEXT_KEY, None)
+        return True
 
     def request_soft_stop(self) -> bool:
         job = self.current_job()

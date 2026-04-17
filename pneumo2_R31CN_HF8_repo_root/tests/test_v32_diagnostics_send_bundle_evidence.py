@@ -94,6 +94,10 @@ def _geometry_reference_evidence(*, gate: str = "PASS", missing: list[str] | Non
         "reference_center_role": "reader_and_evidence_surface",
         "does_not_render_animator_meshes": True,
         "artifact_status": "current",
+        "artifact_freshness_status": "current",
+        "artifact_freshness_relation": "matches_latest",
+        "artifact_freshness_reason": "Selected artifact matches latest by NPZ or pointer path.",
+        "latest_artifact_status": "current",
         "artifact_source_label": "pytest anim_latest",
         "artifact_npz_path": "C:/workspace/exports/anim_latest.npz",
         "road_width_status": "explicit_meta",
@@ -137,6 +141,8 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
     latest_txt = out_dir / "latest_send_bundle_path.txt"
     latest_sha = out_dir / "latest_send_bundle.sha256"
     latest_evidence = out_dir / "latest_evidence_manifest.json"
+    latest_inspection_json = out_dir / "latest_send_bundle_inspection.json"
+    latest_inspection_md = out_dir / "latest_send_bundle_inspection.md"
     latest_geometry_reference = out_dir / GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME
     latest_health = out_dir / "latest_health_report.md"
 
@@ -147,6 +153,8 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
     )
     assert latest_zip.read_bytes() == zip_path.read_bytes()
     assert latest_evidence.exists()
+    assert latest_inspection_json.exists()
+    assert latest_inspection_md.exists()
     assert latest_geometry_reference.exists()
     assert latest_health.exists()
 
@@ -158,6 +166,7 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
             zf.read(GEOMETRY_REFERENCE_EVIDENCE_ARCNAME).decode("utf-8", errors="replace")
         )
     latest_evidence_payload = json.loads(latest_evidence.read_text(encoding="utf-8"))
+    latest_inspection_payload = json.loads(latest_inspection_json.read_text(encoding="utf-8"))
 
     assert "health/health_report.json" in names
     assert "triage/triage_report.json" in names
@@ -210,6 +219,16 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
     assert latest_evidence_payload["latest_zip_matches_original"] is True
     assert latest_evidence_payload["latest_sha_sidecar_matches"] is True
     assert latest_evidence_payload["latest_pointer_matches_original"] is True
+    assert latest_inspection_payload["schema"] == "send_bundle_inspection"
+    assert latest_inspection_payload["zip_path"] == str(latest_zip.resolve())
+    assert latest_inspection_payload["zip_sha256"] == hashlib.sha256(latest_zip.read_bytes()).hexdigest()
+    assert latest_inspection_payload["has_evidence_manifest"] is True
+    assert latest_inspection_payload["has_triage_report"] is True
+    assert latest_inspection_payload["has_validation_report"] is True
+    assert latest_inspection_payload["has_embedded_health_report"] is True
+    latest_inspection_text = latest_inspection_md.read_text(encoding="utf-8")
+    assert "ZIP SHA256" in latest_inspection_text
+    assert "Evidence manifest" in latest_inspection_text
 
     validation = validate_send_bundle(zip_path)
     assert validation.ok is True, json.dumps(validation.report_json, ensure_ascii=False, indent=2)
@@ -285,6 +304,25 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
             "missing_fields": [],
             "can_run_engineering_analysis": True,
         },
+        "selected_run_candidate_readiness": {
+            "schema": "selected_run_candidate_readiness.v1",
+            "candidate_count": 2,
+            "ready_candidate_count": 1,
+            "missing_inputs_candidate_count": 1,
+            "failed_candidate_count": 0,
+            "status_counts": {"MISSING_INPUTS": 1, "READY": 1},
+            "unique_missing_inputs": ["results_csv_path"],
+            "unique_blocking_states": ["missing results artifact"],
+            "ready_run_dirs": ["C:/workspace/opt_runs/coord/run_ready"],
+            "candidates": [
+                {"run_id": "run_ready", "bridge_status": "READY"},
+                {
+                    "run_id": "run_missing",
+                    "bridge_status": "MISSING_INPUTS",
+                    "missing_inputs": ["results_csv_path"],
+                },
+            ],
+        },
         "evidence_manifest_hash": "engineering-hash-001",
     }
     (out_dir / ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME).write_text(
@@ -319,14 +357,20 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
     assert validation_engineering["evidence_manifest_hash"] == "engineering-hash-001"
     assert validation_engineering["influence_status"] == "PASS"
     assert validation_engineering["handoff_requirements"]["contract_status"] == "READY"
+    assert validation_engineering["selected_run_candidate_count"] == 2
+    assert validation_engineering["selected_run_ready_candidate_count"] == 1
+    assert validation_engineering["selected_run_missing_inputs_candidate_count"] == 1
 
     inspection = inspect_send_bundle(zip_path)
     inspection_md = render_inspection_md(inspection)
     assert inspection["has_engineering_analysis_evidence"] is True
-    assert dict(inspection["engineering_analysis_evidence"])["evidence_manifest_hash"] == "engineering-hash-001"
+    inspection_engineering = dict(inspection["engineering_analysis_evidence"])
+    assert inspection_engineering["evidence_manifest_hash"] == "engineering-hash-001"
+    assert inspection_engineering["selected_run_ready_candidate_count"] == 1
     assert "Engineering analysis evidence" in inspection_md
     assert "engineering-hash-001" in inspection_md
     assert "handoff_contract_status" in inspection_md
+    assert "selected_run_ready_candidate_count" in inspection_md
 
 
 def test_send_bundle_evidence_analysis_handoff_prefers_latest_sidecar(tmp_path: Path) -> None:
@@ -448,12 +492,15 @@ def test_geometry_reference_evidence_handoff_reaches_manifest_validation_and_dia
 
     assert evidence_ids["BND-018"]["status"] == "present"
     assert evidence["geometry_reference_handoff"]["status"] == "READY"
+    assert evidence["geometry_reference_handoff"]["artifact_freshness_status"] == "current"
+    assert evidence["geometry_reference_handoff"]["artifact_freshness_relation"] == "matches_latest"
     assert evidence["geometry_reference_handoff"]["road_width_status"] == "explicit_meta"
     assert evidence["geometry_reference_handoff"]["packaging_contract_hash"] == "packaging-hash"
     assert not any("Geometry reference" in msg for msg in evidence_manifest_warnings(evidence))
 
     summary = summarize_geometry_reference_evidence(payload, source_path=GEOMETRY_REFERENCE_EVIDENCE_ARCNAME)
     assert summary["status"] == "READY"
+    assert summary["artifact_freshness_relation"] == "matches_latest"
     assert summary["geometry_acceptance_gate"] == "PASS"
 
     (out_dir / GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME).write_text(
@@ -462,6 +509,8 @@ def test_geometry_reference_evidence_handoff_reaches_manifest_validation_and_dia
     )
     record = load_desktop_diagnostics_bundle_record(repo_root, out_dir=out_dir)
     assert record.geometry_reference_status == "READY"
+    assert record.geometry_reference_artifact_freshness_status == "current"
+    assert record.geometry_reference_artifact_freshness_relation == "matches_latest"
     assert record.geometry_reference_acceptance_gate == "PASS"
     assert record.geometry_reference_packaging_contract_hash == "packaging-hash"
     assert record.latest_geometry_reference_evidence_path.endswith(GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME)
@@ -476,6 +525,7 @@ def test_geometry_reference_evidence_handoff_reaches_manifest_validation_and_dia
         zf.writestr(EVIDENCE_MANIFEST_ARCNAME, json.dumps(evidence, ensure_ascii=False, indent=2))
     validation = validate_send_bundle(zip_path)
     assert validation.report_json["geometry_reference_evidence"]["status"] == "READY"
+    assert validation.report_json["geometry_reference_evidence"]["artifact_freshness_relation"] == "matches_latest"
 
 
 def test_send_bundle_includes_full_runtime_evidence_set_and_manifest_rows(

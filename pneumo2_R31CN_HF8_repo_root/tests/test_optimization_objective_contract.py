@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pneumo_solver_ui.optimization_objective_contract import (
     normalize_objective_keys,
+    objective_contract_hash,
+    objective_contract_payload,
     parse_saved_score_payload,
     score_contract_matches,
 )
@@ -43,4 +45,33 @@ def test_score_contract_matches_accepts_saved_string_objective_keys() -> None:
         },
         objective_keys=['comfort', 'roll', 'energy'],
         penalty_key='penalty_total',
+    )
+
+
+def test_objective_contract_hash_tracks_stack_and_hard_gate_identity() -> None:
+    base_hash = objective_contract_hash(
+        objective_keys=['comfort', 'roll'],
+        penalty_key='penalty_total',
+        penalty_tol=0.5,
+    )
+
+    assert base_hash == objective_contract_payload(
+        objective_keys=['comfort', 'roll'],
+        penalty_key='penalty_total',
+        penalty_tol=0.5,
+    )['objective_contract_hash']
+    assert base_hash != objective_contract_hash(
+        objective_keys=['roll', 'comfort'],
+        penalty_key='penalty_total',
+        penalty_tol=0.5,
+    )
+    assert base_hash != objective_contract_hash(
+        objective_keys=['comfort', 'roll'],
+        penalty_key='penalty_packaging',
+        penalty_tol=0.5,
+    )
+    assert base_hash != objective_contract_hash(
+        objective_keys=['comfort', 'roll'],
+        penalty_key='penalty_total',
+        penalty_tol=0.25,
     )

@@ -190,6 +190,27 @@ ID: `PLAN-0024`.
 Источник: chat + release-readiness acceptance.
 ID: `PLAN-0025`.
 
+26. V32-11 diagnostics SEND-bundle evidence acceptance
+Назначение: Accept the diagnostics/SEND-bundle evidence contract for PB-002, RGH-006, RGH-007, RGH-016 and OG-005 with evidence manifest, latest pointer/SHA proof, health-after-triage warnings and targeted V32-11 tests; this does not close final release OG-005 without a durable bundle path.
+Артефакт: [context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md)
+Статус: актуален.
+Источник: chat + V32-11 diagnostics evidence.
+ID: `PLAN-0026`.
+
+27. V32-15 runtime evidence hard-gate acceptance
+Назначение: Accept the runtime evidence validator/hard-gate contract for PB-006, RGH-011, RGH-012, RGH-019, OG-003 and OG-004 with browser perf, viewport gating and animator frame-budget tests; current workspace probe still hard-fails missing measured artifacts so gaps remain open.
+Артефакт: [context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md)
+Статус: актуален.
+Источник: chat + V32-15 runtime evidence.
+ID: `PLAN-0027`.
+
+28. V32-14/V32-09 producer animator truth contract acceptance
+Назначение: Accept the producer/animator truth evidence contracts for PB-001, RGH-001, RGH-002, RGH-003, RGH-018, OG-001 and OG-002 with solver-points, hardpoints, packaging passport, geometry acceptance and animator truth-gate tests; OG-001 and OG-002 remain open until a named release bundle and complete cylinder packaging passport exist.
+Артефакт: [context/gui_spec_imports/v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md)
+Статус: актуален.
+Источник: chat + V32-14/V32-09 producer animator truth.
+ID: `PLAN-0028`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

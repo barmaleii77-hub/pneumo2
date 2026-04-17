@@ -461,6 +461,21 @@ def _stored_problem_hash(run_dir: Path) -> str:
         return ""
 
 
+def _raise_resume_problem_hash_mismatch(
+    *,
+    run_dir: Path,
+    stored_problem_hash: str,
+    expected_problem_hash: str,
+    pipeline_mode: str,
+) -> None:
+    raise RuntimeError(
+        "Resume problem_hash mismatch: "
+        f"pipeline={pipeline_mode}, run_dir={Path(run_dir)}, "
+        f"stored={stored_problem_hash}, expected={expected_problem_hash}. "
+        "Objective stack, hard gate, suite or baseline scope changed; choose a compatible run or start a new run."
+    )
+
+
 def _selected_history_run_dir(session_state: Mapping[str, Any], *, pipeline_mode: str) -> Path | None:
     raw = str(session_state.get("__opt_history_selected_run_dir", "") or "").strip()
     if not raw:
@@ -495,10 +510,19 @@ def coordinator_resume_run_dir(
     if explicit_run_id:
         for run_dir in candidates:
             try:
-                if (run_dir / "run_id.txt").read_text(encoding="utf-8").strip() == explicit_run_id:
-                    return run_dir
+                candidate_run_id = (run_dir / "run_id.txt").read_text(encoding="utf-8").strip()
             except Exception:
                 continue
+            if candidate_run_id == explicit_run_id:
+                stored = _stored_problem_hash(run_dir)
+                if stored and stored != problem_hash:
+                    _raise_resume_problem_hash_mismatch(
+                        run_dir=run_dir,
+                        stored_problem_hash=stored,
+                        expected_problem_hash=problem_hash,
+                        pipeline_mode="coordinator",
+                    )
+                return run_dir
 
     for run_dir in candidates:
         try:
@@ -531,6 +555,13 @@ def staged_resume_run_dir(
     selected_run = _selected_history_run_dir(session_state, pipeline_mode="staged")
     if selected_run is not None:
         stored = _stored_problem_hash(selected_run)
+        if stored and stored != problem_hash:
+            _raise_resume_problem_hash_mismatch(
+                run_dir=selected_run,
+                stored_problem_hash=stored,
+                expected_problem_hash=problem_hash,
+                pipeline_mode="staged",
+            )
         if not stored or stored == problem_hash:
             return selected_run
 

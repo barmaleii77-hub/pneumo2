@@ -188,7 +188,8 @@ class DesktopOptimizerCenter:
 
         nav_frame = ttk.LabelFrame(sidebar, text="Переходы", padding=8)
         nav_frame.pack(fill="x", pady=(8, 0))
-        ttk.Button(nav_frame, text="Baseline и контракт", command=self.show_contract_tab).pack(fill="x")
+        ttk.Button(nav_frame, text="Открыть Baseline Center", command=self.open_baseline_center).pack(fill="x")
+        ttk.Button(nav_frame, text="Baseline и контракт", command=self.show_contract_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="Optimization runtime", command=self.show_runtime_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="История", command=self.show_history_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="Готовые прогоны", command=self.show_finished_tab).pack(fill="x", pady=(6, 0))
@@ -260,6 +261,23 @@ class DesktopOptimizerCenter:
             subprocess.Popen(["open", str(target)])
             return
         subprocess.Popen(["xdg-open", str(target)])
+
+    def open_baseline_center(self) -> None:
+        env = os.environ.copy()
+        env["PNEUMO_GUI_SPEC_SHELL_OPEN_WORKSPACE"] = "baseline_run"
+        try:
+            subprocess.Popen(
+                [sys.executable, "-m", "pneumo_solver_ui.tools.desktop_gui_spec_shell"],
+                cwd=str(self.repo_root),
+                env=env,
+            )
+        except Exception as exc:
+            messagebox.showerror(
+                "Baseline Center",
+                f"Не удалось открыть Baseline Center:\n{exc}",
+            )
+            return
+        self.status_var.set("Открыт Baseline Center (WS-BASELINE / HO-006).")
 
     def open_current_artifact(self, attr_name: str) -> None:
         snapshot = self._contract_snapshot
@@ -582,9 +600,14 @@ class DesktopOptimizerCenter:
         auto_update = bool(self.runtime.session_state.get("opt_autoupdate_baseline", False))
         source_label = str(getattr(snapshot, "baseline_source_label", "") or getattr(snapshot, "baseline_source_kind", "") or "—")
         baseline_path = str(getattr(snapshot, "baseline_path", "") or "не найден")
+        ho006_state = str(getattr(snapshot, "active_baseline_state", "") or "missing")
+        ho006_hash = str(getattr(snapshot, "active_baseline_hash", "") or "")
+        ho006_can_consume = bool(getattr(snapshot, "optimizer_baseline_can_consume", False))
         return "\n".join(
             [
                 f"Активный baseline: {source_label}",
+                f"HO-006: {ho006_state} ({'current' if ho006_can_consume else 'blocked'})",
+                f"active_baseline_hash: {ho006_hash[:12] if ho006_hash else '—'}",
                 f"Путь: {baseline_path}",
                 f"Автообновление baseline: {'включено' if auto_update else 'выключено'}",
             ]
@@ -1797,8 +1820,10 @@ class DesktopOptimizerCenter:
         self.refresh_all()
 
     def clear_job_status(self) -> None:
-        self.runtime.clear_finished_job()
-        self.status_var.set("Статус текущего optimization job очищен.")
+        if self.runtime.clear_finished_job():
+            self.status_var.set("Статус текущего optimization job очищен.")
+        else:
+            self.status_var.set("Optimization job ещё активен; сначала остановите или дождитесь завершения.")
         self.refresh_all()
 
     def start_selected_handoff(self) -> None:

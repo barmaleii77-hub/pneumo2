@@ -28,6 +28,10 @@ def test_desktop_run_setup_center_uses_russian_operator_facing_sections() -> Non
         encoding="utf-8",
         errors="replace",
     )
+    suite_runtime_src = (ROOT / "pneumo_solver_ui" / "desktop_suite_runtime.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
 
     assert '"Профиль запуска"' in src
     assert '"Предпросмотр дороги"' in src
@@ -36,5 +40,16 @@ def test_desktop_run_setup_center_uses_russian_operator_facing_sections() -> Non
     assert '"Результаты и журналы"' in src
     assert '"Кэш расчёта"' in src
     assert '"Политика выполнения"' in src
+    assert '"Набор испытаний / HO-005"' in src
+    assert '"validated_suite_snapshot / suite_snapshot_hash"' in src
+    assert '"Заморозить HO-005"' in src
+    assert '"Открыть validated_suite_snapshot.json"' in src
+    assert '"Сбросить overrides"' in src
+    assert "self._build_suite_tab()" in src
+    assert "self.suite_tree = ttk.Treeview" in src
     assert '"Открыть набор NPZ"' in src
     assert '"Открыть сводку (JSON)"' in src
+    assert '"Набор испытаний / HO-005"' in src
+    assert "HO-003 inputs_snapshot" in suite_runtime_src
+    assert "resolve_suite_inputs_handoff" in suite_runtime_src
+    assert "can_consume" in suite_runtime_src

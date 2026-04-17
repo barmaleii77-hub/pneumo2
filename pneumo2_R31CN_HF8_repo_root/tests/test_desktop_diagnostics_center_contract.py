@@ -25,6 +25,7 @@ from pneumo_solver_ui.desktop_diagnostics_runtime import (
     write_desktop_diagnostics_summary_md,
     write_desktop_diagnostics_center_state,
 )
+from pneumo_solver_ui.tools.send_bundle_evidence import GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -51,6 +52,31 @@ def _analysis_manifest(
         ],
         "result_context": {"state": state, "selected": {"run_id": run_id}},
         "mismatch_summary": {"state": state, "mismatches": list(mismatches or [])},
+    }
+
+
+def _geometry_reference_evidence() -> dict:
+    return {
+        "schema": "geometry_reference_evidence.v1",
+        "producer_owned": False,
+        "reference_center_role": "reader_and_evidence_surface",
+        "does_not_render_animator_meshes": True,
+        "artifact_status": "current",
+        "artifact_freshness_status": "current",
+        "artifact_freshness_relation": "matches_latest",
+        "artifact_freshness_reason": "Selected artifact matches latest by NPZ or pointer path.",
+        "latest_artifact_status": "current",
+        "artifact_source_label": "pytest",
+        "road_width_status": "explicit_meta",
+        "road_width_source": "meta.geometry.road_width_m",
+        "packaging_status": "complete",
+        "packaging_mismatch_status": "match",
+        "packaging_contract_hash": "packaging-hash",
+        "geometry_acceptance_gate": "PASS",
+        "geometry_acceptance_available": True,
+        "component_passport_components": 3,
+        "component_passport_needs_data": 0,
+        "evidence_missing": [],
     }
 
 
@@ -216,12 +242,22 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
         json.dumps({"ok": True, "message": "powershell ok", "zip_path": str(zip_path.resolve())}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    (out_dir / GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME).write_text(
+        json.dumps(_geometry_reference_evidence(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
     bundle = refresh_desktop_diagnostics_bundle_record(tmp_path, out_dir=out_dir, zip_path=zip_path)
     assert bundle.latest_zip_path == str(zip_path.resolve())
     assert "Anim latest token: tok-123" in bundle.summary_lines
     assert Path(bundle.latest_inspection_json_path).exists()
     assert Path(bundle.latest_health_json_path).exists()
+    assert bundle.geometry_reference_status == "READY"
+    assert bundle.geometry_reference_artifact_freshness_status == "current"
+    assert bundle.geometry_reference_artifact_freshness_relation == "matches_latest"
+    assert bundle.geometry_reference_road_width_status == "explicit_meta"
+    assert bundle.geometry_reference_packaging_contract_hash == "packaging-hash"
+    assert bundle.geometry_reference_acceptance_gate == "PASS"
 
     run = DesktopDiagnosticsRunRecord(
         ok=True,
@@ -268,9 +304,18 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert payload["machine_paths"]["latest_bundle_path_txt"].endswith("latest_send_bundle_path.txt")
     assert payload["machine_paths"]["latest_bundle_sha256"].endswith("latest_send_bundle.sha256")
     assert "latest_analysis_evidence_manifest_json" in payload["machine_paths"]
+    assert payload["machine_paths"]["latest_geometry_reference_evidence_json"].endswith(
+        GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME
+    )
     assert payload["machine_paths"]["latest_run_state_json"].endswith(LATEST_DESKTOP_DIAGNOSTICS_RUN_JSON)
     assert payload["analysis_evidence"]["status"] == bundle.analysis_evidence_status
     assert payload["analysis_evidence"]["context_state"] == bundle.analysis_evidence_context_state
+    assert payload["geometry_reference_evidence"]["status"] == "READY"
+    assert payload["geometry_reference_evidence"]["artifact_freshness_status"] == "current"
+    assert payload["geometry_reference_evidence"]["artifact_freshness_relation"] == "matches_latest"
+    assert payload["geometry_reference_evidence"]["road_width_status"] == "explicit_meta"
+    assert payload["geometry_reference_evidence"]["packaging_contract_hash"] == "packaging-hash"
+    assert payload["geometry_reference_evidence"]["geometry_acceptance_gate"] == "PASS"
     assert payload["bundle"]["latest_clipboard_status_path"].endswith("latest_send_bundle_clipboard_status.json")
     assert payload["ui"]["selected_tab"] == "bundle"
     assert payload["ui"]["active_bundle_out_dir"].endswith("send_bundles")
@@ -337,6 +382,17 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "Машиночитаемые пути" in center_src
     assert "Analysis evidence / HO-009" in center_src
     assert "latest_analysis_evidence_manifest.json" in center_src
+    assert "Evidence handoff status" in center_src
+    assert "Geometry Reference evidence" in center_src
+    assert "Artifact freshness" in center_src
+    assert "geometry_reference_artifact_freshness_relation" in center_src
+    assert 'text="Открыть Geometry JSON"' in center_src
+    assert "self.btn_open_geometry_reference_evidence" in center_src
+    assert "def _open_geometry_reference_evidence(self) -> None:" in center_src
+    assert "latest_geometry_reference_evidence.json" in center_src
+    assert "geometry_reference_evidence.json" in center_src
+    assert "def _geometry_reference_evidence_summary_lines(self, bundle) -> list[str]:" in center_src
+    assert "def _geometry_reference_status_text(self, bundle) -> str:" in center_src
     assert "copy_latest_bundle_to_clipboard(" in center_src
     assert "out_dir=self._active_bundle_out_dir()" in center_src
     assert "def _schedule_poll(self) -> None:" in center_src

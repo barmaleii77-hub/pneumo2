@@ -99,6 +99,10 @@ from pneumo_solver_ui.ring_visuals import (
 from pneumo_solver_ui.desktop_animator.suspension_geometry_diagnostics import (
     format_suspension_hud_lines,
 )
+from pneumo_solver_ui.desktop_animator.analysis_context import (
+    format_analysis_context_banner,
+    load_analysis_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -2851,6 +2855,7 @@ class _PreparedBundleLoad:
 def _prepare_loaded_bundle(path: Path | str) -> _PreparedBundleLoad:
     resolved_path = Path(path).expanduser().resolve()
     bundle = load_npz(resolved_path)
+    b = bundle
     try:
         bundle.ensure_world_xy()
         bundle.ensure_world_velocity_xy()
@@ -2860,12 +2865,11 @@ def _prepare_loaded_bundle(path: Path | str) -> _PreparedBundleLoad:
         bundle.ensure_body_acceleration_xy()
     except Exception:
         pass
-    fallback_msgs = list(getattr(bundle, "service_fallback_messages", lambda: [])())
-    b = bundle
+    fallback_msgs = list(getattr(b, "service_fallback_messages", lambda: [])())
     spring_todo_msgs = _mandatory_spring_geometry_todo_messages(b)
     ring_info_msgs = _ring_overlay_info_messages(b)
     try:
-        check_report = run_self_checks(bundle)
+        check_report = run_self_checks(b)
         check_msgs = list(getattr(check_report, "messages", []) or [])
     except Exception:
         check_msgs = []
@@ -26490,9 +26494,74 @@ class MainWindow(QtWidgets.QMainWindow):
         sb = self.statusBar()
         self._status_label = QtWidgets.QLabel("Ready")
         sb.addWidget(self._status_label, 1)
+        self._analysis_context_label = QtWidgets.QLabel("")
+        self._analysis_context_label.setObjectName("AnalysisContextBanner")
+        self._analysis_context_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self._analysis_context_label.setStyleSheet(
+            "QLabel#AnalysisContextBanner {"
+            " background-color: rgba(31, 75, 58, 210);"
+            " color: rgb(218, 255, 236);"
+            " border: 1px solid rgba(103, 220, 158, 150);"
+            " border-radius: 4px;"
+            " padding: 3px 8px;"
+            " font-weight: 600;"
+            "}"
+        )
+        self._analysis_context_label.hide()
+        sb.addPermanentWidget(self._analysis_context_label, 0)
 
     def _status(self, msg: str):
         self._status_label.setText(str(msg))
+
+    def set_analysis_context_snapshot(self, snapshot: object | None) -> None:
+        label = getattr(self, "_analysis_context_label", None)
+        if label is None:
+            return
+        text = format_analysis_context_banner(snapshot)  # type: ignore[arg-type]
+        status = str(getattr(snapshot, "status", "") or "").upper() if snapshot is not None else ""
+        if not snapshot:
+            label.hide()
+            return
+        if status == "BLOCKED":
+            style = (
+                "QLabel#AnalysisContextBanner {"
+                " background-color: rgba(105, 38, 38, 220);"
+                " color: rgb(255, 230, 230);"
+                " border: 1px solid rgba(255, 126, 126, 170);"
+                " border-radius: 4px;"
+                " padding: 3px 8px;"
+                " font-weight: 700;"
+                "}"
+            )
+        elif status == "DEGRADED":
+            style = (
+                "QLabel#AnalysisContextBanner {"
+                " background-color: rgba(95, 72, 28, 220);"
+                " color: rgb(255, 243, 205);"
+                " border: 1px solid rgba(245, 190, 80, 170);"
+                " border-radius: 4px;"
+                " padding: 3px 8px;"
+                " font-weight: 700;"
+                "}"
+            )
+        else:
+            style = (
+                "QLabel#AnalysisContextBanner {"
+                " background-color: rgba(31, 75, 58, 210);"
+                " color: rgb(218, 255, 236);"
+                " border: 1px solid rgba(103, 220, 158, 150);"
+                " border-radius: 4px;"
+                " padding: 3px 8px;"
+                " font-weight: 600;"
+                "}"
+            )
+        label.setStyleSheet(style)
+        label.setText(text)
+        try:
+            label.setToolTip(json.dumps(snapshot.to_payload(), ensure_ascii=False, indent=2))  # type: ignore[attr-defined]
+        except Exception:
+            label.setToolTip(text)
+        label.show()
 
     def _slider_pressed(self):
         self._interactive_scrub_active = True
@@ -26818,7 +26887,7 @@ class MainWindow(QtWidgets.QMainWindow):
                         self.slider.blockSignals(True)
                         self.slider.setValue(int(self._idx))
                         self.slider.blockSignals(False)
-                    self._update_frame(int(self._idx), sample_t=self._play_cursor_t_s)
+                    self._update_frame(int(self._idx), sample_t=float(self._play_cursor_t_s))
                 else:
                     self._refresh_after_playback_stop()
                 self._sync_prepared_playback_cursor(self._play_cursor_t_s)
@@ -27564,6 +27633,7 @@ def run_app(
     npz_path: Optional[Path],
     follow: bool,
     pointer_path: Path,
+    analysis_context_path: Optional[Path] = None,
     theme: str = "dark",
     enable_gl: bool = True,
 ) -> int:
@@ -27585,8 +27655,27 @@ def run_app(
         except Exception:
             pass
 
+    analysis_snapshot = None
+    if analysis_context_path is not None:
+        analysis_snapshot = load_analysis_context(analysis_context_path, repo_root=PROJECT_ROOT)
+        if analysis_snapshot.ready_for_animator:
+            npz_path = analysis_snapshot.selected_npz_path
+        else:
+            npz_path = None
+        follow = False
+
     win = MainWindow(enable_gl=enable_gl, pointer_path=pointer_path)
     win.show()
+
+    if analysis_snapshot is not None:
+        lineage = dict(analysis_snapshot.lineage or {})
+        run_label = str(lineage.get("run_id") or "-")
+        win.set_analysis_context_snapshot(analysis_snapshot)
+        win._status(
+            "HO-008 analysis context: "
+            f"{analysis_snapshot.status} | run={run_label} | "
+            f"context={analysis_snapshot.path}"
+        )
 
     if follow:
         win.act_follow.setChecked(True)
@@ -27641,6 +27730,11 @@ def _parse_args(argv: Optional[list[str]] = None):
         help="Путь к JSON pointer (anim_latest.json).",
     )
     ap.add_argument(
+        "--analysis-context",
+        default=_os.environ.get("PNEUMO_ANALYSIS_CONTEXT_PATH", ""),
+        help="Путь к frozen HO-008 analysis_context.json для выбранного optimization run.",
+    )
+    ap.add_argument(
         "--no-follow",
         action="store_true",
         help="Не следить за pointer (отключить авто-подхват данных из Web UI).",
@@ -27665,11 +27759,23 @@ if __name__ == "__main__":
     args = _parse_args()
     npz = Path(args.npz).expanduser().resolve() if str(args.npz).strip() else None
     pointer = Path(args.pointer).expanduser().resolve() if str(args.pointer).strip() else _default_pointer_path()
+    analysis_context = (
+        Path(args.analysis_context).expanduser().resolve()
+        if str(args.analysis_context).strip()
+        else None
+    )
     follow = not bool(args.no_follow)
     enable_gl = not bool(args.no_gl)
 
     try:
-        raise SystemExit(run_app(npz_path=npz, follow=follow, pointer_path=pointer, theme=str(args.theme), enable_gl=enable_gl))
+        raise SystemExit(run_app(
+            npz_path=npz,
+            follow=follow,
+            pointer_path=pointer,
+            analysis_context_path=analysis_context,
+            theme=str(args.theme),
+            enable_gl=enable_gl,
+        ))
     except SystemExit:
         raise
     except Exception:

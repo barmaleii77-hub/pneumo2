@@ -46,3 +46,7 @@ def test_aux_cadence_metrics_are_emitted_for_future_acceptance_bundles() -> None
     assert "AnimatorAuxCadence" in APP
     assert "self._record_aux_cadence(\"dock_timeline\", now_ts)" in APP
     assert "self._record_aux_cadence(\"dock_trends\", now_ts)" in APP
+    assert "frame_cadence[\"measured_present_hz\"]" in APP
+    assert "frame_cadence[\"present_dt_ema_ms\"]" in APP
+    assert "frame_cadence=frame_cadence" in APP
+    assert "frame_cadence[\"display_hz_source\"] = \"measured_present\"" in APP

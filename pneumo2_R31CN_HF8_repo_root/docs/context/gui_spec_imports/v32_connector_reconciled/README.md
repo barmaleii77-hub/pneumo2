@@ -33,8 +33,17 @@ entrypoint и картой чтения для будущих задач.
   [GAP_TO_EVIDENCE_ACTION_MAP.csv](./GAP_TO_EVIDENCE_ACTION_MAP.csv) -
   checked-in extracts из v32 для docs/tests/helpers. Остальные матрицы остаются
   archive-only reference внутри ZIP.
+- [PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md](./PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md) -
+  producer/animator truth evidence note для `PB-001 / RGH-001 / RGH-002 /
+  RGH-003 / RGH-018 / OG-001 / OG-002`.
+- [COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md](./COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md) -
+  compare/objective integrity evidence note для `PB-007 / PB-008 /
+  RGH-013 / RGH-014 / RGH-015`.
 - [DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md](./DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md) -
   runtime evidence note для `PB-002 / RGH-006 / RGH-007 / RGH-016`.
+- [RUNTIME_RELEASE_EVIDENCE_NOTE.md](./RUNTIME_RELEASE_EVIDENCE_NOTE.md) -
+  runtime hard-gate note для `PB-006 / RGH-011 / RGH-012 / RGH-019 /
+  OG-003 / OG-004`.
 - [WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md](./WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md) -
   repo evidence note для frozen `WS-INPUTS -> WS-RING -> WS-SUITE ->
   WS-BASELINE` handoff refs/hashes (`HO-002...HO-005`).
@@ -212,6 +221,14 @@ Repo-side evidence also covers the narrow frozen input handoff chain from
 banners and hash preservation are checked by desktop input/ring/suite tests.
 See [WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md](./WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md).
 This is not a solver/runtime closure claim.
+
+Repo-side evidence now covers a narrow `WS-ANALYSIS -> Compare Viewer`
+current-context handoff: Results Center may emit readonly
+`latest_compare_current_context.json`, Compare Viewer accepts it only through
+`--current-context` / `CompareSession.current_context_ref`, preserves
+`current_context_path`, surfaces `ready/missing/session` source status in
+`dock_compare_contract`, and exports the provenance in `compare_contract.json`.
+This is not optimizer history ownership and not animator truth replacement.
 
 Следующий правильный шаг по `NEXT_STEP_DELTA_V32`: не новый summary, а closure
 на живых runtime artifacts:

@@ -45,7 +45,6 @@ DESKTOP_INPUT_HANDOFF_IDS: dict[str, str] = {
 }
 
 
-
 DESKTOP_HELP_OVERRIDES: dict[str, dict[str, str]] = {
     "база": {
         "tooltip": "Расстояние между передней и задней осями. Влияет на продольную устойчивость, посадку и кинематику.",
@@ -387,7 +386,6 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
             DesktopInputFieldSpec("длина_рамы", "Длина рамы", "м", "Габаритная длина кузова/рамы для модели и визуализации.", min_value=1.0, max_value=6.0, step=0.01, digits=3),
             DesktopInputFieldSpec("ширина_рамы", "Ширина рамы", "м", "Габаритная ширина кузова/рамы.", min_value=0.2, max_value=3.0, step=0.01, digits=3),
             DesktopInputFieldSpec("высота_рамы", "Высота рамы", "м", "Габаритная высота кузова/рамы.", min_value=0.1, max_value=2.5, step=0.01, digits=3),
-            DesktopInputFieldSpec("высота_центра_масс", "Высота центра масс", "м", "Высота центра масс относительно дорожного уровня.", min_value=0.05, max_value=1.5, step=0.005, digits=3),
             DesktopInputFieldSpec("радиус_колеса_м", "Радиус колеса", "м", "Радиус колеса для кинематики и контакта с дорогой.", min_value=0.15, max_value=0.8, step=0.005, digits=3),
             DesktopInputFieldSpec("wheel_width_m", "Ширина колеса", "мм", "Физическая ширина колеса/шины.", min_value=120.0, max_value=420.0, step=1.0, ui_scale=1000.0, digits=0),
             DesktopInputFieldSpec("ход_штока", "Полный ход штока", "мм", "Полный рабочий ход цилиндра.", min_value=50.0, max_value=500.0, step=1.0, ui_scale=1000.0, digits=0),
@@ -412,11 +410,21 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
         ),
     ),
     DesktopInputSection(
-        title="Механика",
-        description="Массы, шины, пружина и стабилизаторы, которые формируют механический отклик подвески.",
+        title="Массы",
+        description="Подрессоренная и неподрессоренная масса, положение центра масс и правило распределения веса по углам.",
         fields=(
             DesktopInputFieldSpec("масса_рамы", "Масса рамы", "кг", "Подрессоренная масса кузова/рамы.", min_value=50.0, max_value=5000.0, step=10.0, digits=1),
             DesktopInputFieldSpec("масса_неподрессоренная_на_угол", "Неподрессоренная масса на угол", "кг", "Масса колеса, ступицы и рычагов на один угол.", min_value=1.0, max_value=250.0, step=1.0, digits=1),
+            DesktopInputFieldSpec("высота_центра_масс", "Высота центра масс", "м", "Высота центра масс относительно дорожного уровня.", min_value=0.05, max_value=1.5, step=0.005, digits=3),
+            DesktopInputFieldSpec("cg_x_м", "Смещение ЦТ по базе", "м", "Продольное смещение центра тяжести относительно середины базы.", min_value=-1.5, max_value=1.5, step=0.005, digits=3),
+            DesktopInputFieldSpec("cg_y_м", "Смещение ЦТ по колее", "м", "Поперечное смещение центра тяжести относительно продольной оси.", min_value=-1.0, max_value=1.0, step=0.005, digits=3),
+            DesktopInputFieldSpec("corner_loads_mode", "Режим распределения веса по углам", "", "Как распределять вес по углам при инициализации: через ЦТ или через эффективные жёсткости.", control="choice", choices=("cg", "stiffness"), choice_labels=(("cg", "Через центр тяжести"), ("stiffness", "Через жёсткости"))),
+        ),
+    ),
+    DesktopInputSection(
+        title="Механика",
+        description="Шины, пружина и стабилизаторы, которые формируют механический отклик подвески.",
+        fields=(
             DesktopInputFieldSpec("жёсткость_шины", "Жёсткость шины", "Н/м", "Вертикальная жёсткость шины.", min_value=10000.0, max_value=1000000.0, step=1000.0, digits=0),
             DesktopInputFieldSpec("демпфирование_шины", "Демпфирование шины", "Н·с/м", "Вертикальное демпфирование шины.", min_value=100.0, max_value=50000.0, step=100.0, digits=0),
             DesktopInputFieldSpec("пружина_длина_свободная_м", "Свободная длина пружины", "мм", "Исходная свободная длина пружины до сжатия.", min_value=100.0, max_value=1500.0, step=1.0, ui_scale=1000.0, digits=0),
@@ -428,12 +436,9 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
     ),
     DesktopInputSection(
         title="Статическая настройка",
-        description="Стартовое состояние, распределение веса и режим поиска статической посадки.",
+        description="Стартовое состояние и режим поиска статической посадки.",
         fields=(
             DesktopInputFieldSpec("vx0_м_с", "Начальная скорость", "м/с", "Начальная продольная скорость модели.", min_value=0.0, max_value=80.0, step=0.1, digits=2),
-            DesktopInputFieldSpec("cg_x_м", "Смещение ЦТ по базе", "м", "Продольное смещение центра тяжести относительно середины базы.", min_value=-1.5, max_value=1.5, step=0.005, digits=3),
-            DesktopInputFieldSpec("cg_y_м", "Смещение ЦТ по колее", "м", "Поперечное смещение центра тяжести относительно продольной оси.", min_value=-1.0, max_value=1.0, step=0.005, digits=3),
-            DesktopInputFieldSpec("corner_loads_mode", "Режим распределения веса по углам", "", "Как распределять вес по углам при инициализации: через ЦТ или через эффективные жёсткости.", control="choice", choices=("cg", "stiffness"), choice_labels=(("cg", "Через центр тяжести"), ("stiffness", "Через жёсткости"))),
             DesktopInputFieldSpec("static_trim_enable", "Искать статическую посадку", "", "Перед основным расчётом подобрать статическое равновесие.", control="bool"),
             DesktopInputFieldSpec("static_trim_force", "Форсировать статическую посадку", "", "Принудительно выполнять static trim даже при существующем состоянии.", control="bool"),
             DesktopInputFieldSpec("static_trim_pneumo_mode", "Режим static trim по пневматике", "", "Как корректировать пневматику при поиске посадки: давлением, массой или политропой.", control="choice", choices=("pressure", "mass", "polytropic"), choice_labels=(("pressure", "Коррекция давлением"), ("mass", "Коррекция массой"), ("polytropic", "Политропная коррекция"))),
@@ -456,18 +461,24 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
     ),
     DesktopInputSection(
         title="Справочные данные",
-        description="Режимы газа, температурные reference-параметры и служебные инженерные проверки.",
+        description="Режимы газа, температурные reference-параметры и справочные лимиты пружины.",
         fields=(
             DesktopInputFieldSpec("термодинамика", "Режим термодинамики", "", "Модель газа: изотерма, адиабата или тепловой режим со стенкой.", control="choice", choices=("thermal", "isothermal", "adiabatic"), choice_labels=(("thermal", "Теплообмен со стенкой"), ("isothermal", "Изотермический"), ("adiabatic", "Адиабатический"))),
             DesktopInputFieldSpec("газ_модель_теплоемкости", "Модель теплоёмкости воздуха", "", "Постоянные теплоёмкости или T-зависимая reference-модель nist_air.", control="choice", choices=("constant", "nist_air"), choice_labels=(("constant", "Постоянные теплоёмкости"), ("nist_air", "Справочная модель воздуха NIST"))),
             DesktopInputFieldSpec("температура_окр_К", "Температура окружающей среды", "К", "Температура среды, в которой работает система.", min_value=200.0, max_value=400.0, step=1.0, digits=1),
             DesktopInputFieldSpec("T_AIR_К", "Начальная температура воздуха", "К", "Базовая температура воздуха для начального состояния газа.", min_value=200.0, max_value=400.0, step=1.0, digits=1),
+            DesktopInputFieldSpec("пружина_длина_солид_м", "Сомкнутая длина пружины", "мм", "Справочная длина пружины в полностью сомкнутом состоянии.", min_value=0.0, max_value=400.0, step=1.0, ui_scale=1000.0, digits=0),
+            DesktopInputFieldSpec("пружина_запас_до_coil_bind_минимум_м", "Минимальный запас до смыкания витков", "мм", "Допустимый минимальный запас до смыкания витков для справочных проверок.", min_value=0.0, max_value=120.0, step=1.0, ui_scale=1000.0, digits=0),
+        ),
+    ),
+    DesktopInputSection(
+        title="Численные настройки",
+        description="Ограничения интегратора и инженерные проверки, которые влияют на устойчивость расчёта.",
+        fields=(
             DesktopInputFieldSpec("макс_шаг_интегрирования_с", "Максимальный шаг интегрирования", "мс", "Ограничение шага интегратора.", min_value=0.01, max_value=10.0, step=0.01, ui_scale=1000.0, digits=2),
             DesktopInputFieldSpec("макс_число_внутренних_шагов_на_dt", "Макс. внутренних шагов на dt", "шагов", "Защита от зависания интегратора на одном шаге dt.", control="int", min_value=1000, max_value=1000000, step=1000, digits=0),
             DesktopInputFieldSpec("autoverif_enable", "Включить автопроверку", "", "Проверять физические и численные ограничения после расчёта.", control="bool"),
             DesktopInputFieldSpec("mechanics_selfcheck", "Включить самопроверку механики", "", "Проверять кинематику и механические ограничения.", control="bool"),
-            DesktopInputFieldSpec("пружина_длина_солид_м", "Сомкнутая длина пружины", "мм", "Справочная длина пружины в полностью сомкнутом состоянии.", min_value=0.0, max_value=400.0, step=1.0, ui_scale=1000.0, digits=0),
-            DesktopInputFieldSpec("пружина_запас_до_coil_bind_минимум_м", "Минимальный запас до смыкания витков", "мм", "Допустимый минимальный запас до смыкания витков для справочных проверок.", min_value=0.0, max_value=120.0, step=1.0, ui_scale=1000.0, digits=0),
         ),
     ),
 )
@@ -565,7 +576,6 @@ def desktop_inputs_snapshot_handoff_path(
     workspace_dir: Path | str | None = None,
 ) -> Path:
     return (desktop_inputs_handoff_dir_path(workspace_dir=workspace_dir) / DESKTOP_INPUT_SNAPSHOT_FILENAME).resolve()
-
 
 
 def desktop_runs_dir_path() -> Path:
@@ -968,7 +978,6 @@ def describe_desktop_inputs_snapshot_state(
     }
 
 
-
 def flatten_field_specs() -> tuple[DesktopInputFieldSpec, ...]:
     fields: list[DesktopInputFieldSpec] = []
     for section in DESKTOP_INPUT_SECTIONS:
@@ -1299,11 +1308,29 @@ def evaluate_desktop_section_readiness(
         }
     )
 
-    mechanics_issues: list[str] = []
+    mass_issues: list[str] = []
     if _safe_float(current, "масса_рамы") <= 0.0:
-        mechanics_issues.append("масса рамы")
+        mass_issues.append("масса рамы")
     if _safe_float(current, "масса_неподрессоренная_на_угол") <= 0.0:
-        mechanics_issues.append("неподрессоренная масса")
+        mass_issues.append("неподрессоренная масса")
+    if _safe_float(current, "высота_центра_масс") <= 0.0:
+        mass_issues.append("высота центра масс")
+    if _safe_choice(current, "corner_loads_mode") not in {"cg", "stiffness"}:
+        mass_issues.append("режим распределения веса")
+    rows.append(
+        {
+            "title": "Массы",
+            "status": "warn" if mass_issues else "ok",
+            "summary": (
+                "Проверьте: " + ", ".join(mass_issues) + "."
+                if mass_issues
+                else "Массы, центр тяжести и распределение веса выглядят готовыми к запуску."
+            ),
+            "issues": mass_issues,
+        }
+    )
+
+    mechanics_issues: list[str] = []
     if _safe_float(current, "жёсткость_шины") <= 0.0:
         mechanics_issues.append("жёсткость шины")
     if _safe_float(current, "демпфирование_шины") <= 0.0:
@@ -1324,7 +1351,7 @@ def evaluate_desktop_section_readiness(
             "summary": (
                 "Проверьте: " + ", ".join(mechanics_issues) + "."
                 if mechanics_issues
-                else "Массы, шины, пружина и стабилизаторы выглядят готовыми к запуску."
+                else "Шины, пружина и стабилизаторы выглядят готовыми к запуску."
             ),
             "issues": mechanics_issues,
         }
@@ -1333,8 +1360,6 @@ def evaluate_desktop_section_readiness(
     static_issues: list[str] = []
     if _safe_float(current, "vx0_м_с") < 0.0:
         static_issues.append("начальная скорость")
-    if _safe_choice(current, "corner_loads_mode") not in {"cg", "stiffness"}:
-        static_issues.append("режим распределения веса")
     if _safe_bool(current, "static_trim_force") and not _safe_bool(current, "static_trim_enable"):
         static_issues.append("форсированный static trim без включённого поиска посадки")
     if _safe_choice(current, "static_trim_pneumo_mode") not in {"pressure", "mass", "polytropic"}:
@@ -1390,16 +1415,10 @@ def evaluate_desktop_section_readiness(
         _safe_float(current, "T_AIR_К"),
     ) <= 0.0:
         reference_issues.append("температурные reference-данные")
-    if _safe_float(current, "макс_шаг_интегрирования_с") <= 0.0:
-        reference_issues.append("максимальный шаг интегрирования")
-    if _safe_float(current, "макс_число_внутренних_шагов_на_dt") < 1000.0:
-        reference_issues.append("лимит внутренних шагов")
     if _safe_float(current, "пружина_длина_солид_м") < 0.0:
         reference_issues.append("сомкнутая длина пружины")
     if _safe_float(current, "пружина_запас_до_coil_bind_минимум_м") < 0.0:
         reference_issues.append("запас до смыкания витков")
-    if (not _safe_bool(current, "autoverif_enable")) and (not _safe_bool(current, "mechanics_selfcheck")):
-        reference_issues.append("выключены все инженерные проверки")
     rows.append(
         {
             "title": "Справочные данные",
@@ -1407,9 +1426,29 @@ def evaluate_desktop_section_readiness(
             "summary": (
                 "Проверьте: " + ", ".join(reference_issues) + "."
                 if reference_issues
-                else "Reference-режимы, температуры и инженерные проверки выглядят согласованно."
+                else "Reference-режимы, температуры и справочные лимиты выглядят согласованно."
             ),
             "issues": reference_issues,
+        }
+    )
+
+    numerical_issues: list[str] = []
+    if _safe_float(current, "макс_шаг_интегрирования_с") <= 0.0:
+        numerical_issues.append("максимальный шаг интегрирования")
+    if _safe_float(current, "макс_число_внутренних_шагов_на_dt") < 1000.0:
+        numerical_issues.append("лимит внутренних шагов")
+    if (not _safe_bool(current, "autoverif_enable")) and (not _safe_bool(current, "mechanics_selfcheck")):
+        numerical_issues.append("выключены все инженерные проверки")
+    rows.append(
+        {
+            "title": "Численные настройки",
+            "status": "warn" if numerical_issues else "ok",
+            "summary": (
+                "Проверьте: " + ", ".join(numerical_issues) + "."
+                if numerical_issues
+                else "Ограничения интегратора и инженерные проверки заданы."
+            ),
+            "issues": numerical_issues,
         }
     )
 
@@ -1543,7 +1582,7 @@ _SECTION_ISSUE_FOCUS_MAP = {
             "Диаметр штока Ц2 не должен быть больше или равен диаметру поршня.",
         ),
     },
-    "Механика": {
+    "Массы": {
         "масса рамы": _issue_focus_entry(
             "масса_рамы",
             "Масса рамы",
@@ -1554,6 +1593,18 @@ _SECTION_ISSUE_FOCUS_MAP = {
             "Неподрессоренная масса",
             "Неподрессоренная масса на угол должна быть положительной.",
         ),
+        "высота центра масс": _issue_focus_entry(
+            "высота_центра_масс",
+            "Высота центра масс",
+            "Высота центра масс должна быть положительной.",
+        ),
+        "режим распределения веса": _issue_focus_entry(
+            "corner_loads_mode",
+            "Распределение веса по углам",
+            "Нужно выбрать допустимый режим распределения веса.",
+        ),
+    },
+    "Механика": {
         "жёсткость шины": _issue_focus_entry(
             "жёсткость_шины",
             "Жёсткость шины",
@@ -1585,11 +1636,6 @@ _SECTION_ISSUE_FOCUS_MAP = {
             "vx0_м_с",
             "Начальная скорость",
             "Начальная скорость не может быть отрицательной.",
-        ),
-        "режим распределения веса": _issue_focus_entry(
-            "corner_loads_mode",
-            "Распределение веса по углам",
-            "Нужно выбрать допустимый режим распределения веса.",
         ),
         "форсированный static trim без включённого поиска посадки": _issue_focus_entry(
             "static_trim_enable",
@@ -1650,16 +1696,6 @@ _SECTION_ISSUE_FOCUS_MAP = {
             "Температуры reference-данных",
             "Температуры воздуха и окружения должны быть положительными.",
         ),
-        "максимальный шаг интегрирования": _issue_focus_entry(
-            "макс_шаг_интегрирования_с",
-            "Максимальный шаг интегрирования",
-            "Максимальный шаг интегрирования должен быть положительным.",
-        ),
-        "лимит внутренних шагов": _issue_focus_entry(
-            "макс_число_внутренних_шагов_на_dt",
-            "Лимит внутренних шагов",
-            "Лимит внутренних шагов слишком мал для устойчивого расчёта.",
-        ),
         "сомкнутая длина пружины": _issue_focus_entry(
             "пружина_длина_солид_м",
             "Сомкнутая длина пружины",
@@ -1669,6 +1705,18 @@ _SECTION_ISSUE_FOCUS_MAP = {
             "пружина_запас_до_coil_bind_минимум_м",
             "Запас до смыкания витков",
             "Запас до смыкания витков не может быть отрицательным.",
+        ),
+    },
+    "Численные настройки": {
+        "максимальный шаг интегрирования": _issue_focus_entry(
+            "макс_шаг_интегрирования_с",
+            "Максимальный шаг интегрирования",
+            "Максимальный шаг интегрирования должен быть положительным.",
+        ),
+        "лимит внутренних шагов": _issue_focus_entry(
+            "макс_число_внутренних_шагов_на_dt",
+            "Лимит внутренних шагов",
+            "Лимит внутренних шагов слишком мал для устойчивого расчёта.",
         ),
         "выключены все инженерные проверки": _issue_focus_entry(
             "autoverif_enable",
@@ -1756,16 +1804,20 @@ def build_desktop_section_summary_cards(
 
     geometry_status, geometry_detail = _status_and_detail("Геометрия")
     pneumatic_status, pneumatic_detail = _status_and_detail("Пневматика")
+    mass_status, mass_detail = _status_and_detail("Массы")
     mechanics_status, mechanics_detail = _status_and_detail("Механика")
     static_status, static_detail = _status_and_detail("Статическая настройка")
     components_status, components_detail = _status_and_detail("Компоненты")
     reference_status, reference_detail = _status_and_detail("Справочные данные")
+    numerical_status, numerical_detail = _status_and_detail("Численные настройки")
     geometry_focus = _focus("Геометрия")
     pneumatic_focus = _focus("Пневматика")
+    mass_focus = _focus("Массы")
     mechanics_focus = _focus("Механика")
     static_focus = _focus("Статическая настройка")
     components_focus = _focus("Компоненты")
     reference_focus = _focus("Справочные данные")
+    numerical_focus = _focus("Численные настройки")
 
     return [
         {
@@ -1797,12 +1849,27 @@ def build_desktop_section_summary_cards(
             **pneumatic_focus,
         },
         {
-            "title": "Механика",
-            "status": mechanics_status,
+            "title": "Массы",
+            "status": mass_status,
             "headline": (
                 f"Рама {_safe_float(current, 'масса_рамы'):.0f} кг; "
                 f"угол {_safe_float(current, 'масса_неподрессоренная_на_угол'):.0f} кг; "
+                f"ЦМ H {_fmt_m(current.get('высота_центра_масс'))}; "
+                f"corner loads {str(current.get('corner_loads_mode') or '—')}."
+            ),
+            "details": (
+                f"CG X {_fmt_signed_m(current.get('cg_x_м'))}; "
+                f"CG Y {_fmt_signed_m(current.get('cg_y_м'))}. "
+                f"{mass_detail}"
+            ),
+            **mass_focus,
+        },
+        {
+            "title": "Механика",
+            "status": mechanics_status,
+            "headline": (
                 f"шина {_safe_float(current, 'жёсткость_шины'):.0f} Н/м; "
+                f"демпфер {_safe_float(current, 'демпфирование_шины'):.0f} Н·с/м; "
                 f"пружина {_fmt_mm_from_m(current.get('пружина_длина_свободная_м'))}."
             ),
             "details": (
@@ -1817,13 +1884,10 @@ def build_desktop_section_summary_cards(
             "status": static_status,
             "headline": (
                 f"vx0 {_safe_float(current, 'vx0_м_с', 0.0):.2f} м/с; "
-                f"CG X {_fmt_signed_m(current.get('cg_x_м'))}; "
-                f"CG Y {_fmt_signed_m(current.get('cg_y_м'))}; "
-                f"corner loads {str(current.get('corner_loads_mode') or '—')}."
+                f"static trim {_fmt_bool_flag(current.get('static_trim_enable'), 'включён', 'выключен')}; "
+                f"pneumo mode {str(current.get('static_trim_pneumo_mode') or '—')}."
             ),
             "details": (
-                f"Static trim {_fmt_bool_flag(current.get('static_trim_enable'), 'включён', 'выключен')}; "
-                f"pneumo mode {str(current.get('static_trim_pneumo_mode') or '—')}; "
                 f"цель {float(_safe_float(current, 'zero_pose_target_stroke_frac', 0.0)):.2f} "
                 f"+/- {float(_safe_float(current, 'zero_pose_tol_stroke_frac', 0.0)):.2f}. "
                 f"{static_detail}"
@@ -1853,16 +1917,28 @@ def build_desktop_section_summary_cards(
                 f"Термо {str(current.get('термодинамика') or '—')} / "
                 f"{str(current.get('газ_модель_теплоемкости') or '—')}; "
                 f"T_air {_fmt_temperature_k(current.get('T_AIR_К'))}; "
-                f"T_окр {_fmt_temperature_k(current.get('температура_окр_К'))}; "
-                f"dt_max {_fmt_ms(current.get('макс_шаг_интегрирования_с'))}."
+                f"T_окр {_fmt_temperature_k(current.get('температура_окр_К'))}."
             ),
             "details": (
-                f"Autoverif {_fmt_bool_flag(current.get('autoverif_enable'))}; "
-                f"mech selfcheck {_fmt_bool_flag(current.get('mechanics_selfcheck'))}; "
+                f"Сомкнутая длина {_fmt_mm_from_m(current.get('пружина_длина_солид_м'))}; "
                 f"запас до смыкания {_fmt_mm_from_m(current.get('пружина_запас_до_coil_bind_минимум_м'))}. "
                 f"{reference_detail}"
             ),
             **reference_focus,
+        },
+        {
+            "title": "Численные настройки",
+            "status": numerical_status,
+            "headline": (
+                f"dt_max {_fmt_ms(current.get('макс_шаг_интегрирования_с'))}; "
+                f"внутренних шагов {_safe_float(current, 'макс_число_внутренних_шагов_на_dt', 0.0):.0f}."
+            ),
+            "details": (
+                f"Autoverif {_fmt_bool_flag(current.get('autoverif_enable'))}; "
+                f"mech selfcheck {_fmt_bool_flag(current.get('mechanics_selfcheck'))}. "
+                f"{numerical_detail}"
+            ),
+            **numerical_focus,
         },
     ]
 
@@ -2358,7 +2434,10 @@ def save_base_payload(path: Path, payload: dict[str, Any]) -> Path:
 
 
 __all__ = [
+    "DESKTOP_INPUT_HANDOFF_IDS",
+    "DESKTOP_INPUT_SNAPSHOT_FILENAME",
     "DESKTOP_INPUT_SECTIONS",
+    "DESKTOP_INPUT_SNAPSHOT_SCHEMA_VERSION",
     "DesktopInputFieldSpec",
     "DesktopInputSection",
     "DESKTOP_PREVIEW_SURFACE_OPTIONS",
@@ -2400,8 +2479,8 @@ __all__ = [
     "desktop_field_section_map",
     "describe_desktop_run_mode",
     "field_spec_map",
-    "find_desktop_invented_input_keys",
     "find_desktop_field_matches",
+    "find_desktop_invented_input_keys",
     "flatten_field_specs",
     "list_desktop_profile_paths",
     "list_desktop_snapshot_paths",

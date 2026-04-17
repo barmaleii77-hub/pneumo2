@@ -737,18 +737,73 @@ function collectPerfRegistrySnapshot(){
   };
   return out;
 }
-function sendPerfSnapshotToPython(force=true){
+function collectBrowserPerfTracePayload(snapshot){
+  const snap = snapshot || collectPerfRegistrySnapshot();
+  const entries = [];
+  try {
+    const perf = window.performance;
+    if (perf && typeof perf.getEntries === 'function') {
+      const all = perf.getEntries();
+      all.slice(Math.max(0, all.length - 240)).forEach((it) => {
+        entries.push({
+          name: String(it.name || ''),
+          entryType: String(it.entryType || ''),
+          startTime: Number(it.startTime || 0),
+          duration: Number(it.duration || 0),
+          initiatorType: String(it.initiatorType || ''),
+        });
+      });
+    }
+  } catch(_e) {}
+  const components = snap.components || {};
+  const surfaces = Object.keys(components).sort();
+  const hiddenSurfaceCount = surfaces.filter((name) => {
+    const st = String((components[name] || {}).viewport_state || '');
+    return st === 'hidden' || st === 'offscreen' || st === 'zero_size' || st === 'css_hidden';
+  }).length;
+  const traceSessionId = `playhead-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return {
+    trace_session_id: traceSessionId,
+    surfaces,
+    idle_cpu_summary: {
+      component_count: Number((snap.summary || {}).component_count || surfaces.length),
+      hidden_surface_count: hiddenSurfaceCount,
+      total_wakeups: Number((snap.summary || {}).total_wakeups || 0),
+      max_idle_poll_ms: Number((snap.summary || {}).max_idle_poll_ms || 0),
+    },
+    trace: {
+      schema: 'playhead_browser_perf_trace.v1',
+      trace_session_id: traceSessionId,
+      captured_at: new Date().toISOString(),
+      dataset_id: String(datasetId || ''),
+      source_component: 'playhead_ctrl',
+      time_origin: Number((window.performance && window.performance.timeOrigin) || 0),
+      user_agent: String((navigator && navigator.userAgent) || ''),
+      snapshot_summary: snap.summary || {},
+      entries,
+    },
+  };
+}
+function sendPerfSnapshotToPython(force=true, options={}){
   try {
     const snap = collectPerfRegistrySnapshot();
     snap.source_component = "playhead_ctrl";
-    sendDataToPython({
+    const evt = {
       kind: "browser_perf_snapshot",
       dataset_id: String(datasetId || ""),
       source_component: "playhead_ctrl",
       snapshot: snap,
       ts: Date.now(),
       updated_utc: new Date().toISOString(),
-    });
+    };
+    if (options && options.includeTrace) {
+      const tracePayload = collectBrowserPerfTracePayload(snap);
+      evt.browser_perf_trace = tracePayload.trace;
+      evt.trace_session_id = tracePayload.trace_session_id;
+      evt.surfaces = tracePayload.surfaces;
+      evt.idle_cpu_summary = tracePayload.idle_cpu_summary;
+    }
+    sendDataToPython(evt);
   } catch(_e) {}
 }
 
@@ -778,7 +833,7 @@ if (btnPerfJson) btnPerfJson.addEventListener('click', () => {
   const snap = collectPerfRegistrySnapshot();
   const name = `browser_perf_${String(datasetId || 'dataset').replace(/[^A-Za-z0-9._-]+/g, '_')}.json`;
   __downloadJson(JSON.stringify(snap, null, 2), name);
-  sendPerfSnapshotToPython(true);
+  sendPerfSnapshotToPython(true, {includeTrace: true});
 });
 function tick(ts) {
   const nn = n();

@@ -93,6 +93,8 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.selected_run_var = tk.StringVar(master=self, value="Selected run: not available.")
         self.evidence_var = tk.StringVar(master=self, value="Evidence: not exported.")
         self.status_var = tk.StringVar(master=self, value="Engineering Analysis Center ready.")
+        self.candidate_ready_only_var = tk.BooleanVar(master=self, value=False)
+        self.candidate_filter_summary_var = tk.StringVar(master=self, value="HO-007 candidates: not loaded.")
 
         self._build_ui()
         self.refresh()
@@ -140,7 +142,19 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         artifact_box = ttk.LabelFrame(left_column, text="Study / artifacts", padding=8)
         artifact_box.grid(row=0, column=0, sticky="nsew")
         artifact_box.columnconfigure(0, weight=1)
-        artifact_box.rowconfigure(0, weight=1)
+        artifact_box.rowconfigure(1, weight=1)
+        candidate_filter_bar = ttk.Frame(artifact_box)
+        candidate_filter_bar.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        ttk.Checkbutton(
+            candidate_filter_bar,
+            text="READY only",
+            variable=self.candidate_ready_only_var,
+            command=self._refresh_candidate_filter,
+        ).pack(side="left")
+        ttk.Label(
+            candidate_filter_bar,
+            textvariable=self.candidate_filter_summary_var,
+        ).pack(side="left", padx=(10, 0))
         artifact_frame, self.artifact_tree = build_scrolled_treeview(
             artifact_box,
             columns=("status", "category", "path"),
@@ -155,7 +169,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.artifact_tree.column("status", width=110, anchor="w")
         self.artifact_tree.column("category", width=130, anchor="w")
         self.artifact_tree.column("path", width=380, anchor="w")
-        artifact_frame.grid(row=0, column=0, sticky="nsew")
+        artifact_frame.grid(row=1, column=0, sticky="nsew")
         self.artifact_tree.bind("<<TreeviewSelect>>", self._on_artifact_select)
         self.artifact_tree.bind("<Double-1>", lambda _event: self._open_selected())
 
@@ -326,9 +340,11 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             values=("", "ho007_candidates", ""),
             open=not bool(snapshot.run_dir),
         )
+        discovery_failed = False
         try:
             candidates = self.runtime.discover_selected_run_candidates(limit=25)
         except Exception as exc:
+            discovery_failed = True
             self.artifact_tree.insert(
                 candidate_root,
                 "end",
@@ -336,14 +352,33 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
                 values=("FAILED", "optimization_run", f"{type(exc).__name__}: {exc!s}"),
             )
             candidates = ()
-        if not candidates:
+        all_candidates = tuple(candidates)
+        ready_only = bool(self.candidate_ready_only_var.get())
+        filtered_candidates = tuple(
+            candidate
+            for candidate in all_candidates
+            if not ready_only or str(candidate.get("bridge_status") or "") == "READY"
+        )
+        ready_count = sum(
+            1
+            for candidate in all_candidates
+            if str(candidate.get("bridge_status") or "") == "READY"
+        )
+        self.candidate_filter_summary_var.set(
+            f"HO-007 candidates: shown={len(filtered_candidates)}/{len(all_candidates)} | ready={ready_count}"
+        )
+        self.artifact_tree.item(
+            candidate_root,
+            text=f"Optimization runs for HO-007 ({len(filtered_candidates)}/{len(all_candidates)})",
+        )
+        if not filtered_candidates and not discovery_failed:
             self.artifact_tree.insert(
                 candidate_root,
                 "end",
-                text="No optimization runs found",
+                text="No READY optimization runs found" if ready_only else "No optimization runs found",
                 values=("MISSING", "optimization_run", ""),
             )
-        for candidate in candidates:
+        for candidate in filtered_candidates:
             run_dir_text = str(candidate.get("run_dir") or "")
             bridge_status = str(candidate.get("bridge_status") or "UNKNOWN")
             status_label = str(candidate.get("status_label") or candidate.get("status") or "").strip()
@@ -393,6 +428,18 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             "handoff_requirements": self.runtime.selected_run_handoff_requirements(snapshot),
         }
         return json.dumps(payload, ensure_ascii=False, indent=2)
+
+    def _refresh_candidate_filter(self) -> None:
+        snapshot = self.snapshot_state
+        if snapshot is None:
+            self.refresh()
+            return
+        self._populate_snapshot(snapshot)
+        self.status_var.set(
+            "HO-007 candidate filter: READY only"
+            if bool(self.candidate_ready_only_var.get())
+            else "HO-007 candidate filter: all candidates"
+        )
 
     def _selected_tree_iid(self) -> str:
         selected = self.artifact_tree.selection()

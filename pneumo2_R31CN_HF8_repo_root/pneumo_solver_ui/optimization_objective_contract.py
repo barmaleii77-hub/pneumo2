@@ -13,6 +13,7 @@ Why this module exists:
 """
 
 from typing import Any, Mapping, Optional, Sequence
+import hashlib
 import json
 import math
 import re
@@ -175,6 +176,41 @@ def score_labels(
     return (normalize_penalty_key(penalty_key), *normalize_objective_keys(objective_keys))
 
 
+def objective_contract_identity_payload(
+    *,
+    objective_keys: Sequence[str] | None = None,
+    penalty_key: str | None = None,
+    penalty_tol: Any | None = None,
+) -> dict[str, Any]:
+    return {
+        'version': 'objective_contract_v1',
+        'penalty_key': normalize_penalty_key(penalty_key),
+        'penalty_tol': normalize_penalty_tol(penalty_tol),
+        'objective_keys': list(normalize_objective_keys(objective_keys)),
+        'score_labels': list(score_labels(objective_keys=objective_keys, penalty_key=penalty_key)),
+    }
+
+
+def objective_contract_hash(
+    *,
+    objective_keys: Sequence[str] | None = None,
+    penalty_key: str | None = None,
+    penalty_tol: Any | None = None,
+) -> str:
+    payload = objective_contract_identity_payload(
+        objective_keys=objective_keys,
+        penalty_key=penalty_key,
+        penalty_tol=penalty_tol,
+    )
+    raw = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(',', ':'),
+    ).encode('utf-8')
+    return hashlib.sha256(raw).hexdigest()
+
+
 def objective_contract_payload(
     *,
     objective_keys: Sequence[str] | None = None,
@@ -188,6 +224,11 @@ def objective_contract_payload(
         'penalty_key': normalize_penalty_key(penalty_key),
         'objective_keys': list(normalize_objective_keys(objective_keys)),
         'score_labels': list(score_labels(objective_keys=objective_keys, penalty_key=penalty_key)),
+        'objective_contract_hash': objective_contract_hash(
+            objective_keys=objective_keys,
+            penalty_key=penalty_key,
+            penalty_tol=penalty_tol,
+        ),
     }
     if penalty_tol is not None:
         payload['penalty_tol'] = normalize_penalty_tol(penalty_tol)
@@ -286,6 +327,8 @@ __all__ = [
     'normalize_objective_keys',
     'normalize_penalty_key',
     'normalize_penalty_tol',
+    'objective_contract_hash',
+    'objective_contract_identity_payload',
     'objective_contract_payload',
     'parse_saved_score_payload',
     'scalarize_score_tuple',

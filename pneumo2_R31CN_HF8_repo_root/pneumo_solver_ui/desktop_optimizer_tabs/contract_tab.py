@@ -176,6 +176,17 @@ class DesktopOptimizerContractTab(ttk.Frame):
                     str(getattr(snapshot, "baseline_source_label", "")) or "default_base.json only",
                 ),
                 (
+                    "HO-006 active baseline",
+                    (
+                        f"{str(getattr(snapshot, 'active_baseline_state', '') or 'missing')} / "
+                        f"{'current' if bool(getattr(snapshot, 'optimizer_baseline_can_consume', False)) else 'blocked'}"
+                    ),
+                ),
+                (
+                    "active_baseline_hash",
+                    str(getattr(snapshot, "active_baseline_hash", "") or "—")[:12],
+                ),
+                (
                     "Автообновление baseline",
                     "включено" if bool(self.controller.var("opt_autoupdate_baseline").get()) else "выключено",
                 ),
@@ -209,6 +220,10 @@ class DesktopOptimizerContractTab(ttk.Frame):
                 (
                     "Scoped baseline",
                     str(getattr(snapshot, "baseline_path", "") or "not found"),
+                ),
+                (
+                    "HO-006 contract",
+                    str(getattr(snapshot, "active_baseline_contract_path", "") or "not found"),
                 ),
             ]
         )

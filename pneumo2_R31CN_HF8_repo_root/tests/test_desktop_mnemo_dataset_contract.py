@@ -176,6 +176,16 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
     assert len(dataset.edge_series) == 3
     assert dataset.edge_series[0]["open"] == [1, 1, 0]
     assert [item["name"] for item in dataset.node_series] == dataset.node_names
+    assert dataset.dataset_contract["schema_version"] == "desktop_mnemo_dataset_contract_v1"
+    assert dataset.dataset_contract["overall_truth_state"] in {
+        "solver_confirmed",
+        "approximate_inferred_with_warning",
+    }
+    marker_states = {item["surface"]: item["state"] for item in dataset.availability["source_markers"]}
+    assert marker_states["flow"] == "solver_confirmed"
+    assert marker_states["pressure"] == "solver_confirmed"
+    assert marker_states["state"] == "solver_confirmed"
+    assert marker_states["scheme_mapping"] == "source_data_confirmed"
 
     narrative = _build_frame_narrative(
         dataset,
@@ -210,6 +220,8 @@ def test_prepare_dataset_builds_semantic_mnemo_from_minimal_npz(tmp_path: Path) 
         selected_node="узел_после_рег_Pmid",
     )
     assert diagnostics["scheme_fidelity"]["canonical_nodes_positioned"] == 46
+    assert diagnostics["window_layout_contract"]["schema_version"] == "desktop_mnemo_window_layout_contract_v1"
+    assert diagnostics["window_layout_contract"]["available"] is False
     assert any(item["canonical_kind"] == "check" for item in diagnostics["components"])
     assert any(item["camozzi_code"] == "VNR-238-3/8" for item in diagnostics["components"])
     assert any(item["icon_key"] == "check" for item in diagnostics["components"])
@@ -774,6 +786,8 @@ def test_mnemo_event_tracker_latches_warn_and_mode_switches(tmp_path: Path) -> N
     assert payload["acknowledged_latch_count"] >= 1
     assert "Большой перепад давлений" in payload["acknowledged_titles"]
     assert payload["current_mode"] == "Регуляторный коридор"
+    assert payload["window_layout_contract"]["schema_version"] == "desktop_mnemo_window_layout_contract_v1"
+    assert payload["window_layout_contract"]["available"] is False
     written = _write_event_log_sidecar(
         dataset,
         tracker,
@@ -786,6 +800,7 @@ def test_mnemo_event_tracker_latches_warn_and_mode_switches(tmp_path: Path) -> N
     assert written == sidecar_path
     saved = json.loads(sidecar_path.read_text(encoding="utf-8"))
     assert saved["npz_path"] == str(dataset.npz_path)
+    assert saved["window_layout_contract"]["schema_version"] == "desktop_mnemo_window_layout_contract_v1"
     assert saved["acknowledged_latch_count"] >= 1
     assert any(event["title"] == "ACK latched-событий" for event in saved["events"])
 
@@ -1171,3 +1186,63 @@ def test_edge_direction_meta_distinguishes_passport_and_live_flow() -> None:
     assert operator_checklist["operator_checklist_rows"][0]["is_focus"] is True
     assert operator_checklist["operator_checklist_rows"][0]["tone"] == "info"
     assert "ΔP сразу после команды" in operator_checklist["operator_checklist_summary"]
+
+
+def test_dataset_contract_surfaces_unavailable_pressure_state_and_provenance(tmp_path: Path) -> None:
+    pytest.importorskip("PySide6")
+
+    from pneumo_solver_ui.desktop_mnemo.app import (
+        _build_frame_alert_payload,
+        _build_mnemo_diagnostics_payload,
+        prepare_dataset,
+    )
+
+    t = np.array([0.0, 0.5, 1.0], dtype=float)
+    npz_path = tmp_path / "mnemo_unavailable_bundle.npz"
+    edge_name = "регулятор_до_себя_Pmid_сброс"
+    np.savez(
+        npz_path,
+        main_cols=np.array(["время_с"], dtype=object),
+        main_values=np.column_stack([t]).astype(float),
+        q_cols=np.array(["время_с", edge_name], dtype=object),
+        q_values=np.column_stack([t, np.array([0.0010, 0.0012, 0.0013], dtype=float)]).astype(float),
+        meta_json=np.array(json.dumps({"P_ATM": 101325.0}, ensure_ascii=False), dtype=object),
+    )
+
+    dataset = prepare_dataset(npz_path)
+
+    assert dataset.dataset_contract["schema_version"] == "desktop_mnemo_dataset_contract_v1"
+    assert dataset.dataset_contract["overall_truth_state"] == "approximate_inferred_with_warning"
+    assert dataset.provenance["schema_version"] == "desktop_mnemo_dataset_provenance_v1"
+    assert dataset.provenance["source_files"]["npz"]["available"] is True
+    assert dataset.provenance["source_files"]["npz"]["sha256"]
+    assert dataset.provenance["runtime_tables"]["q_values"]["available"] is True
+    assert dataset.provenance["runtime_tables"]["p_values"]["available"] is False
+    assert dataset.provenance["runtime_tables"]["open_values"]["available"] is False
+
+    markers = {item["surface"]: item for item in dataset.availability["source_markers"]}
+    assert markers["flow"]["state"] == "solver_confirmed"
+    assert markers["pressure"]["state"] == "unavailable"
+    assert markers["pressure"]["missing"] == ["p_values"]
+    assert markers["state"]["state"] == "unavailable"
+    assert markers["state"]["missing"] == ["open_values"]
+    assert markers["scheme_mapping"]["state"] == "source_data_confirmed"
+    assert markers["cylinder_snapshot"]["state"] == "unavailable"
+    assert "stroke_channels" in markers["cylinder_snapshot"]["missing"]
+    assert {"pressure", "state", "cylinder_snapshot"}.issubset(set(dataset.availability["unavailable_surfaces"]))
+
+    diagnostics = _build_mnemo_diagnostics_payload(
+        dataset,
+        1,
+        selected_edge=edge_name,
+        selected_node="",
+    )
+    assert diagnostics["dataset_contract"]["schema_version"] == "desktop_mnemo_dataset_contract_v1"
+    assert diagnostics["provenance"]["source_files"]["npz"]["path"].endswith("mnemo_unavailable_bundle.npz")
+    assert diagnostics["overall_truth_state"] == "approximate_inferred_with_warning"
+    assert "pressure" in diagnostics["unavailable_surfaces"]
+    assert any(item["surface"] == "state" and item["state"] == "unavailable" for item in diagnostics["source_markers"])
+
+    alerts = _build_frame_alert_payload(dataset, 1, selected_edge=edge_name, selected_node="")
+    assert alerts["overall_truth_state"] == "approximate_inferred_with_warning"
+    assert "pressure" in alerts["unavailable_surfaces"]

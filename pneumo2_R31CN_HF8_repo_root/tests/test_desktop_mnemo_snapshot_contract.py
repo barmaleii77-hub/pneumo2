@@ -23,6 +23,10 @@ def test_desktop_mnemo_window_exposes_snapshot_dock() -> None:
     assert "self.snapshot_panel.update_frame(" in src
     assert "flow_display_mode=self.flow_display_mode," in src
     assert "pressure_display_mode=self.pressure_display_mode," in src
+    assert "P only (geometry unavailable)" in src
+    assert "Cylinder snapshot unavailable: отображается pressure-only без тихого volume fallback." in src
+    assert "<b>Truth:</b>" in src
+    assert "<b>Unavailable:</b>" in src
     assert "Шток: выберите полость/угол" in src
 
 
@@ -159,6 +163,14 @@ def test_desktop_mnemo_snapshot_uses_cylinder_geometry_and_stroke_channels(tmp_p
         selected_edge="РґСЂРѕСЃСЃРµР»СЊ_РІС‹С…Р»РѕРї_Pmid",
         selected_node="Р¦1_Р›Рџ_Р‘Рџ",
     )
+    assert diag_payload["dataset_contract"]["schema_version"] == "desktop_mnemo_dataset_contract_v1"
+    assert diag_payload["window_layout_contract"]["schema_version"] == "desktop_mnemo_window_layout_contract_v1"
+    assert diag_payload["provenance"]["source_files"]["scheme_json"]["sha256"]
+    assert diag_payload["availability"]["source_markers"]
+    assert diag_payload["overall_truth_state"] in {
+        "solver_confirmed",
+        "approximate_inferred_with_warning",
+    }
 
     lp_c1 = next(item for item in cylinder_rows if item.corner == "ЛП" and item.cyl_index == 1)
     assert lp_c1.geometry_ready is True

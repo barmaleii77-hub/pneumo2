@@ -47,6 +47,7 @@ class DesktopRunSetupCenter:
         self.launch_action_hint_var = tk.StringVar()
         self.launch_with_check_button: ttk.Button | None = None
         self.launch_plain_button: ttk.Button | None = None
+        self.suite_tree: ttk.Treeview | None = None
 
         self._build_ui()
         self._bind_live_refreshes()
@@ -787,9 +788,14 @@ class DesktopRunSetupCenter:
         ).grid(row=2, column=0, sticky="ew", pady=(8, 0))
         ttk.Button(
             quick_box,
+            text="Набор испытаний / HO-005",
+            command=lambda: self._select_section("suite"),
+        ).grid(row=3, column=0, sticky="ew", pady=(8, 0))
+        ttk.Button(
+            quick_box,
             text="Обновить сводки",
             command=self._refresh_runtime_summaries,
-        ).grid(row=3, column=0, sticky="ew", pady=(8, 0))
+        ).grid(row=4, column=0, sticky="ew", pady=(8, 0))
         quick_box.columnconfigure(0, weight=1)
 
         hint_box = ttk.LabelFrame(sidebar, text="Подсказка запуска", padding=8)
@@ -810,6 +816,7 @@ class DesktopRunSetupCenter:
         self._build_preview_tab()
         self._build_run_tab()
         self._build_policy_tab()
+        self._build_suite_tab()
         self._build_launch_tab()
         self._build_artifacts_tab()
         self._populate_section_tree()
@@ -844,6 +851,7 @@ class DesktopRunSetupCenter:
             "preview": "Предпросмотр дороги",
             "run": "Режим расчёта",
             "policy": "Политики и выгрузка",
+            "suite": "Набор испытаний / HO-005",
             "launch": "Запуск",
             "artifacts": "Результаты и журналы",
         }
@@ -1256,6 +1264,92 @@ class DesktopRunSetupCenter:
             foreground="#555555",
         ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
 
+    def _build_suite_tab(self) -> None:
+        body = self._create_tab("suite", "Набор испытаний / HO-005")
+        body.rowconfigure(1, weight=1)
+
+        status_frame = ttk.LabelFrame(body, text="validated_suite_snapshot / suite_snapshot_hash", padding=10)
+        status_frame.grid(row=0, column=0, sticky="ew")
+        status_frame.columnconfigure(0, weight=1)
+        ttk.Label(
+            status_frame,
+            textvariable=self.editor.suite_handoff_var,
+            wraplength=880,
+            justify="left",
+            foreground="#334455",
+        ).grid(row=0, column=0, sticky="w")
+
+        matrix_frame = ttk.LabelFrame(body, text="Preview матрицы испытаний", padding=10)
+        matrix_frame.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+        matrix_frame.columnconfigure(0, weight=1)
+        matrix_frame.rowconfigure(0, weight=1)
+        columns = ("enabled", "name", "stage", "type", "dt", "t_end", "refs")
+        self.suite_tree = ttk.Treeview(matrix_frame, columns=columns, show="headings", height=10)
+        headings = {
+            "enabled": "enabled",
+            "name": "имя",
+            "stage": "стадия",
+            "type": "тип",
+            "dt": "dt",
+            "t_end": "t_end",
+            "refs": "refs / validation",
+        }
+        widths = {
+            "enabled": 80,
+            "name": 190,
+            "stage": 80,
+            "type": 150,
+            "dt": 90,
+            "t_end": 90,
+            "refs": 260,
+        }
+        for column in columns:
+            self.suite_tree.heading(column, text=headings[column])
+            self.suite_tree.column(column, width=widths[column], stretch=(column in {"name", "refs"}))
+        yscroll = ttk.Scrollbar(matrix_frame, orient="vertical", command=self.suite_tree.yview)
+        self.suite_tree.configure(yscrollcommand=yscroll.set)
+        self.suite_tree.grid(row=0, column=0, sticky="nsew")
+        yscroll.grid(row=0, column=1, sticky="ns")
+
+        command_frame = ttk.LabelFrame(body, text="Команды HO-005", padding=10)
+        command_frame.grid(row=2, column=0, sticky="ew", pady=(12, 0))
+        ttk.Button(
+            command_frame,
+            text="Проверить набор",
+            command=self._refresh_suite_preview_table,
+        ).grid(row=0, column=0, sticky="w")
+        ttk.Button(
+            command_frame,
+            text="Заморозить HO-005",
+            command=self._freeze_suite_handoff,
+        ).grid(row=0, column=1, sticky="w", padx=(12, 0))
+        ttk.Button(
+            command_frame,
+            text="Открыть validated_suite_snapshot.json",
+            command=self.editor._open_suite_handoff_snapshot,
+        ).grid(row=0, column=2, sticky="w", padx=(12, 0))
+        ttk.Button(
+            command_frame,
+            text="Открыть папку handoff",
+            command=self.editor._open_suite_handoff_dir,
+        ).grid(row=0, column=3, sticky="w", padx=(12, 0))
+        ttk.Button(
+            command_frame,
+            text="Сбросить overrides",
+            command=self._reset_suite_overrides,
+        ).grid(row=0, column=4, sticky="w", padx=(12, 0))
+        ttk.Label(
+            command_frame,
+            text=(
+                "Refs из WS-RING и WS-INPUTS здесь только читаются: road_csv, axay_csv, "
+                "scenario_json, inputs_snapshot и ring_source_hash не редактируются в WS-SUITE."
+            ),
+            wraplength=880,
+            justify="left",
+            foreground="#555555",
+        ).grid(row=1, column=0, columnspan=5, sticky="w", pady=(10, 0))
+        self._refresh_suite_preview_table()
+
     def _build_launch_tab(self) -> None:
         body = self._create_tab("launch", "Запуск")
         summary_frame = ttk.LabelFrame(body, text="Что будет запущено", padding=10)
@@ -1546,10 +1640,28 @@ class DesktopRunSetupCenter:
             on_success=_after_check,
         )
 
+    def _refresh_suite_preview_table(self) -> None:
+        context = self.editor._refresh_suite_handoff_state()
+        if self.suite_tree is None:
+            return
+        for item in self.suite_tree.get_children():
+            self.suite_tree.delete(item)
+        for idx, row in enumerate(self.editor._suite_preview_rows(context)):
+            self.suite_tree.insert("", "end", iid=f"suite_row_{idx}", values=row)
+
+    def _freeze_suite_handoff(self) -> None:
+        self.editor._freeze_suite_handoff_snapshot()
+        self._refresh_suite_preview_table()
+
+    def _reset_suite_overrides(self) -> None:
+        self.editor._reset_suite_overrides()
+        self._refresh_suite_preview_table()
+
     def _refresh_runtime_summaries(self) -> None:
         self.editor._refresh_latest_preview_summary()
         self.editor._refresh_latest_selfcheck_summary()
         self.editor._refresh_latest_run_summary()
+        self._refresh_suite_preview_table()
         self._refresh_launch_action_hint()
 
 
