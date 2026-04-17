@@ -537,6 +537,9 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "engineering_analysis_ready_candidate_count" in center_src
     assert "latest_engineering_analysis_evidence_manifest_json" in runtime_src
     assert "selected_run_ready_candidate_count" in runtime_src
+    assert 'text="Открыть Analysis JSON"' in center_src
+    assert "self.btn_open_analysis_evidence" in center_src
+    assert "def _open_analysis_evidence(self) -> None:" in center_src
     assert 'text="Открыть Engineering JSON"' in center_src
     assert "self.btn_open_engineering_analysis_evidence" in center_src
     assert "def _open_engineering_analysis_evidence(self) -> None:" in center_src

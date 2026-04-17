@@ -404,6 +404,13 @@ class DesktopDiagnosticsCenter:
         ttk.Button(top, text="Собрать пакет сейчас", command=lambda: self._start_bundle_build(auto_copy_on_ready=False)).pack(side="left", padx=(8, 0))
         self.btn_open_latest_zip = ttk.Button(top, text="📂 Открыть ZIP", command=self._open_latest_bundle, state="disabled")
         self.btn_open_latest_zip.pack(side="left", padx=(8, 0))
+        self.btn_open_analysis_evidence = ttk.Button(
+            top,
+            text="Открыть Analysis JSON",
+            command=self._open_analysis_evidence,
+            state="disabled",
+        )
+        self.btn_open_analysis_evidence.pack(side="left", padx=(8, 0))
         self.btn_open_geometry_reference_evidence = ttk.Button(
             top,
             text="Открыть Geometry JSON",
@@ -963,6 +970,14 @@ class DesktopDiagnosticsCenter:
             return
         _open_in_explorer(Path(bundle.latest_zip_path).expanduser().resolve().parent)
 
+    def _open_analysis_evidence(self) -> None:
+        bundle = load_desktop_diagnostics_bundle_record(self.repo_root, out_dir=self._active_bundle_out_dir())
+        if not bundle.latest_analysis_evidence_manifest_path:
+            return
+        path = Path(bundle.latest_analysis_evidence_manifest_path).expanduser().resolve()
+        if path.exists():
+            _open_in_explorer(path)
+
     def _open_geometry_reference_evidence(self) -> None:
         bundle = load_desktop_diagnostics_bundle_record(self.repo_root, out_dir=self._active_bundle_out_dir())
         if not bundle.latest_geometry_reference_evidence_path:
@@ -1329,6 +1344,9 @@ class DesktopDiagnosticsCenter:
         self.zip_path = self._last_zip
         self.btn_open.configure(state="normal" if (self._last_zip or self._last_run_dir) else "disabled")
         self.btn_open_latest_zip.configure(state="normal" if bundle.latest_zip_path else "disabled")
+        self.btn_open_analysis_evidence.configure(
+            state="normal" if bundle.latest_analysis_evidence_manifest_path else "disabled"
+        )
         self.btn_open_geometry_reference_evidence.configure(
             state="normal" if bundle.latest_geometry_reference_evidence_path else "disabled"
         )
