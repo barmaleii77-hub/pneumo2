@@ -691,6 +691,10 @@ def test_v32_14_v32_09_producer_animator_truth_note_records_contract_acceptance_
     assert "pneumo_solver_ui/tools/validate_anim_export_contract.py" in text
     assert "tests/test_gui_spec_docs_contract.py" in text
     assert "outside producer truth closure" in text
+    assert "Post-main-merge verification snapshot" in text
+    assert "After merging `origin/main` into `codex/work`" in text
+    assert "combined producer/docs contract suite" in text
+    assert "135 passed" in text
     assert "not a durable release SEND bundle" in text
     assert "complete cylinder packaging passport" in text
 

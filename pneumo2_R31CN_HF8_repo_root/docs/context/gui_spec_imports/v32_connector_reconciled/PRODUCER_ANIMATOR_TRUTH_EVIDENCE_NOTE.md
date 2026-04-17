@@ -106,6 +106,16 @@ Scoped PR / handoff inventory:
   workspace-page scope, not as part of `solver_points` / `hardpoints` /
   packaging / geometry acceptance truth.
 
+Post-main-merge verification snapshot:
+
+- After merging `origin/main` into `codex/work` at `a81d5b3`, the producer
+  compile gate and combined producer/docs contract suite were re-run on the
+  merged tree.
+- The post-merge suite includes `tests/test_gui_spec_docs_contract.py` together
+  with the combined producer verification tests listed above.
+
+Result: `135 passed`.
+
 Non-claims:
 
 - `OG-001` stays open until a named release bundle contains full
