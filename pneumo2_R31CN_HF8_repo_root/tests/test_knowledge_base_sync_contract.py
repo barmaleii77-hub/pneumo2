@@ -59,6 +59,11 @@ def test_chat_knowledge_base_store_exists_and_is_seeded() -> None:
     )
     assert any(
         item["artifact_path"]
+        == "context/gui_spec_imports/v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md"
+        for item in data["plans"]
+    )
+    assert any(
+        item["artifact_path"]
         == "context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md"
         for item in data["plans"]
     )

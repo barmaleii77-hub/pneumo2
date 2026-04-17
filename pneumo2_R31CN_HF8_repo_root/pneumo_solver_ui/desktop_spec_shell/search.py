@@ -44,7 +44,6 @@ def build_search_entries(
             for alias in (
                 *command.search_aliases,
                 *command.web_aliases,
-                *workspace.search_aliases,
             )
             if _normalize(alias)
         )

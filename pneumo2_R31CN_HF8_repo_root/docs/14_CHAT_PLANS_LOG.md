@@ -211,6 +211,13 @@ ID: `PLAN-0027`.
 Источник: chat + V32-14/V32-09 producer animator truth.
 ID: `PLAN-0028`.
 
+29. V32-06/V32-08 compare objective integrity contract acceptance
+Назначение: Accept compare/objective integrity contracts for PB-007, PB-008, RGH-013, RGH-014 and RGH-015 with objective persistence, resume mismatch, run-history provenance, compare contract and stale/current banner tests; this is contract/provenance acceptance, not runtime gap closure.
+Артефакт: [context/gui_spec_imports/v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md)
+Статус: актуален.
+Источник: chat + V32-06/V32-08 compare objective integrity.
+ID: `PLAN-0029`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:
