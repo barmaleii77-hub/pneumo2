@@ -691,6 +691,7 @@ def test_v32_06_v32_08_compare_objective_note_records_contract_acceptance_withou
     assert "`RGH-015`" in text
     assert "Optimization objective contracts persist selected objective stacks" in text
     assert "Resume/staged-resume paths reject or warn" in text
+    assert "Desktop Optimizer Center formats stale `HO-006` active-baseline handoff" in text
     assert "Run history surfaces current/historical/stale objective state" in text
     assert "Compare sessions carry explicit compare contracts" in text
     assert "tests/test_qt_compare_viewer_compare_contract.py" in text
@@ -703,6 +704,8 @@ def test_v32_06_v32_08_compare_objective_note_records_contract_acceptance_withou
     assert "tests/test_optimization_resume_run_dir.py" in text
     assert "tests/test_optimization_staged_resume_run_dir.py" in text
     assert "41 passed" in text
+    assert "tests/test_desktop_optimizer_center_contract.py" in text
+    assert "23 passed" in text
     assert "does not close `OG-003`, `OG-004`, `OG-005`" in text
 
 
@@ -796,6 +799,8 @@ def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_releas
     assert "geometry/geometry_reference_evidence.json" in text
     assert "latest_geometry_reference_evidence.json" in text
     assert "producer_artifact_status=missing" in text
+    assert "producer_readiness_reasons" in text
+    assert "packaging_mismatch_not_match" in text
     assert "producer_evidence_owner=producer_export" in text
     assert "producer_next_action" in text
     assert "consumer_may_fabricate_geometry=false" in text
@@ -824,6 +829,11 @@ def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_releas
     assert "45 passed" in text
     assert "87 passed" in text
     assert "Runtime validation result: `validation ok`" in text
+    assert "Final standalone audit result" in text
+    assert "OK errors=0 warnings=9 zip_entries=310 manifest_checked=286" in text
+    assert "`OK=False` because optional/adjacent evidence remains warning-only" in text
+    assert "embedded/final validation sidecar remains `ok=True`, `errors=0`" in text
+    assert "`warnings=7`; the two additional standalone warnings are audit-surface" in text
     assert "does not alter solver, optimizer, animator, geometry, or domain calculations" in text
 
 

@@ -241,6 +241,7 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert overview["send_bundle_validation"].status == "WARN"
     assert "warnings=2" in overview["send_bundle_validation"].detail
     assert overview["send_bundle_validation"].action_key == "open_artifact"
+    assert overview["selected_result_context"].status == "CURRENT"
     assert overview["selected_result_context"].action_key == "export_diagnostics_evidence"
     assert overview["triage_report"].status == "CRITICAL"
     assert "critical=1" in overview["triage_report"].detail
@@ -261,6 +262,12 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert snapshot.latest_capture_export_manifest_status == "READY"
     assert snapshot.latest_capture_export_manifest_handoff_id == "HO-010"
     assert snapshot.latest_capture_hash == "capture-hash-010"
+    assert snapshot.result_context_state == "CURRENT"
+    context_fields = {field.key: field for field in snapshot.result_context_fields}
+    assert context_fields["analysis_context_hash"].current_value == "analysis-context-hash-010"
+    assert context_fields["analysis_context_hash"].selected_value == "analysis-context-hash-010"
+    assert context_fields["selected_npz_path"].current_value == str(latest_npz)
+    assert context_fields["selected_npz_path"].selected_value == str(latest_npz)
     assert snapshot.latest_mnemo_event_log_path == latest_event_log.resolve()
     assert snapshot.latest_autotest_run_dir == autotest_run.resolve()
     assert snapshot.latest_diagnostics_run_dir == diagnostics_run.resolve()
@@ -392,6 +399,14 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert "критичных=1" in format_triage_summary(snapshot)
     assert "anim_latest.npz" in format_npz_summary(snapshot)
     assert format_result_context_summary(snapshot).startswith("Контекст результата:")
+
+    manifest_payload = runtime.build_diagnostics_evidence_manifest(snapshot)
+    assert manifest_payload["result_context"]["state"] == "CURRENT"
+    assert manifest_payload["mismatch_summary"]["state"] == "CURRENT"
+    assert manifest_payload["result_context"]["current"]["analysis_context_hash"] == "analysis-context-hash-010"
+    assert manifest_payload["result_context"]["selected"]["analysis_context_hash"] == "analysis-context-hash-010"
+    assert manifest_payload["result_context"]["current"]["selected_npz_path"] == str(latest_npz)
+    assert manifest_payload["result_context"]["selected"]["selected_npz_path"] == str(latest_npz)
 
 
 def test_desktop_results_runtime_surfaces_stale_selected_result_context(tmp_path: Path, monkeypatch) -> None:

@@ -28,8 +28,9 @@ Implemented proof:
   `artifact_freshness_status`, `artifact_freshness_relation`,
   `geometry_acceptance_gate`, `road_width_status`, `road_width_source`,
   `packaging_status`, `packaging_mismatch_status`,
-  `packaging_contract_hash`, component passport counts, and missing-evidence
-  explanations for Diagnostics/Send Bundle consumption.
+  `packaging_contract_hash`, `producer_artifact_status`,
+  `producer_readiness_reasons`, component passport counts, and
+  missing-evidence explanations for Diagnostics/Send Bundle consumption.
 - Desktop Diagnostics Center surfaces the Geometry Reference handoff in its
   evidence handoff status and can open `latest_geometry_reference_evidence.json`
   directly from the Evidence tab.
@@ -78,6 +79,7 @@ Runtime proof captured:
   `producer_artifact_status=missing`, `producer_evidence_owner=producer_export`,
   the required producer artifact list for `anim_latest`, packaging passport and
   geometry acceptance, `producer_next_action` for re-exporting producer evidence,
+  producer readiness reasons such as `packaging_mismatch_not_match`,
   `consumer_may_fabricate_geometry=false`,
   `artifact_freshness_status=missing`, `artifact_freshness_relation=latest`,
   `road_width_status=derived_from_track_and_wheel_width`,
@@ -121,6 +123,16 @@ HO-009 analysis evidence, non-ready Geometry Reference sub-evidence such as
 stale freshness, missing acceptance, missing `road_width_m` or partial
 packaging, and browser perf evidence. These warnings are expected non-claims
 for adjacent workstreams and are preserved in health/inspect output.
+
+Final standalone audit result: `validate_send_bundle` reports
+`OK errors=0 warnings=9 zip_entries=310 manifest_checked=286` for
+`send_bundles/latest_send_bundle.zip`. `inspect_send_bundle` reports
+`OK=False` because optional/adjacent evidence remains warning-only:
+HO-009 context state, Geometry Reference producer artifacts, geometry
+acceptance and browser perf evidence are still not closed by WS-DIAGNOSTICS.
+The embedded/final validation sidecar remains `ok=True`, `errors=0`,
+`warnings=7`; the two additional standalone warnings are audit-surface
+warnings, not missing PB-002 required bundle artifacts.
 
 Evidence artifacts exercised by tests:
 

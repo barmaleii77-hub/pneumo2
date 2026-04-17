@@ -854,6 +854,10 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "artifact_freshness_evidence" in tool_src
     assert "road_width_evidence" in tool_src
     assert "diagnostics_handoff_evidence" in tool_src
+    assert "def _producer_readiness_reasons(" in tool_src
+    assert "def _producer_readiness_text(" in tool_src
+    assert "producer_readiness_reasons=" in tool_src
+    assert "producer_artifact_status" in tool_src
     assert "write_diagnostics_handoff_evidence" in tool_src
     assert 'text="Сквозная совместимость компонентов по семействам"' in tool_src
     assert "self.component_fit_summary_var" in tool_src

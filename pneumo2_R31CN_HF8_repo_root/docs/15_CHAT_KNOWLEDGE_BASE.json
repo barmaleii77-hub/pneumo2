@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-17T03:40:31+00:00",
+  "updated_at": "2026-04-17T03:48:01+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -478,6 +478,15 @@
       "title": "Self-check silent warnings review",
       "details": "Review generated REPORTS/SELF_CHECK_SILENT_WARNINGS.json and .md as clean self-check snapshots with rc=0, fail_count=0 and warn_count=0; keep them as release-readiness report provenance only, not diagnostics/SEND runtime closure and not a replacement for V32-11 producer-owned warning handoffs.",
       "artifact_path": "context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0037",
+      "created_at": "2026-04-17T03:48:01+00:00",
+      "source": "chat + V32-11/V32-06 focused validation",
+      "title": "V32-11/V32-06 focused dirty subset validation",
+      "details": "Record focused validation for current diagnostics readiness-reason evidence and optimizer stale HO-006 blocked-summary coverage: diagnostics producer readiness reasons remain evidence-only and do not close SEND/runtime gaps; optimizer stale baseline formatting is V32-06 contract UI coverage, not optimizer runtime closure.",
+      "artifact_path": "context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md",
       "status": "актуален"
     }
   ]

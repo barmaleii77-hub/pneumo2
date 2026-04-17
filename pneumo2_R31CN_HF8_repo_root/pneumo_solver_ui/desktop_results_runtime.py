@@ -340,6 +340,7 @@ def _extract_result_context(
         _nested_mapping(validation_payload, "optimizer_scope", "current"),
     ):
         _merge_context(current, src)
+    _merge_context(current, anim_diag)
 
     for src in (
         _nested_mapping(result_context, "selected"),

@@ -267,6 +267,13 @@ ID: `PLAN-0035`.
 Источник: chat + V32-11/V32-16 self-check review.
 ID: `PLAN-0036`.
 
+37. V32-11/V32-06 focused dirty subset validation
+Назначение: Record focused validation for current diagnostics readiness-reason evidence and optimizer stale HO-006 blocked-summary coverage: diagnostics producer readiness reasons remain evidence-only and do not close SEND/runtime gaps; optimizer stale baseline formatting is V32-06 contract UI coverage, not optimizer runtime closure.
+Артефакт: [context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md](./context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
+Статус: актуален.
+Источник: chat + V32-11/V32-06 focused validation.
+ID: `PLAN-0037`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

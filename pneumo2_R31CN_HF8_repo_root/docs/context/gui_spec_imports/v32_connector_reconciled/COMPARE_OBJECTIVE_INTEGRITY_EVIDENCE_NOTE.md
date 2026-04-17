@@ -14,6 +14,8 @@ Accepted proof shape:
   gates, baseline policy and problem hashes into run directories.
 - Resume/staged-resume paths reject or warn on objective-contract mismatch
   instead of silently rebinding to the current UI context.
+- Desktop Optimizer Center formats stale `HO-006` active-baseline handoff as a
+  blocked summary, not as current consumable baseline state.
 - Run history surfaces current/historical/stale objective state with explicit
   contract hashes and mismatch reasons.
 - Compare sessions carry explicit compare contracts, selected source hashes and
@@ -43,6 +45,14 @@ python -m pytest tests/test_qt_compare_viewer_compare_contract.py tests/test_qt_
 ```
 
 Result: `72 passed`.
+
+Focused Desktop Optimizer Center stale-handoff verification:
+
+```powershell
+python -m pytest tests/test_desktop_optimizer_center_contract.py -q
+```
+
+Result: `23 passed`.
 
 Non-claims:
 

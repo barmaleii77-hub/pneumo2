@@ -888,6 +888,22 @@ class DesktopGeometryReferenceCenter:
     def _artifact_context(self):
         return self.runtime.artifact_context(artifact_path=self._artifact_path())
 
+    @staticmethod
+    def _producer_readiness_reasons(payload: dict[str, object]) -> tuple[str, ...]:
+        return tuple(
+            str(item).strip()
+            for item in (payload.get("producer_readiness_reasons") or ())
+            if str(item).strip()
+        )
+
+    def _producer_readiness_text(self, payload: dict[str, object]) -> str:
+        reasons = self._producer_readiness_reasons(payload)
+        reasons_text = ", ".join(reasons) if reasons else "none"
+        return (
+            f"producer_artifact_status={payload.get('producer_artifact_status') or 'missing'}; "
+            f"producer_readiness_reasons={reasons_text}"
+        )
+
     def _export_evidence_for_send(self) -> None:
         try:
             artifact = self._artifact_context()
@@ -902,17 +918,20 @@ class DesktopGeometryReferenceCenter:
             )
             payload = result["payload"]
             missing = tuple(str(item) for item in payload.get("evidence_missing") or ())
-            status = "READY" if not missing else "WARN"
+            producer_status = str(payload.get("producer_artifact_status") or "missing").strip().lower()
+            producer_reasons = self._producer_readiness_reasons(payload)
+            status = "READY" if not missing and producer_status == "ready" and not producer_reasons else "WARN"
             workspace_path = Path(result["workspace_path"])
             sidecar_path = Path(result["sidecar_path"])
             missing_text = ", ".join(missing) if missing else "none"
+            producer_text = self._producer_readiness_text(payload)
             self.evidence_export_summary_var.set(
                 "Diagnostics evidence export: "
                 f"{status}; gate={payload.get('geometry_acceptance_gate') or '—'}; "
                 f"freshness={freshness.get('status')}/{freshness.get('relation')}; "
                 f"road_width={payload.get('road_width_status') or '—'}; "
                 f"packaging={payload.get('packaging_status') or '—'}; "
-                f"workspace={workspace_path}; sidecar={sidecar_path}; missing={missing_text}."
+                f"{producer_text}; workspace={workspace_path}; sidecar={sidecar_path}; missing={missing_text}."
             )
             self.status_var.set(
                 "Geometry Reference evidence exported for Diagnostics/SEND: "
@@ -971,11 +990,16 @@ class DesktopGeometryReferenceCenter:
                 )
             )
         )
+        diagnostics_handoff = self.runtime.diagnostics_handoff_evidence(
+            self._base_path(),
+            artifact_context=artifact,
+        )
         self.artifact_summary_var.set(
             f"Runtime artifact: status={artifact.status}; updated={artifact.updated_utc or '—'}; "
             f"npz={artifact.npz_path or '—'}; packaging_passport="
             f"{'yes' if artifact.packaging_passport_exists else 'missing'}; "
-            f"geometry_acceptance_report={'yes' if artifact.geometry_acceptance_exists else 'missing'}."
+            f"geometry_acceptance_report={'yes' if artifact.geometry_acceptance_exists else 'missing'}; "
+            f"{self._producer_readiness_text(diagnostics_handoff)}."
         )
         freshness_issues = tuple(str(item) for item in freshness.get("issues") or ())
         self.artifact_freshness_var.set(
@@ -1590,7 +1614,8 @@ class DesktopGeometryReferenceCenter:
             f"cylinder packaging passport: {axis_only} of {len(package_rows)} families remain axis-only or inconsistent. "
             f"export/runtime={packaging_evidence.packaging_status or 'missing'} "
             f"({packaging_evidence.mismatch_status}), hash={packaging_evidence.packaging_contract_hash or '—'}. "
-            f"Diagnostics handoff evidence_missing={diagnostics_handoff.get('evidence_missing') or []}. "
+            f"Diagnostics handoff {self._producer_readiness_text(diagnostics_handoff)}; "
+            f"evidence_missing={diagnostics_handoff.get('evidence_missing') or []}. "
             "These passports are reference/evidence contracts; this workspace does not render animator meshes."
             + ((" Warnings: " + "; ".join(packaging_evidence.warnings)) if packaging_evidence.warnings else "")
         )
