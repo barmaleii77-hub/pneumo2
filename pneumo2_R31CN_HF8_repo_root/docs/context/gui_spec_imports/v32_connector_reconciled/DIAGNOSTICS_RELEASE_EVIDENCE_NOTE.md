@@ -51,7 +51,7 @@ python -m pytest tests/test_v32_diagnostics_send_bundle_evidence.py tests/test_h
 Result: `26 passed`. Focused Geometry/Diagnostics producer-handoff
 regression set: `45 passed`.
 
-Focused Geometry/Diagnostics regression result: `85 passed`.
+Focused Geometry/Diagnostics regression result: `87 passed`.
 
 Runtime proof captured:
 
@@ -62,6 +62,11 @@ Runtime proof captured:
 - Health after final triage: `ok=False`, `notes=9`, preserving adjacent-workstream warnings.
 - PB-002 required evidence: `pb002_missing_required_count=0`
 - Latest pointer/SHA proof: `latest_zip_matches_original=True`, `latest_sha_sidecar_matches=True`, `latest_pointer_matches_original=True`
+- Post-regression latest proof: after the `87 passed` focused Diagnostics run,
+  `latest_send_bundle.zip`, `latest_send_bundle_path.txt`,
+  `latest_send_bundle.sha256`, `latest_evidence_manifest.json` and
+  `latest_send_bundle_inspection.json` still point to the same final manual ZIP
+  and SHA256 above.
 - Embedded evidence stage: `final_after_validation_dashboard`; latest sidecar proof stage: `latest_zip_sha_inspection_proof`.
 - Latest inspection sidecars: `latest_send_bundle_inspection.json` points at `latest_send_bundle.zip`, carries matching `zip_sha256`, and reports health, validation, triage and evidence manifest present.
 - HO-009 analysis sidecar proof: `latest_analysis_evidence_manifest.json` is
