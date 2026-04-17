@@ -109,6 +109,16 @@ def _geometry_reference_evidence(*, gate: str = "PASS", missing: list[str] | Non
         "packaging_axis_only_cylinders": [],
         "geometry_acceptance_gate": gate,
         "geometry_acceptance_available": gate == "PASS",
+        "producer_artifact_status": "ready",
+        "producer_evidence_owner": "producer_export",
+        "producer_required_artifacts": [
+            "workspace/_pointers/anim_latest.json or workspace/exports/anim_latest.json",
+            "workspace/exports/anim_latest.npz",
+            "workspace/exports/CYLINDER_PACKAGING_PASSPORT.json",
+            "workspace/exports/geometry_acceptance_report.json",
+        ],
+        "producer_next_action": "No producer action required for this complete synthetic fixture.",
+        "consumer_may_fabricate_geometry": False,
         "component_passport_components": 3,
         "component_passport_needs_data": 0,
         "evidence_missing": missing_items,
@@ -521,12 +531,16 @@ def test_geometry_reference_evidence_handoff_reaches_manifest_validation_and_dia
     assert evidence["geometry_reference_handoff"]["artifact_freshness_relation"] == "matches_latest"
     assert evidence["geometry_reference_handoff"]["road_width_status"] == "explicit_meta"
     assert evidence["geometry_reference_handoff"]["packaging_contract_hash"] == "packaging-hash"
+    assert evidence["geometry_reference_handoff"]["producer_artifact_status"] == "ready"
+    assert evidence["geometry_reference_handoff"]["consumer_may_fabricate_geometry"] is False
     assert not any("Geometry reference" in msg for msg in evidence_manifest_warnings(evidence))
 
     summary = summarize_geometry_reference_evidence(payload, source_path=GEOMETRY_REFERENCE_EVIDENCE_ARCNAME)
     assert summary["status"] == "READY"
     assert summary["artifact_freshness_relation"] == "matches_latest"
     assert summary["geometry_acceptance_gate"] == "PASS"
+    assert summary["producer_artifact_status"] == "ready"
+    assert summary["producer_required_artifacts"][1] == "workspace/exports/anim_latest.npz"
 
     (out_dir / GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME).write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
@@ -538,6 +552,8 @@ def test_geometry_reference_evidence_handoff_reaches_manifest_validation_and_dia
     assert record.geometry_reference_artifact_freshness_relation == "matches_latest"
     assert record.geometry_reference_acceptance_gate == "PASS"
     assert record.geometry_reference_packaging_contract_hash == "packaging-hash"
+    assert record.geometry_reference_producer_artifact_status == "ready"
+    assert record.geometry_reference_consumer_may_fabricate_geometry is False
     assert record.latest_geometry_reference_evidence_path.endswith(GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME)
 
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -551,6 +567,7 @@ def test_geometry_reference_evidence_handoff_reaches_manifest_validation_and_dia
     validation = validate_send_bundle(zip_path)
     assert validation.report_json["geometry_reference_evidence"]["status"] == "READY"
     assert validation.report_json["geometry_reference_evidence"]["artifact_freshness_relation"] == "matches_latest"
+    assert validation.report_json["geometry_reference_evidence"]["producer_artifact_status"] == "ready"
 
 
 def test_send_bundle_includes_full_runtime_evidence_set_and_manifest_rows(

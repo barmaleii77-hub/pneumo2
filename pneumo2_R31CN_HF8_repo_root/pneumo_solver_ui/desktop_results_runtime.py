@@ -613,6 +613,35 @@ class DesktopResultsRuntime:
         anim_diag = dict(collect_anim_latest_diagnostics_summary(include_meta=True) or {})
         latest_npz_path = _existing_path(anim_diag.get("anim_latest_npz_path"))
         latest_pointer_json_path = _existing_path(anim_diag.get("anim_latest_pointer_json"))
+        latest_capture_export_manifest_path = _existing_path(
+            anim_diag.get("anim_latest_capture_export_manifest_path")
+        )
+        capture_export_manifest_handoff_id = str(
+            anim_diag.get("anim_latest_capture_export_manifest_handoff_id") or ""
+        )
+        capture_hash = str(anim_diag.get("anim_latest_capture_hash") or "")
+        capture_blocking_states = tuple(
+            str(item)
+            for item in (anim_diag.get("anim_latest_capture_export_manifest_blocking_states") or [])
+            if str(item).strip()
+        )
+        capture_truth_state = str(
+            anim_diag.get("anim_latest_capture_export_manifest_truth_state") or ""
+        )
+        capture_analysis_context_status = str(
+            anim_diag.get("anim_latest_analysis_context_status") or ""
+        )
+        if latest_capture_export_manifest_path is None:
+            capture_manifest_status = "MISSING"
+        elif capture_blocking_states:
+            capture_manifest_status = "BLOCKED"
+        elif (
+            capture_export_manifest_handoff_id
+            and capture_export_manifest_handoff_id != "HO-010"
+        ):
+            capture_manifest_status = "WARN"
+        else:
+            capture_manifest_status = "READY"
         latest_mnemo_event_log_path = _existing_path(
             anim_diag.get("anim_latest_mnemo_event_log_path")
         )
@@ -648,6 +677,14 @@ class DesktopResultsRuntime:
         _append_artifact(items, key="anim_diag_json", title="Диагностика визуализации в JSON", category="anim_latest", path=anim_diag_json_path)
         _append_artifact(items, key="latest_npz", title="Последний NPZ анимации", category="results", path=latest_npz_path)
         _append_artifact(items, key="latest_pointer", title="Последний указатель анимации", category="results", path=latest_pointer_json_path)
+        _append_artifact(
+            items,
+            key="capture_export_manifest",
+            title="HO-010 capture/export manifest",
+            category="evidence",
+            path=latest_capture_export_manifest_path,
+            detail="HO-010 WS-ANIMATOR capture/export lineage",
+        )
         _append_artifact(items, key="mnemo_event_log", title="Журнал событий мнемосхемы", category="results", path=latest_mnemo_event_log_path)
         _append_artifact(items, key="autotest_run", title="Последний каталог автотеста", category="runs", path=latest_autotest_run_dir)
         _append_artifact(items, key="diagnostics_run", title="Последний каталог диагностики", category="runs", path=latest_diagnostics_run_dir)
@@ -805,6 +842,29 @@ class DesktopResultsRuntime:
                 artifact_key="latest_pointer",
             ),
             DesktopResultsOverviewRow(
+                key="capture_export_manifest",
+                title="HO-010 capture/export manifest",
+                status=capture_manifest_status,
+                detail=(
+                    f"handoff={capture_export_manifest_handoff_id or '—'} | "
+                    f"capture_hash={_short_text(capture_hash, limit=18) or '—'} | "
+                    f"analysis_context={capture_analysis_context_status or '—'} | "
+                    f"truth={capture_truth_state or '—'}"
+                ),
+                next_action=(
+                    "Открыть capture/export manifest"
+                    if latest_capture_export_manifest_path is not None
+                    else "Экспортировать выбранную анимацию из Animator"
+                ),
+                evidence_path=latest_capture_export_manifest_path,
+                action_key=(
+                    "open_artifact"
+                    if latest_capture_export_manifest_path is not None
+                    else "open_animator_follow"
+                ),
+                artifact_key="capture_export_manifest",
+            ),
+            DesktopResultsOverviewRow(
                 key="mnemo_event_log",
                 title="Журнал событий мнемосхемы",
                 status="READY" if latest_mnemo_event_log_path is not None else "MISSING",
@@ -899,6 +959,10 @@ class DesktopResultsRuntime:
             diagnostics_evidence_manifest_status=(
                 "READY" if diagnostics_evidence_manifest_path is not None else "MISSING"
             ),
+            latest_capture_export_manifest_path=latest_capture_export_manifest_path,
+            latest_capture_export_manifest_status=capture_manifest_status,
+            latest_capture_export_manifest_handoff_id=capture_export_manifest_handoff_id,
+            latest_capture_hash=capture_hash,
         )
 
     def artifact_by_key(
@@ -1073,6 +1137,7 @@ class DesktopResultsRuntime:
             ("anim_diag_json", "Диагностика анимации текущего прогона"),
             ("latest_npz", "NPZ текущего прогона"),
             ("latest_pointer", "Указатель аниматора текущего прогона"),
+            ("capture_export_manifest", "HO-010 manifest текущего прогона"),
             ("mnemo_event_log", "Журнал мнемосхемы текущего прогона"),
             ("compare_current_context_sidecar", "Compare handoff текущего прогона"),
         )
@@ -1294,6 +1359,9 @@ class DesktopResultsRuntime:
                 "diagnostics_evidence_manifest_path": str(
                     snapshot.diagnostics_evidence_manifest_path or ""
                 ),
+                "latest_capture_export_manifest_path": str(
+                    snapshot.latest_capture_export_manifest_path or ""
+                ),
             },
         }
         payload["current_context_ref_hash"] = _sha256_text(
@@ -1488,6 +1556,40 @@ class DesktopResultsRuntime:
                         lines.append(
                             "current_context_ref_hash="
                             + _short_text(obj.get("current_context_ref_hash"), limit=36)
+                        )
+                    return tuple(lines)
+
+                if artifact.key == "capture_export_manifest":
+                    analysis_refs = dict(obj.get("analysis_context_refs") or {})
+                    truth_summary = dict(obj.get("truth_summary") or {})
+                    blocking = [
+                        str(item)
+                        for item in (obj.get("blocking_states") or [])
+                        if str(item).strip()
+                    ]
+                    lines = [
+                        f"schema={obj.get('schema')}",
+                        f"handoff_id={obj.get('handoff_id')}",
+                        "capture_hash="
+                        + _short_text(obj.get("capture_hash"), limit=36),
+                        "analysis_context_status="
+                        + _short_text(
+                            obj.get("analysis_context_status")
+                            or analysis_refs.get("analysis_context_status")
+                            or "—"
+                        ),
+                        "truth_state="
+                        + _short_text(
+                            truth_summary.get("overall_truth_state")
+                            or obj.get("truth_state")
+                            or "—"
+                        ),
+                        f"blocking_states={len(blocking)}",
+                    ]
+                    if analysis_refs.get("selected_test_id"):
+                        lines.append(
+                            "selected_test_id="
+                            + _short_text(analysis_refs.get("selected_test_id"))
                         )
                     return tuple(lines)
 

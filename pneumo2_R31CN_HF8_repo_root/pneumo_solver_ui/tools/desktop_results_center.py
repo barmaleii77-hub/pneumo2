@@ -86,6 +86,7 @@ _STATUS_LABELS: dict[str, str] = {
     "WARN": "Предупреждение",
     "READY": "Готово",
     "MISSING": "Нет данных",
+    "BLOCKED": "Заблокировано",
     "CRITICAL": "Критично",
     "PARTIAL": "Частично",
     "INFO": "Справка",

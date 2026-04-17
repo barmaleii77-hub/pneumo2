@@ -150,10 +150,37 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
 
     latest_npz = repo_root / "workspace" / "exports" / "anim_latest.npz"
     latest_pointer = repo_root / "workspace" / "exports" / "anim_latest.json"
+    latest_capture_manifest = repo_root / "workspace" / "exports" / "capture_export_manifest.json"
     latest_event_log = repo_root / "workspace" / "exports" / "anim_latest.desktop_mnemo_events.json"
     latest_npz.parent.mkdir(parents=True, exist_ok=True)
     latest_npz.write_bytes(b"npz")
     latest_pointer.write_text("{}", encoding="utf-8")
+    latest_capture_manifest.write_text(
+        json.dumps(
+            {
+                "schema": "capture_export_manifest.v1",
+                "handoff_id": "HO-010",
+                "capture_hash": "capture-hash-010",
+                "analysis_context_hash": "analysis-context-hash-010",
+                "analysis_context_refs": {
+                    "analysis_context_status": "READY",
+                    "animator_link_contract_hash": "animator-link-010",
+                    "selected_run_contract_hash": "selected-run-010",
+                    "selected_test_id": "T03",
+                    "selected_npz_path": str(latest_npz),
+                    "objective_contract_hash": "objective-010",
+                    "suite_snapshot_hash": "suite-010",
+                    "problem_hash": "problem-010",
+                },
+                "truth_mode_hash": "truth-mode-010",
+                "truth_summary": {"overall_truth_state": "READY"},
+                "blocking_states": [],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     latest_event_log.write_text("{}", encoding="utf-8")
 
     monkeypatch.setattr(
@@ -161,6 +188,21 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
         lambda include_meta=True: {
             "anim_latest_npz_path": str(latest_npz),
             "anim_latest_pointer_json": str(latest_pointer),
+            "anim_latest_capture_export_manifest_path": str(latest_capture_manifest),
+            "anim_latest_capture_export_manifest_handoff_id": "HO-010",
+            "anim_latest_capture_hash": "capture-hash-010",
+            "anim_latest_analysis_context_hash": "analysis-context-hash-010",
+            "anim_latest_analysis_context_status": "READY",
+            "anim_latest_animator_link_contract_hash": "animator-link-010",
+            "anim_latest_selected_run_contract_hash": "selected-run-010",
+            "anim_latest_selected_test_id": "T03",
+            "anim_latest_selected_npz_path": str(latest_npz),
+            "anim_latest_objective_contract_hash": "objective-010",
+            "anim_latest_suite_snapshot_hash": "suite-010",
+            "anim_latest_problem_hash": "problem-010",
+            "anim_latest_truth_mode_hash": "truth-mode-010",
+            "anim_latest_capture_export_manifest_blocking_states": [],
+            "anim_latest_capture_export_manifest_truth_state": "READY",
             "anim_latest_mnemo_event_log_path": str(latest_event_log),
             "anim_latest_mnemo_event_log_current_mode": "Регуляторный коридор",
             "anim_latest_mnemo_event_log_recent_titles": ["Большой перепад давлений"],
@@ -207,10 +249,18 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert overview["anim_latest_results"].action_key == "open_compare_viewer"
     assert overview["animator_pointer"].status == "READY"
     assert overview["animator_pointer"].action_key == "open_animator_follow"
+    assert overview["capture_export_manifest"].status == "READY"
+    assert overview["capture_export_manifest"].action_key == "open_artifact"
+    assert overview["capture_export_manifest"].artifact_key == "capture_export_manifest"
+    assert "capture-hash-010" in overview["capture_export_manifest"].detail
     assert overview["bundle_sidecars"].status == "READY"
     assert overview["bundle_sidecars"].action_key == "open_send_center"
     assert snapshot.latest_npz_path == latest_npz.resolve()
     assert snapshot.latest_pointer_json_path == latest_pointer.resolve()
+    assert snapshot.latest_capture_export_manifest_path == latest_capture_manifest.resolve()
+    assert snapshot.latest_capture_export_manifest_status == "READY"
+    assert snapshot.latest_capture_export_manifest_handoff_id == "HO-010"
+    assert snapshot.latest_capture_hash == "capture-hash-010"
     assert snapshot.latest_mnemo_event_log_path == latest_event_log.resolve()
     assert snapshot.latest_autotest_run_dir == autotest_run.resolve()
     assert snapshot.latest_diagnostics_run_dir == diagnostics_run.resolve()
@@ -227,6 +277,7 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert "Последний ZIP пакета отправки" in titles
     assert "Проверка в Markdown" in titles
     assert "Последний NPZ анимации" in titles
+    assert "HO-010 capture/export manifest" in titles
     assert "Журнал событий мнемосхемы" in titles
 
     validation_artifact = next(
@@ -239,6 +290,13 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     overview_artifact = runtime.overview_evidence_artifact(snapshot, overview["animator_pointer"])
     assert overview_artifact is not None
     assert overview_artifact.key == "latest_pointer"
+    capture_artifact = runtime.overview_evidence_artifact(snapshot, overview["capture_export_manifest"])
+    assert capture_artifact is not None
+    assert capture_artifact.key == "capture_export_manifest"
+    capture_preview = runtime.artifact_preview_lines(capture_artifact)
+    assert "handoff_id=HO-010" in capture_preview
+    assert "capture_hash=capture-hash-010" in capture_preview
+    assert "analysis_context_status=READY" in capture_preview
     session_artifacts = runtime.session_artifacts(
         snapshot,
         DesktopResultsSessionHandoff(
@@ -257,8 +315,10 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert "Проверка текущего прогона в JSON" in session_titles
     assert "Разбор замечаний текущего прогона в JSON" in session_titles
     assert "Указатель аниматора текущего прогона" in session_titles
+    assert "HO-010 manifest текущего прогона" in session_titles
     assert "session_send_bundle_zip" in session_keys
     assert "session_validation_json" in session_keys
+    assert "session_capture_export_manifest" in session_keys
     assert session_categories["session_send_bundle_zip"] == "bundle"
     assert session_categories["session_validation_json"] == "validation"
     assert session_categories["session_triage_json"] == "triage"

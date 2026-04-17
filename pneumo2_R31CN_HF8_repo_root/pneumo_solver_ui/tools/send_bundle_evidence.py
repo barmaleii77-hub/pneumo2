@@ -28,6 +28,18 @@ GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME = "latest_geometry_reference_evidence.j
 GEOMETRY_REFERENCE_EVIDENCE_ARCNAME = "geometry/geometry_reference_evidence.json"
 GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME = "workspace/exports/geometry_reference_evidence.json"
 GEOMETRY_REFERENCE_EVIDENCE_FALLBACK_ARCNAME = "exports/geometry_reference_evidence.json"
+GEOMETRY_REFERENCE_PRODUCER_EVIDENCE_OWNER = "producer_export"
+GEOMETRY_REFERENCE_REQUIRED_PRODUCER_ARTIFACTS = (
+    "workspace/_pointers/anim_latest.json or workspace/exports/anim_latest.json",
+    "workspace/exports/anim_latest.npz",
+    "workspace/exports/CYLINDER_PACKAGING_PASSPORT.json",
+    "workspace/exports/geometry_acceptance_report.json",
+)
+GEOMETRY_REFERENCE_PRODUCER_NEXT_ACTION = (
+    "Run producer/solver anim_latest export so NPZ meta.geometry/meta.packaging, "
+    "CYLINDER_PACKAGING_PASSPORT.json and geometry_acceptance_report.json are written; "
+    "Reference Center must not fabricate producer geometry evidence."
+)
 _ANALYSIS_CONTEXT_STATES = {"CURRENT", "HISTORICAL", "STALE", "MISSING"}
 PB002_REQUIRED_EVIDENCE_IDS = frozenset({"BND-001", "BND-002", "BND-003", "BND-004", "BND-005", "BND-006"})
 DEFAULT_FINALIZATION_ORDER = (
@@ -242,6 +254,7 @@ EXPECTED_EVIDENCE: tuple[dict[str, Any], ...] = (
             "geometry_acceptance_gate",
             "road_width_status",
             "packaging_contract_hash",
+            "producer_artifact_status",
             "component_passport",
         ),
         "notes": "Geometry acceptance and Reference Center handoff evidence.",
@@ -585,6 +598,33 @@ def summarize_geometry_reference_evidence(
     road_width_status = str(obj.get("road_width_status") or "").strip().lower() or "missing"
     packaging_mismatch = str(obj.get("packaging_mismatch_status") or "").strip().lower() or "missing"
     acceptance_gate = str(obj.get("geometry_acceptance_gate") or "").strip().upper() or "MISSING"
+    producer_evidence_owner = (
+        str(obj.get("producer_evidence_owner") or "").strip() or GEOMETRY_REFERENCE_PRODUCER_EVIDENCE_OWNER
+    )
+    producer_required_artifacts = [
+        str(item).strip()
+        for item in (obj.get("producer_required_artifacts") or GEOMETRY_REFERENCE_REQUIRED_PRODUCER_ARTIFACTS)
+        if str(item).strip()
+    ]
+    producer_next_action = str(obj.get("producer_next_action") or GEOMETRY_REFERENCE_PRODUCER_NEXT_ACTION).strip()
+    consumer_may_fabricate_geometry = bool(obj.get("consumer_may_fabricate_geometry", False))
+    raw_producer_artifact_status = str(obj.get("producer_artifact_status") or "").strip().lower()
+    if raw_producer_artifact_status:
+        producer_artifact_status = raw_producer_artifact_status
+    elif (
+        artifact_status not in {"missing", "stale"}
+        and freshness_status not in {"missing", "stale"}
+        and road_width_status != "missing"
+        and packaging_mismatch not in {"missing", "mismatch"}
+        and acceptance_gate == "PASS"
+    ):
+        producer_artifact_status = "ready"
+    elif artifact_status == "stale" or freshness_status == "stale":
+        producer_artifact_status = "stale"
+    elif artifact_status == "missing" or freshness_status == "missing":
+        producer_artifact_status = "missing"
+    else:
+        producer_artifact_status = "partial"
 
     def _safe_int_field(key: str) -> int:
         try:
@@ -608,6 +648,11 @@ def summarize_geometry_reference_evidence(
             "packaging_mismatch_status": "missing",
             "packaging_contract_hash": "",
             "geometry_acceptance_gate": "MISSING",
+            "producer_artifact_status": "missing",
+            "producer_evidence_owner": GEOMETRY_REFERENCE_PRODUCER_EVIDENCE_OWNER,
+            "producer_required_artifacts": list(GEOMETRY_REFERENCE_REQUIRED_PRODUCER_ARTIFACTS),
+            "producer_next_action": GEOMETRY_REFERENCE_PRODUCER_NEXT_ACTION,
+            "consumer_may_fabricate_geometry": False,
             "component_passport_components": 0,
             "component_passport_needs_data": 0,
             "evidence_missing": [],
@@ -620,6 +665,12 @@ def summarize_geometry_reference_evidence(
         warnings.append("Geometry reference evidence claims producer ownership; Reference Center must remain a reader.")
     if obj.get("does_not_render_animator_meshes") is False:
         warnings.append("Geometry reference evidence claims animator mesh rendering; this adapter must stay read-only.")
+    if consumer_may_fabricate_geometry:
+        warnings.append("Geometry reference evidence allows consumer geometry fabrication; producer export must own it.")
+    if producer_artifact_status in {"missing", "partial", "stale"}:
+        warnings.append(
+            f"Geometry reference producer artifact handoff is {producer_artifact_status}: {producer_next_action}"
+        )
     if evidence_missing:
         warnings.append(f"Geometry reference evidence reports missing item(s): {', '.join(evidence_missing)}.")
     if artifact_status in {"missing", "stale"}:
@@ -651,6 +702,11 @@ def summarize_geometry_reference_evidence(
         "packaging_mismatch_status": packaging_mismatch,
         "packaging_contract_hash": str(obj.get("packaging_contract_hash") or ""),
         "geometry_acceptance_gate": acceptance_gate,
+        "producer_artifact_status": producer_artifact_status,
+        "producer_evidence_owner": producer_evidence_owner,
+        "producer_required_artifacts": list(dict.fromkeys(producer_required_artifacts)),
+        "producer_next_action": producer_next_action,
+        "consumer_may_fabricate_geometry": consumer_may_fabricate_geometry,
         "component_passport_components": _safe_int_field("component_passport_components"),
         "component_passport_needs_data": _safe_int_field("component_passport_needs_data"),
         "evidence_missing": list(dict.fromkeys(evidence_missing)),

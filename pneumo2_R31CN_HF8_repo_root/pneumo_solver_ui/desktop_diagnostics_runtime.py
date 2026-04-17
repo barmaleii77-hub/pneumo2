@@ -252,7 +252,11 @@ def _load_geometry_reference_evidence_summary(repo_root: Path, out_dir: Path) ->
         summary = summarize_geometry_reference_evidence({}, source_path="")
 
     status = str(summary.get("status") or "MISSING").strip().upper()
-    if status == "MISSING":
+    producer_status = str(summary.get("producer_artifact_status") or "").strip().lower()
+    producer_action = str(summary.get("producer_next_action") or "").strip()
+    if producer_status in {"missing", "partial", "stale"} and producer_action:
+        action = producer_action
+    elif status == "MISSING":
         action = "Откройте Reference Center или соберите SEND bundle, чтобы создать geometry reference evidence."
     elif status == "WARN":
         action = "Проверьте packaging/road_width/geometry acceptance warnings перед отправкой."
@@ -447,6 +451,19 @@ def load_desktop_diagnostics_bundle_record(
         ),
         geometry_reference_packaging_contract_hash=str(geometry_reference.get("packaging_contract_hash") or ""),
         geometry_reference_acceptance_gate=str(geometry_reference.get("geometry_acceptance_gate") or "MISSING"),
+        geometry_reference_producer_artifact_status=str(
+            geometry_reference.get("producer_artifact_status") or "missing"
+        ),
+        geometry_reference_producer_evidence_owner=str(
+            geometry_reference.get("producer_evidence_owner") or "producer_export"
+        ),
+        geometry_reference_producer_required_artifacts=_clean_string_list(
+            geometry_reference.get("producer_required_artifacts")
+        ),
+        geometry_reference_producer_next_action=str(geometry_reference.get("producer_next_action") or ""),
+        geometry_reference_consumer_may_fabricate_geometry=bool(
+            geometry_reference.get("consumer_may_fabricate_geometry")
+        ),
         geometry_reference_component_passport_needs_data=int(
             geometry_reference.get("component_passport_needs_data") or 0
         ),
@@ -692,6 +709,11 @@ def write_desktop_diagnostics_center_state(
             "packaging_mismatch_status": bundle_record.geometry_reference_packaging_mismatch_status,
             "packaging_contract_hash": bundle_record.geometry_reference_packaging_contract_hash,
             "geometry_acceptance_gate": bundle_record.geometry_reference_acceptance_gate,
+            "producer_artifact_status": bundle_record.geometry_reference_producer_artifact_status,
+            "producer_evidence_owner": bundle_record.geometry_reference_producer_evidence_owner,
+            "producer_required_artifacts": list(bundle_record.geometry_reference_producer_required_artifacts),
+            "producer_next_action": bundle_record.geometry_reference_producer_next_action,
+            "consumer_may_fabricate_geometry": bundle_record.geometry_reference_consumer_may_fabricate_geometry,
             "component_passport_needs_data": bundle_record.geometry_reference_component_passport_needs_data,
             "evidence_missing": list(bundle_record.geometry_reference_evidence_missing),
             "warnings": list(bundle_record.geometry_reference_warnings),

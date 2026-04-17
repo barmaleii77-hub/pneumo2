@@ -89,6 +89,10 @@ class DesktopResultsSnapshot:
     diagnostics_evidence_manifest_path: Path | None = None
     diagnostics_evidence_manifest_hash: str = ""
     diagnostics_evidence_manifest_status: str = "MISSING"
+    latest_capture_export_manifest_path: Path | None = None
+    latest_capture_export_manifest_status: str = "MISSING"
+    latest_capture_export_manifest_handoff_id: str = ""
+    latest_capture_hash: str = ""
 
 
 def format_validation_summary(snapshot: DesktopResultsSnapshot) -> str:

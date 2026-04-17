@@ -8,6 +8,13 @@ from pneumo_solver_ui.desktop_optimizer_model import (
     build_optimizer_session_defaults,
 )
 from pneumo_solver_ui.desktop_optimizer_runtime import DesktopOptimizerRuntime
+from pneumo_solver_ui.desktop_suite_snapshot import build_validated_suite_snapshot
+from pneumo_solver_ui.optimization_baseline_source import (
+    active_baseline_contract_path,
+    baseline_suite_handoff_snapshot_path,
+    build_active_baseline_contract,
+    write_active_baseline_contract,
+)
 from pneumo_solver_ui.optimization_job_session_runtime import (
     DistOptJob,
     load_job_from_session,
@@ -24,6 +31,30 @@ from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
 
 ROOT = Path(__file__).resolve().parents[1]
 UI_ROOT = ROOT / "pneumo_solver_ui"
+
+
+def _optimizer_suite_snapshot(
+    *,
+    inputs_hash: str = "inputs-hash-optimizer-1",
+    ring_hash: str = "ring-hash-optimizer-1",
+) -> dict[str, object]:
+    return build_validated_suite_snapshot(
+        [
+            {
+                "id": "optimizer-baseline-row-1",
+                "имя": "optimizer_baseline_smoke",
+                "тип": "инерция_крен",
+                "включен": True,
+                "стадия": 0,
+                "dt": 0.01,
+                "t_end": 1.0,
+            }
+        ],
+        inputs_snapshot_hash=inputs_hash,
+        ring_source_hash=ring_hash,
+        created_at_utc="2026-04-17T00:00:00Z",
+        context_label="optimizer-baseline-unit",
+    )
 
 
 def test_desktop_optimizer_center_is_registered_as_hosted_shell_tool() -> None:
@@ -121,6 +152,84 @@ def test_desktop_optimizer_contract_snapshot_reads_default_contract() -> None:
     assert snapshot.optimizer_baseline_can_consume is (
         snapshot.active_baseline_state == "current"
     )
+
+
+def test_desktop_optimizer_contract_snapshot_never_rebinds_legacy_baseline_best(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(workspace_dir))
+    baseline_dir = workspace_dir / "baselines"
+    baseline_dir.mkdir(parents=True)
+    legacy_baseline = baseline_dir / "baseline_best.json"
+    legacy_baseline.write_text(json.dumps({"legacy": True}), encoding="utf-8")
+    contract_path = active_baseline_contract_path(
+        workspace_dir=workspace_dir,
+        repo_root=ROOT,
+    )
+
+    assert not contract_path.exists()
+
+    session_state = build_optimizer_session_defaults(cpu_count=8, platform_name="win32")
+    snapshot = build_contract_snapshot(session_state, ui_root=UI_ROOT)
+
+    assert snapshot.baseline_source_kind == "global"
+    assert snapshot.baseline_path == str(legacy_baseline.resolve())
+    assert snapshot.baseline_handoff_id == "HO-006"
+    assert snapshot.active_baseline_state == "missing"
+    assert snapshot.optimizer_baseline_can_consume is False
+    assert "active_baseline_contract.json" in snapshot.active_baseline_contract_path
+    assert not contract_path.exists()
+
+
+def test_desktop_optimizer_contract_snapshot_blocks_stale_active_baseline_without_rewrite(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(workspace_dir))
+    old_suite = _optimizer_suite_snapshot(
+        inputs_hash="inputs-hash-before",
+        ring_hash="ring-hash-before",
+    )
+    current_suite = _optimizer_suite_snapshot(
+        inputs_hash="inputs-hash-current",
+        ring_hash="ring-hash-current",
+    )
+    suite_path = baseline_suite_handoff_snapshot_path(
+        workspace_dir=workspace_dir,
+        repo_root=ROOT,
+    )
+    suite_path.parent.mkdir(parents=True, exist_ok=True)
+    suite_path.write_text(json.dumps(current_suite, ensure_ascii=False), encoding="utf-8")
+    active = build_active_baseline_contract(
+        suite_snapshot=old_suite,
+        baseline_path=tmp_path / "baseline_stale.json",
+        baseline_payload={"param_a": 1.0},
+        baseline_meta={"problem_hash": "optimizer-stale-baseline"},
+        source_run_dir=tmp_path / "runs" / "baseline_old",
+        created_at_utc="2026-04-17T00:20:00Z",
+    )
+    contract_path = write_active_baseline_contract(
+        active,
+        workspace_dir=workspace_dir,
+        repo_root=ROOT,
+    )
+    before = contract_path.read_text(encoding="utf-8")
+
+    assert old_suite["suite_snapshot_hash"] != current_suite["suite_snapshot_hash"]
+
+    session_state = build_optimizer_session_defaults(cpu_count=8, platform_name="win32")
+    snapshot = build_contract_snapshot(session_state, ui_root=UI_ROOT)
+
+    assert snapshot.baseline_handoff_id == "HO-006"
+    assert snapshot.active_baseline_state == "stale"
+    assert snapshot.active_baseline_hash == active["active_baseline_hash"]
+    assert snapshot.active_baseline_suite_snapshot_hash == old_suite["suite_snapshot_hash"]
+    assert snapshot.optimizer_baseline_can_consume is False
+    assert "suite_snapshot_hash_changed" in snapshot.active_baseline_banner
+    assert contract_path.read_text(encoding="utf-8") == before
 
 
 def test_desktop_optimizer_runtime_builds_stage_and_coordinator_previews() -> None:

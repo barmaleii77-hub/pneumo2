@@ -457,6 +457,11 @@ def test_artifact_backed_runtime_reports_missing_without_latest_artifact() -> No
     assert handoff["schema"] == "geometry_reference_evidence.v1"
     assert handoff["does_not_render_animator_meshes"] is True
     assert "artifact_context" in handoff["evidence_missing"]
+    assert handoff["producer_artifact_status"] == "missing"
+    assert handoff["producer_evidence_owner"] == "producer_export"
+    assert "workspace/exports/anim_latest.npz" in handoff["producer_required_artifacts"]
+    assert handoff["consumer_may_fabricate_geometry"] is False
+    assert "Reference Center must not fabricate" in handoff["producer_next_action"]
 
 
 def test_artifact_backed_runtime_reads_npz_acceptance_and_packaging_passport(tmp_path: Path) -> None:
@@ -483,6 +488,8 @@ def test_artifact_backed_runtime_reads_npz_acceptance_and_packaging_passport(tmp
     assert any(row.cylinder == "cyl2" and row.export_status == "axis_only" for row in packaging.rows)
     assert handoff["packaging_contract_hash"] == "pkg-hash-123"
     assert handoff["geometry_acceptance_gate"] == "PASS"
+    assert handoff["producer_artifact_status"] == "partial"
+    assert handoff["consumer_may_fabricate_geometry"] is False
 
 
 def test_runtime_can_use_selected_pointer_and_npz_artifact_without_rebinding_latest(tmp_path: Path) -> None:
@@ -527,6 +534,7 @@ def test_runtime_acceptance_and_handoff_helpers_accept_summary_or_artifact_path(
     assert selected_handoff["geometry_acceptance_gate"] == "PASS"
     assert selected_handoff["road_width_status"] == "explicit_meta"
     assert selected_handoff["packaging_contract_hash"] == "pkg-hash-123"
+    assert selected_handoff["producer_artifact_status"] == "partial"
 
 
 def test_runtime_reports_selected_artifact_freshness_against_latest(tmp_path: Path) -> None:
@@ -605,6 +613,8 @@ def test_runtime_writes_geometry_reference_evidence_for_diagnostics_send(tmp_pat
     assert workspace_payload["packaging_contract_hash"] == "pkg-hash-123"
     assert workspace_payload["packaging_axis_only_cylinders"] == ["cyl2"]
     assert workspace_payload["evidence_missing"] == []
+    assert workspace_payload["producer_artifact_status"] == "partial"
+    assert workspace_payload["consumer_may_fabricate_geometry"] is False
 
 
 def test_road_width_evidence_prefers_explicit_meta_and_keeps_missing_gap_warning() -> None:

@@ -77,6 +77,11 @@ def _geometry_reference_evidence() -> dict:
         "packaging_contract_hash": "packaging-hash",
         "geometry_acceptance_gate": "PASS",
         "geometry_acceptance_available": True,
+        "producer_artifact_status": "ready",
+        "producer_evidence_owner": "producer_export",
+        "producer_required_artifacts": ["workspace/exports/anim_latest.npz"],
+        "producer_next_action": "",
+        "consumer_may_fabricate_geometry": False,
         "component_passport_components": 3,
         "component_passport_needs_data": 0,
         "evidence_missing": [],
@@ -336,6 +341,7 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert bundle.geometry_reference_road_width_status == "explicit_meta"
     assert bundle.geometry_reference_packaging_contract_hash == "packaging-hash"
     assert bundle.geometry_reference_acceptance_gate == "PASS"
+    assert bundle.geometry_reference_producer_artifact_status == "ready"
 
     run = DesktopDiagnosticsRunRecord(
         ok=True,

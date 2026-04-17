@@ -21,6 +21,7 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
         "Открыть выбранное",
         "Экспорт HO-007",
         "Экспорт evidence",
+        "Открыть evidence",
         "System Influence",
         "Full Report",
         "Influence Staging",
@@ -49,6 +50,9 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "def _auto_export_evidence_after_ho007" in src
     assert "write_diagnostics_evidence_manifest" in src
     assert "evidence auto-exported after HO-007" in src
+    assert "def _open_evidence_manifest" in src
+    assert "Evidence manifest opened" in src
+    assert "run Экспорт evidence first" in src
     assert "compare_influence_surface_count" in src
     assert "def _compare_surface_details" in src
     assert "def _compare_surface_preview_for_artifact" in src

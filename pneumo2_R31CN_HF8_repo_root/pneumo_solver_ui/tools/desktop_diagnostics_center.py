@@ -1141,14 +1141,30 @@ class DesktopDiagnosticsCenter:
             f"- Packaging contract hash: {getattr(bundle, 'geometry_reference_packaging_contract_hash', '') or '—'}",
             f"- Geometry acceptance gate: {getattr(bundle, 'geometry_reference_acceptance_gate', '') or 'MISSING'}",
             (
+                "- Producer artifact status: "
+                f"{getattr(bundle, 'geometry_reference_producer_artifact_status', '') or 'missing'} / "
+                f"owner={getattr(bundle, 'geometry_reference_producer_evidence_owner', '') or 'producer_export'}"
+            ),
+            (
+                "- Consumer fabrication allowed: "
+                f"{bool(getattr(bundle, 'geometry_reference_consumer_may_fabricate_geometry', False))}"
+            ),
+            (
                 "- Component passport needs data: "
                 f"{getattr(bundle, 'geometry_reference_component_passport_needs_data', 0)}"
             ),
             f"- Evidence JSON: {getattr(bundle, 'latest_geometry_reference_evidence_path', '') or '—'}",
         ]
         action = str(getattr(bundle, "geometry_reference_action", "") or "")
+        required_artifacts = [
+            str(item).strip()
+            for item in (getattr(bundle, "geometry_reference_producer_required_artifacts", None) or [])
+            if str(item).strip()
+        ]
         if missing:
             lines.append(f"- Missing: {', '.join(missing)}")
+        if required_artifacts:
+            lines.append(f"- Required producer artifacts: {', '.join(required_artifacts)}")
         if action:
             lines.append(f"- Action: {action}")
         for warning in warnings[:5]:
@@ -1163,6 +1179,7 @@ class DesktopDiagnosticsCenter:
         road = str(getattr(bundle, "geometry_reference_road_width_status", "") or "missing")
         packaging = str(getattr(bundle, "geometry_reference_packaging_mismatch_status", "") or "missing")
         gate = str(getattr(bundle, "geometry_reference_acceptance_gate", "") or "MISSING")
+        producer = str(getattr(bundle, "geometry_reference_producer_artifact_status", "") or "missing")
         missing = [
             str(item).strip()
             for item in (getattr(bundle, "geometry_reference_evidence_missing", None) or [])
@@ -1171,7 +1188,7 @@ class DesktopDiagnosticsCenter:
         action = str(getattr(bundle, "geometry_reference_action", "") or "")
         text = (
             f"{status} / artifact={artifact} / freshness={freshness}:{relation} / road_width={road} / "
-            f"packaging={packaging} / acceptance={gate}"
+            f"packaging={packaging} / acceptance={gate} / producer={producer}"
         )
         if missing:
             text += f"\nmissing={', '.join(missing)}"

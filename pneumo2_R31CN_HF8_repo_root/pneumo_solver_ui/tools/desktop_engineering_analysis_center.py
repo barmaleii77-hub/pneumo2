@@ -133,6 +133,12 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.btn_export_ho007.pack(side="left", padx=(8, 0))
         self.btn_export_evidence = ttk.Button(actions, text="Экспорт evidence", command=self._export_diagnostics_evidence)
         self.btn_export_evidence.pack(side="left", padx=(8, 0))
+        self.btn_open_evidence_manifest = ttk.Button(
+            actions,
+            text="Открыть evidence",
+            command=self._open_evidence_manifest,
+        )
+        self.btn_open_evidence_manifest.pack(side="left", padx=(8, 0))
         self.btn_animator_link = ttk.Button(actions, text="Animator link", command=self._export_animator_link)
         self.btn_animator_link.pack(side="left", padx=(8, 0))
         self.btn_system_influence = ttk.Button(actions, text="System Influence", command=self._run_system_influence)
@@ -595,6 +601,26 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         except Exception as exc:
             messagebox.showerror("Engineering Analysis", f"Не удалось открыть:\n{path}\n\n{exc!s}")
 
+    def _open_evidence_manifest(self) -> None:
+        snapshot = self.snapshot_state or self.runtime.snapshot()
+        path = snapshot.diagnostics_evidence_manifest_path
+        if path is None:
+            self.status_var.set("Evidence manifest is missing; run Экспорт evidence first.")
+            messagebox.showinfo(
+                "Engineering Analysis",
+                "Evidence manifest ещё не создан. Выполните «Экспорт evidence», затем откройте manifest.",
+            )
+            return
+        if not path.exists():
+            self.status_var.set(f"Evidence manifest path is missing on disk: {path}")
+            messagebox.showwarning("Engineering Analysis", f"Evidence manifest не найден:\n{path}")
+            return
+        try:
+            _open_path(path)
+            self.status_var.set(f"Evidence manifest opened: {path}")
+        except Exception as exc:
+            messagebox.showerror("Engineering Analysis", f"Не удалось открыть evidence manifest:\n{path}\n\n{exc!s}")
+
     def _on_artifact_select(self, _event: tk.Event | None = None) -> None:
         selected = self.artifact_tree.selection()
         if not selected:
@@ -637,6 +663,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             self.btn_open_command,
             self.btn_export_ho007,
             self.btn_export_evidence,
+            self.btn_open_evidence_manifest,
             self.btn_animator_link,
             self.btn_system_influence,
             self.btn_full_report,
