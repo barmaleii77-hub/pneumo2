@@ -258,3 +258,104 @@ def test_hosted_baseline_workspace_page_requires_explicit_action_before_restore(
         page.close()
         page.deleteLater()
         app.processEvents()
+
+
+def test_hosted_baseline_workspace_page_warns_before_restore_with_context_mismatch(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app = _app()
+    workspace_dir = tmp_path / "workspace"
+    monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(workspace_dir))
+    suite_snapshot = _suite_snapshot()
+    suite_path = baseline_suite_handoff_snapshot_path(workspace_dir=workspace_dir)
+    suite_path.parent.mkdir(parents=True, exist_ok=True)
+    suite_path.write_text(json.dumps(suite_snapshot, ensure_ascii=False), encoding="utf-8")
+
+    historical_suite = build_validated_suite_snapshot(
+        [
+            {
+                "id": "baseline-ui-row-1",
+                "имя": "baseline_ui_smoke",
+                "тип": "инерция_крен",
+                "включен": True,
+                "стадия": 0,
+                "dt": 0.02,
+                "t_end": 1.0,
+            }
+        ],
+        inputs_snapshot_hash="inputs-hash-ui-old",
+        ring_source_hash="ring-hash-ui",
+        created_at_utc="2026-04-17T00:09:00Z",
+        context_label="baseline-ui-historical",
+    )
+    active = build_active_baseline_contract(
+        suite_snapshot=suite_snapshot,
+        baseline_path=tmp_path / "baseline_active.json",
+        baseline_payload={"param_a": 1.0},
+        baseline_meta={"problem_hash": "ph-baseline-ui"},
+        source_run_dir=tmp_path / "runs" / "active",
+        policy_mode="review_adopt",
+        created_at_utc="2026-04-17T00:10:00Z",
+    )
+    candidate = build_active_baseline_contract(
+        suite_snapshot=historical_suite,
+        baseline_path=tmp_path / "baseline_historical.json",
+        baseline_payload={"param_a": 2.0},
+        baseline_meta={"problem_hash": "ph-baseline-ui-old"},
+        source_run_dir=tmp_path / "runs" / "historical",
+        policy_mode="restore_only",
+        created_at_utc="2026-04-17T00:11:00Z",
+    )
+    write_active_baseline_contract(active, workspace_dir=workspace_dir)
+    history_item = baseline_history_item_from_contract(candidate, action="restore", actor="unit")
+    append_baseline_history_item(history_item, workspace_dir=workspace_dir)
+
+    page = BaselineWorkspacePage(
+        build_workspace_map()["baseline_run"],
+        (),
+        lambda _command_id: None,
+        repo_root=ROOT,
+    )
+    try:
+        app.processEvents()
+
+        assert page.review_button.isEnabled()
+        assert not page.adopt_button.isEnabled()
+        assert not page.restore_button.isEnabled()
+        assert "suite_snapshot_hash" in page.baseline_banner_label.text()
+        assert "inputs_snapshot_hash" in page.baseline_banner_label.text()
+        assert "policy_mode" in page.baseline_banner_label.text()
+        assert "Silent rebinding: запрещён" in page.baseline_mismatch_label.text()
+        matrix_status = {
+            page.baseline_mismatch_matrix.item(row, 0).text(): page.baseline_mismatch_matrix.item(row, 3).text()
+            for row in range(page.baseline_mismatch_matrix.rowCount())
+        }
+        assert matrix_status["suite_snapshot_hash"] == "mismatch"
+        assert matrix_status["inputs_snapshot_hash"] == "mismatch"
+        assert matrix_status["ring_source_hash"] == "match"
+        assert matrix_status["policy_mode"] == "mismatch"
+
+        blocked_restore = page.apply_baseline_action("restore")
+        assert blocked_restore["status"] == "blocked"
+        assert read_active_baseline_contract(workspace_dir=workspace_dir)["active_baseline_hash"] == active["active_baseline_hash"]
+
+        page.explicit_confirmation_checkbox.setChecked(True)
+        app.processEvents()
+        assert not page.adopt_button.isEnabled()
+        assert page.restore_button.isEnabled()
+        page._confirm_baseline_action = lambda _action, _surface: True  # type: ignore[method-assign]
+
+        blocked_adopt = page.apply_baseline_action("adopt")
+        assert blocked_adopt["status"] == "blocked"
+        assert read_active_baseline_contract(workspace_dir=workspace_dir)["active_baseline_hash"] == active["active_baseline_hash"]
+
+        applied_restore = page.apply_baseline_action("restore")
+        assert applied_restore["status"] == "applied"
+        assert applied_restore["silent_rebinding_allowed"] is False
+        assert read_active_baseline_contract(workspace_dir=workspace_dir)["active_baseline_hash"] == candidate["active_baseline_hash"]
+        assert read_baseline_history(workspace_dir=workspace_dir)[-1]["action"] == "restore"
+    finally:
+        page.close()
+        page.deleteLater()
+        app.processEvents()
