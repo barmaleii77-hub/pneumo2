@@ -275,6 +275,23 @@ EXPECTED_EVIDENCE: tuple[dict[str, Any], ...] = (
         "expected_provenance_fields": ("snap", "DPI", "second monitor", "path budget"),
         "notes": "Windows desktop shell acceptance proof.",
     },
+    {
+        "evidence_id": "BND-022",
+        "path_patterns": (
+            "runtime/desktop_mnemo_runtime_proof*.json",
+            "workspace/exports/desktop_mnemo_runtime_proof*.json",
+        ),
+        "required_when": "if Desktop Mnemo runtime proof claimed",
+        "release_blocking_if_missing": False,
+        "hash_required": "optional",
+        "expected_provenance_fields": (
+            "qt_platform",
+            "startup timing",
+            "dock layout",
+            "real Windows visual check status",
+        ),
+        "notes": "Desktop Mnemo startup/runtime proof; does not close visual acceptance without operator evidence.",
+    },
 )
 
 
@@ -1101,6 +1118,11 @@ def _required_for_row(
         "workspace/exports/windows_runtime_claim*.json",
         "runtime/windows_runtime_claim*.json",
     )
+    desktop_mnemo_runtime_claimed = _has_any(
+        name_set,
+        "workspace/exports/desktop_mnemo_runtime_proof*.json",
+        "runtime/desktop_mnemo_runtime_proof*.json",
+    )
 
     if evidence_id in {"BND-007", "BND-008"}:
         return scenario_exists, "scenario_exists" if scenario_exists else "no scenario evidence detected"
@@ -1132,6 +1154,13 @@ def _required_for_row(
         return (
             windows_runtime_claimed,
             "windows_runtime_claimed" if windows_runtime_claimed else "no Windows runtime acceptance claim detected",
+        )
+    if evidence_id == "BND-022":
+        return (
+            desktop_mnemo_runtime_claimed,
+            "desktop_mnemo_runtime_claimed"
+            if desktop_mnemo_runtime_claimed
+            else "no Desktop Mnemo runtime proof detected",
         )
     return False, "not_applicable"
 

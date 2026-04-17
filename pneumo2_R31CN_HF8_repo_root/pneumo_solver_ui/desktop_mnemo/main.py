@@ -74,6 +74,27 @@ def _build_parser() -> argparse.ArgumentParser:
         default=[],
         help="Repeatable onboarding checklist item shown inside the desktop window",
     )
+    ap.add_argument(
+        "--runtime-proof",
+        metavar="DIR",
+        help="Write Desktop Mnemo startup runtime evidence JSON/MD and exit without app.exec().",
+    )
+    ap.add_argument(
+        "--runtime-proof-offscreen",
+        action="store_true",
+        help="Collect --runtime-proof using QT_QPA_PLATFORM=offscreen for CI/headless checks.",
+    )
+    ap.add_argument(
+        "--runtime-proof-validate",
+        metavar="JSON",
+        help="Validate an existing Desktop Mnemo runtime proof JSON and exit.",
+    )
+    ap.add_argument(
+        "--runtime-proof-startup-budget-s",
+        type=float,
+        default=3.0,
+        help="Maximum allowed constructor+first-event-cycle time for --runtime-proof.",
+    )
     return ap
 
 
@@ -119,6 +140,32 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     pointer_path, npz_path = _resolve_launch_paths(args)
+
+    if args.runtime_proof_validate:
+        from .runtime_proof import validate_desktop_mnemo_runtime_proof
+
+        import json
+
+        result = validate_desktop_mnemo_runtime_proof(Path(args.runtime_proof_validate))
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.runtime_proof:
+        from .runtime_proof import write_desktop_mnemo_runtime_proof
+
+        import json
+
+        result = write_desktop_mnemo_runtime_proof(
+            Path(args.runtime_proof),
+            npz_path=npz_path,
+            follow=bool(args.follow),
+            pointer_path=pointer_path,
+            theme=str(args.theme),
+            offscreen=bool(args.runtime_proof_offscreen),
+            startup_budget_s=float(args.runtime_proof_startup_budget_s),
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
 
     try:
         from .app import run_app

@@ -281,6 +281,13 @@ ID: `PLAN-0037`.
 Источник: chat: project audit 2026-04-17.
 ID: `PLAN-0038`.
 
+39. V32-10 Desktop Mnemo runtime proof and diagnostics visibility
+Назначение: Добавить Desktop Mnemo startup runtime-proof CLI без app.exec(), валидатор JSON/MD, offscreen timing checks, а также optional BND-022 row в SEND evidence manifest. Это доказывает быстрый автоматический startup, но оставляет real Windows visual/no-hang verification pending.
+Артефакт: [../pneumo_solver_ui/desktop_mnemo/runtime_proof.py](./../pneumo_solver_ui/desktop_mnemo/runtime_proof.py)
+Статус: active.
+Источник: chat: next step V32-10/V32-15 runtime stability.
+ID: `PLAN-0039`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:
