@@ -272,6 +272,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in imports_readme
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in imports_readme
     assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in imports_readme
+    assert "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in imports_readme
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in imports_readme
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in imports_readme
     assert "специализированный ring-editor migration" in imports_readme
@@ -299,6 +300,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in project_sources_text
+    assert "v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md" in project_sources_text
     assert "v33_connector_reconciled/README.md" in project_sources_text
@@ -324,6 +326,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in index_text
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in index_text
     assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in index_text
+    assert "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in index_text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in index_text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in index_text
     assert "WORKTREE_TRIAGE_2026-04-17.md" in index_text
@@ -431,6 +434,7 @@ def test_v32_connector_reconciled_digest_is_registered() -> None:
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in text
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in text
     assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in text
+    assert "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in text
     assert "WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md" in text
@@ -534,6 +538,7 @@ def test_v32_release_gate_acceptance_map_is_executable_docs_contract() -> None:
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in release_lane_text
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in release_lane_text
     assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in release_lane_text
+    assert "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in release_lane_text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in release_lane_text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in release_lane_text
     assert "Do not implement domain runtime features here." in release_lane_text
