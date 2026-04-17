@@ -225,7 +225,13 @@ class ControlHubWorkspacePage(QtWidgets.QWidget):
         self.refresh_view()
 
     def _workspace_elements(self) -> tuple[str, ...]:
-        owners = [item.strip() for item in str(self.workspace.workspace_owner or "").split(";")]
+        owners = [
+            item.strip()
+            for item in (
+                *str(self.workspace.workspace_owner or "").split(";"),
+                *self.workspace.catalog_owner_aliases,
+            )
+        ]
         labels: list[str] = []
         for owner in owners:
             if not owner:

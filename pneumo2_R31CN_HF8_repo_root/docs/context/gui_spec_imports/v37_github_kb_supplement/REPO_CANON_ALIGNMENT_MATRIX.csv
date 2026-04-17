@@ -1,0 +1,6 @@
+topic,repo_canon_status,v37_status,note
+priority_17_18_first,required,aligned,v37 inserted below 17/18
+ring_editor_single_source,required,aligned,preserved in imported spec
+web_desktop_parity_release_gate,required,aligned,kept as mandatory gate
+non_runtime_closure,required,aligned,explicit notice retained
+producer_side_truth_open,open,aligned,kept as open gap

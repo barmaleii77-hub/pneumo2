@@ -1,6 +1,10 @@
 # Packaging wrapper artifacts
 *_repo_root.zip
 
+# Google Drive desktop sync temp folders
+.tmp.drivedownload/
+.tmp.driveupload/
+
 # Local Python environments and caches
 pneumo2_R31CN_HF8_repo_root/.venv/
 pneumo2_R31CN_HF8_repo_root/**/__pycache__/

@@ -1,0 +1,386 @@
+package_meta:
+  package_id: PNEUMO-CODEX-TZ-SPEC-CONNECTOR-RECONCILED-V37-GITHUB-KB-SUPPLEMENT
+  language: ru
+  recipient_role: системный аналитик требований и архитектор GUI инженерного desktop-приложения
+  target_result: пакет ТЗ и машиночитаемой спецификации для CODEX
+  primary_repository: https://github.com/barmaleii77-hub/pneumo2
+  package_date: '2026-04-17'
+  status_enums:
+  - covered
+  - covered_partially
+  - conflict
+  - assumption
+  - gap
+  - open_question
+  - not_applicable
+  graphics_truth_states: &id001
+  - solver_confirmed
+  - source_data_confirmed
+  - approximate_inferred_with_warning
+  - unavailable
+  prohibited_primary_outputs:
+  - код
+  - bootstrap-каркас
+  - реализация приложения
+  - замена ТЗ общим текстом
+  connector_reconciled: true
+  self_contained_archive: true
+  workspace_annexes_integrated: true
+  frontier_annexes_integrated: true
+  artifact_lifecycle_annexes_integrated: true
+  release_gate_hardening_integrated: true
+  repo_adoption_pass: true
+  import_ready_successor_layer: true
+  acceptance_playbooks_integrated: true
+  runtime_artifact_schema_integrated: true
+  successor_of: PNEUMO-CODEX-TZ-SPEC-CONNECTOR-RECONCILED-V36-REPO-ADOPTION
+  runtime_closure_proof: false
+  runtime_closure_note: Package remains a requirements/specification artifact; producer-side
+    truth, measured perf trace and Windows runtime acceptance stay open until evidenced.
+  github_knowledge_base_supplement: true
+source_priority:
+- текущее каноническое задание
+- прямые уточнения пользователя в текущем чате
+- локальный канон проекта в GitHub
+- фактический код и существующий Web UI
+- imported и historical слои
+- внешние best practices
+shell:
+  technology_target: Qt6 / PySide6
+  layout_baseline: Windows desktop shell with menu, command search, left tree, center
+    workspace, right inspector, bottom status
+  supports:
+  - docking
+  - undocking
+  - floating panes
+  - auto-hide
+  - second-monitor workflow
+  - layout save/restore
+  - mixed-DPI
+  - Windows snap semantics
+  always_visible_command: Собрать диагностику
+  major_regions:
+  - menu
+  - command surface
+  - navigation tree
+  - central work surface
+  - inspector/help/provenance
+  - message bar
+  - status/progress
+  accessibility:
+    keyboard_first: true
+    f6_regions: true
+    visible_focus: true
+    screen_reader_compatible: true
+    tooltip_and_help: true
+  layout_profiles_annex: LAYOUT_DOCKING_PROFILE_MATRIX.csv
+  help_contract_annex: HELP_AND_EXPLAINABILITY_MATRIX.csv
+  visual_semantics_annex: VISUAL_SEMANTICS_DICTIONARY.csv
+  project_tree_annex: PROJECT_TREE_CONTRACT.csv
+  graphics_surface_actions_annex: GRAPHICS_SURFACE_ACTION_MATRIX.csv
+project_model:
+  root_entity: project
+  contains:
+  - inputs
+  - ring scenarios
+  - suite snapshots
+  - baseline contracts
+  - optimization runs
+  - analysis snapshots
+  - animator contexts
+  - diagnostics bundles
+  user_facing_truth: project-bound results first, global archive optional and explicit
+  annex: PROJECT_ENTITY_MODEL.yaml
+workspaces:
+- workspace_id: WS-PROJECT
+  name: Панель проекта
+  order: 1
+  purpose: Стартовое резюме проекта, предупреждения, быстрый переход к следующему
+    шагу.
+  primary_object: project_state
+  source_of_truth_role: source_of_truth_readonly_summary
+  dock_profile: shell_default
+- workspace_id: WS-INPUTS
+  name: Исходные данные
+  order: 2
+  purpose: Ввод и проверка конструктивных и числовых параметров машины.
+  primary_object: base_json + ranges_json
+  source_of_truth_role: primary_edit_surface
+  dock_profile: form_heavy
+- workspace_id: WS-RING
+  name: Редактор кольца
+  order: 3
+  purpose: Единственный источник дорожных сценариев и segment_id.
+  primary_object: ring_source_of_truth.json
+  source_of_truth_role: primary_edit_surface
+  dock_profile: plan_profile
+- workspace_id: WS-SUITE
+  name: Матрица испытаний
+  order: 4
+  purpose: Набор испытаний как consumer кольцевого контракта.
+  primary_object: validated_suite_snapshot.json
+  source_of_truth_role: linked_edit_surface
+  dock_profile: table_matrix
+- workspace_id: WS-BASELINE
+  name: Базовый прогон
+  order: 5
+  purpose: Принятие и история активного baseline.
+  primary_object: active_baseline_contract.json
+  source_of_truth_role: controlled_write_surface
+  dock_profile: run_review
+- workspace_id: WS-OPTIMIZATION
+  name: Оптимизация
+  order: 6
+  purpose: StageRunner и distributed coordinator для одной постановки задачи.
+  primary_object: objective_contract.json + active_baseline_contract.json
+  source_of_truth_role: launch_and_monitor
+  dock_profile: solve_center
+- workspace_id: WS-ANALYSIS
+  name: Анализ результатов
+  order: 7
+  purpose: Сравнение baseline и optimization run, графики, таблицы, экспорт отчёта.
+  primary_object: selected_run_contract.json + compare_contract.json
+  source_of_truth_role: analysis_consumer
+  dock_profile: analysis_center
+- workspace_id: WS-ANIMATOR
+  name: Аниматор
+  order: 8
+  purpose: Просмотр анимации по explicit analysis context и truthful graphics handoff.
+  primary_object: animator_context_contract.json
+  source_of_truth_role: consumer_viewport
+  dock_profile: viewport_first
+- workspace_id: WS-DIAGNOSTICS
+  name: Диагностика
+  order: 9
+  purpose: Evidence manifest, selfcheck, SEND bundle, triage, health report.
+  primary_object: diagnostics_evidence_manifest.json
+  source_of_truth_role: operational_surface
+  dock_profile: diagnostics_center
+- workspace_id: WS-SETTINGS
+  name: Параметры приложения
+  order: 10
+  purpose: Редко меняемые пользовательские и системные параметры оболочки.
+  primary_object: settings_profile.json
+  source_of_truth_role: controlled_write_surface
+  dock_profile: settings_form
+- workspace_id: WS-TOOLS
+  name: Инструменты
+  order: 11
+  purpose: Инженерные утилиты, импорт/экспорт, сервисные действия, которые не должны
+    шуметь в основном потоке.
+  primary_object: tool_registry.json
+  source_of_truth_role: controlled_write_surface
+  dock_profile: toolbox
+specialized_windows:
+- WINDOW_ID: WIN-MAIN-SHELL
+  WINDOW_NAME_RU: Главное окно приложения
+  WINDOW_TYPE: top_level_main_window
+  DEFAULT_VISIBILITY: always_visible
+  PURPOSE: Главный shell с меню, command search, левым деревом, центральной рабочей
+    областью и правым inspector.
+  PREFERRED_SIZE: 1600x980
+  MIN_SIZE: 1280x800
+  LAYOUT_ROLE: windowed+snap+restore
+  BEHAVIOR_RULES: Стандартная строка заголовка, system menu, docking panes, mixed-DPI,
+    second-monitor awareness.
+- WINDOW_ID: WIN-DESKTOP-ANIMATOR
+  WINDOW_NAME_RU: Desktop Animator
+  WINDOW_TYPE: top_level_specialized_window
+  DEFAULT_VISIBILITY: user_invoked
+  PURPOSE: Специализированное окно 3D-аниматора и truthful graphics.
+  PREFERRED_SIZE: 1440x900
+  MIN_SIZE: 1100x700
+  LAYOUT_ROLE: detached_top_level
+  BEHAVIOR_RULES: Допускает второй монитор; не подменяет главный shell; read-only
+    consumer analysis context.
+- WINDOW_ID: WIN-COMPARE-VIEWER
+  WINDOW_NAME_RU: Compare Viewer
+  WINDOW_TYPE: top_level_specialized_window
+  DEFAULT_VISIBILITY: user_invoked
+  PURPOSE: Специализированное окно сравнения baseline/run/run и compare export.
+  PREFERRED_SIZE: 1400x880
+  MIN_SIZE: 1100x720
+  LAYOUT_ROLE: detached_top_level
+  BEHAVIOR_RULES: Открывается из Analysis и shell history; current-vs-historical banners
+    обязательны.
+- WINDOW_ID: WIN-DESKTOP-MNEMO
+  WINDOW_NAME_RU: Desktop Mnemo
+  WINDOW_TYPE: top_level_specialized_window
+  DEFAULT_VISIBILITY: user_invoked
+  PURPOSE: Специализированная мнемосхема/пневмосхема с потоками, давлениями, состояниями.
+  PREFERRED_SIZE: 1360x820
+  MIN_SIZE: 1100x680
+  LAYOUT_ROLE: detached_top_level
+  BEHAVIOR_RULES: Может жить на втором мониторе; selection sync c shell и analysis
+    обязателен.
+- WINDOW_ID: WIN-DIAGNOSTICS
+  WINDOW_NAME_RU: Диагностика
+  WINDOW_TYPE: top_level_workspace_window
+  DEFAULT_VISIBILITY: always_available
+  PURPOSE: First-class диагностика, SEND bundle preview, selfcheck, health, provenance.
+  PREFERRED_SIZE: 1360x860
+  MIN_SIZE: 1100x700
+  LAYOUT_ROLE: workspace_window
+  BEHAVIOR_RULES: Доступна из любого workspace через одну заметную команду.
+- WINDOW_ID: WIN-LEFT-NAV
+  WINDOW_NAME_RU: Левая панель навигации
+  WINDOW_TYPE: dock_widget
+  DEFAULT_VISIBILITY: default_docked_left
+  PURPOSE: Дерево рабочих пространств, сценариев, запусков и артефактов.
+  PREFERRED_SIZE: 320x900
+  MIN_SIZE: 240x600
+  LAYOUT_ROLE: dockable/floating/auto-hide
+  BEHAVIOR_RULES: Selection sync обязателен.
+- WINDOW_ID: WIN-RIGHT-INSPECTOR
+  WINDOW_NAME_RU: Правая панель свойств и помощи
+  WINDOW_TYPE: dock_widget
+  DEFAULT_VISIBILITY: default_docked_right
+  PURPOSE: Context-sensitive inspector, help, provenance, warnings.
+  PREFERRED_SIZE: 420x900
+  MIN_SIZE: 300x600
+  LAYOUT_ROLE: dockable/floating/auto-hide
+  BEHAVIOR_RULES: Пригодна для второго монитора; может сворачиваться во вкладку в
+    narrow layout.
+- WINDOW_ID: WIN-BOTTOM-STATUS
+  WINDOW_NAME_RU: Нижняя панель статуса и прогресса
+  WINDOW_TYPE: dock_widget
+  DEFAULT_VISIBILITY: default_docked_bottom
+  PURPOSE: Status/progress/messages strip для режимов, прогресса и предупреждений.
+  PREFERRED_SIZE: 1600x110
+  MIN_SIZE: 1280x84
+  LAYOUT_ROLE: dockable
+  BEHAVIOR_RULES: Критичные ошибки не прячутся только сюда; progress продублирован
+    в основном экране.
+- WINDOW_ID: WIN-COMMAND-SEARCH
+  WINDOW_NAME_RU: Глобальный поиск команд
+  WINDOW_TYPE: popup_panel
+  DEFAULT_VISIBILITY: transient
+  PURPOSE: Поиск команд, экранов, параметров, артефактов и сущностей проекта.
+  PREFERRED_SIZE: 720x420
+  MIN_SIZE: 560x320
+  LAYOUT_ROLE: transient_overlay
+  BEHAVIOR_RULES: Вызывается Ctrl+K и кнопкой из command surface.
+- WINDOW_ID: WIN-SETTINGS
+  WINDOW_NAME_RU: Параметры приложения
+  WINDOW_TYPE: workspace_window
+  DEFAULT_VISIBILITY: user_invoked
+  PURPOSE: Темы, DPI, layout profiles, runtime helpers, defaults и способы интеграции.
+  PREFERRED_SIZE: 1200x820
+  MIN_SIZE: 960x680
+  LAYOUT_ROLE: workspace_or_tab
+  BEHAVIOR_RULES: Не модальный диалог; хранит редкие, но важные настройки.
+- WINDOW_ID: WIN-TOOLS
+  WINDOW_NAME_RU: Инструменты
+  WINDOW_TYPE: workspace_window
+  DEFAULT_VISIBILITY: user_invoked
+  PURPOSE: Редкие, но полезные инженерные инструменты и проверки среды.
+  PREFERRED_SIZE: 1200x820
+  MIN_SIZE: 960x680
+  LAYOUT_ROLE: workspace_or_tab
+  BEHAVIOR_RULES: Ищутся через command search и живут как second-level surface.
+- WINDOW_ID: WIN-HELP-CONTEXT
+  WINDOW_NAME_RU: Контекстная помощь
+  WINDOW_TYPE: auxiliary_pane
+  DEFAULT_VISIBILITY: conditional
+  PURPOSE: Развёрнутая помощь по знаку вопроса, glossary и cross-links.
+  PREFERRED_SIZE: 420x900
+  MIN_SIZE: 320x600
+  LAYOUT_ROLE: dock_or_popup
+  BEHAVIOR_RULES: Может жить внутри inspector или отдельно как плавающая панель.
+pipeline:
+  current_graph_file: PIPELINE_CURRENT.dot
+  optimized_graph_file: PIPELINE_OPTIMIZED.dot
+  user_steps_file: PIPELINE_USER_STEPS.csv
+  sole_scenario_truth: WS-RING / ring_source_of_truth.json
+  suite_handoff: validated_suite_snapshot.json
+  baseline_handoff: active_baseline_contract.json
+  optimization_handoff: selected_run_contract.json
+  analysis_handoff: analysis_context + compare_contract
+  diagnostics_handoff: evidence_manifest + SEND bundle contract
+truth_policy:
+  law: No invented parameters, no silent aliases, no pretty lies instead of truth
+    contract.
+  approximate_rule: approximate_inferred_with_warning allowed only with prominent
+    warning, source list, missing-data list and explicit prohibition on treating it
+    as solver truth.
+  cylinder_rule: full-truth cylinder body/rod/piston requires complete packaging passport;
+    otherwise axis-only honesty mode.
+libraries_policy:
+- library: Qt6/PySide6
+  purpose: native Windows desktop shell
+  reason: main desktop technology target
+  constraints: respect Windows shell semantics and mixed-DPI
+  fallback: no web-first shell fallback
+- library: PyOpenGL_accelerate
+  purpose: desktop animator runtime dependency
+  reason: Windows OpenGL performance/stability
+  constraints: must be present in installer/runtime validation
+  fallback: show explicit diagnostics and degraded state
+- library: Dask
+  purpose: distributed optimization backend
+  reason: cluster/local distributed evaluation
+  constraints: only when active mode is distributed coordinator
+  fallback: StageRunner
+- library: Ray
+  purpose: distributed optimization backend
+  reason: alternative distributed evaluation and proposer runtime
+  constraints: explicit mode switch and runtime contract
+  fallback: StageRunner or Dask
+- library: BoTorch
+  purpose: advanced proposer/qNEHVI path
+  reason: distributed coordinator advanced path
+  constraints: do not force if objective-contract/runtime proof absent
+  fallback: non-BoTorch proposer modes
+open_gaps:
+- producer-side hardpoints / solver_points completeness
+- complete cylinder packaging passport
+- browser performance trace and measurable perf acceptance
+- runtime evidence proving Windows visual acceptance
+- final cleanup of duplicated/non-canonical base values
+artifact_files:
+  requirements_matrix: REQUIREMENTS_MATRIX.csv
+  acceptance_matrix: ACCEPTANCE_MATRIX.csv
+  parameter_catalog: PARAMETER_CATALOG.csv
+  screen_catalog: SCREEN_CATALOG.csv
+  window_catalog: WINDOW_CATALOG.csv
+  ui_element_catalog: UI_ELEMENT_CATALOG.csv
+  wishlist_todo_reconciliation: WISHLIST_TODO_RECONCILIATION.csv
+  structure_lint: STRUCTURE_LINT_REPORT.md
+authority:
+  matrix_file: SOURCE_AUTHORITY_MATRIX.csv
+  repo_discovery_log: CONNECTOR_DISCOVERY_LOG.md
+  open_conflicts_file: REPO_CANON_CONFLICTS.csv
+parity:
+  reconciliation_file: DESKTOP_WEB_PARITY_RECONCILIATION.csv
+  summary_file: SOURCE_CONTEXT/REPO_CANON_DOC_EXCERPTS.md
+  function_loss_policy: forbidden
+graphics_truth:
+  surface_matrix_file: GRAPHICS_TRUTH_SURFACE_MATRIX.csv
+  allowed_states: *id001
+  default_warning_mode: approximate_inferred_with_warning requires explicit visible
+    warning and provenance
+handoff:
+  matrix_file: WORKSPACE_HANDOFF_MATRIX.csv
+  default_rule: frozen contracts and hashes between workspaces; no silent mutable
+    shared state
+codex_consumption:
+  order_file: CODEx_CONSUMPTION_ORDER.md
+  package_index_file: PACKAGE_INDEX.csv
+workspaces_annex: WORKSPACE_CONTRACT_MATRIX.csv
+workspace_canon_index: WORKSPACE_CANON_INDEX.csv
+canonical_scenario_source_annex: CANONICAL_SCENARIO_SOURCE_CONTRACT.yaml
+release_gate_annex: RELEASE_GATE_MATRIX.csv
+frontier_annexes:
+  workspace_dependency_matrix: WORKSPACE_DEPENDENCY_MATRIX.csv
+  artifact_lifecycle_matrix: ARTIFACT_LIFECYCLE_MATRIX.csv
+  truth_state_action_policy: TRUTH_STATE_ACTION_POLICY.csv
+  current_historical_stale_policy: CURRENT_HISTORICAL_STALE_POLICY.csv
+  provenance_fields_catalog: PROVENANCE_FIELDS_CATALOG.csv
+  user_progress_surface_matrix: USER_PROGRESS_SURFACE_MATRIX.csv
+  diagnostics_evidence_manifest_matrix: DIAGNOSTICS_EVIDENCE_MANIFEST_MATRIX.csv
+  compare_contract_matrix: COMPARE_CONTRACT_MATRIX.csv
+  scenario_lineage_enforcement_matrix: SCENARIO_LINEAGE_ENFORCEMENT_MATRIX.csv
+  project_results_storage_model: PROJECT_RESULTS_STORAGE_MODEL.yaml
+  repo_canon_prompt_trace: REPO_CANON_PROMPT_TRACE.csv
+  attached_context_reconciliation: ATTACHED_CONTEXT_RECONCILIATION.csv
+  next_step_execution_brief: NEXT_STEP_EXECUTION_BRIEF.md

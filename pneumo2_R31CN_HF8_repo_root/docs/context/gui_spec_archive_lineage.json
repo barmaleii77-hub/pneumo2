@@ -190,5 +190,22 @@
       "ring_to_suite_link_contract_v13.json"
     ],
     "repo_layer": "docs/context/gui_spec_imports/v13_ring_editor_migration/"
+  },
+  {
+    "version": "v37",
+    "archive_name": "pneumo_codex_tz_spec_connector_reconciled_v37_github_kb_supplement.zip",
+    "phase": "knowledge_base_reconciliation",
+    "status": "successor_kb_supplement",
+    "role": "GitHub knowledge-base supplement и TZ/spec connector без runtime-closure proof",
+    "main_artifacts": [
+      "TECHNICAL_SPECIFICATION.md",
+      "GUI_SPEC.yaml",
+      "WORKSPACE_CONTRACT_MATRIX.csv",
+      "PARAMETER_CATALOG.csv",
+      "ACCEPTANCE_MATRIX.csv",
+      "REPO_OPEN_GAPS_TO_KEEP_OPEN.csv",
+      "NON_RUNTIME_CLOSURE_NOTICE.md"
+    ],
+    "repo_layer": "docs/context/gui_spec_imports/v37_github_kb_supplement/"
   }
 ]

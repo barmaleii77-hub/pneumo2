@@ -271,6 +271,11 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
             str(_default_shell_state_path(self.repo_root)),
             QtCore.QSettings.IniFormat,
         )
+        self._state_save_suppressed = True
+        self._state_save_timer = QtCore.QTimer(self)
+        self._state_save_timer.setSingleShot(True)
+        self._state_save_timer.setInterval(750)
+        self._state_save_timer.timeout.connect(self._sync_window_state)
         self.workspaces = build_shell_workspaces()
         self.workspace_by_id = build_workspace_map()
         self.commands = build_shell_commands()
@@ -305,6 +310,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         self.open_workspace(
             restored_workspace_id if restored_workspace_id in self.workspace_by_id else "overview"
         )
+        self._state_save_suppressed = False
 
     def _build_ui(self) -> None:
         self._build_menu()
@@ -646,10 +652,18 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
             self.restoreState(state)
 
     def _save_window_state(self) -> None:
+        if getattr(self, "_state_save_suppressed", False):
+            return
         self._settings.setValue("window/geometry", self.saveGeometry())
         self._settings.setValue("window/state", self.saveState())
         self._settings.setValue("window/last_workspace", self._current_workspace_id)
-        self._settings.sync()
+        self._state_save_timer.start()
+
+    def _sync_window_state(self) -> None:
+        try:
+            self._settings.sync()
+        except Exception:
+            pass
 
     def _populate_pinned_actions(self) -> None:
         self.pinned_list.clear()
@@ -925,6 +939,9 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self._save_window_state()
+        if self._state_save_timer.isActive():
+            self._state_save_timer.stop()
+        self._sync_window_state()
         super().closeEvent(event)
 
     def _show_about_dialog(self) -> None:

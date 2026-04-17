@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 
 from pneumo_solver_ui.desktop_shell.launcher_catalog import build_desktop_launch_catalog
 from pneumo_solver_ui.desktop_spec_shell.help_registry import build_help_registry
 from pneumo_solver_ui.desktop_spec_shell.overview_state import build_overview_snapshot
-from pneumo_solver_ui.desktop_spec_shell.registry import build_command_map, build_shell_workspaces
+from pneumo_solver_ui.desktop_spec_shell.registry import (
+    SHELL_WORKSPACE_CODE,
+    build_command_map,
+    build_shell_workspaces,
+)
 from pneumo_solver_ui.desktop_spec_shell.search import build_search_entries, search_command_palette
 
 
@@ -38,8 +43,12 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert workspaces["test_matrix"].workspace_owner == "WS-SUITE"
     assert workspaces["baseline_run"].workspace_owner == "WS-BASELINE"
     assert workspaces["optimization"].workspace_owner == "WS-OPTIMIZATION"
-    assert workspaces["results_analysis"].workspace_owner == "WS-RESULTS; WS-ANALYTICS"
+    assert workspaces["overview"].workspace_owner == "WS-PROJECT"
+    assert workspaces["results_analysis"].workspace_owner == "WS-ANALYSIS"
     assert workspaces["diagnostics"].workspace_owner == "WS-DIAGNOSTICS"
+    assert workspaces["tools"].workspace_owner == "WS-TOOLS"
+    assert "WS-RESULTS" in workspaces["results_analysis"].catalog_owner_aliases
+    assert "WS-ANALYTICS" in workspaces["results_analysis"].catalog_owner_aliases
 
     assert workspaces["baseline_run"].automation_id == "BL-CONTRACT-CARD"
     assert workspaces["optimization"].automation_id == "OP-STAGERUNNER-BLOCK"
@@ -52,7 +61,43 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["baseline.center.open"].automation_id == "BL-BTN-RUN"
     assert commands["optimization.center.open"].automation_id == "OP-BTN-LAUNCH"
     assert commands["input.editor.open"].launch_surface == "legacy_bridge"
+    assert commands["ring.editor.open"].launch_surface == "legacy_bridge"
+    assert commands["test.center.open"].launch_surface == "legacy_bridge"
+    assert commands["baseline.center.open"].launch_surface == "legacy_bridge"
+    assert commands["optimization.center.open"].launch_surface == "legacy_bridge"
+    assert commands["results.center.open"].launch_surface == "legacy_bridge"
+    assert commands["diagnostics.legacy_center.open"].launch_surface == "legacy_bridge"
     assert commands["diagnostics.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_diagnostics_center"
+
+
+def test_gui_spec_shell_launch_module_commands_do_not_claim_native_workspace_surface() -> None:
+    commands = build_command_map()
+    allowed_surfaces = {"legacy_bridge", "external_window", "tooling"}
+
+    for command in commands.values():
+        if command.kind != "launch_module":
+            continue
+        assert command.launch_surface in allowed_surfaces, command.command_id
+        if command.launch_surface == "legacy_bridge":
+            assert command.status_label in {"Legacy bridge", "Legacy fallback", "Fallback / debug"}
+
+
+def test_gui_spec_shell_runtime_workspace_owners_cover_v37_contract_matrix() -> None:
+    matrix_path = ROOT / "docs" / "context" / "gui_spec_imports" / "v37_github_kb_supplement" / "WORKSPACE_CONTRACT_MATRIX.csv"
+    with matrix_path.open("r", encoding="utf-8-sig", newline="") as handle:
+        v37_workspace_ids = {row["workspace_id"] for row in csv.DictReader(handle)}
+
+    runtime_workspace_ids = {
+        workspace.workspace_owner
+        for workspace in build_shell_workspaces()
+        if workspace.workspace_owner
+    }
+    runtime_workspace_ids.add(SHELL_WORKSPACE_CODE)
+
+    assert v37_workspace_ids <= runtime_workspace_ids
+    assert "GLOBAL" not in runtime_workspace_ids
+    assert "WS-RESULTS" not in runtime_workspace_ids
+    assert "WS-ANALYTICS" not in runtime_workspace_ids
 
 
 def test_gui_spec_shell_search_indexes_migration_aliases_and_visual_routes() -> None:
@@ -98,6 +143,18 @@ def test_gui_spec_shell_overview_snapshot_exposes_project_baseline_results_and_d
     assert "Последние результаты" in titles
     assert "Последний diagnostics bundle" in titles
     assert "Health / self-check" in titles
+
+
+def test_gui_spec_overview_snapshot_does_not_recursively_scan_user_desktop() -> None:
+    src = (ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "overview_state.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert 'desktop_root = Path.home() / "Desktop"' in src
+    assert "recursive=False" in src
+    assert "desktop_root.rglob" not in src
+    assert "_latest_path(desktop_root" not in src
 
 
 def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> None:

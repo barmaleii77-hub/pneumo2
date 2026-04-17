@@ -1,0 +1,1433 @@
+ID,TYPE,PRIMARY_FILE,TITLE,LINKS,STATUS
+REQ-001,REQ,REQUIREMENTS_MATRIX.csv,Единый канонический реестр ключей и запрет runtime-алиасов,ACC-001;TST-001,covered
+REQ-002,REQ,REQUIREMENTS_MATRIX.csv,Проект является основной пользовательской сущностью и хранится в файле,ACC-002;TST-002,covered
+REQ-003,REQ,REQUIREMENTS_MATRIX.csv,Для каждого класса сущностей существует один source-of-truth,ACC-003;TST-003,covered
+REQ-004,REQ,REQUIREMENTS_MATRIX.csv,Графика обязана использовать truth-state solver_confirmed/source_data_confirmed/approximate_inferred_with_warning/unavailable,ACC-004;TST-004,covered
+REQ-005,REQ,REQUIREMENTS_MATRIX.csv,"При неполной геометрии допускается только честная approximate/degraded визуализация или unavailable, но не красивая ложь",ACC-005;TST-005,covered
+REQ-006,REQ,REQUIREMENTS_MATRIX.csv,Потеря существующей функциональности при web->desktop migration запрещена,ACC-006;TST-006,covered
+REQ-007,REQ,REQUIREMENTS_MATRIX.csv,Приложение проектируется как нативный Windows desktop shell на Qt6/PySide6,ACC-007;TST-007,covered
+REQ-008,REQ,REQUIREMENTS_MATRIX.csv,"Главное окно имеет верхнее меню, command search, левое дерево, центральную рабочую область, правый inspector и нижнюю status/progress strip",ACC-008;TST-008,covered
+REQ-009,REQ,REQUIREMENTS_MATRIX.csv,Docking/undocking/floating/auto-hide/second-monitor/restore-layout обязательны,ACC-009;TST-009,covered
+REQ-010,REQ,REQUIREMENTS_MATRIX.csv,"Клавиатурная доступность, видимый focus, F6 между крупными регионами и screen-reader compatibility обязательны",ACC-010;TST-010,covered
+REQ-011,REQ,REQUIREMENTS_MATRIX.csv,"High DPI, mixed-DPI и Windows snap semantics обязательны",ACC-011;TST-011,covered
+REQ-012,REQ,REQUIREMENTS_MATRIX.csv,"Глобальный поиск команд, экранов, сущностей и артефактов обязателен",ACC-012;TST-012,covered
+REQ-013,REQ,REQUIREMENTS_MATRIX.csv,Команда «Собрать диагностику» всегда заметна и доступна из любого рабочего пространства,ACC-013;TST-013,covered
+REQ-014,REQ,REQUIREMENTS_MATRIX.csv,"WS-PROJECT показывает состояние проекта, блокеры и следующее действие, но не дублирует редактирование инженерных чисел",ACC-014;TST-014,covered
+REQ-015,REQ,REQUIREMENTS_MATRIX.csv,WS-INPUTS является единственной editable-поверхностью для model input master copy до handoff дальше по pipeline,ACC-015;TST-015,covered
+REQ-016,REQ,REQUIREMENTS_MATRIX.csv,У каждой core-группы входных данных есть обязательный графический двойник и двусторонняя синхронизация число↔графика,ACC-016;TST-016,covered
+REQ-017,REQ,REQUIREMENTS_MATRIX.csv,Редактор циклического сценария является единственным источником истины для дороги и маршрута движения,ACC-017;TST-017,covered
+REQ-018,REQ,REQUIREMENTS_MATRIX.csv,Циклический сценарий нигде не должен рисоваться как геометрическое кольцо; используются только unfolded cyclic views,ACC-018;TST-018,covered
+REQ-019,REQ,REQUIREMENTS_MATRIX.csv,"Сегмент 0 задаёт начальное и конечное состояние, сегменты 1..N-1 задают только конец, последний сегмент логически замыкается на первый",ACC-019;TST-019,covered
+REQ-020,REQ,REQUIREMENTS_MATRIX.csv,Поворот задаётся явно; продольная геометрия через конечные высоты; поперечный уклон одним параметром; разгон/торможение не тип сегмента,ACC-020;TST-020,covered
+REQ-021,REQ,REQUIREMENTS_MATRIX.csv,"WS-SUITE потребляет scenario refs и validated snapshot, но не владеет геометрией сценария",ACC-021;TST-021,covered
+REQ-022,REQ,REQUIREMENTS_MATRIX.csv,Validated suite snapshot обязателен как handoff в WS-BASELINE и несёт upstream lineage,ACC-022;TST-022,covered
+REQ-023,REQ,REQUIREMENTS_MATRIX.csv,WS-BASELINE читает только validated snapshot и ведёт active baseline contract с явной политикой auto-update,ACC-023;TST-023,covered
+REQ-024,REQ,REQUIREMENTS_MATRIX.csv,"WS-OPTIMIZATION читает active_baseline_contract и objective_contract, а run identity включает lineage и hard gate",ACC-024;TST-024,covered
+REQ-025,REQ,REQUIREMENTS_MATRIX.csv,Для оптимизации существует только один активный режим запуска в конкретный момент времени,ACC-025;TST-025,covered
+REQ-026,REQ,REQUIREMENTS_MATRIX.csv,StageRunner и distributed coordinator поддерживаются как разные execution engines с общим objective-contract и явной history semantics,ACC-026;TST-026,covered_partially
+REQ-027,REQ,REQUIREMENTS_MATRIX.csv,"Stage-specific influence summary, seed budgeting и promotion policy должны быть видимы и объяснимы на текущем экране",ACC-027;TST-027,covered
+REQ-028,REQ,REQUIREMENTS_MATRIX.csv,"WS-ANALYSIS работает только от selected run contract и explicit compare contract, а не от live runtime-state",ACC-028;TST-028,covered
+REQ-029,REQ,REQUIREMENTS_MATRIX.csv,"WS-ANIMATOR открывается только по explicit analysis context и explicit artifact pointers, не rebindится молча к текущему проекту",ACC-029;TST-029,covered
+REQ-030,REQ,REQUIREMENTS_MATRIX.csv,Для цилиндров full-truth body/rod/piston разрешён только при complete packaging passport; иначе только axis-only honesty mode,ACC-030;TST-030,covered_partially
+REQ-031,REQ,REQUIREMENTS_MATRIX.csv,"Animator и схемы обязаны показывать источник представления, truth warnings и export/capture provenance",ACC-031;TST-031,covered
+REQ-032,REQ,REQUIREMENTS_MATRIX.csv,"WS-DIAGNOSTICS потребляет explicit evidence manifest, health report, selfcheck и SEND bundle contract",ACC-032;TST-032,covered
+REQ-033,REQ,REQUIREMENTS_MATRIX.csv,"Latest bundle, SHA256, interpreter provenance и freshness обязаны быть видимы пользователю",ACC-033;TST-033,covered
+REQ-034,REQ,REQUIREMENTS_MATRIX.csv,"У каждого значимого поля, кнопки, графика, предупреждения и столбца есть tooltip и знак вопроса с развёрнутым help",ACC-034;TST-034,covered
+REQ-035,REQ,REQUIREMENTS_MATRIX.csv,Обозначения без названия и значения без единиц измерения запрещены,ACC-035;TST-035,covered
+REQ-036,REQ,REQUIREMENTS_MATRIX.csv,"Значимые графические surfaces интерактивны и синхронизированы с деревом, inspector, таблицами и графиками",ACC-036;TST-036,covered
+REQ-037,REQ,REQUIREMENTS_MATRIX.csv,"Пневмосхема/мнемосхема обязана показывать направление, давление, расход и статусы дискретных элементов",ACC-037;TST-037,covered_partially
+REQ-038,REQ,REQUIREMENTS_MATRIX.csv,Диапазоны как first-class сущности редактируются dual-range control или эквивалентом с точными полями,ACC-038;TST-038,covered
+REQ-039,REQ,REQUIREMENTS_MATRIX.csv,"Длительные операции показывают progress на текущем экране, а shell strip дублирует его только как вторичный сигнал",ACC-039;TST-039,covered
+REQ-040,REQ,REQUIREMENTS_MATRIX.csv,Current-vs-historical и mismatch состояния вынесены в явные banners и compare policies,ACC-040;TST-040,covered
+REQ-041,REQ,REQUIREMENTS_MATRIX.csv,Производительность обязана быть доказуемой trace-артефактами; скрытые панели и фоновые web-surface не крадут budget playback,ACC-041;TST-041,covered_partially
+REQ-042,REQ,REQUIREMENTS_MATRIX.csv,"Producer-side hardpoints, solver_points и cylinder packaging contract остаются P0 до доказанного runtime evidence",ACC-042;TST-042,covered_partially
+REQ-043,REQ,REQUIREMENTS_MATRIX.csv,"Специализированные окна Desktop Animator, Compare Viewer и Desktop Mnemo остаются отдельными top-level surfaces",ACC-043;TST-043,covered
+REQ-044,REQ,REQUIREMENTS_MATRIX.csv,Скрытые expert/legacy-маршруты запрещены; незавершённые элементы маркируются «В разработке»,ACC-044;TST-044,covered
+REQ-045,REQ,REQUIREMENTS_MATRIX.csv,"Пакет для CODEX обязан быть recipient-neutral, самодостаточным, с traceability, lint и reconciliation backlog without rediscovery",ACC-045;TST-045,covered
+ACC-001,ACC,ACCEPTANCE_MATRIX.csv,Единый канонический реестр ключей и запрет runtime-алиасов,REQ-001;TST-001,covered
+ACC-002,ACC,ACCEPTANCE_MATRIX.csv,Проект является основной пользовательской сущностью и хранится в файле,REQ-002;TST-002,covered
+ACC-003,ACC,ACCEPTANCE_MATRIX.csv,Для каждого класса сущностей существует один source-of-truth,REQ-003;TST-003,covered
+ACC-004,ACC,ACCEPTANCE_MATRIX.csv,Графика обязана использовать truth-state solver_confirmed/source_data_confirmed/approximate_inferred_with_warning/unavailable,REQ-004;TST-004,covered
+ACC-005,ACC,ACCEPTANCE_MATRIX.csv,"При неполной геометрии допускается только честная approximate/degraded визуализация или unavailable, но не красивая ложь",REQ-005;TST-005,covered
+ACC-006,ACC,ACCEPTANCE_MATRIX.csv,Потеря существующей функциональности при web->desktop migration запрещена,REQ-006;TST-006,covered
+ACC-007,ACC,ACCEPTANCE_MATRIX.csv,Приложение проектируется как нативный Windows desktop shell на Qt6/PySide6,REQ-007;TST-007,covered
+ACC-008,ACC,ACCEPTANCE_MATRIX.csv,"Главное окно имеет верхнее меню, command search, левое дерево, центральную рабочую область, правый inspector и нижнюю status/progress strip",REQ-008;TST-008,covered
+ACC-009,ACC,ACCEPTANCE_MATRIX.csv,Docking/undocking/floating/auto-hide/second-monitor/restore-layout обязательны,REQ-009;TST-009,covered
+ACC-010,ACC,ACCEPTANCE_MATRIX.csv,"Клавиатурная доступность, видимый focus, F6 между крупными регионами и screen-reader compatibility обязательны",REQ-010;TST-010,covered
+ACC-011,ACC,ACCEPTANCE_MATRIX.csv,"High DPI, mixed-DPI и Windows snap semantics обязательны",REQ-011;TST-011,covered
+ACC-012,ACC,ACCEPTANCE_MATRIX.csv,"Глобальный поиск команд, экранов, сущностей и артефактов обязателен",REQ-012;TST-012,covered
+ACC-013,ACC,ACCEPTANCE_MATRIX.csv,Команда «Собрать диагностику» всегда заметна и доступна из любого рабочего пространства,REQ-013;TST-013,covered
+ACC-014,ACC,ACCEPTANCE_MATRIX.csv,"WS-PROJECT показывает состояние проекта, блокеры и следующее действие, но не дублирует редактирование инженерных чисел",REQ-014;TST-014,covered
+ACC-015,ACC,ACCEPTANCE_MATRIX.csv,WS-INPUTS является единственной editable-поверхностью для model input master copy до handoff дальше по pipeline,REQ-015;TST-015,covered
+ACC-016,ACC,ACCEPTANCE_MATRIX.csv,У каждой core-группы входных данных есть обязательный графический двойник и двусторонняя синхронизация число↔графика,REQ-016;TST-016,covered
+ACC-017,ACC,ACCEPTANCE_MATRIX.csv,Редактор циклического сценария является единственным источником истины для дороги и маршрута движения,REQ-017;TST-017,covered
+ACC-018,ACC,ACCEPTANCE_MATRIX.csv,Циклический сценарий нигде не должен рисоваться как геометрическое кольцо; используются только unfolded cyclic views,REQ-018;TST-018,covered
+ACC-019,ACC,ACCEPTANCE_MATRIX.csv,"Сегмент 0 задаёт начальное и конечное состояние, сегменты 1..N-1 задают только конец, последний сегмент логически замыкается на первый",REQ-019;TST-019,covered
+ACC-020,ACC,ACCEPTANCE_MATRIX.csv,Поворот задаётся явно; продольная геометрия через конечные высоты; поперечный уклон одним параметром; разгон/торможение не тип сегмента,REQ-020;TST-020,covered
+ACC-021,ACC,ACCEPTANCE_MATRIX.csv,"WS-SUITE потребляет scenario refs и validated snapshot, но не владеет геометрией сценария",REQ-021;TST-021,covered
+ACC-022,ACC,ACCEPTANCE_MATRIX.csv,Validated suite snapshot обязателен как handoff в WS-BASELINE и несёт upstream lineage,REQ-022;TST-022,covered
+ACC-023,ACC,ACCEPTANCE_MATRIX.csv,WS-BASELINE читает только validated snapshot и ведёт active baseline contract с явной политикой auto-update,REQ-023;TST-023,covered
+ACC-024,ACC,ACCEPTANCE_MATRIX.csv,"WS-OPTIMIZATION читает active_baseline_contract и objective_contract, а run identity включает lineage и hard gate",REQ-024;TST-024,covered
+ACC-025,ACC,ACCEPTANCE_MATRIX.csv,Для оптимизации существует только один активный режим запуска в конкретный момент времени,REQ-025;TST-025,covered
+ACC-026,ACC,ACCEPTANCE_MATRIX.csv,StageRunner и distributed coordinator поддерживаются как разные execution engines с общим objective-contract и явной history semantics,REQ-026;TST-026,covered_partially
+ACC-027,ACC,ACCEPTANCE_MATRIX.csv,"Stage-specific influence summary, seed budgeting и promotion policy должны быть видимы и объяснимы на текущем экране",REQ-027;TST-027,covered
+ACC-028,ACC,ACCEPTANCE_MATRIX.csv,"WS-ANALYSIS работает только от selected run contract и explicit compare contract, а не от live runtime-state",REQ-028;TST-028,covered
+ACC-029,ACC,ACCEPTANCE_MATRIX.csv,"WS-ANIMATOR открывается только по explicit analysis context и explicit artifact pointers, не rebindится молча к текущему проекту",REQ-029;TST-029,covered
+ACC-030,ACC,ACCEPTANCE_MATRIX.csv,Для цилиндров full-truth body/rod/piston разрешён только при complete packaging passport; иначе только axis-only honesty mode,REQ-030;TST-030,covered_partially
+ACC-031,ACC,ACCEPTANCE_MATRIX.csv,"Animator и схемы обязаны показывать источник представления, truth warnings и export/capture provenance",REQ-031;TST-031,covered
+ACC-032,ACC,ACCEPTANCE_MATRIX.csv,"WS-DIAGNOSTICS потребляет explicit evidence manifest, health report, selfcheck и SEND bundle contract",REQ-032;TST-032,covered
+ACC-033,ACC,ACCEPTANCE_MATRIX.csv,"Latest bundle, SHA256, interpreter provenance и freshness обязаны быть видимы пользователю",REQ-033;TST-033,covered
+ACC-034,ACC,ACCEPTANCE_MATRIX.csv,"У каждого значимого поля, кнопки, графика, предупреждения и столбца есть tooltip и знак вопроса с развёрнутым help",REQ-034;TST-034,covered
+ACC-035,ACC,ACCEPTANCE_MATRIX.csv,Обозначения без названия и значения без единиц измерения запрещены,REQ-035;TST-035,covered
+ACC-036,ACC,ACCEPTANCE_MATRIX.csv,"Значимые графические surfaces интерактивны и синхронизированы с деревом, inspector, таблицами и графиками",REQ-036;TST-036,covered
+ACC-037,ACC,ACCEPTANCE_MATRIX.csv,"Пневмосхема/мнемосхема обязана показывать направление, давление, расход и статусы дискретных элементов",REQ-037;TST-037,covered_partially
+ACC-038,ACC,ACCEPTANCE_MATRIX.csv,Диапазоны как first-class сущности редактируются dual-range control или эквивалентом с точными полями,REQ-038;TST-038,covered
+ACC-039,ACC,ACCEPTANCE_MATRIX.csv,"Длительные операции показывают progress на текущем экране, а shell strip дублирует его только как вторичный сигнал",REQ-039;TST-039,covered
+ACC-040,ACC,ACCEPTANCE_MATRIX.csv,Current-vs-historical и mismatch состояния вынесены в явные banners и compare policies,REQ-040;TST-040,covered
+ACC-041,ACC,ACCEPTANCE_MATRIX.csv,Производительность обязана быть доказуемой trace-артефактами; скрытые панели и фоновые web-surface не крадут budget playback,REQ-041;TST-041,covered_partially
+ACC-042,ACC,ACCEPTANCE_MATRIX.csv,"Producer-side hardpoints, solver_points и cylinder packaging contract остаются P0 до доказанного runtime evidence",REQ-042;TST-042,covered_partially
+ACC-043,ACC,ACCEPTANCE_MATRIX.csv,"Специализированные окна Desktop Animator, Compare Viewer и Desktop Mnemo остаются отдельными top-level surfaces",REQ-043;TST-043,covered
+ACC-044,ACC,ACCEPTANCE_MATRIX.csv,Скрытые expert/legacy-маршруты запрещены; незавершённые элементы маркируются «В разработке»,REQ-044;TST-044,covered
+ACC-045,ACC,ACCEPTANCE_MATRIX.csv,"Пакет для CODEX обязан быть recipient-neutral, самодостаточным, с traceability, lint и reconciliation backlog without rediscovery",REQ-045;TST-045,covered
+TST-001,TST,TEST_CATALOG.csv,Проверка REQ-001,REQ-001,covered
+TST-002,TST,TEST_CATALOG.csv,Проверка REQ-002,REQ-002,covered
+TST-003,TST,TEST_CATALOG.csv,Проверка REQ-003,REQ-003,covered
+TST-004,TST,TEST_CATALOG.csv,Проверка REQ-004,REQ-004,covered
+TST-005,TST,TEST_CATALOG.csv,Проверка REQ-005,REQ-005,covered
+TST-006,TST,TEST_CATALOG.csv,Проверка REQ-006,REQ-006,covered
+TST-007,TST,TEST_CATALOG.csv,Проверка REQ-007,REQ-007,covered
+TST-008,TST,TEST_CATALOG.csv,Проверка REQ-008,REQ-008,covered
+TST-009,TST,TEST_CATALOG.csv,Проверка REQ-009,REQ-009,covered
+TST-010,TST,TEST_CATALOG.csv,Проверка REQ-010,REQ-010,covered
+TST-011,TST,TEST_CATALOG.csv,Проверка REQ-011,REQ-011,covered
+TST-012,TST,TEST_CATALOG.csv,Проверка REQ-012,REQ-012,covered
+TST-013,TST,TEST_CATALOG.csv,Проверка REQ-013,REQ-013,covered
+TST-014,TST,TEST_CATALOG.csv,Проверка REQ-014,REQ-014,covered
+TST-015,TST,TEST_CATALOG.csv,Проверка REQ-015,REQ-015,covered
+TST-016,TST,TEST_CATALOG.csv,Проверка REQ-016,REQ-016,covered
+TST-017,TST,TEST_CATALOG.csv,Проверка REQ-017,REQ-017,covered
+TST-018,TST,TEST_CATALOG.csv,Проверка REQ-018,REQ-018,covered
+TST-019,TST,TEST_CATALOG.csv,Проверка REQ-019,REQ-019,covered
+TST-020,TST,TEST_CATALOG.csv,Проверка REQ-020,REQ-020,covered
+TST-021,TST,TEST_CATALOG.csv,Проверка REQ-021,REQ-021,covered
+TST-022,TST,TEST_CATALOG.csv,Проверка REQ-022,REQ-022,covered
+TST-023,TST,TEST_CATALOG.csv,Проверка REQ-023,REQ-023,covered
+TST-024,TST,TEST_CATALOG.csv,Проверка REQ-024,REQ-024,covered
+TST-025,TST,TEST_CATALOG.csv,Проверка REQ-025,REQ-025,covered
+TST-026,TST,TEST_CATALOG.csv,Проверка REQ-026,REQ-026,covered
+TST-027,TST,TEST_CATALOG.csv,Проверка REQ-027,REQ-027,covered
+TST-028,TST,TEST_CATALOG.csv,Проверка REQ-028,REQ-028,covered
+TST-029,TST,TEST_CATALOG.csv,Проверка REQ-029,REQ-029,covered
+TST-030,TST,TEST_CATALOG.csv,Проверка REQ-030,REQ-030,covered
+TST-031,TST,TEST_CATALOG.csv,Проверка REQ-031,REQ-031,covered
+TST-032,TST,TEST_CATALOG.csv,Проверка REQ-032,REQ-032,covered
+TST-033,TST,TEST_CATALOG.csv,Проверка REQ-033,REQ-033,covered
+TST-034,TST,TEST_CATALOG.csv,Проверка REQ-034,REQ-034,covered
+TST-035,TST,TEST_CATALOG.csv,Проверка REQ-035,REQ-035,covered
+TST-036,TST,TEST_CATALOG.csv,Проверка REQ-036,REQ-036,covered
+TST-037,TST,TEST_CATALOG.csv,Проверка REQ-037,REQ-037,covered
+TST-038,TST,TEST_CATALOG.csv,Проверка REQ-038,REQ-038,covered
+TST-039,TST,TEST_CATALOG.csv,Проверка REQ-039,REQ-039,covered
+TST-040,TST,TEST_CATALOG.csv,Проверка REQ-040,REQ-040,covered
+TST-041,TST,TEST_CATALOG.csv,Проверка REQ-041,REQ-041,covered
+TST-042,TST,TEST_CATALOG.csv,Проверка REQ-042,REQ-042,covered
+TST-043,TST,TEST_CATALOG.csv,Проверка REQ-043,REQ-043,covered
+TST-044,TST,TEST_CATALOG.csv,Проверка REQ-044,REQ-044,covered
+TST-045,TST,TEST_CATALOG.csv,Проверка REQ-045,REQ-045,covered
+PAR-0001,PAR,PARAMETER_CATALOG.csv,Название сценария,GRP-RING-GLOBAL;RG-FLD-SCENARIO-NAME,covered
+PAR-0002,PAR,PARAMETER_CATALOG.csv,Политика замыкания кольца,GRP-RING-GLOBAL;RG-FLD-CLOSURE-POLICY,covered
+PAR-0003,PAR,PARAMETER_CATALOG.csv,Начальная скорость прохождения,GRP-RING-GLOBAL;RG-FLD-V0,covered
+PAR-0004,PAR,PARAMETER_CATALOG.csv,Шаг дискретизации дороги,GRP-RING-GLOBAL;RG-FLD-DX,covered
+PAR-0005,PAR,PARAMETER_CATALOG.csv,Количество кругов,GRP-RING-GLOBAL;RG-FLD-LAPS,covered
+PAR-0006,PAR,PARAMETER_CATALOG.csv,Код генератора случайности,GRP-RING-GLOBAL;RG-FLD-SEED,covered
+PAR-0007,PAR,PARAMETER_CATALOG.csv,Ширина дороги,GRP-RING-GLOBAL;RG-FLD-ROAD-WIDTH,covered
+PAR-0008,PAR,PARAMETER_CATALOG.csv,Высота дороги в начале кольца,GRP-RING-SEGMENT;RG-FLD-START-HEIGHT,covered
+PAR-0009,PAR,PARAMETER_CATALOG.csv,Порог допуска шва кольца,GRP-RING-GLOBAL;RG-FLD-SHOV-THRESHOLD,covered
+PAR-0010,PAR,PARAMETER_CATALOG.csv,Номер сегмента,GRP-RING-SEGMENT;RG-FLD-SEGMENT-ID,covered
+PAR-0011,PAR,PARAMETER_CATALOG.csv,Имя сегмента,GRP-RING-SEGMENT;RG-FLD-SEGMENT-LABEL,covered
+PAR-0012,PAR,PARAMETER_CATALOG.csv,Сегмент включён,GRP-RING-SEGMENT;RG-FLD-SEGMENT-ENABLED,covered
+PAR-0013,PAR,PARAMETER_CATALOG.csv,Длина сегмента,GRP-RING-SEGMENT;RG-FLD-SEGMENT-LENGTH,covered
+PAR-0014,PAR,PARAMETER_CATALOG.csv,Направление поворота,GRP-RING-SEGMENT;RG-FLD-TURN-DIRECTION,covered
+PAR-0015,PAR,PARAMETER_CATALOG.csv,Радиус поворота,GRP-RING-SEGMENT;RG-FLD-TURN-RADIUS,covered
+PAR-0016,PAR,PARAMETER_CATALOG.csv,Угол дуги,GRP-RING-SEGMENT;RG-FLD-ARC-ANGLE,covered
+PAR-0017,PAR,PARAMETER_CATALOG.csv,Высота дороги в конце сегмента,GRP-RING-SEGMENT;RG-FLD-END-HEIGHT,covered
+PAR-0018,PAR,PARAMETER_CATALOG.csv,Поперечный уклон,GRP-RING-SEGMENT;RG-FLD-CROSSFALL,covered
+PAR-0019,PAR,PARAMETER_CATALOG.csv,Тип покрытия,GRP-RING-SEGMENT;RG-FLD-SURFACE-TYPE,covered
+PAR-0020,PAR,PARAMETER_CATALOG.csv,Класс шероховатости или профиль,GRP-RING-SEGMENT;RG-FLD-SURFACE-CLASS,covered
+PAR-0021,PAR,PARAMETER_CATALOG.csv,Амплитуда синусоиды,GRP-RING-SEGMENT;RG-FLD-SINE-AMPLITUDE,covered
+PAR-0022,PAR,PARAMETER_CATALOG.csv,Длина волны синусоиды,GRP-RING-SEGMENT;RG-FLD-SINE-WAVELENGTH,covered
+PAR-0023,PAR,PARAMETER_CATALOG.csv,Фаза правой колеи,GRP-RING-SEGMENT;RG-FLD-PHASE-RIGHT,covered
+PAR-0024,PAR,PARAMETER_CATALOG.csv,Случайные фазы,GRP-RING-SEGMENT;RG-FLD-RANDOM-PHASES,covered
+PAR-0025,PAR,PARAMETER_CATALOG.csv,Целевая скорость прохождения,GRP-RING-SEGMENT;RG-FLD-TARGET-SPEED,covered
+PAR-0026,PAR,PARAMETER_CATALOG.csv,Режим прохождения сегмента,GRP-RING-SEGMENT;RG-FLD-PASSAGE-MODE,covered
+PAR-0027,PAR,PARAMETER_CATALOG.csv,Комментарий сегмента,GRP-RING-SEGMENT;RG-FLD-NOTE,covered
+PAR-0028,PAR,PARAMETER_CATALOG.csv,Автозамыкание последнего сегмента,GRP-RING-SEGMENT;RG-FLD-AUTO-CLOSE,covered
+PAR-0029,PAR,PARAMETER_CATALOG.csv,Начало текущего сегмента,GRP-RING-SEGMENT;RG-FLD-START-STATE-DERIVED,covered
+PAR-0030,PAR,PARAMETER_CATALOG.csv,Высота левой колеи,GRP-RING-SEGMENT;RG-FLD-LEFT-RUT-HEIGHT,covered
+PAR-0031,PAR,PARAMETER_CATALOG.csv,Высота правой колеи,GRP-RING-SEGMENT;RG-FLD-RIGHT-RUT-HEIGHT,covered
+PAR-0032,PAR,PARAMETER_CATALOG.csv,Расхождение шва,GRP-RING-GLOBAL;RG-FLD-SEAM-DELTA,covered
+PAR-0033,PAR,PARAMETER_CATALOG.csv,Статус шва,GRP-RING-GLOBAL;RG-FLD-SEAM-STATUS,covered
+PAR-0034,PAR,PARAMETER_CATALOG.csv,Путь road_csv,GRP-RING-SEGMENT;RG-FLD-EXPORT-ROAD-CSV,covered
+PAR-0035,PAR,PARAMETER_CATALOG.csv,Путь scenario_json,GRP-RING-SEGMENT;RG-FLD-EXPORT-SCENARIO-JSON,covered
+PAR-0036,PAR,PARAMETER_CATALOG.csv,Сводка meta road segments,GRP-RING-SEGMENT;RG-FLD-EXPORT-META-ROAD,covered
+PAR-0037,PAR,PARAMETER_CATALOG.csv,Режим связи с матрицей испытаний,GRP-RING-SEGMENT;RG-FLD-SUITE-LINK-MODE,covered
+PAR-0038,PAR,PARAMETER_CATALOG.csv,Целевое испытание,GRP-RING-SEGMENT;RG-FLD-SUITE-TARGET-TEST-ID,covered
+PAR-0039,PAR,PARAMETER_CATALOG.csv,Стадия испытания,GRP-RING-SEGMENT;RG-FLD-SUITE-STAGE,covered
+PAR-0040,PAR,PARAMETER_CATALOG.csv,Шаг интегрирования испытания,GRP-RING-SEGMENT;RG-FLD-SUITE-DT,covered
+PAR-0041,PAR,PARAMETER_CATALOG.csv,Время моделирования испытания,GRP-RING-SEGMENT;RG-FLD-SUITE-T-END,covered
+PAR-0042,PAR,PARAMETER_CATALOG.csv,Тип испытания,GRP-RING-SEGMENT;RG-FLD-SUITE-TYPE,covered
+PAR-0043,PAR,PARAMETER_CATALOG.csv,Уровень проверки перед экспортом,GRP-RING-SEGMENT;RG-FLD-VALIDATION-LEVEL,covered
+PAR-0044,PAR,PARAMETER_CATALOG.csv,Диагностический отчёт кольца,GRP-RING-SEGMENT;RG-FLD-DIAGNOSTIC-REPORT,covered
+PAR-0045,PAR,PARAMETER_CATALOG.csv,Название набора испытаний,GRP-SUITE;ST-FLD-SUITE-NAME,covered
+PAR-0046,PAR,PARAMETER_CATALOG.csv,Фильтр по типу испытания,GRP-SUITE;ST-FLD-FILTER-TYPE,covered
+PAR-0047,PAR,PARAMETER_CATALOG.csv,Фильтр по стадии первого входа,GRP-SUITE;ST-FLD-FILTER-STAGE,covered
+PAR-0048,PAR,PARAMETER_CATALOG.csv,Фильтр по состоянию проверки,GRP-SUITE;ST-FLD-FILTER-VALIDATION,covered
+PAR-0049,PAR,PARAMETER_CATALOG.csv,Поиск по имени испытания и сценарию,GRP-SUITE;ST-FLD-FILTER-TEXT,covered
+PAR-0050,PAR,PARAMETER_CATALOG.csv,Пакетно установить стадию первого входа,GRP-SUITE;ST-FLD-BULK-STAGE,covered
+PAR-0051,PAR,PARAMETER_CATALOG.csv,Пакетно установить приоритет,GRP-SUITE;ST-FLD-BULK-PRIORITY,covered
+PAR-0052,PAR,PARAMETER_CATALOG.csv,"Шаг интегрирования по умолчанию, секунды",GRP-SUITE;ST-FLD-DEFAULT-DT,covered
+PAR-0053,PAR,PARAMETER_CATALOG.csv,"Длительность испытания по умолчанию, секунды",GRP-SUITE;ST-FLD-DEFAULT-TEND,covered
+PAR-0054,PAR,PARAMETER_CATALOG.csv,Профиль проверки набора испытаний,GRP-SUITE;ST-FLD-VALIDATION-PROFILE,covered
+PAR-0055,PAR,PARAMETER_CATALOG.csv,Код испытания,GRP-SUITE;ST-FLD-TEST-ID,covered
+PAR-0056,PAR,PARAMETER_CATALOG.csv,Имя испытания,GRP-SUITE;ST-FLD-TEST-NAME,covered
+PAR-0057,PAR,PARAMETER_CATALOG.csv,Включить испытание,GRP-SUITE;ST-FLD-TEST-ENABLED,covered
+PAR-0058,PAR,PARAMETER_CATALOG.csv,Тип испытания,GRP-SUITE;ST-FLD-TEST-TYPE,covered
+PAR-0059,PAR,PARAMETER_CATALOG.csv,Вид строки набора испытаний,GRP-SUITE;ST-FLD-ROW-KIND,covered
+PAR-0060,PAR,PARAMETER_CATALOG.csv,Стадия первого входа,GRP-SUITE;ST-FLD-STAGE-ENTRY,covered
+PAR-0061,PAR,PARAMETER_CATALOG.csv,Приоритет очереди,GRP-SUITE;ST-FLD-PRIORITY,covered
+PAR-0062,PAR,PARAMETER_CATALOG.csv,"Шаг интегрирования, секунды",GRP-SUITE;ST-FLD-DT,covered
+PAR-0063,PAR,PARAMETER_CATALOG.csv,"Длительность испытания, секунды",GRP-SUITE;ST-FLD-TEND,covered
+PAR-0064,PAR,PARAMETER_CATALOG.csv,Примечание испытания,GRP-SUITE;ST-FLD-NOTE,covered
+PAR-0065,PAR,PARAMETER_CATALOG.csv,"Допустимая доля потери контакта, доля единицы",GRP-SUITE;ST-FLD-TARGET-CONTACT,covered
+PAR-0066,PAR,PARAMETER_CATALOG.csv,"Целевое среднеквадратичное ускорение рамы, метры на секунду в квадрате",GRP-SUITE;ST-FLD-TARGET-RMS,covered
+PAR-0067,PAR,PARAMETER_CATALOG.csv,"Целевой пик крена, градусы",GRP-SUITE;ST-FLD-TARGET-ROLL,covered
+PAR-0068,PAR,PARAMETER_CATALOG.csv,"Целевой пик тангажа, градусы",GRP-SUITE;ST-FLD-TARGET-PITCH,covered
+PAR-0069,PAR,PARAMETER_CATALOG.csv,"Целевые потери на дросселях, миллиджоули",GRP-SUITE;ST-FLD-TARGET-ENERGY,covered
+PAR-0070,PAR,PARAMETER_CATALOG.csv,Ссылка на набор локальных переопределений параметров,GRP-SUITE;ST-FLD-PARAMS-OVERRIDE-REF,covered
+PAR-0071,PAR,PARAMETER_CATALOG.csv,Код связанного сценария,GRP-SUITE;ST-FLD-SCENARIO-REF-ID,covered
+PAR-0072,PAR,PARAMETER_CATALOG.csv,Название связанного сценария,GRP-SUITE;ST-FLD-SCENARIO-NAME,covered
+PAR-0073,PAR,PARAMETER_CATALOG.csv,Версия экспорта сценария,GRP-SUITE;ST-FLD-SCENARIO-EXPORT-VERSION,covered
+PAR-0074,PAR,PARAMETER_CATALOG.csv,Файл сценария JSON,GRP-SUITE;ST-FLD-SCENARIO-JSON,covered
+PAR-0075,PAR,PARAMETER_CATALOG.csv,Файл дорожного профиля CSV,GRP-SUITE;ST-FLD-ROAD-CSV,covered
+PAR-0076,PAR,PARAMETER_CATALOG.csv,Файл режима движения CSV,GRP-SUITE;ST-FLD-AXAY-CSV,covered
+PAR-0077,PAR,PARAMETER_CATALOG.csv,Ссылка на сегментные метаданные,GRP-SUITE;ST-FLD-SEGMENT-META-REF,covered
+PAR-0078,PAR,PARAMETER_CATALOG.csv,Контрольная подпись сценарного экспорта,GRP-SUITE;ST-FLD-SOURCE-HASH,covered
+PAR-0079,PAR,PARAMETER_CATALOG.csv,Состояние актуальности связи со сценарием,GRP-SUITE;ST-FLD-STALE-LINK-STATE,covered
+PAR-0080,PAR,PARAMETER_CATALOG.csv,Вид шаблонного испытания,GRP-SUITE;ST-FLD-TEMPLATE-KIND,covered
+PAR-0081,PAR,PARAMETER_CATALOG.csv,Готовый шаблон испытания,GRP-SUITE;ST-FLD-TEMPLATE-PRESET,covered
+PAR-0082,PAR,PARAMETER_CATALOG.csv,Файл дорожного профиля шаблона,GRP-SUITE;ST-FLD-TEMPLATE-ROAD,covered
+PAR-0083,PAR,PARAMETER_CATALOG.csv,Файл режима движения шаблона,GRP-SUITE;ST-FLD-TEMPLATE-AXAY,covered
+PAR-0084,PAR,PARAMETER_CATALOG.csv,Файл локального сценария шаблона,GRP-SUITE;ST-FLD-TEMPLATE-SCENARIO,covered
+PAR-0085,PAR,PARAMETER_CATALOG.csv,Состояние проверки строки,GRP-SUITE;ST-FLD-VALIDATION-STATE,covered
+PAR-0086,PAR,PARAMETER_CATALOG.csv,"Оценка вычислительной стоимости, секунды",GRP-SUITE;ST-FLD-ESTIMATED-COST,covered
+PAR-0087,PAR,PARAMETER_CATALOG.csv,Подпись передачи в базовый прогон,GRP-SUITE;ST-FLD-HANDOFF-SIGNATURE,covered
+PAR-0088,PAR,PARAMETER_CATALOG.csv,Контрольная подпись validated snapshot,GRP-SUITE;ST-FLD-SNAPSHOT-HASH,covered
+PAR-0089,PAR,PARAMETER_CATALOG.csv,"Строк пригодно к передаче, штуки",GRP-SUITE;ST-FLD-ROWS-ELIGIBLE,covered
+PAR-0090,PAR,PARAMETER_CATALOG.csv,"Блокирующих ошибок, штуки",GRP-SUITE;ST-FLD-ERROR-COUNT,covered
+PAR-0091,PAR,PARAMETER_CATALOG.csv,"Предупреждений, штуки",GRP-SUITE;ST-FLD-WARN-COUNT,covered
+PAR-0092,PAR,PARAMETER_CATALOG.csv,"Устаревших ссылок, штуки",GRP-SUITE;ST-FLD-STALE-COUNT,covered
+PAR-0093,PAR,PARAMETER_CATALOG.csv,Готовность к базовому прогону,GRP-SUITE;ST-FLD-BASELINE-READY,covered
+PAR-0094,PAR,PARAMETER_CATALOG.csv,Идентификатор validated snapshot,GRP-BASELINE;BL-FLD-SNAPSHOT-ID,covered
+PAR-0095,PAR,PARAMETER_CATALOG.csv,Hash validated snapshot,GRP-BASELINE;BL-FLD-SNAPSHOT-HASH,covered_partially
+PAR-0096,PAR,PARAMETER_CATALOG.csv,Время сборки validated snapshot,GRP-BASELINE;BL-FLD-SNAPSHOT-GENERATED-AT,covered
+PAR-0097,PAR,PARAMETER_CATALOG.csv,Количество строк в validated snapshot,GRP-BASELINE;BL-FLD-SNAPSHOT-ROW-COUNT,covered
+PAR-0098,PAR,PARAMETER_CATALOG.csv,Количество пригодных строк,GRP-BASELINE;BL-FLD-SNAPSHOT-ELIGIBLE-COUNT,covered
+PAR-0099,PAR,PARAMETER_CATALOG.csv,Состояние устаревания snapshot,GRP-BASELINE;BL-FLD-SNAPSHOT-STALE-STATE,covered
+PAR-0100,PAR,PARAMETER_CATALOG.csv,Источник активного baseline,GRP-BASELINE;BL-FLD-SOURCE-KIND,covered
+PAR-0101,PAR,PARAMETER_CATALOG.csv,Ссылка на источник baseline,GRP-BASELINE;BL-FLD-SOURCE-REF,covered
+PAR-0102,PAR,PARAMETER_CATALOG.csv,Совместимость источника с snapshot,GRP-BASELINE;BL-FLD-SOURCE-COMPAT,covered
+PAR-0103,PAR,PARAMETER_CATALOG.csv,Режим политики baseline,GRP-BASELINE;BL-FLD-POLICY-MODE,covered
+PAR-0104,PAR,PARAMETER_CATALOG.csv,Авто-обновлять baseline_best,GRP-BASELINE;BL-FLD-AUTO-UPDATE,covered
+PAR-0105,PAR,PARAMETER_CATALOG.csv,Имя базового прогона,GRP-BASELINE;BL-FLD-RUN-NAME,covered
+PAR-0106,PAR,PARAMETER_CATALOG.csv,Префикс файлов результата baseline,GRP-BASELINE;BL-FLD-OUTPUT-PREFIX,covered
+PAR-0107,PAR,PARAMETER_CATALOG.csv,Готовность запуска baseline,GRP-BASELINE;BL-FLD-READY-STATE,covered
+PAR-0108,PAR,PARAMETER_CATALOG.csv,Доля выполнения baseline,GRP-BASELINE;BL-FLD-PROGRESS-FRACTION,covered
+PAR-0109,PAR,PARAMETER_CATALOG.csv,Текущий выполняемый тест,GRP-BASELINE;BL-FLD-CURRENT-TEST,covered
+PAR-0110,PAR,PARAMETER_CATALOG.csv,Завершённые тесты,GRP-BASELINE;BL-FLD-COMPLETED-TESTS,covered
+PAR-0111,PAR,PARAMETER_CATALOG.csv,Тесты с ошибкой,GRP-BASELINE;BL-FLD-FAILED-TESTS,covered
+PAR-0112,PAR,PARAMETER_CATALOG.csv,Тесты с предупреждением,GRP-BASELINE;BL-FLD-WARNING-TESTS,covered
+PAR-0113,PAR,PARAMETER_CATALOG.csv,Статус базового прогона,GRP-BASELINE;BL-FLD-RUN-STATUS,covered
+PAR-0114,PAR,PARAMETER_CATALOG.csv,Идентификатор прогона baseline,GRP-BASELINE;BL-FLD-RUN-ID,covered
+PAR-0115,PAR,PARAMETER_CATALOG.csv,"Среднеквадратичное ускорение рамы, метры на секунду в квадрате",GRP-BASELINE;BL-FLD-METRIC-FRAME-ACC-RMS,covered
+PAR-0116,PAR,PARAMETER_CATALOG.csv,"Пиковый крен, градусы",GRP-BASELINE;BL-FLD-METRIC-ROLL-PEAK,covered
+PAR-0117,PAR,PARAMETER_CATALOG.csv,"Пиковый тангаж, градусы",GRP-BASELINE;BL-FLD-METRIC-PITCH-PEAK,covered
+PAR-0118,PAR,PARAMETER_CATALOG.csv,"Энергия дросселирования, миллиджоули",GRP-BASELINE;BL-FLD-METRIC-ENERGY,covered
+PAR-0119,PAR,PARAMETER_CATALOG.csv,Вердикт принятия baseline,GRP-BASELINE;BL-FLD-ACCEPTANCE-VERDICT,covered
+PAR-0120,PAR,PARAMETER_CATALOG.csv,Идентификатор строки истории baseline,GRP-BASELINE;BL-FLD-HISTORY-RUN-ID,covered
+PAR-0121,PAR,PARAMETER_CATALOG.csv,Тип источника baseline в истории,GRP-BASELINE;BL-FLD-HISTORY-SOURCE-KIND,covered
+PAR-0122,PAR,PARAMETER_CATALOG.csv,Hash snapshot в истории,GRP-BASELINE;BL-FLD-HISTORY-SNAPSHOT-HASH,covered_partially
+PAR-0123,PAR,PARAMETER_CATALOG.csv,Hash active baseline contract,GRP-BASELINE;BL-FLD-HISTORY-CONTRACT-HASH,covered_partially
+PAR-0124,PAR,PARAMETER_CATALOG.csv,Время baseline run в истории,GRP-BASELINE;BL-FLD-HISTORY-GENERATED-AT,covered
+PAR-0125,PAR,PARAMETER_CATALOG.csv,Режим сравнения baseline,GRP-BASELINE;BL-FLD-HISTORY-COMPARE-MODE,covered
+PAR-0126,PAR,PARAMETER_CATALOG.csv,Готовность handoff в optimization,GRP-BASELINE;BL-FLD-HANDOFF-READY,covered
+PAR-0127,PAR,PARAMETER_CATALOG.csv,Hash active baseline contract,GRP-BASELINE;BL-FLD-ACTIVE-CONTRACT-HASH,covered_partially
+PAR-0128,PAR,PARAMETER_CATALOG.csv,Путь к active baseline contract,GRP-BASELINE;BL-FLD-ACTIVE-CONTRACT-PATH,covered
+PAR-0129,PAR,PARAMETER_CATALOG.csv,Hash snapshot для handoff,GRP-BASELINE;BL-FLD-HANDOFF-SNAPSHOT-HASH,covered_partially
+PAR-0130,PAR,PARAMETER_CATALOG.csv,Blockers handoff,GRP-BASELINE;BL-FLD-HANDOFF-BLOCKERS,covered
+PAR-0131,PAR,PARAMETER_CATALOG.csv,Состав handoff payload,GRP-BASELINE;BL-FLD-HANDOFF-PAYLOAD,covered
+PAR-0132,PAR,PARAMETER_CATALOG.csv,Путь к baseline_best.json,GRP-BASELINE;BL-FLD-BASELINE-BEST-PATH,covered
+PAR-0133,PAR,PARAMETER_CATALOG.csv,Путь к baseline_input_manifest.json,GRP-BASELINE;BL-FLD-BASELINE-MANIFEST-PATH,covered
+PAR-0134,PAR,PARAMETER_CATALOG.csv,Путь к baseline CSV результатов,GRP-BASELINE;BL-FLD-PER-TEST-RESULT-CSV,covered
+PAR-0135,PAR,PARAMETER_CATALOG.csv,Каталог baseline run,GRP-BASELINE;BL-FLD-RUN-DIR,covered
+PAR-0136,PAR,PARAMETER_CATALOG.csv,Путь к журналу baseline,GRP-BASELINE;BL-FLD-LOG-PATH,covered
+PAR-0137,PAR,PARAMETER_CATALOG.csv,Режим проверки импортированного baseline,GRP-BASELINE;BL-FLD-IMPORT-COMPAT-MODE,covered
+PAR-0138,PAR,PARAMETER_CATALOG.csv,Профиль проверки snapshot,GRP-BASELINE;BL-FLD-SNAPSHOT-VALIDATION-PROFILE,covered
+PAR-0139,PAR,PARAMETER_CATALOG.csv,Количество ring-linked сценариев,GRP-BASELINE;BL-FLD-RING-SCENARIO-COUNT,covered
+PAR-0140,PAR,PARAMETER_CATALOG.csv,Количество template-строк,GRP-BASELINE;BL-FLD-TEMPLATE-TEST-COUNT,covered
+PAR-0141,PAR,PARAMETER_CATALOG.csv,Причина устаревания active baseline,GRP-BASELINE;BL-FLD-STALE-CAUSE,covered
+PAR-0142,PAR,PARAMETER_CATALOG.csv,Требуется ли ручной review перед заменой,GRP-BASELINE;BL-FLD-REVIEW-REQUIRED,covered
+PAR-0143,PAR,PARAMETER_CATALOG.csv,Дельта метрик к active baseline,GRP-BASELINE;BL-FLD-RESULT-DELTA-TO-ACTIVE,covered
+PAR-0144,PAR,PARAMETER_CATALOG.csv,Готовность строки истории к восстановлению,GRP-BASELINE;BL-FLD-HISTORY-RESTORE-STATE,covered
+PAR-0145,PAR,PARAMETER_CATALOG.csv,Маршрут следующего шага,GRP-BASELINE;BL-FLD-OPTIMIZATION-ROUTE,covered
+PAR-0146,PAR,PARAMETER_CATALOG.csv,Переход к диагностике baseline,GRP-BASELINE;BL-FLD-DIAGNOSTICS-LINK,covered
+PAR-0147,PAR,PARAMETER_CATALOG.csv,Идентификатор active baseline,GRP-OPT-CONTRACT;OPT-FLD-BASELINE-ID,covered
+PAR-0148,PAR,PARAMETER_CATALOG.csv,Hash active baseline,GRP-OPT-CONTRACT;OPT-FLD-BASELINE-HASH,covered_partially
+PAR-0149,PAR,PARAMETER_CATALOG.csv,Источник active baseline,GRP-OPT-CONTRACT;OPT-FLD-BASELINE-SOURCE-KIND,covered
+PAR-0150,PAR,PARAMETER_CATALOG.csv,Hash validated snapshot,GRP-OPT-CONTRACT;OPT-FLD-SNAPSHOT-HASH,covered_partially
+PAR-0151,PAR,PARAMETER_CATALOG.csv,Идентификатор objective contract,GRP-OPT-CONTRACT;OPT-FLD-OBJECTIVE-CONTRACT-ID,covered
+PAR-0152,PAR,PARAMETER_CATALOG.csv,Hash objective contract,GRP-OPT-CONTRACT;OPT-FLD-OBJECTIVE-CONTRACT-HASH,covered_partially
+PAR-0153,PAR,PARAMETER_CATALOG.csv,Стек целевых показателей,GRP-OPT-RUN;OPT-FLD-OBJECTIVE-STACK,covered
+PAR-0154,PAR,PARAMETER_CATALOG.csv,Ключ жёсткого ограничения,GRP-OPT-RUN;OPT-FLD-HARD-GATE-KEY,covered
+PAR-0155,PAR,PARAMETER_CATALOG.csv,Порог жёсткого ограничения,GRP-OPT-RUN;OPT-FLD-HARD-GATE-TOL,covered
+PAR-0156,PAR,PARAMETER_CATALOG.csv,Активный режим оптимизации,GRP-OPT-RUN;OPT-FLD-ACTIVE-MODE,covered
+PAR-0157,PAR,PARAMETER_CATALOG.csv,Готовность запуска optimization,GRP-OPT-RUN;OPT-FLD-READY-STATE,covered
+PAR-0158,PAR,PARAMETER_CATALOG.csv,Имя optimization run,GRP-OPT-RUN;OPT-FLD-RUN-NAME,covered
+PAR-0159,PAR,PARAMETER_CATALOG.csv,Каталог optimization run,GRP-OPT-RUN;OPT-FLD-RUN-DIR,covered
+PAR-0160,PAR,PARAMETER_CATALOG.csv,Лимит времени оптимизации,GRP-OPT-RUN;OPT-FLD-OPT-MINUTES,covered
+PAR-0161,PAR,PARAMETER_CATALOG.csv,Параллельные задания,GRP-OPT-RUN;OPT-FLD-JOBS,covered
+PAR-0162,PAR,PARAMETER_CATALOG.csv,Режим warm-start,GRP-OPT-RUN;OPT-FLD-WARMSTART,covered
+PAR-0163,PAR,PARAMETER_CATALOG.csv,Число surrogate samples,GRP-OPT-CONTRACT;OPT-FLD-SURR-SAMPLES,covered
+PAR-0164,PAR,PARAMETER_CATALOG.csv,Размер элиты surrogate top-k,GRP-OPT-CONTRACT;OPT-FLD-SURR-TOPK,covered
+PAR-0165,PAR,PARAMETER_CATALOG.csv,Seed кандидатов,GRP-OPT-RUN;OPT-FLD-SEED-CANDIDATES,covered
+PAR-0166,PAR,PARAMETER_CATALOG.csv,Seed условий,GRP-OPT-RUN;OPT-FLD-SEED-CONDITIONS,covered
+PAR-0167,PAR,PARAMETER_CATALOG.csv,Сортировать тесты по стоимости,GRP-OPT-RUN;OPT-FLD-SORT-TESTS,covered
+PAR-0168,PAR,PARAMETER_CATALOG.csv,Порог ранней остановки stage1,GRP-OPT-RUN;OPT-FLD-STOP-PEN-1,covered
+PAR-0169,PAR,PARAMETER_CATALOG.csv,Порог ранней остановки stage2,GRP-OPT-RUN;OPT-FLD-STOP-PEN-2,covered
+PAR-0170,PAR,PARAMETER_CATALOG.csv,System influence eps_rel,GRP-OPT-RUN;OPT-FLD-INFLUENCE-EPS,covered
+PAR-0171,PAR,PARAMETER_CATALOG.csv,Adaptive influence epsilon,GRP-OPT-RUN;OPT-FLD-ADAPTIVE-EPS,covered
+PAR-0172,PAR,PARAMETER_CATALOG.csv,Режим seed/promotion policy,GRP-OPT-RUN;OPT-FLD-STAGE-POLICY,covered
+PAR-0173,PAR,PARAMETER_CATALOG.csv,Бюджет stage0,GRP-OPT-RUN;OPT-FLD-STAGE0-BUDGET,covered
+PAR-0174,PAR,PARAMETER_CATALOG.csv,Бюджет stage1,GRP-OPT-RUN;OPT-FLD-STAGE1-BUDGET,covered
+PAR-0175,PAR,PARAMETER_CATALOG.csv,Бюджет stage2,GRP-OPT-RUN;OPT-FLD-STAGE2-BUDGET,covered
+PAR-0176,PAR,PARAMETER_CATALOG.csv,Вычислительный backend,GRP-OPT-RUN;OPT-FLD-BACKEND,covered
+PAR-0177,PAR,PARAMETER_CATALOG.csv,Бюджет distributed run,GRP-OPT-RUN;OPT-FLD-DIST-BUDGET,covered
+PAR-0178,PAR,PARAMETER_CATALOG.csv,Максимум задач в полёте,GRP-OPT-RUN;OPT-FLD-MAX-INFLIGHT,covered
+PAR-0179,PAR,PARAMETER_CATALOG.csv,Размер q-батча,GRP-OPT-RUN;OPT-FLD-Q,covered
+PAR-0180,PAR,PARAMETER_CATALOG.csv,Устройство proposer,GRP-OPT-RUN;OPT-FLD-DEVICE,covered
+PAR-0181,PAR,PARAMETER_CATALOG.csv,Движок базы,GRP-OPT-RUN;OPT-FLD-DB-ENGINE,covered
+PAR-0182,PAR,PARAMETER_CATALOG.csv,Возобновлять run,GRP-OPT-RUN;OPT-FLD-RESUME,covered
+PAR-0183,PAR,PARAMETER_CATALOG.csv,Идентификатор distributed run,GRP-OPT-CONTRACT;OPT-FLD-RUN-ID-DIST,covered
+PAR-0184,PAR,PARAMETER_CATALOG.csv,TTL устаревания,GRP-OPT-RUN;OPT-FLD-STALE-TTL,covered
+PAR-0185,PAR,PARAMETER_CATALOG.csv,Логировать hypervolume,GRP-OPT-RUN;OPT-FLD-HV-LOG,covered
+PAR-0186,PAR,PARAMETER_CATALOG.csv,Период экспорта,GRP-OPT-RUN;OPT-FLD-EXPORT-EVERY,covered
+PAR-0187,PAR,PARAMETER_CATALOG.csv,Число начальных точек,GRP-OPT-RUN;OPT-FLD-N-INIT,covered
+PAR-0188,PAR,PARAMETER_CATALOG.csv,Минимум feasible before qNEHVI,GRP-OPT-RUN;OPT-FLD-MIN-FEASIBLE,covered
+PAR-0189,PAR,PARAMETER_CATALOG.csv,Число рестартов BoTorch,GRP-OPT-RUN;OPT-FLD-BOTORCH-RESTARTS,covered
+PAR-0190,PAR,PARAMETER_CATALOG.csv,Raw samples BoTorch,GRP-OPT-RUN;OPT-FLD-BOTORCH-RAW-SAMPLES,covered
+PAR-0191,PAR,PARAMETER_CATALOG.csv,Максимум итераций BoTorch,GRP-OPT-RUN;OPT-FLD-BOTORCH-MAXITER,covered
+PAR-0192,PAR,PARAMETER_CATALOG.csv,Запас reference margin,GRP-OPT-RUN;OPT-FLD-BOTORCH-REF-MARGIN,covered
+PAR-0193,PAR,PARAMETER_CATALOG.csv,Доля выполнения optimization,GRP-OPT-RUN;OPT-FLD-PROGRESS,covered
+PAR-0194,PAR,PARAMETER_CATALOG.csv,Текущая стадия,GRP-OPT-RUN;OPT-FLD-CURRENT-STAGE,covered
+PAR-0195,PAR,PARAMETER_CATALOG.csv,Прошло времени,GRP-OPT-RUN;OPT-FLD-ELAPSED,covered
+PAR-0196,PAR,PARAMETER_CATALOG.csv,Строк текущей стадии,GRP-OPT-RUN;OPT-FLD-STAGE-ROWS,covered
+PAR-0197,PAR,PARAMETER_CATALOG.csv,Суммарные строки результата,GRP-OPT-RUN;OPT-FLD-COMBINED-ROWS,covered
+PAR-0198,PAR,PARAMETER_CATALOG.csv,Underfill стадии,GRP-OPT-RUN;OPT-FLD-UNDERFILL,covered
+PAR-0199,PAR,PARAMETER_CATALOG.csv,Причины gate reject,GRP-OPT-CONTRACT;OPT-FLD-GATE-PREVIEW,covered
+PAR-0200,PAR,PARAMETER_CATALOG.csv,Причины promotion block,GRP-OPT-RUN;OPT-FLD-PROMO-PREVIEW,covered
+PAR-0201,PAR,PARAMETER_CATALOG.csv,Выбранный run в истории,GRP-OPT-RUN;OPT-FLD-SELECTED-RUN,covered
+PAR-0202,PAR,PARAMETER_CATALOG.csv,Режим выбранного run,GRP-OPT-RUN;OPT-FLD-SELECTED-RUN-MODE,covered
+PAR-0203,PAR,PARAMETER_CATALOG.csv,Hash выбранного objective contract,GRP-OPT-CONTRACT;OPT-FLD-SELECTED-OBJECTIVE-HASH,covered_partially
+PAR-0204,PAR,PARAMETER_CATALOG.csv,Несовпадение hard gate,GRP-OPT-CONTRACT;OPT-FLD-HARD-GATE-MISMATCH,covered
+PAR-0205,PAR,PARAMETER_CATALOG.csv,Несовпадение objective contract,GRP-OPT-CONTRACT;OPT-FLD-CONTRACT-MISMATCH,covered
+PAR-0206,PAR,PARAMETER_CATALOG.csv,Готовность передачи в анализ,GRP-OPT-RUN;OPT-FLD-ANALYSIS-READY,covered
+PAR-0207,PAR,PARAMETER_CATALOG.csv,Готовность передачи в аниматор,GRP-OPT-RUN;OPT-FLD-ANIMATOR-READY,covered
+PAR-0208,PAR,PARAMETER_CATALOG.csv,Готовность диагностики,GRP-OPT-RUN;OPT-FLD-DIAG-READY,covered
+PAR-0209,PAR,PARAMETER_CATALOG.csv,Идентификатор выбранного прогона,GRP-ANALYSIS;AN-FLD-RUN-ID,covered
+PAR-0210,PAR,PARAMETER_CATALOG.csv,Hash контракта прогона,GRP-ANALYSIS;AN-FLD-RUN-CONTRACT-HASH,covered_partially
+PAR-0211,PAR,PARAMETER_CATALOG.csv,Режим оптимизации прогона,GRP-ANALYSIS;AN-FLD-RUN-MODE,covered
+PAR-0212,PAR,PARAMETER_CATALOG.csv,Состояние прогона,GRP-ANALYSIS;AN-FLD-RUN-STATUS,covered
+PAR-0213,PAR,PARAMETER_CATALOG.csv,"Время запуска, UTC",GRP-ANALYSIS;AN-FLD-RUN-START,covered
+PAR-0214,PAR,PARAMETER_CATALOG.csv,"Время завершения, UTC",GRP-ANALYSIS;AN-FLD-RUN-END,covered
+PAR-0215,PAR,PARAMETER_CATALOG.csv,Hash active baseline,GRP-ANALYSIS;AN-FLD-BASELINE-HASH,covered_partially
+PAR-0216,PAR,PARAMETER_CATALOG.csv,Hash objective contract,GRP-ANALYSIS;AN-FLD-OBJECTIVE-HASH,covered_partially
+PAR-0217,PAR,PARAMETER_CATALOG.csv,Hash validated suite snapshot,GRP-ANALYSIS;AN-FLD-SNAPSHOT-HASH,covered_partially
+PAR-0218,PAR,PARAMETER_CATALOG.csv,Жёсткое ограничение,GRP-ANALYSIS;AN-FLD-HARD-GATE-KEY,covered
+PAR-0219,PAR,PARAMETER_CATALOG.csv,Порог жёсткого ограничения,GRP-ANALYSIS;AN-FLD-HARD-GATE-TOL,covered
+PAR-0220,PAR,PARAMETER_CATALOG.csv,Ссылка на лучший кандидат,GRP-ANALYSIS;AN-FLD-BEST-CANDIDATE-REF,covered
+PAR-0221,PAR,PARAMETER_CATALOG.csv,Каталог артефактов run,GRP-ANALYSIS;AN-FLD-RESULTS-ARTIFACT-DIR,covered
+PAR-0222,PAR,PARAMETER_CATALOG.csv,Идентификатор compare contract,GRP-ANALYSIS;AN-FLD-COMPARE-CONTRACT-ID,covered
+PAR-0223,PAR,PARAMETER_CATALOG.csv,Режим сравнения,GRP-ANALYSIS;AN-FLD-COMPARE-MODE,covered
+PAR-0224,PAR,PARAMETER_CATALOG.csv,Левый источник сравнения,GRP-ANALYSIS;AN-FLD-COMPARE-LEFT-REF,covered
+PAR-0225,PAR,PARAMETER_CATALOG.csv,Правый источник сравнения,GRP-ANALYSIS;AN-FLD-COMPARE-RIGHT-REF,covered
+PAR-0226,PAR,PARAMETER_CATALOG.csv,Выбранные испытания,GRP-ANALYSIS;AN-FLD-SELECTED-TESTS,covered
+PAR-0227,PAR,PARAMETER_CATALOG.csv,Выбранные сегменты,GRP-ANALYSIS;AN-FLD-SELECTED-SEGMENTS,covered
+PAR-0228,PAR,PARAMETER_CATALOG.csv,Выбранные показатели,GRP-ANALYSIS;AN-FLD-SELECTED-METRICS,covered
+PAR-0229,PAR,PARAMETER_CATALOG.csv,Профиль единиц,GRP-ANALYSIS;AN-FLD-UNIT-PROFILE,covered
+PAR-0230,PAR,PARAMETER_CATALOG.csv,Режим выравнивания сравнения,GRP-ANALYSIS;AN-FLD-ALIGNMENT-MODE,covered
+PAR-0231,PAR,PARAMETER_CATALOG.csv,Политика mismatch,GRP-ANALYSIS;AN-FLD-MISMATCH-POLICY,covered
+PAR-0232,PAR,PARAMETER_CATALOG.csv,Preset графика,GRP-ANALYSIS;AN-FLD-CHART-PRESET,covered
+PAR-0233,PAR,PARAMETER_CATALOG.csv,Ось X,GRP-ANALYSIS;AN-FLD-XAXIS-MODE,covered
+PAR-0234,PAR,PARAMETER_CATALOG.csv,Нормализация,GRP-ANALYSIS;AN-FLD-NORMALIZATION-MODE,covered
+PAR-0235,PAR,PARAMETER_CATALOG.csv,Начало окна времени,GRP-ANALYSIS;AN-FLD-TIME-START-S,covered
+PAR-0236,PAR,PARAMETER_CATALOG.csv,Конец окна времени,GRP-ANALYSIS;AN-FLD-TIME-END-S,covered
+PAR-0237,PAR,PARAMETER_CATALOG.csv,Показывать единицы измерения,GRP-ANALYSIS;AN-FLD-SHOW-UNITS,covered
+PAR-0238,PAR,PARAMETER_CATALOG.csv,Показывать baseline,GRP-ANALYSIS;AN-FLD-SHOW-BASELINE,covered
+PAR-0239,PAR,PARAMETER_CATALOG.csv,Только проблемные run,GRP-ANALYSIS;AN-FLD-FAILED-ONLY,covered
+PAR-0240,PAR,PARAMETER_CATALOG.csv,Только продвинутые кандидаты,GRP-ANALYSIS;AN-FLD-PROMOTED-ONLY,covered
+PAR-0241,PAR,PARAMETER_CATALOG.csv,Суммарный штраф физичности,GRP-ANALYSIS;AN-FLD-RESULTS-PENALTY,covered
+PAR-0242,PAR,PARAMETER_CATALOG.csv,"Комфорт, среднеквадратичное ускорение рамы",GRP-ANALYSIS;AN-FLD-RESULTS-COMFORT,covered
+PAR-0243,PAR,PARAMETER_CATALOG.csv,"Боковая реакция, proxy по крену",GRP-ANALYSIS;AN-FLD-RESULTS-ROLL,covered
+PAR-0244,PAR,PARAMETER_CATALOG.csv,Энергия дросселирования,GRP-ANALYSIS;AN-FLD-RESULTS-ENERGY,covered
+PAR-0245,PAR,PARAMETER_CATALOG.csv,Таблица по испытаниям,GRP-ANALYSIS;AN-FLD-PER-TEST-METRICS,covered
+PAR-0246,PAR,PARAMETER_CATALOG.csv,Таблица артефактов,GRP-ANALYSIS;AN-FLD-ARTIFACT-TABLE,covered
+PAR-0247,PAR,PARAMETER_CATALOG.csv,Идентификатор сценария,GRP-ANALYSIS;AN-FLD-SCENARIO-ID,covered
+PAR-0248,PAR,PARAMETER_CATALOG.csv,Идентификатор сегмента,GRP-ANALYSIS;AN-FLD-SEGMENT-ID,covered
+PAR-0249,PAR,PARAMETER_CATALOG.csv,Имя сегмента,GRP-ANALYSIS;AN-FLD-SEGMENT-NAME,covered
+PAR-0250,PAR,PARAMETER_CATALOG.csv,Покрытие сегмента,GRP-ANALYSIS;AN-FLD-SEGMENT-SURFACE,covered
+PAR-0251,PAR,PARAMETER_CATALOG.csv,Манёвр сегмента,GRP-ANALYSIS;AN-FLD-SEGMENT-MANEUVER,covered
+PAR-0252,PAR,PARAMETER_CATALOG.csv,Радиус сегмента,GRP-ANALYSIS;AN-FLD-SEGMENT-RADIUS-M,covered
+PAR-0253,PAR,PARAMETER_CATALOG.csv,Целевая скорость прохождения,GRP-ANALYSIS;AN-FLD-SEGMENT-SPEED-KMH,covered
+PAR-0254,PAR,PARAMETER_CATALOG.csv,Mismatch сегмента,GRP-ANALYSIS;AN-FLD-SEGMENT-MISMATCH,covered
+PAR-0255,PAR,PARAMETER_CATALOG.csv,Идентификатор export,GRP-ANALYSIS;AN-FLD-EXPORT-ID,covered
+PAR-0256,PAR,PARAMETER_CATALOG.csv,Формат экспорта,GRP-ANALYSIS;AN-FLD-EXPORT-FORMAT,covered
+PAR-0257,PAR,PARAMETER_CATALOG.csv,Область отчёта,GRP-ANALYSIS;AN-FLD-EXPORT-SCOPE,covered
+PAR-0258,PAR,PARAMETER_CATALOG.csv,Включённые артефакты,GRP-ANALYSIS;AN-FLD-INCLUDED-ARTIFACTS,covered
+PAR-0259,PAR,PARAMETER_CATALOG.csv,Исключённые артефакты,GRP-ANALYSIS;AN-FLD-EXCLUDED-ARTIFACTS,covered
+PAR-0260,PAR,PARAMETER_CATALOG.csv,Handoff в аниматор,GRP-ANALYSIS;AN-FLD-ANIMATOR-HANDOFF,covered
+PAR-0261,PAR,PARAMETER_CATALOG.csv,Handoff в диагностику,GRP-ANALYSIS;AN-FLD-DIAGNOSTICS-HANDOFF,covered
+PAR-0262,PAR,PARAMETER_CATALOG.csv,Сводка contract drift,GRP-ANALYSIS;AN-FLD-CONTRACT-MISMATCH-SUMMARY,covered
+PAR-0263,PAR,PARAMETER_CATALOG.csv,Отсутствующие optional artifacts,GRP-ANALYSIS;AN-FLD-OPTIONAL-MISSING,covered
+PAR-0264,PAR,PARAMETER_CATALOG.csv,Ключ сортировки таблицы,GRP-ANALYSIS;AN-FLD-TABLE-SORT-KEY,covered
+PAR-0265,PAR,PARAMETER_CATALOG.csv,Порядок сортировки,GRP-ANALYSIS;AN-FLD-TABLE-SORT-ORDER,covered
+PAR-0266,PAR,PARAMETER_CATALOG.csv,Профиль выравнивания,GRP-ANALYSIS;AN-FLD-COMPARE-ALIGNMENT-PROFILE,covered
+PAR-0267,PAR,PARAMETER_CATALOG.csv,Время построения результатов,GRP-ANALYSIS;AN-FLD-RESULTS-SOURCE-TIMESTAMP,covered
+PAR-0268,PAR,PARAMETER_CATALOG.csv,Источник результатов,GRP-ANALYSIS;AN-FLD-RESULTS-SOURCE-KIND,covered
+PAR-0269,PAR,PARAMETER_CATALOG.csv,Единица показателя,GRP-ANALYSIS;AN-FLD-METRIC-UNIT,covered
+PAR-0270,PAR,PARAMETER_CATALOG.csv,Описание показателя,GRP-ANALYSIS;AN-FLD-METRIC-DESCRIPTION,covered
+PAR-0271,PAR,PARAMETER_CATALOG.csv,Идентификатор выбранного прогона,GRP-ANIMATOR;AM-FLD-RUN-ID,covered
+PAR-0272,PAR,PARAMETER_CATALOG.csv,Hash контракта выбранного прогона,GRP-ANIMATOR;AM-FLD-RUN-CONTRACT-HASH,covered_partially
+PAR-0273,PAR,PARAMETER_CATALOG.csv,Режим оптимизации прогона,GRP-ANIMATOR;AM-FLD-RUN-MODE,covered
+PAR-0274,PAR,PARAMETER_CATALOG.csv,Hash baseline-контракта,GRP-ANIMATOR;AM-FLD-BASELINE-HASH,covered_partially
+PAR-0275,PAR,PARAMETER_CATALOG.csv,Hash контракта целевых показателей,GRP-ANIMATOR;AM-FLD-OBJECTIVE-HASH,covered_partially
+PAR-0276,PAR,PARAMETER_CATALOG.csv,Hash validated snapshot набора испытаний,GRP-ANIMATOR;AM-FLD-SUITE-SNAPSHOT-HASH,covered_partially
+PAR-0277,PAR,PARAMETER_CATALOG.csv,Идентификатор compare contract,GRP-ANIMATOR;AM-FLD-COMPARE-CONTRACT-ID,covered
+PAR-0278,PAR,PARAMETER_CATALOG.csv,Режим сравнения,GRP-ANIMATOR;AM-FLD-COMPARE-MODE,covered
+PAR-0279,PAR,PARAMETER_CATALOG.csv,Идентификатор выбранного испытания,GRP-ANIMATOR;AM-FLD-SELECTED-TEST-ID,covered
+PAR-0280,PAR,PARAMETER_CATALOG.csv,Идентификатор выбранного сегмента,GRP-ANIMATOR;AM-FLD-SELECTED-SEGMENT-ID,covered
+PAR-0281,PAR,PARAMETER_CATALOG.csv,Тип выбранного объекта,GRP-ANIMATOR;AM-FLD-SELECTED-OBJECT-KIND,covered
+PAR-0282,PAR,PARAMETER_CATALOG.csv,Идентификатор выбранного объекта,GRP-ANIMATOR;AM-FLD-SELECTED-OBJECT-ID,covered
+PAR-0283,PAR,PARAMETER_CATALOG.csv,Путь к артефакту анимации,GRP-ANIMATOR;AM-FLD-RESULT-ARTIFACT-PATH,covered
+PAR-0284,PAR,PARAMETER_CATALOG.csv,Путь к evidence manifest,GRP-ANIMATOR;AM-FLD-EVIDENCE-MANIFEST-PATH,covered
+PAR-0285,PAR,PARAMETER_CATALOG.csv,Путь к hardpoints source-of-truth,GRP-ANIMATOR;AM-FLD-HARDPOINTS-PATH,covered_partially
+PAR-0286,PAR,PARAMETER_CATALOG.csv,Путь к packaging passport,GRP-ANIMATOR;AM-FLD-PACKAGING-PATH,covered_partially
+PAR-0287,PAR,PARAMETER_CATALOG.csv,Путь к metadata сегментов дороги,GRP-ANIMATOR;AM-FLD-ROAD-SEGMENTS-PATH,covered
+PAR-0288,PAR,PARAMETER_CATALOG.csv,Состояние проигрывания,GRP-ANIMATOR;AM-FLD-PLAYING-STATE,covered
+PAR-0289,PAR,PARAMETER_CATALOG.csv,"Текущее время проигрывания, секунды",GRP-ANIMATOR;AM-FLD-SAMPLED-TIME-SEC,covered
+PAR-0290,PAR,PARAMETER_CATALOG.csv,"Шаг исходной временной сетки, секунды",GRP-ANIMATOR;AM-FLD-SOURCE-TIME-STEP-SEC,covered
+PAR-0291,PAR,PARAMETER_CATALOG.csv,Индекс исходной строки источника,GRP-ANIMATOR;AM-FLD-SOURCE-ROW-INDEX,covered
+PAR-0292,PAR,PARAMETER_CATALOG.csv,Режим интерполяции,GRP-ANIMATOR;AM-FLD-INTERPOLATION-MODE,covered
+PAR-0293,PAR,PARAMETER_CATALOG.csv,"Скорость проигрывания, множитель",GRP-ANIMATOR;AM-FLD-PLAYBACK-SPEED-MULTIPLIER,covered
+PAR-0294,PAR,PARAMETER_CATALOG.csv,Режим циклического проигрывания,GRP-ANIMATOR;AM-FLD-LOOP-MODE,covered
+PAR-0295,PAR,PARAMETER_CATALOG.csv,Предустановленный вид камеры,GRP-ANIMATOR;AM-FLD-VIEW-PRESET,covered
+PAR-0296,PAR,PARAMETER_CATALOG.csv,Режим проекции камеры,GRP-ANIMATOR;AM-FLD-PROJECTION-MODE,covered
+PAR-0297,PAR,PARAMETER_CATALOG.csv,Следовать за выбранным объектом,GRP-ANIMATOR;AM-FLD-FOLLOW-SELECTION,covered
+PAR-0298,PAR,PARAMETER_CATALOG.csv,Показывать сетку,GRP-ANIMATOR;AM-FLD-GRID-VISIBLE,covered
+PAR-0299,PAR,PARAMETER_CATALOG.csv,Показывать фоновую плоскость земли,GRP-ANIMATOR;AM-FLD-GROUND-PLANE-VISIBLE,covered
+PAR-0300,PAR,PARAMETER_CATALOG.csv,Глобальный truth mode аниматора,GRP-ANIMATOR;AM-FLD-TRUTH-MODE,covered
+PAR-0301,PAR,PARAMETER_CATALOG.csv,Truth mode дороги,GRP-ANIMATOR;AM-FLD-ROAD-TRUTH-MODE,covered
+PAR-0302,PAR,PARAMETER_CATALOG.csv,Truth mode подвески,GRP-ANIMATOR;AM-FLD-SUSPENSION-TRUTH-MODE,covered
+PAR-0303,PAR,PARAMETER_CATALOG.csv,Truth mode выбранного цилиндра,GRP-ANIMATOR;AM-FLD-CYLINDER-TRUTH-MODE,covered
+PAR-0304,PAR,PARAMETER_CATALOG.csv,Список отсутствующих контрактов,GRP-ANIMATOR;AM-FLD-MISSING-CONTRACTS,covered_partially
+PAR-0305,PAR,PARAMETER_CATALOG.csv,Текст предупреждения truthful/degraded режима,GRP-ANIMATOR;AM-FLD-TRUTH-WARNING-TEXT,covered
+PAR-0306,PAR,PARAMETER_CATALOG.csv,Название сегмента,GRP-ANIMATOR;AM-FLD-SEGMENT-NAME,covered
+PAR-0307,PAR,PARAMETER_CATALOG.csv,Направление поворота сегмента,GRP-ANIMATOR;AM-FLD-SEGMENT-TURN-DIRECTION,covered
+PAR-0308,PAR,PARAMETER_CATALOG.csv,Тип покрытия сегмента,GRP-ANIMATOR;AM-FLD-SEGMENT-SURFACE-TYPE,covered
+PAR-0309,PAR,PARAMETER_CATALOG.csv,"Радиус сегмента, метры",GRP-ANIMATOR;AM-FLD-SEGMENT-RADIUS-M,covered
+PAR-0310,PAR,PARAMETER_CATALOG.csv,"Целевая скорость сегмента, километры в час",GRP-ANIMATOR;AM-FLD-SEGMENT-SPEED-KMH,covered
+PAR-0311,PAR,PARAMETER_CATALOG.csv,"Поперечный уклон сегмента, градусы",GRP-ANIMATOR;AM-FLD-SEGMENT-CROSS-SLOPE-DEG,covered
+PAR-0312,PAR,PARAMETER_CATALOG.csv,"Высота дороги в конце сегмента, метры",GRP-ANIMATOR;AM-FLD-SEGMENT-END-HEIGHT-M,covered
+PAR-0313,PAR,PARAMETER_CATALOG.csv,Идентификатор hardpoint,GRP-ANIMATOR;AM-FLD-HARDPOINT-LABEL,covered_partially
+PAR-0314,PAR,PARAMETER_CATALOG.csv,"Координата X hardpoint, миллиметры",GRP-ANIMATOR;AM-FLD-HARDPOINT-X-MM,covered_partially
+PAR-0315,PAR,PARAMETER_CATALOG.csv,"Координата Y hardpoint, миллиметры",GRP-ANIMATOR;AM-FLD-HARDPOINT-Y-MM,covered_partially
+PAR-0316,PAR,PARAMETER_CATALOG.csv,"Координата Z hardpoint, миллиметры",GRP-ANIMATOR;AM-FLD-HARDPOINT-Z-MM,covered_partially
+PAR-0317,PAR,PARAMETER_CATALOG.csv,"Длина корпуса цилиндра, миллиметры",GRP-ANIMATOR;AM-FLD-CYL-BODY-LENGTH-MM,covered
+PAR-0318,PAR,PARAMETER_CATALOG.csv,"Ход цилиндра, миллиметры",GRP-ANIMATOR;AM-FLD-CYL-STROKE-MM,covered
+PAR-0319,PAR,PARAMETER_CATALOG.csv,"Длина штока до шарнира, миллиметры",GRP-ANIMATOR;AM-FLD-CYL-ROD-EYE-LENGTH-MM,covered
+PAR-0320,PAR,PARAMETER_CATALOG.csv,"Монтажная длина в убранном положении, миллиметры",GRP-ANIMATOR;AM-FLD-CYL-RETRACTED-MOUNT-LENGTH-MM,covered
+PAR-0321,PAR,PARAMETER_CATALOG.csv,"Монтажная длина в выдвинутом положении, миллиметры",GRP-ANIMATOR;AM-FLD-CYL-EXTENDED-MOUNT-LENGTH-MM,covered
+PAR-0322,PAR,PARAMETER_CATALOG.csv,"Минимальный упаковочный зазор, миллиметры",GRP-ANIMATOR;AM-FLD-CYL-PACKAGING-CLEARANCE-MM,covered
+PAR-0323,PAR,PARAMETER_CATALOG.csv,Причина axis-only режима,GRP-ANIMATOR;AM-FLD-CYL-AXIS-ONLY-REASON,covered
+PAR-0324,PAR,PARAMETER_CATALOG.csv,"Прозрачность ghost overlay, доля единицы",GRP-ANIMATOR;AM-FLD-COMPARE-GHOST-ALPHA,covered
+PAR-0325,PAR,PARAMETER_CATALOG.csv,Текст несоответствия compare contract,GRP-ANIMATOR;AM-FLD-COMPARE-MISMATCH-TEXT,covered
+PAR-0326,PAR,PARAMETER_CATALOG.csv,Идентификатор evidence manifest,GRP-ANIMATOR;AM-FLD-EVIDENCE-MANIFEST-ID,covered
+PAR-0327,PAR,PARAMETER_CATALOG.csv,Путь к последнему bundle диагностики,GRP-ANIMATOR;AM-FLD-DIAGNOSTICS-BUNDLE-PATH,covered
+PAR-0328,PAR,PARAMETER_CATALOG.csv,Путь к manifest экспорта кадров,GRP-ANIMATOR;AM-FLD-CAPTURE-EXPORT-PATH,covered
+PAR-0329,PAR,PARAMETER_CATALOG.csv,Формат экспорта кадра,GRP-ANIMATOR;AM-FLD-EXPORT-FORMAT,covered
+PAR-0330,PAR,PARAMETER_CATALOG.csv,Строка состояния аниматора,GRP-ANIMATOR;AM-FLD-STATUS-TEXT,covered
+PAR-0331,PAR,PARAMETER_CATALOG.csv,"Бюджет перерисовки, кадров в секунду",GRP-ANIMATOR;AM-FLD-FPS-BUDGET-HZ,covered
+PAR-0332,PAR,PARAMETER_CATALOG.csv,"Частота исходной сетки, кадров в секунду",GRP-ANIMATOR;AM-FLD-SOURCE-FPS-HZ,covered
+PAR-0333,PAR,PARAMETER_CATALOG.csv,"Время последнего экспортированного кадра, секунды",GRP-ANIMATOR;AM-FLD-LAST-CAPTURE-TIME-SEC,covered
+PAR-0334,PAR,PARAMETER_CATALOG.csv,Имя закладки камеры,GRP-ANIMATOR;AM-FLD-CAMERA-BOOKMARK-NAME,covered
+PAR-0335,PAR,PARAMETER_CATALOG.csv,Путь выбранного объекта в дереве,GRP-ANIMATOR;AM-FLD-SELECTION-PATH,covered
+PAR-0336,PAR,PARAMETER_CATALOG.csv,Пояснение по выбранному объекту,GRP-ANIMATOR;AM-FLD-OBJECT-NOTE,covered
+PAR-0337,PAR,PARAMETER_CATALOG.csv,Домашний вид определён,GRP-ANIMATOR;AM-FLD-HOME-VIEW-DEFINED,covered
+PAR-0338,PAR,PARAMETER_CATALOG.csv,Набор включённых overlay,GRP-ANIMATOR;AM-FLD-OVERLAY-SET,covered
+PAR-0339,PAR,PARAMETER_CATALOG.csv,Идентификатор прогона,GRP-DIAGNOSTICS;DI-FLD-RUN-ID,covered
+PAR-0340,PAR,PARAMETER_CATALOG.csv,Hash контракта прогона,GRP-DIAGNOSTICS;DI-FLD-RUN-CONTRACT-HASH,covered_partially
+PAR-0341,PAR,PARAMETER_CATALOG.csv,Hash objective contract,GRP-DIAGNOSTICS;DI-FLD-OBJECTIVE-HASH,covered_partially
+PAR-0342,PAR,PARAMETER_CATALOG.csv,Hash active baseline,GRP-DIAGNOSTICS;DI-FLD-BASELINE-HASH,covered_partially
+PAR-0343,PAR,PARAMETER_CATALOG.csv,Hash validated suite snapshot,GRP-DIAGNOSTICS;DI-FLD-SUITE-SNAPSHOT-HASH,covered_partially
+PAR-0344,PAR,PARAMETER_CATALOG.csv,Идентификатор evidence manifest,GRP-DIAGNOSTICS;DI-FLD-EVIDENCE-MANIFEST-ID,covered
+PAR-0345,PAR,PARAMETER_CATALOG.csv,Количество source artifacts,GRP-DIAGNOSTICS;DI-FLD-EVIDENCE-SOURCE-COUNT,covered
+PAR-0346,PAR,PARAMETER_CATALOG.csv,Количество derived artifacts,GRP-DIAGNOSTICS;DI-FLD-EVIDENCE-DERIVED-COUNT,covered
+PAR-0347,PAR,PARAMETER_CATALOG.csv,Количество runtime artifacts,GRP-DIAGNOSTICS;DI-FLD-EVIDENCE-RUNTIME-COUNT,covered
+PAR-0348,PAR,PARAMETER_CATALOG.csv,Количество truth warnings,GRP-DIAGNOSTICS;DI-FLD-TRUTH-WARNING-COUNT,covered
+PAR-0349,PAR,PARAMETER_CATALOG.csv,Количество пропущенных артефактов,GRP-DIAGNOSTICS;DI-FLD-MISSING-ARTIFACT-COUNT,covered
+PAR-0350,PAR,PARAMETER_CATALOG.csv,Режим bundle,GRP-DIAGNOSTICS;DI-FLD-BUNDLE-MODE,covered
+PAR-0351,PAR,PARAMETER_CATALOG.csv,Идентификатор bundle,GRP-DIAGNOSTICS;DI-FLD-BUNDLE-ID,covered
+PAR-0352,PAR,PARAMETER_CATALOG.csv,Фаза сборки,GRP-DIAGNOSTICS;DI-FLD-BUILD-PHASE,covered
+PAR-0353,PAR,PARAMETER_CATALOG.csv,Ход сборки,GRP-DIAGNOSTICS;DI-FLD-BUILD-PROGRESS,covered
+PAR-0354,PAR,PARAMETER_CATALOG.csv,Текст ошибки сборки,GRP-DIAGNOSTICS;DI-FLD-BUILD-ERROR-TEXT,covered
+PAR-0355,PAR,PARAMETER_CATALOG.csv,Путь к последнему bundle,GRP-DIAGNOSTICS;DI-FLD-LATEST-BUNDLE-PATH,covered
+PAR-0356,PAR,PARAMETER_CATALOG.csv,SHA256 последнего bundle,GRP-DIAGNOSTICS;DI-FLD-LATEST-BUNDLE-SHA256,covered
+PAR-0357,PAR,PARAMETER_CATALOG.csv,Размер последнего bundle,GRP-DIAGNOSTICS;DI-FLD-LATEST-BUNDLE-SIZE,covered
+PAR-0358,PAR,PARAMETER_CATALOG.csv,Время создания последнего bundle,GRP-DIAGNOSTICS;DI-FLD-LATEST-BUNDLE-CREATED-UTC,covered
+PAR-0359,PAR,PARAMETER_CATALOG.csv,Свежесть последнего bundle,GRP-DIAGNOSTICS;DI-FLD-LATEST-BUNDLE-FRESHNESS,covered
+PAR-0360,PAR,PARAMETER_CATALOG.csv,Статус health report,GRP-DIAGNOSTICS;DI-FLD-HEALTH-STATUS,covered
+PAR-0361,PAR,PARAMETER_CATALOG.csv,Статус triage,GRP-DIAGNOSTICS;DI-FLD-TRIAGE-STATUS,covered
+PAR-0362,PAR,PARAMETER_CATALOG.csv,Статус geometry acceptance,GRP-DIAGNOSTICS;DI-FLD-GEOMETRY-ACCEPTANCE-STATUS,covered
+PAR-0363,PAR,PARAMETER_CATALOG.csv,Статус export validation,GRP-DIAGNOSTICS;DI-FLD-EXPORT-VALIDATION-STATUS,covered
+PAR-0364,PAR,PARAMETER_CATALOG.csv,Статус standard selfcheck,GRP-DIAGNOSTICS;DI-FLD-SELFCHECK-STANDARD-STATUS,covered
+PAR-0365,PAR,PARAMETER_CATALOG.csv,Статус full selfcheck,GRP-DIAGNOSTICS;DI-FLD-SELFCHECK-FULL-STATUS,covered
+PAR-0366,PAR,PARAMETER_CATALOG.csv,Статус workspace contract,GRP-DIAGNOSTICS;DI-FLD-WORKSPACE-CONTRACT-STATUS,covered
+PAR-0367,PAR,PARAMETER_CATALOG.csv,Фактический python executable,GRP-DIAGNOSTICS;DI-FLD-PYTHON-EXECUTABLE,covered
+PAR-0368,PAR,PARAMETER_CATALOG.csv,Предпочтительный helper python,GRP-DIAGNOSTICS;DI-FLD-PREFERRED-HELPER-PYTHON,covered
+PAR-0369,PAR,PARAMETER_CATALOG.csv,Python prefix,GRP-DIAGNOSTICS;DI-FLD-PYTHON-PREFIX,covered
+PAR-0370,PAR,PARAMETER_CATALOG.csv,Python base prefix,GRP-DIAGNOSTICS;DI-FLD-PYTHON-BASE-PREFIX,covered
+PAR-0371,PAR,PARAMETER_CATALOG.csv,Признак активного venv,GRP-DIAGNOSTICS;DI-FLD-VENV-ACTIVE,covered
+PAR-0372,PAR,PARAMETER_CATALOG.csv,Effective workspace,GRP-DIAGNOSTICS;DI-FLD-EFFECTIVE-WORKSPACE,covered
+PAR-0373,PAR,PARAMETER_CATALOG.csv,Путь к каталогу UI логов,GRP-DIAGNOSTICS;DI-FLD-UI-LOG-DIR,covered
+PAR-0374,PAR,PARAMETER_CATALOG.csv,Путь к bundle/meta.json,GRP-DIAGNOSTICS;DI-FLD-BUNDLE-META-PATH,covered
+PAR-0375,PAR,PARAMETER_CATALOG.csv,Путь к triage report,GRP-DIAGNOSTICS;DI-FLD-TRIAGE-REPORT-PATH,covered
+PAR-0376,PAR,PARAMETER_CATALOG.csv,Путь к health_report.json,GRP-DIAGNOSTICS;DI-FLD-HEALTH-REPORT-JSON-PATH,covered
+PAR-0377,PAR,PARAMETER_CATALOG.csv,Путь к health_report.md,GRP-DIAGNOSTICS;DI-FLD-HEALTH-REPORT-MD-PATH,covered
+PAR-0378,PAR,PARAMETER_CATALOG.csv,Путь к standard selfcheck,GRP-DIAGNOSTICS;DI-FLD-SELFCHECK-STANDARD-PATH,covered
+PAR-0379,PAR,PARAMETER_CATALOG.csv,Путь к full selfcheck,GRP-DIAGNOSTICS;DI-FLD-SELFCHECK-FULL-PATH,covered
+PAR-0380,PAR,PARAMETER_CATALOG.csv,Путь к merged evidence manifest,GRP-DIAGNOSTICS;DI-FLD-EVIDENCE-MANIFEST-PATH,covered
+PAR-0381,PAR,PARAMETER_CATALOG.csv,Идентификатор autosave-запроса,GRP-DIAGNOSTICS;DI-FLD-CRASH-AUTOSAVE-REQUEST-ID,covered
+PAR-0382,PAR,PARAMETER_CATALOG.csv,Режим autosave,GRP-DIAGNOSTICS;DI-FLD-AUTOSAVE-REQUEST-MODE,covered
+PAR-0383,PAR,PARAMETER_CATALOG.csv,Включать UI логи,GRP-DIAGNOSTICS;DI-FLD-INCLUDE-UI-LOGS,covered
+PAR-0384,PAR,PARAMETER_CATALOG.csv,Включать run artifacts,GRP-DIAGNOSTICS;DI-FLD-INCLUDE-RUN-ARTIFACTS,covered
+PAR-0385,PAR,PARAMETER_CATALOG.csv,Включать animator capture,GRP-DIAGNOSTICS;DI-FLD-INCLUDE-ANIMATOR-CAPTURE,covered
+PAR-0386,PAR,PARAMETER_CATALOG.csv,Включать system info,GRP-DIAGNOSTICS;DI-FLD-INCLUDE-SYSTEM-INFO,covered
+PAR-0387,PAR,PARAMETER_CATALOG.csv,Включать perf trace,GRP-DIAGNOSTICS;DI-FLD-INCLUDE-PERF-TRACE,covered_partially
+PAR-0388,PAR,PARAMETER_CATALOG.csv,Включать browser trace,GRP-DIAGNOSTICS;DI-FLD-INCLUDE-BROWSER-TRACE,covered_partially
+PAR-0389,PAR,PARAMETER_CATALOG.csv,Включать release metadata,GRP-DIAGNOSTICS;DI-FLD-INCLUDE-RELEASE-METADATA,covered
+PAR-0390,PAR,PARAMETER_CATALOG.csv,Включать source artifacts,GRP-DIAGNOSTICS;DI-FLD-INCLUDE-SOURCE-ARTIFACTS,covered
+PAR-0391,PAR,PARAMETER_CATALOG.csv,Включать derived artifacts,GRP-DIAGNOSTICS;DI-FLD-INCLUDE-DERIVED-ARTIFACTS,covered
+PAR-0392,PAR,PARAMETER_CATALOG.csv,Включать runtime artifacts,GRP-DIAGNOSTICS;DI-FLD-INCLUDE-RUNTIME-ARTIFACTS,covered
+PAR-0393,PAR,PARAMETER_CATALOG.csv,Заметка к bundle,GRP-DIAGNOSTICS;DI-FLD-BUNDLE-NOTES,covered
+PAR-0394,PAR,PARAMETER_CATALOG.csv,Целевой адрес/канал отправки,GRP-DIAGNOSTICS;DI-FLD-EXTERNAL-SEND-TARGET,covered
+PAR-0395,PAR,PARAMETER_CATALOG.csv,Готовность к отправке,GRP-DIAGNOSTICS;DI-FLD-SEND-READY,covered
+PAR-0396,PAR,PARAMETER_CATALOG.csv,Ошибка helper runtime,GRP-DIAGNOSTICS;DI-FLD-HELPER-RUNTIME-ERROR,covered
+PAR-0397,PAR,PARAMETER_CATALOG.csv,Сводка geometry acceptance,GRP-DIAGNOSTICS;DI-FLD-GEOMETRY-ACCEPTANCE-SUMMARY,covered
+PAR-0398,PAR,PARAMETER_CATALOG.csv,Сводка evidence gaps,GRP-DIAGNOSTICS;DI-FLD-EVIDENCE-GAPS-SUMMARY,covered
+PAR-0399,PAR,PARAMETER_CATALOG.csv,Источник readiness launcher,GRP-DIAGNOSTICS;DI-FLD-LAUNCHER-READINESS-SOURCE,covered
+PAR-0400,PAR,PARAMETER_CATALOG.csv,Статус последней UI сессии,GRP-DIAGNOSTICS;DI-FLD-LAST-UI-SESSION-STATUS,covered
+PAR-0401,PAR,PARAMETER_CATALOG.csv,Активное рабочее пространство,GRP-SHELL;SH-FLD-ACTIVE-WS,covered
+PAR-0402,PAR,PARAMETER_CATALOG.csv,Строка глобального поиска,GRP-SHELL;SH-FLD-SEARCH-QUERY,covered
+PAR-0403,PAR,PARAMETER_CATALOG.csv,Область глобального поиска,GRP-SHELL;SH-FLD-SEARCH-SCOPE,covered
+PAR-0404,PAR,PARAMETER_CATALOG.csv,Идентификатор главного действия workspace,GRP-SHELL;SH-FLD-PRIMARY-ACTION-ID,covered
+PAR-0405,PAR,PARAMETER_CATALOG.csv,Набор вторичных действий workspace,GRP-SHELL;SH-FLD-SECONDARY-ACTIONS,covered
+PAR-0406,PAR,PARAMETER_CATALOG.csv,Уровень сообщения оболочки,GRP-SHELL;SH-FLD-MSG-SEVERITY,covered
+PAR-0407,PAR,PARAMETER_CATALOG.csv,Текст сообщения оболочки,GRP-SHELL;SH-FLD-MSG-TEXT,covered
+PAR-0408,PAR,PARAMETER_CATALOG.csv,Свежесть последнего архива диагностики,GRP-SHELL;SH-FLD-DIAG-FRESHNESS,covered
+PAR-0409,PAR,PARAMETER_CATALOG.csv,Путь к последнему диагностическому архиву,GRP-SHELL;SH-FLD-LAST-BUNDLE-PATH,covered
+PAR-0410,PAR,PARAMETER_CATALOG.csv,Контрольная сумма последнего архива,GRP-SHELL;SH-FLD-LAST-BUNDLE-SHA,covered
+PAR-0411,PAR,PARAMETER_CATALOG.csv,Профиль раскладки оболочки,GRP-SHELL;SH-FLD-LAYOUT-PROFILE,covered
+PAR-0412,PAR,PARAMETER_CATALOG.csv,Режим левой панели,GRP-SHELL;SH-FLD-LEFT-PANE-MODE,covered
+PAR-0413,PAR,PARAMETER_CATALOG.csv,Режим правой панели,GRP-SHELL;SH-FLD-RIGHT-PANE-MODE,covered
+PAR-0414,PAR,PARAMETER_CATALOG.csv,Активный режим расчёта/просмотра,GRP-SHELL;SH-FLD-ACTIVE-MODE,covered
+PAR-0415,PAR,PARAMETER_CATALOG.csv,Текущая стадия процесса,GRP-SHELL;SH-FLD-ACTIVE-STAGE,covered
+PAR-0416,PAR,PARAMETER_CATALOG.csv,Свод контракта baseline/objective,GRP-SHELL;SH-FLD-CONTRACT-SUMMARY,covered_partially
+PAR-0417,PAR,PARAMETER_CATALOG.csv,Ссылки на текущий run,GRP-SHELL;SH-FLD-RUN-LINKS,covered
+PAR-0418,PAR,PARAMETER_CATALOG.csv,История последних команд,GRP-SHELL;SH-FLD-RECENT-COMMANDS,covered
+PAR-0419,PAR,PARAMETER_CATALOG.csv,Значки состояний рабочих пространств,GRP-SHELL;SH-FLD-WORKSPACE-BADGES,covered
+PAR-0420,PAR,PARAMETER_CATALOG.csv,Поведение Escape,GRP-SHELL;SH-FLD-ESCAPE-TARGET,covered
+PAR-0421,PAR,PARAMETER_CATALOG.csv,Горячая клавиша палитры команд,GRP-SHELL;SH-FLD-CMD-K,covered
+PAR-0422,PAR,PARAMETER_CATALOG.csv,Порядок F6-переходов,GRP-SHELL;SH-FLD-F6-ORDER,covered
+PAR-0423,PAR,PARAMETER_CATALOG.csv,Название проекта,GRP-PROJECT;PI-FLD-PROJECT-NAME,covered
+PAR-0424,PAR,PARAMETER_CATALOG.csv,Код проекта,GRP-PROJECT;PI-FLD-PROJECT-CODE,covered
+PAR-0425,PAR,PARAMETER_CATALOG.csv,Рабочий каталог проекта,GRP-PROJECT;PI-FLD-WORKSPACE-ROOT,covered
+PAR-0426,PAR,PARAMETER_CATALOG.csv,Вариант машины,GRP-PROJECT;PI-FLD-VEHICLE-VARIANT,covered
+PAR-0427,PAR,PARAMETER_CATALOG.csv,Профиль единиц,GRP-PROJECT;PI-FLD-UNIT-PROFILE,covered
+PAR-0428,PAR,PARAMETER_CATALOG.csv,Режим зеркальности левого и правого борта,GRP-PROJECT;PI-FLD-MIRROR-MODE,covered
+PAR-0429,PAR,PARAMETER_CATALOG.csv,База машины,GRP-INPUT-FRAME;PI-FLD-WHEELBASE,covered
+PAR-0430,PAR,PARAMETER_CATALOG.csv,Передняя колея,GRP-INPUT-FRAME;PI-FLD-FRONT-TRACK,covered
+PAR-0431,PAR,PARAMETER_CATALOG.csv,Задняя колея,GRP-INPUT-FRAME;PI-FLD-REAR-TRACK,covered
+PAR-0432,PAR,PARAMETER_CATALOG.csv,Длина рамы,GRP-INPUT-FRAME;PI-FLD-FRAME-LENGTH,covered
+PAR-0433,PAR,PARAMETER_CATALOG.csv,Ширина рамы,GRP-INPUT-FRAME;PI-FLD-FRAME-WIDTH,covered
+PAR-0434,PAR,PARAMETER_CATALOG.csv,Высота рамы,GRP-INPUT-FRAME;PI-FLD-FRAME-HEIGHT,covered
+PAR-0435,PAR,PARAMETER_CATALOG.csv,Статический дорожный просвет,GRP-INPUT-FRAME;PI-FLD-GROUND-CLEARANCE,covered
+PAR-0436,PAR,PARAMETER_CATALOG.csv,Продольная координата центра тяжести,GRP-INPUT-FRAME;PI-FLD-CG-X,covered
+PAR-0437,PAR,PARAMETER_CATALOG.csv,Поперечная координата центра тяжести,GRP-INPUT-FRAME;PI-FLD-CG-Y,covered
+PAR-0438,PAR,PARAMETER_CATALOG.csv,Высота центра тяжести,GRP-INPUT-FRAME;PI-FLD-CG-Z,covered
+PAR-0439,PAR,PARAMETER_CATALOG.csv,Полная масса машины,GRP-INPUT-MASS;PI-FLD-MASS-TOTAL,covered
+PAR-0440,PAR,PARAMETER_CATALOG.csv,Подрессоренная масса,GRP-INPUT-MASS;PI-FLD-MASS-SPRUNG,covered
+PAR-0441,PAR,PARAMETER_CATALOG.csv,Неподрессоренная масса передней оси,GRP-INPUT-MASS;PI-FLD-MASS-UNSPRUNG-FRONT,covered
+PAR-0442,PAR,PARAMETER_CATALOG.csv,Неподрессоренная масса задней оси,GRP-INPUT-MASS;PI-FLD-MASS-UNSPRUNG-REAR,covered
+PAR-0443,PAR,PARAMETER_CATALOG.csv,Момент инерции вокруг продольной оси,GRP-INPUT-MASS;PI-FLD-IXX,covered
+PAR-0444,PAR,PARAMETER_CATALOG.csv,Момент инерции вокруг поперечной оси,GRP-INPUT-MASS;PI-FLD-IYY,covered
+PAR-0445,PAR,PARAMETER_CATALOG.csv,Момент инерции вокруг вертикальной оси,GRP-INPUT-MASS;PI-FLD-IZZ,covered
+PAR-0446,PAR,PARAMETER_CATALOG.csv,Дополнительная полезная нагрузка,GRP-INPUT-MASS;PI-FLD-PAYLOAD,covered
+PAR-0447,PAR,PARAMETER_CATALOG.csv,Передняя пружина C1 — режим настройки,GRP-INPUT-SPRING;PI-FLD-SPRING-MODE-FR-C1,covered
+PAR-0448,PAR,PARAMETER_CATALOG.csv,Передняя пружина C1 — жёсткость,GRP-INPUT-SPRING;PI-FLD-SPRING-RATE-FR-C1,covered
+PAR-0449,PAR,PARAMETER_CATALOG.csv,Передняя пружина C1 — преднатяг,GRP-INPUT-SPRING;PI-FLD-SPRING-PRELOAD-FR-C1,covered
+PAR-0450,PAR,PARAMETER_CATALOG.csv,Передняя пружина C2 — режим настройки,GRP-INPUT-SPRING;PI-FLD-SPRING-MODE-FR-C2,covered
+PAR-0451,PAR,PARAMETER_CATALOG.csv,Передняя пружина C2 — жёсткость,GRP-INPUT-SPRING;PI-FLD-SPRING-RATE-FR-C2,covered
+PAR-0452,PAR,PARAMETER_CATALOG.csv,Передняя пружина C2 — преднатяг,GRP-INPUT-SPRING;PI-FLD-SPRING-PRELOAD-FR-C2,covered
+PAR-0453,PAR,PARAMETER_CATALOG.csv,Задняя пружина C1 — режим настройки,GRP-INPUT-SPRING;PI-FLD-SPRING-MODE-RR-C1,covered
+PAR-0454,PAR,PARAMETER_CATALOG.csv,Задняя пружина C1 — жёсткость,GRP-INPUT-SPRING;PI-FLD-SPRING-RATE-RR-C1,covered
+PAR-0455,PAR,PARAMETER_CATALOG.csv,Задняя пружина C1 — преднатяг,GRP-INPUT-SPRING;PI-FLD-SPRING-PRELOAD-RR-C1,covered
+PAR-0456,PAR,PARAMETER_CATALOG.csv,Задняя пружина C2 — режим настройки,GRP-INPUT-SPRING;PI-FLD-SPRING-MODE-RR-C2,covered
+PAR-0457,PAR,PARAMETER_CATALOG.csv,Задняя пружина C2 — жёсткость,GRP-INPUT-SPRING;PI-FLD-SPRING-RATE-RR-C2,covered
+PAR-0458,PAR,PARAMETER_CATALOG.csv,Задняя пружина C2 — преднатяг,GRP-INPUT-SPRING;PI-FLD-SPRING-PRELOAD-RR-C2,covered
+PAR-0459,PAR,PARAMETER_CATALOG.csv,Передний цилиндр C1 — диаметр цилиндра,GRP-INPUT-CYL;PI-FLD-CYL-BORE-FR-C1,covered
+PAR-0460,PAR,PARAMETER_CATALOG.csv,Передний цилиндр C1 — ход штока,GRP-INPUT-CYL;PI-FLD-CYL-STROKE-FR-C1,covered
+PAR-0461,PAR,PARAMETER_CATALOG.csv,Передний цилиндр C1 — верхняя точка крепления по высоте,GRP-INPUT-CYL;PI-FLD-CYL-TOP-Z-FR-C1,covered
+PAR-0462,PAR,PARAMETER_CATALOG.csv,Передний цилиндр C1 — верхняя точка крепления по ширине,GRP-INPUT-CYL;PI-FLD-CYL-TOP-Y-FR-C1,covered
+PAR-0463,PAR,PARAMETER_CATALOG.csv,Передний цилиндр C2 — диаметр цилиндра,GRP-INPUT-CYL;PI-FLD-CYL-BORE-FR-C2,covered
+PAR-0464,PAR,PARAMETER_CATALOG.csv,Передний цилиндр C2 — ход штока,GRP-INPUT-CYL;PI-FLD-CYL-STROKE-FR-C2,covered
+PAR-0465,PAR,PARAMETER_CATALOG.csv,Передний цилиндр C2 — верхняя точка крепления по высоте,GRP-INPUT-CYL;PI-FLD-CYL-TOP-Z-FR-C2,covered
+PAR-0466,PAR,PARAMETER_CATALOG.csv,Передний цилиндр C2 — верхняя точка крепления по ширине,GRP-INPUT-CYL;PI-FLD-CYL-TOP-Y-FR-C2,covered
+PAR-0467,PAR,PARAMETER_CATALOG.csv,Задний цилиндр C1 — диаметр цилиндра,GRP-INPUT-CYL;PI-FLD-CYL-BORE-RR-C1,covered
+PAR-0468,PAR,PARAMETER_CATALOG.csv,Задний цилиндр C1 — ход штока,GRP-INPUT-CYL;PI-FLD-CYL-STROKE-RR-C1,covered
+PAR-0469,PAR,PARAMETER_CATALOG.csv,Задний цилиндр C1 — верхняя точка крепления по высоте,GRP-INPUT-CYL;PI-FLD-CYL-TOP-Z-RR-C1,covered
+PAR-0470,PAR,PARAMETER_CATALOG.csv,Задний цилиндр C1 — верхняя точка крепления по ширине,GRP-INPUT-CYL;PI-FLD-CYL-TOP-Y-RR-C1,covered
+PAR-0471,PAR,PARAMETER_CATALOG.csv,Задний цилиндр C2 — диаметр цилиндра,GRP-INPUT-CYL;PI-FLD-CYL-BORE-RR-C2,covered
+PAR-0472,PAR,PARAMETER_CATALOG.csv,Задний цилиндр C2 — ход штока,GRP-INPUT-CYL;PI-FLD-CYL-STROKE-RR-C2,covered
+PAR-0473,PAR,PARAMETER_CATALOG.csv,Задний цилиндр C2 — верхняя точка крепления по высоте,GRP-INPUT-CYL;PI-FLD-CYL-TOP-Z-RR-C2,covered
+PAR-0474,PAR,PARAMETER_CATALOG.csv,Задний цилиндр C2 — верхняя точка крепления по ширине,GRP-INPUT-CYL;PI-FLD-CYL-TOP-Y-RR-C2,covered
+PAR-0475,PAR,PARAMETER_CATALOG.csv,Номинальное питающее давление,GRP-INPUT-PNEU;PI-FLD-SUPPLY-P-NOM,covered
+PAR-0476,PAR,PARAMETER_CATALOG.csv,Максимальное питающее давление,GRP-INPUT-PNEU;PI-FLD-SUPPLY-P-MAX,covered
+PAR-0477,PAR,PARAMETER_CATALOG.csv,Объём ресивера 1,GRP-INPUT-PNEU;PI-FLD-RECEIVER-1-V,covered
+PAR-0478,PAR,PARAMETER_CATALOG.csv,Объём ресивера 2,GRP-INPUT-PNEU;PI-FLD-RECEIVER-2-V,covered
+PAR-0479,PAR,PARAMETER_CATALOG.csv,Внутренний диаметр магистрали,GRP-INPUT-PNEU;PI-FLD-LINE-DIAM,covered
+PAR-0480,PAR,PARAMETER_CATALOG.csv,Пропускная способность клапанов C1,GRP-INPUT-PNEU;PI-FLD-VALVE-C1-CV,covered
+PAR-0481,PAR,PARAMETER_CATALOG.csv,Пропускная способность клапанов C2,GRP-INPUT-PNEU;PI-FLD-VALVE-C2-CV,covered
+PAR-0482,PAR,PARAMETER_CATALOG.csv,Мёртвый объём камеры,GRP-INPUT-PNEU;PI-FLD-DEAD-VOLUME,covered
+PAR-0483,PAR,PARAMETER_CATALOG.csv,Шаг интегрирования,GRP-INPUT-NUM;PI-FLD-INTEGRATION-STEP,covered
+PAR-0484,PAR,PARAMETER_CATALOG.csv,Время моделирования по умолчанию,GRP-INPUT-NUM;PI-FLD-SIM-TIME-DEFAULT,covered
+PAR-0485,PAR,PARAMETER_CATALOG.csv,Допустимая доля потери контакта,GRP-INPUT-NUM;PI-FLD-CONTACT-LOSS-LIMIT,covered
+PAR-0486,PAR,PARAMETER_CATALOG.csv,Автосбор диагностики при штатном выходе,GRP-INPUT-FLAG;PI-FLD-DIAG-AUTO-EXIT,covered
+PAR-0487,PAR,PARAMETER_CATALOG.csv,Автосбор диагностики при аварии,GRP-INPUT-FLAG;PI-FLD-DIAG-AUTO-CRASH,covered
+PAR-0488,PAR,PARAMETER_CATALOG.csv,Замок зеркальной симметрии,GRP-INPUT-FLAG;PI-FLD-SYMMETRY-LOCK,covered
+GRP-SHELL,PAR_GROUP,PARAMETER_GROUPS.csv,"Глобальная оболочка, поиск и shell state",,covered
+GRP-PROJECT,PAR_GROUP,PARAMETER_GROUPS.csv,Метаданные проекта и next-action,,covered
+GRP-INPUT-FRAME,PAR_GROUP,PARAMETER_GROUPS.csv,"Геометрия рамы, базы и высоты",,covered
+GRP-INPUT-MASS,PAR_GROUP,PARAMETER_GROUPS.csv,Массы и инерции,,covered
+GRP-INPUT-CYL,PAR_GROUP,PARAMETER_GROUPS.csv,"Цилиндры, ход, packaging и крепления",,covered
+GRP-INPUT-SPRING,PAR_GROUP,PARAMETER_GROUPS.csv,Пружины и режимы авто-подбора,,covered
+GRP-INPUT-PNEU,PAR_GROUP,PARAMETER_GROUPS.csv,"Пневматика, дроссели, ресиверы, регуляторы и потоки",,covered
+GRP-INPUT-NUM,PAR_GROUP,PARAMETER_GROUPS.csv,"Численные параметры solver, step-size, tolerances",,covered
+GRP-INPUT-FLAG,PAR_GROUP,PARAMETER_GROUPS.csv,"Режимы, флаги и переключатели модели",,covered
+GRP-RING-GLOBAL,PAR_GROUP,PARAMETER_GROUPS.csv,Глобальные настройки циклического сценария,,covered
+GRP-RING-SEGMENT,PAR_GROUP,PARAMETER_GROUPS.csv,Параметры сегментов сценария,,covered
+GRP-SUITE,PAR_GROUP,PARAMETER_GROUPS.csv,"Матрица испытаний, row-overrides, stage entry",,covered
+GRP-BASELINE,PAR_GROUP,PARAMETER_GROUPS.csv,"Baseline source, provenance, policy, history",,covered
+GRP-OPT-CONTRACT,PAR_GROUP,PARAMETER_GROUPS.csv,"Optimization objective stack, hard gate, problem identity",,covered
+GRP-OPT-RUN,PAR_GROUP,PARAMETER_GROUPS.csv,Параметры запуска optimization и distributed settings,,covered
+GRP-ANALYSIS,PAR_GROUP,PARAMETER_GROUPS.csv,"Selected run, compare, report export",,covered
+GRP-ANIMATOR,PAR_GROUP,PARAMETER_GROUPS.csv,"Playback, overlays, view mode, truthful graphics",,covered
+GRP-DIAGNOSTICS,PAR_GROUP,PARAMETER_GROUPS.csv,"Диагностика, selfcheck, evidence manifest, bundle",,covered
+GRP-SETTINGS,PAR_GROUP,PARAMETER_GROUPS.csv,"Параметры приложения, темы, DPI, layout profiles",,covered
+GRP-TOOLS,PAR_GROUP,PARAMETER_GROUPS.csv,Инструменты и редкие инженерные действия,,covered
+RING-SCR-01,SCREEN,SCREEN_CATALOG.csv,Редактор кольца — обзор,WIN-MAIN-SHELL,covered
+RING-SCR-02,SCREEN,SCREEN_CATALOG.csv,Редактор кольца — карточка сегмента,WIN-MAIN-SHELL,covered
+RING-SCR-03,SCREEN,SCREEN_CATALOG.csv,Редактор кольца — шов и экспорт,WIN-MAIN-SHELL,covered
+RING-SCR-04,SCREEN,SCREEN_CATALOG.csv,Редактор кольца — связь с матрицей испытаний,WIN-MAIN-SHELL,covered
+SUITE-SCR-01,SCREEN,SCREEN_CATALOG.csv,Матрица испытаний — обзор,WIN-MAIN-SHELL,covered
+SUITE-SCR-02,SCREEN,SCREEN_CATALOG.csv,Матрица испытаний — строка ring-linked,WIN-MAIN-SHELL,covered
+SUITE-SCR-03,SCREEN,SCREEN_CATALOG.csv,Матрица испытаний — строка шаблона,WIN-MAIN-SHELL,covered
+SUITE-SCR-04,SCREEN,SCREEN_CATALOG.csv,Матрица испытаний — stale-link ремонт,WIN-MAIN-SHELL,covered
+SUITE-SCR-05,SCREEN,SCREEN_CATALOG.csv,Матрица испытаний — проверка и снимок,WIN-MAIN-SHELL,covered
+SUITE-SCR-06,SCREEN,SCREEN_CATALOG.csv,Матрица испытаний — передача в базовый прогон,WIN-MAIN-SHELL,covered
+BASELINE-SCR-01,SCREEN,SCREEN_CATALOG.csv,Базовый прогон — обзор,WIN-MAIN-SHELL,covered
+BASELINE-SCR-02,SCREEN,SCREEN_CATALOG.csv,Базовый прогон — снимок набора испытаний,WIN-MAIN-SHELL,covered
+BASELINE-SCR-03,SCREEN,SCREEN_CATALOG.csv,Базовый прогон — выбор источника и политика,WIN-MAIN-SHELL,covered
+BASELINE-SCR-04,SCREEN,SCREEN_CATALOG.csv,Базовый прогон — выполнение,WIN-MAIN-SHELL,covered
+BASELINE-SCR-05,SCREEN,SCREEN_CATALOG.csv,Базовый прогон — результат и принятие,WIN-MAIN-SHELL,covered
+BASELINE-SCR-06,SCREEN,SCREEN_CATALOG.csv,Базовый прогон — история и сравнение,WIN-MAIN-SHELL,covered
+BASELINE-SCR-07,SCREEN,SCREEN_CATALOG.csv,Базовый прогон — передача в оптимизацию,WIN-MAIN-SHELL,covered
+OPT-SCR-01,SCREEN,SCREEN_CATALOG.csv,Оптимизация — обзор и контракт,WIN-MAIN-SHELL,covered
+OPT-SCR-02,SCREEN,SCREEN_CATALOG.csv,Оптимизация — objective contract и hard gate,WIN-MAIN-SHELL,covered
+OPT-SCR-03,SCREEN,SCREEN_CATALOG.csv,Оптимизация — StageRunner настройка,WIN-MAIN-SHELL,covered
+OPT-SCR-04,SCREEN,SCREEN_CATALOG.csv,Оптимизация — StageRunner выполнение,WIN-MAIN-SHELL,covered
+OPT-SCR-05,SCREEN,SCREEN_CATALOG.csv,Оптимизация — distributed coordinator настройка,WIN-MAIN-SHELL,covered
+OPT-SCR-06,SCREEN,SCREEN_CATALOG.csv,Оптимизация — distributed выполнение и история,WIN-MAIN-SHELL,covered
+OPT-SCR-07,SCREEN,SCREEN_CATALOG.csv,Оптимизация — история и сравнение,WIN-MAIN-SHELL,covered
+OPT-SCR-08,SCREEN,SCREEN_CATALOG.csv,Оптимизация — handoff в анализ и аниматор,WIN-MAIN-SHELL,covered
+AN-SCR-01,SCREEN,SCREEN_CATALOG.csv,Анализ — контракт выбранного прогона,WIN-MAIN-SHELL,covered
+AN-SCR-02,SCREEN,SCREEN_CATALOG.csv,Анализ — настройка сравнения,WIN-MAIN-SHELL,covered
+AN-SCR-03,SCREEN,SCREEN_CATALOG.csv,Анализ — обзор результатов,WIN-MAIN-SHELL,covered
+AN-SCR-04,SCREEN,SCREEN_CATALOG.csv,Анализ — графики по испытанию,WIN-MAIN-SHELL,covered
+AN-SCR-05,SCREEN,SCREEN_CATALOG.csv,Анализ — анализ по сценарию и сегменту,WIN-MAIN-SHELL,covered
+AN-SCR-06,SCREEN,SCREEN_CATALOG.csv,Анализ — сравнение прогонов,WIN-MAIN-SHELL,covered
+AN-SCR-07,SCREEN,SCREEN_CATALOG.csv,Анализ — экспорт отчётов и таблиц,WIN-MAIN-SHELL,covered
+AN-SCR-08,SCREEN,SCREEN_CATALOG.csv,Анализ — handoff в аниматор и диагностику,WIN-MAIN-SHELL,covered
+AM-SCR-01,SCREEN,SCREEN_CATALOG.csv,Аниматор — gate контекста анализа,WIN-DESKTOP-ANIMATOR,covered
+AM-SCR-02,SCREEN,SCREEN_CATALOG.csv,Аниматор — обзор проигрывания,WIN-DESKTOP-ANIMATOR,covered
+AM-SCR-03,SCREEN,SCREEN_CATALOG.csv,Аниматор — фокус по испытанию и сегменту,WIN-DESKTOP-ANIMATOR,covered
+AM-SCR-04,SCREEN,SCREEN_CATALOG.csv,Аниматор — выбор подвески и hardpoints,WIN-DESKTOP-ANIMATOR,covered
+AM-SCR-05,SCREEN,SCREEN_CATALOG.csv,Аниматор — truth-инспекция цилиндра,WIN-DESKTOP-ANIMATOR,covered
+AM-SCR-06,SCREEN,SCREEN_CATALOG.csv,Аниматор — truth-инспекция дороги,WIN-DESKTOP-ANIMATOR,covered
+AM-SCR-07,SCREEN,SCREEN_CATALOG.csv,Аниматор — compare overlay,WIN-DESKTOP-ANIMATOR,covered
+AM-SCR-08,SCREEN,SCREEN_CATALOG.csv,"Аниматор — доказательства, экспорт и handoff диагностики",WIN-DESKTOP-ANIMATOR,covered
+DI-SCR-01,SCREEN,SCREEN_CATALOG.csv,Диагностика — обзор и готовность,WIN-DIAGNOSTICS,covered
+DI-SCR-02,SCREEN,SCREEN_CATALOG.csv,Диагностика — intake evidence manifest,WIN-DIAGNOSTICS,covered
+DI-SCR-03,SCREEN,SCREEN_CATALOG.csv,Диагностика — selfcheck и runtime окружение,WIN-DIAGNOSTICS,covered
+DI-SCR-04,SCREEN,SCREEN_CATALOG.csv,Диагностика — состав bundle и политика включения,WIN-DIAGNOSTICS,covered
+DI-SCR-05,SCREEN,SCREEN_CATALOG.csv,Диагностика — health report и triage,WIN-DIAGNOSTICS,covered
+DI-SCR-06,SCREEN,SCREEN_CATALOG.csv,Диагностика — история и latest bundle,WIN-DIAGNOSTICS,covered
+DI-SCR-07,SCREEN,SCREEN_CATALOG.csv,Диагностика — сборка и отправка bundle,WIN-DIAGNOSTICS,covered
+DI-SCR-08,SCREEN,SCREEN_CATALOG.csv,Диагностика — auto-exit и crash autosave recovery,WIN-DIAGNOSTICS,covered
+PROJECT-SCR-01,SCREEN,SCREEN_CATALOG.csv,Панель проекта — обзор,WIN-MAIN-SHELL,covered
+PROJECT-SCR-02,SCREEN,SCREEN_CATALOG.csv,Панель проекта — recent и открытие,WIN-MAIN-SHELL,covered
+PROJECT-SCR-03,SCREEN,SCREEN_CATALOG.csv,Панель проекта — блокеры и next action,WIN-MAIN-SHELL,covered
+INPUTS-SCR-01,SCREEN,SCREEN_CATALOG.csv,Исходные данные — обзор групп,WIN-MAIN-SHELL,covered
+INPUTS-SCR-02,SCREEN,SCREEN_CATALOG.csv,Исходные данные — геометрия и рама,WIN-MAIN-SHELL,covered
+INPUTS-SCR-03,SCREEN,SCREEN_CATALOG.csv,Исходные данные — массы и пружины,WIN-MAIN-SHELL,covered
+INPUTS-SCR-04,SCREEN,SCREEN_CATALOG.csv,Исходные данные — цилиндры и пневматика,WIN-MAIN-SHELL,covered
+INPUTS-SCR-05,SCREEN,SCREEN_CATALOG.csv,Исходные данные — численные параметры и режимы,WIN-MAIN-SHELL,covered
+INPUTS-SCR-06,SCREEN,SCREEN_CATALOG.csv,Исходные данные — validation и handoff,WIN-MAIN-SHELL,covered
+SHELL-SCR-01,SCREEN,SCREEN_CATALOG.csv,Главная shell-оболочка,WIN-MAIN-SHELL,covered
+SETTINGS-SCR-01,SCREEN,SCREEN_CATALOG.csv,Параметры приложения,WIN-MAIN-SHELL,covered
+TOOLS-SCR-01,SCREEN,SCREEN_CATALOG.csv,Инструменты,WIN-MAIN-SHELL,covered
+WIN-MAIN-SHELL,WINDOW,WINDOW_CATALOG.csv,Главное окно приложения,,covered
+WIN-DESKTOP-ANIMATOR,WINDOW,WINDOW_CATALOG.csv,Desktop Animator,,covered
+WIN-COMPARE-VIEWER,WINDOW,WINDOW_CATALOG.csv,Compare Viewer,,covered
+WIN-DESKTOP-MNEMO,WINDOW,WINDOW_CATALOG.csv,Desktop Mnemo,,covered
+WIN-DIAGNOSTICS,WINDOW,WINDOW_CATALOG.csv,Диагностика,,covered
+WIN-LEFT-NAV,WINDOW,WINDOW_CATALOG.csv,Левая панель навигации,,covered
+WIN-RIGHT-INSPECTOR,WINDOW,WINDOW_CATALOG.csv,Правая панель свойств и помощи,,covered
+WIN-BOTTOM-STATUS,WINDOW,WINDOW_CATALOG.csv,Нижняя панель статуса и прогресса,,covered
+WIN-COMMAND-SEARCH,WINDOW,WINDOW_CATALOG.csv,Глобальный поиск команд,,covered
+WIN-SETTINGS,WINDOW,WINDOW_CATALOG.csv,Параметры приложения,,covered
+WIN-TOOLS,WINDOW,WINDOW_CATALOG.csv,Инструменты,,covered
+WIN-HELP-CONTEXT,WINDOW,WINDOW_CATALOG.csv,Контекстная помощь,,covered
+RG-FLD-SCENARIO-NAME,UI,UI_ELEMENT_CATALOG.csv,Название сценария,WS-RING;WIN-MAIN-SHELL;PAR-0001,covered
+RG-FLD-CLOSURE-POLICY,UI,UI_ELEMENT_CATALOG.csv,Политика замыкания кольца,WS-RING;WIN-MAIN-SHELL;PAR-0002,covered
+RG-FLD-V0,UI,UI_ELEMENT_CATALOG.csv,Начальная скорость,WS-RING;WIN-MAIN-SHELL;PAR-0003,covered
+RG-FLD-DX,UI,UI_ELEMENT_CATALOG.csv,Шаг дискретизации,WS-RING;WIN-MAIN-SHELL;PAR-0004,covered
+RG-FLD-LAPS,UI,UI_ELEMENT_CATALOG.csv,Количество кругов,WS-RING;WIN-MAIN-SHELL;PAR-0005,covered
+RG-FLD-SEED,UI,UI_ELEMENT_CATALOG.csv,Код генератора,WS-RING;WIN-MAIN-SHELL;PAR-0006,covered
+RG-FLD-ROAD-WIDTH,UI,UI_ELEMENT_CATALOG.csv,Ширина дороги,WS-RING;WIN-MAIN-SHELL;PAR-0007,covered
+RG-BTN-GENERATE-PREVIEW,UI,UI_ELEMENT_CATALOG.csv,Сгенерировать предварительный просмотр,WS-RING;WIN-MAIN-SHELL;,covered
+RG-SEGMENT-LIST,UI,UI_ELEMENT_CATALOG.csv,Список сегментов,WS-RING;WIN-MAIN-SHELL;,covered
+RG-BTN-ADD-SEGMENT,UI,UI_ELEMENT_CATALOG.csv,Добавить сегмент,WS-RING;WIN-MAIN-SHELL;,covered
+RG-BTN-DUP-SEGMENT,UI,UI_ELEMENT_CATALOG.csv,Дублировать сегмент,WS-RING;WIN-MAIN-SHELL;,covered
+RG-BTN-DELETE-SEGMENT,UI,UI_ELEMENT_CATALOG.csv,Удалить сегмент,WS-RING;WIN-MAIN-SHELL;,covered
+RG-BTN-INSERT-BEFORE,UI,UI_ELEMENT_CATALOG.csv,Вставить перед,WS-RING;WIN-MAIN-SHELL;,covered
+RG-BTN-INSERT-AFTER,UI,UI_ELEMENT_CATALOG.csv,Вставить после,WS-RING;WIN-MAIN-SHELL;,covered
+RG-BTN-MOVE-UP,UI,UI_ELEMENT_CATALOG.csv,Поднять сегмент,WS-RING;WIN-MAIN-SHELL;,covered
+RG-BTN-MOVE-DOWN,UI,UI_ELEMENT_CATALOG.csv,Опустить сегмент,WS-RING;WIN-MAIN-SHELL;,covered
+RG-SEAM-BADGE,UI,UI_ELEMENT_CATALOG.csv,Индикатор шва,WS-RING;WIN-MAIN-SHELL;,covered
+RING-MESSAGE-BAR,UI,UI_ELEMENT_CATALOG.csv,Локальная строка сообщений,WS-RING;WIN-MAIN-SHELL;,covered
+RG-PLAN-VIEW,UI,UI_ELEMENT_CATALOG.csv,План кольца,WS-RING;WIN-MAIN-SHELL;,covered
+RG-PLAN-LEGEND,UI,UI_ELEMENT_CATALOG.csv,Легенда плана кольца,WS-RING;WIN-MAIN-SHELL;,covered
+RG-LONG-PROFILE-VIEW,UI,UI_ELEMENT_CATALOG.csv,Продольный профиль,WS-RING;WIN-MAIN-SHELL;,covered
+RG-LONG-STATUS,UI,UI_ELEMENT_CATALOG.csv,Статус продольного профиля,WS-RING;WIN-MAIN-SHELL;,covered
+RG-CROSSFALL-VIEW,UI,UI_ELEMENT_CATALOG.csv,Поперечный уклон,WS-RING;WIN-MAIN-SHELL;,covered
+RG-SEAM-DIAGNOSTICS,UI,UI_ELEMENT_CATALOG.csv,Диагностика замыкания,WS-RING;WIN-MAIN-SHELL;,covered
+RG-BTN-CHECK-SEAM,UI,UI_ELEMENT_CATALOG.csv,Проверить шов кольца,WS-RING;WIN-MAIN-SHELL;,covered
+RG-BTN-EXPORT-SCENARIO,UI,UI_ELEMENT_CATALOG.csv,Экспортировать сценарий,WS-RING;WIN-MAIN-SHELL;,covered
+RG-BTN-ADD-TO-SUITE,UI,UI_ELEMENT_CATALOG.csv,Добавить в испытания,WS-RING;WIN-MAIN-SHELL;,covered
+RG-SUITE-LINK-SUMMARY,UI,UI_ELEMENT_CATALOG.csv,Сводка передачи в испытания,WS-RING;WIN-MAIN-SHELL;,covered
+RG-EXPORT-ARTIFACTS,UI,UI_ELEMENT_CATALOG.csv,Сводка экспортированных файлов,WS-RING;WIN-MAIN-SHELL;,covered
+RG-VALIDATION-SUMMARY,UI,UI_ELEMENT_CATALOG.csv,Сводка проверок,WS-RING;WIN-MAIN-SHELL;,covered
+RG-HELP-ANCHOR,UI,UI_ELEMENT_CATALOG.csv,Локальный знак вопроса,WS-RING;WIN-MAIN-SHELL;,covered
+RING-VALIDATION-STRIP,UI,UI_ELEMENT_CATALOG.csv,Полоса валидации,WS-RING;WIN-MAIN-SHELL;,covered
+RING-UNITS-LEGEND,UI,UI_ELEMENT_CATALOG.csv,Легенда единиц измерения,WS-RING;WIN-MAIN-SHELL;,covered
+RG-INS-SEGMENT-CARD,UI,UI_ELEMENT_CATALOG.csv,Карточка выбранного сегмента,WS-RING;WIN-MAIN-SHELL;,covered
+RG-INS-SEAM-CARD,UI,UI_ELEMENT_CATALOG.csv,Карточка шва и экспорта,WS-RING;WIN-MAIN-SHELL;,covered
+RG-INS-HELP-CARD,UI,UI_ELEMENT_CATALOG.csv,Контекстная помощь по элементу,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-SCENARIO-NAME,UI,UI_ELEMENT_CATALOG.csv,Название сценария,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-CLOSURE-POLICY,UI,UI_ELEMENT_CATALOG.csv,Политика замыкания кольца,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-V0,UI,UI_ELEMENT_CATALOG.csv,Начальная скорость прохождения,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-DX,UI,UI_ELEMENT_CATALOG.csv,Шаг дискретизации дороги,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-LAPS,UI,UI_ELEMENT_CATALOG.csv,Количество кругов,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-SEED,UI,UI_ELEMENT_CATALOG.csv,Код генератора случайности,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-ROAD-WIDTH,UI,UI_ELEMENT_CATALOG.csv,Ширина дороги,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-START-HEIGHT,UI,UI_ELEMENT_CATALOG.csv,Высота дороги в начале кольца,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-SHOV-THRESHOLD,UI,UI_ELEMENT_CATALOG.csv,Порог допуска шва кольца,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-SEGMENT-ID,UI,UI_ELEMENT_CATALOG.csv,Номер сегмента,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-SEGMENT-LABEL,UI,UI_ELEMENT_CATALOG.csv,Имя сегмента,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-SEGMENT-ENABLED,UI,UI_ELEMENT_CATALOG.csv,Сегмент включён,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-SEGMENT-LENGTH,UI,UI_ELEMENT_CATALOG.csv,Длина сегмента,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-TURN-DIRECTION,UI,UI_ELEMENT_CATALOG.csv,Направление поворота,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-TURN-RADIUS,UI,UI_ELEMENT_CATALOG.csv,Радиус поворота,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-ARC-ANGLE,UI,UI_ELEMENT_CATALOG.csv,Угол дуги,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-END-HEIGHT,UI,UI_ELEMENT_CATALOG.csv,Высота дороги в конце сегмента,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-CROSSFALL,UI,UI_ELEMENT_CATALOG.csv,Поперечный уклон,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-SURFACE-TYPE,UI,UI_ELEMENT_CATALOG.csv,Тип покрытия,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-SURFACE-CLASS,UI,UI_ELEMENT_CATALOG.csv,Класс шероховатости или профиль,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-SINE-AMPLITUDE,UI,UI_ELEMENT_CATALOG.csv,Амплитуда синусоиды,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-SINE-WAVELENGTH,UI,UI_ELEMENT_CATALOG.csv,Длина волны синусоиды,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-PHASE-RIGHT,UI,UI_ELEMENT_CATALOG.csv,Фаза правой колеи,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-RANDOM-PHASES,UI,UI_ELEMENT_CATALOG.csv,Случайные фазы,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-TARGET-SPEED,UI,UI_ELEMENT_CATALOG.csv,Целевая скорость прохождения,WS-RING;WIN-MAIN-SHELL;,covered
+UI-RG-FLD-PASSAGE-MODE,UI,UI_ELEMENT_CATALOG.csv,Режим прохождения сегмента,WS-RING;WIN-MAIN-SHELL;,covered
+TS-FLD-SUITE-NAME,UI,UI_ELEMENT_CATALOG.csv,Название набора испытаний,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-BADGE-SOURCE-TRUTH,UI,UI_ELEMENT_CATALOG.csv,Источник сценарной истины: WS-RING,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-TXT-SUITE-COUNTS,UI,UI_ELEMENT_CATALOG.csv,Счётчики строк и пригодности,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-BTN-OPEN-RING,UI,UI_ELEMENT_CATALOG.csv,Открыть редактор кольца,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FILTER-TYPE,UI,UI_ELEMENT_CATALOG.csv,Фильтр по типу испытания,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FILTER-STAGE,UI,UI_ELEMENT_CATALOG.csv,Фильтр по стадии первого входа,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FILTER-VALIDATION,UI,UI_ELEMENT_CATALOG.csv,Фильтр по состоянию проверки,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FILTER-TEXT,UI,UI_ELEMENT_CATALOG.csv,Поиск по имени испытания и сценарию,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-BTN-ADD-FROM-RING,UI,UI_ELEMENT_CATALOG.csv,Добавить из редактора кольца,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-BTN-ADD-TEMPLATE,UI,UI_ELEMENT_CATALOG.csv,Добавить шаблон испытания,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-TABLE,UI,UI_ELEMENT_CATALOG.csv,Таблица испытаний,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-COL-ENABLED,UI,UI_ELEMENT_CATALOG.csv,Включено,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-COL-NAME,UI,UI_ELEMENT_CATALOG.csv,Имя испытания,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-COL-TYPE,UI,UI_ELEMENT_CATALOG.csv,Тип,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-COL-SOURCE,UI,UI_ELEMENT_CATALOG.csv,Источник,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-COL-STAGE,UI,UI_ELEMENT_CATALOG.csv,Стадия,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-COL-PRIORITY,UI,UI_ELEMENT_CATALOG.csv,Приоритет,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-COL-DT,UI,UI_ELEMENT_CATALOG.csv,"Шаг, с",WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-COL-TEND,UI,UI_ELEMENT_CATALOG.csv,"Длительность, с",WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-COL-VALIDATION,UI,UI_ELEMENT_CATALOG.csv,Проверка,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-COL-STALE,UI,UI_ELEMENT_CATALOG.csv,Актуальность ссылки,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-COL-COST,UI,UI_ELEMENT_CATALOG.csv,"Стоимость, с",WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-ROW-ACTIONS,UI,UI_ELEMENT_CATALOG.csv,Действия строки,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-GRID-VSCROLL,UI,UI_ELEMENT_CATALOG.csv,Вертикальная полоса прокрутки таблицы,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-GRID-HSCROLL,UI,UI_ELEMENT_CATALOG.csv,Горизонтальная полоса прокрутки таблицы,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-CARD-SOURCE,UI,UI_ELEMENT_CATALOG.csv,Карточка источника строки,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-LBL-SCENARIO-NAME,UI,UI_ELEMENT_CATALOG.csv,Название сценария-источника,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-LBL-SOURCE-VERSION,UI,UI_ELEMENT_CATALOG.csv,Версия экспорта сценария,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-LBL-STALE-STATE,UI,UI_ELEMENT_CATALOG.csv,Состояние актуальности ссылки,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-BTN-OPEN-SOURCE,UI,UI_ELEMENT_CATALOG.csv,Открыть источник в WS-RING,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-BTN-REVEAL-ARTIFACTS,UI,UI_ELEMENT_CATALOG.csv,Показать артефакты,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-BTN-REFRESH-LINK,UI,UI_ELEMENT_CATALOG.csv,Обновить связь,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-CARD-TIMING,UI,UI_ELEMENT_CATALOG.csv,Карточка времени и порядка обработки,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-TEST-NAME,UI,UI_ELEMENT_CATALOG.csv,Имя испытания,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-TEST-ENABLED,UI,UI_ELEMENT_CATALOG.csv,Включить испытание,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-TEST-TYPE,UI,UI_ELEMENT_CATALOG.csv,Тип испытания,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-STAGE-ENTRY,UI,UI_ELEMENT_CATALOG.csv,Стадия первого входа,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-PRIORITY,UI,UI_ELEMENT_CATALOG.csv,Приоритет,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-DT,UI,UI_ELEMENT_CATALOG.csv,"Шаг интегрирования, секунды",WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-TEND,UI,UI_ELEMENT_CATALOG.csv,"Длительность испытания, секунды",WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-CARD-TARGETS,UI,UI_ELEMENT_CATALOG.csv,Карточка целевых ограничений,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-TARGET-RMS,UI,UI_ELEMENT_CATALOG.csv,"Среднеквадратичное ускорение рамы, м/с²",WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-TARGET-CONTACT,UI,UI_ELEMENT_CATALOG.csv,"Доля потери контакта, доля единицы",WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-TARGET-ROLL,UI,UI_ELEMENT_CATALOG.csv,"Пик крена, градусы",WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-TARGET-PITCH,UI,UI_ELEMENT_CATALOG.csv,"Пик тангажа, градусы",WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-TARGET-ENERGY,UI,UI_ELEMENT_CATALOG.csv,"Потери на дросселях, миллиджоули",WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-CARD-OVERRIDES,UI,UI_ELEMENT_CATALOG.csv,Карточка локальных переопределений и файлов,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-PARAMS-REF,UI,UI_ELEMENT_CATALOG.csv,Ссылка на набор локальных переопределений параметров,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-NOTE,UI,UI_ELEMENT_CATALOG.csv,Примечание испытания,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-TEMPLATE-KIND,UI,UI_ELEMENT_CATALOG.csv,Вид шаблонного испытания,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-TEMPLATE-PRESET,UI,UI_ELEMENT_CATALOG.csv,Готовый шаблон испытания,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-SCENARIO-JSON,UI,UI_ELEMENT_CATALOG.csv,Файл сценария JSON,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-ROAD-CSV,UI,UI_ELEMENT_CATALOG.csv,Файл дорожного профиля CSV,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-FLD-AXAY-CSV,UI,UI_ELEMENT_CATALOG.csv,Файл режима движения CSV,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-SUMMARY-VSCROLL,UI,UI_ELEMENT_CATALOG.csv,Вертикальная полоса прокрутки карточки,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-VALIDATION-STRIP,UI,UI_ELEMENT_CATALOG.csv,Сводка проверки набора испытаний,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-VAL-OK,UI,UI_ELEMENT_CATALOG.csv,Исправных строк,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-VAL-WARN,UI,UI_ELEMENT_CATALOG.csv,Предупреждения,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-VAL-ERR,UI,UI_ELEMENT_CATALOG.csv,Блокирующие ошибки,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-VAL-STALE,UI,UI_ELEMENT_CATALOG.csv,Устаревшие ссылки,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-BTN-VALIDATE,UI,UI_ELEMENT_CATALOG.csv,Проверить набор испытаний,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-BTN-FIX-STALE,UI,UI_ELEMENT_CATALOG.csv,Исправить устаревшие ссылки,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-MSG-BAR,UI,UI_ELEMENT_CATALOG.csv,Строка сообщений WS-SUITE,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-BTN-SNAPSHOT,UI,UI_ELEMENT_CATALOG.csv,Собрать validated snapshot,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-BTN-TO-BASELINE,UI,UI_ELEMENT_CATALOG.csv,Перейти к базовому прогону,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-BTN-EXPORT,UI,UI_ELEMENT_CATALOG.csv,Экспортировать набор испытаний,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-BTN-IMPORT,UI,UI_ELEMENT_CATALOG.csv,Импортировать набор испытаний,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-CARD-HANDOFF,UI,UI_ELEMENT_CATALOG.csv,Карточка передачи в базовый прогон,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-LBL-SNAPSHOT-HASH,UI,UI_ELEMENT_CATALOG.csv,Контрольная подпись snapshot,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-LBL-ROWS-ELIGIBLE,UI,UI_ELEMENT_CATALOG.csv,"Строк пригодно к передаче, штуки",WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-LBL-SUITE-HASH,UI,UI_ELEMENT_CATALOG.csv,Контрольная подпись набора испытаний,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-LBL-BASELINE-READY,UI,UI_ELEMENT_CATALOG.csv,Готовность к базовому прогону,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-UNITS-LEGEND,UI,UI_ELEMENT_CATALOG.csv,Легенда единиц измерения,WS-SUITE;WIN-MAIN-SHELL;,covered
+TS-HELP-ANCHOR,UI,UI_ELEMENT_CATALOG.csv,Контекстная помощь WS-SUITE,WS-SUITE;WIN-MAIN-SHELL;,covered
+BL-TXT-TITLE,UI,UI_ELEMENT_CATALOG.csv,Рабочее пространство «Базовый прогон»,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BADGE-SNAPSHOT-ID,UI,UI_ELEMENT_CATALOG.csv,Идентификатор validated snapshot,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TXT-ACTIVE-BASELINE,UI,UI_ELEMENT_CATALOG.csv,Активный baseline и его источник,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-OPEN-SUITE,UI,UI_ELEMENT_CATALOG.csv,Открыть матрицу испытаний,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-OPEN-DIAG,UI,UI_ELEMENT_CATALOG.csv,Собрать диагностику,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TXT-SNAPSHOT-PATH,UI,UI_ELEMENT_CATALOG.csv,Путь к validated snapshot,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BADGE-SNAPSHOT-HASH,UI,UI_ELEMENT_CATALOG.csv,Hash validated snapshot,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BADGE-SNAPSHOT-VALIDATION,UI,UI_ELEMENT_CATALOG.csv,Состояние проверки снимка,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TXT-SNAPSHOT-COUNTS,UI,UI_ELEMENT_CATALOG.csv,Счётчики строк снимка,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BADGE-SNAPSHOT-STALE,UI,UI_ELEMENT_CATALOG.csv,Снимок устарел / актуален,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-CARD-RING-COVERAGE,UI,UI_ELEMENT_CATALOG.csv,Графический охват сценариев кольца,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-CARD-STAGE-COVERAGE,UI,UI_ELEMENT_CATALOG.csv,Графическое покрытие по стадиям,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-OPEN-SNAPSHOT,UI,UI_ELEMENT_CATALOG.csv,Открыть файл снимка,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-REFRESH-SNAPSHOT,UI,UI_ELEMENT_CATALOG.csv,Повторно загрузить снимок,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-SHOW-SNAPSHOT-MANIFEST,UI,UI_ELEMENT_CATALOG.csv,Показать манифест baseline input,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-FLD-SOURCE-KIND,UI,UI_ELEMENT_CATALOG.csv,Источник активного baseline,WS-BASELINE;WIN-MAIN-SHELL;PAR-0100,covered
+BL-PATH-SOURCE-REF,UI,UI_ELEMENT_CATALOG.csv,Ссылка на источник baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BADGE-SOURCE-COMPAT,UI,UI_ELEMENT_CATALOG.csv,Совместимость источника с snapshot,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-CARD-SOURCE-DELTA,UI,UI_ELEMENT_CATALOG.csv,Графический дельта-обзор параметров,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-CARD-SOURCE-METRICS,UI,UI_ELEMENT_CATALOG.csv,Сводка метрик источника baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-CARD-POLICY,UI,UI_ELEMENT_CATALOG.csv,Политика обновления baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-FLD-POLICY-MODE,UI,UI_ELEMENT_CATALOG.csv,Режим политики baseline,WS-BASELINE;WIN-MAIN-SHELL;PAR-0103,covered
+BL-CHK-AUTO-UPDATE,UI,UI_ELEMENT_CATALOG.csv,Авто-обновлять baseline_best,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-IMPORT-BASELINE,UI,UI_ELEMENT_CATALOG.csv,Импортировать baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-OPEN-HISTORY,UI,UI_ELEMENT_CATALOG.csv,Открыть историю baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-FLD-RUN-NAME,UI,UI_ELEMENT_CATALOG.csv,Имя базового прогона,WS-BASELINE;WIN-MAIN-SHELL;PAR-0105,covered
+BL-FLD-CSV-PREFIX,UI,UI_ELEMENT_CATALOG.csv,Префикс файлов результата,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BADGE-RUN-READY,UI,UI_ELEMENT_CATALOG.csv,Готовность запуска,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-RUN,UI,UI_ELEMENT_CATALOG.csv,Запустить базовый прогон,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-STOP,UI,UI_ELEMENT_CATALOG.csv,Остановить прогон,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-PROGRESS-PRIMARY,UI,UI_ELEMENT_CATALOG.csv,Основной progress bar,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TXT-CURRENT-TEST,UI,UI_ELEMENT_CATALOG.csv,Текущий тест и стадия выполнения,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TXT-RUN-COUNTS,UI,UI_ELEMENT_CATALOG.csv,Счётчики выполненных / ошибок / предупреждений,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TABLE-TEST-PROGRESS,UI,UI_ELEMENT_CATALOG.csv,Таблица хода базового прогона по тестам,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TXT-WARNINGS,UI,UI_ELEMENT_CATALOG.csv,Текущие предупреждения baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TXT-BLOCKERS,UI,UI_ELEMENT_CATALOG.csv,Блокирующие причины запуска,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-OPEN-LOG,UI,UI_ELEMENT_CATALOG.csv,Открыть журнал baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-OPEN-ARTIFACTS,UI,UI_ELEMENT_CATALOG.csv,Открыть артефакты baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-CARD-RUN-TIMELINE,UI,UI_ELEMENT_CATALOG.csv,Графическое покрытие выполнения по тестам,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-CARD-RUN-DELTA,UI,UI_ELEMENT_CATALOG.csv,Графическая дельта active baseline к source,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BADGE-RUN-STATUS,UI,UI_ELEMENT_CATALOG.csv,Статус завершённого базового прогона,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TXT-RUN-ID,UI,UI_ELEMENT_CATALOG.csv,Идентификатор прогона baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-CARD-KEY-METRICS,UI,UI_ELEMENT_CATALOG.csv,Ключевые метрики baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-CARD-RESULT-COMPARE,UI,UI_ELEMENT_CATALOG.csv,Сравнение с текущим active baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TXT-VERDICT,UI,UI_ELEMENT_CATALOG.csv,Вердикт принятия baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-ACCEPT-ACTIVE,UI,UI_ELEMENT_CATALOG.csv,Сделать активным baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-KEEP-CURRENT,UI,UI_ELEMENT_CATALOG.csv,Оставить текущий active baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-OPEN-RESULTS,UI,UI_ELEMENT_CATALOG.csv,Открыть результаты baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-OPEN-ANIMATOR,UI,UI_ELEMENT_CATALOG.csv,Открыть аниматор,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TXT-HISTORY-TITLE,UI,UI_ELEMENT_CATALOG.csv,История baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-FLD-COMPARE-MODE,UI,UI_ELEMENT_CATALOG.csv,Режим сравнения baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-RESTORE-HISTORY,UI,UI_ELEMENT_CATALOG.csv,Сделать выбранный baseline активным,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-FREEZE-ACTIVE,UI,UI_ELEMENT_CATALOG.csv,Заморозить active baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TABLE-HISTORY,UI,UI_ELEMENT_CATALOG.csv,Таблица истории baseline,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-CARD-HISTORY-DETAIL,UI,UI_ELEMENT_CATALOG.csv,Карточка выбранного baseline из истории,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-CARD-HISTORY-METRICS,UI,UI_ELEMENT_CATALOG.csv,График сравнения baseline-метрик,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-OPEN-HISTORY-ART,UI,UI_ELEMENT_CATALOG.csv,Открыть артефакты выбранной строки,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BADGE-HANDOFF-READY,UI,UI_ELEMENT_CATALOG.csv,Готовность handoff в оптимизацию,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BADGE-ACTIVE-HASH,UI,UI_ELEMENT_CATALOG.csv,Hash active baseline contract,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-PATH-CONTRACT,UI,UI_ELEMENT_CATALOG.csv,Путь к active baseline contract,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TXT-HANDOFF-SNAPSHOT,UI,UI_ELEMENT_CATALOG.csv,Snapshot hash и suite hash,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-TXT-HANDOFF-BLOCKERS,UI,UI_ELEMENT_CATALOG.csv,Blockers передачи в optimization,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-CARD-HANDOFF-PAYLOAD,UI,UI_ELEMENT_CATALOG.csv,Состав handoff payload,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-OPEN-OPT,UI,UI_ELEMENT_CATALOG.csv,Открыть рабочее пространство оптимизации,WS-BASELINE;WIN-MAIN-SHELL;,covered
+BL-BTN-OPEN-ACTIVE-CONTRACT,UI,UI_ELEMENT_CATALOG.csv,Показать active baseline contract,WS-BASELINE;WIN-MAIN-SHELL;,covered
+OPT-TXT-TITLE,UI,UI_ELEMENT_CATALOG.csv,Рабочее пространство «Оптимизация»,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-BASELINE-ID,UI,UI_ELEMENT_CATALOG.csv,Идентификатор active baseline,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-OBJECTIVE-HASH,UI,UI_ELEMENT_CATALOG.csv,Hash objective contract,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-TXT-MODE,UI,UI_ELEMENT_CATALOG.csv,Активный режим оптимизации,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-OPEN-BASELINE,UI,UI_ELEMENT_CATALOG.csv,Открыть baseline,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-OPEN-ANALYSIS,UI,UI_ELEMENT_CATALOG.csv,Открыть анализ,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-OPEN-ANIMATOR,UI,UI_ELEMENT_CATALOG.csv,Открыть аниматор,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-PATH-BASELINE-CONTRACT,UI,UI_ELEMENT_CATALOG.csv,Путь к active baseline contract,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-BASELINE-SOURCE,UI,UI_ELEMENT_CATALOG.csv,Источник baseline,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-SNAPSHOT-HASH,UI,UI_ELEMENT_CATALOG.csv,Hash snapshot,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-OBJECTIVE-VERSION,UI,UI_ELEMENT_CATALOG.csv,Версия objective contract,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-TXT-OBJECTIVE-STACK,UI,UI_ELEMENT_CATALOG.csv,Стек целевых показателей,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-TXT-HARD-GATE,UI,UI_ELEMENT_CATALOG.csv,Жёсткое ограничение,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-CONTRACT-DRIFT,UI,UI_ELEMENT_CATALOG.csv,Несовпадение контрактов,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-SHOW-BASELINE-CONTRACT,UI,UI_ELEMENT_CATALOG.csv,Показать baseline contract,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-SHOW-OBJECTIVE-CONTRACT,UI,UI_ELEMENT_CATALOG.csv,Показать objective contract,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CARD-OBJECTIVE-ORDER,UI,UI_ELEMENT_CATALOG.csv,Графическая иерархия objective stack,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CARD-HARD-GATE,UI,UI_ELEMENT_CATALOG.csv,Карточка hard gate,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CARD-HASH-PAYLOAD,UI,UI_ELEMENT_CATALOG.csv,Сводка problem hash payload,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-RAD-STAGE,UI,UI_ELEMENT_CATALOG.csv,Режим по стадиям (рекомендуется),WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-RAD-DIST,UI,UI_ELEMENT_CATALOG.csv,Distributed coordinator,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-READY,UI,UI_ELEMENT_CATALOG.csv,Готовность запуска,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-TXT-MODE-HELP,UI,UI_ELEMENT_CATALOG.csv,Что делает выбранный режим,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-LAUNCH-STAGE,UI,UI_ELEMENT_CATALOG.csv,Запустить StageRunner,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-LAUNCH-DIST,UI,UI_ELEMENT_CATALOG.csv,Запустить distributed coordinator,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-STOP,UI,UI_ELEMENT_CATALOG.csv,Остановить,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-CANCEL,UI,UI_ELEMENT_CATALOG.csv,Отменить запуск,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-OPEN-DIAG,UI,UI_ELEMENT_CATALOG.csv,Собрать диагностику,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-OPEN-HISTORY,UI,UI_ELEMENT_CATALOG.csv,Открыть историю,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-FLD-MINUTES,UI,UI_ELEMENT_CATALOG.csv,Лимит времени оптимизации,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-FLD-JOBS,UI,UI_ELEMENT_CATALOG.csv,Параллельные задания,WS-OPTIMIZATION;WIN-MAIN-SHELL;PAR-0161,covered
+OPT-FLD-WARMSTART,UI,UI_ELEMENT_CATALOG.csv,Режим warm-start,WS-OPTIMIZATION;WIN-MAIN-SHELL;PAR-0162,covered
+OPT-FLD-SURR-SAMPLES,UI,UI_ELEMENT_CATALOG.csv,Число surrogate samples,WS-OPTIMIZATION;WIN-MAIN-SHELL;PAR-0163,covered
+OPT-FLD-SURR-TOPK,UI,UI_ELEMENT_CATALOG.csv,Surrogate top-k,WS-OPTIMIZATION;WIN-MAIN-SHELL;PAR-0164,covered
+OPT-FLD-SEED-CAND,UI,UI_ELEMENT_CATALOG.csv,Seed кандидатов,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-FLD-SEED-COND,UI,UI_ELEMENT_CATALOG.csv,Seed условий,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CHK-SORT-COST,UI,UI_ELEMENT_CATALOG.csv,Сортировать тесты по стоимости,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-FLD-STOP-PEN-1,UI,UI_ELEMENT_CATALOG.csv,Порог ранней остановки stage1,WS-OPTIMIZATION;WIN-MAIN-SHELL;PAR-0168,covered
+OPT-FLD-STOP-PEN-2,UI,UI_ELEMENT_CATALOG.csv,Порог ранней остановки stage2,WS-OPTIMIZATION;WIN-MAIN-SHELL;PAR-0169,covered
+OPT-FLD-EPS-REL,UI,UI_ELEMENT_CATALOG.csv,System influence eps_rel,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CHK-ADAPT-EPS,UI,UI_ELEMENT_CATALOG.csv,Adaptive epsilon,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-FLD-POLICY-MODE,UI,UI_ELEMENT_CATALOG.csv,Seed/promotion policy,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CARD-STAGE-BUDGETS,UI,UI_ELEMENT_CATALOG.csv,Графическое распределение бюджета по стадиям,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CARD-STAGE-PRIORITY,UI,UI_ELEMENT_CATALOG.csv,Графический профиль приоритета параметров,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-FLD-BACKEND,UI,UI_ELEMENT_CATALOG.csv,Вычислительный backend,WS-OPTIMIZATION;WIN-MAIN-SHELL;PAR-0176,covered
+OPT-FLD-BUDGET,UI,UI_ELEMENT_CATALOG.csv,Бюджет распределённой оптимизации,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-FLD-MAX-INFLIGHT,UI,UI_ELEMENT_CATALOG.csv,Максимум задач в полёте,WS-OPTIMIZATION;WIN-MAIN-SHELL;PAR-0178,covered
+OPT-FLD-Q,UI,UI_ELEMENT_CATALOG.csv,Размер пакета предложений q,WS-OPTIMIZATION;WIN-MAIN-SHELL;PAR-0179,covered
+OPT-FLD-DEVICE,UI,UI_ELEMENT_CATALOG.csv,Устройство proposer,WS-OPTIMIZATION;WIN-MAIN-SHELL;PAR-0180,covered
+OPT-FLD-DB-ENGINE,UI,UI_ELEMENT_CATALOG.csv,Движок базы run history,WS-OPTIMIZATION;WIN-MAIN-SHELL;PAR-0181,covered
+OPT-CHK-RESUME,UI,UI_ELEMENT_CATALOG.csv,Возобновлять run,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-FLD-RUN-ID,UI,UI_ELEMENT_CATALOG.csv,Идентификатор distributed run,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-FLD-STALE-TTL,UI,UI_ELEMENT_CATALOG.csv,"TTL устаревания, секунды",WS-OPTIMIZATION;WIN-MAIN-SHELL;PAR-0184,covered
+OPT-CHK-HV-LOG,UI,UI_ELEMENT_CATALOG.csv,Писать hypervolume log,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-FLD-EXPORT-EVERY,UI,UI_ELEMENT_CATALOG.csv,Период экспорта результатов,WS-OPTIMIZATION;WIN-MAIN-SHELL;PAR-0186,covered
+OPT-CARD-DASK,UI,UI_ELEMENT_CATALOG.csv,Карточка Dask local cluster,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CARD-RAY,UI,UI_ELEMENT_CATALOG.csv,Карточка Ray runtime,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CARD-BOTORCH,UI,UI_ELEMENT_CATALOG.csv,Карточка BoTorch/qNEHVI,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BAR-PROGRESS,UI,UI_ELEMENT_CATALOG.csv,Общий progress bar,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-STAGE,UI,UI_ELEMENT_CATALOG.csv,Текущая стадия,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-TXT-ELAPSED,UI,UI_ELEMENT_CATALOG.csv,Прошло времени,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-TXT-STAGE-ROWS,UI,UI_ELEMENT_CATALOG.csv,Строк текущей стадии,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-TXT-COMBINED-ROWS,UI,UI_ELEMENT_CATALOG.csv,Суммарные строки,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-UNDERFILL,UI,UI_ELEMENT_CATALOG.csv,Состояние underfill,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CARD-GATE-PREVIEW,UI,UI_ELEMENT_CATALOG.csv,Причины gate reject,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CARD-FOCUS-PREVIEW,UI,UI_ELEMENT_CATALOG.csv,Причины focus-block,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CARD-PROMO-PREVIEW,UI,UI_ELEMENT_CATALOG.csv,Причины promotion-block,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-PATH-RUN-DIR,UI,UI_ELEMENT_CATALOG.csv,Каталог текущего run,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-OPEN-RUN-DIR,UI,UI_ELEMENT_CATALOG.csv,Открыть run dir,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-OPEN-LOGS,UI,UI_ELEMENT_CATALOG.csv,Открыть логи,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-TBL-HISTORY,UI,UI_ELEMENT_CATALOG.csv,Таблица истории optimization run,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-FLD-HISTORY-FILTER,UI,UI_ELEMENT_CATALOG.csv,Фильтр истории,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-COMPARE,UI,UI_ELEMENT_CATALOG.csv,Сравнить выбранные run,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CARD-RUN-CONTRACT,UI,UI_ELEMENT_CATALOG.csv,Карточка выбранного run contract,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CARD-RUN-METRICS,UI,UI_ELEMENT_CATALOG.csv,Сводка метрик выбранного run,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-CONTRACT-MISMATCH,UI,UI_ELEMENT_CATALOG.csv,Разный objective contract,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-HARD-GATE-MISMATCH,UI,UI_ELEMENT_CATALOG.csv,Разный hard gate,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-OPEN-RESULTS,UI,UI_ELEMENT_CATALOG.csv,Открыть results CSV,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-MARK-ANALYSIS,UI,UI_ELEMENT_CATALOG.csv,Открыть в анализе,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-ANALYSIS-READY,UI,UI_ELEMENT_CATALOG.csv,Готовность handoff в анализ,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-ANIMATOR-READY,UI,UI_ELEMENT_CATALOG.csv,Готовность handoff в аниматор,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BADGE-DIAG-READY,UI,UI_ELEMENT_CATALOG.csv,Готовность диагностики,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-TXT-SELECTED-RUN,UI,UI_ELEMENT_CATALOG.csv,Выбранный run для передачи,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-OPEN-ANALYSIS-SELECTED,UI,UI_ELEMENT_CATALOG.csv,Открыть анализ для run,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-OPEN-ANIMATOR-SELECTED,UI,UI_ELEMENT_CATALOG.csv,Открыть аниматор для run,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-COLLECT-DIAG,UI,UI_ELEMENT_CATALOG.csv,Собрать диагностику,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-CARD-PAYLOAD,UI,UI_ELEMENT_CATALOG.csv,Состав payload для handoff,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-SHOW-LATEST-OPT,UI,UI_ELEMENT_CATALOG.csv,Показать latest_optimization,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+OPT-BTN-SHOW-SELECTED-CONTRACT,UI,UI_ELEMENT_CATALOG.csv,Показать selected run contract,WS-OPTIMIZATION;WIN-MAIN-SHELL;,covered
+AN-TXT-TITLE,UI,UI_ELEMENT_CATALOG.csv,Рабочее пространство «Анализ»,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BADGE-RUN-ID,UI,UI_ELEMENT_CATALOG.csv,Идентификатор выбранного прогона,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BADGE-RUN-MODE,UI,UI_ELEMENT_CATALOG.csv,Режим выбранного прогона,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BADGE-BASELINE-HASH,UI,UI_ELEMENT_CATALOG.csv,Hash baseline,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BADGE-OBJECTIVE-HASH,UI,UI_ELEMENT_CATALOG.csv,Hash objective contract,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BADGE-SNAPSHOT-HASH,UI,UI_ELEMENT_CATALOG.csv,Hash snapshot,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-OPEN-HISTORY,UI,UI_ELEMENT_CATALOG.csv,Открыть историю optimization,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-OPEN-DIAGNOSTICS,UI,UI_ELEMENT_CATALOG.csv,Открыть диагностику,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TXT-CONTRACT-TITLE,UI,UI_ELEMENT_CATALOG.csv,Контракт выбранного прогона,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-FLD-RUN-STATUS,UI,UI_ELEMENT_CATALOG.csv,Состояние прогона,WS-ANALYSIS;WIN-MAIN-SHELL;PAR-0212,covered
+AN-FLD-RUN-START,UI,UI_ELEMENT_CATALOG.csv,"Время запуска, UTC",WS-ANALYSIS;WIN-MAIN-SHELL;PAR-0213,covered
+AN-FLD-RUN-END,UI,UI_ELEMENT_CATALOG.csv,"Время завершения, UTC",WS-ANALYSIS;WIN-MAIN-SHELL;PAR-0214,covered
+AN-FLD-HARD-GATE-KEY,UI,UI_ELEMENT_CATALOG.csv,Жёсткое ограничение,WS-ANALYSIS;WIN-MAIN-SHELL;PAR-0218,covered
+AN-FLD-HARD-GATE-TOL,UI,UI_ELEMENT_CATALOG.csv,Порог жёсткого ограничения,WS-ANALYSIS;WIN-MAIN-SHELL;PAR-0219,covered
+AN-FLD-BEST-CANDIDATE,UI,UI_ELEMENT_CATALOG.csv,Лучший кандидат,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BANNER-MISMATCH,UI,UI_ELEMENT_CATALOG.csv,Предупреждение о contract drift,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TABLE-CONTRACT-DIMS,UI,UI_ELEMENT_CATALOG.csv,Таблица измерений контракта,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-OPEN-BASELINE,UI,UI_ELEMENT_CATALOG.csv,Открыть baseline contract,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-BUILD-COMPARE,UI,UI_ELEMENT_CATALOG.csv,Собрать compare contract,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-TO-RESULTS,UI,UI_ELEMENT_CATALOG.csv,Открыть результаты выбранного прогона,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TXT-FILTER-TITLE,UI,UI_ELEMENT_CATALOG.csv,Фильтры анализа,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-TEST,UI,UI_ELEMENT_CATALOG.csv,Испытание,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-SCENARIO,UI,UI_ELEMENT_CATALOG.csv,Сценарий,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-SEGMENT,UI,UI_ELEMENT_CATALOG.csv,Сегмент,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-METRIC-SET,UI,UI_ELEMENT_CATALOG.csv,Набор показателей,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-XAXIS,UI,UI_ELEMENT_CATALOG.csv,Ось X,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-NORM,UI,UI_ELEMENT_CATALOG.csv,Нормализация,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CHK-SHOW-UNITS,UI,UI_ELEMENT_CATALOG.csv,Показывать единицы измерения,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CHK-FAILED-ONLY,UI,UI_ELEMENT_CATALOG.csv,Только проблемные run,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CHK-PROMOTED-ONLY,UI,UI_ELEMENT_CATALOG.csv,Только продвинутые кандидаты,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CHK-SHOW-BASELINE,UI,UI_ELEMENT_CATALOG.csv,Показывать baseline,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-RESET-FILTERS,UI,UI_ELEMENT_CATALOG.csv,Сбросить фильтры,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-APPLY-FILTERS,UI,UI_ELEMENT_CATALOG.csv,Применить фильтры,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TXT-COMPARE-TITLE,UI,UI_ELEMENT_CATALOG.csv,Compare contract,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-COMPARE-MODE,UI,UI_ELEMENT_CATALOG.csv,Режим сравнения,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-LEFT-RUN,UI,UI_ELEMENT_CATALOG.csv,Левый источник,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-RIGHT-RUN,UI,UI_ELEMENT_CATALOG.csv,Правый источник,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-ALIGNMENT,UI,UI_ELEMENT_CATALOG.csv,Выравнивание сравнения,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-MISMATCH-POLICY,UI,UI_ELEMENT_CATALOG.csv,Политика mismatch,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TABLE-COMPARE-SCOPE,UI,UI_ELEMENT_CATALOG.csv,Область сравнения,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BANNER-COMPARE-MISMATCH,UI,UI_ELEMENT_CATALOG.csv,Mismatch выбранных прогонов,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-COMPARE,UI,UI_ELEMENT_CATALOG.csv,Построить сравнение,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-EXPORT-COMPARE,UI,UI_ELEMENT_CATALOG.csv,Экспортировать compare package,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TXT-RESULTS-TITLE,UI,UI_ELEMENT_CATALOG.csv,Результаты выбранного прогона,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-KPI-PENALTY,UI,UI_ELEMENT_CATALOG.csv,Суммарный штраф физичности,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-KPI-COMFORT,UI,UI_ELEMENT_CATALOG.csv,"Комфорт, среднеквадратичное ускорение рамы",WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-KPI-ROLL,UI,UI_ELEMENT_CATALOG.csv,"Боковая реакция, proxy по крену",WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-KPI-ENERGY,UI,UI_ELEMENT_CATALOG.csv,Энергия дросселирования,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-KPI-BEST,UI,UI_ELEMENT_CATALOG.csv,Лучший кандидат,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TABLE-PER-TEST,UI,UI_ELEMENT_CATALOG.csv,Таблица по испытаниям,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TABLE-ARTIFACTS,UI,UI_ELEMENT_CATALOG.csv,Таблица артефактов run,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-OPEN-TEST-CHARTS,UI,UI_ELEMENT_CATALOG.csv,Открыть графики по испытанию,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-OPEN-SEGMENT,UI,UI_ELEMENT_CATALOG.csv,Открыть анализ по сегменту,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-OPEN-EXPORT,UI,UI_ELEMENT_CATALOG.csv,Открыть экспорт,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-HANDOFF-ANIMATOR,UI,UI_ELEMENT_CATALOG.csv,Открыть run в аниматоре,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BADGE-OPTIONAL-MISSING,UI,UI_ELEMENT_CATALOG.csv,Не все optional artifacts доступны,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TXT-CHART-TITLE,UI,UI_ELEMENT_CATALOG.csv,Графики и временные ряды,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-CHART-PRESET,UI,UI_ELEMENT_CATALOG.csv,Preset графика,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-LEFT-METRIC,UI,UI_ELEMENT_CATALOG.csv,Левая ось,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-RIGHT-METRIC,UI,UI_ELEMENT_CATALOG.csv,Правая ось,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TXT-TIME-WINDOW,UI,UI_ELEMENT_CATALOG.csv,Окно времени,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-SLIDER-TIME-START,UI,UI_ELEMENT_CATALOG.csv,Начало окна времени,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-SLIDER-TIME-END,UI,UI_ELEMENT_CATALOG.csv,Конец окна времени,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CANVAS-MAIN,UI,UI_ELEMENT_CATALOG.csv,Основной график,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CANVAS-COMPARE,UI,UI_ELEMENT_CATALOG.csv,Сравнительный график,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-LEGEND,UI,UI_ELEMENT_CATALOG.csv,Легенда,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-EXPORT-CHART,UI,UI_ELEMENT_CATALOG.csv,Экспортировать график,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-RESET-CHART,UI,UI_ELEMENT_CATALOG.csv,Сбросить zoom,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-OPEN-DIAG-EVIDENCE,UI,UI_ELEMENT_CATALOG.csv,Открыть diagnostics evidence,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TXT-SEGMENT-TITLE,UI,UI_ELEMENT_CATALOG.csv,Сценарии и сегменты,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-LIST-SCENARIOS,UI,UI_ELEMENT_CATALOG.csv,Список сценариев,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-LIST-SEGMENTS,UI,UI_ELEMENT_CATALOG.csv,Список сегментов,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CARD-SEGMENT-SUMMARY,UI,UI_ELEMENT_CATALOG.csv,Карточка сегмента,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BADGE-SEGMENT-DRIFT,UI,UI_ELEMENT_CATALOG.csv,Mismatch segment metadata,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CANVAS-SEGMENT-CHART,UI,UI_ELEMENT_CATALOG.csv,График по сегменту,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TABLE-SEGMENT-METRICS,UI,UI_ELEMENT_CATALOG.csv,Таблица показателей сегмента,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-OPEN-RING,UI,UI_ELEMENT_CATALOG.csv,Открыть ring context,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-OPEN-ANIMATOR-SEGMENT,UI,UI_ELEMENT_CATALOG.csv,Открыть сегмент в аниматоре,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-EXPORT-SEGMENT,UI,UI_ELEMENT_CATALOG.csv,Экспортировать segment report,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TXT-HANDOFF-TITLE,UI,UI_ELEMENT_CATALOG.csv,Handoff в аниматор и диагностику,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CARD-HANDOFF-ANIMATOR,UI,UI_ELEMENT_CATALOG.csv,Карточка handoff в аниматор,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CARD-HANDOFF-DIAGNOSTICS,UI,UI_ELEMENT_CATALOG.csv,Карточка handoff в диагностику,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CARD-HANDOFF-EXPORT,UI,UI_ELEMENT_CATALOG.csv,Карточка handoff в export,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-TO-ANIMATOR,UI,UI_ELEMENT_CATALOG.csv,Открыть выбранный run в аниматоре,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-TO-DIAGNOSTICS,UI,UI_ELEMENT_CATALOG.csv,Открыть diagnostics bundle prep,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-TO-EXPORT,UI,UI_ELEMENT_CATALOG.csv,Открыть export manifest,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-BACK-OVERVIEW,UI,UI_ELEMENT_CATALOG.csv,Вернуться к overview,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TXT-EXPORT-TITLE,UI,UI_ELEMENT_CATALOG.csv,Экспорт отчётов и таблиц,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-EXPORT-FORMAT,UI,UI_ELEMENT_CATALOG.csv,Формат экспорта,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-REPORT-SCOPE,UI,UI_ELEMENT_CATALOG.csv,Область отчёта,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-CMB-UNIT-PROFILE,UI,UI_ELEMENT_CATALOG.csv,Профиль единиц,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TABLE-INCLUDE-LIST,UI,UI_ELEMENT_CATALOG.csv,Что войдёт в export manifest,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-TABLE-EXCLUDE-LIST,UI,UI_ELEMENT_CATALOG.csv,Что исключено из export manifest,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-BUILD-MANIFEST,UI,UI_ELEMENT_CATALOG.csv,Собрать export manifest,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-DOWNLOAD-CSV,UI,UI_ELEMENT_CATALOG.csv,Скачать CSV/XLSX,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-DOWNLOAD-PDF,UI,UI_ELEMENT_CATALOG.csv,Скачать PDF summary,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AN-BTN-EXPORT-DIAG,UI,UI_ELEMENT_CATALOG.csv,Передать манифест в diagnostics,WS-ANALYSIS;WIN-MAIN-SHELL;,covered
+AM-TXT-TITLE,UI,UI_ELEMENT_CATALOG.csv,Рабочее пространство «Аниматор»,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-RUN-ID,UI,UI_ELEMENT_CATALOG.csv,Идентификатор прогона,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-RUN-MODE,UI,UI_ELEMENT_CATALOG.csv,Режим прогона,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-BASELINE,UI,UI_ELEMENT_CATALOG.csv,Hash baseline,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-OBJECTIVE,UI,UI_ELEMENT_CATALOG.csv,Hash целей,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-TRUTH,UI,UI_ELEMENT_CATALOG.csv,Truth mode,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-COMPARE,UI,UI_ELEMENT_CATALOG.csv,Compare contract,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-OPEN-DIAG,UI,UI_ELEMENT_CATALOG.csv,Открыть диагностику,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-CAPTURE,UI,UI_ELEMENT_CATALOG.csv,Экспорт кадра,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-LBL-TESTS,UI,UI_ELEMENT_CATALOG.csv,Испытания,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-LIST-TESTS,UI,UI_ELEMENT_CATALOG.csv,Список испытаний,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-LBL-SEGMENTS,UI,UI_ELEMENT_CATALOG.csv,Сегменты,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-LIST-SEGMENTS,UI,UI_ELEMENT_CATALOG.csv,Список сегментов,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-LBL-OBJECTS,UI,UI_ELEMENT_CATALOG.csv,Объекты сцены,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TREE-OBJECTS,UI,UI_ELEMENT_CATALOG.csv,Дерево объектов сцены,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-LBL-ARTIFACTS,UI,UI_ELEMENT_CATALOG.csv,Артефакты,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TREE-ARTIFACTS,UI,UI_ELEMENT_CATALOG.csv,Дерево артефактов,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TXT-SELPATH,UI,UI_ELEMENT_CATALOG.csv,Путь выбора,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TXT-STALELINK,UI,UI_ELEMENT_CATALOG.csv,Предупреждение stale-link,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-FILTER-TEST,UI,UI_ELEMENT_CATALOG.csv,Фильтр испытаний,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-FILTER-SEGMENT,UI,UI_ELEMENT_CATALOG.csv,Фильтр сегментов,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-VIEW-MAIN,UI,UI_ELEMENT_CATALOG.csv,Основной viewport аниматора,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-WGT-VIEWCUBE,UI,UI_ELEMENT_CATALOG.csv,Навигационный куб,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-HOME,UI,UI_ELEMENT_CATALOG.csv,Домой,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-FRONT,UI,UI_ELEMENT_CATALOG.csv,Спереди,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-SIDE,UI,UI_ELEMENT_CATALOG.csv,Сбоку,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-TOP,UI,UI_ELEMENT_CATALOG.csv,Сверху,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-ISO,UI,UI_ELEMENT_CATALOG.csv,Изометрия,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-PROJ,UI,UI_ELEMENT_CATALOG.csv,Проекция,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-GRID,UI,UI_ELEMENT_CATALOG.csv,Сетка,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-GROUND,UI,UI_ELEMENT_CATALOG.csv,Земля,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-SEG-OVERLAY,UI,UI_ELEMENT_CATALOG.csv,Сегмент,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-COMPARE-OVERLAY,UI,UI_ELEMENT_CATALOG.csv,Сравнение,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-TRUTH-OVERLAY,UI,UI_ELEMENT_CATALOG.csv,Truth,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-TIME,UI,UI_ELEMENT_CATALOG.csv,Текущее время,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-SOURCEFPS,UI,UI_ELEMENT_CATALOG.csv,Частота источника,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-SEGMENT,UI,UI_ELEMENT_CATALOG.csv,Сегмент,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-HARDPOINT,UI,UI_ELEMENT_CATALOG.csv,Hardpoint,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-ROAD-TRUTH,UI,UI_ELEMENT_CATALOG.csv,Truth дороги,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-CYL-TRUTH,UI,UI_ELEMENT_CATALOG.csv,Truth цилиндра,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BANNER-TRUTH-WARN,UI,UI_ELEMENT_CATALOG.csv,Баннер truthful/degraded режима,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BANNER-COMPARE-MISMATCH,UI,UI_ELEMENT_CATALOG.csv,Баннер mismatch сравнения,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TXT-OVERLAY-LEGEND,UI,UI_ELEMENT_CATALOG.csv,Легенда overlay,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-CONTACT,UI,UI_ELEMENT_CATALOG.csv,Контакт,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-FOLLOW,UI,UI_ELEMENT_CATALOG.csv,Следовать,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-RESET-CAM,UI,UI_ELEMENT_CATALOG.csv,Сброс камеры,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-FIT-SEL,UI,UI_ELEMENT_CATALOG.csv,Показать выбор,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-SLIDER-GHOST,UI,UI_ELEMENT_CATALOG.csv,Прозрачность ghost,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-SLIDER-ALPHA,UI,UI_ELEMENT_CATALOG.csv,Прозрачность корпуса,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-AXISONLY,UI,UI_ELEMENT_CATALOG.csv,Axis-only,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-CAPTURE-VP,UI,UI_ELEMENT_CATALOG.csv,Снять кадр из viewport,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-ROAD-SRC,UI,UI_ELEMENT_CATALOG.csv,Источник дороги,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-CYL-SRC,UI,UI_ELEMENT_CATALOG.csv,Источник цилиндра,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-HARDPOINTS,UI,UI_ELEMENT_CATALOG.csv,Точки крепления,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-LINKS,UI,UI_ELEMENT_CATALOG.csv,Рычаги,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-WHEEL,UI,UI_ELEMENT_CATALOG.csv,Колесо,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-ROAD-HUD,UI,UI_ELEMENT_CATALOG.csv,HUD дороги,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-BOOKMARK,UI,UI_ELEMENT_CATALOG.csv,Сохранить вид,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-BOOKMARK,UI,UI_ELEMENT_CATALOG.csv,Закладка камеры,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TXT-INSPECTOR-TITLE,UI,UI_ELEMENT_CATALOG.csv,Свойства и объяснение,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-EVIDENCE,UI,UI_ELEMENT_CATALOG.csv,Evidence manifest,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-QUESTION,UI,UI_ELEMENT_CATALOG.csv,Подробное описание,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-CARD-SELECTION,UI,UI_ELEMENT_CATALOG.csv,Карточка выбранного объекта,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TABLE-SELECTION-FIELDS,UI,UI_ELEMENT_CATALOG.csv,Поля выбранного объекта,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-CARD-TRUTH,UI,UI_ELEMENT_CATALOG.csv,Карточка truthful режима,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-CARD-PACKAGING,UI,UI_ELEMENT_CATALOG.csv,Карточка packaging,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-CARD-ROAD,UI,UI_ELEMENT_CATALOG.csv,Карточка сегмента дороги,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-CARD-COMPARE,UI,UI_ELEMENT_CATALOG.csv,Карточка compare contract,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-LIST-WARNINGS,UI,UI_ELEMENT_CATALOG.csv,Список предупреждений,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-HANDOFF-DIAG,UI,UI_ELEMENT_CATALOG.csv,Передать в диагностику,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-EXPORT-MANIFEST,UI,UI_ELEMENT_CATALOG.csv,Экспортировать manifest,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-CARD-TEST,UI,UI_ELEMENT_CATALOG.csv,Карточка испытания,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-CARD-SEGMENT,UI,UI_ELEMENT_CATALOG.csv,Карточка выбранного сегмента,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-PLAYPAUSE,UI,UI_ELEMENT_CATALOG.csv,Воспроизведение / пауза,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-STOP,UI,UI_ELEMENT_CATALOG.csv,Остановить,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-PREV,UI,UI_ELEMENT_CATALOG.csv,Предыдущий кадр,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-NEXT,UI,UI_ELEMENT_CATALOG.csv,Следующий кадр,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-SLIDER-TIME,UI,UI_ELEMENT_CATALOG.csv,Полоса времени,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-COMBO-SPEED,UI,UI_ELEMENT_CATALOG.csv,Скорость,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-CHECK-LOOP,UI,UI_ELEMENT_CATALOG.csv,Повтор,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-SYNC-AN,UI,UI_ELEMENT_CATALOG.csv,Синхронизировать с анализом,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TXT-START-T,UI,UI_ELEMENT_CATALOG.csv,Начало окна,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TXT-END-T,UI,UI_ELEMENT_CATALOG.csv,Конец окна,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-FRAME,UI,UI_ELEMENT_CATALOG.csv,Кадр,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-INTERP,UI,UI_ELEMENT_CATALOG.csv,Интерполяция,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-SRCIDX,UI,UI_ELEMENT_CATALOG.csv,Индекс источника,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-FPS,UI,UI_ELEMENT_CATALOG.csv,Бюджет FPS,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-TEST-SOURCE,UI,UI_ELEMENT_CATALOG.csv,Показать источник test context,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-SEGMENT-SOURCE,UI,UI_ELEMENT_CATALOG.csv,Показать источник segment context,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TXT-NOART,UI,UI_ELEMENT_CATALOG.csv,Нет артефакта анимации,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TXT-NOCOMP,UI,UI_ELEMENT_CATALOG.csv,Сравнение недоступно,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TXT-NOPACK,UI,UI_ELEMENT_CATALOG.csv,Packaging contract неполный,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TABLE-HARDPOINTS,UI,UI_ELEMENT_CATALOG.csv,Таблица координат hardpoint,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TABLE-CYL-GEOM,UI,UI_ELEMENT_CATALOG.csv,Таблица геометрии цилиндра,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TABLE-ROAD-GEOM,UI,UI_ELEMENT_CATALOG.csv,Таблица геометрии дороги,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BADGE-DIAG-PATH,UI,UI_ELEMENT_CATALOG.csv,Путь bundle диагностики,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-OPEN-ANALYSIS,UI,UI_ELEMENT_CATALOG.csv,Вернуться в анализ,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-OPEN-HISTORY,UI,UI_ELEMENT_CATALOG.csv,История run,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-SHOW-EVIDENCE,UI,UI_ELEMENT_CATALOG.csv,Evidence,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-WARNINGS,UI,UI_ELEMENT_CATALOG.csv,Warnings,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-BTN-SOURCEPATH,UI,UI_ELEMENT_CATALOG.csv,Источник артефакта,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+AM-TXT-CONTEXT-DESC,UI,UI_ELEMENT_CATALOG.csv,Описание handoff-контекста,WS-ANIMATOR;WIN-DESKTOP-ANIMATOR;,covered
+DI-TXT-TITLE,UI,UI_ELEMENT_CATALOG.csv,Рабочее пространство «Диагностика»,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-BUNDLE-MODE,UI,UI_ELEMENT_CATALOG.csv,Режим bundle,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-LAST-BUNDLE,UI,UI_ELEMENT_CATALOG.csv,Последний bundle,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-LAST-SHA,UI,UI_ELEMENT_CATALOG.csv,SHA256,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-READY-SOURCE,UI,UI_ELEMENT_CATALOG.csv,Источник readiness,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-HEALTH,UI,UI_ELEMENT_CATALOG.csv,Health,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-COLLECT,UI,UI_ELEMENT_CATALOG.csv,Собрать диагностику,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-OPEN-LATEST,UI,UI_ELEMENT_CATALOG.csv,Открыть последний bundle,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-RERUN-SELFCHECK,UI,UI_ELEMENT_CATALOG.csv,Перезапустить selfcheck,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-SHOW-EVIDENCE,UI,UI_ELEMENT_CATALOG.csv,Evidence,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-HELP,UI,UI_ELEMENT_CATALOG.csv,?,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-PARAMETERS,UI,UI_ELEMENT_CATALOG.csv,Параметры,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-INSTRUMENTS,UI,UI_ELEMENT_CATALOG.csv,Инструменты,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-TXT-BROWSER,UI,UI_ELEMENT_CATALOG.csv,Источники и история,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-TREE-SOURCES,UI,UI_ELEMENT_CATALOG.csv,Дерево источников evidence,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CARD-SELECTED-RUN,UI,UI_ELEMENT_CATALOG.csv,Карточка выбранного прогона,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-RUN-ID,UI,UI_ELEMENT_CATALOG.csv,Run ID,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-RUN-MODE,UI,UI_ELEMENT_CATALOG.csv,Run mode,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-OBJECTIVE,UI,UI_ELEMENT_CATALOG.csv,Objective,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-BASELINE,UI,UI_ELEMENT_CATALOG.csv,Baseline,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-IMPORT-AN,UI,UI_ELEMENT_CATALOG.csv,Импорт из анализа,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-IMPORT-AM,UI,UI_ELEMENT_CATALOG.csv,Импорт из аниматора,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-LIST-WARNINGS,UI,UI_ELEMENT_CATALOG.csv,Список truth/mismatch warnings,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-MANIFEST-ID,UI,UI_ELEMENT_CATALOG.csv,Manifest ID,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-MANIFEST-COUNTS,UI,UI_ELEMENT_CATALOG.csv,Source/Derived/Runtime,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-LIST-HISTORY,UI,UI_ELEMENT_CATALOG.csv,История bundle,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-TXT-SUMMARY,UI,UI_ELEMENT_CATALOG.csv,Сводка готовности,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CARD-HEALTH,UI,UI_ELEMENT_CATALOG.csv,Карточка health,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CARD-SELFCHECK,UI,UI_ELEMENT_CATALOG.csv,Карточка selfcheck,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CARD-TRIAGE,UI,UI_ELEMENT_CATALOG.csv,Карточка triage,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CARD-AUTOSAVE,UI,UI_ELEMENT_CATALOG.csv,Карточка autosave,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-GEOM,UI,UI_ELEMENT_CATALOG.csv,Geometry acceptance,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-WORKSPACE,UI,UI_ELEMENT_CATALOG.csv,Workspace contract,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-HELPER,UI,UI_ELEMENT_CATALOG.csv,Helper python,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-FRESHNESS,UI,UI_ELEMENT_CATALOG.csv,Свежесть last bundle,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-MSG-OVERVIEW,UI,UI_ELEMENT_CATALOG.csv,Строка обзорного сообщения,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-TXT-MANIFEST,UI,UI_ELEMENT_CATALOG.csv,Evidence manifest,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-FILTER-CLASS,UI,UI_ELEMENT_CATALOG.csv,Фильтр по классу,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-FILTER-SOURCE,UI,UI_ELEMENT_CATALOG.csv,Фильтр по producer,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-FILTER-STATUS,UI,UI_ELEMENT_CATALOG.csv,Фильтр по статусу,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-MERGE,UI,UI_ELEMENT_CATALOG.csv,Слить manifest,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-DEDUPE,UI,UI_ELEMENT_CATALOG.csv,Дедупликация,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-TABLE-MANIFEST,UI,UI_ELEMENT_CATALOG.csv,Таблица manifest,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-INCLUDE-ALL,UI,UI_ELEMENT_CATALOG.csv,Включить обязательное,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-CLEAR-OPTIONAL,UI,UI_ELEMENT_CATALOG.csv,Снять optional,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-RELOAD-POINTERS,UI,UI_ELEMENT_CATALOG.csv,Перечитать pointers,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-SHOW-GAPS,UI,UI_ELEMENT_CATALOG.csv,Показать gaps,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-SOURCE-COUNT,UI,UI_ELEMENT_CATALOG.csv,Source,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-DERIVED-COUNT,UI,UI_ELEMENT_CATALOG.csv,Derived,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-RUNTIME-COUNT,UI,UI_ELEMENT_CATALOG.csv,Runtime,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-TXT-CONTENTS,UI,UI_ELEMENT_CATALOG.csv,Состав bundle,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CHK-UI-LOGS,UI,UI_ELEMENT_CATALOG.csv,UI логи,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CHK-RUN-ARTIFACTS,UI,UI_ELEMENT_CATALOG.csv,Run artifacts,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CHK-ANIM-CAPTURE,UI,UI_ELEMENT_CATALOG.csv,Animator capture,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CHK-SYSTEM-INFO,UI,UI_ELEMENT_CATALOG.csv,System info,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CHK-PERF-TRACE,UI,UI_ELEMENT_CATALOG.csv,Perf trace,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CHK-BROWSER-TRACE,UI,UI_ELEMENT_CATALOG.csv,Browser trace,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CHK-RELEASE-META,UI,UI_ELEMENT_CATALOG.csv,Release metadata,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CHK-SOURCE-ARTS,UI,UI_ELEMENT_CATALOG.csv,Source artifacts,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CHK-DERIVED-ARTS,UI,UI_ELEMENT_CATALOG.csv,Derived artifacts,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-CHK-RUNTIME-ARTS,UI,UI_ELEMENT_CATALOG.csv,Runtime artifacts,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-TXT-SIZE-EST,UI,UI_ELEMENT_CATALOG.csv,Оценка размера,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-SIZE-EST,UI,UI_ELEMENT_CATALOG.csv,Размер bundle,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-INPUT-NOTES,UI,UI_ELEMENT_CATALOG.csv,Заметка к bundle,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-TXT-HEALTH,UI,UI_ELEMENT_CATALOG.csv,Health / triage / selfcheck,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-HEALTH-STATUS,UI,UI_ELEMENT_CATALOG.csv,Health status,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-TRIAGE-STATUS,UI,UI_ELEMENT_CATALOG.csv,Triage status,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-GEOMETRY,UI,UI_ELEMENT_CATALOG.csv,Geometry acceptance,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-EXPORT-VALID,UI,UI_ELEMENT_CATALOG.csv,Export validation,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-OPEN-HEALTH,UI,UI_ELEMENT_CATALOG.csv,Открыть health report,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-OPEN-TRIAGE,UI,UI_ELEMENT_CATALOG.csv,Открыть triage report,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-STANDARD-SELFCHECK,UI,UI_ELEMENT_CATALOG.csv,Запустить standard selfcheck,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-FULL-SELFCHECK,UI,UI_ELEMENT_CATALOG.csv,Запустить full selfcheck,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-STD-STATUS,UI,UI_ELEMENT_CATALOG.csv,Standard,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-FULL-STATUS,UI,UI_ELEMENT_CATALOG.csv,Full,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-VIEW-HEALTH-MD,UI,UI_ELEMENT_CATALOG.csv,Просмотр markdown health report,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-VIEW-TRIAGE-MD,UI,UI_ELEMENT_CATALOG.csv,Просмотр markdown triage report,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-LIST-EVIDENCE-GAPS,UI,UI_ELEMENT_CATALOG.csv,Список evidence gaps,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-LIST-HELPER-ERRORS,UI,UI_ELEMENT_CATALOG.csv,Список helper/runtime ошибок,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-TXT-ACTIONS,UI,UI_ELEMENT_CATALOG.csv,Финализация и отправка,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-BUILD,UI,UI_ELEMENT_CATALOG.csv,Собрать SEND bundle,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-OPEN-BUNDLE,UI,UI_ELEMENT_CATALOG.csv,Открыть final zip,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-OPEN-FOLDER,UI,UI_ELEMENT_CATALOG.csv,Открыть папку,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-COPY-PATH,UI,UI_ELEMENT_CATALOG.csv,Скопировать путь,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-COPY-SHA,UI,UI_ELEMENT_CATALOG.csv,Скопировать SHA256,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-EXPORT-MANIFEST,UI,UI_ELEMENT_CATALOG.csv,Сохранить manifest,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-SEND-MANUAL,UI,UI_ELEMENT_CATALOG.csv,Отправить вручную,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-INPUT-SEND-TARGET,UI,UI_ELEMENT_CATALOG.csv,Канал/адрес отправки,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-SEND-READY,UI,UI_ELEMENT_CATALOG.csv,Готовность к отправке,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-LIST-BUILD-PHASES,UI,UI_ELEMENT_CATALOG.csv,Список фаз сборки,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-LIST-BUILD-OUTPUTS,UI,UI_ELEMENT_CATALOG.csv,Список ожидаемых outputs,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-TXT-INSPECTOR,UI,UI_ELEMENT_CATALOG.csv,Свойства и пояснения,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-SELECTED-TYPE,UI,UI_ELEMENT_CATALOG.csv,Тип выбранного объекта,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-SELECTED-SOURCE,UI,UI_ELEMENT_CATALOG.csv,Источник,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-PRODUCER,UI,UI_ELEMENT_CATALOG.csv,Producer workspace,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-VIEW-HELP,UI,UI_ELEMENT_CATALOG.csv,Развёрнутая помощь,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-VIEW-PROPERTIES,UI,UI_ELEMENT_CATALOG.csv,Свойства выбранного evidence item,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-LIST-WARNING-LINKS,UI,UI_ELEMENT_CATALOG.csv,Связанные warnings,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-LIST-ARTIFACT-POINTERS,UI,UI_ELEMENT_CATALOG.csv,Связанные artifact pointers,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-OPEN-ARTIFACT,UI,UI_ELEMENT_CATALOG.csv,Открыть артефакт,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BTN-SHOW-IN-FOLDER,UI,UI_ELEMENT_CATALOG.csv,Показать в папке,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-PHASE,UI,UI_ELEMENT_CATALOG.csv,Фаза,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-PROGRESS-BUILD,UI,UI_ELEMENT_CATALOG.csv,Ход сборки,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-TXT-STATUS-MSG,UI,UI_ELEMENT_CATALOG.csv,Строка статуса,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-WORKSPACE-DIR,UI,UI_ELEMENT_CATALOG.csv,Workspace,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-UI-LOG-DIR,UI,UI_ELEMENT_CATALOG.csv,UI log dir,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-HELPER-PY,UI,UI_ELEMENT_CATALOG.csv,Helper python,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-LATEST-POINTER,UI,UI_ELEMENT_CATALOG.csv,Latest pointer,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-AUTOSAVE,UI,UI_ELEMENT_CATALOG.csv,Autosave mode,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+DI-BADGE-SESSION-STATUS,UI,UI_ELEMENT_CATALOG.csv,Статус UI-сессии,WS-DIAGNOSTICS;WIN-DIAGNOSTICS;,covered
+SH-TITLE-APP-ICON,UI,UI_ELEMENT_CATALOG.csv,Значок приложения,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-TITLE-APP-NAME,UI,UI_ELEMENT_CATALOG.csv,Имя приложения,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-TITLE-PROJECT-NAME,UI,UI_ELEMENT_CATALOG.csv,Имя проекта в заголовке,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-TITLE-DIRTY-BADGE,UI,UI_ELEMENT_CATALOG.csv,Индикатор несохранённых изменений,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-TITLE-LAYOUT-PICKER,UI,UI_ELEMENT_CATALOG.csv,Выбор раскладки shell,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-TITLE-WINDOW-CONTROLS,UI,UI_ELEMENT_CATALOG.csv,Системные кнопки окна,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-WS-SWITCHER,UI,UI_ELEMENT_CATALOG.csv,Переключатель рабочих пространств,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-CMD-SEARCH,UI,UI_ELEMENT_CATALOG.csv,Глобальный поиск команд,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-SEARCH-FILTER,UI,UI_ELEMENT_CATALOG.csv,Фильтр результатов поиска,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-CONTEXT-TITLE,UI,UI_ELEMENT_CATALOG.csv,Контекстный заголовок рабочего пространства,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-PRIMARY-ACTION,UI,UI_ELEMENT_CATALOG.csv,Главное действие текущего workspace,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-SECONDARY-ACTIONS,UI,UI_ELEMENT_CATALOG.csv,Вторичные действия текущего workspace,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-DIAGNOSTICS,UI,UI_ELEMENT_CATALOG.csv,Собрать диагностику,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-MSG-SEVERITY,UI,UI_ELEMENT_CATALOG.csv,Индикатор важности сообщения,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-MSG-TEXT,UI,UI_ELEMENT_CATALOG.csv,Текст глобального сообщения,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-MSG-DETAILS,UI,UI_ELEMENT_CATALOG.csv,Показать подробности,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-MSG-DISMISS,UI,UI_ELEMENT_CATALOG.csv,Скрыть неблокирующее сообщение,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-BROWSER-TABS,UI,UI_ELEMENT_CATALOG.csv,Вкладки обозревателя,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-BROWSER-TREE,UI,UI_ELEMENT_CATALOG.csv,Дерево иерархии,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-BROWSER-LIST,UI,UI_ELEMENT_CATALOG.csv,Список артефактов/истории,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-BROWSER-FILTER,UI,UI_ELEMENT_CATALOG.csv,Фильтр обозревателя,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-BROWSER-LEGEND,UI,UI_ELEMENT_CATALOG.csv,Легенда статусов,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-CENTER-BREADCRUMBS,UI,UI_ELEMENT_CATALOG.csv,Навигационная цепочка,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-CENTER-EMPTY,UI,UI_ELEMENT_CATALOG.csv,Заглушка пустого состояния shell,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-CENTER-MODE-BANNER,UI,UI_ELEMENT_CATALOG.csv,Баннер режима/контракта,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-CENTER-WORKSPACE-HOST,UI,UI_ELEMENT_CATALOG.csv,Хост активного рабочего пространства,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-INSPECTOR-TABS,UI,UI_ELEMENT_CATALOG.csv,Вкладки свойств и помощи,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-INSPECTOR-PROPERTIES,UI,UI_ELEMENT_CATALOG.csv,Панель свойств,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-INSPECTOR-HELP,UI,UI_ELEMENT_CATALOG.csv,Панель развёрнутой помощи,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-INSPECTOR-WARNINGS,UI,UI_ELEMENT_CATALOG.csv,Панель предупреждений выбора,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-STATUS-ACTIVE-MODE,UI,UI_ELEMENT_CATALOG.csv,Активный режим расчёта,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-STATUS-STAGE,UI,UI_ELEMENT_CATALOG.csv,Текущая стадия,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-STATUS-PROGRESS,UI,UI_ELEMENT_CATALOG.csv,Индикатор прогресса,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-STATUS-WARNINGS,UI,UI_ELEMENT_CATALOG.csv,Счётчик предупреждений,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-STATUS-CONTRACT,UI,UI_ELEMENT_CATALOG.csv,Индикатор контракта objective/baseline,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-STATUS-RUN-PATH,UI,UI_ELEMENT_CATALOG.csv,Путь текущего run,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-OVERLAY-CMD-PALETTE,UI,UI_ELEMENT_CATALOG.csv,Палитра команд,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-OVERLAY-LAYOUT-PICKER,UI,UI_ELEMENT_CATALOG.csv,Панель выбора раскладки,WS-SHELL;WIN-MAIN-SHELL;,covered
+SH-OVERLAY-RECENT,UI,UI_ELEMENT_CATALOG.csv,Последние команды и экраны,WS-SHELL;WIN-MAIN-SHELL;,covered
+PR-TXT-TITLE,UI,UI_ELEMENT_CATALOG.csv,Рабочее пространство «Панель проекта»,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BADGE-PROJECT-ID,UI,UI_ELEMENT_CATALOG.csv,Идентификатор проекта,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BADGE-DIRTY,UI,UI_ELEMENT_CATALOG.csv,Индикатор несохранённых изменений,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BADGE-HEALTH,UI,UI_ELEMENT_CATALOG.csv,Сводный статус проекта,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-TXT-LAST-SAVE,UI,UI_ELEMENT_CATALOG.csv,Последнее сохранение,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-CARD-NEXT-ACTION,UI,UI_ELEMENT_CATALOG.csv,Карточка следующего действия,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BTN-NEXT-ACTION,UI,UI_ELEMENT_CATALOG.csv,Выполнить следующее действие,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BTN-GO-INPUTS,UI,UI_ELEMENT_CATALOG.csv,Перейти к исходным данным,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-CARD-PIPELINE,UI,UI_ELEMENT_CATALOG.csv,Карта pipeline,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BTN-GO-RING,UI,UI_ELEMENT_CATALOG.csv,Открыть редактор кольца,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BTN-GO-SUITE,UI,UI_ELEMENT_CATALOG.csv,Открыть матрицу испытаний,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BTN-GO-BASELINE,UI,UI_ELEMENT_CATALOG.csv,Открыть базовый прогон,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BTN-GO-OPT,UI,UI_ELEMENT_CATALOG.csv,Открыть оптимизацию,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BTN-GO-DIAG,UI,UI_ELEMENT_CATALOG.csv,Открыть диагностику,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-TABLE-BLOCKERS,UI,UI_ELEMENT_CATALOG.csv,Таблица блокеров,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-TABLE-WARNINGS,UI,UI_ELEMENT_CATALOG.csv,Таблица предупреждений,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-CARD-RING-STATUS,UI,UI_ELEMENT_CATALOG.csv,Карточка статуса кольца,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-CARD-SUITE-STATUS,UI,UI_ELEMENT_CATALOG.csv,Карточка статуса набора испытаний,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-CARD-BASELINE-STATUS,UI,UI_ELEMENT_CATALOG.csv,Карточка статуса baseline,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-CARD-DIAG-STATUS,UI,UI_ELEMENT_CATALOG.csv,Карточка статуса диагностики,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-TABLE-RECENT-PROJECTS,UI,UI_ELEMENT_CATALOG.csv,Таблица недавних проектов,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BTN-OPEN-PROJECT,UI,UI_ELEMENT_CATALOG.csv,Открыть выбранный проект,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BTN-CREATE-PROJECT,UI,UI_ELEMENT_CATALOG.csv,Создать новый проект,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BTN-IMPORT-PROJECT,UI,UI_ELEMENT_CATALOG.csv,Импортировать проект,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-TABLE-RECENT-RUNS,UI,UI_ELEMENT_CATALOG.csv,Таблица недавних прогонов,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-TABLE-RECENT-BUNDLES,UI,UI_ELEMENT_CATALOG.csv,Таблица последних архивов диагностики,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-BTN-OPEN-BUNDLE,UI,UI_ELEMENT_CATALOG.csv,Открыть выбранный архив диагностики,WS-PROJECT;WIN-MAIN-SHELL;,covered
+PR-HELP-ANCHOR,UI,UI_ELEMENT_CATALOG.csv,Контекстная справка панели проекта,WS-PROJECT;WIN-MAIN-SHELL;,covered
+IN-TXT-TITLE,UI,UI_ELEMENT_CATALOG.csv,Рабочее пространство «Исходные данные»,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BADGE-DIRTY,UI,UI_ELEMENT_CATALOG.csv,Несохранённые изменения,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BADGE-UNIT-PROFILE,UI,UI_ELEMENT_CATALOG.csv,Профиль единиц,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BADGE-MIRROR-MODE,UI,UI_ELEMENT_CATALOG.csv,Режим зеркальности,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-STATUS-HANDOFF-READINESS,UI,UI_ELEMENT_CATALOG.csv,Индикатор готовности handoff,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-TXT-UNSAVED-COUNT,UI,UI_ELEMENT_CATALOG.csv,Количество несохранённых полей,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-TABS-GROUPS,UI,UI_ELEMENT_CATALOG.csv,Вкладки групп исходных данных,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-TREE-GROUPS,UI,UI_ELEMENT_CATALOG.csv,Дерево групп исходных данных,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-EXPAND-ALL,UI,UI_ELEMENT_CATALOG.csv,Развернуть все группы,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-COLLAPSE-ALL,UI,UI_ELEMENT_CATALOG.csv,Свернуть все группы,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-LIST-GROUP-FIELDS,UI,UI_ELEMENT_CATALOG.csv,Список полей активной группы,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-CARD-GROUP-SUMMARY,UI,UI_ELEMENT_CATALOG.csv,Карточка сводки активной группы,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-FILTER-REQUIRED,UI,UI_ELEMENT_CATALOG.csv,Показать только обязательные,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-SHOW-ONLY-INVALID,UI,UI_ELEMENT_CATALOG.csv,Показать только проблемные,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-FORM-FIELD-HOST,UI,UI_ELEMENT_CATALOG.csv,Область полей активной группы,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-COMPARE-LAST-SAVED,UI,UI_ELEMENT_CATALOG.csv,Сравнить с последним сохранением,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-CANVAS-FRAME-TOP,UI,UI_ELEMENT_CATALOG.csv,Эскиз рамы сверху,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-CANVAS-SUSP-FRONT,UI,UI_ELEMENT_CATALOG.csv,Эскиз подвески спереди,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-CANVAS-SUSP-SIDE,UI,UI_ELEMENT_CATALOG.csv,Эскиз подвески сбоку,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-CANVAS-PNEUMO-SCHEME,UI,UI_ELEMENT_CATALOG.csv,Схема пневматической сети,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-CANVAS-CYLINDER-RANGE,UI,UI_ELEMENT_CATALOG.csv,Диапазоны хода цилиндров,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-CANVAS-MASS-MAP,UI,UI_ELEMENT_CATALOG.csv,Карта масс и центра тяжести,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-LEGEND-TWIN-MODE,UI,UI_ELEMENT_CATALOG.csv,Легенда режима visual twin,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-TXT-TWIN-SOURCE,UI,UI_ELEMENT_CATALOG.csv,Подпись источника visual twin,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-TXT-TWIN-WARNING,UI,UI_ELEMENT_CATALOG.csv,Предупреждение visual twin,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BANNER-VALIDATION,UI,UI_ELEMENT_CATALOG.csv,Баннер проверки исходных данных,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-TABLE-VALIDATION-ISSUES,UI,UI_ELEMENT_CATALOG.csv,Таблица validation issues,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-TABLE-DIRTY-DIFF,UI,UI_ELEMENT_CATALOG.csv,Таблица отличий от last saved,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-VALIDATE,UI,UI_ELEMENT_CATALOG.csv,Проверить исходные данные,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-SAVE,UI,UI_ELEMENT_CATALOG.csv,Сохранить исходные данные,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-APPLY,UI,UI_ELEMENT_CATALOG.csv,Применить и обновить эскизы,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-REVERT-GROUP,UI,UI_ELEMENT_CATALOG.csv,Откатить активную группу,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-RESET-DEFAULTS,UI,UI_ELEMENT_CATALOG.csv,Сбросить к каноническим defaults,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-BACK-PROJECT,UI,UI_ELEMENT_CATALOG.csv,Вернуться к панели проекта,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-TO-RING,UI,UI_ELEMENT_CATALOG.csv,Перейти в редактор кольца,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-TO-SUITE,UI,UI_ELEMENT_CATALOG.csv,Перейти в матрицу испытаний,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-BTN-OPEN-DIAG,UI,UI_ELEMENT_CATALOG.csv,Открыть диагностику,WS-INPUTS;WIN-MAIN-SHELL;,covered
+IN-HELP-ANCHOR,UI,UI_ELEMENT_CATALOG.csv,Контекстная справка исходных данных,WS-INPUTS;WIN-MAIN-SHELL;,covered
+ISSUE-001,ISSUE,CONFLICTS_AND_ASSUMPTIONS.csv,"Рабочим корнем GitHub-репозитория принят `pneumo2_R31CN_HF8_repo_root`, опубликованный в ветке `main`.",,assumption
+ISSUE-002,ISSUE,CONFLICTS_AND_ASSUMPTIONS.csv,Подключённый GitHub-источник был reconciled через живые raw GitHub documents и локальный attached corpus; прямой connect,,assumption
+ISSUE-003,ISSUE,CONFLICTS_AND_ASSUMPTIONS.csv,Не доказана полная runtime-приёмка проекта по evidence-layer; snapshot и backlog прямо фиксируют недоказанность runtime ,,gap
+ISSUE-004,ISSUE,CONFLICTS_AND_ASSUMPTIONS.csv,Producer-side hardpoints/solver_points/cylinder packaging contract неполон для полного truthful 3D.,,gap
+ISSUE-005,ISSUE,CONFLICTS_AND_ASSUMPTIONS.csv,"Часть detailed GUI layers доступна только как attached imports, а не как живые repo files в текущей сессии.",,covered_partially
+ISSUE-006,ISSUE,CONFLICTS_AND_ASSUMPTIONS.csv,"Исторические implementation-пакеты v6–v11 и bootstrap/source branches противоречат цели текущего задания, потому что явл",,conflict
+ISSUE-007,ISSUE,CONFLICTS_AND_ASSUMPTIONS.csv,GUI package строится recipient-neutral: без внутренней роли автора/исполнителя и без ссылок на приватные внутренние ярлы,,assumption
+ISSUE-008,ISSUE,CONFLICTS_AND_ASSUMPTIONS.csv,Desktop Animator / Compare Viewer / Desktop Mnemo трактуются как отдельные top-level окна; текущая runtime-реализация мо,,covered_partially
+ISSUE-009,ISSUE,CONFLICTS_AND_ASSUMPTIONS.csv,"Objective-contract alignment между StageRunner и distributed coordinator зафиксирован как обязательный, но runtime proof",,covered_partially
+ISSUE-010,ISSUE,CONFLICTS_AND_ASSUMPTIONS.csv,"Степень выноса historical/legacy CLI knobs в user-facing GUI должна решаться по текущему active control plane, а не по в",,open_question
+ISSUE-011,ISSUE,CONFLICTS_AND_ASSUMPTIONS.csv,Внешние workspace/external_context_snapshots не были прочитаны напрямую как live connected filesystem.,,gap
+ISSUE-012,ISSUE,CONFLICTS_AND_ASSUMPTIONS.csv,Отсутствие retrievable file_search sources компенсировано использованием local container files и live GitHub raw docs.,,assumption
