@@ -61,6 +61,19 @@ TRUTH_STATE_SOURCE_DATA_CONFIRMED = "source_data_confirmed"
 TRUTH_STATE_APPROXIMATE = "approximate_inferred_with_warning"
 TRUTH_STATE_UNAVAILABLE = "unavailable"
 
+GEOMETRY_REFERENCE_PRODUCER_EVIDENCE_OWNER = "producer_export"
+GEOMETRY_REFERENCE_REQUIRED_PRODUCER_ARTIFACTS: tuple[str, ...] = (
+    "workspace/_pointers/anim_latest.json or workspace/exports/anim_latest.json",
+    "workspace/exports/anim_latest.npz",
+    "workspace/exports/CYLINDER_PACKAGING_PASSPORT.json",
+    "workspace/exports/geometry_acceptance_report.json",
+)
+GEOMETRY_REFERENCE_PRODUCER_NEXT_ACTION = (
+    "Run producer/solver anim_latest export so NPZ meta.geometry/meta.packaging, "
+    "CYLINDER_PACKAGING_PASSPORT.json and geometry_acceptance_report.json are written; "
+    "Reference Center must not fabricate producer geometry evidence."
+)
+
 CYLINDER_PACKAGING_BASIC_FIELDS: tuple[str, ...] = (
     "bore_diameter_m",
     "rod_diameter_m",
@@ -1135,11 +1148,26 @@ def build_geometry_reference_diagnostics_handoff(
         missing.append("cylinder_packaging_passport")
     if acceptance.gate == "MISSING":
         missing.append("geometry_acceptance")
+    producer_artifact_status = "ready"
+    if artifact_context.status in {"missing", "stale"}:
+        producer_artifact_status = "missing"
+    elif (
+        acceptance.gate != "PASS"
+        or packaging.packaging_status != "complete"
+        or packaging.mismatch_status != "match"
+    ):
+        producer_artifact_status = "partial"
     return {
         "schema": "geometry_reference_evidence.v1",
         "producer_owned": False,
         "reference_center_role": "reader_and_evidence_surface",
         "does_not_render_animator_meshes": True,
+        "producer_evidence_owner": GEOMETRY_REFERENCE_PRODUCER_EVIDENCE_OWNER,
+        "producer_artifact_status": producer_artifact_status,
+        "producer_required_artifacts": list(GEOMETRY_REFERENCE_REQUIRED_PRODUCER_ARTIFACTS),
+        "producer_next_action": GEOMETRY_REFERENCE_PRODUCER_NEXT_ACTION,
+        "reference_center_can_close_producer_gaps": False,
+        "consumer_may_fabricate_geometry": False,
         "artifact_status": artifact_context.status,
         "artifact_source_label": artifact_context.source_label,
         "artifact_npz_path": artifact_context.npz_path,
