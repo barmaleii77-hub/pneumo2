@@ -41,18 +41,24 @@
    — reviewed clean self-check warnings snapshot; не diagnostics/SEND closure proof.
 10. [V32_16_ACCEPTANCE_NOTE_2026-04-17.md](../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
    — accepted V32-16 docs/helper scope and validation note.
-11. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
+11. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
+   [TECHNICAL_SPECIFICATION.md](../context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md)
+   и [GUI_SPEC.yaml](../context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml)
+   — successor GitHub KB/TZ/spec supplement. Он уточняет requirements,
+   workspace contracts, parameter catalogs, acceptance и open gaps, но не
+   является runtime-closure proof.
+12. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
    и related `v3/*`
    — checked-in detailed machine-readable reference layer.
-12. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
+13. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
    и related `v13_ring_editor_migration/*`
    — специализированный addendum для `WS-RING` и handoff `WS-RING -> WS-SUITE`.
-13. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
+14. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
    — historical design-recovery layer, который возвращает проект из implementation-веток в design-first.
-14. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
+15. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
    и [gui_spec_archive_lineage.json](../context/gui_spec_archive_lineage.json)
-   — lineage `v1…v13`, чтобы понимать роль каждого архива.
-15. `docs/gui_chat_prompts/*`
+   — lineage `v1…v13 + v37`, чтобы понимать роль каждого архива и successor supplement.
+16. `docs/gui_chat_prompts/*`
    — implementation prompts, которые должны наследовать канон, а не заменять его.
 
 ## Что считается reference layer
@@ -91,6 +97,10 @@
   diagnostics/SEND closure claim.
 - `V32_16_ACCEPTANCE_NOTE_2026-04-17` фиксирует accepted V32-16 docs/helper
   scope, focused validation and next lane order.
+- `v37_github_kb_supplement` задаёт successor KB/TZ/spec connector layer:
+  consolidated technical specification, GUI_SPEC.yaml, workspace contract
+  matrix, parameter catalogs, acceptance/requirements matrices, repo canon
+  alignment и список open gaps, которые нельзя скрывать как закрытые.
 - `v3` задаёт общий detailed layer:
   shell, layout, UI elements, help/tooltip catalogs, migration matrix,
   acceptance, verification, keyboard/docking/state/observability contracts.
@@ -134,6 +144,9 @@
   смешивать V32-16 docs/helper patch с runtime/domain lane-пакетами;
 - если нужно понять исходный жёсткий intent ещё до `v1`, дополнительно читать
   `foundations/*`;
+- если lane затрагивает requirements, параметры, workspace coverage,
+  acceptance или open gaps, читать `v37_github_kb_supplement/*` как
+  successor knowledge-base supplement, не подменяя им runtime evidence;
 - если lane касается ring editor, handoff сценария или suite consumer
   сценарного контракта, обязательно дополнительно смотреть
   `v13_ring_editor_migration/*`;
@@ -141,6 +154,7 @@
   границы между design и implementation-pass, смотреть `v12_design_recovery/*`
   и lineage `v1…v13`;
 - при конфликте приоритет у `17/18`, затем у `v33_connector_reconciled`, затем
-  у `v32_connector_reconciled`, затем у `v3`, затем у специализированного
+  у `v32_connector_reconciled`, затем у `foundations`, затем у
+  `v37_github_kb_supplement`, затем у `v3`, затем у специализированного
   `v13_ring_editor_migration`, затем у `v12_design_recovery`, затем у
   historical imports.

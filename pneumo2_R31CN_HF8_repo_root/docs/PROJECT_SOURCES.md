@@ -21,6 +21,18 @@
 - `docs/context/gui_spec_imports/README.md` — верхний source note для imported GUI-spec layers.
 - `docs/context/gui_spec_imports/foundations/README.md` — upstream prompt layer, предшествующий серии архивов `v1…v13`.
 - `docs/context/gui_spec_imports/foundations/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md` — foundational prompt source (`PROMPT_V2`).
+- `docs/context/gui_spec_imports/v37_github_kb_supplement/README.md` — successor consolidated GitHub knowledge-base supplement layer; не является runtime-closure proof.
+- `docs/context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md` — human-readable ТЗ/spec connector для Windows desktop GUI.
+- `docs/context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml` — machine-readable successor GUI-spec/TZ connector.
+- `docs/context/gui_spec_imports/v37_github_kb_supplement/WORKSPACE_CONTRACT_MATRIX.csv` — workspace contract matrix.
+- `docs/context/gui_spec_imports/v37_github_kb_supplement/PARAMETER_CATALOG.csv` — consolidated parameter catalog.
+- `docs/context/gui_spec_imports/v37_github_kb_supplement/PARAMETER_PIPELINE_MATRIX.csv` — связь параметров с pipeline.
+- `docs/context/gui_spec_imports/v37_github_kb_supplement/PARAMETER_VISIBILITY_MATRIX.csv` — visibility/editability matrix для параметров.
+- `docs/context/gui_spec_imports/v37_github_kb_supplement/ACCEPTANCE_MATRIX.csv` — acceptance matrix для требований.
+- `docs/context/gui_spec_imports/v37_github_kb_supplement/REQUIREMENTS_MATRIX.csv` — requirements matrix.
+- `docs/context/gui_spec_imports/v37_github_kb_supplement/REPO_GITHUB_KB_SUPPLEMENT.md` — summary того, что v37 добавляет к GitHub KB.
+- `docs/context/gui_spec_imports/v37_github_kb_supplement/REPO_OPEN_GAPS_TO_KEEP_OPEN.csv` — открытые gaps, которые нельзя скрывать как закрытые.
+- `docs/context/gui_spec_imports/v37_github_kb_supplement/NON_RUNTIME_CLOSURE_NOTICE.md` — явное ограничение: v37 не является runtime-closure proof.
 - `docs/context/gui_spec_imports/v33_connector_reconciled/README.md` — active connector-reconciled GUI/TZ digest из `pneumo_codex_tz_spec_connector_reconciled_v33.zip`; фиксирует v33 integrity policy, selfcheck/remediation, repo-canon read-order/gate mapping и dedicated PB-008 playbook.
 - `docs/context/gui_spec_imports/v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md` — оценка полноты и достаточности v33: structural checks, coverage checks, caveats и runtime limits.
 - `docs/context/gui_spec_imports/v32_connector_reconciled/README.md` — previous connector-reconciled GUI/TZ digest из `pneumo_codex_tz_spec_connector_reconciled_v32.zip`; фиксирует source authority, reading order, 12 workspaces, v32 playbooks, release gates, open gaps и runtime-evidence policy.
@@ -104,15 +116,16 @@
 
 1. `17_WINDOWS_DESKTOP_CAD_GUI_CANON.md`
 2. `18_PNEUMOAPP_WINDOWS_GUI_SPEC.md`
-3. `docs/context/gui_spec_imports/v33_connector_reconciled/README.md` как active connector-reconciled GUI/TZ digest
-4. `docs/context/gui_spec_imports/v32_connector_reconciled/README.md`, `PARALLEL_CHAT_WORKSTREAMS.md` и `RELEASE_GATE_ACCEPTANCE_MAP.md` как previous digest/workstream/release-evidence layer
-5. `docs/context/gui_spec_imports/foundations/*` как upstream intent/provenance layer
-6. `docs/context/gui_spec_imports/v3/*`
-7. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING` и handoff `WS-RING -> WS-SUITE`
-8. `docs/context/gui_spec_imports/v12_design_recovery/*` как historical design-recovery layer
-9. `docs/context/gui_spec_archive_lineage.json` и `docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md`
-10. older versions в `docs/context/gui_spec_imports/*`
-11. `docs/gui_chat_prompts/*`
+3. `docs/context/gui_spec_imports/foundations/*` как upstream intent/provenance layer
+4. `docs/context/gui_spec_imports/v37_github_kb_supplement/*` как successor consolidated KB/TZ/spec supplement, но не runtime-closure proof
+5. `docs/context/gui_spec_imports/v33_connector_reconciled/README.md` как active connector-reconciled GUI/TZ digest
+6. `docs/context/gui_spec_imports/v32_connector_reconciled/README.md`, `PARALLEL_CHAT_WORKSTREAMS.md` и `RELEASE_GATE_ACCEPTANCE_MAP.md` как previous digest/workstream/release-evidence layer
+7. `docs/context/gui_spec_imports/v3/*`
+8. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING` и handoff `WS-RING -> WS-SUITE`
+9. `docs/context/gui_spec_imports/v12_design_recovery/*` как historical design-recovery layer
+10. `docs/context/gui_spec_archive_lineage.json` и `docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md`
+11. older versions в `docs/context/gui_spec_imports/*`
+12. `docs/gui_chat_prompts/*`
 
 ## Зафиксированные внешние AI snapshots
 
@@ -131,7 +144,7 @@
 ## Правило использования
 
 - Внешние ссылки не заменяют локальный канон.
-- Для GUI-first задач сначала читать `17`, затем `18`, затем `gui_spec_imports/v33_connector_reconciled/README.md` и `COMPLETENESS_ASSESSMENT.md`, затем `gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md`, `gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md`, `gui_spec_imports/v3/*`, parity docs и только потом lane-level prompts.
+- Для GUI-first задач сначала читать `17`, затем `18`, затем `gui_spec_imports/foundations/*`, затем `gui_spec_imports/v37_github_kb_supplement/*` для KB/TZ/spec reconciliation, затем `gui_spec_imports/v33_connector_reconciled/README.md` и `COMPLETENESS_ASSESSMENT.md`, затем `gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md`, `gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md`, затем `gui_spec_imports/v3/*`, parity docs и только потом lane-level prompts.
 - Для release-readiness merge сначала сверять `docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md` и `docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md`, затем принимать V32-16 docs/helper patch и только после этого разбирать lane-пакеты с их evidence.
 - Imported JSON/DOT/CSV используются как reference artifacts, а не как единственный источник правды.
 - При конфликте между imported sources и текущим каноном приоритет у `17/18`.

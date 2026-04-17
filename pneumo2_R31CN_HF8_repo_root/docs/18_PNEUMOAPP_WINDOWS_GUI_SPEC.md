@@ -907,7 +907,7 @@ Acceptance gates для этого контура задаются в
 [ring_editor_acceptance_gates_v13.csv](./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_acceptance_gates_v13.csv)
 и считаются обязательными для `WS-RING` и связанных consumer-workspaces.
 
-## Т. Историческая линия `PROMPT_V2 + v1…v13` и политика продолжения
+## Т. Историческая линия `PROMPT_V2 + v1…v13 + v37` и политика продолжения
 
 Текущий канон не вырос из одного архива. Он собирается из последовательности
 слоёв, где разные версии имели разный статус:
@@ -923,7 +923,10 @@ Acceptance gates для этого контура задаются в
 - `v12` — preservation and design recovery: возврат проекта из implementation
   ветки обратно в design-first continuation;
 - `v13` — специализированный addendum для `WS-RING` и handoff
-  `WS-RING -> WS-SUITE`.
+  `WS-RING -> WS-SUITE`;
+- `v37` — successor GitHub KB/TZ/spec supplement: consolidated technical
+  specification, GUI_SPEC.yaml, workspace/parameter/acceptance matrices,
+  repo canon alignment и список gaps, которые должны оставаться открытыми.
 
 Читать lineage нужно через:
 
@@ -932,6 +935,7 @@ Acceptance gates для этого контура задаются в
 - [GUI_SPEC_ARCHIVE_LINEAGE.md](./context/GUI_SPEC_ARCHIVE_LINEAGE.md)
 - [gui_spec_archive_lineage.json](./context/gui_spec_archive_lineage.json)
 - [v12_design_recovery/README.md](./context/gui_spec_imports/v12_design_recovery/README.md)
+- [v37_github_kb_supplement/README.md](./context/gui_spec_imports/v37_github_kb_supplement/README.md)
 
 Практическое правило:
 
@@ -941,4 +945,57 @@ Acceptance gates для этого контура задаются в
 - design-recovery `v12` объясняет, почему проект продолжает work не из
   bootstrap/source-tree ветки, а из design-first ветки;
 - specialized addendum `v13` продолжает именно эту восстановленную ветку в
-  области ring editor и ring-to-suite handoff.
+  области ring editor и ring-to-suite handoff;
+- successor supplement `v37` используется для reconciliation базы знаний,
+  требований, параметров, acceptance и открытых gaps, но не заменяет runtime
+  evidence.
+
+## У. V37 GitHub KB supplement и TZ/spec connector
+
+`v37_github_kb_supplement` импортирован из
+`pneumo_codex_tz_spec_connector_reconciled_v37_github_kb_supplement.zip` как
+repo-local successor knowledge-base layer. Он не заменяет `17/18` и не
+доказывает runtime-closure: producer-side truth, measured perf trace и
+Windows runtime acceptance остаются открытыми до отдельного evidence layer.
+
+Machine-readable и reference source set:
+
+- [README.md](./context/gui_spec_imports/v37_github_kb_supplement/README.md)
+- [TECHNICAL_SPECIFICATION.md](./context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md)
+- [GUI_SPEC.yaml](./context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml)
+- [WORKSPACE_CONTRACT_MATRIX.csv](./context/gui_spec_imports/v37_github_kb_supplement/WORKSPACE_CONTRACT_MATRIX.csv)
+- [PARAMETER_CATALOG.csv](./context/gui_spec_imports/v37_github_kb_supplement/PARAMETER_CATALOG.csv)
+- [PARAMETER_PIPELINE_MATRIX.csv](./context/gui_spec_imports/v37_github_kb_supplement/PARAMETER_PIPELINE_MATRIX.csv)
+- [PARAMETER_VISIBILITY_MATRIX.csv](./context/gui_spec_imports/v37_github_kb_supplement/PARAMETER_VISIBILITY_MATRIX.csv)
+- [REQUIREMENTS_MATRIX.csv](./context/gui_spec_imports/v37_github_kb_supplement/REQUIREMENTS_MATRIX.csv)
+- [ACCEPTANCE_MATRIX.csv](./context/gui_spec_imports/v37_github_kb_supplement/ACCEPTANCE_MATRIX.csv)
+- [REPO_CANON_ALIGNMENT_MATRIX.csv](./context/gui_spec_imports/v37_github_kb_supplement/REPO_CANON_ALIGNMENT_MATRIX.csv)
+- [REPO_OPEN_GAPS_TO_KEEP_OPEN.csv](./context/gui_spec_imports/v37_github_kb_supplement/REPO_OPEN_GAPS_TO_KEEP_OPEN.csv)
+- [NON_RUNTIME_CLOSURE_NOTICE.md](./context/gui_spec_imports/v37_github_kb_supplement/NON_RUNTIME_CLOSURE_NOTICE.md)
+
+### Что уточняет `v37`
+
+- `TECHNICAL_SPECIFICATION.md` связывает продуктовый GUI-spec с ТЗ для
+  native Windows desktop engineering software.
+- `GUI_SPEC.yaml` фиксирует successor machine-readable spec connector,
+  включая shell target, graphics honesty states и запрет объявлять package
+  runtime closure proof.
+- `WORKSPACE_CONTRACT_MATRIX.csv` связывает workspace ids с source-of-truth,
+  inputs, outputs, editing rules и layout rules.
+- `PARAMETER_*` матрицы задают catalog, grouping, pipeline role, relations и
+  visibility/editability для параметров.
+- `REQUIREMENTS_MATRIX.csv` и `ACCEPTANCE_MATRIX.csv` дают проверяемый слой
+  требований и acceptance, который должен связываться с evidence перед
+  объявлением функции готовой.
+- `REPO_OPEN_GAPS_TO_KEEP_OPEN.csv` и `NON_RUNTIME_CLOSURE_NOTICE.md` являются
+  guardrail: открытые gaps нельзя скрывать, переименовывать в закрытые или
+  выдавать за runtime-acceptance.
+
+### Правило использования `v37`
+
+- Для проектирования и ревизии GUI читать `17`, затем `18`, затем
+  `foundations`, затем `v37`, затем `v3` и специализированные addendum.
+- Для реализации нельзя переносить положения `v37` в статус `done` без
+  runtime evidence, self-check или acceptance artifact.
+- При расхождении `v37` с `17/18` приоритет остаётся у human-readable канона,
+  а конфликт фиксируется через assumptions/gaps, а не замалчивается.

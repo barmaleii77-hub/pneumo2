@@ -36,6 +36,7 @@ class DesktopWorkspaceSpec:
     access_key: str = ""
     hotkey: str = ""
     tab_index: float | None = None
+    catalog_owner_aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

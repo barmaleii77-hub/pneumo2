@@ -49,6 +49,29 @@ def test_main_window_applies_v3_shortcuts_and_docking_contracts(tmp_path, monkey
         app.processEvents()
 
 
+def test_main_window_defers_settings_sync_during_initial_open(tmp_path, monkeypatch) -> None:
+    settings_path = tmp_path / "desktop_spec_shell_deferred_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        app.processEvents()
+        assert window._state_save_suppressed is False
+        assert not window._state_save_timer.isActive()
+        assert str(window._settings.value("window/last_workspace") or "") != "overview"
+
+        window.open_workspace("diagnostics")
+        assert window._state_save_timer.isActive()
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+    settings = QtCore.QSettings(str(settings_path), QtCore.QSettings.IniFormat)
+    assert str(settings.value("window/last_workspace") or "") == "diagnostics"
+
+
 def test_main_window_cycles_focus_by_f6_region_order(tmp_path, monkeypatch) -> None:
     settings_path = tmp_path / "desktop_spec_shell_focus.ini"
     monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
