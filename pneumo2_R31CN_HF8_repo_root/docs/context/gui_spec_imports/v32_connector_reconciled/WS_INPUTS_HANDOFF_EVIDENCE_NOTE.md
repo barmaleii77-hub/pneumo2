@@ -40,7 +40,7 @@ python -m pytest tests/test_desktop_suite_snapshot.py -q
 python -m pytest tests/test_desktop_input_editor_contract.py tests/test_desktop_ring_editor_contract.py tests/test_desktop_suite_snapshot.py tests/test_desktop_run_setup_center_contract.py tests/test_desktop_main_shell_qt_contract.py tests/test_test_center_results_center_contract.py tests/test_desktop_optimizer_center_contract.py -q
 ```
 
-Latest observed result in this workstream: `114 passed`.
+Latest observed result in this workstream: `127 passed`.
 
 WS-SUITE / HO-005 update:
 
@@ -61,6 +61,11 @@ WS-SUITE / HO-005 update:
   `suite_snapshot_hash`, enabled rows, missing refs, and snapshot path.
 - Command search discovers the route by `validated_suite_snapshot`,
   `suite_snapshot_hash`, `HO-005`, and `заморозить HO-005`.
+- Shell search scoring gives exact command aliases priority without leaking
+  workspace aliases into every command. Verified query routing:
+  `suite_snapshot_hash`, `validated_suite_snapshot HO-005`, and
+  `заморозить HO-005` land in `test_matrix`; `HO-006 active_baseline_contract`
+  remains in `baseline_run`.
 - Baseline launch uses a hard `HO-005` gate. `missing`, `invalid`, and
   `stale` block baseline launch even when `runtime_policy = force`; detail
   and full routes remain warning-only for missing `HO-005`.
@@ -72,9 +77,32 @@ python -m py_compile pneumo_solver_ui\desktop_suite_snapshot.py pneumo_solver_ui
 python -m pytest tests/test_desktop_suite_snapshot.py tests/test_desktop_run_setup_center_contract.py tests/test_test_center_results_center_contract.py tests/test_optimization_baseline_source_history.py tests/test_optimization_scoped_baseline_autoload.py -q
 python -m pytest tests/test_desktop_gui_spec_shell_contract.py tests/test_desktop_shell_parity_contract.py tests/test_desktop_main_shell_contract.py tests/test_desktop_main_shell_qt_contract.py tests/test_suite_contract_migration.py tests/test_optimization_auto_ring_suite.py -q
 python -m pytest tests/test_desktop_input_editor_contract.py -q
+python -m pytest tests/test_desktop_suite_snapshot.py tests/test_desktop_gui_spec_shell_contract.py -q
+python -m pytest tests/test_desktop_shell_parity_contract.py tests/test_desktop_main_shell_contract.py tests/test_desktop_main_shell_qt_contract.py -q
 ```
 
-Observed results: `45 passed`, `52 passed`, `31 passed`.
+Observed results: `45 passed`, `52 passed`, `31 passed`, `23 passed`,
+`44 passed`.
+
+Desktop-targeted follow-up:
+
+The monolithic `tests/test_*desktop*.py` run exceeded the local timeout when
+run as one command, so the same file family was split into contract/runtime
+batches:
+
+```text
+desktop headless contract subset, excluding animator/runtime smoke and
+test_desktop_ui_core_contract.py: 257 passed
+animator desktop contract group: 21 passed
+static animator/v32 runtime contract group: 75 passed
+r61 runtime smoke files: 4 skipped, no failures
+test_desktop_ui_core_contract.py isolated: 4 passed
+geometry-reference diagnostics writer regression check: 1 passed
+```
+
+No desktop-targeted follow-up failure was in `WS-INPUTS`, `HO-002`,
+`HO-003`, snapshot freezing, invented-key blocking, stale banners, or
+read-only Ring/Suite input handoff consumption.
 
 Manual temp-workspace smoke:
 
@@ -104,6 +132,25 @@ No chunked full-suite failure was in `WS-SUITE`, `HO-005`,
 coverage. Observed failures were in active generator/worldroad numerical
 checks, geometry-reference evidence, docs triage, animator visual/source
 contracts, and static-trim pressure behavior.
+
+Review / staging scope:
+
+The WS-SUITE implementation is present in branch history at commit
+`5340d41 Add WS-SUITE validated snapshot handoff`. Current unstaged
+WS-SUITE-lane delta is this evidence note only.
+
+Stage for this lane when preparing a WS-SUITE evidence update:
+
+- `docs/context/gui_spec_imports/v32_connector_reconciled/WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md`
+
+Do not stage as part of this lane unless that owner explicitly hands it off:
+
+- `docs/context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md`
+- `pneumo_solver_ui/desktop_geometry_reference_runtime.py`
+- `pneumo_solver_ui/desktop_mnemo/app.py`
+- `pneumo_solver_ui/desktop_shell/command_search.py`
+- `tests/test_desktop_geometry_reference_center_contract.py`
+- `tests/test_desktop_mnemo_window_contract.py`
 
 Non-claims:
 
