@@ -61,6 +61,29 @@ Additional accepted checks:
   `CYLINDER_PACKAGING_PASSPORT.json` hash drift visible instead of treating a
   stale passport as current truth.
 
+Merge-ready producer truth closure snapshot:
+
+- Combined producer-side verification now covers `solver_points`, `hardpoints`,
+  `packaging`, geometry acceptance, visual-consumer strictness,
+  `anim_latest` sidecars, diagnostics/health/inspect evidence surfaces and
+  R32 sidecar triage without GUI layout changes.
+- GUI and diagnostics lanes remain consumers: they may read
+  `anim_export_contract_artifacts`, validation summaries, packaging passports
+  and geometry-acceptance reports, but must not fabricate missing solver,
+  hardpoint or cylinder geometry truth.
+- Axis-only honesty mode stays a reported WARN/degraded state for incomplete
+  cylinder packaging; it is not permission to render full body/rod/piston mesh
+  geometry without a complete passport.
+
+Combined verification command:
+
+```powershell
+python -m py_compile pneumo_solver_ui\anim_export_contract.py pneumo_solver_ui\npz_bundle.py pneumo_solver_ui\geometry_acceptance_contract.py pneumo_solver_ui\tools\validate_anim_export_contract.py pneumo_solver_ui\tools\health_report.py pneumo_solver_ui\tools\inspect_send_bundle.py pneumo_solver_ui\tools\send_bundle_evidence.py pneumo_solver_ui\tools\make_send_bundle.py
+python -m pytest tests\test_anim_latest_solver_points_contract_gate.py tests\test_anim_export_contract_gate.py tests\test_r52_anim_export_contract_blocks.py tests\test_geometry_acceptance_release_gate.py tests\test_r31bn_cylinder_truth_gate.py tests\test_v32_desktop_animator_truth_contract.py tests\test_geometry_reference_packaging_passport_drift.py tests\test_desktop_geometry_reference_center_contract.py tests\test_anim_latest_geometry_contract_gate.py tests\test_geometry_acceptance_web_and_bundle.py tests\test_visual_consumers_geometry_strict.py tests\test_health_report_inspect_send_bundle_anim_diagnostics.py tests\test_v32_diagnostics_send_bundle_evidence.py tests\test_r31ci_send_bundle_helper_runtime_contract.py tests\test_r32_triage_and_anim_sidecars.py -q
+```
+
+Result: `111 passed`.
+
 Non-claims:
 
 - `OG-001` stays open until a named release bundle contains full

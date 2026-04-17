@@ -682,6 +682,10 @@ def test_v32_14_v32_09_producer_animator_truth_note_records_contract_acceptance_
     assert "36 passed" in text
     assert "tests/test_geometry_reference_packaging_passport_drift.py" in text
     assert "39 passed" in text
+    assert "Combined producer-side verification" in text
+    assert "diagnostics/health/inspect evidence surfaces" in text
+    assert "GUI and diagnostics lanes remain consumers" in text
+    assert "111 passed" in text
     assert "not a durable release SEND bundle" in text
     assert "complete cylinder packaging passport" in text
 
@@ -743,6 +747,9 @@ def test_v32_12_geometry_reference_note_records_provenance_acceptance_without_ru
     assert "tests/test_geometry_reference_packaging_passport_drift.py" in text
     assert "tests/test_health_report_inspect_send_bundle_anim_diagnostics.py" in text
     assert "50 passed" in text
+    assert "Combined producer-side verification" in text
+    assert "must not flatten `MISSING`, `WARN` or `FAIL`" in text
+    assert "111 passed" in text
     assert "imported-layer/runtime-proof open question" in text
     assert "does not alter solver physics" in text
 
