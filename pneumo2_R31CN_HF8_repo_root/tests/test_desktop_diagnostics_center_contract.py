@@ -79,8 +79,13 @@ def _geometry_reference_evidence() -> dict:
         "geometry_acceptance_available": True,
         "producer_artifact_status": "ready",
         "producer_evidence_owner": "producer_export",
-        "producer_required_artifacts": ["workspace/exports/anim_latest.npz"],
-        "producer_next_action": "",
+        "producer_required_artifacts": [
+            "workspace/_pointers/anim_latest.json or workspace/exports/anim_latest.json",
+            "workspace/exports/anim_latest.npz",
+            "workspace/exports/CYLINDER_PACKAGING_PASSPORT.json",
+            "workspace/exports/geometry_acceptance_report.json",
+        ],
+        "producer_next_action": "No producer action required for this complete synthetic fixture.",
         "consumer_may_fabricate_geometry": False,
         "component_passport_components": 3,
         "component_passport_needs_data": 0,
@@ -342,6 +347,7 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert bundle.geometry_reference_packaging_contract_hash == "packaging-hash"
     assert bundle.geometry_reference_acceptance_gate == "PASS"
     assert bundle.geometry_reference_producer_artifact_status == "ready"
+    assert bundle.geometry_reference_consumer_may_fabricate_geometry is False
 
     run = DesktopDiagnosticsRunRecord(
         ok=True,
@@ -410,6 +416,9 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert payload["geometry_reference_evidence"]["road_width_status"] == "explicit_meta"
     assert payload["geometry_reference_evidence"]["packaging_contract_hash"] == "packaging-hash"
     assert payload["geometry_reference_evidence"]["geometry_acceptance_gate"] == "PASS"
+    assert payload["geometry_reference_evidence"]["producer_artifact_status"] == "ready"
+    assert payload["geometry_reference_evidence"]["consumer_may_fabricate_geometry"] is False
+    assert "workspace/exports/anim_latest.npz" in payload["geometry_reference_evidence"]["producer_required_artifacts"]
     assert payload["bundle"]["latest_clipboard_status_path"].endswith("latest_send_bundle_clipboard_status.json")
     assert payload["ui"]["selected_tab"] == "bundle"
     assert payload["ui"]["active_bundle_out_dir"].endswith("send_bundles")
