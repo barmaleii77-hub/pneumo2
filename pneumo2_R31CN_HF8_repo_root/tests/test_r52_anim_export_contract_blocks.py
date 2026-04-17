@@ -9,7 +9,12 @@ import numpy as np
 import pandas as pd
 
 from pneumo_solver_ui.anim_export_contract import (
+    ANIM_EXPORT_CONTRACT_SIDECAR_NAME,
+    ANIM_EXPORT_CONTRACT_VALIDATION_JSON_NAME,
+    ANIM_EXPORT_CONTRACT_VALIDATION_MD_NAME,
     CYLINDER_ADVANCED_FIELDS,
+    CYLINDER_PACKAGING_PASSPORT_JSON_NAME,
+    HARDPOINTS_SOURCE_OF_TRUTH_JSON_NAME,
     augment_anim_latest_meta,
     ensure_cylinder_length_columns,
     summarize_anim_export_contract,
@@ -213,10 +218,32 @@ def test_export_anim_latest_bundle_writes_contract_blocks_and_repairs_nan_cylind
     assert objective_metrics["мин_запас_до_coil_bind_пружины_м"] == 0.018
 
     artifact_refs = dict(meta["anim_export_contract_artifacts"])
+    assert artifact_refs["sidecar"] == ANIM_EXPORT_CONTRACT_SIDECAR_NAME
+    assert artifact_refs["validation_json"] == ANIM_EXPORT_CONTRACT_VALIDATION_JSON_NAME
+    assert artifact_refs["validation_md"] == ANIM_EXPORT_CONTRACT_VALIDATION_MD_NAME
+    assert artifact_refs["hardpoints_source_of_truth"] == HARDPOINTS_SOURCE_OF_TRUTH_JSON_NAME
+    assert artifact_refs["cylinder_packaging_passport"] == CYLINDER_PACKAGING_PASSPORT_JSON_NAME
     assert artifact_refs["geometry_acceptance_json"] == GEOMETRY_ACCEPTANCE_JSON_NAME
     assert artifact_refs["geometry_acceptance_md"] == GEOMETRY_ACCEPTANCE_MD_NAME
     assert artifact_refs["capture_export_manifest"] == "capture_export_manifest.json"
     assert artifact_refs["frame_budget_evidence"] == "animator_frame_budget_evidence.json"
+    for ref_name in (
+        "sidecar",
+        "validation_json",
+        "validation_md",
+        "hardpoints_source_of_truth",
+        "cylinder_packaging_passport",
+    ):
+        assert (tmp_path / artifact_refs[ref_name]).exists()
+
+    validation_report = json.loads((tmp_path / artifact_refs["validation_json"]).read_text(encoding="utf-8"))
+    assert validation_report["schema"] == "anim_export_contract.validation.v1"
+    assert validation_report["level"] == meta["anim_export_validation"]["validation_level"]
+
+    sidecar = json.loads((tmp_path / artifact_refs["sidecar"]).read_text(encoding="utf-8"))
+    assert sidecar["schema"] == "anim_export_contract.sidecar.v1"
+    assert sidecar["validation"]["validation_level"] == meta["anim_export_validation"]["validation_level"]
+
     geom_report_path = tmp_path / GEOMETRY_ACCEPTANCE_JSON_NAME
     geom_report_md_path = tmp_path / GEOMETRY_ACCEPTANCE_MD_NAME
     assert geom_report_path.exists()
