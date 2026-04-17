@@ -1380,6 +1380,24 @@ def evidence_manifest_warnings(manifest: Mapping[str, Any] | None) -> List[str]:
                 "Geometry reference evidence missing; open Reference Center or re-export anim_latest "
                 "before claiming graphics truth."
             )
+    baseline = obj.get("baseline_center_evidence")
+    if isinstance(baseline, Mapping) and bool(baseline.get("baseline_exists", False)):
+        banner = baseline.get("banner_state")
+        banner_state = dict(banner) if isinstance(banner, Mapping) else {}
+        state = str(banner_state.get("state") or "").strip().lower()
+        can_consume = bool(banner_state.get("optimizer_baseline_can_consume", False))
+        if state and (state != "current" or not can_consume):
+            stale_reasons = [
+                str(item).strip()
+                for item in (banner_state.get("stale_reasons") or [])
+                if str(item).strip()
+            ]
+            reason_text = ", ".join(stale_reasons) if stale_reasons else state
+            warnings.append(
+                "Baseline HO-006 state is "
+                f"{state.upper()}; optimizer consumption blocked. "
+                f"Reasons: {reason_text}. Open Baseline Center for review/adopt/restore."
+            )
     return list(dict.fromkeys(warnings))
 
 

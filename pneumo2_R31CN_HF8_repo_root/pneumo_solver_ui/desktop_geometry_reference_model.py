@@ -1129,12 +1129,15 @@ def build_packaging_passport_evidence(
     mismatch_rows = [row for row in rows if row.mismatch_status != "match"]
     if mismatch_rows:
         warnings.append("Base/reference packaging differs from export/runtime passport for: " + ", ".join(row.cylinder for row in mismatch_rows))
+    packaging_status = str(passport.get("packaging_status") or passport.get("status") or "").strip()
+    if not packaging_status:
+        packaging_status = "missing"
     return PackagingPassportEvidenceSnapshot(
         artifact_status=artifact_status,
         source_label=source_label,
         passport_path=raw_path,
         schema=str(passport.get("schema") or ""),
-        packaging_status=str(passport.get("packaging_status") or passport.get("status") or ""),
+        packaging_status=packaging_status,
         packaging_contract_hash=passport_packaging_hash,
         mismatch_status="mismatch" if (mismatch_rows or hash_drift) else ("missing" if not passport else "match"),
         complete_cylinders=_safe_strings(passport.get("complete_cylinders")),
@@ -1164,7 +1167,8 @@ def build_geometry_reference_diagnostics_handoff(
         producer_readiness_reasons.append("road_width_m_missing")
     if packaging.mismatch_status == "missing":
         missing.append("cylinder_packaging_passport")
-    if packaging.packaging_status != "complete":
+    packaging_status = packaging.packaging_status or "missing"
+    if packaging_status != "complete":
         producer_readiness_reasons.append("packaging_status_not_complete")
     if packaging.mismatch_status != "match":
         producer_readiness_reasons.append("packaging_mismatch_not_match")
@@ -1198,7 +1202,7 @@ def build_geometry_reference_diagnostics_handoff(
         "road_width_status": road_width.status,
         "road_width_source": road_width.preferred_source,
         "road_width_effective_m": road_width.effective_road_width_m,
-        "packaging_status": packaging.packaging_status,
+        "packaging_status": packaging_status,
         "packaging_contract_hash": packaging.packaging_contract_hash,
         "packaging_mismatch_status": packaging.mismatch_status,
         "packaging_axis_only_cylinders": list(packaging.axis_only_cylinders),

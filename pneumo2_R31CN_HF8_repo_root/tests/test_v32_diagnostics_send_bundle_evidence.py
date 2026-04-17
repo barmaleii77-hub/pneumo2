@@ -241,6 +241,8 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
     assert geometry_reference["artifact_freshness_relation"] == "latest"
     assert geometry_reference["artifact_freshness_reason"]
     assert geometry_reference["latest_artifact_status"] == "missing"
+    assert geometry_reference["packaging_status"] == "missing"
+    assert latest_geometry_payload["packaging_status"] == "missing"
     assert "producer_readiness_reasons" in geometry_reference
     assert "producer_readiness_reasons" in latest_geometry_payload
     assert geometry_reference["producer_readiness_reasons"]
@@ -858,6 +860,84 @@ def test_send_bundle_evidence_manifest_tracks_active_baseline_history_and_mismat
     assert baseline["mismatch_state"]["has_mismatch"] is True
     assert baseline["mismatch_state"]["rows"][0]["state"] == "historical_mismatch"
     assert baseline["silent_rebinding_allowed"] is False
+
+
+def test_send_bundle_evidence_manifest_warns_for_stale_ho006_suite_snapshot_hash(tmp_path: Path) -> None:
+    active_suite = build_validated_suite_snapshot(
+        [
+            {
+                "id": "baseline-row-1",
+                "имя": "baseline_smoke",
+                "тип": "инерция_крен",
+                "включен": True,
+                "стадия": 0,
+            }
+        ],
+        inputs_snapshot_hash="inputs-hash-1",
+        ring_source_hash="ring-hash-1",
+        created_at_utc="2026-04-17T01:00:00Z",
+        context_label="send-bundle-baseline-active",
+    )
+    current_suite = build_validated_suite_snapshot(
+        [
+            {
+                "id": "baseline-row-1",
+                "имя": "baseline_smoke",
+                "тип": "инерция_крен",
+                "включен": True,
+                "стадия": 0,
+                "dt": 0.02,
+            }
+        ],
+        inputs_snapshot_hash="inputs-hash-1",
+        ring_source_hash="ring-hash-1",
+        created_at_utc="2026-04-17T01:05:00Z",
+        context_label="send-bundle-baseline-current",
+    )
+    active = build_active_baseline_contract(
+        suite_snapshot=active_suite,
+        baseline_payload={"param_a": 1.0},
+        baseline_meta={"problem_hash": "ph-active"},
+        created_at_utc="2026-04-17T01:01:00Z",
+    )
+    history_item = baseline_history_item_from_contract(active, action="adopt", actor="unit")
+    meta = {
+        "python_executable": "C:/Python/python.exe",
+        "python_prefix": "C:/Python",
+        "python_base_prefix": "C:/Python",
+        "venv_active": False,
+        "preferred_cli_python": "C:/Python/python.exe",
+        "effective_workspace": "C:/workspace",
+    }
+
+    evidence = build_evidence_manifest(
+        zip_path=tmp_path / "bundle.zip",
+        names=[
+            "workspace/handoffs/WS-SUITE/validated_suite_snapshot.json",
+            "workspace/handoffs/WS-BASELINE/active_baseline_contract.json",
+            "workspace/baselines/baseline_history.jsonl",
+        ],
+        meta=meta,
+        json_by_name={
+            "workspace/handoffs/WS-SUITE/validated_suite_snapshot.json": current_suite,
+            "workspace/handoffs/WS-BASELINE/active_baseline_contract.json": active,
+            "workspace/baselines/baseline_history.jsonl": {"rows": [history_item]},
+        },
+        stage="pytest",
+    )
+    baseline = dict(evidence["baseline_center_evidence"])
+    banner = dict(baseline["banner_state"])
+    warnings = evidence_manifest_warnings(evidence)
+
+    assert banner["state"] == "stale"
+    assert banner["optimizer_baseline_can_consume"] is False
+    assert "suite_snapshot_hash_changed" in banner["stale_reasons"]
+    assert "silent rebinding" in banner["banner"]
+    assert baseline["active_baseline_hash"] == active["active_baseline_hash"]
+    assert baseline["silent_rebinding_allowed"] is False
+    assert any("Baseline HO-006 state is STALE" in msg for msg in warnings)
+    assert any("suite_snapshot_hash_changed" in msg for msg in warnings)
+    assert evidence["missing_warnings"] == warnings
 
 
 def test_send_gui_preserves_exit_crash_and_watchdog_trigger_provenance() -> None:

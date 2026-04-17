@@ -1492,9 +1492,12 @@ def _make_send_bundle_inner(
                     "artifact_freshness_relation",
                     "artifact_freshness_reason",
                     "latest_artifact_status",
+                    "packaging_status",
                     "producer_readiness_reasons",
                 )
                 if not all(field in payload for field in required_fields):
+                    return False
+                if not str(payload.get("packaging_status") or "").strip():
                     return False
                 producer_reasons = {
                     str(item).strip()

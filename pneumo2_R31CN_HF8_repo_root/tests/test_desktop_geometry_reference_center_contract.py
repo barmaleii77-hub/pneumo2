@@ -461,6 +461,7 @@ def test_artifact_backed_runtime_reports_missing_without_latest_artifact() -> No
     assert handoff["does_not_render_animator_meshes"] is True
     assert "artifact_context" in handoff["evidence_missing"]
     assert handoff["producer_artifact_status"] == "missing"
+    assert handoff["packaging_status"] == "missing"
     assert "artifact_context_missing" in handoff["producer_readiness_reasons"]
     assert "artifact_freshness_missing" in handoff["producer_readiness_reasons"]
     assert "geometry_acceptance_not_pass" in handoff["producer_readiness_reasons"]

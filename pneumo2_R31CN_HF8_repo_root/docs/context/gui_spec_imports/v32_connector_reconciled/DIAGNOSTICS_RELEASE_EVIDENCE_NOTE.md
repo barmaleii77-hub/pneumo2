@@ -52,18 +52,18 @@ python -m pytest tests/test_v32_diagnostics_send_bundle_evidence.py tests/test_h
 Result: `33 passed`. Focused Geometry/Diagnostics producer-handoff
 regression set: `45 passed`.
 
-Focused Geometry/Diagnostics regression result: `77 passed`.
+Focused Geometry/Diagnostics regression result: `78 passed`.
 
 Runtime proof captured:
 
-- ZIP: `send_bundles/SEND_20260417_085523_bundle.zip`
-- Final latest SHA256: `d9edac34ac1769160c5aefc2668fb69440bf27a9fb8fc8eb25ead0d2c2b3adf2`
+- ZIP: `send_bundles/SEND_20260417_090042_bundle.zip`
+- Final latest SHA256: `9befa1813001fc18cdab8209bf84a0fc9955c478cf2dbbcfce45358571cbb852`
 - Trigger / mode: `desktop_geometry_reference_center` / `manual`
 - Validation: `ok=True`, `errors=0`, `warnings=7`
 - Health after final triage: `ok=False`, `notes=9`, preserving adjacent-workstream warnings.
 - PB-002 required evidence: `pb002_missing_required_count=0`
 - Latest pointer/SHA proof: `latest_zip_matches_original=True`, `latest_sha_sidecar_matches=True`, `latest_pointer_matches_original=True`
-- Post-regression latest proof: after the `77 passed` focused
+- Post-regression latest proof: after the `78 passed` focused
   Geometry/Diagnostics/docs run,
   `latest_send_bundle.zip`, `latest_send_bundle_path.txt`,
   `latest_send_bundle.sha256`, `latest_evidence_manifest.json` and
@@ -86,6 +86,7 @@ Runtime proof captured:
   `consumer_may_fabricate_geometry=false`,
   `artifact_freshness_status=missing`, `artifact_freshness_relation=latest`,
   `road_width_status=derived_from_track_and_wheel_width`,
+  `packaging_status=missing`,
   `packaging_mismatch_status=mismatch`, and
   `geometry_acceptance_gate=MISSING`.
 - Desktop center state refreshed: `latest_desktop_diagnostics_center_state.json` exposes latest ZIP, path pointer, SHA, health, triage, validation, evidence manifest and clipboard paths.
