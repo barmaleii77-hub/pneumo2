@@ -77,7 +77,7 @@ def test_collect_anim_latest_bundle_diagnostics_surfaces_sidecar_paths(tmp_path:
         analysis_context_refs=analysis_context_refs,
     )
 
-    diag, _md = _collect_anim_latest_bundle_diagnostics(tmp_path)
+    diag, md = _collect_anim_latest_bundle_diagnostics(tmp_path)
     assert diag["anim_latest_road_csv_ref"] == "anim_latest_road_csv.csv"
     assert diag["anim_latest_road_csv_path"].endswith("anim_latest_road_csv.csv")
     assert diag["anim_latest_road_csv_exists"] is True
@@ -87,10 +87,18 @@ def test_collect_anim_latest_bundle_diagnostics_surfaces_sidecar_paths(tmp_path:
     assert diag["anim_latest_scenario_json_exists"] is True
     assert diag["anim_latest_contract_sidecar_ref"] == "anim_latest.contract.sidecar.json"
     assert diag["anim_latest_contract_sidecar_exists"] is True
+    assert diag["anim_latest_contract_validation_json_ref"] == "anim_latest.contract.validation.json"
+    assert diag["anim_latest_contract_validation_json_exists"] is True
+    assert diag["anim_latest_contract_validation_md_ref"] == "anim_latest.contract.validation.md"
+    assert diag["anim_latest_contract_validation_md_exists"] is True
     assert diag["anim_latest_hardpoints_source_of_truth_ref"] == "HARDPOINTS_SOURCE_OF_TRUTH.json"
     assert diag["anim_latest_hardpoints_source_of_truth_exists"] is True
     assert diag["anim_latest_cylinder_packaging_passport_ref"] == "CYLINDER_PACKAGING_PASSPORT.json"
     assert diag["anim_latest_cylinder_packaging_passport_exists"] is True
+    assert diag["anim_latest_geometry_acceptance_json_ref"] == "geometry_acceptance_report.json"
+    assert diag["anim_latest_geometry_acceptance_json_exists"] is True
+    assert diag["anim_latest_geometry_acceptance_md_ref"] == "geometry_acceptance_report.md"
+    assert diag["anim_latest_geometry_acceptance_md_exists"] is True
     assert diag["anim_latest_road_contract_web_ref"] == "road_contract_web.json"
     assert diag["anim_latest_road_contract_web_exists"] is True
     assert diag["anim_latest_road_contract_desktop_ref"] == "road_contract_desktop.json"
@@ -116,12 +124,22 @@ def test_collect_anim_latest_bundle_diagnostics_surfaces_sidecar_paths(tmp_path:
     }
     assert diag["anim_latest_frame_budget_evidence_ref"] == "animator_frame_budget_evidence.json"
     assert diag["anim_latest_frame_budget_evidence_exists"] is False
+    assert "anim_latest_contract_validation_json" in md
+    assert "anim_latest_contract_validation_md" in md
+    assert "anim_latest_geometry_acceptance_json" in md
+    assert "anim_latest_geometry_acceptance_md" in md
+    assert "anim_latest_capture_export_manifest" in md
+    assert "anim_latest_frame_budget_evidence" in md
 
     web_contract = json.loads((exports_dir / "road_contract_web.json").read_text(encoding="utf-8"))
     desktop_contract = json.loads((exports_dir / "road_contract_desktop.json").read_text(encoding="utf-8"))
     capture_manifest = json.loads((exports_dir / "capture_export_manifest.json").read_text(encoding="utf-8"))
+    validation_json = json.loads((exports_dir / "anim_latest.contract.validation.json").read_text(encoding="utf-8"))
+    geometry_acceptance_json = json.loads((exports_dir / "geometry_acceptance_report.json").read_text(encoding="utf-8"))
     assert web_contract["level"] == "PASS"
     assert desktop_contract["level"] == "PASS"
+    assert validation_json["schema"] == "anim_export_contract.validation.v1"
+    assert geometry_acceptance_json["schema"] == "geometry_acceptance_report.v1"
     assert web_contract["road_width_status"] == "explicit"
     assert desktop_contract["road_width_status"] == "explicit"
     assert capture_manifest["handoff_id"] == "HO-010"
@@ -245,6 +263,12 @@ def test_generate_triage_report_surfaces_road_contract_artifacts(tmp_path: Path,
     assert summary["operator_recommendations"][0].startswith("Open Desktop Mnemo first")
     assert "anim_latest_road_contract_web" in md
     assert "anim_latest_road_contract_desktop" in md
+    assert "anim_latest_contract_validation_json" in md
+    assert "anim_latest_contract_validation_md" in md
+    assert "anim_latest_geometry_acceptance_json" in md
+    assert "anim_latest_geometry_acceptance_md" in md
+    assert "anim_latest_capture_export_manifest" in md
+    assert "anim_latest_frame_budget_evidence" in md
     assert "## Desktop Mnemo events" in md
     assert "## Recommended actions" in md
     assert "Большой перепад давлений" in md

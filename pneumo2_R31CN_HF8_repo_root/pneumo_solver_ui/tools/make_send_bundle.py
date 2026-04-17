@@ -362,10 +362,16 @@ def _collect_anim_latest_bundle_diagnostics(out_dir: Path) -> Tuple[Dict[str, An
     lines.append(f"- anim_latest_axay_csv: {diag.get('anim_latest_axay_csv_ref') or '—'} -> {diag.get('anim_latest_axay_csv_path') or '—'} (exists={diag.get('anim_latest_axay_csv_exists')})")
     lines.append(f"- anim_latest_scenario_json: {diag.get('anim_latest_scenario_json_ref') or '—'} -> {diag.get('anim_latest_scenario_json_path') or '—'} (exists={diag.get('anim_latest_scenario_json_exists')})")
     lines.append(f"- anim_latest_contract_sidecar: {diag.get('anim_latest_contract_sidecar_ref') or '—'} -> {diag.get('anim_latest_contract_sidecar_path') or '—'} (exists={diag.get('anim_latest_contract_sidecar_exists')})")
+    lines.append(f"- anim_latest_contract_validation_json: {diag.get('anim_latest_contract_validation_json_ref') or '—'} -> {diag.get('anim_latest_contract_validation_json_path') or '—'} (exists={diag.get('anim_latest_contract_validation_json_exists')})")
+    lines.append(f"- anim_latest_contract_validation_md: {diag.get('anim_latest_contract_validation_md_ref') or '—'} -> {diag.get('anim_latest_contract_validation_md_path') or '—'} (exists={diag.get('anim_latest_contract_validation_md_exists')})")
     lines.append(f"- anim_latest_hardpoints_source_of_truth: {diag.get('anim_latest_hardpoints_source_of_truth_ref') or '—'} -> {diag.get('anim_latest_hardpoints_source_of_truth_path') or '—'} (exists={diag.get('anim_latest_hardpoints_source_of_truth_exists')})")
     lines.append(f"- anim_latest_cylinder_packaging_passport: {diag.get('anim_latest_cylinder_packaging_passport_ref') or '—'} -> {diag.get('anim_latest_cylinder_packaging_passport_path') or '—'} (exists={diag.get('anim_latest_cylinder_packaging_passport_exists')})")
+    lines.append(f"- anim_latest_geometry_acceptance_json: {diag.get('anim_latest_geometry_acceptance_json_ref') or '—'} -> {diag.get('anim_latest_geometry_acceptance_json_path') or '—'} (exists={diag.get('anim_latest_geometry_acceptance_json_exists')})")
+    lines.append(f"- anim_latest_geometry_acceptance_md: {diag.get('anim_latest_geometry_acceptance_md_ref') or '—'} -> {diag.get('anim_latest_geometry_acceptance_md_path') or '—'} (exists={diag.get('anim_latest_geometry_acceptance_md_exists')})")
     lines.append(f"- anim_latest_road_contract_web: {diag.get('anim_latest_road_contract_web_ref') or '—'} -> {diag.get('anim_latest_road_contract_web_path') or '—'} (exists={diag.get('anim_latest_road_contract_web_exists')})")
     lines.append(f"- anim_latest_road_contract_desktop: {diag.get('anim_latest_road_contract_desktop_ref') or '—'} -> {diag.get('anim_latest_road_contract_desktop_path') or '—'} (exists={diag.get('anim_latest_road_contract_desktop_exists')})")
+    lines.append(f"- anim_latest_capture_export_manifest: {diag.get('anim_latest_capture_export_manifest_ref') or '—'} -> {diag.get('anim_latest_capture_export_manifest_path') or '—'} (exists={diag.get('anim_latest_capture_export_manifest_exists')}, handoff={diag.get('anim_latest_capture_export_manifest_handoff_id') or '—'})")
+    lines.append(f"- anim_latest_frame_budget_evidence: {diag.get('anim_latest_frame_budget_evidence_ref') or '—'} -> {diag.get('anim_latest_frame_budget_evidence_path') or '—'} (exists={diag.get('anim_latest_frame_budget_evidence_exists')}, handoff={diag.get('anim_latest_frame_budget_evidence_handoff_id') or '—'})")
     lines.append(
         f"- anim_latest_mnemo_event_log: {diag.get('anim_latest_mnemo_event_log_ref') or '—'} -> {diag.get('anim_latest_mnemo_event_log_path') or '—'} "
         f"(exists={diag.get('anim_latest_mnemo_event_log_exists')}, schema={diag.get('anim_latest_mnemo_event_log_schema_version') or '—'}, updated_utc={diag.get('anim_latest_mnemo_event_log_updated_utc') or '—'})"
@@ -493,10 +499,16 @@ def _build_send_bundle_readme(anim_diag: Optional[Dict[str, Any]] = None) -> str
         f"- anim_latest_scenario_json_ref: {scenario_ref}\n"
         f"- ring_closure: policy={ring_closure_policy} / applied={ring_closure_applied} / seam_open={ring_seam_open} / seam_max_jump_m={ring_seam_max if ring_seam_max is not None else '—'} / raw_seam_max_jump_m={ring_raw_seam_max if ring_raw_seam_max is not None else '—'}\n"
         f"- anim_latest_contract_sidecar_ref: {diag.get('anim_latest_contract_sidecar_ref') or '—'}\n"
+        f"- anim_latest_contract_validation_json_ref: {diag.get('anim_latest_contract_validation_json_ref') or '—'}\n"
+        f"- anim_latest_contract_validation_md_ref: {diag.get('anim_latest_contract_validation_md_ref') or '—'}\n"
         f"- anim_latest_hardpoints_source_of_truth_ref: {diag.get('anim_latest_hardpoints_source_of_truth_ref') or '—'}\n"
         f"- anim_latest_cylinder_packaging_passport_ref: {diag.get('anim_latest_cylinder_packaging_passport_ref') or '—'}\n"
+        f"- anim_latest_geometry_acceptance_json_ref: {diag.get('anim_latest_geometry_acceptance_json_ref') or '—'}\n"
+        f"- anim_latest_geometry_acceptance_md_ref: {diag.get('anim_latest_geometry_acceptance_md_ref') or '—'}\n"
         f"- anim_latest_road_contract_web_ref: {diag.get('anim_latest_road_contract_web_ref') or '—'}\n"
         f"- anim_latest_road_contract_desktop_ref: {diag.get('anim_latest_road_contract_desktop_ref') or '—'}\n"
+        f"- anim_latest_capture_export_manifest_ref: {diag.get('anim_latest_capture_export_manifest_ref') or '—'}\n"
+        f"- anim_latest_frame_budget_evidence_ref: {diag.get('anim_latest_frame_budget_evidence_ref') or '—'}\n"
         f"- browser_perf_status: {browser_perf_status} / level={browser_perf_level}\n"
         f"- browser_perf_snapshot_ref: {browser_perf_snapshot_ref}\n"
         f"- browser_perf_previous_snapshot_ref: {browser_perf_prev_snapshot_ref}\n"
@@ -1480,6 +1492,7 @@ def _make_send_bundle_inner(
                     "artifact_freshness_relation",
                     "artifact_freshness_reason",
                     "latest_artifact_status",
+                    "producer_readiness_reasons",
                 )
                 return all(field in payload for field in required_fields)
 
@@ -1533,9 +1546,16 @@ def _make_send_bundle_inner(
                     "reference_center_role": "reader_and_evidence_surface",
                     "does_not_render_animator_meshes": True,
                     "artifact_status": "missing",
+                    "artifact_freshness_status": "missing",
+                    "artifact_freshness_relation": "missing",
+                    "artifact_freshness_reason": "",
+                    "latest_artifact_status": "missing",
                     "road_width_status": "missing",
+                    "packaging_status": "missing",
                     "packaging_mismatch_status": "missing",
                     "geometry_acceptance_gate": "MISSING",
+                    "producer_artifact_status": "missing",
+                    "producer_readiness_reasons": ["geometry_reference_runtime_error"],
                     "component_passport_components": 0,
                     "component_passport_needs_data": 0,
                     "evidence_missing": ["geometry_reference_runtime"],

@@ -150,8 +150,12 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
                 "reference_center_role": "reader_and_evidence_surface",
                 "does_not_render_animator_meshes": True,
                 "artifact_status": "missing",
+                "artifact_freshness_status": "missing",
+                "artifact_freshness_relation": "latest",
+                "artifact_freshness_reason": "legacy sidecar had freshness but no producer readiness reasons",
+                "latest_artifact_status": "missing",
                 "geometry_acceptance_gate": "MISSING",
-                "legacy_without_freshness": True,
+                "legacy_without_producer_readiness": True,
             },
             ensure_ascii=False,
             indent=2,
@@ -230,12 +234,16 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
     assert geometry_reference["schema"] == "geometry_reference_evidence.v1"
     assert geometry_reference["reference_center_role"] == "reader_and_evidence_surface"
     assert geometry_reference["does_not_render_animator_meshes"] is True
-    assert "legacy_without_freshness" not in geometry_reference
-    assert "legacy_without_freshness" not in latest_geometry_payload
+    assert "legacy_without_producer_readiness" not in geometry_reference
+    assert "legacy_without_producer_readiness" not in latest_geometry_payload
     assert geometry_reference["artifact_freshness_status"] == "missing"
     assert geometry_reference["artifact_freshness_relation"] == "latest"
     assert geometry_reference["artifact_freshness_reason"]
     assert geometry_reference["latest_artifact_status"] == "missing"
+    assert "producer_readiness_reasons" in geometry_reference
+    assert "producer_readiness_reasons" in latest_geometry_payload
+    assert geometry_reference["producer_readiness_reasons"]
+    assert latest_geometry_payload["producer_readiness_reasons"]
     assert latest_geometry_payload["artifact_freshness_status"] == "missing"
     assert latest_geometry_payload["artifact_freshness_relation"] == "latest"
     assert evidence["runtime_provenance"]["effective_workspace"] == str(workspace.resolve())

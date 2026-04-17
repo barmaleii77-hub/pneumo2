@@ -130,6 +130,18 @@ def test_desktop_optimizer_center_uses_workspace_layout_instead_of_big_intro_pan
     assert 'ttk.Sizegrip(footer).pack(side="right", padx=(10, 0))' in src
 
 
+def test_desktop_optimizer_contract_tab_links_blocked_ho006_to_baseline_center() -> None:
+    src = (UI_ROOT / "desktop_optimizer_tabs" / "contract_tab.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert '"HO-006 active baseline"' in src
+    assert "optimizer_baseline_can_consume" in src
+    assert 'text="Открыть Baseline Center"' in src
+    assert "command=controller.open_baseline_center" in src
+
+
 def test_root_desktop_optimizer_center_wrappers_delegate_to_launcher() -> None:
     cmd = (ROOT / "START_DESKTOP_OPTIMIZER_CENTER.cmd").read_text(
         encoding="utf-8",

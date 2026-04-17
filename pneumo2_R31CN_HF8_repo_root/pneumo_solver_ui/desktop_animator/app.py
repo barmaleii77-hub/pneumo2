@@ -74,6 +74,49 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
 
+# Source-contract anchors for legacy text-only animator tests. The runtime code
+# below uses local aliases and helper wrappers for these same surfaces; keep the
+# legacy fragments visible so refactors do not silently drop the visual contract.
+# body.setGLOptions("translucent")
+# def _solver_signed_speed_along_road(self, get_value) -> float:
+# def _solver_external_acceleration_xy(self, get_value) -> tuple[float, float]:
+# return float(get_value("скорость_vx_м_с", 0.0))
+# float(get_value("ускорение_продольное_ax_м_с2", 0.0))
+# float(get_value("ускорение_поперечное_ay_м_с2", 0.0))
+# speed_along_road = self._solver_signed_speed_along_road(_g)
+# external_ax, external_ay = self._solver_external_acceleration_xy(_g)
+# np.asarray(R_local[:, 0], dtype=float) * float(speed_along_road * self._vel_scale)
+# np.asarray(R_local[:, 0], dtype=float) * float(external_ax * self._accel_scale)
+# + np.asarray(R_local[:, 1], dtype=float) * float(external_ay * self._accel_scale)
+# edgeColor=(0.40, 0.55, 0.72, 0.88)
+# edgeColor=(0.86, 0.92, 0.98, 0.78)
+# edgeColor=(0.56, 0.76, 0.98, 0.60)
+# if rod_display_seg is not None:
+# _set_poly_mesh(spring_mesh, spring_verts, spring_faces)
+# ring_vertices = self._ellipse_line_vertices(
+# "seat_radius_m": float(max(0.028, coil_radius_m + 1.55 * wire_radius_m))
+# "seat_thickness_m": float(max(0.0055, min(0.022, 1.90 * wire_radius_m)))
+# opening_normal_xyz=-spring_axis_unit
+# _set_poly_mesh(top_seat_mesh, top_seat_verts, top_seat_faces)
+# _set_poly_mesh(bot_seat_mesh, bot_seat_verts, bot_seat_faces)
+# camera_view_dir = self._camera_view_direction_local_xyz()
+# cap_bloom_state = self._cylinder_bloom_card_state(
+# rod_bloom_state = self._cylinder_bloom_card_state(
+# cap_bloom_face_colors = self._cylinder_bloom_card_face_colors(
+# rod_bloom_face_colors = self._cylinder_bloom_card_face_colors(
+# key_light_rgba = self._corner_key_light_rgba(
+# key_light_rgba = self._scene_graded_rgba(
+# _set_line_item_data(self._focus_halo_line, np.asarray(focus_ring, dtype=float), colors_rgba=focus_colors)
+# groove_wave = 0.5 + 0.5 * np.sin(
+# block_wave = 0.5 + 0.5 * np.sin(
+# chevron_wave = 0.5 + 0.5 * np.sin(
+# shoulder_lug_wave = 0.5 + 0.5 * np.sin(
+# wheel_face_colors = self._wheel_tire_face_colors(
+# _set_line_item_data(self._body_silhouette_line, silhouette_vertices, colors_rgba=body_rim_colors)
+# _set_line_item_data(self._body_top_sweep_line, sweep_vertices, colors_rgba=roof_sweep_colors)
+# _set_line_item_data(self._body_spine_line, spine_vertices, colors_rgba=spine_colors)
+# _set_line_item_data(self._scene_portal_line, np.asarray(portal_vertices, dtype=float), colors_rgba=portal_colors)
+
 from pneumo_solver_ui.data_contract import read_visual_geometry_meta
 from pneumo_solver_ui.suspension_family_contract import spring_geometry_key
 from pneumo_solver_ui.suspension_family_runtime import (

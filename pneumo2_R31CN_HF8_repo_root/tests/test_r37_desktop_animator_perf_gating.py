@@ -333,10 +333,13 @@ def test_desktop_animator_scrub_path_avoids_redundant_qt_setters_and_repaints() 
     assert "# ---- Vectors (velocity & acceleration) in local road plane" in app_src
     assert "vec_origin = np.asarray(center_draw, dtype=float) + np.array(" in app_src
     assert "[0.0, 0.0, float(z_vec_offset)]" in app_src
-    assert "vel_vec = np.asarray(" in app_src
-    assert "float(vel_body_x * self._vel_scale)" in app_src
-    assert "float(vel_body_y * self._vel_scale)" in app_src
-    assert "acc_vec = np.asarray(" in app_src
+    assert "vel_vec = (" in app_src
+    assert "np.asarray(R_local[:, 0], dtype=float) * float(speed_along_road * self._vel_scale)" in app_src
+    assert "acc_vec = (" in app_src
+    assert "np.asarray(R_local[:, 0], dtype=float) * float(external_ax * self._accel_scale)" in app_src
+    assert "+ np.asarray(R_local[:, 1], dtype=float) * float(external_ay * self._accel_scale)" in app_src
+    assert "float(vel_body_x * self._vel_scale)" not in app_src
+    assert "float(vel_body_y * self._vel_scale)" not in app_src
     assert "float(external_ax * self._accel_scale)" in app_src
     assert "float(external_ay * self._accel_scale)" in app_src
     assert "np.asarray(R_local[:, 1], dtype=float) * float(vel_body_y * self._vel_scale)" not in app_src

@@ -828,14 +828,26 @@ def generate_triage_report(
         lines.append(f"- anim_latest_scenario_json: `{anim.get('anim_latest_scenario_json_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_scenario_json_path'))}` exists=`{anim.get('anim_latest_scenario_json_exists')}`")
     if anim.get('anim_latest_contract_sidecar_ref') or anim.get('anim_latest_contract_sidecar_path'):
         lines.append(f"- anim_latest_contract_sidecar: `{anim.get('anim_latest_contract_sidecar_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_contract_sidecar_path'))}` exists=`{anim.get('anim_latest_contract_sidecar_exists')}`")
+    if anim.get('anim_latest_contract_validation_json_ref') or anim.get('anim_latest_contract_validation_json_path'):
+        lines.append(f"- anim_latest_contract_validation_json: `{anim.get('anim_latest_contract_validation_json_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_contract_validation_json_path'))}` exists=`{anim.get('anim_latest_contract_validation_json_exists')}`")
+    if anim.get('anim_latest_contract_validation_md_ref') or anim.get('anim_latest_contract_validation_md_path'):
+        lines.append(f"- anim_latest_contract_validation_md: `{anim.get('anim_latest_contract_validation_md_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_contract_validation_md_path'))}` exists=`{anim.get('anim_latest_contract_validation_md_exists')}`")
     if anim.get('anim_latest_hardpoints_source_of_truth_ref') or anim.get('anim_latest_hardpoints_source_of_truth_path'):
         lines.append(f"- anim_latest_hardpoints_source_of_truth: `{anim.get('anim_latest_hardpoints_source_of_truth_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_hardpoints_source_of_truth_path'))}` exists=`{anim.get('anim_latest_hardpoints_source_of_truth_exists')}`")
     if anim.get('anim_latest_cylinder_packaging_passport_ref') or anim.get('anim_latest_cylinder_packaging_passport_path'):
         lines.append(f"- anim_latest_cylinder_packaging_passport: `{anim.get('anim_latest_cylinder_packaging_passport_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_cylinder_packaging_passport_path'))}` exists=`{anim.get('anim_latest_cylinder_packaging_passport_exists')}`")
+    if anim.get('anim_latest_geometry_acceptance_json_ref') or anim.get('anim_latest_geometry_acceptance_json_path'):
+        lines.append(f"- anim_latest_geometry_acceptance_json: `{anim.get('anim_latest_geometry_acceptance_json_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_geometry_acceptance_json_path'))}` exists=`{anim.get('anim_latest_geometry_acceptance_json_exists')}`")
+    if anim.get('anim_latest_geometry_acceptance_md_ref') or anim.get('anim_latest_geometry_acceptance_md_path'):
+        lines.append(f"- anim_latest_geometry_acceptance_md: `{anim.get('anim_latest_geometry_acceptance_md_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_geometry_acceptance_md_path'))}` exists=`{anim.get('anim_latest_geometry_acceptance_md_exists')}`")
     if anim.get('anim_latest_road_contract_web_ref') or anim.get('anim_latest_road_contract_web_path'):
         lines.append(f"- anim_latest_road_contract_web: `{anim.get('anim_latest_road_contract_web_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_road_contract_web_path'))}` exists=`{anim.get('anim_latest_road_contract_web_exists')}`")
     if anim.get('anim_latest_road_contract_desktop_ref') or anim.get('anim_latest_road_contract_desktop_path'):
         lines.append(f"- anim_latest_road_contract_desktop: `{anim.get('anim_latest_road_contract_desktop_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_road_contract_desktop_path'))}` exists=`{anim.get('anim_latest_road_contract_desktop_exists')}`")
+    if anim.get('anim_latest_capture_export_manifest_ref') or anim.get('anim_latest_capture_export_manifest_path'):
+        lines.append(f"- anim_latest_capture_export_manifest: `{anim.get('anim_latest_capture_export_manifest_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_capture_export_manifest_path'))}` exists=`{anim.get('anim_latest_capture_export_manifest_exists')}` handoff=`{anim.get('anim_latest_capture_export_manifest_handoff_id') or '—'}`")
+    if anim.get('anim_latest_frame_budget_evidence_ref') or anim.get('anim_latest_frame_budget_evidence_path'):
+        lines.append(f"- anim_latest_frame_budget_evidence: `{anim.get('anim_latest_frame_budget_evidence_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_frame_budget_evidence_path'))}` exists=`{anim.get('anim_latest_frame_budget_evidence_exists')}` handoff=`{anim.get('anim_latest_frame_budget_evidence_handoff_id') or '—'}`")
     if anim.get('browser_perf_registry_snapshot_ref') or anim.get('browser_perf_registry_snapshot_path'):
         lines.append(f"- browser_perf_registry_snapshot: `{anim.get('browser_perf_registry_snapshot_ref') or '—'}` → `{_fmt_path(anim.get('browser_perf_registry_snapshot_path'))}` exists=`{anim.get('browser_perf_registry_snapshot_exists')}` in_bundle=`{anim.get('browser_perf_registry_snapshot_in_bundle')}`")
     if anim.get('browser_perf_previous_snapshot_ref') or anim.get('browser_perf_previous_snapshot_path'):

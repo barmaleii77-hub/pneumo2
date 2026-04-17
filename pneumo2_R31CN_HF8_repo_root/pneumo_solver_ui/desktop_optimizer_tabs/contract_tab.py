@@ -139,6 +139,11 @@ class DesktopOptimizerContractTab(ttk.Frame):
             text="Открыть рабочую область",
             command=lambda: controller.open_current_artifact("workspace_dir"),
         ).pack(side="left", padx=(8, 0))
+        ttk.Button(
+            open_frame,
+            text="Открыть Baseline Center",
+            command=controller.open_baseline_center,
+        ).pack(side="left", padx=(8, 0))
 
     def set_objectives_text(self, text: str) -> None:
         replace_text(self.objective_text, text)

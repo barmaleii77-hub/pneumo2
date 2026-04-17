@@ -506,6 +506,10 @@ def collect_anim_latest_diagnostics_summary(
         artifact_refs.get("validation_json"),
         default_name="anim_latest.contract.validation.json",
     )
+    validation_md_ref, validation_md_path, validation_md_exists = _resolve_pointer_relative(
+        artifact_refs.get("validation_md"),
+        default_name="anim_latest.contract.validation.md",
+    )
     hardpoints_ref, hardpoints_path, hardpoints_exists = _resolve_pointer_relative(
         artifact_refs.get("hardpoints_source_of_truth"),
         default_name="HARDPOINTS_SOURCE_OF_TRUTH.json",
@@ -521,6 +525,14 @@ def collect_anim_latest_diagnostics_summary(
     road_desktop_ref, road_desktop_path, road_desktop_exists = _resolve_pointer_relative(
         artifact_refs.get("road_contract_desktop"),
         default_name="road_contract_desktop.json",
+    )
+    geometry_acceptance_json_ref, geometry_acceptance_json_path, geometry_acceptance_json_exists = _resolve_pointer_relative(
+        artifact_refs.get("geometry_acceptance_json"),
+        default_name="geometry_acceptance_report.json",
+    )
+    geometry_acceptance_md_ref, geometry_acceptance_md_path, geometry_acceptance_md_exists = _resolve_pointer_relative(
+        artifact_refs.get("geometry_acceptance_md"),
+        default_name="geometry_acceptance_report.md",
     )
     capture_manifest_ref, capture_manifest_path, capture_manifest_exists = _resolve_pointer_relative(
         artifact_refs.get("capture_export_manifest"),
@@ -693,6 +705,9 @@ def collect_anim_latest_diagnostics_summary(
         "anim_latest_contract_validation_json_ref": validation_ref,
         "anim_latest_contract_validation_json_path": validation_path,
         "anim_latest_contract_validation_json_exists": validation_exists,
+        "anim_latest_contract_validation_md_ref": validation_md_ref,
+        "anim_latest_contract_validation_md_path": validation_md_path,
+        "anim_latest_contract_validation_md_exists": validation_md_exists,
         "anim_latest_hardpoints_source_of_truth_ref": hardpoints_ref,
         "anim_latest_hardpoints_source_of_truth_path": hardpoints_path,
         "anim_latest_hardpoints_source_of_truth_exists": hardpoints_exists,
@@ -705,6 +720,12 @@ def collect_anim_latest_diagnostics_summary(
         "anim_latest_road_contract_desktop_ref": road_desktop_ref,
         "anim_latest_road_contract_desktop_path": road_desktop_path,
         "anim_latest_road_contract_desktop_exists": road_desktop_exists,
+        "anim_latest_geometry_acceptance_json_ref": geometry_acceptance_json_ref,
+        "anim_latest_geometry_acceptance_json_path": geometry_acceptance_json_path,
+        "anim_latest_geometry_acceptance_json_exists": geometry_acceptance_json_exists,
+        "anim_latest_geometry_acceptance_md_ref": geometry_acceptance_md_ref,
+        "anim_latest_geometry_acceptance_md_path": geometry_acceptance_md_path,
+        "anim_latest_geometry_acceptance_md_exists": geometry_acceptance_md_exists,
         "anim_latest_capture_export_manifest_ref": capture_manifest_ref,
         "anim_latest_capture_export_manifest_path": capture_manifest_path,
         "anim_latest_capture_export_manifest_exists": capture_manifest_exists,

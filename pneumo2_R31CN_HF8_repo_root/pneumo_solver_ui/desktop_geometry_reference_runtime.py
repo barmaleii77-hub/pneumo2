@@ -359,6 +359,20 @@ class DesktopGeometryReferenceRuntime:
                 "selected_artifact_pointer_path": freshness["selected_pointer_path"],
             }
         )
+        producer_reasons = [
+            str(item).strip()
+            for item in (payload.get("producer_readiness_reasons") or [])
+            if str(item).strip()
+        ]
+        freshness_status = str(freshness.get("status") or "").strip().lower()
+        freshness_relation = str(freshness.get("relation") or "").strip().lower()
+        if freshness_status == "missing":
+            producer_reasons.append("artifact_freshness_missing")
+        elif freshness_status == "stale":
+            producer_reasons.append("artifact_freshness_stale")
+        if freshness_relation in {"differs_from_latest", "selected_without_latest", "selected_unavailable"}:
+            producer_reasons.append(f"artifact_relation_{freshness_relation}")
+        payload["producer_readiness_reasons"] = list(dict.fromkeys(producer_reasons))
         return payload
 
     def artifact_freshness_evidence(

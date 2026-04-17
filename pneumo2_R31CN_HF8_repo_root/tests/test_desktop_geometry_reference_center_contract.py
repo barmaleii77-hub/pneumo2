@@ -462,6 +462,7 @@ def test_artifact_backed_runtime_reports_missing_without_latest_artifact() -> No
     assert "artifact_context" in handoff["evidence_missing"]
     assert handoff["producer_artifact_status"] == "missing"
     assert "artifact_context_missing" in handoff["producer_readiness_reasons"]
+    assert "artifact_freshness_missing" in handoff["producer_readiness_reasons"]
     assert "geometry_acceptance_not_pass" in handoff["producer_readiness_reasons"]
     assert handoff["producer_evidence_owner"] == "producer_export"
     assert "workspace/exports/anim_latest.npz" in handoff["producer_required_artifacts"]
