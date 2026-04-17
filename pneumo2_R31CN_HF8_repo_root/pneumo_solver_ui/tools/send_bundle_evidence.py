@@ -403,11 +403,18 @@ def summarize_analysis_evidence_manifest(
         selected_artifacts = []
     mismatch_summary = _mapping(obj.get("mismatch_summary"))
     result_context = _mapping(obj.get("result_context"))
+    selected_context = _mapping(result_context.get("selected"))
     mismatches = mismatch_summary.get("mismatches") or []
     if not isinstance(mismatches, list):
         mismatches = []
 
     evidence_hash = str(obj.get("evidence_manifest_hash") or "").strip()
+    analysis_context_status = str(
+        selected_context.get("analysis_context_status")
+        or result_context.get("analysis_context_status")
+        or obj.get("analysis_context_status")
+        or ""
+    ).strip().upper()
     context_state = _normalize_analysis_context_state(
         result_context.get("state") or mismatch_summary.get("state")
     )
@@ -450,6 +457,14 @@ def summarize_analysis_evidence_manifest(
             warnings.append(
                 f"Analysis evidence / {ANALYSIS_EVIDENCE_HANDOFF_ID} reports {len(mismatches)} context mismatch(es)."
             )
+        if analysis_context_status in {"MISSING", "BLOCKED", "INVALID"}:
+            warnings.append(
+                f"Analysis evidence / {ANALYSIS_EVIDENCE_HANDOFF_ID} reports HO-008 analysis context is {analysis_context_status}."
+            )
+        elif analysis_context_status == "DEGRADED":
+            warnings.append(
+                f"Analysis evidence / {ANALYSIS_EVIDENCE_HANDOFF_ID} reports HO-008 analysis context is DEGRADED."
+            )
         if warnings:
             status = "WARN"
 
@@ -459,6 +474,16 @@ def summarize_analysis_evidence_manifest(
         "source_path": source,
         "evidence_manifest_hash": evidence_hash,
         "result_context_state": context_state,
+        "analysis_context_status": analysis_context_status,
+        "animator_link_contract_hash": str(selected_context.get("animator_link_contract_hash") or "").strip(),
+        "selected_run_contract_hash": str(selected_context.get("selected_run_contract_hash") or "").strip(),
+        "selected_test_id": str(selected_context.get("selected_test_id") or "").strip(),
+        "selected_npz_path": str(selected_context.get("selected_npz_path") or "").strip(),
+        "capture_export_manifest_handoff_id": str(
+            selected_context.get("capture_export_manifest_handoff_id") or ""
+        ).strip(),
+        "capture_hash": str(selected_context.get("capture_hash") or "").strip(),
+        "truth_mode_hash": str(selected_context.get("truth_mode_hash") or "").strip(),
         "run_id": str(obj.get("run_id") or "").strip(),
         "run_contract_hash": str(obj.get("run_contract_hash") or "").strip(),
         "compare_contract_id": str(obj.get("compare_contract_id") or obj.get("compare_contract_hash") or "").strip(),
