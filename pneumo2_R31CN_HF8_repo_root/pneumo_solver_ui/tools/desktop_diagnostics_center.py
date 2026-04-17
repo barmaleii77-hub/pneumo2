@@ -150,6 +150,8 @@ class DesktopDiagnosticsCenter:
         self.send_title_var = StringVar(value="ZIP для отправки в чат ещё не готов.")
         self.send_path_var = StringVar(value="(ещё не готово)")
         self.send_meta_var = StringVar(value="")
+        self.analysis_evidence_status_var = StringVar(value="Analysis evidence / HO-009: MISSING")
+        self.geometry_reference_status_var = StringVar(value="Geometry Reference evidence: MISSING")
 
         self._restore_bundle_state_from_last_center_state()
         self._restore_diagnostics_request_from_last_center_state()
@@ -193,6 +195,7 @@ class DesktopDiagnosticsCenter:
             bundle_out_dir / "latest_send_bundle_validation.md",
             bundle_out_dir / "latest_evidence_manifest.json",
             bundle_out_dir / "latest_analysis_evidence_manifest.json",
+            bundle_out_dir / "latest_geometry_reference_evidence.json",
             bundle_out_dir / "latest_health_report.json",
             bundle_out_dir / "latest_health_report.md",
             bundle_out_dir / "latest_triage_report.md",
@@ -212,6 +215,7 @@ class DesktopDiagnosticsCenter:
                 self.repo_root / "pneumo_solver_ui" / "workspace"
             ).resolve()
             tracked_paths.append(workspace / "exports" / "analysis_evidence_manifest.json")
+            tracked_paths.append(workspace / "exports" / "geometry_reference_evidence.json")
         except Exception:
             pass
         if self.zip_path is not None:
@@ -405,6 +409,24 @@ class DesktopDiagnosticsCenter:
         summary_box.pack(fill="both", expand=False, pady=(0, 8))
         summary_body, self.summary_text = build_scrolled_text(summary_box, wrap="word", height=13)
         summary_body.pack(fill="both", expand=True)
+
+        evidence_box = ttk.LabelFrame(self.bundle_body, text="Evidence handoff status")
+        evidence_box.pack(fill="x", pady=(0, 8))
+        evidence_box.columnconfigure(1, weight=1)
+        ttk.Label(evidence_box, text="Analysis / HO-009").grid(row=0, column=0, sticky="w", padx=(10, 8), pady=(8, 4))
+        ttk.Label(
+            evidence_box,
+            textvariable=self.analysis_evidence_status_var,
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=(8, 4))
+        ttk.Label(evidence_box, text="Geometry Reference").grid(row=1, column=0, sticky="w", padx=(10, 8), pady=(4, 8))
+        ttk.Label(
+            evidence_box,
+            textvariable=self.geometry_reference_status_var,
+            wraplength=760,
+            justify="left",
+        ).grid(row=1, column=1, sticky="ew", padx=(0, 10), pady=(4, 8))
 
         preview_book = ttk.Notebook(self.bundle_body)
         preview_book.pack(fill="both", expand=True)
@@ -946,6 +968,83 @@ class DesktopDiagnosticsCenter:
             lines.append(f"- Warning: {warning}")
         return lines
 
+    def _analysis_evidence_status_text(self, bundle) -> str:
+        status = str(getattr(bundle, "analysis_evidence_status", "") or "MISSING").strip().upper()
+        context_state = str(getattr(bundle, "analysis_evidence_context_state", "") or "MISSING")
+        run_id = str(getattr(bundle, "analysis_evidence_run_id", "") or "—")
+        artifacts = int(getattr(bundle, "analysis_evidence_artifact_count", 0) or 0)
+        mismatches = int(getattr(bundle, "analysis_evidence_mismatch_count", 0) or 0)
+        action = str(getattr(bundle, "analysis_evidence_action", "") or "")
+        text = f"{status} / context={context_state} / run={run_id} / artifacts={artifacts} / mismatches={mismatches}"
+        if action and status != "READY":
+            text += f"\n{action}"
+        return text
+
+    def _geometry_reference_evidence_summary_lines(self, bundle) -> list[str]:
+        status = str(getattr(bundle, "geometry_reference_status", "") or "MISSING").strip().upper()
+        warnings = [
+            str(item).strip()
+            for item in (getattr(bundle, "geometry_reference_warnings", None) or [])
+            if str(item).strip()
+        ]
+        missing = [
+            str(item).strip()
+            for item in (getattr(bundle, "geometry_reference_evidence_missing", None) or [])
+            if str(item).strip()
+        ]
+        lines = [
+            "## Geometry Reference evidence",
+            f"- Status: {status}",
+            f"- Artifact status: {getattr(bundle, 'geometry_reference_artifact_status', '') or 'missing'}",
+            (
+                "- road_width_m: "
+                f"{getattr(bundle, 'geometry_reference_road_width_status', '') or 'missing'} / "
+                f"source={getattr(bundle, 'geometry_reference_road_width_source', '') or '—'}"
+            ),
+            (
+                "- Packaging: "
+                f"{getattr(bundle, 'geometry_reference_packaging_status', '') or 'missing'} / "
+                f"mismatch={getattr(bundle, 'geometry_reference_packaging_mismatch_status', '') or 'missing'}"
+            ),
+            f"- Packaging contract hash: {getattr(bundle, 'geometry_reference_packaging_contract_hash', '') or '—'}",
+            f"- Geometry acceptance gate: {getattr(bundle, 'geometry_reference_acceptance_gate', '') or 'MISSING'}",
+            (
+                "- Component passport needs data: "
+                f"{getattr(bundle, 'geometry_reference_component_passport_needs_data', 0)}"
+            ),
+            f"- Evidence JSON: {getattr(bundle, 'latest_geometry_reference_evidence_path', '') or '—'}",
+        ]
+        action = str(getattr(bundle, "geometry_reference_action", "") or "")
+        if missing:
+            lines.append(f"- Missing: {', '.join(missing)}")
+        if action:
+            lines.append(f"- Action: {action}")
+        for warning in warnings[:5]:
+            lines.append(f"- Warning: {warning}")
+        return lines
+
+    def _geometry_reference_status_text(self, bundle) -> str:
+        status = str(getattr(bundle, "geometry_reference_status", "") or "MISSING").strip().upper()
+        artifact = str(getattr(bundle, "geometry_reference_artifact_status", "") or "missing")
+        road = str(getattr(bundle, "geometry_reference_road_width_status", "") or "missing")
+        packaging = str(getattr(bundle, "geometry_reference_packaging_mismatch_status", "") or "missing")
+        gate = str(getattr(bundle, "geometry_reference_acceptance_gate", "") or "MISSING")
+        missing = [
+            str(item).strip()
+            for item in (getattr(bundle, "geometry_reference_evidence_missing", None) or [])
+            if str(item).strip()
+        ]
+        action = str(getattr(bundle, "geometry_reference_action", "") or "")
+        text = (
+            f"{status} / artifact={artifact} / road_width={road} / "
+            f"packaging={packaging} / acceptance={gate}"
+        )
+        if missing:
+            text += f"\nmissing={', '.join(missing)}"
+        if action and status != "READY":
+            text += f"\n{action}"
+        return text
+
     def _render_summary_text(self, bundle, *, bundle_out_dir: Path | None = None) -> str:
         bundle_out_dir = bundle_out_dir or self._active_bundle_out_dir()
         center_state_path = bundle_out_dir / LATEST_DESKTOP_DIAGNOSTICS_CENTER_JSON
@@ -977,6 +1076,8 @@ class DesktopDiagnosticsCenter:
             lines.extend(f"- {line}" for line in bundle.summary_lines)
         lines.append("")
         lines.extend(self._analysis_evidence_summary_lines(bundle))
+        lines.append("")
+        lines.extend(self._geometry_reference_evidence_summary_lines(bundle))
         lines.extend(
             [
                 "",
@@ -996,6 +1097,7 @@ class DesktopDiagnosticsCenter:
                 f"- Разбор замечаний Markdown: {bundle.latest_triage_md_path or '—'}",
                 f"- Evidence manifest JSON: {bundle.latest_evidence_manifest_path or '—'}",
                 f"- Analysis evidence / HO-009 JSON: {bundle.latest_analysis_evidence_manifest_path or '—'}",
+                f"- Geometry Reference evidence JSON: {bundle.latest_geometry_reference_evidence_path or '—'}",
                 f"- Статус буфера обмена JSON: {bundle.latest_clipboard_status_path or '—'}",
                 f"- Диагностика указателя анимации JSON: {bundle.anim_pointer_diagnostics_path or '—'}",
                 f"- Последний файл состояния прогона JSON: {self._last_run_record.state_path if self._last_run_record else '—'}",
@@ -1058,15 +1160,14 @@ class DesktopDiagnosticsCenter:
 
         if bundle.summary_lines:
             meta_bits.extend(bundle.summary_lines)
-        meta_bits.append(
-            "Analysis evidence / HO-009: "
-            f"{bundle.analysis_evidence_status} / context={bundle.analysis_evidence_context_state} / "
-            f"run={bundle.analysis_evidence_run_id or '—'} / "
-            f"artifacts={bundle.analysis_evidence_artifact_count} / "
-            f"mismatches={bundle.analysis_evidence_mismatch_count}"
+        self.analysis_evidence_status_var.set(
+            "Analysis evidence / HO-009: " + self._analysis_evidence_status_text(bundle)
         )
-        if bundle.analysis_evidence_action and bundle.analysis_evidence_status != "READY":
-            meta_bits.append(bundle.analysis_evidence_action)
+        self.geometry_reference_status_var.set(
+            "Geometry Reference evidence: " + self._geometry_reference_status_text(bundle)
+        )
+        meta_bits.append(str(self.analysis_evidence_status_var.get() or ""))
+        meta_bits.append(str(self.geometry_reference_status_var.get() or ""))
         if bundle.anim_pointer_diagnostics_path:
             meta_bits.append(f"Диагностика указателя анимации: {bundle.anim_pointer_diagnostics_path}")
         if bundle.clipboard_ok is not None:
