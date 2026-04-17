@@ -991,6 +991,7 @@ class DesktopDiagnosticsCenter:
             "## Analysis evidence / HO-009",
             f"- Status: {status}",
             f"- Context state: {context_state}",
+            f"- HO-008 analysis context: {getattr(bundle, 'analysis_context_status', '') or '—'}",
             f"- Run ID: {getattr(bundle, 'analysis_evidence_run_id', '') or '—'}",
             f"- Run contract hash: {getattr(bundle, 'analysis_evidence_run_contract_hash', '') or '—'}",
             f"- Compare contract: {getattr(bundle, 'analysis_evidence_compare_contract_id', '') or '—'}",
@@ -998,12 +999,21 @@ class DesktopDiagnosticsCenter:
             f"- Mismatches: {getattr(bundle, 'analysis_evidence_mismatch_count', 0)}",
             f"- Manifest: {getattr(bundle, 'latest_analysis_evidence_manifest_path', '') or '—'}",
         ]
+        if getattr(bundle, "analysis_selected_test_id", ""):
+            lines.append(f"- Selected test: {bundle.analysis_selected_test_id}")
+        if getattr(bundle, "analysis_selected_npz_path", ""):
+            lines.append(f"- Selected NPZ: {bundle.analysis_selected_npz_path}")
+        if getattr(bundle, "analysis_capture_export_manifest_handoff_id", ""):
+            lines.append(f"- Capture handoff: {bundle.analysis_capture_export_manifest_handoff_id}")
         manifest_hash = str(getattr(bundle, "analysis_evidence_manifest_hash", "") or "")
         if manifest_hash:
             lines.append(f"- Manifest hash: {manifest_hash}")
         action = str(getattr(bundle, "analysis_evidence_action", "") or "")
         if action:
             lines.append(f"- Action: {action}")
+        analysis_context_action = str(getattr(bundle, "analysis_context_action", "") or "")
+        if analysis_context_action:
+            lines.append(f"- HO-008 action: {analysis_context_action}")
         for warning in warnings[:5]:
             lines.append(f"- Warning: {warning}")
         return lines
@@ -1061,7 +1071,14 @@ class DesktopDiagnosticsCenter:
         artifacts = int(getattr(bundle, "analysis_evidence_artifact_count", 0) or 0)
         mismatches = int(getattr(bundle, "analysis_evidence_mismatch_count", 0) or 0)
         action = str(getattr(bundle, "analysis_evidence_action", "") or "")
-        text = f"{status} / context={context_state} / run={run_id} / artifacts={artifacts} / mismatches={mismatches}"
+        analysis_context_status = str(getattr(bundle, "analysis_context_status", "") or "—")
+        analysis_context_action = str(getattr(bundle, "analysis_context_action", "") or "")
+        text = (
+            f"{status} / context={context_state} / HO-008={analysis_context_status} / "
+            f"run={run_id} / artifacts={artifacts} / mismatches={mismatches}"
+        )
+        if analysis_context_action:
+            text += f"\n{analysis_context_action}"
         if action and status != "READY":
             text += f"\n{action}"
         return text

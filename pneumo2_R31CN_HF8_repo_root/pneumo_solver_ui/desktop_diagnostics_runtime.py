@@ -124,6 +124,17 @@ def _load_analysis_evidence_summary(repo_root: Path, out_dir: Path) -> dict:
         action = "Проверьте HO-009 context state и mismatches перед отправкой."
     else:
         action = "HO-009 evidence готов к включению в diagnostics/SEND."
+    analysis_context_status = str(summary.get("analysis_context_status") or "").strip().upper()
+    if analysis_context_status in {"MISSING", "BLOCKED", "INVALID"}:
+        summary["analysis_context_action"] = (
+            "Откройте Engineering Analysis Center и переэкспортируйте HO-008 analysis context перед SEND."
+        )
+    elif analysis_context_status == "DEGRADED":
+        summary["analysis_context_action"] = (
+            "Проверьте HO-008 degraded artifacts; доступные артефакты видимы, но сравнение/анимация требуют внимания."
+        )
+    else:
+        summary["analysis_context_action"] = ""
     summary["action"] = action
     return summary
 
@@ -380,6 +391,15 @@ def load_desktop_diagnostics_bundle_record(
         analysis_evidence_status=str(analysis.get("status") or "MISSING"),
         analysis_evidence_handoff_id=str(analysis.get("handoff_id") or ""),
         analysis_evidence_context_state=str(analysis.get("result_context_state") or "MISSING"),
+        analysis_context_status=str(analysis.get("analysis_context_status") or ""),
+        analysis_context_action=str(analysis.get("analysis_context_action") or ""),
+        analysis_animator_link_contract_hash=str(analysis.get("animator_link_contract_hash") or ""),
+        analysis_selected_run_contract_hash=str(analysis.get("selected_run_contract_hash") or ""),
+        analysis_selected_test_id=str(analysis.get("selected_test_id") or ""),
+        analysis_selected_npz_path=str(analysis.get("selected_npz_path") or ""),
+        analysis_capture_export_manifest_handoff_id=str(analysis.get("capture_export_manifest_handoff_id") or ""),
+        analysis_capture_hash=str(analysis.get("capture_hash") or ""),
+        analysis_truth_mode_hash=str(analysis.get("truth_mode_hash") or ""),
         analysis_evidence_run_id=str(analysis.get("run_id") or ""),
         analysis_evidence_run_contract_hash=str(analysis.get("run_contract_hash") or ""),
         analysis_evidence_compare_contract_id=str(analysis.get("compare_contract_id") or ""),
@@ -622,6 +642,15 @@ def write_desktop_diagnostics_center_state(
         "analysis_evidence": {
             "status": bundle_record.analysis_evidence_status,
             "context_state": bundle_record.analysis_evidence_context_state,
+            "analysis_context_status": bundle_record.analysis_context_status,
+            "analysis_context_action": bundle_record.analysis_context_action,
+            "animator_link_contract_hash": bundle_record.analysis_animator_link_contract_hash,
+            "selected_run_contract_hash": bundle_record.analysis_selected_run_contract_hash,
+            "selected_test_id": bundle_record.analysis_selected_test_id,
+            "selected_npz_path": bundle_record.analysis_selected_npz_path,
+            "capture_export_manifest_handoff_id": bundle_record.analysis_capture_export_manifest_handoff_id,
+            "capture_hash": bundle_record.analysis_capture_hash,
+            "truth_mode_hash": bundle_record.analysis_truth_mode_hash,
             "manifest_hash": bundle_record.analysis_evidence_manifest_hash,
             "handoff_id": bundle_record.analysis_evidence_handoff_id,
             "run_id": bundle_record.analysis_evidence_run_id,
