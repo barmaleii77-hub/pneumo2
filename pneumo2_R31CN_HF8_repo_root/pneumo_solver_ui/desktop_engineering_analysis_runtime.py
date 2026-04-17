@@ -1176,6 +1176,83 @@ class DesktopEngineeringAnalysisRuntime:
             pointer["sha256_error"] = str(exc)
         return pointer
 
+    def _compare_influence_surface_from_artifact(
+        self,
+        artifact: EngineeringAnalysisArtifact,
+        *,
+        top_k: int = 20,
+    ) -> dict[str, Any] | None:
+        payload = _safe_read_json_dict(artifact.path)
+        if not payload:
+            return None
+        if str(payload.get("surface_type") or "") == "compare_influence" and isinstance(
+            payload.get("diagnostics"),
+            Mapping,
+        ):
+            surface = dict(payload)
+            surface.setdefault("source", str(artifact.path))
+            return surface
+
+        corr = _first_payload_value(
+            payload,
+            "corr",
+            "correlation",
+            "correlation_matrix",
+            "corr_matrix",
+            "matrix",
+        )
+        feature_names = _axis_names(
+            _first_payload_value(payload, "feature_names", "features", "params", "parameters")
+        )
+        target_names = _axis_names(_first_payload_value(payload, "target_names", "targets", "metrics", "signals"))
+        if corr is None or not feature_names or not target_names:
+            return None
+
+        feature_units = _unit_map(
+            _first_payload_value(payload, "feature_units", "param_units", "parameter_units")
+        )
+        target_units = _unit_map(_first_payload_value(payload, "target_units", "metric_units", "signal_units"))
+        unit_profile = _unit_map(_first_payload_value(payload, "unit_profile", "units"))
+        for name in feature_names:
+            if name in unit_profile and name not in feature_units:
+                feature_units[name] = unit_profile[name]
+        for name in target_names:
+            if name in unit_profile and name not in target_units:
+                target_units[name] = unit_profile[name]
+
+        return build_compare_influence_surface(
+            corr,
+            feature_names,
+            target_names,
+            title=str(payload.get("title") or artifact.title or "Compare influence surface"),
+            feature_units=feature_units,
+            target_units=target_units,
+            top_k=top_k,
+            source=str(artifact.path),
+        )
+
+    def compare_influence_surfaces(
+        self,
+        snapshot: EngineeringAnalysisSnapshot,
+        *,
+        top_k: int = 20,
+    ) -> tuple[dict[str, Any], ...]:
+        surfaces: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for artifact in snapshot.artifacts:
+            if artifact.category != "compare_influence" and "compare_influence" not in artifact.key:
+                continue
+            if artifact.path.suffix.lower() != ".json":
+                continue
+            key = str(artifact.path)
+            if key in seen:
+                continue
+            seen.add(key)
+            surface = self._compare_influence_surface_from_artifact(artifact, top_k=top_k)
+            if surface is not None:
+                surfaces.append(surface)
+        return tuple(surfaces)
+
     def build_analysis_to_animator_link_contract(
         self,
         snapshot: EngineeringAnalysisSnapshot,

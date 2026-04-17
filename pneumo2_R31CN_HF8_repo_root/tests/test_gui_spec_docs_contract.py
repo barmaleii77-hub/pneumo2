@@ -662,6 +662,31 @@ def test_v32_12_geometry_reference_note_records_provenance_acceptance_without_ru
     assert "does not alter solver physics" in text
 
 
+def test_v32_10_mnemo_truth_graphics_note_records_dataset_provenance_acceptance_without_runtime_closure() -> None:
+    assert V32_MNEMO_TRUTH_GRAPHICS_NOTE.exists()
+
+    text = V32_MNEMO_TRUTH_GRAPHICS_NOTE.read_text(encoding="utf-8")
+    assert "V32-10 Desktop Mnemo truth-graphics contracts accepted" in text
+    assert "not a runtime gap\nclosure claim" in text
+    assert "`RGH-003`" in text
+    assert "desktop_mnemo_dataset_contract_v1" in text
+    assert "source\n  markers for flow, pressure, state, scheme mapping and cylinder snapshot" in text
+    assert "canonical nodes/routes" in text
+    assert "unavailable/degraded states" in text
+    assert "pressure-only mode without silent volume fallback" in text
+    assert "tests/test_desktop_mnemo_dataset_contract.py" in text
+    assert "tests/test_desktop_mnemo_inline_overlay_contract.py" in text
+    assert "tests/test_desktop_mnemo_launcher_contract.py" in text
+    assert "tests/test_desktop_mnemo_main_contract.py" in text
+    assert "tests/test_desktop_mnemo_page_contract.py" in text
+    assert "tests/test_desktop_mnemo_settings_bridge_contract.py" in text
+    assert "tests/test_desktop_mnemo_snapshot_contract.py" in text
+    assert "tests/test_desktop_mnemo_window_contract.py" in text
+    assert "tests/test_pneumo_scheme_mnemo_cache_resource_contract.py" in text
+    assert "22 passed" in text
+    assert "does not close `OG-001`, `OG-002`, `OG-003`, `OG-004`, `OG-005` or\n  `OG-006`" in text
+
+
 def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_release_closure() -> None:
     assert V32_DIAGNOSTICS_EVIDENCE_NOTE.exists()
 
