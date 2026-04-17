@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
 
@@ -31,6 +33,39 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--legacy-tk-shell",
         action="store_true",
         help="Run the historical Tk shell instead of the new Qt shell.",
+    )
+    parser.add_argument(
+        "--runtime-proof",
+        metavar="DIR",
+        help="Write a Qt main shell runtime evidence JSON/MD pair and exit without launching domain windows.",
+    )
+    parser.add_argument(
+        "--runtime-proof-offscreen",
+        action="store_true",
+        help="Collect --runtime-proof using QT_QPA_PLATFORM=offscreen for CI/headless checks.",
+    )
+    parser.add_argument(
+        "--runtime-proof-manual-results",
+        metavar="JSON",
+        help=(
+            "Merge operator-confirmed Snap/DPI/second-monitor results into --runtime-proof. "
+            "The JSON may contain a 'checks' object keyed by manual check id."
+        ),
+    )
+    parser.add_argument(
+        "--runtime-proof-manual-template",
+        metavar="DIR",
+        help="Write a fillable manual-results JSON template for Snap/DPI/second-monitor evidence and exit.",
+    )
+    parser.add_argument(
+        "--runtime-proof-validate",
+        metavar="JSON",
+        help="Validate an existing Qt main shell runtime proof JSON and exit.",
+    )
+    parser.add_argument(
+        "--runtime-proof-require-manual-pass",
+        action="store_true",
+        help="Make --runtime-proof-validate fail unless manual Snap/DPI/second-monitor checks are PASS.",
     )
     return parser
 
@@ -81,6 +116,42 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     startup_tool_keys = resolve_startup_tool_keys(args.startup_tool_keys)
+    if args.runtime_proof_manual_template:
+        from pneumo_solver_ui.desktop_qt_shell.runtime_proof import (
+            write_qt_main_shell_manual_results_template,
+        )
+
+        result = write_qt_main_shell_manual_results_template(
+            Path(args.runtime_proof_manual_template)
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.runtime_proof_validate:
+        from pneumo_solver_ui.desktop_qt_shell.runtime_proof import (
+            validate_qt_main_shell_runtime_proof,
+        )
+
+        result = validate_qt_main_shell_runtime_proof(
+            Path(args.runtime_proof_validate),
+            require_manual_pass=bool(args.runtime_proof_require_manual_pass),
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.runtime_proof:
+        from pneumo_solver_ui.desktop_qt_shell.runtime_proof import write_qt_main_shell_runtime_proof
+
+        result = write_qt_main_shell_runtime_proof(
+            Path(args.runtime_proof),
+            offscreen=bool(args.runtime_proof_offscreen),
+            manual_results_path=Path(args.runtime_proof_manual_results)
+            if args.runtime_proof_manual_results
+            else None,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
     if args.legacy_tk_shell:
         return _run_legacy_shell(startup_tool_keys=startup_tool_keys)
 
