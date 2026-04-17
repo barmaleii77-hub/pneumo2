@@ -120,6 +120,36 @@ def test_main_window_routes_diagnostics_collect_to_hosted_page_handler() -> None
         app.processEvents()
 
 
+def test_main_window_routes_diagnostics_baseline_link_to_restore_guard(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(tmp_path / "workspace"))
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(tmp_path / "shell.ini"))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        diagnostics_page = window._page_widget_by_workspace_id["diagnostics"]
+        diagnostics_page.open_baseline_center()
+        app.processEvents()
+
+        assert window._current_workspace_id == "baseline_run"
+        baseline_page = window._page_widget_by_workspace_id["baseline_run"]
+        assert baseline_page.baseline_center_box.title() == "Baseline Center: review / adopt / restore"
+
+        window.run_command("baseline.restore")
+        app.processEvents()
+
+        assert window._current_workspace_id == "baseline_run"
+        assert "restore: blocked" in baseline_page.action_result_label.text()
+        assert "baseline.restore" in window.recent_command_ids
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
 def test_diagnostics_fallback_command_remains_available() -> None:
     commands = build_command_map()
     assert commands["diagnostics.legacy_center.open"].kind == "launch_module"

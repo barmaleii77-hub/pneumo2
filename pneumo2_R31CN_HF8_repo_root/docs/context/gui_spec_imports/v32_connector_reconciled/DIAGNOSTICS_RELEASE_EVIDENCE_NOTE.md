@@ -54,8 +54,8 @@ Focused diagnostics/docs regression result: `97 passed`.
 
 Runtime proof captured:
 
-- ZIP: `send_bundles/SEND_20260417_081829_bundle.zip`
-- Final latest SHA256: `91a45fcc80c93f4ed02a8f47625216e23653e68e5a90b7d89e17305cc0d42dbb`
+- ZIP: `send_bundles/SEND_20260417_082228_bundle.zip`
+- Final latest SHA256: `b8a27ec134a91bbbf0fa2f64a36ba7aba6d972ebac7587ea9780740057e1e9c3`
 - Trigger / mode: `desktop_diagnostics_center` / `manual`
 - Validation: `ok=True`, `errors=0`, `warnings=6`
 - Health after final triage: `ok=False`, `notes=8`, preserving adjacent-workstream warnings.
