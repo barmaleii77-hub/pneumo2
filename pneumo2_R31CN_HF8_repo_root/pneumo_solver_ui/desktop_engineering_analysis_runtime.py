@@ -50,6 +50,21 @@ REQUIRED_SELECTED_RUN_CONTRACT_FIELDS: tuple[str, ...] = (
     "suite_snapshot_hash",
     "results_artifact_index",
 )
+_ENGINEERING_ANALYSIS_ARTIFACT_SPECS: tuple[tuple[str, str, str, str, bool], ...] = (
+    ("system_influence.json", "system_influence_json", "System influence JSON", "influence", True),
+    ("SYSTEM_INFLUENCE.md", "system_influence_md", "System influence report", "report", True),
+    ("system_influence_params.csv", "system_influence_params_csv", "System influence parameter table", "influence", True),
+    ("system_influence_edges.csv", "system_influence_edges_csv", "System influence edge table", "influence", False),
+    ("system_influence_paths.csv", "system_influence_paths_csv", "System influence path table", "influence", False),
+    ("PARAM_STAGING_INFLUENCE.md", "param_staging_influence_md", "Influence-guided staging report", "calibration", False),
+    ("stages_influence.json", "stages_influence_json", "Influence-guided stages", "calibration", False),
+    ("REPORT_FULL.md", "report_full_md", "Full calibration report", "report", False),
+    ("fit_report_final.json", "fit_report_final_json", "Final fit report", "calibration", False),
+    ("fit_details_final.json", "fit_details_final_json", "Final fit details", "calibration", False),
+    ("report.md", "calibration_report_md", "Calibration detail report", "report", False),
+    ("fit_report.json", "fit_report_json", "Fit report", "calibration", False),
+    ("fit_details.json", "fit_details_json", "Fit details", "calibration", False),
+)
 
 
 def _utc_now() -> str:
@@ -927,22 +942,7 @@ class DesktopEngineeringAnalysisRuntime:
 
     def collect_artifacts(self, run_dir: Path) -> tuple[EngineeringAnalysisArtifact, ...]:
         items: list[EngineeringAnalysisArtifact] = []
-        specs = (
-            ("system_influence.json", "system_influence_json", "System influence JSON", "influence", True),
-            ("SYSTEM_INFLUENCE.md", "system_influence_md", "System influence report", "report", True),
-            ("system_influence_params.csv", "system_influence_params_csv", "System influence parameter table", "influence", True),
-            ("system_influence_edges.csv", "system_influence_edges_csv", "System influence edge table", "influence", False),
-            ("system_influence_paths.csv", "system_influence_paths_csv", "System influence path table", "influence", False),
-            ("PARAM_STAGING_INFLUENCE.md", "param_staging_influence_md", "Influence-guided staging report", "calibration", False),
-            ("stages_influence.json", "stages_influence_json", "Influence-guided stages", "calibration", False),
-            ("REPORT_FULL.md", "report_full_md", "Full calibration report", "report", False),
-            ("fit_report_final.json", "fit_report_final_json", "Final fit report", "calibration", False),
-            ("fit_details_final.json", "fit_details_final_json", "Final fit details", "calibration", False),
-            ("report.md", "calibration_report_md", "Calibration detail report", "report", False),
-            ("fit_report.json", "fit_report_json", "Fit report", "calibration", False),
-            ("fit_details.json", "fit_details_json", "Fit details", "calibration", False),
-        )
-        for rel, key, title, category, required in specs:
+        for rel, key, title, category, required in _ENGINEERING_ANALYSIS_ARTIFACT_SPECS:
             artifact = self._artifact(
                 run_dir,
                 rel,
@@ -1111,6 +1111,96 @@ class DesktopEngineeringAnalysisRuntime:
         except Exception as exc:
             record["sha256_error"] = str(exc)
         return record
+
+    def _artifact_validation_status(self, record: Mapping[str, Any]) -> str:
+        if not bool(record.get("exists")):
+            return "MISSING"
+        if bool(record.get("is_dir")):
+            return "READY"
+        if str(record.get("sha256") or "").strip():
+            return "READY"
+        if str(record.get("sha256_error") or "").strip():
+            return "HASH_FAILED"
+        return "UNHASHED"
+
+    def validated_artifacts_summary(
+        self,
+        snapshot: EngineeringAnalysisSnapshot,
+        *,
+        selected_artifacts: Sequence[Mapping[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        selected_records = (
+            [dict(item) for item in selected_artifacts]
+            if selected_artifacts is not None
+            else [self._artifact_record(artifact) for artifact in snapshot.artifacts]
+        )
+        selected_by_key = {
+            str(record.get("key") or ""): dict(record)
+            for record in selected_records
+            if str(record.get("key") or "").strip()
+        }
+        spec_keys = {key for _rel, key, _title, _category, _required in _ENGINEERING_ANALYSIS_ARTIFACT_SPECS}
+        expected_records: list[dict[str, Any]] = []
+        missing_required: list[dict[str, Any]] = []
+        required_count = 0
+        ready_required_count = 0
+
+        for rel, key, title, category, required in _ENGINEERING_ANALYSIS_ARTIFACT_SPECS:
+            expected_path = (snapshot.run_dir / rel).resolve() if snapshot.run_dir is not None else Path(rel)
+            record = dict(selected_by_key.get(key) or {})
+            if not record:
+                record = {
+                    "key": key,
+                    "title": title,
+                    "category": category,
+                    "path": str(expected_path),
+                    "status": "MISSING",
+                    "required": bool(required),
+                    "detail": "Expected engineering analysis artifact was not found.",
+                    "exists": False,
+                    "is_dir": False,
+                }
+            record["expected_relpath"] = rel
+            record["validation_status"] = self._artifact_validation_status(record)
+            expected_records.append(record)
+
+            if required:
+                required_count += 1
+                if record["validation_status"] == "READY":
+                    ready_required_count += 1
+                else:
+                    missing_required.append(
+                        {
+                            "key": key,
+                            "title": title,
+                            "category": category,
+                            "path": str(expected_path),
+                            "validation_status": record["validation_status"],
+                        }
+                    )
+
+        discovered_records: list[dict[str, Any]] = []
+        for record in selected_records:
+            if str(record.get("key") or "") in spec_keys:
+                continue
+            item = dict(record)
+            item["validation_status"] = self._artifact_validation_status(item)
+            discovered_records.append(item)
+
+        status = "BLOCKED" if snapshot.run_dir is None else ("READY" if not missing_required else "MISSING")
+        return {
+            "schema": "engineering_analysis_validated_artifacts.v1",
+            "status": status,
+            "run_dir": str(snapshot.run_dir or ""),
+            "required_artifact_count": required_count,
+            "ready_required_artifact_count": ready_required_count,
+            "missing_required_artifact_count": len(missing_required),
+            "missing_required_artifacts": missing_required,
+            "selected_artifact_count": len(selected_records),
+            "hash_ready_artifact_count": sum(1 for item in selected_records if str(item.get("sha256") or "")),
+            "expected_artifacts": expected_records,
+            "discovered_artifacts": discovered_records,
+        }
 
     def selected_run_handoff_requirements(
         self,
@@ -1386,12 +1476,26 @@ class DesktopEngineeringAnalysisRuntime:
             for surface in surfaces
             if str(surface.get("source") or "").strip()
         }
+        validated_artifacts = self.validated_artifacts_summary(
+            snapshot,
+            selected_artifacts=selected_artifacts,
+        )
         unparsed_compare_artifacts = [
             str(artifact.path)
             for artifact in compare_artifacts
             if str(artifact.path) not in surface_source_paths
         ] if compare_surfaces is None else []
         validation_warnings: list[str] = []
+        missing_required_artifacts = [
+            str(item.get("key") or item.get("path") or "").strip()
+            for item in validated_artifacts.get("missing_required_artifacts") or ()
+            if str(item.get("key") or item.get("path") or "").strip()
+        ]
+        if missing_required_artifacts:
+            validation_warnings.append(
+                "Required engineering analysis artifact(s) missing or unvalidated: "
+                + ", ".join(missing_required_artifacts)
+            )
         if compare_surfaces is None and compare_artifacts and not surfaces:
             validation_warnings.append(
                 "compare_influence artifact(s) found but no parseable compare_influence surface was exported; "
@@ -1486,6 +1590,7 @@ class DesktopEngineeringAnalysisRuntime:
                 ),
             },
             "unit_catalog": dict(snapshot.unit_catalog),
+            "validated_artifacts": validated_artifacts,
             "sensitivity_summary": [
                 row.to_payload()
                 for row in snapshot.sensitivity_rows

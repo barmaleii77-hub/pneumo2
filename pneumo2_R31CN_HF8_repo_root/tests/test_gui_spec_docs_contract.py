@@ -42,6 +42,7 @@ V32_PRODUCER_ANIMATOR_TRUTH_NOTE = IMPORTS_V32 / "PRODUCER_ANIMATOR_TRUTH_EVIDEN
 V32_COMPARE_OBJECTIVE_INTEGRITY_NOTE = IMPORTS_V32 / "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md"
 V32_GEOMETRY_REFERENCE_EVIDENCE_NOTE = IMPORTS_V32 / "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md"
 V32_MNEMO_TRUTH_GRAPHICS_NOTE = IMPORTS_V32 / "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md"
+V32_ENGINEERING_ANALYSIS_EVIDENCE_NOTE = IMPORTS_V32 / "ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md"
 V32_DIAGNOSTICS_EVIDENCE_NOTE = IMPORTS_V32 / "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md"
 V32_DIAGNOSTICS_PRODUCER_GAPS_HANDOFF = IMPORTS_V32 / "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md"
 V32_RUNTIME_EVIDENCE_NOTE = IMPORTS_V32 / "RUNTIME_RELEASE_EVIDENCE_NOTE.md"
@@ -257,6 +258,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     imports_readme = IMPORTS_README.read_text(encoding="utf-8")
     project_sources_text = PROJECT_SOURCES.read_text(encoding="utf-8")
     index_text = GUI_INDEX.read_text(encoding="utf-8")
+    release_lane_text = RELEASE_LANE.read_text(encoding="utf-8")
 
     assert "foundations/" in imports_readme
     assert "upstream prompt sources" in imports_readme
@@ -275,6 +277,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in imports_readme
     assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in imports_readme
     assert "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in imports_readme
+    assert "ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md" in imports_readme
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in imports_readme
     assert "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md" in imports_readme
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in imports_readme
@@ -305,6 +308,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in project_sources_text
+    assert "v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md" in project_sources_text
     assert "v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md" in project_sources_text
@@ -333,6 +337,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in index_text
     assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in index_text
     assert "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in index_text
+    assert "ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md" in index_text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in index_text
     assert "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md" in index_text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in index_text
@@ -341,6 +346,9 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "13_RELEASE_GATES_KB_ACCEPTANCE.md" in index_text
     assert "специализированный addendum для `WS-RING`" in index_text
     assert "WS-RING -> WS-SUITE" in index_text
+
+    assert "ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md" in release_lane_text
+    assert "engineering analysis" in release_lane_text
 
 
 def test_canon_and_parity_summary_reference_v13_ring_editor_layer() -> None:
@@ -442,6 +450,7 @@ def test_v32_connector_reconciled_digest_is_registered() -> None:
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in text
     assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in text
     assert "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in text
+    assert "ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md" in text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in text
     assert "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md" in text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in text
@@ -551,6 +560,7 @@ def test_v32_release_gate_acceptance_map_is_executable_docs_contract() -> None:
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in release_lane_text
     assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in release_lane_text
     assert "MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md" in release_lane_text
+    assert "ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md" in release_lane_text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in release_lane_text
     assert "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md" in release_lane_text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in release_lane_text
@@ -700,6 +710,33 @@ def test_v32_10_mnemo_truth_graphics_note_records_dataset_provenance_acceptance_
     assert "does not close `OG-001`, `OG-002`, `OG-003`, `OG-004`, `OG-005` or\n  `OG-006`" in text
 
 
+def test_v32_13_engineering_analysis_note_records_contract_acceptance_without_send_runtime_closure() -> None:
+    assert V32_ENGINEERING_ANALYSIS_EVIDENCE_NOTE.exists()
+
+    text = V32_ENGINEERING_ANALYSIS_EVIDENCE_NOTE.read_text(encoding="utf-8")
+    assert "V32-13 Engineering Analysis evidence contracts accepted" in text
+    assert "not diagnostics/SEND\nruntime closure" in text
+    assert "`HO-007`" in text
+    assert "`HO-008`" in text
+    assert "`HO-010`" in text
+    assert "`HO-009`" in text
+    assert "selected_run_contract" in text
+    assert "capture_export_manifest.json" in text
+    assert "capture_hash" in text
+    assert "engineering_analysis_evidence_manifest.json" in text
+    assert "LATEST_ENGINEERING_ANALYSIS_EVIDENCE_MANIFEST" in text
+    assert "analysis_context.json" in text
+    assert "animator_link_contract.json" in text
+    assert "compare influence surfaces" in text
+    assert "unit catalog" in text
+    assert "tests/test_desktop_engineering_analysis_center_contract.py" in text
+    assert "tests/test_desktop_engineering_analysis_contract.py" in text
+    assert "tests/test_r61_engineering_analysis_helpers.py" in text
+    assert "tests/test_r61_engineering_analysis_panel_runtime.py" in text
+    assert "30 passed" in text
+    assert "does not close `OG-005`" in text
+
+
 def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_release_closure() -> None:
     assert V32_DIAGNOSTICS_EVIDENCE_NOTE.exists()
 
@@ -713,6 +750,10 @@ def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_releas
     assert "`BND-018`" in text
     assert "geometry/geometry_reference_evidence.json" in text
     assert "latest_geometry_reference_evidence.json" in text
+    assert "producer_artifact_status=missing" in text
+    assert "producer_evidence_owner=producer_export" in text
+    assert "producer_next_action" in text
+    assert "consumer_may_fabricate_geometry=false" in text
     assert "artifact_freshness_status" in text
     assert "artifact_freshness_relation" in text
     assert "artifact_freshness_status=missing" in text
@@ -735,9 +776,33 @@ def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_releas
     assert "tests/test_health_report_inspect_send_bundle_anim_diagnostics.py" in text
     assert "tests/test_desktop_diagnostics_center_contract.py" in text
     assert "26 passed" in text
+    assert "45 passed" in text
     assert "85 passed" in text
     assert "Runtime validation result: `validation ok`" in text
     assert "does not alter solver, optimizer, animator, geometry, or domain calculations" in text
+
+
+def test_v32_13_engineering_analysis_evidence_note_records_contract_acceptance_only() -> None:
+    assert V32_ENGINEERING_ANALYSIS_EVIDENCE_NOTE.exists()
+
+    text = V32_ENGINEERING_ANALYSIS_EVIDENCE_NOTE.read_text(encoding="utf-8")
+    assert "Engineering Analysis Evidence Note" in text
+    assert "V32-13 Engineering Analysis evidence contracts accepted" in text
+    assert "not diagnostics/SEND\nruntime closure" in text
+    assert "`HO-007` selected optimization run into analysis" in text
+    assert "`HO-008`\n  analysis context into animator" in text
+    assert "`HO-010` animator capture/export lineage\n  surfaced downstream" in text
+    assert "`HO-009` evidence manifest into" in text
+    assert "diagnostics" in text
+    assert "`HO-010` remains owned by `WS-ANIMATOR`" in text
+    assert "Compare influence surfaces preserve axes, units, diagnostics and previews" in text
+    assert "engineering_analysis_evidence_manifest.json" in text
+    assert "LATEST_ENGINEERING_ANALYSIS_EVIDENCE_MANIFEST" in text
+    assert "`BND-021` is expected only if engineering analysis was used" in text
+    assert "tests/test_desktop_engineering_analysis_center_contract.py" in text
+    assert "tests/test_desktop_engineering_analysis_contract.py" in text
+    assert "30 passed" in text
+    assert "does not alter solver, optimizer objective algorithms, animator" in text
 
 
 def test_v32_11_diagnostics_producer_gaps_handoff_tracks_warning_only_boundaries() -> None:
@@ -750,11 +815,33 @@ def test_v32_11_diagnostics_producer_gaps_handoff_tracks_warning_only_boundaries
     assert "pb002_missing_required_count=0" in text
     assert "latest_send_bundle.zip" in text
     assert "Analysis evidence / HO-009 context state is missing" in text
+    assert "Geometry reference producer artifact handoff is missing" in text
     assert "Geometry acceptance gate is MISSING" in text
     assert "browser perf evidence is not trace_bundle_ready: missing" in text
     assert "Warn only" in text
     assert "Do not compute or reinterpret solver, optimizer, animator, geometry or" in text
     assert "performance domain values in this lane" in text
+
+
+def test_v32_13_engineering_analysis_evidence_note_records_contract_acceptance_without_send_closure() -> None:
+    assert V32_ENGINEERING_ANALYSIS_EVIDENCE_NOTE.exists()
+
+    text = V32_ENGINEERING_ANALYSIS_EVIDENCE_NOTE.read_text(encoding="utf-8")
+    assert "Engineering Analysis Evidence Note" in text
+    assert "V32-13 Engineering Analysis evidence contracts accepted" in text
+    assert "`WS-ANALYSIS`" in text
+    assert "`HO-007`" in text
+    assert "`HO-008`" in text
+    assert "`HO-010`" in text
+    assert "`HO-009`" in text
+    assert "capture_export_manifest.json" in text
+    assert "compare influence surfaces" in text
+    assert "engineering_analysis_evidence_manifest.json" in text
+    assert "tests/test_desktop_engineering_analysis_center_contract.py" in text
+    assert "tests/test_desktop_engineering_analysis_contract.py" in text
+    assert "30 passed" in text
+    assert "not diagnostics/SEND\nruntime closure" in text
+    assert "does not alter solver, optimizer objective algorithms, animator" in text
 
 
 def test_v32_15_runtime_evidence_note_records_hard_gate_acceptance_without_gap_closure() -> None:
@@ -893,6 +980,7 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         V32_COMPARE_OBJECTIVE_INTEGRITY_NOTE,
         V32_GEOMETRY_REFERENCE_EVIDENCE_NOTE,
         V32_MNEMO_TRUTH_GRAPHICS_NOTE,
+        V32_ENGINEERING_ANALYSIS_EVIDENCE_NOTE,
         V32_DIAGNOSTICS_EVIDENCE_NOTE,
         V32_DIAGNOSTICS_PRODUCER_GAPS_HANDOFF,
         V32_RUNTIME_EVIDENCE_NOTE,

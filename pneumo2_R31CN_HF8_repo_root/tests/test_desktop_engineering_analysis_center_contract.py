@@ -58,6 +58,8 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "def _compare_surface_preview_for_artifact" in src
     assert "compare_influence_surface_preview" in src
     assert "compare_influence_surface_for_artifact" in src
+    assert "validated_artifacts_summary" in src
+    assert '"validated_artifacts"' in src
     assert "filedialog.askdirectory" in src
 
 

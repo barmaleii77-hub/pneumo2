@@ -90,6 +90,21 @@ def build_shell_command_search_entries(
             keywords=("HO-008", "selected_npz_path", "npz", "animation npz", "anim_latest"),
         ),
         ShellCommandSearchEntry(
+            label="Открыть HO-010 capture_export_manifest.json",
+            location="Анимация -> HO-010 capture/export",
+            summary="Открывает frozen capture/export manifest для выбранной анимации и её HO-008 lineage.",
+            action_kind="open_artifact",
+            action_value="animator.capture_export_manifest",
+            keywords=(
+                "HO-010",
+                "capture_export_manifest",
+                "capture export manifest",
+                "capture_hash",
+                "animator export",
+                "analysis lineage",
+            ),
+        ),
+        ShellCommandSearchEntry(
             label="Открыть сравнение прогонов",
             location="Главное окно -> Верхняя командная зона",
             summary="Запускает Compare Viewer для сравнения результатов и артефактов.",

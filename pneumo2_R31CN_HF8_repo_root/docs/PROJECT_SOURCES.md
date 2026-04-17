@@ -34,6 +34,7 @@
 - `docs/context/gui_spec_imports/v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md` — V32-06/V32-08 compare/objective integrity evidence note для `PB-007`, `PB-008`, `RGH-013`, `RGH-014`, `RGH-015`.
 - `docs/context/gui_spec_imports/v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md` — V32-12 geometry reference/imported-layer boundary evidence note для `PB-001`, `PB-008`, `RGH-018`, `OG-001`, `OG-002`, `OG-006`.
 - `docs/context/gui_spec_imports/v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md` — V32-10 Desktop Mnemo truth-graphics evidence note для dataset contract, source markers, scheme fidelity и unavailable states.
+- `docs/context/gui_spec_imports/v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md` — V32-13 Engineering Analysis/Calibration/Influence evidence note для `WS-ANALYSIS`, `HO-007`, `HO-008`, `HO-009`.
 - `docs/context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md` — V32-11 diagnostics/SEND-bundle evidence note для `PB-002`, `RGH-006`, `RGH-007`, `RGH-016`, `OG-005`.
 - `docs/context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md` — producer-owned diagnostics warning handoff после SEND-bundle hardening; фиксирует missing producer artifacts без runtime closure claim.
 - `docs/context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md` — V32-15 runtime evidence hard-gate note для `PB-006`, `RGH-011`, `RGH-012`, `RGH-019`, `OG-003`, `OG-004`.

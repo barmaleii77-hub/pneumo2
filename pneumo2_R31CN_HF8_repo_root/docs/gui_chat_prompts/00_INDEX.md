@@ -30,10 +30,11 @@
    [COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md),
    [GEOMETRY_REFERENCE_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md),
    [MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md),
+   [ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md),
    [DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md),
    [DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md](../context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md)
    и [RUNTIME_RELEASE_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md)
-   — lane evidence notes для V32-02/V32-04/V32-06/V32-08/V32-10/V32-14/V32-09/V32-11/V32-15; не объявляют full gap closure без named runtime artifacts.
+   — lane evidence notes для V32-02/V32-04/V32-06/V32-08/V32-10/V32-13/V32-14/V32-09/V32-11/V32-15; не объявляют full gap closure без named runtime artifacts.
 8. [WORKTREE_TRIAGE_2026-04-17.md](../context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
    — release-readiness ownership map текущего dirty tree; не runtime closure proof.
 9. [V32_16_ACCEPTANCE_NOTE_2026-04-17.md](../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
@@ -75,10 +76,11 @@
   `COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE`,
   `GEOMETRY_REFERENCE_EVIDENCE_NOTE`,
   `MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE`,
+  `ENGINEERING_ANALYSIS_EVIDENCE_NOTE`,
   `DIAGNOSTICS_RELEASE_EVIDENCE_NOTE`,
   `DIAGNOSTICS_PRODUCER_GAPS_HANDOFF` и `RUNTIME_RELEASE_EVIDENCE_NOTE`
   фиксируют accepted lane evidence contracts для
-  V32-02/V32-04/V32-06/V32-08/V32-10/V32-14/V32-09/V32-11/V32-15 и explicit non-closure для gaps,
+  V32-02/V32-04/V32-06/V32-08/V32-10/V32-13/V32-14/V32-09/V32-11/V32-15 и explicit non-closure для gaps,
   которым нужны живые artifacts.
 - `WORKTREE_TRIAGE_2026-04-17` фиксирует owner lane, gate/gap, required evidence
   и targeted tests для текущего dirty tree перед release-readiness merge.
@@ -119,7 +121,7 @@
   `v33_connector_reconciled/README.md`, затем `v32_connector_reconciled/README.md`
   и `v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md`; для
   inputs/suite handoff, producer/animator truth, compare/objective integrity,
-  geometry reference, mnemo truth graphics, diagnostics или runtime/perf acceptance
+  geometry reference, mnemo truth graphics, engineering analysis, diagnostics или runtime/perf acceptance
   дополнительно читать соответствующий evidence note;
 - если lane касается текущего mixed dirty tree, дополнительно сверять
   `context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md` и

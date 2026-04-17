@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-17T03:30:59+00:00",
+  "updated_at": "2026-04-17T03:37:08+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -451,6 +451,24 @@
       "title": "DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md",
       "details": "Diagnostics producer-owned warning handoff after SEND-bundle hardening; keeps missing producer evidence visible without runtime closure claims.",
       "artifact_path": "context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0034",
+      "created_at": "2026-04-17T03:36:03+00:00",
+      "source": "chat",
+      "title": "ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md",
+      "details": "V32-13 Engineering Analysis/Calibration/Influence evidence note for HO-007 selected-run contracts, HO-008 animator context and HO-009 diagnostics manifest without SEND runtime closure claims.",
+      "artifact_path": "context/gui_spec_imports/v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0035",
+      "created_at": "2026-04-17T03:37:08+00:00",
+      "source": "chat + V32-13 Engineering Analysis",
+      "title": "V32-13 Engineering Analysis evidence acceptance",
+      "details": "Accept Engineering Analysis/Calibration/Influence evidence contracts for WS-ANALYSIS, HO-007, HO-008 and HO-009 with selected_run_contract, compare influence surfaces, unit catalog, report provenance, engineering_analysis_evidence_manifest and analysis-to-animator link tests; this is contract/provenance acceptance, not diagnostics/SEND runtime closure.",
+      "artifact_path": "context/gui_spec_imports/v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md",
       "status": "актуален"
     }
   ]

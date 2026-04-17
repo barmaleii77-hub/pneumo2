@@ -458,6 +458,40 @@ def test_desktop_diagnostics_prefers_latest_bundle_pointer_over_stale_meta(tmp_p
     assert bundle.latest_sha_path.endswith("latest_send_bundle.sha256")
 
 
+def test_desktop_diagnostics_marks_clipboard_status_stale_when_it_points_to_old_zip(tmp_path: Path) -> None:
+    out_dir = tmp_path / "send_bundles"
+    out_dir.mkdir()
+
+    old_zip = out_dir / "SEND_old_bundle.zip"
+    latest_zip = out_dir / "latest_send_bundle.zip"
+    old_zip.write_bytes(b"old zip bytes")
+    latest_zip.write_bytes(b"latest zip bytes")
+    (out_dir / "latest_send_bundle_path.txt").write_text(str(latest_zip.resolve()), encoding="utf-8")
+    (out_dir / "latest_send_bundle.sha256").write_text(
+        hashlib.sha256(latest_zip.read_bytes()).hexdigest() + "  latest_send_bundle.zip\n",
+        encoding="utf-8",
+    )
+    (out_dir / "latest_send_bundle_clipboard_status.json").write_text(
+        json.dumps(
+            {
+                "ok": True,
+                "message": f"Copied file to clipboard (CF_HDROP): {old_zip.resolve()}",
+                "zip_path": str(old_zip.resolve()),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    bundle = load_desktop_diagnostics_bundle_record(tmp_path, out_dir=out_dir)
+
+    assert bundle.latest_zip_path == str(latest_zip.resolve())
+    assert bundle.clipboard_ok is False
+    assert "stale" in bundle.clipboard_message
+    assert str(old_zip.resolve()) in bundle.clipboard_message
+
+
 def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> None:
     diag_src = (ROOT / "pneumo_solver_ui" / "tools" / "run_full_diagnostics_gui.py").read_text(
         encoding="utf-8",
@@ -505,7 +539,11 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "analysis_context_action" in runtime_src
     assert "Geometry Reference evidence" in center_src
     assert "Artifact freshness" in center_src
+    assert "Producer artifact status" in center_src
+    assert "Consumer fabrication allowed" in center_src
     assert "geometry_reference_artifact_freshness_relation" in center_src
+    assert "geometry_reference_producer_artifact_status" in runtime_src
+    assert "consumer_may_fabricate_geometry" in runtime_src
     assert 'text="Открыть Geometry JSON"' in center_src
     assert "self.btn_open_geometry_reference_evidence" in center_src
     assert "def _open_geometry_reference_evidence(self) -> None:" in center_src

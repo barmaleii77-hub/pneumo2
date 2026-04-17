@@ -70,6 +70,17 @@ def _safe_int(value: object) -> int:
         return 0
 
 
+def _same_path(left: object, right: object) -> bool:
+    left_text = str(left or "").strip()
+    right_text = str(right or "").strip()
+    if not left_text or not right_text:
+        return False
+    try:
+        return Path(left_text).expanduser().resolve() == Path(right_text).expanduser().resolve()
+    except Exception:
+        return left_text.casefold() == right_text.casefold()
+
+
 def _clean_string_list(value: object) -> list[str]:
     if not isinstance(value, (list, tuple)):
         return []
@@ -331,6 +342,18 @@ def load_desktop_diagnostics_bundle_record(
 
     clipboard_path = resolved_out_dir / "latest_send_bundle_clipboard_status.json"
     clipboard_status = _safe_read_json_dict(clipboard_path) if clipboard_path.exists() else {}
+    if clipboard_status and latest_zip is not None:
+        clipboard_zip = str(clipboard_status.get("zip_path") or "").strip()
+        if not _same_path(clipboard_zip, latest_zip):
+            clipboard_status = {
+                "ok": False,
+                "message": (
+                    "Clipboard status is stale for the current latest bundle: "
+                    f"{clipboard_zip or 'no zip_path'}"
+                ),
+                "zip_path": clipboard_zip,
+                "stale_for_latest_zip": path_str(latest_zip),
+            }
     analysis = _load_analysis_evidence_summary(repo_root, resolved_out_dir)
     engineering_analysis = _load_engineering_analysis_evidence_summary(repo_root, resolved_out_dir)
     geometry_reference = _load_geometry_reference_evidence_summary(repo_root, resolved_out_dir)

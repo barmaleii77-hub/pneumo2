@@ -290,12 +290,23 @@ def test_engineering_analysis_runtime_validates_artifacts_and_exports_evidence(t
     assert payload["sensitivity_summary"][0]["param"] == "база"
     assert payload["compare_influence_surfaces"][0]["diagnostics"]["finite_cell_count"] == 2
     assert payload["evidence_manifest_hash"]
+    assert payload["validated_artifacts"]["schema"] == "engineering_analysis_validated_artifacts.v1"
+    assert payload["validated_artifacts"]["status"] == "READY"
+    assert payload["validated_artifacts"]["required_artifact_count"] == 3
+    assert payload["validated_artifacts"]["ready_required_artifact_count"] == 3
+    assert payload["validated_artifacts"]["missing_required_artifacts"] == []
 
     records = {item["key"]: item for item in payload["selected_artifact_list"]}
     assert records["system_influence_json"]["sha256"]
     assert records["system_influence_json"]["size_bytes"] > 0
     assert records["report_full_md"]["sha256"]
     assert any(item["key"] == "report_full_md" for item in payload["report_provenance"])
+    validated_records = {
+        item["key"]: item
+        for item in payload["validated_artifacts"]["expected_artifacts"]
+    }
+    assert validated_records["system_influence_json"]["validation_status"] == "READY"
+    assert validated_records["system_influence_params_csv"]["validation_status"] == "READY"
 
     refreshed = runtime.snapshot(selected_contract_path=contract_path)
     assert refreshed.diagnostics_evidence_manifest_path == sidecar
@@ -323,6 +334,30 @@ def test_evidence_export_builds_compare_influence_surfaces_from_artifacts(tmp_pa
     payload = json.loads(sidecar.read_text(encoding="utf-8"))
     assert payload["compare_influence_surfaces"][0]["diagnostics"]["finite_cell_count"] == 4
     assert payload["selected_charts"] == ["Fixture compare influence"]
+
+
+def test_evidence_export_reports_missing_required_validated_artifacts(tmp_path: Path) -> None:
+    run_dir = tmp_path / "RUN_partial_engineering_analysis"
+    _write_json(run_dir / "system_influence.json", _build_system_influence_payload())
+    contract_path = _write_selected_run_contract(tmp_path / "selected_run_contract.json", run_dir)
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="python")
+    snapshot = runtime.snapshot(selected_contract_path=contract_path)
+
+    payload = runtime.build_diagnostics_evidence_manifest(snapshot)
+
+    validated = payload["validated_artifacts"]
+    assert validated["status"] == "MISSING"
+    assert validated["required_artifact_count"] == 3
+    assert validated["ready_required_artifact_count"] == 1
+    missing_keys = {item["key"] for item in validated["missing_required_artifacts"]}
+    assert missing_keys == {"system_influence_md", "system_influence_params_csv"}
+    records = {item["key"]: item for item in validated["expected_artifacts"]}
+    assert records["system_influence_json"]["validation_status"] == "READY"
+    assert records["system_influence_md"]["validation_status"] == "MISSING"
+    assert any(
+        "Required engineering analysis artifact(s) missing or unvalidated" in warning
+        for warning in payload["validation"]["warnings"]
+    )
 
 
 def test_evidence_export_warns_when_compare_influence_artifact_is_unparseable(tmp_path: Path) -> None:

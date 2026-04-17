@@ -48,17 +48,18 @@ Targeted test command:
 python -m pytest tests/test_v32_diagnostics_send_bundle_evidence.py tests/test_health_report_inspect_send_bundle_anim_diagnostics.py tests/test_desktop_diagnostics_center_contract.py -q
 ```
 
-Result: `26 passed`.
+Result: `26 passed`. Focused Geometry/Diagnostics producer-handoff
+regression set: `45 passed`.
 
 Focused Geometry/Diagnostics regression result: `85 passed`.
 
 Runtime proof captured:
 
-- ZIP: `send_bundles/SEND_20260417_082931_bundle.zip`
-- Final latest SHA256: `20aafc2808aea2e93fd46826144d0c057ffb270b73092de62adda918a0eacfa1`
-- Trigger / mode: `desktop_diagnostics_center` / `manual`
-- Validation: `ok=True`, `errors=0`, `warnings=6`
-- Health after final triage: `ok=False`, `notes=8`, preserving adjacent-workstream warnings.
+- ZIP: `send_bundles/SEND_20260417_083527_auto-exit_bundle.zip`
+- Final latest SHA256: `526fc0c91513c7b1d9e44e3d1b2c49c45b09f4cc79e557ef0f2bb3421cc77d75`
+- Trigger / mode: `auto-exit` / `exit`
+- Validation: `ok=True`, `errors=0`, `warnings=7`
+- Health after final triage: `ok=False`, `notes=9`, preserving adjacent-workstream warnings.
 - PB-002 required evidence: `pb002_missing_required_count=0`
 - Latest pointer/SHA proof: `latest_zip_matches_original=True`, `latest_sha_sidecar_matches=True`, `latest_pointer_matches_original=True`
 - Embedded evidence stage: `final_after_validation_dashboard`; latest sidecar proof stage: `latest_zip_sha_inspection_proof`.
@@ -69,6 +70,10 @@ Runtime proof captured:
   closure.
 - BND-018 sidecar proof: `latest_geometry_reference_evidence.json` is embedded as
   `geometry/geometry_reference_evidence.json`; it carries
+  `producer_artifact_status=missing`, `producer_evidence_owner=producer_export`,
+  the required producer artifact list for `anim_latest`, packaging passport and
+  geometry acceptance, `producer_next_action` for re-exporting producer evidence,
+  `consumer_may_fabricate_geometry=false`,
   `artifact_freshness_status=missing`, `artifact_freshness_relation=latest`,
   `road_width_status=derived_from_track_and_wheel_width`,
   `packaging_mismatch_status=mismatch`, and
@@ -100,7 +105,7 @@ Geometry Reference / GAP evidence state:
 Runtime proof command:
 
 ```powershell
-python -m pneumo_solver_ui.tools.make_send_bundle --trigger desktop_diagnostics_center --max_file_mb 80 --print_path
+python -m pneumo_solver_ui.tools.make_send_bundle --trigger desktop_geometry_reference_center --max_file_mb 80 --print_path
 python -m pytest tests/test_v32_diagnostics_send_bundle_evidence.py tests/test_r53_send_bundle_final_health_after_triage.py tests/test_send_bundle_effective_workspace_projection.py tests/test_ui_autosave_bundle_contract.py tests/test_anim_latest_bundle_usability_diagnostics.py tests/test_health_report_inspect_send_bundle_anim_diagnostics.py tests/test_r31ci_send_bundle_helper_runtime_contract.py tests/test_desktop_diagnostics_center_contract.py tests/test_diagnostics_text_encoding_contract.py tests/test_diagnostics_entrypoint_summary_contract.py tests/test_send_bundle_gui_wrappers_contract.py tests/test_send_bundle_zip_page_contract.py tests/test_run_registry_send_bundle_anim_diagnostics.py tests/test_dashboard_validation_anim_latest_diagnostics.py tests/test_env_diagnostics_send_bundle_summary_source.py tests/test_triage_readme_anim_latest_diagnostics.py tests/test_r32_triage_and_anim_sidecars.py tests/test_legacy_send_bundle_page_wrappers.py tests/test_run_full_diagnostics_tool.py tests/test_clipboard_send_gui_contract.py tests/test_page_runner_auto_bundle_clipboard.py tests/test_page_runner_autobundle_summary.py tests/test_send_bundle_utcaware_source.py tests/test_gui_spec_docs_contract.py -q
 python -m pneumo_solver_ui.tools.validate_send_bundle --zip send_bundles\latest_send_bundle.zip --print_summary
 python -m pneumo_solver_ui.tools.inspect_send_bundle --zip send_bundles\latest_send_bundle.zip --print_summary

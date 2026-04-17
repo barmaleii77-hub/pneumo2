@@ -35,6 +35,7 @@
   `COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md`,
   `GEOMETRY_REFERENCE_EVIDENCE_NOTE.md`,
   `MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md`,
+  `ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md`,
   `DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md`,
   `DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md` and
   `RUNTIME_RELEASE_EVIDENCE_NOTE.md`;
@@ -80,6 +81,8 @@
    `v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md`;
    for Desktop Mnemo truth graphics, also read
    `v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md`;
+   for Engineering Analysis/Calibration/Influence evidence, also read
+   `v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md`;
    for diagnostics/SEND-bundle acceptance,
    also read `v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md`;
    for producer-owned diagnostics warning handoff, also read

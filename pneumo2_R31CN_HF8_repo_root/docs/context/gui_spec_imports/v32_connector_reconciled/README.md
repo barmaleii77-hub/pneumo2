@@ -44,6 +44,9 @@ entrypoint и картой чтения для будущих задач.
   OG-001 / OG-002 / OG-006`.
 - [MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md](./MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md) -
   Desktop Mnemo truth-graphics evidence note для `V32-10 / RGH-003`.
+- [ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md](./ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md) -
+  Engineering Analysis/Calibration/Influence evidence note для `V32-13 /
+  HO-007 / HO-008 / HO-010 / HO-009`.
 - [DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md](./DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md) -
   runtime evidence note для `PB-002 / RGH-006 / RGH-007 / RGH-016`.
 - [DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md](./DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md) -

@@ -463,6 +463,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             "compare_influence_surface_count": len(compare_surfaces),
             "compare_influence_surfaces": compare_surfaces,
             "unit_catalog": dict(snapshot.unit_catalog),
+            "validated_artifacts": self.runtime.validated_artifacts_summary(snapshot),
             "handoff_requirements": self.runtime.selected_run_handoff_requirements(snapshot),
         }
         return json.dumps(payload, ensure_ascii=False, indent=2)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -713,12 +714,54 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             / "analysis_context.json"
         ).resolve(strict=False)
 
+    def _read_json_dict(self, path: Path) -> dict[str, object]:
+        try:
+            obj = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        except Exception:
+            return {}
+        return dict(obj) if isinstance(obj, dict) else {}
+
+    def _resolve_capture_export_manifest_path(self) -> Path | None:
+        workspace_dir = self.project_context.workspace_dir
+        pointer_candidates = (
+            workspace_dir / "exports" / "anim_latest.json",
+            workspace_dir / "_pointers" / "anim_latest.json",
+        )
+        for pointer_path in pointer_candidates:
+            if not pointer_path.exists():
+                continue
+            payload = self._read_json_dict(pointer_path)
+            meta = payload.get("meta")
+            meta_obj = dict(meta) if isinstance(meta, dict) else {}
+            artifact_refs = meta_obj.get("anim_export_contract_artifacts")
+            refs_obj = dict(artifact_refs) if isinstance(artifact_refs, dict) else {}
+            raw_ref = str(refs_obj.get("capture_export_manifest") or "").strip()
+            if not raw_ref:
+                continue
+            target = Path(raw_ref)
+            if not target.is_absolute():
+                target = pointer_path.parent / target
+            try:
+                target = target.resolve(strict=False)
+            except Exception:
+                pass
+            if target.exists():
+                return target
+
+        default_path = workspace_dir / "exports" / "capture_export_manifest.json"
+        try:
+            return default_path.resolve(strict=False)
+        except Exception:
+            return default_path
+
     def _resolve_animator_artifact_path(self, artifact_id: str) -> Path | None:
         context_path = self._analysis_context_path()
         if artifact_id == "animator.analysis_context":
             return context_path
         if artifact_id == "animator.animator_link_contract":
             return context_path.with_name("animator_link_contract.json")
+        if artifact_id == "animator.capture_export_manifest":
+            return self._resolve_capture_export_manifest_path()
 
         snapshot = load_analysis_context(context_path, repo_root=self.project_context.repo_root)
         if artifact_id == "animator.selected_result_artifact_pointer":
@@ -763,6 +806,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             "animator.animator_link_contract": "HO-008 animator_link_contract.json",
             "animator.selected_result_artifact_pointer": "selected result artifact pointer",
             "animator.selected_npz_path": "selected animation NPZ",
+            "animator.capture_export_manifest": "HO-010 capture_export_manifest.json",
         }
         artifact_label = labels.get(str(artifact_id), str(artifact_id))
         try:

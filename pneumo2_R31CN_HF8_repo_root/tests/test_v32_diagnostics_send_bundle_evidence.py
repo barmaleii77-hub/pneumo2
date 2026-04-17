@@ -5,6 +5,8 @@ import json
 import zipfile
 from pathlib import Path
 
+import pytest
+
 from pneumo_solver_ui.browser_perf_artifacts import write_browser_perf_artifacts, write_browser_perf_trace_artifact
 from pneumo_solver_ui.desktop_animator.truth_contract import (
     ANIMATOR_FRAME_BUDGET_EVIDENCE_JSON_NAME,
@@ -286,6 +288,58 @@ def test_collection_mode_classifier_covers_manual_exit_crash_and_watchdog() -> N
     assert classify_collection_mode("auto-sys.excepthook") == "crash"
     assert classify_collection_mode("auto-threading.excepthook") == "crash"
     assert classify_collection_mode("watchdog") == "watchdog"
+
+
+@pytest.mark.parametrize(
+    ("trigger", "expected_mode"),
+    (
+        ("manual", "manual"),
+        ("auto-exit", "exit"),
+        ("auto-sys.excepthook", "crash"),
+        ("watchdog", "watchdog"),
+    ),
+)
+def test_make_send_bundle_preserves_trigger_and_collection_mode_in_runtime_artifacts(
+    tmp_path: Path,
+    monkeypatch,
+    trigger: str,
+    expected_mode: str,
+) -> None:
+    repo_root, out_dir, workspace = _prepare_repo_and_workspace(tmp_path, monkeypatch)
+    (workspace / "exports" / "analysis_evidence_manifest.json").write_text(
+        json.dumps(_analysis_manifest(run_id=f"run-{expected_mode}"), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (out_dir / GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME).write_text(
+        json.dumps(_geometry_reference_evidence(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    zip_path = make_send_bundle(
+        repo_root=repo_root,
+        out_dir=out_dir,
+        keep_last_n=2,
+        max_file_mb=20,
+        trigger=trigger,
+    )
+
+    latest_zip = out_dir / "latest_send_bundle.zip"
+    latest_evidence = json.loads((out_dir / "latest_evidence_manifest.json").read_text(encoding="utf-8"))
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        meta = json.loads(zf.read("bundle/meta.json").decode("utf-8", errors="replace"))
+        evidence = json.loads(zf.read(EVIDENCE_MANIFEST_ARCNAME).decode("utf-8", errors="replace"))
+
+    assert latest_zip.exists()
+    assert latest_zip.read_bytes() == zip_path.read_bytes()
+    assert meta["trigger"] == trigger
+    assert meta["collection_mode"] == expected_mode
+    assert evidence["trigger"] == trigger
+    assert evidence["collection_mode"] == expected_mode
+    assert latest_evidence["trigger"] == trigger
+    assert latest_evidence["collection_mode"] == expected_mode
+    assert latest_evidence["latest_pointer_matches_original"] is True
+    assert latest_evidence["latest_sha_sidecar_matches"] is True
+    assert validate_send_bundle(zip_path).ok is True
 
 
 def test_send_bundle_evidence_manifest_tracks_windows_runtime_proof(tmp_path: Path) -> None:

@@ -246,6 +246,20 @@ ID: `PLAN-0032`.
 Источник: chat.
 ID: `PLAN-0033`.
 
+34. ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md
+Назначение: V32-13 Engineering Analysis/Calibration/Influence evidence note for HO-007 selected-run contracts, HO-008 animator context and HO-009 diagnostics manifest without SEND runtime closure claims.
+Артефакт: [context/gui_spec_imports/v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md)
+Статус: актуален.
+Источник: chat.
+ID: `PLAN-0034`.
+
+35. V32-13 Engineering Analysis evidence acceptance
+Назначение: Accept Engineering Analysis/Calibration/Influence evidence contracts for WS-ANALYSIS, HO-007, HO-008 and HO-009 with selected_run_contract, compare influence surfaces, unit catalog, report provenance, engineering_analysis_evidence_manifest and analysis-to-animator link tests; this is contract/provenance acceptance, not diagnostics/SEND runtime closure.
+Артефакт: [context/gui_spec_imports/v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md)
+Статус: актуален.
+Источник: chat + V32-13 Engineering Analysis.
+ID: `PLAN-0035`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

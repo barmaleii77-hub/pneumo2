@@ -69,14 +69,49 @@ def _test_project_context(tmp_path: Path) -> ShellProjectContext:
     )
 
 
-def _write_qt_shell_analysis_context(workspace_dir: Path) -> tuple[Path, Path, Path]:
+def _write_qt_shell_analysis_context(workspace_dir: Path) -> tuple[Path, Path, Path, Path]:
     context_path = workspace_dir / "handoffs" / "WS-ANALYSIS" / "analysis_context.json"
     link_path = context_path.with_name("animator_link_contract.json")
     npz_path = workspace_dir / "exports" / "anim_latest.npz"
     pointer_path = workspace_dir / "exports" / "anim_latest.json"
+    capture_manifest_path = workspace_dir / "exports" / "capture_export_manifest.json"
     npz_path.parent.mkdir(parents=True, exist_ok=True)
     npz_path.write_bytes(b"npz-demo")
-    pointer_path.write_text(json.dumps({"npz_path": str(npz_path)}, ensure_ascii=False), encoding="utf-8")
+    capture_manifest_path.write_text(
+        json.dumps(
+            {
+                "schema": "capture_export_manifest.v1",
+                "handoff_id": "HO-010",
+                "capture_hash": "capture-shell-010",
+                "analysis_context_hash": "analysis-context-shell",
+                "analysis_context_refs": {
+                    "analysis_context_status": "READY",
+                    "selected_test_id": "T01",
+                    "selected_npz_path": str(npz_path),
+                },
+                "truth_summary": {"overall_truth_state": "READY"},
+                "blocking_states": [],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    pointer_path.write_text(
+        json.dumps(
+            {
+                "npz_path": str(npz_path),
+                "meta": {
+                    "anim_export_contract_artifacts": {
+                        "capture_export_manifest": capture_manifest_path.name,
+                    },
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     pointer = {
         "path": str(pointer_path),
         "exists": True,
@@ -131,7 +166,7 @@ def _write_qt_shell_analysis_context(workspace_dir: Path) -> tuple[Path, Path, P
     context_path.parent.mkdir(parents=True, exist_ok=True)
     context_path.write_text(json.dumps(context, ensure_ascii=False, indent=2), encoding="utf-8")
     link_path.write_text(json.dumps(link, ensure_ascii=False, indent=2), encoding="utf-8")
-    return context_path, link_path, pointer_path
+    return context_path, link_path, pointer_path, capture_manifest_path
 
 
 class _FakeCoexistenceManager:
@@ -336,6 +371,10 @@ def test_desktop_shell_command_search_home_and_project_tree_actions_are_routable
         "animator.selected_result_artifact_pointer"
     )
     assert by_label["Открыть selected animation NPZ"].action_value == "animator.selected_npz_path"
+    assert by_label["Открыть HO-010 capture_export_manifest.json"].action_kind == "open_artifact"
+    assert by_label["Открыть HO-010 capture_export_manifest.json"].action_value == (
+        "animator.capture_export_manifest"
+    )
 
 
 def test_desktop_qt_shell_opens_animator_ho008_artifacts_from_command_surface(
@@ -344,7 +383,9 @@ def test_desktop_qt_shell_opens_animator_ho008_artifacts_from_command_surface(
 ) -> None:
     QtCore, QtGui, _QtWidgets = _qt_modules()
     context = _test_project_context(tmp_path)
-    context_path, link_path, pointer_path = _write_qt_shell_analysis_context(context.workspace_dir)
+    context_path, link_path, pointer_path, capture_manifest_path = _write_qt_shell_analysis_context(
+        context.workspace_dir
+    )
     opened: list[str] = []
 
     monkeypatch.setattr(
@@ -370,6 +411,8 @@ def test_desktop_qt_shell_opens_animator_ho008_artifacts_from_command_surface(
         assert Path(opened[-1]) == pointer_path.resolve()
         assert window.open_shell_artifact("animator.selected_npz_path") is True
         assert Path(opened[-1]).name == "anim_latest.npz"
+        assert window.open_shell_artifact("animator.capture_export_manifest") is True
+        assert Path(opened[-1]) == capture_manifest_path.resolve()
 
         window.command_search_edit.setText("selected animation NPZ")
         app.processEvents()
@@ -378,6 +421,14 @@ def test_desktop_qt_shell_opens_animator_ho008_artifacts_from_command_surface(
         assert first.data(QtCore.Qt.ItemDataRole.UserRole + 1) == "open_artifact"
         window._activate_search_item(first)
         assert Path(opened[-1]).name == "anim_latest.npz"
+
+        window.command_search_edit.setText("HO-010 capture")
+        app.processEvents()
+        first = window.search_results_list.item(0)
+        assert first is not None
+        assert first.data(QtCore.Qt.ItemDataRole.UserRole + 1) == "open_artifact"
+        window._activate_search_item(first)
+        assert Path(opened[-1]) == capture_manifest_path.resolve()
     finally:
         window.close()
         window.deleteLater()
