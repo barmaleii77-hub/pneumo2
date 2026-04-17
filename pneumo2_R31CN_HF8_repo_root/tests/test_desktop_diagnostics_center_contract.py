@@ -202,6 +202,49 @@ def test_desktop_diagnostics_reads_analysis_evidence_workspace_fallback_and_warn
     assert any("context mismatch" in msg for msg in bundle.analysis_evidence_warnings)
 
 
+def test_desktop_diagnostics_surfaces_ho008_analysis_context_warning(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    out_dir = repo_root / "send_bundles"
+    out_dir.mkdir(parents=True)
+    manifest = _analysis_manifest(run_id="run-ho008", manifest_hash="hash-ho008")
+    manifest["result_context"]["selected"] = {
+        "run_id": "run-ho008",
+        "analysis_context_status": "BLOCKED",
+        "animator_link_contract_hash": "animator-link-ho008",
+        "selected_run_contract_hash": "selected-run-ho008",
+        "selected_test_id": "T02",
+        "selected_npz_path": "C:/workspace/exports/selected.npz",
+        "capture_export_manifest_handoff_id": "HO-010",
+        "capture_hash": "capture-ho008",
+        "truth_mode_hash": "truth-ho008",
+    }
+    (out_dir / "latest_analysis_evidence_manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    bundle = load_desktop_diagnostics_bundle_record(repo_root, out_dir=out_dir)
+
+    assert bundle.analysis_evidence_status == "WARN"
+    assert bundle.analysis_context_status == "BLOCKED"
+    assert bundle.analysis_animator_link_contract_hash == "animator-link-ho008"
+    assert bundle.analysis_selected_run_contract_hash == "selected-run-ho008"
+    assert bundle.analysis_selected_test_id == "T02"
+    assert bundle.analysis_selected_npz_path == "C:/workspace/exports/selected.npz"
+    assert bundle.analysis_capture_export_manifest_handoff_id == "HO-010"
+    assert bundle.analysis_capture_hash == "capture-ho008"
+    assert bundle.analysis_truth_mode_hash == "truth-ho008"
+    assert "Engineering Analysis Center" in bundle.analysis_context_action
+    assert any("HO-008 analysis context is BLOCKED" in msg for msg in bundle.analysis_evidence_warnings)
+
+    center_state = write_desktop_diagnostics_center_state(out_dir, bundle_record=bundle)
+    payload = json.loads(center_state.read_text(encoding="utf-8"))
+    assert payload["analysis_evidence"]["analysis_context_status"] == "BLOCKED"
+    assert payload["analysis_evidence"]["animator_link_contract_hash"] == "animator-link-ho008"
+    assert payload["analysis_evidence"]["selected_test_id"] == "T02"
+    assert payload["analysis_evidence"]["capture_export_manifest_handoff_id"] == "HO-010"
+
+
 def test_desktop_diagnostics_marks_missing_analysis_evidence_with_results_action(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     out_dir = repo_root / "send_bundles"
