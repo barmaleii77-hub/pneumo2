@@ -17,6 +17,7 @@ class CommandSearchEntry:
     subtitle: str
     haystack: str
     workspace_id: str
+    exact_aliases: tuple[str, ...] = ()
 
 
 def build_search_entries(
@@ -38,6 +39,15 @@ def build_search_entries(
             *command.web_aliases,
             *workspace.search_aliases,
         ]
+        exact_aliases = tuple(
+            _normalize(alias)
+            for alias in (
+                *command.search_aliases,
+                *command.web_aliases,
+                *workspace.search_aliases,
+            )
+            if _normalize(alias)
+        )
         entries.append(
             CommandSearchEntry(
                 entry_id=f"command:{command.command_id}",
@@ -46,6 +56,7 @@ def build_search_entries(
                 subtitle=command.route_label,
                 haystack=_normalize(" ".join(keywords)),
                 workspace_id=command.workspace_id,
+                exact_aliases=exact_aliases,
             )
         )
     return tuple(entries)
@@ -73,6 +84,10 @@ def search_command_palette(
             score += 60
         if normalized in title:
             score += 25
+        if normalized in entry.exact_aliases:
+            score += 80
+        elif any(normalized in alias for alias in entry.exact_aliases):
+            score += 35
         if haystack.startswith(normalized):
             score += 20
         score += max(0, 15 - len(entry.title))

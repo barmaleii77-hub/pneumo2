@@ -39,6 +39,7 @@ V32_GATE_HARDENING = IMPORTS_V32 / "RELEASE_GATE_HARDENING_MATRIX.csv"
 V32_GAP_MAP = IMPORTS_V32 / "GAP_TO_EVIDENCE_ACTION_MAP.csv"
 V32_INPUTS_HANDOFF_EVIDENCE = IMPORTS_V32 / "WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md"
 V32_PRODUCER_ANIMATOR_TRUTH_NOTE = IMPORTS_V32 / "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md"
+V32_COMPARE_OBJECTIVE_INTEGRITY_NOTE = IMPORTS_V32 / "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md"
 V32_DIAGNOSTICS_EVIDENCE_NOTE = IMPORTS_V32 / "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md"
 V32_RUNTIME_EVIDENCE_NOTE = IMPORTS_V32 / "RUNTIME_RELEASE_EVIDENCE_NOTE.md"
 RELEASE_TRIAGE = CONTEXT / "release_readiness" / "WORKTREE_TRIAGE_2026-04-17.md"
@@ -267,6 +268,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "RELEASE_GATE_HARDENING_MATRIX.csv" in imports_readme
     assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in imports_readme
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in imports_readme
+    assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in imports_readme
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in imports_readme
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in imports_readme
     assert "специализированный ring-editor migration" in imports_readme
@@ -292,6 +294,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "v32_connector_reconciled/RELEASE_GATE_HARDENING_MATRIX.csv" in project_sources_text
     assert "v32_connector_reconciled/GAP_TO_EVIDENCE_ACTION_MAP.csv" in project_sources_text
     assert "v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in project_sources_text
+    assert "v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md" in project_sources_text
     assert "v33_connector_reconciled/README.md" in project_sources_text
@@ -315,6 +318,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "RELEASE_GATE_HARDENING_MATRIX.csv" in index_text
     assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in index_text
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in index_text
+    assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in index_text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in index_text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in index_text
     assert "WORKTREE_TRIAGE_2026-04-17.md" in index_text
@@ -420,6 +424,7 @@ def test_v32_connector_reconciled_digest_is_registered() -> None:
     assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in text
     assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in text
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in text
+    assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in text
     assert "WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md" in text
@@ -521,6 +526,7 @@ def test_v32_release_gate_acceptance_map_is_executable_docs_contract() -> None:
     assert "V32-16" in release_lane_text
     assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in release_lane_text
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in release_lane_text
+    assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in release_lane_text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in release_lane_text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in release_lane_text
     assert "Do not implement domain runtime features here." in release_lane_text
@@ -592,6 +598,32 @@ def test_v32_14_v32_09_producer_animator_truth_note_records_contract_acceptance_
     assert "36 passed" in text
     assert "not a durable release SEND bundle" in text
     assert "complete cylinder packaging passport" in text
+
+
+def test_v32_06_v32_08_compare_objective_note_records_contract_acceptance_without_runtime_gap_closure() -> None:
+    assert V32_COMPARE_OBJECTIVE_INTEGRITY_NOTE.exists()
+
+    text = V32_COMPARE_OBJECTIVE_INTEGRITY_NOTE.read_text(encoding="utf-8")
+    assert "V32-06/V32-08 compare and objective integrity contracts accepted" in text
+    assert "not a runtime gap\nclosure claim" in text
+    assert "`RGH-013`" in text
+    assert "`RGH-014`" in text
+    assert "`RGH-015`" in text
+    assert "Optimization objective contracts persist selected objective stacks" in text
+    assert "Resume/staged-resume paths reject or warn" in text
+    assert "Run history surfaces current/historical/stale objective state" in text
+    assert "Compare sessions carry explicit compare contracts" in text
+    assert "tests/test_qt_compare_viewer_compare_contract.py" in text
+    assert "tests/test_qt_compare_viewer_session_autoload_source.py" in text
+    assert "tests/test_qt_compare_offline_npz_anim_diagnostics.py" in text
+    assert "tests/test_qt_compare_viewer_dock_object_names.py" in text
+    assert "tests/test_optimization_objective_contract.py" in text
+    assert "tests/test_r31cw_optimization_run_history_objective_contract.py" in text
+    assert "tests/test_optimization_baseline_source_history.py" in text
+    assert "tests/test_optimization_resume_run_dir.py" in text
+    assert "tests/test_optimization_staged_resume_run_dir.py" in text
+    assert "41 passed" in text
+    assert "does not close `OG-003`, `OG-004`, `OG-005`" in text
 
 
 def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_release_closure() -> None:
@@ -760,6 +792,7 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         V32_GATE_HARDENING,
         V32_GAP_MAP,
         V32_PRODUCER_ANIMATOR_TRUTH_NOTE,
+        V32_COMPARE_OBJECTIVE_INTEGRITY_NOTE,
         V32_DIAGNOSTICS_EVIDENCE_NOTE,
         V32_RUNTIME_EVIDENCE_NOTE,
         RELEASE_TRIAGE,

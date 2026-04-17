@@ -579,6 +579,24 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         if result.error:
             self._append_log("error: " + result.error)
         self.refresh()
+        if label == "Export HO-007" and result.ok:
+            self._auto_export_evidence_after_ho007()
+
+    def _auto_export_evidence_after_ho007(self) -> None:
+        snapshot = self.snapshot_state or self.runtime.snapshot()
+        if snapshot.status == "BLOCKED" or snapshot.contract_status in {"MISSING", "INVALID", "BLOCKED"}:
+            self._append_log("evidence auto-export skipped: selected run contract is not ready")
+            self.status_var.set("Export HO-007: FINISHED; evidence auto-export skipped")
+            return
+        try:
+            path = self.runtime.write_diagnostics_evidence_manifest(snapshot)
+        except Exception as exc:
+            self._append_log(f"evidence auto-export failed: {type(exc).__name__}: {exc!s}")
+            self.status_var.set("Export HO-007: FINISHED; evidence auto-export failed")
+            return
+        self._append_log(f"evidence auto-exported after HO-007: {path}")
+        self.status_var.set(f"Export HO-007: FINISHED; evidence exported: {path}")
+        self.refresh()
 
     def _run_system_influence(self) -> None:
         self._run_job(

@@ -219,6 +219,33 @@ def test_capture_export_manifest_uses_explicit_ho008_analysis_context_refs(tmp_p
     assert "analysis_context_blocked" not in manifest["blocking_states"]
 
 
+def test_capture_export_manifest_marks_missing_ho008_without_empty_synthetic_hash(tmp_path: Path) -> None:
+    npz_path = tmp_path / "anim_latest.npz"
+    pointer_path = tmp_path / "anim_latest.json"
+    npz_path.write_bytes(b"npz-demo")
+    pointer_path.write_text('{"npz_path":"anim_latest.npz"}', encoding="utf-8")
+
+    meta = _partial_truth_meta()
+    meta.pop("analysis_context_hash", None)
+    meta.pop("analysis_report_path", None)
+    truth = build_animator_truth_summary(meta, updated_utc="2026-04-17T00:00:00+00:00")
+    manifest = build_capture_export_manifest(
+        meta=meta,
+        updated_utc="2026-04-17T00:00:00+00:00",
+        npz_path=npz_path,
+        pointer_path=pointer_path,
+        artifact_refs=meta["anim_export_contract_artifacts"],
+        truth_summary=truth,
+    )
+
+    assert manifest["analysis_context_hash"] == ""
+    assert manifest["analysis_context_hash"] != stable_contract_hash({})
+    assert manifest["analysis_context_status"] == "MISSING"
+    assert manifest["analysis_context_refs"] == {}
+    assert manifest["analysis_artifact_refs"] == {}
+    assert "analysis_context_missing" in manifest["blocking_states"]
+
+
 def test_frame_budget_evidence_records_hidden_dock_gating_and_provenance() -> None:
     evidence = build_frame_budget_evidence(
         panels={

@@ -413,18 +413,39 @@ def build_capture_export_manifest(
             **_as_mapping(artifact_groups.get("optimizer")),
             **_as_mapping(explicit_groups.get("optimizer")),
         }
+    analysis_refs = _as_mapping(artifact_groups.get("analysis"))
+    analysis_context_ref_keys = {
+        "analysis_context",
+        "analysis_context_hash",
+        "analysis_context_path",
+        "analysis_context_status",
+        "animator_link_contract_hash",
+        "animator_link_contract_path",
+        "selected_result_artifact_pointer",
+        "selected_npz_path",
+        "selected_test_id",
+        "selected_segment_id",
+        "selected_time_window",
+    }
+    has_analysis_context_ref = any(
+        _as_mapping(src).get(key) not in (None, "", [], {})
+        for src in (explicit_analysis_context_refs, meta_dict, analysis_refs)
+        for key in analysis_context_ref_keys
+    )
     analysis_context_hash = str(
         explicit_analysis_context_refs.get("analysis_context_hash")
         or meta_dict.get("analysis_context_hash")
         or ""
     ).strip()
-    if not analysis_context_hash:
-        analysis_context_hash = stable_contract_hash(artifact_groups.get("analysis") or {})
+    if not analysis_context_hash and has_analysis_context_ref:
+        analysis_context_hash = stable_contract_hash(analysis_refs)
     analysis_context_status = str(
         explicit_analysis_context_refs.get("analysis_context_status")
         or meta_dict.get("analysis_context_status")
         or ""
     ).strip()
+    if not analysis_context_status and not has_analysis_context_ref:
+        analysis_context_status = "MISSING"
     truth_mode_hash = str(truth.get("truth_mode_hash") or stable_contract_hash(truth))
     capture_hash = stable_contract_hash(capture_refs) if (npz_sha or pointer_sha) else ""
 
@@ -440,8 +461,10 @@ def build_capture_export_manifest(
         blocking_states.append("missing_hardpoints_truth")
     if states.get("cylinder_packaging") == TRUTH_STATE_UNAVAILABLE:
         blocking_states.append("missing_cylinder_packaging_truth")
-    if analysis_context_status in {"BLOCKED", "INVALID", "MISSING"}:
+    if analysis_context_status in {"BLOCKED", "INVALID"}:
         blocking_states.append("analysis_context_blocked")
+    elif analysis_context_status == "MISSING":
+        blocking_states.append("analysis_context_missing")
     elif analysis_context_status == "DEGRADED":
         blocking_states.append("analysis_context_degraded")
 
@@ -468,7 +491,7 @@ def build_capture_export_manifest(
         "capture_refs": capture_refs,
         "artifact_refs": refs,
         "analysis_context_refs": explicit_analysis_context_refs,
-        "analysis_artifact_refs": _as_mapping(artifact_groups.get("analysis")),
+        "analysis_artifact_refs": analysis_refs,
         "optimizer_artifact_refs": _as_mapping(artifact_groups.get("optimizer")),
         "truth_summary": truth,
         "blocking_states": list(dict.fromkeys(blocking_states)),

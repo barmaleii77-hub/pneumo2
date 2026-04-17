@@ -876,3 +876,59 @@ def test_desktop_mnemo_offscreen_runtime_window_layout_evidence(
         restored.close()
         restored.deleteLater()
         qt_app.processEvents()
+
+
+def test_desktop_mnemo_offscreen_bad_npz_reports_status_without_modal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6 import QtWidgets
+    from pneumo_solver_ui.desktop_mnemo import app as mnemo_app
+
+    settings_path = tmp_path / "desktop_animator_settings.ini"
+    monkeypatch.setattr(mnemo_app, "default_settings_path", lambda _project_root: settings_path)
+    bad_npz_path = tmp_path / "broken_desktop_mnemo_bundle.npz"
+    bad_npz_path.write_bytes(b"not a valid npz bundle")
+    pointer_path = tmp_path / "anim_latest.json"
+
+    def forbidden_modal(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("Desktop Mnemo must not open QMessageBox.critical in offscreen runtime.")
+
+    monkeypatch.setattr(QtWidgets.QMessageBox, "critical", forbidden_modal)
+
+    qt_app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    assert mnemo_app._desktop_mnemo_can_show_blocking_dialog() is False
+
+    window = mnemo_app.MnemoMainWindow(
+        npz_path=bad_npz_path,
+        follow=False,
+        pointer_path=pointer_path,
+        theme="dark",
+        startup_preset="runtime_bad_npz",
+        startup_title="Bad NPZ smoke",
+        startup_reason="Verify Desktop Mnemo reports load errors without blocking modal in offscreen mode.",
+        startup_view_mode="overview",
+        startup_time_s=None,
+        startup_time_label="",
+        startup_edge="",
+        startup_node="",
+        startup_event_title="",
+        startup_time_ref_npz="",
+        startup_checklist=["Проверить no-modal load failure."],
+    )
+    try:
+        qt_app.processEvents()
+        assert window.dataset is None
+        assert window.truth_text.text() == "Mnemo: unavailable pressure/state"
+        assert window.status_text.text().startswith("Ошибка загрузки:")
+        window._push_diagnostics()
+        diagnostics = window.mnemo_view.native_canvas._diagnostics
+        assert diagnostics["overall_truth_state"] == "unavailable"
+        assert "dataset" in diagnostics["unavailable_surfaces"]
+    finally:
+        window.close()
+        window.deleteLater()
+        qt_app.processEvents()
