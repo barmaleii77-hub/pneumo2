@@ -487,6 +487,18 @@ def test_desktop_results_runtime_exports_diagnostics_evidence_manifest_input(tmp
             "anim_latest_npz_path": str(latest_npz),
             "anim_latest_pointer_json": str(latest_pointer),
             "anim_latest_visual_cache_token": "tok-777",
+            "anim_latest_capture_export_manifest_handoff_id": "HO-010",
+            "anim_latest_capture_hash": "capture-777",
+            "anim_latest_analysis_context_hash": "analysis-777",
+            "anim_latest_analysis_context_status": "READY",
+            "anim_latest_animator_link_contract_hash": "animator-link-777",
+            "anim_latest_selected_run_contract_hash": "run-hash-777",
+            "anim_latest_selected_test_id": "T01",
+            "anim_latest_selected_npz_path": str(latest_npz),
+            "anim_latest_objective_contract_hash": "objective-777",
+            "anim_latest_suite_snapshot_hash": "suite-777",
+            "anim_latest_problem_hash": "problem-777",
+            "anim_latest_truth_mode_hash": "truth-777",
         },
     )
     monkeypatch.setattr(
@@ -518,6 +530,7 @@ def test_desktop_results_runtime_exports_diagnostics_evidence_manifest_input(tmp
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     refreshed = runtime.snapshot()
     artifact_keys = {item["key"] for item in payload["selected_artifact_list"]}
+    fields = {field.key: field for field in snapshot.result_context_fields}
 
     assert manifest_path == (send_bundles / "latest_analysis_evidence_manifest.json").resolve()
     assert workspace_manifest.exists()
@@ -528,6 +541,20 @@ def test_desktop_results_runtime_exports_diagnostics_evidence_manifest_input(tmp
     assert payload["run_id"] == "run-777"
     assert payload["run_contract_hash"] == "run-hash-777"
     assert payload["compare_contract_id"] == "compare-777"
+    assert payload["result_context"]["selected"]["analysis_context_status"] == "READY"
+    assert payload["result_context"]["selected"]["animator_link_contract_hash"] == "animator-link-777"
+    assert payload["result_context"]["selected"]["selected_run_contract_hash"] == "run-hash-777"
+    assert payload["result_context"]["selected"]["selected_test_id"] == "T01"
+    assert payload["result_context"]["selected"]["selected_npz_path"] == str(latest_npz)
+    assert payload["result_context"]["selected"]["objective_contract_hash"] == "objective-777"
+    assert payload["result_context"]["selected"]["suite_snapshot_hash"] == "suite-777"
+    assert payload["result_context"]["selected"]["problem_hash"] == "problem-777"
+    assert payload["result_context"]["selected"]["capture_export_manifest_handoff_id"] == "HO-010"
+    assert payload["result_context"]["selected"]["capture_hash"] == "capture-777"
+    assert payload["result_context"]["selected"]["truth_mode_hash"] == "truth-777"
+    assert fields["analysis_context_status"].title == "Analysis context status"
+    assert fields["animator_link_contract_hash"].title == "Animator link contract hash"
+    assert fields["selected_npz_path"].selected_value == str(latest_npz)
     assert payload["result_context"]["state"] == "CURRENT"
     assert payload["mismatch_summary"]["state"] == "CURRENT"
     assert payload["evidence_manifest_hash"]

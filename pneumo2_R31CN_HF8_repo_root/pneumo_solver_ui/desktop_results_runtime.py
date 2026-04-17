@@ -189,6 +189,11 @@ _CONTEXT_FIELD_TITLES: dict[str, str] = {
     "run_contract_hash": "Run contract hash",
     "selected_run_hash": "Selected run hash",
     "analysis_context_hash": "Analysis context hash",
+    "analysis_context_status": "Analysis context status",
+    "animator_link_contract_hash": "Animator link contract hash",
+    "selected_run_contract_hash": "Selected run contract hash",
+    "selected_test_id": "Selected test ID",
+    "selected_npz_path": "Selected animation NPZ",
     "compare_contract_hash": "Compare contract hash",
     "evidence_manifest_hash": "Evidence manifest hash",
     "objective_contract_hash": "Objective contract hash",
@@ -202,6 +207,9 @@ _CONTEXT_FIELD_TITLES: dict[str, str] = {
     "objective_keys": "Objective keys",
     "penalty_key": "Penalty key",
     "penalty_tol": "Penalty tolerance",
+    "capture_export_manifest_handoff_id": "Capture manifest handoff",
+    "capture_hash": "Capture hash",
+    "truth_mode_hash": "Animator truth mode hash",
     "visual_cache_token": "Anim visual cache token",
 }
 
@@ -210,7 +218,28 @@ _CONTEXT_FIELD_KEYS: tuple[str, ...] = tuple(_CONTEXT_FIELD_TITLES)
 _CONTEXT_KEY_ALIASES: dict[str, tuple[str, ...]] = {
     "visual_cache_token": ("visual_cache_token", "anim_latest_visual_cache_token"),
     "run_contract_hash": ("run_contract_hash", "selected_run_hash"),
+    "analysis_context_hash": ("analysis_context_hash", "anim_latest_analysis_context_hash"),
+    "analysis_context_status": ("analysis_context_status", "anim_latest_analysis_context_status"),
+    "animator_link_contract_hash": (
+        "animator_link_contract_hash",
+        "anim_latest_animator_link_contract_hash",
+    ),
+    "selected_run_contract_hash": (
+        "selected_run_contract_hash",
+        "anim_latest_selected_run_contract_hash",
+    ),
+    "selected_test_id": ("selected_test_id", "anim_latest_selected_test_id"),
+    "selected_npz_path": ("selected_npz_path", "anim_latest_selected_npz_path", "anim_latest_npz_path"),
     "compare_contract_hash": ("compare_contract_hash", "compare_contract_id"),
+    "objective_contract_hash": ("objective_contract_hash", "anim_latest_objective_contract_hash"),
+    "suite_snapshot_hash": ("suite_snapshot_hash", "anim_latest_suite_snapshot_hash"),
+    "problem_hash": ("problem_hash", "anim_latest_problem_hash"),
+    "capture_export_manifest_handoff_id": (
+        "capture_export_manifest_handoff_id",
+        "anim_latest_capture_export_manifest_handoff_id",
+    ),
+    "capture_hash": ("capture_hash", "anim_latest_capture_hash"),
+    "truth_mode_hash": ("truth_mode_hash", "anim_latest_truth_mode_hash"),
 }
 
 

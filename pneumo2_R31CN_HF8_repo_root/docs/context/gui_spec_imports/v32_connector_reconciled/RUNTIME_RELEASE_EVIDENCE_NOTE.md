@@ -61,8 +61,54 @@ python -m pytest tests\test_r31bu_browser_perf_artifacts.py tests\test_v32_runti
 
 Result: `95 passed`.
 
+Latest runtime/perf acceptance command:
+
+```powershell
+python -m pytest tests\test_r31bu_browser_perf_artifacts.py tests\test_v32_runtime_evidence_gates.py tests\test_v32_desktop_animator_truth_contract.py tests\test_v32_diagnostics_send_bundle_evidence.py tests\test_r42_bundle_stable_road_grid_and_aux_cadence_metrics.py tests\test_send_bundle_contract_helpers.py tests\test_r78_animator_playback_speed_stability.py tests\test_r37_desktop_animator_hidden_docks_skip_updates.py -q
+```
+
+Result: `77 passed`.
+
+Runtime release-gate CLI smoke:
+
+```powershell
+python -m pneumo_solver_ui.release_gate --level quick --runtime-evidence-dir <temp/pass_exports> --require-runtime-evidence
+python -m pneumo_solver_ui.release_gate --level quick --runtime-evidence-dir <temp/fail_exports> --require-viewport-gating
+```
+
+Result: PASS evidence set returned `pass_rc=0`; hidden/offscreen viewport
+activity returned `fail_rc=2`, proving the public CLI hard-fail path.
+
+Live SEND-bundle evidence-hook smoke:
+
+```powershell
+python - <<'PY'
+from pneumo_solver_ui.tools.make_send_bundle import make_send_bundle
+from pneumo_solver_ui.tools.validate_send_bundle import validate_send_bundle
+PY
+```
+
+Result: validation returned `ok=True` and `errors=0` for the generated bundle
+at `C:\Users\Admin\AppData\Local\Temp\pneumo_send_bundle_evidence_20260417_082121\send_bundles\SEND_20260417_082121_bundle.zip`.
+The embedded `diagnostics/evidence_manifest.json` marked these runtime evidence
+classes as present:
+
+- `BND-015`: `workspace/exports/browser_perf_trace.json`
+- `BND-016`: `workspace/exports/viewport_gating_report.json`
+- `BND-017`: `workspace/exports/animator_frame_budget_evidence.json`
+- `BND-019`: `workspace/exports/windows_runtime_proof.json`
+
+Focused SEND-bundle regression checks:
+
+```powershell
+python -m pytest tests\test_v32_diagnostics_send_bundle_evidence.py::test_send_bundle_includes_full_runtime_evidence_set_and_manifest_rows -q
+python -m pytest tests\test_v32_diagnostics_send_bundle_evidence.py -q
+```
+
+Result: `1 passed`; full diagnostics SEND-bundle evidence suite `11 passed`.
+
 Latest `pytest --lf -q` status after the targeted acceptance sweep:
-`26 failed, 1 passed`. The remaining failures are outside this lane: solver /
+`23 failed, 2 passed`. The remaining failures are outside this lane: solver /
 domain numerical assertions, animator visual/source-contract backlog, and
 unrelated desktop contract work already present in the dirty worktree.
 
@@ -83,7 +129,9 @@ Non-claims:
   `pneumo_solver_ui/workspace/exports`.
 - No current `animator_frame_budget_evidence.json` is present in
   `pneumo_solver_ui/workspace/exports`.
-- `OG-003` and `OG-004` stay open until a named SEND bundle contains measured
-  trace and viewport-gating artifacts.
+- `OG-003`, `OG-004` and `OG-005` stay open until a release-nominated run
+  supplies the measured trace, viewport-gating, frame-budget and Windows
+  runtime proof artifacts. The temporary SEND-bundle smoke above proves bundle
+  hooks and manifest classification, not final release closure.
 - This lane only accepts evidence adapters, hard gates and tests; it does not
   alter solver, optimizer, geometry or domain calculations.
