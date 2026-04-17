@@ -1063,6 +1063,21 @@ def build_packaging_passport_evidence(
         warnings.append("Missing CYLINDER_PACKAGING_PASSPORT.json and meta.packaging; packaging truth remains evidence-missing.")
 
     cylinders = dict(passport.get("cylinders") or {}) if isinstance(passport.get("cylinders"), Mapping) else {}
+    meta_packaging = dict(meta.get("packaging") or {}) if isinstance(meta.get("packaging"), Mapping) else {}
+    meta_packaging_hash = str(meta_packaging.get("packaging_contract_hash") or "").strip()
+    passport_packaging_hash = str(passport.get("packaging_contract_hash") or "").strip()
+    hash_drift = False
+    if passport and meta_packaging_hash:
+        if not passport_packaging_hash:
+            hash_drift = True
+            warnings.append(
+                "CYLINDER_PACKAGING_PASSPORT.json is missing packaging_contract_hash from meta.packaging."
+            )
+        elif passport_packaging_hash != meta_packaging_hash:
+            hash_drift = True
+            warnings.append(
+                "CYLINDER_PACKAGING_PASSPORT.json packaging_contract_hash differs from meta.packaging."
+            )
     cyl_names = tuple(dict.fromkeys(("cyl1", "cyl2", *[str(name) for name in cylinders.keys()])))
     rows: list[PackagingPassportEvidenceRow] = []
     for cyl_name in cyl_names:
@@ -1120,8 +1135,8 @@ def build_packaging_passport_evidence(
         passport_path=raw_path,
         schema=str(passport.get("schema") or ""),
         packaging_status=str(passport.get("packaging_status") or passport.get("status") or ""),
-        packaging_contract_hash=str(passport.get("packaging_contract_hash") or ""),
-        mismatch_status="mismatch" if mismatch_rows else ("missing" if not passport else "match"),
+        packaging_contract_hash=passport_packaging_hash,
+        mismatch_status="mismatch" if (mismatch_rows or hash_drift) else ("missing" if not passport else "match"),
         complete_cylinders=_safe_strings(passport.get("complete_cylinders")),
         axis_only_cylinders=_safe_strings(passport.get("axis_only_cylinders")),
         missing_advanced_fields=_safe_strings(passport.get("missing_advanced_fields")),
