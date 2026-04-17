@@ -638,8 +638,11 @@ class DesktopMainShell:
         best = ranked[0]
         if best.action_kind == "tool":
             self.open_tool(best.action_value)
-        elif best.action_value == "home":
+        elif best.action_kind == "home" or best.action_value == "home":
             self._select_home_tab()
+        elif best.action_kind == "focus" and best.action_value == "project_tree":
+            self.nav_tree.focus_set()
+            self.status_var.set("Фокус переведён в дерево разделов проекта.")
         else:
             self.status_var.set(f"Команда «{best.label}» пока не поддерживается.")
             return
