@@ -81,8 +81,9 @@ Operational note:
 22. [docs/context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md](./context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md)
 23. [docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](./context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
 24. [docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](./context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
-25. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
-26. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
+25. [docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md](./context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md)
+26. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
+27. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
 
 ### 3. Активные требования и рабочий backlog
 
@@ -239,6 +240,7 @@ Operational note:
 - [docs/context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md](./context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md)
 - [docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](./context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
 - [docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](./context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
+- [docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md](./context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md)
 
 Что задаёт общий canon:
 
@@ -339,6 +341,10 @@ Operational note:
   viewport gating и animator frame-budget artifacts; текущий workspace probe
   hard-fails missing measured artifacts, поэтому `OG-003` и `OG-004` остаются
   open до named SEND bundle/runtime evidence.
+- Desktop startup visible proof фиксирует controlled real-Windows startup
+  для Qt main shell и Desktop Mnemo (`PASS` automated visible startup), но
+  оставляет manual visual, Snap Layouts, second-monitor, mixed-DPI и
+  long-running stability acceptance pending.
 
 Связанные, но вспомогательные UX-источники:
 

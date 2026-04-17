@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-17T18:06:48+00:00",
+  "updated_at": "2026-04-17T18:14:00+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -505,6 +505,15 @@
       "title": "V32-10 Desktop Mnemo runtime proof and diagnostics visibility",
       "details": "Добавить Desktop Mnemo startup runtime-proof CLI без app.exec(), валидатор JSON/MD, offscreen timing checks, а также optional BND-022 row в SEND evidence manifest. Это доказывает быстрый автоматический startup, но оставляет real Windows visual/no-hang verification pending.",
       "artifact_path": "../pneumo_solver_ui/desktop_mnemo/runtime_proof.py",
+      "status": "active"
+    },
+    {
+      "id": "PLAN-0040",
+      "created_at": "2026-04-17T18:14:00+00:00",
+      "source": "chat: visible startup proof 2026-04-17",
+      "title": "Qt shell and Desktop Mnemo visible startup proof",
+      "details": "Record controlled real-Windows visible startup proof for Qt main shell and Desktop Mnemo: automated startup PASS, while manual visual, Snap Layouts, mixed-DPI, second-monitor and long-running stability acceptance remain pending.",
+      "artifact_path": "context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md",
       "status": "active"
     }
   ]

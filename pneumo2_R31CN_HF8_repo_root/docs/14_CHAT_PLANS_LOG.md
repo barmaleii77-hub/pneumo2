@@ -288,6 +288,13 @@ ID: `PLAN-0038`.
 Источник: chat: next step V32-10/V32-15 runtime stability.
 ID: `PLAN-0039`.
 
+40. Qt shell and Desktop Mnemo visible startup proof
+Назначение: Record controlled real-Windows visible startup proof for Qt main shell and Desktop Mnemo: automated startup PASS, while manual visual, Snap Layouts, mixed-DPI, second-monitor and long-running stability acceptance remain pending.
+Артефакт: [context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md](./context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md)
+Статус: active.
+Источник: chat: visible startup proof 2026-04-17.
+ID: `PLAN-0040`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:
