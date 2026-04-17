@@ -29,9 +29,17 @@ def build_shell_command_search_entries(
             label="Обзор рабочего места",
             location="Главное окно -> Обзор",
             summary="Открывает обзор shell с основным инженерным маршрутом и быстрыми переходами.",
-            action_kind="command",
+            action_kind="home",
             action_value="home",
             keywords=("главная", "обзор", "маршрут", "рабочее место"),
+        ),
+        ShellCommandSearchEntry(
+            label="Показать дерево проекта",
+            location="Главное окно -> Обзор проекта",
+            summary="Переводит фокус в левое дерево проекта, маршрута и артефактов.",
+            action_kind="focus",
+            action_value="project_tree",
+            keywords=("проект", "дерево", "project", "browser", "navigator", "обзор проекта"),
         ),
         ShellCommandSearchEntry(
             label="Собрать диагностику",

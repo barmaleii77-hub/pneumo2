@@ -27,6 +27,10 @@ def _default_context_payload(
         "workspace_role": spec.effective_workspace_role,
         "runtime_kind": spec.effective_runtime_kind,
         "migration_status": spec.effective_migration_status,
+        "project_name": "",
+        "project_dir": "",
+        "workspace_dir": "",
+        "repo_root": "",
     }
     if context_payload:
         payload.update({str(key): value for key, value in context_payload.items()})

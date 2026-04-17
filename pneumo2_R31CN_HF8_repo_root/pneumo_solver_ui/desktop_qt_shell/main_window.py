@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from pneumo_solver_ui.desktop_qt_shell.coexistence import DesktopShellCoexistenceManager
+from pneumo_solver_ui.desktop_qt_shell.project_context import (
+    ShellProjectContext,
+    build_shell_project_context,
+)
 from pneumo_solver_ui.desktop_shell.command_search import (
     ShellCommandSearchEntry,
     build_shell_command_search_entries,
@@ -24,6 +29,13 @@ MAIN_ROUTE_KEYS = (
     "desktop_results_center",
     "desktop_diagnostics_center",
 )
+
+
+def _build_shell_settings() -> QtCore.QSettings:
+    state_path = str(os.environ.get("PNEUMO_QT_MAIN_SHELL_STATE_PATH") or "").strip()
+    if state_path:
+        return QtCore.QSettings(state_path, QtCore.QSettings.Format.IniFormat)
+    return QtCore.QSettings("PneumoApp", "DesktopQtMainShell")
 
 
 def _migration_label(spec: DesktopShellToolSpec) -> str:
@@ -50,21 +62,23 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.specs = build_desktop_shell_specs()
         self.spec_by_key = {spec.key: spec for spec in self.specs}
         self.command_entries = build_shell_command_search_entries(self.specs)
-        self.settings = QtCore.QSettings("PneumoApp", "DesktopQtMainShell")
+        self.settings = _build_shell_settings()
+        self.project_context: ShellProjectContext = build_shell_project_context()
         self.coexistence = DesktopShellCoexistenceManager()
         self._startup_tool_keys = startup_tool_keys
         self._selected_tool_key = startup_tool_keys[0] if startup_tool_keys else "desktop_input_editor"
         self._selected_search_entries: list[ShellCommandSearchEntry] = []
         self._focus_regions: list[QtWidgets.QWidget] = []
+        self._message_log: list[str] = []
 
         self._configure_window()
-        self._build_menu()
         self._build_command_toolbar()
         self._build_browser_dock()
         self._build_inspector_dock()
         self._build_runtime_dock()
         self._build_central_surface()
         self._build_status_bar()
+        self._build_menu()
         self._restore_layout()
         self._populate_workspace_switcher()
         self._populate_browser_tree()
@@ -85,32 +99,123 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             | QtWidgets.QMainWindow.DockOption.GroupedDragging
         )
 
+    def _project_summary_text(self) -> str:
+        return (
+            f"Проект: {self.project_context.project_name} | "
+            f"Workspace: {self.project_context.workspace_dir} | "
+            f"{self.project_context.readiness_label}"
+        )
+
+    def _set_status_message(self, text: str) -> None:
+        message = str(text or "").strip() or "Готово"
+        self.status_label.setText(message)
+        self._message_log.insert(0, message)
+        self._message_log = self._message_log[:8]
+        self.message_strip_label.setText(f"Сообщения: {message}")
+
+    def _set_shell_progress(self, value: int, *, text: str | None = None) -> None:
+        bounded = max(0, min(100, int(value)))
+        self.status_progress_bar.setValue(bounded)
+        if text is not None:
+            self.status_progress_bar.setFormat(text)
+
+    def _focus_command_search(self) -> None:
+        self.command_search_edit.setFocus()
+        self.command_search_edit.selectAll()
+
+    def _focus_project_tree(self) -> None:
+        self.browser_tree.setFocus()
+        if self.browser_tree.topLevelItemCount() > 0:
+            self.browser_tree.setCurrentItem(self.browser_tree.topLevelItem(0))
+        self._set_status_message("Фокус переведён в дерево проекта.")
+
+    def _focus_messages_strip(self) -> None:
+        self.message_strip_label.setFocus()
+        self._set_status_message("Фокус переведён в нижнюю строку сообщений.")
+
+    def _show_project_overview(self) -> None:
+        self.command_search_edit.clear()
+        self.central_stack.setCurrentWidget(self.overview_page)
+        self._focus_project_tree()
+
     def _build_menu(self) -> None:
         menubar = self.menuBar()
 
         file_menu = menubar.addMenu("Файл")
+        overview_action = file_menu.addAction("Обзор проекта")
+        overview_action.triggered.connect(self._show_project_overview)
+        file_menu.addSeparator()
+        save_layout_action = file_menu.addAction("Сохранить раскладку")
+        save_layout_action.triggered.connect(self._save_layout)
         exit_action = file_menu.addAction("Выход")
         exit_action.triggered.connect(self.close)
 
-        workspace_menu = menubar.addMenu("Рабочее пространство")
-        for key in MAIN_ROUTE_KEYS:
-            spec = self.spec_by_key.get(key)
-            if spec is None:
-                continue
-            action = workspace_menu.addAction(spec.title)
-            action.triggered.connect(lambda _checked=False, item_key=key: self._select_workspace(item_key))
+        edit_menu = menubar.addMenu("Правка")
+        search_action = edit_menu.addAction("Поиск команд")
+        search_action.setShortcut(QtGui.QKeySequence("Ctrl+K"))
+        search_action.triggered.connect(self._focus_command_search)
+        tree_action = edit_menu.addAction("Фокус на дерево проекта")
+        tree_action.triggered.connect(self._focus_project_tree)
 
-        window_menu = menubar.addMenu("Окно")
-        for key in ("compare_viewer", "desktop_animator", "desktop_mnemo"):
+        view_menu = menubar.addMenu("Вид")
+        view_menu.addAction(self.browser_dock.toggleViewAction())
+        view_menu.addAction(self.inspector_dock.toggleViewAction())
+        view_menu.addAction(self.runtime_dock.toggleViewAction())
+        view_menu.addSeparator()
+        restore_layout_action = view_menu.addAction("Восстановить раскладку")
+        restore_layout_action.triggered.connect(self._restore_layout)
+        reset_layout_action = view_menu.addAction("Сбросить раскладку shell")
+        reset_layout_action.triggered.connect(self._reset_layout)
+
+        run_menu = menubar.addMenu("Запуск")
+        for key in (
+            "desktop_input_editor",
+            "desktop_ring_editor",
+            "test_center",
+            "desktop_optimizer_center",
+        ):
             spec = self.spec_by_key.get(key)
             if spec is None:
                 continue
-            action = window_menu.addAction(spec.title)
+            action = run_menu.addAction(spec.title)
+            action.triggered.connect(lambda _checked=False, item_key=key: self.open_tool(item_key))
+        run_menu.addSeparator()
+        stop_action = run_menu.addAction("Остановить выбранное окно")
+        stop_action.setShortcut(QtGui.QKeySequence("Shift+F5"))
+        stop_action.triggered.connect(self.stop_selected_tool)
+
+        analysis_menu = menubar.addMenu("Анализ")
+        for key in ("desktop_results_center", "compare_viewer"):
+            spec = self.spec_by_key.get(key)
+            if spec is None:
+                continue
+            action = analysis_menu.addAction(spec.title)
             action.triggered.connect(lambda _checked=False, item_key=key: self.open_tool(item_key))
 
+        animation_menu = menubar.addMenu("Анимация")
+        for key in ("desktop_animator", "desktop_mnemo"):
+            spec = self.spec_by_key.get(key)
+            if spec is None:
+                continue
+            action = animation_menu.addAction(spec.title)
+            if key == "desktop_animator":
+                action.setShortcut(QtGui.QKeySequence("F8"))
+            action.triggered.connect(lambda _checked=False, item_key=key: self.open_tool(item_key))
+
+        diagnostics_menu = menubar.addMenu("Диагностика")
+        collect_diag_action = diagnostics_menu.addAction("Собрать диагностику")
+        collect_diag_action.setShortcut(QtGui.QKeySequence("F7"))
+        collect_diag_action.triggered.connect(lambda: self.open_tool("desktop_diagnostics_center"))
+        focus_messages_action = diagnostics_menu.addAction("Показать сообщения shell")
+        focus_messages_action.triggered.connect(self._focus_messages_strip)
+
         tools_menu = menubar.addMenu("Инструменты")
-        diag_action = tools_menu.addAction("Собрать диагностику")
-        diag_action.triggered.connect(lambda: self.open_tool("desktop_diagnostics_center"))
+        for key in ("desktop_geometry_reference_center", "autotest_gui"):
+            spec = self.spec_by_key.get(key)
+            if spec is None:
+                continue
+            action = tools_menu.addAction(spec.title)
+            action.triggered.connect(lambda _checked=False, item_key=key: self.open_tool(item_key))
         legacy_action = tools_menu.addAction("Открыть legacy Tk-shell")
         legacy_action.triggered.connect(self._show_legacy_shell_note)
 
@@ -126,10 +231,12 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
         toolbar.addWidget(QtWidgets.QLabel("Рабочее пространство:"))
         self.workspace_combo = QtWidgets.QComboBox(toolbar)
+        self.workspace_combo.setAccessibleName("Переключатель рабочего пространства")
         self.workspace_combo.currentIndexChanged.connect(self._on_workspace_changed)
         toolbar.addWidget(self.workspace_combo)
 
         self.open_workspace_button = QtWidgets.QPushButton("Открыть рабочее пространство", toolbar)
+        self.open_workspace_button.setToolTip("Открывает выбранное рабочее пространство через launcher/handoff.")
         self.open_workspace_button.clicked.connect(self.open_selected_workspace)
         toolbar.addWidget(self.open_workspace_button)
 
@@ -137,9 +244,11 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
         toolbar.addWidget(QtWidgets.QLabel("Поиск команд:"))
         self.command_search_edit = QtWidgets.QLineEdit(toolbar)
+        self.command_search_edit.setAccessibleName("Поиск команд")
         self.command_search_edit.setPlaceholderText(
             "Команды, экраны, тесты, сценарии, bundle, runs, artifacts"
         )
+        self.command_search_edit.setToolTip("Ctrl+K. Поиск по разделам, командам, артефактам и launcher-маршрутам.")
         self.command_search_edit.textChanged.connect(self._refresh_search_results)
         self.command_search_edit.returnPressed.connect(self._activate_primary_search_result)
         toolbar.addWidget(self.command_search_edit)
@@ -147,6 +256,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         toolbar.addSeparator()
 
         self.diagnostics_button = QtWidgets.QPushButton("Собрать диагностику", toolbar)
+        self.diagnostics_button.setObjectName("AlwaysVisibleDiagnosticsAction")
+        self.diagnostics_button.setShortcut(QtGui.QKeySequence("F7"))
+        self.diagnostics_button.setToolTip("F7. Открыть диагностику и сбор SEND bundle.")
         self.diagnostics_button.clicked.connect(lambda: self.open_tool("desktop_diagnostics_center"))
         toolbar.addWidget(self.diagnostics_button)
 
@@ -273,6 +385,11 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.route_label.setWordWrap(True)
         central_layout.addWidget(self.route_label)
 
+        self.project_summary_label = QtWidgets.QLabel(self._project_summary_text(), central)
+        self.project_summary_label.setObjectName("ProjectContextSummary")
+        self.project_summary_label.setWordWrap(True)
+        central_layout.addWidget(self.project_summary_label)
+
         self.central_stack = QtWidgets.QStackedWidget(central)
         central_layout.addWidget(self.central_stack, 1)
 
@@ -329,12 +446,22 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         status = QtWidgets.QStatusBar(self)
         self.setStatusBar(status)
         self.status_label = QtWidgets.QLabel("Готово", status)
+        self.message_strip_label = QtWidgets.QLabel("Сообщения: готово", status)
+        self.message_strip_label.setObjectName("ShellMessagesStrip")
+        self.message_strip_label.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
+        self.status_progress_bar = QtWidgets.QProgressBar(status)
+        self.status_progress_bar.setObjectName("ShellStatusProgress")
+        self.status_progress_bar.setRange(0, 100)
+        self.status_progress_bar.setValue(0)
+        self.status_progress_bar.setMaximumWidth(170)
         self.mode_status_label = QtWidgets.QLabel(status)
         self.bundle_status_label = QtWidgets.QLabel(
             "Последний архив диагностики: откройте центр диагностики",
             status,
         )
         status.addWidget(self.status_label, 1)
+        status.addWidget(self.message_strip_label, 1)
+        status.addPermanentWidget(self.status_progress_bar)
         status.addPermanentWidget(self.mode_status_label)
         status.addPermanentWidget(self.bundle_status_label)
         self._refresh_status_bar()
@@ -353,8 +480,32 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
     def _populate_browser_tree(self) -> None:
         self.browser_tree.clear()
+        project_root = QtWidgets.QTreeWidgetItem(
+            (
+                f"Проект: {self.project_context.project_name}",
+                self.project_context.readiness_label,
+            )
+        )
+        project_root.addChild(
+            QtWidgets.QTreeWidgetItem(("Папка проекта", str(self.project_context.project_dir)))
+        )
+        project_root.addChild(
+            QtWidgets.QTreeWidgetItem(("Workspace", str(self.project_context.workspace_dir)))
+        )
+        project_root.addChild(
+            QtWidgets.QTreeWidgetItem(("Источник workspace", self.project_context.workspace_source))
+        )
+        artifacts_root = QtWidgets.QTreeWidgetItem(("Артефакты workspace", "required dirs"))
+        for dirname in ("exports", "uploads", "road_profiles", "maneuvers", "opt_runs", "ui_state"):
+            state = "missing" if dirname in self.project_context.missing_workspace_dirs else "ok"
+            artifacts_root.addChild(QtWidgets.QTreeWidgetItem((dirname, state)))
+        project_root.addChild(artifacts_root)
+        self.browser_tree.addTopLevelItem(project_root)
+        project_root.setExpanded(True)
+        artifacts_root.setExpanded(True)
+
         grouped_specs = {
-            "Основной маршрут": [self.spec_by_key[key] for key in MAIN_ROUTE_KEYS if key in self.spec_by_key],
+            "Маршрут проекта": [self.spec_by_key[key] for key in MAIN_ROUTE_KEYS if key in self.spec_by_key],
             "Справочники и служебные центры": [
                 spec for spec in self.specs if spec.entry_kind == "tool"
             ],
@@ -405,9 +556,12 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             "Контракт: baseline не выбран | objective stack не задан | "
             f"hard gate не задан | режим: {active_mode}"
         )
-        self._refresh_status_bar()
+        if hasattr(self, "mode_status_label"):
+            self._refresh_status_bar()
 
     def _refresh_status_bar(self) -> None:
+        if not hasattr(self, "mode_status_label"):
+            return
         self.mode_status_label.setText(
             f"Активный режим: {self.optimization_mode_combo.currentText().strip()}"
         )
@@ -422,6 +576,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             f"{spec.menu_section} -> {spec.nav_section} | Toolkit: {_runtime_label(spec)} | {_migration_label(spec)}"
         )
         self.surface_description.setText(spec.details or spec.description)
+        self.project_summary_label.setText(self._project_summary_text())
         self.session_summary_label.setText(
             "Tk-центры временно запускаются как управляемые внешние окна. "
             "Qt-переписывание идёт волнами: shell/platform -> setup -> ring/test suite -> baseline/optimization -> analysis/diagnostics."
@@ -431,7 +586,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self._refresh_runtime_table()
         self._select_browser_item(key)
         if announce:
-            self.status_label.setText(f"Выбрано рабочее окно: {spec.title}")
+            self._set_status_message(f"Выбрано рабочее окно: {spec.title}")
 
     def _refresh_workflow_list(self) -> None:
         self.workflow_list.clear()
@@ -507,11 +662,13 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self.runtime_table.addTopLevelItem(item)
         if sessions:
             self.runtime_progress_bar.setValue(min(100, 10 + len(sessions) * 10))
+            self._set_shell_progress(min(100, 10 + len(sessions) * 10), text="Окна: %p%")
             self.runtime_progress_label.setText(
                 "Qt-shell отслеживает жизненный цикл внешних окон и передаёт им launch context через shell handoff."
             )
         else:
             self.runtime_progress_bar.setValue(0)
+            self._set_shell_progress(0, text="Готово: %p%")
             self.runtime_progress_label.setText(
                 "Пока нет открытых управляемых окон. Используйте верхнюю командную зону, обзор проекта или поиск команд."
             )
@@ -541,12 +698,16 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             "selected_run_dir": "",
             "selected_artifact": "",
             "selected_scenario": "",
+            "project_name": self.project_context.project_name,
+            "project_dir": str(self.project_context.project_dir),
+            "workspace_dir": str(self.project_context.workspace_dir),
+            "repo_root": str(self.project_context.repo_root),
         }
 
     def open_tool(self, key: str) -> bool:
         spec = self.spec_by_key.get(key)
         if spec is None:
-            self.status_label.setText(f"Неизвестный ключ окна: {key}")
+            self._set_status_message(f"Неизвестный ключ окна: {key}")
             return False
         self._apply_selected_tool(key)
         try:
@@ -555,14 +716,14 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 context_payload=self._current_context_payload(spec),
             )
         except Exception as exc:
-            self.status_label.setText(f"Не удалось открыть {spec.title}: {exc}")
+            self._set_status_message(f"Не удалось открыть {spec.title}: {exc}")
             QtWidgets.QMessageBox.warning(
                 self,
                 "Не удалось открыть окно",
                 f"{spec.title}\n\n{exc}",
             )
             return False
-        self.status_label.setText(
+        self._set_status_message(
             f"Открыто окно: {spec.title} ({session.runtime_label}, PID {session.pid or '—'})"
         )
         self._refresh_runtime_table()
@@ -579,9 +740,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             return
         if self.coexistence.stop_tool(key):
             title = self.spec_by_key.get(key).title if key in self.spec_by_key else key
-            self.status_label.setText(f"Остановлено окно: {title}")
+            self._set_status_message(f"Остановлено окно: {title}")
         else:
-            self.status_label.setText("Для выбранного окна нет активного управляемого процесса.")
+            self._set_status_message("Для выбранного окна нет активного управляемого процесса.")
         self._refresh_runtime_table()
 
     def _open_startup_tools(self) -> None:
@@ -650,16 +811,21 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _activate_search_item(self, item: QtWidgets.QListWidgetItem) -> None:
         action_kind = item.data(QtCore.Qt.ItemDataRole.UserRole + 1)
         action_value = item.data(QtCore.Qt.ItemDataRole.UserRole)
-        if action_kind == "home":
+        if action_kind == "home" or action_value == "home":
             self.command_search_edit.clear()
             self.central_stack.setCurrentWidget(self.overview_page)
-            self.status_label.setText("Открыт обзор рабочего места.")
+            self._set_status_message("Открыт обзор рабочего места.")
+            return
+        if action_kind == "focus" and action_value == "project_tree":
+            self.command_search_edit.clear()
+            self.central_stack.setCurrentWidget(self.overview_page)
+            self._focus_project_tree()
             return
         if action_kind == "tool" and isinstance(action_value, str):
             self.open_tool(action_value)
 
     def _install_shortcuts(self) -> None:
-        QtGui.QShortcut(QtGui.QKeySequence("Ctrl+K"), self, activated=self.command_search_edit.setFocus)
+        QtGui.QShortcut(QtGui.QKeySequence("Ctrl+K"), self, activated=self._focus_command_search)
         QtGui.QShortcut(QtGui.QKeySequence("F7"), self, activated=lambda: self.open_tool("desktop_diagnostics_center"))
         QtGui.QShortcut(QtGui.QKeySequence("F8"), self, activated=lambda: self.open_tool("desktop_animator"))
         QtGui.QShortcut(QtGui.QKeySequence("Shift+F5"), self, activated=self.stop_selected_tool)
@@ -673,6 +839,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self.workflow_list,
             self.inspector_tabs,
             self.runtime_table,
+            self.message_strip_label,
         ]
 
     def _move_focus(self, delta: int) -> None:
@@ -698,20 +865,49 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         finished = self.coexistence.poll()
         if finished:
             names = ", ".join(session.spec.title for session in finished)
-            self.status_label.setText(f"Обновлён статус управляемых окон: {names}")
+            self._set_status_message(f"Обновлён статус управляемых окон: {names}")
         self._refresh_runtime_table()
 
     def _restore_layout(self) -> None:
-        geometry = self.settings.value("geometry")
-        state = self.settings.value("window_state")
+        geometry = self.settings.value("layout/geometry") or self.settings.value("geometry")
+        state = self.settings.value("layout/window_state") or self.settings.value("window_state")
+        last_key = str(self.settings.value("layout/last_workspace_key") or "").strip()
+        if last_key in self.spec_by_key:
+            self._selected_tool_key = last_key
+        mode = str(self.settings.value("layout/optimization_mode") or "").strip()
+        if mode:
+            index = self.optimization_mode_combo.findText(mode)
+            if index >= 0:
+                self.optimization_mode_combo.setCurrentIndex(index)
         if isinstance(geometry, QtCore.QByteArray):
             self.restoreGeometry(geometry)
         if isinstance(state, QtCore.QByteArray):
             self.restoreState(state)
+        if hasattr(self, "status_label"):
+            self._set_status_message("Раскладка dock-панелей восстановлена.")
 
     def _save_layout(self) -> None:
-        self.settings.setValue("geometry", self.saveGeometry())
-        self.settings.setValue("window_state", self.saveState())
+        geometry = self.saveGeometry()
+        state = self.saveState()
+        self.settings.setValue("layout/geometry", geometry)
+        self.settings.setValue("layout/window_state", state)
+        self.settings.setValue("layout/last_workspace_key", self._selected_tool_key)
+        self.settings.setValue("layout/optimization_mode", self.optimization_mode_combo.currentText().strip())
+        self.settings.setValue("geometry", geometry)
+        self.settings.setValue("window_state", state)
+        self.settings.sync()
+        if hasattr(self, "status_label"):
+            self._set_status_message("Раскладка dock-панелей сохранена.")
+
+    def _reset_layout(self) -> None:
+        for dock in (self.browser_dock, self.inspector_dock, self.runtime_dock):
+            dock.setFloating(False)
+            dock.show()
+        self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, self.browser_dock)
+        self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self.inspector_dock)
+        self.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, self.runtime_dock)
+        self.resize(1640, 980)
+        self._set_status_message("Раскладка shell сброшена к базовой: дерево слева, инспектор справа, ход выполнения снизу.")
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self._save_layout()

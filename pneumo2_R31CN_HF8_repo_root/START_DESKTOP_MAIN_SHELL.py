@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os
-import runpy
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -17,17 +16,19 @@ MODULE = "pneumo_solver_ui.tools.desktop_main_shell_qt"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    args = tuple(argv) if argv is not None else tuple(sys.argv[1:])
     os.chdir(str(ROOT))
     handoff_rc = ensure_root_launcher_runtime(
         root=ROOT,
         script_path=Path(__file__),
         module=MODULE,
-        argv=tuple(argv) if argv is not None else tuple(sys.argv[1:]),
+        argv=args,
     )
     if handoff_rc is not None:
         return int(handoff_rc)
-    runpy.run_module(MODULE, run_name="__main__")
-    return 0
+    from pneumo_solver_ui.tools import desktop_main_shell_qt
+
+    return int(desktop_main_shell_qt.main(args))
 
 
 if __name__ == "__main__":
