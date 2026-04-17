@@ -225,6 +225,13 @@ ID: `PLAN-0029`.
 Источник: chat + V32-12 geometry reference.
 ID: `PLAN-0030`.
 
+31. V32-10 Desktop Mnemo truth graphics acceptance
+Назначение: Accept the Desktop Mnemo dataset/provenance truth-graphics contract for V32-10 and RGH-003 with source markers, scheme fidelity, unavailable-state policy, snapshot, settings bridge, launcher and window tests; this is specialized Mnemo acceptance, not runtime gap closure.
+Артефакт: [context/gui_spec_imports/v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md)
+Статус: актуален.
+Источник: chat + V32-10 Desktop Mnemo truth graphics.
+ID: `PLAN-0031`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

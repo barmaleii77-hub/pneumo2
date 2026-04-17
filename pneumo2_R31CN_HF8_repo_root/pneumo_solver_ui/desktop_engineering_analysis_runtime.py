@@ -1359,7 +1359,12 @@ class DesktopEngineeringAnalysisRuntime:
             for item in selected_artifacts
             if str(item.get("category") or "") in {"report", "calibration", "influence", "compare_influence"}
         ]
-        surfaces = [dict(surface) for surface in (compare_surfaces or [])]
+        surface_sources = (
+            compare_surfaces
+            if compare_surfaces is not None
+            else self.compare_influence_surfaces(snapshot)
+        )
+        surfaces = [dict(surface) for surface in surface_sources]
         payload: dict[str, Any] = {
             "schema": ENGINEERING_ANALYSIS_EVIDENCE_SCHEMA,
             "schema_version": ENGINEERING_ANALYSIS_EVIDENCE_SCHEMA_VERSION,

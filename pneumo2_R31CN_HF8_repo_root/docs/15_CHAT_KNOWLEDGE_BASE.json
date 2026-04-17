@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-17T03:22:25+00:00",
+  "updated_at": "2026-04-17T03:26:37+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -424,6 +424,15 @@
       "title": "V32-12 geometry reference provenance acceptance",
       "details": "Accept the geometry reference evidence contract for PB-001, PB-008, RGH-018, OG-001, OG-002 and OG-006 with artifact freshness, road-width, packaging passport, geometry acceptance and diagnostics handoff tests; OG-006 remains an imported-layer/runtime-proof open question until named release artifact and SEND-bundle proof exist.",
       "artifact_path": "context/gui_spec_imports/v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0031",
+      "created_at": "2026-04-17T03:26:37+00:00",
+      "source": "chat + V32-10 Desktop Mnemo truth graphics",
+      "title": "V32-10 Desktop Mnemo truth graphics acceptance",
+      "details": "Accept the Desktop Mnemo dataset/provenance truth-graphics contract for V32-10 and RGH-003 with source markers, scheme fidelity, unavailable-state policy, snapshot, settings bridge, launcher and window tests; this is specialized Mnemo acceptance, not runtime gap closure.",
+      "artifact_path": "context/gui_spec_imports/v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md",
       "status": "актуален"
     }
   ]

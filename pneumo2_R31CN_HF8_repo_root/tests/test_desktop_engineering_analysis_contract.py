@@ -102,7 +102,21 @@ def _build_run_dir(tmp_path: Path) -> Path:
     _write_text(run_dir / "REPORT_FULL.md", "# REPORT_FULL\n")
     _write_json(run_dir / "fit_report_final.json", {"best_rmse": 0.12, "success": True})
     _write_json(run_dir / "fit_details_final.json", {"tests": [], "signals": []})
-    _write_json(run_dir / "compare_influence.json", {"schema": "compare_influence_fixture"})
+    _write_json(
+        run_dir / "compare_influence.json",
+        {
+            "schema": "compare_influence_fixture",
+            "title": "Fixture compare influence",
+            "corr_matrix": [[0.25, -0.75], [0.91, 0.1]],
+            "feature_names": ["база", "колея"],
+            "target_names": ["RMS(положение_штока_ЛП_м)", "MAXABS(давление_ресивер1_Па)"],
+            "feature_units": {"база": "m", "колея": "m"},
+            "target_units": {
+                "RMS(положение_штока_ЛП_м)": "m",
+                "MAXABS(давление_ресивер1_Па)": "Pa",
+            },
+        },
+    )
     return run_dir
 
 
@@ -287,6 +301,28 @@ def test_engineering_analysis_runtime_validates_artifacts_and_exports_evidence(t
     assert refreshed.diagnostics_evidence_manifest_path == sidecar
     assert refreshed.diagnostics_evidence_manifest_status == "READY"
     assert refreshed.diagnostics_evidence_manifest_hash == payload["evidence_manifest_hash"]
+
+
+def test_evidence_export_builds_compare_influence_surfaces_from_artifacts(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path)
+    contract_path = _write_selected_run_contract(tmp_path / "selected_run_contract.json", run_dir)
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="python")
+    snapshot = runtime.snapshot(selected_contract_path=contract_path)
+
+    surfaces = runtime.compare_influence_surfaces(snapshot)
+
+    assert len(surfaces) == 1
+    assert surfaces[0]["surface_type"] == "compare_influence"
+    assert surfaces[0]["source"].endswith("compare_influence.json")
+    assert surfaces[0]["diagnostics"]["shape_matches_axes"] is True
+    assert surfaces[0]["diagnostics"]["finite_cell_count"] == 4
+    assert surfaces[0]["top_cells"][0]["feature"] == "колея"
+    assert surfaces[0]["top_cells"][0]["target_unit"] == "m"
+
+    sidecar = runtime.write_diagnostics_evidence_manifest(snapshot)
+    payload = json.loads(sidecar.read_text(encoding="utf-8"))
+    assert payload["compare_influence_surfaces"][0]["diagnostics"]["finite_cell_count"] == 4
+    assert payload["selected_charts"] == ["Fixture compare influence"]
 
 
 def test_selected_run_contract_loads_ho007_context_as_analysis_master_source(tmp_path: Path) -> None:
