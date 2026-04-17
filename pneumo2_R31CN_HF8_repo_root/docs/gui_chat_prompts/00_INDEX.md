@@ -43,24 +43,30 @@
    — accepted V32-16 docs/helper scope and validation note.
 11. [PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](../context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
    — synchronized repository/KB conformance audit and improvement plan; not runtime closure proof.
-12. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
+12. [BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md](../context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md)
+   — branch cleanup record and safe parallel-work policy after consolidating
+   temporary Codex branches into `codex/work`.
+13. [14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
+   — copy-paste starter prompts for new parallel chats whose first launch is
+   in Plan mode.
+14. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
    [TECHNICAL_SPECIFICATION.md](../context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md)
    и [GUI_SPEC.yaml](../context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml)
    — successor GitHub KB/TZ/spec supplement. Он уточняет requirements,
    workspace contracts, parameter catalogs, acceptance и open gaps, но не
    является runtime-closure proof.
-12. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
+15. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
    и related `v3/*`
    — checked-in detailed machine-readable reference layer.
-13. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
+16. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
    и related `v13_ring_editor_migration/*`
    — специализированный addendum для `WS-RING` и handoff `WS-RING -> WS-SUITE`.
-14. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
+17. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
    — historical design-recovery layer, который возвращает проект из implementation-веток в design-first.
-15. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
+18. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
    и [gui_spec_archive_lineage.json](../context/gui_spec_archive_lineage.json)
    — lineage `v1…v13 + v37`, чтобы понимать роль каждого архива и successor supplement.
-16. `docs/gui_chat_prompts/*`
+19. `docs/gui_chat_prompts/*`
    — implementation prompts, которые должны наследовать канон, а не заменять его.
 
 ## Что считается reference layer
@@ -101,6 +107,13 @@
   scope, focused validation and next lane order.
 - `PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17` фиксирует текущую синхронизацию
   `codex/work`, соответствие KB по lane matrix и план дальнейшей доработки.
+- `BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18` фиксирует, что временные
+  ветки собраны в `codex/work`, remote/local branch refs очищены и будущая
+  параллельная работа должна идти только от `codex/work`.
+- `14_PLAN_MODE_PARALLEL_START_PROMPTS` задаёт copy-paste стартовые промты для
+  новых чатов, где первый запуск выполняется в Plan mode: сначала чтение,
+  план, owned/forbidden files, tests and risks; только потом правки после
+  подтверждения.
 - `v37_github_kb_supplement` задаёт successor KB/TZ/spec connector layer:
   consolidated technical specification, GUI_SPEC.yaml, workspace contract
   matrix, parameter catalogs, acceptance/requirements matrices, repo canon
@@ -131,6 +144,7 @@
 - [11_GEOMETRY_REFERENCE.md](./11_GEOMETRY_REFERENCE.md)
 - [12_ENGINEERING_ANALYSIS.md](./12_ENGINEERING_ANALYSIS.md)
 - [13_RELEASE_GATES_KB_ACCEPTANCE.md](./13_RELEASE_GATES_KB_ACCEPTANCE.md)
+- [14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
 
 ## Правило использования
 

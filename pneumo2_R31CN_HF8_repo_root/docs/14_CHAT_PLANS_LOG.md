@@ -302,6 +302,13 @@ ID: `PLAN-0040`.
 Источник: chat: branch cleanup 2026-04-18.
 ID: `PLAN-0041`.
 
+42. Plan-mode parallel chat starter prompts
+Назначение: Add copy-paste starter prompts for future parallel chats whose first launch is in Plan mode: each prompt starts from codex/work, forbids edits before plan approval, defines owned/forbidden files, tests, risks and evidence boundaries.
+Артефакт: [gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
+Статус: active.
+Источник: chat: plan-mode parallel prompts 2026-04-18.
+ID: `PLAN-0042`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

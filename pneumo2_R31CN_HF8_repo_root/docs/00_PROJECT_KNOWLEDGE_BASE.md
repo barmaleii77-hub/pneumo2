@@ -83,8 +83,9 @@ Operational note:
 24. [docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](./context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
 25. [docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md](./context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md)
 26. [docs/context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md](./context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md)
-27. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
-28. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
+27. [docs/gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
+28. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
+29. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
 
 ### 3. Активные требования и рабочий backlog
 
@@ -243,6 +244,7 @@ Operational note:
 - [docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](./context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
 - [docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md](./context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md)
 - [docs/context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md](./context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md)
+- [docs/gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
 
 Что задаёт общий canon:
 
@@ -350,6 +352,9 @@ Operational note:
 - Branch cleanup and next-work plan фиксирует, что временные Codex branches
   собраны в `codex/work`, лишние ветки удалены, а следующая параллельная
   работа должна стартовать только от `codex/work` с disjoint file ownership.
+- Plan-mode parallel start prompts фиксируют готовые самодостаточные промты
+  для новых чатов: первый запуск только в Plan mode, без правок до
+  подтверждения, с owned/forbidden files и focused test expectations.
 
 Связанные, но вспомогательные UX-источники:
 
