@@ -18,6 +18,14 @@ Accepted proof shape:
 - Export sidecars include validation, hardpoints source-of-truth,
   cylinder-packaging passport, geometry-acceptance report and capture/export
   manifest references.
+- `anim_latest` metadata now exposes the complete
+  `anim_export_contract_artifacts` surface: contract sidecar, validation
+  JSON/MD, hardpoints source-of-truth, cylinder packaging passport, geometry
+  acceptance JSON/MD, capture manifest and frame-budget evidence refs.
+- `validate_anim_export_contract` accepts both `anim_latest` metadata and
+  `anim_latest.contract.sidecar.json`; stale sidecar validation summaries and
+  fake/fabricated geometry markers fail the same contract drift/no-fabrication
+  gate as NPZ metadata.
 - Geometry acceptance reports are producer-owned and explicitly mark
   `no_synthetic_geometry`.
 - Partial cylinder packaging remains in `axis_only_honesty_mode`; full
@@ -36,6 +44,22 @@ python -m pytest tests/test_anim_latest_solver_points_contract_gate.py tests/tes
 ```
 
 Result: `36 passed`.
+
+Stabilization addendum:
+
+```powershell
+python -m pytest tests/test_anim_latest_solver_points_contract_gate.py tests/test_anim_export_contract_gate.py tests/test_r52_anim_export_contract_blocks.py tests/test_geometry_acceptance_release_gate.py tests/test_r31bn_cylinder_truth_gate.py tests/test_v32_desktop_animator_truth_contract.py tests/test_geometry_reference_packaging_passport_drift.py -q
+```
+
+Result: `39 passed`.
+
+Additional accepted checks:
+
+- `tests/test_r52_anim_export_contract_blocks.py` covers sidecar CLI PASS,
+  stale `validation` FAIL, and fake/fabricated geometry source FAIL.
+- `tests/test_geometry_reference_packaging_passport_drift.py` keeps
+  `CYLINDER_PACKAGING_PASSPORT.json` hash drift visible instead of treating a
+  stale passport as current truth.
 
 Non-claims:
 

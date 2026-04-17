@@ -667,6 +667,10 @@ def test_v32_14_v32_09_producer_animator_truth_note_records_contract_acceptance_
     assert "solver-points contract" in text
     assert "`solver_points`, `hardpoints` and `packaging`" in text
     assert "geometry-acceptance report" in text
+    assert "anim_export_contract_artifacts" in text
+    assert "anim_latest.contract.sidecar.json" in text
+    assert "stale sidecar validation summaries" in text
+    assert "fake/fabricated geometry markers fail" in text
     assert "`no_synthetic_geometry`" in text
     assert "`axis_only_honesty_mode`" in text
     assert "tests/test_anim_latest_solver_points_contract_gate.py" in text
@@ -676,6 +680,8 @@ def test_v32_14_v32_09_producer_animator_truth_note_records_contract_acceptance_
     assert "tests/test_r31bn_cylinder_truth_gate.py" in text
     assert "tests/test_v32_desktop_animator_truth_contract.py" in text
     assert "36 passed" in text
+    assert "tests/test_geometry_reference_packaging_passport_drift.py" in text
+    assert "39 passed" in text
     assert "not a durable release SEND bundle" in text
     assert "complete cylinder packaging passport" in text
 
@@ -721,14 +727,22 @@ def test_v32_12_geometry_reference_note_records_provenance_acceptance_without_ru
     assert "current or\n  historical artifact contexts" in text
     assert "geometry_reference_evidence.json" in text
     assert "latest_geometry_reference_evidence.json" in text
+    assert "geometry_acceptance_report.json" in text
+    assert "`inspection_status`, `truth_state_summary`, `missing_fields`" in text
+    assert "`producer_owned` and `no_synthetic_geometry`" in text
     assert "road_width_m" in text
     assert "Cylinder packaging passport evidence" in text
+    assert "CYLINDER_PACKAGING_PASSPORT.json" in text
+    assert "`artifact_freshness_missing`, `artifact_freshness_stale`" in text
     assert "tests/test_desktop_geometry_reference_center_contract.py" in text
     assert "tests/test_geometry_acceptance_release_gate.py" in text
     assert "tests/test_anim_latest_geometry_contract_gate.py" in text
     assert "tests/test_geometry_acceptance_web_and_bundle.py" in text
     assert "tests/test_visual_consumers_geometry_strict.py" in text
     assert "40 passed" in text
+    assert "tests/test_geometry_reference_packaging_passport_drift.py" in text
+    assert "tests/test_health_report_inspect_send_bundle_anim_diagnostics.py" in text
+    assert "50 passed" in text
     assert "imported-layer/runtime-proof open question" in text
     assert "does not alter solver physics" in text
 

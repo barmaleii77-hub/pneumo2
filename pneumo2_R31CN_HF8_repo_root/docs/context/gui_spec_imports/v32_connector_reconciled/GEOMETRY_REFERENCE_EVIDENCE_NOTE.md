@@ -17,14 +17,26 @@ Accepted proof shape:
   rebound silently to latest workspace data.
 - Geometry acceptance evidence is generated from solver-point artifacts and
   keeps `MISSING`, `PASS`, `WARN` and `FAIL` states explainable.
+- Health and offline inspect surfaces now prefer producer-owned
+  `geometry_acceptance_report.json` when it is present in SEND bundles, and
+  preserve `inspection_status`, `truth_state_summary`, `missing_fields`,
+  `warnings`, `producer_owned` and `no_synthetic_geometry`.
 - Road-width evidence prefers explicit artifact metadata and keeps missing
   `road_width_m` visible as a gap warning instead of deriving it silently in
   Animator/viewer consumers.
 - Cylinder packaging passport evidence compares base/reference state against
   export/runtime passport state and preserves the no-fabricated-geometry policy.
+- Cylinder packaging passport evidence also compares
+  `CYLINDER_PACKAGING_PASSPORT.json` against `meta.packaging` hash lineage;
+  missing or stale passport hashes remain `mismatch` and keep producer
+  readiness reasons open.
 - Diagnostics handoff writes `geometry_reference_evidence.json` into workspace
   exports and `latest_geometry_reference_evidence.json` into send-bundle
   sidecar space, so future SEND bundles can name the geometry proof path.
+- Diagnostics/send-bundle readiness now carries artifact freshness reasons
+  (`artifact_freshness_missing`, `artifact_freshness_stale`) together with
+  packaging and geometry acceptance reasons, so legacy partial sidecars cannot
+  masquerade as complete evidence.
 
 Targeted test command:
 
@@ -33,6 +45,22 @@ python -m pytest tests/test_desktop_geometry_reference_center_contract.py tests/
 ```
 
 Result: `40 passed`.
+
+Stabilization addendum:
+
+```powershell
+python -m pytest tests/test_desktop_geometry_reference_center_contract.py tests/test_geometry_acceptance_release_gate.py tests/test_anim_latest_geometry_contract_gate.py tests/test_geometry_acceptance_web_and_bundle.py tests/test_visual_consumers_geometry_strict.py tests/test_geometry_reference_packaging_passport_drift.py tests/test_health_report_inspect_send_bundle_anim_diagnostics.py -q
+```
+
+Result: `50 passed`.
+
+Additional accepted checks:
+
+- `tests/test_geometry_reference_packaging_passport_drift.py` proves passport
+  hash drift between runtime file and `meta.packaging` remains a mismatch.
+- `tests/test_health_report_inspect_send_bundle_anim_diagnostics.py` proves
+  health/inspect preserve `geometry_acceptance_report` `MISSING`, `WARN` and
+  `FAIL` states without recomputing or flattening producer truth.
 
 Non-claims:
 
