@@ -528,6 +528,95 @@ def test_generate_ring_scenario_bundle_auto_closes_last_segment_speed_and_valida
     assert np.isclose(float(saved["segments"][-1]["speed_end_kph"]), 20.0, atol=1e-9)
 
 
+def test_ring_export_surfaces_lineage_segment_ids_and_no_hidden_closure(tmp_path: Path) -> None:
+    spec = {
+        "closure_policy": "closed_c1_periodic",
+        "v0_kph": 12.0,
+        "segments": [
+            {
+                "name": "S1",
+                "duration_s": 1.0,
+                "turn_direction": "STRAIGHT",
+                "passage_mode": "steady",
+                "speed_end_kph": 12.0,
+                "road": {"mode": "SINE", "aL_mm": 20.0, "aR_mm": 10.0, "lambdaL_m": 2.0, "lambdaR_m": 2.5},
+            },
+            {
+                "name": "S2",
+                "duration_s": 1.0,
+                "turn_direction": "STRAIGHT",
+                "passage_mode": "brake",
+                "speed_end_kph": 12.0,
+                "road": {"mode": "ISO8608", "iso_class": "C"},
+            },
+        ],
+    }
+
+    bundle = generate_ring_scenario_bundle(
+        spec,
+        out_dir=tmp_path,
+        dt_s=0.02,
+        n_laps=1,
+        wheelbase_m=1.5,
+        dx_m=0.05,
+        seed=0,
+        tag="lineage_ring",
+    )
+    road_header = Path(bundle["road_csv"]).read_text(encoding="utf-8").splitlines()[0].split(",")
+    saved = json.loads(Path(bundle["scenario_json"]).read_text(encoding="utf-8"))
+    meta = json.loads(Path(bundle["meta_json"]).read_text(encoding="utf-8"))
+
+    assert "segment_id" in road_header
+    assert saved["_lineage"]["handoff_id"] == "HO-004"
+    assert saved["_generated_meta"]["closure_applied"] is True
+    assert saved["_generated_meta"]["raw_seam_max_jump_m"] >= saved["_generated_meta"]["seam_max_jump_m"]
+    assert meta["closure"]["no_hidden_closure_behavior"] is True
+    assert meta["road"]["segments"][0]["segment_id"] == 1
+    assert meta["road"]["segments"][1]["passage_mode"] == "brake"
+    assert meta["road"]["segment_id_series"]["csv_column"] == "segment_id"
+    assert meta["lineage"]["ring_source_hash_sha256"]
+    assert meta["lineage"]["ring_export_set_hash_sha256"]
+
+
+def test_preview_open_only_exports_with_explicit_warning_and_without_hidden_closure(tmp_path: Path) -> None:
+    spec = {
+        "closure_policy": "preview_open_only",
+        "v0_kph": 10.0,
+        "segments": [
+            {
+                "name": "S1",
+                "duration_s": 1.0,
+                "turn_direction": "STRAIGHT",
+                "speed_end_kph": 10.0,
+                "road": {"mode": "SINE", "aL_mm": 12.0, "aR_mm": 8.0, "lambdaL_m": 3.0, "lambdaR_m": 2.5},
+            }
+        ],
+    }
+
+    report = validate_ring_spec(spec)
+    tracks = generate_ring_tracks(spec, dx_m=0.05, seed=0)
+    bundle = generate_ring_scenario_bundle(
+        spec,
+        out_dir=tmp_path,
+        dt_s=0.02,
+        n_laps=1,
+        wheelbase_m=1.5,
+        dx_m=0.05,
+        seed=0,
+        tag="preview_open",
+    )
+    saved = json.loads(Path(bundle["scenario_json"]).read_text(encoding="utf-8"))
+    meta = json.loads(Path(bundle["meta_json"]).read_text(encoding="utf-8"))
+
+    assert any("preview_open_only" in msg for msg in report["warnings"])
+    assert tracks["meta"]["closure_policy"] == "preview_open_only"
+    assert tracks["meta"]["closure_applied"] is False
+    assert tracks["meta"]["closure_export_state"] == "open_preview_only"
+    assert saved["_generated_meta"]["closure_export_state"] == "open_preview_only"
+    assert meta["closure"]["policy"] == "preview_open_only"
+    assert meta["closure"]["applied"] is False
+
+
 def test_generate_ring_scenario_bundle_preserves_exact_ring_endpoint_in_road_csv(
     tmp_path: Path,
     monkeypatch,

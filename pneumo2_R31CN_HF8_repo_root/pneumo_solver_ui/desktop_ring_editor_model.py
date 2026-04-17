@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .desktop_input_model import describe_desktop_inputs_handoff_for_workspace
 from .scenario_ring import (
     _resolve_initial_speed_kph,
     _segment_length_canonical_m,
@@ -20,7 +21,8 @@ ISO_CLASSES = tuple("ABCDEFGH")
 GD_PICKS = ("lower", "mid", "upper")
 EVENT_KINDS = ("яма", "препятствие")
 EVENT_SIDES = ("left", "right", "both")
-CLOSURE_POLICIES = ("closed_c1_periodic", "strict_exact")
+CLOSURE_POLICIES = ("closed_c1_periodic", "closed_exact", "strict_exact", "preview_open_only")
+PASSAGE_MODES = ("steady", "accel", "brake", "custom")
 
 RING_PRESET_DEFAULT_KEY = "Demo: mixed ISO+SINE"
 SEGMENT_PRESET_DEFAULT_KEY = "Straight ISO cruise"
@@ -67,6 +69,15 @@ def _road_mode_label(value: object) -> str:
         "ISO8608": "ISO 8608",
         "SINE": "Синусоида",
     }.get(str(value or "").upper(), str(value or ""))
+
+
+def _passage_mode_label(value: object) -> str:
+    return {
+        "steady": "постоянный",
+        "accel": "разгон",
+        "brake": "торможение",
+        "custom": "пользовательский",
+    }.get(str(value or "").lower(), str(value or ""))
 
 
 def build_default_iso_road(*, seed: int = 12345) -> dict[str, Any]:
@@ -142,6 +153,7 @@ def build_blank_segment(*, name: str = "Новый сегмент", seed: int = 
         "name": name,
         "duration_s": 3.0,
         "turn_direction": "STRAIGHT",
+        "passage_mode": "steady",
         "speed_end_kph": 40.0,
         "road": build_default_iso_road(seed=seed),
         "events": [],
@@ -200,6 +212,7 @@ def normalize_spec(spec: dict[str, Any] | None) -> dict[str, Any]:
         normalized.setdefault("name", f"S{idx + 1}")
         normalized.setdefault("duration_s", 3.0)
         normalized.setdefault("turn_direction", "STRAIGHT")
+        normalized.setdefault("passage_mode", "steady")
         normalized.setdefault("speed_end_kph", safe_float(segment.get("speed_kph", 40.0), 40.0))
         ensure_road_defaults(normalized)
         segments.append(normalized)
@@ -227,6 +240,7 @@ def build_default_ring_spec() -> dict[str, Any]:
                 "name": "S1_прямо",
                 "duration_s": 5.0,
                 "turn_direction": "STRAIGHT",
+                "passage_mode": "steady",
                 "speed_end_kph": 40.0,
                 "road": build_default_iso_road(seed=12345),
                 "events": [
@@ -253,6 +267,7 @@ def build_default_ring_spec() -> dict[str, Any]:
                 "name": "S2_поворот",
                 "duration_s": 4.0,
                 "turn_direction": "LEFT",
+                "passage_mode": "steady",
                 "speed_end_kph": 40.0,
                 "turn_radius_m": 60.0,
                 "road": build_default_sine_road(),
@@ -263,6 +278,7 @@ def build_default_ring_spec() -> dict[str, Any]:
                 "name": "S3_прямо_55",
                 "duration_s": 3.0,
                 "turn_direction": "STRAIGHT",
+                "passage_mode": "accel",
                 "speed_end_kph": 55.0,
                 "road": build_default_iso_road(seed=54321),
                 "events": [],
@@ -272,6 +288,7 @@ def build_default_ring_spec() -> dict[str, Any]:
                 "name": "S4_замыкание",
                 "duration_s": 3.0,
                 "turn_direction": "STRAIGHT",
+                "passage_mode": "brake",
                 "speed_end_kph": 40.0,
                 "road": build_default_iso_road(seed=999),
                 "events": [],
@@ -288,6 +305,7 @@ def _segment_preset_straight_iso(*, seed: int) -> dict[str, Any]:
         "name": "Прямой участок ISO",
         "duration_s": 4.0,
         "turn_direction": "STRAIGHT",
+        "passage_mode": "steady",
         "speed_end_kph": 45.0,
         "road": {
             **build_default_iso_road(seed=seed + 101),
@@ -305,6 +323,7 @@ def _segment_preset_left_sine(*, seed: int) -> dict[str, Any]:
         "name": "Левый поворот, синусоида",
         "duration_s": 4.0,
         "turn_direction": "LEFT",
+        "passage_mode": "steady",
         "speed_end_kph": 38.0,
         "turn_radius_m": 55.0,
         "road": {
@@ -326,6 +345,7 @@ def _segment_preset_brake_rough(*, seed: int) -> dict[str, Any]:
         "name": "Торможение на грубом ISO",
         "duration_s": 3.5,
         "turn_direction": "STRAIGHT",
+        "passage_mode": "brake",
         "speed_end_kph": 20.0,
         "road": {
             **build_default_iso_road(seed=seed + 202),
@@ -353,6 +373,7 @@ def _segment_preset_obstacle_both(*, seed: int) -> dict[str, Any]:
         "name": "Участок с препятствиями",
         "duration_s": 3.0,
         "turn_direction": "STRAIGHT",
+        "passage_mode": "steady",
         "speed_end_kph": 30.0,
         "road": {
             **build_default_iso_road(seed=seed + 303),
@@ -423,6 +444,7 @@ def _ring_preset_iso_endurance(*, seed: int) -> dict[str, Any]:
                 "name": "Ресурсный прямой участок",
                 "duration_s": 6.0,
                 "turn_direction": "STRAIGHT",
+                "passage_mode": "steady",
                 "speed_end_kph": 36.0,
                 "road": {**build_default_iso_road(seed=seed + 11), "iso_class": "D", "gd_pick": "mid"},
                 "events": [],
@@ -431,6 +453,7 @@ def _ring_preset_iso_endurance(*, seed: int) -> dict[str, Any]:
                 "name": "Ресурсный левый поворот",
                 "duration_s": 4.5,
                 "turn_direction": "LEFT",
+                "passage_mode": "steady",
                 "speed_end_kph": 36.0,
                 "turn_radius_m": 78.0,
                 "road": {**build_default_iso_road(seed=seed + 12), "iso_class": "E", "gd_pick": "upper"},
@@ -440,6 +463,7 @@ def _ring_preset_iso_endurance(*, seed: int) -> dict[str, Any]:
                 "name": "Ресурсный прямой быстрый",
                 "duration_s": 5.0,
                 "turn_direction": "STRAIGHT",
+                "passage_mode": "accel",
                 "speed_end_kph": 42.0,
                 "road": {**build_default_iso_road(seed=seed + 13), "iso_class": "D"},
                 "events": [],
@@ -448,6 +472,7 @@ def _ring_preset_iso_endurance(*, seed: int) -> dict[str, Any]:
                 "name": "Ресурсное замыкание",
                 "duration_s": 4.0,
                 "turn_direction": "RIGHT",
+                "passage_mode": "brake",
                 "speed_end_kph": 36.0,
                 "turn_radius_m": 82.0,
                 "road": {**build_default_iso_road(seed=seed + 14), "iso_class": "E", "left_right_coherence": 0.45},
@@ -473,6 +498,7 @@ def _ring_preset_sine_handling(*, seed: int) -> dict[str, Any]:
                 "name": "Подход к синусоиде",
                 "duration_s": 4.5,
                 "turn_direction": "STRAIGHT",
+                "passage_mode": "accel",
                 "speed_end_kph": 34.0,
                 "road": {**build_default_sine_road(), "aL_mm": 28.0, "aR_mm": 28.0, "lambdaL_m": 2.2, "lambdaR_m": 2.2},
                 "events": [],
@@ -481,6 +507,7 @@ def _ring_preset_sine_handling(*, seed: int) -> dict[str, Any]:
                 "name": "Левый манёвр",
                 "duration_s": 4.0,
                 "turn_direction": "LEFT",
+                "passage_mode": "brake",
                 "speed_end_kph": 32.0,
                 "turn_radius_m": 52.0,
                 "road": {**build_default_sine_road(), "aL_mm": 42.0, "aR_mm": 36.0, "phaseR_deg": 150.0},
@@ -490,6 +517,7 @@ def _ring_preset_sine_handling(*, seed: int) -> dict[str, Any]:
                 "name": "Правый манёвр",
                 "duration_s": 4.0,
                 "turn_direction": "RIGHT",
+                "passage_mode": "steady",
                 "speed_end_kph": 32.0,
                 "turn_radius_m": 52.0,
                 "road": {**build_default_sine_road(), "aL_mm": 36.0, "aR_mm": 42.0, "phaseL_deg": 150.0, "phaseR_deg": 0.0},
@@ -499,6 +527,7 @@ def _ring_preset_sine_handling(*, seed: int) -> dict[str, Any]:
                 "name": "Выход и замыкание",
                 "duration_s": 3.0,
                 "turn_direction": "STRAIGHT",
+                "passage_mode": "steady",
                 "speed_end_kph": 32.0,
                 "road": {**build_default_iso_road(seed=seed + 23), "iso_class": "D"},
                 "events": [],
@@ -523,6 +552,7 @@ def _ring_preset_events_stress(*, seed: int) -> dict[str, Any]:
                 "name": "Разогрев перед событиями",
                 "duration_s": 4.0,
                 "turn_direction": "STRAIGHT",
+                "passage_mode": "steady",
                 "speed_end_kph": 28.0,
                 "road": {**build_default_iso_road(seed=seed + 31), "iso_class": "F", "gd_pick": "upper"},
                 "events": [
@@ -533,6 +563,7 @@ def _ring_preset_events_stress(*, seed: int) -> dict[str, Any]:
                 "name": "Пара препятствий",
                 "duration_s": 3.5,
                 "turn_direction": "STRAIGHT",
+                "passage_mode": "brake",
                 "speed_end_kph": 24.0,
                 "road": {**build_default_iso_road(seed=seed + 32), "iso_class": "E"},
                 "events": [
@@ -544,6 +575,7 @@ def _ring_preset_events_stress(*, seed: int) -> dict[str, Any]:
                 "name": "Замыкающий участок событий",
                 "duration_s": 4.0,
                 "turn_direction": "LEFT",
+                "passage_mode": "accel",
                 "speed_end_kph": 28.0,
                 "turn_radius_m": 68.0,
                 "road": {**build_default_sine_road(), "aL_mm": 18.0, "aR_mm": 22.0, "lambdaL_m": 1.7, "lambdaR_m": 1.7},
@@ -621,6 +653,63 @@ def build_segment_preset(name: str, *, seed: int) -> dict[str, Any]:
     return segment
 
 
+def canonicalize_ring_source_spec(spec: dict[str, Any] | None) -> dict[str, Any]:
+    """Return the WS-RING source payload with derived closure fields locked.
+
+    The editor may show inherited starts and auto-close endpoints, but the saved
+    master copy must not keep those values as independent downstream-editable
+    geometry.
+    """
+    normalized = normalize_spec(spec)
+    out = copy.deepcopy(normalized)
+    segments = get_segments(out)
+    if not segments:
+        return out
+    v_current = float(_resolve_initial_speed_kph(out))
+    ring_start = float(v_current)
+    first_road = ensure_road_defaults(segments[0])
+    first_center_start = safe_float(first_road.get("center_height_start_mm", 0.0), 0.0)
+    first_cross_start = safe_float(first_road.get("cross_slope_start_pct", 0.0), 0.0)
+    for index, segment in enumerate(segments):
+        is_last = index >= len(segments) - 1
+        forced_end_kph = ring_start if is_last else None
+        motion = _segment_motion_contract(
+            segment,
+            v_current,
+            allow_segment_start_override=(index == 0),
+            forced_end_kph=forced_end_kph,
+        )
+        segment["segment_id"] = int(index + 1)
+        segment["turn_direction"] = str(motion.get("turn_direction", "STRAIGHT") or "STRAIGHT").upper()
+        segment["passage_mode"] = str(motion.get("passage_mode", segment.get("passage_mode", "steady")) or "steady")
+        if index == 0:
+            segment["speed_start_kph"] = float(motion.get("speed_start_kph", v_current))
+        else:
+            segment.pop("speed_start_kph", None)
+        segment["speed_end_kph"] = float(motion.get("speed_end_kph", v_current))
+        segment.pop("drive_mode", None)
+        segment.pop("speed_kph", None)
+        segment.pop("v_end_kph", None)
+
+        road = ensure_road_defaults(segment)
+        if index > 0:
+            road.pop("center_height_start_mm", None)
+            road.pop("cross_slope_start_pct", None)
+        if is_last:
+            road["center_height_end_mm"] = float(first_center_start)
+            road["cross_slope_end_pct"] = float(first_cross_start)
+        v_current = float(motion.get("speed_end_kph", v_current))
+    out["segments"] = segments
+    out["_source_contract"] = {
+        "workspace": "WS-RING",
+        "source_of_truth": True,
+        "editable_owner": "WS-RING",
+        "handoff_id": "HO-004",
+        "downstream_geometry_editing_allowed": False,
+    }
+    return out
+
+
 def load_spec_from_path(path: str | Path) -> dict[str, Any]:
     text = Path(path).read_text(encoding="utf-8")
     obj = json.loads(text)
@@ -631,8 +720,26 @@ def load_spec_from_path(path: str | Path) -> dict[str, Any]:
 
 def save_spec_to_path(spec: dict[str, Any], path: str | Path) -> Path:
     target = Path(path)
-    target.write_text(json.dumps(spec, ensure_ascii=False, indent=2), encoding="utf-8")
+    target.write_text(json.dumps(canonicalize_ring_source_spec(spec), ensure_ascii=False, indent=2), encoding="utf-8")
     return target
+
+
+def resolve_ring_inputs_handoff(
+    *,
+    workspace_dir: Path | str | None = None,
+    snapshot_path: Path | str | None = None,
+    snapshot: dict[str, Any] | None = None,
+    current_inputs_snapshot_hash: str = "",
+) -> dict[str, Any]:
+    """Resolve the WS-INPUTS -> WS-RING frozen input ref without rebinding inputs."""
+
+    return describe_desktop_inputs_handoff_for_workspace(
+        "WS-RING",
+        workspace_dir=workspace_dir,
+        snapshot_path=snapshot_path,
+        snapshot=snapshot,
+        current_payload_hash=current_inputs_snapshot_hash,
+    )
 
 
 @dataclass
@@ -868,6 +975,7 @@ def build_segment_flow_rows(spec: dict[str, Any]) -> list[dict[str, Any]]:
             "duration_s": safe_float(segment.get("duration_s", 0.0), 0.0),
             "length_m": float(length_m),
             "turn_direction": str(motion.get("turn_direction", "STRAIGHT") or "STRAIGHT"),
+            "passage_mode": str(motion.get("passage_mode", "steady") or "steady"),
             "speed_start_kph": float(motion.get("speed_start_kph", v_current)),
             "speed_end_kph": float(motion.get("speed_end_kph", v_current)),
             "turn_radius_m": float(motion.get("turn_radius_m", 0.0) or 0.0),
@@ -881,11 +989,13 @@ def build_segment_flow_rows(spec: dict[str, Any]) -> list[dict[str, Any]]:
 
 def build_segment_label(row: dict[str, Any]) -> str:
     turn = _turn_label(row.get("turn_direction") or "")
+    passage = _passage_mode_label(row.get("passage_mode") or "steady")
     road = _road_mode_label(row.get("road_mode") or "ISO8608")
     return (
         f"{int(row.get('index', 0)) + 1:02d}. "
         f"{str(row.get('name') or 'Сегмент')} | "
         f"{turn} | "
+        f"{passage} | "
         f"{float(row.get('speed_start_kph', 0.0)):.0f}->{float(row.get('speed_end_kph', 0.0)):.0f} км/ч | "
         f"{float(row.get('length_m', 0.0)):.1f} м | "
         f"{road} | событий: {int(row.get('event_count', 0) or 0)}"

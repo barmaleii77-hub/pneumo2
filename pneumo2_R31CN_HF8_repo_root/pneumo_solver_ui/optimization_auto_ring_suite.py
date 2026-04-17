@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
@@ -94,6 +95,160 @@ def _safe_float(value: Any, default: float) -> float:
 
 def _read_json(path: str | Path) -> Any:
     return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def _stable_json_dumps(obj: Any) -> str:
+    return json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _sha256_file(path: str | Path) -> str:
+    raw = str(path).strip()
+    if not raw:
+        return ""
+    target = Path(raw)
+    if not target.is_file():
+        return ""
+    h = hashlib.sha256()
+    with target.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _resolve_generated_sidecar(scenario_json: str | Path, spec: Mapping[str, Any], key: str) -> str:
+    outputs = spec.get("_generated_outputs") if isinstance(spec.get("_generated_outputs"), Mapping) else {}
+    raw = str((outputs or {}).get(key) or "").strip()
+    if not raw:
+        return ""
+    path = Path(raw)
+    if not path.is_absolute():
+        path = Path(scenario_json).resolve().parent / path
+    return str(path.resolve())
+
+
+def _canonical_ring_source_hash(path: str | Path) -> str:
+    raw = str(path).strip()
+    if not raw:
+        return ""
+    target = Path(raw)
+    if not target.is_file():
+        return ""
+    try:
+        payload = _read_json(target)
+    except Exception:
+        return ""
+    if not isinstance(payload, Mapping):
+        return ""
+    canonical = dict(payload)
+    canonical.pop("_lineage", None)
+    return _sha256_text(_stable_json_dumps(canonical))
+
+
+def _current_ring_export_set_hash(
+    *,
+    source_hash: str,
+    road_csv: str | Path,
+    axay_csv: str | Path,
+    scenario_json: str | Path,
+    ring_source_of_truth_json: str | Path,
+) -> str:
+    if not str(source_hash or "").strip():
+        return ""
+    file_hashes = {
+        "road_csv_sha256": _sha256_file(road_csv),
+        "axay_csv_sha256": _sha256_file(axay_csv),
+        "scenario_json_sha256": _sha256_file(scenario_json),
+        "ring_source_of_truth_json_sha256": _sha256_file(ring_source_of_truth_json),
+    }
+    if any(not value for value in file_hashes.values()):
+        return ""
+    return _sha256_text(
+        _stable_json_dumps(
+            {
+                "source_hash": str(source_hash),
+                "files": file_hashes,
+                "schema_version": "ring_export_set_v1",
+            }
+        )
+    )
+
+
+def _ring_handoff_fields(
+    *,
+    road_csv: str | Path,
+    axay_csv: str | Path,
+    scenario_json: str | Path,
+    scenario_spec: Mapping[str, Any],
+) -> dict[str, Any]:
+    lineage = scenario_spec.get("_lineage") if isinstance(scenario_spec.get("_lineage"), Mapping) else {}
+    meta_path = _resolve_generated_sidecar(scenario_json, scenario_spec, "meta_json")
+    source_path = _resolve_generated_sidecar(scenario_json, scenario_spec, "ring_source_of_truth_json")
+    meta_lineage: Mapping[str, Any] = {}
+    if meta_path:
+        try:
+            meta_obj = _read_json(meta_path)
+            if isinstance(meta_obj, Mapping) and isinstance(meta_obj.get("lineage"), Mapping):
+                meta_lineage = meta_obj.get("lineage")  # type: ignore[assignment]
+        except Exception:
+            meta_lineage = {}
+    expected_source_hash = str(
+        lineage.get("ring_source_hash_sha256")
+        or meta_lineage.get("ring_source_hash_sha256")
+        or ""
+    ).strip()
+    current_source_hash = _canonical_ring_source_hash(source_path)
+    source_hash = expected_source_hash or current_source_hash or _sha256_file(scenario_json)
+    expected_export_hash = str(meta_lineage.get("ring_export_set_hash_sha256") or "")
+    current_export_hash = _current_ring_export_set_hash(
+        source_hash=current_source_hash or expected_source_hash,
+        road_csv=road_csv,
+        axay_csv=axay_csv,
+        scenario_json=scenario_json,
+        ring_source_of_truth_json=source_path,
+    )
+    stale_reasons: list[str] = []
+    if not meta_path:
+        stale_reasons.append("missing_ring_export_meta_json")
+    if not source_path:
+        stale_reasons.append("missing_ring_source_of_truth_json")
+    elif not current_source_hash:
+        stale_reasons.append("ring_source_of_truth_unreadable")
+    if expected_source_hash and current_source_hash and expected_source_hash != current_source_hash:
+        stale_reasons.append("ring_source_hash_changed")
+    if not expected_export_hash:
+        stale_reasons.append("missing_ring_export_set_hash")
+    elif current_export_hash and expected_export_hash != current_export_hash:
+        stale_reasons.append("ring_export_set_hash_changed")
+    elif not current_export_hash:
+        stale_reasons.append("ring_export_set_unverifiable")
+    return {
+        "handoff_id": "HO-004",
+        "source_workspace": "WS-RING",
+        "consumer_workspace": "WS-SUITE",
+        "test_type": "ring",
+        "scenario_ref_id": source_hash[:16] if source_hash else str(Path(scenario_json).stem),
+        "scenario_json_path": str(Path(scenario_json).resolve()),
+        "road_csv_path": str(Path(road_csv).resolve()),
+        "axay_csv_path": str(Path(axay_csv).resolve()),
+        "segment_meta_ref": meta_path,
+        "ring_source_of_truth_json": source_path,
+        "ring_source_hash_sha256": source_hash,
+        "ring_source_hash_current_sha256": current_source_hash,
+        "ring_export_set_hash_sha256": expected_export_hash,
+        "ring_export_set_hash_current_sha256": current_export_hash,
+        "ring_handoff_stale": bool(stale_reasons),
+        "ring_stale_reasons": stale_reasons,
+        "ring_geometry_editable": False,
+        "ring_refs_readonly": True,
+        "ring_segment_metadata_readonly": True,
+        "downstream_geometry_editing_allowed": False,
+        "geometry_owner_workspace": "WS-RING",
+        "stale_if_ring_source_hash_changes": True,
+    }
 
 
 def _read_csv(path: str | Path) -> pd.DataFrame:
@@ -371,6 +526,14 @@ def build_optimization_auto_ring_suite_rows(
     ring_targets = _ring_targets_from_source(rows_by_name)
     analysis = analyze_ring_windows(road_csv, axay_csv, scenario_json, window_s=window_s)
     ring_basics = dict(analysis.get("ring_basics") or {})
+    scenario_spec_obj = _read_json(scenario_json)
+    scenario_spec = scenario_spec_obj if isinstance(scenario_spec_obj, Mapping) else {}
+    ring_handoff = _ring_handoff_fields(
+        road_csv=road_csv,
+        axay_csv=axay_csv,
+        scenario_json=scenario_json,
+        scenario_spec=scenario_spec,
+    )
 
     suite_rows: list[dict[str, Any]] = []
     for name in _STAGE0_SOURCE_NAMES:
@@ -402,6 +565,7 @@ def build_optimization_auto_ring_suite_rows(
         "wheelbase_m": float(_safe_float(ring_basics.get("wheelbase_m"), 1.5)),
     }
     full_ring_row.update(ring_targets)
+    full_ring_row.update(ring_handoff)
     suite_rows.append(full_ring_row)
 
     fragment_meta: list[dict[str, Any]] = []
@@ -459,6 +623,13 @@ def build_optimization_auto_ring_suite_rows(
             "wheelbase_m": float(_safe_float(ring_basics.get("wheelbase_m"), 1.5)),
         }
         row.update(ring_targets)
+        row.update(
+            {
+                **ring_handoff,
+                "scenario_json_path": str(Path(scenario_json).resolve()),
+                "fragment_meta_ref": str(meta_out.resolve()),
+            }
+        )
         suite_rows.append(row)
 
     by_name: dict[str, dict[str, Any]] = {}
@@ -477,6 +648,7 @@ def build_optimization_auto_ring_suite_rows(
             "axay_csv": str(Path(axay_csv).resolve()),
             "scenario_json": str(Path(scenario_json).resolve()),
         },
+        "handoff": dict(ring_handoff),
         "analysis": analysis,
         "fragment_meta_files": [str(Path(item["scenario_json"]).resolve()) for item in final_rows if str(item.get("имя") or "").startswith("ringfrag_")],
         "recommended_stage_param_hints": AUTO_STAGE_PARAMETER_HINTS,
