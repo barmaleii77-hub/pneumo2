@@ -610,11 +610,10 @@ def render_health_report_md(rep: HealthReport) -> str:
     ring_closure = dict(rep.signals.get("ring_closure") or anim.get("ring_closure_summary") or {})
     operator_recommendations = [str(x) for x in (rep.signals.get("operator_recommendations") or []) if str(x).strip()]
     artifacts = dict(rep.signals.get("artifacts") or {})
-    evidence = dict(rep.signals.get("evidence_manifest") or {})
+    evidence_manifest = dict(rep.signals.get("evidence_manifest") or {})
     engineering = dict(rep.signals.get("engineering_analysis_evidence") or {})
     optimizer_scope = dict(rep.signals.get("optimizer_scope") or {})
     optimizer_scope_gate = dict(rep.signals.get("optimizer_scope_gate") or {})
-    evidence_manifest = dict(rep.signals.get("evidence_manifest") or {})
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
     lines = [
         "# Health report",
@@ -637,7 +636,6 @@ def render_health_report_md(rep: HealthReport) -> str:
         f"- browser_perf_evidence_report: {artifacts.get('browser_perf_evidence_report')}",
         f"- browser_perf_comparison_report: {artifacts.get('browser_perf_comparison_report')}",
         f"- browser_perf_trace: {artifacts.get('browser_perf_trace')}",
-        f"- evidence_manifest: {artifacts.get('evidence_manifest')}",
     ]
 
     if evidence_manifest:
@@ -646,8 +644,12 @@ def render_health_report_md(rep: HealthReport) -> str:
         lines += [
             "",
             "## Evidence manifest",
+            f"- collection_mode: `{evidence_manifest.get('collection_mode') or '—'}`",
+            f"- trigger: `{evidence_manifest.get('trigger') or '—'}`",
             f"- evidence_manifest_hash: `{evidence_manifest.get('evidence_manifest_hash') or '—'}`",
             f"- stage: `{evidence_manifest.get('finalization_stage') or evidence_manifest.get('stage') or '—'}`",
+            f"- zip_sha256: `{evidence_manifest.get('zip_sha256') or '—'}`",
+            f"- pb002_missing_required_count: `{evidence_manifest.get('pb002_missing_required_count')}`",
             f"- missing_required_count: `{evidence_manifest.get('missing_required_count')}`",
             f"- missing_optional_count: `{evidence_manifest.get('missing_optional_count')}`",
             f"- analysis_handoff: `{analysis_handoff.get('status') or 'MISSING'}` / context=`{analysis_handoff.get('result_context_state') or 'MISSING'}`",
@@ -663,21 +665,6 @@ def render_health_report_md(rep: HealthReport) -> str:
             f"- errors_count: {val.get('errors_count')}",
             f"- warnings_count: {val.get('warnings_count')}",
         ]
-
-    if evidence:
-        lines += [
-            "",
-            "## Evidence manifest",
-            f"- collection_mode: {evidence.get('collection_mode') or '—'}",
-            f"- trigger: {evidence.get('trigger') or '—'}",
-            f"- finalization_stage: {evidence.get('finalization_stage') or '—'}",
-            f"- zip_sha256: {evidence.get('zip_sha256') or '—'}",
-            f"- pb002_missing_required_count: {evidence.get('pb002_missing_required_count')}",
-            f"- missing_required_count: {evidence.get('missing_required_count')}",
-            f"- missing_optional_count: {evidence.get('missing_optional_count')}",
-        ]
-        for warning in list(evidence.get("missing_warnings") or [])[:8]:
-            lines.append(f"- missing_evidence: {warning}")
 
     if engineering:
         lines += [
