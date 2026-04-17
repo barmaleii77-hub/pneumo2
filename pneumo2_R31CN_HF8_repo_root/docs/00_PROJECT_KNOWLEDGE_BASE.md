@@ -80,8 +80,9 @@ Operational note:
 21. [docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md](./context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
 22. [docs/context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md](./context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md)
 23. [docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](./context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
-24. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
-25. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
+24. [docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](./context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
+25. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
+26. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
 
 ### 3. Активные требования и рабочий backlog
 
@@ -237,6 +238,7 @@ Operational note:
 - [docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md](./context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
 - [docs/context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md](./context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md)
 - [docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](./context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
+- [docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](./context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
 
 Что задаёт общий canon:
 

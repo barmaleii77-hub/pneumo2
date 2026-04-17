@@ -274,6 +274,13 @@ ID: `PLAN-0036`.
 Источник: chat + V32-11/V32-06 focused validation.
 ID: `PLAN-0037`.
 
+38. Project KB conformance audit and improvement plan
+Назначение: Синхронизировать репозиторий, сверить активную KB/v37/v33/v32 с текущими desktop GUI lanes, зафиксировать conformance matrix и вести дальнейшую доработку через V32-01/V32-10 startup stability, V32-14/V32-12/V32-09 producer truth, V32-11/V32-15 runtime evidence and final release gates.
+Артефакт: [context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](./context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
+Статус: active.
+Источник: chat: project audit 2026-04-17.
+ID: `PLAN-0038`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

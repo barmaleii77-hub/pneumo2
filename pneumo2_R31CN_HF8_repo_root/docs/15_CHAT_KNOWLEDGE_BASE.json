@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-17T03:48:01+00:00",
+  "updated_at": "2026-04-17T15:08:16+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -488,6 +488,15 @@
       "details": "Record focused validation for current diagnostics readiness-reason evidence and optimizer stale HO-006 blocked-summary coverage: diagnostics producer readiness reasons remain evidence-only and do not close SEND/runtime gaps; optimizer stale baseline formatting is V32-06 contract UI coverage, not optimizer runtime closure.",
       "artifact_path": "context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md",
       "status": "актуален"
+    },
+    {
+      "id": "PLAN-0038",
+      "created_at": "2026-04-17T15:08:16+00:00",
+      "source": "chat: project audit 2026-04-17",
+      "title": "Project KB conformance audit and improvement plan",
+      "details": "Синхронизировать репозиторий, сверить активную KB/v37/v33/v32 с текущими desktop GUI lanes, зафиксировать conformance matrix и вести дальнейшую доработку через V32-01/V32-10 startup stability, V32-14/V32-12/V32-09 producer truth, V32-11/V32-15 runtime evidence and final release gates.",
+      "artifact_path": "context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md",
+      "status": "active"
     }
   ]
 }

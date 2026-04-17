@@ -41,7 +41,9 @@
    — reviewed clean self-check warnings snapshot; не diagnostics/SEND closure proof.
 10. [V32_16_ACCEPTANCE_NOTE_2026-04-17.md](../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
    — accepted V32-16 docs/helper scope and validation note.
-11. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
+11. [PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](../context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
+   — synchronized repository/KB conformance audit and improvement plan; not runtime closure proof.
+12. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
    [TECHNICAL_SPECIFICATION.md](../context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md)
    и [GUI_SPEC.yaml](../context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml)
    — successor GitHub KB/TZ/spec supplement. Он уточняет requirements,
@@ -97,6 +99,8 @@
   diagnostics/SEND closure claim.
 - `V32_16_ACCEPTANCE_NOTE_2026-04-17` фиксирует accepted V32-16 docs/helper
   scope, focused validation and next lane order.
+- `PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17` фиксирует текущую синхронизацию
+  `codex/work`, соответствие KB по lane matrix и план дальнейшей доработки.
 - `v37_github_kb_supplement` задаёт successor KB/TZ/spec connector layer:
   consolidated technical specification, GUI_SPEC.yaml, workspace contract
   matrix, parameter catalogs, acceptance/requirements matrices, repo canon
@@ -140,7 +144,8 @@
   дополнительно читать соответствующий evidence note;
 - если lane касается текущего mixed dirty tree, дополнительно сверять
   `context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md` и
-  `context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md`; не
+  `context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md`, а также
+  `context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md`; не
   смешивать V32-16 docs/helper patch с runtime/domain lane-пакетами;
 - если нужно понять исходный жёсткий intent ещё до `v1`, дополнительно читать
   `foundations/*`;

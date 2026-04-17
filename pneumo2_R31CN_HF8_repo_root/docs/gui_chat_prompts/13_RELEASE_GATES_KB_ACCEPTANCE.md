@@ -27,6 +27,7 @@
 21. [../context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md](../context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
 22. [../context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md](../context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md)
 23. [../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
+24. [../context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](../context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
 
 ## Scope
 

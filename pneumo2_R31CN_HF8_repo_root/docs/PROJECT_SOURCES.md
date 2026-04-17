@@ -53,6 +53,7 @@
 - `docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md` — release-readiness triage текущего dirty tree по V32 lane, gate/gap, evidence и targeted tests; не является runtime closure proof.
 - `docs/context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md` — review note для `REPORTS/SELF_CHECK_SILENT_WARNINGS.*`: clean self-check snapshot (`fail_count=0`, `warn_count=0`) без diagnostics/SEND closure claim.
 - `docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md` — V32-16 integration note: accepted docs/helper scope, validation status and no-runtime-closure rule.
+- `docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md` — синхронизационный аудит проекта против активной KB, conformance matrix и план доработки без runtime-closure claim.
 - `docs/context/gui_spec_imports/v3/README.md` — active detailed reference layer из `pneumo_gui_codex_package_v3.zip`.
 - `docs/context/gui_spec_imports/v3/pneumo_gui_codex_spec_v3_refined.json` — главный machine-readable GUI-spec.
 - `docs/context/gui_spec_imports/v3/current_macro.dot` — текущий macro workflow graph.
@@ -145,6 +146,6 @@
 
 - Внешние ссылки не заменяют локальный канон.
 - Для GUI-first задач сначала читать `17`, затем `18`, затем `gui_spec_imports/foundations/*`, затем `gui_spec_imports/v37_github_kb_supplement/*` для KB/TZ/spec reconciliation, затем `gui_spec_imports/v33_connector_reconciled/README.md` и `COMPLETENESS_ASSESSMENT.md`, затем `gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md`, `gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md`, затем `gui_spec_imports/v3/*`, parity docs и только потом lane-level prompts.
-- Для release-readiness merge сначала сверять `docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md` и `docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md`, затем принимать V32-16 docs/helper patch и только после этого разбирать lane-пакеты с их evidence.
+- Для release-readiness merge сначала сверять `docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md`, `docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md` и `docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md`, затем принимать V32-16 docs/helper patch и только после этого разбирать lane-пакеты с их evidence.
 - Imported JSON/DOT/CSV используются как reference artifacts, а не как единственный источник правды.
 - При конфликте между imported sources и текущим каноном приоритет у `17/18`.
