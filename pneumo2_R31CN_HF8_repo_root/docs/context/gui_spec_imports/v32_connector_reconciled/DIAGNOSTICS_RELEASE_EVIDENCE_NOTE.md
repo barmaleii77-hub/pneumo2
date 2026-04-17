@@ -50,19 +50,19 @@ python -m pytest tests/test_v32_diagnostics_send_bundle_evidence.py tests/test_h
 
 Result: `26 passed`.
 
-Focused diagnostics/docs regression result: `95 passed`.
+Focused diagnostics/docs regression result: `97 passed`.
 
 Runtime proof captured:
 
-- ZIP: `send_bundles/SEND_20260417_081354_auto-exit_bundle.zip`
-- Final latest SHA256: `1a31b7765cb866753574a00d2bcd9403f28273dd102819efc85dda9700779fa4`
-- Trigger / mode: `auto-exit` / `exit`
+- ZIP: `send_bundles/SEND_20260417_081829_bundle.zip`
+- Final latest SHA256: `91a45fcc80c93f4ed02a8f47625216e23653e68e5a90b7d89e17305cc0d42dbb`
+- Trigger / mode: `desktop_diagnostics_center` / `manual`
 - Validation: `ok=True`, `errors=0`, `warnings=6`
 - Health after final triage: `ok=False`, `notes=8`, preserving adjacent-workstream warnings.
 - PB-002 required evidence: `pb002_missing_required_count=0`
 - Latest pointer/SHA proof: `latest_zip_matches_original=True`, `latest_sha_sidecar_matches=True`, `latest_pointer_matches_original=True`
 - Embedded evidence stage: `final_after_validation_dashboard`; latest sidecar proof stage: `latest_zip_sha_inspection_proof`.
-- Latest inspection sidecars: `latest_send_bundle_inspection.json` points at `latest_send_bundle.zip` and reports health, validation, triage and evidence manifest present.
+- Latest inspection sidecars: `latest_send_bundle_inspection.json` points at `latest_send_bundle.zip`, carries matching `zip_sha256`, and reports health, validation, triage and evidence manifest present.
 - Desktop center state refreshed: `latest_desktop_diagnostics_center_state.json` exposes latest ZIP, path pointer, SHA, health, triage, validation, evidence manifest and clipboard paths.
 
 Geometry Reference / GAP evidence state:

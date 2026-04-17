@@ -21,6 +21,8 @@ from pneumo_solver_ui.desktop_qt_shell.runtime_proof import (
     write_qt_main_shell_manual_results_template,
     write_qt_main_shell_runtime_proof,
 )
+from pneumo_solver_ui.desktop_animator.analysis_context import ANALYSIS_TO_ANIMATOR_HANDOFF_ID
+from pneumo_solver_ui.desktop_animator.truth_contract import file_sha256, stable_contract_hash
 from pneumo_solver_ui.desktop_shell.command_search import build_shell_command_search_entries
 from pneumo_solver_ui.desktop_shell.external_launch import build_shell_context_env
 from pneumo_solver_ui.desktop_shell.launcher_catalog import build_desktop_launch_catalog
@@ -65,6 +67,71 @@ def _test_project_context(tmp_path: Path) -> ShellProjectContext:
         workspace_source="PNEUMO_WORKSPACE_DIR",
         missing_workspace_dirs=(),
     )
+
+
+def _write_qt_shell_analysis_context(workspace_dir: Path) -> tuple[Path, Path, Path]:
+    context_path = workspace_dir / "handoffs" / "WS-ANALYSIS" / "analysis_context.json"
+    link_path = context_path.with_name("animator_link_contract.json")
+    npz_path = workspace_dir / "exports" / "anim_latest.npz"
+    pointer_path = workspace_dir / "exports" / "anim_latest.json"
+    npz_path.parent.mkdir(parents=True, exist_ok=True)
+    npz_path.write_bytes(b"npz-demo")
+    pointer_path.write_text(json.dumps({"npz_path": str(npz_path)}, ensure_ascii=False), encoding="utf-8")
+    pointer = {
+        "path": str(pointer_path),
+        "exists": True,
+        "kind": "json",
+        "sha256": file_sha256(pointer_path),
+        "size_bytes": pointer_path.stat().st_size,
+    }
+    link = {
+        "schema": "analysis_to_animator_link_contract.v1",
+        "handoff_id": ANALYSIS_TO_ANIMATOR_HANDOFF_ID,
+        "producer_workspace": "WS-ANALYSIS",
+        "consumer_workspace": "WS-ANIMATOR",
+        "analysis_context_path": str(context_path),
+        "run_id": "run-shell-001",
+        "run_contract_hash": "selected-run-shell-hash",
+        "selected_test_id": "T01",
+        "selected_segment_id": "segment-1",
+        "selected_time_window": {"mode": "time_s", "start_s": 0.0, "end_s": 1.0},
+        "selected_best_candidate_ref": "candidate-001",
+        "selected_result_artifact_pointer": pointer,
+        "objective_contract_hash": "objective-shell",
+        "suite_snapshot_hash": "suite-shell",
+        "problem_hash": "problem-shell",
+    }
+    link["animator_link_contract_hash"] = stable_contract_hash(
+        {key: value for key, value in link.items() if key != "animator_link_contract_hash"}
+    )
+    context = {
+        "schema": "analysis_context.v1",
+        "handoff_id": ANALYSIS_TO_ANIMATOR_HANDOFF_ID,
+        "producer_workspace": "WS-ANALYSIS",
+        "consumer_workspace": "WS-ANIMATOR",
+        "analysis_context_path": str(context_path),
+        "selected_run_contract_path": str(workspace_dir / "handoffs" / "WS-OPTIMIZATION" / "selected_run_contract.json"),
+        "selected_run_contract_hash": "selected-run-shell-hash",
+        "selected_run_context": {
+            "run_id": "run-shell-001",
+            "objective_contract_hash": "objective-shell",
+            "suite_snapshot_hash": "suite-shell",
+            "problem_hash": "problem-shell",
+            "run_contract_hash": "selected-run-shell-hash",
+        },
+        "selected_result_artifact_pointer": pointer,
+        "animator_link_contract_path": str(link_path),
+        "animator_link_contract_hash": link["animator_link_contract_hash"],
+        "animator_link_contract": link,
+        "diagnostics_bundle_finalized": False,
+    }
+    context["analysis_context_hash"] = stable_contract_hash(
+        {key: value for key, value in context.items() if key != "analysis_context_hash"}
+    )
+    context_path.parent.mkdir(parents=True, exist_ok=True)
+    context_path.write_text(json.dumps(context, ensure_ascii=False, indent=2), encoding="utf-8")
+    link_path.write_text(json.dumps(link, ensure_ascii=False, indent=2), encoding="utf-8")
+    return context_path, link_path, pointer_path
 
 
 class _FakeCoexistenceManager:
@@ -260,6 +327,61 @@ def test_desktop_shell_command_search_home_and_project_tree_actions_are_routable
     assert by_label["Engineering Analysis"].action_kind == "tool"
     assert by_label["Engineering Analysis"].action_value == "desktop_engineering_analysis_center"
     assert "HO-007" in by_label["Engineering Analysis"].keywords
+    assert by_label["Открыть HO-008 analysis_context.json"].action_kind == "open_artifact"
+    assert by_label["Открыть HO-008 analysis_context.json"].action_value == "animator.analysis_context"
+    assert by_label["Открыть HO-008 animator_link_contract.json"].action_value == (
+        "animator.animator_link_contract"
+    )
+    assert by_label["Открыть selected result artifact pointer"].action_value == (
+        "animator.selected_result_artifact_pointer"
+    )
+    assert by_label["Открыть selected animation NPZ"].action_value == "animator.selected_npz_path"
+
+
+def test_desktop_qt_shell_opens_animator_ho008_artifacts_from_command_surface(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    QtCore, QtGui, _QtWidgets = _qt_modules()
+    context = _test_project_context(tmp_path)
+    context_path, link_path, pointer_path = _write_qt_shell_analysis_context(context.workspace_dir)
+    opened: list[str] = []
+
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "build_shell_project_context",
+        lambda: context,
+    )
+    monkeypatch.setattr(
+        QtGui.QDesktopServices,
+        "openUrl",
+        lambda url: opened.append(url.toLocalFile()) or True,
+    )
+
+    app = _qt_app()
+    window = qt_main_window_module.DesktopQtMainShell()
+    try:
+        app.processEvents()
+        assert window.open_shell_artifact("animator.analysis_context") is True
+        assert Path(opened[-1]) == context_path.resolve()
+        assert window.open_shell_artifact("animator.animator_link_contract") is True
+        assert Path(opened[-1]) == link_path.resolve()
+        assert window.open_shell_artifact("animator.selected_result_artifact_pointer") is True
+        assert Path(opened[-1]) == pointer_path.resolve()
+        assert window.open_shell_artifact("animator.selected_npz_path") is True
+        assert Path(opened[-1]).name == "anim_latest.npz"
+
+        window.command_search_edit.setText("selected animation NPZ")
+        app.processEvents()
+        first = window.search_results_list.item(0)
+        assert first is not None
+        assert first.data(QtCore.Qt.ItemDataRole.UserRole + 1) == "open_artifact"
+        window._activate_search_item(first)
+        assert Path(opened[-1]).name == "anim_latest.npz"
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
 
 
 def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_status_strip(

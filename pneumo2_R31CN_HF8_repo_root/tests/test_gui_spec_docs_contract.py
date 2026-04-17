@@ -40,6 +40,7 @@ V32_GAP_MAP = IMPORTS_V32 / "GAP_TO_EVIDENCE_ACTION_MAP.csv"
 V32_INPUTS_HANDOFF_EVIDENCE = IMPORTS_V32 / "WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md"
 V32_PRODUCER_ANIMATOR_TRUTH_NOTE = IMPORTS_V32 / "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md"
 V32_COMPARE_OBJECTIVE_INTEGRITY_NOTE = IMPORTS_V32 / "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md"
+V32_GEOMETRY_REFERENCE_EVIDENCE_NOTE = IMPORTS_V32 / "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md"
 V32_DIAGNOSTICS_EVIDENCE_NOTE = IMPORTS_V32 / "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md"
 V32_RUNTIME_EVIDENCE_NOTE = IMPORTS_V32 / "RUNTIME_RELEASE_EVIDENCE_NOTE.md"
 RELEASE_TRIAGE = CONTEXT / "release_readiness" / "WORKTREE_TRIAGE_2026-04-17.md"
@@ -269,6 +270,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in imports_readme
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in imports_readme
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in imports_readme
+    assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in imports_readme
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in imports_readme
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in imports_readme
     assert "специализированный ring-editor migration" in imports_readme
@@ -295,6 +297,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "v32_connector_reconciled/GAP_TO_EVIDENCE_ACTION_MAP.csv" in project_sources_text
     assert "v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in project_sources_text
+    assert "v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in project_sources_text
     assert "v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md" in project_sources_text
     assert "v33_connector_reconciled/README.md" in project_sources_text
@@ -319,6 +322,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in index_text
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in index_text
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in index_text
+    assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in index_text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in index_text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in index_text
     assert "WORKTREE_TRIAGE_2026-04-17.md" in index_text
@@ -425,6 +429,7 @@ def test_v32_connector_reconciled_digest_is_registered() -> None:
     assert "GAP_TO_EVIDENCE_ACTION_MAP.csv" in text
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in text
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in text
+    assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in text
     assert "WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md" in text
@@ -527,6 +532,7 @@ def test_v32_release_gate_acceptance_map_is_executable_docs_contract() -> None:
     assert "RELEASE_GATE_ACCEPTANCE_MAP.md" in release_lane_text
     assert "PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md" in release_lane_text
     assert "COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md" in release_lane_text
+    assert "GEOMETRY_REFERENCE_EVIDENCE_NOTE.md" in release_lane_text
     assert "DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md" in release_lane_text
     assert "RUNTIME_RELEASE_EVIDENCE_NOTE.md" in release_lane_text
     assert "Do not implement domain runtime features here." in release_lane_text
@@ -624,6 +630,30 @@ def test_v32_06_v32_08_compare_objective_note_records_contract_acceptance_withou
     assert "tests/test_optimization_staged_resume_run_dir.py" in text
     assert "41 passed" in text
     assert "does not close `OG-003`, `OG-004`, `OG-005`" in text
+
+
+def test_v32_12_geometry_reference_note_records_provenance_acceptance_without_runtime_closure() -> None:
+    assert V32_GEOMETRY_REFERENCE_EVIDENCE_NOTE.exists()
+
+    text = V32_GEOMETRY_REFERENCE_EVIDENCE_NOTE.read_text(encoding="utf-8")
+    assert "V32-12 geometry reference evidence contracts accepted" in text
+    assert "not a runtime closure\nclaim" in text
+    assert "`RGH-018`" in text
+    assert "`OG-006`" in text
+    assert "Selected `anim_latest` JSON/NPZ artifacts" in text
+    assert "current or\n  historical artifact contexts" in text
+    assert "geometry_reference_evidence.json" in text
+    assert "latest_geometry_reference_evidence.json" in text
+    assert "road_width_m" in text
+    assert "Cylinder packaging passport evidence" in text
+    assert "tests/test_desktop_geometry_reference_center_contract.py" in text
+    assert "tests/test_geometry_acceptance_release_gate.py" in text
+    assert "tests/test_anim_latest_geometry_contract_gate.py" in text
+    assert "tests/test_geometry_acceptance_web_and_bundle.py" in text
+    assert "tests/test_visual_consumers_geometry_strict.py" in text
+    assert "40 passed" in text
+    assert "imported-layer/runtime-proof open question" in text
+    assert "does not alter solver physics" in text
 
 
 def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_release_closure() -> None:
@@ -793,6 +823,7 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         V32_GAP_MAP,
         V32_PRODUCER_ANIMATOR_TRUTH_NOTE,
         V32_COMPARE_OBJECTIVE_INTEGRITY_NOTE,
+        V32_GEOMETRY_REFERENCE_EVIDENCE_NOTE,
         V32_DIAGNOSTICS_EVIDENCE_NOTE,
         V32_RUNTIME_EVIDENCE_NOTE,
         RELEASE_TRIAGE,

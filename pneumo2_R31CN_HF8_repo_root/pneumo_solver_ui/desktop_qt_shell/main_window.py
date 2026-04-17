@@ -18,6 +18,7 @@ from pneumo_solver_ui.desktop_shell.command_search import (
 )
 from pneumo_solver_ui.desktop_shell.contracts import DesktopShellToolSpec
 from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
+from pneumo_solver_ui.desktop_animator.analysis_context import load_analysis_context
 from pneumo_solver_ui.release_info import get_release
 
 
@@ -704,6 +705,78 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             "repo_root": str(self.project_context.repo_root),
         }
 
+    def _analysis_context_path(self) -> Path:
+        return (
+            self.project_context.workspace_dir
+            / "handoffs"
+            / "WS-ANALYSIS"
+            / "analysis_context.json"
+        ).resolve(strict=False)
+
+    def _resolve_animator_artifact_path(self, artifact_id: str) -> Path | None:
+        context_path = self._analysis_context_path()
+        if artifact_id == "animator.analysis_context":
+            return context_path
+        if artifact_id == "animator.animator_link_contract":
+            return context_path.with_name("animator_link_contract.json")
+
+        snapshot = load_analysis_context(context_path, repo_root=self.project_context.repo_root)
+        if artifact_id == "animator.selected_result_artifact_pointer":
+            return snapshot.selected_result_artifact_path
+        if artifact_id == "animator.selected_npz_path":
+            return snapshot.selected_npz_path
+        return None
+
+    def _open_local_artifact_path(self, path: Path | None, *, artifact_label: str) -> bool:
+        if path is None:
+            self._set_status_message(f"Артефакт не найден: {artifact_label}")
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Артефакт не найден",
+                f"{artifact_label}\n\nПуть не указан в frozen HO-008 context.",
+            )
+            return False
+        target = Path(path).expanduser().resolve(strict=False)
+        if not target.exists():
+            self._set_status_message(f"Артефакт отсутствует: {target}")
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Артефакт отсутствует",
+                f"{artifact_label}\n\n{target}",
+            )
+            return False
+        opened = QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(target)))
+        if opened:
+            self._set_status_message(f"Открыт артефакт: {target}")
+            return True
+        self._set_status_message(f"Не удалось открыть артефакт: {target}")
+        QtWidgets.QMessageBox.warning(
+            self,
+            "Не удалось открыть артефакт",
+            f"{artifact_label}\n\n{target}",
+        )
+        return False
+
+    def open_shell_artifact(self, artifact_id: str) -> bool:
+        labels = {
+            "animator.analysis_context": "HO-008 analysis_context.json",
+            "animator.animator_link_contract": "HO-008 animator_link_contract.json",
+            "animator.selected_result_artifact_pointer": "selected result artifact pointer",
+            "animator.selected_npz_path": "selected animation NPZ",
+        }
+        artifact_label = labels.get(str(artifact_id), str(artifact_id))
+        try:
+            target = self._resolve_animator_artifact_path(str(artifact_id))
+        except Exception as exc:
+            self._set_status_message(f"Не удалось прочитать HO-008 context: {exc}")
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Не удалось прочитать HO-008 context",
+                f"{artifact_label}\n\n{exc}",
+            )
+            return False
+        return self._open_local_artifact_path(target, artifact_label=artifact_label)
+
     def open_tool(self, key: str) -> bool:
         spec = self.spec_by_key.get(key)
         if spec is None:
@@ -823,6 +896,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             return
         if action_kind == "tool" and isinstance(action_value, str):
             self.open_tool(action_value)
+            return
+        if action_kind == "open_artifact" and isinstance(action_value, str):
+            self.open_shell_artifact(action_value)
 
     def _install_shortcuts(self) -> None:
         QtGui.QShortcut(QtGui.QKeySequence("Ctrl+K"), self, activated=self._focus_command_search)

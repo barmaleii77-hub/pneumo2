@@ -218,6 +218,13 @@ ID: `PLAN-0028`.
 Источник: chat + V32-06/V32-08 compare objective integrity.
 ID: `PLAN-0029`.
 
+30. V32-12 geometry reference provenance acceptance
+Назначение: Accept the geometry reference evidence contract for PB-001, PB-008, RGH-018, OG-001, OG-002 and OG-006 with artifact freshness, road-width, packaging passport, geometry acceptance and diagnostics handoff tests; OG-006 remains an imported-layer/runtime-proof open question until named release artifact and SEND-bundle proof exist.
+Артефакт: [context/gui_spec_imports/v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md)
+Статус: актуален.
+Источник: chat + V32-12 geometry reference.
+ID: `PLAN-0030`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

@@ -511,6 +511,24 @@ def test_runtime_can_use_selected_pointer_and_npz_artifact_without_rebinding_lat
     assert any("stale" in issue for issue in missing_artifact.issues)
 
 
+def test_runtime_acceptance_and_handoff_helpers_accept_summary_or_artifact_path(tmp_path: Path) -> None:
+    runtime = DesktopGeometryReferenceRuntime(ui_root=UI_ROOT)
+    summary = _write_reference_artifact(tmp_path)
+    pointer_path = str(summary["anim_latest_pointer_json"])
+
+    summary_acceptance = runtime.artifact_geometry_acceptance_evidence(summary=summary)  # type: ignore[arg-type]
+    selected_acceptance = runtime.artifact_geometry_acceptance_evidence(artifact_path=pointer_path)
+    selected_handoff = runtime.diagnostics_handoff_evidence(artifact_path=pointer_path)
+
+    assert summary_acceptance.gate == "PASS"
+    assert selected_acceptance.gate == "PASS"
+    assert selected_acceptance.source_path == str(summary["anim_latest_npz_path"])
+    assert selected_handoff["artifact_pointer_path"] == pointer_path
+    assert selected_handoff["geometry_acceptance_gate"] == "PASS"
+    assert selected_handoff["road_width_status"] == "explicit_meta"
+    assert selected_handoff["packaging_contract_hash"] == "pkg-hash-123"
+
+
 def test_runtime_reports_selected_artifact_freshness_against_latest(tmp_path: Path) -> None:
     runtime = DesktopGeometryReferenceRuntime(ui_root=UI_ROOT)
     selected_dir = tmp_path / "selected"

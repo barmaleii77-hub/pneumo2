@@ -1465,6 +1465,24 @@ def _make_send_bundle_inner(
         def _add_geometry_reference_evidence_sidecar() -> None:
             nonlocal geometry_reference_evidence_added, res_total
             sidecar_path = out_dir / GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME
+
+            def _is_current_geometry_reference_contract(path: Path) -> bool:
+                try:
+                    payload = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+                except Exception:
+                    return False
+                if not isinstance(payload, dict):
+                    return False
+                if payload.get("schema") != "geometry_reference_evidence.v1":
+                    return False
+                required_fields = (
+                    "artifact_freshness_status",
+                    "artifact_freshness_relation",
+                    "artifact_freshness_reason",
+                    "latest_artifact_status",
+                )
+                return all(field in payload for field in required_fields)
+
             candidates = (
                 sidecar_path,
                 effective_ws / "exports" / Path(GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME).name,
@@ -1479,11 +1497,14 @@ def _make_send_bundle_inner(
                 if key in seen:
                     continue
                 seen.add(key)
-                if not Path(src).exists() or not Path(src).is_file():
+                src_path = Path(src)
+                if not src_path.exists() or not src_path.is_file():
+                    continue
+                if not _is_current_geometry_reference_contract(src_path):
                     continue
                 rr = _add_file(
                     z,
-                    Path(src),
+                    src_path,
                     GEOMETRY_REFERENCE_EVIDENCE_ARCNAME,
                     manifest=manifest,
                     skips=skips,
@@ -1494,9 +1515,9 @@ def _make_send_bundle_inner(
                 res_total.skipped_files += rr.skipped_files
                 res_total.skipped_bytes += rr.skipped_bytes
                 geometry_reference_evidence_added = rr.added_files > 0
-                if geometry_reference_evidence_added and Path(src) != sidecar_path:
+                if geometry_reference_evidence_added and src_path != sidecar_path:
                     try:
-                        _safe_write_text(sidecar_path, Path(src).read_text(encoding="utf-8", errors="replace"))
+                        _safe_write_text(sidecar_path, src_path.read_text(encoding="utf-8", errors="replace"))
                     except Exception:
                         pass
                 return

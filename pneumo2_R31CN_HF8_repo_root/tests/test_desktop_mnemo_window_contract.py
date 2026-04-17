@@ -924,6 +924,20 @@ def test_desktop_mnemo_offscreen_bad_npz_reports_status_without_modal(
         assert window.dataset is None
         assert window.truth_text.text() == "Mnemo: unavailable pressure/state"
         assert window.status_text.text().startswith("Ошибка загрузки:")
+        sidecar_path = window._last_load_error_sidecar_path
+        assert sidecar_path is not None and sidecar_path.exists()
+        assert sidecar_path == bad_npz_path.with_name("broken_desktop_mnemo_bundle.desktop_mnemo_load_error.json")
+        sidecar_payload = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        assert sidecar_payload["schema_version"] == "desktop_mnemo_load_error_sidecar_v1"
+        assert sidecar_payload["available"] is False
+        assert sidecar_payload["npz_path"] == str(bad_npz_path.resolve())
+        assert sidecar_payload["load_error"]["type"]
+        assert sidecar_payload["dataset_contract"]["schema_version"] == "desktop_mnemo_dataset_contract_v1"
+        assert sidecar_payload["dataset_contract"]["available"] is False
+        assert sidecar_payload["overall_truth_state"] == "unavailable"
+        assert "dataset" in sidecar_payload["unavailable_surfaces"]
+        assert sidecar_payload["window_layout_contract"]["schema_version"] == "desktop_mnemo_window_layout_contract_v1"
+        assert sidecar_payload["window_layout_contract"]["available"] is True
         window._push_diagnostics()
         diagnostics = window.mnemo_view.native_canvas._diagnostics
         assert diagnostics["overall_truth_state"] == "unavailable"

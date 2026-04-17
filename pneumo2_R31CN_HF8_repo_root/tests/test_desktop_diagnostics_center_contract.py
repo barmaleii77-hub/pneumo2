@@ -25,7 +25,10 @@ from pneumo_solver_ui.desktop_diagnostics_runtime import (
     write_desktop_diagnostics_summary_md,
     write_desktop_diagnostics_center_state,
 )
-from pneumo_solver_ui.tools.send_bundle_evidence import GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME
+from pneumo_solver_ui.tools.send_bundle_evidence import (
+    ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME,
+    GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,6 +80,24 @@ def _geometry_reference_evidence() -> dict:
         "component_passport_components": 3,
         "component_passport_needs_data": 0,
         "evidence_missing": [],
+    }
+
+
+def _engineering_analysis_evidence() -> dict:
+    return {
+        "schema": "desktop_engineering_analysis_evidence_manifest",
+        "schema_version": "1.0.0",
+        "evidence_manifest_hash": "engineering-hash-001",
+        "validation": {"status": "READY"},
+        "selected_run_candidate_readiness": {
+            "schema": "selected_run_candidate_readiness.v1",
+            "candidate_count": 2,
+            "ready_candidate_count": 1,
+            "missing_inputs_candidate_count": 1,
+            "failed_candidate_count": 0,
+            "unique_missing_inputs": ["results_csv_path"],
+            "ready_run_dirs": ["C:/workspace/opt_runs/coord/run_ready"],
+        },
     }
 
 
@@ -246,12 +267,26 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
         json.dumps(_geometry_reference_evidence(), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    (out_dir / ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME).write_text(
+        json.dumps(_engineering_analysis_evidence(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
     bundle = refresh_desktop_diagnostics_bundle_record(tmp_path, out_dir=out_dir, zip_path=zip_path)
     assert bundle.latest_zip_path == str(zip_path.resolve())
     assert "Anim latest token: tok-123" in bundle.summary_lines
     assert Path(bundle.latest_inspection_json_path).exists()
     assert Path(bundle.latest_health_json_path).exists()
+    assert bundle.latest_engineering_analysis_evidence_manifest_path.endswith(
+        ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME
+    )
+    assert bundle.engineering_analysis_evidence_status == "READY"
+    assert bundle.engineering_analysis_validation_status == "READY"
+    assert bundle.engineering_analysis_evidence_manifest_hash == "engineering-hash-001"
+    assert bundle.engineering_analysis_candidate_count == 2
+    assert bundle.engineering_analysis_ready_candidate_count == 1
+    assert bundle.engineering_analysis_missing_inputs_candidate_count == 1
+    assert bundle.engineering_analysis_candidate_unique_missing_inputs == ["results_csv_path"]
     assert bundle.geometry_reference_status == "READY"
     assert bundle.geometry_reference_artifact_freshness_status == "current"
     assert bundle.geometry_reference_artifact_freshness_relation == "matches_latest"
@@ -304,12 +339,22 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert payload["machine_paths"]["latest_bundle_path_txt"].endswith("latest_send_bundle_path.txt")
     assert payload["machine_paths"]["latest_bundle_sha256"].endswith("latest_send_bundle.sha256")
     assert "latest_analysis_evidence_manifest_json" in payload["machine_paths"]
+    assert payload["machine_paths"]["latest_engineering_analysis_evidence_manifest_json"].endswith(
+        ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME
+    )
     assert payload["machine_paths"]["latest_geometry_reference_evidence_json"].endswith(
         GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME
     )
     assert payload["machine_paths"]["latest_run_state_json"].endswith(LATEST_DESKTOP_DIAGNOSTICS_RUN_JSON)
     assert payload["analysis_evidence"]["status"] == bundle.analysis_evidence_status
     assert payload["analysis_evidence"]["context_state"] == bundle.analysis_evidence_context_state
+    assert payload["engineering_analysis_evidence"]["status"] == "READY"
+    assert payload["engineering_analysis_evidence"]["validation_status"] == "READY"
+    assert payload["engineering_analysis_evidence"]["manifest_hash"] == "engineering-hash-001"
+    assert payload["engineering_analysis_evidence"]["selected_run_candidate_count"] == 2
+    assert payload["engineering_analysis_evidence"]["selected_run_ready_candidate_count"] == 1
+    assert payload["engineering_analysis_evidence"]["selected_run_missing_inputs_candidate_count"] == 1
+    assert payload["engineering_analysis_evidence"]["selected_run_unique_missing_inputs"] == ["results_csv_path"]
     assert payload["geometry_reference_evidence"]["status"] == "READY"
     assert payload["geometry_reference_evidence"]["artifact_freshness_status"] == "current"
     assert payload["geometry_reference_evidence"]["artifact_freshness_relation"] == "matches_latest"
@@ -382,6 +427,14 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "Машиночитаемые пути" in center_src
     assert "Analysis evidence / HO-009" in center_src
     assert "latest_analysis_evidence_manifest.json" in center_src
+    assert "Engineering Analysis evidence / HO-007" in center_src
+    assert "latest_engineering_analysis_evidence_manifest_json" in center_src
+    assert "selected_run_ready_candidate_count" in center_src
+    assert 'text="Открыть Engineering JSON"' in center_src
+    assert "self.btn_open_engineering_analysis_evidence" in center_src
+    assert "def _open_engineering_analysis_evidence(self) -> None:" in center_src
+    assert "def _engineering_analysis_evidence_summary_lines(self, bundle) -> list[str]:" in center_src
+    assert "def _engineering_analysis_status_text(self, bundle) -> str:" in center_src
     assert "Evidence handoff status" in center_src
     assert "Geometry Reference evidence" in center_src
     assert "Artifact freshness" in center_src

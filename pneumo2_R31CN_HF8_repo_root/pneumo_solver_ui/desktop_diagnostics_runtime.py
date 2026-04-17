@@ -22,6 +22,8 @@ from pneumo_solver_ui.tools.send_bundle_contract import (
 )
 from pneumo_solver_ui.tools.send_bundle_evidence import (
     ANALYSIS_EVIDENCE_SIDECAR_NAME,
+    ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME,
+    ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME,
     EVIDENCE_MANIFEST_SIDECAR_NAME,
     GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME,
     GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME,
@@ -59,6 +61,19 @@ def _safe_write_json(path: Path, payload: dict) -> None:
 def _safe_write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8", errors="replace")
+
+
+def _safe_int(value: object) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except Exception:
+        return 0
+
+
+def _clean_string_list(value: object) -> list[str]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
 
 
 def _resolve_bundle_out_dir(repo_root: Path, out_dir: Optional[Path | str] = None) -> Path:
@@ -111,6 +126,97 @@ def _load_analysis_evidence_summary(repo_root: Path, out_dir: Path) -> dict:
         action = "HO-009 evidence готов к включению в diagnostics/SEND."
     summary["action"] = action
     return summary
+
+
+def _summarize_engineering_analysis_evidence_manifest(
+    payload: dict | None,
+    *,
+    source_path: str = "",
+    read_warnings: list[str] | None = None,
+) -> dict:
+    obj = dict(payload or {})
+    source = str(source_path or "").strip()
+    warnings = [str(item).strip() for item in (read_warnings or []) if str(item).strip()]
+    schema = str(obj.get("schema") or "").strip()
+    manifest_hash = str(obj.get("evidence_manifest_hash") or "").strip()
+    validation = obj.get("validation") if isinstance(obj.get("validation"), dict) else {}
+    readiness = (
+        obj.get("selected_run_candidate_readiness")
+        if isinstance(obj.get("selected_run_candidate_readiness"), dict)
+        else {}
+    )
+    validation_status = str((validation or {}).get("status") or "MISSING").strip().upper()
+
+    if not source:
+        status = "MISSING"
+        warnings.append(
+            "Engineering Analysis evidence / HO-007 missing; export evidence manifest from Engineering Analysis Center before SEND."
+        )
+    else:
+        status = "READY"
+        if not obj:
+            warnings.append("Engineering Analysis evidence / HO-007 manifest is empty or unreadable.")
+        if schema and schema != "desktop_engineering_analysis_evidence_manifest":
+            warnings.append(f"Engineering Analysis evidence / HO-007 has unexpected schema: {schema}.")
+        if not manifest_hash:
+            warnings.append("Engineering Analysis evidence / HO-007 manifest has no evidence_manifest_hash.")
+        if validation_status in {"BLOCKED", "FAILED", "MISSING_INPUTS"}:
+            warnings.append(
+                f"Engineering Analysis evidence / HO-007 validation status requires attention: {validation_status}."
+            )
+        if _safe_int((readiness or {}).get("candidate_count")) and not _safe_int(
+            (readiness or {}).get("ready_candidate_count")
+        ):
+            warnings.append("HO-007 selected-run readiness has no READY optimization candidates.")
+        if warnings:
+            status = "WARN"
+
+    if status == "MISSING":
+        action = "Откройте Engineering Analysis Center и выполните экспорт evidence manifest перед SEND."
+    elif _safe_int((readiness or {}).get("candidate_count")) and not _safe_int(
+        (readiness or {}).get("ready_candidate_count")
+    ):
+        action = "Выберите READY optimization run или устраните missing inputs в Engineering Analysis Center."
+    elif status == "WARN":
+        action = "Проверьте validation/status и HO-007 readiness перед отправкой."
+    else:
+        action = "Engineering Analysis evidence готов к включению в diagnostics/SEND."
+
+    return {
+        "source_path": source,
+        "status": status,
+        "schema": schema,
+        "evidence_manifest_hash": manifest_hash,
+        "validation_status": validation_status,
+        "candidate_count": _safe_int((readiness or {}).get("candidate_count")),
+        "ready_candidate_count": _safe_int((readiness or {}).get("ready_candidate_count")),
+        "missing_inputs_candidate_count": _safe_int((readiness or {}).get("missing_inputs_candidate_count")),
+        "failed_candidate_count": _safe_int((readiness or {}).get("failed_candidate_count")),
+        "unique_missing_inputs": _clean_string_list((readiness or {}).get("unique_missing_inputs")),
+        "ready_run_dirs": _clean_string_list((readiness or {}).get("ready_run_dirs")),
+        "warnings": list(dict.fromkeys(warnings)),
+        "action": action,
+    }
+
+
+def _load_engineering_analysis_evidence_summary(repo_root: Path, out_dir: Path) -> dict:
+    candidates = [
+        out_dir / ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME,
+        _effective_workspace_dir(repo_root) / "exports" / Path(ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME).name,
+    ]
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        payload = _safe_read_json_dict(candidate)
+        read_warnings = []
+        if not payload:
+            read_warnings.append("Engineering Analysis evidence / HO-007 manifest is empty or unreadable.")
+        return _summarize_engineering_analysis_evidence_manifest(
+            payload,
+            source_path=path_str(candidate),
+            read_warnings=read_warnings,
+        )
+    return _summarize_engineering_analysis_evidence_manifest({}, source_path="")
 
 
 def _load_geometry_reference_evidence_summary(repo_root: Path, out_dir: Path) -> dict:
@@ -211,6 +317,7 @@ def load_desktop_diagnostics_bundle_record(
     clipboard_path = resolved_out_dir / "latest_send_bundle_clipboard_status.json"
     clipboard_status = _safe_read_json_dict(clipboard_path) if clipboard_path.exists() else {}
     analysis = _load_analysis_evidence_summary(repo_root, resolved_out_dir)
+    engineering_analysis = _load_engineering_analysis_evidence_summary(repo_root, resolved_out_dir)
     geometry_reference = _load_geometry_reference_evidence_summary(repo_root, resolved_out_dir)
 
     return DesktopDiagnosticsBundleRecord(
@@ -280,6 +387,25 @@ def load_desktop_diagnostics_bundle_record(
         analysis_evidence_mismatch_count=int(analysis.get("mismatch_count") or 0),
         analysis_evidence_warnings=[str(item) for item in (analysis.get("warnings") or []) if str(item).strip()],
         analysis_evidence_action=str(analysis.get("action") or ""),
+        latest_engineering_analysis_evidence_manifest_path=str(engineering_analysis.get("source_path") or ""),
+        engineering_analysis_evidence_manifest_hash=str(engineering_analysis.get("evidence_manifest_hash") or ""),
+        engineering_analysis_evidence_status=str(engineering_analysis.get("status") or "MISSING"),
+        engineering_analysis_evidence_schema=str(engineering_analysis.get("schema") or ""),
+        engineering_analysis_validation_status=str(engineering_analysis.get("validation_status") or "MISSING"),
+        engineering_analysis_candidate_count=_safe_int(engineering_analysis.get("candidate_count")),
+        engineering_analysis_ready_candidate_count=_safe_int(engineering_analysis.get("ready_candidate_count")),
+        engineering_analysis_missing_inputs_candidate_count=_safe_int(
+            engineering_analysis.get("missing_inputs_candidate_count")
+        ),
+        engineering_analysis_failed_candidate_count=_safe_int(engineering_analysis.get("failed_candidate_count")),
+        engineering_analysis_candidate_unique_missing_inputs=_clean_string_list(
+            engineering_analysis.get("unique_missing_inputs")
+        ),
+        engineering_analysis_candidate_ready_run_dirs=_clean_string_list(engineering_analysis.get("ready_run_dirs")),
+        engineering_analysis_evidence_warnings=[
+            str(item) for item in (engineering_analysis.get("warnings") or []) if str(item).strip()
+        ],
+        engineering_analysis_evidence_action=str(engineering_analysis.get("action") or ""),
         latest_geometry_reference_evidence_path=str(geometry_reference.get("source_path") or ""),
         geometry_reference_status=str(geometry_reference.get("status") or "MISSING"),
         geometry_reference_artifact_status=str(geometry_reference.get("artifact_status") or "missing"),
@@ -484,6 +610,9 @@ def write_desktop_diagnostics_center_state(
             "latest_triage_md": bundle_record.latest_triage_md_path,
             "latest_evidence_manifest_json": bundle_record.latest_evidence_manifest_path,
             "latest_analysis_evidence_manifest_json": bundle_record.latest_analysis_evidence_manifest_path,
+            "latest_engineering_analysis_evidence_manifest_json": (
+                bundle_record.latest_engineering_analysis_evidence_manifest_path
+            ),
             "latest_geometry_reference_evidence_json": bundle_record.latest_geometry_reference_evidence_path,
             "latest_clipboard_status_json": bundle_record.latest_clipboard_status_path,
             "anim_pointer_diagnostics_json": bundle_record.anim_pointer_diagnostics_path,
@@ -502,6 +631,24 @@ def write_desktop_diagnostics_center_state(
             "mismatch_count": bundle_record.analysis_evidence_mismatch_count,
             "warnings": list(bundle_record.analysis_evidence_warnings),
             "action": bundle_record.analysis_evidence_action,
+        },
+        "engineering_analysis_evidence": {
+            "status": bundle_record.engineering_analysis_evidence_status,
+            "schema": bundle_record.engineering_analysis_evidence_schema,
+            "manifest_hash": bundle_record.engineering_analysis_evidence_manifest_hash,
+            "validation_status": bundle_record.engineering_analysis_validation_status,
+            "selected_run_candidate_count": bundle_record.engineering_analysis_candidate_count,
+            "selected_run_ready_candidate_count": bundle_record.engineering_analysis_ready_candidate_count,
+            "selected_run_missing_inputs_candidate_count": (
+                bundle_record.engineering_analysis_missing_inputs_candidate_count
+            ),
+            "selected_run_failed_candidate_count": bundle_record.engineering_analysis_failed_candidate_count,
+            "selected_run_unique_missing_inputs": list(
+                bundle_record.engineering_analysis_candidate_unique_missing_inputs
+            ),
+            "selected_run_ready_run_dirs": list(bundle_record.engineering_analysis_candidate_ready_run_dirs),
+            "warnings": list(bundle_record.engineering_analysis_evidence_warnings),
+            "action": bundle_record.engineering_analysis_evidence_action,
         },
         "geometry_reference_evidence": {
             "status": bundle_record.geometry_reference_status,

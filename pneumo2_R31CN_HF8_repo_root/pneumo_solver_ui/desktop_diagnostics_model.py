@@ -102,6 +102,19 @@ class DesktopDiagnosticsBundleRecord:
     analysis_evidence_mismatch_count: int = 0
     analysis_evidence_warnings: list[str] = field(default_factory=list)
     analysis_evidence_action: str = ""
+    latest_engineering_analysis_evidence_manifest_path: str = ""
+    engineering_analysis_evidence_manifest_hash: str = ""
+    engineering_analysis_evidence_status: str = "MISSING"
+    engineering_analysis_evidence_schema: str = ""
+    engineering_analysis_validation_status: str = "MISSING"
+    engineering_analysis_candidate_count: int = 0
+    engineering_analysis_ready_candidate_count: int = 0
+    engineering_analysis_missing_inputs_candidate_count: int = 0
+    engineering_analysis_failed_candidate_count: int = 0
+    engineering_analysis_candidate_unique_missing_inputs: list[str] = field(default_factory=list)
+    engineering_analysis_candidate_ready_run_dirs: list[str] = field(default_factory=list)
+    engineering_analysis_evidence_warnings: list[str] = field(default_factory=list)
+    engineering_analysis_evidence_action: str = ""
     latest_geometry_reference_evidence_path: str = ""
     geometry_reference_status: str = "MISSING"
     geometry_reference_artifact_status: str = "missing"

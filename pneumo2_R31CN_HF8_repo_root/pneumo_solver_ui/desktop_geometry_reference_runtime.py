@@ -294,6 +294,7 @@ class DesktopGeometryReferenceRuntime:
         artifact_context: ArtifactReferenceContext | None = None,
         *,
         summary: dict[str, Any] | None = None,
+        artifact_path: str | Path | None = None,
         tol_m: float = 1e-6,
     ) -> GeometryAcceptanceEvidenceSnapshot:
         artifact = artifact_context or self.artifact_context(summary, artifact_path=artifact_path)
@@ -333,7 +334,7 @@ class DesktopGeometryReferenceRuntime:
         artifact_path: str | Path | None = None,
         summary: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        artifact = artifact_context or self.artifact_context(summary)
+        artifact = artifact_context or self.artifact_context(summary, artifact_path=artifact_path)
         payload = build_geometry_reference_diagnostics_handoff(
             artifact_context=artifact,
             component_rows=self.component_passport_rows(),

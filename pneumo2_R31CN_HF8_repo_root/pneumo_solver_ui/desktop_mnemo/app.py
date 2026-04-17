@@ -56,6 +56,7 @@ REFERENCE_SCHEME_VIEWBOX_H = 1080.0
 REFERENCE_SCHEME_SCENE_INSET = (84.0, 150.0, 84.0, 140.0)
 PLAYHEAD_STORAGE_KEY = "pneumo_desktop_mnemo_playhead"
 EVENT_LOG_SCHEMA_VERSION = "desktop_mnemo_event_log_v1"
+LOAD_ERROR_SIDECAR_SCHEMA_VERSION = "desktop_mnemo_load_error_sidecar_v1"
 DATASET_CONTRACT_SCHEMA_VERSION = "desktop_mnemo_dataset_contract_v1"
 DATASET_PROVENANCE_SCHEMA_VERSION = "desktop_mnemo_dataset_provenance_v1"
 DATASET_AVAILABILITY_SCHEMA_VERSION = "desktop_mnemo_availability_v1"
@@ -905,6 +906,11 @@ def _event_log_sidecar_path(npz_path: Path) -> Path:
     return npz_abs.with_name(f"{npz_abs.stem}.desktop_mnemo_events.json")
 
 
+def _load_error_sidecar_path(npz_path: Path) -> Path:
+    npz_abs = Path(npz_path).expanduser().resolve()
+    return npz_abs.with_name(f"{npz_abs.stem}.desktop_mnemo_load_error.json")
+
+
 def _event_to_dict(event: MnemoTimelineEvent, *, acked: bool) -> dict[str, Any]:
     return {
         "frame_idx": int(event.frame_idx),
@@ -1014,6 +1020,84 @@ def _write_event_log_sidecar(
         dataset,
         tracker,
         idx=idx,
+        selected_edge=selected_edge,
+        selected_node=selected_node,
+        follow_enabled=follow_enabled,
+        pointer_path=pointer_path,
+        window_layout_contract=window_layout_contract,
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp_path.replace(out_path)
+    return out_path
+
+
+def _build_load_error_sidecar_payload(
+    *,
+    npz_path: Path,
+    exc: Exception,
+    dataset: MnemoDataset | None,
+    selected_edge: str | None,
+    selected_node: str | None,
+    follow_enabled: bool,
+    pointer_path: Path | None,
+    window_layout_contract: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    friendly_error = _friendly_error_text(exc)
+    dataset_contract = (
+        dict(dataset.dataset_contract)
+        if dataset is not None
+        else _empty_dataset_contract(f"Dataset load failed: {friendly_error}")
+    )
+    availability = dict(dataset.availability) if dataset is not None else dict(dataset_contract["availability"])
+    provenance = dict(dataset.provenance) if dataset is not None else dict(dataset_contract["provenance"])
+    layout_contract = dict(window_layout_contract or _empty_window_layout_contract())
+    sidecar_path = _load_error_sidecar_path(npz_path)
+    npz_abs = Path(npz_path).expanduser().resolve()
+    return {
+        "schema_version": LOAD_ERROR_SIDECAR_SCHEMA_VERSION,
+        "updated_utc": _utc_iso(),
+        "source": "desktop_mnemo",
+        "available": False,
+        "npz_path": str(npz_abs),
+        "npz_name": npz_abs.name,
+        "load_error_sidecar_path": str(sidecar_path),
+        "pointer_json": str(pointer_path.resolve()) if pointer_path is not None else "",
+        "follow_enabled": bool(follow_enabled),
+        "selected_edge": str(selected_edge or ""),
+        "selected_node": str(selected_node or ""),
+        "load_error": {
+            "type": type(exc).__name__,
+            "message": str(exc),
+            "friendly": friendly_error,
+        },
+        "dataset_contract": dataset_contract,
+        "availability": availability,
+        "provenance": provenance,
+        "source_markers": list(availability.get("source_markers") or []),
+        "unavailable_surfaces": list(availability.get("unavailable_surfaces") or []),
+        "overall_truth_state": str(availability.get("overall_truth_state") or "unavailable"),
+        "window_layout_contract": layout_contract,
+    }
+
+
+def _write_load_error_sidecar(
+    *,
+    npz_path: Path,
+    exc: Exception,
+    dataset: MnemoDataset | None,
+    selected_edge: str | None,
+    selected_node: str | None,
+    follow_enabled: bool,
+    pointer_path: Path | None,
+    window_layout_contract: dict[str, Any] | None = None,
+) -> Path | None:
+    out_path = _load_error_sidecar_path(npz_path)
+    payload = _build_load_error_sidecar_payload(
+        npz_path=npz_path,
+        exc=exc,
+        dataset=dataset,
         selected_edge=selected_edge,
         selected_node=selected_node,
         follow_enabled=follow_enabled,
@@ -13600,6 +13684,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self._play_speed = 1.0
         self.event_tracker = MnemoEventTracker(max_events=96)
         self._last_event_log_path: Path | None = None
+        self._last_load_error_sidecar_path: Path | None = None
         self._startup_time_s = float(startup_time_s) if startup_time_s is not None else None
         self._startup_time_label = str(startup_time_label or "").strip()
         self._startup_edge = str(startup_edge or "").strip()
@@ -14628,6 +14713,19 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
                 QtWidgets.QMessageBox.critical(self, "Desktop Mnemo", _friendly_error_text(exc))
             if self.dataset is None:
                 self._set_dataset_title()
+            try:
+                self._last_load_error_sidecar_path = _write_load_error_sidecar(
+                    npz_path=Path(npz_path),
+                    exc=exc,
+                    dataset=self.dataset,
+                    selected_edge=self.selected_edge,
+                    selected_node=self.selected_node,
+                    follow_enabled=self.follow_enabled,
+                    pointer_path=self.pointer_path if self.pointer_path else None,
+                    window_layout_contract=self._build_window_layout_contract(),
+                )
+            except Exception:
+                self._last_load_error_sidecar_path = None
             self._set_status(f"Ошибка загрузки: {exc}")
 
     def _refresh_frame(self, *, push_to_view: bool = False) -> None:
