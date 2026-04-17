@@ -61,6 +61,7 @@ def test_worldroad_allows_upper_mount_coordinates_outside_frame_envelope() -> No
         'верх_Ц1_зад_z_относительно_рамы_м': 0.72,
         'верх_Ц2_перед_z_относительно_рамы_м': 0.72,
         'верх_Ц2_зад_z_относительно_рамы_м': 0.72,
+        'mechanics_selfcheck_expect_static_at_t0': False,
     })
     test = {
         'road_func': lambda t: np.zeros(4, dtype=float),

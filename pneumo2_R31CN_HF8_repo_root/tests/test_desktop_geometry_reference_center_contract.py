@@ -637,24 +637,28 @@ def test_road_width_evidence_prefers_explicit_meta_and_keeps_missing_gap_warning
     assert "GAP-008" in missing.explanation
 
 
-def test_producer_handoff_stays_partial_when_road_width_evidence_is_missing() -> None:
-    artifact = ArtifactReferenceContext(
+def _current_producer_artifact_context(
+    *, source_label: str, meta: dict[str, object] | None = None
+) -> ArtifactReferenceContext:
+    return ArtifactReferenceContext(
         status="current",
-        source_label="synthetic complete artifact without road_width_m",
+        source_label=source_label,
         pointer_path="C:/workspace/exports/anim_latest.json",
         npz_path="C:/workspace/exports/anim_latest.npz",
         exports_dir="C:/workspace/exports",
         updated_utc="2026-04-17T00:00:00+00:00",
         visual_cache_token="token",
-        meta={},
+        meta=meta or {},
         issues=(),
         packaging_passport_path="C:/workspace/exports/CYLINDER_PACKAGING_PASSPORT.json",
         packaging_passport_exists=True,
         geometry_acceptance_path="C:/workspace/exports/geometry_acceptance_report.json",
         geometry_acceptance_exists=True,
     )
-    road_width = build_road_width_evidence({}, artifact_meta={})
-    packaging = PackagingPassportEvidenceSnapshot(
+
+
+def _complete_packaging_passport_evidence() -> PackagingPassportEvidenceSnapshot:
+    return PackagingPassportEvidenceSnapshot(
         artifact_status="current",
         source_label="synthetic complete passport",
         passport_path="C:/workspace/exports/CYLINDER_PACKAGING_PASSPORT.json",
@@ -669,11 +673,18 @@ def test_producer_handoff_stays_partial_when_road_width_evidence_is_missing() ->
         warnings=(),
         rows=(),
     )
+
+
+def test_producer_handoff_stays_partial_when_road_width_evidence_is_missing() -> None:
+    artifact = _current_producer_artifact_context(
+        source_label="synthetic complete artifact without road_width_m"
+    )
+    road_width = build_road_width_evidence({}, artifact_meta={})
     handoff = build_geometry_reference_diagnostics_handoff(
         artifact_context=artifact,
         component_rows=(),
         road_width=road_width,
-        packaging=packaging,
+        packaging=_complete_packaging_passport_evidence(),
         acceptance=build_geometry_acceptance_evidence(
             _geometry_acceptance_mapping(),
             source_label="synthetic PASS frame",
@@ -685,6 +696,36 @@ def test_producer_handoff_stays_partial_when_road_width_evidence_is_missing() ->
     assert handoff["road_width_status"] == "missing"
     assert handoff["producer_artifact_status"] == "partial"
     assert "road_width_m" in handoff["evidence_missing"]
+
+
+def test_producer_handoff_is_ready_with_pass_complete_packaging_and_explicit_road_width() -> None:
+    artifact_meta: dict[str, object] = {"geometry": {"road_width_m": 1.5}}
+    artifact = _current_producer_artifact_context(
+        source_label="synthetic ready producer artifact",
+        meta=artifact_meta,
+    )
+    road_width = build_road_width_evidence({}, artifact_meta=artifact_meta)
+    handoff = build_geometry_reference_diagnostics_handoff(
+        artifact_context=artifact,
+        component_rows=(),
+        road_width=road_width,
+        packaging=_complete_packaging_passport_evidence(),
+        acceptance=build_geometry_acceptance_evidence(
+            _geometry_acceptance_mapping(),
+            source_label="synthetic PASS frame",
+        ),
+    )
+
+    assert handoff["artifact_status"] == "current"
+    assert handoff["geometry_acceptance_gate"] == "PASS"
+    assert handoff["packaging_status"] == "complete"
+    assert handoff["packaging_mismatch_status"] == "match"
+    assert handoff["road_width_status"] == "explicit_meta"
+    assert handoff["road_width_source"] == "meta.geometry.road_width_m"
+    assert math.isclose(handoff["road_width_effective_m"], 1.5, rel_tol=0.0, abs_tol=1e-9)
+    assert handoff["producer_artifact_status"] == "ready"
+    assert handoff["evidence_missing"] == []
+    assert handoff["consumer_may_fabricate_geometry"] is False
 
 
 def test_packaging_passport_reader_surfaces_base_export_mismatch_and_truth_policy(tmp_path: Path) -> None:

@@ -346,6 +346,48 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
                 values=(snapshot.diagnostics_evidence_manifest_status, "evidence", str(snapshot.diagnostics_evidence_manifest_path)),
             )
             self._path_by_iid[iid] = snapshot.diagnostics_evidence_manifest_path
+        validated_artifacts = self.runtime.validated_artifacts_summary(snapshot)
+        validated_iid = self.artifact_tree.insert(
+            run_iid,
+            "end",
+            text="Validated artifacts",
+            values=(
+                str(validated_artifacts.get("status") or "MISSING"),
+                "validated_artifacts",
+                (
+                    f"required={validated_artifacts.get('ready_required_artifact_count')}/"
+                    f"{validated_artifacts.get('required_artifact_count')} | "
+                    f"missing={validated_artifacts.get('missing_required_artifact_count')}"
+                ),
+            ),
+            open=bool(validated_artifacts.get("missing_required_artifacts")),
+        )
+        missing_required_artifacts = list(validated_artifacts.get("missing_required_artifacts") or [])
+        if missing_required_artifacts:
+            for item in missing_required_artifacts:
+                if not isinstance(item, dict):
+                    continue
+                raw_missing_path = str(item.get("path") or "").strip()
+                missing_path = Path(raw_missing_path) if raw_missing_path else None
+                iid = self.artifact_tree.insert(
+                    validated_iid,
+                    "end",
+                    text=str(item.get("title") or item.get("key") or "Missing required artifact"),
+                    values=(
+                        str(item.get("validation_status") or "MISSING"),
+                        "missing_required_artifact",
+                        str(missing_path or ""),
+                    ),
+                )
+                if missing_path is not None:
+                    self._path_by_iid[iid] = missing_path
+        else:
+            self.artifact_tree.insert(
+                validated_iid,
+                "end",
+                text="Required artifacts ready",
+                values=("READY", "validated_artifacts", ""),
+            )
 
         group_iids: dict[str, str] = {}
         for artifact in sorted(snapshot.artifacts, key=lambda item: (item.category, item.title)):

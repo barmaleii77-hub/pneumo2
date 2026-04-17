@@ -11,16 +11,23 @@ def _vector_arrow_block() -> str:
     return SRC[start:end]
 
 
-def _method_block(name: str, next_marker: str) -> str:
-    start = SRC.index(f"    def {name}(")
+def _method_block(name: str, next_marker: str, *, last: bool = False) -> str:
+    marker = f"    def {name}("
+    start = SRC.rindex(marker) if last else SRC.index(marker)
     end = SRC.index(next_marker, start)
+    return SRC[start:end]
+
+
+def _canonical_update_sample_block() -> str:
+    start = SRC.index("        # Canonical solver-truth channels only.")
+    end = SRC.index("        # ---- Road preview", start)
     return SRC[start:end]
 
 
 def test_3d_speed_and_accel_arrows_use_solver_truth_channels_with_sign() -> None:
     speed_block = _method_block("_solver_signed_speed_along_road", "    def _solver_external_acceleration_xy(")
     accel_block = _method_block("_solver_external_acceleration_xy", "    # ---------------------------- main update")
-    update_block = _method_block("update_frame", "        # ---- Road preview")
+    update_block = _canonical_update_sample_block()
 
     assert "def _solver_signed_speed_along_road(" in speed_block
     assert "def _solver_external_acceleration_xy(" in accel_block

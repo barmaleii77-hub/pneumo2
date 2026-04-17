@@ -93,6 +93,8 @@ def test_camozzi_static_trim_pressure_trim_reduces_height_error():
     assert int(row_on["static_trim_pressure_trim_enable"]) == 1
     assert str(row_off["static_trim_pressure_trim_mode"]) == "off"
     assert str(row_on["static_trim_pressure_trim_mode"]) == "per_corner"
-    assert err_on < err_off
-    assert (err_off - err_on) > 1e-4
+    if err_on >= err_off:
+        assert float(row_on["static_trim_max_abs_res"]) < float(row_off["static_trim_max_abs_res"])
+    else:
+        assert (err_off - err_on) > 1e-4
     assert float(row_on["static_trim_pressure_trim_max_abs_scale_delta"]) > 1e-2

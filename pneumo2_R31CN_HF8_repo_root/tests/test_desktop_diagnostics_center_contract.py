@@ -243,6 +243,7 @@ def test_desktop_diagnostics_surfaces_ho008_analysis_context_warning(tmp_path: P
     assert bundle.analysis_selected_run_contract_hash == "selected-run-ho008"
     assert bundle.analysis_selected_test_id == "T02"
     assert bundle.analysis_selected_npz_path == "C:/workspace/exports/selected.npz"
+    assert bundle.analysis_capture_export_manifest_status == "READY"
     assert bundle.analysis_capture_export_manifest_handoff_id == "HO-010"
     assert bundle.analysis_capture_hash == "capture-ho008"
     assert bundle.analysis_truth_mode_hash == "truth-ho008"
@@ -256,6 +257,7 @@ def test_desktop_diagnostics_surfaces_ho008_analysis_context_warning(tmp_path: P
     assert payload["analysis_evidence"]["analysis_context_status"] == "BLOCKED"
     assert payload["analysis_evidence"]["animator_link_contract_hash"] == "animator-link-ho008"
     assert payload["analysis_evidence"]["selected_test_id"] == "T02"
+    assert payload["analysis_evidence"]["capture_export_manifest_status"] == "READY"
     assert payload["analysis_evidence"]["capture_export_manifest_handoff_id"] == "HO-010"
 
 
@@ -540,6 +542,8 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "Evidence handoff status" in center_src
     assert "HO-008 analysis context" in center_src
     assert "HO-010 capture/export" in center_src
+    assert "analysis_capture_export_manifest_status" in center_src
+    assert "capture_export_manifest_status" in runtime_src
     assert "analysis_context_status" in runtime_src
     assert "analysis_context_action" in runtime_src
     assert "Geometry Reference evidence" in center_src

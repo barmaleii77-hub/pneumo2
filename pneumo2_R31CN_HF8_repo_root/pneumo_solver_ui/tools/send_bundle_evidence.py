@@ -437,6 +437,14 @@ def summarize_analysis_evidence_manifest(
     context_state = _normalize_analysis_context_state(
         result_context.get("state") or mismatch_summary.get("state")
     )
+    capture_handoff = str(selected_context.get("capture_export_manifest_handoff_id") or "").strip()
+    capture_hash = str(selected_context.get("capture_hash") or "").strip()
+    if capture_handoff == "HO-010" and capture_hash:
+        capture_status = "READY"
+    elif capture_handoff or capture_hash:
+        capture_status = "DEGRADED"
+    else:
+        capture_status = "MISSING"
     status = "READY"
 
     if not source:
@@ -498,10 +506,9 @@ def summarize_analysis_evidence_manifest(
         "selected_run_contract_hash": str(selected_context.get("selected_run_contract_hash") or "").strip(),
         "selected_test_id": str(selected_context.get("selected_test_id") or "").strip(),
         "selected_npz_path": str(selected_context.get("selected_npz_path") or "").strip(),
-        "capture_export_manifest_handoff_id": str(
-            selected_context.get("capture_export_manifest_handoff_id") or ""
-        ).strip(),
-        "capture_hash": str(selected_context.get("capture_hash") or "").strip(),
+        "capture_export_manifest_status": capture_status,
+        "capture_export_manifest_handoff_id": capture_handoff,
+        "capture_hash": capture_hash,
         "truth_mode_hash": str(selected_context.get("truth_mode_hash") or "").strip(),
         "run_id": str(obj.get("run_id") or "").strip(),
         "run_contract_hash": str(obj.get("run_contract_hash") or "").strip(),

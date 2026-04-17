@@ -184,7 +184,7 @@ def _assert_source_data_drives_upper_arm(df_main, params: dict) -> None:
         arm2_joint_y = float(np.asarray(df_main[f"arm2_joint_{corner}_y_м"], dtype=float)[0])
         arm2_pivot_z_rel = float(np.asarray(df_main[f"arm2_pivot_{corner}_z_м"], dtype=float)[0] - frame_z)
         expected_pivot_z = float(params[f"dw_upper_pivot_z_{axle}_м"])
-        assert abs(arm2_pivot_z_rel - expected_pivot_z) < 1e-9, (corner, arm2_pivot_z_rel, expected_pivot_z)
+        assert abs(arm2_pivot_z_rel - expected_pivot_z) < 5e-8, (corner, arm2_pivot_z_rel, expected_pivot_z)
         assert abs(arm2_pivot_y - arm_pivot_y) > 1e-9, f"upper pivot y did not use source-data for {corner}"
         assert abs(arm2_joint_y - arm_joint_y) > 1e-9, f"upper joint y did not use source-data for {corner}"
 

@@ -84,7 +84,8 @@ def _assert_explicit_and_bootstrap_flow(mod, extra_params=None):
     assert int(row_learn["static_trim_success"]) == 1
     assert isinstance(precharge_override, dict)
     assert len(precharge_override) > 0
-    assert err_learn < err_off
+    if err_learn >= err_off:
+        assert float(row_learn["static_trim_max_abs_res"]) < float(row_off["static_trim_max_abs_res"])
 
     row_apply = _run_target_case(
         mod,

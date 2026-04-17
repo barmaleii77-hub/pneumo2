@@ -101,6 +101,7 @@ class DesktopDiagnosticsBundleRecord:
     analysis_selected_run_contract_hash: str = ""
     analysis_selected_test_id: str = ""
     analysis_selected_npz_path: str = ""
+    analysis_capture_export_manifest_status: str = "MISSING"
     analysis_capture_export_manifest_handoff_id: str = ""
     analysis_capture_hash: str = ""
     analysis_truth_mode_hash: str = ""

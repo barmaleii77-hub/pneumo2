@@ -1005,12 +1005,14 @@ class DesktopDiagnosticsCenter:
             lines.append(f"- Selected NPZ: {bundle.analysis_selected_npz_path}")
         capture_handoff = str(getattr(bundle, "analysis_capture_export_manifest_handoff_id", "") or "")
         capture_hash = str(getattr(bundle, "analysis_capture_hash", "") or "")
-        if capture_handoff == "HO-010" and capture_hash:
-            capture_status = "READY"
-        elif capture_handoff or capture_hash:
-            capture_status = "DEGRADED"
-        else:
-            capture_status = "MISSING"
+        capture_status = str(getattr(bundle, "analysis_capture_export_manifest_status", "") or "").strip().upper()
+        if capture_status not in {"READY", "DEGRADED", "MISSING"}:
+            if capture_handoff == "HO-010" and capture_hash:
+                capture_status = "READY"
+            elif capture_handoff or capture_hash:
+                capture_status = "DEGRADED"
+            else:
+                capture_status = "MISSING"
         lines.append(
             "- HO-010 capture/export: "
             f"{capture_status} | handoff={capture_handoff or '—'} | capture_hash={capture_hash or '—'}"
