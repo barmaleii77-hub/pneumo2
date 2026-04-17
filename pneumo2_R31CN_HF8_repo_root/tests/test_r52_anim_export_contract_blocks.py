@@ -284,6 +284,70 @@ def test_validate_anim_export_contract_cli_exits_zero_only_for_pass(tmp_path: Pa
     assert pass_result.returncode == 0, pass_result.stdout + pass_result.stderr
     assert json.loads(pass_result.stdout)["level"] == "PASS"
 
+    pass_sidecar = tmp_path / "anim_latest.contract.sidecar.json"
+    pass_sidecar.write_text(
+        json.dumps(
+            {
+                "schema": "anim_export_contract.sidecar.v1",
+                "geometry": meta["geometry"],
+                "solver_points": meta["solver_points"],
+                "hardpoints": meta["hardpoints"],
+                "packaging": meta["packaging"],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    pass_sidecar_result = subprocess.run(
+        [sys.executable, "-m", "pneumo_solver_ui.tools.validate_anim_export_contract", str(pass_sidecar)],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert pass_sidecar_result.returncode == 0, pass_sidecar_result.stdout + pass_sidecar_result.stderr
+    assert json.loads(pass_sidecar_result.stdout)["level"] == "PASS"
+
+    stale_sidecar = tmp_path / "stale_anim_latest.contract.sidecar.json"
+    stale_report_json = tmp_path / "stale_sidecar_report.json"
+    stale_sidecar.write_text(
+        json.dumps(
+            {
+                "schema": "anim_export_contract.sidecar.v1",
+                "geometry": meta["geometry"],
+                "solver_points": meta["solver_points"],
+                "hardpoints": meta["hardpoints"],
+                "packaging": meta["packaging"],
+                "validation": {
+                    "visible_present_family_count": 0,
+                    "visible_missing_families": ["stale_fake_family"],
+                    "packaging_status": "partial",
+                    "packaging_truth_ready": False,
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    stale_sidecar_result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pneumo_solver_ui.tools.validate_anim_export_contract",
+            str(stale_sidecar),
+            "--report-json",
+            str(stale_report_json),
+        ],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert stale_sidecar_result.returncode == 1
+    stale_report = json.loads(stale_report_json.read_text(encoding="utf-8"))
+    assert stale_report["level"] == "FAIL"
+    assert any("anim_export_validation" in msg and "current" in msg for msg in stale_report["messages"])
+
     fail_meta = json.loads(json.dumps(meta, ensure_ascii=False))
     fail_meta["hardpoints"]["families"].pop("cyl1_top")
     fail_json = tmp_path / "fail_anim_latest.json"
