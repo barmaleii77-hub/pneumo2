@@ -1168,6 +1168,11 @@ class DesktopDiagnosticsCenter:
             f"- Evidence JSON: {getattr(bundle, 'latest_geometry_reference_evidence_path', '') or '—'}",
         ]
         action = str(getattr(bundle, "geometry_reference_action", "") or "")
+        producer_readiness_reasons = [
+            str(item).strip()
+            for item in (getattr(bundle, "geometry_reference_producer_readiness_reasons", None) or [])
+            if str(item).strip()
+        ]
         required_artifacts = [
             str(item).strip()
             for item in (getattr(bundle, "geometry_reference_producer_required_artifacts", None) or [])
@@ -1175,6 +1180,8 @@ class DesktopDiagnosticsCenter:
         ]
         if missing:
             lines.append(f"- Missing: {', '.join(missing)}")
+        if producer_readiness_reasons:
+            lines.append(f"- Producer readiness reasons: {', '.join(producer_readiness_reasons)}")
         if required_artifacts:
             lines.append(f"- Required producer artifacts: {', '.join(required_artifacts)}")
         if action:
@@ -1192,6 +1199,11 @@ class DesktopDiagnosticsCenter:
         packaging = str(getattr(bundle, "geometry_reference_packaging_mismatch_status", "") or "missing")
         gate = str(getattr(bundle, "geometry_reference_acceptance_gate", "") or "MISSING")
         producer = str(getattr(bundle, "geometry_reference_producer_artifact_status", "") or "missing")
+        producer_readiness_reasons = [
+            str(item).strip()
+            for item in (getattr(bundle, "geometry_reference_producer_readiness_reasons", None) or [])
+            if str(item).strip()
+        ]
         missing = [
             str(item).strip()
             for item in (getattr(bundle, "geometry_reference_evidence_missing", None) or [])
@@ -1204,6 +1216,8 @@ class DesktopDiagnosticsCenter:
         )
         if missing:
             text += f"\nmissing={', '.join(missing)}"
+        if producer_readiness_reasons:
+            text += f"\nproducer_readiness_reasons={', '.join(producer_readiness_reasons)}"
         if action and status != "READY":
             text += f"\n{action}"
         return text

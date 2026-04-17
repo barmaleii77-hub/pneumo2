@@ -820,7 +820,7 @@ def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_releas
     assert "tests/test_v32_diagnostics_send_bundle_evidence.py" in text
     assert "tests/test_health_report_inspect_send_bundle_anim_diagnostics.py" in text
     assert "tests/test_desktop_diagnostics_center_contract.py" in text
-    assert "26 passed" in text
+    assert "33 passed" in text
     assert "45 passed" in text
     assert "87 passed" in text
     assert "Runtime validation result: `validation ok`" in text

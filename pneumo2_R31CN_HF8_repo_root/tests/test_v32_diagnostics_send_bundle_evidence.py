@@ -113,6 +113,7 @@ def _geometry_reference_evidence(*, gate: str = "PASS", missing: list[str] | Non
         "geometry_acceptance_gate": gate,
         "geometry_acceptance_available": gate == "PASS",
         "producer_artifact_status": "ready",
+        "producer_readiness_reasons": [],
         "producer_evidence_owner": "producer_export",
         "producer_required_artifacts": [
             "workspace/_pointers/anim_latest.json or workspace/exports/anim_latest.json",
@@ -641,6 +642,7 @@ def test_geometry_reference_evidence_handoff_reaches_manifest_validation_and_dia
     assert evidence["geometry_reference_handoff"]["road_width_status"] == "explicit_meta"
     assert evidence["geometry_reference_handoff"]["packaging_contract_hash"] == "packaging-hash"
     assert evidence["geometry_reference_handoff"]["producer_artifact_status"] == "ready"
+    assert evidence["geometry_reference_handoff"]["producer_readiness_reasons"] == []
     assert evidence["geometry_reference_handoff"]["consumer_may_fabricate_geometry"] is False
     assert not any("Geometry reference" in msg for msg in evidence_manifest_warnings(evidence))
 
@@ -649,6 +651,7 @@ def test_geometry_reference_evidence_handoff_reaches_manifest_validation_and_dia
     assert summary["artifact_freshness_relation"] == "matches_latest"
     assert summary["geometry_acceptance_gate"] == "PASS"
     assert summary["producer_artifact_status"] == "ready"
+    assert summary["producer_readiness_reasons"] == []
     assert summary["producer_required_artifacts"][1] == "workspace/exports/anim_latest.npz"
 
     (out_dir / GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME).write_text(
@@ -662,6 +665,7 @@ def test_geometry_reference_evidence_handoff_reaches_manifest_validation_and_dia
     assert record.geometry_reference_acceptance_gate == "PASS"
     assert record.geometry_reference_packaging_contract_hash == "packaging-hash"
     assert record.geometry_reference_producer_artifact_status == "ready"
+    assert record.geometry_reference_producer_readiness_reasons == []
     assert record.geometry_reference_consumer_may_fabricate_geometry is False
     assert record.latest_geometry_reference_evidence_path.endswith(GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME)
 
@@ -677,6 +681,7 @@ def test_geometry_reference_evidence_handoff_reaches_manifest_validation_and_dia
     assert validation.report_json["geometry_reference_evidence"]["status"] == "READY"
     assert validation.report_json["geometry_reference_evidence"]["artifact_freshness_relation"] == "matches_latest"
     assert validation.report_json["geometry_reference_evidence"]["producer_artifact_status"] == "ready"
+    assert validation.report_json["geometry_reference_evidence"]["producer_readiness_reasons"] == []
 
 
 def test_send_bundle_includes_full_runtime_evidence_set_and_manifest_rows(

@@ -48,7 +48,7 @@ Targeted test command:
 python -m pytest tests/test_v32_diagnostics_send_bundle_evidence.py tests/test_health_report_inspect_send_bundle_anim_diagnostics.py tests/test_desktop_diagnostics_center_contract.py -q
 ```
 
-Result: `26 passed`. Focused Geometry/Diagnostics producer-handoff
+Result: `33 passed`. Focused Geometry/Diagnostics producer-handoff
 regression set: `45 passed`.
 
 Focused Geometry/Diagnostics regression result: `87 passed`.

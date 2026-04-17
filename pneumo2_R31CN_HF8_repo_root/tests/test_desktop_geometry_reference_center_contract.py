@@ -461,6 +461,8 @@ def test_artifact_backed_runtime_reports_missing_without_latest_artifact() -> No
     assert handoff["does_not_render_animator_meshes"] is True
     assert "artifact_context" in handoff["evidence_missing"]
     assert handoff["producer_artifact_status"] == "missing"
+    assert "artifact_context_missing" in handoff["producer_readiness_reasons"]
+    assert "geometry_acceptance_not_pass" in handoff["producer_readiness_reasons"]
     assert handoff["producer_evidence_owner"] == "producer_export"
     assert "workspace/exports/anim_latest.npz" in handoff["producer_required_artifacts"]
     assert handoff["consumer_may_fabricate_geometry"] is False
@@ -492,6 +494,8 @@ def test_artifact_backed_runtime_reads_npz_acceptance_and_packaging_passport(tmp
     assert handoff["packaging_contract_hash"] == "pkg-hash-123"
     assert handoff["geometry_acceptance_gate"] == "PASS"
     assert handoff["producer_artifact_status"] == "partial"
+    assert "packaging_status_not_complete" in handoff["producer_readiness_reasons"]
+    assert "packaging_mismatch_not_match" in handoff["producer_readiness_reasons"]
     assert handoff["consumer_may_fabricate_geometry"] is False
 
 
@@ -617,6 +621,7 @@ def test_runtime_writes_geometry_reference_evidence_for_diagnostics_send(tmp_pat
     assert workspace_payload["packaging_axis_only_cylinders"] == ["cyl2"]
     assert workspace_payload["evidence_missing"] == []
     assert workspace_payload["producer_artifact_status"] == "partial"
+    assert "packaging_status_not_complete" in workspace_payload["producer_readiness_reasons"]
     assert workspace_payload["consumer_may_fabricate_geometry"] is False
 
 
@@ -696,6 +701,7 @@ def test_producer_handoff_stays_partial_when_road_width_evidence_is_missing() ->
     assert handoff["road_width_status"] == "missing"
     assert handoff["producer_artifact_status"] == "partial"
     assert "road_width_m" in handoff["evidence_missing"]
+    assert handoff["producer_readiness_reasons"] == ["road_width_m_missing"]
 
 
 def test_producer_handoff_is_ready_with_pass_complete_packaging_and_explicit_road_width() -> None:
@@ -724,6 +730,7 @@ def test_producer_handoff_is_ready_with_pass_complete_packaging_and_explicit_roa
     assert handoff["road_width_source"] == "meta.geometry.road_width_m"
     assert math.isclose(handoff["road_width_effective_m"], 1.5, rel_tol=0.0, abs_tol=1e-9)
     assert handoff["producer_artifact_status"] == "ready"
+    assert handoff["producer_readiness_reasons"] == []
     assert handoff["evidence_missing"] == []
     assert handoff["consumer_may_fabricate_geometry"] is False
 
