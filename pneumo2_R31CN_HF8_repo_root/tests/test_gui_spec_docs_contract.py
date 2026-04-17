@@ -702,6 +702,11 @@ def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_releas
     assert "latest_geometry_reference_evidence.json" in text
     assert "artifact_freshness_status" in text
     assert "artifact_freshness_relation" in text
+    assert "artifact_freshness_status=missing" in text
+    assert "artifact_freshness_relation=latest" in text
+    assert "geometry_acceptance_gate=MISSING" in text
+    assert "road_width_status=derived_from_track_and_wheel_width" in text
+    assert "packaging_mismatch_status=mismatch" in text
     assert "`GAP-002`" in text
     assert "`GAP-006`" in text
     assert "`GAP-008`" in text
@@ -717,6 +722,7 @@ def test_v32_11_diagnostics_evidence_note_records_lane_acceptance_without_releas
     assert "tests/test_health_report_inspect_send_bundle_anim_diagnostics.py" in text
     assert "tests/test_desktop_diagnostics_center_contract.py" in text
     assert "26 passed" in text
+    assert "85 passed" in text
     assert "Runtime validation result: `validation ok`" in text
     assert "does not alter solver, optimizer, animator, geometry, or domain calculations" in text
 

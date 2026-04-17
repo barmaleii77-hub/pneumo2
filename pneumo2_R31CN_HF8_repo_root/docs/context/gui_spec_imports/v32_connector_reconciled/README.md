@@ -46,6 +46,8 @@ entrypoint и картой чтения для будущих задач.
   Desktop Mnemo truth-graphics evidence note для `V32-10 / RGH-003`.
 - [DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md](./DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md) -
   runtime evidence note для `PB-002 / RGH-006 / RGH-007 / RGH-016`.
+- [DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md](./DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md) -
+  producer-owned warnings handoff after Diagnostics/SEND bundle hardening.
 - [RUNTIME_RELEASE_EVIDENCE_NOTE.md](./RUNTIME_RELEASE_EVIDENCE_NOTE.md) -
   runtime hard-gate note для `PB-006 / RGH-011 / RGH-012 / RGH-019 /
   OG-003 / OG-004`.

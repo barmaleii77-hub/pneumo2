@@ -50,12 +50,12 @@ python -m pytest tests/test_v32_diagnostics_send_bundle_evidence.py tests/test_h
 
 Result: `26 passed`.
 
-Focused diagnostics/docs regression result: `97 passed`.
+Focused Geometry/Diagnostics regression result: `85 passed`.
 
 Runtime proof captured:
 
-- ZIP: `send_bundles/SEND_20260417_082228_bundle.zip`
-- Final latest SHA256: `b8a27ec134a91bbbf0fa2f64a36ba7aba6d972ebac7587ea9780740057e1e9c3`
+- ZIP: `send_bundles/SEND_20260417_082546_bundle.zip`
+- Final latest SHA256: `8aa8b64347793c9023691de7d6edb5b987447a7bd516e074a774c03650112130`
 - Trigger / mode: `desktop_diagnostics_center` / `manual`
 - Validation: `ok=True`, `errors=0`, `warnings=6`
 - Health after final triage: `ok=False`, `notes=8`, preserving adjacent-workstream warnings.
@@ -63,6 +63,12 @@ Runtime proof captured:
 - Latest pointer/SHA proof: `latest_zip_matches_original=True`, `latest_sha_sidecar_matches=True`, `latest_pointer_matches_original=True`
 - Embedded evidence stage: `final_after_validation_dashboard`; latest sidecar proof stage: `latest_zip_sha_inspection_proof`.
 - Latest inspection sidecars: `latest_send_bundle_inspection.json` points at `latest_send_bundle.zip`, carries matching `zip_sha256`, and reports health, validation, triage and evidence manifest present.
+- BND-018 sidecar proof: `latest_geometry_reference_evidence.json` is embedded as
+  `geometry/geometry_reference_evidence.json`; it carries
+  `artifact_freshness_status=missing`, `artifact_freshness_relation=latest`,
+  `road_width_status=derived_from_track_and_wheel_width`,
+  `packaging_mismatch_status=mismatch`, and
+  `geometry_acceptance_gate=MISSING`.
 - Desktop center state refreshed: `latest_desktop_diagnostics_center_state.json` exposes latest ZIP, path pointer, SHA, health, triage, validation, evidence manifest and clipboard paths.
 
 Geometry Reference / GAP evidence state:
