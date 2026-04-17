@@ -14709,8 +14709,6 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
                 status += f" • фокус {self._last_startup_selection_applied_label}"
             self._set_status(status)
         except Exception as exc:
-            if _desktop_mnemo_can_show_blocking_dialog():
-                QtWidgets.QMessageBox.critical(self, "Desktop Mnemo", _friendly_error_text(exc))
             if self.dataset is None:
                 self._set_dataset_title()
             try:

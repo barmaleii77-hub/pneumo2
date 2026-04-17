@@ -226,6 +226,7 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert '"custom_titlebar_assumption": False' in src
     assert '"window_layout_contract": layout_contract' in src
     assert "window_layout_contract=self._build_window_layout_contract()" in src
+    assert "QMessageBox.critical" not in src
     assert 'self.truth_text = QtWidgets.QLabel("Mnemo: unavailable pressure/state")' in src
     assert "def _set_truth_status(self, availability: dict[str, Any] | None) -> None:" in src
     assert 'return "Mnemo: confirmed"' in src

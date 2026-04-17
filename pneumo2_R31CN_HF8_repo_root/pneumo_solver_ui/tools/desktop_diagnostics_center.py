@@ -1220,6 +1220,10 @@ class DesktopDiagnosticsCenter:
                     "- Engineering Analysis evidence / HO-007 JSON: "
                     f"{bundle.latest_engineering_analysis_evidence_manifest_path or '—'}"
                 ),
+                (
+                    "- latest_engineering_analysis_evidence_manifest_json: "
+                    f"{bundle.latest_engineering_analysis_evidence_manifest_path or '—'}"
+                ),
                 f"- Geometry Reference evidence JSON: {bundle.latest_geometry_reference_evidence_path or '—'}",
                 f"- Статус буфера обмена JSON: {bundle.latest_clipboard_status_path or '—'}",
                 f"- Диагностика указателя анимации JSON: {bundle.anim_pointer_diagnostics_path or '—'}",

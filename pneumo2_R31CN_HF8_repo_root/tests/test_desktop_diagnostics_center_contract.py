@@ -413,6 +413,10 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
         encoding="utf-8",
         errors="replace",
     )
+    runtime_src = (ROOT / "pneumo_solver_ui" / "desktop_diagnostics_runtime.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
 
     assert "DesktopDiagnosticsCenter" in diag_src
     assert 'initial_tab="diagnostics"' in diag_src
@@ -428,8 +432,10 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "Analysis evidence / HO-009" in center_src
     assert "latest_analysis_evidence_manifest.json" in center_src
     assert "Engineering Analysis evidence / HO-007" in center_src
-    assert "latest_engineering_analysis_evidence_manifest_json" in center_src
-    assert "selected_run_ready_candidate_count" in center_src
+    assert "latest_engineering_analysis_evidence_manifest_path" in center_src
+    assert "engineering_analysis_ready_candidate_count" in center_src
+    assert "latest_engineering_analysis_evidence_manifest_json" in runtime_src
+    assert "selected_run_ready_candidate_count" in runtime_src
     assert 'text="Открыть Engineering JSON"' in center_src
     assert "self.btn_open_engineering_analysis_evidence" in center_src
     assert "def _open_engineering_analysis_evidence(self) -> None:" in center_src
