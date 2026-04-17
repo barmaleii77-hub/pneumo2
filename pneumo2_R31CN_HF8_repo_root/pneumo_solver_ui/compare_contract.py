@@ -250,17 +250,27 @@ def extract_compare_run_ref(
         "baseline_ref": {
             "active_baseline_hash": _first_text(
                 src.get("active_baseline_hash"),
+                selected_run.get("active_baseline_hash"),
                 baseline.get("active_baseline_hash"),
                 baseline.get("active_baseline_contract_hash"),
                 baseline.get("baseline_contract_hash"),
                 baseline.get("baseline_hash"),
             ),
-            "suite_snapshot_hash": _first_text(src.get("suite_snapshot_hash"), baseline.get("suite_snapshot_hash")),
-            "contract_path": _first_text(src.get("active_baseline_contract_path"), baseline.get("contract_path")),
+            "suite_snapshot_hash": _first_text(
+                src.get("suite_snapshot_hash"),
+                selected_run.get("suite_snapshot_hash"),
+                baseline.get("suite_snapshot_hash"),
+            ),
+            "contract_path": _first_text(
+                src.get("active_baseline_contract_path"),
+                selected_run.get("active_baseline_contract_path"),
+                baseline.get("contract_path"),
+            ),
         },
         "objective_ref": {
             "objective_contract_hash": _first_text(
                 src.get("objective_contract_hash"),
+                selected_run.get("objective_contract_hash"),
                 objective.get("objective_contract_hash"),
             ),
             "objective_keys": _first_value(src.get("objective_keys"), objective.get("objective_keys")),

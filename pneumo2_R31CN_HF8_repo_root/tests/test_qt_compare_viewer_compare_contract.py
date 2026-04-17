@@ -156,7 +156,9 @@ def test_extract_compare_run_ref_keeps_baseline_objective_and_run_refs(tmp_path:
     assert ref["hard_gate_key"] == "max_pressure"
     assert ref["active_baseline_hash"] == "base-hash"
     assert ref["compare_contract_path"] == "compare_contract.json"
+    assert ref["baseline_ref"]["active_baseline_hash"] == "base-hash"
     assert ref["baseline_ref"]["suite_snapshot_hash"] == "suite-hash"
+    assert ref["objective_ref"]["objective_contract_hash"] == "obj-hash"
     assert ref["objective_ref"]["hard_gate_tolerance"] == 0.2
 
 
@@ -209,6 +211,7 @@ def test_qt_compare_viewer_surfaces_compare_contract_and_mismatch_banner(monkeyp
         assert "optimizer history" in viewer.lbl_compare_mismatch.text()
         assert "Compare " in viewer.lbl_status_quality.text()
 
+        viewer._current_time_window = lambda: (0.0, 0.1)
         exports = viewer._export_workspace_snapshot_set(tmp_path / "snapshots")
         contract_path = tmp_path / "snapshots" / "compare_contract.json"
         assert contract_path in exports
@@ -217,7 +220,13 @@ def test_qt_compare_viewer_surfaces_compare_contract_and_mismatch_banner(monkeyp
         assert payload["mismatch_banner"]["banner_id"] == "BANNER-HIST-002"
         assert payload["selected_table"] == str(viewer.current_table)
         assert payload["selected_signals"] == list(viewer._selected_signals())
+        assert payload["selected_time_window"] == [0.0, 0.1]
         assert len(payload["run_refs"]) == 2
+        assert payload["run_refs"][0]["baseline_ref"]["active_baseline_hash"] == "base-a"
+        assert payload["run_refs"][0]["objective_ref"]["objective_contract_hash"] == "obj-a"
+        assert payload["run_refs"][1]["objective_ref"]["objective_contract_hash"] == "obj-b"
+        assert payload["baseline_ref"]["active_baseline_hash"] == "base-a"
+        assert payload["objective_ref"]["objective_contract_hash"] == "obj-a"
     finally:
         viewer.close()
         app.processEvents()
@@ -270,6 +279,16 @@ def test_qt_compare_viewer_contract_dock_surfaces_current_context_sidecar(
         assert payload["current_context_ref_source"] == "sidecar"
         assert payload["current_context_ref_source_path"] == str(sidecar.resolve())
         assert payload["mismatch_banner"]["banner_id"] == "BANNER-HIST-002"
+
+        exports = viewer._export_workspace_snapshot_set(tmp_path / "current_context_snapshots")
+        contract_path = tmp_path / "current_context_snapshots" / "compare_contract.json"
+        assert contract_path in exports
+        exported = load_compare_contract(contract_path)
+        assert exported["current_context_ref"]["run_id"] == "current"
+        assert exported["current_context_ref_source"] == "sidecar"
+        assert exported["current_context_ref_source_path"] == str(sidecar.resolve())
+        assert exported["current_context_ref_source_status"] == "ready"
+        assert exported["mismatch_banner"]["banner_id"] == "BANNER-HIST-002"
 
         restored = viewer._current_compare_session()
         assert restored is not None
