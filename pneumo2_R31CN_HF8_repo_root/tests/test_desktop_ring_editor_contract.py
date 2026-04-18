@@ -240,10 +240,13 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "def _open_anim_latest_exports" in tool_src
     assert "artifacts_stale" in tool_src
     assert "opt_suite_stale" in tool_src
-    assert "Состояние файлов сценария:" in tool_src
-    assert "Состояние набора оптимизации:" in tool_src
+    assert "WS-RING source state" in tool_src
+    assert "Derived artifacts state" in tool_src
+    assert "HO-005 suite link state" in tool_src
     assert "Длина кольца:" in tool_src
-    assert "Максимальный шов после export-policy:" in tool_src
+    assert "Post-policy seam:" in tool_src
+    assert "WS-RING source hash" in tool_src
+    assert "Derived export-set hash" in tool_src
     assert "build_ring_bundle_optimization_preview" in tool_src
     assert "build_ring_bundle_optimization_suite_preview" in tool_src
     assert "Фрагментов оптимизации:" in tool_src
@@ -418,11 +421,22 @@ def test_desktop_ring_editor_default_spec_builds_preview_and_bundle(tmp_path: Pa
     assert meta["source_workspace"] == "WS-RING"
     assert meta["consumer_workspace"] == "WS-SUITE"
     assert meta["downstream_geometry_editing_allowed"] is False
+    assert exported["_artifact_roles"]["ring_source_of_truth_json"]["role"] == "authoritative_ws_ring_source"
+    assert exported["_artifact_roles"]["scenario_json"]["role"] == "derived_runtime_scenario"
+    assert exported["_artifact_roles"]["scenario_json"]["derived"] is True
+    assert meta["artifact_roles"]["ring_source_of_truth_json"]["editable_source"] is True
+    assert meta["artifact_roles"]["road_csv"]["role"] == "derived_road_timeseries"
+    assert meta["source_and_derived_boundaries"]["authoritative_source"] == "ring_source_of_truth_json"
+    assert meta["source_and_derived_boundaries"]["editable_owner"] == "WS-RING"
+    assert meta["source_and_derived_boundaries"]["downstream_geometry_editing_allowed"] is False
+    assert "scenario_json" in meta["source_and_derived_boundaries"]["derived_artifacts"]
+    assert "segment_meta_ref" in meta["source_and_derived_boundaries"]["ws_suite_readonly_ring_refs"]
     assert meta["road"]["segments"]
     assert meta["road"]["segment_id_series"]["csv_column"] == "segment_id"
     assert meta["lineage"]["ring_source_hash_sha256"]
     assert meta["lineage"]["ring_export_set_hash_sha256"]
     assert source["_source_contract"]["editable_owner"] == "WS-RING"
+    assert source["_source_contract"]["artifact_role"] == "authoritative_ws_ring_source"
     assert source["_source_contract"]["downstream_geometry_editing_allowed"] is False
 
 
@@ -658,7 +672,25 @@ def test_desktop_ring_editor_rebuilds_fresh_bundle_before_opt_suite_when_stale(t
     assert editor.state.export.last_bundle["scenario_json"] == generated_bundle["scenario_json"]
     assert editor.state.export.last_bundle["suite_json"].endswith("suite_auto_ring.json")
     assert float(editor.state.export.last_bundle["window_s"]) == 5.5
+    assert "derived artifacts were rebuilt from current WS-RING source" in editor.state.status_message
     assert refresh_calls == ["refresh"]
+
+
+def test_desktop_ring_editor_surfaces_source_derived_stale_and_closure_labels() -> None:
+    src = (
+        ROOT / "pneumo_solver_ui" / "tools" / "desktop_ring_scenario_editor.py"
+    ).read_text(encoding="utf-8", errors="replace")
+
+    assert "WS-RING source state" in src
+    assert "Derived artifacts state" in src
+    assert "HO-005 suite link state" in src
+    assert "WS-RING source hash" in src
+    assert "Derived export-set hash" in src
+    assert "Raw seam before export policy" in src
+    assert "Post-policy seam" in src
+    assert "Closure transform applied" in src
+    assert "Closure correction max L/R" in src
+    assert "Derived artifacts were rebuilt from current WS-RING source before suite handoff" in src
 
 
 def test_desktop_ring_editor_export_path_change_marks_bundle_and_suite_stale(tmp_path: Path) -> None:
