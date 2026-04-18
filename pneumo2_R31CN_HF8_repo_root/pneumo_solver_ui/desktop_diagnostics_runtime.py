@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import zipfile
 from dataclasses import replace
 from pathlib import Path
 from typing import Optional
@@ -27,6 +28,8 @@ from pneumo_solver_ui.tools.send_bundle_evidence import (
     EVIDENCE_MANIFEST_SIDECAR_NAME,
     GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME,
     GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME,
+    build_latest_integrity_proof,
+    load_evidence_manifest_from_zip,
     summarize_analysis_evidence_manifest,
     summarize_geometry_reference_evidence,
 )
@@ -85,6 +88,14 @@ def _clean_string_list(value: object) -> list[str]:
     if not isinstance(value, (list, tuple)):
         return []
     return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _bool_or_none(value: object) -> Optional[bool]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    return bool(value)
 
 
 def _resolve_bundle_out_dir(repo_root: Path, out_dir: Optional[Path | str] = None) -> Path:
@@ -277,6 +288,94 @@ def _load_geometry_reference_evidence_summary(repo_root: Path, out_dir: Path) ->
     return summary
 
 
+def _load_embedded_evidence_manifest(zip_path: Path | None) -> dict:
+    if zip_path is None or not zip_path.exists():
+        return {}
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            return load_evidence_manifest_from_zip(zf)
+    except Exception:
+        return {}
+
+
+def _load_latest_integrity_proof(out_dir: Path, latest_zip: Path | None) -> dict:
+    if latest_zip is None:
+        return {}
+    sidecar_path = out_dir / EVIDENCE_MANIFEST_SIDECAR_NAME
+    sidecar = _safe_read_json_dict(sidecar_path) if sidecar_path.exists() else {}
+    if latest_zip.name != "latest_send_bundle.zip" and not sidecar:
+        return {}
+    embedded = _load_embedded_evidence_manifest(latest_zip)
+    return build_latest_integrity_proof(
+        zip_path=latest_zip,
+        latest_zip_path=latest_zip,
+        original_zip_path=sidecar.get("zip_path") or latest_zip,
+        latest_sha_path=out_dir / "latest_send_bundle.sha256",
+        latest_pointer_path=out_dir / "latest_send_bundle_path.txt",
+        evidence_manifest=sidecar,
+        embedded_manifest=embedded,
+    )
+
+
+def _summarize_self_check_silent_warnings_snapshot(payload: dict, *, json_path: str, md_path: str = "") -> dict:
+    if not payload:
+        return {
+            "status": "MISSING",
+            "json_path": str(json_path or ""),
+            "md_path": str(md_path or ""),
+            "snapshot_only": True,
+            "rc": None,
+            "fail_count": 0,
+            "warn_count": 0,
+        }
+    summary = dict(payload.get("summary") or {}) if isinstance(payload.get("summary"), dict) else {}
+    fail_count = _safe_int(summary.get("fail_count"))
+    warn_count = _safe_int(summary.get("warn_count"))
+    if not fail_count:
+        fail_count = len([item for item in (payload.get("fails") or []) if isinstance(item, dict)])
+    if not warn_count:
+        warn_count = len([item for item in (payload.get("warnings") or []) if isinstance(item, dict)])
+    rc_value = payload.get("rc")
+    status = "READY"
+    if fail_count or warn_count or (rc_value not in (None, 0, "0")):
+        status = "WARN"
+    return {
+        "status": status,
+        "json_path": str(json_path or ""),
+        "md_path": str(md_path or ""),
+        "snapshot_only": True,
+        "rc": rc_value,
+        "fail_count": fail_count,
+        "warn_count": warn_count,
+    }
+
+
+def _load_self_check_silent_warnings_snapshot(repo_root: Path, latest_zip: Path | None) -> dict:
+    reports_dir = Path(repo_root) / "REPORTS"
+    json_path = reports_dir / "SELF_CHECK_SILENT_WARNINGS.json"
+    md_path = reports_dir / "SELF_CHECK_SILENT_WARNINGS.md"
+    if json_path.exists():
+        return _summarize_self_check_silent_warnings_snapshot(
+            _safe_read_json_dict(json_path),
+            json_path=path_str(json_path),
+            md_path=path_str(md_path if md_path.exists() else ""),
+        )
+    if latest_zip is not None and latest_zip.exists():
+        try:
+            with zipfile.ZipFile(latest_zip, "r") as zf:
+                with zf.open("reports/SELF_CHECK_SILENT_WARNINGS.json", "r") as handle:
+                    obj = json.loads(handle.read().decode("utf-8", errors="replace"))
+                payload = dict(obj) if isinstance(obj, dict) else {}
+            return _summarize_self_check_silent_warnings_snapshot(
+                payload,
+                json_path=f"{path_str(latest_zip)}::reports/SELF_CHECK_SILENT_WARNINGS.json",
+                md_path=f"{path_str(latest_zip)}::reports/SELF_CHECK_SILENT_WARNINGS.md",
+            )
+        except Exception:
+            pass
+    return _summarize_self_check_silent_warnings_snapshot({}, json_path=path_str(json_path), md_path=path_str(md_path))
+
+
 def _pick_latest_bundle_candidate(out_dir: Path) -> Optional[Path]:
     latest = out_dir / "latest_send_bundle.zip"
     if latest.exists():
@@ -357,6 +456,34 @@ def load_desktop_diagnostics_bundle_record(
     analysis = _load_analysis_evidence_summary(repo_root, resolved_out_dir)
     engineering_analysis = _load_engineering_analysis_evidence_summary(repo_root, resolved_out_dir)
     geometry_reference = _load_geometry_reference_evidence_summary(repo_root, resolved_out_dir)
+    latest_integrity = _load_latest_integrity_proof(resolved_out_dir, latest_zip)
+    self_check_snapshot = _load_self_check_silent_warnings_snapshot(repo_root, latest_zip)
+
+    integrity_summary_lines: list[str] = []
+    if latest_integrity:
+        final_sha = str(latest_integrity.get("final_latest_zip_sha256") or "")
+        embedded_scope = str(latest_integrity.get("embedded_manifest_zip_sha256_scope") or "—")
+        integrity_summary_lines.append(
+            "Latest integrity: "
+            f"{latest_integrity.get('status') or 'MISSING'} "
+            f"final_sha={final_sha[:12] or '—'} "
+            f"sha_sidecar={latest_integrity.get('latest_sha_sidecar_matches')} "
+            f"pointer={latest_integrity.get('latest_pointer_matches_original')} "
+            f"embedded_scope={embedded_scope}"
+        )
+        integrity_summary_lines.append(
+            "Producer-owned warnings remain warning-only; Diagnostics/SEND makes no release closure claim."
+        )
+    if self_check_snapshot:
+        integrity_summary_lines.append(
+            "Self-check silent warnings snapshot: "
+            f"{self_check_snapshot.get('status') or 'MISSING'} "
+            f"fail={self_check_snapshot.get('fail_count', 0)} "
+            f"warn={self_check_snapshot.get('warn_count', 0)} "
+            "snapshot_only=True"
+        )
+    if integrity_summary_lines:
+        summary_lines = list(dict.fromkeys(integrity_summary_lines + summary_lines))
 
     return DesktopDiagnosticsBundleRecord(
         out_dir=path_str(resolved_out_dir),
@@ -413,6 +540,48 @@ def load_desktop_diagnostics_bundle_record(
             if (resolved_out_dir / EVIDENCE_MANIFEST_SIDECAR_NAME).exists()
             else ""
         ),
+        latest_integrity_status=str(latest_integrity.get("status") or "MISSING"),
+        latest_integrity_final_zip_sha256=str(latest_integrity.get("final_latest_zip_sha256") or ""),
+        latest_integrity_final_original_zip_sha256=str(latest_integrity.get("final_original_zip_sha256") or ""),
+        latest_integrity_sha_sidecar_matches=_bool_or_none(latest_integrity.get("latest_sha_sidecar_matches")),
+        latest_integrity_pointer_matches_original=_bool_or_none(
+            latest_integrity.get("latest_pointer_matches_original")
+        ),
+        latest_integrity_latest_zip_matches_original=_bool_or_none(
+            latest_integrity.get("latest_zip_matches_original")
+        ),
+        latest_integrity_evidence_sidecar_path=path_str(
+            (resolved_out_dir / EVIDENCE_MANIFEST_SIDECAR_NAME)
+            if (resolved_out_dir / EVIDENCE_MANIFEST_SIDECAR_NAME).exists()
+            else ""
+        ),
+        latest_integrity_embedded_manifest_zip_sha256=str(
+            latest_integrity.get("embedded_manifest_zip_sha256") or ""
+        ),
+        latest_integrity_embedded_manifest_zip_sha256_scope=str(
+            latest_integrity.get("embedded_manifest_zip_sha256_scope") or ""
+        ),
+        latest_integrity_embedded_manifest_stage=str(latest_integrity.get("embedded_manifest_stage") or ""),
+        latest_integrity_embedded_manifest_finalization_stage=str(
+            latest_integrity.get("embedded_manifest_finalization_stage") or ""
+        ),
+        latest_integrity_trigger=str(latest_integrity.get("trigger") or ""),
+        latest_integrity_collection_mode=str(latest_integrity.get("collection_mode") or ""),
+        latest_integrity_producer_warning_count=_safe_int(latest_integrity.get("producer_warning_count")),
+        latest_integrity_warning_only_gaps_present=bool(latest_integrity.get("warning_only_gaps_present")),
+        latest_integrity_no_release_closure_claim=bool(latest_integrity.get("no_release_closure_claim", True)),
+        latest_integrity_warnings=[str(item) for item in (latest_integrity.get("warnings") or []) if str(item).strip()],
+        self_check_silent_warnings_status=str(self_check_snapshot.get("status") or "MISSING"),
+        self_check_silent_warnings_json_path=str(self_check_snapshot.get("json_path") or ""),
+        self_check_silent_warnings_md_path=str(self_check_snapshot.get("md_path") or ""),
+        self_check_silent_warnings_rc=(
+            _safe_int(self_check_snapshot.get("rc"))
+            if self_check_snapshot.get("rc") not in (None, "")
+            else None
+        ),
+        self_check_silent_warnings_fail_count=_safe_int(self_check_snapshot.get("fail_count")),
+        self_check_silent_warnings_warn_count=_safe_int(self_check_snapshot.get("warn_count")),
+        self_check_silent_warnings_snapshot_only=bool(self_check_snapshot.get("snapshot_only", True)),
         latest_analysis_evidence_manifest_path=str(analysis.get("source_path") or ""),
         analysis_evidence_manifest_hash=str(analysis.get("evidence_manifest_hash") or ""),
         analysis_evidence_status=str(analysis.get("status") or "MISSING"),
@@ -673,6 +842,9 @@ def write_desktop_diagnostics_center_state(
             "latest_validation_md": bundle_record.latest_validation_md_path,
             "latest_triage_md": bundle_record.latest_triage_md_path,
             "latest_evidence_manifest_json": bundle_record.latest_evidence_manifest_path,
+            "latest_integrity_evidence_sidecar_json": bundle_record.latest_integrity_evidence_sidecar_path,
+            "self_check_silent_warnings_json": bundle_record.self_check_silent_warnings_json_path,
+            "self_check_silent_warnings_md": bundle_record.self_check_silent_warnings_md_path,
             "latest_analysis_evidence_manifest_json": bundle_record.latest_analysis_evidence_manifest_path,
             "latest_engineering_analysis_evidence_manifest_json": (
                 bundle_record.latest_engineering_analysis_evidence_manifest_path
@@ -682,6 +854,39 @@ def write_desktop_diagnostics_center_state(
             "anim_pointer_diagnostics_json": bundle_record.anim_pointer_diagnostics_path,
             "latest_run_state_json": run_record.state_path if run_record is not None else "",
             "latest_run_log": run_record.log_path if run_record is not None else "",
+        },
+        "latest_integrity_proof": {
+            "status": bundle_record.latest_integrity_status,
+            "final_latest_zip_sha256": bundle_record.latest_integrity_final_zip_sha256,
+            "final_original_zip_sha256": bundle_record.latest_integrity_final_original_zip_sha256,
+            "latest_sha_sidecar_matches": bundle_record.latest_integrity_sha_sidecar_matches,
+            "latest_pointer_matches_original": bundle_record.latest_integrity_pointer_matches_original,
+            "latest_zip_matches_original": bundle_record.latest_integrity_latest_zip_matches_original,
+            "evidence_sidecar_path": bundle_record.latest_integrity_evidence_sidecar_path,
+            "embedded_manifest_zip_sha256": bundle_record.latest_integrity_embedded_manifest_zip_sha256,
+            "embedded_manifest_zip_sha256_scope": (
+                bundle_record.latest_integrity_embedded_manifest_zip_sha256_scope
+            ),
+            "embedded_manifest_stage": bundle_record.latest_integrity_embedded_manifest_stage,
+            "embedded_manifest_finalization_stage": (
+                bundle_record.latest_integrity_embedded_manifest_finalization_stage
+            ),
+            "trigger": bundle_record.latest_integrity_trigger,
+            "collection_mode": bundle_record.latest_integrity_collection_mode,
+            "producer_warning_count": bundle_record.latest_integrity_producer_warning_count,
+            "warning_only_gaps_present": bundle_record.latest_integrity_warning_only_gaps_present,
+            "no_release_closure_claim": bundle_record.latest_integrity_no_release_closure_claim,
+            "warnings": list(bundle_record.latest_integrity_warnings),
+        },
+        "self_check_silent_warnings": {
+            "status": bundle_record.self_check_silent_warnings_status,
+            "json_path": bundle_record.self_check_silent_warnings_json_path,
+            "md_path": bundle_record.self_check_silent_warnings_md_path,
+            "rc": bundle_record.self_check_silent_warnings_rc,
+            "fail_count": bundle_record.self_check_silent_warnings_fail_count,
+            "warn_count": bundle_record.self_check_silent_warnings_warn_count,
+            "snapshot_only": bundle_record.self_check_silent_warnings_snapshot_only,
+            "does_not_close_producer_warnings": True,
         },
         "analysis_evidence": {
             "status": bundle_record.analysis_evidence_status,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import zipfile
 from pathlib import Path
@@ -270,6 +271,77 @@ def test_health_and_inspect_preserve_geometry_acceptance_report_states(tmp_path:
         assert "missing_fields: road_contact_ЛП_z_м" in inspect_md
 
 
+def test_health_and_inspector_carry_latest_integrity_and_self_check_snapshot(tmp_path: Path) -> None:
+    zip_path = _write_minimal_send_bundle(tmp_path)
+    latest_zip = tmp_path / "latest_send_bundle.zip"
+    zip_path.rename(latest_zip)
+    with zipfile.ZipFile(latest_zip, "a", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "reports/SELF_CHECK_SILENT_WARNINGS.json",
+            json.dumps(
+                {
+                    "generated_at_utc": "2026-04-18T00:00:00Z",
+                    "rc": 0,
+                    "summary": {"fail_count": 0, "warn_count": 0},
+                    "fails": [],
+                    "warnings": [],
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+        )
+    original_zip = tmp_path / "SEND_20260418_000000_bundle.zip"
+    original_zip.write_bytes(latest_zip.read_bytes())
+    final_sha = hashlib.sha256(latest_zip.read_bytes()).hexdigest()
+    (tmp_path / "latest_send_bundle.sha256").write_text(final_sha + "  latest_send_bundle.zip\n", encoding="utf-8")
+    (tmp_path / "latest_send_bundle_path.txt").write_text(str(original_zip.resolve()), encoding="utf-8")
+    (tmp_path / "latest_evidence_manifest.json").write_text(
+        json.dumps(
+            {
+                "schema": "diagnostics_evidence_manifest",
+                "zip_path": str(original_zip.resolve()),
+                "zip_sha256": "build-stage-sha",
+                "zip_sha256_scope": "zip bytes at evidence manifest build time",
+                "stage": "pytest_build_stage",
+                "finalization_stage": "pytest_build_stage",
+                "trigger": "watchdog",
+                "collection_mode": "watchdog",
+                "missing_warnings": ["producer-owned browser perf evidence is still missing"],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    rep = collect_health_report(latest_zip)
+    proof = dict(rep.signals.get("latest_integrity_proof") or {})
+    snapshot = dict(rep.signals.get("self_check_silent_warnings") or {})
+    health_md = render_health_report_md(rep)
+    summary = inspect_send_bundle(latest_zip)
+    inspect_md = render_inspection_md(summary)
+
+    assert proof["status"] == "READY"
+    assert proof["final_latest_zip_sha256"] == final_sha
+    assert proof["latest_sha_sidecar_matches"] is True
+    assert proof["latest_pointer_matches_original"] is True
+    assert proof["embedded_manifest_stage_scoped"] is True
+    assert proof["trigger"] == "watchdog"
+    assert proof["collection_mode"] == "watchdog"
+    assert proof["warning_only_gaps_present"] is True
+    assert proof["no_release_closure_claim"] is True
+    assert rep.ok is False
+    assert snapshot["status"] == "READY"
+    assert snapshot["snapshot_only"] is True
+    assert snapshot["does_not_close_producer_warnings"] is True
+    assert summary["latest_integrity_proof"]["status"] == "READY"
+    assert summary["ok"] is False
+    assert summary["self_check_silent_warnings"]["status"] == "READY"
+    assert "Latest integrity proof" in health_md
+    assert "no_release_closure_claim: True" in health_md
+    assert "Self-check silent warnings snapshot" in inspect_md
+
+
 
 def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip(tmp_path: Path) -> None:
     zip_path = _write_minimal_send_bundle(tmp_path)
@@ -412,7 +484,10 @@ def test_sources_wire_health_report_and_offline_inspector_into_send_bundle_flow(
     assert 'signals["mnemo_event_log"]' in health_text
     assert 'signals["ring_closure"]' in health_text
     assert 'signals["operator_recommendations"]' in health_text
+    assert 'signals["latest_integrity_proof"]' in health_text
+    assert 'signals["self_check_silent_warnings"]' in health_text
     assert '## Distributed optimization' in health_text
+    assert '## Latest integrity proof' in health_text
     assert "scope_sync_ok" in health_text
     assert '## Desktop Mnemo events' in health_text
     assert '## Ring closure' in health_text
@@ -426,8 +501,11 @@ def test_sources_wire_health_report_and_offline_inspector_into_send_bundle_flow(
     assert 'ring_closure' in inspect_text
     assert 'optimizer_scope' in inspect_text
     assert 'optimizer_scope_gate' in inspect_text
+    assert 'latest_integrity_proof' in inspect_text
+    assert 'self_check_silent_warnings' in inspect_text
     assert 'operator_recommendations' in inspect_text
     assert '## Distributed optimization' in inspect_text
+    assert '## Latest integrity proof' in inspect_text
     assert "scope_sync_ok" in inspect_text
     assert "scope_release_risk" in inspect_text
     assert '## Desktop Mnemo events' in inspect_text

@@ -994,6 +994,62 @@ class DesktopDiagnosticsCenter:
         if path.exists():
             _open_in_explorer(path)
 
+    def _latest_integrity_summary_lines(self, bundle) -> list[str]:
+        status = str(getattr(bundle, "latest_integrity_status", "") or "MISSING").strip().upper()
+        warnings = [
+            str(item).strip()
+            for item in (getattr(bundle, "latest_integrity_warnings", None) or [])
+            if str(item).strip()
+        ]
+        lines = [
+            "## Latest integrity proof",
+            f"- Status: {status}",
+            f"- Final latest SHA256: {getattr(bundle, 'latest_integrity_final_zip_sha256', '') or '—'}",
+            (
+                "- Latest ZIP matches original: "
+                f"{getattr(bundle, 'latest_integrity_latest_zip_matches_original', None)}"
+            ),
+            f"- SHA sidecar match: {getattr(bundle, 'latest_integrity_sha_sidecar_matches', None)}",
+            f"- Pointer target match: {getattr(bundle, 'latest_integrity_pointer_matches_original', None)}",
+            f"- Evidence sidecar: {getattr(bundle, 'latest_integrity_evidence_sidecar_path', '') or '—'}",
+            (
+                "- Embedded manifest scope: "
+                f"{getattr(bundle, 'latest_integrity_embedded_manifest_zip_sha256_scope', '') or '—'}"
+            ),
+            (
+                "- Embedded manifest stage: "
+                f"{getattr(bundle, 'latest_integrity_embedded_manifest_stage', '') or '—'} / "
+                f"{getattr(bundle, 'latest_integrity_embedded_manifest_finalization_stage', '') or '—'}"
+            ),
+            (
+                "- Trigger: "
+                f"{getattr(bundle, 'latest_integrity_trigger', '') or '—'} / "
+                f"collection={getattr(bundle, 'latest_integrity_collection_mode', '') or '—'}"
+            ),
+            f"- Producer warning count: {getattr(bundle, 'latest_integrity_producer_warning_count', 0)}",
+            (
+                "- Producer-owned warnings remain warning-only; "
+                "Diagnostics/SEND makes no release closure claim."
+            ),
+            f"- No release closure claim: {getattr(bundle, 'latest_integrity_no_release_closure_claim', True)}",
+        ]
+        for warning in warnings[:5]:
+            lines.append(f"- Warning: {warning}")
+        return lines
+
+    def _self_check_silent_warnings_summary_lines(self, bundle) -> list[str]:
+        return [
+            "## Self-check silent warnings snapshot",
+            f"- Status: {getattr(bundle, 'self_check_silent_warnings_status', '') or 'MISSING'}",
+            f"- Snapshot only: {getattr(bundle, 'self_check_silent_warnings_snapshot_only', True)}",
+            f"- JSON: {getattr(bundle, 'self_check_silent_warnings_json_path', '') or '—'}",
+            f"- Markdown: {getattr(bundle, 'self_check_silent_warnings_md_path', '') or '—'}",
+            f"- rc: {getattr(bundle, 'self_check_silent_warnings_rc', None)}",
+            f"- fail_count: {getattr(bundle, 'self_check_silent_warnings_fail_count', 0)}",
+            f"- warn_count: {getattr(bundle, 'self_check_silent_warnings_warn_count', 0)}",
+            "- Snapshot does not supersede SEND/producer warning state.",
+        ]
+
     def _analysis_evidence_summary_lines(self, bundle) -> list[str]:
         status = str(getattr(bundle, "analysis_evidence_status", "") or "MISSING").strip().upper()
         context_state = str(getattr(bundle, "analysis_evidence_context_state", "") or "MISSING")
@@ -1267,6 +1323,10 @@ class DesktopDiagnosticsCenter:
             lines.extend(["", "## Общая сводка"])
             lines.extend(f"- {line}" for line in bundle.summary_lines)
         lines.append("")
+        lines.extend(self._latest_integrity_summary_lines(bundle))
+        lines.append("")
+        lines.extend(self._self_check_silent_warnings_summary_lines(bundle))
+        lines.append("")
         lines.extend(self._analysis_evidence_summary_lines(bundle))
         lines.append("")
         lines.extend(self._engineering_analysis_evidence_summary_lines(bundle))
@@ -1290,6 +1350,9 @@ class DesktopDiagnosticsCenter:
                 f"- Проверка содержимого Markdown: {bundle.latest_validation_md_path or '—'}",
                 f"- Разбор замечаний Markdown: {bundle.latest_triage_md_path or '—'}",
                 f"- Evidence manifest JSON: {bundle.latest_evidence_manifest_path or '—'}",
+                f"- Latest integrity evidence sidecar JSON: {bundle.latest_integrity_evidence_sidecar_path or '—'}",
+                f"- SELF_CHECK silent warnings JSON: {bundle.self_check_silent_warnings_json_path or '—'}",
+                f"- SELF_CHECK silent warnings Markdown: {bundle.self_check_silent_warnings_md_path or '—'}",
                 f"- Analysis evidence / HO-009 JSON: {bundle.latest_analysis_evidence_manifest_path or '—'}",
                 (
                     "- Engineering Analysis evidence / HO-007 JSON: "
@@ -1371,6 +1434,20 @@ class DesktopDiagnosticsCenter:
 
         if bundle.summary_lines:
             meta_bits.extend(bundle.summary_lines)
+        meta_bits.append(
+            "Latest integrity: "
+            f"{bundle.latest_integrity_status} / "
+            f"sha_sidecar={bundle.latest_integrity_sha_sidecar_matches} / "
+            f"pointer={bundle.latest_integrity_pointer_matches_original} / "
+            f"no_release_closure_claim={bundle.latest_integrity_no_release_closure_claim}"
+        )
+        meta_bits.append(
+            "SELF_CHECK silent warnings snapshot: "
+            f"{bundle.self_check_silent_warnings_status} / "
+            f"fail={bundle.self_check_silent_warnings_fail_count} / "
+            f"warn={bundle.self_check_silent_warnings_warn_count} / snapshot_only=True"
+        )
+        meta_bits.append("Producer-owned warnings remain warning-only; Diagnostics/SEND does not close them.")
         self.analysis_evidence_status_var.set(
             "Analysis evidence / HO-009: " + self._analysis_evidence_status_text(bundle)
         )

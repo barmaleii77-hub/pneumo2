@@ -59,7 +59,9 @@ from .send_bundle_evidence import (
     ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME,
     ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME,
     EVIDENCE_MANIFEST_ARCNAME,
+    EVIDENCE_MANIFEST_SIDECAR_NAME,
     build_evidence_manifest,
+    build_latest_integrity_proof,
     evidence_manifest_warnings,
     load_evidence_manifest_from_zip,
     read_manifest_inputs_from_zip,
@@ -91,8 +93,64 @@ def _read_json_from_zip(z: zipfile.ZipFile, name: str) -> Optional[Dict[str, Any
         return None
 
 
+def _read_json_file(path: Path) -> Optional[Dict[str, Any]]:
+    try:
+        obj = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        return dict(obj) if isinstance(obj, dict) else None
+    except Exception:
+        return None
+
+
 def _glob_zip_names(names: List[str], suffix: str) -> List[str]:
     return [n for n in names if n.endswith(suffix)]
+
+
+def _safe_int(value: object) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except Exception:
+        return 0
+
+
+def _summarize_self_check_silent_warnings_snapshot(
+    report: Dict[str, Any] | None,
+    *,
+    source_path: str = "",
+) -> Dict[str, Any]:
+    if not report:
+        return {
+            "status": "MISSING",
+            "source_path": str(source_path or ""),
+            "snapshot_only": True,
+            "does_not_close_producer_warnings": True,
+            "rc": None,
+            "fail_count": 0,
+            "warn_count": 0,
+            "generated_at_utc": "",
+        }
+    summary = dict(report.get("summary") or {}) if isinstance(report.get("summary"), dict) else {}
+    fail_count = _safe_int(summary.get("fail_count"))
+    warn_count = _safe_int(summary.get("warn_count"))
+    if not fail_count:
+        fail_count = len([item for item in (report.get("fails") or []) if isinstance(item, dict)])
+    if not warn_count:
+        warn_count = len([item for item in (report.get("warnings") or []) if isinstance(item, dict)])
+    rc = report.get("rc")
+    status = "READY"
+    if fail_count or warn_count or (rc not in (None, 0, "0")):
+        status = "WARN"
+    return {
+        "status": status,
+        "source_path": str(source_path or ""),
+        "snapshot_only": True,
+        "does_not_close_producer_warnings": True,
+        "rc": rc,
+        "fail_count": fail_count,
+        "warn_count": warn_count,
+        "generated_at_utc": str(report.get("generated_at_utc") or ""),
+        "release": str(report.get("release") or ""),
+        "version": str(report.get("version") or ""),
+    }
 
 
 
@@ -254,6 +312,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                 "browser_perf_evidence_report": f"workspace/exports/{BROWSER_PERF_EVIDENCE_REPORT_JSON_NAME}" in name_set,
                 "browser_perf_comparison_report": f"workspace/exports/{BROWSER_PERF_COMPARISON_REPORT_JSON_NAME}" in name_set,
                 "browser_perf_trace": any(f"workspace/exports/{name}" in name_set for name in BROWSER_PERF_TRACE_CANDIDATE_NAMES),
+                "self_check_silent_warnings": "reports/SELF_CHECK_SILENT_WARNINGS.json" in name_set,
                 "evidence_manifest": EVIDENCE_MANIFEST_ARCNAME in name_set,
             }
 
@@ -285,6 +344,39 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                         notes.append(msg)
             except Exception as exc:
                 notes.append(f"failed to inspect evidence manifest: {type(exc).__name__}: {exc!s}")
+
+            self_check_snapshot = _read_json_from_zip(z, "reports/SELF_CHECK_SILENT_WARNINGS.json")
+            signals["self_check_silent_warnings"] = _summarize_self_check_silent_warnings_snapshot(
+                self_check_snapshot,
+                source_path="reports/SELF_CHECK_SILENT_WARNINGS.json" if self_check_snapshot else "",
+            )
+            if signals["self_check_silent_warnings"].get("status") == "WARN":
+                notes.append(
+                    "self_check silent warnings snapshot has WARN/FAIL entries; snapshot-only evidence does not close producer gaps."
+                )
+
+            if zip_path.name == "latest_send_bundle.zip":
+                latest_evidence_path = zip_path.parent / EVIDENCE_MANIFEST_SIDECAR_NAME
+                latest_evidence_obj = _read_json_file(latest_evidence_path) if latest_evidence_path.exists() else None
+                if latest_evidence_obj is not None:
+                    latest_proof = build_latest_integrity_proof(
+                        zip_path=zip_path,
+                        latest_zip_path=zip_path,
+                        original_zip_path=latest_evidence_obj.get("zip_path") or zip_path,
+                        latest_sha_path=zip_path.parent / "latest_send_bundle.sha256",
+                        latest_pointer_path=zip_path.parent / "latest_send_bundle_path.txt",
+                        evidence_manifest=latest_evidence_obj,
+                        embedded_manifest=signals.get("evidence_manifest")
+                        if isinstance(signals.get("evidence_manifest"), dict)
+                        else {},
+                    )
+                    signals["latest_integrity_proof"] = latest_proof
+                    if latest_proof.get("warning_only_gaps_present"):
+                        ok = False
+                    for msg in latest_proof.get("warnings") or []:
+                        smsg = str(msg).strip()
+                        if smsg and smsg not in notes:
+                            notes.append(smsg)
 
             engineering_name = ""
             if ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME in name_set:
@@ -611,6 +703,8 @@ def render_health_report_md(rep: HealthReport) -> str:
     operator_recommendations = [str(x) for x in (rep.signals.get("operator_recommendations") or []) if str(x).strip()]
     artifacts = dict(rep.signals.get("artifacts") or {})
     evidence_manifest = dict(rep.signals.get("evidence_manifest") or {})
+    latest_proof = dict(rep.signals.get("latest_integrity_proof") or {})
+    self_check_snapshot = dict(rep.signals.get("self_check_silent_warnings") or {})
     engineering = dict(rep.signals.get("engineering_analysis_evidence") or {})
     optimizer_scope = dict(rep.signals.get("optimizer_scope") or {})
     optimizer_scope_gate = dict(rep.signals.get("optimizer_scope_gate") or {})
@@ -636,7 +730,41 @@ def render_health_report_md(rep: HealthReport) -> str:
         f"- browser_perf_evidence_report: {artifacts.get('browser_perf_evidence_report')}",
         f"- browser_perf_comparison_report: {artifacts.get('browser_perf_comparison_report')}",
         f"- browser_perf_trace: {artifacts.get('browser_perf_trace')}",
+        f"- self_check_silent_warnings: {artifacts.get('self_check_silent_warnings')}",
     ]
+
+    if latest_proof:
+        lines += [
+            "",
+            "## Latest integrity proof",
+            f"- status: `{latest_proof.get('status') or 'MISSING'}`",
+            f"- final_latest_zip_sha256: `{latest_proof.get('final_latest_zip_sha256') or '—'}`",
+            f"- final_original_zip_sha256: `{latest_proof.get('final_original_zip_sha256') or '—'}`",
+            f"- latest_sha_sidecar_matches: {latest_proof.get('latest_sha_sidecar_matches')}",
+            f"- latest_pointer_matches_original: {latest_proof.get('latest_pointer_matches_original')}",
+            f"- embedded_manifest_zip_sha256_scope: `{latest_proof.get('embedded_manifest_zip_sha256_scope') or '—'}`",
+            f"- embedded_manifest_stage: `{latest_proof.get('embedded_manifest_stage') or '—'}`",
+            f"- trigger: `{latest_proof.get('trigger') or '—'}`",
+            f"- collection_mode: `{latest_proof.get('collection_mode') or '—'}`",
+            f"- producer_warning_count: {latest_proof.get('producer_warning_count')}",
+            f"- warning_only_gaps_present: {latest_proof.get('warning_only_gaps_present')}",
+            f"- no_release_closure_claim: {latest_proof.get('no_release_closure_claim')}",
+        ]
+        for msg in [str(x) for x in (latest_proof.get("warnings") or []) if str(x).strip()][:5]:
+            lines.append(f"- warning: {msg}")
+
+    if self_check_snapshot:
+        lines += [
+            "",
+            "## Self-check silent warnings snapshot",
+            f"- status: `{self_check_snapshot.get('status') or 'MISSING'}`",
+            f"- snapshot_only: {self_check_snapshot.get('snapshot_only')}",
+            f"- does_not_close_producer_warnings: {self_check_snapshot.get('does_not_close_producer_warnings')}",
+            f"- source_path: `{self_check_snapshot.get('source_path') or '—'}`",
+            f"- rc: {self_check_snapshot.get('rc')}",
+            f"- fail_count: {self_check_snapshot.get('fail_count')}",
+            f"- warn_count: {self_check_snapshot.get('warn_count')}",
+        ]
 
     if evidence_manifest:
         analysis_handoff = dict(evidence_manifest.get("analysis_handoff") or {})

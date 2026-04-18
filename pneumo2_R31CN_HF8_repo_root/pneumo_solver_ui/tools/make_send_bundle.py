@@ -67,6 +67,7 @@ from .send_bundle_evidence import (
     GEOMETRY_REFERENCE_EVIDENCE_ARCNAME,
     GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME,
     GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME,
+    build_latest_integrity_proof,
     build_evidence_manifest,
     classify_collection_mode,
     helper_runtime_provenance,
@@ -2310,29 +2311,32 @@ def _make_send_bundle_inner(
             payload = json.loads(latest_evidence_json.read_text(encoding="utf-8", errors="replace"))
             if not isinstance(payload, dict):
                 return
+            embedded_manifest_payload = dict(payload)
         except Exception:
             return
         try:
-            latest_sha_text = latest_sha.read_text(encoding="utf-8", errors="replace").strip()
-        except Exception:
-            latest_sha_text = ""
-        latest_sha_value = latest_sha_text.split()[0] if latest_sha_text else ""
-        try:
-            payload["final_latest_zip_sha256"] = _sha256_file(latest_zip) if latest_zip.exists() else ""
-            payload["final_original_zip_sha256"] = _sha256_file(zip_path) if zip_path.exists() else ""
-            payload["final_latest_sha256_sidecar"] = latest_sha_value
-            payload["latest_zip_matches_original"] = bool(
-                payload.get("final_latest_zip_sha256")
-                and payload.get("final_latest_zip_sha256") == payload.get("final_original_zip_sha256")
+            proof = build_latest_integrity_proof(
+                zip_path=zip_path,
+                latest_zip_path=latest_zip,
+                original_zip_path=zip_path,
+                latest_sha_path=latest_sha,
+                latest_pointer_path=latest_txt,
+                evidence_manifest=payload,
+                embedded_manifest=embedded_manifest_payload,
             )
-            payload["latest_sha_sidecar_matches"] = bool(
-                latest_sha_value and latest_sha_value == payload.get("final_latest_zip_sha256")
-            )
-            payload["latest_pointer_path"] = str(latest_txt.resolve())
-            payload["latest_pointer_target"] = latest_txt.read_text(encoding="utf-8", errors="replace").strip() if latest_txt.exists() else ""
-            payload["latest_pointer_matches_original"] = bool(
-                payload.get("latest_pointer_target") == str(zip_path.resolve())
-            )
+            payload["latest_integrity_proof"] = proof
+            payload["embedded_manifest_zip_sha256"] = proof.get("embedded_manifest_zip_sha256") or ""
+            payload["embedded_manifest_zip_sha256_scope"] = proof.get("embedded_manifest_zip_sha256_scope") or ""
+            payload["embedded_manifest_stage"] = proof.get("embedded_manifest_stage") or ""
+            payload["embedded_manifest_finalization_stage"] = proof.get("embedded_manifest_finalization_stage") or ""
+            payload["final_latest_zip_sha256"] = proof.get("final_latest_zip_sha256") or ""
+            payload["final_original_zip_sha256"] = proof.get("final_original_zip_sha256") or ""
+            payload["final_latest_sha256_sidecar"] = proof.get("final_latest_sha256_sidecar") or ""
+            payload["latest_zip_matches_original"] = bool(proof.get("latest_zip_matches_original"))
+            payload["latest_sha_sidecar_matches"] = bool(proof.get("latest_sha_sidecar_matches"))
+            payload["latest_pointer_path"] = str(proof.get("latest_pointer_path") or "")
+            payload["latest_pointer_target"] = str(proof.get("latest_pointer_target") or "")
+            payload["latest_pointer_matches_original"] = bool(proof.get("latest_pointer_matches_original"))
             payload["finalized_at"] = datetime.now().isoformat(timespec="seconds")
             payload["finalization_stage"] = "latest_zip_sha_inspection_proof"
             payload["zip_sha256"] = payload.get("final_latest_zip_sha256") or payload.get("zip_sha256") or ""

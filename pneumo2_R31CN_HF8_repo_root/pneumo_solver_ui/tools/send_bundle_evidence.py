@@ -1453,6 +1453,178 @@ def evidence_manifest_release_errors(manifest: Mapping[str, Any] | None) -> List
     return list(dict.fromkeys(str(x) for x in errors if str(x).strip()))
 
 
+def _latest_proof_path_text(path: Path | str | None) -> str:
+    if path in (None, ""):
+        return ""
+    try:
+        return str(Path(path).expanduser().resolve())
+    except Exception:
+        return str(path)
+
+
+def _latest_proof_read_text(path: Path | str | None) -> str:
+    if path in (None, ""):
+        return ""
+    try:
+        return Path(path).expanduser().read_text(encoding="utf-8", errors="replace").strip()
+    except Exception:
+        return ""
+
+
+def _latest_proof_same_path(left: object, right: object) -> bool:
+    left_text = str(left or "").strip()
+    right_text = str(right or "").strip()
+    if not left_text or not right_text:
+        return False
+    try:
+        return Path(left_text).expanduser().resolve() == Path(right_text).expanduser().resolve()
+    except Exception:
+        return left_text.casefold() == right_text.casefold()
+
+
+def _latest_proof_is_stage_scoped(scope: object, stage: object, finalization_stage: object) -> bool:
+    text = " ".join(str(item or "") for item in (scope, stage, finalization_stage)).lower()
+    return any(token in text for token in ("build time", "stage", "stage-scoped", "evidence manifest build"))
+
+
+def _latest_proof_sha_sidecar_value(path: Path | str | None, fallback: object = "") -> str:
+    text = _latest_proof_read_text(path)
+    if text:
+        return text.split()[0].strip()
+    return str(fallback or "").strip()
+
+
+def build_latest_integrity_proof(
+    *,
+    zip_path: Path | str,
+    latest_zip_path: Path | str | None = None,
+    original_zip_path: Path | str | None = None,
+    latest_sha_path: Path | str | None = None,
+    latest_pointer_path: Path | str | None = None,
+    evidence_manifest: Mapping[str, Any] | None = None,
+    embedded_manifest: Mapping[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Build an operator-facing proof for latest_send_bundle.zip integrity.
+
+    The embedded diagnostics/evidence_manifest.json is written before the final
+    latest pointer/sha sidecars exist, so its zip_sha256 is intentionally
+    stage-scoped. This proof records the final latest bytes separately.
+    """
+    sidecar = dict(evidence_manifest or {})
+    embedded = dict(embedded_manifest or {})
+    embedded_source = embedded if embedded else sidecar
+
+    latest_zip = Path(latest_zip_path or zip_path).expanduser()
+    original_raw = original_zip_path or sidecar.get("zip_path") or zip_path
+    original_zip = Path(str(original_raw)).expanduser() if str(original_raw or "").strip() else None
+    latest_sha = Path(latest_sha_path).expanduser() if latest_sha_path not in (None, "") else None
+    latest_pointer = Path(latest_pointer_path).expanduser() if latest_pointer_path not in (None, "") else None
+
+    latest_actual_sha = _sha256_file(latest_zip)
+    sidecar_final_latest_sha = str(sidecar.get("final_latest_zip_sha256") or "").strip()
+    final_latest_sha = latest_actual_sha or sidecar_final_latest_sha
+
+    original_actual_sha = _sha256_file(original_zip) if original_zip is not None else ""
+    sidecar_original_sha = str(sidecar.get("final_original_zip_sha256") or "").strip()
+    final_original_sha = original_actual_sha or sidecar_original_sha
+
+    latest_sha_value = _latest_proof_sha_sidecar_value(
+        latest_sha,
+        sidecar.get("final_latest_sha256_sidecar"),
+    )
+    pointer_target = _latest_proof_read_text(latest_pointer) or str(sidecar.get("latest_pointer_target") or "").strip()
+    original_text = _latest_proof_path_text(original_zip) if original_zip is not None else ""
+
+    embedded_sha = str(embedded_source.get("zip_sha256") or "").strip()
+    embedded_scope = str(embedded_source.get("zip_sha256_scope") or "").strip()
+    embedded_stage = str(embedded_source.get("stage") or "").strip()
+    embedded_finalization_stage = str(embedded_source.get("finalization_stage") or "").strip()
+
+    latest_claim_matches_actual = None
+    if sidecar_final_latest_sha and latest_actual_sha:
+        latest_claim_matches_actual = sidecar_final_latest_sha == latest_actual_sha
+    original_claim_matches_actual = None
+    if sidecar_original_sha and original_actual_sha:
+        original_claim_matches_actual = sidecar_original_sha == original_actual_sha
+
+    latest_zip_matches_original = bool(final_latest_sha and final_original_sha and final_latest_sha == final_original_sha)
+    latest_sha_sidecar_matches = bool(final_latest_sha and latest_sha_value and latest_sha_value == final_latest_sha)
+    latest_pointer_matches_original = bool(pointer_target and original_text and _latest_proof_same_path(pointer_target, original_text))
+
+    producer_warnings = evidence_manifest_warnings(embedded_source)
+    warnings: list[str] = []
+    if not sidecar:
+        warnings.append("latest_evidence_manifest.json sidecar is missing or unreadable.")
+    if not final_latest_sha:
+        warnings.append("latest_send_bundle.zip final SHA256 is missing or unreadable.")
+    if sidecar_final_latest_sha and latest_actual_sha and sidecar_final_latest_sha != latest_actual_sha:
+        warnings.append("latest_evidence_manifest.json final_latest_zip_sha256 does not match latest_send_bundle.zip bytes.")
+    if not latest_sha_value:
+        warnings.append("latest_send_bundle.sha256 sidecar is missing or unreadable.")
+    elif final_latest_sha and latest_sha_value != final_latest_sha:
+        warnings.append("latest_send_bundle.sha256 mismatch with latest_send_bundle.zip bytes.")
+    if not pointer_target:
+        warnings.append("latest_send_bundle_path.txt pointer is missing or unreadable.")
+    elif original_text and not latest_pointer_matches_original:
+        warnings.append("latest_send_bundle_path.txt does not point to the original timestamped ZIP.")
+    if not final_original_sha:
+        warnings.append("Original timestamped ZIP SHA256 is missing or unavailable; final latest bytes still need sidecar proof.")
+    elif final_latest_sha and final_original_sha != final_latest_sha:
+        warnings.append("latest_send_bundle.zip bytes differ from the original timestamped ZIP.")
+    if sidecar_original_sha and original_actual_sha and sidecar_original_sha != original_actual_sha:
+        warnings.append("latest_evidence_manifest.json final_original_zip_sha256 does not match original ZIP bytes.")
+    if embedded_sha and final_latest_sha and embedded_sha != final_latest_sha and not _latest_proof_is_stage_scoped(
+        embedded_scope,
+        embedded_stage,
+        embedded_finalization_stage,
+    ):
+        warnings.append("Embedded evidence manifest zip_sha256 differs from final latest ZIP without a stage-scoped hash claim.")
+
+    warnings = list(dict.fromkeys(warnings))
+    if not final_latest_sha:
+        status = "MISSING"
+    elif warnings:
+        status = "WARN"
+    else:
+        status = "READY"
+
+    return {
+        "schema": "latest_integrity_proof",
+        "schema_version": "1.0.0",
+        "checked_at": now_iso(),
+        "status": status,
+        "zip_path": _latest_proof_path_text(zip_path),
+        "latest_zip_path": _latest_proof_path_text(latest_zip),
+        "original_zip_path": original_text,
+        "final_latest_zip_sha256": final_latest_sha,
+        "final_original_zip_sha256": final_original_sha,
+        "final_latest_sha256_sidecar": latest_sha_value,
+        "latest_zip_matches_original": latest_zip_matches_original,
+        "latest_sha_sidecar_matches": latest_sha_sidecar_matches,
+        "latest_pointer_path": _latest_proof_path_text(latest_pointer),
+        "latest_pointer_target": pointer_target,
+        "latest_pointer_matches_original": latest_pointer_matches_original,
+        "embedded_manifest_zip_sha256": embedded_sha,
+        "embedded_manifest_zip_sha256_scope": embedded_scope,
+        "embedded_manifest_stage": embedded_stage,
+        "embedded_manifest_finalization_stage": embedded_finalization_stage,
+        "embedded_manifest_stage_scoped": _latest_proof_is_stage_scoped(
+            embedded_scope,
+            embedded_stage,
+            embedded_finalization_stage,
+        ),
+        "final_latest_zip_sha256_matches_actual": latest_claim_matches_actual,
+        "final_original_zip_sha256_matches_actual": original_claim_matches_actual,
+        "trigger": str(sidecar.get("trigger") or embedded_source.get("trigger") or "").strip(),
+        "collection_mode": str(sidecar.get("collection_mode") or embedded_source.get("collection_mode") or "").strip(),
+        "producer_warning_count": len(producer_warnings),
+        "warning_only_gaps_present": bool(producer_warnings),
+        "no_release_closure_claim": True,
+        "producer_warnings": producer_warnings,
+        "warnings": warnings,
+    }
+
+
 def read_manifest_inputs_from_zip(zf: Any) -> tuple[dict[str, Any], dict[str, Dict[str, Any]]]:
     meta = _load_json_from_zip(zf, "bundle/meta.json")
     json_by_name: dict[str, Dict[str, Any]] = {}
