@@ -977,7 +977,8 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "_refresh_source_reference_diff_state" in editor_src
     assert "describe_desktop_field_source_state" in editor_src
     assert "inspector_source_state_var" in editor_src
-    assert "Source/state:" in editor_src
+    assert "Источник/состояние:" in editor_src
+    assert "Source/state:" not in editor_src
     assert "source: {source} · state: {state}" in (
         ROOT / "pneumo_solver_ui" / "desktop_input_model.py"
     ).read_text(encoding="utf-8", errors="replace")
@@ -1335,7 +1336,7 @@ def test_desktop_input_editor_hides_service_layers_behind_explicit_toggle() -> N
     assert "_toggle_service_panels" in editor_src
     assert "_set_service_panels_visible" in editor_src
     assert 'textvariable=self.service_toggle_text_var' in editor_src
-    assert 'overview_frame = ttk.LabelFrame(outer, text="Readiness и source-of-truth", padding=10)' in editor_src
+    assert 'overview_frame = ttk.LabelFrame(outer, text="Готовность и источник данных", padding=10)' in editor_src
     assert 'self._service_container = ttk.Frame(outer)' in editor_src
     assert 'service_notebook = ttk.Notebook(self._service_container)' in editor_src
     assert '(files_service_tab, "Файлы")' in editor_src

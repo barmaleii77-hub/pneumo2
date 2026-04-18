@@ -14,7 +14,7 @@ def create_hosted_diagnostics_center(parent: tk.Misc) -> DesktopDiagnosticsCente
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="desktop_diagnostics_center",
-        title="Диагностика и отправка",
+        title="Диагностика",
         description="Единый центр проверки окружения, сборки диагностического пакета и подготовки материалов к отправке.",
         group="Встроенные окна",
         mode="hosted",
@@ -33,4 +33,10 @@ def build_spec() -> DesktopShellToolSpec:
         nav_order=140,
         standalone_module="pneumo_solver_ui.tools.desktop_diagnostics_center",
         create_hosted=create_hosted_diagnostics_center,
+        search_aliases=(
+            "диагностика и отправка",
+            "send bundle",
+            "health-check",
+            "restore",
+        ),
     )

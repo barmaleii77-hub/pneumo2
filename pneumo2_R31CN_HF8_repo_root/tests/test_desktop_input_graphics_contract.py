@@ -3,7 +3,11 @@ from __future__ import annotations
 import tkinter as tk
 
 from pneumo_solver_ui.desktop_input_graphics import DesktopInputGraphicPanel
-from pneumo_solver_ui.desktop_input_model import field_spec_map, load_base_with_defaults
+from pneumo_solver_ui.desktop_input_model import (
+    desktop_section_display_title,
+    field_spec_map,
+    load_base_with_defaults,
+)
 from pneumo_solver_ui.tools.desktop_input_editor import DesktopInputEditor
 
 
@@ -61,6 +65,7 @@ def test_desktop_input_graphic_panel_renders_engineering_workspace_for_all_main_
         "Статическая настройка",
         "Компоненты",
         "Справочные данные",
+        "Расчётные настройки",
     ):
         panel.refresh(section_title=section, payload=payload, field_label="Тестовое поле", unit_label="м")
         assert str(panel.summary_var.get() or "").strip()
@@ -139,6 +144,57 @@ def test_desktop_input_graphic_panel_shows_static_trim_metrics_and_context() -> 
     assert "Цель по ходу" in joined
     assert "CG X" in joined
     assert "CG Y" in joined
+
+
+def test_desktop_input_graphic_panel_shows_v38_source_marker_and_calculation_settings() -> None:
+    payload = load_base_with_defaults()
+    _root, panel = _make_panel()
+    panel.refresh(
+        section_title="Расчётные настройки",
+        payload=payload,
+        field_label="Шаг интегрирования",
+        unit_label="мс",
+        field_key="макс_шаг_интегрирования_с",
+        graphic_context="integration",
+        source_marker="source: default_base.json · state: dirty",
+    )
+
+    marker = str(panel.source_marker_var.get() or "")
+    assert "Источник: WS-INPUTS live" in marker
+    assert "source: default_base.json" in marker
+    assert "state: dirty" in marker
+    assert "режим: По исходным данным" in marker
+
+    joined = " ".join(_canvas_texts(panel))
+    assert "Контекст: Интегрирование" in joined
+    assert "Шаг интегрирования" in joined
+    assert "Autoverif" in joined
+
+
+def test_desktop_input_editor_tree_selection_opens_cluster_editor_directly() -> None:
+    root = tk.Tk()
+    root.withdraw()
+    editor = DesktopInputEditor(host=root, hosted=True)
+    try:
+        for section_title in ("Механика", "Численные настройки"):
+            item_id = editor._section_tree_ids[section_title]
+            editor.section_tree.selection_set(item_id)
+            editor.section_tree.focus(item_id)
+            editor._on_section_tree_selected()
+            root.update_idletasks()
+
+            expected_index = editor.section_title_to_index[section_title]
+            current_index = editor.section_notebook.index(editor.section_notebook.select())
+            display_title = desktop_section_display_title(section_title)
+            first_field = editor.section_by_title[section_title].fields[0]
+
+            assert current_index == expected_index
+            assert editor.current_section_title_var.get() == display_title
+            assert display_title in str(editor.section_tree.item(item_id, "text") or "")
+            assert first_field.key in editor._widget_handles
+            assert editor._field_tabs_by_key[first_field.key] is not None
+    finally:
+        root.destroy()
 
 
 def test_desktop_input_editor_forwards_graphic_context_from_selected_field() -> None:

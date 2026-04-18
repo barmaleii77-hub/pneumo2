@@ -509,17 +509,25 @@ def format_compare_contract_summary(contract: Mapping[str, Any] | None) -> str:
     refs = [_as_mapping(item) for item in list(payload.get("run_refs") or []) if isinstance(item, Mapping)]
     if not refs:
         return "Compare contract: -"
+    selected_runs = [
+        str(ref.get("run_id") or ref.get("label") or ref.get("source_path") or "").strip()
+        for ref in refs
+    ]
+    selected_runs = [value for value in selected_runs if value]
     objective_hashes = sorted({_short(ref.get("objective_contract_hash")) for ref in refs if ref.get("objective_contract_hash")})
     baseline_hashes = sorted({_short(ref.get("active_baseline_hash")) for ref in refs if ref.get("active_baseline_hash")})
     run_hashes = sorted({_short(ref.get("run_contract_hash")) for ref in refs if ref.get("run_contract_hash")})
+    source_hashes = sorted({_short(ref.get("ring_source_hash")) for ref in refs if ref.get("ring_source_hash")})
     banner = _as_mapping(payload.get("mismatch_banner"))
     dims = [str(x) for x in (banner.get("mismatch_dimensions") or []) if str(x).strip()]
     lines = [
         f"compare_contract_hash={_short(payload.get('compare_contract_hash'), 16)}",
         f"mode={payload.get('compare_mode') or '-'} runs={len(refs)}",
+        f"selected_run={', '.join(selected_runs[:4]) if selected_runs else '-'}",
         f"run_refs={', '.join(run_hashes) if run_hashes else '-'}",
         f"objective={', '.join(objective_hashes) if objective_hashes else '-'}",
         f"baseline={', '.join(baseline_hashes) if baseline_hashes else '-'}",
+        f"source={', '.join(source_hashes) if source_hashes else '-'}",
     ]
     if dims:
         lines.append(f"mismatch={banner.get('banner_id') or '-'}: {', '.join(dims[:6])}")

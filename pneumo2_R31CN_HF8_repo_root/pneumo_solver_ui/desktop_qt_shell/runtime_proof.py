@@ -305,6 +305,8 @@ def validate_qt_main_shell_runtime_proof(
         "status_progress_messages_strip",
         "command_search_project_tree_route",
         "all_launchable_tools_visible_from_shell",
+        "operator_surface_no_service_jargon",
+        "v38_pipeline_selection_sync",
         "layout_save_restore_reset",
         "no_domain_windows_launched",
     }
@@ -346,6 +348,38 @@ def validate_qt_main_shell_runtime_proof(
                 f"runtime proof launch coverage missing from {surface}: "
                 + ", ".join(missing)
             )
+
+    operator_surface = proof.get("operator_surface")
+    if not isinstance(operator_surface, dict):
+        errors.append("runtime proof operator_surface must be an object")
+        operator_surface = {}
+    service_hits = [str(item) for item in operator_surface.get("service_blocker_hits") or []]
+    if service_hits:
+        errors.append("runtime proof operator surface exposes service jargon: " + "; ".join(service_hits))
+
+    pipeline_coverage = proof.get("pipeline_surface_coverage")
+    if not isinstance(pipeline_coverage, dict):
+        errors.append("runtime proof pipeline_surface_coverage must be an object")
+        pipeline_coverage = {}
+    expected_workspace_ids = {str(item) for item in pipeline_coverage.get("expected") or []}
+    if not expected_workspace_ids:
+        errors.append("runtime proof pipeline_surface_coverage.expected must be non-empty")
+    for surface in ("browser", "toolbar", "command_search"):
+        surface_ids = {str(item) for item in pipeline_coverage.get(surface) or []}
+        missing = sorted(expected_workspace_ids - surface_ids)
+        if missing:
+            errors.append(
+                f"runtime proof V38 pipeline coverage missing from {surface}: "
+                + ", ".join(missing)
+            )
+
+    pipeline_sync = proof.get("pipeline_selection_sync")
+    if not isinstance(pipeline_sync, dict):
+        errors.append("runtime proof pipeline_selection_sync must be an object")
+        pipeline_sync = {}
+    missing_sync = [str(item) for item in pipeline_sync.get("missing_workspace_ids") or []]
+    if missing_sync:
+        errors.append("runtime proof V38 pipeline selection sync missing: " + ", ".join(missing_sync))
 
     manual_required = {str(item) for item in proof.get("manual_verification_required") or []}
     required_manual = set(_manual_check_ids())
@@ -533,6 +567,17 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                 surface: sorted(expected_launch_keys - set(launch_coverage[surface]))
                 for surface in ("browser", "menu", "toolbar", "command_search")
             }
+            pipeline_surface_coverage = {
+                key: list(value)
+                for key, value in window.pipeline_surface_coverage().items()
+            }
+            expected_workspace_ids = set(pipeline_surface_coverage["expected"])
+            pipeline_surface_coverage_missing = {
+                surface: sorted(expected_workspace_ids - set(pipeline_surface_coverage[surface]))
+                for surface in ("browser", "toolbar", "command_search")
+            }
+            operator_surface = window.operator_surface_snapshot()
+            pipeline_selection_sync = window.prove_v38_pipeline_selection_sync()
             proof: dict[str, object] = {
                 "schema": "qt_main_shell_runtime_proof.v1",
                 "generated_utc": _utc_iso(),
@@ -592,6 +637,10 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                 },
                 "launch_coverage": launch_coverage,
                 "launch_coverage_missing": launch_coverage_missing,
+                "pipeline_surface_coverage": pipeline_surface_coverage,
+                "pipeline_surface_coverage_missing": pipeline_surface_coverage_missing,
+                "operator_surface": operator_surface,
+                "pipeline_selection_sync": pipeline_selection_sync,
                 "layout": {
                     "settings_path": str(settings_path.resolve(strict=False)),
                     "saved": bool(layout_saved),
@@ -638,6 +687,13 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                 "all_launchable_tools_visible_from_shell": all(
                     not missing for missing in launch_coverage_missing.values()
                 ),
+                "operator_surface_no_service_jargon": not bool(
+                    dict(operator_surface).get("service_blocker_hits") or []
+                ),
+                "v38_pipeline_selection_sync": all(
+                    not missing for missing in pipeline_surface_coverage_missing.values()
+                )
+                and not bool(dict(pipeline_selection_sync).get("missing_workspace_ids") or []),
                 "layout_save_restore_reset": bool(layout_saved and layout_reset),
                 "no_domain_windows_launched": True,
             }

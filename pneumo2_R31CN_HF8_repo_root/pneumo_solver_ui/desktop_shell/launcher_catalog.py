@@ -23,12 +23,12 @@ class DesktopLaunchCatalogItem:
 def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[DesktopLaunchCatalogItem, ...]:
     items: list[DesktopLaunchCatalogItem] = [
         DesktopLaunchCatalogItem(
-            key="desktop_gui_spec_shell",
-            title="PneumoApp Desktop Shell (GUI-spec)",
-            module="pneumo_solver_ui.tools.desktop_gui_spec_shell",
+            key="desktop_main_shell_qt",
+            title="Desktop Main Shell",
+            module="pneumo_solver_ui.tools.desktop_main_shell_qt",
             description=(
-                "Канонический PySide6 shell по GUI-spec (17/18): workspace-first маршрут, "
-                "global command search, overview dashboard и always-visible diagnostics."
+                "Главное Windows-окно оператора: верхнее меню, поиск команд, дерево маршрута, "
+                "инспектор, status/progress strip и единый запуск GUI-модулей."
             ),
             group="Главное окно",
             runtime_kind="qt",
@@ -36,10 +36,39 @@ def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[Desktop
             source_of_truth_role="launcher",
             migration_status="native",
             search_aliases=(
+                "desktop main shell",
                 "desktop shell",
-                "gui spec shell",
+                "qt main shell",
                 "главное окно",
                 "рабочее место инженера",
+                "WS-SHELL",
+            ),
+            context_handoff_keys=(
+                "selected_tool_key",
+                "workflow_stage",
+                "active_optimization_mode",
+                "selected_run_dir",
+                "selected_artifact",
+                "selected_scenario",
+                "source_of_truth_role",
+            ),
+        ),
+        DesktopLaunchCatalogItem(
+            key="desktop_gui_spec_shell",
+            title="Резервный GUI-spec shell",
+            module="pneumo_solver_ui.tools.desktop_gui_spec_shell",
+            description=(
+                "Legacy/reference shell surface. Primary operator launch target is Desktop Main Shell."
+            ),
+            group="Резервные окна",
+            runtime_kind="qt",
+            workspace_role="workspace",
+            source_of_truth_role="launcher",
+            migration_status="in_development",
+            search_aliases=(
+                "gui spec shell",
+                "legacy shell",
+                "reference shell",
             ),
             context_handoff_keys=(
                 "selected_tool_key",

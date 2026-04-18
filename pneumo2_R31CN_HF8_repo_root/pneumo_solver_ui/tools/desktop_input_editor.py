@@ -245,7 +245,7 @@ class DesktopInputEditor:
         self.inspector_unit_var = tk.StringVar(value="Единица: —")
         self.inspector_range_var = tk.StringVar(value="Диапазон: —")
         self.inspector_context_var = tk.StringVar(value="Контекст: —")
-        self.inspector_source_state_var = tk.StringVar(value="Source/state: —")
+        self.inspector_source_state_var = tk.StringVar(value="Источник/состояние: —")
         self.inspector_help_var = tk.StringVar(value="Выберите параметр слева или в форме, чтобы увидеть пояснение.")
         self.inspector_related_summary_var = tk.StringVar(value="Связанные параметры появятся после выбора поля.")
         self._inspector_related_field_keys: dict[str, str] = {}
@@ -1657,7 +1657,7 @@ class DesktopInputEditor:
             host.body.columnconfigure(0, weight=1)
             service_notebook.add(host, text=title)
 
-        overview_frame = ttk.LabelFrame(outer, text="Readiness и source-of-truth", padding=10)
+        overview_frame = ttk.LabelFrame(outer, text="Готовность и источник данных", padding=10)
         overview_frame.pack(fill="x", pady=(0, 12))
         overview_frame.columnconfigure(1, weight=1)
         ttk.Label(overview_frame, text="Источник данных:").grid(row=0, column=0, sticky="w")
@@ -1692,9 +1692,9 @@ class DesktopInputEditor:
         ttk.Label(
             overview_frame,
             text=(
-                "Этот экран остаётся master copy для параметров машины и solver defaults. "
-                "Preview, профили, baseline, история и артефакты вынесены в сервисные панели, "
-                "чтобы не смешивать редактирование source-of-truth с производными представлениями."
+                "Этот экран остаётся основным местом редактирования параметров модели и расчётных настроек. "
+                "Предпросмотр, профили, базовый прогон, история и артефакты вынесены в отдельные панели, "
+                "чтобы не смешивать ввод исходных данных с производными представлениями."
             ),
             wraplength=1040,
             justify="left",
@@ -2792,7 +2792,7 @@ class DesktopInputEditor:
         self.inspector_context_var.set(
             f"Контекст: {self._graphic_context_title(spec.effective_graphic_context) or 'общий'}"
         )
-        self.inspector_source_state_var.set(f"Source/state: {source_state.get('marker') or '—'}")
+        self.inspector_source_state_var.set(f"Источник/состояние: {source_state.get('marker') or '—'}")
         self.inspector_help_var.set(spec.effective_tooltip_text or spec.description)
         self._refresh_inspector_related_fields(spec)
         self._refresh_graphics_for_section(
@@ -2824,7 +2824,7 @@ class DesktopInputEditor:
         }
         if self._selected_field_key:
             source_state = self._field_source_state_info(self._selected_field_key)
-            self.inspector_source_state_var.set(f"Source/state: {source_state.get('marker') or '—'}")
+            self.inspector_source_state_var.set(f"Источник/состояние: {source_state.get('marker') or '—'}")
 
     def _on_field_var_changed(self, key: str) -> None:
         self._refresh_source_reference_diff_state()

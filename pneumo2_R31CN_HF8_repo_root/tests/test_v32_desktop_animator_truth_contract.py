@@ -14,6 +14,9 @@ from pneumo_solver_ui.desktop_animator.cylinder_truth_gate import (
     ALLOWED_GRAPHICS_TRUTH_STATES,
     evaluate_all_cylinder_truth_gates,
 )
+from pneumo_solver_ui.desktop_animator.cylinder_render_policy import (
+    evaluate_cylinder_render_policy,
+)
 from pneumo_solver_ui.desktop_animator.truth_contract import (
     CAPTURE_EXPORT_HANDOFF_ID,
     build_animator_truth_summary,
@@ -58,6 +61,50 @@ def _partial_truth_meta() -> dict:
         "analysis_report_path": "analysis/report.json",
         "optimizer_run_dir": "runs/opt/demo",
     }
+
+
+def _complete_gate_without_render_geometry_meta() -> dict:
+    return {
+        "packaging": {
+            "status": "complete",
+            "cylinders": {
+                "cyl1": {
+                    "contract_complete": True,
+                    "length_status_by_corner": {
+                        "ЛП": "already_finite",
+                        "ПП": "already_finite",
+                        "ЛЗ": "already_finite",
+                        "ПЗ": "already_finite",
+                    },
+                    "resolved_geometry": {
+                        "bore_diameter_m": 0.032,
+                        "rod_diameter_m": 0.016,
+                        "outer_diameter_m": 0.038,
+                        "body_length_front_m": 0.293,
+                    },
+                    "advanced_fields_missing": [],
+                    "mount_families": {"top": "cyl1_top", "bottom": "cyl1_bot"},
+                }
+            },
+        }
+    }
+
+
+def _complete_render_geometry_meta() -> dict:
+    meta = _complete_gate_without_render_geometry_meta()
+    meta["packaging"]["cylinders"]["cyl1"]["resolved_geometry_by_axle"] = {
+        "front": {
+            "bore_diameter_m": 0.032,
+            "rod_diameter_m": 0.016,
+            "outer_diameter_m": 0.038,
+            "stroke_m": 0.25,
+            "dead_cap_length_m": 0.018,
+            "dead_rod_length_m": 0.024,
+            "dead_height_m": 0.018,
+            "body_length_m": 0.293,
+        }
+    }
+    return meta
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -152,6 +199,103 @@ def test_truth_summary_uses_allowed_badges_and_keeps_partial_cylinders_axis_only
     assert {badge["truth_state"] for badge in summary["truth_badges"]} <= set(ALLOWED_GRAPHICS_TRUTH_STATES)
     assert any("do not fabricate geometry" in warning for warning in summary["warnings"])
     assert summary["truth_mode_hash"]
+
+
+def test_cylinder_render_policy_keeps_partial_packaging_axis_only_with_solver_pair() -> None:
+    meta = _partial_truth_meta()
+    gate = evaluate_all_cylinder_truth_gates(meta)["cyl1"]
+
+    policy = evaluate_cylinder_render_policy(
+        meta=meta,
+        cyl_name="cyl1",
+        axle="front",
+        top_xyz=(0.0, 0.0, 0.0),
+        bottom_xyz=(0.0, 0.3, 0.0),
+        truth_gate=gate,
+    )
+
+    assert policy["axis_visible"] is True
+    assert policy["body_enabled"] is False
+    assert policy["body_mode"] == "axis_only"
+    assert "body" in policy["hidden_elements"]
+    assert "rod" in policy["hidden_elements"]
+    assert "piston" in policy["hidden_elements"]
+
+
+def test_cylinder_render_policy_requires_explicit_render_geometry_even_when_truth_gate_complete() -> None:
+    meta = _complete_gate_without_render_geometry_meta()
+    gate = evaluate_all_cylinder_truth_gates(meta)["cyl1"]
+
+    policy = evaluate_cylinder_render_policy(
+        meta=meta,
+        cyl_name="cyl1",
+        axle="front",
+        top_xyz=(0.0, 0.0, 0.0),
+        bottom_xyz=(0.0, 0.3, 0.0),
+        truth_gate=gate,
+    )
+
+    assert gate["enabled"] is True
+    assert policy["axis_visible"] is True
+    assert policy["body_enabled"] is False
+    assert policy["reason"] == "missing_explicit_render_geometry"
+    assert set(policy["missing_render_geometry_fields"]) >= {
+        "stroke_m",
+        "dead_cap_length_m",
+        "dead_rod_length_m",
+        "dead_height_m",
+        "body_length_m",
+    }
+
+
+def test_cylinder_render_policy_enables_exact_explicit_packaging_geometry() -> None:
+    meta = _complete_render_geometry_meta()
+    gate = evaluate_all_cylinder_truth_gates(meta)["cyl1"]
+
+    policy = evaluate_cylinder_render_policy(
+        meta=meta,
+        cyl_name="cyl1",
+        axle="front",
+        top_xyz=(0.0, 0.0, 0.0),
+        bottom_xyz=(0.0, 0.3, 0.0),
+        truth_gate=gate,
+    )
+
+    assert policy["axis_visible"] is True
+    assert policy["body_enabled"] is True
+    assert policy["body_mode"] == "body_rod_piston"
+    assert policy["hidden_elements"] == []
+    assert policy["render_geometry"] == meta["packaging"]["cylinders"]["cyl1"]["resolved_geometry_by_axle"]["front"]
+
+
+def test_cylinder_render_policy_hides_axis_and_body_for_degenerate_solver_pair() -> None:
+    meta = _complete_render_geometry_meta()
+    gate = evaluate_all_cylinder_truth_gates(meta)["cyl1"]
+
+    policy = evaluate_cylinder_render_policy(
+        meta=meta,
+        cyl_name="cyl1",
+        axle="front",
+        top_xyz=(1.0, 2.0, 3.0),
+        bottom_xyz=(1.0, 2.0, 3.0),
+        truth_gate=gate,
+    )
+
+    assert policy["axis_visible"] is False
+    assert policy["axis_reason"] == "degenerate_explicit_solver_point_pair"
+    assert policy["body_enabled"] is False
+    assert policy["body_mode"] == "unavailable"
+
+
+def test_desktop_animator_source_has_no_viewer_derived_cylinder_body_length_path() -> None:
+    app_src = (Path(__file__).resolve().parents[1] / "pneumo_solver_ui" / "desktop_animator" / "app.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "_derive_body_len" not in app_src
+    assert "cyl1_dead_height = float(cyl1_dead_cap)" not in app_src
+    assert "cyl2_dead_height = float(cyl2_dead_cap)" not in app_src
+    assert "_evaluate_cylinder_render_policy" in app_src
 
 
 def test_capture_export_manifest_handoff_contains_hashes_refs_and_blocking_truth_warning(tmp_path: Path) -> None:
@@ -277,6 +421,44 @@ def test_frame_budget_evidence_records_hidden_dock_gating_and_provenance() -> No
     assert evidence["hidden_dock_gating"]["gated"] is True
     assert evidence["provenance"]["hidden_dock_gate"] == "_dock_is_exposed"
     assert evidence["evidence_hash"]
+
+
+def test_frame_budget_evidence_missing_cadence_is_warn_not_release_closure() -> None:
+    evidence = build_frame_budget_evidence(
+        panels={"dock_hud": {"count": 2, "hz": 18.0, "visible": True}},
+        visible_aux=1,
+        total_aux_docks=3,
+        playing=True,
+        many_visible_budget=True,
+        frame_budget_active=True,
+        window_s=1.0,
+        updated_utc="2026-04-17T00:00:00+00:00",
+    )
+
+    assert evidence["frame_cadence"]["cadence_measured"] is False
+    assert evidence["frame_cadence"]["cadence_budget_ok"] is None
+    assert evidence["release_gate"]["level"] == "WARN"
+    assert evidence["release_gate"]["status"] == "missing_frame_cadence"
+    assert evidence["release_gate"]["hard_fail"] is False
+
+
+def test_frame_budget_evidence_missing_panel_samples_is_unavailable_warn_not_release_closure() -> None:
+    evidence = build_frame_budget_evidence(
+        panels={},
+        visible_aux=0,
+        total_aux_docks=3,
+        playing=True,
+        many_visible_budget=True,
+        frame_budget_active=True,
+        window_s=1.0,
+        frame_cadence={"target_interval_ms": 16, "measured_present_hz": 59.5},
+        updated_utc="2026-04-17T00:00:00+00:00",
+    )
+
+    assert evidence["evidence_state"] == "unavailable"
+    assert evidence["release_gate"]["level"] == "WARN"
+    assert evidence["release_gate"]["status"] == "missing_panel_samples"
+    assert evidence["release_gate"]["hard_fail"] is False
 
 
 def test_anim_sidecar_meta_preserves_analysis_and_optimizer_artifact_refs() -> None:

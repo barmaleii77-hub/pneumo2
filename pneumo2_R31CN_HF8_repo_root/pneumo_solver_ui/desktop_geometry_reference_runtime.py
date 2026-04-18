@@ -22,6 +22,7 @@ from pneumo_solver_ui.desktop_geometry_reference_model import (
     RoadWidthReference,
     SpringReferenceSnapshot,
     build_artifact_reference_context,
+    build_catalog_source_summary,
     build_geometry_acceptance_evidence,
     build_geometry_acceptance_evidence_from_artifact,
     build_component_fit_reference_rows,
@@ -335,16 +336,18 @@ class DesktopGeometryReferenceRuntime:
         summary: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         artifact = artifact_context or self.artifact_context(summary, artifact_path=artifact_path)
+        freshness = self.artifact_freshness_evidence(
+            artifact_context=artifact,
+            artifact_path=artifact_path,
+        )
         payload = build_geometry_reference_diagnostics_handoff(
             artifact_context=artifact,
             component_rows=self.component_passport_rows(),
             road_width=self.road_width_evidence(raw_path, artifact_context=artifact),
             packaging=self.packaging_passport_evidence(raw_path, artifact_context=artifact),
             acceptance=self.artifact_geometry_acceptance_evidence(artifact),
-        )
-        freshness = self.artifact_freshness_evidence(
-            artifact_context=artifact,
-            artifact_path=artifact_path,
+            artifact_freshness=freshness,
+            catalog_source=self.catalog_source_summary(),
         )
         payload.update(
             {
@@ -373,6 +376,8 @@ class DesktopGeometryReferenceRuntime:
         if freshness_relation in {"differs_from_latest", "selected_without_latest", "selected_unavailable"}:
             producer_reasons.append(f"artifact_relation_{freshness_relation}")
         payload["producer_readiness_reasons"] = list(dict.fromkeys(producer_reasons))
+        if payload.get("producer_artifact_status") == "ready" and producer_reasons:
+            payload["producer_artifact_status"] = "partial"
         return payload
 
     def artifact_freshness_evidence(
@@ -485,6 +490,9 @@ class DesktopGeometryReferenceRuntime:
     def catalog_variant_labels(self) -> tuple[str, ...]:
         labels = sorted({row.variant_label for row in self._catalog_rows})
         return tuple(labels)
+
+    def catalog_source_summary(self) -> dict[str, Any]:
+        return build_catalog_source_summary()
 
     def cylinder_catalog_rows(
         self,

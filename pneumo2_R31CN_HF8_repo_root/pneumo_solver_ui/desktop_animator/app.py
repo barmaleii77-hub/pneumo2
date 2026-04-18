@@ -1077,6 +1077,9 @@ from .cylinder_truth_gate import (
     evaluate_all_cylinder_truth_gates as _evaluate_all_cylinder_truth_gates,
     render_cylinder_truth_gate_message as _render_cylinder_truth_gate_message,
 )
+from .cylinder_render_policy import (
+    evaluate_cylinder_render_policy as _evaluate_cylinder_render_policy,
+)
 from .truth_contract import (
     ANIMATOR_FRAME_BUDGET_EVIDENCE_JSON_NAME as _ANIMATOR_FRAME_BUDGET_EVIDENCE_JSON_NAME,
     TRUTH_STATE_SOLVER_CONFIRMED as _TRUTH_STATE_SOLVER_CONFIRMED,
@@ -2616,27 +2619,26 @@ def infer_geometry(meta: Dict[str, Any]) -> "ViewGeometry":
                     cylinder_wall_thickness = float(_wt)
                     break
 
-    if cyl1_dead_height is None and cyl1_dead_cap is not None:
-        cyl1_dead_height = float(cyl1_dead_cap)
-    if cyl2_dead_height is None and cyl2_dead_cap is not None:
-        cyl2_dead_height = float(cyl2_dead_cap)
-
-    def _derive_body_len(stroke_val, dead_h_val):
-        if stroke_val is None or dead_h_val is None or cylinder_wall_thickness is None:
-            return None
-        try:
-            return float(float(stroke_val) + 2.0 * float(dead_h_val) + 2.0 * float(cylinder_wall_thickness))
-        except Exception:
-            return None
-
-    if cyl1_body_front is None:
-        cyl1_body_front = _derive_body_len(cyl1_stroke_front, cyl1_dead_height)
-    if cyl1_body_rear is None:
-        cyl1_body_rear = _derive_body_len(cyl1_stroke_rear, cyl1_dead_height)
-    if cyl2_body_front is None:
-        cyl2_body_front = _derive_body_len(cyl2_stroke_front, cyl2_dead_height)
-    if cyl2_body_rear is None:
-        cyl2_body_rear = _derive_body_len(cyl2_stroke_rear, cyl2_dead_height)
+    if cyl1_any and cyl1_dead_height is None:
+        _emit_animator_warning(
+            "[Animator] C1 packaging contract is incomplete in meta_json.geometry: missing explicit 'cyl1_dead_height_m'; viewer will not promote dead-cap length into render truth.",
+            code="missing_cyl1_dead_height_m",
+        )
+    if cyl2_any and cyl2_dead_height is None:
+        _emit_animator_warning(
+            "[Animator] C2 packaging contract is incomplete in meta_json.geometry: missing explicit 'cyl2_dead_height_m'; viewer will not promote dead-cap length into render truth.",
+            code="missing_cyl2_dead_height_m",
+        )
+    if cyl1_any and (cyl1_body_front is None or cyl1_body_rear is None):
+        _emit_animator_warning(
+            "[Animator] C1 packaging contract is incomplete in meta_json.geometry: missing explicit cylinder body length; full cylinder meshes require exporter-authored packaging geometry.",
+            code="missing_cyl1_body_length_m",
+        )
+    if cyl2_any and (cyl2_body_front is None or cyl2_body_rear is None):
+        _emit_animator_warning(
+            "[Animator] C2 packaging contract is incomplete in meta_json.geometry: missing explicit cylinder body length; full cylinder meshes require exporter-authored packaging geometry.",
+            code="missing_cyl2_body_length_m",
+        )
 
     return ViewGeometry(
         wheelbase=float(wheelbase),
@@ -6175,6 +6177,7 @@ class Car3DWidget(QtWidgets.QWidget):
         self._glass_f0 = self._schlick_f0_from_ior(self._glass_ior)
         self._shadow_hover_m = 0.006
         self._bundle_context_key: Optional[int] = None
+        self._bundle_meta: Dict[str, Any] = {}
         self._bundle_geometry_meta: Dict[str, Any] = {}
         self._cyl_pressure_series_map: Dict[str, np.ndarray] = {}
         self._tire_force_series_map: Dict[str, np.ndarray] = {}
@@ -7546,6 +7549,10 @@ class Car3DWidget(QtWidgets.QWidget):
     @staticmethod
     def _corner_is_front(corner: str) -> bool:
         return str(corner) in ("ЛП", "ПП")
+
+    @staticmethod
+    def _corner_axle_slug(corner: str) -> str:
+        return "front" if Car3DWidget._corner_is_front(corner) else "rear"
 
     def _corner_cylinder_contract(self, *, cyl_index: int, corner: str) -> tuple[float, float, float, float, float, float, float, float]:
         front = self._corner_is_front(corner)
@@ -12973,6 +12980,7 @@ class Car3DWidget(QtWidgets.QWidget):
         self._bundle_history_m = None
         self._bundle_lookahead_m = None
         self._bundle_context_key = int(id(bundle)) if bundle is not None else None
+        self._bundle_meta = dict(getattr(bundle, "meta", {}) or {}) if bundle is not None else {}
         self._bundle_geometry_meta = {}
         self._cyl_pressure_series_map = {}
         self._tire_force_series_map = {}
@@ -15156,6 +15164,51 @@ class Car3DWidget(QtWidgets.QWidget):
                 out.extend([int(idx), int(idx), int(idx), int(idx)])
             return out
 
+        def _cylinder_render_policy_for_corner(
+            cyl_index: int,
+            corner: str,
+            top_pt: Optional[np.ndarray],
+            bot_pt: Optional[np.ndarray],
+        ) -> dict[str, Any]:
+            truth_gate = self._cylinder_truth_gate(cyl_index)
+            try:
+                return _evaluate_cylinder_render_policy(
+                    meta=getattr(self, "_bundle_meta", {}) or {},
+                    cyl_name=self._cylinder_name(cyl_index),
+                    axle=self._corner_axle_slug(corner),
+                    top_xyz=top_pt,
+                    bottom_xyz=bot_pt,
+                    truth_gate=truth_gate,
+                )
+            except Exception as exc:
+                return {
+                    "cyl_name": self._cylinder_name(cyl_index),
+                    "axle": self._corner_axle_slug(corner),
+                    "axis_visible": False,
+                    "axis_reason": "render_policy_error",
+                    "body_enabled": False,
+                    "body_mode": "unavailable",
+                    "reason": f"render_policy_error:{type(exc).__name__}",
+                    "missing_render_geometry_fields": [],
+                    "hidden_elements": ["body", "rod", "piston"],
+                }
+
+        def _segments_from_cylinder_policy(
+            cyl_index: int,
+            top_list: list[Optional[np.ndarray]],
+            bot_list: list[Optional[np.ndarray]],
+        ) -> np.ndarray:
+            pts: list[list[float]] = []
+            for corner_name, pa, pb in zip(corners, top_list, bot_list):
+                policy = _cylinder_render_policy_for_corner(int(cyl_index), str(corner_name), pa, pb)
+                if not bool(policy.get("axis_visible")):
+                    continue
+                pts.append(np.asarray(pa, dtype=float).tolist())  # type: ignore[arg-type]
+                pts.append(np.asarray(pb, dtype=float).tolist())  # type: ignore[arg-type]
+            if not pts:
+                return np.zeros((0, 3), dtype=float)
+            return np.asarray(pts, dtype=float)
+
         wheel_radius_m = float(self.geom.wheel_radius)
         lower_arm_thickness = max(0.0075, 0.060 * wheel_radius_m)
         upper_arm_thickness = max(0.0065, 0.048 * wheel_radius_m)
@@ -15215,13 +15268,13 @@ class Car3DWidget(QtWidgets.QWidget):
                 _set_line_item_pos(self._arm_lines, None)
         if self._cyl1_lines is not None:
             if show_solver_wire_overlay:
-                pos = _segments_from_pairs(cyl1_top_local_pts, cyl1_bot_local_pts)
+                pos = _segments_from_cylinder_policy(1, cyl1_top_local_pts, cyl1_bot_local_pts)
                 _set_line_item_pos(self._cyl1_lines, pos)
             else:
                 _set_line_item_pos(self._cyl1_lines, None)
         if self._cyl2_lines is not None:
             if show_solver_wire_overlay:
-                pos = _segments_from_pairs(cyl2_top_local_pts, cyl2_bot_local_pts)
+                pos = _segments_from_cylinder_policy(2, cyl2_top_local_pts, cyl2_bot_local_pts)
                 _set_line_item_pos(self._cyl2_lines, pos)
             else:
                 _set_line_item_pos(self._cyl2_lines, None)
@@ -15349,6 +15402,36 @@ class Car3DWidget(QtWidgets.QWidget):
             for hub_item in self._wheel_hub_meshes:
                 self._invalidate_mesh(hub_item)
 
+        def _invalidate_cylinder_render_stack(mesh_idx: int) -> None:
+            glass_fx_base = 2 * int(mesh_idx)
+            bloom_card_base = 2 * int(mesh_idx)
+            if mesh_idx < len(self._cyl_body_meshes):
+                self._invalidate_mesh(self._cyl_body_meshes[mesh_idx])
+            if mesh_idx < len(self._cyl_chamber_meshes):
+                self._invalidate_mesh(self._cyl_chamber_meshes[mesh_idx])
+            if mesh_idx < len(self._cyl_rod_chamber_meshes):
+                self._invalidate_mesh(self._cyl_rod_chamber_meshes[mesh_idx])
+            for bloom_idx in range(bloom_card_base, bloom_card_base + 2):
+                if bloom_idx < len(self._cyl_bloom_card_meshes):
+                    self._invalidate_mesh(self._cyl_bloom_card_meshes[bloom_idx])
+            if mesh_idx < len(self._cyl_rod_meshes):
+                self._invalidate_mesh(self._cyl_rod_meshes[mesh_idx])
+            if mesh_idx < len(self._cyl_piston_meshes):
+                self._invalidate_mesh(self._cyl_piston_meshes[mesh_idx])
+            if mesh_idx < len(self._cyl_piston_ring_lines):
+                _set_line_item_pos(self._cyl_piston_ring_lines[mesh_idx], None)
+            if mesh_idx < len(self._cyl_rod_core_lines):
+                _set_line_item_pos(self._cyl_rod_core_lines[mesh_idx], None)
+            if mesh_idx < len(self._cyl_cap_ring_lines):
+                _set_line_item_pos(self._cyl_cap_ring_lines[mesh_idx], None)
+            if mesh_idx < len(self._cyl_gland_ring_lines):
+                _set_line_item_pos(self._cyl_gland_ring_lines[mesh_idx], None)
+            for fx_idx in range(glass_fx_base, glass_fx_base + 2):
+                if fx_idx < len(self._cyl_glass_glint_lines):
+                    _set_line_item_pos(self._cyl_glass_glint_lines[fx_idx], None)
+                if fx_idx < len(self._cyl_glass_caustic_lines):
+                    _set_line_item_pos(self._cyl_glass_caustic_lines[fx_idx], None)
+
         patm_pa = self._sample_patm_pa(i0=i0, i1=i1, alpha=alpha)
         cyl_mesh_idx = 0
         for idx, corner in enumerate(corners):
@@ -15358,83 +15441,36 @@ class Car3DWidget(QtWidgets.QWidget):
                 bot_pt = bot_list[idx]
                 if top_pt is None or bot_pt is None:
                     spring_visual_states.append(None)
-                    if cyl_mesh_idx < len(self._cyl_body_meshes):
-                        glass_fx_base = 2 * cyl_mesh_idx
-                        bloom_card_base = 2 * cyl_mesh_idx
-                        self._invalidate_mesh(self._cyl_body_meshes[cyl_mesh_idx])
-                        if cyl_mesh_idx < len(self._cyl_chamber_meshes):
-                            self._invalidate_mesh(self._cyl_chamber_meshes[cyl_mesh_idx])
-                        if cyl_mesh_idx < len(self._cyl_rod_chamber_meshes):
-                            self._invalidate_mesh(self._cyl_rod_chamber_meshes[cyl_mesh_idx])
-                        for bloom_idx in range(bloom_card_base, bloom_card_base + 2):
-                            if bloom_idx < len(self._cyl_bloom_card_meshes):
-                                self._invalidate_mesh(self._cyl_bloom_card_meshes[bloom_idx])
-                        self._invalidate_mesh(self._cyl_rod_meshes[cyl_mesh_idx])
-                        self._invalidate_mesh(self._cyl_piston_meshes[cyl_mesh_idx])
-                        if cyl_mesh_idx < len(self._cyl_piston_ring_lines):
-                            _set_line_item_pos(self._cyl_piston_ring_lines[cyl_mesh_idx], None)
-                        if cyl_mesh_idx < len(self._cyl_rod_core_lines):
-                            _set_line_item_pos(self._cyl_rod_core_lines[cyl_mesh_idx], None)
-                        if cyl_mesh_idx < len(self._cyl_cap_ring_lines):
-                            _set_line_item_pos(self._cyl_cap_ring_lines[cyl_mesh_idx], None)
-                        if cyl_mesh_idx < len(self._cyl_gland_ring_lines):
-                            _set_line_item_pos(self._cyl_gland_ring_lines[cyl_mesh_idx], None)
-                        for fx_idx in range(glass_fx_base, glass_fx_base + 2):
-                            if fx_idx < len(self._cyl_glass_glint_lines):
-                                _set_line_item_pos(self._cyl_glass_glint_lines[fx_idx], None)
-                            if fx_idx < len(self._cyl_glass_caustic_lines):
-                                _set_line_item_pos(self._cyl_glass_caustic_lines[fx_idx], None)
+                    _invalidate_cylinder_render_stack(cyl_mesh_idx)
                     cyl_mesh_idx += 1
                     continue
-                bore_d, rod_d, outer_d, stroke_len, dead_cap_len, dead_rod_len, dead_height_len, body_len = self._corner_cylinder_contract(cyl_index=cyl_index, corner=corner)
                 stroke_col = self._column_for_cyl_stroke(cyl_index, corner)
                 try:
                     stroke_pos = _g(stroke_col, 0.0)
                 except Exception:
                     stroke_pos = 0.0
                 truth_gate = self._cylinder_truth_gate(cyl_index)
+                render_policy = _cylinder_render_policy_for_corner(cyl_index, corner, top_pt, bot_pt)
                 packaging_state = None
                 if bool(truth_gate.get("enabled")):
-                    packaging_state = _cylinder_visual_state_from_packaging(
-                        top_xyz=np.asarray(top_pt, dtype=float),
-                        bot_xyz=np.asarray(bot_pt, dtype=float),
-                        stroke_pos_m=float(stroke_pos),
-                        stroke_len_m=float(stroke_len),
-                        bore_d_m=float(bore_d),
-                        rod_d_m=float(rod_d),
-                        outer_d_m=float(outer_d),
-                        dead_cap_len_m=float(dead_cap_len),
-                        dead_rod_len_m=float(dead_rod_len),
-                        dead_height_m=float(dead_height_len),
-                        body_len_m=float(body_len),
-                    )
+                    render_geometry = dict(render_policy.get("render_geometry") or {})
+                    if bool(render_policy.get("body_enabled")) and render_geometry:
+                        packaging_state = _cylinder_visual_state_from_packaging(
+                            top_xyz=np.asarray(top_pt, dtype=float),
+                            bot_xyz=np.asarray(bot_pt, dtype=float),
+                            stroke_pos_m=float(stroke_pos),
+                            stroke_len_m=float(render_geometry["stroke_m"]),
+                            bore_d_m=float(render_geometry["bore_diameter_m"]),
+                            rod_d_m=float(render_geometry["rod_diameter_m"]),
+                            outer_d_m=float(render_geometry["outer_diameter_m"]),
+                            dead_cap_len_m=float(render_geometry["dead_cap_length_m"]),
+                            dead_rod_len_m=float(render_geometry["dead_rod_length_m"]),
+                            dead_height_m=float(render_geometry["dead_height_m"]),
+                            body_len_m=float(render_geometry["body_length_m"]),
+                        )
                 if cyl_mesh_idx < len(self._cyl_body_meshes):
                     if packaging_state is None:
-                        glass_fx_base = 2 * cyl_mesh_idx
-                        bloom_card_base = 2 * cyl_mesh_idx
-                        self._invalidate_mesh(self._cyl_body_meshes[cyl_mesh_idx])
-                        if cyl_mesh_idx < len(self._cyl_chamber_meshes):
-                            self._invalidate_mesh(self._cyl_chamber_meshes[cyl_mesh_idx])
-                        if cyl_mesh_idx < len(self._cyl_rod_chamber_meshes):
-                            self._invalidate_mesh(self._cyl_rod_chamber_meshes[cyl_mesh_idx])
-                        for bloom_idx in range(bloom_card_base, bloom_card_base + 2):
-                            if bloom_idx < len(self._cyl_bloom_card_meshes):
-                                self._invalidate_mesh(self._cyl_bloom_card_meshes[bloom_idx])
-                        self._invalidate_mesh(self._cyl_rod_meshes[cyl_mesh_idx])
-                        self._invalidate_mesh(self._cyl_piston_meshes[cyl_mesh_idx])
-                        if cyl_mesh_idx < len(self._cyl_piston_ring_lines):
-                            _set_line_item_pos(self._cyl_piston_ring_lines[cyl_mesh_idx], None)
-                        if cyl_mesh_idx < len(self._cyl_rod_core_lines):
-                            _set_line_item_pos(self._cyl_rod_core_lines[cyl_mesh_idx], None)
-                        if cyl_mesh_idx < len(self._cyl_cap_ring_lines):
-                            _set_line_item_pos(self._cyl_cap_ring_lines[cyl_mesh_idx], None)
-                        if cyl_mesh_idx < len(self._cyl_gland_ring_lines):
-                            _set_line_item_pos(self._cyl_gland_ring_lines[cyl_mesh_idx], None)
-                        for fx_idx in range(glass_fx_base, glass_fx_base + 2):
-                            if fx_idx < len(self._cyl_glass_glint_lines):
-                                _set_line_item_pos(self._cyl_glass_glint_lines[fx_idx], None)
-                            if fx_idx < len(self._cyl_glass_caustic_lines):
-                                _set_line_item_pos(self._cyl_glass_caustic_lines[fx_idx], None)
+                        _invalidate_cylinder_render_stack(cyl_mesh_idx)
                     else:
                         piston_radius = float(packaging_state.get("piston_radius_m", 0.0) or 0.0)
                         pneumo_force_n = float(
@@ -26546,6 +26582,25 @@ class MainWindow(QtWidgets.QMainWindow):
     def _status(self, msg: str):
         self._status_label.setText(str(msg))
 
+    def _surface_startup_degraded_status(self, reason: str, *, detail: str = "") -> None:
+        reason_text = str(reason or "truth_absent").strip()
+        detail_text = str(detail or "").strip()
+        status_msg = f"DEGRADED: truth absent/partial ({reason_text}); solver-point axes and authored packaging meshes stay disabled until explicit NPZ truth is loaded."
+        if detail_text:
+            status_msg = f"{status_msg} {detail_text}"
+        self._status(status_msg)
+        try:
+            car3d = getattr(self.cockpit, "car3d", None)
+            if car3d is not None:
+                car3d._set_canvas_warning_lines(
+                    [
+                        f"TRUTH ABSENT/PARTIAL: {reason_text}",
+                        "No fake geometry: solver axes and cylinder meshes wait for explicit export truth.",
+                    ]
+                )
+        except Exception:
+            pass
+
     def set_analysis_context_snapshot(self, snapshot: object | None) -> None:
         label = getattr(self, "_analysis_context_label", None)
         if label is None:
@@ -27705,15 +27760,16 @@ def run_app(
         run_label = str(lineage.get("run_id") or "-")
         win.set_analysis_context_snapshot(analysis_snapshot)
         win._status(
-            "HO-008 analysis context: "
-            f"{analysis_snapshot.status} | run={run_label} | "
-            f"context={analysis_snapshot.path}"
+            "Контекст анализа HO-008: "
+            f"{analysis_snapshot.status} | прогон={run_label} | "
+            f"файл={analysis_snapshot.path}"
         )
 
     if follow:
         win.act_follow.setChecked(True)
         win._toggle_follow(True)
 
+    pointer_load_reason = ""
     if npz_path is not None and npz_path.exists():
         win.load_npz(npz_path, background=False)
     else:
@@ -27729,8 +27785,31 @@ def run_app(
                             pp = (pointer_path.parent / pp).resolve()
                         if pp.exists():
                             win.load_npz(pp, background=False)
+                        else:
+                            pointer_load_reason = f"pointer target is missing: {pp}"
+                    else:
+                        pointer_load_reason = "pointer json does not contain npz_path/path"
+                else:
+                    pointer_load_reason = "pointer json is not an object"
             except Exception:
-                pass
+                pointer_load_reason = "pointer json could not be read"
+        elif follow:
+            pointer_load_reason = f"pointer missing: {pointer_path}"
+        elif npz_path is None:
+            pointer_load_reason = "no --npz and follow mode is off"
+        else:
+            pointer_load_reason = f"npz missing: {npz_path}"
+
+    if win.bundle is None:
+        if analysis_snapshot is not None and not bool(analysis_snapshot.ready_for_animator):
+            win._surface_startup_degraded_status(
+                f"HO-008 {analysis_snapshot.status}",
+                detail="; ".join(str(x) for x in tuple(analysis_snapshot.blocking_states or ())[:3]),
+            )
+        elif pointer_load_reason:
+            win._surface_startup_degraded_status(pointer_load_reason)
+        else:
+            win._surface_startup_degraded_status("no loadable NPZ")
 
     return int(app.exec())
 

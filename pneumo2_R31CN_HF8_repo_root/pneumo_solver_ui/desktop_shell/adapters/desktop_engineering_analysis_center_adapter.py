@@ -31,7 +31,7 @@ def create_hosted_engineering_analysis_center(parent: tk.Misc) -> DesktopEnginee
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="desktop_engineering_analysis_center",
-        title="Engineering Analysis",
+        title="Инженерный анализ",
         description="Consumer HO-007: selected optimization run, influence artifacts, compare integrity and HO-009 evidence handoff.",
         group="Встроенные окна",
         mode="hosted",

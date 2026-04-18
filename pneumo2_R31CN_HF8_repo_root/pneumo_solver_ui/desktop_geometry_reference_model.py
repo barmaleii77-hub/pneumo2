@@ -541,6 +541,29 @@ def load_camozzi_catalog_rows() -> tuple[CylinderCatalogRow, ...]:
     return tuple(rows)
 
 
+def build_catalog_source_summary() -> dict[str, Any]:
+    raw = _read_json_mapping(CATALOG_JSON)
+    cylinders = dict(raw.get("cylinders") or {}) if isinstance(raw.get("cylinders"), Mapping) else {}
+    meta = dict(cylinders.get("meta") or {}) if isinstance(cylinders.get("meta"), Mapping) else {}
+    top_meta = dict(raw.get("meta") or {}) if isinstance(raw.get("meta"), Mapping) else {}
+    variants = dict(cylinders.get("variants") or {}) if isinstance(cylinders.get("variants"), Mapping) else {}
+    item_count = 0
+    for payload in variants.values():
+        if isinstance(payload, Mapping):
+            item_count += len(payload.get("items") or [])
+    return {
+        "path": str(CATALOG_JSON),
+        "exists": CATALOG_JSON.exists(),
+        "source": str(meta.get("source") or top_meta.get("generator") or ""),
+        "source_pdf": str(meta.get("source_pdf") or ""),
+        "source_shop": str(meta.get("source_shop") or meta.get("source_url") or ""),
+        "extracted_at_utc": str(meta.get("extracted_at_utc") or top_meta.get("generated_at_utc") or ""),
+        "series": str(cylinders.get("series") or ""),
+        "variant_count": len(variants),
+        "item_count": item_count,
+    }
+
+
 @lru_cache(maxsize=1)
 def load_camozzi_stroke_options_mm() -> tuple[int, ...]:
     if not CATALOG_JSON.exists():
@@ -1149,6 +1172,205 @@ def build_packaging_passport_evidence(
     )
 
 
+def _freshness_payload(
+    artifact_context: ArtifactReferenceContext,
+    artifact_freshness: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    freshness = dict(artifact_freshness or {})
+    if not freshness:
+        status = "current" if artifact_context.status == "current" else artifact_context.status
+        relation = "latest" if artifact_context.status == "current" else artifact_context.status
+        freshness = {
+            "status": status,
+            "relation": relation,
+            "reason": "No explicit selected artifact override was supplied.",
+            "selected_status": artifact_context.status,
+            "latest_status": artifact_context.status,
+            "selected_npz_path": artifact_context.npz_path,
+            "selected_pointer_path": artifact_context.pointer_path,
+            "latest_npz_path": artifact_context.npz_path,
+            "latest_pointer_path": artifact_context.pointer_path,
+        }
+    return {
+        "status": str(freshness.get("status") or "missing"),
+        "relation": str(freshness.get("relation") or "missing"),
+        "reason": str(freshness.get("reason") or ""),
+        "selected_status": str(freshness.get("selected_status") or artifact_context.status or ""),
+        "latest_status": str(freshness.get("latest_status") or ""),
+        "selected_npz_path": str(freshness.get("selected_npz_path") or artifact_context.npz_path or ""),
+        "selected_pointer_path": str(freshness.get("selected_pointer_path") or artifact_context.pointer_path or ""),
+        "latest_npz_path": str(freshness.get("latest_npz_path") or ""),
+        "latest_pointer_path": str(freshness.get("latest_pointer_path") or ""),
+    }
+
+
+def _freshness_is_current(
+    artifact_context: ArtifactReferenceContext,
+    freshness: Mapping[str, Any],
+) -> bool:
+    status = str(freshness.get("status") or "").strip().lower()
+    relation = str(freshness.get("relation") or "").strip().lower()
+    return artifact_context.status == "current" and status == "current" and relation in {"latest", "matches_latest"}
+
+
+def _producer_source_artifact_paths(artifact_context: ArtifactReferenceContext) -> dict[str, str]:
+    return {
+        "anim_latest_pointer": artifact_context.pointer_path,
+        "anim_latest_npz": artifact_context.npz_path,
+        "cylinder_packaging_passport": artifact_context.packaging_passport_path,
+        "geometry_acceptance_report": artifact_context.geometry_acceptance_path,
+    }
+
+
+def _unique_nonempty(items: tuple[str, ...] | list[str]) -> list[str]:
+    return list(dict.fromkeys(str(item).strip() for item in items if str(item).strip()))
+
+
+def _gap_entry(
+    *,
+    status: str,
+    blocking_reasons: tuple[str, ...] | list[str],
+    source_artifact_paths: Mapping[str, str],
+    freshness_relation: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "blocking_reasons": _unique_nonempty(list(blocking_reasons)),
+        "source_artifact_paths": dict(source_artifact_paths),
+        "freshness_relation": dict(freshness_relation),
+        "consumer_may_fabricate_geometry": False,
+    }
+
+
+def build_producer_truth_gap_map(
+    *,
+    artifact_context: ArtifactReferenceContext,
+    road_width: RoadWidthEvidence,
+    packaging: PackagingPassportEvidenceSnapshot,
+    acceptance: GeometryAcceptanceEvidenceSnapshot,
+    artifact_freshness: Mapping[str, Any] | None = None,
+) -> dict[str, dict[str, Any]]:
+    freshness = _freshness_payload(artifact_context, artifact_freshness)
+    fresh_current = _freshness_is_current(artifact_context, freshness)
+    paths = _producer_source_artifact_paths(artifact_context)
+
+    og001_reasons: list[str] = []
+    if not artifact_context.npz_path:
+        og001_reasons.append("anim_latest_npz_missing")
+    if not artifact_context.geometry_acceptance_path or not artifact_context.geometry_acceptance_exists:
+        og001_reasons.append("geometry_acceptance_report_missing")
+    if artifact_context.status in {"missing", "stale"}:
+        og001_reasons.append(f"artifact_context_{artifact_context.status}")
+    elif not fresh_current:
+        og001_reasons.append("artifact_not_current_latest")
+    if acceptance.gate == "MISSING":
+        og001_reasons.append("geometry_acceptance_missing")
+        og001_status = "missing"
+    elif acceptance.gate == "FAIL":
+        og001_reasons.append("geometry_acceptance_fail")
+        og001_status = "fail"
+    elif not og001_reasons and acceptance.gate == "PASS":
+        og001_status = "ready"
+    else:
+        if acceptance.gate != "PASS":
+            og001_reasons.append(f"geometry_acceptance_{acceptance.gate.lower()}")
+        og001_status = "partial"
+    if any(reason.endswith("_missing") for reason in og001_reasons) and og001_status != "fail":
+        og001_status = "missing"
+
+    og002_reasons: list[str] = []
+    if not artifact_context.packaging_passport_path or not artifact_context.packaging_passport_exists:
+        og002_reasons.append("cylinder_packaging_passport_missing")
+    if packaging.packaging_status != "complete":
+        og002_reasons.append("packaging_status_not_complete")
+    if packaging.mismatch_status == "missing":
+        og002_reasons.append("packaging_passport_missing")
+    elif packaging.mismatch_status != "match":
+        og002_reasons.append("packaging_mismatch_not_match")
+    if packaging.axis_only_cylinders:
+        og002_reasons.append("axis_only_cylinders_present")
+    if packaging.consumer_geometry_fabrication_allowed:
+        og002_reasons.append("consumer_geometry_fabrication_allowed")
+    if acceptance.gate == "FAIL":
+        og002_reasons.append("geometry_acceptance_fail")
+    elif acceptance.gate != "PASS":
+        og002_reasons.append("geometry_acceptance_not_pass")
+    if not fresh_current:
+        og002_reasons.append("artifact_not_current_latest")
+    if packaging.consumer_geometry_fabrication_allowed or acceptance.gate == "FAIL":
+        og002_status = "fail"
+    elif any("missing" in reason for reason in og002_reasons):
+        og002_status = "missing"
+    elif og002_reasons:
+        og002_status = "partial"
+    else:
+        og002_status = "ready"
+
+    og006_reasons: list[str] = []
+    freshness_status = str(freshness.get("status") or "").strip().lower()
+    freshness_relation = str(freshness.get("relation") or "").strip().lower()
+    if artifact_context.status in {"missing", "stale"}:
+        og006_reasons.append(f"artifact_context_{artifact_context.status}")
+    if freshness_status in {"missing", "stale"}:
+        og006_reasons.append(f"artifact_freshness_{freshness_status}")
+    if freshness_relation in {"differs_from_latest", "selected_without_latest", "selected_unavailable"}:
+        og006_reasons.append(f"artifact_relation_{freshness_relation}")
+    if fresh_current:
+        og006_status = "ready"
+    elif artifact_context.status == "missing" or freshness_relation == "selected_unavailable":
+        og006_status = "missing"
+    else:
+        og006_status = "partial"
+
+    gap008_reasons: list[str] = []
+    if road_width.status == "explicit_meta":
+        gap008_status = "ready"
+    elif road_width.status == "missing":
+        gap008_status = "missing"
+        gap008_reasons.append("road_width_m_missing")
+    else:
+        gap008_status = "partial"
+        gap008_reasons.append("road_width_m_not_explicit_meta")
+
+    return {
+        "OG-001": _gap_entry(
+            status=og001_status,
+            blocking_reasons=og001_reasons,
+            source_artifact_paths={
+                "anim_latest_pointer": paths["anim_latest_pointer"],
+                "anim_latest_npz": paths["anim_latest_npz"],
+                "geometry_acceptance_report": paths["geometry_acceptance_report"],
+            },
+            freshness_relation=freshness,
+        ),
+        "OG-002": _gap_entry(
+            status=og002_status,
+            blocking_reasons=og002_reasons,
+            source_artifact_paths={
+                "anim_latest_npz": paths["anim_latest_npz"],
+                "cylinder_packaging_passport": paths["cylinder_packaging_passport"],
+                "geometry_acceptance_report": paths["geometry_acceptance_report"],
+            },
+            freshness_relation=freshness,
+        ),
+        "OG-006": _gap_entry(
+            status=og006_status,
+            blocking_reasons=og006_reasons,
+            source_artifact_paths=paths,
+            freshness_relation=freshness,
+        ),
+        "GAP-008": _gap_entry(
+            status=gap008_status,
+            blocking_reasons=gap008_reasons,
+            source_artifact_paths={
+                "anim_latest_npz": paths["anim_latest_npz"],
+                "canonical_key": "meta.geometry.road_width_m",
+            },
+            freshness_relation=freshness,
+        ),
+    }
+
+
 def build_geometry_reference_diagnostics_handoff(
     *,
     artifact_context: ArtifactReferenceContext,
@@ -1156,6 +1378,8 @@ def build_geometry_reference_diagnostics_handoff(
     road_width: RoadWidthEvidence,
     packaging: PackagingPassportEvidenceSnapshot,
     acceptance: GeometryAcceptanceEvidenceSnapshot,
+    artifact_freshness: Mapping[str, Any] | None = None,
+    catalog_source: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     missing: list[str] = []
     producer_readiness_reasons: list[str] = []
@@ -1176,10 +1400,19 @@ def build_geometry_reference_diagnostics_handoff(
         missing.append("geometry_acceptance")
     if acceptance.gate != "PASS":
         producer_readiness_reasons.append("geometry_acceptance_not_pass")
+    producer_truth_gap_map = build_producer_truth_gap_map(
+        artifact_context=artifact_context,
+        road_width=road_width,
+        packaging=packaging,
+        acceptance=acceptance,
+        artifact_freshness=artifact_freshness,
+    )
     producer_artifact_status = "ready"
     if artifact_context.status in {"missing", "stale"}:
         producer_artifact_status = "missing"
-    elif producer_readiness_reasons:
+    elif producer_readiness_reasons or any(
+        str(entry.get("status") or "") != "ready" for entry in producer_truth_gap_map.values()
+    ):
         producer_artifact_status = "partial"
     producer_readiness_reasons = list(dict.fromkeys(producer_readiness_reasons))
     return {
@@ -1190,10 +1423,12 @@ def build_geometry_reference_diagnostics_handoff(
         "producer_evidence_owner": GEOMETRY_REFERENCE_PRODUCER_EVIDENCE_OWNER,
         "producer_artifact_status": producer_artifact_status,
         "producer_readiness_reasons": producer_readiness_reasons,
+        "producer_truth_gap_map": producer_truth_gap_map,
         "producer_required_artifacts": list(GEOMETRY_REFERENCE_REQUIRED_PRODUCER_ARTIFACTS),
         "producer_next_action": GEOMETRY_REFERENCE_PRODUCER_NEXT_ACTION,
         "reference_center_can_close_producer_gaps": False,
         "consumer_may_fabricate_geometry": False,
+        "catalog_source": dict(catalog_source or build_catalog_source_summary()),
         "artifact_status": artifact_context.status,
         "artifact_source_label": artifact_context.source_label,
         "artifact_npz_path": artifact_context.npz_path,

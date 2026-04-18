@@ -21,7 +21,7 @@ def create_hosted_results_center(parent: tk.Misc) -> DesktopResultsCenter:
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="desktop_results_center",
-        title="Analysis и результаты",
+        title="Анализ результатов",
         description="Единый центр результатов, validation summary и переходов к сравнению, визуализации и диагностике.",
         group="Встроенные окна",
         mode="hosted",
@@ -44,4 +44,11 @@ def build_spec() -> DesktopShellToolSpec:
         primary=True,
         standalone_module="pneumo_solver_ui.tools.desktop_results_center",
         create_hosted=create_hosted_results_center,
+        search_aliases=(
+            "analysis и результаты",
+            "analysis",
+            "results",
+            "compare",
+            "validation summary",
+        ),
     )

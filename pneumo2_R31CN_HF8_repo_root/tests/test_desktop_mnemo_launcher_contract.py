@@ -14,6 +14,33 @@ def test_desktop_mnemo_is_launchable_from_streamlit_shells() -> None:
     assert "launch_desktop_mnemo" in legacy_src
 
 
+def test_desktop_mnemo_is_shell_searchable_specialized_window() -> None:
+    from pneumo_solver_ui.desktop_shell.command_search import build_shell_command_search_entries
+    from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
+
+    specs = build_desktop_shell_specs()
+    by_key = {spec.key: spec for spec in specs}
+    mnemo = by_key["desktop_mnemo"]
+
+    assert mnemo.entry_kind == "external"
+    assert mnemo.effective_runtime_kind == "qt"
+    assert mnemo.effective_workspace_role == "specialized_window"
+    assert mnemo.effective_source_of_truth_role == "derived"
+    assert mnemo.standalone_module == "pneumo_solver_ui.desktop_mnemo.main"
+    assert {"mnemo", "мнемосхема", "пневмосхема"}.issubset(set(mnemo.effective_search_aliases))
+
+    entries = build_shell_command_search_entries(specs)
+    mnemo_entries = [entry for entry in entries if entry.action_kind == "tool" and entry.action_value == "desktop_mnemo"]
+
+    assert len(mnemo_entries) == 1
+    mnemo_entry = mnemo_entries[0]
+    assert mnemo_entry.label == mnemo.title
+    assert "desktop_mnemo" not in {entry.action_value for entry in entries if entry.action_kind != "tool"}
+    assert {"mnemo", "мнемосхема", "пневмосхема", "specialized_window", "derived", "qt"}.issubset(
+        set(mnemo_entry.keywords)
+    )
+
+
 def test_desktop_mnemo_launcher_contract_keeps_specialized_window_scope(tmp_path: Path) -> None:
     from pneumo_solver_ui.desktop_mnemo.main import build_desktop_mnemo_launch_contract
 

@@ -65,6 +65,7 @@ class DesktopGeometryReferenceCenter:
         self.road_width_summary_var = tk.StringVar(master=self.root)
         self.geometry_acceptance_summary_var = tk.StringVar(master=self.root)
         self.artifact_summary_var = tk.StringVar(master=self.root)
+        self.producer_gap_summary_var = tk.StringVar(master=self.root)
         self.artifact_freshness_var = tk.StringVar(
             master=self.root,
             value="Artifact freshness: latest not checked yet.",
@@ -81,6 +82,7 @@ class DesktopGeometryReferenceCenter:
         self.cylinder_search_var = tk.StringVar(master=self.root, value="")
         self.cylinder_pressure_var = tk.DoubleVar(master=self.root, value=6.0)
         self.cylinder_context_var = tk.StringVar(master=self.root)
+        self.catalog_source_summary_var = tk.StringVar(master=self.root)
         self.cylinder_choice_var = tk.StringVar(master=self.root)
         self.cylinder_recommendation_var = tk.StringVar(master=self.root)
         self.cylinder_precharge_summary_var = tk.StringVar(master=self.root)
@@ -270,6 +272,26 @@ class DesktopGeometryReferenceCenter:
             wraplength=1440,
             justify="left",
         ).pack(anchor="w", pady=(0, 10))
+
+        gap_frame = ttk.LabelFrame(self.geometry_tab, text="producer truth gap map", padding=8)
+        gap_frame.pack(fill="both", expand=False, pady=(0, 10))
+        ttk.Label(
+            gap_frame,
+            textvariable=self.producer_gap_summary_var,
+            wraplength=1440,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 8))
+        self.producer_gap_tree = self._build_tree(
+            gap_frame,
+            columns=(
+                ("gap", "Gap", 90, "w"),
+                ("status", "Status", 90, "w"),
+                ("blockers", "Blocking reasons", 330, "w"),
+                ("freshness", "Freshness", 220, "w"),
+                ("sources", "Source artifacts", 520, "w"),
+            ),
+            height=5,
+        )
 
         road_frame = ttk.LabelFrame(self.geometry_tab, text="road_width_m reference / GAP-008", padding=8)
         road_frame.pack(fill="both", expand=False, pady=(0, 10))
@@ -521,6 +543,12 @@ class DesktopGeometryReferenceCenter:
 
         catalog_frame = ttk.LabelFrame(self.cylinder_tab, text="Camozzi catalog + force estimate", padding=8)
         catalog_frame.pack(fill="both", expand=True, pady=(10, 0))
+        ttk.Label(
+            catalog_frame,
+            textvariable=self.catalog_source_summary_var,
+            wraplength=1440,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 8))
         self.catalog_tree = self._build_tree(
             catalog_frame,
             columns=(
@@ -904,6 +932,32 @@ class DesktopGeometryReferenceCenter:
             f"producer_readiness_reasons={reasons_text}"
         )
 
+    @staticmethod
+    def _gap_map_status_text(gap_map: object) -> str:
+        if not isinstance(gap_map, dict) or not gap_map:
+            return "producer_truth_gap_map: missing"
+        counts: dict[str, int] = {}
+        for entry in gap_map.values():
+            if isinstance(entry, dict):
+                status = str(entry.get("status") or "missing")
+            else:
+                status = "missing"
+            counts[status] = counts.get(status, 0) + 1
+        return "producer_truth_gap_map: " + ", ".join(
+            f"{status}={count}" for status, count in sorted(counts.items())
+        )
+
+    @staticmethod
+    def _source_paths_text(paths: object) -> str:
+        if not isinstance(paths, dict):
+            return "—"
+        parts = []
+        for key, value in paths.items():
+            text = str(value or "").strip()
+            if text:
+                parts.append(f"{key}={text}")
+        return "; ".join(parts) if parts else "—"
+
     def _export_evidence_for_send(self) -> None:
         try:
             artifact = self._artifact_context()
@@ -1010,6 +1064,32 @@ class DesktopGeometryReferenceCenter:
             f"{freshness.get('reason') or ''}"
             + (f" Issues: {'; '.join(freshness_issues[:2])}" if freshness_issues else "")
         )
+        gap_map = diagnostics_handoff.get("producer_truth_gap_map")
+        self.producer_gap_summary_var.set(
+            self._gap_map_status_text(gap_map)
+            + "; consumer_may_fabricate_geometry=false; Reference Center is evidence/provenance only."
+        )
+        self._clear_tree(self.producer_gap_tree)
+        if isinstance(gap_map, dict):
+            for gap_id in ("OG-001", "OG-002", "OG-006", "GAP-008"):
+                entry = dict(gap_map.get(gap_id) or {})
+                freshness_entry = dict(entry.get("freshness_relation") or {})
+                blockers = tuple(str(item) for item in (entry.get("blocking_reasons") or ()))
+                self.producer_gap_tree.insert(
+                    "",
+                    "end",
+                    iid=f"producer_gap_{gap_id}",
+                    values=(
+                        gap_id,
+                        str(entry.get("status") or "missing"),
+                        ", ".join(blockers) if blockers else "none",
+                        (
+                            f"{freshness_entry.get('status') or 'missing'}"
+                            f"/{freshness_entry.get('relation') or 'missing'}"
+                        ),
+                        self._source_paths_text(entry.get("source_artifact_paths")),
+                    ),
+                )
         road_width = self.runtime.road_width_reference(self._base_path())
         road_evidence = self.runtime.road_width_evidence(self._base_path(), artifact_context=artifact)
         self.road_width_summary_var.set(
@@ -1217,6 +1297,17 @@ class DesktopGeometryReferenceCenter:
             "Ниже показывается shortlist ближайших Camozzi-вариантов по bore/rod/stroke и по смещению current precharge bias, "
             "а полный каталог справа фильтруется по варианту и поиску, показывает raw Camozzi dims B/E/TG "
             "и считает усилия как p*A."
+        )
+        catalog_source = self.runtime.catalog_source_summary()
+        self.catalog_source_summary_var.set(
+            "Catalog source: "
+            f"items={catalog_source.get('item_count') or 0}; "
+            f"variants={catalog_source.get('variant_count') or 0}; "
+            f"series={catalog_source.get('series') or '—'}; "
+            f"source={catalog_source.get('source') or '—'}; "
+            f"pdf={catalog_source.get('source_pdf') or '—'}; "
+            f"extracted={catalog_source.get('extracted_at_utc') or '—'}; "
+            f"path={catalog_source.get('path') or '—'}."
         )
 
         recommendations = self.runtime.cylinder_match_recommendations(

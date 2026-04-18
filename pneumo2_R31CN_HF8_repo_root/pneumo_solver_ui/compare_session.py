@@ -68,6 +68,8 @@ class CompareSession:
     run_refs: Optional[List[Dict[str, Any]]] = None
     current_context_ref: Optional[Dict[str, Any]] = None
     current_context_path: str = ""
+    current_context_ref_source_path: str = ""
+    current_context_ref_source_status: str = ""
     mismatch_banner: Optional[Dict[str, Any]] = None
     session_source: str = ""
 

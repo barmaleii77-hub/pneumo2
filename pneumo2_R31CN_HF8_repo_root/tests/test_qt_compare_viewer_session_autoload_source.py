@@ -37,6 +37,7 @@ def test_qt_compare_viewer_loads_saved_compare_session_for_autoload(tmp_path: Pa
             signals=["p_fr"],
             compare_contract_hash="abc123",
             current_context_ref={"objective_contract_hash": "current"},
+            current_context_ref_source_status="session",
         ),
         session_path,
     )
@@ -46,4 +47,16 @@ def test_qt_compare_viewer_loads_saved_compare_session_for_autoload(tmp_path: Pa
 
     assert loaded is not None
     assert loaded.compare_contract_hash == "abc123"
+    assert loaded.current_context_ref_source_status == "session"
     assert paths == [npz.resolve()]
+
+
+def test_qt_compare_viewer_page_adapters_launch_standalone_compare_viewer() -> None:
+    pages = ROOT / "pneumo_solver_ui" / "pages"
+    compare_viewer_page = (pages / "06_CompareViewer_QT.py").read_text(encoding="utf-8")
+    compare_npz_page = (pages / "07_CompareNPZ_QT.py").read_text(encoding="utf-8")
+
+    assert "07_Сравнение_NPZ_QT.py" not in compare_viewer_page
+    assert "run_page(" not in compare_viewer_page
+    assert "pneumo_solver_ui.qt_compare_viewer" in compare_viewer_page
+    assert "pneumo_solver_ui.qt_compare_viewer" in compare_npz_page

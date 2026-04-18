@@ -12,6 +12,7 @@ from pneumo_solver_ui.desktop_qt_shell.project_context import (
     ShellProjectContext,
     build_shell_project_context,
 )
+from pneumo_solver_ui.desktop_qt_shell.pipeline_surfaces import V38_PIPELINE_WORKSPACE_IDS
 from pneumo_solver_ui.desktop_qt_shell.runtime_proof import (
     QT_MAIN_SHELL_MANUAL_CHECKLIST_JSON_NAME,
     QT_MAIN_SHELL_MANUAL_RESULTS_TEMPLATE_JSON_NAME,
@@ -23,7 +24,10 @@ from pneumo_solver_ui.desktop_qt_shell.runtime_proof import (
 )
 from pneumo_solver_ui.desktop_animator.analysis_context import ANALYSIS_TO_ANIMATOR_HANDOFF_ID
 from pneumo_solver_ui.desktop_animator.truth_contract import file_sha256, stable_contract_hash
-from pneumo_solver_ui.desktop_shell.command_search import build_shell_command_search_entries
+from pneumo_solver_ui.desktop_shell.command_search import (
+    build_shell_command_search_entries,
+    rank_shell_command_search_entries,
+)
 from pneumo_solver_ui.desktop_shell.external_launch import build_shell_context_env
 from pneumo_solver_ui.desktop_shell.launcher_catalog import build_desktop_launch_catalog
 from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
@@ -223,6 +227,12 @@ def test_desktop_qt_shell_launcher_catalog_keeps_runtime_and_migration_metadata(
     catalog = build_desktop_launch_catalog(include_mnemo=True)
     by_key = {item.key: item for item in catalog}
 
+    assert catalog[0].key == "desktop_main_shell_qt"
+    assert by_key["desktop_main_shell_qt"].module == "pneumo_solver_ui.tools.desktop_main_shell_qt"
+    assert by_key["desktop_main_shell_qt"].group == "Главное окно"
+    assert by_key["desktop_gui_spec_shell"].group == "Резервные окна"
+    assert by_key["desktop_gui_spec_shell"].module == "pneumo_solver_ui.tools.desktop_gui_spec_shell"
+
     assert by_key["desktop_input_editor"].runtime_kind == "tk"
     assert by_key["desktop_input_editor"].migration_status == "managed_external"
     assert by_key["desktop_input_editor"].source_of_truth_role == "master"
@@ -322,16 +332,24 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert "QSettings" in src
     assert "build_shell_project_context()" in src
     assert "def launch_surface_coverage(self) -> dict[str, tuple[str, ...]]:" in src
+    assert "def pipeline_surface_coverage(self) -> dict[str, tuple[str, ...]]:" in src
+    assert "def operator_surface_snapshot(self) -> dict[str, object]:" in src
+    assert "def prove_v38_pipeline_selection_sync(self) -> dict[str, object]:" in src
     assert '"desktop_engineering_analysis_center"' in src
     assert "def _reset_layout(self) -> None:" in src
     assert 'self.settings.setValue("layout/geometry", geometry)' in src
     assert 'self.settings.setValue("layout/window_state", state)' in src
     assert 'self.settings.setValue("layout/last_workspace_key", self._selected_tool_key)' in src
+    assert 'self.settings.setValue("layout/last_surface_key", self._selected_surface_key)' in src
     assert '"project_name": self.project_context.project_name' in src
     assert '"workspace_dir": str(self.project_context.workspace_dir)' in src
     assert 'f"Проект: {self.project_context.project_name}"' in src
     assert '"Маршрут проекта"' in src
     assert 'action_kind == "focus" and action_value == "project_tree"' in src
+    assert '"Запустить раздел"' not in src
+    assert '"Запустить текущий раздел"' not in src
+    assert '"Workspace:"' not in src
+    assert '"required dirs"' not in src
 
 
 def test_desktop_qt_shell_project_context_resolves_project_and_workspace(tmp_path: Path) -> None:
@@ -362,9 +380,11 @@ def test_desktop_shell_command_search_home_and_project_tree_actions_are_routable
     assert by_label["Обзор рабочего места"].action_value == "home"
     assert by_label["Показать дерево проекта"].action_kind == "focus"
     assert by_label["Показать дерево проекта"].action_value == "project_tree"
-    assert by_label["Engineering Analysis"].action_kind == "tool"
-    assert by_label["Engineering Analysis"].action_value == "desktop_engineering_analysis_center"
-    assert "HO-007" in by_label["Engineering Analysis"].keywords
+    assert by_label["Инженерный анализ"].action_kind == "tool"
+    assert by_label["Инженерный анализ"].action_value == "desktop_engineering_analysis_center"
+    assert "HO-007" in by_label["Инженерный анализ"].keywords
+    engineering_matches = rank_shell_command_search_entries("Engineering Analysis", entries)
+    assert engineering_matches[0].action_value == "desktop_engineering_analysis_center"
     assert by_label["Открыть HO-008 analysis_context.json"].action_kind == "open_artifact"
     assert by_label["Открыть HO-008 analysis_context.json"].action_value == "animator.analysis_context"
     assert by_label["Открыть HO-008 animator_link_contract.json"].action_value == (
@@ -514,6 +534,7 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         }
         assert "Проект: Runtime Shell" in top_level_labels
         assert "Маршрут проекта" in top_level_labels
+        assert "GUI-модули" in top_level_labels
 
         expected_launch_keys = {
             spec.key for spec in build_desktop_shell_specs() if spec.standalone_module
@@ -530,6 +551,24 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         assert "desktop_engineering_analysis_center" in coverage["browser"]
         assert "desktop_engineering_analysis_center" in coverage["menu"]
         assert "desktop_engineering_analysis_center" in coverage["toolbar"]
+
+        pipeline_coverage = {
+            surface: set(keys)
+            for surface, keys in window.pipeline_surface_coverage().items()
+        }
+        expected_workspace_ids = set(V38_PIPELINE_WORKSPACE_IDS)
+        assert pipeline_coverage["expected"] == expected_workspace_ids
+        assert expected_workspace_ids <= pipeline_coverage["browser"]
+        assert expected_workspace_ids <= pipeline_coverage["toolbar"]
+        assert expected_workspace_ids <= pipeline_coverage["command_search"]
+
+        operator_snapshot = window.operator_surface_snapshot()
+        assert operator_snapshot["service_blocker_hits"] == []
+        assert "Запустить раздел" not in operator_snapshot["toolbar_buttons"]
+        assert "Запустить текущий раздел" not in operator_snapshot["toolbar_buttons"]
+        pipeline_sync = window.prove_v38_pipeline_selection_sync()
+        assert pipeline_sync["missing_workspace_ids"] == []
+        assert all(row["synced"] is True for row in pipeline_sync["rows"])
 
         window.command_search_edit.setText("дерево проекта")
         app.processEvents()
@@ -585,10 +624,11 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
         assert window.runtime_table.topLevelItemCount() == 2
         assert window.status_progress_bar.value() > 0
 
-        window._selected_tool_key = "desktop_results_center"
+        window._apply_selected_tool("desktop_results_center", announce=False)
         window._save_layout()
         settings = QtCore.QSettings(str(settings_path), QtCore.QSettings.Format.IniFormat)
         assert settings.value("layout/last_workspace_key") == "desktop_results_center"
+        assert settings.value("layout/last_surface_key") == "ws_analysis"
         assert settings.value("layout/optimization_mode") == "Распределённая координация"
         assert settings.value("layout/geometry") is not None
         assert settings.value("layout/window_state") is not None
@@ -672,6 +712,8 @@ def test_desktop_qt_shell_runtime_proof_writes_shell_only_evidence(
     assert proof["checks"]["layout_save_restore_reset"] is True
     assert proof["checks"]["command_search_project_tree_route"] is True
     assert proof["checks"]["all_launchable_tools_visible_from_shell"] is True
+    assert proof["checks"]["operator_surface_no_service_jargon"] is True
+    assert proof["checks"]["v38_pipeline_selection_sync"] is True
     expected_launch_keys = {
         spec.key for spec in build_desktop_shell_specs() if spec.standalone_module
     }
@@ -686,6 +728,18 @@ def test_desktop_qt_shell_runtime_proof_writes_shell_only_evidence(
         "toolbar": [],
         "command_search": [],
     }
+    expected_workspace_ids = set(V38_PIPELINE_WORKSPACE_IDS)
+    assert set(proof["pipeline_surface_coverage"]["expected"]) == expected_workspace_ids
+    assert set(proof["pipeline_surface_coverage"]["browser"]) >= expected_workspace_ids
+    assert set(proof["pipeline_surface_coverage"]["toolbar"]) >= expected_workspace_ids
+    assert set(proof["pipeline_surface_coverage"]["command_search"]) >= expected_workspace_ids
+    assert proof["pipeline_surface_coverage_missing"] == {
+        "browser": [],
+        "toolbar": [],
+        "command_search": [],
+    }
+    assert proof["operator_surface"]["service_blocker_hits"] == []
+    assert proof["pipeline_selection_sync"]["missing_workspace_ids"] == []
     assert proof["diagnostics_action"]["object_name"] == "AlwaysVisibleDiagnosticsAction"
     assert "snap_half_third_quarter" in proof["manual_verification_required"]
     validation = validate_qt_main_shell_runtime_proof(proof_path)
@@ -925,6 +979,18 @@ def test_desktop_qt_shell_runtime_proof_validator_rejects_failed_automated_check
                     "toolbar": ["desktop_input_editor"],
                     "command_search": ["desktop_input_editor"],
                 },
+                "pipeline_surface_coverage": {
+                    "expected": ["WS-PROJECT"],
+                    "browser": ["WS-PROJECT"],
+                    "toolbar": ["WS-PROJECT"],
+                    "command_search": ["WS-PROJECT"],
+                },
+                "operator_surface": {
+                    "service_blocker_hits": [],
+                },
+                "pipeline_selection_sync": {
+                    "missing_workspace_ids": [],
+                },
                 "checks": {
                     "qmainwindow_runtime": True,
                     "native_titlebar_precondition": True,
@@ -935,6 +1001,8 @@ def test_desktop_qt_shell_runtime_proof_validator_rejects_failed_automated_check
                     "status_progress_messages_strip": True,
                     "command_search_project_tree_route": True,
                     "all_launchable_tools_visible_from_shell": True,
+                    "operator_surface_no_service_jargon": True,
+                    "v38_pipeline_selection_sync": True,
                     "layout_save_restore_reset": True,
                     "no_domain_windows_launched": True,
                 },

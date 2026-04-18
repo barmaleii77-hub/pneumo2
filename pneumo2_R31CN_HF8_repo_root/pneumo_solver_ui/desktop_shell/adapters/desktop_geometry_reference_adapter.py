@@ -27,7 +27,7 @@ def build_spec() -> DesktopShellToolSpec:
             "reference.components",
             "reference.guides",
         ),
-        launch_contexts=("data", "optimization", "results"),
+        launch_contexts=("data", "baseline", "optimization", "results", "animator"),
         menu_section="Данные",
         nav_section="Инструменты",
         details="Наглядный справочный центр для геометрии подвески, подбора цилиндров и пружин, схемных связей и инженерных пояснений к параметрам.",

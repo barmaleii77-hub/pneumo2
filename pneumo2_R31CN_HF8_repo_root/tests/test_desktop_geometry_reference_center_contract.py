@@ -13,7 +13,9 @@ from pneumo_solver_ui.desktop_geometry_reference_model import (
     TRUTH_STATE_APPROXIMATE,
     TRUTH_STATE_SOURCE_DATA_CONFIRMED,
     CylinderFamilyReferenceRow,
+    build_catalog_source_summary,
     build_geometry_reference_diagnostics_handoff,
+    build_producer_truth_gap_map,
     build_cylinder_match_recommendations,
     build_cylinder_force_bias_estimate,
     build_current_cylinder_package_rows,
@@ -625,6 +627,11 @@ def test_runtime_writes_geometry_reference_evidence_for_diagnostics_send(tmp_pat
     assert workspace_payload["producer_artifact_status"] == "partial"
     assert "packaging_status_not_complete" in workspace_payload["producer_readiness_reasons"]
     assert workspace_payload["consumer_may_fabricate_geometry"] is False
+    assert workspace_payload["producer_truth_gap_map"]["OG-002"]["status"] == "partial"
+    assert workspace_payload["producer_truth_gap_map"]["OG-006"]["status"] in {"ready", "partial"}
+    assert workspace_payload["producer_truth_gap_map"]["GAP-008"]["status"] == "ready"
+    assert workspace_payload["catalog_source"]["path"].endswith("camozzi_catalog.json")
+    assert workspace_payload["catalog_source"]["item_count"] > 0
 
 
 def test_road_width_evidence_prefers_explicit_meta_and_keeps_missing_gap_warning() -> None:
@@ -682,6 +689,30 @@ def _complete_packaging_passport_evidence() -> PackagingPassportEvidenceSnapshot
     )
 
 
+def _partial_packaging_passport_evidence() -> PackagingPassportEvidenceSnapshot:
+    return PackagingPassportEvidenceSnapshot(
+        artifact_status="current",
+        source_label="synthetic partial passport",
+        passport_path="C:/workspace/exports/CYLINDER_PACKAGING_PASSPORT.json",
+        schema="cylinder_packaging_passport.v1",
+        packaging_status="partial",
+        packaging_contract_hash="pkg-partial",
+        mismatch_status="match",
+        complete_cylinders=("cyl1",),
+        axis_only_cylinders=("cyl2",),
+        missing_advanced_fields=("gland_or_sleeve_position_m",),
+        consumer_geometry_fabrication_allowed=False,
+        warnings=(),
+        rows=(),
+    )
+
+
+def _failed_geometry_acceptance_evidence():
+    mapping = _geometry_acceptance_mapping()
+    mapping["колесо_относительно_дороги_ПЗ_м"] = np.array([0.90, 0.91], dtype=float)
+    return build_geometry_acceptance_evidence(mapping, source_label="synthetic FAIL frame")
+
+
 def test_producer_handoff_stays_partial_when_road_width_evidence_is_missing() -> None:
     artifact = _current_producer_artifact_context(
         source_label="synthetic complete artifact without road_width_m"
@@ -704,6 +735,8 @@ def test_producer_handoff_stays_partial_when_road_width_evidence_is_missing() ->
     assert handoff["producer_artifact_status"] == "partial"
     assert "road_width_m" in handoff["evidence_missing"]
     assert handoff["producer_readiness_reasons"] == ["road_width_m_missing"]
+    assert handoff["producer_truth_gap_map"]["GAP-008"]["status"] == "missing"
+    assert handoff["producer_truth_gap_map"]["GAP-008"]["consumer_may_fabricate_geometry"] is False
 
 
 def test_producer_handoff_is_ready_with_pass_complete_packaging_and_explicit_road_width() -> None:
@@ -735,6 +768,137 @@ def test_producer_handoff_is_ready_with_pass_complete_packaging_and_explicit_roa
     assert handoff["producer_readiness_reasons"] == []
     assert handoff["evidence_missing"] == []
     assert handoff["consumer_may_fabricate_geometry"] is False
+    assert set(handoff["producer_truth_gap_map"]) == {"OG-001", "OG-002", "OG-006", "GAP-008"}
+    assert all(entry["status"] == "ready" for entry in handoff["producer_truth_gap_map"].values())
+    assert all(
+        entry["consumer_may_fabricate_geometry"] is False
+        for entry in handoff["producer_truth_gap_map"].values()
+    )
+    assert handoff["catalog_source"]["path"].endswith("camozzi_catalog.json")
+    assert handoff["catalog_source"]["item_count"] > 0
+
+
+def test_producer_truth_gap_map_reports_partial_packaging_without_ready() -> None:
+    artifact_meta: dict[str, object] = {"geometry": {"road_width_m": 1.5}}
+    artifact = _current_producer_artifact_context(
+        source_label="synthetic partial packaging artifact",
+        meta=artifact_meta,
+    )
+    gap_map = build_producer_truth_gap_map(
+        artifact_context=artifact,
+        road_width=build_road_width_evidence({}, artifact_meta=artifact_meta),
+        packaging=_partial_packaging_passport_evidence(),
+        acceptance=build_geometry_acceptance_evidence(
+            _geometry_acceptance_mapping(),
+            source_label="synthetic PASS frame",
+        ),
+    )
+
+    assert gap_map["OG-002"]["status"] == "partial"
+    assert "packaging_status_not_complete" in gap_map["OG-002"]["blocking_reasons"]
+    assert "axis_only_cylinders_present" in gap_map["OG-002"]["blocking_reasons"]
+
+
+def test_producer_truth_gap_map_reports_packaging_hash_mismatch_as_partial() -> None:
+    artifact_meta: dict[str, object] = {"geometry": {"road_width_m": 1.5}}
+    artifact = _current_producer_artifact_context(
+        source_label="synthetic packaging drift artifact",
+        meta=artifact_meta,
+    )
+    packaging = PackagingPassportEvidenceSnapshot(
+        artifact_status="current",
+        source_label="synthetic drifted passport",
+        passport_path="C:/workspace/exports/CYLINDER_PACKAGING_PASSPORT.json",
+        schema="cylinder_packaging_passport.v1",
+        packaging_status="complete",
+        packaging_contract_hash="passport-hash",
+        mismatch_status="mismatch",
+        complete_cylinders=("cyl1", "cyl2"),
+        axis_only_cylinders=(),
+        missing_advanced_fields=(),
+        consumer_geometry_fabrication_allowed=False,
+        warnings=("CYLINDER_PACKAGING_PASSPORT.json packaging_contract_hash differs from meta.packaging.",),
+        rows=(),
+    )
+    gap_map = build_producer_truth_gap_map(
+        artifact_context=artifact,
+        road_width=build_road_width_evidence({}, artifact_meta=artifact_meta),
+        packaging=packaging,
+        acceptance=build_geometry_acceptance_evidence(
+            _geometry_acceptance_mapping(),
+            source_label="synthetic PASS frame",
+        ),
+    )
+
+    assert gap_map["OG-002"]["status"] == "partial"
+    assert "packaging_mismatch_not_match" in gap_map["OG-002"]["blocking_reasons"]
+
+
+def test_producer_truth_gap_map_reports_historical_artifact_as_partial() -> None:
+    artifact_meta: dict[str, object] = {"geometry": {"road_width_m": 1.5}}
+    artifact = _current_producer_artifact_context(
+        source_label="synthetic historical artifact",
+        meta=artifact_meta,
+    )
+    gap_map = build_producer_truth_gap_map(
+        artifact_context=artifact,
+        road_width=build_road_width_evidence({}, artifact_meta=artifact_meta),
+        packaging=_complete_packaging_passport_evidence(),
+        acceptance=build_geometry_acceptance_evidence(
+            _geometry_acceptance_mapping(),
+            source_label="synthetic PASS frame",
+        ),
+        artifact_freshness={
+            "status": "historical",
+            "relation": "differs_from_latest",
+            "reason": "Selected artifact differs from latest.",
+            "selected_status": "current",
+            "latest_status": "current",
+        },
+    )
+
+    assert gap_map["OG-001"]["status"] == "partial"
+    assert gap_map["OG-006"]["status"] == "partial"
+    assert "artifact_relation_differs_from_latest" in gap_map["OG-006"]["blocking_reasons"]
+
+
+def test_producer_truth_gap_map_reports_missing_and_failed_acceptance() -> None:
+    artifact_meta: dict[str, object] = {"geometry": {"road_width_m": 1.5}}
+    artifact = _current_producer_artifact_context(
+        source_label="synthetic acceptance artifact",
+        meta=artifact_meta,
+    )
+    common = {
+        "artifact_context": artifact,
+        "road_width": build_road_width_evidence({}, artifact_meta=artifact_meta),
+        "packaging": _complete_packaging_passport_evidence(),
+    }
+
+    missing = build_producer_truth_gap_map(
+        **common,
+        acceptance=build_geometry_acceptance_evidence(None, source_label="missing frame"),
+    )
+    failed = build_producer_truth_gap_map(
+        **common,
+        acceptance=_failed_geometry_acceptance_evidence(),
+    )
+
+    assert missing["OG-001"]["status"] == "missing"
+    assert "geometry_acceptance_missing" in missing["OG-001"]["blocking_reasons"]
+    assert failed["OG-001"]["status"] == "fail"
+    assert failed["OG-002"]["status"] == "fail"
+    assert "geometry_acceptance_fail" in failed["OG-001"]["blocking_reasons"]
+
+
+def test_catalog_source_summary_reports_camozzi_provenance() -> None:
+    summary = build_catalog_source_summary()
+
+    assert summary["path"].endswith("camozzi_catalog.json")
+    assert summary["exists"] is True
+    assert "Camozzi" in summary["source"]
+    assert summary["source_pdf"].startswith("https://")
+    assert summary["variant_count"] > 0
+    assert summary["item_count"] > 0
 
 
 def test_packaging_passport_reader_surfaces_base_export_mismatch_and_truth_policy(tmp_path: Path) -> None:
@@ -810,6 +974,10 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
         encoding="utf-8",
         errors="replace",
     )
+    adapter_src = (UI_ROOT / "desktop_shell" / "adapters" / "desktop_geometry_reference_adapter.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
 
     assert "class DesktopGeometryReferenceCenter" in tool_src
     assert "ttk.Notebook" in tool_src
@@ -841,6 +1009,10 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "attach_tooltip" in tool_src
     assert "show_help_dialog" in tool_src
     assert "self.artifact_summary_var" in tool_src
+    assert "self.producer_gap_summary_var" in tool_src
+    assert "self.producer_gap_tree = self._build_tree(" in tool_src
+    assert 'text="producer truth gap map"' in tool_src
+    assert "producer_truth_gap_map" in tool_src
     assert 'text="road_width_m reference / GAP-008"' in tool_src
     assert 'text="Geometry acceptance evidence / GAP-006"' in tool_src
     assert "self.road_width_tree = self._build_tree(" in tool_src
@@ -849,10 +1021,19 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "self.packaging_passport_tree = self._build_tree(" in tool_src
     assert "self.packaging_artifact_tree = self._build_tree(" in tool_src
     assert 'text="export/runtime packaging passport evidence"' in tool_src
+    assert "self.catalog_source_summary_var" in tool_src
+    assert "Catalog source:" in tool_src
     assert '("unit", "Ед. изм.", 80, "w")' in tool_src
     assert '("layer", "Layer", 120, "w")' in tool_src
     assert '("source", "Source", 220, "w")' in tool_src
     assert "artifact_geometry_acceptance_evidence" in tool_src
+    assert "build_catalog_source_summary" in runtime_src
+    assert "build_producer_truth_gap_map" in model_src
+    assert "producer_truth_gap_map" in model_src
+    assert "catalog_source" in model_src
+    assert 'workflow_stage="reference"' in adapter_src
+    assert 'entry_kind="tool"' in adapter_src
+    assert 'launch_contexts=("data", "baseline", "optimization", "results", "animator")' in adapter_src
     assert "artifact_freshness_evidence" in tool_src
     assert "road_width_evidence" in tool_src
     assert "diagnostics_handoff_evidence" in tool_src

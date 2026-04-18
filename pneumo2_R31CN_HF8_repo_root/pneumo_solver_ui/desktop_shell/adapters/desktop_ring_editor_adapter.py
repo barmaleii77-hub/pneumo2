@@ -14,7 +14,7 @@ def create_hosted_ring_editor(parent: tk.Misc) -> DesktopRingScenarioEditor:
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="desktop_ring_editor",
-        title="Test Suite и сценарии",
+        title="Сценарии и редактор кольца",
         description="Главный редактор дорожных и кольцевых сценариев, тестовых артефактов и проверок сценарного покрытия.",
         group="Встроенные окна",
         mode="hosted",
@@ -28,10 +28,17 @@ def build_spec() -> DesktopShellToolSpec:
         launch_contexts=("home", "data", "optimization"),
         menu_section="Сценарии",
         nav_section="Сценарии",
-        details="Кольцевой редактор остаётся единственным source-of-truth сценариев; preview, validation и экспортные артефакты являются производными представлениями.",
+        details="Кольцевой редактор остаётся основным источником сценариев; предпросмотр, проверка и экспортные артефакты являются производными представлениями.",
         menu_order=20,
         nav_order=20,
         primary=True,
         standalone_module="pneumo_solver_ui.tools.desktop_ring_scenario_editor",
         create_hosted=create_hosted_ring_editor,
+        search_aliases=(
+            "test suite и сценарии",
+            "ring editor",
+            "road scenario",
+            "сценарии",
+            "редактор кольца",
+        ),
     )

@@ -12,6 +12,18 @@ from pneumo_solver_ui.desktop_qt_shell.project_context import (
     ShellProjectContext,
     build_shell_project_context,
 )
+from pneumo_solver_ui.desktop_qt_shell.pipeline_surfaces import (
+    V38_PIPELINE_SURFACES,
+    V38_PIPELINE_WORKSPACE_IDS,
+    WORKSPACE_ARTIFACT_LABELS,
+    ShellPipelineSurface,
+    artifact_state_label,
+    build_pipeline_surface_by_key,
+    default_surface_key_for_tool,
+    operator_readiness_label,
+    service_jargon_hits,
+    workspace_source_label,
+)
 from pneumo_solver_ui.desktop_shell.command_search import (
     ShellCommandSearchEntry,
     build_shell_command_search_entries,
@@ -31,6 +43,10 @@ MAIN_ROUTE_KEYS = (
     "desktop_results_center",
     "desktop_diagnostics_center",
 )
+
+SURFACE_ROLE = int(QtCore.Qt.ItemDataRole.UserRole)
+TOOL_ROLE = SURFACE_ROLE + 1
+ITEM_KIND_ROLE = SURFACE_ROLE + 2
 
 
 def _build_shell_settings() -> QtCore.QSettings:
@@ -98,12 +114,22 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         super().__init__()
         self.specs = build_desktop_shell_specs()
         self.spec_by_key = {spec.key: spec for spec in self.specs}
-        self.command_entries = build_shell_command_search_entries(self.specs)
+        self.pipeline_surfaces = V38_PIPELINE_SURFACES
+        self.pipeline_surface_by_key = build_pipeline_surface_by_key()
+        self.command_entries = (
+            *self._build_pipeline_search_entries(),
+            *build_shell_command_search_entries(self.specs),
+        )
         self.settings = _build_shell_settings()
         self.project_context: ShellProjectContext = build_shell_project_context()
         self.coexistence = DesktopShellCoexistenceManager()
         self._startup_tool_keys = startup_tool_keys
         self._selected_tool_key = startup_tool_keys[0] if startup_tool_keys else "desktop_input_editor"
+        self._selected_surface_key = (
+            default_surface_key_for_tool(self._selected_tool_key)
+            if startup_tool_keys
+            else "ws_project"
+        )
         self._selected_search_entries: list[ShellCommandSearchEntry] = []
         self._focus_regions: list[QtWidgets.QWidget] = []
         self._message_log: list[str] = []
@@ -121,7 +147,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self._populate_launch_tool_switcher()
         self._populate_browser_tree()
         self._refresh_search_results()
-        self._apply_selected_tool(self._selected_tool_key, announce=False)
+        self._apply_selected_surface(self._selected_surface_key, announce=False)
         self._install_shortcuts()
         self._start_polling()
         QtCore.QTimer.singleShot(0, self._open_startup_tools)
@@ -142,9 +168,39 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         )
         return (
             ("Маршрут проекта", main_route_specs),
-            ("Справочники и служебные центры", _unique_specs(tool_specs)),
+            ("Справочники и проверка проекта", _unique_specs(tool_specs)),
             ("Анализ и специализированные окна", _unique_specs(analysis_specs)),
         )
+
+    def _build_pipeline_search_entries(self) -> tuple[ShellCommandSearchEntry, ...]:
+        entries: list[ShellCommandSearchEntry] = []
+        for surface in self.pipeline_surfaces:
+            entries.append(
+                ShellCommandSearchEntry(
+                    label=surface.title,
+                    location=f"Главное окно -> Маршрут проекта -> {surface.title}",
+                    summary=surface.purpose,
+                    action_kind="pipeline_surface",
+                    action_value=surface.key,
+                    keywords=(
+                        surface.workspace_id,
+                        surface.title,
+                        surface.purpose,
+                        surface.source_label,
+                        surface.next_action,
+                        surface.handoff_label,
+                        *surface.search_aliases,
+                    ),
+                )
+            )
+        return tuple(entries)
+
+    def _surface_for_tool(self, key: str) -> ShellPipelineSurface:
+        if self._selected_surface_key in self.pipeline_surface_by_key:
+            current = self.pipeline_surface_by_key[self._selected_surface_key]
+            if current.tool_key == key:
+                return current
+        return self.pipeline_surface_by_key[default_surface_key_for_tool(key)]
 
     def expected_launchable_tool_keys(self) -> tuple[str, ...]:
         return tuple(spec.key for spec in self._launchable_specs())
@@ -153,15 +209,30 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         keys: set[str] = set()
 
         def visit(item: QtWidgets.QTreeWidgetItem) -> None:
-            key = item.data(0, QtCore.Qt.ItemDataRole.UserRole)
-            if isinstance(key, str) and key in self.spec_by_key:
-                keys.add(key)
+            for role in (TOOL_ROLE, SURFACE_ROLE):
+                key = item.data(0, role)
+                if isinstance(key, str) and key in self.spec_by_key:
+                    keys.add(key)
             for child_index in range(item.childCount()):
                 visit(item.child(child_index))
 
         for index in range(self.browser_tree.topLevelItemCount()):
             visit(self.browser_tree.topLevelItem(index))
         return tuple(sorted(keys))
+
+    def visible_browser_workspace_ids(self) -> tuple[str, ...]:
+        ids: set[str] = set()
+
+        def visit(item: QtWidgets.QTreeWidgetItem) -> None:
+            surface_key = item.data(0, SURFACE_ROLE)
+            if isinstance(surface_key, str) and surface_key in self.pipeline_surface_by_key:
+                ids.add(self.pipeline_surface_by_key[surface_key].workspace_id)
+            for child_index in range(item.childCount()):
+                visit(item.child(child_index))
+
+        for index in range(self.browser_tree.topLevelItemCount()):
+            visit(self.browser_tree.topLevelItem(index))
+        return tuple(sorted(ids))
 
     def visible_menu_tool_keys(self) -> tuple[str, ...]:
         keys = {
@@ -173,12 +244,25 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
     def visible_toolbar_tool_keys(self) -> tuple[str, ...]:
         keys: set[str] = set()
-        for combo in (self.workspace_combo, self.launch_tool_combo):
-            for index in range(combo.count()):
-                key = combo.itemData(index)
-                if isinstance(key, str) and key in self.spec_by_key:
-                    keys.add(key)
+        for index in range(self.launch_tool_combo.count()):
+            key = self.launch_tool_combo.itemData(index)
+            if isinstance(key, str) and key in self.spec_by_key:
+                keys.add(key)
+        for index in range(self.workspace_combo.count()):
+            surface_key = self.workspace_combo.itemData(index)
+            if isinstance(surface_key, str):
+                surface = self.pipeline_surface_by_key.get(surface_key)
+                if surface is not None and surface.tool_key:
+                    keys.add(surface.tool_key)
         return tuple(sorted(keys))
+
+    def visible_toolbar_workspace_ids(self) -> tuple[str, ...]:
+        ids: set[str] = set()
+        for index in range(self.workspace_combo.count()):
+            surface_key = self.workspace_combo.itemData(index)
+            if isinstance(surface_key, str) and surface_key in self.pipeline_surface_by_key:
+                ids.add(self.pipeline_surface_by_key[surface_key].workspace_id)
+        return tuple(sorted(ids))
 
     def visible_command_search_tool_keys(self) -> tuple[str, ...]:
         keys = {
@@ -188,6 +272,15 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         }
         return tuple(sorted(keys))
 
+    def visible_command_search_workspace_ids(self) -> tuple[str, ...]:
+        ids = {
+            self.pipeline_surface_by_key[entry.action_value].workspace_id
+            for entry in self.command_entries
+            if entry.action_kind == "pipeline_surface"
+            and entry.action_value in self.pipeline_surface_by_key
+        }
+        return tuple(sorted(ids))
+
     def launch_surface_coverage(self) -> dict[str, tuple[str, ...]]:
         return {
             "expected": self.expected_launchable_tool_keys(),
@@ -195,6 +288,14 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             "menu": self.visible_menu_tool_keys(),
             "toolbar": self.visible_toolbar_tool_keys(),
             "command_search": self.visible_command_search_tool_keys(),
+        }
+
+    def pipeline_surface_coverage(self) -> dict[str, tuple[str, ...]]:
+        return {
+            "expected": V38_PIPELINE_WORKSPACE_IDS,
+            "browser": self.visible_browser_workspace_ids(),
+            "toolbar": self.visible_toolbar_workspace_ids(),
+            "command_search": self.visible_command_search_workspace_ids(),
         }
 
     def _add_tool_action(
@@ -227,8 +328,8 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _project_summary_text(self) -> str:
         return (
             f"Проект: {self.project_context.project_name} | "
-            f"Workspace: {self.project_context.workspace_dir} | "
-            f"{self.project_context.readiness_label}"
+            f"Рабочая папка: {self.project_context.workspace_dir} | "
+            f"{operator_readiness_label(self.project_context.missing_workspace_dirs)}"
         )
 
     def _set_status_message(self, text: str) -> None:
@@ -260,7 +361,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
     def _show_project_overview(self) -> None:
         self.command_search_edit.clear()
-        self.central_stack.setCurrentWidget(self.overview_page)
+        self._apply_selected_surface("ws_project")
         self._focus_project_tree()
 
     def _build_menu(self) -> None:
@@ -289,7 +390,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         view_menu.addSeparator()
         restore_layout_action = view_menu.addAction("Восстановить раскладку")
         restore_layout_action.triggered.connect(self._restore_layout)
-        reset_layout_action = view_menu.addAction("Сбросить раскладку shell")
+        reset_layout_action = view_menu.addAction("Сбросить раскладку окна")
         reset_layout_action.triggered.connect(self._reset_layout)
 
         run_menu = menubar.addMenu("Запуск")
@@ -335,7 +436,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         collect_diag_action = diagnostics_menu.addAction("Собрать диагностику")
         collect_diag_action.setShortcut(QtGui.QKeySequence("F7"))
         collect_diag_action.triggered.connect(lambda: self.open_tool("desktop_diagnostics_center"))
-        focus_messages_action = diagnostics_menu.addAction("Показать сообщения shell")
+        focus_messages_action = diagnostics_menu.addAction("Показать сообщения рабочего места")
         focus_messages_action.triggered.connect(self._focus_messages_strip)
 
         tools_menu = menubar.addMenu("Инструменты")
@@ -363,24 +464,19 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.workspace_combo.currentIndexChanged.connect(self._on_workspace_changed)
         toolbar.addWidget(self.workspace_combo)
 
-        self.open_workspace_button = QtWidgets.QPushButton("Запустить раздел", toolbar)
-        self.open_workspace_button.setToolTip("Запускает выбранный рабочий раздел с текущим проектным контекстом.")
-        self.open_workspace_button.clicked.connect(self.open_selected_workspace)
-        toolbar.addWidget(self.open_workspace_button)
-
         toolbar.addSeparator()
 
         toolbar.addWidget(QtWidgets.QLabel("GUI-модуль:"))
         self.launch_tool_combo = QtWidgets.QComboBox(toolbar)
         self.launch_tool_combo.setObjectName("DesktopQtShellLaunchToolCombo")
         self.launch_tool_combo.setAccessibleName("Единый выбор GUI-модуля")
-        self.launch_tool_combo.setToolTip("Все launchable GUI-модули из shell registry.")
+        self.launch_tool_combo.setToolTip("Все доступные GUI-модули рабочего места.")
         self.launch_tool_combo.currentIndexChanged.connect(self._on_launch_tool_changed)
         toolbar.addWidget(self.launch_tool_combo)
 
         self.open_launch_tool_button = QtWidgets.QPushButton("Запустить GUI", toolbar)
         self.open_launch_tool_button.setObjectName("DesktopQtShellOpenLaunchTool")
-        self.open_launch_tool_button.setToolTip("Запускает выбранный GUI-модуль из единого списка.")
+        self.open_launch_tool_button.setToolTip("Явно запускает выбранное GUI-окно; навигация по маршруту работает сразу при выборе.")
         self.open_launch_tool_button.clicked.connect(self.open_selected_launch_tool)
         toolbar.addWidget(self.open_launch_tool_button)
 
@@ -392,7 +488,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.command_search_edit.setPlaceholderText(
             "Команды, экраны, тесты, сценарии, bundle, runs, artifacts"
         )
-        self.command_search_edit.setToolTip("Ctrl+K. Поиск по разделам, командам, артефактам и launcher-маршрутам.")
+        self.command_search_edit.setToolTip("Ctrl+K. Поиск по разделам, командам, артефактам и маршрутам запуска.")
         self.command_search_edit.textChanged.connect(self._refresh_search_results)
         self.command_search_edit.returnPressed.connect(self._activate_primary_search_result)
         toolbar.addWidget(self.command_search_edit)
@@ -459,12 +555,12 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.property_module_value.setTextInteractionFlags(
             QtCore.Qt.TextInteractionFlag.TextSelectableByMouse
         )
-        properties_layout.addRow("Окно:", self.property_title_value)
-        properties_layout.addRow("Тип окна:", self.property_runtime_value)
+        properties_layout.addRow("Раздел:", self.property_title_value)
+        properties_layout.addRow("Поверхность:", self.property_runtime_value)
         properties_layout.addRow("Роль:", self.property_role_value)
-        properties_layout.addRow("Источник истины:", self.property_source_value)
-        properties_layout.addRow("Готовность:", self.property_operator_state_value)
-        properties_layout.addRow("Технический модуль:", self.property_module_value)
+        properties_layout.addRow("Источник данных:", self.property_source_value)
+        properties_layout.addRow("Состояние:", self.property_operator_state_value)
+        properties_layout.addRow("Связанный GUI:", self.property_module_value)
         self.inspector_tabs.addTab(properties_page, "Свойства")
 
         help_page = QtWidgets.QWidget(self.inspector_tabs)
@@ -566,9 +662,6 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.session_summary_label = QtWidgets.QLabel(session_box)
         self.session_summary_label.setWordWrap(True)
         session_layout.addWidget(self.session_summary_label)
-        self.open_tool_button = QtWidgets.QPushButton("Запустить текущий раздел", session_box)
-        self.open_tool_button.clicked.connect(self.open_selected_workspace)
-        session_layout.addWidget(self.open_tool_button)
         overview_layout.addWidget(session_box)
 
         self.central_stack.addWidget(self.overview_page)
@@ -613,12 +706,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _populate_workspace_switcher(self) -> None:
         self.workspace_combo.blockSignals(True)
         self.workspace_combo.clear()
-        for key in MAIN_ROUTE_KEYS:
-            spec = self.spec_by_key.get(key)
-            if spec is None:
-                continue
-            self.workspace_combo.addItem(spec.title, userData=key)
-        index = max(0, self.workspace_combo.findData(self._selected_tool_key))
+        for surface in self.pipeline_surfaces:
+            self.workspace_combo.addItem(surface.title, userData=surface.key)
+        index = max(0, self.workspace_combo.findData(self._selected_surface_key))
         self.workspace_combo.setCurrentIndex(index)
         self.workspace_combo.blockSignals(False)
 
@@ -636,27 +726,52 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         project_root = QtWidgets.QTreeWidgetItem(
             (
                 f"Проект: {self.project_context.project_name}",
-                self.project_context.readiness_label,
+                operator_readiness_label(self.project_context.missing_workspace_dirs),
             )
         )
         project_root.addChild(
             QtWidgets.QTreeWidgetItem(("Папка проекта", str(self.project_context.project_dir)))
         )
         project_root.addChild(
-            QtWidgets.QTreeWidgetItem(("Workspace", str(self.project_context.workspace_dir)))
+            QtWidgets.QTreeWidgetItem(("Рабочая папка", str(self.project_context.workspace_dir)))
         )
         project_root.addChild(
-            QtWidgets.QTreeWidgetItem(("Источник workspace", self.project_context.workspace_source))
+            QtWidgets.QTreeWidgetItem(
+                ("Выбор рабочей папки", workspace_source_label(self.project_context.workspace_source))
+            )
         )
-        artifacts_root = QtWidgets.QTreeWidgetItem(("Артефакты workspace", "required dirs"))
+        artifacts_root = QtWidgets.QTreeWidgetItem(
+            (
+                "Рабочие артефакты",
+                operator_readiness_label(self.project_context.missing_workspace_dirs),
+            )
+        )
         for dirname in ("exports", "uploads", "road_profiles", "maneuvers", "opt_runs", "ui_state"):
-            state = "missing" if dirname in self.project_context.missing_workspace_dirs else "ok"
-            artifacts_root.addChild(QtWidgets.QTreeWidgetItem((dirname, state)))
+            artifacts_root.addChild(
+                QtWidgets.QTreeWidgetItem(
+                    (
+                        WORKSPACE_ARTIFACT_LABELS.get(dirname, dirname),
+                        artifact_state_label(dirname, self.project_context.missing_workspace_dirs),
+                    )
+                )
+            )
         project_root.addChild(artifacts_root)
         self.browser_tree.addTopLevelItem(project_root)
         project_root.setExpanded(True)
         artifacts_root.setExpanded(True)
 
+        route_root = QtWidgets.QTreeWidgetItem(("Маршрут проекта", "выбор сразу показывает раздел"))
+        for surface in self.pipeline_surfaces:
+            item = QtWidgets.QTreeWidgetItem((surface.title, "готово к выбору"))
+            item.setData(0, SURFACE_ROLE, surface.key)
+            if surface.tool_key:
+                item.setData(0, TOOL_ROLE, surface.tool_key)
+            item.setData(0, ITEM_KIND_ROLE, "surface")
+            route_root.addChild(item)
+        self.browser_tree.addTopLevelItem(route_root)
+        route_root.setExpanded(True)
+
+        modules_root = QtWidgets.QTreeWidgetItem(("GUI-модули", "явный запуск отдельных окон"))
         for group_title, group_specs in self._launch_surface_groups():
             root_item = QtWidgets.QTreeWidgetItem((group_title, ""))
             for spec in group_specs:
@@ -666,10 +781,14 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                         _operator_state_label(spec),
                     )
                 )
-                item.setData(0, QtCore.Qt.ItemDataRole.UserRole, spec.key)
+                item.setData(0, SURFACE_ROLE, default_surface_key_for_tool(spec.key))
+                item.setData(0, TOOL_ROLE, spec.key)
+                item.setData(0, ITEM_KIND_ROLE, "tool")
                 root_item.addChild(item)
-            self.browser_tree.addTopLevelItem(root_item)
+            modules_root.addChild(root_item)
             root_item.setExpanded(True)
+        self.browser_tree.addTopLevelItem(modules_root)
+        modules_root.setExpanded(True)
 
     def _refresh_search_results(self) -> None:
         query = self.command_search_edit.text().strip()
@@ -695,8 +814,8 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _refresh_contract_badge(self) -> None:
         active_mode = self.optimization_mode_combo.currentText().strip()
         self.contract_badge.setText(
-            "Контракт: baseline не выбран | objective stack не задан | "
-            f"hard gate не задан | режим: {active_mode}"
+            "Расчёт: базовый прогон не выбран | цель не задана | "
+            f"ограничения не проверены | режим: {active_mode}"
         )
         if hasattr(self, "mode_status_label"):
             self._refresh_status_bar()
@@ -712,78 +831,121 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         spec = self.spec_by_key.get(key)
         if spec is None:
             return
-        self._selected_tool_key = key
-        self.surface_title.setText(spec.title)
+        surface = self._surface_for_tool(key)
+        self._apply_selected_surface(surface.key, announce=announce, selected_tool_key=key)
+
+    def _apply_selected_surface(
+        self,
+        key: str,
+        *,
+        announce: bool = True,
+        selected_tool_key: str | None = None,
+    ) -> None:
+        surface = self.pipeline_surface_by_key.get(key)
+        if surface is None:
+            return
+        self._selected_surface_key = surface.key
+        if selected_tool_key is not None:
+            self._selected_tool_key = selected_tool_key
+        elif surface.tool_key:
+            self._selected_tool_key = surface.tool_key
+        spec = self.spec_by_key.get(surface.tool_key or "") if surface.tool_key else None
+        self.surface_title.setText(surface.title)
         self.surface_meta.setText(
-            f"{spec.menu_section} -> {spec.nav_section} | {_workspace_role_label(spec)} | {_operator_state_label(spec)}"
+            f"Шаг маршрута: {surface.title} | {surface.source_label} | "
+            f"{operator_readiness_label(self.project_context.missing_workspace_dirs)}"
         )
-        self.surface_description.setText(spec.details or spec.description)
+        self.surface_description.setText(
+            "\n".join(
+                (
+                    surface.purpose,
+                    f"Следующее действие: {surface.next_action}",
+                    f"Передача дальше: {surface.handoff_label}",
+                )
+            )
+        )
         self.project_summary_label.setText(self._project_summary_text())
         self.session_summary_label.setText(
-            "Выбор в дереве, поиске или верхнем переключателе сразу синхронизирует рабочую область и инспектор. "
-            "Запуск GUI передаёт выбранный проектный контекст в соответствующий раздел."
+            "Выбор в дереве, поиске или верхнем переключателе уже является навигацией. "
+            "Отдельное GUI-окно запускается только явной командой из списка GUI-модулей."
         )
         self._refresh_workflow_list()
-        self._refresh_inspector(spec)
+        self._refresh_inspector(surface, spec)
         self._refresh_runtime_table()
-        self._select_browser_item(key)
+        self._select_browser_item(surface.key)
         if hasattr(self, "launch_tool_combo"):
-            index = self.launch_tool_combo.findData(key)
+            index = self.launch_tool_combo.findData(surface.tool_key)
             if index >= 0 and self.launch_tool_combo.currentIndex() != index:
                 self.launch_tool_combo.blockSignals(True)
                 self.launch_tool_combo.setCurrentIndex(index)
                 self.launch_tool_combo.blockSignals(False)
         if announce:
-            self._set_status_message(f"Выбрано рабочее окно: {spec.title}")
+            self._set_status_message(f"Выбран раздел маршрута: {surface.title}")
 
     def _refresh_workflow_list(self) -> None:
         self.workflow_list.clear()
-        for index, key in enumerate(MAIN_ROUTE_KEYS, start=1):
-            spec = self.spec_by_key.get(key)
-            if spec is None:
-                continue
-            line = f"{index}. {spec.title} — {_operator_state_label(spec)}"
+        for index, surface in enumerate(self.pipeline_surfaces, start=1):
+            line = f"{index}. {surface.title} — {surface.next_action}"
             item = QtWidgets.QListWidgetItem(line)
-            item.setData(QtCore.Qt.ItemDataRole.UserRole, key)
-            if key == self._selected_tool_key:
+            item.setData(SURFACE_ROLE, surface.key)
+            if surface.tool_key:
+                item.setData(TOOL_ROLE, surface.tool_key)
+            item.setData(ITEM_KIND_ROLE, "surface")
+            if surface.key == self._selected_surface_key:
                 item.setSelected(True)
             self.workflow_list.addItem(item)
 
-    def _refresh_inspector(self, spec: DesktopShellToolSpec) -> None:
-        self.property_title_value.setText(spec.title)
-        self.property_runtime_value.setText(_runtime_label(spec))
-        self.property_role_value.setText(_workspace_role_label(spec))
-        self.property_source_value.setText(_source_of_truth_label(spec))
-        self.property_operator_state_value.setText(_operator_state_label(spec))
-        self.property_module_value.setText(spec.standalone_module or "n/a")
+    def _refresh_inspector(
+        self,
+        surface: ShellPipelineSurface,
+        spec: DesktopShellToolSpec | None,
+    ) -> None:
+        self.property_title_value.setText(surface.title)
+        self.property_runtime_value.setText(
+            "Обзор внутри главного окна" if spec is None else _runtime_label(spec)
+        )
+        self.property_role_value.setText(
+            "Сводка проекта" if spec is None else _workspace_role_label(spec)
+        )
+        self.property_source_value.setText(
+            surface.source_label if spec is None else _source_of_truth_label(spec)
+        )
+        self.property_operator_state_value.setText(
+            operator_readiness_label(self.project_context.missing_workspace_dirs)
+            if spec is None
+            else _operator_state_label(spec)
+        )
+        self.property_module_value.setText(
+            "Навигация внутри главного окна" if spec is None else spec.title
+        )
 
         self.help_text.setPlainText(
             "\n\n".join(
                 [
-                    f"Что это: {spec.title}",
-                    f"Короткая подсказка: {spec.effective_tooltip}",
-                    f"Развёрнутое описание: {spec.effective_help_topic}",
-                    f"Где находится: {spec.menu_section} -> {spec.title}",
-                    f"Что откроется: {spec.standalone_module or 'не задан'}",
-                    f"Источник истины: {_source_of_truth_label(spec)}",
+                    f"Что это: {surface.title}",
+                    f"Назначение: {surface.purpose}",
+                    f"Следующее действие: {surface.next_action}",
+                    f"Передача дальше: {surface.handoff_label}",
+                    f"Связанный GUI: {spec.title if spec is not None else 'не требуется'}",
+                    f"Источник данных: {surface.source_label}",
                 ]
             )
         )
 
         warnings: list[str] = []
-        if spec.effective_migration_status == "managed_external":
+        if spec is not None and spec.effective_migration_status == "managed_external":
             warnings.append(
-                "Окно открывается отдельно, но shell передаёт ему проектный контекст и отслеживает его состояние."
+                "Окно открывается отдельно, а главное окно передаёт ему проектный контекст и отслеживает состояние."
             )
-        if spec.key == "desktop_animator":
+        if spec is not None and spec.key == "desktop_animator":
             warnings.append(
                 "Аниматор обязан показывать режимы: Расчётно подтверждено / По исходным данным / Условно по неполным данным."
             )
-        if spec.key == "desktop_optimizer_center":
+        if spec is not None and spec.key == "desktop_optimizer_center":
             warnings.append(
                 "Для оптимизации разрешён только один активный режим запуска. Два равноправных launch controls запрещены."
             )
-        if spec.key == "desktop_ring_editor":
+        if spec is not None and spec.key == "desktop_ring_editor":
             warnings.append(
                 "Редактор кольца остаётся единственным источником истины для сценариев. Все road_csv, axay_csv и scenario_json — производные артефакты."
             )
@@ -821,6 +983,89 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 "Пока нет открытых GUI-окон. Используйте верхнюю командную зону, обзор проекта или поиск команд."
             )
 
+    def _browser_tree_texts(self) -> list[str]:
+        rows: list[str] = []
+
+        def visit(item: QtWidgets.QTreeWidgetItem) -> None:
+            values = [
+                item.text(column).strip()
+                for column in range(self.browser_tree.columnCount())
+                if item.text(column).strip()
+            ]
+            if values:
+                rows.append(" | ".join(values))
+            for child_index in range(item.childCount()):
+                visit(item.child(child_index))
+
+        for index in range(self.browser_tree.topLevelItemCount()):
+            visit(self.browser_tree.topLevelItem(index))
+        return rows
+
+    def operator_surface_snapshot(self) -> dict[str, object]:
+        texts: list[str] = []
+        for widget in self.findChildren(QtWidgets.QLabel):
+            text = str(widget.text()).strip()
+            if text:
+                texts.append(text)
+        for widget in self.findChildren(QtWidgets.QPushButton):
+            text = str(widget.text()).strip()
+            if text:
+                texts.append(text)
+        for widget in self.findChildren(QtWidgets.QGroupBox):
+            text = str(widget.title()).strip()
+            if text:
+                texts.append(text)
+        texts.extend(self._browser_tree_texts())
+        hits = service_jargon_hits(texts)
+        return {
+            "visible_text_count": len(texts),
+            "service_blocker_hits": hits,
+            "toolbar_buttons": [
+                button.text()
+                for button in self.findChildren(QtWidgets.QPushButton)
+                if button.text().strip()
+            ],
+            "browser_rows": self._browser_tree_texts(),
+        }
+
+    def prove_v38_pipeline_selection_sync(self) -> dict[str, object]:
+        original_surface_key = self._selected_surface_key
+        original_tool_key = self._selected_tool_key
+        rows: list[dict[str, object]] = []
+        for surface in self.pipeline_surfaces:
+            self._apply_selected_surface(surface.key, announce=False)
+            current_item = self.browser_tree.currentItem()
+            rows.append(
+                {
+                    "workspace_id": surface.workspace_id,
+                    "surface_key": surface.key,
+                    "title": surface.title,
+                    "tool_key": surface.tool_key or "",
+                    "central_title": self.surface_title.text(),
+                    "inspector_title": self.property_title_value.text(),
+                    "browser_selection": current_item.text(0) if current_item is not None else "",
+                    "synced": (
+                        self.surface_title.text() == surface.title
+                        and self.property_title_value.text() == surface.title
+                        and current_item is not None
+                        and current_item.data(0, SURFACE_ROLE) == surface.key
+                    ),
+                }
+            )
+        self._apply_selected_surface(
+            original_surface_key,
+            announce=False,
+            selected_tool_key=original_tool_key,
+        )
+        observed = {str(row["workspace_id"]) for row in rows if row.get("synced") is True}
+        required = set(V38_PIPELINE_WORKSPACE_IDS)
+        return {
+            "required_workspace_ids": list(V38_PIPELINE_WORKSPACE_IDS),
+            "observed_workspace_ids": sorted(observed),
+            "missing_workspace_ids": sorted(required - observed),
+            "rows": rows,
+        }
+
     def _select_browser_item(self, key: str) -> None:
         items = self.browser_tree.findItems(
             "*",
@@ -830,7 +1075,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.browser_tree.blockSignals(True)
         try:
             for item in items:
-                if item.data(0, QtCore.Qt.ItemDataRole.UserRole) == key:
+                if item.data(0, SURFACE_ROLE) == key:
                     self.browser_tree.setCurrentItem(item)
                     break
         finally:
@@ -993,7 +1238,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def open_selected_workspace(self) -> None:
         key = self.workspace_combo.currentData()
         if isinstance(key, str) and key:
-            self.open_tool(key)
+            self._select_surface(key)
 
     def open_selected_launch_tool(self) -> None:
         key = self.launch_tool_combo.currentData()
@@ -1019,7 +1264,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         QtWidgets.QMessageBox.information(
             self,
             "Резервное старое окно",
-            "Старый shell сохранён только как резервный отладочный маршрут. "
+            "Старое окно сохранено только как резервный отладочный маршрут. "
             "Основная работа должна идти через это главное desktop-окно.",
         )
 
@@ -1035,7 +1280,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _on_workspace_changed(self, index: int) -> None:
         key = self.workspace_combo.itemData(index)
         if isinstance(key, str) and key:
-            self._select_workspace(key)
+            self._select_surface(key)
 
     def _on_launch_tool_changed(self, index: int) -> None:
         key = self.launch_tool_combo.itemData(index)
@@ -1044,6 +1289,14 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
     def _select_workspace(self, key: str) -> None:
         self._apply_selected_tool(key)
+        index = self.workspace_combo.findData(self._selected_surface_key)
+        if index >= 0 and self.workspace_combo.currentIndex() != index:
+            self.workspace_combo.blockSignals(True)
+            self.workspace_combo.setCurrentIndex(index)
+            self.workspace_combo.blockSignals(False)
+
+    def _select_surface(self, key: str) -> None:
+        self._apply_selected_surface(key)
         index = self.workspace_combo.findData(key)
         if index >= 0 and self.workspace_combo.currentIndex() != index:
             self.workspace_combo.blockSignals(True)
@@ -1054,19 +1307,24 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         item = self.browser_tree.currentItem()
         if item is None:
             return
-        key = item.data(0, QtCore.Qt.ItemDataRole.UserRole)
-        if isinstance(key, str) and key:
-            self._select_workspace(key)
+        surface_key = item.data(0, SURFACE_ROLE)
+        if isinstance(surface_key, str) and surface_key in self.pipeline_surface_by_key:
+            self._select_surface(surface_key)
 
     def _on_browser_item_activated(self, item: QtWidgets.QTreeWidgetItem, _column: int) -> None:
-        key = item.data(0, QtCore.Qt.ItemDataRole.UserRole)
-        if isinstance(key, str) and key:
-            self.open_tool(key)
+        item_kind = item.data(0, ITEM_KIND_ROLE)
+        tool_key = item.data(0, TOOL_ROLE)
+        surface_key = item.data(0, SURFACE_ROLE)
+        if item_kind == "tool" and isinstance(tool_key, str) and tool_key:
+            self.open_tool(tool_key)
+            return
+        if isinstance(surface_key, str) and surface_key in self.pipeline_surface_by_key:
+            self._select_surface(surface_key)
 
     def _on_workflow_item_activated(self, item: QtWidgets.QListWidgetItem) -> None:
-        key = item.data(QtCore.Qt.ItemDataRole.UserRole)
+        key = item.data(SURFACE_ROLE)
         if isinstance(key, str) and key:
-            self.open_tool(key)
+            self._select_surface(key)
 
     def _on_search_result_activated(self, item: QtWidgets.QListWidgetItem) -> None:
         self._activate_search_item(item)
@@ -1083,13 +1341,17 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         action_value = item.data(QtCore.Qt.ItemDataRole.UserRole)
         if action_kind == "home" or action_value == "home":
             self.command_search_edit.clear()
-            self.central_stack.setCurrentWidget(self.overview_page)
-            self._set_status_message("Открыт обзор рабочего места.")
+            self._select_surface("ws_project")
+            self._set_status_message("Открыта панель проекта.")
             return
         if action_kind == "focus" and action_value == "project_tree":
             self.command_search_edit.clear()
             self.central_stack.setCurrentWidget(self.overview_page)
             self._focus_project_tree()
+            return
+        if action_kind == "pipeline_surface" and isinstance(action_value, str):
+            self.command_search_edit.clear()
+            self._select_surface(action_value)
             return
         if action_kind == "tool" and isinstance(action_value, str):
             self.open_tool(action_value)
@@ -1144,9 +1406,16 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _restore_layout(self) -> None:
         geometry = self.settings.value("layout/geometry") or self.settings.value("geometry")
         state = self.settings.value("layout/window_state") or self.settings.value("window_state")
+        last_surface_key = str(self.settings.value("layout/last_surface_key") or "").strip()
         last_key = str(self.settings.value("layout/last_workspace_key") or "").strip()
-        if last_key in self.spec_by_key:
+        if last_surface_key in self.pipeline_surface_by_key:
+            self._selected_surface_key = last_surface_key
+            surface = self.pipeline_surface_by_key[last_surface_key]
+            if surface.tool_key:
+                self._selected_tool_key = surface.tool_key
+        elif last_key in self.spec_by_key:
             self._selected_tool_key = last_key
+            self._selected_surface_key = default_surface_key_for_tool(last_key)
         mode = str(self.settings.value("layout/optimization_mode") or "").strip()
         if mode:
             index = self.optimization_mode_combo.findText(mode)
@@ -1165,12 +1434,13 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.settings.setValue("layout/geometry", geometry)
         self.settings.setValue("layout/window_state", state)
         self.settings.setValue("layout/last_workspace_key", self._selected_tool_key)
+        self.settings.setValue("layout/last_surface_key", self._selected_surface_key)
         self.settings.setValue("layout/optimization_mode", self.optimization_mode_combo.currentText().strip())
         self.settings.setValue("geometry", geometry)
         self.settings.setValue("window_state", state)
         self.settings.sync()
         if hasattr(self, "status_label"):
-            self._set_status_message("Раскладка dock-панелей сохранена.")
+            self._set_status_message("Раскладка панелей сохранена.")
 
     def _reset_layout(self) -> None:
         for dock in (self.browser_dock, self.inspector_dock, self.runtime_dock):
@@ -1180,7 +1450,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self.inspector_dock)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, self.runtime_dock)
         self.resize(1640, 980)
-        self._set_status_message("Раскладка shell сброшена к базовой: дерево слева, инспектор справа, ход выполнения снизу.")
+        self._set_status_message("Раскладка сброшена к базовой: дерево слева, инспектор справа, ход выполнения снизу.")
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self._save_layout()

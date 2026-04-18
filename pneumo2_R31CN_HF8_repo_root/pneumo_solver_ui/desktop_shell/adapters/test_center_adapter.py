@@ -14,7 +14,7 @@ def create_hosted_test_center(parent: tk.Misc) -> App:
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="test_center",
-        title="Baseline и проверки",
+        title="Набор испытаний и базовый прогон",
         description="Baseline-прогоны, контрольные тесты и первичная проверка результатов из одного понятного места.",
         group="Встроенные окна",
         mode="hosted",
@@ -40,7 +40,10 @@ def build_spec() -> DesktopShellToolSpec:
         standalone_module="pneumo_solver_ui.tools.test_center_gui",
         create_hosted=create_hosted_test_center,
         search_aliases=(
+            "baseline и проверки",
             "набор испытаний",
+            "базовый прогон",
+            "baseline",
             "test matrix",
             "validated suite",
             "validated_suite_snapshot",

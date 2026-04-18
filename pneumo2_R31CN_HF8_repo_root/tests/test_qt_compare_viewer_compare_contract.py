@@ -17,6 +17,7 @@ from pneumo_solver_ui.compare_contract import (
     compare_contract_hash,
     current_vs_historical_mismatch,
     extract_compare_run_ref,
+    format_compare_contract_summary,
     format_compare_mismatch_banner,
     load_compare_contract,
     save_compare_contract,
@@ -34,7 +35,14 @@ class _MemorySettings:
         self._values[str(key)] = value
 
 
-def _ref(label: str, *, objective: str = "obj-a", gate: str = "penalty", baseline: str = "base-a") -> dict:
+def _ref(
+    label: str,
+    *,
+    objective: str = "obj-a",
+    gate: str = "penalty",
+    baseline: str = "base-a",
+    source: str = "source-a",
+) -> dict:
     return {
         "label": label,
         "source_path": f"C:/runs/{label}.npz",
@@ -46,6 +54,7 @@ def _ref(label: str, *, objective: str = "obj-a", gate: str = "penalty", baselin
         "active_baseline_hash": baseline,
         "suite_snapshot_hash": "suite-a",
         "scenario_lineage_hash": "scenario-a",
+        "ring_source_hash": source,
     }
 
 
@@ -77,6 +86,20 @@ def test_compare_contract_hash_is_stable_and_sensitive_to_contract_refs() -> Non
     assert "objective_contract_hash" in changed["mismatch_banner"]["mismatch_dimensions"]
 
 
+def test_compare_contract_summary_surfaces_selected_run_and_source_hash() -> None:
+    contract = build_compare_contract(
+        [_ref("selected-a", source="ring-src-a"), _ref("selected-b", source="ring-src-b")],
+        selected_metrics=["p_fr"],
+    )
+
+    text = format_compare_contract_summary(contract)
+
+    assert "selected_run=selected-a, selected-b" in text
+    assert "source=ring-src-a, ring-src-b" in text
+    assert "objective=obj-a" in text
+    assert "baseline=base-a" in text
+
+
 def test_compare_contract_sidecar_round_trips_without_rehashing_export_evidence(tmp_path: Path) -> None:
     contract = build_compare_contract([_ref("left"), _ref("right")], selected_table="main")
     contract["export_only_note"] = "evidence"
@@ -96,6 +119,8 @@ def test_compare_session_current_context_path_round_trips_and_ignores_future_fie
         labels=["history"],
         current_context_ref={"run_id": "current", "objective_contract_hash": "obj-current"},
         current_context_path="C:/runs/latest_compare_current_context.json",
+        current_context_ref_source_path="C:/runs/latest_compare_current_context.json",
+        current_context_ref_source_status="missing",
         run_refs=[_ref("history", objective="obj-old")],
         session_source="current_context_sidecar",
     )
@@ -105,6 +130,8 @@ def test_compare_session_current_context_path_round_trips_and_ignores_future_fie
     loaded = load_compare_session(json.dumps(obj, ensure_ascii=False))
 
     assert loaded.current_context_path == "C:/runs/latest_compare_current_context.json"
+    assert loaded.current_context_ref_source_path == "C:/runs/latest_compare_current_context.json"
+    assert loaded.current_context_ref_source_status == "missing"
     assert loaded.current_context_ref["run_id"] == "current"
     assert loaded.run_refs[0]["run_id"] == "history"
     assert not hasattr(loaded, "future_compare_field")
@@ -172,6 +199,7 @@ def _write_npz(path: Path, *, label: str, objective: str) -> None:
             "active_baseline_hash": "base-a",
             "suite_snapshot_hash": "suite-a",
             "scenario_lineage_hash": "scenario-a",
+            "ring_source_hash": f"ring-{label}",
         },
         "objective_contract": {
             "objective_contract_hash": objective,
@@ -206,6 +234,8 @@ def test_qt_compare_viewer_surfaces_compare_contract_and_mismatch_banner(monkeyp
         assert "Compare contract" in [action.text() for action in viewer.menu_view_docks.actions()]
         assert viewer.compare_contract_hash
         assert "compare_contract_hash=" in viewer.txt_compare_contract.toPlainText()
+        assert "selected_run=left, right" in viewer.txt_compare_contract.toPlainText()
+        assert "source=ring-left, ring-right" in viewer.txt_compare_contract.toPlainText()
         assert "objective_contract_hash" in viewer.txt_compare_contract.toPlainText()
         assert viewer.lbl_compare_mismatch.isVisible()
         assert "optimizer history" in viewer.lbl_compare_mismatch.text()
@@ -294,6 +324,8 @@ def test_qt_compare_viewer_contract_dock_surfaces_current_context_sidecar(
         assert restored is not None
         assert restored.current_context_ref["run_id"] == "current"
         assert restored.current_context_path == str(sidecar.resolve())
+        assert restored.current_context_ref_source_path == str(sidecar.resolve())
+        assert restored.current_context_ref_source_status == "ready"
     finally:
         viewer.close()
         app.processEvents()
@@ -309,7 +341,8 @@ def test_qt_compare_viewer_contract_dock_marks_missing_current_context_sidecar(
     missing_sidecar = tmp_path / "latest_compare_current_context.json"
     session = CompareSession(
         current_context_ref=_ref("current", objective="obj-current"),
-        current_context_path=str(missing_sidecar.resolve()),
+        current_context_ref_source_path=str(missing_sidecar.resolve()),
+        current_context_ref_source_status="missing",
         session_source="current_context_sidecar",
     )
 
@@ -329,6 +362,53 @@ def test_qt_compare_viewer_contract_dock_marks_missing_current_context_sidecar(
         assert payload["current_context_ref_source_status"] == "missing"
         assert payload["current_context_ref_source_path"] == str(missing_sidecar.resolve())
         assert payload["mismatch_banner"]["banner_id"] == "BANNER-HIST-002"
+
+        restored = viewer._current_compare_session()
+        assert restored is not None
+        assert restored.current_context_ref["run_id"] == "current"
+        assert restored.current_context_path == str(missing_sidecar.resolve())
+        assert restored.current_context_ref_source_path == str(missing_sidecar.resolve())
+        assert restored.current_context_ref_source_status == "missing"
+    finally:
+        viewer.close()
+        app.processEvents()
+
+
+def test_qt_compare_viewer_contract_dock_keeps_session_only_current_context_refs(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(viewer_mod.QtCore, "QSettings", _MemorySettings)
+    history = tmp_path / "history.npz"
+    _write_npz(history, label="history", objective="obj-old")
+    session = CompareSession(
+        current_context_ref=_ref("current", objective="obj-current"),
+        current_context_ref_source_status="session",
+        session_source="compare_session",
+    )
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    viewer = viewer_mod.CompareViewer([history], session=session)
+    try:
+        viewer.show()
+        app.processEvents()
+
+        assert "session refs=" in viewer.lbl_compare_current_context_source.text()
+        assert not viewer.btn_open_compare_current_context_sidecar.isEnabled()
+
+        payload = viewer._current_compare_contract_payload()
+        assert payload["current_context_ref"]["run_id"] == "current"
+        assert payload["current_context_ref_source"] == "session"
+        assert payload["current_context_ref_source_status"] == "session"
+        assert "current_context_ref_source_path" not in payload
+        assert payload["mismatch_banner"]["banner_id"] == "BANNER-HIST-002"
+
+        restored = viewer._current_compare_session()
+        assert restored is not None
+        assert restored.current_context_ref["run_id"] == "current"
+        assert restored.current_context_path == ""
+        assert restored.current_context_ref_source_path == ""
+        assert restored.current_context_ref_source_status == "session"
     finally:
         viewer.close()
         app.processEvents()

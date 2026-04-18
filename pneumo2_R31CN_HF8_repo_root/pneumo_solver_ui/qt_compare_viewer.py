@@ -535,6 +535,8 @@ class CompareViewer(QtWidgets.QMainWindow):
         self._startup_compare_session = session
         self._compare_current_context_ref: Dict[str, Any] = {}
         self._compare_current_context_path: str = ""
+        self._compare_current_context_ref_source_path: str = ""
+        self._compare_current_context_ref_source_status: str = ""
         self.compare_contract: Dict[str, Any] = {}
         self.compare_contract_hash: str = ""
 
@@ -1779,8 +1781,21 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             self._compare_current_context_ref = {}
         try:
+            self._compare_current_context_ref_source_path = str(
+                getattr(sess, 'current_context_ref_source_path', '') or ''
+            ).strip()
+        except Exception:
+            self._compare_current_context_ref_source_path = ""
+        try:
+            self._compare_current_context_ref_source_status = str(
+                getattr(sess, 'current_context_ref_source_status', '') or ''
+            ).strip()
+        except Exception:
+            self._compare_current_context_ref_source_status = ""
+        try:
             self._compare_current_context_path = str(
                 getattr(sess, 'current_context_path', '')
+                or self._compare_current_context_ref_source_path
                 or getattr(sess, 'current_context_sidecar_path', '')
                 or ''
             ).strip()
@@ -2592,24 +2607,57 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, dock)
         self.dock_compare_contract = dock
 
-    def _refresh_compare_current_context_source(self) -> None:
-        label = getattr(self, 'lbl_compare_current_context_source', None)
-        button = getattr(self, 'btn_open_compare_current_context_sidecar', None)
-        ref_count = len(dict(getattr(self, '_compare_current_context_ref', {}) or {}))
-        raw_path = str(getattr(self, '_compare_current_context_path', '') or '').strip()
-        path_exists = False
+    def _compare_current_context_source_state(self) -> Dict[str, Any]:
+        ref = dict(getattr(self, '_compare_current_context_ref', {}) or {})
+        raw_path = (
+            str(getattr(self, '_compare_current_context_path', '') or '').strip()
+            or str(getattr(self, '_compare_current_context_ref_source_path', '') or '').strip()
+        )
         display_path = raw_path
+        path_exists = False
         if raw_path:
             try:
                 p = _absolute_fs_path(Path(raw_path))
                 display_path = str(p)
                 path_exists = p.exists() and p.is_file()
             except Exception:
+                display_path = raw_path
                 path_exists = False
+            return {
+                "source": "sidecar",
+                "status": "ready" if path_exists else "missing",
+                "source_path": display_path,
+                "path_exists": path_exists,
+                "ref_count": len(ref),
+            }
+        if ref:
+            return {
+                "source": "session",
+                "status": "session",
+                "source_path": "",
+                "path_exists": False,
+                "ref_count": len(ref),
+            }
+        return {
+            "source": "",
+            "status": "missing",
+            "source_path": "",
+            "path_exists": False,
+            "ref_count": 0,
+        }
+
+    def _refresh_compare_current_context_source(self) -> None:
+        label = getattr(self, 'lbl_compare_current_context_source', None)
+        button = getattr(self, 'btn_open_compare_current_context_sidecar', None)
+        source_state = self._compare_current_context_source_state()
+        ref_count = int(source_state.get("ref_count") or 0)
+        display_path = str(source_state.get("source_path") or "")
+        path_exists = bool(source_state.get("path_exists"))
+        status = str(source_state.get("status") or "")
         if label is not None:
             try:
                 if display_path:
-                    state = "sidecar" if path_exists else "sidecar missing"
+                    state = "sidecar" if status == "ready" else "sidecar missing"
                     label.setText(f"current_context_ref {state}: {Path(display_path).name} | refs={ref_count}")
                     label.setToolTip(display_path)
                 elif ref_count:
@@ -2628,7 +2676,8 @@ class CompareViewer(QtWidgets.QMainWindow):
                 pass
 
     def _open_compare_current_context_sidecar(self) -> None:
-        raw_path = str(getattr(self, '_compare_current_context_path', '') or '').strip()
+        state = self._compare_current_context_source_state()
+        raw_path = str(state.get("source_path") or '').strip()
         if not raw_path:
             return
         try:
@@ -17621,23 +17670,14 @@ class CompareViewer(QtWidgets.QMainWindow):
         payload["baseline_ref"] = baseline_ref
         payload["objective_ref"] = objective_ref
         payload["current_context_ref"] = dict(getattr(self, "_compare_current_context_ref", {}) or {})
-        current_context_path = str(getattr(self, "_compare_current_context_path", "") or "").strip()
-        payload["current_context_ref_source"] = (
-            "sidecar" if current_context_path else ("session" if payload["current_context_ref"] else "")
-        )
-        if current_context_path:
-            payload["current_context_ref_source_path"] = current_context_path
-            try:
-                p = _absolute_fs_path(Path(current_context_path))
-                payload["current_context_ref_source_status"] = (
-                    "ready" if p.exists() and p.is_file() else "missing"
-                )
-            except Exception:
-                payload["current_context_ref_source_status"] = "missing"
-        elif payload["current_context_ref"]:
-            payload["current_context_ref_source_status"] = "session"
+        source_state = self._compare_current_context_source_state()
+        source_path = str(source_state.get("source_path") or "")
+        payload["current_context_ref_source"] = str(source_state.get("source") or "")
+        payload["current_context_ref_source_status"] = str(source_state.get("status") or "missing")
+        if source_path:
+            payload["current_context_ref_source_path"] = source_path
         else:
-            payload["current_context_ref_source_status"] = "missing"
+            payload.pop("current_context_ref_source_path", None)
         payload["mismatch_banner"] = dict(payload.get("mismatch_banner") or {})
         payload["selected_table"] = table
         payload["selected_signals"] = signals
@@ -17841,6 +17881,9 @@ class CompareViewer(QtWidgets.QMainWindow):
                 labels = [str(x) for x in (getattr(session_hint, 'labels', None) or []) if str(x).strip()]
             except Exception:
                 labels = []
+        source_state = self._compare_current_context_source_state()
+        source_path = str(source_state.get("source_path") or "")
+        current_context_path = source_path or str(getattr(self, '_compare_current_context_path', '') or '')
         try:
             return CompareSession(
                 npz_paths=npz_paths,
@@ -17869,7 +17912,9 @@ class CompareViewer(QtWidgets.QMainWindow):
                 objective_ref=objective_ref or None,
                 run_refs=run_refs,
                 current_context_ref=dict(getattr(self, '_compare_current_context_ref', {}) or {}),
-                current_context_path=str(getattr(self, '_compare_current_context_path', '') or ''),
+                current_context_path=current_context_path,
+                current_context_ref_source_path=source_path,
+                current_context_ref_source_status=str(source_state.get("status") or "missing"),
                 mismatch_banner=dict((getattr(self, 'compare_contract', {}) or {}).get('mismatch_banner') or {}),
                 session_source='qt_compare_viewer',
             )
@@ -18146,6 +18191,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     current_context_arg = getattr(args, 'current_context', None)
     current_context_ref = _load_current_context_ref_safely(current_context_arg)
     current_context_path = _current_context_sidecar_path_safely(current_context_arg)
+    current_context_status = "ready" if current_context_path else ("session" if current_context_ref else "")
     paths: List[Path] = []
     for raw in (args.npz or []):
         p = Path(raw)
@@ -18161,6 +18207,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 session = CompareSession(
                     current_context_ref=current_context_ref,
                     current_context_path=current_context_path,
+                    current_context_ref_source_path=current_context_path,
+                    current_context_ref_source_status=current_context_status,
                     session_source='current_context_sidecar',
                 )
             except Exception:
@@ -18169,6 +18217,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             try:
                 session.current_context_ref = current_context_ref
                 session.current_context_path = current_context_path
+                session.current_context_ref_source_path = current_context_path
+                session.current_context_ref_source_status = current_context_status
             except Exception:
                 pass
     if session is not None and not paths:
@@ -18187,6 +18237,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                     try:
                         session.current_context_ref = current_context_ref
                         session.current_context_path = current_context_path
+                        session.current_context_ref_source_path = current_context_path
+                        session.current_context_ref_source_status = current_context_status
                     except Exception:
                         pass
                 paths = _compare_session_npz_paths(session)
