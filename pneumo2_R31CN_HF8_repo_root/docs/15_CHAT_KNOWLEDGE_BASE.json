@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-17T19:23:17+00:00",
+  "updated_at": "2026-04-18T06:29:42+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -532,6 +532,15 @@
       "title": "Plan-mode parallel chat starter prompts",
       "details": "Add copy-paste starter prompts for future parallel chats whose first launch is in Plan mode: each prompt starts from codex/work, forbids edits before plan approval, defines owned/forbidden files, tests, risks and evidence boundaries.",
       "artifact_path": "gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md",
+      "status": "active"
+    },
+    {
+      "id": "PLAN-0043",
+      "created_at": "2026-04-18T06:29:42+00:00",
+      "source": "chat: code audit and prompts 2026-04-18",
+      "title": "Code tree audit and v2 Plan-mode prompts",
+      "details": "Audit the current code tree after branch cleanup, record dirty files by lane and create updated self-contained Plan-mode starter prompts for the same 10 parallel chats with current dirty-tree risks and ownership boundaries.",
+      "artifact_path": "gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md",
       "status": "active"
     }
   ]

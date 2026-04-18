@@ -84,8 +84,10 @@ Operational note:
 25. [docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md](./context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md)
 26. [docs/context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md](./context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md)
 27. [docs/gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
-28. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
-29. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
+28. [docs/context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md](./context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md)
+29. [docs/gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
+30. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
+31. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
 
 ### 3. Активные требования и рабочий backlog
 
@@ -245,6 +247,8 @@ Operational note:
 - [docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md](./context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md)
 - [docs/context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md](./context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md)
 - [docs/gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
+- [docs/context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md](./context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md)
+- [docs/gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
 
 Что задаёт общий canon:
 
@@ -355,6 +359,11 @@ Operational note:
 - Plan-mode parallel start prompts фиксируют готовые самодостаточные промты
   для новых чатов: первый запуск только в Plan mode, без правок до
   подтверждения, с owned/forbidden files и focused test expectations.
+- Code tree audit фиксирует текущие dirty-файлы по lane, prepared worktrees,
+  code hotspots и unsafe ignored-artifact cleanup boundary.
+- Code-audit Plan-mode prompts обновляют стартовые промты для тех же 10
+  параллельных чатов с учётом текущего dirty tree; для новых стартов
+  предпочитать `15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md`.
 
 Связанные, но вспомогательные UX-источники:
 

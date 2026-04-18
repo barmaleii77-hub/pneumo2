@@ -309,6 +309,13 @@ ID: `PLAN-0041`.
 Источник: chat: plan-mode parallel prompts 2026-04-18.
 ID: `PLAN-0042`.
 
+43. Code tree audit and v2 Plan-mode prompts
+Назначение: Audit the current code tree after branch cleanup, record dirty files by lane and create updated self-contained Plan-mode starter prompts for the same 10 parallel chats with current dirty-tree risks and ownership boundaries.
+Артефакт: [gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
+Статус: active.
+Источник: chat: code audit and prompts 2026-04-18.
+ID: `PLAN-0043`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

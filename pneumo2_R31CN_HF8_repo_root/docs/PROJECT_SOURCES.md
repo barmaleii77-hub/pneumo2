@@ -57,6 +57,8 @@
 - `docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md` — controlled real-Windows visible startup proof for Qt main shell and Desktop Mnemo; automated startup `PASS`, manual visual/Snap/DPI/second-monitor acceptance remains pending.
 - `docs/context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md` — branch cleanup record after consolidating temporary Codex branches into `codex/work`, plus the next safe parallel-work plan.
 - `docs/gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md` — copy-paste starter prompts for parallel chats whose first launch is in Plan mode, with owned/forbidden file boundaries and no-edit-before-plan rules.
+- `docs/context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md` — code-tree audit after branch cleanup: dirty files by lane, prepared worktrees, ignored-artifact cleanup boundary and code hotspots.
+- `docs/gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md` — updated self-contained starter prompts for the same 10 Plan-mode chats, now including current dirty-tree and code-audit risks.
 - `docs/context/gui_spec_imports/v3/README.md` — active detailed reference layer из `pneumo_gui_codex_package_v3.zip`.
 - `docs/context/gui_spec_imports/v3/pneumo_gui_codex_spec_v3_refined.json` — главный machine-readable GUI-spec.
 - `docs/context/gui_spec_imports/v3/current_macro.dot` — текущий macro workflow graph.
