@@ -290,6 +290,13 @@ def test_engineering_analysis_runtime_validates_artifacts_and_exports_evidence(t
     assert payload["sensitivity_summary"][0]["param"] == "база"
     assert payload["compare_influence_surfaces"][0]["diagnostics"]["finite_cell_count"] == 2
     assert payload["evidence_manifest_hash"]
+    pipeline = {item["key"]: item for item in payload["analysis_workspace_pipeline"]}
+    assert pipeline["selected_run_context"]["status"] == "READY"
+    assert pipeline["calibration_fit_reports"]["status"] == "READY"
+    assert pipeline["influence_system"]["status"] == "READY"
+    assert pipeline["sensitivity_summary"]["status"] == "READY"
+    assert pipeline["handoff_ho008_animator"]["status"] in {"MISSING", "BLOCKED"}
+    assert payload["runtime_data_gaps"]
     assert payload["validated_artifacts"]["schema"] == "engineering_analysis_validated_artifacts.v1"
     assert payload["validated_artifacts"]["status"] == "READY"
     assert payload["validated_artifacts"]["required_artifact_count"] == 3
@@ -299,6 +306,10 @@ def test_engineering_analysis_runtime_validates_artifacts_and_exports_evidence(t
     records = {item["key"]: item for item in payload["selected_artifact_list"]}
     assert records["system_influence_json"]["sha256"]
     assert records["system_influence_json"]["size_bytes"] > 0
+    assert records["system_influence_json"]["source_run_dir"] == str(run_dir.resolve())
+    assert records["system_influence_json"]["source_relpath"] == "system_influence.json"
+    assert records["system_influence_json"]["source_selected_run_contract_hash"] == snapshot.selected_run_contract_hash
+    assert records["system_influence_json"]["source_objective_contract_hash"] == "objective-hash-001"
     assert records["report_full_md"]["sha256"]
     assert any(item["key"] == "report_full_md" for item in payload["report_provenance"])
     validated_records = {
@@ -312,6 +323,8 @@ def test_engineering_analysis_runtime_validates_artifacts_and_exports_evidence(t
     assert refreshed.diagnostics_evidence_manifest_path == sidecar
     assert refreshed.diagnostics_evidence_manifest_status == "READY"
     assert refreshed.diagnostics_evidence_manifest_hash == payload["evidence_manifest_hash"]
+    refreshed_pipeline = {row.key: row for row in runtime.analysis_workspace_pipeline_status(refreshed)}
+    assert refreshed_pipeline["handoff_ho009_diagnostics"].status == "READY"
 
 
 def test_evidence_export_builds_compare_influence_surfaces_from_artifacts(tmp_path: Path) -> None:
@@ -385,6 +398,92 @@ def test_evidence_export_warns_when_compare_influence_artifact_is_unparseable(tm
     exported = json.loads(sidecar.read_text(encoding="utf-8"))
     assert exported["compare_influence_diagnostics"]["surface_count"] == 0
     assert exported["validation"]["warnings"] == payload["validation"]["warnings"]
+
+
+def test_v38_pipeline_status_exposes_static_trim_uq_handoffs_and_gaps(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path)
+    results_csv = run_dir / "selected_results.csv"
+    _write_text(
+        results_csv,
+        "static_trim_success,static_trim_body_height_err_max_m,static_trim_pressure_trim_enable,"
+        "static_trim_pressure_trim_mode,static_trim_pressure_trim_max_abs_scale_delta\n"
+        "true,0.0004,true,per_corner,0.2\n",
+    )
+    _write_json(run_dir / "AUTOPILOT_V20_WRAPPER.json", {"status": "done", "out_dir": str(run_dir)})
+    _write_text(run_dir / "uq_sensitivity_summary.csv", "param,importance\nKphi,0.8\n")
+    _write_text(run_dir / "measurement_priority.csv", "component,priority\nfront_left,0.9\n")
+    _write_text(run_dir / "uq_runs.csv", "run,metric\n1,0.1\n")
+    _write_text(run_dir / "uq_report.md", "# UQ report\n")
+    contract_path = _write_selected_run_contract(
+        tmp_path / "selected_run_contract.json",
+        run_dir,
+        results_csv_path=str(results_csv),
+        results_artifact_index={
+            "run_dir": str(run_dir),
+            "results_csv_path": str(results_csv),
+            "objective_contract_path": str(run_dir / "objective_contract.json"),
+        },
+    )
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="python")
+    snapshot = runtime.snapshot(selected_contract_path=contract_path)
+
+    rows = {row.key: row.to_payload() for row in runtime.analysis_workspace_pipeline_status(snapshot)}
+
+    assert rows["selected_run_context"]["status"] == "READY"
+    assert rows["calibration_autopilot_v20"]["status"] == "READY"
+    assert rows["calibration_static_trim"]["status"] == "READY"
+    assert rows["calibration_static_trim"]["metrics"]["static_trim_body_height_err_max_m"] == "0.0004"
+    assert rows["calibration_static_trim"]["units"]["static_trim_body_height_err_max_m"] == "m"
+    assert rows["influence_compare_surfaces"]["status"] == "READY"
+    assert rows["sensitivity_summary"]["status"] == "READY"
+    assert rows["uncertainty_uq"]["status"] == "READY"
+    assert rows["handoff_ho008_animator"]["status"] in {"MISSING", "BLOCKED"}
+    assert rows["handoff_ho009_diagnostics"]["status"] == "MISSING"
+
+    manifest = runtime.build_diagnostics_evidence_manifest(snapshot)
+    manifest_rows = {item["key"]: item for item in manifest["analysis_workspace_pipeline"]}
+    assert manifest_rows["calibration_static_trim"]["status"] == "READY"
+    assert manifest_rows["uncertainty_uq"]["metrics"]["artifact_count"] == 4
+    assert any(item["key"] == "handoff_ho009_diagnostics" for item in manifest["runtime_data_gaps"])
+
+
+def test_v38_pipeline_marks_static_trim_missing_and_uq_available_not_run(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path)
+    contract_path = _write_selected_run_contract(tmp_path / "selected_run_contract.json", run_dir)
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="python")
+    snapshot = runtime.snapshot(selected_contract_path=contract_path)
+
+    rows = {row.key: row for row in runtime.analysis_workspace_pipeline_status(snapshot)}
+
+    assert rows["calibration_static_trim"].status == "MISSING"
+    assert rows["uncertainty_uq"].status == "AVAILABLE_NOT_RUN"
+    gaps = {item["key"]: item for item in runtime.analysis_workspace_runtime_gaps(snapshot)}
+    assert gaps["calibration_static_trim"]["status"] == "MISSING"
+    assert gaps["uncertainty_uq"]["status"] == "AVAILABLE_NOT_RUN"
+
+
+def test_latest_evidence_manifest_freshness_detects_stale_and_invalid(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path / "first")
+    contract_path = _write_selected_run_contract(tmp_path / "selected_run_contract.json", run_dir)
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="python")
+    first_snapshot = runtime.snapshot(selected_contract_path=contract_path)
+    sidecar = runtime.write_diagnostics_evidence_manifest(first_snapshot)
+
+    refreshed = runtime.snapshot(selected_contract_path=contract_path)
+    assert refreshed.diagnostics_evidence_manifest_status == "READY"
+
+    second_run_dir = _build_run_dir(tmp_path / "second")
+    second_contract_path = _write_selected_run_contract(
+        tmp_path / "selected_run_contract_second.json",
+        second_run_dir,
+    )
+    second_snapshot = runtime.snapshot(selected_contract_path=second_contract_path)
+    assert second_snapshot.diagnostics_evidence_manifest_path == sidecar
+    assert second_snapshot.diagnostics_evidence_manifest_status == "STALE"
+
+    _write_json(sidecar, {"run_dir": str(second_run_dir.resolve()), "evidence_manifest_hash": "bad"})
+    invalid_snapshot = runtime.snapshot(selected_contract_path=second_contract_path)
+    assert invalid_snapshot.diagnostics_evidence_manifest_status == "INVALID"
 
 
 def test_selected_run_contract_loads_ho007_context_as_analysis_master_source(tmp_path: Path) -> None:

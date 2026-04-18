@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import os
@@ -27,6 +28,7 @@ from pneumo_solver_ui.desktop_engineering_analysis_model import (
     SYSTEM_INFLUENCE_UNIT_CATALOG,
     EngineeringAnalysisArtifact,
     EngineeringAnalysisJobResult,
+    EngineeringAnalysisPipelineRow,
     EngineeringAnalysisSnapshot,
     SelectedRunContractSnapshot,
     build_analysis_to_animator_link_contract,
@@ -56,6 +58,8 @@ _ENGINEERING_ANALYSIS_ARTIFACT_SPECS: tuple[tuple[str, str, str, str, bool], ...
     ("system_influence_params.csv", "system_influence_params_csv", "System influence parameter table", "influence", True),
     ("system_influence_edges.csv", "system_influence_edges_csv", "System influence edge table", "influence", False),
     ("system_influence_paths.csv", "system_influence_paths_csv", "System influence path table", "influence", False),
+    ("AUTOPILOT_V20_WRAPPER.json", "autopilot_v20_wrapper_json", "Autopilot v20 wrapper evidence", "calibration", False),
+    ("AUTOPILOT_V19_WRAPPER.json", "autopilot_v19_wrapper_json", "Autopilot v19 wrapper evidence", "calibration", False),
     ("PARAM_STAGING_INFLUENCE.md", "param_staging_influence_md", "Influence-guided staging report", "calibration", False),
     ("stages_influence.json", "stages_influence_json", "Influence-guided stages", "calibration", False),
     ("REPORT_FULL.md", "report_full_md", "Full calibration report", "report", False),
@@ -64,6 +68,10 @@ _ENGINEERING_ANALYSIS_ARTIFACT_SPECS: tuple[tuple[str, str, str, str, bool], ...
     ("report.md", "calibration_report_md", "Calibration detail report", "report", False),
     ("fit_report.json", "fit_report_json", "Fit report", "calibration", False),
     ("fit_details.json", "fit_details_json", "Fit details", "calibration", False),
+    ("uq_sensitivity_summary.csv", "uq_sensitivity_summary_csv", "UQ sensitivity summary", "uncertainty", False),
+    ("measurement_priority.csv", "measurement_priority_csv", "Measurement priority table", "uncertainty", False),
+    ("uq_runs.csv", "uq_runs_csv", "UQ run table", "uncertainty", False),
+    ("uq_report.md", "uq_report_md", "UQ report", "uncertainty", False),
 )
 
 
@@ -955,6 +963,37 @@ class DesktopEngineeringAnalysisRuntime:
                 items.append(artifact)
 
         known_paths = {str(item.path) for item in items}
+        known_keys = {item.key for item in items}
+        optional_recursive = (
+            ("uq_sensitivity_summary.csv", "uq_sensitivity_summary_csv", "UQ sensitivity summary", "uncertainty"),
+            ("measurement_priority.csv", "measurement_priority_csv", "Measurement priority table", "uncertainty"),
+            ("uq_runs.csv", "uq_runs_csv", "UQ run table", "uncertainty"),
+            ("uq_report.md", "uq_report_md", "UQ report", "uncertainty"),
+        )
+        for filename, key, title, category in optional_recursive:
+            if key in known_keys:
+                continue
+            try:
+                matches = sorted(
+                    (path for path in run_dir.rglob(filename) if path.is_file()),
+                    key=lambda path: (len(path.relative_to(run_dir).parts), str(path).lower()),
+                )
+            except Exception:
+                matches = []
+            if not matches:
+                continue
+            path = matches[0].resolve()
+            known_paths.add(str(path))
+            known_keys.add(key)
+            items.append(
+                EngineeringAnalysisArtifact(
+                    key=key,
+                    title=title,
+                    category=category,
+                    path=path,
+                    detail="Discovered optional V38 uncertainty artifact in analysis run directory.",
+                )
+            )
         for path in sorted(run_dir.glob("*influence*.*"), key=lambda p: p.name.lower()):
             if str(path.resolve()) in known_paths or not path.is_file():
                 continue
@@ -1069,7 +1108,35 @@ class DesktopEngineeringAnalysisRuntime:
         manifest_path = self.send_bundles_dir / LATEST_ENGINEERING_ANALYSIS_EVIDENCE_MANIFEST
         manifest_payload = _safe_read_json_dict(manifest_path)
         manifest_hash = str(manifest_payload.get("evidence_manifest_hash") or "")
-        manifest_status = "READY" if manifest_path.exists() and manifest_hash else "MISSING"
+        manifest_status = "MISSING"
+        if manifest_path.exists():
+            if not manifest_payload or not manifest_hash:
+                manifest_status = "INVALID"
+            else:
+                computed_manifest_hash = _payload_hash(
+                    manifest_payload,
+                    hash_key="evidence_manifest_hash",
+                )
+                upstream = (
+                    manifest_payload.get("upstream_handoff")
+                    if isinstance(manifest_payload.get("upstream_handoff"), Mapping)
+                    else {}
+                )
+                manifest_run_dir = str(manifest_payload.get("run_dir") or "").strip()
+                manifest_contract_hash = str(
+                    dict(upstream).get("selected_run_contract_hash") or ""
+                ).strip()
+                run_matches = manifest_run_dir == str(resolved_run_dir)
+                hash_matches = (
+                    bool(contract_snapshot.selected_run_contract_hash)
+                    and manifest_contract_hash == contract_snapshot.selected_run_contract_hash
+                )
+                if computed_manifest_hash != manifest_hash:
+                    manifest_status = "INVALID"
+                elif run_matches and hash_matches:
+                    manifest_status = "READY"
+                else:
+                    manifest_status = "STALE"
 
         return EngineeringAnalysisSnapshot(
             run_dir=resolved_run_dir,
@@ -1238,6 +1305,468 @@ class DesktopEngineeringAnalysisRuntime:
                 "Refresh Engineering Analysis Center and export engineering analysis evidence again.",
             ],
         }
+
+    def _artifact_for_keys(
+        self,
+        snapshot: EngineeringAnalysisSnapshot,
+        keys: Sequence[str],
+    ) -> EngineeringAnalysisArtifact | None:
+        wanted = {str(key) for key in keys}
+        for artifact in snapshot.artifacts:
+            if artifact.key in wanted:
+                return artifact
+        return None
+
+    def _read_static_trim_summary(self, snapshot: EngineeringAnalysisSnapshot) -> dict[str, Any]:
+        def _static_metrics_from_mapping(value: Any) -> dict[str, Any]:
+            found: dict[str, Any] = {}
+
+            def _walk(item: Any) -> None:
+                if len(found) >= 80:
+                    return
+                if isinstance(item, Mapping):
+                    for raw_key, raw_value in item.items():
+                        key = str(raw_key or "")
+                        if key.startswith("static_trim_"):
+                            found[key] = raw_value
+                        if isinstance(raw_value, Mapping) or (
+                            isinstance(raw_value, Sequence)
+                            and not isinstance(raw_value, (str, bytes, bytearray))
+                        ):
+                            _walk(raw_value)
+                elif isinstance(item, Sequence) and not isinstance(item, (str, bytes, bytearray)):
+                    for child in list(item)[:20]:
+                        _walk(child)
+
+            _walk(value)
+            return found
+
+        def _status_from_metrics(metrics: Mapping[str, Any]) -> str:
+            if not metrics:
+                return "MISSING"
+            raw_success = (
+                metrics.get("static_trim_success")
+                if "static_trim_success" in metrics
+                else metrics.get("static_trim_pressure_trim_success")
+            )
+            if raw_success in (None, ""):
+                return "PARTIAL"
+            text = str(raw_success).strip().lower()
+            return "READY" if text in {"1", "true", "yes", "ok", "pass", "passed", "success"} else "PARTIAL"
+
+        if snapshot.run_dir is None:
+            return {
+                "status": "BLOCKED",
+                "detail": "Static-trim evidence is blocked until a selected run_dir is available.",
+                "path": "",
+                "metrics": {},
+                "units": {},
+            }
+
+        candidates: list[Path] = []
+        context = snapshot.selected_run_context
+        if context is not None:
+            raw_candidates = [
+                context.results_csv_path,
+                context.results_artifact_index.get("results_csv_path")
+                if isinstance(context.results_artifact_index, Mapping)
+                else "",
+                context.results_artifact_index.get("results_path")
+                if isinstance(context.results_artifact_index, Mapping)
+                else "",
+            ]
+            for raw_path in raw_candidates:
+                if not str(raw_path or "").strip():
+                    continue
+                try:
+                    candidates.append(Path(str(raw_path)).expanduser().resolve())
+                except Exception:
+                    candidates.append(Path(str(raw_path)).expanduser())
+
+        for artifact in snapshot.artifacts:
+            if artifact.key in {
+                "fit_report_final_json",
+                "fit_details_final_json",
+                "fit_report_json",
+                "fit_details_json",
+            }:
+                candidates.append(artifact.path)
+
+        seen: set[str] = set()
+        for path in candidates:
+            key = str(path)
+            if key in seen or not path.exists() or not path.is_file():
+                continue
+            seen.add(key)
+            metrics: dict[str, Any] = {}
+            if path.suffix.lower() == ".csv":
+                try:
+                    with path.open("r", encoding="utf-8", errors="replace", newline="") as fh:
+                        reader = csv.DictReader(fh)
+                        for idx, row in enumerate(reader):
+                            for raw_key, raw_value in dict(row or {}).items():
+                                if str(raw_key or "").startswith("static_trim_"):
+                                    metrics[str(raw_key)] = raw_value
+                            if metrics or idx >= 4:
+                                break
+                except Exception:
+                    metrics = {}
+            elif path.suffix.lower() == ".json":
+                metrics = _static_metrics_from_mapping(_safe_read_json_dict(path))
+            if metrics:
+                units = {
+                    key: str(SYSTEM_INFLUENCE_UNIT_CATALOG.get(key) or "")
+                    for key in metrics
+                    if str(SYSTEM_INFLUENCE_UNIT_CATALOG.get(key) or "")
+                }
+                return {
+                    "status": _status_from_metrics(metrics),
+                    "detail": "Static-trim result fields were found in the selected run evidence.",
+                    "path": str(path),
+                    "metrics": dict(metrics),
+                    "units": units,
+                }
+
+        return {
+            "status": "MISSING",
+            "detail": "No static_trim_* result fields were found in selected results or fit details.",
+            "path": "",
+            "metrics": {},
+            "units": {},
+        }
+
+    def analysis_animator_handoff_summary(self, snapshot: EngineeringAnalysisSnapshot) -> dict[str, Any]:
+        context_path = self.analysis_context_path()
+        link_path = self.animator_link_contract_path()
+        context_exists = context_path.exists() and context_path.is_file()
+        link_exists = link_path.exists() and link_path.is_file()
+        context_payload = _safe_read_json_dict(context_path)
+        link_payload = _safe_read_json_dict(link_path)
+        pointer = dict(
+            context_payload.get("selected_result_artifact_pointer")
+            or link_payload.get("selected_result_artifact_pointer")
+            or {}
+        )
+        pointer_exists = bool(pointer.get("exists"))
+        raw_pointer_path = str(pointer.get("path") or "").strip()
+        if raw_pointer_path and not pointer_exists:
+            try:
+                pointer_exists = Path(raw_pointer_path).expanduser().exists()
+            except Exception:
+                pointer_exists = False
+
+        context_hash = ""
+        link_hash = ""
+        try:
+            context_hash = _sha256_file(context_path) if context_exists else ""
+        except Exception:
+            context_hash = ""
+        try:
+            link_hash = _sha256_file(link_path) if link_exists else ""
+        except Exception:
+            link_hash = ""
+
+        handoff_hash = str(
+            context_payload.get("selected_run_contract_hash")
+            or link_payload.get("run_contract_hash")
+            or ""
+        )
+        selected_hash_match = bool(
+            snapshot.selected_run_contract_hash
+            and handoff_hash
+            and handoff_hash == snapshot.selected_run_contract_hash
+        )
+        if context_exists and link_exists and selected_hash_match and pointer_exists:
+            status = "READY"
+        elif context_exists or link_exists:
+            status = "PARTIAL"
+        elif snapshot.contract_status in {"MISSING", "INVALID", "BLOCKED"}:
+            status = "BLOCKED"
+        else:
+            status = "MISSING"
+
+        return {
+            "handoff_id": ANALYSIS_TO_ANIMATOR_HANDOFF_ID,
+            "status": status,
+            "analysis_context_path": str(context_path),
+            "analysis_context_exists": context_exists,
+            "analysis_context_hash": context_hash,
+            "animator_link_contract_path": str(link_path),
+            "animator_link_contract_exists": link_exists,
+            "animator_link_contract_hash": link_hash,
+            "selected_artifact_pointer_status": "READY" if pointer_exists else "MISSING",
+            "selected_result_artifact_pointer": pointer,
+            "selected_run_contract_hash": snapshot.selected_run_contract_hash,
+            "handoff_selected_run_contract_hash": handoff_hash,
+            "selected_run_hash_match": selected_hash_match,
+        }
+
+    def analysis_workspace_pipeline_status(
+        self,
+        snapshot: EngineeringAnalysisSnapshot,
+    ) -> tuple[EngineeringAnalysisPipelineRow, ...]:
+        rows: list[EngineeringAnalysisPipelineRow] = []
+
+        context = snapshot.selected_run_context
+        selected_status = "READY"
+        if snapshot.contract_status == "DEGRADED":
+            selected_status = "PARTIAL"
+        elif snapshot.contract_status in {"MISSING", "INVALID", "BLOCKED"} or snapshot.run_dir is None:
+            selected_status = "BLOCKED"
+        rows.append(
+            EngineeringAnalysisPipelineRow(
+                key="selected_run_context",
+                section="selected_run",
+                title="HO-007 selected-run context",
+                status=selected_status,
+                detail="Master selected-run contract consumed by WS-ANALYSIS.",
+                path=snapshot.selected_run_contract_path,
+                metrics={
+                    "handoff_id": SELECTED_RUN_HANDOFF_ID,
+                    "run_id": context.run_id if context else "",
+                    "objective_contract_hash": context.objective_contract_hash if context else "",
+                    "hard_gate_key": context.hard_gate_key if context else "",
+                    "hard_gate_tolerance": context.hard_gate_tolerance if context else "",
+                    "active_baseline_hash": context.active_baseline_hash if context else "",
+                    "suite_snapshot_hash": context.suite_snapshot_hash if context else "",
+                    "selected_run_contract_hash": snapshot.selected_run_contract_hash,
+                    "contract_status": snapshot.contract_status,
+                    "run_dir": str(snapshot.run_dir or ""),
+                },
+                source="workspace/handoffs/WS-OPTIMIZATION/selected_run_contract.json",
+            )
+        )
+
+        autopilot = self._artifact_for_keys(
+            snapshot,
+            ("autopilot_v20_wrapper_json", "autopilot_v19_wrapper_json"),
+        )
+        autopilot_script = self.repo_root / "pneumo_solver_ui" / "calibration" / "pipeline_npz_autopilot_v20.py"
+        rows.append(
+            EngineeringAnalysisPipelineRow(
+                key="calibration_autopilot_v20",
+                section="calibration",
+                title="Autopilot v20 calibration pipeline",
+                status="READY" if autopilot is not None else "AVAILABLE_NOT_RUN",
+                detail=(
+                    "Autopilot wrapper evidence was found."
+                    if autopilot is not None
+                    else "Pipeline capability is available; this status pass does not launch heavy calibration."
+                ),
+                path=autopilot.path if autopilot is not None else autopilot_script,
+                source="pneumo_solver_ui.calibration.pipeline_npz_autopilot_v20",
+            )
+        )
+
+        fit_report = self._artifact_for_keys(
+            snapshot,
+            ("report_full_md", "fit_report_final_json", "calibration_report_md", "fit_report_json"),
+        )
+        fit_ready = {"report_full_md", "fit_report_final_json"}.issubset(
+            {artifact.key for artifact in snapshot.artifacts}
+        )
+        rows.append(
+            EngineeringAnalysisPipelineRow(
+                key="calibration_fit_reports",
+                section="calibration",
+                title="Calibration fit reports",
+                status="READY" if fit_ready else ("PARTIAL" if fit_report is not None else "MISSING"),
+                detail="Full/final calibration reports and fit evidence from the selected run.",
+                path=fit_report.path if fit_report is not None else None,
+                source="report_full_from_run_v1 / fit_report artifacts",
+            )
+        )
+
+        static_trim = self._read_static_trim_summary(snapshot)
+        rows.append(
+            EngineeringAnalysisPipelineRow(
+                key="calibration_static_trim",
+                section="calibration",
+                title="Static-trim result evidence",
+                status=str(static_trim.get("status") or "MISSING"),
+                detail=str(static_trim.get("detail") or ""),
+                path=Path(str(static_trim.get("path"))) if str(static_trim.get("path") or "") else None,
+                units=dict(static_trim.get("units") or {}),
+                metrics=dict(static_trim.get("metrics") or {}),
+                source="selected results CSV/JSON and fit details",
+            )
+        )
+
+        system_influence = self._artifact_for_keys(snapshot, ("system_influence_json",))
+        rows.append(
+            EngineeringAnalysisPipelineRow(
+                key="influence_system",
+                section="influence",
+                title="System influence report",
+                status=(
+                    "READY"
+                    if snapshot.influence_status == "PASS"
+                    else ("PARTIAL" if system_influence is not None else "MISSING")
+                ),
+                detail="System influence artifacts and sensitivity rows from the selected run.",
+                path=system_influence.path if system_influence is not None else None,
+                metrics={"sensitivity_row_count": len(snapshot.sensitivity_rows)},
+                source="system_influence_report_v1",
+            )
+        )
+
+        staging_artifacts = [
+            artifact
+            for artifact in snapshot.artifacts
+            if artifact.key in {"param_staging_influence_md", "stages_influence_json"}
+        ]
+        rows.append(
+            EngineeringAnalysisPipelineRow(
+                key="influence_staging",
+                section="influence",
+                title="Influence-guided staging",
+                status=(
+                    "READY"
+                    if len(staging_artifacts) >= 2
+                    else ("PARTIAL" if staging_artifacts else ("AVAILABLE_NOT_RUN" if system_influence else "MISSING"))
+                ),
+                detail="Param staging evidence derived from influence artifacts when run.",
+                path=staging_artifacts[0].path if staging_artifacts else None,
+                metrics={"artifact_count": len(staging_artifacts)},
+                source="param_staging_v3_influence",
+            )
+        )
+
+        compare_artifacts = [
+            artifact
+            for artifact in snapshot.artifacts
+            if artifact.path.suffix.lower() == ".json"
+            and (artifact.category == "compare_influence" or "compare_influence" in artifact.key)
+        ]
+        try:
+            compare_surfaces = self.compare_influence_surfaces(snapshot, top_k=5)
+            compare_surface_error = ""
+        except Exception as exc:
+            compare_surfaces = ()
+            compare_surface_error = f"{type(exc).__name__}: {exc!s}"
+        rows.append(
+            EngineeringAnalysisPipelineRow(
+                key="influence_compare_surfaces",
+                section="influence",
+                title="Compare influence surfaces",
+                status=(
+                    "READY"
+                    if compare_surfaces
+                    else ("PARTIAL" if compare_artifacts else "MISSING")
+                ),
+                detail=compare_surface_error or "Compare influence artifacts parsed for axes, units, and diagnostics.",
+                path=compare_artifacts[0].path if compare_artifacts else None,
+                metrics={
+                    "artifact_count": len(compare_artifacts),
+                    "surface_count": len(compare_surfaces),
+                    "titles": [str(surface.get("title") or "") for surface in compare_surfaces],
+                },
+                source="analysis compare influence surface contract",
+            )
+        )
+
+        rows.append(
+            EngineeringAnalysisPipelineRow(
+                key="sensitivity_summary",
+                section="sensitivity_uncertainty",
+                title="Sensitivity summary",
+                status="READY" if snapshot.sensitivity_rows else "MISSING",
+                detail="Ranked sensitivity rows from system_influence.json.",
+                path=system_influence.path if system_influence is not None else None,
+                units={
+                    "score": str(snapshot.unit_catalog.get("score") or ""),
+                    "eps_rel_used": str(snapshot.unit_catalog.get("eps_rel_used") or ""),
+                },
+                metrics={"row_count": len(snapshot.sensitivity_rows)},
+                source="build_sensitivity_summary",
+            )
+        )
+
+        uq_artifacts = [
+            artifact
+            for artifact in snapshot.artifacts
+            if artifact.key in {
+                "uq_sensitivity_summary_csv",
+                "measurement_priority_csv",
+                "uq_runs_csv",
+                "uq_report_md",
+            }
+        ]
+        rows.append(
+            EngineeringAnalysisPipelineRow(
+                key="uncertainty_uq",
+                section="sensitivity_uncertainty",
+                title="Uncertainty/UQ artifacts",
+                status=(
+                    "READY"
+                    if len(uq_artifacts) >= 2
+                    else ("PARTIAL" if uq_artifacts else "AVAILABLE_NOT_RUN")
+                ),
+                detail="Optional UQ advisor outputs are discovered only; this pass does not launch UQ.",
+                path=uq_artifacts[0].path if uq_artifacts else None,
+                metrics={
+                    "artifact_count": len(uq_artifacts),
+                    "artifact_keys": [artifact.key for artifact in uq_artifacts],
+                },
+                source="uncertainty_advisor outputs",
+            )
+        )
+
+        animator_summary = self.analysis_animator_handoff_summary(snapshot)
+        rows.append(
+            EngineeringAnalysisPipelineRow(
+                key="handoff_ho008_animator",
+                section="handoffs_evidence",
+                title="HO-008 Animator handoff",
+                status=str(animator_summary.get("status") or "MISSING"),
+                detail="Analysis context and animator link contract preflight status.",
+                path=self.analysis_context_path(),
+                metrics=animator_summary,
+                source="workspace/handoffs/WS-ANALYSIS",
+            )
+        )
+
+        rows.append(
+            EngineeringAnalysisPipelineRow(
+                key="handoff_ho009_diagnostics",
+                section="handoffs_evidence",
+                title="HO-009 Diagnostics evidence manifest",
+                status=snapshot.diagnostics_evidence_manifest_status,
+                detail="Latest engineering analysis evidence manifest freshness for Diagnostics/SEND handoff.",
+                path=snapshot.diagnostics_evidence_manifest_path or (
+                    self.send_bundles_dir / LATEST_ENGINEERING_ANALYSIS_EVIDENCE_MANIFEST
+                ),
+                metrics={
+                    "handoff_id": ENGINEERING_ANALYSIS_HANDOFF_ID,
+                    "manifest_hash": snapshot.diagnostics_evidence_manifest_hash,
+                    "run_dir": str(snapshot.run_dir or ""),
+                    "selected_run_contract_hash": snapshot.selected_run_contract_hash,
+                },
+                source="send_bundles/latest_engineering_analysis_evidence_manifest.json",
+            )
+        )
+
+        return tuple(rows)
+
+    def analysis_workspace_runtime_gaps(
+        self,
+        snapshot: EngineeringAnalysisSnapshot,
+    ) -> tuple[dict[str, Any], ...]:
+        gap_statuses = {"MISSING", "BLOCKED", "PARTIAL", "AVAILABLE_NOT_RUN", "INVALID", "STALE"}
+        gaps: list[dict[str, Any]] = []
+        for row in self.analysis_workspace_pipeline_status(snapshot):
+            if row.status in gap_statuses:
+                gaps.append(
+                    {
+                        "key": row.key,
+                        "section": row.section,
+                        "title": row.title,
+                        "status": row.status,
+                        "detail": row.detail,
+                        "path": str(row.path or ""),
+                    }
+                )
+        return tuple(gaps)
 
     def _result_artifact_pointer(self, raw_path: Path | str | None) -> dict[str, Any]:
         text = str(raw_path or "").strip()
@@ -1452,6 +1981,22 @@ class DesktopEngineeringAnalysisRuntime:
         compare_surfaces: Sequence[Mapping[str, Any]] | None = None,
     ) -> dict[str, Any]:
         selected_artifacts = [self._artifact_record(artifact) for artifact in snapshot.artifacts]
+        for item in selected_artifacts:
+            item["source_run_dir"] = str(snapshot.run_dir or "")
+            item["source_selected_run_contract_hash"] = snapshot.selected_run_contract_hash
+            item["source_objective_contract_hash"] = (
+                snapshot.selected_run_context.objective_contract_hash
+                if snapshot.selected_run_context is not None
+                else ""
+            )
+            raw_path = str(item.get("path") or "")
+            relpath = ""
+            if raw_path and snapshot.run_dir is not None:
+                try:
+                    relpath = str(Path(raw_path).resolve().relative_to(snapshot.run_dir))
+                except Exception:
+                    relpath = ""
+            item["source_relpath"] = relpath
         report_provenance = [
             item
             for item in selected_artifacts
@@ -1505,6 +2050,8 @@ class DesktopEngineeringAnalysisRuntime:
             validation_warnings.append(
                 f"{len(unparsed_compare_artifacts)} compare_influence artifact(s) were not parseable as surfaces."
             )
+        pipeline_rows = [row.to_payload() for row in self.analysis_workspace_pipeline_status(snapshot)]
+        runtime_data_gaps = [dict(item) for item in self.analysis_workspace_runtime_gaps(snapshot)]
         payload: dict[str, Any] = {
             "schema": ENGINEERING_ANALYSIS_EVIDENCE_SCHEMA,
             "schema_version": ENGINEERING_ANALYSIS_EVIDENCE_SCHEMA_VERSION,
@@ -1591,6 +2138,8 @@ class DesktopEngineeringAnalysisRuntime:
             },
             "unit_catalog": dict(snapshot.unit_catalog),
             "validated_artifacts": validated_artifacts,
+            "analysis_workspace_pipeline": pipeline_rows,
+            "runtime_data_gaps": runtime_data_gaps,
             "sensitivity_summary": [
                 row.to_payload()
                 for row in snapshot.sensitivity_rows
@@ -1600,6 +2149,7 @@ class DesktopEngineeringAnalysisRuntime:
                 "surface_count": len(surfaces),
                 "unparsed_artifacts": unparsed_compare_artifacts,
                 "source": "explicit" if compare_surfaces is not None else "artifact_auto_discovery",
+                "surface_titles": [str(surface.get("title") or "") for surface in surfaces],
             },
             "compare_influence_surfaces": surfaces,
             "report_provenance": report_provenance,

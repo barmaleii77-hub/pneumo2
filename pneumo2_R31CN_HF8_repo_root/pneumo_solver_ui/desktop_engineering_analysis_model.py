@@ -57,6 +57,14 @@ SYSTEM_INFLUENCE_UNIT_CATALOG: dict[str, str] = {
     "Ktheta": "N*m/rad",
     "f_roll": "Hz",
     "f_pitch": "Hz",
+    "static_trim_body_height_err_max_m": "m",
+    "static_trim_max_abs_res": "model residual",
+    "static_trim_pressure_trim_max_abs_scale_delta": "dimensionless",
+    "static_trim_pressure_trim_enable": "bool",
+    "static_trim_pressure_trim_bootstrap_applied": "bool",
+    "static_trim_pressure_trim_mode": "enum",
+    "static_trim_pressure_trim_precharge_override_json": "json",
+    "static_trim_success": "bool",
 }
 
 
@@ -175,6 +183,32 @@ class EngineeringSensitivityRow:
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class EngineeringAnalysisPipelineRow:
+    key: str
+    section: str
+    title: str
+    status: str
+    detail: str = ""
+    path: Path | None = None
+    units: Mapping[str, str] = field(default_factory=dict)
+    metrics: Mapping[str, Any] = field(default_factory=dict)
+    source: str = ""
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "key": str(self.key),
+            "section": str(self.section),
+            "title": str(self.title),
+            "status": str(self.status),
+            "detail": str(self.detail or ""),
+            "path": str(self.path or ""),
+            "units": dict(self.units or {}),
+            "metrics": dict(self.metrics or {}),
+            "source": str(self.source or ""),
+        }
 
 
 @dataclass(frozen=True)
@@ -670,6 +704,7 @@ __all__ = [
     "ENGINEERING_ANALYSIS_SCHEMA_VERSION",
     "EngineeringAnalysisArtifact",
     "EngineeringAnalysisJobResult",
+    "EngineeringAnalysisPipelineRow",
     "EngineeringAnalysisSnapshot",
     "EngineeringSensitivityRow",
     "SELECTED_RUN_CONSUMED_BY",
