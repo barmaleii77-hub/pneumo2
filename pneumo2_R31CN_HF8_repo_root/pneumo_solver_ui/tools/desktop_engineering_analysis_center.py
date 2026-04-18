@@ -8,7 +8,7 @@ import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import Callable
+from typing import Any, Callable
 
 from pneumo_solver_ui.desktop_engineering_analysis_model import (
     EngineeringAnalysisArtifact,
@@ -50,6 +50,9 @@ def _status_text(value: str) -> str:
         "BLOCKED": "заблокировано",
         "DEGRADED": "требует внимания",
         "FAILED": "ошибка",
+        "INVALID": "некорректно",
+        "STALE": "устарело",
+        "AVAILABLE_NOT_RUN": "доступно, не запускалось",
         "FINISHED": "завершено",
         "MISSING_INPUTS": "нет входных данных",
     }
@@ -95,6 +98,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self._path_by_iid: dict[str, Path] = {}
         self._candidate_by_iid: dict[str, dict] = {}
         self._sensitivity_by_iid: dict[str, EngineeringSensitivityRow] = {}
+        self._pipeline_by_iid: dict[str, dict[str, Any]] = {}
         self._worker_thread: threading.Thread | None = None
 
         self.release_var = tk.StringVar(master=self, value=f"Release: {get_release(default='unknown')}")
@@ -298,8 +302,11 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self._path_by_iid.clear()
         self._candidate_by_iid.clear()
         self._sensitivity_by_iid.clear()
+        self._pipeline_by_iid.clear()
         self.artifact_tree.delete(*self.artifact_tree.get_children())
         self.sensitivity_tree.delete(*self.sensitivity_tree.get_children())
+        pipeline_rows = self.runtime.analysis_workspace_pipeline_status(snapshot)
+        runtime_gaps = self.runtime.analysis_workspace_runtime_gaps(snapshot)
 
         self.summary_var.set(
             " | ".join(
@@ -308,6 +315,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
                     f"influence={_status_text(snapshot.influence_status)}",
                     f"calibration={_status_text(snapshot.calibration_status)}",
                     f"compare={_status_text(snapshot.compare_status)}",
+                    f"v38_gaps={len(runtime_gaps)}",
                 )
             )
         )
@@ -388,6 +396,48 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
                 text="Required artifacts ready",
                 values=("READY", "validated_artifacts", ""),
             )
+
+        pipeline_iid = self.artifact_tree.insert(
+            run_iid,
+            "end",
+            text="V38 workspace pipeline / gaps",
+            values=(
+                "READY" if not runtime_gaps else "PARTIAL",
+                "WS-ANALYSIS pipeline",
+                f"rows={len(pipeline_rows)} | gaps={len(runtime_gaps)} | OPT -> AN -> AM/DI",
+            ),
+            open=True,
+        )
+        section_iids: dict[str, str] = {}
+        section_labels = {
+            "selected_run": "Selected-run context",
+            "calibration": "Calibration pipelines",
+            "influence": "Influence and compare context",
+            "sensitivity_uncertainty": "Sensitivity / uncertainty",
+            "handoffs_evidence": "Animator / Diagnostics handoffs",
+        }
+        for row in pipeline_rows:
+            section = str(row.section or "workspace")
+            section_iid = section_iids.get(section)
+            if section_iid is None:
+                section_iid = self.artifact_tree.insert(
+                    pipeline_iid,
+                    "end",
+                    text=section_labels.get(section, section),
+                    values=("", "v38_pipeline_section", ""),
+                    open=True,
+                )
+                section_iids[section] = section_iid
+            payload = row.to_payload()
+            iid = self.artifact_tree.insert(
+                section_iid,
+                "end",
+                text=row.title,
+                values=(row.status, row.section, str(row.path or row.detail or "")),
+            )
+            self._pipeline_by_iid[iid] = payload
+            if row.path is not None:
+                self._path_by_iid[iid] = row.path
 
         group_iids: dict[str, str] = {}
         for artifact in sorted(snapshot.artifacts, key=lambda item: (item.category, item.title)):
@@ -492,6 +542,10 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
 
     def _snapshot_detail(self, snapshot: EngineeringAnalysisSnapshot) -> str:
         compare_surfaces = self._compare_surface_details(snapshot)
+        pipeline_rows = [
+            row.to_payload()
+            for row in self.runtime.analysis_workspace_pipeline_status(snapshot)
+        ]
         payload = {
             "status": snapshot.status,
             "run_dir": str(snapshot.run_dir or ""),
@@ -503,10 +557,21 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             "artifact_count": len(snapshot.artifacts),
             "sensitivity_row_count": len(snapshot.sensitivity_rows),
             "compare_influence_surface_count": len(compare_surfaces),
+            "compare_influence_diagnostics": {
+                "surface_count": len(compare_surfaces),
+                "source": "desktop_detail_auto_discovery",
+                "titles": [str(surface.get("title") or "") for surface in compare_surfaces],
+            },
             "compare_influence_surfaces": compare_surfaces,
             "unit_catalog": dict(snapshot.unit_catalog),
             "validated_artifacts": self.runtime.validated_artifacts_summary(snapshot),
             "handoff_requirements": self.runtime.selected_run_handoff_requirements(snapshot),
+            "analysis_workspace_pipeline": pipeline_rows,
+            "runtime_data_gaps": [
+                dict(item)
+                for item in self.runtime.analysis_workspace_runtime_gaps(snapshot)
+            ],
+            "animator_handoff_summary": self.runtime.analysis_animator_handoff_summary(snapshot),
         }
         return json.dumps(payload, ensure_ascii=False, indent=2)
 
@@ -682,6 +747,10 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         candidate = self._candidate_by_iid.get(iid)
         if candidate is not None:
             self._set_text(self.detail_text, json.dumps(candidate, ensure_ascii=False, indent=2))
+            return
+        pipeline_row = self._pipeline_by_iid.get(iid)
+        if pipeline_row is not None:
+            self._set_text(self.detail_text, json.dumps(pipeline_row, ensure_ascii=False, indent=2))
             return
         path = self._path_by_iid.get(iid)
         if path is not None:

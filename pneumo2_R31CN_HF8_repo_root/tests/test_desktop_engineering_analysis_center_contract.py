@@ -61,6 +61,17 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "validated_artifacts_summary" in src
     assert '"validated_artifacts"' in src
     assert "Validated artifacts" in src
+    assert "V38 workspace pipeline / gaps" in src
+    assert "analysis_workspace_pipeline_status" in src
+    assert "analysis_workspace_runtime_gaps" in src
+    assert '"analysis_workspace_pipeline"' in src
+    assert '"runtime_data_gaps"' in src
+    assert "Calibration pipelines" in src
+    assert "Influence and compare context" in src
+    assert "Sensitivity / uncertainty" in src
+    assert "Animator / Diagnostics handoffs" in src
+    assert "animator_handoff_summary" in src
+    assert "compare_influence_diagnostics" in src
     assert "missing_required_artifacts" in src
     assert "missing_required_artifact" in src
     assert "Required artifacts ready" in src
