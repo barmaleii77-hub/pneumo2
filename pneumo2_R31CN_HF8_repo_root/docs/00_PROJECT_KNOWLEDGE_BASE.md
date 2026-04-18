@@ -372,14 +372,15 @@ Operational note:
   параллельных чатов с учётом dirty tree; после recovery-pass считать этот
   файл historical comparison layer.
 - Branch/tree recovery audit фиксирует, что primary `codex/work` снова чистый,
-  локальные duplicate worktrees/branches удалены, а смешанный GUI-код сохранён
-  только в quarantine branch для read-only разбора по lane.
+  локальные duplicate worktrees/branches удалены, а последующая судьба
+  смешанного GUI-кода зафиксирована в quarantine resolution note.
 - Quarantine 7823dc2 resolution фиксирует, что локальный quarantine patch
   разобран, перенесён в `codex/work` cherry-pick-ом и проверен focused
   desktop/docs/no-mojibake тестами без runtime-closure claims.
 - Recovery Plan-mode prompts становятся текущим starter pack для тех же 10
   параллельных чатов: старт только от clean `origin/codex/work`, никаких веток
-  и правок до принятого плана, quarantine только read-only.
+  и правок до принятого плана, resolved quarantine не использовать как
+  рабочий источник, а post-resolution baseline сохранять по lane.
 
 Связанные, но вспомогательные UX-источники:
 

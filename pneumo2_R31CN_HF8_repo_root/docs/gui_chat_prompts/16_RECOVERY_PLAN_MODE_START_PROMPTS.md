@@ -1,12 +1,13 @@
-# Recovery Plan-Mode Start Prompts
+# Post-Quarantine Recovery Plan-Mode Start Prompts
 
 Purpose: self-contained starter prompts for the same 10 parallel chats after
-the branch/tree recovery pass of 2026-04-18.
+the branch/tree recovery pass and quarantine `7823dc2` resolution of
+2026-04-18.
 
 Use this file instead of `15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md` for new
 chat starts. It assumes that `codex/work` is clean, old local worktree sprawl
-has been removed and the mixed unfinished GUI code is preserved only in the
-local quarantine branch `codex/quarantine-mixed-gui-dirty-20260418`.
+has been removed, quarantine commit `7823dc2` has been integrated into
+`codex/work` by cherry-pick and the local quarantine branch has been deleted.
 
 ## Global First-Run Rule
 
@@ -19,21 +20,27 @@ Plan mode means:
 - do not stage, commit or push;
 - do not create, delete or move branches or worktrees;
 - do not run bulk cleanup commands;
-- do not merge, rebase or cherry-pick quarantine;
+- do not recreate, merge, rebase or cherry-pick the resolved quarantine branch;
 - report current branch, dirty files, owned files, forbidden files, proposed
   minimal patch, tests and evidence boundaries;
 - wait for user confirmation before implementation.
 
 Every chat must start from `origin/codex/work`, not from `main` and not from
-the quarantine branch. If the current worktree is dirty, the chat must report
-the dirty paths and stop before implementation.
+any historical local branch. If the current worktree is dirty, the chat must
+report the dirty paths and stop before implementation.
 
-Quarantine may be inspected read-only only if the lane owns the relevant files:
+The old quarantine branch is resolved. Do not look for it as a working source.
+If historical context is needed, read:
 
-```powershell
-git diff origin/codex/work...codex/quarantine-mixed-gui-dirty-20260418 -- <owned-path>
-git show codex/quarantine-mixed-gui-dirty-20260418:<repo-path>
-```
+- `pneumo2_R31CN_HF8_repo_root/docs/context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md`
+
+The integrated baseline from `7823dc2` is now part of `codex/work` and covers:
+
+- Main Shell launch surface and all-launchable-GUI coverage.
+- Input Data source/state markers and `Расчётные настройки` display title.
+- Desktop Mnemo close/runtime proof and unavailable truth-state evidence.
+- Optimizer/Results selected-run identity, resume safety and selected-run
+  contract evidence.
 
 Global prohibitions:
 
@@ -48,6 +55,7 @@ Required first-read documents for every lane:
 
 - `pneumo2_R31CN_HF8_repo_root/docs/00_PROJECT_KNOWLEDGE_BASE.md`
 - `pneumo2_R31CN_HF8_repo_root/docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md`
+- `pneumo2_R31CN_HF8_repo_root/docs/context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md`
 - `pneumo2_R31CN_HF8_repo_root/docs/context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md`
 - `pneumo2_R31CN_HF8_repo_root/docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md`
 - `pneumo2_R31CN_HF8_repo_root/docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md`
@@ -61,7 +69,7 @@ Required Plan-mode answer shape:
 2. Files owned by this lane.
 3. Files explicitly forbidden for this lane.
 4. Relevant KB requirements and open gaps.
-5. Whether quarantine contains relevant hunks and what to do with them.
+5. Which post-quarantine baseline behaviors this lane must preserve.
 6. Minimal implementation plan after confirmation.
 7. Tests and manual Windows checks.
 8. Evidence artifacts to update or create.
@@ -104,8 +112,8 @@ Forbidden without explicit coordination:
 - diagnostics/SEND producer internals
 - model/solver files
 
-Quarantine check:
-Inspect quarantine read-only only for owned shell files. Do not merge the quarantine commit. In the plan, say whether the shell hunks should be adopted, split, or rejected.
+Post-resolution baseline:
+The `7823dc2` shell work is already integrated. Preserve `Desktop Main Shell` as the launch target, `desktop_main_shell_qt.log` as the launcher log, and all-launchable-GUI coverage through browser, menu, toolbar and command search. Do not reintroduce `desktop_gui_spec_shell` as the primary launcher.
 
 Expected tests after implementation approval:
 - `python -m pytest tests/test_desktop_main_shell_qt_contract.py tests/test_desktop_main_shell_contract.py tests/test_desktop_shell_parity_contract.py tests/test_home_desktop_gui_launcher_contract.py tests/test_web_launcher_desktop_bridge_contract.py -q`
@@ -148,8 +156,8 @@ Forbidden without explicit coordination:
 - optimizer/results internals
 - model/solver files and parameter registry changes unless the plan explicitly proves a canonical-key update is required
 
-Quarantine check:
-Inspect quarantine read-only for input-owned files. In the plan, classify every relevant hunk as adopt, split, reject, or supersede.
+Post-resolution baseline:
+The `7823dc2` input work is already integrated. Preserve source/state markers, `Расчётные настройки` as the display title for numerical calculation settings, and WS-INPUTS snapshot/folder actions. Do not rename canonical section keys in persisted handoff data.
 
 Expected tests after implementation approval:
 - `python -m pytest tests/test_desktop_input_editor_contract.py tests/test_desktop_input_graphics_contract.py tests/test_desktop_suite_snapshot.py -q`
@@ -189,8 +197,8 @@ Forbidden without explicit coordination:
 - shell internals except small adapter/launcher requests
 - diagnostics/SEND internals except evidence-manifest registration requests
 
-Quarantine check:
-Inspect quarantine read-only for Mnemo files and the saved Mnemo acceptance note. Do not accept the quarantine as proof; runtime evidence must be regenerated or explicitly marked historical.
+Post-resolution baseline:
+The `7823dc2` Mnemo work is already integrated. Preserve close-time timer shutdown, unavailable truth-state visibility, runtime-proof close checks and the acceptance note boundaries. Treat `DESKTOP_MNEMO_WINDOWS_ACCEPTANCE_2026-04-18.md` as automated evidence plus manual-check TODOs, not final Windows visual closure.
 
 Expected tests after implementation approval:
 - `python -m pytest tests/test_desktop_mnemo_runtime_proof.py tests/test_desktop_mnemo_window_contract.py tests/test_desktop_mnemo_dataset_contract.py tests/test_desktop_mnemo_launcher_contract.py tests/test_desktop_mnemo_settings_bridge_contract.py tests/test_desktop_mnemo_snapshot_contract.py -q`
@@ -230,8 +238,8 @@ Forbidden without explicit coordination:
 - shell internals except adapter registration requests
 - diagnostics/SEND packaging internals
 
-Quarantine check:
-The current quarantine snapshot is not primarily a Compare Viewer patch. Inspect only if `git diff --name-only` shows owned compare files.
+Post-resolution baseline:
+No Compare Viewer code came from `7823dc2`. Start from current `codex/work` and coordinate only through explicit handoff artifacts such as selected-run context sidecars, objective hashes and diagnostics evidence.
 
 Expected tests after implementation approval:
 - `python -m pytest tests/test_qt_compare_viewer_compare_contract.py tests/test_qt_compare_viewer_dock_object_names.py tests/test_qt_compare_viewer_session_autoload_source.py tests/test_qt_compare_offline_npz_anim_diagnostics.py tests/test_r64_qt_compare_viewer_workspace_layout_runtime.py tests/test_r65_qt_compare_viewer_real_bundle_runtime_smoke.py -q`
@@ -272,8 +280,8 @@ Forbidden without explicit coordination:
 - shell internals except launcher adapter requests
 - model/solver changes unless the plan proves a producer-truth bug and updates evidence
 
-Quarantine check:
-The current quarantine snapshot is not primarily an Animator patch. Inspect only if owned Animator paths appear in the quarantine diff.
+Post-resolution baseline:
+No Desktop Animator code came from `7823dc2`. Start from current `codex/work`; preserve shell discoverability without moving Animator rendering or truth logic into shell or results modules.
 
 Expected tests after implementation approval:
 - choose a focused animator subset that matches the patch;
@@ -319,8 +327,8 @@ Forbidden without explicit coordination:
 - diagnostics/SEND packaging internals except evidence handoff requests
 - input/ring/run-setup source editors except explicit handoff contracts
 
-Quarantine check:
-Inspect quarantine read-only for optimizer/results owned files. In the plan, split optimizer and results hunks if they can land independently.
+Post-resolution baseline:
+The `7823dc2` optimizer/results work is already integrated. Preserve selected-run identity, resume preflight blocking for mismatched history runs, selected optimizer run contract evidence in Results Center and latest optimizer pointer surfacing.
 
 Expected tests after implementation approval:
 - `python -m pytest tests/test_desktop_optimizer_center_contract.py tests/test_test_center_results_center_contract.py tests/test_optimization_objective_contract.py tests/test_optimization_resume_run_dir.py tests/test_optimization_staged_resume_run_dir.py tests/test_r31cw_optimization_run_history_objective_contract.py -q`
@@ -366,8 +374,8 @@ Forbidden without explicit coordination:
 - Compare Viewer internals;
 - optimizer/results UI except evidence handoff requests.
 
-Quarantine check:
-The quarantine snapshot may contain Mnemo evidence visibility or shell bridge effects. Inspect only if owned diagnostics paths appear in the diff.
+Post-resolution baseline:
+The quarantine branch is resolved. Diagnostics should consume current `codex/work` evidence surfaces, including Mnemo runtime proof visibility and optimizer selected-run contract artifacts where relevant, without claiming closure for producer-owned gaps.
 
 Expected tests after implementation approval:
 - `python -m pytest tests/test_desktop_diagnostics_center_contract.py tests/test_v32_diagnostics_send_bundle_evidence.py tests/test_run_full_diagnostics_tool.py tests/test_health_report_inspect_send_bundle_anim_diagnostics.py tests/test_diagnostics_text_encoding_contract.py -q`
@@ -408,8 +416,8 @@ Forbidden without explicit coordination:
 - Compare Viewer UI;
 - shell UI except adapter registration requests.
 
-Quarantine check:
-The quarantine snapshot is not primarily a geometry producer patch. Inspect only if owned geometry/catalog paths appear in the diff.
+Post-resolution baseline:
+No geometry/catalog producer code came from `7823dc2`. Start from current `codex/work` and preserve strict source-of-truth geometry and no invented viewer geometry.
 
 Expected tests after implementation approval:
 - `python -m pytest tests/test_desktop_geometry_reference_center_contract.py tests/test_geometry_acceptance_release_gate.py tests/test_geometry_acceptance_web_and_bundle.py tests/test_active_generators_solver_points_canon.py -q`
@@ -449,8 +457,8 @@ Forbidden without explicit coordination:
 - Desktop Animator/Compare/Mnemo surfaces;
 - diagnostics/SEND packaging except evidence handoff requests.
 
-Quarantine check:
-The quarantine snapshot is not primarily an engineering analysis patch. Inspect only if owned analysis/calibration paths appear in the diff.
+Post-resolution baseline:
+No engineering/calibration code came from `7823dc2`, but the main shell now exposes the engineering analysis center in all launch surfaces. Preserve that discoverability and coordinate analysis handoff through optimizer/results evidence, not shell duplication.
 
 Expected tests after implementation approval:
 - `python -m pytest tests/test_desktop_engineering_analysis_contract.py tests/test_desktop_engineering_analysis_center_contract.py tests/test_static_trim_pressure_p0_bootstrap.py tests/test_static_trim_pressure_trim_targets.py -q`
@@ -498,8 +506,8 @@ Forbidden without explicit coordination:
 - Desktop Animator/Compare/Mnemo internals;
 - model/solver files unless canonical scenario semantics require a contract update.
 
-Quarantine check:
-The quarantine snapshot is not primarily a ring/run setup patch. Inspect only if owned ring/run setup paths appear in the diff.
+Post-resolution baseline:
+No ring/run setup code came from `7823dc2`. Start from current `codex/work`; preserve input handoff semantics and do not rename persisted canonical scenario or suite keys while improving desktop workflow.
 
 Expected tests after implementation approval:
 - `python -m pytest tests/test_desktop_ring_editor_contract.py tests/test_desktop_run_setup_center_contract.py tests/test_desktop_run_setup_modules.py tests/test_r33_ring_sine_input_semantics.py tests/test_ui_scenario_ring_no_free_spec.py -q`

@@ -63,8 +63,8 @@
    — resolution note for integrating quarantine commit `7823dc2` into
    `codex/work` by cherry-pick, with validation and non-closure boundaries.
 18. [16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
-   — current self-contained Plan-mode starter prompts for the same 10 chats.
-   Prefer this file for all new chat starts.
+   — current post-quarantine self-contained Plan-mode starter prompts for the
+   same 10 chats. Prefer this file for all new chat starts.
 19. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
    [TECHNICAL_SPECIFICATION.md](../context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md)
    и [GUI_SPEC.yaml](../context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml)
@@ -136,16 +136,18 @@
 - `15_CODE_AUDIT_PLAN_MODE_START_PROMPTS` задаёт обновлённые самодостаточные
   стартовые промты для тех же 10 чатов; после recovery-pass использовать его
   только как historical comparison layer.
-- `BRANCH_TREE_RECOVERY_AUDIT_2026-04-18` фиксирует текущий clean primary
-  worktree, quarantine branch, удаление локальных duplicate worktrees/branches
-  и новую политику старта параллельных чатов.
+- `BRANCH_TREE_RECOVERY_AUDIT_2026-04-18` фиксирует clean primary worktree,
+  удаление локальных duplicate worktrees/branches и новую политику старта
+  параллельных чатов; subsequent resolution status lives in the quarantine
+  resolution note.
 - `QUARANTINE_7823DC2_RESOLUTION_2026-04-18` фиксирует перенос карантинного
   патча в `codex/work` через cherry-pick, результаты focused validation и
   явные non-closure boundaries.
 - `16_RECOVERY_PLAN_MODE_START_PROMPTS` задаёт текущие самодостаточные
   стартовые промты для тех же 10 чатов: старт только с clean
-  `origin/codex/work`, quarantine только read-only и без веток до принятого
-  Plan-mode плана.
+  `origin/codex/work`, resolved quarantine не использовать как рабочий
+  источник, post-resolution baseline сохранять по lane и не создавать ветки до
+  принятого Plan-mode плана.
 - `v37_github_kb_supplement` задаёт successor KB/TZ/spec connector layer:
   consolidated technical specification, GUI_SPEC.yaml, workspace contract
   matrix, parameter catalogs, acceptance/requirements matrices, repo canon

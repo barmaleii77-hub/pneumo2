@@ -330,6 +330,13 @@ ID: `PLAN-0044`.
 Источник: chat: quarantine 7823dc2 resolution 2026-04-18.
 ID: `PLAN-0045`.
 
+46. Actualize 10 Plan-mode prompts after quarantine resolution
+Назначение: Обновить текущий prompt-pack для 10 параллельных GUI-чатов после интеграции quarantine commit 7823dc2: убрать инструкции искать/инспектировать удаленную quarantine branch, добавить post-resolution baseline для каждого lane и обязать новые чаты стартовать от clean origin/codex/work.
+Артефакт: [gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
+Статус: active.
+Источник: chat: actualize 10 prompts after quarantine resolution 2026-04-18.
+ID: `PLAN-0046`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:
