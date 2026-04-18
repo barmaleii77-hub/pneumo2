@@ -176,7 +176,7 @@ class DesktopResultsCenter(ttk.Frame):
         actions = ttk.Frame(header)
         actions.pack(side="right", anchor="ne")
         ttk.Button(actions, text="Обновить", command=self.refresh).pack(side="left")
-        self.btn_open_selected = ttk.Button(actions, text="Открыть выбранное", command=self._open_selected)
+        self.btn_open_selected = ttk.Button(actions, text="Открыть артефакт", command=self._open_selected)
         self.btn_open_selected.pack(side="left", padx=(8, 0))
         self.btn_diagnostics = ttk.Button(actions, text="Собрать диагностику", command=self._launch_full_diagnostics_gui)
         self.btn_diagnostics.pack(side="left", padx=(8, 0))

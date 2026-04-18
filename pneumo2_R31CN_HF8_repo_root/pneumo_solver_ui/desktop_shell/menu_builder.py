@@ -131,12 +131,12 @@ class ShellWorkspaceContextMenuController:
             state="normal" if self.workflow_specs else "disabled",
         )
         self.menu.add_command(
-            label="Предыдущий этап\tCtrl+Alt+Left",
+            label="Предыдущий раздел\tCtrl+Alt+Left",
             command=self.select_previous_workflow,
             state="normal" if has_workflow_sessions else "disabled",
         )
         self.menu.add_command(
-            label="Следующий этап\tCtrl+Alt+Right",
+            label="Следующий раздел\tCtrl+Alt+Right",
             command=self.select_next_workflow,
             state="normal" if has_workflow_sessions else "disabled",
         )
@@ -274,12 +274,12 @@ def build_shell_menubar(
                 command=continue_workflow,
             )
             section_menu.add_command(
-                label="Предыдущий этап маршрута\tCtrl+Alt+Left",
+                label="Предыдущий раздел маршрута\tCtrl+Alt+Left",
                 command=select_previous_workflow,
                 state="normal" if has_open_workflow_sessions() else "disabled",
             )
             section_menu.add_command(
-                label="Следующий этап маршрута\tCtrl+Alt+Right",
+                label="Следующий раздел маршрута\tCtrl+Alt+Right",
                 command=select_next_workflow,
                 state="normal" if has_open_workflow_sessions() else "disabled",
             )

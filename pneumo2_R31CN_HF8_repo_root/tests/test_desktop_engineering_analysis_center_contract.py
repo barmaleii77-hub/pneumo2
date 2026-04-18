@@ -18,7 +18,7 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert 'workspace = ttk.Panedwindow(self, orient="horizontal")' in src
     for label in (
         "Обновить",
-        "Открыть выбранное",
+        "Открыть артефакт",
         "Экспорт HO-007",
         "Экспорт evidence",
         "Открыть evidence",

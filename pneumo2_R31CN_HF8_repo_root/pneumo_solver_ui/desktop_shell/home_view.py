@@ -75,10 +75,10 @@ class ShellHomeViewController:
 
         for key, status_var in self.workflow_status_vars.items():
             status_var.set(
-                "Открыто в рабочей области" if key in open_keys else "Готово к открытию"
+                "Открыто в рабочей области" if key in open_keys else "Готов к переходу"
             )
         for key, button in self.workflow_buttons.items():
-            button.configure(text="Перейти к окну" if key in open_keys else "Открыть этап")
+            button.configure(text="Перейти к окну" if key in open_keys else "Перейти к разделу")
 
         if not sessions:
             self.session_summary_var.set(
@@ -293,14 +293,14 @@ def _build_workflow_box(
             wraplength=420,
             justify="left",
         ).pack(anchor="w", pady=(2, 6))
-        status_var = tk.StringVar(value="Готово к открытию")
+        status_var = tk.StringVar(value="Готов к переходу")
         ttk.Label(
             card,
             textvariable=status_var,
         ).pack(anchor="w", pady=(0, 6))
         button = ttk.Button(
             card,
-            text="Открыть этап",
+            text="Перейти к разделу",
             command=lambda key=spec.key: open_tool(key),
         )
         button.pack(anchor="w")

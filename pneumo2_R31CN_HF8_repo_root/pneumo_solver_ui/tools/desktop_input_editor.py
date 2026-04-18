@@ -129,7 +129,7 @@ class DesktopInputEditor:
         self._hosted = bool(hosted or not self._owns_root)
         self.root = host if host is not None else tk.Tk()
         if self._owns_root:
-            self.root.title(f"Данные машины ({RELEASE})")
+            self.root.title(f"Исходные данные ({RELEASE})")
             self.root.geometry("1160x860")
             self.root.minsize(1020, 760)
         self.ui_style = ttk.Style(self.root)

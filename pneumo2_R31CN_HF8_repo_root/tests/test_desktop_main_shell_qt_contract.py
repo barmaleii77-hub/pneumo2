@@ -213,10 +213,10 @@ def test_desktop_qt_shell_launcher_exposes_qt_first_cli_and_legacy_fallback() ->
     assert '"--runtime-proof-manual-template"' in src
     assert '"--runtime-proof-validate"' in src
     assert '"--runtime-proof-require-manual-pass"' in src
-    assert "Desktop shell tools (Qt shell catalog):" in src
+    assert "Desktop shell tools:" in src
     assert "from pneumo_solver_ui.tools import desktop_main_shell as legacy_shell" in src
     assert "from pneumo_solver_ui.desktop_qt_shell.main_window import main as run_qt_shell_main" in src
-    assert "fallback to legacy Tk shell" in src
+    assert "fallback to historical shell" in src
 
 
 def test_desktop_qt_shell_launcher_catalog_keeps_runtime_and_migration_metadata() -> None:
@@ -982,11 +982,11 @@ def test_desktop_qt_shell_coexistence_manager_tracks_managed_external_windows() 
 def test_desktop_qt_shell_launcher_validates_registry_keys_and_formats_catalog() -> None:
     catalog = desktop_main_shell_qt_module.format_tool_catalog()
 
-    assert "Desktop shell tools (Qt shell catalog):" in catalog
+    assert "Desktop shell tools:" in catalog
     assert "desktop_input_editor" in catalog
     assert "desktop_animator" in catalog
-    assert "managed_external" in catalog
-    assert "qt" in catalog.lower()
+    assert "master" in catalog
+    assert "derived" in catalog
 
     assert desktop_main_shell_qt_module.resolve_startup_tool_keys(
         ["desktop_input_editor", "compare_viewer"]

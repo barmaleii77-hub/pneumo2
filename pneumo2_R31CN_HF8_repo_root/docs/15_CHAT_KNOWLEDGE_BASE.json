@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-18T08:07:34+00:00",
+  "updated_at": "2026-04-18T08:34:02+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -160,6 +160,14 @@
       "source": "chat: branch/tree recovery 2026-04-18",
       "title": "Clean branch starts for parallel GUI chats",
       "details": "Новые параллельные GUI-чаты должны начинать работу только от clean origin/codex/work, не создавать ветки и не менять файлы до принятого Plan-mode плана; quarantine branch можно использовать только read-only для разбора сохраненных смешанных GUI-правок.",
+      "status": "active"
+    },
+    {
+      "id": "REQ-0021",
+      "created_at": "2026-04-18T08:34:02+00:00",
+      "source": "chat: V37 compliance correction 2026-04-18",
+      "title": "V37 GUI visual surface is mandatory",
+      "details": "Все GUI-направления должны соответствовать V37 визуально и по PIPELINE_OPTIMIZED.dot: tree/search/selection sync из shell является навигацией, лишние промежуточные кнопки навигации являются blocker, пользовательская поверхность не должна показывать служебные migration/runtime/toolkit/implementation labels вместо операторской информации. Каноническое имя WS-INPUTS: Исходные данные.",
       "status": "active"
     }
   ],
@@ -577,6 +585,15 @@
       "details": "Обновить текущий prompt-pack для 10 параллельных GUI-чатов после интеграции quarantine commit 7823dc2: убрать инструкции искать/инспектировать удаленную quarantine branch, добавить post-resolution baseline для каждого lane и обязать новые чаты стартовать от clean origin/codex/work.",
       "artifact_path": "gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md",
       "status": "active"
+    },
+    {
+      "id": "PLAN-0047",
+      "created_at": "2026-04-18T08:34:02+00:00",
+      "source": "chat: V37 compliance correction 2026-04-18",
+      "title": "Actualize 10 chat prompts for V37 visual compliance",
+      "details": "Prompt pack 16 now requires visual GUI checks against V37 GUI_SPEC/WORKSPACE/ACCEPTANCE/PIPELINE, blocks service-jargon leaks, requires direct shell tree/search/selection sync and rejects ad-hoc labels such as machine-data wording.",
+      "artifact_path": "docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md",
+      "status": "done"
     }
   ]
 }

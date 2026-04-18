@@ -380,7 +380,11 @@ Operational note:
 - Recovery Plan-mode prompts становятся текущим starter pack для тех же 10
   параллельных чатов: старт только от clean `origin/codex/work`, никаких веток
   и правок до принятого плана, resolved quarantine не использовать как
-  рабочий источник, а post-resolution baseline сохранять по lane.
+  рабочий источник, post-resolution baseline сохранять по lane, обязательно
+  проводить V37 visual acceptance и проверять соответствие
+  `PIPELINE_OPTIMIZED.dot` без лишних user-flow шагов: tree/search/selection
+  sync из shell является навигацией, а служебные статусы/implementation labels
+  не являются пользовательской информацией.
 
 Связанные, но вспомогательные UX-источники:
 

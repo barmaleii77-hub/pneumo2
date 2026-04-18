@@ -40,22 +40,46 @@ def _build_shell_settings() -> QtCore.QSettings:
     return QtCore.QSettings("PneumoApp", "DesktopQtMainShell")
 
 
-def _migration_label(spec: DesktopShellToolSpec) -> str:
+def _operator_state_label(spec: DesktopShellToolSpec) -> str:
     status = spec.effective_migration_status
     if status == "managed_external":
-        return "Управляемое внешнее окно"
+        return "Готово: отдельное окно"
     if status == "in_development":
-        return "В разработке"
-    return "Нативный маршрут"
+        return "Есть открытые ограничения"
+    return "Готово к работе"
 
 
 def _runtime_label(spec: DesktopShellToolSpec) -> str:
     kind = spec.effective_runtime_kind
     if kind == "tk":
-        return "Tk"
+        return "Рабочее GUI-окно"
     if kind == "qt":
-        return "Qt"
-    return "Процесс"
+        return "Специализированное GUI-окно"
+    return "Служебный процесс"
+
+
+def _workspace_role_label(spec: DesktopShellToolSpec) -> str:
+    role = spec.effective_workspace_role
+    if role == "workspace":
+        return "Рабочий раздел"
+    if role == "specialized_window":
+        return "Специализированное окно"
+    if role == "contextual_tool":
+        return "Контекстный инструмент"
+    return "Служебный центр"
+
+
+def _source_of_truth_label(spec: DesktopShellToolSpec) -> str:
+    role = spec.effective_source_of_truth_role
+    if role == "master":
+        return "Основной ввод"
+    if role == "derived":
+        return "Результаты и анализ"
+    if role == "launcher":
+        return "Запуск"
+    if role == "support":
+        return "Справка и диагностика"
+    return "Не задан"
 
 
 def _unique_specs(specs: tuple[DesktopShellToolSpec, ...]) -> tuple[DesktopShellToolSpec, ...]:
@@ -191,7 +215,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
     def _configure_window(self) -> None:
         release = get_release()
-        self.setWindowTitle(f"PneumoApp - Qt shell инженера ({release})")
+        self.setWindowTitle(f"PneumoApp - Рабочее место инженера ({release})")
         self.setObjectName("DesktopQtMainShell")
         self.resize(1640, 980)
         self.setDockOptions(
@@ -320,11 +344,11 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             if spec is None:
                 continue
             self._add_tool_action(tools_menu, spec)
-        legacy_action = tools_menu.addAction("Открыть legacy Tk-shell")
+        legacy_action = tools_menu.addAction("Открыть резервное старое окно")
         legacy_action.triggered.connect(self._show_legacy_shell_note)
 
         help_menu = menubar.addMenu("Справка")
-        help_action = help_menu.addAction("О текущем Qt-shell")
+        help_action = help_menu.addAction("О рабочем месте")
         help_action.triggered.connect(self._show_about_dialog)
 
     def _build_command_toolbar(self) -> None:
@@ -339,8 +363,8 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.workspace_combo.currentIndexChanged.connect(self._on_workspace_changed)
         toolbar.addWidget(self.workspace_combo)
 
-        self.open_workspace_button = QtWidgets.QPushButton("Открыть рабочее пространство", toolbar)
-        self.open_workspace_button.setToolTip("Открывает выбранное рабочее пространство через launcher/handoff.")
+        self.open_workspace_button = QtWidgets.QPushButton("Запустить раздел", toolbar)
+        self.open_workspace_button.setToolTip("Запускает выбранный рабочий раздел с текущим проектным контекстом.")
         self.open_workspace_button.clicked.connect(self.open_selected_workspace)
         toolbar.addWidget(self.open_workspace_button)
 
@@ -354,9 +378,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.launch_tool_combo.currentIndexChanged.connect(self._on_launch_tool_changed)
         toolbar.addWidget(self.launch_tool_combo)
 
-        self.open_launch_tool_button = QtWidgets.QPushButton("Открыть модуль", toolbar)
+        self.open_launch_tool_button = QtWidgets.QPushButton("Запустить GUI", toolbar)
         self.open_launch_tool_button.setObjectName("DesktopQtShellOpenLaunchTool")
-        self.open_launch_tool_button.setToolTip("Открывает выбранный GUI-модуль из единого shell registry.")
+        self.open_launch_tool_button.setToolTip("Запускает выбранный GUI-модуль из единого списка.")
         self.open_launch_tool_button.clicked.connect(self.open_selected_launch_tool)
         toolbar.addWidget(self.open_launch_tool_button)
 
@@ -430,17 +454,17 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.property_runtime_value = QtWidgets.QLabel(properties_page)
         self.property_role_value = QtWidgets.QLabel(properties_page)
         self.property_source_value = QtWidgets.QLabel(properties_page)
-        self.property_migration_value = QtWidgets.QLabel(properties_page)
+        self.property_operator_state_value = QtWidgets.QLabel(properties_page)
         self.property_module_value = QtWidgets.QLabel(properties_page)
         self.property_module_value.setTextInteractionFlags(
             QtCore.Qt.TextInteractionFlag.TextSelectableByMouse
         )
         properties_layout.addRow("Окно:", self.property_title_value)
-        properties_layout.addRow("Toolkit:", self.property_runtime_value)
+        properties_layout.addRow("Тип окна:", self.property_runtime_value)
         properties_layout.addRow("Роль:", self.property_role_value)
         properties_layout.addRow("Источник истины:", self.property_source_value)
-        properties_layout.addRow("Состояние миграции:", self.property_migration_value)
-        properties_layout.addRow("Standalone module:", self.property_module_value)
+        properties_layout.addRow("Готовность:", self.property_operator_state_value)
+        properties_layout.addRow("Технический модуль:", self.property_module_value)
         self.inspector_tabs.addTab(properties_page, "Свойства")
 
         help_page = QtWidgets.QWidget(self.inspector_tabs)
@@ -467,7 +491,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         runtime_layout = QtWidgets.QVBoxLayout(runtime_widget)
 
         self.runtime_progress_label = QtWidgets.QLabel(
-            "Длительные операции пока не встроены в native workspace. Здесь отражается переходный managed-external слой.",
+            "Здесь видно, какие GUI-окна запущены, что выполняется сейчас и где смотреть результат.",
             runtime_widget,
         )
         self.runtime_progress_label.setWordWrap(True)
@@ -476,11 +500,11 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.runtime_progress_bar = QtWidgets.QProgressBar(runtime_widget)
         self.runtime_progress_bar.setRange(0, 100)
         self.runtime_progress_bar.setValue(0)
-        self.runtime_progress_bar.setFormat("Переходный shell-phase: %p%")
+        self.runtime_progress_bar.setFormat("Готово: %p%")
         runtime_layout.addWidget(self.runtime_progress_bar)
 
         self.runtime_table = QtWidgets.QTreeWidget(runtime_widget)
-        self.runtime_table.setHeaderLabels(("Окно", "Состояние", "Toolkit", "Процесс"))
+        self.runtime_table.setHeaderLabels(("Окно", "Состояние", "Тип", "Процесс"))
         runtime_layout.addWidget(self.runtime_table)
 
         self.runtime_dock.setWidget(runtime_widget)
@@ -491,7 +515,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         central_layout = QtWidgets.QVBoxLayout(central)
 
         self.banner_label = QtWidgets.QLabel(
-            "Qt-shell уже стал главным desktop entrypoint. Tk-центры пока открываются как управляемые внешние окна, без потери функциональности и без попытки хостить Tk внутри Qt.",
+            "Главное окно объединяет рабочие разделы проекта, поиск команд, диагностику и запуск специализированных GUI без возврата в WEB.",
             central,
         )
         self.banner_label.setWordWrap(True)
@@ -537,12 +561,12 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         workflow_layout.addWidget(self.workflow_list)
         overview_layout.addWidget(workflow_box, 1)
 
-        session_box = QtWidgets.QGroupBox("Управляемые внешние окна", self.overview_page)
+        session_box = QtWidgets.QGroupBox("Открытые GUI-окна", self.overview_page)
         session_layout = QtWidgets.QVBoxLayout(session_box)
         self.session_summary_label = QtWidgets.QLabel(session_box)
         self.session_summary_label.setWordWrap(True)
         session_layout.addWidget(self.session_summary_label)
-        self.open_tool_button = QtWidgets.QPushButton("Открыть выбранное окно", session_box)
+        self.open_tool_button = QtWidgets.QPushButton("Запустить текущий раздел", session_box)
         self.open_tool_button.clicked.connect(self.open_selected_workspace)
         session_layout.addWidget(self.open_tool_button)
         overview_layout.addWidget(session_box)
@@ -602,8 +626,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.launch_tool_combo.blockSignals(True)
         self.launch_tool_combo.clear()
         for spec in self._launchable_specs():
-            label = f"{spec.title} ({_migration_label(spec)})"
-            self.launch_tool_combo.addItem(label, userData=spec.key)
+            self.launch_tool_combo.addItem(spec.title, userData=spec.key)
         index = max(0, self.launch_tool_combo.findData(self._selected_tool_key))
         self.launch_tool_combo.setCurrentIndex(index)
         self.launch_tool_combo.blockSignals(False)
@@ -640,7 +663,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 item = QtWidgets.QTreeWidgetItem(
                     (
                         spec.title,
-                        _migration_label(spec),
+                        _operator_state_label(spec),
                     )
                 )
                 item.setData(0, QtCore.Qt.ItemDataRole.UserRole, spec.key)
@@ -692,13 +715,13 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self._selected_tool_key = key
         self.surface_title.setText(spec.title)
         self.surface_meta.setText(
-            f"{spec.menu_section} -> {spec.nav_section} | Toolkit: {_runtime_label(spec)} | {_migration_label(spec)}"
+            f"{spec.menu_section} -> {spec.nav_section} | {_workspace_role_label(spec)} | {_operator_state_label(spec)}"
         )
         self.surface_description.setText(spec.details or spec.description)
         self.project_summary_label.setText(self._project_summary_text())
         self.session_summary_label.setText(
-            "Tk-центры временно запускаются как управляемые внешние окна. "
-            "Qt-переписывание идёт волнами: shell/platform -> setup -> ring/test suite -> baseline/optimization -> analysis/diagnostics."
+            "Выбор в дереве, поиске или верхнем переключателе сразу синхронизирует рабочую область и инспектор. "
+            "Запуск GUI передаёт выбранный проектный контекст в соответствующий раздел."
         )
         self._refresh_workflow_list()
         self._refresh_inspector(spec)
@@ -719,7 +742,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             spec = self.spec_by_key.get(key)
             if spec is None:
                 continue
-            line = f"{index}. {spec.title} — {_migration_label(spec)}"
+            line = f"{index}. {spec.title} — {_operator_state_label(spec)}"
             item = QtWidgets.QListWidgetItem(line)
             item.setData(QtCore.Qt.ItemDataRole.UserRole, key)
             if key == self._selected_tool_key:
@@ -729,9 +752,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _refresh_inspector(self, spec: DesktopShellToolSpec) -> None:
         self.property_title_value.setText(spec.title)
         self.property_runtime_value.setText(_runtime_label(spec))
-        self.property_role_value.setText(spec.effective_workspace_role)
-        self.property_source_value.setText(spec.effective_source_of_truth_role)
-        self.property_migration_value.setText(_migration_label(spec))
+        self.property_role_value.setText(_workspace_role_label(spec))
+        self.property_source_value.setText(_source_of_truth_label(spec))
+        self.property_operator_state_value.setText(_operator_state_label(spec))
         self.property_module_value.setText(spec.standalone_module or "n/a")
 
         self.help_text.setPlainText(
@@ -741,8 +764,8 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                     f"Короткая подсказка: {spec.effective_tooltip}",
                     f"Развёрнутое описание: {spec.effective_help_topic}",
                     f"Где находится: {spec.menu_section} -> {spec.title}",
-                    f"Что откроется: standalone module {spec.standalone_module or 'не задан'}",
-                    f"Источник истины: {spec.effective_source_of_truth_role}",
+                    f"Что откроется: {spec.standalone_module or 'не задан'}",
+                    f"Источник истины: {_source_of_truth_label(spec)}",
                 ]
             )
         )
@@ -750,7 +773,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         warnings: list[str] = []
         if spec.effective_migration_status == "managed_external":
             warnings.append(
-                "Это окно пока не переписано в Qt-workspace. Оно откроется как управляемое внешнее окно без встраивания Tk в shell."
+                "Окно открывается отдельно, но shell передаёт ему проектный контекст и отслеживает его состояние."
             )
         if spec.key == "desktop_animator":
             warnings.append(
@@ -789,13 +812,13 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self.runtime_progress_bar.setValue(min(100, 10 + len(sessions) * 10))
             self._set_shell_progress(min(100, 10 + len(sessions) * 10), text="Окна: %p%")
             self.runtime_progress_label.setText(
-                "Qt-shell отслеживает жизненный цикл внешних окон и передаёт им launch context через shell handoff."
+                "Главное окно отслеживает запущенные GUI и передаёт им выбранный проектный контекст."
             )
         else:
             self.runtime_progress_bar.setValue(0)
             self._set_shell_progress(0, text="Готово: %p%")
             self.runtime_progress_label.setText(
-                "Пока нет открытых управляемых окон. Используйте верхнюю командную зону, обзор проекта или поиск команд."
+                "Пока нет открытых GUI-окон. Используйте верхнюю командную зону, обзор проекта или поиск команд."
             )
 
     def _select_browser_item(self, key: str) -> None:
@@ -963,9 +986,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 f"{spec.title}\n\n{exc}",
             )
             return False
-        self._set_status_message(
-            f"Открыто окно: {spec.title} ({session.runtime_label}, PID {session.pid or '—'})"
-        )
+        self._set_status_message(f"Открыто окно: {spec.title}")
         self._refresh_runtime_table()
         return True
 
@@ -997,19 +1018,18 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _show_legacy_shell_note(self) -> None:
         QtWidgets.QMessageBox.information(
             self,
-            "Legacy Tk-shell",
-            "Старый Tk-shell сохранён как fallback/debug route. "
-            "Qt-shell теперь является основным desktop entrypoint, а Tk-центры временно живут как управляемые внешние окна.",
+            "Резервное старое окно",
+            "Старый shell сохранён только как резервный отладочный маршрут. "
+            "Основная работа должна идти через это главное desktop-окно.",
         )
 
     def _show_about_dialog(self) -> None:
         QtWidgets.QMessageBox.information(
             self,
-            "О текущем Qt-shell",
-            "PneumoApp Qt-shell\n\n"
-            "Фаза A: новый shell-platform слой на QMainWindow + QDockWidget.\n"
-            "Текущие Tk-центры открываются как managed-external workspaces без попытки встраивать Tk в Qt.\n"
-            "Специализированные окна Desktop Animator, Compare Viewer и Desktop Mnemo остаются отдельными native windows.",
+            "О рабочем месте",
+            "PneumoApp\n\n"
+            "Главное окно держит меню, поиск команд, дерево проекта, инспектор, диагностику и запуск GUI-разделов.\n"
+            "Специализированные окна Desktop Animator, Compare Viewer и Desktop Mnemo остаются отдельными окнами.",
         )
 
     def _on_workspace_changed(self, index: int) -> None:
@@ -1172,7 +1192,7 @@ def main(*, startup_tool_keys: tuple[str, ...] = ()) -> int:
     owns_app = app is None
     if app is None:
         app = QtWidgets.QApplication([Path(sys.argv[0]).name, *sys.argv[1:]])
-        app.setApplicationName("PneumoApp Qt Shell")
+        app.setApplicationName("PneumoApp Desktop")
         app.setOrganizationName("PneumoApp")
     window = DesktopQtMainShell(startup_tool_keys=startup_tool_keys)
     window.show()

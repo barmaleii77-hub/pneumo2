@@ -68,10 +68,10 @@ class ManagedExternalWindowSession:
         kind = self.spec.effective_runtime_kind
         status = self.spec.effective_migration_status
         if kind == "tk" and status == "managed_external":
-            return "Tk -> управляемое внешнее окно"
+            return "Рабочее GUI-окно"
         if kind == "qt":
-            return "Qt"
-        return "Процесс"
+            return "Специализированное GUI-окно"
+        return "Служебный процесс"
 
     def status_label(self) -> str:
         if self.is_running:

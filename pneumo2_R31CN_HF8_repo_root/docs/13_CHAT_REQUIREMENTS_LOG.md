@@ -131,6 +131,12 @@ ID: `REQ-0019`.
 Источник: chat: branch/tree recovery 2026-04-18.
 ID: `REQ-0020`.
 
+21. V37 GUI visual surface is mandatory
+Все GUI-направления должны соответствовать V37 визуально и по PIPELINE_OPTIMIZED.dot: tree/search/selection sync из shell является навигацией, лишние промежуточные кнопки навигации являются blocker, пользовательская поверхность не должна показывать служебные migration/runtime/toolkit/implementation labels вместо операторской информации. Каноническое имя WS-INPUTS: Исходные данные.
+Статус: active.
+Источник: chat: V37 compliance correction 2026-04-18.
+ID: `REQ-0021`.
+
 ## Как ссылаться из будущих задач
 
 Если новая задача опирается на решение из чата, но не отражена в старом каноне, сначала проверить этот файл, а затем соответствующие plan-файлы из [docs/14_CHAT_PLANS_LOG.md](./14_CHAT_PLANS_LOG.md).

@@ -337,6 +337,13 @@ ID: `PLAN-0045`.
 Источник: chat: actualize 10 prompts after quarantine resolution 2026-04-18.
 ID: `PLAN-0046`.
 
+47. Actualize 10 chat prompts for V37 visual compliance
+Назначение: Prompt pack 16 now requires visual GUI checks against V37 GUI_SPEC/WORKSPACE/ACCEPTANCE/PIPELINE, blocks service-jargon leaks, requires direct shell tree/search/selection sync and rejects ad-hoc labels such as machine-data wording.
+Артефакт: [docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
+Статус: done.
+Источник: chat: V37 compliance correction 2026-04-18.
+ID: `PLAN-0047`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

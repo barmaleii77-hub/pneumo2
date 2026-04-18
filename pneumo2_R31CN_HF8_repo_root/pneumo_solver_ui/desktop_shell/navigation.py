@@ -95,11 +95,11 @@ def describe_workflow_progress(
     next_spec = next_workflow_spec(workflow_specs, open_keys)
     if open_count < len(workflow_specs) and next_spec is not None:
         return (
-            f"Открыто этапов маршрута: {open_count}/{len(workflow_specs)}. "
-            f"Следующий рекомендуемый этап: {next_spec.title}."
+            f"Открыто разделов маршрута: {open_count}/{len(workflow_specs)}. "
+            f"Следующий рекомендуемый раздел: {next_spec.title}."
         )
     return (
-        f"Все этапы маршрута уже открыты: {open_count}/{len(workflow_specs)}. "
+        f"Все разделы маршрута уже открыты: {open_count}/{len(workflow_specs)}. "
         "Можно вернуться к нужному шагу в любой момент."
     )
 

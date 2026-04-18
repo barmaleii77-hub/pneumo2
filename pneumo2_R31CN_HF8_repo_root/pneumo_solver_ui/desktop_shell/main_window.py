@@ -63,6 +63,7 @@ class DesktopMainShell:
         self._startup_tool_keys = startup_tool_keys
         self._startup_route_applied = False
         self._nav_item_to_key: dict[str, str] = {}
+        self._syncing_navigation_selection = False
         self._runtime_trace_var: tk.Variable | None = None
         self._runtime_trace_id: str | None = None
         self._f6_region_widgets: tuple[tk.Widget, ...] = ()
@@ -245,7 +246,7 @@ class DesktopMainShell:
         nav_scroll.pack(side="right", fill="y")
         self.nav_tree.configure(yscrollcommand=nav_scroll.set)
         self.nav_tree.bind("<<TreeviewSelect>>", self._on_navigation_selected)
-        ttk.Button(panel, text="Открыть выбранный раздел", command=self._open_selected_navigation_item).pack(
+        ttk.Button(panel, text="Перейти к выбранному разделу", command=self._open_selected_navigation_item).pack(
             fill="x",
             pady=(8, 0),
         )
@@ -286,7 +287,7 @@ class DesktopMainShell:
         ).pack(anchor="w", pady=(8, 0))
         self.details_open_button = ttk.Button(
             body,
-            text="Открыть текущий раздел",
+            text="Перейти к текущему разделу",
             command=self._open_current_detail_target,
         )
         self.details_open_button.pack(
@@ -372,7 +373,7 @@ class DesktopMainShell:
         for spec in self._main_nav_specs():
             sections.setdefault(spec.nav_section, []).append(spec)
         for section_label in (
-            "Данные машины",
+            "Исходные данные",
             "Сценарии",
             "Расчёт",
             "Оптимизация",
@@ -433,8 +434,12 @@ class DesktopMainShell:
         target_key = current_key or "__home__"
         for item_id, item_key in self._nav_item_to_key.items():
             if item_key == target_key:
-                self.nav_tree.selection_set(item_id)
-                self.nav_tree.focus(item_id)
+                self._syncing_navigation_selection = True
+                try:
+                    self.nav_tree.selection_set(item_id)
+                    self.nav_tree.focus(item_id)
+                finally:
+                    self._syncing_navigation_selection = False
                 break
 
     def _refresh_details_panel(self) -> None:
@@ -446,7 +451,7 @@ class DesktopMainShell:
                 "Используйте разделы слева для перехода к данным, сценариям, расчёту, оптимизации и результатам."
             )
             self.details_hint_var.set(
-                "Подсказка: сначала заполните данные машины, затем проверьте сценарии и только после этого переходите к расчёту и оптимизации."
+                "Подсказка: сначала заполните исходные данные, затем проверьте сценарии и только после этого переходите к расчёту и оптимизации."
             )
             return
         spec = self.spec_by_key.get(current_key)
@@ -482,7 +487,10 @@ class DesktopMainShell:
         return "служебный инструмент"
 
     def _on_navigation_selected(self, _event: object | None = None) -> None:
-        self._refresh_details_for_selected_navigation_item()
+        if self._syncing_navigation_selection:
+            self._refresh_details_for_selected_navigation_item()
+            return
+        self._open_selected_navigation_item()
 
     def _refresh_details_for_selected_navigation_item(self) -> None:
         item_id = next(iter(self.nav_tree.selection()), "")
@@ -491,9 +499,9 @@ class DesktopMainShell:
             self.details_title_var.set("Обзор")
             self.details_meta_var.set("Главная страница")
             self.details_body_var.set(
-                "Обзор собирает рабочий маршрут, открытые окна и быстрые переходы по основным этапам."
+                "Обзор собирает рабочий маршрут, открытые окна и быстрые переходы по основным разделам."
             )
-            self.details_hint_var.set("Двойной щелчок или кнопка ниже откроют выбранный раздел.")
+            self.details_hint_var.set("Выбор в дереве сразу синхронизирует рабочую область и пояснение.")
             return
         spec = self.spec_by_key.get(key)
         if spec is None:

@@ -1,4 +1,4 @@
-"""Launcher for the Qt-first desktop shell with legacy Tk fallback."""
+"""Launcher for the desktop main shell with a legacy fallback."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="desktop_main_shell_qt",
-        description="Qt-first Windows desktop shell for orchestrating native and managed-external GUI tools.",
+        description="Windows desktop main shell for orchestrating PneumoApp GUI tools.",
     )
     parser.add_argument(
         "--open",
@@ -32,12 +32,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--legacy-tk-shell",
         action="store_true",
-        help="Run the historical Tk shell instead of the new Qt shell.",
+        help="Run the historical shell instead of the current desktop shell.",
     )
     parser.add_argument(
         "--runtime-proof",
         metavar="DIR",
-        help="Write a Qt main shell runtime evidence JSON/MD pair and exit without launching domain windows.",
+        help="Write a desktop main shell runtime evidence JSON/MD pair and exit without launching domain windows.",
     )
     parser.add_argument(
         "--runtime-proof-offscreen",
@@ -60,7 +60,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--runtime-proof-validate",
         metavar="JSON",
-        help="Validate an existing Qt main shell runtime proof JSON and exit.",
+        help="Validate an existing desktop main shell runtime proof JSON and exit.",
     )
     parser.add_argument(
         "--runtime-proof-require-manual-pass",
@@ -71,7 +71,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def format_tool_catalog() -> str:
-    lines = ["Desktop shell tools (Qt shell catalog):"]
+    lines = ["Desktop shell tools:"]
     for spec in build_desktop_shell_specs():
         lines.append(
             "\t".join(
@@ -80,7 +80,7 @@ def format_tool_catalog() -> str:
                     spec.group,
                     spec.title,
                     spec.effective_runtime_kind,
-                    spec.effective_migration_status,
+                    spec.effective_source_of_truth_role,
                 )
             )
         )
@@ -160,7 +160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         from pneumo_solver_ui.desktop_qt_shell.main_window import main as run_qt_shell_main
     except Exception as exc:
         print(
-            f"[desktop_main_shell_qt] Qt shell is unavailable, fallback to legacy Tk shell: {exc}",
+            f"[desktop_main_shell_qt] current shell is unavailable, fallback to historical shell: {exc}",
             file=sys.stderr,
         )
         return _run_legacy_shell(startup_tool_keys=startup_tool_keys)

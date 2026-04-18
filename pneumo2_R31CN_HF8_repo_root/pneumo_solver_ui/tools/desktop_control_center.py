@@ -118,7 +118,7 @@ class DesktopControlCenter:
 
         left_actions = ttk.Frame(list_box)
         left_actions.pack(fill="x", pady=(8, 0))
-        ttk.Button(left_actions, text="Открыть выбранное", command=self._launch_selected_target).pack(side="left")
+        ttk.Button(left_actions, text="Запустить GUI", command=self._launch_selected_target).pack(side="left")
         ttk.Button(left_actions, text="Папка проекта", command=self._open_repo_root).pack(side="left", padx=(8, 0))
 
         right_split = ttk.Panedwindow(right, orient="vertical")
@@ -133,7 +133,7 @@ class DesktopControlCenter:
         ).pack(anchor="w")
         detail_actions = ttk.Frame(detail_box)
         detail_actions.pack(fill="x", pady=(10, 0))
-        ttk.Button(detail_actions, text="Открыть выбранное окно", command=self._launch_selected_target).pack(side="left")
+        ttk.Button(detail_actions, text="Запустить этот GUI", command=self._launch_selected_target).pack(side="left")
 
         log_frame = ttk.LabelFrame(right_split, text="Журнал запуска", padding=8)
         log_body, self.log = build_scrolled_text(log_frame, height=12, wrap="word")

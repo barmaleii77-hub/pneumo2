@@ -130,7 +130,6 @@ def build_shell_command_search_entries(
                     spec.effective_workspace_role,
                     spec.effective_source_of_truth_role,
                     spec.effective_runtime_kind,
-                    spec.effective_migration_status,
                     *spec.capability_ids,
                     *spec.launch_contexts,
                     *spec.effective_search_aliases,

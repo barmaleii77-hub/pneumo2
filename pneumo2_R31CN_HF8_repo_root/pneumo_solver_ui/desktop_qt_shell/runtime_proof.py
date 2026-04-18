@@ -329,7 +329,7 @@ def validate_qt_main_shell_runtime_proof(
     if handoff.get("external_domain_windows_launched") != 0:
         errors.append("runtime proof must not launch domain windows")
     if handoff.get("managed_external_launcher_only") is not True:
-        errors.append("runtime proof must preserve managed-external launcher policy")
+        errors.append("runtime proof must preserve separate-window launcher policy")
 
     launch_coverage = proof.get("launch_coverage")
     if not isinstance(launch_coverage, dict):

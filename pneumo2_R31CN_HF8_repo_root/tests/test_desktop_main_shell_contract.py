@@ -93,6 +93,7 @@ def test_desktop_main_shell_keeps_classic_menu_and_workspace_shell() -> None:
     assert "self.workspace_context_menu: ShellWorkspaceContextMenuController | None = None" in src
     assert "self._startup_tool_keys = startup_tool_keys" in src
     assert "self._startup_route_applied = False" in src
+    assert "self._syncing_navigation_selection = False" in src
     assert 'self.workflow_var = tk.StringVar(value="Маршрут: недоступен")' in src
     assert 'self.workspace_var = tk.StringVar(value="Обзор | Открытых окон: 0")' in src
     assert 'self.details_title_var = tk.StringVar(value="Обзор")' in src
@@ -108,6 +109,7 @@ def test_desktop_main_shell_keeps_classic_menu_and_workspace_shell() -> None:
     assert "self._build_details_panel(right_panel)" in src
     assert "self._rebuild_navigation_tree()" in src
     assert "self._refresh_details_panel()" in src
+    assert "self._open_selected_navigation_item()" in src
     assert "self.toolbar.frame.pack(fill=\"x\", before=body)" in src
     assert 'external_specs=self._specs_for_group("Внешние окна")' in src
     assert "select_hosted_session=self.select_hosted_session" in src
@@ -214,7 +216,7 @@ def test_desktop_main_shell_extracts_workspace_manager_for_hosted_tabs() -> None
     assert '"Закрывать остальные можно только для встроенного окна."' in src
     assert '"Других встроенных окон нет."' in src
     assert '"Нет недавно закрытых встроенных окон."' in src
-    assert '"Этапы основного маршрута пока не открыты."' in src
+    assert '"Разделы основного маршрута пока не открыты."' in src
     assert '"Недавно закрытое окно #{index} недоступно."' in src
     assert "return tuple(reversed(self._recently_closed_specs))" in src
     assert "history_index = len(self._recently_closed_specs) - index" in src
@@ -279,7 +281,7 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
     assert 'text="Основной маршрут"' in src
     assert 'text="Открытые встроенные окна"' in src
     assert 'text="Недавно закрытые окна"' in src
-    assert 'text="Открыть этап"' in src
+    assert 'text="Перейти к разделу"' in src
     assert 'text="Перейти"' in src
     assert 'text="Продолжить маршрут"' in src
     assert 'text="Вернуть"' in src
@@ -308,9 +310,9 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
     assert 'tool_specs = tuple(spec for spec in hosted_specs if spec.entry_kind != "main")' in src
     assert "workflow_specs = ordered_workflow_specs(main_specs)" in src
     assert "continue_workflow=continue_workflow" in src
-    assert '"Открыто в рабочей области" if key in open_keys else "Готово к открытию"' in src
-    assert 'button.configure(text="Перейти к окну" if key in open_keys else "Открыть этап")' in src
-    assert 'status_var = tk.StringVar(value="Готово к открытию")' in src
+    assert '"Открыто в рабочей области" if key in open_keys else "Готов к переходу"' in src
+    assert 'button.configure(text="Перейти к окну" if key in open_keys else "Перейти к разделу")' in src
+    assert 'status_var = tk.StringVar(value="Готов к переходу")' in src
     assert '_build_group_box(cards, 0, "Справочники и служебные центры", tool_specs, open_tool)' in src
     assert '_build_group_box(cards, 1, "Анализ и визуализация", external_specs, open_tool)' in src
     assert 'textvariable=status_var' in src
@@ -342,9 +344,9 @@ def test_desktop_main_shell_extracts_classic_toolbar_builder() -> None:
     assert 'text="Открыть окно"' in src
     assert 'text="Окна:"' in src
     assert 'text="Перейти"' in src
-    assert 'text="Следующий этап"' in src
-    assert 'text="Этап назад"' in src
-    assert 'text="Этап вперед"' in src
+    assert 'text="Следующий раздел"' in src
+    assert 'text="Раздел назад"' in src
+    assert 'text="Раздел вперед"' in src
     assert 'text="Недавние:"' in src
     assert 'text="Вернуть"' in src
     assert "external_specs: tuple[DesktopShellToolSpec, ...]" in src
@@ -417,8 +419,8 @@ def test_desktop_main_shell_extracts_menu_builder_with_classic_navigation_comman
     assert "select_next_workflow: Callable[[], None]" in src
     assert "label=describe_workflow_status(self.workflow_specs, open_keys)" in src
     assert 'label="Продолжить основной маршрут\\tCtrl+Shift+N"' in src
-    assert 'label="Предыдущий этап маршрута\\tCtrl+Alt+Left"' in src
-    assert 'label="Следующий этап маршрута\\tCtrl+Alt+Right"' in src
+    assert 'label="Предыдущий раздел маршрута\\tCtrl+Alt+Left"' in src
+    assert 'label="Следующий раздел маршрута\\tCtrl+Alt+Right"' in src
     assert 'label="Следующее окно\\tCtrl+Tab"' in src
     assert 'label="Предыдущее окно\\tCtrl+Shift+Tab"' in src
     assert 'label="Перезагрузить текущее окно\\tF5"' in src
@@ -641,7 +643,7 @@ def test_navigation_helpers_keep_primary_workflow_order_and_progress_text() -> N
         ),
         DesktopShellToolSpec(
             key="desktop_input_editor",
-            title="Данные машины",
+            title="Исходные данные",
             description="",
             group="Встроенные окна",
             mode="hosted",
@@ -681,8 +683,8 @@ def test_navigation_helpers_keep_primary_workflow_order_and_progress_text() -> N
     assert next_workflow_spec(specs, {"desktop_input_editor"}).key == "desktop_ring_editor"
 
     progress = describe_workflow_progress(specs, {"desktop_input_editor"})
-    assert "Открыто этапов маршрута: 1/5." in progress
-    assert "Следующий рекомендуемый этап: Редактор кольцевых сценариев." in progress
+    assert "Открыто разделов маршрута: 1/5." in progress
+    assert "Следующий рекомендуемый раздел: Редактор кольцевых сценариев." in progress
     assert (
         describe_workflow_status(specs, {"desktop_input_editor"})
         == "Маршрут: 1/5 -> Редактор кольцевых сценариев"
@@ -782,7 +784,7 @@ def test_workspace_manager_tracks_recently_closed_history_and_can_reopen_by_inde
 def test_navigation_helpers_keep_open_workflow_sessions_in_route_order() -> None:
     workflow_input = DesktopShellToolSpec(
         key="desktop_input_editor",
-        title="Данные машины",
+        title="Исходные данные",
         description="",
         group="Встроенные окна",
         mode="hosted",

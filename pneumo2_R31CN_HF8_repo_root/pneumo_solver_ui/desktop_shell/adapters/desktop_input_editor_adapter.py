@@ -14,7 +14,7 @@ def create_hosted_input_editor(parent: tk.Misc) -> DesktopInputEditor:
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="desktop_input_editor",
-        title="Данные машины",
+        title="Исходные данные",
         description="Основной экран ввода исходных инженерных данных с единицами измерения, подсказками и графическим сопровождением.",
         group="Встроенные окна",
         mode="hosted",
@@ -28,7 +28,7 @@ def build_spec() -> DesktopShellToolSpec:
         ),
         launch_contexts=("home", "data", "results"),
         menu_section="Данные",
-        nav_section="Данные машины",
+        nav_section="Исходные данные",
         details="Здесь вводятся геометрия, пневматика, механика, статическая настройка, компоненты и справочные данные без показа служебных JSON-потоков.",
         menu_order=10,
         nav_order=10,

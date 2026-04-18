@@ -119,7 +119,7 @@ class DesktopShellToolSpec:
     @property
     def effective_search_aliases(self) -> tuple[str, ...]:
         base_aliases: dict[str, tuple[str, ...]] = {
-            "desktop_input_editor": ("исходные данные", "setup", "данные машины"),
+            "desktop_input_editor": ("исходные данные", "setup", "параметры"),
             "desktop_ring_editor": ("test suite", "сценарии", "редактор кольца"),
             "test_center": ("набор испытаний", "tests", "validation"),
             "desktop_optimizer_center": ("baseline", "optimization", "stagerunner", "distributed"),

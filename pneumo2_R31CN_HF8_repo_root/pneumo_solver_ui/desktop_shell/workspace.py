@@ -218,7 +218,7 @@ class DesktopWorkspaceManager:
             step=1,
         )
         if session is None:
-            self._set_status("Этапы основного маршрута пока не открыты.")
+            self._set_status("Разделы основного маршрута пока не открыты.")
             return False
         return self.select_hosted_session(session.key)
 
@@ -232,7 +232,7 @@ class DesktopWorkspaceManager:
             step=-1,
         )
         if session is None:
-            self._set_status("Этапы основного маршрута пока не открыты.")
+            self._set_status("Разделы основного маршрута пока не открыты.")
             return False
         return self.select_hosted_session(session.key)
 

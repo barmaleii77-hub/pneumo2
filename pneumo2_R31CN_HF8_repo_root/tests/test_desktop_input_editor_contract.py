@@ -861,7 +861,7 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
 
     assert "build_desktop_launch_catalog(include_mnemo=False)" in src
     assert "pneumo_solver_ui.tools.desktop_input_editor" in launcher_modules
-    assert "Данные машины" in launcher_titles
+    assert "Исходные данные" in launcher_titles
     assert "default_base.json" in editor_src
     assert "Сохранить рабочую копию" in editor_src
     assert "Рабочие профили" in editor_src

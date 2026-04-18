@@ -64,7 +64,9 @@
    `codex/work` by cherry-pick, with validation and non-closure boundaries.
 18. [16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
    — current post-quarantine self-contained Plan-mode starter prompts for the
-   same 10 chats. Prefer this file for all new chat starts.
+   same 10 chats, now with mandatory V37 visual checks and
+   `PIPELINE_OPTIMIZED.dot` user-flow checks. Prefer this file for all new
+   chat starts.
 19. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
    [TECHNICAL_SPECIFICATION.md](../context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md)
    и [GUI_SPEC.yaml](../context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml)
@@ -146,8 +148,9 @@
 - `16_RECOVERY_PLAN_MODE_START_PROMPTS` задаёт текущие самодостаточные
   стартовые промты для тех же 10 чатов: старт только с clean
   `origin/codex/work`, resolved quarantine не использовать как рабочий
-  источник, post-resolution baseline сохранять по lane и не создавать ветки до
-  принятого Plan-mode плана.
+  источник, post-resolution baseline сохранять по lane, обязательно проводить
+  V37 visual acceptance, проверять оптимизированный user pipeline без лишних
+  navigation steps и блокировать service-jargon leaks до принятого Plan-mode плана.
 - `v37_github_kb_supplement` задаёт successor KB/TZ/spec connector layer:
   consolidated technical specification, GUI_SPEC.yaml, workspace contract
   matrix, parameter catalogs, acceptance/requirements matrices, repo canon

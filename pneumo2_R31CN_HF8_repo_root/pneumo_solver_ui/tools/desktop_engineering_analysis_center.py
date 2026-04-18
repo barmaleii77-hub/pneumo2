@@ -127,7 +127,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         actions.pack(side="right", anchor="ne")
         self.btn_refresh = ttk.Button(actions, text="Обновить", command=self.refresh)
         self.btn_refresh.pack(side="left")
-        self.btn_open_selected = ttk.Button(actions, text="Открыть выбранное", command=self._open_selected)
+        self.btn_open_selected = ttk.Button(actions, text="Открыть артефакт", command=self._open_selected)
         self.btn_open_selected.pack(side="left", padx=(8, 0))
         self.btn_export_ho007 = ttk.Button(actions, text="Экспорт HO-007", command=self._export_selected_run_contract_bridge)
         self.btn_export_ho007.pack(side="left", padx=(8, 0))
