@@ -1,0 +1,30 @@
+digraph PIPELINE_CURRENT {
+rankdir=LR;
+node [shape=box, fontsize=10];
+P0 [label="WS-PROJECT\nпроект+контекст"];
+P1 [label="WS-INPUTS\nmaster inputs"];
+P2 [label="WS-RING\nring draft"];
+P3 [label="WS-SUITE\nsuite refs + overrides"];
+P4 [label="WS-BASELINE\nbaseline history"];
+P5 [label="WS-OPTIMIZATION\nStageRunner / distributed"];
+P6 [label="WS-ANALYSIS\nselected run / compare"];
+P7 [label="WS-ANIMATOR\nanalysis consumer"];
+P8 [label="WS-DIAGNOSTICS\nevidence + SEND bundle"];
+P9 [label="Global archive\nwarm-start / resume"];
+P10 [label="Legacy web fragments\nimported surfaces"];
+P0 -> P1 [label="project file + inputs"];
+P1 -> P2 [label="inputs snapshot"];
+P2 -> P3 [label="scenario refs/export"];
+P1 -> P3 [label="context leakage risk"];
+P3 -> P4 [label="validated snapshot"];
+P4 -> P5 [label="active baseline"];
+P9 -> P5 [label="warm-start"];
+P5 -> P6 [label="selected run"];
+P6 -> P7 [label="analysis context"];
+P6 -> P8 [label="evidence manifest"];
+P7 -> P8 [label="capture provenance"];
+P10 -> P1 [label="migration debt"];
+P10 -> P3 [label="legacy scenario drift"];
+P5 -> P8 [label="runtime logs"];
+P2 -> P7 [label="historical overlay drift risk"];
+}

@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-18T08:34:02+00:00",
+  "updated_at": "2026-04-18T09:07:08+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -169,6 +169,14 @@
       "title": "V37 GUI visual surface is mandatory",
       "details": "Все GUI-направления должны соответствовать V37 визуально и по PIPELINE_OPTIMIZED.dot: tree/search/selection sync из shell является навигацией, лишние промежуточные кнопки навигации являются blocker, пользовательская поверхность не должна показывать служебные migration/runtime/toolkit/implementation labels вместо операторской информации. Каноническое имя WS-INPUTS: Исходные данные.",
       "status": "active"
+    },
+    {
+      "id": "REQ-0022",
+      "created_at": "2026-04-18T09:01:27+00:00",
+      "source": "chat",
+      "title": "V38 commit-ready KB layer is the current GUI/TZ/spec imported reference.",
+      "details": "V38 from pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip is imported as docs/context/gui_spec_imports/v38_github_kb_commit_ready and must be read after 17/18/foundations. V37 remains predecessor provenance. V38 does not close producer truth, cylinder packaging, measured browser performance, viewport gating or Windows visual/runtime acceptance without named evidence.",
+      "status": "активно"
     }
   ],
   "plans": [
@@ -594,6 +602,15 @@
       "details": "Prompt pack 16 now requires visual GUI checks against V37 GUI_SPEC/WORKSPACE/ACCEPTANCE/PIPELINE, blocks service-jargon leaks, requires direct shell tree/search/selection sync and rejects ad-hoc labels such as machine-data wording.",
       "artifact_path": "docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md",
       "status": "done"
+    },
+    {
+      "id": "PLAN-0048",
+      "created_at": "2026-04-18T09:07:08+00:00",
+      "source": "chat",
+      "title": "Actualize 10 parallel GUI chat prompts for V38.",
+      "details": "The current 10-chat Plan-mode prompt pack must use V38 GUI_SPEC, workspace/acceptance matrices and PIPELINE_OPTIMIZED.dot, plus V38_KB_IMPORT_AUDIT_2026-04-18.md for ambiguity resolution. It must preserve post-quarantine 7823dc2 baseline, no-WEB expansion, no service-jargon leaks and direct tree/search/selection navigation.",
+      "artifact_path": "gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md",
+      "status": "актуален"
     }
   ]
 }

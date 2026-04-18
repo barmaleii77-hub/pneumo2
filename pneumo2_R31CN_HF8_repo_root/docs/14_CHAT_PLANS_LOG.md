@@ -344,6 +344,13 @@ ID: `PLAN-0046`.
 Источник: chat: V37 compliance correction 2026-04-18.
 ID: `PLAN-0047`.
 
+48. Actualize 10 parallel GUI chat prompts for V38.
+Назначение: The current 10-chat Plan-mode prompt pack must use V38 GUI_SPEC, workspace/acceptance matrices and PIPELINE_OPTIMIZED.dot, plus V38_KB_IMPORT_AUDIT_2026-04-18.md for ambiguity resolution. It must preserve post-quarantine 7823dc2 baseline, no-WEB expansion, no service-jargon leaks and direct tree/search/selection navigation.
+Артефакт: [gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
+Статус: актуален.
+Источник: chat.
+ID: `PLAN-0048`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

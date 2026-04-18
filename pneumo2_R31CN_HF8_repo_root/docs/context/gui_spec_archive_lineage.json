@@ -195,8 +195,8 @@
     "version": "v37",
     "archive_name": "pneumo_codex_tz_spec_connector_reconciled_v37_github_kb_supplement.zip",
     "phase": "knowledge_base_reconciliation",
-    "status": "successor_kb_supplement",
-    "role": "GitHub knowledge-base supplement и TZ/spec connector без runtime-closure proof",
+    "status": "predecessor_kb_supplement",
+    "role": "predecessor GitHub knowledge-base supplement и TZ/spec connector без runtime-closure proof",
     "main_artifacts": [
       "TECHNICAL_SPECIFICATION.md",
       "GUI_SPEC.yaml",
@@ -207,5 +207,24 @@
       "NON_RUNTIME_CLOSURE_NOTICE.md"
     ],
     "repo_layer": "docs/context/gui_spec_imports/v37_github_kb_supplement/"
+  },
+  {
+    "version": "v38",
+    "archive_name": "pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip",
+    "phase": "knowledge_base_reconciliation",
+    "status": "current_successor_kb_commit_ready",
+    "role": "current commit-ready GitHub knowledge-base successor layer и TZ/spec connector без runtime-closure proof",
+    "main_artifacts": [
+      "TECHNICAL_SPECIFICATION.md",
+      "GUI_SPEC.yaml",
+      "WORKSPACE_CONTRACT_MATRIX.csv",
+      "PARAMETER_CATALOG.csv",
+      "ACCEPTANCE_MATRIX.csv",
+      "PIPELINE_OPTIMIZED.dot",
+      "REPO_OPEN_GAPS_TO_KEEP_OPEN.csv",
+      "NON_RUNTIME_CLOSURE_NOTICE.md",
+      "V38_KB_IMPORT_AUDIT_2026-04-18.md"
+    ],
+    "repo_layer": "docs/context/gui_spec_imports/v38_github_kb_commit_ready/"
   }
 ]

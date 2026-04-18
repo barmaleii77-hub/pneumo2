@@ -907,7 +907,7 @@ Acceptance gates для этого контура задаются в
 [ring_editor_acceptance_gates_v13.csv](./context/gui_spec_imports/v13_ring_editor_migration/ring_editor_acceptance_gates_v13.csv)
 и считаются обязательными для `WS-RING` и связанных consumer-workspaces.
 
-## Т. Историческая линия `PROMPT_V2 + v1…v13 + v37` и политика продолжения
+## Т. Историческая линия `PROMPT_V2 + v1…v13 + v37 + v38` и политика продолжения
 
 Текущий канон не вырос из одного архива. Он собирается из последовательности
 слоёв, где разные версии имели разный статус:
@@ -924,9 +924,12 @@ Acceptance gates для этого контура задаются в
   ветки обратно в design-first continuation;
 - `v13` — специализированный addendum для `WS-RING` и handoff
   `WS-RING -> WS-SUITE`;
-- `v37` — successor GitHub KB/TZ/spec supplement: consolidated technical
+- `v37` — predecessor GitHub KB/TZ/spec supplement: consolidated technical
   specification, GUI_SPEC.yaml, workspace/parameter/acceptance matrices,
   repo canon alignment и список gaps, которые должны оставаться открытыми.
+- `v38` — current commit-ready successor KB/TZ/spec layer after V37:
+  import-ready subtree, refreshed matrices, optimized pipeline and local
+  ambiguity audit. Он не является runtime-closure proof.
 
 Читать lineage нужно через:
 
@@ -936,6 +939,8 @@ Acceptance gates для этого контура задаются в
 - [gui_spec_archive_lineage.json](./context/gui_spec_archive_lineage.json)
 - [v12_design_recovery/README.md](./context/gui_spec_imports/v12_design_recovery/README.md)
 - [v37_github_kb_supplement/README.md](./context/gui_spec_imports/v37_github_kb_supplement/README.md)
+- [v38_github_kb_commit_ready/README.md](./context/gui_spec_imports/v38_github_kb_commit_ready/README.md)
+- [V38_KB_IMPORT_AUDIT_2026-04-18.md](./context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md)
 
 Практическое правило:
 
@@ -946,15 +951,69 @@ Acceptance gates для этого контура задаются в
   bootstrap/source-tree ветки, а из design-first ветки;
 - specialized addendum `v13` продолжает именно эту восстановленную ветку в
   области ring editor и ring-to-suite handoff;
-- successor supplement `v37` используется для reconciliation базы знаний,
-  требований, параметров, acceptance и открытых gaps, но не заменяет runtime
-  evidence.
+- successor supplement `v38` используется для reconciliation базы знаний,
+  требований, параметров, acceptance, optimized pipeline и открытых gaps, но не
+  заменяет runtime evidence. V37 остаётся predecessor provenance layer.
 
-## У. V37 GitHub KB supplement и TZ/spec connector
+## У. V38 GitHub KB commit-ready layer и TZ/spec connector
+
+`v38_github_kb_commit_ready` импортирован из
+`pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip` как
+current repo-local successor knowledge-base layer. Он не заменяет `17/18` и не
+доказывает runtime-closure: producer-side truth, measured perf trace,
+viewport gating, cylinder packaging и Windows visual/runtime acceptance
+остаются открытыми до отдельного evidence layer.
+
+Machine-readable и reference source set:
+
+- [README.md](./context/gui_spec_imports/v38_github_kb_commit_ready/README.md)
+- [TECHNICAL_SPECIFICATION.md](./context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md)
+- [GUI_SPEC.yaml](./context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml)
+- [WORKSPACE_CONTRACT_MATRIX.csv](./context/gui_spec_imports/v38_github_kb_commit_ready/WORKSPACE_CONTRACT_MATRIX.csv)
+- [PARAMETER_CATALOG.csv](./context/gui_spec_imports/v38_github_kb_commit_ready/PARAMETER_CATALOG.csv)
+- [PARAMETER_PIPELINE_MATRIX.csv](./context/gui_spec_imports/v38_github_kb_commit_ready/PARAMETER_PIPELINE_MATRIX.csv)
+- [PARAMETER_VISIBILITY_MATRIX.csv](./context/gui_spec_imports/v38_github_kb_commit_ready/PARAMETER_VISIBILITY_MATRIX.csv)
+- [REQUIREMENTS_MATRIX.csv](./context/gui_spec_imports/v38_github_kb_commit_ready/REQUIREMENTS_MATRIX.csv)
+- [ACCEPTANCE_MATRIX.csv](./context/gui_spec_imports/v38_github_kb_commit_ready/ACCEPTANCE_MATRIX.csv)
+- [PIPELINE_OPTIMIZED.dot](./context/gui_spec_imports/v38_github_kb_commit_ready/PIPELINE_OPTIMIZED.dot)
+- [REPO_CANON_ALIGNMENT_MATRIX.csv](./context/gui_spec_imports/v38_github_kb_commit_ready/REPO_CANON_ALIGNMENT_MATRIX.csv)
+- [REPO_OPEN_GAPS_TO_KEEP_OPEN.csv](./context/gui_spec_imports/v38_github_kb_commit_ready/REPO_OPEN_GAPS_TO_KEEP_OPEN.csv)
+- [NON_RUNTIME_CLOSURE_NOTICE.md](./context/gui_spec_imports/v38_github_kb_commit_ready/NON_RUNTIME_CLOSURE_NOTICE.md)
+- [V38_KB_IMPORT_AUDIT_2026-04-18.md](./context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md)
+
+### Что уточняет `v38`
+
+- `TECHNICAL_SPECIFICATION.md` фиксирует target Windows desktop GUI,
+  project-bound truth, WS-INPUTS/WS-RING/WS-SUITE/WS-BASELINE/WS-OPTIMIZATION/
+  WS-ANALYSIS/WS-ANIMATOR/WS-DIAGNOSTICS pipeline и не-WEB цель.
+- `GUI_SPEC.yaml` фиксирует shell, workspaces, specialized windows,
+  graphics truth states and runtime-closure=false.
+- `WORKSPACE_CONTRACT_MATRIX.csv` и `WINDOW_CATALOG.csv` фиксируют 12
+  workspaces and 12 windows/surfaces, включая `WIN-MAIN-SHELL`,
+  `Desktop Animator`, `Compare Viewer`, `Desktop Mnemo` и `Диагностика`.
+- `PARAMETER_*` catalogs фиксируют user-facing parameter canon, visibility,
+  editability and pipeline usage without inventing aliases.
+- `PIPELINE_OPTIMIZED.dot` является текущей проверкой optimized user graph:
+  shell tree/search/selection sync is navigation; лишняя кнопка обязательного
+  открытия выбранного этапа является blocker.
+- `V38_KB_IMPORT_AUDIT_2026-04-18.md` снимает packaging ambiguities and records
+  that all 96 archive files were read/classified.
+
+### Правило использования `v38`
+
+- Для проектирования и ревизии GUI читать `17`, затем `18`, затем
+  `foundations`, затем `v38`, затем V38 audit, затем `v37` как predecessor,
+  затем connector/evidence layers and `v3`.
+- Для реализации нельзя переносить положения `v38` в статус `done` без
+  runtime evidence, self-check, visual proof или acceptance artifact.
+- При расхождении `v38` с `17/18` приоритет остаётся у human-readable канона,
+  а конфликт фиксируется через assumptions/gaps, а не замалчивается.
+
+## Ф. V37 GitHub KB supplement predecessor
 
 `v37_github_kb_supplement` импортирован из
 `pneumo_codex_tz_spec_connector_reconciled_v37_github_kb_supplement.zip` как
-repo-local successor knowledge-base layer. Он не заменяет `17/18` и не
+repo-local predecessor knowledge-base layer. Он не заменяет `17/18` и не
 доказывает runtime-closure: producer-side truth, measured perf trace и
 Windows runtime acceptance остаются открытыми до отдельного evidence layer.
 
@@ -973,7 +1032,7 @@ Machine-readable и reference source set:
 - [REPO_OPEN_GAPS_TO_KEEP_OPEN.csv](./context/gui_spec_imports/v37_github_kb_supplement/REPO_OPEN_GAPS_TO_KEEP_OPEN.csv)
 - [NON_RUNTIME_CLOSURE_NOTICE.md](./context/gui_spec_imports/v37_github_kb_supplement/NON_RUNTIME_CLOSURE_NOTICE.md)
 
-### Что уточняет `v37`
+### Что уточняет `v37` как predecessor
 
 - `TECHNICAL_SPECIFICATION.md` связывает продуктовый GUI-spec с ТЗ для
   native Windows desktop engineering software.
@@ -993,8 +1052,8 @@ Machine-readable и reference source set:
 
 ### Правило использования `v37`
 
-- Для проектирования и ревизии GUI читать `17`, затем `18`, затем
-  `foundations`, затем `v37`, затем `v3` и специализированные addendum.
+- Для проектирования и ревизии GUI читать `v37` после `v38`, когда нужно
+  сравнить predecessor supplement with current V38 commit-ready layer.
 - Для реализации нельзя переносить положения `v37` в статус `done` без
   runtime evidence, self-check или acceptance artifact.
 - При расхождении `v37` с `17/18` приоритет остаётся у human-readable канона,

@@ -1,0 +1,5 @@
+layer,role,status,note
+v38_github_kb_commit_ready,successor imported layer,proposed_active,target successor layer for GitHub knowledge base
+v3,historical detailed reference,kept_reference,retain as detailed historical reference
+v13_ring_editor_migration,historical WS-RING addendum,kept_reference,retain specialized ring contract
+v12_design_recovery,historical recovery layer,kept_reference,retain recovery provenance

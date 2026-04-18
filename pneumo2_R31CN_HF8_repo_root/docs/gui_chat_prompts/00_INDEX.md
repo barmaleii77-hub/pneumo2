@@ -13,19 +13,31 @@
    и
    [prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md](../context/gui_spec_imports/foundations/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md)
    — foundational upstream prompt source (`PROMPT_V2`).
-4. [gui_spec_imports/v33_connector_reconciled/README.md](../context/gui_spec_imports/v33_connector_reconciled/README.md)
+4. [gui_spec_imports/v38_github_kb_commit_ready/README.md](../context/gui_spec_imports/v38_github_kb_commit_ready/README.md),
+   [TECHNICAL_SPECIFICATION.md](../context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md),
+   [GUI_SPEC.yaml](../context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml)
+   и [V38_KB_IMPORT_AUDIT_2026-04-18.md](../context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md)
+   — current imported successor GitHub KB/TZ/spec commit-ready layer. Он
+   уточняет requirements, workspace contracts, parameter catalogs, acceptance,
+   optimized pipeline and open gaps, но не является runtime-closure proof.
+5. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
+   [TECHNICAL_SPECIFICATION.md](../context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md)
+   и [GUI_SPEC.yaml](../context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml)
+   — predecessor GitHub KB/TZ/spec supplement. Читать для provenance и
+   сравнения с V38, не как текущий верхний successor layer.
+6. [gui_spec_imports/v33_connector_reconciled/README.md](../context/gui_spec_imports/v33_connector_reconciled/README.md)
    и [COMPLETENESS_ASSESSMENT.md](../context/gui_spec_imports/v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
    — active connector-reconciled GUI/TZ digest для v33 integrity policy,
    selfcheck/remediation, repo-canon read order, gate mapping и PB-008.
-5. [gui_spec_imports/v32_connector_reconciled/README.md](../context/gui_spec_imports/v32_connector_reconciled/README.md),
+7. [gui_spec_imports/v32_connector_reconciled/README.md](../context/gui_spec_imports/v32_connector_reconciled/README.md),
    [COMPLETENESS_ASSESSMENT.md](../context/gui_spec_imports/v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
    и [PARALLEL_CHAT_WORKSTREAMS.md](../context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md)
    — previous connector-reconciled digest и разбиение работы на независимые чаты.
-6. [RELEASE_GATE_ACCEPTANCE_MAP.md](../context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md),
+8. [RELEASE_GATE_ACCEPTANCE_MAP.md](../context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md),
    [RELEASE_GATE_HARDENING_MATRIX.csv](../context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_HARDENING_MATRIX.csv)
    и [GAP_TO_EVIDENCE_ACTION_MAP.csv](../context/gui_spec_imports/v32_connector_reconciled/GAP_TO_EVIDENCE_ACTION_MAP.csv)
    — checked-in release/evidence extracts для V32-16 и docs-contract tests.
-7. [WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md),
+9. [WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md),
    [PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md),
    [COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md),
    [GEOMETRY_REFERENCE_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md),
@@ -35,56 +47,50 @@
    [DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md](../context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md)
    и [RUNTIME_RELEASE_EVIDENCE_NOTE.md](../context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md)
    — lane evidence notes для V32-02/V32-04/V32-06/V32-08/V32-10/V32-13/V32-14/V32-09/V32-11/V32-15; не объявляют full gap closure без named runtime artifacts.
-8. [WORKTREE_TRIAGE_2026-04-17.md](../context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
+10. [WORKTREE_TRIAGE_2026-04-17.md](../context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
    — release-readiness ownership map текущего dirty tree; не runtime closure proof.
-9. [SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md](../context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md)
+11. [SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md](../context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md)
    — reviewed clean self-check warnings snapshot; не diagnostics/SEND closure proof.
-10. [V32_16_ACCEPTANCE_NOTE_2026-04-17.md](../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
+12. [V32_16_ACCEPTANCE_NOTE_2026-04-17.md](../context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
    — accepted V32-16 docs/helper scope and validation note.
-11. [PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](../context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
+13. [PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](../context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
    — synchronized repository/KB conformance audit and improvement plan; not runtime closure proof.
-12. [BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md](../context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md)
+14. [BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md](../context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md)
    — branch cleanup record and safe parallel-work policy after consolidating
    temporary Codex branches into `codex/work`.
-13. [14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
+15. [14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
    — copy-paste starter prompts for new parallel chats whose first launch is
    in Plan mode.
-14. [CODE_TREE_AUDIT_2026-04-18.md](../context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md)
+16. [CODE_TREE_AUDIT_2026-04-18.md](../context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md)
    — code-tree audit after branch cleanup: dirty files by lane, hotspot modules
    and ignored-artifact cleanup policy.
-15. [15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
+17. [15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
    — updated self-contained Plan-mode starter prompts for the same 10 chats,
    with current code audit and dirty-tree risks. Prefer this file for new
    chat starts only for historical comparison.
-16. [BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md](../context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md)
+18. [BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md](../context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md)
    — recovery audit after quarantining the mixed GUI dirty tree and removing
    duplicate local worktrees/branches.
-17. [QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md](../context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md)
+19. [QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md](../context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md)
    — resolution note for integrating quarantine commit `7823dc2` into
    `codex/work` by cherry-pick, with validation and non-closure boundaries.
-18. [16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
+20. [16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
    — current post-quarantine self-contained Plan-mode starter prompts for the
-   same 10 chats, now with mandatory V37 visual checks and
+   same 10 chats, now with mandatory V38 visual checks and
    `PIPELINE_OPTIMIZED.dot` user-flow checks. Prefer this file for all new
    chat starts.
-19. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
-   [TECHNICAL_SPECIFICATION.md](../context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md)
-   и [GUI_SPEC.yaml](../context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml)
-   — successor GitHub KB/TZ/spec supplement. Он уточняет requirements,
-   workspace contracts, parameter catalogs, acceptance и open gaps, но не
-   является runtime-closure proof.
-20. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
+21. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
    и related `v3/*`
    — checked-in detailed machine-readable reference layer.
-21. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
+22. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
    и related `v13_ring_editor_migration/*`
    — специализированный addendum для `WS-RING` и handoff `WS-RING -> WS-SUITE`.
-22. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
+23. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
    — historical design-recovery layer, который возвращает проект из implementation-веток в design-first.
-23. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
+24. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
    и [gui_spec_archive_lineage.json](../context/gui_spec_archive_lineage.json)
-   — lineage `v1…v13 + v37`, чтобы понимать роль каждого архива и successor supplement.
-24. `docs/gui_chat_prompts/*`
+   — lineage `v1…v13 + v37 + v38`, чтобы понимать роль каждого архива и successor supplement.
+25. `docs/gui_chat_prompts/*`
    — implementation prompts, которые должны наследовать канон, а не заменять его.
 
 ## Что считается reference layer
@@ -149,12 +155,17 @@
   стартовые промты для тех же 10 чатов: старт только с clean
   `origin/codex/work`, resolved quarantine не использовать как рабочий
   источник, post-resolution baseline сохранять по lane, обязательно проводить
-  V37 visual acceptance, проверять оптимизированный user pipeline без лишних
+  V38 visual acceptance, проверять оптимизированный user pipeline без лишних
   navigation steps и блокировать service-jargon leaks до принятого Plan-mode плана.
-- `v37_github_kb_supplement` задаёт successor KB/TZ/spec connector layer:
-  consolidated technical specification, GUI_SPEC.yaml, workspace contract
-  matrix, parameter catalogs, acceptance/requirements matrices, repo canon
-  alignment и список open gaps, которые нельзя скрывать как закрытые.
+- `v38_github_kb_commit_ready` задаёт текущий successor KB/TZ/spec connector
+  layer: consolidated technical specification, GUI_SPEC.yaml, workspace
+  contract matrix, parameter catalogs, acceptance/requirements matrices, repo
+  canon alignment, optimized pipeline and open gaps. Local ambiguity resolution
+  lives in `V38_KB_IMPORT_AUDIT_2026-04-18.md`.
+- `v37_github_kb_supplement` задаёт predecessor KB/TZ/spec connector layer:
+  predecessor consolidated technical specification, GUI_SPEC.yaml, workspace
+  contract matrix, parameter catalogs, acceptance/requirements matrices, repo
+  canon alignment и список open gaps, которые нельзя скрывать как закрытые.
 - `v3` задаёт общий detailed layer:
   shell, layout, UI elements, help/tooltip catalogs, migration matrix,
   acceptance, verification, keyboard/docking/state/observability contracts.
@@ -206,16 +217,19 @@
 - если нужно понять исходный жёсткий intent ещё до `v1`, дополнительно читать
   `foundations/*`;
 - если lane затрагивает requirements, параметры, workspace coverage,
-  acceptance или open gaps, читать `v37_github_kb_supplement/*` как
-  successor knowledge-base supplement, не подменяя им runtime evidence;
+  acceptance или open gaps, читать `v38_github_kb_commit_ready/*` и
+  `V38_KB_IMPORT_AUDIT_2026-04-18.md` как current successor knowledge-base
+  supplement, затем `v37_github_kb_supplement/*` только как predecessor
+  provenance; runtime evidence ими не подменять;
 - если lane касается ring editor, handoff сценария или suite consumer
   сценарного контракта, обязательно дополнительно смотреть
   `v13_ring_editor_migration/*`;
 - если lane касается происхождения текущего канона, recovery decisions или
   границы между design и implementation-pass, смотреть `v12_design_recovery/*`
   и lineage `v1…v13`;
-- при конфликте приоритет у `17/18`, затем у `v33_connector_reconciled`, затем
-  у `v32_connector_reconciled`, затем у `foundations`, затем у
-  `v37_github_kb_supplement`, затем у `v3`, затем у специализированного
+- при конфликте приоритет у `17/18`, затем у `foundations`, затем у
+  `v38_github_kb_commit_ready` плюс `V38_KB_IMPORT_AUDIT_2026-04-18.md`, затем
+  у `v37_github_kb_supplement`, затем у `v33_connector_reconciled`, затем
+  у `v32_connector_reconciled`, затем у `v3`, затем у специализированного
   `v13_ring_editor_migration`, затем у `v12_design_recovery`, затем у
   historical imports.

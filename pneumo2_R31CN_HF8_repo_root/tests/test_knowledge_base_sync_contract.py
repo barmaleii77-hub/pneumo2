@@ -96,6 +96,15 @@ def test_chat_knowledge_base_store_exists_and_is_seeded() -> None:
         == "context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md"
         for item in data["plans"]
     )
+    assert any(
+        item["title"] == "V38 commit-ready KB layer is the current GUI/TZ/spec imported reference."
+        for item in data["requirements"]
+    )
+    assert any(
+        item["artifact_path"] == "gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md"
+        and "V38" in item["title"]
+        for item in data["plans"]
+    )
 
 
 def test_chat_knowledge_base_adders_dedupe_same_entry() -> None:

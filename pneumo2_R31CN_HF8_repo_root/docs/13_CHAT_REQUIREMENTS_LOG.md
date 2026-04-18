@@ -137,6 +137,12 @@ ID: `REQ-0020`.
 Источник: chat: V37 compliance correction 2026-04-18.
 ID: `REQ-0021`.
 
+22. V38 commit-ready KB layer is the current GUI/TZ/spec imported reference.
+V38 from pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip is imported as docs/context/gui_spec_imports/v38_github_kb_commit_ready and must be read after 17/18/foundations. V37 remains predecessor provenance. V38 does not close producer truth, cylinder packaging, measured browser performance, viewport gating or Windows visual/runtime acceptance without named evidence.
+Статус: активно.
+Источник: chat.
+ID: `REQ-0022`.
+
 ## Как ссылаться из будущих задач
 
 Если новая задача опирается на решение из чата, но не отражена в старом каноне, сначала проверить этот файл, а затем соответствующие plan-файлы из [docs/14_CHAT_PLANS_LOG.md](./14_CHAT_PLANS_LOG.md).

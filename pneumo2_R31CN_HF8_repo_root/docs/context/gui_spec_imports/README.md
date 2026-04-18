@@ -17,6 +17,12 @@
 
 - `foundations/` — upstream prompt sources, предшествующие серии архивов
   `v1…v13`;
+- `v38_github_kb_commit_ready/` — current import-ready successor
+  knowledge-base commit-ready layer из
+  `pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip`.
+  Слой читается после `foundations/*`, но не выше `17/18`, и не является
+  `runtime-closure proof`; локальная разборка неоднозначностей зафиксирована в
+  `docs/context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md`;
 - `v33_connector_reconciled/` — active connector-reconciled knowledge digest из
   `pneumo_codex_tz_spec_connector_reconciled_v33.zip`; использовать как
   текущий v33 source-priority, integrity/selfcheck/remediation и repo-canon
@@ -40,8 +46,8 @@
   `DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md` and
   `RUNTIME_RELEASE_EVIDENCE_NOTE.md`;
 - `v37_github_kb_supplement/` — import-ready successor knowledge-base
-  supplement layer для GitHub/CODEX/TZ/spec reconciliation. Слой читается
-  после `foundations/*`, но не выше `17/18`, и не является
+  supplement layer для GitHub/CODEX/TZ/spec reconciliation. После импорта V38
+  этот слой остаётся predecessor provenance/reference layer и не является
   `runtime-closure proof`;
 - `v3/` — active detailed machine-readable reference layer из
   `pneumo_gui_codex_package_v3.zip`;
@@ -63,15 +69,23 @@
 1. Сначала читать `17` и `18` как канон для людей.
 2. Если нужен upstream provenance исходного design-intent, читать
    `foundations/*` как pre-`v1` prompt layer.
-3. Затем читать `v33_connector_reconciled/README.md` как active
+3. Затем читать `v38_github_kb_commit_ready/README.md`,
+   `v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md`,
+   `v38_github_kb_commit_ready/GUI_SPEC.yaml`, V38 catalog/matrix files and
+   `../release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md` as the current
+   imported successor KB/TZ/spec layer. V38 is commit-ready knowledge-base
+   context, not runtime closure proof.
+4. Затем читать `v37_github_kb_supplement/README.md` as predecessor
+   GitHub KB/TZ/spec supplement if lineage/provenance comparison is needed.
+5. Затем читать `v33_connector_reconciled/README.md` как active
    connector-reconciled digest для V33: integrity policy, selfcheck,
    remediation, repo-canon read order, gate mapping и PB-008 provenance
    playbook.
-4. Для контекста V32 и параллельной разработки читать
+6. Для контекста V32 и параллельной разработки читать
    `v32_connector_reconciled/README.md` и
    `v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md`; если нужно понять
    достаточность архива, читать `v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md`.
-5. Если задача касается release gates, acceptance evidence или open gaps, читать
+7. Если задача касается release gates, acceptance evidence или open gaps, читать
    `v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md` и local checked-in
    extracts `RELEASE_GATE_HARDENING_MATRIX.csv`,
    `GAP_TO_EVIDENCE_ACTION_MAP.csv`; for frozen inputs/suite handoff
@@ -93,24 +107,20 @@
    `v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md`;
    for runtime/perf evidence gates, also read
    `v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md`.
-6. Для repo knowledge-base reconciliation, связки ТЗ с GUI-spec, workspace
-   contract matrix, parameter catalogs, open gaps and acceptance matrix читать
-   `v37_github_kb_supplement/*`. Этот слой является successor KB supplement,
-   но не закрывает runtime acceptance без отдельного evidence layer.
-7. Затем использовать `v3/*` как checked-in detailed machine-readable reference для:
+8. Затем использовать `v3/*` как checked-in detailed machine-readable reference для:
    layout, UI elements, field/help/tooltip catalogs, migration matrix,
    acceptance criteria, pipeline verification, source-of-truth, docking,
    keyboard, UI state и observability contracts.
-8. Если нужно понять, как текущий канон вырос из старых архивов, читать
+9. Если нужно понять, как текущий канон вырос из старых архивов, читать
    `GUI_SPEC_ARCHIVE_LINEAGE.md` и `gui_spec_archive_lineage.json`.
-9. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
+10. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
    `v13_ring_editor_migration/*` как специализированный addendum поверх `v3`:
    schema contract, screen blueprints, state machine, ring-level migration
    matrix, acceptance gates и suite-link contract.
-10. `v12_design_recovery/*` использовать как historical design-recovery layer:
+11. `v12_design_recovery/*` использовать как historical design-recovery layer:
    он фиксирует возврат в design-first ветку, канон ring editor, optimization
    control plane и truthful graphics перед `v13`.
-11. `v2` и `v1` использовать только как historical imports и источник для
+12. `v2` и `v1` использовать только как historical imports и источник для
    сравнения эволюции GUI-spec.
 
 ## Политика обновления
@@ -121,13 +131,14 @@
 - нормализация допускается только в производных docs/tests, а не в imported
   source artifacts;
 - при конфликте между imported sources и текущим каноном приоритет у `17/18`,
-  затем у `v33_connector_reconciled/README.md` как active connector-reconciled
-  digest, затем у `v32_connector_reconciled/README.md` как previous
-  connector-reconciled digest/workstream layer и его release/evidence extracts,
-  затем у `foundations/*` как upstream intent layer только для provenance,
-  затем у `v37_github_kb_supplement/*` как successor consolidated
-  knowledge-base supplement, затем у active detailed layer `v3`, затем у
-  специализированного addendum
+  затем у `foundations/*` как upstream intent/provenance layer, затем у
+  `v38_github_kb_commit_ready/*` как current successor KB/TZ/spec layer and
+  `V38_KB_IMPORT_AUDIT_2026-04-18.md` as local ambiguity resolution, затем у
+  `v37_github_kb_supplement/*` as predecessor KB/TZ/spec layer, затем у
+  `v33_connector_reconciled/README.md` как connector-reconciled digest, затем у
+  `v32_connector_reconciled/README.md` как previous connector-reconciled
+  digest/workstream layer и его release/evidence extracts, затем у active
+  detailed layer `v3`, затем у специализированного addendum
   `v13_ring_editor_migration` в пределах `WS-RING` и ring-to-suite handoff,
   затем у `v12_design_recovery` как historical design-recovery layer, затем у
   остальных historical imports.

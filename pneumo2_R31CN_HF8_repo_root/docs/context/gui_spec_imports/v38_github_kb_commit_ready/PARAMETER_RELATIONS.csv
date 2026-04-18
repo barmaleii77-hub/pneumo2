@@ -1,0 +1,29 @@
+REL_ID,SOURCE_PAR_ID,RELATION_TYPE,TARGET_PAR_ID,LOGIC
+REL-0001,PAR-0423,context_scopes,PAR-0001,"Проект задаёт имя, контекст и storage lineage для сценария."
+REL-0002,PAR-0001,produces_refs_for,PAR-0045,"Редактор циклического сценария экспортирует refs, которые потребляет матрица испытаний."
+REL-0003,PAR-0045,produces_snapshot_for,PAR-0094,Validated suite snapshot передаётся в baseline как frozen handoff.
+REL-0004,PAR-0095,lineage_gate_for,PAR-0148,Optimization identity зависит от active baseline hash.
+REL-0005,PAR-0148,supports_selected_run,PAR-0210,Analysis context читает run contract и baseline provenance.
+REL-0006,PAR-0210,feeds_selected_context,PAR-0272,"Animator получает selected analysis context, а не live runtime state."
+REL-0007,PAR-0272,feeds_diagnostics_evidence,PAR-0340,Диагностика получает provenance run/capture через evidence manifest.
+REL-0008,PAR-0209,paired_identity_hash,PAR-0210,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0009,PAR-0209,paired_identity_hash,PAR-0215,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0010,PAR-0209,paired_identity_hash,PAR-0216,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0011,PAR-0209,paired_identity_hash,PAR-0217,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0012,PAR-0271,paired_identity_hash,PAR-0272,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0013,PAR-0271,paired_identity_hash,PAR-0274,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0014,PAR-0271,paired_identity_hash,PAR-0275,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0015,PAR-0271,paired_identity_hash,PAR-0276,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0016,PAR-0094,paired_identity_hash,PAR-0095,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0017,PAR-0094,paired_identity_hash,PAR-0122,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0018,PAR-0094,paired_identity_hash,PAR-0123,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0019,PAR-0094,paired_identity_hash,PAR-0127,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0020,PAR-0094,paired_identity_hash,PAR-0129,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0021,PAR-0339,paired_identity_hash,PAR-0340,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0022,PAR-0339,paired_identity_hash,PAR-0341,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0023,PAR-0339,paired_identity_hash,PAR-0342,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0024,PAR-0339,paired_identity_hash,PAR-0343,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0025,PAR-0147,paired_identity_hash,PAR-0148,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0026,PAR-0147,paired_identity_hash,PAR-0150,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0027,PAR-0147,paired_identity_hash,PAR-0152,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
+REL-0028,PAR-0147,paired_identity_hash,PAR-0203,"Идентификатор и hash совместно задают identity, stale-check и resume semantics."
