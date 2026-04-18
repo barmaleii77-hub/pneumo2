@@ -493,11 +493,13 @@ class DesktopRingScenarioEditor:
         scenario_label = Path(self.state.spec_path).name if self.state.spec_path else "в памяти"
         artifacts_label = "требуется пересборка" if self.state.export.artifacts_stale else "актуально"
         opt_suite_label = "требуется пересборка" if self.state.export.opt_suite_stale else "актуально"
+        source_state_label = "dirty in editor" if self.state.dirty else "current"
         self.status_var.set(
             f"Сохранение: {dirty_label} | Сценарий: {scenario_label} | "
             f"Сегментов: {len(rows)} | Ошибок: {len(diagnostics.errors)} | Предупреждений: {len(diagnostics.warnings)} | "
-            f"Каталог выгрузки: {self.state.export.output_dir or 'не выбран'} | Файлы сценария: {artifacts_label} | "
-            f"Набор оптимизации: {opt_suite_label}"
+            f"Каталог выгрузки: {self.state.export.output_dir or 'не выбран'} | "
+            f"WS-RING source state: {source_state_label} | Derived artifacts state: {artifacts_label} | "
+            f"HO-005 suite link state: {opt_suite_label}"
             + (f" | {self.state.status_message}" if self.state.status_message else "")
         )
         self._update_window_title()
@@ -750,32 +752,41 @@ class DesktopRingScenarioEditor:
 
         if self.state.export.last_bundle:
             bundle = self.state.export.last_bundle
+            source_state_line = (
+                "\nWS-RING source state: dirty in editor"
+                if self.state.dirty
+                else "\nWS-RING source state: current"
+            )
             artifacts_line = (
-                "\nСостояние файлов сценария: требуется пересборка"
+                "\nDerived artifacts state: stale, rebuild required"
                 if self.state.export.artifacts_stale
-                else "\nСостояние файлов сценария: актуально"
+                else "\nDerived artifacts state: current"
             )
             opt_suite_line = (
-                "\nСостояние набора оптимизации: требуется пересборка"
+                "\nHO-005 suite link state: stale, rebuild required"
                 if self.state.export.opt_suite_stale
-                else "\nСостояние набора оптимизации: актуально"
+                else "\nHO-005 suite link state: current"
             )
             meta_lines = ""
             meta = bundle.get("meta")
             if isinstance(meta, dict):
+                closure_left_mm = 1000.0 * float(meta.get("closure_correction_left_max_m", 0.0) or 0.0)
+                closure_right_mm = 1000.0 * float(meta.get("closure_correction_right_max_m", 0.0) or 0.0)
                 meta_lines = (
                     f"\nДлина кольца: {float(meta.get('ring_length_m', 0.0) or 0.0):.2f} м"
                     f"\nДлительность круга: {float(meta.get('lap_time_s', 0.0) or 0.0):.2f} с"
                     f"\nЧисло отсчётов: {int(meta.get('n_samples', 0) or 0)}"
                     f"\nРежим замыкания: {CLOSURE_POLICY_TO_UI.get(str(meta.get('closure_policy', '')), 'не задан')}"
-                    f"\nRaw seam до export-замыкания: {1000.0 * float(meta.get('raw_seam_max_jump_m', 0.0) or 0.0):.1f} мм"
-                    f"\nМаксимальный шов после export-policy: {1000.0 * float(meta.get('seam_max_jump_m', 0.0) or 0.0):.1f} мм"
+                    f"\nRaw seam before export policy: {1000.0 * float(meta.get('raw_seam_max_jump_m', 0.0) or 0.0):.1f} мм"
+                    f"\nPost-policy seam: {1000.0 * float(meta.get('seam_max_jump_m', 0.0) or 0.0):.1f} мм"
+                    f"\nClosure transform applied: {'yes' if bool(meta.get('closure_applied', False)) else 'no'}"
+                    f"\nClosure correction max L/R: {closure_left_mm:.1f} / {closure_right_mm:.1f} мм"
                 )
                 lineage = meta.get("lineage") if isinstance(meta.get("lineage"), dict) else {}
                 if lineage:
                     meta_lines += (
-                        f"\nRing source hash: {str(lineage.get('ring_source_hash_sha256', ''))[:16]}"
-                        f"\nExport set hash: {str(lineage.get('ring_export_set_hash_sha256', ''))[:16]}"
+                        f"\nWS-RING source hash: {str(lineage.get('ring_source_hash_sha256', ''))[:16]}"
+                        f"\nDerived export-set hash: {str(lineage.get('ring_export_set_hash_sha256', ''))[:16]}"
                     )
             anim_latest_lines = ""
             if bundle.get("anim_latest_scenario_json"):
@@ -802,6 +813,7 @@ class DesktopRingScenarioEditor:
                 f"Файл ускорений: {bundle.get('axay_csv', '')}"
                 f"\nMeta HO-004: {bundle.get('meta_json', '')}"
                 f"\nSource-of-truth WS-RING: {bundle.get('ring_source_of_truth_json', '')}"
+                f"{source_state_line}"
                 f"{artifacts_line}"
                 f"{opt_suite_line}"
                 f"{meta_lines}"
@@ -1133,6 +1145,7 @@ class DesktopRingScenarioEditor:
     def _build_optimization_auto_suite(self) -> None:
         self._apply_form_to_state()
         bundle = dict(self.state.export.last_bundle)
+        rebuilt_derived_from_source = False
         if (
             self.state.export.artifacts_stale
             or not bundle.get("scenario_json")
@@ -1140,6 +1153,7 @@ class DesktopRingScenarioEditor:
             or not bundle.get("axay_csv")
         ):
             bundle = self._generate_bundle(show_dialog=False) or {}
+            rebuilt_derived_from_source = bool(bundle)
         if not bundle:
             return
         try:
@@ -1151,11 +1165,22 @@ class DesktopRingScenarioEditor:
             self.state.export.last_bundle = {**bundle, **suite_info}
             self.state.export.last_error = ""
             self.state.export.opt_suite_stale = False
-            self.state.status_message = "Набор оптимизации подготовлен в рабочей папке."
+            if rebuilt_derived_from_source:
+                self.state.status_message = (
+                    "Набор оптимизации подготовлен; derived artifacts were rebuilt from current WS-RING source."
+                )
+            else:
+                self.state.status_message = "Набор оптимизации подготовлен в рабочей папке."
             self._refresh_from_state()
+            rebuild_line = (
+                "\nDerived artifacts were rebuilt from current WS-RING source before suite handoff.\n"
+                if rebuilt_derived_from_source
+                else ""
+            )
             messagebox.showinfo(
                 EDITOR_DIALOG_TITLE,
                 "Набор оптимизации готов.\n\n"
+                f"{rebuild_line}"
                 f"Набор: {suite_info.get('suite_json', '')}\n"
                 f"Описание: {suite_info.get('suite_meta_json', '')}\n"
                 f"Рабочая папка: {suite_info.get('workspace_dir', '')}\n"

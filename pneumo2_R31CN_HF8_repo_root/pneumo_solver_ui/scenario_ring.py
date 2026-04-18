@@ -1471,6 +1471,71 @@ def generate_ring_scenario_bundle(
     scenario_json = out_dir / f"{stem}_spec.json"
     ring_source_of_truth_json = out_dir / f"{stem}_ring_source_of_truth.json"
     meta_json = out_dir / f"{stem}_meta.json"
+    artifact_roles = {
+        "ring_source_of_truth_json": {
+            "role": "authoritative_ws_ring_source",
+            "owner_workspace": "WS-RING",
+            "editable_source": True,
+            "derived": False,
+            "consumer_workspace": "WS-SUITE",
+        },
+        "scenario_json": {
+            "role": "derived_runtime_scenario",
+            "owner_workspace": "WS-RING",
+            "editable_source": False,
+            "derived": True,
+            "consumer_workspace": "WS-SUITE",
+        },
+        "road_csv": {
+            "role": "derived_road_timeseries",
+            "owner_workspace": "WS-RING",
+            "editable_source": False,
+            "derived": True,
+            "consumer_workspace": "WS-SUITE",
+        },
+        "axay_csv": {
+            "role": "derived_motion_timeseries",
+            "owner_workspace": "WS-RING",
+            "editable_source": False,
+            "derived": True,
+            "consumer_workspace": "WS-SUITE",
+        },
+        "meta_json": {
+            "role": "derived_handoff_evidence",
+            "owner_workspace": "WS-RING",
+            "editable_source": False,
+            "derived": True,
+            "consumer_workspace": "WS-SUITE",
+        },
+    }
+    source_and_derived_boundaries = {
+        "authoritative_source": "ring_source_of_truth_json",
+        "editable_owner": "WS-RING",
+        "source_workspace": "WS-RING",
+        "consumer_workspace": "WS-SUITE",
+        "derived_artifacts": ["scenario_json", "road_csv", "axay_csv", "meta_json"],
+        "ws_suite_readonly_ring_refs": [
+            "road_csv",
+            "axay_csv",
+            "scenario_json",
+            "segment_meta_ref",
+            "ring_source_hash_sha256",
+            "ring_export_set_hash_sha256",
+            "ring_geometry_metadata",
+        ],
+        "ws_suite_editable_runtime_fields": [
+            "stage",
+            "type",
+            "dt",
+            "t_end",
+            "target",
+            "runtime_overrides",
+        ],
+        "downstream_geometry_editing_allowed": False,
+        "validated_suite_snapshot_role": "frozen_consumer_snapshot",
+        "closure_policy_authoring_workspace": "WS-RING",
+        "closure_transform_scope": "derived_export_only",
+    }
 
     z4 = np.column_stack([z_fl, z_fr, z_rl, z_rr])
     write_road_csv(road_csv, t, z4, extra_columns={"segment_id": [int(v) for v in segment_id_series]})
@@ -1555,6 +1620,9 @@ def generate_ring_scenario_bundle(
         "source_of_truth": True,
         "editable_owner": "WS-RING",
         "handoff_id": "HO-004",
+        "artifact_role": "authoritative_ws_ring_source",
+        "artifact_key": "ring_source_of_truth_json",
+        "derived_artifacts_not_editable_sources": ["scenario_json", "road_csv", "axay_csv", "meta_json"],
         "downstream_geometry_editing_allowed": False,
     }
     ring_source_hash = _sha256_text(_stable_json_dumps(source_of_truth_payload))
@@ -1576,6 +1644,7 @@ def generate_ring_scenario_bundle(
         "meta_json": meta_json.name,
         "ring_source_of_truth_json": ring_source_of_truth_json.name,
     }
+    spec_to_save["_artifact_roles"] = artifact_roles
     spec_to_save["_lineage"] = {
         "ring_source_hash_sha256": ring_source_hash,
         "handoff_id": "HO-004",
@@ -1626,6 +1695,8 @@ def generate_ring_scenario_bundle(
             "ring_source_of_truth_json": str(ring_source_of_truth_json),
         },
         "lineage": dict(meta["lineage"]),
+        "artifact_roles": artifact_roles,
+        "source_and_derived_boundaries": source_and_derived_boundaries,
         "closure": {
             "policy": str(meta.get("closure_policy") or ""),
             "export_state": str(meta.get("closure_export_state") or ""),

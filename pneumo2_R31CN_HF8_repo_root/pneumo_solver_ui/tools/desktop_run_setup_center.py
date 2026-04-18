@@ -47,6 +47,12 @@ class DesktopRunSetupCenter:
         self.launch_action_hint_var = tk.StringVar()
         self.launch_with_check_button: ttk.Button | None = None
         self.launch_plain_button: ttk.Button | None = None
+        self.suite_lineage_var = tk.StringVar(
+            value=(
+                "HO-003 / HO-004 / HO-005 state will appear after checking the suite. "
+                "Ring geometry refs are read-only in WS-SUITE."
+            )
+        )
         self.suite_tree: ttk.Treeview | None = None
 
         self._build_ui()
@@ -1278,12 +1284,19 @@ class DesktopRunSetupCenter:
             justify="left",
             foreground="#334455",
         ).grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            status_frame,
+            textvariable=self.suite_lineage_var,
+            wraplength=880,
+            justify="left",
+            foreground="#334455",
+        ).grid(row=1, column=0, sticky="w", pady=(8, 0))
 
         matrix_frame = ttk.LabelFrame(body, text="Preview матрицы испытаний", padding=10)
         matrix_frame.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
         matrix_frame.columnconfigure(0, weight=1)
         matrix_frame.rowconfigure(0, weight=1)
-        columns = ("enabled", "name", "stage", "type", "dt", "t_end", "refs")
+        columns = ("enabled", "name", "stage", "type", "dt", "t_end", "refs", "hashes", "state")
         self.suite_tree = ttk.Treeview(matrix_frame, columns=columns, show="headings", height=10)
         headings = {
             "enabled": "enabled",
@@ -1292,20 +1305,24 @@ class DesktopRunSetupCenter:
             "type": "тип",
             "dt": "dt",
             "t_end": "t_end",
-            "refs": "refs / validation",
+            "refs": "read-only WS-RING refs",
+            "hashes": "source/export hashes",
+            "state": "ring_handoff_stale / reasons",
         }
         widths = {
-            "enabled": 80,
-            "name": 190,
-            "stage": 80,
-            "type": 150,
-            "dt": 90,
-            "t_end": 90,
-            "refs": 260,
+            "enabled": 70,
+            "name": 160,
+            "stage": 65,
+            "type": 120,
+            "dt": 65,
+            "t_end": 65,
+            "refs": 210,
+            "hashes": 180,
+            "state": 230,
         }
         for column in columns:
             self.suite_tree.heading(column, text=headings[column])
-            self.suite_tree.column(column, width=widths[column], stretch=(column in {"name", "refs"}))
+            self.suite_tree.column(column, width=widths[column], stretch=(column in {"name", "refs", "state"}))
         yscroll = ttk.Scrollbar(matrix_frame, orient="vertical", command=self.suite_tree.yview)
         self.suite_tree.configure(yscrollcommand=yscroll.set)
         self.suite_tree.grid(row=0, column=0, sticky="nsew")
@@ -1342,7 +1359,9 @@ class DesktopRunSetupCenter:
             command_frame,
             text=(
                 "Refs из WS-RING и WS-INPUTS здесь только читаются: road_csv, axay_csv, "
-                "scenario_json, inputs_snapshot и ring_source_hash не редактируются в WS-SUITE."
+                "scenario_json, segment_meta_ref, inputs_snapshot, ring_source_hash и "
+                "ring_export_set_hash не редактируются в WS-SUITE. "
+                "Для правки геометрии откройте Ring Editor / WS-RING source."
             ),
             wraplength=880,
             justify="left",
@@ -1640,13 +1659,131 @@ class DesktopRunSetupCenter:
             on_success=_after_check,
         )
 
+    @staticmethod
+    def _short_hash(value: object) -> str:
+        text = str(value or "").strip()
+        return text[:12] if text else "—"
+
+    @staticmethod
+    def _suite_lineage_status_text(context: dict[str, object] | None) -> str:
+        current = dict(context or {})
+        if not current:
+            return (
+                "HO-003 / HO-004 / HO-005: not checked. "
+                "Ring geometry refs are read-only in WS-SUITE; edit geometry in Ring Editor / WS-RING."
+            )
+        snapshot = dict(current.get("snapshot") or {})
+        inputs_context = dict(current.get("inputs_context") or {})
+        ring_context = dict(current.get("ring_context") or {})
+        current_state = dict(current.get("state") or {})
+        existing_state = dict(current.get("existing_state") or {})
+        source_ref = dict(ring_context.get("source_ref") or {})
+        if not source_ref:
+            source_ref = dict(dict(snapshot.get("upstream_refs") or {}).get("ring") or {}).get("source_ref") or {}
+            source_ref = dict(source_ref) if isinstance(source_ref, dict) else {}
+        ring_source_hash = (
+            str(ring_context.get("source_hash") or "").strip()
+            or str(dict(dict(snapshot.get("upstream_refs") or {}).get("ring") or {}).get("source_hash") or "").strip()
+        )
+        export_set_hash = str(
+            source_ref.get("ring_export_set_hash_sha256")
+            or source_ref.get("ring_export_set_hash_current_sha256")
+            or ""
+        ).strip()
+        suite_hash = str(snapshot.get("suite_snapshot_hash") or "").strip()
+        suite_state = str(existing_state.get("state") or current_state.get("state") or "missing")
+        stale_reasons = list(existing_state.get("stale_reasons") or current_state.get("stale_reasons") or [])
+        stale_row_names: list[str] = []
+        stale_row_reasons: list[str] = []
+        for idx, row in enumerate(list(snapshot.get("suite_rows") or [])):
+            if not isinstance(row, dict) or not bool(row.get("ring_handoff_stale", False)):
+                continue
+            name = str(row.get("имя") or row.get("name") or row.get("id") or f"row_{idx + 1}")
+            stale_row_names.append(name)
+            stale_row_reasons.extend(str(item) for item in list(row.get("ring_stale_reasons") or []) if str(item).strip())
+        lines = [
+            (
+                f"HO-003 / HO-004 / HO-005: inputs={inputs_context.get('state') or 'missing'}; "
+                f"ring={ring_context.get('state') or 'missing'}; validated_suite_snapshot={suite_state}"
+            ),
+            (
+                f"WS-RING source hash={DesktopRunSetupCenter._short_hash(ring_source_hash)} | "
+                f"Derived export-set hash={DesktopRunSetupCenter._short_hash(export_set_hash)} | "
+                f"suite_snapshot_hash={DesktopRunSetupCenter._short_hash(suite_hash)}"
+            ),
+            f"ring_handoff_stale rows={', '.join(stale_row_names) if stale_row_names else 'none'}",
+            (
+                "Stale reasons: "
+                + ", ".join(str(item) for item in [*stale_reasons, *stale_row_reasons] if str(item).strip())
+                if stale_reasons or stale_row_reasons
+                else "Stale reasons: none"
+            ),
+            "Ring geometry refs are read-only in WS-SUITE; edit geometry in Ring Editor / WS-RING source.",
+        ]
+        return "\n".join(lines)
+
+    @staticmethod
+    def _suite_preview_rows(context: dict[str, object] | None) -> list[tuple[str, str, str, str, str, str, str, str, str]]:
+        current = dict(context or {})
+        snapshot = dict(current.get("snapshot") or {})
+        validation = dict(snapshot.get("validation") or {})
+        missing_by_row: dict[str, int] = {}
+        for item in list(validation.get("missing_refs") or []):
+            if isinstance(item, dict):
+                name = str(item.get("row") or "")
+                missing_by_row[name] = missing_by_row.get(name, 0) + 1
+        rows: list[tuple[str, str, str, str, str, str, str, str, str]] = []
+        for idx, row in enumerate(list(snapshot.get("suite_rows") or [])):
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get("имя") or row.get("name") or row.get("id") or f"row_{idx + 1}")
+            refs = ", ".join(
+                key
+                for key in (
+                    "road_csv",
+                    "axay_csv",
+                    "scenario_json",
+                    "road_csv_path",
+                    "axay_csv_path",
+                    "scenario_json_path",
+                    "segment_meta_ref",
+                )
+                if str(row.get(key) or "").strip()
+            )
+            source_hash = str(row.get("ring_source_hash_sha256") or row.get("ring_source_hash") or "").strip()
+            export_hash = str(row.get("ring_export_set_hash_sha256") or "").strip()
+            stale_reasons = [str(item) for item in list(row.get("ring_stale_reasons") or []) if str(item).strip()]
+            if missing_by_row.get(name):
+                stale_reasons.append(f"missing_refs={missing_by_row[name]}")
+            stale_label = "ring_handoff_stale=yes" if bool(row.get("ring_handoff_stale", False)) else "ring_handoff_stale=no"
+            if stale_reasons:
+                stale_label += "; " + ", ".join(stale_reasons)
+            rows.append(
+                (
+                    "yes" if bool(row.get("включен", row.get("enabled", True))) else "no",
+                    name,
+                    str(row.get("стадия", row.get("stage", 0)) or 0),
+                    str(row.get("тип", row.get("type", "")) or ""),
+                    str(row.get("dt", "")),
+                    str(row.get("t_end", row.get("t_end_s", ""))),
+                    refs or "—",
+                    (
+                        f"source={DesktopRunSetupCenter._short_hash(source_hash)} | "
+                        f"export={DesktopRunSetupCenter._short_hash(export_hash)}"
+                    ),
+                    stale_label,
+                )
+            )
+        return rows
+
     def _refresh_suite_preview_table(self) -> None:
         context = self.editor._refresh_suite_handoff_state()
+        self.suite_lineage_var.set(self._suite_lineage_status_text(context))
         if self.suite_tree is None:
             return
         for item in self.suite_tree.get_children():
             self.suite_tree.delete(item)
-        for idx, row in enumerate(self.editor._suite_preview_rows(context)):
+        for idx, row in enumerate(self._suite_preview_rows(context)):
             self.suite_tree.insert("", "end", iid=f"suite_row_{idx}", values=row)
 
     def _freeze_suite_handoff(self) -> None:
