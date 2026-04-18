@@ -321,7 +321,7 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert "ZIP текущего прогона" in session_titles
     assert "Проверка текущего прогона в JSON" in session_titles
     assert "Разбор замечаний текущего прогона в JSON" in session_titles
-    assert "Указатель аниматора текущего прогона" in session_titles
+    assert "Контекст аниматора текущего прогона" in session_titles
     assert "HO-010 manifest текущего прогона" in session_titles
     assert "session_send_bundle_zip" in session_keys
     assert "session_validation_json" in session_keys
@@ -615,6 +615,99 @@ def test_desktop_results_runtime_surfaces_latest_optimizer_selected_run_contract
     assert sidecar["optimizer_selected_run_contract"]["hash"] == "selected-contract-001"
     assert sidecar["artifacts"]["selected_run_contract_path"] == str(selected_contract_path.resolve())
     assert sidecar["selected_context_ref"]["selected_run_contract_path"] == str(selected_contract_path.resolve())
+
+
+def test_desktop_results_runtime_warns_when_selected_contract_exists_without_pointer(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    send_bundles = repo_root / "send_bundles"
+    workspace = repo_root / "pneumo_solver_ui" / "workspace"
+    contract_dir = workspace / "handoffs" / "WS-OPTIMIZATION"
+    run_dir = workspace / "opt_runs" / "coord" / "p_selected_without_pointer"
+    send_bundles.mkdir(parents=True, exist_ok=True)
+    contract_dir.mkdir(parents=True, exist_ok=True)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    selected_contract_path = contract_dir / "selected_run_contract.json"
+    selected_contract_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "selected_run_contract_v1",
+                "handoff_id": "HO-007",
+                "run_id": "run-selected-no-pointer",
+                "run_dir": str(run_dir),
+                "objective_contract_hash": "objective-no-pointer",
+                "hard_gate_key": "penalty_total",
+                "hard_gate_tolerance": 0.15,
+                "problem_hash": "problem-no-pointer",
+                "problem_hash_mode": "stable",
+                "active_baseline_hash": "baseline-no-pointer",
+                "suite_snapshot_hash": "suite-no-pointer",
+                "results_csv_path": str(run_dir / "export" / "trials.csv"),
+                "analysis_handoff_ready_state": "ready",
+                "selected_run_contract_hash": "selected-contract-no-pointer",
+                "blocking_states": [],
+                "warnings": [],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (send_bundles / "latest_send_bundle_validation.json").write_text(
+        json.dumps({"ok": True, "errors": [], "warnings": []}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (send_bundles / "latest_send_bundle_validation.md").write_text("# validation\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.collect_anim_latest_diagnostics_summary",
+        lambda include_meta=True: {},
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.load_latest_send_bundle_anim_dashboard",
+        lambda out_dir: {},
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.format_anim_dashboard_brief_lines",
+        lambda anim: [],
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.build_anim_operator_recommendations",
+        lambda anim: [],
+    )
+
+    runtime = DesktopResultsRuntime(repo_root=repo_root, python_executable="python")
+    snapshot = runtime.snapshot()
+    overview = {row.key: row for row in snapshot.validation_overview_rows}
+    artifacts = {item.key: item for item in snapshot.recent_artifacts}
+    fields = {field.key: field for field in snapshot.result_context_fields}
+
+    assert snapshot.latest_optimizer_pointer_json_path is None
+    assert snapshot.latest_optimizer_run_dir == run_dir.resolve()
+    assert snapshot.selected_run_contract_path == selected_contract_path.resolve()
+    assert snapshot.selected_run_contract_hash == "selected-contract-no-pointer"
+    assert snapshot.selected_run_contract_status == "WARN"
+    assert "закреплённый контекст анализа отсутствует" in snapshot.selected_run_contract_banner
+    assert overview["selected_optimizer_run_contract"].status == "WARN"
+    assert overview["selected_optimizer_run_contract"].artifact_key == "selected_optimizer_run_contract"
+    assert artifacts["selected_optimizer_run_contract"].path == selected_contract_path.resolve()
+    assert "latest_optimizer_pointer" not in artifacts
+    assert fields["selected_run_contract_hash"].selected_value == "selected-contract-no-pointer"
+    assert fields["selected_run_contract_path"].selected_value == str(selected_contract_path.resolve())
+    assert fields["objective_contract_hash"].selected_value == "objective-no-pointer"
+    assert fields["problem_hash"].selected_value == "problem-no-pointer"
+
+    manifest = runtime.build_diagnostics_evidence_manifest(snapshot)
+    assert manifest["optimizer_selected_run_contract"]["status"] == "WARN"
+    assert manifest["optimizer_selected_run_contract"]["path"] == str(selected_contract_path.resolve())
+    assert manifest["optimizer_selected_run_contract"]["latest_optimizer_pointer_path"] == ""
+
+    sidecar = runtime.build_compare_current_context_sidecar(snapshot)
+    assert sidecar["optimizer_selected_run_contract"]["status"] == "WARN"
+    assert sidecar["optimizer_selected_run_contract"]["latest_optimizer_pointer_path"] == ""
+    assert sidecar["artifacts"]["selected_run_contract_path"] == str(selected_contract_path.resolve())
 
 
 def test_desktop_results_runtime_keeps_validation_report_visible_without_json(tmp_path: Path, monkeypatch) -> None:

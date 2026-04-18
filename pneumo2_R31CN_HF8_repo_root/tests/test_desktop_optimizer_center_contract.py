@@ -696,6 +696,107 @@ def test_desktop_optimizer_runtime_exports_selected_run_contract_for_analysis(tm
     assert pointer["analysis_handoff_ready_state"] == "ready"
 
 
+def test_desktop_optimizer_center_selection_materializes_analysis_handoff(tmp_path: Path) -> None:
+    run_dir = tmp_path / "opt_runs" / "selected_from_surfaces"
+    run_dir.mkdir(parents=True)
+    summary = OptimizationRunSummary(
+        run_dir=run_dir,
+        pipeline_mode="coordinator",
+        backend="Ray",
+        status="done",
+        status_label="DONE",
+        started_at="2026-04-17T00:00:00Z",
+        updated_ts=1.0,
+        run_id="run-selection-handoff",
+        result_path=run_dir / "export" / "trials.csv",
+        objective_contract_hash="objective-selection-handoff",
+        problem_hash="problem-selection-handoff",
+        active_baseline_hash="baseline-selection-handoff",
+        suite_snapshot_hash="suite-selection-handoff",
+    )
+
+    class _StatusVar:
+        def __init__(self) -> None:
+            self.value = ""
+
+        def set(self, value: str) -> None:
+            self.value = value
+
+    class _SelectionTab:
+        def __init__(self, selected_run_dir: Path) -> None:
+            self._selected_run_dir = str(selected_run_dir)
+
+        def selected_run_dir(self) -> str:
+            return self._selected_run_dir
+
+    class _Runtime:
+        def __init__(self, run_summary: OptimizationRunSummary) -> None:
+            self.summary = run_summary
+            self.bound_run_dirs: list[str] = []
+            self.saved_from: list[str] = []
+
+        def bind_selected_run_dir(self, run_dir: Path | str | None) -> None:
+            self.bound_run_dirs.append(str(run_dir or ""))
+
+        def selected_run_details(self, run_dir: Path | str | None) -> SimpleNamespace | None:
+            if str(run_dir or "") == str(self.summary.run_dir):
+                return SimpleNamespace(summary=self.summary)
+            return None
+
+        def save_run_pointer(
+            self,
+            run_summary: OptimizationRunSummary,
+            *,
+            selected_from: str,
+        ) -> dict[str, object]:
+            assert run_summary is self.summary
+            self.saved_from.append(selected_from)
+            return {
+                "run_name": run_summary.run_dir.name,
+                "analysis_handoff_ready_state": "ready",
+                "selected_run_contract_path": str(
+                    tmp_path
+                    / "handoffs"
+                    / "WS-OPTIMIZATION"
+                    / "selected_run_contract.json"
+                ),
+            }
+
+    runtime = _Runtime(summary)
+    center = object.__new__(DesktopOptimizerCenter)
+    center.runtime = runtime
+    center.status_var = _StatusVar()
+    center._selected_run_dir = ""
+    center.history_tab = _SelectionTab(run_dir)
+    center.finished_tab = _SelectionTab(run_dir)
+    center.handoff_tab = _SelectionTab(run_dir)
+    center.packaging_tab = _SelectionTab(run_dir)
+    for name in (
+        "refresh_contract",
+        "refresh_history",
+        "refresh_finished_jobs",
+        "refresh_handoff",
+        "refresh_packaging",
+        "refresh_dashboard",
+    ):
+        setattr(center, name, lambda: None)
+
+    center.on_history_selection_changed()
+    center.on_finished_selection_changed()
+    center.on_handoff_selection_changed()
+    center.on_packaging_selection_changed()
+
+    assert runtime.saved_from == [
+        "history_selection",
+        "finished_selection",
+        "handoff_selection",
+        "packaging_selection",
+    ]
+    assert runtime.bound_run_dirs[-1] == str(run_dir)
+    assert "Передача в анализ обновлена" in center.status_var.value
+    assert "selected_run_contract.json=ready" in center.status_var.value
+
+
 def test_desktop_optimizer_runtime_blocks_cleanup_while_job_is_active(tmp_path: Path) -> None:
     runtime = DesktopOptimizerRuntime(
         ui_root=UI_ROOT,
@@ -786,7 +887,8 @@ def test_desktop_optimizer_runtime_builds_selected_run_next_step_summary(tmp_pat
     assert summary["next_action_kind"] == "show_handoff_tab"
     assert by_title["Packaging route"]["status"] == "ok"
     assert by_title["Continuation route"]["status"] == "ok"
-    assert by_title["Latest pointer"]["action_kind"] == "make_latest_pointer"
+    assert by_title["Analysis handoff"]["action_kind"] == "show_history_tab"
+    assert "selected_run_contract.json" in by_title["Analysis handoff"]["summary"]
 
 
 def test_desktop_optimizer_runtime_builds_finished_jobs_packaging_view(tmp_path: Path) -> None:
@@ -1086,7 +1188,12 @@ def test_desktop_optimizer_center_keeps_tabbed_modular_architecture() -> None:
     assert "def follow_selected_run_next_step(self) -> None:" in tool_src
     assert "def open_latest_optimization_pointer(self) -> None:" in tool_src
     assert "def make_selected_run_latest_pointer(self) -> None:" in tool_src
+    assert "def _materialize_selected_run_for_analysis(self, selected_from: str) -> str:" in tool_src
+    assert "def _refresh_after_run_selection(self, status_text: str = \"\") -> None:" in tool_src
+    assert "selected_run_contract.json будет создан автоматически" in tool_src
+    assert "Контракт запуска" in tool_src
     assert "self.runtime.bind_selected_run_dir(self._selected_run_dir)" in tool_src
+    assert "self.runtime.save_run_pointer(" in tool_src
     assert "def open_selected_results(self) -> None:" in tool_src
     assert "def open_selected_objective_contract(self) -> None:" in tool_src
     assert "def apply_selected_run_contract(self) -> None:" in tool_src

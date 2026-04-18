@@ -81,16 +81,16 @@ class DesktopOptimizerCenter:
             value="Готово. Автоматизированная оптимизация доступна в отдельном инженерном центре."
         )
         self.mode_summary_var = tk.StringVar(
-            value="Режим: active optimization mode, baseline и runtime contract будут показаны после первого обновления."
+            value="Маршрут: Базовый прогон -> Оптимизация -> Анализ; режим и baseline будут показаны после первого обновления."
         )
         self.workspace_summary_var = tk.StringVar(
             value="Контекст: контракт, история прогонов и готовые выпуски будут показаны после первого обновления."
         )
         self.baseline_summary_var = tk.StringVar(
-            value="Baseline: источник и политика автообновления будут показаны после первого обновления."
+            value="Базовый прогон: источник и политика автообновления будут показаны после первого обновления."
         )
         self.contract_summary_var = tk.StringVar(
-            value="Runtime contract: objective stack и hard gate будут показаны после первого обновления."
+            value="Контракт запуска: objective stack и hard gate будут показаны после первого обновления."
         )
         self.launch_button_text_var = tk.StringVar(value="Запустить оптимизацию")
         self._poll_after_id: str | None = None
@@ -182,7 +182,7 @@ class DesktopOptimizerCenter:
             wraplength=300,
         ).pack(anchor="w")
 
-        contract_frame = ttk.LabelFrame(sidebar, text="Runtime contract", padding=8)
+        contract_frame = ttk.LabelFrame(sidebar, text="Контракт запуска", padding=8)
         contract_frame.pack(fill="x", pady=(8, 0))
         ttk.Label(
             contract_frame,
@@ -195,7 +195,7 @@ class DesktopOptimizerCenter:
         nav_frame.pack(fill="x", pady=(8, 0))
         ttk.Button(nav_frame, text="Открыть Baseline Center", command=self.open_baseline_center).pack(fill="x")
         ttk.Button(nav_frame, text="Baseline и контракт", command=self.show_contract_tab).pack(fill="x", pady=(6, 0))
-        ttk.Button(nav_frame, text="Optimization runtime", command=self.show_runtime_tab).pack(fill="x", pady=(6, 0))
+        ttk.Button(nav_frame, text="Выполнение оптимизации", command=self.show_runtime_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="История", command=self.show_history_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="Готовые прогоны", command=self.show_finished_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="Передача стадий", command=self.show_handoff_tab).pack(fill="x", pady=(6, 0))
@@ -212,7 +212,7 @@ class DesktopOptimizerCenter:
         self.packaging_tab = DesktopOptimizerPackagingTab(self.notebook, self)
         self.notebook.add(self.dashboard_tab, text="Baseline и запуск")
         self.notebook.add(self.contract_tab, text="Baseline и контракт")
-        self.notebook.add(self.runtime_tab, text="Optimization runtime")
+        self.notebook.add(self.runtime_tab, text="Выполнение")
         self.notebook.add(self.history_tab, text="История")
         self.notebook.add(self.finished_tab, text="Готовые прогоны")
         self.notebook.add(self.handoff_tab, text="Передача стадий")
@@ -595,7 +595,10 @@ class DesktopOptimizerCenter:
         pipeline = str(payload.get("launch_pipeline") or "—")
         backend = str(payload.get("backend") or "—")
         drift_keys = tuple(str(key) for key in payload.get("drift_keys") or ())
-        summary = f"Режим: {profile} | Контур: {pipeline} | Исполнитель: {backend}"
+        summary = (
+            "Маршрут: Базовый прогон -> Оптимизация -> Анализ | "
+            f"Режим: {profile} | Контур: {pipeline} | Исполнитель: {backend}"
+        )
         if drift_keys:
             summary += " | Изменено вручную: " + ", ".join(drift_keys[:3])
             if len(drift_keys) > 3:
@@ -618,7 +621,7 @@ class DesktopOptimizerCenter:
                     "Параметры поиска: "
                     f"{int(getattr(snapshot, 'search_param_count', 0) or 0)}"
                 ),
-                "Рабочая зона: baseline, runtime, history, handoff и выпуск открываются справа во вкладках.",
+                "Рабочая зона: базовый прогон, выполнение оптимизации, история, передача в анализ и выпуск открываются справа во вкладках.",
             ]
         )
 
@@ -667,7 +670,7 @@ class DesktopOptimizerCenter:
         ho006_can_consume = bool(getattr(snapshot, "optimizer_baseline_can_consume", False))
         return "\n".join(
             [
-                f"Активный baseline: {source_label}",
+                f"Базовый прогон: {source_label}",
                 f"HO-006: {ho006_state} ({'current' if ho006_can_consume else 'blocked'})",
                 f"active_baseline_hash: {ho006_hash[:12] if ho006_hash else '—'}",
                 f"Путь: {baseline_path}",
@@ -691,7 +694,7 @@ class DesktopOptimizerCenter:
             mode_label = "Расширенный: Распределённая координация"
         return "\n".join(
             [
-                f"Активный режим: {mode_label}",
+                f"Контракт запуска: {mode_label}",
                 f"Objective stack: {objective_stack}",
                 f"Hard gate: {hard_gate}",
                 (
@@ -708,13 +711,14 @@ class DesktopOptimizerCenter:
         pointer = dict(dashboard.get("latest_pointer") or {})
         if not bool(pointer.get("exists")):
             return (
-                "Latest optimization pointer ещё не materialized.\n"
-                "Выберите run в History / Finished Jobs / Packaging / Handoff и нажмите `Make latest pointer`."
+                "Контекст анализа ещё не закреплён.\n"
+                "Выберите прогон в History / Finished Jobs / Packaging / Handoff: "
+                "selected_run_contract.json будет создан автоматически."
             )
         lines = [
-            f"pointer file: {pointer.get('pointer_path') or '—'}",
+            f"контекст анализа: {pointer.get('pointer_path') or '—'}",
             (
-                "target run: "
+                "выбранный прогон: "
                 f"{pointer.get('run_name') or '—'} | "
                 f"{pointer.get('pipeline_mode') or '—'} / {pointer.get('backend') or '—'} | "
                 f"{pointer.get('status_label') or pointer.get('status') or '—'}"
@@ -732,13 +736,13 @@ class DesktopOptimizerCenter:
             ),
         ]
         if bool(pointer.get("selected_matches_pointer")):
-            lines.append("selected run relation: current selection already matches latest_optimization.")
+            lines.append("передача в анализ: выбранный прогон уже закреплён.")
         elif self._selected_run_dir:
-            lines.append("selected run relation: latest_optimization currently points to another run.")
+            lines.append("передача в анализ: закреплён другой прогон.")
         if not bool(pointer.get("pointer_in_history")):
-            lines.append("history relation: pointer target is outside current workspace history snapshot.")
+            lines.append("история: закреплённый прогон вне текущего снимка workspace history.")
         elif pointer.get("result_path"):
-            lines.append(f"results artifact: {pointer.get('result_path')}")
+            lines.append(f"результаты: {pointer.get('result_path')}")
         return "\n".join(lines)
 
     def _format_selected_run_next_step_text(self, payload: dict[str, Any]) -> str:
@@ -787,10 +791,10 @@ class DesktopOptimizerCenter:
             f"results: {summary.result_path or 'not found'}",
         ]
         if bool(latest_pointer.get("selected_matches_pointer")):
-            lines.append("latest pointer: this selected run is the current latest_optimization target")
+            lines.append("передача в анализ: выбранный прогон уже закреплён")
         elif bool(latest_pointer.get("exists")):
             lines.append(
-                "latest pointer: "
+                "передача в анализ: закреплён "
                 f"{latest_pointer.get('run_name') or '—'}"
             )
         diff_bits = tuple(drift.get("diff_bits") or ())
@@ -1576,14 +1580,44 @@ class DesktopOptimizerCenter:
             log_text=log_text,
         )
 
-    def on_history_selection_changed(self) -> None:
-        self._selected_run_dir = self.history_tab.selected_run_dir()
+    def _materialize_selected_run_for_analysis(self, selected_from: str) -> str:
+        if not self._selected_run_dir:
+            return ""
+        self.runtime.bind_selected_run_dir(self._selected_run_dir)
+        details = self.runtime.selected_run_details(self._selected_run_dir)
+        if details is None:
+            return "Передача в анализ не обновлена: выбранный прогон не найден в истории."
+        summary = getattr(details, "summary")
+        try:
+            pointer = self.runtime.save_run_pointer(
+                summary,
+                selected_from=selected_from,
+            )
+        except Exception as exc:
+            return f"Передача в анализ не обновлена: {exc}"
+        contract_state = str(pointer.get("analysis_handoff_ready_state") or "unknown")
+        contract_path = str(pointer.get("selected_run_contract_path") or "")
+        path_suffix = f" | {contract_path}" if contract_path else ""
+        return (
+            "Передача в анализ обновлена: "
+            f"{pointer.get('run_name') or summary.run_dir.name} | "
+            f"selected_run_contract.json={contract_state}{path_suffix}"
+        )
+
+    def _refresh_after_run_selection(self, status_text: str = "") -> None:
         self.refresh_contract()
         self.refresh_history()
         self.refresh_finished_jobs()
         self.refresh_handoff()
         self.refresh_packaging()
         self.refresh_dashboard()
+        if status_text:
+            self.status_var.set(status_text)
+
+    def on_history_selection_changed(self) -> None:
+        self._selected_run_dir = self.history_tab.selected_run_dir()
+        status_text = self._materialize_selected_run_for_analysis("history_selection")
+        self._refresh_after_run_selection(status_text)
 
     def refresh_finished_jobs(self) -> None:
         self._sync_widget_state()
@@ -1607,12 +1641,8 @@ class DesktopOptimizerCenter:
 
     def on_finished_selection_changed(self) -> None:
         self._selected_run_dir = self.finished_tab.selected_run_dir()
-        self.refresh_contract()
-        self.refresh_history()
-        self.refresh_finished_jobs()
-        self.refresh_handoff()
-        self.refresh_packaging()
-        self.refresh_dashboard()
+        status_text = self._materialize_selected_run_for_analysis("finished_selection")
+        self._refresh_after_run_selection(status_text)
 
     def refresh_handoff(self) -> None:
         self._sync_widget_state()
@@ -1632,12 +1662,8 @@ class DesktopOptimizerCenter:
 
     def on_handoff_selection_changed(self) -> None:
         self._selected_run_dir = self.handoff_tab.selected_run_dir()
-        self.refresh_contract()
-        self.refresh_history()
-        self.refresh_finished_jobs()
-        self.refresh_handoff()
-        self.refresh_packaging()
-        self.refresh_dashboard()
+        status_text = self._materialize_selected_run_for_analysis("handoff_selection")
+        self._refresh_after_run_selection(status_text)
 
     def refresh_packaging(self) -> None:
         self._sync_widget_state()
@@ -1657,12 +1683,8 @@ class DesktopOptimizerCenter:
 
     def on_packaging_selection_changed(self) -> None:
         self._selected_run_dir = self.packaging_tab.selected_run_dir()
-        self.refresh_contract()
-        self.refresh_history()
-        self.refresh_finished_jobs()
-        self.refresh_handoff()
-        self.refresh_packaging()
-        self.refresh_dashboard()
+        status_text = self._materialize_selected_run_for_analysis("packaging_selection")
+        self._refresh_after_run_selection(status_text)
 
     def refresh_dashboard(self) -> None:
         self._sync_widget_state()
@@ -1835,7 +1857,7 @@ class DesktopOptimizerCenter:
         if not bool(pointer.get("exists")):
             messagebox.showinfo(
                 "Desktop Optimizer Center",
-                "latest_optimization pointer пока не создан.",
+                "Контекст анализа пока не закреплён.",
             )
             return
         try:
@@ -1843,7 +1865,7 @@ class DesktopOptimizerCenter:
         except Exception as exc:
             messagebox.showerror(
                 "Desktop Optimizer Center",
-                f"Не удалось открыть latest_optimization pointer:\n{exc}",
+                f"Не удалось открыть контекст анализа:\n{exc}",
             )
 
     def make_selected_run_latest_pointer(self) -> None:
@@ -1855,19 +1877,20 @@ class DesktopOptimizerCenter:
         if details is None:
             messagebox.showinfo(
                 "Desktop Optimizer Center",
-                "Сначала выберите run, который нужно сделать latest_optimization pointer.",
+                "Сначала выберите прогон, который нужно закрепить для анализа.",
             )
             return
         summary = getattr(details, "summary")
         pointer = self.runtime.save_run_pointer(
             summary,
-            selected_from="desktop_optimizer_center",
+            selected_from="desktop_optimizer_center_manual_retry",
         )
-        self.status_var.set(
-            "latest_optimization pointer перепривязан: "
+        status_text = (
+            "Контекст анализа перепривязан: "
             f"{pointer.get('run_name') or summary.run_dir.name}"
         )
         self.refresh_all()
+        self.status_var.set(status_text)
 
     def apply_selected_run_contract(self) -> None:
         details = (

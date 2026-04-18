@@ -21,13 +21,13 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
 
         ttk.Label(
             body,
-            text="Optimization runtime",
+            text="Выполнение оптимизации",
             font=("Segoe UI", 14, "bold"),
         ).grid(row=0, column=0, sticky="w")
         ttk.Label(
             body,
             text=(
-                "Здесь видны active mode, baseline/runtime contract, stage policy, distributed knobs, live log и запуск StageRunner / coordinator без WEB."
+                "Здесь видны active mode, baseline, контракт запуска, stage policy, distributed knobs, live log и запуск StageRunner / coordinator без WEB."
             ),
             wraplength=980,
             justify="left",

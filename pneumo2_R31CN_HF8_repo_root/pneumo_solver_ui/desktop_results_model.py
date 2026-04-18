@@ -98,7 +98,7 @@ class DesktopResultsSnapshot:
     selected_run_contract_path: Path | None = None
     selected_run_contract_hash: str = ""
     selected_run_contract_status: str = "MISSING"
-    selected_run_contract_banner: str = "Selected optimizer run contract is not available."
+    selected_run_contract_banner: str = "Контекст выбранного оптимизационного прогона пока недоступен."
 
 
 def format_validation_summary(snapshot: DesktopResultsSnapshot) -> str:
