@@ -94,8 +94,9 @@ Operational note:
 35. [docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md](./context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md)
 36. [docs/context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md](./context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md)
 37. [docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
-38. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
-39. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
+38. [docs/gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md](./gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md)
+39. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
+40. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
 
 ### 3. Активные требования и рабочий backlog
 
@@ -272,6 +273,7 @@ Operational note:
 - [docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md](./context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md)
 - [docs/context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md](./context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md)
 - [docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
+- [docs/gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md](./gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md)
 
 Что задаёт общий canon:
 
@@ -416,14 +418,16 @@ Operational note:
 - Quarantine 7823dc2 resolution фиксирует, что локальный quarantine patch
   разобран, перенесён в `codex/work` cherry-pick-ом и проверен focused
   desktop/docs/no-mojibake тестами без runtime-closure claims.
-- Recovery Plan-mode prompts становятся текущим starter pack для тех же 10
-  параллельных чатов: старт только от clean `origin/codex/work`, никаких веток
-  и правок до принятого плана, resolved quarantine не использовать как
-  рабочий источник, post-resolution baseline сохранять по lane, обязательно
-  проводить V38 visual acceptance и проверять соответствие
+- Recovery Plan-mode prompts остаются historical starter pack до приемки
+  результатов 10 параллельных GUI-чатов.
+- Post-acceptance V38 Plan-mode prompts становятся текущим starter pack для
+  тех же 10 параллельных чатов после `ed9c4cd`: старт только от clean
+  `origin/codex/work`, временные worktree и исторические ветки не являются
+  рабочим источником, принятые handoffs не переизобретать, обязательно
+  проводить V38 visual/runtime acceptance и проверять соответствие
   `PIPELINE_OPTIMIZED.dot` без лишних user-flow шагов: tree/search/selection
-  sync из shell является навигацией, а служебные статусы/implementation labels
-  не являются пользовательской информацией.
+  sync из главного окна является навигацией, а служебные статусы и
+  implementation labels не являются пользовательской информацией.
 
 Связанные, но вспомогательные UX-источники:
 

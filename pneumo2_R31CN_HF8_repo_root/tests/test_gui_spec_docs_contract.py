@@ -65,6 +65,7 @@ OPTIMIZER_LANE = DOCS / "gui_chat_prompts" / "08_OPTIMIZER_CENTER.md"
 RING_LANE = DOCS / "gui_chat_prompts" / "04_RING_EDITOR.md"
 RESULTS_LANE = DOCS / "gui_chat_prompts" / "10_TEST_VALIDATION_RESULTS.md"
 RELEASE_LANE = DOCS / "gui_chat_prompts" / "13_RELEASE_GATES_KB_ACCEPTANCE.md"
+POST_ACCEPTANCE_PROMPTS = DOCS / "gui_chat_prompts" / "17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md"
 LINEAGE_MD = CONTEXT / "GUI_SPEC_ARCHIVE_LINEAGE.md"
 LINEAGE_JSON = CONTEXT / "gui_spec_archive_lineage.json"
 PARITY_SUMMARY = CONTEXT / "DESKTOP_WEB_PARITY_SUMMARY.md"
@@ -495,6 +496,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "v33_connector_reconciled/README.md" in project_sources_text
     assert "v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md" in project_sources_text
     assert "gui_chat_prompts/13_RELEASE_GATES_KB_ACCEPTANCE.md" in project_sources_text
+    assert "gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md" in project_sources_text
     assert "context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md" in project_sources_text
     assert "context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md" in project_sources_text
     assert "context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md" in project_sources_text
@@ -506,6 +508,8 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md" in index_text
     assert "gui_spec_imports/v38_github_kb_commit_ready/README.md" in index_text
     assert "V38_KB_IMPORT_AUDIT_2026-04-18.md" in index_text
+    assert "17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md" in index_text
+    assert "current post-acceptance self-contained Plan-mode starter prompts" in index_text
     assert "gui_spec_imports/v37_github_kb_supplement/README.md" in index_text
     assert "TECHNICAL_SPECIFICATION.md" in index_text
     assert "GUI_SPEC.yaml" in index_text
@@ -1286,6 +1290,7 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         RING_LANE,
         RESULTS_LANE,
         RELEASE_LANE,
+        POST_ACCEPTANCE_PROMPTS,
         FOUNDATIONS / "README.md",
         FOUNDATIONS / "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md",
         IMPORTS_V12 / "README.md",

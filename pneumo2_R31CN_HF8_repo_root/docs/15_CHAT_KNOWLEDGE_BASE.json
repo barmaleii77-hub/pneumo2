@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-18T10:34:00+00:00",
+  "updated_at": "2026-04-18T10:50:50+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -627,6 +627,15 @@
       "title": "Завершить интеграционную уборку после 10 GUI-чатов",
       "details": "После приемки V38-направлений проверить тесты, diff-check, синхронизировать codex/work с origin, удалить временные локальные worktree и локальные chat-ветки, удалять remote-ветки только если их изменения уже доставлены в codex/work.",
       "artifact_path": "docs/14_CHAT_PLANS_LOG.md",
+      "status": "completed"
+    },
+    {
+      "id": "PLAN-0050",
+      "created_at": "2026-04-18T10:50:50+00:00",
+      "source": "chat:2026-04-18 актуальный набор промтов",
+      "title": "Актуализировать post-acceptance промты для 10 GUI-чатов",
+      "details": "Создать текущий набор самодостаточных Plan-mode стартовых промтов после приемки 10 V38 GUI handoffs в codex/work: старт от clean origin/codex/work, запрет исторических worktree/веток как рабочих источников, обязательные V38 visual/runtime checks, PIPELINE_OPTIMIZED.dot user-flow checks и запрет service-jargon leaks.",
+      "artifact_path": "gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md",
       "status": "completed"
     }
   ]

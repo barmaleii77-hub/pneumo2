@@ -105,6 +105,11 @@ def test_chat_knowledge_base_store_exists_and_is_seeded() -> None:
         and "V38" in item["title"]
         for item in data["plans"]
     )
+    assert any(
+        item["artifact_path"] == "gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md"
+        and "post-acceptance" in item["title"].lower()
+        for item in data["plans"]
+    )
 
 
 def test_chat_knowledge_base_adders_dedupe_same_entry() -> None:

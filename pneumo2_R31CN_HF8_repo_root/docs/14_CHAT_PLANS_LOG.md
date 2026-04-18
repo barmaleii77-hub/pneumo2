@@ -358,6 +358,13 @@ ID: `PLAN-0048`.
 Источник: chat:2026-04-18 accept 10 chats cleanup.
 ID: `PLAN-0049`.
 
+50. Актуализировать post-acceptance промты для 10 GUI-чатов
+Назначение: Создать текущий набор самодостаточных Plan-mode стартовых промтов после приемки 10 V38 GUI handoffs в codex/work: старт от clean origin/codex/work, запрет исторических worktree/веток как рабочих источников, обязательные V38 visual/runtime checks, PIPELINE_OPTIMIZED.dot user-flow checks и запрет service-jargon leaks.
+Артефакт: [gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md](./gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md)
+Статус: completed.
+Источник: chat:2026-04-18 актуальный набор промтов.
+ID: `PLAN-0050`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:
