@@ -22,13 +22,13 @@ class DesktopOptimizerContractTab(ttk.Frame):
 
         ttk.Label(
             body,
-            text="Baseline и runtime contract",
+            text="Baseline и контракт запуска",
             font=("Segoe UI", 14, "bold"),
         ).grid(row=0, column=0, sticky="w")
         ttk.Label(
             body,
             text=(
-                "Desktop center показывает честный scope текущего optimization contract: "
+                "Desktop center показывает честный scope текущего контракта запуска: "
                 "baseline source-of-truth, objective stack, hard gate, canonical model/base/ranges/suite и problem hash."
             ),
             wraplength=980,

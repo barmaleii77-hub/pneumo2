@@ -948,20 +948,23 @@ class DesktopOptimizerRuntime:
         )
         if pointer_matches:
             pointer_status = "ok"
-            pointer_summary = "This selected run is already published as latest_optimization."
+            pointer_summary = "selected_run_contract.json is ready for WS-ANALYSIS."
         elif has_results:
             pointer_status = "info"
-            pointer_summary = "Selected run can be promoted to latest_optimization for downstream review surfaces."
+            pointer_summary = "Selecting this run in the GUI refreshes selected_run_contract.json for WS-ANALYSIS."
         else:
             pointer_status = "info"
-            pointer_summary = "Pointer promotion is possible, but downstream result surfaces will remain limited without results artifacts."
+            pointer_summary = (
+                "Analysis handoff can be refreshed, but downstream review remains limited "
+                "without results artifacts."
+            )
         rows.append(
             {
-                "title": "Latest pointer",
+                "title": "Analysis handoff",
                 "status": pointer_status,
                 "summary": pointer_summary,
-                "action": "Make latest pointer",
-                "action_kind": "make_latest_pointer",
+                "action": "Review selected run",
+                "action_kind": "show_history_tab",
             }
         )
         if live_now:
@@ -1000,15 +1003,15 @@ class DesktopOptimizerRuntime:
             next_action = "Handoff"
             next_action_kind = "show_handoff_tab"
         elif not pointer_matches and has_results:
-            headline = "Selected run can be published as latest_optimization."
-            next_action = "Make latest pointer"
-            next_action_kind = "make_latest_pointer"
+            headline = "Selected run will be handed to analysis from selection."
+            next_action = "History"
+            next_action_kind = "show_history_tab"
         elif not has_results:
             headline = "Selected run is still missing results artifacts."
             next_action = "History"
             next_action_kind = "show_history_tab"
         elif pointer_matches:
-            headline = "Selected run is already published and aligned with downstream review."
+            headline = "Selected run is already aligned with downstream analysis."
             next_action = "Packaging"
             next_action_kind = "show_packaging_tab"
         return {

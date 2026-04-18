@@ -75,7 +75,7 @@ _BROWSE_CATEGORY_OPTIONS: tuple[tuple[str, str], ...] = (
     ("triage", "Разбор замечаний"),
     ("results", "Результаты"),
     ("anim_latest", "Визуализация"),
-    ("evidence", "Evidence"),
+    ("evidence", "Доказательства"),
     ("runs", "Прогоны"),
     ("bundle", "Пакет"),
 )
@@ -142,7 +142,7 @@ class DesktopResultsCenter(ttk.Frame):
         self.runs_var = tk.StringVar(master=self, value="Последние прогоны: автотест=— | диагностика=—")
         self.context_var = tk.StringVar(master=self, value="Контекст результата: не определён")
         self.context_banner_var = tk.StringVar(master=self, value="Контекст результата: выбранный результат пока не определён.")
-        self.evidence_manifest_var = tk.StringVar(master=self, value="Evidence manifest: пока не экспортирован.")
+        self.evidence_manifest_var = tk.StringVar(master=self, value="Доказательства диагностики: пока не экспортированы.")
         self.next_step_var = tk.StringVar(master=self, value="Следующий шаг: дождитесь первого снимка проверки и результатов.")
         self.next_detail_var = tk.StringVar(master=self, value="Пояснение: свежие артефакты проверки и результатов пока не появились.")
         self.handoff_summary_var = tk.StringVar(master=self, value="Передача последнего прогона: локальная точка передачи пока не сформирована.")
@@ -180,7 +180,7 @@ class DesktopResultsCenter(ttk.Frame):
         self.btn_open_selected.pack(side="left", padx=(8, 0))
         self.btn_diagnostics = ttk.Button(actions, text="Собрать диагностику", command=self._launch_full_diagnostics_gui)
         self.btn_diagnostics.pack(side="left", padx=(8, 0))
-        self.btn_export_evidence = ttk.Button(actions, text="Экспорт evidence", command=self._export_diagnostics_evidence)
+        self.btn_export_evidence = ttk.Button(actions, text="Экспорт доказательств", command=self._export_diagnostics_evidence)
         self.btn_export_evidence.pack(side="left", padx=(8, 0))
         self.btn_compare = ttk.Button(actions, text="Сравнение", command=self._launch_compare_viewer)
         self.btn_compare.pack(side="left", padx=(8, 0))
@@ -318,7 +318,7 @@ class DesktopResultsCenter(ttk.Frame):
         tools.pack(fill="x", pady=(10, 0))
         ttk.Button(tools, text="Открыть send_bundles", command=self._open_send_bundles).pack(fill="x")
         ttk.Button(tools, text="Собрать диагностику", command=self._launch_full_diagnostics_gui).pack(fill="x", pady=(6, 0))
-        ttk.Button(tools, text="Экспорт evidence manifest", command=self._export_diagnostics_evidence).pack(fill="x", pady=(6, 0))
+        ttk.Button(tools, text="Экспорт доказательств диагностики", command=self._export_diagnostics_evidence).pack(fill="x", pady=(6, 0))
         ttk.Button(tools, text="Открыть центр отправки", command=self._launch_send_results_gui).pack(fill="x", pady=(6, 0))
 
         overview = ttk.LabelFrame(left_pane, text="Обзор проверок", padding=8)
@@ -440,12 +440,12 @@ class DesktopResultsCenter(ttk.Frame):
             else "пока не экспортирован"
         )
         self.evidence_manifest_var.set(
-            f"Evidence manifest: {snapshot.diagnostics_evidence_manifest_status} | {manifest_label}"
+            f"Доказательства диагностики: {snapshot.diagnostics_evidence_manifest_status} | {manifest_label}"
         )
         if snapshot.selected_run_contract_path is not None:
             self.context_banner_var.set(
                 snapshot.result_context_banner
-                + "\nOptimizer selected-run contract: "
+                + "\nКонтекст оптимизации для анализа: "
                 + f"{snapshot.selected_run_contract_status} | "
                 + str(snapshot.selected_run_contract_path)
             )
@@ -850,13 +850,13 @@ class DesktopResultsCenter(ttk.Frame):
             format_result_context_summary(snapshot),
             snapshot.result_context_banner,
             (
-                "Optimizer selected-run contract: "
+                "Контекст оптимизации для анализа: "
                 f"{snapshot.selected_run_contract_status} | "
                 f"hash={snapshot.selected_run_contract_hash or '—'} | "
                 f"path={snapshot.selected_run_contract_path or '—'}"
             ),
             snapshot.selected_run_contract_banner,
-            f"Evidence manifest: {snapshot.diagnostics_evidence_manifest_path or '—'}",
+            f"Доказательства диагностики: {snapshot.diagnostics_evidence_manifest_path or '—'}",
             "Область просмотра: " + self._browse_scope_summary(),
             "",
             "Рекомендуемый следующий шаг:",
@@ -932,7 +932,7 @@ class DesktopResultsCenter(ttk.Frame):
             if compare_target is not None:
                 lines.append(f"NPZ для сравнения: {compare_target}")
             if animator_pointer is not None:
-                lines.append(f"Указатель аниматора: {animator_pointer}")
+                lines.append(f"Контекст аниматора: {animator_pointer}")
             elif animator_npz is not None:
                 lines.append(f"NPZ аниматора: {animator_npz}")
             preview_lines = self.runtime.artifact_preview_lines(artifact)
@@ -1042,7 +1042,7 @@ class DesktopResultsCenter(ttk.Frame):
                     "diagnostics_evidence_manifest",
                 )
                 self._select_artifact(artifact)
-                self.status_var.set(f"Evidence manifest exported: {manifest_path}")
+                self.status_var.set(f"Доказательства диагностики экспортированы: {manifest_path}")
                 return
             else:
                 return
@@ -1174,7 +1174,7 @@ class DesktopResultsCenter(ttk.Frame):
     def _export_diagnostics_evidence(self) -> None:
         self._run_action(
             "export_diagnostics_evidence",
-            success_message="Evidence manifest exported for diagnostics.",
+            success_message="Доказательства диагностики экспортированы.",
         )
 
     def _launch_compare_viewer(self) -> None:
@@ -1204,7 +1204,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_animator_follow",
             artifact=self._selected_artifact(),
-            success_message="Desktop Animator follow launched from latest pointer.",
+            success_message="Desktop Animator follow launched from analysis context.",
         )
 
     def _launch_full_diagnostics_gui(self) -> None:

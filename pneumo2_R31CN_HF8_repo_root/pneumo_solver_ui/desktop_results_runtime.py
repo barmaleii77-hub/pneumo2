@@ -198,7 +198,7 @@ _CONTEXT_FIELD_TITLES: dict[str, str] = {
     "selected_test_id": "Selected test ID",
     "selected_npz_path": "Selected animation NPZ",
     "compare_contract_hash": "Compare contract hash",
-    "evidence_manifest_hash": "Evidence manifest hash",
+    "evidence_manifest_hash": "Diagnostics evidence hash",
     "objective_contract_hash": "Objective contract hash",
     "hard_gate_key": "Hard gate key",
     "hard_gate_tolerance": "Hard gate tolerance",
@@ -323,6 +323,8 @@ def _optimizer_selected_contract_info(
         )
         contract_path = _existing_path(fallback)
     contract_payload = _safe_read_json_dict(contract_path)
+    if run_dir is None:
+        run_dir = _existing_path(contract_payload.get("run_dir"))
     selected_run_contract_hash = str(
         meta.get("selected_run_contract_hash")
         or contract_payload.get("selected_run_contract_hash")
@@ -345,18 +347,24 @@ def _optimizer_selected_contract_info(
         for item in (contract_payload.get("warnings") or ())
         if str(item).strip()
     )
-    if pointer_path is None:
+    if contract_path is None:
         status = "MISSING"
-        banner = "Latest optimizer pointer is not available."
-    elif contract_path is None:
-        status = "MISSING"
-        banner = "Latest optimizer pointer exists, but selected_run_contract.json is missing."
+        if pointer_path is None:
+            banner = "Контекст выбранного оптимизационного прогона пока недоступен."
+        else:
+            banner = "Контекст анализа есть, но selected_run_contract.json не найден."
     elif blocking_states or ready_state == "blocked":
         status = "BLOCKED"
         banner = "Selected optimizer run contract has blocking handoff states."
     elif warnings or ready_state == "warning":
         status = "WARN"
         banner = "Selected optimizer run contract is available with warnings."
+    elif pointer_path is None:
+        status = "WARN"
+        banner = (
+            "selected_run_contract.json найден как доказательство выбранного прогона; "
+            "закреплённый контекст анализа отсутствует."
+        )
     else:
         status = "READY"
         banner = "Selected optimizer run contract is available for results evidence."
@@ -857,7 +865,7 @@ class DesktopResultsRuntime:
         _append_artifact(
             items,
             key="diagnostics_evidence_manifest",
-            title="Evidence manifest для диагностики",
+            title="Доказательства диагностики",
             category="evidence",
             path=diagnostics_evidence_manifest_path,
             detail="HO-009 WS-ANALYSIS -> WS-DIAGNOSTICS",
@@ -881,10 +889,10 @@ class DesktopResultsRuntime:
         _append_artifact(
             items,
             key="latest_optimizer_pointer",
-            title="Latest optimizer pointer",
+            title="Закреплённый оптимизационный контекст",
             category="evidence",
             path=latest_optimizer_pointer_path,
-            detail="Durable latest_optimization pointer",
+            detail="Durable analysis context for the selected optimization run",
         )
 
         validation_status = _validation_status(
@@ -994,14 +1002,14 @@ class DesktopResultsRuntime:
                 title="Контекст выбранного результата",
                 status=str(context.get("state") or "MISSING"),
                 detail=str(context.get("banner") or ""),
-                next_action=str(context.get("action") or "Экспортировать evidence manifest"),
+                next_action=str(context.get("action") or "Экспортировать доказательства диагностики"),
                 evidence_path=diagnostics_evidence_manifest_path,
                 action_key="export_diagnostics_evidence",
                 artifact_key="diagnostics_evidence_manifest",
             ),
             DesktopResultsOverviewRow(
                 key="selected_optimizer_run_contract",
-                title="Контракт выбранного optimizer run",
+                title="Контекст оптимизации для анализа",
                 status=str(optimizer_contract_info.get("status") or "MISSING"),
                 detail=(
                     str(optimizer_contract_info.get("banner") or "")
@@ -1014,7 +1022,7 @@ class DesktopResultsRuntime:
                 next_action=(
                     "Открыть selected_run_contract"
                     if optimizer_contract_info.get("contract_path") is not None
-                    else "Создать latest pointer в Optimizer Center"
+                    else "Выбрать прогон в Optimizer Center"
                 ),
                 evidence_path=optimizer_contract_info.get("contract_path"),
                 action_key=(
@@ -1036,14 +1044,14 @@ class DesktopResultsRuntime:
             ),
             DesktopResultsOverviewRow(
                 key="animator_pointer",
-                title="Указатель аниматора",
+                title="Контекст аниматора",
                 status="READY" if latest_pointer_json_path is not None else "MISSING",
                 detail=str(
                     latest_pointer_json_path.name
                     if latest_pointer_json_path is not None
-                    else "anim_latest pointer is not available."
+                    else "Контекст анимации пока недоступен."
                 ),
-                next_action="Открыть аниматор" if latest_pointer_json_path is not None else "Сформировать указатель anim_latest",
+                next_action="Открыть аниматор" if latest_pointer_json_path is not None else "Сформировать контекст анимации",
                 evidence_path=latest_pointer_json_path,
                 action_key="open_animator_follow" if latest_pointer_json_path is not None else "open_diagnostics_gui",
                 artifact_key="latest_pointer",
@@ -1353,12 +1361,12 @@ class DesktopResultsRuntime:
             ("dashboard_html", "HTML-сводка текущего прогона"),
             ("anim_diag_json", "Диагностика анимации текущего прогона"),
             ("latest_npz", "NPZ текущего прогона"),
-            ("latest_pointer", "Указатель аниматора текущего прогона"),
+            ("latest_pointer", "Контекст аниматора текущего прогона"),
             ("capture_export_manifest", "HO-010 manifest текущего прогона"),
             ("mnemo_event_log", "Журнал мнемосхемы текущего прогона"),
             ("compare_current_context_sidecar", "Compare handoff текущего прогона"),
-            ("selected_optimizer_run_contract", "Optimizer selected-run contract текущего прогона"),
-            ("latest_optimizer_pointer", "Latest optimizer pointer текущего прогона"),
+            ("selected_optimizer_run_contract", "Контекст оптимизации для анализа текущего прогона"),
+            ("latest_optimizer_pointer", "Закреплённый оптимизационный контекст текущего прогона"),
         )
         for artifact_key, title in pinned_map:
             artifact = self.artifact_by_key(snapshot, artifact_key)
