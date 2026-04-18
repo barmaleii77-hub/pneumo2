@@ -99,6 +99,8 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
     ring_closure = dict(signals.get("ring_closure") or summarize_ring_closure(anim))
     optimizer_scope = dict(signals.get("optimizer_scope") or {})
     optimizer_scope_gate = dict(signals.get("optimizer_scope_gate") or {})
+    latest_integrity_proof = dict(signals.get("latest_integrity_proof") or {})
+    self_check_silent_warnings = dict(signals.get("self_check_silent_warnings") or {})
     operator_recommendations = [
         str(x)
         for x in (signals.get("operator_recommendations") or build_anim_operator_recommendations(anim))
@@ -124,6 +126,8 @@ def inspect_send_bundle(zip_path: Path) -> Dict[str, Any]:
         "ring_closure": ring_closure,
         "optimizer_scope": optimizer_scope,
         "optimizer_scope_gate": optimizer_scope_gate,
+        "latest_integrity_proof": latest_integrity_proof,
+        "self_check_silent_warnings": self_check_silent_warnings,
         "operator_recommendations": operator_recommendations,
         "geometry_acceptance": geometry_acceptance,
         "geometry_acceptance_gate": str(geometry_acceptance.get("release_gate") or "MISSING") if geometry_acceptance else "MISSING",
@@ -165,6 +169,8 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
     ring_closure = dict(summary.get("ring_closure") or {})
     optimizer_scope = dict(summary.get("optimizer_scope") or {})
     optimizer_scope_gate = dict(summary.get("optimizer_scope_gate") or {})
+    latest_integrity_proof = dict(summary.get("latest_integrity_proof") or {})
+    self_check_silent_warnings = dict(summary.get("self_check_silent_warnings") or {})
     engineering = dict(summary.get("engineering_analysis_evidence") or {})
     operator_recommendations = [str(x) for x in (summary.get("operator_recommendations") or []) if str(x).strip()]
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
@@ -192,6 +198,35 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
         f"- Geometry acceptance gate: {summary.get('geometry_acceptance_gate') or 'MISSING'}",
         f"- Geometry acceptance reason: {summary.get('geometry_acceptance_reason') or '—'}",
     ]
+    if latest_integrity_proof:
+        lines += [
+            "",
+            "## Latest integrity proof",
+            f"- status: `{latest_integrity_proof.get('status') or 'MISSING'}`",
+            f"- final_latest_zip_sha256: `{latest_integrity_proof.get('final_latest_zip_sha256') or '—'}`",
+            f"- final_original_zip_sha256: `{latest_integrity_proof.get('final_original_zip_sha256') or '—'}`",
+            f"- latest_sha_sidecar_matches: {latest_integrity_proof.get('latest_sha_sidecar_matches')}",
+            f"- latest_pointer_matches_original: {latest_integrity_proof.get('latest_pointer_matches_original')}",
+            f"- embedded_manifest_zip_sha256_scope: `{latest_integrity_proof.get('embedded_manifest_zip_sha256_scope') or '—'}`",
+            f"- embedded_manifest_stage: `{latest_integrity_proof.get('embedded_manifest_stage') or '—'}`",
+            f"- producer_warning_count: {latest_integrity_proof.get('producer_warning_count')}",
+            f"- warning_only_gaps_present: {latest_integrity_proof.get('warning_only_gaps_present')}",
+            f"- no_release_closure_claim: {latest_integrity_proof.get('no_release_closure_claim')}",
+        ]
+        for warning in [str(x) for x in (latest_integrity_proof.get("warnings") or []) if str(x).strip()][:5]:
+            lines.append(f"- warning: {warning}")
+    if self_check_silent_warnings:
+        lines += [
+            "",
+            "## Self-check silent warnings snapshot",
+            f"- status: `{self_check_silent_warnings.get('status') or 'MISSING'}`",
+            f"- snapshot_only: {self_check_silent_warnings.get('snapshot_only')}",
+            f"- does_not_close_producer_warnings: {self_check_silent_warnings.get('does_not_close_producer_warnings')}",
+            f"- source_path: `{self_check_silent_warnings.get('source_path') or '—'}`",
+            f"- rc: {self_check_silent_warnings.get('rc')}",
+            f"- fail_count: {self_check_silent_warnings.get('fail_count')}",
+            f"- warn_count: {self_check_silent_warnings.get('warn_count')}",
+        ]
     if optimizer_scope:
         lines += [
             "",

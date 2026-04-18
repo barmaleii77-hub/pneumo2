@@ -44,6 +44,7 @@ def test_diagnostics_source_files_keep_clean_russian_literals() -> None:
     triage_text = TRIAGE_REPORT_PATH.read_text(encoding="utf-8")
 
     assert "Этот ZIP сформирован автоматически" in bundle_text
+    assert "latest_integrity_proof" in bundle_text
     assert "Отсутствует необязательная зависимость" in bundle_text
     assert "Отсутствует необязательная зависимость" in triage_text
     for text in (bundle_text, triage_text):

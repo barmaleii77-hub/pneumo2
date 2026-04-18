@@ -69,8 +69,10 @@ from .send_bundle_evidence import (
     ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME,
     ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME,
     EVIDENCE_MANIFEST_ARCNAME,
+    EVIDENCE_MANIFEST_SIDECAR_NAME,
     GEOMETRY_REFERENCE_EVIDENCE_ARCNAME,
     GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME,
+    build_latest_integrity_proof,
     evidence_manifest_release_errors,
     evidence_manifest_warnings,
     load_evidence_manifest_from_zip,
@@ -98,6 +100,13 @@ def _sha256_bytes(b: bytes) -> str:
 def _safe_json_load_bytes(b: bytes) -> Any:
     try:
         return json.loads(b.decode("utf-8", errors="replace"))
+    except Exception:
+        return None
+
+
+def _safe_json_load_file(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8", errors="replace"))
     except Exception:
         return None
 
@@ -227,6 +236,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
         "stats": {},
         "anim_latest": {},
         "evidence_manifest": {},
+        "latest_integrity_proof": {},
         "engineering_analysis_evidence": {},
         "geometry_reference_evidence": {},
         "optimizer_scope": {},
@@ -743,6 +753,39 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
     except Exception as e:
         errors.append(f"Exception while validating zip: {e}")
 
+    if zp.name == "latest_send_bundle.zip":
+        latest_evidence_path = zp.parent / EVIDENCE_MANIFEST_SIDECAR_NAME
+        if latest_evidence_path.exists():
+            latest_evidence_obj = _safe_json_load_file(latest_evidence_path)
+            if isinstance(latest_evidence_obj, dict):
+                proof = build_latest_integrity_proof(
+                    zip_path=zp,
+                    latest_zip_path=zp,
+                    original_zip_path=latest_evidence_obj.get("zip_path") or zp,
+                    latest_sha_path=zp.parent / "latest_send_bundle.sha256",
+                    latest_pointer_path=zp.parent / "latest_send_bundle_path.txt",
+                    evidence_manifest=latest_evidence_obj,
+                    embedded_manifest=rep.get("evidence_manifest") if isinstance(rep.get("evidence_manifest"), dict) else {},
+                )
+                rep["latest_integrity_proof"] = proof
+                if proof.get("final_latest_zip_sha256_matches_actual") is False:
+                    msg = (
+                        "latest integrity error: latest_evidence_manifest.json final_latest_zip_sha256 "
+                        "does not match latest_send_bundle.zip bytes"
+                    )
+                    if msg not in errors:
+                        errors.append(msg)
+                if (proof.get("final_latest_sha256_sidecar") or "") and proof.get("latest_sha_sidecar_matches") is False:
+                    msg = "latest integrity error: latest_send_bundle.sha256 does not match latest_send_bundle.zip bytes"
+                    if msg not in errors:
+                        errors.append(msg)
+                for item in proof.get("warnings") or []:
+                    msg = str(item).strip()
+                    if msg and msg not in warnings and not msg.startswith("latest_send_bundle.sha256 mismatch"):
+                        warnings.append(msg)
+            else:
+                warnings.append(f"{EVIDENCE_MANIFEST_SIDECAR_NAME} is not valid JSON")
+
     rep["errors"] = errors
     rep["warnings"] = warnings
     rep["ok"] = len(errors) == 0
@@ -769,6 +812,7 @@ def _render_md(rep: Dict[str, Any]) -> str:
     optimizer_scope = rep.get("optimizer_scope") or {}
     optimizer_scope_gate = rep.get("optimizer_scope_gate") or {}
     ui_autosave = rep.get("ui_autosave") or {}
+    latest_proof = rep.get("latest_integrity_proof") or {}
 
     title = "✅ SEND BUNDLE VALIDATION: OK" if ok else "❌ SEND BUNDLE VALIDATION: FAIL"
 
@@ -790,6 +834,24 @@ def _render_md(rep: Dict[str, Any]) -> str:
         f"- missing_optional_count: `{evidence.get('missing_optional_count')}`",
         f"- analysis_handoff: `{analysis_handoff.get('status') or 'MISSING'}` / context=`{analysis_handoff.get('result_context_state') or 'MISSING'}` / run=`{analysis_handoff.get('run_id') or '-'}`",
         f"- analysis_handoff_mismatches: `{analysis_handoff.get('mismatch_count') or 0}`",
+        "",
+        "## Latest integrity proof",
+        "",
+        f"- present: `{bool(latest_proof)}`",
+        f"- status: `{latest_proof.get('status') or 'n/a'}`",
+        f"- final_latest_zip_sha256: `{latest_proof.get('final_latest_zip_sha256') or 'n/a'}`",
+        f"- final_original_zip_sha256: `{latest_proof.get('final_original_zip_sha256') or 'n/a'}`",
+        f"- latest_sha_sidecar_matches: `{latest_proof.get('latest_sha_sidecar_matches')}`",
+        f"- latest_pointer_matches_original: `{latest_proof.get('latest_pointer_matches_original')}`",
+        f"- embedded_manifest_zip_sha256_scope: `{latest_proof.get('embedded_manifest_zip_sha256_scope') or 'n/a'}`",
+        f"- embedded_manifest_stage: `{latest_proof.get('embedded_manifest_stage') or 'n/a'}`",
+        f"- producer_warning_count: `{latest_proof.get('producer_warning_count')}`",
+        f"- warning_only_gaps_present: `{latest_proof.get('warning_only_gaps_present')}`",
+        f"- no_release_closure_claim: `{latest_proof.get('no_release_closure_claim')}`",
+        "",
+        "### Latest integrity warnings",
+        "",
+        _md_list([str(x) for x in (latest_proof.get('warnings') or [])]),
         "",
         "### Missing evidence warnings",
         "",

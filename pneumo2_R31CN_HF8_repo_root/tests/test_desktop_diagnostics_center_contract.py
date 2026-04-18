@@ -27,6 +27,7 @@ from pneumo_solver_ui.desktop_diagnostics_runtime import (
 )
 from pneumo_solver_ui.tools.send_bundle_evidence import (
     ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME,
+    EVIDENCE_MANIFEST_SIDECAR_NAME,
     GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME,
 )
 
@@ -291,6 +292,41 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
         hashlib.sha256(zip_path.read_bytes()).hexdigest() + "  latest_send_bundle.zip\n",
         encoding="utf-8",
     )
+    (out_dir / EVIDENCE_MANIFEST_SIDECAR_NAME).write_text(
+        json.dumps(
+            {
+                "schema": "diagnostics_evidence_manifest",
+                "zip_path": str(zip_path.resolve()),
+                "zip_sha256": "build-stage-sha",
+                "zip_sha256_scope": "zip bytes at evidence manifest build time",
+                "stage": "pytest_build_stage",
+                "finalization_stage": "pytest_build_stage",
+                "trigger": "manual",
+                "collection_mode": "manual",
+                "missing_warnings": ["producer-owned geometry evidence is still missing"],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    reports_dir = tmp_path / "REPORTS"
+    reports_dir.mkdir()
+    (reports_dir / "SELF_CHECK_SILENT_WARNINGS.json").write_text(
+        json.dumps(
+            {
+                "generated_at_utc": "2026-04-18T00:00:00Z",
+                "rc": 0,
+                "summary": {"fail_count": 0, "warn_count": 0},
+                "fails": [],
+                "warnings": [],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (reports_dir / "SELF_CHECK_SILENT_WARNINGS.md").write_text("# self-check snapshot\n", encoding="utf-8")
 
     (out_dir / "last_bundle_meta.json").write_text(
         json.dumps(
@@ -356,6 +392,18 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert bundle.geometry_reference_producer_artifact_status == "ready"
     assert bundle.geometry_reference_producer_readiness_reasons == []
     assert bundle.geometry_reference_consumer_may_fabricate_geometry is False
+    assert bundle.latest_integrity_status == "READY"
+    assert bundle.latest_integrity_final_zip_sha256 == hashlib.sha256(zip_path.read_bytes()).hexdigest()
+    assert bundle.latest_integrity_sha_sidecar_matches is True
+    assert bundle.latest_integrity_pointer_matches_original is True
+    assert bundle.latest_integrity_embedded_manifest_zip_sha256_scope == "zip bytes at evidence manifest build time"
+    assert bundle.latest_integrity_producer_warning_count > 0
+    assert bundle.latest_integrity_warning_only_gaps_present is True
+    assert bundle.latest_integrity_no_release_closure_claim is True
+    assert bundle.self_check_silent_warnings_status == "READY"
+    assert bundle.self_check_silent_warnings_fail_count == 0
+    assert bundle.self_check_silent_warnings_warn_count == 0
+    assert bundle.self_check_silent_warnings_snapshot_only is True
 
     run = DesktopDiagnosticsRunRecord(
         ok=True,
@@ -401,6 +449,12 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert payload["machine_paths"]["latest_bundle_inspection_json"].endswith(LATEST_SEND_BUNDLE_INSPECTION_JSON)
     assert payload["machine_paths"]["latest_bundle_path_txt"].endswith("latest_send_bundle_path.txt")
     assert payload["machine_paths"]["latest_bundle_sha256"].endswith("latest_send_bundle.sha256")
+    assert payload["machine_paths"]["latest_integrity_evidence_sidecar_json"].endswith(
+        EVIDENCE_MANIFEST_SIDECAR_NAME
+    )
+    assert payload["machine_paths"]["self_check_silent_warnings_json"].endswith(
+        "SELF_CHECK_SILENT_WARNINGS.json"
+    )
     assert "latest_analysis_evidence_manifest_json" in payload["machine_paths"]
     assert payload["machine_paths"]["latest_engineering_analysis_evidence_manifest_json"].endswith(
         ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME
@@ -428,6 +482,14 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert payload["geometry_reference_evidence"]["producer_readiness_reasons"] == []
     assert payload["geometry_reference_evidence"]["consumer_may_fabricate_geometry"] is False
     assert "workspace/exports/anim_latest.npz" in payload["geometry_reference_evidence"]["producer_required_artifacts"]
+    assert payload["latest_integrity_proof"]["status"] == "READY"
+    assert payload["latest_integrity_proof"]["latest_sha_sidecar_matches"] is True
+    assert payload["latest_integrity_proof"]["latest_pointer_matches_original"] is True
+    assert payload["latest_integrity_proof"]["warning_only_gaps_present"] is True
+    assert payload["latest_integrity_proof"]["no_release_closure_claim"] is True
+    assert payload["self_check_silent_warnings"]["status"] == "READY"
+    assert payload["self_check_silent_warnings"]["snapshot_only"] is True
+    assert payload["self_check_silent_warnings"]["does_not_close_producer_warnings"] is True
     assert payload["bundle"]["latest_clipboard_status_path"].endswith("latest_send_bundle_clipboard_status.json")
     assert payload["ui"]["selected_tab"] == "bundle"
     assert payload["ui"]["active_bundle_out_dir"].endswith("send_bundles")
@@ -558,6 +620,11 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "Producer readiness reasons" in center_src
     assert "Consumer fabrication allowed" in center_src
     assert "geometry_reference_artifact_freshness_relation" in center_src
+    assert "Latest integrity proof" in center_src
+    assert "Producer-owned warnings remain warning-only" in center_src
+    assert "Self-check silent warnings snapshot" in center_src
+    assert "latest_integrity_proof" in runtime_src
+    assert "self_check_silent_warnings" in runtime_src
     assert "geometry_reference_producer_artifact_status" in runtime_src
     assert "geometry_reference_producer_readiness_reasons" in runtime_src
     assert "consumer_may_fabricate_geometry" in runtime_src

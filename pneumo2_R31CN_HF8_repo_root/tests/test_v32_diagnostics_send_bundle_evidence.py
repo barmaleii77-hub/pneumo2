@@ -271,9 +271,30 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
     assert latest_evidence_payload["latest_zip_matches_original"] is True
     assert latest_evidence_payload["latest_sha_sidecar_matches"] is True
     assert latest_evidence_payload["latest_pointer_matches_original"] is True
+    proof = dict(latest_evidence_payload.get("latest_integrity_proof") or {})
+    assert proof["status"] == "READY"
+    assert proof["final_latest_zip_sha256"] == latest_evidence_payload["final_latest_zip_sha256"]
+    assert proof["final_original_zip_sha256"] == latest_evidence_payload["final_original_zip_sha256"]
+    assert proof["final_latest_sha256_sidecar"] == latest_evidence_payload["final_latest_sha256_sidecar"]
+    assert proof["latest_zip_matches_original"] is True
+    assert proof["latest_sha_sidecar_matches"] is True
+    assert proof["latest_pointer_matches_original"] is True
+    assert proof["embedded_manifest_zip_sha256"] == evidence["zip_sha256"]
+    assert proof["embedded_manifest_zip_sha256_scope"] == "zip bytes at evidence manifest build time"
+    assert proof["embedded_manifest_stage"] == evidence["stage"]
+    assert proof["embedded_manifest_finalization_stage"] == evidence["finalization_stage"]
+    assert proof["trigger"] == "manual"
+    assert proof["collection_mode"] == "manual"
+    assert proof["producer_warning_count"] > 0
+    assert proof["warning_only_gaps_present"] is True
+    assert proof["no_release_closure_claim"] is True
+    assert latest_evidence_payload["embedded_manifest_zip_sha256"] == evidence["zip_sha256"]
+    assert latest_evidence_payload["embedded_manifest_zip_sha256_scope"] == proof["embedded_manifest_zip_sha256_scope"]
     assert latest_inspection_payload["schema"] == "send_bundle_inspection"
     assert latest_inspection_payload["zip_path"] == str(latest_zip.resolve())
     assert latest_inspection_payload["zip_sha256"] == hashlib.sha256(latest_zip.read_bytes()).hexdigest()
+    assert latest_inspection_payload["latest_integrity_proof"]["status"] == "READY"
+    assert latest_inspection_payload["latest_integrity_proof"]["no_release_closure_claim"] is True
     assert latest_inspection_payload["has_evidence_manifest"] is True
     assert latest_inspection_payload["has_triage_report"] is True
     assert latest_inspection_payload["has_validation_report"] is True
@@ -286,6 +307,11 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
     assert validation.ok is True, json.dumps(validation.report_json, ensure_ascii=False, indent=2)
     warnings = [str(x) for x in (validation.report_json.get("warnings") or [])]
     assert not any(EVIDENCE_MANIFEST_ARCNAME in msg and "Missing" in msg for msg in warnings)
+    latest_validation = validate_send_bundle(latest_zip)
+    assert latest_validation.ok is True, json.dumps(latest_validation.report_json, ensure_ascii=False, indent=2)
+    assert latest_validation.report_json["latest_integrity_proof"]["status"] == "READY"
+    assert latest_validation.report_json["latest_integrity_proof"]["embedded_manifest_stage_scoped"] is True
+    assert "Latest integrity proof" in latest_validation.report_md
 
     text_for_encoding = (
         json.dumps(meta, ensure_ascii=False)
@@ -352,6 +378,9 @@ def test_make_send_bundle_preserves_trigger_and_collection_mode_in_runtime_artif
     assert evidence["collection_mode"] == expected_mode
     assert latest_evidence["trigger"] == trigger
     assert latest_evidence["collection_mode"] == expected_mode
+    assert latest_evidence["latest_integrity_proof"]["trigger"] == trigger
+    assert latest_evidence["latest_integrity_proof"]["collection_mode"] == expected_mode
+    assert latest_evidence["latest_integrity_proof"]["latest_pointer_matches_original"] is True
     assert latest_evidence["latest_pointer_matches_original"] is True
     assert latest_evidence["latest_sha_sidecar_matches"] is True
     assert validate_send_bundle(zip_path).ok is True
