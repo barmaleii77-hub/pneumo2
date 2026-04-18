@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-18T09:07:08+00:00",
+  "updated_at": "2026-04-18T10:34:00+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -177,6 +177,14 @@
       "title": "V38 commit-ready KB layer is the current GUI/TZ/spec imported reference.",
       "details": "V38 from pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip is imported as docs/context/gui_spec_imports/v38_github_kb_commit_ready and must be read after 17/18/foundations. V37 remains predecessor provenance. V38 does not close producer truth, cylinder packaging, measured browser performance, viewport gating or Windows visual/runtime acceptance without named evidence.",
       "status": "активно"
+    },
+    {
+      "id": "REQ-0023",
+      "created_at": "2026-04-18T10:34:00+00:00",
+      "source": "chat:2026-04-18 accept 10 chats cleanup",
+      "title": "Приёмка и уборка результатов 10 параллельных GUI-чатов",
+      "details": "Работа 10 V38-направлений должна приниматься в codex/work через интеграционный коммит/merge-коммиты, с проверкой отсутствия служебных UI-формулировок, сохранением полезных изменений из dirty worktree и последующей уборкой временных worktree/веток.",
+      "status": "active"
     }
   ],
   "plans": [
@@ -611,6 +619,15 @@
       "details": "The current 10-chat Plan-mode prompt pack must use V38 GUI_SPEC, workspace/acceptance matrices and PIPELINE_OPTIMIZED.dot, plus V38_KB_IMPORT_AUDIT_2026-04-18.md for ambiguity resolution. It must preserve post-quarantine 7823dc2 baseline, no-WEB expansion, no service-jargon leaks and direct tree/search/selection navigation.",
       "artifact_path": "gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md",
       "status": "актуален"
+    },
+    {
+      "id": "PLAN-0049",
+      "created_at": "2026-04-18T10:34:00+00:00",
+      "source": "chat:2026-04-18 accept 10 chats cleanup",
+      "title": "Завершить интеграционную уборку после 10 GUI-чатов",
+      "details": "После приемки V38-направлений проверить тесты, diff-check, синхронизировать codex/work с origin, удалить временные локальные worktree и локальные chat-ветки, удалять remote-ветки только если их изменения уже доставлены в codex/work.",
+      "artifact_path": "docs/14_CHAT_PLANS_LOG.md",
+      "status": "completed"
     }
   ]
 }
